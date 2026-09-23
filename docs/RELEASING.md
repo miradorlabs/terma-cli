@@ -3,7 +3,7 @@
 Tagging is the whole process — `.github/workflows/release.yml` runs GoReleaser, which
 builds every platform, publishes the GitHub Release (archives, `checksums.txt`,
 `install.sh`) with signed provenance, and pushes the Homebrew cask; the npm shim is
-published when `NPM_TOKEN` is set. A `smoke` job then installs the release the way the
+published through npm trusted publishing. A `smoke` job then installs the release the way the
 README says to — `install.sh` on Linux and macOS, `brew install miradorlabs/tap/terma`
 on macOS — and fails the workflow if `terma version` does not print the tag.
 
@@ -27,10 +27,16 @@ test — fails.
 
 Before announcing public availability, verify the unauthenticated download path at
 `https://terma.ai/install.sh` follows through to a successful release asset, and
-`npm view @miradorlabs/terma version` returns the intended public version. Configure
-`NPM_TOKEN` before tagging if npm is an advertised installation path: the workflow
-currently skips npm publication when that secret is absent. A green release workflow
-alone does not establish that the npm package is available.
+`npm view @miradorlabs/terma version` returns the intended public version.
+
+The npm shim has no token. `@miradorlabs/terma` names a Trusted Publisher on npmjs.com
+(organization `miradorlabs`, repository `terma-cli`, workflow `release.yml`, environment
+`npm`, allowed action "npm publish"), and its publishing access requires two-factor
+authentication and disallows tokens. The job exchanges its GitHub OIDC token for a
+one-time credential, and npm attaches provenance automatically. The `npm` environment in
+this repository deploys from `v*` tags only. Renaming the workflow file or the
+environment, or moving the repository, breaks publishing until the Trusted Publisher
+entry is updated to match, and the job then fails rather than skipping.
 
 The npm installer's extraction and path-handling tests run on Linux, macOS and
 Windows in CI (`npm test --prefix npm`). They exercise real archives using paths with
