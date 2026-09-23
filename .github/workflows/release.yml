@@ -52,29 +52,32 @@ jobs:
             install.sh
 
   # The npm shim (`npx @miradorlabs/terma`) downloads this exact release at
-  # install time, so it is published after the archives exist. Skipped cleanly
-  # when NPM_TOKEN is not configured.
+  # install time, so it is published after the archives exist.
+  #
+  # Trusted publishing: npm exchanges this job's OIDC token for a one-time
+  # publish credential, so no NPM_TOKEN exists anywhere. The package trusts
+  # exactly this repository, this workflow file and the `npm` environment (which
+  # deploys from v* tags only); renaming any of the three breaks publishing until
+  # the package's Trusted Publisher settings on npmjs.com are changed to match.
   npm:
     needs: goreleaser
     runs-on: ubuntu-latest
+    environment: npm
     permissions:
       contents: read
-      id-token: write # npm provenance
+      id-token: write # trusted publishing and npm provenance
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
+      # Trusted publishing needs npm 11.5.1 or later; Node 22 ships npm 10.
+      - name: Update npm
+        run: npm install -g npm@^11.5.1
       - name: Publish shim
         working-directory: npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo "NPM_TOKEN not set; skipping the npm shim publish."
-            exit 0
-          fi
           version="${GITHUB_REF_NAME#v}"
           npm version "$version" --no-git-tag-version
           npm publish --access public --provenance
