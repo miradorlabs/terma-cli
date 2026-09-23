@@ -18,6 +18,16 @@ function fixture(t) {
   return { root, tmpRoot, vendor };
 }
 
+// The package is published from a clean CI checkout, so a file that exists only on a
+// developer's disk ships missing. `npm/bin/terma.js` did exactly that under a root
+// `bin/` ignore rule: 0.0.1 installed with no `terma` command at all.
+test('every file the package declares is in the checkout', () => {
+  const pkg = require('./package.json');
+  const declared = [...new Set([...Object.values(pkg.bin), ...pkg.files])];
+  const missing = declared.filter((file) => !fs.existsSync(path.join(__dirname, file)));
+  assert.deepEqual(missing, []);
+});
+
 test('extracts a real archive through paths with apostrophes and shell characters', (t) => {
   const options = fixture(t);
   const windows = process.platform === 'win32';
