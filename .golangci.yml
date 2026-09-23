@@ -1,0 +1,66 @@
+version: "2"
+
+run:
+  timeout: 10m
+  tests: true
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+linters:
+  default: none
+  enable:
+    - errorlint
+    - errcheck
+    - govet
+    - ineffassign
+    - revive
+    - staticcheck
+    - unused
+
+  settings:
+    # revive is on for four rules only: what the public surface of a package owes its
+    # reader, and two ways a name misleads. Its defaults are a style guide this
+    # repository has not adopted.
+    revive:
+      rules:
+        # Every exported identifier says what it is for. The stuttering check is off:
+        # harness.Harness and doctor.Doctor-style names are deliberate here.
+        - name: exported
+          arguments: [disableStutteringCheck]
+        - name: package-comments
+        # `max`, `copy`, `real` as variable names compile, and shadow the builtin for
+        # the rest of the scope.
+        - name: redefines-builtin-id
+        - name: var-naming
+
+    errorlint:
+      errorf: true
+      errorf-multi: true
+      asserts: false
+      comparison: false
+
+    errcheck:
+      exclude-functions:
+        # Writes to a terminal/stderr: a CLI cannot do anything useful with a
+        # failed write to its own output, and the convention is to ignore them.
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+        # A handler whose response write fails has nobody left to tell: the client went
+        # away. Every call this silences today is in a test server — the one handler
+        # that ships, the sign-in callback, writes through fmt.Fprintf — but
+        # exclude-functions cannot be scoped to test files, so a shipped handler that
+        # calls w.Write directly would go unchecked too. The reasoning holds there as well.
+        - (net/http.ResponseWriter).Write
+        # Teardown errors cannot alter an already-completed read or shutdown.
+        - (io.ReadCloser).Close
+        - (io.Closer).Close
+        - (*os.File).Close
+
+  exclusions:
+    paths:
+      - ".*\\.pb\\.go$"
+      - ".*\\.gen\\.go$"
+      - "vendor/"

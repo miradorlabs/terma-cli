@@ -1,0 +1,16 @@
+[
+  "claude.version",
+  "evidence_source",
+  "fast_mode",
+  "five_hour_resets_at",
+  "five_hour_used_pct",
+  "model",
+  "project_id",
+  "prompt_id",
+  "schema_version",
+  "session_cost_usd",
+  "seven_day_resets_at",
+  "seven_day_used_pct",
+  "terma.version",
+  "tool"
+]

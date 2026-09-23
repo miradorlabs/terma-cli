@@ -1,0 +1,10 @@
+{
+  "provider": "claude",
+  "organization_id": "synthetic-org",
+  "start": "2026-09-01",
+  "end": "2026-09-04",
+  "product": "Claude Code",
+  "measure": "net_usd",
+  "coverage": "partial",
+  "source": "Synthetic fixture only; dates and organization are explicitly bound"
+}

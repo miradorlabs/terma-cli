@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terma · harness support</title>
+<style>
+  :root { color-scheme: light dark; --bg: #fbfbfd; --card: #fff; --fg: #1a1a22;
+    --muted: #626270; --line: #e4e4ec; --brand: #7654d8; --yes: #18733c; --no: #b42318; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #101014; --card: #18181e; --fg: #ececf2; --muted: #aaaab8;
+      --line: #30303b; --brand: #b49aff; --yes: #6cdb96; --no: #ff9187; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 36px 20px; background: var(--bg); color: var(--fg);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  main { max-width: 860px; margin: auto; }
+  h1 { margin: 0 0 6px; font-size: 27px; letter-spacing: -.02em; }
+  .mark { color: var(--brand); margin-right: 10px; }
+  .lead, .foot { color: var(--muted); }
+  .lead { margin: 0 0 20px; }
+  .scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+  .matrix { border-collapse: collapse; width: 100%; min-width: 580px; }
+  .matrix th, .matrix td { border-bottom: 1px solid var(--line); padding: 9px 14px; }
+  .matrix thead th { color: var(--muted); font-size: 13px; }
+  .matrix th { text-align: left; font-weight: 600; }
+  .matrix thead th:not(:first-child), .matrix td { text-align: center; }
+  .matrix tbody tr:last-child > * { border-bottom: 0; }
+  .yes, .no { display: inline-block; width: 1em; font-size: 23px; font-weight: 700; line-height: 1; }
+  .yes { color: var(--yes); } .no { color: var(--no); }
+  sup { font-size: 10px; margin-left: 2px; }
+  a { color: var(--brand); text-underline-offset: 3px; }
+  a:focus-visible, .scroll:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+  .notes { margin-top: 22px; width: 100%; border-collapse: collapse; color: var(--muted); font-size: 13px; }
+  .notes caption { text-align: left; color: var(--fg); font-weight: 600; margin-bottom: 8px; }
+  .notes th, .notes td { padding: 5px 0; vertical-align: top; text-align: left; }
+  .notes th { width: 32px; font-weight: 600; }
+  .foot { margin-top: 22px; font-size: 12px; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  @media (max-width: 600px) { body { padding: 24px 14px; } h1 { font-size: 24px; } }
+</style>
+</head>
+<body>
+<main>
+  <h1><span class="mark" aria-hidden="true">t</span>Harness support</h1>
+  <p class="lead"><span class="yes" aria-hidden="true">✓</span> Implemented on this branch &nbsp; <span class="no" aria-hidden="true">×</span> Not supported yet</p>
+  <div class="scroll" tabindex="0" role="region" aria-label="Harness support matrix">
+    <table class="matrix">
+      <caption class="sr-only">Current Terma collection support by harness</caption>
+      <thead><tr><th scope="col">Instrumentation</th><th scope="col">Claude Code</th><th scope="col">Codex</th><th scope="col">OpenCode</th><th scope="col">Cursor</th><th scope="col">Antigravity</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Session lifecycle</th><td><span class="yes" role="img" aria-label="Supported">✓</span></td><td><span class="yes" role="img" aria-label="Supported">✓</span></td><td><span class="yes" role="img" aria-label="Supported">✓</span></td><td><span class="yes" role="img" aria-label="Supported">✓</span></td><td><span class="yes" role="img" aria-label="Supported">✓</span></td></tr>
+        <tr><th scope="row">Subagents</th><td><span class="yes" role="img" aria-label="Supported">✓</span><sup><a href="#note-10" aria-label="See note 10">*10</a></sup></td><td><span class="yes" role="img" aria-label="Supported with caveat">✓</span><sup><a href="#note-10" aria-label="See note 10">*10</a></sup></td><td><span class="yes" role="img" aria-label="Supported with caveat">✓</span><sup><a href="#note-10" aria-label="See note 10">*10</a></sup></td><td><span class="yes" role="img" aria-label="Supported with caveat">✓</span><sup><a href="#note-10" aria-label="See note 10">*10</a></sup></td><td><span class="no" role="img" aria-label="Not supported">×</span></td></tr>
+        <tr><th scope="row">File &amp; commit attribution</th><td><span class="yes" role="img" aria-label="Supported">✓</span></td><td><span class="yes" role="img" aria-label="Supported">✓</span><sup><a href="#note-1" aria-label="See note 1">*1</a></sup></td><td><span class="yes" role="img" aria-label="Supported">✓</span></td><td><span class="yes" role="img" aria-label="Supported">✓</span><sup><a href="#note-8" aria-label="See note 8">*8</a></sup></td><td><span class="yes" role="img" aria-label="Supported with caveat">✓</span><sup><a href="#note-11" aria-label="See note 11">*11</a></sup></td></tr>
+        <tr><th scope="row">Tool calls</th><td><span class="yes" role="img" aria-label="Supported">✓</span></td><td><span class="yes" role="img" aria-label="Supported">✓</span></td><td><span class="yes" role="img" aria-label="Supported">✓</span></td><td><span class="yes" role="img" aria-label="Supported with caveat">✓</span><sup><a href="#note-12" aria-label="See note 12">*12</a></sup></td><td><span class="yes" role="img" aria-label="Supported with caveat">✓</span><sup><a href="#note-12" aria-label="See note 12">*12</a></sup></td></tr>
+        <tr><th scope="row">Token usage</th><td><span class="yes" role="img" aria-label="Supported">✓</span></td><td><span class="yes" role="img" aria-label="Supported">✓</span></td><td><span class="yes" role="img" aria-label="Supported">✓</span></td><td><span class="yes" role="img" aria-label="Supported with caveat">✓</span><sup><a href="#note-8" aria-label="See note 8">*8</a></sup></td><td><span class="no" role="img" aria-label="Not supported">×</span><sup><a href="#note-11" aria-label="See note 11">*11</a></sup></td></tr>
+        <tr><th scope="row">Reference cost</th><td><span class="yes" role="img" aria-label="Supported">✓</span></td><td><span class="yes" role="img" aria-label="Supported">✓</span><sup><a href="#note-2" aria-label="See note 2">*2</a></sup></td><td><span class="yes" role="img" aria-label="Supported">✓</span><sup><a href="#note-2" aria-label="See note 2">*2</a></sup></td><td><span class="yes" role="img" aria-label="Supported with caveat">✓</span><sup><a href="#note-9" aria-label="See note 9">*9</a></sup></td><td><span class="no" role="img" aria-label="Not supported">×</span></td></tr>
+        <tr><th scope="row">Authentication hints</th><td><span class="yes" role="img" aria-label="Supported">✓</span><sup><a href="#note-3" aria-label="See note 3">*3</a></sup></td><td><span class="yes" role="img" aria-label="Supported">✓</span><sup><a href="#note-3" aria-label="See note 3">*3</a></sup></td><td><span class="no" role="img" aria-label="Not supported">×</span></td><td><span class="no" role="img" aria-label="Not supported">×</span></td><td><span class="no" role="img" aria-label="Not supported">×</span></td></tr>
+        <tr><th scope="row">Plan / seat</th><td><span class="yes" role="img" aria-label="Supported">✓</span><sup><a href="#note-4" aria-label="See note 4">*4</a></sup></td><td><span class="yes" role="img" aria-label="Supported">✓</span><sup><a href="#note-4" aria-label="See note 4">*4</a></sup></td><td><span class="no" role="img" aria-label="Not supported">×</span></td><td><span class="no" role="img" aria-label="Not supported">×</span></td><td><span class="no" role="img" aria-label="Not supported">×</span></td></tr>
+        <tr><th scope="row">Quota windows</th><td><span class="yes" role="img" aria-label="Supported">✓</span><sup><a href="#note-5" aria-label="See note 5">*5</a></sup></td><td><span class="yes" role="img" aria-label="Supported">✓</span><sup><a href="#note-4" aria-label="See note 4">*4</a></sup></td><td><span class="no" role="img" aria-label="Not supported">×</span></td><td><span class="no" role="img" aria-label="Not supported">×</span></td><td><span class="no" role="img" aria-label="Not supported">×</span></td></tr>
+        <tr><th scope="row">Credit policy</th><td><span class="yes" role="img" aria-label="Supported">✓</span><sup><a href="#note-4" aria-label="See note 4">*4</a></sup></td><td><span class="yes" role="img" aria-label="Supported">✓</span><sup><a href="#note-4" aria-label="See note 4">*4</a></sup></td><td><span class="no" role="img" aria-label="Not supported">×</span></td><td><span class="no" role="img" aria-label="Not supported">×</span></td><td><span class="no" role="img" aria-label="Not supported">×</span></td></tr>
+        <tr><th scope="row">Credit balance</th><td><span class="no" role="img" aria-label="Not supported">×</span><sup><a href="#note-6" aria-label="See note 6">*6</a></sup></td><td><span class="yes" role="img" aria-label="Supported">✓</span><sup><a href="#note-4" aria-label="See note 4">*4</a></sup></td><td><span class="no" role="img" aria-label="Not supported">×</span></td><td><span class="no" role="img" aria-label="Not supported">×</span></td><td><span class="no" role="img" aria-label="Not supported">×</span></td></tr>
+        <tr><th scope="row">Fast-mode signal</th><td><span class="yes" role="img" aria-label="Supported">✓</span></td><td><span class="no" role="img" aria-label="Not supported">×</span></td><td><span class="no" role="img" aria-label="Not supported">×</span></td><td><span class="no" role="img" aria-label="Not supported">×</span></td><td><span class="no" role="img" aria-label="Not supported">×</span></td></tr>
+        <tr><th scope="row">Limit / overage signals</th><td><span class="yes" role="img" aria-label="Supported">✓</span><sup><a href="#note-4" aria-label="See note 4">*4</a></sup></td><td><span class="yes" role="img" aria-label="Supported">✓</span><sup><a href="#note-4" aria-label="See note 4">*4</a></sup></td><td><span class="no" role="img" aria-label="Not supported">×</span></td><td><span class="no" role="img" aria-label="Not supported">×</span></td><td><span class="no" role="img" aria-label="Not supported">×</span></td></tr>
+        <tr><th scope="row">Provider account identity</th><td><span class="yes" role="img" aria-label="Supported">✓</span><sup><a href="#note-3" aria-label="See note 3">*3</a></sup></td><td><span class="yes" role="img" aria-label="Supported">✓</span></td><td><span class="no" role="img" aria-label="Not supported">×</span><sup><a href="#note-6" aria-label="See note 6">*6</a></sup></td><td><span class="yes" role="img" aria-label="Supported with caveat">✓</span><sup><a href="#note-8" aria-label="See note 8">*8</a></sup></td><td><span class="no" role="img" aria-label="Not supported">×</span></td></tr>
+        <tr><th scope="row">Billing imports</th><td><span class="no" role="img" aria-label="Not supported">×</span><sup><a href="#note-7" aria-label="See note 7">*7</a></sup></td><td><span class="no" role="img" aria-label="Not supported">×</span><sup><a href="#note-7" aria-label="See note 7">*7</a></sup></td><td><span class="no" role="img" aria-label="Not supported">×</span><sup><a href="#note-7" aria-label="See note 7">*7</a></sup></td><td><span class="yes" role="img" aria-label="Supported with caveat">✓</span><sup><a href="#note-9" aria-label="See note 9">*9</a></sup></td><td><span class="no" role="img" aria-label="Not supported">×</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <table class="notes">
+    <caption>Notes</caption>
+    <tbody>
+      <tr id="note-1"><th scope="row">*1</th><td>Codex file attribution is verified on 0.153.3–0.154.0 with trusted hooks and the companion code-mode host installed.</td></tr>
+      <tr id="note-2"><th scope="row">*2</th><td>Reference cost is a list-price estimate. Codex cost is calculated by the backend; OpenCode supplies a pricing estimate.</td></tr>
+      <tr id="note-3"><th scope="row">*3</th><td>Codex exposes an authentication class. Claude captures stored login metadata and visible credential hints. Neither proves which bucket paid.</td></tr>
+      <tr id="note-4"><th scope="row">*4</th><td>Claude reads stored account state and typed failures; Codex incrementally preserves rollout quota observations at Stop, PostToolUse and SessionEnd, with source order and turn IDs when available. Fields depend on the provider and plan; absent evidence stays unknown. Credit balances retain provider units.</td></tr>
+      <tr id="note-5"><th scope="row">*5</th><td>Claude quota capture requires the interactive status line and quota data. Received changes retain prompt IDs and observation sequence; identical redraws are suppressed. Percentages may exceed 100. Backend funding mapping is pending.</td></tr>
+      <tr id="note-6"><th scope="row">*6</th><td>Claude’s captured status-line data has no credit balance. OpenCode’s configured user label is not a provider account identity.</td></tr>
+      <tr id="note-8"><th scope="row">*8</th><td>Cursor interactive CLI 2026.09.10-fd3934a: two turns, generation IDs, token snapshots and file/commit attribution live verified. Response and Stop snapshots must not be summed. Headless --print omits turn hooks in the tested versions; conversation billing works. IDE validation pending. <a href="CURSOR-INSTRUMENTATION.md">Collection contract</a>.</td></tr>
+      <tr id="note-9"><th scope="row">*9</th><td>Standalone Cursor team API importer and conversation cost join are live verified; platform scheduling, storage and UI integration are pending. Included model value is not extra cash spend. Tier/seat and quota meanings still need dashboard comparison. <a href="../pocs/cursor-billing/README.md">Importer contract</a>.</td></tr>
+      <tr id="note-10"><th scope="row">*10</th><td>Subagents are hook evidence filed under the session a person can find, with the agent named. Claude Code and Codex report an in-session agent (<code>agent_id</code>, <code>agent_type</code>) on start, stop and everything its hooks produce; a Codex subagent is a spawned thread, and its start carries the rollout's spawn record (<code>agent_parent_id</code>, depth, nickname, path). Claude Code's <code>Agent</code> tool call adds <code>terma.subagent.call</code>: the subagent's model and, when the parent waited for it, how the run went (duration, tool use and stats, the context's final size) &mdash; an observation keyed on <code>agent_id</code>. It is not what the run spent: the response's <code>usage</code> is the subagent's last request only, so no token count is sent, and spend stays the native export's. OpenCode reports a child session with <code>parent_session_id</code>; Cursor's <code>subagentStop</code> is filed under the parent conversation and the subagent's own edits are folded into it. Live verified on Claude Code 2.1.278 (21 Sep 2026); Codex and Cursor are source-read, OpenCode SDK verified. Cursor's <code>subagentStart</code> is a permission gate and is never wired. The task's description, prompt and reply are never read. <a href="SUBAGENT-INSTRUMENTATION.md">Collection contract</a>.</td></tr>
+      <tr id="note-11"><th scope="row">*11</th><td>Antigravity CLI 1.2.4 (agy), print mode with the repository bound as a workspace: session start, write/replace attribution, commit trailer and PostInvocation/Stop observations live verified 2026-09-16. Hooks load only in a trusted workspace, and an agy started in an unregistered directory works in its default CLI project and loads no repository hooks. Payloads and transcripts carry no token counts; agy has no OTLP export; no subagent hook exists. Interactive agy and the IDE unverified. <a href="ANTIGRAVITY-INSTRUMENTATION.md">Collection contract</a>.</td></tr>
+      <tr id="note-12"><th scope="row">*12</th><td>Cursor tool calls come from the generic <code>postToolUse</code> / <code>postToolUseFailure</code> hooks: tool name, <code>tool_use_id</code>, duration and outcome, never arguments or output. Documented contract (hook reference, 2026-09-17), not yet live verified; the platform's terma-cli adapter does not map <code>terma.tool.call</code> yet. Cursor's permission gates and the shell/MCP <code>after*</code> hooks are never wired. Antigravity's unmatched <code>PostToolUse</code> hook reports every tool step the same way: tool name, outcome and agy's step index as the call id (<code>step-&lt;stepIdx&gt;</code>), placed in a turn terma names by where it began; no duration (agy reports none), never arguments. Live verified on agy 1.2.7, 2026-09-18. <a href="ANTIGRAVITY-INSTRUMENTATION.md#tool-calls-and-turns">Collection contract</a>. Claude Code, Codex and OpenCode report tool calls in their native export. <a href="CURSOR-INSTRUMENTATION.md#tool-calls">Collection contract</a>.</td></tr>
+      <tr id="note-7"><th scope="row">*7</th><td>Claude/OpenAI export replay is a local pilot; production imports and reconciliation remain pending. Other crosses mean missing, unavailable or unverified collection today.</td></tr>
+    </tbody>
+  </table>
+  <p class="foot">Last live checks: 15–16 Sep 2026 · Claude Code 2.1.270–2.1.272 · Codex 0.153.3–0.154.0 · Cursor interactive hooks + conversation billing · Antigravity CLI 1.2.4 print mode.</p>
+</main>
+</body>
+</html>

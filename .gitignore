@@ -1,0 +1,30 @@
+bin/
+dist/
+*.test
+coverage.out
+.DS_Store
+
+# npm shim: the downloaded binary and installed modules
+npm/node_modules/
+npm/vendor/
+
+# Per-developer Claude Code overrides (permissions etc.)
+.claude/settings.local.json
+
+# This repository's own Terma binding. `terma install` writes .terma/settings.json to
+# be committed (it holds no secrets — see README), and that stays true for the repos
+# that install Terma. This one is different: terma-cli goes public, and its binding
+# names Mirador's own project and organization ids, which are nobody else's business.
+# The file stays on disk, so the hooks installed here keep working. Both the current
+# and the legacy locations are ignored.
+.terma/settings.json
+.terma.toml
+
+# live tests: local credentials, built binaries, the last report
+live/.env.local
+live/bin/
+live/report/
+live/versions/
+
+# Local provisioning credential
+/openai-key.txt

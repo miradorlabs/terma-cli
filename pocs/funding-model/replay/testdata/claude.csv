@@ -1,0 +1,4 @@
+user_email,account_uuid,product,model,total_requests,total_prompt_tokens,total_completion_tokens,total_net_spend_usd,total_gross_spend_usd,user_id,total_uncached_input_tokens,total_cache_read_tokens,total_cache_write_5m_tokens,total_cache_write_1h_tokens,total_web_search_count,slack_channel_id,teams_channel_id
+synthetic@example.invalid,account-a,Claude Code,synthetic-model,2,20,10,0.85,1.00,user-a,20,0,0,0,0,,
+synthetic-other@example.invalid,account-b,Claude Code,synthetic-model,1,10,5,2.00,2.00,user-b,10,0,0,0,0,,
+synthetic@example.invalid,account-a,Chat,synthetic-model,1,10,5,5.00,5.00,user-a,10,0,0,0,0,,

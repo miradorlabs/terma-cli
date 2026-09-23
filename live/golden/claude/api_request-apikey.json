@@ -1,0 +1,22 @@
+[
+  "cache_creation_tokens",
+  "cache_read_tokens",
+  "client_request_id",
+  "cost_usd",
+  "cost_usd_micros",
+  "duration_ms",
+  "event.name",
+  "event.sequence",
+  "event.timestamp",
+  "input_tokens",
+  "model",
+  "output_tokens",
+  "prompt.id",
+  "query_source",
+  "request_id",
+  "session.id",
+  "speed",
+  "terminal.type",
+  "ttft_ms",
+  "user.id"
+]

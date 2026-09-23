@@ -1,0 +1,22 @@
+[
+  "credits_unlimited",
+  "event.name",
+  "evidence_source",
+  "evidence_status",
+  "has_credits",
+  "limit_id",
+  "plan_type",
+  "primary_resets_at",
+  "primary_used_pct",
+  "primary_window_minutes",
+  "project_id",
+  "schema_version",
+  "secondary_resets_at",
+  "secondary_used_pct",
+  "secondary_window_minutes",
+  "session.id",
+  "source_time",
+  "terma.repo",
+  "terma.version",
+  "tool"
+]

@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "organization_id": "synthetic-org",
+  "source": "Synthetic settled per-call usage; not a real billing period",
+  "calls": [
+    {
+      "id": "claude-1",
+      "session_id": "claude-session",
+      "user_id": "user-a",
+      "account_id": "account-a",
+      "harness": "claude-code",
+      "product": "Claude Code",
+      "model": "synthetic-model",
+      "at": "2026-09-01T10:02:00Z",
+      "reference_usd": 1,
+      "price_source": "Synthetic reference amount",
+      "speed": "normal",
+      "entrypoint": "cli"
+    },
+    {
+      "id": "codex-1",
+      "session_id": "codex-session",
+      "user_id": "user-a",
+      "account_id": "account-a",
+      "harness": "codex",
+      "product": "Codex",
+      "model": "synthetic-model",
+      "at": "2026-09-01T10:02:00Z",
+      "reference_usd": 1,
+      "price_source": "Synthetic reference amount",
+      "auth_mode": "Chatgpt"
+    }
+  ],
+  "events": [
+    {
+      "time": "2026-09-01T10:00:00Z",
+      "name": "terma.session.account",
+      "session_id": "claude-session",
+      "attrs": {
+        "tool": "claude-code",
+        "evidence_status": "present",
+        "organization_id": "synthetic-org",
+        "account_id": "account-a",
+        "billing_type": "stripe_subscription",
+        "organization_type": "claude_team",
+        "seat_tier": "team_tier_1",
+        "extra_usage_enabled": true
+      }
+    },
+    {
+      "time": "2026-09-01T10:01:00Z",
+      "name": "terma.session.quota",
+      "session_id": "claude-session",
+      "attrs": {
+        "tool": "claude-code",
+        "five_hour_used_pct": 107,
+        "five_hour_resets_at": 1788274800,
+        "spend_limit_used_pct": 107
+      }
+    },
+    {
+      "time": "2026-09-01T10:01:00Z",
+      "name": "terma.session.quota",
+      "session_id": "codex-session",
+      "attrs": {
+        "tool": "codex",
+        "evidence_status": "present",
+        "source_time": "2026-09-01T10:00:30Z",
+        "plan_type": "business",
+        "has_credits": true,
+        "credits_unlimited": false,
+        "credits_balance": "12.3456",
+        "primary_used_pct": 100,
+        "primary_resets_at": 1788274800
+      }
+    },
+    {
+      "time": "2026-09-01T10:03:00Z",
+      "name": "terma.session.account",
+      "session_id": "claude-session",
+      "attrs": {
+        "tool": "claude-code",
+        "evidence_status": "present",
+        "organization_id": "synthetic-org",
+        "account_id": "account-a",
+        "extra_usage_enabled": false
+      }
+    }
+  ]
+}

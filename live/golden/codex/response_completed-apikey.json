@@ -1,0 +1,18 @@
+[
+  "app.version",
+  "auth_mode",
+  "cache_write_token_count",
+  "cached_token_count",
+  "conversation.id",
+  "event.kind",
+  "event.name",
+  "event.timestamp",
+  "input_token_count",
+  "model",
+  "originator",
+  "output_token_count",
+  "reasoning_token_count",
+  "slug",
+  "terminal.type",
+  "tool_token_count"
+]

@@ -1,0 +1,102 @@
+name: Live harness contracts
+
+on:
+  workflow_dispatch:
+    inputs:
+      include_subscriptions:
+        description: Also test Claude and Codex subscription logins
+        type: boolean
+        default: false
+  schedule:
+    - cron: "23 4 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-harness-contracts
+  cancel-in-progress: false
+
+jobs:
+  live:
+    runs-on: macos-latest
+    timeout-minutes: 35
+    environment: live-harnesses
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      INCLUDE_SUBSCRIPTIONS: ${{ github.event_name == 'workflow_dispatch' && inputs.include_subscriptions || false }}
+      ANTHROPIC_FEDERATION_RULE_ID: fdrl_0171h2kkJshPaiHxCxTmsF1F
+      ANTHROPIC_ORGANIZATION_ID: 0a8c23d6-3675-41b0-9a37-31be453eadb1
+      ANTHROPIC_SERVICE_ACCOUNT_ID: svac_01YCaxYCodudV3vAUrEyWTah
+      ANTHROPIC_WORKSPACE_ID: wrkspc_01Ug36g2VPKLUSFZ9LZXFTvU
+      TERMA_LIVE_CLAUDE_VERSIONS: last3
+      TERMA_LIVE_CODEX_VERSIONS: last3
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: live/go.mod
+          cache-dependency-path: |
+            go.sum
+            live/go.sum
+      - name: Require coverage credentials
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ inputs.include_subscriptions && secrets.CLAUDE_CODE_OAUTH_TOKEN || '' }}
+          CODEX_AUTH_JSON: ${{ inputs.include_subscriptions && secrets.CODEX_AUTH_JSON || '' }}
+        run: |
+          required=(OPENAI_API_KEY)
+          if [ "$INCLUDE_SUBSCRIPTIONS" = "true" ]; then
+            required+=(CLAUDE_CODE_OAUTH_TOKEN CODEX_AUTH_JSON)
+          fi
+          for key in ACTIONS_ID_TOKEN_REQUEST_URL ACTIONS_ID_TOKEN_REQUEST_TOKEN; do
+            if [ -z "${!key}" ]; then
+              echo "::error::GitHub OIDC unavailable: $key"
+              exit 1
+            fi
+          done
+          for key in "${required[@]}"; do
+            if [ -z "${!key}" ]; then
+              echo "::error::Missing live-harnesses secret: $key"
+              exit 1
+            fi
+          done
+          if [ "$INCLUDE_SUBSCRIPTIONS" != "true" ]; then
+            echo 'API contracts enabled. Subscription coverage: **not run** (manual opt-in).' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo 'API and subscription contracts enabled.' >> "$GITHUB_STEP_SUMMARY"
+          umask 077
+          printf '%s' "$CODEX_AUTH_JSON" > "$RUNNER_TEMP/terma-codex-auth.json"
+          printf 'TERMA_LIVE_CODEX_AUTH=%s/terma-codex-auth.json\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+      - name: Build native test binaries
+        run: |
+          go build -o live/bin/terma .
+          cd live
+          go test -c -o bin/live.test .
+      - name: Run live contracts (subscription coverage is opt-in)
+        working-directory: live
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ inputs.include_subscriptions && secrets.CLAUDE_CODE_OAUTH_TOKEN || '' }}
+          TERMA_LIVE: "1"
+          TERMA_LIVE_BINARY: ${{ github.workspace }}/live/bin/terma
+        run: ./bin/live.test -test.v -test.timeout 25m
+      - name: Publish coverage summary
+        if: always()
+        run: |
+          if [ -f live/report/latest.md ]; then
+            cat live/report/latest.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload summary
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: live-harness-report
+          path: live/report/
+          retention-days: 7
+      - name: Remove temporary login
+        if: always()
+        run: rm -f "$RUNNER_TEMP/terma-codex-auth.json"

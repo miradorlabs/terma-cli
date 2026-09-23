@@ -1,0 +1,24 @@
+#!/bin/sh
+# Installed by "terma install". Thin shim: all logic lives in the terma binary,
+# so this file never needs to change when terma updates. It must never block a
+# commit: a missing or failing terma is ignored.
+if command -v terma >/dev/null 2>&1; then
+  terma hook prepare-commit-msg "$@" || true
+fi
+# Chain a pre-existing hook of the same name: an explicit directory first, else
+# the repository's own hooks dir (never core.hooksPath, which points back here).
+# git runs hooks from the worktree root, so .git/hooks is right without asking
+# git (a subprocess this shim cannot afford); linked worktrees ask.
+chain_dir="${TERMA_CHAIN_HOOKS_DIR:-}"
+if [ -z "$chain_dir" ]; then
+  if [ -d "${GIT_DIR:-.git}/hooks" ]; then
+    chain_dir="${GIT_DIR:-.git}/hooks"
+  else
+    chain_dir="$(git rev-parse --git-common-dir 2>/dev/null)/hooks"
+  fi
+fi
+chained="$chain_dir/prepare-commit-msg"
+if [ -x "$chained" ] && ! [ "$chained" -ef "$0" ]; then
+  exec "$chained" "$@"
+fi
+exit 0

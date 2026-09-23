@@ -1,0 +1,237 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  npm-installer:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 18
+      - run: npm test --prefix npm
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Verify formatting
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "::error::gofmt needed on:"; echo "$unformatted"; exit 1
+          fi
+
+      - run: go vet ./...
+
+      # The version lives in .golangci-lint-version, which `make lint` reads too.
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version-file: .golangci-lint-version
+
+      - run: go test -race ./...
+
+      # The hook budget is a product guarantee, not a nice-to-have: a
+      # prepare-commit-msg that gets slow gets uninstalled.
+      - name: Hook latency budget
+        run: make bench-hook
+
+  launcher-contracts:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+      - name: Install additional Linux shell
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -qq && sudo apt-get install -y zsh
+      - name: Launcher and interactive terminal contracts
+        run: go test -race ./internal/shim -count=1 -timeout=3m -v
+
+  # The live suite is a separate module; its offline contracts must run in CI too.
+  live-contracts:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: live
+    env:
+      TERMA_LIVE: "0"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: live/go.mod
+          cache-dependency-path: live/go.sum
+      - run: go vet ./...
+      - run: go test -race ./...
+
+  cursor-billing:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: pocs/cursor-billing
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: pocs/cursor-billing/go.mod
+          cache: false
+      - run: test -z "$(gofmt -l .)"
+      - run: go vet ./...
+      - run: go test -race ./...
+
+  # The funding model is a proof of concept, but it is the estimator the backend
+  # will be reconciled against, so a change that breaks its tests should not pass
+  # review only because the module lives under pocs/.
+  funding-model:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: pocs/funding-model
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: pocs/funding-model/go.mod
+          cache: false
+      - run: test -z "$(gofmt -l .)"
+      - run: go vet ./...
+      - run: go test -race ./...
+
+  # The OpenCode plugin is ~450 lines of JavaScript that writes into a user's
+  # plugin directory and ships in the release archives. `make test-plugin` skips it
+  # wherever bun is absent, so CI is where it is actually run.
+  opencode-plugin:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: internal/harness/opencode
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun test
+
+  # The shim scripts are committed into customers' repositories: they must be
+  # POSIX sh, and they must keep working on the sh that Debian/Alpine ship.
+  shim-portability:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go build -o bin/terma .
+      - name: Shim runs under dash and busybox sh
+        run: |
+          sudo apt-get install -y -q dash busybox >/dev/null
+          tmp=$(mktemp -d); cd "$tmp"; git init -q; git config user.email t@example.com; git config user.name t
+          "$GITHUB_WORKSPACE/bin/terma" install --project proj_ci --harness none --yes >/dev/null
+          for sh in dash "busybox sh"; do
+            echo "subject" > msg.txt
+            $sh .terma/hooks/prepare-commit-msg msg.txt message
+            $sh .terma/hooks/post-commit
+          done
+          echo "ok"
+
+  # Everything a release publishes, rendered with the committed GoReleaser config
+  # from a throwaway tag that never leaves the runner: every platform
+  # cross-compiles, and the cask's download URL carries v#{version} exactly as a
+  # real release's does (a --snapshot build's would not, and `brew audit` rejects
+  # it). Nothing is published. The two jobs after this one install what it built.
+  release-dry-run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: git tag v0.0.0-ci
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          # `before` is `go test`, which the test job already runs.
+          args: release --clean --skip=publish,validate,announce,before
+        env:
+          # Read only by the cask template; the dry run pushes nothing.
+          HOMEBREW_TAP_TOKEN: dry-run
+      - uses: actions/upload-artifact@v5
+        with:
+          name: release-dry-run
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/checksums.txt
+            dist/homebrew/
+          retention-days: 1
+          if-no-files-found: error
+
+  # `curl -fsSL https://terma.ai/install.sh | bash`, against those archives served
+  # over loopback: pinned and latest, piped through bash and under sh, plus the two
+  # refusals (checksum mismatch, cleartext). scripts/test-install.sh.
+  install-script:
+    needs: release-dry-run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          name: release-dry-run
+          path: dist
+      - name: shellcheck
+        run: |
+          shellcheck -s sh install.sh
+          shellcheck scripts/test-install.sh scripts/test-cask.sh
+      - run: ./scripts/test-install.sh dist v0.0.0-ci
+
+  # `brew install miradorlabs/tap/terma`, with the cask the release would push:
+  # `brew audit --strict`, then a real install from a throwaway local tap whose
+  # URLs point at the loopback mirror — download, sha256, the preflight that strips
+  # the quarantine flag, completions generated by running the binary, the link.
+  # scripts/test-cask.sh.
+  homebrew-cask:
+    needs: release-dry-run
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          name: release-dry-run
+          path: dist
+      # The runner image's Homebrew can be weeks behind what users get from the
+      # auto-update `brew install` runs; the cask relies on a stanza from 2026-08.
+      - run: brew update --quiet
+      - run: ./scripts/test-cask.sh dist v0.0.0-ci

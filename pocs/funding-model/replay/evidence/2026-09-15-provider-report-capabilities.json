@@ -1,0 +1,65 @@
+{
+  "reviewed_at": "2026-09-15T04:48:48.812966+00:00",
+  "evidence_class": "live_observed",
+  "providers": {
+    "claude": {
+      "plan": "Team",
+      "seat_user_reported": "Premium",
+      "usage_credits_enabled": true,
+      "auto_reload_enabled": false
+    },
+    "codex": {
+      "plan": "Business",
+      "seat": "Standard",
+      "auto_reload_enabled": true
+    }
+  },
+  "exports": [
+    {
+      "provider": "claude",
+      "sha256": "4afc8c1e4bec785728074b264c0a6f5509b78202e1a67dfd956e0e90d1fd2962",
+      "rows": 46,
+      "columns": [
+        "user_email",
+        "account_uuid",
+        "product",
+        "model",
+        "total_requests",
+        "total_prompt_tokens",
+        "total_completion_tokens",
+        "total_net_spend_usd",
+        "total_gross_spend_usd",
+        "user_id",
+        "total_uncached_input_tokens",
+        "total_cache_read_tokens",
+        "total_cache_write_5m_tokens",
+        "total_cache_write_1h_tokens",
+        "total_web_search_count",
+        "slack_channel_id",
+        "teams_channel_id"
+      ]
+    },
+    {
+      "provider": "openai",
+      "sha256": "3eee58923e1918f5005d5617cb2a9b5ebc2e3b70a3640d4bdb8d0dc7c9d8f305",
+      "rows": 29,
+      "columns": [
+        "Start Time",
+        "End Time",
+        "Codex",
+        "Work",
+        "Chat"
+      ]
+    }
+  ],
+  "individual_test_funding": "unknown",
+  "billing_settings_changed": false,
+  "new_inference_runs": 0,
+  "limitations": [
+    "Snapshot is after tests, not a baseline.",
+    "Provider exports currently exclude test period.",
+    "Claude CSV has aggregate totals, no request/session IDs; observed money values have cent precision.",
+    "Codex chart export has daily product credits, no request/session IDs or funding-source field.",
+    "Current balance and quota values cannot establish historical per-request funding."
+  ]
+}

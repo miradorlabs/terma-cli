@@ -1,0 +1,124 @@
+version: 2
+
+project_name: terma
+
+before:
+  hooks:
+    # verify, not tidy: a tagged release must build from the committed go.mod/go.sum,
+    # never silently re-resolve dependencies at release time.
+    - go mod verify
+    - go test ./...
+
+builds:
+  - id: terma
+    main: .
+    # The module is github.com/miradorlabs/terma-cli, so `go build` would name the
+    # binary `terma-cli`. Everything a user installs — and every hook shim calls —
+    # is `terma`.
+    binary: terma
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -mod=readonly
+      - -trimpath
+    goos: [darwin, linux, windows]
+    goarch: [amd64, arm64]
+    # The version is the git tag so `terma version` matches the release someone
+    # downloaded, and so `terma update` can compare against the latest tag.
+    ldflags:
+      - -s -w -X github.com/miradorlabs/terma-cli/cmd.Version={{.Version}}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: terma
+    ids: [terma]
+    # install.sh, the npm shim, `terma update`, and the Homebrew cask all expect
+    # <name>_<Os>_<arch>.tar.gz with x86_64 for amd64 (internal/selfupdate.AssetName).
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else }}{{ .Arch }}{{ end }}
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - SECURITY.md
+      - LICENSE*
+
+checksum:
+  name_template: "checksums.txt"
+
+release:
+  # A tag like v1.2.0-rc1 is published as a pre-release, so it never becomes what
+  # `releases/latest/download/...` resolves to: install.sh, the Homebrew smoke test
+  # and `terma update` all follow "latest".
+  prerelease: auto
+  extra_files:
+    # The installer travels with the release it installs. https://terma.ai/install.sh
+    # redirects to releases/latest/download/install.sh, so the script people pipe into
+    # a shell is the one that was tested against these exact archives and is covered
+    # by the same provenance attestation.
+    - glob: ./install.sh
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+
+homebrew_casks:
+  - name: terma
+    ids: [terma]
+    binaries: [terma]
+    # The tap repo must exist before the first release — see docs/RELEASING.md.
+    repository:
+      owner: miradorlabs
+      name: homebrew-tap
+      # A PAT with contents:write on the tap repo. The workflow's default
+      # GITHUB_TOKEN is scoped to this repo and cannot push to the tap.
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Casks
+    # Trailing slash: Homebrew's Cask/HomepageUrlStyling cop wants one after a bare
+    # domain, and `brew audit --strict` runs it.
+    homepage: https://terma.ai/
+    description: Connect coding agents to Terma and stamp the commits they produce
+    license: MIT
+    commit_author:
+      name: mirador-bot
+      email: engineering@mirador.org
+    generate_completions_from_executable:
+      executable: terma
+      args: [completion]
+    # Homebrew quarantines every cask download, and Gatekeeper SIGKILLs a quarantined
+    # binary the moment anything executes it — including the completions generation
+    # during install. Strip the flag before the first execution.
+    #
+    # This is a `custom_block` rather than `hooks.pre.install` because GoReleaser
+    # renders the latter as `preflight do`, which Homebrew deprecated on 2026-08-04
+    # in favour of the structured `preflight_steps` (every install printed "Calling
+    # `preflight` is deprecated ... please report this issue to the tap"). Steps are
+    # data, not Ruby: paths in a preflight step resolve against the staged download,
+    # so `chdir: "."` is the staged directory and the binary is just "terma"
+    # (Homebrew's own `{{staged_path}}` token would be eaten by GoReleaser's Go
+    # templating of this block). `on_macos` skips the step on Linux and
+    # `must_succeed: false` covers a download that arrived without the flag. Homebrew
+    # orders artifacts by class, so where the block sits in the file does not change
+    # when it runs. CI installs the rendered cask (.github/workflows/ci.yml,
+    # homebrew-cask) so a template change here or in Homebrew shows up before a
+    # release does.
+    custom_block: |
+      preflight_steps do
+        on_macos do
+          run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "terma"], chdir: ".",
+                                must_succeed: false, print_stderr: false
+        end
+      end

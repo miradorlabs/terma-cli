@@ -1,0 +1,119 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # create the GitHub Release and upload archives
+  id-token: write # OIDC identity for signing the provenance attestation
+  attestations: write # store the attestation with GitHub
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # GoReleaser builds the changelog from commit history; a shallow clone
+          # produces an empty one.
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # This binary holds credentials; a release with a vulnerable stdlib is worse
+      # than a late release. Pinned so the scanner is a reproducible input.
+      - name: govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
+
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # PAT with contents:write on miradorlabs/homebrew-tap. Without it the
+          # release still publishes; only the cask update fails.
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+      # Signed build provenance for every published artifact, verifiable with
+      # `gh attestation verify <file> --owner miradorlabs`.
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/checksums.txt
+            install.sh
+
+  # The npm shim (`npx @miradorlabs/terma`) downloads this exact release at
+  # install time, so it is published after the archives exist. Skipped cleanly
+  # when NPM_TOKEN is not configured.
+  npm:
+    needs: goreleaser
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # npm provenance
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - name: Publish shim
+        working-directory: npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "NPM_TOKEN not set; skipping the npm shim publish."
+            exit 0
+          fi
+          version="${GITHUB_REF_NAME#v}"
+          npm version "$version" --no-git-tag-version
+          npm publish --access public --provenance
+
+  # A release is done when it installs the way the README says. The published
+  # install.sh (the asset https://terma.ai/install.sh redirects to) on both
+  # platforms, and on macOS the cask GoReleaser just pushed to the tap.
+  smoke:
+    needs: goreleaser
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    steps:
+      - name: curl | bash
+        run: |
+          curl -fsSL "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/install.sh" \
+            | TERMA_VERSION="${GITHUB_REF_NAME}" TERMA_INSTALL_DIR="${RUNNER_TEMP}/bin" bash
+          got="$("${RUNNER_TEMP}/bin/terma" version)"
+          [ "$got" = "terma ${GITHUB_REF_NAME#v}" ] || { echo "::error::install.sh installed '$got'"; exit 1; }
+
+      - name: brew install
+        if: runner.os == 'macOS'
+        run: |
+          brew tap miradorlabs/tap
+          brew trust miradorlabs/tap || true # Homebrew >= 6 will not load an untrusted third-party tap
+          # GoReleaser pushed the cask before this job began, so `brew tap` normally
+          # already has it; the retry only covers a slow fetch.
+          cask="$(brew --repository)/Library/Taps/miradorlabs/homebrew-tap/Casks/terma.rb"
+          for attempt in 1 2 3 4 5 6; do
+            grep -qF "version \"${GITHUB_REF_NAME#v}\"" "$cask" && break
+            if [ "$attempt" -eq 6 ]; then
+              echo "::error::tap still has '$(grep -m1 '^  version' "$cask")' for ${GITHUB_REF_NAME}"; exit 1
+            fi
+            sleep 20; brew update --quiet
+          done
+          brew install --cask miradorlabs/tap/terma
+          got="$("$(brew --prefix)/bin/terma" version)"
+          [ "$got" = "terma ${GITHUB_REF_NAME#v}" ] || { echo "::error::brew installed '$got'"; exit 1; }
