@@ -18,7 +18,7 @@ func TestDesktopOnlySelectionDoesNotRequireCodexCLIShim(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	cli, desktop := false, true
 	if err := shim.SaveRecord(shim.Record{ProjectID: testProjectID, Endpoint: "https://otel.terma.ai", Signals: []string{"logs"},
-		Harnesses: []string{shim.AgentCodex}, CLI: &cli, Desktop: &desktop}); err != nil {
+		Harnesses: []string{shim.AgentCodex}, CLI: cli, Desktop: desktop}); err != nil {
 		t.Fatal(err)
 	}
 	selected := selectedForRepo(testProjectID, []string{shim.AgentCodex})
@@ -65,7 +65,7 @@ func TestDesktopVerdictUsesLocalRouteAndKey(t *testing.T) {
 	desktop := true
 	if err := shim.SaveRecord(shim.Record{ProjectID: testProjectID, Endpoint: "https://otel.terma.ai",
 		Signals: []string{"logs"}, Harnesses: []string{shim.AgentCodex},
-		IncludePrompts: true, IncludeToolContent: true, Desktop: &desktop}); err != nil {
+		IncludePrompts: true, IncludeToolContent: true, Desktop: desktop}); err != nil {
 		t.Fatal(err)
 	}
 	if got := judgeDesktop(testProjectID).emissionProblem; got != "this repository has no delivery key" {

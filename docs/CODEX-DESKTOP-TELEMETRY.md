@@ -27,11 +27,6 @@ LaunchAgent, or global Codex exporter.
 Codex requires review again whenever a hook definition changes. `terma install`
 does not approve hooks on the user's behalf.
 
-An install that finds Terma's earlier Desktop relay exporter removes that
-exporter and its LaunchAgent. Restart Codex Desktop once so its backend unloads
-the old exporter. `terma desktop disconnect` can remove the old relay without
-reinstalling. An unrelated user-level exporter is left alone.
-
 ## What is captured
 
 - `SessionStart` marks the session. `UserPromptSubmit` reports the turn and

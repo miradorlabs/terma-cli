@@ -70,9 +70,9 @@ func TestCodexRenderWritesOneExporterPerSignal(t *testing.T) {
 	env := Codex{}.render(codexExporter())
 
 	want := map[string]string{
-		"trace_exporter":   `{ otlp-http = { endpoint = "https://otel.terma.ai/v1/traces", headers = { Authorization = "Bearer mir_srv_0123456789abcdef" }, protocol = "binary" } }`,
-		"exporter":         `{ otlp-http = { endpoint = "https://otel.terma.ai/v1/logs", headers = { Authorization = "Bearer mir_srv_0123456789abcdef" }, protocol = "binary" } }`,
-		"metrics_exporter": `{ otlp-http = { endpoint = "https://otel.terma.ai/v1/metrics", headers = { Authorization = "Bearer mir_srv_0123456789abcdef" }, protocol = "binary" } }`,
+		"trace_exporter":   `{ otlp-http = { endpoint = "https://otel.terma.ai/v1/traces", headers = { Authorization = "Bearer ter_srv_0123456789abcdef" }, protocol = "binary" } }`,
+		"exporter":         `{ otlp-http = { endpoint = "https://otel.terma.ai/v1/logs", headers = { Authorization = "Bearer ter_srv_0123456789abcdef" }, protocol = "binary" } }`,
+		"metrics_exporter": `{ otlp-http = { endpoint = "https://otel.terma.ai/v1/metrics", headers = { Authorization = "Bearer ter_srv_0123456789abcdef" }, protocol = "binary" } }`,
 		"log_user_prompt":  "false",
 		"tool_result":      "{ max_bytes = 0 }",
 		// service.name is Codex's own; only the attribution keys go on spans, and each
@@ -417,7 +417,7 @@ func TestCodexStatusRoundTrip(t *testing.T) {
 }
 
 func TestCodexStatusNeverReturnsTheWholeKey(t *testing.T) {
-	const key = "mir_srv_0123456789abcdef0123456789abcdef"
+	const key = "ter_srv_0123456789abcdef0123456789abcdef"
 	c, _ := codexIn(t, "")
 	e := codexExporter()
 	e.APIKey = key
@@ -428,7 +428,7 @@ func TestCodexStatusNeverReturnsTheWholeKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Status: %v", err)
 	}
-	if st.KeyPrefix == "" || strings.Contains(st.KeyPrefix, key) || !strings.HasPrefix(st.KeyPrefix, "mir_srv_") {
+	if st.KeyPrefix == "" || strings.Contains(st.KeyPrefix, key) || !strings.HasPrefix(st.KeyPrefix, "ter_srv_") {
 		t.Fatalf("key prefix = %q", st.KeyPrefix)
 	}
 }
@@ -804,7 +804,7 @@ func TestCodexCurrentCredential(t *testing.T) {
 	if err := c.Connect(codexExporter(), false); err != nil {
 		t.Fatalf("Connect: %v", err)
 	}
-	if key, ok := c.CurrentCredential(termaEndpoint, "proj_123"); !ok || key != "mir_srv_0123456789abcdef" {
+	if key, ok := c.CurrentCredential(termaEndpoint, "proj_123"); !ok || key != "ter_srv_0123456789abcdef" {
 		t.Errorf("CurrentCredential = (%q, %v), want the installed key", key, ok)
 	}
 	if _, ok := c.CurrentCredential(termaEndpoint, "proj_other"); ok {

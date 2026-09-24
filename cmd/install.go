@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"slices"
 	"strings"
 	"time"
@@ -42,14 +41,11 @@ type installFlags struct {
 	signals            string
 	excludePrompts     bool
 	excludeToolContent bool
-	// telemetry keeps the legacy --telemetry=false opt-out working. Repository
-	// policies are installed by default, including for older global connections.
-	telemetry    bool
-	updatePolicy bool
-	noBrowser    bool
-	dryRun       bool
-	assumeYes    bool
-	force        bool
+	updatePolicy       bool
+	noBrowser          bool
+	dryRun             bool
+	assumeYes          bool
+	force              bool
 }
 
 func newInstallCommand() *cobra.Command {
@@ -95,8 +91,6 @@ The keys and per-project configuration live in your home directory; the committe
 	cmd.Flags().StringVar(&f.signals, "signals", "", "comma-separated signals to export: traces, logs, metrics (default all)")
 	cmd.Flags().BoolVar(&f.excludePrompts, "exclude-prompts", false, "do not export prompt text or model responses")
 	cmd.Flags().BoolVar(&f.excludeToolContent, "exclude-tool-content", false, "do not export tool parameters, input, or output")
-	cmd.Flags().BoolVar(&f.telemetry, "telemetry", true, "write the repository telemetry policy (enabled by default)")
-	_ = cmd.Flags().MarkHidden("telemetry")
 	cmd.Flags().BoolVar(&f.noBrowser, "no-browser", false, "print the sign-in URL instead of opening a browser")
 	cmd.Flags().BoolVar(&f.dryRun, "dry-run", false, "show what would change without writing anything")
 	cmd.Flags().BoolVarP(&f.assumeYes, "yes", "y", false, "do not ask for confirmation")
@@ -210,14 +204,12 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 		if needsAuth {
 			fmt.Fprintln(out, "\nA real install would sign in first (not done for a dry run).")
 		}
-		if f.telemetry {
-			for _, h := range repoPolicyHarnesses(adapters) {
-				path, err := h.(harness.Scoped).Local(root).ConfigPath()
-				if err != nil {
-					return err
-				}
-				fmt.Fprintf(out, "\nRepository telemetry: %s (preserve existing policy unless export flags are supplied).\n", path)
+		for _, h := range repoPolicyHarnesses(adapters) {
+			path, err := h.(harness.Scoped).Local(root).ConfigPath()
+			if err != nil {
+				return err
 			}
+			fmt.Fprintf(out, "\nRepository telemetry: %s (preserve existing policy unless export flags are supplied).\n", path)
 		}
 		if slices.Contains(agents, codexDesktopAgent) {
 			fmt.Fprintln(out, "\nCodex Desktop: a real install writes repository hooks and a local project route. Then open Settings → Hooks → Review in Codex Desktop to approve the Terma entries; Codex CLI is not required.")
@@ -290,19 +282,17 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 
 	// 6. Repository telemetry also supports developers using a global repos-only
 	// connection. Hooks alone do not enable that connection's exporters.
-	if f.telemetry {
-		paths, err := writeRepoPolicy(ctx, out, root, cfg, repoPolicyHarnesses(adapters), f)
-		if err != nil {
-			return err
-		}
-		for _, path := range paths {
-			if !slices.Contains(written, path) {
-				written = append(written, path)
-			}
+	paths, err := writeRepoPolicy(ctx, out, root, cfg, repoPolicyHarnesses(adapters), f)
+	if err != nil {
+		return err
+	}
+	for _, path := range paths {
+		if !slices.Contains(written, path) {
+			written = append(written, path)
 		}
 	}
 
-	// 7. The committed binding, migrating any legacy .terma.toml in place. installed_at
+	// 7. The committed binding. installed_at
 	// and terma_version are preserved on a re-install so a colleague setting themselves
 	// up does not churn the committed file — only the onboarder stamps them.
 	version, installedAt := Version, time.Now().UTC()
@@ -329,7 +319,6 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 			InstalledAt: installedAt,
 		},
 	}
-	_, legacyErr := os.Stat(termaproject.LegacyPath(root))
 	if err := termaproject.Save(root, file); err != nil {
 		return err
 	}
@@ -341,13 +330,6 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 		}
 	}
 	if slices.Contains(agents, codexDesktopAgent) {
-		removed, err := removeLegacyDesktopRelay(cmd)
-		if err != nil {
-			return fmt.Errorf("remove previous Desktop relay: %w", err)
-		}
-		if removed {
-			fmt.Fprintln(out, "Removed the previous Desktop relay; restart Codex Desktop to unload its old exporter.")
-		}
 		fmt.Fprintln(out, "Codex Desktop captures this repository through trusted hooks and Terma's existing spool.")
 		fmt.Fprintln(out, "To approve Codex Desktop capture:")
 		fmt.Fprintln(out, "  1. Open this repository in Codex Desktop and trust the project if prompted.")
@@ -361,11 +343,8 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 
 	fmt.Fprintf(out, "\n%s\n", style.For(out).Bold("Installed."))
 	if len(written) > 0 {
-		// Save always rewrites the binding, and removes a legacy .terma.toml it migrated.
+		// Save always rewrites the binding.
 		written = append(written, termaproject.FileName)
-		if legacyErr == nil {
-			written = append(written, termaproject.LegacyFileName)
-		}
 		printCommitList(out, written)
 	}
 	// Verify the chain right away. Skipped without a terminal (a script, CI) or with
@@ -523,8 +502,8 @@ func connectHarnessesForRepo(cmd *cobra.Command, cfg *config.Config, agents []st
 	if slices.Contains(telemetryAgents, shim.AgentCodex) {
 		cli := slices.Contains(agents, shim.AgentCodex)
 		desktop := slices.Contains(agents, codexDesktopAgent)
-		rec.CLI = &cli
-		rec.Desktop = &desktop
+		rec.CLI = cli
+		rec.Desktop = desktop
 	}
 	for _, a := range telemetryAgents {
 		h, _ := harness.Lookup(a)
@@ -568,13 +547,8 @@ func connectHarnessesForRepo(cmd *cobra.Command, cfg *config.Config, agents []st
 			// The plugin is global and shared across every bound repository, so a
 			// per-repo prompt / tool-content choice cannot ride in it (that would flip
 			// capture on for every other project). It lives only in a committed
-			// .opencode/terma.json overlay, written by install below. Note it rather
-			// than silently dropping a capture the flags imply the developer wanted.
-			if !f.telemetry && (!f.excludePrompts || !f.excludeToolContent) {
-				fmt.Fprintln(out, "  OpenCode     → per-repo plugin (prompt/tool-content capture off; enable with terma install)")
-			} else {
-				fmt.Fprintln(out, "  OpenCode     → per-repo plugin")
-			}
+			// .opencode/terma.json overlay, written by install below.
+			fmt.Fprintln(out, "  OpenCode     → per-repo plugin")
 		default:
 			// Every telemetry harness is routed above. One added to the registry without
 			// a case here must not pass for routed: it would export to whatever project

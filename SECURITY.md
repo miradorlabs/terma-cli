@@ -11,7 +11,7 @@ with — if a claim here is wrong, that is a bug.
 | CLI refresh token | 30 d, rotated per use | same file; hash only server-side | Mint access tokens until detected or revoked |
 | Authorization code | 60 s, single use | never written to disk | Useless without the PKCE verifier |
 | PKCE verifier | one login | process memory only | Useless without the code |
-| Project server key `mir_srv_` | until revoked | `~/.config/terma/keys.json` (0600) and the harness's own config | Write telemetry into the one project it is bound to |
+| Project server key `ter_srv_` | until revoked | `~/.config/terma/keys.json` (0600) and the harness's own config | Write telemetry into the one project it is bound to |
 
 A CLI credential is **org-scoped**. A server key is **project-scoped and write-only for
 telemetry**; it is what a harness exports with and what the spool delivers with. Neither
@@ -98,7 +98,7 @@ through on any failure.
   key indirectly, so it rides in the process arguments: **visible in `ps` /
   `/proc/<pid>/cmdline` to anything running as your user for the life of the session.**
   This is a deliberate, documented trade-off (see `docs/DESIGN.md`); Terma never logs the
-  generated argv, and a local OTLP relay is the future path to keep it out of arguments.
+  generated argv.
   The per-launch argument file is written under a `mktemp -d` 0700 directory at 0600.
 
 ## Identity and attribution are not authentication

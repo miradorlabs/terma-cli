@@ -73,7 +73,7 @@ func e2eRouted(t *testing.T) (cfgDir, repo, codexHome string) {
 	if err := shim.SaveRecord(shim.Record{
 		ProjectID: e2eProjectID, Endpoint: e2eEndpoint,
 		Signals: []string{"traces", "logs", "metrics"}, IncludePrompts: true, IncludeToolContent: true,
-		Harnesses: []string{shim.AgentClaude, shim.AgentCodex},
+		Harnesses: []string{shim.AgentClaude, shim.AgentCodex}, CLI: true,
 	}); err != nil {
 		t.Fatal(err)
 	}

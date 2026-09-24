@@ -106,7 +106,7 @@ func codexRepliesConsented(r *repo) bool {
 	if err != nil {
 		return false
 	}
-	if os.Getenv(shim.CodexRoutedEnv) != "1" && rec.Desktop != nil && *rec.Desktop {
+	if os.Getenv(shim.CodexRoutedEnv) != "1" && rec.Desktop {
 		return recorded && slices.Contains(rec.Harnesses, shim.AgentCodex) &&
 			slices.Contains(rec.Signals, "logs") && rec.IncludePrompts
 	}

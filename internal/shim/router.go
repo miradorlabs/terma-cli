@@ -61,7 +61,7 @@ func routeFor(agent, cwd string, userArgs []string) route {
 	if err != nil || !ok || !slices.Contains(rec.Harnesses, agent) {
 		return route{}
 	}
-	if agent == AgentCodex && rec.CLI != nil && !*rec.CLI {
+	if agent == AgentCodex && !rec.CLI {
 		return route{}
 	}
 	if args := r.routeArgs(rec, userArgs); len(args) > 0 {

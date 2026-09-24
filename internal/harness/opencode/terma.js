@@ -74,10 +74,8 @@ function effectiveConfig(worktree) {
 }
 
 // readProjectID walks up from a worktree to the first Terma binding and returns its
-// project id, or "" when the repository is not bound to a Terma project. It reads both
-// the current .terma/settings.json and the legacy top-level .terma.toml, matching the
-// Go side (project.Find/Load) — a repository whose binding has not been migrated yet
-// must still route, not silently export nothing.
+// project id, or "" when the repository is not bound to a Terma project. It reads
+// .terma/settings.json, matching the Go side (project.Find/Load).
 function readProjectID(worktree) {
   let dir = worktree
   for (let i = 0; i < 64 && dir; i++) {
@@ -90,17 +88,12 @@ function readProjectID(worktree) {
   return ""
 }
 
-// bindingProjectID reads the project id from a directory's binding, new format first.
+// bindingProjectID reads the project id from a directory's binding.
 // An id that is not safe as a path component is no binding at all: see validProjectID.
 function bindingProjectID(dir) {
   try {
     const id = JSON.parse(readFileSync(join(dir, ".terma", "settings.json"), "utf8"))?.project?.id
-    if (id) return validProjectID(String(id))
-  } catch {
-    // fall through to the legacy format
-  }
-  try {
-    return validProjectID(tomlProjectID(readFileSync(join(dir, ".terma.toml"), "utf8")))
+    return id ? validProjectID(String(id)) : ""
   } catch {
     return ""
   }
@@ -113,24 +106,6 @@ function bindingProjectID(dir) {
 // id like "x/../../../../Projects/repo/run.sh" would run a script the repository chose.
 function validProjectID(id) {
   return id.length <= 128 && /^[A-Za-z0-9._-]+$/.test(id) && !id.startsWith(".") ? id : ""
-}
-
-// tomlProjectID pulls `id` out of the [project] table of a legacy .terma.toml. It is not
-// a general TOML parser — the file is terma-written and simple — it just finds the id in
-// the [project] section without dragging a dependency into the plugin.
-function tomlProjectID(toml) {
-  let inProject = false
-  for (const raw of toml.split("\n")) {
-    const line = raw.trim()
-    if (line.startsWith("[")) {
-      inProject = line === "[project]"
-      continue
-    }
-    if (!inProject) continue
-    const m = line.match(/^id\s*=\s*['"]([^'"]+)['"]/)
-    if (m) return m[1]
-  }
-  return ""
 }
 
 // --- ids and encoding ---------------------------------------------------------------

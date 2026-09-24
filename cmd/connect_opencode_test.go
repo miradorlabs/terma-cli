@@ -17,7 +17,7 @@ func TestTelemetryConnectOpenCodeInstallsThePlugin(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", termaDir)
 
 	out, err := runTerma(t, "connect", "opencode",
-		"--api-key", "mir_srv_0123456789abcdef", "--project", "770e8400-e29b-41d4-a716-446655440000",
+		"--api-key", "ter_srv_0123456789abcdef", "--project", "770e8400-e29b-41d4-a716-446655440000",
 		"--yes", "--exclude-tool-content")
 	if err != nil {
 		t.Fatalf("connect: %v\n%s", err, out)
@@ -33,7 +33,7 @@ func TestTelemetryConnectOpenCodeInstallsThePlugin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("plugin not written: %v", err)
 	}
-	if !strings.Contains(string(data), "const CONFIG = {") || strings.Contains(string(data), "mir_srv_0123456789abcdef") {
+	if !strings.Contains(string(data), "const CONFIG = {") || strings.Contains(string(data), "ter_srv_0123456789abcdef") {
 		t.Fatalf("plugin config not spliced, or the key leaked into it")
 	}
 	if _, err := os.Stat(helper); err != nil {
@@ -59,7 +59,7 @@ func TestTelemetryConnectOpenCodeInstallsThePlugin(t *testing.T) {
 	if st.State != "connected" || st.Signals != "logs,metrics,traces" || st.Prompts != "on" || st.ToolContent != "off" {
 		t.Errorf("status = %+v", st)
 	}
-	if st.KeyPrefix == "" || strings.Contains(out, "mir_srv_0123456789abcdef") {
+	if st.KeyPrefix == "" || strings.Contains(out, "ter_srv_0123456789abcdef") {
 		t.Errorf("key must be reported masked, never whole:\n%s", out)
 	}
 	if st.ProjectID != "770e8400-e29b-41d4-a716-446655440000" {

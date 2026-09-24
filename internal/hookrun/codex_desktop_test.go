@@ -16,7 +16,7 @@ func TestCodexDesktopHooksCaptureLocalToolsWithRepositoryConsent(t *testing.T) {
 			env := fundingEnv(t)
 			desktop := true
 			if err := shim.SaveRecord(shim.Record{ProjectID: "project-a", Endpoint: "https://otel.terma.ai",
-				Signals: []string{"logs"}, Harnesses: []string{shim.AgentCodex}, Desktop: &desktop,
+				Signals: []string{"logs"}, Harnesses: []string{shim.AgentCodex}, Desktop: desktop,
 				IncludePrompts: allow, IncludeToolContent: allow}); err != nil {
 				t.Fatal(err)
 			}

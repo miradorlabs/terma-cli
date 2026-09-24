@@ -286,14 +286,11 @@ func selectedForRepo(projectID string, saved []string) []string {
 	}
 	for _, choice := range []struct {
 		name    string
-		enabled *bool
+		enabled bool
 	}{{shim.AgentCodex, rec.CLI}, {codexDesktopAgent, rec.Desktop}} {
-		if choice.enabled == nil {
-			continue
-		}
-		if *choice.enabled && !slices.Contains(selected, choice.name) {
+		if choice.enabled && !slices.Contains(selected, choice.name) {
 			selected = append(selected, choice.name)
-		} else if !*choice.enabled {
+		} else if !choice.enabled {
 			selected = slices.DeleteFunc(selected, func(name string) bool { return name == choice.name })
 		}
 	}
@@ -306,7 +303,7 @@ func judgeDesktop(projectID string) harnessVerdict {
 	switch {
 	case routeErr != nil:
 		v.emissionProblem, v.emissionFix = "could not read this repository's Codex desktop route: "+routeErr.Error(), "terma install"
-	case !ok || route.Desktop == nil || !*route.Desktop || !slices.Contains(route.Harnesses, shim.AgentCodex) || !slices.Contains(route.Signals, "logs"):
+	case !ok || !route.Desktop || !slices.Contains(route.Harnesses, shim.AgentCodex) || !slices.Contains(route.Signals, "logs"):
 		v.emissionProblem, v.emissionFix = "this repository has no Codex Desktop hook route", "terma install --signals logs"
 	case keystore.GetFor(shim.AgentCodex, projectID) == "":
 		v.emissionProblem, v.emissionFix = "this repository has no delivery key", "terma install"

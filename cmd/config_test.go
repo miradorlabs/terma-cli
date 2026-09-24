@@ -21,7 +21,7 @@ func TestConfigView_NeverCarriesTheAPIKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	if strings.Contains(strings.ToLower(string(encoded)), "mir_srv_") {
+	if strings.Contains(strings.ToLower(string(encoded)), "ter_srv_") {
 		t.Fatalf("configView serialized a credential: %s", encoded)
 	}
 	if !strings.Contains(string(encoded), "server key") {
@@ -63,12 +63,12 @@ func TestConfigProfilesAreListedByName(t *testing.T) {
 func TestConfig_APIKeyIsNotSerializable(t *testing.T) {
 	encoded, err := json.Marshal(&config.Config{
 		ProfileName: "default",
-		APIKey:      "mir_srv_secret",
+		APIKey:      "ter_srv_secret",
 	})
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	if strings.Contains(string(encoded), "mir_srv_secret") {
+	if strings.Contains(string(encoded), "ter_srv_secret") {
 		t.Fatalf("config.Config serialized the API key: %s", encoded)
 	}
 }

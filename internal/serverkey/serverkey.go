@@ -8,24 +8,13 @@ import (
 	"strings"
 )
 
-// Prefixes a server key may carry, newest first. Keys are a prefix plus hex. The
-// backend minted mir_srv_ keys before Terma had a prefix of its own; those keys
-// stay valid, so the CLI must keep accepting them alongside ter_srv_.
-var Prefixes = []string{"ter_srv_", "mir_srv_"}
-
 // Pattern matches a server key anywhere in text, such as inside a helper script.
-// The character class is exact: nothing else in a config file looks like this.
+// Include Mirador keys when inspecting existing settings so they stay masked.
+// Is separately restricts keys accepted for new Terma connections.
 var Pattern = regexp.MustCompile(`(?:ter|mir)_srv_[0-9a-f]+`)
 
 // Is reports whether s carries a server-key prefix.
-func Is(s string) bool {
-	for _, p := range Prefixes {
-		if strings.HasPrefix(s, p) {
-			return true
-		}
-	}
-	return false
-}
+func Is(s string) bool { return strings.HasPrefix(s, Display) }
 
 // Display is the prefix to name in help and error text.
 const Display = "ter_srv_"

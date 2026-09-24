@@ -451,7 +451,7 @@ func printConnectNotes(out io.Writer, h harness.Harness, e harness.Exporter) {
 func resolveKey(ctx context.Context, cfg *config.Config, h harness.Harness, f connectFlags) (key string, meta api.ServerKey, minted, reused bool, err error) {
 	if key := strings.TrimSpace(f.apiKey); key != "" {
 		if !serverkey.Is(key) {
-			return "", api.ServerKey{}, false, false, errors.New("--api-key expects a server key (ter_srv_… or mir_srv_…)")
+			return "", api.ServerKey{}, false, false, errors.New("--api-key expects a server key (ter_srv_…)")
 		}
 		return key, api.ServerKey{KeyPrefix: harness.MaskKey(key)}, false, false, nil
 	}

@@ -33,7 +33,7 @@ const (
 // printed after a connect matches on.
 //
 // Claude Code's is its own default, "claude-code", which Terma does not override (it
-// writes no OTEL_RESOURCE_ATTRIBUTES; see claudeRetiredKeys). Codex's is not
+// writes no OTEL_RESOURCE_ATTRIBUTES). Codex's is not
 // configurable: it stamps its own originator on every resource, and for the `codex` CLI
 // that is "codex_cli_rs". The Codex desktop app and IDE extensions report under their
 // own originators, which this harness does not configure. OpenCode's is stamped by

@@ -3,7 +3,6 @@ package cmd
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -11,7 +10,6 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
 	"github.com/miradorlabs/terma-cli/internal/shim"
 )
@@ -49,7 +47,7 @@ func TestInstallUsesSavedCodexDesktopChoiceWithoutShellShim(t *testing.T) {
 		t.Fatalf("desktop route/key missing or minted twice (mints=%d):\n%s", gateway.keysMint.Load(), out)
 	}
 	record, ok, err := shim.LoadRecord(projectID)
-	if err != nil || !ok || record.CLI == nil || *record.CLI || record.Desktop == nil || !*record.Desktop {
+	if err != nil || !ok || record.CLI || !record.Desktop {
 		t.Fatalf("desktop-only route choices = %+v, exists=%v, err=%v", record, ok, err)
 	}
 	if _, err := os.Stat(filepath.Join(home, ".zshrc")); !os.IsNotExist(err) {
@@ -73,37 +71,6 @@ func TestInstallUsesSavedCodexDesktopChoiceWithoutShellShim(t *testing.T) {
 	}
 }
 
-func TestDesktopInstallRemovesPreviousRelay(t *testing.T) {
-	if runtime.GOOS != "darwin" {
-		t.Skip("legacy LaunchAgent is macOS only")
-	}
-	home, _ := desktopInstallSandbox(t)
-	if err := (harness.Codex{}).Connect(harness.Exporter{
-		Endpoint: legacyDesktopBaseURL, Signals: []harness.Signal{harness.SignalLogs},
-	}, false); err != nil {
-		t.Fatal(err)
-	}
-	service := filepath.Join(home, "Library", "LaunchAgents", desktopServiceLabel+".plist")
-	if err := os.MkdirAll(filepath.Dir(service), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(service, []byte("legacy"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	const projectID = "aaaaaaaa-0000-4000-8000-000000000001"
-	if out, err := within(20*time.Second).combined(t, "install", "--harness", "codex-desktop",
-		"--project", projectID, "--yes", "--no-doctor"); err != nil {
-		t.Fatalf("migrate install: %v\n%s", err, out)
-	}
-	status, err := (harness.Codex{}).Status()
-	if err != nil || status.Connected {
-		t.Fatalf("old exporter still configured: %+v, %v", status, err)
-	}
-	if _, err := os.Stat(service); !os.IsNotExist(err) {
-		t.Fatalf("old LaunchAgent remains: %v", err)
-	}
-}
-
 func TestInstallCodexCLIAndDesktopShareOneProjectKey(t *testing.T) {
 	_, gateway := desktopInstallSandbox(t)
 	const projectID = "aaaaaaaa-0000-4000-8000-000000000001"
@@ -123,7 +90,7 @@ func TestInstallCodexCLIAndDesktopShareOneProjectKey(t *testing.T) {
 		t.Fatalf("CLI choice did not install its PATH shim: %v", err)
 	}
 	record, ok, err := shim.LoadRecord(projectID)
-	if err != nil || !ok || record.CLI == nil || !*record.CLI || record.Desktop == nil || !*record.Desktop {
+	if err != nil || !ok || !record.CLI || !record.Desktop {
 		t.Fatalf("combined route choices = %+v, exists=%v, err=%v", record, ok, err)
 	}
 }

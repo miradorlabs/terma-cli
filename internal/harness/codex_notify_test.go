@@ -212,31 +212,3 @@ func TestCodexNotifyKeepsOneChainPerConfig(t *testing.T) {
 		}
 	}
 }
-
-// The record the first chaining build wrote named no config. It still restores.
-func TestCodexNotifyReadsTheLegacyRecord(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("CODEX_HOME", home)
-	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
-	statePath, err := codexNotifyStatePath()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(statePath, []byte(`{"previous":["legacy-notifier","--flag"]}`), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	cfg := filepath.Join(home, "config.toml")
-	if err := os.WriteFile(cfg, []byte("notify = [\"terma\", \"hook\", \"codex-notify\"]\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := (Codex{}).RemoveCodexNotify(); err != nil {
-		t.Fatal(err)
-	}
-	data, _ := os.ReadFile(cfg)
-	if !strings.Contains(string(data), "legacy-notifier") {
-		t.Fatalf("the legacy record's notifier was not restored:\n%s", data)
-	}
-	if _, err := os.Stat(statePath); !os.IsNotExist(err) {
-		t.Fatalf("an emptied record should be removed: %v", err)
-	}
-}

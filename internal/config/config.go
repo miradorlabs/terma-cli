@@ -42,11 +42,6 @@ type Profile struct {
 	OTLPURL          string `json:"otlp_url,omitempty"`
 	OrganizationID   string `json:"organization_id,omitempty"`
 	OrganizationName string `json:"organization_name,omitempty"`
-	// Legacy project selections are read for compatibility but never used as defaults.
-	// Projects now belong to repository bindings written by terma install.
-	ProjectID      string                `json:"project_id,omitempty"`
-	ProjectName    string                `json:"project_name,omitempty"`
-	RecentProjects map[string]ProjectRef `json:"recent_projects,omitempty"`
 	// Harnesses is the machine-level list of coding agents this developer works with,
 	// recorded by `terma setup` (adapter names plus codex-desktop as a separate
 	// launch surface). `terma install` connects and wires these for a repository without
@@ -54,14 +49,8 @@ type Profile struct {
 	Harnesses []string `json:"harnesses,omitempty"`
 }
 
-// ProjectRef decodes legacy project selections; they are no longer used as defaults.
-type ProjectRef struct {
-	ID   string `json:"id"`
-	Name string `json:"name,omitempty"`
-}
-
-// SelectOrganization records the account scope and clears obsolete global project
-// selections. Switching accounts never chooses or changes a repository's project.
+// SelectOrganization records the account scope. Switching accounts never chooses
+// or changes a repository's project.
 func (p *Profile) SelectOrganization(id, name string) {
 	if p.OrganizationID != id {
 		p.OrganizationName = ""
@@ -70,7 +59,6 @@ func (p *Profile) SelectOrganization(id, name string) {
 	if name != "" {
 		p.OrganizationName = name
 	}
-	p.ProjectID, p.ProjectName, p.RecentProjects = "", "", nil
 }
 
 // File is config.json as it is on disk: every profile, and which one is active. It holds

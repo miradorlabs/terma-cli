@@ -9,7 +9,7 @@ import (
 func captureExporter() Exporter {
 	return Exporter{
 		Endpoint:           "https://otel.terma.ai",
-		APIKey:             "mir_srv_test",
+		APIKey:             "ter_srv_test",
 		Signals:            AllSignals,
 		IncludePrompts:     true,
 		IncludeToolContent: true,

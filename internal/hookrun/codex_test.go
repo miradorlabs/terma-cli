@@ -13,7 +13,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-func TestCodexSessionStartDoesNotNeedRelay(t *testing.T) {
+func TestCodexSessionStartAnnouncesSession(t *testing.T) {
 	root := initRepo(t)
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	const id = "01a0d0ff-0000-7000-8000-000000000003"

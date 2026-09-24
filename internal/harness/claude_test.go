@@ -68,7 +68,7 @@ func envOf(t *testing.T, path string) map[string]string {
 func fullExporter() Exporter {
 	return Exporter{
 		Endpoint:  "https://otel.terma.ai",
-		APIKey:    "mir_srv_0123456789abcdef",
+		APIKey:    "ter_srv_0123456789abcdef",
 		ProjectID: "proj_123",
 		Signals:   AllSignals,
 		ResourceAttributes: map[string]string{
@@ -90,7 +90,7 @@ func TestRenderDefaultsExcludeContent(t *testing.T) {
 		"OTEL_METRICS_EXPORTER":               "otlp",
 		"OTEL_EXPORTER_OTLP_PROTOCOL":         "http/protobuf",
 		"OTEL_EXPORTER_OTLP_ENDPOINT":         "https://otel.terma.ai",
-		"OTEL_EXPORTER_OTLP_HEADERS":          "Authorization=Bearer mir_srv_0123456789abcdef",
+		"OTEL_EXPORTER_OTLP_HEADERS":          "Authorization=Bearer ter_srv_0123456789abcdef",
 		"OTEL_LOG_USER_PROMPTS":               "0",
 		"OTEL_LOG_ASSISTANT_RESPONSES":        "0",
 		"OTEL_LOG_TOOL_DETAILS":               "0",
@@ -359,7 +359,7 @@ func TestStatusDoesNotClaimTracesWithoutTheBetaFlag(t *testing.T) {
 
 // Status output lands in terminals, screenshots and bug reports.
 func TestStatusNeverReturnsTheWholeKey(t *testing.T) {
-	const key = "mir_srv_0123456789abcdef0123456789abcdef"
+	const key = "ter_srv_0123456789abcdef0123456789abcdef"
 	c, _ := claudeIn(t, "")
 
 	e := fullExporter()
@@ -378,7 +378,7 @@ func TestStatusNeverReturnsTheWholeKey(t *testing.T) {
 	if strings.Contains(st.KeyPrefix, key) || len(st.KeyPrefix) >= len(key) {
 		t.Fatalf("key prefix %q exposes too much of the credential", st.KeyPrefix)
 	}
-	if !strings.HasPrefix(st.KeyPrefix, "mir_srv_") {
+	if !strings.HasPrefix(st.KeyPrefix, "ter_srv_") {
 		t.Errorf("key prefix %q should stay recognizable enough to match in the web app", st.KeyPrefix)
 	}
 }

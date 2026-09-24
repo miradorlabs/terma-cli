@@ -257,8 +257,8 @@ run that reaches them opens a browser login on **production**. A script that run
 - `terma install` writes the repository half of that arrangement by default into the
   same committed `.claude/settings.json` the hooks live in, after the hook plan applies
   so both merges land in order. Re-running install preserves an existing policy unless
-  export flags explicitly change it. The hidden legacy `--telemetry=false` opts out of
-  writing that policy; per-repo routing is configured independently. A pre-existing OTLP conflict there is reported and
+  export flags explicitly change it. Per-repo routing is configured independently.
+  A pre-existing OTLP conflict there is reported and
   skipped, not fatal — the hooks and the binding are already written by that point.
 - Connect scope (`internal/harness/scope.go`): `Claude{}` is global; `Claude{}.Local(root)`
   writes `<root>/.claude/settings.json` and renders only `claudeLocalKeys` — the three
@@ -267,16 +267,15 @@ run that reaches them opens a browser login on **production**. A script that run
   `Status().Connected` is false, and `status`/`doctor` judge connectedness from the
   global file alone. `claudeLayer` says what outranks each file; a conflict in the file
   being written is clearable, one above it is not. Codex has no local scope.
-- Claude Code never gets `OTEL_RESOURCE_ATTRIBUTES` (`claudeRetiredKeys`): it is the
+- Claude Code never gets `OTEL_RESOURCE_ATTRIBUTES`: it is the
   user's variable, the key names the project, and Claude Code stamps `user.id`,
   `user.email` and `service.name=claude-code` itself. The project a configuration
   reports to lives in the connect journal (`journal.ProjectID`, from
-  `Exporter.ProjectID`); `projectIDOf` falls back to the legacy variable for installs
-  that have not reconnected, and a reconnect removes it only while the journal owns it.
+  `Exporter.ProjectID`). User-level settings require a journal for removal; committed
+  repository policies can be removed in any clone.
   `enduser.id` / `mirador.project.id` resource attributes are Codex and OpenCode only.
 - Sessions (`internal/auth/store.go`): `credentials.json` holds, per profile, one
-  credential per organization plus which is active (`{active, organizations}`); the
-  pre-2026-09 one-credential-per-profile shape is read and rewritten on the next save.
+  credential per organization plus which is active (`{active, organizations}`).
   `cmd.signIn` is the only way a command obtains a credential: verify the stored one
   (`/v1/whoami`, which also refreshes it), reuse it, and open the browser only when
   the organization has none. `SaveCredential` activates and reports the session it
@@ -284,10 +283,8 @@ run that reaches them opens a browser login on **production**. A script that run
   changes which organization is active. `logout` revokes every stored session.
 - `terma org use` (`cmd/org.go`) changes account scope only. `terma install` selects
   and saves projects per repository, and reinstalls reuse that binding. Project-scoped
-  reads resolve the Git worktree's `.terma/settings.json` (including legacy TOML),
-  unless `--project` or `TERMA_PROJECT_ID` explicitly overrides it. Legacy profile
-  project defaults are ignored and cleared on login; no project is restored on an
-  organization switch. `terma project use` only explains the install replacement.
+  reads resolve the Git worktree's `.terma/settings.json`, unless `--project` or
+  `TERMA_PROJECT_ID` explicitly overrides it. Machine profiles have no project defaults.
   Keys are remembered per harness per project in `keys.json`
   (`keystore.SetFor`, written by every connect) so returning to a project reuses the
   harness's own key; `resolveKey` checks the harness config, then the keystore, then mints.
@@ -341,8 +338,7 @@ run that reaches them opens a browser login on **production**. A script that run
   A pre-existing Codex notifier is recorded in `~/.config/terma/codex-notify.json`, run
   after capture, and restored by `disconnect codex`. The file holds one chain per Codex
   config path (`chains`), so a second `CODEX_HOME` never overwrites the first's notifier;
-  the earlier single-record shape is read and folded in, and every change goes through
-  `updateCodexNotifyRecord` under a lock, because it is one file for every config on the
+  every change goes through `updateCodexNotifyRecord` under a lock, because it is one file for every config on the
   machine. The notify edit writes where
   `tomlFile` writes: through a symlinked `config.toml`, keeping a mode tighter than 0600.
   Durable cursors advance after spooling; observation IDs allow replay deduplication.
@@ -537,8 +533,7 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   what the platform's `opencode` aisignal adapter parses.
 - Project header under a CLI token: `X-Mirador-Project` (`internal/api/client.go`).
   The shared gateway knows only that name; a Terma-branded header is a 400.
-- `.terma/settings.json` (`internal/project`, JSON; replaced the top-level `.terma.toml`,
-  which is still read and migrated on the next `Save`): `project{id,name,organization_id,
+- `.terma/settings.json` (`internal/project`, JSON): `project{id,name,organization_id,
   environment}`, `install{hook_manager,hooks,adapters,terma_version,installed_at}`. No
   secrets, ever, and nothing per-developer: which agents a developer routes, and how, is
   home-directory state (`config.Profile.Harnesses`, the routing record), so a colleague

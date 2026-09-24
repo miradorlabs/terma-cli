@@ -81,8 +81,7 @@ func (c *Client) cachedCheck(ctx context.Context, dir, current string) (Cache, *
 		cache = Cache{AttemptAt: cache.AttemptAt}
 	}
 	interval := CheckInterval
-	// An empty latest also recognizes failed checks written by older builds.
-	if cache.Failed || cache.Latest == "" {
+	if cache.Failed {
 		interval = RetryInterval
 	}
 	if time.Since(cache.CheckedAt) >= interval || cache.CheckedAt.After(time.Now()) {

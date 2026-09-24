@@ -44,7 +44,6 @@ func TestProjectReadsFollowRepositoryBinding(t *testing.T) {
 				t.Fatal(err)
 			}
 			if err := config.UpdateProfile(config.DefaultProfile, func(p *config.Profile) {
-				p.ProjectID, p.ProjectName = "stale-global", "Old global project"
 				p.OrganizationID, p.OrganizationName = "another-org", "Another organization"
 			}); err != nil {
 				t.Fatal(err)
@@ -58,22 +57,17 @@ func TestProjectReadsFollowRepositoryBinding(t *testing.T) {
 				t.Fatalf("project show disagrees with API scope: %v\n%s", err, out)
 			}
 			file, _ := config.LoadFile()
-			if file.Profiles[config.DefaultProfile].ProjectID != "stale-global" {
+			if file.Profiles[config.DefaultProfile].OrganizationID != "another-org" {
 				t.Fatal("a repository read rewrote machine-wide state")
 			}
 		})
 	}
 }
 
-func TestProjectScopeNeverFallsBackToProfile(t *testing.T) {
+func TestUnboundRepositoryRequiresProject(t *testing.T) {
 	repo := installRepo(t)
 	t.Setenv("TERMA_PROJECT_ID", "")
 	t.Setenv("TERMA_API_KEY", "")
-	if err := config.UpdateProfile(config.DefaultProfile, func(p *config.Profile) {
-		p.ProjectID, p.ProjectName = "stale-global", "Old project"
-	}); err != nil {
-		t.Fatal(err)
-	}
 	// An unbound checkout and a directory outside git both need an explicit choice.
 	for _, dir := range []string{repo, t.TempDir()} {
 		t.Chdir(dir)
@@ -83,7 +77,7 @@ func TestProjectScopeNeverFallsBackToProfile(t *testing.T) {
 			t.Fatal(err)
 		}
 		if err := requireProject(cfg); err == nil || !strings.Contains(err.Error(), "terma install") {
-			t.Fatalf("legacy global selection should not scope a read: %+v, %v", cfg, err)
+			t.Fatalf("unbound directory should require a project: %+v, %v", cfg, err)
 		}
 	}
 	// A nested, unbound checkout must not accidentally use its parent's project.
@@ -101,15 +95,14 @@ func TestProjectScopeNeverFallsBackToProfile(t *testing.T) {
 	}
 }
 
-func TestProjectScopeExplicitOverrideAndLegacyBinding(t *testing.T) {
+func TestProjectScopeExplicitOverrideAndBinding(t *testing.T) {
 	repo := installRepo(t)
 	t.Setenv("TERMA_PROJECT_ID", "")
-	legacy := "[project]\nid = 'legacy-repo'\nname = 'Legacy repository'\n"
-	if err := os.WriteFile(termaproject.LegacyPath(repo), []byte(legacy), 0644); err != nil {
+	if err := termaproject.Save(repo, &termaproject.File{Project: termaproject.Project{ID: "bound-repo", Name: "Repository"}}); err != nil {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct{ flag, env, want string }{
-		{"", "", "legacy-repo"},
+		{"", "", "bound-repo"},
 		{"", "env-project", "env-project"},
 		{"flag-project", "env-project", "flag-project"},
 	} {
@@ -119,7 +112,7 @@ func TestProjectScopeExplicitOverrideAndLegacyBinding(t *testing.T) {
 		if err != nil || cfg.ProjectID != tc.want {
 			t.Fatalf("scope: %+v, %v; want %s", cfg, err, tc.want)
 		}
-		if tc.want != "legacy-repo" && cfg.ProjectName != "" {
+		if tc.want != "bound-repo" && cfg.ProjectName != "" {
 			t.Fatal("explicit override retained the repository's display name")
 		}
 	}
@@ -132,22 +125,7 @@ func TestProjectScopeExplicitOverrideAndLegacyBinding(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := loadProjectConfig(); err == nil {
-		t.Fatal("invalid JSON binding silently fell back to an old project")
-	}
-}
-
-func TestProjectUseDirectsToInstallWithoutWriting(t *testing.T) {
-	repo := installRepo(t)
-	out, err := runTerma(t, "project", "use", "My Project")
-	if err == nil || !strings.Contains(err.Error(), "terma install --project") {
-		t.Fatalf("old global command should explain the repo-level replacement: %v\n%s", err, out)
-	}
-	file, err := config.LoadFile()
-	if err != nil || len(file.Profiles) != 0 {
-		t.Fatalf("project use wrote a global selection: %+v, %v", file, err)
-	}
-	if _, err := termaproject.Load(repo); err != termaproject.ErrNotFound {
-		t.Fatalf("project use should leave binding to install: %v", err)
+		t.Fatal("invalid JSON binding was accepted")
 	}
 }
 
@@ -170,15 +148,6 @@ func TestInstallKeepsProjectChoiceInEachRepo(t *testing.T) {
 		bound, err := termaproject.Load(repo)
 		if err != nil || bound.Project.ID != ids[i] {
 			t.Fatalf("repository %d changed projects: %+v, %v", i, bound, err)
-		}
-	}
-	file, err := config.LoadFile()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, profile := range file.Profiles {
-		if profile.ProjectID != "" || len(profile.RecentProjects) != 0 {
-			t.Fatalf("install selected a global project: %+v", profile)
 		}
 	}
 }

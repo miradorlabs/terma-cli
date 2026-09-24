@@ -124,7 +124,7 @@ func TestTelemetryConnectLocalNeedsARepository(t *testing.T) {
 func TestTelemetryConnectLocalRejectsGlobalOnlyFlags(t *testing.T) {
 	localRepo(t)
 	for _, args := range [][]string{
-		{"--api-key", "mir_srv_test"},
+		{"--api-key", "ter_srv_test"},
 		{"--identity", "someone@example.com"},
 		{"--key-name", "x"},
 		{"--inline-key"},

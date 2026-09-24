@@ -1,14 +1,9 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"os"
-	"os/exec"
-	"os/user"
-	"path/filepath"
 	"slices"
-	"strconv"
 
 	"github.com/spf13/cobra"
 
@@ -19,70 +14,10 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/shim"
 )
 
-const (
-	desktopServiceLabel  = "ai.terma.codex-relay"
-	legacyDesktopBaseURL = "http://127.0.0.1:43199"
-)
-
 func newDesktopCommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "desktop", Short: "Inspect repository-scoped Codex Desktop capture", Hidden: true}
 	cmd.AddCommand(&cobra.Command{Use: "status", Short: "Show this repository's Desktop capture", RunE: statusDesktop})
-	cmd.AddCommand(&cobra.Command{Use: "disconnect", Short: "Remove a previously installed Desktop relay", RunE: disconnectDesktop})
 	return cmd
-}
-
-// removeLegacyDesktopRelay only alters the exporter when it still points at Terma's
-// old loopback endpoint. An unrelated global Codex exporter belongs to the user.
-func removeLegacyDesktopRelay(cmd *cobra.Command) (bool, error) {
-	status, err := (harness.Codex{}).Status()
-	if err != nil {
-		return false, err
-	}
-	changed := false
-	if status.Endpoint == legacyDesktopBaseURL {
-		if _, err := (harness.Codex{}).Disconnect(); err != nil {
-			return false, err
-		}
-		changed = true
-	}
-	path, err := desktopServicePath()
-	if err != nil {
-		return changed, err
-	}
-	if _, err := os.Stat(path); err == nil {
-		if current, err := user.Current(); err == nil && filepath.Dir(filepath.Dir(filepath.Dir(path))) == current.HomeDir {
-			target := "gui/" + strconv.Itoa(os.Getuid()) + "/" + desktopServiceLabel
-			_ = exec.CommandContext(cmd.Context(), "launchctl", "bootout", target).Run()
-		}
-		if err := os.Remove(path); err != nil {
-			return changed, err
-		}
-		changed = true
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return changed, err
-	}
-	return changed, nil
-}
-
-func disconnectDesktop(cmd *cobra.Command, _ []string) error {
-	changed, err := removeLegacyDesktopRelay(cmd)
-	if err != nil {
-		return err
-	}
-	if changed {
-		fmt.Fprintln(cmd.OutOrStdout(), "Previous Desktop relay removed. Restart Codex Desktop to drop the old exporter.")
-	} else {
-		fmt.Fprintln(cmd.OutOrStdout(), "No previous Desktop relay is installed.")
-	}
-	return nil
-}
-
-func desktopServicePath() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, "Library", "LaunchAgents", desktopServiceLabel+".plist"), nil
 }
 
 func statusDesktop(cmd *cobra.Command, _ []string) error {
@@ -107,7 +42,7 @@ func statusDesktop(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
-	ready := ok && route.Desktop != nil && *route.Desktop && slices.Contains(route.Signals, "logs") &&
+	ready := ok && route.Desktop && slices.Contains(route.Signals, "logs") &&
 		slices.Contains(route.Harnesses, shim.AgentCodex) && keystore.GetFor(shim.AgentCodex, projectID) != ""
 	fmt.Fprintf(cmd.OutOrStdout(), "Repository:    %s\n", projectID)
 	fmt.Fprintf(cmd.OutOrStdout(), "Desktop route: %s\n", yesNo(ready))

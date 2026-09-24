@@ -13,7 +13,7 @@ import (
 
 const (
 	testProjectID = "770e8400-e29b-41d4-a716-446655440000"
-	testKey       = "mir_srv_0123456789abcdef"
+	testKey       = "ter_srv_0123456789abcdef"
 	testEndpoint  = "https://otel-dev.example.com"
 )
 
@@ -136,7 +136,7 @@ func TestRouteClaudeYieldsToTheDevelopersOwnSettingsFlag(t *testing.T) {
 func TestRouteCodexPreservesHome(t *testing.T) {
 	sandbox(t)
 	repo := boundRepo(t, testProjectID)
-	if err := SaveRecord(Record{ProjectID: testProjectID, Endpoint: testEndpoint, Signals: []string{"logs"}, Harnesses: []string{AgentCodex}}); err != nil {
+	if err := SaveRecord(Record{ProjectID: testProjectID, Endpoint: testEndpoint, Signals: []string{"logs"}, Harnesses: []string{AgentCodex}, CLI: true}); err != nil {
 		t.Fatal(err)
 	}
 	if err := keystore.SetFor(AgentCodex, testProjectID, testKey); err != nil {
@@ -170,7 +170,7 @@ func TestDesktopOnlyRouteDoesNotConfigureCodexCLI(t *testing.T) {
 	repo := boundRepo(t, testProjectID)
 	cli, desktop := false, true
 	if err := SaveRecord(Record{ProjectID: testProjectID, Endpoint: testEndpoint, Signals: []string{"logs"},
-		Harnesses: []string{AgentCodex}, CLI: &cli, Desktop: &desktop}); err != nil {
+		Harnesses: []string{AgentCodex}, CLI: cli, Desktop: desktop}); err != nil {
 		t.Fatal(err)
 	}
 	if err := keystore.SetFor(AgentCodex, testProjectID, testKey); err != nil {
@@ -218,7 +218,7 @@ func TestCodexRouteUsesDestinationBinding(t *testing.T) {
 	personal := boundRepo(t, personalID)
 	unbound := t.TempDir()
 	for _, id := range []string{testProjectID, personalID} {
-		if err := SaveRecord(Record{ProjectID: id, Signals: []string{"logs"}, Harnesses: []string{AgentCodex}}); err != nil {
+		if err := SaveRecord(Record{ProjectID: id, Signals: []string{"logs"}, Harnesses: []string{AgentCodex}, CLI: true}); err != nil {
 			t.Fatal(err)
 		}
 		if err := keystore.SetFor(AgentCodex, id, testKey+id); err != nil {
@@ -265,7 +265,7 @@ func TestRouteEnvPassesThroughWhenNotApplicable(t *testing.T) {
 		t.Fatal("no record should not route")
 	}
 	// Record exists but does not list the agent.
-	if err := SaveRecord(Record{ProjectID: testProjectID, Endpoint: testEndpoint, Harnesses: []string{AgentCodex}}); err != nil {
+	if err := SaveRecord(Record{ProjectID: testProjectID, Endpoint: testEndpoint, Harnesses: []string{AgentCodex}, CLI: true}); err != nil {
 		t.Fatal(err)
 	}
 	if err := keystore.SetFor(AgentClaude, testProjectID, testKey); err != nil {
@@ -332,7 +332,7 @@ func TestRemoveAllTearsDownRoutingState(t *testing.T) {
 	if _, err := InstallShims([]string{AgentCodex}); err != nil {
 		t.Fatal(err)
 	}
-	if err := SaveRecord(Record{ProjectID: testProjectID, Endpoint: testEndpoint, Harnesses: []string{AgentCodex}}); err != nil {
+	if err := SaveRecord(Record{ProjectID: testProjectID, Endpoint: testEndpoint, Harnesses: []string{AgentCodex}, CLI: true}); err != nil {
 		t.Fatal(err)
 	}
 	if err := RemoveAll(); err != nil {
@@ -494,7 +494,7 @@ func TestClaudeRouteRefreshesKeysAndMasksInheritedDestinations(t *testing.T) {
 	if len(first.args) != 2 {
 		t.Fatal("missing initial route")
 	}
-	if err := keystore.SetFor(AgentClaude, testProjectID, "mir_srv_fedcba9876543210"); err != nil {
+	if err := keystore.SetFor(AgentClaude, testProjectID, "ter_srv_fedcba9876543210"); err != nil {
 		t.Fatal(err)
 	}
 	routeFor(AgentClaude, repo, nil)
@@ -522,7 +522,7 @@ func TestClaudeRouteRefreshesKeysAndMasksInheritedDestinations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(helper), "mir_srv_fedcba9876543210") || strings.Contains(string(helper), testKey) {
+	if !strings.Contains(string(helper), "ter_srv_fedcba9876543210") || strings.Contains(string(helper), testKey) {
 		t.Fatal("stale credential")
 	}
 	// A damaged settings path must not switch to a partial environment route.
@@ -535,5 +535,19 @@ func TestClaudeRouteRefreshesKeysAndMasksInheritedDestinations(t *testing.T) {
 	r := routeFor(AgentClaude, repo, nil)
 	if len(r.args) != 0 || len(r.env) != 0 {
 		t.Fatal("failed preparation did not pass through")
+	}
+}
+
+func TestCodexRouteRequiresExplicitCLIChoice(t *testing.T) {
+	sandbox(t)
+	repo := boundRepo(t, testProjectID)
+	if err := SaveRecord(Record{ProjectID: testProjectID, Endpoint: testEndpoint, Harnesses: []string{AgentCodex}, Signals: []string{"logs"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := keystore.SetFor(AgentCodex, testProjectID, testKey); err != nil {
+		t.Fatal(err)
+	}
+	if got := routeFor(AgentCodex, repo, nil); len(got.args) != 0 || len(got.env) != 0 {
+		t.Fatalf("Codex routed without a CLI choice: %+v", got)
 	}
 }

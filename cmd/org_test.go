@@ -215,10 +215,8 @@ func TestOrgUseSwitchesAccountsWithoutSelectingProjects(t *testing.T) {
 	if _, err := auth.UseOrganization(config.DefaultProfile, orgA().ID); err != nil {
 		t.Fatal(err)
 	}
-	acmeAPI := projectsIn(orgA().ID)[1]
 	if err := config.UpdateProfile(config.DefaultProfile, func(p *config.Profile) {
 		p.SelectOrganization(orgA().ID, "Acme")
-		p.ProjectID, p.ProjectName = acmeAPI.ID, acmeAPI.Name
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -252,11 +250,8 @@ func TestOrgUseSwitchesAccountsWithoutSelectingProjects(t *testing.T) {
 	}
 	file, _ := config.LoadFile()
 	p := file.Profiles[config.DefaultProfile]
-	if p.OrganizationID != orgA().ID || p.ProjectID != "" {
+	if p.OrganizationID != orgA().ID {
 		t.Fatalf("profile after switching back: %+v", p)
-	}
-	if len(p.RecentProjects) != 0 {
-		t.Fatalf("projects should not be remembered globally: %+v", p.RecentProjects)
 	}
 
 	// Already there: says so, changes nothing.

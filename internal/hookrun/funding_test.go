@@ -22,7 +22,7 @@ func fundingEnv(t *testing.T) Env {
 	t.Setenv("ANTHROPIC_API_KEY", "")
 	t.Setenv("ANTHROPIC_AUTH_TOKEN", "")
 	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "")
-	writeFile(t, root, ".terma.toml", "[project]\nid = \"project-a\"\n")
+	writeFile(t, root, ".terma/settings.json", `{"project":{"id":"project-a"}}`)
 	sp, err := spool.Open(t.TempDir())
 	if err != nil {
 		t.Fatal(err)

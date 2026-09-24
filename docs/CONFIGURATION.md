@@ -32,8 +32,7 @@ choosing a project or changing repository bindings.
 Project-scoped reads use the current Git repository's binding, including from its
 subdirectories. Outside an installed repository, use `--project <id>` for a single
 command. An explicit `--project` or `TERMA_PROJECT_ID` overrides the binding without
-saving a selection. Legacy project defaults in user profiles are ignored; login
-clears them. The old `terma project use` command directs you to `terma install`.
+saving a selection.
 
 ## Local files
 

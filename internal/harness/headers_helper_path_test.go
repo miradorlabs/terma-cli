@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// A project id out of a committed .terma.toml must never steer the helper — which
+// A project id out of a committed .terma/settings.json must never steer the helper — which
 // holds a live server key and is written executable — out of the helpers directory.
 func TestHelperFilePathRejectsTraversal(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", filepath.Join(t.TempDir(), "cfg"))

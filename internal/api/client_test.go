@@ -30,6 +30,10 @@ func newTestClient(t *testing.T, url string, cred *auth.Credential, projectID st
 func newSplitTestClient(t *testing.T, apiURL, authURL string, cred *auth.Credential, projectID string) *Client {
 	t.Helper()
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	cred.AuthURL = authURL
+	if cred.OrganizationID == "" {
+		cred.OrganizationID = "org-test"
+	}
 
 	if _, err := auth.SaveCredential(config.DefaultProfile, cred); err != nil {
 		t.Fatalf("seed credential: %v", err)
@@ -48,9 +52,10 @@ func newSplitTestClient(t *testing.T, apiURL, authURL string, cred *auth.Credent
 
 func liveCredential() *auth.Credential {
 	return &auth.Credential{
-		AccessToken:  "mir_cli_live",
-		RefreshToken: "mir_clr_live",
-		ExpiresAt:    time.Now().Add(time.Hour),
+		AccessToken:    "mir_cli_live",
+		OrganizationID: "org-test",
+		RefreshToken:   "mir_clr_live",
+		ExpiresAt:      time.Now().Add(time.Hour),
 	}
 }
 
@@ -135,9 +140,10 @@ func TestClient_RefreshesExpiredTokenBeforeRequesting(t *testing.T) {
 	defer srv.Close()
 
 	expired := &auth.Credential{
-		AccessToken:  "mir_cli_stale",
-		RefreshToken: "mir_clr_stale",
-		ExpiresAt:    time.Now().Add(-time.Hour),
+		AccessToken:    "mir_cli_stale",
+		OrganizationID: "org-1",
+		RefreshToken:   "mir_clr_stale",
+		ExpiresAt:      time.Now().Add(-time.Hour),
 	}
 	client := newTestClient(t, srv.URL, expired, "project-123")
 
@@ -358,16 +364,15 @@ func TestClient_RefusesACredentialFromAnotherDeployment(t *testing.T) {
 	}
 }
 
-// TestClient_AcceptsACredentialFromTheSameEnvironment keeps the guard from being a wall:
-// the ordinary case must be untouched, and credentials written before the field existed
-// carry no host and must still work.
+// A credential needs an issuing host before the client can send it.
 func TestClient_AcceptsACredentialFromTheSameEnvironment(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		authURL string
+		wantErr bool
 	}{
-		{"same host", "https://auth.mirador.org"},
-		{"pre-existing credential with no recorded host", ""},
+		{"same host", "https://auth.mirador.org", false},
+		{"missing issuing host", "", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
@@ -380,8 +385,8 @@ func TestClient_AcceptsACredentialFromTheSameEnvironment(t *testing.T) {
 				ProfileName: config.DefaultProfile,
 				APIURL:      "https://api.mirador.org",
 				AuthURL:     "https://auth.mirador.org",
-			}, Options{Version: "test"}); err != nil {
-				t.Fatalf("New: %v", err)
+			}, Options{Version: "test"}); (err != nil) != tc.wantErr {
+				t.Fatalf("New error = %v, want error %v", err, tc.wantErr)
 			}
 		})
 	}

@@ -168,39 +168,12 @@ var claudeLocalKeys = []string{
 	otelLogToolContent,
 }
 
-// claudeRetiredKeys were written by earlier versions of Terma and never are again.
-// OTEL_RESOURCE_ATTRIBUTES carried the identity, the project and a service.name; it is
-// the user's own variable for describing their resources, and nothing Terma put in it
-// is needed: the server key names the project, Claude Code stamps user.id and
-// user.email on every metric and event itself, and its resource already says
-// service.name=claude-code.
-//
-// A connect clears a retired key only while the journal shows it still holds what an
-// earlier Terma installed — a value the user set, or edited, is theirs. The paths with
-// no journal to consult (a legacy disconnect, a legacy status count) treat retired keys
-// as managed, because an install old enough to have no journal did write them.
-var claudeRetiredKeys = []string{otelResourceAttributes}
-
 // managedKeys is what this value owns in the file it writes.
 func (c Claude) managedKeys() []string {
 	if c.root != "" {
 		return claudeLocalKeys
 	}
 	return claudeManagedKeys
-}
-
-// retiredKeys is what earlier versions wrote into the file this value writes. The
-// repository scope never carried them.
-func (c Claude) retiredKeys() []string {
-	if c.root != "" {
-		return nil
-	}
-	return claudeRetiredKeys
-}
-
-// legacyKeys is every key an install without a journal may owe to Terma.
-func (c Claude) legacyKeys() []string {
-	return append(append([]string{}, c.managedKeys()...), c.retiredKeys()...)
 }
 
 // Name is the token `terma connect` and `--harness` accept.
@@ -293,7 +266,7 @@ func renderClaude(e Exporter) map[string]string {
 		env[otelHeaders] = "Authorization=Bearer " + e.APIKey
 	}
 	// e.ResourceAttributes are deliberately not rendered. OTEL_RESOURCE_ATTRIBUTES
-	// belongs to the user (see claudeRetiredKeys); the project travels in the connect
+	// belongs to the user; the project travels in the connect
 	// journal instead, and Claude Code supplies the identity and service name itself.
 	return env
 }
@@ -368,13 +341,13 @@ func (c Claude) Status() (Status, error) {
 		}
 	}
 	// With a journal, ownership is value-based: a key edited since connect is the user's
-	// and must not make a later disconnect fall back to deleting it. Without a journal,
-	// retain the legacy name-based count so older installations can still be cleaned up.
+	// and must not make a later disconnect fall back to deleting it. Repository
+	// policy can also be committed by a colleague without a local journal.
 	j, err := loadJournal(c.Name(), path)
 	if err != nil {
 		return Status{}, err
 	}
-	status.ProjectID = projectIDOf(s.env, j)
+	status.ProjectID = projectIDOf(j)
 	if j != nil {
 		for key, installed := range j.Installed {
 			if current, ok := s.env[key]; ok && current == installed {
@@ -386,8 +359,8 @@ func (c Claude) Status() (Status, error) {
 				status.ManagedKeys++
 			}
 		}
-	} else {
-		for _, key := range c.legacyKeys() {
+	} else if c.root != "" {
+		for _, key := range c.managedKeys() {
 			if _, ok := s.env[key]; ok {
 				status.ManagedKeys++
 			}
@@ -617,12 +590,7 @@ func (c Claude) Connect(e Exporter, clearConflicts bool) error {
 	//
 	// Only this scope's keys: at repository scope the render omits the endpoint and
 	// headers by design, and a project file that holds its own is not Terma's to empty.
-	//
-	// A retired key (claudeRetiredKeys) goes the same way, but only while it still
-	// holds what an earlier connect installed. A managed key is cleared whoever set it,
-	// because a stale value there defeats the connect; a retired key the user set is
-	// simply theirs.
-	for _, key := range c.legacyKeys() {
+	for _, key := range c.managedKeys() {
 		if _, rendered := env[key]; rendered {
 			continue
 		}
@@ -633,18 +601,13 @@ func (c Claude) Connect(e Exporter, clearConflicts bool) error {
 		// What disconnect should put back: for a value an earlier connect installed,
 		// the pre-Terma value it recorded — never Terma's own leftover.
 		restore := value
-		owned := false
 		if previousJournal != nil {
 			if installed, ok := previousJournal.Installed[key]; ok && installed == value {
-				owned = true
 				restore = ""
 				if prior := previousJournal.Previous[key]; prior != nil {
 					restore = *prior
 				}
 			}
-		}
-		if !owned && slices.Contains(c.retiredKeys(), key) {
-			continue
 		}
 		if restore != "" {
 			cleared[key] = restore
@@ -796,10 +759,10 @@ func (c Claude) Disconnect() (DisconnectResult, error) {
 			s.root[key] = encoded
 			result.Restored++
 		}
-	default:
-		// No record: an older connect, a hand-edited config — or, at repository scope,
-		// a project file committed by a colleague whose journal is on their machine.
-		result.Removed = s.remove(c.legacyKeys())
+	case c.root != "":
+		// A repository policy can be committed by a colleague whose journal is
+		// on their machine. User-level settings require a local ownership record.
+		result.Removed = s.remove(c.managedKeys())
 		result.Unjournaled = true
 	}
 
@@ -918,11 +881,11 @@ func (c Claude) CurrentCredential(endpoint, projectID string) (string, bool) {
 		return "", false
 	}
 	j, err := loadJournal(c.Name(), path)
-	if err != nil || projectIDOf(s.env, j) != projectID {
+	if err != nil || projectIDOf(j) != projectID {
 		return "", false
 	}
 	if helper := stringSetting(s.root, claudeOtelHeadersHelper); helper != "" && isOwnHelper(helper) {
-		if key := keyFromHelper(helper); key != "" {
+		if key := keyFromHelper(helper); serverkey.Is(key) {
 			return key, true
 		}
 	}
@@ -947,26 +910,10 @@ func MaskKey(key string) string {
 	return serverkey.Mask(key)
 }
 
-// projectIDOf is the project a configuration reports to. The connect journal is the
-// record. A configuration connected before the journal carried it still holds the id
-// in the OTEL_RESOURCE_ATTRIBUTES an older Terma wrote, and that answers until the next
-// connect replaces both; a hand-assembled configuration has neither and reads as
-// unknown.
-func projectIDOf(env map[string]string, j *journal) string {
-	if j != nil && j.ProjectID != "" {
+// projectIDOf reports the project recorded by connect's ownership journal.
+func projectIDOf(j *journal) string {
+	if j != nil {
 		return j.ProjectID
-	}
-	return resourceAttribute(env[otelResourceAttributes], AttrProjectID)
-}
-
-// resourceAttribute reads one key out of an OTEL_RESOURCE_ATTRIBUTES value, which
-// only the legacy fallback in projectIDOf still has reason to do.
-func resourceAttribute(raw, key string) string {
-	for pair := range strings.SplitSeq(raw, ",") {
-		name, value, found := strings.Cut(pair, "=")
-		if found && strings.TrimSpace(name) == key {
-			return strings.TrimSpace(value)
-		}
 	}
 	return ""
 }

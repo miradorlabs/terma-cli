@@ -121,7 +121,7 @@ func codexDesktopRoute(r *repo) (shim.Record, bool) {
 		return shim.Record{}, false
 	}
 	rec, ok, err := shim.LoadRecord(r.projectID)
-	return rec, err == nil && ok && rec.Desktop != nil && *rec.Desktop &&
+	return rec, err == nil && ok && rec.Desktop &&
 		slices.Contains(rec.Harnesses, shim.AgentCodex) && slices.Contains(rec.Signals, "logs")
 }
 

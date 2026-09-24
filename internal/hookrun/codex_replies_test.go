@@ -63,7 +63,7 @@ func connectCodexDesktop(t *testing.T, includePrompts bool) {
 	desktop := true
 	if err := shim.SaveRecord(shim.Record{ProjectID: "project-a", Endpoint: "https://otel.terma.ai",
 		Signals: []string{"logs"}, Harnesses: []string{shim.AgentCodex},
-		IncludePrompts: includePrompts, Desktop: &desktop}); err != nil {
+		IncludePrompts: includePrompts, Desktop: desktop}); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv(shim.CodexRoutedEnv, "")
@@ -157,7 +157,7 @@ func TestCodexRepliesNeedTheConsentPromptsTravelUnder(t *testing.T) {
 			falseValue := false
 			if err := shim.SaveRecord(shim.Record{ProjectID: "project-a", Endpoint: "https://otel.terma.ai",
 				Signals: []string{"logs"}, IncludePrompts: true, Harnesses: []string{shim.AgentCodex},
-				Desktop: &falseValue}); err != nil {
+				Desktop: falseValue}); err != nil {
 				t.Fatal(err)
 			}
 			t.Setenv(shim.CodexRoutedEnv, "")

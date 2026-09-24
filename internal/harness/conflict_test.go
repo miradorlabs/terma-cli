@@ -368,7 +368,7 @@ func TestBackupIsNotOverwrittenByAReconnect(t *testing.T) {
 	if !strings.Contains(string(data), "their-collector.example.com") {
 		t.Fatalf("the backup no longer holds the original configuration:\n%s", data)
 	}
-	if strings.Contains(string(data), "mir_srv_") {
+	if strings.Contains(string(data), "ter_srv_") {
 		t.Fatal("the backup was replaced with a copy of Terma's own settings")
 	}
 }
@@ -587,13 +587,13 @@ func TestReconnectPreservesOriginalJournal(t *testing.T) {
 	}`)
 
 	first := fullExporter()
-	first.APIKey = "mir_srv_first_credential"
+	first.APIKey = "ter_srv_first_credential"
 	if err := c.Connect(first, true); err != nil {
 		t.Fatalf("first Connect: %v", err)
 	}
 
 	second := fullExporter()
-	second.APIKey = "mir_srv_second_credential"
+	second.APIKey = "ter_srv_second_credential"
 	if err := c.Connect(second, true); err != nil {
 		t.Fatalf("second Connect: %v", err)
 	}
@@ -615,7 +615,7 @@ func TestReconnectPreservesOriginalJournal(t *testing.T) {
 
 // A first disconnect deliberately leaves an edited value alone. Keeping a reduced
 // journal makes that decision stable: status no longer calls the edit Terma-owned,
-// and a repeated disconnect cannot fall into the legacy name-based removal path.
+// and a repeated disconnect must keep leaving the edit alone.
 func TestRepeatedDisconnectKeepsEditedKeys(t *testing.T) {
 	c, path := claudeIn(t, `{}`)
 	if err := c.Connect(fullExporter(), false); err != nil {
@@ -694,7 +694,7 @@ func TestDisconnectRefusesCorruptJournal(t *testing.T) {
 	}
 
 	if _, err := c.Disconnect(); err == nil {
-		t.Fatal("Disconnect treated a corrupt ownership journal as an absent legacy journal")
+		t.Fatal("Disconnect treated a corrupt ownership journal as an absent journal")
 	}
 	if envOf(t, path)[otelHeaders] == "" {
 		t.Error("Disconnect changed settings despite the corrupt ownership journal")
@@ -1013,7 +1013,7 @@ func TestConnectClearsInlineHeaderWhenSwitchingToHelper(t *testing.T) {
 	c := Claude{}
 	old := Exporter{
 		Endpoint:  "https://otel-dev.mirador.org",
-		APIKey:    "mir_srv_oldprojectkey0001",
+		APIKey:    "ter_srv_oldprojectkey0001",
 		ProjectID: "project-old",
 		Signals:   AllSignals,
 	}
@@ -1027,7 +1027,7 @@ func TestConnectClearsInlineHeaderWhenSwitchingToHelper(t *testing.T) {
 	helper := filepath.Join(dir, ".config", "terma", "helpers", "claude-otel-project-new")
 	fresh := Exporter{
 		Endpoint:   "https://otel-dev.mirador.org",
-		APIKey:     "mir_srv_newprojectkey0002",
+		APIKey:     "ter_srv_newprojectkey0002",
 		ProjectID:  "project-new",
 		Signals:    AllSignals,
 		HelperPath: helper,
@@ -1047,7 +1047,7 @@ func TestConnectClearsInlineHeaderWhenSwitchingToHelper(t *testing.T) {
 	if err != nil {
 		t.Fatalf("helper: %v", err)
 	}
-	if !strings.Contains(string(body), "mir_srv_newprojectkey0002") {
+	if !strings.Contains(string(body), "ter_srv_newprojectkey0002") {
 		t.Fatal("helper does not carry the new key")
 	}
 
