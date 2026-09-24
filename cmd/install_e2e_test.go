@@ -666,3 +666,72 @@ func TestInstallE2EPreservesFileMode(t *testing.T) {
 		t.Fatalf("uninstall relaxed permissions: %v %v", info, err)
 	}
 }
+
+func TestInstallE2EUpgradesLegacyHooksPath(t *testing.T) {
+	for _, previous := range []string{"", "team-hooks"} {
+		t.Run("previous="+previous, func(t *testing.T) {
+			s := newInstallSandbox(t)
+			root := s.mkdir("workspace")
+			s.git(root, "init", "-q")
+			// Reproduce the on-disk shape from the released installer, rather
+			// than using the current installer to create the initial state.
+			s.git(root, "config", "--local", "core.hooksPath", hookmgr.ShimDir)
+			record, err := json.Marshal(map[string]string{
+				"previous_hooks_path": previous,
+				"recorded_at":         "2026-01-01T00:00:00Z",
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			s.write(root, ".git/terma/install.json", string(record))
+			if previous != "" {
+				s.write(root, previous+"/prepare-commit-msg", "#!/bin/sh\nprintf 'legacy-hook\\n' >> legacy-hook-ran\n")
+			}
+			s.install(root)
+			s.install(root)
+			if got := s.git(root, "config", "--worktree", "core.hooksPath"); got != hookmgr.ShimDir {
+				t.Fatalf("worktree hooks = %q", got)
+			}
+			if previous != "" {
+				s.git(root, "commit", "--allow-empty", "-qm", "legacy chaining")
+				if got := string(readInstallFile(t, root, "legacy-hook-ran")); got != "legacy-hook\n" {
+					t.Fatalf("legacy hook output = %q", got)
+				}
+			}
+			s.cli(root, "uninstall", "--yes")
+			for _, scope := range []string{"--local", "--worktree"} {
+				got, err := s.run(root, "", "git", "config", scope, "--get", "core.hooksPath")
+				if scope == "--local" && previous != "" {
+					if err != nil || strings.TrimSpace(got) != previous {
+						t.Fatalf("restored local = %q, %v", got, err)
+					}
+				} else if err == nil {
+					t.Fatalf("stale %s hooksPath = %q", scope, got)
+				}
+			}
+		})
+	}
+}
+
+func TestInstallE2ELegacyLinkedMigrationDoesNotChangeSharedHooks(t *testing.T) {
+	s := newInstallSandbox(t)
+	main := s.mkdir("main")
+	s.git(main, "init", "-q")
+	s.git(main, "commit", "--allow-empty", "-qm", "initial")
+	linked := filepath.Join(s.base, "linked")
+	s.git(main, "worktree", "add", "-qb", "linked", linked)
+	gitDir := s.git(linked, "rev-parse", "--absolute-git-dir")
+	s.git(main, "config", "--local", "core.hooksPath", hookmgr.ShimDir)
+	record := `{"previous_hooks_path":"team-hooks","recorded_at":"2026-01-01T00:00:00Z"}`
+	s.write(gitDir, "terma/install.json", record)
+	out, err := s.run(linked, "", s.bin, "install", "--harness", "none", "--project", testProjectID, "--yes", "--no-doctor")
+	if err == nil || !strings.Contains(out, "main worktree") {
+		t.Fatalf("expected migration guidance, got %v: %s", err, out)
+	}
+	if got := s.git(main, "config", "--local", "core.hooksPath"); got != hookmgr.ShimDir {
+		t.Fatalf("changed shared hooksPath to %q", got)
+	}
+	if got := string(readInstallFile(t, gitDir, "terma/install.json")); got != record {
+		t.Fatalf("overwrote legacy journal: %s", got)
+	}
+}

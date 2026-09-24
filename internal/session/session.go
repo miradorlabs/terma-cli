@@ -401,16 +401,6 @@ type installRecord struct {
 
 const installFile = "install.json"
 
-// RecordPreviousHooksPath remembers the core.hooksPath in force before terma
-// pointed git at its shims. Recording twice keeps the first value: the second
-// run would otherwise "remember" terma's own path.
-func RecordPreviousHooksPath(gitDir, previous string) error {
-	if _, ok := PreviousHooksPath(gitDir); ok {
-		return nil
-	}
-	return RecordPreviousHooksPathAtScope(gitDir, previous, "--local", previous != "", previous)
-}
-
 // RecordPreviousHooksPathAtScope also records Git's scope and whether the previous
 // setting was explicit there. Inherited values must be restored by unsetting ours.
 func RecordPreviousHooksPathAtScope(gitDir, previous, scope string, local bool, chainPath string) error {
@@ -430,7 +420,7 @@ func PreviousHooksScope(gitDir string) string {
 	return "--local"
 }
 
-// PreviousHooksPath returns what RecordPreviousHooksPath stored; ok is false when
+// PreviousHooksPath returns the saved original hook path; ok is false when
 // nothing was recorded.
 func PreviousHooksPath(gitDir string) (previous string, ok bool) {
 	var rec installRecord

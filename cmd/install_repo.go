@@ -42,6 +42,26 @@ func wireRepo(ctx context.Context, out io.Writer, root string, bound *termaproje
 	if err != nil {
 		return err
 	}
+	// Older installs wrote shared --local config. Restore that owned setting
+	// before recording the new worktree override, or we'd remember our own shim
+	// and lose the user's original hook path. Never migrate shared config from
+	// a linked checkout: the owning main checkout must do that first.
+	if session.PreviousHooksScope(gitDir) == "--local" {
+		local, localErr := gitx.Git(ctx, root, "config", "--local", "--get", "core.hooksPath")
+		if previous, recorded := session.PreviousHooksPath(gitDir); recorded && localErr == nil && local == hookmgr.ShimDir {
+			if filepath.Clean(gitx.CommonDirFS(gitDir)) != filepath.Clean(gitDir) {
+				return fmt.Errorf("legacy shared Git hooks must be migrated from the main worktree with `terma install` first")
+			}
+			if session.HooksPathWasLocal(gitDir) {
+				err = gitx.ConfigSet(ctx, root, "core.hooksPath", previous)
+			} else {
+				err = gitx.ConfigUnset(ctx, root, "core.hooksPath")
+			}
+			if err != nil {
+				return err
+			}
+		}
+	}
 	scope, err := hooksConfigScope(ctx, root, gitDir)
 	if err != nil {
 		return err
