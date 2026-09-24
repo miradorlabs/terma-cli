@@ -44,6 +44,12 @@ var CodexHooks = []struct {
 }{
 	{"SessionStart", CodexHookCommand("codex-session-start"), false, 10},
 	{"UserPromptSubmit", CodexHookCommand("codex-user-prompt-submit"), true, 10},
+	// Record the start before the tool runs. PostToolUse can then report an
+	// observed elapsed time under the same tool_use_id.
+	{"PreToolUse", CodexHookCommand("codex-pre-tool-use"), false, 10},
+	// This only observes that approval was requested. Codex does not send the
+	// eventual user decision back to repository hooks.
+	{"PermissionRequest", CodexHookCommand("codex-permission-request"), false, 10},
 	{"PostToolUse", CodexHookCommand("codex-post-tool-use"), true, 10},
 	// Finish the bounded local snapshot before codex exec can shut down. An
 	// async Stop may be cancelled at exit; network delivery stays detached.

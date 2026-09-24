@@ -32,6 +32,8 @@ func (codex) Events() map[string]Handler {
 		"codex-notify":             hookrun.CodexNotify,
 		"codex-session-start":      hookrun.CodexSessionStart,
 		"codex-user-prompt-submit": hookrun.CodexUserPromptSubmit,
+		"codex-pre-tool-use":       hookrun.CodexPreToolUse,
+		"codex-permission-request": hookrun.CodexPermissionRequest,
 		"codex-session-end":        hookrun.CodexSessionEnd,
 		"codex-post-tool-use":      hookrun.CodexPostToolUse,
 		"codex-stop":               hookrun.CodexStop,

@@ -113,6 +113,12 @@ func TestCodexHooksMergeKeepsDescriptionAndUserGroups(t *testing.T) {
 	if !ours.Async {
 		t.Fatal("PostToolUse must be async")
 	}
+	if pre := doc.Hooks["PreToolUse"]; len(pre) != 1 || pre[0].Hooks[0].Command != CodexHookCommand("codex-pre-tool-use") || pre[0].Hooks[0].Async {
+		t.Fatalf("PreToolUse must record before the call: %+v", pre)
+	}
+	if approval := doc.Hooks["PermissionRequest"]; len(approval) != 1 || approval[0].Hooks[0].Command != CodexHookCommand("codex-permission-request") {
+		t.Fatalf("PermissionRequest missing: %+v", approval)
+	}
 	if prompt := doc.Hooks["UserPromptSubmit"]; len(prompt) != 2 || prompt[0].Hooks[0].Command != "./log.sh" || prompt[1].Hooks[0].Command != CodexHookCommand("codex-user-prompt-submit") {
 		t.Fatalf("user prompt hook merge wrong: %+v", prompt)
 	}

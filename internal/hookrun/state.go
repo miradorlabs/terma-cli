@@ -20,6 +20,7 @@ const (
 	codexFundingCursorDir = "funding-cursors"
 	codexReplyCursorDir   = "reply-cursors"
 	codexDesktopCursorDir = "desktop-cursors"
+	codexToolStartDir     = "codex-tool-starts"
 	// cursorObservationDir and antigravityObservationDir are the observation
 	// checkpoints, per harness so one harness's stream survives another's arrival.
 	cursorObservationDir      = "cursor-observations"

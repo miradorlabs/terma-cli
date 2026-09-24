@@ -36,12 +36,19 @@ reinstalling. An unrelated user-level exporter is left alone.
 
 - `SessionStart` marks the session. `UserPromptSubmit` reports the turn and
   sends prompt text only if this repository allows it.
-- `PostToolUse` reports local tool calls and results. Arguments and output
-  travel only when this repository allows tool content. Identified file edits
-  carry the same tool call ID, so the platform folds them into one call.
+- `PreToolUse` and `PostToolUse` pair by Codex's tool call ID to report an
+  observed elapsed time. It includes approval waits and hook scheduling, so it
+  is not Codex's native execution duration. `PostToolUse` reports local tool
+  calls and results; arguments and output travel only when this repository
+  allows tool content. Identified file edits carry the same call ID.
+- `PermissionRequest` records that Codex asked for approval, and an optional
+  reason under the tool-content policy. Codex does not report the user's answer
+  to a repository hook. Terma labels this **requested**, never approved/denied.
 - `Stop`, `SessionEnd`, and `PostToolUse` read a bounded local Codex rollout
-  cursor for per-response token usage and completed hosted Extension actions,
-  which do not arrive through ordinary tool hooks. Assistant replies are read
+  cursor for per-response token usage, completed hosted Extension actions,
+  turn duration and time to first token, and compaction duration where present.
+  The rollout's trace ID is carried as a cross-reference when available; its
+  absence does not create a synthetic native span. Assistant replies are read
   at turn end only if this repository allows prompt content. These readers
   append to the spool before advancing their cursors.
 - The existing spool delivers events with this repository's project key. A
@@ -52,7 +59,10 @@ record shapes above, with a 1 MiB and 128 relevant-record limit per invocation;
 later hooks continue a backlog. Codex's published hooks also exempt some hosted
 and specialized tools. The Extension reader covers the observed hosted action
 shape, but **there is no stable Codex API that guarantees every Desktop tool
-call**. New Codex item types require a Terma update.
+call**. New Codex item types require a Terma update. Per-request SSE/WebSocket
+timing, actual user approval decisions and their source, and native trace spans
+still require Codex's native OTel export. Codex ignores `otel` in project config,
+so that export is machine-wide unless Codex adds a scoped Desktop interface.
 
 Codex CLI launches routed by the Terma shim keep their native OTLP configuration
 and are not converted to Desktop hook telemetry. A separate, unrelated global

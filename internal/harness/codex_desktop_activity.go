@@ -13,10 +13,13 @@ import (
 // rollout. Project hooks supply ordinary tool calls; only categories without a hook
 // are read here, so one action cannot be counted twice.
 type CodexDesktopActivity struct {
-	Kind, ID, TurnID, Model, ToolName, Input              string
+	Kind, ID, TurnID, TraceID, Model, ToolName, Input     string
+	Status, Reason                                        string
 	InputTokens, CachedInputTokens, CacheWriteInputTokens int64
 	OutputTokens, ReasoningOutputTokens                   int64
-	At                                                    time.Time
+	DurationMs, TTFTMs                                    int64
+	HasDuration, HasTTFT                                  bool
+	At, StartedAt                                         time.Time
 }
 
 // CodexDesktopCursor stores only position and turn metadata, never content.
@@ -25,6 +28,7 @@ type CodexDesktopCursor struct {
 	Offset   int64  `json:"offset"`
 	Anchor   string `json:"anchor"`
 	TurnID   string `json:"turn_id,omitempty"`
+	TraceID  string `json:"trace_id,omitempty"`
 	Model    string `json:"model,omitempty"`
 	Skipping bool   `json:"skipping,omitempty"`
 }
@@ -109,11 +113,18 @@ func codexDesktopActivityFrom(line []byte, cursor *CodexDesktopCursor, sessionID
 		Timestamp time.Time `json:"timestamp"`
 		Type      string    `json:"type"`
 		Payload   struct {
-			Type       string `json:"type"`
-			TurnID     string `json:"turn_id"`
-			Model      string `json:"model"`
-			ResponseID string `json:"response_id"`
-			Usage      struct {
+			Type          string `json:"type"`
+			TurnID        string `json:"turn_id"`
+			Model         string `json:"model"`
+			ResponseID    string `json:"response_id"`
+			TraceID       string `json:"trace_id"`
+			Reason        string `json:"reason"`
+			StartedAt     int64  `json:"started_at"`
+			DurationMs    *int64 `json:"duration_ms"`
+			TTFTMs        *int64 `json:"time_to_first_token_ms"`
+			StartedAtMs   int64  `json:"started_at_ms"`
+			CompletedAtMs int64  `json:"completed_at_ms"`
+			Usage         struct {
 				Input      int64 `json:"input_tokens"`
 				Cached     int64 `json:"cached_input_tokens"`
 				CacheWrite int64 `json:"cache_write_input_tokens"`
@@ -133,6 +144,9 @@ func codexDesktopActivityFrom(line []byte, cursor *CodexDesktopCursor, sessionID
 	}
 	if rec.Type == "turn_context" {
 		if evidenceLabel.MatchString(rec.Payload.TurnID) {
+			if cursor.TurnID != rec.Payload.TurnID {
+				cursor.TraceID = ""
+			}
 			cursor.TurnID = rec.Payload.TurnID
 		}
 		if evidenceLabel.MatchString(rec.Payload.Model) {
@@ -141,9 +155,18 @@ func codexDesktopActivityFrom(line []byte, cursor *CodexDesktopCursor, sessionID
 		return CodexDesktopActivity{}, false
 	}
 	if rec.Payload.TurnID != "" && evidenceLabel.MatchString(rec.Payload.TurnID) {
+		if cursor.TurnID != rec.Payload.TurnID {
+			cursor.TraceID = ""
+		}
 		cursor.TurnID = rec.Payload.TurnID
 	}
-	a := CodexDesktopActivity{TurnID: cursor.TurnID, Model: cursor.Model, At: rec.Timestamp}
+	if rec.Type == "event_msg" && rec.Payload.Type == "task_started" {
+		if evidenceLabel.MatchString(rec.Payload.TraceID) {
+			cursor.TraceID = rec.Payload.TraceID
+		}
+		return CodexDesktopActivity{}, false
+	}
+	a := CodexDesktopActivity{TurnID: cursor.TurnID, TraceID: cursor.TraceID, Model: cursor.Model, At: rec.Timestamp}
 	switch {
 	case rec.Type == "token_usage_record":
 		a.Kind, a.ID = "model", rec.Payload.ResponseID
@@ -152,6 +175,26 @@ func codexDesktopActivityFrom(line []byte, cursor *CodexDesktopCursor, sessionID
 	case rec.Type == "event_msg" && rec.Payload.Type == "item_completed" && rec.Payload.Item.Type == "Extension":
 		a.Kind, a.ID = "tool", rec.Payload.Item.ID
 		a.ToolName, a.Input = "Extension:"+rec.Payload.Item.Kind, rec.Payload.Item.Query
+		a.StartedAt, a.DurationMs, a.HasDuration = codexItemTiming(rec.Payload.StartedAtMs, rec.Payload.CompletedAtMs)
+	case rec.Type == "event_msg" && rec.Payload.Type == "item_completed" && rec.Payload.Item.Type == "ContextCompaction":
+		a.Kind, a.ID = "compaction", rec.Payload.Item.ID
+		a.StartedAt, a.DurationMs, a.HasDuration = codexItemTiming(rec.Payload.StartedAtMs, rec.Payload.CompletedAtMs)
+	case rec.Type == "event_msg" && (rec.Payload.Type == "task_complete" || rec.Payload.Type == "turn_aborted"):
+		a.Kind, a.ID = "turn", cursor.TurnID
+		if rec.Payload.Type == "turn_aborted" {
+			a.Status, a.Reason = "cancelled", rec.Payload.Reason
+		} else {
+			a.Status = "completed"
+		}
+		if rec.Payload.StartedAt > 0 {
+			a.StartedAt = time.Unix(rec.Payload.StartedAt, 0).UTC()
+		}
+		if rec.Payload.DurationMs != nil && *rec.Payload.DurationMs >= 0 {
+			a.DurationMs, a.HasDuration = *rec.Payload.DurationMs, true
+		}
+		if rec.Payload.TTFTMs != nil && *rec.Payload.TTFTMs >= 0 {
+			a.TTFTMs, a.HasTTFT = *rec.Payload.TTFTMs, true
+		}
 	default:
 		return CodexDesktopActivity{}, false
 	}
@@ -159,4 +202,11 @@ func codexDesktopActivityFrom(line []byte, cursor *CodexDesktopCursor, sessionID
 		a.ID = fundingHash(sessionID + cursor.Identity + fmt.Sprint(cursor.Offset))
 	}
 	return a, true
+}
+
+func codexItemTiming(start, end int64) (time.Time, int64, bool) {
+	if start <= 0 || end < start {
+		return time.Time{}, 0, false
+	}
+	return time.UnixMilli(start).UTC(), end - start, true
 }

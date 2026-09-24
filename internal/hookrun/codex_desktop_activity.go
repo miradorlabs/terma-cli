@@ -47,12 +47,14 @@ func (e Env) captureCodexDesktopActivity(ctx context.Context, r *repo, in *codex
 		attrs["capture_surface"] = codexDesktopSurface
 		boundedAttr(attrs, attrTurnID, a.TurnID)
 		boundedAttr(attrs, attrModel, a.Model)
+		boundedAttr(attrs, "trace_id", a.TraceID)
 		at := a.At
 		if at.IsZero() || at.After(e.now()) {
 			at = e.now()
 		}
 		ev := spool.Event{Time: at, SessionID: in.SessionID, Repo: repoName(r.root), Attrs: attrs}
-		if a.Kind == "model" {
+		switch a.Kind {
+		case "model":
 			ev.Name = EventModelCall
 			attrs["response_id"] = a.ID
 			attrs["reported_input_tokens"] = a.InputTokens
@@ -60,14 +62,42 @@ func (e Env) captureCodexDesktopActivity(ctx context.Context, r *repo, in *codex
 			attrs["reported_cache_write_tokens"] = a.CacheWriteInputTokens
 			attrs["reported_output_tokens"] = a.OutputTokens
 			attrs["reasoning_output_tokens"] = a.ReasoningOutputTokens
-		} else {
+		case "tool":
 			ev.Name = EventToolCall
 			attrs[attrToolCallID] = a.ID
 			attrs[attrToolName] = a.ToolName
 			attrs[attrStatus] = "completed"
+			if a.HasDuration {
+				attrs["duration_ms"] = a.DurationMs
+				attrs["duration_source"] = "rollout_item"
+			}
 			if route.IncludeToolContent {
 				attrs["arguments"] = boundedCodexContent(a.Input)
 			}
+		case "compaction":
+			ev.Name = EventCompaction
+			attrs["item_id"] = a.ID
+			if a.HasDuration {
+				attrs["duration_ms"] = a.DurationMs
+			}
+			if !a.StartedAt.IsZero() {
+				ev.Time = a.StartedAt
+			}
+		case "turn":
+			ev.Name = EventTurnSummary
+			attrs[attrStatus] = a.Status
+			boundedAttr(attrs, attrReason, a.Reason)
+			if a.HasDuration {
+				attrs["duration_ms"] = a.DurationMs
+			}
+			if a.HasTTFT {
+				attrs["ttft_ms"] = a.TTFTMs
+			}
+			if !a.StartedAt.IsZero() {
+				ev.Time = a.StartedAt
+			}
+		default:
+			return nil
 		}
 		return e.Spool.Append(ev)
 	})

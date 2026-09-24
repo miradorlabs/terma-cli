@@ -7,9 +7,11 @@ import (
 	"errors"
 	"io"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/shim"
@@ -99,6 +101,7 @@ type codexHookInput struct {
 	AgentID        string `json:"agent_id"`
 	AgentType      string `json:"agent_type"`
 	ToolName       string `json:"tool_name"`
+	PermissionMode string `json:"permission_mode"`
 	Prompt         string `json:"prompt"`
 	// ToolUseID matches Codex's native OTLP call_id, so a file touch can join its tool call.
 	ToolUseID string `json:"tool_use_id"`
@@ -156,6 +159,9 @@ func CodexSessionStart(ctx context.Context, env Env) error {
 	attrs := map[string]any{attrSource: in.Source}
 	if _, desktop := codexDesktopRoute(r); desktop {
 		attrs["capture_surface"] = codexDesktopSurface
+		if dir, err := config.Dir(); err == nil {
+			pruneQuotaState(filepath.Join(dir, codexToolStartDir), env.now().Add(-spool.MaxAge))
+		}
 	}
 	// Codex's source dispatches no SessionStart for a thread another thread spawned: the
 	// child arrives as the root's SubagentStart, which is where the spawn record is read.
@@ -272,6 +278,10 @@ func CodexPostToolUse(ctx context.Context, env Env) error {
 		boundedAttr(attrs, attrToolCallID, in.ToolUseID)
 		boundedAttr(attrs, attrTurnID, in.TurnID)
 		boundedAttr(attrs, attrModel, in.Model)
+		if elapsed, ok := env.codexToolElapsed(in); ok {
+			attrs["duration_ms"] = elapsed
+			attrs["duration_source"] = "hook_elapsed"
+		}
 		if route.IncludeToolContent {
 			attrs["arguments"] = boundedCodexContent(string(in.ToolInput))
 			attrs["output"] = boundedCodexContent(string(in.ToolResponse))
