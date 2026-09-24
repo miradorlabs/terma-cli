@@ -498,8 +498,10 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   `session-end` / `post-tool-use` / `stop` / `stop-failure` / `subagent-start` /
   `subagent-stop` (Claude Code's `.claude/settings.json`),
   `statusline` (Claude Code's user-level `statusLine.command`, written by `terma connect
-  claude`), `codex-notify` (Codex's `notify`), `codex-session-start` / `codex-session-end`
-  / `codex-post-tool-use` / `codex-stop` / `codex-subagent-start` / `codex-subagent-stop`
+  claude`), `codex-notify` (Codex's `notify`), `codex-session-start` /
+  `codex-user-prompt-submit` / `codex-pre-tool-use` / `codex-permission-request` /
+  `codex-session-end` / `codex-post-tool-use` / `codex-stop` / `codex-subagent-start` /
+  `codex-subagent-stop`
   (Codex's `.codex/hooks.json`), `cursor-session-start` /
   `cursor-session-end` / `cursor-file-edit` / `cursor-post-tool-use` /
   `cursor-post-tool-use-failure` / `cursor-before-submit-prompt` /
@@ -513,10 +515,13 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
 - Spool event names the platform parses (`gateways/otel/.../termacli_logs.go` and
   `termacli_entitlement_logs.go`): `terma.session.start`, `terma.files.touched`,
   `terma.session.observation`, the commit events, `terma.tool.call`,
-  `terma.assistant.message` (Codex only — `text`, `message_id`, `trace_id`, `phase`; the one
-  record the adapter admits for an agent that exports natively), and the funding
+  `terma.assistant.message` (Codex only — `text`, `message_id`, `trace_id`, `phase`;
+  supplements Codex's native exporter), and the funding
   events `terma.session.quota` / `.account` / `.limit` (folded by the entitlement adapter,
-  live-ingesting in dev). `terma.tool.call` (Cursor `postToolUse` / `postToolUseFailure`,
+  live-ingesting in dev). Codex Desktop also emits `terma.turn.summary` (rollout turn
+  status and available timing), `terma.compaction` (rollout compaction records), and
+  `terma.approval.requested` (an approval request; the eventual decision is unavailable).
+  `terma.tool.call` (Cursor `postToolUse` / `postToolUseFailure`,
   keyed on Cursor's `tool_use_id` as `tool_call_id`; `docs/CURSOR-INSTRUMENTATION.md`,
   "Tool calls" — and Antigravity's `PostToolUse`, keyed on `step-<stepIdx>`, unique only
   within its conversation; `docs/ANTIGRAVITY-INSTRUMENTATION.md`, "Tool calls and turns")
