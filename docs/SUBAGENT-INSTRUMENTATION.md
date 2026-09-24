@@ -103,7 +103,8 @@ who trusted terma's hooks before `SubagentStart` and `SubagentStop` were added h
 that counts as trusted and two hooks Codex skips without a word — every subagent in that
 repository unrecorded. `terma doctor` compares terma's entries in the file with the ones
 Codex has a trusted hash for (`hookmgr.CodexTermaEntries`, `CodexHookTrust.TrustedKeys`) and
-names what is skipped; opening Codex and running `/hooks` trusts them.
+names what is skipped; review them in Codex Desktop's Hooks settings or run
+`/hooks` in Codex CLI.
 
 ## What the OTel export adds (Claude Code)
 

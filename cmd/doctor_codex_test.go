@@ -28,8 +28,8 @@ func TestDoctorReportsCodexHooksAwaitingTrust(t *testing.T) {
 	if !strings.Contains(out, "has not been shown them") {
 		t.Fatalf("doctor should say Codex has not been shown the hooks:\n%s", out)
 	}
-	if !strings.Contains(out, "/hooks") {
-		t.Fatalf("doctor should say how to fix it:\n%s", out)
+	if !strings.Contains(out, "Codex Desktop's Hooks settings") || !strings.Contains(out, "/hooks in Codex CLI") {
+		t.Fatalf("doctor should explain trust for both Desktop-only and CLI users:\n%s", out)
 	}
 	// It is a warning about Codex, not a verdict on the repository: the commit hooks are
 	// in and Claude Code's run, so commit stamping is worth half of what it could be —
@@ -117,7 +117,7 @@ func TestDoctorRejectsChangedCodexHookAfterTrust(t *testing.T) {
 		t.Fatal(err)
 	}
 	out, _ := runTerma(t, "doctor", "--skip-commit")
-	if !strings.Contains(out, "PostToolUse") || !strings.Contains(out, "review the new or changed entries") {
+	if !strings.Contains(out, "PostToolUse") || !strings.Contains(out, "including new or changed entries") {
 		t.Fatalf("doctor accepted a changed, untrusted hook:\n%s", out)
 	}
 }
@@ -172,7 +172,7 @@ func TestDoctorNamesTheCodexEntriesANewerTermaAdded(t *testing.T) {
 	if strings.Contains(out, "Codex hooks present and trusted") {
 		t.Fatalf("doctor passed a file with untrusted entries:\n%s", out)
 	}
-	for _, want := range []string{"SubagentStart", "SubagentStop", "run /hooks to review the new or changed entries"} {
+	for _, want := range []string{"SubagentStart", "SubagentStop", "Codex Desktop's Hooks settings", "including new or changed entries"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("doctor does not mention %q:\n%s", want, out)
 		}

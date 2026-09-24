@@ -11,11 +11,12 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hookrun"
 )
 
-// codex is OpenAI's Codex CLI. Its repository half is .codex/hooks.json, wired by
-// default where the repository carries a .codex directory; its user half (`notify` in
-// ~/.codex/config.toml, written by `terma connect codex`) reaches the same handler set through
-// the codex-notify event.
+// codex covers OpenAI's Codex CLI and Desktop repository hooks in .codex/hooks.json.
+// The CLI's user-level notifier (`notify` in ~/.codex/config.toml, written by
+// `terma connect codex`) reaches the same handler set through codex-notify.
 type codex struct{}
+
+const codexHookReview = "review Terma's hooks in Codex Desktop's Hooks settings, or run /hooks in Codex CLI"
 
 func (codex) Name() string                       { return "codex" }
 func (codex) DisplayName() string                { return "Codex" }
@@ -57,17 +58,17 @@ func (c codex) Trust(root string) (TrustState, error) {
 	case !trust.Reviewed():
 		return TrustState{
 			Detail: ", but Codex has not been shown them yet, so it runs none of them",
-			Fix:    "open Codex in this repository and run /hooks to review and trust them",
+			Fix:    "open this repository in Codex and " + codexHookReview,
 		}, nil
 	case trust.Trusted == 0:
 		return TrustState{
 			Detail: ", but none are trusted, so Codex runs none of them",
-			Fix:    "open Codex in this repository and run /hooks to trust them",
+			Fix:    "open this repository in Codex and " + codexHookReview,
 		}, nil
 	case trust.Disabled > 0:
 		return TrustState{
 			Detail: fmt.Sprintf(", but %d is switched off in Codex", trust.Disabled),
-			Fix:    "open Codex in this repository and run /hooks to re-enable them",
+			Fix:    "open this repository in Codex and re-enable Terma's hooks in Desktop's Hooks settings or CLI /hooks",
 		}, nil
 	}
 	// Codex trusts a hook entry by entry. A file that was trusted before terma added an
@@ -86,7 +87,7 @@ func (c codex) Trust(root string) (TrustState, error) {
 	if len(skipped) > 0 {
 		return TrustState{
 			Detail: fmt.Sprintf(", but Codex needs to review %s, so it skips %s", strings.Join(skipped, ", "), pronoun(len(skipped))),
-			Fix:    "open Codex in this repository and run /hooks to review the new or changed entries",
+			Fix:    "open this repository in Codex and " + codexHookReview + " (including new or changed entries)",
 		}, nil
 	}
 	return TrustState{Trusted: true, Detail: " and trusted"}, nil

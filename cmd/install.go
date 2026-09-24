@@ -220,7 +220,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 			}
 		}
 		if slices.Contains(agents, codexDesktopAgent) {
-			fmt.Fprintln(out, "\nCodex Desktop: install trusted repository hooks and a local project route; no receiver or app restart needed.")
+			fmt.Fprintln(out, "\nCodex Desktop: write repository hooks and a local project route; review the hooks in Codex Desktop's Hooks settings before they can run. No Codex CLI is needed.")
 		}
 		fmt.Fprintln(out, "\nDry run: nothing written.")
 		return nil
@@ -349,6 +349,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 			fmt.Fprintln(out, "Removed the previous Desktop relay; restart Codex Desktop to unload its old exporter.")
 		}
 		fmt.Fprintln(out, "Codex Desktop captures this repository through trusted hooks and Terma's existing spool.")
+		fmt.Fprintln(out, "Open this repository in Codex Desktop and review Terma's hooks in Hooks settings before they can run. Codex CLI is not required.")
 		if global, err := (harness.Codex{}).Status(); err == nil && global.Connected {
 			fmt.Fprintln(out, "Warning: Codex also has a user-level exporter; it may send Desktop activity from other repositories.")
 		}
