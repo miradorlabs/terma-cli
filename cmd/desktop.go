@@ -20,8 +20,8 @@ import (
 )
 
 const (
-	desktopServiceLabel   = "ai.terma.codex-relay"
-	legacyDesktopBaseURL  = "http://127.0.0.1:43199"
+	desktopServiceLabel  = "ai.terma.codex-relay"
+	legacyDesktopBaseURL = "http://127.0.0.1:43199"
 )
 
 func newDesktopCommand() *cobra.Command {
