@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -73,6 +74,9 @@ func TestInstallUsesSavedCodexDesktopChoiceWithoutShellShim(t *testing.T) {
 }
 
 func TestDesktopInstallRemovesPreviousRelay(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("legacy LaunchAgent is macOS only")
+	}
 	home, _ := desktopInstallSandbox(t)
 	if err := (harness.Codex{}).Connect(harness.Exporter{
 		Endpoint: legacyDesktopEndpoint, Signals: []harness.Signal{harness.SignalLogs},
