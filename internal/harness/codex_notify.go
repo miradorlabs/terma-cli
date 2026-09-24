@@ -82,12 +82,6 @@ func (c Codex) CodexNotify() (CodexNotifyStatus, error) {
 type codexNotifyRecord struct {
 	// Chains maps a Codex config path to the notifier argv terma displaced there.
 	Chains map[string][]string `json:"chains,omitempty"`
-
-	// ConfigPath and Previous are the single-record shape, read and folded into Chains.
-	// An empty ConfigPath is the first chaining build's, which bound the record to
-	// nothing; it is kept under "" and answers for any config that has none of its own.
-	ConfigPath string   `json:"config_path,omitempty"`
-	Previous   []string `json:"previous,omitempty"`
 }
 
 func codexNotifyStatePath() (string, error) {
@@ -111,8 +105,7 @@ func parseCodexNotify(value string) ([]string, error) {
 	return doc.Notify, nil
 }
 
-// loadCodexNotifyRecord reads the record, folding the legacy shape into Chains. A
-// missing file is an empty record.
+// loadCodexNotifyRecord reads the config-scoped chains. A missing file is an empty record.
 func loadCodexNotifyRecord() (*codexNotifyRecord, string, error) {
 	path, err := codexNotifyStatePath()
 	if err != nil {
@@ -132,12 +125,6 @@ func loadCodexNotifyRecord() (*codexNotifyRecord, string, error) {
 	if rec.Chains == nil {
 		rec.Chains = map[string][]string{}
 	}
-	if len(rec.Previous) > 0 {
-		if _, taken := rec.Chains[rec.ConfigPath]; !taken {
-			rec.Chains[rec.ConfigPath] = rec.Previous
-		}
-	}
-	rec.ConfigPath, rec.Previous = "", nil
 	return rec, path, nil
 }
 
@@ -189,12 +176,9 @@ func saveCodexNotifyChain(configPath string, previous []string) error {
 }
 
 // clearCodexNotifyChain forgets the notifier displaced at configPath, and only that one.
-// The legacy unbound chain goes with it: it was this machine's one record, and leaving
-// it would resurrect a notifier on the next disconnect of any config.
 func clearCodexNotifyChain(configPath string) error {
 	return updateCodexNotifyRecord(func(rec *codexNotifyRecord) {
 		delete(rec.Chains, configPath)
-		delete(rec.Chains, "")
 	})
 }
 
@@ -266,18 +250,13 @@ func loadCodexNotifyChain() ([]string, error) {
 	return loadCodexNotifyChainFor(current)
 }
 
-// loadCodexNotifyChainFor reads the notifier a connect displaced at configPath. The
-// legacy unbound chain answers only when configPath has none of its own, so that
-// upgrading the first chaining build still restores the notifier it preserved.
+// loadCodexNotifyChainFor reads the notifier a connect displaced at configPath.
 func loadCodexNotifyChainFor(configPath string) ([]string, error) {
 	rec, _, err := loadCodexNotifyRecord()
 	if err != nil {
 		return nil, err
 	}
-	if previous, ok := rec.Chains[configPath]; ok {
-		return previous, nil
-	}
-	return rec.Chains[""], nil
+	return rec.Chains[configPath], nil
 }
 
 // RunPreviousCodexNotify forwards the payload to the notifier setup preserved.

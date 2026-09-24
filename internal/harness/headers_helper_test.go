@@ -113,7 +113,7 @@ func TestOwnHelperIsNotAConflict(t *testing.T) {
 	if !st.Connected {
 		t.Fatal("helper-mode config did not report as connected")
 	}
-	if !strings.HasPrefix(st.KeyPrefix, "mir_srv_") {
+	if !strings.HasPrefix(st.KeyPrefix, "ter_srv_") {
 		t.Errorf("key prefix = %q, want it read from the helper script", st.KeyPrefix)
 	}
 }
@@ -286,7 +286,7 @@ func TestHelperSurvivesReconnectThenDisconnect(t *testing.T) {
 	}
 }
 
-// The backend now mints ter_srv_ keys; older mir_srv_ keys stay valid. Both must
+// The backend now mints ter_srv_ keys; older ter_srv_ keys stay valid. Both must
 // round-trip through the helper: a prefix the regex does not know would make a
 // fresh connect report as keyless and leave the spool without a key to deliver with.
 func TestCurrentCredentialAcceptsTermaPrefix(t *testing.T) {

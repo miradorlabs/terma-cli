@@ -107,7 +107,7 @@ func agentHooksCheck(root string, bound *termaproject.File, mine []string) docto
 		if !ok || a.HooksPath() == "" {
 			continue
 		}
-		used := len(mine) == 0 || slices.Contains(mine, name)
+		used := len(mine) == 0 || slices.Contains(mine, name) || (name == "codex" && slices.Contains(mine, codexDesktopAgent))
 		if used {
 			of++
 		}
@@ -311,7 +311,7 @@ func runDoctor(ctx context.Context, skipCommit bool, progress doctorProgress) do
 	// 5. Harness export.
 	timed(doctor.KeyHarness, "agent exporting to Terma", d.agentsExporting)
 	timed(doctor.KeyRouting, "shell routing active", func() doctor.Check {
-		return shellRoutingCheck(d.harnesses, d.installed(), d.cfg.Harnesses)
+		return shellRoutingCheck(d.harnesses, d.installed(), selectedForRepo(d.projectID, d.cfg.Harnesses))
 	})
 
 	// 5b. Status line: the payload Claude Code hands its status line carries the
@@ -448,11 +448,11 @@ func (d *doctorRun) agentHooks() doctor.Check {
 	if !d.installed() {
 		return doctor.Check{Status: doctor.Skip, Detail: "needs an installed repository"}
 	}
-	return agentHooksCheck(d.root, d.bound, d.cfg.Harnesses)
+	return agentHooksCheck(d.root, d.bound, selectedForRepo(d.projectID, d.cfg.Harnesses))
 }
 
 func (d *doctorRun) agentsExporting() doctor.Check {
-	d.harnesses = judgeHarnesses(d.ctx, d.cfg.OTLPURL, d.projectID, d.root)
+	d.harnesses = judgeSelectedHarnesses(d.ctx, d.cfg.OTLPURL, d.projectID, d.root, d.cfg.Harnesses)
 	return doctorHarnessCheck(d.harnesses, d.cfg.OTLPURL, d.projectID, d.installed())
 }
 

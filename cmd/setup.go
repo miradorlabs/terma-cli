@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -22,6 +25,22 @@ type setupFlags struct {
 	assumeYes bool
 }
 
+const codexDesktopAgent = "codex-desktop"
+
+// agentChoice is an onboarding surface. Codex CLI and Codex desktop share one
+// repository adapter, but developers choose independently how they launch it.
+type agentChoice struct {
+	name      string
+	display   string
+	installed func(context.Context) bool
+}
+
+func (a agentChoice) Name() string        { return a.name }
+func (a agentChoice) DisplayName() string { return a.display }
+func (a agentChoice) Installed(ctx context.Context) bool {
+	return a.installed(ctx)
+}
+
 func newSetupCommand() *cobra.Command {
 	var f setupFlags
 	cmd := &cobra.Command{
@@ -31,7 +50,8 @@ func newSetupCommand() *cobra.Command {
 no project, no telemetry configuration, no files touched:
 
   1. Signs you in (a browser handoff; --no-browser prints the URL instead).
-  2. Records which coding agents you work with (Claude Code or Codex), so ` + "`terma install`" + ` never has to ask again.
+  2. Records which coding agents you work with (including Codex CLI and Codex
+     desktop separately), so ` + "`terma install`" + ` never has to ask again.
 
 setup is optional: ` + "`terma install`" + ` signs you in and asks for your agents itself
 when you have not run it. The real configuration — pointing an agent at a project,
@@ -85,6 +105,9 @@ func runSetup(cmd *cobra.Command, f setupFlags) error {
 	} else {
 		fmt.Fprintf(out, "\nAgents recorded: %s.\n", joinNames(adapterDisplayNames(names)))
 	}
+	if slices.Contains(names, codexDesktopAgent) {
+		fmt.Fprintln(out, "Codex Desktop: after `terma install` in a repository, open Settings → Hooks → Review in Codex Desktop and approve Terma's hooks.")
+	}
 	fmt.Fprintf(out, "\n%s Now run `terma install` in each codebase you want to instrument with terma.\n",
 		style.For(out).Bold("Done!"))
 	return nil
@@ -129,12 +152,12 @@ func chooseHarnesses(cmd *cobra.Command, cfg *config.Config, f setupFlags) ([]st
 
 // agentAvailable gates onboarding while the remaining integrations are coming soon.
 func agentAvailable(name string) bool {
-	return name == "claude" || name == "codex"
+	return name == "claude" || name == "codex" || name == codexDesktopAgent
 }
 
 func availableAgentNames() []string {
 	var names []string
-	for _, a := range adapter.All() {
+	for _, a := range harnessSelectionAgents() {
 		if agentAvailable(a.Name()) {
 			names = append(names, a.Name())
 		}
@@ -144,16 +167,37 @@ func availableAgentNames() []string {
 
 // harnessSelectionAgents puts available agents first, preserving registry order
 // within each group. Both the form and its result mapping must use this order.
-func harnessSelectionAgents() []adapter.Adapter {
-	var agents []adapter.Adapter
+func harnessSelectionAgents() []agentChoice {
+	var agents []agentChoice
 	for _, available := range []bool{true, false} {
 		for _, a := range adapter.All() {
 			if agentAvailable(a.Name()) == available {
-				agents = append(agents, a)
+				adapterAgent := a
+				display := a.DisplayName()
+				if a.Name() == "codex" {
+					display = "Codex CLI"
+				}
+				agents = append(agents, agentChoice{name: a.Name(), display: display, installed: adapterAgent.Installed})
+				if a.Name() == "codex" {
+					agents = append(agents, agentChoice{name: codexDesktopAgent, display: "Codex Desktop", installed: codexDesktopInstalled})
+				}
 			}
 		}
 	}
 	return agents
+}
+
+func codexDesktopInstalled(context.Context) bool {
+	if runtime.GOOS != "darwin" {
+		return false
+	}
+	home, _ := os.UserHomeDir()
+	for _, path := range []string{"/Applications/ChatGPT.app", filepath.Join(home, "Applications", "ChatGPT.app")} {
+		if info, err := os.Stat(path); err == nil && info.IsDir() {
+			return true
+		}
+	}
+	return false
 }
 
 func harnessSelectionForm(ctx context.Context, preselect map[string]bool) *prompt.Form {
@@ -176,8 +220,10 @@ func harnessSelectionForm(ctx context.Context, preselect map[string]bool) *promp
 func parseAgentList(raw string) ([]string, error) {
 	seen := map[string]bool{}
 	for _, n := range splitCommas(raw) {
-		if _, ok := adapter.Lookup(n); !ok {
-			return nil, fmt.Errorf("unknown agent %q (want %s)", n, joinNames(availableAgentNames()))
+		if n != codexDesktopAgent {
+			if _, ok := adapter.Lookup(n); !ok {
+				return nil, fmt.Errorf("unknown agent %q (want %s)", n, joinNames(availableAgentNames()))
+			}
 		}
 		if !agentAvailable(n) {
 			return nil, fmt.Errorf("agent %q: Coming Soon; available agents: %s", n, joinNames(availableAgentNames()))
@@ -190,7 +236,7 @@ func parseAgentList(raw string) ([]string, error) {
 // selectedInRegistryOrder returns available chosen adapter names in registry order.
 func selectedInRegistryOrder(chosen map[string]bool) []string {
 	var names []string
-	for _, a := range adapter.All() {
+	for _, a := range harnessSelectionAgents() {
 		if agentAvailable(a.Name()) && chosen[a.Name()] {
 			names = append(names, a.Name())
 		}
@@ -201,7 +247,7 @@ func selectedInRegistryOrder(chosen map[string]bool) []string {
 // detectedAgents lists the supported agents whose binary is present on this machine.
 func detectedAgents(ctx context.Context) []string {
 	var names []string
-	for _, a := range adapter.All() {
+	for _, a := range harnessSelectionAgents() {
 		if agentAvailable(a.Name()) && a.Installed(ctx) {
 			names = append(names, a.Name())
 		}
@@ -210,6 +256,9 @@ func detectedAgents(ctx context.Context) []string {
 }
 
 func agentDetail(ctx context.Context, name string) string {
+	if name == codexDesktopAgent && codexDesktopInstalled(ctx) {
+		return "installed"
+	}
 	if a, ok := adapter.Lookup(name); ok && a.Installed(ctx) {
 		return "installed"
 	}
@@ -220,6 +269,14 @@ func agentDetail(ctx context.Context, name string) string {
 func adapterDisplayNames(names []string) []string {
 	out := make([]string, 0, len(names))
 	for _, n := range names {
+		if n == codexDesktopAgent {
+			out = append(out, "Codex Desktop")
+			continue
+		}
+		if n == "codex" {
+			out = append(out, "Codex CLI")
+			continue
+		}
 		if a, ok := adapter.Lookup(n); ok {
 			out = append(out, a.DisplayName())
 		} else {

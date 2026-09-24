@@ -1,6 +1,7 @@
 package harness
 
 import (
+	"os"
 	"testing"
 )
 
@@ -35,7 +36,7 @@ func TestConnectLeavesUsersResourceAttributesAlone(t *testing.T) {
 	if st.ProjectID != "proj_123" {
 		t.Fatalf("status project = %q, want the journal's proj_123 (not parsed from the user's attributes)", st.ProjectID)
 	}
-	if key, ok := c.CurrentCredential("https://otel.terma.ai", "proj_123"); !ok || key != "mir_srv_0123456789abcdef" {
+	if key, ok := c.CurrentCredential("https://otel.terma.ai", "proj_123"); !ok || key != "ter_srv_0123456789abcdef" {
 		t.Fatalf("CurrentCredential = %q, %v; want the installed key reused for the journal's project", key, ok)
 	}
 	if _, ok := c.CurrentCredential("https://otel.terma.ai", "proj_other"); ok {
@@ -50,57 +51,22 @@ func TestConnectLeavesUsersResourceAttributesAlone(t *testing.T) {
 	}
 }
 
-// A configuration written by an earlier Terma carries the project in
-// OTEL_RESOURCE_ATTRIBUTES and a journal that owns that key. Status still reads the
-// project from it, and the next connect removes it — it is Terma's leftover, not the
-// user's — leaving the journal as the record.
-func TestReconnectClearsResourceAttributesAnEarlierTermaWrote(t *testing.T) {
-	c, path := claudeIn(t, `{}`)
-	if err := c.Connect(fullExporter(), true); err != nil {
-		t.Fatalf("Connect: %v", err)
-	}
-
-	// Rewind to what an older Terma left behind: the variable in the file, owned by
-	// the journal, and a journal that predates the project field.
-	const legacy = "enduser.id=dev@example.com,mirador.project.id=proj_legacy,service.name=claude-code"
-	s, err := loadSettings(path)
-	if err != nil {
-		t.Fatalf("loadSettings: %v", err)
-	}
-	s.env[otelResourceAttributes] = legacy
-	if err := s.save(false); err != nil {
-		t.Fatalf("save: %v", err)
-	}
-	j, err := loadJournal(c.Name(), path)
-	if err != nil || j == nil {
-		t.Fatalf("journal: %v, %v", j, err)
-	}
-	j.Installed[otelResourceAttributes] = legacy
-	j.Previous[otelResourceAttributes] = nil
-	j.ProjectID = ""
-	if err := j.save(); err != nil {
-		t.Fatalf("save journal: %v", err)
-	}
-
+func TestUnjournaledUserSettingsAreNotOwned(t *testing.T) {
+	const original = `{"env":{"CLAUDE_CODE_ENABLE_TELEMETRY":"1","OTEL_EXPORTER_OTLP_ENDPOINT":"https://collector.example","OTEL_RESOURCE_ATTRIBUTES":"mirador.project.id=unselected"}}`
+	c, path := claudeIn(t, original)
 	st, err := c.Status()
 	if err != nil {
-		t.Fatalf("Status: %v", err)
+		t.Fatal(err)
 	}
-	if st.ProjectID != "proj_legacy" {
-		t.Fatalf("legacy status project = %q, want proj_legacy read from the attributes", st.ProjectID)
+	if st.ManagedKeys != 0 || st.ProjectID != "" {
+		t.Fatalf("unowned configuration claimed: %+v", st)
 	}
-
-	if err := c.Connect(fullExporter(), true); err != nil {
-		t.Fatalf("reconnect: %v", err)
+	result, err := c.Disconnect()
+	if err != nil || result.Removed != 0 || result.Restored != 0 {
+		t.Fatalf("unowned configuration changed: %+v, %v", result, err)
 	}
-	if got, ok := envOf(t, path)[otelResourceAttributes]; ok {
-		t.Fatalf("%s = %q survived the reconnect; an earlier Terma's leftover must go", otelResourceAttributes, got)
-	}
-	st, err = c.Status()
-	if err != nil {
-		t.Fatalf("Status: %v", err)
-	}
-	if st.ProjectID != "proj_123" {
-		t.Fatalf("status project = %q, want proj_123 from the journal", st.ProjectID)
+	data, err := os.ReadFile(path)
+	if err != nil || string(data) != original {
+		t.Fatalf("user settings changed: %q, %v", data, err)
 	}
 }

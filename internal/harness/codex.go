@@ -468,9 +468,8 @@ func (c Codex) Status() (Status, error) {
 		status.Signals = withoutSignal(status.Signals, SignalMetrics)
 	}
 
-	// Ownership is by journal only. There is no name-based fallback here, unlike
-	// Claude's: no released build ever wrote a Codex config without a journal, so a
-	// config with none is somebody else's work — a company collector, say — and every
+	// Ownership is by journal only. A config with none is somebody else's work
+	// — a company collector, say — and every
 	// standard otel key in it is theirs. Counting those as managed would let disconnect
 	// delete a telemetry setup Terma never touched.
 	j, err := loadJournal(c.Name(), path)

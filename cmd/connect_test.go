@@ -90,7 +90,7 @@ func TestTelemetryRejectsUnknownSignalBeforeWriting(t *testing.T) {
 	_, err := runTerma(t,
 		"telemetry", "connect", "claude",
 		"--signals", "spans",
-		"--api-key", "mir_srv_test",
+		"--api-key", "ter_srv_test",
 		"--project", "770e8400-e29b-41d4-a716-446655440000",
 		"--yes",
 	)
@@ -127,7 +127,7 @@ func TestTelemetryRejectsNonServerKey(t *testing.T) {
 	if err == nil {
 		t.Fatal("connect accepted a CLI token as --api-key")
 	}
-	if !strings.Contains(err.Error(), "mir_srv_") {
+	if !strings.Contains(err.Error(), "ter_srv_") {
 		t.Errorf("error = %q, want it to name the expected prefix", err)
 	}
 }
@@ -181,7 +181,7 @@ func TestTelemetryCodexConnectStatusDisconnect(t *testing.T) {
 	}
 
 	out, err := run("telemetry", "connect", "codex",
-		"--api-key", "mir_srv_codex123",
+		"--api-key", "ter_srv_codex123",
 		"--project", "770e8400-e29b-41d4-a716-446655440000",
 		"--yes")
 	if err != nil {
@@ -203,7 +203,7 @@ func TestTelemetryCodexConnectStatusDisconnect(t *testing.T) {
 	}
 	if !strings.Contains(string(data), "# my config\nmodel = \"gpt-5\"") ||
 		!strings.Contains(string(data), "[mcp_servers.foo]\ncommand = \"foo\"") ||
-		!strings.Contains(string(data), "mir_srv_codex123") ||
+		!strings.Contains(string(data), "ter_srv_codex123") ||
 		!strings.Contains(string(data), `notify = ["terma", "hook", "codex-notify"]`) {
 		t.Fatalf("config.toml after connect:\n%s", data)
 	}
@@ -218,7 +218,7 @@ func TestTelemetryCodexConnectStatusDisconnect(t *testing.T) {
 	if !strings.Contains(out, `"state": "connected"`) || !strings.Contains(out, `"project_id": "770e8400-e29b-41d4-a716-446655440000"`) {
 		t.Errorf("status after connect:\n%s", out)
 	}
-	if strings.Contains(out, "mir_srv_codex123") {
+	if strings.Contains(out, "ter_srv_codex123") {
 		t.Error("status printed the whole key")
 	}
 
@@ -245,7 +245,7 @@ func TestTelemetryCodexRefusesMetricsWhenAnalyticsDisabled(t *testing.T) {
 	connect := func(args ...string) (string, error) {
 		out, _, err := termaRun{}.exec(t, append([]string{
 			"telemetry", "connect", "codex",
-			"--api-key", "mir_srv_secret",
+			"--api-key", "ter_srv_secret",
 			"--project", "770e8400-e29b-41d4-a716-446655440000",
 			"--yes",
 		}, args...)...)
@@ -286,7 +286,7 @@ func TestTelemetryCodexProfileOverridesAreReportedNotBlocking(t *testing.T) {
 
 	out, _, err := termaRun{}.exec(t,
 		"telemetry", "connect", "codex",
-		"--api-key", "mir_srv_profiles",
+		"--api-key", "ter_srv_profiles",
 		"--project", "770e8400-e29b-41d4-a716-446655440000",
 		"--exclude-prompts", "--exclude-tool-content",
 		"--yes",
@@ -351,7 +351,7 @@ func TestTelemetryCodexInlineKeyFlagIsAccepted(t *testing.T) {
 
 	if _, err := runTerma(t,
 		"telemetry", "connect", "codex",
-		"--api-key", "mir_srv_inline",
+		"--api-key", "ter_srv_inline",
 		"--project", "770e8400-e29b-41d4-a716-446655440000",
 		"--inline-key", "--yes",
 	); err != nil {
@@ -361,7 +361,7 @@ func TestTelemetryCodexInlineKeyFlagIsAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
-	if !strings.Contains(string(data), "mir_srv_inline") {
+	if !strings.Contains(string(data), "ter_srv_inline") {
 		t.Fatal("the key was not written")
 	}
 }
@@ -381,7 +381,7 @@ func TestTelemetryConnectRefusesOnPerSignalConflict(t *testing.T) {
 
 	out, _, err := termaRun{}.exec(t,
 		"telemetry", "connect", "claude",
-		"--api-key", "mir_srv_secret",
+		"--api-key", "ter_srv_secret",
 		"--project", "770e8400-e29b-41d4-a716-446655440000",
 		"--yes",
 	)
@@ -404,7 +404,7 @@ func TestTelemetryConnectRefusesOnPerSignalConflict(t *testing.T) {
 	if string(after) != original {
 		t.Fatalf("the config was modified despite the refusal:\n%s", after)
 	}
-	if strings.Contains(string(after), "mir_srv_secret") {
+	if strings.Contains(string(after), "ter_srv_secret") {
 		t.Fatal("the server key was written into a config that would have leaked it")
 	}
 }
@@ -421,7 +421,7 @@ func TestTelemetryConnectProceedsWithForce(t *testing.T) {
 
 	if _, err := runTerma(t,
 		"telemetry", "connect", "claude",
-		"--api-key", "mir_srv_secret",
+		"--api-key", "ter_srv_secret",
 		"--project", "770e8400-e29b-41d4-a716-446655440000",
 		"--yes", "--force",
 	); err != nil {
@@ -455,7 +455,7 @@ func TestTelemetryIdentityFlagNeverReachesClaude(t *testing.T) {
 
 			args := []string{
 				"telemetry", "connect", "claude",
-				"--api-key", "mir_srv_test",
+				"--api-key", "ter_srv_test",
 				"--project", "770e8400-e29b-41d4-a716-446655440000",
 				"--yes",
 			}
@@ -486,26 +486,41 @@ func TestTelemetryDisconnectCleansPartiallyDisabledConfig(t *testing.T) {
 	t.Setenv("CLAUDE_CONFIG_DIR", dir)
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 
-	// Telemetry off, endpoint gone, key still present.
-	seed := `{"env":{
-		"CLAUDE_CODE_ENABLE_TELEMETRY":"0",
-		"OTEL_EXPORTER_OTLP_HEADERS":"Authorization=Bearer mir_srv_leftover",
-		"EDITOR":"vim"
-	}}`
+	if _, err := runTerma(t, "connect", "claude", "--api-key", "ter_srv_leftover", "--project", testProjectID, "--yes"); err != nil {
+		t.Fatal(err)
+	}
 	path := filepath.Join(dir, "settings.json")
-	if err := os.WriteFile(path, []byte(seed), 0o600); err != nil {
-		t.Fatalf("seed: %v", err)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Env map[string]string `json:"env"`
+	}
+	if err := json.Unmarshal(data, &doc); err != nil {
+		t.Fatal(err)
+	}
+	// Disable the exporter after a real connect, preserving its ownership journal.
+	doc.Env["CLAUDE_CODE_ENABLE_TELEMETRY"] = "0"
+	delete(doc.Env, "OTEL_EXPORTER_OTLP_ENDPOINT")
+	doc.Env["EDITOR"] = "vim"
+	data, err = json.Marshal(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
 	}
 
 	if _, err := runTerma(t, "telemetry", "disconnect", "claude", "--yes"); err != nil {
 		t.Fatalf("disconnect: %v", err)
 	}
 
-	data, err := os.ReadFile(path)
+	data, err = os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
-	if strings.Contains(string(data), "mir_srv_leftover") {
+	if strings.Contains(string(data), "ter_srv_leftover") {
 		t.Fatalf("the server key survived disconnect:\n%s", data)
 	}
 	if !strings.Contains(string(data), "vim") {
@@ -525,7 +540,7 @@ func TestTelemetryConnectEndsOnACommandThatExists(t *testing.T) {
 
 	out, _, err := termaRun{}.exec(t,
 		"telemetry", "connect", "claude",
-		"--api-key", "mir_srv_test",
+		"--api-key", "ter_srv_test",
 		"--project", "770e8400-e29b-41d4-a716-446655440000",
 		"--yes",
 	)
@@ -591,7 +606,7 @@ func TestTelemetryConnectCapturesContentByDefault(t *testing.T) {
 
 			if _, err := runTerma(t, append([]string{
 				"telemetry", "connect", "claude",
-				"--api-key", "mir_srv_test",
+				"--api-key", "ter_srv_test",
 				"--project", "770e8400-e29b-41d4-a716-446655440000",
 				"--yes",
 			}, tc.args...)...); err != nil {
@@ -638,7 +653,7 @@ func TestTelemetryReconnectReusesInstalledKey(t *testing.T) {
 		return out, err
 	}
 
-	if _, err := connect("--api-key", "mir_srv_0123456789abcdef"); err != nil {
+	if _, err := connect("--api-key", "ter_srv_0123456789abcdef"); err != nil {
 		t.Fatalf("first connect: %v", err)
 	}
 
@@ -654,7 +669,7 @@ func TestTelemetryReconnectReusesInstalledKey(t *testing.T) {
 
 	h := harness.Claude{}
 	key, ok := h.CurrentCredential("https://otel.terma.ai", "770e8400-e29b-41d4-a716-446655440000")
-	if !ok || key != "mir_srv_0123456789abcdef" {
+	if !ok || key != "ter_srv_0123456789abcdef" {
 		t.Fatalf("installed key after reconnect = (%q, %v), want the original", key, ok)
 	}
 }
@@ -668,7 +683,7 @@ func TestTelemetryInlineKeyFlag(t *testing.T) {
 
 	if _, err := runTerma(t,
 		"telemetry", "connect", "claude",
-		"--api-key", "mir_srv_inline123",
+		"--api-key", "ter_srv_inline123",
 		"--project", "770e8400-e29b-41d4-a716-446655440000",
 		"--inline-key", "--yes",
 	); err != nil {
@@ -679,7 +694,7 @@ func TestTelemetryInlineKeyFlag(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
-	if !strings.Contains(string(data), "mir_srv_inline123") {
+	if !strings.Contains(string(data), "ter_srv_inline123") {
 		t.Fatal("--inline-key did not write the key into the settings file")
 	}
 	if strings.Contains(string(data), "otelHeadersHelper") {
@@ -697,7 +712,7 @@ func TestTelemetryDefaultConnectUsesHelper(t *testing.T) {
 
 	if _, err := runTerma(t,
 		"telemetry", "connect", "claude",
-		"--api-key", "mir_srv_helperdefault1",
+		"--api-key", "ter_srv_helperdefault1",
 		"--project", "770e8400-e29b-41d4-a716-446655440000",
 		"--yes",
 	); err != nil {
@@ -708,7 +723,7 @@ func TestTelemetryDefaultConnectUsesHelper(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
-	if strings.Contains(string(data), "mir_srv_helperdefault1") {
+	if strings.Contains(string(data), "ter_srv_helperdefault1") {
 		t.Fatalf("the key landed in settings.json on a default connect:\n%s", data)
 	}
 	if !strings.Contains(string(data), "otelHeadersHelper") {
@@ -720,7 +735,7 @@ func TestTelemetryDefaultConnectUsesHelper(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read helper: %v", err)
 	}
-	if !strings.Contains(string(script), "mir_srv_helperdefault1") {
+	if !strings.Contains(string(script), "ter_srv_helperdefault1") {
 		t.Fatal("the helper script does not hold the key")
 	}
 }
@@ -739,7 +754,7 @@ func TestTelemetryConnectKeepsKeysSeparatePerHarness(t *testing.T) {
 		return err
 	}
 
-	if err := connect("codex", "--project", project, "--yes", "--api-key", "mir_srv_0123456789abcdef"); err != nil {
+	if err := connect("codex", "--project", project, "--yes", "--api-key", "ter_srv_0123456789abcdef"); err != nil {
 		t.Fatalf("connect codex: %v", err)
 	}
 	if err := connect("claude", "--project", project, "--yes"); err == nil {
@@ -761,7 +776,7 @@ func TestTelemetryConnectSeveralHarnessesAtOnce(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	const project = "770e8400-e29b-41d4-a716-446655440000"
 
-	out, _, err := termaRun{}.exec(t, "telemetry", "connect", "claude", "codex", "--project", project, "--yes", "--api-key", "mir_srv_0123456789abcdef")
+	out, _, err := termaRun{}.exec(t, "telemetry", "connect", "claude", "codex", "--project", project, "--yes", "--api-key", "ter_srv_0123456789abcdef")
 	if err != nil {
 		t.Fatalf("connect claude codex: %v", err)
 	}
@@ -769,7 +784,7 @@ func TestTelemetryConnectSeveralHarnessesAtOnce(t *testing.T) {
 		cur := h.(interface {
 			CurrentCredential(endpoint, projectID string) (string, bool)
 		})
-		if key, ok := cur.CurrentCredential("https://otel.terma.ai", project); !ok || key != "mir_srv_0123456789abcdef" {
+		if key, ok := cur.CurrentCredential("https://otel.terma.ai", project); !ok || key != "ter_srv_0123456789abcdef" {
 			t.Errorf("%s key = (%q, %v), want the supplied key", h.DisplayName(), key, ok)
 		}
 	}
@@ -787,7 +802,7 @@ func TestTelemetryConnectRefusesListWithUnknownHarness(t *testing.T) {
 	t.Setenv("CODEX_HOME", t.TempDir())
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 
-	if _, err := runTerma(t, "telemetry", "connect", "claude", "gemini", "--project", "770e8400-e29b-41d4-a716-446655440000", "--yes", "--api-key", "mir_srv_0123456789abcdef"); err == nil || !strings.Contains(err.Error(), "gemini") {
+	if _, err := runTerma(t, "telemetry", "connect", "claude", "gemini", "--project", "770e8400-e29b-41d4-a716-446655440000", "--yes", "--api-key", "ter_srv_0123456789abcdef"); err == nil || !strings.Contains(err.Error(), "gemini") {
 		t.Fatalf("err = %v, want a refusal naming gemini", err)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "settings.json")); !os.IsNotExist(err) {

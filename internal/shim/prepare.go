@@ -20,7 +20,7 @@ func Prepare(agent, directory string, args []string) error {
 		return err
 	}
 	r := routeFor(agent, cwd, args)
-	if len(r.env) != 0 || len(r.args) > 256 {
+	if len(r.args) > 256 {
 		return fmt.Errorf("unsupported routing plan")
 	}
 	for i, arg := range r.args {
@@ -121,6 +121,10 @@ terma_launch_plan() {
   done
   terma_cleanup
   trap - 0 INT TERM HUP
+  if [ "$terma_agent" = codex ] && [ "$terma_count" -gt 0 ]; then
+    TERMA_CODEX_ROUTED=1
+    export TERMA_CODEX_ROUTED
+  fi
   exec "$terma_real" "$@"
 }
 if [ "$terma_ok" = 1 ]; then

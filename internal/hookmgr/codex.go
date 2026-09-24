@@ -1,6 +1,8 @@
 package hookmgr
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -14,12 +16,12 @@ import (
 // project's `.codex` layer is trusted, and each developer trusts a repository's hooks
 // once, from inside Codex — see doctor's codex-hooks check, which is what tells them.
 //
-// This is the *only* thing terma can put in a repository for Codex. Telemetry cannot
-// live here: Codex strips `otel` (with `notify`, `profile` and the provider keys) out of
+// This is the repository-specific capture surface for Codex Desktop. Native OTLP
+// telemetry cannot live here: Codex strips `otel` (with `notify`, `profile` and the provider keys) out of
 // project-local config and says so at startup, so a Codex export is always driven from
 // outside the repository — the machine-wide user config `terma connect codex` writes, or
 // the runtime `-c` overrides `terma install` routes through the shim (keeping the
-// developer's own CODEX_HOME). Hooks are the repository-scoped half.
+// developer's own CODEX_HOME). Trusted hooks report Desktop activity directly.
 const CodexHooksPath = ".codex/hooks.json"
 
 // CodexHooks are the adapter shims for Codex. Each is a one-liner that forwards the
@@ -40,18 +42,32 @@ var CodexHooks = []struct {
 	Async   bool
 	Timeout int
 }{
-	{"SessionStart", HookCommand("codex-session-start"), false, 10},
-	{"PostToolUse", HookCommand("codex-post-tool-use"), true, 10},
+	{"SessionStart", CodexHookCommand("codex-session-start"), false, 10},
+	{"UserPromptSubmit", CodexHookCommand("codex-user-prompt-submit"), true, 10},
+	// Record the start before the tool runs. PostToolUse can then report an
+	// observed elapsed time under the same tool_use_id.
+	{"PreToolUse", CodexHookCommand("codex-pre-tool-use"), false, 10},
+	// This only observes that approval was requested. Codex does not send the
+	// eventual user decision back to repository hooks.
+	{"PermissionRequest", CodexHookCommand("codex-permission-request"), false, 10},
+	{"PostToolUse", CodexHookCommand("codex-post-tool-use"), true, 10},
 	// Finish the bounded local snapshot before codex exec can shut down. An
 	// async Stop may be cancelled at exit; network delivery stays detached.
-	{"Stop", HookCommand("codex-stop"), false, 3},
-	{"SessionEnd", HookCommand("codex-session-end"), false, 3},
+	{"Stop", CodexHookCommand("codex-stop"), false, 3},
+	{"SessionEnd", CodexHookCommand("codex-session-end"), false, 3},
 	// Subagents run inside the thread and name themselves (agent_id / agent_type).
 	// SubagentStart is async like PostToolUse: nothing terma returns changes what Codex
 	// does. SubagentStop stays synchronous and cheap so its event is spooled before the
 	// parent's Stop.
-	{"SubagentStart", HookCommand("codex-subagent-start"), true, 10},
-	{"SubagentStop", HookCommand("codex-subagent-stop"), false, 3},
+	{"SubagentStart", CodexHookCommand("codex-subagent-start"), true, 10},
+	{"SubagentStop", CodexHookCommand("codex-subagent-stop"), false, 3},
+}
+
+// CodexHookCommand also finds user-installed binaries when Codex Desktop was
+// launched with macOS's small GUI PATH. Its hook entry is committed, so the
+// directories must be portable across developers and their install methods.
+func CodexHookCommand(event string) string {
+	return `PATH="${PATH:-/usr/bin:/bin}:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin"; ` + HookCommand(event)
 }
 
 // HasCodex reports whether the repository already carries Codex configuration — a
@@ -115,6 +131,7 @@ type CodexEntry struct {
 	Event   string
 	Group   int
 	Handler int
+	Hash    string
 }
 
 // Key is the entry's name in Codex's trust records, after the hooks file's path:
@@ -146,7 +163,8 @@ func CodexTermaEntries(root string) ([]CodexEntry, error) {
 	}
 	var doc struct {
 		Hooks map[string][]struct {
-			Hooks []json.RawMessage `json:"hooks"`
+			Matcher *string           `json:"matcher"`
+			Hooks   []json.RawMessage `json:"hooks"`
 		} `json:"hooks"`
 	}
 	if err := json.Unmarshal(before, &doc); err != nil {
@@ -157,10 +175,47 @@ func CodexTermaEntries(root string) ([]CodexEntry, error) {
 		for g, group := range doc.Hooks[h.Event] {
 			for i, handler := range group.Hooks {
 				if callsTerma(handler) {
-					out = append(out, CodexEntry{Event: h.Event, Group: g, Handler: i})
+					entry := CodexEntry{Event: h.Event, Group: g, Handler: i}
+					entry.Hash, err = codexEntryHash(entry, group.Matcher, handler)
+					if err != nil {
+						return nil, err
+					}
+					out = append(out, entry)
 				}
 			}
 		}
 	}
 	return out, nil
+}
+
+// codexEntryHash matches Codex's normalized command-hook identity: the event,
+// matcher group, and one handler, serialized as canonical JSON and SHA-256.
+// It is read-only; only Codex can grant trust for this hash.
+func codexEntryHash(entry CodexEntry, matcher *string, raw json.RawMessage) (string, error) {
+	var handler map[string]any
+	if err := json.Unmarshal(raw, &handler); err != nil {
+		return "", err
+	}
+	normalized := map[string]any{
+		"type":    handler["type"],
+		"command": handler["command"],
+		"async":   false,
+	}
+	for _, key := range []string{"async", "timeout", "commandWindows", "statusMessage", "additionalContextLimit"} {
+		if v, ok := handler[key]; ok {
+			normalized[key] = v
+		}
+	}
+	identity := map[string]any{"event_name": strings.SplitN(entry.Key(), ":", 2)[0], "hooks": []any{normalized}}
+	if matcher != nil {
+		identity["matcher"] = *matcher
+	}
+	var buf bytes.Buffer
+	encoder := json.NewEncoder(&buf)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(identity); err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(bytes.TrimSuffix(buf.Bytes(), []byte{'\n'}))
+	return fmt.Sprintf("sha256:%x", sum), nil
 }

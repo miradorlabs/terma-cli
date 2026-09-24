@@ -156,7 +156,7 @@ func TestUninstallRemovesRepoPolicy(t *testing.T) {
 
 // userSandbox points Claude Code's config dir and Terma's at scratch directories and
 // returns the user-level settings path. It also moves out of whatever repository the
-// test binary was built in, so a status run here reads no real .terma.toml.
+// test binary was built in, so a status run here reads no real .terma/settings.json.
 func userSandbox(t *testing.T) string {
 	t.Helper()
 	claudeDir := t.TempDir()
@@ -186,7 +186,7 @@ func fakeClaudeOnPath(t *testing.T) {
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 }
 
-const testServerKey = "mir_srv_0123456789abcdef"
+const testServerKey = "ter_srv_0123456789abcdef"
 
 func valuesOf(m map[string]string) []string {
 	out := make([]string, 0, len(m))
@@ -226,7 +226,10 @@ func TestDoctorFailsWhenThisRepositoryHasNoPolicy(t *testing.T) {
 		"--api-key", testServerKey, "--project", testProjectID, "--yes"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--telemetry=false", "--yes"); err != nil {
+	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (harness.Claude{}).Local(mustGetwd(t)).Disconnect(); err != nil {
 		t.Fatal(err)
 	}
 	out, _ := runTerma(t, "doctor", "--skip-commit")
@@ -281,7 +284,10 @@ func TestStatusAndDoctorAgreeWhenRoutingIsConfiguredButNotLive(t *testing.T) {
 		"--api-key", testServerKey, "--project", testProjectID, "--yes"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--telemetry=false", "--yes"); err != nil {
+	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (harness.Claude{}).Local(mustGetwd(t)).Disconnect(); err != nil {
 		t.Fatal(err)
 	}
 	if err := shim.SaveRecord(shim.Record{ProjectID: testProjectID, Endpoint: "https://otel.terma.ai", Signals: []string{"logs"}, Harnesses: []string{shim.AgentClaude}}); err != nil {
@@ -352,7 +358,10 @@ func TestInstallPreservesExistingRepositoryPolicy(t *testing.T) {
 func TestInstallUpgradesHooksOnlyRepository(t *testing.T) {
 	repo := installRepo(t)
 	args := []string{"install", "--harness", "none", "--project", testProjectID, "--yes", "--no-doctor"}
-	if _, err := runTerma(t, append(args, "--telemetry=false")...); err != nil {
+	if _, err := runTerma(t, args...); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (harness.Claude{}).Local(mustGetwd(t)).Disconnect(); err != nil {
 		t.Fatal(err)
 	}
 	out, err := runTerma(t, args...)

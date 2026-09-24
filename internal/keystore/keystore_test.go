@@ -41,3 +41,16 @@ func TestSetCreatesTheConfigDirectory(t *testing.T) {
 		t.Fatalf("Get = %q", got)
 	}
 }
+
+func TestMiradorKeysAreNotReused(t *testing.T) {
+	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	if err := save(&file{Keys: map[string]string{"project": "mir_srv_1234"}, HarnessKeys: map[string]map[string]string{"codex": {"project": "mir_srv_1234"}}}); err != nil {
+		t.Fatal(err)
+	}
+	if Get("project") != "" || GetFor("codex", "project") != "" {
+		t.Fatal("unsupported key was reused")
+	}
+	if err := Set("project", "mir_srv_1234"); err == nil {
+		t.Fatal("unsupported key was accepted")
+	}
+}

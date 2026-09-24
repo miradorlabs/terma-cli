@@ -59,6 +59,9 @@ func (e Env) captureCodexReplies(ctx context.Context, r *repo, in *codexHookInpu
 			"text": reply.Text, "text_bytes": reply.Bytes, "text_truncated": reply.Truncated,
 			attrVersion: e.Version, AttrProjectID: r.projectID,
 		}, in.AgentID, in.AgentType)
+		if _, desktop := codexDesktopRoute(r); desktop {
+			attrs["capture_surface"] = codexDesktopSurface
+		}
 		for k, v := range map[string]string{attrTurnID: reply.TurnID, "trace_id": reply.TraceID, "phase": reply.Phase, attrModel: in.Model} {
 			boundedAttr(attrs, k, v)
 		}
@@ -91,10 +94,8 @@ func (e Env) captureCodexReplies(ctx context.Context, r *repo, in *codexHookInpu
 // and `terma connect codex --exclude-prompts` are documented as withholding "prompt text
 // or model responses", and this is the model-response half of that promise.
 //
-// Two configurations can govern a Codex session and the hook cannot tell which did: the
-// repository's routing record, applied when Codex was started through terma's launcher,
-// and the machine-wide config, which applies when it was not. So either one that exists
-// and withholds prompts is a no, and with neither there is no export to extend at all.
+// A routed CLI launch is marked by the shim; its runtime overrides govern consent.
+// Desktop launches have no marker. Their repository route alone governs capture.
 //
 // It fails closed. A configuration that is there and cannot be read — a routing record
 // half-written, a config.toml that does not parse — might be the one that withholds
@@ -105,20 +106,19 @@ func codexRepliesConsented(r *repo) bool {
 	if err != nil {
 		return false
 	}
-	routed := recorded && slices.Contains(rec.Harnesses, shim.AgentCodex)
-	routedPrompts := routed && rec.IncludePrompts
+	if os.Getenv(shim.CodexRoutedEnv) != "1" && rec.Desktop {
+		return recorded && slices.Contains(rec.Harnesses, shim.AgentCodex) &&
+			slices.Contains(rec.Signals, "logs") && rec.IncludePrompts
+	}
 	st, err := (harness.Codex{}).Status()
 	if err != nil {
 		return false
 	}
-	machineWide := st.Connected
-	switch {
-	case !routed && !machineWide:
-		return false
-	case routed && !routedPrompts:
-		return false
-	case machineWide && !st.IncludePrompts:
-		return false
+	if os.Getenv(shim.CodexRoutedEnv) == "1" {
+		return recorded && slices.Contains(rec.Harnesses, shim.AgentCodex) && rec.IncludePrompts
 	}
-	return true
+	// Repository hooks can run even when an IDE or TERMA_DISABLE bypasses the
+	// shim. Keep a saved repository opt-out in force for those launches.
+	return st.Connected && st.IncludePrompts &&
+		(!recorded || !slices.Contains(rec.Harnesses, shim.AgentCodex) || rec.IncludePrompts)
 }

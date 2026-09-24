@@ -11,6 +11,11 @@ import (
 // AgentCodex is Codex's binary name and its key in the keystore and the record.
 const AgentCodex = "codex"
 
+// CodexRoutedEnv marks a Codex process launched with Terma's runtime export
+// overrides. Repository hooks use it to distinguish CLI consent from the
+// desktop app's machine-wide exporter.
+const CodexRoutedEnv = "TERMA_CODEX_ROUTED"
+
 // codexRouter routes Codex through runtime `-c` overrides, preserving the developer's
 // CODEX_HOME. Codex accepts an explicit working-directory flag, so its binding is looked
 // up from that directory, not the shell's cwd.

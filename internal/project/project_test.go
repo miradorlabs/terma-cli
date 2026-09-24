@@ -74,37 +74,6 @@ func TestFindWalksUp(t *testing.T) {
 	}
 }
 
-// A repository that still carries the pre-migration .terma.toml is read as-is, and
-// the next Save moves it to .terma/settings.json and deletes the legacy file.
-func TestLegacyTOMLReadAndMigrate(t *testing.T) {
-	root := t.TempDir()
-	legacy := "[project]\nid = 'proj-legacy'\nname = 'Old'\n\n[install]\nhook_manager = 'git'\nadapters = ['claude']\n"
-	if err := os.WriteFile(LegacyPath(root), []byte(legacy), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	out, err := Load(root)
-	if err != nil {
-		t.Fatalf("legacy load: %v", err)
-	}
-	if out.Project.ID != "proj-legacy" || out.Install.HookManager != "git" || out.Install.Adapters[0] != "claude" {
-		t.Fatalf("legacy parse mismatch: %+v", out)
-	}
-	// Find locates a repo that only has the legacy file.
-	if got, err := Find(root); err != nil || got != root {
-		t.Fatalf("Find legacy: got %q (%v)", got, err)
-	}
-	// Saving migrates: new file appears, legacy file goes away.
-	if err := Save(root, out); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(Path(root)); err != nil {
-		t.Fatalf("new file missing after migration: %v", err)
-	}
-	if _, err := os.Stat(LegacyPath(root)); !os.IsNotExist(err) {
-		t.Fatalf("legacy file should be removed after migration, stat err = %v", err)
-	}
-}
-
 // Removing the binding must not take the committed hook shims under .terma/hooks/
 // down with it.
 func TestRemoveKeepsHooksDir(t *testing.T) {
@@ -127,5 +96,30 @@ func TestRemoveKeepsHooksDir(t *testing.T) {
 	}
 	if _, err := os.Stat(Path(root)); !os.IsNotExist(err) {
 		t.Fatalf("binding should be gone, stat err = %v", err)
+	}
+}
+
+func TestTOMLBindingIsNotLoadedOrModified(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, ".terma.toml")
+	original := "[project]\nid = 'unselected-project'\n"
+	if err := os.WriteFile(path, []byte(original), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(root); err != ErrNotFound {
+		t.Fatalf("unsupported binding loaded: %v", err)
+	}
+	if _, err := Find(root); err != ErrNotFound {
+		t.Fatalf("unsupported binding discovered: %v", err)
+	}
+	if err := Save(root, &File{Project: Project{ID: "current-project"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := Remove(root); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil || string(data) != original {
+		t.Fatalf("unmanaged file changed: %q, %v", data, err)
 	}
 }

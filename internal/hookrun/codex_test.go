@@ -9,8 +9,23 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
+	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
+
+func TestCodexSessionStartAnnouncesSession(t *testing.T) {
+	root := initRepo(t)
+	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	const id = "01a0d0ff-0000-7000-8000-000000000003"
+	if err := project.Save(root, &project.File{Project: project.Project{ID: "project-a"}}); err != nil {
+		t.Fatal(err)
+	}
+	env := Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(`{"session_id":"` + id + `","cwd":"` + root + `"}`)}
+	if err := CodexSessionStart(context.Background(), env); err != nil {
+		t.Fatal(err)
+	}
+	// A trusted hook can announce a repository session without a global exporter.
+}
 
 // Codex names no edited file of its own: an edit is a tool call carrying an apply_patch
 // envelope, and the paths are inside it. This is the whole reason the project hooks are
@@ -44,6 +59,10 @@ func TestCodexSessionStampsItsCommitFromApplyPatch(t *testing.T) {
 	}, "\\n")
 	if err := CodexPostToolUse(ctx, env(`{"session_id":"`+id+`","hook_event_name":"PostToolUse","cwd":"`+root+`","model":"gpt-6","permission_mode":"default","tool_name":"apply_patch","tool_use_id":"call_1","turn_id":"turn_1","transcript_path":null,"tool_response":"ok","tool_input":{"command":"`+patch+`"}}`)); err != nil {
 		t.Fatal(err)
+	}
+	touched := eventsNamed(spooledQuota(t, sp), EventFilesTouched)
+	if len(touched) != 1 || touched[0].Attrs[attrToolCallID] != "call_1" {
+		t.Fatalf("file touch must carry Codex's tool call id: %+v", touched)
 	}
 
 	if _, err := gitx.Git(ctx, root, "add", "src"); err != nil {

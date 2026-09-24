@@ -23,7 +23,7 @@ func TestLoad_PrecedenceIsFlagThenEnvThenProfile(t *testing.T) {
 	seedConfig(t, &File{
 		ActiveProfile: DefaultProfile,
 		Profiles: map[string]*Profile{
-			DefaultProfile: {APIURL: "https://profile.example", ProjectID: "project-from-profile"},
+			DefaultProfile: {APIURL: "https://profile.example"},
 		},
 	})
 
@@ -97,30 +97,12 @@ func TestLoad_TrimsTrailingSlashFromURLs(t *testing.T) {
 	}
 }
 
-func TestLoad_DropsStoredProjectNameWhenProjectIsOverridden(t *testing.T) {
-	seedConfig(t, &File{
-		ActiveProfile: DefaultProfile,
-		Profiles: map[string]*Profile{
-			DefaultProfile: {ProjectID: "project-a", ProjectName: "Project A"},
-		},
-	})
-
-	cfg, err := Load(Overrides{ProjectID: "project-b"})
-	if err != nil {
-		t.Fatalf("Load: %v", err)
-	}
-	// Keeping "Project A" here would label a read of project-b with the wrong name.
-	if cfg.ProjectName != "" {
-		t.Errorf("ProjectName = %q, want it cleared when --project names a different project", cfg.ProjectName)
-	}
-}
-
 func TestUpdateProfile_CreatesTheProfileAndPersists(t *testing.T) {
 	seedConfig(t, nil)
 
 	if err := UpdateProfile("staging", func(p *Profile) {
-		p.ProjectID = "project-x"
-		p.ProjectName = "Project X"
+		p.OrganizationID = "org-x"
+		p.OrganizationName = "Organization X"
 	}); err != nil {
 		t.Fatalf("UpdateProfile: %v", err)
 	}
@@ -130,7 +112,7 @@ func TestUpdateProfile_CreatesTheProfileAndPersists(t *testing.T) {
 		t.Fatalf("LoadFile: %v", err)
 	}
 	got := file.Profiles["staging"]
-	if got == nil || got.ProjectID != "project-x" {
+	if got == nil || got.OrganizationID != "org-x" {
 		t.Fatalf("profile not persisted: %+v", got)
 	}
 }
@@ -296,18 +278,15 @@ func TestLoad_EndpointPrecedence(t *testing.T) {
 	})
 }
 
-// Account switches must never resurrect old profile-level project defaults.
-func TestProfileSelectOrganizationDiscardsLegacyProjects(t *testing.T) {
-	p := &Profile{OrganizationID: "org-a", ProjectID: "proj-a", ProjectName: "Acme Web",
-		RecentProjects: map[string]ProjectRef{"org-b": {ID: "proj-b", Name: "Beta Core"}}}
-	for _, org := range []string{"org-b", "org-a", "org-a"} {
-		p.SelectOrganization(org, "")
-		if p.ProjectID != "" || p.ProjectName != "" || len(p.RecentProjects) != 0 {
-			t.Fatalf("organization switch restored a global project: %+v", p)
-		}
+func TestProfileSelectOrganization(t *testing.T) {
+	p := &Profile{OrganizationID: "org-a", OrganizationName: "Acme"}
+	p.SelectOrganization("org-b", "")
+	if p.OrganizationID != "org-b" || p.OrganizationName != "" {
+		t.Fatalf("organization switch retained the previous name: %+v", p)
 	}
-	p.SelectOrganization("org-a", "Acme")
-	if p.OrganizationName != "Acme" {
-		t.Fatalf("organization name not recorded: %+v", p)
+	p.SelectOrganization("org-b", "Beta")
+	p.SelectOrganization("org-b", "")
+	if p.OrganizationName != "Beta" {
+		t.Fatalf("organization name not preserved: %+v", p)
 	}
 }

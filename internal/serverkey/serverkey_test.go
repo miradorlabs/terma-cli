@@ -8,7 +8,7 @@ func TestIs(t *testing.T) {
 		want bool
 	}{
 		{"ter_srv_00112233445566778899aabbccddeeff", true},
-		{"mir_srv_0f23abcd0123456789abcdef01234567", true},
+		{"mir_srv_0f23abcd0123456789abcdef01234567", false},
 		{"Bearer ter_srv_abc", false},
 		{"sk-live-abc", false},
 		{"", false},

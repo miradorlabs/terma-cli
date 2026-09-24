@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -13,9 +12,10 @@ import (
 
 func sampleCredential() *Credential {
 	return &Credential{
-		AccessToken:  "mir_cli_x",
-		RefreshToken: "mir_clr_x",
-		ExpiresAt:    time.Now().Add(time.Hour),
+		AccessToken:    "ter_cli_x",
+		OrganizationID: "org-test",
+		RefreshToken:   "ter_clr_x",
+		ExpiresAt:      time.Now().Add(time.Hour),
 	}
 }
 
@@ -99,50 +99,6 @@ func TestDeleteCredential_MissingProfileIsNoError(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	if err := DeleteCredential("never-existed"); err != nil {
 		t.Errorf("deleting a missing profile should be a no-op, got %v", err)
-	}
-}
-
-// A credentials.json written before organizations were kept side by side holds one
-// credential per profile. It must load as-is — a release must never log everyone out —
-// and be rewritten in the current shape by the next save.
-func TestLoadCredential_MigratesTheLegacyShape(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("TERMA_CONFIG_DIR", dir)
-	legacy := `{"default": {"access_token": "ter_cli_old", "refresh_token": "ter_clr_old",
-		"expires_at": "2030-01-01T00:00:00Z", "organization_id": "org-a", "user_email": "d@example.com"}}`
-	if err := os.WriteFile(filepath.Join(dir, "credentials.json"), []byte(legacy), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	cred, err := LoadCredential("default")
-	if err != nil {
-		t.Fatalf("LoadCredential: %v", err)
-	}
-	if cred.AccessToken != "ter_cli_old" || cred.OrganizationID != "org-a" {
-		t.Fatalf("legacy credential not read back: %+v", cred)
-	}
-	if _, err := LoadCredentialFor("default", "org-a"); err != nil {
-		t.Fatalf("legacy credential should be addressable by organization: %v", err)
-	}
-
-	// Any write rewrites the file in the current shape, and the legacy entry survives
-	// beside the new one.
-	if _, err := SaveCredential("default", orgCredential("org-b", "s-b")); err != nil {
-		t.Fatal(err)
-	}
-	data, err := os.ReadFile(filepath.Join(dir, "credentials.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var file map[string]struct {
-		Active        string                     `json:"active"`
-		Organizations map[string]json.RawMessage `json:"organizations"`
-	}
-	if err := json.Unmarshal(data, &file); err != nil {
-		t.Fatalf("rewritten file is not in the current shape: %v\n%s", err, data)
-	}
-	if file["default"].Active != "org-b" || len(file["default"].Organizations) != 2 {
-		t.Fatalf("expected org-b active beside org-a, got %+v", file["default"])
 	}
 }
 
@@ -252,5 +208,21 @@ func TestDeleteCredentialFor_FallsBackToAnotherOrganization(t *testing.T) {
 	}
 	if _, err := LoadCredential("default"); err != ErrNotLoggedIn {
 		t.Fatalf("nothing left should read as not logged in, got %v", err)
+	}
+}
+
+// An unsupported credential layout must not silently authenticate a profile.
+func TestLoadCredentialIgnoresSingleCredentialShape(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("TERMA_CONFIG_DIR", dir)
+	data := `{"default":{"access_token":"ter_cli_old","organization_id":"org-a"}}`
+	if err := os.WriteFile(filepath.Join(dir, "credentials.json"), []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadCredential("default"); err != ErrNotLoggedIn {
+		t.Fatalf("unsupported credential authenticated: %v", err)
+	}
+	if _, err := LoadCredentialFor("default", "org-a"); err != ErrNotLoggedIn {
+		t.Fatalf("unsupported organization authenticated: %v", err)
 	}
 }

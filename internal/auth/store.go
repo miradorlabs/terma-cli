@@ -30,7 +30,6 @@ type Credential struct {
 	// AuthURL records the host that minted this credential. A token is only valid to
 	// the environment that issued it, so sending one somewhere else is never useful —
 	// and the 401 it earns looks like a broken login rather than a wrong endpoint.
-	// Empty on credentials written before this field existed; those are not checked.
 	AuthURL        string `json:"auth_url,omitempty"`
 	OrganizationID string `json:"organization_id,omitempty"`
 	UserEmail      string `json:"user_email,omitempty"`
@@ -51,7 +50,10 @@ func (e *ErrWrongEnvironment) Error() string {
 
 // CheckEnvironment reports whether the credential belongs to authURL.
 func (c *Credential) CheckEnvironment(authURL string) error {
-	if c.AuthURL == "" || authURL == "" || c.AuthURL == authURL {
+	if c.AuthURL == "" {
+		return ErrNotLoggedIn
+	}
+	if c.AuthURL == authURL {
 		return nil
 	}
 	return &ErrWrongEnvironment{IssuedBy: c.AuthURL, ConfiguredAs: authURL}
@@ -76,53 +78,12 @@ type profileCredentials struct {
 	Organizations map[string]*Credential `json:"organizations"`
 }
 
-// legacyOrganization keys a credential that recorded no organization id — one written
-// by a build from before the field existed. It can still be used and refreshed; it
-// just cannot be told apart from another such credential, and there is at most one.
-const legacyOrganization = "-"
-
-func organizationKey(id string) string {
-	if id == "" {
-		return legacyOrganization
-	}
-	return id
-}
-
-// UnmarshalJSON accepts both shapes of a profile entry: the current one, and the
-// single credential each profile held before organizations were kept side by side.
-// The old shape is recognised by its access_token and becomes a one-entry map, so an
-// existing credentials.json keeps working and is rewritten in the new shape on the
-// next save.
-func (p *profileCredentials) UnmarshalJSON(data []byte) error {
-	type current profileCredentials
-	var cur current
-	if err := json.Unmarshal(data, &cur); err != nil {
-		return err
-	}
-	if cur.Organizations != nil {
-		*p = profileCredentials(cur)
-		return nil
-	}
-	var legacy Credential
-	if err := json.Unmarshal(data, &legacy); err != nil {
-		return err
-	}
-	p.Organizations = map[string]*Credential{}
-	if legacy.AccessToken == "" {
-		return nil
-	}
-	key := organizationKey(legacy.OrganizationID)
-	p.Active = key
-	p.Organizations[key] = &legacy
-	return nil
-}
-
 func (p *profileCredentials) active() *Credential {
-	if p == nil || p.Organizations == nil {
+	if p == nil || p.Active == "" {
 		return nil
 	}
 	cred := p.Organizations[p.Active]
-	if cred == nil || cred.AccessToken == "" {
+	if cred == nil || cred.AccessToken == "" || cred.OrganizationID == "" {
 		return nil
 	}
 	return cred
@@ -130,29 +91,11 @@ func (p *profileCredentials) active() *Credential {
 
 // put stores cred under its organization and reports the credential it replaced, if
 // any — the caller may want to revoke that session now that nothing will use it.
-//
-// A credential can move keys: a legacy entry that recorded no organization learns its
-// organization on the first refresh, and a rotated pair keeps its session id. Either
-// way the old entry is the same session and is dropped rather than left behind as a
-// second, stale copy — and if it was active, the active mark follows it.
 func (p *profileCredentials) put(cred *Credential) (replaced *Credential) {
 	if p.Organizations == nil {
 		p.Organizations = map[string]*Credential{}
 	}
-	key := organizationKey(cred.OrganizationID)
-	for other, existing := range p.Organizations {
-		if other == key || existing == nil {
-			continue
-		}
-		sameSession := cred.SessionID != "" && existing.SessionID == cred.SessionID
-		if other != legacyOrganization && !sameSession {
-			continue
-		}
-		delete(p.Organizations, other)
-		if p.Active == other {
-			p.Active = key
-		}
-	}
+	key := cred.OrganizationID
 	replaced = p.Organizations[key]
 	p.Organizations[key] = cred
 	return replaced
@@ -184,8 +127,8 @@ func LoadCredentialFor(profile, organizationID string) (*Credential, error) {
 	if p == nil {
 		return nil, ErrNotLoggedIn
 	}
-	cred := p.Organizations[organizationKey(organizationID)]
-	if cred == nil || cred.AccessToken == "" {
+	cred := p.Organizations[organizationID]
+	if cred == nil || cred.AccessToken == "" || cred.OrganizationID == "" {
 		return nil, ErrNotLoggedIn
 	}
 	return cred, nil
@@ -232,7 +175,7 @@ func SaveCredential(profile string, cred *Credential) (replaced *Credential, err
 			file[profile] = p
 		}
 		replaced = p.put(cred)
-		p.Active = organizationKey(cred.OrganizationID)
+		p.Active = cred.OrganizationID
 	})
 	if replaced != nil && replaced.SessionID == cred.SessionID {
 		replaced = nil
@@ -252,7 +195,7 @@ func UpdateCredential(profile string, cred *Credential) error {
 		}
 		p.put(cred)
 		if p.Active == "" {
-			p.Active = organizationKey(cred.OrganizationID)
+			p.Active = cred.OrganizationID
 		}
 	})
 }
@@ -266,7 +209,7 @@ func UseOrganization(profile, organizationID string) (*Credential, error) {
 		if p == nil {
 			return
 		}
-		key := organizationKey(organizationID)
+		key := organizationID
 		if c := p.Organizations[key]; c != nil && c.AccessToken != "" {
 			cred = c
 			p.Active = key
@@ -297,7 +240,7 @@ func DeleteCredentialFor(profile, organizationID string) error {
 		if p == nil {
 			return
 		}
-		key := organizationKey(organizationID)
+		key := organizationID
 		delete(p.Organizations, key)
 		if p.Active != key {
 			return

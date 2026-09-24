@@ -52,9 +52,7 @@ type journal struct {
 	InstalledSettings map[string]string  `json:"installed_settings,omitempty"`
 	PreviousSettings  map[string]*string `json:"previous_settings,omitempty"`
 	// ProjectID is the Terma project the connect reported to. Status and key reuse
-	// read it back. A journal from before the field reads as unknown, and the
-	// OTEL_RESOURCE_ATTRIBUTES an older Terma wrote answers instead until the next
-	// connect replaces both.
+	// read it back.
 	ProjectID string `json:"project_id,omitempty"`
 }
 
@@ -82,7 +80,7 @@ func journalPath(harness, configPath string) (string, error) {
 }
 
 // loadJournal returns nil when there is no record, which is not an error: a config
-// connected by an older build, or edited by hand, simply has none.
+// configured by hand or in another clone simply has none.
 func loadJournal(harness, configPath string) (*journal, error) {
 	path, err := journalPath(harness, configPath)
 	if err != nil {
@@ -98,7 +96,7 @@ func loadJournal(harness, configPath string) (*journal, error) {
 
 	var j journal
 	if err := json.Unmarshal(data, &j); err != nil {
-		// Absence means an older install and permits the legacy removal path. Corruption
+		// Absence means there is no local ownership record. Corruption
 		// is different: silently treating a damaged ownership record as absent would let
 		// disconnect delete values that a user changed after connecting.
 		return nil, fmt.Errorf("parse %s: %w (repair or remove it explicitly, then retry)", path, err)

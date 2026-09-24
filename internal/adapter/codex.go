@@ -11,11 +11,12 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hookrun"
 )
 
-// codex is OpenAI's Codex CLI. Its repository half is .codex/hooks.json, wired by
-// default where the repository carries a .codex directory; its user half (`notify` in
-// ~/.codex/config.toml, written by `terma connect codex`) reaches the same handler set through
-// the codex-notify event.
+// codex covers OpenAI's Codex CLI and Desktop repository hooks in .codex/hooks.json.
+// The CLI's user-level notifier (`notify` in ~/.codex/config.toml, written by
+// `terma connect codex`) reaches the same handler set through codex-notify.
 type codex struct{}
+
+const codexHookReview = "open this repository in Codex Desktop, then go to Settings → Hooks → Review and approve the Terma entries (or run /hooks in Codex CLI)"
 
 func (codex) Name() string                       { return "codex" }
 func (codex) DisplayName() string                { return "Codex" }
@@ -28,18 +29,21 @@ func (codex) Plan(root string, install bool) (hookmgr.Plan, error) {
 
 func (codex) Events() map[string]Handler {
 	return map[string]Handler{
-		"codex-notify":         hookrun.CodexNotify,
-		"codex-session-start":  hookrun.CodexSessionStart,
-		"codex-session-end":    hookrun.CodexSessionEnd,
-		"codex-post-tool-use":  hookrun.CodexPostToolUse,
-		"codex-stop":           hookrun.CodexStop,
-		"codex-subagent-start": hookrun.CodexSubagentStart,
-		"codex-subagent-stop":  hookrun.CodexSubagentStop,
+		"codex-notify":             hookrun.CodexNotify,
+		"codex-session-start":      hookrun.CodexSessionStart,
+		"codex-user-prompt-submit": hookrun.CodexUserPromptSubmit,
+		"codex-pre-tool-use":       hookrun.CodexPreToolUse,
+		"codex-permission-request": hookrun.CodexPermissionRequest,
+		"codex-session-end":        hookrun.CodexSessionEnd,
+		"codex-post-tool-use":      hookrun.CodexPostToolUse,
+		"codex-stop":               hookrun.CodexStop,
+		"codex-subagent-start":     hookrun.CodexSubagentStart,
+		"codex-subagent-stop":      hookrun.CodexSubagentStop,
 	}
 }
 
 func (codex) FlushAfter() []string {
-	return []string{"codex-notify", "codex-session-end", "codex-stop"}
+	return []string{"codex-notify", "codex-session-end", "codex-stop", "codex-user-prompt-submit"}
 }
 
 // Trust reads the question Cursor's hooks cannot raise: Codex refuses to run a hook it
@@ -56,17 +60,17 @@ func (c codex) Trust(root string) (TrustState, error) {
 	case !trust.Reviewed():
 		return TrustState{
 			Detail: ", but Codex has not been shown them yet, so it runs none of them",
-			Fix:    "open Codex in this repository and run /hooks to review and trust them",
+			Fix:    codexHookReview,
 		}, nil
 	case trust.Trusted == 0:
 		return TrustState{
 			Detail: ", but none are trusted, so Codex runs none of them",
-			Fix:    "open Codex in this repository and run /hooks to trust them",
+			Fix:    codexHookReview,
 		}, nil
 	case trust.Disabled > 0:
 		return TrustState{
 			Detail: fmt.Sprintf(", but %d is switched off in Codex", trust.Disabled),
-			Fix:    "open Codex in this repository and run /hooks to re-enable them",
+			Fix:    "open this repository in Codex Desktop and re-enable Terma's hooks in Settings → Hooks (or use /hooks in Codex CLI)",
 		}, nil
 	}
 	// Codex trusts a hook entry by entry. A file that was trusted before terma added an
@@ -78,14 +82,14 @@ func (c codex) Trust(root string) (TrustState, error) {
 	}
 	var skipped []string
 	for _, e := range entries {
-		if !trust.TrustedKeys[e.Key()] {
+		if trust.TrustedHashes[e.Key()] != e.Hash {
 			skipped = append(skipped, e.Event)
 		}
 	}
 	if len(skipped) > 0 {
 		return TrustState{
-			Detail: fmt.Sprintf(", but Codex has not trusted %s yet, so it skips %s", strings.Join(skipped, ", "), pronoun(len(skipped))),
-			Fix:    "open Codex in this repository and run /hooks to trust the new entries",
+			Detail: fmt.Sprintf(", but Codex needs to review %s, so it skips %s", strings.Join(skipped, ", "), pronoun(len(skipped))),
+			Fix:    codexHookReview + "; include any new or changed entries",
 		}, nil
 	}
 	return TrustState{Trusted: true, Detail: " and trusted"}, nil

@@ -3,10 +3,12 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
+	"github.com/miradorlabs/terma-cli/internal/keystore"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/shim"
 )
@@ -258,4 +260,55 @@ func judgeHarnesses(ctx context.Context, otlpURL, projectID, root string) []harn
 		out = append(out, v)
 	}
 	return out
+}
+
+// judgeSelectedHarnesses keeps the CLI and desktop Codex surfaces distinct for a
+// developer who selected desktop during setup. A desktop-only choice must never
+// be reported as a missing CLI PATH shim.
+func judgeSelectedHarnesses(ctx context.Context, otlpURL, projectID, root string, selected []string) []harnessVerdict {
+	selected = selectedForRepo(projectID, selected)
+	verdicts := judgeHarnesses(ctx, otlpURL, projectID, root)
+	if !slices.Contains(selected, codexDesktopAgent) {
+		return verdicts
+	}
+	verdicts = slices.DeleteFunc(verdicts, func(v harnessVerdict) bool { return !slices.Contains(selected, v.name) })
+	return append(verdicts, judgeDesktop(projectID))
+}
+
+func selectedForRepo(projectID string, saved []string) []string {
+	selected := slices.Clone(saved)
+	if projectID == "" {
+		return selected
+	}
+	rec, ok, err := shim.LoadRecord(projectID)
+	if err != nil || !ok {
+		return selected
+	}
+	for _, choice := range []struct {
+		name    string
+		enabled bool
+	}{{shim.AgentCodex, rec.CLI}, {codexDesktopAgent, rec.Desktop}} {
+		if choice.enabled && !slices.Contains(selected, choice.name) {
+			selected = append(selected, choice.name)
+		} else if !choice.enabled {
+			selected = slices.DeleteFunc(selected, func(name string) bool { return name == choice.name })
+		}
+	}
+	return selected
+}
+
+func judgeDesktop(projectID string) harnessVerdict {
+	v := harnessVerdict{name: codexDesktopAgent, displayName: "Codex Desktop"}
+	route, ok, routeErr := shim.LoadRecord(projectID)
+	switch {
+	case routeErr != nil:
+		v.emissionProblem, v.emissionFix = "could not read this repository's Codex desktop route: "+routeErr.Error(), "terma install"
+	case !ok || !route.Desktop || !slices.Contains(route.Harnesses, shim.AgentCodex) || !slices.Contains(route.Signals, "logs"):
+		v.emissionProblem, v.emissionFix = "this repository has no Codex Desktop hook route", "terma install --signals logs"
+	case keystore.GetFor(shim.AgentCodex, projectID) == "":
+		v.emissionProblem, v.emissionFix = "this repository has no delivery key", "terma install"
+	default:
+		v.routed, v.live, v.route = true, true, routeLive
+	}
+	return v
 }

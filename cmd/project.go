@@ -33,7 +33,7 @@ func newProjectCommand() *cobra.Command {
 		Long: `Projects are selected per repository by terma install.
 Read commands use the current repository's binding, or an explicit --project override.`,
 	}
-	cmd.AddCommand(newProjectListCommand(), newProjectUseCommand(), newProjectShowCommand())
+	cmd.AddCommand(newProjectListCommand(), newProjectShowCommand())
 	return cmd
 }
 
@@ -68,19 +68,6 @@ func newProjectListCommand() *cobra.Command {
 				Headers: []string{"", "NAME", "DESCRIPTION"},
 				Rows:    rows,
 			}, listProjectsResponse{Projects: projects})
-		},
-	}
-}
-
-// Keep the old command discoverable so existing users get the migration command
-// instead of silently changing a machine-wide default.
-func newProjectUseCommand() *cobra.Command {
-	return &cobra.Command{
-		Use:   "use [name-or-id]",
-		Short: "Use terma install to select this repository's project",
-		Args:  cobra.MaximumNArgs(1),
-		RunE: func(_ *cobra.Command, _ []string) error {
-			return errors.New("projects are selected per repository — run `terma install --project <name-or-id>` inside the repository")
 		},
 	}
 }

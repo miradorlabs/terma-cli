@@ -208,9 +208,6 @@ We chose this over maintaining a per-project copy of the Codex home:
   We avoid copying configuration, merging trust back, or synchronizing symlinks.
 - Key changes take effect on the next launch. No generated Codex config contains
   a second copy of the credential.
-- A local OTLP relay could keep the bearer key out of Codex's arguments, but adds a
-  service to start, supervise, and shut down, plus another delivery failure point.
-  We prefer direct export for now.
 
 The tradeoff is credential visibility: the exporter Authorization header is passed
 as a literal in `-c` arguments. It can therefore appear in process inspection and
@@ -236,10 +233,7 @@ user's variable for describing their own resources, and nothing Terma used to pu
 is needed: the server key names the project, Claude Code stamps `user.id` and
 `user.email` on every metric and event itself, and its resource already says
 `service.name=claude-code`. The project a configuration reports to is recorded in the
-connect journal instead, which is what `status`, `doctor` and key reuse read. A
-configuration from before that still holds the old variable; it answers until the next
-connect, which removes it — and only it: a value the user set is theirs
-(`claudeRetiredKeys`).
+connect journal instead, which is what `status`, `doctor` and key reuse read.
 
 `terma connect claude --scope local` is the one place a repository file carries telemetry
 settings: the committed `.claude/settings.json` gets the signal and content switches —

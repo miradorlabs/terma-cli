@@ -197,7 +197,7 @@ func TestStatusLineWithoutRendererIsSilentButCaptures(t *testing.T) {
 
 func TestStatusLineStampsProjectFromRepository(t *testing.T) {
 	root := initRepo(t)
-	writeFile(t, root, ".terma.toml", "[project]\nid = \"proj_sl\"\n")
+	writeFile(t, root, ".terma/settings.json", `{"project":{"id":"proj_sl"}}`)
 	payload := strings.Replace(quotaPayload, `"cwd":"/tmp"`, `"cwd":`+string(mustJSON(root)), 1)
 	env, _, sp := statusEnv(t, payload)
 	StatusLine(context.Background(), env, StatusLineOptions{CaptureOnly: true})

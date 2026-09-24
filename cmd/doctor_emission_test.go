@@ -23,7 +23,7 @@ func TestDoctorChecksClaudeEmissionSettings(t *testing.T) {
 		wantFailure   bool
 		wantDetail    string
 	}{
-		{name: "legacy repos-only connect without policy", wantFailure: true, wantDetail: "send nothing"},
+		{name: "repos-only connect without policy", wantFailure: true, wantDetail: "send nothing"},
 		{name: "repository enables globally disabled logs", shared: map[string]string{"OTEL_LOGS_EXPORTER": "otlp"}},
 		{name: "partial policy inherits the traces beta flag", globalSignals: []harness.Signal{harness.SignalTraces}, shared: map[string]string{"OTEL_TRACES_EXPORTER": "otlp"}},
 		{name: "all exporters explicitly disabled", globalSignals: harness.AllSignals,

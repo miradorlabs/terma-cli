@@ -88,7 +88,7 @@ func TestDoctorScratchCommitRoundTrip(t *testing.T) {
 	if err := termaproject.Save(repo, &termaproject.File{Project: termaproject.Project{ID: testProjectID}}); err != nil {
 		t.Fatal(err)
 	}
-	if out, err := runTerma(t, "install", "--harness", "none", "--yes", "--no-doctor", "--telemetry=false"); err != nil {
+	if out, err := runTerma(t, "install", "--harness", "none", "--yes", "--no-doctor"); err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

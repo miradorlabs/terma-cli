@@ -37,6 +37,7 @@ func replyRollout(t *testing.T) string {
 
 func routeCodex(t *testing.T, includePrompts bool) {
 	t.Helper()
+	t.Setenv(shim.CodexRoutedEnv, "1")
 	if err := shim.SaveRecord(shim.Record{ProjectID: "project-a", Endpoint: "https://otel.terma.ai", Signals: []string{"logs"},
 		IncludePrompts: includePrompts, Harnesses: []string{shim.AgentCodex}}); err != nil {
 		t.Fatal(err)
@@ -55,6 +56,17 @@ func connectCodexMachineWide(t *testing.T, includePrompts bool) {
 	if st, err := (harness.Codex{}).Status(); err != nil || !st.Connected || st.IncludePrompts != includePrompts {
 		t.Fatalf("machine-wide connect did not take: %+v %v", st, err)
 	}
+}
+
+func connectCodexDesktop(t *testing.T, includePrompts bool) {
+	t.Helper()
+	desktop := true
+	if err := shim.SaveRecord(shim.Record{ProjectID: "project-a", Endpoint: "https://otel.terma.ai",
+		Signals: []string{"logs"}, Harnesses: []string{shim.AgentCodex},
+		IncludePrompts: includePrompts, Desktop: desktop}); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(shim.CodexRoutedEnv, "")
 }
 
 func stopCodex(t *testing.T, env Env, path string) []spool.Event {
@@ -127,11 +139,39 @@ func TestCodexRepliesNeedTheConsentPromptsTravelUnder(t *testing.T) {
 		{"this repository routes Codex with prompts", func(t *testing.T) { routeCodex(t, true) }, 2},
 		{"a machine-wide connect with prompts, no routing", func(t *testing.T) { connectCodexMachineWide(t, true) }, 2},
 		{"a machine-wide connect without prompts, no routing", func(t *testing.T) { connectCodexMachineWide(t, false) }, 0},
-		// The hook cannot tell whether Codex was started through terma's launcher, so
-		// either configuration that withholds prompts is a no.
-		{"routed with prompts, but machine-wide withholds them", func(t *testing.T) { routeCodex(t, true); connectCodexMachineWide(t, false) }, 0},
-		{"machine-wide with prompts, but this repository withholds them", func(t *testing.T) { routeCodex(t, false); connectCodexMachineWide(t, true) }, 0},
+		{"routed with prompts overrides machine-wide exclusion", func(t *testing.T) { routeCodex(t, true); connectCodexMachineWide(t, false) }, 2},
+		{"routed exclusion overrides machine-wide prompts", func(t *testing.T) { routeCodex(t, false); connectCodexMachineWide(t, true) }, 0},
 		{"both export prompts", func(t *testing.T) { routeCodex(t, true); connectCodexMachineWide(t, true) }, 2},
+		{"desktop with no repository route", func(t *testing.T) { t.Setenv(shim.CodexRoutedEnv, "") }, 0},
+		{"desktop route excludes prompts", func(t *testing.T) {
+			connectCodexDesktop(t, false)
+		}, 0},
+		{"desktop route allows prompts without a global exporter", func(t *testing.T) {
+			connectCodexDesktop(t, true)
+		}, 2},
+		{"desktop route does not depend on global exporter syntax", func(t *testing.T) {
+			connectCodexDesktop(t, true)
+			writeFile(t, os.Getenv("CODEX_HOME"), "config.toml", "[otel\ninvalid\n")
+		}, 2},
+		{"desktop choice is explicitly off", func(t *testing.T) {
+			falseValue := false
+			if err := shim.SaveRecord(shim.Record{ProjectID: "project-a", Endpoint: "https://otel.terma.ai",
+				Signals: []string{"logs"}, IncludePrompts: true, Harnesses: []string{shim.AgentCodex},
+				Desktop: falseValue}); err != nil {
+				t.Fatal(err)
+			}
+			t.Setenv(shim.CodexRoutedEnv, "")
+		}, 0},
+		{"desktop ignores a dormant repository route", func(t *testing.T) {
+			routeCodex(t, true)
+			t.Setenv(shim.CodexRoutedEnv, "")
+			connectCodexMachineWide(t, false)
+		}, 0},
+		{"unrouted CLI still honors the repository prompt exclusion", func(t *testing.T) {
+			routeCodex(t, false)
+			t.Setenv(shim.CodexRoutedEnv, "")
+			connectCodexMachineWide(t, true)
+		}, 0},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			env := fundingEnv(t)

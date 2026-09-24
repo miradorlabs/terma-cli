@@ -271,25 +271,6 @@ test("per-repo mode resolves the project and key from the repository binding", a
   expect(res["service.name"]).toBe("opencode")
 })
 
-test("per-repo mode reads a legacy .terma.toml binding too", async () => {
-  received = []
-  const wt = mkdtempSync(join(tmpdir(), "terma-wt-legacy-"))
-  writeFileSync(join(wt, ".terma.toml"), "[project]\nid = 'proj-legacy'\nname = 'Old'\n\n[install]\nadapters = ['claude']\n")
-  const perHelper = join(dir, "opencode-otel-proj-legacy")
-  writeFileSync(perHelper, `#!/bin/sh\necho '{"Authorization": "Bearer ter_srv_legacy"}'\n`)
-  chmodSync(perHelper, 0o700)
-
-  const hooks = await load(perRepoConfig(), wt)
-  await hooks.event({ event: { type: "message.updated", properties: { info: assistant } } })
-  await hooks.dispose()
-
-  const traces = received.filter((r) => r.path === "/v1/traces")
-  expect(traces.length).toBe(1)
-  expect(traces[0].headers["authorization"]).toBe("Bearer ter_srv_legacy")
-  const res = Object.fromEntries(traces[0].body.resourceSpans[0].resource.attributes.map((a) => [a.key, a.value.stringValue]))
-  expect(res["mirador.project.id"]).toBe("proj-legacy")
-})
-
 test("per-repo mode stays inert in a repository with no terma binding", async () => {
   received = []
   const wt = mkdtempSync(join(tmpdir(), "terma-wt-unbound-"))
@@ -317,4 +298,13 @@ test("per-repo mode refuses a project id that escapes the helpers directory", as
   expect(Object.keys(hooks)).toEqual([])
   expect(received.length).toBe(0)
   expect(readdirSync(wt)).not.toContain("ran")
+})
+
+test("per-repo mode ignores an unsupported TOML binding", async () => {
+  received = []
+  const wt = mkdtempSync(join(tmpdir(), "terma-wt-toml-"))
+  writeFileSync(join(wt, ".terma.toml"), "[project]\nid = 'unselected'\n")
+  const hooks = await load(perRepoConfig(), wt)
+  expect(Object.keys(hooks)).toEqual([])
+  expect(received.length).toBe(0)
 })

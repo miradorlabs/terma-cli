@@ -23,7 +23,7 @@ import (
 const fileName = "keys.json"
 
 type file struct {
-	// Keys maps project id → server key (ter_srv_, or a legacy mir_srv_).
+	// Keys maps project id → Terma server key.
 	Keys map[string]string `json:"keys"`
 	// HarnessKeys maps harness name → project id → the key that harness exported with
 	// when it was last pointed at that project. Each harness holds a key of its own so
@@ -112,7 +112,11 @@ func Get(projectID string) string {
 	if err != nil {
 		return ""
 	}
-	return f.Keys[projectID]
+	key := f.Keys[projectID]
+	if !serverkey.Is(key) {
+		return ""
+	}
+	return key
 }
 
 // Set records a project's key.
@@ -145,7 +149,11 @@ func GetFor(harness, projectID string) string {
 	if err != nil {
 		return ""
 	}
-	return f.HarnessKeys[harness][projectID]
+	key := f.HarnessKeys[harness][projectID]
+	if !serverkey.Is(key) {
+		return ""
+	}
+	return key
 }
 
 // SetFor records the key a harness exports with for a project, alongside the

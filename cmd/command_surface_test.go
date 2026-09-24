@@ -25,7 +25,7 @@ var primaryCommands = []string{
 // troubleshooting run, and what terma's own fix-it hints name (`terma login`, `terma
 // connect codex`, `terma spool flush`) — so every one of them must keep working.
 var advancedCommands = []string{
-	"config", "connect", "disconnect", "harness", "hook", "login", "logout",
+	"config", "connect", "desktop", "disconnect", "harness", "hook", "login", "logout",
 	"principal", "project", "shim", "spool", "telemetry", "version", "whoami",
 }
 

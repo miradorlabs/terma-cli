@@ -227,8 +227,7 @@ func (c Claude) RemoveStatusLine() (bool, error) {
 	}
 	switch {
 	case rec == nil:
-		// Terma's command without a record (an older install, a hand copy): the
-		// best restoration is removal.
+		// A manually copied Terma command has no displaced renderer to restore.
 		delete(s.root, claudeStatusLineKey)
 	case string(rec.Previous) == "null" || len(rec.Previous) == 0:
 		delete(s.root, claudeStatusLineKey)

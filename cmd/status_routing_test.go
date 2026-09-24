@@ -39,7 +39,7 @@ func TestRoutedPerRepo(t *testing.T) {
 	// Configured but keyless: the record routes Codex too now, but no Codex key was
 	// minted, so its sessions cannot deliver — routed must stay false. This is exactly
 	// the "configured but not connected" state status and doctor must not call connected.
-	if err := shim.SaveRecord(shim.Record{ProjectID: project, Harnesses: []string{shim.AgentClaude, shim.AgentCodex}}); err != nil {
+	if err := shim.SaveRecord(shim.Record{ProjectID: project, Harnesses: []string{shim.AgentClaude, shim.AgentCodex}, CLI: true}); err != nil {
 		t.Fatal(err)
 	}
 	if routedPerRepo(shim.AgentCodex, project) {

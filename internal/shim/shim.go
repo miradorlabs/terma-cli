@@ -54,6 +54,8 @@ type Record struct {
 	ProjectID          string            `json:"project_id"`
 	Endpoint           string            `json:"endpoint"`
 	Signals            []string          `json:"signals"`
+	CLI                bool              `json:"cli"`
+	Desktop            bool              `json:"desktop"`
 	IncludePrompts     bool              `json:"include_prompts"`
 	IncludeToolContent bool              `json:"include_tool_content"`
 	ResourceAttributes map[string]string `json:"resource_attributes,omitempty"`

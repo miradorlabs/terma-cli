@@ -45,9 +45,11 @@ func TestInstallWiresCodexHooksWhenAsked(t *testing.T) {
 	}
 	hooks := codexHooksIn(t, repo)
 	for _, want := range []struct{ event, command string }{
-		{"SessionStart", hookmgr.HookCommand("codex-session-start")},
-		{"PostToolUse", hookmgr.HookCommand("codex-post-tool-use")},
-		{"SessionEnd", hookmgr.HookCommand("codex-session-end")},
+		{"SessionStart", hookmgr.CodexHookCommand("codex-session-start")},
+		{"PreToolUse", hookmgr.CodexHookCommand("codex-pre-tool-use")},
+		{"PermissionRequest", hookmgr.CodexHookCommand("codex-permission-request")},
+		{"PostToolUse", hookmgr.CodexHookCommand("codex-post-tool-use")},
+		{"SessionEnd", hookmgr.CodexHookCommand("codex-session-end")},
 	} {
 		groups := hooks[want.event]
 		if len(groups) != 1 || len(groups[0].Hooks) != 1 || groups[0].Hooks[0].Command != want.command {
