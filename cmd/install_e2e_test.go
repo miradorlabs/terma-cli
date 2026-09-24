@@ -714,24 +714,38 @@ func TestInstallE2EUpgradesLegacyHooksPath(t *testing.T) {
 }
 
 func TestInstallE2ELegacyLinkedMigrationDoesNotChangeSharedHooks(t *testing.T) {
-	s := newInstallSandbox(t)
-	main := s.mkdir("main")
-	s.git(main, "init", "-q")
-	s.git(main, "commit", "--allow-empty", "-qm", "initial")
-	linked := filepath.Join(s.base, "linked")
-	s.git(main, "worktree", "add", "-qb", "linked", linked)
-	gitDir := s.git(linked, "rev-parse", "--absolute-git-dir")
-	s.git(main, "config", "--local", "core.hooksPath", hookmgr.ShimDir)
-	record := `{"previous_hooks_path":"team-hooks","recorded_at":"2026-01-01T00:00:00Z"}`
-	s.write(gitDir, "terma/install.json", record)
-	out, err := s.run(linked, "", s.bin, "install", "--harness", "none", "--project", testProjectID, "--yes", "--no-doctor")
-	if err == nil || !strings.Contains(out, "main worktree") {
-		t.Fatalf("expected migration guidance, got %v: %s", err, out)
-	}
-	if got := s.git(main, "config", "--local", "core.hooksPath"); got != hookmgr.ShimDir {
-		t.Fatalf("changed shared hooksPath to %q", got)
-	}
-	if got := string(readInstallFile(t, gitDir, "terma/install.json")); got != record {
-		t.Fatalf("overwrote legacy journal: %s", got)
+	for _, journalOwner := range []string{"main", "linked"} {
+		t.Run(journalOwner, func(t *testing.T) {
+			s := newInstallSandbox(t)
+			main := s.mkdir("main")
+			s.git(main, "init", "-q")
+			s.git(main, "commit", "--allow-empty", "-qm", "initial")
+			linked := filepath.Join(s.base, "linked")
+			s.git(main, "worktree", "add", "-qb", "linked", linked)
+			gitDir := s.git(linked, "rev-parse", "--absolute-git-dir")
+			s.git(main, "config", "--local", "core.hooksPath", hookmgr.ShimDir)
+			record := `{"previous_hooks_path":"team-hooks","recorded_at":"2026-01-01T00:00:00Z"}`
+			journalDir := gitDir
+			if journalOwner == "main" {
+				journalDir = filepath.Join(main, ".git")
+			}
+			s.write(journalDir, "terma/install.json", record)
+			out, err := s.run(linked, "", s.bin, "install", "--harness", "none", "--project", testProjectID, "--yes", "--no-doctor")
+			if err == nil || !strings.Contains(out, "main worktree") {
+				t.Fatalf("expected migration guidance, got %v: %s", err, out)
+			}
+			if got := s.git(main, "config", "--local", "core.hooksPath"); got != hookmgr.ShimDir {
+				t.Fatalf("changed shared hooksPath to %q", got)
+			}
+			if got := string(readInstallFile(t, journalDir, "terma/install.json")); got != record {
+				t.Fatalf("overwrote legacy journal: %s", got)
+			}
+
+			if journalOwner == "main" {
+				if _, err := os.Stat(filepath.Join(gitDir, "terma", "install.json")); !os.IsNotExist(err) {
+					t.Fatalf("refused install created a linked journal: %v", err)
+				}
+			}
+		})
 	}
 }

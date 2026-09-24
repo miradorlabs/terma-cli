@@ -48,10 +48,10 @@ func wireRepo(ctx context.Context, out io.Writer, root string, bound *termaproje
 	// a linked checkout: the owning main checkout must do that first.
 	if session.PreviousHooksScope(gitDir) == "--local" {
 		local, localErr := gitx.Git(ctx, root, "config", "--local", "--get", "core.hooksPath")
+		if localErr == nil && local == hookmgr.ShimDir && filepath.Clean(gitx.CommonDirFS(gitDir)) != filepath.Clean(gitDir) {
+			return fmt.Errorf("legacy shared Git hooks must be migrated from the main worktree with `terma install` first")
+		}
 		if previous, recorded := session.PreviousHooksPath(gitDir); recorded && localErr == nil && local == hookmgr.ShimDir {
-			if filepath.Clean(gitx.CommonDirFS(gitDir)) != filepath.Clean(gitDir) {
-				return fmt.Errorf("legacy shared Git hooks must be migrated from the main worktree with `terma install` first")
-			}
 			if session.HooksPathWasLocal(gitDir) {
 				err = gitx.ConfigSet(ctx, root, "core.hooksPath", previous)
 			} else {
