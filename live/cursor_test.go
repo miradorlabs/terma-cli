@@ -89,7 +89,7 @@ func cursorSession(t *testing.T, billingOnly, interactive bool) {
 			t.Errorf("write Cursor validation capture: %v", err)
 		}
 	})
-	sb.terma(sb.Repo, "install", "--project", sb.ProjectID, "--adapters", "cursor", "--yes")
+	sb.terma(sb.Repo, "install", "--harness", "none", "--no-browser", "--no-doctor", "--project", sb.ProjectID, "--adapters", "cursor", "--yes")
 	// No local Cursor exporter exists to connect. Give only the sandbox spool
 	// the loopback receiver's dummy project key.
 	keys, _ := json.Marshal(map[string]any{"keys": map[string]string{sb.ProjectID: liveKey}})
@@ -318,7 +318,7 @@ func cursorSession(t *testing.T, billingOnly, interactive bool) {
 func TestCursorHookDelivery(t *testing.T) {
 	track(t)
 	sb := New(t, Isolated)
-	sb.terma(sb.Repo, "install", "--project", sb.ProjectID, "--adapters", "cursor", "--yes")
+	sb.terma(sb.Repo, "install", "--harness", "none", "--no-browser", "--no-doctor", "--project", sb.ProjectID, "--adapters", "cursor", "--yes")
 	keys, _ := json.Marshal(map[string]any{"keys": map[string]string{sb.ProjectID: liveKey}})
 	if err := os.WriteFile(filepath.Join(sb.TermaConfig, "keys.json"), keys, 0o600); err != nil {
 		t.Fatal(err)
