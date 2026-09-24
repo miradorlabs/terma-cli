@@ -10,7 +10,6 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/desktoprelay"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
 	"github.com/miradorlabs/terma-cli/internal/shim"
@@ -41,11 +40,11 @@ func TestInstallUsesSavedCodexDesktopChoiceWithoutShellShim(t *testing.T) {
 		t.Fatal(err)
 	}
 	const projectID = "aaaaaaaa-0000-4000-8000-000000000001"
-	out, err := within(20*time.Second).combined(t, "install", "--project", projectID, "--desktop-manual", "--yes", "--no-doctor")
+	out, err := within(20*time.Second).combined(t, "install", "--project", projectID, "--yes", "--no-doctor")
 	if err != nil {
 		t.Fatalf("install desktop: %v\n%s", err, out)
 	}
-	if gateway.keysMint.Load() != 1 || keystore.GetFor(shim.AgentCodex, projectID) == "" || !desktoprelay.ReadyForProject(projectID) {
+	if gateway.keysMint.Load() != 1 || keystore.GetFor(shim.AgentCodex, projectID) == "" {
 		t.Fatalf("desktop route/key missing or minted twice (mints=%d):\n%s", gateway.keysMint.Load(), out)
 	}
 	record, ok, err := shim.LoadRecord(projectID)
@@ -65,12 +64,39 @@ func TestInstallUsesSavedCodexDesktopChoiceWithoutShellShim(t *testing.T) {
 	if len(codexHooksIn(t, mustGetwd(t))["SessionStart"]) != 1 {
 		t.Fatal("desktop-only install did not wire the Codex SessionStart hook")
 	}
-	status, err := (harness.Codex{}).Status()
-	if err != nil || status.Endpoint != desktoprelay.Endpoint || !slices.Contains(status.Signals, harness.SignalLogs) {
-		t.Fatalf("desktop exporter not configured: %+v, %v", status, err)
+	if _, err := os.Stat(filepath.Join(home, ".codex", "config.toml")); !os.IsNotExist(err) {
+		t.Fatalf("desktop-only install configured a global Codex exporter: %v", err)
 	}
-	if !strings.Contains(out, "Restart the Codex desktop app") {
-		t.Fatalf("install did not explain the required desktop restart:\n%s", out)
+	if !strings.Contains(out, "trusted hooks") {
+		t.Fatalf("install did not explain Desktop capture:\n%s", out)
+	}
+}
+
+func TestDesktopInstallRemovesPreviousRelay(t *testing.T) {
+	home, _ := desktopInstallSandbox(t)
+	if err := (harness.Codex{}).Connect(harness.Exporter{
+		Endpoint: legacyDesktopEndpoint, Signals: []harness.Signal{harness.SignalLogs},
+	}, false); err != nil {
+		t.Fatal(err)
+	}
+	service := filepath.Join(home, "Library", "LaunchAgents", desktopServiceLabel+".plist")
+	if err := os.MkdirAll(filepath.Dir(service), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(service, []byte("legacy"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	const projectID = "aaaaaaaa-0000-4000-8000-000000000001"
+	if out, err := within(20*time.Second).combined(t, "install", "--harness", "codex-desktop",
+		"--project", projectID, "--yes", "--no-doctor"); err != nil {
+		t.Fatalf("migrate install: %v\n%s", err, out)
+	}
+	status, err := (harness.Codex{}).Status()
+	if err != nil || status.Endpoint == legacyDesktopEndpoint {
+		t.Fatalf("old exporter still configured: %+v, %v", status, err)
+	}
+	if _, err := os.Stat(service); !os.IsNotExist(err) {
+		t.Fatalf("old LaunchAgent remains: %v", err)
 	}
 }
 
@@ -78,7 +104,7 @@ func TestInstallCodexCLIAndDesktopShareOneProjectKey(t *testing.T) {
 	_, gateway := desktopInstallSandbox(t)
 	const projectID = "aaaaaaaa-0000-4000-8000-000000000001"
 	out, err := within(20*time.Second).combined(t, "install", "--harness", "codex,codex-desktop", "--project", projectID,
-		"--desktop-manual", "--no-path", "--yes", "--no-doctor")
+		"--no-path", "--yes", "--no-doctor")
 	if err != nil {
 		t.Fatalf("install both Codex surfaces: %v\n%s", err, out)
 	}
@@ -92,9 +118,6 @@ func TestInstallCodexCLIAndDesktopShareOneProjectKey(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(shimDir, "codex")); err != nil {
 		t.Fatalf("CLI choice did not install its PATH shim: %v", err)
 	}
-	if !desktoprelay.ReadyForProject(projectID) {
-		t.Fatal("desktop choice did not configure its project route")
-	}
 	record, ok, err := shim.LoadRecord(projectID)
 	if err != nil || !ok || record.CLI == nil || !*record.CLI || record.Desktop == nil || !*record.Desktop {
 		t.Fatalf("combined route choices = %+v, exists=%v, err=%v", record, ok, err)
@@ -105,12 +128,12 @@ func TestDesktopInstallDryRunAndMissingLogsLeaveSettingsUntouched(t *testing.T) 
 	home, _ := desktopInstallSandbox(t)
 	const projectID = "aaaaaaaa-0000-4000-8000-000000000001"
 	for _, args := range [][]string{
-		{"install", "--harness", "codex-desktop", "--project", projectID, "--desktop-manual", "--dry-run"},
-		{"install", "--harness", "codex-desktop", "--project", projectID, "--desktop-manual", "--signals", "traces"},
+		{"install", "--harness", "codex-desktop", "--project", projectID, "--dry-run"},
+		{"install", "--harness", "codex-desktop", "--project", projectID, "--signals", "traces"},
 	} {
 		out, err := runTerma(t, args...)
 		if slices.Contains(args, "--dry-run") {
-			if err != nil || !strings.Contains(out, "Codex Desktop: configure") {
+			if err != nil || !strings.Contains(out, "Codex Desktop: install trusted repository hooks") {
 				t.Fatalf("desktop dry run: %v\n%s", err, out)
 			}
 		} else if err == nil || !strings.Contains(err.Error(), "logs signal") {
@@ -126,7 +149,7 @@ func TestDesktopInstallRequiresCodexRepositoryHooks(t *testing.T) {
 	home, _ := desktopInstallSandbox(t)
 	const projectID = "aaaaaaaa-0000-4000-8000-000000000001"
 	for _, extra := range [][]string{{"--no-hooks"}, {"--adapters", "claude"}} {
-		args := append([]string{"install", "--harness", "codex-desktop", "--project", projectID, "--desktop-manual", "--yes", "--no-doctor"}, extra...)
+		args := append([]string{"install", "--harness", "codex-desktop", "--project", projectID, "--yes", "--no-doctor"}, extra...)
 		out, err := runTerma(t, args...)
 		if err == nil || !strings.Contains(err.Error(), "Codex repository hooks") && !strings.Contains(err.Error(), "SessionStart repository hook") {
 			t.Fatalf("missing Codex hooks accepted: %v\n%s", err, out)

@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/desktoprelay"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/shim"
 	"github.com/miradorlabs/terma-cli/internal/spool"
@@ -61,10 +60,10 @@ func connectCodexMachineWide(t *testing.T, includePrompts bool) {
 
 func connectCodexDesktop(t *testing.T, includePrompts bool) {
 	t.Helper()
-	if err := (harness.Codex{}).Connect(harness.Exporter{
-		Endpoint: desktoprelay.Endpoint, Signals: []harness.Signal{harness.SignalLogs},
-		IncludePrompts: includePrompts,
-	}, false); err != nil {
+	desktop := true
+	if err := shim.SaveRecord(shim.Record{ProjectID: "project-a", Endpoint: "https://otel.terma.ai",
+		Signals: []string{"logs"}, Harnesses: []string{shim.AgentCodex},
+		IncludePrompts: includePrompts, Desktop: &desktop}); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv(shim.CodexRoutedEnv, "")
@@ -143,18 +142,16 @@ func TestCodexRepliesNeedTheConsentPromptsTravelUnder(t *testing.T) {
 		{"routed with prompts overrides machine-wide exclusion", func(t *testing.T) { routeCodex(t, true); connectCodexMachineWide(t, false) }, 2},
 		{"routed exclusion overrides machine-wide prompts", func(t *testing.T) { routeCodex(t, false); connectCodexMachineWide(t, true) }, 0},
 		{"both export prompts", func(t *testing.T) { routeCodex(t, true); connectCodexMachineWide(t, true) }, 2},
-		{"desktop exporter with no repository route", func(t *testing.T) { connectCodexDesktop(t, true) }, 0},
+		{"desktop with no repository route", func(t *testing.T) { t.Setenv(shim.CodexRoutedEnv, "") }, 0},
 		{"desktop route excludes prompts", func(t *testing.T) {
-			routeCodex(t, false)
-			connectCodexDesktop(t, true)
-		}, 0},
-		{"desktop exporter excludes prompts", func(t *testing.T) {
-			routeCodex(t, true)
 			connectCodexDesktop(t, false)
 		}, 0},
-		{"desktop route and exporter allow prompts", func(t *testing.T) {
-			routeCodex(t, true)
+		{"desktop route allows prompts without a global exporter", func(t *testing.T) {
 			connectCodexDesktop(t, true)
+		}, 2},
+		{"desktop route does not depend on global exporter syntax", func(t *testing.T) {
+			connectCodexDesktop(t, true)
+			writeFile(t, os.Getenv("CODEX_HOME"), "config.toml", "[otel\ninvalid\n")
 		}, 2},
 		{"desktop choice is explicitly off", func(t *testing.T) {
 			falseValue := false
@@ -163,7 +160,7 @@ func TestCodexRepliesNeedTheConsentPromptsTravelUnder(t *testing.T) {
 				Desktop: &falseValue}); err != nil {
 				t.Fatal(err)
 			}
-			connectCodexDesktop(t, true)
+			t.Setenv(shim.CodexRoutedEnv, "")
 		}, 0},
 		{"desktop ignores a dormant repository route", func(t *testing.T) {
 			routeCodex(t, true)

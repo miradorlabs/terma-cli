@@ -8,13 +8,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/desktoprelay"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-func TestCodexSessionStartRegistersDesktopConversation(t *testing.T) {
+func TestCodexSessionStartDoesNotNeedRelay(t *testing.T) {
 	root := initRepo(t)
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	const id = "01a0d0ff-0000-7000-8000-000000000003"
@@ -25,9 +24,7 @@ func TestCodexSessionStartRegistersDesktopConversation(t *testing.T) {
 	if err := CodexSessionStart(context.Background(), env); err != nil {
 		t.Fatal(err)
 	}
-	if got := desktoprelay.ProjectFor(id, time.Now()); got != "project-a" {
-		t.Fatalf("registered project = %q", got)
-	}
+	// A trusted hook can announce a repository session without a global exporter.
 }
 
 // Codex names no edited file of its own: an edit is a tool call carrying an apply_patch

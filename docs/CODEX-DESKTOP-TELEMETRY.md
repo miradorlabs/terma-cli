@@ -1,80 +1,59 @@
-# Codex desktop: repository-specific telemetry
+# Codex Desktop: repository-specific telemetry
 
-Codex desktop starts its own backend, so it does not pass through the `codex` PATH
-shim that `terma install` uses for CLI sessions. Codex also ignores `otel` in a
-repository's `.codex/config.toml`. Desktop export therefore needs one user-level
-logs exporter and a local receiver that determines each log record's project.
+Codex Desktop does not launch through the shell shim used by Codex CLI, and Codex
+ignores `otel` in repository config. Terma captures Desktop activity with trusted
+repository hooks and its existing local spool. It installs no background receiver,
+LaunchAgent, or global Codex exporter.
 
 ## Set up
 
-1. Select **Codex Desktop** in `terma setup`, or pass
-   `--harness codex-desktop` to `terma install` for one installation. If you
-   also use the `codex` shell command, select **Codex** as well. Setup only
-   saves your choices; it does not configure telemetry.
-2. Run `terma install` in each repository whose desktop sessions should report to
-   Terma. It creates the repository binding, a Codex route and key, and the
-   `.codex/hooks.json` hooks. It also installs a loopback receiver as a macOS
-   LaunchAgent and sets Codex's user-level logs exporter to
-   `http://127.0.0.1:43199/v1/logs`. The receiver keeps a private on-disk queue
-   and looks up each destination key at delivery time. On another platform,
-   or with `terma install --desktop-manual`, run `terma desktop serve` separately.
-   Open the repository in Codex and review its hooks with `/hooks`; the
-   `SessionStart` hook must be trusted for routing to work.
-3. Restart the Codex desktop app. From an installed repository, run
-   `terma desktop status` to check the exporter, receiver, project route, and
-   Codex hook trust. Start a new desktop task in that repository, then check the
-   receiver's accepted-record count and the project's sessions in Terma.
+1. Select **Codex Desktop** in `terma setup`, or run `terma install --harness
+   codex-desktop` in a repository. Select **Codex** too if you use its shell CLI.
+2. Run `terma install` in each repository you want to report. It binds the
+   project, stores a project key and local content policy, and commits the Codex
+   hooks. Setup alone writes no repository files.
+3. Open the repository in Codex Desktop and trust its hooks through `/hooks`.
+   Start a new task in that repository. Run `terma desktop status` to inspect
+   the route, key, content choices, and hook trust. Run `terma doctor` to verify
+   delivery.
 
-`terma desktop connect` remains available to configure the receiver directly
-without re-running repository install. `terma desktop disconnect` restores the previous Codex exporter settings that
-Terma owns and removes its LaunchAgent. Restart the desktop app afterward.
+An install that finds Terma's earlier Desktop relay exporter removes that
+exporter and its LaunchAgent. Restart Codex Desktop once so its backend unloads
+the old exporter. `terma desktop disconnect` can remove the old relay without
+reinstalling. An unrelated user-level exporter is left alone.
 
-## Routing and limits
+## What is captured
 
-The receiver accepts OTLP logs on loopback. A trusted repository `SessionStart`
-hook registers its Codex `session_id` against the repository's project binding.
-The receiver sends only records whose `conversation.id` matches a registration
-and whose project still has a Codex logs route and key. A mixed batch is split
-before delivery. Records without a matching session stay local and are counted
-as unrouted; they are never assigned by the current working directory or a
-machine-wide default project. A short wait handles records exported just before
-the session hook completes.
+- `SessionStart` marks the session. `UserPromptSubmit` reports the turn and
+  sends prompt text only if this repository allows it.
+- `PostToolUse` reports local tool calls and results. Arguments and output
+  travel only when this repository allows tool content. Identified file edits
+  carry the same tool call ID, so the platform folds them into one call.
+- `Stop`, `SessionEnd`, and `PostToolUse` read a bounded local Codex rollout
+  cursor for per-response token usage and completed hosted Extension actions,
+  which do not arrive through ordinary tool hooks. Assistant replies are read
+  at turn end only if this repository allows prompt content. These readers
+  append to the spool before advancing their cursors.
+- The existing spool delivers events with this repository's project key. A
+  missing key holds them locally for later delivery.
 
-The desktop choice is stored in each project's local routing record. A new
-`terma install` run that selects Codex CLI but not Codex Desktop leaves desktop
-delivery off for that project. Existing routing records created before the
-desktop choice was available keep their previous behavior until reinstalled.
-Desktop routing requires the `logs` signal; `terma install --signals traces`
-refuses a desktop selection.
+The rollout is a private, unstable Codex format. Terma reads only the specific
+record shapes above, with a 1 MiB and 128 relevant-record limit per invocation;
+later hooks continue a backlog. Codex's published hooks also exempt some hosted
+and specialized tools. The Extension reader covers the observed hosted action
+shape, but **there is no stable Codex API that guarantees every Desktop tool
+call**. New Codex item types require a Terma update.
 
-The desktop connection sends logs only. Codex's native aggregate metrics have
-no reliable conversation ID for repository routing, so the receiver does not
-accept or forward them. Terma's ingest derives usage and cost observations from
-the routed Codex log events. Native traces are also outside this route.
+Codex CLI launches routed by the Terma shim keep their native OTLP configuration
+and are not converted to Desktop hook telemetry. A separate, unrelated global
+Codex exporter can still export machine-wide data under its own configuration;
+`terma install` does not manage it. `terma desktop status` reports whether one
+is active. If you require exports only from installed repositories, disconnect
+that user-level exporter (use `terma disconnect codex` for a Terma-owned one).
 
-Codex's user-level exporter must allow prompt text and tool output so that a
-repository can opt in to either one. It sends them only to the local relay. The
-relay drops `codex.user_prompt` and `codex.tool_result` records when the
-repository route excludes those content types, and drops every record from an
-unregistered session. Codex can include tool arguments even with tool output
-capped at zero, so the relay drops the whole result when tool content is excluded.
-The repository's prompt policy also controls assistant-reply capture from the
-local rollout. CLI launches retain their own runtime `-c` route and are
-distinguished from desktop launches by a process marker. A newly enabled prompt
-setting applies after restarting Codex; prompts already exported as redacted
-cannot be recovered from Terma's events.
-
-The queue is under `~/.config/terma/desktop-relay/` (or `TERMA_CONFIG_DIR`),
-with a 64 MiB bound and 14-day item lifetime. A full queue causes the receiver
-to reject the batch so Codex can retry. A missing or changed project route
-leaves its queued batches local until the route is repaired.
-
-For a Codex-managed local worktree, Git-ignored `.terma/settings.json` must be
-copied into the worktree. Add that path to the repository's `.worktreeinclude`
-if the binding is ignored. Ordinary Git worktrees do not use this mechanism;
-install or copy the binding into those worktrees yourself.
+For Codex-managed local worktrees, a Git-ignored `.terma/settings.json` must be
+copied into the worktree. Add it to `.worktreeinclude` when needed.
 
 See the [Codex configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference),
 [hooks guide](https://learn.chatgpt.com/docs/hooks), and
-[worktree guide](https://learn.chatgpt.com/docs/environments/git-worktrees)
-for the Codex behavior this design relies on.
+[worktree guide](https://learn.chatgpt.com/docs/environments/git-worktrees).

@@ -19,6 +19,7 @@ const (
 	// the quota capture and the reply capture have read.
 	codexFundingCursorDir = "funding-cursors"
 	codexReplyCursorDir   = "reply-cursors"
+	codexDesktopCursorDir = "desktop-cursors"
 	// cursorObservationDir and antigravityObservationDir are the observation
 	// checkpoints, per harness so one harness's stream survives another's arrival.
 	cursorObservationDir      = "cursor-observations"

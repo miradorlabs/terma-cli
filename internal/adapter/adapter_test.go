@@ -63,7 +63,7 @@ func TestEventNamesAreStable(t *testing.T) {
 	want := []string{
 		"antigravity-post-invocation", "antigravity-post-tool-use", "antigravity-pre-invocation", "antigravity-stop",
 		"codex-notify", "codex-post-tool-use", "codex-session-end", "codex-session-start", "codex-stop",
-		"codex-subagent-start", "codex-subagent-stop",
+		"codex-subagent-start", "codex-subagent-stop", "codex-user-prompt-submit",
 		"cursor-after-agent-response", "cursor-before-submit-prompt", "cursor-file-edit", "cursor-post-tool-use",
 		"cursor-post-tool-use-failure", "cursor-pre-compact", "cursor-session-end", "cursor-session-start",
 		"cursor-stop", "cursor-subagent-stop",

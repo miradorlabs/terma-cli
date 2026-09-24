@@ -7,9 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/miradorlabs/terma-cli/internal/desktoprelay"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
-	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/shim"
@@ -56,7 +54,7 @@ func TestDesktopChoiceCountsCodexHookTrust(t *testing.T) {
 	}
 }
 
-func TestDesktopVerdictReportsContentRedactedBeforeRelay(t *testing.T) {
+func TestDesktopVerdictUsesLocalRouteAndKey(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("CODEX_HOME", filepath.Join(home, ".codex"))
@@ -64,28 +62,19 @@ func TestDesktopVerdictReportsContentRedactedBeforeRelay(t *testing.T) {
 	if err := os.MkdirAll(os.Getenv("CODEX_HOME"), 0o700); err != nil {
 		t.Fatal(err)
 	}
+	desktop := true
 	if err := shim.SaveRecord(shim.Record{ProjectID: testProjectID, Endpoint: "https://otel.terma.ai",
 		Signals: []string{"logs"}, Harnesses: []string{shim.AgentCodex},
-		IncludePrompts: true, IncludeToolContent: true}); err != nil {
+		IncludePrompts: true, IncludeToolContent: true, Desktop: &desktop}); err != nil {
 		t.Fatal(err)
+	}
+	if got := judgeDesktop(testProjectID).emissionProblem; got != "this repository has no delivery key" {
+		t.Fatalf("missing key verdict = %q", got)
 	}
 	if err := keystore.SetFor(shim.AgentCodex, testProjectID, "ter_srv_0123456789abcdef01234567"); err != nil {
 		t.Fatal(err)
 	}
-	connect := func(prompts, toolContent bool) {
-		t.Helper()
-		if err := (harness.Codex{}).Connect(harness.Exporter{Endpoint: desktoprelay.Endpoint,
-			Signals: []harness.Signal{harness.SignalLogs}, IncludePrompts: prompts,
-			IncludeToolContent: toolContent}, false); err != nil {
-			t.Fatal(err)
-		}
-	}
-	connect(false, false)
-	if got := judgeDesktop(testProjectID).emissionProblem; got != "Codex redacts prompts before they reach the local receiver" {
-		t.Fatalf("prompt verdict = %q", got)
-	}
-	connect(true, false)
-	if got := judgeDesktop(testProjectID).emissionProblem; got != "Codex suppresses tool output before it reaches the local receiver" {
-		t.Fatalf("tool output verdict = %q", got)
+	if verdict := judgeDesktop(testProjectID); verdict.emissionProblem != "" || !verdict.routed {
+		t.Fatalf("local desktop verdict = %+v", verdict)
 	}
 }

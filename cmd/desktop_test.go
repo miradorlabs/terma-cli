@@ -7,11 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/miradorlabs/terma-cli/internal/desktoprelay"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-func TestDesktopManualConnectAndDisconnectRestoreCodexSettings(t *testing.T) {
+func TestDesktopDisconnectMigratesLegacyRelayOnly(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("CODEX_HOME", filepath.Join(home, ".codex"))
@@ -24,44 +23,29 @@ func TestDesktopManualConnectAndDisconnectRestoreCodexSettings(t *testing.T) {
 	if err := os.WriteFile(path, []byte(original), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	// An earlier desktop connection suppressed content machine-wide. A reconnect
-	// must give the repository relay enough data to apply its own content policy.
 	if err := (harness.Codex{}).Connect(harness.Exporter{
-		Endpoint: desktoprelay.Endpoint, Signals: []harness.Signal{harness.SignalLogs},
+		Endpoint: legacyDesktopEndpoint, Signals: []harness.Signal{harness.SignalLogs},
 	}, false); err != nil {
 		t.Fatal(err)
 	}
-	command, _, err := NewRootCommand().Find([]string{"desktop", "connect"})
+	command, _, err := NewRootCommand().Find([]string{"desktop", "disconnect"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	var output bytes.Buffer
 	command.SetOut(&output)
-	if err := connectDesktop(command, true); err != nil {
-		t.Fatal(err)
-	}
-	if err := connectDesktop(command, true); err != nil {
-		t.Fatalf("repeat connect: %v", err)
-	}
-	status, err := (harness.Codex{}).Status()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !status.Connected || status.Endpoint != desktoprelay.Endpoint || !status.IncludePrompts || !status.IncludeToolContent || len(status.Signals) != 1 || status.Signals[0] != harness.SignalLogs {
-		t.Fatalf("desktop config = %+v", status)
-	}
-	configured, err := os.ReadFile(path)
-	if err != nil || !strings.Contains(string(configured), `model = "test-model"`) {
-		t.Fatalf("unrelated Codex setting was lost: %s, %v", configured, err)
-	}
-	if _, err := os.Stat(filepath.Join(home, "Library", "LaunchAgents", desktopServiceLabel+".plist")); !os.IsNotExist(err) {
-		t.Fatalf("manual mode installed a service: %v", err)
-	}
 	if err := disconnectDesktop(command, nil); err != nil {
 		t.Fatal(err)
 	}
-	status, err = (harness.Codex{}).Status()
-	if err != nil || status.Connected || status.IncludePrompts {
-		t.Fatalf("original Codex exporter/prompt setting not restored: %+v, %v", status, err)
+	status, err := (harness.Codex{}).Status()
+	if err != nil || status.Connected {
+		t.Fatalf("legacy exporter still configured: %+v, %v", status, err)
+	}
+	configured, err := os.ReadFile(path)
+	if err != nil || !strings.Contains(string(configured), `model = "test-model"`) {
+		t.Fatalf("unrelated setting lost: %s, %v", configured, err)
+	}
+	if found, _, _ := NewRootCommand().Find([]string{"desktop", "connect"}); found.Name() == "connect" {
+		t.Fatal("relay connect command is still available")
 	}
 }

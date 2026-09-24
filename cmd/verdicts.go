@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/miradorlabs/terma-cli/internal/desktoprelay"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
+	"github.com/miradorlabs/terma-cli/internal/keystore"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/shim"
 )
@@ -302,23 +302,14 @@ func selectedForRepo(projectID string, saved []string) []string {
 
 func judgeDesktop(projectID string) harnessVerdict {
 	v := harnessVerdict{name: codexDesktopAgent, displayName: "Codex Desktop"}
-	status, err := (harness.Codex{}).Status()
-	route, _, routeErr := shim.LoadRecord(projectID)
+	route, ok, routeErr := shim.LoadRecord(projectID)
 	switch {
-	case err != nil:
-		v.emissionProblem, v.emissionFix = "could not read Codex desktop settings: "+err.Error(), "repair Codex config.toml, then run `terma install`"
-	case status.Endpoint != desktoprelay.Endpoint || !slices.Contains(status.Signals, harness.SignalLogs):
-		v.emissionProblem, v.emissionFix = "local logs exporter is not configured", "terma install"
 	case routeErr != nil:
 		v.emissionProblem, v.emissionFix = "could not read this repository's Codex desktop route: "+routeErr.Error(), "terma install"
-	case !desktoprelay.ReadyForProject(projectID):
-		v.emissionProblem, v.emissionFix = "this repository has no Codex desktop logs route or key", "terma install --signals logs"
-	case route.IncludePrompts && !status.IncludePrompts:
-		v.emissionProblem, v.emissionFix = "Codex redacts prompts before they reach the local receiver", "terma desktop connect"
-	case route.IncludeToolContent && !status.IncludeToolContent:
-		v.emissionProblem, v.emissionFix = "Codex suppresses tool output before it reaches the local receiver", "terma desktop connect"
-	case !desktopReceiverRunning():
-		v.emissionProblem, v.emissionFix = "local receiver is not running", "terma desktop connect"
+	case !ok || route.Desktop == nil || !*route.Desktop || !slices.Contains(route.Harnesses, shim.AgentCodex) || !slices.Contains(route.Signals, "logs"):
+		v.emissionProblem, v.emissionFix = "this repository has no Codex Desktop hook route", "terma install --signals logs"
+	case keystore.GetFor(shim.AgentCodex, projectID) == "":
+		v.emissionProblem, v.emissionFix = "this repository has no delivery key", "terma install"
 	default:
 		v.routed, v.live, v.route = true, true, routeLive
 	}

@@ -8,7 +8,6 @@ import (
 	"slices"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/desktoprelay"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/shim"
@@ -60,6 +59,9 @@ func (e Env) captureCodexReplies(ctx context.Context, r *repo, in *codexHookInpu
 			"text": reply.Text, "text_bytes": reply.Bytes, "text_truncated": reply.Truncated,
 			attrVersion: e.Version, AttrProjectID: r.projectID,
 		}, in.AgentID, in.AgentType)
+		if _, desktop := codexDesktopRoute(r); desktop {
+			attrs["capture_surface"] = codexDesktopSurface
+		}
 		for k, v := range map[string]string{attrTurnID: reply.TurnID, "trace_id": reply.TraceID, "phase": reply.Phase, attrModel: in.Model} {
 			boundedAttr(attrs, k, v)
 		}
@@ -93,9 +95,7 @@ func (e Env) captureCodexReplies(ctx context.Context, r *repo, in *codexHookInpu
 // or model responses", and this is the model-response half of that promise.
 //
 // A routed CLI launch is marked by the shim; its runtime overrides govern consent.
-// Desktop launches have no marker. When the machine-wide exporter points at the
-// desktop relay, both that exporter and this repository's desktop route must allow
-// prompts; otherwise the reply would bypass the relay's per-repository filter.
+// Desktop launches have no marker. Their repository route alone governs capture.
 //
 // It fails closed. A configuration that is there and cannot be read — a routing record
 // half-written, a config.toml that does not parse — might be the one that withholds
@@ -106,18 +106,16 @@ func codexRepliesConsented(r *repo) bool {
 	if err != nil {
 		return false
 	}
+	if os.Getenv(shim.CodexRoutedEnv) != "1" && rec.Desktop != nil && *rec.Desktop {
+		return recorded && slices.Contains(rec.Harnesses, shim.AgentCodex) &&
+			slices.Contains(rec.Signals, "logs") && rec.IncludePrompts
+	}
 	st, err := (harness.Codex{}).Status()
 	if err != nil {
 		return false
 	}
 	if os.Getenv(shim.CodexRoutedEnv) == "1" {
 		return recorded && slices.Contains(rec.Harnesses, shim.AgentCodex) && rec.IncludePrompts
-	}
-	if st.Endpoint == desktoprelay.Endpoint {
-		return st.Connected && st.IncludePrompts && recorded &&
-			slices.Contains(rec.Harnesses, shim.AgentCodex) &&
-			(rec.Desktop == nil || *rec.Desktop) && slices.Contains(rec.Signals, "logs") &&
-			rec.IncludePrompts
 	}
 	// Repository hooks can run even when an IDE or TERMA_DISABLE bypasses the
 	// shim. Keep a saved repository opt-out in force for those launches.

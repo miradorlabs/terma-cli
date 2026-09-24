@@ -102,9 +102,8 @@ bearer key, which local process inspection can expose; do not log generated agen
 arguments. Codex can suppress tool output but cannot suppress native tool arguments
 with `--exclude-tool-content`. See [SECURITY.md](../SECURITY.md) for these limitations.
 Select `codex-desktop` during `terma setup` to have `terma install` configure
-the Codex desktop receiver when it binds a repository. The desktop app bypasses
-the shell launch route; see
-[Codex desktop telemetry](CODEX-DESKTOP-TELEMETRY.md) for its local receiver setup.
+repository hooks and a local project route. The desktop app bypasses the shell
+launch route; see [Codex desktop telemetry](CODEX-DESKTOP-TELEMETRY.md).
 OpenCode uses a
 plugin and `.opencode/terma.json` rather than environment variables.
 

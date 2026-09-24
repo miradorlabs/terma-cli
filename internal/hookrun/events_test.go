@@ -8,6 +8,8 @@ import "testing"
 func TestWireNamesAreFrozen(t *testing.T) {
 	for got, want := range map[string]string{
 		EventSessionStart:       "terma.session.start",
+		EventUserPrompt:         "terma.user.prompt",
+		EventModelCall:          "terma.model.call",
 		EventSessionEnd:         "terma.session.end",
 		EventFilesTouched:       "terma.files.touched",
 		EventCommitStamped:      "terma.commit.stamped",

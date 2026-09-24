@@ -22,8 +22,8 @@ Restart running agents after installation so they load the new configuration.
 
 Codex desktop uses a separate backend from the `codex` shell command. Select
 **Codex Desktop** in `terma setup` (or use `--harness codex-desktop` with
-`terma install`). Install then configures the local receiver and repository
-route. Restart the app and check `terma desktop status` from that repository.
+`terma install`). Install then configures repository hooks and a local project
+route. Trust the hooks in the app and check `terma desktop status` from that repository.
 See [Codex desktop telemetry](docs/CODEX-DESKTOP-TELEMETRY.md).
 
 Then verify the installation:

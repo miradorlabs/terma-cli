@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -36,9 +35,6 @@ type installFlags struct {
 	noHooks      bool
 	noDoctor     bool
 	noStatusLine bool
-	// desktopManual configures the exporter but leaves the receiver under the
-	// developer's own process manager instead of installing a LaunchAgent.
-	desktopManual bool
 	// noPath keeps install out of the shell startup file: it prints the PATH line for the
 	// developer to place instead of offering to write it.
 	noPath             bool
@@ -73,7 +69,7 @@ not run ` + "`terma setup`" + `, asks which agents you use if you have not chose
      on PATH in your shell's startup file (--no-path prints the line instead;
      --activation wrapper prints shell functions instead). Keys stay in your home directory, namespaced by project —
      never in the repository.
-     Codex Desktop uses the same repository hooks and a user-level loopback receiver.
+     Codex Desktop reports through repository hooks and the local Terma spool.
   3. Enables repository telemetry, including for machines configured to export only
      from installed repositories. Existing repository policies are preserved unless
      --signals or a content flag changes them.
@@ -95,7 +91,6 @@ The keys and per-project configuration live in your home directory; the committe
 	cmd.Flags().BoolVar(&f.noDoctor, "no-doctor", false, "do not run `terma doctor` to verify the chain after installing")
 	cmd.Flags().BoolVar(&f.noPath, "no-path", false, "do not offer to add the shim directory to PATH in your shell's startup file; print the line instead")
 	cmd.Flags().BoolVar(&f.noStatusLine, "no-statusline", false, "do not wrap Claude Code's status line (which captures the plan's rate-limit windows)")
-	cmd.Flags().BoolVar(&f.desktopManual, "desktop-manual", false, "configure Codex desktop but run `terma desktop serve` yourself")
 	cmd.Flags().StringVar(&f.identity, "identity", "", "identity stamped on Codex/OpenCode sessions (default: git user.email; \"none\" to omit)")
 	cmd.Flags().StringVar(&f.signals, "signals", "", "comma-separated signals to export: traces, logs, metrics (default all)")
 	cmd.Flags().BoolVar(&f.excludePrompts, "exclude-prompts", false, "do not export prompt text or model responses")
@@ -133,9 +128,6 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 		return err
 	}
 	if slices.Contains(agents, codexDesktopAgent) {
-		if err := desktopPreflight(); err != nil {
-			return err
-		}
 		signals, err := harness.ParseSignals(f.signals)
 		if err != nil {
 			return err
@@ -228,7 +220,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 			}
 		}
 		if slices.Contains(agents, codexDesktopAgent) {
-			fmt.Fprintln(out, "\nCodex Desktop: configure a user-level logs exporter and local per-repository receiver; restart the app afterward.")
+			fmt.Fprintln(out, "\nCodex Desktop: install trusted repository hooks and a local project route; no receiver or app restart needed.")
 		}
 		fmt.Fprintln(out, "\nDry run: nothing written.")
 		return nil
@@ -349,12 +341,16 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 		}
 	}
 	if slices.Contains(agents, codexDesktopAgent) {
-		if desktopConfigured() {
-			fmt.Fprintln(out, "Codex Desktop receiver already configured and running.")
-		} else {
-			if err := connectDesktop(cmd, f.desktopManual || runtime.GOOS != "darwin"); err != nil {
-				return fmt.Errorf("configure Codex desktop: %w", err)
-			}
+		removed, err := removeLegacyDesktopRelay(cmd)
+		if err != nil {
+			return fmt.Errorf("remove previous Desktop relay: %w", err)
+		}
+		if removed {
+			fmt.Fprintln(out, "Removed the previous Desktop relay; restart Codex Desktop to unload its old exporter.")
+		}
+		fmt.Fprintln(out, "Codex Desktop captures this repository through trusted hooks and Terma's existing spool.")
+		if global, err := (harness.Codex{}).Status(); err == nil && global.Connected {
+			fmt.Fprintln(out, "Warning: Codex also has a user-level exporter; it may send Desktop activity from other repositories.")
 		}
 	}
 

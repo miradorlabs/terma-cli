@@ -28,18 +28,19 @@ func (codex) Plan(root string, install bool) (hookmgr.Plan, error) {
 
 func (codex) Events() map[string]Handler {
 	return map[string]Handler{
-		"codex-notify":         hookrun.CodexNotify,
-		"codex-session-start":  hookrun.CodexSessionStart,
-		"codex-session-end":    hookrun.CodexSessionEnd,
-		"codex-post-tool-use":  hookrun.CodexPostToolUse,
-		"codex-stop":           hookrun.CodexStop,
-		"codex-subagent-start": hookrun.CodexSubagentStart,
-		"codex-subagent-stop":  hookrun.CodexSubagentStop,
+		"codex-notify":             hookrun.CodexNotify,
+		"codex-session-start":      hookrun.CodexSessionStart,
+		"codex-user-prompt-submit": hookrun.CodexUserPromptSubmit,
+		"codex-session-end":        hookrun.CodexSessionEnd,
+		"codex-post-tool-use":      hookrun.CodexPostToolUse,
+		"codex-stop":               hookrun.CodexStop,
+		"codex-subagent-start":     hookrun.CodexSubagentStart,
+		"codex-subagent-stop":      hookrun.CodexSubagentStop,
 	}
 }
 
 func (codex) FlushAfter() []string {
-	return []string{"codex-notify", "codex-session-end", "codex-stop"}
+	return []string{"codex-notify", "codex-session-end", "codex-stop", "codex-user-prompt-submit"}
 }
 
 // Trust reads the question Cursor's hooks cannot raise: Codex refuses to run a hook it

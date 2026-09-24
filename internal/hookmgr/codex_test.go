@@ -74,8 +74,8 @@ func TestCodexHooksMergeKeepsDescriptionAndUserGroups(t *testing.T) {
 	if !ours.Async {
 		t.Fatal("PostToolUse must be async")
 	}
-	if len(doc.Hooks["UserPromptSubmit"]) != 1 {
-		t.Fatalf("unrelated event touched: %+v", doc.Hooks["UserPromptSubmit"])
+	if prompt := doc.Hooks["UserPromptSubmit"]; len(prompt) != 2 || prompt[0].Hooks[0].Command != "./log.sh" || prompt[1].Hooks[0].Command != HookCommand("codex-user-prompt-submit") {
+		t.Fatalf("user prompt hook merge wrong: %+v", prompt)
 	}
 	start := doc.Hooks["SessionStart"]
 	if len(start) != 1 || start[0].Hooks[0].Command != HookCommand("codex-session-start") {

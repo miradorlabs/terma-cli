@@ -7,6 +7,8 @@ package hookrun
 // Event names written to the spool. The backend groups on these.
 const (
 	EventSessionStart  = "terma.session.start"
+	EventUserPrompt    = "terma.user.prompt"
+	EventModelCall     = "terma.model.call"
 	EventSessionEnd    = "terma.session.end"
 	EventFilesTouched  = "terma.files.touched"
 	EventCommitStamped = "terma.commit.stamped"
@@ -93,6 +95,7 @@ const (
 	sourceCursorHook      = "cursor_hook"
 	sourceAntigravityHook = "antigravity_hook"
 	sourceCodexRollout    = "codex_rollout"
+	sourceCodexHook       = "codex_hook"
 )
 
 // Values of evidence_status and of the per-facet *_status attributes. The harness

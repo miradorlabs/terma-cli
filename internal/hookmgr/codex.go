@@ -14,12 +14,12 @@ import (
 // project's `.codex` layer is trusted, and each developer trusts a repository's hooks
 // once, from inside Codex — see doctor's codex-hooks check, which is what tells them.
 //
-// This is the *only* thing terma can put in a repository for Codex. Telemetry cannot
-// live here: Codex strips `otel` (with `notify`, `profile` and the provider keys) out of
+// This is the repository-specific capture surface for Codex Desktop. Native OTLP
+// telemetry cannot live here: Codex strips `otel` (with `notify`, `profile` and the provider keys) out of
 // project-local config and says so at startup, so a Codex export is always driven from
 // outside the repository — the machine-wide user config `terma connect codex` writes, or
 // the runtime `-c` overrides `terma install` routes through the shim (keeping the
-// developer's own CODEX_HOME). Hooks are the repository-scoped half.
+// developer's own CODEX_HOME). Trusted hooks report Desktop activity directly.
 const CodexHooksPath = ".codex/hooks.json"
 
 // CodexHooks are the adapter shims for Codex. Each is a one-liner that forwards the
@@ -41,6 +41,7 @@ var CodexHooks = []struct {
 	Timeout int
 }{
 	{"SessionStart", HookCommand("codex-session-start"), false, 10},
+	{"UserPromptSubmit", HookCommand("codex-user-prompt-submit"), true, 10},
 	{"PostToolUse", HookCommand("codex-post-tool-use"), true, 10},
 	// Finish the bounded local snapshot before codex exec can shut down. An
 	// async Stop may be cancelled at exit; network delivery stays detached.
