@@ -55,15 +55,15 @@ type Project struct {
 
 // Install records what `terma install` wired, so uninstall is exact and doctor
 // knows what to check.
+//
+// Which agents' hooks are wired is not recorded: the committed hooks files say it
+// themselves (adapter.WiredNames), and which agents a developer uses is home-directory
+// state (config.Profile.Harnesses). A list here once copied the second into the first,
+// so each colleague's own agents churned a file the whole team shares. A binding that
+// still carries "adapters" loads, and loses it on the next Save.
 type Install struct {
-	HookManager string   `json:"hook_manager,omitempty"`
-	Hooks       []string `json:"hooks,omitempty"`
-	// Adapters are the harness adapters wired at repo scope (e.g. "claude") — the ones
-	// that write a committed hooks file. This is a team decision (the hooks are
-	// committed), so it lives here. Which telemetry harnesses each developer connects,
-	// and how they route (wrapper vs PATH shim), is per-developer state that lives in
-	// the home directory (the routing record and keystore), never in this committed file.
-	Adapters    []string  `json:"adapters,omitempty"`
+	HookManager string    `json:"hook_manager,omitempty"`
+	Hooks       []string  `json:"hooks,omitempty"`
 	Version     string    `json:"terma_version,omitempty"`
 	InstalledAt time.Time `json:"installed_at"`
 }
@@ -199,6 +199,10 @@ func Find(dir string) (string, error) {
 	for {
 		if _, err := os.Stat(Path(dir)); err == nil {
 			return dir, nil
+		}
+		// Do not inherit the parent workspace's binding across a nested checkout.
+		if _, err := os.Lstat(filepath.Join(dir, ".git")); err == nil {
+			return "", ErrNotFound
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {

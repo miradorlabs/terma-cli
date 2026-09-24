@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/project"
 )
 
 // Manager is the hook manager a repository uses.
@@ -171,8 +172,21 @@ func PlanUninstall(root string, det Detection) (Plan, error) {
 	}
 }
 
+// Validate checks all destinations before applying any part of a plan.
+func Validate(root string, p Plan) error {
+	for _, c := range p.Changes {
+		if err := project.CheckPath(root, filepath.FromSlash(c.Path)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Apply writes every change atomically (temp file + rename per file).
 func Apply(root string, p Plan) error {
+	if err := Validate(root, p); err != nil {
+		return err
+	}
 	for _, c := range p.Changes {
 		path := filepath.Join(root, filepath.FromSlash(c.Path))
 		if c.After == nil {
@@ -188,6 +202,9 @@ func Apply(root string, p Plan) error {
 		mode := c.Mode
 		if mode == 0 {
 			mode = 0o644
+			if info, err := os.Stat(path); err == nil {
+				mode = info.Mode().Perm()
+			}
 		}
 		if err := config.WriteFileAtomic(path, c.After, mode); err != nil {
 			return err

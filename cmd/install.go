@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"slices"
 	"strings"
 	"time"
@@ -52,7 +53,7 @@ func newInstallCommand() *cobra.Command {
 	var f installFlags
 	cmd := &cobra.Command{
 		Use:   "install",
-		Short: "Configure this repository: point your agents at its project and wire the hooks",
+		Short: "Configure this workspace: point your agents at its project and wire the hooks",
 		Long: `Run once per repository. install is self-contained — it signs you in if you have
 not run ` + "`terma setup`" + `, asks which agents you use if you have not chosen, then:
 
@@ -71,6 +72,12 @@ not run ` + "`terma setup`" + `, asks which agents you use if you have not chose
      --signals or a content flag changes them.
   4. Offers to install the commit hooks and the agents' own hooks (session start/end,
      tool use, stop) into the files you commit, so one merged PR onboards everyone.
+
+Run from any subdirectory of a Git worktree; install uses its root. Outside Git,
+the first install uses the current directory and later installs find the nearest
+.terma/settings.json above it. Agent hooks and telemetry work there; Git hooks and
+commit stamping are skipped. Recognizable non-Git repositories produce a warning:
+only Git has version-control integration. Bare repositories are not workspaces.
 
 The keys and per-project configuration live in your home directory; the committed
 .terma/settings.json only names the project.`,
@@ -101,17 +108,35 @@ The keys and per-project configuration live in your home directory; the committe
 func runInstall(cmd *cobra.Command, f installFlags) error {
 	ctx := cmd.Context()
 	out := cmd.OutOrStdout()
-	root, gitDir, err := repoHere(ctx, "terma install runs inside a git repository")
+	root, gitDir, err := workspaceHere(ctx)
 	if err != nil {
 		return err
 	}
+	if gitDir == "" {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+		if vcs := termaproject.UnsupportedVCS(cwd); vcs != "" {
+			fmt.Fprintf(cmd.ErrOrStderr(), "Warning: detected %s repository metadata. Terma only supports Git for version-control integration; this repository type is not supported. Agent hooks and telemetry can still be installed, but commit hooks and commit stamping are skipped.\n", vcs)
+		}
+	}
+
 	cfg, err := loadConfig()
 	if err != nil {
 		return err
 	}
+	for _, path := range []string{termaproject.FileName, hookmgr.ClaudeSettingsPath} {
+		if err := termaproject.CheckPath(root, path); err != nil {
+			return err
+		}
+	}
 	// A linked worktree installing for the first time keeps its main checkout's project
 	// rather than asking again; the binding it writes is its own.
-	existing, _, _ := termaproject.Resolve(root, gitDir)
+	existing, _, err := termaproject.Resolve(root, gitDir)
+	if err != nil && !errors.Is(err, termaproject.ErrNotFound) {
+		return err
+	}
 
 	// 1. Which agents to configure: --harness, else recorded, else a picker. Resolved
 	// before sign-in so we know whether sign-in is even needed.
@@ -163,7 +188,10 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	// attributes speak for it.
 	cfg.ProjectID, cfg.ProjectName, cfg.OrganizationID = b.ID, b.Name, b.OrganizationID
 
-	fmt.Fprintf(out, "Repository: %s\n", root)
+	fmt.Fprintf(out, "Workspace:  %s\n", root)
+	if gitDir == "" {
+		fmt.Fprintln(out, "Not a Git repository — Git hooks and commit stamping are skipped.")
+	}
 	if b.ID == "" && b.Name == "" {
 		fmt.Fprintln(out, "Project:    (unresolved — a real install signs in and selects one)")
 	} else {
@@ -176,14 +204,17 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	// The hook plan — the commit hooks and the agents' own hooks, into committed files —
 	// is built once, before anything is written, so a dry run prints exactly the plan an
 	// install goes on to apply. The wired adapters are a team decision, so a re-install
-	// keeps whatever the binding already records unless --adapters overrides it — a
-	// colleague re-running install must not rewrite the committed hooks to match their
-	// own agent set.
-	adapters := installAdapters(root, agents, f.adapters, existing)
+	// keeps every agent the repository's hooks files already wire unless --adapters
+	// overrides it — a colleague re-running install must not rewrite the committed hooks
+	// to match their own agent set.
+	adapters := installAdapters(root, agents, f.adapters)
 	if slices.Contains(agents, codexDesktopAgent) && !slices.Contains(adapters, shim.AgentCodex) {
 		return errors.New("codex desktop needs the Codex repository hooks; include codex in --adapters")
 	}
 	det := hookmgr.Detect(root)
+	if gitDir == "" {
+		det = hookmgr.Detection{}
+	}
 	var plan hookPlan
 	if !f.noHooks {
 		if plan, err = planHooks(root, det, adapters); err != nil {
@@ -220,6 +251,19 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 		return nil
 	}
 
+	// Reserve the private store even before the first agent event. A hook already
+	// in flight when git init runs and a hook starting afterwards must choose the
+	// same store, including when neither has written a manifest yet.
+	if gitDir == "" {
+		stateDir, err := termaproject.StateDir(root, "")
+		if err != nil {
+			return err
+		}
+		if err := os.MkdirAll(stateDir, 0o700); err != nil {
+			return err
+		}
+	}
+
 	// 4. Configure each agent for this repository (per-repo routing). This is the
 	// per-developer half — keys and routing state in the home directory — and touches
 	// no committed file.
@@ -240,7 +284,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	}
 
 	// 5. Hooks: apply the plan built above.
-	installedHooks := existing != nil && existing.Install.HookManager != ""
+	installedHooks := gitDir != "" && existing != nil && existing.Install.HookManager != ""
 	var written []string // the repository files this run wrote hooks into, to commit
 	if !f.noHooks {
 		plan.print(out)
@@ -248,18 +292,18 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 		case plan.empty():
 			// An empty git-hook plan means the commit hooks are already wired, so this
 			// repo is hook-installed; record them in the binding without rewriting.
-			installedHooks = true
+			installedHooks = gitDir != ""
 		case f.assumeYes || confirmYes(cmd, "Install these hooks?"):
 			if err := plan.apply(root); err != nil {
 				return err
 			}
-			installedHooks = true
+			installedHooks = gitDir != ""
 			written = plan.paths()
 		default:
-			adapters = committedAdapters(existing) // declined: record only what is wired
+			adapters = adapter.WiredNames(root) // declined: only what is already wired
 		}
 	} else {
-		adapters = committedAdapters(existing) // --no-hooks: record only what is wired
+		adapters = adapter.WiredNames(root) // --no-hooks: only what is already wired
 	}
 	if slices.Contains(agents, codexDesktopAgent) {
 		codexPlan, err := hookmgr.PlanCodexHooks(root, true)
@@ -276,7 +320,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	// no longer connects anything — so without this step a developer whose agents are
 	// all hooks-only would see "Installed." while every commit, tool call and observation
 	// sat in the spool, held for a key that no command would ever mint.
-	if installedHooks {
+	if installedHooks || len(adapter.WiredNames(root)) > 0 {
 		if note := ensureSpoolKey(ctx, cfg); note != "" {
 			fmt.Fprintf(out, "\n%s\n", note)
 		}
@@ -316,7 +360,6 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 		Install: termaproject.Install{
 			HookManager: managerOrEmpty(det, installedHooks),
 			Hooks:       hooksOrNil(installedHooks),
-			Adapters:    adapters,
 			Version:     version,
 			InstalledAt: installedAt,
 		},
@@ -328,7 +371,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	// 8. Per-clone git wiring for the shim manager.
 	if installedHooks {
 		if err := wireRepo(ctx, out, root, file); err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "Warning: %v\n", err)
+			return err
 		}
 	}
 	if slices.Contains(agents, codexDesktopAgent) {
@@ -344,7 +387,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	}
 
 	fmt.Fprintf(out, "\n%s\n", style.For(out).Bold("Installed."))
-	if len(written) > 0 {
+	if gitDir != "" && len(written) > 0 {
 		// Save always rewrites the binding.
 		written = append(written, termaproject.FileName)
 		printCommitList(out, "Commit these files and open a PR — merging it onboards the repository:", written)
@@ -679,52 +722,31 @@ func allActive(agents []string) bool {
 }
 
 // installAdapters lists the agents whose committed hooks to wire. --adapters overrides
-// it outright; otherwise it is the union of what a prior install already committed, the
-// agents this install configures, and any adapter whose directory the repository already
-// carries (a .cursor / .codex / .agents directory is a clear sign the repo is opened in
-// that agent) — restricted to adapters that actually write a hooks file.
+// it outright; otherwise it is the union of the agents the repository's hooks files
+// already wire, the agents this install configures, and any adapter whose directory the
+// repository already carries (a .cursor / .codex / .agents directory is a clear sign the
+// repo is opened in that agent) — restricted to adapters that actually write a hooks file.
 //
 // A union (rather than replacing with the current selection) means selecting more agents
 // grows the committed set, while a colleague re-running install with a narrower selection
-// never removes hooks someone else committed — so the file grows on purpose and never
-// churns down.
-func installAdapters(root string, agents []string, override string, existing *termaproject.File) []string {
+// never removes hooks someone else committed — so the files grow on purpose and never
+// churn down.
+func installAdapters(root string, agents []string, override string) []string {
 	if list := splitCommas(override); len(list) > 0 {
 		return list
-	}
-	want := map[string]bool{}
-	if existing != nil {
-		for _, a := range existing.Install.Adapters {
-			want[a] = true
-		}
-	}
-	for _, a := range agents {
-		if a == codexDesktopAgent {
-			want[shim.AgentCodex] = true
-		} else {
-			want[a] = true
-		}
 	}
 	var out []string
 	for _, a := range adapter.All() {
 		if a.HooksPath() == "" {
 			continue
 		}
-		if want[a.Name()] || a.Default(root) {
+		// Codex Desktop is captured through the Codex hooks file.
+		selected := slices.Contains(agents, a.Name()) || (a.Name() == shim.AgentCodex && slices.Contains(agents, codexDesktopAgent))
+		if selected || a.Default(root) || adapter.Wired(root, a) {
 			out = append(out, a.Name())
 		}
 	}
 	return out
-}
-
-// committedAdapters is what the binding already records as wired — what install keeps
-// when it writes no hooks this time, so the committed file never names an adapter whose
-// hooks file was not written. Nil on a fresh install.
-func committedAdapters(existing *termaproject.File) []string {
-	if existing == nil {
-		return nil
-	}
-	return existing.Install.Adapters
 }
 
 // hookPlan is everything install would write into the repository for hooks: the
@@ -736,12 +758,19 @@ type hookPlan struct {
 }
 
 func planHooks(root string, det hookmgr.Detection, adapters []string) (hookPlan, error) {
-	hooks, err := hookmgr.PlanInstall(root, det)
-	if err != nil {
-		return hookPlan{}, err
+	var hooks hookmgr.Plan
+	var err error
+	if det.Manager != "" {
+		hooks, err = hookmgr.PlanInstall(root, det)
+		if err != nil {
+			return hookPlan{}, err
+		}
 	}
 	agents, err := planAdapters(root, adapters, true)
 	if err != nil {
+		return hookPlan{}, err
+	}
+	if err := hookmgr.Validate(root, hooks); err != nil {
 		return hookPlan{}, err
 	}
 	return hookPlan{det: det, hooks: hooks, agents: agents}, nil
@@ -766,7 +795,11 @@ func (p hookPlan) print(out io.Writer) {
 		fmt.Fprintln(out, "\nHooks already present — nothing to write.")
 		return
 	}
-	fmt.Fprintf(out, "\nHooks — commit stamping via %s (%s):\n", p.det.Manager, p.det.Detail)
+	if p.det.Manager == "" {
+		fmt.Fprintln(out, "\nAgent hooks:")
+	} else {
+		fmt.Fprintf(out, "\nHooks — commit stamping via %s (%s):\n", p.det.Manager, p.det.Detail)
+	}
 	for _, c := range p.hooks.Changes {
 		fmt.Fprintf(out, "  %-7s %s\n", c.Action(), c.Path)
 	}
@@ -933,6 +966,9 @@ func planAdapters(root string, names []string, install bool) ([]hookmgr.Plan, er
 		if err != nil {
 			return nil, err
 		}
+		if err := hookmgr.Validate(root, p); err != nil {
+			return nil, err
+		}
 		plans = append(plans, p)
 	}
 	return plans, nil
@@ -973,11 +1009,19 @@ to the same project — remove it machine-wide with 'terma shim uninstall'.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
 			out := cmd.OutOrStdout()
-			root, gitDir, err := repoHere(ctx, "terma uninstall runs inside a git repository")
+			root, gitDir, err := workspaceHere(ctx)
 			if err != nil {
 				return err
 			}
-			existing, _ := termaproject.Load(root)
+			for _, path := range []string{termaproject.FileName, hookmgr.ClaudeSettingsPath} {
+				if err := termaproject.CheckPath(root, path); err != nil {
+					return err
+				}
+			}
+			existing, err := termaproject.Load(root)
+			if err != nil && !errors.Is(err, termaproject.ErrNotFound) {
+				return err
+			}
 			det := hookmgr.Detect(root)
 			if existing != nil && existing.Install.HookManager != "" {
 				det.Manager = hookmgr.Manager(existing.Install.HookManager)
@@ -985,8 +1029,14 @@ to the same project — remove it machine-wide with 'terma shim uninstall'.`,
 					det.ConfigPath = hookmgr.ShimDir
 				}
 			}
-			hooks, err := hookmgr.PlanUninstall(root, det)
-			if err != nil {
+			var hooks hookmgr.Plan
+			if gitDir != "" {
+				hooks, err = hookmgr.PlanUninstall(root, det)
+				if err != nil {
+					return err
+				}
+			}
+			if err := hookmgr.Validate(root, hooks); err != nil {
 				return err
 			}
 			plans, err := planAdapters(root, adapter.Names(), false)
@@ -996,6 +1046,9 @@ to the same project — remove it machine-wide with 'terma shim uninstall'.`,
 			changes := append([]hookmgr.Change{}, hooks.Changes...)
 			for _, p := range plans {
 				changes = append(changes, p.Changes...)
+			}
+			for _, note := range hooks.Notes {
+				fmt.Fprintln(out, note)
 			}
 			if len(changes) == 0 && existing == nil {
 				fmt.Fprintln(out, "Nothing of terma's is installed here.")
@@ -1008,7 +1061,7 @@ to the same project — remove it machine-wide with 'terma shim uninstall'.`,
 			if existing != nil {
 				fmt.Fprintf(out, "  %-7s %s\n", "delete", termaproject.FileName)
 			}
-			if hp := gitx.ConfigGet(ctx, root, "core.hooksPath"); hp == hookmgr.ShimDir {
+			if gitDir != "" && gitx.ConfigGet(ctx, root, "core.hooksPath") == hookmgr.ShimDir {
 				fmt.Fprintln(out, "  restore git config core.hooksPath")
 			}
 			if !assumeYes {
@@ -1029,7 +1082,10 @@ to the same project — remove it machine-wide with 'terma shim uninstall'.`,
 					return err
 				}
 			}
-			for _, h := range repoPolicyHarnesses(installedAdapters(existing)) {
+			// Every harness that reads a repository policy, not only the ones some
+			// install chose: uninstall removes whatever of terma's is here, and a policy
+			// that is not there is nothing to remove.
+			for _, h := range harness.All() {
 				scoped, ok := h.(harness.Scoped)
 				if !ok {
 					continue
@@ -1044,16 +1100,37 @@ to the same project — remove it machine-wide with 'terma shim uninstall'.`,
 			// keystore keys are. Removing .terma/settings.json below un-binds this checkout,
 			// which is what stops routing here; other checkouts of the same project keep
 			// working. `terma shim uninstall` is the machine-level teardown.
-			if err := unwireRepo(ctx, root, gitDir); err != nil {
-				return err
+			if gitDir != "" {
+				if err := unwireRepo(ctx, root, gitDir); err != nil {
+					return err
+				}
 			}
 			if err := termaproject.Remove(root); err != nil {
 				return err
 			}
-			if err := session.Open(gitDir).Remove(); err != nil {
+			stateDir, err := termaproject.StateDir(root, gitDir)
+			if err != nil {
 				return err
 			}
-			fmt.Fprintln(out, "Uninstalled. Commit the removals if the install was committed.")
+			if err := session.Open(stateDir).Remove(); err != nil {
+				return err
+			}
+			if stateDir != gitDir {
+				// A workspace that gained Git retains private session storage, but
+				// its Git hook restoration journal lives in the worktree metadata.
+				if gitDir != "" {
+					if err := session.Open(gitDir).Remove(); err != nil {
+						return err
+					}
+				}
+				// Remove the reservation only when empty; leave any unrelated files.
+				_ = os.Remove(stateDir)
+			}
+			if gitDir != "" {
+				fmt.Fprintln(out, "Uninstalled. Commit the removals if the install was committed.")
+			} else {
+				fmt.Fprintln(out, "Uninstalled.")
+			}
 			fmt.Fprintln(out, "Per-repo routing (a PATH shim and routing records) stays on your machine — run `terma shim uninstall` when you no longer route any repo.")
 			return nil
 		},

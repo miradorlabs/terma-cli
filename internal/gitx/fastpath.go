@@ -103,6 +103,9 @@ func CommonDirFS(gitDir string) string {
 // checkout. A submodule's git directory has no commondir and is not a worktree. It reads
 // one small file and runs nothing.
 func LinkedWorktreeFS(gitDir string) (name, mainRoot string, ok bool) {
+	if gitDir == "" {
+		return "", "", false // a workspace outside Git
+	}
 	gitDir = filepath.Clean(gitDir)
 	common := CommonDirFS(gitDir)
 	if common == gitDir {

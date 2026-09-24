@@ -357,7 +357,12 @@ func (e Env) captureQuota(p *statusLinePayload) bool {
 		return false
 	}
 	repo, worktree, projectID, repoRoot := "", "", "", ""
-	if root, gitDir, ok := gitx.LocateFS(cmp.Or(p.Cwd, e.Cwd)); ok {
+	root, gitDir, located := gitx.LocateFS(cmp.Or(p.Cwd, e.Cwd))
+	if !located {
+		// A workspace outside Git (PR #4) is found by its binding.
+		root, _ = project.Find(cmp.Or(p.Cwd, e.Cwd))
+	}
+	if root != "" {
 		repoRoot = root
 		repo, worktree = checkoutNames(root, gitDir)
 		if f, _, err := project.Resolve(root, gitDir); err == nil {

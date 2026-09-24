@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -36,18 +38,33 @@ func wireRepo(ctx context.Context, out io.Writer, root string, bound *termaproje
 	if bound.Install.HookManager != string(hookmgr.GitShim) {
 		return nil
 	}
-	current := gitx.ConfigGet(ctx, root, "core.hooksPath")
-	if current == hookmgr.ShimDir {
-		return nil
-	}
 	_, gitDir, err := gitx.Locate(ctx, root)
 	if err != nil {
 		return err
 	}
-	if err := session.RecordPreviousHooksPath(gitDir, current); err != nil {
+	scope, err := hooksConfigScope(ctx, root, gitDir)
+	if err != nil {
 		return err
 	}
-	if err := gitx.ConfigSet(ctx, root, "core.hooksPath", hookmgr.ShimDir); err != nil {
+	current := gitx.ConfigGet(ctx, root, "core.hooksPath")
+	if strings.ContainsAny(current, "\r\n") {
+		return fmt.Errorf("cannot chain a core.hooksPath containing a newline")
+	}
+	scopedCurrent, localErr := gitx.Git(ctx, root, "config", scope, "--get", "core.hooksPath")
+	if localErr == nil && scopedCurrent == hookmgr.ShimDir {
+		return nil
+	}
+	chainPath := current
+	if current != "" {
+		chainPath, err = gitx.Git(ctx, root, "config", "--path", "--get", "core.hooksPath")
+		if err != nil {
+			return err
+		}
+	}
+	if err := session.RecordPreviousHooksPathAtScope(gitDir, current, scope, localErr == nil, chainPath); err != nil {
+		return err
+	}
+	if _, err := gitx.Git(ctx, root, "config", scope, "core.hooksPath", hookmgr.ShimDir); err != nil {
 		return err
 	}
 	fmt.Fprintf(out, "\nPointed git at the committed hook shims (core.hooksPath = %s).\n", hookmgr.ShimDir)
@@ -63,8 +80,43 @@ func unwireRepo(ctx context.Context, root, gitDir string) error {
 		return nil
 	}
 	previous, ok := session.PreviousHooksPath(gitDir)
-	if ok && previous != "" {
-		return gitx.ConfigSet(ctx, root, "core.hooksPath", previous)
+	if !ok {
+		return nil
 	}
-	return gitx.ConfigUnset(ctx, root, "core.hooksPath")
+	scope := session.PreviousHooksScope(gitDir)
+	var err error
+	if session.HooksPathWasLocal(gitDir) {
+		_, err = gitx.Git(ctx, root, "config", scope, "core.hooksPath", previous)
+		return err
+	}
+	_, err = gitx.Git(ctx, root, "config", scope, "--unset", "core.hooksPath")
+	return err
+}
+
+// Linked worktrees share --local config. Use Git's per-worktree scope so changing
+// one checkout never redirects or disables hooks in another checkout. Enable it
+// for the first install too, before another worktree might be added.
+func hooksConfigScope(ctx context.Context, root, gitDir string) (string, error) {
+	common := gitx.CommonDirFS(gitDir)
+
+	if gitx.ConfigGet(ctx, root, "extensions.worktreeConfig") != "true" {
+		// Git requires these main-worktree-only settings to move out of the
+		// shared config when enabling worktreeConfig (notably separate git dirs).
+		for _, key := range []string{"core.worktree", "core.bare"} {
+			value, err := gitx.Git(ctx, root, "config", "--local", "--get", key)
+			if err != nil || (key == "core.bare" && strings.ToLower(value) != "true") {
+				continue
+			}
+			if _, err := gitx.Git(ctx, root, "config", "--file", filepath.Join(common, "config.worktree"), key, value); err != nil {
+				return "", err
+			}
+			if err := gitx.ConfigUnset(ctx, root, key); err != nil {
+				return "", err
+			}
+		}
+		if err := gitx.ConfigSet(ctx, root, "extensions.worktreeConfig", "true"); err != nil {
+			return "", err
+		}
+	}
+	return "--worktree", nil
 }

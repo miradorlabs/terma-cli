@@ -16,7 +16,8 @@ with — if a claim here is wrong, that is a bug.
 A CLI credential is **org-scoped**. A server key is **project-scoped and write-only for
 telemetry**; it is what a harness exports with and what the spool delivers with. Neither
 is ever written into a repository: `terma install` produces hook wiring and `.terma/settings.json`
-(project id, hook manager, adapters) in the repository. Install also writes per-developer
+(project id and hook installation metadata) in the repository. The agent hook files
+themselves record which adapters are wired. Install also writes per-developer
 keys and routing configuration under the user's configuration directory, may update
 agent settings, and offers to add a managed PATH block to the shell startup file.
 

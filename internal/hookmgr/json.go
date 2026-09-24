@@ -11,35 +11,33 @@ import (
 	"strings"
 )
 
-// callsTerma reports whether a raw hook entry runs the binary: any "command" string in
-// it names `terma hook`, whatever guard surrounds it. Matching the command rather than
-// its exact text keeps a user's own entry in the same event untouched and recognizes
-// entries written before the guard, so an install can rewrite them in place.
+// callsTerma reports whether an entry contains a recognized Terma command, including
+// older unguarded commands. Mentions inside user scripts are not ownership evidence.
 func callsTerma(entry json.RawMessage) bool {
 	var v any
 	if json.Unmarshal(entry, &v) != nil {
 		return false
 	}
-	return anyCommandContains(v, Marker)
+	return anyOwnedCommand(v)
 }
 
-func anyCommandContains(v any, needle string) bool {
+func anyOwnedCommand(v any) bool {
 	switch t := v.(type) {
 	case map[string]any:
 		for key, value := range t {
 			if key == "command" {
-				if s, ok := value.(string); ok && strings.Contains(s, needle) {
+				if s, ok := value.(string); ok && ownedHookCommand(s) {
 					return true
 				}
 				continue
 			}
-			if anyCommandContains(value, needle) {
+			if anyOwnedCommand(value) {
 				return true
 			}
 		}
 	case []any:
 		for _, value := range t {
-			if anyCommandContains(value, needle) {
+			if anyOwnedCommand(value) {
 				return true
 			}
 		}
@@ -98,4 +96,82 @@ func marshalOrdered(m map[string]json.RawMessage) ([]byte, error) {
 	}
 	buf.WriteString("}")
 	return buf.Bytes(), nil
+}
+
+// ownedHookCommand recognizes generated commands and their older unguarded forms.
+// Merely mentioning "terma hook" in a user's script is not ownership evidence.
+func ownedHookCommand(command string) bool {
+	command = strings.TrimSpace(command)
+	var commands []string
+	for _, h := range ClaudeHooks {
+		commands = append(commands, h.Command)
+	}
+	for _, h := range CursorHooks {
+		commands = append(commands, h.Command)
+	}
+	for _, h := range CodexHooks {
+		commands = append(commands, h.Command)
+	}
+	for _, h := range AntigravityHooks {
+		commands = append(commands, h.Command)
+	}
+	for _, guarded := range commands {
+		// Codex's commands lead with a PATH assignment (CodexHookCommand); the forms an
+		// older terma wrote did not, and must still be recognized to be upgraded in place.
+		plain := guarded
+		if i := strings.Index(plain, "; command -v terma "); i >= 0 {
+			plain = plain[i+2:]
+		}
+		bare := strings.TrimSuffix(strings.TrimPrefix(plain, "command -v terma >/dev/null 2>&1 && "), " || true")
+		if command == guarded || command == plain || command == bare || command == bare+" || true" {
+			return true
+		}
+	}
+	return false
+}
+
+// withoutTerma removes only owned command leaves, retaining unrelated handlers in
+// the same group and their matcher/options. A nil result is an entirely owned entry.
+func withoutTerma(entry json.RawMessage) (json.RawMessage, bool, error) {
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(entry, &obj); err != nil {
+		return nil, false, err
+	}
+	var command string
+	if json.Unmarshal(obj["command"], &command) == nil && ownedHookCommand(command) {
+		return nil, true, nil
+	}
+	raw, ok := obj["hooks"]
+	if !ok {
+		return entry, false, nil
+	}
+	var handlers []json.RawMessage
+	if err := json.Unmarshal(raw, &handlers); err != nil {
+		return nil, false, err
+	}
+	var kept []json.RawMessage
+	changed := false
+	for _, handler := range handlers {
+		remaining, removed, err := withoutTerma(handler)
+		if err != nil {
+			return nil, false, err
+		}
+		changed = changed || removed
+		if remaining != nil {
+			kept = append(kept, remaining)
+		}
+	}
+	if !changed {
+		return entry, false, nil
+	}
+	if len(kept) == 0 {
+		return nil, true, nil
+	}
+	encoded, err := marshalJSON(kept, "", "")
+	if err != nil {
+		return nil, false, err
+	}
+	obj["hooks"] = encoded
+	out, err := marshalJSON(obj, "", "")
+	return out, true, err
 }

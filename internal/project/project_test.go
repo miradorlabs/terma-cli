@@ -16,7 +16,7 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	}
 	in := &File{
 		Project: Project{ID: "proj-1", Name: "Terma Frontend", OrganizationID: "org-1"},
-		Install: Install{HookManager: "husky", Hooks: []string{"prepare-commit-msg", "post-commit"}, Adapters: []string{"claude"}, Version: "1.0.0", InstalledAt: time.Date(2026, 9, 7, 0, 0, 0, 0, time.UTC)},
+		Install: Install{HookManager: "husky", Hooks: []string{"prepare-commit-msg", "post-commit"}, Version: "1.0.0", InstalledAt: time.Date(2026, 9, 7, 0, 0, 0, 0, time.UTC)},
 	}
 	if err := Save(root, in); err != nil {
 		t.Fatal(err)
@@ -37,7 +37,7 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.Project != in.Project || out.Install.HookManager != "husky" || len(out.Install.Hooks) != 2 || out.Install.Adapters[0] != "claude" {
+	if out.Project != in.Project || out.Install.HookManager != "husky" || len(out.Install.Hooks) != 2 {
 		t.Fatalf("round trip mismatch: %+v", out)
 	}
 	if err := Remove(root); err != nil {
@@ -71,6 +71,27 @@ func TestFindWalksUp(t *testing.T) {
 	}
 	if _, err := Find(t.TempDir()); err != ErrNotFound {
 		t.Fatalf("expected ErrNotFound, got %v", err)
+	}
+}
+
+// A binding written when install still recorded its adapters loads, and the next Save
+// leaves the list out: the repository's hooks files are the record now.
+func TestRetiredAdaptersFieldIsDroppedOnSave(t *testing.T) {
+	root := t.TempDir()
+	writeRaw(t, root, []byte(`{"project":{"id":"p"},"install":{"hook_manager":"git","adapters":["claude","cursor"]}}`))
+	out, err := Load(root)
+	if err != nil {
+		t.Fatalf("a binding carrying adapters must still load: %v", err)
+	}
+	if err := Save(root, out); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(Path(root))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "adapters") {
+		t.Fatalf("Save kept the retired adapters field:\n%s", data)
 	}
 }
 

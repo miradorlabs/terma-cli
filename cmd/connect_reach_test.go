@@ -5,6 +5,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/keystore"
 	"github.com/miradorlabs/terma-cli/internal/shim"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -154,6 +155,37 @@ func TestUninstallRemovesRepoPolicy(t *testing.T) {
 	}
 }
 
+// A repository whose team set Claude Code's exporter to a value terma never writes: with
+// no record of writing it, uninstall takes out only terma's hooks and leaves the setting.
+// (A value terma does write is removable from any clone: see renderedByTerma.)
+func TestUninstallKeepsAValueTermaNeverWrites(t *testing.T) {
+	repo := installRepo(t)
+	path := filepath.Join(repo, ".claude", "settings.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(`{"env":{"OTEL_LOGS_EXPORTER":"console"}}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--yes", "--no-doctor"); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runTerma(t, "uninstall", "--yes")
+	if err != nil {
+		t.Fatalf("uninstall: %v\n%s", err, out)
+	}
+	if settings := readClaudeSettings(t, path); settings["OTEL_LOGS_EXPORTER"] != "console" {
+		t.Fatalf("uninstall removed the team's own exporter setting: %+v", settings)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "terma hook") {
+		t.Fatalf("uninstall left terma's hooks behind:\n%s", data)
+	}
+}
+
 // userSandbox points Claude Code's config dir and Terma's at scratch directories and
 // returns the user-level settings path. It also moves out of whatever repository the
 // test binary was built in, so a status run here reads no real .terma/settings.json.
@@ -167,7 +199,8 @@ func userSandbox(t *testing.T) string {
 	return filepath.Join(claudeDir, "settings.json")
 }
 
-// fakeClaudeOnPath puts a `claude` executable on PATH.
+// fakeClaudeOnPath puts only a fake Claude and git on PATH, excluding other installed
+// agents so their real configuration cannot affect these Claude-specific checks.
 //
 // status and doctor only report a harness they can find, so without this these tests
 // pass or fail according to whether the machine running them happens to have Claude
@@ -183,7 +216,14 @@ func fakeClaudeOnPath(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "claude"), []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	git, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(git, filepath.Join(dir, "git")); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
 }
 
 const testServerKey = "ter_srv_0123456789abcdef"

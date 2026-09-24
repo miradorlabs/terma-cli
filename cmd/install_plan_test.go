@@ -85,26 +85,42 @@ func TestInstallDryRunUnauthenticatedNoProject(t *testing.T) {
 	}
 }
 
-// The committed binding names only adapters whose hooks file was written: a re-install
-// that writes no hooks keeps what was committed instead of adding this developer's agents.
-func TestInstallWithoutHooksRecordsOnlyWiredAdapters(t *testing.T) {
+// The committed binding says nothing about which agents are wired — that is the hooks
+// files' to say, and a list there churned with each colleague's own agents. A binding
+// from an install that still wrote one loses it on the next install, and --no-hooks
+// writes no agent's hooks file whatever --adapters asks for.
+func TestInstallRecordsNoAdapters(t *testing.T) {
 	repo := installRepo(t)
 	if out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude", "--yes", "--no-doctor"); err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}
-	// Requesting Cursor hooks with --no-hooks writes no .cursor/hooks.json.
-	if out, err := runTerma(t, "install", "--harness", "none", "--adapters", "cursor", "--no-hooks", "--yes", "--no-doctor"); err != nil {
-		t.Fatalf("re-install --no-hooks: %v\n%s", err, out)
-	}
-	bound, err := termaproject.Load(repo)
+	path := termaproject.Path(repo)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.Join(bound.Install.Adapters, ","); got != "claude" {
-		t.Fatalf("adapters = %q, want only the wired one (claude)", got)
+	if strings.Contains(string(data), "adapters") {
+		t.Fatalf("install recorded adapters in the committed binding:\n%s", data)
+	}
+	// A binding an older terma wrote, with the list.
+	legacy := strings.Replace(string(data), `"install": {`, `"install": {"adapters": ["claude"],`, 1)
+	if err := os.WriteFile(path, []byte(legacy), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := runTerma(t, "install", "--harness", "none", "--adapters", "cursor", "--no-hooks", "--yes", "--no-doctor"); err != nil {
+		t.Fatalf("re-install --no-hooks: %v\n%s", err, out)
+	}
+	if data, err = os.ReadFile(path); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "adapters") {
+		t.Fatalf("re-install kept the retired adapters field:\n%s", data)
 	}
 	if _, err := os.Stat(filepath.Join(repo, ".cursor", "hooks.json")); !os.IsNotExist(err) {
 		t.Fatalf("--no-hooks wrote cursor hooks (stat err = %v)", err)
+	}
+	if _, err := os.Stat(filepath.Join(repo, ".claude", "settings.json")); err != nil {
+		t.Fatalf("--no-hooks re-install removed the committed Claude hooks: %v", err)
 	}
 }
 

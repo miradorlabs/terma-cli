@@ -271,6 +271,20 @@ func renderClaude(e Exporter) map[string]string {
 	return env
 }
 
+// renderedByTerma reports whether value is one renderClaude writes for a repository
+// policy key: the only evidence a policy without a journal is Terma's to remove.
+func renderedByTerma(key, value string) bool {
+	switch key {
+	case otelTracesExporter, otelLogsExporter, otelMetricsExporter:
+		return value == exporterFor(true) || value == exporterFor(false)
+	case otelLogUserPrompts, otelLogAssistantResponse, otelLogToolDetails, otelLogToolContent:
+		return value == boolValue(true) || value == boolValue(false)
+	case claudeEnhancedTelemetry:
+		return value == "1"
+	}
+	return false
+}
+
 func exporterFor(on bool) string {
 	if on {
 		return exporterOTLP
@@ -691,9 +705,11 @@ func (c Claude) Connect(e Exporter, clearConflicts bool) error {
 //
 // With a journal it restores each key to the value it held beforehand and leaves alone
 // any key edited since — a config someone has adjusted is their decision, not stale
-// Terma state. Without one (an older connect, a hand-edited config) it falls back to
-// removing the managed keys, which is the best that can be done without a record and is
-// reported as such.
+// Terma state. Without one, a repository policy — which a colleague may have committed,
+// with the journal on their machine — has its managed keys removed where they hold a
+// value Terma writes (renderedByTerma), reported as such; any other value is the
+// developer's own and stays. User-level settings are left alone, since nothing on this
+// machine shows Terma wrote them.
 func (c Claude) Disconnect() (DisconnectResult, error) {
 	path, err := c.ConfigPath()
 	if err != nil {
@@ -760,10 +776,18 @@ func (c Claude) Disconnect() (DisconnectResult, error) {
 			result.Restored++
 		}
 	case c.root != "":
-		// A repository policy can be committed by a colleague whose journal is
-		// on their machine. User-level settings require a local ownership record.
-		result.Removed = s.remove(c.managedKeys())
-		result.Unjournaled = true
+		// A repository policy can be committed by a colleague whose journal is on their
+		// machine, so it can be removed from any clone — but only a value Terma writes.
+		// An exporter set to "console", say, is the developer's own and stays. User-level
+		// settings require a local ownership record.
+		var rendered []string
+		for _, key := range c.managedKeys() {
+			if value, ok := s.env[key]; ok && renderedByTerma(key, value) {
+				rendered = append(rendered, key)
+			}
+		}
+		result.Removed = s.remove(rendered)
+		result.Unjournaled = result.Removed > 0
 	}
 
 	sort.Strings(result.Skipped)

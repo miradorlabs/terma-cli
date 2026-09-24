@@ -15,7 +15,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/output"
-	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/prompt"
 )
 
@@ -483,22 +482,6 @@ func conflictKeys(conflicts []harness.Conflict) []string {
 	out := make([]string, 0, len(conflicts))
 	for _, c := range conflicts {
 		out = append(out, c.Key)
-	}
-	return out
-}
-
-// installedAdapters is the adapter list a repository recorded, falling back to the
-// harnesses that read a repository policy so an uninstall still cleans up after an
-// install whose binding has already been hand-edited away.
-func installedAdapters(bound *termaproject.File) []string {
-	if bound != nil && len(bound.Install.Adapters) > 0 {
-		return bound.Install.Adapters
-	}
-	var out []string
-	for _, h := range harness.All() {
-		if _, ok := h.(harness.Scoped); ok {
-			out = append(out, h.Name())
-		}
 	}
 	return out
 }

@@ -76,7 +76,7 @@ func PlanCursorHooks(root string, install bool) (Plan, error) {
 		own = append(own, eventHook{Event: h.Event, Entry: entry})
 	}
 	// Cursor refuses a file without its schema version, so terma sets one on a file it
-	// creates and removes a file left holding nothing else.
+	// creates. The version survives uninstall because it may predate Terma.
 	return mergeEventHooks(root, hooksFile{
 		Path:     CursorHooksPath,
 		Defaults: map[string]json.RawMessage{"version": json.RawMessage(cursorHooksVersion)},

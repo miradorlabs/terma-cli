@@ -6,32 +6,52 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/miradorlabs/terma-cli/internal/adapter"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
-	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 )
 
-// installAdapters unions the committed set, the configured agents, and directory-present
-// agents — so a selection grows the wired hooks and a narrower re-run never removes them.
+// installAdapters unions what the repository's hooks files wire, the configured agents,
+// and directory-present agents — so a selection grows the wired hooks and a narrower
+// re-run never removes them.
 func TestInstallAdaptersUnionGrowsNeverShrinks(t *testing.T) {
 	root := t.TempDir()
-	existing := &termaproject.File{Install: termaproject.Install{Adapters: []string{"claude"}}}
 
 	// Selecting more agents wires their committed hooks too (opencode has no hooks file).
-	got := installAdapters(root, []string{"claude", "cursor", "codex", "opencode"}, "", existing)
+	got := installAdapters(root, []string{"claude", "cursor", "codex", "opencode"}, "")
 	if strings.Join(got, ",") != "claude,cursor,codex" {
 		t.Fatalf("selecting agents should grow adapters, got %v", got)
 	}
-	// A narrower re-run preserves what was already committed (no churn-down).
-	wide := &termaproject.File{Install: termaproject.Install{Adapters: []string{"claude", "cursor", "codex"}}}
-	if got := installAdapters(root, []string{"claude"}, "", wide); strings.Join(got, ",") != "claude,cursor,codex" {
+	// A narrower re-run keeps what a colleague's install committed (no churn-down).
+	wireAdapters(t, root, "cursor", "codex")
+	if got := installAdapters(root, []string{"claude"}, ""); strings.Join(got, ",") != "claude,cursor,codex" {
 		t.Fatalf("a narrower re-run must not drop committed adapters, got %v", got)
 	}
 	// --adapters overrides outright.
-	if got := installAdapters(root, []string{"claude", "cursor"}, "codex", existing); strings.Join(got, ",") != "codex" {
+	if got := installAdapters(root, []string{"claude", "cursor"}, "codex"); strings.Join(got, ",") != "codex" {
 		t.Fatalf("--adapters should override, got %v", got)
+	}
+}
+
+// wireAdapters writes the named adapters' hooks files into root, as a colleague's
+// install would have committed them.
+func wireAdapters(t *testing.T, root string, names ...string) {
+	t.Helper()
+	for _, name := range names {
+		a, ok := adapter.Lookup(name)
+		if !ok {
+			t.Fatalf("no adapter %q", name)
+		}
+		plan, err := a.Plan(root, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := hookmgr.Apply(root, plan); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 
@@ -92,18 +112,21 @@ func TestInstallWiresCursorHooksWhenAsked(t *testing.T) {
 			t.Errorf("%s = %v, want one entry running %q", event, entries, command)
 		}
 	}
-	binding, _ := os.ReadFile(filepath.Join(repo, ".terma", "settings.json"))
-	if !strings.Contains(string(binding), `"claude"`) || !strings.Contains(string(binding), `"cursor"`) {
-		t.Errorf(".terma/settings.json does not record the cursor adapter:\n%s", binding)
+	if got := strings.Join(adapter.WiredNames(repo), ","); got != "claude,cursor" {
+		t.Errorf("wired adapters = %q, want claude,cursor", got)
 	}
 
-	// Symmetric: uninstall removes the file terma created.
+	// Uninstall removes commands, retaining the schema version whose ownership is ambiguous.
 	out, err = runTerma(t, "uninstall", "--yes")
 	if err != nil {
 		t.Fatalf("uninstall: %v\n%s", err, out)
 	}
-	if _, err := os.Stat(filepath.Join(repo, ".cursor", "hooks.json")); err == nil {
-		t.Error("hooks.json survived uninstall")
+	remaining, err := os.ReadFile(filepath.Join(repo, ".cursor", "hooks.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(remaining), "terma hook") || !strings.Contains(string(remaining), "version") {
+		t.Fatalf("uninstall: %s", remaining)
 	}
 }
 
@@ -130,9 +153,8 @@ func TestInstallWiresCursorByDefaultOnlyWhereCursorIsUsed(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(repo, ".cursor", "hooks.json")); err != nil {
 		t.Fatal("a repository with a .cursor directory should get Cursor hooks by default")
 	}
-	binding, _ := os.ReadFile(filepath.Join(repo, ".terma", "settings.json"))
-	if !strings.Contains(string(binding), "cursor") {
-		t.Errorf(".terma/settings.json does not record the cursor adapter:\n%s", binding)
+	if !slices.Contains(adapter.WiredNames(repo), "cursor") {
+		t.Errorf("cursor is not wired: %v", adapter.WiredNames(repo))
 	}
 }
 
@@ -175,7 +197,22 @@ func TestInstallReRunDoesNotChurnBinding(t *testing.T) {
 	if !bytes.Equal(first, second) {
 		t.Fatalf("re-install churned the committed binding:\n--- first ---\n%s\n--- second ---\n%s", first, second)
 	}
-	if !strings.Contains(string(second), `"claude"`) {
-		t.Fatalf("committed adapter was lost on re-install:\n%s", second)
+	if !slices.Contains(adapter.WiredNames(repo), "claude") {
+		t.Fatalf("committed adapter was lost on re-install: %v", adapter.WiredNames(repo))
+	}
+	// A developer who also uses Cursor wires its hooks — a file of its own — and still
+	// leaves the binding as it was: their agents are not the team's record.
+	if out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude,cursor", "--yes"); err != nil {
+		t.Fatalf("re-install with cursor: %v\n%s", err, out)
+	}
+	third, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(first, third) {
+		t.Fatalf("another developer's agents churned the committed binding:\n--- first ---\n%s\n--- third ---\n%s", first, third)
+	}
+	if got := strings.Join(adapter.WiredNames(repo), ","); got != "claude,cursor" {
+		t.Fatalf("wired adapters = %q, want claude,cursor", got)
 	}
 }

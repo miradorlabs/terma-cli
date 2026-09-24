@@ -53,11 +53,12 @@ type repoRefresh struct {
 
 // planRepoRefresh plans the refresh of the repository around the working directory,
 // from its binding: the commit hooks through the manager it records, and the agent hook
-// files it records as wired. It returns nil outside a repository terma installed. Only
-// files that exist are refreshed; one that is gone was removed by someone, and bringing
-// it back is `terma install`'s decision.
+// files its hooks files already wire (adapter.WiredNames). It returns nil outside a
+// workspace terma installed; a workspace outside Git has agent hooks and no commit hooks.
+// Only files that exist are refreshed; one that is gone was removed by someone, and
+// bringing it back is `terma install`'s decision.
 func planRepoRefresh(ctx context.Context) (*repoRefresh, error) {
-	root, gitDir, err := repoHere(ctx, "")
+	root, gitDir, err := workspaceHere(ctx)
 	if err != nil {
 		return nil, nil
 	}
@@ -71,7 +72,7 @@ func planRepoRefresh(ctx context.Context) (*repoRefresh, error) {
 		return nil, err
 	}
 	r := &repoRefresh{root: root}
-	if recorded := existing.Install.HookManager; recorded != "" {
+	if recorded := existing.Install.HookManager; recorded != "" && gitDir != "" {
 		det := hookmgr.Detect(root)
 		if string(det.Manager) != recorded {
 			r.notes = append(r.notes, fmt.Sprintf("The commit hooks were installed through %s, but the repository now uses %s. Run `terma install` to move them.", recorded, det.Manager))
@@ -83,13 +84,7 @@ func planRepoRefresh(ctx context.Context) (*repoRefresh, error) {
 			r.plan.det, r.plan.hooks = det, existingFilesOnly(hooks)
 		}
 	}
-	var adapters []string
-	for _, name := range existing.Install.Adapters {
-		if _, ok := adapter.Lookup(name); ok {
-			adapters = append(adapters, name)
-		}
-	}
-	plans, err := planAdapters(root, adapters, true)
+	plans, err := planAdapters(root, adapter.WiredNames(root), true)
 	if err != nil {
 		return nil, err
 	}
