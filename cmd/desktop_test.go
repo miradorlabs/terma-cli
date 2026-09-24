@@ -24,9 +24,13 @@ func TestDesktopDisconnectMigratesLegacyRelayOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := (harness.Codex{}).Connect(harness.Exporter{
-		Endpoint: legacyDesktopEndpoint, Signals: []harness.Signal{harness.SignalLogs},
+		Endpoint: legacyDesktopBaseURL, Signals: []harness.Signal{harness.SignalLogs},
 	}, false); err != nil {
 		t.Fatal(err)
+	}
+	before, err := (harness.Codex{}).Status()
+	if err != nil || before.Endpoint != legacyDesktopBaseURL {
+		t.Fatalf("unexpected legacy exporter status: %+v, %v", before, err)
 	}
 	command, _, err := NewRootCommand().Find([]string{"desktop", "disconnect"})
 	if err != nil {

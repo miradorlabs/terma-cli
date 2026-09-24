@@ -21,7 +21,7 @@ import (
 
 const (
 	desktopServiceLabel   = "ai.terma.codex-relay"
-	legacyDesktopEndpoint = "http://127.0.0.1:43199/v1/logs"
+	legacyDesktopBaseURL  = "http://127.0.0.1:43199"
 )
 
 func newDesktopCommand() *cobra.Command {
@@ -39,7 +39,7 @@ func removeLegacyDesktopRelay(cmd *cobra.Command) (bool, error) {
 		return false, err
 	}
 	changed := false
-	if status.Endpoint == legacyDesktopEndpoint {
+	if status.Endpoint == legacyDesktopBaseURL {
 		if _, err := (harness.Codex{}).Disconnect(); err != nil {
 			return false, err
 		}

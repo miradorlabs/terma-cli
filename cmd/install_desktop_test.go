@@ -79,7 +79,7 @@ func TestDesktopInstallRemovesPreviousRelay(t *testing.T) {
 	}
 	home, _ := desktopInstallSandbox(t)
 	if err := (harness.Codex{}).Connect(harness.Exporter{
-		Endpoint: legacyDesktopEndpoint, Signals: []harness.Signal{harness.SignalLogs},
+		Endpoint: legacyDesktopBaseURL, Signals: []harness.Signal{harness.SignalLogs},
 	}, false); err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +96,7 @@ func TestDesktopInstallRemovesPreviousRelay(t *testing.T) {
 		t.Fatalf("migrate install: %v\n%s", err, out)
 	}
 	status, err := (harness.Codex{}).Status()
-	if err != nil || status.Endpoint == legacyDesktopEndpoint {
+	if err != nil || status.Connected {
 		t.Fatalf("old exporter still configured: %+v, %v", status, err)
 	}
 	if _, err := os.Stat(service); !os.IsNotExist(err) {
