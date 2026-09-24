@@ -38,6 +38,9 @@ type CodexHookTrust struct {
 	// enough — Codex trusts each entry by itself, so an entry a newer terma added to an
 	// already-trusted file has no record at all and is skipped without a word.
 	TrustedKeys map[string]bool
+	// TrustedHashes are Codex's recorded hashes by entry key. A recorded hash
+	// does not establish trust when the hook definition has since changed.
+	TrustedHashes map[string]string
 }
 
 // Reviewed reports whether Codex has been shown this file's hooks at all. A file with
@@ -86,8 +89,10 @@ func (c Codex) CodexHookTrustFor(hooksPath string) (CodexHookTrust, error) {
 			trust.Trusted++
 			if trust.TrustedKeys == nil {
 				trust.TrustedKeys = map[string]bool{}
+				trust.TrustedHashes = map[string]string{}
 			}
 			trust.TrustedKeys[name] = true
+			trust.TrustedHashes[name] = hash
 		}
 		if enabled, ok := entry[codexHookEnabledKey].(bool); ok && !enabled {
 			trust.Disabled++

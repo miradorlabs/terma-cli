@@ -1,6 +1,8 @@
 package hookmgr
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -40,19 +42,26 @@ var CodexHooks = []struct {
 	Async   bool
 	Timeout int
 }{
-	{"SessionStart", HookCommand("codex-session-start"), false, 10},
-	{"UserPromptSubmit", HookCommand("codex-user-prompt-submit"), true, 10},
-	{"PostToolUse", HookCommand("codex-post-tool-use"), true, 10},
+	{"SessionStart", CodexHookCommand("codex-session-start"), false, 10},
+	{"UserPromptSubmit", CodexHookCommand("codex-user-prompt-submit"), true, 10},
+	{"PostToolUse", CodexHookCommand("codex-post-tool-use"), true, 10},
 	// Finish the bounded local snapshot before codex exec can shut down. An
 	// async Stop may be cancelled at exit; network delivery stays detached.
-	{"Stop", HookCommand("codex-stop"), false, 3},
-	{"SessionEnd", HookCommand("codex-session-end"), false, 3},
+	{"Stop", CodexHookCommand("codex-stop"), false, 3},
+	{"SessionEnd", CodexHookCommand("codex-session-end"), false, 3},
 	// Subagents run inside the thread and name themselves (agent_id / agent_type).
 	// SubagentStart is async like PostToolUse: nothing terma returns changes what Codex
 	// does. SubagentStop stays synchronous and cheap so its event is spooled before the
 	// parent's Stop.
-	{"SubagentStart", HookCommand("codex-subagent-start"), true, 10},
-	{"SubagentStop", HookCommand("codex-subagent-stop"), false, 3},
+	{"SubagentStart", CodexHookCommand("codex-subagent-start"), true, 10},
+	{"SubagentStop", CodexHookCommand("codex-subagent-stop"), false, 3},
+}
+
+// CodexHookCommand also finds user-installed binaries when Codex Desktop was
+// launched with macOS's small GUI PATH. Its hook entry is committed, so the
+// directories must be portable across developers and their install methods.
+func CodexHookCommand(event string) string {
+	return `PATH="${PATH:-/usr/bin:/bin}:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin"; ` + HookCommand(event)
 }
 
 // HasCodex reports whether the repository already carries Codex configuration — a
@@ -116,6 +125,7 @@ type CodexEntry struct {
 	Event   string
 	Group   int
 	Handler int
+	Hash    string
 }
 
 // Key is the entry's name in Codex's trust records, after the hooks file's path:
@@ -147,7 +157,8 @@ func CodexTermaEntries(root string) ([]CodexEntry, error) {
 	}
 	var doc struct {
 		Hooks map[string][]struct {
-			Hooks []json.RawMessage `json:"hooks"`
+			Matcher *string           `json:"matcher"`
+			Hooks   []json.RawMessage `json:"hooks"`
 		} `json:"hooks"`
 	}
 	if err := json.Unmarshal(before, &doc); err != nil {
@@ -158,10 +169,47 @@ func CodexTermaEntries(root string) ([]CodexEntry, error) {
 		for g, group := range doc.Hooks[h.Event] {
 			for i, handler := range group.Hooks {
 				if callsTerma(handler) {
-					out = append(out, CodexEntry{Event: h.Event, Group: g, Handler: i})
+					entry := CodexEntry{Event: h.Event, Group: g, Handler: i}
+					entry.Hash, err = codexEntryHash(entry, group.Matcher, handler)
+					if err != nil {
+						return nil, err
+					}
+					out = append(out, entry)
 				}
 			}
 		}
 	}
 	return out, nil
+}
+
+// codexEntryHash matches Codex's normalized command-hook identity: the event,
+// matcher group, and one handler, serialized as canonical JSON and SHA-256.
+// It is read-only; only Codex can grant trust for this hash.
+func codexEntryHash(entry CodexEntry, matcher *string, raw json.RawMessage) (string, error) {
+	var handler map[string]any
+	if err := json.Unmarshal(raw, &handler); err != nil {
+		return "", err
+	}
+	normalized := map[string]any{
+		"type":    handler["type"],
+		"command": handler["command"],
+		"async":   false,
+	}
+	for _, key := range []string{"async", "timeout", "commandWindows", "statusMessage", "additionalContextLimit"} {
+		if v, ok := handler[key]; ok {
+			normalized[key] = v
+		}
+	}
+	identity := map[string]any{"event_name": strings.SplitN(entry.Key(), ":", 2)[0], "hooks": []any{normalized}}
+	if matcher != nil {
+		identity["matcher"] = *matcher
+	}
+	var buf bytes.Buffer
+	encoder := json.NewEncoder(&buf)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(identity); err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(bytes.TrimSuffix(buf.Bytes(), []byte{'\n'}))
+	return fmt.Sprintf("sha256:%x", sum), nil
 }

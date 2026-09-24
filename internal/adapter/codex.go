@@ -79,14 +79,14 @@ func (c codex) Trust(root string) (TrustState, error) {
 	}
 	var skipped []string
 	for _, e := range entries {
-		if !trust.TrustedKeys[e.Key()] {
+		if trust.TrustedHashes[e.Key()] != e.Hash {
 			skipped = append(skipped, e.Event)
 		}
 	}
 	if len(skipped) > 0 {
 		return TrustState{
-			Detail: fmt.Sprintf(", but Codex has not trusted %s yet, so it skips %s", strings.Join(skipped, ", "), pronoun(len(skipped))),
-			Fix:    "open Codex in this repository and run /hooks to trust the new entries",
+			Detail: fmt.Sprintf(", but Codex needs to review %s, so it skips %s", strings.Join(skipped, ", "), pronoun(len(skipped))),
+			Fix:    "open Codex in this repository and run /hooks to review the new or changed entries",
 		}, nil
 	}
 	return TrustState{Trusted: true, Detail: " and trusted"}, nil

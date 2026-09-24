@@ -85,6 +85,43 @@ func TestDoctorAcceptsTrustedCodexHooks(t *testing.T) {
 	}
 }
 
+func TestDoctorRejectsChangedCodexHookAfterTrust(t *testing.T) {
+	repo := installRepo(t)
+	codexHome := t.TempDir()
+	t.Setenv("CODEX_HOME", codexHome)
+	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude,codex", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	trustCodexEntries(t, repo, codexHome, func(hookmgr.CodexEntry) bool { return true })
+	path := filepath.Join(codexHome, "config.toml")
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries, err := hookmgr.CodexTermaEntries(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var oldHash string
+	for _, entry := range entries {
+		if entry.Event == "PostToolUse" {
+			oldHash = entry.Hash
+			break
+		}
+	}
+	after := strings.Replace(string(before), oldHash, "sha256:stale", 1)
+	if after == string(before) {
+		t.Fatal("PostToolUse trust hash was not found")
+	}
+	if err := os.WriteFile(path, []byte(after), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out, _ := runTerma(t, "doctor", "--skip-commit")
+	if !strings.Contains(out, "PostToolUse") || !strings.Contains(out, "review the new or changed entries") {
+		t.Fatalf("doctor accepted a changed, untrusted hook:\n%s", out)
+	}
+}
+
 // A repository installed without the Codex adapter is not missing anything, and must
 // not be nagged about a trust prompt that does not apply to it.
 func TestDoctorIgnoresCodexTrustWithoutTheAdapter(t *testing.T) {
@@ -111,7 +148,7 @@ func trustCodexEntries(t *testing.T, repo, codexHome string, keep func(hookmgr.C
 	config := ""
 	for _, e := range entries {
 		if keep(e) {
-			config += "[hooks.state.\"" + hooksPath + ":" + e.Key() + "\"]\n" + "trusted_hash = \"sha256:abc\"\nenabled = true\n\n"
+			config += "[hooks.state.\"" + hooksPath + ":" + e.Key() + "\"]\n" + "trusted_hash = \"" + e.Hash + "\"\nenabled = true\n\n"
 		}
 	}
 	if err := os.WriteFile(filepath.Join(codexHome, "config.toml"), []byte(config), 0o600); err != nil {
@@ -135,7 +172,7 @@ func TestDoctorNamesTheCodexEntriesANewerTermaAdded(t *testing.T) {
 	if strings.Contains(out, "Codex hooks present and trusted") {
 		t.Fatalf("doctor passed a file with untrusted entries:\n%s", out)
 	}
-	for _, want := range []string{"SubagentStart", "SubagentStop", "run /hooks to trust the new entries"} {
+	for _, want := range []string{"SubagentStart", "SubagentStop", "run /hooks to review the new or changed entries"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("doctor does not mention %q:\n%s", want, out)
 		}
