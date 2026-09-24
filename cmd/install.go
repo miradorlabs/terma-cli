@@ -220,7 +220,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 			}
 		}
 		if slices.Contains(agents, codexDesktopAgent) {
-			fmt.Fprintln(out, "\nCodex Desktop: write repository hooks and a local project route; review the hooks in Codex Desktop's Hooks settings before they can run. No Codex CLI is needed.")
+			fmt.Fprintln(out, "\nCodex Desktop: a real install writes repository hooks and a local project route. Then open Settings → Hooks → Review in Codex Desktop to approve the Terma entries; Codex CLI is not required.")
 		}
 		fmt.Fprintln(out, "\nDry run: nothing written.")
 		return nil
@@ -349,7 +349,11 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 			fmt.Fprintln(out, "Removed the previous Desktop relay; restart Codex Desktop to unload its old exporter.")
 		}
 		fmt.Fprintln(out, "Codex Desktop captures this repository through trusted hooks and Terma's existing spool.")
-		fmt.Fprintln(out, "Open this repository in Codex Desktop and review Terma's hooks in Hooks settings before they can run. Codex CLI is not required.")
+		fmt.Fprintln(out, "To approve Codex Desktop capture:")
+		fmt.Fprintln(out, "  1. Open this repository in Codex Desktop and trust the project if prompted.")
+		fmt.Fprintln(out, "  2. Open Settings → Hooks, then select Review for the entries from .codex/hooks.json.")
+		fmt.Fprintln(out, "  3. Inspect and approve each Terma hook command for full capture. Codex CLI is not required.")
+		fmt.Fprintln(out, "  4. Run `terma desktop status` to confirm 'Codex hooks: ready', then start a new Local task in this repository.")
 		if global, err := (harness.Codex{}).Status(); err == nil && global.Connected {
 			fmt.Fprintln(out, "Warning: Codex also has a user-level exporter; it may send Desktop activity from other repositories.")
 		}

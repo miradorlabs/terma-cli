@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -103,6 +104,9 @@ func runSetup(cmd *cobra.Command, f setupFlags) error {
 		fmt.Fprintln(out, "\nNo agents recorded. `terma install` will ask you to pick some in each repository.")
 	} else {
 		fmt.Fprintf(out, "\nAgents recorded: %s.\n", joinNames(adapterDisplayNames(names)))
+	}
+	if slices.Contains(names, codexDesktopAgent) {
+		fmt.Fprintln(out, "Codex Desktop: after `terma install` in a repository, open Settings → Hooks → Review in Codex Desktop and approve Terma's hooks.")
 	}
 	fmt.Fprintf(out, "\n%s Now run `terma install` in each codebase you want to instrument with terma.\n",
 		style.For(out).Bold("Done!"))

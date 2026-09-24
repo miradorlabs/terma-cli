@@ -29,6 +29,9 @@ func TestSetupRecordsCodexDesktopSeparatelyFromCLI(t *testing.T) {
 	if !strings.Contains(out, "Codex Desktop") || strings.Contains(out, "Agents recorded: Codex.") {
 		t.Fatalf("setup did not name the separate desktop choice:\n%s", out)
 	}
+	if !strings.Contains(out, "after `terma install` in a repository, open Settings → Hooks → Review") {
+		t.Fatalf("setup did not explain Desktop hook approval:\n%s", out)
+	}
 }
 
 func TestHarnessSelectionComingSoon(t *testing.T) {

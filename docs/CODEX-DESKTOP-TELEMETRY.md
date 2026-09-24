@@ -12,14 +12,20 @@ LaunchAgent, or global Codex exporter.
 2. Run `terma install` in each repository you want to report. It binds the
    project, stores a project key and local content policy, and writes the Codex
    hooks for you to commit. Setup alone writes no repository files.
-3. Open the repository in Codex Desktop. Review and trust Terma's hooks in the
-   app's **Hooks** settings or its in-app trust review when prompted. Codex
-   requires this for each new or changed hook definition; `terma install`
-   cannot approve hooks on a user's behalf. You do not need Codex CLI. If you
-   also use the CLI, `/hooks` offers the same review there.
-4. Start a new task in that repository. Run `terma desktop status` to inspect
-   the route, key, content choices, and hook trust. Run `terma doctor` to verify
-   delivery.
+3. Approve the hooks in Codex Desktop:
+   1. Open this repository in Codex Desktop and trust the project if prompted.
+   2. Open **Settings → Hooks** and select **Review** for the entries from this
+      repository's `.codex/hooks.json`. If hooks are disabled, enable them there.
+   3. Inspect the `terma hook …` commands and approve each Terma entry
+      for full capture. Codex skips any entry you leave untrusted.
+4. Run `terma desktop status` in the repository. **Codex hooks: ready** confirms
+   that the current definitions are trusted. Then start a new **Local** task in
+   that repository and send a test message. Run `terma doctor` to verify
+   delivery. Codex CLI is not required; its `/hooks` command is an alternative
+   review path for CLI users.
+
+Codex requires review again whenever a hook definition changes. `terma install`
+does not approve hooks on the user's behalf.
 
 An install that finds Terma's earlier Desktop relay exporter removes that
 exporter and its LaunchAgent. Restart Codex Desktop once so its backend unloads

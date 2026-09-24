@@ -68,7 +68,7 @@ func TestInstallUsesSavedCodexDesktopChoiceWithoutShellShim(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(home, ".codex", "config.toml")); !os.IsNotExist(err) {
 		t.Fatalf("desktop-only install configured a global Codex exporter: %v", err)
 	}
-	if !strings.Contains(out, "Hooks settings before they can run") || !strings.Contains(out, "Codex CLI is not required") {
+	if !strings.Contains(out, "Settings → Hooks, then select Review") || !strings.Contains(out, "approve each Terma hook command") || !strings.Contains(out, "Codex CLI is not required") {
 		t.Fatalf("install did not explain Desktop-only hook approval:\n%s", out)
 	}
 }
@@ -137,7 +137,7 @@ func TestDesktopInstallDryRunAndMissingLogsLeaveSettingsUntouched(t *testing.T) 
 	} {
 		out, err := runTerma(t, args...)
 		if slices.Contains(args, "--dry-run") {
-			if err != nil || !strings.Contains(out, "review the hooks in Codex Desktop's Hooks settings") {
+			if err != nil || !strings.Contains(out, "Settings → Hooks → Review in Codex Desktop") {
 				t.Fatalf("desktop dry run: %v\n%s", err, out)
 			}
 		} else if err == nil || !strings.Contains(err.Error(), "logs signal") {
