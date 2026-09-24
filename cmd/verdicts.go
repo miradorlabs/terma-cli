@@ -3,7 +3,9 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"slices"
 
+	"github.com/miradorlabs/terma-cli/internal/desktoprelay"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
@@ -258,4 +260,67 @@ func judgeHarnesses(ctx context.Context, otlpURL, projectID, root string) []harn
 		out = append(out, v)
 	}
 	return out
+}
+
+// judgeSelectedHarnesses keeps the CLI and desktop Codex surfaces distinct for a
+// developer who selected desktop during setup. A desktop-only choice must never
+// be reported as a missing CLI PATH shim.
+func judgeSelectedHarnesses(ctx context.Context, otlpURL, projectID, root string, selected []string) []harnessVerdict {
+	selected = selectedForRepo(projectID, selected)
+	verdicts := judgeHarnesses(ctx, otlpURL, projectID, root)
+	if !slices.Contains(selected, codexDesktopAgent) {
+		return verdicts
+	}
+	verdicts = slices.DeleteFunc(verdicts, func(v harnessVerdict) bool { return !slices.Contains(selected, v.name) })
+	return append(verdicts, judgeDesktop(projectID))
+}
+
+func selectedForRepo(projectID string, saved []string) []string {
+	selected := slices.Clone(saved)
+	if projectID == "" {
+		return selected
+	}
+	rec, ok, err := shim.LoadRecord(projectID)
+	if err != nil || !ok {
+		return selected
+	}
+	for _, choice := range []struct {
+		name    string
+		enabled *bool
+	}{{shim.AgentCodex, rec.CLI}, {codexDesktopAgent, rec.Desktop}} {
+		if choice.enabled == nil {
+			continue
+		}
+		if *choice.enabled && !slices.Contains(selected, choice.name) {
+			selected = append(selected, choice.name)
+		} else if !*choice.enabled {
+			selected = slices.DeleteFunc(selected, func(name string) bool { return name == choice.name })
+		}
+	}
+	return selected
+}
+
+func judgeDesktop(projectID string) harnessVerdict {
+	v := harnessVerdict{name: codexDesktopAgent, displayName: "Codex Desktop"}
+	status, err := (harness.Codex{}).Status()
+	route, _, routeErr := shim.LoadRecord(projectID)
+	switch {
+	case err != nil:
+		v.emissionProblem, v.emissionFix = "could not read Codex desktop settings: "+err.Error(), "repair Codex config.toml, then run `terma install`"
+	case status.Endpoint != desktoprelay.Endpoint || !slices.Contains(status.Signals, harness.SignalLogs):
+		v.emissionProblem, v.emissionFix = "local logs exporter is not configured", "terma install"
+	case routeErr != nil:
+		v.emissionProblem, v.emissionFix = "could not read this repository's Codex desktop route: "+routeErr.Error(), "terma install"
+	case !desktoprelay.ReadyForProject(projectID):
+		v.emissionProblem, v.emissionFix = "this repository has no Codex desktop logs route or key", "terma install --signals logs"
+	case route.IncludePrompts && !status.IncludePrompts:
+		v.emissionProblem, v.emissionFix = "Codex redacts prompts before they reach the local receiver", "terma desktop connect"
+	case route.IncludeToolContent && !status.IncludeToolContent:
+		v.emissionProblem, v.emissionFix = "Codex suppresses tool output before it reaches the local receiver", "terma desktop connect"
+	case !desktopReceiverRunning():
+		v.emissionProblem, v.emissionFix = "local receiver is not running", "terma desktop connect"
+	default:
+		v.routed, v.live, v.route = true, true, routeLive
+	}
+	return v
 }

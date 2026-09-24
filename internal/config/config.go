@@ -48,8 +48,8 @@ type Profile struct {
 	ProjectName    string                `json:"project_name,omitempty"`
 	RecentProjects map[string]ProjectRef `json:"recent_projects,omitempty"`
 	// Harnesses is the machine-level list of coding agents this developer works with,
-	// recorded by `terma setup` (the adapter names: claude, codex, cursor, opencode,
-	// antigravity). `terma install` connects and wires these for a repository without
+	// recorded by `terma setup` (adapter names plus codex-desktop as a separate
+	// launch surface). `terma install` connects and wires these for a repository without
 	// asking again. It is a preference, not a connection — no endpoint or key.
 	Harnesses []string `json:"harnesses,omitempty"`
 }

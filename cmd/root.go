@@ -48,8 +48,8 @@ func NewRootCommand() *cobra.Command {
 		Long: `terma connects your coding agents to Terma and stamps the commits they produce.
 
   terma setup     optional, once per developer — signs you in and records which
-                  coding agents you use (Claude Code, Codex, Cursor, OpenCode,
-                  Antigravity). No project, no telemetry, no files.
+                  coding agents you use (including Codex CLI and Codex Desktop
+                  as separate choices). No project or telemetry connection.
   terma install   run in each repository — signs you in if setup has not, binds the
                   repo to a Terma project, points your agents at that project per
                   repository, and (offer to) wire the commit and agent hooks. A
@@ -113,6 +113,7 @@ spend will be attributed.`,
 		newHookCommand(),
 		// Internal: the target of the per-repo routing PATH shim / wrapper.
 		newShimCommand(),
+		newDesktopCommand(),
 	)
 	return root
 }

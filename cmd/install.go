@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -35,6 +36,9 @@ type installFlags struct {
 	noHooks      bool
 	noDoctor     bool
 	noStatusLine bool
+	// desktopManual configures the exporter but leaves the receiver under the
+	// developer's own process manager instead of installing a LaunchAgent.
+	desktopManual bool
 	// noPath keeps install out of the shell startup file: it prints the PATH line for the
 	// developer to place instead of offering to write it.
 	noPath             bool
@@ -64,11 +68,12 @@ not run ` + "`terma setup`" + `, asks which agents you use if you have not chose
      picker) and records it in .terma/settings.json — committed, no secrets.
   2. Points each of your agents at that project, per repository:
        - Claude Code exports to it through per-repo settings (claude --settings);
-       - Codex exports to it through runtime -c overrides;
+       - Codex CLI exports to it through runtime -c overrides;
      both delivered by PATH shims installed automatically, which install offers to put
      on PATH in your shell's startup file (--no-path prints the line instead;
      --activation wrapper prints shell functions instead). Keys stay in your home directory, namespaced by project —
      never in the repository.
+     Codex Desktop uses the same repository hooks and a user-level loopback receiver.
   3. Enables repository telemetry, including for machines configured to export only
      from installed repositories. Existing repository policies are preserved unless
      --signals or a content flag changes them.
@@ -90,6 +95,7 @@ The keys and per-project configuration live in your home directory; the committe
 	cmd.Flags().BoolVar(&f.noDoctor, "no-doctor", false, "do not run `terma doctor` to verify the chain after installing")
 	cmd.Flags().BoolVar(&f.noPath, "no-path", false, "do not offer to add the shim directory to PATH in your shell's startup file; print the line instead")
 	cmd.Flags().BoolVar(&f.noStatusLine, "no-statusline", false, "do not wrap Claude Code's status line (which captures the plan's rate-limit windows)")
+	cmd.Flags().BoolVar(&f.desktopManual, "desktop-manual", false, "configure Codex desktop but run `terma desktop serve` yourself")
 	cmd.Flags().StringVar(&f.identity, "identity", "", "identity stamped on Codex/OpenCode sessions (default: git user.email; \"none\" to omit)")
 	cmd.Flags().StringVar(&f.signals, "signals", "", "comma-separated signals to export: traces, logs, metrics (default all)")
 	cmd.Flags().BoolVar(&f.excludePrompts, "exclude-prompts", false, "do not export prompt text or model responses")
@@ -110,7 +116,6 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	if err != nil {
 		return err
 	}
-
 	cfg, err := loadConfig()
 	if err != nil {
 		return err
@@ -126,6 +131,18 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	}
 	if err != nil {
 		return err
+	}
+	if slices.Contains(agents, codexDesktopAgent) {
+		if err := desktopPreflight(); err != nil {
+			return err
+		}
+		signals, err := harness.ParseSignals(f.signals)
+		if err != nil {
+			return err
+		}
+		if !slices.Contains(signals, harness.SignalLogs) {
+			return errors.New("codex desktop needs the logs signal to route sessions by repository")
+		}
 	}
 
 	// 2. Auth, lazily. install signs in only when a step needs a credential — a
@@ -175,11 +192,22 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	// colleague re-running install must not rewrite the committed hooks to match their
 	// own agent set.
 	adapters := installAdapters(root, agents, f.adapters, existing)
+	if slices.Contains(agents, codexDesktopAgent) && !slices.Contains(adapters, shim.AgentCodex) {
+		return errors.New("codex desktop needs the Codex repository hooks; include codex in --adapters")
+	}
 	det := hookmgr.Detect(root)
 	var plan hookPlan
 	if !f.noHooks {
 		if plan, err = planHooks(root, det, adapters); err != nil {
 			return err
+		}
+	} else if slices.Contains(agents, codexDesktopAgent) {
+		codexPlan, err := hookmgr.PlanCodexHooks(root, true)
+		if err != nil {
+			return err
+		}
+		if !codexPlan.Empty() {
+			return errors.New("codex desktop needs the SessionStart repository hook; run `terma install` without --no-hooks")
 		}
 	}
 
@@ -198,6 +226,9 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 				}
 				fmt.Fprintf(out, "\nRepository telemetry: %s (preserve existing policy unless export flags are supplied).\n", path)
 			}
+		}
+		if slices.Contains(agents, codexDesktopAgent) {
+			fmt.Fprintln(out, "\nCodex Desktop: configure a user-level logs exporter and local per-repository receiver; restart the app afterward.")
 		}
 		fmt.Fprintln(out, "\nDry run: nothing written.")
 		return nil
@@ -243,6 +274,15 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 		}
 	} else {
 		adapters = committedAdapters(existing) // --no-hooks: record only what is wired
+	}
+	if slices.Contains(agents, codexDesktopAgent) {
+		codexPlan, err := hookmgr.PlanCodexHooks(root, true)
+		if err != nil {
+			return err
+		}
+		if !codexPlan.Empty() {
+			return errors.New("codex desktop needs the SessionStart repository hook; run `terma install` without --no-hooks and accept the Codex hook plan")
+		}
 	}
 
 	// The key this machine delivers the repository's hook events with. Pointing a
@@ -308,6 +348,15 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 			fmt.Fprintf(cmd.ErrOrStderr(), "Warning: %v\n", err)
 		}
 	}
+	if slices.Contains(agents, codexDesktopAgent) {
+		if desktopConfigured() {
+			fmt.Fprintln(out, "Codex Desktop receiver already configured and running.")
+		} else {
+			if err := connectDesktop(cmd, f.desktopManual || runtime.GOOS != "darwin"); err != nil {
+				return fmt.Errorf("configure Codex desktop: %w", err)
+			}
+		}
+	}
 
 	fmt.Fprintf(out, "\n%s\n", style.For(out).Bold("Installed."))
 	if len(written) > 0 {
@@ -337,7 +386,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 // wired with no agent of the developer's own (`--harness none`) is never made to sign in
 // for it: ensureSpoolKey mints when a credential is already there and says so when not.
 func installNeedsAuth(agents []string, projectRef string, existing *termaproject.File, wantsHooks bool) bool {
-	for _, a := range agents {
+	for _, a := range telemetryAgentNames(agents) {
 		if _, err := harness.Lookup(a); err == nil {
 			return true
 		}
@@ -351,6 +400,19 @@ func installNeedsAuth(agents []string, projectRef string, existing *termaproject
 		projectID = existing.Project.ID
 	}
 	return wantsHooks && len(agents) > 0 && keystore.Get(projectID) == ""
+}
+
+func telemetryAgentNames(agents []string) []string {
+	var names []string
+	for _, name := range agents {
+		if name == codexDesktopAgent {
+			name = shim.AgentCodex
+		}
+		if !slices.Contains(names, name) {
+			names = append(names, name)
+		}
+	}
+	return names
 }
 
 // projectRefNeedsLookup reports whether resolving --project needs the API: an empty ref
@@ -440,7 +502,7 @@ func connectHarnessesForRepo(cmd *cobra.Command, cfg *config.Config, agents []st
 		return err
 	}
 	var telemetryAgents []string
-	for _, a := range agents {
+	for _, a := range telemetryAgentNames(agents) {
 		if _, err := harness.Lookup(a); err == nil {
 			telemetryAgents = append(telemetryAgents, a)
 		}
@@ -456,6 +518,12 @@ func connectHarnessesForRepo(cmd *cobra.Command, cfg *config.Config, agents []st
 		Signals:            signalStrings(signals),
 		IncludePrompts:     !f.excludePrompts,
 		IncludeToolContent: !f.excludeToolContent,
+	}
+	if slices.Contains(telemetryAgents, shim.AgentCodex) {
+		cli := slices.Contains(agents, shim.AgentCodex)
+		desktop := slices.Contains(agents, codexDesktopAgent)
+		rec.CLI = &cli
+		rec.Desktop = &desktop
 	}
 	for _, a := range telemetryAgents {
 		h, _ := harness.Lookup(a)
@@ -479,7 +547,11 @@ func connectHarnessesForRepo(cmd *cobra.Command, cfg *config.Config, agents []st
 		case shim.AgentCodex:
 			rec.ResourceAttributes = exp.ResourceAttributes
 			rec.Harnesses = append(rec.Harnesses, a)
-			fmt.Fprintln(out, "  Codex        → per-repo runtime overrides")
+			if slices.Contains(agents, shim.AgentCodex) {
+				fmt.Fprintln(out, "  Codex CLI    → per-repo runtime overrides")
+			} else {
+				fmt.Fprintln(out, "  Codex Desktop → per-repo logs route")
+			}
 		case shim.AgentClaude:
 			if _, err := shim.PrepareClaudeSettings(exp); err != nil {
 				return fmt.Errorf("claude: %w", err)
@@ -516,7 +588,16 @@ func connectHarnessesForRepo(cmd *cobra.Command, cfg *config.Config, agents []st
 	if err := shim.SaveRecord(rec); err != nil {
 		return err
 	}
-	err = setupActivation(cmd, rec.Harnesses, f)
+	var launchedFromShell []string
+	for _, name := range rec.Harnesses {
+		if slices.Contains(agents, name) {
+			launchedFromShell = append(launchedFromShell, name)
+		}
+	}
+	if len(launchedFromShell) == 0 {
+		return nil
+	}
+	err = setupActivation(cmd, launchedFromShell, f)
 	return err
 }
 
@@ -641,7 +722,11 @@ func installAdapters(root string, agents []string, override string, existing *te
 		}
 	}
 	for _, a := range agents {
-		want[a] = true
+		if a == codexDesktopAgent {
+			want[shim.AgentCodex] = true
+		} else {
+			want[a] = true
+		}
 	}
 	var out []string
 	for _, a := range adapter.All() {

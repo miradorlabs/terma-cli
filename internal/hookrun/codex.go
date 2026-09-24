@@ -8,6 +8,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/miradorlabs/terma-cli/internal/desktoprelay"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
@@ -95,6 +96,8 @@ type codexHookInput struct {
 	AgentID        string `json:"agent_id"`
 	AgentType      string `json:"agent_type"`
 	ToolName       string `json:"tool_name"`
+	// ToolUseID matches Codex's native OTLP call_id, so a file touch can join its tool call.
+	ToolUseID string `json:"tool_use_id"`
 	// ToolInput is whatever the tool was called with; its shape is the tool's own.
 	// Codex documents `command` for the shell and apply_patch tools, which is where a
 	// file edit is described.
@@ -132,6 +135,11 @@ func CodexSessionStart(ctx context.Context, env Env) error {
 	if err != nil {
 		env.logf("not in a git repository: %v", err)
 		return nil
+	}
+	if r.projectID != "" {
+		if err := desktoprelay.Register(in.SessionID, r.projectID, env.now()); err != nil {
+			env.logf("desktop session registration: %v", err)
+		}
 	}
 	sess := env.newSession(r, in.SessionID, codexTool, in.Model)
 	env.setActive(r, sess)
@@ -220,8 +228,10 @@ func CodexPostToolUse(ctx context.Context, env Env) error {
 		return nil
 	}
 	// Reported as a set: the call's own path fields and its patch can name the same file.
+	attrs := agentAttrs(map[string]any{}, in.AgentID, in.AgentType)
+	boundedAttr(attrs, attrToolCallID, in.ToolUseID)
 	env.touch(r, session.Session{ID: in.SessionID, Tool: codexTool, Model: in.Model}, in.ToolName,
-		uniqueSorted(relativeFiles(r, env.Cwd, candidates)), agentAttrs(map[string]any{}, in.AgentID, in.AgentType))
+		uniqueSorted(relativeFiles(r, env.Cwd, candidates)), attrs)
 	return nil
 }
 

@@ -94,6 +94,7 @@ func fakeAgents(t *testing.T) string {
 	dir := t.TempDir()
 	writeExecutable(t, filepath.Join(dir, "codex"), `#!/bin/sh
 echo "CODEX_HOME=$CODEX_HOME"
+echo "TERMA_CODEX_ROUTED=$TERMA_CODEX_ROUTED"
 printf 'ARG=%s\n' "$@"
 `)
 	writeExecutable(t, filepath.Join(dir, "claude"), `#!/bin/sh
@@ -159,11 +160,11 @@ func TestE2E_ShimExecRoutesCodex(t *testing.T) {
 	_, repo, codexHome := e2eRouted(t)
 	env := withPath(fakeAgents(t))
 
-	if out := runProc(t, bin, repo, env, "shim", "exec", "codex"); !strings.Contains(out, "CODEX_HOME="+codexHome) || !strings.Contains(out, e2eEndpoint) || !strings.Contains(out, "Bearer "+e2eKey) {
+	if out := runProc(t, bin, repo, env, "shim", "exec", "codex"); !strings.Contains(out, "CODEX_HOME="+codexHome) || !strings.Contains(out, "TERMA_CODEX_ROUTED=1") || !strings.Contains(out, e2eEndpoint) || !strings.Contains(out, "Bearer "+e2eKey) {
 		t.Fatalf("codex in a bound repo must get the original CODEX_HOME and runtime exporter:\n%s", out)
 	}
 	// Outside any bound repo: no routing; original CODEX_HOME preserved.
-	if out := runProc(t, bin, t.TempDir(), env, "shim", "exec", "codex"); strings.Contains(out, e2eEndpoint) || !strings.Contains(out, "CODEX_HOME="+codexHome) {
+	if out := runProc(t, bin, t.TempDir(), env, "shim", "exec", "codex"); strings.Contains(out, e2eEndpoint) || !strings.Contains(out, "CODEX_HOME="+codexHome) || !strings.Contains(out, "TERMA_CODEX_ROUTED=\n") {
 		t.Fatalf("codex outside a bound repo must pass through untouched:\n%s", out)
 	}
 	// -C chooses the destination binding, and user arguments survive unchanged.
@@ -250,7 +251,7 @@ func TestE2E_PathShimRoutes(t *testing.T) {
 	env := withPath(shimBin, filepath.Dir(bin), agents)
 
 	out := runProc(t, filepath.Join(shimBin, "codex"), repo, env)
-	if !strings.Contains(out, "CODEX_HOME="+codexHome) || !strings.Contains(out, e2eEndpoint) || !strings.Contains(out, "Bearer "+e2eKey) {
+	if !strings.Contains(out, "CODEX_HOME="+codexHome) || !strings.Contains(out, "TERMA_CODEX_ROUTED=1") || !strings.Contains(out, e2eEndpoint) || !strings.Contains(out, "Bearer "+e2eKey) {
 		t.Fatalf("the PATH shim must route codex to the original CODEX_HOME and runtime exporter:\n%s", out)
 	}
 	out = runProc(t, filepath.Join(shimBin, "claude"), repo, env, "-p", "hello")

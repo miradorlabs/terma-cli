@@ -220,7 +220,7 @@ Nothing is written and no scratch commit is made — run
 				fmt.Fprintf(out, "Hooks:       %s via %s\n", state, wiring.manager)
 				// The agents' own hooks, judged the way doctor judges them: an agent that
 				// cannot run its hooks yet costs its share of commit stamping in both.
-				if agentHooks = agentHooksCheck(root, bound, cfg.Harnesses); agentHooks.Status == doctor.Warn {
+				if agentHooks = agentHooksCheck(root, bound, selectedForRepo(projectID, cfg.Harnesses)); agentHooks.Status == doctor.Warn {
 					fmt.Fprintf(out, "Agent hooks: %d of %d agents can run theirs — %s\n", agentHooks.Ready, agentHooks.Of, agentHooks.Fix)
 				}
 				store := session.Open(gitDir)
@@ -243,7 +243,7 @@ Nothing is written and no scratch commit is made — run
 
 			// Harnesses.
 			var connected []string
-			verdicts := judgeHarnesses(ctx, cfg.OTLPURL, projectID, root)
+			verdicts := judgeSelectedHarnesses(ctx, cfg.OTLPURL, projectID, root, cfg.Harnesses)
 			for _, v := range verdicts {
 				suffix, ok := statusAgent(v, repoBound)
 				if ok {
@@ -257,7 +257,7 @@ Nothing is written and no scratch commit is made — run
 			if len(connected) == 0 {
 				fmt.Fprintln(out, "Agent:       none connected — run `terma install`")
 			}
-			routing := shellRoutingCheck(verdicts, repoBound, cfg.Harnesses)
+			routing := shellRoutingCheck(verdicts, repoBound, selectedForRepo(projectID, cfg.Harnesses))
 			if routing.Status != doctor.Skip {
 				fmt.Fprintf(out, "Routing:     %s\n", routing.Detail)
 				if routing.Fix != "" {

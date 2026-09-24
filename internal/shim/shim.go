@@ -51,9 +51,15 @@ import (
 // install time and read by Exec. It holds no secret: the key stays in the keystore,
 // keyed by harness and project, so revoking one project's key never exposes another's.
 type Record struct {
-	ProjectID          string            `json:"project_id"`
-	Endpoint           string            `json:"endpoint"`
-	Signals            []string          `json:"signals"`
+	ProjectID string   `json:"project_id"`
+	Endpoint  string   `json:"endpoint"`
+	Signals   []string `json:"signals"`
+	// CLI and Desktop are per-project launch choices. Nil keeps legacy routing
+	// records readable; a new install records each choice explicitly.
+	CLI *bool `json:"cli,omitempty"`
+	// Desktop is nil for legacy routes made before desktop was a setup choice.
+	// Those remain enabled until a new install explicitly selects or excludes it.
+	Desktop            *bool             `json:"desktop,omitempty"`
 	IncludePrompts     bool              `json:"include_prompts"`
 	IncludeToolContent bool              `json:"include_tool_content"`
 	ResourceAttributes map[string]string `json:"resource_attributes,omitempty"`

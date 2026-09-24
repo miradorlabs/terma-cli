@@ -61,8 +61,15 @@ func routeFor(agent, cwd string, userArgs []string) route {
 	if err != nil || !ok || !slices.Contains(rec.Harnesses, agent) {
 		return route{}
 	}
+	if agent == AgentCodex && rec.CLI != nil && !*rec.CLI {
+		return route{}
+	}
 	if args := r.routeArgs(rec, userArgs); len(args) > 0 {
-		return route{args: args}
+		plan := route{args: args}
+		if agent == AgentCodex {
+			plan.env = map[string]string{CodexRoutedEnv: "1"}
+		}
+		return plan
 	}
 	return route{}
 }

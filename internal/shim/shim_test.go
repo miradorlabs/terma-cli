@@ -149,8 +149,8 @@ func TestRouteCodexPreservesHome(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := routeFor(AgentCodex, repo, nil)
-	if len(r.env) != 0 || os.Getenv("CODEX_HOME") != home {
-		t.Fatal("routing changed Codex home")
+	if r.env[CodexRoutedEnv] != "1" || os.Getenv("CODEX_HOME") != home {
+		t.Fatal("routing did not mark Codex without changing its home")
 	}
 	args := strings.Join(r.args, " ")
 	if !strings.Contains(args, testEndpoint) || !strings.Contains(args, "Bearer "+testKey) {
@@ -162,6 +162,22 @@ func TestRouteCodexPreservesHome(t *testing.T) {
 	}
 	if strings.Contains(args, "notify") {
 		t.Fatal("routing replaced notifier")
+	}
+}
+
+func TestDesktopOnlyRouteDoesNotConfigureCodexCLI(t *testing.T) {
+	sandbox(t)
+	repo := boundRepo(t, testProjectID)
+	cli, desktop := false, true
+	if err := SaveRecord(Record{ProjectID: testProjectID, Endpoint: testEndpoint, Signals: []string{"logs"},
+		Harnesses: []string{AgentCodex}, CLI: &cli, Desktop: &desktop}); err != nil {
+		t.Fatal(err)
+	}
+	if err := keystore.SetFor(AgentCodex, testProjectID, testKey); err != nil {
+		t.Fatal(err)
+	}
+	if r := routeFor(AgentCodex, repo, nil); len(r.args) != 0 || len(r.env) != 0 {
+		t.Fatalf("desktop-only project changed a CLI launch: %+v", r)
 	}
 }
 

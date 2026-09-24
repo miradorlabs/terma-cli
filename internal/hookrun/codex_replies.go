@@ -8,6 +8,7 @@ import (
 	"slices"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/desktoprelay"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/shim"
@@ -91,10 +92,10 @@ func (e Env) captureCodexReplies(ctx context.Context, r *repo, in *codexHookInpu
 // and `terma connect codex --exclude-prompts` are documented as withholding "prompt text
 // or model responses", and this is the model-response half of that promise.
 //
-// Two configurations can govern a Codex session and the hook cannot tell which did: the
-// repository's routing record, applied when Codex was started through terma's launcher,
-// and the machine-wide config, which applies when it was not. So either one that exists
-// and withholds prompts is a no, and with neither there is no export to extend at all.
+// A routed CLI launch is marked by the shim; its runtime overrides govern consent.
+// Desktop launches have no marker. When the machine-wide exporter points at the
+// desktop relay, both that exporter and this repository's desktop route must allow
+// prompts; otherwise the reply would bypass the relay's per-repository filter.
 //
 // It fails closed. A configuration that is there and cannot be read — a routing record
 // half-written, a config.toml that does not parse — might be the one that withholds
@@ -105,20 +106,18 @@ func codexRepliesConsented(r *repo) bool {
 	if err != nil {
 		return false
 	}
-	routed := recorded && slices.Contains(rec.Harnesses, shim.AgentCodex)
-	routedPrompts := routed && rec.IncludePrompts
 	st, err := (harness.Codex{}).Status()
 	if err != nil {
 		return false
 	}
-	machineWide := st.Connected
-	switch {
-	case !routed && !machineWide:
-		return false
-	case routed && !routedPrompts:
-		return false
-	case machineWide && !st.IncludePrompts:
-		return false
+	if os.Getenv(shim.CodexRoutedEnv) == "1" {
+		return recorded && slices.Contains(rec.Harnesses, shim.AgentCodex) && rec.IncludePrompts
 	}
-	return true
+	if st.Endpoint == desktoprelay.Endpoint {
+		return st.Connected && st.IncludePrompts && recorded &&
+			slices.Contains(rec.Harnesses, shim.AgentCodex) &&
+			(rec.Desktop == nil || *rec.Desktop) && slices.Contains(rec.Signals, "logs") &&
+			rec.IncludePrompts
+	}
+	return st.Connected && st.IncludePrompts
 }

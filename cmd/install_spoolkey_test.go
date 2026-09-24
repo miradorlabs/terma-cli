@@ -98,6 +98,7 @@ func TestInstallNeedsAuth(t *testing.T) {
 		want     bool
 	}{
 		{"a telemetry agent mints a key", []string{"claude"}, id, nil, true, true},
+		{"Codex desktop mints a Codex key", []string{codexDesktopAgent}, id, nil, true, true},
 		{"a project name needs a lookup", nil, "Acme Web", nil, true, true},
 		{"no binding and no --project is a picker", nil, "", nil, true, true},
 		{"wiring a repository with no agent of one's own", nil, id, nil, true, false},
