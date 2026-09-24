@@ -119,5 +119,8 @@ func codexRepliesConsented(r *repo) bool {
 			(rec.Desktop == nil || *rec.Desktop) && slices.Contains(rec.Signals, "logs") &&
 			rec.IncludePrompts
 	}
-	return st.Connected && st.IncludePrompts
+	// Repository hooks can run even when an IDE or TERMA_DISABLE bypasses the
+	// shim. Keep a saved repository opt-out in force for those launches.
+	return st.Connected && st.IncludePrompts &&
+		(!recorded || !slices.Contains(rec.Harnesses, shim.AgentCodex) || rec.IncludePrompts)
 }

@@ -170,6 +170,11 @@ func TestCodexRepliesNeedTheConsentPromptsTravelUnder(t *testing.T) {
 			t.Setenv(shim.CodexRoutedEnv, "")
 			connectCodexMachineWide(t, false)
 		}, 0},
+		{"unrouted CLI still honors the repository prompt exclusion", func(t *testing.T) {
+			routeCodex(t, false)
+			t.Setenv(shim.CodexRoutedEnv, "")
+			connectCodexMachineWide(t, true)
+		}, 0},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			env := fundingEnv(t)

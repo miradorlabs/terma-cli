@@ -21,6 +21,8 @@ const (
 	maxQueueBytes = 64 << 20
 	maxPayload    = 20 << 20
 	queueMaxAge   = 14 * 24 * time.Hour
+	retryMin      = 30 * time.Second
+	retryMax      = time.Hour
 )
 
 type queueItem struct {
@@ -32,7 +34,13 @@ type queueItem struct {
 // Queue durably holds project-separated OTLP requests until the ingest host accepts
 // them. A server key is looked up only while sending and never stored with a batch.
 type Queue struct {
-	dir string
+	dir   string
+	retry map[string]retryState
+}
+
+type retryState struct {
+	until time.Time
+	delay time.Duration
 }
 
 // OpenQueue prepares the private directory for desktop relay batches.
@@ -45,7 +53,7 @@ func OpenQueue() (*Queue, error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, err
 	}
-	return &Queue{dir: dir}, nil
+	return &Queue{dir: dir, retry: make(map[string]retryState)}, nil
 }
 
 // Enqueue acknowledges a Codex export only after its identifiable records have
@@ -198,10 +206,22 @@ func (q *Queue) Drain(ctx context.Context, send func(context.Context, string, []
 			}
 			continue
 		}
-		if err := send(ctx, item.ProjectID, item.Payload); err != nil {
-			firstErr = errors.Join(firstErr, err)
+		if state := q.retry[item.ProjectID]; time.Now().Before(state.until) {
 			continue
 		}
+		if err := send(ctx, item.ProjectID, item.Payload); err != nil {
+			firstErr = errors.Join(firstErr, err)
+			state := q.retry[item.ProjectID]
+			if state.delay == 0 {
+				state.delay = retryMin
+			} else {
+				state.delay = min(state.delay*2, retryMax)
+			}
+			state.until = time.Now().Add(state.delay)
+			q.retry[item.ProjectID] = state
+			continue
+		}
+		delete(q.retry, item.ProjectID)
 		if err := os.Remove(path); err != nil {
 			firstErr = errors.Join(firstErr, err)
 			continue

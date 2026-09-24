@@ -214,6 +214,43 @@ func TestQueueRejectsMixedRequestBeforeWritingAnyProject(t *testing.T) {
 	}
 }
 
+func TestQueueBacksOffFailedProjectWithoutBlockingOtherProjects(t *testing.T) {
+	t.Setenv("TERMA_CONFIG_DIR", filepath.Join(t.TempDir(), "config"))
+	queue, err := OpenQueue()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := queue.EnqueueMany(map[string][]byte{projectA: []byte("a"), projectB: []byte("b")}); err != nil {
+		t.Fatal(err)
+	}
+	called := map[string]int{}
+	send := func(_ context.Context, projectID string, _ []byte) error {
+		called[projectID]++
+		if projectID == projectA && called[projectID] == 1 {
+			return context.DeadlineExceeded
+		}
+		return nil
+	}
+	if delivered, err := queue.Drain(context.Background(), send); err == nil || delivered != 1 {
+		t.Fatalf("first drain = %d, %v", delivered, err)
+	}
+	if called[projectA] != 1 || called[projectB] != 1 {
+		t.Fatalf("failed project blocked a healthy one: %v", called)
+	}
+	if delivered, err := queue.Drain(context.Background(), send); err != nil || delivered != 0 || called[projectA] != 1 {
+		t.Fatalf("backoff drain = %d, %v; calls %v", delivered, err, called)
+	}
+	state := queue.retry[projectA]
+	if state.delay != retryMin {
+		t.Fatalf("initial retry delay = %s", state.delay)
+	}
+	state.until = time.Now().Add(-time.Second)
+	queue.retry[projectA] = state
+	if delivered, err := queue.Drain(context.Background(), send); err != nil || delivered != 1 || called[projectA] != 2 {
+		t.Fatalf("retry drain = %d, %v; calls %v", delivered, err, called)
+	}
+}
+
 func TestProjectThatSelectedCodexCLIOnlyDoesNotReceiveDesktopLogs(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", filepath.Join(t.TempDir(), "config"))
 	enabled := false
