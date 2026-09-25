@@ -955,7 +955,11 @@ func resolveBinding(cmd *cobra.Command, cfg *config.Config, existing *termaproje
 // is scoped to exactly one project, and the account service that lists projects accepts
 // only a signed-in user, so the API gateway's /v1/identity is what can say which project
 // it is. A --project or an existing binding that names a different project is an error
-// rather than a silent switch: the key could not deliver that project's events.
+// rather than a silent switch: the key could not deliver that project's events. It asks
+// on every install, a reinstall with a binding included, because that is what verifies the
+// key still belongs to the bound project; the key needs the network to deliver anyway.
+// /v1/identity names no project, so a first install records none (Name is omitempty) and
+// output falls back to the id.
 func serverKeyBinding(ctx context.Context, cfg *config.Config, existing *termaproject.File, ref string) (binding, error) {
 	client, err := newClient(cfg)
 	if err != nil {

@@ -3,6 +3,8 @@ package cmd
 import (
 	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -26,10 +28,7 @@ func TestInstallWithAServerKeyBindsTheKeysProject(t *testing.T) {
 	})
 	run := termaRun{within: 30 * time.Second, env: gw}
 
-	repo := installRepo(t)
-	for k, v := range gw {
-		t.Setenv(k, v) // installRepo set its own config dir; the gateway's wins
-	}
+	repo := installRepo(t) // its config dir is replaced by the gateway's when run sets env
 	out, err := run.combined(t, "install", "--harness", "none", "--project", keyProject, "--adapters", "claude", "--yes", "--no-doctor", "--no-browser")
 	if err != nil {
 		t.Fatalf("install with a server key and its own project: %v\n%s", err, out)
@@ -37,6 +36,10 @@ func TestInstallWithAServerKeyBindsTheKeysProject(t *testing.T) {
 	bound, err := termaproject.Load(repo)
 	if err != nil || bound.Project.ID != keyProject || bound.Project.OrganizationID != keyOrg {
 		t.Fatalf("binding %+v, err %v", bound, err)
+	}
+	// /v1/identity names no project, and the committed file says nothing rather than "".
+	if raw, err := os.ReadFile(filepath.Join(repo, ".terma", "settings.json")); err != nil || strings.Contains(string(raw), `"name"`) {
+		t.Fatalf("the binding should carry no project name: %v\n%s", err, raw)
 	}
 	for _, p := range paths {
 		if p == "/v1/projects" {
