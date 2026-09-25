@@ -6,9 +6,11 @@
 //
 // What it does: turns OpenCode's own events into OpenTelemetry — one span per model
 // call carrying tokens and cost, one span per tool call, and events for prompts and
-// session lifecycle — and posts them as OTLP/JSON to the Terma endpoint. Nothing else
-// is read or changed. Commit attribution is not done here: session start/end and file
-// edits are handed to `terma hook`, where the logic lives.
+// session lifecycle — and posts them as OTLP/JSON to the Terma endpoint. The one change
+// it makes to a request: an OpenRouter request from a subagent's session names its parent
+// session and agent in the body's `trace` field, so OpenRouter's own trace export can place
+// the subagent. Nothing else is read or changed. Commit attribution is not done here:
+// session start/end and file edits are handed to `terma hook`, where the logic lives.
 //
 // Dependency-free on purpose. OpenCode loads directory plugins without installing
 // anything for them, so this file uses only what Bun ships: fetch, node:crypto,
@@ -475,6 +477,22 @@ export const TermaPlugin = async ({ directory, worktree }) => {
       } catch {
         // A telemetry failure must never surface in the agent.
       }
+    },
+
+    // OpenRouter's trace export carries the request body's `trace` object as
+    // trace.metadata.*, and nothing else a subagent's request sends names its parent. The
+    // SDK spreads these options over the provider's extraBody, so its trace keys are kept.
+    "chat.params": async (input, output) => {
+      try {
+        const parent = parentOf(input?.sessionID)
+        if (!parent || input?.model?.api?.npm !== "@openrouter/ai-sdk-provider" || !output?.options) return
+        output.options.trace = {
+          ...input.provider?.options?.extraBody?.trace,
+          ...output.options.trace,
+          parent_session_id: parent,
+          agent: input.agent,
+        }
+      } catch {}
     },
 
     "chat.message": async (input, output) => {
