@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -667,9 +666,12 @@ func wrapperFile(shell string) string {
 		return tildePath(rc.Path)
 	}
 	if shell == "fish" {
-		home, _ := os.UserHomeDir()
-		dir := cmp.Or(os.Getenv("XDG_CONFIG_HOME"), filepath.Join(home, ".config"))
-		return tildePath(filepath.Join(dir, "fish", "config.fish"))
+		// Without a home directory, the literal path: a relative one would be a wrong hint.
+		home, err := os.UserHomeDir()
+		if err != nil || home == "" {
+			return "~/.config/fish/config.fish"
+		}
+		return tildePath(filepath.Join(shim.FishConfigDir(home), "config.fish"))
 	}
 	return "~/.profile"
 }

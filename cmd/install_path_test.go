@@ -111,3 +111,12 @@ func TestInstallWrapperHintNamesOneFile(t *testing.T) {
 		t.Fatalf("the wrapper hint should name zsh's startup file:\n%s", out)
 	}
 }
+
+// With no home directory the fish hint stays the literal path rather than a relative one.
+func TestWrapperHintForFishWithoutAHome(t *testing.T) {
+	t.Setenv("HOME", "")
+	t.Setenv("XDG_CONFIG_HOME", "")
+	if got := wrapperFile("fish"); got != "~/.config/fish/config.fish" {
+		t.Fatalf("wrapperFile(fish) without HOME = %q", got)
+	}
+}
