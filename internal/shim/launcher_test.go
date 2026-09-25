@@ -98,6 +98,31 @@ func TestLauncherReadsArgumentsAsData(t *testing.T) {
 	}
 }
 
+// BusyBox systems (Alpine) have mktemp in /bin and not /usr/bin. The launcher took only
+// /usr/bin/mktemp, failed there, and ran every agent unrouted without a word. Rewriting the
+// first path to one that does not exist models that system on any host with /bin/mktemp.
+func TestLauncherRoutesWithMktempOnlyInBin(t *testing.T) {
+	if _, err := os.Stat("/bin/mktemp"); err != nil {
+		t.Skip("no /bin/mktemp on this host (macOS keeps it in /usr/bin only)")
+	}
+	_, _, launcher := launcherFixture(t, "printf %s x > \"$4/0\"; printf 'terma-args-v1:1\\n' > \"$4/count\"\n")
+	script, err := os.ReadFile(launcher)
+	if err != nil {
+		t.Fatal(err)
+	}
+	busybox := strings.ReplaceAll(string(script), "terma_mktemp=/usr/bin/mktemp", "terma_mktemp=/nonexistent/mktemp")
+	if busybox == string(script) {
+		t.Fatal("the launcher no longer names /usr/bin/mktemp first; update this test")
+	}
+	if err := os.WriteFile(launcher, []byte(busybox), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	got, _, err := runLauncher(t, launcher, []string{"hello"})
+	if err != nil || !reflect.DeepEqual(got, []string{"x", "hello"}) {
+		t.Fatalf("args=%q err=%v, want the prepared argument before the user's", got, err)
+	}
+}
+
 func TestLauncherBypassAndMaintenanceNeverPrepare(t *testing.T) {
 	_, realDir, launcher := launcherFixture(t, "echo CALLED > \"$MARKER\"\nexit 1\n")
 	marker := filepath.Join(realDir, "called")
