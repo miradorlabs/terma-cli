@@ -91,7 +91,9 @@ Homebrew or npm installation through the package manager that owns it. A release
 carries its tag, which the updater compares with the latest published release; a source
 build is never updated without `terma update --force`.
 
-After an update, the new version refreshes what earlier versions wrote — the agent shims,
+The first time a new version runs, it migrates anything it keeps in `~/.config/terma`
+whose format changed, before doing anything else, with no command from you. After an
+update, the new version also refreshes what earlier versions wrote — the agent shims,
 the wrapped Claude Code status line, the OpenCode plugin, and the hooks of the repository
 you ran `terma update` in — keeping every choice you made when you installed. It works
 from what is on disk, never signs in, and never adds a file. The repository hooks are

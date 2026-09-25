@@ -618,3 +618,19 @@ it does not prove that a running agent has reloaded its settings or sent telemet
   home-directory files once (`refreshed.json`, upward only, so two builds on PATH do not
   take turns) and only *reports* stale committed files. `update --refresh` is a contract
   between releases: an older binary invokes it on a newer one, so it must keep working.
+- Migrations (`internal/migrate`, registry in `migrations.go`): a change to the shape of
+  state under the config directory ships with a migration, not a tolerant reader in the
+  owning package (those were removed in 14a0037 and are not coming back). `cmd.Execute`
+  runs pending ones before every command — hooks and shims too, silent and bounded to one
+  second, because a hook is as likely as anything to be a new build's first run — and
+  `update --refresh` retries a failed one and reports. Tests never pass through `Execute`,
+  so none can migrate a real config directory. `migrations.json` records the last ID
+  applied (one small read per start when nothing is pending). The rules: append-only IDs
+  (never renumber, reuse or delete); idempotent; recognise the old shape exactly (a
+  missing key, not a false one) because a fresh machine runs every migration against
+  current state; leave state the previous build can still read — add and fill in, never
+  remove or repurpose, since another terma may share the machine; home directory only
+  (committed repository files are `--refresh`'s, on request). doctor has a `saved state
+  migrated` line only when one is pending or failed. The first, ID 1, fills in `cli` on
+  routing records 0.0.2 wrote: without it the router read the missing field as false and
+  stopped routing the Codex CLI.

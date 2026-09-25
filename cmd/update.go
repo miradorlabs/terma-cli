@@ -29,9 +29,11 @@ and replaces the binary in place. Existing hooks continue to work.
 A Homebrew or npm installation is upgraded through that package manager instead —
 the one that owns this copy of terma, not whichever one is first on PATH.
 
-After the new version is in place it refreshes what earlier versions wrote — the agent
-shims, the wrapped Claude Code status line, the OpenCode plugin, and the hooks of the
-repository you run it in — keeping every choice you made at install time. It works from
+Every command a new version runs first migrates anything it keeps in the config
+directory whose format changed. After the new version is in place, update also refreshes
+what earlier versions wrote — the agent shims, the wrapped Claude Code status line, the
+OpenCode plugin, and the hooks of the repository you run it in — keeping every choice
+you made at install time. It works from
 what is on disk: it signs in to nothing and never adds a file. --refresh runs just that
 step; inside each other repository terma is installed in, run it to update the hooks
 there (they are committed files, so they change only when you ask).
@@ -95,7 +97,7 @@ release.`,
 	cmd.Flags().BoolVar(&check, "check", false, "check for a newer published release without installing")
 	cmd.Flags().BoolVar(&force, "force", false, "replace a source/development build with the latest published release")
 	cmd.Flags().StringVar(&automatic, "auto", "", "automatic updates: on, off, or status (default: off)")
-	cmd.Flags().BoolVar(&refresh, "refresh", false, "only refresh what terma installed (shims, status line, OpenCode plugin, this repository's hooks) to this version; runs by itself after an update")
+	cmd.Flags().BoolVar(&refresh, "refresh", false, "only migrate saved state and refresh what terma installed (shims, status line, OpenCode plugin, this repository's hooks) to this version; runs by itself after an update")
 	cmd.MarkFlagsMutuallyExclusive("auto", "check", "force", "refresh")
 	return cmd
 }

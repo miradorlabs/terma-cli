@@ -587,3 +587,74 @@ func TestRefreshShimsRewritesOnlyInstalledStaleShims(t *testing.T) {
 		t.Fatalf("second refresh: changed=%v err=%v", changed, err)
 	}
 }
+
+// A record written by 0.0.2 has no cli field, and today's router reads that as "do not
+// route the Codex CLI". The migration restores what the record meant, once, and touches
+// nothing else.
+func TestMigrateCodexCLIRoutesFillsInWhatOldRecordsMeant(t *testing.T) {
+	sandbox(t)
+	if err := MigrateCodexCLIRoutes(); err != nil {
+		t.Fatalf("no routing directory: %v", err)
+	}
+	dir, err := RoutingDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	write := func(name, body string) string {
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	old := write("a.json", `{"project_id":"a","endpoint":"https://otel","signals":["logs"],"include_prompts":false,"include_tool_content":true,"harnesses":["claude","codex"],"future":{"kept":1}}`)
+	claudeOnly := write("b.json", `{"project_id":"b","harnesses":["claude"]}`)
+	current := write("c.json", `{"project_id":"c","harnesses":["codex"],"cli":false,"desktop":true}`)
+	broken := write("d.json", `{not json`)
+
+	if err := MigrateCodexCLIRoutes(); err != nil {
+		t.Fatal(err)
+	}
+	read := func(p string) map[string]any {
+		t.Helper()
+		data, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var m map[string]any
+		if err := json.Unmarshal(data, &m); err != nil {
+			t.Fatalf("%s: %v", p, err)
+		}
+		return m
+	}
+	a := read(old)
+	if a["cli"] != true || a["desktop"] != false || a["include_prompts"] != false || a["include_tool_content"] != true || a["future"] == nil {
+		t.Fatalf("migrated record %v", a)
+	}
+	if b := read(claudeOnly); b["cli"] != false {
+		t.Fatalf("a record that does not route codex: %v", b)
+	}
+	if c := read(current); c["cli"] != false || c["desktop"] != true {
+		t.Fatalf("a record that already says was changed: %v", c)
+	}
+	if data, _ := os.ReadFile(broken); string(data) != `{not json` {
+		t.Fatal("an unparseable record was rewritten")
+	}
+	if info, _ := os.Stat(old); info.Mode().Perm() != 0o600 {
+		t.Fatalf("mode %v", info.Mode().Perm())
+	}
+	rec, ok, err := LoadRecord("a")
+	if err != nil || !ok || !rec.CLI || rec.Desktop {
+		t.Fatalf("LoadRecord after migration: %+v %v %v", rec, ok, err)
+	}
+	before, _ := os.ReadFile(old)
+	if err := MigrateCodexCLIRoutes(); err != nil {
+		t.Fatal(err)
+	}
+	if after, _ := os.ReadFile(old); string(after) != string(before) {
+		t.Fatal("a second run changed a migrated record")
+	}
+}

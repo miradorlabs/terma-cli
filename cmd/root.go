@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"slices"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -15,6 +17,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
+	"github.com/miradorlabs/terma-cli/internal/migrate"
 	"github.com/miradorlabs/terma-cli/internal/output"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
@@ -184,6 +187,30 @@ func automaticUpdatesAllowed(cmd *cobra.Command, interactive bool) bool {
 	return true
 }
 
+// migrateState brings the state an earlier terma left behind up to this build before any
+// command reads it (internal/migrate). It runs on every start, hooks included, because
+// after an upgrade a hook is as likely as anything to be the new build's first run; when
+// nothing is pending it costs one small read. It never fails the command: a hook or a
+// launch shim stays silent and waits at most a second, and anything else says what
+// failed on a terminal a person is watching. Tests do not come through here, so none
+// can migrate a developer's real config directory.
+func migrateState(ctx context.Context, args []string) {
+	dir, err := config.Dir()
+	if err != nil || !migrate.Pending(dir) {
+		return
+	}
+	quiet := len(args) > 0 && slices.Contains([]string{"hook", "shim", "spool"}, args[0])
+	wait := 10 * time.Second
+	if quiet {
+		wait = time.Second
+	}
+	ctx, cancel := context.WithTimeout(ctx, wait)
+	defer cancel()
+	if _, err := migrate.Run(ctx, dir, false); err != nil && !quiet && canPrompt() {
+		fmt.Fprintf(os.Stderr, "terma could not update its saved state for this version (%v). Run `terma update --refresh` to retry.\n", err)
+	}
+}
+
 // Execute runs the command line and returns the process's exit status: 0, 1 for a
 // failure, or the code a command chose to mean something more specific (see
 // exitcode.go).
@@ -208,6 +235,8 @@ func Execute() int {
 		case <-ctx.Done():
 		}
 	}()
+
+	migrateState(ctx, os.Args[1:])
 
 	if err := NewRootCommand().ExecuteContext(ctx); err != nil {
 		// A command that has already explained itself on stdout ends the process

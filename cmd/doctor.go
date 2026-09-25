@@ -26,6 +26,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
+	"github.com/miradorlabs/terma-cli/internal/migrate"
 	"github.com/miradorlabs/terma-cli/internal/output"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/session"
@@ -282,6 +283,12 @@ func runDoctor(ctx context.Context, skipCommit bool, progress doctorProgress) do
 		return binaryCheck
 	})
 
+	// 1b. Saved state. Every start migrates it, so this is a line only when an update
+	// left a migration pending or failed.
+	if c, ok := stateCheck(); ok {
+		timed(doctor.KeyState, "saved state migrated", func() doctor.Check { return c })
+	}
+
 	// 2. Sign-in.
 	cfg, err := loadConfig()
 	if err != nil {
@@ -474,6 +481,23 @@ func (d *doctorRun) scratchCommit() doctor.Check {
 	sha, c := scratchCommit(d.ctx, d.root, d.bound)
 	d.scratchSHA = sha
 	return c
+}
+
+// stateCheck reports saved state this build has not finished migrating, and has nothing
+// to say (false) when every migration it has is applied.
+func stateCheck() (doctor.Check, bool) {
+	dir, err := config.Dir()
+	if err != nil || !migrate.Pending(dir) {
+		return doctor.Check{}, false
+	}
+	s, err := migrate.Load(dir)
+	switch {
+	case err != nil:
+		return doctor.Check{Status: doctor.Warn, Detail: "the migration record cannot be read: " + err.Error(), Fix: "terma update --refresh"}, true
+	case s.Failed != nil:
+		return doctor.Check{Status: doctor.Fail, Detail: fmt.Sprintf("%s failed: %s", s.Failed.Name, s.Failed.Error), Fix: "terma update --refresh"}, true
+	}
+	return doctor.Check{Status: doctor.Warn, Detail: fmt.Sprintf("%d migration(s) from this update not applied yet", migrate.Remaining(s)), Fix: "terma update --refresh"}, true
 }
 
 func (d *doctorRun) eventSpool() doctor.Check {

@@ -180,6 +180,24 @@ record (`--signals`, `--exclude-prompts`, `--identity`, `--no-statusline`,
 `--activation`) back to its default. The repository files it changes are listed to
 commit.
 
+### Migrating saved state
+
+When a new version changes the shape of something terma keeps in `~/.config/terma` — a
+routing record, the key store, a status-line record — it ships a migration that rewrites
+the old shape. Every terma command, hooks included, checks `migrations.json` when it
+starts (one small read) and applies any migrations this version has that the machine has
+not had, in order, before reading anything else. It needs no command from you, and
+whichever process starts first after an update does it: the rest wait for it, briefly.
+A hook never fails because of a migration; it stays silent and tries again on a later
+run. An interactive command says what failed, `terma doctor` shows a `saved state
+migrated` line while one is pending or failed, and `terma update --refresh` retries it
+straight away and reports what it applied.
+
+Migrations only add to or fill in what an earlier version wrote, so an older terma
+still on the machine (doctor warns when there is one) keeps reading the same files.
+They change nothing in a repository; committed files are `terma update --refresh`'s,
+when you ask.
+
 The first interactive command under a newer release, however it arrived (an automatic
 update, or `brew upgrade` run by hand), refreshes the home-directory files once and
 records the release in `refreshed.json`. It does not rewrite committed files: when the

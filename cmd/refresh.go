@@ -11,6 +11,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
+	"github.com/miradorlabs/terma-cli/internal/migrate"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 	"github.com/miradorlabs/terma-cli/internal/shim"
@@ -105,8 +106,20 @@ func existingFilesOnly(p hookmgr.Plan) hookmgr.Plan {
 }
 
 // runRefresh is `terma update --refresh`: the machine's files, then the repository
-// around the working directory, reported as it goes.
+// around the working directory, reported as it goes. Saved state is migrated first,
+// retrying a migration that failed, so the files are rewritten from current state.
 func runRefresh(ctx context.Context, out io.Writer) error {
+	var migrateErr error
+	if dir, err := config.Dir(); err == nil {
+		var applied []string
+		applied, migrateErr = migrate.Run(ctx, dir, true)
+		for _, name := range applied {
+			fmt.Fprintf(out, "Migrated saved state: %s.\n", name)
+		}
+		if migrateErr != nil {
+			migrateErr = fmt.Errorf("migrate saved state: %w", migrateErr)
+		}
+	}
 	machine, machineErr := refreshMachine()
 	repo, repoErr := planRepoRefresh(ctx)
 	var repoChanged []string
@@ -143,7 +156,7 @@ func runRefresh(ctx context.Context, out io.Writer) error {
 	if repo == nil {
 		fmt.Fprintln(out, "\nRun `terma update --refresh` inside each repository terma is installed in to update its committed hooks too.")
 	}
-	err := errors.Join(machineErr, repoErr)
+	err := errors.Join(migrateErr, machineErr, repoErr)
 	if err == nil {
 		if dir, dirErr := config.Dir(); dirErr == nil {
 			err = selfupdate.SaveRefreshed(dir, Version)
