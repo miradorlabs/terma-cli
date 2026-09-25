@@ -34,8 +34,13 @@ Terma therefore records launch evidence from `SubagentStart` or a successful
 `Agent`/legacy `Task` tool response before accepting `SubagentStop` for the same
 `(session_id, agent_id)`. Each pair has a separate atomic marker under
 `claude-subagents/` in the config directory, shared across worktrees and hook
-processes. Stops keep the marker so a resumed agent or one continued by another hook
-still reports its end. Markers expire after 14 days and session starts prune them.
+processes. Each observed start or Agent/Task response refreshes the marker. Stops
+keep it but do not refresh its age, so repeated stops remain eligible within the
+same retention window. Markers expire 14 days after the latest launch evidence,
+and session starts prune them. A long-running or resumed agent with no new launch
+evidence for 14 days will therefore have its final stop omitted, even if it was
+active during that time. The retention window bounds local launch state; it is not
+an inactivity measurement.
 An unobserved launch (including one before an upgrade, a failed marker write or an
 expired marker) means its stop is omitted; its launch/tool-call evidence and native
 usage remain available. This filters future hook events; previously ingested rows
