@@ -40,7 +40,7 @@ func run(ctx context.Context, dir string, args ...string) (string, error) {
 			return "", ErrNotRepo
 		}
 		if msg == "" {
-			msg = err.Error()
+			return "", fmt.Errorf("git %s: %w", args[0], err)
 		}
 		return "", fmt.Errorf("git %s: %s", args[0], msg)
 	}
@@ -55,7 +55,7 @@ func Locate(ctx context.Context, dir string) (root, gitDir string, err error) {
 		return "", "", err
 	}
 	lines := strings.Split(out, "\n")
-	if len(lines) < 2 {
+	if len(lines) != 2 {
 		return "", "", fmt.Errorf("git rev-parse: unexpected output %q", out)
 	}
 	return filepath.Clean(lines[0]), filepath.Clean(lines[1]), nil

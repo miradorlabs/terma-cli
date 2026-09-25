@@ -84,15 +84,17 @@ func executeDoctor(cmd *cobra.Command, skipCommit bool) doctor.Report {
 // are in place and whether the agent will run them. It is shared by doctor and status so
 // the two cannot disagree about it.
 //
-// Each agent's hooks are checked where the install asked for them: a repository nobody
-// opens in Cursor is not missing anything, and an install that predates the adapter list
-// recorded none and gets the default set. A hooks file that is missing is stale wiring
-// whoever uses the agent. Trust is different: some agents refuse to run a committed hook
-// until the developer has trusted it, or the repository, once from inside the agent — the
-// wiring looks perfect and nothing runs, a silence worth naming — but only for an agent
-// this developer uses (mine; empty means "has not said", so all of them). A colleague's
-// agent is naturally untrusted here and costs this developer nothing.
-func agentHooksCheck(root string, bound *termaproject.File, mine []string) doctor.Check {
+// The repository's hooks files are the record of what is wired (adapter.Wired). An agent
+// they wire is checked whoever uses it: wiring an older terma wrote is stale for everyone.
+// An agent they do not wire is missing only when this developer named it among their
+// agents (mine) — a repository nobody opens in Cursor is not missing anything, and a
+// developer who has not said which agents they use is not told about every agent terma
+// knows. Trust is different: some agents refuse to run a committed hook until the
+// developer has trusted it, or the repository, once from inside the agent — the wiring
+// looks perfect and nothing runs, a silence worth naming — but only for an agent this
+// developer uses (mine; empty means "has not said", so all of them). A colleague's agent
+// is naturally untrusted here and costs this developer nothing.
+func agentHooksCheck(root string, mine []string) doctor.Check {
 	var parts []string
 	var fix string
 	ready, of := 0, 0
@@ -103,17 +105,32 @@ func agentHooksCheck(root string, bound *termaproject.File, mine []string) docto
 			fix = f
 		}
 	}
-	for _, name := range installedAdapters(bound) {
-		a, ok := adapter.Lookup(name)
-		if !ok || a.HooksPath() == "" {
+	for _, a := range adapter.All() {
+		if a.HooksPath() == "" {
 			continue
 		}
-		used := len(mine) == 0 || slices.Contains(mine, name) || (name == "codex" && slices.Contains(mine, codexDesktopAgent))
+		// Codex Desktop is wired through the Codex hooks file.
+		named := slices.Contains(mine, a.Name()) || (a.Name() == shim.AgentCodex && slices.Contains(mine, codexDesktopAgent))
+		if !adapter.Wired(root, a) {
+			if named {
+				of++
+				parts = append(parts, a.DisplayName()+" hooks missing")
+				problem("terma install")
+			}
+			continue
+		}
+		used := len(mine) == 0 || named
 		if used {
 			of++
 		}
-		if plan, _ := a.Plan(root, true); !plan.Empty() {
-			parts = append(parts, a.DisplayName()+" hooks missing")
+		plan, err := a.Plan(root, true)
+		if err != nil {
+			parts = append(parts, a.DisplayName()+" hooks could not be read: "+err.Error())
+			problem("repair " + a.HooksPath() + "; then run terma install")
+			continue
+		}
+		if !plan.Empty() {
+			parts = append(parts, a.DisplayName()+" hooks out of date")
 			problem("terma install")
 			continue
 		}
@@ -299,7 +316,8 @@ func runDoctor(ctx context.Context, skipCommit bool, progress doctorProgress) do
 	timed(doctor.KeyAuth, "signed in", d.signedIn)
 
 	// 3. Repository binding.
-	d.root, d.gitDir, d.repoErr = repoHere(ctx, "")
+	d.root, d.gitDir, d.repoErr = workspaceHere(ctx)
+	d.nonGit = d.repoErr == nil && d.gitDir == ""
 	timed(doctor.KeyProject, "repository bound", d.repositoryBound)
 	d.projectID = cfg.ProjectID
 	if d.bound != nil {
@@ -353,6 +371,7 @@ type doctorRun struct {
 	root    string
 	gitDir  string
 	repoErr error
+	nonGit  bool
 	// bound is set by repositoryBound, and projectID follows it.
 	bound     *termaproject.File
 	projectID string
@@ -435,7 +454,7 @@ func (d *doctorRun) signedIn() doctor.Check {
 
 func (d *doctorRun) repositoryBound() doctor.Check {
 	if d.repoErr != nil {
-		return doctor.Check{Status: doctor.Skip, Detail: "not inside a git repository (repo checks skipped)"}
+		return doctor.Check{Status: doctor.Fail, Detail: d.repoErr.Error()}
 	}
 	f, from, err := termaproject.Resolve(d.root, d.gitDir)
 	if err != nil {
@@ -459,6 +478,9 @@ func throughMain(root, from string) string {
 }
 
 func (d *doctorRun) commitHooks() doctor.Check {
+	if d.nonGit {
+		return doctor.Check{Status: doctor.Skip, Detail: "not a Git repository"}
+	}
 	if !d.installed() {
 		return doctor.Check{Status: doctor.Skip, Detail: "needs an installed repository"}
 	}
@@ -469,7 +491,7 @@ func (d *doctorRun) agentHooks() doctor.Check {
 	if !d.installed() {
 		return doctor.Check{Status: doctor.Skip, Detail: "needs an installed repository"}
 	}
-	return agentHooksCheck(d.root, d.bound, selectedForRepo(d.projectID, d.cfg.Harnesses))
+	return agentHooksCheck(d.root, selectedForRepo(d.projectID, d.cfg.Harnesses))
 }
 
 func (d *doctorRun) agentsExporting() doctor.Check {
@@ -486,6 +508,9 @@ func (d *doctorRun) statusLine() doctor.Check {
 }
 
 func (d *doctorRun) scratchCommit() doctor.Check {
+	if d.nonGit {
+		return doctor.Check{Status: doctor.Skip, Detail: "not a Git repository"}
+	}
 	if !d.installed() {
 		return doctor.Check{Status: doctor.Skip, Detail: "needs an installed repository"}
 	}

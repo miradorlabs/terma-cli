@@ -18,6 +18,16 @@ Terma has two onboarding commands with different owners:
 | `terma install` | Once per repository | Binds the repository to a Terma project, configures per-repository agent routing, and offers to install commit and agent hooks. |
 
 Repository telemetry is enabled by `terma install`; no extra telemetry flag is needed.
+Run it from any subdirectory: Git worktrees and submodules use their own root.
+Outside Git, the first install uses the current directory; later install/uninstall
+calls from subdirectories find the nearest `.terma/settings.json`. Agent hooks and
+telemetry work in these folders, while Git hooks and commit stamping are skipped.
+If you later run `git init` in that same folder, rerun `terma install` to add Git
+hooks; existing sessions and tracked edits carry on without losing attribution.
+Bare repositories are rejected because they have no working directory.
+
+Run `make test-install-e2e` for the isolated install/uninstall subprocess suite.
+See [the installation test matrix](docs/INSTALLATION-TESTS.md) for coverage and limits.
 Restart running agents after installation so they load the new configuration.
 
 Codex desktop uses a separate backend from the `codex` shell command. Select

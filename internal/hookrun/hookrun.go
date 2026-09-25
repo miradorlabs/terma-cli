@@ -98,11 +98,20 @@ func (e Env) repo(ctx context.Context) (*repo, error) {
 	root, gitDir, ok := gitx.LocateFS(e.Cwd)
 	if !ok {
 		var err error
-		if root, gitDir, err = gitx.Locate(ctx, e.Cwd); err != nil {
+		if root, gitDir, err = project.Locate(ctx, e.Cwd); err != nil {
 			return nil, err
 		}
 	}
-	r := &repo{root: root, gitDir: gitDir, store: session.Open(gitDir)}
+	if gitDir == "" {
+		if _, err := project.Load(root); err != nil {
+			return nil, err
+		}
+	}
+	stateDir, err := project.StateDir(root, gitDir)
+	if err != nil {
+		return nil, err
+	}
+	r := &repo{root: root, gitDir: gitDir, store: session.Open(stateDir)}
 	r.name, r.worktree = checkoutNames(root, gitDir)
 	if f, _, err := project.Resolve(root, gitDir); err == nil {
 		r.projectID = f.Project.ID
@@ -306,7 +315,7 @@ func PrepareCommitMsg(ctx context.Context, env Env) error {
 		return nil
 	}
 	r, err := env.repo(ctx)
-	if err != nil {
+	if err != nil || r.gitDir == "" {
 		return nil
 	}
 	manifests, err := r.store.Manifests()
@@ -382,7 +391,7 @@ type commitFileStat struct {
 // count-only event instead, so the share of commits terma attributed is measurable.
 func PostCommit(ctx context.Context, env Env) error {
 	r, err := env.repo(ctx)
-	if err != nil {
+	if err != nil || r.gitDir == "" {
 		return nil
 	}
 	head, err := gitx.LastCommit(ctx, r.root)

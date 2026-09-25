@@ -196,14 +196,25 @@ func TestStatusLineWithoutRendererIsSilentButCaptures(t *testing.T) {
 }
 
 func TestStatusLineStampsProjectFromRepository(t *testing.T) {
-	root := initRepo(t)
-	writeFile(t, root, ".terma/settings.json", `{"project":{"id":"proj_sl"}}`)
-	payload := strings.Replace(quotaPayload, `"cwd":"/tmp"`, `"cwd":`+string(mustJSON(root)), 1)
-	env, _, sp := statusEnv(t, payload)
-	StatusLine(context.Background(), env, StatusLineOptions{CaptureOnly: true})
-	evs := spooledQuota(t, sp)
-	if len(evs) != 1 || evs[0].Attrs[AttrProjectID] != "proj_sl" || evs[0].Repo != filepath.Base(root) {
-		t.Fatalf("project binding: %+v", evs)
+	for _, nonGit := range []bool{false, true} {
+		t.Run(map[bool]string{false: "git", true: "non_git"}[nonGit], func(t *testing.T) {
+			root := t.TempDir()
+			if !nonGit {
+				root = initRepo(t)
+			}
+			writeFile(t, root, ".terma/settings.json", `{"project":{"id":"proj_sl"}}`)
+			nested := filepath.Join(root, "nested")
+			if err := os.MkdirAll(nested, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			payload := strings.Replace(quotaPayload, `"cwd":"/tmp"`, `"cwd":`+string(mustJSON(nested)), 1)
+			env, _, sp := statusEnv(t, payload)
+			StatusLine(context.Background(), env, StatusLineOptions{CaptureOnly: true})
+			evs := spooledQuota(t, sp)
+			if len(evs) != 1 || evs[0].Attrs[AttrProjectID] != "proj_sl" || evs[0].Repo != filepath.Base(root) {
+				t.Fatalf("project binding: %+v", evs)
+			}
+		})
 	}
 }
 

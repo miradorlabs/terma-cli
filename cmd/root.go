@@ -305,7 +305,7 @@ func resolveRepoProject(cfg *config.Config) error {
 	if cfg.ProjectID != "" {
 		return nil
 	}
-	root, gitDir, err := repoHere(context.Background(), "")
+	root, gitDir, err := workspaceHere(context.Background())
 	if err != nil {
 		return nil // Outside a repository: requireProject explains the next step.
 	}
@@ -352,6 +352,14 @@ func repoHere(ctx context.Context, outside string) (root, gitDir string, err err
 		return "", "", errors.New(outside)
 	}
 	return root, gitDir, err
+}
+
+func workspaceHere(ctx context.Context) (root, gitDir string, err error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", "", err
+	}
+	return termaproject.Locate(ctx, cwd)
 }
 
 // setupCommand is the preamble every signed-in read shares: the configuration, the

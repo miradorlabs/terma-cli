@@ -17,7 +17,11 @@ import (
 // ShimScript is the committed fallback hook. It is also the shape every manager's
 // entry follows: guard, run terma without ever failing the commit, then chain.
 func ShimScript(hook string) string {
-	return fmt.Sprintf(`#!/bin/sh
+	return shimScript(hook, true)
+}
+
+func shimScript(hook string, remember bool) string {
+	script := fmt.Sprintf(`#!/bin/sh
 # Installed by "terma install". Thin shim: all logic lives in the terma binary,
 # so this file never needs to change when terma updates. It must never block a
 # commit: a missing or failing terma is ignored.
@@ -42,6 +46,19 @@ if [ -x "$chained" ] && ! [ "$chained" -ef "$0" ]; then
 fi
 exit 0
 `, hook)
+	if !remember {
+		return script
+	}
+	return strings.Replace(script, `chain_dir="${TERMA_CHAIN_HOOKS_DIR:-}"`, `chain_dir="${TERMA_CHAIN_HOOKS_DIR:-}"
+if [ -z "$chain_dir" ]; then
+  state_git_dir="${GIT_DIR:-.git}"
+  if [ ! -d "$state_git_dir" ]; then
+    state_git_dir="$(git rev-parse --absolute-git-dir 2>/dev/null)"
+  fi
+  if [ -f "$state_git_dir/terma/previous-hooks-path" ]; then
+    IFS= read -r chain_dir < "$state_git_dir/terma/previous-hooks-path" || true
+  fi
+fi`, 1)
 }
 
 func planShim(root string, install bool) (Plan, error) {
@@ -52,8 +69,15 @@ func planShim(root string, install bool) (Plan, error) {
 		if err != nil {
 			return p, err
 		}
+		want := []byte(ShimScript(hook))
+		if before != nil && !bytes.Equal(before, want) && !bytes.Equal(before, []byte(shimScript(hook, false))) {
+			if install {
+				return p, fmt.Errorf("%s contains an unrecognized or modified hook; preserve or move it before retrying", rel)
+			}
+			p.Notes = append(p.Notes, "Left modified or unrecognized hook: "+rel)
+			continue
+		}
 		if install {
-			want := []byte(ShimScript(hook))
 			if !bytes.Equal(before, want) {
 				p.Changes = append(p.Changes, Change{Path: rel, Before: before, After: want, Mode: 0o755})
 			}
@@ -177,12 +201,18 @@ func planLefthook(root, configPath string, install bool) (Plan, error) {
 				mapSet(commands, "terma", entry)
 				changed = true
 			} else if cur := mapGet(entry, "run"); cur != nil && cur.Kind == yaml.ScalarNode && cur.Value != run {
-				// An entry from an older terma is brought up to date in place.
+				// Never overwrite a user's command just because they named it terma.
+				if !ownedLefthookRun(cur.Value, hook) {
+					return p, fmt.Errorf("%s: %s.commands.terma is not a Terma hook", configPath, hook)
+				}
 				cur.Value = run
 				changed = true
 			}
 		} else if hookNode != nil {
-			if commands := mapGet(hookNode, "commands"); commands != nil && mapDelete(commands, "terma") {
+			commands := mapGet(hookNode, "commands")
+			entry := mapGet(commands, "terma")
+			run := mapGet(entry, "run")
+			if run != nil && ownedLefthookRun(run.Value, hook) && mapDelete(commands, "terma") {
 				changed = true
 				if len(commands.Content) == 0 {
 					mapDelete(hookNode, "commands")
@@ -274,6 +304,11 @@ func planPreCommit(root string, install bool) (Plan, error) {
 		for _, hook := range GitHooks {
 			id := "terma-" + hook
 			if seqHasID(hooks, id) {
+				for _, entry := range hooks.Content {
+					if v := mapGet(entry, "id"); v != nil && v.Value == id && !ownedPreCommitEntry(entry) {
+						return p, fmt.Errorf("%s: hook id %s belongs to another command", configPath, id)
+					}
+				}
 				continue
 			}
 			entry := &yaml.Node{Kind: yaml.MappingNode}
@@ -292,20 +327,20 @@ func planPreCommit(root string, install bool) (Plan, error) {
 		// The hook types must be installed for these stages to fire.
 		types := mapGet(rootMap, "default_install_hook_types")
 		if types == nil {
-			types = &yaml.Node{Kind: yaml.SequenceNode, Content: []*yaml.Node{scalar("pre-commit")}}
+			types = &yaml.Node{Kind: yaml.SequenceNode, Content: []*yaml.Node{termaHookType("pre-commit")}}
 			mapSet(rootMap, "default_install_hook_types", types)
 			changed = true
 		}
 		for _, hook := range GitHooks {
 			if !seqHasValue(types, hook) {
-				types.Content = append(types.Content, scalar(hook))
+				types.Content = append(types.Content, termaHookType(hook))
 				changed = true
 			}
 		}
 	} else if hooks != nil {
 		var kept []*yaml.Node
 		for _, h := range hooks.Content {
-			if v := mapGet(h, "id"); v != nil && strings.HasPrefix(v.Value, "terma-") {
+			if ownedPreCommitEntry(h) {
 				changed = true
 				continue
 			}
@@ -322,6 +357,23 @@ func planPreCommit(root string, install bool) (Plan, error) {
 			repos.Content = keptRepos
 		}
 	}
+	if !install {
+		if types := mapGet(rootMap, "default_install_hook_types"); types != nil {
+			var kept []*yaml.Node
+			for _, item := range types.Content {
+				if item.LineComment == "# added by terma install" && (item.Value == "pre-commit" || item.Value == "prepare-commit-msg" || item.Value == "post-commit") {
+					changed = true
+					continue
+				}
+				kept = append(kept, item)
+			}
+			types.Content = kept
+			if len(kept) == 0 {
+				mapDelete(rootMap, "default_install_hook_types")
+			}
+		}
+	}
+
 	if !changed {
 		return p, nil
 	}
@@ -354,7 +406,7 @@ func splitLines(data []byte) []string {
 
 func containsMarker(lines []string) bool {
 	for _, l := range lines {
-		if strings.Contains(l, Marker) {
+		if ownedHuskyLine(l) {
 			return true
 		}
 	}
@@ -364,7 +416,7 @@ func containsMarker(lines []string) bool {
 func removeMarked(lines []string) []string {
 	var out []string
 	for _, l := range lines {
-		if !strings.Contains(l, Marker) {
+		if !ownedHuskyLine(l) {
 			out = append(out, l)
 		}
 	}
@@ -377,7 +429,7 @@ func replaceMarked(lines []string, line string) ([]string, bool) {
 	out := make([]string, 0, len(lines))
 	changed := false
 	for _, l := range lines {
-		if strings.Contains(l, Marker) && l != line {
+		if ownedHuskyLine(l) && l != line {
 			l = line
 			changed = true
 		}
@@ -441,6 +493,45 @@ func seqHasID(seq *yaml.Node, id string) bool {
 func seqHasValue(seq *yaml.Node, value string) bool {
 	for _, item := range seq.Content {
 		if item.Value == value {
+			return true
+		}
+	}
+	return false
+}
+
+// termaHookType marks only a hook type we add, so uninstall preserves existing types.
+func termaHookType(value string) *yaml.Node {
+	n := scalar(value)
+	n.LineComment = "# added by terma install"
+	return n
+}
+
+func ownedHuskyLine(line string) bool {
+	line = strings.TrimSpace(line)
+	for _, hook := range GitHooks {
+		bare := `terma hook ` + hook + ` "$@" || true`
+		if line == huskyLine(hook) || line == bare || line == bare+" # "+Marker || line == `command -v terma >/dev/null 2>&1 && { `+bare+`; } # `+Marker {
+			return true
+		}
+	}
+	return false
+}
+
+func ownedLefthookRun(run, hook string) bool {
+	bare := "terma hook " + hook
+	if hook == "prepare-commit-msg" {
+		bare += " {1} {2} {3}"
+	}
+	return run == lefthookRun(hook) || run == bare || run == bare+" || true"
+}
+
+func ownedPreCommitEntry(entry *yaml.Node) bool {
+	id, command := mapGet(entry, "id"), mapGet(entry, "entry")
+	if id == nil || command == nil {
+		return false
+	}
+	for _, hook := range GitHooks {
+		if id.Value == "terma-"+hook && command.Value == preCommitEntry(hook) {
 			return true
 		}
 	}

@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/miradorlabs/terma-cli/internal/adapter"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 )
 
@@ -49,9 +51,8 @@ func TestInstallWiresAntigravityHooksWhenAsked(t *testing.T) {
 	if len(terma.PostToolUse) != 1 || terma.PostToolUse[0].Matcher != "" || terma.PostToolUse[0].Hooks[0]["command"] != hookmgr.HookCommand("antigravity-post-tool-use") {
 		t.Errorf("PostToolUse = %+v", terma.PostToolUse)
 	}
-	binding, _ := os.ReadFile(filepath.Join(repo, ".terma", "settings.json"))
-	if !strings.Contains(string(binding), `"claude"`) || !strings.Contains(string(binding), `"antigravity"`) {
-		t.Errorf(".terma/settings.json does not record the antigravity adapter:\n%s", binding)
+	if got := strings.Join(adapter.WiredNames(repo), ","); got != "claude,antigravity" {
+		t.Errorf("wired adapters = %q, want claude,antigravity", got)
 	}
 
 	out, err = runTerma(t, "uninstall", "--yes")
@@ -85,9 +86,8 @@ func TestInstallWiresAntigravityByDefaultOnlyWhereItIsUsed(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(repo, ".agents", "hooks.json")); err != nil {
 		t.Fatal("a repository with a .agents directory should get Antigravity hooks by default")
 	}
-	binding, _ := os.ReadFile(filepath.Join(repo, ".terma", "settings.json"))
-	if !strings.Contains(string(binding), "antigravity") {
-		t.Errorf(".terma/settings.json does not record the antigravity adapter:\n%s", binding)
+	if !slices.Contains(adapter.WiredNames(repo), "antigravity") {
+		t.Errorf("antigravity is not wired: %v", adapter.WiredNames(repo))
 	}
 }
 

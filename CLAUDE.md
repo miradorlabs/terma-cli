@@ -15,6 +15,7 @@ make lint             # the golangci-lint in .golangci-lint-version, built with 
 make format           # go fix ./... then gofmt -w . (mirrors the .claude/hooks edit-time hooks)
 make bench-hook       # prepare-commit-msg budget (<50 ms end to end), enforced in CI
 make release-dry-run  # goreleaser snapshot, nothing published
+make test-install-e2e # built CLI: root discovery, non-Git workspaces, ownership, uninstall
 make test-install     # what CI runs: tagged goreleaser render, then install.sh (+ the cask on macOS) over loopback
 go test ./internal/hookrun/ -run TestName
 ```
@@ -272,7 +273,9 @@ run that reaches them opens a browser login on **production**. A script that run
   `user.email` and `service.name=claude-code` itself. The project a configuration
   reports to lives in the connect journal (`journal.ProjectID`, from
   `Exporter.ProjectID`). User-level settings require a journal for removal; committed
-  repository policies can be removed in any clone.
+  repository policies can be removed in any clone, but without the journal only a key
+  holding a value Terma writes (`renderedByTerma`: `otlp`/`none`, `0`/`1`) — a developer's
+  own `OTEL_LOGS_EXPORTER=console` stays.
   `enduser.id` / `mirador.project.id` resource attributes are Codex and OpenCode only.
 - Sessions (`internal/auth/store.go`): `credentials.json` holds, per profile, one
   credential per organization plus which is active (`{active, organizations}`).
@@ -557,11 +560,15 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
 - Project header under a CLI token: `X-Mirador-Project` (`internal/api/client.go`).
   The shared gateway knows only that name; a Terma-branded header is a 400.
 - `.terma/settings.json` (`internal/project`, JSON): `project{id,name,organization_id,
-  environment}`, `install{hook_manager,hooks,adapters,terma_version,installed_at}`. No
+  environment}`, `install{hook_manager,hooks,terma_version,installed_at}`. No
   secrets, ever, and nothing per-developer: which agents a developer routes, and how, is
   home-directory state (`config.Profile.Harnesses`, the routing record), so a colleague
-  re-running install never churns the committed file. Lives inside the same `.terma/` dir as the hook shims
-  (`.terma/hooks/`).
+  re-running install never churns the committed file. Which agents' hooks are wired is
+  not recorded either — the committed hooks files are the record (`adapter.WiredNames`:
+  an adapter is wired when its uninstall plan is non-empty). An `install.adapters` list
+  once lived here and grew with each colleague's own agents; a binding that carries it
+  loads and drops it on the next `Save`. Lives inside the same `.terma/` dir as the hook
+  shims (`.terma/hooks/`).
 - Browser login page: `<AppURL>/cli/auth?challenge&state&port&label[&org]` →
   `http://127.0.0.1:<port>/callback?code&state` (terma-frontend `src/features/cli`).
   `org` is an id or a name the page preselects; a hint only — the CLI compares the
@@ -629,8 +636,8 @@ it does not prove that a running agent has reloaded its settings or sent telemet
 - Refresh (`cmd/refresh.go`, `terma update --refresh`): after replacing itself or running
   the package manager, the old binary execs the new one's `update --refresh` — the old
   process cannot run new templates. It rewrites only files terma already wrote (shims,
-  the status-line wrap, the OpenCode plugin, and the current repository's hooks from its
-  binding's manager and adapters), never creates one, never signs in, and never changes a
+  the status-line wrap, the OpenCode plugin, and the current repository's hooks: the commit
+  hooks through the binding's manager, the agent hooks its files already wire), never creates one, never signs in, and never changes a
   choice. Re-running `terma install` is not a substitute: it re-defaults every flag it
   does not record. The first interactive command under a newer release refreshes the
   home-directory files once (`refreshed.json`, upward only, so two builds on PATH do not
@@ -654,3 +661,22 @@ it does not prove that a running agent has reloaded its settings or sent telemet
   migrated` line only when one is pending or failed. The first, ID 1, fills in `cli` on
   routing records 0.0.2 wrote: without it the router read the missing field as false and
   stopped routing the Codex CLI.
+
+## Workspace installation regression tests
+
+`make test-install-e2e` builds the actual CLI and exercises install/uninstall as
+subprocesses with private configuration and no inherited credentials or exporters.
+The matrix is documented in `docs/INSTALLATION-TESTS.md` and is also part of
+`make check`. Installation uses `project.Locate`: Git determines a worktree root;
+outside Git, the nearest binding or the first install's current directory does.
+Non-Git session state lives under the config directory, keyed by canonical root.
+Install reserves that directory before hooks can run, even with no session yet.
+After `git init`, `project.StateDir` keeps selecting the existing private store,
+so in-flight and newly started hooks use the same lock and manifests; do not
+switch that workspace to an empty Git store on reinstall. Uninstall removes both
+the private store/reservation and Git's hook-restoration journal. New Git-only
+workspaces and linked worktrees continue to use their own Git metadata.
+Git hooks use worktree-scoped config; never write shared `core.hooksPath` for a
+linked worktree. Preserve user commands in mixed hook groups and refuse mutation
+through symlinked configuration paths. An unknown or edited fallback shim must
+not be overwritten or deleted just because it occupies `.terma/hooks/`.

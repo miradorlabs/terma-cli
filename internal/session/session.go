@@ -2,9 +2,10 @@
 // which files, so a commit can be attributed to the sessions that actually produced
 // its staged content.
 //
-// State lives under <gitdir>/terma/ — inside the repository's own metadata, never in
-// the worktree, so nothing here can be committed by accident and every worktree has
-// its own. Two things are recorded:
+// State lives under <gitdir>/terma/ for a workspace installed with Git, or under
+// its private configuration directory if it started without Git. That choice is
+// retained after git init, so active hooks keep sharing a store. State is never
+// committed with the worktree, and each worktree has its own. Two things are recorded:
 //
 //   - the active session (session.json): what the harness most recently announced,
 //     used only as a fallback when no manifest matches;
@@ -91,9 +92,9 @@ const (
 	maxIDLen     = 128
 )
 
-// Open addresses the state under gitDir without creating anything.
-func Open(gitDir string) *Store {
-	return &Store{dir: filepath.Join(gitDir, stateDirName), lockWait: hookLockWait}
+// Open addresses state under its Git or private storage root without creating it.
+func Open(stateRoot string) *Store {
+	return &Store{dir: filepath.Join(stateRoot, stateDirName), lockWait: hookLockWait}
 }
 
 // safeID is what a session id is allowed to look like when it becomes a file name.
@@ -393,24 +394,33 @@ func (s *Store) Prune(before time.Time) (int, error) {
 // configuration, so uninstall can put it back exactly.
 type installRecord struct {
 	PreviousHooksPath string    `json:"previous_hooks_path"`
+	HooksConfigScope  string    `json:"hooks_config_scope,omitempty"`
+	HooksPathLocal    *bool     `json:"hooks_path_local,omitempty"`
 	RecordedAt        time.Time `json:"recorded_at"`
 }
 
 const installFile = "install.json"
 
-// RecordPreviousHooksPath remembers the core.hooksPath in force before terma
-// pointed git at its shims. Recording twice keeps the first value: the second
-// run would otherwise "remember" terma's own path.
-func RecordPreviousHooksPath(gitDir, previous string) error {
+// RecordPreviousHooksPathAtScope also records Git's scope and whether the previous
+// setting was explicit there. Inherited values must be restored by unsetting ours.
+func RecordPreviousHooksPathAtScope(gitDir, previous, scope string, local bool, chainPath string) error {
 	path := filepath.Join(gitDir, stateDirName, installFile)
-	var existing installRecord
-	if err := readJSON(path, &existing); err == nil && !existing.RecordedAt.IsZero() {
-		return nil
+	if err := writeJSON(path, installRecord{PreviousHooksPath: previous, HooksConfigScope: scope, HooksPathLocal: &local, RecordedAt: time.Now()}); err != nil {
+		return err
 	}
-	return writeJSON(path, installRecord{PreviousHooksPath: previous, RecordedAt: time.Now()})
+	return os.WriteFile(filepath.Join(gitDir, stateDirName, "previous-hooks-path"), []byte(chainPath+"\n"), fileMode)
 }
 
-// PreviousHooksPath returns what RecordPreviousHooksPath stored; ok is false when
+// PreviousHooksScope returns the scope Terma changed. Older installs used --local.
+func PreviousHooksScope(gitDir string) string {
+	var rec installRecord
+	if readJSON(filepath.Join(gitDir, stateDirName, installFile), &rec) == nil && rec.HooksConfigScope == "--worktree" {
+		return "--worktree"
+	}
+	return "--local"
+}
+
+// PreviousHooksPath returns the saved original hook path; ok is false when
 // nothing was recorded.
 func PreviousHooksPath(gitDir string) (previous string, ok bool) {
 	var rec installRecord
@@ -529,4 +539,17 @@ func writeJSON(path string, v any) error {
 		return err
 	}
 	return config.WriteFileAtomicNoSync(path, data, fileMode)
+}
+
+// HooksPathWasLocal distinguishes an explicit hooksPath (including an empty value)
+// from an inherited value, so uninstall restores inheritance rather than pinning it.
+func HooksPathWasLocal(gitDir string) bool {
+	var rec installRecord
+	if err := readJSON(filepath.Join(gitDir, stateDirName, installFile), &rec); err != nil {
+		return false
+	}
+	if rec.HooksPathLocal != nil {
+		return *rec.HooksPathLocal
+	}
+	return rec.PreviousHooksPath != ""
 }

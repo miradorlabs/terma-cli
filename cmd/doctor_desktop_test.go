@@ -9,7 +9,6 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
-	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/shim"
 )
 
@@ -44,11 +43,7 @@ func TestDesktopChoiceCountsCodexHookTrust(t *testing.T) {
 	if out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "codex", "--yes", "--no-doctor"); err != nil {
 		t.Fatalf("wire Codex hooks: %v\n%s", err, out)
 	}
-	binding, err := termaproject.Load(repo)
-	if err != nil {
-		t.Fatal(err)
-	}
-	check := agentHooksCheck(repo, binding, []string{codexDesktopAgent})
+	check := agentHooksCheck(repo, []string{codexDesktopAgent})
 	if check.Of != 1 || check.Status != doctor.Warn {
 		t.Fatalf("desktop choice did not check the required Codex hook trust: %+v", check)
 	}

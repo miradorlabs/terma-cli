@@ -30,6 +30,11 @@ install:
 test:
 	go test ./...
 
+# Builds and exercises the real CLI in isolated workspaces; no login or live backend.
+.PHONY: test-install-e2e
+test-install-e2e:
+	go test ./cmd -run '^TestInstallE2E' -count=1 -v
+
 .PHONY: cover
 cover:
 	go test -cover ./...

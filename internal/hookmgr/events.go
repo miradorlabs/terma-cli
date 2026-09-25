@@ -20,9 +20,8 @@ type hooksFile struct {
 	// Path is relative to the repository root, slash-separated.
 	Path string
 	// Defaults are top-level members terma sets when it writes the file and the file
-	// has none of its own — Cursor refuses a hooks file without its schema version. A
-	// value the developer already has is theirs. On uninstall a file left holding only
-	// these is removed: terma put them there.
+	// has none of its own — Cursor refuses a hooks file without its schema version.
+	// Defaults are preserved on uninstall: an identical value may predate Terma.
 	Defaults map[string]json.RawMessage
 }
 
@@ -45,6 +44,9 @@ func mergeEventHooks(root string, file hooksFile, own []eventHook, install bool)
 			return p, fmt.Errorf("parse %s: %w", file.Path, err)
 		}
 	}
+	if top == nil {
+		return p, fmt.Errorf("parse %s: expected a JSON object", file.Path)
+	}
 	events := map[string][]json.RawMessage{}
 	if raw, ok := top["hooks"]; ok && len(raw) > 0 {
 		if err := json.Unmarshal(raw, &events); err != nil {
@@ -52,29 +54,38 @@ func mergeEventHooks(root string, file hooksFile, own []eventHook, install bool)
 		}
 	}
 
+	if events == nil {
+		return p, fmt.Errorf("parse %s hooks: expected a JSON object", file.Path)
+	}
 	changed := false
 	for _, h := range own {
 		entries := events[h.Event]
-		idx := -1
-		for i, e := range entries {
-			if callsTerma(e) {
-				idx = i
-				break
+		// Keep user commands even when they share a matcher group with ours.
+		var kept []json.RawMessage
+		present := false
+		for _, entry := range entries {
+			if install && !present && sameJSON(entry, h.Entry) {
+				kept = append(kept, entry)
+				present = true
+				continue
+			}
+			remaining, removed, err := withoutTerma(entry)
+			if err != nil {
+				return p, err
+			}
+			changed = changed || removed
+			if remaining != nil {
+				kept = append(kept, remaining)
 			}
 		}
-		switch {
-		case install && idx == -1:
-			events[h.Event] = append(entries, h.Entry)
+		if install && !present {
+			kept = append(kept, h.Entry)
 			changed = true
-		case install && !sameJSON(entries[idx], h.Entry):
-			entries[idx] = h.Entry
-			changed = true
-		case !install && idx != -1:
-			events[h.Event] = append(entries[:idx], entries[idx+1:]...)
-			if len(events[h.Event]) == 0 {
-				delete(events, h.Event)
-			}
-			changed = true
+		}
+		if len(kept) == 0 {
+			delete(events, h.Event)
+		} else {
+			events[h.Event] = kept
 		}
 	}
 	if !changed {
@@ -101,7 +112,7 @@ func mergeEventHooks(root string, file hooksFile, own []eventHook, install bool)
 	}
 	// Uninstall from a file that held nothing but what terma wrote: remove it rather
 	// than leave an empty shell behind.
-	if !install && before != nil && onlyDefaults(top, file.Defaults) {
+	if !install && before != nil && len(top) == 0 {
 		p.Changes = append(p.Changes, Change{Path: file.Path, Before: before})
 		return p, nil
 	}
@@ -111,14 +122,4 @@ func mergeEventHooks(root string, file hooksFile, own []eventHook, install bool)
 	}
 	p.Changes = append(p.Changes, Change{Path: file.Path, Before: before, After: append(out, '\n')})
 	return p, nil
-}
-
-// onlyDefaults reports whether every member of top is one terma would have added.
-func onlyDefaults(top, defaults map[string]json.RawMessage) bool {
-	for key := range top {
-		if _, ok := defaults[key]; !ok {
-			return false
-		}
-	}
-	return true
 }

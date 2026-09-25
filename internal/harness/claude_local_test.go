@@ -246,6 +246,43 @@ func TestLocalStatusReportsPresenceNotConnection(t *testing.T) {
 	}
 }
 
+// Without a journal only a value Terma writes is Terma's to remove: a developer's own
+// exporter ("console") and switch values Terma never renders stay where they are.
+func TestLocalDisconnectWithoutJournalKeepsValuesTermaNeverWrites(t *testing.T) {
+	h, path := localClaudeIn(t, `{"env":{
+		"OTEL_LOGS_EXPORTER":"console",
+		"OTEL_TRACES_EXPORTER":"otlp",
+		"OTEL_LOG_USER_PROMPTS":"true",
+		"OTEL_LOG_TOOL_DETAILS":"0"
+	}}`)
+	result, err := h.Disconnect()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Removed != 2 || !result.Unjournaled {
+		t.Fatalf("result = %+v, want the 2 Terma values removed", result)
+	}
+	env := envOf(t, path)
+	if env[otelLogsExporter] != "console" || env[otelLogUserPrompts] != "true" {
+		t.Fatalf("a developer's own value was removed: %v", env)
+	}
+	if _, ok := env[otelTracesExporter]; ok {
+		t.Fatal("a value Terma writes survived")
+	}
+	if _, ok := env[otelLogToolDetails]; ok {
+		t.Fatal("a switch value Terma writes survived")
+	}
+
+	// Nothing of Terma's: nothing removed, and not reported as an unjournaled removal.
+	h, path = localClaudeIn(t, `{"env":{"OTEL_LOGS_EXPORTER":"console"}}`)
+	if result, err := h.Disconnect(); err != nil || result.Removed != 0 || result.Unjournaled {
+		t.Fatalf("result = %+v, err %v", result, err)
+	}
+	if env := envOf(t, path); env[otelLogsExporter] != "console" {
+		t.Fatalf("env %v", env)
+	}
+}
+
 // A colleague's committed layer arrives without this machine's journal. Disconnect still
 // removes exactly the local keys, and leaves the rest of the env block — including an
 // endpoint a global disconnect would have owned — where it found it.

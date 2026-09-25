@@ -151,27 +151,82 @@ func PlanAntigravityHooks(root string, install bool) (Plan, error) {
 			return p, fmt.Errorf("parse %s: %w", AntigravityHooksPath, err)
 		}
 	}
+	if top == nil {
+		return p, fmt.Errorf("parse %s: expected a JSON object", AntigravityHooksPath)
+	}
 	previous, present := top[antigravityHookName]
-	if install {
-		entry, err := renderAntigravityEntry(previous)
+	if !install && !present {
+		return p, nil
+	}
+	entry := map[string]json.RawMessage{}
+	if present {
+		if err := json.Unmarshal(previous, &entry); err != nil {
+			return p, err
+		}
+	}
+	if entry == nil {
+		return p, fmt.Errorf("parse %s terma: expected a JSON object", AntigravityHooksPath)
+	}
+	generated, err := renderAntigravityEntry(previous)
+	if err != nil {
+		return p, err
+	}
+	var desired map[string]json.RawMessage
+	if err := json.Unmarshal(generated, &desired); err != nil {
+		return p, err
+	}
+	for event, target := range desired {
+		if event == "enabled" {
+			continue
+		}
+		var entries, wanted []json.RawMessage
+		if raw, ok := entry[event]; ok {
+			if err := json.Unmarshal(raw, &entries); err != nil {
+				return p, err
+			}
+		}
+		if err := json.Unmarshal(target, &wanted); err != nil {
+			return p, err
+		}
+		var kept []json.RawMessage
+		for _, handler := range entries {
+			remaining, _, err := withoutTerma(handler)
+			if err != nil {
+				return p, err
+			}
+			if remaining != nil {
+				kept = append(kept, remaining)
+			}
+		}
+		if install {
+			kept = append(kept, wanted...)
+		}
+		if len(kept) == 0 {
+			delete(entry, event)
+		} else {
+			encoded, err := marshalJSON(kept, "", "")
+			if err != nil {
+				return p, err
+			}
+			entry[event] = encoded
+		}
+	}
+	// A user-set enabled switch or any extra field remains the user's.
+	if len(entry) == 0 {
+		delete(top, antigravityHookName)
+	} else {
+		encoded, err := marshalJSON(entry, "  ", "  ")
 		if err != nil {
 			return p, err
 		}
-		if present && sameJSON(previous, entry) {
+		if present && sameJSON(previous, encoded) {
 			return p, nil
 		}
-		top[antigravityHookName] = entry
-	} else {
-		if !present {
-			return p, nil
-		}
-		delete(top, antigravityHookName)
-		// Uninstall from a file that held nothing but terma's hook: remove it rather
-		// than leave an empty object behind.
-		if len(top) == 0 {
-			p.Changes = append(p.Changes, Change{Path: AntigravityHooksPath, Before: before})
-			return p, nil
-		}
+		top[antigravityHookName] = encoded
+	}
+	if len(top) == 0 {
+		p.Changes = append(p.Changes, Change{Path: AntigravityHooksPath, Before: before})
+		return p, nil
 	}
 	out, err := marshalOrdered(top)
 	if err != nil {

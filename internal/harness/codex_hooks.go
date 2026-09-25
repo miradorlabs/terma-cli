@@ -75,8 +75,8 @@ func (c Codex) CodexHookTrustFor(hooksPath string) (CodexHookTrust, error) {
 	for key, raw := range state {
 		matched, name := false, ""
 		for _, prefix := range prefixes {
-			if strings.HasPrefix(key, prefix) {
-				matched, name = true, strings.TrimPrefix(key, prefix)
+			if after, ok := strings.CutPrefix(key, prefix); ok {
+				matched, name = true, after
 				break
 			}
 		}

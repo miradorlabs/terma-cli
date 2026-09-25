@@ -64,21 +64,38 @@ func TestCursorHooksMergeKeepsUnknownKeysAndUserHooks(t *testing.T) {
 	}
 }
 
-// A file terma creates carries the schema version Cursor requires, and goes away whole
-// on uninstall — the version it added is not a reason to keep an otherwise empty file.
-func TestCursorHooksCreatedAndRemovedWhole(t *testing.T) {
-	root := t.TempDir()
-	plan, _ := PlanCursorHooks(root, true)
-	if err := Apply(root, plan); err != nil {
-		t.Fatal(err)
-	}
-	got := read(t, root, CursorHooksPath)
-	if !strings.Contains(got, "terma hook cursor-session-start") || !strings.Contains(got, `"version": 1`) {
-		t.Fatalf("file wrong:\n%s", got)
-	}
-	un, _ := PlanCursorHooks(root, false)
-	if len(un.Changes) != 1 || un.Changes[0].Action() != "delete" {
-		t.Fatalf("expected a delete, got %+v", un.Changes)
+// The version is not ownership evidence: the same value could have existed before
+// install or arrived from a colleague, so uninstall removes commands and keeps it.
+func TestCursorUninstallPreservesSchemaVersion(t *testing.T) {
+	for _, before := range []string{"", `{"version":1}`, `{"version":42}`} {
+		t.Run(before, func(t *testing.T) {
+			root := t.TempDir()
+			if before != "" {
+				write(t, root, CursorHooksPath, before)
+			}
+			plan, err := PlanCursorHooks(root, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := Apply(root, plan); err != nil {
+				t.Fatal(err)
+			}
+			un, err := PlanCursorHooks(root, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := Apply(root, un); err != nil {
+				t.Fatal(err)
+			}
+			got := read(t, root, CursorHooksPath)
+			want := before
+			if want == "" {
+				want = `{"version":1}`
+			}
+			if !sameJSON([]byte(got), []byte(want)) {
+				t.Fatalf("schema changed: %s", got)
+			}
+		})
 	}
 }
 

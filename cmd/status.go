@@ -202,7 +202,7 @@ Nothing is written and no scratch commit is made — run
 			}
 
 			// Repository.
-			root, gitDir, repoErr := repoHere(ctx, "")
+			root, gitDir, repoErr := workspaceHere(ctx)
 			hooksOK := false
 			var agentHooks doctor.Check
 			repoBound := false
@@ -214,16 +214,24 @@ Nothing is written and no scratch commit is made — run
 			} else {
 				projectID, repoBound = bound.Project.ID, true
 				fmt.Fprintf(out, "Repository:  %s → %s%s\n", root, nameOrID(bound.Project.Name, bound.Project.ID), throughMain(root, from))
-				wiring := judgeHookWiring(ctx, root, bound)
-				var state string
-				state, hooksOK = statusHooks(wiring)
-				fmt.Fprintf(out, "Hooks:       %s via %s\n", state, wiring.manager)
+				if gitDir == "" {
+					fmt.Fprintln(out, "Hooks:       Git hooks skipped (not a Git repository)")
+				} else {
+					wiring := judgeHookWiring(ctx, root, bound)
+					var state string
+					state, hooksOK = statusHooks(wiring)
+					fmt.Fprintf(out, "Hooks:       %s via %s\n", state, wiring.manager)
+				}
 				// The agents' own hooks, judged the way doctor judges them: an agent that
 				// cannot run its hooks yet costs its share of commit stamping in both.
-				if agentHooks = agentHooksCheck(root, bound, selectedForRepo(projectID, cfg.Harnesses)); agentHooks.Status == doctor.Warn {
+				if agentHooks = agentHooksCheck(root, selectedForRepo(projectID, cfg.Harnesses)); agentHooks.Status == doctor.Warn {
 					fmt.Fprintf(out, "Agent hooks: %d of %d agents can run theirs — %s\n", agentHooks.Ready, agentHooks.Of, agentHooks.Fix)
 				}
-				store := session.Open(gitDir)
+				stateDir, err := termaproject.StateDir(root, gitDir)
+				if err != nil {
+					return err
+				}
+				store := session.Open(stateDir)
 				if active, fresh := store.Active(time.Now(), 4*time.Hour); active != nil && fresh {
 					fmt.Fprintf(out, "Session:     %s (%s), active\n", active.ID, active.ToolLabel())
 				}
@@ -308,7 +316,7 @@ Nothing is written and no scratch commit is made — run
 			if !authOK {
 				checks = append(checks, doctor.Check{Status: doctor.Fail, Fix: "terma setup"})
 			}
-			if !repoBound || !hooksOK {
+			if !repoBound || (gitDir != "" && !hooksOK) {
 				checks = append(checks, doctor.Check{Status: doctor.Fail, Fix: "terma install"})
 			}
 			if !backendOK {

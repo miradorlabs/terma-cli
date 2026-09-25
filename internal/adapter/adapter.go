@@ -30,7 +30,7 @@ type Handler = func(context.Context, hookrun.Env) error
 
 // Adapter is terma's integration with one coding agent at repository scope.
 type Adapter interface {
-	// Name is the token `--adapters` accepts and .terma/settings.json records.
+	// Name is the token `--adapters` accepts.
 	Name() string
 	// DisplayName is how the agent is written in prose — "Claude Code".
 	DisplayName() string
@@ -114,6 +114,31 @@ func RepoNames() []string {
 	var out []string
 	for _, a := range registry {
 		if a.HooksPath() != "" {
+			out = append(out, a.Name())
+		}
+	}
+	return out
+}
+
+// Wired reports whether root's committed hooks file carries a's entries: whether
+// uninstalling it would change anything. The repository is the record — which agents a
+// repository is wired for is whatever its committed files say, not a list kept beside
+// them that a colleague's install or a hand edit can make disagree. A file that cannot
+// be read counts as wired, so the plan built from it raises the error rather than
+// install passing over it in silence.
+func Wired(root string, a Adapter) bool {
+	if a.HooksPath() == "" {
+		return false
+	}
+	plan, err := a.Plan(root, false)
+	return err != nil || !plan.Empty()
+}
+
+// WiredNames lists the adapters wired in root, in registry order.
+func WiredNames(root string) []string {
+	var out []string
+	for _, a := range registry {
+		if Wired(root, a) {
 			out = append(out, a.Name())
 		}
 	}
