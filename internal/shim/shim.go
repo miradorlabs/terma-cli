@@ -322,20 +322,43 @@ func RemoveShims() error {
 	return nil
 }
 
-// WrapperSnippet delegates to the installed launcher without changing PATH.
-func WrapperSnippet(agents []string) string {
+// WrapperSnippet delegates to the installed launcher without changing PATH, as POSIX
+// shell functions (sh, bash, zsh).
+func WrapperSnippet(agents []string) string { return WrapperSnippetFor("", agents) }
+
+// WrapperSnippetFor is WrapperSnippet in the syntax of the given shell: fish functions for
+// "fish", POSIX shell functions for anything else. fish cannot source the POSIX form at
+// all — `name() { … }` and `export` are not fish syntax.
+func WrapperSnippetFor(shell string, agents []string) string {
+	fish := shell == "fish"
 	var b strings.Builder
 	b.WriteString("# terma per-repo routing — added by `terma install`.\n")
 	b.WriteString("# Routes these agents to the repository's Terma project when run inside one.\n")
-	b.WriteString("export " + WrapperEnv + "=wrapper\n")
+	if fish {
+		b.WriteString("set -gx " + WrapperEnv + " wrapper\n")
+	} else {
+		b.WriteString("export " + WrapperEnv + "=wrapper\n")
+	}
+	binDir, _ := ShimBinDir()
 	for _, agent := range agents {
 		if !Routable(agent) {
 			continue
 		}
-		binDir, _ := ShimBinDir()
-		fmt.Fprintf(&b, "%s() { if [ -x %s ]; then command %s \"$@\"; else command %s \"$@\"; fi; }\n", agent, shellQuote(filepath.Join(binDir, agent)), shellQuote(filepath.Join(binDir, agent)), agent)
+		launcher := filepath.Join(binDir, agent)
+		if fish {
+			q := fishQuote(launcher)
+			fmt.Fprintf(&b, "function %s --wraps %s\n    if test -x %s\n        command %s $argv\n    else\n        command %s $argv\n    end\nend\n", agent, agent, q, q, agent)
+			continue
+		}
+		fmt.Fprintf(&b, "%s() { if [ -x %s ]; then command %s \"$@\"; else command %s \"$@\"; fi; }\n", agent, shellQuote(launcher), shellQuote(launcher), agent)
 	}
 	return b.String()
+}
+
+// fishQuote single-quotes s for fish, where a backslash and a single quote are the only
+// characters that stay special inside single quotes.
+func fishQuote(s string) string {
+	return "'" + strings.NewReplacer(`\`, `\\`, `'`, `\'`).Replace(s) + "'"
 }
 
 // mergeEnv overlays extra onto a base environment slice, replacing matching keys.

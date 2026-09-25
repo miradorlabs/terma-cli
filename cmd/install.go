@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -647,8 +648,13 @@ func setupActivation(cmd *cobra.Command, agents []string, f installFlags) error 
 		if _, err := shim.InstallShims(agents); err != nil {
 			return err
 		}
-		fmt.Fprintln(out, "\nAdd these to your ~/.zshrc (or ~/.bashrc) so the agents route to this repo's project:")
-		fmt.Fprint(out, indent(shim.WrapperSnippet(agents)))
+		shell := filepath.Base(os.Getenv("SHELL"))
+		if shell == "fish" {
+			fmt.Fprintln(out, "\nAdd these to your ~/.config/fish/config.fish so the agents route to this repo's project:")
+		} else {
+			fmt.Fprintln(out, "\nAdd these to your ~/.zshrc (or ~/.bashrc) so the agents route to this repo's project:")
+		}
+		fmt.Fprint(out, indent(shim.WrapperSnippetFor(shell, agents)))
 	default:
 		return fmt.Errorf("unknown --activation %q (want shim or wrapper)", mode)
 	}
