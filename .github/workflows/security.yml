@@ -13,15 +13,28 @@ permissions:
 
 jobs:
   govulncheck:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: govulncheck
+            module: .
+          - name: govulncheck (live)
+            module: live
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ matrix.module }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version-file: ${{ matrix.module }}/go.mod
           cache: true
-      # Covers our dependencies and the Go standard library the binary is built
-      # against. Pinned so the scanner itself is a reproducible input; the
-      # vulnerability database is still fetched fresh at run time.
+          cache-dependency-path: ${{ matrix.module }}/go.sum
+      # ./... does not cross module boundaries: scan the live harness separately,
+      # including its test code. The scanner is pinned; its vulnerability database
+      # is fetched fresh at run time.
       - name: govulncheck
-        run: go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 -test ./...
