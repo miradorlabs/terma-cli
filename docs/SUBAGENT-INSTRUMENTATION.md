@@ -24,6 +24,30 @@ way as its own edits.
 `agent_id` is the discriminator. `claude --agent <name>` sends `agent_type` on every hook
 of the session, main thread included, so a type without an id stamps nothing.
 
+For Claude lifecycle events, an id alone does not prove a delegated run. Claude's
+internal forks (including periodic background-agent summaries, prompt suggestions and
+`/btw`) also fire `SubagentStop`, with new ids and no `SubagentStart` or Agent call.
+The type is usually empty, but can inherit the session's `--agent` name; filtering
+empty types alone misses that case. See the [Claude hook reference](https://code.claude.com/docs/en/hooks#subagentstop).
+
+Terma therefore records launch evidence from `SubagentStart` or a successful
+`Agent`/legacy `Task` tool response before accepting `SubagentStop` for the same
+`(session_id, agent_id)`. Each pair has a separate atomic marker under
+`claude-subagents/` in the config directory, shared across worktrees and hook
+processes. Stops keep the marker so a resumed agent or one continued by another hook
+still reports its end. Markers expire after 14 days and session starts prune them.
+An unobserved launch (including one before an upgrade, a failed marker write or an
+expired marker) means its stop is omitted; its launch/tool-call evidence and native
+usage remain available. This filters future hook events; previously ingested rows
+require a separate platform cleanup.
+
+Checked 2026-09-25 against a live dev session: four agent launches, 107 orphan end
+records with no type, and no orphan start records. Forty orphan ends aligned within
+one second of native `query_source=agent_summary` calls. The installed Claude Code
+2.1.282 bundle confirms a 30-second summary timer, a fresh fork id, no start-hook
+dispatch on that path, and the shared stop-hook path. The other orphan ends are not
+individually classified; none has evidence of delegation.
+
 **A session of its own.** Cursor and OpenCode give the child a conversation or session of
 its own. OpenCode's `terma.session.start` names the parent in `parent_session_id`, and the
 child is never made the repository's active session: that is what claims a commit no
