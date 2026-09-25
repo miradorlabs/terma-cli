@@ -295,8 +295,10 @@ run that reaches them opens a browser login on **production**. A script that run
   add` does not copy ignored files; before this, every event from such a worktree had no
   project and was dropped as `Unroutable` at the next flush, in silence. It follows git's
   `commondir` link, never directory nesting (a nested separate repository still inherits
-  nothing), costs one small read only when the checkout has no binding, and a bare
-  repository's worktrees have no main checkout to fall back to. Events from a linked
+  nothing). A hook reads the git directory's `commondir` (one small file, absent in a main
+  checkout) on every run, to name the worktree, and the main checkout's binding only when
+  the checkout has none; no git subprocess. A bare repository's worktrees have no main
+  checkout to fall back to. Events from a linked
   worktree report the **main** checkout's directory name as `repo` and git's name for the
   worktree as `worktree` (`AttrWorktree`), so one repository's worktrees — Claude Code's
   `.claude/worktrees/agent-…` among them — group as that repository. `install` and

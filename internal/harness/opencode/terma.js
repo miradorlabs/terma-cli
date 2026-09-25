@@ -17,7 +17,7 @@
 const CONFIG = null /* terma:config */
 
 import { createHash } from "node:crypto"
-import { readFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { spawn, execFile } from "node:child_process"
 import { join, dirname, basename, isAbsolute, resolve } from "node:path"
 
@@ -83,10 +83,17 @@ function readProjectID(worktree) {
   for (let i = 0; i < 64 && dir; i++) {
     const id = bindingProjectID(dir)
     if (id) return id
-    const main = mainCheckout(dir)
-    if (main) {
-      const mainID = bindingProjectID(main)
-      if (mainID) return mainID
+    const parent = dirname(dir)
+    if (parent === dir) break
+    dir = parent
+  }
+  // No binding on the way up: only now, and only at the nearest git root, try the main
+  // checkout of a linked worktree — the same order as ResolveDir (Find, then Resolve).
+  dir = worktree
+  for (let i = 0; i < 64 && dir; i++) {
+    if (existsSync(join(dir, ".git"))) {
+      const main = mainCheckout(dir)
+      return main ? bindingProjectID(main) : ""
     }
     const parent = dirname(dir)
     if (parent === dir) break
