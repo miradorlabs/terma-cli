@@ -192,6 +192,29 @@ func TestUpdateUpgradesThroughThePackageManager(t *testing.T) {
 	}
 }
 
+// A project's own npm dependency is never upgraded from here, and the developer is told
+// to update it in that project — not to make an unrelated global install.
+func TestUpdateSendsAProjectDependencyToItsProject(t *testing.T) {
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	project := filepath.Join(root, "app")
+	exe := filepath.Join(project, "node_modules", "@miradorlabs", "terma", "vendor", "terma")
+	if err := os.MkdirAll(filepath.Dir(exe), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(exe, nil, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	steps := recordSteps(t, "")
+	var out bytes.Buffer
+	err = runUpdate(context.Background(), latestRelease(t, "v2.0.0"), t.TempDir(), exe, &out, false, false)
+	if err == nil || !strings.Contains(err.Error(), project) || !strings.Contains(err.Error(), "`npm install @miradorlabs/terma@latest`") || strings.Contains(err.Error(), " -g ") || len(*steps) != 0 {
+		t.Fatalf("project dependency: %v, ran %q", err, *steps)
+	}
+}
+
 // After replacing itself, the old binary hands the refresh to the new one; a refresh
 // that fails leaves the update in place and says how to retry.
 func TestUpdateRefreshesWithTheReplacedBinary(t *testing.T) {

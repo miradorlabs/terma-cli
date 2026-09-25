@@ -34,26 +34,36 @@ func TestManagedByUsesThePackageManagerThatOwnsTheBinary(t *testing.T) {
 		manager   string
 		argv      []string
 		terma     string
+		command   string
+		project   string
 	}{
 		{"cask", filepath.Join(brew, "Caskroom", "terma", "1.0.0", "terma"), "Homebrew",
-			[]string{filepath.Join(brew, "bin", "brew"), "upgrade", "--cask", "terma"}, filepath.Join(brew, "bin", "terma")},
+			[]string{filepath.Join(brew, "bin", "brew"), "upgrade", "--cask", "terma"}, filepath.Join(brew, "bin", "terma"), "", ""},
 		{"formula", filepath.Join(brew, "Cellar", "terma", "1.0.0", "bin", "terma"), "Homebrew",
-			[]string{filepath.Join(brew, "bin", "brew"), "upgrade", "terma"}, filepath.Join(brew, "bin", "terma")},
-		{"brew not found", filepath.Join(root, "elsewhere", "Caskroom", "terma", "1.0.0", "terma"), "Homebrew", nil, filepath.Join(root, "elsewhere", "bin", "terma")},
+			[]string{filepath.Join(brew, "bin", "brew"), "upgrade", "terma"}, filepath.Join(brew, "bin", "terma"), "", ""},
+		{"brew not found", filepath.Join(root, "elsewhere", "Caskroom", "terma", "1.0.0", "terma"), "Homebrew", nil, filepath.Join(root, "elsewhere", "bin", "terma"), "", ""},
 		{"npm global", filepath.Join(npm, "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "npm",
 			[]string{filepath.Join(npm, "bin", "npm"), "install", "--global", "--prefix", npm, "@miradorlabs/terma@latest"},
-			filepath.Join(npm, "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma")},
+			filepath.Join(npm, "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "", ""},
 		// A custom prefix keeps no npm of its own, and PATH has none here either.
 		{"npm prefix without npm", filepath.Join(root, "custom", "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "npm", nil,
-			filepath.Join(root, "custom", "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma")},
-		// A project's own dependency is that project's to upgrade.
+			filepath.Join(root, "custom", "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "", ""},
+		// A project's own dependency is that project's to upgrade, in that project: a
+		// global install would not change the copy that runs.
 		{"npm project", filepath.Join(root, "app", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "npm", nil,
-			filepath.Join(root, "app", "node_modules", "@miradorlabs", "terma", "vendor", "terma")},
+			filepath.Join(root, "app", "node_modules", "@miradorlabs", "terma", "vendor", "terma"),
+			"npm install @miradorlabs/terma@latest", filepath.Join(root, "app")},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			m, ok := ManagedBy(tc.exe)
-			if !ok || m.Name != tc.manager || !slices.Equal(m.Argv, tc.argv) || m.Terma != tc.terma || m.Command == "" {
+			if !ok || m.Name != tc.manager || !slices.Equal(m.Argv, tc.argv) || m.Terma != tc.terma || m.Project != tc.project {
 				t.Fatalf("ManagedBy = %+v, %v", m, ok)
+			}
+			if tc.command != "" && m.Command != tc.command {
+				t.Fatalf("command %q, want %q", m.Command, tc.command)
+			}
+			if tc.project == "" && m.Command == "" {
+				t.Fatal("no command to name")
 			}
 		})
 	}

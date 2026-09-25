@@ -21,6 +21,9 @@ type Manager struct {
 	Argv []string
 	// Terma is where the upgraded binary is found afterwards.
 	Terma string
+	// Project is set when terma is a dependency of a project rather than a global
+	// install: Command then runs in this directory, and terma never runs it itself.
+	Project string
 }
 
 // ManagedBy reports the package manager that owns the binary at exe, if any. It reads
@@ -49,18 +52,27 @@ func ManagedBy(exe string) (Manager, bool) {
 	}
 	if before, _, ok := strings.Cut(path, "/node_modules/@miradorlabs/terma/"); ok {
 		m := Manager{Name: "npm", Command: "npm install -g @miradorlabs/terma@latest", Terma: exe}
-		// A global package lives in <prefix>/lib/node_modules on Unix; anything else is a
-		// project's own dependency, which only that project's npm should change. The
-		// prefix is passed explicitly, so an npm found on PATH (a custom prefix keeps no
-		// npm of its own) still upgrades this copy and not another.
-		if prefix, ok := strings.CutSuffix(before, "/lib"); ok && runtime.GOOS != "windows" {
-			npm := filepath.FromSlash(prefix + "/bin/npm")
-			if !isExecutable(npm) {
-				npm, _ = exec.LookPath("npm")
-			}
-			if npm != "" {
-				m.Argv = []string{npm, "install", "--global", "--prefix", filepath.FromSlash(prefix), "@miradorlabs/terma@latest"}
-			}
+		// On Windows terma neither runs npm nor tells the layouts apart, and names the
+		// global command as it always has.
+		if runtime.GOOS == "windows" {
+			return m, true
+		}
+		// A global package lives in <prefix>/lib/node_modules. Anything else is a
+		// project's own dependency: a global install would not change the copy that runs,
+		// and only the project should change its lockfile.
+		prefix, global := strings.CutSuffix(before, "/lib")
+		if !global {
+			m.Command, m.Project = "npm install @miradorlabs/terma@latest", filepath.FromSlash(before)
+			return m, true
+		}
+		// The prefix is passed explicitly, so an npm found on PATH (a custom prefix keeps
+		// no npm of its own) still upgrades this copy and not another.
+		npm := filepath.FromSlash(prefix + "/bin/npm")
+		if !isExecutable(npm) {
+			npm, _ = exec.LookPath("npm")
+		}
+		if npm != "" {
+			m.Argv = []string{npm, "install", "--global", "--prefix", filepath.FromSlash(prefix), "@miradorlabs/terma@latest"}
 		}
 		return m, true
 	}

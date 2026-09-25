@@ -155,7 +155,9 @@ manager that owns it, read from where the binary lives: `<prefix>/bin/brew upgra
 [--cask] terma` for `<prefix>/Caskroom` or `<prefix>/Cellar`, and `npm install --global
 --prefix <prefix> @miradorlabs/terma@latest` for `<prefix>/lib/node_modules` (that
 prefix's npm, else the one on PATH). When that program cannot be found, or fails, the
-command to run is printed instead. Automatic updates never run a package manager; those
+command to run is printed instead. terma installed as a project's own npm dependency
+(`<project>/node_modules`) is that project's to upgrade: `terma update` names
+`npm install @miradorlabs/terma@latest` and the project directory, and runs nothing. Automatic updates never run a package manager; those
 installations get notices only.
 
 ### Refreshing what terma installed

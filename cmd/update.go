@@ -166,6 +166,9 @@ func runUpdate(ctx context.Context, client *selfupdate.Client, dir, exe string, 
 // owns it, then has the upgraded binary finish the update. When that package manager
 // cannot be found, or it fails, the developer is given the command to run.
 func upgradeManaged(ctx context.Context, m selfupdate.Manager, current, latest string, out io.Writer) error {
+	if m.Project != "" {
+		return fmt.Errorf("this terma is a dependency of the project in %s; run `%s` there", m.Project, m.Command)
+	}
 	if len(m.Argv) == 0 {
 		return fmt.Errorf("this installation is managed by %s; run `%s`", m.Name, m.Command)
 	}
