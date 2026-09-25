@@ -169,7 +169,9 @@ run that reaches them opens a browser login on **production**. A script that run
 - Per-repo routing (`internal/shim`, `terma shim prepare <agent>`): `terma install` points
   each agent at the repository's project; secrets stay in the home directory,
   namespaced by project id (`routing/<id>.json`, `claude/<id>/`, keys in the keystore).
-  PATH scripts and `--activation wrapper` functions share the shell launcher. It
+  PATH scripts and `--activation wrapper` functions share the shell launcher (the
+  wrapper is printed in `$SHELL`'s syntax: `WrapperSnippetFor`, fish functions for fish,
+  POSIX functions otherwise — fish cannot source the POSIX form). It
   resolves the real agent from PATH, bounds Terma preparation to two seconds, reads
   a versioned argument-file protocol without eval, and execs the agent exactly once.
   Preparation failure passes through; `TERMA_DISABLE=1` and leading maintenance

@@ -367,6 +367,76 @@ func TestWrapperSnippetRoutesRoutableAgentsOnly(t *testing.T) {
 // A "." on PATH must be searched as the current directory, not collapsed to a bare name
 // that exec.LookPath would resolve against the whole PATH — which could re-include the
 // shim directory and make the shim resolve itself.
+// fish cannot source the POSIX snippet at all, so a fish user gets fish functions and
+// `set -gx`, and nothing of the POSIX form.
+func TestWrapperSnippetForFishIsFishSyntax(t *testing.T) {
+	sandbox(t)
+	snip := WrapperSnippetFor("fish", []string{AgentCodex, "cursor", AgentClaude})
+	for _, want := range []string{"set -gx " + WrapperEnv + " wrapper", "function claude --wraps claude", "function codex --wraps codex", "command claude $argv"} {
+		if !strings.Contains(snip, want) {
+			t.Errorf("fish snippet lacks %q:\n%s", want, snip)
+		}
+	}
+	for _, posix := range []string{"export ", "() {", `"$@"`, "cursor"} {
+		if strings.Contains(snip, posix) {
+			t.Errorf("fish snippet carries %q:\n%s", posix, snip)
+		}
+	}
+	if WrapperSnippetFor("zsh", []string{AgentClaude}) != WrapperSnippet([]string{AgentClaude}) {
+		t.Fatal("a POSIX shell must get the POSIX snippet")
+	}
+}
+
+// The fish snippet, sourced by a real fish, routes to terma's launcher while it exists and
+// to the real agent once it is gone — with a config path fish must unquote correctly.
+func TestWrapperSnippetFishRunsInFish(t *testing.T) {
+	fish, err := exec.LookPath("fish")
+	if err != nil {
+		t.Skip("fish not installed")
+	}
+	cfg := filepath.Join(t.TempDir(), `cfg it's \x`)
+	t.Setenv("TERMA_CONFIG_DIR", cfg)
+	t.Setenv("HOME", t.TempDir())
+	binDir, err := ShimBinDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	launcher := filepath.Join(binDir, AgentClaude)
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(launcher, []byte("#!/bin/sh\necho \"launcher:$*\"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	realDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(realDir, AgentClaude), []byte("#!/bin/sh\necho \"real:$*\"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	snippet := filepath.Join(t.TempDir(), "terma.fish")
+	if err := os.WriteFile(snippet, []byte(WrapperSnippetFor("fish", []string{AgentClaude})), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	run := func(script string) string {
+		t.Helper()
+		cmd := exec.Command(fish, "--no-config", "-c", script)
+		cmd.Env = append(os.Environ(), "PATH="+realDir+string(os.PathListSeparator)+"/usr/bin:/bin")
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("fish -c %q: %v\n%s", script, err, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	if out := run("source " + fishQuote(snippet) + "; claude a 'b c'; echo $" + WrapperEnv); out != "launcher:a b c\nwrapper" {
+		t.Fatalf("with the launcher present: %q", out)
+	}
+	if err := os.Remove(launcher); err != nil {
+		t.Fatal(err)
+	}
+	if out := run("source " + fishQuote(snippet) + "; claude x"); out != "real:x" {
+		t.Fatalf("with the launcher gone: %q", out)
+	}
+}
+
 func TestRealBinaryConfinesDotPathEntry(t *testing.T) {
 	sandbox(t)
 	shimDir, _ := ShimBinDir()

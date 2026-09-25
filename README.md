@@ -123,7 +123,8 @@ terminal afterward.
 `terma doctor` detects when another startup-file entry has moved Terma behind the
 real binary. `terma shim uninstall` removes the managed block; `--no-path` prints the
 line instead, and `--activation wrapper` prints shell functions for users who prefer
-not to use `PATH` shims.
+not to use `PATH` shims — POSIX functions for bash and zsh, fish functions when `$SHELL`
+is fish.
 
 An IDE extension that launches an agent by full path can bypass the shims and use the
 machine-wide configuration. See [CONFIGURATION.md](docs/CONFIGURATION.md) for routing,
