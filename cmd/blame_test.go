@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/miradorlabs/terma-cli/internal/api"
 )
 
 // runBlameCmd drives `terma blame` from inside a real git repository against a fake
@@ -172,5 +174,29 @@ func TestBlameInCommandTree(t *testing.T) {
 	}
 	if cmd.Name() != "blame" || cmd.RunE == nil {
 		t.Fatalf("blame resolves to %q with RunE=%v", cmd.CommandPath(), cmd.RunE != nil)
+	}
+}
+
+// A commit made in a linked worktree says so: the record's worktree travels to the view
+// and the repository line, next to the repository it belongs to.
+func TestBlameNamesTheWorktree(t *testing.T) {
+	rec := &api.LogRecord{Attributes: map[string]any{
+		"sha": "abc1234def", "terma.repo": "terma-cli", "branch": "feature", "worktree": "terma-cli-wt-check",
+	}}
+	v := blameViewOf(rec, "abc1234def")
+	if v.Repository != "terma-cli" || v.Worktree != "terma-cli-wt-check" {
+		t.Fatalf("view %+v", v)
+	}
+	var repoRow string
+	for _, row := range blameTable(v).Rows {
+		if row[0] == "repo" {
+			repoRow = row[1]
+		}
+	}
+	if repoRow != "terma-cli @ feature (worktree terma-cli-wt-check)" {
+		t.Fatalf("repo row %q", repoRow)
+	}
+	if v := blameViewOf(&api.LogRecord{Attributes: map[string]any{"terma.repo": "terma-cli"}}, "abc"); v.Worktree != "" {
+		t.Fatalf("a main checkout's commit names a worktree: %+v", v)
 	}
 }
