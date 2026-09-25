@@ -551,3 +551,39 @@ func TestCodexRouteRequiresExplicitCLIChoice(t *testing.T) {
 		t.Fatalf("Codex routed without a CLI choice: %+v", got)
 	}
 }
+
+// A refresh rewrites only terma's own shims that differ from this build's script: an
+// absent shim stays absent, and a file terma did not write is left alone.
+func TestRefreshShimsRewritesOnlyInstalledStaleShims(t *testing.T) {
+	sandbox(t)
+	if changed, err := RefreshShims(); err != nil || len(changed) != 0 {
+		t.Fatalf("no shims: changed=%v err=%v", changed, err)
+	}
+	binDir, err := InstallShims([]string{AgentClaude})
+	if err != nil {
+		t.Fatal(err)
+	}
+	claude := filepath.Join(binDir, AgentClaude)
+	want, _ := os.ReadFile(claude)
+	if err := os.WriteFile(claude, []byte(shimHeader(AgentClaude)+" An earlier build.\nexec terma shim exec claude \"$@\"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	theirs := []byte("#!/bin/sh\nexec /opt/codex \"$@\"\n")
+	if err := os.WriteFile(filepath.Join(binDir, AgentCodex), theirs, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	changed, err := RefreshShims()
+	if err != nil || len(changed) != 1 || changed[0] != claude {
+		t.Fatalf("changed=%v err=%v", changed, err)
+	}
+	if got, _ := os.ReadFile(claude); string(got) != string(want) {
+		t.Fatalf("claude shim not refreshed:\n%s", got)
+	}
+	if got, _ := os.ReadFile(filepath.Join(binDir, AgentCodex)); string(got) != string(theirs) {
+		t.Fatalf("a file terma did not write was rewritten:\n%s", got)
+	}
+	if changed, err := RefreshShims(); err != nil || len(changed) != 0 {
+		t.Fatalf("second refresh: changed=%v err=%v", changed, err)
+	}
+}

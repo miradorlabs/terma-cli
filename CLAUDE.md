@@ -603,6 +603,18 @@ it does not prove that a running agent has reloaded its settings or sent telemet
   never nagged or replaced; `--force` explicitly switches one to a release. A
   checked-in version file once made every source build pass for the release it named,
   and a stale branch build became a replacement target. Downloads use checksum
-  verification and atomic replacement under `update.lock`. Package-managed binaries
-  receive their manager's upgrade command. Failed checks retry after 15 minutes;
-  auto-install attempts are throttled daily.
+  verification and atomic replacement under `update.lock`. An explicit `terma update` of a
+  package-managed binary runs the manager that owns it (`selfupdate.ManagedBy`, read from
+  the binary's path: that prefix's brew, or npm with `--prefix`); automatic updates only
+  notify those. Failed checks retry after 15 minutes; auto-install attempts are throttled
+  daily.
+- Refresh (`cmd/refresh.go`, `terma update --refresh`): after replacing itself or running
+  the package manager, the old binary execs the new one's `update --refresh` — the old
+  process cannot run new templates. It rewrites only files terma already wrote (shims,
+  the status-line wrap, the OpenCode plugin, and the current repository's hooks from its
+  binding's manager and adapters), never creates one, never signs in, and never changes a
+  choice. Re-running `terma install` is not a substitute: it re-defaults every flag it
+  does not record. The first interactive command under a newer release refreshes the
+  home-directory files once (`refreshed.json`, upward only, so two builds on PATH do not
+  take turns) and only *reports* stale committed files. `update --refresh` is a contract
+  between releases: an older binary invokes it on a newer one, so it must keep working.

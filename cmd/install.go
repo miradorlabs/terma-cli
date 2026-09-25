@@ -345,7 +345,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	if len(written) > 0 {
 		// Save always rewrites the binding.
 		written = append(written, termaproject.FileName)
-		printCommitList(out, written)
+		printCommitList(out, "Commit these files and open a PR — merging it onboards the repository:", written)
 	}
 	// Verify the chain right away. Skipped without a terminal (a script, CI) or with
 	// --no-doctor, since doctor makes a scratch commit and a network round-trip; those
@@ -801,15 +801,16 @@ func (p hookPlan) paths() []string {
 
 // printCommitList tells the developer which files the hook install wrote and that they
 // must be committed: the hooks do nothing for a colleague until the files are merged.
-// A path is listed once, even when two changes touched it.
-func printCommitList(out io.Writer, paths []string) {
+// lead is the sentence that says why. A path is listed once, even when two changes
+// touched it.
+func printCommitList(out io.Writer, lead string, paths []string) {
 	var unique []string
 	for _, p := range paths {
 		if !slices.Contains(unique, p) {
 			unique = append(unique, p)
 		}
 	}
-	fmt.Fprintln(out, "Commit these files and open a PR — merging it onboards the repository:")
+	fmt.Fprintln(out, lead)
 	for _, p := range unique {
 		fmt.Fprintf(out, "  %s\n", p)
 	}

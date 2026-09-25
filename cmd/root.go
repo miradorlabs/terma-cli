@@ -151,7 +151,8 @@ func newVersionCommand() *cobra.Command {
 	}
 }
 
-// printUpdateNotice runs daily update maintenance after interactive commands,
+// printUpdateNotice runs daily update maintenance after interactive commands, and the
+// first time a new release runs one, the refresh of what earlier versions installed —
 // never from a hook or a spool flush (those must stay silent and fast).
 func printUpdateNotice(cmd *cobra.Command) {
 	if !automaticUpdatesAllowed(cmd, canPrompt()) {
@@ -161,6 +162,7 @@ func printUpdateNotice(cmd *cobra.Command) {
 	if err != nil {
 		return
 	}
+	refreshAfterUpgrade(cmd.Context(), dir, cmd.ErrOrStderr())
 	exe, err := os.Executable()
 	if err != nil {
 		return

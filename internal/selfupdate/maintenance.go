@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -65,6 +64,36 @@ func SaveCache(dir string, c Cache) {
 	_ = config.WriteJSON(filepath.Join(dir, cacheFile), c, 0600)
 }
 
+const refreshedFile = "refreshed.json"
+
+// refreshed names the release that last rewrote this machine's installed files.
+type refreshed struct {
+	Version string `json:"version"`
+}
+
+// NeedsRefresh reports whether version is a release newer than the one that last
+// refreshed the files terma installed on this machine. Only upward: two builds side by
+// side on PATH must not take turns rewriting each other's files.
+func NeedsRefresh(dir, version string) bool {
+	if !IsRelease(version) {
+		return false
+	}
+	var last refreshed
+	if data, err := os.ReadFile(filepath.Join(dir, refreshedFile)); err == nil {
+		_ = json.Unmarshal(data, &last)
+	}
+	return !IsRelease(last.Version) || Newer(last.Version, version)
+}
+
+// SaveRefreshed records version as the one that last refreshed this machine. A build
+// that is not a release records nothing.
+func SaveRefreshed(dir, version string) error {
+	if !IsRelease(version) {
+		return nil
+	}
+	return config.WriteJSON(filepath.Join(dir, refreshedFile), refreshed{Version: version}, 0600)
+}
+
 // Lock serializes checks and replacements across simultaneous CLI processes.
 // It returns immediately when another update is already running.
 func Lock(dir string) (func(), error) {
@@ -105,34 +134,16 @@ func (c *Client) Notice(ctx context.Context, dir, current string) string {
 		return ""
 	}
 	cache, _ := c.cachedCheck(ctx, dir, current)
-	return notice(cache, current, "")
+	return notice(cache, current)
 }
 
-func notice(cache Cache, current, exe string) string {
+// notice names `terma update` for every installation: it upgrades a package-managed one
+// through its package manager.
+func notice(cache Cache, current string) string {
 	if !Newer(current, cache.Latest) {
 		return ""
 	}
-	command := ManagedCommand(exe)
-	if command == "" {
-		command = "terma update"
-	}
-	return fmt.Sprintf("A newer terma is available (%s → %s). Run `%s`.", current, cache.Latest, command)
-}
-
-// ManagedCommand returns the owning package manager's upgrade command, if any.
-// Those installations are not replaced behind the package manager's back.
-func ManagedCommand(exe string) string {
-	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
-		exe = resolved
-	}
-	path := filepath.ToSlash(exe)
-	if strings.Contains(path, "/Cellar/terma/") || strings.Contains(path, "/Caskroom/terma/") {
-		return "brew upgrade terma"
-	}
-	if strings.Contains(path, "/node_modules/@miradorlabs/terma/") {
-		return "npm install -g @miradorlabs/terma@latest"
-	}
-	return ""
+	return fmt.Sprintf("A newer terma is available (%s → %s). Run `terma update`.", current, cache.Latest)
 }
 
 // Maintain checks for updates after a human-facing command. Errors never change the
@@ -152,13 +163,13 @@ func (c *Client) Maintain(ctx context.Context, dir, exe string, out io.Writer) {
 	defer unlock()
 	cache, rel := c.cachedCheck(ctx, dir, c.Version)
 	if !p.Auto || !IsRelease(c.Version) || !Newer(c.Version, cache.Latest) || ManagedCommand(exe) != "" || runtime.GOOS == "windows" {
-		if msg := notice(cache, c.Version, exe); msg != "" {
+		if msg := notice(cache, c.Version); msg != "" {
 			fmt.Fprintln(out, msg)
 		}
 		return
 	}
 	if time.Since(cache.AttemptAt) < CheckInterval {
-		if msg := notice(cache, c.Version, exe); msg != "" {
+		if msg := notice(cache, c.Version); msg != "" {
 			fmt.Fprintln(out, msg)
 		}
 		return

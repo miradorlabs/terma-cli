@@ -79,16 +79,24 @@ on by default; automatic installation is opt-in:
 ```sh
 terma update --check        # check without installing
 terma update                # install the latest published release
+terma update --refresh      # bring this repository's hooks up to the installed version
 terma update --auto on      # automatically install future releases
 terma update --auto status  # show the saved preference
 terma update --auto off     # return to notifications only
 ```
 
 Updates verify the release checksum before replacing the binary. Hooks, launch shims,
-CI, and scripted commands never trigger automatic updates. Homebrew/npm installations
-receive an upgrade command for their package manager. A release binary carries its
-tag, which the updater compares with the latest published release; a source build is
-never updated without `terma update --force`.
+CI, and scripted commands never trigger automatic updates. `terma update` upgrades a
+Homebrew or npm installation through the package manager that owns it. A release binary
+carries its tag, which the updater compares with the latest published release; a source
+build is never updated without `terma update --force`.
+
+After an update, the new version refreshes what earlier versions wrote — the agent shims,
+the wrapped Claude Code status line, the OpenCode plugin, and the hooks of the repository
+you ran `terma update` in — keeping every choice you made when you installed. It works
+from what is on disk, never signs in, and never adds a file. The repository hooks are
+committed files, so they change only when you ask: run `terma update --refresh` in each
+other repository to bring its hooks up to date, then commit them.
 
 Release, versioning and installer details are in [RELEASING.md](docs/RELEASING.md).
 
