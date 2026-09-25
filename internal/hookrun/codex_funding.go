@@ -79,10 +79,11 @@ func (e Env) captureCodexFunding(ctx context.Context, r *repo, in *codexHookInpu
 			attrs["account_user_id"] = userID
 		}
 		attrs[AttrProjectID] = r.projectID
+		r.stampWorktree(attrs)
 		if !ev.SourceTime.IsZero() {
 			attrs["source_time"] = ev.SourceTime.UTC().Format(time.RFC3339Nano)
 		}
-		return e.Spool.Append(spool.Event{Time: e.now(), Name: EventSessionQuota, SessionID: in.SessionID, Repo: repoName(r.root), Attrs: attrs})
+		return e.Spool.Append(spool.Event{Time: e.now(), Name: EventSessionQuota, SessionID: in.SessionID, Repo: r.name, Attrs: attrs})
 	})
 	if next != cursor {
 		b, _ := json.Marshal(next)

@@ -45,7 +45,7 @@ func cursorToolCall(ctx context.Context, env Env, hook string) error {
 		return nil
 	}
 	attrs[attrVersion] = env.Version
-	env.emitFor(r, spool.Event{Name: EventToolCall, SessionID: in.id(), Repo: repoName(r.root), Attrs: attrs})
+	env.emitFor(r, spool.Event{Name: EventToolCall, SessionID: in.id(), Repo: r.name, Attrs: attrs})
 	return nil
 }
 

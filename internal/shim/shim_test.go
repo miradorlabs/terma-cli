@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -668,5 +669,46 @@ func TestMigrateCodexCLIRoutesFillsInWhatOldRecordsMeant(t *testing.T) {
 	}
 	if after, _ := os.ReadFile(old); string(after) != string(before) {
 		t.Fatal("a second run changed a migrated record")
+	}
+}
+
+// An agent started in a linked worktree of a bound repository is routed to that
+// repository's project, though the worktree has no binding of its own (it is gitignored,
+// and `git worktree add` does not copy ignored files).
+func TestRouteFollowsALinkedWorktreeToItsMainCheckout(t *testing.T) {
+	sandbox(t)
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	base, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	main, wt := filepath.Join(base, "main"), filepath.Join(base, "feature")
+	if err := os.MkdirAll(main, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{
+		{"init", "-q", "-b", "main"},
+		{"-c", "user.email=dev@example.com", "-c", "user.name=Dev", "commit", "-q", "--allow-empty", "-m", "init"},
+		{"worktree", "add", "-q", wt},
+	} {
+		cmd := exec.Command("git", args...)
+		cmd.Dir, cmd.Env = main, append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	if err := termaproject.Save(main, &termaproject.File{Project: termaproject.Project{ID: testProjectID}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := SaveRecord(Record{ProjectID: testProjectID, Signals: []string{"logs"}, Harnesses: []string{AgentCodex}, CLI: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := keystore.SetFor(AgentCodex, testProjectID, testKey); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(routeFor(AgentCodex, wt, nil).args, " "); !strings.Contains(got, testKey) {
+		t.Fatalf("a worktree's Codex was not routed to its repository's project: %q", got)
 	}
 }

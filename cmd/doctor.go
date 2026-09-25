@@ -299,7 +299,7 @@ func runDoctor(ctx context.Context, skipCommit bool, progress doctorProgress) do
 	timed(doctor.KeyAuth, "signed in", d.signedIn)
 
 	// 3. Repository binding.
-	d.root, _, d.repoErr = repoHere(ctx, "")
+	d.root, d.gitDir, d.repoErr = repoHere(ctx, "")
 	timed(doctor.KeyProject, "repository bound", d.repositoryBound)
 	d.projectID = cfg.ProjectID
 	if d.bound != nil {
@@ -351,6 +351,7 @@ type doctorRun struct {
 
 	// The repository the CLI stands in, from before the binding check.
 	root    string
+	gitDir  string
 	repoErr error
 	// bound is set by repositoryBound, and projectID follows it.
 	bound     *termaproject.File
@@ -436,12 +437,25 @@ func (d *doctorRun) repositoryBound() doctor.Check {
 	if d.repoErr != nil {
 		return doctor.Check{Status: doctor.Skip, Detail: "not inside a git repository (repo checks skipped)"}
 	}
-	f, err := termaproject.Load(d.root)
+	f, from, err := termaproject.Resolve(d.root, d.gitDir)
 	if err != nil {
-		return doctor.Check{Status: doctor.Fail, Detail: "no " + termaproject.FileName + " in " + d.root, Fix: "terma install"}
+		where := d.root
+		if _, main, ok := gitx.LinkedWorktreeFS(d.gitDir); ok && main != "" {
+			where += " or its main checkout " + main
+		}
+		return doctor.Check{Status: doctor.Fail, Detail: "no " + termaproject.FileName + " in " + where, Fix: "terma install"}
 	}
 	d.bound = f
-	return doctor.Check{Status: doctor.Pass, Detail: nameOrID(f.Project.Name, f.Project.ID)}
+	return doctor.Check{Status: doctor.Pass, Detail: nameOrID(f.Project.Name, f.Project.ID) + throughMain(d.root, from)}
+}
+
+// throughMain says, for a linked worktree bound through its main checkout, where the
+// binding came from; it is empty when the checkout has its own.
+func throughMain(root, from string) string {
+	if from == "" || from == root {
+		return ""
+	}
+	return " (through the main checkout " + from + ")"
 }
 
 func (d *doctorRun) commitHooks() doctor.Check {

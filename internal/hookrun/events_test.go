@@ -30,6 +30,7 @@ func TestWireNamesAreFrozen(t *testing.T) {
 		EventAssistantMessage:   "terma.assistant.message",
 
 		AttrProjectID:      "project_id",
+		AttrWorktree:       "worktree",
 		attrAgentParentID:  "agent_parent_id",
 		attrTool:           "tool",
 		attrModel:          "model",

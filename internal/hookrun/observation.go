@@ -56,6 +56,7 @@ func (e Env) captureObservation(ctx context.Context, r *repo, o observation) {
 		attrs = map[string]any{}
 	}
 	attrs[attrVersion], attrs[AttrProjectID] = e.Version, r.projectID
+	r.stampWorktree(attrs)
 	raw, _ := json.Marshal(attrs)
 	hash := evidenceID(string(raw))
 	dir, err := config.Dir()
@@ -87,7 +88,7 @@ func (e Env) captureObservation(ctx context.Context, r *repo, o observation) {
 			if o.turnID != "" {
 				gap[attrTurnID] = o.turnID
 			}
-			e.emitFor(r, spool.Event{Name: EventSessionCapture, SessionID: o.sessionID, Repo: repoName(r.root), Attrs: gap})
+			e.emitFor(r, spool.Event{Name: EventSessionCapture, SessionID: o.sessionID, Repo: r.name, Attrs: gap})
 			return
 		case <-time.After(observationLockPoll):
 		}
@@ -135,7 +136,7 @@ func (e Env) captureObservation(ctx context.Context, r *repo, o observation) {
 	state.LastHash, state.At = hash, e.now()
 	attrs["source_stream"], attrs["observation_sequence"] = state.Stream, state.Sequence
 	attrs["observation_id"] = evidenceID(fmt.Sprintf("%s\x00%s\x00%d", o.tool, state.Stream, state.Sequence))
-	state.Pending = &spool.Event{Time: e.now(), Name: EventSessionObservation, SessionID: o.sessionID, Repo: repoName(r.root), Attrs: attrs}
+	state.Pending = &spool.Event{Time: e.now(), Name: EventSessionObservation, SessionID: o.sessionID, Repo: r.name, Attrs: attrs}
 	if err = write(); err != nil {
 		e.logf("%s checkpoint: %v", o.tool, err)
 		return

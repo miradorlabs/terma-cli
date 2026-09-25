@@ -288,6 +288,20 @@ run that reaches them opens a browser login on **production**. A script that run
   Keys are remembered per harness per project in `keys.json`
   (`keystore.SetFor`, written by every connect) so returning to a project reuses the
   harness's own key; `resolveKey` checks the harness config, then the keystore, then mints.
+- Linked worktrees (`project.Resolve` / `ResolveDir`, `gitx.LinkedWorktreeFS`): every
+  reader of a binding — hooks, the status line, routing, status, doctor, install, refresh
+  and the OpenCode plugin's `readProjectID` — takes the checkout's own binding, else, in a
+  linked worktree, its main checkout's. The binding is often gitignored and `git worktree
+  add` does not copy ignored files; before this, every event from such a worktree had no
+  project and was dropped as `Unroutable` at the next flush, in silence. It follows git's
+  `commondir` link, never directory nesting (a nested separate repository still inherits
+  nothing), costs one small read only when the checkout has no binding, and a bare
+  repository's worktrees have no main checkout to fall back to. Events from a linked
+  worktree report the **main** checkout's directory name as `repo` and git's name for the
+  worktree as `worktree` (`AttrWorktree`), so one repository's worktrees — Claude Code's
+  `.claude/worktrees/agent-…` among them — group as that repository. `install` and
+  `refresh` read through it but write the checkout's own files; `uninstall` reads only the
+  checkout's own binding, so it never acts on the main checkout's.
 - Terminal courtesies (`internal/style`, `internal/spinner`): colour and the
   four-square spinner draw only on a terminal a person is watching — never in a
   buffer, a pipe, an agent (`CLAUDECODE` and friends), `NO_COLOR` or `TERM=dumb` —
@@ -526,6 +540,8 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   "Tool calls" — and Antigravity's `PostToolUse`, keyed on `step-<stepIdx>`, unique only
   within its conversation; `docs/ANTIGRAVITY-INSTRUMENTATION.md`, "Tool calls and turns")
   carries a terma-made `turn_id`, as do Antigravity's observations.
+  Every event from a linked git worktree carries `worktree` (git's name for it) and reports
+  the main repository as `repo`; no adapter reads `worktree` yet.
   Still awaiting the adapter: `terma.subagent.start` / `terma.subagent.end` /
   `terma.subagent.call` and the `parent_session_id` / `agent_id` / `agent_type` /
   `agent_parent_id` attributes (`docs/SUBAGENT-INSTRUMENTATION.md`) are spooled today but

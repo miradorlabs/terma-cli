@@ -299,16 +299,17 @@ func loadProjectConfig() (*config.Config, error) {
 
 // resolveRepoProject supplies the repository's project only when the caller has
 // not given a command/env override. Git's worktree root prevents a nested checkout
-// from inheriting the parent repository's binding. No profile is changed.
+// from inheriting the parent repository's binding; a linked worktree without one of its
+// own uses its main checkout's (project.Resolve). No profile is changed.
 func resolveRepoProject(cfg *config.Config) error {
 	if cfg.ProjectID != "" {
 		return nil
 	}
-	root, _, err := repoHere(context.Background(), "")
+	root, gitDir, err := repoHere(context.Background(), "")
 	if err != nil {
 		return nil // Outside a repository: requireProject explains the next step.
 	}
-	bound, err := termaproject.Load(root)
+	bound, _, err := termaproject.Resolve(root, gitDir)
 	if errors.Is(err, termaproject.ErrNotFound) {
 		return nil
 	}

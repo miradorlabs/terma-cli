@@ -356,10 +356,11 @@ func (e Env) captureQuota(p *statusLinePayload) bool {
 	if len(quota) == 0 && p.FastMode == nil && prev == nil {
 		return false
 	}
-	repo, projectID, repoRoot := "", "", ""
-	if root, _, ok := gitx.LocateFS(cmp.Or(p.Cwd, e.Cwd)); ok {
-		repo, repoRoot = repoName(root), root
-		if f, err := project.Load(root); err == nil {
+	repo, worktree, projectID, repoRoot := "", "", "", ""
+	if root, gitDir, ok := gitx.LocateFS(cmp.Or(p.Cwd, e.Cwd)); ok {
+		repoRoot = root
+		repo, worktree = checkoutNames(root, gitDir)
+		if f, _, err := project.Resolve(root, gitDir); err == nil {
 			projectID = f.Project.ID
 		}
 	}
@@ -416,6 +417,9 @@ func (e Env) captureQuota(p *statusLinePayload) bool {
 		}
 	}
 	ev := spool.Event{Name: EventSessionQuota, SessionID: p.SessionID, Repo: repo, Attrs: attrs}
+	if worktree != "" {
+		attrs[AttrWorktree] = worktree
+	}
 	if projectID != "" {
 		attrs[AttrProjectID] = projectID
 	}

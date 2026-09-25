@@ -187,7 +187,7 @@ func AntigravityPostToolUse(ctx context.Context, env Env) error {
 	call, called := antigravityToolCallAttrs(in, turn)
 	if called {
 		call[attrVersion] = env.Version
-		env.emitFor(r, spool.Event{Name: EventToolCall, SessionID: id, Repo: repoName(r.root), Attrs: call})
+		env.emitFor(r, spool.Event{Name: EventToolCall, SessionID: id, Repo: r.name, Attrs: call})
 	}
 
 	// A payload without a toolCall yields no paths, so this guard is also what makes

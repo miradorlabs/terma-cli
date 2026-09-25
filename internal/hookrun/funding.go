@@ -41,6 +41,7 @@ func (e Env) captureFunding(r *repo, id, tool, name string, evidence harness.Fun
 	}
 	// Include project routing in the hash: a resumed session may move projects.
 	attrs[AttrProjectID] = r.projectID
+	r.stampWorktree(attrs)
 	raw, err := json.Marshal(attrs)
 	if err != nil {
 		return
@@ -72,7 +73,7 @@ func (e Env) captureFunding(r *repo, id, tool, name string, evidence harness.Fun
 	if prev.Hash == next.Hash && !next.At.Before(prev.At) && next.At.Sub(prev.At) < quotaHeartbeat {
 		return
 	}
-	ev := spool.Event{Time: e.now(), Name: name, SessionID: id, Repo: repoName(r.root), Attrs: attrs}
+	ev := spool.Event{Time: e.now(), Name: name, SessionID: id, Repo: r.name, Attrs: attrs}
 	if e.Spool.Append(ev) != nil {
 		return
 	} // Retry a failed append at the next hook.
@@ -122,7 +123,7 @@ func StopFailure(ctx context.Context, env Env) error {
 	if owned {
 		attrs[attrAccountID] = accountID
 	}
-	env.emitFor(r, spool.Event{Name: EventSessionLimit, SessionID: in.SessionID, Repo: repoName(r.root), Attrs: attrs})
+	env.emitFor(r, spool.Event{Name: EventSessionLimit, SessionID: in.SessionID, Repo: r.name, Attrs: attrs})
 	return nil
 }
 

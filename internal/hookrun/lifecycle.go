@@ -44,7 +44,7 @@ func (e Env) pruneManifests(r *repo, now time.Time) {
 func (e Env) emitStart(r *repo, sess session.Session, extra map[string]any) {
 	attrs := map[string]any{attrTool: sess.Tool, attrModel: sess.Model, attrVersion: e.Version}
 	maps.Copy(attrs, extra)
-	e.emitFor(r, spool.Event{Name: EventSessionStart, SessionID: sess.ID, Repo: repoName(r.root), Attrs: attrs})
+	e.emitFor(r, spool.Event{Name: EventSessionStart, SessionID: sess.ID, Repo: r.name, Attrs: attrs})
 }
 
 // announce is a session's start: the session becomes the active one, old manifests are
@@ -61,7 +61,7 @@ func (e Env) announce(r *repo, sess session.Session, extra map[string]any) {
 // still be uncommitted.
 func (e Env) endSession(r *repo, id, tool, reason string) {
 	_ = r.store.ClearActive(id)
-	e.emitFor(r, spool.Event{Name: EventSessionEnd, SessionID: id, Repo: repoName(r.root), Attrs: map[string]any{
+	e.emitFor(r, spool.Event{Name: EventSessionEnd, SessionID: id, Repo: r.name, Attrs: map[string]any{
 		attrTool: tool, attrReason: reason,
 	}})
 }
@@ -81,7 +81,7 @@ func (e Env) touch(r *repo, sess session.Session, toolName string, files []strin
 		attrTool: sess.Tool, attrToolName: toolName, "files": strings.Join(files, ","), attrFileCount: len(files),
 	}
 	maps.Copy(attrs, extra)
-	e.emitFor(r, spool.Event{Name: EventFilesTouched, SessionID: sess.ID, Repo: repoName(r.root), Attrs: attrs})
+	e.emitFor(r, spool.Event{Name: EventFilesTouched, SessionID: sess.ID, Repo: r.name, Attrs: attrs})
 }
 
 // relativeFiles resolves reported paths against the working directory and keeps the

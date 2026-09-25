@@ -198,7 +198,7 @@ func CodexUserPromptSubmit(ctx context.Context, env Env) error {
 	if route.IncludePrompts {
 		attrs["prompt"] = boundedCodexContent(in.Prompt)
 	}
-	env.emitFor(r, spool.Event{Name: EventUserPrompt, SessionID: in.SessionID, Repo: repoName(r.root), Attrs: attrs})
+	env.emitFor(r, spool.Event{Name: EventUserPrompt, SessionID: in.SessionID, Repo: r.name, Attrs: attrs})
 	return nil
 }
 
@@ -293,7 +293,7 @@ func CodexPostToolUse(ctx context.Context, env Env) error {
 				attrs[attrStatus] = "error"
 			}
 		}
-		env.emitFor(r, spool.Event{Name: EventToolCall, SessionID: in.SessionID, Repo: repoName(r.root), Attrs: attrs})
+		env.emitFor(r, spool.Event{Name: EventToolCall, SessionID: in.SessionID, Repo: r.name, Attrs: attrs})
 	}
 	env.captureCodexDesktopActivity(ctx, r, in)
 	candidates := codexEditedPaths(in)
