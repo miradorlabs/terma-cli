@@ -17,6 +17,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
+	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 )
@@ -118,5 +119,38 @@ func TestDoctorScratchCommitRoundTrip(t *testing.T) {
 	d := doctorRun{ctx: ctx, cfg: cfg, projectID: testProjectID, scratchSHA: sha}
 	if check := d.backendReceives(); check.Status != doctor.Pass || !strings.Contains(check.Detail, "round-trip confirmed") {
 		t.Fatalf("backend: %+v", check)
+	}
+}
+
+// A first install leaves its hook files uncommitted until the developer adds them.
+// The install's immediate doctor check must run those files in its scratch worktree.
+func TestDoctorScratchCommitWithUncommittedHooks(t *testing.T) {
+	s := newInstallSandbox(t)
+	s.env = append(s.env, "HOME="+s.mkdir("home"))
+	repo := s.mkdir("repo")
+	s.git(repo, "init", "-q")
+	s.git(repo, "config", "user.name", "Test")
+	s.git(repo, "config", "user.email", "test@example.com")
+	s.git(repo, "commit", "--allow-empty", "-qm", "initial")
+	s.install(repo)
+	if tracked := s.git(repo, "ls-files", hookmgr.ShimDir); tracked != "" {
+		t.Fatalf("hook files were unexpectedly committed: %s", tracked)
+	}
+
+	t.Setenv("HOME", filepath.Join(s.base, "home"))
+	t.Setenv("PATH", filepath.Dir(s.bin)+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("TERMA_ENV", "dev")
+	t.Setenv("TERMA_CONFIG_DIR", filepath.Join(s.base, "config"))
+	t.Setenv("TERMA_HOOKS", "1")
+	t.Setenv("GIT_CONFIG_GLOBAL", "/dev/null")
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	bound, err := termaproject.Load(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	if _, check := scratchCommit(ctx, repo, bound); check.Status != doctor.Pass {
+		t.Fatalf("uncommitted hooks: %+v", check)
 	}
 }

@@ -1,8 +1,11 @@
 package cmd
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -38,6 +41,56 @@ func TestDoctorComparesPATHBinaryWithRunningBuild(t *testing.T) {
 	}
 	if check := doctorBinaryCheckFor(current); check.Status != doctor.Pass {
 		t.Fatalf("identical copy should pass: %+v", check)
+	}
+}
+
+func TestDoctorRecognizesOfficialNpmLauncher(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("npm's Windows command wrapper has a different layout")
+	}
+	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	launcher, err := os.ReadFile(filepath.Join("..", "npm", "bin", "terma.js"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(launcher)
+	if hex.EncodeToString(sum[:]) != npmLauncherDigest {
+		t.Fatal("the npm launcher changed; update the pinned digest only after reviewing its vendor-binary delegation")
+	}
+	current := writeTerma(t, t.TempDir(), "same Go build")
+	pkg := filepath.Join(t.TempDir(), "lib", "node_modules", "@miradorlabs", "terma")
+	if err := os.MkdirAll(filepath.Join(pkg, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(pkg, "bin", "terma.js"), launcher, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	vendor := writeTerma(t, filepath.Join(pkg, "vendor"), "same Go build")
+	bin := t.TempDir()
+	if err := os.Symlink(filepath.Join(pkg, "bin", "terma.js"), filepath.Join(bin, "terma")); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin)
+	if check := doctorBinaryCheckFor(current); check.Status != doctor.Pass {
+		t.Fatalf("official npm launcher should delegate to this build: %+v", check)
+	}
+	if others := otherTermas(filepath.Join(bin, "terma")); len(others) != 0 {
+		t.Fatalf("npm launcher should compare its vendor binary: %v", others)
+	}
+	if err := os.WriteFile(vendor, []byte("old Go build"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if check := doctorBinaryCheckFor(current); check.Status != doctor.Warn {
+		t.Fatalf("stale vendor binary must still be reported: %+v", check)
+	}
+	if err := os.WriteFile(vendor, []byte("same Go build"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(pkg, "bin", "terma.js"), append(launcher, []byte("\n// changed\n")...), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if check := doctorBinaryCheckFor(current); check.Status != doctor.Warn {
+		t.Fatalf("edited npm launcher must not be trusted: %+v", check)
 	}
 }
 
