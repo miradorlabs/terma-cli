@@ -175,7 +175,8 @@ run that reaches them opens a browser login on **production**. A script that run
   namespaced by project id (`routing/<id>.json`, `claude/<id>/`, keys in the keystore).
   PATH scripts and `--activation wrapper` functions share the shell launcher (the
   wrapper is printed in `$SHELL`'s syntax: `WrapperSnippetFor`, fish functions for fish,
-  POSIX functions otherwise — fish cannot source the POSIX form). It
+  POSIX functions otherwise — fish cannot source the POSIX form — and the hint names that
+  shell's own startup file, `wrapperFile`: `~/.profile` for sh, dash and BusyBox ash). It
   resolves the real agent from PATH, bounds Terma preparation to two seconds, reads
   a versioned argument-file protocol without eval, and execs the agent exactly once.
   Preparation failure passes through; `TERMA_DISABLE=1` and leading maintenance

@@ -56,10 +56,15 @@ func ShellRC() (RC, bool) {
 		// A file of terma's own: conf.d is read after config.fish's PATH edits only in
 		// name order, so the block is the whole file and fish_add_path moves the entry
 		// to the front whenever it runs.
-		dir := cmp.Or(os.Getenv("XDG_CONFIG_HOME"), filepath.Join(home, ".config"))
-		return RC{Path: filepath.Join(dir, "fish", "conf.d", "terma.fish"), Shell: shell}, true
+		return RC{Path: filepath.Join(FishConfigDir(home), "conf.d", "terma.fish"), Shell: shell}, true
 	}
 	return RC{}, false
+}
+
+// FishConfigDir is fish's configuration directory for the given home directory:
+// $XDG_CONFIG_HOME/fish, else ~/.config/fish.
+func FishConfigDir(home string) string {
+	return filepath.Join(cmp.Or(os.Getenv("XDG_CONFIG_HOME"), filepath.Join(home, ".config")), "fish")
 }
 
 // PathLine is the line that puts binDir first on PATH, in the shell's own syntax. A

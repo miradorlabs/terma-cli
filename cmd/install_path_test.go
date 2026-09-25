@@ -79,3 +79,56 @@ func TestInstallDoesNotWriteTheStartupFileUnasked(t *testing.T) {
 		t.Fatalf("install should say it did not write, and print the line:\n%s", out)
 	}
 }
+
+// The wrapper is pasted by hand, so the hint has to name the file the developer's own
+// shell reads functions from: a dash or BusyBox ash user told "~/.zshrc (or ~/.bashrc)"
+// pastes into a file their shell never reads, and routing is silently off.
+func TestWrapperHintNamesTheShellsStartupFile(t *testing.T) {
+	for _, tc := range []struct{ shell, want string }{
+		{"/bin/zsh", "~/.zshrc"},
+		{"/bin/bash", "~/.bashrc"},
+		{"/usr/bin/fish", "~/.config/fish/config.fish"},
+		{"/bin/dash", "~/.profile"},
+		{"/bin/sh", "~/.profile"},
+		{"", "~/.profile"},
+	} {
+		t.Run(tc.shell, func(t *testing.T) {
+			t.Setenv("HOME", t.TempDir())
+			t.Setenv("SHELL", tc.shell)
+			t.Setenv("ZDOTDIR", "")
+			t.Setenv("XDG_CONFIG_HOME", "")
+			if got := wrapperFile(filepath.Base(tc.shell)); got != tc.want {
+				t.Fatalf("wrapperFile(%q) = %q, want %q", tc.shell, got, tc.want)
+			}
+		})
+	}
+}
+
+// install --activation wrapper names one file, the login shell's, not a choice of two.
+func TestInstallWrapperHintNamesOneFile(t *testing.T) {
+	out, _ := routedInstall(t, "--activation", "wrapper")
+	if !strings.Contains(out, "Add these to your ~/.zshrc so the agents route") {
+		t.Fatalf("the wrapper hint should name zsh's startup file:\n%s", out)
+	}
+}
+
+// With no home directory each shell's hint stays its usual file, literally — not a
+// relative path, and not ~/.profile for a shell that never reads it.
+func TestWrapperHintWithoutAHome(t *testing.T) {
+	for _, tc := range []struct{ shell, want string }{
+		{"/bin/zsh", "~/.zshrc"},
+		{"/bin/bash", "~/.bashrc"},
+		{"/usr/bin/fish", "~/.config/fish/config.fish"},
+		{"/bin/dash", "~/.profile"},
+	} {
+		t.Run(tc.shell, func(t *testing.T) {
+			t.Setenv("HOME", "")
+			t.Setenv("SHELL", tc.shell)
+			t.Setenv("ZDOTDIR", "")
+			t.Setenv("XDG_CONFIG_HOME", "")
+			if got := wrapperFile(filepath.Base(tc.shell)); got != tc.want {
+				t.Fatalf("wrapperFile(%q) without HOME = %q, want %q", tc.shell, got, tc.want)
+			}
+		})
+	}
+}
