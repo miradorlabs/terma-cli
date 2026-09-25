@@ -52,3 +52,39 @@ func TestDisconnectClaudeRestoresStatusLineWithoutTelemetry(t *testing.T) {
 		t.Fatalf("original status line was not restored: %s", data)
 	}
 }
+
+func TestDisconnectClaudeCleansTelemetryWithCorruptStatusLineRecord(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("TERMA_ENV", "dev")
+	configDir := t.TempDir()
+	t.Setenv("TERMA_CONFIG_DIR", configDir)
+	claudeDir := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", claudeDir)
+	for _, entry := range os.Environ() {
+		key, _, _ := strings.Cut(entry, "=")
+		if strings.HasPrefix(key, "OTEL_") {
+			t.Setenv(key, "")
+		}
+	}
+	if out, err := runTerma(t, "connect", "claude", "--api-key", "ter_srv_leftover", "--project", testProjectID, "--yes"); err != nil {
+		t.Fatalf("connect: %v\n%s", err, out)
+	}
+	settings := filepath.Join(claudeDir, "settings.json")
+	if err := os.WriteFile(filepath.Join(configDir, "statusline.json"), []byte("{broken"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runTerma(t, "disconnect", "claude", "--yes")
+	if err != nil {
+		t.Fatalf("corrupt status-line record blocked telemetry cleanup: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "Warning: could not restore the status line") {
+		t.Fatalf("missing status-line warning: %s", out)
+	}
+	data, err := os.ReadFile(settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "ter_srv_leftover") {
+		t.Fatalf("telemetry key survived disconnect: %s", data)
+	}
+}

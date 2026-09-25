@@ -59,11 +59,9 @@ instead, and leaves your global connect as it is.`,
 			// global telemetry connection. It still belongs to this disconnect.
 			claudeStatusLineLeftover := false
 			if h.Name() == "claude" && scope == harness.ScopeGlobal {
-				line, err := (harness.Claude{}).StatusLineState("")
-				if err != nil {
-					return err
+				if line, lineErr := (harness.Claude{}).StatusLineState(""); lineErr == nil {
+					claudeStatusLineLeftover = line.Installed || line.Replaced
 				}
-				claudeStatusLineLeftover = line.Installed || line.Replaced
 			}
 			// Keyed off the settings actually present, not off Connected. A config with
 			// telemetry switched off, or with the endpoint deleted, is not "connected" —
