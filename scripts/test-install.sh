@@ -18,6 +18,9 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 INSTALLER="$ROOT/install.sh"
 
 work="$(mktemp -d)"
+# `make test-install` exports TERMA_ENV=dev. Keep the release binary's version
+# check in that environment too, with no machine profile influencing its output.
+export TERMA_ENV=dev TERMA_CONFIG_DIR="$work/config"
 mirror="$work/mirror/miradorlabs/terma-cli/releases"
 mkdir -p "$mirror/download/$TAG" "$mirror/latest"
 cp "$DIST"/*.tar.gz "$DIST"/checksums.txt "$mirror/download/$TAG/"
@@ -30,7 +33,7 @@ trap 'kill $server 2>/dev/null || true; rm -rf "$work"' EXIT
 for _ in $(seq 1 50); do curl -fs -o /dev/null "http://127.0.0.1:$PORT/" && break; sleep 0.1; done
 
 BASE="http://127.0.0.1:$PORT/miradorlabs/terma-cli/releases"
-want="terma ${TAG#v}"
+want="terma ${TAG#v} (dev)"
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
 echo "== pinned version, piped through bash"

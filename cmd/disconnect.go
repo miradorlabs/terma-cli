@@ -55,11 +55,21 @@ instead, and leaves your global connect as it is.`,
 					codexNotifierLeftover = ns.Terma
 				}
 			}
+			// Repository install can wrap the user-level status line without a
+			// global telemetry connection. It still belongs to this disconnect.
+			claudeStatusLineLeftover := false
+			if h.Name() == "claude" && scope == harness.ScopeGlobal {
+				line, err := (harness.Claude{}).StatusLineState("")
+				if err != nil {
+					return err
+				}
+				claudeStatusLineLeftover = line.Installed || line.Replaced
+			}
 			// Keyed off the settings actually present, not off Connected. A config with
 			// telemetry switched off, or with the endpoint deleted, is not "connected" —
 			// but it still has Terma's server key sitting in it, and that is the state
 			// where walking away would be worst.
-			if st.ManagedKeys == 0 && !codexNotifierLeftover {
+			if st.ManagedKeys == 0 && !codexNotifierLeftover && !claudeStatusLineLeftover {
 				fmt.Fprintf(out, "%s has no Terma telemetry settings%s. Nothing to do.\n", h.DisplayName(), scopeSuffix(scope))
 				return nil
 			}
@@ -69,7 +79,7 @@ instead, and leaves your global connect as it is.`,
 				fmt.Fprintf(out, "%s is not exporting, but Terma settings are still present.\n\n", h.DisplayName())
 			}
 
-			fmt.Fprintf(out, "This will remove Terma's telemetry settings from:\n  %s\n", st.ConfigPath)
+			fmt.Fprintf(out, "This will remove Terma's settings from:\n  %s\n", st.ConfigPath)
 			if st.KeyPrefix != "" {
 				fmt.Fprintf(out, "\nThe server key %s stays live — revoke it in the web app.\n", st.KeyPrefix)
 			}

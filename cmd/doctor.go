@@ -185,7 +185,7 @@ var wellKnownBinDirs = func() []string {
 // contents — it does not run what it finds. A copy of the same build, or a link to the
 // same file, is not reported: having two is only a problem when they disagree.
 func otherTermas(primary string) []string {
-	want, err := fileDigest(primary)
+	want, err := installedBinaryDigest(primary)
 	if err != nil {
 		return nil
 	}
@@ -211,7 +211,7 @@ func otherTermas(primary string) []string {
 			continue
 		}
 		seen[resolved] = true
-		if got, err := fileDigest(candidate); err != nil || got == want {
+		if got, err := installedBinaryDigest(candidate); err != nil || got == want {
 			continue
 		}
 		out = append(out, tildePath(candidate)+" (installed "+info.ModTime().Format("2006-01-02 15:04")+")")
@@ -230,6 +230,37 @@ func fileDigest(path string) (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// npmLauncherDigest pins the published npm launcher. A path named terma in an
+// npm layout is not enough to trust it: the launcher is executable JavaScript,
+// and doctor must never run a PATH candidate to learn where it points.
+const npmLauncherDigest = "a90d18d5df9946c37f39c80fe34f178202a1f65bf58abffaf0eb1f6f4f15cedb"
+
+// installedBinary resolves only the official npm launcher to its vendor binary.
+// For every other PATH entry, including an edited npm launcher, compare the file
+// itself. npm's bin link and the package-local bin file both lead to this path.
+func installedBinary(path string) string {
+	if runtime.GOOS == "windows" {
+		return path
+	}
+	resolved, err := filepath.EvalSymlinks(path)
+	if err != nil || !strings.HasSuffix(filepath.ToSlash(resolved), "/node_modules/@miradorlabs/terma/bin/terma.js") {
+		return path
+	}
+	if digest, err := fileDigest(resolved); err != nil || digest != npmLauncherDigest {
+		return path
+	}
+	vendor := filepath.Clean(filepath.Join(filepath.Dir(resolved), "..", "vendor", "terma"))
+	info, err := os.Stat(vendor)
+	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o111 == 0 {
+		return path
+	}
+	return vendor
+}
+
+func installedBinaryDigest(path string) (string, error) {
+	return fileDigest(installedBinary(path))
 }
 
 // shimPathFix is what gets terma's shims ahead of the real binaries from here. `terma
@@ -395,7 +426,7 @@ func doctorBinaryCheckFor(exe string) doctor.Check {
 		return doctor.Check{Status: doctor.Fail, Detail: "hooks call `terma` by name and will not find it", Fix: "add " + filepath.Dir(exe) + " to PATH (or reinstall with the install script)"}
 	}
 	if current, err := fileDigest(exe); err == nil {
-		if installed, err := fileDigest(path); err == nil && current != installed {
+		if installed, err := installedBinaryDigest(path); err == nil && current != installed {
 			return doctor.Check{Status: doctor.Warn,
 				Detail: path + binaryBuildLabel(path) + "; hooks run a different build from " + exe,
 				Fix:    "put " + filepath.Dir(exe) + " first on PATH, or replace " + path + " with this build; then run `terma doctor`"}
@@ -417,7 +448,7 @@ func doctorBinaryCheckFor(exe string) doctor.Check {
 
 // binaryBuildLabel reads build metadata without running an executable found on PATH.
 func binaryBuildLabel(path string) string {
-	info, err := buildinfo.ReadFile(path)
+	info, err := buildinfo.ReadFile(installedBinary(path))
 	if err != nil {
 		return ""
 	}
@@ -645,7 +676,23 @@ func scratchCommit(ctx context.Context, root string, bound *termaproject.File) (
 	if _, err := gitx.Git(ctx, wt, "add", file); err != nil {
 		return "", doctor.Check{Status: doctor.Fail, Detail: err.Error()}
 	}
-	if _, err := gitx.Git(ctx, wt, "-c", "commit.gpgsign=false", "commit", "-q", "-m", "terma doctor scratch commit"); err != nil {
+	commitArgs := []string{"-c", "commit.gpgsign=false"}
+	// A new worktree has its own config.worktree and checks out HEAD. Immediately
+	// after install, neither the per-worktree core.hooksPath nor the uncommitted
+	// shim files exist there. Point the scratch commit at the hooks this checkout
+	// actually runs, including files the developer has yet to commit.
+	if gitx.ConfigGet(ctx, root, "core.hooksPath") != "" {
+		hooksPath, err := gitx.Git(ctx, root, "config", "--path", "--get", "core.hooksPath")
+		if err != nil {
+			return "", doctor.Check{Status: doctor.Fail, Detail: "could not resolve core.hooksPath: " + err.Error()}
+		}
+		if !filepath.IsAbs(hooksPath) {
+			hooksPath = filepath.Join(root, hooksPath)
+		}
+		commitArgs = append(commitArgs, "-c", "core.hooksPath="+hooksPath)
+	}
+	commitArgs = append(commitArgs, "commit", "-q", "-m", "terma doctor scratch commit")
+	if _, err := gitx.Git(ctx, wt, commitArgs...); err != nil {
 		return "", doctor.Check{Status: doctor.Fail, Detail: "scratch commit failed: " + err.Error(), Fix: "a hook is failing the commit — run it with TERMA_DEBUG=1 to see why"}
 	}
 	sha := gitx.HeadSHA(ctx, wt)
