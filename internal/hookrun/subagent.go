@@ -59,7 +59,8 @@ func SubagentStart(ctx context.Context, env Env) error {
 	return claudeSubagent(ctx, env, EventSubagentStart)
 }
 
-// SubagentStop handles the second half, from the same payload under the same rule.
+// SubagentStop handles the second half for an agent whose launch terma observed.
+// Claude's internal forks also fire this hook, without a delegated launch.
 func SubagentStop(ctx context.Context, env Env) error {
 	return claudeSubagent(ctx, env, EventSubagentEnd)
 }
@@ -76,6 +77,13 @@ func claudeSubagent(ctx context.Context, env Env, name string) error {
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
 	r, err := env.repo(ctx)
 	if err != nil {
+		return nil
+	}
+	if name == EventSubagentStart {
+		env.rememberClaudeSubagent(in.SessionID, in.AgentID)
+	} else if !env.knownClaudeSubagent(in.SessionID, in.AgentID) {
+		// Internal forks (background summaries, prompt suggestions, /btw) also
+		// fire SubagentStop. Only a launch establishes a delegated run.
 		return nil
 	}
 	attrs := agentAttrs(map[string]any{attrTool: claudeTool, attrSchemaVersion: 1}, in.AgentID, in.AgentType)
@@ -155,6 +163,7 @@ func (e Env) claudeSubagentCall(r *repo, in *claudeHookInput) {
 		e.logf("%s tool response names no agent", in.ToolName)
 		return
 	}
+	e.rememberClaudeSubagent(in.SessionID, res.AgentID)
 	attrs := agentAttrs(map[string]any{attrTool: claudeTool, attrSchemaVersion: 1}, res.AgentID, cmp.Or(res.AgentType, in.ToolInput.SubagentType))
 	// A subagent can launch one of its own: the hook then fires inside the launching
 	// agent and names it, which is the new agent's parent.

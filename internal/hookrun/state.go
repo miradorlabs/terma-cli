@@ -6,8 +6,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
-// State directories under the config dir. Each holds one small JSON file per session,
-// named by a hash, with a `.lock` beside it; pruneQuotaState ages all of them out. The
+// State directories under the config dir. Each holds small files named by a hash,
+// with a `.lock` beside mutable checkpoints; pruneQuotaState ages them out. The
 // names are on developers' disks already: renaming one orphans its files and restarts
 // every sequence and cursor kept there.
 const (
@@ -28,6 +28,9 @@ const (
 	// antigravityTurnDir holds one record per conversation, beside the observation
 	// checkpoints: the turn agy is in (see antigravity_turn.go).
 	antigravityTurnDir = "antigravity-turns"
+	// claudeSubagentDir holds launch evidence per (session, agent), so internal
+	// Claude forks' orphan stop hooks cannot create delegated runs.
+	claudeSubagentDir = "claude-subagents"
 )
 
 // snapshotStateRetention is how long a status line snapshot or a funding evidence hash

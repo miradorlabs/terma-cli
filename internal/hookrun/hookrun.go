@@ -219,6 +219,7 @@ func SessionStart(ctx context.Context, env Env) error {
 		return nil
 	}
 	env.announce(r, env.newSession(r, in.SessionID, claudeTool, in.Model), map[string]any{attrSource: in.Source})
+	env.pruneClaudeSubagents()
 	env.captureClaudeAccount(r, in)
 	return nil
 }
