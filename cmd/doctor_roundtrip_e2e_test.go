@@ -34,6 +34,11 @@ func TestDoctorScratchCommitRoundTrip(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
 		defer mu.Unlock()
+		if r.URL.Path == "/v1/identity" {
+			// What the API gateway says about a server key: the one project it belongs to.
+			fmt.Fprintf(w, `{"project_id":%q,"organization_id":"org","auth_type":"server_key"}`, testProjectID)
+			return
+		}
 		if r.Method == http.MethodPost {
 			var body struct {
 				ResourceLogs []struct {

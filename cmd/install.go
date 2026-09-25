@@ -20,6 +20,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
+	"github.com/miradorlabs/terma-cli/internal/serverkey"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/shim"
 	"github.com/miradorlabs/terma-cli/internal/style"
@@ -915,6 +916,9 @@ type binding struct {
 // existing binding, else a picker.
 func resolveBinding(cmd *cobra.Command, cfg *config.Config, existing *termaproject.File, ref string) (binding, error) {
 	ref = strings.TrimSpace(ref)
+	if serverkey.Is(cfg.APIKey) {
+		return serverKeyBinding(cmd.Context(), cfg, existing, ref)
+	}
 	if ref != "" {
 		client, err := newClient(cfg)
 		if err != nil {
@@ -945,6 +949,39 @@ func resolveBinding(cmd *cobra.Command, cfg *config.Config, existing *termaproje
 		return binding{}, err
 	}
 	return binding{ID: p.ID, Name: p.Name, OrganizationID: p.OrganizationID}, nil
+}
+
+// serverKeyBinding is the project a server key (TERMA_API_KEY) belongs to. A ter_srv_ key
+// is scoped to exactly one project, and the account service that lists projects accepts
+// only a signed-in user, so the API gateway's /v1/identity is what can say which project
+// it is. A --project or an existing binding that names a different project is an error
+// rather than a silent switch: the key could not deliver that project's events.
+func serverKeyBinding(ctx context.Context, cfg *config.Config, existing *termaproject.File, ref string) (binding, error) {
+	client, err := newClient(cfg)
+	if err != nil {
+		return binding{}, err
+	}
+	var identity struct {
+		ProjectID      string `json:"project_id"`
+		OrganizationID string `json:"organization_id"`
+	}
+	if err := client.Get(ctx, "/v1/identity", nil, &identity); err != nil {
+		return binding{}, fmt.Errorf("look up the project TERMA_API_KEY belongs to: %w", err)
+	}
+	if identity.ProjectID == "" {
+		return binding{}, errors.New("TERMA_API_KEY names no project")
+	}
+	if ref != "" && ref != identity.ProjectID {
+		return binding{}, fmt.Errorf("TERMA_API_KEY belongs to project %s, not %q — a server key binds only its own project, named by id", identity.ProjectID, ref)
+	}
+	b := binding{ID: identity.ProjectID, OrganizationID: identity.OrganizationID}
+	if existing != nil {
+		if existing.Project.ID != identity.ProjectID {
+			return binding{}, fmt.Errorf("this repository is bound to project %s, and TERMA_API_KEY belongs to %s", existing.Project.ID, identity.ProjectID)
+		}
+		b.Name = existing.Project.Name
+	}
+	return b, nil
 }
 
 // planAdapters computes each named adapter's repository changes, in registry order so
