@@ -165,7 +165,11 @@ run that reaches them opens a browser login on **production**. A script that run
   wired and none is stored; install signs in for it only when the developer selected an agent —
   `--harness none` (CI, onboarding a repository) stays credential-free and is told its events
   are held. Fix-it hints follow the same split: sign-in → `terma setup`; a missing key, an
-  unwired clone, an agent on the wrong project → `terma install`.
+  unwired clone, an agent on the wrong project → `terma install`. With a server key
+  (`TERMA_API_KEY`) install signs in to nothing and binds the key's own project, read from
+  the API gateway's `/v1/identity` (`serverKeyBinding`): the account service's
+  `/v1/projects` accepts only a signed-in user, and a `--project` or existing binding
+  naming another project is refused, since the key could not deliver its events.
 - Per-repo routing (`internal/shim`, `terma shim prepare <agent>`): `terma install` points
   each agent at the repository's project; secrets stay in the home directory,
   namespaced by project id (`routing/<id>.json`, `claude/<id>/`, keys in the keystore).
