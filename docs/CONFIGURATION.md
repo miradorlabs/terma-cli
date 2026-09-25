@@ -148,8 +148,61 @@ active account profile. `update-check.json` stores only versions and timestamps.
 
 Automatic updates use checksum verification and an atomic binary replacement. A
 failed download leaves the installed binary intact and does not fail the command
-that triggered the update. Homebrew/npm installations receive instructions to update
-through that package manager; Windows requires a manual release download.
+that triggered the update. Windows requires a manual release download.
+
+An explicit `terma update` upgrades a Homebrew or npm installation through the package
+manager that owns it, read from where the binary lives: `<prefix>/bin/brew upgrade
+[--cask] terma` for `<prefix>/Caskroom` or `<prefix>/Cellar`, and `npm install --global
+--prefix <prefix> @miradorlabs/terma@latest` for `<prefix>/lib/node_modules` (that
+prefix's npm, else the one on PATH). When that program cannot be found, or fails, the
+command to run is printed instead. terma installed as a project's own npm dependency
+(`<project>/node_modules`) is that project's to upgrade: `terma update` names
+`npm install @miradorlabs/terma@latest` and the project directory, and runs nothing. Automatic updates never run a package manager; those
+installations get notices only.
+
+### Refreshing what terma installed
+
+An update replaces the binary; what earlier versions wrote stays as it was until
+something rewrites it. So once the new version is in place, `terma update` runs it as
+`terma update --refresh`, which rewrites, with the new version's templates:
+
+- the PATH shims in `~/.config/terma/shim/bin`,
+- the wrapped Claude Code status line (falling back to the renderer recorded in
+  `statusline.json`),
+- the OpenCode plugin, around its own configuration,
+- and, in the repository it runs in, the commit hooks through the manager and the agent
+  hook files for the adapters that `.terma/settings.json` records.
+
+It works only from what is on disk. It never signs in, never creates a file (one that is
+gone was removed on purpose and stays gone; `terma install` brings it back), and never
+changes a choice — unlike re-running `terma install`, which puts every flag it does not
+record (`--signals`, `--exclude-prompts`, `--identity`, `--no-statusline`,
+`--activation`) back to its default. The repository files it changes are listed to
+commit.
+
+### Migrating saved state
+
+When a new version changes the shape of something terma keeps in `~/.config/terma` — a
+routing record, the key store, a status-line record — it ships a migration that rewrites
+the old shape. Every terma command, hooks included, checks `migrations.json` when it
+starts (one small read) and applies any migrations this version has that the machine has
+not had, in order, before reading anything else. It needs no command from you, and
+whichever process starts first after an update does it: the rest wait for it, briefly.
+A hook never fails because of a migration; it stays silent and tries again on a later
+run. An interactive command says what failed, `terma doctor` shows a `saved state
+migrated` line while one is pending or failed, and `terma update --refresh` retries it
+straight away and reports what it applied.
+
+Migrations only add to or fill in what an earlier version wrote, so an older terma
+still on the machine (doctor warns when there is one) keeps reading the same files.
+They change nothing in a repository; committed files are `terma update --refresh`'s,
+when you ask.
+
+The first interactive command under a newer release, however it arrived (an automatic
+update, or `brew upgrade` run by hand), refreshes the home-directory files once and
+records the release in `refreshed.json`. It does not rewrite committed files: when the
+current repository's hooks are out of date it says so, and `terma update --refresh` there
+updates them.
 
 Update checks compare the release tag stamped into the binary with the latest
 published release. Source builds (`make build` reports `git describe`, a plain

@@ -198,6 +198,63 @@ func (c Claude) InstallStatusLine() (bool, error) {
 	return true, nil
 }
 
+// RefreshStatusLine rewrites Terma's command in the user's Claude settings when it is
+// an older form of the one this build installs, falling back to the same recorded
+// renderer. It never installs one: a file without Terma's command, or a wrap with no
+// record of what it replaced, is left as it is. It returns the settings path and
+// whether the file changed.
+func (c Claude) RefreshStatusLine() (string, bool, error) {
+	if c.root != "" {
+		return "", false, nil
+	}
+	path, err := c.ConfigPath()
+	if err != nil {
+		return "", false, err
+	}
+	s, err := loadSettings(path)
+	if err != nil {
+		return path, false, err
+	}
+	cur, err := parseStatusLine(s.root[claudeStatusLineKey])
+	if err != nil || cur == nil || !isStatusLineOurs(cur.Command) {
+		return path, false, nil
+	}
+	rec, err := loadStatusLineRecord(path)
+	if err != nil || rec == nil {
+		return path, false, err
+	}
+	prev, err := parseStatusLine(rec.Previous)
+	if err != nil {
+		return path, false, fmt.Errorf("%s: %w", statusLineRecordFile, err)
+	}
+	previousCommand := ""
+	if prev != nil {
+		previousCommand = prev.Command
+	}
+	want := StatusLineCommand(previousCommand)
+	if cur.Command == want {
+		return path, false, nil
+	}
+	entry := maps.Clone(cur.Options)
+	entry["type"] = json.RawMessage(`"command"`)
+	entry["command"], _ = marshalJSON(want, "")
+	installed, err := marshalJSON(entry, "")
+	if err != nil {
+		return path, false, err
+	}
+	// Record first, as InstallStatusLine does: the hook reads it the moment the
+	// settings change.
+	rec.Installed = installed
+	if err := saveStatusLineRecord(path, rec); err != nil {
+		return path, false, err
+	}
+	s.root[claudeStatusLineKey] = installed
+	if err := s.save(false); err != nil {
+		return path, false, err
+	}
+	return path, true, nil
+}
+
 // RemoveStatusLine restores the entry Terma replaced, if the file still holds
 // Terma's command. It returns whether the file changed.
 func (c Claude) RemoveStatusLine() (bool, error) {

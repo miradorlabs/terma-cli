@@ -246,6 +246,37 @@ func InstallShims(agents []string) (string, error) {
 	return binDir, nil
 }
 
+// RefreshShims rewrites each installed PATH shim whose script differs from this build's,
+// so a new launcher reaches a machine without re-running `terma install`. It never adds a
+// shim, and a file in the shim directory that terma did not write is left alone. It
+// returns the paths it rewrote.
+func RefreshShims() ([]string, error) {
+	binDir, err := ShimBinDir()
+	if err != nil {
+		return nil, err
+	}
+	var changed []string
+	for _, r := range routers {
+		path := filepath.Join(binDir, r.name())
+		data, err := os.ReadFile(path)
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return changed, err
+		}
+		script := shimScript(r.name(), binDir)
+		if !strings.HasPrefix(string(data), shimHeader(r.name())) || string(data) == script {
+			continue
+		}
+		if err := config.WriteFileAtomic(path, []byte(script), 0o755); err != nil {
+			return changed, err
+		}
+		changed = append(changed, path)
+	}
+	return changed, nil
+}
+
 // RemoveAll tears down every trace of per-repo routing on this machine: the PATH-shim
 // scripts and the block that put them on PATH, all projects' routing records, all
 // per-project Claude settings. Keystore keys are left — they belong to the spool and to

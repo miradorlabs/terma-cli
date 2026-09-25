@@ -154,7 +154,9 @@ func TestMaintainRequiresOptInAndVerifiesUpdates(t *testing.T) {
 			if mode == "locked" && lookups != 0 {
 				t.Fatal("contended updater still made requests")
 			}
-			if mode == "managed" && (downloads != 0 || !strings.Contains(out.String(), "brew upgrade terma")) {
+			// `terma update` upgrades a managed installation through its package manager,
+			// so the notice names it for every installation; nothing is downloaded here.
+			if mode == "managed" && (downloads != 0 || !strings.Contains(out.String(), "Run `terma update`")) {
 				t.Fatalf("managed installation: %s", &out)
 			}
 			if mode == "notify" && (downloads != 0 || !strings.Contains(out.String(), "terma update")) {

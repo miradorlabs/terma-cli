@@ -1,6 +1,7 @@
 package harness
 
 import (
+	"bytes"
 	"context"
 	_ "embed"
 	"encoding/json"
@@ -407,6 +408,37 @@ func (OpenCode) ConnectPerRepo(e Exporter) error {
 	}
 	// The key lives in the helper, not the plugin, so this file stays readable.
 	return config.WriteFileAtomic(path, src, 0o644)
+}
+
+// RefreshPlugin re-splices an installed plugin's own configuration into this build's
+// plugin source, so a new plugin reaches a machine without connecting again. A plugin
+// that is absent, or inert (no configuration), is left alone, as is its file mode. It
+// returns the plugin path and whether the file changed.
+func (OpenCode) RefreshPlugin() (string, bool, error) {
+	path, err := (OpenCode{}).ConfigPath()
+	if err != nil {
+		return "", false, err
+	}
+	info, err := os.Stat(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return path, false, nil
+	}
+	if err != nil {
+		return path, false, err
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return path, false, err
+	}
+	cfg, ok := readPluginConfig(data)
+	if !ok {
+		return path, false, nil
+	}
+	src, err := renderPlugin(*cfg)
+	if err != nil || bytes.Equal(src, data) {
+		return path, false, err
+	}
+	return path, true, config.WriteFileAtomic(path, src, info.Mode().Perm())
 }
 
 // opencodeBaseAttributes are the resource attributes a per-repo plugin carries for every

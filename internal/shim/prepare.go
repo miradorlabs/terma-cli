@@ -35,8 +35,14 @@ func Prepare(agent, directory string, args []string) error {
 }
 
 func shimScript(agent, binDir string) string {
-	return "#!/bin/sh\n# terma per-repo routing shim for " + agent + ". Managed by `terma install`.\n" +
+	return shimHeader(agent) + " Managed by `terma install`.\n" +
 		"terma_agent=" + shellQuote(agent) + "\nterma_bin=" + shellQuote(binDir) + "\n" + launcherBody
+}
+
+// shimHeader is how every version of the shim script has begun; it tells terma's
+// script from anything else in the shim directory.
+func shimHeader(agent string) string {
+	return "#!/bin/sh\n# terma per-repo routing shim for " + agent + "."
 }
 
 const launcherBody = `# Resolve on every launch, including when Terma is absent or disabled.

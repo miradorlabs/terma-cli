@@ -75,7 +75,9 @@ func (r Report) Failed() bool {
 
 // Check keys shared by doctor and status.
 const (
-	KeyBinary  = "binary"
+	KeyBinary = "binary"
+	// KeyState: saved state an update has not finished migrating (internal/migrate).
+	KeyState   = "state"
 	KeyAuth    = "auth"
 	KeyProject = "project"
 	KeyHooks   = "hooks"
