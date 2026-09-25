@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/gitx"
 )
 
 const (
@@ -109,6 +110,49 @@ func Load(root string) (*File, error) {
 	default:
 		return nil, err
 	}
+}
+
+// Resolve reads the binding for the checkout at root, whose git directory is gitDir ("" to
+// find it). The checkout's own binding wins. A linked git worktree without one uses its
+// main checkout's: a new worktree does not get a gitignored binding, and without this
+// every event from it carried no project and was dropped at the next flush. It follows
+// git's own link between the two, never directory nesting, so a separate repository
+// inside a bound one still does not inherit it. from is the root the binding was read
+// from; a missing binding is ErrNotFound, as from Load.
+func Resolve(root, gitDir string) (f *File, from string, err error) {
+	f, err = Load(root)
+	if !errors.Is(err, ErrNotFound) {
+		return f, root, err
+	}
+	if gitDir == "" {
+		_, gitDir, _ = gitx.LocateFS(root)
+	}
+	_, main, ok := gitx.LinkedWorktreeFS(gitDir)
+	if gitDir == "" || !ok || main == "" {
+		return nil, root, err
+	}
+	mf, merr := Load(main)
+	if errors.Is(merr, ErrNotFound) {
+		return nil, root, err
+	}
+	return mf, main, merr
+}
+
+// ResolveDir finds the binding for dir: the nearest one above it (Find), else, when dir
+// is in a linked worktree with none of its own, the main checkout's (Resolve). root is
+// the checkout it applies to — Find's directory, or the worktree's own root, which is
+// where that worktree's agents run and are trusted.
+func ResolveDir(dir string) (f *File, root string, err error) {
+	if root, err := Find(dir); err == nil {
+		f, err := Load(root)
+		return f, root, err
+	}
+	root, gitDir, ok := gitx.LocateFS(dir)
+	if !ok {
+		return nil, "", ErrNotFound
+	}
+	f, _, err = Resolve(root, gitDir)
+	return f, root, err
 }
 
 func validate(f *File, source string) (*File, error) {

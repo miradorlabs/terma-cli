@@ -49,11 +49,7 @@ func routeFor(agent, cwd string, userArgs []string) route {
 	if !ok {
 		return route{}
 	}
-	root, err := termaproject.Find(r.workingDir(cwd, userArgs))
-	if err != nil {
-		return route{}
-	}
-	f, err := termaproject.Load(root)
+	f, _, err := termaproject.ResolveDir(r.workingDir(cwd, userArgs))
 	if err != nil {
 		return route{}
 	}

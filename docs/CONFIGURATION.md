@@ -34,6 +34,15 @@ subdirectories. Outside an installed repository, use `--project <id>` for a sing
 command. An explicit `--project` or `TERMA_PROJECT_ID` overrides the binding without
 saving a selection.
 
+A linked Git worktree (`git worktree add`, including the ones coding agents create for
+isolated work) uses its own `.terma/settings.json` when it has one, and otherwise its
+main checkout's. That matters when the binding is gitignored: a new worktree does not
+get ignored files, so without the fallback its hooks would have no project to report to.
+The link is Git's own, never directory nesting — a separate repository inside a bound
+one does not inherit it. Everything from a worktree reports as its main repository
+(`repo`) with a `worktree` attribute naming it, and `terma status` / `terma doctor` say
+when a worktree is bound through its main checkout.
+
 ## Local files
 
 ```text

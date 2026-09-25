@@ -57,11 +57,13 @@ type repoRefresh struct {
 // files that exist are refreshed; one that is gone was removed by someone, and bringing
 // it back is `terma install`'s decision.
 func planRepoRefresh(ctx context.Context) (*repoRefresh, error) {
-	root, _, err := repoHere(ctx, "")
+	root, gitDir, err := repoHere(ctx, "")
 	if err != nil {
 		return nil, nil
 	}
-	existing, err := termaproject.Load(root)
+	// A linked worktree refreshes its own hook files from its main checkout's binding
+	// when it has none of its own: the committed files are the same repository's.
+	existing, _, err := termaproject.Resolve(root, gitDir)
 	if errors.Is(err, termaproject.ErrNotFound) {
 		return nil, nil
 	}

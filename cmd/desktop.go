@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"slices"
@@ -29,11 +30,10 @@ func statusDesktop(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
-	root, err := termaproject.Find(cwd)
-	if err != nil {
+	binding, root, err := termaproject.ResolveDir(cwd)
+	if errors.Is(err, termaproject.ErrNotFound) {
 		return fmt.Errorf("find installed repository: %w", err)
 	}
-	binding, err := termaproject.Load(root)
 	if err != nil {
 		return err
 	}

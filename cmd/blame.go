@@ -108,6 +108,7 @@ type blameView struct {
 	LinesDeleted int      `json:"lines_deleted"`
 	FileCount    int      `json:"file_count"`
 	Repository   string   `json:"repository,omitempty"`
+	Worktree     string   `json:"worktree,omitempty"`
 	Branch       string   `json:"branch,omitempty"`
 	RepoURL      string   `json:"repo_url,omitempty"`
 	AuthorEmail  string   `json:"author_email,omitempty"`
@@ -131,6 +132,7 @@ func blameViewOf(r *api.LogRecord, sha string) blameView {
 		LinesDeleted: r.Int("lines_deleted"),
 		FileCount:    r.Int("file_count"),
 		Repository:   r.Attr("terma.repo"),
+		Worktree:     r.Attr("worktree"),
 		Branch:       r.Attr("branch"),
 		RepoURL:      r.Attr("repo_url"),
 		AuthorEmail:  r.Attr("author_email"),
@@ -152,6 +154,9 @@ func blameTable(v blameView) output.Table {
 	repo := v.Repository
 	if v.Branch != "" {
 		repo = strings.TrimSpace(v.Repository + " @ " + v.Branch)
+	}
+	if v.Worktree != "" {
+		repo = strings.TrimSpace(repo + " (worktree " + v.Worktree + ")")
 	}
 
 	t := output.Table{Headers: []string{"FIELD", "VALUE"}}

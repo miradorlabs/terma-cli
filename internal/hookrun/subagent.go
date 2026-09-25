@@ -85,7 +85,7 @@ func claudeSubagent(ctx context.Context, env Env, name string) error {
 	if session.ValidID(in.PromptID) {
 		attrs[attrTurnID] = in.PromptID
 	}
-	env.emitFor(r, spool.Event{Name: name, SessionID: in.SessionID, Repo: repoName(r.root), Attrs: attrs})
+	env.emitFor(r, spool.Event{Name: name, SessionID: in.SessionID, Repo: r.name, Attrs: attrs})
 	return nil
 }
 
@@ -196,7 +196,7 @@ func (e Env) claudeSubagentCall(r *repo, in *claudeHookInput) {
 			attrs[key] = int64(value)
 		}
 	}
-	e.emitFor(r, spool.Event{Name: EventSubagentCall, SessionID: in.SessionID, Repo: repoName(r.root), Attrs: attrs})
+	e.emitFor(r, spool.Event{Name: EventSubagentCall, SessionID: in.SessionID, Repo: r.name, Attrs: attrs})
 }
 
 // --- Codex -----------------------------------------------------------------------------
@@ -245,7 +245,7 @@ func codexSubagent(ctx context.Context, env Env, name string) error {
 			codexSpawnAttrs(attrs, attrAgentParentID, spawn)
 		}
 	}
-	env.emitFor(r, spool.Event{Name: name, SessionID: in.SessionID, Repo: repoName(r.root), Attrs: attrs})
+	env.emitFor(r, spool.Event{Name: name, SessionID: in.SessionID, Repo: r.name, Attrs: attrs})
 	return nil
 }
 
@@ -354,6 +354,6 @@ func CursorSubagentStop(ctx context.Context, env Env) error {
 	touched := facet(map[string]any{})
 	boundedAttr(touched, attrTurnID, in.GenerationID)
 	env.touch(r, sess, "subagentStop", files, touched)
-	env.emitFor(r, spool.Event{Name: EventSubagentEnd, SessionID: id, Repo: repoName(r.root), Attrs: attrs})
+	env.emitFor(r, spool.Event{Name: EventSubagentEnd, SessionID: id, Repo: r.name, Attrs: attrs})
 	return nil
 }

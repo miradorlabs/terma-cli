@@ -271,6 +271,62 @@ test("per-repo mode resolves the project and key from the repository binding", a
   expect(res["service.name"]).toBe("opencode")
 })
 
+// A new git worktree does not get a gitignored binding. It is the same repository, so it
+// reports to its main checkout's project — through git's own link, never nesting.
+test("per-repo mode resolves a linked worktree through its main checkout", async () => {
+  received = []
+  const base = mkdtempSync(join(tmpdir(), "terma-wt-linked-"))
+  const main = join(base, "main")
+  mkdirSync(join(main, ".git", "worktrees", "feature"), { recursive: true })
+  mkdirSync(join(main, ".terma"), { recursive: true })
+  writeFileSync(join(main, ".terma", "settings.json"), JSON.stringify({ project: { id: "proj-77" } }))
+  writeFileSync(join(main, ".git", "worktrees", "feature", "commondir"), "../..\n")
+  const wt = join(base, "feature")
+  mkdirSync(wt)
+  writeFileSync(join(wt, ".git"), `gitdir: ${join(main, ".git", "worktrees", "feature")}\n`)
+  const perHelper = join(dir, "opencode-otel-proj-77")
+  writeFileSync(perHelper, `#!/bin/sh\necho '{"Authorization": "Bearer ter_srv_proj77"}'\n`)
+  chmodSync(perHelper, 0o700)
+
+  const hooks = await load(perRepoConfig(), wt)
+  await hooks.event({ event: { type: "message.updated", properties: { info: assistant } } })
+  await hooks.dispose()
+
+  const traces = received.filter((r) => r.path === "/v1/traces")
+  expect(traces.length).toBe(1)
+  expect(traces[0].headers["authorization"]).toBe("Bearer ter_srv_proj77")
+  const res = Object.fromEntries(traces[0].body.resourceSpans[0].resource.attributes.map((a) => [a.key, a.value.stringValue]))
+  expect(res["mirador.project.id"]).toBe("proj-77")
+})
+
+// Same order as the Go side: a binding anywhere above is found before a linked worktree
+// falls back to its main checkout's.
+test("per-repo mode prefers a binding above the worktree over its main checkout's", async () => {
+  received = []
+  const base = mkdtempSync(join(tmpdir(), "terma-wt-order-"))
+  const main = join(base, "main")
+  mkdirSync(join(main, ".git", "worktrees", "feature"), { recursive: true })
+  mkdirSync(join(main, ".terma"), { recursive: true })
+  writeFileSync(join(main, ".terma", "settings.json"), JSON.stringify({ project: { id: "proj-main" } }))
+  writeFileSync(join(main, ".git", "worktrees", "feature", "commondir"), "../..\n")
+  const outer = join(base, "outer")
+  mkdirSync(join(outer, ".terma"), { recursive: true })
+  writeFileSync(join(outer, ".terma", "settings.json"), JSON.stringify({ project: { id: "proj-outer" } }))
+  const wt = join(outer, "feature")
+  mkdirSync(wt)
+  writeFileSync(join(wt, ".git"), `gitdir: ${join(main, ".git", "worktrees", "feature")}\n`)
+  const perHelper = join(dir, "opencode-otel-proj-outer")
+  writeFileSync(perHelper, `#!/bin/sh\necho '{"Authorization": "Bearer ter_srv_outer"}'\n`)
+  chmodSync(perHelper, 0o700)
+
+  const hooks = await load(perRepoConfig(), wt)
+  await hooks.event({ event: { type: "message.updated", properties: { info: assistant } } })
+  await hooks.dispose()
+  const traces = received.filter((r) => r.path === "/v1/traces")
+  expect(traces.length).toBe(1)
+  expect(traces[0].headers["authorization"]).toBe("Bearer ter_srv_outer")
+})
+
 test("per-repo mode stays inert in a repository with no terma binding", async () => {
   received = []
   const wt = mkdtempSync(join(tmpdir(), "terma-wt-unbound-"))

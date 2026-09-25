@@ -97,6 +97,23 @@ func CommonDirFS(gitDir string) string {
 	return filepath.Clean(target)
 }
 
+// LinkedWorktreeFS reports whether gitDir belongs to a linked worktree (`git worktree
+// add`), with git's name for it (the directory under .git/worktrees) and the main
+// checkout's root. mainRoot is "" for a worktree of a bare repository, which has no main
+// checkout. A submodule's git directory has no commondir and is not a worktree. It reads
+// one small file and runs nothing.
+func LinkedWorktreeFS(gitDir string) (name, mainRoot string, ok bool) {
+	gitDir = filepath.Clean(gitDir)
+	common := CommonDirFS(gitDir)
+	if common == gitDir {
+		return "", "", false
+	}
+	if filepath.Base(common) == ".git" {
+		mainRoot = filepath.Dir(common)
+	}
+	return filepath.Base(gitDir), mainRoot, true
+}
+
 // CommentCharFS reads core.commentChar the way git resolves it — global config
 // then the repository's — without a subprocess. Includes and conditional includes
 // are not followed; a repository relying on those for commentChar (rare) gets "#",

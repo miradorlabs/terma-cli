@@ -52,7 +52,7 @@ func (e Env) captureCodexDesktopActivity(ctx context.Context, r *repo, in *codex
 		if at.IsZero() || at.After(e.now()) {
 			at = e.now()
 		}
-		ev := spool.Event{Time: at, SessionID: in.SessionID, Repo: repoName(r.root), Attrs: attrs}
+		ev := spool.Event{Time: at, SessionID: in.SessionID, Repo: r.name, Attrs: attrs}
 		switch a.Kind {
 		case "model":
 			ev.Name = EventModelCall
@@ -99,6 +99,12 @@ func (e Env) captureCodexDesktopActivity(ctx context.Context, r *repo, in *codex
 		default:
 			return nil
 		}
+		// Spooled directly rather than through emitFor, so the binding is stamped here:
+		// an event with no project id is dropped as unroutable at the next flush.
+		if r.projectID != "" {
+			attrs[AttrProjectID] = r.projectID
+		}
+		r.stampWorktree(attrs)
 		return e.Spool.Append(ev)
 	})
 	if err != nil {

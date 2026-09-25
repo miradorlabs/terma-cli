@@ -105,6 +105,6 @@ func CodexPermissionRequest(ctx context.Context, env Env) error {
 			boundedAttr(attrs, "reason", input.Description)
 		}
 	}
-	env.emitFor(r, spool.Event{Time: at, Name: EventApprovalAsked, SessionID: in.SessionID, Repo: repoName(r.root), Attrs: attrs})
+	env.emitFor(r, spool.Event{Time: at, Name: EventApprovalAsked, SessionID: in.SessionID, Repo: r.name, Attrs: attrs})
 	return nil
 }

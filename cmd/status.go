@@ -209,11 +209,11 @@ Nothing is written and no scratch commit is made — run
 			projectID := cfg.ProjectID
 			if repoErr != nil {
 				fmt.Fprintln(out, "Repository:  not inside a git repository")
-			} else if bound, err := termaproject.Load(root); err != nil {
+			} else if bound, from, err := termaproject.Resolve(root, gitDir); err != nil {
 				fmt.Fprintf(out, "Repository:  %s — not installed (run `terma install`)\n", root)
 			} else {
 				projectID, repoBound = bound.Project.ID, true
-				fmt.Fprintf(out, "Repository:  %s → %s\n", root, nameOrID(bound.Project.Name, bound.Project.ID))
+				fmt.Fprintf(out, "Repository:  %s → %s%s\n", root, nameOrID(bound.Project.Name, bound.Project.ID), throughMain(root, from))
 				wiring := judgeHookWiring(ctx, root, bound)
 				var state string
 				state, hooksOK = statusHooks(wiring)

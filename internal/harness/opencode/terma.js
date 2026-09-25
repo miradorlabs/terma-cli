@@ -17,9 +17,9 @@
 const CONFIG = null /* terma:config */
 
 import { createHash } from "node:crypto"
-import { readFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { spawn, execFile } from "node:child_process"
-import { join, dirname } from "node:path"
+import { join, dirname, basename, isAbsolute, resolve } from "node:path"
 
 // --- limits -------------------------------------------------------------------------
 
@@ -75,7 +75,9 @@ function effectiveConfig(worktree) {
 
 // readProjectID walks up from a worktree to the first Terma binding and returns its
 // project id, or "" when the repository is not bound to a Terma project. It reads
-// .terma/settings.json, matching the Go side (project.Find/Load).
+// .terma/settings.json, matching the Go side (project.ResolveDir): a linked git worktree
+// with no binding of its own uses its main checkout's, because a new worktree does not
+// get a gitignored binding.
 function readProjectID(worktree) {
   let dir = worktree
   for (let i = 0; i < 64 && dir; i++) {
@@ -85,7 +87,37 @@ function readProjectID(worktree) {
     if (parent === dir) break
     dir = parent
   }
+  // No binding on the way up: only now, and only at the nearest git root, try the main
+  // checkout of a linked worktree — the same order as ResolveDir (Find, then Resolve).
+  dir = worktree
+  for (let i = 0; i < 64 && dir; i++) {
+    if (existsSync(join(dir, ".git"))) {
+      const main = mainCheckout(dir)
+      return main ? bindingProjectID(main) : ""
+    }
+    const parent = dirname(dir)
+    if (parent === dir) break
+    dir = parent
+  }
   return ""
+}
+
+// mainCheckout returns the main checkout's root when dir is the root of a linked git
+// worktree, else "". Its .git is a file naming the worktree's git directory, whose
+// commondir leads to the main .git. It is gitx.LinkedWorktreeFS on the Go side.
+function mainCheckout(dir) {
+  try {
+    const line = readFileSync(join(dir, ".git"), "utf8").split("\n")[0].trim()
+    if (!line.startsWith("gitdir:")) return ""
+    let gitDir = line.slice("gitdir:".length).trim()
+    if (!isAbsolute(gitDir)) gitDir = resolve(dir, gitDir)
+    let common = readFileSync(join(gitDir, "commondir"), "utf8").trim()
+    if (!common) return ""
+    if (!isAbsolute(common)) common = resolve(gitDir, common)
+    return basename(common) === ".git" ? dirname(common) : ""
+  } catch {
+    return ""
+  }
 }
 
 // bindingProjectID reads the project id from a directory's binding.

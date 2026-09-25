@@ -59,6 +59,7 @@ func (e Env) captureCodexReplies(ctx context.Context, r *repo, in *codexHookInpu
 			"text": reply.Text, "text_bytes": reply.Bytes, "text_truncated": reply.Truncated,
 			attrVersion: e.Version, AttrProjectID: r.projectID,
 		}, in.AgentID, in.AgentType)
+		r.stampWorktree(attrs)
 		if _, desktop := codexDesktopRoute(r); desktop {
 			attrs["capture_surface"] = codexDesktopSurface
 		}
@@ -72,7 +73,7 @@ func (e Env) captureCodexReplies(ctx context.Context, r *repo, in *codexHookInpu
 		if !reply.At.IsZero() && !reply.At.After(at) {
 			at = reply.At
 		}
-		return e.Spool.Append(spool.Event{Time: at, Name: EventAssistantMessage, SessionID: in.SessionID, Repo: repoName(r.root), Attrs: attrs})
+		return e.Spool.Append(spool.Event{Time: at, Name: EventAssistantMessage, SessionID: in.SessionID, Repo: r.name, Attrs: attrs})
 	})
 	if err != nil {
 		e.logf("codex replies (%s): %v", status, err)

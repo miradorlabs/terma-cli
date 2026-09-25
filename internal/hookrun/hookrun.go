@@ -81,8 +81,16 @@ type repo struct {
 	gitDir string
 	store  *session.Store
 	// projectID is the committed binding from .terma/settings.json ("" when the repo has
-	// not been installed); the flusher routes events to the project's key by it.
+	// not been installed); the flusher routes events to the project's key by it. A linked
+	// worktree without a binding of its own has its main checkout's (project.Resolve).
 	projectID string
+	// name is the repository events report (their repo): the directory name of the
+	// checkout, or in a linked worktree of its main checkout, so every worktree of one
+	// repository reports as that repository.
+	name string
+	// worktree is git's name for a linked worktree ("" in a main checkout), sent as
+	// AttrWorktree so the work done in one is still told apart.
+	worktree string
 }
 
 func (e Env) repo(ctx context.Context) (*repo, error) {
@@ -95,21 +103,47 @@ func (e Env) repo(ctx context.Context) (*repo, error) {
 		}
 	}
 	r := &repo{root: root, gitDir: gitDir, store: session.Open(gitDir)}
-	if f, err := project.Load(root); err == nil {
+	r.name, r.worktree = checkoutNames(root, gitDir)
+	if f, _, err := project.Resolve(root, gitDir); err == nil {
 		r.projectID = f.Project.ID
 	}
 	return r, nil
 }
 
-// emitFor spools an event stamped with the repository's project binding.
+// emitFor spools an event stamped with the repository's project binding and, from a
+// linked worktree, which one.
 func (e Env) emitFor(r *repo, ev spool.Event) {
-	if r != nil && r.projectID != "" {
+	if r != nil && (r.projectID != "" || r.worktree != "") {
 		if ev.Attrs == nil {
 			ev.Attrs = map[string]any{}
 		}
-		ev.Attrs[AttrProjectID] = r.projectID
+		if r.projectID != "" {
+			ev.Attrs[AttrProjectID] = r.projectID
+		}
+		r.stampWorktree(ev.Attrs)
 	}
 	e.emit(ev)
+}
+
+// stampWorktree names the linked worktree an event came from, for the events that are
+// spooled without going through emitFor.
+func (r *repo) stampWorktree(attrs map[string]any) {
+	if r.worktree != "" {
+		attrs[AttrWorktree] = r.worktree
+	}
+}
+
+// checkoutNames names a checkout for events: the repository (in a linked worktree, its
+// main checkout's directory name) and, for a linked worktree, git's name for it.
+func checkoutNames(root, gitDir string) (name, worktree string) {
+	name = filepath.Base(root)
+	if wt, main, ok := gitx.LinkedWorktreeFS(gitDir); ok {
+		worktree = wt
+		if main != "" {
+			name = filepath.Base(main)
+		}
+	}
+	return name, worktree
 }
 
 // --- Claude Code adapter -----------------------------------------------------------
@@ -313,7 +347,7 @@ func PrepareCommitMsg(ctx context.Context, env Env) error {
 	for _, a := range attributions {
 		ids = append(ids, a.SessionID)
 	}
-	env.emitFor(r, spool.Event{Name: EventCommitStamped, SessionID: ids[0], Repo: repoName(r.root), Attrs: map[string]any{
+	env.emitFor(r, spool.Event{Name: EventCommitStamped, SessionID: ids[0], Repo: r.name, Attrs: map[string]any{
 		"sessions": strings.Join(ids, ","), "session_count": len(ids), "staged_count": len(staged), attrSource: source,
 	}})
 	return nil
@@ -382,7 +416,7 @@ func PostCommit(ctx context.Context, env Env) error {
 	attrs["session_count"] = len(ids)
 	attrs[attrTool] = stamped[0].Tool
 	addFileStats(env, attrs, head.Files, owners)
-	env.emitFor(r, spool.Event{Name: EventCommit, SessionID: ids[0], Repo: repoName(r.root), Attrs: attrs})
+	env.emitFor(r, spool.Event{Name: EventCommit, SessionID: ids[0], Repo: r.name, Attrs: attrs})
 	return nil
 }
 
@@ -418,7 +452,7 @@ func emitUnattributedCommit(env Env, r *repo, head gitx.Commit) {
 	if head.IsMerge() || head.IsSquash() {
 		return
 	}
-	env.emitFor(r, spool.Event{Name: EventCommitUnattributed, Repo: repoName(r.root), Attrs: commitAttrs(r, head)})
+	env.emitFor(r, spool.Event{Name: EventCommitUnattributed, Repo: r.name, Attrs: commitAttrs(r, head)})
 }
 
 // commitAttrs is a commit's identity and size — what both commit events share.
@@ -532,6 +566,3 @@ func fileOwners(env Env, store *session.Store, ids []string) map[string]string {
 	}
 	return owners
 }
-
-// repoName is a stable, non-secret label for the repository: its directory name.
-func repoName(root string) string { return filepath.Base(root) }

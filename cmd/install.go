@@ -101,7 +101,7 @@ The keys and per-project configuration live in your home directory; the committe
 func runInstall(cmd *cobra.Command, f installFlags) error {
 	ctx := cmd.Context()
 	out := cmd.OutOrStdout()
-	root, _, err := repoHere(ctx, "terma install runs inside a git repository")
+	root, gitDir, err := repoHere(ctx, "terma install runs inside a git repository")
 	if err != nil {
 		return err
 	}
@@ -109,7 +109,9 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	if err != nil {
 		return err
 	}
-	existing, _ := termaproject.Load(root)
+	// A linked worktree installing for the first time keeps its main checkout's project
+	// rather than asking again; the binding it writes is its own.
+	existing, _, _ := termaproject.Resolve(root, gitDir)
 
 	// 1. Which agents to configure: --harness, else recorded, else a picker. Resolved
 	// before sign-in so we know whether sign-in is even needed.

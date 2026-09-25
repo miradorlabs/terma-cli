@@ -69,6 +69,10 @@ const EventAssistantMessage = "terma.assistant.message"
 // AttrProjectID is the event attribute carrying the project binding.
 const AttrProjectID = "project_id"
 
+// AttrWorktree names the linked git worktree an event came from (git's name for it,
+// the directory under .git/worktrees). Absent in a main checkout.
+const AttrWorktree = "worktree"
+
 // Attribute keys more than one adapter writes. A key only one event carries stays a
 // literal beside the code that explains it.
 const (

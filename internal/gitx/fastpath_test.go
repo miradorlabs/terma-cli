@@ -413,3 +413,43 @@ func TestRemoteURLFSMatchesGit(t *testing.T) {
 		t.Fatalf("from a linked worktree: %q, want %q", got, want)
 	}
 }
+
+// A linked worktree names git's name for it and its main checkout; a main checkout is
+// not one, and a worktree of a bare repository has no main checkout to name.
+func TestLinkedWorktreeFS(t *testing.T) {
+	base, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	main := filepath.Join(base, "main")
+	if err := os.MkdirAll(main, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	mustGit(t, main, "init", "-q", "-b", "main")
+	mustGit(t, main, "-c", "user.email=dev@example.com", "-c", "user.name=Dev", "commit", "-q", "--allow-empty", "-m", "init")
+	if _, gitDir, ok := LocateFS(main); !ok {
+		t.Fatal("main checkout not located")
+	} else if _, _, linked := LinkedWorktreeFS(gitDir); linked {
+		t.Fatal("a main checkout is not a linked worktree")
+	}
+
+	wt := filepath.Join(base, "feature")
+	mustGit(t, main, "worktree", "add", "-q", wt)
+	root, gitDir, ok := LocateFS(filepath.Join(wt))
+	if !ok || root != wt {
+		t.Fatalf("worktree located at %q (%v)", root, ok)
+	}
+	name, mainRoot, linked := LinkedWorktreeFS(gitDir)
+	if !linked || name != "feature" || mainRoot != main {
+		t.Fatalf("LinkedWorktreeFS = %q, %q, %v", name, mainRoot, linked)
+	}
+
+	bare := filepath.Join(base, "bare.git")
+	mustGit(t, base, "clone", "-q", "--bare", main, bare)
+	bareWT := filepath.Join(base, "from-bare")
+	mustGit(t, bare, "worktree", "add", "-q", bareWT)
+	_, gitDir, _ = LocateFS(bareWT)
+	if name, mainRoot, linked := LinkedWorktreeFS(gitDir); !linked || name != "from-bare" || mainRoot != "" {
+		t.Fatalf("bare worktree: %q, %q, %v", name, mainRoot, linked)
+	}
+}
