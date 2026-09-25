@@ -622,7 +622,9 @@ it does not prove that a running agent has reloaded its settings or sent telemet
   state under the config directory ships with a migration, not a tolerant reader in the
   owning package (those were removed in 14a0037 and are not coming back). `cmd.Execute`
   runs pending ones before every command — hooks and shims too, silent and bounded to one
-  second, because a hook is as likely as anything to be a new build's first run — and
+  second, because a hook is as likely as anything to be a new build's first run. The bound
+  is a context the runner checks before each migration and every `Run(ctx)` checks between
+  units of work; a run it cuts short records no failure and the next start carries on — and
   `update --refresh` retries a failed one and reports. Tests never pass through `Execute`,
   so none can migrate a real config directory. `migrations.json` records the last ID
   applied (one small read per start when nothing is pending). The rules: append-only IDs

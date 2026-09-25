@@ -191,8 +191,9 @@ func automaticUpdatesAllowed(cmd *cobra.Command, interactive bool) bool {
 // command reads it (internal/migrate). It runs on every start, hooks included, because
 // after an upgrade a hook is as likely as anything to be the new build's first run; when
 // nothing is pending it costs one small read. It never fails the command: a hook or a
-// launch shim stays silent and waits at most a second, and anything else says what
-// failed on a terminal a person is watching. Tests do not come through here, so none
+// launch shim stays silent and gives migrating about a second — the bound covers the
+// migrations themselves, which stop between steps and carry on at the next start — and
+// anything else says what failed on a terminal a person is watching. Tests do not come through here, so none
 // can migrate a developer's real config directory.
 func migrateState(ctx context.Context, args []string) {
 	dir, err := config.Dir()

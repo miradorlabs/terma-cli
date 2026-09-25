@@ -1,6 +1,7 @@
 package shim
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io/fs"
@@ -18,8 +19,9 @@ import (
 // and nothing routes Codex Desktop. Without it the router reads the missing field as
 // false and silently stops exporting that developer's Codex CLI sessions. A record that
 // already says either way is left alone, as is every field this build does not know; a
-// record that does not parse is not this migration's to repair.
-func MigrateCodexCLIRoutes() error {
+// record that does not parse is not this migration's to repair. It stops between records
+// when ctx is done; the records it has not reached are migrated on a later start.
+func MigrateCodexCLIRoutes(ctx context.Context) error {
 	dir, err := RoutingDir()
 	if err != nil {
 		return err
@@ -35,6 +37,9 @@ func MigrateCodexCLIRoutes() error {
 	for _, e := range entries {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
 			continue
+		}
+		if err := ctx.Err(); err != nil {
+			return errors.Join(append(errs, err)...)
 		}
 		errs = append(errs, addCLIField(filepath.Join(dir, e.Name())))
 	}

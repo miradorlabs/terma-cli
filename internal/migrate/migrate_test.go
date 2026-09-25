@@ -50,7 +50,7 @@ func TestRunAppliesInOrderAndRecordsEach(t *testing.T) {
 	dir := t.TempDir()
 	var ran []int
 	step := func(id int) Migration {
-		return Migration{ID: id, Name: "step", Run: func() error { ran = append(ran, id); return nil }}
+		return Migration{ID: id, Name: "step", Run: func(context.Context) error { ran = append(ran, id); return nil }}
 	}
 	with(t, step(1), step(2), step(5))
 	if !Pending(dir) {
@@ -85,15 +85,15 @@ func TestAFailedMigrationStopsTheRunAndIsRetried(t *testing.T) {
 	dir := t.TempDir()
 	broken, ran := true, 0
 	with(t,
-		Migration{ID: 1, Name: "first", Run: func() error { return nil }},
-		Migration{ID: 2, Name: "second", Run: func() error {
+		Migration{ID: 1, Name: "first", Run: func(context.Context) error { return nil }},
+		Migration{ID: 2, Name: "second", Run: func(context.Context) error {
 			ran++
 			if broken {
 				return errors.New("disk full")
 			}
 			return nil
 		}},
-		Migration{ID: 3, Name: "third", Run: func() error { return nil }},
+		Migration{ID: 3, Name: "third", Run: func(context.Context) error { return nil }},
 	)
 	applied, err := Run(context.Background(), dir, false)
 	if err == nil || !slices.Equal(applied, []string{"first"}) || ran != 1 {
@@ -116,7 +116,7 @@ func TestAFailedMigrationStopsTheRunAndIsRetried(t *testing.T) {
 	}
 
 	// Past RetryAfter, an ordinary start tries again too.
-	with(t, Migration{ID: 4, Name: "fourth", Run: func() error { return nil }})
+	with(t, Migration{ID: 4, Name: "fourth", Run: func(context.Context) error { return nil }})
 	stale := State{Applied: 3, Failed: &Failure{ID: 4, Name: "fourth", At: time.Now().Add(-RetryAfter - time.Minute), Error: "x"}}
 	if err := config.WriteJSON(filepath.Join(dir, stateFile), stale, 0o600); err != nil {
 		t.Fatal(err)
@@ -131,7 +131,7 @@ func TestAFailedMigrationStopsTheRunAndIsRetried(t *testing.T) {
 func TestAnUnreadableRecordIsRepaired(t *testing.T) {
 	dir := t.TempDir()
 	ran := 0
-	with(t, Migration{ID: 1, Name: "only", Run: func() error { ran++; return nil }})
+	with(t, Migration{ID: 1, Name: "only", Run: func(context.Context) error { ran++; return nil }})
 	if err := os.WriteFile(filepath.Join(dir, stateFile), []byte("{not json"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -143,12 +143,44 @@ func TestAnUnreadableRecordIsRepaired(t *testing.T) {
 	}
 }
 
+// The bound covers the migrations themselves, not only the lock: a run cut short records
+// no failure, and the next start carries on.
+func TestTheBoundCoversRunningMigrations(t *testing.T) {
+	dir := t.TempDir()
+	finished := false
+	with(t,
+		Migration{ID: 1, Name: "slow", Run: func(ctx context.Context) error {
+			if !finished {
+				<-ctx.Done()
+				return ctx.Err()
+			}
+			return nil
+		}},
+		Migration{ID: 2, Name: "after", Run: func(context.Context) error { return nil }},
+	)
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	applied, err := Run(ctx, dir, false)
+	if err == nil || !errors.Is(err, context.DeadlineExceeded) || len(applied) != 0 || time.Since(start) > 2*time.Second {
+		t.Fatalf("applied %v, err %v after %v", applied, err, time.Since(start))
+	}
+	if s, _ := Load(dir); s.Applied != 0 || s.Failed != nil || !Pending(dir) {
+		t.Fatalf("a run cut short was recorded: %+v", s)
+	}
+	// Not a failure, so an ordinary start does not wait RetryAfter to carry on.
+	finished = true
+	if applied, err := Run(context.Background(), dir, false); err != nil || len(applied) != 2 {
+		t.Fatalf("next start: applied %v, err %v", applied, err)
+	}
+}
+
 // Concurrent starts share one lock; one that cannot get it within its bound changes
 // nothing and says so.
 func TestRunWaitsForAnotherMigratingProcess(t *testing.T) {
 	dir := t.TempDir()
 	ran := 0
-	with(t, Migration{ID: 1, Name: "only", Run: func() error { ran++; return nil }})
+	with(t, Migration{ID: 1, Name: "only", Run: func(context.Context) error { ran++; return nil }})
 	unlock, err := flock.Lock(context.Background(), filepath.Join(dir, lockFile))
 	if err != nil {
 		t.Fatal(err)

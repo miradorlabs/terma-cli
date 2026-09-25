@@ -40,8 +40,9 @@ type Migration struct {
 	ID int
 	// Name says what it changes, for messages.
 	Name string
-	// Run makes the change.
-	Run func() error
+	// Run makes the change. It stops early when ctx is done, leaving state the next
+	// start can finish from; that is how a hook keeps to its bound.
+	Run func(ctx context.Context) error
 }
 
 // State is what migrations.json records.
@@ -116,7 +117,11 @@ func Pending(dir string) bool {
 // returns the names of those it applied. It stops at the first failure, which it
 // records; a later run starts again from there. retry says whether to attempt a
 // migration that failed less than RetryAfter ago. Concurrent starts wait on one lock,
-// bounded by ctx, and the ones that get it second find nothing left to do.
+// and the ones that get it second find nothing left to do.
+//
+// ctx bounds the whole run, not only the wait for the lock: it is checked before each
+// migration and passed into it. A run that ctx cuts short is not a failure — nothing is
+// recorded against the migration, and the next start carries on where it stopped.
 func Run(ctx context.Context, dir string, retry bool) ([]string, error) {
 	if !Pending(dir) {
 		return nil, nil
@@ -140,7 +145,13 @@ func Run(ctx context.Context, dir string, retry bool) ([]string, error) {
 		if m.ID <= s.Applied {
 			continue
 		}
-		if err := m.Run(); err != nil {
+		if err := ctx.Err(); err != nil {
+			return applied, err
+		}
+		if err := m.Run(ctx); err != nil {
+			if ctx.Err() != nil {
+				return applied, fmt.Errorf("%s: %w", m.Name, ctx.Err())
+			}
 			s.Failed = &Failure{ID: m.ID, Name: m.Name, At: time.Now(), Error: err.Error()}
 			_ = save(dir, s)
 			return applied, fmt.Errorf("%s: %w", m.Name, err)

@@ -1,7 +1,9 @@
 package shim
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -593,7 +595,7 @@ func TestRefreshShimsRewritesOnlyInstalledStaleShims(t *testing.T) {
 // nothing else.
 func TestMigrateCodexCLIRoutesFillsInWhatOldRecordsMeant(t *testing.T) {
 	sandbox(t)
-	if err := MigrateCodexCLIRoutes(); err != nil {
+	if err := MigrateCodexCLIRoutes(context.Background()); err != nil {
 		t.Fatalf("no routing directory: %v", err)
 	}
 	dir, err := RoutingDir()
@@ -615,7 +617,7 @@ func TestMigrateCodexCLIRoutesFillsInWhatOldRecordsMeant(t *testing.T) {
 	current := write("c.json", `{"project_id":"c","harnesses":["codex"],"cli":false,"desktop":true}`)
 	broken := write("d.json", `{not json`)
 
-	if err := MigrateCodexCLIRoutes(); err != nil {
+	if err := MigrateCodexCLIRoutes(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	read := func(p string) map[string]any {
@@ -650,8 +652,18 @@ func TestMigrateCodexCLIRoutesFillsInWhatOldRecordsMeant(t *testing.T) {
 	if err != nil || !ok || !rec.CLI || rec.Desktop {
 		t.Fatalf("LoadRecord after migration: %+v %v %v", rec, ok, err)
 	}
+	// A start whose bound is already spent changes nothing.
+	pending := write("e.json", `{"project_id":"e","harnesses":["codex"]}`)
+	done, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := MigrateCodexCLIRoutes(done); !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancelled: %v", err)
+	}
+	if e := read(pending); e["cli"] != nil {
+		t.Fatalf("a cancelled run migrated a record: %v", e)
+	}
 	before, _ := os.ReadFile(old)
-	if err := MigrateCodexCLIRoutes(); err != nil {
+	if err := MigrateCodexCLIRoutes(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	if after, _ := os.ReadFile(old); string(after) != string(before) {
