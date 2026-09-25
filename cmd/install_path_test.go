@@ -112,11 +112,23 @@ func TestInstallWrapperHintNamesOneFile(t *testing.T) {
 	}
 }
 
-// With no home directory the fish hint stays the literal path rather than a relative one.
-func TestWrapperHintForFishWithoutAHome(t *testing.T) {
-	t.Setenv("HOME", "")
-	t.Setenv("XDG_CONFIG_HOME", "")
-	if got := wrapperFile("fish"); got != "~/.config/fish/config.fish" {
-		t.Fatalf("wrapperFile(fish) without HOME = %q", got)
+// With no home directory each shell's hint stays its usual file, literally — not a
+// relative path, and not ~/.profile for a shell that never reads it.
+func TestWrapperHintWithoutAHome(t *testing.T) {
+	for _, tc := range []struct{ shell, want string }{
+		{"/bin/zsh", "~/.zshrc"},
+		{"/bin/bash", "~/.bashrc"},
+		{"/usr/bin/fish", "~/.config/fish/config.fish"},
+		{"/bin/dash", "~/.profile"},
+	} {
+		t.Run(tc.shell, func(t *testing.T) {
+			t.Setenv("HOME", "")
+			t.Setenv("SHELL", tc.shell)
+			t.Setenv("ZDOTDIR", "")
+			t.Setenv("XDG_CONFIG_HOME", "")
+			if got := wrapperFile(filepath.Base(tc.shell)); got != tc.want {
+				t.Fatalf("wrapperFile(%q) without HOME = %q, want %q", tc.shell, got, tc.want)
+			}
+		})
 	}
 }

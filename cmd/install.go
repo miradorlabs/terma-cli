@@ -665,8 +665,14 @@ func wrapperFile(shell string) string {
 	if rc, ok := shim.ShellRC(); ok && rc.Shell == shell && shell != "fish" {
 		return tildePath(rc.Path)
 	}
-	if shell == "fish" {
-		// Without a home directory, the literal path: a relative one would be a wrong hint.
+	// Without a home directory each shell's usual file, literally: a path joined onto ""
+	// would be relative, and ~/.profile is not what zsh or bash reads.
+	switch shell {
+	case "zsh":
+		return "~/.zshrc"
+	case "bash":
+		return "~/.bashrc"
+	case "fish":
 		home, err := os.UserHomeDir()
 		if err != nil || home == "" {
 			return "~/.config/fish/config.fish"
