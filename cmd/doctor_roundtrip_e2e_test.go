@@ -129,6 +129,8 @@ func TestDoctorScratchCommitWithUncommittedHooks(t *testing.T) {
 	s.env = append(s.env, "HOME="+s.mkdir("home"))
 	repo := s.mkdir("repo")
 	s.git(repo, "init", "-q")
+	s.git(repo, "config", "user.name", "Test")
+	s.git(repo, "config", "user.email", "test@example.com")
 	s.git(repo, "commit", "--allow-empty", "-qm", "initial")
 	s.install(repo)
 	if tracked := s.git(repo, "ls-files", hookmgr.ShimDir); tracked != "" {
