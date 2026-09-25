@@ -155,7 +155,11 @@ func New(t *testing.T, mode Mode, opts ...Option) *Sandbox {
 	// scenario that uses them (connectClaude, connectCodex). All of it works
 	// without a backend when the key is supplied.
 	sb.terma(sb.Repo, "config", "set", "--otlp-url", sb.Receiver.URL())
-	sb.terma(sb.Repo, "install", "--project", sb.ProjectID, "--adapters", "claude,codex", "--yes")
+	// --harness none keeps install credential-free: selecting an agent makes install sign
+	// in, and the sandbox has no account (the project id is a placeholder). The connect a
+	// scenario makes supplies the key hook events are delivered with. --no-browser turns
+	// any sign-in that does creep back in into a failure instead of a browser window.
+	sb.terma(sb.Repo, "install", "--project", sb.ProjectID, "--harness", "none", "--adapters", "claude,codex", "--yes", "--no-browser")
 	return sb
 }
 
@@ -231,7 +235,14 @@ func (sb *Sandbox) baseEnv() []string {
 			env = append(env, "SHELL=/bin/zsh")
 		}
 	}
-	return append(env, "PATH="+path, "TERM=xterm-256color", "COLORTERM=truecolor")
+	env = append(env, "PATH="+path, "TERM=xterm-256color", "COLORTERM=truecolor")
+	// The one terma setting carried across: which environment's auth and API hosts a
+	// run may reach (TERMA_ENV=dev keeps anything that is not the receiver off
+	// production). Everything else of the developer's terma stays out.
+	if v := os.Getenv("TERMA_ENV"); v != "" {
+		env = append(env, "TERMA_ENV="+v)
+	}
+	return env
 }
 
 // binDir is a PATH prefix holding the builds under test under their plain

@@ -57,6 +57,11 @@ exit status to the caller.
 A missing credential makes its scenarios "not run" in the report. Nothing here
 passes by absence.
 
+`TERMA_ENV` is the one terma setting the sandboxes inherit (`TERMA_ENV=dev make live …`),
+so anything that is not the in-test receiver stays off production. The sandbox installs
+with `--harness none --no-browser`: it has no account, and a sign-in that crept back into
+`terma install` fails the run instead of opening a browser.
+
 For Codex API tests, the suite pipes the key to `codex login --with-api-key` in
 its scratch `CODEX_HOME`, using `cli_auth_credentials_store="file"` for login and
 execution. Supplying `OPENAI_API_KEY` alone left requests unauthenticated on the
