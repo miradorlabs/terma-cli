@@ -5,7 +5,7 @@
   </picture>
 </p>
 
-`terma` connects coding agents to [Terma](https://terma.ai), then stamps the commits
+The `terma` cli connects coding agents to [Terma](https://terma.ai), then stamps the commits
 they produce so agent spend can be traced to shipped code.
 
 ## The workflow
