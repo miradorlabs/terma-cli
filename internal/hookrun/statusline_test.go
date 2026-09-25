@@ -336,15 +336,39 @@ func TestClaudeQuotaCarriesAccountIDAndSchemaV2(t *testing.T) {
 	if len(evs) != 1 || evs[0].Attrs["account_id"] != "account-q" || evs[0].Attrs["schema_version"] != float64(1) {
 		t.Fatalf("quota record: %+v", evs)
 	}
+	if _, ok := evs[0].Attrs["organization_id"]; ok {
+		t.Fatalf("organization_id invented for a login that names none: %+v", evs[0].Attrs)
+	}
+}
+
+// The quota record names the organization the account is signed in to, read from the
+// real ~/.claude.json oauthAccount shape: a Team seat is funded by the organization,
+// not the account, so the backend keys the funding facility on both.
+func TestClaudeQuotaCarriesOrganizationID(t *testing.T) {
+	env, _, sp := statusEnv(t, quotaPayload)
+	claudeConfigDir(t, "unused")
+	writeRealClaudeAccount(t)
+	var p statusLinePayload
+	if err := json.Unmarshal([]byte(quotaPayload), &p); err != nil {
+		t.Fatal(err)
+	}
+	if !env.captureQuota(&p) {
+		t.Fatal("observation missing")
+	}
+	evs := spooledQuota(t, sp)
+	if len(evs) != 1 || evs[0].Attrs["account_id"] != realClaudeAccountID || evs[0].Attrs["organization_id"] != realClaudeOrganizationID {
+		t.Fatalf("quota record: %+v", evs)
+	}
 }
 
 // An env API key, auth token or cloud provider outranks the cached OAuth login,
-// so the OAuth accountUuid must not be stamped as the funding owner.
+// so neither the OAuth accountUuid nor its organization is stamped as the funding owner.
 func TestClaudeQuotaOmitsAccountIDUnderOverrideCredential(t *testing.T) {
 	for _, override := range []string{"ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY"} {
 		t.Run(override, func(t *testing.T) {
 			env, _, sp := statusEnv(t, quotaPayload)
-			claudeConfigDir(t, "account-q")
+			claudeConfigDir(t, "unused")
+			writeRealClaudeAccount(t)
 			t.Setenv(override, "1")
 			var p statusLinePayload
 			if err := json.Unmarshal([]byte(quotaPayload), &p); err != nil {
@@ -357,8 +381,10 @@ func TestClaudeQuotaOmitsAccountIDUnderOverrideCredential(t *testing.T) {
 			if len(evs) != 1 || evs[0].Attrs["schema_version"] != float64(1) {
 				t.Fatalf("quota record: %+v", evs)
 			}
-			if _, ok := evs[0].Attrs["account_id"]; ok {
-				t.Fatalf("account_id stamped under override credential: %+v", evs[0].Attrs)
+			for _, k := range []string{"account_id", "organization_id"} {
+				if _, ok := evs[0].Attrs[k]; ok {
+					t.Fatalf("%s stamped under override credential: %+v", k, evs[0].Attrs)
+				}
 			}
 		})
 	}
@@ -388,6 +414,41 @@ func TestClaudeQuotaAccountSwitchEmitsNewObservation(t *testing.T) {
 	evs := spooledQuota(t, sp)
 	if len(evs) != 2 || evs[0].Attrs["account_id"] != "account-1" || evs[1].Attrs["account_id"] != "account-2" {
 		t.Fatalf("account switch observations: %+v", evs)
+	}
+}
+
+// Switching organization keeps the account id (Team to personal on one login), so an
+// otherwise-identical quota payload must still emit a fresh observation naming the new
+// organization.
+func TestClaudeQuotaOrganizationSwitchEmitsNewObservation(t *testing.T) {
+	env, _, sp := statusEnv(t, quotaPayload)
+	claudeConfigDir(t, "unused")
+	login := func(org string) {
+		t.Helper()
+		body := `{"oauthAccount":{"accountUuid":"account-1","organizationUuid":"` + org + `"}}`
+		if err := os.WriteFile(filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), ".claude.json"), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	login("org-team")
+	var p statusLinePayload
+	if err := json.Unmarshal([]byte(quotaPayload), &p); err != nil {
+		t.Fatal(err)
+	}
+	if !env.captureQuota(&p) {
+		t.Fatal("first observation missing")
+	}
+	if env.captureQuota(&p) {
+		t.Fatal("identical redraw captured")
+	}
+	login("org-personal")
+	if !env.captureQuota(&p) {
+		t.Fatal("organization switch not captured")
+	}
+	evs := spooledQuota(t, sp)
+	if len(evs) != 2 || evs[0].Attrs["organization_id"] != "org-team" || evs[1].Attrs["organization_id"] != "org-personal" ||
+		evs[1].Attrs["account_id"] != "account-1" {
+		t.Fatalf("organization switch observations: %+v", evs)
 	}
 }
 

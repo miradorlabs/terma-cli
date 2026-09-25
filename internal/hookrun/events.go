@@ -91,6 +91,7 @@ const (
 	attrParentSession  = "parent_session_id"
 	attrFileCount      = "file_count"
 	attrAccountID      = "account_id"
+	attrOrganizationID = "organization_id"
 	attrSchemaVersion  = "schema_version"
 	attrEvidenceSource = "evidence_source"
 	attrEvidenceStatus = "evidence_status"

@@ -143,6 +143,7 @@ type quotaState struct {
 	Resets    map[string]int64   `json:"resets"`
 	Cost      *float64           `json:"cost,omitempty"`
 	AccountID string             `json:"account_id,omitempty"`
+	OrgID     string             `json:"organization_id,omitempty"`
 }
 
 // StatusLine runs the status line hook and returns the exit status to end with:
@@ -369,9 +370,9 @@ func (e Env) captureQuota(p *statusLinePayload) bool {
 			projectID = f.Project.ID
 		}
 	}
-	accountID, _ := claudeOAuthAccountID(repoRoot)
+	accountID, orgID, _ := claudeOAuthAccount(repoRoot)
 	next := quotaState{EmittedAt: now, Quota: quota, FastMode: p.FastMode, Model: p.Model.ID,
-		PromptID: p.PromptID, Resets: resets, Cost: p.Cost.TotalCostUSD, ProjectID: projectID, AccountID: accountID}
+		PromptID: p.PromptID, Resets: resets, Cost: p.Cost.TotalCostUSD, ProjectID: projectID, AccountID: accountID, OrgID: orgID}
 	if prev != nil && !quotaChanged(*prev, next) && now.Sub(prev.EmittedAt) < quotaHeartbeat {
 		return false
 	}
@@ -399,6 +400,9 @@ func (e Env) captureQuota(p *statusLinePayload) bool {
 	}
 	if next.AccountID != "" {
 		attrs[attrAccountID] = next.AccountID
+	}
+	if next.OrgID != "" {
+		attrs[attrOrganizationID] = next.OrgID
 	}
 	if p.Model.ID != "" {
 		attrs[attrModel] = p.Model.ID
@@ -438,7 +442,7 @@ func (e Env) captureQuota(p *statusLinePayload) bool {
 }
 
 func quotaChanged(a, b quotaState) bool {
-	if a.ProjectID != b.ProjectID || a.PromptID != b.PromptID || a.AccountID != b.AccountID || !maps.Equal(a.Resets, b.Resets) ||
+	if a.ProjectID != b.ProjectID || a.PromptID != b.PromptID || a.AccountID != b.AccountID || a.OrgID != b.OrgID || !maps.Equal(a.Resets, b.Resets) ||
 		(a.Cost == nil) != (b.Cost == nil) || (a.Cost != nil && b.Cost != nil && *a.Cost != *b.Cost) {
 		return true
 	}

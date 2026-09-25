@@ -22,7 +22,7 @@ or a configured `apiKeyHelper` is in effect; for Codex when `auth.json` is not t
 | Event | Trigger | Evidence |
 |---|---|---|
 | `terma.session.account` | Claude SessionStart, Stop, StopFailure | Stored account/organization IDs, billing type, organization type, seat tier, extra-usage policy; visible credential configuration hints |
-| `terma.session.quota` | Claude status line | Prompt ID, model, fast-mode setting, cumulative session cost, window percentages and Unix-second reset times |
+| `terma.session.quota` | Claude status line | Account and organization IDs, prompt ID, model, fast-mode setting, cumulative session cost, window percentages and Unix-second reset times |
 | `terma.session.quota` | Codex notify, Stop, PostToolUse, SessionEnd | Plan, primary/secondary windows, credit flags/balance, limit category and spend-control flag |
 | `terma.session.capture` | Codex capture cannot catch up | Backlog, incomplete record, or read/discovery failure; separate from quota state |
 | `terma.session.limit` | Claude StopFailure | Allowlisted `error_type`; no error details or assistant text |
@@ -72,8 +72,14 @@ nonblocking advisory lock. A failed append does not advance deduplication state.
 Claude uses `evidence_source=claude_statusline` and these existing field names:
 `prompt_id`, `session_cost_usd`, `fast_mode`, `model`, `claude.version`, and
 `<window>_used_pct` / `<window>_resets_at` for `five_hour`, `seven_day` and, when
-available, `spend_limit`. Changes to the prompt, resets or cost now produce a
-snapshot even when percentages are unchanged. Identical redraws are suppressed.
+available, `spend_limit`. The status line payload names no account, so `account_id`
+and `organization_id` come from the stored login (`~/.claude.json` `oauthAccount`)
+under the account snapshot's credential check, both withheld together. The
+organization is part of the funding owner: Pro/Max plans belong to the account,
+Team/Enterprise seats and Console billing to the organization, and one account can
+switch organizations without changing its ID. Changes to the prompt, resets, cost,
+account or organization now produce a snapshot even when percentages are unchanged.
+Identical redraws are suppressed.
 Each emitted Claude snapshot carries `observation_id`, `source_stream` and a
 session-local `observation_sequence`. The sequence orders capture under a lock;
 `prompt_id` groups observations from the same prompt. `time_basis=observed` makes

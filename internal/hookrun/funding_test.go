@@ -34,11 +34,14 @@ func hookInput(env Env, event string) string {
 	return string(b)
 }
 
-// realClaudeAccountID is the account UUID in testdata/claude_account_real.json — the real captured
+// realClaudeAccountID and realClaudeOrganizationID are the account and organization UUIDs in testdata/claude_account_real.json — the real captured
 // ~/.claude.json oauthAccount shape (Team plan, stripe_subscription billing), with the ids anonymized
 // to match the platform's real_claude_account.json fixture. writeRealClaudeAccount lands it as the
 // hook's .claude.json so the funding tests run against the true wire shape, not a stub.
-const realClaudeAccountID = "a1111111-1111-4111-8111-111111111111"
+const (
+	realClaudeAccountID      = "a1111111-1111-4111-8111-111111111111"
+	realClaudeOrganizationID = "b2222222-2222-4222-8222-222222222222"
+)
 
 func writeRealClaudeAccount(t *testing.T) {
 	t.Helper()
@@ -56,13 +59,13 @@ func TestClaudeAccountWithheldWhenApiKeyHelperConfigured(t *testing.T) {
 	writeRealClaudeAccount(t)
 
 	// Control: with no apiKeyHelper, the OAuth account is the funding owner.
-	if id, ok := claudeOAuthAccountID(env.Cwd); !ok || id != realClaudeAccountID {
-		t.Fatalf("baseline: claudeOAuthAccountID = %q,%v; want %q,true", id, ok, realClaudeAccountID)
+	if id, _, ok := claudeOAuthAccount(env.Cwd); !ok || id != realClaudeAccountID {
+		t.Fatalf("baseline: claudeOAuthAccount = %q,%v; want %q,true", id, ok, realClaudeAccountID)
 	}
 
 	// A configured apiKeyHelper in repo settings now outranks the OAuth login.
 	writeFile(t, filepath.Join(env.Cwd, ".claude"), "settings.json", `{"apiKeyHelper":"/usr/local/bin/get-key"}`)
-	if id, ok := claudeOAuthAccountID(env.Cwd); ok {
+	if id, _, ok := claudeOAuthAccount(env.Cwd); ok {
 		t.Fatalf("apiKeyHelper configured: expected the account withheld, got %q", id)
 	}
 }
@@ -75,15 +78,15 @@ func TestClaudeAccountWithheldWhenApiKeyHelperConfigured(t *testing.T) {
 func TestClaudeAccountWithheldWhenHelperStateUnknown(t *testing.T) {
 	env := fundingEnv(t)
 	writeRealClaudeAccount(t)
-	if id, ok := claudeOAuthAccountID(env.Cwd); !ok || id != realClaudeAccountID {
-		t.Fatalf("baseline: claudeOAuthAccountID = %q,%v; want %q,true", id, ok, realClaudeAccountID)
+	if id, _, ok := claudeOAuthAccount(env.Cwd); !ok || id != realClaudeAccountID {
+		t.Fatalf("baseline: claudeOAuthAccount = %q,%v; want %q,true", id, ok, realClaudeAccountID)
 	}
 	// A directory at settings.json is a non-regular file: readEvidenceJSON reports unsupported, so the
 	// helper state is "unknown" and the account is withheld.
 	if err := os.MkdirAll(filepath.Join(env.Cwd, ".claude", "settings.json"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if id, ok := claudeOAuthAccountID(env.Cwd); ok {
+	if id, _, ok := claudeOAuthAccount(env.Cwd); ok {
 		t.Fatalf("non-regular settings (helper state unknown): expected the account withheld, got %q", id)
 	}
 }
@@ -94,11 +97,11 @@ func TestClaudeAccountWithheldWhenHelperStateUnknown(t *testing.T) {
 func TestClaudeAccountWithheldWhenOAuthTokenVisible(t *testing.T) {
 	env := fundingEnv(t)
 	writeRealClaudeAccount(t)
-	if id, ok := claudeOAuthAccountID(env.Cwd); !ok || id != realClaudeAccountID {
-		t.Fatalf("baseline: claudeOAuthAccountID = %q,%v; want %q,true", id, ok, realClaudeAccountID)
+	if id, _, ok := claudeOAuthAccount(env.Cwd); !ok || id != realClaudeAccountID {
+		t.Fatalf("baseline: claudeOAuthAccount = %q,%v; want %q,true", id, ok, realClaudeAccountID)
 	}
 	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "oauth-token-for-some-account")
-	if id, ok := claudeOAuthAccountID(env.Cwd); ok {
+	if id, _, ok := claudeOAuthAccount(env.Cwd); ok {
 		t.Fatalf("visible oauth token: expected the account withheld, got %q", id)
 	}
 }
@@ -108,11 +111,11 @@ func TestClaudeAccountWithheldWhenOAuthTokenVisible(t *testing.T) {
 func TestClaudeAccountWithheldOnYesCloudFlag(t *testing.T) {
 	env := fundingEnv(t)
 	writeRealClaudeAccount(t)
-	if id, ok := claudeOAuthAccountID(env.Cwd); !ok || id != realClaudeAccountID {
-		t.Fatalf("baseline: claudeOAuthAccountID = %q,%v; want %q,true", id, ok, realClaudeAccountID)
+	if id, _, ok := claudeOAuthAccount(env.Cwd); !ok || id != realClaudeAccountID {
+		t.Fatalf("baseline: claudeOAuthAccount = %q,%v; want %q,true", id, ok, realClaudeAccountID)
 	}
 	t.Setenv("CLAUDE_CODE_USE_BEDROCK", "yes")
-	if id, ok := claudeOAuthAccountID(env.Cwd); ok {
+	if id, _, ok := claudeOAuthAccount(env.Cwd); ok {
 		t.Fatalf("CLAUDE_CODE_USE_BEDROCK=yes: expected the account withheld, got %q", id)
 	}
 }
