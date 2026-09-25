@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -649,16 +650,28 @@ func setupActivation(cmd *cobra.Command, agents []string, f installFlags) error 
 			return err
 		}
 		shell := filepath.Base(os.Getenv("SHELL"))
-		if shell == "fish" {
-			fmt.Fprintln(out, "\nAdd these to your ~/.config/fish/config.fish so the agents route to this repo's project:")
-		} else {
-			fmt.Fprintln(out, "\nAdd these to your ~/.zshrc (or ~/.bashrc) so the agents route to this repo's project:")
-		}
+		fmt.Fprintf(out, "\nAdd these to your %s so the agents route to this repo's project:\n", wrapperFile(shell))
 		fmt.Fprint(out, indent(shim.WrapperSnippetFor(shell, agents)))
 	default:
 		return fmt.Errorf("unknown --activation %q (want shim or wrapper)", mode)
 	}
 	return nil
+}
+
+// wrapperFile is the startup file the wrapper hint names: the one the developer's shell
+// reads functions from. zsh and bash read the file the PATH block goes in (ShellRC); fish
+// reads config.fish, never terma's own conf.d file; any other shell (sh, dash, BusyBox ash)
+// is a POSIX shell whose login shells read ~/.profile.
+func wrapperFile(shell string) string {
+	if rc, ok := shim.ShellRC(); ok && rc.Shell == shell && shell != "fish" {
+		return tildePath(rc.Path)
+	}
+	if shell == "fish" {
+		home, _ := os.UserHomeDir()
+		dir := cmp.Or(os.Getenv("XDG_CONFIG_HOME"), filepath.Join(home, ".config"))
+		return tildePath(filepath.Join(dir, "fish", "config.fish"))
+	}
+	return "~/.profile"
 }
 
 // putShimsOnPath gets the shim directory onto PATH ahead of the real binaries — the one
