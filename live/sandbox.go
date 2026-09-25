@@ -158,8 +158,9 @@ func New(t *testing.T, mode Mode, opts ...Option) *Sandbox {
 	// --harness none keeps install credential-free: selecting an agent makes install sign
 	// in, and the sandbox has no account (the project id is a placeholder). The connect a
 	// scenario makes supplies the key hook events are delivered with. --no-browser turns
-	// any sign-in that does creep back in into a failure instead of a browser window.
-	sb.terma(sb.Repo, "install", "--project", sb.ProjectID, "--harness", "none", "--adapters", "claude,codex", "--yes", "--no-browser")
+	// any sign-in that does creep back in into a failure instead of a browser window, and
+	// --no-doctor keeps install from running doctor's network checks against no backend.
+	sb.terma(sb.Repo, "install", "--project", sb.ProjectID, "--harness", "none", "--adapters", "claude,codex", "--yes", "--no-browser", "--no-doctor")
 	return sb
 }
 
@@ -294,7 +295,10 @@ func (sb *Sandbox) HookPayloads(event string) []map[string]any {
 
 func (sb *Sandbox) terma(dir string, args ...string) string {
 	sb.T.Helper()
-	cmd := exec.Command(sb.Terma, args...)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, sb.Terma, args...)
+	cmd.WaitDelay = 2 * time.Second
 	cmd.Dir = dir
 	cmd.Env = sb.termaEnv()
 	out, err := cmd.CombinedOutput()

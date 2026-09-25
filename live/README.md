@@ -58,9 +58,8 @@ A missing credential makes its scenarios "not run" in the report. Nothing here
 passes by absence.
 
 `TERMA_ENV` is the one terma setting the sandboxes inherit (`TERMA_ENV=dev make live …`),
-so anything that is not the in-test receiver stays off production. The sandbox installs
-with `--harness none --no-browser`: it has no account, and a sign-in that crept back into
-`terma install` fails the run instead of opening a browser.
+so anything that is not the in-test receiver stays off production. How the sandbox
+installs without an account is under "Sandbox installation" at the end.
 
 For Codex API tests, the suite pipes the key to `codex login --with-api-key` in
 its scratch `CODEX_HOME`, using `cli_auth_credentials_store="file"` for login and
@@ -96,8 +95,8 @@ workspace `terma-cli-ci` (`wrkspc_01Ug36g2VPKLUSFZ9LZXFTvU`), with a maximum tok
 lifetime of 600 seconds. Its match requires all of:
 
 - Audience `https://api.anthropic.com`.
-- Subject `repo:miradorlabs@243301318/terma-cli@1360515068:environment:live-harnesses`.
-- Repository `miradorlabs/terma-cli`, repository ID `1360515068`, owner ID `243301318`.
+- Subject `repo:miradorlabs@243301318/terma-cli@1383906316:environment:live-harnesses`.
+- Repository `miradorlabs/terma-cli`, repository ID `1383906316`, owner ID `243301318`.
 - Ref `refs/heads/main` and workflow
   `miradorlabs/terma-cli/.github/workflows/live.yml@refs/heads/main`.
 - Event `schedule` or `workflow_dispatch`.
@@ -245,3 +244,13 @@ Use `make live RUN='^TestCursorInteractiveTurnObservations$'` (and the optional
 binary/capture variables above). The inspected `--print` runner lacks the local
 turn-hook invocations present in the interactive UI; the headless test remains a
 separate regression check.
+
+## Sandbox installation
+
+Sandbox installation uses `--harness none --no-browser --no-doctor`: the sandbox has
+no account (its project id is a placeholder), and selecting an agent makes `terma
+install` sign in. Each scenario connects its exporter separately with a dummy key for
+the loopback receiver, which also stores the key hook events are delivered with.
+Terma setup subprocesses have a 30-second deadline, so a login regression fails
+promptly rather than consuming the entire live-suite timeout
+(`TestSandboxSetupWithoutLogin` checks this offline).
