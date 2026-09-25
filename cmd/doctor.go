@@ -596,8 +596,10 @@ func scratchCommit(ctx context.Context, root string, bound *termaproject.File) (
 	// Seed the binding into the worktree so the post-commit hook attributes the scratch
 	// commit to this project — the round-trip needs a routable terma.commit event. The
 	// worktree is a checkout of HEAD, so a repository that commits .terma/settings.json
-	// already has it; one that gitignores its own binding (like terma-cli) does not, and
-	// without this the commit event would carry no project id and go unroutable.
+	// already has it; one that gitignores its own binding (like terma-cli) does not. This
+	// build's hooks would find the main checkout's through the worktree link
+	// (project.Resolve), but the hooks run whatever terma is on PATH, and a build from
+	// before that would spool a commit event with no project id, dropped as unroutable.
 	if bound != nil {
 		_ = termaproject.Save(wt, bound)
 	}
