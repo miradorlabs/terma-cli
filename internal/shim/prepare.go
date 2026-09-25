@@ -73,7 +73,11 @@ case "${1-}" in
     exec "$terma_real" "$@" ;;
 esac
 command -v terma >/dev/null 2>&1 || exec "$terma_real" "$@"
-terma_tmp=$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/terma-route.XXXXXXXX") || exec "$terma_real" "$@"
+# By absolute path, so PATH cannot substitute it; /usr/bin on macOS and glibc systems,
+# /bin on BusyBox (Alpine), where a missing /usr/bin/mktemp silently skipped routing.
+terma_mktemp=/usr/bin/mktemp
+[ -x "$terma_mktemp" ] || terma_mktemp=/bin/mktemp
+terma_tmp=$("$terma_mktemp" -d "${TMPDIR:-/tmp}/terma-route.XXXXXXXX") || exec "$terma_real" "$@"
 terma_pid=
 terma_timer=
 terma_cleanup() {
