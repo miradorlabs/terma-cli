@@ -226,6 +226,27 @@ test("a child session's spans name its parent, so the link survives a traces-onl
   for (const span of spans.filter((s) => sessionOf(s) === "ses_root2")) expect(attr(span, "opencode.parent_session.id")).toBeUndefined()
 })
 
+test("a subagent's OpenRouter request names its parent and agent in the trace field", async () => {
+  const hooks = await load(baseConfig(), dir)
+  await hooks.event({ event: { type: "session.created", properties: { info: { id: "ses_child3", parentID: "ses_parent3", directory: "/repo" } } } })
+  const openrouter = { api: { npm: "@openrouter/ai-sdk-provider" } }
+  const params = async (sessionID, model, provider = { options: {} }, options = { usage: { include: true } }) => {
+    const output = { temperature: 0, topP: 1, topK: 0, maxOutputTokens: undefined, options }
+    await hooks["chat.params"]({ sessionID, agent: "explore", model, provider, message: {} }, output)
+    return output.options
+  }
+
+  expect(await params("ses_child3", openrouter)).toEqual({ usage: { include: true }, trace: { parent_session_id: "ses_parent3", agent: "explore" } })
+  // A trace the developer configured, on the provider's extraBody or the model's options, is kept.
+  expect(
+    await params("ses_child3", openrouter, { options: { extraBody: { trace: { trace_id: "t1", environment: "ci" } } } }, { trace: { environment: "staging" } }),
+  ).toEqual({ trace: { trace_id: "t1", environment: "staging", parent_session_id: "ses_parent3", agent: "explore" } })
+  // A session with no parent, or a provider other than OpenRouter, sends its request unchanged.
+  expect(await params("ses_root3", openrouter)).toEqual({ usage: { include: true } })
+  expect(await params("ses_child3", { api: { npm: "@ai-sdk/anthropic" } })).toEqual({ usage: { include: true } })
+  await hooks.dispose()
+})
+
 test("a null CONFIG makes the plugin inert", async () => {
   const src = readFileSync(join(import.meta.dir, "terma.js"), "utf8")
   const path = join(dir, "raw.js")

@@ -478,7 +478,9 @@ run that reaches them opens a browser login on **production**. A script that run
   read there stays in case a build does.
   **Cursor** and **OpenCode** give the child a conversation or session of its own.
   OpenCode's `terma.session.start` carries `parent_session_id`, its spans
-  `opencode.parent_session.id`, and the child is never made active — it would claim the
+  `opencode.parent_session.id`, its OpenRouter requests `trace.parent_session_id` and
+  `trace.agent` (the plugin's `chat.params` hook; OpenRouter's broadcast is otherwise
+  blind to the link), and the child is never made active — it would claim the
   developer's next hand-written commit. Cursor's `subagentStop` is filed under
   `parent_conversation_id`, names the subagent as `agent_id`, and folds a manifest the
   subagent built under its own conversation id into the parent's (`session.Store.Merge`),
