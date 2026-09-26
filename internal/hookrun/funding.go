@@ -127,8 +127,12 @@ func StopFailure(ctx context.Context, env Env) error {
 	return nil
 }
 
-// claudeOAuthAccountID returns the cached OAuth account id, and true, only when
-// OAuth is the proven effective credential. Claude Code's env API key, auth
+// claudeOAuthAccount returns the cached OAuth account id and the organization it
+// is signed in to, and true, only when OAuth is the proven effective credential.
+// The organization shares the account's gate because it is part of the same
+// login: Pro/Max plans belong to the account, Team/Enterprise seats and Console
+// billing to the organization, and one account can switch organizations without
+// changing id (anthropics/claude-code#89966). Claude Code's env API key, auth
 // token, cloud providers (Bedrock/Vertex/Foundry) and a VISIBLE externally
 // supplied CLAUDE_CODE_OAUTH_TOKEN (which may belong to a different account than
 // the cached profile) all outrank the stored OAuth login; and attribution
@@ -142,8 +146,13 @@ func StopFailure(ctx context.Context, env Env) error {
 // the backend treats account_id as evidence, not a settled payer). Reads
 // ~/.claude.json once via ClaudeFunding; a caller that already holds the evidence
 // uses oauthAccountID and does not read it again.
-func claudeOAuthAccountID(root string) (string, bool) {
-	return oauthAccountID(harness.ClaudeFunding(root).Attrs)
+func claudeOAuthAccount(root string) (accountID, orgID string, ok bool) {
+	attrs := harness.ClaudeFunding(root).Attrs
+	if accountID, ok = oauthAccountID(attrs); !ok {
+		return "", "", false
+	}
+	orgID, _ = attrs[attrOrganizationID].(string)
+	return accountID, orgID, true
 }
 
 func oauthAccountID(attrs map[string]any) (string, bool) {
