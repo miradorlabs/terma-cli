@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 )
@@ -168,6 +169,173 @@ func TestHeldEventsRequeueWithoutLooping(t *testing.T) {
 	}
 	if n, _, _ := s.Pending(); n != 0 {
 		t.Fatalf("pending after delivery = %d", n)
+	}
+}
+
+// One destination refusing its events must not keep another's queued. Before
+// PartialDelivery a batch was all-or-nothing: a project whose key the ingest host
+// refused held every other project's events for two days, and the ones that had
+// gone through were re-sent on every retry. The pass acknowledges what went out,
+// walks on to the end of its snapshot, and still ends as a failure — without the
+// spool-wide backoff, which would make every destination wait out the failed one's.
+func TestPartialDeliveryAcknowledgesWhatWentOutAndCarriesOn(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := []string{"ok", "refused", "held", "ok", "refused", "held"}
+	for i, name := range names {
+		if err := s.Append(Event{Name: name, Attrs: map[string]any{"i": i}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	boom := errors.New("403 invalid key")
+	calls, reported := 0, false
+	sender := SenderFunc(func(_ context.Context, events []Event) ([]Event, error) {
+		calls++
+		var held, undelivered []Event
+		for _, e := range events {
+			switch e.Name {
+			case "held":
+				held = append(held, e)
+			case "refused":
+				undelivered = append(undelivered, e)
+			}
+		}
+		if len(undelivered) == 0 {
+			return held, nil
+		}
+		// Like the router: the refusal is reported once, later batches only defer.
+		partial := &PartialDelivery{Undelivered: undelivered}
+		if !reported {
+			partial.Err, reported = boom, true
+		}
+		return held, partial
+	})
+	now := time.Date(2026, 9, 27, 13, 0, 0, 0, time.UTC)
+	res := s.Flush(context.Background(), sender, FlushOptions{Batch: 2, Now: now})
+	if !errors.Is(res.Err, boom) {
+		t.Fatalf("a partial delivery must end the pass as a failure: %+v", res)
+	}
+	if res.Sent != 2 || res.Held != 2 || res.Failed != 2 {
+		t.Fatalf("counts = sent %d held %d failed %d, want 2 2 2", res.Sent, res.Held, res.Failed)
+	}
+	if calls != 3 {
+		t.Fatalf("sender called %d times, want 3 (every batch of the snapshot, and none of the re-queued)", calls)
+	}
+	left, err := s.Peek(10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(left) != 4 {
+		t.Fatalf("queue after flush = %+v, want the two refused and the two held", left)
+	}
+	for _, e := range left {
+		if e.Name == "ok" {
+			t.Fatalf("a delivered event stayed queued and would be sent again: %+v", left)
+		}
+	}
+	if next := s.NextAttempt(); !next.IsZero() {
+		t.Fatalf("a partial failure opened the spool-wide window (until %s): every destination would wait out the failed one's", next)
+	}
+	if !s.LastFlush().IsZero() {
+		t.Fatal("a failed pass must not be recorded as a completed flush")
+	}
+
+	res = s.Flush(context.Background(), SenderFunc(func(context.Context, []Event) ([]Event, error) { return nil, nil }), FlushOptions{Force: true})
+	if res.Err != nil || res.Sent != 4 || !s.NextAttempt().IsZero() {
+		t.Fatalf("retry after the refusal cleared: %+v next=%s", res, s.NextAttempt())
+	}
+}
+
+// A sender that only defers — its destination is waiting out an earlier failure —
+// leaves the events queued and counted, but nothing failed this pass: no error, and
+// no window, since a deferral that opened one would double it every pass.
+func TestPartialDeliveryThatOnlyDefersIsNotAFailure(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = s.Append(Event{Name: "a"})
+	_ = s.Append(Event{Name: "b"})
+	res := s.Flush(context.Background(), SenderFunc(func(_ context.Context, events []Event) ([]Event, error) {
+		return nil, &PartialDelivery{Undelivered: events[1:]}
+	}), FlushOptions{})
+	if res.Err != nil || res.Sent != 1 || res.Failed != 1 {
+		t.Fatalf("unexpected result: %+v", res)
+	}
+	if !s.NextAttempt().IsZero() {
+		t.Fatal("a deferral opened the spool-wide window")
+	}
+	if left, _ := s.Peek(10); len(left) != 1 || left[0].Name != "b" {
+		t.Fatalf("queue = %+v, want the deferred event", left)
+	}
+}
+
+// A pass that reaches every destination clears a spool-wide window left by an older
+// terma: under per-destination windows it has nothing left to protect, and it would
+// otherwise keep hook-started flushes skipping for up to an hour.
+func TestPartialDeliveryClearsAStaleSpoolWideWindow(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.recordFailure(time.Now())
+	_ = s.Append(Event{Name: "a"})
+	res := s.Flush(context.Background(), SenderFunc(func(_ context.Context, events []Event) ([]Event, error) {
+		return nil, &PartialDelivery{Undelivered: events, Err: errors.New("403")}
+	}), FlushOptions{Force: true})
+	if res.Err == nil {
+		t.Fatal("the failure must be reported")
+	}
+	if !s.NextAttempt().IsZero() {
+		t.Fatal("the stale spool-wide window survived a pass that reached every destination")
+	}
+}
+
+// Each destination backs off on its own schedule: 30 seconds, doubling to an hour,
+// reset by a delivery. The windows are what a sender consults before it asks a host
+// that failed again.
+func TestDestinationRetryWindows(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 9, 27, 13, 0, 0, 0, time.UTC)
+	if !s.RetryAt("a").IsZero() {
+		t.Fatal("a destination with no failure has no window")
+	}
+	var waits []time.Duration
+	for range 9 {
+		waits = append(waits, s.DestinationFailed("a", now).Sub(now))
+	}
+	want := []time.Duration{30 * time.Second, time.Minute, 2 * time.Minute, 4 * time.Minute, 8 * time.Minute, 16 * time.Minute, 32 * time.Minute, time.Hour, time.Hour}
+	if !slices.Equal(waits, want) {
+		t.Fatalf("waits = %v, want %v", waits, want)
+	}
+	s.DestinationFailed("b", now)
+	if got := s.RetryWindows(now); len(got) != 2 || !got["a"].Equal(now.Add(time.Hour)) || !got["b"].Equal(now.Add(30*time.Second)) {
+		t.Fatalf("open windows = %v", got)
+	}
+	if got := s.RetryWindows(now.Add(time.Minute)); len(got) != 1 {
+		t.Fatalf("b's window closed after 30s; open = %v", got)
+	}
+
+	s.DestinationDelivered("a", now)
+	if !s.RetryAt("a").IsZero() {
+		t.Fatal("a delivery must close the window")
+	}
+	if got := s.DestinationFailed("a", now).Sub(now); got != 30*time.Second {
+		t.Fatalf("after a delivery the next failure starts over, got %s", got)
+	}
+	if !s.NextAttempt().IsZero() {
+		t.Fatal("a destination's window is not the spool's")
+	}
+
+	// A window closed for longer than any event can wait is forgotten.
+	s.DestinationFailed("c", now.Add(MaxAge+2*time.Hour))
+	if got := s.loadRetryWindows(); len(got) != 1 {
+		t.Fatalf("windows closed past MaxAge were kept: %v", got)
 	}
 }
 

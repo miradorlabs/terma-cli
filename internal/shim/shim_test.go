@@ -66,7 +66,7 @@ func claudeRouted(t *testing.T) string {
 	if err := SaveRecord(Record{ProjectID: testProjectID, Endpoint: testEndpoint, Signals: []string{"traces", "logs", "metrics"}, Harnesses: []string{AgentClaude}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := keystore.SetFor(AgentClaude, testProjectID, testKey); err != nil {
+	if err := keystore.SetFor(AgentClaude, testProjectID, testKey, keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
 	return repo
@@ -142,7 +142,7 @@ func TestRouteCodexPreservesHome(t *testing.T) {
 	if err := SaveRecord(Record{ProjectID: testProjectID, Endpoint: testEndpoint, Signals: []string{"logs"}, Harnesses: []string{AgentCodex}, CLI: true}); err != nil {
 		t.Fatal(err)
 	}
-	if err := keystore.SetFor(AgentCodex, testProjectID, testKey); err != nil {
+	if err := keystore.SetFor(AgentCodex, testProjectID, testKey, keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
 	home := t.TempDir()
@@ -176,7 +176,7 @@ func TestDesktopOnlyRouteDoesNotConfigureCodexCLI(t *testing.T) {
 		Harnesses: []string{AgentCodex}, CLI: cli, Desktop: desktop}); err != nil {
 		t.Fatal(err)
 	}
-	if err := keystore.SetFor(AgentCodex, testProjectID, testKey); err != nil {
+	if err := keystore.SetFor(AgentCodex, testProjectID, testKey, keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
 	if r := routeFor(AgentCodex, repo, nil); len(r.args) != 0 || len(r.env) != 0 {
@@ -224,7 +224,7 @@ func TestCodexRouteUsesDestinationBinding(t *testing.T) {
 		if err := SaveRecord(Record{ProjectID: id, Signals: []string{"logs"}, Harnesses: []string{AgentCodex}, CLI: true}); err != nil {
 			t.Fatal(err)
 		}
-		if err := keystore.SetFor(AgentCodex, id, testKey+id); err != nil {
+		if err := keystore.SetFor(AgentCodex, id, testKey+id, keystore.Hosts{}); err != nil {
 			t.Fatal(err)
 		}
 
@@ -271,7 +271,7 @@ func TestRouteEnvPassesThroughWhenNotApplicable(t *testing.T) {
 	if err := SaveRecord(Record{ProjectID: testProjectID, Endpoint: testEndpoint, Harnesses: []string{AgentCodex}, CLI: true}); err != nil {
 		t.Fatal(err)
 	}
-	if err := keystore.SetFor(AgentClaude, testProjectID, testKey); err != nil {
+	if err := keystore.SetFor(AgentClaude, testProjectID, testKey, keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
 	if routes(AgentClaude, repo) {
@@ -567,7 +567,7 @@ func TestClaudeRouteRefreshesKeysAndMasksInheritedDestinations(t *testing.T) {
 	if len(first.args) != 2 {
 		t.Fatal("missing initial route")
 	}
-	if err := keystore.SetFor(AgentClaude, testProjectID, "ter_srv_fedcba9876543210"); err != nil {
+	if err := keystore.SetFor(AgentClaude, testProjectID, "ter_srv_fedcba9876543210", keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
 	routeFor(AgentClaude, repo, nil)
@@ -617,7 +617,7 @@ func TestCodexRouteRequiresExplicitCLIChoice(t *testing.T) {
 	if err := SaveRecord(Record{ProjectID: testProjectID, Endpoint: testEndpoint, Harnesses: []string{AgentCodex}, Signals: []string{"logs"}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := keystore.SetFor(AgentCodex, testProjectID, testKey); err != nil {
+	if err := keystore.SetFor(AgentCodex, testProjectID, testKey, keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
 	if got := routeFor(AgentCodex, repo, nil); len(got.args) != 0 || len(got.env) != 0 {
@@ -775,7 +775,7 @@ func TestRouteFollowsALinkedWorktreeToItsMainCheckout(t *testing.T) {
 	if err := SaveRecord(Record{ProjectID: testProjectID, Signals: []string{"logs"}, Harnesses: []string{AgentCodex}, CLI: true}); err != nil {
 		t.Fatal(err)
 	}
-	if err := keystore.SetFor(AgentCodex, testProjectID, testKey); err != nil {
+	if err := keystore.SetFor(AgentCodex, testProjectID, testKey, keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
 	if got := strings.Join(routeFor(AgentCodex, wt, nil).args, " "); !strings.Contains(got, testKey) {

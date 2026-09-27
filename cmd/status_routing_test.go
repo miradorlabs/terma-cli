@@ -17,7 +17,7 @@ func TestRoutedPerRepo(t *testing.T) {
 	if err := shim.SaveRecord(shim.Record{ProjectID: project, Harnesses: []string{shim.AgentClaude}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := keystore.SetFor(shim.AgentClaude, project, "ter_srv_0123456789abcdef"); err != nil {
+	if err := keystore.SetFor(shim.AgentClaude, project, "ter_srv_0123456789abcdef", keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
 

@@ -19,7 +19,7 @@ func TestConcurrentSetsKeepEveryKey(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := range writers {
 		wg.Go(func() {
-			if err := Set(fmt.Sprintf("proj-%02d", i), key); err != nil {
+			if err := Set(fmt.Sprintf("proj-%02d", i), key, Hosts{}); err != nil {
 				t.Errorf("set %d: %v", i, err)
 			}
 		})

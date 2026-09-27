@@ -49,7 +49,7 @@ func TestShellRoutingCheckExplainsActivation(t *testing.T) {
 					t.Fatal(err)
 				}
 				if !tc.keyless {
-					if err := keystore.SetFor("claude", testProjectID, testServerKey); err != nil {
+					if err := keystore.SetFor("claude", testProjectID, testServerKey, keystore.Hosts{}); err != nil {
 						t.Fatal(err)
 					}
 				}

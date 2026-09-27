@@ -5,7 +5,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 )
 
 func initRepo(t *testing.T) string {
@@ -91,5 +93,24 @@ func TestRelativize(t *testing.T) {
 	}
 	if got := Relativize(root, "already/relative.go"); got != "already/relative.go" {
 		t.Fatalf("got %q", got)
+	}
+}
+
+// A git killed at its deadline used to report "signal: killed", which doctor printed
+// as "could not create a temporary worktree: git worktree: signal: killed" — read as
+// git crashing, when a large checkout had simply outlasted a hook's 2-second budget.
+func TestGitWithinNamesTheDeadlineItMissed(t *testing.T) {
+	dir := initRepo(t)
+	hooks := filepath.Join(dir, "slow-hooks")
+	if err := os.MkdirAll(hooks, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// exec, and no inherited output: once git is killed nothing holds its pipes.
+	if err := os.WriteFile(filepath.Join(hooks, "pre-commit"), []byte("#!/bin/sh\nexec sleep 5 >/dev/null 2>&1 </dev/null\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	_, err := GitWithin(context.Background(), 300*time.Millisecond, dir, "-c", "core.hooksPath="+hooks, "commit", "--allow-empty", "-qm", "slow")
+	if err == nil || !strings.Contains(err.Error(), "git commit: did not finish within 300ms") {
+		t.Fatalf("err = %v", err)
 	}
 }

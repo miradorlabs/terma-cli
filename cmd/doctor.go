@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -32,6 +33,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/shim"
 	"github.com/miradorlabs/terma-cli/internal/spinner"
+	"github.com/miradorlabs/terma-cli/internal/spool"
 	"github.com/miradorlabs/terma-cli/internal/trailer"
 )
 
@@ -605,17 +607,37 @@ func (d *doctorRun) backendReceives() doctor.Check {
 	if err != nil {
 		return doctor.Check{Status: doctor.Fail, Detail: err.Error(), Fix: "terma install"}
 	}
+	// The flush delivers every project's queued events, not only this repository's.
+	// Another project's refusal says nothing about this repository's chain — it read
+	// as this repository's credentials failing — so it is a warning here, named with
+	// its own project and host. This project's refusal, or a failure no project owns
+	// (a lock, the deadline), fails the check.
+	var others []string
+	var othersFix string
 	if res.Err != nil {
-		return doctor.Check{Status: doctor.Fail, Detail: "flush failed: " + res.Err.Error(), Fix: "check network / OTLP endpoint " + d.cfg.OTLPURL}
+		if f, ok := res.failureFor(d.projectID); ok {
+			return doctor.Check{Status: doctor.Fail, Detail: "this project's events were not delivered: " + describeFailure(f), Fix: failureFix(f)}
+		}
+		if len(res.Failures) == 0 {
+			return doctor.Check{Status: doctor.Fail, Detail: "flush failed: " + res.Err.Error(), Fix: "check the network, then run `terma spool flush --force`"}
+		}
+		for _, f := range res.Failures {
+			others = append(others, "another project's events were not delivered: "+f.ProjectID+" "+describeFailure(f))
+		}
+		othersFix = failureFix(res.Failures[0])
 	}
 	delivered, undelivered := describeFlush(res)
-	flushDetail := "flushed " + delivered + " to " + d.cfg.OTLPURL
+	hosts := res.Endpoints
+	if len(hosts) == 0 {
+		hosts = []string{projectEndpoint(d.cfg, d.projectID)}
+	}
+	flushDetail := "flushed " + delivered + " to " + strings.Join(hosts, ", ")
 	if res.Sent == 0 && len(undelivered) == 0 {
 		flushDetail = "nothing queued at verification time (hooks may already have flushed)"
 	}
-	detail := strings.Join(append([]string{flushDetail}, undelivered...), "; ")
+	detail := strings.Join(append(append([]string{flushDetail}, undelivered...), others...), "; ")
 	if d.scratchSHA == "" {
-		return doctor.Check{Status: doctor.Skip, Inconclusive: true, Detail: detail + "; no scratch commit event to verify"}
+		return doctor.Check{Status: doctor.Skip, Inconclusive: true, Detail: detail + "; no scratch commit event to verify", Fix: othersFix}
 	}
 	// Round-trip: the scratch commit's event must be readable back.
 	if ok, err := waitForCommitEvent(d.ctx, d.cfg, d.projectID, d.scratchSHA, d.progress); err != nil {
@@ -623,7 +645,30 @@ func (d *doctorRun) backendReceives() doctor.Check {
 	} else if !ok {
 		return doctor.Check{Status: doctor.Warn, Inconclusive: true, Detail: detail + "; the scratch commit event was not visible via the API within " + roundTripWait.String(), Fix: "terma doctor"}
 	}
+	if len(others) > 0 {
+		return doctor.Check{Status: doctor.Warn, Detail: detail + "; round-trip confirmed for this project", Fix: othersFix}
+	}
 	return doctor.Check{Status: doctor.Pass, Detail: detail + "; round-trip confirmed"}
+}
+
+// describeFailure words one project's failed delivery with the host that refused it:
+// the host is the half of the story a developer with projects in two environments
+// cannot guess.
+func describeFailure(f projectFailure) string {
+	if _, ok := errors.AsType[*spool.IngestError](f.Err); ok {
+		return "refused by " + f.Endpoint + " (" + f.Err.Error() + ")"
+	}
+	return "not sent to " + f.Endpoint + " (" + f.Err.Error() + ")"
+}
+
+// failureFix is the next step for a failed delivery. A refused key is not a network
+// problem, and pointing at the network for one sent a developer to check a
+// connection that was working.
+func failureFix(f projectFailure) string {
+	if ingest, ok := errors.AsType[*spool.IngestError](f.Err); ok && ingest.KeyRefused() {
+		return "the key this machine holds for project " + f.ProjectID + " was refused by " + f.Endpoint + " — it may have been revoked, or belong to another environment"
+	}
+	return "check the network and " + f.Endpoint + ", then run `terma spool flush --force`"
 }
 
 // scratchCommit proves the installed hook chain works: a detached temporary
@@ -635,20 +680,22 @@ func scratchCommit(ctx context.Context, root string, bound *termaproject.File) (
 	if gitx.HeadSHA(ctx, root) == "" {
 		return "", doctor.Check{Status: doctor.Skip, Detail: "repository has no commits yet"}
 	}
-	tmp, err := os.MkdirTemp("", "terma-doctor-*")
+	clearStaleScratchWorktrees(ctx, root)
+	tmp, err := os.MkdirTemp("", scratchDirPrefix+"*")
 	if err != nil {
 		return "", doctor.Check{Status: doctor.Fail, Detail: err.Error()}
 	}
-	wt := filepath.Join(tmp, "wt")
-	if _, err := gitx.Git(ctx, root, "worktree", "add", "--detach", "-q", wt, "HEAD"); err != nil {
+	wt := filepath.Join(tmp, scratchWorktreeName)
+	cleanup := func() {
+		removeScratchWorktree(ctx, root, wt)
 		_ = os.RemoveAll(tmp)
-		return "", doctor.Check{Status: doctor.Fail, Detail: "could not create a temporary worktree: " + err.Error()}
+		_, _ = gitx.Git(context.WithoutCancel(ctx), root, "worktree", "prune")
 	}
-	defer func() {
-		_, _ = gitx.Git(ctx, root, "worktree", "remove", "--force", wt)
-		_, _ = gitx.Git(ctx, root, "worktree", "prune")
-		_ = os.RemoveAll(tmp)
-	}()
+	if _, err := gitx.GitWithin(ctx, scratchGitTimeout, root, "worktree", "add", "--detach", "-q", wt, "HEAD"); err != nil {
+		cleanup()
+		return "", doctor.Check{Status: doctor.Fail, Detail: "could not create a temporary worktree: " + err.Error(), Fix: "`terma doctor --skip-commit` runs every other check"}
+	}
+	defer cleanup()
 	// Seed the binding into the worktree so the post-commit hook attributes the scratch
 	// commit to this project — the round-trip needs a routable terma.commit event. The
 	// worktree is a checkout of HEAD, so a repository that commits .terma/settings.json
@@ -692,7 +739,7 @@ func scratchCommit(ctx context.Context, root string, bound *termaproject.File) (
 		commitArgs = append(commitArgs, "-c", "core.hooksPath="+hooksPath)
 	}
 	commitArgs = append(commitArgs, "commit", "-q", "-m", "terma doctor scratch commit")
-	if _, err := gitx.Git(ctx, wt, commitArgs...); err != nil {
+	if _, err := gitx.GitWithin(ctx, scratchGitTimeout, wt, commitArgs...); err != nil {
 		return "", doctor.Check{Status: doctor.Fail, Detail: "scratch commit failed: " + err.Error(), Fix: "a hook is failing the commit — run it with TERMA_DEBUG=1 to see why"}
 	}
 	sha := gitx.HeadSHA(ctx, wt)
@@ -706,6 +753,48 @@ func scratchCommit(ctx context.Context, root string, bound *termaproject.File) (
 		}
 	}
 	return sha, doctor.Check{Status: doctor.Fail, Detail: "the commit went through but carried no Agent-Session-Id trailer", Fix: "the hook did not run: re-run `terma install`, then the hook manager's install step (see its notes)"}
+}
+
+const (
+	// scratchGitTimeout bounds the scratch worktree's checkout, commit and removal.
+	// They ran under gitx.Timeout, a hook's 2-second budget: a checkout of 9,270
+	// files and 2.7 GB takes 11 s, so doctor failed that repository on every run
+	// with "git worktree: signal: killed". The commit runs the repository's own
+	// hooks too, which are not terma's to budget.
+	scratchGitTimeout = 2 * time.Minute
+	// scratchDirPrefix and scratchWorktreeName name the scratch worktree
+	// (<tmp>/terma-doctor-*/wt), so a later run can recognise one an earlier run
+	// could not clean up.
+	scratchDirPrefix    = "terma-doctor-"
+	scratchWorktreeName = "wt"
+)
+
+// removeScratchWorktree unregisters a scratch worktree. --force twice, because an
+// add killed mid-checkout leaves its registration locked ("initializing"), and
+// `git worktree prune` passes over a locked one for ever. It runs even when doctor
+// is interrupted, since that is when a half-made worktree is most likely.
+func removeScratchWorktree(ctx context.Context, root, wt string) {
+	_, _ = gitx.GitWithin(context.WithoutCancel(ctx), scratchGitTimeout, root, "worktree", "remove", "--force", "--force", wt)
+}
+
+// clearStaleScratchWorktrees removes what earlier runs could not: registrations of
+// a scratch worktree whose directory is gone. Before scratchGitTimeout, every run
+// against a large repository left one behind, locked. Only doctor's own naming is
+// touched, and only once the directory no longer exists.
+func clearStaleScratchWorktrees(ctx context.Context, root string) {
+	out, err := gitx.Git(ctx, root, "worktree", "list", "--porcelain")
+	if err != nil {
+		return
+	}
+	for line := range strings.SplitSeq(out, "\n") {
+		path, ok := strings.CutPrefix(line, "worktree ")
+		if !ok || filepath.Base(path) != scratchWorktreeName || !strings.HasPrefix(filepath.Base(filepath.Dir(path)), scratchDirPrefix) {
+			continue
+		}
+		if _, err := os.Lstat(path); errors.Is(err, fs.ErrNotExist) {
+			removeScratchWorktree(ctx, root, path)
+		}
+	}
 }
 
 // doctorHooksCheck is doctor's wording for the commit-hook verdict. An unreadable plan
@@ -857,6 +946,15 @@ func waitForCommitEvent(ctx context.Context, cfg *config.Config, projectID, sha 
 	// Query the project the scratch event used, independently of command overrides.
 	queryConfig := *cfg
 	queryConfig.ProjectID = projectID
+	// Read it back where it was delivered. A project in another environment than the
+	// active profile's is read from its own data API, with its own key: the signed-in
+	// credential is bound to the active profile's auth host, and asking the profile's
+	// API for the project's events found nothing on every run.
+	if api := projectAPI(cfg, projectID); api != cfg.APIURL {
+		if key := keystore.Get(projectID); key != "" {
+			queryConfig.APIURL, queryConfig.APIKey = api, key
+		}
+	}
 	client, err := newClient(&queryConfig)
 	if err != nil {
 		return false, err

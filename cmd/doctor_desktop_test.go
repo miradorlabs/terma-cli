@@ -66,7 +66,7 @@ func TestDesktopVerdictUsesLocalRouteAndKey(t *testing.T) {
 	if got := judgeDesktop(testProjectID).emissionProblem; got != "this repository has no delivery key" {
 		t.Fatalf("missing key verdict = %q", got)
 	}
-	if err := keystore.SetFor(shim.AgentCodex, testProjectID, "ter_srv_0123456789abcdef01234567"); err != nil {
+	if err := keystore.SetFor(shim.AgentCodex, testProjectID, "ter_srv_0123456789abcdef01234567", keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
 	if verdict := judgeDesktop(testProjectID); verdict.emissionProblem != "" || !verdict.routed {

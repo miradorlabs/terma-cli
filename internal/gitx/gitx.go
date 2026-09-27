@@ -28,23 +28,51 @@ var ErrNotRepo = errors.New("not a git repository")
 var errNoCommit = errors.New("no commit at HEAD")
 
 func run(ctx context.Context, dir string, args ...string) (string, error) {
-	ctx, cancel := context.WithTimeout(ctx, Timeout)
+	return runWithin(ctx, Timeout, dir, args...)
+}
+
+func runWithin(ctx context.Context, timeout time.Duration, dir string, args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", dir}, args...)...)
 	cmd.Env = append(os.Environ(), "GIT_OPTIONAL_LOCKS=0", "LC_ALL=C")
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	if err := cmd.Run(); err != nil {
+		// A git killed at its deadline reports only "signal: killed", which reads
+		// as git crashing rather than as the bound doing its job.
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return "", fmt.Errorf("git %s: did not finish within %s", subcommand(args), timeout)
+		}
 		msg := strings.TrimSpace(stderr.String())
 		if strings.Contains(msg, "not a git repository") {
 			return "", ErrNotRepo
 		}
 		if msg == "" {
-			return "", fmt.Errorf("git %s: %w", args[0], err)
+			return "", fmt.Errorf("git %s: %w", subcommand(args), err)
 		}
-		return "", fmt.Errorf("git %s: %s", args[0], msg)
+		return "", fmt.Errorf("git %s: %s", subcommand(args), msg)
 	}
 	return strings.TrimRight(stdout.String(), "\n"), nil
+}
+
+// subcommand names the git command in args for an error message, past any leading
+// global options: doctor's scratch commit starts with -c pairs, and its failures
+// read "git -c: …".
+func subcommand(args []string) string {
+	for i := 0; i < len(args); i++ {
+		switch a := args[i]; {
+		case a == "-c" || a == "-C":
+			i++
+		case strings.HasPrefix(a, "-"):
+		default:
+			return a
+		}
+	}
+	if len(args) > 0 {
+		return args[0]
+	}
+	return ""
 }
 
 // Locate resolves the worktree root and the metadata directory in one git call —
@@ -172,7 +200,14 @@ func NormalizeRemote(raw string) string {
 	return u.String()
 }
 
-// Git runs an arbitrary git command in dir (for doctor's scratch commits).
+// Git runs an arbitrary git command in dir, bounded by Timeout.
 func Git(ctx context.Context, dir string, args ...string) (string, error) {
 	return run(ctx, dir, args...)
+}
+
+// GitWithin is Git with its own bound, for a command that is not a hook's to wait
+// on: doctor's scratch worktree checks out the whole of HEAD, which no repository of
+// any size finishes inside a hook's Timeout.
+func GitWithin(ctx context.Context, timeout time.Duration, dir string, args ...string) (string, error) {
+	return runWithin(ctx, timeout, dir, args...)
 }

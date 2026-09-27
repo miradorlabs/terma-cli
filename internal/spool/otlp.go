@@ -162,7 +162,24 @@ func (o *OTLPSender) send(ctx context.Context, events []Event) error {
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		detail, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return fmt.Errorf("otlp ingest returned %d: %s", resp.StatusCode, bytes.TrimSpace(detail))
+		return &IngestError{Status: resp.StatusCode, Detail: string(bytes.TrimSpace(detail))}
 	}
 	return nil
+}
+
+// IngestError is the ingest host answering with a non-2xx status. It is typed so a
+// caller can tell a refused key (401, 403), which no retry will fix, from a host
+// having a bad day.
+type IngestError struct {
+	Status int
+	Detail string
+}
+
+func (e *IngestError) Error() string {
+	return fmt.Sprintf("otlp ingest returned %d: %s", e.Status, e.Detail)
+}
+
+// KeyRefused reports whether the host rejected the credential rather than the request.
+func (e *IngestError) KeyRefused() bool {
+	return e.Status == http.StatusUnauthorized || e.Status == http.StatusForbidden
 }

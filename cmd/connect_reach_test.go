@@ -333,7 +333,7 @@ func TestStatusAndDoctorAgreeWhenRoutingIsConfiguredButNotLive(t *testing.T) {
 	if err := shim.SaveRecord(shim.Record{ProjectID: testProjectID, Endpoint: "https://otel.terma.ai", Signals: []string{"logs"}, Harnesses: []string{shim.AgentClaude}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := keystore.SetFor(shim.AgentClaude, testProjectID, testServerKey); err != nil {
+	if err := keystore.SetFor(shim.AgentClaude, testProjectID, testServerKey, keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
 

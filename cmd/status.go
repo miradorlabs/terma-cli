@@ -298,6 +298,9 @@ Nothing is written and no scratch commit is made — run
 				if next := s.NextAttempt(); !next.IsZero() && time.Now().Before(next) {
 					line += fmt.Sprintf(", delivery failing (retry at %s)", next.Local().Format(time.Kitchen))
 					backendOK = false
+				} else if next, open := s.RetryWindows(time.Now())[projectID]; open && projectID != "" {
+					line += fmt.Sprintf(", delivery failing for this project (retry at %s)", next.Local().Format(time.Kitchen))
+					backendOK = false
 				}
 				if projectID != "" {
 					if key := keystore.Get(projectID); key != "" {

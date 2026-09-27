@@ -88,7 +88,7 @@ func TestDoctorScratchCommitRoundTrip(t *testing.T) {
 	t.Setenv("TERMA_OTLP_URL", srv.URL)
 	t.Setenv("TERMA_API_URL", srv.URL)
 	t.Setenv("TERMA_AUTH_URL", srv.URL)
-	if err := keystore.Set(testProjectID, testServerKey); err != nil {
+	if err := keystore.Set(testProjectID, testServerKey, keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
 	if err := termaproject.Save(repo, &termaproject.File{Project: termaproject.Project{ID: testProjectID}}); err != nil {
