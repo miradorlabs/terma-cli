@@ -28,6 +28,7 @@ func TestWireNamesAreFrozen(t *testing.T) {
 		EventSubagentCall:       "terma.subagent.call",
 		EventToolCall:           "terma.tool.call",
 		EventAssistantMessage:   "terma.assistant.message",
+		EventSessionTitle:       "terma.session.title",
 
 		AttrProjectID:      "project_id",
 		AttrWorktree:       "worktree",
@@ -51,12 +52,13 @@ func TestWireNamesAreFrozen(t *testing.T) {
 		attrEvidenceStatus: "evidence_status",
 		attrHookEvent:      "hook_event",
 
-		sourceCursorHook:      "cursor_hook",
-		sourceAntigravityHook: "antigravity_hook",
-		sourceCodexRollout:    "codex_rollout",
-		statusPresent:         "present",
-		statusUnavailable:     "unavailable",
-		unknownValue:          "unknown",
+		sourceCursorHook:        "cursor_hook",
+		sourceAntigravityHook:   "antigravity_hook",
+		sourceCodexRollout:      "codex_rollout",
+		sourceCodexSessionIndex: "codex_session_index",
+		statusPresent:           "present",
+		statusUnavailable:       "unavailable",
+		unknownValue:            "unknown",
 
 		claudeTool:      "claude-code",
 		codexTool:       "codex",

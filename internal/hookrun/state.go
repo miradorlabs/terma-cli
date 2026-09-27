@@ -20,7 +20,9 @@ const (
 	codexFundingCursorDir = "funding-cursors"
 	codexReplyCursorDir   = "reply-cursors"
 	codexDesktopCursorDir = "desktop-cursors"
-	codexToolStartDir     = "codex-tool-starts"
+	// codexTitleStateDir is when each Codex thread's name that was last spooled was written.
+	codexTitleStateDir = "codex-titles"
+	codexToolStartDir  = "codex-tool-starts"
 	// cursorObservationDir and antigravityObservationDir are the observation
 	// checkpoints, per harness so one harness's stream survives another's arrival.
 	cursorObservationDir      = "cursor-observations"

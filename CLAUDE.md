@@ -243,6 +243,14 @@ run that reaches them opens a browser login on **production**. A script that run
   it introduced. `message_id` is Codex's own (`msg_…`). The turn the platform knows is the
   OTLP **trace id** (`task_started.trace_id`), sent as `trace_id`; the rollout's `turn_id`
   UUID matches nothing native and is informational.
+- Codex never exports the thread's **name** either: a hidden side conversation (its own
+  `conversation.id`, a fixed "Generate a concise, single-line task title…" prompt, no link
+  back) generates it, and it lands only in `$CODEX_HOME/session_index.jsonl`, keyed by the
+  thread it names (0.157.1, 2026-09-27). The same three hooks read the latest line for their
+  session (`harness.ReadCodexThreadTitle`) and spool `terma.session.title` (`title`, stamped
+  with the index's `updated_at`) when it is new or renamed; `codex-titles/` keeps the last
+  `updated_at` sent. The name restates the first prompt, so it is the one other read of
+  conversation content and travels under the same `codexRepliesConsented` gate.
 - Codex names no edited file: `PostToolUse` carries the tool call, and the paths live in
   the apply_patch envelope inside `tool_input.command` (`hookrun.applyPatchPaths`). That
   hook is `async` in the committed file because it fires on every tool call and nothing
@@ -544,7 +552,8 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   `termacli_entitlement_logs.go`): `terma.session.start`, `terma.files.touched`,
   `terma.session.observation`, the commit events, `terma.tool.call`,
   `terma.assistant.message` (Codex only — `text`, `message_id`, `trace_id`, `phase`;
-  supplements Codex's native exporter), and the funding
+  supplements Codex's native exporter), `terma.session.title` (Codex only — `title` from
+  `session_index.jsonl`), and the funding
   events `terma.session.quota` / `.account` / `.limit` (folded by the entitlement adapter,
   live-ingesting in dev). Codex Desktop also emits `terma.turn.summary` (rollout turn
   status and available timing), `terma.compaction` (rollout compaction records), and
