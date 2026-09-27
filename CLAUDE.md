@@ -69,6 +69,15 @@ run that reaches them opens a browser login on **production**. A script that run
   batches for replay. Only the flusher prunes, before its initial byte snapshot.
   A `Sender` may return events as *held* (no project key yet); they re-queue at the
   tail and never loop within a pass. Delivery failure → exponential backoff 30s..1h.
+  Each project goes to the ingest host its routing record names (`projectEndpoint`;
+  `--otlp-url`/`TERMA_OTLP_URL` still win, no record → the profile's host): the key
+  was minted in that project's environment, and sending every project to the active
+  profile's host had a dev-deployment project's key refused by production on every
+  flush. A project whose send fails comes back as `spool.PartialDelivery`: what was
+  delivered is acknowledged, its events re-queue like held ones, the pass carries on
+  and ends as a failure. The router asks a refusing host once per pass. Before this, one
+  refused project kept every other project's events queued. Doctor fails the backend
+  check only on its own project's failure; another project's is a warning naming it.
   Flushes are detached processes started by hooks: immediately after a commit or a
   session end and after end-of-turn capture (`stop`, `codex-stop`, `stop-failure`).
   Newly queued Claude status-line snapshots also trigger a flush because rendering

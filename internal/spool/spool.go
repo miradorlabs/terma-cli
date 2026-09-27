@@ -23,6 +23,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -40,15 +41,40 @@ type Event struct {
 	Attrs     map[string]any `json:"attrs,omitempty"`
 }
 
-// Sender delivers a batch. It must be all-or-nothing per call: on error the batch
-// stays spooled and is retried later. Send must respect context cancellation.
+// Sender delivers a batch. Send must respect context cancellation.
 type Sender interface {
 	// Send delivers a batch. Events it cannot deliver yet but should not lose —
 	// typically ones whose project has no key on this machine until `terma install`
-	// runs — are returned as held; they go back to the end of the queue. An error
-	// means nothing was accepted and the whole batch stays put.
+	// runs — are returned as held; they go back to the end of the queue. A
+	// *PartialDelivery error means the rest of the batch was accepted and only its
+	// Undelivered events failed. Any other error means nothing was accepted and the
+	// whole batch stays put.
 	Send(ctx context.Context, events []Event) (held []Event, err error)
 }
+
+// PartialDelivery is the error a Sender returns when one destination refused its
+// part of a batch and the others accepted theirs. Before it existed, a batch was
+// all-or-nothing: one project whose key the ingest host refused kept every other
+// project's events queued behind it for days, and re-sent the ones that had gone
+// through on every retry. The flusher acknowledges what was delivered, puts
+// Undelivered back at the end of the queue like held events, carries on with the
+// pass, and ends it as a failure with the usual backoff.
+type PartialDelivery struct {
+	// Undelivered are the events whose send failed. They stay queued.
+	Undelivered []Event
+	// Err is what went wrong in this call. It is nil when the sender only
+	// deferred events whose failure it already reported earlier in the pass.
+	Err error
+}
+
+func (p *PartialDelivery) Error() string {
+	if p.Err == nil {
+		return fmt.Sprintf("%d event(s) deferred after an earlier failure in this pass", len(p.Undelivered))
+	}
+	return p.Err.Error()
+}
+
+func (p *PartialDelivery) Unwrap() error { return p.Err }
 
 // SenderFunc adapts a function to Sender.
 type SenderFunc func(ctx context.Context, events []Event) ([]Event, error)
@@ -243,6 +269,9 @@ type Result struct {
 	// Held counts events the sender handed back for a later attempt. They are
 	// still queued, not lost.
 	Held int
+	// Failed counts events a PartialDelivery left undelivered. They are still
+	// queued, not lost; Err says why they failed.
+	Failed int
 	// Expired counts events given up on for age: older than MaxAge, held or not.
 	// Time, not corruption.
 	Expired int
@@ -270,7 +299,9 @@ func (r *Result) add(b batch) {
 // Flush delivers queued events. Bytes sent are trimmed from the file under the
 // lock; anything appended meanwhile survives. On a send failure the remaining
 // events stay and an exponential backoff (30s .. 1h) is recorded so a dead backend
-// is not hammered by every commit.
+// is not hammered by every commit. A partial delivery (PartialDelivery) is
+// acknowledged as far as it went and the pass continues, so one destination's
+// failure never keeps another's events queued; the pass still ends as a failure.
 func (s *Spool) Flush(ctx context.Context, sender Sender, opts FlushOptions) Result {
 	timeout := opts.Timeout
 	if timeout <= 0 {
@@ -308,48 +339,71 @@ func (s *Spool) Flush(ctx context.Context, sender Sender, opts FlushOptions) Res
 	}
 
 	var res Result
-	// Consume only the bytes present at the start. Held events and concurrent
-	// appends stay at the tail for the next pass.
+	failedAt := func() time.Time {
+		if opts.Now.IsZero() {
+			return time.Now()
+		}
+		return opts.Now
+	}
+	// A partial delivery does not end the pass: every destination that accepts its
+	// events gets them this time round. Its failures are collected here and end the
+	// pass as a failure, with the backoff, however the pass ends.
+	var failures []error
+	stop := func(err error) Result {
+		if len(failures) > 0 {
+			s.recordFailure(failedAt())
+		}
+		res.Err = errors.Join(append(failures, err)...)
+		return res
+	}
+	// Consume only the bytes present at the start. Held, undelivered and
+	// concurrently appended events stay at the tail for the next pass.
 	budget := int64(-1)
 	for {
 		if err := ctx.Err(); err != nil {
-			res.Err = err
-			return res
+			return stop(err)
 		}
 		batchResult, err := s.readFlushBatch(ctx, batch, budget, now)
 		res.add(batchResult)
 		if err != nil {
-			res.Err = err
-			return res
+			return stop(err)
 		}
 		if budget < 0 {
 			budget = batchResult.Size
 		}
-		var held []Event
+		var held, undelivered []Event
 		if len(batchResult.Events) > 0 {
 			held, err = sender.Send(ctx, batchResult.Events)
-			if err != nil {
-				failureTime := opts.Now
-				if failureTime.IsZero() {
-					failureTime = time.Now()
+			if partial, ok := errors.AsType[*PartialDelivery](err); ok {
+				undelivered = partial.Undelivered
+				if partial.Err != nil || len(failures) == 0 {
+					failures = append(failures, partial)
 				}
-				s.recordFailure(failureTime)
-				res.Err = err
+			} else if err != nil {
+				s.recordFailure(failedAt())
+				res.Err = errors.Join(append(failures, err)...)
 				return res
 			}
 		}
-		// Acknowledging delivery is one atomic rewrite, including held events.
-		// If cancellation prevents it, the original batch remains for replay.
+		// Acknowledging delivery is one atomic rewrite, including the events that
+		// go back on the queue. If cancellation prevents it, the original batch
+		// remains for replay.
+		requeue := slices.Concat(held, undelivered)
 		if batchResult.Consumed > 0 {
-			if err := s.ackBatch(ctx, batchResult.Consumed, batchResult.Prefix, held); err != nil {
-				res.Err = err
-				return res
+			if err := s.ackBatch(ctx, batchResult.Consumed, batchResult.Prefix, requeue); err != nil {
+				return stop(err)
 			}
 		}
-		res.Sent += len(batchResult.Events) - len(held)
+		res.Sent += len(batchResult.Events) - len(requeue)
 		res.Held += len(held)
+		res.Failed += len(undelivered)
 		budget -= batchResult.Consumed
 		if len(batchResult.Events) < batch || budget <= 0 {
+			if len(failures) > 0 {
+				s.recordFailure(failedAt())
+				res.Err = errors.Join(failures...)
+				return res
+			}
 			s.clearBackoff()
 			s.recordFlush(now)
 			return res

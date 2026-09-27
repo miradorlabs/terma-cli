@@ -171,6 +171,101 @@ func TestHeldEventsRequeueWithoutLooping(t *testing.T) {
 	}
 }
 
+// One destination refusing its events must not keep another's queued. Before
+// PartialDelivery a batch was all-or-nothing: a project whose key the ingest host
+// refused held every other project's events for two days, and the ones that had
+// gone through were re-sent on every retry. The pass acknowledges what went out,
+// walks on to the end of its snapshot, and still ends as a failure with a backoff.
+func TestPartialDeliveryAcknowledgesWhatWentOutAndCarriesOn(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := []string{"ok", "refused", "held", "ok", "refused", "held"}
+	for i, name := range names {
+		if err := s.Append(Event{Name: name, Attrs: map[string]any{"i": i}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	boom := errors.New("403 invalid key")
+	calls, reported := 0, false
+	sender := SenderFunc(func(_ context.Context, events []Event) ([]Event, error) {
+		calls++
+		var held, undelivered []Event
+		for _, e := range events {
+			switch e.Name {
+			case "held":
+				held = append(held, e)
+			case "refused":
+				undelivered = append(undelivered, e)
+			}
+		}
+		if len(undelivered) == 0 {
+			return held, nil
+		}
+		// Like the router: the refusal is reported once, later batches only defer.
+		partial := &PartialDelivery{Undelivered: undelivered}
+		if !reported {
+			partial.Err, reported = boom, true
+		}
+		return held, partial
+	})
+	now := time.Date(2026, 9, 27, 13, 0, 0, 0, time.UTC)
+	res := s.Flush(context.Background(), sender, FlushOptions{Batch: 2, Now: now})
+	if !errors.Is(res.Err, boom) {
+		t.Fatalf("a partial delivery must end the pass as a failure: %+v", res)
+	}
+	if res.Sent != 2 || res.Held != 2 || res.Failed != 2 {
+		t.Fatalf("counts = sent %d held %d failed %d, want 2 2 2", res.Sent, res.Held, res.Failed)
+	}
+	if calls != 3 {
+		t.Fatalf("sender called %d times, want 3 (every batch of the snapshot, and none of the re-queued)", calls)
+	}
+	left, err := s.Peek(10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(left) != 4 {
+		t.Fatalf("queue after flush = %+v, want the two refused and the two held", left)
+	}
+	for _, e := range left {
+		if e.Name == "ok" {
+			t.Fatalf("a delivered event stayed queued and would be sent again: %+v", left)
+		}
+	}
+	if got := s.NextAttempt().Sub(now); got != 30*time.Second {
+		t.Fatalf("a partial failure must back off like any other, next attempt in %s", got)
+	}
+	if !s.LastFlush().IsZero() {
+		t.Fatal("a failed pass must not be recorded as a completed flush")
+	}
+
+	res = s.Flush(context.Background(), SenderFunc(func(context.Context, []Event) ([]Event, error) { return nil, nil }), FlushOptions{Force: true})
+	if res.Err != nil || res.Sent != 4 || !s.NextAttempt().IsZero() {
+		t.Fatalf("retry after the refusal cleared: %+v next=%s", res, s.NextAttempt())
+	}
+}
+
+// A sender that only defers, without saying why, still fails the pass: nothing may
+// read a queue that kept events back as a clean delivery.
+func TestPartialDeliveryWithoutACauseStillFails(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = s.Append(Event{Name: "a"})
+	_ = s.Append(Event{Name: "b"})
+	res := s.Flush(context.Background(), SenderFunc(func(_ context.Context, events []Event) ([]Event, error) {
+		return nil, &PartialDelivery{Undelivered: events[1:]}
+	}), FlushOptions{})
+	if res.Err == nil || res.Sent != 1 || res.Failed != 1 {
+		t.Fatalf("unexpected result: %+v", res)
+	}
+	if s.NextAttempt().IsZero() {
+		t.Fatal("expected a backoff")
+	}
+}
+
 func TestFlushDropsEventsOlderThanMaxAge(t *testing.T) {
 	s, err := Open(t.TempDir())
 	if err != nil {

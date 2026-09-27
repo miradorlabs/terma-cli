@@ -32,6 +32,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/shim"
 	"github.com/miradorlabs/terma-cli/internal/spinner"
+	"github.com/miradorlabs/terma-cli/internal/spool"
 	"github.com/miradorlabs/terma-cli/internal/trailer"
 )
 
@@ -605,17 +606,37 @@ func (d *doctorRun) backendReceives() doctor.Check {
 	if err != nil {
 		return doctor.Check{Status: doctor.Fail, Detail: err.Error(), Fix: "terma install"}
 	}
+	// The flush delivers every project's queued events, not only this repository's.
+	// Another project's refusal says nothing about this repository's chain — it read
+	// as this repository's credentials failing — so it is a warning here, named with
+	// its own project and host. This project's refusal, or a failure no project owns
+	// (a lock, the deadline), fails the check.
+	var others []string
+	var othersFix string
 	if res.Err != nil {
-		return doctor.Check{Status: doctor.Fail, Detail: "flush failed: " + res.Err.Error(), Fix: "check network / OTLP endpoint " + d.cfg.OTLPURL}
+		if f, ok := res.failureFor(d.projectID); ok {
+			return doctor.Check{Status: doctor.Fail, Detail: "this project's events were not delivered: " + describeFailure(f), Fix: failureFix(f)}
+		}
+		if len(res.Failures) == 0 {
+			return doctor.Check{Status: doctor.Fail, Detail: "flush failed: " + res.Err.Error(), Fix: "check the network, then run `terma spool flush --force`"}
+		}
+		for _, f := range res.Failures {
+			others = append(others, "another project's events were not delivered: "+f.ProjectID+" "+describeFailure(f))
+		}
+		othersFix = failureFix(res.Failures[0])
 	}
 	delivered, undelivered := describeFlush(res)
-	flushDetail := "flushed " + delivered + " to " + d.cfg.OTLPURL
+	hosts := res.Endpoints
+	if len(hosts) == 0 {
+		hosts = []string{projectEndpoint(d.cfg, d.projectID)}
+	}
+	flushDetail := "flushed " + delivered + " to " + strings.Join(hosts, ", ")
 	if res.Sent == 0 && len(undelivered) == 0 {
 		flushDetail = "nothing queued at verification time (hooks may already have flushed)"
 	}
-	detail := strings.Join(append([]string{flushDetail}, undelivered...), "; ")
+	detail := strings.Join(append(append([]string{flushDetail}, undelivered...), others...), "; ")
 	if d.scratchSHA == "" {
-		return doctor.Check{Status: doctor.Skip, Inconclusive: true, Detail: detail + "; no scratch commit event to verify"}
+		return doctor.Check{Status: doctor.Skip, Inconclusive: true, Detail: detail + "; no scratch commit event to verify", Fix: othersFix}
 	}
 	// Round-trip: the scratch commit's event must be readable back.
 	if ok, err := waitForCommitEvent(d.ctx, d.cfg, d.projectID, d.scratchSHA, d.progress); err != nil {
@@ -623,7 +644,30 @@ func (d *doctorRun) backendReceives() doctor.Check {
 	} else if !ok {
 		return doctor.Check{Status: doctor.Warn, Inconclusive: true, Detail: detail + "; the scratch commit event was not visible via the API within " + roundTripWait.String(), Fix: "terma doctor"}
 	}
+	if len(others) > 0 {
+		return doctor.Check{Status: doctor.Warn, Detail: detail + "; round-trip confirmed for this project", Fix: othersFix}
+	}
 	return doctor.Check{Status: doctor.Pass, Detail: detail + "; round-trip confirmed"}
+}
+
+// describeFailure words one project's failed delivery with the host that refused it:
+// the host is the half of the story a developer with projects in two environments
+// cannot guess.
+func describeFailure(f projectFailure) string {
+	if _, ok := errors.AsType[*spool.IngestError](f.Err); ok {
+		return "refused by " + f.Endpoint + " (" + f.Err.Error() + ")"
+	}
+	return "not sent to " + f.Endpoint + " (" + f.Err.Error() + ")"
+}
+
+// failureFix is the next step for a failed delivery. A refused key is not a network
+// problem, and pointing at the network for one sent a developer to check a
+// connection that was working.
+func failureFix(f projectFailure) string {
+	if ingest, ok := errors.AsType[*spool.IngestError](f.Err); ok && ingest.KeyRefused() {
+		return "the key this machine holds for project " + f.ProjectID + " was refused by " + f.Endpoint + " — it may have been revoked, or belong to another environment"
+	}
+	return "check the network and " + f.Endpoint + ", then run `terma spool flush --force`"
 }
 
 // scratchCommit proves the installed hook chain works: a detached temporary

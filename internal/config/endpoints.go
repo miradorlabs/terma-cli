@@ -24,7 +24,8 @@ type Endpoints struct {
 	AppURL  string
 	// OTLPURL is the telemetry ingest host. The CLI writes it into a harness's own
 	// configuration (the harness exports there directly) and flushes its own event
-	// spool to it.
+	// spool to it for a project with no routing record; a routed project's events
+	// go to the host its record names.
 	OTLPURL string
 }
 

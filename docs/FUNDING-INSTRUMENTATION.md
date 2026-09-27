@@ -187,7 +187,10 @@ retain the existing best-effort locking fallback.
 Successful batches are acknowledged with one atomic rewrite that preserves both
 concurrent appends and held events. Cancellation before acknowledgement leaves the
 original batch for retry: delivery remains at least once, so a remotely accepted
-batch can be replayed. Sender failures retain the batch and apply backoff. There
+batch can be replayed. Each project is sent to the ingest host its routing record
+names. A project whose send fails keeps its events queued without holding up any
+other project's; the pass continues, then ends as a failure and applies backoff.
+Sender failures that are not per project retain the batch and apply backoff. There
 is no background retry timer; a later hook or `terma spool flush` triggers retry.
 The separate renderer deadline is described in the compatibility guide above.
 
