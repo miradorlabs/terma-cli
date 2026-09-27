@@ -148,7 +148,12 @@ run that reaches them opens a browser login on **production**. A script that run
   Doctor also compares PATH's executable with the running build; a mismatch can leave
   scratch events without a project binding. Only the developer's own agents
   (`config.Harnesses`; empty = all) count — a colleague's committed Codex hooks are not
-  theirs to trust.
+  theirs to trust. The scratch commit's checkout, commit and removal run under
+  `scratchGitTimeout` (2 min) through `gitx.GitWithin`, never a hook's 2-second
+  `gitx.Timeout`: a 2.7 GB checkout takes 11 s and was killed on every run, each
+  killed `worktree add` leaving a registration locked "initializing" that `prune`
+  skips. Removal forces twice for that lock, and each run first clears its own
+  abandoned ones (`<tmp>/terma-doctor-*/wt`, directory gone) — nothing else.
 - The command surface is small on purpose (`cmd/command_surface_test.go`). `terma --help`
   lists `primaryCommands` — setup, install, status, doctor, session, usage, blame, org,
   uninstall, update — and everything else is `Hidden: true`, **not removed**: login/logout/
