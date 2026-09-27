@@ -119,7 +119,7 @@ func TestDoctorChecksLiveRouteSignals(t *testing.T) {
 			if err := shim.SaveRecord(shim.Record{ProjectID: testProjectID, Endpoint: "https://otel.example.test", Signals: signals, Harnesses: []string{"claude"}}); err != nil {
 				t.Fatal(err)
 			}
-			if err := keystore.SetFor("claude", testProjectID, testServerKey); err != nil {
+			if err := keystore.SetFor("claude", testProjectID, testServerKey, keystore.Hosts{}); err != nil {
 				t.Fatal(err)
 			}
 			v := judgeHarness(gatherHarness(harness.Claude{}, testProjectID, repo), "https://otel.example.test", testProjectID)
@@ -145,7 +145,7 @@ func TestDoctorChecksOpenCodeRepositoryPolicy(t *testing.T) {
 			if err := h.Local(repo).Connect(harness.Exporter{Signals: signals}, false); err != nil {
 				t.Fatal(err)
 			}
-			if err := keystore.SetFor("opencode", testProjectID, testServerKey); err != nil {
+			if err := keystore.SetFor("opencode", testProjectID, testServerKey, keystore.Hosts{}); err != nil {
 				t.Fatal(err)
 			}
 			v := judgeHarness(gatherHarness(h, testProjectID, repo), endpoint, testProjectID)

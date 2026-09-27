@@ -1,6 +1,9 @@
 package config
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // Environment names. Only production is public: `terma` never mentions the others
 // in help output. They exist so Terma's own engineers can point the same binary at
@@ -84,4 +87,18 @@ func EndpointsFor(env string) (Endpoints, error) {
 		return Endpoints{}, fmt.Errorf("unknown environment %q (want %s, %s or %s)", env, EnvProd, EnvDev, EnvLocal)
 	}
 	return e, nil
+}
+
+// EndpointsByOTLP finds the built-in environment whose ingest host is otlpURL. A
+// project known only by the ingest host its routing record names is read back from
+// that environment's data API. Dev and local share every backend host, so the first
+// match answers for both.
+func EndpointsByOTLP(otlpURL string) (Endpoints, bool) {
+	otlpURL = strings.TrimRight(otlpURL, "/")
+	for _, name := range []string{EnvProd, EnvDev, EnvLocal} {
+		if e := environments[name]; e.OTLPURL == otlpURL {
+			return e, true
+		}
+	}
+	return Endpoints{}, false
 }

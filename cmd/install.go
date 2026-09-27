@@ -476,7 +476,7 @@ func ensureSpoolKey(ctx context.Context, cfg *config.Config) string {
 	case err != nil:
 		return held + "minting one failed (" + err.Error() + "); run `terma install` again."
 	}
-	if err := keystore.Set(cfg.ProjectID, key); err != nil {
+	if err := keystore.Set(cfg.ProjectID, key, keystore.HostsOf(cfg)); err != nil {
 		return held + "storing it failed (" + err.Error() + ")."
 	}
 	return "Project key stored for this machine's hook events (" + keystore.Mask(key) + ")."
@@ -558,7 +558,7 @@ func connectHarnessesForRepo(cmd *cobra.Command, cfg *config.Config, agents []st
 		if err != nil {
 			return fmt.Errorf("%s: %w", a, err)
 		}
-		if err := keystore.SetFor(a, cfg.ProjectID, key); err != nil {
+		if err := keystore.SetFor(a, cfg.ProjectID, key, keystore.HostsOf(cfg)); err != nil {
 			return err
 		}
 		exp := harness.Exporter{

@@ -946,6 +946,15 @@ func waitForCommitEvent(ctx context.Context, cfg *config.Config, projectID, sha 
 	// Query the project the scratch event used, independently of command overrides.
 	queryConfig := *cfg
 	queryConfig.ProjectID = projectID
+	// Read it back where it was delivered. A project in another environment than the
+	// active profile's is read from its own data API, with its own key: the signed-in
+	// credential is bound to the active profile's auth host, and asking the profile's
+	// API for the project's events found nothing on every run.
+	if api := projectAPI(cfg, projectID); api != cfg.APIURL {
+		if key := keystore.Get(projectID); key != "" {
+			queryConfig.APIURL, queryConfig.APIKey = api, key
+		}
+	}
 	client, err := newClient(&queryConfig)
 	if err != nil {
 		return false, err

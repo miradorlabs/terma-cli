@@ -15,6 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
+	"github.com/miradorlabs/terma-cli/internal/shim"
 )
 
 // Doctor's round-trip is the lookup `terma blame` makes, so it has to ask the way
@@ -112,7 +113,7 @@ func TestDoctorBackendReadErrorIsInconclusive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := keystore.Set("repo-project", "ter_srv_test"); err != nil {
+	if err := keystore.Set("repo-project", "ter_srv_test", keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
 	d := doctorRun{ctx: context.Background(), cfg: cfg, projectID: "repo-project", scratchSHA: "scratch"}
@@ -127,5 +128,93 @@ func TestDoctorSkipsBackendProbeWhenHookBinaryDiffers(t *testing.T) {
 	check := d.backendReceives()
 	if check.Status != doctor.Warn || !check.Inconclusive || check.Fix != d.binaryCheck.Fix {
 		t.Fatalf("must identify the binary mismatch before flushing or polling: %+v", check)
+	}
+}
+
+// A repository whose project lives in another environment than the active profile's
+// is read back from that environment's data API, with the project's own key. The
+// signed-in credential is bound to the profile's auth host, and asking the profile's
+// API for the project's scratch commit found nothing on every run.
+func TestWaitForCommitEventReadsTheProjectsOwnEnvironment(t *testing.T) {
+	const sha = "0123456789abcdef0123456789abcdef01234567"
+	profileAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("the active profile's API was asked for another environment's project: %s", r.URL)
+		fmt.Fprint(w, `{"logs":[]}`)
+	}))
+	t.Cleanup(profileAPI.Close)
+	var auths []string
+	var mu sync.Mutex
+	projectAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		auths = append(auths, r.Header.Get("Authorization"))
+		mu.Unlock()
+		fmt.Fprintf(w, `{"logs":[{"event_name":"terma.commit","attributes":{"sha":%q}}]}`, sha)
+	}))
+	t.Cleanup(projectAPI.Close)
+
+	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	for _, v := range []string{"TERMA_API_URL", "TERMA_AUTH_URL", "TERMA_API_KEY", "TERMA_ENV", "TERMA_PROFILE"} {
+		t.Setenv(v, "")
+	}
+	flags = globalFlags{}
+	if err := config.UpdateProfile(config.DefaultProfile, func(p *config.Profile) {
+		p.APIURL, p.AuthURL = profileAPI.URL, profileAPI.URL
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := auth.SaveCredential(config.DefaultProfile, &auth.Credential{
+		AccessToken: "ter_cli_profile", OrganizationID: "org-test", AuthURL: profileAPI.URL,
+		ExpiresAt: time.Now().Add(time.Hour),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := keystore.Set("dev-project", "ter_srv_dev", keystore.Hosts{OTLP: "http://127.0.0.1:1", API: projectAPI.URL}); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	found, err := waitForCommitEvent(ctx, cfg, "dev-project", sha, doctorProgress{})
+	if err != nil || !found {
+		t.Fatalf("waitForCommitEvent = %v, %v", found, err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(auths) != 1 || auths[0] != "Bearer ter_srv_dev" {
+		t.Fatalf("the project's API was asked with %v, want its own key", auths)
+	}
+}
+
+// Where a key's hosts were never recorded, a routing record naming another built-in
+// environment's ingest host places the project; one naming the profile's own ingest
+// host changes nothing, so a profile with a custom data API keeps it.
+func TestProjectAPIFromTheRoutingRecord(t *testing.T) {
+	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	t.Setenv("TERMA_API_URL", "")
+	flags = globalFlags{}
+	prod, _ := config.EndpointsFor(config.EnvProd)
+	dev, _ := config.EndpointsFor(config.EnvDev)
+	cfg := &config.Config{OTLPURL: prod.OTLPURL, APIURL: "https://api.custom.example"}
+	for id, endpoint := range map[string]string{"dev-project": dev.OTLPURL + "/", "prod-project": prod.OTLPURL} {
+		if err := shim.SaveRecord(shim.Record{ProjectID: id, Endpoint: endpoint, Harnesses: []string{"claude"}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := projectAPI(cfg, "dev-project"); got != dev.APIURL {
+		t.Fatalf("projectAPI(dev) = %q, want %q", got, dev.APIURL)
+	}
+	if got := projectAPI(cfg, "prod-project"); got != cfg.APIURL {
+		t.Fatalf("projectAPI(prod) = %q, want the profile's own %q", got, cfg.APIURL)
+	}
+	if got := projectAPI(cfg, "unknown-project"); got != cfg.APIURL {
+		t.Fatalf("projectAPI(unknown) = %q", got)
+	}
+	t.Setenv("TERMA_API_URL", "https://api.override.example")
+	if got := projectAPI(cfg, "dev-project"); got != cfg.APIURL {
+		t.Fatalf("an explicit TERMA_API_URL must win, got %q", got)
 	}
 }

@@ -68,20 +68,38 @@ run that reaches them opens a browser login on **production**. A script that run
   remove the sent prefix and requeue held events; cancellation leaves unacknowledged
   batches for replay. Only the flusher prunes, before its initial byte snapshot.
   A `Sender` may return events as *held* (no project key yet); they re-queue at the
-  tail and never loop within a pass. Delivery failure → exponential backoff 30s..1h.
-  Each project goes to the ingest host its routing record names (`projectEndpoint`;
-  `--otlp-url`/`TERMA_OTLP_URL` still win, no record → the profile's host): the key
-  was minted in that project's environment, and sending every project to the active
-  profile's host had a dev-deployment project's key refused by production on every
-  flush. A project whose send fails comes back as `spool.PartialDelivery`: what was
+  tail and never loop within a pass. Delivery failure → exponential backoff 30s..1h,
+  **per project**: `spool.DestinationFailed` / `RetryAt` / `DestinationDelivered`
+  (`retry.json`, written only by the router inside `Flush`, under the delivery lock).
+  The spool-wide window (`next_attempt`) is left for a sender that fails a whole batch;
+  a `spool.PartialDelivery` never opens it, and a pass that reaches every destination
+  clears one. With one window, a project whose key was refused failed every pass, the
+  window grew to an hour, and hook-started flushes delivered every other project hourly.
+  A project in its window is not asked (its events re-queue, counted as `Failed`, exit
+  3) until it closes; `--force` (doctor) ignores windows. `spool status` lists them,
+  `status` flags this project's.
+  Each project goes to its key's own environment (`projectEndpoint`, `projectAPI`):
+  `keys.json` files `hosts` per project with the key (`keystore.Set`/`SetFor` take a
+  `keystore.Hosts`, `keystore.HostsOf(cfg)` in production; a built-in environment is
+  recorded by name and resolved through the current table). A key already on file
+  keeps the hosts it came with. Order: `--otlp-url`/`TERMA_OTLP_URL` (`--api-url`/
+  `TERMA_API_URL`), the key's hosts, the routing record (for the API only when it names
+  another built-in environment's ingest host), the profile. The map is optional — keys
+  stored earlier have none and an older terma rewriting `keys.json` drops it — so a
+  missing entry means "not recorded". Sending every project to the active profile's
+  host had a dev-deployment project's key refused by production on every flush, and a
+  hooks-only project (no routing record) had no record of its environment at all.
+  A project whose send fails comes back as `spool.PartialDelivery`: what was
   delivered is acknowledged, its events re-queue like held ones, the pass carries on
   and ends as a failure. The router asks a refusing host once per pass. Before this, one
   refused project kept every other project's events queued. Doctor fails the backend
   check only on its own project's failure; another project's is a warning naming it.
+  Its round-trip reads the project's own data API with the project's key when that is
+  not the profile's (the signed-in credential belongs to the profile's auth host).
   Flushes are detached processes started by hooks: immediately after a commit or a
   session end and after end-of-turn capture (`stop`, `codex-stop`, `stop-failure`).
   Newly queued Claude status-line snapshots also trigger a flush because rendering
-  can happen after Stop. Sender failure backoff still applies.
+  can happen after Stop. A failed project's retry window still applies.
   Loss is accounted by reason, never in one bucket. `Expired` is age past `MaxAge`
   (14 days), `Pruned` is the 16 MiB disk bound, `Dropped` is a line that would not
   decode, and `Unroutable` (cmd) is an event no project id can route. Held events stay

@@ -45,6 +45,15 @@ func TestInstallGivesAHooksOnlyDeveloperAKeyToDeliverWith(t *testing.T) {
 	if !strings.Contains(out, "Project key stored") {
 		t.Fatalf("install should say it stored a key:\n%s", out)
 	}
+	// A hooks-only project has no routing record, so the key's own hosts are the only
+	// record of which environment its events belong to.
+	cfg, err := loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h, ok := keystore.HostsFor(project); !ok || h.OTLP != cfg.OTLPURL || h.API != cfg.APIURL {
+		t.Fatalf("the key was stored without its environment's hosts: %+v, %v (profile %s, %s)", h, ok, cfg.OTLPURL, cfg.APIURL)
+	}
 
 	// Once is enough: a re-install reuses the key instead of leaving a trail of them.
 	if out, err := within(20*time.Second).combined(t, "install", "--harness", "none", "--adapters", "cursor", "--yes", "--no-doctor", "--no-browser"); err != nil {
@@ -111,7 +120,7 @@ func TestInstallNeedsAuth(t *testing.T) {
 		}
 	}
 	// …or the machine already holds the project's key.
-	if err := keystore.Set(id, "ter_srv_0123456789abcdef01234567"); err != nil {
+	if err := keystore.Set(id, "ter_srv_0123456789abcdef01234567", keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
 	if installNeedsAuth([]string{"cursor"}, "", bound, true) {

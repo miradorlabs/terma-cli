@@ -138,7 +138,7 @@ func TestSpoolFlushReportsBackoffAsExitCode(t *testing.T) {
 func TestSpoolFlushThrottleIsNotAnError(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	acceptingOTLP(t)
-	if err := keystore.Set(spoolTestProject, "ter_srv_test"); err != nil {
+	if err := keystore.Set(spoolTestProject, "ter_srv_test", keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
 	s := spoolForTest(t)
@@ -168,7 +168,7 @@ func TestSpoolFlushDeliversUnderTheProjectKey(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 	t.Setenv("TERMA_OTLP_URL", srv.URL)
-	if err := keystore.Set(spoolTestProject, "ter_srv_test"); err != nil {
+	if err := keystore.Set(spoolTestProject, "ter_srv_test", keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
 	s := spoolForTest(t)

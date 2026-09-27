@@ -78,7 +78,7 @@ func e2eRouted(t *testing.T) (cfgDir, repo, codexHome string) {
 		t.Fatal(err)
 	}
 	for _, a := range []string{shim.AgentClaude, shim.AgentCodex} {
-		if err := keystore.SetFor(a, e2eProjectID, e2eKey); err != nil {
+		if err := keystore.SetFor(a, e2eProjectID, e2eKey, keystore.Hosts{}); err != nil {
 			t.Fatal(err)
 		}
 	}

@@ -57,19 +57,23 @@ type Sender interface {
 // all-or-nothing: one project whose key the ingest host refused kept every other
 // project's events queued behind it for days, and re-sent the ones that had gone
 // through on every retry. The flusher acknowledges what was delivered, puts
-// Undelivered back at the end of the queue like held events, carries on with the
-// pass, and ends it as a failure with the usual backoff.
+// Undelivered back at the end of the queue like held events, and carries on with the
+// pass. A pass that saw a failure ends as one, but opens no spool-wide backoff: the
+// sender keeps a window per destination (DestinationFailed), so the destination
+// that failed waits and no other does.
 type PartialDelivery struct {
-	// Undelivered are the events whose send failed. They stay queued.
+	// Undelivered are the events not delivered in this call. They stay queued.
 	Undelivered []Event
-	// Err is what went wrong in this call. It is nil when the sender only
-	// deferred events whose failure it already reported earlier in the pass.
+	// Err is what went wrong in this call. It is nil when the sender only deferred
+	// events to a destination whose failure is already on record — earlier in the
+	// pass, or a retry window still open — which leaves work queued without
+	// failing the pass.
 	Err error
 }
 
 func (p *PartialDelivery) Error() string {
 	if p.Err == nil {
-		return fmt.Sprintf("%d event(s) deferred after an earlier failure in this pass", len(p.Undelivered))
+		return fmt.Sprintf("%d event(s) deferred after an earlier failure", len(p.Undelivered))
 	}
 	return p.Err.Error()
 }
@@ -269,8 +273,9 @@ type Result struct {
 	// Held counts events the sender handed back for a later attempt. They are
 	// still queued, not lost.
 	Held int
-	// Failed counts events a PartialDelivery left undelivered. They are still
-	// queued, not lost; Err says why they failed.
+	// Failed counts events a PartialDelivery left undelivered: their destination
+	// failed in this pass, or is waiting out an earlier failure. They are still
+	// queued, not lost.
 	Failed int
 	// Expired counts events given up on for age: older than MaxAge, held or not.
 	// Time, not corruption.
@@ -301,7 +306,9 @@ func (r *Result) add(b batch) {
 // events stay and an exponential backoff (30s .. 1h) is recorded so a dead backend
 // is not hammered by every commit. A partial delivery (PartialDelivery) is
 // acknowledged as far as it went and the pass continues, so one destination's
-// failure never keeps another's events queued; the pass still ends as a failure.
+// failure never keeps another's events queued; the pass still ends as a failure,
+// and the backoff is the failed destination's own (DestinationFailed), not the
+// spool's.
 func (s *Spool) Flush(ctx context.Context, sender Sender, opts FlushOptions) Result {
 	timeout := opts.Timeout
 	if timeout <= 0 {
@@ -339,20 +346,12 @@ func (s *Spool) Flush(ctx context.Context, sender Sender, opts FlushOptions) Res
 	}
 
 	var res Result
-	failedAt := func() time.Time {
-		if opts.Now.IsZero() {
-			return time.Now()
-		}
-		return opts.Now
-	}
 	// A partial delivery does not end the pass: every destination that accepts its
 	// events gets them this time round. Its failures are collected here and end the
-	// pass as a failure, with the backoff, however the pass ends.
+	// pass as a failure, however the pass ends. The destinations that failed have
+	// their own windows, so none of them opens the spool-wide one.
 	var failures []error
 	stop := func(err error) Result {
-		if len(failures) > 0 {
-			s.recordFailure(failedAt())
-		}
 		res.Err = errors.Join(append(failures, err)...)
 		return res
 	}
@@ -376,11 +375,15 @@ func (s *Spool) Flush(ctx context.Context, sender Sender, opts FlushOptions) Res
 			held, err = sender.Send(ctx, batchResult.Events)
 			if partial, ok := errors.AsType[*PartialDelivery](err); ok {
 				undelivered = partial.Undelivered
-				if partial.Err != nil || len(failures) == 0 {
+				if partial.Err != nil {
 					failures = append(failures, partial)
 				}
 			} else if err != nil {
-				s.recordFailure(failedAt())
+				failureTime := opts.Now
+				if failureTime.IsZero() {
+					failureTime = time.Now()
+				}
+				s.recordFailure(failureTime)
 				res.Err = errors.Join(append(failures, err)...)
 				return res
 			}
@@ -399,12 +402,13 @@ func (s *Spool) Flush(ctx context.Context, sender Sender, opts FlushOptions) Res
 		res.Failed += len(undelivered)
 		budget -= batchResult.Consumed
 		if len(batchResult.Events) < batch || budget <= 0 {
+			// The pass reached every destination, so a spool-wide window, even one an
+			// older terma opened, has nothing left to protect.
+			s.clearBackoff()
 			if len(failures) > 0 {
-				s.recordFailure(failedAt())
 				res.Err = errors.Join(failures...)
 				return res
 			}
-			s.clearBackoff()
 			s.recordFlush(now)
 			return res
 		}

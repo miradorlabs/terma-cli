@@ -351,7 +351,7 @@ func connectGlobal(cmd *cobra.Command, name string, f connectFlags) error {
 	// Remember the key per harness and per project, so the spool can deliver this
 	// project's events and a later `terma install` for this project reuses the key
 	// without minting again.
-	if err := keystore.SetFor(h.Name(), cfg.ProjectID, key); err != nil {
+	if err := keystore.SetFor(h.Name(), cfg.ProjectID, key, keystore.HostsOf(cfg)); err != nil {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not store the project key for the spool (%v); `terma spool flush` will not deliver until it is stored.\n", err)
 	}
 	statusLineNote := ""

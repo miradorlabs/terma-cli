@@ -44,11 +44,12 @@ func newSpoolFlushCommand() *cobra.Command {
 The exit status distinguishes the outcomes a script needs apart:
 
   0  everything queued was delivered (including "nothing was queued")
-  1  delivery failed for at least one project; its events stay queued, every
-     other project's are delivered, and a backoff is recorded
+  1  delivery failed for at least one project; its events stay queued and that
+     project backs off on its own, while every other project's are delivered
   2  nothing was attempted: an earlier failure's retry window is open (--force overrides)
-  3  the pass ran but left work: events held for a project key, or given up on
-     for age, disk pressure, or being unreadable`,
+  3  the pass ran but left work: events held for a project key or waiting out
+     their project's retry window (--force overrides), or given up on for age,
+     disk pressure, or being unreadable`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			res, err := flushSpool(cmd.Context(), force, minInterval)
 			// A background flush has no reader and no caller to inform.
@@ -72,9 +73,9 @@ The exit status distinguishes the outcomes a script needs apart:
 			if res.Err != nil {
 				return res.Err
 			}
-			// Held events are still queued, and every other counter is a loss:
-			// either way this pass did not finish what it was asked to do.
-			if res.Held > 0 || res.Lost() {
+			// Held and waiting events are still queued, and every other counter is
+			// a loss: either way this pass did not finish what it was asked to do.
+			if res.Held > 0 || res.Failed > 0 || res.Lost() {
 				return exitWith(ExitIncomplete)
 			}
 			return nil
@@ -99,6 +100,14 @@ func describeFlush(res flushResult) (delivered string, undelivered []string) {
 	}
 	if res.Failed > 0 {
 		undelivered = append(undelivered, fmt.Sprintf("keeping %d queued after a failed delivery", res.Failed))
+	}
+	for _, f := range res.Failures {
+		if !f.RetryAt.IsZero() {
+			undelivered = append(undelivered, fmt.Sprintf("retrying project %s after %s", f.ProjectID, f.RetryAt.Local().Format(time.Kitchen)))
+		}
+	}
+	for _, w := range res.Waiting {
+		undelivered = append(undelivered, fmt.Sprintf("retrying project %s after %s", w.ProjectID, w.RetryAt.Local().Format(time.Kitchen)))
 	}
 	if res.Expired > 0 {
 		undelivered = append(undelivered, fmt.Sprintf("expired %d past the spool's age limit", res.Expired))
@@ -132,6 +141,10 @@ func newSpoolStatusCommand() *cobra.Command {
 			fmt.Fprintf(out, "Queued events:   %d (%d KB)\n", n, size/1024)
 			if next := s.NextAttempt(); !next.IsZero() && time.Now().Before(next) {
 				fmt.Fprintf(out, "Backing off:     until %s (last delivery failed)\n", next.Local().Format(time.Kitchen))
+			}
+			windows := s.RetryWindows(time.Now())
+			for _, id := range slices.Sorted(maps.Keys(windows)) {
+				fmt.Fprintf(out, "Retrying:        project %s after %s — its last delivery failed (`terma spool flush --force` retries now)\n", id, windows[id].Local().Format(time.Kitchen))
 			}
 			keys := keystore.Projects()
 			sort.Strings(keys)
@@ -169,14 +182,25 @@ type flushResult struct {
 	// Failures names each project whose send failed, once per pass, in the order
 	// they failed. Doctor reads it to tell its own project's failure from another's.
 	Failures []projectFailure
+	// Waiting names each project that was not asked this pass because an earlier
+	// failure's window was still open (never under --force).
+	Waiting []projectWait
 	// Endpoints are the ingest hosts that accepted events, sorted.
 	Endpoints []string
 }
 
-// projectFailure is one project's refused or failed delivery.
+// projectFailure is one project's refused or failed delivery, and when that project
+// will next be tried (zero when the pass ran out of time rather than failing).
 type projectFailure struct {
 	ProjectID, Endpoint string
 	Err                 error
+	RetryAt             time.Time
+}
+
+// projectWait is a project whose events stayed queued, unsent, until RetryAt.
+type projectWait struct {
+	ProjectID string
+	RetryAt   time.Time
 }
 
 // failureFor returns the failure recorded for projectID, if any.
@@ -201,7 +225,8 @@ func (r flushResult) Lost() bool {
 // are held for a later flush; ones with no project at all can never be routed, and
 // are counted apart from events that simply aged out so the two failures stay
 // distinguishable. A project whose send fails keeps its events queued without
-// holding up any other project's (spool.PartialDelivery).
+// holding up any other project's (spool.PartialDelivery), and backs off on its own:
+// until its window closes it is not asked again, unless force says to.
 func flushSpool(ctx context.Context, force bool, minInterval time.Duration) (flushResult, error) {
 	s := openSpool()
 	if s == nil {
@@ -214,6 +239,7 @@ func flushSpool(ctx context.Context, force bool, minInterval time.Duration) (flu
 	var res flushResult
 	now := time.Now()
 	failed := map[string]bool{}
+	waiting := map[string]bool{}
 	accepted := map[string]bool{}
 	router := spool.SenderFunc(func(ctx context.Context, events []spool.Event) ([]spool.Event, error) {
 		byProject := map[string][]spool.Event{}
@@ -244,15 +270,31 @@ func flushSpool(ctx context.Context, force bool, minInterval time.Duration) (flu
 				undelivered = append(undelivered, batch...)
 				continue
 			}
+			if next := s.RetryAt(id); !force && now.Before(next) {
+				// Its last send failed and its window is still open. It waits
+				// without holding up any other project, and without asking again.
+				if !waiting[id] {
+					waiting[id] = true
+					res.Waiting = append(res.Waiting, projectWait{ProjectID: id, RetryAt: next})
+				}
+				undelivered = append(undelivered, batch...)
+				continue
+			}
 			endpoint := projectEndpoint(cfg, id)
 			sender := &spool.OTLPSender{Endpoint: endpoint, APIKey: key, ProjectID: id, Version: Version}
 			if _, err := sender.Send(ctx, batch); err != nil {
 				failed[id] = true
-				res.Failures = append(res.Failures, projectFailure{ProjectID: id, Endpoint: endpoint, Err: err})
+				f := projectFailure{ProjectID: id, Endpoint: endpoint, Err: err}
+				// A pass cut short by its own deadline learned nothing about the host.
+				if ctx.Err() == nil {
+					f.RetryAt = s.DestinationFailed(id, time.Now())
+				}
+				res.Failures = append(res.Failures, f)
 				errs = append(errs, fmt.Errorf("%s (%s): %w", id, endpoint, err))
 				undelivered = append(undelivered, batch...)
 				continue
 			}
+			s.DestinationDelivered(id, time.Now())
 			accepted[endpoint] = true
 			res.Sent += len(batch)
 		}
@@ -279,23 +321,46 @@ func flushSpool(ctx context.Context, force bool, minInterval time.Duration) (flu
 	return res, nil
 }
 
-// projectEndpoint is the ingest host a project's events are delivered to: the one
-// its routing record names, because the project's key was minted in that project's
-// environment and only that environment's ingest host accepts it. Sending every
-// project to the active profile's host had a developer with one repository bound
-// to a dev-deployment project and another to a production one refused with
-// "invalid OTLP API key" on every flush, while their agents, which read the record,
-// exported without trouble. An explicit --otlp-url or TERMA_OTLP_URL still wins. A
-// project with no record (routed by nothing that `terma install` records: OpenCode's
-// plugin, or hooks-only agents) goes to the active profile's host, as before.
+// projectEndpoint is the ingest host a project's events are delivered to: the one its
+// key was stored with, because the key was minted in that project's environment and
+// only that environment's ingest host accepts it. Sending every project to the active
+// profile's host had a developer with one repository bound to a dev-deployment project
+// and another to a production one refused with "invalid OTLP API key" on every flush,
+// while their agents, which read the routing record, exported without trouble. An
+// explicit --otlp-url or TERMA_OTLP_URL still wins. A key stored before its hosts were
+// recorded falls back to the routing record `terma install` writes for a telemetry
+// agent, and a project with neither to the active profile's host.
 func projectEndpoint(cfg *config.Config, projectID string) string {
 	if flags.otlpURL != "" || os.Getenv("TERMA_OTLP_URL") != "" {
 		return cfg.OTLPURL
+	}
+	if h, ok := keystore.HostsFor(projectID); ok && h.OTLP != "" {
+		return h.OTLP
 	}
 	if rec, ok, err := shim.LoadRecord(projectID); err == nil && ok && rec.Endpoint != "" {
 		return strings.TrimRight(rec.Endpoint, "/")
 	}
 	return cfg.OTLPURL
+}
+
+// projectAPI is the data API a project's events are read back from: its key's
+// environment, like projectEndpoint. A key stored before its hosts were recorded is
+// placed by its routing record — only when that names another built-in environment's
+// ingest host, since a profile with a custom data API and the stock ingest host would
+// otherwise be sent to the stock API. An explicit --api-url or TERMA_API_URL wins.
+func projectAPI(cfg *config.Config, projectID string) string {
+	if flags.apiURL != "" || os.Getenv("TERMA_API_URL") != "" {
+		return cfg.APIURL
+	}
+	if h, ok := keystore.HostsFor(projectID); ok && h.API != "" {
+		return h.API
+	}
+	if rec, ok, err := shim.LoadRecord(projectID); err == nil && ok && strings.TrimRight(rec.Endpoint, "/") != cfg.OTLPURL {
+		if e, ok := config.EndpointsByOTLP(rec.Endpoint); ok {
+			return e.APIURL
+		}
+	}
+	return cfg.APIURL
 }
 
 // queuedByRouting splits the queued events by what delivery can do with them: how
