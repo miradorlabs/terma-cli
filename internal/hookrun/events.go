@@ -66,6 +66,13 @@ const EventToolCall = "terma.tool.call"
 // bounded by the consent that already governs content: see codexRepliesConsented.
 const EventAssistantMessage = "terma.assistant.message"
 
+// EventSessionTitle is the name a coding agent gave the session, for an agent that keeps
+// it only on the developer's disk. Today that is Codex: its title comes from a hidden side
+// conversation that exports neither its answer nor which thread it names, and lands in
+// $CODEX_HOME/session_index.jsonl (harness.ReadCodexThreadTitle). A rename is a new event
+// with a later time. It travels under the consent a reply does.
+const EventSessionTitle = "terma.session.title"
+
 // AttrProjectID is the event attribute carrying the project binding.
 const AttrProjectID = "project_id"
 
@@ -104,6 +111,8 @@ const (
 	sourceAntigravityHook = "antigravity_hook"
 	sourceCodexRollout    = "codex_rollout"
 	sourceCodexHook       = "codex_hook"
+	// sourceCodexSessionIndex is $CODEX_HOME/session_index.jsonl, where Codex names threads.
+	sourceCodexSessionIndex = "codex_session_index"
 )
 
 // Values of evidence_status and of the per-facet *_status attributes. The harness

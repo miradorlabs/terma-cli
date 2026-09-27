@@ -66,6 +66,7 @@ func CodexNotify(ctx context.Context, env Env) error {
 	env.captureCodexFunding(ctx, r, turn)
 	env.captureCodexDesktopActivity(ctx, r, turn)
 	env.captureCodexReplies(ctx, r, turn)
+	env.captureCodexTitle(ctx, r, turn)
 	// Not announce: notify fires at the end of every turn and does not age out manifests.
 	sess := env.newSession(r, id, codexTool, n.Model)
 	env.setActive(r, sess)
@@ -202,8 +203,8 @@ func CodexUserPromptSubmit(ctx context.Context, env Env) error {
 	return nil
 }
 
-// CodexStop drains the thread's quota observations, and what Codex said this turn,
-// before starting delivery.
+// CodexStop drains the thread's quota observations, what Codex said this turn and the
+// name it gave the thread, before starting delivery.
 func CodexStop(ctx context.Context, env Env) error {
 	in, err := readCodexHookInput(env.Stdin)
 	if err != nil {
@@ -218,6 +219,7 @@ func CodexStop(ctx context.Context, env Env) error {
 	env.captureCodexFunding(ctx, r, in)
 	env.captureCodexDesktopActivity(ctx, r, in)
 	env.captureCodexReplies(ctx, r, in)
+	env.captureCodexTitle(ctx, r, in)
 	return nil
 }
 
@@ -247,6 +249,7 @@ func CodexSessionEnd(ctx context.Context, env Env) error {
 	env.captureCodexFunding(ctx, r, in)
 	env.captureCodexDesktopActivity(ctx, r, in)
 	env.captureCodexReplies(ctx, r, in) // whatever a busy Stop left as backlog
+	env.captureCodexTitle(ctx, r, in)
 	env.endSession(r, in.SessionID, codexTool, in.Reason)
 	return nil
 }
