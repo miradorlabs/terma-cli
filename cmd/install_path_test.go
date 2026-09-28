@@ -121,6 +121,11 @@ func TestInstallWrapperHintNamesOneFile(t *testing.T) {
 	if !strings.Contains(out, "so the agents route to this repo's project, then run `source ~/.zshrc` in this terminal") {
 		t.Fatalf("install should end with what to do with the functions:\n%s", out)
 	}
+	// Lines to paste sit four spaces in under their step, the PATH line and the functions
+	// alike, so a block reads as one; the step's own text is indented five.
+	if !strings.Contains(out, "\n         codex() {") || !strings.Contains(out, "\n         # terma per-repo routing") {
+		t.Fatalf("the functions should be indented as a block under their step:\n%s", out)
+	}
 }
 
 // `source` is not POSIX: a dash or BusyBox ash user is told `.`.
