@@ -34,6 +34,7 @@ coverage.
 | Metrics | Actual point values and dimensions, not just names; exact token/cache/reasoning totals, Claude session count and cost agreement with request logs, Codex request/tool counts and duration histograms |
 | Hooks | Actual delivered session-start/end records with matching session/project identity; queued events alone do not satisfy delivery |
 | Content excluded | Both content switches exercised through `terma connect`; prompt/reply markers absent from **all** exports; Claude tool content absent; Codex tool output excluded (Codex still exports arguments) |
+| Per-repository route (Claude) | `install-content` / `install-redacted`: `terma install` routes Claude with nothing exporting machine-wide, and the run is launched through terma's shim, which hands Claude the route as `--settings`. The same contract holds for install's default (prompts and responses sent) and for `--prompts off --exclude-tool-content` |
 | Failures | Claude HTTP 400: native API-error fields, ERROR request span and StopFailure delivery |
 
 `live/golden/{claude,codex}/telemetry-{content,redacted}.json` lists the required
@@ -60,8 +61,11 @@ metric values, malformed histogram buckets and broken trace parents.
 
 ## Scope and known limits
 
-These scenarios exercise CLI exporters configured through `terma connect`, not
-Desktop/app-server launch paths or the complete per-repository shim launch flow.
+These scenarios exercise CLI exporters configured through `terma connect`, and
+Claude's per-repository route through `terma install` and its shim. They do not cover
+Desktop/app-server launch paths, Codex's per-repository route (runtime `-c` overrides),
+or install signing in: the routed scenarios use a server key and a stand-in for the API
+gateway's `/v1/identity`, with the key on file from an earlier connect.
 They verify the OTLP boundary, not backend parsing or storage. They do not claim
 coverage of every conditional vendor event: hosted tools, WebSockets, MCP,
 subagents, compaction, user-denied approvals and subscription quota changes need

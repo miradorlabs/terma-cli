@@ -17,6 +17,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -72,6 +74,10 @@ type Sandbox struct {
 	ExcludeContent bool
 
 	claudeConnected, codexConnected bool
+	// claudeRouted says Claude exports through the per-repository route `terma install`
+	// sets up (RouteClaude), so a run launches it through terma's shim and never
+	// connects it machine-wide.
+	claudeRouted bool
 }
 
 // Option adjusts a sandbox before it is configured.
@@ -202,6 +208,60 @@ func (sb *Sandbox) connectHarness(name string) {
 	sb.terma(sb.Repo, args...)
 }
 
+// RouteClaude points Claude Code at the receiver the way `terma install` does for a
+// developer, instead of a machine-wide connect: a per-repository route that terma's
+// shim hands Claude as --settings. With ExcludeContent it passes the switches install
+// offers (`--prompts off`, `--exclude-tool-content`); without, it passes none, so the
+// route carries install's own default. install with an agent needs a key it can reuse and
+// the project its server key belongs to. The key comes from a connect that is then
+// undone — disconnect keeps it, as it does for a developer moving between repositories —
+// and the project from a stand-in for the API gateway's /v1/identity, the one request a
+// server-key install makes.
+func (sb *Sandbox) RouteClaude() {
+	sb.T.Helper()
+	if sb.Mode != Isolated {
+		sb.T.Fatal("RouteClaude needs an isolated sandbox: real-login runs pass their own --settings, which the shim leaves alone")
+	}
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/identity" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, `{"project_id":%q,"organization_id":"org_live"}`, sb.ProjectID)
+	}))
+	sb.T.Cleanup(api.Close)
+	sb.terma(sb.Repo, "connect", "claude", "--project", sb.ProjectID, "--api-key", liveKey, "--yes", "--otlp-url", sb.Receiver.URL())
+	sb.terma(sb.Repo, "disconnect", "claude", "--yes")
+	// Nothing machine-wide may export any more, or a pass would not say the route works.
+	if user, err := os.ReadFile(filepath.Join(sb.ClaudeConfig, "settings.json")); err == nil &&
+		(bytes.Contains(user, []byte("OTEL_EXPORTER_OTLP_ENDPOINT")) || bytes.Contains(user, []byte("CLAUDE_CODE_ENABLE_TELEMETRY"))) {
+		sb.T.Fatalf("disconnect left Claude exporting machine-wide:\n%s", user)
+	}
+	args := []string{"install", "--project", sb.ProjectID, "--harness", "claude", "--yes", "--no-browser", "--no-doctor"}
+	if sb.ExcludeContent {
+		args = append(args, "--prompts", "off", "--exclude-tool-content")
+	}
+	sb.termaWith([]string{"TERMA_API_KEY=" + liveKey, "TERMA_API_URL=" + api.URL}, sb.Repo, args...)
+	sb.claudeRouted = true
+}
+
+// ensureClaudeExport connects Claude machine-wide unless the scenario routed it.
+func (sb *Sandbox) ensureClaudeExport() {
+	if !sb.claudeRouted {
+		sb.connectClaude()
+	}
+}
+
+// claudeLauncher is what a run starts: the build under test, or terma's shim for it
+// when the scenario routed Claude — the shim finds that build on PATH itself.
+func (sb *Sandbox) claudeLauncher() string {
+	if sb.claudeRouted {
+		return filepath.Join(sb.TermaConfig, "shim", "bin", "claude")
+	}
+	return sb.Claude.Path
+}
+
 // termaEnv is the environment terma itself runs with: its scratch config and
 // the scratch harness config, so it writes there and nowhere else.
 func (sb *Sandbox) termaEnv() []string {
@@ -303,12 +363,18 @@ func (sb *Sandbox) HookPayloads(event string) []map[string]any {
 
 func (sb *Sandbox) terma(dir string, args ...string) string {
 	sb.T.Helper()
+	return sb.termaWith(nil, dir, args...)
+}
+
+// termaWith is terma with extra environment for this one command.
+func (sb *Sandbox) termaWith(env []string, dir string, args ...string) string {
+	sb.T.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, sb.Terma, args...)
 	cmd.WaitDelay = 2 * time.Second
 	cmd.Dir = dir
-	cmd.Env = sb.termaEnv()
+	cmd.Env = append(sb.termaEnv(), env...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		sb.T.Fatalf("terma %s: %v\n%s", strings.Join(args, " "), err, out)

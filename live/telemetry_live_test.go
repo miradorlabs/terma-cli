@@ -16,14 +16,32 @@ const telemetryCommand = "printf TERMA_TELEMETRY_TOOL"
 
 // These scenarios use real harnesses and exporters with deterministic provider
 // responses. No provider credentials, model compliance or paid calls are needed.
+//
+// Claude runs two ways. content/redacted connect it machine-wide (`terma connect`
+// and its content switches). install-content/install-redacted route it the way `terma
+// install` does for a developer: a per-repository route handed to Claude by terma's shim
+// as --settings — install's own default, which sends prompts and responses, and the
+// `--prompts off` its checklist names to stop them.
 func TestClaudeTelemetry(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, newest bool) {
-		for _, exclude := range []bool{false, true} {
-			t.Run(map[bool]string{false: "content", true: "redacted"}[exclude], func(t *testing.T) {
+		for _, tc := range []struct {
+			name            string
+			exclude, routed bool
+		}{
+			{"content", false, false},
+			{"redacted", true, false},
+			{"install-content", false, true},
+			{"install-redacted", true, true},
+		} {
+			exclude := tc.exclude
+			t.Run(tc.name, func(t *testing.T) {
 				track(t)
 				t.Setenv("ANTHROPIC_API_KEY", "synthetic-telemetry-key")
 				sb := New(t, Isolated, WithClaude(b))
 				sb.ExcludeContent = exclude
+				if tc.routed {
+					sb.RouteClaude()
+				}
 				var calls atomic.Int32
 				provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					if !strings.HasPrefix(r.URL.Path, "/v1/messages") {
