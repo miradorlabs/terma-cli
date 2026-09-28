@@ -304,6 +304,12 @@ run that reaches them opens a browser login on **production**. A script that run
   policy is the only thing that can make it send, and `status`/`doctor` read it back
   that way. Codex cannot be narrowed (one config file, no project otel), so setup
   connects it everywhere and says so rather than silencing it.
+- Prompt capture (`resolvePrompts`): `--prompts on|off` (`--exclude-prompts` is the older,
+  hidden spelling); otherwise an interactive install with an exporting agent asks, the
+  default being this developer's last answer for the project (`shim.Record.IncludePrompts`,
+  on for a first install), and `--yes` keeps that answer. It lands in the routing record
+  and a newly written repository policy; only an explicit `--prompts` rewrites an existing
+  committed policy (`updatePolicy`). A bare re-install used to switch prompts back on.
 - `terma install` writes the repository half of that arrangement by default into the
   same committed `.claude/settings.json` the hooks live in, after the hook plan applies
   so both merges land in order. Re-running install preserves an existing policy unless

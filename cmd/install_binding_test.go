@@ -210,3 +210,58 @@ func TestInstallStampsTheVersionOnlyWhenItWritesCommittedFiles(t *testing.T) {
 		t.Fatalf("an install that rewrote the hooks left terma_version at %q, want %q", got.Install.Version, Version)
 	}
 }
+
+// --prompts is the one switch for whether the developer's agents send what was said, and
+// the answer sticks: a re-install without it keeps the last one instead of switching
+// prompts back on, which is what re-running install used to do.
+func TestInstallPromptsSwitchSticks(t *testing.T) {
+	acme := projectsIn(orgA().ID)[0]
+	boundRepo(t, termaproject.Project{ID: acme.ID, Name: acme.Name, OrganizationID: orgA().ID}, true)
+	prompts := func() bool {
+		t.Helper()
+		rec, ok, err := shim.LoadRecord(acme.ID)
+		if err != nil || !ok {
+			t.Fatalf("no routing record: ok=%v err=%v", ok, err)
+		}
+		return rec.IncludePrompts
+	}
+	for _, step := range []struct {
+		args []string
+		want bool
+	}{
+		{[]string{"--yes"}, true}, // a first install sends them
+		{[]string{"--yes", "--prompts", "off"}, false},
+		{[]string{"--yes"}, false}, // kept, not re-defaulted
+		{[]string{"--yes", "--prompts", "on"}, true},
+		{[]string{"--yes", "--exclude-prompts"}, false}, // the older spelling still works
+	} {
+		if out, err := routeCodex(t, step.args...); err != nil {
+			t.Fatalf("install %v: %v\n%s", step.args, err, out)
+		}
+		if got := prompts(); got != step.want {
+			t.Fatalf("after install %v: prompts included = %v, want %v", step.args, got, step.want)
+		}
+	}
+	if _, err := routeCodex(t, "--yes", "--prompts", "maybe"); err == nil || !strings.Contains(err.Error(), "want on or off") {
+		t.Fatalf("--prompts maybe: %v", err)
+	}
+	if _, err := routeCodex(t, "--yes", "--prompts", "on", "--exclude-prompts"); err == nil || !strings.Contains(err.Error(), "disagree") {
+		t.Fatalf("--prompts on --exclude-prompts: %v", err)
+	}
+}
+
+func TestYesAnswer(t *testing.T) {
+	for _, c := range []struct {
+		line string
+		def  bool
+		want bool
+	}{
+		{"\n", true, true}, {"\n", false, false},
+		{"y\n", false, true}, {"YES\n", false, true},
+		{"n\n", true, false}, {"nah\n", true, false}, // a typo is never a yes
+	} {
+		if got := yesAnswer(c.line, c.def); got != c.want {
+			t.Errorf("yesAnswer(%q, %v) = %v, want %v", c.line, c.def, got, c.want)
+		}
+	}
+}

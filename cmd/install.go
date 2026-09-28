@@ -39,9 +39,12 @@ type installFlags struct {
 	noStatusLine bool
 	// noPath keeps install out of the shell startup file: it prints the PATH line for the
 	// developer to place instead of offering to write it.
-	noPath             bool
-	identity           string
-	signals            string
+	noPath   bool
+	identity string
+	signals  string
+	// prompts is --prompts: "on", "off", or "" (ask on a terminal, else keep what this
+	// developer chose for the project last time, on for a first install).
+	prompts            string
 	excludePrompts     bool
 	excludeToolContent bool
 	updatePolicy       bool
@@ -87,7 +90,7 @@ only Git has version-control integration. Bare repositories are not workspaces.
 The keys and per-project configuration live in your home directory; the committed
 .terma/settings.json only names the project.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			f.updatePolicy = cmd.Flags().Changed("signals") || cmd.Flags().Changed("exclude-prompts") || cmd.Flags().Changed("exclude-tool-content")
+			f.updatePolicy = cmd.Flags().Changed("signals") || cmd.Flags().Changed("prompts") || cmd.Flags().Changed("exclude-prompts") || cmd.Flags().Changed("exclude-tool-content")
 			return runInstall(cmd, f)
 		},
 	}
@@ -101,7 +104,10 @@ The keys and per-project configuration live in your home directory; the committe
 	cmd.Flags().BoolVar(&f.noStatusLine, "no-statusline", false, "do not wrap Claude Code's status line (which captures the plan's rate-limit windows)")
 	cmd.Flags().StringVar(&f.identity, "identity", "", "identity stamped on Codex/OpenCode sessions (default: git user.email; \"none\" to omit)")
 	cmd.Flags().StringVar(&f.signals, "signals", "", "comma-separated signals to export: traces, logs, metrics (default all)")
+	cmd.Flags().StringVar(&f.prompts, "prompts", "", "send prompt text and model responses: on or off (default: ask, keeping your last answer for this project)")
 	cmd.Flags().BoolVar(&f.excludePrompts, "exclude-prompts", false, "do not export prompt text or model responses")
+	// --exclude-prompts is --prompts off, kept working for the scripts that pass it.
+	_ = cmd.Flags().MarkHidden("exclude-prompts")
 	cmd.Flags().BoolVar(&f.excludeToolContent, "exclude-tool-content", false, "do not export tool parameters, input, or output")
 	cmd.Flags().BoolVar(&f.noBrowser, "no-browser", false, "print the sign-in URL instead of opening a browser")
 	cmd.Flags().BoolVar(&f.dryRun, "dry-run", false, "show what would change without writing anything")
@@ -205,6 +211,15 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	if cfg.Environment != config.EnvProd {
 		fmt.Fprintf(out, "Environment: %s\n", cfg.Environment)
 	}
+
+	// Whether the developer's agents send what was said, asked here — once the project is
+	// known, so the last answer for it is the default — and carried as excludePrompts to
+	// the routing record and any repository policy written below.
+	include, err := resolvePrompts(cmd, cfg.ProjectID, agents, f)
+	if err != nil {
+		return err
+	}
+	f.excludePrompts = !include
 
 	// The hook plan — the commit hooks and the agents' own hooks, into committed files —
 	// is built once, before anything is written, so a dry run prints exactly the plan an
@@ -411,6 +426,45 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	fmt.Fprintf(out, "\n%s\n", style.For(out).Bold("Verifying the chain (terma doctor):"))
 	executeDoctor(cmd, false)
 	return nil
+}
+
+// resolvePrompts decides whether the developer's agents send prompt text and model
+// responses: --prompts (or the older --exclude-prompts) when given; else, on a terminal
+// with an agent that exports, the question, defaulting to the answer this developer gave
+// for the project last time (its routing record) and on for a first install; else that
+// same default. Re-running install without the flag used to switch prompts back on.
+func resolvePrompts(cmd *cobra.Command, projectID string, agents []string, f installFlags) (bool, error) {
+	explicit := strings.ToLower(strings.TrimSpace(f.prompts))
+	excluded := cmd.Flags().Changed("exclude-prompts") && f.excludePrompts
+	switch explicit {
+	case "on":
+		if excluded {
+			return false, errors.New("--prompts on and --exclude-prompts disagree; pass one")
+		}
+		return true, nil
+	case "off":
+		return false, nil
+	case "":
+	default:
+		return false, fmt.Errorf("--prompts %q: want on or off", f.prompts)
+	}
+	if excluded {
+		return false, nil
+	}
+	current := true
+	if rec, ok, err := shim.LoadRecord(projectID); err == nil && ok && projectID != "" {
+		current = rec.IncludePrompts
+	}
+	var exporting []string
+	for _, a := range telemetryAgentNames(agents) {
+		if _, err := harness.Lookup(a); err == nil {
+			exporting = append(exporting, a)
+		}
+	}
+	if len(exporting) == 0 || f.assumeYes || f.dryRun || !canPrompt() {
+		return current, nil
+	}
+	return confirmDefault(cmd, "Include prompt text and model responses in what "+joinNames(adapterDisplayNames(exporting))+" send?", current)
 }
 
 // installNeedsAuth reports whether install must obtain a credential: to point a

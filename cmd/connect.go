@@ -633,13 +633,22 @@ func installStatusLine(errOut io.Writer) string {
 // assuming yes: this command writes a credential into a config file, and a piped
 // invocation that meant to be non-interactive should say so with --yes.
 func confirm(cmd *cobra.Command, question string) (bool, error) {
+	return confirmDefault(cmd, question, true)
+}
+
+// confirmDefault is confirm with the answer a bare Enter gives: yes when def, else no.
+func confirmDefault(cmd *cobra.Command, question string, def bool) (bool, error) {
 	if !output.Interactive() {
 		return false, fmt.Errorf("%s — no terminal to confirm on; pass --yes to proceed non-interactively", question)
 	}
 
 	errOut := cmd.ErrOrStderr()
 	p := style.For(errOut)
-	fmt.Fprintf(errOut, "%s %s %s ", p.Brand("?"), p.Bold(question), p.Dim("[Y/n]"))
+	hint := "[Y/n]"
+	if !def {
+		hint = "[y/N]"
+	}
+	fmt.Fprintf(errOut, "%s %s %s ", p.Brand("?"), p.Bold(question), p.Dim(hint))
 	line, err := bufio.NewReader(cmd.InOrStdin()).ReadString('\n')
 	if err != nil {
 		// EOF with nothing typed is a decline, not a crash.
@@ -648,12 +657,19 @@ func confirm(cmd *cobra.Command, question string) (bool, error) {
 		}
 		return false, fmt.Errorf("read confirmation: %w", err)
 	}
+	return yesAnswer(line, def), nil
+}
+
+// yesAnswer reads a typed answer: y or yes is yes, nothing is def, and anything else —
+// a typo included — is no, so a mistyped answer never agrees to something.
+func yesAnswer(line string, def bool) bool {
 	switch strings.ToLower(strings.TrimSpace(line)) {
-	case "", "y", "yes":
-		return true, nil
-	default:
-		return false, nil
+	case "y", "yes":
+		return true
+	case "":
+		return def
 	}
+	return false
 }
 
 func containsSignal(signals []harness.Signal, want harness.Signal) bool {

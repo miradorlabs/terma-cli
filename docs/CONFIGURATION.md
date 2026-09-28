@@ -101,8 +101,14 @@ terma connect claude \
 require repositories to opt in with `--exports repos`. `terma install` enables repository telemetry by default, including for this arrangement.
 It writes a reviewable policy alongside the agent hooks, keeping endpoints and keys out
 of the repository. Reinstalling preserves an existing policy; use `--signals`,
-`--exclude-prompts`, and `--exclude-tool-content` to change what the repository sends.
+`--prompts on|off`, and `--exclude-tool-content` to change what the repository sends.
 Restart Claude Code after installing so the session loads the new settings.
+
+Whether your own agents send prompt text and model responses is asked on every
+interactive install, defaulting to your last answer for that project (on for a first
+install). `terma install --prompts off` or `--prompts on` changes it without the
+question; `--yes` keeps the last answer. The answer is yours: it changes the repository's
+committed policy only when you pass `--prompts` explicitly.
 
 Codex ignores project-level OTEL configuration, so direct `terma connect codex` is
 machine-wide. `terma install` instead routes each launch using runtime `-c` overrides
@@ -187,8 +193,8 @@ something rewrites it. So once the new version is in place, `terma update` runs 
 It works only from what is on disk. It never signs in, never creates a file (one that is
 gone was removed on purpose and stays gone; `terma install` brings it back), and never
 changes a choice — unlike re-running `terma install`, which puts every flag it does not
-record (`--signals`, `--exclude-prompts`, `--identity`, `--no-statusline`,
-`--activation`) back to its default. The repository files it changes are listed to
+record (`--signals`, `--identity`, `--no-statusline`, `--activation`) back to its
+default. The repository files it changes are listed to
 commit.
 
 ### Migrating saved state
