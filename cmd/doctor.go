@@ -276,7 +276,7 @@ func shimPathFix() string {
 	}
 	switch state, _ := rc.State(); state {
 	case shim.RCLast:
-		return "open a new terminal — " + tildePath(rc.Path) + " already puts the shims first, and this shell started before it did"
+		return "run `" + reloadCommand(tildePath(rc.Path)) + "` or open a new terminal — " + tildePath(rc.Path) + " already puts the shims first, and this shell started before it did"
 	case shim.RCOvertaken:
 		return "terma install (a later line in " + tildePath(rc.Path) + " puts the real binaries back in front; install moves terma's line to the end)"
 	}

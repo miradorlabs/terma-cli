@@ -54,6 +54,11 @@ func TestInstallPutsTheShimsOnPath(t *testing.T) {
 	if !strings.Contains(out, "~/.zshrc") || !strings.Contains(out, "new terminal") {
 		t.Fatalf("install should say where it wrote and what is left to do:\n%s", out)
 	}
+	// terma cannot change the PATH of the shell that ran it, so the last thing install
+	// says is how to make this one read the file.
+	if !strings.Contains(out, "Next step: run `source ~/.zshrc` in this terminal") {
+		t.Fatalf("install should end with the command that reloads this shell:\n%s", out)
+	}
 }
 
 // --no-path keeps install out of the startup file, and the line it prints says the one
@@ -65,6 +70,9 @@ func TestInstallNoPathPrintsTheLineInstead(t *testing.T) {
 	}
 	if !strings.Contains(out, "LAST line") || !strings.Contains(out, "export PATH=") {
 		t.Fatalf("install should print the line and where it goes:\n%s", out)
+	}
+	if !strings.Contains(out, "Next step: add the PATH line above to the end of ~/.zshrc, then run `source ~/.zshrc`") {
+		t.Fatalf("install should end with what to do with the line:\n%s", out)
 	}
 }
 
@@ -109,6 +117,21 @@ func TestInstallWrapperHintNamesOneFile(t *testing.T) {
 	out, _ := routedInstall(t, "--activation", "wrapper")
 	if !strings.Contains(out, "Add these to your ~/.zshrc so the agents route") {
 		t.Fatalf("the wrapper hint should name zsh's startup file:\n%s", out)
+	}
+	if !strings.Contains(out, "Next step: add the functions above to ~/.zshrc, then run `source ~/.zshrc`") {
+		t.Fatalf("install should end with what to do with the functions:\n%s", out)
+	}
+}
+
+// `source` is not POSIX: a dash or BusyBox ash user is told `.`.
+func TestReloadCommandMatchesTheShell(t *testing.T) {
+	for shell, want := range map[string]string{
+		"/bin/zsh": "source ~/.zshrc", "/usr/bin/fish": "source ~/.zshrc", "/bin/dash": ". ~/.zshrc", "": ". ~/.zshrc",
+	} {
+		t.Setenv("SHELL", shell)
+		if got := reloadCommand("~/.zshrc"); got != want {
+			t.Errorf("SHELL=%q: reloadCommand = %q, want %q", shell, got, want)
+		}
 	}
 }
 

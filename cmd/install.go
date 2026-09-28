@@ -397,6 +397,9 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 		written = append(written, termaproject.FileName)
 		printCommitList(out, "Commit these files and open a PR — merging it onboards the repository:", written)
 	}
+	if step := reloadStep(agents, f); step != "" {
+		fmt.Fprintf(out, "\n%s %s\n", style.For(out).Bold("Next step:"), step)
+	}
 	// Verify the chain right away. Skipped without a terminal (a script, CI) or with
 	// --no-doctor, since doctor makes a scratch commit and a network round-trip; those
 	// callers can run `terma doctor` themselves.
@@ -719,7 +722,7 @@ func putShimsOnPath(cmd *cobra.Command, binDir string, f installFlags) {
 	question := "Add terma's shim directory to PATH in " + tildePath(rc.Path) + "?"
 	switch state {
 	case shim.RCLast:
-		fmt.Fprintf(out, "  %s already puts the shims first — open a new terminal; this one started before that line did.\n", tildePath(rc.Path))
+		fmt.Fprintf(out, "  PATH         → %s already puts the shims first; this shell started before it did.\n", tildePath(rc.Path))
 		return
 	case shim.RCOvertaken:
 		question = "A later line in " + tildePath(rc.Path) + " puts the real binaries back in front. Move terma's PATH line to the end?"
@@ -739,7 +742,47 @@ func putShimsOnPath(cmd *cobra.Command, binDir string, f installFlags) {
 		manual("Could not write " + tildePath(rc.Path) + " (" + err.Error() + "). Add this")
 		return
 	}
-	fmt.Fprintf(out, "  PATH         → %s (last line; `terma shim uninstall` removes it). Open a new terminal for it to take effect.\n", tildePath(rc.Path))
+	fmt.Fprintf(out, "  PATH         → %s (last line; `terma shim uninstall` removes it).\n", tildePath(rc.Path))
+}
+
+// reloadStep is what is left for the developer when install routed an agent through the
+// shims and this shell cannot see them yet: terma is a child process and cannot change
+// its parent's PATH, so the startup file it wrote (or printed a line for) takes effect
+// only in a shell that reads it again. "" when the shims already answer here.
+func reloadStep(agents []string, f installFlags) string {
+	var routed []string
+	for _, a := range agents {
+		if shim.Routable(a) {
+			routed = append(routed, a)
+		}
+	}
+	if len(routed) == 0 || allActive(routed) {
+		return ""
+	}
+	names := joinNames(adapterDisplayNames(routed))
+	if strings.TrimSpace(f.activation) == "wrapper" {
+		file := wrapperFile(filepath.Base(os.Getenv("SHELL")))
+		return fmt.Sprintf("add the functions above to %s, then run `%s` in this terminal to route %s through terma.", file, reloadCommand(file), names)
+	}
+	rc, ok := shim.ShellRC()
+	if !ok {
+		return fmt.Sprintf("add the PATH line above to your shell's startup file and start a new shell to route %s through terma.", names)
+	}
+	file := tildePath(rc.Path)
+	if state, err := rc.State(); err != nil || state != shim.RCLast {
+		return fmt.Sprintf("add the PATH line above to the end of %s, then run `%s` in this terminal to route %s through terma.", file, reloadCommand(file), names)
+	}
+	return fmt.Sprintf("run `%s` in this terminal, or open a new terminal, to route %s through terma.", reloadCommand(file), names)
+}
+
+// reloadCommand re-reads a startup file in the running shell: `source` where the shell
+// has it (zsh, bash, fish), the POSIX `.` otherwise.
+func reloadCommand(file string) string {
+	switch filepath.Base(os.Getenv("SHELL")) {
+	case "zsh", "bash", "fish":
+		return "source " + file
+	}
+	return ". " + file
 }
 
 // allActive reports whether every routed agent already resolves to terma's shim.

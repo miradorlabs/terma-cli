@@ -119,8 +119,9 @@ Release, versioning and installer details are in [RELEASING.md](docs/RELEASING.m
 To send two repositories to different Terma projects on one machine, `terma install`
 creates a small directory of agent shims and puts it ahead of the real `claude` and
 `codex` binaries on `PATH`. It asks to add that directory to the end of your shell
-startup file (`~/.zshrc`, `~/.bashrc`, `~/.bash_profile`, or fish `conf.d`). Open a new
-terminal afterward.
+startup file (`~/.zshrc`, `~/.bashrc`, `~/.bash_profile`, or fish `conf.d`). terma
+cannot change the PATH of the shell that ran it, so install ends with the command that
+does — for zsh, `source ~/.zshrc` — or open a new terminal.
 
 `terma doctor` detects when another startup-file entry has moved Terma behind the
 real binary. `terma shim uninstall` removes the managed block; `--no-path` prints the

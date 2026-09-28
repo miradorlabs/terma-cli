@@ -242,8 +242,10 @@ run that reaches them opens a browser login on **production**. A script that run
   tells absent / last / overtaken (a later line sets PATH — `pathEdit`, which must not
   match GOPATH or MANPATH), `Ensure` appends or moves the block and keeps every other
   byte (writing *through* a symlinked dotfile), `Remove` restores the file exactly, and
-  `shim uninstall` calls it. doctor's fix is specific: "open a new terminal" when the block
-  is last and this shell predates it, else `terma install`. Never write a startup file
+  `shim uninstall` calls it. doctor's fix is specific: `source` the file or open a new
+  terminal when the block is last and this shell predates it, else `terma install`. A child
+  process cannot change its parent's PATH, so install ends with a "Next step:" naming the
+  reload (`reloadStep`; `.` for a POSIX shell) whenever a routed agent is not live yet. Never write a startup file
   without consent, and any test that can reach `RemoveAll` or `putShimsOnPath` must
   sandbox `HOME` and set `SHELL`.
 - Codex is split across two scopes and neither is optional. Telemetry supports user-level and runtime configuration: Codex strips `otel` (with `notify`, `profile`, `profiles` and the provider keys)

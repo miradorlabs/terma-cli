@@ -68,8 +68,9 @@ Project server keys are namespaced by project and never written to the repositor
 
 The shim directory must appear before the machine-wide agent binary. `terma install` offers
 to append a marked block to the end of the shell startup file; later PATH edits can
-otherwise put the real binary first. `terma doctor` reports when routing is configured but
-not active.
+otherwise put the real binary first. The block takes effect in shells that read the file
+afterwards: install ends with the command that reloads the current one (`source ~/.zshrc`
+for zsh). `terma doctor` reports when routing is configured but not active.
 
 An IDE or launcher that invokes an agent by absolute path bypasses the shim and uses
 machine-wide configuration. `doctor` also checks for a different Terma build elsewhere on
@@ -137,8 +138,9 @@ settings, custom `--settings` arguments, and a running session's inherited envir
 are outside this configuration check.
 
 Shell activation has its own diagnostic in both commands. It reports a missing
-per-project route, a missing PATH setup or inactive wrapper, a startup file that
-requires a new terminal, and a later PATH entry that bypasses the shims. It warns
+per-project route, a missing PATH setup or inactive wrapper, a startup file this shell
+has not read yet (`source` it or open a new terminal), and a later PATH entry that
+bypasses the shims. It warns
 even when global telemetry still works, and says which settings provide that
 fallback. OpenCode needs no shell integration. Diagnostics never opt in or modify
 your shell startup file; `terma install` offers that setup.
