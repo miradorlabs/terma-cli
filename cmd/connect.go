@@ -357,7 +357,7 @@ func connectGlobal(cmd *cobra.Command, name string, f connectFlags) error {
 	statusLineNote := ""
 	codexNotifyNote := ""
 	if h.Name() == "claude" && !f.noStatusLine {
-		statusLineNote = installStatusLine(cmd.ErrOrStderr())
+		statusLineNote, _ = installStatusLine(cmd.ErrOrStderr())
 	}
 	if h.Name() == "codex" {
 		switch changed, err := (harness.Codex{}).InstallCodexNotify(); {
@@ -607,25 +607,25 @@ func backupHarnessConfig(h harness.Harness, endpoint string) (string, error) {
 }
 
 // installStatusLine puts `terma hook statusline` in front of Claude Code's status
-// line and returns the line to say about it. A failure is a warning, never a failed
-// connect: the exporters are already written and working.
-func installStatusLine(errOut io.Writer) string {
+// line and returns the line to say about it, and whether it is in place. A failure is a
+// warning, never a failed connect: the exporters are already written and working.
+func installStatusLine(errOut io.Writer) (string, bool) {
 	c := harness.Claude{}
 	changed, err := c.InstallStatusLine()
 	if err != nil {
 		fmt.Fprintf(errOut, "Warning: could not wrap Claude Code's status line (%v); plan usage will not be captured.\n", err)
-		return ""
+		return "", false
 	}
 	st, stErr := c.StatusLineState("")
 	switch {
 	case stErr != nil:
-		return ""
+		return "", true
 	case changed && st.Renderer != "":
-		return fmt.Sprintf("Status line: terma now reads the plan's usage windows from it; your own status line (%s) keeps running unchanged behind it.", output.SanitizeTerminal(st.Renderer))
+		return fmt.Sprintf("Status line: terma now reads the plan's usage windows from it; your own status line (%s) keeps running unchanged behind it.", output.SanitizeTerminal(st.Renderer)), true
 	case changed:
-		return "Status line: terma added one that shows model, context, cost and the plan's usage windows (remove it with `terma disconnect claude`, or skip it with --no-statusline)."
+		return "Status line: terma added one that shows model, context, cost and the plan's usage windows (remove it with `terma disconnect claude`, or skip it with --no-statusline).", true
 	default:
-		return "Status line: already wrapped by terma."
+		return "Status line: already wrapped by terma.", true
 	}
 }
 

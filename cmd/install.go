@@ -24,7 +24,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/serverkey"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/shim"
-	"github.com/miradorlabs/terma-cli/internal/style"
 )
 
 type installFlags struct {
@@ -52,6 +51,8 @@ type installFlags struct {
 	dryRun             bool
 	assumeYes          bool
 	force              bool
+	// verbose prints the long-form account of every step under the checklist.
+	verbose bool
 }
 
 func newInstallCommand() *cobra.Command {
@@ -111,6 +112,7 @@ The keys and per-project configuration live in your home directory; the committe
 	cmd.Flags().BoolVar(&f.excludeToolContent, "exclude-tool-content", false, "do not export tool parameters, input, or output")
 	cmd.Flags().BoolVar(&f.noBrowser, "no-browser", false, "print the sign-in URL instead of opening a browser")
 	cmd.Flags().BoolVar(&f.dryRun, "dry-run", false, "show what would change without writing anything")
+	cmd.Flags().BoolVar(&f.verbose, "verbose", false, "say what each step wrote, not only whether it worked")
 	cmd.Flags().BoolVarP(&f.assumeYes, "yes", "y", false, "do not ask for confirmation")
 	cmd.Flags().BoolVar(&f.force, "force", false, "replace conflicting harness settings instead of refusing")
 	return cmd
@@ -137,6 +139,9 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	if err != nil {
 		return err
 	}
+	// A dry run is nothing but its plan, so it always says everything.
+	ui := newInstallUI(out, f.verbose || f.dryRun)
+	fmt.Fprintf(out, "Installing terma in %s\n\n", tildePath(root))
 	for _, path := range []string{termaproject.FileName, hookmgr.ClaudeSettingsPath} {
 		if err := termaproject.CheckPath(root, path); err != nil {
 			return err
@@ -199,17 +204,17 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	// attributes speak for it.
 	cfg.ProjectID, cfg.ProjectName, cfg.OrganizationID = b.ID, b.Name, b.OrganizationID
 
-	fmt.Fprintf(out, "Workspace:  %s\n", root)
 	if gitDir == "" {
-		fmt.Fprintln(out, "Not a Git repository — Git hooks and commit stamping are skipped.")
+		ui.warn("Git hooks", "skipped — not a Git repository, so commits are not stamped")
+	}
+	env := ""
+	if cfg.Environment != config.EnvProd {
+		env = " (" + cfg.Environment + ")"
 	}
 	if b.ID == "" && b.Name == "" {
-		fmt.Fprintln(out, "Project:    (unresolved — a real install signs in and selects one)")
+		ui.warn("Project", "unresolved — a real install signs in and selects one"+env)
 	} else {
-		fmt.Fprintf(out, "Project:    %s\n", nameOrID(b.Name, b.ID))
-	}
-	if cfg.Environment != config.EnvProd {
-		fmt.Fprintf(out, "Environment: %s\n", cfg.Environment)
+		ui.ok("Project", nameOrID(b.Name, b.ID)+env)
 	}
 
 	// Whether the developer's agents send what was said, asked here — once the project is
@@ -220,6 +225,13 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 		return err
 	}
 	f.excludePrompts = !include
+	if len(exportingAgents(agents)) > 0 {
+		if include {
+			ui.ok("Prompts", "included — `terma install --prompts off` stops them")
+		} else {
+			ui.ok("Prompts", "not sent — `terma install --prompts on` includes them")
+		}
+	}
 
 	// The hook plan — the commit hooks and the agents' own hooks, into committed files —
 	// is built once, before anything is written, so a dry run prints exactly the plan an
@@ -287,7 +299,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	// 4. Configure each agent for this repository (per-repo routing). This is the
 	// per-developer half — keys and routing state in the home directory — and touches
 	// no committed file.
-	if err := connectHarnessesForRepo(cmd, cfg, agents, f); err != nil {
+	if err := connectHarnessesForRepo(cmd, ui, cfg, agents, f); err != nil {
 		return err
 	}
 
@@ -298,29 +310,38 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	// has chosen Claude — which also keeps `--harness none` installs from touching it.
 	// --no-statusline opts out.
 	if !f.noStatusLine && slices.Contains(agents, shim.AgentClaude) {
-		if note := installStatusLine(cmd.ErrOrStderr()); note != "" {
-			fmt.Fprintf(out, "\n%s\n", note)
+		if note, ok := installStatusLine(cmd.ErrOrStderr()); ok {
+			fmt.Fprintf(ui.detail, "\n%s\n", note)
+			ui.ok("Status line", "reads your plan's usage windows")
+		} else {
+			ui.warn("Status line", "not wrapped — your plan's usage windows are not captured")
 		}
 	}
 
 	// 5. Hooks: apply the plan built above.
 	installedHooks := gitDir != "" && existing != nil && existing.Install.HookManager != ""
-	var written []string // the repository files this run wrote hooks into, to commit
+	var written []string    // the repository files this run wrote hooks into, to commit
+	var afterMerge []string // what each clone does once they are merged
 	if !f.noHooks {
-		plan.print(out)
+		plan.print(ui.detail)
 		switch {
 		case plan.empty():
 			// An empty git-hook plan means the commit hooks are already wired, so this
 			// repo is hook-installed; record them in the binding without rewriting.
 			installedHooks = gitDir != ""
-		case f.assumeYes || confirmYes(cmd, "Install these hooks?"):
+			ui.ok("Hooks", plan.summary(adapters)+" — already in place")
+		case f.assumeYes || confirmYes(cmd, "Write terma's hooks to "+joinNames(plan.files())+"?"):
 			if err := plan.apply(root); err != nil {
 				return err
 			}
 			installedHooks = gitDir != ""
 			written = plan.paths()
+			ui.ok("Hooks", plan.summary(adapters))
+			afterMerge = plan.hooks.Notes
 		default:
 			adapters = adapter.WiredNames(root) // declined: only what is already wired
+			ui.warn("Hooks", "not written — commits are not stamped until they are")
+			ui.then("Run `terma install` again and accept the hooks when you are ready.")
 		}
 	} else {
 		adapters = adapter.WiredNames(root) // --no-hooks: only what is already wired
@@ -341,14 +362,17 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	// all hooks-only would see "Installed." while every commit, tool call and observation
 	// sat in the spool, held for a key that no command would ever mint.
 	if installedHooks || len(adapter.WiredNames(root)) > 0 {
-		if note := ensureSpoolKey(ctx, cfg); note != "" {
-			fmt.Fprintf(out, "\n%s\n", note)
+		if k := ensureSpoolKey(ctx, cfg); k.fix == "" {
+			ui.ok("Hook events", k.state)
+		} else {
+			ui.warn("Hook events", k.state)
+			ui.then(k.fix)
 		}
 	}
 
 	// 6. Repository telemetry also supports developers using a global repos-only
 	// connection. Hooks alone do not enable that connection's exporters.
-	paths, err := writeRepoPolicy(ctx, out, root, cfg, repoPolicyHarnesses(adapters), f)
+	paths, err := writeRepoPolicy(ctx, ui, root, cfg, repoPolicyHarnesses(adapters), f)
 	if err != nil {
 		return err
 	}
@@ -391,40 +415,39 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 
 	// 8. Per-clone git wiring for the shim manager.
 	if installedHooks {
-		if err := wireRepo(ctx, out, root, file); err != nil {
+		if err := wireRepo(ctx, ui.detail, root, file); err != nil {
 			return err
 		}
 	}
 	if slices.Contains(agents, codexDesktopAgent) {
-		fmt.Fprintln(out, "Codex Desktop captures this repository through trusted hooks and Terma's existing spool.")
-		fmt.Fprintln(out, "To approve Codex Desktop capture:")
-		fmt.Fprintln(out, "  1. Open this repository in Codex Desktop and trust the project if prompted.")
-		fmt.Fprintln(out, "  2. Open Settings → Hooks, then select Review for the entries from .codex/hooks.json.")
-		fmt.Fprintln(out, "  3. Inspect and approve each Terma hook command for full capture. Codex CLI is not required.")
-		fmt.Fprintln(out, "  4. Run `terma desktop status` to confirm 'Codex hooks: ready', then start a new Local task in this repository.")
+		fmt.Fprintln(ui.detail, "Codex Desktop captures this repository through trusted hooks and Terma's existing spool.")
+		ui.then("Approve Codex Desktop capture:\n" +
+			"a. Open this repository in Codex Desktop and trust the project if prompted.\n" +
+			"b. Open Settings → Hooks, then select Review for the entries from .codex/hooks.json.\n" +
+			"c. Inspect and approve each Terma hook command for full capture. Codex CLI is not required.\n" +
+			"d. Run `terma desktop status` to confirm 'Codex hooks: ready', then start a new Local task in this repository.")
 		if global, err := (harness.Codex{}).Status(); err == nil && global.Connected {
-			fmt.Fprintln(out, "Warning: Codex also has a user-level exporter; it may send Desktop activity from other repositories.")
+			ui.warn("Codex", "also has a user-level exporter; it may send Desktop activity from other repositories")
 		}
 	}
 
-	fmt.Fprintf(out, "\n%s\n", style.For(out).Bold("Installed."))
 	if gitDir != "" && len(written) > 0 {
 		// Save always rewrites the binding.
 		written = append(written, termaproject.FileName)
-		printCommitList(out, "Commit these files and open a PR — merging it onboards the repository:", written)
+		ui.then(commitList("Commit these files and open a PR — merging it onboards the repository:", written))
 	}
-	if step := reloadStep(agents, f); step != "" {
-		fmt.Fprintf(out, "\n%s %s\n", style.For(out).Bold("Next step:"), step)
+	for _, n := range afterMerge {
+		ui.then("After merging: " + n)
 	}
 	// Verify the chain right away. Skipped without a terminal (a script, CI) or with
 	// --no-doctor, since doctor makes a scratch commit and a network round-trip; those
 	// callers can run `terma doctor` themselves.
-	if f.noDoctor || f.dryRun || !canPrompt() {
-		fmt.Fprintln(out, "Run `terma doctor` to verify the chain end to end.")
-		return nil
+	if f.noDoctor || !canPrompt() {
+		ui.then("Run `terma doctor` to verify the chain end to end.")
+	} else {
+		ui.verify(cmd)
 	}
-	fmt.Fprintf(out, "\n%s\n", style.For(out).Bold("Verifying the chain (terma doctor):"))
-	executeDoctor(cmd, false)
+	ui.finish()
 	return nil
 }
 
@@ -455,12 +478,7 @@ func resolvePrompts(cmd *cobra.Command, projectID string, agents []string, f ins
 	if rec, ok, err := shim.LoadRecord(projectID); err == nil && ok && projectID != "" {
 		current = rec.IncludePrompts
 	}
-	var exporting []string
-	for _, a := range telemetryAgentNames(agents) {
-		if _, err := harness.Lookup(a); err == nil {
-			exporting = append(exporting, a)
-		}
-	}
+	exporting := exportingAgents(agents)
 	if len(exporting) == 0 || f.assumeYes || f.dryRun || !canPrompt() {
 		return current, nil
 	}
@@ -513,17 +531,21 @@ func projectRefNeedsLookup(ref string) bool {
 	return !termaproject.ValidID(ref)
 }
 
+// spoolKey is how this machine delivers the repository's hook events: state says it, and
+// fix, when set, is what the developer has to do before they are delivered.
+type spoolKey struct{ state, fix string }
+
 // ensureSpoolKey makes sure this machine holds a key for cfg's project, minting one when
-// it has none and a credential to mint with. It returns a line to print, or "" when there
-// is nothing to say. It never fails the install: the hooks and the binding are what the
-// repository needs, and held events wait up to the spool's MaxAge for a key.
-func ensureSpoolKey(ctx context.Context, cfg *config.Config) string {
+// it has none and a credential to mint with. It never fails the install: the hooks and
+// the binding are what the repository needs, and held events wait up to the spool's
+// MaxAge for a key.
+func ensureSpoolKey(ctx context.Context, cfg *config.Config) spoolKey {
 	if keystore.Get(cfg.ProjectID) != "" {
-		return ""
+		return spoolKey{state: "delivered with this project's key"}
 	}
-	const held = "Hook events from this machine are held until it has a key for the project — "
+	const held = "held until this machine has a key for the project"
 	if cfg.APIKey != "" {
-		return held + "TERMA_API_KEY cannot mint one; unset it and run `terma install` again."
+		return spoolKey{held, "TERMA_API_KEY cannot mint a key for hook events: unset it and run `terma install` again."}
 	}
 	client, err := newClient(cfg)
 	var key string
@@ -533,14 +555,14 @@ func ensureSpoolKey(ctx context.Context, cfg *config.Config) string {
 	}
 	switch {
 	case errors.Is(err, auth.ErrNotLoggedIn):
-		return held + "sign in with `terma setup`, then run `terma install` again."
+		return spoolKey{held, "Sign in with `terma setup`, then run `terma install` again, so hook events from this machine are delivered."}
 	case err != nil:
-		return held + "minting one failed (" + err.Error() + "); run `terma install` again."
+		return spoolKey{held, "Minting a key for hook events failed (" + err.Error() + "); run `terma install` again."}
 	}
 	if err := keystore.Set(cfg.ProjectID, key, keystore.HostsOf(cfg)); err != nil {
-		return held + "storing it failed (" + err.Error() + ")."
+		return spoolKey{held, "Storing the key for hook events failed (" + err.Error() + "); run `terma install` again."}
 	}
-	return "Project key stored for this machine's hook events (" + keystore.Mask(key) + ")."
+	return spoolKey{state: "Project key stored for this machine (" + keystore.Mask(key) + ")"}
 }
 
 // resolveInstallHarnesses picks the agents to configure: the --harness flag ("none" for
@@ -582,19 +604,14 @@ func resolveInstallHarnesses(cmd *cobra.Command, cfg *config.Config, f installFl
 // `--settings`, Codex through runtime -c overrides, and OpenCode through its own per-repo plugin; the wrapper or
 // PATH-shim activation is set up once for the routable pair (Claude, Codex). It writes
 // no committed file — keys and routing state live in the home directory.
-func connectHarnessesForRepo(cmd *cobra.Command, cfg *config.Config, agents []string, f installFlags) error {
+func connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *config.Config, agents []string, f installFlags) error {
 	ctx := cmd.Context()
-	out := cmd.OutOrStdout()
+	out := ui.detail
 	signals, err := harness.ParseSignals(f.signals)
 	if err != nil {
 		return err
 	}
-	var telemetryAgents []string
-	for _, a := range telemetryAgentNames(agents) {
-		if _, err := harness.Lookup(a); err == nil {
-			telemetryAgents = append(telemetryAgents, a)
-		}
-	}
+	telemetryAgents := exportingAgents(agents)
 	if len(telemetryAgents) == 0 {
 		return nil
 	}
@@ -640,6 +657,9 @@ func connectHarnessesForRepo(cmd *cobra.Command, cfg *config.Config, agents []st
 			} else {
 				fmt.Fprintln(out, "  Codex Desktop → per-repo logs route")
 			}
+			if slices.Contains(agents, codexDesktopAgent) {
+				ui.ok("Codex Desktop", "reports through this repository's hooks")
+			}
 		case shim.AgentClaude:
 			if _, err := shim.PrepareClaudeSettings(exp); err != nil {
 				return fmt.Errorf("claude: %w", err)
@@ -657,6 +677,7 @@ func connectHarnessesForRepo(cmd *cobra.Command, cfg *config.Config, agents []st
 			// capture on for every other project). It lives only in a committed
 			// .opencode/terma.json overlay, written by install below.
 			fmt.Fprintln(out, "  OpenCode     → per-repo plugin")
+			ui.ok("OpenCode", "reports through terma's plugin")
 		default:
 			// Every telemetry harness is routed above. One added to the registry without
 			// a case here must not pass for routed: it would export to whatever project
@@ -680,8 +701,20 @@ func connectHarnessesForRepo(cmd *cobra.Command, cfg *config.Config, agents []st
 	if len(launchedFromShell) == 0 {
 		return nil
 	}
-	err = setupActivation(cmd, launchedFromShell, f)
+	err = setupActivation(cmd, ui, launchedFromShell, f)
 	return err
+}
+
+// exportingAgents are the agents among a developer's that terma points at a project —
+// the ones with an exporter, Codex Desktop counted as Codex.
+func exportingAgents(agents []string) []string {
+	var names []string
+	for _, a := range telemetryAgentNames(agents) {
+		if _, err := harness.Lookup(a); err == nil {
+			names = append(names, a)
+		}
+	}
+	return names
 }
 
 // setupActivation installs the per-repo routing mechanism.
@@ -690,8 +723,7 @@ func connectHarnessesForRepo(cmd *cobra.Command, cfg *config.Config, agents []st
 // functions instead. The one thing terma cannot do silently is put the shim directory on
 // PATH — that lives in the developer's shell rc — so it prints that line once, and only
 // when the directory is not already there.
-func setupActivation(cmd *cobra.Command, agents []string, f installFlags) error {
-	out := cmd.OutOrStdout()
+func setupActivation(cmd *cobra.Command, ui *installUI, agents []string, f installFlags) error {
 	mode := strings.TrimSpace(f.activation)
 	if mode == "" {
 		mode = "shim"
@@ -702,17 +734,27 @@ func setupActivation(cmd *cobra.Command, agents []string, f installFlags) error 
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(out, "  Routing      → PATH shims for %s in %s\n", joinNames(adapterDisplayNames(agents)), binDir)
+		fmt.Fprintf(ui.detail, "  Routing      → PATH shims for %s in %s\n", joinNames(adapterDisplayNames(agents)), binDir)
+		for _, a := range agents {
+			ui.ok(adapterDisplayNames([]string{a})[0], "shim at "+tildePath(filepath.Join(binDir, a)))
+		}
 		if !allActive(agents) {
-			putShimsOnPath(cmd, binDir, f)
+			putShimsOnPath(cmd, ui, binDir, agents, f)
 		}
 	case "wrapper":
 		if _, err := shim.InstallShims(agents); err != nil {
 			return err
 		}
-		shell := filepath.Base(os.Getenv("SHELL"))
-		fmt.Fprintf(out, "\nAdd these to your %s so the agents route to this repo's project:\n", wrapperFile(shell))
-		fmt.Fprint(out, indent(shim.WrapperSnippetFor(shell, agents)))
+		for _, a := range agents {
+			ui.ok(adapterDisplayNames([]string{a})[0], "routed by a shell function")
+		}
+		if !allActive(agents) {
+			shell := filepath.Base(os.Getenv("SHELL"))
+			file := wrapperFile(shell)
+			ui.reloading = true
+			ui.then(fmt.Sprintf("Add these to your %s so the agents route to this repo's project, then run `%s` in this terminal:\n%s",
+				file, reloadCommand(file), strings.TrimRight(indent(shim.WrapperSnippetFor(shell, agents)), "\n")))
+		}
 	default:
 		return fmt.Errorf("unknown --activation %q (want shim or wrapper)", mode)
 	}
@@ -748,45 +790,54 @@ func wrapperFile(shell string) string {
 // step of per-repo routing that lives in the developer's shell startup file. It asks
 // before writing there (--yes answers; --no-path declines) and writes one marked block at
 // the end of the file. The shell install was run from read that file before the block was
-// in it; reloadStep, at the end of the install, says how to make it read the file again.
+// in it, and terma, a child process, cannot change its parent's PATH — so whatever
+// happens, a next step says how to make this shell read the file again.
 //
 // The block goes last on purpose. A PATH line only wins over the ones that run after it,
 // and a real startup file prepends ~/.local/bin — where the real claude and codex live —
 // more than once; pasted anywhere but the end, terma's line is silently overtaken.
-func putShimsOnPath(cmd *cobra.Command, binDir string, f installFlags) {
-	out := cmd.OutOrStdout()
+func putShimsOnPath(cmd *cobra.Command, ui *installUI, binDir string, agents []string, f installFlags) {
+	ui.reloading = true
+	names := joinNames(adapterDisplayNames(agents))
 	rc, ok := shim.ShellRC()
+	file := "your shell's startup file"
+	if ok {
+		file = tildePath(rc.Path)
+	}
 	manual := func(why string) {
 		line := `export PATH="` + binDir + `:$PATH"`
+		reload := "then start a new shell"
 		if ok {
 			line = rc.PathLine(binDir)
+			reload = "then run `" + reloadCommand(file) + "` in this terminal"
 		}
-		fmt.Fprintf(out, "  %s as the LAST line that touches PATH in your shell's startup file — a later line that\n", why)
-		fmt.Fprintln(out, "  prepends another directory puts the real binaries back in front:")
-		fmt.Fprintf(out, "    %s\n", line)
+		ui.warn("PATH", "the shims are not on PATH yet")
+		ui.then(fmt.Sprintf("%s as the LAST line that touches PATH in %s — a later line that prepends another directory puts the real binaries back in front:\n    %s\n%s to route %s through terma.",
+			why, file, line, reload, names))
 	}
+	reload := fmt.Sprintf("Run `%s` in this terminal, or open a new terminal, to route %s through terma.", reloadCommand(file), names)
 	if !ok || f.noPath {
 		manual("Add this")
 		return
 	}
 	state, err := rc.State()
 	if err != nil {
-		manual("Could not read " + tildePath(rc.Path) + " (" + err.Error() + "). Add this")
+		manual("Could not read " + file + " (" + err.Error() + "). Add this")
 		return
 	}
-	question := "Add terma's shim directory to PATH in " + tildePath(rc.Path) + "?"
+	question := "Add terma's shim directory to PATH in " + file + "?"
 	switch state {
 	case shim.RCLast:
-		fmt.Fprintf(out, "  PATH         → %s already puts the shims first; this shell started before it did.\n", tildePath(rc.Path))
+		ui.ok("PATH", file+" puts the shims first")
+		ui.then(reload)
 		return
 	case shim.RCOvertaken:
-		question = "A later line in " + tildePath(rc.Path) + " puts the real binaries back in front. Move terma's PATH line to the end?"
+		question = "A later line in " + file + " puts the real binaries back in front. Move terma's PATH line to the end?"
 	}
 	// Consent is --yes, or a yes typed at a terminal. Anything else — a script, an agent, a
 	// declined prompt — leaves the file alone.
 	consented := f.assumeYes
 	if !consented && canPrompt() {
-		fmt.Fprintln(out)
 		consented = confirmYes(cmd, question)
 	}
 	if !consented {
@@ -794,40 +845,12 @@ func putShimsOnPath(cmd *cobra.Command, binDir string, f installFlags) {
 		return
 	}
 	if _, err := rc.Ensure(binDir); err != nil {
-		manual("Could not write " + tildePath(rc.Path) + " (" + err.Error() + "). Add this")
+		manual("Could not write " + file + " (" + err.Error() + "). Add this")
 		return
 	}
-	fmt.Fprintf(out, "  PATH         → %s (last line; `terma shim uninstall` removes it).\n", tildePath(rc.Path))
-}
-
-// reloadStep is what is left for the developer when install routed an agent through the
-// shims and this shell cannot see them yet: terma is a child process and cannot change
-// its parent's PATH, so the startup file it wrote (or printed a line for) takes effect
-// only in a shell that reads it again. "" when the shims already answer here.
-func reloadStep(agents []string, f installFlags) string {
-	var routed []string
-	for _, a := range agents {
-		if shim.Routable(a) {
-			routed = append(routed, a)
-		}
-	}
-	if len(routed) == 0 || allActive(routed) {
-		return ""
-	}
-	names := joinNames(adapterDisplayNames(routed))
-	if strings.TrimSpace(f.activation) == "wrapper" {
-		file := wrapperFile(filepath.Base(os.Getenv("SHELL")))
-		return fmt.Sprintf("add the functions above to %s, then run `%s` in this terminal to route %s through terma.", file, reloadCommand(file), names)
-	}
-	rc, ok := shim.ShellRC()
-	if !ok {
-		return fmt.Sprintf("add the PATH line above to your shell's startup file and start a new shell to route %s through terma.", names)
-	}
-	file := tildePath(rc.Path)
-	if state, err := rc.State(); err != nil || state != shim.RCLast {
-		return fmt.Sprintf("add the PATH line above to the end of %s, then run `%s` in this terminal to route %s through terma.", file, reloadCommand(file), names)
-	}
-	return fmt.Sprintf("run `%s` in this terminal, or open a new terminal, to route %s through terma.", reloadCommand(file), names)
+	fmt.Fprintf(ui.detail, "  PATH         → %s (last line; `terma shim uninstall` removes it).\n", file)
+	ui.ok("PATH", file+" puts the shims first")
+	ui.then(reload)
 }
 
 // reloadCommand re-reads a startup file in the running shell: `source` where the shell
@@ -948,6 +971,43 @@ func (p hookPlan) print(out io.Writer) {
 	}
 }
 
+// files names what the plan writes for a question that fits on a line: terma's own hook
+// shims as their directory, every other file by its path.
+func (p hookPlan) files() []string {
+	var files []string
+	for _, path := range p.paths() {
+		if strings.HasPrefix(path, hookmgr.ShimDir+"/") {
+			path = hookmgr.ShimDir + "/"
+		}
+		if !slices.Contains(files, path) {
+			files = append(files, path)
+		}
+	}
+	return files
+}
+
+// summary says what the hooks do once installed: commit stamping through the hook
+// manager, and the agents whose own hooks report their sessions.
+func (p hookPlan) summary(adapters []string) string {
+	var parts []string
+	if p.det.Manager != "" {
+		parts = append(parts, "commit stamping via "+string(p.det.Manager))
+	}
+	var agents []string
+	for _, name := range adapters {
+		if a, ok := adapter.Lookup(name); ok {
+			agents = append(agents, a.DisplayName())
+		}
+	}
+	if len(agents) > 0 {
+		parts = append(parts, "session hooks for "+joinNames(agents))
+	}
+	if len(parts) == 0 {
+		return "none to write"
+	}
+	return strings.Join(parts, "; ")
+}
+
 // paths lists the files the plan writes or deletes, relative to the root, in the order
 // print shows them.
 func (p hookPlan) paths() []string {
@@ -968,17 +1028,7 @@ func (p hookPlan) paths() []string {
 // lead is the sentence that says why. A path is listed once, even when two changes
 // touched it.
 func printCommitList(out io.Writer, lead string, paths []string) {
-	var unique []string
-	for _, p := range paths {
-		if !slices.Contains(unique, p) {
-			unique = append(unique, p)
-		}
-	}
-	fmt.Fprintln(out, lead)
-	for _, p := range unique {
-		fmt.Fprintf(out, "  %s\n", p)
-	}
-	fmt.Fprintf(out, "\n  git add %s\n", strings.Join(unique, " "))
+	fmt.Fprintln(out, commitList(lead, paths))
 }
 
 func (p hookPlan) apply(root string) error {

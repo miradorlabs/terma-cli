@@ -304,6 +304,15 @@ run that reaches them opens a browser login on **production**. A script that run
   policy is the only thing that can make it send, and `status`/`doctor` read it back
   that way. Codex cannot be narrowed (one config file, no project otel), so setup
   connects it everywhere and says so rather than silencing it.
+- install's output (`cmd/install_ui.go`, `installUI`): one marked line per step (`ok`, or
+  `warn` for one that needs the developer), a verdict, then numbered next steps (`then`) —
+  the reload, the files to commit, a declined PATH line, Codex Desktop approval, doctor's
+  fixes. Everything long-form (the plan's file list, policies written, git wiring, doctor's
+  per-check lines) goes to `ui.detail`, which is stdout under `--verbose` or `--dry-run`
+  and discarded otherwise. New install output goes through one of those, never straight
+  to `cmd.OutOrStdout()`. Doctor runs behind a spinner as the `Verified` step and leaves
+  out the routing warning when a next step already says to reload the shell (install's
+  own process always predates the PATH block).
 - Prompt capture (`resolvePrompts`): `--prompts on|off` (`--exclude-prompts` is the older,
   hidden spelling); otherwise an interactive install with an exporting agent asks, the
   default being this developer's last answer for the project (`shim.Record.IncludePrompts`,

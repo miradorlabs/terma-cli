@@ -406,7 +406,7 @@ func repoPolicyHarnesses(adapters []string) []harness.Harness {
 // pre-existing OTLP settings would leave the repository half-onboarded for no gain.
 func writeRepoPolicy(
 	ctx context.Context,
-	out io.Writer,
+	ui *installUI,
 	root string,
 	cfg *config.Config,
 	hs []harness.Harness,
@@ -444,10 +444,9 @@ func writeRepoPolicy(
 		}
 		conflicts, _ = partitionConflicts(conflicts)
 		if len(conflicts) > 0 {
-			fmt.Fprintf(out, "\nSkipped %s's repository policy: %s already has OTLP settings here (%s).\n",
-				h.DisplayName(), h.DisplayName(),
-				output.SanitizeTerminal(strings.Join(conflictKeys(conflicts), ", ")))
-			fmt.Fprintf(out, "Resolve them, then run `terma connect %s --scope local` in this repository.\n", h.Name())
+			ui.warn("Repo policy", fmt.Sprintf("%s skipped — this repository already has OTLP settings for it (%s)",
+				h.DisplayName(), output.SanitizeTerminal(strings.Join(conflictKeys(conflicts), ", "))))
+			ui.then(fmt.Sprintf("Resolve %s's OTLP settings in this repository, then run `terma connect %s --scope local` here.", h.DisplayName(), h.Name()))
 			continue
 		}
 		path, err := local.ConfigPath()
@@ -472,7 +471,12 @@ func writeRepoPolicy(
 			}
 			written = append(written, rel)
 		}
-		fmt.Fprintf(out, "\nWrote %s's repository policy to %s.\n", h.DisplayName(), path)
+		fmt.Fprintf(ui.detail, "\nWrote %s's repository policy to %s.\n", h.DisplayName(), path)
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			rel = path
+		}
+		ui.ok("Repo policy", h.DisplayName()+" telemetry settings in "+rel)
 	}
 	return written, nil
 }

@@ -48,7 +48,9 @@ terma doctor      # verify the chain end to end
 an existing `.terma/settings.json` first (Enter keeps it), or takes
 `--project <name-or-id>`. A bound project your account cannot see is never used:
 install says why and lets you choose another. Use `--yes` for non-interactive setup
-(it keeps an existing binding), or `--harness none` when you only want commit hooks. The committed settings
+(it keeps an existing binding), or `--harness none` when you only want commit hooks.
+It reports one line per step (✓ done, ! needs you), then numbers what is left for you
+to do; `--verbose` also shows every file and setting it wrote. The committed settings
 file contains a project reference, never a secret.
 
 ## Install

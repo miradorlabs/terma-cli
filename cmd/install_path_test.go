@@ -56,7 +56,7 @@ func TestInstallPutsTheShimsOnPath(t *testing.T) {
 	}
 	// terma cannot change the PATH of the shell that ran it, so the last thing install
 	// says is how to make this one read the file.
-	if !strings.Contains(out, "Next step: run `source ~/.zshrc` in this terminal") {
+	if !strings.Contains(out, "Next steps:\n  1. Run `source ~/.zshrc` in this terminal") {
 		t.Fatalf("install should end with the command that reloads this shell:\n%s", out)
 	}
 }
@@ -71,7 +71,7 @@ func TestInstallNoPathPrintsTheLineInstead(t *testing.T) {
 	if !strings.Contains(out, "LAST line") || !strings.Contains(out, "export PATH=") {
 		t.Fatalf("install should print the line and where it goes:\n%s", out)
 	}
-	if !strings.Contains(out, "Next step: add the PATH line above to the end of ~/.zshrc, then run `source ~/.zshrc`") {
+	if !strings.Contains(out, "! PATH") || !strings.Contains(out, "then run `source ~/.zshrc` in this terminal") {
 		t.Fatalf("install should end with what to do with the line:\n%s", out)
 	}
 }
@@ -118,7 +118,7 @@ func TestInstallWrapperHintNamesOneFile(t *testing.T) {
 	if !strings.Contains(out, "Add these to your ~/.zshrc so the agents route") {
 		t.Fatalf("the wrapper hint should name zsh's startup file:\n%s", out)
 	}
-	if !strings.Contains(out, "Next step: add the functions above to ~/.zshrc, then run `source ~/.zshrc`") {
+	if !strings.Contains(out, "so the agents route to this repo's project, then run `source ~/.zshrc` in this terminal") {
 		t.Fatalf("install should end with what to do with the functions:\n%s", out)
 	}
 }

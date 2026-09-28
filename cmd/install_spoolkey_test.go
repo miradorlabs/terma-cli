@@ -73,7 +73,7 @@ func TestInstallWithoutACredentialSaysItsEventsAreHeld(t *testing.T) {
 	if err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}
-	if !strings.Contains(out, "held until it has a key") || !strings.Contains(out, "terma setup") {
+	if !strings.Contains(out, "held until this machine has a key") || !strings.Contains(out, "terma setup") {
 		t.Fatalf("install should say hook events are held, and how to fix it:\n%s", out)
 	}
 	if keystore.Get(testProjectID) != "" {
