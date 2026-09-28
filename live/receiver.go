@@ -16,25 +16,30 @@ import (
 	colmetricspb "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
+	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
+	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
 // Receiver is the OTLP/HTTP endpoint the harness exports to. It accepts what
 // Terma's gateway accepts (protobuf or JSON over HTTP) and keeps every record
-// as flat string attributes, which is all a contract needs.
+// with their complete OTLP payloads as well as convenient flattened attributes.
 type Receiver struct {
-	srv  *http.Server
-	addr string
-	mu   sync.Mutex
-	logs []LogRecord
-	span []Span
-	metr []string
-	auth []string
+	srv      *http.Server
+	addr     string
+	mu       sync.Mutex
+	logs     []LogRecord
+	span     []Span
+	metr     []Metric
+	auth     []string
+	requests []ExportRequest
 }
 
 // LogRecord is one OTLP log record, flattened.
 type LogRecord struct {
+	Proto    *logspb.LogRecord
 	Time     time.Time
 	Scope    string
 	Body     string
@@ -44,10 +49,26 @@ type LogRecord struct {
 
 // Span is one OTLP span, flattened.
 type Span struct {
+	Proto    *tracepb.Span
 	Scope    string
 	Name     string
 	Attrs    map[string]string
 	Resource map[string]string
+}
+
+// Metric retains values, point attributes, temporality, buckets and exemplars.
+type Metric struct {
+	Proto    *metricspb.Metric
+	Scope    string
+	Resource map[string]string
+}
+
+// ExportRequest ties authorization to each signal, including rejected requests.
+type ExportRequest struct {
+	Path          string
+	Authorization string
+	Payload       proto.Message
+	DecodeError   error
 }
 
 // StartReceiver listens on a loopback port for the test's lifetime.
@@ -76,13 +97,16 @@ func (r *Receiver) read(req *http.Request, msg proto.Message) error {
 	if err != nil {
 		return err
 	}
+	if strings.Contains(req.Header.Get("Content-Type"), "json") {
+		err = protojson.Unmarshal(body, msg)
+	} else {
+		err = proto.Unmarshal(body, msg)
+	}
 	r.mu.Lock()
 	r.auth = append(r.auth, req.Header.Get("Authorization"))
+	r.requests = append(r.requests, ExportRequest{Path: req.URL.Path, Authorization: req.Header.Get("Authorization"), Payload: msg, DecodeError: err})
 	r.mu.Unlock()
-	if strings.Contains(req.Header.Get("Content-Type"), "json") {
-		return protojson.Unmarshal(body, msg)
-	}
-	return proto.Unmarshal(body, msg)
+	return err
 }
 
 func (r *Receiver) handleLogs(w http.ResponseWriter, req *http.Request) {
@@ -100,7 +124,7 @@ func (r *Receiver) handleLogs(w http.ResponseWriter, req *http.Request) {
 				if lr.GetTimeUnixNano() != 0 {
 					at = time.Unix(0, int64(lr.GetTimeUnixNano()))
 				}
-				r.logs = append(r.logs, LogRecord{Time: at, Scope: sl.GetScope().GetName(), Body: anyString(lr.GetBody()),
+				r.logs = append(r.logs, LogRecord{Proto: lr, Time: at, Scope: sl.GetScope().GetName(), Body: anyString(lr.GetBody()),
 					Attrs: flatten(lr.GetAttributes()), Resource: res})
 			}
 		}
@@ -122,7 +146,7 @@ func (r *Receiver) handleTraces(w http.ResponseWriter, req *http.Request) {
 		res := flatten(rs.GetResource().GetAttributes())
 		for _, ss := range rs.ScopeSpans {
 			for _, sp := range ss.Spans {
-				r.span = append(r.span, Span{Scope: ss.GetScope().GetName(), Name: sp.GetName(), Attrs: flatten(sp.GetAttributes()), Resource: res})
+				r.span = append(r.span, Span{Proto: sp, Scope: ss.GetScope().GetName(), Name: sp.GetName(), Attrs: flatten(sp.GetAttributes()), Resource: res})
 			}
 		}
 	}
@@ -142,7 +166,7 @@ func (r *Receiver) handleMetrics(w http.ResponseWriter, req *http.Request) {
 	for _, rm := range in.ResourceMetrics {
 		for _, sm := range rm.ScopeMetrics {
 			for _, m := range sm.Metrics {
-				r.metr = append(r.metr, m.GetName())
+				r.metr = append(r.metr, Metric{Proto: m, Scope: sm.GetScope().GetName(), Resource: flatten(rm.GetResource().GetAttributes())})
 			}
 		}
 	}
@@ -173,13 +197,28 @@ func (r *Receiver) MetricNames() []string {
 	seen := map[string]bool{}
 	var out []string
 	for _, n := range r.metr {
-		if !seen[n] {
-			seen[n] = true
-			out = append(out, n)
+		name := n.Proto.GetName()
+		if !seen[name] {
+			seen[name] = true
+			out = append(out, name)
 		}
 	}
 	sort.Strings(out)
 	return out
+}
+
+// Metrics returns the received metrics. Payloads must be treated as read-only.
+func (r *Receiver) Metrics() []Metric {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]Metric(nil), r.metr...)
+}
+
+// Requests returns one entry per received export, rather than just the first key.
+func (r *Receiver) Requests() []ExportRequest {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]ExportRequest(nil), r.requests...)
 }
 
 // Authorizations returns the Authorization headers seen, for the key contract.

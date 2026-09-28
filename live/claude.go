@@ -1,6 +1,7 @@
 package live
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -180,7 +181,9 @@ func (sb *Sandbox) ClaudeHeadless(route Route, prompt string, extra ...string) (
 	sessionID := uuid.NewString()
 	args := append([]string{"-p", prompt, "--output-format", "json", "--max-turns", "1", "--max-budget-usd", "0.05"},
 		sb.claudeArgs(sessionID, extra...)...)
-	cmd := exec.Command(sb.Claude.Path, args...)
+	ctx, cancel := context.WithTimeout(context.Background(), scenarioTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, sb.Claude.Path, args...)
 	cmd.Dir = sb.Repo
 	cmd.Env = sb.claudeEnv(route)
 	cmd.Stdin = nil

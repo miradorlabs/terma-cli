@@ -9,7 +9,7 @@ GO := docker run --rm -v "$(ROOT)":/src -w /src/live \
        -v terma-cli-gocache:/root/.cache/go-build -v terma-cli-gomod:/go/pkg/mod \
        -e CGO_ENABLED=0 -e GOTOOLCHAIN=auto -e GOOS=$(HOST_OS) -e GOARCH=$(HOST_ARCH) $(GO_IMAGE)
 
-.PHONY: build tidy vet test live run
+.PHONY: build tidy vet test live run telemetry
 tidy:
 	$(GO) go mod tidy
 vet:
@@ -20,6 +20,12 @@ build:
 # Offline contracts exercise malformed evidence without launching harnesses.
 test: build
 	TERMA_LIVE=0 ./bin/live.test -test.v -test.timeout 1m
+
+# Real harnesses, local fixture providers, no account credentials or paid calls.
+telemetry: build
+	TERMA_LIVE=1 TERMA_LIVE_BINARY="$(CURDIR)/bin/terma" \
+	 ./bin/live.test -test.v -test.timeout 10m \
+	 -test.run '^(TestClaudeTelemetry|TestCodexTelemetry|TestClaudeStopFailureDelivery)$$'
 # Loads live/.env.local (credentials, never committed) and runs every scenario.
 # RUN=TestClaude... narrows it; ARGS adds test flags.
 live: build

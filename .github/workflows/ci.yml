@@ -93,6 +93,37 @@ jobs:
       - run: go vet ./...
       - run: go test -race ./...
 
+  # Real harness exporters, deterministic loopback model responses and OTLP.
+  # Pin PR builds; live.yml also checks the latest releases nightly.
+  harness-telemetry:
+    runs-on: macos-latest
+    timeout-minutes: 15
+    env:
+      TERMA_ENV: dev
+      TERMA_LIVE: "1"
+      TERMA_LIVE_CLAUDE_VERSIONS: "2.1.283"
+      TERMA_LIVE_CODEX_VERSIONS: "0.158.0"
+      TERMA_LIVE_BINARY: ${{ github.workspace }}/live/bin/terma
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: live/go.mod
+          cache-dependency-path: |
+            go.sum
+            live/go.sum
+      - name: Build Terma
+        run: go build -o live/bin/terma .
+      - name: Assert harness telemetry (no provider credentials)
+        working-directory: live
+        run: go test -v -count=1 -timeout=10m -run '^(TestClaudeTelemetry|TestCodexTelemetry|TestClaudeStopFailureDelivery)$' .
+      - name: Publish coverage summary
+        if: always()
+        run: |
+          if [ -f live/report/latest.md ]; then
+            cat live/report/latest.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   cursor-billing:
     runs-on: ubuntu-latest
     defaults:

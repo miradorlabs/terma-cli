@@ -68,6 +68,8 @@ type Sandbox struct {
 	Codex  Binary
 	// ClaudeBaseURL is set only by scenarios using a synthetic loopback provider.
 	ClaudeBaseURL string
+	// ExcludeContent exercises Terma's actual exporter redaction switches.
+	ExcludeContent bool
 
 	claudeConnected, codexConnected bool
 }
@@ -180,8 +182,7 @@ func (sb *Sandbox) connectClaude() {
 		return
 	}
 	sb.claudeConnected = true
-	sb.terma(sb.Repo, "connect", "claude", "--project", sb.ProjectID, "--api-key", liveKey, "--yes",
-		"--otlp-url", sb.Receiver.URL())
+	sb.connectHarness("claude")
 }
 
 // connectCodex points Codex's export at the receiver, once.
@@ -190,8 +191,15 @@ func (sb *Sandbox) connectCodex() {
 		return
 	}
 	sb.codexConnected = true
-	sb.terma(sb.Repo, "connect", "codex", "--project", sb.ProjectID, "--api-key", liveKey, "--yes",
-		"--otlp-url", sb.Receiver.URL())
+	sb.connectHarness("codex")
+}
+
+func (sb *Sandbox) connectHarness(name string) {
+	args := []string{"connect", name, "--project", sb.ProjectID, "--api-key", liveKey, "--yes", "--otlp-url", sb.Receiver.URL()}
+	if sb.ExcludeContent {
+		args = append(args, "--exclude-prompts", "--exclude-tool-content")
+	}
+	sb.terma(sb.Repo, args...)
 }
 
 // termaEnv is the environment terma itself runs with: its scratch config and

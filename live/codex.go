@@ -172,7 +172,14 @@ func (sb *Sandbox) CodexExec(route Route, prompt string, extra ...string) *Codex
 // start and every completed response.
 func (sb *Sandbox) CodexLogs(threadID string, timeout time.Duration) (starts, completed []LogRecord) {
 	all := sb.Receiver.WaitLogs(timeout, func(l LogRecord) bool {
-		return l.Attrs["conversation.id"] == threadID && l.Attrs["event.name"] == "codex.sse_event" && l.Attrs["event.kind"] == "response.completed"
+		// Timing-only stream observations share the same event kind; they
+		// are not usage records. A partially populated usage record still
+		// reaches the value contracts and fails there.
+		_, input := l.Attrs["input_token_count"]
+		_, output := l.Attrs["output_token_count"]
+		_, cached := l.Attrs["cached_token_count"]
+		_, timing := l.Attrs["duration_ms"]
+		return (!timing || input || output || cached) && l.Attrs["conversation.id"] == threadID && l.Attrs["event.name"] == "codex.sse_event" && l.Attrs["event.kind"] == "response.completed"
 	})
 	completed = all
 	for _, l := range sb.Receiver.Logs() {
