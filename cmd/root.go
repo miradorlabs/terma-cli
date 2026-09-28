@@ -69,8 +69,10 @@ spend will be attributed.`,
 		},
 	}
 
-	// No shell completion command: terma is not a CLI worth completing yet.
-	root.CompletionOptions.DisableDefaultCmd = true
+	// Shell completion stays, hidden: the Homebrew cask generates its completion files by
+	// running `terma completion <shell>` during install, and fails the install if it
+	// cannot. It is not a command a developer needs listed.
+	root.CompletionOptions.HiddenDefaultCmd = true
 
 	pf := root.PersistentFlags()
 	pf.StringVar(&flags.profile, "profile", "", "configuration profile to use")
@@ -182,7 +184,7 @@ func automaticUpdatesAllowed(cmd *cobra.Command, interactive bool) bool {
 	}
 	for c := cmd; c != nil; c = c.Parent() {
 		switch c.Name() {
-		case "hook", "shim", "spool", "update", "version", "__complete", "__completeNoDesc":
+		case "hook", "shim", "spool", "update", "version", "completion", "__complete", "__completeNoDesc":
 			return false
 		}
 	}

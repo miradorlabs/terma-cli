@@ -223,7 +223,7 @@ update      Update terma
 ```
 
 Authentication, direct telemetry management, project lookup, principal lookup,
-configuration, hook execution, shim management, and spool maintenance remain
+shell completion, configuration, hook execution, shim management, and spool maintenance remain
 available as hidden commands for automation and troubleshooting. Run
 `terma <command> --help` for details.
 

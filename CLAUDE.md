@@ -176,10 +176,12 @@ run that reaches them opens a browser login on **production**. A script that run
   lists `primaryCommands` — setup, install, status, doctor, session, usage, org,
   uninstall, update — and everything else is `Hidden: true`, **not removed**: login/logout/
   whoami, connect/disconnect/telemetry/harness, project, principal, config, spool, version,
-  hook, shim. `blame` and cobra's `completion` were removed outright (2026-09-28, a product
-  call: not part of terma for now; `removedCommands`, `CompletionOptions.DisableDefaultCmd`)
-  — no message may name them. doctor's round-trip still reads `terma.commit` back through
-  `api.CommitLog` (`commitLogWindow`). Hidden commands are what automation and CI run and what terma's own fix-it
+  hook, shim — and cobra's `completion`, hidden (`CompletionOptions.HiddenDefaultCmd`), not
+  removed: the Homebrew cask's `generate_completions_from_executable` runs `terma
+  completion <shell>` during `brew install`, and a failing command fails the install.
+  `blame` was removed outright (2026-09-28, a product call: not part of terma for now;
+  `removedCommands`) — no message may name it. doctor's round-trip still reads
+  `terma.commit` back through `api.CommitLog` (`commitLogWindow`). Hidden commands are what automation and CI run and what terma's own fix-it
   hints name, so they must keep working; `project` is advanced because `install` binds a
   repository to its project and the selection only scopes the read commands elsewhere. A new
   command is advanced unless a developer needs it day to day — an unclassified or un-hidden
@@ -697,7 +699,7 @@ it does not prove that a running agent has reloaded its settings or sent telemet
   rewrites a stale husky/lefthook line in place.
 
 - Updates (`internal/selfupdate`): normal successful interactive commands check daily;
-  hook/shim/spool/version/update, machine output, CI and
+  hook/shim/spool/version/update/completion, machine output, CI and
   `TERMA_NO_UPDATE_CHECK=1` skip passive work. `terma update --auto on|off|status`
   stores a machine-wide opt-in in `updates.json`. The release tag is the version:
   GoReleaser stamps it, and checks compare it with the latest published release. A
