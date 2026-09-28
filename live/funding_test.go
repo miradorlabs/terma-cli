@@ -162,6 +162,7 @@ func TestClaudeStopFailureDelivery(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			calls.Add(1)
 			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("request-id", "req_telemetry_error")
 			w.WriteHeader(http.StatusBadRequest)
 			_, _ = w.Write([]byte(`{"type":"error","error":{"type":"invalid_request_error","message":"synthetic error for hook verification"}}`))
 		}))
@@ -192,6 +193,28 @@ func TestClaudeStopFailureDelivery(t *testing.T) {
 			}
 		}
 		checkClaudeAccount(t, sb, sid, false)
+		awaitTelemetry(t, sb, func(reporter contractReporter, e telemetryEvidence) {
+			checkExportRequests(reporter, e)
+			for _, record := range e.logsFor(reporter, "api_error", "session.id", sid, 1,
+				"prompt.id", "event.sequence", "model", "error", "status_code", "duration_ms", "attempt", "request_id") {
+				equalField(reporter, "api_error", record.Attrs, "status_code", "400")
+				equalField(reporter, "api_error", record.Attrs, "request_id", "req_telemetry_error")
+			}
+			found := false
+			for _, span := range e.spans {
+				if span.Name == "claude_code.llm_request" && span.Attrs["session.id"] == sid {
+					found = true
+					if span.Proto.GetStatus().GetCode() != 2 {
+						reporter.Errorf("failed llm_request: expected ERROR span status")
+					}
+					equalField(reporter, span.Name, span.Attrs, "success", "false")
+					equalField(reporter, span.Name, span.Attrs, "status_code", "400")
+				}
+			}
+			if !found {
+				reporter.Errorf("missing failed llm_request span")
+			}
+		})
 		Note("claude/StopFailure", "real harness; synthetic loopback 400 is classified as unknown")
 	})
 }

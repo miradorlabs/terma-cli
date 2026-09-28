@@ -1,6 +1,7 @@
 package live
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -104,9 +105,9 @@ func (sb *Sandbox) ClaudeInteractive(route Route, prompt string, reply *regexp.R
 func (sb *Sandbox) ClaudeInteractiveTurns(route Route, prompts []string, replies []*regexp.Regexp, afterTurn func(int, string), extra ...string) *ClaudeRun {
 	t := sb.T
 	t.Helper()
-	sb.connectClaude()
+	sb.ensureClaudeExport()
 	sessionID := uuid.NewString()
-	term, err := Start(sb.Repo, sb.claudeEnv(route), 40, 120, sb.Claude.Path, sb.claudeArgs(sessionID, extra...)...)
+	term, err := Start(sb.Repo, sb.claudeEnv(route), 40, 120, sb.claudeLauncher(), sb.claudeArgs(sessionID, extra...)...)
 	if err != nil {
 		t.Fatalf("start claude: %v", err)
 	}
@@ -176,11 +177,13 @@ ready:
 func (sb *Sandbox) ClaudeHeadless(route Route, prompt string, extra ...string) (map[string]any, string) {
 	t := sb.T
 	t.Helper()
-	sb.connectClaude()
+	sb.ensureClaudeExport()
 	sessionID := uuid.NewString()
 	args := append([]string{"-p", prompt, "--output-format", "json", "--max-turns", "1", "--max-budget-usd", "0.05"},
 		sb.claudeArgs(sessionID, extra...)...)
-	cmd := exec.Command(sb.Claude.Path, args...)
+	ctx, cancel := context.WithTimeout(context.Background(), scenarioTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, sb.claudeLauncher(), args...)
 	cmd.Dir = sb.Repo
 	cmd.Env = sb.claudeEnv(route)
 	cmd.Stdin = nil

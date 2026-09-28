@@ -1,12 +1,14 @@
 # live
 
-Real harnesses, real credentials, the real `terma` binary, against the
+Real harnesses and the real `terma` binary, with credential-free fixture scenarios
+and separate authenticated provider scenarios, against the
 collection matrix in `docs/collection-matrix.html`. A cell there is either a
 passing test here or a claim.
 
 ```sh
 make test                      # offline value contracts; no harnesses or credentials
 cp .env.example .env.local     # fill in what you have
+make telemetry                 # real harnesses, local provider fixtures, no credentials
 make live                      # build in Docker, run natively, write report/latest.md
 make live RUN=TestClaudeSubscriptionSession
 LIVE_UPDATE_GOLDEN=1 make live # re-record the attribute key sets after a harness upgrade
@@ -45,6 +47,11 @@ scenarios explicitly. A passing offline run does not establish provider
 compatibility; `make live` runs those scenarios and propagates a failing test's
 exit status to the caller.
 
+The [telemetry contracts](../docs/TELEMETRY-TESTS.md) describe the event/field
+assertions, content-exclusion checks, schema baselines, CI coverage and known
+limits. The receiver retains complete OTLP payloads; telemetry tests validate
+logs, traces and metric values together.
+
 ## Credentials and modes
 
 | variable | enables | route |
@@ -81,7 +88,10 @@ the authentic API billing route.
 
 ## CI
 
-The main CI workflow runs this module's offline contracts with the race detector.
+The main CI workflow runs this module's offline contracts with the race detector
+and the credential-free telemetry scenarios against pinned real harness builds,
+tolerating only Codex's documented SessionEnd race there
+(`TERMA_LIVE_KNOWN_UPSTREAM=codex-session-end`; see docs/CODEX-SESSION-END.md).
 `Live harness contracts` runs nightly and on manual dispatch against the latest
 three releases. Claude uses GitHub OIDC with Anthropic workload identity
 federation; no Anthropic API-key secret is needed. The workflow contains the
