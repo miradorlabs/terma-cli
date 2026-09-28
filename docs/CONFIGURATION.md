@@ -66,9 +66,9 @@ Project server keys are namespaced by project and never written to the repositor
 - Both routes are delivered by PATH shims, or by shell functions printed with
   `--activation wrapper`.
 
-The shim directory must appear before the machine-wide agent binary. `terma install` offers
-to append a marked block to the end of the shell startup file; later PATH edits can
-otherwise put the real binary first. The block takes effect in shells that read the file
+The shim directory must appear before the machine-wide agent binary. `terma install`
+appends a marked block to the end of the shell startup file, or moves it there when a
+later PATH edit would put the real binary first; `--no-path` prints the line instead. The block takes effect in shells that read the file
 afterwards: install ends with the command that reloads the current one (`source ~/.zshrc`
 for zsh). `terma doctor` reports when routing is configured but not active.
 
@@ -104,11 +104,11 @@ of the repository. Reinstalling preserves an existing policy; use `--signals`,
 `--prompts on|off`, and `--exclude-tool-content` to change what the repository sends.
 Restart Claude Code after installing so the session loads the new settings.
 
-Whether your own agents send prompt text and model responses is asked on every
-interactive install, defaulting to your last answer for that project (on for a first
-install). `terma install --prompts off` or `--prompts on` changes it without the
-question; `--yes` keeps the last answer. The answer is yours: it changes the repository's
-committed policy only when you pass `--prompts` explicitly.
+Your own agents send prompt text and model responses by default: install does not ask,
+keeps your last choice for that project (on for a first install), and its Prompts line
+says how to change it. `terma install --prompts off` stops them and `--prompts on` turns
+them back on. The choice is yours: it changes the repository's committed policy only when
+you pass `--prompts` explicitly.
 
 Codex ignores project-level OTEL configuration, so direct `terma connect codex` is
 machine-wide. `terma install` instead routes each launch using runtime `-c` overrides
@@ -149,7 +149,7 @@ has not read yet (`source` it or open a new terminal), and a later PATH entry th
 bypasses the shims. It warns
 even when global telemetry still works, and says which settings provide that
 fallback. OpenCode needs no shell integration. Diagnostics never opt in or modify
-your shell startup file; `terma install` offers that setup.
+your shell startup file; `terma install` does that setup.
 
 ## Updates
 

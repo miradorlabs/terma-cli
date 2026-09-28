@@ -35,7 +35,10 @@ run that reaches them opens a browser login on **production**. A script that run
   one file there plus its hookmgr/hookrun halves, never another hand-written triplet in
   `cmd/`. The telemetry registry (`harness.All`) is a different, narrower list: only
   agents with a configurable OTLP exporter. Cursor and Antigravity are adapters but not
-  harnesses.
+  harnesses. While `agentAvailable` (cmd/setup.go) says an agent is coming soon — Cursor,
+  Antigravity, OpenCode — `installAdapters` never wires its hooks by default, whatever
+  directory the repository carries or a colleague committed; only `--adapters` names one.
+  uninstall, doctor and `terma hook` still cover them.
 - Hooks are thin shims; **all logic is in the binary** (`terma hook <event>`,
   `internal/hookrun`). Never put logic in `hookmgr.ShimScript` or the husky/lefthook/
   pre-commit lines beyond "call terma, never fail, chain". Every committed entry is
@@ -239,9 +242,10 @@ run that reaches them opens a browser login on **production**. A script that run
   fails. PATH entries are compared by identity (`sameDir`), not spelling: a trailing
   slash that slipped past `RealBinary` would make the shim exec itself forever.
   The shim directory gets onto PATH through the developer's shell startup file
-  (`internal/shim/rc.go`): install asks (`--yes` consents, `--no-path` declines and prints
-  the line), then writes one marked block **at the end** of `~/.zshrc` / `~/.bashrc` (macOS:
-  an existing `~/.bash_profile`) / fish `conf.d/terma.fish`. Last, because a PATH line only
+  (`internal/shim/rc.go`): install writes it without asking (running install is the
+  consent; `--no-path` declines and prints the line) as one marked block **at the end** of
+  `~/.zshrc` / `~/.bashrc` (macOS: an existing `~/.bash_profile`) / fish
+  `conf.d/terma.fish`. Last, because a PATH line only
   beats the ones after it and a real startup file prepends `~/.local/bin` — where the real
   binaries live — several times; a pasted line was silently overtaken. `RC.State`
   tells absent / last / overtaken (a later line sets PATH — `pathEdit`, which must not
@@ -250,8 +254,9 @@ run that reaches them opens a browser login on **production**. A script that run
   `shim uninstall` calls it. doctor's fix is specific: `source` the file or open a new
   terminal when the block is last and this shell predates it, else `terma install`. A child
   process cannot change its parent's PATH, so install ends with a "Next step:" naming the
-  reload (`reloadStep`; `.` for a POSIX shell) whenever a routed agent is not live yet. Never write a startup file
-  without consent, and any test that can reach `RemoveAll` or `putShimsOnPath` must
+  reload (`reloadStep`; `.` for a POSIX shell) whenever a routed agent is not live yet. Only
+  install adds the block and only `shim uninstall` removes it — doctor, status and refresh
+  never touch the file — and any test that can reach `RemoveAll` or `putShimsOnPath` must
   sandbox `HOME` and set `SHELL`.
 - Codex is split across two scopes and neither is optional. Telemetry supports user-level and runtime configuration: Codex strips `otel` (with `notify`, `profile`, `profiles` and the provider keys)
   out of a project's `.codex/config.toml` and warns at startup, so `--scope local` has
@@ -323,9 +328,9 @@ run that reaches them opens a browser login on **production**. A script that run
   verifying, and records it; the repository half is its own hook plan, which rewrites a
   stale committed file as it adds a missing one.
 - Prompt capture (`resolvePrompts`): `--prompts on|off` (`--exclude-prompts` is the older,
-  hidden spelling); otherwise an interactive install with an exporting agent asks, the
-  default being this developer's last answer for the project (`shim.Record.IncludePrompts`,
-  on for a first install), and `--yes` keeps that answer. It lands in the routing record
+  hidden spelling); otherwise install never asks: it keeps this developer's last choice for
+  the project (`shim.Record.IncludePrompts`), on for a first install, and its Prompts line
+  names the `terma install --prompts off|on` that changes it. It lands in the routing record
   and a newly written repository policy; only an explicit `--prompts` rewrites an existing
   committed policy (`updatePolicy`). A bare re-install used to switch prompts back on.
 - `terma install` writes the repository half of that arrangement by default into the
@@ -358,8 +363,9 @@ run that reaches them opens a browser login on **production**. A script that run
   displaced (revoked best-effort); `UpdateCredential` is the refresh path and never
   changes which organization is active. `logout` revokes every stored session.
 - `terma org use` (`cmd/org.go`) changes account scope only. `terma install` selects
-  and saves projects per repository. On a terminal it asks every time, the bound project
-  marked and kept by Enter; without one, or with `--yes`, it keeps the binding. When
+  and saves projects per repository. An organization with one project is bound to it
+  without asking (`soleOrPick`). With several, on a terminal it asks every time, the bound
+  project marked and kept by Enter; without one, or with `--yes`, it keeps the binding. When
   install signs in, `resolveBinding` checks the binding against the projects that
   credential lists: one made in another environment or organization is named and
   replaced, never used — used as-is, its first key mint was refused with the gateway's

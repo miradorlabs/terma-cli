@@ -1,12 +1,16 @@
 package cmd
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/spf13/cobra"
 
 	"github.com/miradorlabs/terma-cli/internal/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -160,6 +164,47 @@ func TestInstallWithoutACredentialKeepsTheBindingsEnvironment(t *testing.T) {
 	}
 }
 
+// An organization with one project gives install nothing to choose, so it binds that
+// project without the picker — even with a person there to ask, on a first install and in
+// place of a binding the account cannot see alike. With several it still asks: here, with
+// no terminal to draw the picker on, that is the picker's own error.
+func TestResolveBindingTakesTheOnlyProjectWithoutAsking(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	resolve := func(org organization, existing *termaproject.File) (binding, string, error) {
+		t.Helper()
+		if _, err := auth.SaveCredential(config.DefaultProfile, storedSession(f, org)); err != nil {
+			t.Fatal(err)
+		}
+		cfg, err := loadConfig()
+		if err != nil {
+			t.Fatal(err)
+		}
+		var stderr bytes.Buffer
+		cmd := &cobra.Command{}
+		cmd.SetContext(context.Background())
+		cmd.SetErr(&stderr)
+		b, err := resolveBinding(cmd, cfg, existing, "", true, true)
+		return b, stderr.String(), err
+	}
+
+	beta := projectsIn(orgB().ID)[0]
+	if b, _, err := resolve(orgB(), nil); err != nil || b.ID != beta.ID || b.Name != beta.Name {
+		t.Fatalf("first install: binding %+v, err %v; want %s without asking", b, err, beta.Name)
+	}
+	acme := projectsIn(orgA().ID)[0]
+	b, stderr, err := resolve(orgB(), &termaproject.File{Project: termaproject.Project{ID: acme.ID, Name: acme.Name, OrganizationID: orgA().ID}})
+	if err != nil || b.ID != beta.ID {
+		t.Fatalf("unreachable binding: %+v, err %v; want it replaced by %s", b, err, beta.Name)
+	}
+	if !strings.Contains(stderr, "not a project in") {
+		t.Errorf("install should still say why it replaced the binding: %q", stderr)
+	}
+	if _, _, err := resolve(orgA(), nil); err == nil || !strings.Contains(err.Error(), "no terminal") {
+		t.Fatalf("an organization with several projects should go to the picker: %v", err)
+	}
+}
+
 func TestUnreachableBindingWording(t *testing.T) {
 	cfg := &config.Config{Environment: config.EnvLocal, OrganizationID: orgA().ID, OrganizationName: "Acme"}
 	// local and dev share an account service, so the environment is not the reason.
@@ -228,18 +273,24 @@ func TestInstallPromptsSwitchSticks(t *testing.T) {
 	for _, step := range []struct {
 		args []string
 		want bool
+		line string
 	}{
-		{[]string{"--yes"}, true}, // a first install sends them
-		{[]string{"--yes", "--prompts", "off"}, false},
-		{[]string{"--yes"}, false}, // kept, not re-defaulted
-		{[]string{"--yes", "--prompts", "on"}, true},
-		{[]string{"--yes", "--exclude-prompts"}, false}, // the older spelling still works
+		// a first install sends them, unasked, and says how to stop it
+		{nil, true, "prompt text and model responses are sent — `terma install --prompts off` stops them"},
+		{[]string{"--prompts", "off"}, false, "prompt text and model responses are not sent — `terma install --prompts on` sends them"},
+		{nil, false, ""}, // kept, not re-defaulted
+		{[]string{"--prompts", "on"}, true, ""},
+		{[]string{"--exclude-prompts"}, false, ""}, // the older spelling still works
 	} {
-		if out, err := routeCodex(t, step.args...); err != nil {
+		out, err := routeCodex(t, step.args...)
+		if err != nil {
 			t.Fatalf("install %v: %v\n%s", step.args, err, out)
 		}
 		if got := prompts(); got != step.want {
 			t.Fatalf("after install %v: prompts included = %v, want %v", step.args, got, step.want)
+		}
+		if !strings.Contains(out, step.line) {
+			t.Fatalf("install %v should say %q:\n%s", step.args, step.line, out)
 		}
 	}
 	if _, err := routeCodex(t, "--yes", "--prompts", "maybe"); err == nil || !strings.Contains(err.Error(), "want on or off") {

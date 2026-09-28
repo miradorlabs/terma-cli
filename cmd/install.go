@@ -39,12 +39,12 @@ type installFlags struct {
 	noDoctor     bool
 	noStatusLine bool
 	// noPath keeps install out of the shell startup file: it prints the PATH line for the
-	// developer to place instead of offering to write it.
+	// developer to place instead of writing it.
 	noPath   bool
 	identity string
 	signals  string
-	// prompts is --prompts: "on", "off", or "" (ask on a terminal, else keep what this
-	// developer chose for the project last time, on for a first install).
+	// prompts is --prompts: "on", "off", or "" (keep what this developer chose for the
+	// project last time, on for a first install).
 	prompts            string
 	excludePrompts     bool
 	excludeToolContent bool
@@ -66,17 +66,20 @@ func newInstallCommand() *cobra.Command {
 not run ` + "`terma setup`" + `, asks which agents you use if you have not chosen, then:
 
   1. Binds the repository to a Terma project and records it in .terma/settings.json —
-     committed, no secrets. On a terminal you choose the project every time, the one
+     committed, no secrets. An organization with one project is bound to it without
+     asking. With several, on a terminal you choose the project every time, the one
      already bound offered first (Enter keeps it); --project names it instead, and
      without a terminal, or with --yes, an existing binding is kept. A binding to a
-     project your account cannot see is not used: install says why and asks again.
+     project your account cannot see is not used: install says why and chooses again.
   2. Points each of your agents at that project, per repository:
        - Claude Code exports to it through per-repo settings (claude --settings);
        - Codex CLI exports to it through runtime -c overrides;
-     both delivered by PATH shims installed automatically, which install offers to put
-     on PATH in your shell's startup file (--no-path prints the line instead;
-     --activation wrapper prints shell functions instead). Keys stay in your home directory, namespaced by project —
-     never in the repository.
+     both delivered by PATH shims, which install puts on PATH at the end of your
+     shell's startup file (--no-path prints the line instead; --activation wrapper
+     prints shell functions instead). Keys stay in your home directory, namespaced by
+     project — never in the repository. Prompt text and model responses are sent
+     (your last choice for the project, on for a first install); --prompts off stops
+     them.
      Codex Desktop reports through repository hooks and the local Terma spool.
   3. Enables repository telemetry, including for machines configured to export only
      from installed repositories. Existing repository policies are preserved unless
@@ -103,11 +106,11 @@ The keys and per-project configuration live in your home directory; the committe
 	cmd.Flags().StringVar(&f.activation, "activation", "", "per-repo routing delivery: shim (PATH shims, the default) or wrapper (printed shell functions)")
 	cmd.Flags().BoolVar(&f.noHooks, "no-hooks", false, "do not install commit hooks or agent hooks")
 	cmd.Flags().BoolVar(&f.noDoctor, "no-doctor", false, "do not run `terma doctor` to verify the chain after installing")
-	cmd.Flags().BoolVar(&f.noPath, "no-path", false, "do not offer to add the shim directory to PATH in your shell's startup file; print the line instead")
+	cmd.Flags().BoolVar(&f.noPath, "no-path", false, "do not add the shim directory to PATH in your shell's startup file; print the line instead")
 	cmd.Flags().BoolVar(&f.noStatusLine, "no-statusline", false, "do not wrap Claude Code's status line (which captures the plan's rate-limit windows)")
 	cmd.Flags().StringVar(&f.identity, "identity", "", "identity stamped on Codex/OpenCode sessions (default: git user.email; \"none\" to omit)")
 	cmd.Flags().StringVar(&f.signals, "signals", "", "comma-separated signals to export: traces, logs, metrics (default all)")
-	cmd.Flags().StringVar(&f.prompts, "prompts", "", "send prompt text and model responses: on or off (default: ask, keeping your last answer for this project)")
+	cmd.Flags().StringVar(&f.prompts, "prompts", "", "send prompt text and model responses: on or off (default: your last choice for this project, on for a first install)")
 	cmd.Flags().BoolVar(&f.excludePrompts, "exclude-prompts", false, "do not export prompt text or model responses")
 	// --exclude-prompts is --prompts off, kept working for the scripts that pass it.
 	_ = cmd.Flags().MarkHidden("exclude-prompts")
@@ -223,19 +226,20 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 		ui.ok("Project", nameOrID(b.Name, b.ID)+env)
 	}
 
-	// Whether the developer's agents send what was said, asked here — once the project is
-	// known, so the last answer for it is the default — and carried as excludePrompts to
-	// the routing record and any repository policy written below.
-	include, err := resolvePrompts(cmd, cfg.ProjectID, agents, f)
+	// Whether the developer's agents send what was said, settled here — once the project
+	// is known, so the last choice for it stands — and carried as excludePrompts to the
+	// routing record and any repository policy written below. Nothing asks, so the line
+	// names the command that changes it.
+	include, err := resolvePrompts(cmd, cfg.ProjectID, f)
 	if err != nil {
 		return err
 	}
 	f.excludePrompts = !include
 	if len(exportingAgents(agents)) > 0 {
 		if include {
-			ui.ok("Prompts", "included — `terma install --prompts off` stops them")
+			ui.ok("Prompts", "prompt text and model responses are sent — `terma install --prompts off` stops them")
 		} else {
-			ui.ok("Prompts", "not sent — `terma install --prompts on` includes them")
+			ui.ok("Prompts", "prompt text and model responses are not sent — `terma install --prompts on` sends them")
 		}
 	}
 
@@ -479,11 +483,10 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 }
 
 // resolvePrompts decides whether the developer's agents send prompt text and model
-// responses: --prompts (or the older --exclude-prompts) when given; else, on a terminal
-// with an agent that exports, the question, defaulting to the answer this developer gave
-// for the project last time (its routing record) and on for a first install; else that
-// same default. Re-running install without the flag used to switch prompts back on.
-func resolvePrompts(cmd *cobra.Command, projectID string, agents []string, f installFlags) (bool, error) {
+// responses, without asking: --prompts (or the older --exclude-prompts) when given, else
+// the choice this developer made for the project last time (its routing record), on for
+// a first install. Re-running install without the flag used to switch prompts back on.
+func resolvePrompts(cmd *cobra.Command, projectID string, f installFlags) (bool, error) {
 	explicit := strings.ToLower(strings.TrimSpace(f.prompts))
 	excluded := cmd.Flags().Changed("exclude-prompts") && f.excludePrompts
 	switch explicit {
@@ -501,15 +504,10 @@ func resolvePrompts(cmd *cobra.Command, projectID string, agents []string, f ins
 	if excluded {
 		return false, nil
 	}
-	current := true
 	if rec, ok, err := shim.LoadRecord(projectID); err == nil && ok && projectID != "" {
-		current = rec.IncludePrompts
+		return rec.IncludePrompts, nil
 	}
-	exporting := exportingAgents(agents)
-	if len(exporting) == 0 || f.assumeYes || f.dryRun || !canPrompt() {
-		return current, nil
-	}
-	return confirmDefault(cmd, "Include prompt text and model responses in what "+joinNames(adapterDisplayNames(exporting))+" send?", current)
+	return true, nil
 }
 
 // installNeedsAuth reports whether install must obtain a credential: to point a
@@ -747,9 +745,8 @@ func exportingAgents(agents []string) []string {
 // setupActivation installs the per-repo routing mechanism.
 // The PATH shim is the default and is installed without asking; the shim scripts front
 // the agent binaries and re-invoke terma. `--activation wrapper` opts into printed shell
-// functions instead. The one thing terma cannot do silently is put the shim directory on
-// PATH — that lives in the developer's shell rc — so it prints that line once, and only
-// when the directory is not already there.
+// functions instead. Unless the shims already route, the shim directory then goes on
+// PATH in the developer's shell startup file (putShimsOnPath).
 func setupActivation(cmd *cobra.Command, ui *installUI, agents []string, f installFlags) error {
 	mode := strings.TrimSpace(f.activation)
 	if mode == "" {
@@ -766,7 +763,7 @@ func setupActivation(cmd *cobra.Command, ui *installUI, agents []string, f insta
 			ui.ok(adapterDisplayNames([]string{a})[0], "shim at "+tildePath(filepath.Join(binDir, a)))
 		}
 		if !allActive(agents) {
-			putShimsOnPath(cmd, ui, binDir, agents, f)
+			putShimsOnPath(ui, binDir, agents, f)
 		}
 	case "wrapper":
 		if _, err := shim.InstallShims(agents); err != nil {
@@ -814,16 +811,17 @@ func wrapperFile(shell string) string {
 }
 
 // putShimsOnPath gets the shim directory onto PATH ahead of the real binaries — the one
-// step of per-repo routing that lives in the developer's shell startup file. It asks
-// before writing there (--yes answers; --no-path declines) and writes one marked block at
-// the end of the file. The shell install was run from read that file before the block was
-// in it, and terma, a child process, cannot change its parent's PATH — so whatever
-// happens, a next step says how to make this shell read the file again.
+// step of per-repo routing that lives in the developer's shell startup file. It writes
+// one marked block at the end of the file without asking: running install is the
+// consent, and --no-path keeps terma out of the file and prints the line instead. The
+// shell install was run from read that file before the block was in it, and terma, a
+// child process, cannot change its parent's PATH — so whatever happens, a next step says
+// how to make this shell read the file again.
 //
 // The block goes last on purpose. A PATH line only wins over the ones that run after it,
 // and a real startup file prepends ~/.local/bin — where the real claude and codex live —
 // more than once; pasted anywhere but the end, terma's line is silently overtaken.
-func putShimsOnPath(cmd *cobra.Command, ui *installUI, binDir string, agents []string, f installFlags) {
+func putShimsOnPath(ui *installUI, binDir string, agents []string, f installFlags) {
 	ui.reloading = true
 	names := joinNames(adapterDisplayNames(agents))
 	rc, ok := shim.ShellRC()
@@ -852,31 +850,23 @@ func putShimsOnPath(cmd *cobra.Command, ui *installUI, binDir string, agents []s
 		manual("Could not read " + file + " (" + err.Error() + "). Add this")
 		return
 	}
-	question := "Add terma's shim directory to PATH in " + file + "?"
-	switch state {
-	case shim.RCLast:
+	if state == shim.RCLast {
 		ui.ok("PATH", file+" puts the shims first")
 		ui.then(reload)
 		return
-	case shim.RCOvertaken:
-		question = "A later line in " + file + " puts the real binaries back in front. Move terma's PATH line to the end?"
 	}
-	// Consent is --yes, or a yes typed at a terminal. Anything else — a script, an agent, a
-	// declined prompt — leaves the file alone.
-	consented := f.assumeYes
-	if !consented && canPrompt() {
-		consented = confirmYes(cmd, question)
-	}
-	if !consented {
-		manual("Not written. Add this")
-		return
-	}
+	// Absent, or overtaken by a later line that puts the real binaries back in front:
+	// either way Ensure appends the block, or moves it to the end.
 	if _, err := rc.Ensure(binDir); err != nil {
 		manual("Could not write " + file + " (" + err.Error() + "). Add this")
 		return
 	}
 	fmt.Fprintf(ui.detail, "  PATH         → %s (last line; `terma shim uninstall` removes it).\n", file)
-	ui.ok("PATH", file+" puts the shims first")
+	if state == shim.RCOvertaken {
+		ui.ok("PATH", "moved terma's line to the end of "+file+", so the shims come first")
+	} else {
+		ui.ok("PATH", file+" puts the shims first")
+	}
 	ui.then(reload)
 }
 
@@ -903,8 +893,11 @@ func allActive(agents []string) bool {
 // installAdapters lists the agents whose committed hooks to wire. --adapters overrides
 // it outright; otherwise it is the union of the agents the repository's hooks files
 // already wire, the agents this install configures, and any adapter whose directory the
-// repository already carries (a .cursor / .codex / .agents directory is a clear sign the
-// repo is opened in that agent) — restricted to adapters that actually write a hooks file.
+// repository already carries (a .codex directory is a clear sign the repo is opened in
+// Codex) — restricted to adapters that actually write a hooks file, and to agents that
+// are available: one still coming soon (agentAvailable — Cursor, Antigravity) is wired
+// only when --adapters names it, whatever directory the repository carries. Hooks a
+// colleague committed for one are left as they are, not rewritten or removed.
 //
 // A union (rather than replacing with the current selection) means selecting more agents
 // grows the committed set, while a colleague re-running install with a narrower selection
@@ -916,7 +909,7 @@ func installAdapters(root string, agents []string, override string) []string {
 	}
 	var out []string
 	for _, a := range adapter.All() {
-		if a.HooksPath() == "" {
+		if a.HooksPath() == "" || !agentAvailable(a.Name()) {
 			continue
 		}
 		// Codex Desktop is captured through the Codex hooks file.
@@ -1125,9 +1118,10 @@ func boundTo(p *project, cfg *config.Config) binding {
 // names a project the account service refuses, and used as-is it failed at the first key
 // install minted, with the server's words about neither. ask says a person is there to
 // choose: they confirm or change the project on every install, the bound one marked and
-// kept by Enter. Without ask, a binding that checks out is kept and one that does not is an
-// error naming the fix. A hooks-only install that needs no credential keeps the binding
-// unchecked — there is nothing to check it with.
+// kept by Enter — unless the organization has one project, which is taken without asking.
+// Without ask, a binding that checks out is kept and one that does not is an error naming
+// the fix. A hooks-only install that needs no credential keeps the binding unchecked —
+// there is nothing to check it with.
 func resolveBinding(cmd *cobra.Command, cfg *config.Config, existing *termaproject.File, ref string, verify, ask bool) (binding, error) {
 	ref = strings.TrimSpace(ref)
 	if serverkey.Is(cfg.APIKey) {
@@ -1189,15 +1183,12 @@ func resolveBinding(cmd *cobra.Command, cfg *config.Config, existing *termaproje
 		current = ""
 	case bound && !ask:
 		return keptBinding(existing), nil
-	case !ask:
-		p, err := soleOrPick(cmd, projects)
-		if err != nil {
-			return binding{}, err
-		}
-		return boundTo(p, cfg), nil
 	}
 
-	p, err := pickProject(cmd, projects, current)
+	// One project is no choice, so it is taken without asking — on a first install and in
+	// place of a binding the account cannot see alike. Several are a picker, the bound one
+	// marked and kept by Enter.
+	p, err := soleOrPick(cmd, projects, current)
 	if err != nil {
 		return binding{}, err
 	}

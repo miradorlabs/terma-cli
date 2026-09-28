@@ -44,9 +44,9 @@ terma install     # run inside each repository
 terma doctor      # verify the chain end to end
 ```
 
-`terma install` asks which project the repository reports to, offering the one in
-an existing `.terma/settings.json` first (Enter keeps it), or takes
-`--project <name-or-id>`. A bound project your account cannot see is never used:
+`terma install` binds the repository to a project: the only one, when your
+organization has one; otherwise it asks, offering the one in an existing
+`.terma/settings.json` first (Enter keeps it), or takes `--project <name-or-id>`. A bound project your account cannot see is never used:
 install says why and lets you choose another. Use `--yes` for non-interactive setup
 (it keeps an existing binding), or `--harness none` when you only want commit hooks.
 It reports one line per step (✓ done, ! needs you), then numbers what is left for you
@@ -120,8 +120,8 @@ Release, versioning and installer details are in [RELEASING.md](docs/RELEASING.m
 
 To send two repositories to different Terma projects on one machine, `terma install`
 creates a small directory of agent shims and puts it ahead of the real `claude` and
-`codex` binaries on `PATH`. It asks to add that directory to the end of your shell
-startup file (`~/.zshrc`, `~/.bashrc`, `~/.bash_profile`, or fish `conf.d`). terma
+`codex` binaries on `PATH`. It adds that directory at the end of your shell startup
+file (`~/.zshrc`, `~/.bashrc`, `~/.bash_profile`, or fish `conf.d`). terma
 cannot change the PATH of the shell that ran it, so install ends with the command that
 does — for zsh, `source ~/.zshrc` — or open a new terminal.
 

@@ -131,12 +131,13 @@ func availableProjects(ctx context.Context, client *api.Client) ([]project, erro
 	return projects, nil
 }
 
-// soleOrPick takes the only project without asking, and prompts among several.
-func soleOrPick(cmd *cobra.Command, projects []project) (*project, error) {
+// soleOrPick takes the only project without asking, and prompts among several, current
+// (the bound project, or "") marked and kept by a bare Enter.
+func soleOrPick(cmd *cobra.Command, projects []project, current string) (*project, error) {
 	if len(projects) == 1 {
 		return &projects[0], nil
 	}
-	return pickProject(cmd, projects, "")
+	return pickProject(cmd, projects, current)
 }
 
 // matchProject resolves an argument the way every named thing resolves; see

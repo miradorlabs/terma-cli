@@ -41,9 +41,10 @@ func routedInstall(t *testing.T, extra ...string) (out, zshrc string) {
 
 // The last manual step of per-repo routing: the shim directory has to be on PATH, ahead
 // of the real binaries, and that lives in the developer's shell startup file. install
-// writes it — with consent, which --yes gives — instead of printing a line to paste.
+// writes it without asking — no --yes and no terminal here — instead of printing a line
+// to paste.
 func TestInstallPutsTheShimsOnPath(t *testing.T) {
-	out, zshrc := routedInstall(t, "--yes")
+	out, zshrc := routedInstall(t)
 	data, err := os.ReadFile(zshrc)
 	if err != nil {
 		t.Fatalf("no startup file was written: %v\n%s", err, out)
@@ -64,7 +65,7 @@ func TestInstallPutsTheShimsOnPath(t *testing.T) {
 // --no-path keeps install out of the startup file, and the line it prints says the one
 // thing a developer placing it by hand has to know: it goes last.
 func TestInstallNoPathPrintsTheLineInstead(t *testing.T) {
-	out, zshrc := routedInstall(t, "--yes", "--no-path")
+	out, zshrc := routedInstall(t, "--no-path")
 	if _, err := os.Stat(zshrc); !os.IsNotExist(err) {
 		t.Fatalf("--no-path wrote %s (err=%v)", zshrc, err)
 	}
@@ -76,15 +77,38 @@ func TestInstallNoPathPrintsTheLineInstead(t *testing.T) {
 	}
 }
 
-// Without a terminal to ask on and without --yes there is no consent, so nothing is
-// written: the startup file is the developer's.
-func TestInstallDoesNotWriteTheStartupFileUnasked(t *testing.T) {
-	out, zshrc := routedInstall(t)
-	if _, err := os.Stat(zshrc); !os.IsNotExist(err) {
-		t.Fatalf("install wrote %s without being told it could (err=%v)\n%s", zshrc, err, out)
+// A later line that prepends another directory puts the real binaries back in front of
+// the shims. install moves its block to the end without asking, and keeps that line.
+func TestInstallMovesAnOvertakenPathLine(t *testing.T) {
+	_, zshrc := routedInstall(t)
+	later := `export PATH="$HOME/.local/bin:$PATH"` + "\n"
+	f, err := os.OpenFile(zshrc, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if !strings.Contains(out, "Not written") {
-		t.Fatalf("install should say it did not write, and print the line:\n%s", out)
+	if _, err := f.WriteString(later); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := within(20*time.Second).combined(t, "install", "--harness", "codex", "--project", "aaaaaaaa-0000-4000-8000-000000000001", "--no-hooks", "--no-doctor", "--no-browser")
+	if err != nil {
+		t.Fatalf("install: %v\n%s", err, out)
+	}
+	data, err := os.ReadFile(zshrc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), later) {
+		t.Fatalf("install dropped the developer's own PATH line:\n%s", data)
+	}
+	if !strings.HasSuffix(strings.TrimRight(string(data), "\n"), "# <<< terma per-repo routing <<<") {
+		t.Fatalf("terma's block is not the last thing in the file:\n%s", data)
+	}
+	if !strings.Contains(out, "moved terma's line to the end of ~/.zshrc") {
+		t.Fatalf("install should say it moved the line:\n%s", out)
 	}
 }
 

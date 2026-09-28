@@ -57,7 +57,7 @@ func (u *installUI) line(mark, label, what string) {
 // a quoted command is drawn, each indented under its step; a shell comment stays dim.
 func (u *installUI) code(block string) string {
 	var lines []string
-	for _, l := range strings.Split(strings.TrimRight(block, "\n"), "\n") {
+	for l := range strings.SplitSeq(strings.TrimRight(block, "\n"), "\n") {
 		l = strings.TrimRight(l, " ")
 		if strings.HasPrefix(strings.TrimSpace(l), "#") {
 			lines = append(lines, "    "+u.p.Dim(l))

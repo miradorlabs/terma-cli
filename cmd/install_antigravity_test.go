@@ -64,30 +64,21 @@ func TestInstallWiresAntigravityHooksWhenAsked(t *testing.T) {
 	}
 }
 
-// A repository with one of agy's customization directories is one people open in
-// Antigravity, so its hooks come along by default; one without is left alone.
-func TestInstallWiresAntigravityByDefaultOnlyWhereItIsUsed(t *testing.T) {
+// Antigravity is coming soon: a repository with one of agy's customization directories
+// gets no Antigravity hooks from a plain install. --adapters antigravity still wires them.
+func TestInstallLeavesAntigravityAloneWhileComingSoon(t *testing.T) {
 	repo := installRepo(t)
-	if out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--yes"); err != nil {
-		t.Fatalf("install: %v\n%s", err, out)
-	}
-	if _, err := os.Stat(filepath.Join(repo, ".agents", "hooks.json")); err == nil {
-		t.Fatal("a repository with no .agents directory got Antigravity hooks by default")
-	}
-	if out, err := runTerma(t, "uninstall", "--yes"); err != nil {
-		t.Fatalf("uninstall: %v\n%s", err, out)
-	}
 	if err := os.MkdirAll(filepath.Join(repo, ".agents", "rules"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--yes"); err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}
-	if _, err := os.Stat(filepath.Join(repo, ".agents", "hooks.json")); err != nil {
-		t.Fatal("a repository with a .agents directory should get Antigravity hooks by default")
+	if _, err := os.Stat(filepath.Join(repo, ".agents", "hooks.json")); err == nil {
+		t.Fatal("a repository with a .agents directory got Antigravity hooks by default")
 	}
-	if !slices.Contains(adapter.WiredNames(repo), "antigravity") {
-		t.Errorf("antigravity is not wired: %v", adapter.WiredNames(repo))
+	if slices.Contains(adapter.WiredNames(repo), "antigravity") {
+		t.Errorf("antigravity is wired: %v", adapter.WiredNames(repo))
 	}
 }
 
