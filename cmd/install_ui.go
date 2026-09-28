@@ -50,7 +50,22 @@ func (u *installUI) warn(label, what string) {
 }
 
 func (u *installUI) line(mark, label, what string) {
-	fmt.Fprintf(u.out, "  %s %-*s %s\n", mark, stepLabelWidth, label, what)
+	fmt.Fprintf(u.out, "  %s %-*s %s\n", mark, stepLabelWidth, label, u.p.Commands(what))
+}
+
+// code draws lines the developer pastes whole — a PATH line, shell functions — the way
+// a quoted command is drawn, each indented under its step; a shell comment stays dim.
+func (u *installUI) code(block string) string {
+	var lines []string
+	for _, l := range strings.Split(strings.TrimRight(block, "\n"), "\n") {
+		l = strings.TrimRight(l, " ")
+		if strings.HasPrefix(strings.TrimSpace(l), "#") {
+			lines = append(lines, "    "+u.p.Dim(l))
+		} else {
+			lines = append(lines, "    "+u.p.Command(l))
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // then adds a step left for the developer. Lines after the first keep their own
@@ -73,8 +88,8 @@ func (u *installUI) finish() {
 	}
 	fmt.Fprintf(u.out, "\n%s\n", u.p.Bold("Next steps:"))
 	for i, step := range u.next {
-		lines := strings.Split(step, "\n")
-		fmt.Fprintf(u.out, "  %d. %s\n", i+1, lines[0])
+		lines := strings.Split(u.p.Commands(step), "\n")
+		fmt.Fprintf(u.out, "  %s %s\n", u.p.Brand(fmt.Sprintf("%d.", i+1)), lines[0])
 		for _, l := range lines[1:] {
 			if l == "" {
 				fmt.Fprintln(u.out)
@@ -156,8 +171,9 @@ func doctorFixStep(fix string) string {
 
 // commitList is the next step that names the committed files an install or refresh
 // wrote: the hooks do nothing for a colleague until the files are merged. lead says why.
-// A path is listed once, even when two changes touched it.
-func commitList(lead string, paths []string) string {
+// A path is listed once, even when two changes touched it, and the `git add` that
+// commits them is drawn in p as a command.
+func commitList(p style.Palette, lead string, paths []string) string {
 	var unique []string
 	for _, p := range paths {
 		if !slices.Contains(unique, p) {
@@ -169,6 +185,6 @@ func commitList(lead string, paths []string) string {
 	for _, p := range unique {
 		b.WriteString("\n  " + p)
 	}
-	b.WriteString("\n\n  git add " + strings.Join(unique, " "))
+	b.WriteString("\n\n  " + p.Command("git add "+strings.Join(unique, " ")))
 	return b.String()
 }

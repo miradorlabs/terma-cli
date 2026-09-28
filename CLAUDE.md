@@ -385,7 +385,12 @@ run that reaches them opens a browser login on **production**. A script that run
   four-square spinner draw only on a terminal a person is watching — never in a
   buffer, a pipe, an agent (`CLAUDECODE` and friends), `NO_COLOR` or `TERM=dumb` —
   so tests compare plain strings. `doctor` streams each check as it finishes
-  (`doctorProgress`) and polls the round-trip every second.
+  (`doctorProgress`) and polls the round-trip every second. A command a message tells
+  the reader to run is quoted in backticks, and on a terminal it is drawn as one
+  (`Palette.Command`, bold brand purple) with the backticks dropped, so a copy is the
+  command alone: `Palette.Commands` for a string, `style.Highlight(w)` for a writer
+  (status, refresh, the top-level error line), doctor's `fixText` for a fix that leads
+  with a bare `terma …`. Plain output keeps the backticks.
 - Interactive prompts (`internal/prompt`): a pure form model plus a raw-mode driver on
   `x/term`, no TUI dependency. Shown only when `canPrompt()` (stdin/stdout/stderr are
   terminals, no agent env var); every box has a flag and `--yes` skips the form.

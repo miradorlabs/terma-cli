@@ -65,3 +65,40 @@ func TestHeaderLaysInfoBesideTheLogo(t *testing.T) {
 	}
 	t.Logf("\n%s", h) // eyeball with -v
 }
+
+// A quoted command is drawn as one on a terminal, its backticks dropped so a copy is the
+// command alone; plain text keeps the quotes that mark it.
+func TestCommandsDrawsQuotedCommands(t *testing.T) {
+	const msg = "Run `source ~/.zshrc` in this terminal, then `terma update --refresh`."
+	if got := Plain().Commands(msg); got != msg {
+		t.Fatalf("plain text changed: %q", got)
+	}
+	p := Palette{enabled: true, brand: brandBasic}
+	want := "Run " + bold + brandBasic + "source ~/.zshrc" + reset + " in this terminal, then " +
+		bold + brandBasic + "terma update --refresh" + reset + "."
+	if got := p.Commands(msg); got != want {
+		t.Fatalf("got %q\nwant %q", got, want)
+	}
+	if got := p.Commands("a lone ` backtick\nand `another`"); !strings.Contains(got, "a lone ` backtick") {
+		t.Fatalf("an unmatched backtick is left alone: %q", got)
+	}
+}
+
+// Highlight is the writer itself when the writer gets plain text, and a styled writer
+// keeps answering For and Terminal about the writer underneath.
+func TestHighlight(t *testing.T) {
+	var buf bytes.Buffer
+	if w := Highlight(&buf); w != &buf {
+		t.Fatal("a buffer gets plain text, so Highlight has nothing to do")
+	}
+	h := highlighter{w: &buf, p: Palette{enabled: true, brand: brandBasic}}
+	if !For(h).Enabled() || Terminal(h) {
+		t.Fatal("For reads the highlighter's palette; Terminal asks about the writer beneath")
+	}
+	if _, err := h.Write([]byte("run `terma doctor`\n")); err != nil {
+		t.Fatal(err)
+	}
+	if got := buf.String(); strings.Contains(got, "`") || !strings.Contains(got, "terma doctor") {
+		t.Fatalf("written through the highlighter: %q", got)
+	}
+}

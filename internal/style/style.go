@@ -29,6 +29,9 @@ type Palette struct {
 // For returns the palette for w: coloured when w is a terminal a person is reading,
 // plain for anything else. Only *os.File writers can be terminals; a buffer never is.
 func For(w io.Writer) Palette {
+	if h, ok := w.(highlighter); ok {
+		return h.p
+	}
 	f, ok := w.(*os.File)
 	if !ok || !enabled(f) {
 		return Palette{}
@@ -43,6 +46,9 @@ func Plain() Palette { return Palette{} }
 // progress that redraws in place. NO_COLOR does not turn this off: it asks for no
 // colour, not for no feedback.
 func Terminal(w io.Writer) bool {
+	if h, ok := w.(highlighter); ok {
+		w = h.w
+	}
 	f, ok := w.(*os.File)
 	if !ok || agentMode() || os.Getenv("TERM") == "dumb" {
 		return false
@@ -154,6 +160,48 @@ func (p Palette) Warn(s string) string { return p.wrap(yellow, s) }
 // Fail colours a status word for something that does not work, bold as well as red so
 // it survives a terminal theme in which red is hard to see.
 func (p Palette) Fail(s string) string { return p.wrap(red+bold, s) }
+
+// Command is something the reader is meant to run or paste: bold in terma's purple, so
+// it stands out of the sentence around it.
+func (p Palette) Command(s string) string { return p.wrap(bold+p.brand, s) }
+
+// quoted is a command the way every message in this CLI names one: in backticks, on
+// one line.
+var quoted = regexp.MustCompile("`([^`\n]+)`")
+
+// Commands draws every quoted command in s as a Command and drops its backticks, which
+// were only there to mark it — so what is copied off the terminal is the command alone.
+// Plain text keeps them: a pipe, an agent or a test reads the quotes as the marker.
+func (p Palette) Commands(s string) string {
+	if !p.enabled {
+		return s
+	}
+	return quoted.ReplaceAllStringFunc(s, func(m string) string { return p.Command(m[1 : len(m)-1]) })
+}
+
+// Highlight is w with its quoted commands drawn as Commands, for a command whose
+// messages name others to run; w itself when w gets plain text. Each write is styled on
+// its own, so a quoted command must not be split across two — fmt's print functions
+// write all they format at once.
+func Highlight(w io.Writer) io.Writer {
+	p := For(w)
+	if !p.enabled {
+		return w
+	}
+	return highlighter{w: w, p: p}
+}
+
+type highlighter struct {
+	w io.Writer
+	p Palette
+}
+
+func (h highlighter) Write(b []byte) (int, error) {
+	if _, err := io.WriteString(h.w, h.p.Commands(string(b))); err != nil {
+		return 0, err
+	}
+	return len(b), nil
+}
 
 // logoLines renders the four rounded squares from docs/assets/terma-logo-dark.svg.
 // A terminal cell is roughly twice as tall as it is wide, so each six-column tile

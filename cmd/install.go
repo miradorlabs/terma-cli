@@ -25,6 +25,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/serverkey"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/shim"
+	"github.com/miradorlabs/terma-cli/internal/style"
 )
 
 type installFlags struct {
@@ -142,7 +143,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	}
 	// A dry run is nothing but its plan, so it always says everything.
 	ui := newInstallUI(out, f.verbose || f.dryRun)
-	fmt.Fprintf(out, "Installing terma in %s\n\n", tildePath(root))
+	fmt.Fprintf(out, "%s in %s\n\n", ui.p.Bold("Installing terma"), tildePath(root))
 	for _, path := range []string{termaproject.FileName, hookmgr.ClaudeSettingsPath} {
 		if err := termaproject.CheckPath(root, path); err != nil {
 			return err
@@ -435,7 +436,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	if gitDir != "" && len(written) > 0 {
 		// Save always rewrites the binding.
 		written = append(written, termaproject.FileName)
-		ui.then(commitList("Commit these files and open a PR — merging it onboards the repository:", written))
+		ui.then(commitList(ui.p, "Commit these files and open a PR — merging it onboards the repository:", written))
 	}
 	for _, n := range afterMerge {
 		ui.then("After merging: " + n)
@@ -775,7 +776,7 @@ func setupActivation(cmd *cobra.Command, ui *installUI, agents []string, f insta
 			file := wrapperFile(shell)
 			ui.reloading = true
 			ui.then(fmt.Sprintf("Add these to your %s so the agents route to this repo's project, then run `%s` in this terminal:\n%s",
-				file, reloadCommand(file), strings.TrimRight(indent(shim.WrapperSnippetFor(shell, agents)), "\n")))
+				file, reloadCommand(file), ui.code(shim.WrapperSnippetFor(shell, agents))))
 		}
 	default:
 		return fmt.Errorf("unknown --activation %q (want shim or wrapper)", mode)
@@ -834,8 +835,8 @@ func putShimsOnPath(cmd *cobra.Command, ui *installUI, binDir string, agents []s
 			reload = "then run `" + reloadCommand(file) + "` in this terminal"
 		}
 		ui.warn("PATH", "the shims are not on PATH yet")
-		ui.then(fmt.Sprintf("%s as the LAST line that touches PATH in %s — a later line that prepends another directory puts the real binaries back in front:\n    %s\n%s to route %s through terma.",
-			why, file, line, reload, names))
+		ui.then(fmt.Sprintf("%s as the LAST line that touches PATH in %s — a later line that prepends another directory puts the real binaries back in front:\n%s\n%s to route %s through terma.",
+			why, file, ui.code(line), reload, names))
 	}
 	reload := fmt.Sprintf("Run `%s` in this terminal, or open a new terminal, to route %s through terma.", reloadCommand(file), names)
 	if !ok || f.noPath {
@@ -1050,7 +1051,7 @@ func (p hookPlan) paths() []string {
 // lead is the sentence that says why. A path is listed once, even when two changes
 // touched it.
 func printCommitList(out io.Writer, lead string, paths []string) {
-	fmt.Fprintln(out, commitList(lead, paths))
+	fmt.Fprintln(out, commitList(style.For(out), lead, paths))
 }
 
 func (p hookPlan) apply(root string) error {
@@ -1091,19 +1092,6 @@ func signalStrings(signals []harness.Signal) []string {
 		out = append(out, string(s))
 	}
 	return out
-}
-
-// indent prefixes each non-empty line with two spaces, for a printed snippet.
-func indent(s string) string {
-	var b strings.Builder
-	for line := range strings.SplitSeq(s, "\n") {
-		if line == "" {
-			b.WriteByte('\n')
-			continue
-		}
-		b.WriteString("  " + line + "\n")
-	}
-	return b.String()
 }
 
 // binding is the project a repository is tied to, and the environment it was chosen in.

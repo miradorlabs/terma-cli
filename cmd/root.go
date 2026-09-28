@@ -259,16 +259,18 @@ func Execute() int {
 			default:
 			}
 		}
+		// An error's fix is usually a command to run, so it is drawn as one.
+		errOut := style.Highlight(os.Stderr)
 		label := style.For(os.Stderr).Fail("Error:")
 		if errors.Is(err, auth.ErrNotLoggedIn) {
-			fmt.Fprintf(os.Stderr, "%s not signed in. Run `terma setup` (or `terma login`).\n", label)
+			fmt.Fprintf(errOut, "%s not signed in. Run `terma setup` (or `terma login`).\n", label)
 			return 1
 		}
 		if wrongEnv, ok := errors.AsType[*auth.ErrWrongEnvironment](err); ok {
-			fmt.Fprintf(os.Stderr, "%s %v\n", label, wrongEnv)
+			fmt.Fprintf(errOut, "%s %v\n", label, wrongEnv)
 			return 1
 		}
-		fmt.Fprintf(os.Stderr, "%s %v\n", label, err)
+		fmt.Fprintf(errOut, "%s %v\n", label, err)
 		return 1
 	}
 	return 0
