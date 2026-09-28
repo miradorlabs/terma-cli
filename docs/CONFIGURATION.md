@@ -213,7 +213,10 @@ The first interactive command under a newer release, however it arrived (an auto
 update, or `brew upgrade` run by hand), refreshes the home-directory files once and
 records the release in `refreshed.json`. It does not rewrite committed files: when the
 current repository's hooks are out of date it says so, and `terma update --refresh` there
-updates them.
+updates them. In any repository afterwards, `terma status` and `terma doctor` compare the
+committed hooks with what this terma writes and name the same command when they differ.
+`.terma/settings.json`'s `terma_version` records the terma that last wrote those files;
+it changes only when install or a refresh rewrites one.
 
 Update checks compare the release tag stamped into the binary with the latest
 published release. Source builds (`make build` reports `git describe`, a plain

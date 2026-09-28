@@ -343,12 +343,13 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 		}
 	}
 
-	// 7. The committed binding. installed_at
-	// and terma_version are preserved on a re-install so a colleague setting themselves
-	// up does not churn the committed file — only the onboarder stamps them.
+	// 7. The committed binding. installed_at is the onboarder's and never moves;
+	// terma_version is the terma that last wrote the committed files, so it moves only
+	// when this run wrote one — a colleague's install that changes nothing does not
+	// churn the file.
 	version, installedAt := Version, time.Now().UTC()
 	if existing != nil {
-		if existing.Install.Version != "" {
+		if existing.Install.Version != "" && len(written) == 0 {
 			version = existing.Install.Version
 		}
 		if !existing.Install.InstalledAt.IsZero() {
@@ -691,9 +692,9 @@ func wrapperFile(shell string) string {
 
 // putShimsOnPath gets the shim directory onto PATH ahead of the real binaries — the one
 // step of per-repo routing that lives in the developer's shell startup file. It asks
-// before writing there (--yes answers; --no-path declines), writes one marked block at
-// the end of the file, and says what is left to do, which is always "open a new terminal":
-// the shell install was run from read that file before the block was in it.
+// before writing there (--yes answers; --no-path declines) and writes one marked block at
+// the end of the file. The shell install was run from read that file before the block was
+// in it; reloadStep, at the end of the install, says how to make it read the file again.
 //
 // The block goes last on purpose. A PATH line only wins over the ones that run after it,
 // and a real startup file prepends ~/.local/bin — where the real claude and codex live —

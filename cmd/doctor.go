@@ -132,8 +132,10 @@ func agentHooksCheck(root string, mine []string) doctor.Check {
 			continue
 		}
 		if !plan.Empty() {
+			// Wired, so the file is there: an earlier terma wrote it, and a refresh
+			// rewrites it without re-asking everything install asks.
 			parts = append(parts, a.DisplayName()+" hooks out of date")
-			problem("terma install")
+			problem("terma update --refresh")
 			continue
 		}
 		part := a.DisplayName() + " hooks present"
@@ -803,8 +805,10 @@ func doctorHooksCheck(w hookWiring) doctor.Check {
 	switch {
 	case w.err != nil:
 		return doctor.Check{Status: doctor.Fail, Detail: w.err.Error(), Fix: "terma install"}
+	case w.changes > 0 && w.stale == w.changes:
+		return doctor.Check{Status: doctor.Fail, Detail: fmt.Sprintf("%s wiring was written by an earlier terma (%d file(s) out of date)", w.manager, w.stale), Fix: "terma update --refresh"}
 	case w.changes > 0:
-		return doctor.Check{Status: doctor.Fail, Detail: fmt.Sprintf("%s wiring is missing or stale (%d file change(s))", w.manager, w.changes), Fix: "terma install"}
+		return doctor.Check{Status: doctor.Fail, Detail: fmt.Sprintf("%s wiring is missing (%d file change(s))", w.manager, w.changes), Fix: "terma install"}
 	case w.unpointed:
 		return doctor.Check{Status: doctor.Fail, Detail: "shims are committed but git is not pointed at them in this clone (core.hooksPath=" + firstNonEmpty(w.hooksPath, "unset") + ")", Fix: "terma install"}
 	case w.manager == hookmgr.GitShim:

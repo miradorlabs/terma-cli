@@ -699,7 +699,13 @@ it does not prove that a running agent has reloaded its settings or sent telemet
   choice. Re-running `terma install` is not a substitute: it re-defaults every flag it
   does not record. The first interactive command under a newer release refreshes the
   home-directory files once (`refreshed.json`, upward only, so two builds on PATH do not
-  take turns) and only *reports* stale committed files. `update --refresh` is a contract
+  take turns) and only *reports* stale committed files. Per repository, doctor and status
+  name the same fix: committed hooks that exist but differ from this build's templates
+  are out of date → `terma update --refresh` (`hookWiring.stale`, and `agentHooksCheck`
+  for the agents' files); files that are missing → `terma install`. The binding's
+  `terma_version` is the terma that last wrote the committed files: install stamps it only
+  when it wrote one, refresh when it rewrote one (`stampVersion`, the checkout's own
+  binding) — never a trigger, since contents decide staleness. `update --refresh` is a contract
   between releases: an older binary invokes it on a newer one, so it must keep working.
 - Migrations (`internal/migrate`, registry in `migrations.go`): a change to the shape of
   state under the config directory ships with a migration, not a tolerant reader in the

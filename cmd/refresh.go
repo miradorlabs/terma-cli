@@ -94,6 +94,21 @@ func planRepoRefresh(ctx context.Context) (*repoRefresh, error) {
 	return r, nil
 }
 
+// stampVersion records this build as the terma that last wrote the repository's
+// committed files, in the checkout's own binding (a linked worktree reading its main
+// checkout's has none to stamp). It reports whether the file changed.
+func stampVersion(root string) (bool, error) {
+	bound, err := termaproject.Load(root)
+	if errors.Is(err, termaproject.ErrNotFound) {
+		return false, nil
+	}
+	if err != nil || bound.Install.Version == Version {
+		return false, err
+	}
+	bound.Install.Version = Version
+	return true, termaproject.Save(root, bound)
+}
+
 // existingFilesOnly keeps a plan's changes to files that are already there. The notes
 // are for a first install (what each clone must run) and are dropped.
 func existingFilesOnly(p hookmgr.Plan) hookmgr.Plan {
@@ -123,6 +138,11 @@ func runRefresh(ctx context.Context, out io.Writer) error {
 	if repo != nil && !repo.plan.empty() {
 		if repoErr = repo.plan.apply(repo.root); repoErr == nil {
 			repoChanged = repo.plan.paths()
+			if stamped, err := stampVersion(repo.root); err != nil {
+				repoErr = err
+			} else if stamped {
+				repoChanged = append(repoChanged, termaproject.FileName)
+			}
 		}
 	}
 

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -49,5 +50,33 @@ func TestAgentHooksCheckReadsTheRepository(t *testing.T) {
 	}
 	if c.Ready != 0 || c.Of != 1 {
 		t.Fatalf("readiness counts only the developer's own agents: %d/%d, want 0/1", c.Ready, c.Of)
+	}
+}
+
+// Wired hooks an earlier terma wrote — here, missing an event this build adds — are out
+// of date, and the fix is the refresh that rewrites them, not a re-install that signs in
+// and asks everything again.
+func TestAgentHooksCheckSendsStaleHooksToRefresh(t *testing.T) {
+	root := t.TempDir()
+	wireAdapters(t, root, "claude")
+	path := filepath.Join(root, ".claude", "settings.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var settings map[string]any
+	if err := json.Unmarshal(data, &settings); err != nil {
+		t.Fatal(err)
+	}
+	delete(settings["hooks"].(map[string]any), "Stop")
+	if data, err = json.Marshal(settings); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c := agentHooksCheck(root, []string{"claude"})
+	if c.Status != doctor.Warn || !strings.Contains(c.Detail, "Claude Code hooks out of date") || c.Fix != "terma update --refresh" {
+		t.Fatalf("stale hooks: %v %q fix %q", c.Status, c.Detail, c.Fix)
 	}
 }

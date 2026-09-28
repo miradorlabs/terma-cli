@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"encoding/json"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -164,5 +166,47 @@ func TestUnreachableBindingWording(t *testing.T) {
 	got := unreachableBinding(&termaproject.File{Project: termaproject.Project{ID: testProjectID, Name: "Web", Environment: config.EnvDev}}, cfg)
 	if want := "this repository is bound to Web, which is not a project in Acme"; got != want {
 		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+// terma_version is the terma that last wrote the repository's committed files: an
+// install that writes none leaves an older one alone, and one that rewrites them moves it.
+func TestInstallStampsTheVersionOnlyWhenItWritesCommittedFiles(t *testing.T) {
+	repo := installRepo(t)
+	install := func() {
+		t.Helper()
+		if out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude", "--yes", "--no-doctor"); err != nil {
+			t.Fatalf("install: %v\n%s", err, out)
+		}
+	}
+	install()
+	bound, err := termaproject.Load(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bound.Install.Version = "v0.0.1"
+	if err := termaproject.Save(repo, bound); err != nil {
+		t.Fatal(err)
+	}
+
+	install()
+	if got, _ := termaproject.Load(repo); got.Install.Version != "v0.0.1" {
+		t.Fatalf("an install that wrote nothing moved terma_version to %q", got.Install.Version)
+	}
+
+	settings := filepath.Join(repo, ".claude", "settings.json")
+	data, _ := os.ReadFile(settings)
+	var doc map[string]map[string]json.RawMessage
+	if err := json.Unmarshal(data, &doc); err != nil {
+		t.Fatal(err)
+	}
+	delete(doc["hooks"], "Stop")
+	stale, _ := json.Marshal(doc)
+	if err := os.WriteFile(settings, stale, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	install()
+	if got, _ := termaproject.Load(repo); got.Install.Version != Version {
+		t.Fatalf("an install that rewrote the hooks left terma_version at %q, want %q", got.Install.Version, Version)
 	}
 }

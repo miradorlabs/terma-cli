@@ -88,6 +88,8 @@ func statusHooks(w hookWiring) (string, bool) {
 		return "could not be checked — " + w.err.Error(), false
 	case w.changes == 0 && !w.unpointed:
 		return "wired", true
+	case w.changes > 0 && w.stale == w.changes && !w.unpointed:
+		return "out of date (run `terma update --refresh`)", false
 	default:
 		return "NOT wired (run `terma install`)", false
 	}
