@@ -18,10 +18,10 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/shim"
 )
 
-// Doctor's round-trip is the lookup `terma blame` makes, so it has to ask the way
-// blame asks: a since/until window the store documents, not a `window` parameter it
+// Doctor's round-trip reads the scratch commit's terma.commit record back, so it has to
+// ask the way the log store documents: a since/until window, not a `window` parameter it
 // does not. A miss is polled again rather than reported.
-func TestWaitForCommitEventAsksTheWayBlameDoes(t *testing.T) {
+func TestWaitForCommitEventAsksForAWindow(t *testing.T) {
 	const sha = "0123456789abcdef0123456789abcdef01234567"
 
 	var mu sync.Mutex
@@ -94,8 +94,8 @@ func TestWaitForCommitEventAsksTheWayBlameDoes(t *testing.T) {
 		if errS != nil || errU != nil {
 			t.Fatalf("query %d window not RFC3339: %q..%q", i, q.Get("since"), q.Get("until"))
 		}
-		if since.After(started) || until.Before(started) || until.Sub(since) != 2*blameWindow {
-			t.Errorf("query %d window %v..%v does not bracket the scratch commit by %v", i, since, until, blameWindow)
+		if since.After(started) || until.Before(started) || until.Sub(since) != 2*commitLogWindow {
+			t.Errorf("query %d window %v..%v does not bracket the scratch commit by %v", i, since, until, commitLogWindow)
 		}
 	}
 }

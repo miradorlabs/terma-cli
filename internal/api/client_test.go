@@ -427,6 +427,8 @@ func TestAPIErrorKeepsItsMessage(t *testing.T) {
 	}{
 		{"envelope", APIError{StatusCode: 403, Code: "forbidden", Message: "no access", RequestID: "req_1"}, "no access (forbidden, request_id=req_1)"},
 		{"shared gateway project hint", APIError{StatusCode: 400, Code: "INVALID_ARGUMENT", Message: "missing X-Mirador-Project header — run `mirador project use <project>` or pass --project", RequestID: "req_1"}, "no project selected — run `terma install` in this repository or pass --project (INVALID_ARGUMENT, request_id=req_1)"},
+		{"shared gateway project remedy", APIError{StatusCode: 400, Code: "INVALID_ARGUMENT", Message: "no such project in this organization — run `mirador project list`"}, "no such project in this organization — run `terma project list` (INVALID_ARGUMENT)"},
+		{"shared gateway sign-in remedy", APIError{StatusCode: 403, Code: "PERMISSION_DENIED", Message: "listing organizations requires a user credential — run `mirador login`"}, "listing organizations requires a user credential — run `terma login` (PERMISSION_DENIED)"},
 		{"code only", APIError{StatusCode: 404, Code: "not_found", Message: "no such session"}, "no such session (not_found)"},
 		{"request id without a code", APIError{StatusCode: 500, Message: "boom", RequestID: "req_2"}, "boom (status 500) (request_id=req_2)"},
 		{"plain body", APIError{StatusCode: 502, Message: "upstream connect error"}, "upstream connect error (status 502)"},

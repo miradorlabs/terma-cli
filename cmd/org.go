@@ -119,6 +119,10 @@ Choose a project for each repository with ` + "`terma install`" + `.`,
 					return errors.New("you do not belong to any organization yet")
 				}
 				chosen, err := pickOrganization(cmd, cfg, orgs)
+				if errors.Is(err, errCancelled) {
+					fmt.Fprintln(cmd.OutOrStdout(), "Cancelled. Nothing changed.")
+					return nil
+				}
 				if err != nil {
 					return err
 				}

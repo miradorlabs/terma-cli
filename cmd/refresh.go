@@ -15,6 +15,7 @@ import (
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 	"github.com/miradorlabs/terma-cli/internal/shim"
+	"github.com/miradorlabs/terma-cli/internal/style"
 )
 
 // A refresh brings what earlier versions of terma wrote up to this build, so an update
@@ -94,6 +95,21 @@ func planRepoRefresh(ctx context.Context) (*repoRefresh, error) {
 	return r, nil
 }
 
+// stampVersion records this build as the terma that last wrote the repository's
+// committed files, in the checkout's own binding (a linked worktree reading its main
+// checkout's has none to stamp). It reports whether the file changed.
+func stampVersion(root string) (bool, error) {
+	bound, err := termaproject.Load(root)
+	if errors.Is(err, termaproject.ErrNotFound) {
+		return false, nil
+	}
+	if err != nil || bound.Install.Version == Version {
+		return false, err
+	}
+	bound.Install.Version = Version
+	return true, termaproject.Save(root, bound)
+}
+
 // existingFilesOnly keeps a plan's changes to files that are already there. The notes
 // are for a first install (what each clone must run) and are dropped.
 func existingFilesOnly(p hookmgr.Plan) hookmgr.Plan {
@@ -106,6 +122,7 @@ func existingFilesOnly(p hookmgr.Plan) hookmgr.Plan {
 // around the working directory, reported as it goes. Saved state is migrated first,
 // retrying a migration that failed, so the files are rewritten from current state.
 func runRefresh(ctx context.Context, out io.Writer) error {
+	out = style.Highlight(out)
 	var migrateErr error
 	if dir, err := config.Dir(); err == nil {
 		var applied []string
@@ -123,6 +140,11 @@ func runRefresh(ctx context.Context, out io.Writer) error {
 	if repo != nil && !repo.plan.empty() {
 		if repoErr = repo.plan.apply(repo.root); repoErr == nil {
 			repoChanged = repo.plan.paths()
+			if stamped, err := stampVersion(repo.root); err != nil {
+				repoErr = err
+			} else if stamped {
+				repoChanged = append(repoChanged, termaproject.FileName)
+			}
 		}
 	}
 
@@ -169,6 +191,7 @@ func runRefresh(ctx context.Context, out io.Writer) error {
 // current repository it says what is out of date instead. It stays quiet when nothing
 // changed, and records the release either way so it runs once.
 func refreshAfterUpgrade(ctx context.Context, dir string, out io.Writer) {
+	out = style.Highlight(out)
 	if !selfupdate.NeedsRefresh(dir, Version) {
 		return
 	}

@@ -20,8 +20,10 @@ func TestHookWiringVerdictInBothCommands(t *testing.T) {
 		w            hookWiring
 		doctorStatus doctor.Status
 		doctorDetail string
-		statusState  string
-		statusWired  bool
+		// doctorFix is the fix a failed check names; empty means `terma install`.
+		doctorFix   string
+		statusState string
+		statusWired bool
 	}{
 		{
 			name:         "wired through a hook manager",
@@ -37,9 +39,19 @@ func TestHookWiringVerdictInBothCommands(t *testing.T) {
 		},
 		{
 			name:         "an install would still write files",
-			w:            hookWiring{manager: hookmgr.Lefthook, changes: 2},
-			doctorStatus: doctor.Fail, doctorDetail: string(hookmgr.Lefthook) + " wiring is missing or stale (2 file change(s))",
+			w:            hookWiring{manager: hookmgr.Lefthook, changes: 2, stale: 1},
+			doctorStatus: doctor.Fail, doctorDetail: string(hookmgr.Lefthook) + " wiring is missing (2 file change(s))",
+			doctorFix:   "terma install",
 			statusState: "NOT wired (run `terma install`)", statusWired: false,
+		},
+		{
+			// Every file is there, written by an earlier terma: a refresh rewrites them
+			// without the sign-in and questions a re-install brings.
+			name:         "an earlier terma wrote the files",
+			w:            hookWiring{manager: hookmgr.GitShim, hooksPath: hookmgr.ShimDir, changes: 2, stale: 2},
+			doctorStatus: doctor.Fail, doctorDetail: string(hookmgr.GitShim) + " wiring was written by an earlier terma (2 file(s) out of date)",
+			doctorFix:   "terma update --refresh",
+			statusState: "out of date (run `terma update --refresh`)", statusWired: false,
 		},
 		{
 			name:         "shims committed, this clone not pointed at them",
@@ -63,8 +75,8 @@ func TestHookWiringVerdictInBothCommands(t *testing.T) {
 			if check.Status != tc.doctorStatus || check.Detail != tc.doctorDetail {
 				t.Errorf("doctor = %v %q; want %v %q", check.Status, check.Detail, tc.doctorStatus, tc.doctorDetail)
 			}
-			if check.Status == doctor.Fail && check.Fix != "terma install" {
-				t.Errorf("a failed wiring check should name the fix, got %q", check.Fix)
+			if want := firstNonEmpty(tc.doctorFix, "terma install"); check.Status == doctor.Fail && check.Fix != want {
+				t.Errorf("a failed wiring check should name the fix %q, got %q", want, check.Fix)
 			}
 			state, wired := statusHooks(tc.w)
 			if state != tc.statusState || wired != tc.statusWired {

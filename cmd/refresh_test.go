@@ -19,6 +19,7 @@ import (
 	"strings"
 	"testing"
 
+	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 	"github.com/miradorlabs/terma-cli/internal/shim"
 )
@@ -41,9 +42,17 @@ func TestRefreshUpdatesTheRepositoryFromItsBinding(t *testing.T) {
 	if out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude", "--yes", "--no-doctor"); err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}
-	binding, _ := os.ReadFile(filepath.Join(repo, ".terma", "settings.json"))
+	// What an earlier build wrote: its own version in the binding…
+	bound, err := termaproject.Load(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bound.Install.Version = "v0.0.1"
+	if err := termaproject.Save(repo, bound); err != nil {
+		t.Fatal(err)
+	}
 
-	// What an earlier build wrote: no SubagentStop hook yet.
+	// …and no SubagentStop hook yet.
 	settings := filepath.Join(repo, ".claude", "settings.json")
 	var doc map[string]map[string]json.RawMessage
 	data, _ := os.ReadFile(settings)
@@ -74,8 +83,18 @@ func TestRefreshUpdatesTheRepositoryFromItsBinding(t *testing.T) {
 	if _, err := os.Stat(postCommit); !os.IsNotExist(err) {
 		t.Fatalf("a removed hook file was brought back (stat err = %v)", err)
 	}
-	if after, _ := os.ReadFile(filepath.Join(repo, ".terma", "settings.json")); !bytes.Equal(after, binding) {
-		t.Fatalf("the binding changed:\n%s", after)
+	// The binding now names the terma that last wrote the committed files, and says
+	// nothing else new: the rest of it is the onboarder's.
+	after, err := termaproject.Load(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.Install.Version != Version || !strings.Contains(out, "git add .claude/settings.json "+termaproject.FileName) {
+		t.Fatalf("refresh should stamp terma_version %q and list the binding: %q\n%s", Version, after.Install.Version, out)
+	}
+	after.Install.Version = bound.Install.Version
+	if after.Project != bound.Project || !after.Install.InstalledAt.Equal(bound.Install.InstalledAt) || after.Install.HookManager != bound.Install.HookManager {
+		t.Fatalf("the binding changed beyond terma_version:\n%+v\nwas\n%+v", after, bound)
 	}
 
 	if out, err := runTerma(t, "update", "--refresh"); err != nil || !strings.Contains(out, "Nothing to refresh") {
@@ -320,5 +339,49 @@ func TestRefreshAfterUpgradeRunsOncePerRelease(t *testing.T) {
 	refreshAfterUpgrade(context.Background(), dir, &out)
 	if out.Len() != 0 {
 		t.Fatalf("second run under the same release was not silent:\n%s", &out)
+	}
+}
+
+// The first install under a newer release refreshes what earlier versions wrote on the
+// machine before it verifies anything, says so as a step, and records it — so the
+// refresh that follows an interactive command has nothing left to do.
+func TestInstallRefreshesTheMachineOnANewRelease(t *testing.T) {
+	installRepo(t)
+	sandboxMachine(t)
+	install := func() string {
+		t.Helper()
+		out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude", "--yes", "--no-doctor")
+		if err != nil {
+			t.Fatalf("install: %v\n%s", err, out)
+		}
+		return out
+	}
+	install()
+	binDir, err := shim.InstallShims([]string{shim.AgentCodex})
+	if err != nil {
+		t.Fatal(err)
+	}
+	codex := filepath.Join(binDir, shim.AgentCodex)
+	current, _ := os.ReadFile(codex)
+	if err := os.WriteFile(codex, append(bytes.Clone(current), "# an earlier build\n"...), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	original := Version
+	Version = "9.9.9"
+	t.Cleanup(func() { Version = original })
+	if out := install(); !strings.Contains(out, "✓ Refreshed     1 file(s) an earlier terma installed") {
+		t.Fatalf("install should refresh the machine as a step:\n%s", out)
+	}
+	if got, _ := os.ReadFile(codex); !bytes.Equal(got, current) {
+		t.Fatal("shim not refreshed")
+	}
+	var after bytes.Buffer
+	refreshAfterUpgrade(context.Background(), os.Getenv("TERMA_CONFIG_DIR"), &after)
+	if after.Len() != 0 {
+		t.Fatalf("the refresh after the command ran again:\n%s", &after)
+	}
+	if out := install(); strings.Contains(out, "Refreshed") {
+		t.Fatalf("a second install under the same release refreshed again:\n%s", out)
 	}
 }

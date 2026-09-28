@@ -290,3 +290,24 @@ func TestProfileSelectOrganization(t *testing.T) {
 		t.Fatalf("organization name not preserved: %+v", p)
 	}
 }
+
+// A binding records the environment it was made in; whether it can be read under another
+// comes down to whether the two share an account service.
+func TestSameAccounts(t *testing.T) {
+	for _, c := range []struct {
+		a, b string
+		want bool
+	}{
+		{"", EnvProd, true},
+		{EnvDev, EnvDev, true},
+		{EnvLocal, EnvDev, true}, // a local app in front of the dev backend
+		{EnvDev, "", false},
+		{EnvLocal, EnvProd, false},
+		{"staging", "staging", true},
+		{"staging", EnvProd, false},
+	} {
+		if got := SameAccounts(c.a, c.b); got != c.want {
+			t.Errorf("SameAccounts(%q, %q) = %v, want %v", c.a, c.b, got, c.want)
+		}
+	}
+}

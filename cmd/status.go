@@ -18,6 +18,7 @@ import (
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/shim"
+	"github.com/miradorlabs/terma-cli/internal/style"
 )
 
 // routedPerRepo reports whether per-repo routing is *configured* for a harness and
@@ -88,6 +89,8 @@ func statusHooks(w hookWiring) (string, bool) {
 		return "could not be checked — " + w.err.Error(), false
 	case w.changes == 0 && !w.unpointed:
 		return "wired", true
+	case w.changes > 0 && w.stale == w.changes && !w.unpointed:
+		return "out of date (run `terma update --refresh`)", false
 	default:
 		return "NOT wired (run `terma install`)", false
 	}
@@ -169,7 +172,7 @@ Nothing is written and no scratch commit is made — run
 ` + "`terma doctor`" + ` for the end-to-end verification.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
-			out := cmd.OutOrStdout()
+			out := style.Highlight(cmd.OutOrStdout())
 			cfg, err := loadConfig()
 			if err != nil {
 				return err

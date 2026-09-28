@@ -69,6 +69,11 @@ spend will be attributed.`,
 		},
 	}
 
+	// Shell completion stays, hidden: the Homebrew cask generates its completion files by
+	// running `terma completion <shell>` during install, and fails the install if it
+	// cannot. It is not a command a developer needs listed.
+	root.CompletionOptions.HiddenDefaultCmd = true
+
 	pf := root.PersistentFlags()
 	pf.StringVar(&flags.profile, "profile", "", "configuration profile to use")
 	// The environment and endpoint overrides are for Terma's own engineers (and
@@ -89,13 +94,13 @@ spend will be attributed.`,
 		newSetupCommand(),
 		newInstallCommand(),
 		newUninstallCommand(),
+		newNateCommand(),
 		newDoctorCommand(),
 		newStatusCommand(),
 		// Insight: what the connected agents did, for whom, and what it cost.
 		newSessionCommand(),
 		newUsageCommand(),
 		newPrincipalCommand(), // advanced: hidden from the primary workflow
-		newBlameCommand(),
 		// Harness connections (also reachable under the `telemetry` group).
 		newTelemetryConnectCommand(), // advanced: install configures telemetry normally
 		newTelemetryDisconnectCommand(),
@@ -158,6 +163,11 @@ func newVersionCommand() *cobra.Command {
 // first time a new release runs one, the refresh of what earlier versions installed —
 // never from a hook or a spool flush (those must stay silent and fast).
 func printUpdateNotice(cmd *cobra.Command) {
+	// nate deliberately removes the updater's state and the running executable. Its
+	// post-run must not recreate either half of the installation it just removed.
+	if cmd.Name() == "nate" {
+		return
+	}
 	if !automaticUpdatesAllowed(cmd, canPrompt()) {
 		return
 	}
@@ -255,16 +265,18 @@ func Execute() int {
 			default:
 			}
 		}
+		// An error's fix is usually a command to run, so it is drawn as one.
+		errOut := style.Highlight(os.Stderr)
 		label := style.For(os.Stderr).Fail("Error:")
 		if errors.Is(err, auth.ErrNotLoggedIn) {
-			fmt.Fprintf(os.Stderr, "%s not signed in. Run `terma setup` (or `terma login`).\n", label)
+			fmt.Fprintf(errOut, "%s not signed in. Run `terma setup` (or `terma login`).\n", label)
 			return 1
 		}
 		if wrongEnv, ok := errors.AsType[*auth.ErrWrongEnvironment](err); ok {
-			fmt.Fprintf(os.Stderr, "%s %v\n", label, wrongEnv)
+			fmt.Fprintf(errOut, "%s %v\n", label, wrongEnv)
 			return 1
 		}
-		fmt.Fprintf(os.Stderr, "%s %v\n", label, err)
+		fmt.Fprintf(errOut, "%s %v\n", label, err)
 		return 1
 	}
 	return 0

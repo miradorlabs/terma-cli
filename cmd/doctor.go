@@ -132,8 +132,10 @@ func agentHooksCheck(root string, mine []string) doctor.Check {
 			continue
 		}
 		if !plan.Empty() {
+			// Wired, so the file is there: an earlier terma wrote it, and a refresh
+			// rewrites it without re-asking everything install asks.
 			parts = append(parts, a.DisplayName()+" hooks out of date")
-			problem("terma install")
+			problem("terma update --refresh")
 			continue
 		}
 		part := a.DisplayName() + " hooks present"
@@ -276,11 +278,39 @@ func shimPathFix() string {
 	}
 	switch state, _ := rc.State(); state {
 	case shim.RCLast:
-		return "open a new terminal — " + tildePath(rc.Path) + " already puts the shims first, and this shell started before it did"
+		return "run `" + reloadCommand(tildePath(rc.Path)) + "` or open a new terminal — " + tildePath(rc.Path) + " already puts the shims first, and this shell started before it did"
 	case shim.RCOvertaken:
 		return "terma install (a later line in " + tildePath(rc.Path) + " puts the real binaries back in front; install moves terma's line to the end)"
 	}
-	return "terma install (it offers to put the shim directory on PATH in " + tildePath(rc.Path) + ")"
+	return "terma install (it puts the shim directory on PATH in " + tildePath(rc.Path) + ")"
+}
+
+// addToPathCommand is the command a developer runs to put dir on PATH for good, in their
+// own shell: the line appended to the startup file terma knows for it and read into this
+// shell, or for fish, fish_add_path, which keeps the entry itself. A shell terma does not
+// know gets the line for this shell alone. terma never runs it: this is the developer's
+// own binary directory, not the shim block install manages.
+func addToPathCommand(dir string) string {
+	rc, ok := shim.ShellRC()
+	if !ok {
+		return `export PATH="` + dir + `:$PATH"`
+	}
+	line := rc.PathLine(dir)
+	if rc.Shell == "fish" {
+		return line
+	}
+	file := shellPath(rc.Path)
+	return "echo '" + strings.ReplaceAll(line, "'", `'\''`) + "' >> " + file + " && " + reloadCommand(file)
+}
+
+// shellPath writes a path for a command line: ~/… when that needs no quoting, else the
+// full path in single quotes.
+func shellPath(path string) string {
+	const plain = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/._-~"
+	if short := tildePath(path); !strings.ContainsFunc(short, func(r rune) bool { return !strings.ContainsRune(plain, r) }) {
+		return short
+	}
+	return "'" + strings.ReplaceAll(path, "'", `'\''`) + "'"
 }
 
 // doctorProgress is how runDoctor reports as it goes: a check starting, a word about
@@ -425,13 +455,14 @@ func doctorBinaryCheck() doctor.Check {
 func doctorBinaryCheckFor(exe string) doctor.Check {
 	path, err := exec.LookPath("terma")
 	if err != nil {
-		return doctor.Check{Status: doctor.Fail, Detail: "hooks call `terma` by name and will not find it", Fix: "add " + filepath.Dir(exe) + " to PATH (or reinstall with the install script)"}
+		return doctor.Check{Status: doctor.Fail, Detail: "hooks call `terma` by name and will not find it",
+			Fix: "run `" + addToPathCommand(filepath.Dir(exe)) + "` to put " + filepath.Dir(exe) + " on PATH (or reinstall with the install script)"}
 	}
 	if current, err := fileDigest(exe); err == nil {
 		if installed, err := installedBinaryDigest(path); err == nil && current != installed {
 			return doctor.Check{Status: doctor.Warn,
 				Detail: path + binaryBuildLabel(path) + "; hooks run a different build from " + exe,
-				Fix:    "put " + filepath.Dir(exe) + " first on PATH, or replace " + path + " with this build; then run `terma doctor`"}
+				Fix:    "run `" + addToPathCommand(filepath.Dir(exe)) + "` to put " + filepath.Dir(exe) + " first on PATH, or replace " + path + " with this build; then run `terma doctor`"}
 		}
 	}
 	// Hooks call `terma` by name, and the name does not resolve the same way
@@ -803,8 +834,10 @@ func doctorHooksCheck(w hookWiring) doctor.Check {
 	switch {
 	case w.err != nil:
 		return doctor.Check{Status: doctor.Fail, Detail: w.err.Error(), Fix: "terma install"}
+	case w.changes > 0 && w.stale == w.changes:
+		return doctor.Check{Status: doctor.Fail, Detail: fmt.Sprintf("%s wiring was written by an earlier terma (%d file(s) out of date)", w.manager, w.stale), Fix: "terma update --refresh"}
 	case w.changes > 0:
-		return doctor.Check{Status: doctor.Fail, Detail: fmt.Sprintf("%s wiring is missing or stale (%d file change(s))", w.manager, w.changes), Fix: "terma install"}
+		return doctor.Check{Status: doctor.Fail, Detail: fmt.Sprintf("%s wiring is missing (%d file change(s))", w.manager, w.changes), Fix: "terma install"}
 	case w.unpointed:
 		return doctor.Check{Status: doctor.Fail, Detail: "shims are committed but git is not pointed at them in this clone (core.hooksPath=" + firstNonEmpty(w.hooksPath, "unset") + ")", Fix: "terma install"}
 	case w.manager == hookmgr.GitShim:
@@ -941,6 +974,11 @@ const (
 	roundTripPoll = time.Second
 )
 
+// commitLogWindow is how far the terma.commit lookup reaches on each side of the time
+// it centres on. The log store caps a query's span, so the lookup asks for a tight
+// window around the commit rather than scanning back from now.
+const commitLogWindow = time.Hour
+
 // waitForCommitEvent polls the data API for the scratch commit's event.
 func waitForCommitEvent(ctx context.Context, cfg *config.Config, projectID, sha string, progress doctorProgress) (bool, error) {
 	// Query the project the scratch event used, independently of command overrides.
@@ -964,9 +1002,9 @@ func waitForCommitEvent(ctx context.Context, cfg *config.Config, projectID, sha 
 	for {
 		progress.noting(fmt.Sprintf("backend receives events… waiting for the round-trip (%ds of %ds)",
 			int(time.Since(started).Seconds()), int(roundTripWait.Seconds())))
-		// The lookup `terma blame` makes, windowed the same way: the scratch commit was
-		// made moments before this started, so its record sits inside the window.
-		rec, err := client.CommitLog(ctx, sha, started.Add(-blameWindow), started.Add(blameWindow))
+		// The scratch commit was made moments before this started, so its record sits
+		// inside the window.
+		rec, err := client.CommitLog(ctx, sha, started.Add(-commitLogWindow), started.Add(commitLogWindow))
 		if err != nil {
 			return false, err
 		}

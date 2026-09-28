@@ -54,6 +54,9 @@ type Item struct {
 type Form struct {
 	Title string
 	Items []Item
+	// Choice makes the form a list to pick one item from: no boxes, the cursor starts
+	// on the Selected item (the current choice), and Enter picks the item under it.
+	Choice bool
 
 	cursor int
 	// termWidth is the terminal's column count, used so render can count the physical
@@ -144,6 +147,22 @@ func Run(f *Form) ([]Item, error) {
 	}
 }
 
+// Choose shows items as a list to pick one from with the arrow keys and returns the
+// index picked. The item marked Selected is where the cursor starts, so Enter keeps it.
+func Choose(title string, items []Item) (int, error) {
+	f := &Form{Title: title, Items: items, Choice: true}
+	chosen, err := Run(f)
+	if err != nil {
+		return -1, err
+	}
+	for i, it := range chosen {
+		if it.Selected {
+			return i, nil
+		}
+	}
+	return -1, ErrCancelled
+}
+
 // tokens splits raw input into keypresses: a CSI sequence (ESC [ x) is one token, any
 // other byte is one on its own. A lone trailing ESC is a token too — Esc means cancel.
 func tokens(b []byte) [][]byte {
@@ -160,9 +179,18 @@ func tokens(b []byte) [][]byte {
 	return out
 }
 
-// init puts the cursor on the first item that can be acted on.
+// init puts the cursor on the first item that can be acted on — in a Choice form, on
+// the selected one, so Enter keeps the current choice.
 func (f *Form) init() {
 	f.cursor = 0
+	if f.Choice {
+		for i, it := range f.Items {
+			if it.Selected && !it.Disabled {
+				f.cursor = i
+				return
+			}
+		}
+	}
 	for i, it := range f.Items {
 		if !it.Disabled {
 			f.cursor = i
@@ -179,20 +207,37 @@ func (f *Form) handle(k key) (done, cancelled bool) {
 	case keyDown:
 		f.move(1)
 	case keyToggle:
+		if f.Choice {
+			return f.handle(keyEnter)
+		}
 		f.toggle(f.cursor)
 	case keyAll:
+		if f.Choice {
+			break
+		}
 		for i := range f.Items {
 			if f.Items[i].Kind == Check && !f.Items[i].Disabled {
 				f.Items[i].Selected = true
 			}
 		}
 	case keyClear:
+		if f.Choice {
+			break
+		}
 		for i := range f.Items {
 			if f.Items[i].Kind == Check && !f.Items[i].Disabled {
 				f.Items[i].Selected = false
 			}
 		}
 	case keyEnter:
+		if f.Choice {
+			if f.cursor < 0 || f.cursor >= len(f.Items) || f.Items[f.cursor].Disabled {
+				return false, false
+			}
+			for i := range f.Items {
+				f.Items[i].Selected = i == f.cursor
+			}
+		}
 		return true, false
 	case keyCancel:
 		return false, true
@@ -279,7 +324,11 @@ func (f *Form) render(w io.Writer, p style.Palette) int {
 
 	if f.Title != "" {
 		line(bold(f.Title))
-		line(dim("  ↑/↓ move   space toggle   a all   n none   enter confirm   esc cancel"))
+		if f.Choice {
+			line(dim("  ↑/↓ move   enter select   esc cancel"))
+		} else {
+			line(dim("  ↑/↓ move   space toggle   a all   n none   enter confirm   esc cancel"))
+		}
 	}
 
 	width := 0
@@ -310,6 +359,21 @@ func (f *Form) render(w io.Writer, p style.Palette) int {
 			cursor = brand("❯") + " "
 		}
 		label := it.Label + strings.Repeat(" ", width-len([]rune(it.Label)))
+		if f.Choice {
+			// No box: the cursor is the selection, drawn bright where it rests.
+			if i == f.cursor && !it.Disabled {
+				label = brand(label)
+			}
+			text := cursor + label
+			switch {
+			case it.Disabled:
+				text = dim(cursor + label + "   " + it.Reason)
+			case it.Detail != "":
+				text += "   " + dim(it.Detail)
+			}
+			line(text)
+			continue
+		}
 		detail := it.Detail
 		if it.Disabled && it.Reason != "" {
 			detail = it.Reason

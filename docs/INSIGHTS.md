@@ -210,34 +210,6 @@ provider reported (a user's email, an API key's label) and any alias set in the 
 app; `find` matches the way `--user` does. Setting or clearing an alias is done in the
 web app — the API these commands use is read-only.
 
-## Which session produced a commit
-
-```sh
-terma blame                 # HEAD
-terma blame <commit>        # any revision git understands
-terma blame <commit> -o json
-```
-
-`blame` is the reverse of `session`: given a commit, it names the agent session that
-produced it. It reads the commit locally to get its sha and time, then reads back the
-`terma.commit` record the post-commit hook exported for that sha — the stamped
-`Agent-Session-Id`, the tool, the line counts, and the repository.
-
-- The commit must be in the current repository; the revision is anything `git show`
-  accepts (`HEAD`, `HEAD~3`, a sha, a tag).
-- The lookup is a single log query windowed tightly (±1h) on the commit's own time, so
-  a commit of any age resolves without scanning back from now.
-- JSON carries `session_id` and the full `sessions` list (a commit can be stamped for
-  more than one session), `tool`, `source_system` (the tool without its version),
-  `lines_added` / `lines_deleted` / `file_count`, `branch`, `repo_url` and
-  `reported_at` (when the backend recorded the commit).
-- Per-commit **cost** is not reported yet. The session id here is the harness session
-  id, which the usage metrics do not key on; joining a commit to its spend needs the
-  AI-session lookup and lands in a follow-up. Attribution works for every harness that
-  stamps commits. Cursor also captures ordered hook observations and optional token
-  snapshots, but backend usage and billing mapping remain pending; its attributed
-  sessions do not yet have a cost in these commands.
-
 ## Errors worth knowing
 
 | You see | It means |
@@ -251,5 +223,3 @@ produced it. It reads the commit locally to get its sha and time, then reads bac
 | `INVALID_FILTER` from the gateway | A `--filter` expression the gateway's grammar rejects — its message names the rule. |
 | `the server closed the stream (connections rotate hourly)` | Normal for `--follow`; rerun. |
 | `No usage recorded for this window and filter.` | A valid answer, not a failure: nothing settled in that slice for that selection. |
-| `<sha> carries no Agent-Session-Id trailer` | A human commit, or one made without terma — nothing to attribute. |
-| `<sha> is stamped … but has not reached Terma yet` | The trailer is there but its `terma.commit` event has not been delivered; run `terma spool flush`. |
