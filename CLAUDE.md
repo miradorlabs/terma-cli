@@ -161,7 +161,12 @@ run that reaches them opens a browser login on **production**. A script that run
   never runs what it finds) sits elsewhere on PATH or in `wellKnownBinDirs`: an app started
   from the Dock gets the system PATH, so `/usr/local/bin/terma` is what Cursor's hooks run,
   and a build from before `.terma/settings.json` does not see the binding. Tests blank
-  `wellKnownBinDirs`. The hooks check is two: `commit hooks installed` (git wiring, all or
+  `wellKnownBinDirs`. When no terma is on PATH at all (a `make build` run as bin/terma),
+  or another build is ahead of this one, the fix is the one quoted command that puts this
+  build's directory on PATH in the developer's shell (`addToPathCommand`: the PATH line
+  appended to the startup file and sourced; `fish_add_path` for fish). It lands after
+  terma's shim block, which is harmless: that directory holds no agent binaries, so the
+  shims still route, and the next install moves the block back to the end. The hooks check is two: `commit hooks installed` (git wiring, all or
   nothing) and `agent hooks run` (`agentHooksCheck`, shared with status — a fraction,
   `Check.Ready`/`Of`). A commit is stamped with the session that touched its files and a
   session exists only because its agent's hooks announced it. The readiness checklist

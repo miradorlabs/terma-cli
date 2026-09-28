@@ -282,7 +282,35 @@ func shimPathFix() string {
 	case shim.RCOvertaken:
 		return "terma install (a later line in " + tildePath(rc.Path) + " puts the real binaries back in front; install moves terma's line to the end)"
 	}
-	return "terma install (it offers to put the shim directory on PATH in " + tildePath(rc.Path) + ")"
+	return "terma install (it puts the shim directory on PATH in " + tildePath(rc.Path) + ")"
+}
+
+// addToPathCommand is the command a developer runs to put dir on PATH for good, in their
+// own shell: the line appended to the startup file terma knows for it and read into this
+// shell, or for fish, fish_add_path, which keeps the entry itself. A shell terma does not
+// know gets the line for this shell alone. terma never runs it: this is the developer's
+// own binary directory, not the shim block install manages.
+func addToPathCommand(dir string) string {
+	rc, ok := shim.ShellRC()
+	if !ok {
+		return `export PATH="` + dir + `:$PATH"`
+	}
+	line := rc.PathLine(dir)
+	if rc.Shell == "fish" {
+		return line
+	}
+	file := shellPath(rc.Path)
+	return "echo '" + strings.ReplaceAll(line, "'", `'\''`) + "' >> " + file + " && " + reloadCommand(file)
+}
+
+// shellPath writes a path for a command line: ~/… when that needs no quoting, else the
+// full path in single quotes.
+func shellPath(path string) string {
+	const plain = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/._-~"
+	if short := tildePath(path); !strings.ContainsFunc(short, func(r rune) bool { return !strings.ContainsRune(plain, r) }) {
+		return short
+	}
+	return "'" + strings.ReplaceAll(path, "'", `'\''`) + "'"
 }
 
 // doctorProgress is how runDoctor reports as it goes: a check starting, a word about
@@ -427,13 +455,14 @@ func doctorBinaryCheck() doctor.Check {
 func doctorBinaryCheckFor(exe string) doctor.Check {
 	path, err := exec.LookPath("terma")
 	if err != nil {
-		return doctor.Check{Status: doctor.Fail, Detail: "hooks call `terma` by name and will not find it", Fix: "add " + filepath.Dir(exe) + " to PATH (or reinstall with the install script)"}
+		return doctor.Check{Status: doctor.Fail, Detail: "hooks call `terma` by name and will not find it",
+			Fix: "run `" + addToPathCommand(filepath.Dir(exe)) + "` to put " + filepath.Dir(exe) + " on PATH (or reinstall with the install script)"}
 	}
 	if current, err := fileDigest(exe); err == nil {
 		if installed, err := installedBinaryDigest(path); err == nil && current != installed {
 			return doctor.Check{Status: doctor.Warn,
 				Detail: path + binaryBuildLabel(path) + "; hooks run a different build from " + exe,
-				Fix:    "put " + filepath.Dir(exe) + " first on PATH, or replace " + path + " with this build; then run `terma doctor`"}
+				Fix:    "run `" + addToPathCommand(filepath.Dir(exe)) + "` to put " + filepath.Dir(exe) + " first on PATH, or replace " + path + " with this build; then run `terma doctor`"}
 		}
 	}
 	// Hooks call `terma` by name, and the name does not resolve the same way
