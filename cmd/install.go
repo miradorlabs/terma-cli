@@ -191,6 +191,10 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 
 	// 3. Project binding.
 	b, err := resolveBinding(cmd, cfg, existing, f.projectRef, needsAuth, !f.assumeYes && !f.dryRun && canPrompt())
+	if errors.Is(err, errCancelled) {
+		fmt.Fprintln(out, "Cancelled. Nothing was written.")
+		return nil
+	}
 	if err != nil {
 		// A dry run never signs in (step 2), so when no credential is stored the
 		// project picker cannot reach the API to resolve a binding. Rather than fail

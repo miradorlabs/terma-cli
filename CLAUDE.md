@@ -398,7 +398,11 @@ run that reaches them opens a browser login on **production**. A script that run
   with a bare `terma …`. Plain output keeps the backticks.
 - Interactive prompts (`internal/prompt`): a pure form model plus a raw-mode driver on
   `x/term`, no TUI dependency. Shown only when `canPrompt()` (stdin/stdout/stderr are
-  terminals, no agent env var); every box has a flag and `--yes` skips the form.
+  terminals, no agent env var); every box has a flag and `--yes` skips the form. The
+  pickers (`cmd/pick.go`: the install project picker, `terma org use`) are a `Choice`
+  form through `prompt.Choose` — arrow keys, Enter picks, Esc is `errCancelled`, the
+  cursor starting on the default or current row; the numbered list answered by number
+  or name is the fallback when stdout is a terminal and stdin is not.
 - OpenCode (`internal/harness/opencode.go`; plugin `internal/harness/opencode/terma.js`,
   embedded): the harness is a dependency-free plugin written whole into
   `~/.config/opencode/plugins/terma.js` with one `const CONFIG = {...}` line spliced in

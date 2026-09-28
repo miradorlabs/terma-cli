@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/miradorlabs/terma-cli/internal/output"
+	"github.com/miradorlabs/terma-cli/internal/prompt"
 	"github.com/miradorlabs/terma-cli/internal/style"
 )
 
@@ -23,12 +25,30 @@ type pickRow struct {
 	Default bool
 }
 
-// pick prompts for one of rows by number or by name and returns its index. It refuses
-// to run without a terminal: a script that reaches this path wanted an argument, and
-// blocking on stdin would hang a pipeline instead of failing it. match resolves a typed
-// name the same way the command's argument would, so the picker and the argument
-// agree on what a string means.
+// pick prompts for one of rows and returns its index. On a terminal it is a list to move
+// through with the arrow keys, starting on the default (or current) row, Enter to pick
+// and Esc to back out (errCancelled). With a terminal to draw on but none to read keys
+// from, it falls back to a numbered list answered by number or by name — match
+// resolves a typed name the same way the command's argument would, so the picker and
+// the argument agree on what a string means. It refuses to run without a terminal at
+// all: a script that reaches this path wanted an argument, and blocking on stdin would
+// hang a pipeline instead of failing it.
 func pick(cmd *cobra.Command, title string, rows []pickRow, match func(string) (int, error)) (int, error) {
+	if canPrompt() {
+		items := make([]prompt.Item, len(rows))
+		for i, r := range rows {
+			note := r.Note
+			if r.Current {
+				note = strings.TrimSpace(note + "  (current)")
+			}
+			items[i] = prompt.Item{Label: r.Label, Detail: note, Selected: r.Default || r.Current}
+		}
+		i, err := prompt.Choose(title, items)
+		if errors.Is(err, prompt.ErrCancelled) {
+			return -1, errCancelled
+		}
+		return i, err
+	}
 	if !output.Interactive() {
 		return -1, fmt.Errorf("no selection given and no terminal to prompt on — pass a name or id")
 	}
