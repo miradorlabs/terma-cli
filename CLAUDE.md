@@ -175,8 +175,11 @@ run that reaches them opens a browser login on **production**. A script that run
 - The command surface is small on purpose (`cmd/command_surface_test.go`). `terma --help`
   lists `primaryCommands` — setup, install, status, doctor, session, usage, org,
   uninstall, update — and everything else is `Hidden: true`, **not removed**: login/logout/
-  whoami, connect/disconnect/telemetry/harness, project, principal, blame, config, spool,
-  version, hook, shim — and cobra's `completion` (`CompletionOptions.HiddenDefaultCmd`). Hidden commands are what automation and CI run and what terma's own fix-it
+  whoami, connect/disconnect/telemetry/harness, project, principal, config, spool, version,
+  hook, shim. `blame` and cobra's `completion` were removed outright (2026-09-28, a product
+  call: not part of terma for now; `removedCommands`, `CompletionOptions.DisableDefaultCmd`)
+  — no message may name them. doctor's round-trip still reads `terma.commit` back through
+  `api.CommitLog` (`commitLogWindow`). Hidden commands are what automation and CI run and what terma's own fix-it
   hints name, so they must keep working; `project` is advanced because `install` binds a
   repository to its project and the selection only scopes the read commands elsewhere. A new
   command is advanced unless a developer needs it day to day — an unclassified or un-hidden
@@ -416,14 +419,6 @@ run that reaches them opens a browser login on **production**. A script that run
   frame of under a 15-second bound. Names never travel on the wire: `--user`/`--api-key` resolve
   through `/v1/ai/principals` (`principalIndex`), and a substring that lands on two
   people is an error, never a guess. Semantics for agents live in `docs/INSIGHTS.md`.
-- `blame` (`cmd/blame.go`) is the reverse join: a commit → the session that produced it.
-  It reads the commit locally for its sha and time, then reads back the `terma.commit`
-  record the post-commit hook exported, via `CommitLog` over the log store's `/v1/logs`
-  query surface (`internal/api/logs.go`) — filter `attribute.event.name="terma.commit"
-  AND attribute.sha=…`, windowed ±1h on the commit's own time because the store caps a
-  query's span (currently 840h). Records come under `logs`, every attribute value is a
-  string nested under `attributes`/`resource_attributes` (hence `LogRecord.Attr/Int`).
-  No cost yet: the trailer/session.id is not what the usage metrics key on.
 
 ## Funding attribution (in progress)
 
@@ -702,7 +697,7 @@ it does not prove that a running agent has reloaded its settings or sent telemet
   rewrites a stale husky/lefthook line in place.
 
 - Updates (`internal/selfupdate`): normal successful interactive commands check daily;
-  hook/shim/spool/version/update/completion, machine output, CI and
+  hook/shim/spool/version/update, machine output, CI and
   `TERMA_NO_UPDATE_CHECK=1` skip passive work. `terma update --auto on|off|status`
   stores a machine-wide opt-in in `updates.json`. The release tag is the version:
   GoReleaser stamps it, and checks compare it with the latest published release. A

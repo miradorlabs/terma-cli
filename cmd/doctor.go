@@ -945,6 +945,11 @@ const (
 	roundTripPoll = time.Second
 )
 
+// commitLogWindow is how far the terma.commit lookup reaches on each side of the time
+// it centres on. The log store caps a query's span, so the lookup asks for a tight
+// window around the commit rather than scanning back from now.
+const commitLogWindow = time.Hour
+
 // waitForCommitEvent polls the data API for the scratch commit's event.
 func waitForCommitEvent(ctx context.Context, cfg *config.Config, projectID, sha string, progress doctorProgress) (bool, error) {
 	// Query the project the scratch event used, independently of command overrides.
@@ -968,9 +973,9 @@ func waitForCommitEvent(ctx context.Context, cfg *config.Config, projectID, sha 
 	for {
 		progress.noting(fmt.Sprintf("backend receives events… waiting for the round-trip (%ds of %ds)",
 			int(time.Since(started).Seconds()), int(roundTripWait.Seconds())))
-		// The lookup `terma blame` makes, windowed the same way: the scratch commit was
-		// made moments before this started, so its record sits inside the window.
-		rec, err := client.CommitLog(ctx, sha, started.Add(-blameWindow), started.Add(blameWindow))
+		// The scratch commit was made moments before this started, so its record sits
+		// inside the window.
+		rec, err := client.CommitLog(ctx, sha, started.Add(-commitLogWindow), started.Add(commitLogWindow))
 		if err != nil {
 			return false, err
 		}

@@ -179,7 +179,6 @@ status: [Cursor](docs/CURSOR-INSTRUMENTATION.md),
 terma status
 terma usage --user dawson --since today
 terma session list --user dawson --since yesterday
-terma blame <commit>
 ```
 
 `status` is the quick local view of sign-in, project binding, hooks, connected
@@ -224,8 +223,7 @@ update      Update terma
 ```
 
 Authentication, direct telemetry management, project lookup, principal lookup,
-commit blame, shell completion, configuration, hook execution, shim management, and
-spool maintenance remain
+configuration, hook execution, shim management, and spool maintenance remain
 available as hidden commands for automation and troubleshooting. Run
 `terma <command> --help` for details.
 

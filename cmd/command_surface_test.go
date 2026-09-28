@@ -25,9 +25,13 @@ var primaryCommands = []string{
 // troubleshooting run, and what terma's own fix-it hints name (`terma login`, `terma
 // connect codex`, `terma spool flush`) — so every one of them must keep working.
 var advancedCommands = []string{
-	"blame", "config", "connect", "desktop", "disconnect", "harness", "hook", "login", "logout",
+	"config", "connect", "desktop", "disconnect", "harness", "hook", "login", "logout",
 	"principal", "project", "shim", "spool", "telemetry", "version", "whoami",
 }
+
+// removedCommands are gone, not hidden: product decisions to drop them, so no message
+// may name them and `terma <name>` is an unknown command.
+var removedCommands = []string{"blame", "completion"}
 
 func commandNamed(root *cobra.Command, name string) *cobra.Command {
 	for _, c := range root.Commands() {
@@ -41,8 +45,8 @@ func commandNamed(root *cobra.Command, name string) *cobra.Command {
 func TestHelpListsOnlyThePrimaryCommands(t *testing.T) {
 	var visible []string
 	for _, c := range NewRootCommand().Commands() {
-		// cobra's own `help` and `completion` are not terma's to list or hide.
-		if c.IsAvailableCommand() && c.Name() != "help" && c.Name() != "completion" {
+		// cobra's own `help` is not terma's to list or hide.
+		if c.IsAvailableCommand() && c.Name() != "help" {
 			visible = append(visible, c.Name())
 		}
 	}
@@ -61,7 +65,7 @@ func TestHelpListsOnlyThePrimaryCommands(t *testing.T) {
 	if j := strings.Index(listing, "Flags:"); j >= 0 {
 		listing = listing[:j]
 	}
-	for _, name := range append(slices.Clone(advancedCommands), "completion") {
+	for _, name := range append(slices.Clone(advancedCommands), removedCommands...) {
 		if regexp.MustCompile(`(?m)^\s+` + regexp.QuoteMeta(name) + `\s`).MatchString(listing) {
 			t.Errorf("`terma --help` lists the advanced command %q:\n%s", name, listing)
 		}
@@ -93,7 +97,7 @@ func TestAdvancedCommandsAreHiddenNotRemoved(t *testing.T) {
 	}
 	// Every command is one or the other: nothing is left unclassified.
 	for _, name := range known {
-		if name == "help" || name == "completion" {
+		if name == "help" {
 			continue
 		}
 		if !slices.Contains(primaryCommands, name) && !slices.Contains(advancedCommands, name) {
@@ -121,7 +125,7 @@ var unquotedCommand = regexp.MustCompile(`(?:Fix:\s*"|[Ww]ith: )terma ([a-z][a-z
 // which is also what stops a cleanup from removing a command the hints still name.
 func TestEveryCommandAMessageNamesExists(t *testing.T) {
 	root := NewRootCommand()
-	exists := map[string]bool{"help": true, "completion": true}
+	exists := map[string]bool{"help": true}
 	for _, c := range root.Commands() {
 		exists[c.Name()] = true
 		for _, alias := range c.Aliases {
@@ -156,11 +160,11 @@ func TestEveryCommandAMessageNamesExists(t *testing.T) {
 	}
 }
 
-// Shell completion is hidden from the listing, not switched off: a completion script
-// someone already sources keeps being generated.
-func TestCompletionIsHiddenNotRemoved(t *testing.T) {
-	out, err := runTerma(t, "completion", "zsh")
-	if err != nil || !strings.Contains(out, "compdef") {
-		t.Fatalf("`terma completion zsh` = %v, output %.200q", err, out)
+// blame and completion were removed outright: running either is an unknown command.
+func TestRemovedCommandsAreGone(t *testing.T) {
+	for _, name := range removedCommands {
+		if _, err := runTerma(t, name); err == nil || !strings.Contains(err.Error(), "unknown command") {
+			t.Errorf("`terma %s` = %v, want an unknown command", name, err)
+		}
 	}
 }

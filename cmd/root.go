@@ -69,9 +69,8 @@ spend will be attributed.`,
 		},
 	}
 
-	// Shell completion still works (`terma completion zsh`); it is just not a command a
-	// developer needs listed.
-	root.CompletionOptions.HiddenDefaultCmd = true
+	// No shell completion command: terma is not a CLI worth completing yet.
+	root.CompletionOptions.DisableDefaultCmd = true
 
 	pf := root.PersistentFlags()
 	pf.StringVar(&flags.profile, "profile", "", "configuration profile to use")
@@ -99,7 +98,6 @@ spend will be attributed.`,
 		newSessionCommand(),
 		newUsageCommand(),
 		newPrincipalCommand(), // advanced: hidden from the primary workflow
-		newBlameCommand(),
 		// Harness connections (also reachable under the `telemetry` group).
 		newTelemetryConnectCommand(), // advanced: install configures telemetry normally
 		newTelemetryDisconnectCommand(),
@@ -184,7 +182,7 @@ func automaticUpdatesAllowed(cmd *cobra.Command, interactive bool) bool {
 	}
 	for c := cmd; c != nil; c = c.Parent() {
 		switch c.Name() {
-		case "hook", "shim", "spool", "update", "version", "completion", "__complete", "__completeNoDesc":
+		case "hook", "shim", "spool", "update", "version", "__complete", "__completeNoDesc":
 			return false
 		}
 	}
