@@ -72,8 +72,12 @@ Repeated local validation also caught an intermittent missing Codex session-end
 event: native logs, traces and metrics arrived, but no SessionEnd hook payload
 was captured and no end event was queued or delivered within 45 seconds. The
 configured hook is synchronous with Codex's maximum three-second timeout. The
-lifecycle assertion deliberately remains strict, so this gap can fail CI; the
+lifecycle assertion remains strict locally and in the nightly live workflow; the
 suite is not claimed to be reliably green until the missing invocation is fixed.
+Pull-request CI sets `TERMA_LIVE_KNOWN_UPSTREAM=codex-session-end`, which drops
+only Codex's session end from the contract (the start stays required) and logs
+`KNOWN UPSTREAM` when it did not arrive, so the race does not fail unrelated pull
+requests at random.
 The [Codex shutdown investigation](CODEX-SESSION-END.md) reproduces this with
 shell-builtin marker hooks, independent of Terma, and traces the conflicting
 upstream cleanup deadlines.

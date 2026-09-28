@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 const telemetryPrompt = "Run the requested tool, then reply exactly TERMA_TELEMETRY_REPLY."
@@ -134,6 +135,9 @@ func TestCodexTelemetry(t *testing.T) {
 				awaitTelemetry(t, sb, func(reporter contractReporter, e telemetryEvidence) {
 					checkCodexTelemetry(reporter, e, run.ThreadID, sb.ProjectID, exclude)
 				})
+				if knownUpstream(upstreamCodexSessionEnd) && len(sb.Delivered("terma.session.end", run.ThreadID, 10*time.Second)) == 0 {
+					t.Logf("KNOWN UPSTREAM: Codex exited without running SessionEnd; tolerated by TERMA_LIVE_KNOWN_UPSTREAM (docs/CODEX-SESSION-END.md)")
+				}
 				checkTelemetrySchema(t, sb.Receiver.evidence(), "codex", exclude, newest)
 			})
 		}

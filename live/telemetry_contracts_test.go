@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -140,7 +141,7 @@ func checkSpans(t contractReporter, e telemetryEvidence, sessionKey, sid, projec
 func checkClaudeTelemetry(t contractReporter, e telemetryEvidence, sid, project string, exclude bool) {
 	t.Helper()
 	checkExportRequests(t, e)
-	checkHookLifecycle(t, e, sid, project)
+	checkHookLifecycle(t, e, sid, project, false)
 	if exclude {
 		checkRedaction(t, e, "claude")
 	}
@@ -310,7 +311,7 @@ func awaitTelemetry(t *testing.T, sb *Sandbox, check func(contractReporter, tele
 func checkCodexTelemetry(t contractReporter, e telemetryEvidence, sid, project string, exclude bool) {
 	t.Helper()
 	checkExportRequests(t, e)
-	checkHookLifecycle(t, e, sid, project)
+	checkHookLifecycle(t, e, sid, project, knownUpstream(upstreamCodexSessionEnd))
 	if exclude {
 		checkRedaction(t, e, "codex")
 	}
@@ -480,8 +481,26 @@ func checkCodexHistogram(t contractReporter, e telemetryEvidence, name string, f
 	}
 }
 
-func checkHookLifecycle(t contractReporter, e telemetryEvidence, sid, project string) {
+// upstreamCodexSessionEnd is Codex exiting without running its synchronous SessionEnd
+// hook — intermittent in 0.158.0, reproduced without Terma (docs/CODEX-SESSION-END.md).
+const upstreamCodexSessionEnd = "codex-session-end"
+
+// knownUpstream reports whether this run tolerates a documented upstream failure,
+// named in TERMA_LIVE_KNOWN_UPSTREAM (comma-separated). Only pull-request CI sets it,
+// so an upstream race does not turn unrelated pull requests red at random; local runs
+// and the nightly live workflow leave it unset and stay strict.
+func knownUpstream(name string) bool {
+	return slices.Contains(strings.Split(os.Getenv("TERMA_LIVE_KNOWN_UPSTREAM"), ","), name)
+}
+
+// checkHookLifecycle requires the session's start and end, delivered by Terma's hooks.
+// endOptional drops the end from the contract, for a run that tolerates the upstream
+// failure above; the scenario says whether it arrived.
+func checkHookLifecycle(t contractReporter, e telemetryEvidence, sid, project string, endOptional bool) {
 	for _, name := range []string{"terma.session.start", "terma.session.end"} {
+		if name == "terma.session.end" && endOptional {
+			continue
+		}
 		found := false
 		for _, r := range e.logs {
 			if r.Resource["service.name"] == "terma-cli" && r.Attrs["event.name"] == name && r.Attrs["session.id"] == sid {

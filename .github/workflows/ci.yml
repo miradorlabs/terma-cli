@@ -104,6 +104,10 @@ jobs:
       TERMA_LIVE_CLAUDE_VERSIONS: "2.1.283"
       TERMA_LIVE_CODEX_VERSIONS: "0.158.0"
       TERMA_LIVE_BINARY: ${{ github.workspace }}/live/bin/terma
+      # Codex 0.158.0 sometimes exits without running its SessionEnd hook, with or
+      # without Terma (docs/CODEX-SESSION-END.md). Pull requests report it instead of
+      # failing on it; the nightly live workflow stays strict.
+      TERMA_LIVE_KNOWN_UPSTREAM: codex-session-end
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6

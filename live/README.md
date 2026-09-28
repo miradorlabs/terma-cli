@@ -89,7 +89,9 @@ the authentic API billing route.
 ## CI
 
 The main CI workflow runs this module's offline contracts with the race detector
-and the credential-free telemetry scenarios against pinned real harness builds.
+and the credential-free telemetry scenarios against pinned real harness builds,
+tolerating only Codex's documented SessionEnd race there
+(`TERMA_LIVE_KNOWN_UPSTREAM=codex-session-end`; see docs/CODEX-SESSION-END.md).
 `Live harness contracts` runs nightly and on manual dispatch against the latest
 three releases. Claude uses GitHub OIDC with Anthropic workload identity
 federation; no Anthropic API-key secret is needed. The workflow contains the

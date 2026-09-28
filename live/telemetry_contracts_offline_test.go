@@ -138,3 +138,23 @@ func TestCodexUsageSelectionKeepsMalformedRecords(t *testing.T) {
 	}
 	mustReject(t, "input_token_count", func(r contractReporter) { checkCodexCompleted(r, usage) })
 }
+
+// A missing session end fails the contract unless the run names Codex's upstream
+// SessionEnd race in TERMA_LIVE_KNOWN_UPSTREAM, which only pull-request CI does; the
+// session start stays required either way, and nothing else is tolerated by that name.
+func TestHookLifecycleToleratesOnlyTheNamedUpstreamFailure(t *testing.T) {
+	start := LogRecord{Resource: map[string]string{"service.name": "terma-cli", "mirador.project.id": "p"},
+		Attrs: map[string]string{"event.name": "terma.session.start", "session.id": "s", "tool": "codex", "project_id": "p"}}
+	e := telemetryEvidence{logs: []LogRecord{start}}
+
+	t.Setenv("TERMA_LIVE_KNOWN_UPSTREAM", "")
+	mustReject(t, "terma.session.end", func(r contractReporter) {
+		checkHookLifecycle(r, e, "s", "p", knownUpstream(upstreamCodexSessionEnd))
+	})
+
+	t.Setenv("TERMA_LIVE_KNOWN_UPSTREAM", "something-else,"+upstreamCodexSessionEnd)
+	checkHookLifecycle(t, e, "s", "p", knownUpstream(upstreamCodexSessionEnd))
+	mustReject(t, "terma.session.start", func(r contractReporter) {
+		checkHookLifecycle(r, telemetryEvidence{}, "s", "p", knownUpstream(upstreamCodexSessionEnd))
+	})
+}

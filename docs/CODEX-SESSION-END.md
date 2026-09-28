@@ -92,5 +92,7 @@ TERMA_ENV=dev TERMA_LIVE=1 TERMA_LIVE_BINARY="$PWD/bin/terma" \
 
 The probe is opt-in because it deliberately substitutes marker hooks for Terma
 and diagnoses a known upstream race. Ordinary telemetry contracts retain their
-strict session-end assertion. `TERMA_LIVE_CODEX_RUST_LOG` also works with those
+strict session-end assertion, except where `TERMA_LIVE_KNOWN_UPSTREAM` names
+`codex-session-end`: pull-request CI sets it and logs `KNOWN UPSTREAM` for a run
+the race hit; local runs and the nightly live workflow do not. `TERMA_LIVE_CODEX_RUST_LOG` also works with those
 contracts; failures print native stdout/stderr and exported lifecycle spans.
