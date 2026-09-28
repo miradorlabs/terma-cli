@@ -59,8 +59,11 @@ func newInstallCommand() *cobra.Command {
 		Long: `Run once per repository. install is self-contained — it signs you in if you have
 not run ` + "`terma setup`" + `, asks which agents you use if you have not chosen, then:
 
-  1. Binds the repository to a Terma project (--project, an existing binding, or a
-     picker) and records it in .terma/settings.json — committed, no secrets.
+  1. Binds the repository to a Terma project and records it in .terma/settings.json —
+     committed, no secrets. On a terminal you choose the project every time, the one
+     already bound offered first (Enter keeps it); --project names it instead, and
+     without a terminal, or with --yes, an existing binding is kept. A binding to a
+     project your account cannot see is not used: install says why and asks again.
   2. Points each of your agents at that project, per repository:
        - Claude Code exports to it through per-repo settings (claude --settings);
        - Codex CLI exports to it through runtime -c overrides;
@@ -174,7 +177,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	}
 
 	// 3. Project binding.
-	b, err := resolveBinding(cmd, cfg, existing, f.projectRef)
+	b, err := resolveBinding(cmd, cfg, existing, f.projectRef, needsAuth, !f.assumeYes && !f.dryRun && canPrompt())
 	if err != nil {
 		// A dry run never signs in (step 2), so when no credential is stored the
 		// project picker cannot reach the API to resolve a binding. Rather than fail
@@ -357,7 +360,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 			ID:             b.ID,
 			Name:           b.Name,
 			OrganizationID: b.OrganizationID,
-			Environment:    nonProd(cfg.Environment),
+			Environment:    b.Environment,
 		},
 		Install: termaproject.Install{
 			HookManager: managerOrEmpty(det, installedHooks),
@@ -933,24 +936,50 @@ func indent(s string) string {
 	return b.String()
 }
 
-// binding is the project a repository is tied to.
+// binding is the project a repository is tied to, and the environment it was chosen in.
 type binding struct {
-	ID, Name, OrganizationID string
+	ID, Name, OrganizationID, Environment string
+}
+
+// keptBinding is the repository's binding as it stands, environment included: a
+// colleague confirming the project must not rewrite the committed file to match their
+// own setup.
+func keptBinding(existing *termaproject.File) binding {
+	p := existing.Project
+	return binding{ID: p.ID, Name: p.Name, OrganizationID: p.OrganizationID, Environment: p.Environment}
+}
+
+// boundTo is a newly chosen project, recorded with the environment it was chosen in.
+func boundTo(p *project, cfg *config.Config) binding {
+	return binding{ID: p.ID, Name: p.Name, OrganizationID: p.OrganizationID, Environment: nonProd(cfg.Environment)}
 }
 
 // resolveBinding picks the project: an explicit reference (matched against the
 // organization's projects, falling back to a picker when it does not match), else the
-// existing binding, else a picker.
-func resolveBinding(cmd *cobra.Command, cfg *config.Config, existing *termaproject.File, ref string) (binding, error) {
+// organization's projects with the existing binding offered first.
+//
+// verify says install signs in to act for the project, so the binding is checked against
+// the projects that credential can see: one made in another environment or organization
+// names a project the account service refuses, and used as-is it failed at the first key
+// install minted, with the server's words about neither. ask says a person is there to
+// choose: they confirm or change the project on every install, the bound one marked and
+// kept by Enter. Without ask, a binding that checks out is kept and one that does not is an
+// error naming the fix. A hooks-only install that needs no credential keeps the binding
+// unchecked — there is nothing to check it with.
+func resolveBinding(cmd *cobra.Command, cfg *config.Config, existing *termaproject.File, ref string, verify, ask bool) (binding, error) {
 	ref = strings.TrimSpace(ref)
 	if serverkey.Is(cfg.APIKey) {
 		return serverKeyBinding(cmd.Context(), cfg, existing, ref)
+	}
+	current := ""
+	if existing != nil {
+		current = existing.Project.ID
 	}
 	if ref != "" {
 		client, err := newClient(cfg)
 		if err != nil {
 			if errors.Is(err, auth.ErrNotLoggedIn) {
-				return binding{ID: ref}, nil
+				return binding{ID: ref, Environment: nonProd(cfg.Environment)}, nil
 			}
 			return binding{}, err
 		}
@@ -959,23 +988,88 @@ func resolveBinding(cmd *cobra.Command, cfg *config.Config, existing *termaproje
 			return binding{}, err
 		}
 		if p, err := matchProject(projects, ref); err == nil {
-			return binding{ID: p.ID, Name: p.Name, OrganizationID: p.OrganizationID}, nil
+			return boundTo(p, cfg), nil
 		}
 		fmt.Fprintf(cmd.ErrOrStderr(), "No project matches %q in this organization — pick one:\n", ref)
-		p, err := pickProject(cmd, projects)
+		p, err := pickProject(cmd, projects, current)
 		if err != nil {
 			return binding{}, err
 		}
-		return binding{ID: p.ID, Name: p.Name, OrganizationID: p.OrganizationID}, nil
+		return boundTo(p, cfg), nil
 	}
-	if existing != nil {
-		return binding{ID: existing.Project.ID, Name: existing.Project.Name, OrganizationID: existing.Project.OrganizationID}, nil
+	if existing != nil && !verify {
+		return keptBinding(existing), nil
 	}
-	p, err := chooseProject(cmd, cfg)
+
+	client, err := newClient(cfg)
+	if err != nil {
+		// A dry run does not sign in; without a credential the binding stands unchecked.
+		if existing != nil && errors.Is(err, auth.ErrNotLoggedIn) {
+			return keptBinding(existing), nil
+		}
+		return binding{}, err
+	}
+	projects, err := availableProjects(cmd.Context(), client)
+	if errors.Is(err, errNoProjects) {
+		return binding{}, fmt.Errorf("%w, then run `terma install` again", err)
+	}
 	if err != nil {
 		return binding{}, err
 	}
-	return binding{ID: p.ID, Name: p.Name, OrganizationID: p.OrganizationID}, nil
+	bound := existing != nil && slices.ContainsFunc(projects, func(p project) bool { return p.ID == current })
+
+	switch {
+	case existing != nil && !bound && !ask:
+		return binding{}, fmt.Errorf("%s — run `terma install --project <name or id>` with one of yours (`terma project list` lists them)", unreachableBinding(existing, cfg))
+	case existing != nil && !bound:
+		reason := unreachableBinding(existing, cfg)
+		fmt.Fprintf(cmd.ErrOrStderr(), "%s%s.\n", strings.ToUpper(reason[:1]), reason[1:])
+		current = ""
+	case bound && !ask:
+		return keptBinding(existing), nil
+	case !ask:
+		p, err := soleOrPick(cmd, projects)
+		if err != nil {
+			return binding{}, err
+		}
+		return boundTo(p, cfg), nil
+	}
+
+	p, err := pickProject(cmd, projects, current)
+	if err != nil {
+		return binding{}, err
+	}
+	if bound && p.ID == current {
+		return keptBinding(existing), nil
+	}
+	return boundTo(p, cfg), nil
+}
+
+// unreachableBinding says why the repository's project is not among those the current
+// credential can see: the environment it was bound in when that differs, else the
+// organization it belongs to, which the developer may be able to switch to.
+func unreachableBinding(existing *termaproject.File, cfg *config.Config) string {
+	p := existing.Project
+	org := nameOrID(cfg.OrganizationName, cfg.OrganizationID)
+	if org == "" {
+		org = "your organization"
+	}
+	msg := fmt.Sprintf("this repository is bound to %s, which is not a project in %s", nameOrID(p.Name, p.ID), org)
+	switch {
+	case !config.SameAccounts(p.Environment, cfg.Environment):
+		return fmt.Sprintf("%s: it was bound in %s, and terma is using %s", msg, environmentLabel(p.Environment), environmentLabel(cfg.Environment))
+	case p.OrganizationID != "" && p.OrganizationID != cfg.OrganizationID:
+		return fmt.Sprintf("%s: it belongs to organization %s (`terma org use %s` switches to it, if you are a member)", msg, p.OrganizationID, p.OrganizationID)
+	}
+	return msg
+}
+
+// environmentLabel names a built-in environment in a sentence.
+func environmentLabel(env string) string {
+	if env == "" || env == config.EnvProd {
+		return "production"
+	}
+	return "the " + env + " environment"
 }
 
 // serverKeyBinding is the project a server key (TERMA_API_KEY) belongs to. A ter_srv_ key
@@ -1005,7 +1099,7 @@ func serverKeyBinding(ctx context.Context, cfg *config.Config, existing *termapr
 	if ref != "" && ref != identity.ProjectID {
 		return binding{}, fmt.Errorf("TERMA_API_KEY belongs to project %s, not %q — a server key binds only its own project, named by id", identity.ProjectID, ref)
 	}
-	b := binding{ID: identity.ProjectID, OrganizationID: identity.OrganizationID}
+	b := binding{ID: identity.ProjectID, OrganizationID: identity.OrganizationID, Environment: nonProd(cfg.Environment)}
 	if existing != nil {
 		if existing.Project.ID != identity.ProjectID {
 			return binding{}, fmt.Errorf("this repository is bound to project %s, and TERMA_API_KEY belongs to %s", existing.Project.ID, identity.ProjectID)

@@ -136,7 +136,7 @@ func soleOrPick(cmd *cobra.Command, projects []project) (*project, error) {
 	if len(projects) == 1 {
 		return &projects[0], nil
 	}
-	return pickProject(cmd, projects)
+	return pickProject(cmd, projects, "")
 }
 
 // matchProject resolves an argument the way every named thing resolves; see
@@ -145,11 +145,17 @@ func matchProject(projects []project, query string) (*project, error) {
 	return projectKind.match(projects, query)
 }
 
-// pickProject prompts for a selection on a terminal.
-func pickProject(cmd *cobra.Command, projects []project) (*project, error) {
-	cfg, _ := loadProjectConfig()
+// pickProject prompts for a selection on a terminal. current is the project the
+// repository is bound to: marked in the list and kept by a bare Enter. With none, Enter
+// takes the only project when there is just one.
+func pickProject(cmd *cobra.Command, projects []project, current string) (*project, error) {
 	labels := projectKind.labels(projects)
 	return projectKind.pick(cmd, projects, func(p project) pickRow {
-		return pickRow{Label: labels[p.ID], Note: output.Truncate(p.Description, 48), Current: cfg != nil && p.ID == cfg.ProjectID}
+		return pickRow{
+			Label:   labels[p.ID],
+			Note:    output.Truncate(p.Description, 48),
+			Current: p.ID == current,
+			Default: p.ID == current || (current == "" && len(projects) == 1),
+		}
 	})
 }

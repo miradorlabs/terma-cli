@@ -2,35 +2,16 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
 	"strings"
 
-	"github.com/spf13/cobra"
-
-	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
-
-func chooseProject(cmd *cobra.Command, cfg *config.Config) (*project, error) {
-	client, err := newClient(cfg)
-	if err != nil {
-		return nil, err
-	}
-	projects, err := availableProjects(cmd.Context(), client)
-	if errors.Is(err, errNoProjects) {
-		return nil, fmt.Errorf("%w, then run `terma install` again", err)
-	}
-	if err != nil {
-		return nil, err
-	}
-	return soleOrPick(cmd, projects)
-}
 
 // wireRepo does the per-clone half of an install: point git at the committed shims
 // when the repo uses them, remembering the previous hooksPath for uninstall.

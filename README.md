@@ -44,9 +44,11 @@ terma install     # run inside each repository
 terma doctor      # verify the chain end to end
 ```
 
-`terma install` can use `--project <name-or-id>`, an existing
-`.terma/settings.json`, or an interactive picker. Use `--yes` for non-interactive
-setup, or `--harness none` when you only want commit hooks. The committed settings
+`terma install` asks which project the repository reports to, offering the one in
+an existing `.terma/settings.json` first (Enter keeps it), or takes
+`--project <name-or-id>`. A bound project your account cannot see is never used:
+install says why and lets you choose another. Use `--yes` for non-interactive setup
+(it keeps an existing binding), or `--harness none` when you only want commit hooks. The committed settings
 file contains a project reference, never a secret.
 
 ## Install

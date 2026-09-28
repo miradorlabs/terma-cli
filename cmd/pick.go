@@ -19,6 +19,8 @@ type pickRow struct {
 	Note  string
 	// Current marks the row that is already selected, so the list says so.
 	Current bool
+	// Default is the row a bare Enter selects. Without one, Enter selects nothing.
+	Default bool
 }
 
 // pick prompts for one of rows by number or by name and returns its index. It refuses
@@ -34,10 +36,13 @@ func pick(cmd *cobra.Command, title string, rows []pickRow, match func(string) (
 	out := cmd.ErrOrStderr()
 	p := style.For(out)
 	fmt.Fprintln(out, p.Bold(title))
-	width := 0
-	for _, r := range rows {
+	width, def := 0, -1
+	for i, r := range rows {
 		if n := len([]rune(r.Label)); n > width {
 			width = n
+		}
+		if r.Default {
+			def = i
 		}
 	}
 	for i, r := range rows {
@@ -49,22 +54,34 @@ func pick(cmd *cobra.Command, title string, rows []pickRow, match func(string) (
 		}
 		fmt.Fprintf(out, "  %s %s  %s\n", number, label, p.Dim(note))
 	}
-	fmt.Fprint(out, "\n"+p.Brand("?")+" Number or name: ")
+	ask := "Number or name: "
+	if def >= 0 {
+		ask = fmt.Sprintf("Number or name (Enter for %s): ", rows[def].Label)
+	}
+	fmt.Fprint(out, "\n"+p.Brand("?")+" "+ask)
 
 	reader := bufio.NewReader(cmd.InOrStdin())
 	line, err := reader.ReadString('\n')
 	if err != nil {
 		return -1, fmt.Errorf("read selection: %w", err)
 	}
-	answer := strings.TrimSpace(line)
+	return pickAnswer(strings.TrimSpace(line), len(rows), def, match)
+}
+
+// pickAnswer reads what was typed at a picker of n rows: nothing takes the default row
+// (def, or -1 for none), a number is a row, and anything else is a name for match.
+func pickAnswer(answer string, n, def int, match func(string) (int, error)) (int, error) {
 	if answer == "" {
+		if def >= 0 {
+			return def, nil
+		}
 		return -1, fmt.Errorf("no selection made")
 	}
-	if n, convErr := strconv.Atoi(answer); convErr == nil {
-		if n < 1 || n > len(rows) {
-			return -1, fmt.Errorf("selection %d is out of range (1-%d)", n, len(rows))
+	if i, convErr := strconv.Atoi(answer); convErr == nil {
+		if i < 1 || i > n {
+			return -1, fmt.Errorf("selection %d is out of range (1-%d)", i, n)
 		}
-		return n - 1, nil
+		return i - 1, nil
 	}
 	return match(answer)
 }

@@ -332,7 +332,13 @@ run that reaches them opens a browser login on **production**. A script that run
   displaced (revoked best-effort); `UpdateCredential` is the refresh path and never
   changes which organization is active. `logout` revokes every stored session.
 - `terma org use` (`cmd/org.go`) changes account scope only. `terma install` selects
-  and saves projects per repository, and reinstalls reuse that binding. Project-scoped
+  and saves projects per repository. On a terminal it asks every time, the bound project
+  marked and kept by Enter; without one, or with `--yes`, it keeps the binding. When
+  install signs in, `resolveBinding` checks the binding against the projects that
+  credential lists: one made in another environment or organization is named and
+  replaced, never used — used as-is, its first key mint was refused with the gateway's
+  "run `mirador project list`". A credential-free install keeps it unchecked, and a
+  kept binding keeps the environment it recorded. Project-scoped
   reads resolve the Git worktree's `.terma/settings.json`, unless `--project` or
   `TERMA_PROJECT_ID` explicitly overrides it. Machine profiles have no project defaults.
   Keys are remembered per harness per project in `keys.json`

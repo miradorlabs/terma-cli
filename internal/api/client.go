@@ -42,11 +42,13 @@ type APIError struct {
 
 func (e *APIError) Error() string {
 	msg := e.Message
-	// The shared gateway's remedy names its original CLI. Keep the protocol header
-	// unchanged, but give Terma users the command that binds their repository.
+	// The shared gateway's remedies name its original CLI. Keep the protocol header
+	// unchanged, but give Terma users the command that binds their repository, and
+	// terma's own name for the others.
 	if e.Code == "INVALID_ARGUMENT" && strings.Contains(msg, "missing X-Mirador-Project header") {
 		msg = "no project selected — run `terma install` in this repository or pass --project"
 	}
+	msg = gatewayRemedies.Replace(msg)
 	switch {
 	case msg == "" && e.StatusCode != 0:
 		msg = fmt.Sprintf("request failed with status %d", e.StatusCode)
@@ -69,6 +71,13 @@ func (e *APIError) Error() string {
 	}
 	return fmt.Sprintf("%s (%s)", msg, strings.Join(detail, ", "))
 }
+
+// gatewayRemedies renames the commands the shared gateway's messages recommend. Each
+// has a terma command of the same shape.
+var gatewayRemedies = strings.NewReplacer(
+	"`mirador login`", "`terma login`",
+	"`mirador project list`", "`terma project list`",
+)
 
 // Unauthenticated reports whether the credential itself was rejected, as opposed to
 // the request being malformed or the caller lacking access to a specific resource.
