@@ -638,17 +638,18 @@ func confirm(cmd *cobra.Command, question string) (bool, error) {
 
 // confirmDefault is confirm with the answer a bare Enter gives: yes when def, else no.
 func confirmDefault(cmd *cobra.Command, question string, def bool) (bool, error) {
+	return confirmExplained(cmd, question, nil, def)
+}
+
+// confirmExplained is confirmDefault with lines under the question that say what a yes
+// does, so they are read before the answer is typed.
+func confirmExplained(cmd *cobra.Command, question string, detail []string, def bool) (bool, error) {
 	if !output.Interactive() {
 		return false, fmt.Errorf("%s — no terminal to confirm on; pass --yes to proceed non-interactively", question)
 	}
 
 	errOut := cmd.ErrOrStderr()
-	p := style.For(errOut)
-	hint := "[Y/n]"
-	if !def {
-		hint = "[y/N]"
-	}
-	fmt.Fprintf(errOut, "%s %s %s ", p.Brand("?"), p.Bold(question), p.Dim(hint))
+	fmt.Fprint(errOut, confirmPrompt(style.For(errOut), question, detail, def))
 	line, err := bufio.NewReader(cmd.InOrStdin()).ReadString('\n')
 	if err != nil {
 		// EOF with nothing typed is a decline, not a crash.
@@ -658,6 +659,26 @@ func confirmDefault(cmd *cobra.Command, question string, def bool) (bool, error)
 		return false, fmt.Errorf("read confirmation: %w", err)
 	}
 	return yesAnswer(line, def), nil
+}
+
+// confirmPrompt draws a yes/no question. Without detail the answer is typed on the
+// question's own line; with it, the detail sits indented under the question and the
+// answer goes on a line of its own beneath.
+func confirmPrompt(p style.Palette, question string, detail []string, def bool) string {
+	hint := "[Y/n]"
+	if !def {
+		hint = "[y/N]"
+	}
+	if len(detail) == 0 {
+		return fmt.Sprintf("%s %s %s ", p.Brand("?"), p.Bold(question), p.Dim(hint))
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s %s\n", p.Brand("?"), p.Bold(question))
+	for _, l := range detail {
+		fmt.Fprintf(&b, "  %s\n", l)
+	}
+	fmt.Fprintf(&b, "  %s ", p.Dim(hint))
+	return b.String()
 }
 
 // yesAnswer reads a typed answer: y or yes is yes, nothing is def, and anything else —

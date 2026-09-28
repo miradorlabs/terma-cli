@@ -340,7 +340,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 			// repo is hook-installed; record them in the binding without rewriting.
 			installedHooks = gitDir != ""
 			ui.ok("Hooks", plan.summary(adapters)+" — already in place")
-		case f.assumeYes || confirmYes(cmd, "Write terma's hooks to "+joinNames(plan.files())+"?"):
+		case f.assumeYes || confirmYes(cmd, "Write terma's hooks to "+joinNames(plan.files())+"?", plan.explain()):
 			if err := plan.apply(root); err != nil {
 				return err
 			}
@@ -996,14 +996,51 @@ func (p hookPlan) print(out io.Writer) {
 func (p hookPlan) files() []string {
 	var files []string
 	for _, path := range p.paths() {
-		if strings.HasPrefix(path, hookmgr.ShimDir+"/") {
-			path = hookmgr.ShimDir + "/"
-		}
-		if !slices.Contains(files, path) {
+		if path = shownPath(path); !slices.Contains(files, path) {
 			files = append(files, path)
 		}
 	}
 	return files
+}
+
+// shownPath is how a question names a file the plan writes: terma's hook shims by their
+// directory, every other file by its path.
+func shownPath(path string) string {
+	if strings.HasPrefix(path, hookmgr.ShimDir+"/") {
+		return hookmgr.ShimDir + "/"
+	}
+	return path
+}
+
+// explain says what each file in files() is for, a line apiece, and what committing them
+// means — the lines under the question that asks to write them, so a developer knows what
+// a yes does before giving it.
+func (p hookPlan) explain() []string {
+	what := map[string]string{}
+	for _, c := range p.hooks.Changes {
+		what[shownPath(c.Path)] = "stamps each commit with the agent session that wrote it"
+	}
+	for _, a := range adapter.All() {
+		if path := a.HooksPath(); path != "" {
+			what[path] = "reports each " + a.DisplayName() + " session and the files it edits"
+		}
+	}
+	files := p.files()
+	width := 0
+	for _, f := range files {
+		width = max(width, len(f))
+	}
+	lines := make([]string, 0, len(files)+2)
+	for _, f := range files {
+		desc, ok := what[f]
+		if !ok {
+			desc = "terma's hook wiring"
+		}
+		lines = append(lines, fmt.Sprintf("%-*s  %s", width, f, desc))
+	}
+	return append(lines,
+		"These are committed: merging them sets up everyone who clones the repository,",
+		"and on a machine without terma they do nothing.")
 }
 
 // summary says what the hooks do once installed: commit stamping through the hook
@@ -1063,9 +1100,10 @@ func (p hookPlan) apply(root string) error {
 	return nil
 }
 
-// confirmYes prompts and treats a read error as "no".
-func confirmYes(cmd *cobra.Command, question string) bool {
-	ok, err := confirm(cmd, question)
+// confirmYes prompts, detail under the question saying what a yes does, and treats a
+// read error as "no".
+func confirmYes(cmd *cobra.Command, question string, detail []string) bool {
+	ok, err := confirmExplained(cmd, question, detail, true)
 	return err == nil && ok
 }
 
