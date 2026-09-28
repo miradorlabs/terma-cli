@@ -132,6 +132,10 @@ func (sb *Sandbox) CodexExec(route Route, prompt string, extra ...string) *Codex
 	cmd := exec.Command(sb.Codex.Path, args...)
 	cmd.Dir = sb.Repo
 	cmd.Env = sb.codexEnv(route)
+	// Opt-in native diagnostics for intermittent harness lifecycle failures.
+	if filter := os.Getenv("TERMA_LIVE_CODEX_RUST_LOG"); filter != "" {
+		cmd.Env = append(cmd.Env, "RUST_LOG="+filter)
+	}
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	cmd.Stdin = nil
@@ -150,6 +154,9 @@ func (sb *Sandbox) CodexExec(route Route, prompt string, extra ...string) *Codex
 		t.Fatalf("codex exec did not finish in %v\n%s\n%s", scenarioTimeout, stdout.String(), stderr.String())
 	}
 	run := &CodexRun{Route: route, Stdout: stdout.String(), Stderr: stderr.String()}
+	if os.Getenv("TERMA_LIVE_CODEX_RUST_LOG") != "" {
+		t.Logf("Codex diagnostics:\n%s", run.Stderr)
+	}
 	sc := bufio.NewScanner(strings.NewReader(run.Stdout))
 	sc.Buffer(make([]byte, 1<<20), 1<<20)
 	for sc.Scan() {

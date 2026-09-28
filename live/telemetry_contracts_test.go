@@ -293,6 +293,11 @@ func awaitTelemetry(t *testing.T, sb *Sandbox, check func(contractReporter, tele
 				t.Logf("still queued: %s for %s", event.Name, event.SessionID)
 			}
 			t.Logf("captured SessionEnd hooks: codex=%d claude=%d", len(sb.HookPayloads("codex-session-end")), len(sb.HookPayloads("session-end")))
+			for _, span := range evidence.spans {
+				if strings.Contains(span.Name, "hook") || strings.Contains(span.Name, "shutdown") {
+					t.Logf("lifecycle span %s: start=%d end=%d attrs=%v events=%v", span.Name, span.Proto.GetStartTimeUnixNano(), span.Proto.GetEndTimeUnixNano(), span.Attrs, span.Proto.GetEvents())
+				}
+			}
 			for _, failure := range slices.Compact(failures) {
 				t.Error(failure)
 			}

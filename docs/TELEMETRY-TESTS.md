@@ -74,6 +74,9 @@ was captured and no end event was queued or delivered within 45 seconds. The
 configured hook is synchronous with Codex's maximum three-second timeout. The
 lifecycle assertion deliberately remains strict, so this gap can fail CI; the
 suite is not claimed to be reliably green until the missing invocation is fixed.
+The [Codex shutdown investigation](CODEX-SESSION-END.md) reproduces this with
+shell-builtin marker hooks, independent of Terma, and traces the conflicting
+upstream cleanup deadlines.
 
 Codex 0.158.0 did not reliably deliver native error logs or metrics when a
 controlled terminal HTTP 400 caused it to exit. A controlled 503 followed by a
