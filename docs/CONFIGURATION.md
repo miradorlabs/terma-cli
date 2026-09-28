@@ -66,10 +66,11 @@ Project server keys are namespaced by project and never written to the repositor
 - Both routes are delivered by PATH shims, or by shell functions printed with
   `--activation wrapper`.
 
-The shim directory must appear before the machine-wide agent binary. `terma install` offers
-to append a marked block to the end of the shell startup file; later PATH edits can
-otherwise put the real binary first. `terma doctor` reports when routing is configured but
-not active.
+The shim directory must appear before the machine-wide agent binary. `terma install`
+appends a marked block to the end of the shell startup file, or moves it there when a
+later PATH edit would put the real binary first; `--no-path` prints the line instead. The block takes effect in shells that read the file
+afterwards: install ends with the command that reloads the current one (`source ~/.zshrc`
+for zsh). `terma doctor` reports when routing is configured but not active.
 
 An IDE or launcher that invokes an agent by absolute path bypasses the shim and uses
 machine-wide configuration. `doctor` also checks for a different Terma build elsewhere on
@@ -100,8 +101,14 @@ terma connect claude \
 require repositories to opt in with `--exports repos`. `terma install` enables repository telemetry by default, including for this arrangement.
 It writes a reviewable policy alongside the agent hooks, keeping endpoints and keys out
 of the repository. Reinstalling preserves an existing policy; use `--signals`,
-`--exclude-prompts`, and `--exclude-tool-content` to change what the repository sends.
+`--prompts on|off`, and `--exclude-tool-content` to change what the repository sends.
 Restart Claude Code after installing so the session loads the new settings.
+
+Your own agents send prompt text and model responses by default: install does not ask,
+keeps your last choice for that project (on for a first install), and its Prompts line
+says how to change it. `terma install --prompts off` stops them and `--prompts on` turns
+them back on. The choice is yours: it changes the repository's committed policy only when
+you pass `--prompts` explicitly.
 
 Codex ignores project-level OTEL configuration, so direct `terma connect codex` is
 machine-wide. `terma install` instead routes each launch using runtime `-c` overrides
@@ -137,11 +144,12 @@ settings, custom `--settings` arguments, and a running session's inherited envir
 are outside this configuration check.
 
 Shell activation has its own diagnostic in both commands. It reports a missing
-per-project route, a missing PATH setup or inactive wrapper, a startup file that
-requires a new terminal, and a later PATH entry that bypasses the shims. It warns
+per-project route, a missing PATH setup or inactive wrapper, a startup file this shell
+has not read yet (`source` it or open a new terminal), and a later PATH entry that
+bypasses the shims. It warns
 even when global telemetry still works, and says which settings provide that
 fallback. OpenCode needs no shell integration. Diagnostics never opt in or modify
-your shell startup file; `terma install` offers that setup.
+your shell startup file; `terma install` does that setup.
 
 ## Updates
 
@@ -185,8 +193,8 @@ something rewrites it. So once the new version is in place, `terma update` runs 
 It works only from what is on disk. It never signs in, never creates a file (one that is
 gone was removed on purpose and stays gone; `terma install` brings it back), and never
 changes a choice — unlike re-running `terma install`, which puts every flag it does not
-record (`--signals`, `--exclude-prompts`, `--identity`, `--no-statusline`,
-`--activation`) back to its default. The repository files it changes are listed to
+record (`--signals`, `--identity`, `--no-statusline`, `--activation`) back to its
+default. The repository files it changes are listed to
 commit.
 
 ### Migrating saved state
@@ -211,7 +219,10 @@ The first interactive command under a newer release, however it arrived (an auto
 update, or `brew upgrade` run by hand), refreshes the home-directory files once and
 records the release in `refreshed.json`. It does not rewrite committed files: when the
 current repository's hooks are out of date it says so, and `terma update --refresh` there
-updates them.
+updates them. In any repository afterwards, `terma status` and `terma doctor` compare the
+committed hooks with what this terma writes and name the same command when they differ.
+`.terma/settings.json`'s `terma_version` records the terma that last wrote those files;
+it changes only when install or a refresh rewrites one.
 
 Update checks compare the release tag stamped into the binary with the latest
 published release. Source builds (`make build` reports `git describe`, a plain

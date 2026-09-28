@@ -1,0 +1,128 @@
+package cmd
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func nateTestEnvironment(t *testing.T) (home, configDir, workspace string) {
+	t.Helper()
+	home = t.TempDir()
+	configDir = filepath.Join(home, ".config", "terma")
+	workspace = t.TempDir()
+	t.Chdir(workspace)
+	t.Setenv("HOME", home)
+	t.Setenv("SHELL", "/bin/zsh")
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("TERMA_CONFIG_DIR", configDir)
+	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(home, ".claude"))
+	t.Setenv("CODEX_HOME", filepath.Join(home, ".codex"))
+	return home, configDir, workspace
+}
+
+func stubNateBinary(t *testing.T, path string) {
+	t.Helper()
+	oldCandidates, oldRemove := nateBinaryCandidates, nateRemoveBinary
+	nateBinaryCandidates = func() []string { return []string{path} }
+	nateRemoveBinary = removeNateBinary
+	t.Cleanup(func() {
+		nateBinaryCandidates, nateRemoveBinary = oldCandidates, oldRemove
+	})
+}
+
+func TestNateRequiresExplicitConfirmationWithoutATerminal(t *testing.T) {
+	_, configDir, _ := nateTestEnvironment(t)
+	if err := os.MkdirAll(configDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	marker := filepath.Join(configDir, "keep-until-confirmed")
+	if err := os.WriteFile(marker, []byte("present"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runTerma(t, "nate")
+	if err == nil || !strings.Contains(err.Error(), "Are you sure you want to do this? It will remove everything related to Terma.") {
+		t.Fatalf("nate without confirmation = %v, output %q", err, out)
+	}
+	if _, err := os.Stat(marker); err != nil {
+		t.Fatalf("nate changed state before confirmation: %v", err)
+	}
+}
+
+func TestNateRemovesRepositoryMachineStateAndBinary(t *testing.T) {
+	home, configDir, workspace := nateTestEnvironment(t)
+	if err := os.MkdirAll(configDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(configDir, "credentials.json"), []byte("secret"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(workspace, ".terma"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(workspace, ".terma", "settings.json"), []byte(`{"version":1,"project":{"id":"p"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	binary := filepath.Join(home, "bin", "terma")
+	if err := os.MkdirAll(filepath.Dir(binary), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(binary, []byte("binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	stubNateBinary(t, binary)
+
+	out, err := runTerma(t, "nate", "--yes")
+	if err != nil {
+		t.Fatalf("nate: %v\n%s", err, out)
+	}
+	for _, path := range []string{configDir, filepath.Join(workspace, ".terma", "settings.json"), binary} {
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Errorf("%s survived nate: %v", path, err)
+		}
+	}
+	if !strings.Contains(out, "Terma has been removed") {
+		t.Fatalf("missing completion message:\n%s", out)
+	}
+}
+
+func TestNateKeepsRecoveryStateWhenRestorationFails(t *testing.T) {
+	home, configDir, _ := nateTestEnvironment(t)
+	if err := os.MkdirAll(configDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	marker := filepath.Join(configDir, "journal")
+	if err := os.WriteFile(marker, []byte("needed to recover"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	claudeSettings := filepath.Join(home, ".claude", "settings.json")
+	if err := os.MkdirAll(filepath.Dir(claudeSettings), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(claudeSettings, []byte("{"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	binary := filepath.Join(home, "bin", "terma")
+	stubNateBinary(t, binary)
+
+	out, err := runTerma(t, "nate", "--yes")
+	if err == nil || !strings.Contains(err.Error(), "restore Claude Code settings") {
+		t.Fatalf("nate with unreadable managed config = %v, output %q", err, out)
+	}
+	if _, err := os.Stat(marker); err != nil {
+		t.Fatalf("recovery state was deleted after restoration failed: %v", err)
+	}
+}
+
+func TestRemoveTermaConfigDirRefusesHome(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	if err := removeTermaConfigDir(home); err == nil {
+		t.Fatal("home directory was accepted as a config directory")
+	}
+	if _, err := os.Stat(home); err != nil {
+		t.Fatalf("home directory was removed: %v", err)
+	}
+}

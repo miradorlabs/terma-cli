@@ -6,7 +6,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
+	"github.com/miradorlabs/terma-cli/internal/style"
 )
 
 // A hook manager that needs something run in each clone says so in the plan. Without
@@ -148,5 +150,45 @@ func TestInstallListsTheFilesToCommit(t *testing.T) {
 	}
 	if strings.Contains(out, "Commit these files") {
 		t.Fatalf("a re-install that wrote nothing asked for a commit:\n%s", out)
+	}
+}
+
+// The question that asks to write the hooks names the files; the lines under it say what
+// each one does and what committing them means, so a developer knows what a yes does.
+// Every file the question names gets its own line.
+func TestInstallHookQuestionExplainsEachFile(t *testing.T) {
+	repo := installRepo(t)
+	plan, err := planHooks(repo, hookmgr.Detect(repo), []string{"claude", "codex"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := plan.explain()
+	if len(lines) != len(plan.files())+2 {
+		t.Fatalf("want a line per file %v and the closing sentence, got:\n%s", plan.files(), strings.Join(lines, "\n"))
+	}
+	for i, want := range [][2]string{
+		{".terma/hooks/", "stamps each commit with the agent session that wrote it"},
+		{".claude/settings.json", "reports each Claude Code session and the files it edits"},
+		{".codex/hooks.json", "reports each Codex session and the files it edits"},
+	} {
+		if !strings.HasPrefix(lines[i], want[0]) || !strings.Contains(lines[i], want[1]) {
+			t.Errorf("line %d = %q, want %s explained as %q", i, lines[i], want[0], want[1])
+		}
+	}
+	if text := strings.Join(lines, " "); !strings.Contains(text, "merging them sets up everyone who clones") || !strings.Contains(text, "without terma they do nothing") {
+		t.Errorf("the explanation should say what committing the files means:\n%s", strings.Join(lines, "\n"))
+	}
+}
+
+// With detail, the question stands alone, the detail sits indented under it, and the
+// answer is typed on a line of its own; without, the answer follows the question.
+func TestConfirmPromptPutsTheDetailBeforeTheAnswer(t *testing.T) {
+	p := style.Plain()
+	if got, want := confirmPrompt(p, "Write them?", nil, true), "? Write them? [Y/n] "; got != want {
+		t.Errorf("without detail: %q, want %q", got, want)
+	}
+	got := confirmPrompt(p, "Write them?", []string{"a.json  does a", "b.json  does b"}, false)
+	if want := "? Write them?\n  a.json  does a\n  b.json  does b\n  [y/N] "; got != want {
+		t.Errorf("with detail: %q, want %q", got, want)
 	}
 }

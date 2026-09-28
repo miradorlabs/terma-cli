@@ -4,12 +4,14 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/miradorlabs/terma-cli/internal/doctor"
+	"github.com/miradorlabs/terma-cli/internal/shim"
 )
 
 // What else is installed on the machine running the tests is none of their business.
@@ -124,5 +126,47 @@ func TestOtherTermasReportsOnlyADifferentBuild(t *testing.T) {
 	others := otherTermas(primary)
 	if len(others) != 1 || !strings.Contains(others[0], filepath.Base(filepath.Dir(stale))) || !strings.Contains(others[0], "installed ") {
 		t.Fatalf("the stale copy should be reported once, with when it was installed: %v", others)
+	}
+}
+
+// A build run from a directory that is not on PATH — `make build` and then bin/terma —
+// installs hooks that call `terma` by name and find nothing. The fix is the command that
+// puts the directory on PATH, quoted once and whole, so it is drawn as one command to copy.
+func TestDoctorGivesTheCommandThatPutsTermaOnPath(t *testing.T) {
+	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("SHELL", "/bin/zsh")
+	t.Setenv("ZDOTDIR", "")
+	t.Setenv("PATH", t.TempDir())
+	current := writeTerma(t, filepath.Join(t.TempDir(), "it's a build"), "this build")
+	dir := filepath.Dir(current)
+
+	check := doctorBinaryCheckFor(current)
+	command := addToPathCommand(dir)
+	if check.Status != doctor.Fail || !strings.Contains(check.Fix, "run `"+command+"` to put "+dir+" on PATH") || strings.Count(check.Fix, "`") != 2 {
+		t.Fatalf("the fix should be the one quoted command: %+v", check)
+	}
+	echo, reload, ok := strings.Cut(command, " && ")
+	if !ok || reload != "source ~/.zshrc" || !strings.HasSuffix(echo, " >> ~/.zshrc") {
+		t.Fatalf("zsh: %q, want the line appended to ~/.zshrc, then sourced", command)
+	}
+	// The quoting holds for a directory with a quote and a space in it: the line lands in
+	// the file exactly as terma writes a PATH line for this shell.
+	if out, err := exec.Command("/bin/sh", "-c", echo).CombinedOutput(); err != nil {
+		t.Fatalf("%s: %v\n%s", echo, err, out)
+	}
+	rc, _ := shim.ShellRC()
+	if data, _ := os.ReadFile(filepath.Join(home, ".zshrc")); string(data) != rc.PathLine(dir)+"\n" {
+		t.Fatalf("~/.zshrc = %q, want %q", data, rc.PathLine(dir)+"\n")
+	}
+
+	t.Setenv("SHELL", "/usr/bin/fish")
+	if got, want := addToPathCommand("/opt/terma"), `fish_add_path --move --prepend "/opt/terma"`; got != want {
+		t.Errorf("fish: %q, want %q", got, want)
+	}
+	t.Setenv("SHELL", "/bin/dash")
+	if got, want := addToPathCommand("/opt/terma"), `export PATH="/opt/terma:$PATH"`; got != want {
+		t.Errorf("an unknown shell: %q, want %q", got, want)
 	}
 }

@@ -35,7 +35,10 @@ run that reaches them opens a browser login on **production**. A script that run
   one file there plus its hookmgr/hookrun halves, never another hand-written triplet in
   `cmd/`. The telemetry registry (`harness.All`) is a different, narrower list: only
   agents with a configurable OTLP exporter. Cursor and Antigravity are adapters but not
-  harnesses.
+  harnesses. While `agentAvailable` (cmd/setup.go) says an agent is coming soon — Cursor,
+  Antigravity, OpenCode — `installAdapters` never wires its hooks by default, whatever
+  directory the repository carries or a colleague committed; only `--adapters` names one.
+  uninstall, doctor and `terma hook` still cover them.
 - Hooks are thin shims; **all logic is in the binary** (`terma hook <event>`,
   `internal/hookrun`). Never put logic in `hookmgr.ShimScript` or the husky/lefthook/
   pre-commit lines beyond "call terma, never fail, chain". Every committed entry is
@@ -158,7 +161,12 @@ run that reaches them opens a browser login on **production**. A script that run
   never runs what it finds) sits elsewhere on PATH or in `wellKnownBinDirs`: an app started
   from the Dock gets the system PATH, so `/usr/local/bin/terma` is what Cursor's hooks run,
   and a build from before `.terma/settings.json` does not see the binding. Tests blank
-  `wellKnownBinDirs`. The hooks check is two: `commit hooks installed` (git wiring, all or
+  `wellKnownBinDirs`. When no terma is on PATH at all (a `make build` run as bin/terma),
+  or another build is ahead of this one, the fix is the one quoted command that puts this
+  build's directory on PATH in the developer's shell (`addToPathCommand`: the PATH line
+  appended to the startup file and sourced; `fish_add_path` for fish). It lands after
+  terma's shim block, which is harmless: that directory holds no agent binaries, so the
+  shims still route, and the next install moves the block back to the end. The hooks check is two: `commit hooks installed` (git wiring, all or
   nothing) and `agent hooks run` (`agentHooksCheck`, shared with status — a fraction,
   `Check.Ready`/`Of`). A commit is stamped with the session that touched its files and a
   session exists only because its agent's hooks announced it. The readiness checklist
@@ -173,10 +181,15 @@ run that reaches them opens a browser login on **production**. A script that run
   skips. Removal forces twice for that lock, and each run first clears its own
   abandoned ones (`<tmp>/terma-doctor-*/wt`, directory gone) — nothing else.
 - The command surface is small on purpose (`cmd/command_surface_test.go`). `terma --help`
-  lists `primaryCommands` — setup, install, status, doctor, session, usage, blame, org,
+  lists `primaryCommands` — setup, install, status, doctor, session, usage, org,
   uninstall, update — and everything else is `Hidden: true`, **not removed**: login/logout/
   whoami, connect/disconnect/telemetry/harness, project, principal, config, spool, version,
-  hook, shim. Hidden commands are what automation and CI run and what terma's own fix-it
+  hook, shim — and cobra's `completion`, hidden (`CompletionOptions.HiddenDefaultCmd`), not
+  removed: the Homebrew cask's `generate_completions_from_executable` runs `terma
+  completion <shell>` during `brew install`, and a failing command fails the install.
+  `blame` was removed outright (2026-09-28, a product call: not part of terma for now;
+  `removedCommands`) — no message may name it. doctor's round-trip still reads
+  `terma.commit` back through `api.CommitLog` (`commitLogWindow`). Hidden commands are what automation and CI run and what terma's own fix-it
   hints name, so they must keep working; `project` is advanced because `install` binds a
   repository to its project and the selection only scopes the read commands elsewhere. A new
   command is advanced unless a developer needs it day to day — an unclassified or un-hidden
@@ -234,17 +247,21 @@ run that reaches them opens a browser login on **production**. A script that run
   fails. PATH entries are compared by identity (`sameDir`), not spelling: a trailing
   slash that slipped past `RealBinary` would make the shim exec itself forever.
   The shim directory gets onto PATH through the developer's shell startup file
-  (`internal/shim/rc.go`): install asks (`--yes` consents, `--no-path` declines and prints
-  the line), then writes one marked block **at the end** of `~/.zshrc` / `~/.bashrc` (macOS:
-  an existing `~/.bash_profile`) / fish `conf.d/terma.fish`. Last, because a PATH line only
+  (`internal/shim/rc.go`): install writes it without asking (running install is the
+  consent; `--no-path` declines and prints the line) as one marked block **at the end** of
+  `~/.zshrc` / `~/.bashrc` (macOS: an existing `~/.bash_profile`) / fish
+  `conf.d/terma.fish`. Last, because a PATH line only
   beats the ones after it and a real startup file prepends `~/.local/bin` — where the real
   binaries live — several times; a pasted line was silently overtaken. `RC.State`
   tells absent / last / overtaken (a later line sets PATH — `pathEdit`, which must not
   match GOPATH or MANPATH), `Ensure` appends or moves the block and keeps every other
   byte (writing *through* a symlinked dotfile), `Remove` restores the file exactly, and
-  `shim uninstall` calls it. doctor's fix is specific: "open a new terminal" when the block
-  is last and this shell predates it, else `terma install`. Never write a startup file
-  without consent, and any test that can reach `RemoveAll` or `putShimsOnPath` must
+  `shim uninstall` calls it. doctor's fix is specific: `source` the file or open a new
+  terminal when the block is last and this shell predates it, else `terma install`. A child
+  process cannot change its parent's PATH, so install ends with a "Next step:" naming the
+  reload (`reloadStep`; `.` for a POSIX shell) whenever a routed agent is not live yet. Only
+  install adds the block and only `shim uninstall` removes it — doctor, status and refresh
+  never touch the file — and any test that can reach `RemoveAll` or `putShimsOnPath` must
   sandbox `HOME` and set `SHELL`.
 - Codex is split across two scopes and neither is optional. Telemetry supports user-level and runtime configuration: Codex strips `otel` (with `notify`, `profile`, `profiles` and the provider keys)
   out of a project's `.codex/config.toml` and warns at startup, so `--scope local` has
@@ -302,6 +319,25 @@ run that reaches them opens a browser login on **production**. A script that run
   policy is the only thing that can make it send, and `status`/`doctor` read it back
   that way. Codex cannot be narrowed (one config file, no project otel), so setup
   connects it everywhere and says so rather than silencing it.
+- install's output (`cmd/install_ui.go`, `installUI`): one marked line per step (`ok`, or
+  `warn` for one that needs the developer), a verdict, then numbered next steps (`then`) —
+  the reload, the files to commit, a declined PATH line, Codex Desktop approval, doctor's
+  fixes. Everything long-form (the plan's file list, policies written, git wiring, doctor's
+  per-check lines) goes to `ui.detail`, which is stdout under `--verbose` or `--dry-run`
+  and discarded otherwise. New install output goes through one of those, never straight
+  to `cmd.OutOrStdout()`. Doctor runs behind a spinner as the `Verified` step and leaves
+  out the routing warning when a next step already says to reload the shell (install's
+  own process always predates the PATH block). The first install under a newer release
+  also does the machine half of `update --refresh` (`refreshMachine`, gated on
+  `selfupdate.NeedsRefresh`, so source builds and tests never touch home files) before
+  verifying, and records it; the repository half is its own hook plan, which rewrites a
+  stale committed file as it adds a missing one.
+- Prompt capture (`resolvePrompts`): `--prompts on|off` (`--exclude-prompts` is the older,
+  hidden spelling); otherwise install never asks: it keeps this developer's last choice for
+  the project (`shim.Record.IncludePrompts`), on for a first install, and its Prompts line
+  names the `terma install --prompts off|on` that changes it. It lands in the routing record
+  and a newly written repository policy; only an explicit `--prompts` rewrites an existing
+  committed policy (`updatePolicy`). A bare re-install used to switch prompts back on.
 - `terma install` writes the repository half of that arrangement by default into the
   same committed `.claude/settings.json` the hooks live in, after the hook plan applies
   so both merges land in order. Re-running install preserves an existing policy unless
@@ -332,7 +368,14 @@ run that reaches them opens a browser login on **production**. A script that run
   displaced (revoked best-effort); `UpdateCredential` is the refresh path and never
   changes which organization is active. `logout` revokes every stored session.
 - `terma org use` (`cmd/org.go`) changes account scope only. `terma install` selects
-  and saves projects per repository, and reinstalls reuse that binding. Project-scoped
+  and saves projects per repository. An organization with one project is bound to it
+  without asking (`soleOrPick`). With several, on a terminal it asks every time, the bound
+  project marked and kept by Enter; without one, or with `--yes`, it keeps the binding. When
+  install signs in, `resolveBinding` checks the binding against the projects that
+  credential lists: one made in another environment or organization is named and
+  replaced, never used — used as-is, its first key mint was refused with the gateway's
+  "run `mirador project list`". A credential-free install keeps it unchecked, and a
+  kept binding keeps the environment it recorded. Project-scoped
   reads resolve the Git worktree's `.terma/settings.json`, unless `--project` or
   `TERMA_PROJECT_ID` explicitly overrides it. Machine profiles have no project defaults.
   Keys are remembered per harness per project in `keys.json`
@@ -358,10 +401,19 @@ run that reaches them opens a browser login on **production**. A script that run
   four-square spinner draw only on a terminal a person is watching — never in a
   buffer, a pipe, an agent (`CLAUDECODE` and friends), `NO_COLOR` or `TERM=dumb` —
   so tests compare plain strings. `doctor` streams each check as it finishes
-  (`doctorProgress`) and polls the round-trip every second.
+  (`doctorProgress`) and polls the round-trip every second. A command a message tells
+  the reader to run is quoted in backticks, and on a terminal it is drawn as one
+  (`Palette.Command`, bold brand purple) with the backticks dropped, so a copy is the
+  command alone: `Palette.Commands` for a string, `style.Highlight(w)` for a writer
+  (status, refresh, the top-level error line), doctor's `fixText` for a fix that leads
+  with a bare `terma …`. Plain output keeps the backticks.
 - Interactive prompts (`internal/prompt`): a pure form model plus a raw-mode driver on
   `x/term`, no TUI dependency. Shown only when `canPrompt()` (stdin/stdout/stderr are
-  terminals, no agent env var); every box has a flag and `--yes` skips the form.
+  terminals, no agent env var); every box has a flag and `--yes` skips the form. The
+  pickers (`cmd/pick.go`: the install project picker, `terma org use`) are a `Choice`
+  form through `prompt.Choose` — arrow keys, Enter picks, Esc is `errCancelled`, the
+  cursor starting on the default or current row; the numbered list answered by number
+  or name is the fallback when stdout is a terminal and stdin is not.
 - OpenCode (`internal/harness/opencode.go`; plugin `internal/harness/opencode/terma.js`,
   embedded): the harness is a dependency-free plugin written whole into
   `~/.config/opencode/plugins/terma.js` with one `const CONFIG = {...}` line spliced in
@@ -384,14 +436,6 @@ run that reaches them opens a browser login on **production**. A script that run
   frame of under a 15-second bound. Names never travel on the wire: `--user`/`--api-key` resolve
   through `/v1/ai/principals` (`principalIndex`), and a substring that lands on two
   people is an error, never a guess. Semantics for agents live in `docs/INSIGHTS.md`.
-- `blame` (`cmd/blame.go`) is the reverse join: a commit → the session that produced it.
-  It reads the commit locally for its sha and time, then reads back the `terma.commit`
-  record the post-commit hook exported, via `CommitLog` over the log store's `/v1/logs`
-  query surface (`internal/api/logs.go`) — filter `attribute.event.name="terma.commit"
-  AND attribute.sha=…`, windowed ±1h on the commit's own time because the store caps a
-  query's span (currently 840h). Records come under `logs`, every attribute value is a
-  string nested under `attributes`/`resource_attributes` (hence `LogRecord.Attr/Int`).
-  No cost yet: the trailer/session.id is not what the usage metrics key on.
 
 ## Funding attribution (in progress)
 
@@ -691,7 +735,13 @@ it does not prove that a running agent has reloaded its settings or sent telemet
   choice. Re-running `terma install` is not a substitute: it re-defaults every flag it
   does not record. The first interactive command under a newer release refreshes the
   home-directory files once (`refreshed.json`, upward only, so two builds on PATH do not
-  take turns) and only *reports* stale committed files. `update --refresh` is a contract
+  take turns) and only *reports* stale committed files. Per repository, doctor and status
+  name the same fix: committed hooks that exist but differ from this build's templates
+  are out of date → `terma update --refresh` (`hookWiring.stale`, and `agentHooksCheck`
+  for the agents' files); files that are missing → `terma install`. The binding's
+  `terma_version` is the terma that last wrote the committed files: install stamps it only
+  when it wrote one, refresh when it rewrote one (`stampVersion`, the checkout's own
+  binding) — never a trigger, since contents decide staleness. `update --refresh` is a contract
   between releases: an older binary invokes it on a newer one, so it must keep working.
 - Migrations (`internal/migrate`, registry in `migrations.go`): a change to the shape of
   state under the config directory ships with a migration, not a tolerant reader in the

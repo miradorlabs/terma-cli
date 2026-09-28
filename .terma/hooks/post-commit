@@ -11,6 +11,15 @@ fi
 # git (a subprocess this shim cannot afford); linked worktrees ask.
 chain_dir="${TERMA_CHAIN_HOOKS_DIR:-}"
 if [ -z "$chain_dir" ]; then
+  state_git_dir="${GIT_DIR:-.git}"
+  if [ ! -d "$state_git_dir" ]; then
+    state_git_dir="$(git rev-parse --absolute-git-dir 2>/dev/null)"
+  fi
+  if [ -f "$state_git_dir/terma/previous-hooks-path" ]; then
+    IFS= read -r chain_dir < "$state_git_dir/terma/previous-hooks-path" || true
+  fi
+fi
+if [ -z "$chain_dir" ]; then
   if [ -d "${GIT_DIR:-.git}/hooks" ]; then
     chain_dir="${GIT_DIR:-.git}/hooks"
   else

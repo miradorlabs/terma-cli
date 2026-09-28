@@ -357,7 +357,7 @@ func connectGlobal(cmd *cobra.Command, name string, f connectFlags) error {
 	statusLineNote := ""
 	codexNotifyNote := ""
 	if h.Name() == "claude" && !f.noStatusLine {
-		statusLineNote = installStatusLine(cmd.ErrOrStderr())
+		statusLineNote, _ = installStatusLine(cmd.ErrOrStderr())
 	}
 	if h.Name() == "codex" {
 		switch changed, err := (harness.Codex{}).InstallCodexNotify(); {
@@ -607,25 +607,25 @@ func backupHarnessConfig(h harness.Harness, endpoint string) (string, error) {
 }
 
 // installStatusLine puts `terma hook statusline` in front of Claude Code's status
-// line and returns the line to say about it. A failure is a warning, never a failed
-// connect: the exporters are already written and working.
-func installStatusLine(errOut io.Writer) string {
+// line and returns the line to say about it, and whether it is in place. A failure is a
+// warning, never a failed connect: the exporters are already written and working.
+func installStatusLine(errOut io.Writer) (string, bool) {
 	c := harness.Claude{}
 	changed, err := c.InstallStatusLine()
 	if err != nil {
 		fmt.Fprintf(errOut, "Warning: could not wrap Claude Code's status line (%v); plan usage will not be captured.\n", err)
-		return ""
+		return "", false
 	}
 	st, stErr := c.StatusLineState("")
 	switch {
 	case stErr != nil:
-		return ""
+		return "", true
 	case changed && st.Renderer != "":
-		return fmt.Sprintf("Status line: terma now reads the plan's usage windows from it; your own status line (%s) keeps running unchanged behind it.", output.SanitizeTerminal(st.Renderer))
+		return fmt.Sprintf("Status line: terma now reads the plan's usage windows from it; your own status line (%s) keeps running unchanged behind it.", output.SanitizeTerminal(st.Renderer)), true
 	case changed:
-		return "Status line: terma added one that shows model, context, cost and the plan's usage windows (remove it with `terma disconnect claude`, or skip it with --no-statusline)."
+		return "Status line: terma added one that shows model, context, cost and the plan's usage windows (remove it with `terma disconnect claude`, or skip it with --no-statusline).", true
 	default:
-		return "Status line: already wrapped by terma."
+		return "Status line: already wrapped by terma.", true
 	}
 }
 
@@ -633,13 +633,23 @@ func installStatusLine(errOut io.Writer) string {
 // assuming yes: this command writes a credential into a config file, and a piped
 // invocation that meant to be non-interactive should say so with --yes.
 func confirm(cmd *cobra.Command, question string) (bool, error) {
+	return confirmDefault(cmd, question, true)
+}
+
+// confirmDefault is confirm with the answer a bare Enter gives: yes when def, else no.
+func confirmDefault(cmd *cobra.Command, question string, def bool) (bool, error) {
+	return confirmExplained(cmd, question, nil, def)
+}
+
+// confirmExplained is confirmDefault with lines under the question that say what a yes
+// does, so they are read before the answer is typed.
+func confirmExplained(cmd *cobra.Command, question string, detail []string, def bool) (bool, error) {
 	if !output.Interactive() {
 		return false, fmt.Errorf("%s — no terminal to confirm on; pass --yes to proceed non-interactively", question)
 	}
 
 	errOut := cmd.ErrOrStderr()
-	p := style.For(errOut)
-	fmt.Fprintf(errOut, "%s %s %s ", p.Brand("?"), p.Bold(question), p.Dim("[Y/n]"))
+	fmt.Fprint(errOut, confirmPrompt(style.For(errOut), question, detail, def))
 	line, err := bufio.NewReader(cmd.InOrStdin()).ReadString('\n')
 	if err != nil {
 		// EOF with nothing typed is a decline, not a crash.
@@ -648,12 +658,39 @@ func confirm(cmd *cobra.Command, question string) (bool, error) {
 		}
 		return false, fmt.Errorf("read confirmation: %w", err)
 	}
-	switch strings.ToLower(strings.TrimSpace(line)) {
-	case "", "y", "yes":
-		return true, nil
-	default:
-		return false, nil
+	return yesAnswer(line, def), nil
+}
+
+// confirmPrompt draws a yes/no question. Without detail the answer is typed on the
+// question's own line; with it, the detail sits indented under the question and the
+// answer goes on a line of its own beneath.
+func confirmPrompt(p style.Palette, question string, detail []string, def bool) string {
+	hint := "[Y/n]"
+	if !def {
+		hint = "[y/N]"
 	}
+	if len(detail) == 0 {
+		return fmt.Sprintf("%s %s %s ", p.Brand("?"), p.Bold(question), p.Dim(hint))
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s %s\n", p.Brand("?"), p.Bold(question))
+	for _, l := range detail {
+		fmt.Fprintf(&b, "  %s\n", l)
+	}
+	fmt.Fprintf(&b, "  %s ", p.Dim(hint))
+	return b.String()
+}
+
+// yesAnswer reads a typed answer: y or yes is yes, nothing is def, and anything else —
+// a typo included — is no, so a mistyped answer never agrees to something.
+func yesAnswer(line string, def bool) bool {
+	switch strings.ToLower(strings.TrimSpace(line)) {
+	case "y", "yes":
+		return true
+	case "":
+		return def
+	}
+	return false
 }
 
 func containsSignal(signals []harness.Signal, want harness.Signal) bool {

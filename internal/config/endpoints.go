@@ -89,6 +89,25 @@ func EndpointsFor(env string) (Endpoints, error) {
 	return e, nil
 }
 
+// SameAccounts reports whether two built-in environments share an account service,
+// which is where organizations and projects live. An empty name is production. dev and
+// local do: local is a local app in front of the dev backend. A name this build does not
+// know matches only itself.
+func SameAccounts(a, b string) bool {
+	if a == "" {
+		a = EnvProd
+	}
+	if b == "" {
+		b = EnvProd
+	}
+	if a == b {
+		return true
+	}
+	ea, errA := EndpointsFor(a)
+	eb, errB := EndpointsFor(b)
+	return errA == nil && errB == nil && ea.AuthURL == eb.AuthURL
+}
+
 // EndpointsByOTLP finds the built-in environment whose ingest host is otlpURL. A
 // project known only by the ingest host its routing record names is read back from
 // that environment's data API. Dev and local share every backend host, so the first

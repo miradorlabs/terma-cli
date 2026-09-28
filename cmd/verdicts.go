@@ -23,8 +23,11 @@ type hookWiring struct {
 	manager hookmgr.Manager
 	// err is set when the plan could not be computed at all.
 	err error
-	// changes is how many files an install would still write.
+	// changes is how many files an install would still write, and stale how many of
+	// those are already there: written by an earlier terma, which `terma update
+	// --refresh` rewrites without asking anything. A missing one is install's to add.
 	changes int
+	stale   int
 	// unpointed is the shim manager's own failure: the shims are committed, and this
 	// clone's core.hooksPath (hooksPath) is not pointed at them.
 	unpointed bool
@@ -39,6 +42,11 @@ func judgeHookWiring(ctx context.Context, root string, bound *termaproject.File)
 	w := hookWiring{manager: det.Manager}
 	plan, err := hookmgr.PlanInstall(root, det)
 	w.err, w.changes = err, len(plan.Changes)
+	for _, c := range plan.Changes {
+		if c.Before != nil {
+			w.stale++
+		}
+	}
 	if det.Manager == hookmgr.GitShim {
 		w.hooksPath = gitx.ConfigGet(ctx, root, "core.hooksPath")
 		w.unpointed = w.hooksPath != hookmgr.ShimDir

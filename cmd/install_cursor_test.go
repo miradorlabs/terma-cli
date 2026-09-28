@@ -16,23 +16,43 @@ import (
 
 // installAdapters unions what the repository's hooks files wire, the configured agents,
 // and directory-present agents — so a selection grows the wired hooks and a narrower
-// re-run never removes them.
+// re-run never removes them. An agent still coming soon is left out of all three.
 func TestInstallAdaptersUnionGrowsNeverShrinks(t *testing.T) {
 	root := t.TempDir()
 
-	// Selecting more agents wires their committed hooks too (opencode has no hooks file).
+	// Selecting more agents wires their committed hooks too (opencode has no hooks file,
+	// and cursor is coming soon).
 	got := installAdapters(root, []string{"claude", "cursor", "codex", "opencode"}, "")
-	if strings.Join(got, ",") != "claude,cursor,codex" {
+	if strings.Join(got, ",") != "claude,codex" {
 		t.Fatalf("selecting agents should grow adapters, got %v", got)
 	}
 	// A narrower re-run keeps what a colleague's install committed (no churn-down).
-	wireAdapters(t, root, "cursor", "codex")
-	if got := installAdapters(root, []string{"claude"}, ""); strings.Join(got, ",") != "claude,cursor,codex" {
+	wireAdapters(t, root, "codex")
+	if got := installAdapters(root, []string{"claude"}, ""); strings.Join(got, ",") != "claude,codex" {
 		t.Fatalf("a narrower re-run must not drop committed adapters, got %v", got)
 	}
 	// --adapters overrides outright.
 	if got := installAdapters(root, []string{"claude", "cursor"}, "codex"); strings.Join(got, ",") != "codex" {
 		t.Fatalf("--adapters should override, got %v", got)
+	}
+}
+
+// Cursor and Antigravity are coming soon, so install offers neither's hooks: not for a
+// repository that carries the agent's directory, and not to refresh a file a colleague
+// committed — which stays as it is. --adapters is the only way to wire one.
+func TestInstallAdaptersLeavesComingSoonAgentsOut(t *testing.T) {
+	root := t.TempDir()
+	for _, dir := range []string{".cursor", ".agents"} {
+		if err := os.MkdirAll(filepath.Join(root, dir), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	wireAdapters(t, root, "cursor", "antigravity")
+	if got := installAdapters(root, []string{"claude"}, ""); strings.Join(got, ",") != "claude" {
+		t.Fatalf("a coming-soon agent was wired by default: %v", got)
+	}
+	if got := installAdapters(root, []string{"claude"}, "claude,cursor"); strings.Join(got, ",") != "claude,cursor" {
+		t.Fatalf("--adapters cursor should still wire Cursor, got %v", got)
 	}
 }
 
@@ -130,31 +150,22 @@ func TestInstallWiresCursorHooksWhenAsked(t *testing.T) {
 	}
 }
 
-// A repository that already has a .cursor directory is one people open in Cursor, so
-// its hooks come along by default; one without is left alone.
-func TestInstallWiresCursorByDefaultOnlyWhereCursorIsUsed(t *testing.T) {
+// Cursor is coming soon: a repository people open in Cursor (it has a .cursor directory)
+// gets no Cursor hooks from a plain install, and the plan does not name the file.
+func TestInstallLeavesCursorAloneWhileComingSoon(t *testing.T) {
 	repo := installRepo(t)
-	if out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--yes"); err != nil {
-		t.Fatalf("install: %v\n%s", err, out)
-	}
-	if _, err := os.Stat(filepath.Join(repo, ".cursor", "hooks.json")); err == nil {
-		t.Fatal("a repository with no .cursor directory got Cursor hooks by default")
-	}
-	if out, err := runTerma(t, "uninstall", "--yes"); err != nil {
-		t.Fatalf("uninstall: %v\n%s", err, out)
-	}
-
 	if err := os.MkdirAll(filepath.Join(repo, ".cursor", "rules"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--yes"); err != nil {
+	out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--yes", "--verbose")
+	if err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}
-	if _, err := os.Stat(filepath.Join(repo, ".cursor", "hooks.json")); err != nil {
-		t.Fatal("a repository with a .cursor directory should get Cursor hooks by default")
+	if _, err := os.Stat(filepath.Join(repo, ".cursor", "hooks.json")); err == nil {
+		t.Fatal("a repository with a .cursor directory got Cursor hooks by default")
 	}
-	if !slices.Contains(adapter.WiredNames(repo), "cursor") {
-		t.Errorf("cursor is not wired: %v", adapter.WiredNames(repo))
+	if strings.Contains(out, ".cursor") || slices.Contains(adapter.WiredNames(repo), "cursor") {
+		t.Fatalf("install offered Cursor's hooks:\n%s", out)
 	}
 }
 

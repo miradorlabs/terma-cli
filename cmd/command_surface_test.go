@@ -18,16 +18,20 @@ import (
 // `Hidden: true` lengthens this list and fails here — put it in advancedCommands instead,
 // or add it to this list because a developer needs it in the normal course of things.
 var primaryCommands = []string{
-	"blame", "doctor", "install", "org", "session", "setup", "status", "uninstall", "update", "usage",
+	"doctor", "install", "org", "session", "setup", "status", "uninstall", "update", "usage",
 }
 
 // advancedCommands are hidden, not removed. They are what automation, CI and
 // troubleshooting run, and what terma's own fix-it hints name (`terma login`, `terma
 // connect codex`, `terma spool flush`) — so every one of them must keep working.
 var advancedCommands = []string{
-	"config", "connect", "desktop", "disconnect", "harness", "hook", "login", "logout",
+	"config", "connect", "desktop", "disconnect", "harness", "hook", "login", "logout", "nate",
 	"principal", "project", "shim", "spool", "telemetry", "version", "whoami",
 }
+
+// removedCommands are gone, not hidden: product decisions to drop them, so no message
+// may name them and `terma <name>` is an unknown command.
+var removedCommands = []string{"blame"}
 
 func commandNamed(root *cobra.Command, name string) *cobra.Command {
 	for _, c := range root.Commands() {
@@ -61,7 +65,7 @@ func TestHelpListsOnlyThePrimaryCommands(t *testing.T) {
 	if j := strings.Index(listing, "Flags:"); j >= 0 {
 		listing = listing[:j]
 	}
-	for _, name := range advancedCommands {
+	for _, name := range slices.Concat(advancedCommands, removedCommands, []string{"completion"}) {
 		if regexp.MustCompile(`(?m)^\s+` + regexp.QuoteMeta(name) + `\s`).MatchString(listing) {
 			t.Errorf("`terma --help` lists the advanced command %q:\n%s", name, listing)
 		}
@@ -152,6 +156,25 @@ func TestEveryCommandAMessageNamesExists(t *testing.T) {
 		})
 		if err != nil {
 			t.Fatal(err)
+		}
+	}
+}
+
+// Shell completion is hidden from the listing, not switched off: the Homebrew cask runs
+// `terma completion <shell>` during install to generate its completion files, and a
+// failure there fails the install.
+func TestCompletionIsHiddenNotRemoved(t *testing.T) {
+	out, err := runTerma(t, "completion", "zsh")
+	if err != nil || !strings.Contains(out, "compdef") {
+		t.Fatalf("`terma completion zsh` = %v, output %.200q", err, out)
+	}
+}
+
+// blame was removed outright: running it is an unknown command.
+func TestRemovedCommandsAreGone(t *testing.T) {
+	for _, name := range removedCommands {
+		if _, err := runTerma(t, name); err == nil || !strings.Contains(err.Error(), "unknown command") {
+			t.Errorf("`terma %s` = %v, want an unknown command", name, err)
 		}
 	}
 }

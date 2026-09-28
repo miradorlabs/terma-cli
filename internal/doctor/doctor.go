@@ -118,10 +118,24 @@ func RenderCheck(w io.Writer, c Check, width int) {
 	default:
 		status = p.Dim(status)
 	}
-	fmt.Fprintf(w, "  %s  %-*s  %s\n", status, width, c.Name, c.Detail)
+	fmt.Fprintf(w, "  %s  %-*s  %s\n", status, width, c.Name, p.Commands(c.Detail))
 	if c.Fix != "" && c.Status != Pass {
-		fmt.Fprintf(w, "        %*s  %s %s\n", width, "", p.Brand("→"), c.Fix)
+		fmt.Fprintf(w, "        %*s  %s %s\n", width, "", p.Brand("→"), fixText(p, c.Fix))
 	}
+}
+
+// fixText draws the command in a fix so it stands out: the terma command a fix leads
+// with (most are one, bare — "terma install"), and any other quoted in its sentence.
+func fixText(p style.Palette, fix string) string {
+	if !strings.HasPrefix(fix, "terma ") {
+		return p.Commands(fix)
+	}
+	head, tail := fix, ""
+	if i := strings.IndexAny(fix, "(—;"); i > 0 {
+		head = strings.TrimRight(fix[:i], " ")
+		tail = fix[len(head):]
+	}
+	return p.Command(head) + p.Commands(tail)
 }
 
 // RenderSummary names the remaining setup actions, without claiming measured coverage.
@@ -159,6 +173,6 @@ func RenderSummary(w io.Writer, r Report) {
 	}
 	fmt.Fprintf(w, "\n%s\n", p.Bold("Setup needs attention:"))
 	for _, action := range actions {
-		fmt.Fprintf(w, "  - %s\n", strings.TrimSpace(action))
+		fmt.Fprintf(w, "  - %s\n", fixText(p, strings.TrimSpace(action)))
 	}
 }

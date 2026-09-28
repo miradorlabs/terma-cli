@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/miradorlabs/terma-cli/internal/style"
 )
 
 func TestReadinessSummary(t *testing.T) {
@@ -47,5 +49,15 @@ func TestRenderCheck(t *testing.T) {
 	RenderCheck(&out, Check{Status: Fail, Name: "commit hooks installed", Detail: "hooks missing", Fix: "terma install"}, NameWidth)
 	if !strings.Contains(out.String(), "FAIL  commit hooks installed") || !strings.Contains(out.String(), "→ terma install") {
 		t.Fatal(out.String())
+	}
+}
+
+// A fix's command is drawn only on a terminal; plain output is the fix as written, which
+// is what scripts and the other tests read.
+func TestFixTextIsPlainOffATerminal(t *testing.T) {
+	for _, fix := range []string{"terma install", "terma install (a later line puts the real binaries back in front)", "run `source ~/.zshrc` or open a new terminal"} {
+		if got := fixText(style.Plain(), fix); got != fix {
+			t.Errorf("fixText(%q) = %q", fix, got)
+		}
 	}
 }

@@ -207,3 +207,69 @@ func TestTokensSplitsBatchedInput(t *testing.T) {
 		t.Fatalf("trailing escape: %q", got)
 	}
 }
+
+func choice() *Form {
+	return &Form{
+		Title:  "Select a project:",
+		Choice: true,
+		Items: []Item{
+			{Label: "Acme Web"},
+			{Label: "Acme API", Detail: "(current)", Selected: true},
+			{Label: "Acme Docs"},
+		},
+	}
+}
+
+// A choice starts on the current item, so Enter keeps it.
+func TestChoiceEnterKeepsTheCurrentItem(t *testing.T) {
+	f := choice()
+	if done, _ := drive(f, keyEnter); !done {
+		t.Fatal("enter should finish a choice")
+	}
+	if got := selected(f); got[0] || !got[1] || got[2] {
+		t.Fatalf("selected = %v, want the current item kept", got)
+	}
+}
+
+// The arrows move the cursor and Enter picks what is under it, and only that.
+func TestChoiceArrowsThenEnterPicksOne(t *testing.T) {
+	f := choice()
+	drive(f, keyDown, keyEnter)
+	if got := selected(f); got[0] || got[1] || !got[2] {
+		t.Fatalf("selected = %v, want the last item alone", got)
+	}
+	f = choice()
+	drive(f, keyUp, keyUp, keyUp, keyToggle) // space picks too; the cursor stops at the top
+	if got := selected(f); !got[0] || got[1] || got[2] {
+		t.Fatalf("selected = %v, want the first item alone", got)
+	}
+}
+
+// a and n are checkbox keys; in a choice they do nothing, and Esc still cancels.
+func TestChoiceIgnoresCheckboxKeys(t *testing.T) {
+	f := choice()
+	if done, cancelled := drive(f, keyAll, keyClear); done || cancelled {
+		t.Fatalf("a/n finished the choice: done=%v cancelled=%v", done, cancelled)
+	}
+	if got := selected(f); got[0] || !got[1] || got[2] {
+		t.Fatalf("selected = %v, want untouched", got)
+	}
+	if _, cancelled := drive(choice(), keyCancel); !cancelled {
+		t.Fatal("esc should cancel")
+	}
+}
+
+// A choice draws no boxes and says how to pick.
+func TestChoiceRendersAList(t *testing.T) {
+	f := choice()
+	f.init()
+	var buf bytes.Buffer
+	f.render(&buf, style.Plain())
+	out := buf.String()
+	if strings.Contains(out, "( )") || strings.Contains(out, "[ ]") || !strings.Contains(out, "enter select") {
+		t.Fatalf("a choice is a list, not a form of boxes:\n%s", out)
+	}
+	if !strings.Contains(out, "❯ Acme API    (current)") {
+		t.Fatalf("the cursor should rest on the current item:\n%s", out)
+	}
+}
