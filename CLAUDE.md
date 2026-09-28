@@ -312,7 +312,11 @@ run that reaches them opens a browser login on **production**. A script that run
   and discarded otherwise. New install output goes through one of those, never straight
   to `cmd.OutOrStdout()`. Doctor runs behind a spinner as the `Verified` step and leaves
   out the routing warning when a next step already says to reload the shell (install's
-  own process always predates the PATH block).
+  own process always predates the PATH block). The first install under a newer release
+  also does the machine half of `update --refresh` (`refreshMachine`, gated on
+  `selfupdate.NeedsRefresh`, so source builds and tests never touch home files) before
+  verifying, and records it; the repository half is its own hook plan, which rewrites a
+  stale committed file as it adds a missing one.
 - Prompt capture (`resolvePrompts`): `--prompts on|off` (`--exclude-prompts` is the older,
   hidden spelling); otherwise an interactive install with an exporting agent asks, the
   default being this developer's last answer for the project (`shim.Record.IncludePrompts`,

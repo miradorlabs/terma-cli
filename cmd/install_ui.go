@@ -101,7 +101,13 @@ func (u *installUI) verify(cmd *cobra.Command) {
 		},
 	})
 	sp.Stop()
+	u.verdict(report)
+}
 
+// verdict reports a doctor run as install's Verified step: every problem's fix becomes a
+// next step (its name and detail when it names no fix), and the full report is one
+// command away.
+func (u *installUI) verdict(report doctor.Report) {
 	var fixes []string
 	skipped := false
 	for _, c := range report.Checks {

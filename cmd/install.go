@@ -21,6 +21,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
+	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 	"github.com/miradorlabs/terma-cli/internal/serverkey"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/shim"
@@ -439,6 +440,27 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	for _, n := range afterMerge {
 		ui.then("After merging: " + n)
 	}
+	// The first run of a newer release brings what earlier versions wrote on this machine
+	// up to this build — the shims and wraps this run did not rewrite itself — before
+	// doctor checks them, and records it, so the refresh that would otherwise follow the
+	// command has nothing left to do. The repository's committed hooks went through the
+	// plan above, which rewrites a stale file as it adds a missing one.
+	if dir, err := config.Dir(); err == nil && selfupdate.NeedsRefresh(dir, Version) {
+		changed, err := refreshMachine()
+		for _, p := range changed {
+			fmt.Fprintf(ui.detail, "  updated %s\n", p)
+		}
+		if err != nil {
+			ui.warn("Refreshed", "some files an earlier terma installed could not be updated ("+err.Error()+")")
+			ui.then("Run `terma update --refresh` to retry.")
+		} else {
+			if len(changed) > 0 {
+				ui.ok("Refreshed", fmt.Sprintf("%d file(s) an earlier terma installed", len(changed)))
+			}
+			_ = selfupdate.SaveRefreshed(dir, Version)
+		}
+	}
+
 	// Verify the chain right away. Skipped without a terminal (a script, CI) or with
 	// --no-doctor, since doctor makes a scratch commit and a network round-trip; those
 	// callers can run `terma doctor` themselves.
