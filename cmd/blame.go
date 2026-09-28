@@ -21,8 +21,9 @@ const blameWindow = time.Hour
 
 func newBlameCommand() *cobra.Command {
 	return &cobra.Command{
-		Use:   "blame [<commit>]",
-		Short: "Show which agent session produced a commit",
+		Use:    "blame [<commit>]",
+		Hidden: true,
+		Short:  "Show which agent session produced a commit",
 		Long: `blame resolves a commit to the agent session that produced it: the session terma
 stamped as its Agent-Session-Id trailer, joined to the terma.commit record the backend
 holds — the tool, the line counts, and the repository.

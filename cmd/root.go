@@ -69,6 +69,10 @@ spend will be attributed.`,
 		},
 	}
 
+	// Shell completion still works (`terma completion zsh`); it is just not a command a
+	// developer needs listed.
+	root.CompletionOptions.HiddenDefaultCmd = true
+
 	pf := root.PersistentFlags()
 	pf.StringVar(&flags.profile, "profile", "", "configuration profile to use")
 	// The environment and endpoint overrides are for Terma's own engineers (and

@@ -173,10 +173,10 @@ run that reaches them opens a browser login on **production**. A script that run
   skips. Removal forces twice for that lock, and each run first clears its own
   abandoned ones (`<tmp>/terma-doctor-*/wt`, directory gone) — nothing else.
 - The command surface is small on purpose (`cmd/command_surface_test.go`). `terma --help`
-  lists `primaryCommands` — setup, install, status, doctor, session, usage, blame, org,
+  lists `primaryCommands` — setup, install, status, doctor, session, usage, org,
   uninstall, update — and everything else is `Hidden: true`, **not removed**: login/logout/
-  whoami, connect/disconnect/telemetry/harness, project, principal, config, spool, version,
-  hook, shim. Hidden commands are what automation and CI run and what terma's own fix-it
+  whoami, connect/disconnect/telemetry/harness, project, principal, blame, config, spool,
+  version, hook, shim — and cobra's `completion` (`CompletionOptions.HiddenDefaultCmd`). Hidden commands are what automation and CI run and what terma's own fix-it
   hints name, so they must keep working; `project` is advanced because `install` binds a
   repository to its project and the selection only scopes the read commands elsewhere. A new
   command is advanced unless a developer needs it day to day — an unclassified or un-hidden

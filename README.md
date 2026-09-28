@@ -215,14 +215,14 @@ status      Show local connections, queue, and setup readiness
 doctor      Verify the full chain
 session     Inspect agent sessions
 usage       Summarize usage and cost
-blame       Trace a commit to an agent session
 org         List and switch organizations
 uninstall   Remove repository installation files
 update      Update terma
 ```
 
 Authentication, direct telemetry management, project lookup, principal lookup,
-configuration, hook execution, shim management, and spool maintenance remain
+commit blame, shell completion, configuration, hook execution, shim management, and
+spool maintenance remain
 available as hidden commands for automation and troubleshooting. Run
 `terma <command> --help` for details.
 

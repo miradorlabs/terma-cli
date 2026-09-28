@@ -18,14 +18,14 @@ import (
 // `Hidden: true` lengthens this list and fails here — put it in advancedCommands instead,
 // or add it to this list because a developer needs it in the normal course of things.
 var primaryCommands = []string{
-	"blame", "doctor", "install", "org", "session", "setup", "status", "uninstall", "update", "usage",
+	"doctor", "install", "org", "session", "setup", "status", "uninstall", "update", "usage",
 }
 
 // advancedCommands are hidden, not removed. They are what automation, CI and
 // troubleshooting run, and what terma's own fix-it hints name (`terma login`, `terma
 // connect codex`, `terma spool flush`) — so every one of them must keep working.
 var advancedCommands = []string{
-	"config", "connect", "desktop", "disconnect", "harness", "hook", "login", "logout",
+	"blame", "config", "connect", "desktop", "disconnect", "harness", "hook", "login", "logout",
 	"principal", "project", "shim", "spool", "telemetry", "version", "whoami",
 }
 
@@ -61,7 +61,7 @@ func TestHelpListsOnlyThePrimaryCommands(t *testing.T) {
 	if j := strings.Index(listing, "Flags:"); j >= 0 {
 		listing = listing[:j]
 	}
-	for _, name := range advancedCommands {
+	for _, name := range append(slices.Clone(advancedCommands), "completion") {
 		if regexp.MustCompile(`(?m)^\s+` + regexp.QuoteMeta(name) + `\s`).MatchString(listing) {
 			t.Errorf("`terma --help` lists the advanced command %q:\n%s", name, listing)
 		}
@@ -153,5 +153,14 @@ func TestEveryCommandAMessageNamesExists(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+// Shell completion is hidden from the listing, not switched off: a completion script
+// someone already sources keeps being generated.
+func TestCompletionIsHiddenNotRemoved(t *testing.T) {
+	out, err := runTerma(t, "completion", "zsh")
+	if err != nil || !strings.Contains(out, "compdef") {
+		t.Fatalf("`terma completion zsh` = %v, output %.200q", err, out)
 	}
 }
