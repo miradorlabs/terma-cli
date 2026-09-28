@@ -92,6 +92,12 @@ func SupportCatalog() []AgentSupport {
 			Telemetry:   CapabilitySupport{Level: SupportFull},
 		},
 		{
+			Name:        "omp",
+			DisplayName: "Omp",
+			Attribution: CapabilitySupport{Level: SupportFull},
+			Telemetry:   CapabilitySupport{Level: SupportFull, Note: "tokens, effort, service tier and latency ride omp's native OTLP spans; estimated cost is posted as a companion record the server joins by session"},
+		},
+		{
 			Name:        "cursor",
 			DisplayName: "Cursor",
 			Attribution: CapabilitySupport{Level: SupportFull},

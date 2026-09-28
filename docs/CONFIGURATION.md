@@ -114,6 +114,15 @@ repository hooks and a local project route. The desktop app bypasses the shell
 launch route; see [Codex desktop telemetry](CODEX-DESKTOP-TELEMETRY.md).
 OpenCode uses a
 plugin and `.opencode/terma.json` rather than environment variables.
+omp is wired by a hook extension Terma writes into `~/.omp/agent/hooks/pre/terma.ts`
+(`$OMP_DIR/agent` when set). omp's own OTLP exporter reads only process env, so the
+extension exports the `OTEL_*` variables before omp's telemetry initializes; tokens,
+reasoning effort, service tier, and latency arrive on omp's native spans, and the
+extension posts the estimated cost omp does not compute as a companion log record.
+The key stays in Terma's helper script, never in the file. Per repository, install
+writes a committed `.omp/terma.json` policy (signals, prompt and tool-content capture)
+and hooks at `.omp/hooks/pre/terma.ts` for commit attribution. Restart omp after
+connecting — hooks load at startup.
 
 `terma doctor` fails when a connected agent has no telemetry signals enabled in the
 current repository, even if another agent is configured correctly. For Claude it

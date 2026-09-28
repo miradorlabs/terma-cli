@@ -152,7 +152,7 @@ func chooseHarnesses(cmd *cobra.Command, cfg *config.Config, f setupFlags) ([]st
 
 // agentAvailable gates onboarding while the remaining integrations are coming soon.
 func agentAvailable(name string) bool {
-	return name == "claude" || name == "codex" || name == codexDesktopAgent
+	return name == "claude" || name == "codex" || name == codexDesktopAgent || name == "omp"
 }
 
 func availableAgentNames() []string {

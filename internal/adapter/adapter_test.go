@@ -47,7 +47,7 @@ func TestRegistryIsConsistent(t *testing.T) {
 	if len(Handlers()) != len(owners) {
 		t.Errorf("Handlers() has %d entries, adapters declare %d", len(Handlers()), len(owners))
 	}
-	for _, name := range []string{"claude", "cursor", "codex", "opencode", "antigravity"} {
+	for _, name := range []string{"claude", "cursor", "codex", "opencode", "omp", "antigravity"} {
 		if _, ok := Lookup(name); !ok {
 			t.Errorf("Lookup(%q) failed", name)
 		}
@@ -67,6 +67,7 @@ func TestEventNamesAreStable(t *testing.T) {
 		"cursor-after-agent-response", "cursor-before-submit-prompt", "cursor-file-edit", "cursor-post-tool-use",
 		"cursor-post-tool-use-failure", "cursor-pre-compact", "cursor-session-end", "cursor-session-start",
 		"cursor-stop", "cursor-subagent-stop",
+		"omp-file-edit", "omp-session-end", "omp-session-start",
 		"opencode-file-edit", "opencode-session-end", "opencode-session-start",
 		"post-tool-use", "session-end", "session-start", "stop", "stop-failure", "subagent-start", "subagent-stop",
 	}
@@ -100,12 +101,12 @@ func TestDefaultsFollowTheRepositoryLayout(t *testing.T) {
 	if got := defaults(); strings.Join(got, ",") != "claude" {
 		t.Fatalf("empty repository defaults = %v, want claude only", got)
 	}
-	for _, dir := range []string{".cursor", ".codex", ".agents"} {
+	for _, dir := range []string{".cursor", ".codex", ".agents", ".omp"} {
 		if err := os.MkdirAll(filepath.Join(root, dir), 0o755); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if got := defaults(); strings.Join(got, ",") != "claude,cursor,codex,antigravity" {
+	if got := defaults(); strings.Join(got, ",") != "claude,cursor,codex,omp,antigravity" {
 		t.Fatalf("defaults = %v", got)
 	}
 	// Every repo-scope adapter plans a file on an empty repository; OpenCode plans none.
@@ -123,7 +124,7 @@ func TestDefaultsFollowTheRepositoryLayout(t *testing.T) {
 			}
 		}
 	}
-	if strings.Join(RepoNames(), ",") != "claude,cursor,codex,antigravity" {
+	if strings.Join(RepoNames(), ",") != "claude,cursor,codex,omp,antigravity" {
 		t.Fatalf("RepoNames = %v", RepoNames())
 	}
 }

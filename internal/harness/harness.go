@@ -313,7 +313,7 @@ type Harness interface {
 // registry is fixed at compile time. A harness is a code-level integration — it has to
 // know a vendor's file format and variable names — so there is nothing a runtime
 // registration would enable.
-var registry = []Harness{Claude{}, Codex{}, OpenCode{}}
+var registry = []Harness{Claude{}, Codex{}, OpenCode{}, Omp{}}
 
 // All returns every known harness, in the order they are listed by `--help`.
 func All() []Harness {

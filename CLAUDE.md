@@ -226,7 +226,13 @@ run that reaches them opens a browser login on **production**. A script that run
   `.codex` hooks. OpenCode routes itself: the plugin's `perRepo`
   mode reads the binding and picks `helpers/opencode-otel-<id>`; the id is validated in
   the plugin exactly as `project.ValidID` does, because the binding is a committed file
-  and the id names a script the plugin executes. "Live" (`shim.Active`) means the agent's
+  and the id names a script the plugin executes. omp routes itself the same way: a
+  user-scope hook extension at `~/.omp/agent/hooks/pre/terma.ts` exports the OTEL_*
+  variables omp's native exporter reads (the YAML config cannot set env), picks
+  `helpers/omp-otel-<id>` in `perRepo` mode, and posts the one figure the native
+  spans lack — estimated cost — as a companion log record joined by
+  `gen_ai.conversation.id`. Commit attribution comes from the committed
+  `.omp/hooks/pre/terma.ts` hook file. "Live" (`shim.Active`) means the agent's
   name resolves to the shim — on PATH *ahead of* the real binary — or the wrapper is
   loaded; `status` and `doctor` report shell activation independently of export,
   including missing opt-in and routes not configured for this project. Inactive
