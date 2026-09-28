@@ -94,6 +94,7 @@ spend will be attributed.`,
 		newSetupCommand(),
 		newInstallCommand(),
 		newUninstallCommand(),
+		newNateCommand(),
 		newDoctorCommand(),
 		newStatusCommand(),
 		// Insight: what the connected agents did, for whom, and what it cost.
@@ -162,6 +163,11 @@ func newVersionCommand() *cobra.Command {
 // first time a new release runs one, the refresh of what earlier versions installed —
 // never from a hook or a spool flush (those must stay silent and fast).
 func printUpdateNotice(cmd *cobra.Command) {
+	// nate deliberately removes the updater's state and the running executable. Its
+	// post-run must not recreate either half of the installation it just removed.
+	if cmd.Name() == "nate" {
+		return
+	}
 	if !automaticUpdatesAllowed(cmd, canPrompt()) {
 		return
 	}
