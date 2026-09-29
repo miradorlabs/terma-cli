@@ -43,6 +43,8 @@ jobs:
           # which every terma since signing refuses to install from without. A release
           # without it fails at the signing step rather than shipping unsigned.
           TERMA_SIGNING_KEY: ${{ secrets.TERMA_SIGNING_KEY }}
+          # Refuse to sign with a key terma does not trust (scripts/sign).
+          TERMA_SIGNING_REQUIRE_TRUSTED: "1"
 
       # Signed build provenance for every published artifact, verifiable with
       # `gh attestation verify <file> --owner miradorlabs`.

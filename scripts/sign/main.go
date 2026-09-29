@@ -52,7 +52,17 @@ func run(args []string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(args[1], selfupdate.Sign(ed25519.NewKeyFromSeed(seed), data), 0o644)
+	sig := selfupdate.Sign(ed25519.NewKeyFromSeed(seed), data)
+	// A release (TERMA_SIGNING_REQUIRE_TRUSTED=1, set by release.yml) must be signed by a
+	// key terma trusts: a secret holding any other key would publish a release no
+	// installed terma accepts, and every update would fail with nothing said at release
+	// time. Dry runs sign with a throwaway key and skip this.
+	if os.Getenv("TERMA_SIGNING_REQUIRE_TRUSTED") == "1" {
+		if err := selfupdate.Verify(data, sig); err != nil {
+			return fmt.Errorf("TERMA_SIGNING_KEY is not the release key this build trusts: %w", err)
+		}
+	}
+	return os.WriteFile(args[1], sig, 0o644)
 }
 
 func generate(path string) error {
