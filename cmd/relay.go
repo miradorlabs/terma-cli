@@ -180,5 +180,4 @@ func runRelayStatus(cmd *cobra.Command, _ []string) error {
 }
 
 // machineProjectID is the project chosen for this machine in `terma setup`.
-// TODO(merge): read the profile field Phase 1 adds.
-func machineProjectID(_ *config.Config) string { return "" }
+func machineProjectID(cfg *config.Config) string { return cfg.Telemetry.Project.ID }
