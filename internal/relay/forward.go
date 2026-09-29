@@ -22,14 +22,18 @@ type Destination struct {
 	Authorization string
 }
 
-// ErrHeld is returned by a DestinationFunc when a route cannot be delivered yet — no key
-// for the project on this machine, no machine project chosen. The route's records wait.
+// ErrHeld is returned by a DestinationFunc when a project cannot be delivered to yet —
+// no key for it on this machine. Its records wait.
 var ErrHeld = errors.New("held")
 
-// DestinationFunc resolves a route (a project id, or the machine route) to where its
-// records go. It is called before every delivery, so a key stored or a machine project
-// chosen after the relay started takes effect without a restart.
-type DestinationFunc func(route string) (project string, dest Destination, err error)
+// DestinationFunc says where a project's records go. It is called before every delivery,
+// so a key stored after the relay started takes effect without a restart.
+type DestinationFunc func(project string) (Destination, error)
+
+// MachineProjectFunc names the machine project, "" while none is chosen. It is called
+// before every delivery of the machine project's records, so a project chosen by
+// `terma setup` after the relay started takes effect without a restart.
+type MachineProjectFunc func() string
 
 const (
 	sendTimeout   = 15 * time.Second
@@ -50,6 +54,7 @@ type forwarders struct {
 	ctx     context.Context
 	dir     string
 	dest    DestinationFunc
+	machine MachineProjectFunc
 	client  *http.Client
 	version string
 	logf    func(string, ...any)
@@ -126,7 +131,7 @@ func (f *forwarders) loop(route string, wake <-chan struct{}) {
 			}
 			continue
 		}
-		project, dest, err := f.dest(route)
+		project, dest, err := f.destination(route)
 		if err != nil {
 			f.stats.setHeld(route, true)
 			if !errors.Is(err, ErrHeld) {
@@ -178,6 +183,18 @@ func (f *forwarders) loop(route string, wake <-chan struct{}) {
 			}
 		}
 	}
+}
+
+// destination resolves a route to its project and where that project's records go.
+func (f *forwarders) destination(route string) (string, Destination, error) {
+	project := route
+	if route == machineRoute {
+		if project = f.machine(); project == "" {
+			return "", Destination{}, ErrHeld
+		}
+	}
+	dest, err := f.dest(project)
+	return project, dest, err
 }
 
 // take reads the oldest entries of one signal that fit one request: JSON bodies are

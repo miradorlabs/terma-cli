@@ -28,8 +28,11 @@ type Options struct {
 	Version string
 	// Binding names the project a directory is bound to.
 	Binding BindingFunc
-	// Destination says where a route's records go.
+	// Destination says where a project's records go.
 	Destination DestinationFunc
+	// MachineProject names the project records go to when their session is in no bound
+	// repository, or has no session.
+	MachineProject MachineProjectFunc
 	// Cwd finds a session's directory from the agent's own files; CodexCwd when nil.
 	Cwd CwdFunc
 	// Hold is how long a record whose session cannot be placed waits before it goes to
@@ -62,8 +65,8 @@ func Serve(ctx context.Context, o Options) error {
 		}
 		o.Dir = dir
 	}
-	if o.Binding == nil || o.Destination == nil {
-		return errors.New("relay: Binding and Destination are required")
+	if o.Binding == nil || o.Destination == nil || o.MachineProject == nil {
+		return errors.New("relay: Binding, Destination and MachineProject are required")
 	}
 	if o.Cwd == nil {
 		o.Cwd = CodexCwd
@@ -106,7 +109,7 @@ func Serve(ctx context.Context, o Options) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	st := newStats()
-	fw := &forwarders{ctx: ctx, dir: o.Dir, dest: o.Destination, client: o.Client,
+	fw := &forwarders{ctx: ctx, dir: o.Dir, dest: o.Destination, machine: o.MachineProject, client: o.Client,
 		version: o.Version, logf: o.Logf, stats: st, m: map[string]chan struct{}{}}
 	kick := make(chan struct{}, 1)
 	wakeRouter := func() {

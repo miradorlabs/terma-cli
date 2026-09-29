@@ -157,18 +157,15 @@ func (h *testRelay) start() {
 			}
 			return h.bindings[dir], nil
 		},
-		Destination: func(route string) (string, Destination, error) {
-			project := route
-			if route == machineRoute {
-				project, _ = h.machine.Load().(string)
-			}
+		MachineProject: func() string { p, _ := h.machine.Load().(string); return p },
+		Destination: func(project string) (Destination, error) {
 			h.mu.Lock()
 			key, ok := h.keys[project]
 			h.mu.Unlock()
-			if project == "" || !ok {
-				return project, Destination{}, ErrHeld
+			if !ok {
+				return Destination{}, ErrHeld
 			}
-			return project, Destination{Endpoint: h.gw.URL, Authorization: key}, nil
+			return Destination{Endpoint: h.gw.URL, Authorization: key}, nil
 		},
 		Cwd: func(_ context.Context, session, source string) string {
 			if source == "codex" && session == codexID {
@@ -416,8 +413,9 @@ func TestServeRefusesASecondRelay(t *testing.T) {
 	ln, _ := net.Listen("tcp", "127.0.0.1:0")
 	defer func() { _ = ln.Close() }()
 	err := Serve(context.Background(), Options{Config: h.cfg, Dir: h.dir, Listener: ln,
-		Binding:     func(string) (string, error) { return "", nil },
-		Destination: func(string) (string, Destination, error) { return "", Destination{}, ErrHeld }})
+		Binding:        func(string) (string, error) { return "", nil },
+		MachineProject: func() string { return "" },
+		Destination:    func(string) (Destination, error) { return Destination{}, ErrHeld }})
 	if !errors.Is(err, ErrRunning) {
 		t.Fatalf("second relay: %v", err)
 	}

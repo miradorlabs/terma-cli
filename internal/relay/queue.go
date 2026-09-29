@@ -39,8 +39,12 @@ const (
 	// resolved to a project id only when sent, so records routed before setup chose one
 	// wait for it rather than being lost. It cannot collide with a project id: those are
 	// letters, digits, dot, dash and underscore (project.ValidID).
-	machineRoute = "@machine"
+	machineRoute = MachineRoute
 )
+
+// MachineRoute is how Health.HeldProjects names the machine project's records while no
+// machine project is chosen.
+const MachineRoute = "@machine"
 
 // entry is one queued body, named by its file.
 type entry struct {
