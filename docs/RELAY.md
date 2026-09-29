@@ -52,7 +52,10 @@ Live-verified 2026-09-29 (Codex CLI 0.158.0, Claude Code 2.1.284, OTLP/JSON):
   retried until the hold window (30 s) closes; then its unplaced records go to the
   machine project.
 - **One forwarder per project** sends the outbox oldest first. 2xx removes the file.
-  Network errors, 408, 429 and 5xx back off exponentially (1 s to 5 min). Other 4xx
+  Network errors, 408, 429 and 5xx back off exponentially (1 s to 2 min, a gateway's
+  `Retry-After` honoured up to 10 min), every wait spread ±20% so relays that lost the
+  gateway together do not all retry the moment it recovers. OTLP partial success (records
+  rejected from an accepted request) is counted and logged, never resent. Other 4xx
   (a refused key, a malformed body) move the file to `dead/` and are counted. A project
   with no key on this machine is held, not dropped.
 - **Bounds:** 16 MiB per request, 256 MiB on disk across inbox and outbox (oldest dropped,

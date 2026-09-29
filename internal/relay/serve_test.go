@@ -28,9 +28,13 @@ type gateway struct {
 	got      map[string][]string // authorization → event names received, in order
 	requests atomic.Int64
 	answer   atomic.Value // func(auth string) int
+	okBody   atomic.Value // string
 }
 
 func (g *gateway) respond(f func(auth string) int) { g.answer.Store(f) }
+
+// respondBody sets the body of the gateway's successful answers.
+func (g *gateway) respondBody(body string) { g.okBody.Store(body) }
 
 func newGateway(t *testing.T) *gateway {
 	g := &gateway{got: map[string][]string{}}
@@ -48,7 +52,11 @@ func newGateway(t *testing.T) *gateway {
 		g.got[auth] = append(g.got[auth], names...)
 		g.mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte("{}"))
+		answer := "{}"
+		if b, ok := g.okBody.Load().(string); ok {
+			answer = b
+		}
+		_, _ = w.Write([]byte(answer))
 	}))
 	t.Cleanup(g.Close)
 	return g

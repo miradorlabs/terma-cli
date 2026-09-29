@@ -15,6 +15,7 @@ type stats struct {
 	delivered int64
 	dead      int64
 	dropped   int64
+	rejected  int64
 	held      map[string]bool
 	errors    map[string]string // project → last delivery failure
 	lastError string
@@ -30,6 +31,12 @@ func (s *stats) addRouted(n int)    { s.add(&s.routed, n) }
 func (s *stats) addDelivered(n int) { s.add(&s.delivered, n) }
 func (s *stats) addDead(n int)      { s.add(&s.dead, n) }
 func (s *stats) addDropped(n int)   { s.add(&s.dropped, n) }
+
+func (s *stats) addRejected(n int64) {
+	s.mu.Lock()
+	s.rejected += n
+	s.mu.Unlock()
+}
 
 func (s *stats) add(field *int64, n int) {
 	s.mu.Lock()
@@ -72,12 +79,15 @@ type Counters struct {
 	Delivered int64 `json:"delivered"`
 	Dead      int64 `json:"dead"`
 	Dropped   int64 `json:"dropped"`
+	// Rejected counts records the gateway dropped from requests it otherwise accepted
+	// (OTLP partial success).
+	Rejected int64 `json:"rejected"`
 }
 
 func (s *stats) snapshot() (Counters, []string, string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	held := slices.Sorted(maps.Keys(s.held))
-	return Counters{Received: s.received, Routed: s.routed, Delivered: s.delivered, Dead: s.dead, Dropped: s.dropped},
+	return Counters{Received: s.received, Routed: s.routed, Delivered: s.delivered, Dead: s.dead, Dropped: s.dropped, Rejected: s.rejected},
 		held, s.lastError
 }

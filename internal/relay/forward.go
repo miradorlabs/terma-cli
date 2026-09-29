@@ -3,9 +3,11 @@ package relay
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"math/rand/v2"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -40,7 +42,9 @@ const (
 	maxMergeBytes = 4 << 20
 	maxMergeFiles = 64
 	minBackoff    = time.Second
-	maxBackoff    = 5 * time.Minute
+	maxBackoff    = 2 * time.Minute
+	// maxRetryAfter bounds how long a gateway's Retry-After can park a project.
+	maxRetryAfter = 10 * time.Minute
 	// A refused key is not fixed by retrying soon; it waits for `terma install`.
 	refusedBackoff    = 5 * time.Minute
 	maxRefusedBackoff = time.Hour
@@ -154,9 +158,15 @@ func (f *forwarders) loop(route string, wake <-chan struct{}) {
 			}
 			continue
 		}
-		outcome, wait, detail := f.send(dest, batch[0], body)
+		outcome, wait, detail, rejected := f.send(dest, batch[0], body)
 		switch outcome {
 		case sent:
+			if rejected > 0 {
+				// Accepted, but the gateway dropped some of it: resending would only
+				// duplicate what it kept, so it is counted and said, not retried.
+				f.stats.addRejected(rejected)
+				f.logf("%s accepted %s but rejected %d records: %s", project, batch[0].name, rejected, detail)
+			}
 			single = false
 			f.remove(dir, batch)
 			f.stats.addDelivered(len(batch))
@@ -178,7 +188,7 @@ func (f *forwarders) loop(route string, wake <-chan struct{}) {
 		case retry:
 			f.stats.setError(project, detail)
 			backoff = nextBackoff(backoff, wait)
-			if !sleep(backoff) {
+			if !sleep(jitter(backoff, wait)) {
 				return
 			}
 		}
@@ -243,13 +253,14 @@ const (
 // send delivers one request and classifies the answer. A refused key (401, 403) and a
 // missing endpoint (404) are retried, slowly: they are configuration, fixed on this
 // machine, not a fault in the records. Only a body the backend judges malformed is
-// refused for good.
-func (f *forwarders) send(dest Destination, e entry, body []byte) (outcome, time.Duration, string) {
+// refused for good. A 2xx can still carry OTLP's partial success: how many records the
+// gateway rejected out of an accepted request, returned as rejected.
+func (f *forwarders) send(dest Destination, e entry, body []byte) (outcome, time.Duration, string, int64) {
 	ctx, cancel := context.WithTimeout(f.ctx, sendTimeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, dest.Endpoint+e.sig.path(), bytes.NewReader(body))
 	if err != nil {
-		return refused, 0, err.Error()
+		return refused, 0, err.Error(), 0
 	}
 	if e.format == formatJSON {
 		req.Header.Set("Content-Type", "application/json")
@@ -260,21 +271,55 @@ func (f *forwarders) send(dest Destination, e entry, body []byte) (outcome, time
 	req.Header.Set("User-Agent", "terma-relay/"+f.version)
 	resp, err := f.client.Do(req)
 	if err != nil {
-		return retry, 0, err.Error()
+		return retry, 0, err.Error(), 0
 	}
 	defer resp.Body.Close()
-	snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+	answer, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
+	snippet := answer[:min(len(answer), 512)]
 	detail := fmt.Sprintf("HTTP %d %s", resp.StatusCode, bytes.TrimSpace(snippet))
 	switch code := resp.StatusCode; {
 	case code >= 200 && code < 300:
-		return sent, 0, ""
+		if e.format != formatJSON {
+			return sent, 0, "", 0
+		}
+		rejected, message := partialSuccess(answer)
+		return sent, 0, message, rejected
 	case code == http.StatusUnauthorized || code == http.StatusForbidden:
-		return retry, refusedBackoff, detail + " — the project's key was refused; `terma install` in the repository stores a new one"
+		return retry, refusedBackoff, detail + " — the project's key was refused; `terma install` in the repository stores a new one", 0
 	case code == http.StatusRequestTimeout || code == http.StatusTooManyRequests || code == http.StatusNotFound || code >= 500:
-		return retry, retryAfter(resp.Header.Get("Retry-After")), detail
+		return retry, retryAfter(resp.Header.Get("Retry-After")), detail, 0
 	default:
-		return refused, 0, detail
+		return refused, 0, detail, 0
 	}
+}
+
+// partialSuccess reads OTLP/JSON's partial success from an export response: the records
+// the gateway rejected (one of the three counts, by signal) and its message. protojson
+// writes int64 as a string, which json.Number takes as it takes a number.
+func partialSuccess(body []byte) (int64, string) {
+	var resp struct {
+		PartialSuccess struct {
+			Logs    json.Number `json:"rejectedLogRecords"`
+			Spans   json.Number `json:"rejectedSpans"`
+			Points  json.Number `json:"rejectedDataPoints"`
+			Message string      `json:"errorMessage"`
+		} `json:"partialSuccess"`
+	}
+	if json.Unmarshal(body, &resp) != nil {
+		return 0, ""
+	}
+	ps := resp.PartialSuccess
+	return sumCounts(ps.Logs.String(), ps.Spans.String(), ps.Points.String()), ps.Message
+}
+
+func sumCounts(counts ...string) int64 {
+	var total int64
+	for _, c := range counts {
+		if n, err := strconv.ParseInt(c, 10, 64); err == nil && n > 0 {
+			total += n
+		}
+	}
+	return total
 }
 
 func retryAfter(v string) time.Duration {
@@ -282,7 +327,7 @@ func retryAfter(v string) time.Duration {
 	if err != nil || secs <= 0 {
 		return 0
 	}
-	return min(time.Duration(secs)*time.Second, maxBackoff)
+	return min(time.Duration(secs)*time.Second, maxRetryAfter)
 }
 
 // nextBackoff doubles the previous wait within its bounds, starting from floor when the
@@ -293,7 +338,18 @@ func nextBackoff(prev, floor time.Duration) time.Duration {
 	if floor >= refusedBackoff {
 		limit = maxRefusedBackoff
 	}
-	return min(next, limit)
+	return min(next, max(limit, floor))
+}
+
+// jitter spreads a wait over ±20%, never below floor (a gateway's Retry-After). Without
+// it, every relay that lost the gateway in the same outage retries on the same beat and
+// meets the recovering gateway all at once.
+func jitter(d, floor time.Duration) time.Duration {
+	if d <= 0 {
+		return d
+	}
+	spread := int64(d) * 2 / 5
+	return max(floor, d-time.Duration(spread/2)+time.Duration(rand.Int64N(spread+1)))
 }
 
 func (f *forwarders) remove(dir string, batch []entry) {

@@ -158,6 +158,9 @@ func runRelayStatus(cmd *cobra.Command, _ []string) error {
 	c := health.Counters
 	fmt.Fprintf(out, "Since start: %d received, %d routed, %d delivered, %d refused, %d dropped\n",
 		c.Received, c.Routed, c.Delivered, c.Dead, c.Dropped)
+	if c.Rejected > 0 {
+		fmt.Fprintf(out, "Rejected:  %d records the gateway dropped from accepted requests (see the log)\n", c.Rejected)
+	}
 	var held []string
 	for _, p := range health.HeldProjects {
 		if p == relay.MachineRoute {
