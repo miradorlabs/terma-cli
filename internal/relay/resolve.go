@@ -82,6 +82,21 @@ func (r *resolver) decide(ctx context.Context, session, source string, now time.
 	return r.settle(session, machineRoute), true
 }
 
+// known reports whether session can be placed now without searching an agent's files:
+// it is decided, or a session-start hook has recorded its directory.
+func (r *resolver) known(session string) bool {
+	r.mu.Lock()
+	_, ok := r.decided[session]
+	r.mu.Unlock()
+	if ok {
+		return true
+	}
+	if _, err := os.Stat(filepath.Join(r.dir, routesDir, session)); err == nil {
+		return true
+	}
+	return sessionDir(r.dir, session) != ""
+}
+
 func (r *resolver) shouldSearch(session string, now time.Time) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
