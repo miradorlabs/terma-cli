@@ -98,17 +98,17 @@ terma connect claude \
 ```
 
 `--signals none` disables export. A machine-wide connection can export everywhere or
-require repositories to opt in with `--exports repos`. `terma install` enables repository telemetry by default, including for this arrangement.
-It writes a reviewable policy alongside the agent hooks, keeping endpoints and keys out
-of the repository. Reinstalling preserves an existing policy; use `--signals`,
-`--prompts on|off`, and `--exclude-tool-content` to change what the repository sends.
-Restart Claude Code after installing so the session loads the new settings.
+require repositories to opt in with `--exports repos`. Claude Code 2.1.282 and later
+ignore any repository or local setting that turns telemetry on, so for Claude that
+opt-in no longer sends anything, and `terma install` no longer writes a Claude policy
+into `.claude/settings.json`. Per-repository Claude telemetry comes from the shim's
+launch settings; `--signals`, `--prompts on|off`, and `--exclude-tool-content` shape
+them. Restart Claude Code after installing so the session loads the new settings.
 
 Your own agents send prompt text and model responses by default: install does not ask,
 keeps your last choice for that project (on for a first install), and its Prompts line
 says how to change it. `terma install --prompts off` stops them and `--prompts on` turns
-them back on. The choice is yours: it changes the repository's committed policy only when
-you pass `--prompts` explicitly.
+them back on.
 
 Codex ignores project-level OTEL configuration, so direct `terma connect codex` is
 machine-wide. `terma install` instead routes each launch using runtime `-c` overrides
@@ -116,9 +116,8 @@ from the repository binding, as described above. Those overrides include the tel
 bearer key, which local process inspection can expose; do not log generated agent
 arguments. Codex can suppress tool output but cannot suppress native tool arguments
 with `--exclude-tool-content`. See [SECURITY.md](../SECURITY.md) for these limitations.
-Select `codex-desktop` during `terma setup` to have `terma install` configure
-repository hooks and a local project route. The desktop app bypasses the shell
-launch route; see [Codex desktop telemetry](CODEX-DESKTOP-TELEMETRY.md).
+Codex Desktop is coming soon: the app bypasses the shell launch route, and Codex reads
+`otel` only from the user-level config.
 OpenCode uses a
 plugin and `.opencode/terma.json` rather than environment variables.
 
@@ -134,8 +133,6 @@ of spend from configuration. Doctor also compares the running executable with th
 one hooks find on PATH: an older build may stamp commits while failing to read the
 repository's current binding format. Resolve a binary mismatch before verifying
 delivery. Backend read-back remains unverified when its API cannot confirm the event.
-A missing repository policy is repaired with `terma install`; an existing disabled
-policy requires an explicit choice, such as `terma install --signals traces,logs,metrics`.
 Private overrides must be edited in the named file. Restart the agent afterwards.
 
 These are configuration checks, not proof that a running agent has emitted data.

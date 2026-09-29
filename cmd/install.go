@@ -381,8 +381,8 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 		}
 	}
 
-	// 6. Repository telemetry also supports developers using a global repos-only
-	// connection. Hooks alone do not enable that connection's exporters.
+	// 6. Repository telemetry policy, for the agents whose repository settings can still
+	// switch an export on (OpenCode). Claude's no longer can (repoPolicyHarnesses).
 	paths, err := writeRepoPolicy(ctx, ui, root, cfg, repoPolicyHarnesses(adapters), f)
 	if err != nil {
 		return err

@@ -379,15 +379,20 @@ func describeShipment(st harness.Status) string {
 	return fmt.Sprintf("%s; prompts %s; tool content %s", signals, onOff(st.IncludePrompts), onOff(st.IncludeToolContent))
 }
 
-// repoPolicyHarnesses is the subset of an install's adapters whose harness reads a
-// repository's own export policy. Cursor and Codex are wired for hooks and nothing
-// else: Cursor has no local OTLP exporter policy, and Codex ignores an otel table
-// in a project's config.
+// repoPolicyHarnesses is the subset of an install's adapters whose repository policy
+// install writes. Cursor and Codex are wired for hooks and nothing else: Cursor has no
+// local OTLP exporter policy, and Codex ignores an otel table in a project's config.
+// Claude is left out too: since Claude Code 2.1.282 a repository's settings can only
+// switch telemetry off, and the shim's --settings outranks them anyway, so the policy
+// sent nothing. uninstall still removes one an earlier install committed.
 func repoPolicyHarnesses(adapters []string) []harness.Harness {
 	var out []harness.Harness
 	for _, a := range adapters {
 		h, err := harness.Lookup(a)
 		if err != nil {
+			continue
+		}
+		if _, claude := h.(harness.Claude); claude {
 			continue
 		}
 		if _, ok := h.(harness.Scoped); ok {

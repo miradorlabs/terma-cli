@@ -87,6 +87,7 @@ func TestConnectExportsRejectsUnknownValue(t *testing.T) {
 
 // A repository policy on top of the narrow global connect is the arrangement working
 // end to end: the repository turns exporters on, the machine holds everything else.
+// install no longer writes Claude's policy; `connect --scope local` still does.
 func TestRepoPolicyOverNarrowGlobalConnect(t *testing.T) {
 	repo := installRepo(t)
 	claudeDir := t.TempDir()
@@ -100,12 +101,13 @@ func TestRepoPolicyOverNarrowGlobalConnect(t *testing.T) {
 	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--yes"); err != nil {
 		t.Fatal(err)
 	}
+	connectLocalPolicy(t)
 	project := readClaudeSettings(t, filepath.Join(repo, ".claude", "settings.json"))
 	if project["OTEL_TRACES_EXPORTER"] != "otlp" || project["OTEL_LOGS_EXPORTER"] != "otlp" {
 		t.Fatalf("the repository should switch its signals on: %+v", project)
 	}
 	if project["OTEL_METRICS_EXPORTER"] != "otlp" {
-		t.Fatalf("plain install should enable metrics too: %q", project["OTEL_METRICS_EXPORTER"])
+		t.Fatalf("the policy should enable metrics too: %q", project["OTEL_METRICS_EXPORTER"])
 	}
 	// The committed file must never carry the parts that make it unsafe to commit.
 	for _, key := range []string{"OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_EXPORTER_OTLP_HEADERS", "OTEL_RESOURCE_ATTRIBUTES"} {
@@ -123,35 +125,65 @@ func TestRepoPolicyOverNarrowGlobalConnect(t *testing.T) {
 	}
 }
 
-func TestInstallEnablesRepositoryTelemetryByDefault(t *testing.T) {
+// Since Claude Code 2.1.282 a repository's settings can only switch telemetry off, and
+// the shim's --settings outranks them anyway, so install writes Claude's hooks there and
+// no export policy.
+func TestInstallWritesNoClaudeRepositoryPolicy(t *testing.T) {
 	repo := installRepo(t)
-	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--yes"); err != nil {
+	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--yes", "--no-doctor"); err != nil {
 		t.Fatal(err)
 	}
-	settings := readClaudeSettings(t, filepath.Join(repo, ".claude", "settings.json"))
-	for _, key := range []string{"OTEL_TRACES_EXPORTER", "OTEL_LOGS_EXPORTER", "OTEL_METRICS_EXPORTER"} {
-		if settings[key] != "otlp" {
-			t.Fatalf("plain install must enable %s, got %q", key, settings[key])
-		}
+	data, err := os.ReadFile(filepath.Join(repo, ".claude", "settings.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "terma hook session-start") {
+		t.Fatalf("install did not write Claude's hooks:\n%s", data)
+	}
+	if settings := readClaudeSettings(t, filepath.Join(repo, ".claude", "settings.json")); len(settings) != 0 {
+		t.Fatalf("install wrote a Claude repository policy: %+v", settings)
 	}
 }
 
+// A policy an earlier install committed is still terma's to remove, from any clone.
 func TestUninstallRemovesRepoPolicy(t *testing.T) {
 	repo := installRepo(t)
-	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--yes"); err != nil {
+	path := writeCommittedPolicy(t, repo)
+	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--yes", "--no-doctor"); err != nil {
 		t.Fatal(err)
-	}
-	if settings := readClaudeSettings(t, filepath.Join(repo, ".claude", "settings.json")); settings["OTEL_TRACES_EXPORTER"] != "otlp" {
-		t.Fatalf("policy not written: %+v", settings)
 	}
 	if _, err := runTerma(t, "uninstall", "--yes"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(repo, ".claude", "settings.json")); err == nil {
-		settings := readClaudeSettings(t, filepath.Join(repo, ".claude", "settings.json"))
+	if _, err := os.Stat(path); err == nil {
+		settings := readClaudeSettings(t, path)
 		if _, ok := settings["OTEL_TRACES_EXPORTER"]; ok {
 			t.Fatalf("uninstall left the repository policy behind: %+v", settings)
 		}
+	}
+}
+
+// writeCommittedPolicy writes the Claude policy an earlier terma install committed, as a
+// clone without its connect journal sees it, and returns the file's path.
+func writeCommittedPolicy(t *testing.T, repo string) string {
+	t.Helper()
+	path := filepath.Join(repo, ".claude", "settings.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	policy := `{"env":{"OTEL_LOGS_EXPORTER":"otlp","OTEL_METRICS_EXPORTER":"otlp","OTEL_TRACES_EXPORTER":"otlp","OTEL_LOG_USER_PROMPTS":"1"}}` + "\n"
+	if err := os.WriteFile(path, []byte(policy), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// connectLocalPolicy writes this repository's Claude policy the way a developer still
+// can, now that install does not.
+func connectLocalPolicy(t *testing.T) {
+	t.Helper()
+	if out, err := runTerma(t, "connect", "claude", "--scope", "local", "--yes"); err != nil {
+		t.Fatalf("connect --scope local: %v\n%s", err, out)
 	}
 }
 
@@ -269,9 +301,6 @@ func TestDoctorFailsWhenThisRepositoryHasNoPolicy(t *testing.T) {
 	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--yes"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := (harness.Claude{}).Local(mustGetwd(t)).Disconnect(); err != nil {
-		t.Fatal(err)
-	}
 	out, _ := runTerma(t, "doctor", "--skip-commit")
 	if !strings.Contains(out, "FAIL  agent exporting to Terma") {
 		t.Fatalf("doctor must fail the export check when no signals can be sent:\n%s", out)
@@ -294,9 +323,7 @@ func TestDoctorFailsWhenThisRepositoryHasNoPolicy(t *testing.T) {
 
 	// With a policy the same repository is fine, and doctor says so rather than
 	// staying quiet about an arrangement the reader may not remember choosing.
-	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--yes"); err != nil {
-		t.Fatal(err)
-	}
+	connectLocalPolicy(t)
 	out, _ = runTerma(t, "doctor", "--skip-commit")
 	if !strings.Contains(out, "this repository asks") {
 		t.Fatalf("doctor should confirm the repository has a policy:\n%s", out)
@@ -327,9 +354,6 @@ func TestStatusAndDoctorAgreeWhenRoutingIsConfiguredButNotLive(t *testing.T) {
 	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--yes"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := (harness.Claude{}).Local(mustGetwd(t)).Disconnect(); err != nil {
-		t.Fatal(err)
-	}
 	if err := shim.SaveRecord(shim.Record{ProjectID: testProjectID, Endpoint: "https://otel.terma.ai", Signals: []string{"logs"}, Harnesses: []string{shim.AgentClaude}}); err != nil {
 		t.Fatal(err)
 	}
@@ -348,9 +372,7 @@ func TestStatusAndDoctorAgreeWhenRoutingIsConfiguredButNotLive(t *testing.T) {
 
 	// The repository asks: sessions send through the machine-wide config, to this project.
 	// That works, and neither command may claim otherwise because the shim is missing.
-	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--yes"); err != nil {
-		t.Fatal(err)
-	}
+	connectLocalPolicy(t)
 	status, _ = runTerma(t, "status")
 	doc, _ = runTerma(t, "doctor", "--skip-commit")
 	if !strings.Contains(status, "Claude Code → connected") || strings.Contains(status, "not ahead") {
@@ -361,97 +383,27 @@ func TestStatusAndDoctorAgreeWhenRoutingIsConfiguredButNotLive(t *testing.T) {
 	}
 }
 
-// Re-installing a repository must not replace a team's narrower policy with defaults.
-func TestInstallPreservesExistingRepositoryPolicy(t *testing.T) {
-	for _, signals := range []string{"logs", "none"} {
-		t.Run(signals, func(t *testing.T) {
+// install leaves a committed Claude policy exactly as it is — a team's own, or one an
+// earlier install wrote — whatever export flags it is given: they shape the shim's route.
+func TestInstallLeavesAnExistingClaudePolicyAlone(t *testing.T) {
+	for _, flags := range [][]string{nil, {"--signals", "metrics"}, {"--prompts", "off", "--exclude-tool-content"}} {
+		t.Run(strings.Join(flags, " "), func(t *testing.T) {
 			repo := installRepo(t)
-			args := []string{"install", "--harness", "none", "--project", testProjectID, "--yes", "--no-doctor"}
-			if out, err := runTerma(t, append(args, "--signals", signals, "--exclude-prompts", "--exclude-tool-content")...); err != nil {
-				t.Fatalf("%v\n%s", err, out)
-			}
-			path := filepath.Join(repo, ".claude", "settings.json")
-			before, err := os.ReadFile(path)
-			if err != nil {
-				t.Fatal(err)
-			}
+			path := writeCommittedPolicy(t, repo)
+			args := append([]string{"install", "--harness", "none", "--project", testProjectID, "--yes", "--no-doctor"}, flags...)
 			if out, err := runTerma(t, args...); err != nil {
 				t.Fatalf("%v\n%s", err, out)
 			}
-			after, err := os.ReadFile(path)
-			if err != nil {
-				t.Fatal(err)
+			got := readClaudeSettings(t, path)
+			want := map[string]string{"OTEL_LOGS_EXPORTER": "otlp", "OTEL_METRICS_EXPORTER": "otlp", "OTEL_TRACES_EXPORTER": "otlp", "OTEL_LOG_USER_PROMPTS": "1"}
+			if len(got) != len(want) {
+				t.Fatalf("install changed the existing policy: %+v", got)
 			}
-			if string(before) != string(after) {
-				t.Fatal("plain reinstall changed the existing telemetry policy")
-			}
-			if out, err := runTerma(t, append(args, "--signals", "metrics")...); err != nil {
-				t.Fatalf("%v\n%s", err, out)
-			}
-			if got := readClaudeSettings(t, path)["OTEL_METRICS_EXPORTER"]; got != "otlp" {
-				t.Fatalf("explicit policy update did not enable metrics: %q", got)
+			for k, v := range want {
+				if got[k] != v {
+					t.Fatalf("install changed %s: %+v", k, got)
+				}
 			}
 		})
-	}
-}
-
-func TestInstallUpgradesHooksOnlyRepository(t *testing.T) {
-	repo := installRepo(t)
-	args := []string{"install", "--harness", "none", "--project", testProjectID, "--yes", "--no-doctor"}
-	if _, err := runTerma(t, args...); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := (harness.Claude{}).Local(mustGetwd(t)).Disconnect(); err != nil {
-		t.Fatal(err)
-	}
-	out, err := runTerma(t, args...)
-	if err != nil {
-		t.Fatalf("%v\n%s", err, out)
-	}
-	if got := readClaudeSettings(t, filepath.Join(repo, ".claude", "settings.json"))["OTEL_LOGS_EXPORTER"]; got != "otlp" {
-		t.Fatalf("reinstall did not enable telemetry: %q", got)
-	}
-}
-
-func TestInstallPreservesManuallyChangedRepositoryPolicy(t *testing.T) {
-	repo := installRepo(t)
-	args := []string{"install", "--harness", "none", "--project", testProjectID, "--yes", "--no-doctor"}
-	if _, err := runTerma(t, args...); err != nil {
-		t.Fatal(err)
-	}
-	path := filepath.Join(repo, ".claude", "settings.json")
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var doc map[string]any
-	if err := json.Unmarshal(data, &doc); err != nil {
-		t.Fatal(err)
-	}
-	env := doc["env"].(map[string]any)
-	// Change every policy value so none still match the connect journal.
-	for key := range env {
-		if strings.HasSuffix(key, "_EXPORTER") {
-			env[key] = "none"
-		} else {
-			env[key] = "0"
-		}
-	}
-	before, err := json.Marshal(doc)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, before, 0600); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := runTerma(t, args...); err != nil {
-		t.Fatal(err)
-	}
-	after, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(before) != string(after) {
-		t.Fatal("reinstall replaced a manually disabled policy")
 	}
 }

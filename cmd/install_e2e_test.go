@@ -554,6 +554,8 @@ func TestInstallE2EUninstallOwnership(t *testing.T) {
 			s.git(root, "init", "-q")
 			s.write(root, hookmgr.ClaudeSettingsPath, `{"env":{"USER_FLAG":"keep","OTEL_LOG_USER_PROMPTS":"0"}}`)
 			s.install(root, "--exclude-prompts=false")
+			// install writes no Claude policy; connect --scope local still does, journaled.
+			s.cli(root, "connect", "claude", "--scope", "local", "--yes")
 			switch kind {
 			case "journal_missing":
 				s.env = append(s.env, "TERMA_CONFIG_DIR="+filepath.Join(s.base, "other-machine"))

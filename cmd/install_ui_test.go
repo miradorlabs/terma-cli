@@ -26,7 +26,7 @@ func TestInstallIsConciseUnlessVerbose(t *testing.T) {
 			t.Errorf("the checklist should say %q:\n%s", want, out)
 		}
 	}
-	for _, detail := range []string{"git add", "open a PR", "✓ Hooks", "✓ Repo policy", "create  ", "Wrote Claude Code's repository policy", "Pointed git at"} {
+	for _, detail := range []string{"git add", "open a PR", "✓ Hooks", "create  ", "Pointed git at"} {
 		if strings.Contains(out, detail) {
 			t.Errorf("%q is detail, for --verbose:\n%s", detail, out)
 		}
@@ -37,10 +37,13 @@ func TestInstallIsConciseUnlessVerbose(t *testing.T) {
 	if err != nil {
 		t.Fatalf("install --verbose: %v\n%s", err, out)
 	}
-	for _, want := range []string{"✓ Project", "✓ Hooks", "✓ Repo policy", "create  ", "Wrote Claude Code's repository policy", "Pointed git at"} {
+	for _, want := range []string{"✓ Project", "✓ Hooks", "create  ", "Pointed git at"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("--verbose should say %q:\n%s", want, out)
 		}
+	}
+	if strings.Contains(out, "Repo policy") || strings.Contains(out, "repository policy") {
+		t.Errorf("install writes no Claude repository policy, so it names none:\n%s", out)
 	}
 }
 
@@ -103,7 +106,7 @@ func TestInstallShellReloadIsOnlyRequestedOnce(t *testing.T) {
 			putShimsOnPath(ui, bin, []string{"claude"}, installFlags{})
 			verdicts := []harnessVerdict{{displayName: "Claude Code", route: routePending}}
 			if missingPolicy {
-				verdicts = append(verdicts, harnessVerdict{displayName: "Other agent", route: routeRepoDecides})
+				verdicts = append(verdicts, harnessVerdict{name: "opencode", displayName: "OpenCode", route: routeRepoDecides})
 			}
 			check := doctorHarnessCheck(verdicts, "https://otel.example.test", testProjectID, true)
 			check.Key = doctor.KeyHarness
@@ -111,7 +114,7 @@ func TestInstallShellReloadIsOnlyRequestedOnce(t *testing.T) {
 			ui.finish()
 			out := buf.String()
 			if missingPolicy {
-				if !strings.Contains(out, "enable the missing repository policy") || !strings.Contains(out, "! Verified") {
+				if !strings.Contains(out, "terma connect opencode --exports everywhere") || !strings.Contains(out, "! Verified") {
 					t.Fatalf("missing policy must still be reported:\n%s", out)
 				}
 			} else if strings.Count(out, "source ~/.zshrc") != 1 || strings.Contains(out, "! Verified") {

@@ -38,7 +38,14 @@ run that reaches them opens a browser login on **production**. A script that run
   harnesses. While `agentAvailable` (cmd/setup.go) says an agent is coming soon — Cursor,
   Antigravity, OpenCode — `installAdapters` never wires its hooks by default, whatever
   directory the repository carries or a colleague committed; only `--adapters` names one.
-  uninstall, doctor and `terma hook` still cover them.
+  uninstall, doctor and `terma hook` still cover them. setup's menu offers Claude Code and
+  the Codex CLI; Claude Desktop, Codex Desktop and GitHub Copilot are coming-soon rows
+  with no adapter (`claudeDesktopAgent`, `codexDesktopAgent`, `copilotAgent`). A desktop
+  app runs its own copy of its agent, never the one the shim routes, so it would get hooks
+  and no telemetry: Claude Code 2.1.282+ drops every OTel variable that turns export on
+  from repository and local settings, and Codex reads `otel` only from the user config. A
+  saved `codex-desktop` choice is dropped (`selectedInRegistryOrder`); the Desktop route
+  code (`rec.Desktop`, `terma desktop`, `judgeDesktop`) stays, dormant.
 - Hooks are thin shims; **all logic is in the binary** (`terma hook <event>`,
   `internal/hookrun`). Never put logic in `hookmgr.ShimScript` or the husky/lefthook/
   pre-commit lines beyond "call terma, never fail, chain". Every committed entry is
@@ -330,8 +337,7 @@ run that reaches them opens a browser login on **production**. A script that run
   connects it everywhere and says so rather than silencing it.
 - install's output (`cmd/install_ui.go`, `installUI`): one marked line per step (`ok`, or
   `warn` for one that needs the developer), a verdict, then numbered next steps (`then`) —
-  the reload, a declined PATH line, Codex Desktop approval, doctor's
-  fixes. Everything long-form (the plan's file list, policies written, git wiring, doctor's
+  the reload, a declined PATH line, doctor's fixes. Everything long-form (the plan's file list, policies written, git wiring, doctor's
   per-check lines) goes to `ui.detail`, which is stdout under `--verbose` or `--dry-run`
   and discarded otherwise. New install output goes through one of those, never straight
   to `cmd.OutOrStdout()`. Doctor runs behind a spinner as the `Verified` step and leaves
@@ -345,14 +351,18 @@ run that reaches them opens a browser login on **production**. A script that run
   hidden spelling); otherwise install never asks: it keeps this developer's last choice for
   the project (`shim.Record.IncludePrompts`), on for a first install, and its Prompts line
   names the `terma install --prompts off|on` that changes it. It lands in the routing record
-  and a newly written repository policy; only an explicit `--prompts` rewrites an existing
+  (and OpenCode's repository policy); only an explicit `--prompts` rewrites an existing
   committed policy (`updatePolicy`). A bare re-install used to switch prompts back on.
-- `terma install` writes the repository half of that arrangement by default into the
-  same committed `.claude/settings.json` the hooks live in, after the hook plan applies
-  so both merges land in order. Re-running install preserves an existing policy unless
-  export flags explicitly change it. Per-repo routing is configured independently.
-  A pre-existing OTLP conflict there is reported and
-  skipped, not fatal — the hooks and the binding are already written by that point.
+- `terma install` writes **no Claude repository policy** (`repoPolicyHarnesses` leaves
+  Claude out). Since Claude Code 2.1.282 repository and local settings can only switch
+  telemetry off — the exporters, endpoint, headers and master switch are ignored there —
+  and the shim's `--settings` outranks them anyway, so the policy sent nothing. The routed
+  CLI is Claude's only per-repository telemetry. install leaves an existing committed
+  policy alone; uninstall still removes terma's. `terma connect claude --scope local`
+  still writes one, and the `--exports repos` arrangement that needs it is dead on current
+  Claude Code (doctor/status still model it; a follow-up). OpenCode's policy is still
+  written when it is wired. A pre-existing OTLP conflict there is reported and skipped,
+  not fatal — the hooks and the binding are already written by that point.
 - Connect scope (`internal/harness/scope.go`): `Claude{}` is global; `Claude{}.Local(root)`
   writes `<root>/.claude/settings.json` and renders only `claudeLocalKeys` — the three
   exporters, the four capture switches, the traces beta flag — never the endpoint, key

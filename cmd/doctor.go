@@ -895,7 +895,7 @@ func doctorHarnessCheck(verdicts []harnessVerdict, otlpURL, projectID string, bo
 	if len(problems) > 0 {
 		return doctor.Check{Status: doctor.Fail, Detail: strings.Join(problems, "; "), Fix: strings.Join(fixes, "; ")}
 	}
-	var connected, installed, pendingShim, repoDecides, silent []string
+	var connected, installed, pendingShim, repoDecides, silent, connectAll []string
 	for _, v := range verdicts {
 		installed = append(installed, v.displayName)
 		switch v.route {
@@ -916,6 +916,7 @@ func doctorHarnessCheck(verdicts []harnessVerdict, otlpURL, projectID string, bo
 			// for a config status said sent nothing.
 			if !v.repoAsks {
 				silent = append(silent, v.displayName)
+				connectAll = append(connectAll, "`terma connect "+v.name+" --exports everywhere`")
 			}
 		}
 	}
@@ -938,7 +939,7 @@ func doctorHarnessCheck(verdicts []harnessVerdict, otlpURL, projectID string, bo
 		if bound && len(silent) > 0 {
 			status = doctor.Fail
 			detail += "; " + strings.Join(silent, ", ") + " sessions here send nothing because no repository telemetry policy enables their exporters"
-			fix += "; terma install to enable the missing repository policy"
+			fix += "; or " + strings.Join(connectAll, ", ") + " to export from every repository"
 		}
 		return doctor.Check{Status: status, Detail: detail, Fix: fix, NeedsShellActivationOnly: !bound || len(silent) == 0}
 	}

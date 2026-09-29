@@ -1,5 +1,9 @@
 # Codex Desktop: repository-specific telemetry
 
+> **Coming soon.** `terma setup` and `terma install` no longer offer Codex Desktop. Hooks
+> alone carry no native telemetry, and Codex reads `otel` only from the user-level
+> `~/.codex/config.toml`. This page describes the dormant hook route for when it returns.
+
 Codex Desktop does not launch through the shell shim used by Codex CLI, and Codex
 ignores `otel` in repository config. Terma captures Desktop activity with trusted
 repository hooks and its existing local spool. It installs no background receiver,

@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
-	"runtime"
 	"slices"
 	"strings"
 
@@ -25,10 +23,16 @@ type setupFlags struct {
 	assumeYes bool
 }
 
-const codexDesktopAgent = "codex-desktop"
+// The agents setup lists as coming soon without an adapter of their own. A desktop app
+// runs its own copy of its agent, never the one terma's shim routes, so its sessions
+// would get hooks but no telemetry.
+const (
+	codexDesktopAgent  = "codex-desktop"
+	claudeDesktopAgent = "claude-desktop"
+	copilotAgent       = "copilot"
+)
 
-// agentChoice is an onboarding surface. Codex CLI and Codex desktop share one
-// repository adapter, but developers choose independently how they launch it.
+// agentChoice is an onboarding surface: an adapter, or a coming-soon row with none.
 type agentChoice struct {
 	name      string
 	display   string
@@ -38,7 +42,7 @@ type agentChoice struct {
 func (a agentChoice) Name() string        { return a.name }
 func (a agentChoice) DisplayName() string { return a.display }
 func (a agentChoice) Installed(ctx context.Context) bool {
-	return a.installed(ctx)
+	return a.installed != nil && a.installed(ctx)
 }
 
 func newSetupCommand() *cobra.Command {
@@ -50,8 +54,7 @@ func newSetupCommand() *cobra.Command {
 no project, no telemetry configuration, no files touched:
 
   1. Signs you in (a browser handoff; --no-browser prints the URL instead).
-  2. Records which coding agents you work with (including Codex CLI and Codex
-     desktop separately), so ` + "`terma install`" + ` never has to ask again.
+  2. Records which coding agents you work with, so ` + "`terma install`" + ` never has to ask again.
 
 setup is optional: ` + "`terma install`" + ` signs you in and asks for your agents itself
 when you have not run it. The real configuration — pointing an agent at a project,
@@ -103,10 +106,7 @@ func runSetup(cmd *cobra.Command, f setupFlags) error {
 	if len(names) == 0 {
 		fmt.Fprintln(out, "\nNo agents recorded. `terma install` will ask you to pick some in each repository.")
 	} else {
-		fmt.Fprintf(out, "\nAgents recorded: %s.\n", joinNames(choiceDisplayNames(names)))
-	}
-	if slices.Contains(names, codexDesktopAgent) {
-		fmt.Fprintln(out, "Codex Desktop: after `terma install` in a repository, open Settings → Hooks → Review in Codex Desktop and approve Terma's hooks.")
+		fmt.Fprintf(out, "\nAgents recorded: %s.\n", joinNames(adapterDisplayNames(names)))
 	}
 	fmt.Fprintf(out, "\n%s Now run `terma install` in each codebase you want to instrument with terma.\n",
 		style.For(out).Bold("Done!"))
@@ -152,7 +152,7 @@ func chooseHarnesses(cmd *cobra.Command, cfg *config.Config, f setupFlags) ([]st
 
 // agentAvailable gates onboarding while the remaining integrations are coming soon.
 func agentAvailable(name string) bool {
-	return name == "claude" || name == "codex" || name == codexDesktopAgent
+	return name == "claude" || name == "codex"
 }
 
 func availableAgentNames() []string {
@@ -165,60 +165,27 @@ func availableAgentNames() []string {
 	return names
 }
 
-// harnessSelectionAgents puts available agents first, preserving registry order
-// within each group. Both the form and its result mapping must use this order.
+// harnessSelectionAgents lists the available agents in registry order, then the coming
+// soon ones: the desktop apps, the other adapters in registry order, and Copilot. Both
+// the form and its result mapping must use this order.
 func harnessSelectionAgents() []agentChoice {
-	var agents []agentChoice
-	for _, available := range []bool{true, false} {
-		for _, a := range adapter.All() {
-			if agentAvailable(a.Name()) == available {
-				adapterAgent := a
-				display, installed := a.DisplayName(), adapterAgent.Installed
-				switch a.Name() {
-				case "codex":
-					display = "Codex CLI"
-				case "claude":
-					display = claudeChoiceDisplay
-					installed = func(ctx context.Context) bool { return adapterAgent.Installed(ctx) || claudeDesktopInstalled() }
-				}
-				agents = append(agents, agentChoice{name: a.Name(), display: display, installed: installed})
-				if a.Name() == "codex" {
-					agents = append(agents, agentChoice{name: codexDesktopAgent, display: "Codex Desktop", installed: codexDesktopInstalled})
-				}
-			}
+	var available, soon []agentChoice
+	for _, a := range adapter.All() {
+		choice := agentChoice{name: a.Name(), display: a.DisplayName(), installed: a.Installed}
+		if a.Name() == "codex" {
+			choice.display = "Codex CLI"
+		}
+		if agentAvailable(a.Name()) {
+			available = append(available, choice)
+		} else {
+			soon = append(soon, choice)
 		}
 	}
-	return agents
-}
-
-// claudeChoiceDisplay is how setup names Claude: the desktop app runs Claude Code
-// sessions, which read the same settings and hooks, so one choice covers both.
-const claudeChoiceDisplay = "Claude Code (CLI and Desktop)"
-
-func claudeDesktopInstalled() bool {
-	if runtime.GOOS != "darwin" {
-		return false
-	}
-	home, _ := os.UserHomeDir()
-	for _, path := range []string{"/Applications/Claude.app", filepath.Join(home, "Applications", "Claude.app")} {
-		if info, err := os.Stat(path); err == nil && info.IsDir() {
-			return true
-		}
-	}
-	return false
-}
-
-func codexDesktopInstalled(context.Context) bool {
-	if runtime.GOOS != "darwin" {
-		return false
-	}
-	home, _ := os.UserHomeDir()
-	for _, path := range []string{"/Applications/ChatGPT.app", filepath.Join(home, "Applications", "ChatGPT.app")} {
-		if info, err := os.Stat(path); err == nil && info.IsDir() {
-			return true
-		}
-	}
-	return false
+	agents := append(available,
+		agentChoice{name: claudeDesktopAgent, display: "Claude Desktop"},
+		agentChoice{name: codexDesktopAgent, display: "Codex Desktop"})
+	agents = append(agents, soon...)
+	return append(agents, agentChoice{name: copilotAgent, display: "GitHub Copilot"})
 }
 
 func harnessSelectionForm(ctx context.Context, preselect map[string]bool) *prompt.Form {
@@ -241,10 +208,8 @@ func harnessSelectionForm(ctx context.Context, preselect map[string]bool) *promp
 func parseAgentList(raw string) ([]string, error) {
 	seen := map[string]bool{}
 	for _, n := range splitCommas(raw) {
-		if n != codexDesktopAgent {
-			if _, ok := adapter.Lookup(n); !ok {
-				return nil, fmt.Errorf("unknown agent %q (want %s)", n, joinNames(availableAgentNames()))
-			}
+		if !slices.ContainsFunc(harnessSelectionAgents(), func(a agentChoice) bool { return a.name == n }) {
+			return nil, fmt.Errorf("unknown agent %q (want %s)", n, joinNames(availableAgentNames()))
 		}
 		if !agentAvailable(n) {
 			return nil, fmt.Errorf("agent %q: Coming Soon; available agents: %s", n, joinNames(availableAgentNames()))
@@ -277,28 +242,10 @@ func detectedAgents(ctx context.Context) []string {
 }
 
 func agentDetail(ctx context.Context, name string) string {
-	if name == codexDesktopAgent && codexDesktopInstalled(ctx) {
-		return "installed"
-	}
 	if a, ok := adapter.Lookup(name); ok && a.Installed(ctx) {
 		return "installed"
 	}
-	if name == "claude" && claudeDesktopInstalled() {
-		return "installed"
-	}
 	return ""
-}
-
-// choiceDisplayNames names agents as setup's form does — Claude as CLI and Desktop —
-// where adapterDisplayNames names what install routes (a shim routes the CLI only).
-func choiceDisplayNames(names []string) []string {
-	out := adapterDisplayNames(names)
-	for i, n := range names {
-		if n == "claude" {
-			out[i] = claudeChoiceDisplay
-		}
-	}
-	return out
 }
 
 // adapterDisplayNames maps adapter tokens to their display names, in the given order.

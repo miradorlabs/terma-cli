@@ -15,9 +15,10 @@ Terma has two onboarding commands with different owners:
 | Command | Run it | What it does |
 |---|---|---|
 | `terma setup` | Once per developer (optional) | Signs you in and records which coding agents you use. It does not bind a project or write repository files. |
-| `terma install` | Once per repository | Binds the repository to a Terma project, configures per-repository agent routing, and offers to install commit and agent hooks. |
+| `terma install` | Once per repository | Binds the repository to a Terma project, configures per-repository agent routing, and installs commit and agent hooks. |
 
-Repository telemetry is enabled by `terma install`; no extra telemetry flag is needed.
+`terma install` routes Claude Code and the Codex CLI to the repository's project when
+you start them from a terminal; no extra telemetry flag is needed.
 Run it from any subdirectory: Git worktrees and submodules use their own root.
 Outside Git, the first install uses the current directory; later install/uninstall
 calls from subdirectories find the nearest `.terma/settings.json`. Agent hooks and
@@ -30,11 +31,9 @@ Run `make test-install-e2e` for the isolated install/uninstall subprocess suite.
 See [the installation test matrix](docs/INSTALLATION-TESTS.md) for coverage and limits.
 Restart running agents after installation so they load the new configuration.
 
-Codex desktop uses a separate backend from the `codex` shell command. Select
-**Codex Desktop** in `terma setup` (or use `--harness codex-desktop` with
-`terma install`). Install then configures repository hooks and a local project
-route. Trust the hooks in the app and check `terma desktop status` from that repository.
-See [Codex desktop telemetry](docs/CODEX-DESKTOP-TELEMETRY.md).
+Claude Desktop, Codex Desktop and GitHub Copilot are coming soon. The desktop apps run
+their own copy of the agent rather than the one terma routes, so they report no telemetry
+to your project yet.
 
 Then verify the installation:
 

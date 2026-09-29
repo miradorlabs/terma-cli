@@ -12,31 +12,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func TestSetupRecordsCodexDesktopSeparatelyFromCLI(t *testing.T) {
-	gateway := newFakeAuth(t)
-	authSandbox(t, gateway)
-	if _, err := auth.SaveCredential(config.DefaultProfile, storedSession(gateway, orgA())); err != nil {
-		t.Fatal(err)
-	}
-	out, err := runTerma(t, "setup", "--harness", "codex-desktop")
-	if err != nil {
-		t.Fatalf("setup: %v\n%s", err, out)
-	}
-	cfg, err := loadConfig()
-	if err != nil || !slices.Equal(cfg.Harnesses, []string{codexDesktopAgent}) {
-		t.Fatalf("saved agent choices = %v, %v", cfg.Harnesses, err)
-	}
-	if !strings.Contains(out, "Codex Desktop") || strings.Contains(out, "Agents recorded: Codex.") {
-		t.Fatalf("setup did not name the separate desktop choice:\n%s", out)
-	}
-	if !strings.Contains(out, "after `terma install` in a repository, open Settings → Hooks → Review") {
-		t.Fatalf("setup did not explain Desktop hook approval:\n%s", out)
-	}
-}
-
-// Claude Desktop runs Claude Code sessions, which read the same settings and hooks: the
-// one Claude choice says it covers both.
-func TestSetupNamesClaudeDesktopWithTheCLI(t *testing.T) {
+// The desktop apps run their own copy of their agent, so the shim that routes the CLI
+// never reaches them: setup offers them as coming soon, and names Claude as the CLI.
+func TestSetupNamesClaudeCodeAndRefusesTheDesktopApps(t *testing.T) {
 	gateway := newFakeAuth(t)
 	authSandbox(t, gateway)
 	if _, err := auth.SaveCredential(config.DefaultProfile, storedSession(gateway, orgA())); err != nil {
@@ -46,8 +24,14 @@ func TestSetupNamesClaudeDesktopWithTheCLI(t *testing.T) {
 	if err != nil {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}
-	if !strings.Contains(out, "Agents recorded: Claude Code (CLI and Desktop).") {
-		t.Fatalf("setup should say the Claude choice covers the desktop app:\n%s", out)
+	if !strings.Contains(out, "Agents recorded: Claude Code.") {
+		t.Fatalf("setup should name Claude Code alone:\n%s", out)
+	}
+	for _, name := range []string{codexDesktopAgent, claudeDesktopAgent, copilotAgent} {
+		out, err := runTerma(t, "setup", "--harness", name)
+		if err == nil || !strings.Contains(err.Error(), "Coming Soon") {
+			t.Fatalf("setup --harness %s = %v, want Coming Soon\n%s", name, err, out)
+		}
 	}
 }
 
@@ -57,19 +41,16 @@ func TestHarnessSelectionComingSoon(t *testing.T) {
 		chosen[name] = true
 	}
 	form := harnessSelectionForm(context.Background(), chosen)
-	wantOrder := []string{"claude", "codex", codexDesktopAgent, "cursor", "opencode", "antigravity"}
+	wantOrder := []string{"claude", "codex", claudeDesktopAgent, codexDesktopAgent, "cursor", "opencode", "antigravity", copilotAgent}
 	if len(form.Items) != len(wantOrder) {
 		t.Fatalf("picker has %d items, want %d", len(form.Items), len(wantOrder))
 	}
 	for i, name := range wantOrder {
-		display := name
-		if name == codexDesktopAgent {
-			display = "Codex Desktop"
-		} else if name == "codex" {
-			display = "Codex CLI"
-		} else if name == "claude" {
-			display = "Claude Code (CLI and Desktop)"
-		} else if a, ok := adapter.Lookup(name); ok {
+		display := map[string]string{
+			"claude": "Claude Code", "codex": "Codex CLI",
+			claudeDesktopAgent: "Claude Desktop", codexDesktopAgent: "Codex Desktop", copilotAgent: "GitHub Copilot",
+		}[name]
+		if a, ok := adapter.Lookup(name); ok && display == "" {
 			display = a.DisplayName()
 		}
 		if form.Items[i].Label != display {
@@ -88,7 +69,7 @@ func TestHarnessSelectionComingSoon(t *testing.T) {
 }
 
 func TestHarnessSelectionFlags(t *testing.T) {
-	for _, name := range []string{"cursor", "opencode", "antigravity"} {
+	for _, name := range []string{"cursor", "opencode", "antigravity", codexDesktopAgent, claudeDesktopAgent, copilotAgent} {
 		t.Run(name, func(t *testing.T) {
 			cmd := &cobra.Command{}
 			cfg := &config.Config{}
@@ -104,42 +85,28 @@ func TestHarnessSelectionFlags(t *testing.T) {
 	if err != nil || !slices.Equal(got, []string{"claude", "codex"}) {
 		t.Fatalf("available selection = %v, %v", got, err)
 	}
-	got, err = parseAgentList("codex-desktop,codex,claude,codex-desktop")
-	if err != nil || !slices.Equal(got, []string{"claude", "codex", codexDesktopAgent}) {
-		t.Fatalf("independent desktop selection = %v, %v", got, err)
+	if _, err := parseAgentList("copilot-cli"); err == nil || !strings.Contains(err.Error(), "unknown agent") {
+		t.Fatalf("unknown agent error = %v", err)
 	}
 }
 
 func TestHarnessSelectionFiltersSavedAgents(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 	cmd := &cobra.Command{}
-	for _, saved := range [][]string{adapter.Names(), {"cursor", "opencode", "antigravity"}} {
+	// A profile an earlier setup wrote may hold codex-desktop; it is dropped, never an error.
+	for _, saved := range [][]string{append(adapter.Names(), codexDesktopAgent), {"cursor", "opencode", "antigravity", codexDesktopAgent}} {
 		cfg := &config.Config{Harnesses: saved}
-		wantInstalled := []string(nil)
+		want := []string(nil)
 		if slices.Contains(saved, "claude") {
-			wantInstalled = []string{"claude", "codex"}
-		}
-		// The desktop apps count as installed agents, whatever PATH says.
-		wantSetup := slices.Clone(wantInstalled)
-		var desktops []string
-		if claudeDesktopInstalled() && !slices.Contains(wantSetup, "claude") {
-			wantSetup = append([]string{"claude"}, wantSetup...)
-			desktops = append(desktops, "claude")
-		}
-		if codexDesktopInstalled(context.Background()) {
-			wantSetup = append(wantSetup, codexDesktopAgent)
-			desktops = append(desktops, codexDesktopAgent)
-		}
-		if len(wantInstalled) == 0 {
-			wantInstalled = desktops
+			want = []string{"claude", "codex"}
 		}
 		got, err := chooseHarnesses(cmd, cfg, setupFlags{assumeYes: true})
-		if err != nil || !slices.Equal(got, wantSetup) {
-			t.Fatalf("setup selection = %v, %v; want %v", got, err, wantSetup)
+		if err != nil || !slices.Equal(got, want) {
+			t.Fatalf("setup selection = %v, %v; want %v", got, err, want)
 		}
 		got, err = resolveInstallHarnesses(cmd, cfg, installFlags{assumeYes: true, dryRun: true})
-		if err != nil || !slices.Equal(got, wantInstalled) {
-			t.Fatalf("install selection = %v, %v; want %v", got, err, wantInstalled)
+		if err != nil || !slices.Equal(got, want) {
+			t.Fatalf("install selection = %v, %v; want %v", got, err, want)
 		}
 	}
 }
