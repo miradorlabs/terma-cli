@@ -30,6 +30,12 @@ func setupSandbox(t *testing.T) (*fakeAuth, string) {
 	t.Setenv("ZDOTDIR", "")
 	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(home, ".claude"))
 	t.Setenv("CODEX_HOME", filepath.Join(home, ".codex"))
+	// Claude Code and Codex of the sandbox's own, first on PATH: status and doctor judge
+	// only agents they find, and a CI runner has neither installed.
+	bin := t.TempDir()
+	writeExecutable(t, filepath.Join(bin, "claude"), "#!/bin/sh\necho '2.1.284 (Claude Code)'\n")
+	writeExecutable(t, filepath.Join(bin, "codex"), "#!/bin/sh\necho 'codex-cli 0.158.0'\n")
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	if _, err := auth.SaveCredential(config.DefaultProfile, storedSession(f, orgA())); err != nil {
 		t.Fatal(err)
 	}

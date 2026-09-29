@@ -3,6 +3,7 @@ package selfupdate
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"testing"
 )
@@ -19,6 +20,9 @@ func executable(t *testing.T, path string) {
 }
 
 func TestManagedByUsesThePackageManagerThatOwnsTheBinary(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Homebrew and npm's Unix prefix layouts; Windows: TestManagedByOnWindowsNamesTheCommandOnly")
+	}
 	t.Setenv("PATH", "")
 	root, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
@@ -74,6 +78,9 @@ func TestManagedByUsesThePackageManagerThatOwnsTheBinary(t *testing.T) {
 
 // The npm on PATH is used only when the prefix has none, and always with that prefix.
 func TestManagedByFallsBackToNpmOnPathForItsPrefix(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("npm's Unix prefix layout; Windows: TestManagedByOnWindowsNamesTheCommandOnly")
+	}
 	root, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -86,6 +93,27 @@ func TestManagedByFallsBackToNpmOnPathForItsPrefix(t *testing.T) {
 	want := []string{filepath.Join(bin, "npm"), "install", "--global", "--prefix", prefix, "@miradorlabs/terma@latest"}
 	if !ok || !slices.Equal(m.Argv, want) {
 		t.Fatalf("ManagedBy = %+v, %v", m, ok)
+	}
+}
+
+// On Windows terma never runs npm and does not tell a global install from a project's:
+// it names the global upgrade, and an update of an npm-owned binary is left to npm.
+func TestManagedByOnWindowsNamesTheCommandOnly(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows behaviour")
+	}
+	root := t.TempDir()
+	for _, exe := range []string{
+		filepath.Join(root, "npm", "node_modules", "@miradorlabs", "terma", "vendor", "terma.exe"),
+		filepath.Join(root, "app", "node_modules", "@miradorlabs", "terma", "vendor", "terma.exe"),
+	} {
+		m, ok := ManagedBy(exe)
+		if !ok || m.Name != "npm" || m.Command != "npm install -g @miradorlabs/terma@latest" || m.Argv != nil || m.Project != "" {
+			t.Fatalf("ManagedBy(%s) = %+v, %v", exe, m, ok)
+		}
+	}
+	if m, ok := ManagedBy(filepath.Join(root, "bin", "terma.exe")); ok {
+		t.Fatalf("an install script's binary is not managed: %+v", m)
 	}
 }
 
