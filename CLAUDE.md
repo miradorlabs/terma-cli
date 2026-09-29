@@ -44,8 +44,10 @@ run that reaches them opens a browser login on **production**. A script that run
   app runs its own copy of its agent, never the one the shim routes, so it would get hooks
   and no telemetry: Claude Code 2.1.282+ drops every OTel variable that turns export on
   from repository and local settings, and Codex reads `otel` only from the user config. A
-  saved `codex-desktop` choice is dropped (`selectedInRegistryOrder`); the Desktop route
-  code (`rec.Desktop`, `terma desktop`, `judgeDesktop`) stays, dormant.
+  saved coming-soon choice is ignored when choosing agents (`selectedInRegistryOrder`),
+  kept whenever the profile is saved (`withComingSoon` — nothing can select one, so a
+  save would drop it for good) and never judged by doctor/status (`selectedForRepo`). The
+  Desktop route code (`rec.Desktop`, `terma desktop`, `judgeDesktop`) stays, dormant.
 - Hooks are thin shims; **all logic is in the binary** (`terma hook <event>`,
   `internal/hookrun`). Never put logic in `hookmgr.ShimScript` or the husky/lefthook/
   pre-commit lines beyond "call terma, never fail, chain". Every committed entry is

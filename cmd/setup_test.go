@@ -90,6 +90,53 @@ func TestHarnessSelectionFlags(t *testing.T) {
 	}
 }
 
+// A saved coming-soon choice survives a real install and a setup that save the profile,
+// even when it was the only one — no picker can select it, so dropping it would be for good.
+func TestSavingAgentsKeepsComingSoonChoices(t *testing.T) {
+	gateway := newFakeAuth(t)
+	authSandbox(t, gateway)
+	installRepo(t)
+	t.Setenv("PATH", "/usr/bin:/bin")
+	if _, err := auth.SaveCredential(config.DefaultProfile, storedSession(gateway, orgA())); err != nil {
+		t.Fatal(err)
+	}
+	save := func(names ...string) {
+		t.Helper()
+		if err := config.UpdateProfile(config.DefaultProfile, func(p *config.Profile) { p.Harnesses = names }); err != nil {
+			t.Fatal(err)
+		}
+	}
+	saved := func() []string {
+		t.Helper()
+		cfg, err := loadConfig()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return cfg.Harnesses
+	}
+	save(codexDesktopAgent, "cursor")
+	if out, err := runTerma(t, "install", "--project", "aaaaaaaa-0000-4000-8000-000000000001", "--no-path", "--yes", "--no-doctor", "--no-browser"); err != nil {
+		t.Fatalf("install: %v\n%s", err, out)
+	}
+	if got := saved(); !slices.Contains(got, codexDesktopAgent) || !slices.Contains(got, "cursor") {
+		t.Fatalf("install dropped a saved coming-soon choice: %v", got)
+	}
+	save(codexDesktopAgent)
+	if out, err := runTerma(t, "setup", "--harness", "claude"); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	if got := saved(); !slices.Equal(got, []string{"claude", codexDesktopAgent}) {
+		t.Fatalf("setup saved %v, want claude and the coming-soon codex-desktop", got)
+	}
+	// Kept, but never judged: doctor and status see no Codex Desktop verdict for it.
+	if got := selectedForRepo("", []string{"claude", codexDesktopAgent, copilotAgent}); !slices.Equal(got, []string{"claude"}) {
+		t.Fatalf("selectedForRepo = %v, want the coming-soon apps left out", got)
+	}
+	if got := withComingSoon([]string{"codex"}, []string{"claude", "not-an-agent", copilotAgent}); !slices.Equal(got, []string{"codex", copilotAgent}) {
+		t.Fatalf("withComingSoon = %v: an available agent the developer dropped, or an unknown name, must not come back", got)
+	}
+}
+
 func TestHarnessSelectionFiltersSavedAgents(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 	cmd := &cobra.Command{}

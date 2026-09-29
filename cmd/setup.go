@@ -99,7 +99,7 @@ func runSetup(cmd *cobra.Command, f setupFlags) error {
 	if err != nil {
 		return err
 	}
-	if err := config.UpdateProfile(cfg.ProfileName, func(p *config.Profile) { p.Harnesses = names }); err != nil {
+	if err := config.UpdateProfile(cfg.ProfileName, func(p *config.Profile) { p.Harnesses = withComingSoon(names, p.Harnesses) }); err != nil {
 		return err
 	}
 
@@ -217,6 +217,20 @@ func parseAgentList(raw string) ([]string, error) {
 		seen[n] = true
 	}
 	return selectedInRegistryOrder(seen), nil
+}
+
+// withComingSoon is the agent list to save: chosen, plus every saved agent that is coming
+// soon. Nothing can select one of those, so without this a save would drop it for good
+// and the choice would not come back when the agent does.
+func withComingSoon(chosen, saved []string) []string {
+	out := slices.Clone(chosen)
+	for _, name := range saved {
+		if !agentAvailable(name) && !slices.Contains(out, name) &&
+			slices.ContainsFunc(harnessSelectionAgents(), func(a agentChoice) bool { return a.name == name }) {
+			out = append(out, name)
+		}
+	}
+	return out
 }
 
 // selectedInRegistryOrder returns available chosen adapter names in registry order.

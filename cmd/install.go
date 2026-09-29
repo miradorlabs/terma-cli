@@ -620,7 +620,7 @@ func resolveInstallHarnesses(cmd *cobra.Command, cfg *config.Config, f installFl
 	if f.dryRun {
 		return names, nil
 	}
-	if err := config.UpdateProfile(cfg.ProfileName, func(p *config.Profile) { p.Harnesses = names }); err != nil {
+	if err := config.UpdateProfile(cfg.ProfileName, func(p *config.Profile) { p.Harnesses = withComingSoon(names, p.Harnesses) }); err != nil {
 		return nil, err
 	}
 	return names, nil

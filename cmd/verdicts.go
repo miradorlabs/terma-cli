@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/miradorlabs/terma-cli/internal/adapter"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
@@ -283,8 +284,15 @@ func judgeSelectedHarnesses(ctx context.Context, otlpURL, projectID, root string
 	return append(verdicts, judgeDesktop(projectID))
 }
 
+// selectedForRepo is which of the developer's agents doctor and status judge here: the
+// saved choices that name an adapter — a coming-soon app is saved only so the choice
+// survives (withComingSoon) — reconciled with this project's routing record, whose
+// Desktop flag an install from before Codex Desktop was withdrawn may still carry.
 func selectedForRepo(projectID string, saved []string) []string {
-	selected := slices.Clone(saved)
+	selected := slices.DeleteFunc(slices.Clone(saved), func(name string) bool {
+		_, ok := adapter.Lookup(name)
+		return !ok
+	})
 	if projectID == "" {
 		return selected
 	}
