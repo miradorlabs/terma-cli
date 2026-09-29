@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 )
 
@@ -85,12 +86,12 @@ func CheckKeys(t *testing.T, name string, observed map[string]string, strict boo
 }
 
 func joinStrings(s []string) string {
-	out := ""
+	var out strings.Builder
 	for i, x := range s {
 		if i > 0 {
-			out += ", "
+			out.WriteString(", ")
 		}
-		out += x
+		out.WriteString(x)
 	}
-	return out
+	return out.String()
 }

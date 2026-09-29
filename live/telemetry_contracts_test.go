@@ -308,9 +308,20 @@ func awaitTelemetry(t *testing.T, sb *Sandbox, check func(contractReporter, tele
 	}
 }
 
-func checkCodexTelemetry(t contractReporter, e telemetryEvidence, sid, project string, exclude bool) {
+// checkCodexTelemetry checks one Codex session's export. relayed is the relay's
+// contract (docs/RELAY.md), checked on what reached the session's project (the
+// evidence under its key): Codex's metrics name no session, so they go to the machine
+// project and none may be here; the relay stamps no project on a record (the key says
+// it), so spans are not asked for one; and a project that withholds tool content loses
+// the tool call's arguments too — the relay is stricter than Codex's own switch, which
+// only drops the output.
+func checkCodexTelemetry(t contractReporter, e telemetryEvidence, sid, project string, exclude, relayed bool) {
 	t.Helper()
-	checkExportRequests(t, e)
+	if relayed {
+		checkExportRequests(t, e, "/v1/logs", "/v1/traces")
+	} else {
+		checkExportRequests(t, e)
+	}
 	checkHookLifecycle(t, e, sid, project, knownUpstream(upstreamCodexSessionEnd))
 	if exclude {
 		checkRedaction(t, e, "codex")
@@ -364,11 +375,15 @@ func checkCodexTelemetry(t contractReporter, e telemetryEvidence, sid, project s
 		equalField(t, "codex.tool_decision", r.Attrs, "decision", "approved")
 		equalField(t, "codex.tool_decision", r.Attrs, "source", "Config")
 	}
-	for _, r := range e.logsFor(t, "codex.tool_result", "conversation.id", sid, 1, append(common, "call_id", "tool_name", "success", "duration_ms", "arguments")...) {
+	resultFields := append(common, "call_id", "tool_name", "success", "duration_ms")
+	if !(relayed && exclude) {
+		resultFields = append(resultFields, "arguments")
+	}
+	for _, r := range e.logsFor(t, "codex.tool_result", "conversation.id", sid, 1, resultFields...) {
 		equalField(t, "codex.tool_result", r.Attrs, "call_id", "call_telemetry")
 		equalField(t, "codex.tool_result", r.Attrs, "success", "true")
 		for key, marker := range map[string]string{"arguments": telemetryCommand, "output": "TERMA_TELEMETRY_TOOL"} {
-			if key == "output" && exclude {
+			if (key == "output" || relayed) && exclude {
 				if strings.Contains(r.Attrs[key], marker) {
 					t.Errorf("codex.tool_result: excluded output leaked")
 				}
@@ -402,7 +417,11 @@ func checkCodexTelemetry(t contractReporter, e telemetryEvidence, sid, project s
 				trace.spans = append(trace.spans, s)
 			}
 		}
-		checkSpans(t, trace, "", "", project, "session_task.turn", "handle_responses")
+		spanProject := project
+		if relayed {
+			spanProject = ""
+		}
+		checkSpans(t, trace, "", "", spanProject, "session_task.turn", "handle_responses")
 		usageSpans, tools := 0, 0
 		for _, s := range trace.spans {
 			if _, ok := s.Attrs["gen_ai.usage.input_tokens"]; ok {
@@ -421,6 +440,14 @@ func checkCodexTelemetry(t contractReporter, e telemetryEvidence, sid, project s
 		if tools == 0 {
 			t.Errorf("no tool span joins call_telemetry")
 		}
+	}
+	if relayed {
+		for _, m := range e.metrics {
+			if strings.HasPrefix(m.Proto.GetName(), "codex.") {
+				t.Errorf("%s: a Codex metric names no session and must reach the machine project, not the session's", m.Proto.GetName())
+			}
+		}
+		return
 	}
 	// Codex metrics intentionally have no session/project dimensions. Each
 	// sandbox has its own receiver, so counts cannot be satisfied by another run.

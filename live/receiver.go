@@ -1,6 +1,10 @@
 package live
 
 import (
+	"bytes"
+	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -9,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -35,6 +40,28 @@ type Receiver struct {
 	metr     []Metric
 	auth     []string
 	requests []ExportRequest
+	// refusal, when non-zero, is the status every export is answered with and not
+	// recorded under: Terma's ingest down, for the relay's durability scenarios.
+	refusal atomic.Int32
+	// refused counts the exports answered with refusal.
+	refused atomic.Int64
+}
+
+// Refuse answers every export with status (0: accept again) without recording it.
+func (r *Receiver) Refuse(status int) { r.refusal.Store(int32(status)) }
+
+// Refused is how many exports were answered with a refusal.
+func (r *Receiver) Refused() int64 { return r.refused.Load() }
+
+// refusing answers req with the refusal when one is set.
+func (r *Receiver) refusing(w http.ResponseWriter) bool {
+	code := r.refusal.Load()
+	if code == 0 {
+		return false
+	}
+	r.refused.Add(1)
+	w.WriteHeader(int(code))
+	return true
 }
 
 // LogRecord is one OTLP log record, flattened.
@@ -98,7 +125,11 @@ func (r *Receiver) read(req *http.Request, msg proto.Message) error {
 		return err
 	}
 	if strings.Contains(req.Header.Get("Content-Type"), "json") {
-		err = protojson.Unmarshal(body, msg)
+		// Decoded as Terma's gateway decodes it (gateways/otel/.../otlp_json.go): OTLP/JSON
+		// writes trace and span ids as hex, which protojson alone would read as base64.
+		if body, err = hexIDsToBase64(body); err == nil {
+			err = protojson.Unmarshal(body, msg)
+		}
 	} else {
 		err = proto.Unmarshal(body, msg)
 	}
@@ -110,6 +141,9 @@ func (r *Receiver) read(req *http.Request, msg proto.Message) error {
 }
 
 func (r *Receiver) handleLogs(w http.ResponseWriter, req *http.Request) {
+	if r.refusing(w) {
+		return
+	}
 	var in collogspb.ExportLogsServiceRequest
 	if err := r.read(req, &in); err != nil {
 		http.Error(w, err.Error(), 400)
@@ -136,6 +170,9 @@ func (r *Receiver) handleLogs(w http.ResponseWriter, req *http.Request) {
 }
 
 func (r *Receiver) handleTraces(w http.ResponseWriter, req *http.Request) {
+	if r.refusing(w) {
+		return
+	}
 	var in coltracepb.ExportTraceServiceRequest
 	if err := r.read(req, &in); err != nil {
 		http.Error(w, err.Error(), 400)
@@ -157,6 +194,9 @@ func (r *Receiver) handleTraces(w http.ResponseWriter, req *http.Request) {
 }
 
 func (r *Receiver) handleMetrics(w http.ResponseWriter, req *http.Request) {
+	if r.refusing(w) {
+		return
+	}
 	var in colmetricspb.ExportMetricsServiceRequest
 	if err := r.read(req, &in); err != nil {
 		http.Error(w, err.Error(), 400)
@@ -268,4 +308,86 @@ func anyString(v *commonpb.AnyValue) string {
 	default:
 		return fmt.Sprintf("%v", v)
 	}
+}
+
+// otlpIDFields are the OTLP/JSON fields the specification writes as hex.
+var otlpIDFields = map[string]bool{"traceId": true, "spanId": true, "parentSpanId": true}
+
+// hexIDsToBase64 rewrites OTLP/JSON's hex trace and span ids as the base64 protojson
+// reads, so a 16-byte trace id decodes to itself and not to 24 bytes of noise. Numbers
+// are kept as they were written.
+func hexIDsToBase64(body []byte) ([]byte, error) {
+	dec := json.NewDecoder(bytes.NewReader(body))
+	dec.UseNumber()
+	var doc any
+	if err := dec.Decode(&doc); err != nil {
+		return nil, err
+	}
+	var walk func(v any)
+	walk = func(v any) {
+		switch t := v.(type) {
+		case map[string]any:
+			for k, child := range t {
+				if s, ok := child.(string); ok && otlpIDFields[k] {
+					if raw, err := hex.DecodeString(s); err == nil && (len(raw) == 16 || len(raw) == 8) {
+						t[k] = base64.StdEncoding.EncodeToString(raw)
+					}
+					continue
+				}
+				walk(child)
+			}
+		case []any:
+			for _, child := range t {
+				walk(child)
+			}
+		}
+	}
+	walk(doc)
+	return json.Marshal(doc)
+}
+
+// evidenceFor is what reached the receiver under one Authorization header: the part of
+// the export a relay delivered with one project's key.
+func (r *Receiver) evidenceFor(auth string) telemetryEvidence {
+	var e telemetryEvidence
+	for _, req := range r.Requests() {
+		if req.Authorization != auth {
+			continue
+		}
+		e.requests = append(e.requests, req)
+		switch m := req.Payload.(type) {
+		case *collogspb.ExportLogsServiceRequest:
+			for _, rl := range m.ResourceLogs {
+				res := flatten(rl.GetResource().GetAttributes())
+				for _, sl := range rl.ScopeLogs {
+					for _, lr := range sl.LogRecords {
+						var at time.Time
+						if lr.GetTimeUnixNano() != 0 {
+							at = time.Unix(0, int64(lr.GetTimeUnixNano()))
+						}
+						e.logs = append(e.logs, LogRecord{Proto: lr, Time: at, Scope: sl.GetScope().GetName(), Body: anyString(lr.GetBody()),
+							Attrs: flatten(lr.GetAttributes()), Resource: res})
+					}
+				}
+			}
+		case *coltracepb.ExportTraceServiceRequest:
+			for _, rs := range m.ResourceSpans {
+				res := flatten(rs.GetResource().GetAttributes())
+				for _, ss := range rs.ScopeSpans {
+					for _, sp := range ss.Spans {
+						e.spans = append(e.spans, Span{Proto: sp, Scope: ss.GetScope().GetName(), Name: sp.GetName(), Attrs: flatten(sp.GetAttributes()), Resource: res})
+					}
+				}
+			}
+		case *colmetricspb.ExportMetricsServiceRequest:
+			for _, rm := range m.ResourceMetrics {
+				for _, sm := range rm.ScopeMetrics {
+					for _, mt := range sm.Metrics {
+						e.metrics = append(e.metrics, Metric{Proto: mt, Scope: sm.GetScope().GetName(), Resource: flatten(rm.GetResource().GetAttributes())})
+					}
+				}
+			}
+		}
+	}
+	return e
 }
