@@ -110,7 +110,7 @@ type Relay struct {
 	heldBytes  int
 	traces     map[string]traceSession
 	procs      map[int]map[string]time.Time // sender pid → sessions it exported, and when
-	origins    map[int]string               // sender pid → the client it named itself (Codex's originator)
+	origins    map[int]map[string]bool      // sender pid → every client it served (Codex's originator)
 	internal   map[string]time.Time         // sessions whose start says Codex made them for itself
 	dests      map[string]*destination
 	lastSeen   time.Time
@@ -151,7 +151,7 @@ func New(opts Options) *Relay {
 		opts: opts, stats: newStats(),
 		cache:  lookupCache{claims: map[string]cachedClaim{}, policies: map[string]cachedPolicy{}},
 		held:   map[string][]heldPart{},
-		traces: map[string]traceSession{}, procs: map[int]map[string]time.Time{}, origins: map[int]string{}, internal: map[string]time.Time{}, dests: map[string]*destination{},
+		traces: map[string]traceSession{}, procs: map[int]map[string]time.Time{}, origins: map[int]map[string]bool{}, internal: map[string]time.Time{}, dests: map[string]*destination{},
 		lastSeen: opts.Now(), sendCtx: sendCtx, cancelSend: cancel, stopping: make(chan struct{}),
 	}
 }

@@ -692,8 +692,8 @@ func TestRelayAdoptsTheTUITitleConversation(t *testing.T) {
 }
 
 // Nothing is adopted where an unclaimed conversation could be personal: a
-// multi-workspace client (Desktop, the IDE extension), or a TUI working for two
-// projects at once.
+// multi-workspace client (Desktop, the IDE extension), a TUI working for two
+// projects at once, or a daemon serving both kinds.
 func TestRelayAdoptsNothingAmbiguous(t *testing.T) {
 	pr := newProcRelay(t)
 	pr.send(700, "/v1/logs", codexLogs("A", "Codex Desktop", 1))
@@ -705,6 +705,11 @@ func TestRelayAdoptsNothingAmbiguous(t *testing.T) {
 	// the developer's policies, not Codex's internal ones, and is never adopted.
 	pr.send(900, "/v1/logs", codexLogs("A", "codex-tui", 1))
 	pr.send(900, "/v1/logs", codexStart("resumed", "codex-tui", "on-request", "workspace-write"))
+	// Codex's shared app-server daemon: a Desktop thread, then a TUI thread, in one
+	// process. The last client to connect does not make it single-workspace.
+	pr.send(1000, "/v1/logs", codexLogs("A", "Codex Desktop", 1))
+	pr.send(1000, "/v1/logs", codexLogs("A", "codex-tui", 1))
+	pr.send(1000, "/v1/logs", codexStart("daemon", "codex-tui", "never", "read-only"))
 	time.Sleep(200 * time.Millisecond)
 	pr.f.mu.Lock()
 	pr.f.now = pr.f.now.Add(2 * time.Minute)
@@ -713,12 +718,12 @@ func TestRelayAdoptsNothingAmbiguous(t *testing.T) {
 	logs, _ := pr.u.logs(t)
 	for _, recs := range logs {
 		for _, lr := range recs {
-			if s := attr(lr.Attributes, "session.id"); s == "personal" || s == "stray" || s == "resumed" {
+			if s := attr(lr.Attributes, "session.id"); s == "personal" || s == "stray" || s == "resumed" || s == "daemon" {
 				t.Fatalf("an ambiguous unclaimed conversation %q was adopted", s)
 			}
 		}
 	}
-	if c := pr.r.Stats().Snapshot().Counters; c["dropped.unclaimed_expired.logs"] != 3 {
+	if c := pr.r.Stats().Snapshot().Counters; c["dropped.unclaimed_expired.logs"] != 4 {
 		t.Fatalf("stats = %v", c)
 	}
 }

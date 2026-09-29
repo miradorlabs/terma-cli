@@ -118,6 +118,23 @@ func (r *Relay) isInternal(session string) bool {
 // app server) can hold a personal thread beside a claimed one; nothing is adopted there.
 var singleWorkspace = map[string]bool{"codex-tui": true, "codex_exec": true}
 
+// adoptsLocked reports whether pid is a single-workspace client: every client it has
+// served named itself one. Codex's shared app-server daemon runs threads for the TUI
+// and for Desktop in one process, so one TUI thread does not make it single-workspace.
+// r.mu must be held.
+func (r *Relay) adoptsLocked(pid int) bool {
+	o := r.origins[pid]
+	if len(o) == 0 {
+		return false
+	}
+	for name := range o {
+		if !singleWorkspace[name] {
+			return false
+		}
+	}
+	return true
+}
+
 // processProject is where a process's work belongs: the project that every session
 // the process exported lately and that a hook claimed maps to, under one policy. A
 // single-workspace client's unclaimed sessions (see singleWorkspace) go along with it;
@@ -131,7 +148,7 @@ func (r *Relay) processProject(pid int, exclude string) (c claim.Claim, pol Poli
 			sessions = append(sessions, s)
 		}
 	}
-	adopts := singleWorkspace[r.origins[pid]]
+	adopts := r.adoptsLocked(pid)
 	r.mu.Unlock()
 	sort.Strings(sessions)
 	var claimed []string
@@ -198,7 +215,12 @@ func (r *Relay) learnProcess(pid int, session, originator string) {
 	}
 	m[session] = r.opts.Now()
 	if originator != "" {
-		r.origins[pid] = originator
+		o := r.origins[pid]
+		if o == nil {
+			o = map[string]bool{}
+			r.origins[pid] = o
+		}
+		o[originator] = true
 	}
 }
 
@@ -211,7 +233,7 @@ func (r *Relay) decideSession(session string, pid int) (claim.Claim, Policy, str
 		return c, pol, why, ok, attribution{}
 	}
 	r.mu.Lock()
-	adopts := singleWorkspace[r.origins[pid]]
+	adopts := r.adoptsLocked(pid)
 	r.mu.Unlock()
 	if !adopts || !r.isInternal(session) {
 		return c, pol, why, false, attribution{}
