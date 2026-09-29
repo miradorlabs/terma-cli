@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -13,7 +14,28 @@ import (
 // `terma setup` must never install a launchd agent or a systemd unit. With the relay
 // unsupported, setup configures agents to export straight to Terma; a test about the
 // relay opts in with fakeRelay.
+//
+// It also gives the whole package a throwaway home before any test runs. A test that
+// forgets its own t.Setenv must land here, never in the developer's real ~/.codex,
+// ~/.claude, shell startup files or terma config: one did, and left a test project id in
+// a real Codex config.toml. Tests that set their own directories still do.
 func TestMain(m *testing.M) {
+	home, err := os.MkdirTemp("", "terma-cmd-test-home-")
+	if err != nil {
+		panic(err)
+	}
+	for k, v := range map[string]string{
+		"HOME":              home,
+		"CODEX_HOME":        filepath.Join(home, ".codex"),
+		"CLAUDE_CONFIG_DIR": filepath.Join(home, ".claude"),
+		"TERMA_CONFIG_DIR":  filepath.Join(home, ".config", "terma"),
+		"XDG_CONFIG_HOME":   filepath.Join(home, ".config"),
+		"SHELL":             "/bin/zsh",
+	} {
+		if err := os.Setenv(k, v); err != nil {
+			panic(err)
+		}
+	}
 	relaySupported = func() bool { return false }
 	relayInstallService = func(context.Context, string) error { panic("a test reached the real relay service install") }
 	relayRestartService = func(context.Context) error { panic("a test reached the real relay service restart") }
@@ -21,7 +43,9 @@ func TestMain(m *testing.M) {
 	relayProbe = func(context.Context, relay.Config) (relay.Health, error) {
 		return relay.Health{}, os.ErrDeadlineExceeded
 	}
-	os.Exit(m.Run())
+	code := m.Run()
+	_ = os.RemoveAll(home)
+	os.Exit(code)
 }
 
 // fakeRelay is a relay that is set up, running and answering, for the length of the test.

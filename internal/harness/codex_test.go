@@ -906,3 +906,28 @@ func TestCodexCurrentCredentialAcceptsTermaPrefix(t *testing.T) {
 		t.Errorf("key prefix = %q, want the installed key's head", st.KeyPrefix)
 	}
 }
+
+// The relay decides a session's project, so a relay export names none — and a project id
+// left on Codex's spans (by an earlier terma, or a test that once reached the real file)
+// would stamp one project on every session. Connect removes it; disconnect puts it back.
+func TestCodexRelayExportRemovesALeftoverProjectID(t *testing.T) {
+	const seed = "[otel]\nspan_attributes = { \"enduser.id\" = \"dev@example.com\", \"mirador.project.id\" = \"aaaaaaaa-0000-4000-8000-000000000001\" }\n"
+	c, path := codexIn(t, seed)
+	e := codexExporter()
+	delete(e.ResourceAttributes, AttrProjectID)
+	if err := c.Connect(e, false); err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	if got := codexSpanAttribute(otelOf(t, path), AttrProjectID); got != "" {
+		t.Fatalf("mirador.project.id = %q after a relay connect, want none", got)
+	}
+	if got := codexSpanAttribute(otelOf(t, path), AttrEnduserID); got != "dev@example.com" {
+		t.Fatalf("enduser.id = %q, want it kept", got)
+	}
+	if _, err := c.Disconnect(); err != nil {
+		t.Fatalf("Disconnect: %v", err)
+	}
+	if got := codexSpanAttribute(otelOf(t, path), AttrProjectID); got != "aaaaaaaa-0000-4000-8000-000000000001" {
+		t.Fatalf("disconnect left mirador.project.id = %q, want the original restored", got)
+	}
+}

@@ -820,6 +820,17 @@ func (c Codex) Connect(e Exporter, clearConflicts bool) error {
 		}
 	}
 
+	// A project id on Codex's spans names one project for every session. An export that
+	// names none (the relay's: it decides per session) removes one left behind, whoever
+	// wrote it — the attribute is Terma's own name. Disconnect restores it from the journal.
+	if _, names := e.ResourceAttributes[AttrProjectID]; !names {
+		key := codexSpanAttributePrefix + AttrProjectID
+		if value, ok := current[key]; ok {
+			cleared[key] = value
+			delete(current, key)
+		}
+	}
+
 	// carried is the earlier record minus the keys restored here, so the new journal
 	// does not inherit ownership of a key this connect just gave back. previousJournal
 	// itself is kept intact for the rollback below.
