@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/doctor"
+	"github.com/miradorlabs/terma-cli/internal/relay"
 )
 
 // relayCheck is whether terma's relay can deliver what the agents pointed at it send:
@@ -42,6 +43,10 @@ func relayCheck(ctx context.Context, verdicts []harnessVerdict) doctor.Check {
 		detail += fmt.Sprintf(", %d request(s) waiting to be delivered", h.Backlog)
 	}
 	switch {
+	case slices.Contains(h.HeldProjects, relay.MachineRoute):
+		return doctor.Check{Status: doctor.Warn,
+			Detail: detail + "; records for the machine project are held — none is chosen",
+			Fix:    "terma setup"}
 	case len(h.HeldProjects) > 0:
 		return doctor.Check{Status: doctor.Warn,
 			Detail: detail + "; held for a key: " + strings.Join(h.HeldProjects, ", "),

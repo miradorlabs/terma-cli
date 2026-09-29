@@ -112,6 +112,11 @@ func remove(path string) bool {
 	return os.Remove(path) == nil
 }
 
+// outboxBacklog counts the bodies waiting in every outbox for delivery.
+func outboxBacklog(dir string) int {
+	return backlog(dir) - len(collect(filepath.Join(dir, inboxDir)))
+}
+
 // backlog counts the bodies waiting in the inbox and every outbox.
 func backlog(dir string) int {
 	n := len(collect(filepath.Join(dir, inboxDir)))

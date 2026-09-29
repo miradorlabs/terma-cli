@@ -117,7 +117,8 @@ func (in *intake) health(w http.ResponseWriter, r *http.Request) {
 	counters, held, lastError := in.stats.snapshot()
 	report := Health{
 		Version:      in.version,
-		Backlog:      backlog(in.dir),
+		Backlog:      outboxBacklog(in.dir),
+		Placing:      len(collect(filepath.Join(in.dir, inboxDir))),
 		HeldProjects: held,
 		LastError:    lastError,
 		Counters:     counters,

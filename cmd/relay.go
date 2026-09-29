@@ -212,7 +212,10 @@ func runRelayStatus(cmd *cobra.Command, _ []string) error {
 		return nil
 	}
 	fmt.Fprintf(out, "Health:   answering, terma %s\n", health.Version)
-	fmt.Fprintf(out, "Backlog:  %d waiting to be delivered\n", health.Backlog)
+	fmt.Fprintf(out, "Backlog:  %d waiting to be delivered to Terma\n", health.Backlog)
+	if health.Placing > 0 {
+		fmt.Fprintf(out, "Placing:  %d holding records whose session is not placed yet (a trace may wait up to 30 minutes)\n", health.Placing)
+	}
 	c := health.Counters
 	fmt.Fprintf(out, "Since start: %d received, %d routed, %d delivered, %d refused, %d dropped\n",
 		c.Received, c.Routed, c.Delivered, c.Dead, c.Dropped)

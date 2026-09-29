@@ -44,8 +44,11 @@ func Service(ctx context.Context) (ServiceState, error) {
 type Health struct {
 	// Version is the terma build serving.
 	Version string `json:"version"`
-	// Backlog is the number of accepted request bodies not yet delivered.
+	// Backlog is the number of routed bodies waiting to be delivered to Terma.
 	Backlog int `json:"backlog"`
+	// Placing is the number of accepted bodies still holding records whose session is
+	// not placed yet — most often Codex spans waiting for their trace to name one.
+	Placing int `json:"placing"`
 	// HeldProjects are projects with records waiting for a key on this machine.
 	HeldProjects []string `json:"held_projects,omitempty"`
 	// LastError is the most recent delivery failure, "" when the last attempt succeeded.
