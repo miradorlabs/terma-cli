@@ -1,10 +1,11 @@
-//go:build !darwin && !linux
+//go:build !darwin && !linux && !windows
 
 package relay
 
 import (
 	"context"
 	"errors"
+	"syscall"
 )
 
 // errUnsupported is returned by InstallService on a platform without a supported service
@@ -18,3 +19,11 @@ func uninstallService(context.Context) error { return nil }
 func restartService(context.Context) error { return nil }
 
 func serviceState(context.Context) (ServiceState, error) { return ServiceState{}, nil }
+
+// RecordSupervisor is Windows' (service_windows.go); elsewhere a service manager
+// supervises the relay.
+func RecordSupervisor() error { return nil }
+
+// HiddenProcess is how a supervised relay is started: with no window of its own on
+// Windows, as is elsewhere.
+func HiddenProcess() *syscall.SysProcAttr { return nil }

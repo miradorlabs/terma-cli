@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
@@ -102,3 +103,11 @@ func serviceState(ctx context.Context) (ServiceState, error) {
 	s.Running = active == "active"
 	return s, nil
 }
+
+// RecordSupervisor is Windows' (service_windows.go); here the service manager
+// supervises the relay.
+func RecordSupervisor() error { return nil }
+
+// HiddenProcess is how a supervised relay is started: with no window of its own on
+// Windows, as is elsewhere.
+func HiddenProcess() *syscall.SysProcAttr { return nil }

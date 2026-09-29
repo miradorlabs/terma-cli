@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"runtime"
 	"strings"
 	"time"
 
@@ -153,9 +152,6 @@ func runUpdate(ctx context.Context, client *selfupdate.Client, dir, exe string, 
 	}
 	if m, ok := selfupdate.ManagedBy(exe); ok {
 		return upgradeManaged(ctx, m, current, rel.Version(), out)
-	}
-	if runtime.GOOS == "windows" {
-		return errors.New("download the latest release from https://github.com/" + selfupdate.Repo + "/releases; in-place updates on Windows are not supported yet")
 	}
 	installed, err := client.Apply(download, rel, exe, out)
 	if err != nil {

@@ -39,7 +39,7 @@ func TestWaitingEntriesAreLeftAloneUntilSomethingChanges(t *testing.T) {
 	dir := t.TempDir()
 	start := time.Unix(1790700000, 0)
 	clock := start
-	rt, routed := newTestRouter(t, dir, 30*time.Second, &clock, map[string]string{"/repos/codex": "proj-codex"})
+	rt, routed := newTestRouter(t, dir, 30*time.Second, &clock, map[string]string{repoPath("codex"): "proj-codex"})
 	ctx := context.Background()
 	inbox := filepath.Join(dir, inboxDir)
 
@@ -71,7 +71,7 @@ func TestWaitingEntriesAreLeftAloneUntilSomethingChanges(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(dir, sessionsDir), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, sessionsDir, codexID), []byte("/repos/codex\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, sessionsDir, codexID), []byte(repoPath("codex")+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := writeEntry(inbox, newEntry(clock, sigLogs, formatJSON),
@@ -100,7 +100,7 @@ func TestWaitingEntriesAreLeftAloneUntilSomethingChanges(t *testing.T) {
 func TestAHookRecordReleasesAWaitingSessionEarly(t *testing.T) {
 	dir := t.TempDir()
 	clock := time.Unix(1790700000, 0)
-	rt, routed := newTestRouter(t, dir, 30*time.Second, &clock, map[string]string{"/repos/a": "proj-a"})
+	rt, routed := newTestRouter(t, dir, 30*time.Second, &clock, map[string]string{repoPath("a"): "proj-a"})
 	ctx := context.Background()
 	if err := writeEntry(filepath.Join(dir, inboxDir), newEntry(clock, sigLogs, formatJSON),
 		logsBody(t, logRecord("early", "", strAttr("session.id", sessionA)))); err != nil {
@@ -115,7 +115,7 @@ func TestAHookRecordReleasesAWaitingSessionEarly(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(dir, sessionsDir), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, sessionsDir, sessionA), []byte("/repos/a\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, sessionsDir, sessionA), []byte(repoPath("a")+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	clock = clock.Add(time.Second)

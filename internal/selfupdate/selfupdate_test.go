@@ -2,6 +2,7 @@ package selfupdate
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -67,6 +68,28 @@ func TestParseChecksums(t *testing.T) {
 	}
 }
 
+// platformArchive is this platform's release archive holding content as the binary: a
+// zip with terma.exe on Windows, a tar.gz with terma elsewhere.
+func platformArchive(t *testing.T, content []byte) []byte {
+	t.Helper()
+	if runtime.GOOS != "windows" {
+		return archiveWith(t, "terma", content)
+	}
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	w, err := zw.Create("terma.exe")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Write(content); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
 func archiveWith(t *testing.T, name string, content []byte) []byte {
 	t.Helper()
 	var buf bytes.Buffer
@@ -84,12 +107,9 @@ func archiveWith(t *testing.T, name string, content []byte) []byte {
 }
 
 func TestApplyVerifiesChecksumAndSwapsBinary(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("no self-update on windows")
-	}
 	sign := testSigner(t)
 	newBinary := []byte("#!/bin/sh\necho new\n")
-	archive := archiveWith(t, "terma", newBinary)
+	archive := platformArchive(t, newBinary)
 	sum := sha256.Sum256(archive)
 	assetName := AssetName(runtime.GOOS, runtime.GOARCH)
 	sums := []byte(hex.EncodeToString(sum[:]) + "  " + assetName + "\n")
@@ -126,7 +146,7 @@ func TestApplyVerifiesChecksumAndSwapsBinary(t *testing.T) {
 		t.Fatalf("binary not replaced: %q", data)
 	}
 	info, _ := os.Stat(exe)
-	if info.Mode()&0o111 == 0 {
+	if runtime.GOOS != "windows" && info.Mode()&0o111 == 0 {
 		t.Fatal("replacement lost the executable bit")
 	}
 
@@ -183,5 +203,28 @@ func TestNoticeAsksNothingForABuildThatIsNotARelease(t *testing.T) {
 	}
 	if calls != 0 {
 		t.Fatalf("a build outside the release sequence made %d request(s)", calls)
+	}
+}
+
+// A Windows release is a zip holding terma.exe; read here on every platform, installed by
+// the Windows CI job.
+func TestExtractWindowsArchive(t *testing.T) {
+	zipWith := func(name string) []byte {
+		var buf bytes.Buffer
+		zw := zip.NewWriter(&buf)
+		w, _ := zw.Create("terma_Windows_x86_64/" + name)
+		_, _ = w.Write([]byte("MZ binary"))
+		_ = zw.Close()
+		return buf.Bytes()
+	}
+	got, err := extractBinaryFor("windows", zipWith("terma.exe"))
+	if err != nil || string(got) != "MZ binary" {
+		t.Fatalf("extracted %q, %v", got, err)
+	}
+	if _, err := extractBinaryFor("windows", zipWith("other.exe")); err == nil {
+		t.Fatal("an archive without terma.exe was accepted")
+	}
+	if _, err := extractBinaryFor("windows", []byte("not a zip")); err == nil {
+		t.Fatal("a non-zip was accepted")
 	}
 }

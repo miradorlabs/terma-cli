@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -163,7 +162,7 @@ func (c *Client) Maintain(ctx context.Context, dir, exe string, out io.Writer) {
 	}
 	defer unlock()
 	cache, rel := c.cachedCheck(ctx, dir, c.Version)
-	if !p.Auto || !IsRelease(c.Version) || !Newer(c.Version, cache.Latest) || ManagedCommand(exe) != "" || runtime.GOOS == "windows" {
+	if !p.Auto || !IsRelease(c.Version) || !Newer(c.Version, cache.Latest) || ManagedCommand(exe) != "" {
 		if msg := notice(cache, c.Version); msg != "" {
 			fmt.Fprintln(out, msg)
 		}
@@ -230,7 +229,7 @@ func (c *Client) Background(ctx context.Context, dir, exe string, logf func(stri
 	if !below && !Newer(c.Version, cache.Latest) {
 		return ""
 	}
-	if !p.Auto || ManagedCommand(exe) != "" || runtime.GOOS == "windows" {
+	if !p.Auto || ManagedCommand(exe) != "" {
 		return "" // commands say so: notice and MinimumWarning
 	}
 	if !below && time.Since(cache.AttemptAt) < CheckInterval {

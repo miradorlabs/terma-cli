@@ -37,6 +37,11 @@ func newRelayCommand() *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE:  runRelayServe,
 	}, &cobra.Command{
+		Use:   "supervise",
+		Short: "Run the relay and start it again whenever it exits (Windows' service)",
+		Args:  cobra.NoArgs,
+		RunE:  runRelaySupervise,
+	}, &cobra.Command{
 		Use:   "status",
 		Short: "Show whether the relay is running and delivering",
 		Args:  cobra.NoArgs,
@@ -76,6 +81,33 @@ func runRelayServe(cmd *cobra.Command, _ []string) error {
 		log.Printf("relay stopped: %v", err)
 	}
 	return err
+}
+
+// runRelaySupervise is what the Windows launcher runs at logon: the relay under a
+// supervisor, which starts it again after a crash or a self-update's exit. The binary is
+// resolved once, before an update can rename the running one aside, so the path it
+// starts is always the installed terma.
+func runRelaySupervise(cmd *cobra.Command, _ []string) error {
+	dir, err := relay.Dir()
+	if err != nil {
+		return err
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	if err := relay.RecordSupervisor(); err != nil {
+		return err
+	}
+	log := relay.NewLog(dir)
+	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	relay.Supervise(ctx, func(ctx context.Context) *exec.Cmd {
+		c := exec.CommandContext(ctx, exe, "relay", "serve")
+		c.SysProcAttr = relay.HiddenProcess()
+		return c
+	}, log.Printf)
+	return nil
 }
 
 // relayBinding names the project a session's directory is bound to — its checkout's own

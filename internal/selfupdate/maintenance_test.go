@@ -80,14 +80,11 @@ func TestFailedCheckRetriesAfter15Minutes(t *testing.T) {
 }
 
 func TestMaintainRequiresOptInAndVerifiesUpdates(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("in-place updates are Unix-only")
-	}
 	for _, mode := range []string{"notify", "auto", "tampered", "locked", "managed"} {
 		t.Run(mode, func(t *testing.T) {
 			sign := testSigner(t)
 			binary := []byte("new binary")
-			archive := archiveWith(t, "terma", binary)
+			archive := platformArchive(t, binary)
 			sum := sha256.Sum256(archive)
 			sums := []byte(fmt.Sprintf("%x  %s\n", sum, AssetName(runtime.GOOS, runtime.GOARCH)))
 			downloads, lookups := 0, 0

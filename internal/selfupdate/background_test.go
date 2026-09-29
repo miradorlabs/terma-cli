@@ -31,7 +31,7 @@ type releaseHost struct {
 
 func newReleaseHost(t *testing.T, tag, minimum string) *releaseHost {
 	t.Helper()
-	h := &releaseHost{tag: tag, minimum: minimum, sign: testSigner(t), archive: archiveWith(t, "terma", []byte("new binary"))}
+	h := &releaseHost{tag: tag, minimum: minimum, sign: testSigner(t), archive: platformArchive(t, []byte("new binary"))}
 	h.Server = httptest.NewServer(http.HandlerFunc(h.serve))
 	t.Cleanup(h.Close)
 	return h
@@ -99,9 +99,6 @@ func binaryIs(t *testing.T, exe, want string) {
 }
 
 func TestApplyRefusesAnUnsignedRelease(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("in-place updates are Unix-only")
-	}
 	h := newReleaseHost(t, "v2.0.0", "0.0.0")
 	h.unsigned = true
 	c := h.client("1.0.0")
@@ -149,9 +146,6 @@ func TestFetchPolicyTrustsOnlySignedChecksums(t *testing.T) {
 }
 
 func TestBackgroundUpdatesByDefault(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("in-place updates are Unix-only")
-	}
 	h := newReleaseHost(t, "v2.0.0", "0.0.0")
 	dir, exe := t.TempDir(), oldBinary(t)
 	if got := h.client("1.0.0").Background(context.Background(), dir, exe, t.Logf); got != "2.0.0" {
@@ -161,9 +155,6 @@ func TestBackgroundUpdatesByDefault(t *testing.T) {
 }
 
 func TestBackgroundRespectsTheOptOutAndPackageManagers(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("in-place updates are Unix-only")
-	}
 	h := newReleaseHost(t, "v2.0.0", "1.5.0")
 	dir, exe := t.TempDir(), oldBinary(t)
 	if err := SavePreferences(dir, Preferences{Auto: false}); err != nil {
@@ -194,9 +185,6 @@ func TestBackgroundRespectsTheOptOutAndPackageManagers(t *testing.T) {
 }
 
 func TestBackgroundBelowTheMinimumSkipsTheDailyThrottle(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("in-place updates are Unix-only")
-	}
 	h := newReleaseHost(t, "v2.0.0", "2.0.0")
 	dir, exe := t.TempDir(), oldBinary(t)
 	// An attempt an hour ago would hold an ordinary update back for a day.

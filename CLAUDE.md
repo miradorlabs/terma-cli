@@ -202,7 +202,8 @@ run that reaches them opens a browser login on **production**. A script that run
   picks the **machine project** (`--project`; `chooseMachineProject`) and configures each
   agent's telemetry once, machine-wide (`configureMachineTelemetry`, `cmd/machine_telemetry.go`):
   Claude Code's user settings and Codex's `config.toml`, pointed at terma's loopback relay
-  (`internal/relay`, docs/RELAY.md; cmd calls it only through the
+  (`internal/relay`, docs/RELAY.md — launchd on macOS, systemd --user on Linux, the Run
+  key + `terma relay supervise` on Windows; cmd calls it only through the
   `relay*` package vars, which `TestMain` in `cmd/relay_seams_test.go` stubs so no test can
   install a launchd agent or systemd unit; `fakeRelay` opts a test in) or, with `--no-relay`
   or no service manager (`relay.Supported`), straight at Terma with the machine project's

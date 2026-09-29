@@ -2,9 +2,9 @@ package relay
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -38,13 +38,14 @@ func TestSystemdUnitQuotesAndRoundTrips(t *testing.T) {
 }
 
 func TestInstallServiceIsIdempotent(t *testing.T) {
-	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
+	if !Supported() {
 		t.Skip("no service manager")
 	}
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
-	running := false
+	t.Setenv("TERMA_CONFIG_DIR", filepath.Join(home, "terma"))
+	running, registered := false, false
 	var calls []string
 	orig := runCommand
 	runCommand = func(_ context.Context, name string, args ...string) ([]byte, error) {
@@ -60,6 +61,20 @@ func TestInstallServiceIsIdempotent(t *testing.T) {
 			return []byte("active\n"), nil
 		case name == "systemctl" && args[1] == "is-active":
 			return []byte("inactive\n"), nil
+		// Windows: the Run key, the wscript launcher, the supervisor's process.
+		case name == "reg" && args[0] == "add":
+			registered = true
+		case name == "reg" && args[0] == "delete":
+			registered = false
+		case name == "reg" && args[0] == "query" && !registered:
+			return nil, os.ErrNotExist
+		case name == "wscript.exe":
+			running = true
+			_ = RecordSupervisor()
+		case name == "taskkill":
+			running = false
+		case name == "tasklist" && running:
+			return []byte(fmt.Sprintf("terma.exe  %d Console\n", os.Getpid())), nil
 		}
 		return nil, nil
 	}
@@ -79,6 +94,9 @@ func TestInstallServiceIsIdempotent(t *testing.T) {
 	}
 	for _, c := range calls[before:] {
 		if strings.Contains(c, "bootstrap") || strings.Contains(c, "restart") {
+			t.Fatalf("an unchanged, running service was restarted: %v", calls[before:])
+		}
+		if strings.Contains(c, "wscript") || strings.Contains(c, "taskkill") {
 			t.Fatalf("an unchanged, running service was restarted: %v", calls[before:])
 		}
 	}
@@ -127,7 +145,7 @@ func TestEntryNamesRoundTrip(t *testing.T) {
 func TestRecordSessionNeedsASetUpRelay(t *testing.T) {
 	cfg := t.TempDir()
 	t.Setenv("TERMA_CONFIG_DIR", cfg)
-	if err := RecordSession(sessionA, "/repos/a"); err != nil {
+	if err := RecordSession(sessionA, repoPath("a")); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(cfg, dirName)); !os.IsNotExist(err) {
@@ -136,10 +154,10 @@ func TestRecordSessionNeedsASetUpRelay(t *testing.T) {
 	if _, err := Ensure(); err != nil {
 		t.Fatal(err)
 	}
-	if err := RecordSession(sessionA, "/repos/a"); err != nil {
+	if err := RecordSession(sessionA, repoPath("a")); err != nil {
 		t.Fatal(err)
 	}
-	if got := sessionDir(filepath.Join(cfg, dirName), sessionA); got != "/repos/a" {
+	if got := sessionDir(filepath.Join(cfg, dirName), sessionA); got != repoPath("a") {
 		t.Fatalf("recorded %q", got)
 	}
 	if err := RecordSession("../escape", "/x"); err != nil {

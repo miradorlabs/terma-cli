@@ -76,6 +76,14 @@ keys never leave the keystore, and no agent configuration holds one.
   `KeepAlive`, running `terma relay serve`.
 - Linux: a systemd user unit, `~/.config/systemd/user/terma-relay.service`,
   `Restart=always`.
+- Windows: the per-user Run key (`HKCU\...\CurrentVersion\Run`, value `TermaRelay`)
+  starts `wscript.exe relay.vbs` at logon — no administrator, no console window — which
+  runs `terma relay supervise` hidden. The supervisor starts `terma relay serve` and starts
+  it again whenever it exits (a crash, or the exit after a self-update), pausing 1 s
+  doubling to a minute while it keeps dying. Updates rename the running `terma.exe` aside
+  to `terma.exe.old` (Windows refuses to overwrite a running executable but lets it be
+  renamed) and put the new one in its place. Locks are `LockFileEx`. CI runs the relay,
+  lock and updater tests on `windows-latest`; not yet verified on a developer's machine.
 - Elsewhere, or with `terma setup --no-relay`: no relay; agents export straight to Terma
   with the machine project's key.
 

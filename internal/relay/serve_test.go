@@ -177,7 +177,7 @@ func (h *testRelay) start() {
 		},
 		Cwd: func(_ context.Context, session, source string) string {
 			if source == "codex" && session == codexID {
-				return "/repos/codex-repo"
+				return repoPath("codex-repo")
 			}
 			return ""
 		},
@@ -229,6 +229,13 @@ func (h *testRelay) recordSession(id, dir string) {
 	}
 }
 
+// repoPath is an absolute directory for a test repository, on every platform: the
+// relay places a session only in an absolute directory, and /repos/a is not one on
+// Windows.
+func repoPath(name string) string {
+	return filepath.Join(os.TempDir(), "terma-relay-test-repos", name)
+}
+
 func eventually(t *testing.T, what string, cond func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(10 * time.Second)
@@ -250,12 +257,12 @@ func sameSet(got, want []string) bool {
 
 func TestRelayRoutesEachSessionToItsRepository(t *testing.T) {
 	h := newTestRelay(t)
-	h.bindings["/repos/a"] = "proj-a"
-	h.bindings["/repos/codex-repo"] = "proj-codex"
+	h.bindings[repoPath("a")] = "proj-a"
+	h.bindings[repoPath("codex-repo")] = "proj-codex"
 	h.keys["proj-a"] = "Bearer key-a"
 	h.keys["proj-codex"] = "Bearer key-codex"
-	h.recordSession(sessionA, "/repos/a")         // a bound repository's hook ran
-	h.recordSession(sessionB, "/elsewhere/notes") // an unbound directory
+	h.recordSession(sessionA, repoPath("a"))               // a bound repository's hook ran
+	h.recordSession(sessionB, repoPath("elsewhere-notes")) // an unbound directory
 	h.start()
 
 	// One Claude export carrying two sessions, as Claude Desktop's batches can.
@@ -287,14 +294,14 @@ func TestRelayRoutesEachSessionToItsRepository(t *testing.T) {
 
 func TestRelayHoldsAnUnplacedSessionThenUsesTheMachineProject(t *testing.T) {
 	h := newTestRelay(t)
-	h.bindings["/repos/a"] = "proj-a"
+	h.bindings[repoPath("a")] = "proj-a"
 	h.keys["proj-a"] = "Bearer key-a"
 	h.start()
 
 	// The export arrives before the session-start hook has written its record.
 	h.post(sigLogs, logsBody(t, logRecord("early", "", strAttr("session.id", sessionA))))
 	time.Sleep(100 * time.Millisecond)
-	h.recordSession(sessionA, "/repos/a")
+	h.recordSession(sessionA, repoPath("a"))
 	eventually(t, "the early record placed once the hook recorded the session", func() bool {
 		return sameSet(h.gw.received("Bearer key-a"), []string{"early"})
 	})
@@ -305,7 +312,7 @@ func TestRelayHoldsAnUnplacedSessionThenUsesTheMachineProject(t *testing.T) {
 	eventually(t, "the orphan in the machine project", func() bool {
 		return sameSet(h.gw.received("Bearer key-machine"), []string{"orphan.1"})
 	})
-	h.recordSession(sessionB, "/repos/a")
+	h.recordSession(sessionB, repoPath("a"))
 	h.post(sigLogs, logsBody(t, logRecord("orphan.2", "", strAttr("session.id", sessionB))))
 	eventually(t, "the session kept where it was decided", func() bool {
 		return sameSet(h.gw.received("Bearer key-machine"), []string{"orphan.1", "orphan.2"})

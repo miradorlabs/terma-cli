@@ -105,10 +105,11 @@ func Ensure() (Config, error) {
 	return c, nil
 }
 
-// Supported reports whether this platform has a service manager the relay can run under
-// (launchd, systemd --user). Elsewhere agents export straight to Terma.
+// Supported reports whether this platform can keep the relay running: launchd (macOS),
+// systemd --user (Linux), or the Run key and `terma relay supervise` (Windows). Elsewhere
+// agents export straight to Terma.
 func Supported() bool {
-	return runtime.GOOS == "darwin" || runtime.GOOS == "linux"
+	return runtime.GOOS == "darwin" || runtime.GOOS == "linux" || runtime.GOOS == "windows"
 }
 
 // RecordSession notes the directory a session runs in, for the relay to route its
