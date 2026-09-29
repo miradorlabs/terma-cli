@@ -164,9 +164,7 @@ run that reaches them opens a browser login on **production**. A script that run
   `wellKnownBinDirs`. When no terma is on PATH at all (a `make build` run as bin/terma),
   or another build is ahead of this one, the fix is the one quoted command that puts this
   build's directory on PATH in the developer's shell (`addToPathCommand`: the PATH line
-  appended to the startup file and sourced; `fish_add_path` for fish). It lands after
-  terma's shim block, which is harmless: that directory holds no agent binaries, so the
-  shims still route, and the next install moves the block back to the end. The hooks check is two: `commit hooks installed` (git wiring, all or
+  appended to the startup file and sourced; `fish_add_path` for fish). The hooks check is two: `commit hooks installed` (git wiring, all or
   nothing) and `agent hooks run` (`agentHooksCheck`, shared with status — a fraction,
   `Check.Ready`/`Of`). A commit is stamped with the session that touched its files and a
   session exists only because its agent's hooks announced it. The readiness checklist
@@ -200,73 +198,66 @@ run that reaches them opens a browser login on **production**. A script that run
   weeks because nothing checked, `terma connect` recommended the fork's `terma trace list`
   for as long as its hint stayed unquoted, and the same test stops a cleanup from deleting
   a command a hint names. Quote a command in backticks when a message names one.
-- `terma setup` signs in and records the developer's agents (`config.Profile.Harnesses`) and
-  does nothing else — no project, no key, no connection, no file. Everything per-repository is
-  `terma install`, including what `setup` used to do on the way: per-clone `core.hooksPath`
-  wiring, the Claude status-line wrap, and the **spool key**. That key (`keystore.Get(project)`)
-  is what hook events are delivered with; pointing a telemetry agent stores it as a side effect
-  (`keystore.SetFor`) and nothing else did, so a developer whose agents are all hooks-only
-  (Cursor, Antigravity) had every event held forever. `ensureSpoolKey` mints one when hooks are
-  wired and none is stored; install signs in for it only when the developer selected an agent —
-  `--harness none` (CI, onboarding a repository) stays credential-free and is told its events
-  are held. Fix-it hints follow the same split: sign-in → `terma setup`; a missing key, an
-  unwired clone, an agent on the wrong project → `terma install`. With a server key
+- `terma setup` signs in, records the developer's agents (`config.Profile.Harnesses`),
+  picks the **machine project** (`--project`; `chooseMachineProject`) and configures each
+  agent's telemetry once, machine-wide (`configureMachineTelemetry`, `cmd/machine_telemetry.go`):
+  Claude Code's user settings and Codex's `config.toml`, pointed at terma's loopback relay
+  (`internal/relay`, docs/RELAY.md; cmd calls it only through the
+  `relay*` package vars, which `TestMain` in `cmd/relay_seams_test.go` stubs so no test can
+  install a launchd agent or systemd unit; `fakeRelay` opts a test in) or, with `--no-relay`
+  or no service manager (`relay.Supported`), straight at Terma with the machine project's
+  key. The choices (mode, `NoRelay`, project, signals, prompts, tool content, identity)
+  are recorded on the profile (`config.Profile.Telemetry`, read as `cfg.Telemetry`) so a
+  later setup, install or refresh rewrites the files from them. In relay mode the agents
+  export OTLP/JSON (`Exporter.JSON`), the credential is the relay's token (Claude through
+  `harness.RelayHelperFilePath`), and nothing names a project (`mirador.project.id` is
+  dropped from Codex's span attributes): the relay decides per record. A relay that
+  cannot be installed falls back to direct, said as a warning. Terma's own earlier
+  settings (a direct export, the relay, a built-in environment's host: `termaEndpoint`)
+  are replaced without `--force`; another collector's leaves that agent unconfigured and
+  named, unless `--force`. OpenCode is not a machine agent: it keeps routing itself per
+  repository through its plugin (`connectOpenCodeForRepo`).
+  Everything per-repository is `terma install`: the binding (a repository with none
+  defaults to the machine project), per-clone `core.hooksPath` wiring, the Claude
+  status-line wrap, and the **spool key**. That key (`keystore.Get(project)`) is what
+  hook events — and the relay's records for that project — are delivered with;
+  `ensureSpoolKey` mints one when hooks are wired and none is stored; install signs in
+  for it only when the developer selected an agent — `--harness none` (CI, onboarding a
+  repository) stays credential-free and is told its events are held. install configures
+  the agents' telemetry itself only when it is not current (`machineTelemetryCurrent`:
+  every selected agent pointed where the recorded mode says) or an export flag changes a
+  choice (`applyExportFlags`: `--prompts`, `--signals`, `--exclude-tool-content`,
+  `--identity`, `--no-relay`, all hidden now — they are setup's). In direct mode a
+  repository bound to another project than the machine's is a warning (its telemetry goes
+  to the machine's). Fix-it hints follow the split: sign-in and agent telemetry →
+  `terma setup`; a missing key, an unwired clone → `terma install`. With a server key
   (`TERMA_API_KEY`) install signs in to nothing and binds the key's own project, read from
   the API gateway's `/v1/identity` (`serverKeyBinding`): the account service's
   `/v1/projects` accepts only a signed-in user, and a `--project` or existing binding
   naming another project is refused, since the key could not deliver its events.
-- Per-repo routing (`internal/shim`, `terma shim prepare <agent>`): `terma install` points
-  each agent at the repository's project; secrets stay in the home directory,
-  namespaced by project id (`routing/<id>.json`, `claude/<id>/`, keys in the keystore).
-  PATH scripts and `--activation wrapper` functions share the shell launcher (the
-  wrapper is printed in `$SHELL`'s syntax: `WrapperSnippetFor`, fish functions for fish,
-  POSIX functions otherwise — fish cannot source the POSIX form — and the hint names that
-  shell's own startup file, `wrapperFile`: `~/.profile` for sh, dash and BusyBox ash). It
-  resolves the real agent from PATH, bounds Terma preparation to three seconds, reads
-  a versioned argument-file protocol without eval, and execs the agent exactly once.
-  Preparation failure passes through; `TERMA_DISABLE=1` and leading maintenance
-  commands bypass preparation entirely. Never retry after the agent has started.
-  Claude uses `--settings <claude/<id>/settings.json>` with a dedicated headers helper.
-  Native tests on 2.1.270–2.1.272 show this overrides global/shell detailed beta
-  tracing where repository-local settings cannot. Generated settings mask per-signal
-  overrides and competing beta destinations. An explicit user `--settings`, or a
-  failed settings write, passes through without an environment fallback.
-  Codex keeps the original `CODEX_HOME` and
-  receives per-launch telemetry through `-c` overrides, including the bearer key.
-  The key is visible in process arguments; never log the generated argv. Config,
-  keyring login, trust, history, and notify remain in the original home. Routing
-  resolves `-C` / `--cd` before choosing the project. Funding comes from repository
-  `.codex` hooks. OpenCode routes itself: the plugin's `perRepo`
-  mode reads the binding and picks `helpers/opencode-otel-<id>`; the id is validated in
-  the plugin exactly as `project.ValidID` does, because the binding is a committed file
-  and the id names a script the plugin executes. "Live" (`shim.Active`) means the agent's
-  name resolves to the shim — on PATH *ahead of* the real binary — or the wrapper is
-  loaded; `status` and `doctor` report shell activation independently of export,
-  including missing opt-in and routes not configured for this project. Inactive
-  routing warns when global export still works; an export with no working route
-  fails. PATH entries are compared by identity (`sameDir`), not spelling: a trailing
-  slash that slipped past `RealBinary` would make the shim exec itself forever.
-  The shim directory gets onto PATH through the developer's shell startup file
-  (`internal/shim/rc.go`): install writes it without asking (running install is the
-  consent; `--no-path` declines and prints the line) as one marked block **at the end** of
-  `~/.zshrc` / `~/.bashrc` (macOS: an existing `~/.bash_profile`) / fish
-  `conf.d/terma.fish`. Last, because a PATH line only
-  beats the ones after it and a real startup file prepends `~/.local/bin` — where the real
-  binaries live — several times; a pasted line was silently overtaken. `RC.State`
-  tells absent / last / overtaken (a later line sets PATH — `pathEdit`, which must not
-  match GOPATH or MANPATH), `Ensure` appends or moves the block and keeps every other
-  byte (writing *through* a symlinked dotfile), `Remove` restores the file exactly, and
-  `shim uninstall` calls it. doctor's fix is specific: `source` the file or open a new
-  terminal when the block is last and this shell predates it, else `terma install`. A child
-  process cannot change its parent's PATH, so install ends with a "Next step:" naming the
-  reload (`reloadStep`; `.` for a POSIX shell) whenever a routed agent is not live yet. Only
-  install adds the block and only `shim uninstall` removes it — doctor, status and refresh
-  never touch the file — and any test that can reach `RemoveAll` or `putShimsOnPath` must
-  sandbox `HOME` and set `SHELL`.
-- Codex is split across two scopes and neither is optional. Telemetry supports user-level and runtime configuration: Codex strips `otel` (with `notify`, `profile`, `profiles` and the provider keys)
+- Per-repository routing is gone (`internal/shim` keeps its remains). Earlier versions put
+  a PATH shim in front of `claude`/`codex` (a marked block at the end of the shell's
+  startup file put it first), wrote `routing/<id>.json` and `claude/<id>/` per project,
+  handed Claude `--settings` and Codex `-c` overrides at launch. None of it reached Codex
+  Desktop, the ChatGPT app or Claude Desktop. `cleanupLegacyRouting` (setup, install,
+  `refreshMachine`) removes it all through `shim.RemoveAll` — only when the config dir
+  holds `shim/`, `routing/` or `claude/`, so it never edits a startup file on a machine
+  that never had the block; any test that can reach it with such a directory must
+  sandbox `HOME` and set `SHELL`. `terma shim prepare` answers an old launcher with the
+  empty plan (`terma-args-v1:0`) and `shim exec` execs the real agent unchanged, so a
+  shim left behind is harmless. `shim.LoadRecord` stays for readers of a record an older
+  terma wrote (hookrun's Desktop capture and reply consent, the spool's endpoint order)
+  and migration 1; nothing writes one (`shim.SaveRecord` is for tests). install also
+  strips the telemetry policy an earlier install committed to `.claude/settings.json`
+  (`stripRepoPolicy`, guarded by `harness.Claude.TermaPolicy`: with this machine's journal,
+  a key still holding what it installed; without, all three exporters holding values terma
+  writes — a developer's lone `OTEL_LOG_USER_PROMPTS=0` is not one), because project
+  settings outrank the user file and a leftover exporter=none would switch the machine's
+  export off there. `update --refresh` does the same in the repository it runs in.
+- Codex is split across two scopes and neither is optional. Telemetry is user-level only: Codex strips `otel` (with `notify`, `profile`, `profiles` and the provider keys)
   out of a project's `.codex/config.toml` and warns at startup, so `--scope local` has
-  nothing to write. `terma connect codex` writes user-level `config.toml`;
-  `terma install` configures the shim to pass runtime `-c` overrides. The repository half is hooks
+  nothing to write. `terma setup` (and `terma connect codex`) writes user-level `config.toml`, which Codex
+  Desktop's app server reads too. The repository half is hooks
   (`internal/hookmgr/codex.go`): `SessionStart`, `PostToolUse`, `Stop` and `SessionEnd` in
   `.codex/hooks.json`, which Codex loads only for a trusted project *and* only after the
   developer trusts each entry from inside Codex. Until then the file is inert and
@@ -321,29 +312,21 @@ run that reaches them opens a browser login on **production**. A script that run
   connects it everywhere and says so rather than silencing it.
 - install's output (`cmd/install_ui.go`, `installUI`): one marked line per step (`ok`, or
   `warn` for one that needs the developer), a verdict, then numbered next steps (`then`) —
-  the reload, the files to commit, a declined PATH line, Codex Desktop approval, doctor's
-  fixes. Everything long-form (the plan's file list, policies written, git wiring, doctor's
-  per-check lines) goes to `ui.detail`, which is stdout under `--verbose` or `--dry-run`
-  and discarded otherwise. New install output goes through one of those, never straight
-  to `cmd.OutOrStdout()`. Doctor runs behind a spinner as the `Verified` step and leaves
-  out the routing warning when a next step already says to reload the shell (install's
-  own process always predates the PATH block). The first install under a newer release
+  the files to commit, restarting the agents after their telemetry changed, Codex Desktop
+  approval, doctor's fixes. Everything long-form (the plan's file list, git wiring,
+  doctor's per-check lines) goes to `ui.detail`, which is stdout under `--verbose` or
+  `--dry-run` and discarded otherwise. New install output goes through one of those,
+  never straight to `cmd.OutOrStdout()`. setup uses the same UI with `loud` (every step is
+  its result) and `done` ("terma set up"). Doctor runs behind a spinner as the `Verified`
+  step. The first install under a newer release
   also does the machine half of `update --refresh` (`refreshMachine`, gated on
   `selfupdate.NeedsRefresh`, so source builds and tests never touch home files) before
   verifying, and records it; the repository half is its own hook plan, which rewrites a
   stale committed file as it adds a missing one.
-- Prompt capture (`resolvePrompts`): `--prompts on|off` (`--exclude-prompts` is the older,
-  hidden spelling); otherwise install never asks: it keeps this developer's last choice for
-  the project (`shim.Record.IncludePrompts`), on for a first install, and its Prompts line
-  names the `terma install --prompts off|on` that changes it. It lands in the routing record
-  and a newly written repository policy; only an explicit `--prompts` rewrites an existing
-  committed policy (`updatePolicy`). A bare re-install used to switch prompts back on.
-- `terma install` writes the repository half of that arrangement by default into the
-  same committed `.claude/settings.json` the hooks live in, after the hook plan applies
-  so both merges land in order. Re-running install preserves an existing policy unless
-  export flags explicitly change it. Per-repo routing is configured independently.
-  A pre-existing OTLP conflict there is reported and
-  skipped, not fatal — the hooks and the binding are already written by that point.
+- Prompt capture is the machine's (`config.Telemetry.ExcludePrompts`, zero value = sent):
+  `terma setup --prompts on|off`, kept by every later setup and install; install's hidden
+  `--prompts` (and the older `--exclude-prompts`) change it too. install never asks, and
+  its Prompts line names the `terma setup --prompts off|on` that changes it.
 - Connect scope (`internal/harness/scope.go`): `Claude{}` is global; `Claude{}.Local(root)`
   writes `<root>/.claude/settings.json` and renders only `claudeLocalKeys` — the three
   exporters, the four capture switches, the traces beta flag — never the endpoint, key
@@ -377,7 +360,10 @@ run that reaches them opens a browser login on **production**. A script that run
   "run `mirador project list`". A credential-free install keeps it unchecked, and a
   kept binding keeps the environment it recorded. Project-scoped
   reads resolve the Git worktree's `.terma/settings.json`, unless `--project` or
-  `TERMA_PROJECT_ID` explicitly overrides it. Machine profiles have no project defaults.
+  `TERMA_PROJECT_ID` explicitly overrides it. The profile's machine project
+  (`cfg.Telemetry.Project`) is telemetry's fallback only — the relay's destination for a
+  session outside a bound repository, and direct mode's for every session — never a
+  default for project-scoped reads.
   Keys are remembered per harness per project in `keys.json`
   (`keystore.SetFor`, written by every connect) so returning to a project reuses the
   harness's own key; `resolveKey` checks the harness config, then the keystore, then mints.
@@ -692,9 +678,13 @@ thing on a profile. See docs/DEVELOPMENT.md, "Working against the dev backend".
 harness exporting to the right host but a *different project* as not connected
 (`harnessState` in `cmd/status.go`, the `KeyHarness` check in `cmd/doctor.go`). Keep the
 two in step — a status that says "connected" while doctor fails is worse than either.
-The shared emission check fails zero-signal repository setups, reads Claude's merged
-user/shared/private settings, and checks live routing's own signals. A route record
-alone is not evidence of emission. Doctor verifies configuration and hook delivery;
+The shared emission check fails zero-signal repository setups and reads Claude's merged
+user/shared/private settings. An agent pointed at the relay reports to this repository's
+project whatever its own file says (`routeRelay`); one pointed straight at Terma reports
+to its key's project (`routeOtherProject` when that is not this repository's — a warning,
+fixed by `terma setup`). Both commands show the relay check (`relayCheck`,
+`doctor.KeyRelay`: set up, service installed and running, answering `relay.Probe`,
+delivering) whenever an agent exports through it. Doctor verifies configuration and hook delivery;
 it does not prove that a running agent has reloaded its settings or sent telemetry.
 
 ## Gotchas
@@ -729,10 +719,12 @@ it does not prove that a running agent has reloaded its settings or sent telemet
   daily.
 - Refresh (`cmd/refresh.go`, `terma update --refresh`): after replacing itself or running
   the package manager, the old binary execs the new one's `update --refresh` — the old
-  process cannot run new templates. It rewrites only files terma already wrote (shims,
-  the status-line wrap, the OpenCode plugin, and the current repository's hooks: the commit
+  process cannot run new templates. It rewrites only files terma already wrote (the
+  status-line wrap, the OpenCode plugin, and the current repository's hooks: the commit
   hooks through the binding's manager, the agent hooks its files already wire), never creates one, never signs in, and never changes a
-  choice. Re-running `terma install` is not a substitute: it re-defaults every flag it
+  choice. It also removes the old per-repository routing (`cleanupLegacyRouting`), strips
+  a committed policy an earlier install wrote (`stripRepoPolicy`), and restarts the relay
+  when its service is installed (`restartRelay`), so the new binary serves. Re-running `terma install` is not a substitute: it re-defaults every flag it
   does not record. The first interactive command under a newer release refreshes the
   home-directory files once (`refreshed.json`, upward only, so two builds on PATH do not
   take turns) and only *reports* stale committed files. Per repository, doctor and status

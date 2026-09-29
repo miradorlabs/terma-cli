@@ -115,125 +115,48 @@ with `git commit` reaches it — and a squash off git's default "Squashed commit
 following:" subject. `SQUASH_MSG` is already unlinked by then, so a squash whose message
 was rewritten by hand is counted as the ordinary single-parent commit it is.
 
-## Repo scope vs. user scope
+## Repo scope vs. machine scope
 
 `terma install` writes only things that belong in the repository and carry no secrets:
 hook wiring through the manager the repo already uses (husky, lefthook, pre-commit) or
 committed shims plus `core.hooksPath`; `.claude/settings.json` project hooks; and
 `.terma/settings.json` binding the repo to a project. One merged PR onboards everyone.
 
-`terma install` also does the per-person, per-repo half in the same run: sign in (if
-`terma setup` has not), identity (`git user.email` as `enduser.id` on Codex and OpenCode
-sessions), and pointing each agent at *this repository's* project — Claude Code through
-a per-repo settings document passed as `claude --settings` (the command line outranks
-`~/.claude/settings.json`; the process environment does not, so exporting `OTEL_*`
-around the agent loses to a machine-wide connect), Codex through per-repo
-`-c` telemetry overrides while preserving its original home, OpenCode through its project-aware plugin. Keys live in the home directory, namespaced by project. `terma
-setup` is the optional machine-level preamble: sign in and record which agents you use.
-Events spooled before a key is stored are **held**, not dropped, so ordering loses no
-data.
+Telemetry is the machine's. `terma setup` writes each agent's global configuration once
+— Claude Code's `~/.claude/settings.json`, Codex's `~/.codex/config.toml` — pointed at
+terma's loopback relay, which sends each record to the project of the repository its
+session ran in, or with `--no-relay` straight at Terma with the machine project's key.
+`terma install` binds the repository, which is all the relay needs, and configures the
+agents itself only when setup has not. Keys live in the home directory, namespaced by
+project. Events spooled before a key is stored are **held**, not dropped, so ordering
+loses no data.
 
-### Decision: retain the Claude launcher and bound preparation
+### Decision: global configuration and a relay, not a launcher
 
-Claude still receives a private settings document through `--settings`. Tests against
-Claude Code 2.1.270, 2.1.271, and 2.1.272 with local mock API and OTLP receivers found
-that explicit settings override global/shell detailed beta tracing; repository-local
-`settings.local.json` does not reliably override that exporter. This is a precedence
-finding, not evidence that detailed beta tracing is deprecated. The route explicitly
-sets its per-signal endpoints, protocols, and headers, and disables the competing
-beta destination for that launch. Global and repository settings are left intact.
-Generated settings and the credential helper are refreshed on every launch.
+Earlier versions routed per repository at launch: a PATH shim in front of `claude` and
+`codex`, a block at the end of the shell's startup file to put it first, a per-project
+Claude settings document handed over as `--settings`, and Codex telemetry passed as
+per-launch `-c` overrides. It worked for a shell launch in a shell that had read the
+startup file, and for nothing else. Codex Desktop and the ChatGPT app run one app server
+for every folder; Claude Desktop starts its own Claude Code by absolute path; an IDE
+extension does the same. None of them passes through a PATH shim, and a
+per-process configuration cannot tell one repository's thread from another's in a
+process that serves them all.
 
-Keeping launch-time resolution also lets separate worktrees select separate projects
-without writing shared Claude local settings. The cost is intercepting the agent's
-launch and depending on its CLI/configuration contract. An explicit user `--settings`
-causes Claude routing to pass through unchanged; a failed settings write does the same.
-We removed the environment fallback because it cannot reliably override global
-settings and can produce a partially configured export.
+What they all do read is the agent's global configuration, and what every record they
+export carries is its session (`session.id` for Claude Code, `conversation.id` on
+Codex's logs, a trace id shared with them on its spans). So the global configuration
+names one destination — the relay — and the relay decides the project per record, from
+the session's directory as the session-start hook recorded it (or the rollout's and the
+transcript's own record of it). See [RELAY.md](RELAY.md). The relay keeps the
+credentials: no agent file holds a Terma key, and none names a project.
 
-The existing shell script, not another binary, now owns launch:
-
-- Resolve the real agent from the current PATH on every invocation, skipping the shim
-  and aliases by filesystem identity. Homebrew/other replacement paths are not cached.
-- `TERMA_DISABLE=1` (or `true`) bypasses Terma completely. Leading help/version,
-  update/install, auth/login/logout, and completion commands also bypass preparation.
-- Run `terma shim prepare` with a three-second deadline and disconnected stdin.
-  Preparation writes a versioned data plan in a private temporary directory: one file
-  per prefix argument and a completion count. The shell never sources or evals it.
-  Codex credentials temporarily occur in these mode-0600 argument files, inside the
-  mode-0700 directory; normal completion and handled cancellation remove them.
-- Codex interactive launches resolve `--no-daemon` through `internal/compat`: verified
-  stable versions use version rules; unknown versions use a help probe. Version and
-  help subprocesses share a 1.5-second deadline. Observations are cached under
-  `cache/compat-codex-cli` in the Terma config directory, validated against the resolved
-  executable path, size, modification time, and permissions. Unknown probe results
-  are retried. See [harness compatibility](HARNESS-COMPATIBILITY.md) for rule provenance
-  and how to extend the matrix.
-- Missing/crashed/hung/incompatible Terma or an invalid plan launches the original
-  agent arguments. Preparation failures emit a warning; missing Terma is transparent.
-- After successful preparation, `exec` the agent once. Stdio, PID, signals, and exit
-  status belong to the agent. Never retry after an agent has started: a nonzero exit
-  can follow real edits or billable work. Cancellation during preparation does not
-  launch the agent. Shell functions use the same installed launcher.
-
-This does not guarantee compatibility with every future agent version. A CLI that
-rejects an injected option after launch returns its own error; use `TERMA_DISABLE=1`
-to bypass it. Administrator policies and explicit user overrides remain authoritative.
-An uncatchable kill can leave temporary files until OS/user cleanup. Preparation
-errors may mean the user's pre-existing global exporter applies instead of Terma.
-
-Regression coverage includes launcher fault injection, argument quoting/newlines,
-PATH changes and aliases, stdin/stderr/exit preservation, cancellation, and PID/signal
-behavior. The PTY tests also check all three terminal descriptors, interactive
-input, resize/SIGWINCH delivery, terminal-generated Ctrl-C during preparation and
-agent execution, exit status 130, temporary-file cleanup, and returning to a usable
-shell. They exercise both PATH and function activation under available sh/bash/zsh/dash
-shells. CI runs launcher contracts on Linux and macOS. The PTY driver uses Python 3's
-standard library; no extra launcher executable or production dependency is introduced.
-`TestClaudeRouteNativeExport` is an opt-in local contract test, enabled with
-`TERMA_CLAUDE_NATIVE_TEST=1` and optional `TERMA_CLAUDE_BINARY`; it uses no real provider
-credentials or inference. A future stage should wire these native contract checks
-into the periodic version matrix and assess safe pre-launch compatibility probes.
-
-### Decision: Codex telemetry through runtime overrides
-
-The routing shim keeps the developer's original `CODEX_HOME` (including a custom
-one) and passes this project's telemetry settings through Codex's `-c` runtime
-overrides. It resolves `-C` / `--cd` before selecting the repository binding and
-reads the project key from the keystore on each launch. Outside a configured
-repository it passes through without adding telemetry settings. Existing global
-telemetry configuration still applies there; this is not a global telemetry opt-out.
-
-We chose this over maintaining a per-project copy of the Codex home:
-
-- The real configuration remains authoritative, so changes to models, providers,
-  MCP servers, and other settings take effect without reinstalling Terma.
-- Authentication stays in its original location. In particular, Codex's keyring
-  lookup is tied to its home directory; symlinking `auth.json` alone does not
-  preserve keyring-backed login when the home changes.
-- History, skills, project/hook trust, and the developer's notifier remain in place.
-  We avoid copying configuration, merging trust back, or synchronizing symlinks.
-- Key changes take effect on the next launch. No generated Codex config contains
-  a second copy of the credential.
-
-The tradeoff is credential visibility: the exporter Authorization header is passed
-as a literal in `-c` arguments. It can therefore appear in process inspection and
-tools that record command lines. Terma must not log the generated argv. This path
-does not inject the credential into environment variables, but argv is not a secret
-channel either. Runtime overrides also depend on Codex's configuration contract;
-explicit user overrides and administrator-managed settings can affect the result.
-Routing applies to launches through the shim/wrapper, not arbitrary direct binary
-or app launches. Repository hooks still require trust for funding capture; routing
-does not bypass that approval or replace `notify`.
-
-A possible future alternative is ingestion without a separate Authorization
-credential: a Sentry-style ingestion URL containing an opaque project hash. This
-could remove bearer credentials from both launch arguments and environment-based
-integrations. It is a design option, not implemented behavior. The URL would still
-be visible wherever endpoints are recorded. Its identifier should grant ingestion
-only, with no read or administrative access, and support rotation and abuse controls;
-if possession of the URL authorizes writes, it remains a capability rather than
-being literally authentication-free.
+The cost is a service on the developer's machine (launchd, systemd --user) and records
+without a session — Codex's metrics, its process-level spans — that can only go to the
+machine project. Direct mode (`--no-relay`, or no service manager) is the fallback that
+needs neither and gives up per-repository projects: every session reports to the
+machine's. The launcher is gone; `terma shim prepare` still answers an old shim with an
+empty plan, so the agent starts unchanged until setup, install or a refresh removes it.
 
 Claude Code's settings carry no resource attributes. `OTEL_RESOURCE_ATTRIBUTES` is the
 user's variable for describing their own resources, and nothing Terma used to put in it

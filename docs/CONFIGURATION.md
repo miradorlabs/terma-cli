@@ -1,7 +1,7 @@
 # Configuration and authentication
 
 This guide covers the settings intentionally kept out of the repository: authentication,
-profiles, project routing, telemetry scope, and environment variables. For the user-facing
+profiles, agent telemetry, export scope, and environment variables. For the user-facing
 setup path, start with the [README](../README.md).
 
 ## Sign in
@@ -50,43 +50,58 @@ when a worktree is bound through its main checkout.
   config.json        profiles, organization, endpoints, preferred agents
   credentials.json   CLI credentials, one per organization and profile (0600)
   keys.json          project server keys and per-harness keys (0600)
+  helpers/           the headers helpers that hand Claude Code its credential (0700)
+  relay/             the relay's port and token, and what it has yet to deliver
   spool/             queued events
 ```
 
 Project server keys are namespaced by project and never written to the repository.
 `TERMA_API_KEY` supplies a key for CI and headless use.
 
-## Agent routing
+## Agent telemetry
 
-`terma install` stores a repository's project binding and prepares agent launch routing:
-
-- Claude Code receives a per-repository settings document through `claude --settings`.
-- Codex receives telemetry as launch-time `-c` overrides while retaining its original
-  `CODEX_HOME`, login, history, trust, and notifier configuration.
-- Both routes are delivered by PATH shims, or by shell functions printed with
-  `--activation wrapper`.
-
-The shim directory must appear before the machine-wide agent binary. `terma install`
-appends a marked block to the end of the shell startup file, or moves it there when a
-later PATH edit would put the real binary first; `--no-path` prints the line instead. The block takes effect in shells that read the file
-afterwards: install ends with the command that reloads the current one (`source ~/.zshrc`
-for zsh). `terma doctor` reports when routing is configured but not active.
-
-An IDE or launcher that invokes an agent by absolute path bypasses the shim and uses
-machine-wide configuration. `doctor` also checks for a different Terma build elsewhere on
-the machine.
-
-Routing can be bypassed explicitly for one launch:
+`terma setup` configures each agent's telemetry once, machine-wide, in the agent's own
+global settings file — `~/.claude/settings.json` (or `$CLAUDE_CONFIG_DIR`) for Claude
+Code, `~/.codex/config.toml` (or `$CODEX_HOME`) for Codex. Every launcher reads those
+files: the CLI, Codex Desktop and the ChatGPT app, Claude Desktop, an IDE extension.
 
 ```sh
-TERMA_DISABLE=1 claude
-TERMA_DISABLE=1 codex
+terma setup                                   # sign in, pick agents and this machine's project
+terma setup --project "Acme Web"              # change the machine's project
+terma setup --prompts off                     # stop sending prompt text and model responses
+terma setup --signals traces,logs --exclude-tool-content
+terma setup --no-relay                        # export straight to Terma (see below)
 ```
+
+**Through the relay (the default on macOS and Linux).** The agents export OTLP/JSON to
+terma's relay on `127.0.0.1`, authenticated with a token only this machine holds. The
+relay sends each session to the project of the repository it ran in — the binding
+`terma install` wrote — and a session outside any bound repository to the machine's
+project. The agents' files name no project and hold no Terma key; keys stay in
+`keys.json`. See [the relay](RELAY.md).
+
+**Straight to Terma (`--no-relay`, or no launchd / systemd).** Each agent's file points
+at Terma's ingest host with the machine project's key, so every session on the machine
+reports to that one project. `terma status` and `terma doctor` say so in a repository
+bound to another project.
+
+A file that already exports to another collector is left alone and named; `terma setup
+--force` replaces it. Terma's own earlier settings are always replaced. Restart running
+agents after setup so they read the new settings. `terma install` configures the agents
+itself when setup has not, with the repository's project as the machine's, and takes
+the same export flags (`--prompts`, `--signals`, `--exclude-tool-content`, `--identity`,
+`--no-relay`) as a change to the machine's choices.
+
+Versions before the relay routed Claude Code and Codex per repository through PATH shims
+and a block in the shell's startup file. `terma setup`, `terma install` and `terma
+update --refresh` remove them, and `terma install` removes the telemetry policy an
+earlier install committed to `.claude/settings.json` (it would outrank the machine's
+configuration there). A shim left behind until then starts the agent unchanged.
 
 ## Export scope and consent
 
-The advanced `terma connect` command presents a checklist before writing telemetry
-configuration. The controls are also available as flags:
+The advanced `terma connect` command writes one agent's telemetry configuration and
+presents a checklist first. The controls are also available as flags:
 
 ```sh
 terma connect claude \
@@ -98,58 +113,42 @@ terma connect claude \
 ```
 
 `--signals none` disables export. A machine-wide connection can export everywhere or
-require repositories to opt in with `--exports repos`. `terma install` enables repository telemetry by default, including for this arrangement.
-It writes a reviewable policy alongside the agent hooks, keeping endpoints and keys out
-of the repository. Reinstalling preserves an existing policy; use `--signals`,
-`--prompts on|off`, and `--exclude-tool-content` to change what the repository sends.
-Restart Claude Code after installing so the session loads the new settings.
+require repositories to opt in with `--exports repos`, in which case a repository's
+committed policy (`terma connect claude --scope local`) switches its signals on. `terma
+setup` always configures the agents to export everywhere.
 
-Your own agents send prompt text and model responses by default: install does not ask,
-keeps your last choice for that project (on for a first install), and its Prompts line
-says how to change it. `terma install --prompts off` stops them and `--prompts on` turns
-them back on. The choice is yours: it changes the repository's committed policy only when
-you pass `--prompts` explicitly.
+Your agents send prompt text and model responses by default: `terma setup --prompts off`
+stops them and `--prompts on` turns them back on. The choice is the machine's, recorded
+in `config.json`, and every later setup or install keeps it.
 
-Codex ignores project-level OTEL configuration, so direct `terma connect codex` is
-machine-wide. `terma install` instead routes each launch using runtime `-c` overrides
-from the repository binding, as described above. Those overrides include the telemetry
-bearer key, which local process inspection can expose; do not log generated agent
-arguments. Codex can suppress tool output but cannot suppress native tool arguments
+Codex ignores project-level OTEL configuration and has no headers helper, so its
+configuration is always the user-level `config.toml`. In relay mode it carries only the
+relay's token. Codex can suppress tool output but cannot suppress native tool arguments
 with `--exclude-tool-content`. See [SECURITY.md](../SECURITY.md) for these limitations.
-Select `codex-desktop` during `terma setup` to have `terma install` configure
-repository hooks and a local project route. The desktop app bypasses the shell
-launch route; see [Codex desktop telemetry](CODEX-DESKTOP-TELEMETRY.md).
-OpenCode uses a
-plugin and `.opencode/terma.json` rather than environment variables.
+Codex Desktop reads the same file; select `codex-desktop` during `terma setup` so
+`terma install` wires the Codex hooks that announce its sessions — see [Codex desktop
+telemetry](CODEX-DESKTOP-TELEMETRY.md). OpenCode uses a plugin and
+`.opencode/terma.json` rather than environment variables.
 
 `terma doctor` fails when a connected agent has no telemetry signals enabled in the
 current repository, even if another agent is configured correctly. For Claude it
 combines user settings, `.claude/settings.json`, and `.claude/settings.local.json`,
-including the master telemetry switch and the beta switch required for traces.
-Live shim routing is checked against its own signal list, since its launch settings
-override those files. `terma status` uses the same checks for setup readiness.
+including the master telemetry switch and the beta switch required for traces. `terma
+status` uses the same checks for setup readiness. When an agent exports through the
+relay, both also check the relay: installed, running, answering on loopback, and
+delivering (a project held for a key, or the last failed delivery, is a warning).
 
 Doctor and status list remaining setup actions rather than estimating a percentage
 of spend from configuration. Doctor also compares the running executable with the
 one hooks find on PATH: an older build may stamp commits while failing to read the
 repository's current binding format. Resolve a binary mismatch before verifying
 delivery. Backend read-back remains unverified when its API cannot confirm the event.
-A missing repository policy is repaired with `terma install`; an existing disabled
-policy requires an explicit choice, such as `terma install --signals traces,logs,metrics`.
 Private overrides must be edited in the named file. Restart the agent afterwards.
 
 These are configuration checks, not proof that a running agent has emitted data.
 Doctor's backend round-trip verifies Terma's hook events separately. Managed Claude
 settings, custom `--settings` arguments, and a running session's inherited environment
 are outside this configuration check.
-
-Shell activation has its own diagnostic in both commands. It reports a missing
-per-project route, a missing PATH setup or inactive wrapper, a startup file this shell
-has not read yet (`source` it or open a new terminal), and a later PATH entry that
-bypasses the shims. It warns
-even when global telemetry still works, and says which settings provide that
-fallback. OpenCode needs no shell integration. Diagnostics never opt in or modify
-your shell startup file; `terma install` does that setup.
 
 ## Updates
 
@@ -183,18 +182,19 @@ An update replaces the binary; what earlier versions wrote stays as it was until
 something rewrites it. So once the new version is in place, `terma update` runs it as
 `terma update --refresh`, which rewrites, with the new version's templates:
 
-- the PATH shims in `~/.config/terma/shim/bin`,
 - the wrapped Claude Code status line (falling back to the renderer recorded in
   `statusline.json`),
 - the OpenCode plugin, around its own configuration,
 - and, in the repository it runs in, the commit hooks through the manager and the agent
   hook files for the adapters that `.terma/settings.json` records.
 
+It also restarts the relay, so the new version serves, and removes the per-repository
+PATH shims, shell startup block and routing records earlier versions installed.
+
 It works only from what is on disk. It never signs in, never creates a file (one that is
 gone was removed on purpose and stays gone; `terma install` brings it back), and never
 changes a choice — unlike re-running `terma install`, which puts every flag it does not
-record (`--signals`, `--identity`, `--no-statusline`, `--activation`) back to its
-default. The repository files it changes are listed to
+record (`--no-statusline`, `--adapters`) back to its default. The repository files it changes are listed to
 commit.
 
 ### Migrating saved state

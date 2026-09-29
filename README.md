@@ -14,10 +14,17 @@ Terma has two onboarding commands with different owners:
 
 | Command | Run it | What it does |
 |---|---|---|
-| `terma setup` | Once per developer (optional) | Signs you in and records which coding agents you use. It does not bind a project or write repository files. |
-| `terma install` | Once per repository | Binds the repository to a Terma project, configures per-repository agent routing, and offers to install commit and agent hooks. |
+| `terma setup` | Once per machine | Signs you in, records which coding agents you use, and configures each agent's telemetry once, machine-wide. It writes no repository files. |
+| `terma install` | Once per repository | Binds the repository to a Terma project and offers to install commit and agent hooks. |
 
-Repository telemetry is enabled by `terma install`; no extra telemetry flag is needed.
+Each agent's telemetry is configured in its own global settings file, so every
+launcher — the CLI, Codex Desktop, Claude Desktop, an IDE — exports the same way. The
+agents export to terma's relay, a small service on this machine (launchd on macOS,
+systemd on Linux) that sends each session to the project of the repository it ran in,
+and sessions outside a bound repository to the project `terma setup` chose for the
+machine. `terma setup --no-relay`, or a platform without a service manager, exports
+straight to Terma instead, every session to the machine's project. See
+[the relay](docs/RELAY.md).
 Run it from any subdirectory: Git worktrees and submodules use their own root.
 Outside Git, the first install uses the current directory; later install/uninstall
 calls from subdirectories find the nearest `.terma/settings.json`. Agent hooks and
@@ -30,16 +37,16 @@ Run `make test-install-e2e` for the isolated install/uninstall subprocess suite.
 See [the installation test matrix](docs/INSTALLATION-TESTS.md) for coverage and limits.
 Restart running agents after installation so they load the new configuration.
 
-Codex desktop uses a separate backend from the `codex` shell command. Select
-**Codex Desktop** in `terma setup` (or use `--harness codex-desktop` with
-`terma install`). Install then configures repository hooks and a local project
-route. Trust the hooks in the app and check `terma desktop status` from that repository.
-See [Codex desktop telemetry](docs/CODEX-DESKTOP-TELEMETRY.md).
+Codex Desktop reads Codex's own global configuration, so `terma setup` configures it
+with the CLI. Select **Codex Desktop** in `terma setup` (or use `--harness codex-desktop`
+with `terma install`) so install wires the Codex hooks that announce its sessions; trust
+them in the app and check `terma desktop status` from that repository. See
+[Codex desktop telemetry](docs/CODEX-DESKTOP-TELEMETRY.md).
 
 Then verify the installation:
 
 ```bash
-terma setup       # optional: sign in and choose agents
+terma setup       # once: sign in, choose agents, configure their telemetry
 terma install     # run inside each repository
 terma doctor      # verify the chain end to end
 ```
@@ -49,8 +56,10 @@ organization has one; otherwise it asks, offering the one in an existing
 `.terma/settings.json` first (Enter keeps it), or takes `--project <name-or-id>`. A bound project your account cannot see is never used:
 install says why and lets you choose another. Use `--yes` for non-interactive setup
 (it keeps an existing binding), or `--harness none` when you only want commit hooks.
-It shows the project, prompt-capture setting, warnings, and what is left for you
-to do; `-v` / `--verbose` also shows setup steps and every file and setting it wrote. The committed settings
+When `terma setup` has not configured your agents' telemetry yet, install does, with
+the repository's project as the machine's. It shows the project, prompt-capture setting
+(`terma setup --prompts off` stops prompt text and responses), warnings, and what is left
+for you to do; `-v` / `--verbose` also shows setup steps and every file and setting it wrote. The committed settings
 file contains a project reference, never a secret.
 
 ## Install
@@ -99,41 +108,33 @@ terma update --auto status  # show the saved preference
 terma update --auto off     # return to notifications only
 ```
 
-Updates verify the release checksum before replacing the binary. Hooks, launch shims,
-CI, and scripted commands never trigger automatic updates. `terma update` upgrades a
+Updates verify the release checksum before replacing the binary. Hooks, CI, and
+scripted commands never trigger automatic updates. `terma update` upgrades a
 Homebrew or npm installation through the package manager that owns it. A release binary
 carries its tag, which the updater compares with the latest published release; a source
 build is never updated without `terma update --force`.
 
 The first time a new version runs, it migrates anything it keeps in `~/.config/terma`
 whose format changed, before doing anything else, with no command from you. After an
-update, the new version also refreshes what earlier versions wrote — the agent shims,
-the wrapped Claude Code status line, the OpenCode plugin, and the hooks of the repository
-you ran `terma update` in — keeping every choice you made when you installed. It works
+update, the new version also refreshes what earlier versions wrote — the wrapped Claude
+Code status line, the OpenCode plugin, and the hooks of the repository you ran `terma
+update` in — restarts the relay so the new version serves, and removes the per-repository
+PATH shims older versions installed, keeping every choice you made. It works
 from what is on disk, never signs in, and never adds a file. The repository hooks are
 committed files, so they change only when you ask: run `terma update --refresh` in each
 other repository to bring its hooks up to date, then commit them.
 
 Release, versioning and installer details are in [RELEASING.md](docs/RELEASING.md).
 
-## Per-repository routing
+## One project per repository
 
-To send two repositories to different Terma projects on one machine, `terma install`
-creates a small directory of agent shims and puts it ahead of the real `claude` and
-`codex` binaries on `PATH`. It adds that directory at the end of your shell startup
-file (`~/.zshrc`, `~/.bashrc`, `~/.bash_profile`, or fish `conf.d`). terma
-cannot change the PATH of the shell that ran it, so install ends with the command that
-does — for zsh, `source ~/.zshrc` — or open a new terminal.
-
-`terma doctor` detects when another startup-file entry has moved Terma behind the
-real binary. `terma shim uninstall` removes the managed block; `--no-path` prints the
-line instead, and `--activation wrapper` prints shell functions for users who prefer
-not to use `PATH` shims — POSIX functions for bash and zsh, fish functions when `$SHELL`
-is fish.
-
-An IDE extension that launches an agent by full path can bypass the shims and use the
-machine-wide configuration. See [CONFIGURATION.md](docs/CONFIGURATION.md) for routing,
-profiles, authentication, and export scope.
+`terma install` binds each repository to its project, and the relay sends each session
+there: two repositories on one machine report to two projects with no per-repository
+agent configuration. Versions before the relay did this with PATH shims in front of
+`claude` and `codex` and a block in your shell startup file; `terma setup`, `terma
+install` and `terma update --refresh` remove both (`terma shim uninstall` does it on its
+own). See [CONFIGURATION.md](docs/CONFIGURATION.md) for profiles, authentication, and
+export settings.
 
 ## What gets collected
 
@@ -223,7 +224,7 @@ update      Update terma
 ```
 
 Authentication, direct telemetry management, project lookup, principal lookup,
-shell completion, configuration, hook execution, shim management, and spool maintenance remain
+shell completion, configuration, hook execution, shim cleanup, and spool maintenance remain
 available as hidden commands for automation and troubleshooting. Run
 `terma <command> --help` for details.
 
