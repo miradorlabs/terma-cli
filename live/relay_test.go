@@ -172,6 +172,18 @@ func leakedFieldsOf(e telemetryEvidence, markers ...string) []string {
 		}
 		hit("log "+r.Attrs["event.name"], "body", r.Body)
 	}
+	for _, m := range e.metrics {
+		for _, p := range m.Proto.GetSum().GetDataPoints() {
+			for k, v := range flatten(p.Attributes) {
+				hit("metric "+m.Proto.GetName(), k, v)
+			}
+		}
+		for _, p := range m.Proto.GetHistogram().GetDataPoints() {
+			for k, v := range flatten(p.Attributes) {
+				hit("metric "+m.Proto.GetName(), k, v)
+			}
+		}
+	}
 	sort.Strings(out)
 	return out
 }
@@ -226,6 +238,7 @@ func TestRelayClaude(t *testing.T) {
 					}
 				}
 				checkTelemetrySchemaAt(t, sb.Receiver.evidenceFor(bearer(liveKey)), "claude", "relay/claude-"+relayMode(content), newest)
+				checkFieldRegistry(t, all, "claude", b.Version, !content, newest)
 				noteRelay(t.Name(), sb)
 			})
 		}
@@ -257,6 +270,7 @@ func TestRelayCodex(t *testing.T) {
 					}
 				}
 				checkTelemetrySchemaAt(t, sb.Receiver.evidenceFor(bearer(liveKey)), "codex", "relay/codex-"+relayMode(content), newest)
+				checkFieldRegistry(t, sb.Receiver.evidence(), "codex", b.Version, !content, newest)
 				noteRelay(t.Name(), sb)
 			})
 		}
