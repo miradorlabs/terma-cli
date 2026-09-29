@@ -33,7 +33,7 @@ func TestTelemetryMissingSignalsFail(t *testing.T) {
 					if harness == "claude" {
 						checkClaudeTelemetry(r, telemetryEvidence{}, "s", "p", false)
 					} else {
-						checkCodexTelemetry(r, telemetryEvidence{}, "s", "p", false)
+						checkCodexTelemetry(r, telemetryEvidence{}, "s", "p", false, false)
 					}
 				})
 			}

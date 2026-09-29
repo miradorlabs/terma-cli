@@ -1,0 +1,286 @@
+// Package relay is the local OTLP relay: the agents' global exporters send to it on
+// loopback, and it forwards a record only when its session was claimed by a hook in an
+// opted-in repository (package claim), to that repository's project, with that
+// project's key. Everything else is held briefly — the first batch can race the hook —
+// and then dropped, without ever leaving the machine or touching the disk.
+package relay
+
+import (
+	"encoding/hex"
+
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
+	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
+	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
+	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
+	"google.golang.org/protobuf/proto"
+)
+
+// Signal is one of the three OTLP export paths.
+type Signal string
+
+// The OTLP signals, named as their export paths are: /v1/<signal>.
+const (
+	Logs    Signal = "logs"
+	Metrics Signal = "metrics"
+	Traces  Signal = "traces"
+)
+
+// sessionKeys are the attributes that name the session a record belongs to, in the
+// order they are tried: Claude Code's session.id (logs, spans and metric points),
+// Codex's conversation.id (logs) and thread.id (its session_task.turn span). Codex's
+// metrics carry none of them (live/golden/codex, 0.158), so they are dropped as
+// unattributable. On every other Codex span thread.id is the tracing library's OS
+// thread number (with thread.name "tokio-rt-worker"), not a conversation, so a
+// thread.id that is a number is never a session: those spans go by their trace.
+var sessionKeys = []string{"session.id", "conversation.id", "thread.id"}
+
+// The export requests are decoded as LogsData, MetricsData and TracesData: the same
+// message on the wire and in JSON (field 1, repeated resource entries), without the
+// collector packages' gRPC and gateway dependencies, which every hook would link.
+
+// part is the slice of one export request that belongs to one session: a request of
+// the same signal holding only that session's records, and how many records it has.
+type part struct {
+	signal  Signal
+	session string
+	msg     proto.Message
+	records int
+}
+
+func sessionOf(attrs, resource []*commonpb.KeyValue) string {
+	for _, set := range [][]*commonpb.KeyValue{attrs, resource} {
+		for _, key := range sessionKeys {
+			for _, kv := range set {
+				if kv.GetKey() == key {
+					if v := kv.GetValue().GetStringValue(); v != "" && (key != "thread.id" || !numeric(v)) {
+						return v
+					}
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func numeric(s string) bool {
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return s != ""
+}
+
+// splitLogs divides a logs export by session. Records naming no session come back
+// under the empty key.
+func splitLogs(req *logspb.LogsData) map[string]*part {
+	out := map[string]*part{}
+	for _, rl := range req.GetResourceLogs() {
+		res := rl.GetResource().GetAttributes()
+		for _, sl := range rl.GetScopeLogs() {
+			bySession := map[string][]*logspb.LogRecord{}
+			var order []string
+			for _, lr := range sl.GetLogRecords() {
+				s := sessionOf(lr.GetAttributes(), res)
+				if _, seen := bySession[s]; !seen {
+					order = append(order, s)
+				}
+				bySession[s] = append(bySession[s], lr)
+			}
+			for _, s := range order {
+				p := out[s]
+				if p == nil {
+					p = &part{signal: Logs, session: s, msg: &logspb.LogsData{}}
+					out[s] = p
+				}
+				m := p.msg.(*logspb.LogsData)
+				m.ResourceLogs = append(m.ResourceLogs, &logspb.ResourceLogs{
+					Resource:  cloneResource(rl.GetResource()),
+					SchemaUrl: rl.GetSchemaUrl(),
+					ScopeLogs: []*logspb.ScopeLogs{{Scope: sl.GetScope(), SchemaUrl: sl.GetSchemaUrl(), LogRecords: bySession[s]}},
+				})
+				p.records += len(bySession[s])
+			}
+		}
+	}
+	return out
+}
+
+// tracePrefix marks a part keyed by a trace, not yet a session: spans that name no
+// session in a trace whose session the relay has not learnt yet.
+const tracePrefix = "trace:"
+
+// splitTraces divides a traces export by session, span by span. A span that names no
+// session belongs to the session of its trace: Codex puts thread.id on the turn span
+// only, and its children inherit the trace, not the attribute. learn records every
+// trace a keyed span names; known answers for the others. A span of a trace nobody
+// has named yet comes back under tracePrefix+traceID, for the relay to hold.
+func splitTraces(req *tracepb.TracesData, learn func(traceID, session string), known func(traceID string) string) map[string]*part {
+	for _, rs := range req.GetResourceSpans() {
+		res := rs.GetResource().GetAttributes()
+		for _, ss := range rs.GetScopeSpans() {
+			for _, sp := range ss.GetSpans() {
+				if s := sessionOf(sp.GetAttributes(), res); s != "" && len(sp.GetTraceId()) > 0 {
+					learn(hex.EncodeToString(sp.GetTraceId()), s)
+				}
+			}
+		}
+	}
+	out := map[string]*part{}
+	for _, rs := range req.GetResourceSpans() {
+		res := rs.GetResource().GetAttributes()
+		for _, ss := range rs.GetScopeSpans() {
+			bySession := map[string][]*tracepb.Span{}
+			var order []string
+			for _, sp := range ss.GetSpans() {
+				s := sessionOf(sp.GetAttributes(), res)
+				if s == "" && len(sp.GetTraceId()) > 0 {
+					id := hex.EncodeToString(sp.GetTraceId())
+					if s = known(id); s == "" {
+						s = tracePrefix + id
+					}
+				}
+				if _, seen := bySession[s]; !seen {
+					order = append(order, s)
+				}
+				bySession[s] = append(bySession[s], sp)
+			}
+			for _, s := range order {
+				p := out[s]
+				if p == nil {
+					p = &part{signal: Traces, session: s, msg: &tracepb.TracesData{}}
+					out[s] = p
+				}
+				m := p.msg.(*tracepb.TracesData)
+				m.ResourceSpans = append(m.ResourceSpans, &tracepb.ResourceSpans{
+					Resource:   cloneResource(rs.GetResource()),
+					SchemaUrl:  rs.GetSchemaUrl(),
+					ScopeSpans: []*tracepb.ScopeSpans{{Scope: ss.GetScope(), SchemaUrl: ss.GetSchemaUrl(), Spans: bySession[s]}},
+				})
+				p.records += len(bySession[s])
+			}
+		}
+	}
+	return out
+}
+
+// splitMetrics divides a metrics export by session, data point by data point: one
+// metric's points can belong to several sessions (Claude Code stamps session.id on
+// each point), so each session gets a copy of the metric holding only its own points.
+func splitMetrics(req *metricspb.MetricsData) map[string]*part {
+	out := map[string]*part{}
+	for _, rm := range req.GetResourceMetrics() {
+		res := rm.GetResource().GetAttributes()
+		for _, sm := range rm.GetScopeMetrics() {
+			bySession := map[string][]*metricspb.Metric{}
+			counts := map[string]int{}
+			var order []string
+			for _, m := range sm.GetMetrics() {
+				for s, piece := range splitMetric(m, res) {
+					if _, seen := bySession[s]; !seen {
+						order = append(order, s)
+					}
+					bySession[s] = append(bySession[s], piece.metric)
+					counts[s] += piece.points
+				}
+			}
+			for _, s := range order {
+				p := out[s]
+				if p == nil {
+					p = &part{signal: Metrics, session: s, msg: &metricspb.MetricsData{}}
+					out[s] = p
+				}
+				m := p.msg.(*metricspb.MetricsData)
+				m.ResourceMetrics = append(m.ResourceMetrics, &metricspb.ResourceMetrics{
+					Resource:     cloneResource(rm.GetResource()),
+					SchemaUrl:    rm.GetSchemaUrl(),
+					ScopeMetrics: []*metricspb.ScopeMetrics{{Scope: sm.GetScope(), SchemaUrl: sm.GetSchemaUrl(), Metrics: bySession[s]}},
+				})
+				p.records += counts[s]
+			}
+		}
+	}
+	return out
+}
+
+type metricPiece struct {
+	metric *metricspb.Metric
+	points int
+}
+
+// splitMetric groups one metric's data points by session, each group a shallow copy
+// of the metric (name, unit, temporality) holding only those points.
+func splitMetric(m *metricspb.Metric, res []*commonpb.KeyValue) map[string]metricPiece {
+	out := map[string]metricPiece{}
+	shell := func() *metricspb.Metric {
+		return &metricspb.Metric{Name: m.GetName(), Description: m.GetDescription(), Unit: m.GetUnit(), Metadata: m.GetMetadata()}
+	}
+	switch d := m.GetData().(type) {
+	case *metricspb.Metric_Sum:
+		groups := map[string][]*metricspb.NumberDataPoint{}
+		for _, dp := range d.Sum.GetDataPoints() {
+			s := sessionOf(dp.GetAttributes(), res)
+			groups[s] = append(groups[s], dp)
+		}
+		for s, pts := range groups {
+			c := shell()
+			c.Data = &metricspb.Metric_Sum{Sum: &metricspb.Sum{DataPoints: pts, AggregationTemporality: d.Sum.GetAggregationTemporality(), IsMonotonic: d.Sum.GetIsMonotonic()}}
+			out[s] = metricPiece{c, len(pts)}
+		}
+	case *metricspb.Metric_Gauge:
+		groups := map[string][]*metricspb.NumberDataPoint{}
+		for _, dp := range d.Gauge.GetDataPoints() {
+			s := sessionOf(dp.GetAttributes(), res)
+			groups[s] = append(groups[s], dp)
+		}
+		for s, pts := range groups {
+			c := shell()
+			c.Data = &metricspb.Metric_Gauge{Gauge: &metricspb.Gauge{DataPoints: pts}}
+			out[s] = metricPiece{c, len(pts)}
+		}
+	case *metricspb.Metric_Histogram:
+		groups := map[string][]*metricspb.HistogramDataPoint{}
+		for _, dp := range d.Histogram.GetDataPoints() {
+			s := sessionOf(dp.GetAttributes(), res)
+			groups[s] = append(groups[s], dp)
+		}
+		for s, pts := range groups {
+			c := shell()
+			c.Data = &metricspb.Metric_Histogram{Histogram: &metricspb.Histogram{DataPoints: pts, AggregationTemporality: d.Histogram.GetAggregationTemporality()}}
+			out[s] = metricPiece{c, len(pts)}
+		}
+	case *metricspb.Metric_ExponentialHistogram:
+		groups := map[string][]*metricspb.ExponentialHistogramDataPoint{}
+		for _, dp := range d.ExponentialHistogram.GetDataPoints() {
+			s := sessionOf(dp.GetAttributes(), res)
+			groups[s] = append(groups[s], dp)
+		}
+		for s, pts := range groups {
+			c := shell()
+			c.Data = &metricspb.Metric_ExponentialHistogram{ExponentialHistogram: &metricspb.ExponentialHistogram{DataPoints: pts, AggregationTemporality: d.ExponentialHistogram.GetAggregationTemporality()}}
+			out[s] = metricPiece{c, len(pts)}
+		}
+	case *metricspb.Metric_Summary:
+		groups := map[string][]*metricspb.SummaryDataPoint{}
+		for _, dp := range d.Summary.GetDataPoints() {
+			s := sessionOf(dp.GetAttributes(), res)
+			groups[s] = append(groups[s], dp)
+		}
+		for s, pts := range groups {
+			c := shell()
+			c.Data = &metricspb.Metric_Summary{Summary: &metricspb.Summary{DataPoints: pts}}
+			out[s] = metricPiece{c, len(pts)}
+		}
+	}
+	return out
+}
+
+// cloneResource copies a resource so stamping one project's id on it cannot reach a
+// part bound for another project.
+func cloneResource(r *resourcepb.Resource) *resourcepb.Resource {
+	if r == nil {
+		return &resourcepb.Resource{}
+	}
+	return proto.Clone(r).(*resourcepb.Resource)
+}

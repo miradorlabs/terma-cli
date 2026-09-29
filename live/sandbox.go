@@ -78,6 +78,17 @@ type Sandbox struct {
 	// sets up (RouteClaude), so a run launches it through terma's shim and never
 	// connects it machine-wide.
 	claudeRouted bool
+	// WorkDir is where an agent run starts; the sandbox repository when empty. The
+	// relay's negative controls run agents outside the installed repository.
+	WorkDir string
+	// ExtraEnv is appended to every environment the sandbox builds, so a setting
+	// reaches the agents and the hooks and relays they start.
+	ExtraEnv []string
+	// relayed means the agents export to the local relay (UseRelay), never straight to
+	// the receiver: the scenario is that nothing else reaches it.
+	relayed      bool
+	relayAddr    string
+	codexTrusted map[string]bool
 }
 
 // Option adjusts a sandbox before it is configured.
@@ -193,7 +204,7 @@ func (sb *Sandbox) connectClaude() {
 
 // connectCodex points Codex's export at the receiver, once.
 func (sb *Sandbox) connectCodex() {
-	if sb.codexConnected {
+	if sb.codexConnected || sb.relayed {
 		return
 	}
 	sb.codexConnected = true
@@ -246,9 +257,18 @@ func (sb *Sandbox) RouteClaude() {
 	sb.claudeRouted = true
 }
 
-// ensureClaudeExport connects Claude machine-wide unless the scenario routed it.
+// workDir is where an agent run starts.
+func (sb *Sandbox) workDir() string {
+	if sb.WorkDir != "" {
+		return sb.WorkDir
+	}
+	return sb.Repo
+}
+
+// ensureClaudeExport connects Claude machine-wide unless the scenario routed it, or
+// sends everything through the relay.
 func (sb *Sandbox) ensureClaudeExport() {
-	if !sb.claudeRouted {
+	if !sb.claudeRouted && !sb.relayed {
 		sb.connectClaude()
 	}
 }
@@ -311,7 +331,7 @@ func (sb *Sandbox) baseEnv() []string {
 	if v := os.Getenv("TERMA_ENV"); v != "" {
 		env = append(env, "TERMA_ENV="+v)
 	}
-	return env
+	return append(env, sb.ExtraEnv...)
 }
 
 // binDir is a PATH prefix holding the builds under test under their plain
@@ -384,8 +404,14 @@ func (sb *Sandbox) termaWith(env []string, dir string, args ...string) string {
 
 func (sb *Sandbox) git(args ...string) string {
 	sb.T.Helper()
+	return sb.gitIn(sb.Repo, args...)
+}
+
+// gitIn runs git in dir with the sandbox's environment.
+func (sb *Sandbox) gitIn(dir string, args ...string) string {
+	sb.T.Helper()
 	cmd := exec.Command("git", args...)
-	cmd.Dir = sb.Repo
+	cmd.Dir = dir
 	cmd.Env = append(sb.baseEnv(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null")
 	out, err := cmd.CombinedOutput()
 	if err != nil {

@@ -601,6 +601,29 @@ exploration it superseded (`pocs/funding-observer` and two handover files in the
 removed on 2026-09-21; it is in the history before that. The one piece of it still cited, the
 provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
 
+## Local relay (spike)
+
+- `docs/RELAY-SPIKE.md`. `terma relay setup|run|status` (hidden): the agents' global
+  exporters send to `127.0.0.1:43180` with a local token (`relay/token`); only sessions a
+  hook in a bound repository claimed (`relay/claims/<session>.json`, `internal/relay/claim`,
+  no OTLP dependency — every hook imports it) are forwarded, per project, with that
+  project's key and host (`projectEndpoint`), content filtered by its routing record.
+  Unclaimed records are held 2 minutes in memory, then dropped; nothing unclaimed touches
+  disk. Claims come from `emitFor` and, for hooks that spool nothing, from the payload
+  (`hookrun.ClaimFromPayload`, fed a bounded copy of stdin in `cmd/hook.go`); hooks write
+  none unless `relay/token` exists. The claiming hook starts the relay (`spawnRelay`,
+  single instance on `relay/relay.lock`).
+- Session keys: `session.id` (Claude, every signal), `conversation.id` (Codex logs), and
+  `thread.id` on Codex's turn span only — a numeric `thread.id` is an OS thread and is
+  never a session; sessionless spans go by their trace. Codex metrics carry no session and
+  are dropped. Claude's tool content also rides a `tool.output` span event, which the
+  golden attribute lists do not see.
+- OTLP types come from `go.opentelemetry.io/proto/otlp/{logs,metrics,trace}` as
+  `*Data` messages (wire-identical to the export requests); never import the collector
+  packages, which pull gRPC into every hook. Under the relay the machine-wide Codex config
+  always allows prompts, so `codexRepliesConsented` takes consent from the routing record
+  alone. `live/relay_test.go` is the e2e proof and nightly canary (`golden/relay/`).
+
 ## Contracts other repos depend on
 
 - Trailers: `Agent-Session-Id`, `Agent-Tool` (`internal/trailer`). The Terma backend

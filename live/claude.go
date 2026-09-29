@@ -184,7 +184,7 @@ func (sb *Sandbox) ClaudeHeadless(route Route, prompt string, extra ...string) (
 	ctx, cancel := context.WithTimeout(context.Background(), scenarioTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, sb.claudeLauncher(), args...)
-	cmd.Dir = sb.Repo
+	cmd.Dir = sb.workDir()
 	cmd.Env = sb.claudeEnv(route)
 	cmd.Stdin = nil
 	out, err := cmd.Output()

@@ -22,6 +22,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/project"
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 	"github.com/miradorlabs/terma-cli/internal/trailer"
@@ -48,6 +49,10 @@ type Env struct {
 	Version string
 	// Debug prints what happened to Stderr.
 	Debug bool
+	// OnClaim, when set, is called after this hook claimed a session for the local
+	// relay (see claimForRelay), so the caller can start the relay if it is not
+	// running. It may be called more than once.
+	OnClaim func()
 }
 
 func (e Env) now() time.Time {
@@ -131,7 +136,25 @@ func (e Env) emitFor(r *repo, ev spool.Event) {
 		}
 		r.stampWorktree(ev.Attrs)
 	}
+	e.claimForRelay(r, ev)
 	e.emit(ev)
+}
+
+// claimForRelay records, for the local relay, that the event's session belongs to the
+// repository's project. Every adapter's events pass through emitFor, so any hook of a
+// session claims it, not only its start: a Codex session whose hooks were trusted
+// mid-way, a Cursor session that skipped sessionStart, a resumed conversation. A
+// repository without a binding claims nothing, and neither does a machine that never
+// ran `terma relay setup`.
+func (e Env) claimForRelay(r *repo, ev spool.Event) {
+	if r == nil || r.projectID == "" || ev.SessionID == "" || !claim.Enabled() {
+		return
+	}
+	tool, _ := ev.Attrs[attrTool].(string)
+	claim.Write(ev.SessionID, claim.Claim{ProjectID: r.projectID, Tool: tool, Repo: r.name, Worktree: r.worktree}, e.now())
+	if e.OnClaim != nil {
+		e.OnClaim()
+	}
 }
 
 // stampWorktree names the linked worktree an event came from, for the events that are

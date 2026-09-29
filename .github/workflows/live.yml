@@ -20,7 +20,7 @@ concurrency:
 jobs:
   live:
     runs-on: macos-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     environment: live-harnesses
     permissions:
       contents: read
@@ -83,7 +83,7 @@ jobs:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ inputs.include_subscriptions && secrets.CLAUDE_CODE_OAUTH_TOKEN || '' }}
           TERMA_LIVE: "1"
           TERMA_LIVE_BINARY: ${{ github.workspace }}/live/bin/terma
-        run: ./bin/live.test -test.v -test.timeout 25m
+        run: ./bin/live.test -test.v -test.timeout 35m
       - name: Publish coverage summary
         if: always()
         run: |

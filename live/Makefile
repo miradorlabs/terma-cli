@@ -25,7 +25,7 @@ test: build
 telemetry: build
 	TERMA_LIVE=1 TERMA_LIVE_BINARY="$(CURDIR)/bin/terma" \
 	 ./bin/live.test -test.v -test.timeout 10m \
-	 -test.run '^(TestClaudeTelemetry|TestCodexTelemetry|TestClaudeStopFailureDelivery)$$'
+	 -test.run '^(TestClaudeTelemetry|TestCodexTelemetry|TestClaudeStopFailureDelivery|TestRelay.*)$$'
 # Loads live/.env.local (credentials, never committed) and runs every scenario.
 # RUN=TestClaude... narrows it; ARGS adds test flags.
 live: build

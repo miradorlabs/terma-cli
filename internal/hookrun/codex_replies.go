@@ -9,6 +9,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/harness"
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/shim"
 	"github.com/miradorlabs/terma-cli/internal/spool"
@@ -106,6 +107,12 @@ func codexRepliesConsented(r *repo) bool {
 	rec, recorded, err := shim.LoadRecord(r.projectID)
 	if err != nil {
 		return false
+	}
+	// Through the local relay the machine-wide Codex config lets prompts out on
+	// purpose — the relay withholds them per project — so it says nothing about this
+	// repository. Only the project's own routing record can consent.
+	if claim.Enabled() {
+		return recorded && rec.IncludePrompts
 	}
 	if os.Getenv(shim.CodexRoutedEnv) != "1" && rec.Desktop {
 		return recorded && slices.Contains(rec.Harnesses, shim.AgentCodex) &&

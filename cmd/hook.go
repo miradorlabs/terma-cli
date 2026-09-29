@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -94,11 +95,16 @@ func newHookCommand() *cobra.Command {
 			// Stdout is the hook's reply to the agent. Most handlers write nothing
 			// there — Claude Code feeds SessionStart's stdout to the model — and the
 			// ones that must (agy expects `{}`) do so themselves.
+			// The payload is kept, bounded, so a hook whose handler spooled nothing can
+			// still claim its session for the local relay (hookrun.ClaimFromPayload).
+			payload := &boundedBuffer{max: 4 << 20}
+			claimed := false
 			env := hookrun.Env{
 				Now:     time.Now(),
 				Cwd:     cwd,
 				Args:    args[1:],
-				Stdin:   cmd.InOrStdin(),
+				Stdin:   io.TeeReader(cmd.InOrStdin(), payload),
+				OnClaim: func() { claimed = true },
 				Stdout:  cmd.OutOrStdout(),
 				Stderr:  cmd.ErrOrStderr(),
 				Version: Version,
@@ -108,6 +114,12 @@ func newHookCommand() *cobra.Command {
 			ctx, cancel := context.WithTimeout(cmd.Context(), 5*time.Second)
 			defer cancel()
 			_ = handler(ctx, env)
+			if !claimed {
+				claimed = hookrun.ClaimFromPayload(ctx, env, payload.Bytes(), hookrun.ToolForEvent(event))
+			}
+			if claimed {
+				spawnRelay()
+			}
 			if flushesAfter(event) && env.Spool != nil {
 				spawnFlush()
 			}
@@ -154,6 +166,23 @@ func openSpool() *spool.Spool {
 	}
 	return s
 }
+
+// boundedBuffer keeps the first max bytes written to it and discards the rest: a
+// copy of a hook's payload that an oversized one cannot inflate.
+type boundedBuffer struct {
+	buf []byte
+	max int
+}
+
+func (b *boundedBuffer) Write(p []byte) (int, error) {
+	if room := b.max - len(b.buf); room > 0 {
+		b.buf = append(b.buf, p[:min(len(p), room)]...)
+	}
+	return len(p), nil
+}
+
+// Bytes is what was kept.
+func (b *boundedBuffer) Bytes() []byte { return b.buf }
 
 // spawnFlush starts `terma spool flush --quiet` detached from the hook, so the
 // hook returns immediately and the network happens in the background. Failures

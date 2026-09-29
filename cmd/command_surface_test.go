@@ -26,7 +26,7 @@ var primaryCommands = []string{
 // connect codex`, `terma spool flush`) — so every one of them must keep working.
 var advancedCommands = []string{
 	"config", "connect", "desktop", "disconnect", "harness", "hook", "login", "logout", "nate",
-	"principal", "project", "shim", "spool", "telemetry", "version", "whoami",
+	"principal", "project", "relay", "shim", "spool", "telemetry", "version", "whoami",
 }
 
 // removedCommands are gone, not hidden: product decisions to drop them, so no message

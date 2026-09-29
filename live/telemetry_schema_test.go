@@ -16,6 +16,15 @@ import (
 // additions are reported; disappearance on even one record fails.
 func checkTelemetrySchema(t *testing.T, e telemetryEvidence, harness string, exclude, newest bool) {
 	t.Helper()
+	mode := map[bool]string{false: "content", true: "redacted"}[exclude]
+	checkTelemetrySchemaAt(t, e, harness, harness+"/telemetry-"+mode, newest)
+}
+
+// checkTelemetrySchemaAt compares a run's telemetry with the golden at name, relative
+// to the golden directory. The relay's runs keep their own (relay/<harness>-<mode>): what
+// reaches Terma through it differs from the harness's own export by design.
+func checkTelemetrySchemaAt(t *testing.T, e telemetryEvidence, harness, name string, newest bool) {
+	t.Helper()
 	shapes := map[string][]map[string]string{}
 	add := func(surface string, attrs, resource map[string]string) {
 		fields := maps.Clone(attrs)
@@ -68,8 +77,7 @@ func checkTelemetrySchema(t *testing.T, e telemetryEvidence, harness string, exc
 			}
 		}
 	}
-	mode := map[bool]string{false: "content", true: "redacted"}[exclude]
-	path := goldenPath(harness + "/telemetry-" + mode)
+	path := goldenPath(name)
 	if os.Getenv("LIVE_UPDATE_GOLDEN") == "1" {
 		if !newest || t.Failed() {
 			return
@@ -133,5 +141,5 @@ func checkTelemetrySchema(t *testing.T, e telemetryEvidence, harness string, exc
 			Note(harness+"/"+surface, "new fields: "+strings.Join(slices.Sorted(maps.Keys(additions)), ", "))
 		}
 	}
-	Note(harness+"/telemetry-"+mode, "logs, traces, metrics, content policy, session/tool joins and per-export authentication checked")
+	Note(name, "logs, traces, metrics, content policy, session/tool joins and per-export authentication checked")
 }

@@ -80,9 +80,13 @@ func (sb *Sandbox) codexEnv(route Route) []string {
 func (sb *Sandbox) prepareCodex(route Route) {
 	t := sb.T
 	t.Helper()
-	if !sb.codexConnected {
+	if !sb.codexTrusted[sb.workDir()] {
+		if sb.codexTrusted == nil {
+			sb.codexTrusted = map[string]bool{}
+		}
+		sb.codexTrusted[sb.workDir()] = true
 		cfg := filepath.Join(sb.CodexHome, "config.toml")
-		trust := "[projects." + tomlQuote(sb.Repo) + "]\ntrust_level = \"trusted\"\n"
+		trust := "[projects." + tomlQuote(sb.workDir()) + "]\ntrust_level = \"trusted\"\n"
 		existing, _ := os.ReadFile(cfg)
 		if err := os.WriteFile(cfg, append(existing, []byte("\n"+trust)...), 0o600); err != nil {
 			t.Fatal(err)
@@ -123,14 +127,14 @@ func (sb *Sandbox) CodexExec(route Route, prompt string, extra ...string) *Codex
 	t.Helper()
 	sb.prepareCodex(route)
 	args := append([]string{"exec", "--json", "--skip-git-repo-check", "--dangerously-bypass-hook-trust",
-		"-C", sb.Repo, "-c", `cli_auth_credentials_store="file"`,
+		"-C", sb.workDir(), "-c", `cli_auth_credentials_store="file"`,
 		// Plugin catalog clones can outlive Codex and race TempDir cleanup.
 		// These contracts exercise hooks/telemetry, not plugin installation.
 		"-c", "features.plugins=false", "-c", "features.remote_plugin=false",
 		"-c", `model_reasoning_effort="low"`}, extra...)
 	args = append(args, prompt)
 	cmd := exec.Command(sb.Codex.Path, args...)
-	cmd.Dir = sb.Repo
+	cmd.Dir = sb.workDir()
 	cmd.Env = sb.codexEnv(route)
 	// Opt-in native diagnostics for intermittent harness lifecycle failures.
 	if filter := os.Getenv("TERMA_LIVE_CODEX_RUST_LOG"); filter != "" {

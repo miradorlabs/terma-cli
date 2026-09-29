@@ -122,6 +122,8 @@ spend will be attributed.`,
 		// Internal: the target of the per-repo routing PATH shim / wrapper.
 		newShimCommand(),
 		newDesktopCommand(),
+		// Spike: the local OTLP relay (docs/RELAY-SPIKE.md).
+		newRelayCommand(),
 	)
 	return root
 }
