@@ -2,6 +2,7 @@ package live
 
 import (
 	"fmt"
+	"maps"
 	"strings"
 	"testing"
 	"time"
@@ -117,12 +118,8 @@ func TestCodexUsageSelectionKeepsMalformedRecords(t *testing.T) {
 	base := map[string]string{"event.name": "codex.sse_event", "event.kind": "response.completed", "conversation.id": "s"}
 	record := func(extra map[string]string) LogRecord {
 		a := map[string]string{}
-		for k, v := range base {
-			a[k] = v
-		}
-		for k, v := range extra {
-			a[k] = v
-		}
+		maps.Copy(a, base)
+		maps.Copy(a, extra)
 		return LogRecord{Attrs: a}
 	}
 	receiver := &Receiver{logs: []LogRecord{

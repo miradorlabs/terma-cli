@@ -5,6 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
+	"sync"
+
+	"github.com/miradorlabs/terma-cli/internal/procinfo"
 
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 )
@@ -23,6 +26,7 @@ func ClaimFromPayload(ctx context.Context, env Env, payload []byte, tool string)
 		SessionID      string   `json:"session_id"`
 		ConversationID string   `json:"conversation_id"`
 		Antigravity    string   `json:"conversationId"`
+		AgentID        string   `json:"agent_id"`
 		Cwd            string   `json:"cwd"`
 		Workspaces     []string `json:"workspacePaths"`
 	}
@@ -41,12 +45,21 @@ func ClaimFromPayload(ctx context.Context, env Env, payload []byte, tool string)
 	if err != nil || r.projectID == "" {
 		return false
 	}
-	if !claim.Write(id, claim.Claim{ProjectID: r.projectID, Tool: tool, Repo: r.name, Worktree: r.worktree}, env.now()) {
+	c := claim.Claim{ProjectID: r.projectID, Tool: tool, Repo: r.name, Worktree: r.worktree, PIDs: claimPIDs()}
+	// A Codex subagent's telemetry names its own thread (see claimForRelay).
+	if in.AgentID != "" && in.AgentID != id {
+		claim.Write(in.AgentID, c, env.now())
+	}
+	if !claim.Write(id, c, env.now()) {
 		_, live := claim.Read(id, env.now())
 		return live
 	}
 	return true
 }
+
+// claimPIDs are the processes this hook runs under, one of which is the agent: a claim
+// covers only records those processes export. Walked once per hook.
+var claimPIDs = sync.OnceValue(procinfo.Ancestors)
 
 // ToolForEvent is the agent label a `terma hook <event>` name belongs to — the same
 // labels the trailers and spooled events carry.
@@ -59,4 +72,16 @@ func ToolForEvent(event string) string {
 		}
 	}
 	return claudeTool
+}
+
+// UserPromptSubmit is Claude Code's turn-start hook. terma records nothing for it:
+// the caller claims the session for the local relay from the payload this reads, and
+// starts the relay, so a relay that died between turns is back before the turn's
+// telemetry is exported. It must print nothing — Claude Code hands this hook's stdout
+// to the model as context.
+func UserPromptSubmit(_ context.Context, env Env) error {
+	_, err := readHookInput[struct {
+		SessionID string `json:"session_id"`
+	}](env.Stdin)
+	return err
 }

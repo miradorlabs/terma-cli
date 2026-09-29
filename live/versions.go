@@ -81,7 +81,7 @@ func resolve(t *testing.T, harness, spec string, list func() ([]string, error), 
 		seen[b.Version] = true
 		out = append(out, b)
 	}
-	for _, part := range strings.Split(spec, ",") {
+	for part := range strings.SplitSeq(spec, ",") {
 		part = strings.TrimSpace(part)
 		switch {
 		case part == "":
@@ -128,7 +128,7 @@ func resolve(t *testing.T, harness, spec string, list func() ([]string, error), 
 
 // numberOf pulls the x.y.z out of a --version line.
 func numberOf(line string) string {
-	for _, f := range strings.Fields(line) {
+	for f := range strings.FieldsSeq(line) {
 		f = strings.TrimPrefix(f, "v")
 		if isRelease(f) {
 			return f

@@ -126,12 +126,18 @@ func (sb *Sandbox) CodexExec(route Route, prompt string, extra ...string) *Codex
 	t := sb.T
 	t.Helper()
 	sb.prepareCodex(route)
-	args := append([]string{"exec", "--json", "--skip-git-repo-check", "--dangerously-bypass-hook-trust",
+	args := []string{"exec", "--json", "--skip-git-repo-check"}
+	if !sb.CodexHooksUntrusted {
+		// Otherwise the first run of a real developer's Codex: the project's hooks exist
+		// but nobody has trusted them, so Codex runs none.
+		args = append(args, "--dangerously-bypass-hook-trust")
+	}
+	args = append(append(args,
 		"-C", sb.workDir(), "-c", `cli_auth_credentials_store="file"`,
 		// Plugin catalog clones can outlive Codex and race TempDir cleanup.
 		// These contracts exercise hooks/telemetry, not plugin installation.
 		"-c", "features.plugins=false", "-c", "features.remote_plugin=false",
-		"-c", `model_reasoning_effort="low"`}, extra...)
+		"-c", `model_reasoning_effort="low"`), extra...)
 	args = append(args, prompt)
 	cmd := exec.Command(sb.Codex.Path, args...)
 	cmd.Dir = sb.workDir()

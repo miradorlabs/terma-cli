@@ -20,7 +20,7 @@ concurrency:
 jobs:
   live:
     runs-on: macos-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     environment: live-harnesses
     permissions:
       contents: read
@@ -33,6 +33,7 @@ jobs:
       ANTHROPIC_WORKSPACE_ID: wrkspc_01Ug36g2VPKLUSFZ9LZXFTvU
       TERMA_LIVE_CLAUDE_VERSIONS: last3
       TERMA_LIVE_CODEX_VERSIONS: last3
+      TERMA_LIVE_OPENCODE_VERSIONS: last3
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
@@ -83,7 +84,7 @@ jobs:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ inputs.include_subscriptions && secrets.CLAUDE_CODE_OAUTH_TOKEN || '' }}
           TERMA_LIVE: "1"
           TERMA_LIVE_BINARY: ${{ github.workspace }}/live/bin/terma
-        run: ./bin/live.test -test.v -test.timeout 35m
+        run: ./bin/live.test -test.v -test.timeout 75m
       - name: Publish coverage summary
         if: always()
         run: |

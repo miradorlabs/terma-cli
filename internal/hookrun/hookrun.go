@@ -151,7 +151,16 @@ func (e Env) claimForRelay(r *repo, ev spool.Event) {
 		return
 	}
 	tool, _ := ev.Attrs[attrTool].(string)
-	claim.Write(ev.SessionID, claim.Claim{ProjectID: r.projectID, Tool: tool, Repo: r.name, Worktree: r.worktree}, e.now())
+	c := claim.Claim{ProjectID: r.projectID, Tool: tool, Repo: r.name, Worktree: r.worktree, PIDs: claimPIDs()}
+	claim.Write(ev.SessionID, c, e.now())
+	// A Codex subagent is a thread of its own: its hooks carry the root's session and the
+	// child thread as agent_id, and its telemetry the child's conversation.id. Claimed
+	// only under the root, everything the subagent did would be dropped. (Claude's
+	// subagents export under the parent's session.id; claiming their agent_id too is
+	// harmless — no export names it.)
+	if agent, _ := ev.Attrs[attrAgentID].(string); agent != "" && agent != ev.SessionID {
+		claim.Write(agent, c, e.now())
+	}
 	if e.OnClaim != nil {
 		e.OnClaim()
 	}

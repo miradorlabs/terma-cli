@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -48,10 +49,8 @@ func Record(test, status, note string) {
 func Note(surface, note string) {
 	reportMu.Lock()
 	defer reportMu.Unlock()
-	for _, n := range reportNotes[surface] {
-		if n == note {
-			return
-		}
+	if slices.Contains(reportNotes[surface], note) {
+		return
 	}
 	reportNotes[surface] = append(reportNotes[surface], note)
 }

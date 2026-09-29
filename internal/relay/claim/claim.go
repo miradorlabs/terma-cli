@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -43,6 +44,24 @@ type Claim struct {
 	Repo      string    `json:"repo,omitempty"`
 	Worktree  string    `json:"worktree,omitempty"`
 	ClaimedAt time.Time `json:"claimed_at"`
+	// PIDs are the processes the claiming hooks ran under: the agent is one of them.
+	// The relay forwards a record only from a process named here, so the same session
+	// resumed by another process elsewhere — where no hook of this repository runs —
+	// is not covered. Every hook of the session adds its own; the most recent maxPIDs
+	// are kept. Empty (a platform where they cannot be read) matches any sender.
+	PIDs []int `json:"pids,omitempty"`
+}
+
+// maxPIDs bounds a claim's process list: a few runs of one session, each with its
+// chain of ancestors.
+const maxPIDs = 64
+
+// Covers reports whether pid may send under this claim.
+func (c Claim) Covers(pid int) bool {
+	if len(c.PIDs) == 0 || pid == 0 {
+		return true
+	}
+	return slices.Contains(c.PIDs, pid)
 }
 
 // Dir is the relay directory, under the config dir.
@@ -96,10 +115,12 @@ func Write(sessionID string, c Claim, now time.Time) bool {
 	if !ok {
 		return false
 	}
-	if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < Refresh {
-		if prev, ok := read(p); ok && prev.ProjectID == c.ProjectID {
+	prev, havePrev := read(p)
+	if havePrev && prev.ProjectID == c.ProjectID {
+		if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < Refresh && subset(c.PIDs, prev.PIDs) {
 			return false
 		}
+		c.PIDs = merge(prev.PIDs, c.PIDs)
 	}
 	c.ClaimedAt = now.UTC()
 	data, err := json.Marshal(c)
@@ -110,6 +131,30 @@ func Write(sessionID string, c Claim, now time.Time) bool {
 		return false
 	}
 	return config.WriteFileAtomicNoSync(p, data, 0o600) == nil
+}
+
+func subset(a, b []int) bool {
+	for _, v := range a {
+		if !slices.Contains(b, v) {
+			return false
+		}
+	}
+	return true
+}
+
+// merge appends the new pids to the old ones, without repeats, keeping the newest.
+func merge(old, add []int) []int {
+	out := slices.Clone(old)
+	for _, v := range add {
+		if i := slices.Index(out, v); i >= 0 {
+			out = slices.Delete(out, i, i+1)
+		}
+		out = append(out, v)
+	}
+	if len(out) > maxPIDs {
+		out = out[len(out)-maxPIDs:]
+	}
+	return out
 }
 
 // Read returns the live claim for sessionID: one written less than TTL ago.

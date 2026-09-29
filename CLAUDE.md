@@ -611,8 +611,32 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   Unclaimed records are held 2 minutes in memory, then dropped; nothing unclaimed touches
   disk. Claims come from `emitFor` and, for hooks that spool nothing, from the payload
   (`hookrun.ClaimFromPayload`, fed a bounded copy of stdin in `cmd/hook.go`); hooks write
-  none unless `relay/token` exists. The claiming hook starts the relay (`spawnRelay`,
-  single instance on `relay/relay.lock`).
+  none unless `relay/token` exists. `relay setup` and the claiming hook start the relay
+  (`spawnRelay`, single instance on `relay/relay.lock`, a minute's backoff after a failed
+  start recorded in `relay/last-error`); it idles 8 hours, because Codex emits
+  `conversation_starts` before any hook and never retries it.
+- A claim is scoped to processes, not just a session: it carries the hook's ancestors
+  (`internal/procinfo`), and the relay forwards a record only from a process the claim
+  names (`procinfo.PeerPID` per connection; an unresolved sender falls back to the
+  session and is counted). Claude keeps a session id across `--resume` in any directory,
+  so a session-only claim forwarded personal work. A Codex subagent's `agent_id` is its
+  own thread and is claimed too. OTLP/JSON trace and span ids are hex and must be
+  converted before protojson (`otlpjson.go`). A session's records leave in arrival order
+  (`deliverMu`, held parts first). Every change to the relay's routing keeps
+  `received = forwarded + dropped` (`TestRelayAccountsForEveryRecordUnderLoad`).
+- The sender of a connection is found with the kernel (`procinfo.FindSender`:
+  `proc_info` on macOS, offsets pinned by a test against a real socket; `/proc` on
+  Linux) once per connection at its first export, while the socket exists — never with
+  lsof or another subprocess. A trace's session is learnt from spans *and* log records
+  (Codex's mid-turn logs carry the trace id; its turn span arrives when the turn ends),
+  and trace-keyed spans wait `TraceHold` (30 min); a full hold evicts the oldest, unnamed
+  traces first. Claude's `UserPromptSubmit` hook (`user-prompt-submit`) exists to claim
+  and start the relay at every turn's start — a relay that died between turns otherwise
+  lost the next turn; it must print nothing (its stdout goes to the model).
+- OpenCode goes through the relay too (`relay setup` points the plugin at it): its
+  prompt rides a log body and its reply `gen_ai.completion`, both withheld with content.
+  `live/opencode.go` fetches OpenCode builds from npm (`opencode-<os>-<arch>`), and
+  `openAIChatProvider` is its fake model.
 - Session keys: `session.id` (Claude, every signal), `conversation.id` (Codex logs), and
   `thread.id` on Codex's turn span only — a numeric `thread.id` is an OS thread and is
   never a session; sessionless spans go by their trace. Codex metrics carry no session and
@@ -631,7 +655,7 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   `antigravity`.
 - Hook event names are committed wiring and must stay stable: `session-start` /
   `session-end` / `post-tool-use` / `stop` / `stop-failure` / `subagent-start` /
-  `subagent-stop` (Claude Code's `.claude/settings.json`),
+  `subagent-stop` / `user-prompt-submit` (Claude Code's `.claude/settings.json`),
   `statusline` (Claude Code's user-level `statusLine.command`, written by `terma connect
   claude`), `codex-notify` (Codex's `notify`), `codex-session-start` /
   `codex-user-prompt-submit` / `codex-pre-tool-use` / `codex-permission-request` /

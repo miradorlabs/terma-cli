@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -22,9 +23,11 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
+	"github.com/miradorlabs/terma-cli/internal/procinfo"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/shim"
@@ -43,7 +46,12 @@ const (
 	relayLockFile  = "relay.lock"
 	relayStatsFile = "stats.json"
 	relayPIDFile   = "pid"
+	relayErrorFile = "last-error"
 )
+
+// relayRetryAfter is how long hooks leave a relay that failed to start before trying
+// again.
+const relayRetryAfter = time.Minute
 
 func newRelayCommand() *cobra.Command {
 	cmd := &cobra.Command{
@@ -124,11 +132,15 @@ func newRelayRunCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			r := relay.New(relay.Options{Token: token, Hold: hold, Resolve: relayResolver(cfg), Version: Version})
+			r := relay.New(relay.Options{Token: token, Hold: hold, Resolve: relayResolver(cfg), Version: Version, PeerPID: procinfo.FindSender})
 			ln, err := net.Listen("tcp", addr)
 			if err != nil {
-				return fmt.Errorf("relay: listen on %s: %w", addr, err)
+				// A hook started this relay with nowhere to print; status reads it.
+				err = fmt.Errorf("relay: listen on %s: %w", addr, err)
+				_ = config.WriteFileAtomicNoSync(filepath.Join(dir, relayErrorFile), []byte(time.Now().UTC().Format(time.RFC3339)+" "+err.Error()+"\n"), 0o600)
+				return err
 			}
+			_ = os.Remove(filepath.Join(dir, relayErrorFile))
 			if !quiet {
 				fmt.Fprintf(cmd.OutOrStdout(), "Relay listening on %s (hold %s, idle exit %s).\n", ln.Addr(), hold, idle)
 			}
@@ -140,7 +152,8 @@ func newRelayRunCommand() *cobra.Command {
 			defer stop()
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			srv := &http.Server{Handler: r.Handler(), ReadHeaderTimeout: 10 * time.Second}
+			// A client that trickles its request cannot hold a connection open.
+			srv := &http.Server{Handler: r.Handler(), ConnContext: r.ConnContext, ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 2 * time.Minute}
 			go func() { _ = srv.Serve(ln) }()
 			done := make(chan struct{})
 			go func() { r.Run(ctx); close(done) }()
@@ -167,7 +180,10 @@ func newRelayRunCommand() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().DurationVar(&idle, "idle", 30*time.Minute, "exit after this long with no export and nothing held or queued (0: never)")
+	// Long, because a relay that is not running when an agent starts loses what the
+	// agent exports before its first hook: Codex's conversation_starts comes before
+	// SessionStart (docs/RELAY-SPIKE.md). A relay a hook started stays for the next one.
+	cmd.Flags().DurationVar(&idle, "idle", 8*time.Hour, "exit after this long with no export and nothing held or queued (0: never)")
 	cmd.Flags().StringVar(&addr, "addr", "", "listen here instead of the address `terma relay setup` recorded")
 	cmd.Flags().BoolVar(&quiet, "quiet", false, "print nothing")
 	return cmd
@@ -205,6 +221,7 @@ func harnessForTool(tool string) string {
 
 func newRelaySetupCommand() *cobra.Command {
 	var addr, agents string
+	var noStart bool
 	cmd := &cobra.Command{
 		Use:   "setup",
 		Short: "Point the agents' global exporters at the local relay",
@@ -237,12 +254,17 @@ func newRelaySetupCommand() *cobra.Command {
 				}
 				fmt.Fprintf(out, "%s exports to the relay at %s.\n", h.DisplayName(), addr)
 			}
-			fmt.Fprintln(out, "Hooks in repositories with a binding start the relay and claim their sessions; nothing else is forwarded.")
+			fmt.Fprintln(out, "Hooks in repositories with a binding claim their sessions; nothing else is forwarded.")
+			// Started now, so the first session does not open against a closed port.
+			if !noStart {
+				spawnRelay()
+			}
 			return nil
 		},
 	}
 	cmd.Flags().StringVar(&addr, "addr", "", "the loopback address the relay listens on (default "+defaultRelayAddr+")")
 	cmd.Flags().StringVar(&agents, "harness", "claude,codex", "the agents to point at the relay")
+	cmd.Flags().BoolVar(&noStart, "no-start", false, "do not start the relay now (the next hook that claims a session will)")
 	return cmd
 }
 
@@ -280,6 +302,12 @@ func newRelayStatusCommand() *cobra.Command {
 			if running {
 				fmt.Fprintf(out, "Running on %s since %s.\n", relayAddr(dir), snap.Since.Format(time.RFC3339))
 			} else {
+				if squatted(relayAddr(dir)) {
+					fmt.Fprintf(out, "Warning: another process is listening on %s. The agents' telemetry goes to it, not to terma — stop it, or move the relay with `terma relay setup --addr`.\n", relayAddr(dir))
+				}
+				if data, err := os.ReadFile(filepath.Join(dir, relayErrorFile)); err == nil {
+					fmt.Fprintf(out, "The relay last failed to start: %s", data)
+				}
 				fmt.Fprintln(out, "Not running. Last run:")
 			}
 			for _, k := range snap.Keys() {
@@ -288,6 +316,17 @@ func newRelayStatusCommand() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+// squatted reports whether something answers on the relay's address while the relay
+// is not running: the agents' exporters would be sending to it.
+func squatted(addr string) bool {
+	conn, err := net.DialTimeout("tcp", addr, 300*time.Millisecond)
+	if err != nil {
+		return false
+	}
+	_ = conn.Close()
+	return true
 }
 
 // relayStats reads the running relay's stats, else those the last run left behind.
@@ -331,6 +370,11 @@ func spawnRelay() {
 		return // running (or unlockable: nothing to do from a hook either way)
 	}
 	unlock()
+	// One that just failed to start (its port taken) is not retried by every hook:
+	// each would start a process that fails the same way.
+	if info, err := os.Stat(filepath.Join(dir, relayErrorFile)); err == nil && time.Since(info.ModTime()) < relayRetryAfter {
+		return
+	}
 	exe, err := os.Executable()
 	if err != nil {
 		return
@@ -342,4 +386,55 @@ func spawnRelay() {
 		return
 	}
 	_ = proc.Process.Release()
+}
+
+// relayDoctorCheck is doctor's "agent exporting to Terma" on a machine that exports
+// through the local relay: the relay can run (or runs) on its address with no one else
+// there, each of the developer's agents sends to it, and this repository's sessions
+// can leave — it is bound and this machine holds its project's key.
+func relayDoctorCheck(projectID string, agents []string) doctor.Check {
+	dir, err := claim.Dir()
+	if err != nil {
+		return doctor.Check{Status: doctor.Fail, Detail: err.Error()}
+	}
+	addr := relayAddr(dir)
+	running := false
+	if unlock, err := flock.TryLock(filepath.Join(dir, relayLockFile)); err == nil {
+		unlock()
+	} else if flock.IsBusy(err) {
+		running = true
+	}
+	if !running && squatted(addr) {
+		return doctor.Check{Status: doctor.Fail, Detail: "another process is listening on " + addr + " and receives the agents' telemetry",
+			Fix: "stop it, or move the relay with `terma relay setup --addr`"}
+	}
+	var wrong []string
+	for _, name := range []string{shim.AgentClaude, shim.AgentCodex, "opencode"} {
+		// OpenCode only for a developer who named it: its plugin is not set up by
+		// default, and most machines have no OpenCode.
+		if (len(agents) > 0 || name == "opencode") && !slices.Contains(agents, name) {
+			continue
+		}
+		h, err := harness.Lookup(name)
+		if err != nil {
+			continue
+		}
+		if st, err := h.Status(); err != nil || !st.Connected || strings.TrimRight(st.Endpoint, "/") != "http://"+addr {
+			wrong = append(wrong, h.DisplayName())
+		}
+	}
+	if len(wrong) > 0 {
+		return doctor.Check{Status: doctor.Fail, Detail: strings.Join(wrong, " and ") + " not exporting to the local relay", Fix: "terma relay setup"}
+	}
+	state := "starts with the next hook"
+	if running {
+		state = "running"
+	}
+	switch {
+	case projectID == "":
+		return doctor.Check{Status: doctor.Warn, Detail: "local relay on " + addr + " (" + state + "); this repository is not bound, so its sessions are never forwarded", Fix: "terma install"}
+	case keystore.Get(projectID) == "" && keystore.GetFor("claude", projectID) == "" && keystore.GetFor("codex", projectID) == "":
+		return doctor.Check{Status: doctor.Warn, Detail: "local relay on " + addr + " (" + state + "); no key for this project on this machine, so its sessions are dropped", Fix: "terma install"}
+	}
+	return doctor.Check{Status: doctor.Pass, Detail: "through the local relay on " + addr + " (" + state + "); only this repository's sessions are forwarded"}
 }

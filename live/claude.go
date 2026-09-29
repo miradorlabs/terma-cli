@@ -175,6 +175,13 @@ ready:
 
 // ClaudeHeadless runs `claude -p` and returns its JSON result.
 func (sb *Sandbox) ClaudeHeadless(route Route, prompt string, extra ...string) (map[string]any, string) {
+	sb.T.Helper()
+	return sb.ClaudeHeadlessIn(sb.workDir(), route, prompt, extra...)
+}
+
+// ClaudeHeadlessIn is ClaudeHeadless started in dir, so several sessions can run at
+// once in different places.
+func (sb *Sandbox) ClaudeHeadlessIn(dir string, route Route, prompt string, extra ...string) (map[string]any, string) {
 	t := sb.T
 	t.Helper()
 	sb.ensureClaudeExport()
@@ -184,7 +191,7 @@ func (sb *Sandbox) ClaudeHeadless(route Route, prompt string, extra ...string) (
 	ctx, cancel := context.WithTimeout(context.Background(), scenarioTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, sb.claudeLauncher(), args...)
-	cmd.Dir = sb.workDir()
+	cmd.Dir = dir
 	cmd.Env = sb.claudeEnv(route)
 	cmd.Stdin = nil
 	out, err := cmd.Output()

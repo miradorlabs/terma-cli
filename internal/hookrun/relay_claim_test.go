@@ -87,3 +87,26 @@ func TestNoClaimWithoutBindingOrRelay(t *testing.T) {
 		t.Fatal("a machine without `terma relay setup` claimed a session")
 	}
 }
+
+// A Codex subagent exports under its own thread id, which its hooks name as agent_id:
+// both ids are claimed, from a spooled event and from a bare payload alike.
+func TestCodexSubagentThreadIsClaimed(t *testing.T) {
+	root := initRepo(t)
+	relaySetUp(t)
+	if err := project.Save(root, &project.File{Project: project.Project{ID: "project-a"}}); err != nil {
+		t.Fatal(err)
+	}
+	sp, _ := spool.Open(t.TempDir())
+	env := Env{Now: time.Now(), Cwd: root, Spool: sp,
+		Stdin: strings.NewReader(`{"session_id":"root-thread","agent_id":"child-thread","agent_type":"worker","cwd":"` + root + `"}`)}
+	if err := CodexSubagentStart(context.Background(), env); err != nil {
+		t.Fatal(err)
+	}
+	payload := `{"session_id":"root-thread","agent_id":"child-thread-2","cwd":"` + root + `"}`
+	ClaimFromPayload(context.Background(), Env{Now: time.Now(), Cwd: root}, []byte(payload), "codex")
+	for _, id := range []string{"root-thread", "child-thread", "child-thread-2"} {
+		if c, ok := claim.Read(id, time.Now()); !ok || c.ProjectID != "project-a" {
+			t.Errorf("%s not claimed: %+v %v", id, c, ok)
+		}
+	}
+}

@@ -18,8 +18,16 @@ var (
 	// them when prompts are off, and the relay does the same, with each harness's own
 	// marker, so the backend sees the shape it already parses.
 	promptFields = []string{"prompt", "response", "user_prompt"}
+	// promptDropFields hold what was said and are removed outright, as the exporters
+	// that write them omit them when content is off: the GenAI semantic conventions'
+	// content attributes (terma's OpenCode plugin writes gen_ai.completion).
+	promptDropFields = []string{"gen_ai.prompt", "gen_ai.completion", "gen_ai.input.messages", "gen_ai.output.messages", "gen_ai.system_instructions"}
+	// promptBodyEvents carry what was said in the log body, not an attribute: the
+	// OpenCode plugin's prompt, and the session title, which restates it.
+	promptBodyEvents = []string{"opencode.user_prompt", "opencode.session.created"}
 	// toolContentFields hold what a tool was called with or returned.
-	toolContentFields = []string{"tool_parameters", "tool_input", "full_command", "bash_command", "arguments", "output"}
+	toolContentFields = []string{"tool_parameters", "tool_input", "full_command", "bash_command", "arguments", "output",
+		"gen_ai.tool.call.arguments", "gen_ai.tool.call.result", "opencode.tool.file_path"}
 	// toolContentEvents are span events that exist only to carry tool content: Claude
 	// Code's claude_code.tool span records the command and its output as a
 	// tool.output event (live, 2.1.284), which the golden attribute lists do not see.
@@ -51,6 +59,10 @@ func withhold(p *part, prompts, toolContent bool) int {
 			for _, sl := range rl.GetScopeLogs() {
 				for _, lr := range sl.GetLogRecords() {
 					lr.Attributes = apply(lr.GetAttributes())
+					if !prompts && contains(promptBodyEvents, attrString(lr.GetAttributes(), "event.name")) && lr.GetBody().GetStringValue() != "" {
+						lr.Body = &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: ""}}
+						changed++
+					}
 				}
 			}
 		}
@@ -90,6 +102,9 @@ func withholdAttrs(attrs []*commonpb.KeyValue, prompts, toolContent bool) ([]*co
 		case !toolContent && contains(toolContentFields, kv.GetKey()):
 			changed = true
 			continue
+		case !prompts && contains(promptDropFields, kv.GetKey()):
+			changed = true
+			continue
 		case !prompts && contains(promptFields, kv.GetKey()) && kv.GetValue().GetStringValue() != marker:
 			kv.Value = &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: marker}}
 			changed = true
@@ -97,6 +112,15 @@ func withholdAttrs(attrs []*commonpb.KeyValue, prompts, toolContent bool) ([]*co
 		out = append(out, kv)
 	}
 	return out, changed
+}
+
+func attrString(attrs []*commonpb.KeyValue, key string) string {
+	for _, kv := range attrs {
+		if kv.GetKey() == key {
+			return kv.GetValue().GetStringValue()
+		}
+	}
+	return ""
 }
 
 func contains(set []string, s string) bool {

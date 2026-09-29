@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -34,6 +35,9 @@ const ProjectAttr = "mirador.project.id"
 // memory before it is dropped. It covers the first export batch racing the hook that
 // claims the session; the spike measures the real race.
 const DefaultHold = 2 * time.Minute
+
+// DefaultTraceHold is TraceHold's default.
+const DefaultTraceHold = 30 * time.Minute
 
 // maxBody bounds one export request, decompressed.
 const maxBody = 16 << 20
@@ -67,6 +71,52 @@ type Options struct {
 	Now func() time.Time
 	// Version is terma's, sent as the User-Agent.
 	Version string
+	// TraceHold is how long spans wait for their trace's session to be learnt
+	// (DefaultTraceHold when zero): longer than Hold, because a turn's child spans can
+	// precede the span or log that names the session by as long as the turn lasts.
+	TraceHold time.Duration
+	// Grace is how long a stopping relay keeps delivering what it had already
+	// accepted for claimed sessions (five seconds when zero).
+	Grace time.Duration
+	// PeerPID names the process on the other end of a connection from its remote
+	// port (procinfo.FindSender). With it, a claim covers only its own processes; without
+	// it, or when a lookup fails (counted as sender_unresolved), the session decides.
+	PeerPID func(port int) (int, bool)
+}
+
+type connKey struct{}
+
+// connInfo is one exporter connection: its remote port, and the process behind it,
+// looked up once and kept for the connection's life.
+type connInfo struct {
+	port int
+	once sync.Once
+	pid  int
+}
+
+// ConnContext is the http.Server hook that remembers each connection's remote port,
+// so the process behind it can be looked up once, not per request.
+func (r *Relay) ConnContext(ctx context.Context, c net.Conn) context.Context {
+	info := &connInfo{}
+	if addr, ok := c.RemoteAddr().(*net.TCPAddr); ok {
+		info.port = addr.Port
+	}
+	return context.WithValue(ctx, connKey{}, info)
+}
+
+func (r *Relay) senderPID(req *http.Request) int {
+	info, ok := req.Context().Value(connKey{}).(*connInfo)
+	if !ok || r.opts.PeerPID == nil || info.port == 0 {
+		return 0
+	}
+	info.once.Do(func() {
+		if pid, ok := r.opts.PeerPID(info.port); ok {
+			info.pid = pid
+		} else {
+			r.stats.add("sender_unresolved", 1)
+		}
+	})
+	return info.pid
 }
 
 // Relay is the local OTLP relay. Handler serves the agents; Run delivers what was
@@ -75,14 +125,22 @@ type Relay struct {
 	opts  Options
 	stats *Stats
 
-	mu       sync.Mutex
-	held     map[string][]heldPart
-	heldN    int
-	lastSeen time.Time
-	dests    map[string]*destination
-	traces   map[string]traceSession
-	wg       sync.WaitGroup
-	ctx      context.Context
+	// deliverMu orders every hand-off to a destination, so a session's records leave in
+	// the order they arrived: a record that finds its session claimed waits behind the
+	// session's held ones instead of overtaking them. Taken before mu, never after.
+	deliverMu sync.Mutex
+
+	mu         sync.Mutex
+	held       map[string][]heldPart
+	heldN      int
+	heldBytes  int
+	lastSeen   time.Time
+	dests      map[string]*destination
+	traces     map[string]traceSession
+	wg         sync.WaitGroup
+	sendCtx    context.Context
+	cancelSend context.CancelFunc
+	stopping   chan struct{}
 }
 
 // traceSession is the session a trace was seen to belong to, and when.
@@ -96,18 +154,31 @@ type traceSession struct {
 const traceTTL = time.Hour
 
 type heldPart struct {
-	p  *part
-	at time.Time
+	p    *part
+	at   time.Time
+	size int
 }
 
-// maxHeld bounds how many records wait for claims at once. Past it a new unclaimed
-// record is dropped on arrival, counted as unclaimed_overflow.
-const maxHeld = 50000
+// maxHeld and maxHeldBytes bound what waits for claims at once, by records and by
+// encoded size: a few huge exports must not be able to exhaust memory. Past either, a
+// new unclaimed part is dropped on arrival, counted as unclaimed_overflow.
+const (
+	maxHeld      = 50000
+	maxHeldBytes = 64 << 20
+)
+
+// maxTraces bounds the trace → session index. Past it no new trace is learnt (counted
+// as trace_index_full) until old ones age out, and their unnamed spans are held and
+// then dropped as no_session_trace.
+const maxTraces = 100000
 
 // New returns a relay. Run must be started before requests are served.
 func New(opts Options) *Relay {
 	if opts.Hold == 0 {
 		opts.Hold = DefaultHold
+	}
+	if opts.TraceHold == 0 {
+		opts.TraceHold = max(DefaultTraceHold, opts.Hold)
 	}
 	if opts.Lookup == nil {
 		opts.Lookup = claim.Read
@@ -121,7 +192,12 @@ func New(opts Options) *Relay {
 			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 		}
 	}
-	return &Relay{opts: opts, stats: newStats(), held: map[string][]heldPart{}, dests: map[string]*destination{}, traces: map[string]traceSession{}, lastSeen: opts.Now(), ctx: context.Background()}
+	if opts.Grace == 0 {
+		opts.Grace = 5 * time.Second
+	}
+	sendCtx, cancel := context.WithCancel(context.Background())
+	return &Relay{opts: opts, stats: newStats(), held: map[string][]heldPart{}, dests: map[string]*destination{},
+		traces: map[string]traceSession{}, lastSeen: opts.Now(), sendCtx: sendCtx, cancelSend: cancel, stopping: make(chan struct{})}
 }
 
 // Stats is the relay's running account.
@@ -173,7 +249,9 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	pid := r.senderPID(req)
 	for _, p := range parts {
+		p.pid = pid
 		r.stats.received(s, p.records)
 		if p.session == "" {
 			r.stats.dropped(s, "no_session_id", p.records)
@@ -211,6 +289,11 @@ func readBody(req *http.Request) ([]byte, error) {
 func (r *Relay) decode(s Signal, body []byte, isJSON bool) (map[string]*part, error) {
 	unmarshal := proto.Unmarshal
 	if isJSON {
+		fixed, err := hexIDsToBase64(body)
+		if err != nil {
+			return nil, err
+		}
+		body = fixed
 		unmarshal = protojson.UnmarshalOptions{DiscardUnknown: true}.Unmarshal
 	}
 	switch s {
@@ -219,7 +302,7 @@ func (r *Relay) decode(s Signal, body []byte, isJSON bool) (map[string]*part, er
 		if err := unmarshal(body, &m); err != nil {
 			return nil, err
 		}
-		return splitLogs(&m), nil
+		return splitLogs(&m, r.learnTrace), nil
 	case Traces:
 		var m tracepb.TracesData
 		if err := unmarshal(body, &m); err != nil {
@@ -237,8 +320,12 @@ func (r *Relay) decode(s Signal, body []byte, isJSON bool) (map[string]*part, er
 
 func (r *Relay) learnTrace(traceID, session string) {
 	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, known := r.traces[traceID]; !known && len(r.traces) >= maxTraces {
+		r.stats.add("trace_index_full", 1)
+		return
+	}
 	r.traces[traceID] = traceSession{session, r.opts.Now()}
-	r.mu.Unlock()
 }
 
 func (r *Relay) traceOf(traceID string) string {
@@ -262,23 +349,78 @@ func (r *Relay) touch() {
 	r.mu.Unlock()
 }
 
-// route forwards a session's part if its session is claimed, and holds it otherwise.
+// route forwards a session's part if its session is claimed, and holds it otherwise —
+// also when the session is claimed but still has parts held, which the next sweep
+// releases first, so the new part never overtakes them.
 func (r *Relay) route(p *part) {
+	r.deliverMu.Lock()
+	defer r.deliverMu.Unlock()
 	if s := r.sessionFor(p.session); s != "" {
-		if c, ok := r.opts.Lookup(s, r.opts.Now()); ok {
-			r.deliver(c, p)
-			return
+		// A claim covers only the processes whose hooks made it: the same session
+		// resumed by another process, where this repository's hooks do not run, waits
+		// like an unclaimed one — its own hook may still claim it.
+		if c, ok := r.opts.Lookup(s, r.opts.Now()); ok && c.Covers(p.pid) {
+			r.mu.Lock()
+			waiting := len(r.held[p.session]) > 0
+			r.mu.Unlock()
+			if !waiting {
+				r.deliver(c, p)
+				return
+			}
 		}
 	}
+	size := proto.Size(p.msg)
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.heldN+p.records > maxHeld {
+	if p.records > maxHeld || size > maxHeldBytes {
 		r.stats.dropped(p.signal, "unclaimed_overflow", p.records)
 		return
 	}
-	r.held[p.session] = append(r.held[p.session], heldPart{p, r.opts.Now()})
+	// Full: make room by evicting the oldest held parts — traces nothing has named
+	// first (mostly process-level work that never will be), then the oldest of any
+	// kind — rather than refusing the newcomer, which is the likeliest to be claimed.
+	for r.heldN+p.records > maxHeld || r.heldBytes+size > maxHeldBytes {
+		if !r.evictOldestLocked() {
+			r.stats.dropped(p.signal, "unclaimed_overflow", p.records)
+			return
+		}
+	}
+	r.held[p.session] = append(r.held[p.session], heldPart{p, r.opts.Now(), size})
 	r.heldN += p.records
+	r.heldBytes += size
 	r.stats.add("held_parts", 1)
+}
+
+// evictOldestLocked drops the oldest held part, preferring trace-keyed ones, and
+// reports whether it found one. r.mu is held.
+func (r *Relay) evictOldestLocked() bool {
+	var victim string
+	var at time.Time
+	for _, traceOnly := range []bool{true, false} {
+		for key, parts := range r.held {
+			if len(parts) == 0 || (traceOnly && !strings.HasPrefix(key, tracePrefix)) {
+				continue
+			}
+			if victim == "" || parts[0].at.Before(at) {
+				victim, at = key, parts[0].at
+			}
+		}
+		if victim != "" {
+			break
+		}
+	}
+	if victim == "" {
+		return false
+	}
+	h := r.held[victim][0]
+	r.held[victim] = r.held[victim][1:]
+	if len(r.held[victim]) == 0 {
+		delete(r.held, victim)
+	}
+	r.heldN -= h.p.records
+	r.heldBytes -= h.size
+	r.stats.dropped(h.p.signal, "unclaimed_evicted", h.p.records)
+	return true
 }
 
 func (r *Relay) deliver(c claim.Claim, p *part) {
@@ -330,14 +472,14 @@ func strValue(s string) *commonpb.AnyValue {
 // the hold, and delivers until ctx is done. It returns when ctx is cancelled and every
 // destination has stopped; what was still queued is counted as lost.
 func (r *Relay) Run(ctx context.Context) {
-	r.mu.Lock()
-	r.ctx = ctx
-	r.mu.Unlock()
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 	for {
 		select {
 		case <-ctx.Done():
+			// Claims that landed since the last sweep still count.
+			r.sweep()
+			r.deliverMu.Lock()
 			r.mu.Lock()
 			for s, parts := range r.held {
 				for _, h := range parts {
@@ -349,9 +491,20 @@ func (r *Relay) Run(ctx context.Context) {
 				}
 				delete(r.held, s)
 			}
-			r.heldN = 0
+			r.heldN, r.heldBytes = 0, 0
 			r.mu.Unlock()
-			r.wg.Wait()
+			r.deliverMu.Unlock()
+			// What was accepted for claimed sessions gets Grace to leave.
+			close(r.stopping)
+			done := make(chan struct{})
+			go func() { r.wg.Wait(); close(done) }()
+			select {
+			case <-done:
+			case <-time.After(r.opts.Grace):
+				r.cancelSend()
+				<-done
+			}
+			r.cancelSend()
 			return
 		case <-tick.C:
 			r.sweep()
@@ -374,6 +527,8 @@ func (r *Relay) sweep() {
 		}
 	}
 	r.mu.Unlock()
+	r.deliverMu.Lock()
+	defer r.deliverMu.Unlock()
 	for _, s := range sessions {
 		var c claim.Claim
 		claimed := false
@@ -384,21 +539,31 @@ func (r *Relay) sweep() {
 		parts := r.held[s]
 		var keep []heldPart
 		var release []*part
+		hold := r.opts.Hold
+		if strings.HasPrefix(s, tracePrefix) {
+			hold = r.opts.TraceHold
+		}
 		for _, h := range parts {
+			covered := claimed && c.Covers(h.p.pid)
 			switch {
-			case claimed:
+			case covered:
 				release = append(release, h.p)
-			case now.Sub(h.at) >= r.opts.Hold && strings.HasPrefix(s, tracePrefix):
+			case now.Sub(h.at) >= hold && claimed:
+				// The session is claimed, but not by this process: the session resumed
+				// somewhere no hook of the repository runs.
+				r.stats.dropped(h.p.signal, "uncovered_process", h.p.records)
+			case now.Sub(h.at) >= hold && strings.HasPrefix(s, tracePrefix):
 				// No span ever named this trace's session: process-level work, not an
 				// unclaimed session.
 				r.stats.dropped(h.p.signal, "no_session_trace", h.p.records)
-			case now.Sub(h.at) >= r.opts.Hold:
+			case now.Sub(h.at) >= hold:
 				r.stats.dropped(h.p.signal, "unclaimed_expired", h.p.records)
 			default:
 				keep = append(keep, h)
 			}
-			if claimed || now.Sub(h.at) >= r.opts.Hold {
+			if covered || now.Sub(h.at) >= hold {
 				r.heldN -= h.p.records
+				r.heldBytes -= h.size
 			}
 		}
 		if len(keep) == 0 {
@@ -452,7 +617,7 @@ func (r *Relay) destination(pol Policy) *destination {
 		d = &destination{r: r, pol: pol, queue: make(chan *part, destQueue)}
 		r.dests[key] = d
 		r.wg.Add(1)
-		go d.drain(r.ctx)
+		go d.drain()
 	}
 	return d
 }
@@ -471,27 +636,38 @@ func (d *destination) busy() bool {
 	return d.active || len(d.queue) > 0
 }
 
-func (d *destination) drain(ctx context.Context) {
+// drain sends the queue in order until the relay stops, then empties it: each part
+// still gets its send, bounded by the relay's grace, and what the grace cuts off is
+// counted as lost.
+func (d *destination) drain() {
 	defer d.r.wg.Done()
+	ctx := d.r.sendCtx
+	sendOne := func(p *part) {
+		d.mu.Lock()
+		d.active = true
+		d.mu.Unlock()
+		d.send(ctx, p)
+		d.mu.Lock()
+		d.active = false
+		d.mu.Unlock()
+	}
 	for {
 		select {
-		case <-ctx.Done():
+		case p := <-d.queue:
+			sendOne(p)
+		case <-d.r.stopping:
 			for {
 				select {
 				case p := <-d.queue:
-					d.r.stats.dropped(p.signal, "upstream_lost_at_exit", p.records)
+					if ctx.Err() != nil {
+						d.r.stats.dropped(p.signal, "upstream_lost_at_exit", p.records)
+						continue
+					}
+					sendOne(p)
 				default:
 					return
 				}
 			}
-		case p := <-d.queue:
-			d.mu.Lock()
-			d.active = true
-			d.mu.Unlock()
-			d.send(ctx, p)
-			d.mu.Lock()
-			d.active = false
-			d.mu.Unlock()
 		}
 	}
 }
@@ -507,6 +683,10 @@ func (d *destination) send(ctx context.Context, p *part) {
 	}
 	backoff := time.Second
 	for {
+		if ctx.Err() != nil {
+			d.r.stats.dropped(p.signal, "upstream_lost_at_exit", p.records)
+			return
+		}
 		status, err := d.post(ctx, p.signal, body)
 		switch {
 		case err == nil && status/100 == 2:

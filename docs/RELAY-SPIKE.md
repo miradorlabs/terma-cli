@@ -2,92 +2,159 @@
 
 ## Why
 
-A repository cannot switch an agent's telemetry on or off for itself:
+A repository can't switch an agent's telemetry on or off for itself:
 - **Claude Code and Codex** refuse OTel settings from repository config.
 - **The desktop apps** never pass through terma's PATH shims.
 
-The only exporter config that reaches every surface is global. Global config, though, sends everything: personal use and unrelated repositories included, under one key, with nothing that says which project a record belongs to.
+The only exporter config that reaches every surface is global. Global config sends everything: personal use and unrelated repositories included, under one key, with nothing that says which project a record belongs to.
 
-The spike tests a way around that. Every agent's global exporter sends to a relay terma runs on loopback. The relay forwards a record only if a hook in an opted-in repository claimed its session, and sends it to that repository's project with that project's key. Anything unclaimed never leaves the machine and never touches the disk.
+The relay is the way around that. Every agent's global exporter sends to a relay terma runs on loopback. The relay forwards a record only when a hook in an opted-in repository has claimed the session **and** the record comes from a process the claim names. It sends the record to that repository's project with that project's key. Nothing unclaimed leaves the machine or touches the disk.
 
 ## How it works
 
-1. **`terma relay setup`** (hidden) points Claude's and Codex's global exporters at `http://127.0.0.1:43180`. It writes a random local token into their exporter headers; the relay refuses any request without it. Content is left on in the exporters, because the relay applies each project's content policy itself.
-2. **Hooks claim sessions.** Any hook in a repository with a binding writes `~/.config/terma/relay/claims/<session>.json`, holding `{project_id, tool, repo}`. Claims come from two places:
-   - `hookrun.Env.emitFor`, which every spooled event passes through;
-   - `hookrun.ClaimFromPayload`, for hooks that spool nothing, such as a Codex tool call that edits no file. It reads the session from the hook's payload.
+1. **`terma relay setup`** (hidden) does three things:
+   - points Claude's, Codex's and OpenCode's global exporters at `http://127.0.0.1:43180`;
+   - writes a random local token into the exporters' headers, and the relay refuses any request without it;
+   - starts the relay.
 
-   A claim is rewritten at most every 5 minutes and expires after 4 hours. Hooks write claims only on a machine that ran `terma relay setup`.
-3. **The hook that claims also starts the relay** (`terma relay run --quiet`, detached) if its lock is free. The relay exits after 30 idle minutes.
+   The exporters send content; the relay applies each project's content policy itself.
+2. **Hooks claim sessions.** Any hook in a repository with a binding writes `~/.config/terma/relay/claims/<session>.json`, holding `{project_id, tool, repo, pids}`:
+   - **`pids`** are the processes the hook runs under, the agent among them. Each hook of the session adds its own.
+   - **Where claims come from:** `hookrun.Env.emitFor`, which every spooled event passes through; and `hookrun.ClaimFromPayload`, for hooks that spool nothing, reading a bounded copy of the hook's stdin.
+   - **Codex subagents:** a subagent's thread (`agent_id`) is claimed alongside its root session.
+   - **Claude's `UserPromptSubmit`** is wired so every turn starts with a claim and a running relay.
+   - **Lifetime:** a claim is rewritten at most every 5 minutes, and expires 4 hours after the last write.
+   - **Only on relay machines:** hooks write claims only where `terma relay setup` has run.
+3. **Starting the relay.** Any claiming hook starts the relay (`terma relay run --quiet`, detached) when its lock is free, and backs off for a minute after a recorded start failure. The relay exits after 8 idle hours.
 4. **The relay splits every export by session:**
    - by record for logs, by span for traces, by data point for metrics;
-   - using `session.id` (Claude), `conversation.id` (Codex logs), and `thread.id` on Codex's `session_task.turn` span only;
-   - a span that names no session belongs to its trace's session. A span whose trace hasn't been named yet is held under the trace.
-5. **Each session's part is then handled one of three ways:**
-   - **Claimed, and this machine holds a key for the project:** the content policy is applied, `mirador.project.id` is stamped on the resource, and the part is POSTed in native OTLP (protobuf) to the project's own ingest host (`projectEndpoint`). Retries are per project.
-   - **Claimed, but no key:** dropped. The developer never opted in to that project on this machine.
-   - **Unclaimed:** held in memory for 2 minutes (`TERMA_RELAY_HOLD` overrides this), then dropped.
-6. **Content policy:** the project's routing record decides. With no record, both prompts and tool content are withheld.
-   - **Prompts off:** `prompt`, `response` and `user_prompt` are blanked with each harness's own marker (`<REDACTED>` for Claude, `[REDACTED]` for Codex).
-   - **Tool content off:** `tool_parameters`, `tool_input`, `full_command`, `bash_command`, `arguments` and `output` are removed, and so are the `tool.output` and `tool.input` span events.
-7. **`terma relay status`** prints the counters, keyed by reason (`received`, `forwarded`, `dropped.<reason>`, `released_after_hold`). They are also written to `relay/stats.json` on exit.
+   - using `session.id` (Claude, OpenCode), `conversation.id` (Codex logs), and `thread.id` on Codex's turn span. A numeric `thread.id` is an OS thread, never a session.
+   - A span naming no session belongs to its trace's session. The relay learns a trace's session from any span or log record that names both.
+5. **It learns which process sent each connection** (`procinfo.FindSender`: the kernel's `proc_info` on macOS, `/proc` on Linux). It does this once per connection, on the connection's first export, while the socket still exists.
+6. **Each session's part is then handled one of three ways:**
+   - **Claimed, from a process the claim names, with this machine holding the project's key:**
+     - apply the content policy;
+     - stamp `mirador.project.id` on the resource;
+     - POST it in native OTLP (protobuf) to the project's own ingest host, with retries per project.
+   - **Claimed, but no key:** dropped (`no_key`). The developer never opted in to that project here.
+   - **Unclaimed, or from a process the claim doesn't name:**
+     - **Held** in memory: 2 minutes normally (`TERMA_RELAY_HOLD`), 30 minutes for spans waiting on their trace.
+     - **Then dropped.**
+     - **Bounded:** the hold keeps at most 50,000 records and 64 MiB. When full it evicts the oldest parts, unnamed traces first.
+     - **Ordered:** a session's records leave in the order they arrived.
+7. **Content policy:** the project's routing record decides; with no record, content is withheld.
+   - **Prompts off:**
+     - `prompt`, `response` and `user_prompt` are blanked with each harness's own marker;
+     - the GenAI content attributes (`gen_ai.prompt`, `gen_ai.completion`, the input and output messages) are removed;
+     - the body of OpenCode's prompt and session-title events is emptied.
+   - **Tool content off:**
+     - `tool_parameters`, `tool_input`, `full_command`, `bash_command`, `arguments` and `output` are removed;
+     - so are `gen_ai.tool.call.arguments`, `gen_ai.tool.call.result` and `opencode.tool.file_path`;
+     - so are the `tool.output` and `tool.input` span events.
+8. **OTLP/JSON is accepted**, with its hex ids converted before decoding. **On stop**, the relay keeps delivering accepted records for 5 seconds.
+9. **`terma doctor` and `terma status`** replace their export check with the same relay check:
+   - the relay runs, or can run, on its address with no one else there;
+   - each agent exports to it;
+   - this repository is bound, with a key on this machine.
 
-## What the live runs showed
+   **`terma relay status`** prints the counters by reason, which are also written to `relay/stats.json` on exit.
 
-Every scenario passed on every build in the matrix (2026-09-29).
+## What was run
 
-Every scenario ran against real harness builds with deterministic fake model providers (`live/relay_test.go`): Claude Code 2.1.282–2.1.284 and Codex 0.157.1–0.159.0.
+The scenarios are in `live/relay_test.go`, `live/relay_more_test.go` and `live/relay_opencode_test.go`. They drive real harness binaries against deterministic fake model providers, and the in-test receiver stands in for Terma upstream.
 
-| Scenario | Result |
-|---|---|
-| Opted-in Claude session, content allowed / withheld | The full direct-export contract arrives: logs, traces, metrics, session and tool joins, and the project key on every request. Only the claimed session's records arrive, and every resource carries the project. Withheld content never leaves. |
-| Opted-in Codex session, content allowed / withheld | The same, minus metrics (see below). |
-| Session outside any repository | The relay received 22 records and forwarded 0 (`dropped.unclaimed_expired`). |
-| Session in a repository with no binding | Received 22, forwarded 0 (`unclaimed_expired`). |
-| Installed repository, no key on this machine | Received 33, forwarded 0 (`dropped.no_key`). |
-| Cold start (relay not running when the agent starts) | The first hook started it and the whole contract arrived. |
-| Claim written seconds after the session's exports | All 22 held records were released and forwarded (`released_after_hold`). |
+Harness coverage: Claude Code, Codex and OpenCode, the three agents terma supports that export OTLP. Cursor and Antigravity have no exporter; they're hooks-only and never touch the relay.
+
+| Scenario | Claude | Codex | OpenCode |
+|---|---|---|---|
+| Opted-in session: the full contract, the project on every record, the project key on every request | ✓ | ✓ (no metrics) | ✓ |
+| Content allowed / withheld | ✓ | ✓ | ✓ |
+| File tools (Write, Read, Edit) with content withheld: the file's contents appear nowhere | ✓ | | |
+| Outside any repository / unbound repository / installed repository without a key | ✓ | | ✓ (outside) |
+| `TERMA_HOOKS=0` in an opted-in repository | ✓ | | |
+| Hooks not yet trusted (Codex's first run) | | ✓ nothing forwarded | |
+| Two opted-in projects and a personal session at once | ✓ | | |
+| Session resumed in a personal directory | ✓ | ✓ | n/a (runs in its own project) |
+| Linked worktree | ✓ | | |
+| Subagent | ✓ | (claim test) | |
+| Late claim (released from the hold) | ✓ | | |
+| Turn longer than the hold | | ✓ | |
+| Cold start (no relay running) | ✓ | ✓ loses `conversation_starts` | |
+| Relay dies mid-session (interactive, 3 turns) | ✓ every turn arrives | | |
+
+VERSIONS_PLACEHOLDER
 
 ## Findings
 
-1. **Session keys.**
+1. **Session keys:**
    - **Claude** stamps `session.id` on every log, span and metric data point.
-   - **Codex** stamps `conversation.id` on every log, and on no metric.
-   - **Codex spans** carry the conversation id only on `session_task.turn`, as `thread.id`. On every other Codex span, `thread.id` is the tracing library's OS thread number (with `thread.name=tokio-rt-worker`). Treating it as a session key mis-attributes spans, so a numeric `thread.id` is ignored and those spans go by their trace.
-2. **Codex's spans need the trace join, and the hold.** Per run the relay received about 935 Codex records:
-   - About 457 were forwarded.
-   - About 250 of those came out of the hold (`released_after_hold`). Codex exports a turn's child spans before the `session_task.turn` span that names the session, so the children wait under their trace until it arrives.
-   - About 310 spans sit in traces no span ever names: hook runtime, rollout persistence and other process-level work. They are dropped as `no_session_trace`. None of them is needed for the contract.
-3. **All Codex metrics are dropped** (`no_session_id`, about 167 points per run). Every number in them can be rebuilt per session from Codex's log events (`codex.sse_event` / `response.completed`, `codex.api_request`, `codex.tool_result`). A backend reading Codex usage from metrics would have to read the logs instead.
-4. **Claude records tool content in a span event** (`claude_code.tool` → `tool.output` event with `bash_command`) as well as in attributes. The golden attribute lists don't see span events. The relay drops those events when tool content is withheld, and the live test's `leakedFields` names any content that reaches upstream.
-5. **terma's own Codex reply capture** (`terma.assistant.message`) used to read the machine-wide Codex config as consent. Under the relay, that config always allows prompts, because the relay decides. So with the relay set up, only the project's routing record can consent (`codexRepliesConsented`).
-6. **Cold start:** a headless run's only export is the flush at exit, well after the `SessionStart` hook has started the relay. Long interactive sessions export every few seconds, and the 2-minute hold covers a first batch that arrives before the claim does. No session in any run lost a record waiting for its claim.
-7. **Hook budget:** `prepare-commit-msg` stayed at a median of 21 ms, the same as before the change (the budget is 50 ms), with the OTLP protobuf types linked into the binary. The collector packages are avoided: they would bring gRPC into every hook.
+   - **OpenCode's plugin** stamps `session.id` on its logs and spans.
+   - **Codex** stamps `conversation.id` on its logs and on no metric. It names the conversation on its turn span only, as `thread.id`; elsewhere `thread.id` is an OS thread number.
+2. **Codex's spans need the trace join.** A turn's child spans are exported before the turn span that names the session, as each ends. The relay learns their trace from Codex's own mid-turn logs, which carry both the conversation and the trace id. That cut unattributable spans from about 310 to about 140 per run and raised forwarded records from about 456 to about 628. A turn longer than the ordinary hold keeps its children.
+3. **All Codex metrics are dropped** (about 168 points per run). Every number in them is in Codex's log events per session (`response.completed`, `codex.api_request`, `codex.tool_result`), so the backend should read Codex usage from those logs.
+4. **Content lives in more places than the attribute goldens show:**
+   - Claude's `claude_code.tool` span carries a `tool.output` event, holding `bash_command`, and for file tools `content` and `diff`.
+   - OpenCode's plugin puts the prompt in a log **body** and the reply in `gen_ai.completion`.
 
-## Not done in the spike
+   All of these are withheld. The live tests plant markers and scan everything upstream received (`leakedFields`), so a harness release that puts content somewhere new fails the canary.
+5. **Resuming a session elsewhere.**
+   - **Claude and Codex** keep the session id when resumed from any directory (`claude --resume`, `codex exec resume`). A claim keyed by session alone forwarded the personal run. Process-scoped claims close that: the resumed run's records are held, then dropped (`uncovered_process`), and the original run's are forwarded.
+   - **OpenCode** binds a session to its project directory, so a continued session runs in the repository. In 1.18.33 it also never exits when continued from another directory.
+6. **Cold start through Codex** loses `codex.conversation_starts`. Codex emits it before its `SessionStart` hook, and its exporter doesn't retry a refused connection. That's why setup starts the relay and the relay idles for 8 hours. What remains is the first Codex session after the relay has idled out. Claude loses nothing: its first export comes after its hook.
+7. **A relay that dies mid-session** used to lose the next turn: the turn's `Stop` hook restarted it too late, and Claude's exporter doesn't retry. Claude's `UserPromptSubmit` hook now restarts it at the start of the turn, and every turn arrives. Codex's `UserPromptSubmit` was already wired.
+8. **Hook budget:**
+   - `prepare-commit-msg` is unchanged, at a median of 20 ms against a 50 ms budget.
+   - A claiming agent hook costs about 1 ms more: 11 ms against 10 ms.
+   - Finding a connection's sender takes about 3 ms over 900 processes.
+   - The relay handles about 390,000 records a second with claims read from disk.
+9. **terma's own Codex reply capture** takes consent from the routing record alone under the relay, because the relay sets the machine-wide Codex config to allow prompts.
 
-- `terma status` and `terma doctor` don't know the relay endpoint. They compare exporter endpoints with the profile's OTLP URL, so a relayed agent reads as "not exporting to Terma".
-- **Nothing is persisted.** An upstream failure is retried in memory, and whatever is still queued at exit is counted as lost (`upstream_lost_at_exit`), not spooled.
-- **Not covered:**
-  - OpenCode: its plugin routes itself;
-  - Cursor and Antigravity: they're hooks-only;
-  - the desktop apps: not driven by `live/` yet.
-- `OTEL_METRICS_INCLUDE_SESSION_ID` is not pinned in the global Claude config, so a developer who sets it to `false` makes Claude's metrics unattributable.
+## Break attempts
+
+| Attempt | Result |
+|---|---|
+| OTLP/JSON with spec hex ids | **Broke:** ids decoded as base64 garbage. Fixed. |
+| A record after its claim, older ones still held | **Broke:** it overtook them. Fixed (ordered hand-off). |
+| 20 × 4 MiB unclaimed exports | **Broke:** no byte bound. Fixed (64 MiB, evicting the oldest). |
+| A fresh trace id on every span | **Broke:** unbounded index. Fixed (100,000 entries). |
+| A slow client trickling a request | **Broke:** no read timeout. Fixed. |
+| SIGTERM with a slow upstream | **Broke:** the queue was dropped. Fixed (5 s grace). |
+| Codex subagent threads | **Broke:** never claimed. Fixed (`agent_id`). |
+| Resume in a personal directory, Claude and Codex | **Broke:** personal work was forwarded. Fixed (process-scoped claims). |
+| OpenCode with content withheld | **Broke:** the prompt left in a log body and the reply in `gen_ai.completion`. Fixed. |
+| Codex turn longer than the hold | **Broke:** child spans were dropped. Fixed (trace learnt from logs; 30-minute trace hold). |
+| Relay killed mid-session | **Broke:** the next turn was lost. Fixed (`UserPromptSubmit`). |
+| Hold full of never-named traces | **Broke:** new arrivals were refused. Fixed (evict the oldest, unnamed traces first). |
+| Port taken by another process | Can't be prevented. It is detected: `relay status` and `doctor` name it, and hooks back off. |
+| An agent naming its own `mirador.project.id` | Overridden by the claim. |
+| No token, a wrong token, `GET`, malformed bodies, 4.2 M fuzzed inputs | Refused, nothing forwarded, no panic. |
+| 8 concurrent writers, claims mid-way, then a stop | `received = forwarded + dropped`, exactly. |
+| Transient `503`s / a `403` | Retried and delivered once / not retried. |
+| Two relays racing to start | One runs. |
+
+## What remains uncertain
+
+- **The desktop apps aren't driven.** Claude Desktop and Codex Desktop run the same hooks and exporters. If one app process exports for every workspace, process scoping can't separate them, and the relay falls back to the session id, which is still required.
+- **A squatter on the relay's port** receives what the agents send. This includes another local user on a shared machine, since loopback is shared. The fix is TLS to the relay with a pinned certificate. Claude's exporter takes a CA file; Codex's and the plugin's haven't been checked.
+- **An unresolved sender** falls back to the session, counted as `sender_unresolved`. That happens for an agent running as another user, or on a platform without `/proc` or `proc_info`.
+- **The first Codex session after an idle-out** loses `conversation_starts` (finding 6). Only an always-running relay closes that.
+- **Upstream acceptance hasn't been tested against the real Terma ingest.** The payload is the agents' own native OTLP with one resource attribute added, but no live key was used.
+- **Nothing is persisted.** What's queued when the grace runs out is counted as lost.
 
 ## Recommendation
 
-**Go.** The relay separates opted-in work from everything else on real Claude and Codex builds, and a claim is enough to find the project. It doesn't reimplement the server's correlation: it's a gate, with one join (trace → session) that Codex's span shape makes necessary.
+**Go.** On every build in the matrix, across three harnesses, the relay separated opted-in work from everything else, found the project from a claim, and withheld content per project. Every break attempt that got through has a fix and a test. What it gates on is small:
+- a session id the harness already stamps;
+- a trace join that Codex's span shape makes necessary;
+- a process check against what the claiming hook saw.
 
-The server-side variant (the same claim check at the edge, with no local process) would need three things:
-- every signal to carry a session key, which Codex metrics don't;
-- a claim tied to the developer, not only to a project key;
-- a hold that discards unclaimed data before anything persists.
+The server-side correlation stays on the server.
 
 ## Running it
 
 ```bash
 cd live && make telemetry          # includes TestRelay*, no credentials
-TERMA_LIVE_CLAUDE_VERSIONS=last3 TERMA_LIVE_CODEX_VERSIONS=last3 make live RUN='TestRelay.*'
+TERMA_LIVE_CLAUDE_VERSIONS=last6 TERMA_LIVE_CODEX_VERSIONS=last6 TERMA_LIVE_OPENCODE_VERSIONS=last4 make live RUN='TestRelay.*'
 ```
 
-The nightly `live.yml` runs them on the last three releases of each harness. A release that stops stamping a session key on a surface, or that starts exporting content somewhere new, fails there. Relay goldens live in `live/golden/relay/` (`LIVE_UPDATE_GOLDEN=1` rewrites them from the newest build).
+The nightly `live.yml` runs them on the last three releases of each harness. Relay goldens are in `live/golden/relay/` (`LIVE_UPDATE_GOLDEN=1`).

@@ -81,6 +81,9 @@ type Sandbox struct {
 	// WorkDir is where an agent run starts; the sandbox repository when empty. The
 	// relay's negative controls run agents outside the installed repository.
 	WorkDir string
+	// CodexHooksUntrusted runs Codex without bypassing its hook trust, as a developer
+	// who has not yet trusted the project's hooks does.
+	CodexHooksUntrusted bool
 	// ExtraEnv is appended to every environment the sandbox builds, so a setting
 	// reaches the agents and the hooks and relays they start.
 	ExtraEnv []string
@@ -301,7 +304,7 @@ func (sb *Sandbox) baseEnv() []string {
 	// The build under test first: terma's own detection and any `claude` a script
 	// runs must both mean this one.
 	path := sb.binDir() + filepath.Dir(sb.Terma) + ":/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-	for _, p := range strings.Split(os.Getenv("PATH"), ":") {
+	for p := range strings.SplitSeq(os.Getenv("PATH"), ":") {
 		if p != "" && !strings.Contains(path, p) {
 			path += ":" + p
 		}

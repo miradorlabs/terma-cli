@@ -25,6 +25,11 @@ var ClaudeHooks = []struct {
 	// refresh account evidence and start a background spool flush.
 	{"Stop", "", HookCommand("stop")},
 	{"StopFailure", "", HookCommand("stop-failure")},
+	// UserPromptSubmit opens every turn: the one hook that runs before a turn exports
+	// anything, so the local relay is up (and the session claimed) before the turn's
+	// telemetry leaves the agent, even if the relay died since the last turn. It
+	// prints nothing: Claude Code hands this hook's stdout to the model.
+	{"UserPromptSubmit", "", HookCommand("user-prompt-submit")},
 	// A subagent runs inside the session: the payload keeps session_id and adds
 	// agent_id / agent_type. Both are notification-only for terma.
 	{"SubagentStart", "", HookCommand("subagent-start")},

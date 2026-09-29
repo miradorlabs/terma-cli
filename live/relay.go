@@ -58,7 +58,8 @@ func (sb *Sandbox) UseRelay(o RelayOptions) {
 		rec, _ := json.Marshal(map[string]any{"project_id": sb.ProjectID, "include_prompts": true, "include_tool_content": true})
 		sb.writeAbs(filepath.Join(sb.TermaConfig, "routing", sb.ProjectID+".json"), string(rec)+"\n")
 	}
-	sb.terma(sb.Repo, "relay", "setup", "--addr", sb.relayAddr)
+	// --no-start: the scenario decides whether the relay runs before the agent.
+	sb.terma(sb.Repo, "relay", "setup", "--no-start", "--addr", sb.relayAddr, "--harness", "claude,codex,opencode")
 	t.Cleanup(sb.StopRelay)
 	if o.Start {
 		sb.StartRelay()

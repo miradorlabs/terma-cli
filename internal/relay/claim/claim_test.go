@@ -66,3 +66,24 @@ func TestReadRejectsStaleAndUnsafe(t *testing.T) {
 		t.Fatal("a claim without a project is not written")
 	}
 }
+
+// Each hook of a session adds the processes it ran under; a hook whose processes are
+// already named, inside Refresh, writes nothing.
+func TestClaimMergesProcesses(t *testing.T) {
+	enable(t)
+	now := time.Now()
+	Write("s", Claim{ProjectID: "p", PIDs: []int{10, 11}}, now)
+	if Write("s", Claim{ProjectID: "p", PIDs: []int{11}}, now) {
+		t.Fatal("known processes rewrote a fresh claim")
+	}
+	if !Write("s", Claim{ProjectID: "p", PIDs: []int{20, 21}}, now) {
+		t.Fatal("a new run of the session did not add its processes")
+	}
+	c, _ := Read("s", now)
+	if !c.Covers(10) || !c.Covers(21) || c.Covers(99) {
+		t.Fatalf("claim %v", c.PIDs)
+	}
+	if !(Claim{}).Covers(99) || !c.Covers(0) {
+		t.Fatal("a claim without processes, or a sender that could not be resolved, is covered")
+	}
+}

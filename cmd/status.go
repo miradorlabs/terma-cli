@@ -16,6 +16,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/keystore"
 	"github.com/miradorlabs/terma-cli/internal/output"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/shim"
 	"github.com/miradorlabs/terma-cli/internal/style"
@@ -252,28 +253,41 @@ Nothing is written and no scratch commit is made — run
 				}
 			}
 
-			// Harnesses.
-			var connected []string
-			verdicts := judgeSelectedHarnesses(ctx, cfg.OTLPURL, projectID, root, cfg.Harnesses)
-			for _, v := range verdicts {
-				suffix, ok := statusAgent(v, repoBound)
-				if ok {
-					connected = append(connected, v.displayName)
+			// Harnesses. Through the local relay one line says it all, the same verdict
+			// doctor gives (relayDoctorCheck), so the two never disagree.
+			var export, routing doctor.Check
+			if claim.Enabled() {
+				export = relayDoctorCheck(projectID, cfg.Harnesses)
+				export.Key = doctor.KeyHarness
+				fmt.Fprintf(out, "Agents:      %s\n", export.Detail)
+				if export.Fix != "" {
+					fmt.Fprintf(out, "             → %s\n", export.Fix)
 				}
-				fmt.Fprintf(out, "Agent:       %s %s\n", v.displayName, suffix)
-				if v.name == "claude" && ok {
-					fmt.Fprintf(out, "Status line: %s\n", statusLineSummary(judgeStatusLine(root)))
+				routing = doctor.Check{Key: doctor.KeyRouting, Status: doctor.Skip}
+			} else {
+				var connected []string
+				verdicts := judgeSelectedHarnesses(ctx, cfg.OTLPURL, projectID, root, cfg.Harnesses)
+				for _, v := range verdicts {
+					suffix, ok := statusAgent(v, repoBound)
+					if ok {
+						connected = append(connected, v.displayName)
+					}
+					fmt.Fprintf(out, "Agent:       %s %s\n", v.displayName, suffix)
+					if v.name == "claude" && ok {
+						fmt.Fprintf(out, "Status line: %s\n", statusLineSummary(judgeStatusLine(root)))
+					}
 				}
-			}
-			if len(connected) == 0 {
-				fmt.Fprintln(out, "Agent:       none connected — run `terma install`")
-			}
-			routing := shellRoutingCheck(verdicts, repoBound, selectedForRepo(projectID, cfg.Harnesses))
-			if routing.Status != doctor.Skip {
-				fmt.Fprintf(out, "Routing:     %s\n", routing.Detail)
-				if routing.Fix != "" {
-					fmt.Fprintf(out, "             → %s\n", routing.Fix)
+				if len(connected) == 0 {
+					fmt.Fprintln(out, "Agent:       none connected — run `terma install`")
 				}
+				routing = shellRoutingCheck(verdicts, repoBound, selectedForRepo(projectID, cfg.Harnesses))
+				if routing.Status != doctor.Skip {
+					fmt.Fprintf(out, "Routing:     %s\n", routing.Detail)
+					if routing.Fix != "" {
+						fmt.Fprintf(out, "             → %s\n", routing.Fix)
+					}
+				}
+				export = doctorHarnessCheck(verdicts, cfg.OTLPURL, projectID, repoBound)
 			}
 			// A repository's own policy narrows what its sessions ship. Said next to
 			// the agent it applies to, since the global line cannot show it.
@@ -316,7 +330,6 @@ Nothing is written and no scratch commit is made — run
 				fmt.Fprintln(out, line)
 			}
 
-			export := doctorHarnessCheck(verdicts, cfg.OTLPURL, projectID, repoBound)
 			checks := []doctor.Check{doctorBinaryCheck(), export, agentHooks, routing,
 				{Key: doctor.KeyBackend, Status: doctor.Skip}}
 			if !authOK {

@@ -30,6 +30,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/migrate"
 	"github.com/miradorlabs/terma-cli/internal/output"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/shim"
 	"github.com/miradorlabs/terma-cli/internal/spinner"
@@ -404,6 +405,9 @@ func runDoctor(ctx context.Context, skipCommit bool, progress doctorProgress) do
 		})
 	}
 	timed(doctor.KeyRouting, "shell routing active", func() doctor.Check {
+		if claim.Enabled() {
+			return doctor.Check{Status: doctor.Skip, Detail: "the local relay routes every agent; no shell integration needed"}
+		}
 		return shellRoutingCheck(d.harnesses, d.installed(), selectedForRepo(d.projectID, d.cfg.Harnesses))
 	})
 
@@ -564,6 +568,9 @@ func (d *doctorRun) agentHooks() doctor.Check {
 }
 
 func (d *doctorRun) agentsExporting() doctor.Check {
+	if claim.Enabled() {
+		return relayDoctorCheck(d.projectID, d.cfg.Harnesses)
+	}
 	d.harnesses = judgeSelectedHarnesses(d.ctx, d.cfg.OTLPURL, d.projectID, d.root, d.cfg.Harnesses)
 	return doctorHarnessCheck(d.harnesses, d.cfg.OTLPURL, d.projectID, d.installed())
 }

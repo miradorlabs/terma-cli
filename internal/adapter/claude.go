@@ -28,6 +28,9 @@ func (claude) Events() map[string]Handler {
 		"post-tool-use": hookrun.PostToolUse,
 		"stop":          hookrun.Stop,
 		"stop-failure":  hookrun.StopFailure,
+		// Turn start: claims the session for the local relay and starts it (cmd/hook.go
+		// does both from the payload); the handler itself only reads the payload.
+		"user-prompt-submit": hookrun.UserPromptSubmit,
 		// A subagent runs inside the session; both are notification-only for terma.
 		"subagent-start": hookrun.SubagentStart,
 		"subagent-stop":  hookrun.SubagentStop,

@@ -69,6 +69,7 @@ func TestEventNamesAreStable(t *testing.T) {
 		"cursor-stop", "cursor-subagent-stop",
 		"opencode-file-edit", "opencode-session-end", "opencode-session-start",
 		"post-tool-use", "session-end", "session-start", "stop", "stop-failure", "subagent-start", "subagent-stop",
+		"user-prompt-submit",
 	}
 	got := EventNames()
 	if strings.Join(got, ",") != strings.Join(want, ",") {

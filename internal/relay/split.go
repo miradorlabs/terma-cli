@@ -46,6 +46,8 @@ type part struct {
 	session string
 	msg     proto.Message
 	records int
+	// pid is the process that exported it, 0 when unknown (see Options.PeerPID).
+	pid int
 }
 
 func sessionOf(attrs, resource []*commonpb.KeyValue) string {
@@ -74,7 +76,13 @@ func numeric(s string) bool {
 
 // splitLogs divides a logs export by session. Records naming no session come back
 // under the empty key.
-func splitLogs(req *logspb.LogsData) map[string]*part {
+//
+// A log record that names its session and carries a trace id also teaches learn which
+// session the trace belongs to. Codex's logs do, mid-turn; its turn span, the only span
+// that names the session, is exported when the turn ends. Without this, a turn's child
+// spans would wait in the hold for the whole turn, and a turn longer than the hold
+// would lose them.
+func splitLogs(req *logspb.LogsData, learn func(traceID, session string)) map[string]*part {
 	out := map[string]*part{}
 	for _, rl := range req.GetResourceLogs() {
 		res := rl.GetResource().GetAttributes()
@@ -83,6 +91,9 @@ func splitLogs(req *logspb.LogsData) map[string]*part {
 			var order []string
 			for _, lr := range sl.GetLogRecords() {
 				s := sessionOf(lr.GetAttributes(), res)
+				if s != "" && len(lr.GetTraceId()) > 0 {
+					learn(hex.EncodeToString(lr.GetTraceId()), s)
+				}
 				if _, seen := bySession[s]; !seen {
 					order = append(order, s)
 				}
