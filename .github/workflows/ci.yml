@@ -119,12 +119,19 @@ jobs:
             live/go.sum
       - name: Build Terma
         run: go build -o live/bin/terma .
+      # Pi has no exporter; terma's extension is one, tested only on the installed
+      # build (live/pi.go).
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Install Pi
+        run: npm install -g @earendil-works/pi-coding-agent@0.99.1
       - name: Assert harness telemetry (no provider credentials)
         working-directory: live
         # TestRelay* is the local relay spike (docs/RELAY-SPIKE.md): the same
         # harnesses exporting globally through `terma relay run`, and nothing but the
         # claimed session reaching the receiver.
-        run: go test -v -count=1 -timeout=30m -run '^(TestClaudeTelemetry|TestCodexTelemetry|TestClaudeStopFailureDelivery|TestRelay.*)$' .
+        run: go test -v -count=1 -timeout=30m -run '^(TestClaudeTelemetry|TestCodexTelemetry|TestClaudeStopFailureDelivery|TestRelay.*|TestPi.*)$' .
       - name: Publish coverage summary
         if: always()
         run: |

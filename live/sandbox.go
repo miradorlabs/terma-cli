@@ -87,6 +87,9 @@ type Sandbox struct {
 	// ExtraEnv is appended to every environment the sandbox builds, so a setting
 	// reaches the agents and the hooks and relays they start.
 	ExtraEnv []string
+	// RelayAgents are pointed at the relay too, beyond Claude Code, Codex and OpenCode
+	// (UseRelay).
+	RelayAgents []string
 	// relayed means the agents export to the local relay (UseRelay), never straight to
 	// the receiver: the scenario is that nothing else reaches it.
 	relayed      bool

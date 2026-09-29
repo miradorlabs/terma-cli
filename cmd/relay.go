@@ -329,6 +329,17 @@ func newRelaySetupCommand() *cobra.Command {
 			// The relay withholds content per project, so the exporters send it all.
 			exp := harness.Exporter{Endpoint: "http://" + addr, APIKey: token, Signals: harness.AllSignals, IncludePrompts: true, IncludeToolContent: true}
 			for name := range strings.SplitSeq(agents, ",") {
+				// Pi has no exporter of its own and no connection to journal: terma's
+				// extension is its exporter, pointed at the relay.
+				if strings.TrimSpace(name) == "pi" {
+					path, err := harness.WritePiExtension(harness.PiConfig{Endpoint: exp.Endpoint,
+						Headers: map[string]string{"Authorization": "Bearer " + token}, IncludePrompts: true, IncludeToolContent: true})
+					if err != nil {
+						return fmt.Errorf("pi: %w", err)
+					}
+					fmt.Fprintf(out, "Pi exports to the relay at %s (%s).\n", addr, tildePath(path))
+					continue
+				}
 				h, err := harness.Lookup(strings.TrimSpace(name))
 				if err != nil {
 					return err

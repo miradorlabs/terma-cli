@@ -319,21 +319,30 @@ func TestRelayWorkloadsCodex(t *testing.T) {
 // openAIToolProvider asks OpenCode's bash tool to run cmd on the first call, then
 // replies.
 func openAIToolProvider(calls *atomic.Int32, cmd string) http.Handler {
+	if cmd == "" {
+		return openAIToolCallProvider(calls, "", nil)
+	}
+	return openAIToolCallProvider(calls, "bash", map[string]any{"command": cmd, "description": "workload"})
+}
+
+// openAIToolCallProvider asks for one call of tool with args on the first request
+// (none when tool is empty), then replies.
+func openAIToolCallProvider(calls *atomic.Int32, tool string, args map[string]any) http.Handler {
 	reply := openAIChatProvider(calls)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if cmd == "" || calls.Load() > 0 || !strings.HasSuffix(r.URL.Path, "/chat/completions") {
+		if tool == "" || calls.Load() > 0 || !strings.HasSuffix(r.URL.Path, "/chat/completions") {
 			reply.ServeHTTP(w, r)
 			return
 		}
 		_, _ = io.Copy(io.Discard, r.Body)
 		calls.Add(1)
 		w.Header().Set("Content-Type", "text/event-stream")
-		args, _ := json.Marshal(map[string]any{"command": cmd, "description": "workload"})
+		arguments, _ := json.Marshal(args)
 		emit := func(v any) {
 			data, _ := json.Marshal(v)
 			fmt.Fprintf(w, "data: %s\n\n", data)
 		}
-		emit(map[string]any{"id": "chatcmpl_tool", "object": "chat.completion.chunk", "created": 1, "model": "m", "choices": []any{map[string]any{"index": 0, "delta": map[string]any{"role": "assistant", "tool_calls": []any{map[string]any{"index": 0, "id": "call_oc_1", "type": "function", "function": map[string]any{"name": "bash", "arguments": string(args)}}}}}}})
+		emit(map[string]any{"id": "chatcmpl_tool", "object": "chat.completion.chunk", "created": 1, "model": "m", "choices": []any{map[string]any{"index": 0, "delta": map[string]any{"role": "assistant", "tool_calls": []any{map[string]any{"index": 0, "id": "call_oc_1", "type": "function", "function": map[string]any{"name": tool, "arguments": string(arguments)}}}}}}})
 		emit(map[string]any{"id": "chatcmpl_tool", "object": "chat.completion.chunk", "created": 1, "model": "m", "choices": []any{map[string]any{"index": 0, "delta": map[string]any{}, "finish_reason": "tool_calls"}}, "usage": map[string]any{"prompt_tokens": 12, "completion_tokens": 4, "total_tokens": 16}})
 		fmt.Fprint(w, "data: [DONE]\n\n")
 	})

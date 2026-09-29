@@ -40,7 +40,7 @@ func TestHarnessSelectionComingSoon(t *testing.T) {
 		chosen[name] = true
 	}
 	form := harnessSelectionForm(context.Background(), chosen)
-	wantOrder := []string{"claude", "codex", codexDesktopAgent, "omp", "cursor", "opencode", "antigravity"}
+	wantOrder := []string{"claude", "codex", codexDesktopAgent, "omp", "cursor", "opencode", "pi", "antigravity"}
 	if len(form.Items) != len(wantOrder) {
 		t.Fatalf("picker has %d items, want %d", len(form.Items), len(wantOrder))
 	}

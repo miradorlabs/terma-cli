@@ -12,6 +12,7 @@ import (
 func ompSandbox(t *testing.T, cmd string) func(t *testing.T) *Sandbox {
 	return func(t *testing.T) *Sandbox {
 		sb := New(t, Isolated)
+		sb.RelayAgents = []string{"omp"}
 		sb.terma(sb.Repo, "install", "--project", sb.ProjectID, "--harness", "none", "--adapters", "omp", "--yes", "--no-browser", "--no-doctor")
 		var calls atomic.Int32
 		provider := httptest.NewServer(openAIToolProvider(&calls, cmd))
@@ -28,9 +29,6 @@ func TestRelayWorkloadsOmp(t *testing.T) {
 		for _, w := range []struct{ name, cmd string }{{"reply", ""}, {"bash", "printf ok"}} {
 			t.Run(w.name, func(t *testing.T) {
 				runBoth(t, ompSandbox(t, w.cmd), func(t *testing.T, sb *Sandbox) {
-					if sb.relayed {
-						sb.terma(sb.Repo, "relay", "setup", "--no-start", "--addr", sb.relayAddr, "--harness", "omp")
-					}
 					sb.OmpRun(b, sb.Repo, "Do the task. TERMA_WORKLOAD")
 				})
 			})
@@ -45,7 +43,6 @@ func TestRelayOmpOutsideARepository(t *testing.T) {
 		track(t)
 		sb := ompSandbox(t, "")(t)
 		sb.UseRelay(RelayOptions{Start: true, Hold: 3 * time.Second})
-		sb.terma(sb.Repo, "relay", "setup", "--no-start", "--addr", sb.relayAddr, "--harness", "omp")
 		personal := filepath.Join(sb.Dir, "personal")
 		if err := os.MkdirAll(personal, 0o700); err != nil {
 			t.Fatal(err)

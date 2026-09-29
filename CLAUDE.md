@@ -686,7 +686,7 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
 
 - Trailers: `Agent-Session-Id`, `Agent-Tool` (`internal/trailer`). The Terma backend
   and GitHub App parse these. Tool labels: `claude-code`, `codex`, `opencode`, `cursor`,
-  `antigravity`.
+  `antigravity`, `omp`, `pi`.
 - Hook event names are committed wiring and must stay stable: `session-start` /
   `session-end` / `post-tool-use` / `stop` / `stop-failure` / `subagent-start` /
   `subagent-stop` / `user-prompt-submit` (Claude Code's `.claude/settings.json`),
@@ -703,7 +703,10 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   `antigravity-post-tool-use` / `antigravity-post-invocation` / `antigravity-stop` (Antigravity's
   `.agents/hooks.json`),
   `opencode-session-start` / `opencode-session-end` / `opencode-file-edit` (called by
-  the OpenCode plugin). Cursor sessions are keyed on `conversation_id`, the one id
+  the OpenCode plugin), `omp-session-start` / `omp-session-end` / `omp-file-edit` (omp's
+  committed hook file and extension), `pi-session-start` / `pi-prompt` /
+  `pi-session-end` / `pi-file-edit` (called by terma's Pi extension,
+  `internal/harness/pi/terma.ts`, which `terma relay setup --harness pi` writes). Cursor sessions are keyed on `conversation_id`, the one id
   present on every Cursor event; `afterFileEdit` has no `session_id`.
 - Spool event names the platform parses (`gateways/otel/.../termacli_logs.go` and
   `termacli_entitlement_logs.go`): `terma.session.start`, `terma.files.touched`,

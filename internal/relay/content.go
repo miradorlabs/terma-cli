@@ -25,8 +25,8 @@ var (
 		// omp's own (omp.gen_ai.*): the request's messages and the response's text.
 		"omp.gen_ai.request.messages", "omp.gen_ai.response.text"}
 	// promptBodyEvents carry what was said in the log body, not an attribute: the
-	// OpenCode plugin's prompt, and the session title, which restates it.
-	promptBodyEvents = []string{"opencode.user_prompt", "opencode.session.created"}
+	// OpenCode plugin's prompt, the session title, which restates it, and Pi's prompt.
+	promptBodyEvents = []string{"opencode.user_prompt", "opencode.session.created", "pi.user_prompt"}
 	// toolContentFields hold what a tool was called with or returned.
 	toolContentFields = []string{"tool_parameters", "tool_input", "full_command", "bash_command", "arguments", "output",
 		"gen_ai.tool.call.arguments", "gen_ai.tool.call.result", "opencode.tool.file_path"}

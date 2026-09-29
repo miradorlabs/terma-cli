@@ -111,6 +111,7 @@ Harness coverage: Claude Code, Codex and OpenCode, the three agents terma suppor
 | Claude | reply, Bash, a failing Bash, 400 KB of tool output, 8 sequential tools, 3 parallel tools in one response, Write/Read/Edit, a subagent, Unicode and RTL, a provider overload (529) retried |
 | Codex | reply, shell, a failing shell, 400 KB of output, 6 tools, a file written by the shell |
 | OpenCode | reply, a bash tool call |
+| Pi | reply, a bash tool call, a file written (plus: Pi outside any repository reaches nothing upstream) |
 | omp | reply, a bash tool call (plus: omp outside any repository exports nothing at all) |
 
 All 18 pass on the installed builds (Claude 2.1.284, Codex 0.158.0, OpenCode 1.18.33). In every relayed run the relay forwarded everything it received. The only difference found is Claude's `retention_sweep`, a housekeeping event on Claude's own schedule that a run may or may not emit.
@@ -125,11 +126,33 @@ omp (oh-my-pi, PR #21, merged into this branch) exports OTLP natively under the 
 
 The omp route exports only in a bound repository, so omp elsewhere exports nothing at all: stricter than the agents whose global config the relay filters.
 
+### Pi
+
+Pi (`@earendil-works/pi-coding-agent`) has no OpenTelemetry, so terma's extension (`internal/harness/pi/terma.ts`) is its exporter. `terma relay setup --harness pi` writes it into Pi's agent directory (`PI_CODING_AGENT_DIR`, else `~/.pi/agent`) pointed at the relay. It emits OTLP/JSON under the GenAI conventions:
+- a `chat <model>` span per model response, with usage and cost;
+- an `execute_tool <tool>` span per tool call;
+- a `pi.user_prompt` log per prompt.
+
+Every record names Pi's own session id as `session.id`. The extension also calls `terma hook`:
+- `pi-session-start` at session start;
+- `pi-prompt` on every prompt, which claims the session without announcing it again, as Claude's `user-prompt-submit` does;
+- `pi-file-edit` for `write` and `edit`;
+- `pi-session-end`.
+
+The relay withholds the prompt body, `gen_ai.completion` and the tool arguments and results when content is off.
+
+Tested on the installed 0.99.1 (`live/relay_pi_test.go`):
+- **Workload equivalence:** reply, bash, and write, each direct vs relay, with zero drops.
+- **Content:** allowed and withheld. The withheld case was sabotaged: without `pi.user_prompt` in the gate, the prompt body leaked, and the test caught it.
+- **Negative control:** Pi outside any bound repository sends to the relay, and nothing reaches upstream.
+- **Attribution:** the commit of a file Pi wrote carries `Agent-Tool: pi` and Pi's session.
+
+Pi is not yet selectable in `terma setup` ("Coming Soon"). The relay is its only route.
+
 ### Other harnesses
 
 | Harness | Exports OTLP? | Claims possible? | Status |
 |---|---|---|---|
-| Pi (`@earendil-works/pi-coding-agent`) | no | extension API (`session_start`, `turn_end`, `tool_call`, …) | needs a terma extension that exports OTLP itself, like OpenCode's plugin |
 | Hermes (Nous Research) | no usage telemetry (Langfuse plugin; content-free gateway monitoring) | shell hooks (`on_session_start`, `post_llm_call`, …) in user config | needs a terma plugin that exports OTLP, and user-level hooks |
 | T3 Code | its agents': it runs `codex app-server`, Claude's Agent SDK and `cursor-agent` | through those agents' hooks | a multi-workspace client: no adoption (safe); not driven yet |
 | Cursor | no | hooks (terma already wires them) | nothing reaches the relay; its events go through terma's spool |

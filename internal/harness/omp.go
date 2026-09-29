@@ -188,7 +188,7 @@ func renderOmpExtension(cfg ompConfig) ([]byte, error) {
 // readOmpExtensionConfig extracts the spliced config line back out of an installed
 // extension file. A file without it is one Terma did not write.
 func readOmpExtensionConfig(data []byte) (*ompConfig, bool) {
-	for _, line := range strings.Split(string(data), "\n") {
+	for line := range strings.SplitSeq(string(data), "\n") {
 		line = strings.TrimSpace(line)
 		if !strings.HasPrefix(line, ompConfigPrefix) || strings.Contains(line, ompConfigPlaceholder) {
 			continue

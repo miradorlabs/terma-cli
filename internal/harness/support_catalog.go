@@ -98,6 +98,12 @@ func SupportCatalog() []AgentSupport {
 			Telemetry:   CapabilitySupport{Level: SupportFull, Note: "tokens, effort, service tier and latency ride omp's native OTLP spans; estimated cost is posted as a companion record the server joins by session"},
 		},
 		{
+			Name:        "pi",
+			DisplayName: "Pi",
+			Attribution: CapabilitySupport{Level: SupportFull},
+			Telemetry:   CapabilitySupport{Level: SupportPartial, Note: "Pi has no OTLP export; terma's extension exports tokens, cost and tool calls through the local relay only"},
+		},
+		{
 			Name:        "cursor",
 			DisplayName: "Cursor",
 			Attribution: CapabilitySupport{Level: SupportFull},

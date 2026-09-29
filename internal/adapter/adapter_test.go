@@ -69,6 +69,7 @@ func TestEventNamesAreStable(t *testing.T) {
 		"cursor-stop", "cursor-subagent-stop",
 		"omp-file-edit", "omp-session-end", "omp-session-start",
 		"opencode-file-edit", "opencode-session-end", "opencode-session-start",
+		"pi-file-edit", "pi-prompt", "pi-session-end", "pi-session-start",
 		"post-tool-use", "session-end", "session-start", "stop", "stop-failure", "subagent-start", "subagent-stop",
 		"user-prompt-submit",
 	}
