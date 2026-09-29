@@ -30,15 +30,18 @@ func newNateCommand() *cobra.Command {
 	var assumeYes bool
 	cmd := &cobra.Command{
 		Use:    "nate",
-		Short:  "Remove Terma from this repository and machine",
+		Short:  "Remove Terma from this machine",
 		Hidden: true,
 		Args:   cobra.NoArgs,
-		Long: `Remove the current repository's Terma install, restore user settings that
-Terma changed, remove machine routing and local Terma state, then delete installed
-Terma executables. This is intended for testing onboarding from a clean machine.`,
+		Long: `Restore user settings that Terma changed, remove machine routing and local
+Terma state, then delete installed Terma executables. This is intended for testing
+onboarding from a clean machine.
+
+Repositories are left alone: their hooks and binding are committed files shared with
+everyone who works in them. Remove a repository's install with 'terma uninstall'.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if !assumeYes {
-				ok, err := confirm(cmd, "Are you sure you want to do this? It will remove everything related to Terma.")
+				ok, err := confirm(cmd, "Are you sure you want to do this? It will remove everything related to Terma on this machine.")
 				if err != nil {
 					return err
 				}
@@ -57,19 +60,9 @@ Terma executables. This is intended for testing onboarding from a clean machine.
 func runNate(cmd *cobra.Command) error {
 	out := cmd.OutOrStdout()
 
-	// Reuse the repository uninstaller so shared hook/config files lose only Terma's
-	// entries and any displaced Git configuration is restored from its journal.
-	uninstall := newUninstallCommand()
-	uninstall.SetContext(cmd.Context())
-	uninstall.SetIn(cmd.InOrStdin())
-	uninstall.SetOut(out)
-	uninstall.SetErr(cmd.ErrOrStderr())
-	if err := uninstall.Flags().Set("yes", "true"); err != nil {
-		return err
-	}
-	if err := uninstall.RunE(uninstall, nil); err != nil {
-		return fmt.Errorf("remove the current repository install: %w", err)
-	}
+	// Only home-directory state. The current repository's install is committed wiring
+	// shared with colleagues, and which repository that is depends on where nate ran;
+	// removing it is `terma uninstall`'s job, with its own file list and prompt.
 
 	// These journals live in Terma's config directory. Restore what Terma displaced
 	// before that directory is deleted; after it is gone, the original values cannot
@@ -118,6 +111,7 @@ func runNate(cmd *cobra.Command) error {
 		fmt.Fprintln(out, "No installed Terma executable was found.")
 	}
 	fmt.Fprintln(out, "Terma has been removed. A new install will start with a fresh configuration.")
+	fmt.Fprintln(out, "Repositories keep their committed hooks and binding; remove one with `terma uninstall` inside it.")
 	return nil
 }
 
