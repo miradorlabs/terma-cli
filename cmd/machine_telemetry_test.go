@@ -321,3 +321,36 @@ func TestRelayServeRecordsAMissingMachinePolicy(t *testing.T) {
 		t.Fatalf("recorded %+v (%v), want setup's choices: prompts on, tool content off", p, ok)
 	}
 }
+
+// Under the relay, setup writes one user-level hook into Claude Code's own settings — the
+// placement hook, which runs in every directory — beside the developer's own hooks; with
+// no relay it takes it out again.
+func TestSetupWritesClaudesPlacementHookUnderTheRelay(t *testing.T) {
+	_, home := setupSandbox(t)
+	fakeRelay(t)
+	settings := filepath.Join(home, ".claude", "settings.json")
+	if err := os.MkdirAll(filepath.Dir(settings), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	mine := `{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"echo mine"}]}]}}`
+	if err := os.WriteFile(settings, []byte(mine), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	setupRun(t)
+	data, _ := os.ReadFile(settings)
+	if !strings.Contains(string(data), "terma hook place") || !strings.Contains(string(data), "echo mine") {
+		t.Fatalf("user settings should hold terma's placement hook beside the developer's own:\n%s", data)
+	}
+	if strings.Contains(string(data), "terma hook session-start") {
+		t.Fatalf("the repository's hooks stay in the repository:\n%s", data)
+	}
+	out := setupRun(t, "--no-relay")
+	data, _ = os.ReadFile(settings)
+	if strings.Contains(string(data), "terma hook place") || !strings.Contains(string(data), "echo mine") {
+		t.Logf("setup --no-relay said:\n%s", out)
+	}
+	if strings.Contains(out, "already exports elsewhere") {
+		t.Fatalf("moving off the relay treated terma's own relay settings as another collector's:\n%s", out)
+		t.Fatalf("with no relay the placement hook comes out and the developer's stays:\n%s", data)
+	}
+}

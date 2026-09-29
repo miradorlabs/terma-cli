@@ -32,7 +32,25 @@ A record's project is decided in this order:
    session the relay could not place within the hold window, and records with no session
    at all (every Codex metric; Codex process-level spans such as startup and auth).
 
-A session's project is decided once and cached; it never moves mid-session.
+A session can run in more than one place: `claude --resume` and `codex exec resume` keep
+the session id in whatever directory they run. So a session has a **placement history**
+(`relay/sessions/<id>`, one `<unix nanos>\t<dir>` line per move), and each record goes
+by the placement in effect at the record's own timestamp — a resumed personal run goes
+to the machine project, while the earlier run's records, even arriving late, stay with
+their repository. The history comes from:
+
+- **Claude Code**: its SessionStart hook fires on startup *and* on resume, with the new
+  directory, before the run's first record (2.1.284, live-verified). The repository's
+  own hook runs only in the repository, so `terma setup` adds one user-level SessionStart
+  hook to Claude's settings, `terma hook place`, which only records the placement.
+- **Codex**: it runs no user-level hooks (0.158: project, managed and plugin hooks only),
+  so the relay reads the rollout — the header's directory, then each
+  `thread_settings_applied` (written as a resumed process attaches, before its turn and
+  prompt) and `turn_context`. Only those lines are decoded, incrementally, and read again
+  at once for a record stamped after the last read.
+
+Each placement's decision is made once and kept (`relay/routes/<id>`, one line per
+placement): a session's records never move between projects, across restarts too.
 
 A record whose session is known but not yet placed waits up to 30 s; a span that names
 no session waits up to 30 min for a record of its trace to name one, because a long Codex

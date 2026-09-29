@@ -527,8 +527,10 @@ func TestRelayLateSessionRecord(t *testing.T) {
 		t.Setenv("ANTHROPIC_API_KEY", "synthetic-telemetry-key")
 		sb := New(t, Isolated, WithClaude(b))
 		sb.UseRelay(RelayOptions{Content: true})
-		// The session runs where no hook records it, then the record is written the way the
-		// session-start hook writes it, naming the bound repository.
+		// The session runs where no hook records it — setup's user-level placement hook
+		// taken out, as on a machine where it failed to run — then the record is written
+		// the way the session-start hook writes it, naming the bound repository.
+		sb.dropClaudePlacementHook()
 		dir := filepath.Join(sb.Dir, "elsewhere")
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			t.Fatal(err)
@@ -782,9 +784,20 @@ func TestRelayClaudeResumedElsewhere(t *testing.T) {
 		}
 		msg := fmt.Sprintf("resume elsewhere: session id %s; the personal run's prompt reached the bound project in %d fields, the machine project in %d",
 			map[bool]string{true: "kept", false: "changed"}[resumed == sid], at["bound project"], at["machine project"])
-		Note(t.Name(), msg)
 		t.Log(msg)
 		noteRelay(t.Name(), sb)
+		// The user-level placement hook records the resumed run's directory, and the relay
+		// places each record by the placement in effect when it happened: the personal
+		// run goes to the machine project, and none of it to the repository's.
+		if at["bound project"] != 0 {
+			t.Fatalf("%s\n%s", msg, sb.routingReport(sid))
+		}
+		if at["machine project"] == 0 {
+			t.Fatalf("the personal run's prompt reached neither project: %s\n%s", msg, sb.routingReport(sid))
+		}
+		if n := agentSessions(sb.Receiver.evidenceFor(bearer(liveKey)))[sid]; n == 0 {
+			t.Fatalf("the original run's records left the repository's project:\n%s", sb.routingReport(sid))
+		}
 	})
 }
 
@@ -804,4 +817,70 @@ func (sb *Sandbox) routingReport(sid string) string {
 	}
 	fmt.Fprintf(&b, "session under test: %s\nlog:\n%s", sid, sb.relayLog())
 	return b.String()
+}
+
+// `codex exec resume` in a personal directory keeps the thread. Codex runs no user-level
+// hooks, so the relay learns the resumed turn's directory from the rollout's turn_context:
+// the personal turn goes to the machine project, the first turn stays with the repository.
+func TestRelayCodexResumedElsewhere(t *testing.T) {
+	forEachCodex(t, func(t *testing.T, b Binary, _ bool) {
+		track(t)
+		t.Setenv("OPENAI_API_KEY", "synthetic-telemetry-key")
+		sb := New(t, Isolated, WithCodex(b))
+		sb.UseRelay(RelayOptions{Content: true})
+		var calls atomic.Int32
+		provider := httptest.NewServer(codexTelemetryProvider(t, &calls))
+		defer provider.Close()
+		run := sb.CodexExec(RouteAPIKey, telemetryPrompt, fixtureCodexArgs(provider.URL)...)
+		personal := filepath.Join(sb.Dir, "personal")
+		if err := os.MkdirAll(personal, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := sb.resumeCodex(personal, run.ThreadID, "TERMA_PERSONAL_WORK please", fixtureCodexArgs(provider.URL)...); err != nil {
+			Note(t.Name(), "resume elsewhere: Codex refused ("+strings.SplitN(err.Error(), "\n", 2)[0]+")")
+			return
+		}
+		waitFor(relayHold+15*time.Second, func() bool {
+			return len(leakedFieldsOf(sb.Receiver.evidence(), "TERMA_PERSONAL_WORK")) > 0 && sb.relayDrained(time.Second)
+		})
+		bound := len(leakedFieldsOf(sb.Receiver.evidenceFor(bearer(liveKey)), "TERMA_PERSONAL_WORK"))
+		machine := len(leakedFieldsOf(sb.Receiver.evidenceFor(bearer(machineKey)), "TERMA_PERSONAL_WORK"))
+		msg := fmt.Sprintf("codex resume elsewhere: the personal turn's prompt reached the bound project in %d fields, the machine project in %d", bound, machine)
+		t.Log(msg)
+		noteRelay(t.Name(), sb)
+		if bound != 0 {
+			t.Fatalf("%s\n%s", msg, sb.routingReport(run.ThreadID))
+		}
+		if machine == 0 {
+			t.Fatalf("the personal turn's prompt reached neither project: %s\n%s", msg, sb.routingReport(run.ThreadID))
+		}
+		if n := agentSessions(sb.Receiver.evidenceFor(bearer(liveKey)))[run.ThreadID]; n == 0 {
+			t.Fatalf("the first turn's records left the repository's project:\n%s", sb.routingReport(run.ThreadID))
+		}
+	})
+}
+
+// dropClaudePlacementHook removes terma's user-level placement hook from the sandbox's
+// Claude Code settings, for a scenario about a session no hook records.
+func (sb *Sandbox) dropClaudePlacementHook() {
+	sb.T.Helper()
+	path := filepath.Join(sb.ClaudeConfig, "settings.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		sb.T.Fatal(err)
+	}
+	var settings map[string]any
+	if err := json.Unmarshal(data, &settings); err != nil {
+		sb.T.Fatal(err)
+	}
+	hooks, _ := settings["hooks"].(map[string]any)
+	delete(hooks, "SessionStart")
+	out, err := json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		sb.T.Fatal(err)
+	}
+	if strings.Contains(string(out), "terma hook place") {
+		sb.T.Fatal("the placement hook is still in the sandbox's Claude settings")
+	}
+	sb.writeAbs(path, string(out)+"\n")
 }

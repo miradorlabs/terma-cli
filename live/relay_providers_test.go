@@ -68,3 +68,22 @@ func (sb *Sandbox) resumeClaude(dir, sid, prompt string) (string, error) {
 	_ = json.Unmarshal(out, &result)
 	return result.SessionID, nil
 }
+
+// resumeCodex resumes thread id in dir the way a developer would with `codex exec
+// resume`, against the same fake provider.
+func (sb *Sandbox) resumeCodex(dir, id, prompt string, extra ...string) error {
+	args := []string{"exec", "--json", "--skip-git-repo-check", "--dangerously-bypass-hook-trust",
+		"-C", dir, "-c", `cli_auth_credentials_store="file"`,
+		"-c", "features.plugins=false", "-c", "features.remote_plugin=false",
+		"-c", `model_reasoning_effort="low"`}
+	args = append(append(args, extra...), "resume", id, prompt)
+	ctx, cancel := context.WithTimeout(context.Background(), scenarioTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, sb.Codex.Path, args...)
+	cmd.Dir = dir
+	cmd.Env = sb.codexEnv(RouteAPIKey)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("%v: %s", err, out)
+	}
+	return nil
+}

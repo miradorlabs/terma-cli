@@ -7,6 +7,7 @@
 package relay
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -17,8 +18,11 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/flock"
 )
 
 // DefaultPort is the loopback port the relay listens on. It is deliberately not 4317 or
@@ -112,11 +116,20 @@ func Supported() bool {
 	return runtime.GOOS == "darwin" || runtime.GOOS == "linux" || runtime.GOOS == "windows"
 }
 
-// RecordSession notes the directory a session runs in, for the relay to route its
-// records by. A session-start hook calls it; it is one small unsynced file write, so it
-// stays inside a hook's budget, and it never creates terma's config directory just to
-// record a session (no relay has been set up there to read it).
+// RecordSession notes that a session runs in cwd from now on, for the relay to route
+// its records by. A session-start hook calls it — the repository's, and the global one
+// that sees a session resumed elsewhere — so it is small: one read and, when the
+// directory changed, one unsynced write, under a lock both hooks of a start may contend
+// for. It never creates terma's config directory just to record a session (no relay has
+// been set up there to read it).
 func RecordSession(id, cwd string) error {
+	return recordPlacement(id, cwd, time.Now())
+}
+
+// maxPlacements bounds a session's placement history.
+const maxPlacements = 32
+
+func recordPlacement(id, cwd string, at time.Time) error {
 	if !validSessionID(id) || cwd == "" {
 		return nil
 	}
@@ -131,7 +144,27 @@ func RecordSession(id, cwd string) error {
 	if err := os.MkdirAll(sessions, 0o700); err != nil {
 		return err
 	}
-	return config.WriteFileAtomicNoSync(filepath.Join(sessions, id), []byte(cwd+"\n"), 0o600)
+	// A lock that cannot be had within the hook's budget falls through to the write:
+	// losing a race costs one placement line, dropping the write loses the session.
+	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
+	defer cancel()
+	if unlock, err := flock.Lock(ctx, filepath.Join(dir, "sessions.lock")); err == nil {
+		defer unlock()
+	}
+	path := filepath.Join(sessions, id)
+	existing := readLines(path)
+	if n := len(existing); n > 0 && existing[n-1].value == cwd {
+		return nil // still where it was: the earlier line's time stands
+	}
+	existing = append(existing, line{since: at, value: cwd})
+	if len(existing) > maxPlacements {
+		existing = existing[len(existing)-maxPlacements:]
+	}
+	var b strings.Builder
+	for _, l := range existing {
+		b.WriteString(formatSince(l.since) + "\t" + l.value + "\n")
+	}
+	return config.WriteFileAtomicNoSync(path, []byte(b.String()), 0o600)
 }
 
 // validSessionID admits the ids agents use (UUIDs, Codex's thread ids) and nothing that

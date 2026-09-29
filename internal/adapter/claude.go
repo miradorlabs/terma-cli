@@ -31,6 +31,8 @@ func (claude) Events() map[string]Handler {
 		// A subagent runs inside the session; both are notification-only for terma.
 		"subagent-start": hookrun.SubagentStart,
 		"subagent-stop":  hookrun.SubagentStop,
+		// User-level, not committed: where a session runs, in every directory.
+		"place": hookrun.Place,
 	}
 }
 

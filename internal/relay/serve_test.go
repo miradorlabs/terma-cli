@@ -143,15 +143,17 @@ type testRelay struct {
 	url      string
 	bindings map[string]string // directory → project
 	keys     map[string]string // project → key; a missing key holds the project
-	machine  atomic.Value      // string
-	mu       sync.Mutex
-	cancel   context.CancelFunc
-	done     chan error
+	// agentDirs are placements the agent's own files show, by session (Codex's rollout).
+	agentDirs map[string][]Placement
+	machine   atomic.Value // string
+	mu        sync.Mutex
+	cancel    context.CancelFunc
+	done      chan error
 }
 
 func newTestRelay(t *testing.T) *testRelay {
 	h := &testRelay{t: t, dir: t.TempDir(), gw: newGateway(t), cfg: Config{Token: "relay-token"},
-		bindings: map[string]string{}, keys: map[string]string{}}
+		bindings: map[string]string{}, keys: map[string]string{}, agentDirs: map[string][]Placement{}}
 	h.machine.Store("machine-proj")
 	h.keys["machine-proj"] = "Bearer key-machine"
 	// setup records the machine's content policy; these tests are about routing, so the
@@ -197,11 +199,20 @@ func (h *testRelay) start() {
 			}
 			return Destination{Endpoint: h.gw.URL, Authorization: key}, nil
 		},
-		Cwd: func(_ context.Context, session, source string) string {
+		Dirs: func(_ context.Context, session, source string, from int64) ([]Placement, int64) {
+			// Like CodexRolloutDirs: everything from the start on the first read, only what
+			// was appended after.
+			h.mu.Lock()
+			defer h.mu.Unlock()
+			var all []Placement
 			if source == "codex" && session == codexID {
-				return repoPath("codex-repo")
+				all = append(all, Placement{Dir: repoPath("codex-repo")})
 			}
-			return ""
+			all = append(all, h.agentDirs[session]...)
+			if int(from) >= len(all) {
+				return nil, from
+			}
+			return all[from:], int64(len(all))
 		},
 		Logf: func(f string, a ...any) { h.t.Logf("relay: "+f, a...) },
 	}

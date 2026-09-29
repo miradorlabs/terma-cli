@@ -181,11 +181,6 @@ func (rt *router) route(ctx context.Context, e entry, force bool) error {
 			rt.traces.put(it.traceID, it.session, it.source, now)
 		}
 	}
-	type decision struct {
-		route string
-		final bool
-	}
-	memo := map[string]decision{}
 	for _, it := range items {
 		session, source := it.session, it.source
 		if session == "" && it.traceID != "" {
@@ -193,13 +188,9 @@ func (rt *router) route(ctx context.Context, e entry, force bool) error {
 		}
 		switch {
 		case session != "":
-			d, ok := memo[session]
-			if !ok {
-				d.route, d.final = rt.res.decide(ctx, session, source, now, expired)
-				memo[session] = d
-			}
-			it.route = d.route
-			if !d.final {
+			route, final := rt.res.decide(ctx, session, source, it.at, now, expired)
+			it.route = route
+			if !final {
 				it.route = pendingRoute
 			}
 		case it.traceID != "" && !traceExpired:

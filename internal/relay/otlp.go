@@ -6,6 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"strconv"
+	"strings"
+	"time"
 )
 
 // signal is one of the three OTLP/HTTP signals, named as in its path (/v1/<signal>).
@@ -80,6 +83,7 @@ type unit struct {
 // item is the smallest thing routed: a log record, a span, or a metric data point.
 type item struct {
 	point   json.RawMessage // metrics only
+	at      time.Time       // when it happened, by the agent's clock; zero when unstated
 	session string
 	source  string // "claude" or "codex", by the attribute that named the session
 	traceID string
@@ -153,8 +157,24 @@ func parseBatch(sig signal, body []byte) (*batch, error) {
 
 // record is the part of a log record, span or data point routing reads.
 type record struct {
-	TraceID    string `json:"traceId"`
-	Attributes []kv   `json:"attributes"`
+	TraceID      string          `json:"traceId"`
+	Attributes   []kv            `json:"attributes"`
+	Start        json.RawMessage `json:"startTimeUnixNano"`
+	Time         json.RawMessage `json:"timeUnixNano"`
+	ObservedTime json.RawMessage `json:"observedTimeUnixNano"`
+}
+
+// at is when the record happened: a span's or data point's start (a data point starts
+// with its process, so a resumed run's points start in that run), else its time, else
+// when it was observed. OTLP/JSON writes these as strings; a number is taken too.
+func (r record) at() time.Time {
+	for _, raw := range []json.RawMessage{r.Start, r.Time, r.ObservedTime} {
+		s := strings.Trim(string(raw), `"`)
+		if n, err := strconv.ParseInt(s, 10, 64); err == nil && n > 0 {
+			return time.Unix(0, n)
+		}
+	}
+	return time.Time{}
 }
 
 func parseUnit(sig signal, raw json.RawMessage, resourceSession string) (unit, error) {
@@ -163,7 +183,7 @@ func parseUnit(sig signal, raw json.RawMessage, resourceSession string) (unit, e
 		if err := json.Unmarshal(raw, &r); err != nil {
 			return unit{}, fmt.Errorf("%w: %w", errNotOTLP, err)
 		}
-		it := &item{traceID: r.TraceID}
+		it := &item{traceID: r.TraceID, at: r.at()}
 		it.session, it.source = sessionFrom(r.Attributes)
 		if it.session == "" {
 			it.session = resourceSession
@@ -199,7 +219,7 @@ func parseUnit(sig signal, raw json.RawMessage, resourceSession string) (unit, e
 			if err := json.Unmarshal(p, &r); err != nil {
 				return unit{}, fmt.Errorf("%w: data point: %w", errNotOTLP, err)
 			}
-			it := &item{point: p}
+			it := &item{point: p, at: r.at()}
 			it.session, it.source = sessionFrom(r.Attributes)
 			if it.session == "" {
 				it.session = resourceSession

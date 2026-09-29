@@ -33,8 +33,8 @@ type Options struct {
 	// MachineProject names the project records go to when their session is in no bound
 	// repository, or has no session.
 	MachineProject MachineProjectFunc
-	// Cwd finds a session's directory from the agent's own files; CodexCwd when nil.
-	Cwd CwdFunc
+	// Dirs reads a session's placements from the agent's own files; CodexDirs when nil.
+	Dirs DirsFunc
 	// Hold is how long a record whose session cannot be placed waits before it goes to
 	// the machine project; 30 s when zero.
 	Hold time.Duration
@@ -76,8 +76,8 @@ func Serve(ctx context.Context, o Options) error {
 	if o.Binding == nil || o.Destination == nil || o.MachineProject == nil {
 		return errors.New("relay: Binding, Destination and MachineProject are required")
 	}
-	if o.Cwd == nil {
-		o.Cwd = CodexCwd
+	if o.Dirs == nil {
+		o.Dirs = CodexDirs
 	}
 	if o.Hold <= 0 {
 		o.Hold = DefaultHold
@@ -132,7 +132,7 @@ func Serve(ctx context.Context, o Options) error {
 		default:
 		}
 	}
-	rt := &router{dir: o.Dir, res: newResolver(o.Dir, o.Binding, o.Cwd, o.Logf), traces: newTraceMap(100_000),
+	rt := &router{dir: o.Dir, res: newResolver(o.Dir, o.Binding, o.Dirs, o.Logf), traces: newTraceMap(100_000),
 		hold: o.Hold, traceHold: o.TraceHold, now: o.Now, logf: o.Logf, stats: st, routed: fw.wake}
 	in := &intake{dir: o.Dir, token: o.Config.Token, version: o.Version, now: o.Now, stats: st,
 		logf: o.Logf, accepted: wakeRouter}
@@ -207,15 +207,20 @@ func Serve(ctx context.Context, o Options) error {
 	return err
 }
 
-// CodexCwd is the default CwdFunc: a Codex session's directory from its rollout header.
-// Claude Code sessions are placed by their session-start hook alone; its transcript is
-// conversation content the relay does not open.
-func CodexCwd(ctx context.Context, session, source string) string {
+// CodexDirs is the default DirsFunc: a Codex session's placements from its rollout —
+// the directory it started in, and each turn's (a session resumed elsewhere records its
+// new directory at the turn's start). Only those records are decoded; nothing a session
+// said is. Claude Code sessions are placed by their session-start hooks alone.
+func CodexDirs(ctx context.Context, session, source string, from int64) ([]Placement, int64) {
 	if source != "codex" {
-		return ""
+		return nil, from
 	}
-	cwd, _ := harness.CodexRolloutCwd(ctx, session, "")
-	return cwd
+	dirs, next := harness.CodexRolloutDirs(ctx, session, from)
+	out := make([]Placement, 0, len(dirs))
+	for _, d := range dirs {
+		out = append(out, Placement{Since: d.At, Dir: d.Cwd})
+	}
+	return out, next
 }
 
 func probe(ctx context.Context, c Config) (Health, error) {

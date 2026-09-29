@@ -16,6 +16,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/harness"
+	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
 	"github.com/miradorlabs/terma-cli/internal/output"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
@@ -130,6 +131,17 @@ func configureMachineTelemetry(ctx context.Context, errOut io.Writer, cfg *confi
 		res.agents = append(res.agents, out)
 	}
 	res.telemetry = t
+	for _, h := range machineAgents(agents) {
+		if h.Name() == "claude" {
+			// Under the relay, a user-level SessionStart hook records where every Claude
+			// session runs, so one resumed outside its repository is placed where it runs;
+			// with no relay there is nothing to read it, and it comes out.
+			if err := claudePlacementHook(t.Mode == config.TelemetryRelay); err != nil {
+				// Not fatal: without it a resumed-elsewhere session keeps its first placement.
+				fmt.Fprintf(errOut, "Warning: Claude Code's placement hook was not written: %v\n", err)
+			}
+		}
+	}
 	if t.Mode == config.TelemetryRelay {
 		// The machine's content choice is the relay's default: for the machine project,
 		// and for every project that has none of its own (`terma install --prompts`).
@@ -195,8 +207,16 @@ func configureMachineAgent(
 		return err
 	}
 	blocking, _ := partitionConflicts(conflicts)
+	// terma's own relay is terma's own even in direct mode (rc is then empty): a machine
+	// moving off the relay replaces the relay's settings without --force.
+	known := rc
+	if known.Port == 0 {
+		if loaded, err := relayLoad(); err == nil {
+			known = loaded
+		}
+	}
 	foreign := slices.DeleteFunc(blocking, func(c harness.Conflict) bool {
-		return c.Clearable && termaEndpoint(c.Value, machine.OTLPURL, rc)
+		return c.Clearable && termaEndpoint(c.Value, machine.OTLPURL, known)
 	})
 	if stuck := unclearable(foreign); len(stuck) > 0 {
 		out.skipped = "has settings terma does not change: " + output.SanitizeTerminal(strings.Join(stuck, ", "))
@@ -298,6 +318,17 @@ func machineTelemetryCurrent(cfg *config.Config, agents []string) bool {
 	if t.Mode == config.TelemetryRelay {
 		if _, ok := relayLoadContentPolicy(relay.MachineRoute); !ok {
 			return false
+		}
+		// A relay set up before the placement hook existed lacks it.
+		for _, h := range machineAgents(agents) {
+			if h.Name() != "claude" {
+				continue
+			}
+			if path, err := h.ConfigPath(); err == nil {
+				if plan, err := hookmgr.PlanClaudeUserHooks(filepath.Dir(path), true); err == nil && !plan.Empty() {
+					return false
+				}
+			}
 		}
 	}
 	return true
@@ -437,4 +468,27 @@ func printMachineResult(ui *installUI, res machineResult) {
 	if len(res.agents) > 0 {
 		ui.then("Restart your agents so they read their new telemetry settings.")
 	}
+}
+
+// claudePlacementHook writes (or removes) terma's user-level SessionStart hook in Claude
+// Code's user settings — the one place a hook runs in every directory.
+func claudePlacementHook(install bool) error {
+	path, err := (harness.Claude{}).ConfigPath()
+	if err != nil {
+		return err
+	}
+	dir := filepath.Dir(path)
+	plan, err := hookmgr.PlanClaudeUserHooks(dir, install)
+	if err != nil || plan.Empty() {
+		return err
+	}
+	if !install {
+		if _, err := os.Stat(path); err != nil {
+			return nil
+		}
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	return hookmgr.Apply(dir, plan)
 }

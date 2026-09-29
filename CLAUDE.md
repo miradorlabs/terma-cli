@@ -597,7 +597,9 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   `session-end` / `post-tool-use` / `stop` / `stop-failure` / `subagent-start` /
   `subagent-stop` (Claude Code's `.claude/settings.json`),
   `statusline` (Claude Code's user-level `statusLine.command`, written by `terma connect
-  claude`), `codex-notify` (Codex's `notify`), `codex-session-start` /
+  claude`), `place` (Claude Code's user-level SessionStart, written by `terma setup` under
+  the relay: records where a session runs, so one resumed outside its repository is placed
+  where it runs; docs/RELAY.md), `codex-notify` (Codex's `notify`), `codex-session-start` /
   `codex-user-prompt-submit` / `codex-pre-tool-use` / `codex-permission-request` /
   `codex-session-end` / `codex-post-tool-use` / `codex-stop` / `codex-subagent-start` /
   `codex-subagent-stop`

@@ -57,3 +57,38 @@ func PlanClaudeSettings(root string, install bool) (Plan, error) {
 	}
 	return mergeEventHooks(root, hooksFile{Path: ClaudeSettingsPath}, own, install)
 }
+
+// ClaudeUserHooks are terma's entries in Claude Code's user-level settings, which run in
+// every directory: only the placement hook, so the relay sees a session resumed outside
+// the repository it began in. Everything else stays in the repository's own file.
+var ClaudeUserHooks = []struct{ Event, Matcher, Command string }{
+	{"SessionStart", "", HookCommand("place")},
+}
+
+// PlanClaudeUserHooks merges ClaudeUserHooks into, or out of, the settings.json in
+// configDir (Claude Code's user config directory), leaving everything else in it as it
+// was — the developer's own hooks included.
+func PlanClaudeUserHooks(configDir string, install bool) (Plan, error) {
+	type hookCmd struct {
+		Type    string `json:"type"`
+		Command string `json:"command"`
+		Timeout int    `json:"timeout,omitempty"`
+	}
+	type hookEntry struct {
+		Matcher string            `json:"matcher,omitempty"`
+		Hooks   []json.RawMessage `json:"hooks"`
+	}
+	own := make([]eventHook, 0, len(ClaudeUserHooks))
+	for _, h := range ClaudeUserHooks {
+		cmd, err := marshalJSON(hookCmd{Type: "command", Command: h.Command, Timeout: 5}, "", "")
+		if err != nil {
+			return Plan{}, err
+		}
+		entry, err := marshalJSON(hookEntry{Matcher: h.Matcher, Hooks: []json.RawMessage{cmd}}, "", "")
+		if err != nil {
+			return Plan{}, err
+		}
+		own = append(own, eventHook{Event: h.Event, Entry: entry})
+	}
+	return mergeEventHooks(configDir, hooksFile{Path: "settings.json"}, own, install)
+}
