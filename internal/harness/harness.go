@@ -106,6 +106,11 @@ type Exporter struct {
 	// shareable, diffable, and safe in a dotfiles repo. Empty means inline delivery.
 	HelperPath string
 
+	// JSON selects OTLP/JSON instead of OTLP/protobuf. The relay reads each record's
+	// session to route it, and JSON is what it can split without a protobuf decoder;
+	// Terma's own ingest host takes either.
+	JSON bool
+
 	// IncludePrompts and IncludeToolContent control content capture. They are separate
 	// switches because they disclose different things: prompts and responses are what
 	// the user and model said, tool content is what ran and what came back. The policy

@@ -55,6 +55,17 @@ func HelperFilePath(h Harness, projectID string) (string, error) {
 	return filepath.Join(dir, h.Name()+"-otel-"+projectID), nil
 }
 
+// RelayHelperFilePath names the script that hands a harness the relay's token when its
+// global configuration points at terma's loopback relay. One per harness: the relay
+// token is the machine's, not a project's.
+func RelayHelperFilePath(h Harness) (string, error) {
+	dir, err := HelpersDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, h.Name()+"-otel-relay"), nil
+}
+
 // helperKeyRE matches the one secret a helper carries: a server key of either
 // prefix. Nothing else in the script looks like this.
 var helperKeyRE = serverkey.Pattern

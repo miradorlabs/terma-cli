@@ -47,6 +47,45 @@ type Profile struct {
 	// launch surface). `terma install` connects and wires these for a repository without
 	// asking again. It is a preference, not a connection — no endpoint or key.
 	Harnesses []string `json:"harnesses,omitempty"`
+	// Telemetry is how this machine's agents export, written by `terma setup`: one
+	// global configuration per agent, pointed at the relay or straight at Terma.
+	Telemetry *Telemetry `json:"telemetry,omitempty"`
+}
+
+// Telemetry modes: where the agents' global configuration points.
+const (
+	// TelemetryRelay points every agent at terma's loopback relay, which delivers each
+	// record to the project of the repository its session ran in (docs/RELAY.md).
+	TelemetryRelay = "relay"
+	// TelemetryDirect points every agent straight at Terma with the machine project's
+	// key: every session on the machine reports to that one project.
+	TelemetryDirect = "direct"
+)
+
+// Telemetry is the machine-wide export configuration: the choices `terma setup` made,
+// recorded so a later setup, install or refresh rewrites the agents' global files from
+// them instead of from defaults.
+type Telemetry struct {
+	// Mode is TelemetryRelay or TelemetryDirect: what setup last wrote.
+	Mode string `json:"mode,omitempty"`
+	// NoRelay is the developer's `--no-relay`: direct even where a relay can run.
+	NoRelay bool `json:"no_relay,omitempty"`
+	// Project is the machine project: where sessions from a repository with no binding
+	// report, and, in direct mode, where every session reports.
+	Project ProjectRef `json:"project"`
+	// Signals is the --signals value ("" = all, "none", or a comma-separated list).
+	Signals            string `json:"signals,omitempty"`
+	ExcludePrompts     bool   `json:"exclude_prompts,omitempty"`
+	ExcludeToolContent bool   `json:"exclude_tool_content,omitempty"`
+	// Identity is --identity: enduser.id on Codex sessions ("" = git email, "none").
+	Identity string `json:"identity,omitempty"`
+}
+
+// ProjectRef names a Terma project.
+type ProjectRef struct {
+	ID             string `json:"id,omitempty"`
+	Name           string `json:"name,omitempty"`
+	OrganizationID string `json:"organization_id,omitempty"`
 }
 
 // SelectOrganization records the account scope. Switching accounts never chooses
@@ -93,6 +132,10 @@ type Config struct {
 	// Harnesses is the machine-level list of coding agents recorded by `terma setup`.
 	// It is a preference read by `terma install`, never a connection.
 	Harnesses []string
+
+	// Telemetry is the machine-wide export configuration `terma setup` recorded; the
+	// zero value when setup has not configured it.
+	Telemetry Telemetry
 
 	// APIKey is a server key (ter_srv_…) from TERMA_API_KEY. When set it replaces the
 	// OAuth credential entirely — this is the CI and agent path, where a browser
@@ -149,6 +192,9 @@ func Load(o Overrides) (*Config, error) {
 		ProjectID:        firstNonEmpty(o.ProjectID, os.Getenv("TERMA_PROJECT_ID")),
 		Harnesses:        profile.Harnesses,
 		APIKey:           strings.TrimSpace(os.Getenv("TERMA_API_KEY")),
+	}
+	if profile.Telemetry != nil {
+		cfg.Telemetry = *profile.Telemetry
 	}
 
 	for _, endpoint := range []struct{ name, value string }{

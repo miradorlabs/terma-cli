@@ -324,7 +324,7 @@ func expectedValue(key string, e Exporter) (string, bool) {
 		case o.endpoint:
 			return e.SignalEndpoint(o.signal), true
 		case o.protocol:
-			return protocolHTTPProtobuf, true
+			return claudeProtocol(e), true
 		}
 	}
 	return "", false
@@ -356,4 +356,42 @@ func redactIfHeader(key, value string) string {
 		}
 	}
 	return value
+}
+
+// TermaPolicy reports whether this repository's settings hold a telemetry policy terma
+// wrote, which is what a machine-wide configuration must not be outranked by. With this
+// machine's record of writing it, any key still holding the value it installed counts;
+// without one, only the whole shape a repository connect writes does — every exporter
+// set, each to a value terma writes — so a developer's own single setting (a lone
+// OTEL_LOG_USER_PROMPTS=0) is never mistaken for one. Global scope has none.
+func (c Claude) TermaPolicy() (bool, error) {
+	if c.root == "" {
+		return false, nil
+	}
+	path, err := c.ConfigPath()
+	if err != nil {
+		return false, err
+	}
+	s, err := loadSettings(path)
+	if err != nil {
+		return false, err
+	}
+	j, err := loadJournal(c.Name(), path)
+	if err != nil {
+		return false, err
+	}
+	if j != nil {
+		for key, installed := range j.Installed {
+			if current, ok := s.env[key]; ok && current == installed {
+				return true, nil
+			}
+		}
+		return false, nil
+	}
+	for _, key := range []string{otelTracesExporter, otelLogsExporter, otelMetricsExporter} {
+		if value, ok := s.env[key]; !ok || !renderedByTerma(key, value) {
+			return false, nil
+		}
+	}
+	return true, nil
 }

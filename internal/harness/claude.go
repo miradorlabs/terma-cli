@@ -85,6 +85,8 @@ const (
 	// proxies and corporate TLS interception, which the gRPC transport frequently
 	// does not.
 	protocolHTTPProtobuf = "http/protobuf"
+	// protocolHTTPJSON is what an export to terma's relay uses (Exporter.JSON).
+	protocolHTTPJSON = "http/json"
 
 	// The detailed-beta-tracing pair. Together these send logs and traces to
 	// BETA_TRACING_ENDPOINT *instead of* through the configured exporters — a redirect
@@ -242,7 +244,7 @@ func renderClaude(e Exporter) map[string]string {
 		otelLogsExporter:    exporterFor(e.HasSignal(SignalLogs)),
 		otelMetricsExporter: exporterFor(e.HasSignal(SignalMetrics)),
 
-		otelProtocol: protocolHTTPProtobuf,
+		otelProtocol: claudeProtocol(e),
 		otelEndpoint: e.Endpoint,
 
 		// Off unless explicitly opted into. Written rather than omitted so the file is
@@ -283,6 +285,14 @@ func renderedByTerma(key, value string) bool {
 		return value == "1"
 	}
 	return false
+}
+
+// claudeProtocol is the OTLP transport an export uses.
+func claudeProtocol(e Exporter) string {
+	if e.JSON {
+		return protocolHTTPJSON
+	}
+	return protocolHTTPProtobuf
 }
 
 func exporterFor(on bool) string {
@@ -476,7 +486,7 @@ func claudeConflicts(env map[string]string, root map[string]json.RawMessage, e E
 				Clearable: true,
 			})
 		}
-		if v := env[o.protocol]; v != "" && v != protocolHTTPProtobuf {
+		if v := env[o.protocol]; v != "" && v != claudeProtocol(e) {
 			out = append(out, Conflict{
 				Key:       o.protocol,
 				Value:     v,

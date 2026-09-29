@@ -83,6 +83,7 @@ const (
 	codexProtocolKey = "protocol"
 	// codexProtocolBinary is http/protobuf in Codex's spelling; json is the other.
 	codexProtocolBinary = "binary"
+	codexProtocolJSON   = "json"
 
 	codexAuthorizationHeader = "Authorization"
 
@@ -229,6 +230,9 @@ func codexOTLPExporter(e Exporter, s Signal) map[string]any {
 	inner := map[string]any{
 		codexEndpointKey: e.SignalEndpoint(s),
 		codexProtocolKey: codexProtocolBinary,
+	}
+	if e.JSON {
+		inner[codexProtocolKey] = codexProtocolJSON
 	}
 	if e.APIKey != "" {
 		inner[codexHeadersKey] = map[string]any{codexAuthorizationHeader: "Bearer " + e.APIKey}
