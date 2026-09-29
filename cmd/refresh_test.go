@@ -74,7 +74,7 @@ func TestRefreshUpdatesTheRepositoryFromItsBinding(t *testing.T) {
 	if err != nil {
 		t.Fatalf("refresh: %v\n%s", err, out)
 	}
-	if !strings.Contains(out, "updated .claude/settings.json") || !strings.Contains(out, "git add .claude/settings.json") {
+	if !strings.Contains(out, "updated .claude/settings.json") {
 		t.Fatalf("refresh does not report the committed file:\n%s", out)
 	}
 	if data, _ := os.ReadFile(settings); !strings.Contains(string(data), `"SubagentStop"`) {
@@ -89,8 +89,8 @@ func TestRefreshUpdatesTheRepositoryFromItsBinding(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if after.Install.Version != Version || !strings.Contains(out, "git add .claude/settings.json "+termaproject.FileName) {
-		t.Fatalf("refresh should stamp terma_version %q and list the binding: %q\n%s", Version, after.Install.Version, out)
+	if after.Install.Version != Version || !strings.Contains(out, "updated "+termaproject.FileName) {
+		t.Fatalf("refresh should stamp terma_version %q and report the binding: %q\n%s", Version, after.Install.Version, out)
 	}
 	after.Install.Version = bound.Install.Version
 	if after.Project != bound.Project || !after.Install.InstalledAt.Equal(bound.Install.InstalledAt) || after.Install.HookManager != bound.Install.HookManager {

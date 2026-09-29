@@ -6,12 +6,12 @@
 # The script is POSIX sh, so `| sh` works too. What it does, so you can read it
 # before you run it: pick the archive for this platform from GitHub Releases, verify
 # it against the release's checksums.txt, extract the single `terma` binary, and
-# place it on your PATH. Nothing else is written; nothing downloaded is executed
+# place it in ~/.local/bin. It never asks for sudo. Nothing else is written; nothing downloaded is executed
 # before it has been verified. Windows users: download terma_Windows_x86_64.zip
 # from https://github.com/miradorlabs/terma-cli/releases.
 #
 #   TERMA_VERSION      install this release instead of the latest (v1.2.3 or 1.2.3)
-#   TERMA_INSTALL_DIR  put the binary here instead of /usr/local/bin or ~/.local/bin
+#   TERMA_INSTALL_DIR  put the binary here instead of ~/.local/bin
 set -eu
 
 REPO="miradorlabs/terma-cli"
@@ -80,31 +80,44 @@ actual="$(sha256 "$tmp/$asset")"
 tar -xzf "$tmp/$asset" -C "$tmp" terma || die "${asset} does not contain a terma binary"
 chmod +x "$tmp/terma"
 
-# Where to put it: an explicit TERMA_INSTALL_DIR, else /usr/local/bin when writable
-# (with sudo when it is not and a terminal is attached), else ~/.local/bin. Under
-# `curl | sh` stdin is the pipe, so the terminal check is on stderr; sudo prompts
-# on /dev/tty, not stdin.
+# Where to put it: an explicit TERMA_INSTALL_DIR, else over a terma already on PATH
+# when this user can write it (so no older copy is left ahead of the new one), else
+# ~/.local/bin. Never sudo: the committed hooks look in ~/.local/bin themselves, since
+# an app started from the Dock gets a PATH without it. A symlinked terma is Homebrew's
+# or npm's and is left to them.
 dest="${TERMA_INSTALL_DIR:-}"
-sudo_cmd=""
 if [ -z "$dest" ]; then
-  if [ -w /usr/local/bin ]; then
-    dest=/usr/local/bin
-  elif [ -t 2 ] && command -v sudo >/dev/null 2>&1; then
-    dest=/usr/local/bin; sudo_cmd="sudo"
-    say "Installing to ${dest} needs sudo (set TERMA_INSTALL_DIR to install elsewhere)."
-  else
-    dest="$HOME/.local/bin"
-  fi
+  dest="$HOME/.local/bin"
+  existing="$(command -v terma 2>/dev/null || true)"
+  case "$existing" in
+    /*) if [ -f "$existing" ] && ! [ -L "$existing" ] && [ -w "$existing" ] && [ -w "$(dirname "$existing")" ]; then
+          dest="$(dirname "$existing")"
+        fi ;;
+  esac
 fi
-$sudo_cmd mkdir -p "$dest"
-$sudo_cmd install -m 0755 "$tmp/terma" "$dest/terma"
+mkdir -p "$dest" || die "cannot create ${dest} (set TERMA_INSTALL_DIR to install elsewhere)"
+install -m 0755 "$tmp/terma" "$dest/terma" || die "cannot write ${dest}/terma (set TERMA_INSTALL_DIR to install elsewhere)"
 
 # No quarantine handling is needed here: curl does not set com.apple.quarantine,
 # only browser downloads do. The Homebrew cask strips it because Homebrew sets it.
 
 say "Installed $("$dest/terma" version 2>/dev/null || echo terma) to ${dest}/terma"
+terma_cmd="terma"
 case ":$PATH:" in
-  *":$dest:"*) ;;
-  *) say "Note: ${dest} is not on your PATH. Add it, e.g.:  export PATH=\"${dest}:\$PATH\"" ;;
+  *":$dest:"*)
+    found="$(command -v terma 2>/dev/null || true)"
+    if [ -n "$found" ] && [ "$found" != "$dest/terma" ]; then
+      say "Note: ${found} comes first on your PATH; remove it so this install is the one that runs."
+    fi
+    ;;
+  *)
+    terma_cmd="$dest/terma"
+    case "${SHELL:-}" in
+      */fish) say "Note: ${dest} is not on your PATH. Add it with:  fish_add_path ${dest}" ;;
+      */zsh) say "Note: ${dest} is not on your PATH. Add it with:  echo 'export PATH=\"${dest}:\$PATH\"' >> ~/.zshrc" ;;
+      */bash) say "Note: ${dest} is not on your PATH. Add it with:  echo 'export PATH=\"${dest}:\$PATH\"' >> ~/.bashrc" ;;
+      *) say "Note: ${dest} is not on your PATH. Add it, e.g.:  export PATH=\"${dest}:\$PATH\"" ;;
+    esac
+    ;;
 esac
-say "Next: run \`terma setup\` in a terminal, then \`terma install\` inside a repository."
+say "Next: run \`${terma_cmd} setup\` in a terminal, then \`terma install\` inside a repository."

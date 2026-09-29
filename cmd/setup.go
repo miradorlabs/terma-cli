@@ -103,7 +103,7 @@ func runSetup(cmd *cobra.Command, f setupFlags) error {
 	if len(names) == 0 {
 		fmt.Fprintln(out, "\nNo agents recorded. `terma install` will ask you to pick some in each repository.")
 	} else {
-		fmt.Fprintf(out, "\nAgents recorded: %s.\n", joinNames(adapterDisplayNames(names)))
+		fmt.Fprintf(out, "\nAgents recorded: %s.\n", joinNames(choiceDisplayNames(names)))
 	}
 	if slices.Contains(names, codexDesktopAgent) {
 		fmt.Fprintln(out, "Codex Desktop: after `terma install` in a repository, open Settings → Hooks → Review in Codex Desktop and approve Terma's hooks.")
@@ -173,11 +173,15 @@ func harnessSelectionAgents() []agentChoice {
 		for _, a := range adapter.All() {
 			if agentAvailable(a.Name()) == available {
 				adapterAgent := a
-				display := a.DisplayName()
-				if a.Name() == "codex" {
+				display, installed := a.DisplayName(), adapterAgent.Installed
+				switch a.Name() {
+				case "codex":
 					display = "Codex CLI"
+				case "claude":
+					display = claudeChoiceDisplay
+					installed = func(ctx context.Context) bool { return adapterAgent.Installed(ctx) || claudeDesktopInstalled() }
 				}
-				agents = append(agents, agentChoice{name: a.Name(), display: display, installed: adapterAgent.Installed})
+				agents = append(agents, agentChoice{name: a.Name(), display: display, installed: installed})
 				if a.Name() == "codex" {
 					agents = append(agents, agentChoice{name: codexDesktopAgent, display: "Codex Desktop", installed: codexDesktopInstalled})
 				}
@@ -185,6 +189,23 @@ func harnessSelectionAgents() []agentChoice {
 		}
 	}
 	return agents
+}
+
+// claudeChoiceDisplay is how setup names Claude: the desktop app runs Claude Code
+// sessions, which read the same settings and hooks, so one choice covers both.
+const claudeChoiceDisplay = "Claude Code (CLI and Desktop)"
+
+func claudeDesktopInstalled() bool {
+	if runtime.GOOS != "darwin" {
+		return false
+	}
+	home, _ := os.UserHomeDir()
+	for _, path := range []string{"/Applications/Claude.app", filepath.Join(home, "Applications", "Claude.app")} {
+		if info, err := os.Stat(path); err == nil && info.IsDir() {
+			return true
+		}
+	}
+	return false
 }
 
 func codexDesktopInstalled(context.Context) bool {
@@ -262,7 +283,22 @@ func agentDetail(ctx context.Context, name string) string {
 	if a, ok := adapter.Lookup(name); ok && a.Installed(ctx) {
 		return "installed"
 	}
+	if name == "claude" && claudeDesktopInstalled() {
+		return "installed"
+	}
 	return ""
+}
+
+// choiceDisplayNames names agents as setup's form does — Claude as CLI and Desktop —
+// where adapterDisplayNames names what install routes (a shim routes the CLI only).
+func choiceDisplayNames(names []string) []string {
+	out := adapterDisplayNames(names)
+	for i, n := range names {
+		if n == "claude" {
+			out[i] = claudeChoiceDisplay
+		}
+	}
+	return out
 }
 
 // adapterDisplayNames maps adapter tokens to their display names, in the given order.

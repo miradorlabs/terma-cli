@@ -26,7 +26,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/shim"
 	"github.com/miradorlabs/terma-cli/internal/spinner"
-	"github.com/miradorlabs/terma-cli/internal/style"
 )
 
 type installFlags struct {
@@ -238,9 +237,9 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	f.excludePrompts = !include
 	if len(exportingAgents(agents)) > 0 {
 		if include {
-			ui.summary("Prompts", "prompt text and model responses are sent — `terma install --prompts off` stops them")
+			ui.summary("Prompts", "sent — `terma install --prompts off` stops that")
 		} else {
-			ui.summary("Prompts", "prompt text and model responses are not sent — `terma install --prompts on` sends them")
+			ui.summary("Prompts", "not sent — `terma install --prompts on` sends them")
 		}
 	}
 
@@ -331,26 +330,18 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 
 	// 5. Hooks: apply the plan built above.
 	installedHooks := gitDir != "" && existing != nil && existing.Install.HookManager != ""
-	var written []string    // the repository files this run wrote hooks into, to commit
+	var written []string    // the repository files this run wrote hooks into
 	var afterMerge []string // what each clone does once they are merged
 	if !f.noHooks {
+		// Running install is the consent: the hooks are what it installs, and --no-hooks
+		// is the way to decline them.
 		plan.print(ui.detail)
-		writeHooks := f.assumeYes
-		if !plan.empty() && !writeHooks {
-			var err error
-			writeHooks, err = confirmExplained(cmd, "Write terma's hooks to "+joinNames(plan.files())+"?", plan.explain(), true)
-			if errors.Is(err, errCancelled) {
-				return err
-			}
-			writeHooks = err == nil && writeHooks
-		}
-		switch {
-		case plan.empty():
+		if plan.empty() {
 			// An empty git-hook plan means the commit hooks are already wired, so this
 			// repo is hook-installed; record them in the binding without rewriting.
 			installedHooks = gitDir != ""
 			ui.ok("Hooks", plan.summary(adapters)+" — already in place")
-		case writeHooks:
+		} else {
 			if err := plan.apply(root); err != nil {
 				return err
 			}
@@ -358,10 +349,6 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 			written = plan.paths()
 			ui.ok("Hooks", plan.summary(adapters))
 			afterMerge = plan.hooks.Notes
-		default:
-			adapters = adapter.WiredNames(root) // declined: only what is already wired
-			ui.warn("Hooks", "not written — commits are not stamped until they are")
-			ui.then("Run `terma install` again and accept the hooks when you are ready.")
 		}
 	} else {
 		adapters = adapter.WiredNames(root) // --no-hooks: only what is already wired
@@ -372,7 +359,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 			return err
 		}
 		if !codexPlan.Empty() {
-			return errors.New("codex desktop needs the SessionStart repository hook; run `terma install` without --no-hooks and accept the Codex hook plan")
+			return errors.New("codex desktop needs the SessionStart repository hook; run `terma install` without --no-hooks")
 		}
 	}
 
@@ -455,13 +442,14 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 		}
 	}
 
-	if gitDir != "" && len(written) > 0 {
-		// Save always rewrites the binding.
-		written = append(written, termaproject.FileName)
-		ui.then(commitList(ui.p, "Commit these files and open a PR — merging it onboards the repository:", written))
-	}
+	// The shims' note is the core.hooksPath wiring this run just did; husky's and
+	// lefthook's are a step this clone needs as much as the next one.
 	for _, n := range afterMerge {
-		ui.then("After merging: " + n)
+		if plan.hooks.Manager == hookmgr.GitShim {
+			fmt.Fprintln(ui.detail, "After merging: "+n)
+		} else {
+			ui.then("After merging: " + n)
+		}
 	}
 	// The first run of a newer release brings what earlier versions wrote on this machine
 	// up to this build — the shims and wraps this run did not rewrite itself — before
@@ -858,7 +846,7 @@ func putShimsOnPath(ui *installUI, binDir string, agents []string, f installFlag
 		ui.then(fmt.Sprintf("%s as the LAST line that touches PATH in %s — a later line that prepends another directory puts the real binaries back in front:\n%s\n%s to route %s through terma.",
 			why, file, ui.code(line), reload, names))
 	}
-	reload := fmt.Sprintf("Run `%s` in this terminal, or open a new terminal, to route %s through terma.", reloadCommand(file), names)
+	reload := fmt.Sprintf("Run `%s` or open a new terminal.", reloadCommand(file))
 	if !ok || f.noPath {
 		manual("Add this")
 		return
@@ -1009,58 +997,6 @@ func (p hookPlan) print(out io.Writer) {
 	}
 }
 
-// files names what the plan writes for a question that fits on a line: terma's own hook
-// shims as their directory, every other file by its path.
-func (p hookPlan) files() []string {
-	var files []string
-	for _, path := range p.paths() {
-		if path = shownPath(path); !slices.Contains(files, path) {
-			files = append(files, path)
-		}
-	}
-	return files
-}
-
-// shownPath is how a question names a file the plan writes: terma's hook shims by their
-// directory, every other file by its path.
-func shownPath(path string) string {
-	if strings.HasPrefix(path, hookmgr.ShimDir+"/") {
-		return hookmgr.ShimDir + "/"
-	}
-	return path
-}
-
-// explain says what each file in files() is for, a line apiece, and what committing them
-// means — the lines under the question that asks to write them, so a developer knows what
-// a yes does before giving it.
-func (p hookPlan) explain() []string {
-	what := map[string]string{}
-	for _, c := range p.hooks.Changes {
-		what[shownPath(c.Path)] = "stamps each commit with the agent session that wrote it"
-	}
-	for _, a := range adapter.All() {
-		if path := a.HooksPath(); path != "" {
-			what[path] = "reports each " + a.DisplayName() + " session and the files it edits"
-		}
-	}
-	files := p.files()
-	width := 0
-	for _, f := range files {
-		width = max(width, len(f))
-	}
-	lines := make([]string, 0, len(files)+2)
-	for _, f := range files {
-		desc, ok := what[f]
-		if !ok {
-			desc = "terma's hook wiring"
-		}
-		lines = append(lines, fmt.Sprintf("%-*s  %s", width, f, desc))
-	}
-	return append(lines,
-		"These are committed: merging them sets up everyone who clones the repository,",
-		"and on a machine without terma they do nothing.")
-}
-
 // summary says what the hooks do once installed: commit stamping through the hook
 // manager, and the agents whose own hooks report their sessions.
 func (p hookPlan) summary(adapters []string) string {
@@ -1096,14 +1032,6 @@ func (p hookPlan) paths() []string {
 		}
 	}
 	return paths
-}
-
-// printCommitList tells the developer which files the hook install wrote and that they
-// must be committed: the hooks do nothing for a colleague until the files are merged.
-// lead is the sentence that says why. A path is listed once, even when two changes
-// touched it.
-func printCommitList(out io.Writer, lead string, paths []string) {
-	fmt.Fprintln(out, commitList(style.For(out), lead, paths))
 }
 
 func (p hookPlan) apply(root string) error {

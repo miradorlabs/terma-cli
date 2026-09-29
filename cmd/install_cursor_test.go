@@ -99,7 +99,7 @@ const testProjectID = "770e8400-e29b-41d4-a716-446655440000"
 
 func TestInstallWiresCursorHooksWhenAsked(t *testing.T) {
 	repo := installRepo(t)
-	out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude,cursor", "--yes")
+	out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude,cursor", "--yes", "-v")
 	if err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}

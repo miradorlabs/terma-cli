@@ -1,7 +1,11 @@
 #!/bin/sh
+# terma-shim format=2 sha256=ad0f446cfe4065056d6a734a594144938150e1c1e9b73dc36ba58d354a7d8513
 # Installed by "terma install". Thin shim: all logic lives in the terma binary,
 # so this file never needs to change when terma updates. It must never block a
 # commit: a missing or failing terma is ignored.
+# A commit made from an app started from the Dock gets launchd's PATH, which has none
+# of terma's install directories.
+PATH="${PATH:-/usr/bin:/bin}:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin"
 if command -v terma >/dev/null 2>&1; then
   terma hook prepare-commit-msg "$@" || true
 fi

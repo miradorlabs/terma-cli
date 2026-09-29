@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/style"
 )
@@ -126,57 +125,21 @@ func TestInstallRecordsNoAdapters(t *testing.T) {
 	}
 }
 
-// An install that writes hooks names every file it wrote, so the developer commits them
-// all; the hooks do nothing for a colleague until they are merged. A re-run that writes
-// nothing asks for no commit.
-func TestInstallListsTheFilesToCommit(t *testing.T) {
+// The files install writes show up in `git status`; install does not also ask for a
+// commit. --verbose lists each one.
+func TestInstallDoesNotAskForACommit(t *testing.T) {
 	installRepo(t)
-	out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude,cursor", "--yes", "--no-doctor")
+	out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude,cursor", "--yes", "--no-doctor", "-v")
 	if err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}
-	_, list, ok := strings.Cut(out, "Commit these files")
-	if !ok {
-		t.Fatalf("install did not ask for a commit:\n%s", out)
+	if strings.Contains(out, "git add") || strings.Contains(out, "open a PR") {
+		t.Fatalf("install asked for a commit:\n%s", out)
 	}
-	for _, want := range []string{".terma/hooks/post-commit", ".claude/settings.json", ".cursor/hooks.json", termaproject.FileName, "git add "} {
-		if !strings.Contains(list, want) {
-			t.Errorf("commit list is missing %s:\n%s", want, list)
+	for _, want := range []string{".terma/hooks/post-commit", ".claude/settings.json", ".cursor/hooks.json"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("--verbose should list %s:\n%s", want, out)
 		}
-	}
-	out, err = runTerma(t, "install", "--harness", "none", "--yes", "--no-doctor")
-	if err != nil {
-		t.Fatalf("re-install: %v\n%s", err, out)
-	}
-	if strings.Contains(out, "Commit these files") {
-		t.Fatalf("a re-install that wrote nothing asked for a commit:\n%s", out)
-	}
-}
-
-// The question that asks to write the hooks names the files; the lines under it say what
-// each one does and what committing them means, so a developer knows what a yes does.
-// Every file the question names gets its own line.
-func TestInstallHookQuestionExplainsEachFile(t *testing.T) {
-	repo := installRepo(t)
-	plan, err := planHooks(repo, hookmgr.Detect(repo), []string{"claude", "codex"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	lines := plan.explain()
-	if len(lines) != len(plan.files())+2 {
-		t.Fatalf("want a line per file %v and the closing sentence, got:\n%s", plan.files(), strings.Join(lines, "\n"))
-	}
-	for i, want := range [][2]string{
-		{".terma/hooks/", "stamps each commit with the agent session that wrote it"},
-		{".claude/settings.json", "reports each Claude Code session and the files it edits"},
-		{".codex/hooks.json", "reports each Codex session and the files it edits"},
-	} {
-		if !strings.HasPrefix(lines[i], want[0]) || !strings.Contains(lines[i], want[1]) {
-			t.Errorf("line %d = %q, want %s explained as %q", i, lines[i], want[0], want[1])
-		}
-	}
-	if text := strings.Join(lines, " "); !strings.Contains(text, "merging them sets up everyone who clones") || !strings.Contains(text, "without terma they do nothing") {
-		t.Errorf("the explanation should say what committing the files means:\n%s", strings.Join(lines, "\n"))
 	}
 }
 

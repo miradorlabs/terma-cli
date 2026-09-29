@@ -34,6 +34,23 @@ func TestSetupRecordsCodexDesktopSeparatelyFromCLI(t *testing.T) {
 	}
 }
 
+// Claude Desktop runs Claude Code sessions, which read the same settings and hooks: the
+// one Claude choice says it covers both.
+func TestSetupNamesClaudeDesktopWithTheCLI(t *testing.T) {
+	gateway := newFakeAuth(t)
+	authSandbox(t, gateway)
+	if _, err := auth.SaveCredential(config.DefaultProfile, storedSession(gateway, orgA())); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runTerma(t, "setup", "--harness", "claude")
+	if err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "Agents recorded: Claude Code (CLI and Desktop).") {
+		t.Fatalf("setup should say the Claude choice covers the desktop app:\n%s", out)
+	}
+}
+
 func TestHarnessSelectionComingSoon(t *testing.T) {
 	chosen := map[string]bool{}
 	for _, name := range adapter.Names() {
@@ -50,6 +67,8 @@ func TestHarnessSelectionComingSoon(t *testing.T) {
 			display = "Codex Desktop"
 		} else if name == "codex" {
 			display = "Codex CLI"
+		} else if name == "claude" {
+			display = "Claude Code (CLI and Desktop)"
 		} else if a, ok := adapter.Lookup(name); ok {
 			display = a.DisplayName()
 		}
@@ -100,12 +119,19 @@ func TestHarnessSelectionFiltersSavedAgents(t *testing.T) {
 		if slices.Contains(saved, "claude") {
 			wantInstalled = []string{"claude", "codex"}
 		}
+		// The desktop apps count as installed agents, whatever PATH says.
 		wantSetup := slices.Clone(wantInstalled)
+		var desktops []string
+		if claudeDesktopInstalled() && !slices.Contains(wantSetup, "claude") {
+			wantSetup = append([]string{"claude"}, wantSetup...)
+			desktops = append(desktops, "claude")
+		}
 		if codexDesktopInstalled(context.Background()) {
 			wantSetup = append(wantSetup, codexDesktopAgent)
-			if len(wantInstalled) == 0 {
-				wantInstalled = append(wantInstalled, codexDesktopAgent)
-			}
+			desktops = append(desktops, codexDesktopAgent)
+		}
+		if len(wantInstalled) == 0 {
+			wantInstalled = desktops
 		}
 		got, err := chooseHarnesses(cmd, cfg, setupFlags{assumeYes: true})
 		if err != nil || !slices.Equal(got, wantSetup) {

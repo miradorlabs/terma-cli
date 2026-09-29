@@ -15,7 +15,10 @@ files would freeze the first version of that logic into every repository that in
 it.
 
 The one thing every committed line does besides calling terma is guard the call:
-`command -v terma` first, `|| true` last. The files land in a repository through a PR,
+`command -v terma` first, `|| true` last, and before it `hookmgr.PathFallback`, which
+appends `~/.local/bin` and Homebrew's two bin directories to PATH: an agent or a git GUI
+started from the Dock gets launchd's PATH, without the directory install.sh puts terma
+in, and the guard then skipped every hook in silence. The files land in a repository through a PR,
 so they run on every colleague's machine, including those who never installed terma,
 and for them the hooks must be invisible: exit 0, no output, the message untouched
 (`TestManagerLinesAreInertWithoutTerma` runs each manager's line that way, and

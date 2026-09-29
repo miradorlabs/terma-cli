@@ -166,8 +166,6 @@ func runRefresh(ctx context.Context, out io.Writer) error {
 		}
 	}
 	if len(repoChanged) > 0 {
-		fmt.Fprintln(out)
-		printCommitList(out, "These are committed files. Commit them so every clone runs the same hooks:", repoChanged)
 		if slices.Contains(repoChanged, hookmgr.CodexHooksPath) {
 			fmt.Fprintln(out, "\nCodex runs changed hooks only after you trust them again in Codex; `terma doctor` names any it is skipping.")
 		}

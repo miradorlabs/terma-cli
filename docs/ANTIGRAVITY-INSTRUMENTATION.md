@@ -18,8 +18,8 @@ else remains. A developer's `"enabled": false` on terma's entry is preserved by 
 reinstall and reported by `terma doctor`. There is no `PreToolUse` entry: agy requires a
 decision from that hook and terma never decides anything for an agent.
 
-Each command is the shared guard, `command -v terma >/dev/null 2>&1 && terma hook
-<event> || true`, and every handler answers `{}` on stdout, the reply agy documents.
+Each command is the shared guard, `hookmgr.PathFallback` then `command -v terma
+>/dev/null 2>&1 && terma hook <event> || true`, and every handler answers `{}` on stdout, the reply agy documents.
 On a machine without terma the guard prints nothing and agy raises no warning (checked
 against agy 1.2.4 with a second named hook whose binary was absent).
 

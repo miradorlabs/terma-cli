@@ -276,8 +276,8 @@ func TestInstallPromptsSwitchSticks(t *testing.T) {
 		line string
 	}{
 		// a first install sends them, unasked, and says how to stop it
-		{nil, true, "prompt text and model responses are sent — `terma install --prompts off` stops them"},
-		{[]string{"--prompts", "off"}, false, "prompt text and model responses are not sent — `terma install --prompts on` sends them"},
+		{nil, true, "sent — `terma install --prompts off` stops that"},
+		{[]string{"--prompts", "off"}, false, "not sent — `terma install --prompts on` sends them"},
 		{nil, false, ""}, // kept, not re-defaulted
 		{[]string{"--prompts", "on"}, true, ""},
 		{[]string{"--exclude-prompts"}, false, ""}, // the older spelling still works

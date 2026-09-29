@@ -33,7 +33,7 @@ func TestHarnessHookCommandsAreInertWithoutTerma(t *testing.T) {
 	}
 	for _, command := range commands {
 		t.Run(command, func(t *testing.T) {
-			cmd := exec.Command("sh", "-c", command)
+			cmd := exec.Command("sh", "-c", withoutSystemDirs(command))
 			cmd.Dir = t.TempDir()
 			cmd.Env = []string{"PATH=/usr/bin:/bin", "HOME=" + cmd.Dir}
 			cmd.Stdin = strings.NewReader(`{"session_id":"s1","hook_event_name":"SessionStart","cwd":"` + cmd.Dir + `"}`)
@@ -123,7 +123,7 @@ func TestHarnessHookEntriesUpgradeInPlace(t *testing.T) {
 		if strings.Contains(got, `"terma hook`) {
 			t.Fatalf("%s still carries an unguarded command:\n%s", path, got)
 		}
-		if n := strings.Count(got, HookCommand("")[:len("command -v terma")]); n != guarded[path] {
+		if n := strings.Count(got, inJSON(t, PathFallback)+"command -v terma"); n != guarded[path] {
 			t.Fatalf("%s should carry exactly %d guarded commands, has %d:\n%s", path, guarded[path], n, got)
 		}
 		if again, _ := plan(root, true); !again.Empty() {
@@ -165,7 +165,7 @@ func TestHookFilesAreNotHTMLEscaped(t *testing.T) {
 	if strings.Contains(got, `\u00`) {
 		t.Fatalf("HTML-escaped characters in a committed file:\n%s", got)
 	}
-	if !strings.Contains(got, HookCommand("session-start")) {
+	if !strings.Contains(got, inJSON(t, HookCommand("session-start"))) {
 		t.Fatalf("guarded command not written verbatim:\n%s", got)
 	}
 	if !strings.Contains(got, userHook) {

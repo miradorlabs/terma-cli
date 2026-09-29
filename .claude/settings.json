@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "command -v terma >/dev/null 2>&1 && terma hook post-tool-use || true",
+            "command": "PATH=\"${PATH:-/usr/bin:/bin}:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin\"; command -v terma >/dev/null 2>&1 && terma hook post-tool-use || true",
             "timeout": 10
           }
         ]
@@ -26,7 +26,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "command -v terma >/dev/null 2>&1 && terma hook session-end || true",
+            "command": "PATH=\"${PATH:-/usr/bin:/bin}:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin\"; command -v terma >/dev/null 2>&1 && terma hook session-end || true",
             "timeout": 10
           }
         ]
@@ -37,7 +37,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "command -v terma >/dev/null 2>&1 && terma hook session-start || true",
+            "command": "PATH=\"${PATH:-/usr/bin:/bin}:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin\"; command -v terma >/dev/null 2>&1 && terma hook session-start || true",
             "timeout": 10
           }
         ]
@@ -48,7 +48,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "command -v terma >/dev/null 2>&1 && terma hook stop || true",
+            "command": "PATH=\"${PATH:-/usr/bin:/bin}:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin\"; command -v terma >/dev/null 2>&1 && terma hook stop || true",
             "timeout": 10
           }
         ]
@@ -59,7 +59,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "command -v terma >/dev/null 2>&1 && terma hook stop-failure || true",
+            "command": "PATH=\"${PATH:-/usr/bin:/bin}:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin\"; command -v terma >/dev/null 2>&1 && terma hook stop-failure || true",
             "timeout": 10
           }
         ]
@@ -70,7 +70,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "command -v terma >/dev/null 2>&1 && terma hook subagent-start || true",
+            "command": "PATH=\"${PATH:-/usr/bin:/bin}:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin\"; command -v terma >/dev/null 2>&1 && terma hook subagent-start || true",
             "timeout": 10
           }
         ]
@@ -81,7 +81,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "command -v terma >/dev/null 2>&1 && terma hook subagent-stop || true",
+            "command": "PATH=\"${PATH:-/usr/bin:/bin}:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin\"; command -v terma >/dev/null 2>&1 && terma hook subagent-stop || true",
             "timeout": 10
           }
         ]

@@ -57,7 +57,7 @@ func TestInstallPutsTheShimsOnPath(t *testing.T) {
 	}
 	// terma cannot change the PATH of the shell that ran it, so the last thing install
 	// says is how to make this one read the file.
-	if !strings.Contains(out, "Next steps:\n  1. Run `source ~/.zshrc` in this terminal") {
+	if !strings.Contains(out, "Next steps:\n  1. Run `source ~/.zshrc` or open a new terminal.") {
 		t.Fatalf("install should end with the command that reloads this shell:\n%s", out)
 	}
 }

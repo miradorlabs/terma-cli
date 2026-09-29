@@ -467,7 +467,7 @@ func doctorBinaryCheckFor(exe string) doctor.Check {
 		if installed, err := installedBinaryDigest(path); err == nil && current != installed {
 			return doctor.Check{Status: doctor.Warn,
 				Detail: path + binaryBuildLabel(path) + "; hooks run a different build from " + exe,
-				Fix:    "run `" + addToPathCommand(filepath.Dir(exe)) + "` to put " + filepath.Dir(exe) + " first on PATH, or replace " + path + " with this build; then run `terma doctor`"}
+				Fix:    "hooks run " + tildePath(path) + ", not this build: run `" + addToPathCommand(filepath.Dir(exe)) + "` to put this build first on PATH"}
 		}
 	}
 	// Hooks call `terma` by name, and the name does not resolve the same way

@@ -6,7 +6,8 @@
 #   scripts/test-install.sh <dist-dir> <tag>
 #
 # Covers the paths a user takes: pinned version piped through bash (the documented
-# `curl | bash`), latest under plain sh, a version without the v prefix, and the two
+# `curl | bash`), latest under plain sh, a version without the v prefix, the default
+# destination (~/.local/bin, never sudo) and an upgrade over a copy already on PATH, and the two
 # refusals — a checksum that does not match, and cleartext to a host that is not this
 # machine. Nothing here touches the real PATH: every install goes to a temp dir.
 set -euo pipefail
@@ -47,6 +48,20 @@ TERMA_RELEASE_BASE="$BASE" TERMA_INSTALL_DIR="$work/bin2" sh "$INSTALLER" 2>/dev
 echo "== version without the v prefix"
 TERMA_RELEASE_BASE="$BASE" TERMA_VERSION="${TAG#v}" TERMA_INSTALL_DIR="$work/bin3" sh "$INSTALLER" 2>/dev/null
 [ -x "$work/bin3/terma" ] || fail "unprefixed version did not install"
+
+echo "== default: ~/.local/bin, no sudo, even with /usr/local/bin unwritable"
+home="$work/home"; mkdir -p "$home"
+out="$(HOME="$home" PATH="/usr/bin:/bin" TERMA_RELEASE_BASE="$BASE" TERMA_VERSION="$TAG" sh "$INSTALLER" 2>&1 </dev/null)"
+[ "$("$home/.local/bin/terma" version)" = "$want" ] || fail "default install did not land in ~/.local/bin: $out"
+! grep -qi sudo <<<"$out" || fail "installer mentioned sudo: $out"
+grep -q "is not on your PATH" <<<"$out" || fail "missing PATH hint: $out"
+grep -q "run \`$home/.local/bin/terma setup\`" <<<"$out" || fail "next step should name the full path: $out"
+
+echo "== upgrades a writable copy already on PATH in place"
+mkdir -p "$work/onpath"
+printf '#!/bin/sh\necho old\n' >"$work/onpath/terma"; chmod 755 "$work/onpath/terma"
+HOME="$home" PATH="$work/onpath:/usr/bin:/bin" TERMA_RELEASE_BASE="$BASE" TERMA_VERSION="$TAG" sh "$INSTALLER" 2>/dev/null </dev/null
+[ "$("$work/onpath/terma" version)" = "$want" ] || fail "copy on PATH not replaced: $("$work/onpath/terma" version)"
 
 echo "== refuses a checksum that does not match"
 sums="$mirror/download/$TAG/checksums.txt"

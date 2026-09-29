@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -36,10 +37,8 @@ func anyOwnedCommand(v any) bool {
 			}
 		}
 	case []any:
-		for _, value := range t {
-			if anyOwnedCommand(value) {
-				return true
-			}
+		if slices.ContainsFunc(t, anyOwnedCommand) {
+			return true
 		}
 	}
 	return false
@@ -116,12 +115,9 @@ func ownedHookCommand(command string) bool {
 		commands = append(commands, h.Command)
 	}
 	for _, guarded := range commands {
-		// Codex's commands lead with a PATH assignment (CodexHookCommand); the forms an
-		// older terma wrote did not, and must still be recognized to be upgraded in place.
-		plain := guarded
-		if i := strings.Index(plain, "; command -v terma "); i >= 0 {
-			plain = plain[i+2:]
-		}
+		// The commands lead with PathFallback; the forms an older terma wrote did not,
+		// and must still be recognized to be upgraded in place.
+		plain := strings.TrimPrefix(guarded, PathFallback)
 		bare := strings.TrimSuffix(strings.TrimPrefix(plain, "command -v terma >/dev/null 2>&1 && "), " || true")
 		if command == guarded || command == plain || command == bare || command == bare+" || true" {
 			return true

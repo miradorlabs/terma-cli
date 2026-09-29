@@ -42,32 +42,25 @@ var CodexHooks = []struct {
 	Async   bool
 	Timeout int
 }{
-	{"SessionStart", CodexHookCommand("codex-session-start"), false, 10},
-	{"UserPromptSubmit", CodexHookCommand("codex-user-prompt-submit"), true, 10},
+	{"SessionStart", HookCommand("codex-session-start"), false, 10},
+	{"UserPromptSubmit", HookCommand("codex-user-prompt-submit"), true, 10},
 	// Record the start before the tool runs. PostToolUse can then report an
 	// observed elapsed time under the same tool_use_id.
-	{"PreToolUse", CodexHookCommand("codex-pre-tool-use"), false, 10},
+	{"PreToolUse", HookCommand("codex-pre-tool-use"), false, 10},
 	// This only observes that approval was requested. Codex does not send the
 	// eventual user decision back to repository hooks.
-	{"PermissionRequest", CodexHookCommand("codex-permission-request"), false, 10},
-	{"PostToolUse", CodexHookCommand("codex-post-tool-use"), true, 10},
+	{"PermissionRequest", HookCommand("codex-permission-request"), false, 10},
+	{"PostToolUse", HookCommand("codex-post-tool-use"), true, 10},
 	// Finish the bounded local snapshot before codex exec can shut down. An
 	// async Stop may be cancelled at exit; network delivery stays detached.
-	{"Stop", CodexHookCommand("codex-stop"), false, 3},
-	{"SessionEnd", CodexHookCommand("codex-session-end"), false, 3},
+	{"Stop", HookCommand("codex-stop"), false, 3},
+	{"SessionEnd", HookCommand("codex-session-end"), false, 3},
 	// Subagents run inside the thread and name themselves (agent_id / agent_type).
 	// SubagentStart is async like PostToolUse: nothing terma returns changes what Codex
 	// does. SubagentStop stays synchronous and cheap so its event is spooled before the
 	// parent's Stop.
-	{"SubagentStart", CodexHookCommand("codex-subagent-start"), true, 10},
-	{"SubagentStop", CodexHookCommand("codex-subagent-stop"), false, 3},
-}
-
-// CodexHookCommand also finds user-installed binaries when Codex Desktop was
-// launched with macOS's small GUI PATH. Its hook entry is committed, so the
-// directories must be portable across developers and their install methods.
-func CodexHookCommand(event string) string {
-	return `PATH="${PATH:-/usr/bin:/bin}:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin"; ` + HookCommand(event)
+	{"SubagentStart", HookCommand("codex-subagent-start"), true, 10},
+	{"SubagentStop", HookCommand("codex-subagent-stop"), false, 3},
 }
 
 // HasCodex reports whether the repository already carries Codex configuration — a

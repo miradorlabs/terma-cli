@@ -43,7 +43,15 @@ run that reaches them opens a browser login on **production**. A script that run
   `internal/hookrun`). Never put logic in `hookmgr.ShimScript` or the husky/lefthook/
   pre-commit lines beyond "call terma, never fail, chain". Every committed entry is
   guarded (`command -v terma … || true`) so a colleague without terma sees nothing, in
-  git or in their agent; the harness entries share one string, `hookmgr.HookCommand`,
+  git or in their agent, and led by `hookmgr.PathFallback` (PATH += `~/.local/bin`, the
+  two Homebrew bins) so an app started from the Dock finds a terma install.sh put in the
+  home directory — install.sh never uses sudo. The husky line runs in a subshell so the
+  PATH change stays out of the user's own lines; each older form stays recognized so it
+  upgrades in place. The shims are sealed (`# terma-shim format=N sha256=…`, a digest of
+  the rest of the file): any build accepts an unedited sealed shim, upgrades a lower
+  format, keeps a higher one untouched, and refuses a broken digest as an edit. **Raise
+  `shimFormat` whenever `ShimScript`'s output changes.** Before sealing, an older terma
+  refused every newer shim as "unrecognized or modified". The harness entries share one string, `hookmgr.HookCommand`,
   and changing it re-trusts Codex's hooks (hash-keyed) on every developer's machine.
   Hook JSON is written without HTML escaping (`marshalJSON`) — the guard carries `>`
   and `&&`.
@@ -159,7 +167,8 @@ run that reaches them opens a browser login on **production**. A script that run
   the reported order.
 - doctor: `terma on PATH` warns when a *different build* of terma (by content hash — it
   never runs what it finds) sits elsewhere on PATH or in `wellKnownBinDirs`: an app started
-  from the Dock gets the system PATH, so `/usr/local/bin/terma` is what Cursor's hooks run,
+  from the Dock gets the system PATH plus `PathFallback`, so the first of `~/.local/bin`,
+  `/opt/homebrew/bin`, `/usr/local/bin` holding a terma is what Cursor's hooks run,
   and a build from before `.terma/settings.json` does not see the binding. Tests blank
   `wellKnownBinDirs`. When no terma is on PATH at all (a `make build` run as bin/terma),
   or another build is ahead of this one, the fix is the one quoted command that puts this
@@ -321,7 +330,7 @@ run that reaches them opens a browser login on **production**. A script that run
   connects it everywhere and says so rather than silencing it.
 - install's output (`cmd/install_ui.go`, `installUI`): one marked line per step (`ok`, or
   `warn` for one that needs the developer), a verdict, then numbered next steps (`then`) —
-  the reload, the files to commit, a declined PATH line, Codex Desktop approval, doctor's
+  the reload, a declined PATH line, Codex Desktop approval, doctor's
   fixes. Everything long-form (the plan's file list, policies written, git wiring, doctor's
   per-check lines) goes to `ui.detail`, which is stdout under `--verbose` or `--dry-run`
   and discarded otherwise. New install output goes through one of those, never straight

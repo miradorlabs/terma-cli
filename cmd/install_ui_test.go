@@ -20,13 +20,13 @@ func TestInstallIsConciseUnlessVerbose(t *testing.T) {
 	}
 	for _, want := range []string{
 		"✓ Project", "! Hook events   held until this machine has a key",
-		"terma installed", "Next steps:\n  1. Sign in with `terma setup`", "Commit these files", "git add ",
+		"terma installed", "Next steps:\n  1. Sign in with `terma setup`",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the checklist should say %q:\n%s", want, out)
 		}
 	}
-	for _, detail := range []string{"✓ Hooks", "✓ Repo policy", "create  ", "Wrote Claude Code's repository policy", "Pointed git at"} {
+	for _, detail := range []string{"git add", "open a PR", "✓ Hooks", "✓ Repo policy", "create  ", "Wrote Claude Code's repository policy", "Pointed git at"} {
 		if strings.Contains(out, detail) {
 			t.Errorf("%q is detail, for --verbose:\n%s", detail, out)
 		}
@@ -53,12 +53,12 @@ func TestInstallUIFinish(t *testing.T) {
 	ui.ok("Hook events", "delivered with this project's key")
 	fmt.Fprintln(ui.detail, "only with --verbose")
 	ui.then("Run `source ~/.zshrc`.")
-	ui.then("Commit these files:\n  a\n\n  git add a")
+	ui.then("Open Codex:\n  a")
 	ui.then("Run `source ~/.zshrc`.") // said once
 	ui.finish()
 	want := "  ✓ Project       Acme Web\n\n✓ terma installed\n\nNext steps:\n" +
 		"  1. Run `source ~/.zshrc`.\n" +
-		"  2. Commit these files:\n       a\n\n       git add a\n"
+		"  2. Open Codex:\n       a\n"
 	if got := buf.String(); got != want {
 		t.Fatalf("got\n%s\nwant\n%s", got, want)
 	}
@@ -70,7 +70,7 @@ func TestInstallUIFinish(t *testing.T) {
 	}
 	ui.warn("PATH", "the shims are not on PATH yet")
 	ui.finish()
-	if !strings.Contains(buf.String(), "! PATH") || !strings.Contains(buf.String(), "! terma installed — the steps marked ! need you") || strings.Contains(buf.String(), "Next steps") {
+	if !strings.Contains(buf.String(), "! PATH") || !strings.Contains(buf.String(), "! terma installed — see the warnings above") || strings.Contains(buf.String(), "Next steps") {
 		t.Fatalf("a warning is the verdict, and no steps means no list:\n%s", buf.String())
 	}
 }
@@ -122,7 +122,8 @@ func TestInstallShellReloadIsOnlyRequestedOnce(t *testing.T) {
 }
 
 // install's Verified step: each problem doctor found is a next step — its fix, or its
-// name and detail when it names none — and the full report is one command away. The
+// name and detail when it names none — and nothing more: the Verified line names
+// `terma doctor`, which has the full report. The
 // routing warning is left out only when a next step already says to reload the shell.
 func TestInstallUIVerdict(t *testing.T) {
 	report := doctor.Report{Checks: []doctor.Check{
@@ -140,11 +141,10 @@ func TestInstallUIVerdict(t *testing.T) {
 	ui.finish()
 	out := buf.String()
 	for _, want := range []string{
-		"! Verified      terma doctor found 3 thing(s) to fix",
+		"! Verified      `terma doctor` flagged agent hooks run, commit hooks installed, backend receives events",
 		"1. Open Codex and trust this project's hooks",
 		"2. Run `terma update --refresh`.",
 		"3. backend receives events: no event after 30s",
-		"4. Run `terma doctor` for the full report.",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the verdict should say %q:\n%s", want, out)

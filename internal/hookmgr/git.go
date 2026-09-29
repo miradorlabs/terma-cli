@@ -5,8 +5,12 @@ package hookmgr
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -17,7 +21,67 @@ import (
 // ShimScript is the committed fallback hook. It is also the shape every manager's
 // entry follows: guard, run terma without ever failing the commit, then chain.
 func ShimScript(hook string) string {
-	return shimScript(hook, true)
+	return seal(pathFallbackShim(hook), shimFormat)
+}
+
+// shimFormat numbers the shim template. Raise it whenever ShimScript's output changes:
+// a build leaves a sealed shim of a higher format alone, so a colleague on an older
+// terma neither refuses a newer shim nor rewrites it back to an older one.
+const shimFormat = 2
+
+// sealPrefix starts a shim's second line, which carries its format and a digest of
+// every other byte. The digest is what tells a shim terma wrote, of any version, from
+// one a developer edited: an edit breaks it, and an edited hook is never replaced.
+const sealPrefix = "# terma-shim format="
+
+func seal(script string, format int) string {
+	shebang, rest, _ := strings.Cut(script, "\n")
+	return shebang + "\n" + sealPrefix + strconv.Itoa(format) + " sha256=" + shimDigest(shebang, rest) + "\n" + rest
+}
+
+func shimDigest(shebang, rest string) string {
+	sum := sha256.Sum256([]byte(shebang + "\n" + rest))
+	return hex.EncodeToString(sum[:])
+}
+
+// sealedFormat returns the format of a shim some terma wrote and left unedited, and
+// false for anything else.
+func sealedFormat(content []byte) (int, bool) {
+	shebang, rest, _ := strings.Cut(string(content), "\n")
+	line, rest, ok := strings.Cut(rest, "\n")
+	if !ok || !strings.HasPrefix(line, sealPrefix) {
+		return 0, false
+	}
+	format, digest, ok := strings.Cut(strings.TrimPrefix(line, sealPrefix), " sha256=")
+	n, err := strconv.Atoi(format)
+	if !ok || err != nil || digest != shimDigest(shebang, rest) {
+		return 0, false
+	}
+	return n, true
+}
+
+// knownShim reports whether content is a shim some terma wrote: sealed and unedited,
+// or one of the forms from before shims were sealed. newer says it is sealed with a
+// format this build does not know, which install keeps as it is.
+func knownShim(hook string, content []byte) (known, newer bool) {
+	if format, ok := sealedFormat(content); ok {
+		return true, format > shimFormat
+	}
+	for _, legacy := range []string{pathFallbackShim(hook), shimScript(hook, true), shimScript(hook, false)} {
+		if bytes.Equal(content, []byte(legacy)) {
+			return true, false
+		}
+	}
+	return false, false
+}
+
+// pathFallbackShim is the shim with PathFallback, before the seal.
+func pathFallbackShim(hook string) string {
+	return strings.Replace(shimScript(hook, true), "\nif command -v terma ", `
+# A commit made from an app started from the Dock gets launchd's PATH, which has none
+# of terma's install directories.
+`+strings.TrimSuffix(PathFallback, "; ")+`
+if command -v terma `, 1)
 }
 
 func shimScript(hook string, remember bool) string {
@@ -70,7 +134,8 @@ func planShim(root string, install bool) (Plan, error) {
 			return p, err
 		}
 		want := []byte(ShimScript(hook))
-		if before != nil && !bytes.Equal(before, want) && !bytes.Equal(before, []byte(shimScript(hook, false))) {
+		known, newer := knownShim(hook, before)
+		if before != nil && !known {
 			if install {
 				return p, fmt.Errorf("%s contains an unrecognized or modified hook; preserve or move it before retrying", rel)
 			}
@@ -78,7 +143,7 @@ func planShim(root string, install bool) (Plan, error) {
 			continue
 		}
 		if install {
-			if !bytes.Equal(before, want) {
+			if !newer && !bytes.Equal(before, want) {
 				p.Changes = append(p.Changes, Change{Path: rel, Before: before, After: want, Mode: 0o755})
 			}
 		} else if before != nil {
@@ -100,8 +165,14 @@ func planShim(root string, install bool) (Plan, error) {
 // call with `command -v terma && { ... }` and nothing after it, so on a machine
 // without terma the guard's own status (1) became the hook's, and husky failed the
 // commit of every colleague who had not installed terma. The whole point of the
-// guard is that they never notice it.
+// guard is that they never notice it. The subshell keeps PathFallback from changing
+// PATH for the user's own lines after it.
 func huskyLine(hook string) string {
+	return fmt.Sprintf(`(%scommand -v terma >/dev/null 2>&1 && terma hook %s "$@") || true # %s`, PathFallback, hook, Marker)
+}
+
+// legacyHuskyLine is huskyLine before PathFallback.
+func legacyHuskyLine(hook string) string {
 	return fmt.Sprintf(`command -v terma >/dev/null 2>&1 && terma hook %s "$@" || true # %s`, hook, Marker)
 }
 
@@ -157,7 +228,7 @@ func lefthookRun(hook string) string {
 	if hook == "prepare-commit-msg" {
 		run += " {1} {2} {3}"
 	}
-	return "command -v terma >/dev/null 2>&1 && " + run + " || true"
+	return PathFallback + "command -v terma >/dev/null 2>&1 && " + run + " || true"
 }
 
 func planLefthook(root, configPath string, install bool) (Plan, error) {
@@ -252,6 +323,11 @@ const preCommitRepo = "local"
 // it and appends the stage's arguments. The `command -v` guard and the closing
 // `exit 0` keep a machine without terma silent and the hook green.
 func preCommitEntry(hook string) string {
+	return "sh -c '" + PathFallback + "command -v terma >/dev/null 2>&1 && { terma hook " + hook + " \"$@\" || true; }; exit 0' --"
+}
+
+// legacyPreCommitEntry is preCommitEntry before PathFallback.
+func legacyPreCommitEntry(hook string) string {
 	return "sh -c 'command -v terma >/dev/null 2>&1 && { terma hook " + hook + " \"$@\" || true; }; exit 0' --"
 }
 
@@ -305,8 +381,15 @@ func planPreCommit(root string, install bool) (Plan, error) {
 			id := "terma-" + hook
 			if seqHasID(hooks, id) {
 				for _, entry := range hooks.Content {
-					if v := mapGet(entry, "id"); v != nil && v.Value == id && !ownedPreCommitEntry(entry) {
-						return p, fmt.Errorf("%s: hook id %s belongs to another command", configPath, id)
+					if v := mapGet(entry, "id"); v != nil && v.Value == id {
+						if !ownedPreCommitEntry(entry) {
+							return p, fmt.Errorf("%s: hook id %s belongs to another command", configPath, id)
+						}
+						// An entry from an older terma is rewritten where it stands.
+						if cur := mapGet(entry, "entry"); cur.Value != preCommitEntry(hook) {
+							cur.Value = preCommitEntry(hook)
+							changed = true
+						}
 					}
 				}
 				continue
@@ -405,12 +488,7 @@ func splitLines(data []byte) []string {
 }
 
 func containsMarker(lines []string) bool {
-	for _, l := range lines {
-		if ownedHuskyLine(l) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(lines, ownedHuskyLine)
 }
 
 func removeMarked(lines []string) []string {
@@ -510,7 +588,7 @@ func ownedHuskyLine(line string) bool {
 	line = strings.TrimSpace(line)
 	for _, hook := range GitHooks {
 		bare := `terma hook ` + hook + ` "$@" || true`
-		if line == huskyLine(hook) || line == bare || line == bare+" # "+Marker || line == `command -v terma >/dev/null 2>&1 && { `+bare+`; } # `+Marker {
+		if line == huskyLine(hook) || line == legacyHuskyLine(hook) || line == bare || line == bare+" # "+Marker || line == `command -v terma >/dev/null 2>&1 && { `+bare+`; } # `+Marker {
 			return true
 		}
 	}
@@ -522,7 +600,7 @@ func ownedLefthookRun(run, hook string) bool {
 	if hook == "prepare-commit-msg" {
 		bare += " {1} {2} {3}"
 	}
-	return run == lefthookRun(hook) || run == bare || run == bare+" || true"
+	return run == lefthookRun(hook) || run == strings.TrimPrefix(lefthookRun(hook), PathFallback) || run == bare || run == bare+" || true"
 }
 
 func ownedPreCommitEntry(entry *yaml.Node) bool {
@@ -531,7 +609,7 @@ func ownedPreCommitEntry(entry *yaml.Node) bool {
 		return false
 	}
 	for _, hook := range GitHooks {
-		if id.Value == "terma-"+hook && command.Value == preCommitEntry(hook) {
+		if id.Value == "terma-"+hook && (command.Value == preCommitEntry(hook) || command.Value == legacyPreCommitEntry(hook)) {
 			return true
 		}
 	}

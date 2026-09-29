@@ -411,10 +411,6 @@ func TestInstallUpgradesHooksOnlyRepository(t *testing.T) {
 	if got := readClaudeSettings(t, filepath.Join(repo, ".claude", "settings.json"))["OTEL_LOGS_EXPORTER"]; got != "otlp" {
 		t.Fatalf("reinstall did not enable telemetry: %q", got)
 	}
-	_, files, ok := strings.Cut(out, "Commit these files")
-	if !ok || !strings.Contains(files, ".claude/settings.json") {
-		t.Fatalf("policy-only upgrade omitted commit instructions:\n%s", out)
-	}
 }
 
 func TestInstallPreservesManuallyChangedRepositoryPolicy(t *testing.T) {

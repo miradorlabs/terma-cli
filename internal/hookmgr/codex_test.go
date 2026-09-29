@@ -46,7 +46,7 @@ func TestCodexHookCommandFindsHomeInstallWithGUIPath(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(bin, "terma"), []byte("#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$HOME/invoked\"\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command("/bin/sh", "-c", CodexHookCommand("codex-user-prompt-submit"))
+	cmd := exec.Command("/bin/sh", "-c", HookCommand("codex-user-prompt-submit"))
 	cmd.Env = []string{"HOME=" + home, "PATH=" + t.TempDir()}
 	if out, err := cmd.CombinedOutput(); err != nil || len(out) != 0 {
 		t.Fatalf("Codex hook command failed: %v, output %q", err, out)
@@ -106,38 +106,38 @@ func TestCodexHooksMergeKeepsDescriptionAndUserGroups(t *testing.T) {
 		t.Fatalf("terma's group should carry no matcher, got %q", *post[1].Matcher)
 	}
 	ours := post[1].Hooks[0]
-	if ours.Command != CodexHookCommand("codex-post-tool-use") || ours.Type != "command" {
+	if ours.Command != HookCommand("codex-post-tool-use") || ours.Type != "command" {
 		t.Fatalf("terma's PostToolUse handler wrong: %+v", ours)
 	}
 	// PostToolUse fires on every tool call, so it must not make the agent wait.
 	if !ours.Async {
 		t.Fatal("PostToolUse must be async")
 	}
-	if pre := doc.Hooks["PreToolUse"]; len(pre) != 1 || pre[0].Hooks[0].Command != CodexHookCommand("codex-pre-tool-use") || pre[0].Hooks[0].Async {
+	if pre := doc.Hooks["PreToolUse"]; len(pre) != 1 || pre[0].Hooks[0].Command != HookCommand("codex-pre-tool-use") || pre[0].Hooks[0].Async {
 		t.Fatalf("PreToolUse must record before the call: %+v", pre)
 	}
-	if approval := doc.Hooks["PermissionRequest"]; len(approval) != 1 || approval[0].Hooks[0].Command != CodexHookCommand("codex-permission-request") {
+	if approval := doc.Hooks["PermissionRequest"]; len(approval) != 1 || approval[0].Hooks[0].Command != HookCommand("codex-permission-request") {
 		t.Fatalf("PermissionRequest missing: %+v", approval)
 	}
-	if prompt := doc.Hooks["UserPromptSubmit"]; len(prompt) != 2 || prompt[0].Hooks[0].Command != "./log.sh" || prompt[1].Hooks[0].Command != CodexHookCommand("codex-user-prompt-submit") {
+	if prompt := doc.Hooks["UserPromptSubmit"]; len(prompt) != 2 || prompt[0].Hooks[0].Command != "./log.sh" || prompt[1].Hooks[0].Command != HookCommand("codex-user-prompt-submit") {
 		t.Fatalf("user prompt hook merge wrong: %+v", prompt)
 	}
 	start := doc.Hooks["SessionStart"]
-	if len(start) != 1 || start[0].Hooks[0].Command != CodexHookCommand("codex-session-start") {
+	if len(start) != 1 || start[0].Hooks[0].Command != HookCommand("codex-session-start") {
 		t.Fatalf("SessionStart missing: %+v", start)
 	}
 	if start[0].Hooks[0].Async {
 		t.Fatal("SessionStart should be synchronous: the session must exist before the first edit")
 	}
 	stop := doc.Hooks["Stop"]
-	if len(stop) != 1 || stop[0].Hooks[0].Command != CodexHookCommand("codex-stop") {
+	if len(stop) != 1 || stop[0].Hooks[0].Command != HookCommand("codex-stop") {
 		t.Fatalf("Stop missing: %+v", stop)
 	}
 	if stop[0].Hooks[0].Async || stop[0].Hooks[0].Timeout != 3 {
 		t.Fatal("Stop must finish bounded local capture before codex exec exits")
 	}
 	end := doc.Hooks["SessionEnd"]
-	if len(end) != 1 || end[0].Hooks[0].Command != CodexHookCommand("codex-session-end") {
+	if len(end) != 1 || end[0].Hooks[0].Command != HookCommand("codex-session-end") {
 		t.Fatalf("SessionEnd missing: %+v", end)
 	}
 	// Codex caps SessionEnd at 3 seconds and defaults to 1; ask for the maximum.
@@ -145,11 +145,11 @@ func TestCodexHooksMergeKeepsDescriptionAndUserGroups(t *testing.T) {
 		t.Fatalf("SessionEnd timeout = %d, want Codex's maximum of 3", end[0].Hooks[0].Timeout)
 	}
 	sub := doc.Hooks["SubagentStart"]
-	if len(sub) != 1 || sub[0].Hooks[0].Command != CodexHookCommand("codex-subagent-start") || !sub[0].Hooks[0].Async {
+	if len(sub) != 1 || sub[0].Hooks[0].Command != HookCommand("codex-subagent-start") || !sub[0].Hooks[0].Async {
 		t.Fatalf("SubagentStart should be wired and async: %+v", sub)
 	}
 	sub = doc.Hooks["SubagentStop"]
-	if len(sub) != 1 || sub[0].Hooks[0].Command != CodexHookCommand("codex-subagent-stop") || sub[0].Hooks[0].Async || sub[0].Hooks[0].Timeout != 3 {
+	if len(sub) != 1 || sub[0].Hooks[0].Command != HookCommand("codex-subagent-stop") || sub[0].Hooks[0].Async || sub[0].Hooks[0].Timeout != 3 {
 		t.Fatalf("SubagentStop should be synchronous and short: %+v", sub)
 	}
 

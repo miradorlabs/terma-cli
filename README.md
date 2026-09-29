@@ -70,8 +70,8 @@ curl -fsSL https://terma.ai/install.sh | bash
 ```
 
 The installer selects the platform archive, verifies `checksums.txt`, and installs
-the static binary to `/usr/local/bin` or `~/.local/bin`. Set `TERMA_INSTALL_DIR` to
-override the destination or `TERMA_VERSION=vX.Y.Z` to pin a release. The script is
+the static binary to `~/.local/bin` (or over a terma already on your `PATH` that you
+can write). It never asks for `sudo`. Set `TERMA_INSTALL_DIR` to override the destination or `TERMA_VERSION=vX.Y.Z` to pin a release. The script is
 POSIX `sh`, so `| sh` works too.
 
 ### npm, direct download, or source

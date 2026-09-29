@@ -21,6 +21,17 @@ func write(t *testing.T, root, rel, content string) {
 	}
 }
 
+// inJSON is how s appears in a committed JSON file: quoted characters escaped, the
+// guard's `>` and `&` not (marshalJSON).
+func inJSON(t *testing.T, s string) string {
+	t.Helper()
+	b, err := marshalJSON(s, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b[1 : len(b)-1])
+}
+
 func read(t *testing.T, root, rel string) string {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
@@ -102,7 +113,7 @@ func TestHuskyPreservesUserLines(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := read(t, root, ".husky/prepare-commit-msg")
-	if !strings.HasPrefix(got, "#!/bin/sh\nnpx commitlint --edit \"$1\"\n") || !strings.Contains(got, `terma hook prepare-commit-msg "$@" || true`) {
+	if !strings.HasPrefix(got, "#!/bin/sh\nnpx commitlint --edit \"$1\"\n") || !strings.Contains(got, huskyLine("prepare-commit-msg")) {
 		t.Fatalf("user line lost or terma line missing:\n%s", got)
 	}
 	if !strings.Contains(read(t, root, ".husky/post-commit"), "terma hook post-commit") {

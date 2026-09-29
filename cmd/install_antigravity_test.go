@@ -14,7 +14,7 @@ import (
 
 func TestInstallWiresAntigravityHooksWhenAsked(t *testing.T) {
 	repo := installRepo(t)
-	out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude,antigravity", "--yes")
+	out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude,antigravity", "--yes", "-v")
 	if err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}

@@ -59,10 +59,27 @@ const Marker = "terma hook"
 // and fail open. The guard writes nothing to either stream: SessionStart's stdout
 // becomes context too.
 //
+// The command leads with PathFallback, so an agent started from the Dock, with macOS's
+// small GUI PATH, still finds a terma installed in the home directory or by Homebrew.
+//
 // Changing this string changes every committed hooks file on its next `terma install`
 // (terma rewrites its own entries in place) and, for Codex, the hash each developer
 // trusted, so they trust the hooks once more; `terma doctor` says so.
 func HookCommand(event string) string {
+	return PathFallback + guardedHook(event)
+}
+
+// PathFallback appends the directories terma's installers use to PATH, after
+// everything already on it, so a terma the developer's own PATH names still wins. An
+// app launched from the Dock or Finder gets launchd's PATH (/usr/bin:/bin:/usr/sbin:
+// /sbin), which has none of them, and the guard then skipped every hook in silence.
+// The entries are committed, so the directories must be the same for every
+// developer: install.sh's ~/.local/bin, then Homebrew on Apple silicon and Intel.
+const PathFallback = `PATH="${PATH:-/usr/bin:/bin}:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin"; `
+
+// guardedHook is the guard without PathFallback: the form every agent hook took before
+// the fallback, still recognized as terma's so it is upgraded in place.
+func guardedHook(event string) string {
 	return "command -v terma >/dev/null 2>&1 && terma hook " + event + " || true"
 }
 

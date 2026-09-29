@@ -95,7 +95,7 @@ func TestAntigravityHooksPreserveTheEnabledSwitch(t *testing.T) {
 	if !strings.Contains(got, `"enabled": false`) {
 		t.Fatalf("the developer's switch was lost:\n%s", got)
 	}
-	if strings.Contains(got, `"terma hook`) || !strings.Contains(got, HookCommand("antigravity-stop")) {
+	if strings.Contains(got, `"terma hook`) || !strings.Contains(got, inJSON(t, HookCommand("antigravity-stop"))) {
 		t.Fatalf("stale command not upgraded in place:\n%s", got)
 	}
 	if AntigravityHooksEnabled(root) {
