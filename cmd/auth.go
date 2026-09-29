@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -220,6 +221,8 @@ type signInOptions struct {
 	force     bool
 	noBrowser bool
 	label     string
+	// pauseBeforeBrowser lets setup explain the handoff before opening a browser.
+	pauseBeforeBrowser bool
 }
 
 type signInResult struct {
@@ -275,6 +278,12 @@ func signIn(cmd *cobra.Command, cfg *config.Config, opts signInOptions) (*signIn
 			return nil, err
 		} else if ok {
 			return res, nil
+		}
+	}
+
+	if opts.pauseBeforeBrowser && !opts.noBrowser && canPrompt() {
+		if err := waitForBrowserEnter(cmd); err != nil {
+			return nil, err
 		}
 	}
 
@@ -487,4 +496,13 @@ func applyLogin(p *config.Profile, cred *auth.Credential, orgName string) {
 // no name is known. Structured output retains IDs for scripts and diagnostics.
 func nameOrID(name, id string) string {
 	return firstNonEmpty(name, id)
+}
+
+// waitForBrowserEnter runs before starting login, so the user can take their time.
+func waitForBrowserEnter(cmd *cobra.Command) error {
+	fmt.Fprint(cmd.ErrOrStderr(), "Press Enter to open your browser and sign in to Terma (Ctrl-C to cancel): ")
+	if _, err := bufio.NewReader(cmd.InOrStdin()).ReadString('\n'); err != nil {
+		return fmt.Errorf("read browser confirmation: %w", err)
+	}
+	return cmd.Context().Err()
 }

@@ -222,7 +222,7 @@ run that reaches them opens a browser login on **production**. A script that run
   wrapper is printed in `$SHELL`'s syntax: `WrapperSnippetFor`, fish functions for fish,
   POSIX functions otherwise — fish cannot source the POSIX form — and the hint names that
   shell's own startup file, `wrapperFile`: `~/.profile` for sh, dash and BusyBox ash). It
-  resolves the real agent from PATH, bounds Terma preparation to two seconds, reads
+  resolves the real agent from PATH, bounds Terma preparation to three seconds, reads
   a versioned argument-file protocol without eval, and execs the agent exactly once.
   Preparation failure passes through; `TERMA_DISABLE=1` and leading maintenance
   commands bypass preparation entirely. Never retry after the agent has started.

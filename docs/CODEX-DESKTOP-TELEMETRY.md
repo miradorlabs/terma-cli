@@ -66,6 +66,23 @@ Codex exporter can still export machine-wide data under its own configuration;
 is active. If you require exports only from installed repositories, disconnect
 that user-level exporter (use `terma disconnect codex` for a Terma-owned one).
 
+### CLI embedded mode
+
+Codex's shared background server cannot accept the per-launch `-c otel.*`
+overrides Terma uses for repository-specific native telemetry. Routed interactive
+CLI launches (including resume and fork) explicitly select `--no-daemon` when the
+compatibility resolver establishes support from a verified version rule or a
+successful capability probe (see [harness compatibility](HARNESS-COMPATIBILITY.md)). This keeps the existing embedded behavior
+without the startup warning about falling back from the shared server. Older
+versions retain the same telemetry overrides without the new flag. Remote
+connections, noninteractive commands, and launches outside bound repositories
+do not receive an automatic `--no-daemon`.
+
+Hooks and rollout capture are not a complete substitute: they lack native trace
+spans, per-request SSE/WebSocket timing, actual approval decisions and their
+source, and native local-tool execution timing. Hosted tool coverage also depends
+on observed rollout shapes. CLI therefore retains native export alongside hooks.
+
 For Codex-managed local worktrees, a Git-ignored `.terma/settings.json` must be
 copied into the worktree. Add it to `.worktreeinclude` when needed.
 

@@ -52,6 +52,8 @@ type Check struct {
 	Fix string
 	// Inconclusive means verification could not establish success or failure.
 	Inconclusive bool
+	// NeedsShellActivationOnly means the only remaining fix is activating shell routing.
+	NeedsShellActivationOnly bool
 	// Ready of Of counts agents that can export or run their hooks. Both zero means
 	// the check does not report a count.
 	Ready, Of int
@@ -84,8 +86,9 @@ const (
 	// KeyAgentHooks: the agents' own hooks (session start, files touched) are wired and
 	// each agent will run them — which for Codex and Antigravity takes the developer's
 	// trust, given from inside the agent.
-	KeyAgentHooks = "agent-hooks"
-	KeyHarness    = "harness"
+	KeyAgentHooks    = "agent-hooks"
+	KeyHarness       = "harness"
+	KeyCompatibility = "compatibility"
 	// KeyRouting reports whether shell integration actually routes agent launches.
 	KeyRouting = "routing"
 	// KeyStatusLine: Claude Code's status line feeds terma the plan's usage windows.

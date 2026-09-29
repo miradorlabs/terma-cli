@@ -91,9 +91,9 @@ func agentMode() bool {
 	return false
 }
 
-// Terma's purple, #8b6cff, as the web app draws its mark.
+// Light purple, #a78bfa, keeps terminal text readable on dark backgrounds.
 const (
-	brandTrueColor = "\x1b[38;2;139;108;255m"
+	brandTrueColor = "\x1b[38;2;167;139;250m"
 	brand256       = "\x1b[38;5;141m"
 	brandBasic     = "\x1b[95m"
 )

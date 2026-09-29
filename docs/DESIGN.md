@@ -157,11 +157,18 @@ The existing shell script, not another binary, now owns launch:
   and aliases by filesystem identity. Homebrew/other replacement paths are not cached.
 - `TERMA_DISABLE=1` (or `true`) bypasses Terma completely. Leading help/version,
   update/install, auth/login/logout, and completion commands also bypass preparation.
-- Run `terma shim prepare` with a two-second deadline and disconnected stdin.
+- Run `terma shim prepare` with a three-second deadline and disconnected stdin.
   Preparation writes a versioned data plan in a private temporary directory: one file
   per prefix argument and a completion count. The shell never sources or evals it.
   Codex credentials temporarily occur in these mode-0600 argument files, inside the
   mode-0700 directory; normal completion and handled cancellation remove them.
+- Codex interactive launches resolve `--no-daemon` through `internal/compat`: verified
+  stable versions use version rules; unknown versions use a help probe. Version and
+  help subprocesses share a 1.5-second deadline. Observations are cached under
+  `cache/compat-codex-cli` in the Terma config directory, validated against the resolved
+  executable path, size, modification time, and permissions. Unknown probe results
+  are retried. See [harness compatibility](HARNESS-COMPATIBILITY.md) for rule provenance
+  and how to extend the matrix.
 - Missing/crashed/hung/incompatible Terma or an invalid plan launches the original
   agent arguments. Preparation failures emit a warning; missing Terma is transparent.
 - After successful preparation, `exec` the agent once. Stdio, PID, signals, and exit

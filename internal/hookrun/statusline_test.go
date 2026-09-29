@@ -169,7 +169,7 @@ func TestStatusLineIndicatorPrefixesTheFirstLineOnly(t *testing.T) {
 	t.Setenv("COLORTERM", "truecolor")
 	env, out, _ = statusEnv(t, quotaPayload)
 	StatusLine(context.Background(), env, StatusLineOptions{Renderer: "printf custom", Indicator: true})
-	if got := out.String(); got != "\x1b[38;2;139;108;255mt\x1b[0m custom" {
+	if got := out.String(); got != "\x1b[38;2;167;139;250mt\x1b[0m custom" {
 		t.Fatalf("coloured mark %q", got)
 	}
 	// The renderer's exit status still comes through with the indicator on.

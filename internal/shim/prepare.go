@@ -93,7 +93,7 @@ trap 'exit 129' HUP
 terma shim prepare "$terma_agent" "$terma_tmp" -- "$@" </dev/null >/dev/null 2>&1 &
 terma_pid=$!
 (
-  /bin/sleep 2
+  /bin/sleep 3
   kill -9 "$terma_pid" 2>/dev/null
 ) </dev/null >/dev/null 2>&1 &
 terma_timer=$!

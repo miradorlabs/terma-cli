@@ -42,8 +42,8 @@ func TestInstallGivesAHooksOnlyDeveloperAKeyToDeliverWith(t *testing.T) {
 	if keystore.Get(project) == "" || f.keysMint.Load() != 1 {
 		t.Fatalf("no key to deliver hook events with (mints=%d):\n%s", f.keysMint.Load(), out)
 	}
-	if !strings.Contains(out, "Project key stored") {
-		t.Fatalf("install should say it stored a key:\n%s", out)
+	if strings.Contains(out, "Project key stored") {
+		t.Fatalf("key storage details should require --verbose:\n%s", out)
 	}
 	// A hooks-only project has no routing record, so the key's own hosts are the only
 	// record of which environment its events belong to.

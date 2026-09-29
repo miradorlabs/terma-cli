@@ -84,7 +84,7 @@ the repository. The per-project server key stays in the home directory
 (`keys.json`, the keystore, or a 0700 headers-helper script), namespaced by project id;
 the committed `.terma/settings.json` names only the project. A PATH shim (or shell
 wrapper) resolves the real agent from PATH — skipping its own directory by file identity
-so it can never exec itself — bounds Terma preparation to two seconds, reads a versioned,
+so it can never exec itself — bounds Terma preparation to three seconds, reads a versioned,
 data-only argument file (no `eval`), and execs the agent exactly once, passing preparation
 through on any failure.
 
