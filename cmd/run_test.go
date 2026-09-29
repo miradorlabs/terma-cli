@@ -5,6 +5,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 )
@@ -78,5 +79,13 @@ func fakeGateway(t *testing.T, handler http.HandlerFunc) map[string]string {
 		"TERMA_API_KEY":    "ter_srv_0123456789abcdef",
 		"TERMA_ENV":        "",
 		"TERMA_PROFILE":    "",
+	}
+}
+
+// writeExecutable writes a script test code runs as a program.
+func writeExecutable(t *testing.T, path, body string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(body), 0o755); err != nil {
+		t.Fatal(err)
 	}
 }

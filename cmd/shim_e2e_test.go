@@ -105,13 +105,6 @@ echo "ENV_HEADERS=$OTEL_EXPORTER_OTLP_HEADERS"
 	return dir
 }
 
-func writeExecutable(t *testing.T, path, body string) {
-	t.Helper()
-	if err := os.WriteFile(path, []byte(body), 0o755); err != nil {
-		t.Fatal(err)
-	}
-}
-
 // envWith returns the current environment with the given KEY=VALUE pairs overriding any
 // existing entry for those keys.
 func envWith(pairs ...string) []string {
