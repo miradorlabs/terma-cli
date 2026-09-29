@@ -38,10 +38,13 @@ what is on disk: it signs in to nothing and never adds a file. --refresh runs ju
 step; inside each other repository terma is installed in, run it to update the hooks
 there (they are committed files, so they change only when you ask).
 
-Normal interactive commands check daily and notify you when a newer version exists.
-Use --auto on to install those updates automatically, or --auto off for notices only.
-Automatic updates run after successful interactive commands, never inside agent hooks,
-launch shims, scripts, or CI. Package-managed installations receive notices only.
+terma updates itself: the relay checks every hour and installs a newer release in the
+background, and interactive commands check daily as well. Every release is signed, and
+one whose signature does not verify is never installed. --auto off keeps notices only;
+--auto on turns updating back on. Updates never run inside agent hooks, scripts, or CI.
+Homebrew and npm installations receive notices only; an explicit update upgrades them
+through the package manager. An installation older than the oldest supported release
+is told so by every command.
 
 Updates compare the installed release version with the latest published release.
 Source builds are not updated automatically; use --force to switch one to the latest
@@ -63,7 +66,7 @@ release.`,
 						return err
 					}
 					if automatic == "on" {
-						fmt.Fprintln(out, "Automatic updates enabled for numbered releases after interactive commands. Package-managed installations receive notices only; unversioned development builds are skipped.")
+						fmt.Fprintln(out, "Automatic updates enabled: the relay and interactive commands install new signed releases. Package-managed installations receive notices only; unversioned development builds are skipped.")
 					} else {
 						fmt.Fprintln(out, "Automatic updates disabled; update notices remain enabled.")
 					}
@@ -96,7 +99,7 @@ release.`,
 	}
 	cmd.Flags().BoolVar(&check, "check", false, "check for a newer published release without installing")
 	cmd.Flags().BoolVar(&force, "force", false, "replace a source/development build with the latest published release")
-	cmd.Flags().StringVar(&automatic, "auto", "", "automatic updates: on, off, or status (default: off)")
+	cmd.Flags().StringVar(&automatic, "auto", "", "automatic updates: on, off, or status (default: on)")
 	cmd.Flags().BoolVar(&refresh, "refresh", false, "only migrate saved state and refresh what terma installed (shims, status line, OpenCode plugin, this repository's hooks) to this version; runs by itself after an update")
 	cmd.MarkFlagsMutuallyExclusive("auto", "check", "force", "refresh")
 	return cmd

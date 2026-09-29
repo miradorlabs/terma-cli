@@ -703,20 +703,33 @@ it does not prove that a running agent has reloaded its settings or sent telemet
   `TestManagerLinesAreInertWithoutTerma` runs each one terma-less, and `terma install`
   rewrites a stale husky/lefthook line in place.
 
-- Updates (`internal/selfupdate`): normal successful interactive commands check daily;
-  hook/shim/spool/version/update/completion, machine output, CI and
-  `TERMA_NO_UPDATE_CHECK=1` skip passive work. `terma update --auto on|off|status`
-  stores a machine-wide opt-in in `updates.json`. The release tag is the version:
+- Updates (`internal/selfupdate`): automatic by default — `updates.json` holds only the
+  opt-out (`terma update --auto off`; a missing file is on). Two paths install: the relay
+  (`relayUpdater`, cmd/relay.go: first look a minute after start, then hourly with up to ten
+  minutes' spread) calls `Client.Background`, which reads the signed policy every run and
+  the latest release daily, installs, runs `update --refresh` with `TERMA_RELAY_UPDATING=1`
+  (so the refresh does not restart its own parent) and stops the relay for launchd/systemd
+  to start the new binary; and normal successful interactive commands check daily
+  (`Maintain`). hook/shim/spool/relay/version/update/completion, machine output, CI and
+  `TERMA_NO_UPDATE_CHECK=1` skip interactive passive work. The release tag is the version:
   GoReleaser stamps it, and checks compare it with the latest published release. A
   source build (`make build`'s `git describe`, or `dev`) is never a release, so it is
   never nagged or replaced; `--force` explicitly switches one to a release. A
   checked-in version file once made every source build pass for the release it named,
-  and a stale branch build became a replacement target. Downloads use checksum
-  verification and atomic replacement under `update.lock`. An explicit `terma update` of a
-  package-managed binary runs the manager that owns it (`selfupdate.ManagedBy`, read from
-  the binary's path: that prefix's brew, or npm with `--prefix`); automatic updates only
-  notify those. Failed checks retry after 15 minutes; auto-install attempts are throttled
-  daily.
+  and a stale branch build became a replacement target. **Releases are signed**
+  (docs/RELEASING.md, "Signing"): `checksums.txt.sig`, ed25519 over `checksums.txt`,
+  verified against `trustedKeys` (`release_key.go`) before any checksum is trusted — an
+  unsigned release is refused; tests trust a key of their own (`TrustOnly`). Downloads use
+  checksum verification and atomic replacement under `update.lock`. **Minimum version**:
+  `release/policy.json` ships with each release, covered by the signed checksums;
+  `FetchPolicy` reads `releases/latest/download/policy.json` (not the rate-limited API),
+  `SavePolicy` records it, and `MinimumWarning` — read by every interactive command, no
+  network — warns an installation below it. Below the minimum, an installation that updates
+  itself installs at once; one that does not is warned, never forced (a product call,
+  2026-09-29). An explicit `terma update` of a package-managed binary runs the manager that
+  owns it (`selfupdate.ManagedBy`, read from the binary's path: that prefix's brew, or npm
+  with `--prefix`); automatic updates only notify those. Failed checks retry after 15
+  minutes; ordinary auto-install attempts are throttled daily.
 - Refresh (`cmd/refresh.go`, `terma update --refresh`): after replacing itself or running
   the package manager, the old binary execs the new one's `update --refresh` — the old
   process cannot run new templates. It rewrites only files terma already wrote (the

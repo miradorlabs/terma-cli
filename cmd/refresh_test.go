@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -159,6 +161,12 @@ func TestRefreshRestartsTheRelay(t *testing.T) {
 	if out, err := runTerma(t, "update", "--refresh"); err != nil || r.restarts != 1 {
 		t.Fatalf("relay installed: restarts=%d err=%v\n%s", r.restarts, err, out)
 	}
+	// The relay that updated itself runs the refresh and then exits on its own; a restart
+	// from inside would kill the refresh's parent.
+	t.Setenv(relayUpdatingEnv, "1")
+	if out, err := runTerma(t, "update", "--refresh"); err != nil || r.restarts != 1 {
+		t.Fatalf("refresh run by the updating relay restarted it: restarts=%d err=%v\n%s", r.restarts, err, out)
+	}
 }
 
 func TestRefreshIsExclusiveWithTheOtherModes(t *testing.T) {
@@ -274,14 +282,19 @@ func TestUpdateRefreshesWithTheReplacedBinary(t *testing.T) {
 	archive := tarGzWith(t, "terma", []byte("#!/bin/sh\necho new\n"))
 	sum := sha256.Sum256(archive)
 	asset := selfupdate.AssetName(runtime.GOOS, runtime.GOARCH)
+	sums := []byte(hex.EncodeToString(sum[:]) + "  " + asset + "\n")
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(selfupdate.TrustOnly(pub))
 	mux := http.NewServeMux()
 	mux.HandleFunc("/repos/"+selfupdate.Repo+"/releases/latest", func(w http.ResponseWriter, r *http.Request) {
 		host := "http://" + r.Host
-		_, _ = w.Write([]byte(`{"tag_name":"v2.0.0","assets":[{"name":"checksums.txt","browser_download_url":"` + host + `/sums"},{"name":"` + asset + `","browser_download_url":"` + host + `/archive"}]}`))
+		_, _ = w.Write([]byte(`{"tag_name":"v2.0.0","assets":[{"name":"checksums.txt","browser_download_url":"` + host + `/sums"},{"name":"checksums.txt.sig","browser_download_url":"` + host + `/sums.sig"},{"name":"` + asset + `","browser_download_url":"` + host + `/archive"}]}`))
 	})
-	mux.HandleFunc("/sums", func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(hex.EncodeToString(sum[:]) + "  " + asset + "\n"))
-	})
+	mux.HandleFunc("/sums", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(sums) })
+	mux.HandleFunc("/sums.sig", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(selfupdate.Sign(priv, sums)) })
 	mux.HandleFunc("/archive", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(archive) })
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)

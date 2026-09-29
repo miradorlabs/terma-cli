@@ -20,6 +20,10 @@ against those archives over loopback (`make test-install` does the same locally;
 cask half needs macOS). A change to the archive names, the checksum format, the cask
 template or Homebrew itself fails there, not on release day.
 
+Before the first signed release: the `TERMA_SIGNING_KEY` secret must hold terma's
+release key (see [Signing](#signing)). Without it the release fails at GoReleaser's
+signing step — it never publishes unsigned.
+
 Before the first release: the `miradorlabs/homebrew-tap` repo must exist and the
 `HOMEBREW_TAP_TOKEN` secret (a PAT with `contents:write` on it) must be set. Without the
 token the release still publishes; only the cask push — and with it the macOS smoke
@@ -79,9 +83,36 @@ archive against `checksums.txt` before swapping the binary in place.
 |---|---|
 | `terma_<Os>_<arch>.tar.gz` (`.zip` on Windows), `x86_64` for amd64 | `install.sh`, `terma update`, the npm shim, the Homebrew cask |
 | `checksums.txt` | every installer verifies against it before running anything |
+| `checksums.txt.sig` | `terma update` and the relay's updater refuse a release whose checksums it does not verify |
+| `policy.json` | every relay, hourly: the oldest supported version (covered by `checksums.txt`) |
 | `install.sh` | `https://terma.ai/install.sh` redirects to the copy on the latest release |
 | signed provenance | `gh attestation verify <file> --owner miradorlabs` |
 
 The asset names are a contract: `internal/selfupdate.AssetName`, `.goreleaser.yaml`,
 `install.sh` and `npm/install.js` all spell them the same way, and
 `scripts/test-install.sh` fails when one of them drifts.
+
+## Signing
+
+`checksums.txt` is signed with an ed25519 key: GoReleaser's `signs` runs
+`go run ./scripts/sign` with the `TERMA_SIGNING_KEY` secret (a base64 seed). The public
+half is `releaseKey` in `internal/selfupdate/release_key.go`, and every terma since
+signing refuses to install a release whose `checksums.txt.sig` does not verify under a
+key built into it. `checksums.txt` names the SHA-256 of every archive and of
+`policy.json`, so the one signature covers everything the updater installs or obeys.
+Dry runs (CI, `make release-dry-run`, `make test-install`) sign with a throwaway key
+(`go run ./scripts/sign -throwaway`), so the step is exercised on every change.
+
+The private key exists in the secret and in the maintainers' password manager, nowhere
+else. To rotate: `go run ./scripts/sign -generate <file>` makes a new pair; add its
+public key to `trustedKeys` beside the old one and release (signed with the old key);
+then switch the secret to the new key, and after a release or two drop the old key.
+
+## Raising the minimum supported version
+
+`release/policy.json` names the oldest supported release. It is published with every
+release, and every relay reads the latest one each hour. A relay older than the minimum
+that updates itself installs the latest release at once instead of at its next daily
+attempt; one that does not (automatic updates off, Homebrew or npm) is warned on every
+interactive command until someone runs `terma update`. Raising it is a commit to
+`release/policy.json` and a release: no backend is involved.

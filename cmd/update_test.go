@@ -21,9 +21,10 @@ func TestAutomaticUpdatePreference(t *testing.T) {
 		args []string
 		want string
 	}{
+		{[]string{"update", "--auto", "status"}, "Automatic updates: on."}, // the default
+		{[]string{"update", "--auto", "off"}, "disabled"},
 		{[]string{"update", "--auto", "status"}, "off (notify only)"},
 		{[]string{"update", "--auto", "on"}, "enabled"},
-		{[]string{"update", "--auto", "status"}, "on"},
 		{[]string{"update", "--auto", "off"}, "disabled"},
 	} {
 		out, err := runTerma(t, step.args...)

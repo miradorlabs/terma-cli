@@ -70,7 +70,10 @@ func (r Release) Version() string { return strings.TrimPrefix(r.TagName, "v") }
 type Client struct {
 	HTTP    *http.Client
 	BaseURL string // GitHub API base; defaults to https://api.github.com
-	Version string // the running version, for User-Agent
+	// DownloadURL is where the latest release's files are fetched by name; defaults to
+	// https://github.com/<Repo>/releases/latest/download.
+	DownloadURL string
+	Version     string // the running version, for User-Agent
 }
 
 // httpClient is the configured client, or one with a timeout: a release lookup must
@@ -199,7 +202,7 @@ func (c *Client) Apply(ctx context.Context, rel *Release, exePath string, out io
 	if runtime.GOOS == "windows" {
 		return "", errors.New("self-update is not supported on Windows yet — download the release from https://github.com/" + Repo + "/releases")
 	}
-	sumsBody, err := c.get(ctx, sums.URL)
+	sumsBody, err := c.signedChecksums(ctx, rel, sums)
 	if err != nil {
 		return "", err
 	}
@@ -226,6 +229,32 @@ func (c *Client) Apply(ctx context.Context, rel *Release, exePath string, out io
 		return "", err
 	}
 	return rel.Version(), nil
+}
+
+// signedChecksums downloads a release's checksums.txt and its signature, and returns the
+// checksums only when the signature verifies under a key this build trusts.
+func (c *Client) signedChecksums(ctx context.Context, rel *Release, sums *Asset) ([]byte, error) {
+	var sig *Asset
+	for i := range rel.Assets {
+		if rel.Assets[i].Name == sums.Name+SignatureSuffix {
+			sig = &rel.Assets[i]
+		}
+	}
+	if sig == nil {
+		return nil, fmt.Errorf("%w: %s has no %s — refusing to install", ErrUnsigned, rel.TagName, sums.Name+SignatureSuffix)
+	}
+	body, err := c.get(ctx, sums.URL)
+	if err != nil {
+		return nil, err
+	}
+	sigBody, err := c.get(ctx, sig.URL)
+	if err != nil {
+		return nil, err
+	}
+	if err := Verify(body, sigBody); err != nil {
+		return nil, fmt.Errorf("%s: %w — refusing to install", rel.TagName, err)
+	}
+	return body, nil
 }
 
 func (c *Client) get(ctx context.Context, target string) ([]byte, error) {

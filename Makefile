@@ -98,7 +98,7 @@ bench-hook: build
 # tap token is only read by the cask template; any value renders it.
 .PHONY: release-dry-run
 release-dry-run:
-	HOMEBREW_TAP_TOKEN="$${HOMEBREW_TAP_TOKEN:-unset}" \
+	HOMEBREW_TAP_TOKEN="$${HOMEBREW_TAP_TOKEN:-unset}" TERMA_SIGNING_KEY="$$(go run ./scripts/sign -throwaway)" \
 		go run github.com/goreleaser/goreleaser/v2@latest release --snapshot --clean --skip=publish
 
 # What CI runs before a release can ship: render dist/ from a throwaway local tag
@@ -107,7 +107,7 @@ release-dry-run:
 .PHONY: test-install
 test-install:
 	git tag -f v0.0.0-ci >/dev/null
-	HOMEBREW_TAP_TOKEN="$${HOMEBREW_TAP_TOKEN:-unset}" \
+	HOMEBREW_TAP_TOKEN="$${HOMEBREW_TAP_TOKEN:-unset}" TERMA_SIGNING_KEY="$$(go run ./scripts/sign -throwaway)" \
 		go run github.com/goreleaser/goreleaser/v2@latest release --clean --skip=publish,validate,announce,before; \
 		status=$$?; git tag -d v0.0.0-ci >/dev/null; [ $$status -eq 0 ]
 	./scripts/test-install.sh dist v0.0.0-ci

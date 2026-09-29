@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"os"
+	"os/exec"
 	"os/signal"
 	"strings"
 	"syscall"
@@ -16,6 +18,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/keystore"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/relay"
+	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 	"github.com/miradorlabs/terma-cli/internal/style"
 )
 
@@ -57,6 +60,9 @@ func runRelayServe(cmd *cobra.Command, _ []string) error {
 	log := relay.NewLog(dir)
 	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	if exe, err := os.Executable(); err == nil {
+		go relayUpdater(ctx, exe, log.Printf, stop)
+	}
 	err = relay.Serve(ctx, relay.Options{
 		Config:         rc,
 		Dir:            dir,
@@ -184,3 +190,47 @@ func runRelayStatus(cmd *cobra.Command, _ []string) error {
 
 // machineProjectID is the project chosen for this machine in `terma setup`.
 func machineProjectID(cfg *config.Config) string { return cfg.Telemetry.Project.ID }
+
+// relayUpdatingEnv tells the `update --refresh` a relay runs after installing a release
+// that the relay restarts itself.
+const relayUpdatingEnv = "TERMA_RELAY_UPDATING"
+
+// relayUpdater keeps this installation current from the one terma process that is
+// always running. Every hour (the first look a minute after start, each look spread by
+// up to ten minutes so a fleet does not arrive at once) it reads the signed policy and,
+// once a day, the latest release; selfupdate.Background installs one when this
+// installation updates itself. Then it refreshes what terma installed, as `terma update`
+// does, and stops the relay: launchd or systemd starts it again on the new binary.
+func relayUpdater(ctx context.Context, exe string, logf func(string, ...any), restart func()) {
+	dir, err := config.Dir()
+	if err != nil {
+		return
+	}
+	client := &selfupdate.Client{Version: Version}
+	wait := time.Minute
+	for {
+		t := time.NewTimer(wait + time.Duration(rand.Int64N(int64(10*time.Minute))))
+		select {
+		case <-ctx.Done():
+			t.Stop()
+			return
+		case <-t.C:
+		}
+		wait = selfupdate.PolicyInterval
+		if os.Getenv("TERMA_NO_UPDATE_CHECK") == "1" {
+			continue
+		}
+		installed := client.Background(ctx, dir, exe, logf)
+		if installed == "" {
+			continue
+		}
+		refresh := exec.CommandContext(ctx, exe, "update", "--refresh")
+		refresh.Env = append(os.Environ(), relayUpdatingEnv+"=1")
+		if out, err := refresh.CombinedOutput(); err != nil {
+			logf("refresh after updating to %s: %v: %s", installed, err, strings.TrimSpace(string(out)))
+		}
+		logf("updated to %s; restarting on it", installed)
+		restart()
+		return
+	}
+}

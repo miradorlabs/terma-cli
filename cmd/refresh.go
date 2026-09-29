@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"slices"
 
 	"github.com/miradorlabs/terma-cli/internal/adapter"
@@ -59,7 +60,10 @@ func refreshMachine() ([]string, error) {
 // restartRelay restarts terma's relay when its service is installed, so a replaced
 // binary serves; a machine without one has nothing to restart.
 func restartRelay(ctx context.Context) error {
-	if !relaySupported() {
+	// The relay that just updated itself runs this refresh and exits when it returns,
+	// for its service manager to start the new binary: restarting it here would kill the
+	// refresh's own parent mid-way.
+	if !relaySupported() || os.Getenv(relayUpdatingEnv) == "1" {
 		return nil
 	}
 	st, err := relayService(ctx)

@@ -50,6 +50,21 @@ archives:
 
 checksum:
   name_template: "checksums.txt"
+  # policy.json (the oldest supported version) is covered by the same signed checksums
+  # as the archives, so a relay trusts it only as far as it trusts a release.
+  extra_files:
+    - glob: ./release/policy.json
+
+# checksums.txt is signed with terma's release key; `terma update` and the relay's
+# background updater refuse a release whose checksums do not verify under a key built
+# into the binary (internal/selfupdate/signing.go). The key is the TERMA_SIGNING_KEY
+# secret; dry runs pass a throwaway one (`go run ./scripts/sign -throwaway`).
+signs:
+  - id: checksums
+    artifacts: checksum
+    cmd: go
+    args: ["run", "./scripts/sign", "${artifact}", "${signature}"]
+    signature: "${artifact}.sig"
 
 release:
   # A tag like v1.2.0-rc1 is published as a pre-release, so it never becomes what
@@ -62,6 +77,8 @@ release:
     # a shell is the one that was tested against these exact archives and is covered
     # by the same provenance attestation.
     - glob: ./install.sh
+    # Read by every relay each hour from releases/latest/download/policy.json.
+    - glob: ./release/policy.json
 
 snapshot:
   version_template: "{{ incpatch .Version }}-next"

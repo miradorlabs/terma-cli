@@ -177,6 +177,12 @@ func printUpdateNotice(cmd *cobra.Command) {
 		return
 	}
 	refreshAfterUpgrade(cmd.Context(), dir, cmd.ErrOrStderr())
+	// Below the oldest supported release: said on every interactive command, whether or
+	// not this installation updates itself (an opt-out, a package manager). It reads the
+	// policy the relay last fetched, so it costs no network.
+	if w := selfupdate.MinimumWarning(dir, Version); w != "" {
+		fmt.Fprintln(style.Highlight(cmd.ErrOrStderr()), "Warning: "+w)
+	}
 	exe, err := os.Executable()
 	if err != nil {
 		return

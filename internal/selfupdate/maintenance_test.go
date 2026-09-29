@@ -85,18 +85,22 @@ func TestMaintainRequiresOptInAndVerifiesUpdates(t *testing.T) {
 	}
 	for _, mode := range []string{"notify", "auto", "tampered", "locked", "managed"} {
 		t.Run(mode, func(t *testing.T) {
+			sign := testSigner(t)
 			binary := []byte("new binary")
 			archive := archiveWith(t, "terma", binary)
 			sum := sha256.Sum256(archive)
+			sums := []byte(fmt.Sprintf("%x  %s\n", sum, AssetName(runtime.GOOS, runtime.GOARCH)))
 			downloads, lookups := 0, 0
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch r.URL.Path {
 				case "/repos/" + Repo + "/releases/latest":
 					lookups++
 					base := "http://" + r.Host
-					_ = json.NewEncoder(w).Encode(Release{TagName: "v2.0.0", Assets: []Asset{{Name: AssetName(runtime.GOOS, runtime.GOARCH), URL: base + "/archive"}, {Name: "checksums.txt", URL: base + "/sums"}}})
+					_ = json.NewEncoder(w).Encode(Release{TagName: "v2.0.0", Assets: []Asset{{Name: AssetName(runtime.GOOS, runtime.GOARCH), URL: base + "/archive"}, {Name: "checksums.txt", URL: base + "/sums"}, {Name: "checksums.txt.sig", URL: base + "/sums.sig"}}})
 				case "/sums":
-					fmt.Fprintf(w, "%x  %s\n", sum, AssetName(runtime.GOOS, runtime.GOARCH))
+					_, _ = w.Write(sums)
+				case "/sums.sig":
+					_, _ = w.Write(sign(sums))
 				case "/archive":
 					downloads++
 					if mode == "tampered" {
@@ -120,8 +124,9 @@ func TestMaintainRequiresOptInAndVerifiesUpdates(t *testing.T) {
 			if err := os.WriteFile(exe, []byte("old binary"), 0755); err != nil {
 				t.Fatal(err)
 			}
-			if mode != "notify" {
-				if err := SavePreferences(dir, Preferences{Auto: true}); err != nil {
+			// Automatic updates are the default; notify is the saved opt-out.
+			if mode == "notify" {
+				if err := SavePreferences(dir, Preferences{Auto: false}); err != nil {
 					t.Fatal(err)
 				}
 			}

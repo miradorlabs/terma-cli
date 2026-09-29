@@ -87,19 +87,20 @@ func TestApplyVerifiesChecksumAndSwapsBinary(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("no self-update on windows")
 	}
+	sign := testSigner(t)
 	newBinary := []byte("#!/bin/sh\necho new\n")
 	archive := archiveWith(t, "terma", newBinary)
 	sum := sha256.Sum256(archive)
 	assetName := AssetName(runtime.GOOS, runtime.GOARCH)
+	sums := []byte(hex.EncodeToString(sum[:]) + "  " + assetName + "\n")
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/repos/"+Repo+"/releases/latest", func(w http.ResponseWriter, r *http.Request) {
 		host := "http://" + r.Host
-		_, _ = w.Write([]byte(`{"tag_name":"v9.0.0","assets":[{"name":"checksums.txt","browser_download_url":"` + host + `/sums"},{"name":"` + assetName + `","browser_download_url":"` + host + `/archive","size":` + "123" + `}]}`))
+		_, _ = w.Write([]byte(`{"tag_name":"v9.0.0","assets":[{"name":"checksums.txt","browser_download_url":"` + host + `/sums"},{"name":"checksums.txt.sig","browser_download_url":"` + host + `/sums.sig"},{"name":"` + assetName + `","browser_download_url":"` + host + `/archive","size":` + "123" + `}]}`))
 	})
-	mux.HandleFunc("/sums", func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(hex.EncodeToString(sum[:]) + "  " + assetName + "\n"))
-	})
+	mux.HandleFunc("/sums", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(sums) })
+	mux.HandleFunc("/sums.sig", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(sign(sums)) })
 	mux.HandleFunc("/archive", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(archive) })
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
@@ -131,7 +132,7 @@ func TestApplyVerifiesChecksumAndSwapsBinary(t *testing.T) {
 
 	// A tampered archive is refused.
 	mux.HandleFunc("/archive2", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("tampered")) })
-	rel.Assets[1].URL = srv.URL + "/archive2"
+	rel.Assets[2].URL = srv.URL + "/archive2"
 	if _, err := c.Apply(context.Background(), rel, exe, nil); err == nil || !strings.Contains(err.Error(), "checksum mismatch") {
 		t.Fatalf("expected a checksum error, got %v", err)
 	}

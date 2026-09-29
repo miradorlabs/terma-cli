@@ -215,6 +215,9 @@ jobs:
           go-version-file: go.mod
           cache: true
       - run: git tag v0.0.0-ci
+      # Signed with a throwaway key: the signing step runs on every change, the release
+      # key only on a tag (release.yml).
+      - run: echo "TERMA_SIGNING_KEY=$(go run ./scripts/sign -throwaway)" >> "$GITHUB_ENV"
       - uses: goreleaser/goreleaser-action@v6
         with:
           version: "~> v2"

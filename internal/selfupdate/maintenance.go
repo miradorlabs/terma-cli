@@ -19,9 +19,10 @@ type Preferences struct {
 	Auto bool `json:"auto_update"`
 }
 
-// LoadPreferences defaults to notifications, without automatic replacement.
+// LoadPreferences defaults to automatic updates: a machine with no saved choice updates
+// itself; `terma update --auto off` saves the opt-out.
 func LoadPreferences(dir string) (Preferences, error) {
-	var p Preferences
+	p := Preferences{Auto: true}
 	data, err := os.ReadFile(filepath.Join(dir, "updates.json"))
 	if os.IsNotExist(err) {
 		return p, nil
@@ -195,4 +196,66 @@ func (c *Client) Maintain(ctx context.Context, dir, exe string, out io.Writer) {
 	cache.Latest, cache.Current, cache.CheckedAt = rel.Version(), c.Version, time.Now()
 	SaveCache(dir, cache)
 	fmt.Fprintf(out, "Updated terma to %s; the next invocation uses it.\n", rel.Version())
+}
+
+// Background is the relay's update check, run every PolicyInterval. It reads the signed
+// policy on every run and the latest release once a day, and installs a newer release
+// when this installation updates itself: automatic updates are on, it is a release
+// build, and no package manager owns the binary. An installation below the policy's
+// minimum installs at once, without waiting for the daily attempt. Otherwise it only
+// records what it found, for the notices commands print. It returns the version it
+// installed, "" when it installed nothing.
+func (c *Client) Background(ctx context.Context, dir, exe string, logf func(string, ...any)) string {
+	if !IsRelease(c.Version) {
+		return ""
+	}
+	below := false
+	if pol, err := c.FetchPolicy(ctx); err == nil {
+		SavePolicy(dir, pol)
+		below = BelowMinimum(c.Version, pol)
+	} else {
+		logf("update policy: %v", err)
+	}
+	p, err := LoadPreferences(dir)
+	if err != nil {
+		logf("update preferences: %v", err)
+		return ""
+	}
+	unlock, err := Lock(dir)
+	if err != nil {
+		return ""
+	}
+	defer unlock()
+	cache, rel := c.cachedCheck(ctx, dir, c.Version)
+	if !below && !Newer(c.Version, cache.Latest) {
+		return ""
+	}
+	if !p.Auto || ManagedCommand(exe) != "" || runtime.GOOS == "windows" {
+		return "" // commands say so: notice and MinimumWarning
+	}
+	if !below && time.Since(cache.AttemptAt) < CheckInterval {
+		return ""
+	}
+	cache.AttemptAt = time.Now()
+	SaveCache(dir, cache)
+	updateCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+	if rel == nil {
+		if rel, err = c.Latest(updateCtx); err != nil {
+			logf("update: %v", err)
+			return ""
+		}
+	}
+	if !Newer(c.Version, rel.TagName) {
+		return ""
+	}
+	logf("updating terma %s → %s", c.Version, rel.Version())
+	installed, err := c.Apply(updateCtx, rel, exe, nil)
+	if err != nil {
+		logf("update failed: %v", err)
+		return ""
+	}
+	cache.Latest, cache.Current, cache.CheckedAt = installed, c.Version, time.Now()
+	SaveCache(dir, cache)
+	return installed
 }

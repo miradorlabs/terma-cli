@@ -79,7 +79,10 @@ keys never leave the keystore, and no agent configuration holds one.
 - Elsewhere, or with `terma setup --no-relay`: no relay; agents export straight to Terma
   with the machine project's key.
 
-`terma update --refresh` restarts the service so the new binary serves. `terma relay
+`terma update --refresh` restarts the service so the new binary serves. The relay is
+also terma's updater: hourly it reads the signed `policy.json`, daily the latest release,
+and when this installation updates itself (the default) it installs a newer signed
+release, refreshes, and exits for its service manager to start the new binary. `terma relay
 status` reports health, counts, backlog and the last delivery error; `doctor` and `status`
 include it.
 
