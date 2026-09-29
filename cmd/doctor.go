@@ -398,6 +398,11 @@ func runDoctor(ctx context.Context, skipCommit bool, progress doctorProgress) do
 
 	// 5. Harness export.
 	timed(doctor.KeyHarness, "agent exporting to Terma", d.agentsExporting)
+	if slices.ContainsFunc(d.harnesses, func(v harnessVerdict) bool { return v.name == shim.AgentCodex }) {
+		timed(doctor.KeyCompatibility, "Codex CLI compatibility", func() doctor.Check {
+			return doctorCodexCompatibility(ctx)
+		})
+	}
 	timed(doctor.KeyRouting, "shell routing active", func() doctor.Check {
 		return shellRoutingCheck(d.harnesses, d.installed(), selectedForRepo(d.projectID, d.cfg.Harnesses))
 	})
@@ -935,7 +940,7 @@ func doctorHarnessCheck(verdicts []harnessVerdict, otlpURL, projectID string, bo
 			detail += "; " + strings.Join(silent, ", ") + " sessions here send nothing because no repository telemetry policy enables their exporters"
 			fix += "; terma install to enable the missing repository policy"
 		}
-		return doctor.Check{Status: status, Detail: detail, Fix: fix}
+		return doctor.Check{Status: status, Detail: detail, Fix: fix, NeedsShellActivationOnly: !bound || len(silent) == 0}
 	}
 	if len(connected) == 0 {
 		return doctor.Check{Status: doctor.Fail, Detail: strings.Join(installed, ", ") + " installed but not exporting to " + otlpURL, Fix: "terma install"}

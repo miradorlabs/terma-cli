@@ -1,16 +1,17 @@
 package cmd
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"slices"
 	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 
 	"github.com/miradorlabs/terma-cli/internal/api"
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -629,9 +630,7 @@ func installStatusLine(errOut io.Writer) (string, bool) {
 	}
 }
 
-// confirm asks a yes/no question. It refuses to run without a terminal rather than
-// assuming yes: this command writes a credential into a config file, and a piped
-// invocation that meant to be non-interactive should say so with --yes.
+// confirm accepts a single key at a terminal or a line from piped input.
 func confirm(cmd *cobra.Command, question string) (bool, error) {
 	return confirmDefault(cmd, question, true)
 }
@@ -644,21 +643,43 @@ func confirmDefault(cmd *cobra.Command, question string, def bool) (bool, error)
 // confirmExplained is confirmDefault with lines under the question that say what a yes
 // does, so they are read before the answer is typed.
 func confirmExplained(cmd *cobra.Command, question string, detail []string, def bool) (bool, error) {
-	if !output.Interactive() {
-		return false, fmt.Errorf("%s — no terminal to confirm on; pass --yes to proceed non-interactively", question)
-	}
-
-	errOut := cmd.ErrOrStderr()
-	fmt.Fprint(errOut, confirmPrompt(style.For(errOut), question, detail, def))
-	line, err := bufio.NewReader(cmd.InOrStdin()).ReadString('\n')
-	if err != nil {
-		// EOF with nothing typed is a decline, not a crash.
-		if errors.Is(err, io.EOF) && strings.TrimSpace(line) == "" {
-			return false, nil
+	in := cmd.InOrStdin()
+	interactive := false
+	// /dev/null (including go test's stdin) is not an explicit piped answer.
+	if f, ok := in.(*os.File); ok && !term.IsTerminal(int(f.Fd())) {
+		if info, err := f.Stat(); err == nil && info.Mode()&os.ModeCharDevice != 0 {
+			return false, fmt.Errorf("%s — no input to confirm with; pass --yes or pipe an answer", question)
 		}
-		return false, fmt.Errorf("read confirmation: %w", err)
 	}
-	return yesAnswer(line, def), nil
+	if f, ok := in.(*os.File); ok && term.IsTerminal(int(f.Fd())) {
+		if !canPrompt() {
+			return false, fmt.Errorf("%s — no terminal to confirm on; pass --yes to proceed non-interactively", question)
+		}
+		state, err := term.MakeRaw(int(f.Fd()))
+		if err != nil {
+			return false, fmt.Errorf("read confirmation: %w", err)
+		}
+		defer func() { _ = term.Restore(int(f.Fd()), state) }()
+		interactive = true
+	}
+	errOut := cmd.ErrOrStderr()
+	text := confirmPrompt(style.For(errOut), question, detail, def)
+	if interactive {
+		text = strings.ReplaceAll(text, "\n", "\r\n")
+	}
+	fmt.Fprint(errOut, text)
+	answer, err := readConfirmation(in, interactive, def)
+	if interactive {
+		if err == nil {
+			if answer {
+				fmt.Fprint(errOut, "y")
+			} else {
+				fmt.Fprint(errOut, "n")
+			}
+		}
+		fmt.Fprint(errOut, "\r\n")
+	}
+	return answer, err
 }
 
 // confirmPrompt draws a yes/no question. Without detail the answer is typed on the

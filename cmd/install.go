@@ -25,6 +25,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/serverkey"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/shim"
+	"github.com/miradorlabs/terma-cli/internal/spinner"
 	"github.com/miradorlabs/terma-cli/internal/style"
 )
 
@@ -53,7 +54,7 @@ type installFlags struct {
 	dryRun             bool
 	assumeYes          bool
 	force              bool
-	// verbose prints the long-form account of every step under the checklist.
+	// verbose prints setup steps and their details.
 	verbose bool
 }
 
@@ -117,7 +118,7 @@ The keys and per-project configuration live in your home directory; the committe
 	cmd.Flags().BoolVar(&f.excludeToolContent, "exclude-tool-content", false, "do not export tool parameters, input, or output")
 	cmd.Flags().BoolVar(&f.noBrowser, "no-browser", false, "print the sign-in URL instead of opening a browser")
 	cmd.Flags().BoolVar(&f.dryRun, "dry-run", false, "show what would change without writing anything")
-	cmd.Flags().BoolVar(&f.verbose, "verbose", false, "say what each step wrote, not only whether it worked")
+	cmd.Flags().BoolVarP(&f.verbose, "verbose", "v", false, "show setup steps and what each step wrote")
 	cmd.Flags().BoolVarP(&f.assumeYes, "yes", "y", false, "do not ask for confirmation")
 	cmd.Flags().BoolVar(&f.force, "force", false, "replace conflicting harness settings instead of refusing")
 	return cmd
@@ -223,7 +224,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	if b.ID == "" && b.Name == "" {
 		ui.warn("Project", "unresolved — a real install signs in and selects one"+env)
 	} else {
-		ui.ok("Project", nameOrID(b.Name, b.ID)+env)
+		ui.summary("Project", nameOrID(b.Name, b.ID)+env)
 	}
 
 	// Whether the developer's agents send what was said, settled here — once the project
@@ -237,9 +238,9 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	f.excludePrompts = !include
 	if len(exportingAgents(agents)) > 0 {
 		if include {
-			ui.ok("Prompts", "prompt text and model responses are sent — `terma install --prompts off` stops them")
+			ui.summary("Prompts", "prompt text and model responses are sent — `terma install --prompts off` stops them")
 		} else {
-			ui.ok("Prompts", "prompt text and model responses are not sent — `terma install --prompts on` sends them")
+			ui.summary("Prompts", "prompt text and model responses are not sent — `terma install --prompts on` sends them")
 		}
 	}
 
@@ -334,13 +335,22 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	var afterMerge []string // what each clone does once they are merged
 	if !f.noHooks {
 		plan.print(ui.detail)
+		writeHooks := f.assumeYes
+		if !plan.empty() && !writeHooks {
+			var err error
+			writeHooks, err = confirmExplained(cmd, "Write terma's hooks to "+joinNames(plan.files())+"?", plan.explain(), true)
+			if errors.Is(err, errCancelled) {
+				return err
+			}
+			writeHooks = err == nil && writeHooks
+		}
 		switch {
 		case plan.empty():
 			// An empty git-hook plan means the commit hooks are already wired, so this
 			// repo is hook-installed; record them in the binding without rewriting.
 			installedHooks = gitDir != ""
 			ui.ok("Hooks", plan.summary(adapters)+" — already in place")
-		case f.assumeYes || confirmYes(cmd, "Write terma's hooks to "+joinNames(plan.files())+"?", plan.explain()):
+		case writeHooks:
 			if err := plan.apply(root); err != nil {
 				return err
 			}
@@ -372,7 +382,11 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	// all hooks-only would see "Installed." while every commit, tool call and observation
 	// sat in the spool, held for a key that no command would ever mint.
 	if installedHooks || len(adapter.WiredNames(root)) > 0 {
-		if k := ensureSpoolKey(ctx, cfg); k.fix == "" {
+		sp := spinner.New(cmd.ErrOrStderr())
+		sp.Start("Preparing hook event delivery…")
+		k := ensureSpoolKey(ctx, cfg)
+		sp.Stop()
+		if k.fix == "" {
 			ui.ok("Hook events", k.state)
 		} else {
 			ui.warn("Hook events", k.state)
@@ -655,8 +669,11 @@ func connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *config.Conf
 		rec.CLI = cli
 		rec.Desktop = desktop
 	}
+	sp := spinner.New(cmd.ErrOrStderr())
+	defer sp.Stop()
 	for _, a := range telemetryAgents {
 		h, _ := harness.Lookup(a)
+		sp.Start("Configuring " + h.DisplayName() + "…")
 		key, _, _, _, err := resolveKey(ctx, cfg, h, connectFlags{})
 		if err != nil {
 			return fmt.Errorf("%s: %w", a, err)
@@ -673,6 +690,7 @@ func connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *config.Conf
 			IncludePrompts:     !f.excludePrompts,
 			IncludeToolContent: !f.excludeToolContent,
 		}
+		sp.Stop()
 		switch a {
 		case shim.AgentCodex:
 			rec.ResourceAttributes = exp.ResourceAttributes
@@ -1100,13 +1118,6 @@ func (p hookPlan) apply(root string) error {
 	return nil
 }
 
-// confirmYes prompts, detail under the question saying what a yes does, and treats a
-// read error as "no".
-func confirmYes(cmd *cobra.Command, question string, detail []string) bool {
-	ok, err := confirmExplained(cmd, question, detail, true)
-	return err == nil && ok
-}
-
 func managerOrEmpty(det hookmgr.Detection, installed bool) string {
 	if !installed {
 		return ""
@@ -1161,6 +1172,9 @@ func boundTo(p *project, cfg *config.Config) binding {
 // the fix. A hooks-only install that needs no credential keeps the binding unchecked —
 // there is nothing to check it with.
 func resolveBinding(cmd *cobra.Command, cfg *config.Config, existing *termaproject.File, ref string, verify, ask bool) (binding, error) {
+	sp := spinner.New(cmd.ErrOrStderr())
+	sp.Start("Loading projects…")
+	defer sp.Stop()
 	ref = strings.TrimSpace(ref)
 	if serverkey.Is(cfg.APIKey) {
 		return serverKeyBinding(cmd.Context(), cfg, existing, ref)
@@ -1178,6 +1192,7 @@ func resolveBinding(cmd *cobra.Command, cfg *config.Config, existing *termaproje
 			return binding{}, err
 		}
 		projects, err := fetchProjects(cmd.Context(), client)
+		sp.Stop()
 		if err != nil {
 			return binding{}, err
 		}
@@ -1204,6 +1219,7 @@ func resolveBinding(cmd *cobra.Command, cfg *config.Config, existing *termaproje
 		return binding{}, err
 	}
 	projects, err := availableProjects(cmd.Context(), client)
+	sp.Stop()
 	if errors.Is(err, errNoProjects) {
 		return binding{}, fmt.Errorf("%w, then run `terma install` again", err)
 	}

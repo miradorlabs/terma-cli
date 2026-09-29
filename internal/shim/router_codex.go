@@ -27,12 +27,16 @@ func (codexRouter) workingDir(cwd string, userArgs []string) string {
 	return codexWorkingDir(cwd, userArgs)
 }
 
-func (codexRouter) routeArgs(rec Record, _ []string) []string {
+func (codexRouter) routeArgs(rec Record, userArgs []string) []string {
 	key := keystore.GetFor(AgentCodex, rec.ProjectID)
 	if key == "" {
 		return nil
 	}
-	return (harness.Codex{}).RuntimeArgs(exporterFor(rec, key))
+	args := (harness.Codex{}).RuntimeArgs(exporterFor(rec, key))
+	if codexNeedsEmbeddedFlag(userArgs) && codexSupportsNoDaemon() {
+		args = append(args, "--no-daemon")
+	}
+	return args
 }
 
 // codexWorkingDir resolves Codex's explicit working-directory override before looking up

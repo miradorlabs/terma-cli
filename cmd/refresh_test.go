@@ -350,7 +350,7 @@ func TestInstallRefreshesTheMachineOnANewRelease(t *testing.T) {
 	sandboxMachine(t)
 	install := func() string {
 		t.Helper()
-		out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude", "--yes", "--no-doctor")
+		out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude", "--yes", "--no-doctor", "--verbose")
 		if err != nil {
 			t.Fatalf("install: %v\n%s", err, out)
 		}

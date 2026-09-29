@@ -13,11 +13,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/style"
 )
 
-// installUI is how install reports: one marked line per step as it finishes, then the
-// verdict, then what is left for the developer, numbered. The long-form account of each
-// step — the files, the keys, the policies — goes to detail, which is the same writer
-// under --verbose and nowhere otherwise: a developer who wants to know whether install
-// worked should not have to read how.
+// installUI reports the project, capture choice, warnings, result, and next steps.
+// Successful setup steps and their details are only printed under --verbose.
 type installUI struct {
 	out    io.Writer
 	detail io.Writer
@@ -41,16 +38,19 @@ func newInstallUI(out io.Writer, verbose bool) *installUI {
 const stepLabelWidth = 13
 
 // ok reports a step that did what it should.
-func (u *installUI) ok(label, what string) { u.line(u.p.OK("✓"), label, what) }
+func (u *installUI) ok(label, what string) { u.line(u.detail, u.p.OK("✓"), label, what) }
+
+// summary keeps user-facing choices visible without exposing setup internals.
+func (u *installUI) summary(label, what string) { u.line(u.out, u.p.OK("✓"), label, what) }
 
 // warn reports a step that needs the developer, whose fix is a next step.
 func (u *installUI) warn(label, what string) {
 	u.warned = true
-	u.line(u.p.Warn("!"), label, what)
+	u.line(u.out, u.p.Warn("!"), label, what)
 }
 
-func (u *installUI) line(mark, label, what string) {
-	fmt.Fprintf(u.out, "  %s %-*s %s\n", mark, stepLabelWidth, label, u.p.Commands(what))
+func (u *installUI) line(out io.Writer, mark, label, what string) {
+	fmt.Fprintf(out, "  %s %-*s %s\n", mark, stepLabelWidth, label, u.p.Commands(what))
 }
 
 // code draws lines the developer pastes whole — a PATH line, shell functions — the way
@@ -101,15 +101,25 @@ func (u *installUI) finish() {
 }
 
 // verify runs doctor behind a spinner and reports it as one step, its fixes as next
-// steps. The shell-routing warning is left out when a next step already says to reload
+// steps. Warnings solely about shell activation are left out when a next step says to reload
 // the shell: install ran in a shell that predates the PATH block, so doctor, running in
 // the same process, cannot see the shims yet — that is the step, not a second problem.
 func (u *installUI) verify(cmd *cobra.Command) {
 	fmt.Fprintf(u.detail, "\n%s\n", u.p.Bold("Verifying the chain (terma doctor):"))
 	sp := spinner.New(cmd.ErrOrStderr())
 	report := runDoctor(cmd.Context(), false, doctorProgress{
-		start: func(name string) { sp.Start("Verifying: " + name + "…") },
-		note:  sp.Update,
+		start: func(name string) {
+			if u.detail == io.Discard {
+				sp.Start("Verifying installation…")
+			} else {
+				sp.Start("Verifying: " + name + "…")
+			}
+		},
+		note: func(note string) {
+			if u.detail != io.Discard {
+				sp.Update(note)
+			}
+		},
 		done: func(c doctor.Check) {
 			sp.Stop()
 			doctor.RenderCheck(u.detail, c, doctor.NameWidth)
@@ -130,7 +140,7 @@ func (u *installUI) verdict(report doctor.Report) {
 		case c.Status == doctor.Pass:
 		case c.Status == doctor.Skip:
 			skipped = skipped || c.Key == doctor.KeyScratch || c.Key == doctor.KeyBackend || c.Key == doctor.KeyProject
-		case c.Key == doctor.KeyRouting && u.reloading:
+		case (c.Key == doctor.KeyRouting || c.NeedsShellActivationOnly) && u.reloading:
 		default:
 			fix := c.Name + ": " + c.Detail
 			if c.Fix != "" {

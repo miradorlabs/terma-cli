@@ -38,7 +38,7 @@ func TestNoColorAndAgentsDisableColour(t *testing.T) {
 
 func TestBrandSequenceFollowsTheTerminalsDepth(t *testing.T) {
 	t.Setenv("COLORTERM", "truecolor")
-	if !strings.Contains(brandSequence(), "38;2;139;108;255") {
+	if !strings.Contains(brandSequence(), "38;2;167;139;250") {
 		t.Fatalf("truecolor should get the exact purple: %q", brandSequence())
 	}
 	t.Setenv("COLORTERM", "")

@@ -65,6 +65,8 @@ func e2eRouted(t *testing.T) (cfgDir, repo, codexHome string) {
 	t.Helper()
 	cfgDir = t.TempDir()
 	t.Setenv("TERMA_CONFIG_DIR", cfgDir)
+	// Model a fresh launch even when the test runner is itself inside routed Codex.
+	t.Setenv(shim.CodexRoutedEnv, "")
 
 	repo = t.TempDir()
 	if err := termaproject.Save(repo, &termaproject.File{Project: termaproject.Project{ID: e2eProjectID}}); err != nil {
@@ -259,6 +261,77 @@ func TestE2E_PathShimRoutes(t *testing.T) {
 		t.Fatalf("Claude PATH launcher did not deliver settings: %s", out)
 	}
 
+}
+
+// A slow capability probe must finish within the launcher's preparation budget;
+// a hung probe must still leave enough time to deliver the telemetry arguments.
+func TestE2E_PathShimRoutesWithSlowCodexHelp(t *testing.T) {
+	bin := termaBinary(t)
+	for _, tc := range []struct {
+		name     string
+		help     string
+		wantFlag bool
+	}{
+		{"slow", "/bin/sleep 0.7; printf '  --no-daemon\\n'", true},
+		{"hung", "exec /bin/sleep 10", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, repo, _ := e2eRouted(t)
+			agents := fakeAgents(t)
+			writeExecutable(t, filepath.Join(agents, "codex"), "#!/bin/sh\nif [ \"$1\" = --help ]; then\n"+tc.help+"\nexit 0\nfi\nprintf 'ARG=%s\\n' \"$@\"\n")
+			shimBin, err := shim.InstallShims([]string{shim.AgentCodex})
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			proc := exec.CommandContext(ctx, filepath.Join(shimBin, "codex"))
+			proc.Dir, proc.Env = repo, withPath(shimBin, filepath.Dir(bin), agents)
+			out, err := proc.CombinedOutput()
+			if err != nil {
+				t.Fatalf("launch: %v\n%s", err, out)
+			}
+			if strings.Contains(string(out), "ARG=--no-daemon\n") != tc.wantFlag {
+				t.Fatalf("incorrect embedded mode selection:\n%s", out)
+			}
+			if !strings.Contains(string(out), e2eEndpoint) || strings.Contains(string(out), "routing preparation failed") {
+				t.Fatalf("probe lost telemetry routing:\n%s", out)
+			}
+		})
+	}
+}
+
+// The capability cache survives the short-lived preparation process, so later
+// launches of the same executable do not start another help subprocess.
+func TestE2E_PathShimCachesCodexCapabilities(t *testing.T) {
+	bin := termaBinary(t)
+	for _, supported := range []bool{true, false} {
+		t.Run(fmt.Sprint(supported), func(t *testing.T) {
+			_, repo, _ := e2eRouted(t)
+			agents := fakeAgents(t)
+			option := "--no-alt-screen"
+			if supported {
+				option = "--no-daemon"
+			}
+			writeExecutable(t, filepath.Join(agents, "codex"), "#!/bin/sh\nif [ \"$1\" = --help ]; then\nprintf x >> \"$TERMA_TEST_PROBE_LOG\"\nprintf '  "+option+"\\n'\nexit 0\nfi\nprintf 'ARG=%s\\n' \"$@\"\n")
+			shimBin, err := shim.InstallShims([]string{shim.AgentCodex})
+			if err != nil {
+				t.Fatal(err)
+			}
+			log := filepath.Join(t.TempDir(), "probes")
+			env := append(withPath(shimBin, filepath.Dir(bin), agents), "TERMA_TEST_PROBE_LOG="+log)
+			for range 2 {
+				out := runProc(t, filepath.Join(shimBin, "codex"), repo, env)
+				if strings.Contains(out, "ARG=--no-daemon\n") != supported || !strings.Contains(out, e2eEndpoint) {
+					t.Fatalf("cached launch lost capabilities or telemetry:\n%s", out)
+				}
+			}
+			data, err := os.ReadFile(log)
+			if err != nil || string(data) != "x" {
+				t.Fatalf("expected one help subprocess across two launches: %q, %v", data, err)
+			}
+		})
+	}
 }
 
 // The full install lifecycle through the real binary, offline (--harness none, a

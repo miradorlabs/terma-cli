@@ -61,7 +61,7 @@ wiring the hooks — happens per repository, in ` + "`terma install`" + `.`,
 	}
 	cmd.Flags().StringVar(&f.harnesses, "harness", "", "comma-separated agents to record ("+strings.Join(availableAgentNames(), ", ")+"); default: a picker")
 	cmd.Flags().BoolVar(&f.noBrowser, "no-browser", false, "print the sign-in URL instead of opening a browser")
-	cmd.Flags().BoolVarP(&f.assumeYes, "yes", "y", false, "skip the picker; record every available installed agent")
+	cmd.Flags().BoolVarP(&f.assumeYes, "yes", "y", false, "skip the browser prompt and picker; record every available installed agent")
 	return cmd
 }
 
@@ -82,7 +82,7 @@ func runSetup(cmd *cobra.Command, f setupFlags) error {
 	}
 
 	// 1. Sign in — reusing the session this machine already has, verified.
-	if cfg, err = signInAndReload(cmd, cfg, signInOptions{noBrowser: f.noBrowser}); err != nil {
+	if cfg, err = signInAndReload(cmd, cfg, signInOptions{noBrowser: f.noBrowser, pauseBeforeBrowser: !f.assumeYes}); err != nil {
 		return err
 	}
 

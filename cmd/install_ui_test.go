@@ -8,38 +8,36 @@ import (
 	"testing"
 
 	"github.com/miradorlabs/terma-cli/internal/doctor"
+	"github.com/miradorlabs/terma-cli/internal/shim"
 )
 
-// install says whether each step worked, one line each, and saves how for --verbose: the
-// plan's file list and the policy it wrote are detail, and the files to commit are a next
-// step either way.
-func TestInstallIsAChecklistUnlessVerbose(t *testing.T) {
+// Default output keeps the project, warnings, and actions; -v includes setup details.
+func TestInstallIsConciseUnlessVerbose(t *testing.T) {
 	installRepo(t)
 	out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude", "--yes", "--no-doctor")
 	if err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}
 	for _, want := range []string{
-		"✓ Project", "✓ Hooks         commit stamping via git; session hooks for Claude Code",
-		"! Hook events   held until this machine has a key", "✓ Repo policy",
+		"✓ Project", "! Hook events   held until this machine has a key",
 		"terma installed", "Next steps:\n  1. Sign in with `terma setup`", "Commit these files", "git add ",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the checklist should say %q:\n%s", want, out)
 		}
 	}
-	for _, detail := range []string{"create  ", "Wrote Claude Code's repository policy", "Pointed git at"} {
+	for _, detail := range []string{"✓ Hooks", "✓ Repo policy", "create  ", "Wrote Claude Code's repository policy", "Pointed git at"} {
 		if strings.Contains(out, detail) {
 			t.Errorf("%q is detail, for --verbose:\n%s", detail, out)
 		}
 	}
 
 	installRepo(t)
-	out, err = runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude", "--yes", "--no-doctor", "--verbose")
+	out, err = runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude", "--yes", "--no-doctor", "-v")
 	if err != nil {
 		t.Fatalf("install --verbose: %v\n%s", err, out)
 	}
-	for _, want := range []string{"✓ Project", "create  ", "Wrote Claude Code's repository policy", "Pointed git at"} {
+	for _, want := range []string{"✓ Project", "✓ Hooks", "✓ Repo policy", "create  ", "Wrote Claude Code's repository policy", "Pointed git at"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("--verbose should say %q:\n%s", want, out)
 		}
@@ -49,7 +47,10 @@ func TestInstallIsAChecklistUnlessVerbose(t *testing.T) {
 func TestInstallUIFinish(t *testing.T) {
 	var buf bytes.Buffer
 	ui := newInstallUI(&buf, false)
-	ui.ok("Project", "Acme Web")
+	ui.summary("Project", "Acme Web")
+	ui.ok("Status line", "reads your plan's usage windows")
+	ui.ok("Claude Code", "shim at ~/.config/terma/shim/bin/claude")
+	ui.ok("Hook events", "delivered with this project's key")
 	fmt.Fprintln(ui.detail, "only with --verbose")
 	ui.then("Run `source ~/.zshrc`.")
 	ui.then("Commit these files:\n  a\n\n  git add a")
@@ -83,6 +84,40 @@ func TestDoctorFixStep(t *testing.T) {
 		if got := doctorFixStep(fix); got != want {
 			t.Errorf("doctorFixStep(%q) = %q, want %q", fix, got, want)
 		}
+	}
+}
+
+// The export check can report the same pending shell activation as PATH setup.
+func TestInstallShellReloadIsOnlyRequestedOnce(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("SHELL", "/bin/zsh")
+	t.Setenv("ZDOTDIR", "")
+	bin, err := shim.ShimBinDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, missingPolicy := range []bool{false, true} {
+		t.Run(fmt.Sprintf("missing policy=%t", missingPolicy), func(t *testing.T) {
+			var buf bytes.Buffer
+			ui := newInstallUI(&buf, false)
+			putShimsOnPath(ui, bin, []string{"claude"}, installFlags{})
+			verdicts := []harnessVerdict{{displayName: "Claude Code", route: routePending}}
+			if missingPolicy {
+				verdicts = append(verdicts, harnessVerdict{displayName: "Other agent", route: routeRepoDecides})
+			}
+			check := doctorHarnessCheck(verdicts, "https://otel.example.test", testProjectID, true)
+			check.Key = doctor.KeyHarness
+			ui.verdict(doctor.Build([]doctor.Check{check}))
+			ui.finish()
+			out := buf.String()
+			if missingPolicy {
+				if !strings.Contains(out, "enable the missing repository policy") || !strings.Contains(out, "! Verified") {
+					t.Fatalf("missing policy must still be reported:\n%s", out)
+				}
+			} else if strings.Count(out, "source ~/.zshrc") != 1 || strings.Contains(out, "! Verified") {
+				t.Fatalf("pending shell activation should be requested once:\n%s", out)
+			}
+		})
 	}
 }
 
@@ -131,7 +166,7 @@ func TestInstallUIVerdict(t *testing.T) {
 		"✓ Verified      terma doctor: the checks that ran passed; some were skipped": {{Status: doctor.Pass}, {Key: doctor.KeyBackend, Status: doctor.Skip}},
 	} {
 		buf.Reset()
-		newInstallUI(&buf, false).verdict(doctor.Report{Checks: checks})
+		newInstallUI(&buf, true).verdict(doctor.Report{Checks: checks})
 		if !strings.Contains(buf.String(), want) {
 			t.Errorf("got %q, want %q", buf.String(), want)
 		}

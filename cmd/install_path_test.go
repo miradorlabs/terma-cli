@@ -93,7 +93,7 @@ func TestInstallMovesAnOvertakenPathLine(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err := within(20*time.Second).combined(t, "install", "--harness", "codex", "--project", "aaaaaaaa-0000-4000-8000-000000000001", "--no-hooks", "--no-doctor", "--no-browser")
+	out, err := within(20*time.Second).combined(t, "install", "--harness", "codex", "--project", "aaaaaaaa-0000-4000-8000-000000000001", "--no-hooks", "--no-doctor", "--no-browser", "--verbose")
 	if err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}
