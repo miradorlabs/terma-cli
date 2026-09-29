@@ -14,8 +14,8 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/harness"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
-	"github.com/miradorlabs/terma-cli/internal/shim"
 )
 
 // boundRepo is a git repository bound to project, the test's own home and agent
@@ -30,7 +30,6 @@ func boundRepo(t *testing.T, bound termaproject.Project, signedIn bool) *fakeAut
 	t.Setenv("ZDOTDIR", "")
 	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
 	t.Setenv("CODEX_HOME", "")
-	t.Setenv(shim.WrapperEnv, "")
 	t.Setenv("PATH", "/usr/bin:/bin")
 	gitRepoHere(t)
 	if signedIn {
@@ -46,7 +45,7 @@ func boundRepo(t *testing.T, bound termaproject.Project, signedIn bool) *fakeAut
 
 func routeCodex(t *testing.T, extra ...string) (string, error) {
 	t.Helper()
-	args := append([]string{"install", "--harness", "codex", "--no-hooks", "--no-path", "--no-doctor", "--no-browser"}, extra...)
+	args := append([]string{"install", "--harness", "codex", "--no-hooks", "--no-doctor", "--no-browser"}, extra...)
 	return within(20*time.Second).combined(t, args...)
 }
 
@@ -256,19 +255,27 @@ func TestInstallStampsTheVersionOnlyWhenItWritesCommittedFiles(t *testing.T) {
 	}
 }
 
-// --prompts is the one switch for whether the developer's agents send what was said, and
-// the answer sticks: a re-install without it keeps the last one instead of switching
-// prompts back on, which is what re-running install used to do.
+// --prompts is the one switch for whether the developer's agents send what was said. It is
+// the machine's choice now (`terma setup` records it), and install still takes it — as a
+// change to that choice — and the answer sticks: a re-install without it keeps the last
+// one instead of switching prompts back on, which is what re-running install used to do.
 func TestInstallPromptsSwitchSticks(t *testing.T) {
 	acme := projectsIn(orgA().ID)[0]
 	boundRepo(t, termaproject.Project{ID: acme.ID, Name: acme.Name, OrganizationID: orgA().ID}, true)
 	prompts := func() bool {
 		t.Helper()
-		rec, ok, err := shim.LoadRecord(acme.ID)
-		if err != nil || !ok {
-			t.Fatalf("no routing record: ok=%v err=%v", ok, err)
+		cfg, err := loadConfig()
+		if err != nil {
+			t.Fatal(err)
 		}
-		return rec.IncludePrompts
+		st, err := (harness.Codex{}).Status()
+		if err != nil || !st.Connected {
+			t.Fatalf("Codex's global configuration: %+v, %v", st, err)
+		}
+		if st.IncludePrompts == cfg.Telemetry.ExcludePrompts {
+			t.Fatalf("Codex's file (prompts %v) disagrees with the machine's record (excluded %v)", st.IncludePrompts, cfg.Telemetry.ExcludePrompts)
+		}
+		return st.IncludePrompts
 	}
 	for _, step := range []struct {
 		args []string
@@ -276,8 +283,8 @@ func TestInstallPromptsSwitchSticks(t *testing.T) {
 		line string
 	}{
 		// a first install sends them, unasked, and says how to stop it
-		{nil, true, "prompt text and model responses are sent — `terma install --prompts off` stops them"},
-		{[]string{"--prompts", "off"}, false, "prompt text and model responses are not sent — `terma install --prompts on` sends them"},
+		{nil, true, "prompt text and model responses are sent — `terma setup --prompts off` stops them"},
+		{[]string{"--prompts", "off"}, false, "prompt text and model responses are not sent — `terma setup --prompts on` sends them"},
 		{nil, false, ""}, // kept, not re-defaulted
 		{[]string{"--prompts", "on"}, true, ""},
 		{[]string{"--exclude-prompts"}, false, ""}, // the older spelling still works

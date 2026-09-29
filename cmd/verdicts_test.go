@@ -162,17 +162,14 @@ func TestStatusLineVerdictInBothCommands(t *testing.T) {
 }
 
 func TestHarnessVerdictInBothCommands(t *testing.T) {
-	// The pending case asks where the shims should go, which reads the shell's
-	// startup file; keep that away from the developer's own.
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("SHELL", "/bin/zsh")
-
 	const otlp = "https://otel-dev.mirador.org"
+	const relayAt = "http://127.0.0.1:14318"
 	const project = "6796a71f-7949-40f1-bde8-b87a74071686"
 	const elsewhere = "c970664b-ba35-4cdd-b7a9-d5acadb327f6"
 	sending := harness.Status{Connected: true, Endpoint: otlp, ProjectID: project, Signals: harness.AllSignals}
 	silent := harness.Status{Connected: true, Endpoint: otlp, ProjectID: project}
 	other := harness.Status{Connected: true, Endpoint: otlp, ProjectID: elsewhere, Signals: harness.AllSignals}
+	relayed := harness.Status{Connected: true, Endpoint: relayAt, ProjectID: elsewhere, Signals: harness.AllSignals}
 
 	cases := []struct {
 		name         string
@@ -185,110 +182,83 @@ func TestHarnessVerdictInBothCommands(t *testing.T) {
 		statusOK     bool
 	}{
 		{
-			name:  "machine-wide config sends to this project",
+			name:  "exports straight to Terma, to this project",
 			facts: harnessFacts{status: sending}, bound: true,
 			route:        routeGlobal,
 			doctorStatus: doctor.Pass, doctorDetail: "Claude Code → " + otlp,
 			status: "→ connected", statusOK: true,
 		},
 		{
-			name:  "per-repo routing fires",
-			facts: harnessFacts{routed: true, live: true}, bound: true,
-			route:        routeLive,
-			doctorStatus: doctor.Pass, doctorDetail: "Claude Code (per-repo) → " + otlp,
-			status: "→ connected (per-repo routing)", statusOK: true,
+			// Whatever project the machine's own key belongs to: the relay routes by
+			// the session's repository.
+			name:  "exports through the relay",
+			facts: harnessFacts{status: relayed}, bound: true,
+			route:        routeRelay,
+			doctorStatus: doctor.Pass, doctorDetail: "Claude Code → terma's relay",
+			status: "→ connected (through terma's relay)", statusOK: true,
 		},
 		{
-			// Same verdict, each command's own emphasis: doctor names the routing,
-			// status says the plainer thing when the machine-wide config delivers too.
-			name:  "per-repo routing fires over a config that already sends here",
-			facts: harnessFacts{status: sending, routed: true, live: true}, bound: true,
+			name:  "routes itself per repository",
+			facts: harnessFacts{routed: true}, bound: true,
 			route:        routeLive,
 			doctorStatus: doctor.Pass, doctorDetail: "Claude Code (per-repo) → " + otlp,
-			status: "→ connected", statusOK: true,
+			status: "→ connected (per-repo)", statusOK: true,
 		},
 		{
-			name:  "live routing overrides a config that reports elsewhere",
-			facts: harnessFacts{status: other, routed: true, live: true}, bound: true,
-			route:        routeLive,
-			doctorStatus: doctor.Pass, doctorDetail: "Claude Code (per-repo) → " + otlp,
-			status: "→ connected (per-repo routing)", statusOK: true,
-		},
-		{
-			name:  "reports to another project",
+			name:  "exports straight to Terma, to the machine's other project",
 			facts: harnessFacts{status: other}, bound: true,
 			route:        routeOtherProject,
-			doctorStatus: doctor.Fail, doctorDetail: "Claude Code reports to project " + elsewhere + ", not " + project,
-			status: "→ reporting to project " + elsewhere + ", not this one — run `terma install`", statusOK: false,
+			doctorStatus: doctor.Warn, doctorDetail: "Claude Code reports to project " + elsewhere + ", not this repository's project " + project,
+			status: "→ reporting to project " + elsewhere + ", not this one — run `terma setup` to send each session to its repository's project", statusOK: false,
 		},
 		{
-			// Neither command calls this working. doctor names the project it goes to;
-			// status names the routing that would fix it and is not live yet.
-			name:  "reports to another project, routing configured but not live",
-			facts: harnessFacts{status: other, routed: true}, bound: true,
-			route:        routeOtherProject,
-			doctorStatus: doctor.Fail, doctorDetail: "Claude Code reports to project " + elsewhere + ", not " + project,
-			status: "→ per-repo routing configured, but terma's shim is not ahead of it on your PATH", statusOK: false,
-		},
-		{
-			name:  "routing configured but not live, nothing else sends",
-			facts: harnessFacts{routed: true}, bound: true,
-			route:        routePending,
-			doctorStatus: doctor.Fail, doctorDetail: "per-repo routing for Claude Code is configured, but terma's shim directory is not ahead of the agent on your PATH — sessions still use the machine-wide config",
-			status: "→ per-repo routing configured, but terma's shim is not ahead of it on your PATH", statusOK: false,
-		},
-		{
-			// Routing that is not live yet changes nothing about a repository that asks:
-			// sessions here do send, through the machine-wide config.
-			name:  "routing not live, but the repository's policy makes it send",
-			facts: harnessFacts{status: silent, routed: true, repoAsks: true, localScope: true}, bound: true,
+			name:  "no signal of its own, and this repository asks",
+			facts: harnessFacts{status: silent, repoAsks: true, localScope: true}, bound: true,
 			route:        routeRepoDecides,
 			doctorStatus: doctor.Pass, doctorDetail: "Claude Code → " + otlp + " (only where a repository asks); this repository asks",
 			status: "→ connected; repositories decide what is sent", statusOK: true,
 		},
 		{
-			name:  "silent machine-wide config, and this repository neither routes nor asks",
+			name:  "no signal of its own, and this repository does not ask",
 			facts: harnessFacts{status: silent, localScope: true}, bound: true,
 			route:        routeRepoDecides,
-			doctorStatus: doctor.Fail, doctorDetail: "Claude Code → " + otlp + " (only where a repository asks); this repository does not route Claude Code to its project, so its sessions send nothing",
-			status: "→ no telemetry: this repository neither routes it nor asks for it — sessions here send nothing (run `terma install`)", statusOK: false,
+			doctorStatus: doctor.Fail, doctorDetail: "Claude Code → " + otlp + " (only where a repository asks); Claude Code exports no signal, so sessions here send nothing",
+			status: "→ no telemetry: no signal is exported — sessions here send nothing (run `terma setup --signals traces,logs,metrics`)", statusOK: false,
 		},
 		{
-			name:  "silent machine-wide config, outside any installed repository",
+			name:  "no signal of its own, outside any installed repository",
 			facts: harnessFacts{status: silent, localScope: true}, bound: false,
 			route:        routeRepoDecides,
 			doctorStatus: doctor.Pass, doctorDetail: "Claude Code → " + otlp + " (only where a repository asks)",
 			status: "→ connected; repositories decide what is sent", statusOK: true,
 		},
 		{
-			// The second place the two used to disagree: an agent that cannot carry a
-			// repository policy at all (Codex) was never asked by doctor whether this
-			// repository has one, so doctor passed what status said sends nothing. Only a
-			// hand-edited config reaches it — connect always writes Codex's signals.
+			// An agent that cannot carry a repository policy at all (Codex) cannot be
+			// asked by one, so doctor must not pass what status says sends nothing.
 			name:  "silent config for an agent with no repository scope",
 			facts: harnessFacts{status: silent}, bound: true,
 			route:        routeRepoDecides,
-			doctorStatus: doctor.Fail, doctorDetail: "Claude Code → " + otlp + " (only where a repository asks); this repository does not route Claude Code to its project, so its sessions send nothing",
-			status: "→ no telemetry: this repository neither routes it nor asks for it — sessions here send nothing (run `terma install`)", statusOK: false,
+			doctorStatus: doctor.Fail, doctorDetail: "Claude Code → " + otlp + " (only where a repository asks); Claude Code exports no signal, so sessions here send nothing",
+			status: "→ no telemetry: no signal is exported — sessions here send nothing (run `terma setup --signals traces,logs,metrics`)", statusOK: false,
 		},
 		{
 			name:  "not connected",
 			facts: harnessFacts{}, bound: true,
 			route:        routeNone,
-			doctorStatus: doctor.Fail, doctorDetail: "Claude Code installed but not exporting to " + otlp,
-			status: "→ not connected", statusOK: false,
+			doctorStatus: doctor.Fail, doctorDetail: "Claude Code installed but not exporting to Terma",
+			status: "→ not connected (run `terma setup`)", statusOK: false,
 		},
 		{
 			name:  "configuration unreadable",
 			facts: harnessFacts{err: errors.New("permission denied")}, bound: true,
 			route:        routeNone,
-			doctorStatus: doctor.Fail, doctorDetail: "Claude Code installed but not exporting to " + otlp,
+			doctorStatus: doctor.Fail, doctorDetail: "Claude Code installed but not exporting to Terma",
 			status: "(error)", statusOK: false,
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			v := judgeHarness(tc.facts, otlp, project)
+			v := judgeHarness(tc.facts, otlp, relayAt, project)
 			v.name, v.displayName = "claude", "Claude Code"
 			if v.route != tc.route {
 				t.Fatalf("route = %v, want %v", v.route, tc.route)

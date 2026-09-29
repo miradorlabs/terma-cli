@@ -553,7 +553,9 @@ func TestInstallE2EUninstallOwnership(t *testing.T) {
 			root := s.mkdir("workspace")
 			s.git(root, "init", "-q")
 			s.write(root, hookmgr.ClaudeSettingsPath, `{"env":{"USER_FLAG":"keep","OTEL_LOG_USER_PROMPTS":"0"}}`)
-			s.install(root, "--exclude-prompts=false")
+			s.install(root)
+			// The policy an earlier install committed, written the way it was.
+			s.cli(root, "connect", "claude", "--scope", "local", "--yes")
 			switch kind {
 			case "journal_missing":
 				s.env = append(s.env, "TERMA_CONFIG_DIR="+filepath.Join(s.base, "other-machine"))

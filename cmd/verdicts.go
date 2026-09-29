@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
-	"github.com/miradorlabs/terma-cli/internal/shim"
 )
 
 // The verdicts `terma status` and `terma doctor` both reach. Each is judged once, here,
@@ -107,19 +107,19 @@ func classifyStatusLine(st harness.StatusLineState, err error) statusLineVerdict
 type harnessRoute int
 
 const (
-	// routeNone: not connected to this host, and nothing routes it here.
+	// routeNone: not pointed at terma's relay or at Terma.
 	routeNone harnessRoute = iota
-	// routeOtherProject: connected machine-wide to a different project, with no live
-	// routing to override that. Everything looks wired, and none of the spend arrives.
+	// routeOtherProject: exporting straight to Terma with another project's key (the
+	// machine project, in direct mode). Everything looks wired, and none of the spend
+	// arrives here.
 	routeOtherProject
-	// routeLive: per-repo routing is configured and actually fires.
-	routeLive
-	// routeGlobal: the machine-wide config exports signals of its own.
+	// routeRelay: pointed at terma's relay, which sends each session to its
+	// repository's project.
+	routeRelay
+	// routeGlobal: exporting straight to Terma, to this project.
 	routeGlobal
-	// routePending: routing is configured but not delivered — the shims are installed
-	// and their directory is not ahead of the agent on PATH — and nothing else makes it
-	// send, so sessions fall back to the machine-wide config.
-	routePending
+	// routeLive: routed per repository by the agent itself (OpenCode's plugin).
+	routeLive
 	// routeRepoDecides: connected machine-wide and exporting no signal of its own, so
 	// only a repository's committed policy makes it send.
 	routeRepoDecides
@@ -130,13 +130,14 @@ const (
 type harnessFacts struct {
 	status harness.Status
 	err    error
-	// routed: a routing record and this project's key exist. live: that routing fires.
-	routed, live bool
+	// routed: the agent routes itself per repository (OpenCode's plugin with this
+	// project's key).
+	routed bool
 	// repoAsks: the repository the CLI stands in carries a committed policy that
 	// switches this agent's signals on. localScope: the agent can carry one at all.
 	repoAsks, localScope bool
-	// emissionProblem prevents routing or another healthy agent from hiding a
-	// configuration that cannot emit telemetry. These checks never launch an agent.
+	// emissionProblem prevents a healthy-looking agent from hiding a configuration that
+	// cannot emit telemetry. These checks never launch an agent.
 	emissionProblem, emissionFix string
 }
 
@@ -146,43 +147,46 @@ type harnessVerdict struct {
 	harnessFacts
 	// otherProject is the project a routeOtherProject agent reports to instead.
 	otherProject string
-	// sendsGlobally: the machine-wide config alone would deliver to this project.
-	sendsGlobally bool
 }
 
 func gatherHarness(h harness.Harness, projectID, root string) harnessFacts {
 	st, err := h.Status()
-	routed := routedPerRepo(h.Name(), projectID)
 	_, scoped := h.(harness.Scoped)
 	f := harnessFacts{
 		status:     st,
 		err:        err,
-		routed:     routed,
-		live:       routed && perRepoLive(h.Name()),
+		routed:     routedPerRepo(h.Name(), projectID),
 		repoAsks:   repoAsks(h, root),
 		localScope: scoped,
 	}
-	f.emissionProblem, f.emissionFix = emissionProblem(h, root, projectID, &f)
+	f.emissionProblem, f.emissionFix = emissionProblem(h, root, &f)
 	return f
 }
 
-func emissionProblem(h harness.Harness, root, projectID string, f *harnessFacts) (string, string) {
+// routedPerRepo reports whether an agent routes itself to projectID from here: OpenCode's
+// per-repository plugin, with this project's key on the machine.
+func routedPerRepo(name, projectID string) bool {
+	if name != "opencode" || projectID == "" || keystore.GetFor("opencode", projectID) == "" {
+		return false
+	}
+	st, err := (harness.OpenCode{}).Status()
+	return err == nil && st.Exists
+}
+
+// repoAsks reports whether the repository at root carries a committed policy that switches
+// a harness's signals on.
+func repoAsks(h harness.Harness, root string) bool {
+	scoped, ok := h.(harness.Scoped)
+	if !ok || root == "" {
+		return false
+	}
+	st, err := scoped.Local(root).Status()
+	return err == nil && len(st.Signals) > 0
+}
+
+func emissionProblem(h harness.Harness, root string, f *harnessFacts) (string, string) {
 	if root == "" {
 		return "", ""
-	}
-	// Claude's routed --settings and Codex's -c options override repository and
-	// user settings. Judge the record actually used at launch in that case.
-	if f.live && shim.Routable(h.Name()) {
-		rec, _, err := shim.LoadRecord(projectID)
-		if err != nil {
-			return "could not read per-repo telemetry settings", "terma install"
-		}
-		for _, signal := range rec.Signals {
-			if containsSignal(harness.AllSignals, harness.Signal(signal)) {
-				return "", ""
-			}
-		}
-		return "per-repo routing has no telemetry signals enabled; sessions here send nothing", "terma install --signals traces,logs,metrics"
 	}
 	st := f.status
 	if c, ok := h.(harness.Claude); ok {
@@ -191,7 +195,7 @@ func emissionProblem(h harness.Harness, root, projectID string, f *harnessFacts)
 			return "could not read effective telemetry settings: " + err.Error(), "repair the Claude Code settings file named above, then restart Claude Code"
 		}
 		if effective.Endpoint == "" {
-			return "", "" // The routing verdict already reports the missing connection.
+			return "", "" // The route verdict already reports the missing connection.
 		}
 		if !effective.Connected {
 			return "telemetry is disabled (CLAUDE_CODE_ENABLE_TELEMETRY); sessions here send nothing",
@@ -212,8 +216,8 @@ func emissionProblem(h harness.Harness, root, projectID string, f *harnessFacts)
 		return "", ""
 	}
 	// Leave the missing-policy case to routeRepoDecides, which explains the
-	// machine-wide 'repos decide' arrangement and its plain-install fix.
-	if !f.live && len(f.status.Signals) == 0 && !f.repoAsks {
+	// machine-wide 'repos decide' arrangement and its fix.
+	if len(f.status.Signals) == 0 && !f.repoAsks {
 		if scoped, ok := h.(harness.Scoped); ok {
 			local, err := scoped.Local(root).Status()
 			if err == nil && !local.HasPolicy && st.ConfigPath == f.status.ConfigPath {
@@ -224,46 +228,58 @@ func emissionProblem(h harness.Harness, root, projectID string, f *harnessFacts)
 		}
 	}
 	return fmt.Sprintf("no OTLP telemetry signals enabled by %s; sessions here send nothing", st.ConfigPath),
-		"review the export switches in the settings file named above (including the traces beta switch); run `terma install --signals traces,logs,metrics` to enable repository telemetry, then restart " + h.DisplayName()
+		"review the export switches in the settings file named above (including the traces beta switch); `terma setup --signals traces,logs,metrics` enables them machine-wide, then restart " + h.DisplayName()
 }
 
-// judgeHarness classifies one agent. The order is the judgement: another project's
-// export fails before anything else unless live routing overrides it, live routing
-// outranks the machine-wide config, and routing that is configured but not live is
-// only "pending" when no repository policy makes the agent send anyway.
-func judgeHarness(f harnessFacts, otlpURL, projectID string) harnessVerdict {
+// judgeHarness classifies one agent. relayEndpoint is where terma's relay listens, "" when
+// this machine has none. The relay routes a session by its repository, so an agent
+// pointed at it reports here whatever the machine project is; one exporting straight to
+// Terma reports to its key's project.
+func judgeHarness(f harnessFacts, otlpURL, relayEndpoint, projectID string) harnessVerdict {
 	v := harnessVerdict{harnessFacts: f}
 	st := f.status
-	global := f.err == nil && st.Connected && st.Endpoint == otlpURL
-	other := global && projectID != "" && st.ProjectID != "" && st.ProjectID != projectID
-	silent := global && len(st.Signals) == 0
-	v.sendsGlobally = global && !other && !silent
+	endpoint := strings.TrimRight(st.Endpoint, "/")
+	connected := f.err == nil && st.Connected
+	viaRelay := connected && relayEndpoint != "" && endpoint == relayEndpoint
+	direct := connected && endpoint == strings.TrimRight(otlpURL, "/")
+	silent := len(st.Signals) == 0
 	switch {
-	case other && !f.live:
-		v.route, v.otherProject = routeOtherProject, st.ProjectID
-	case f.live:
+	case f.routed:
 		v.route = routeLive
-	case global && !silent:
-		v.route = routeGlobal
-	case f.routed && (!silent || !f.repoAsks):
-		v.route = routePending
-	case global:
+	case direct && projectID != "" && st.ProjectID != "" && st.ProjectID != projectID:
+		v.route, v.otherProject = routeOtherProject, st.ProjectID
+	case (viaRelay || direct) && silent:
 		v.route = routeRepoDecides
+	case viaRelay:
+		v.route = routeRelay
+	case direct:
+		v.route = routeGlobal
 	default:
 		v.route = routeNone
 	}
 	return v
 }
 
+// relayEndpointHere is where this machine's relay listens, "" when setup has not
+// configured one.
+func relayEndpointHere() string {
+	rc, err := relayLoad()
+	if err != nil {
+		return ""
+	}
+	return rc.Endpoint()
+}
+
 // judgeHarnesses judges every agent found on this machine, in registry order. root is
 // empty outside a repository, where no repository policy can be asking.
 func judgeHarnesses(ctx context.Context, otlpURL, projectID, root string) []harnessVerdict {
+	relayEndpoint := relayEndpointHere()
 	var out []harnessVerdict
 	for _, h := range harness.All() {
 		if !h.Detect(ctx).Found {
 			continue
 		}
-		v := judgeHarness(gatherHarness(h, projectID, root), otlpURL, projectID)
+		v := judgeHarness(gatherHarness(h, projectID, root), otlpURL, relayEndpoint, projectID)
 		v.name, v.displayName = h.Name(), h.DisplayName()
 		out = append(out, v)
 	}
@@ -271,52 +287,17 @@ func judgeHarnesses(ctx context.Context, otlpURL, projectID, root string) []harn
 }
 
 // judgeSelectedHarnesses keeps the CLI and desktop Codex surfaces distinct for a
-// developer who selected desktop during setup. A desktop-only choice must never
-// be reported as a missing CLI PATH shim.
+// developer who selected desktop during setup. Codex Desktop reads Codex's own global
+// configuration, so it is judged by it, under its own name — and judged even when no
+// Codex CLI is on PATH to be found.
 func judgeSelectedHarnesses(ctx context.Context, otlpURL, projectID, root string, selected []string) []harnessVerdict {
-	selected = selectedForRepo(projectID, selected)
 	verdicts := judgeHarnesses(ctx, otlpURL, projectID, root)
 	if !slices.Contains(selected, codexDesktopAgent) {
 		return verdicts
 	}
 	verdicts = slices.DeleteFunc(verdicts, func(v harnessVerdict) bool { return !slices.Contains(selected, v.name) })
-	return append(verdicts, judgeDesktop(projectID))
-}
-
-func selectedForRepo(projectID string, saved []string) []string {
-	selected := slices.Clone(saved)
-	if projectID == "" {
-		return selected
-	}
-	rec, ok, err := shim.LoadRecord(projectID)
-	if err != nil || !ok {
-		return selected
-	}
-	for _, choice := range []struct {
-		name    string
-		enabled bool
-	}{{shim.AgentCodex, rec.CLI}, {codexDesktopAgent, rec.Desktop}} {
-		if choice.enabled && !slices.Contains(selected, choice.name) {
-			selected = append(selected, choice.name)
-		} else if !choice.enabled {
-			selected = slices.DeleteFunc(selected, func(name string) bool { return name == choice.name })
-		}
-	}
-	return selected
-}
-
-func judgeDesktop(projectID string) harnessVerdict {
-	v := harnessVerdict{name: codexDesktopAgent, displayName: "Codex Desktop"}
-	route, ok, routeErr := shim.LoadRecord(projectID)
-	switch {
-	case routeErr != nil:
-		v.emissionProblem, v.emissionFix = "could not read this repository's Codex desktop route: "+routeErr.Error(), "terma install"
-	case !ok || !route.Desktop || !slices.Contains(route.Harnesses, shim.AgentCodex) || !slices.Contains(route.Signals, "logs"):
-		v.emissionProblem, v.emissionFix = "this repository has no Codex Desktop hook route", "terma install --signals logs"
-	case keystore.GetFor(shim.AgentCodex, projectID) == "":
-		v.emissionProblem, v.emissionFix = "this repository has no delivery key", "terma install"
-	default:
-		v.routed, v.live, v.route = true, true, routeLive
-	}
-	return v
+	h := harness.Codex{}
+	v := judgeHarness(gatherHarness(h, projectID, root), otlpURL, relayEndpointHere(), projectID)
+	v.name, v.displayName = codexDesktopAgent, "Codex Desktop"
+	return append(verdicts, v)
 }

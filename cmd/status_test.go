@@ -13,6 +13,7 @@ import (
 func TestHarnessState(t *testing.T) {
 	const otlp = "https://otel-dev.mirador.org"
 	const project = "6796a71f-7949-40f1-bde8-b87a74071686"
+	const relayAt = "http://127.0.0.1:14318"
 
 	cases := []struct {
 		name    string
@@ -43,18 +44,25 @@ func TestHarnessState(t *testing.T) {
 		{
 			name: "exporting to another project is not connected",
 			st:   harness.Status{Connected: true, Endpoint: otlp, ProjectID: "c970664b-ba35-4cdd-b7a9-d5acadb327f6"},
-			want: "→ reporting to project c970664b-ba35-4cdd-b7a9-d5acadb327f6, not this one — run `terma install`",
+			want: "→ reporting to project c970664b-ba35-4cdd-b7a9-d5acadb327f6, not this one — run `terma setup` to send each session to its repository's project",
 			ok:   false, project: project,
 		},
 		{
 			name: "another collector entirely",
 			st:   harness.Status{Connected: true, Endpoint: "https://otel.example.com", ProjectID: project},
-			want: "→ not connected", ok: false, project: project,
+			want: "→ not connected (run `terma setup`)", ok: false, project: project,
 		},
 		{
 			name: "not connected",
 			st:   harness.Status{},
-			want: "→ not connected", ok: false, project: project,
+			want: "→ not connected (run `terma setup`)", ok: false, project: project,
+		},
+		{
+			// The relay sends each session to its repository's project, so an agent
+			// pointed at it reports here whatever project its own file was set up with.
+			name: "through the relay",
+			st:   harness.Status{Connected: true, Endpoint: relayAt, Signals: harness.AllSignals},
+			want: "→ connected (through terma's relay)", ok: true, project: project,
 		},
 		{
 			name: "unreadable configuration",
@@ -65,7 +73,7 @@ func TestHarnessState(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got, ok := statusAgent(judgeHarness(harnessFacts{status: tc.st, err: tc.err}, otlp, tc.project), false)
+			got, ok := statusAgent(judgeHarness(harnessFacts{status: tc.st, err: tc.err}, otlp, relayAt, tc.project), false)
 			if got != tc.want || ok != tc.ok {
 				t.Fatalf("statusAgent = %q, %v; want %q, %v", got, ok, tc.want, tc.ok)
 			}

@@ -4,15 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"slices"
 
 	"github.com/spf13/cobra"
 
 	"github.com/miradorlabs/terma-cli/internal/adapter"
 	"github.com/miradorlabs/terma-cli/internal/harness"
-	"github.com/miradorlabs/terma-cli/internal/keystore"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
-	"github.com/miradorlabs/terma-cli/internal/shim"
 )
 
 func newDesktopCommand() *cobra.Command {
@@ -22,7 +19,9 @@ func newDesktopCommand() *cobra.Command {
 }
 
 func statusDesktop(cmd *cobra.Command, _ []string) error {
-	global, err := (harness.Codex{}).Status()
+	ctx := cmd.Context()
+	out := cmd.OutOrStdout()
+	cfg, err := loadConfig()
 	if err != nil {
 		return err
 	}
@@ -37,23 +36,18 @@ func statusDesktop(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
-	projectID := binding.Project.ID
-	route, ok, err := shim.LoadRecord(projectID)
-	if err != nil {
-		return err
+	// Codex Desktop reads Codex's own global configuration, so its export is judged
+	// exactly as the CLI's is.
+	v := judgeHarness(gatherHarness(harness.Codex{}, binding.Project.ID, root), cfg.OTLPURL, relayEndpointHere(), binding.Project.ID)
+	line, ready := statusAgent(v, true)
+	fmt.Fprintf(out, "Repository:    %s\n", binding.Project.ID)
+	fmt.Fprintf(out, "Export:        %s %s\n", yesNo(ready), line)
+	if v.route == routeRelay {
+		fmt.Fprintf(out, "Relay:         %s\n", relayCheck(ctx, []harnessVerdict{v}).Detail)
 	}
-	ready := ok && route.Desktop && slices.Contains(route.Signals, "logs") &&
-		slices.Contains(route.Harnesses, shim.AgentCodex) && keystore.GetFor(shim.AgentCodex, projectID) != ""
-	fmt.Fprintf(cmd.OutOrStdout(), "Repository:    %s\n", projectID)
-	fmt.Fprintf(cmd.OutOrStdout(), "Desktop route: %s\n", yesNo(ready))
-	if global.Connected {
-		fmt.Fprintln(cmd.OutOrStdout(), "Global export: on (may include other repositories)")
-	} else {
-		fmt.Fprintln(cmd.OutOrStdout(), "Global export: off")
-	}
-	if ok {
-		fmt.Fprintf(cmd.OutOrStdout(), "Prompt text:   %s\n", onOff(route.IncludePrompts))
-		fmt.Fprintf(cmd.OutOrStdout(), "Tool content:  %s\n", onOff(route.IncludeToolContent))
+	if st := v.status; st.Connected {
+		fmt.Fprintf(out, "Prompt text:   %s\n", onOff(st.IncludePrompts))
+		fmt.Fprintf(out, "Tool content:  %s\n", onOff(st.IncludeToolContent))
 	}
 	if codex, found := adapter.Lookup("codex"); found {
 		if trusting, found := codex.(adapter.Trusting); found {
@@ -61,9 +55,9 @@ func statusDesktop(cmd *cobra.Command, _ []string) error {
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Codex hooks:   %s\n", yesNo(trust.Trusted))
+			fmt.Fprintf(out, "Codex hooks:   %s\n", yesNo(trust.Trusted))
 			if !trust.Trusted && trust.Fix != "" {
-				fmt.Fprintf(cmd.OutOrStdout(), "Next:          %s\n", trust.Fix)
+				fmt.Fprintf(out, "Next:          %s\n", trust.Fix)
 			}
 		}
 	}

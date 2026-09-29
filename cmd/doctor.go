@@ -267,24 +267,6 @@ func installedBinaryDigest(path string) (string, error) {
 	return fileDigest(installedBinary(path))
 }
 
-// shimPathFix is what gets terma's shims ahead of the real binaries from here. `terma
-// install` writes the PATH line; when it is already written and still last, the shell
-// doctor runs in simply started before it, and no command fixes that.
-func shimPathFix() string {
-	rc, ok := shim.ShellRC()
-	if !ok {
-		shimDir, _ := shim.ShimBinDir()
-		return `put the shim directory first on PATH, as the last PATH line of your shell's startup file: export PATH="` + shimDir + `:$PATH"`
-	}
-	switch state, _ := rc.State(); state {
-	case shim.RCLast:
-		return "run `" + reloadCommand(tildePath(rc.Path)) + "` or open a new terminal — " + tildePath(rc.Path) + " already puts the shims first, and this shell started before it did"
-	case shim.RCOvertaken:
-		return "terma install (a later line in " + tildePath(rc.Path) + " puts the real binaries back in front; install moves terma's line to the end)"
-	}
-	return "terma install (it puts the shim directory on PATH in " + tildePath(rc.Path) + ")"
-}
-
 // addToPathCommand is the command a developer runs to put dir on PATH for good, in their
 // own shell: the line appended to the startup file terma knows for it and read into this
 // shell, or for fish, fish_add_path, which keeps the entry itself. A shell terma does not
@@ -301,6 +283,16 @@ func addToPathCommand(dir string) string {
 	}
 	file := shellPath(rc.Path)
 	return "echo '" + strings.ReplaceAll(line, "'", `'\''`) + "' >> " + file + " && " + reloadCommand(file)
+}
+
+// reloadCommand re-reads a startup file in the running shell: `source` where the shell
+// has it (zsh, bash, fish), the POSIX `.` otherwise.
+func reloadCommand(file string) string {
+	switch filepath.Base(os.Getenv("SHELL")) {
+	case "zsh", "bash", "fish":
+		return "source " + file
+	}
+	return ". " + file
 }
 
 // shellPath writes a path for a command line: ~/… when that needs no quoting, else the
@@ -403,8 +395,8 @@ func runDoctor(ctx context.Context, skipCommit bool, progress doctorProgress) do
 			return doctorCodexCompatibility(ctx)
 		})
 	}
-	timed(doctor.KeyRouting, "shell routing active", func() doctor.Check {
-		return shellRoutingCheck(d.harnesses, d.installed(), selectedForRepo(d.projectID, d.cfg.Harnesses))
+	timed(doctor.KeyRelay, "relay delivering", func() doctor.Check {
+		return relayCheck(ctx, d.harnesses)
 	})
 
 	// 5b. Status line: the payload Claude Code hands its status line carries the
@@ -560,7 +552,7 @@ func (d *doctorRun) agentHooks() doctor.Check {
 	if !d.installed() {
 		return doctor.Check{Status: doctor.Skip, Detail: "needs an installed repository"}
 	}
-	return agentHooksCheck(d.root, selectedForRepo(d.projectID, d.cfg.Harnesses))
+	return agentHooksCheck(d.root, d.cfg.Harnesses)
 }
 
 func (d *doctorRun) agentsExporting() doctor.Check {
@@ -872,7 +864,7 @@ func doctorStatusLineCheck(v statusLineVerdict) doctor.Check {
 
 // doctorHarnessCheck folds every agent's verdict into doctor's one export check. bound
 // says the CLI stands in an installed repository, the only place "this repository does
-// not route it" means anything.
+// not ask for it" means anything.
 func doctorHarnessCheck(verdicts []harnessVerdict, otlpURL, projectID string, bound bool) (check doctor.Check) {
 	// Count working agents independently of another agent's failure.
 	defer func() {
@@ -895,63 +887,50 @@ func doctorHarnessCheck(verdicts []harnessVerdict, otlpURL, projectID string, bo
 	if len(problems) > 0 {
 		return doctor.Check{Status: doctor.Fail, Detail: strings.Join(problems, "; "), Fix: strings.Join(fixes, "; ")}
 	}
-	var connected, installed, pendingShim, repoDecides, silent []string
+	var connected, installed, repoDecides, silent, elsewhere []string
 	for _, v := range verdicts {
 		installed = append(installed, v.displayName)
 		switch v.route {
 		case routeOtherProject:
-			return doctor.Check{Status: doctor.Fail, Detail: v.displayName + " reports to project " + v.otherProject + ", not " + projectID, Fix: "terma install"}
+			elsewhere = append(elsewhere, v.displayName+" reports to project "+v.otherProject)
+		case routeRelay:
+			connected = append(connected, v.displayName+" → terma's relay")
 		case routeLive:
-			connected = append(connected, v.displayName+" (per-repo)")
+			connected = append(connected, v.displayName+" (per-repo) → "+otlpURL)
 		case routeGlobal:
-			connected = append(connected, v.displayName)
-		case routePending:
-			pendingShim = append(pendingShim, v.displayName)
+			connected = append(connected, v.displayName+" → "+otlpURL)
 		case routeRepoDecides:
-			connected = append(connected, v.displayName)
+			connected = append(connected, v.displayName+" → "+exportTarget(v, otlpURL))
 			repoDecides = append(repoDecides, v.displayName)
 			// An agent that cannot carry a repository policy at all (Codex) cannot be
 			// asked for by one either, so it is as silent here as one whose repository
-			// simply has none. doctor used to skip it and report "this repository asks"
-			// for a config status said sent nothing.
+			// simply has none.
 			if !v.repoAsks {
 				silent = append(silent, v.displayName)
 			}
 		}
 	}
 	if len(installed) == 0 {
-		return doctor.Check{Status: doctor.Fail, Detail: "no coding agent found (Claude Code, Codex, OpenCode)", Fix: "install one, then terma install"}
+		return doctor.Check{Status: doctor.Fail, Detail: "no coding agent found (Claude Code, Codex, OpenCode)", Fix: "install one, then terma setup"}
 	}
-	// Routing configured but not on PATH is the honest "looks set up, sends nothing
-	// yet" case — the exact gap that made doctor report a repo as fine while its
-	// sessions used the global config. Surfaced with the fix that actually activates it.
-	if len(pendingShim) > 0 {
-		detail := "per-repo routing for " + strings.Join(pendingShim, ", ") + " is configured, but terma's shim directory is not ahead of the agent on your PATH — sessions still use the machine-wide config"
-		if len(connected) > 0 {
-			detail = strings.Join(connected, ", ") + " → " + otlpURL + "; " + detail
-		}
-		status := doctor.Warn
-		fix := shimPathFix()
-		if len(connected) == 0 {
-			status = doctor.Fail
-		}
-		if bound && len(silent) > 0 {
-			status = doctor.Fail
-			detail += "; " + strings.Join(silent, ", ") + " sessions here send nothing because no repository telemetry policy enables their exporters"
-			fix += "; terma install to enable the missing repository policy"
-		}
-		return doctor.Check{Status: status, Detail: detail, Fix: fix, NeedsShellActivationOnly: !bound || len(silent) == 0}
+	if len(elsewhere) > 0 {
+		// Exporting straight to Terma with the machine project's key: the spend is
+		// real, and lands in another project. The relay is what sends each session to
+		// its own repository's project.
+		return doctor.Check{Status: doctor.Warn,
+			Detail: strings.Join(elsewhere, "; ") + ", not this repository's project " + projectID,
+			Fix:    "terma setup (the relay sends each session to its repository's project)"}
 	}
 	if len(connected) == 0 {
-		return doctor.Check{Status: doctor.Fail, Detail: strings.Join(installed, ", ") + " installed but not exporting to " + otlpURL, Fix: "terma install"}
+		return doctor.Check{Status: doctor.Fail, Detail: strings.Join(installed, ", ") + " installed but not exporting to Terma", Fix: "terma setup"}
 	}
-	detail := strings.Join(connected, ", ") + " → " + otlpURL
+	detail := strings.Join(connected, ", ")
 	if len(repoDecides) == 0 {
 		return doctor.Check{Status: doctor.Pass, Detail: detail}
 	}
-	// A globally-connected-but-silent harness that this repository neither routes nor
-	// carries a committed policy for is the one case worth a word — and only in the
-	// repository the developer is standing in.
+	// A connected-but-silent harness that this repository carries no committed policy
+	// for is the one case worth a word — and only in the repository the developer is
+	// standing in.
 	qualifier := "only where a repository asks"
 	if len(repoDecides) < len(connected) {
 		qualifier = strings.Join(repoDecides, ", ") + ": " + qualifier
@@ -965,9 +944,17 @@ func doctorHarnessCheck(verdicts []harnessVerdict, otlpURL, projectID string, bo
 	}
 	return doctor.Check{
 		Status: doctor.Fail,
-		Detail: detail + "; this repository does not route " + strings.Join(silent, ", ") + " to its project, so its sessions send nothing",
-		Fix:    "terma install",
+		Detail: detail + "; " + strings.Join(silent, ", ") + map[bool]string{true: " exports", false: " export"}[len(silent) == 1] + " no signal, so sessions here send nothing",
+		Fix:    "terma setup --signals traces,logs,metrics",
 	}
+}
+
+// exportTarget names where an agent's global configuration points.
+func exportTarget(v harnessVerdict, otlpURL string) string {
+	if strings.TrimRight(v.status.Endpoint, "/") == strings.TrimRight(otlpURL, "/") {
+		return otlpURL
+	}
+	return "terma's relay"
 }
 
 // roundTripWait bounds how long doctor waits for the scratch commit to be readable

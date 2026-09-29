@@ -71,8 +71,13 @@ func TestRefreshMigratesSavedState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("refresh: %v\n%s", err, out)
 	}
-	if !strings.Contains(out, "Migrated saved state: route Codex CLI") || !routesCodexCLI(t) {
+	// The record is migrated first, and then — per-repository routing being gone —
+	// taken away with the rest of it.
+	if !strings.Contains(out, "Migrated saved state: route Codex CLI") || !strings.Contains(out, "per-repository routing (removed)") {
 		t.Fatalf("output:\n%s", out)
+	}
+	if _, ok, _ := shim.LoadRecord(testProjectID); ok {
+		t.Fatal("the routing record survived the refresh")
 	}
 	if out, _ := runTerma(t, "update", "--refresh"); strings.Contains(out, "Migrated") {
 		t.Fatalf("a second refresh migrated again:\n%s", out)

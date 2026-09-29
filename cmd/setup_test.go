@@ -18,7 +18,7 @@ func TestSetupRecordsCodexDesktopSeparatelyFromCLI(t *testing.T) {
 	if _, err := auth.SaveCredential(config.DefaultProfile, storedSession(gateway, orgA())); err != nil {
 		t.Fatal(err)
 	}
-	out, err := runTerma(t, "setup", "--harness", "codex-desktop")
+	out, err := runTerma(t, "setup", "--harness", "codex-desktop", "--project", "Acme Web")
 	if err != nil {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}

@@ -15,14 +15,26 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/adapter"
 	"github.com/miradorlabs/terma-cli/internal/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/prompt"
+	"github.com/miradorlabs/terma-cli/internal/spinner"
 	"github.com/miradorlabs/terma-cli/internal/style"
 )
 
 type setupFlags struct {
-	harnesses string
-	noBrowser bool
-	assumeYes bool
+	harnesses  string
+	noBrowser  bool
+	assumeYes  bool
+	projectRef string
+	noRelay    bool
+	// The export choices, recorded machine-wide.
+	signals            string
+	prompts            string
+	excludeToolContent bool
+	identity           string
+	noStatusLine       bool
+	force              bool
+	verbose            bool
 }
 
 const codexDesktopAgent = "codex-desktop"
@@ -45,23 +57,41 @@ func newSetupCommand() *cobra.Command {
 	var f setupFlags
 	cmd := &cobra.Command{
 		Use:   "setup",
-		Short: "Sign in and choose your coding agents (once per developer)",
-		Long: `Gets this machine ready to use terma. It does two things and nothing more —
-no project, no telemetry configuration, no files touched:
+		Short: "Sign in, choose your coding agents and configure their telemetry (once per machine)",
+		Long: `Gets this machine ready to use terma:
 
   1. Signs you in (a browser handoff; --no-browser prints the URL instead).
   2. Records which coding agents you work with (including Codex CLI and Codex
      desktop separately), so ` + "`terma install`" + ` never has to ask again.
+  3. Picks this machine's project (--project names it): where sessions in a
+     repository that is not bound to a project report.
+  4. Configures each agent's telemetry once, machine-wide, in its own global
+     settings file: every launcher — the CLI, Codex Desktop, Claude Desktop —
+     reads it. The agents export to terma's relay on this machine, which sends
+     each session to the project of the repository it ran in; --no-relay (or a
+     platform without launchd or systemd) exports straight to Terma instead,
+     every session to this machine's project. Prompt text and model responses
+     are sent unless --prompts off.
 
-setup is optional: ` + "`terma install`" + ` signs you in and asks for your agents itself
-when you have not run it. The real configuration — pointing an agent at a project,
-wiring the hooks — happens per repository, in ` + "`terma install`" + `.`,
+` + "`terma install`" + ` then binds each repository to its project and wires the hooks that
+stamp commits. Run setup again to change a choice; it rewrites the agents' settings
+from the choices it recorded.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error { return runSetup(cmd, f) },
 	}
-	cmd.Flags().StringVar(&f.harnesses, "harness", "", "comma-separated agents to record ("+strings.Join(availableAgentNames(), ", ")+"); default: a picker")
-	cmd.Flags().BoolVar(&f.noBrowser, "no-browser", false, "print the sign-in URL instead of opening a browser")
-	cmd.Flags().BoolVarP(&f.assumeYes, "yes", "y", false, "skip the browser prompt and picker; record every available installed agent")
+	fl := cmd.Flags()
+	fl.StringVar(&f.harnesses, "harness", "", "comma-separated agents to record ("+strings.Join(availableAgentNames(), ", ")+"); default: a picker")
+	fl.BoolVar(&f.noBrowser, "no-browser", false, "print the sign-in URL instead of opening a browser")
+	fl.BoolVarP(&f.assumeYes, "yes", "y", false, "skip the browser prompt and pickers; record every available installed agent and keep the recorded project")
+	fl.StringVar(&f.projectRef, "project", "", "this machine's Terma project (name or id)")
+	fl.BoolVar(&f.noRelay, "no-relay", false, "export straight to Terma, every session to this machine's project, instead of through terma's relay")
+	fl.StringVar(&f.prompts, "prompts", "", "send prompt text and model responses: on or off (default: the recorded choice, on at first)")
+	fl.StringVar(&f.signals, "signals", "", "comma-separated signals to export: traces, logs, metrics (default all)")
+	fl.BoolVar(&f.excludeToolContent, "exclude-tool-content", false, "do not export tool parameters, input, or output")
+	fl.StringVar(&f.identity, "identity", "", "identity stamped on Codex sessions (default: git user.email; \"none\" to omit)")
+	fl.BoolVar(&f.noStatusLine, "no-statusline", false, "do not wrap Claude Code's status line (which captures the plan's rate-limit windows)")
+	fl.BoolVar(&f.force, "force", false, "replace another collector's settings in an agent's global configuration")
+	fl.BoolVarP(&f.verbose, "verbose", "v", false, "show what each step wrote")
 	return cmd
 }
 
@@ -80,13 +110,19 @@ func runSetup(cmd *cobra.Command, f setupFlags) error {
 	if cfg.APIKey != "" {
 		return errors.New("TERMA_API_KEY is set — setup signs in as a person; unset it first")
 	}
+	// The export choices, before anything is written: a bad flag must not leave a
+	// signed-in machine with half a configuration.
+	t := cfg.Telemetry
+	if err := applySetupFlags(cmd, &t, f); err != nil {
+		return err
+	}
 
 	// 1. Sign in — reusing the session this machine already has, verified.
 	if cfg, err = signInAndReload(cmd, cfg, signInOptions{noBrowser: f.noBrowser, pauseBeforeBrowser: !f.assumeYes}); err != nil {
 		return err
 	}
 
-	// 2. Which agents this developer uses. A machine-level preference, not a connection.
+	// 2. Which agents this developer uses.
 	fmt.Fprintln(out)
 	names, err := chooseHarnesses(cmd, cfg, f)
 	if errors.Is(err, errCancelled) {
@@ -99,17 +135,83 @@ func runSetup(cmd *cobra.Command, f setupFlags) error {
 	if err := config.UpdateProfile(cfg.ProfileName, func(p *config.Profile) { p.Harnesses = names }); err != nil {
 		return err
 	}
+	cfg.Harnesses = names
 
+	ui := newInstallUI(out, f.verbose)
+	ui.done, ui.loud = "terma set up", true
 	if len(names) == 0 {
-		fmt.Fprintln(out, "\nNo agents recorded. `terma install` will ask you to pick some in each repository.")
+		ui.summary("Agents", "none recorded — `terma install` asks in each repository")
 	} else {
-		fmt.Fprintf(out, "\nAgents recorded: %s.\n", joinNames(adapterDisplayNames(names)))
+		ui.summary("Agents", joinNames(adapterDisplayNames(names)))
+	}
+
+	// 3 and 4. The machine project, and each agent's global telemetry configuration.
+	if len(machineAgents(names)) > 0 {
+		project, err := chooseMachineProject(cmd, cfg, f.projectRef, !f.assumeYes && canPrompt(), config.ProjectRef{})
+		if errors.Is(err, errCancelled) {
+			fmt.Fprintln(out, "Cancelled. Agents were recorded; their telemetry was not configured.")
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		t.Project = project
+		ui.summary("Project", nameOrID(project.Name, project.ID)+" — for sessions in a repository with no project of its own")
+		sp := spinner.New(cmd.ErrOrStderr())
+		sp.Start("Configuring your agents' telemetry…")
+		res, err := configureMachineTelemetry(cmd.Context(), cmd.ErrOrStderr(), cfg, names, t, machineOptions{force: f.force, noStatusLine: f.noStatusLine})
+		sp.Stop()
+		if err != nil {
+			return err
+		}
+		printMachineResult(ui, res)
+		if res.telemetry.ExcludePrompts {
+			ui.summary("Prompts", "prompt text and model responses are not sent — `terma setup --prompts on` sends them")
+		} else {
+			ui.summary("Prompts", "prompt text and model responses are sent — `terma setup --prompts off` stops them")
+		}
+	}
+	if removed, err := cleanupLegacyRouting(); err != nil {
+		ui.warn("Cleanup", "could not remove the old per-repository routing ("+err.Error()+")")
+		ui.then("Run `terma shim uninstall` to remove it.")
+	} else if removed {
+		ui.summary("Cleanup", "removed the old per-repository routing (PATH shims, routing records)")
 	}
 	if slices.Contains(names, codexDesktopAgent) {
-		fmt.Fprintln(out, "Codex Desktop: after `terma install` in a repository, open Settings → Hooks → Review in Codex Desktop and approve Terma's hooks.")
+		ui.then("Codex Desktop: after `terma install` in a repository, open Settings → Hooks → Review in Codex Desktop and approve Terma's hooks.")
 	}
-	fmt.Fprintf(out, "\n%s Now run `terma install` in each codebase you want to instrument with terma.\n",
-		style.For(out).Bold("Done!"))
+	ui.then("Run `terma install` in each codebase you want to instrument with terma.")
+	ui.finish()
+	return nil
+}
+
+// applySetupFlags folds setup's export flags into the machine's recorded choices.
+func applySetupFlags(cmd *cobra.Command, t *config.Telemetry, f setupFlags) error {
+	flags := cmd.Flags()
+	switch p := strings.ToLower(strings.TrimSpace(f.prompts)); p {
+	case "on":
+		t.ExcludePrompts = false
+	case "off":
+		t.ExcludePrompts = true
+	case "":
+	default:
+		return fmt.Errorf("--prompts %q: want on or off", f.prompts)
+	}
+	if flags.Changed("signals") {
+		if _, err := harness.ParseSignals(f.signals); err != nil {
+			return err
+		}
+		t.Signals = f.signals
+	}
+	if flags.Changed("exclude-tool-content") {
+		t.ExcludeToolContent = f.excludeToolContent
+	}
+	if flags.Changed("identity") {
+		t.Identity = f.identity
+	}
+	if flags.Changed("no-relay") {
+		t.NoRelay = f.noRelay
+	}
 	return nil
 }
 

@@ -8,26 +8,27 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/shim"
 )
 
-// newShimCommand groups the internal per-repo routing entry points. `prepare` is what a
-// PATH shim or an opt-in shell wrapper calls before it execs the agent; `uninstall`
-// tears down per-repo routing machine-wide (the PATH shims, routing records, and
-// per-project Claude settings).
+// newShimCommand groups what is left of per-repository routing, which terma no longer
+// does. `prepare` and `exec` answer a PATH shim or shell wrapper an earlier terma
+// installed, starting the agent unchanged; `uninstall` removes all of it (the PATH shims
+// and the block in the shell's startup file, routing records, per-project Claude
+// settings), as setup, install and a refresh also do.
 func newShimCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:    "shim",
-		Short:  "Per-repository agent routing (internal)",
+		Short:  "Remove the per-repository routing earlier versions installed (internal)",
 		Hidden: true,
 	}
 	cmd.AddCommand(newShimPrepareCommand(), newShimExecCommand(), newShimUninstallCommand(), newShimStatusCommand())
 	return cmd
 }
 
-// newShimExecCommand runs the real agent binary with per-repo routing applied. Flag
-// parsing is disabled so the agent's own flags pass through untouched.
+// newShimExecCommand runs the real agent binary, unchanged. Flag parsing is disabled so
+// the agent's own flags pass through untouched.
 func newShimExecCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:                "exec <agent> [-- args...]",
-		Short:              "Run an agent with this repository's Terma project applied",
+		Short:              "Run an agent (what an old shim calls)",
 		Args:               cobra.MinimumNArgs(1),
 		DisableFlagParsing: true,
 		RunE: func(_ *cobra.Command, args []string) error {
@@ -46,7 +47,7 @@ func newShimExecCommand() *cobra.Command {
 func newShimUninstallCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "uninstall",
-		Short: "Remove per-repo routing from this machine (shims, routing records, Claude settings)",
+		Short: "Remove the per-repository routing earlier versions installed (shims, routing records, Claude settings)",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := shim.RemoveAll(); err != nil {
@@ -79,7 +80,8 @@ func newShimStatusCommand() *cobra.Command {
 	}
 }
 
-// Preparation never starts the agent. The shell retains responsibility for execution.
+// Preparation never starts the agent: an old shim asks it for arguments to add, and the
+// answer is none.
 func newShimPrepareCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:                "prepare <agent> <directory> [-- args...]",

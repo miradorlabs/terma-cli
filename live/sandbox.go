@@ -74,9 +74,8 @@ type Sandbox struct {
 	ExcludeContent bool
 
 	claudeConnected, codexConnected bool
-	// claudeRouted says Claude exports through the per-repository route `terma install`
-	// sets up (RouteClaude), so a run launches it through terma's shim and never
-	// connects it machine-wide.
+	// claudeRouted says `terma install` configured Claude Code (RouteClaude), so a run
+	// never connects it itself.
 	claudeRouted bool
 }
 
@@ -209,10 +208,12 @@ func (sb *Sandbox) connectHarness(name string) {
 }
 
 // RouteClaude points Claude Code at the receiver the way `terma install` does for a
-// developer, instead of a machine-wide connect: a per-repository route that terma's
-// shim hands Claude as --settings. With ExcludeContent it passes the switches install
-// offers (`--prompts off`, `--exclude-tool-content`); without, it passes none, so the
-// route carries install's own default. install with an agent needs a key it can reuse and
+// developer who never ran `terma setup`: install configures Claude Code machine-wide, in
+// its own user settings, with this repository's project as the machine's. --no-relay
+// keeps it exporting straight to the receiver (the relay is a machine service a test
+// sandbox must not install). With ExcludeContent it passes the switches install still
+// takes (`--prompts off`, `--exclude-tool-content`); without, it passes none, so the
+// configuration carries the default. install with an agent needs a key it can reuse and
 // the project its server key belongs to. The key comes from a connect that is then
 // undone — disconnect keeps it, as it does for a developer moving between repositories —
 // and the project from a stand-in for the API gateway's /v1/identity, the one request a
@@ -220,7 +221,7 @@ func (sb *Sandbox) connectHarness(name string) {
 func (sb *Sandbox) RouteClaude() {
 	sb.T.Helper()
 	if sb.Mode != Isolated {
-		sb.T.Fatal("RouteClaude needs an isolated sandbox: real-login runs pass their own --settings, which the shim leaves alone")
+		sb.T.Fatal("RouteClaude needs an isolated sandbox: real-login runs pass their own --settings")
 	}
 	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/identity" {
@@ -233,12 +234,12 @@ func (sb *Sandbox) RouteClaude() {
 	sb.T.Cleanup(api.Close)
 	sb.terma(sb.Repo, "connect", "claude", "--project", sb.ProjectID, "--api-key", liveKey, "--yes", "--otlp-url", sb.Receiver.URL())
 	sb.terma(sb.Repo, "disconnect", "claude", "--yes")
-	// Nothing machine-wide may export any more, or a pass would not say the route works.
+	// Nothing may export any more, or a pass would not say install's configuration works.
 	if user, err := os.ReadFile(filepath.Join(sb.ClaudeConfig, "settings.json")); err == nil &&
 		(bytes.Contains(user, []byte("OTEL_EXPORTER_OTLP_ENDPOINT")) || bytes.Contains(user, []byte("CLAUDE_CODE_ENABLE_TELEMETRY"))) {
 		sb.T.Fatalf("disconnect left Claude exporting machine-wide:\n%s", user)
 	}
-	args := []string{"install", "--project", sb.ProjectID, "--harness", "claude", "--yes", "--no-browser", "--no-doctor"}
+	args := []string{"install", "--project", sb.ProjectID, "--harness", "claude", "--no-relay", "--yes", "--no-browser", "--no-doctor"}
 	if sb.ExcludeContent {
 		args = append(args, "--prompts", "off", "--exclude-tool-content")
 	}
@@ -253,12 +254,9 @@ func (sb *Sandbox) ensureClaudeExport() {
 	}
 }
 
-// claudeLauncher is what a run starts: the build under test, or terma's shim for it
-// when the scenario routed Claude — the shim finds that build on PATH itself.
+// claudeLauncher is what a run starts: the build under test. terma no longer puts a
+// launcher in front of it; install configures Claude Code in its own settings.
 func (sb *Sandbox) claudeLauncher() string {
-	if sb.claudeRouted {
-		return filepath.Join(sb.TermaConfig, "shim", "bin", "claude")
-	}
 	return sb.Claude.Path
 }
 

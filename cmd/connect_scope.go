@@ -1,13 +1,10 @@
 package cmd
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -377,115 +374,4 @@ func describeShipment(st harness.Status) string {
 		signals = joinSignals(st.Signals)
 	}
 	return fmt.Sprintf("%s; prompts %s; tool content %s", signals, onOff(st.IncludePrompts), onOff(st.IncludeToolContent))
-}
-
-// repoPolicyHarnesses is the subset of an install's adapters whose harness reads a
-// repository's own export policy. Cursor and Codex are wired for hooks and nothing
-// else: Cursor has no local OTLP exporter policy, and Codex ignores an otel table
-// in a project's config.
-func repoPolicyHarnesses(adapters []string) []harness.Harness {
-	var out []harness.Harness
-	for _, a := range adapters {
-		h, err := harness.Lookup(a)
-		if err != nil {
-			continue
-		}
-		if _, ok := h.(harness.Scoped); ok {
-			out = append(out, h)
-		}
-	}
-	return out
-}
-
-// writeRepoPolicy writes each harness's repository-scope export policy: what this
-// repository's sessions ship. No endpoint, no key, no identity — those belong to the
-// developer's own settings, which is what keeps this file safe to commit.
-//
-// A conflict here is reported and skipped rather than fatal: the hooks and the binding
-// are already written by this point, and failing the whole install over one harness's
-// pre-existing OTLP settings would leave the repository half-onboarded for no gain.
-func writeRepoPolicy(
-	ctx context.Context,
-	ui *installUI,
-	root string,
-	cfg *config.Config,
-	hs []harness.Harness,
-	f installFlags,
-) ([]string, error) {
-	signals, err := harness.ParseSignals(f.signals)
-	if err != nil {
-		return nil, err
-	}
-	var written []string
-	for _, h := range hs {
-		scoped, ok := h.(harness.Scoped)
-		if !ok {
-			continue
-		}
-		local := scoped.Local(root)
-		status, err := local.Status()
-		if err != nil {
-			return nil, err
-		}
-		if status.HasPolicy && !f.updatePolicy {
-			continue
-		}
-		intended := harness.Exporter{
-			// Carried, never written: an outranking per-signal redirect has to be
-			// judged against where the export actually goes.
-			Endpoint:           cfg.OTLPURL,
-			Signals:            signals,
-			IncludePrompts:     !f.excludePrompts,
-			IncludeToolContent: !f.excludeToolContent,
-		}
-		conflicts, err := local.ConflictsWith(intended)
-		if err != nil {
-			return nil, err
-		}
-		conflicts, _ = partitionConflicts(conflicts)
-		if len(conflicts) > 0 {
-			ui.warn("Repo policy", fmt.Sprintf("%s skipped — this repository already has OTLP settings for it (%s)",
-				h.DisplayName(), output.SanitizeTerminal(strings.Join(conflictKeys(conflicts), ", "))))
-			ui.then(fmt.Sprintf("Resolve %s's OTLP settings in this repository, then run `terma connect %s --scope local` here.", h.DisplayName(), h.Name()))
-			continue
-		}
-		path, err := local.ConfigPath()
-		if err != nil {
-			return nil, err
-		}
-		before, err := os.ReadFile(path)
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
-			return nil, err
-		}
-		if err := local.Connect(intended, false); err != nil {
-			return nil, fmt.Errorf("write %s repository policy: %w", h.Name(), err)
-		}
-		after, err := os.ReadFile(path)
-		if err != nil {
-			return nil, err
-		}
-		if !bytes.Equal(before, after) {
-			rel, err := filepath.Rel(root, path)
-			if err != nil {
-				return nil, err
-			}
-			written = append(written, rel)
-		}
-		fmt.Fprintf(ui.detail, "\nWrote %s's repository policy to %s.\n", h.DisplayName(), path)
-		rel, err := filepath.Rel(root, path)
-		if err != nil {
-			rel = path
-		}
-		ui.ok("Repo policy", h.DisplayName()+" telemetry settings in "+rel)
-	}
-	return written, nil
-}
-
-// conflictKeys names the settings in the way a reader can go and find them.
-func conflictKeys(conflicts []harness.Conflict) []string {
-	out := make([]string, 0, len(conflicts))
-	for _, c := range conflicts {
-		out = append(out, c.Key)
-	}
-	return out
 }

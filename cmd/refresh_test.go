@@ -31,6 +31,28 @@ func sandboxMachine(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
+	t.Setenv("SHELL", "/bin/zsh")
+	t.Setenv("ZDOTDIR", "")
+}
+
+// leaveOldShims leaves what per-repository routing installed on a machine: a PATH shim,
+// and the routing record beside it. It returns the shim directory.
+func leaveOldShims(t *testing.T) string {
+	t.Helper()
+	binDir, err := shim.ShimBinDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(binDir, shim.AgentCodex), []byte("#!/bin/sh\n# terma per-repo routing shim for codex.\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := shim.SaveRecord(shim.Record{ProjectID: testProjectID, Harnesses: []string{shim.AgentCodex}, CLI: true}); err != nil {
+		t.Fatal(err)
+	}
+	return binDir
 }
 
 // A refresh brings the repository's committed hooks up to this build from what its
@@ -102,31 +124,40 @@ func TestRefreshUpdatesTheRepositoryFromItsBinding(t *testing.T) {
 	}
 }
 
-// Outside a repository a refresh still updates the machine's files, and says where the
-// committed ones get theirs.
+// Outside a repository a refresh still updates the machine — here, taking away the
+// per-repository routing an earlier terma installed — and says where the committed
+// files get theirs.
 func TestRefreshOutsideARepositoryRefreshesTheMachine(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	sandboxMachine(t)
 	t.Chdir(t.TempDir())
-	binDir, err := shim.InstallShims([]string{shim.AgentClaude})
-	if err != nil {
-		t.Fatal(err)
-	}
-	claude := filepath.Join(binDir, shim.AgentClaude)
-	current, _ := os.ReadFile(claude)
-	if err := os.WriteFile(claude, append(bytes.Clone(current), "# an earlier build\n"...), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	binDir := leaveOldShims(t)
 
 	out, err := runTerma(t, "update", "--refresh")
 	if err != nil {
 		t.Fatalf("refresh: %v\n%s", err, out)
 	}
-	if !strings.Contains(out, "updated "+claude) || !strings.Contains(out, "inside each repository") {
+	if !strings.Contains(out, "per-repository routing (removed)") || !strings.Contains(out, "inside each repository") {
 		t.Fatalf("output:\n%s", out)
 	}
-	if got, _ := os.ReadFile(claude); !bytes.Equal(got, current) {
-		t.Fatalf("shim not refreshed:\n%s", got)
+	if _, err := os.Stat(binDir); !os.IsNotExist(err) {
+		t.Fatalf("the shims survived a refresh: %v", err)
+	}
+}
+
+// A refresh restarts terma's relay, so the build it just installed is the one serving;
+// with no relay service there is nothing to restart.
+func TestRefreshRestartsTheRelay(t *testing.T) {
+	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	sandboxMachine(t)
+	t.Chdir(t.TempDir())
+	r := fakeRelay(t)
+	if out, err := runTerma(t, "update", "--refresh"); err != nil || r.restarts != 0 {
+		t.Fatalf("no relay installed: restarts=%d err=%v\n%s", r.restarts, err, out)
+	}
+	r.installed = "/usr/local/bin/terma"
+	if out, err := runTerma(t, "update", "--refresh"); err != nil || r.restarts != 1 {
+		t.Fatalf("relay installed: restarts=%d err=%v\n%s", r.restarts, err, out)
 	}
 }
 
@@ -309,15 +340,7 @@ func TestRefreshAfterUpgradeRunsOncePerRelease(t *testing.T) {
 	if err := os.WriteFile(settings, stale, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	binDir, err := shim.InstallShims([]string{shim.AgentCodex})
-	if err != nil {
-		t.Fatal(err)
-	}
-	codex := filepath.Join(binDir, shim.AgentCodex)
-	current, _ := os.ReadFile(codex)
-	if err := os.WriteFile(codex, append(bytes.Clone(current), "# an earlier build\n"...), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	binDir := leaveOldShims(t)
 
 	original := Version
 	Version = "9.9.9"
@@ -328,8 +351,8 @@ func TestRefreshAfterUpgradeRunsOncePerRelease(t *testing.T) {
 	if !strings.Contains(out.String(), "refreshed 1 file(s)") || !strings.Contains(out.String(), "`terma update --refresh` here") {
 		t.Fatalf("output:\n%s", &out)
 	}
-	if got, _ := os.ReadFile(codex); !bytes.Equal(got, current) {
-		t.Fatal("shim not refreshed")
+	if _, err := os.Stat(binDir); !os.IsNotExist(err) {
+		t.Fatalf("the old shims survived: %v", err)
 	}
 	if got, _ := os.ReadFile(settings); !bytes.Equal(got, stale) {
 		t.Fatal("an automatic refresh rewrote a committed file")
@@ -343,8 +366,9 @@ func TestRefreshAfterUpgradeRunsOncePerRelease(t *testing.T) {
 }
 
 // The first install under a newer release refreshes what earlier versions wrote on the
-// machine before it verifies anything, says so as a step, and records it — so the
-// refresh that follows an interactive command has nothing left to do.
+// machine before it verifies anything and records it — so the refresh that follows an
+// interactive command has nothing left to do. The old per-repository routing is one of
+// those things, and install says it took it away.
 func TestInstallRefreshesTheMachineOnANewRelease(t *testing.T) {
 	installRepo(t)
 	sandboxMachine(t)
@@ -357,24 +381,16 @@ func TestInstallRefreshesTheMachineOnANewRelease(t *testing.T) {
 		return out
 	}
 	install()
-	binDir, err := shim.InstallShims([]string{shim.AgentCodex})
-	if err != nil {
-		t.Fatal(err)
-	}
-	codex := filepath.Join(binDir, shim.AgentCodex)
-	current, _ := os.ReadFile(codex)
-	if err := os.WriteFile(codex, append(bytes.Clone(current), "# an earlier build\n"...), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	binDir := leaveOldShims(t)
 
 	original := Version
 	Version = "9.9.9"
 	t.Cleanup(func() { Version = original })
-	if out := install(); !strings.Contains(out, "✓ Refreshed     1 file(s) an earlier terma installed") {
-		t.Fatalf("install should refresh the machine as a step:\n%s", out)
+	if out := install(); !strings.Contains(out, "removed the old per-repository routing") {
+		t.Fatalf("install should take the old routing away as a step:\n%s", out)
 	}
-	if got, _ := os.ReadFile(codex); !bytes.Equal(got, current) {
-		t.Fatal("shim not refreshed")
+	if _, err := os.Stat(binDir); !os.IsNotExist(err) {
+		t.Fatalf("the old shims survived: %v", err)
 	}
 	var after bytes.Buffer
 	refreshAfterUpgrade(context.Background(), os.Getenv("TERMA_CONFIG_DIR"), &after)

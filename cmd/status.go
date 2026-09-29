@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 	"time"
 
@@ -17,65 +16,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/output"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/session"
-	"github.com/miradorlabs/terma-cli/internal/shim"
 	"github.com/miradorlabs/terma-cli/internal/style"
 )
-
-// routedPerRepo reports whether per-repo routing is *configured* for a harness and
-// project — a routing record that names it, plus a stored key. It does not check that
-// the delivery mechanism is actually live; see perRepoLive. Configured-but-not-live is a
-// real state (the shims are installed but their directory is not yet on PATH), and
-// treating it as "connected" is exactly the lie that made doctor report a repo as fine
-// while its sessions still used the global config.
-func routedPerRepo(name, projectID string) bool {
-	if projectID == "" {
-		return false
-	}
-	// OpenCode routes itself: a per-repo plugin plus this project's key means a session
-	// here reports to this project, even though the plugin file names no fixed project.
-	if name == "opencode" {
-		if keystore.GetFor("opencode", projectID) == "" {
-			return false
-		}
-		st, err := (harness.OpenCode{}).Status()
-		return err == nil && st.Exists
-	}
-	if !shim.Routable(name) {
-		return false
-	}
-	rec, ok, err := shim.LoadRecord(projectID)
-	if err != nil || !ok {
-		return false
-	}
-	if slices.Contains(rec.Harnesses, name) {
-		return keystore.GetFor(name, projectID) != ""
-	}
-	return false
-}
-
-// repoAsks reports whether the repository at root carries a committed policy that switches
-// a harness's signals on. It is the other half of a machine-wide connect made with
-// `--exports repos`: that connect holds the endpoint and the key and exports nothing, so
-// whether a session here sends anything is this file's decision.
-func repoAsks(h harness.Harness, root string) bool {
-	scoped, ok := h.(harness.Scoped)
-	if !ok || root == "" {
-		return false
-	}
-	st, err := scoped.Local(root).Status()
-	return err == nil && len(st.Signals) > 0
-}
-
-// perRepoLive reports whether a configured harness's per-repo routing actually fires for
-// a session started now. OpenCode's plugin routes on its own; the shim-delivered agents
-// (Claude Code, Codex) route only when their name resolves to terma's shim — the shim
-// directory ahead of the real binary on PATH — or the shell wrapper is loaded.
-func perRepoLive(name string) bool {
-	if name == "opencode" {
-		return true
-	}
-	return shim.Active(name)
-}
 
 // statusHooks is status's wording for the commit-hook verdict, and whether commit
 // stamping counts toward coverage. A plan that could not be computed is not "nothing
@@ -97,51 +39,35 @@ func statusHooks(w hookWiring) (string, bool) {
 }
 
 // statusAgent describes one agent in a line, and reports whether its spend actually
-// reaches this project. Exporting to the right host but the wrong project is the case
-// worth spelling out: everything looks wired, and none of the spend arrives. `terma
-// doctor` fails on it, so status must not call it connected. bound says the CLI
-// stands in an installed repository.
+// reaches this project. Exporting to Terma but to another project is the case worth
+// spelling out: everything looks wired, and none of the spend arrives. bound says the
+// CLI stands in an installed repository.
 func statusAgent(v harnessVerdict, bound bool) (string, bool) {
 	if v.emissionProblem != "" {
 		return "→ " + v.emissionProblem + " — " + v.emissionFix, false
 	}
-	const pending = "→ per-repo routing configured, but terma's shim is not ahead of it on your PATH"
 	switch v.route {
-	case routeLive:
-		// Only call it connected when the routing actually fires. The machine-wide
-		// config already delivering here is the plainer thing to say when it does.
-		if v.sendsGlobally {
-			return "→ connected", true
-		}
-		return "→ connected (per-repo routing)", true
+	case routeRelay:
+		return "→ connected (through terma's relay)", true
 	case routeGlobal:
 		return "→ connected", true
-	case routePending:
-		return pending, false
+	case routeLive:
+		return "→ connected (per-repo)", true
 	case routeOtherProject:
-		if v.routed {
-			return pending, false
-		}
-		return "→ reporting to project " + v.otherProject + ", not this one — run `terma install`", false
+		return "→ reporting to project " + v.otherProject + ", not this one — run `terma setup` to send each session to its repository's project", false
 	case routeRepoDecides:
-		// A machine-wide connect that exports no signal of its own is "connected" in
-		// general and says nothing about *here*. In a bound repository the question
-		// has an answer — this repository routes the agent, asks for it, or neither —
-		// and doctor gives it; status must give the same one, or it reports readiness
-		// for a repository whose sessions send nothing.
+		// Connected machine-wide and exporting no signal of its own. In a bound
+		// repository the question has an answer — this repository asks for it, or
+		// its sessions send nothing — and doctor gives it; status gives the same one.
 		if bound && !v.repoAsks {
-			return "→ no telemetry: this repository neither routes it nor asks for it — sessions here send nothing (run `terma install`)", false
+			return "→ no telemetry: no signal is exported — sessions here send nothing (run `terma setup --signals traces,logs,metrics`)", false
 		}
-		// Pointed somewhere, holding a key, exporting no signal. Nothing but a
-		// repository's own policy can make this send, which is `--exports repos`
-		// however it was arrived at. Saying "connected" alone would read as working;
-		// saying "not connected" would read as broken. It is neither.
 		return "→ connected; repositories decide what is sent", true
 	}
 	if v.err != nil {
 		return "(error)", false
 	}
-	return "→ not connected", false
+	return "→ not connected (run `terma setup`)", false
 }
 
 // statusLineSummary is one line on whether Claude Code's status line feeds terma the
@@ -227,7 +153,7 @@ Nothing is written and no scratch commit is made — run
 				}
 				// The agents' own hooks, judged the way doctor judges them: an agent that
 				// cannot run its hooks yet costs its share of commit stamping in both.
-				if agentHooks = agentHooksCheck(root, selectedForRepo(projectID, cfg.Harnesses)); agentHooks.Status == doctor.Warn {
+				if agentHooks = agentHooksCheck(root, cfg.Harnesses); agentHooks.Status == doctor.Warn {
 					fmt.Fprintf(out, "Agent hooks: %d of %d agents can run theirs — %s\n", agentHooks.Ready, agentHooks.Of, agentHooks.Fix)
 				}
 				stateDir, err := termaproject.StateDir(root, gitDir)
@@ -266,13 +192,13 @@ Nothing is written and no scratch commit is made — run
 				}
 			}
 			if len(connected) == 0 {
-				fmt.Fprintln(out, "Agent:       none connected — run `terma install`")
+				fmt.Fprintln(out, "Agent:       none connected — run `terma setup`")
 			}
-			routing := shellRoutingCheck(verdicts, repoBound, selectedForRepo(projectID, cfg.Harnesses))
-			if routing.Status != doctor.Skip {
-				fmt.Fprintf(out, "Routing:     %s\n", routing.Detail)
-				if routing.Fix != "" {
-					fmt.Fprintf(out, "             → %s\n", routing.Fix)
+			relayState := relayCheck(ctx, verdicts)
+			if relayState.Status != doctor.Skip {
+				fmt.Fprintf(out, "Relay:       %s\n", relayState.Detail)
+				if relayState.Fix != "" && relayState.Status != doctor.Pass {
+					fmt.Fprintf(out, "             → %s\n", relayState.Fix)
 				}
 			}
 			// A repository's own policy narrows what its sessions ship. Said next to
@@ -317,7 +243,7 @@ Nothing is written and no scratch commit is made — run
 			}
 
 			export := doctorHarnessCheck(verdicts, cfg.OTLPURL, projectID, repoBound)
-			checks := []doctor.Check{doctorBinaryCheck(), export, agentHooks, routing,
+			checks := []doctor.Check{doctorBinaryCheck(), export, agentHooks, relayState,
 				{Key: doctor.KeyBackend, Status: doctor.Skip}}
 			if !authOK {
 				checks = append(checks, doctor.Check{Status: doctor.Fail, Fix: "terma setup"})

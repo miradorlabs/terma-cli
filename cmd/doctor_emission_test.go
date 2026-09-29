@@ -10,7 +10,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
-	"github.com/miradorlabs/terma-cli/internal/shim"
 )
 
 func TestDoctorChecksClaudeEmissionSettings(t *testing.T) {
@@ -40,7 +39,6 @@ func TestDoctorChecksClaudeEmissionSettings(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			repo := installRepo(t)
-			t.Setenv(shim.WrapperEnv, "")
 			h := harness.Claude{}
 			if err := h.Connect(harness.Exporter{Endpoint: endpoint, APIKey: testServerKey, Signals: tc.globalSignals}, false); err != nil {
 				t.Fatal(err)
@@ -56,7 +54,7 @@ func TestDoctorChecksClaudeEmissionSettings(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			v := judgeHarness(gatherHarness(h, testProjectID, repo), endpoint, testProjectID)
+			v := judgeHarness(gatherHarness(h, testProjectID, repo), endpoint, "", testProjectID)
 			v.name, v.displayName = h.Name(), h.DisplayName()
 			check := doctorHarnessCheck([]harnessVerdict{v}, endpoint, testProjectID, true)
 			if (check.Status == doctor.Fail) != tc.wantFailure || !strings.Contains(check.Detail, tc.wantDetail) {
@@ -99,36 +97,13 @@ func writeDoctorEnv(t *testing.T, path string, env map[string]string) {
 	}
 }
 
-func TestDoctorKeepsWorkingExportWhenAnotherAgentNeedsRouting(t *testing.T) {
+func TestDoctorKeepsWorkingExportWhenAnotherAgentReportsElsewhere(t *testing.T) {
 	check := doctorHarnessCheck([]harnessVerdict{
-		{displayName: "Claude Code", route: routePending},
-		{displayName: "Codex", route: routeGlobal},
+		{displayName: "Claude Code", route: routeOtherProject, otherProject: "machine"},
+		{displayName: "Codex", route: routeRelay},
 	}, "https://otel.example.test", testProjectID, true)
-	if check.Status != doctor.Warn || check.Ready != 1 || check.Of != 2 {
+	if check.Status != doctor.Warn || check.Ready != 1 || check.Of != 2 || check.Fix == "" {
 		t.Fatalf("working Codex export should survive Claude's warning: %+v", check)
-	}
-}
-
-func TestDoctorChecksLiveRouteSignals(t *testing.T) {
-	for _, signals := range [][]string{nil, {"logs"}} {
-		t.Run(strings.Join(signals, ","), func(t *testing.T) {
-			repo := installRepo(t)
-			t.Setenv(shim.WrapperEnv, "wrapper")
-			// The routed --settings document outranks even a disabled local policy.
-			writeDoctorEnv(t, filepath.Join(repo, ".claude/settings.local.json"), map[string]string{"CLAUDE_CODE_ENABLE_TELEMETRY": "0"})
-			if err := shim.SaveRecord(shim.Record{ProjectID: testProjectID, Endpoint: "https://otel.example.test", Signals: signals, Harnesses: []string{"claude"}}); err != nil {
-				t.Fatal(err)
-			}
-			if err := keystore.SetFor("claude", testProjectID, testServerKey, keystore.Hosts{}); err != nil {
-				t.Fatal(err)
-			}
-			v := judgeHarness(gatherHarness(harness.Claude{}, testProjectID, repo), "https://otel.example.test", testProjectID)
-			v.name, v.displayName = "claude", "Claude Code"
-			check := doctorHarnessCheck([]harnessVerdict{v}, "https://otel.example.test", testProjectID, true)
-			if (check.Status == doctor.Pass) != (len(signals) > 0) {
-				t.Fatalf("route signals %v: %+v", signals, check)
-			}
-		})
 	}
 }
 
@@ -148,7 +123,7 @@ func TestDoctorChecksOpenCodeRepositoryPolicy(t *testing.T) {
 			if err := keystore.SetFor("opencode", testProjectID, testServerKey, keystore.Hosts{}); err != nil {
 				t.Fatal(err)
 			}
-			v := judgeHarness(gatherHarness(h, testProjectID, repo), endpoint, testProjectID)
+			v := judgeHarness(gatherHarness(h, testProjectID, repo), endpoint, "", testProjectID)
 			v.name, v.displayName = h.Name(), h.DisplayName()
 			check := doctorHarnessCheck([]harnessVerdict{v}, endpoint, testProjectID, true)
 			if (check.Status == doctor.Pass) != (len(signals) > 0) {

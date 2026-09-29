@@ -52,8 +52,6 @@ type Check struct {
 	Fix string
 	// Inconclusive means verification could not establish success or failure.
 	Inconclusive bool
-	// NeedsShellActivationOnly means the only remaining fix is activating shell routing.
-	NeedsShellActivationOnly bool
 	// Ready of Of counts agents that can export or run their hooks. Both zero means
 	// the check does not report a count.
 	Ready, Of int
@@ -89,8 +87,9 @@ const (
 	KeyAgentHooks    = "agent-hooks"
 	KeyHarness       = "harness"
 	KeyCompatibility = "compatibility"
-	// KeyRouting reports whether shell integration actually routes agent launches.
-	KeyRouting = "routing"
+	// KeyRelay: terma's loopback relay, which the agents' global configuration points
+	// at, is running and delivering.
+	KeyRelay = "relay"
 	// KeyStatusLine: Claude Code's status line feeds terma the plan's usage windows.
 	KeyStatusLine = "statusline"
 	KeyScratch    = "scratch-commit"

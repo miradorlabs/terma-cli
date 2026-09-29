@@ -9,12 +9,12 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/adapter"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/migrate"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
-	"github.com/miradorlabs/terma-cli/internal/shim"
 	"github.com/miradorlabs/terma-cli/internal/style"
 )
 
@@ -26,12 +26,23 @@ import (
 // rewrites files terma wrote with this build's templates, never creates one, never signs
 // in, and never touches a choice: an absent shim, status line or hook file stays absent.
 
-// refreshMachine rewrites the home-directory files every repository shares: the PATH
-// shims, the wrapped Claude status line and the OpenCode plugin. It returns the paths
-// it changed, carrying on past a failure so one broken file does not strand the rest.
+// refreshMachine rewrites the home-directory files every repository shares: the wrapped
+// Claude status line and the OpenCode plugin. It takes away the per-repository routing an
+// earlier terma installed (PATH shims, the block in the shell's startup file, routing
+// records) — every agent is configured machine-wide now — and restarts the relay so this
+// build serves. It returns the paths it changed, carrying on past a failure so one broken
+// file does not strand the rest.
 func refreshMachine() ([]string, error) {
-	changed, err := shim.RefreshShims()
-	errs := []error{err}
+	var changed []string
+	var errs []error
+	if removed, err := cleanupLegacyRouting(); err != nil {
+		errs = append(errs, fmt.Errorf("per-repository routing: %w", err))
+	} else if removed {
+		changed = append(changed, "per-repository routing (removed)")
+	}
+	if err := restartRelay(context.Background()); err != nil {
+		errs = append(errs, fmt.Errorf("relay: %w", err))
+	}
 	if path, ok, err := (harness.Claude{}).RefreshStatusLine(); err != nil {
 		errs = append(errs, fmt.Errorf("claude status line: %w", err))
 	} else if ok {
@@ -43,6 +54,19 @@ func refreshMachine() ([]string, error) {
 		changed = append(changed, path)
 	}
 	return changed, errors.Join(errs...)
+}
+
+// restartRelay restarts terma's relay when its service is installed, so a replaced
+// binary serves; a machine without one has nothing to restart.
+func restartRelay(ctx context.Context) error {
+	if !relaySupported() {
+		return nil
+	}
+	st, err := relayService(ctx)
+	if err != nil || !st.Installed {
+		return err
+	}
+	return relayRestartService(ctx)
 }
 
 // repoRefresh is what a refresh would change in one repository's committed files.
@@ -137,9 +161,16 @@ func runRefresh(ctx context.Context, out io.Writer) error {
 	machine, machineErr := refreshMachine()
 	repo, repoErr := planRepoRefresh(ctx)
 	var repoChanged []string
-	if repo != nil && !repo.plan.empty() {
+	if repo != nil && repoErr == nil {
+		if path, err := stripRepoPolicy(repo.root); err != nil {
+			repoErr = err
+		} else if path != "" {
+			repoChanged = append(repoChanged, gitx.Relativize(repo.root, path))
+		}
+	}
+	if repo != nil && repoErr == nil && !repo.plan.empty() {
 		if repoErr = repo.plan.apply(repo.root); repoErr == nil {
-			repoChanged = repo.plan.paths()
+			repoChanged = append(repoChanged, repo.plan.paths()...)
 			if stamped, err := stampVersion(repo.root); err != nil {
 				repoErr = err
 			} else if stamped {

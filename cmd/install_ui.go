@@ -21,9 +21,11 @@ type installUI struct {
 	p      style.Palette
 	warned bool
 	next   []string
-	// reloading says a next step already tells the developer to reload their shell, so
-	// doctor's warning that this shell does not route yet is not news.
-	reloading bool
+	// done is the verdict's subject: "terma installed" unless a command says otherwise.
+	done string
+	// loud prints every step, not only those that need the developer: setup's steps
+	// are its result.
+	loud bool
 }
 
 func newInstallUI(out io.Writer, verbose bool) *installUI {
@@ -38,7 +40,13 @@ func newInstallUI(out io.Writer, verbose bool) *installUI {
 const stepLabelWidth = 13
 
 // ok reports a step that did what it should.
-func (u *installUI) ok(label, what string) { u.line(u.detail, u.p.OK("✓"), label, what) }
+func (u *installUI) ok(label, what string) {
+	w := u.detail
+	if u.loud {
+		w = u.out
+	}
+	u.line(w, u.p.OK("✓"), label, what)
+}
 
 // summary keeps user-facing choices visible without exposing setup internals.
 func (u *installUI) summary(label, what string) { u.line(u.out, u.p.OK("✓"), label, what) }
@@ -53,21 +61,6 @@ func (u *installUI) line(out io.Writer, mark, label, what string) {
 	fmt.Fprintf(out, "  %s %-*s %s\n", mark, stepLabelWidth, label, u.p.Commands(what))
 }
 
-// code draws lines the developer pastes whole — a PATH line, shell functions — the way
-// a quoted command is drawn, each indented under its step; a shell comment stays dim.
-func (u *installUI) code(block string) string {
-	var lines []string
-	for l := range strings.SplitSeq(strings.TrimRight(block, "\n"), "\n") {
-		l = strings.TrimRight(l, " ")
-		if strings.HasPrefix(strings.TrimSpace(l), "#") {
-			lines = append(lines, "    "+u.p.Dim(l))
-		} else {
-			lines = append(lines, "    "+u.p.Command(l))
-		}
-	}
-	return strings.Join(lines, "\n")
-}
-
 // then adds a step left for the developer. Lines after the first keep their own
 // indentation under the step's number.
 func (u *installUI) then(step string) {
@@ -78,10 +71,14 @@ func (u *installUI) then(step string) {
 
 // finish prints the verdict and the next steps.
 func (u *installUI) finish() {
+	done := u.done
+	if done == "" {
+		done = "terma installed"
+	}
 	if u.warned {
-		fmt.Fprintf(u.out, "\n%s %s\n", u.p.Warn("!"), u.p.Bold("terma installed — the steps marked ! need you"))
+		fmt.Fprintf(u.out, "\n%s %s\n", u.p.Warn("!"), u.p.Bold(done+" — the steps marked ! need you"))
 	} else {
-		fmt.Fprintf(u.out, "\n%s %s\n", u.p.OK("✓"), u.p.Bold("terma installed"))
+		fmt.Fprintf(u.out, "\n%s %s\n", u.p.OK("✓"), u.p.Bold(done))
 	}
 	if len(u.next) == 0 {
 		return
@@ -101,9 +98,7 @@ func (u *installUI) finish() {
 }
 
 // verify runs doctor behind a spinner and reports it as one step, its fixes as next
-// steps. Warnings solely about shell activation are left out when a next step says to reload
-// the shell: install ran in a shell that predates the PATH block, so doctor, running in
-// the same process, cannot see the shims yet — that is the step, not a second problem.
+// steps.
 func (u *installUI) verify(cmd *cobra.Command) {
 	fmt.Fprintf(u.detail, "\n%s\n", u.p.Bold("Verifying the chain (terma doctor):"))
 	sp := spinner.New(cmd.ErrOrStderr())
@@ -136,11 +131,10 @@ func (u *installUI) verdict(report doctor.Report) {
 	var fixes []string
 	skipped := false
 	for _, c := range report.Checks {
-		switch {
-		case c.Status == doctor.Pass:
-		case c.Status == doctor.Skip:
+		switch c.Status {
+		case doctor.Pass:
+		case doctor.Skip:
 			skipped = skipped || c.Key == doctor.KeyScratch || c.Key == doctor.KeyBackend || c.Key == doctor.KeyProject
-		case (c.Key == doctor.KeyRouting || c.NeedsShellActivationOnly) && u.reloading:
 		default:
 			fix := c.Name + ": " + c.Detail
 			if c.Fix != "" {

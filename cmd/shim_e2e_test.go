@@ -4,7 +4,6 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -155,182 +154,40 @@ func runProc(t *testing.T, bin, dir string, env []string, args ...string) string
 	return string(out)
 }
 
-// A Codex session launched through `terma shim exec` in a bound repo is handed that
-// project's runtime exporter; outside a bound repo it is a transparent pass-through.
-func TestE2E_ShimExecRoutesCodex(t *testing.T) {
+// terma no longer routes an agent per repository, but a PATH shim an earlier terma
+// installed may still front one until the next setup, install or refresh removes it. The
+// shim's entry points must start the real agent exactly as it was invoked, in a bound
+// repository or anywhere else.
+func TestE2E_ShimExecPassesThrough(t *testing.T) {
 	bin := termaBinary(t)
 	_, repo, codexHome := e2eRouted(t)
 	env := withPath(fakeAgents(t))
-
-	if out := runProc(t, bin, repo, env, "shim", "exec", "codex"); !strings.Contains(out, "CODEX_HOME="+codexHome) || !strings.Contains(out, "TERMA_CODEX_ROUTED=1") || !strings.Contains(out, e2eEndpoint) || !strings.Contains(out, "Bearer "+e2eKey) {
-		t.Fatalf("codex in a bound repo must get the original CODEX_HOME and runtime exporter:\n%s", out)
+	for _, dir := range []string{repo, t.TempDir()} {
+		out := runProc(t, bin, dir, env, "shim", "exec", "codex", "--", "exec", "hello world")
+		if !strings.Contains(out, "CODEX_HOME="+codexHome) || !strings.Contains(out, "TERMA_CODEX_ROUTED=\n") ||
+			strings.Contains(out, e2eEndpoint) || !strings.Contains(out, "ARG=exec\nARG=hello world\n") || strings.Count(out, "ARG=") != 2 {
+			t.Fatalf("codex must start unchanged in %s:\n%s", dir, out)
+		}
+		if out := runProc(t, bin, dir, env, "shim", "exec", "claude", "--", "-p", "hello"); !strings.Contains(out, "ARGS=-p hello\n") {
+			t.Fatalf("claude must start unchanged in %s:\n%s", dir, out)
+		}
 	}
-	// Outside any bound repo: no routing; original CODEX_HOME preserved.
-	if out := runProc(t, bin, t.TempDir(), env, "shim", "exec", "codex"); strings.Contains(out, e2eEndpoint) || !strings.Contains(out, "CODEX_HOME="+codexHome) || !strings.Contains(out, "TERMA_CODEX_ROUTED=\n") {
-		t.Fatalf("codex outside a bound repo must pass through untouched:\n%s", out)
-	}
-	// -C chooses the destination binding, and user arguments survive unchanged.
-	outside := t.TempDir()
-	out := runProc(t, bin, outside, env, "shim", "exec", "codex", "--", "exec", "-C", repo, "hello world")
-	if !strings.Contains(out, e2eEndpoint) || !strings.Contains(out, "ARG=hello world\n") || !strings.Contains(out, "ARG=-C\nARG="+repo+"\n") {
-		t.Fatalf("-C did not route or preserve argv: %s", out)
-	}
-	out = runProc(t, bin, repo, env, "shim", "exec", "codex", "--", "-C", outside)
-	if strings.Contains(out, e2eEndpoint) {
-		t.Fatal("an unbound destination received telemetry overrides")
-	}
-	// Leaving CODEX_HOME unset preserves Codex's normal default-home selection.
-	out = runProc(t, bin, repo, append(env, "CODEX_HOME="), "shim", "exec", "codex")
-	if !strings.Contains(out, "CODEX_HOME=\n") {
-		t.Fatal("routing injected a custom home")
-	}
-
 }
 
-// A Claude session launched through `terma shim exec` in a bound repo is started with
-// the project's settings document ahead of its own arguments. The document describes the
-// export; the key reaches Claude Code through the headers helper it names, and never
-// through the environment, which a machine-wide connect would outrank anyway.
-func TestE2E_ShimExecRoutesClaude(t *testing.T) {
+// The launcher protocol an old PATH shim speaks: it asks `terma shim prepare` for the
+// arguments to put ahead of the agent's own and reads them back. The answer is none.
+func TestE2E_ShimPrepareAnswersNothingToAdd(t *testing.T) {
 	bin := termaBinary(t)
 	_, repo, _ := e2eRouted(t)
-	env := withPath(fakeAgents(t))
-
-	out := runProc(t, bin, repo, env, "shim", "exec", "claude", "--", "-p", "hello")
-	args := strings.Fields(strings.TrimPrefix(strings.SplitN(out, "\n", 2)[0], "ARGS="))
-	if len(args) != 4 || args[0] != "--settings" || args[2] != "-p" || args[3] != "hello" {
-		t.Fatalf("claude must be started with --settings <path> ahead of its own arguments:\n%s", out)
-	}
-	if !strings.Contains(out, "ENV_HEADERS=\n") {
-		t.Fatalf("the key must not ride the agent's environment:\n%s", out)
-	}
-	// Read the document the way Claude Code would: the export from its env block, the
-	// key from running the headers helper it names.
-	data, err := os.ReadFile(args[1])
+	plan := t.TempDir()
+	runProc(t, bin, repo, withPath(fakeAgents(t)), "shim", "prepare", "codex", plan, "--", "exec", "hi")
+	entries, err := os.ReadDir(plan)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var doc struct {
-		Env    map[string]string `json:"env"`
-		Helper string            `json:"otelHeadersHelper"`
-	}
-	if err := json.Unmarshal(data, &doc); err != nil {
-		t.Fatalf("settings document: %v\n%s", err, data)
-	}
-	if doc.Env["OTEL_EXPORTER_OTLP_ENDPOINT"] != e2eEndpoint || doc.Env["CLAUDE_CODE_ENABLE_TELEMETRY"] != "1" {
-		t.Fatalf("the settings document must describe the project's export:\n%s", data)
-	}
-	if strings.Contains(string(data), e2eKey) {
-		t.Fatalf("the key must live in the helper, not the document:\n%s", data)
-	}
-	headers, err := exec.Command(doc.Helper).Output()
-	if err != nil {
-		t.Fatalf("run the headers helper: %v", err)
-	}
-	if !strings.Contains(string(headers), "Bearer "+e2eKey) {
-		t.Fatalf("the headers helper must hand Claude Code the project key, got %q", headers)
-	}
-
-	// Outside any bound repo: a transparent pass-through.
-	if out := runProc(t, bin, t.TempDir(), env, "shim", "exec", "claude", "--", "-p", "hello"); !strings.Contains(out, "ARGS=-p hello\n") {
-		t.Fatalf("claude outside a bound repo must pass through untouched:\n%s", out)
-	}
-}
-
-// The PATH shim delivers the same routing: the shim script re-invokes terma, which finds
-// the real binary past the shim directory and execs it with the project's environment.
-func TestE2E_PathShimRoutes(t *testing.T) {
-	bin := termaBinary(t)
-	_, repo, codexHome := e2eRouted(t)
-	agents := fakeAgents(t)
-
-	shimBin, err := shim.InstallShims([]string{shim.AgentCodex, shim.AgentClaude})
-	if err != nil {
-		t.Fatal(err)
-	}
-	// The shim script calls `terma`, then terma finds the real codex past the shim dir:
-	// so PATH is shim dir, then terma's dir, then the fake agents.
-	env := withPath(shimBin, filepath.Dir(bin), agents)
-
-	out := runProc(t, filepath.Join(shimBin, "codex"), repo, env)
-	if !strings.Contains(out, "CODEX_HOME="+codexHome) || !strings.Contains(out, "TERMA_CODEX_ROUTED=1") || !strings.Contains(out, e2eEndpoint) || !strings.Contains(out, "Bearer "+e2eKey) {
-		t.Fatalf("the PATH shim must route codex to the original CODEX_HOME and runtime exporter:\n%s", out)
-	}
-	out = runProc(t, filepath.Join(shimBin, "claude"), repo, env, "-p", "hello")
-	if !strings.Contains(out, "ARGS=--settings ") || !strings.Contains(out, " -p hello\n") || !strings.Contains(out, "ENV_HEADERS=\n") {
-		t.Fatalf("Claude PATH launcher did not deliver settings: %s", out)
-	}
-
-}
-
-// A slow capability probe must finish within the launcher's preparation budget;
-// a hung probe must still leave enough time to deliver the telemetry arguments.
-func TestE2E_PathShimRoutesWithSlowCodexHelp(t *testing.T) {
-	bin := termaBinary(t)
-	for _, tc := range []struct {
-		name     string
-		help     string
-		wantFlag bool
-	}{
-		{"slow", "/bin/sleep 0.7; printf '  --no-daemon\\n'", true},
-		{"hung", "exec /bin/sleep 10", false},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			_, repo, _ := e2eRouted(t)
-			agents := fakeAgents(t)
-			writeExecutable(t, filepath.Join(agents, "codex"), "#!/bin/sh\nif [ \"$1\" = --help ]; then\n"+tc.help+"\nexit 0\nfi\nprintf 'ARG=%s\\n' \"$@\"\n")
-			shimBin, err := shim.InstallShims([]string{shim.AgentCodex})
-			if err != nil {
-				t.Fatal(err)
-			}
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			proc := exec.CommandContext(ctx, filepath.Join(shimBin, "codex"))
-			proc.Dir, proc.Env = repo, withPath(shimBin, filepath.Dir(bin), agents)
-			out, err := proc.CombinedOutput()
-			if err != nil {
-				t.Fatalf("launch: %v\n%s", err, out)
-			}
-			if strings.Contains(string(out), "ARG=--no-daemon\n") != tc.wantFlag {
-				t.Fatalf("incorrect embedded mode selection:\n%s", out)
-			}
-			if !strings.Contains(string(out), e2eEndpoint) || strings.Contains(string(out), "routing preparation failed") {
-				t.Fatalf("probe lost telemetry routing:\n%s", out)
-			}
-		})
-	}
-}
-
-// The capability cache survives the short-lived preparation process, so later
-// launches of the same executable do not start another help subprocess.
-func TestE2E_PathShimCachesCodexCapabilities(t *testing.T) {
-	bin := termaBinary(t)
-	for _, supported := range []bool{true, false} {
-		t.Run(fmt.Sprint(supported), func(t *testing.T) {
-			_, repo, _ := e2eRouted(t)
-			agents := fakeAgents(t)
-			option := "--no-alt-screen"
-			if supported {
-				option = "--no-daemon"
-			}
-			writeExecutable(t, filepath.Join(agents, "codex"), "#!/bin/sh\nif [ \"$1\" = --help ]; then\nprintf x >> \"$TERMA_TEST_PROBE_LOG\"\nprintf '  "+option+"\\n'\nexit 0\nfi\nprintf 'ARG=%s\\n' \"$@\"\n")
-			shimBin, err := shim.InstallShims([]string{shim.AgentCodex})
-			if err != nil {
-				t.Fatal(err)
-			}
-			log := filepath.Join(t.TempDir(), "probes")
-			env := append(withPath(shimBin, filepath.Dir(bin), agents), "TERMA_TEST_PROBE_LOG="+log)
-			for range 2 {
-				out := runProc(t, filepath.Join(shimBin, "codex"), repo, env)
-				if strings.Contains(out, "ARG=--no-daemon\n") != supported || !strings.Contains(out, e2eEndpoint) {
-					t.Fatalf("cached launch lost capabilities or telemetry:\n%s", out)
-				}
-			}
-			data, err := os.ReadFile(log)
-			if err != nil || string(data) != "x" {
-				t.Fatalf("expected one help subprocess across two launches: %q, %v", data, err)
-			}
-		})
+	data, _ := os.ReadFile(filepath.Join(plan, "count"))
+	if len(entries) != 1 || string(data) != "terma-args-v1:0\n" {
+		t.Fatalf("prepare wrote %d file(s), count %q", len(entries), data)
 	}
 }
 
