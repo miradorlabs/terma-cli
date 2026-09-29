@@ -42,6 +42,9 @@ var (
 	relayRestartService = relay.RestartService
 	relayService        = relay.Service
 	relayProbe          = relay.Probe
+	// Files under terma's config directory, which every test sandboxes: not stubbed.
+	relaySaveContentPolicy = relay.SaveContentPolicy
+	relayLoadContentPolicy = relay.LoadContentPolicy
 )
 
 // machineAgents are the harnesses among a developer's agents whose global configuration
@@ -127,6 +130,15 @@ func configureMachineTelemetry(ctx context.Context, errOut io.Writer, cfg *confi
 		res.agents = append(res.agents, out)
 	}
 	res.telemetry = t
+	if t.Mode == config.TelemetryRelay {
+		// The machine's content choice is the relay's default: for the machine project,
+		// and for every project that has none of its own (`terma install --prompts`).
+		if err := relaySaveContentPolicy(relay.MachineRoute, relay.ContentPolicy{
+			Prompts: !t.ExcludePrompts, ToolContent: !t.ExcludeToolContent,
+		}); err != nil {
+			return res, err
+		}
+	}
 	if err := config.UpdateProfile(cfg.ProfileName, func(p *config.Profile) {
 		saved := t
 		p.Telemetry = &saved
@@ -158,7 +170,11 @@ func configureMachineAgent(
 	if t.Mode == config.TelemetryRelay {
 		// The relay decides each record's project, so nothing in the agent's file may
 		// name one, and the credential it holds is the relay's token, not a Terma key.
+		// The agent exports content to the relay, which cannot know a record's project
+		// before it places the session; the relay withholds it per project
+		// (relay.ContentPolicy), so nothing a project withholds leaves the machine.
 		e.Endpoint, e.APIKey, e.JSON = rc.Endpoint(), rc.Token, true
+		e.IncludePrompts, e.IncludeToolContent = true, true
 		delete(e.ResourceAttributes, harness.AttrProjectID)
 		if h.SupportsHeadersHelper() {
 			if e.HelperPath, err = harness.RelayHelperFilePath(h); err != nil {
@@ -271,6 +287,16 @@ func machineTelemetryCurrent(cfg *config.Config, agents []string) bool {
 	for _, h := range machineAgents(agents) {
 		st, err := h.Status()
 		if err != nil || !st.Connected || strings.TrimRight(st.Endpoint, "/") != want {
+			return false
+		}
+		// Under the relay an agent exports content for the relay to withhold per project;
+		// one configured before that (content off at the agent) is not current.
+		if t.Mode == config.TelemetryRelay && !st.IncludePrompts {
+			return false
+		}
+	}
+	if t.Mode == config.TelemetryRelay {
+		if _, ok := relayLoadContentPolicy(relay.MachineRoute); !ok {
 			return false
 		}
 	}

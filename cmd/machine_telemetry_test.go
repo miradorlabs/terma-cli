@@ -252,3 +252,53 @@ func TestTermaEndpoint(t *testing.T) {
 		}
 	}
 }
+
+// Under the relay the agents export content to it and the relay withholds it per
+// project: setup's --prompts is the machine default the relay applies, never a switch in
+// the agent's own file (which would withhold content from every project alike).
+func TestSetupRecordsTheMachineContentPolicyForTheRelay(t *testing.T) {
+	_, home := setupSandbox(t)
+	fakeRelay(t)
+	setupRun(t, "--prompts", "off", "--exclude-tool-content")
+	p, ok := relay.LoadContentPolicy(relay.MachineRoute)
+	if !ok || p.Prompts || p.ToolContent {
+		t.Fatalf("machine policy %+v (recorded %v), want both withheld", p, ok)
+	}
+	claude := readClaudeSettings(t, filepath.Join(home, ".claude", "settings.json"))
+	if claude["OTEL_LOG_USER_PROMPTS"] != "1" {
+		t.Fatalf("Claude Code must export prompts to the relay, which withholds them per project: %+v", claude)
+	}
+	codex, err := os.ReadFile(filepath.Join(home, ".codex", "config.toml"))
+	if err != nil || !strings.Contains(string(codex), "log_user_prompt = true") {
+		t.Fatalf("Codex must export prompts to the relay:\n%s", codex)
+	}
+}
+
+// `terma install --prompts off` under the relay is this repository's project's choice:
+// its own policy, with the machine default untouched for everything else.
+func TestInstallSetsItsProjectsContentPolicyUnderTheRelay(t *testing.T) {
+	setupSandbox(t)
+	fakeRelay(t)
+	setupRun(t)
+	t.Chdir(t.TempDir())
+	gitRepoHere(t)
+	out, err := within(20*time.Second).combined(t, "install", "--harness", "claude,codex", "--project", "Acme Web",
+		"--prompts", "off", "--no-hooks", "--no-doctor", "--no-browser", "--no-statusline", "--yes")
+	if err != nil {
+		t.Fatalf("install: %v\n%s", err, out)
+	}
+	acme := projectsIn(orgA().ID)[0]
+	if p, ok := relay.LoadContentPolicy(acme.ID); !ok || p.Prompts || !p.ToolContent {
+		t.Fatalf("project policy %+v (recorded %v), want prompts withheld and tool content kept", p, ok)
+	}
+	if !strings.Contains(out, "not sent for this project") {
+		t.Fatalf("install should say prompts are not sent for this project:\n%s", out)
+	}
+	if p, _ := relay.LoadContentPolicy(relay.MachineRoute); !p.Prompts {
+		t.Fatalf("a repository's --prompts off changed the machine default: %+v", p)
+	}
+	cfg, err := loadConfig()
+	if err != nil || cfg.Telemetry.ExcludePrompts {
+		t.Fatalf("a repository's --prompts off changed the machine's telemetry record: %+v %v", cfg.Telemetry, err)
+	}
+}

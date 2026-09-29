@@ -18,6 +18,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
 // gateway is a fake OTLP ingest host: it records what each project's key delivered and
@@ -26,6 +28,7 @@ type gateway struct {
 	*httptest.Server
 	mu       sync.Mutex
 	got      map[string][]string // authorization → event names received, in order
+	bodies   map[string][]string // authorization → request bodies received, for leak scans
 	requests atomic.Int64
 	answer   atomic.Value // func(auth string) int
 	okBody   atomic.Value // string
@@ -37,7 +40,7 @@ func (g *gateway) respond(f func(auth string) int) { g.answer.Store(f) }
 func (g *gateway) respondBody(body string) { g.okBody.Store(body) }
 
 func newGateway(t *testing.T) *gateway {
-	g := &gateway{got: map[string][]string{}}
+	g := &gateway{got: map[string][]string{}, bodies: map[string][]string{}}
 	g.respond(func(string) int { return http.StatusOK })
 	g.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		g.requests.Add(1)
@@ -50,6 +53,7 @@ func newGateway(t *testing.T) *gateway {
 		names := namesIn(body)
 		g.mu.Lock()
 		g.got[auth] = append(g.got[auth], names...)
+		g.bodies[auth] = append(g.bodies[auth], string(body))
 		g.mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
 		answer := "{}"
@@ -117,6 +121,13 @@ func namesIn(body []byte) []string {
 	return out
 }
 
+// bodiesFor is everything auth's project received, as one string to scan.
+func (g *gateway) bodiesFor(auth string) string {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return strings.Join(g.bodies[auth], "\n")
+}
+
 func (g *gateway) received(auth string) []string {
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -143,7 +154,18 @@ func newTestRelay(t *testing.T) *testRelay {
 		bindings: map[string]string{}, keys: map[string]string{}}
 	h.machine.Store("machine-proj")
 	h.keys["machine-proj"] = "Bearer key-machine"
+	// setup records the machine's content policy; these tests are about routing, so the
+	// machine allows content. The withholding tests set their own.
+	h.setPolicy(MachineRoute, ContentPolicy{Prompts: true, ToolContent: true})
 	return h
+}
+
+// setPolicy records project's content policy (MachineRoute: the machine default).
+func (h *testRelay) setPolicy(project string, p ContentPolicy) {
+	h.t.Helper()
+	if err := config.WriteJSON(filepath.Join(h.dir, policyDir, project+".json"), p, 0o600); err != nil {
+		h.t.Fatal(err)
+	}
 }
 
 func (h *testRelay) start() {
@@ -156,7 +178,7 @@ func (h *testRelay) start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	h.cancel, h.done = cancel, make(chan error, 1)
 	opts := Options{
-		Config: h.cfg, Dir: h.dir, Version: "test", Listener: ln, Hold: 300 * time.Millisecond,
+		Config: h.cfg, Dir: h.dir, Version: "test", Listener: ln, Hold: 300 * time.Millisecond, TraceHold: 600 * time.Millisecond,
 		Binding: func(dir string) (string, error) {
 			h.mu.Lock()
 			defer h.mu.Unlock()

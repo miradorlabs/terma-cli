@@ -16,7 +16,7 @@ func newTestRouter(t *testing.T, dir string, hold time.Duration, clock *time.Tim
 	binding := func(d string) (string, error) { return bindings[d], nil }
 	return &router{
 		dir: dir, res: newResolver(dir, binding, nil, t.Logf), traces: newTraceMap(64),
-		hold: hold, now: func() time.Time { return *clock }, logf: t.Logf, stats: newStats(),
+		hold: hold, traceHold: hold, now: func() time.Time { return *clock }, logf: t.Logf, stats: newStats(),
 		routed: func(r string) { routed[r]++ },
 	}, routed
 }

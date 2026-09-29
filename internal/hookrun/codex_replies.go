@@ -9,6 +9,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/harness"
+	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/shim"
 	"github.com/miradorlabs/terma-cli/internal/spool"
@@ -103,6 +104,13 @@ func (e Env) captureCodexReplies(ctx context.Context, r *repo, in *codexHookInpu
 // prompts, and "could not tell" is not consent. A file that does not exist is different:
 // both loaders report that without an error, and it simply is not a source.
 func codexRepliesConsented(r *repo) bool {
+	// Under the relay, Codex exports content to it and the project's content policy
+	// decides what leaves; the replies terma reads itself follow the same policy. No
+	// policy recorded at all is a no.
+	if _, err := relay.Load(); err == nil {
+		p, ok := relay.LoadContentPolicy(r.projectID)
+		return ok && p.Prompts
+	}
 	rec, recorded, err := shim.LoadRecord(r.projectID)
 	if err != nil {
 		return false

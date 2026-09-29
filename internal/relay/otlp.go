@@ -269,7 +269,7 @@ func (b *batch) encode(route string) ([]byte, int, error) {
 	if count == 0 {
 		return nil, 0, nil
 	}
-	body, err := json.Marshal(map[string]any{sh.resources: resources})
+	body, err := marshal(map[string]any{sh.resources: resources})
 	return body, count, err
 }
 
@@ -293,20 +293,20 @@ func (u unit) encode(route string) (json.RawMessage, int, error) {
 	if err != nil {
 		return nil, 0, err
 	}
-	rawData, err := json.Marshal(data)
+	rawData, err := marshal(data)
 	if err != nil {
 		return nil, 0, err
 	}
 	metric := object{}
 	maps.Copy(metric, u.fields)
 	metric[u.dataKey] = rawData
-	raw, err := json.Marshal(metric)
+	raw, err := marshal(metric)
 	return raw, len(points), err
 }
 
 // withArray is fields plus key set to arr.
 func withArray[T any](fields object, key string, arr []T) (object, error) {
-	raw, err := json.Marshal(arr)
+	raw, err := marshal(arr)
 	if err != nil {
 		return nil, err
 	}
@@ -337,7 +337,7 @@ func mergeBodies(sig signal, bodies [][]byte) ([]byte, error) {
 		all = append(all, top.Spans...)
 		all = append(all, top.Metrics...)
 	}
-	return json.Marshal(map[string]any{sh.resources: all})
+	return marshal(map[string]any{sh.resources: all})
 }
 
 // kv is an OTLP attribute, read for its string value only.
@@ -405,4 +405,17 @@ func isHex(r rune) bool {
 func looksLikeJSON(body []byte) bool {
 	trimmed := bytes.TrimLeft(body, " \t\r\n")
 	return len(trimmed) > 0 && trimmed[0] == '{'
+}
+
+// marshal is json.Marshal without HTML escaping: records leave as the agents wrote them,
+// "<REDACTED>" as itself and not as "\u003cREDACTED\u003e". Escaping applies even to a
+// json.RawMessage the encoder copies, so every re-encoding in the relay goes through here.
+func marshal(v any) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		return nil, err
+	}
+	return bytes.TrimSuffix(buf.Bytes(), []byte("\n")), nil
 }

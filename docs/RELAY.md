@@ -34,6 +34,29 @@ A record's project is decided in this order:
 
 A session's project is decided once and cached; it never moves mid-session.
 
+A record whose session is known but not yet placed waits up to 30 s; a span that names
+no session waits up to 30 min for a record of its trace to name one, because a long Codex
+turn exports its child spans as each ends, before the turn span (PR #27's finding). A
+waiting entry is neither read nor rewritten until something it waits on becomes known,
+every 5 s, or its hold closes; over 64 MiB of waiting entries, the oldest are placed at
+once.
+
+## Content policy
+
+The agents' global exporters send content — prompts, replies, tool arguments and output —
+because the relay cannot know a record's project before it places the session. The relay
+then withholds content **per project** before a record reaches the outbox, so nothing a
+project withholds is written for it or sent: `relay/policy/<project>.json`
+(`{"include_prompts", "include_tool_content"}`, written by `terma install --prompts
+on|off` / `--exclude-tool-content`), else `relay/policy/@machine.json` (written by `terma
+setup`), else everything is withheld. The field sets are PR #27's: prompts blanked with
+each harness's own marker (`<REDACTED>` Claude, `[REDACTED]` Codex), the GenAI content
+attributes and OpenCode's prompt bodies removed, tool arguments and output removed, and
+Claude's `tool.output` / `tool.input` span events dropped. terma's own Codex reply and
+title capture follows the same policy. A protobuf body cannot be filtered: it is
+forwarded to the machine project only when the machine policy withholds nothing, and set
+aside otherwise. Records are re-encoded without HTML escaping, so they leave as written.
+
 Live-verified 2026-09-29 (Codex CLI 0.158.0, Claude Code 2.1.284, OTLP/JSON):
 
 | | Codex | Claude Code |

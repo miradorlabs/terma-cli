@@ -18,19 +18,29 @@ const pendingRoute = ""
 // re-parsing them every second held a core at half load for the length of the hold.
 const recheck = 5 * time.Second
 
+// maxInboxBytes bounds what waits in the inbox for its session to be placed.
+const maxInboxBytes = 64 << 20
+
 // router moves accepted bodies from the inbox to per-project outboxes. It is the only
 // reader of the inbox and runs on one goroutine, so no two passes race over a file.
 type router struct {
 	dir    string
 	res    *resolver
 	traces *traceMap
-	hold   time.Duration
-	now    func() time.Time
-	logf   func(string, ...any)
-	stats  *stats
+	// hold is how long a record whose session is known but not placed waits;
+	// traceHold how long one that names no session waits for its trace to name one. A
+	// Codex turn exports its child spans as each ends, before the turn span that names
+	// the session, so a long turn's children need far longer than a session does.
+	hold      time.Duration
+	traceHold time.Duration
+	now       func() time.Time
+	logf      func(string, ...any)
+	stats     *stats
 	// routed is told each route that has something new to deliver.
 	routed func(route string)
 
+	// inboxBytes bounds the inbox (maxInboxBytes when zero).
+	inboxBytes int64
 	// waiting is what each inbox entry still holding records waits on, by file name.
 	waiting map[string]*waitState
 	// looked counts entries read and routed (tests).
@@ -58,17 +68,22 @@ func (rt *router) pass(ctx context.Context) {
 		rt.waiting = map[string]*waitState{}
 	}
 	now := rt.now()
+	// Over the inbox's bound, the oldest entries are placed now, as if their holds had
+	// closed: a flood of records that name no session must not grow the inbox for the
+	// half hour a trace may wait.
+	force := rt.overBound(entries)
 	present := make(map[string]bool, len(entries))
 	for _, e := range entries {
 		present[e.name] = true
 		if ctx.Err() != nil {
 			return
 		}
-		if w := rt.waiting[e.name]; w != nil && !rt.due(w, e, now) {
+		forced := force[e.name]
+		if w := rt.waiting[e.name]; w != nil && !forced && !rt.due(w, e, now) {
 			continue
 		}
 		delete(rt.waiting, e.name)
-		if err := rt.route(ctx, e); err != nil {
+		if err := rt.route(ctx, e, forced); err != nil {
 			rt.logf("route %s: %v", e.name, err)
 		}
 	}
@@ -82,7 +97,8 @@ func (rt *router) pass(ctx context.Context) {
 // due reports whether a waiting entry is worth reading again: its hold closed, its
 // recheck came round, or a session or trace it waits on can now be placed.
 func (rt *router) due(w *waitState, e entry, now time.Time) bool {
-	if now.Sub(e.received) >= rt.hold || !now.Before(w.next) {
+	age := now.Sub(e.received)
+	if (len(w.sessions) > 0 && age >= rt.hold) || age >= rt.traceHold || !now.Before(w.next) {
 		return true
 	}
 	for trace := range w.traces {
@@ -98,7 +114,36 @@ func (rt *router) due(w *waitState, e entry, now time.Time) bool {
 	return false
 }
 
-func (rt *router) route(ctx context.Context, e entry) error {
+// overBound names the oldest inbox entries to place now so the inbox fits
+// rt.inboxBytes; none while it fits.
+func (rt *router) overBound(entries []entry) map[string]bool {
+	limit := rt.inboxBytes
+	if limit <= 0 {
+		limit = maxInboxBytes
+	}
+	sizes := make([]int64, len(entries))
+	var total int64
+	for i, e := range entries {
+		if info, err := os.Stat(filepath.Join(rt.dir, inboxDir, e.name)); err == nil {
+			sizes[i] = info.Size()
+			total += sizes[i]
+		}
+	}
+	force := map[string]bool{}
+	for i, e := range entries { // oldest first
+		if total <= limit {
+			break
+		}
+		force[e.name] = true
+		total -= sizes[i]
+	}
+	if len(force) > 0 {
+		rt.logf("inbox over %d bytes: placing its %d oldest entries now", limit, len(force))
+	}
+	return force
+}
+
+func (rt *router) route(ctx context.Context, e entry, force bool) error {
 	rt.looked++
 	path := filepath.Join(rt.dir, inboxDir, e.name)
 	body, err := os.ReadFile(path)
@@ -109,8 +154,15 @@ func (rt *router) route(ctx context.Context, e entry) error {
 		return err
 	}
 	if e.format != formatJSON {
-		// Protobuf cannot be split without a decoder the relay does not carry; the whole
-		// request goes to the machine project.
+		// Protobuf cannot be split or filtered without a decoder the relay does not carry
+		// (terma configures every agent for OTLP/JSON; this is an exporter a developer
+		// overrode). The whole request goes to the machine project — unless its policy
+		// withholds content, which could not be enforced on it: then it is set aside.
+		if policy, _ := loadContentPolicy(rt.dir, machineRoute); !policy.allowsAll() {
+			rt.logf("%s is protobuf and the machine project withholds content; set aside unsent", e.name)
+			rt.stats.addDead(1)
+			return rt.moveDead(e, path, "unfilterable")
+		}
 		return rt.moveWhole(e, path, body, machineRoute)
 	}
 	b, err := parseBatch(e.sig, body)
@@ -121,7 +173,8 @@ func (rt *router) route(ctx context.Context, e entry) error {
 	}
 
 	now := rt.now()
-	expired := now.Sub(e.received) >= rt.hold
+	age := now.Sub(e.received)
+	expired, traceExpired := age >= rt.hold || force, age >= rt.traceHold || force
 	items := b.items()
 	for _, it := range items {
 		if it.session != "" {
@@ -149,9 +202,9 @@ func (rt *router) route(ctx context.Context, e entry) error {
 			if !d.final {
 				it.route = pendingRoute
 			}
-		case it.traceID != "" && !expired:
+		case it.traceID != "" && !traceExpired:
 			// A span may name its session only through a sibling in its trace that has not
-			// arrived yet.
+			// arrived yet: a Codex turn's children arrive before the turn span.
 			it.route = pendingRoute
 		default:
 			// No session at all: every Codex metric, Codex's process-level spans.
@@ -165,6 +218,11 @@ func (rt *router) route(ctx context.Context, e entry) error {
 			continue
 		}
 		seen[it.route] = true
+		// The route's content policy, applied before anything reaches its outbox: what a
+		// project withholds is never written for it, let alone sent.
+		if policy, _ := loadContentPolicy(rt.dir, it.route); !policy.allowsAll() {
+			rt.stats.addWithheld(b.withhold(it.route, policy))
+		}
 		out, n, err := b.encode(it.route)
 		if err != nil {
 			return err

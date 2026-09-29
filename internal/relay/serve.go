@@ -38,6 +38,9 @@ type Options struct {
 	// Hold is how long a record whose session cannot be placed waits before it goes to
 	// the machine project; 30 s when zero.
 	Hold time.Duration
+	// TraceHold is how long a span that names no session waits for its trace to name
+	// one; 30 min when zero.
+	TraceHold time.Duration
 	// Logf receives the relay's diagnostics; discarded when nil.
 	Logf func(format string, args ...any)
 	// Client sends deliveries; a client with no overall timeout (each request has its
@@ -51,6 +54,11 @@ type Options struct {
 
 // DefaultHold is how long an unplaced record waits for its session to be placed.
 const DefaultHold = 30 * time.Second
+
+// DefaultTraceHold is how long a span that names no session waits for its trace to name
+// one. A long Codex turn exports its children minutes before the turn span (PR #27's
+// finding); waiting entries cost nothing between looks, so the wait can be long.
+const DefaultTraceHold = 30 * time.Minute
 
 // ErrRunning is returned by Serve when another relay already serves this state directory.
 var ErrRunning = errors.New("another relay is already running")
@@ -73,6 +81,12 @@ func Serve(ctx context.Context, o Options) error {
 	}
 	if o.Hold <= 0 {
 		o.Hold = DefaultHold
+	}
+	if o.TraceHold <= 0 {
+		o.TraceHold = DefaultTraceHold
+	}
+	if o.TraceHold < o.Hold {
+		o.TraceHold = o.Hold
 	}
 	if o.Logf == nil {
 		o.Logf = func(string, ...any) {}
@@ -118,8 +132,8 @@ func Serve(ctx context.Context, o Options) error {
 		default:
 		}
 	}
-	rt := &router{dir: o.Dir, res: newResolver(o.Dir, o.Binding, o.Cwd, o.Logf), traces: newTraceMap(8192),
-		hold: o.Hold, now: o.Now, logf: o.Logf, stats: st, routed: fw.wake}
+	rt := &router{dir: o.Dir, res: newResolver(o.Dir, o.Binding, o.Cwd, o.Logf), traces: newTraceMap(100_000),
+		hold: o.Hold, traceHold: o.TraceHold, now: o.Now, logf: o.Logf, stats: st, routed: fw.wake}
 	in := &intake{dir: o.Dir, token: o.Config.Token, version: o.Version, now: o.Now, stats: st,
 		logf: o.Logf, accepted: wakeRouter}
 

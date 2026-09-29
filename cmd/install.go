@@ -20,6 +20,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
+	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 	"github.com/miradorlabs/terma-cli/internal/serverkey"
 	"github.com/miradorlabs/terma-cli/internal/session"
@@ -164,9 +165,16 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	if err != nil {
 		return err
 	}
-	// The machine-wide export choices, with any this run's flags change.
+	// The machine-wide export choices, with any this run's flags change. Under the relay
+	// the content flags are this repository's project's, not the machine's: the relay
+	// withholds content per project (relay.ContentPolicy), applied once the project is.
 	t := cfg.Telemetry
-	exportChanged, err := applyExportFlags(cmd, &t, f)
+	perProjectContent := t.Mode == config.TelemetryRelay && !cmd.Flags().Changed("no-relay")
+	contentChange, err := contentFlags(cmd, f)
+	if err != nil {
+		return err
+	}
+	exportChanged, err := applyExportFlags(cmd, &t, f, !perProjectContent)
 	if err != nil {
 		return err
 	}
@@ -218,12 +226,27 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 		ui.summary("Project", nameOrID(b.Name, b.ID)+env)
 	}
 
-	// Whether the developer's agents send what was said is a machine-wide choice, and
-	// nothing asks here, so the line names the command that changes it.
+	// Whether what was said is sent: under the relay, this project's choice (its own, or
+	// the machine's default until it has one); otherwise the machine's. Nothing asks, so
+	// the line names the command that changes it.
 	if len(machineAgents(agents)) > 0 {
-		if !t.ExcludePrompts {
+		switch {
+		case perProjectContent && b.ID != "":
+			policy, _ := relayLoadContentPolicy(b.ID)
+			if contentChange.any() && !f.dryRun {
+				policy = contentChange.apply(policy)
+				if err := relaySaveContentPolicy(b.ID, policy); err != nil {
+					return err
+				}
+			}
+			if policy.Prompts {
+				ui.summary("Prompts", "prompt text and model responses are sent for this project — `terma install --prompts off` stops them")
+			} else {
+				ui.summary("Prompts", "prompt text and model responses are not sent for this project — `terma install --prompts on` sends them")
+			}
+		case !t.ExcludePrompts:
 			ui.summary("Prompts", "prompt text and model responses are sent — `terma setup --prompts off` stops them")
-		} else {
+		default:
 			ui.summary("Prompts", "prompt text and model responses are not sent — `terma setup --prompts on` sends them")
 		}
 	}
@@ -480,32 +503,26 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 // applyExportFlags folds this run's export flags into the machine's choices, and
 // reports whether any changed one: an install that passes --prompts off means it for
 // the machine, since the setting lives there now.
-func applyExportFlags(cmd *cobra.Command, t *config.Telemetry, f installFlags) (bool, error) {
+func applyExportFlags(cmd *cobra.Command, t *config.Telemetry, f installFlags, content bool) (bool, error) {
 	before := *t
 	flags := cmd.Flags()
-	switch p := strings.ToLower(strings.TrimSpace(f.prompts)); p {
-	case "on":
-		if flags.Changed("exclude-prompts") && f.excludePrompts {
-			return false, errors.New("--prompts on and --exclude-prompts disagree; pass one")
+	if content {
+		change, err := contentFlags(cmd, f)
+		if err != nil {
+			return false, err
 		}
-		t.ExcludePrompts = false
-	case "off":
-		t.ExcludePrompts = true
-	case "":
-		if flags.Changed("exclude-prompts") {
-			t.ExcludePrompts = f.excludePrompts
+		if change.prompts != nil {
+			t.ExcludePrompts = !*change.prompts
 		}
-	default:
-		return false, fmt.Errorf("--prompts %q: want on or off", f.prompts)
+		if change.toolContent != nil {
+			t.ExcludeToolContent = !*change.toolContent
+		}
 	}
 	if flags.Changed("signals") {
 		if _, err := harness.ParseSignals(f.signals); err != nil {
 			return false, err
 		}
 		t.Signals = f.signals
-	}
-	if flags.Changed("exclude-tool-content") {
-		t.ExcludeToolContent = f.excludeToolContent
 	}
 	if flags.Changed("identity") {
 		t.Identity = f.identity
@@ -514,6 +531,53 @@ func applyExportFlags(cmd *cobra.Command, t *config.Telemetry, f installFlags) (
 		t.NoRelay = f.noRelay
 	}
 	return *t != before, nil
+}
+
+// contentChange is what this run's content flags ask for; nil fields were not given.
+type contentChange struct {
+	prompts, toolContent *bool
+}
+
+func (c contentChange) any() bool { return c.prompts != nil || c.toolContent != nil }
+
+// apply is p with the change made.
+func (c contentChange) apply(p relay.ContentPolicy) relay.ContentPolicy {
+	if c.prompts != nil {
+		p.Prompts = *c.prompts
+	}
+	if c.toolContent != nil {
+		p.ToolContent = *c.toolContent
+	}
+	return p
+}
+
+// contentFlags reads --prompts (and the older --exclude-prompts) and
+// --exclude-tool-content.
+func contentFlags(cmd *cobra.Command, f installFlags) (contentChange, error) {
+	var c contentChange
+	flags := cmd.Flags()
+	on, off := true, false
+	switch p := strings.ToLower(strings.TrimSpace(f.prompts)); p {
+	case "on":
+		if flags.Changed("exclude-prompts") && f.excludePrompts {
+			return c, errors.New("--prompts on and --exclude-prompts disagree; pass one")
+		}
+		c.prompts = &on
+	case "off":
+		c.prompts = &off
+	case "":
+		if flags.Changed("exclude-prompts") {
+			v := !f.excludePrompts
+			c.prompts = &v
+		}
+	default:
+		return c, fmt.Errorf("--prompts %q: want on or off", f.prompts)
+	}
+	if flags.Changed("exclude-tool-content") {
+		v := !f.excludeToolContent
+		c.toolContent = &v
+	}
+	return c, nil
 }
 
 // connectOpenCodeForRepo points OpenCode at the repository's project. OpenCode routes
