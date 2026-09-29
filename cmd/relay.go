@@ -63,6 +63,7 @@ func runRelayServe(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 	log := relay.NewLog(dir)
+	ensureMachineContentPolicy(log.Printf)
 	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	if exe, err := os.Executable(); err == nil {
@@ -108,6 +109,25 @@ func runRelaySupervise(cmd *cobra.Command, _ []string) error {
 		return c
 	}, log.Printf)
 	return nil
+}
+
+// ensureMachineContentPolicy records the machine's content default from the choices
+// setup saved on the profile when the relay has none — a relay set up before policies
+// existed would otherwise withhold every record's content, the fail-closed default.
+func ensureMachineContentPolicy(logf func(string, ...any)) {
+	if _, ok := relay.LoadContentPolicy(relay.MachineRoute); ok {
+		return
+	}
+	cfg, err := loadConfig()
+	if err != nil || cfg.Telemetry.Mode != config.TelemetryRelay {
+		return
+	}
+	p := relay.ContentPolicy{Prompts: !cfg.Telemetry.ExcludePrompts, ToolContent: !cfg.Telemetry.ExcludeToolContent}
+	if err := relay.SaveContentPolicy(relay.MachineRoute, p); err != nil {
+		logf("record the machine content policy: %v", err)
+		return
+	}
+	logf("recorded the machine content policy from setup's choices: prompts %v, tool content %v", p.Prompts, p.ToolContent)
 }
 
 // relayBinding names the project a session's directory is bound to — its checkout's own

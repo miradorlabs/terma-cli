@@ -302,3 +302,22 @@ func TestInstallSetsItsProjectsContentPolicyUnderTheRelay(t *testing.T) {
 		t.Fatalf("a repository's --prompts off changed the machine's telemetry record: %+v %v", cfg.Telemetry, err)
 	}
 }
+
+// A relay set up before content policies existed has none; it records the default from
+// setup's saved choices rather than withholding everything.
+func TestRelayServeRecordsAMissingMachinePolicy(t *testing.T) {
+	setupSandbox(t)
+	fakeRelay(t)
+	setupRun(t, "--exclude-tool-content")
+	dir, err := relay.Dir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(dir, "policy", relay.MachineRoute+".json")); err != nil {
+		t.Fatal(err)
+	}
+	ensureMachineContentPolicy(t.Logf)
+	if p, ok := relay.LoadContentPolicy(relay.MachineRoute); !ok || !p.Prompts || p.ToolContent {
+		t.Fatalf("recorded %+v (%v), want setup's choices: prompts on, tool content off", p, ok)
+	}
+}
