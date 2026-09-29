@@ -1,10 +1,13 @@
 package live
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -416,21 +419,38 @@ func TestRelayCodexUntrustedHooks(t *testing.T) {
 		sb.CodexHooksUntrusted = true
 		sb.UseRelay(RelayOptions{Content: true})
 		run := codexRun(t, sb)
-		if !waitFor(45*time.Second, func() bool {
-			return agentSessions(sb.Receiver.evidenceFor(bearer(liveKey)))[run.ThreadID] > 0 && sb.relayDrained(time.Second)
-		}) {
-			t.Fatalf("a session no hook announced never reached the bound project; relay: %+v", sb.RelayStats())
+		entries, _ := os.ReadDir(sb.payloadDir())
+		var ran []string
+		for _, e := range entries {
+			ran = append(ran, e.Name())
 		}
-		if len(sb.HookPayloads("codex-session-start")) != 0 {
-			t.Fatalf("a hook ran, so this does not prove the rollout placed the session")
+		t.Logf("hooks that ran: %v", ran)
+		// No hook ran, so the session can only have been placed from Codex's rollout. Every
+		// record naming the session must reach the bound project; the relay's backlog is not
+		// asked to drain, because Codex's process spans correctly wait out the trace hold.
+		check := func(r contractReporter) {
+			e := sb.Receiver.evidenceFor(bearer(liveKey))
+			for _, name := range []string{"codex.user_prompt", "codex.api_request", "codex.tool_result"} {
+				e.logsFor(r, name, "conversation.id", run.ThreadID, 1)
+			}
 		}
+		waitFor(45*time.Second, func() bool {
+			var f contractFailures
+			check(&f)
+			return len(f) == 0
+		})
 		var failures contractFailures
-		e := sb.Receiver.evidenceFor(bearer(liveKey))
-		for _, name := range []string{"codex.user_prompt", "codex.api_request", "codex.tool_result"} {
-			e.logsFor(&failures, name, "conversation.id", run.ThreadID, 1)
-		}
+		check(&failures)
 		for _, f := range failures {
 			t.Error(f)
+		}
+		if t.Failed() {
+			t.Logf("relay: %+v\n%s", sb.RelayStats(), sb.routingReport(run.ThreadID))
+		}
+		for _, p := range ran {
+			if strings.Contains(p, "codex-session-start") {
+				t.Errorf("a repository hook ran (%s), so this does not prove the rollout placed the session", p)
+			}
 		}
 		checkNoSession(t, sb.Receiver.evidenceFor(bearer(machineKey)), run.ThreadID, "the machine project")
 		noteRelay(t.Name(), sb)
@@ -530,4 +550,258 @@ func TestRelayLateSessionRecord(t *testing.T) {
 		checkNoSession(t, sb.Receiver.evidenceFor(bearer(machineKey)), sid, "the machine project")
 		noteRelay(t.Name(), sb)
 	})
+}
+
+// What the relay accepted is on disk before it answers, so a relay killed outright while
+// Terma's ingest is refusing everything loses nothing: the restarted relay delivers the
+// session whole, and terma's own hook events follow with the next flush.
+func TestRelayKeepsWhatItAcceptedAcrossACrash(t *testing.T) {
+	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
+		track(t)
+		t.Setenv("ANTHROPIC_API_KEY", "synthetic-telemetry-key")
+		sb := New(t, Isolated, WithClaude(b))
+		sb.UseRelay(RelayOptions{Content: true})
+		sb.Receiver.Refuse(503)
+		sid := claudeRun(t, sb, sb.Repo)
+		// Everything the session exported is accepted and waiting.
+		if !waitFor(30*time.Second, func() bool {
+			h := sb.RelayStats()
+			return h.Counters["received"] > 0 && h.Backlog > 0 && sb.Receiver.Refused() > 0
+		}) {
+			t.Fatalf("the relay never held the session while Terma refused it: %+v", sb.RelayStats())
+		}
+		held := sb.RelayStats().Backlog
+		sb.KillRelay()
+		if n := agentSessions(sb.Receiver.evidence())[sid]; n != 0 {
+			t.Fatalf("%d records reached Terma while it was refusing", n)
+		}
+		sb.Receiver.Refuse(0)
+		sb.StartRelay() // what launchd or systemd does after a crash
+		sb.terma(sb.Repo, "spool", "flush", "--force")
+		awaitTelemetry(t, sb, func(r contractReporter, _ telemetryEvidence) {
+			checkClaudeTelemetry(r, sb.Receiver.evidenceFor(bearer(liveKey)), sid, sb.ProjectID, false)
+		})
+		Note(t.Name(), fmt.Sprintf("crash: %d bodies held across SIGKILL, %d refused exports before it", held, sb.Receiver.Refused()))
+		noteRelay(t.Name(), sb)
+	})
+}
+
+// An outage of Terma's ingest that outlasts the session: the relay keeps retrying, with
+// backoff, and delivers the session whole once ingest is back — without a restart.
+func TestRelayDeliversAfterAnOutage(t *testing.T) {
+	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
+		track(t)
+		t.Setenv("ANTHROPIC_API_KEY", "synthetic-telemetry-key")
+		sb := New(t, Isolated, WithClaude(b))
+		sb.UseRelay(RelayOptions{Content: true})
+		sb.Receiver.Refuse(503)
+		sid := claudeRun(t, sb, sb.Repo)
+		time.Sleep(15 * time.Second) // several failed attempts: the backoff has grown
+		if sb.Receiver.Refused() == 0 {
+			t.Fatal("the relay never tried Terma during the outage")
+		}
+		sb.Receiver.Refuse(0)
+		sb.terma(sb.Repo, "spool", "flush", "--force")
+		// The relay's backoff tops out at two minutes (docs/RELAY.md).
+		deadline := time.Now().Add(2*time.Minute + 30*time.Second)
+		for time.Now().Before(deadline) {
+			var failures contractFailures
+			checkClaudeTelemetry(&failures, sb.Receiver.evidenceFor(bearer(liveKey)), sid, sb.ProjectID, false)
+			if len(failures) == 0 {
+				break
+			}
+			time.Sleep(2 * time.Second)
+		}
+		awaitTelemetry(t, sb, func(r contractReporter, _ telemetryEvidence) {
+			checkClaudeTelemetry(r, sb.Receiver.evidenceFor(bearer(liveKey)), sid, sb.ProjectID, false)
+		})
+		noteRelay(t.Name(), sb)
+	})
+}
+
+// An interactive session (the way developers use Claude) whose relay dies between turns
+// and is started again, as its service manager would, before the next turn: every turn
+// arrives, the one before the crash included.
+func TestRelayClaudeInteractiveRestart(t *testing.T) {
+	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
+		track(t)
+		const key = "synthetic-telemetry-key"
+		t.Setenv("ANTHROPIC_API_KEY", key)
+		sb := New(t, Isolated, WithClaude(b))
+		// The key is approved already, as it is for a developer who has used it.
+		state := map[string]any{}
+		raw, _ := os.ReadFile(filepath.Join(sb.ClaudeConfig, ".claude.json"))
+		_ = json.Unmarshal(raw, &state)
+		state["customApiKeyResponses"] = map[string]any{"approved": []string{key[len(key)-20:]}, "rejected": []string{}}
+		raw, _ = json.MarshalIndent(state, "", "  ")
+		sb.writeAbs(filepath.Join(sb.ClaudeConfig, ".claude.json"), string(raw))
+		sb.UseRelay(RelayOptions{Content: true})
+		var calls atomic.Int32
+		provider := httptest.NewServer(claudeScriptedProvider(&calls, nil))
+		defer provider.Close()
+		sb.ClaudeBaseURL = provider.URL
+		reply := regexp.MustCompile(`TERMA_TELEMETRY_REPLY`)
+		prompts := []string{"turn one", "turn two", "turn three"}
+		run := sb.ClaudeInteractiveTurns(RouteAPIKey, prompts, []*regexp.Regexp{reply, reply, reply}, func(turn int, _ string) {
+			if turn == 0 {
+				sb.KillRelay()
+				sb.StartRelay()
+			}
+		})
+		perTurn := func() []int {
+			counts := make([]int, len(prompts))
+			for _, r := range sb.Receiver.evidenceFor(bearer(liveKey)).logs {
+				if r.Attrs["event.name"] != "user_prompt" || r.Attrs["session.id"] != run.SessionID {
+					continue
+				}
+				for i, p := range prompts {
+					if strings.Contains(r.Attrs["prompt"], p) {
+						counts[i]++
+					}
+				}
+			}
+			return counts
+		}
+		waitFor(45*time.Second, func() bool { c := perTurn(); return c[0] > 0 && c[1] > 0 && c[2] > 0 })
+		if c := perTurn(); c[0] == 0 || c[1] == 0 || c[2] == 0 {
+			t.Errorf("user_prompt records per turn %v: every turn must arrive, the one before the crash included", c)
+		}
+		checkOnlySession(t, sb.Receiver.evidenceFor(bearer(liveKey)), run.SessionID, "the bound project")
+		noteRelay(t.Name(), sb)
+	})
+}
+
+// A Codex turn that outlasts the relay's 30-second session hold: the provider stalls
+// mid-turn, so the turn's first child spans are exported long before the turn span that
+// names the session. They wait under their trace (the trace hold) and the full contract
+// still reaches the session's project.
+func TestRelayCodexLongTurn(t *testing.T) {
+	forEachCodex(t, func(t *testing.T, b Binary, _ bool) {
+		track(t)
+		t.Setenv("OPENAI_API_KEY", "synthetic-telemetry-key")
+		sb := New(t, Isolated, WithCodex(b))
+		sb.UseRelay(RelayOptions{Content: true})
+		var calls atomic.Int32
+		inner := codexTelemetryProvider(t, &calls)
+		provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if calls.Load() >= 1 {
+				time.Sleep(relayHold + 5*time.Second) // the second request: past the session hold
+			}
+			inner.ServeHTTP(w, r)
+		}))
+		defer provider.Close()
+		run := sb.CodexExec(RouteAPIKey, telemetryPrompt, fixtureCodexArgs(provider.URL)...)
+		awaitTelemetry(t, sb, func(r contractReporter, _ telemetryEvidence) {
+			e := sb.Receiver.evidenceFor(bearer(liveKey))
+			checkCodexTelemetry(r, e, run.ThreadID, sb.ProjectID, false, true)
+			checkOnlySession(r, e, run.ThreadID, "the bound project")
+		})
+		checkNoSession(t, sb.Receiver.evidenceFor(bearer(machineKey)), run.ThreadID, "the machine project")
+		noteRelay(t.Name(), sb)
+	})
+}
+
+// File tools carry file contents: Write's input, Read's output, Edit's strings. With
+// tool content withheld none of it may leave, wherever a Claude release puts it; with
+// it allowed, the relay must not have removed it.
+func TestRelayClaudeFileToolsContent(t *testing.T) {
+	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
+		for _, content := range []bool{false, true} {
+			t.Run(relayMode(content), func(t *testing.T) {
+				track(t)
+				t.Setenv("ANTHROPIC_API_KEY", "synthetic-telemetry-key")
+				sb := New(t, Isolated, WithClaude(b))
+				sb.UseRelay(RelayOptions{Content: content})
+				path := filepath.Join(sb.Repo, "secret.txt")
+				steps := []map[string]any{
+					{"name": "Write", "input": map[string]any{"file_path": path, "content": fileSecret + " line one\n"}},
+					{"name": "Read", "input": map[string]any{"file_path": path}},
+					{"name": "Edit", "input": map[string]any{"file_path": path, "old_string": "line one", "new_string": fileSecret + " edited"}},
+				}
+				var calls atomic.Int32
+				provider := httptest.NewServer(claudeScriptedProvider(&calls, steps))
+				defer provider.Close()
+				sb.ClaudeBaseURL = provider.URL
+				_, sid := sb.ClaudeHeadless(RouteAPIKey, "Write, read and edit the file.", "--max-turns", "6", "--tools", "Write,Read,Edit", "--allowedTools", "Write,Read,Edit", "--permission-mode", "acceptEdits")
+				if calls.Load() < int32(len(steps))+1 {
+					t.Fatalf("provider calls = %d: Claude did not run the scripted tools", calls.Load())
+				}
+				waitFor(30*time.Second, func() bool {
+					return len(sb.APIRequests(sid, time.Second)) >= len(steps)+1 && sb.relayDrained(time.Second)
+				})
+				found := leakedFieldsOf(sb.Receiver.evidence(), fileSecret)
+				if content && len(found) == 0 {
+					t.Errorf("tool content allowed, but the file's contents reached Terma nowhere")
+				}
+				if !content && len(found) > 0 {
+					t.Errorf("tool content withheld, but the file's contents reached Terma in: %v", found)
+				}
+				checkOnlySession(t, sb.Receiver.evidenceFor(bearer(liveKey)), sid, "the bound project")
+				if content {
+					Note(t.Name(), "file contents at Terma in: "+strings.Join(found, ", "))
+				}
+				noteRelay(t.Name(), sb)
+			})
+		}
+	})
+}
+
+// A session placed in the bound repository, resumed somewhere personal: Claude keeps the
+// session id, and the relay keeps a session with the project it was first placed in, so
+// the resumed run reaches the bound project too. This records it rather than failing on
+// it: telling the resumed run apart needs per-process placement (PR #27's), which PR #28
+// does not have.
+func TestRelayClaudeResumedElsewhere(t *testing.T) {
+	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
+		track(t)
+		t.Setenv("ANTHROPIC_API_KEY", "synthetic-telemetry-key")
+		sb := New(t, Isolated, WithClaude(b))
+		sb.UseRelay(RelayOptions{Content: true})
+		// One provider for the run and its resumption.
+		var calls atomic.Int32
+		provider := httptest.NewServer(claudeTelemetryProvider(&calls))
+		defer provider.Close()
+		sb.ClaudeBaseURL = provider.URL
+		_, sid := sb.ClaudeHeadless(RouteAPIKey, telemetryPrompt, "--max-turns", "3", "--tools", "Bash", "--allowedTools", "Bash")
+		personal := filepath.Join(sb.Dir, "personal")
+		if err := os.MkdirAll(personal, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		const personalPrompt = "TERMA_PERSONAL_WORK please"
+		resumed, err := sb.resumeClaude(personal, sid, personalPrompt)
+		if err != nil {
+			Note(t.Name(), "resume elsewhere: Claude refused ("+strings.SplitN(err.Error(), "\n", 2)[0]+")")
+			return
+		}
+		waitFor(relayHold+15*time.Second, func() bool {
+			return len(leakedFieldsOf(sb.Receiver.evidence(), "TERMA_PERSONAL_WORK")) > 0 && sb.relayDrained(time.Second)
+		})
+		at := map[string]int{}
+		for name, key := range map[string]string{"bound project": liveKey, "machine project": machineKey} {
+			at[name] = len(leakedFieldsOf(sb.Receiver.evidenceFor(bearer(key)), "TERMA_PERSONAL_WORK"))
+		}
+		msg := fmt.Sprintf("resume elsewhere: session id %s; the personal run's prompt reached the bound project in %d fields, the machine project in %d",
+			map[bool]string{true: "kept", false: "changed"}[resumed == sid], at["bound project"], at["machine project"])
+		Note(t.Name(), msg)
+		t.Log(msg)
+		noteRelay(t.Name(), sb)
+	})
+}
+
+// routingReport says where a session's records went and what the relay decided, for a
+// failure message.
+func (sb *Sandbox) routingReport(sid string) string {
+	var b strings.Builder
+	for name, key := range map[string]string{"bound": liveKey, "machine": machineKey, "other": otherKey} {
+		fmt.Fprintf(&b, "at %s: %v\n", name, agentSessions(sb.Receiver.evidenceFor(bearer(key))))
+	}
+	for _, sub := range []string{"sessions", "routes"} {
+		entries, _ := os.ReadDir(filepath.Join(sb.TermaConfig, "relay", sub))
+		for _, e := range entries {
+			data, _ := os.ReadFile(filepath.Join(sb.TermaConfig, "relay", sub, e.Name()))
+			fmt.Fprintf(&b, "%s/%s: %s", sub, e.Name(), data)
+		}
+	}
+	fmt.Fprintf(&b, "session under test: %s\nlog:\n%s", sid, sb.relayLog())
+	return b.String()
 }

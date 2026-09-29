@@ -112,7 +112,7 @@ jobs:
   # Pin PR builds; live.yml also checks the latest releases nightly.
   harness-telemetry:
     runs-on: macos-latest
-    timeout-minutes: 15
+    timeout-minutes: 35
     env:
       TERMA_ENV: dev
       TERMA_LIVE: "1"
@@ -135,7 +135,10 @@ jobs:
         run: go build -o live/bin/terma .
       - name: Assert harness telemetry (no provider credentials)
         working-directory: live
-        run: go test -v -count=1 -timeout=10m -run '^(TestClaudeTelemetry|TestCodexTelemetry|TestClaudeStopFailureDelivery)$' .
+        # TestRelay* (docs/RELAY.md): the same harnesses exporting through their global
+        # configuration to `terma relay serve`, each session reaching its repository's
+        # project, unplaced ones the machine project, and nothing accepted lost.
+        run: go test -v -count=1 -timeout=30m -run '^(TestClaudeTelemetry|TestCodexTelemetry|TestClaudeStopFailureDelivery|TestRelay.*)$' .
       - name: Publish coverage summary
         if: always()
         run: |

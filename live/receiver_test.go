@@ -28,8 +28,14 @@ func TestReceiverPreservesTelemetry(t *testing.T) {
 	for _, tc := range cases {
 		for _, format := range []string{"json", "protobuf"} {
 			t.Run(tc.name+"/"+format, func(t *testing.T) {
+				// The fixture is OTLP/JSON, whose ids are hex: what it means is what Terma's
+				// gateway decodes, not what protojson alone makes of it.
+				spec, err := hexIDsToBase64([]byte(tc.body))
+				if err != nil {
+					t.Fatal(err)
+				}
 				want := tc.message()
-				if err := protojson.Unmarshal([]byte(tc.body), want); err != nil {
+				if err := protojson.Unmarshal(spec, want); err != nil {
 					t.Fatal(err)
 				}
 				body := []byte(tc.body)
@@ -62,6 +68,9 @@ func TestReceiverPreservesTelemetry(t *testing.T) {
 				case "traces":
 					if len(r.Spans()) != 1 || !proto.Equal(r.Spans()[0].Proto, want.(*coltracepb.ExportTraceServiceRequest).ResourceSpans[0].ScopeSpans[0].Spans[0]) {
 						t.Fatal("lost span fields")
+					}
+					if id := r.Spans()[0].Proto.GetTraceId(); format == "json" && !bytes.Equal(id, []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}) {
+						t.Fatalf("an OTLP/JSON hex trace id decoded as %x", id)
 					}
 				case "metrics":
 					if len(r.Metrics()) != 2 || !proto.Equal(r.Metrics()[1].Proto, want.(*colmetricspb.ExportMetricsServiceRequest).ResourceMetrics[0].ScopeMetrics[0].Metrics[1]) {

@@ -178,6 +178,32 @@ input context. The report sums available harness-reported USD; Codex usage is
 recorded in tokens and is not priced there. Treat that sum as partial, not the
 combined provider bill.
 
+## The relay
+
+`TestRelay*` (`relay.go`, `relay_test.go`) run the real harnesses through terma's
+loopback relay (docs/RELAY.md), set up by a real `terma install`: a server key and a
+stand-in `/v1/identity`, keys seeded in `keys.json` for three projects (the bound
+repository, the machine project, a second repository), `launchctl`/`systemctl` stand-ins
+first on the sandbox PATH so install never loads a job in the developer's session, and a
+relay port of the sandbox's own. `terma relay serve` runs in the foreground. The
+receiver decodes OTLP/JSON's hex ids as Terma's gateway does and `evidenceFor(key)`
+splits what arrived by the key it came with, which is how routing is observed: the relay
+stamps no project on a record.
+
+| Scenario | Asserts |
+|---|---|
+| `TestRelayClaude`, `TestRelayCodex` (content, withheld) | the direct export's whole contract at the bound project; nothing of the session anywhere else; Codex's metrics at the machine project; withheld content nowhere (planted markers, every field scanned) |
+| `TestRelayUnplacedSessionsReachTheMachineProject` | outside a repository, an unbound repository, `TERMA_HOOKS=0`: the session whole at the machine project after the 30 s hold, none at the bound project |
+| `TestRelayConcurrentProjects` | two bound projects and a personal session at once, each at its own key |
+| `TestRelayCodexUntrustedHooks` | no hook ran; the rollout still placed the session in the bound project |
+| `TestRelayLinkedWorktree`, `TestRelayClaudeSubagent`, `TestRelayLateSessionRecord` | inherited binding; subagent requests with the parent; a late hook record placing held records |
+| `TestRelayKeepsWhatItAcceptedAcrossACrash`, `TestRelayDeliversAfterAnOutage`, `TestRelayClaudeInteractiveRestart` | SIGKILL while ingest refuses, a 503 outage, a crash between interactive turns: nothing accepted is lost |
+| `TestRelayCodexLongTurn` | a turn past the session hold: child spans wait on their trace and arrive with the session |
+| `TestRelayClaudeFileToolsContent` | Write/Read/Edit file contents nowhere when withheld, somewhere when allowed |
+| `TestRelayClaudeResumedElsewhere` | recorded, not asserted: a session resumed in a personal directory keeps its first project |
+
+Goldens are `golden/relay/<harness>-<content|withheld>.json`.
+
 ## Golden key sets
 
 `golden/<harness>/<surface>.json` holds the attribute names each surface

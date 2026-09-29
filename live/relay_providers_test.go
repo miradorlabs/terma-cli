@@ -1,9 +1,11 @@
 package live
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os/exec"
 	"strings"
 	"sync/atomic"
 )
@@ -40,4 +42,29 @@ func claudeScriptedProvider(calls *atomic.Int32, steps []map[string]any) http.Ha
 		emit("message_delta", map[string]any{"type": "message_delta", "delta": map[string]any{"stop_reason": stop, "stop_sequence": nil}, "usage": map[string]any{"output_tokens": 4}})
 		emit("message_stop", map[string]any{"type": "message_stop"})
 	})
+}
+
+// fileSecret is written into a file by one tool and read back by another: the withheld
+// scenario fails if it reaches upstream anywhere — an attribute, a span event, a body.
+const fileSecret = "TERMA_FILE_SECRET_CONTENT"
+
+// resumeClaude resumes session sid headlessly in dir, the way a developer would with
+// `claude --resume`, and returns the session id the resumed run reports.
+func (sb *Sandbox) resumeClaude(dir, sid, prompt string) (string, error) {
+	args := []string{"-p", prompt, "--output-format", "json", "--max-turns", "3", "--tools", "Bash", "--allowedTools", "Bash",
+		"--model", "claude-haiku-4-5", "--strict-mcp-config", "--no-chrome", "--disable-slash-commands", "--resume", sid}
+	ctx, cancel := context.WithTimeout(context.Background(), scenarioTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, sb.claudeLauncher(), args...)
+	cmd.Dir = dir
+	cmd.Env = sb.claudeEnv(RouteAPIKey)
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("%v: %s", err, out)
+	}
+	var result struct {
+		SessionID string `json:"session_id"`
+	}
+	_ = json.Unmarshal(out, &result)
+	return result.SessionID, nil
 }
