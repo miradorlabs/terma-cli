@@ -7,6 +7,7 @@
 package claim
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
@@ -104,9 +106,21 @@ func path(sessionID string) (string, bool) {
 	return filepath.Join(dir, claimsDir, sessionID+".json"), true
 }
 
-// Write records that sessionID belongs to c.ProjectID, unless a claim for the same
-// project was written less than Refresh ago. It reports whether it wrote. Errors are
-// swallowed: a hook never fails for want of a claim, the session is only not exported.
+// lockWait is how long a hook waits for another hook of the same session to finish
+// its read-merge-write of the claim: the session store's policy (internal/session). A
+// lock that cannot be had costs the write its exclusivity, never the write itself — a
+// hook must not lose its claim to a wedged process. A variable so a test of the
+// exclusion is not decided by a loaded machine.
+var lockWait = 250 * time.Millisecond
+
+// Write records that sessionID belongs to c.ProjectID, merging c.PIDs into the
+// processes already named, unless a claim for the same project naming them was
+// written less than Refresh ago. It reports whether it wrote. Errors are swallowed: a
+// hook never fails for want of a claim, the session is only not exported.
+//
+// The read-merge-write runs under a sidecar lock: two runs of one session (a resume
+// in the repository while the first still exports) each add their processes, and
+// without it one run's would be lost and its records dropped as another process's.
 func Write(sessionID string, c Claim, now time.Time) bool {
 	if c.ProjectID == "" {
 		return false
@@ -114,6 +128,21 @@ func Write(sessionID string, c Claim, now time.Time) bool {
 	p, ok := path(sessionID)
 	if !ok {
 		return false
+	}
+	// The fast path needs no lock: a fresh claim already naming these processes.
+	if prev, ok := read(p); ok && prev.ProjectID == c.ProjectID && subset(c.PIDs, prev.PIDs) {
+		if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < Refresh {
+			return false
+		}
+	}
+	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), lockWait)
+	unlock, err := flock.Lock(ctx, p+".lock")
+	cancel()
+	if err == nil {
+		defer unlock()
 	}
 	prev, havePrev := read(p)
 	if havePrev && prev.ProjectID == c.ProjectID {
@@ -125,9 +154,6 @@ func Write(sessionID string, c Claim, now time.Time) bool {
 	c.ClaimedAt = now.UTC()
 	data, err := json.Marshal(c)
 	if err != nil {
-		return false
-	}
-	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
 		return false
 	}
 	return config.WriteFileAtomicNoSync(p, data, 0o600) == nil
@@ -195,6 +221,7 @@ func Prune(now time.Time) {
 	for _, e := range entries {
 		info, err := e.Info()
 		if err == nil && now.Sub(info.ModTime()) >= TTL {
+			// A claim's lock goes with it; a lock alone ages out the same way.
 			_ = os.Remove(filepath.Join(dir, claimsDir, e.Name()))
 		}
 	}

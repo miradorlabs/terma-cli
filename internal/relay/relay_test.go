@@ -249,8 +249,17 @@ func TestRelayRoutesLogsPerClaimedSession(t *testing.T) {
 				}
 			}
 			c := r.Stats().Snapshot().Counters
-			if c["received.logs"] != 6 || c["dropped.no_session_id.logs"] != 1 || c["dropped.no_key.logs"] != 1 || c["held_parts"] != 1 {
+			// C (unclaimed) and D (keyless) wait: a claim or a key may still come.
+			if c["received.logs"] != 6 || c["dropped.no_session_id.logs"] != 1 || c["held_parts"] != 2 {
 				t.Fatalf("stats = %v", c)
+			}
+			f.mu.Lock()
+			f.now = f.now.Add(2 * time.Minute)
+			f.mu.Unlock()
+			r.sweep()
+			c = r.Stats().Snapshot().Counters
+			if c["dropped.no_key.logs"] != 1 || c["dropped.unclaimed_expired.logs"] != 1 {
+				t.Fatalf("after the hold: %v", c)
 			}
 		})
 	}

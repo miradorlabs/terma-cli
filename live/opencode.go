@@ -126,6 +126,8 @@ func (sb *Sandbox) UseOpenCodeProvider(url string) {
 			"models":  map[string]any{"m": map[string]any{"name": "m"}},
 		}},
 		"model": "fake/m", "autoupdate": false, "share": "disabled",
+		// Headless runs must never stop to ask.
+		"permission": map[string]any{"bash": "allow", "edit": "allow", "webfetch": "allow"},
 	}
 	data, _ := json.MarshalIndent(cfg, "", "  ")
 	sb.writeAbs(filepath.Join(sb.Home, ".config", "opencode", "opencode.json"), string(data)+"\n")

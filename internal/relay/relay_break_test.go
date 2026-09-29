@@ -15,6 +15,7 @@ import (
 
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
+	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
 	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/protobuf/proto"
@@ -370,8 +371,7 @@ func TestRelayClaimCoversOnlyItsProcesses(t *testing.T) {
 	r := New(Options{Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
 		PeerPID: func(int) (int, bool) { pid := int(sender.Load()); return pid, pid != 0 },
 		Resolve: func(c claim.Claim) (Policy, error) { return allPolicies(u)[c.ProjectID], nil }})
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	go r.Run(ctx)
 	srv := httptest.NewUnstartedServer(r.Handler())
 	srv.Config.ConnContext = r.ConnContext
@@ -413,8 +413,7 @@ func TestRelayLearnsTracesFromLogs(t *testing.T) {
 	f := newFixture()
 	r := New(Options{Token: token, Hold: time.Second, Lookup: f.lookup, Now: f.clock,
 		Resolve: func(c claim.Claim) (Policy, error) { return allPolicies(u)[c.ProjectID], nil }})
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	go r.Run(ctx)
 	srv := httptest.NewServer(r.Handler())
 	defer srv.Close()
@@ -456,8 +455,7 @@ func BenchmarkRelayExport(b *testing.B) {
 	r := New(Options{Token: token, Resolve: func(claim.Claim) (Policy, error) {
 		return Policy{Endpoint: sink.URL, Key: "k", IncludePrompts: false, IncludeToolContent: false}, nil
 	}})
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := b.Context()
 	go r.Run(ctx)
 	var recs []*logspb.LogRecord
 	for i := range 50 {
@@ -473,4 +471,254 @@ func BenchmarkRelayExport(b *testing.B) {
 		h.ServeHTTP(httptest.NewRecorder(), req)
 	}
 	b.ReportMetric(float64(b.N*50)/b.Elapsed().Seconds(), "records/s")
+}
+
+// procRelay is a relay whose senders are told by the test: send(pid, ...) posts on a
+// fresh connection that PeerPID names pid.
+type procRelay struct {
+	t      *testing.T
+	r      *Relay
+	f      *fixture
+	u      *upstream
+	srv    *httptest.Server
+	sender atomic.Int64
+}
+
+func newProcRelay(t *testing.T) *procRelay {
+	pr := &procRelay{t: t, u: newUpstream(t), f: newFixture()}
+	pr.r = New(Options{Token: token, Hold: time.Minute, Lookup: pr.f.lookup, Now: pr.f.clock,
+		PeerPID: func(int) (int, bool) { pid := int(pr.sender.Load()); return pid, pid != 0 },
+		Resolve: func(c claim.Claim) (Policy, error) {
+			if p, ok := allPolicies(pr.u)[c.ProjectID]; ok {
+				return p, nil
+			}
+			return Policy{}, ErrNoKey
+		}})
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	go pr.r.Run(ctx)
+	pr.srv = httptest.NewUnstartedServer(pr.r.Handler())
+	pr.srv.Config.ConnContext = pr.r.ConnContext
+	pr.srv.Start()
+	t.Cleanup(pr.srv.Close)
+	return pr
+}
+
+func (pr *procRelay) send(pid int, path string, m proto.Message) {
+	pr.sender.Store(int64(pid))
+	body, _ := proto.Marshal(m)
+	req, _ := http.NewRequest(http.MethodPost, pr.srv.URL+path, bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/x-protobuf")
+	resp, err := (&http.Client{Transport: &http.Transport{DisableKeepAlives: true}}).Do(req)
+	if err != nil {
+		pr.t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+}
+
+// codexMetric is a Codex-shaped metric: no session anywhere.
+func codexMetric() *metricspb.MetricsData {
+	return &metricspb.MetricsData{ResourceMetrics: []*metricspb.ResourceMetrics{{Resource: &resourcepb.Resource{}, ScopeMetrics: []*metricspb.ScopeMetrics{{Metrics: []*metricspb.Metric{
+		{Name: "codex.turn.token_usage", Data: &metricspb.Metric_Histogram{Histogram: &metricspb.Histogram{DataPoints: []*metricspb.HistogramDataPoint{{Count: 1}}}}},
+	}}}}}}
+}
+
+func (pr *procRelay) metricsBy(auth string) []map[string]string {
+	pr.u.mu.Lock()
+	defer pr.u.mu.Unlock()
+	var out []map[string]string
+	for _, req := range pr.u.requests {
+		var m metricspb.MetricsData
+		if req.path != "/v1/metrics" || proto.Unmarshal(req.body, &m) != nil {
+			continue
+		}
+		if auth != "" && req.auth != auth {
+			continue
+		}
+		for _, rm := range m.ResourceMetrics {
+			res := map[string]string{}
+			for _, kv := range rm.Resource.Attributes {
+				res[kv.Key] = kv.Value.GetStringValue()
+			}
+			out = append(out, res)
+		}
+	}
+	return out
+}
+
+// Codex's metrics name no session. A process that exported for exactly one opted-in
+// session gets its metrics attributed to that session's project, marked as inferred.
+func TestRelayAttributesSessionlessMetricsByProcess(t *testing.T) {
+	pr := newProcRelay(t)
+	pr.send(100, "/v1/logs", logsOf("B", 1)) // B: p2, the process's one session
+	pr.send(100, "/v1/metrics", codexMetric())
+	waitFor(t, func() bool { return len(pr.metricsBy("Bearer key-p2")) == 1 })
+	res := pr.metricsBy("Bearer key-p2")[0]
+	if res[ProjectAttr] != "p2" || res[AttributionAttr] != "process" || res[InferredSessionAttr] != "B" {
+		t.Fatalf("resource = %v", res)
+	}
+}
+
+// A process that exported for an opted-in session and an unclaimed one, or for two
+// projects, could have made the metric for either: it is never guessed.
+func TestRelayRefusesAmbiguousProcesses(t *testing.T) {
+	pr := newProcRelay(t)
+	pr.send(200, "/v1/logs", logsOf("A", 1)) // p1
+	pr.send(200, "/v1/logs", logsOf("C", 1)) // unclaimed
+	pr.send(200, "/v1/metrics", codexMetric())
+	pr.send(300, "/v1/logs", logsOf("A", 1)) // p1
+	pr.send(300, "/v1/logs", logsOf("B", 1)) // p2
+	pr.send(300, "/v1/metrics", codexMetric())
+	pr.send(0, "/v1/metrics", codexMetric()) // a sender nobody could name
+	time.Sleep(200 * time.Millisecond)
+	pr.f.mu.Lock()
+	pr.f.now = pr.f.now.Add(2 * time.Minute)
+	pr.f.mu.Unlock()
+	pr.r.sweep()
+	if got := pr.metricsBy(""); len(got) != 0 {
+		t.Fatalf("an ambiguous process's metric was forwarded: %v", got)
+	}
+	c := pr.r.Stats().Snapshot().Counters
+	if c["dropped.ambiguous_process.metrics"] != 2 || c["dropped.no_session_id.metrics"] != 1 {
+		t.Fatalf("stats = %v", c)
+	}
+}
+
+// A process whose metrics arrive before it has named any session: they wait, and
+// leave once its first log names an opted-in session.
+func TestRelayHoldsMetricsUntilTheProcessNamesItsSession(t *testing.T) {
+	pr := newProcRelay(t)
+	pr.send(400, "/v1/metrics", codexMetric())
+	if got := pr.metricsBy(""); len(got) != 0 {
+		t.Fatal("forwarded before the process named a session")
+	}
+	pr.send(400, "/v1/logs", logsOf("A", 1))
+	pr.r.sweep()
+	waitFor(t, func() bool { return len(pr.metricsBy("Bearer key-p1")) == 1 })
+}
+
+// A span of a trace nothing ever names — Codex's process-level work — is attributed
+// by its process the same way, instead of waiting out the trace hold.
+func TestRelayAttributesUnnamedTracesByProcess(t *testing.T) {
+	pr := newProcRelay(t)
+	pr.send(500, "/v1/logs", logsOf("A", 1))
+	orphan := &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{Resource: &resourcepb.Resource{}, ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{{Name: "persist_rollout_items", TraceId: []byte("fedcba9876543210")}}}}}}}
+	pr.send(500, "/v1/traces", orphan)
+	waitFor(t, func() bool { return pr.r.Stats().Snapshot().Counters["forwarded.traces"] == 1 })
+	if c := pr.r.Stats().Snapshot().Counters; c["attributed_by_process.traces"] != 1 {
+		t.Fatalf("stats = %v", c)
+	}
+}
+
+// A developer runs `terma install` moments after starting a session: its claim exists
+// before its key does. The session's parts wait, and leave once the key is there,
+// instead of being dropped on arrival.
+func TestRelayWaitsForAKey(t *testing.T) {
+	u := newUpstream(t)
+	f := newFixture()
+	var keyed atomic.Bool
+	r := New(Options{Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+		Resolve: func(c claim.Claim) (Policy, error) {
+			if c.ProjectID == "p3" && keyed.Load() {
+				return Policy{Endpoint: u.srv.URL, Key: "key-p3"}, nil
+			}
+			return Policy{}, ErrNoKey
+		}})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go r.Run(ctx)
+	srv := httptest.NewServer(r.Handler())
+	defer srv.Close()
+	body, _ := proto.Marshal(logsOf("D", 2)) // D is claimed for p3
+	post(t, srv, "/v1/logs", body, "application/x-protobuf", token, false)
+	r.sweep()
+	if c := r.Stats().Snapshot().Counters; c["forwarded.logs"] != 0 || sum(c, "dropped.") != 0 {
+		t.Fatalf("a keyless session's parts must wait: %v", c)
+	}
+	keyed.Store(true)
+	r.sweep()
+	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["forwarded.logs"] == 2 })
+}
+
+// codexStart is a Codex conversation start for session, with its policies.
+func codexStart(session, originator, approval, sandbox string) *logspb.LogsData {
+	return logsOf(session, 1, kv("originator", originator), kv("event.name", "codex.conversation_starts"), kv("approval_policy", approval), kv("sandbox_policy", sandbox))
+}
+
+// codexLogs is a Codex-shaped log export for session, from client originator.
+func codexLogs(session, originator string, n int) *logspb.LogsData {
+	return logsOf(session, n, kv("originator", originator))
+}
+
+// Codex's TUI starts a second conversation of its own to title the thread: its own
+// conversation.id, no hook, same process. The single-workspace client's unclaimed
+// conversation goes with its claimed thread's project, marked as the relay's
+// inference, naming the thread it belongs to.
+func TestRelayAdoptsTheTUITitleConversation(t *testing.T) {
+	pr := newProcRelay(t)
+	pr.send(600, "/v1/logs", codexLogs("A", "codex-tui", 1))                         // the thread, claimed for p1
+	pr.send(600, "/v1/logs", codexStart("title", "codex-tui", "never", "read-only")) // Codex's own
+	pr.send(600, "/v1/logs", codexLogs("title", "codex-tui", 1))                     // no hook claimed it
+	pr.send(600, "/v1/metrics", codexMetric())                                       // the process's metrics
+	waitFor(t, func() bool {
+		c := pr.r.Stats().Snapshot().Counters
+		return c["forwarded.logs"] == 3 && c["forwarded.metrics"] == 1
+	})
+	// (The thread's one log, and the title conversation's start and record.)
+	logs, projects := pr.u.logs(t)
+	if len(logs["Bearer key-p1"]) != 3 || projects["Bearer key-p1"] != "p1" {
+		t.Fatalf("forwarded = %v %v", logs, projects)
+	}
+	pr.u.mu.Lock()
+	found := false
+	for _, req := range pr.u.requests {
+		var m logspb.LogsData
+		if req.path != "/v1/logs" || proto.Unmarshal(req.body, &m) != nil {
+			continue
+		}
+		res := m.ResourceLogs[0].Resource.Attributes
+		if attr(m.ResourceLogs[0].ScopeLogs[0].LogRecords[0].Attributes, "session.id") == "title" {
+			found = attr(res, AttributionAttr) == "process-sibling" && attr(res, InferredSessionAttr) == "A"
+		}
+	}
+	pr.u.mu.Unlock()
+	if !found {
+		t.Fatal("the title conversation was not marked as adopted from thread A")
+	}
+	if res := pr.metricsBy("Bearer key-p1"); len(res) != 1 || res[0][InferredSessionAttr] != "A" {
+		t.Fatalf("metrics = %v", res)
+	}
+}
+
+// Nothing is adopted where an unclaimed conversation could be personal: a
+// multi-workspace client (Desktop, the IDE extension), or a TUI working for two
+// projects at once.
+func TestRelayAdoptsNothingAmbiguous(t *testing.T) {
+	pr := newProcRelay(t)
+	pr.send(700, "/v1/logs", codexLogs("A", "Codex Desktop", 1))
+	pr.send(700, "/v1/logs", codexStart("personal", "Codex Desktop", "never", "read-only"))
+	pr.send(800, "/v1/logs", codexLogs("A", "codex-tui", 1))
+	pr.send(800, "/v1/logs", codexLogs("B", "codex-tui", 1))
+	pr.send(800, "/v1/logs", codexStart("stray", "codex-tui", "never", "read-only"))
+	// A TUI in the repository that resumed a personal thread: the thread starts with
+	// the developer's policies, not Codex's internal ones, and is never adopted.
+	pr.send(900, "/v1/logs", codexLogs("A", "codex-tui", 1))
+	pr.send(900, "/v1/logs", codexStart("resumed", "codex-tui", "on-request", "workspace-write"))
+	time.Sleep(200 * time.Millisecond)
+	pr.f.mu.Lock()
+	pr.f.now = pr.f.now.Add(2 * time.Minute)
+	pr.f.mu.Unlock()
+	pr.r.sweep()
+	logs, _ := pr.u.logs(t)
+	for _, recs := range logs {
+		for _, lr := range recs {
+			if s := attr(lr.Attributes, "session.id"); s == "personal" || s == "stray" || s == "resumed" {
+				t.Fatalf("an ambiguous unclaimed conversation %q was adopted", s)
+			}
+		}
+	}
+	if c := pr.r.Stats().Snapshot().Counters; c["dropped.unclaimed_expired.logs"] != 3 {
+		t.Fatalf("stats = %v", c)
+	}
 }

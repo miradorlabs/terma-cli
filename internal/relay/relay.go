@@ -1,7 +1,16 @@
+// Package relay is the local OTLP relay. The agents' global exporters send to it on
+// loopback; it forwards a record only when a hook in an opted-in repository claimed
+// the record's session (package claim) and the record came from a process that claim
+// names, to that repository's project, with that project's key and under its content
+// policy. Everything else waits briefly in memory — a first export can race the hook
+// that claims it — and is then dropped, without leaving the machine or touching disk.
+//
+// The files: relay.go takes requests and decodes them, split.go divides an export by
+// session, route.go decides and holds, forward.go sends upstream, content.go applies
+// the content policy, conn.go names senders, stats.go counts every record's fate.
 package relay
 
 import (
-	"bytes"
 	"compress/gzip"
 	"context"
 	"crypto/subtle"
@@ -9,16 +18,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
-	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
-	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -31,12 +37,12 @@ import (
 // OpenCode's exports.
 const ProjectAttr = "mirador.project.id"
 
-// DefaultHold is how long a record whose session nobody has claimed yet is kept in
-// memory before it is dropped. It covers the first export batch racing the hook that
-// claims the session; the spike measures the real race.
+// DefaultHold is how long a part that cannot leave yet — unclaimed, uncovered, keyless
+// — waits for its reason to go away. It covers a first export racing the hook.
 const DefaultHold = 2 * time.Minute
 
-// DefaultTraceHold is TraceHold's default.
+// DefaultTraceHold is how long a span waits for its trace to be named: as long as a
+// turn can last, since a turn's child spans can precede the span naming the session.
 const DefaultTraceHold = 30 * time.Minute
 
 // maxBody bounds one export request, decompressed.
@@ -52,127 +58,69 @@ type Policy struct {
 }
 
 // ErrNoKey is Resolve's answer for a project this machine holds no key for: the
-// developer never opted in here, so the session is dropped, not held.
+// developer has not opted in here, so the session's parts wait, then are dropped.
 var ErrNoKey = errors.New("no key for this project on this machine")
 
 // Options configure a relay.
 type Options struct {
 	// Token is what the agents' exporters present as `Authorization: Bearer <token>`.
 	Token string
-	// Hold is how long unclaimed records wait for a claim (DefaultHold when zero).
-	Hold time.Duration
+	// Hold and TraceHold: DefaultHold and DefaultTraceHold (at least Hold) when zero.
+	Hold      time.Duration
+	TraceHold time.Duration
 	// Lookup finds a session's claim; claim.Read when nil.
 	Lookup func(sessionID string, now time.Time) (claim.Claim, bool)
 	// Resolve turns a claim into a Policy, or ErrNoKey.
 	Resolve func(c claim.Claim) (Policy, error)
+	// ClaimCacheTTL and PolicyCacheTTL keep Lookup's and Resolve's answers that long
+	// (0: ask every time). Production uses about a second and a few seconds.
+	ClaimCacheTTL  time.Duration
+	PolicyCacheTTL time.Duration
+	// PeerPID names the process behind a connection from its remote port
+	// (procinfo.FindSender). Without it the session alone decides.
+	PeerPID func(port int) (int, bool)
 	// HTTP sends upstream; a no-redirect client with a 15-second timeout when nil.
 	HTTP *http.Client
+	// Grace is how long a stopping relay keeps delivering what it accepted (5 s).
+	Grace time.Duration
 	// Now is the clock; time.Now when nil.
 	Now func() time.Time
 	// Version is terma's, sent as the User-Agent.
 	Version string
-	// TraceHold is how long spans wait for their trace's session to be learnt
-	// (DefaultTraceHold when zero): longer than Hold, because a turn's child spans can
-	// precede the span or log that names the session by as long as the turn lasts.
-	TraceHold time.Duration
-	// Grace is how long a stopping relay keeps delivering what it had already
-	// accepted for claimed sessions (five seconds when zero).
-	Grace time.Duration
-	// PeerPID names the process on the other end of a connection from its remote
-	// port (procinfo.FindSender). With it, a claim covers only its own processes; without
-	// it, or when a lookup fails (counted as sender_unresolved), the session decides.
-	PeerPID func(port int) (int, bool)
-}
-
-type connKey struct{}
-
-// connInfo is one exporter connection: its remote port, and the process behind it,
-// looked up once and kept for the connection's life.
-type connInfo struct {
-	port int
-	once sync.Once
-	pid  int
-}
-
-// ConnContext is the http.Server hook that remembers each connection's remote port,
-// so the process behind it can be looked up once, not per request.
-func (r *Relay) ConnContext(ctx context.Context, c net.Conn) context.Context {
-	info := &connInfo{}
-	if addr, ok := c.RemoteAddr().(*net.TCPAddr); ok {
-		info.port = addr.Port
-	}
-	return context.WithValue(ctx, connKey{}, info)
-}
-
-func (r *Relay) senderPID(req *http.Request) int {
-	info, ok := req.Context().Value(connKey{}).(*connInfo)
-	if !ok || r.opts.PeerPID == nil || info.port == 0 {
-		return 0
-	}
-	info.once.Do(func() {
-		if pid, ok := r.opts.PeerPID(info.port); ok {
-			info.pid = pid
-		} else {
-			r.stats.add("sender_unresolved", 1)
-		}
-	})
-	return info.pid
+	// Logf, when set, is told why each part that could not leave was dropped: its key,
+	// its sender and the claim's processes. `terma relay run` sets it with
+	// TERMA_RELAY_DEBUG=1.
+	Logf func(format string, args ...any)
 }
 
 // Relay is the local OTLP relay. Handler serves the agents; Run delivers what was
-// accepted and ages out what was never claimed.
+// accepted and ages out what never may be.
 type Relay struct {
 	opts  Options
 	stats *Stats
+	cache lookupCache
 
-	// deliverMu orders every hand-off to a destination, so a session's records leave in
-	// the order they arrived: a record that finds its session claimed waits behind the
-	// session's held ones instead of overtaking them. Taken before mu, never after.
+	// deliverMu orders every hand-off to a destination and every hold, so a session's
+	// parts leave in arrival order. Taken before mu, never after.
 	deliverMu sync.Mutex
 
 	mu         sync.Mutex
 	held       map[string][]heldPart
 	heldN      int
 	heldBytes  int
-	lastSeen   time.Time
-	dests      map[string]*destination
 	traces     map[string]traceSession
+	procs      map[int]map[string]time.Time // sender pid → sessions it exported, and when
+	origins    map[int]string               // sender pid → the client it named itself (Codex's originator)
+	internal   map[string]time.Time         // sessions whose start says Codex made them for itself
+	dests      map[string]*destination
+	lastSeen   time.Time
 	wg         sync.WaitGroup
 	sendCtx    context.Context
 	cancelSend context.CancelFunc
 	stopping   chan struct{}
 }
 
-// traceSession is the session a trace was seen to belong to, and when.
-type traceSession struct {
-	session string
-	at      time.Time
-}
-
-// traceTTL is how long the relay remembers which session a trace belongs to. A turn's
-// spans arrive within seconds of each other; an hour is generous.
-const traceTTL = time.Hour
-
-type heldPart struct {
-	p    *part
-	at   time.Time
-	size int
-}
-
-// maxHeld and maxHeldBytes bound what waits for claims at once, by records and by
-// encoded size: a few huge exports must not be able to exhaust memory. Past either, a
-// new unclaimed part is dropped on arrival, counted as unclaimed_overflow.
-const (
-	maxHeld      = 50000
-	maxHeldBytes = 64 << 20
-)
-
-// maxTraces bounds the trace → session index. Past it no new trace is learnt (counted
-// as trace_index_full) until old ones age out, and their unnamed spans are held and
-// then dropped as no_session_trace.
-const maxTraces = 100000
-
-// New returns a relay. Run must be started before requests are served.
+// New returns a relay. Run must be started for anything to leave.
 func New(opts Options) *Relay {
 	if opts.Hold == 0 {
 		opts.Hold = DefaultHold
@@ -182,6 +130,9 @@ func New(opts Options) *Relay {
 	}
 	if opts.Lookup == nil {
 		opts.Lookup = claim.Read
+	}
+	if opts.Resolve == nil {
+		opts.Resolve = func(claim.Claim) (Policy, error) { return Policy{}, ErrNoKey }
 	}
 	if opts.Now == nil {
 		opts.Now = time.Now
@@ -196,8 +147,13 @@ func New(opts Options) *Relay {
 		opts.Grace = 5 * time.Second
 	}
 	sendCtx, cancel := context.WithCancel(context.Background())
-	return &Relay{opts: opts, stats: newStats(), held: map[string][]heldPart{}, dests: map[string]*destination{},
-		traces: map[string]traceSession{}, lastSeen: opts.Now(), sendCtx: sendCtx, cancelSend: cancel, stopping: make(chan struct{})}
+	return &Relay{
+		opts: opts, stats: newStats(),
+		cache:  lookupCache{claims: map[string]cachedClaim{}, policies: map[string]cachedPolicy{}},
+		held:   map[string][]heldPart{},
+		traces: map[string]traceSession{}, procs: map[int]map[string]time.Time{}, origins: map[int]string{}, internal: map[string]time.Time{}, dests: map[string]*destination{},
+		lastSeen: opts.Now(), sendCtx: sendCtx, cancelSend: cancel, stopping: make(chan struct{}),
+	}
 }
 
 // Stats is the relay's running account.
@@ -236,9 +192,12 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	r.touch()
+	r.mu.Lock()
+	r.lastSeen = r.opts.Now()
+	r.mu.Unlock()
 	body, err := readBody(req)
 	if err != nil {
+		r.stats.add("refused_unreadable", 1)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -253,9 +212,24 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 	for _, p := range parts {
 		p.pid = pid
 		r.stats.received(s, p.records)
+		if p.session != "" && !strings.HasPrefix(p.session, tracePrefix) {
+			r.learnProcess(pid, p.session, originatorOf(p))
+			if internalStart(p) {
+				r.mu.Lock()
+				r.internal[p.session] = r.opts.Now()
+				r.mu.Unlock()
+			}
+		}
+	}
+	for _, p := range parts {
 		if p.session == "" {
-			r.stats.dropped(s, "no_session_id", p.records)
-			continue
+			// Nothing in the record names a session — Codex's metrics. Its process
+			// might: see decideProcess.
+			if pid == 0 {
+				r.stats.dropped(s, "no_session_id", p.records)
+				continue
+			}
+			p.session = procKey(pid)
 		}
 		r.route(p)
 	}
@@ -316,410 +290,4 @@ func (r *Relay) decode(s Signal, body []byte, isJSON bool) (map[string]*part, er
 		}
 		return splitMetrics(&m), nil
 	}
-}
-
-func (r *Relay) learnTrace(traceID, session string) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if _, known := r.traces[traceID]; !known && len(r.traces) >= maxTraces {
-		r.stats.add("trace_index_full", 1)
-		return
-	}
-	r.traces[traceID] = traceSession{session, r.opts.Now()}
-}
-
-func (r *Relay) traceOf(traceID string) string {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.traces[traceID].session
-}
-
-// sessionFor resolves a held key to a session: itself, or for a trace key, the
-// session its trace has since been seen to belong to ("" while unknown).
-func (r *Relay) sessionFor(key string) string {
-	if id, ok := strings.CutPrefix(key, tracePrefix); ok {
-		return r.traceOf(id)
-	}
-	return key
-}
-
-func (r *Relay) touch() {
-	r.mu.Lock()
-	r.lastSeen = r.opts.Now()
-	r.mu.Unlock()
-}
-
-// route forwards a session's part if its session is claimed, and holds it otherwise —
-// also when the session is claimed but still has parts held, which the next sweep
-// releases first, so the new part never overtakes them.
-func (r *Relay) route(p *part) {
-	r.deliverMu.Lock()
-	defer r.deliverMu.Unlock()
-	if s := r.sessionFor(p.session); s != "" {
-		// A claim covers only the processes whose hooks made it: the same session
-		// resumed by another process, where this repository's hooks do not run, waits
-		// like an unclaimed one — its own hook may still claim it.
-		if c, ok := r.opts.Lookup(s, r.opts.Now()); ok && c.Covers(p.pid) {
-			r.mu.Lock()
-			waiting := len(r.held[p.session]) > 0
-			r.mu.Unlock()
-			if !waiting {
-				r.deliver(c, p)
-				return
-			}
-		}
-	}
-	size := proto.Size(p.msg)
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if p.records > maxHeld || size > maxHeldBytes {
-		r.stats.dropped(p.signal, "unclaimed_overflow", p.records)
-		return
-	}
-	// Full: make room by evicting the oldest held parts — traces nothing has named
-	// first (mostly process-level work that never will be), then the oldest of any
-	// kind — rather than refusing the newcomer, which is the likeliest to be claimed.
-	for r.heldN+p.records > maxHeld || r.heldBytes+size > maxHeldBytes {
-		if !r.evictOldestLocked() {
-			r.stats.dropped(p.signal, "unclaimed_overflow", p.records)
-			return
-		}
-	}
-	r.held[p.session] = append(r.held[p.session], heldPart{p, r.opts.Now(), size})
-	r.heldN += p.records
-	r.heldBytes += size
-	r.stats.add("held_parts", 1)
-}
-
-// evictOldestLocked drops the oldest held part, preferring trace-keyed ones, and
-// reports whether it found one. r.mu is held.
-func (r *Relay) evictOldestLocked() bool {
-	var victim string
-	var at time.Time
-	for _, traceOnly := range []bool{true, false} {
-		for key, parts := range r.held {
-			if len(parts) == 0 || (traceOnly && !strings.HasPrefix(key, tracePrefix)) {
-				continue
-			}
-			if victim == "" || parts[0].at.Before(at) {
-				victim, at = key, parts[0].at
-			}
-		}
-		if victim != "" {
-			break
-		}
-	}
-	if victim == "" {
-		return false
-	}
-	h := r.held[victim][0]
-	r.held[victim] = r.held[victim][1:]
-	if len(r.held[victim]) == 0 {
-		delete(r.held, victim)
-	}
-	r.heldN -= h.p.records
-	r.heldBytes -= h.size
-	r.stats.dropped(h.p.signal, "unclaimed_evicted", h.p.records)
-	return true
-}
-
-func (r *Relay) deliver(c claim.Claim, p *part) {
-	pol, err := r.opts.Resolve(c)
-	if err != nil || pol.Endpoint == "" || pol.Key == "" {
-		r.stats.dropped(p.signal, "no_key", p.records)
-		return
-	}
-	if n := withhold(p, pol.IncludePrompts, pol.IncludeToolContent); n > 0 {
-		r.stats.add("withheld_content_records", n)
-	}
-	stamp(p, c.ProjectID)
-	r.destination(pol).enqueue(p)
-}
-
-// stamp names the claimed project on every resource in the part, replacing any value
-// already there: the claim decides.
-func stamp(p *part, projectID string) {
-	set := func(res *resourcepb.Resource) {
-		for _, kv := range res.Attributes {
-			if kv.GetKey() == ProjectAttr {
-				kv.Value = strValue(projectID)
-				return
-			}
-		}
-		res.Attributes = append(res.Attributes, &commonpb.KeyValue{Key: ProjectAttr, Value: strValue(projectID)})
-	}
-	switch m := p.msg.(type) {
-	case *logspb.LogsData:
-		for _, rl := range m.GetResourceLogs() {
-			set(rl.Resource)
-		}
-	case *tracepb.TracesData:
-		for _, rs := range m.GetResourceSpans() {
-			set(rs.Resource)
-		}
-	case *metricspb.MetricsData:
-		for _, rm := range m.GetResourceMetrics() {
-			set(rm.Resource)
-		}
-	}
-}
-
-func strValue(s string) *commonpb.AnyValue {
-	return &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: s}}
-}
-
-// Run releases held records as their sessions are claimed, drops those that outlive
-// the hold, and delivers until ctx is done. It returns when ctx is cancelled and every
-// destination has stopped; what was still queued is counted as lost.
-func (r *Relay) Run(ctx context.Context) {
-	tick := time.NewTicker(time.Second)
-	defer tick.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			// Claims that landed since the last sweep still count.
-			r.sweep()
-			r.deliverMu.Lock()
-			r.mu.Lock()
-			for s, parts := range r.held {
-				for _, h := range parts {
-					reason := "unclaimed_at_exit"
-					if strings.HasPrefix(s, tracePrefix) {
-						reason = "no_session_trace_at_exit"
-					}
-					r.stats.dropped(h.p.signal, reason, h.p.records)
-				}
-				delete(r.held, s)
-			}
-			r.heldN, r.heldBytes = 0, 0
-			r.mu.Unlock()
-			r.deliverMu.Unlock()
-			// What was accepted for claimed sessions gets Grace to leave.
-			close(r.stopping)
-			done := make(chan struct{})
-			go func() { r.wg.Wait(); close(done) }()
-			select {
-			case <-done:
-			case <-time.After(r.opts.Grace):
-				r.cancelSend()
-				<-done
-			}
-			r.cancelSend()
-			return
-		case <-tick.C:
-			r.sweep()
-		}
-	}
-}
-
-func (r *Relay) sweep() {
-	now := r.opts.Now()
-	r.mu.Lock()
-	sessions := make([]string, 0, len(r.held))
-	for s := range r.held {
-		sessions = append(sessions, s)
-	}
-	r.mu.Unlock()
-	r.mu.Lock()
-	for id, t := range r.traces {
-		if now.Sub(t.at) >= traceTTL {
-			delete(r.traces, id)
-		}
-	}
-	r.mu.Unlock()
-	r.deliverMu.Lock()
-	defer r.deliverMu.Unlock()
-	for _, s := range sessions {
-		var c claim.Claim
-		claimed := false
-		if session := r.sessionFor(s); session != "" {
-			c, claimed = r.opts.Lookup(session, now)
-		}
-		r.mu.Lock()
-		parts := r.held[s]
-		var keep []heldPart
-		var release []*part
-		hold := r.opts.Hold
-		if strings.HasPrefix(s, tracePrefix) {
-			hold = r.opts.TraceHold
-		}
-		for _, h := range parts {
-			covered := claimed && c.Covers(h.p.pid)
-			switch {
-			case covered:
-				release = append(release, h.p)
-			case now.Sub(h.at) >= hold && claimed:
-				// The session is claimed, but not by this process: the session resumed
-				// somewhere no hook of the repository runs.
-				r.stats.dropped(h.p.signal, "uncovered_process", h.p.records)
-			case now.Sub(h.at) >= hold && strings.HasPrefix(s, tracePrefix):
-				// No span ever named this trace's session: process-level work, not an
-				// unclaimed session.
-				r.stats.dropped(h.p.signal, "no_session_trace", h.p.records)
-			case now.Sub(h.at) >= hold:
-				r.stats.dropped(h.p.signal, "unclaimed_expired", h.p.records)
-			default:
-				keep = append(keep, h)
-			}
-			if covered || now.Sub(h.at) >= hold {
-				r.heldN -= h.p.records
-				r.heldBytes -= h.size
-			}
-		}
-		if len(keep) == 0 {
-			delete(r.held, s)
-		} else {
-			r.held[s] = keep
-		}
-		r.mu.Unlock()
-		for _, p := range release {
-			r.stats.add("released_after_hold", p.records)
-			r.deliver(c, p)
-		}
-	}
-}
-
-// Idle reports how long the relay has had no export, if it holds and queues nothing.
-func (r *Relay) Idle() (time.Duration, bool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.heldN > 0 {
-		return 0, false
-	}
-	for _, d := range r.dests {
-		if d.busy() {
-			return 0, false
-		}
-	}
-	return r.opts.Now().Sub(r.lastSeen), true
-}
-
-// --- upstream ------------------------------------------------------------------------
-
-// destination is one project's upstream: a queue drained by its own goroutine, which
-// retries with backoff so one refusing host never holds up another project.
-type destination struct {
-	r      *Relay
-	pol    Policy
-	queue  chan *part
-	mu     sync.Mutex
-	active bool
-}
-
-const destQueue = 512
-
-func (r *Relay) destination(pol Policy) *destination {
-	key := pol.Endpoint + "\x00" + pol.Key
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	d := r.dests[key]
-	if d == nil {
-		d = &destination{r: r, pol: pol, queue: make(chan *part, destQueue)}
-		r.dests[key] = d
-		r.wg.Add(1)
-		go d.drain()
-	}
-	return d
-}
-
-func (d *destination) enqueue(p *part) {
-	select {
-	case d.queue <- p:
-	default:
-		d.r.stats.dropped(p.signal, "upstream_queue_full", p.records)
-	}
-}
-
-func (d *destination) busy() bool {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	return d.active || len(d.queue) > 0
-}
-
-// drain sends the queue in order until the relay stops, then empties it: each part
-// still gets its send, bounded by the relay's grace, and what the grace cuts off is
-// counted as lost.
-func (d *destination) drain() {
-	defer d.r.wg.Done()
-	ctx := d.r.sendCtx
-	sendOne := func(p *part) {
-		d.mu.Lock()
-		d.active = true
-		d.mu.Unlock()
-		d.send(ctx, p)
-		d.mu.Lock()
-		d.active = false
-		d.mu.Unlock()
-	}
-	for {
-		select {
-		case p := <-d.queue:
-			sendOne(p)
-		case <-d.r.stopping:
-			for {
-				select {
-				case p := <-d.queue:
-					if ctx.Err() != nil {
-						d.r.stats.dropped(p.signal, "upstream_lost_at_exit", p.records)
-						continue
-					}
-					sendOne(p)
-				default:
-					return
-				}
-			}
-		}
-	}
-}
-
-// send delivers one part, retrying a transient failure (network, 429, 5xx) with
-// backoff from one second to a minute. A refusal (any other 4xx) is final: the host
-// will not take it however often it is asked.
-func (d *destination) send(ctx context.Context, p *part) {
-	body, err := proto.Marshal(p.msg)
-	if err != nil {
-		d.r.stats.dropped(p.signal, "encode_failed", p.records)
-		return
-	}
-	backoff := time.Second
-	for {
-		if ctx.Err() != nil {
-			d.r.stats.dropped(p.signal, "upstream_lost_at_exit", p.records)
-			return
-		}
-		status, err := d.post(ctx, p.signal, body)
-		switch {
-		case err == nil && status/100 == 2:
-			d.r.stats.forwarded(p.signal, p.records)
-			return
-		case err == nil && status != http.StatusTooManyRequests && status/100 == 4:
-			d.r.stats.dropped(p.signal, fmt.Sprintf("upstream_refused_%d", status), p.records)
-			return
-		}
-		d.r.stats.add("upstream_retries", 1)
-		select {
-		case <-ctx.Done():
-			d.r.stats.dropped(p.signal, "upstream_lost_at_exit", p.records)
-			return
-		case <-time.After(backoff):
-		}
-		backoff = min(backoff*2, time.Minute)
-	}
-}
-
-func (d *destination) post(ctx context.Context, s Signal, body []byte) (int, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(d.pol.Endpoint, "/")+"/v1/"+string(s), bytes.NewReader(body))
-	if err != nil {
-		return 0, err
-	}
-	req.Header.Set("Content-Type", "application/x-protobuf")
-	req.Header.Set("Authorization", "Bearer "+d.pol.Key)
-	req.Header.Set("User-Agent", "terma-relay/"+d.r.opts.Version)
-	resp, err := d.r.opts.HTTP.Do(req)
-	if err != nil {
-		return 0, err
-	}
-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
-	_ = resp.Body.Close()
-	return resp.StatusCode, nil
 }

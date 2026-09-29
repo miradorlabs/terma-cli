@@ -1,7 +1,6 @@
 package live
 
 import (
-	"bytes"
 	"encoding/json"
 	"net"
 	"net/http"
@@ -71,16 +70,45 @@ func (sb *Sandbox) StartRelay() {
 	t := sb.T
 	t.Helper()
 	cmd := exec.Command(sb.Terma, "relay", "run", "--idle", "0", "--quiet")
-	cmd.Env = sb.termaEnv()
+	// Every drop is logged with its reason, sender and claim; a failing test prints it.
+	cmd.Env = append(sb.termaEnv(), "TERMA_RELAY_DEBUG=1")
 	cmd.Dir = sb.Repo
-	var out bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &out, &out
+	logPath := filepath.Join(sb.Dir, "relay.log")
+	logFile, err := os.Create(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd.Stdout, cmd.Stderr = logFile, logFile
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("start relay: %v", err)
 	}
-	go func() { _ = cmd.Wait() }()
+	go func() { _ = cmd.Wait(); _ = logFile.Close() }()
+	t.Cleanup(func() {
+		if !t.Failed() {
+			return
+		}
+		data, _ := os.ReadFile(logPath)
+		t.Logf("relay log:\n%s", tail(string(data), 4000))
+		// When each claim was written, and when each hook ran: which hook claimed a
+		// session, and how long after its first export.
+		claims, _ := filepath.Glob(filepath.Join(sb.TermaConfig, "relay", "claims", "*.json"))
+		for _, c := range claims {
+			data, _ := os.ReadFile(c)
+			t.Logf("claim %s: %s", filepath.Base(c), data)
+		}
+		hooks, _ := os.ReadDir(sb.payloadDir())
+		for _, h := range hooks {
+			name := h.Name()
+			if ns, event, ok := strings.Cut(strings.TrimSuffix(name, ".json"), "-"); ok {
+				if n, err := strconv.ParseInt(ns, 10, 64); err == nil {
+					t.Logf("hook %s at %s", event, time.Unix(0, n).Format("15:04:05.000"))
+				}
+			}
+		}
+	})
 	if !sb.waitRelay(10 * time.Second) {
-		t.Fatalf("relay never came up on %s:\n%s", sb.relayAddr, out.String())
+		data, _ := os.ReadFile(logPath)
+		t.Fatalf("relay never came up on %s:\n%s", sb.relayAddr, data)
 	}
 }
 

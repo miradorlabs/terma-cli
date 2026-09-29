@@ -3,6 +3,7 @@ package claim
 import (
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 )
@@ -85,5 +86,33 @@ func TestClaimMergesProcesses(t *testing.T) {
 	}
 	if !(Claim{}).Covers(99) || !c.Covers(0) {
 		t.Fatal("a claim without processes, or a sender that could not be resolved, is covered")
+	}
+}
+
+// Concurrent hooks of one session each add their processes: none is lost. Unlocked,
+// the read-merge-write kept whichever writer renamed last.
+func TestConcurrentWritersKeepEveryProcess(t *testing.T) {
+	enable(t)
+	saved := lockWait
+	lockWait = time.Minute // exclusion under test, not the machine's speed
+	t.Cleanup(func() { lockWait = saved })
+	now := time.Now()
+	var wg sync.WaitGroup
+	for i := range 16 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			Write("s", Claim{ProjectID: "p", PIDs: []int{1000 + i}}, now)
+		}()
+	}
+	wg.Wait()
+	c, ok := Read("s", now)
+	if !ok {
+		t.Fatal("no claim")
+	}
+	for i := range 16 {
+		if !c.Covers(1000 + i) {
+			t.Fatalf("writer %d's process was lost: %v", i, c.PIDs)
+		}
 	}
 }

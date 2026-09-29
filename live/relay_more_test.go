@@ -3,6 +3,7 @@ package live
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -158,12 +159,17 @@ func TestRelayCodexLongTurn(t *testing.T) {
 		track(t)
 		t.Setenv("OPENAI_API_KEY", "synthetic-telemetry-key")
 		sb := New(t, Isolated, WithCodex(b))
-		sb.UseRelay(RelayOptions{Start: true, Hold: 3 * time.Second, Content: true})
+		// The ordinary hold covers the claim racing Codex's first log (the hook claims
+		// the session a few seconds after conversation_starts on most builds); the stall
+		// outlasts it, so the turn's first child spans precede the turn span by more than
+		// the ordinary hold and only the trace hold keeps them.
+		const hold = 30 * time.Second
+		sb.UseRelay(RelayOptions{Start: true, Hold: hold, Content: true})
 		var calls atomic.Int32
 		inner := codexTelemetryProvider(t, &calls)
 		provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if calls.Load() >= 1 {
-				time.Sleep(5 * time.Second) // the second request: past the hold
+				time.Sleep(hold + 5*time.Second) // the second request: past the hold
 			}
 			inner.ServeHTTP(w, r)
 		}))
@@ -250,5 +256,96 @@ func TestRelayClaudeInteractiveRestart(t *testing.T) {
 		sb.StopRelay()
 		Note(t.Name(), fmt.Sprintf("interactive restart: user_prompt records per turn %v (the relay died after turn 1)", counts))
 		noteRelayStats(t.Name(), sb.RelayStats())
+	})
+}
+
+// codexTUI runs Codex's interactive TUI in a pty for one prompt, against provider,
+// and returns once the reply is on screen and the session has had time to title
+// itself and export.
+func (sb *Sandbox) codexTUI(b Binary, providerURL, prompt string) {
+	t := sb.T
+	t.Helper()
+	sb.prepareCodex(RouteAPIKey)
+	args := append([]string{"-C", sb.workDir(), "-c", `cli_auth_credentials_store="file"`, "-c", "features.plugins=false",
+		"-c", "features.remote_plugin=false", "--dangerously-bypass-hook-trust"}, fixtureCodexArgs(providerURL)...)
+	term, err := Start(sb.workDir(), sb.codexEnv(RouteAPIKey), 40, 140, b.Path, append(args, prompt)...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := term.Expect(regexp.MustCompile(`TERMA_TELEMETRY_REPLY`), 90*time.Second); err != nil {
+		t.Fatalf("the TUI never replied:\n%s", tail(term.Text(), 3000))
+	}
+	time.Sleep(12 * time.Second) // the title conversation starts after the first reply
+	_ = term.Close("/quit", 8*time.Second)
+}
+
+// replyingCodexProvider answers every request with TERMA_TELEMETRY_REPLY — the
+// thread's turn and the TUI's title request alike.
+func replyingCodexProvider(calls *atomic.Int32) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasSuffix(r.URL.Path, "/responses") {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = io.Copy(io.Discard, r.Body)
+		item := map[string]any{"type": "message", "id": "msg_reply", "role": "assistant", "status": "completed", "content": []any{map[string]any{"type": "output_text", "text": "TERMA_TELEMETRY_REPLY", "annotations": []any{}}}}
+		writeCodexResponse(w, calls.Add(1), item)
+	})
+}
+
+// The Codex TUI through the relay. After the first reply it starts a conversation of
+// its own to title the thread — its own conversation.id, its own model call and cost,
+// no hook. It is caught: attributed to the thread's project, marked as the relay's
+// inference with the thread it belongs to; and the process's metrics too. Nothing of
+// the session is dropped.
+func TestRelayCodexTUITitle(t *testing.T) {
+	forEachCodex(t, func(t *testing.T, b Binary, _ bool) {
+		track(t)
+		t.Setenv("OPENAI_API_KEY", "synthetic-telemetry-key")
+		sb := New(t, Isolated, WithCodex(b))
+		sb.UseRelay(RelayOptions{Start: true, Content: true})
+		var calls atomic.Int32
+		provider := httptest.NewServer(replyingCodexProvider(&calls))
+		defer provider.Close()
+		sb.codexTUI(b, provider.URL, "Say hello please")
+		time.Sleep(5 * time.Second)
+		sb.StopRelay()
+		c := sb.RelayStats()
+		noteRelayStats(t.Name(), c)
+		e := sb.Receiver.evidence()
+		threads := map[string]bool{}
+		var title, thread string
+		for _, r := range e.logs {
+			if r.Attrs["event.name"] != "codex.conversation_starts" {
+				continue
+			}
+			threads[r.Attrs["conversation.id"]] = true
+			if r.Attrs["approval_policy"] == "never" && r.Attrs["sandbox_policy"] == "read-only" {
+				title = r.Attrs["conversation.id"]
+				if r.Resource["terma.relay.attribution"] != "process-sibling" {
+					t.Errorf("the title conversation arrived without the relay's attribution: %v", r.Resource)
+				}
+				thread = r.Resource["terma.relay.session.id"]
+			}
+		}
+		if calls.Load() < 2 {
+			Note(t.Name(), fmt.Sprintf("the TUI made %d model call(s): no title conversation this build", calls.Load()))
+		} else if title == "" {
+			t.Fatalf("the title conversation never reached upstream: %v (conversations %v)", c, threads)
+		}
+		if title != "" && (thread == "" || thread == title || !threads[thread]) {
+			t.Errorf("the title conversation names %q as its thread; conversations %v", thread, threads)
+		}
+		for _, r := range e.logs {
+			if r.Resource["service.name"] != "terma-cli" && r.Resource["mirador.project.id"] != sb.ProjectID {
+				t.Errorf("a record reached upstream without the project: %v", r.Attrs)
+			}
+		}
+		if n := sum(c, "dropped.") - sum(c, "dropped.no_session_trace"); n > 0 {
+			t.Errorf("records of the session were dropped: %v", c)
+		}
+		if sum(c, "attributed_by_process.metrics") == 0 {
+			t.Errorf("the TUI's metrics were not attributed: %v", c)
+		}
 	})
 }

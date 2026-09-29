@@ -309,9 +309,10 @@ func awaitTelemetry(t *testing.T, sb *Sandbox, check func(contractReporter, tele
 }
 
 // checkCodexTelemetry checks one Codex session's export. relayed is the local relay's
-// contract (docs/RELAY-SPIKE.md): Codex's metrics name no session, so none may reach
-// Terma, and a project that withholds tool content loses the tool call's arguments
-// too — the relay is stricter than Codex's own switch, which only drops the output.
+// contract (docs/RELAY-SPIKE.md): Codex's metrics name no session and arrive
+// attributed by process — the project, the inferred session and the attribution on
+// their resource — and a project that withholds tool content loses the tool call's
+// arguments too, stricter than Codex's own switch, which only drops the output.
 func checkCodexTelemetry(t contractReporter, e telemetryEvidence, sid, project string, exclude, relayed bool) {
 	t.Helper()
 	if relayed {
@@ -435,12 +436,16 @@ func checkCodexTelemetry(t contractReporter, e telemetryEvidence, sid, project s
 		}
 	}
 	if relayed {
+		// Codex's metrics name no session; the relay attributes them by the process that
+		// sent them, and says so on the resource.
 		for _, m := range e.metrics {
-			if strings.HasPrefix(m.Proto.GetName(), "codex.") {
-				t.Errorf("%s: a Codex metric names no session and must not pass the relay", m.Proto.GetName())
+			if !strings.HasPrefix(m.Proto.GetName(), "codex.") {
+				continue
 			}
+			equalField(t, m.Proto.GetName(), m.Resource, "mirador.project.id", project)
+			equalField(t, m.Proto.GetName(), m.Resource, "terma.relay.attribution", "process")
+			equalField(t, m.Proto.GetName(), m.Resource, "terma.relay.session.id", sid)
 		}
-		return
 	}
 	// Codex metrics intentionally have no session/project dimensions. Each
 	// sandbox has its own receiver, so counts cannot be satisfied by another run.

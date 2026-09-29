@@ -59,7 +59,7 @@ func newRelayCommand() *cobra.Command {
 		Short:  "Spike: the local OTLP relay that forwards only opted-in repositories' telemetry",
 		Hidden: true,
 	}
-	cmd.AddCommand(newRelayRunCommand(), newRelaySetupCommand(), newRelayStatusCommand())
+	cmd.AddCommand(newRelayRunCommand(), newRelaySetupCommand(), newRelayStatusCommand(), newRelayDaemonCommand())
 	return cmd
 }
 
@@ -132,7 +132,13 @@ func newRelayRunCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			r := relay.New(relay.Options{Token: token, Hold: hold, Resolve: relayResolver(cfg), Version: Version, PeerPID: procinfo.FindSender})
+			opts := relay.Options{Token: token, Hold: hold, Resolve: relayResolver(cfg), Version: Version,
+				PeerPID: procinfo.FindSender, ClaimCacheTTL: time.Second, PolicyCacheTTL: 5 * time.Second}
+			if os.Getenv("TERMA_RELAY_DEBUG") == "1" {
+				errOut := cmd.ErrOrStderr()
+				opts.Logf = func(f string, a ...any) { fmt.Fprintf(errOut, time.Now().Format("15:04:05.000 ")+f+"\n", a...) }
+			}
+			r := relay.New(opts)
 			ln, err := net.Listen("tcp", addr)
 			if err != nil {
 				// A hook started this relay with nowhere to print; status reads it.
@@ -157,11 +163,31 @@ func newRelayRunCommand() *cobra.Command {
 			go func() { _ = srv.Serve(ln) }()
 			done := make(chan struct{})
 			go func() { r.Run(ctx); close(done) }()
+			self := executableStamp()
+			lastPrune := time.Now()
 			for tick := time.NewTicker(time.Second); ; {
 				select {
 				case <-ctx.Done():
 				case <-tick.C:
-					if d, ok := r.Idle(); !ok || idle <= 0 || d < idle {
+					d, quiet := r.Idle()
+					// Setup undone — terma uninstalled, the config directory removed: the
+					// agents no longer point here, so there is nothing to relay for.
+					if _, err := relayToken(); err != nil {
+						cancel()
+						break
+					}
+					if time.Since(lastPrune) > time.Hour {
+						claim.Prune(time.Now())
+						lastPrune = time.Now()
+					}
+					// A newer terma replaced this binary (update, reinstall): step aside
+					// once quiet, and the next hook starts the new one. Not mid-export —
+					// agents do not retry a refused connection.
+					if quiet && d >= time.Minute && self != "" && executableStamp() != self {
+						cancel()
+						break
+					}
+					if !quiet || idle <= 0 || d < idle {
 						continue
 					}
 					cancel()
@@ -187,6 +213,43 @@ func newRelayRunCommand() *cobra.Command {
 	cmd.Flags().StringVar(&addr, "addr", "", "listen here instead of the address `terma relay setup` recorded")
 	cmd.Flags().BoolVar(&quiet, "quiet", false, "print nothing")
 	return cmd
+}
+
+// executableStamp identifies the file this process was started from — its size and
+// modification time — so a relay can tell it has been replaced. Empty when unknown.
+func executableStamp() string {
+	exe, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	info, err := os.Stat(exe)
+	if err != nil {
+		return ""
+	}
+	return fmt.Sprintf("%d-%d", info.Size(), info.ModTime().UnixNano())
+}
+
+// stopRelay asks a running relay to stop (SIGTERM through its pid file) and waits for
+// its lock, so a setup that changed the address or token takes effect.
+func stopRelay(dir string) {
+	data, err := os.ReadFile(filepath.Join(dir, relayPIDFile))
+	if err != nil {
+		return
+	}
+	pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
+	if err != nil || pid <= 1 {
+		return
+	}
+	proc, err := os.FindProcess(pid)
+	if err != nil || proc.Signal(syscall.SIGTERM) != nil {
+		return
+	}
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
+		if unlock, err := flock.TryLock(filepath.Join(dir, relayLockFile)); err == nil {
+			unlock()
+			return
+		}
+	}
 }
 
 // relayResolver turns a claim into where its session's telemetry goes: the project's
@@ -255,8 +318,12 @@ func newRelaySetupCommand() *cobra.Command {
 				fmt.Fprintf(out, "%s exports to the relay at %s.\n", h.DisplayName(), addr)
 			}
 			fmt.Fprintln(out, "Hooks in repositories with a binding claim their sessions; nothing else is forwarded.")
-			// Started now, so the first session does not open against a closed port.
-			if !noStart {
+			// A running relay has the old address and token: replace it. Then start one
+			// now, so the first session does not open against a closed port.
+			stopRelay(dir)
+			if _, ok := relayServiceInstalled(); ok {
+				// The service manager starts it again, with the new address and token.
+			} else if !noStart {
 				spawnRelay()
 			}
 			return nil
@@ -298,6 +365,9 @@ func newRelayStatusCommand() *cobra.Command {
 			snap, running, err := relayStats(dir)
 			if err != nil {
 				return err
+			}
+			if path, ok := relayServiceInstalled(); ok {
+				fmt.Fprintf(out, "Service:  installed (%s)\n", path)
 			}
 			if running {
 				fmt.Fprintf(out, "Running on %s since %s.\n", relayAddr(dir), snap.Since.Format(time.RFC3339))
@@ -386,7 +456,21 @@ func spawnRelay() {
 		return
 	}
 	_ = proc.Process.Release()
+	// Wait, briefly, until it listens. The hook runs before its turn does, so an agent
+	// that exports as soon as the hook returns — Claude Code 2.1.280 did, right after
+	// UserPromptSubmit — finds the relay up instead of a refused connection it will not
+	// retry. Only a hook that had to start the relay waits; the others return above.
+	addr := relayAddr(dir)
+	for deadline := time.Now().Add(relayStartWait); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+		if conn, err := net.DialTimeout("tcp", addr, 50*time.Millisecond); err == nil {
+			_ = conn.Close()
+			return
+		}
+	}
 }
+
+// relayStartWait bounds how long a hook that started the relay waits for it to listen.
+const relayStartWait = time.Second
 
 // relayDoctorCheck is doctor's "agent exporting to Terma" on a machine that exports
 // through the local relay: the relay can run (or runs) on its address with no one else

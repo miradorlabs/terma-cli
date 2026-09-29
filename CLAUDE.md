@@ -633,6 +633,27 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   traces first. Claude's `UserPromptSubmit` hook (`user-prompt-submit`) exists to claim
   and start the relay at every turn's start — a relay that died between turns otherwise
   lost the next turn; it must print nothing (its stdout goes to the model).
+- Routing is one decision (`relay.decide`, `internal/relay/route.go`): a part leaves when
+  its session is claimed, covered and keyed, else it waits in the hold for that reason and
+  is dropped under it. A part naming no session (Codex metrics, process-level spans) is
+  attributed by its sender process (`processProject`): all of that process's claimed
+  sessions in one project, or it is ambiguous and dropped — never guessed. An unclaimed
+  conversation is adopted only from a single-workspace Codex client (`codex-tui`,
+  `codex_exec`) and only when its own start carries Codex's internal signature
+  (`approval_policy=never`, `sandbox_policy=read-only`: the TUI's title conversation);
+  inferred attribution is marked on the resource (`terma.relay.attribution`,
+  `terma.relay.session.id`). A keyless claim waits too — the key may land mid-session.
+- `claim.Write` is a read-merge-write under a sidecar lock (`<session>.json.lock`, 250 ms,
+  falls through): unlocked, 14 of 16 concurrent writers' processes were lost.
+- The relay can run as a per-user service (`terma relay daemon install|remove`, launchd /
+  systemd --user, named per config directory so sandboxes never collide): the only way to
+  catch what an agent exports before its first hook. It exits when quiet after its binary
+  is replaced (the service manager restarts the new one), when its token is gone, and on
+  `relay setup` (which restarts it). A hook that had to start the relay waits up to 1 s
+  for it to listen. `TERMA_RELAY_DEBUG=1` logs every drop.
+- `live/relay_workloads_test.go` runs each workload directly and through the relay and
+  requires the same telemetry and zero drops; long live matrix runs use frozen copies of
+  `bin/terma` and `bin/live.test`, or a rebuild mid-run mixes versions.
 - OpenCode goes through the relay too (`relay setup` points the plugin at it): its
   prompt rides a log body and its reply `gen_ai.completion`, both withheld with content.
   `live/opencode.go` fetches OpenCode builds from npm (`opencode-<os>-<arch>`), and

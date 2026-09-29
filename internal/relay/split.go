@@ -1,8 +1,3 @@
-// Package relay is the local OTLP relay: the agents' global exporters send to it on
-// loopback, and it forwards a record only when its session was claimed by a hook in an
-// opted-in repository (package claim), to that repository's project, with that
-// project's key. Everything else is held briefly — the first batch can race the hook —
-// and then dropped, without ever leaving the machine or touching the disk.
 package relay
 
 import (
@@ -294,4 +289,56 @@ func cloneResource(r *resourcepb.Resource) *resourcepb.Resource {
 		return &resourcepb.Resource{}
 	}
 	return proto.Clone(r).(*resourcepb.Resource)
+}
+
+// originatorOf is the client a part's first log record says sent it (Codex's
+// originator attribute), "" when none does.
+func originatorOf(p *part) string {
+	m, ok := p.msg.(*logspb.LogsData)
+	if !ok {
+		return ""
+	}
+	for _, rl := range m.GetResourceLogs() {
+		for _, sl := range rl.GetScopeLogs() {
+			for _, lr := range sl.GetLogRecords() {
+				for _, kv := range lr.GetAttributes() {
+					if kv.GetKey() == "originator" {
+						return kv.GetValue().GetStringValue()
+					}
+				}
+			}
+		}
+	}
+	return ""
+}
+
+// internalStart reports whether a part holds a Codex conversation start with the
+// signature of a conversation Codex runs for itself — approval "never", a read-only
+// sandbox — such as the TUI's title generator (0.158, live).
+func internalStart(p *part) bool {
+	m, ok := p.msg.(*logspb.LogsData)
+	if !ok {
+		return false
+	}
+	for _, rl := range m.GetResourceLogs() {
+		for _, sl := range rl.GetScopeLogs() {
+			for _, lr := range sl.GetLogRecords() {
+				var event, approval, sandbox string
+				for _, kv := range lr.GetAttributes() {
+					switch kv.GetKey() {
+					case "event.name":
+						event = kv.GetValue().GetStringValue()
+					case "approval_policy":
+						approval = kv.GetValue().GetStringValue()
+					case "sandbox_policy":
+						sandbox = kv.GetValue().GetStringValue()
+					}
+				}
+				if event == "codex.conversation_starts" && approval == "never" && sandbox == "read-only" {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }

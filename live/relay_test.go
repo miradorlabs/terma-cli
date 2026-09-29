@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -37,8 +38,16 @@ import (
 func checkOnlyClaimed(t contractReporter, e telemetryEvidence, key, sid, project string) {
 	t.Helper()
 	agent := func(res map[string]string) bool { return res["service.name"] != "terma-cli" }
+	// A record naming no session passes only as the relay's inference, said on its
+	// resource: attributed by the process that sent it, to this session.
+	inferred := func(res map[string]string) bool {
+		return res["terma.relay.attribution"] == "process" && res["terma.relay.session.id"] == sid
+	}
 	for _, r := range e.logs {
 		if !agent(r.Resource) {
+			continue
+		}
+		if r.Attrs[key] == "" && inferred(r.Resource) && r.Resource["mirador.project.id"] == project {
 			continue
 		}
 		if r.Attrs[key] != sid || r.Resource["mirador.project.id"] != project {
@@ -48,6 +57,9 @@ func checkOnlyClaimed(t contractReporter, e telemetryEvidence, key, sid, project
 	for _, s := range e.spans {
 		if agent(s.Resource) && s.Resource["mirador.project.id"] != project {
 			t.Errorf("relay forwarded span %s without the claimed project", s.Name)
+		}
+		if a := s.Resource["terma.relay.attribution"]; a != "" && !inferred(s.Resource) {
+			t.Errorf("span %s attributed by process to another session: %v", s.Name, s.Resource)
 		}
 		for _, k := range []string{"session.id", "conversation.id", "thread.id"} {
 			// A numeric thread.id is Codex's OS thread number, not a session.
@@ -59,6 +71,9 @@ func checkOnlyClaimed(t contractReporter, e telemetryEvidence, key, sid, project
 	for _, m := range e.metrics {
 		if m.Resource["mirador.project.id"] != project {
 			t.Errorf("relay forwarded metric %s without the claimed project", m.Proto.GetName())
+		}
+		if a := m.Resource["terma.relay.attribution"]; a != "" && !inferred(m.Resource) {
+			t.Errorf("metric %s attributed by process to another session: %v", m.Proto.GetName(), m.Resource)
 		}
 	}
 }
@@ -85,11 +100,23 @@ func agentRecords(e telemetryEvidence) int {
 }
 
 func noteRelayStats(name string, c map[string]int) {
-	var parts []string
-	for _, k := range []string{"received.", "forwarded.", "dropped.no_session_id.", "dropped.no_session_trace", "dropped.unclaimed_expired.", "dropped.no_key.", "dropped.uncovered_process.", "released_after_hold", "withheld_content_records", "upstream_retries"} {
-		if n := sum(c, k); n > 0 {
-			parts = append(parts, fmt.Sprintf("%s%d", strings.TrimSuffix(k, "."), n))
+	// Totals per counter family — every drop reason by name, whatever it is.
+	totals := map[string]int{}
+	for k, v := range c {
+		family := k
+		if i := strings.LastIndexByte(k, '.'); i > 0 && (strings.HasSuffix(k, ".logs") || strings.HasSuffix(k, ".traces") || strings.HasSuffix(k, ".metrics")) {
+			family = k[:i]
 		}
+		totals[family] += v
+	}
+	keys := make([]string, 0, len(totals))
+	for k := range totals {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, k := range keys {
+		parts = append(parts, fmt.Sprintf("%s=%d", k, totals[k]))
 	}
 	Note(name, "relay: "+strings.Join(parts, " "))
 }
@@ -202,8 +229,11 @@ func TestRelayCodex(t *testing.T) {
 				if n := sum(c, "dropped.unclaimed"); n > 0 {
 					t.Errorf("an opted-in session lost %d records waiting for its claim: %v", n, c)
 				}
-				if sum(c, "dropped.no_session_id.metrics") == 0 {
-					Note(t.Name(), "Codex metrics arrived with no unattributable points: check whether a release added conversation.id")
+				if sum(c, "attributed_by_process.metrics") == 0 {
+					t.Errorf("no Codex metric was attributed by its process: %v", c)
+				}
+				if n := sum(c, "dropped.") - sum(c, "dropped.no_session_trace"); n > 0 {
+					Note(t.Name(), fmt.Sprintf("dropped %d records other than unnamed traces", n))
 				}
 			})
 		}
