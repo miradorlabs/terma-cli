@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"os/exec"
@@ -171,6 +172,42 @@ func TestRelayDoctorCheck(t *testing.T) {
 	}
 	if c := relayDoctorCheck("proj_x", nil); c.Status != doctor.Fail || !strings.Contains(c.Detail, "Codex") || c.Fix != "terma relay setup" {
 		t.Fatalf("codex pointed elsewhere: %+v", c)
+	}
+}
+
+// A Codex daemon reads its exporter when it starts: one running from before `relay
+// setup` still exports where it did. setup says so, and doctor warns until it restarts;
+// terma never restarts it (Codex says running work may be interrupted).
+func TestRelayCodexDaemonPredatesSetup(t *testing.T) {
+	dir := relaySandbox(t)
+	codex := os.Getenv("CODEX_HOME")
+	daemonDir := filepath.Join(codex, "app-server-daemon")
+	if err := os.MkdirAll(daemonDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	record := func(started time.Time) {
+		rec := fmt.Sprintf(`{"pid":%d,"processIdentity":{"startSeconds":%d}}`, os.Getpid(), started.Unix())
+		if err := os.WriteFile(filepath.Join(daemonDir, "daemon.pid"), []byte(rec), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	record(time.Now().Add(-time.Hour))
+	if err := os.WriteFile(filepath.Join(filepath.Dir(dir), "keys.json"), []byte(`{"keys":{"proj_x":"ter_srv_1"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runTerma(t, "relay", "setup", "--no-start", "--addr", freeAddr(t))
+	if err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "`codex app-server daemon restart`") {
+		t.Errorf("setup did not name the daemon restart:\n%s", out)
+	}
+	if c := relayDoctorCheck("proj_x", nil); c.Status != doctor.Warn || !strings.Contains(c.Fix, "codex app-server daemon restart") {
+		t.Fatalf("a daemon from before the setup: %+v", c)
+	}
+	record(time.Now().Add(time.Minute)) // restarted since
+	if c := relayDoctorCheck("proj_x", nil); c.Status != doctor.Pass {
+		t.Fatalf("a daemon started after the setup: %+v", c)
 	}
 }
 

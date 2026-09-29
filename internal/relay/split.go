@@ -29,8 +29,12 @@ const (
 // thread number (with thread.name "tokio-rt-worker"), not a conversation, so a
 // thread.id that is a number is never a session: those spans go by their trace.
 // gen_ai.conversation.id is the GenAI semantic conventions' session, which omp stamps
-// on its invoke_agent, chat and execute_tool spans.
-var sessionKeys = []string{"session.id", "conversation.id", "gen_ai.conversation.id", "thread.id"}
+// on its invoke_agent, chat and execute_tool spans. thread_id (underscore) is on Codex's
+// session_loop span, the root of a trace holding the thread's own work — turn context,
+// rollout persistence, its hook commands, shutdown (0.158, app-server and exec alike):
+// without it that trace names no thread, and in an app-server running several threads
+// it could only be dropped as ambiguous. A numeric value of either is never a session.
+var sessionKeys = []string{"session.id", "conversation.id", "gen_ai.conversation.id", "thread.id", "thread_id"}
 
 // The export requests are decoded as LogsData, MetricsData and TracesData: the same
 // message on the wire and in JSON (field 1, repeated resource entries), without the
@@ -45,6 +49,9 @@ type part struct {
 	records int
 	// pid is the process that exported it, 0 when unknown (see Options.PeerPID).
 	pid int
+	// start holds a Codex conversation start: unclaimed, it waits as long as a trace
+	// (Options.TraceHold), because the hook that claims it may be a long way off.
+	start bool
 }
 
 func sessionOf(attrs, resource []*commonpb.KeyValue) string {
@@ -52,7 +59,7 @@ func sessionOf(attrs, resource []*commonpb.KeyValue) string {
 		for _, key := range sessionKeys {
 			for _, kv := range set {
 				if kv.GetKey() == key {
-					if v := kv.GetValue().GetStringValue(); v != "" && (key != "thread.id" || !numeric(v)) {
+					if v := kv.GetValue().GetStringValue(); v != "" && (key != "thread.id" && key != "thread_id" || !numeric(v)) {
 						return v
 					}
 				}
@@ -317,6 +324,28 @@ func originatorOf(p *part) string {
 // internalStart reports whether a part holds a Codex conversation start with the
 // signature of a conversation Codex runs for itself — approval "never", a read-only
 // sandbox — such as the TUI's title generator (0.158, live).
+// conversationStart reports whether p holds a Codex conversation start. An app-server
+// thread (Desktop, the daemon) exports it at thread/start, and its first hook fires at
+// its first turn — whenever the developer types the first prompt.
+func conversationStart(p *part) bool {
+	m, ok := p.msg.(*logspb.LogsData)
+	if !ok {
+		return false
+	}
+	for _, rl := range m.GetResourceLogs() {
+		for _, sl := range rl.GetScopeLogs() {
+			for _, lr := range sl.GetLogRecords() {
+				for _, kv := range lr.GetAttributes() {
+					if kv.GetKey() == "event.name" && kv.GetValue().GetStringValue() == "codex.conversation_starts" {
+						return true
+					}
+				}
+			}
+		}
+	}
+	return false
+}
+
 func internalStart(p *part) bool {
 	m, ok := p.msg.(*logspb.LogsData)
 	if !ok {

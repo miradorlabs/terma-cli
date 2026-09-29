@@ -46,7 +46,30 @@ const (
 	relayStatsFile = "stats.json"
 	relayPIDFile   = "pid"
 	relayErrorFile = "last-error"
+	// relayCodexFile records when `relay setup` last pointed Codex at the relay, so
+	// doctor can tell a Codex daemon that started before it (and still exports where
+	// it did) from one that reads the relay.
+	relayCodexFile = "codex-setup"
 )
+
+// codexDaemonPredates reports a Codex app-server daemon that started before Codex
+// was last pointed at the relay: it reads its exporter only when it starts.
+func codexDaemonPredates(dir string) (harness.CodexDaemon, bool) {
+	d, ok := harness.RunningCodexDaemon()
+	if !ok {
+		return d, false
+	}
+	data, err := os.ReadFile(filepath.Join(dir, relayCodexFile))
+	if err != nil {
+		return d, false
+	}
+	at, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(string(data)))
+	return d, err == nil && d.Started.Before(at)
+}
+
+// codexDaemonRestart is the one fix for a daemon that predates the setup. Codex says a
+// restart may interrupt running work, so terma names it and never runs it.
+const codexDaemonRestart = "restart Codex's background server with `codex app-server daemon restart` (running work may be interrupted)"
 
 // relayRetryAfter is how long hooks leave a relay that failed to start before trying
 // again.
@@ -351,6 +374,12 @@ func newRelaySetupCommand() *cobra.Command {
 				// omp reads its exporter's endpoint from the environment before any
 				// extension runs, so the launcher hands it over: a PATH shim, in a bound
 				// repository only (shim.ompRouter).
+				if h.Name() == shim.AgentCodex {
+					_ = config.WriteFileAtomic(filepath.Join(dir, relayCodexFile), []byte(time.Now().UTC().Format(time.RFC3339Nano)+"\n"), 0o600)
+					if d, ok := codexDaemonPredates(dir); ok {
+						fmt.Fprintf(out, "Codex's background server (pid %d) reads its exporter only when it starts, so its threads — Codex Desktop's, and the TUI's since 0.157 — still export where they did: %s.\n", d.PID, codexDaemonRestart)
+					}
+				}
 				if h.Name() == shim.AgentOmp {
 					if err := putOmpOnRelay(out); err != nil {
 						return err
@@ -549,6 +578,12 @@ func relayDoctorCheck(projectID string, agents []string) doctor.Check {
 	}
 	if len(wrong) > 0 {
 		return doctor.Check{Status: doctor.Fail, Detail: strings.Join(wrong, " and ") + " not exporting to the local relay", Fix: "terma relay setup"}
+	}
+	if slices.Contains(agents, shim.AgentCodex) || len(agents) == 0 {
+		if d, ok := codexDaemonPredates(dir); ok {
+			return doctor.Check{Status: doctor.Warn, Detail: fmt.Sprintf("Codex's background server (pid %d) started before Codex was pointed at the relay, and its threads still export where they did", d.PID),
+				Fix: codexDaemonRestart}
+		}
 	}
 	state := "starts with the next hook"
 	if running {

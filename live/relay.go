@@ -59,11 +59,12 @@ func (sb *Sandbox) UseRelay(o RelayOptions) {
 	}
 	// --no-start: the scenario decides whether the relay runs before the agent.
 	// One setup for every agent: a second would stop the relay StartRelay runs.
-	agents := "claude,codex,opencode"
+	var agents strings.Builder
+	agents.WriteString("claude,codex,opencode")
 	for _, a := range sb.RelayAgents {
-		agents += "," + a
+		agents.WriteString("," + a)
 	}
-	sb.terma(sb.Repo, "relay", "setup", "--no-start", "--addr", sb.relayAddr, "--harness", agents)
+	sb.terma(sb.Repo, "relay", "setup", "--no-start", "--addr", sb.relayAddr, "--harness", agents.String())
 	t.Cleanup(sb.StopRelay)
 	if o.Start {
 		sb.StartRelay()

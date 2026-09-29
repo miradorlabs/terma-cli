@@ -372,6 +372,38 @@ func TestRelaySplitsSpans(t *testing.T) {
 	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["forwarded.traces"] == 5 })
 }
 
+// Codex's session_loop names its thread as thread_id (underscore), at the root of the
+// trace that holds the thread's own work; it is exported last, when the loop ends.
+// Its trace's spans wait for it and then go with the thread. A numeric thread_id is
+// an OS thread, never a session.
+func TestRelayNamesTracesBySessionLoop(t *testing.T) {
+	u := newUpstream(t)
+	f := newFixture()
+	r, srv := f.relay(t, u, allPolicies(u))
+	loop, other := []byte("1111111111111111"), []byte("2222222222222222")
+	work := &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{
+		{Name: "turn_context.build", TraceId: loop, Attributes: []*commonpb.KeyValue{kv("thread.id", "12")}},
+		{Name: "persist_rollout_items", TraceId: loop},
+		{Name: "list_models", TraceId: other, Attributes: []*commonpb.KeyValue{kv("thread_id", "8")}},
+	}}}}}}
+	body, _ := proto.Marshal(work)
+	post(t, srv, "/v1/traces", body, "application/x-protobuf", token, false)
+	r.sweep()
+	if c := r.Stats().Snapshot().Counters; c["forwarded.traces"] != 0 {
+		t.Fatalf("spans of an unnamed trace left before it was named: %v", c)
+	}
+	end := &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{
+		{Name: "session_loop", TraceId: loop, Attributes: []*commonpb.KeyValue{kv("thread_id", "B"), kv("thread.id", "8")}},
+	}}}}}}
+	body, _ = proto.Marshal(end)
+	post(t, srv, "/v1/traces", body, "application/x-protobuf", token, false)
+	r.sweep()
+	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["forwarded.traces"] == 3 })
+	if c := r.Stats().Snapshot().Counters; c["held_parts"] < 1 {
+		t.Fatalf("stats = %v", c)
+	}
+}
+
 // Only the agents' exporters, holding the local token, can send; nothing else on the
 // machine can inject telemetry into a project.
 func TestRelayRefusesWithoutToken(t *testing.T) {

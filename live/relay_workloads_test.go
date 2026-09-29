@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -69,9 +70,26 @@ func sometimes(key string) bool {
 	return key == "log retention_sweep"
 }
 
+// endedCleanly reports whether the agent ran its session-end hook: Codex sometimes
+// exits without its shutdown (docs/CODEX-SESSION-END.md), and then neither the hook
+// nor the shutdown's own telemetry — session_loop, op.dispatch.shutdown, the last
+// metrics flush — ever leaves the process, relay or not.
+func (sb *Sandbox) endedCleanly() bool {
+	entries, _ := os.ReadDir(sb.payloadDir())
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), "session-end.json") {
+			return true
+		}
+	}
+	return false
+}
+
 // compareShapes fails for anything the direct export delivered that the relayed one
-// did not, and notes anything extra.
-func compareShapes(t *testing.T, direct, relayed map[string]int) {
+// did not, and notes anything extra. unshut says the relayed run's agent exited
+// without its shutdown while the direct one did not: what it never sent is missing
+// for the harness's reason, not the relay's, and is noted — the caller still requires
+// that the relay dropped nothing it received.
+func compareShapes(t *testing.T, direct, relayed map[string]int, unshut bool) {
 	t.Helper()
 	keys := make([]string, 0, len(direct))
 	for k := range direct {
@@ -83,6 +101,8 @@ func compareShapes(t *testing.T, direct, relayed map[string]int) {
 		switch {
 		case got == 0 && sometimes(k):
 			Note(t.Name(), k+": not emitted in the relayed run (the harness's own schedule)")
+		case unshut && got < direct[k]:
+			Note(t.Name(), fmt.Sprintf("%s: %d of %d — the relayed run's agent exited without its shutdown", k, got, direct[k]))
 		case got == 0:
 			t.Errorf("%s: the direct export delivered %d, the relay none", k, direct[k])
 		case got < direct[k] && !volatile(k):
@@ -106,11 +126,13 @@ func compareShapes(t *testing.T, direct, relayed map[string]int) {
 func runBoth(t *testing.T, sandbox func(t *testing.T) *Sandbox, run func(t *testing.T, sb *Sandbox)) {
 	t.Helper()
 	var direct map[string]int
+	directEnded := false
 	t.Run("direct", func(t *testing.T) {
 		sb := sandbox(t)
 		run(t, sb)
 		time.Sleep(6 * time.Second)
 		direct = telemetryShape(sb.Receiver.evidence())
+		directEnded = sb.endedCleanly()
 	})
 	t.Run("relay", func(t *testing.T) {
 		track(t)
@@ -125,9 +147,13 @@ func runBoth(t *testing.T, sandbox func(t *testing.T) *Sandbox, run func(t *test
 		if len(direct) == 0 {
 			t.Fatal("the direct run delivered nothing to compare with")
 		}
-		compareShapes(t, direct, relayed)
+		unshut := directEnded && !sb.endedCleanly()
+		compareShapes(t, direct, relayed, unshut)
 		if n := sum(c, "dropped."); n > 0 {
 			t.Errorf("the relay dropped %d records of an opted-in session: %v", n, c)
+		}
+		if unshut && sum(c, "received.") != sum(c, "forwarded.") {
+			t.Errorf("the agent exited without its shutdown, and the relay also kept back part of what it did send: %v", c)
 		}
 	})
 }

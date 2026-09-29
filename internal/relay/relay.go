@@ -214,7 +214,8 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 		r.stats.received(s, p.records)
 		if p.session != "" && !strings.HasPrefix(p.session, tracePrefix) {
 			r.learnProcess(pid, p.session, originatorOf(p))
-			if internalStart(p) {
+			p.start = conversationStart(p)
+			if p.start && internalStart(p) {
 				r.mu.Lock()
 				r.internal[p.session] = r.opts.Now()
 				r.mu.Unlock()

@@ -417,10 +417,15 @@ func (r *Relay) sweep() {
 		// among parts that leave, and those belong to other runs.
 		for _, h := range parts {
 			c, pol, why, ok, how := r.decide(key, h.p.pid)
+			limit := hold
+			if h.p.start && why == whyUnclaimed {
+				// A conversation start waits for the thread's first turn (part.start).
+				limit = max(hold, r.opts.TraceHold)
+			}
 			switch {
 			case ok:
 				out = append(out, release{c, pol, h.p, how})
-			case now.Sub(h.at) >= hold:
+			case now.Sub(h.at) >= limit:
 				r.stats.dropped(h.p.signal, why, h.p.records)
 				if r.opts.Logf != nil {
 					c, _ := r.lookup(r.sessionFor(key))

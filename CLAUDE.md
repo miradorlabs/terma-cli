@@ -676,6 +676,24 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   never a session; sessionless spans go by their trace. Codex metrics carry no session and
   are dropped. Claude's tool content also rides a `tool.output` span event, which the
   golden attribute lists do not see.
+- Desktop apps never run a PATH shim; the relay reaches them through user-level config.
+  Claude Desktop runs its own pinned Claude Code (2.1.202) via the Agent SDK with
+  `--setting-sources=user,project,local` under `service.name=claude-code-desktop` (the
+  relay routes by session, never service name); its cowork VM loads no repository hooks
+  and cannot reach the host's loopback. Codex Desktop, and since 0.157 a bare TUI when a
+  daemon runs, run threads in `codex app-server`: one process for every workspace, which
+  spawns the hooks and exports everything, so only `conversation.id` separates threads,
+  originator is the *first* client's, and adoption rests on evidence (any unclaimed
+  developer thread in the process makes it ambiguous). `session_loop`'s `thread_id`
+  (underscore) is a session key; an unclaimed `codex.conversation_starts` waits
+  `TraceHold` (app-server exports it at `thread/start`, the first hook fires at the first
+  turn). The daemon reads `[otel]` only at start: `relay setup` and doctor name
+  `codex app-server daemon restart` (`harness.RunningCodexDaemon`), never run it.
+  `live/codex_appserver.go` drives app-server over stdio JSON-RPC and a sandbox daemon
+  (short `CODEX_HOME`: SUN_LEN); `live/claude_desktop.go` reproduces Desktop's launch.
+- Pi has no exporter: terma's extension (`internal/harness/pi/terma.ts`, written by
+  `relay setup --harness pi`) exports GenAI spans and prompt logs under Pi's session id
+  and calls `terma hook pi-*`; `pi-prompt` claims without announcing.
 - OTLP types come from `go.opentelemetry.io/proto/otlp/{logs,metrics,trace}` as
   `*Data` messages (wire-identical to the export requests); never import the collector
   packages, which pull gRPC into every hook. Under the relay the machine-wide Codex config

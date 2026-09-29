@@ -100,7 +100,19 @@ Harness coverage: Claude Code, Codex and OpenCode, the three agents terma suppor
 | Cold start (no relay running) | ✓ | ✓ loses `conversation_starts` | |
 | Relay dies mid-session (interactive, 3 turns) | ✓ every turn arrives | | |
 
-**Versions:** the scenarios passed on the installed builds (Claude 2.1.284, Codex 0.158.0, OpenCode 1.18.33). A matrix run over the last six Claude and Codex releases and the last four OpenCode releases is in progress; this table will name them when it's done.
+**Versions:** the matrix ran every scenario above, plus the workloads and the direct telemetry contracts, from frozen binaries (578 runs):
+- **Claude Code:** 2.1.280–2.1.285.
+- **Codex:** 0.156.0–0.159.0, with 0.159.1 in part as it came out during the run.
+- **OpenCode:** 1.18.30–1.18.33.
+
+Every relay scenario passed on every build. Two failures came from elsewhere:
+- **`TestRelayWorkloadsCodex`:** on some runs the relayed `codex exec` exited without its shutdown. That is Codex's known exit without `SessionEnd` (`docs/CODEX-SESSION-END.md`), and with it the shutdown's own telemetry never left the process (`session_loop`, `op.dispatch.shutdown`, the last metrics flush). It is not the relay: across five runs each, direct exec shut down cleanly 2 times and relayed exec 3 times. The comparison now notes what an unshut run never sent. It still requires that the relay dropped nothing and forwarded everything it received.
+- **`TestClaudeTelemetry/redacted`:** fails on 2.1.280 and 2.1.281 with a terma built from `main` too. Claude exported the prompt with prompts off; 2.1.282 and later do not. The relay's own withheld-content scenario passed on those builds, because the relay removes content itself, whatever the harness's switches say.
+
+Later additions, run on the installed builds and the last four Codex releases:
+- Claude Desktop, on its pinned 2.1.202 and on the newest build;
+- Codex's app-server and daemon, on 0.157.0–0.159.1;
+- Pi 0.99.1.
 
 ### Workload equivalence
 
@@ -125,6 +137,45 @@ omp (oh-my-pi, PR #21, merged into this branch) exports OTLP natively under the 
 - **Exporter setup:** omp 18.3 reads its `OTEL_*` variables in `initTelemetryExport`, before any hook or extension loads, so the extension's variables came too late and nothing was exported. The launcher now hands them over. The shim protocol gained a versioned, validated environment channel (`OTEL_*` names only, never evaluated). `terma relay setup --harness omp` installs omp's shim.
 
 The omp route exports only in a bound repository, so omp elsewhere exports nothing at all: stricter than the agents whose global config the relay filters.
+
+### Codex's app-server (Desktop, the daemon)
+
+Codex Desktop, the IDE extension and, since 0.157, the interactive TUI run their threads in `codex app-server`. A bare `codex` with a daemon running attaches to it (`daemon_auto_start`, stable and on). Any `-c` override or `--dangerously-bypass-hook-trust` runs the TUI in-process instead; so do `codex exec` and terma's own Codex shim.
+
+The daemon is one process per `CODEX_HOME`, reached at `$CODEX_HOME/app-server-control/app-server-control.sock`. It serves every workspace, and it spawns every thread's hooks and exports all their telemetry (`service.name=codex-app-server`). The TUI process exports only a few metrics of its own, which name no session. What that means for the relay:
+
+- **Process scoping separates nothing within the daemon:** every claim names the daemon, so only `conversation.id` tells threads apart. A loaded thread keeps its own working directory: `thread/resume` with another `cwd` is ignored, and the resumed turn runs in the repository with its hooks. A daemon or Desktop restart unloads every thread. A thread resumed from a personal directory after that runs in a new process, and process scoping holds it back (`TestRelayCodexDesktopResumedElsewhere`: 412 records dropped as `uncovered_process`).
+- **Originator names the first client, not the thread's:** it is global to the daemon and set by the first client's `clientInfo.name` (a TUI connecting after Desktop reports `Codex_Desktop`). The relay keeps every client a process served and adopts only when all of them are single-workspace. What actually prevents a wrong adoption is evidence: a process with any unclaimed thread the developer started is ambiguous. The relay learns every part of an export before it routes any, so a personal thread's records and its title's in the same batch make the process ambiguous first. The daemon test covers this: under sabotage the personal title was adopted and the test failed.
+- **The thread's own work is named by `session_loop`:** its internal spans (turn context, rollout persistence, its hook commands, shutdown) sit under the `session_loop` root span, which names the thread as `thread_id` (underscore). That is now a session key, numeric values excluded. `session_loop` is exported when the loop ends, so these spans wait in the trace hold until then.
+- **A thread's start waits for its first turn:** app-server exports `conversation_starts` at `thread/start`, and the first hook fires with the first turn, whenever the developer types. An unclaimed conversation start now waits as long as a trace (30 minutes), not 2 minutes. `TestRelayCodexDesktop` waits past the test's hold before the first turn, and the start still arrives.
+- **Metrics:** the app-server exported no OTLP metrics in any run, 0.157.0 through 0.159.1, including after a clean SIGTERM. The only session-less counters seen come from the TUI client processes, and those name no session and are dropped.
+- **The exporter is read once:** the daemon reads `[otel]` when it starts. A change reaches it only after `codex app-server daemon restart`, and Codex warns that running work may be interrupted. `relay setup` says so when a daemon predates it, and doctor warns until the daemon has restarted (`harness.RunningCodexDaemon`, read from `$CODEX_HOME/app-server-daemon/daemon.pid`). terma never restarts it.
+
+Tests (`live/codex_appserver.go` drives app-server over stdio JSON-RPC the way Desktop does, and a sandbox daemon with a TUI attached to it):
+- **`TestRelayCodexDesktop`:** one process holds a repository thread and a personal thread. The first reaches its project, the second nothing.
+- **`TestRelayCodexDesktopResumedElsewhere`:** a thread is resumed from a personal directory after a restart, and nothing of the resumed turn leaves.
+- **`TestRelayCodexDaemonTUI`:** a TUI attached to the daemon, verified by the claim naming the daemon's pid. The repository thread and its adopted title reach the project. A personal thread in the same daemon, and its title, reach nothing.
+
+All three pass on 0.157.0 through 0.159.1. The daemon test needs a short `CODEX_HOME`, because a socket path is limited to 104 bytes.
+
+### Claude Desktop
+
+Claude Desktop's Code tab never runs the `claude` on PATH, so terma's per-repository shim never reaches it. What reaches it is the user's `settings.json`, which is where `relay setup` points the exporter. Read from the app bundle (Desktop 1.19367.0):
+- **Binary:** its own pinned Claude Code (2.1.202), under `~/Library/Application Support/Claude/claude-code/<version>/`.
+- **Launch:** through the Agent SDK, under the `Contents/Helpers/disclaimer` helper, which stays alive as the parent (Claude → disclaimer → claude).
+- **Transport:** `stream-json` over pipes, with no terminal, so the status line never renders.
+- **Settings:** `--setting-sources=user,project,local`, so the user's exporter settings and the repository's hooks both apply.
+- **Service name:** `service.name=claude-code-desktop`, set through `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES`. The relay routes by session, never by service name. The backend's adapter must accept the Desktop name.
+- **Worktree mode:** "use worktree" creates linked worktrees at `<repo>/.claude/worktrees/<name>`, which find the main checkout's binding.
+
+`TestRelayClaudeDesktop` (`live/claude_desktop.go`) reproduces that launch on the pinned build and on the newest. On one relay it runs a repository session, a worktree session and a personal session. The first two reach the project with its key, and their hooks ran. The personal session was received and dropped. It passes on 2.1.202 and 2.1.284.
+
+**Not covered:** Desktop's cowork mode (`claude-code-vm`) runs Claude Code in a Linux VM:
+- with user settings only (so no repository hooks, and no claims);
+- with its own `CLAUDE_CONFIG_DIR`;
+- behind a userspace network where 127.0.0.1 is not the host.
+
+Nothing it does reaches the relay, so it is lost rather than leaked.
 
 ### Pi
 

@@ -641,6 +641,39 @@ func TestRelayWaitsForAKey(t *testing.T) {
 	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["forwarded.logs"] == 2 })
 }
 
+// A Codex Desktop thread exports its start at thread/start, and its first hook fires
+// at its first turn, however long after: the start waits past the ordinary hold for
+// that claim, and still leaves; an unclaimed one is dropped when the trace hold ends.
+func TestRelayConversationStartWaitsForTheFirstTurn(t *testing.T) {
+	pr := newProcRelay(t)
+	pr.f.mu.Lock()
+	delete(pr.f.claims, "A")
+	pr.f.mu.Unlock()
+	pr.send(600, "/v1/logs", codexStart("A", "Codex Desktop", "on-request", "workspace-write"))
+	pr.send(600, "/v1/logs", codexStart("mine", "Codex Desktop", "on-request", "workspace-write"))
+	pr.send(600, "/v1/logs", codexLogs("mine", "Codex Desktop", 1))
+	time.Sleep(100 * time.Millisecond)
+	advance := func(d time.Duration) {
+		pr.f.mu.Lock()
+		pr.f.now = pr.f.now.Add(d)
+		pr.f.mu.Unlock()
+		pr.r.sweep()
+	}
+	advance(10 * time.Minute)
+	if c := pr.r.Stats().Snapshot().Counters; c["dropped.unclaimed_expired.logs"] != 1 || c["forwarded.logs"] != 0 {
+		t.Fatalf("after 10 minutes, only the personal thread's ordinary record may be gone: %v", c)
+	}
+	pr.f.mu.Lock()
+	pr.f.claims["A"] = claim.Claim{ProjectID: "p1", Tool: "codex"}
+	pr.f.mu.Unlock()
+	advance(time.Second)
+	waitFor(t, func() bool { return pr.r.Stats().Snapshot().Counters["forwarded.logs"] == 1 })
+	advance(25 * time.Minute)
+	if c := pr.r.Stats().Snapshot().Counters; c["dropped.unclaimed_expired.logs"] != 2 || c["forwarded.logs"] != 1 {
+		t.Fatalf("the personal thread's start outlived the trace hold, or leaked: %v", c)
+	}
+}
+
 // codexStart is a Codex conversation start for session, with its policies.
 func codexStart(session, originator, approval, sandbox string) *logspb.LogsData {
 	return logsOf(session, 1, kv("originator", originator), kv("event.name", "codex.conversation_starts"), kv("approval_policy", approval), kv("sandbox_policy", sandbox))
@@ -711,10 +744,14 @@ func TestRelayAdoptsNothingAmbiguous(t *testing.T) {
 	pr.send(1000, "/v1/logs", codexLogs("A", "codex-tui", 1))
 	pr.send(1000, "/v1/logs", codexStart("daemon", "codex-tui", "never", "read-only"))
 	time.Sleep(200 * time.Millisecond)
-	pr.f.mu.Lock()
-	pr.f.now = pr.f.now.Add(2 * time.Minute)
-	pr.f.mu.Unlock()
-	pr.r.sweep()
+	// A conversation start waits as long as a trace for its claim; every sweep of that
+	// wait decides again, and none may adopt.
+	for range 31 {
+		pr.f.mu.Lock()
+		pr.f.now = pr.f.now.Add(time.Minute)
+		pr.f.mu.Unlock()
+		pr.r.sweep()
+	}
 	logs, _ := pr.u.logs(t)
 	for _, recs := range logs {
 		for _, lr := range recs {

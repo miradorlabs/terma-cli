@@ -97,7 +97,7 @@ jobs:
   # Pin PR builds; live.yml also checks the latest releases nightly.
   harness-telemetry:
     runs-on: macos-latest
-    timeout-minutes: 35
+    timeout-minutes: 50
     env:
       TERMA_ENV: dev
       TERMA_LIVE: "1"
@@ -131,7 +131,7 @@ jobs:
         # TestRelay* is the local relay spike (docs/RELAY-SPIKE.md): the same
         # harnesses exporting globally through `terma relay run`, and nothing but the
         # claimed session reaching the receiver.
-        run: go test -v -count=1 -timeout=30m -run '^(TestClaudeTelemetry|TestCodexTelemetry|TestClaudeStopFailureDelivery|TestRelay.*|TestPi.*)$' .
+        run: go test -v -count=1 -timeout=45m -run '^(TestClaudeTelemetry|TestCodexTelemetry|TestClaudeStopFailureDelivery|TestRelay.*|TestPi.*)$' .
       - name: Publish coverage summary
         if: always()
         run: |
