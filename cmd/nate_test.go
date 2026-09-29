@@ -43,7 +43,7 @@ func TestNateRequiresExplicitConfirmationWithoutATerminal(t *testing.T) {
 	}
 
 	out, err := runTerma(t, "nate")
-	if err == nil || !strings.Contains(err.Error(), "Are you sure you want to do this? It will remove everything related to Terma.") {
+	if err == nil || !strings.Contains(err.Error(), "Are you sure you want to do this? It will remove everything related to Terma on this machine.") {
 		t.Fatalf("nate without confirmation = %v, output %q", err, out)
 	}
 	if _, err := os.Stat(marker); err != nil {
@@ -51,7 +51,7 @@ func TestNateRequiresExplicitConfirmationWithoutATerminal(t *testing.T) {
 	}
 }
 
-func TestNateRemovesRepositoryMachineStateAndBinary(t *testing.T) {
+func TestNateRemovesMachineStateAndBinaryButNotTheRepository(t *testing.T) {
 	home, configDir, workspace := nateTestEnvironment(t)
 	if err := os.MkdirAll(configDir, 0o700); err != nil {
 		t.Fatal(err)
@@ -78,13 +78,20 @@ func TestNateRemovesRepositoryMachineStateAndBinary(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nate: %v\n%s", err, out)
 	}
-	for _, path := range []string{configDir, filepath.Join(workspace, ".terma", "settings.json"), binary} {
+	for _, path := range []string{configDir, binary} {
 		if _, err := os.Stat(path); !os.IsNotExist(err) {
 			t.Errorf("%s survived nate: %v", path, err)
 		}
 	}
+	// The binding is a committed file; nate must not touch the repository it ran in.
+	if _, err := os.Stat(filepath.Join(workspace, ".terma", "settings.json")); err != nil {
+		t.Errorf("nate removed the repository's binding: %v", err)
+	}
 	if !strings.Contains(out, "Terma has been removed") {
 		t.Fatalf("missing completion message:\n%s", out)
+	}
+	if !strings.Contains(out, "`terma uninstall`") {
+		t.Fatalf("completion message does not point at `terma uninstall`:\n%s", out)
 	}
 }
 
