@@ -59,3 +59,19 @@ func TestBrowserEnterRequiresNewline(t *testing.T) {
 		}
 	}
 }
+
+func TestBrowserEnterPreservesNextAnswer(t *testing.T) {
+	cmd := &cobra.Command{}
+	cmd.SetContext(context.Background())
+	cmd.SetIn(strings.NewReader("\nyes\nno\n"))
+	cmd.SetErr(io.Discard)
+	if err := waitForBrowserEnter(cmd); err != nil {
+		t.Fatal(err)
+	}
+	for i, want := range []bool{true, false} {
+		got, err := confirmDefault(cmd, "Continue?", !want)
+		if err != nil || got != want {
+			t.Fatalf("prompt %d after browser pause: got %v, %v; want %v", i, got, err, want)
+		}
+	}
+}

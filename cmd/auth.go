@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -501,8 +500,15 @@ func nameOrID(name, id string) string {
 // waitForBrowserEnter runs before starting login, so the user can take their time.
 func waitForBrowserEnter(cmd *cobra.Command) error {
 	fmt.Fprint(cmd.ErrOrStderr(), "Press Enter to open your browser and sign in to Terma (Ctrl-C to cancel): ")
-	if _, err := bufio.NewReader(cmd.InOrStdin()).ReadString('\n'); err != nil {
-		return fmt.Errorf("read browser confirmation: %w", err)
+	// Do not buffer input: queued answers belong to the prompts that follow.
+	var key [1]byte
+	for {
+		n, err := cmd.InOrStdin().Read(key[:])
+		if n > 0 && key[0] == '\n' {
+			return cmd.Context().Err()
+		}
+		if err != nil {
+			return fmt.Errorf("read browser confirmation: %w", err)
+		}
 	}
-	return cmd.Context().Err()
 }
