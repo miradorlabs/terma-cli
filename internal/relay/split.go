@@ -28,7 +28,9 @@ const (
 // unattributable. On every other Codex span thread.id is the tracing library's OS
 // thread number (with thread.name "tokio-rt-worker"), not a conversation, so a
 // thread.id that is a number is never a session: those spans go by their trace.
-var sessionKeys = []string{"session.id", "conversation.id", "thread.id"}
+// gen_ai.conversation.id is the GenAI semantic conventions' session, which omp stamps
+// on its invoke_agent, chat and execute_tool spans.
+var sessionKeys = []string{"session.id", "conversation.id", "gen_ai.conversation.id", "thread.id"}
 
 // The export requests are decoded as LogsData, MetricsData and TracesData: the same
 // message on the wire and in JSON (field 1, repeated resource entries), without the

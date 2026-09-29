@@ -157,11 +157,14 @@ and spool guarantees in [INSTRUMENTATION.md](docs/INSTRUMENTATION.md) and
 
 ## Supported agents
 
-Terma currently supports Claude Code, Codex, Cursor, OpenCode, and Antigravity. The
+Terma currently supports Claude Code, Codex, Cursor, OpenCode, Omp, and Antigravity. The
 support level differs by agent:
 
 - Claude Code and Codex provide commit attribution plus native telemetry paths.
 - OpenCode uses a dependency-free plugin for model, tool, session, and file events.
+- Omp exports tokens, effort, service tier, and latency through its native OTLP spans,
+  wired by a user-scope hook extension; estimated cost is posted as a companion record,
+  and commit attribution rides repository hooks.
 - Cursor provides commit attribution and ordered hook observations; billed-cost and
   quota mapping depend on platform integration.
 - Antigravity provides session, turn, tool, and file observations but has no token or

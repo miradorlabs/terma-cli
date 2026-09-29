@@ -239,7 +239,13 @@ run that reaches them opens a browser login on **production**. A script that run
   `.codex` hooks. OpenCode routes itself: the plugin's `perRepo`
   mode reads the binding and picks `helpers/opencode-otel-<id>`; the id is validated in
   the plugin exactly as `project.ValidID` does, because the binding is a committed file
-  and the id names a script the plugin executes. "Live" (`shim.Active`) means the agent's
+  and the id names a script the plugin executes. omp routes itself the same way: a
+  user-scope hook extension at `~/.omp/agent/hooks/pre/terma.ts` exports the OTEL_*
+  variables omp's native exporter reads (the YAML config cannot set env), picks
+  `helpers/omp-otel-<id>` in `perRepo` mode, and posts the one figure the native
+  spans lack — estimated cost — as a companion log record joined by
+  `gen_ai.conversation.id`. Commit attribution comes from the committed
+  `.omp/hooks/pre/terma.ts` hook file. "Live" (`shim.Active`) means the agent's
   name resolves to the shim — on PATH *ahead of* the real binary — or the wrapper is
   loaded; `status` and `doctor` report shell activation independently of export,
   including missing opt-in and routes not configured for this project. Inactive
@@ -654,6 +660,13 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
 - `live/relay_workloads_test.go` runs each workload directly and through the relay and
   requires the same telemetry and zero drops; long live matrix runs use frozen copies of
   `bin/terma` and `bin/live.test`, or a rebuild mid-run mixes versions.
+- omp goes through the relay by environment: its exporter reads `OTEL_*` before any
+  extension loads (omp 18.3), so `relay setup --harness omp` installs its PATH shim, and
+  `shim.ompRouter` (an `envRouter`) hands it the relay's variables in a bound repository
+  only. The shim protocol's environment channel (`env.N` + `envcount`,
+  `terma-env-v1`) carries `OTEL_*` names alone; the launcher exports them without eval.
+  omp's hook file and extension name the session `ctx.sessionManager.getSessionId()`
+  — the `gen_ai.conversation.id` its spans carry — never an invented id.
 - OpenCode goes through the relay too (`relay setup` points the plugin at it): its
   prompt rides a log body and its reply `gen_ai.completion`, both withheld with content.
   `live/opencode.go` fetches OpenCode builds from npm (`opencode-<os>-<arch>`), and

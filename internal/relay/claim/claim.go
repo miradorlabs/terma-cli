@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -84,6 +85,37 @@ func Enabled() bool {
 	}
 	_, err = os.Stat(filepath.Join(dir, tokenFile))
 	return err == nil
+}
+
+// DefaultAddr is where the relay listens unless `terma relay setup --addr` said
+// otherwise. It is fixed, because the agents' exporter configuration is static.
+const DefaultAddr = "127.0.0.1:43180"
+
+// Addr is the address the relay listens on: what setup recorded, else DefaultAddr.
+func Addr() string {
+	dir, err := Dir()
+	if err != nil {
+		return DefaultAddr
+	}
+	if data, err := os.ReadFile(filepath.Join(dir, "addr")); err == nil {
+		if a := strings.TrimSpace(string(data)); a != "" {
+			return a
+		}
+	}
+	return DefaultAddr
+}
+
+// Token is the relay's local token, "" when the relay is not set up.
+func Token() string {
+	path, err := TokenPath()
+	if err != nil {
+		return ""
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
 }
 
 // TokenPath is where the relay's local token lives.

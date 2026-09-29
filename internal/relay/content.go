@@ -21,7 +21,9 @@ var (
 	// promptDropFields hold what was said and are removed outright, as the exporters
 	// that write them omit them when content is off: the GenAI semantic conventions'
 	// content attributes (terma's OpenCode plugin writes gen_ai.completion).
-	promptDropFields = []string{"gen_ai.prompt", "gen_ai.completion", "gen_ai.input.messages", "gen_ai.output.messages", "gen_ai.system_instructions"}
+	promptDropFields = []string{"gen_ai.prompt", "gen_ai.completion", "gen_ai.input.messages", "gen_ai.output.messages", "gen_ai.system_instructions",
+		// omp's own (omp.gen_ai.*): the request's messages and the response's text.
+		"omp.gen_ai.request.messages", "omp.gen_ai.response.text"}
 	// promptBodyEvents carry what was said in the log body, not an attribute: the
 	// OpenCode plugin's prompt, and the session title, which restates it.
 	promptBodyEvents = []string{"opencode.user_prompt", "opencode.session.created"}

@@ -37,9 +37,8 @@ import (
 // terma on loopback, and only what a hook in an opted-in repository claimed goes on
 // to Terma. Every command here is hidden while it is a spike.
 
-// defaultRelayAddr is where the relay listens unless `terma relay setup --addr` said
-// otherwise. It is fixed, because the agents' exporter configuration is static.
-const defaultRelayAddr = "127.0.0.1:43180"
+// defaultRelayAddr is where the relay listens by default (claim.DefaultAddr).
+const defaultRelayAddr = claim.DefaultAddr
 
 const (
 	relayAddrFile  = "addr"
@@ -215,6 +214,28 @@ func newRelayRunCommand() *cobra.Command {
 	return cmd
 }
 
+// putOmpOnRelay installs omp's PATH shim and puts the shim directory on PATH through
+// the startup-file block `terma install` maintains.
+func putOmpOnRelay(out io.Writer) error {
+	binDir, err := shim.InstallShims([]string{shim.AgentOmp})
+	if err != nil {
+		return err
+	}
+	if shim.Active(shim.AgentOmp) {
+		return nil
+	}
+	rc, ok := shim.ShellRC()
+	if !ok {
+		fmt.Fprintf(out, "Add %s to the front of PATH so omp starts through terma's launcher.\n", binDir)
+		return nil
+	}
+	if _, err := rc.Ensure(binDir); err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "omp starts through terma's launcher (%s); run `%s` or open a new terminal.\n", tildePath(rc.Path), reloadCommand(tildePath(rc.Path)))
+	return nil
+}
+
 // executableStamp identifies the file this process was started from — its size and
 // modification time — so a relay can tell it has been replaced. Empty when unknown.
 func executableStamp() string {
@@ -316,6 +337,14 @@ func newRelaySetupCommand() *cobra.Command {
 					return fmt.Errorf("%s: %w", h.DisplayName(), err)
 				}
 				fmt.Fprintf(out, "%s exports to the relay at %s.\n", h.DisplayName(), addr)
+				// omp reads its exporter's endpoint from the environment before any
+				// extension runs, so the launcher hands it over: a PATH shim, in a bound
+				// repository only (shim.ompRouter).
+				if h.Name() == shim.AgentOmp {
+					if err := putOmpOnRelay(out); err != nil {
+						return err
+					}
+				}
 			}
 			fmt.Fprintln(out, "Hooks in repositories with a binding claim their sessions; nothing else is forwarded.")
 			// A running relay has the old address and token: replace it. Then start one

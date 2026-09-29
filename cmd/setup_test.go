@@ -40,7 +40,7 @@ func TestHarnessSelectionComingSoon(t *testing.T) {
 		chosen[name] = true
 	}
 	form := harnessSelectionForm(context.Background(), chosen)
-	wantOrder := []string{"claude", "codex", codexDesktopAgent, "cursor", "opencode", "antigravity"}
+	wantOrder := []string{"claude", "codex", codexDesktopAgent, "omp", "cursor", "opencode", "antigravity"}
 	if len(form.Items) != len(wantOrder) {
 		t.Fatalf("picker has %d items, want %d", len(form.Items), len(wantOrder))
 	}
@@ -100,9 +100,17 @@ func TestHarnessSelectionFiltersSavedAgents(t *testing.T) {
 		if slices.Contains(saved, "claude") {
 			wantInstalled = []string{"claude", "codex"}
 		}
+		if slices.Contains(saved, "omp") {
+			wantInstalled = append(wantInstalled, "omp")
+		}
 		wantSetup := slices.Clone(wantInstalled)
 		if codexDesktopInstalled(context.Background()) {
-			wantSetup = append(wantSetup, codexDesktopAgent)
+			// Codex Desktop sorts right after the CLI in the picker, ahead of omp.
+			if i := slices.Index(wantSetup, "codex"); i >= 0 {
+				wantSetup = slices.Insert(wantSetup, i+1, codexDesktopAgent)
+			} else {
+				wantSetup = append(wantSetup, codexDesktopAgent)
+			}
 			if len(wantInstalled) == 0 {
 				wantInstalled = append(wantInstalled, codexDesktopAgent)
 			}

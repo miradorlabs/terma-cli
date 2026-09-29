@@ -129,6 +129,10 @@ func resolve(t *testing.T, harness, spec string, list func() ([]string, error), 
 // numberOf pulls the x.y.z out of a --version line.
 func numberOf(line string) string {
 	for f := range strings.FieldsSeq(line) {
+		// "omp/18.3.0" names itself before the version.
+		if _, after, ok := strings.Cut(f, "/"); ok {
+			f = after
+		}
 		f = strings.TrimPrefix(f, "v")
 		if isRelease(f) {
 			return f

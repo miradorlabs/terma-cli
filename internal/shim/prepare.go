@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -31,7 +32,56 @@ func Prepare(agent, directory string, args []string) error {
 			return err
 		}
 	}
+	// Environment variables, for an agent configured only through its environment
+	// (omp's OTLP exporter): one NAME=value file each and a versioned count, written
+	// before the arguments' count, which is the plan's commit marker. The launcher
+	// exports only names it accepts (envNameOK); a launcher from before this ignores
+	// the files.
+	// Only the names the launcher exports are written; others in a route (Codex's
+	// TERMA_CODEX_ROUTED marker) are the launcher's own to set, or Exec's.
+	names := make([]string, 0, len(r.env))
+	for k := range r.env {
+		if envNameOK(k) {
+			names = append(names, k)
+		}
+	}
+	slices.Sort(names)
+	if len(names) > maxPlanEnv {
+		return fmt.Errorf("unsupported routing plan")
+	}
+	for i, k := range names {
+		v := r.env[k]
+		if strings.ContainsAny(v, "\x00\r\n") {
+			return fmt.Errorf("invalid environment variable %q", k)
+		}
+		if err := os.WriteFile(filepath.Join(directory, "env."+strconv.Itoa(i)), []byte(k+"="+v), 0o600); err != nil {
+			return err
+		}
+	}
+	if len(names) > 0 {
+		if err := os.WriteFile(filepath.Join(directory, "envcount"), []byte(fmt.Sprintf("terma-env-v1:%d\n", len(names))), 0o600); err != nil {
+			return err
+		}
+	}
 	return os.WriteFile(filepath.Join(directory, "count"), []byte(fmt.Sprintf("terma-args-v1:%d\n", len(r.args))), 0o600)
+}
+
+// maxPlanEnv bounds the environment variables one plan may set.
+const maxPlanEnv = 32
+
+// envNameOK is the names a plan may set: OpenTelemetry's exporter configuration, and
+// nothing that could change how the agent or the shell resolves anything else. The
+// launcher applies the same rule.
+func envNameOK(name string) bool {
+	if !strings.HasPrefix(name, "OTEL_") || len(name) > 64 {
+		return false
+	}
+	for _, r := range name {
+		if (r < 'A' || r > 'Z') && (r < '0' || r > '9') && r != '_' {
+			return false
+		}
+	}
+	return true
 }
 
 func shimScript(agent, binDir string) string {
@@ -121,6 +171,25 @@ else
   terma_ok=0
 fi
 terma_launch_plan() {
+  # Environment first, while the plan is still on disk: NAME=value per file, only
+  # OTEL_ names, never eval'd.
+  if [ -f "$terma_tmp/envcount" ]; then
+    terma_envn=
+    IFS= read -r terma_envn < "$terma_tmp/envcount" || terma_envn=
+    case "$terma_envn" in terma-env-v1:*) terma_envn=${terma_envn#terma-env-v1:} ;; *) terma_envn= ;; esac
+    case "$terma_envn" in ''|*[!0-9]*|???*) terma_envn=0 ;; esac
+    terma_i=0
+    while [ "$terma_i" -lt "$terma_envn" ]; do
+      terma_line=
+      IFS= read -r terma_line < "$terma_tmp/env.$terma_i" || [ -n "$terma_line" ] || terma_line=
+      terma_key=${terma_line%%=*}
+      terma_val=${terma_line#*=}
+      case "$terma_key" in
+        OTEL_*) case "$terma_key" in *[!A-Z0-9_]*) ;; *) export "$terma_key=$terma_val" ;; esac ;;
+      esac
+      terma_i=$((terma_i + 1))
+    done
+  fi
   terma_i=$terma_count
   while [ "$terma_i" -gt 0 ]; do
     terma_i=$((terma_i - 1))

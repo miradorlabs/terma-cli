@@ -111,10 +111,28 @@ Harness coverage: Claude Code, Codex and OpenCode, the three agents terma suppor
 | Claude | reply, Bash, a failing Bash, 400 KB of tool output, 8 sequential tools, 3 parallel tools in one response, Write/Read/Edit, a subagent, Unicode and RTL, a provider overload (529) retried |
 | Codex | reply, shell, a failing shell, 400 KB of output, 6 tools, a file written by the shell |
 | OpenCode | reply, a bash tool call |
+| omp | reply, a bash tool call (plus: omp outside any repository exports nothing at all) |
 
 All 18 pass on the installed builds (Claude 2.1.284, Codex 0.158.0, OpenCode 1.18.33). In every relayed run the relay forwarded everything it received. The only difference found is Claude's `retention_sweep`, a housekeeping event on Claude's own schedule that a run may or may not emit.
 
 The Codex TUI (`TestRelayCodexTUITitle`) forwarded 1,614 of 1,614 records, its title conversation included.
+
+### omp
+
+omp (oh-my-pi, PR #21, merged into this branch) exports OTLP natively under the GenAI conventions (`invoke_agent`, `chat`, `execute_tool`, with `gen_ai.conversation.id`). The relay treats `gen_ai.conversation.id` as a session key, and withholds omp's content attributes (`omp.gen_ai.request.messages`, `omp.gen_ai.response.text`). Two things in the branch had to change:
+- **Session ids:** its hook file and extension invented a random session id, so a claim named a session no span belongs to. They now use omp's own (`ctx.sessionManager.getSessionId()`).
+- **Exporter setup:** omp 18.3 reads its `OTEL_*` variables in `initTelemetryExport`, before any hook or extension loads, so the extension's variables came too late and nothing was exported. The launcher now hands them over. The shim protocol gained a versioned, validated environment channel (`OTEL_*` names only, never evaluated). `terma relay setup --harness omp` installs omp's shim.
+
+The omp route exports only in a bound repository, so omp elsewhere exports nothing at all: stricter than the agents whose global config the relay filters.
+
+### Other harnesses
+
+| Harness | Exports OTLP? | Claims possible? | Status |
+|---|---|---|---|
+| Pi (`@earendil-works/pi-coding-agent`) | no | extension API (`session_start`, `turn_end`, `tool_call`, …) | needs a terma extension that exports OTLP itself, like OpenCode's plugin |
+| Hermes (Nous Research) | no usage telemetry (Langfuse plugin; content-free gateway monitoring) | shell hooks (`on_session_start`, `post_llm_call`, …) in user config | needs a terma plugin that exports OTLP, and user-level hooks |
+| T3 Code | its agents': it runs `codex app-server`, Claude's Agent SDK and `cursor-agent` | through those agents' hooks | a multi-workspace client: no adoption (safe); not driven yet |
+| Cursor | no | hooks (terma already wires them) | nothing reaches the relay; its events go through terma's spool |
 
 ## Findings
 

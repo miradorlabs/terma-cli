@@ -80,7 +80,7 @@ type Trusting interface {
 // registry is fixed at compile time: an adapter has to know an agent's file format and
 // payload, so there is nothing a runtime registration would enable. The order is the
 // order `terma install` plans and reports them.
-var registry = []Adapter{claude{}, cursor{}, codex{}, opencode{}, antigravity{}}
+var registry = []Adapter{claude{}, cursor{}, codex{}, opencode{}, omp{}, antigravity{}}
 
 // All returns every adapter, in registry order.
 func All() []Adapter {

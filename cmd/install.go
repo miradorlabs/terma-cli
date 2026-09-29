@@ -721,6 +721,18 @@ func connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *config.Conf
 			// .opencode/terma.json overlay, written by install below.
 			fmt.Fprintln(out, "  OpenCode     → per-repo plugin")
 			ui.ok("OpenCode", "reports through terma's plugin")
+		case "omp":
+			// omp routes itself: its hook extension reads the repository's binding and
+			// picks the project's key, so it needs no wrapper or shim.
+			if err := (harness.Omp{}).ConnectPerRepo(exp); err != nil {
+				return fmt.Errorf("omp: %w", err)
+			}
+			// The extension is global and shared across every bound repository, so a
+			// per-repo prompt / tool-content choice cannot ride in it (that would flip
+			// capture on for every other project). It lives only in a committed
+			// .omp/terma.json overlay, written by install below.
+			fmt.Fprintln(out, "  Omp          → per-repo extension")
+			ui.ok("omp", "reports through terma's extension")
 		default:
 			// Every telemetry harness is routed above. One added to the registry without
 			// a case here must not pass for routed: it would export to whatever project
