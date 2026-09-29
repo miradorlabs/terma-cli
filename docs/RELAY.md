@@ -90,3 +90,11 @@ include it.
 | `outbox/<project>/` | router | per-project bodies awaiting delivery |
 | `dead/` | forwarder | refused bodies (bounded) |
 | `stats.json` | relay | counters and last error, for `status` |
+
+## Later
+
+- **Heartbeat.** The relay periodically sends one OTLP log record to the machine project:
+  terma version, OS, relay health (backlog, held projects, last error), which agents'
+  global configs point at it. The backend gets a fleet view of which terma versions are
+  rolled out and which machines have a relay that is not delivering. Not in the first
+  cut.

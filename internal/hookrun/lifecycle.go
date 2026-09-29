@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
+	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -24,11 +25,16 @@ func (e Env) newSession(r *repo, id, tool, model string) session.Session {
 	return session.Session{ID: id, Tool: tool, Model: model, Cwd: r.root, StartedAt: now, UpdatedAt: now}
 }
 
-// setActive records sess as the session an unattributed commit falls back to. A failure
-// is logged and the hook carries on: the event is still worth spooling.
+// setActive records sess as the session an unattributed commit falls back to, and tells
+// the relay which repository the session runs in, so its native telemetry reaches this
+// repository's project (docs/RELAY.md). A failure is logged and the hook carries on: the
+// event is still worth spooling.
 func (e Env) setActive(r *repo, sess session.Session) {
 	if err := r.store.SetActive(sess); err != nil {
 		e.logf("record session: %v", err)
+	}
+	if err := relay.RecordSession(sess.ID, r.root); err != nil {
+		e.logf("record session for the relay: %v", err)
 	}
 }
 

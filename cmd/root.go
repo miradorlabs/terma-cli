@@ -121,6 +121,7 @@ spend will be attributed.`,
 		newHookCommand(),
 		// Internal: the target of the per-repo routing PATH shim / wrapper.
 		newShimCommand(),
+		newRelayCommand(),
 		newDesktopCommand(),
 	)
 	return root
@@ -190,7 +191,7 @@ func automaticUpdatesAllowed(cmd *cobra.Command, interactive bool) bool {
 	}
 	for c := cmd; c != nil; c = c.Parent() {
 		switch c.Name() {
-		case "hook", "shim", "spool", "update", "version", "completion", "__complete", "__completeNoDesc":
+		case "hook", "relay", "shim", "spool", "update", "version", "completion", "__complete", "__completeNoDesc":
 			return false
 		}
 	}
@@ -210,7 +211,7 @@ func migrateState(ctx context.Context, args []string) {
 	if err != nil || !migrate.Pending(dir) {
 		return
 	}
-	quiet := len(args) > 0 && slices.Contains([]string{"hook", "shim", "spool"}, args[0])
+	quiet := len(args) > 0 && slices.Contains([]string{"hook", "relay", "shim", "spool"}, args[0])
 	wait := 10 * time.Second
 	if quiet {
 		wait = time.Second
