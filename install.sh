@@ -120,4 +120,4 @@ case ":$PATH:" in
     esac
     ;;
 esac
-say "Next: run \`${terma_cmd} setup\` in a terminal, then \`terma install\` inside a repository."
+say "Next: run \`${terma_cmd} setup\` in a terminal, then \`${terma_cmd} install\` inside a repository."

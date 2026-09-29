@@ -164,6 +164,17 @@ func TestInstallUIVerdict(t *testing.T) {
 		t.Errorf("with no reload step queued, the routing fix is the developer's:\n%s", buf.String())
 	}
 
+	// A round-trip that timed out is inconclusive; with nothing else wrong it is what the
+	// Verified line names, never a dangling "flagged ".
+	buf.Reset()
+	newInstallUI(&buf, true).verdict(doctor.Report{Checks: []doctor.Check{
+		{Key: doctor.KeyAuth, Name: "signed in", Status: doctor.Pass},
+		{Key: doctor.KeyBackend, Name: "backend receives events", Status: doctor.Warn, Inconclusive: true, Detail: "no event after 30s"},
+	}})
+	if !strings.Contains(buf.String(), "`terma doctor` flagged backend receives events\n") {
+		t.Errorf("an inconclusive check alone should still be named:\n%s", buf.String())
+	}
+
 	for want, checks := range map[string][]doctor.Check{
 		"✓ Verified      terma doctor: all checks passed":                             {{Status: doctor.Pass}},
 		"✓ Verified      terma doctor: the checks that ran passed; some were skipped": {{Status: doctor.Pass}, {Key: doctor.KeyBackend, Status: doctor.Skip}},

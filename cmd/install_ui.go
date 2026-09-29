@@ -137,7 +137,7 @@ func (u *installUI) verify(cmd *cobra.Command) {
 // next step (its name and detail when it names no fix). The Verified line names
 // `terma doctor`, which has the full report.
 func (u *installUI) verdict(report doctor.Report) {
-	var fixes, flagged []string
+	var fixes, flagged, consequences []string
 	skipped := false
 	for _, c := range report.Checks {
 		switch {
@@ -147,8 +147,10 @@ func (u *installUI) verdict(report doctor.Report) {
 		case (c.Key == doctor.KeyRouting || c.NeedsShellActivationOnly) && u.reloading:
 		default:
 			// An inconclusive check is a consequence of another one; the Verified line
-			// names the cause.
-			if !c.Inconclusive {
+			// names the cause, and the check itself only when nothing else was flagged.
+			if c.Inconclusive {
+				consequences = append(consequences, c.Name)
+			} else {
 				flagged = append(flagged, c.Name)
 			}
 			fix := c.Name + ": " + c.Detail
@@ -162,6 +164,9 @@ func (u *installUI) verdict(report doctor.Report) {
 	}
 	switch {
 	case len(fixes) > 0:
+		if len(flagged) == 0 {
+			flagged = consequences
+		}
 		u.warn("Verified", "`terma doctor` flagged "+strings.Join(flagged, ", "))
 		for _, f := range fixes {
 			u.then(f)

@@ -56,6 +56,7 @@ out="$(HOME="$home" PATH="/usr/bin:/bin" TERMA_RELEASE_BASE="$BASE" TERMA_VERSIO
 ! grep -qi sudo <<<"$out" || fail "installer mentioned sudo: $out"
 grep -q "is not on your PATH" <<<"$out" || fail "missing PATH hint: $out"
 grep -q "run \`$home/.local/bin/terma setup\`" <<<"$out" || fail "next step should name the full path: $out"
+grep -q "then \`$home/.local/bin/terma install\`" <<<"$out" || fail "the install step should name the full path too: $out"
 
 echo "== upgrades a writable copy already on PATH in place"
 mkdir -p "$work/onpath"
