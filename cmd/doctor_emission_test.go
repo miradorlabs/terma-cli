@@ -103,11 +103,11 @@ func TestDoctorChecksOpenCodeRepositoryPolicy(t *testing.T) {
 		t.Run(joinSignals(signals), func(t *testing.T) {
 			repo := installRepo(t)
 			t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-			h := harness.OpenCode{}
+			h := harnessOf(t, "opencode")
 			if err := h.Connect(harness.Exporter{Endpoint: endpoint, APIKey: testServerKey, Signals: harness.AllSignals}, false); err != nil {
 				t.Fatal(err)
 			}
-			if err := h.Local(repo).Connect(harness.Exporter{Signals: signals}, false); err != nil {
+			if err := h.(harness.Scoped).Local(repo).Connect(harness.Exporter{Signals: signals}, false); err != nil {
 				t.Fatal(err)
 			}
 			if err := keystore.SetFor("opencode", testProjectID, testServerKey, keystore.Hosts{}); err != nil {

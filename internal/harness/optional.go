@@ -45,17 +45,14 @@ type TurnNotifier interface {
 
 var (
 	_ Noter = Codex{}
-	_ Noter = OpenCode{}
 
 	_ Credentialed = Claude{}
 	_ Credentialed = Codex{}
-	_ Credentialed = OpenCode{}
 
 	_ Backuper = Claude{}
 	_ Backuper = Codex{}
 
 	_ Scoped = Claude{}
-	_ Scoped = OpenCode{}
 
 	_ StatusLiner  = Claude{}
 	_ TurnNotifier = Codex{}

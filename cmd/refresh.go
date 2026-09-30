@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/migrate"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
@@ -28,8 +28,8 @@ import (
 // rewrites files terma wrote with this build's templates, never creates one, never signs
 // in, and never touches a choice: an absent shim, status line or hook file stays absent.
 
-// refreshMachine rewrites the home-directory files every repository shares: the wrapped
-// Claude status line and the OpenCode plugin. It also removes the PATH shims an earlier
+// refreshMachine rewrites the home-directory files every repository shares, each agent's
+// (agents.MachineRefresher). It also removes the PATH shims an earlier
 // build installed — the local relay routes the agents now, and a shim left on PATH would
 // run every agent launch through terma for nothing. It returns the paths it changed,
 // carrying on past a failure so one broken file does not strand the rest.
@@ -44,15 +44,12 @@ func refreshMachine() ([]string, error) {
 		dir, _ := shim.ShimBinDir()
 		changed = append(changed, dir+" — removed: the local relay routes the agents now")
 	}
-	if path, ok, err := (harness.Claude{}).RefreshStatusLine(); err != nil {
-		errs = append(errs, fmt.Errorf("claude status line: %w", err))
-	} else if ok {
-		changed = append(changed, path)
-	}
-	if path, ok, err := (harness.OpenCode{}).RefreshPlugin(); err != nil {
-		errs = append(errs, fmt.Errorf("opencode plugin: %w", err))
-	} else if ok {
-		changed = append(changed, path)
+	for _, a := range registered.With[agents.MachineRefresher]() {
+		if path, ok, err := a.RefreshMachine(); err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", a.Name(), err))
+		} else if ok {
+			changed = append(changed, path)
+		}
 	}
 	return changed, errors.Join(errs...)
 }

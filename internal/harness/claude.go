@@ -169,6 +169,10 @@ func (c Claude) managedKeys() []string {
 // Name is the token `terma connect` and `--harness` accept.
 func (Claude) Name() string { return "claude" }
 
+// ServiceName is Claude Code's own default, which terma does not override: it writes no
+// OTEL_RESOURCE_ATTRIBUTES.
+func (Claude) ServiceName() string { return "claude-code" }
+
 // DisplayName is how the agent is written in prose.
 func (Claude) DisplayName() string { return "Claude Code" }
 

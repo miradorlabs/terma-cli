@@ -29,26 +29,18 @@ const (
 	AttrProjectID = "mirador.project.id"
 )
 
-// ServiceName is the service.name a harness reports under, which is what the filter
-// printed after a connect matches on.
-//
-// Claude Code's is its own default, "claude-code", which Terma does not override (it
-// writes no OTEL_RESOURCE_ATTRIBUTES). Codex's is not
-// configurable: it stamps its own originator on every resource, and for the `codex` CLI
-// that is "codex_cli_rs". The Codex desktop app and IDE extensions report under their
-// own originators, which this harness does not configure. OpenCode's is stamped by
-// Terma's plugin.
+// ServiceNamer is a harness that reports under a service.name other than its own name.
+type ServiceNamer interface {
+	ServiceName() string
+}
+
+// ServiceName is the service.name h reports under, which is what the filter printed
+// after a connect matches on.
 func ServiceName(h Harness) string {
-	switch h.Name() {
-	case "claude":
-		return "claude-code"
-	case "codex":
-		return codexServiceName
-	case "opencode":
-		return opencodeServiceName
-	default:
-		return h.Name()
+	if n, ok := h.(ServiceNamer); ok {
+		return n.ServiceName()
 	}
+	return h.Name()
 }
 
 // GitEmail returns the email from git's *global* configuration, or "" when git is

@@ -18,7 +18,7 @@ type Agent struct{}
 
 func (Agent) Name() string                       { return "opencode" }
 func (Agent) DisplayName() string                { return "OpenCode" }
-func (Agent) Installed(ctx context.Context) bool { return harness.OpenCode{}.Detect(ctx).Found }
+func (Agent) Installed(ctx context.Context) bool { return exporter{}.Detect(ctx).Found }
 func (Agent) HooksPath() string                  { return "" }
 func (Agent) Default(string) bool                { return false }
 func (Agent) Plan(string, bool) (hookmgr.Plan, error) {
@@ -36,9 +36,13 @@ func (Agent) Events() map[string]agents.Handler {
 func (Agent) FlushAfter() []string { return []string{"opencode-session-end"} }
 
 // Harness is how terma configures the agent's exporter.
-func (Agent) Harness() harness.Harness { return harness.OpenCode{} }
+func (Agent) Harness() harness.Harness { return exporter{} }
+
+// RefreshMachine rewrites the plugin.
+func (Agent) RefreshMachine() (string, bool, error) { return exporter{}.RefreshPlugin() }
 
 var (
-	_ agents.Exporting = Agent{}
-	_ agents.Agent     = Agent{}
+	_ agents.MachineRefresher = Agent{}
+	_ agents.Exporting        = Agent{}
+	_ agents.Agent            = Agent{}
 )

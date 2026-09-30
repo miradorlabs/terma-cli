@@ -60,7 +60,7 @@ func TestRefreshContinuesAfterExporterMigrationFails(t *testing.T) {
 	if err := os.WriteFile(statusPath, []byte(`{"statusLine":{"type":"command","command":"exec terma hook statusline"}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	opencode := harness.OpenCode{}
+	opencode := harnessOf(t, "opencode")
 	if err := opencode.Connect(harness.Exporter{Endpoint: "https://example.invalid", APIKey: policyTestKey, ProjectID: "team", Signals: harness.AllSignals}, false); err != nil {
 		t.Fatal(err)
 	}

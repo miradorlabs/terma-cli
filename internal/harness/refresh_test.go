@@ -2,7 +2,6 @@ package harness
 
 import (
 	"os"
-	"strings"
 	"testing"
 )
 
@@ -64,52 +63,5 @@ func TestRefreshStatusLineNeverInstalls(t *testing.T) {
 				t.Fatalf("file changed:\n%s", after)
 			}
 		})
-	}
-}
-
-// An installed plugin gets this build's source around its own configuration, and keeps
-// its file mode; an absent or inert one is left alone.
-func TestRefreshPluginKeepsItsConfiguration(t *testing.T) {
-	h, path := opencodeIn(t)
-	if _, changed, err := h.RefreshPlugin(); err != nil || changed {
-		t.Fatalf("absent plugin: changed=%v err=%v", changed, err)
-	}
-	if err := h.Connect(opencodeExporter(t, h, false), false); err != nil {
-		t.Fatal(err)
-	}
-	want, _ := os.ReadFile(path)
-	cfg, ok := readPluginConfig(want)
-	if !ok {
-		t.Fatal("connect wrote no configuration")
-	}
-	info, _ := os.Stat(path)
-	stale := strings.Replace(string(want), "export", "// an earlier build\nexport", 1)
-	if err := os.WriteFile(path, []byte(stale), info.Mode().Perm()); err != nil {
-		t.Fatal(err)
-	}
-
-	if _, changed, err := h.RefreshPlugin(); err != nil || !changed {
-		t.Fatalf("refresh: changed=%v err=%v", changed, err)
-	}
-	got, _ := os.ReadFile(path)
-	if string(got) != string(want) {
-		t.Fatalf("refreshed plugin differs from this build's:\n%s", got)
-	}
-	if again, ok := readPluginConfig(got); !ok || again.Endpoint != cfg.Endpoint || len(again.Headers) != len(cfg.Headers) {
-		t.Fatalf("configuration not kept: %+v", again)
-	}
-	if after, _ := os.Stat(path); after.Mode().Perm() != info.Mode().Perm() {
-		t.Fatalf("mode %v, want %v", after.Mode().Perm(), info.Mode().Perm())
-	}
-	if _, changed, err := h.RefreshPlugin(); err != nil || changed {
-		t.Fatalf("second refresh: changed=%v err=%v", changed, err)
-	}
-
-	inert := []byte(opencodePluginSource + "\n// inert\n")
-	if err := os.WriteFile(path, inert, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if _, changed, err := h.RefreshPlugin(); err != nil || changed {
-		t.Fatalf("inert plugin: changed=%v err=%v", changed, err)
 	}
 }

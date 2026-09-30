@@ -1,4 +1,4 @@
-package harness
+package opencode
 
 import (
 	"bytes"
@@ -14,15 +14,16 @@ import (
 	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/serverkey"
 )
 
-// OpenCode configures the OpenCode CLI's export to Terma by installing a plugin.
+// exporter configures the exporter CLI's export to Terma by installing a plugin.
 //
-// OpenCode has a native OpenTelemetry export, but it reads the OTEL_* variables from
+// exporter has a native OpenTelemetry export, but it reads the OTEL_* variables from
 // the process environment only — its config file cannot set them — so there is no file
 // Terma could write an endpoint and key into, short of the user's shell profile. What
-// OpenCode does offer is a plugins directory it loads at startup, and a plugin API whose
+// exporter does offer is a plugins directory it loads at startup, and a plugin API whose
 // events carry everything a trace needs: sessions, user prompts, tool calls with their
 // arguments and output, and each assistant message with model, provider, tokens and
 // cost. So the harness is a plugin: a single dependency-free JavaScript file, embedded
@@ -37,16 +38,15 @@ import (
 // Repository scope is a policy file, <root>/.opencode/terma.json, that the plugin lays
 // over its global settings: which signals ship and whether prompt and tool content go
 // with them. Nothing about where or with which key, so it is safe to commit.
-type OpenCode struct {
+type exporter struct {
 	// root, when set, is the repository whose policy file this value acts on.
 	root string
 }
 
-//go:embed opencode/terma.js
+//go:embed plugin/terma.js
 var opencodePluginSource string
 
 const (
-	opencodeServiceName = "opencode"
 	opencodePluginsDir  = "plugins"
 	opencodePluginFile  = "terma.js"
 	opencodeLocalPolicy = ".opencode/terma.json"
@@ -95,28 +95,28 @@ type opencodePolicy struct {
 }
 
 // Name is the token `terma connect` and `--harness` accept.
-func (OpenCode) Name() string { return "opencode" }
+func (exporter) Name() string { return "opencode" }
 
 // DisplayName is how the agent is written in prose.
-func (OpenCode) DisplayName() string { return "OpenCode" }
+func (exporter) DisplayName() string { return "OpenCode" }
 
 // SupportsHeadersHelper is true: the plugin runs the helper script itself.
-func (OpenCode) SupportsHeadersHelper() bool { return true }
+func (exporter) SupportsHeadersHelper() bool { return true }
 
 // Local returns the harness bound to the repository at root.
-func (OpenCode) Local(root string) Harness { return OpenCode{root: root} }
+func (exporter) Local(root string) harness.Harness { return exporter{root: root} }
 
 // Scope reports which layer this value acts on.
-func (c OpenCode) Scope() Scope {
+func (c exporter) Scope() harness.Scope {
 	if c.root != "" {
-		return ScopeLocal
+		return harness.ScopeLocal
 	}
-	return ScopeGlobal
+	return harness.ScopeGlobal
 }
 
 // Detect runs `opencode --version`. A missing binary is not-found rather than an error.
-func (OpenCode) Detect(ctx context.Context) Detection {
-	return DetectBinary(ctx, "opencode", SemverRE)
+func (exporter) Detect(ctx context.Context) harness.Detection {
+	return harness.DetectBinary(ctx, "opencode", harness.SemverRE)
 }
 
 // opencodeConfigDir is where OpenCode keeps its global configuration and plugins:
@@ -133,7 +133,7 @@ func opencodeConfigDir() (string, error) {
 }
 
 // ConfigPath is the plugin file OpenCode loads, or the repository's policy file.
-func (c OpenCode) ConfigPath() (string, error) {
+func (c exporter) ConfigPath() (string, error) {
 	if c.root != "" {
 		return filepath.Join(c.root, filepath.FromSlash(opencodeLocalPolicy)), nil
 	}
@@ -146,10 +146,10 @@ func (c OpenCode) ConfigPath() (string, error) {
 
 // config builds what the plugin will read. At repository scope only the policy fields
 // are kept; the destination and credential are the global connect's.
-func (c OpenCode) config(e Exporter) opencodeConfig {
+func (c exporter) config(e harness.Exporter) opencodeConfig {
 	cfg := opencodeConfig{
 		Version:            1,
-		Signals:            SignalNames(e.Signals),
+		Signals:            harness.SignalNames(e.Signals),
 		IncludePrompts:     e.IncludePrompts,
 		IncludeToolContent: e.IncludeToolContent,
 	}
@@ -211,18 +211,18 @@ func readPluginConfig(data []byte) (*opencodeConfig, bool) {
 }
 
 // Status reads the installed plugin back.
-func (c OpenCode) Status() (Status, error) {
+func (c exporter) Status() (harness.Status, error) {
 	path, err := c.ConfigPath()
 	if err != nil {
-		return Status{}, err
+		return harness.Status{}, err
 	}
-	status := Status{ConfigPath: path}
+	status := harness.Status{ConfigPath: path}
 	data, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return status, nil
 	}
 	if err != nil {
-		return Status{}, fmt.Errorf("read %s: %w", path, err)
+		return harness.Status{}, fmt.Errorf("read %s: %w", path, err)
 	}
 	status.Exists = true
 
@@ -232,7 +232,7 @@ func (c OpenCode) Status() (Status, error) {
 			return status, nil
 		}
 		status.HasPolicy = true
-		status.Signals = SignalsFromNames(policy.Signals)
+		status.Signals = harness.SignalsFromNames(policy.Signals)
 		status.IncludePrompts = policy.IncludePrompts
 		status.IncludeToolContent = policy.IncludeToolContent
 		status.ManagedKeys = 1
@@ -245,21 +245,21 @@ func (c OpenCode) Status() (Status, error) {
 	}
 	status.ManagedKeys = 1
 	status.Endpoint = cfg.Endpoint
-	status.Signals = SignalsFromNames(cfg.Signals)
+	status.Signals = harness.SignalsFromNames(cfg.Signals)
 	status.IncludePrompts = cfg.IncludePrompts
 	status.IncludeToolContent = cfg.IncludeToolContent
-	status.ProjectID = cfg.ResourceAttributes[AttrProjectID]
+	status.ProjectID = cfg.ResourceAttributes[harness.AttrProjectID]
 	// Connected means a destination and a way to authenticate to it.
 	status.Connected = cfg.Endpoint != "" && (cfg.HeadersHelper != "" || cfg.Headers[opencodeAuthorizationHeader] != "")
-	status.KeyPrefix = MaskKey(opencodeKey(cfg))
-	status.Conflicts = opencodeConflicts(Exporter{Endpoint: cfg.Endpoint})
+	status.KeyPrefix = harness.MaskKey(opencodeKey(cfg))
+	status.Conflicts = opencodeConflicts(harness.Exporter{Endpoint: cfg.Endpoint})
 	return status, nil
 }
 
 // opencodeKey is the raw key a config presents, from the helper or inline.
 func opencodeKey(cfg *opencodeConfig) string {
-	if cfg.HeadersHelper != "" && IsOwnHelper(cfg.HeadersHelper) {
-		if key := KeyFromHelper(cfg.HeadersHelper); key != "" {
+	if cfg.HeadersHelper != "" && harness.IsOwnHelper(cfg.HeadersHelper) {
+		if key := harness.KeyFromHelper(cfg.HeadersHelper); key != "" {
 			return key
 		}
 	}
@@ -273,20 +273,20 @@ func opencodeKey(cfg *opencodeConfig) string {
 // export is driven by OTEL_EXPORTER_OTLP_ENDPOINT in the shell; it does not affect the
 // plugin, and the plugin does not affect it, but a user who sees two streams should be
 // told where the second one comes from. Advisory: nothing here can disclose Terma's key.
-func (c OpenCode) ConflictsWith(e Exporter) ([]Conflict, error) {
+func (c exporter) ConflictsWith(e harness.Exporter) ([]harness.Conflict, error) {
 	return opencodeConflicts(e), nil
 }
 
-func opencodeConflicts(e Exporter) []Conflict {
-	value := os.Getenv(EnvOTLPEndpoint)
+func opencodeConflicts(e harness.Exporter) []harness.Conflict {
+	value := os.Getenv(harness.EnvOTLPEndpoint)
 	if value == "" || value == e.Endpoint {
 		return nil
 	}
-	return []Conflict{{
-		Key:       EnvOTLPEndpoint,
+	return []harness.Conflict{{
+		Key:       harness.EnvOTLPEndpoint,
 		Value:     value,
 		Reason:    "exported in your shell — OpenCode's built-in OpenTelemetry export sends its own traces there as well; Terma's plugin is unaffected",
-		Scope:     ScopeEnvironment,
+		Scope:     harness.ScopeEnvironment,
 		Clearable: false,
 		Advisory:  true,
 	}}
@@ -295,7 +295,7 @@ func opencodeConflicts(e Exporter) []Conflict {
 // Connect writes the plugin (and its helper script), or the repository's policy file.
 // The file is generated whole, so there is nothing to merge and nothing to journal:
 // disconnect removes exactly this file.
-func (c OpenCode) Connect(e Exporter, _ bool) error {
+func (c exporter) Connect(e harness.Exporter, _ bool) error {
 	path, err := c.ConfigPath()
 	if err != nil {
 		return err
@@ -318,7 +318,7 @@ func (c OpenCode) Connect(e Exporter, _ bool) error {
 	// The helper first: the plugin about to be written points at it, and an OpenCode
 	// starting between the two writes must find the credential already there.
 	if e.HelperPath != "" {
-		if err := WriteHelper(e.HelperPath, e.APIKey); err != nil {
+		if err := harness.WriteHelper(e.HelperPath, e.APIKey); err != nil {
 			return err
 		}
 	}
@@ -330,7 +330,7 @@ func (c OpenCode) Connect(e Exporter, _ bool) error {
 	// secret, and stays readable like the user's other plugins.
 	mode := fs.FileMode(0o644)
 	if len(cfg.Headers) > 0 {
-		mode = SettingsMode
+		mode = harness.SettingsMode
 	}
 	return config.WriteFileAtomic(path, src, mode)
 }
@@ -343,22 +343,22 @@ func (c OpenCode) Connect(e Exporter, _ bool) error {
 // project rewrites it (idempotently) and adds that project's helper. The plugin carries
 // no key and no fixed project — only the endpoint, the helpers directory and the naming
 // convention it resolves a project's helper with at runtime.
-func (OpenCode) ConnectPerRepo(e Exporter) error {
-	helper, err := HelperFilePath(OpenCode{}, e.ProjectID)
+func (exporter) ConnectPerRepo(e harness.Exporter) error {
+	helper, err := harness.HelperFilePath(exporter{}, e.ProjectID)
 	if err != nil {
 		return err
 	}
-	if err := WriteHelper(helper, e.APIKey); err != nil {
+	if err := harness.WriteHelper(helper, e.APIKey); err != nil {
 		return err
 	}
-	helpersDir, err := HelpersDir()
+	helpersDir, err := harness.HelpersDir()
 	if err != nil {
 		return err
 	}
 	cfg := opencodeConfig{
 		Version:  1,
 		Endpoint: e.Endpoint,
-		Signals:  SignalNames(e.Signals),
+		Signals:  harness.SignalNames(e.Signals),
 		// The plugin file is global and shared across every bound repository, so this
 		// repo's content-capture choice must NOT ride in it — otherwise installing one
 		// project would flip prompt / tool-content capture on for every other project
@@ -371,10 +371,10 @@ func (OpenCode) ConnectPerRepo(e Exporter) error {
 		HookCommand:        []string{"terma", "hook"},
 		PerRepo:            true,
 		HelpersDir:         helpersDir,
-		HelperPrefix:       OpenCode{}.Name() + "-otel-",
-		ProjectAttribute:   AttrProjectID,
+		HelperPrefix:       exporter{}.Name() + "-otel-",
+		ProjectAttribute:   harness.AttrProjectID,
 	}
-	path, err := (OpenCode{}).ConfigPath()
+	path, err := (exporter{}).ConfigPath()
 	if err != nil {
 		return err
 	}
@@ -393,8 +393,8 @@ func (OpenCode) ConnectPerRepo(e Exporter) error {
 // plugin source, so a new plugin reaches a machine without connecting again. A plugin
 // that is absent, or inert (no configuration), is left alone, as is its file mode. It
 // returns the plugin path and whether the file changed.
-func (OpenCode) RefreshPlugin() (string, bool, error) {
-	path, err := (OpenCode{}).ConfigPath()
+func (exporter) RefreshPlugin() (string, bool, error) {
+	path, err := (exporter{}).ConfigPath()
 	if err != nil {
 		return "", false, err
 	}
@@ -422,10 +422,10 @@ func (OpenCode) RefreshPlugin() (string, bool, error) {
 
 // opencodeBaseAttributes are the resource attributes a per-repo plugin carries for every
 // project — everything but the project id, which the plugin stamps per repository.
-func opencodeBaseAttributes(e Exporter) map[string]string {
+func opencodeBaseAttributes(e harness.Exporter) map[string]string {
 	out := map[string]string{}
 	for k, v := range e.ResourceAttributes {
-		if k == "" || v == "" || k == AttrProjectID {
+		if k == "" || v == "" || k == harness.AttrProjectID {
 			continue
 		}
 		out[k] = v
@@ -435,34 +435,34 @@ func opencodeBaseAttributes(e Exporter) map[string]string {
 
 // Disconnect removes the plugin and, when Terma wrote it, its helper script — or the
 // repository's policy file.
-func (c OpenCode) Disconnect() (DisconnectResult, error) {
+func (c exporter) Disconnect() (harness.DisconnectResult, error) {
 	path, err := c.ConfigPath()
 	if err != nil {
-		return DisconnectResult{}, err
+		return harness.DisconnectResult{}, err
 	}
 	data, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
-		return DisconnectResult{}, nil
+		return harness.DisconnectResult{}, nil
 	}
 	if err != nil {
-		return DisconnectResult{}, fmt.Errorf("read %s: %w", path, err)
+		return harness.DisconnectResult{}, fmt.Errorf("read %s: %w", path, err)
 	}
 	if c.root == "" {
-		if cfg, ok := readPluginConfig(data); ok && cfg.HeadersHelper != "" && IsOwnHelper(cfg.HeadersHelper) {
-			if err := DeleteHelper(cfg.HeadersHelper); err != nil {
-				return DisconnectResult{}, err
+		if cfg, ok := readPluginConfig(data); ok && cfg.HeadersHelper != "" && harness.IsOwnHelper(cfg.HeadersHelper) {
+			if err := harness.DeleteHelper(cfg.HeadersHelper); err != nil {
+				return harness.DisconnectResult{}, err
 			}
 		}
 	}
 	if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return DisconnectResult{}, fmt.Errorf("remove %s: %w", path, err)
+		return harness.DisconnectResult{}, fmt.Errorf("remove %s: %w", path, err)
 	}
-	return DisconnectResult{Removed: 1}, nil
+	return harness.DisconnectResult{Removed: 1}, nil
 }
 
 // CurrentCredential returns the key the installed plugin already presents to endpoint
 // for projectID, so a reconnect reuses it instead of minting an orphan.
-func (c OpenCode) CurrentCredential(endpoint, projectID string) (string, bool) {
+func (c exporter) CurrentCredential(endpoint, projectID string) (string, bool) {
 	if c.root != "" {
 		return "", false
 	}
@@ -475,7 +475,7 @@ func (c OpenCode) CurrentCredential(endpoint, projectID string) (string, bool) {
 		return "", false
 	}
 	cfg, ok := readPluginConfig(data)
-	if !ok || cfg.Endpoint != endpoint || cfg.ResourceAttributes[AttrProjectID] != projectID {
+	if !ok || cfg.Endpoint != endpoint || cfg.ResourceAttributes[harness.AttrProjectID] != projectID {
 		return "", false
 	}
 	if key := opencodeKey(cfg); serverkey.Is(key) {
@@ -485,9 +485,9 @@ func (c OpenCode) CurrentCredential(endpoint, projectID string) (string, bool) {
 }
 
 // ConnectNotes says what is particular about this harness before the user confirms.
-func (c OpenCode) ConnectNotes(e Exporter) []string {
+func (c exporter) ConnectNotes(e harness.Exporter) []string {
 	var notes []string
-	if e.HasSignal(SignalMetrics) {
+	if e.HasSignal(harness.SignalMetrics) {
 		notes = append(notes, "OpenCode's plugin sends traces and events only; token counts and cost ride on each model-call span, so there is no separate metrics stream.")
 	}
 	if c.root == "" {

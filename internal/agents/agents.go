@@ -86,3 +86,11 @@ func Wired(root string, a Agent) bool {
 type PayloadReader interface {
 	PayloadSession(payload []byte) (hookrun.PayloadSession, bool)
 }
+
+// MachineRefresher is an agent with home-directory files terma rewrites to this build's
+// templates on `terma update --refresh`. It rewrites only a file terma wrote, never
+// creates one, and reports the path it changed.
+type MachineRefresher interface {
+	Agent
+	RefreshMachine() (path string, changed bool, err error)
+}

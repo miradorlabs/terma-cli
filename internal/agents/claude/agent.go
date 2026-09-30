@@ -51,9 +51,13 @@ func (Agent) ManagedHookFiles(root string) []string { return harness.ClaudeManag
 // Harness is how terma configures the agent's exporter.
 func (Agent) Harness() harness.Harness { return harness.Claude{} }
 
+// RefreshMachine rewrites the status-line wrap.
+func (Agent) RefreshMachine() (string, bool, error) { return harness.Claude{}.RefreshStatusLine() }
+
 var (
-	_ agents.Exporting    = Agent{}
-	_ agents.Agent        = Agent{}
-	_ agents.UserHooks    = Agent{}
-	_ agents.ManagedHooks = Agent{}
+	_ agents.MachineRefresher = Agent{}
+	_ agents.Exporting        = Agent{}
+	_ agents.Agent            = Agent{}
+	_ agents.UserHooks        = Agent{}
+	_ agents.ManagedHooks     = Agent{}
 )

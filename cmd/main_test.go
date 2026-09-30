@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
+	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/shape"
 )
@@ -67,4 +68,14 @@ func newTestRelay(o relay.Options) *relay.Relay {
 func hooksPathOf(name string) string {
 	a, _ := registered.Lookup(name)
 	return a.HooksPath()
+}
+
+// harnessOf is the named agent's harness.
+func harnessOf(t *testing.T, name string) harness.Harness {
+	t.Helper()
+	h, err := registered.Harness(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return h
 }

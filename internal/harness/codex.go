@@ -116,6 +116,11 @@ var codexSignalKeys = []struct {
 // Name is the token `terma connect` and `--harness` accept.
 func (Codex) Name() string { return "codex" }
 
+// ServiceName is not configurable: Codex stamps its originator on every resource, and
+// for the codex CLI that is codex_cli_rs. Desktop and the IDE extensions report under
+// their own.
+func (Codex) ServiceName() string { return codexServiceName }
+
 // DisplayName is how the agent is written in prose.
 func (Codex) DisplayName() string { return "Codex" }
 

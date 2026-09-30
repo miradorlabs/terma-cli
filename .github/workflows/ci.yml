@@ -181,7 +181,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: internal/harness/opencode
+        working-directory: internal/agents/opencode/plugin
     steps:
       - uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2

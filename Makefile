@@ -82,7 +82,7 @@ $(GOLANGCI_LINT): .golangci-lint-version
 # bun is not installed, so `make check` still works on a Go-only machine.
 .PHONY: test-plugin
 test-plugin:
-	@if command -v bun >/dev/null 2>&1; then (cd internal/harness/opencode && bun test); \
+	@if command -v bun >/dev/null 2>&1; then (cd internal/agents/opencode/plugin && bun test); \
 	else echo "bun not installed; skipping OpenCode plugin tests"; fi
 
 .PHONY: check
