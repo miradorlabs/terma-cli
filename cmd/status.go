@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 	"time"
 
@@ -18,41 +17,8 @@ import (
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/session"
-	"github.com/miradorlabs/terma-cli/internal/shim"
 	"github.com/miradorlabs/terma-cli/internal/style"
 )
-
-// routedPerRepo reports whether per-repo routing is *configured* for a harness and
-// project — a routing record that names it, plus a stored key. It does not check that
-// the delivery mechanism is actually live; see perRepoLive. Configured-but-not-live is a
-// real state (the shims are installed but their directory is not yet on PATH), and
-// treating it as "connected" is exactly the lie that made doctor report a repo as fine
-// while its sessions still used the global config.
-func routedPerRepo(name, projectID string) bool {
-	if projectID == "" {
-		return false
-	}
-	// OpenCode routes itself: a per-repo plugin plus this project's key means a session
-	// here reports to this project, even though the plugin file names no fixed project.
-	if name == "opencode" {
-		if keystore.GetFor("opencode", projectID) == "" {
-			return false
-		}
-		st, err := (harness.OpenCode{}).Status()
-		return err == nil && st.Exists
-	}
-	if !shim.Routable(name) {
-		return false
-	}
-	rec, ok, err := shim.LoadRecord(projectID)
-	if err != nil || !ok {
-		return false
-	}
-	if slices.Contains(rec.Harnesses, name) {
-		return keystore.GetFor(name, projectID) != ""
-	}
-	return false
-}
 
 // repoAsks reports whether the repository at root carries a committed policy that switches
 // a harness's signals on. It is the other half of a machine-wide connect made with
@@ -65,17 +31,6 @@ func repoAsks(h harness.Harness, root string) bool {
 	}
 	st, err := scoped.Local(root).Status()
 	return err == nil && len(st.Signals) > 0
-}
-
-// perRepoLive reports whether a configured harness's per-repo routing actually fires for
-// a session started now. OpenCode's plugin routes on its own; the shim-delivered agents
-// (Claude Code, Codex) route only when their name resolves to terma's shim — the shim
-// directory ahead of the real binary on PATH — or the shell wrapper is loaded.
-func perRepoLive(name string) bool {
-	if name == "opencode" {
-		return true
-	}
-	return shim.Active(name)
 }
 
 // statusHooks is status's wording for the commit-hook verdict, and whether commit
@@ -106,23 +61,12 @@ func statusAgent(v harnessVerdict, bound bool) (string, bool) {
 	if v.emissionProblem != "" {
 		return "→ " + v.emissionProblem + " — " + v.emissionFix, false
 	}
-	const pending = "→ per-repo routing configured, but terma's shim is not ahead of it on your PATH"
 	switch v.route {
-	case routeLive:
-		// Only call it connected when the routing actually fires. The machine-wide
-		// config already delivering here is the plainer thing to say when it does.
-		if v.sendsGlobally {
-			return "→ connected", true
-		}
-		return "→ connected (per-repo routing)", true
 	case routeGlobal:
 		return "→ connected", true
-	case routePending:
-		return pending, false
+	case routeHooks:
+		return "→ connected (repository hooks)", true
 	case routeOtherProject:
-		if v.routed {
-			return pending, false
-		}
 		return "→ reporting to project " + v.otherProject + ", not this one — run `terma install`", false
 	case routeRepoDecides:
 		// A machine-wide connect that exports no signal of its own is "connected" in
@@ -255,7 +199,7 @@ Nothing is written and no scratch commit is made — run
 
 			// Harnesses. Through the local relay one line says it all, the same verdict
 			// doctor gives (relayDoctorCheck), so the two never disagree.
-			var export, routing doctor.Check
+			var export doctor.Check
 			if claim.Enabled() {
 				export = relayDoctorCheck(projectID, cfg.Harnesses)
 				export.Key = doctor.KeyHarness
@@ -263,7 +207,6 @@ Nothing is written and no scratch commit is made — run
 				if export.Fix != "" {
 					fmt.Fprintf(out, "             → %s\n", export.Fix)
 				}
-				routing = doctor.Check{Key: doctor.KeyRouting, Status: doctor.Skip}
 			} else {
 				var connected []string
 				verdicts := judgeSelectedHarnesses(ctx, cfg.OTLPURL, projectID, root, cfg.Harnesses)
@@ -279,13 +222,6 @@ Nothing is written and no scratch commit is made — run
 				}
 				if len(connected) == 0 {
 					fmt.Fprintln(out, "Agent:       none connected — run `terma install`")
-				}
-				routing = shellRoutingCheck(verdicts, repoBound, selectedForRepo(projectID, cfg.Harnesses))
-				if routing.Status != doctor.Skip {
-					fmt.Fprintf(out, "Routing:     %s\n", routing.Detail)
-					if routing.Fix != "" {
-						fmt.Fprintf(out, "             → %s\n", routing.Fix)
-					}
 				}
 				export = doctorHarnessCheck(verdicts, cfg.OTLPURL, projectID, repoBound)
 			}
@@ -330,7 +266,7 @@ Nothing is written and no scratch commit is made — run
 				fmt.Fprintln(out, line)
 			}
 
-			checks := []doctor.Check{doctorBinaryCheck(), export, agentHooks, routing,
+			checks := []doctor.Check{doctorBinaryCheck(), export, agentHooks,
 				{Key: doctor.KeyBackend, Status: doctor.Skip}}
 			if !authOK {
 				checks = append(checks, doctor.Check{Status: doctor.Fail, Fix: "terma setup"})

@@ -6,29 +6,23 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
-// The PATH shims route nothing until their directory is on PATH ahead of the real
-// binaries, and PATH is set by the developer's shell startup file — the one thing about
-// per-repo routing terma cannot arrange from inside its own directory. Printing the line
-// and leaving it to the developer turned out to be a trap as well as a chore: the line
-// has to be the *last* thing that touches PATH, because every installer that came before
-// (`export PATH="$HOME/.local/bin:$PATH"`, several times over on a real machine) puts the
-// real `claude` and `codex` back in front if it runs later. So, with the developer's
-// consent, install writes the line itself: one marked block, at the end of the file,
-// which `terma shim uninstall` removes again.
+// Earlier builds put the shim directory on PATH through one marked block at the end of
+// the developer's shell startup file. RC finds that file, and Remove takes the block out
+// again, leaving every other byte. PathLine is the one line that puts a directory first
+// on PATH in the file's own shell, which doctor quotes for terma's own directory.
 
 const (
 	rcBegin = "# >>> terma per-repo routing >>>"
 	rcEnd   = "# <<< terma per-repo routing <<<"
 )
 
-// RC is a shell startup file terma can put the shim directory on PATH through.
+// RC is the developer's shell startup file.
 type RC struct {
 	Path  string
 	Shell string // "zsh", "bash" or "fish"
@@ -104,75 +98,6 @@ func escapeDoubleQuoted(s string, backtick bool) string {
 	return s
 }
 
-func (rc RC) block(binDir string) string {
-	return rcBegin + "\n" +
-		"# Keeps terma's shims ahead of the real claude and codex, so an agent started inside a\n" +
-		"# repository reports to that repository's Terma project. Keep this the last thing that\n" +
-		"# touches PATH. Managed by `terma install`; removed by `terma shim uninstall`.\n" +
-		rc.PathLine(binDir) + "\n" +
-		rcEnd + "\n"
-}
-
-// RCState is what a startup file says about the shim directory.
-type RCState int
-
-const (
-	// RCAbsent means terma's block is not in the file.
-	RCAbsent RCState = iota
-	// RCLast means the block is there and nothing after it touches PATH. A shell started
-	// now finds the shims first; one started before the block was written does not.
-	RCLast
-	// RCOvertaken means the block is there, and a later line puts something in front
-	// of it.
-	RCOvertaken
-)
-
-// State reads the file. A missing file is RCAbsent.
-func (rc RC) State() (RCState, error) {
-	data, err := os.ReadFile(rc.Path)
-	if errors.Is(err, fs.ErrNotExist) {
-		return RCAbsent, nil
-	}
-	if err != nil {
-		return RCAbsent, err
-	}
-	_, after, found := splitBlock(string(data))
-	switch {
-	case !found:
-		return RCAbsent, nil
-	case touchesPath(after):
-		return RCOvertaken, nil
-	}
-	return RCLast, nil
-}
-
-// Ensure leaves terma's block as the last thing in the file that touches PATH: appended
-// when absent, moved to the end when a later line overtook it, untouched when it is
-// already last. It reports whether the file changed. Every other byte of the file is
-// kept, and the file is created (0644) when the developer has none.
-func (rc RC) Ensure(binDir string) (changed bool, err error) {
-	data, err := os.ReadFile(rc.Path)
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return false, err
-	}
-	before, after, found := splitBlock(string(data))
-	if found && !touchesPath(after) {
-		return false, nil
-	}
-	body := string(data)
-	if found {
-		// The blank line that led into the block moves with it.
-		body = strings.TrimSuffix(before, "\n") + after
-	}
-	if body != "" && !strings.HasSuffix(body, "\n") {
-		body += "\n"
-	}
-	if body != "" && !strings.HasSuffix(body, "\n\n") {
-		body += "\n"
-	}
-	return true, rc.write(body + rc.block(binDir))
-}
-
 // Remove takes terma's block out of the file, leaving the rest as it was. A fish file
 // that held nothing else is deleted. It reports whether anything was removed.
 func (rc RC) Remove() (bool, error) {
@@ -187,7 +112,7 @@ func (rc RC) Remove() (bool, error) {
 	if !found {
 		return false, nil
 	}
-	// The blank line Ensure put ahead of the block goes with it.
+	// The blank line install put ahead of the block goes with it.
 	rest := strings.TrimSuffix(before, "\n") + after
 	if strings.TrimSpace(rest) == "" && rc.Shell == "fish" {
 		return true, os.Remove(rc.Path)
@@ -231,26 +156,6 @@ func splitBlock(content string) (before, after string, found bool) {
 		end = len(content)
 	}
 	return content[:start], content[end:], true
-}
-
-// pathEdit matches a line that sets PATH itself — not GOPATH, MANPATH or PNPM_HOME: a POSIX
-// assignment or export, zsh's `path=(…)` array, or one of fish's spellings.
-var pathEdit = regexp.MustCompile(`(^|[\s;&|(])(PATH\s*=|path\s*\+?=\s*\(|fish_add_path\b|set\s+(-\w+\s+)*(PATH|fish_user_paths)\b)`)
-
-// touchesPath reports whether any line of a shell fragment sets PATH. Comments do not
-// count. A false positive only moves the block to the end once more, which is harmless;
-// a false negative leaves it overtaken, which is not.
-func touchesPath(fragment string) bool {
-	for line := range strings.SplitSeq(fragment, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		if pathEdit.MatchString(line) {
-			return true
-		}
-	}
-	return false
 }
 
 func exists(path string) bool {

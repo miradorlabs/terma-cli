@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"os"
 	"slices"
 
@@ -12,7 +13,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
-	"github.com/miradorlabs/terma-cli/internal/shim"
 )
 
 func newDesktopCommand() *cobra.Command {
@@ -38,12 +38,12 @@ func statusDesktop(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 	projectID := binding.Project.ID
-	route, ok, err := shim.LoadRecord(projectID)
+	route, ok, err := routing.LoadRecord(projectID)
 	if err != nil {
 		return err
 	}
 	ready := ok && route.Desktop && slices.Contains(route.Signals, "logs") &&
-		slices.Contains(route.Harnesses, shim.AgentCodex) && keystore.GetFor(shim.AgentCodex, projectID) != ""
+		slices.Contains(route.Harnesses, routing.AgentCodex) && keystore.GetFor(routing.AgentCodex, projectID) != ""
 	fmt.Fprintf(cmd.OutOrStdout(), "Repository:    %s\n", projectID)
 	fmt.Fprintf(cmd.OutOrStdout(), "Desktop route: %s\n", yesNo(ready))
 	if global.Connected {

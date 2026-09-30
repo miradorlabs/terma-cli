@@ -625,8 +625,7 @@ func TestRelayWaitsForAKey(t *testing.T) {
 			}
 			return Policy{}, ErrNoKey
 		}})
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	go r.Run(ctx)
 	srv := httptest.NewServer(r.Handler())
 	defer srv.Close()

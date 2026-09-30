@@ -18,10 +18,10 @@ const telemetryCommand = "printf TERMA_TELEMETRY_TOOL"
 // responses. No provider credentials, model compliance or paid calls are needed.
 //
 // Claude runs two ways. content/redacted connect it machine-wide (`terma connect`
-// and its content switches). install-content/install-redacted route it the way `terma
-// install` does for a developer: a per-repository route handed to Claude by terma's shim
-// as --settings — install's own default, which sends prompts and responses, and the
-// `--prompts off` its checklist names to stop them.
+// and its content switches). install-content/install-redacted set it up the way `terma
+// install` does for a developer: its exporter at the local relay, which forwards this
+// repository's sessions under the project's policy — install's own default, which sends
+// prompts and responses, and the `--prompts off` its checklist names to stop them.
 func TestClaudeTelemetry(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, newest bool) {
 		for _, tc := range []struct {

@@ -76,12 +76,3 @@ telemetry, so an agent already reporting to a Mirador project stops doing that â
 selected, which is otherwise a silent "everything is wired and no spend arrives".
 
 
-### Launcher terminal contracts
-
-Launcher tests require Python 3 for a standard-library PTY driver. Run
-`go test -race ./internal/shim -count=1 -timeout=3m` to exercise failure handling,
-interactive input and terminal resizing, and Ctrl-C before and after agent startup.
-Both PATH and shell-function activation are checked under installed sh, bash, zsh,
-and dash shells. The `launcher-contracts` CI job runs on Linux and macOS; it installs
-zsh on Linux so both common interactive shells are covered. These tests use fake
-agents and need no provider credentials or API calls.

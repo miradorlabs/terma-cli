@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,7 +14,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
-	"github.com/miradorlabs/terma-cli/internal/shim"
 )
 
 const (
@@ -77,7 +77,7 @@ func routeProject(t *testing.T, projectID, key, endpoint string) {
 	if endpoint == "" {
 		return
 	}
-	if err := shim.SaveRecord(shim.Record{ProjectID: projectID, Endpoint: endpoint, Harnesses: []string{"claude"}}); err != nil {
+	if err := routing.SaveRecord(routing.Record{ProjectID: projectID, Endpoint: endpoint, Harnesses: []string{"claude"}}); err != nil {
 		t.Fatal(err)
 	}
 }

@@ -5,8 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"io"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -14,7 +14,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/session"
-	"github.com/miradorlabs/terma-cli/internal/shim"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -115,15 +114,14 @@ type codexHookInput struct {
 
 const codexDesktopSurface = "desktop"
 
-// codexDesktopRoute is the repository-local opt-in for desktop capture. The CLI shim
-// marks routed CLI launches, which continue to use Codex's native exporter.
-func codexDesktopRoute(r *repo) (shim.Record, bool) {
-	if r.projectID == "" || os.Getenv(shim.CodexRoutedEnv) == "1" {
-		return shim.Record{}, false
+// codexDesktopRoute is the repository-local opt-in for desktop capture.
+func codexDesktopRoute(r *repo) (routing.Record, bool) {
+	if r.projectID == "" {
+		return routing.Record{}, false
 	}
-	rec, ok, err := shim.LoadRecord(r.projectID)
+	rec, ok, err := routing.LoadRecord(r.projectID)
 	return rec, err == nil && ok && rec.Desktop &&
-		slices.Contains(rec.Harnesses, shim.AgentCodex) && slices.Contains(rec.Signals, "logs")
+		slices.Contains(rec.Harnesses, routing.AgentCodex) && slices.Contains(rec.Signals, "logs")
 }
 
 func readCodexHookInput(r io.Reader) (*codexHookInput, error) {

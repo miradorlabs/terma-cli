@@ -74,10 +74,6 @@ type Sandbox struct {
 	ExcludeContent bool
 
 	claudeConnected, codexConnected bool
-	// claudeRouted says Claude exports through the per-repository route `terma install`
-	// sets up (RouteClaude), so a run launches it through terma's shim and never
-	// connects it machine-wide.
-	claudeRouted bool
 	// WorkDir is where an agent run starts; the sandbox repository when empty. The
 	// relay's negative controls run agents outside the installed repository.
 	WorkDir string
@@ -225,19 +221,19 @@ func (sb *Sandbox) connectHarness(name string) {
 	sb.terma(sb.Repo, args...)
 }
 
-// RouteClaude points Claude Code at the receiver the way `terma install` does for a
-// developer, instead of a machine-wide connect: a per-repository route that terma's
-// shim hands Claude as --settings. With ExcludeContent it passes the switches install
-// offers (`--prompts off`, `--exclude-tool-content`); without, it passes none, so the
-// route carries install's own default. install with an agent needs a key it can reuse and
-// the project its server key belongs to. The key comes from a connect that is then
-// undone — disconnect keeps it, as it does for a developer moving between repositories —
-// and the project from a stand-in for the API gateway's /v1/identity, the one request a
-// server-key install makes.
+// RouteClaude points Claude Code at this repository's project the way `terma install`
+// does for a developer: its user-level exporter at the local relay, which forwards the
+// sessions this repository's hooks claim to the receiver, standing in for Terma. With
+// ExcludeContent it passes the switches install offers (`--prompts off`,
+// `--exclude-tool-content`); without, none, so the project's policy is install's own
+// default. install with an agent needs a key it can reuse and the project its server key
+// belongs to. The key comes from a connect that is then undone — disconnect keeps it, as
+// it does for a developer moving between repositories — and the project from a stand-in
+// for the API gateway's /v1/identity, the one request a server-key install makes.
 func (sb *Sandbox) RouteClaude() {
 	sb.T.Helper()
 	if sb.Mode != Isolated {
-		sb.T.Fatal("RouteClaude needs an isolated sandbox: real-login runs pass their own --settings, which the shim leaves alone")
+		sb.T.Fatal("RouteClaude needs an isolated sandbox")
 	}
 	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/identity" {
@@ -250,17 +246,17 @@ func (sb *Sandbox) RouteClaude() {
 	sb.T.Cleanup(api.Close)
 	sb.terma(sb.Repo, "connect", "claude", "--project", sb.ProjectID, "--api-key", liveKey, "--yes", "--otlp-url", sb.Receiver.URL())
 	sb.terma(sb.Repo, "disconnect", "claude", "--yes")
-	// Nothing machine-wide may export any more, or a pass would not say the route works.
-	if user, err := os.ReadFile(filepath.Join(sb.ClaudeConfig, "settings.json")); err == nil &&
-		(bytes.Contains(user, []byte("OTEL_EXPORTER_OTLP_ENDPOINT")) || bytes.Contains(user, []byte("CLAUDE_CODE_ENABLE_TELEMETRY"))) {
-		sb.T.Fatalf("disconnect left Claude exporting machine-wide:\n%s", user)
-	}
+	// The relay on a port of its own, forwarding to the receiver; install finds it there.
+	sb.UseRelay(RelayOptions{Start: true, Content: !sb.ExcludeContent})
 	args := []string{"install", "--project", sb.ProjectID, "--harness", "claude", "--yes", "--no-browser", "--no-doctor"}
 	if sb.ExcludeContent {
 		args = append(args, "--prompts", "off", "--exclude-tool-content")
 	}
 	sb.termaWith([]string{"TERMA_API_KEY=" + liveKey, "TERMA_API_URL=" + api.URL}, sb.Repo, args...)
-	sb.claudeRouted = true
+	// What install wrote is the only exporter: the relay's, in the user's settings.
+	if user, err := os.ReadFile(filepath.Join(sb.ClaudeConfig, "settings.json")); err != nil || !bytes.Contains(user, []byte(sb.relayAddr)) {
+		sb.T.Fatalf("install did not point Claude Code at the relay (%s): %v\n%s", sb.relayAddr, err, user)
+	}
 }
 
 // workDir is where an agent run starts.
@@ -274,17 +270,13 @@ func (sb *Sandbox) workDir() string {
 // ensureClaudeExport connects Claude machine-wide unless the scenario routed it, or
 // sends everything through the relay.
 func (sb *Sandbox) ensureClaudeExport() {
-	if !sb.claudeRouted && !sb.relayed {
+	if !sb.relayed {
 		sb.connectClaude()
 	}
 }
 
-// claudeLauncher is what a run starts: the build under test, or terma's shim for it
-// when the scenario routed Claude — the shim finds that build on PATH itself.
+// claudeLauncher is what a run starts: the build under test.
 func (sb *Sandbox) claudeLauncher() string {
-	if sb.claudeRouted {
-		return filepath.Join(sb.TermaConfig, "shim", "bin", "claude")
-	}
 	return sb.Claude.Path
 }
 

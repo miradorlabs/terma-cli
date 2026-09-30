@@ -10,7 +10,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
-	"github.com/miradorlabs/terma-cli/internal/shim"
 )
 
 func TestDoctorChecksClaudeEmissionSettings(t *testing.T) {
@@ -40,7 +39,6 @@ func TestDoctorChecksClaudeEmissionSettings(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			repo := installRepo(t)
-			t.Setenv(shim.WrapperEnv, "")
 			h := harness.Claude{}
 			if err := h.Connect(harness.Exporter{Endpoint: endpoint, APIKey: testServerKey, Signals: tc.globalSignals}, false); err != nil {
 				t.Fatal(err)
@@ -96,39 +94,6 @@ func writeDoctorEnv(t *testing.T, path string, env map[string]string) {
 	}
 	if err := os.WriteFile(path, data, 0600); err != nil {
 		t.Fatal(err)
-	}
-}
-
-func TestDoctorKeepsWorkingExportWhenAnotherAgentNeedsRouting(t *testing.T) {
-	check := doctorHarnessCheck([]harnessVerdict{
-		{displayName: "Claude Code", route: routePending},
-		{displayName: "Codex", route: routeGlobal},
-	}, "https://otel.example.test", testProjectID, true)
-	if check.Status != doctor.Warn || check.Ready != 1 || check.Of != 2 {
-		t.Fatalf("working Codex export should survive Claude's warning: %+v", check)
-	}
-}
-
-func TestDoctorChecksLiveRouteSignals(t *testing.T) {
-	for _, signals := range [][]string{nil, {"logs"}} {
-		t.Run(strings.Join(signals, ","), func(t *testing.T) {
-			repo := installRepo(t)
-			t.Setenv(shim.WrapperEnv, "wrapper")
-			// The routed --settings document outranks even a disabled local policy.
-			writeDoctorEnv(t, filepath.Join(repo, ".claude/settings.local.json"), map[string]string{"CLAUDE_CODE_ENABLE_TELEMETRY": "0"})
-			if err := shim.SaveRecord(shim.Record{ProjectID: testProjectID, Endpoint: "https://otel.example.test", Signals: signals, Harnesses: []string{"claude"}}); err != nil {
-				t.Fatal(err)
-			}
-			if err := keystore.SetFor("claude", testProjectID, testServerKey, keystore.Hosts{}); err != nil {
-				t.Fatal(err)
-			}
-			v := judgeHarness(gatherHarness(harness.Claude{}, testProjectID, repo), "https://otel.example.test", testProjectID)
-			v.name, v.displayName = "claude", "Claude Code"
-			check := doctorHarnessCheck([]harnessVerdict{v}, "https://otel.example.test", testProjectID, true)
-			if (check.Status == doctor.Pass) != (len(signals) > 0) {
-				t.Fatalf("route signals %v: %+v", signals, check)
-			}
-		})
 	}
 }
 

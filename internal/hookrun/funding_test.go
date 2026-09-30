@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/shim"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -22,7 +21,6 @@ func fundingEnv(t *testing.T) Env {
 	t.Setenv("CODEX_HOME", t.TempDir())
 	// A test launched from routed Codex must not inherit its parent's consent mode.
 	// Routed cases opt in explicitly through routeCodex.
-	t.Setenv(shim.CodexRoutedEnv, "")
 	t.Setenv("ANTHROPIC_API_KEY", "")
 	t.Setenv("ANTHROPIC_AUTH_TOKEN", "")
 	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "")

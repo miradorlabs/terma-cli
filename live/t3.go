@@ -102,7 +102,7 @@ func (sb *Sandbox) StartT3(b Binary, env ...string) *T3 {
 	t.Cleanup(x.Stop)
 	deadline := time.Now().Add(60 * time.Second)
 	for time.Now().Before(deadline) {
-		if resp, err := http.Get(x.url + "/"); err == nil {
+		if resp, err := t3Client.Get(x.url + "/"); err == nil {
 			_ = resp.Body.Close()
 			break
 		}
@@ -112,6 +112,8 @@ func (sb *Sandbox) StartT3(b Binary, env ...string) *T3 {
 	defer cancel()
 	issue := exec.CommandContext(ctx, b.Path, "auth", "session", "issue", "--token-only", "--base-dir", x.base)
 	issue.Env = x.env
+	// The launcher's native child can hold the output pipe past the launcher's exit.
+	issue.WaitDelay = 5 * time.Second
 	tok, err := issue.Output()
 	if err != nil {
 		t.Fatalf("t3 auth session issue: %v\n%s", err, x.out.String())
@@ -119,6 +121,10 @@ func (sb *Sandbox) StartT3(b Binary, env ...string) *T3 {
 	x.token = strings.TrimSpace(string(tok))
 	return x
 }
+
+// t3Client bounds every request: a server that accepts and never answers must fail the
+// scenario, not hang it past the test's own deadline.
+var t3Client = &http.Client{Timeout: 30 * time.Second}
 
 // Stop ends the server and the agents it started: the launcher's whole process group.
 func (x *T3) Stop() {
@@ -150,7 +156,7 @@ func (x *T3) request(method, path string, body any) []byte {
 	req, _ := http.NewRequest(method, x.url+path, rd)
 	req.Header.Set("Authorization", "Bearer "+x.token)
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := t3Client.Do(req)
 	if err != nil {
 		x.t.Fatalf("t3 %s %s: %v\n%s", method, path, err, tail(x.out.String(), 2000))
 	}

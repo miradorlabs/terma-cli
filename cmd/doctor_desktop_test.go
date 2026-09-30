@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"os"
 	"path/filepath"
 	"slices"
@@ -9,18 +10,17 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
-	"github.com/miradorlabs/terma-cli/internal/shim"
 )
 
 func TestDesktopOnlySelectionDoesNotRequireCodexCLIShim(t *testing.T) {
 	t.Setenv("CODEX_HOME", t.TempDir())
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	cli, desktop := false, true
-	if err := shim.SaveRecord(shim.Record{ProjectID: testProjectID, Endpoint: "https://otel.terma.ai", Signals: []string{"logs"},
-		Harnesses: []string{shim.AgentCodex}, CLI: cli, Desktop: desktop}); err != nil {
+	if err := routing.SaveRecord(routing.Record{ProjectID: testProjectID, Endpoint: "https://otel.terma.ai", Signals: []string{"logs"},
+		Harnesses: []string{routing.AgentCodex}, CLI: cli, Desktop: desktop}); err != nil {
 		t.Fatal(err)
 	}
-	selected := selectedForRepo(testProjectID, []string{shim.AgentCodex})
+	selected := selectedForRepo(testProjectID, []string{routing.AgentCodex})
 	if !slices.Equal(selected, []string{codexDesktopAgent}) {
 		t.Fatalf("effective choices = %v", selected)
 	}
@@ -29,11 +29,8 @@ func TestDesktopOnlySelectionDoesNotRequireCodexCLIShim(t *testing.T) {
 	for _, verdict := range verdicts {
 		names = append(names, verdict.name)
 	}
-	if slices.Contains(names, shim.AgentCodex) || !slices.Contains(names, codexDesktopAgent) {
+	if slices.Contains(names, routing.AgentCodex) || !slices.Contains(names, codexDesktopAgent) {
 		t.Fatalf("desktop-only choice produced agent verdicts %v", names)
-	}
-	if check := shellRoutingCheck(verdicts, true, selected); check.Status != doctor.Skip {
-		t.Fatalf("desktop-only choice demanded a shell shim: %+v", check)
 	}
 }
 
@@ -58,18 +55,18 @@ func TestDesktopVerdictUsesLocalRouteAndKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	desktop := true
-	if err := shim.SaveRecord(shim.Record{ProjectID: testProjectID, Endpoint: "https://otel.terma.ai",
-		Signals: []string{"logs"}, Harnesses: []string{shim.AgentCodex},
+	if err := routing.SaveRecord(routing.Record{ProjectID: testProjectID, Endpoint: "https://otel.terma.ai",
+		Signals: []string{"logs"}, Harnesses: []string{routing.AgentCodex},
 		IncludePrompts: true, IncludeToolContent: true, Desktop: desktop}); err != nil {
 		t.Fatal(err)
 	}
 	if got := judgeDesktop(testProjectID).emissionProblem; got != "this repository has no delivery key" {
 		t.Fatalf("missing key verdict = %q", got)
 	}
-	if err := keystore.SetFor(shim.AgentCodex, testProjectID, "ter_srv_0123456789abcdef01234567", keystore.Hosts{}); err != nil {
+	if err := keystore.SetFor(routing.AgentCodex, testProjectID, "ter_srv_0123456789abcdef01234567", keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
-	if verdict := judgeDesktop(testProjectID); verdict.emissionProblem != "" || !verdict.routed {
+	if verdict := judgeDesktop(testProjectID); verdict.emissionProblem != "" || verdict.route != routeHooks {
 		t.Fatalf("local desktop verdict = %+v", verdict)
 	}
 }

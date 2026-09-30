@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"maps"
 	"os"
 	"slices"
@@ -16,7 +17,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
-	"github.com/miradorlabs/terma-cli/internal/shim"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -337,7 +337,7 @@ func projectEndpoint(cfg *config.Config, projectID string) string {
 	if h, ok := keystore.HostsFor(projectID); ok && h.OTLP != "" {
 		return h.OTLP
 	}
-	if rec, ok, err := shim.LoadRecord(projectID); err == nil && ok && rec.Endpoint != "" {
+	if rec, ok, err := routing.LoadRecord(projectID); err == nil && ok && rec.Endpoint != "" {
 		return strings.TrimRight(rec.Endpoint, "/")
 	}
 	return cfg.OTLPURL
@@ -355,7 +355,7 @@ func projectAPI(cfg *config.Config, projectID string) string {
 	if h, ok := keystore.HostsFor(projectID); ok && h.API != "" {
 		return h.API
 	}
-	if rec, ok, err := shim.LoadRecord(projectID); err == nil && ok && strings.TrimRight(rec.Endpoint, "/") != cfg.OTLPURL {
+	if rec, ok, err := routing.LoadRecord(projectID); err == nil && ok && strings.TrimRight(rec.Endpoint, "/") != cfg.OTLPURL {
 		if e, ok := config.EndpointsByOTLP(rec.Endpoint); ok {
 			return e.APIURL
 		}

@@ -3,11 +3,10 @@ package hookrun
 import (
 	"context"
 	"encoding/json"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/miradorlabs/terma-cli/internal/shim"
 )
 
 func TestCodexDesktopHooksCaptureLocalToolsWithRepositoryConsent(t *testing.T) {
@@ -15,12 +14,11 @@ func TestCodexDesktopHooksCaptureLocalToolsWithRepositoryConsent(t *testing.T) {
 		t.Run(map[bool]string{false: "redacted", true: "content"}[allow], func(t *testing.T) {
 			env := fundingEnv(t)
 			desktop := true
-			if err := shim.SaveRecord(shim.Record{ProjectID: "project-a", Endpoint: "https://otel.terma.ai",
-				Signals: []string{"logs"}, Harnesses: []string{shim.AgentCodex}, Desktop: desktop,
+			if err := routing.SaveRecord(routing.Record{ProjectID: "project-a", Endpoint: "https://otel.terma.ai",
+				Signals: []string{"logs"}, Harnesses: []string{routing.AgentCodex}, Desktop: desktop,
 				IncludePrompts: allow, IncludeToolContent: allow}); err != nil {
 				t.Fatal(err)
 			}
-			t.Setenv(shim.CodexRoutedEnv, "")
 			run := func(input map[string]any, fn func(context.Context, Env) error) {
 				b, _ := json.Marshal(input)
 				env.Stdin = strings.NewReader(string(b))

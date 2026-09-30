@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"io"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -24,7 +24,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 	"github.com/miradorlabs/terma-cli/internal/serverkey"
 	"github.com/miradorlabs/terma-cli/internal/session"
-	"github.com/miradorlabs/terma-cli/internal/shim"
 	"github.com/miradorlabs/terma-cli/internal/spinner"
 	"github.com/miradorlabs/terma-cli/internal/style"
 )
@@ -33,7 +32,8 @@ type installFlags struct {
 	projectRef string
 	harnesses  string
 	adapters   string
-	// activation is how per-repo agent routing is delivered: "shim", "wrapper", or ""
+	// activation and noPath configured the PATH shims, which are gone; accepted and ignored.
+	// activation was how per-repo agent routing was delivered: "shim", "wrapper", or ""
 	// (ask). Codex and Claude Code route to this repo's project through it.
 	activation   string
 	noHooks      bool
@@ -72,16 +72,14 @@ not run ` + "`terma setup`" + `, asks which agents you use if you have not chose
      already bound offered first (Enter keeps it); --project names it instead, and
      without a terminal, or with --yes, an existing binding is kept. A binding to a
      project your account cannot see is not used: install says why and chooses again.
-  2. Points each of your agents at that project, per repository:
-       - Claude Code exports to it through per-repo settings (claude --settings);
-       - Codex CLI exports to it through runtime -c overrides;
-     both delivered by PATH shims, which install puts on PATH at the end of your
-     shell's startup file (--no-path prints the line instead; --activation wrapper
-     prints shell functions instead). Keys stay in your home directory, namespaced by
-     project — never in the repository. Prompt text and model responses are sent
-     (your last choice for the project, on for a first install); --prompts off stops
-     them.
-     Codex Desktop reports through repository hooks and the local Terma spool.
+  2. Points each of your agents at that project, through the local relay: their own
+     exporters send to a relay on this machine (Claude Code's and Codex's user
+     settings, Gemini CLI's; terma's plugin for OpenCode, omp, Pi, Hermes and DeepSeek
+     Harness), and the relay forwards only the sessions this repository's hooks claim,
+     with the project's key. Nothing else leaves the machine. Keys stay in your home
+     directory, namespaced by project — never in the repository. Prompt text and model
+     responses are sent (your last choice for the project, on for a first install);
+     --prompts off stops them. Codex Desktop also reports through repository hooks.
   3. Enables repository telemetry, including for machines configured to export only
      from installed repositories. Existing repository policies are preserved unless
      --signals or a content flag changes them.
@@ -104,10 +102,14 @@ The keys and per-project configuration live in your home directory; the committe
 	cmd.Flags().StringVar(&f.projectRef, "project", "", "Terma project (name or id) to bind the repository to")
 	cmd.Flags().StringVar(&f.harnesses, "harness", "", "comma-separated agents to configure ("+strings.Join(availableAgentNames(), ", ")+"); default: what `terma setup` recorded, else a picker")
 	cmd.Flags().StringVar(&f.adapters, "adapters", "", "comma-separated agents whose committed hooks to wire (default: the configured agents that have one)")
-	cmd.Flags().StringVar(&f.activation, "activation", "", "per-repo routing delivery: shim (PATH shims, the default) or wrapper (printed shell functions)")
+	cmd.Flags().StringVar(&f.activation, "activation", "", "no effect: agents are routed by the local relay")
 	cmd.Flags().BoolVar(&f.noHooks, "no-hooks", false, "do not install commit hooks or agent hooks")
 	cmd.Flags().BoolVar(&f.noDoctor, "no-doctor", false, "do not run `terma doctor` to verify the chain after installing")
-	cmd.Flags().BoolVar(&f.noPath, "no-path", false, "do not add the shim directory to PATH in your shell's startup file; print the line instead")
+	cmd.Flags().BoolVar(&f.noPath, "no-path", false, "no effect: install no longer changes your shell's startup file")
+	// Both routed agents through PATH shims, which are gone; kept so the scripts that
+	// pass them keep working.
+	_ = cmd.Flags().MarkHidden("activation")
+	_ = cmd.Flags().MarkHidden("no-path")
 	cmd.Flags().BoolVar(&f.noStatusLine, "no-statusline", false, "do not wrap Claude Code's status line (which captures the plan's rate-limit windows)")
 	cmd.Flags().StringVar(&f.identity, "identity", "", "identity stamped on Codex/OpenCode sessions (default: git user.email; \"none\" to omit)")
 	cmd.Flags().StringVar(&f.signals, "signals", "", "comma-separated signals to export: traces, logs, metrics (default all)")
@@ -236,7 +238,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 		return err
 	}
 	f.excludePrompts = !include
-	if len(exportingAgents(agents)) > 0 {
+	if len(relayTargets(agents)) > 0 {
 		if include {
 			ui.summary("Prompts", "prompt text and model responses are sent — `terma install --prompts off` stops them")
 		} else {
@@ -251,7 +253,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	// overrides it — a colleague re-running install must not rewrite the committed hooks
 	// to match their own agent set.
 	adapters := installAdapters(root, agents, f.adapters)
-	if slices.Contains(agents, codexDesktopAgent) && !slices.Contains(adapters, shim.AgentCodex) {
+	if slices.Contains(agents, codexDesktopAgent) && !slices.Contains(adapters, routing.AgentCodex) {
 		return errors.New("codex desktop needs the Codex repository hooks; include codex in --adapters")
 	}
 	det := hookmgr.Detect(root)
@@ -320,7 +322,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	// (not merely installed) so it only touches the global config for a developer who
 	// has chosen Claude — which also keeps `--harness none` installs from touching it.
 	// --no-statusline opts out.
-	if !f.noStatusLine && slices.Contains(agents, shim.AgentClaude) {
+	if !f.noStatusLine && slices.Contains(agents, routing.AgentClaude) {
 		if note, ok := installStatusLine(cmd.ErrOrStderr()); ok {
 			fmt.Fprintf(ui.detail, "\n%s\n", note)
 			ui.ok("Status line", "reads your plan's usage windows")
@@ -518,7 +520,7 @@ func resolvePrompts(cmd *cobra.Command, projectID string, f installFlags) (bool,
 	if excluded {
 		return false, nil
 	}
-	if rec, ok, err := shim.LoadRecord(projectID); err == nil && ok && projectID != "" {
+	if rec, ok, err := routing.LoadRecord(projectID); err == nil && ok && projectID != "" {
 		return rec.IncludePrompts, nil
 	}
 	return true, nil
@@ -551,7 +553,7 @@ func telemetryAgentNames(agents []string) []string {
 	var names []string
 	for _, name := range agents {
 		if name == codexDesktopAgent {
-			name = shim.AgentCodex
+			name = routing.AgentCodex
 		}
 		if !slices.Contains(names, name) {
 			names = append(names, name)
@@ -638,286 +640,94 @@ func resolveInstallHarnesses(cmd *cobra.Command, cfg *config.Config, f installFl
 	return names, nil
 }
 
-// connectHarnessesForRepo points each configured telemetry harness at cfg's project,
-// per repository. Claude routes through a per-repo settings document handed to it as
-// `--settings`, Codex through runtime -c overrides, and OpenCode through its own per-repo plugin; the wrapper or
-// PATH-shim activation is set up once for the routable pair (Claude, Codex). It writes
-// no committed file — keys and routing state live in the home directory.
+// connectHarnessesForRepo points the developer's agents at this repository's project
+// through the local relay (docs/RELAY-SPIKE.md): the project's key for each agent with a
+// native exporter (the keystore — the relay sends the project's sessions with it), the
+// project's routing record (its signals and what content may leave: the relay's policy
+// for it), and each agent's user-level exporter pointed at the relay, which is started.
+// The repository's hooks claim its sessions; nothing unclaimed leaves the machine. It
+// writes no committed file.
 func connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *config.Config, agents []string, f installFlags) error {
 	ctx := cmd.Context()
-	out := ui.detail
 	signals, err := harness.ParseSignals(f.signals)
 	if err != nil {
 		return err
 	}
-	telemetryAgents := exportingAgents(agents)
-	if len(telemetryAgents) == 0 {
+	targets := relayTargets(agents)
+	if len(targets) == 0 {
 		return nil
 	}
-
-	fmt.Fprintln(out, "\nConfiguring agents for this project:")
-	rec := shim.Record{
+	rec := routing.Record{
 		ProjectID:          cfg.ProjectID,
 		Endpoint:           cfg.OTLPURL,
 		Signals:            signalStrings(signals),
 		IncludePrompts:     !f.excludePrompts,
 		IncludeToolContent: !f.excludeToolContent,
-	}
-	if slices.Contains(telemetryAgents, shim.AgentCodex) {
-		cli := slices.Contains(agents, shim.AgentCodex)
-		desktop := slices.Contains(agents, codexDesktopAgent)
-		rec.CLI = cli
-		rec.Desktop = desktop
+		Harnesses:          targets,
+		CLI:                slices.Contains(agents, routing.AgentCodex),
+		Desktop:            slices.Contains(agents, codexDesktopAgent),
 	}
 	sp := spinner.New(cmd.ErrOrStderr())
 	defer sp.Stop()
-	for _, a := range telemetryAgents {
-		h, _ := harness.Lookup(a)
-		sp.Start("Configuring " + h.DisplayName() + "…")
+	for _, a := range targets {
+		h, err := harness.Lookup(a)
+		if err != nil {
+			continue // an exporter terma writes: it sends with the project's spool key
+		}
+		// The relay sends a session with its agent's key for the project, else the
+		// project's own (relayResolver): one already on file needs no mint.
+		if keystore.GetFor(a, cfg.ProjectID) != "" || keystore.Get(cfg.ProjectID) != "" {
+			continue
+		}
+		sp.Start("Preparing " + h.DisplayName() + "'s key for this project…")
 		key, _, _, _, err := resolveKey(ctx, cfg, h, connectFlags{})
+		sp.Stop()
 		if err != nil {
 			return fmt.Errorf("%s: %w", a, err)
 		}
 		if err := keystore.SetFor(a, cfg.ProjectID, key, keystore.HostsOf(cfg)); err != nil {
 			return err
 		}
-		exp := harness.Exporter{
-			Endpoint:           cfg.OTLPURL,
-			APIKey:             key,
-			Signals:            signals,
-			ProjectID:          cfg.ProjectID,
-			ResourceAttributes: resourceAttributes(ctx, h, cfg, f.identity),
-			IncludePrompts:     !f.excludePrompts,
-			IncludeToolContent: !f.excludeToolContent,
-		}
-		sp.Stop()
-		switch a {
-		case shim.AgentCodex:
-			rec.ResourceAttributes = exp.ResourceAttributes
-			rec.Harnesses = append(rec.Harnesses, a)
-			if slices.Contains(agents, shim.AgentCodex) {
-				fmt.Fprintln(out, "  Codex CLI    → per-repo runtime overrides")
-			} else {
-				fmt.Fprintln(out, "  Codex Desktop → per-repo logs route")
-			}
-			if slices.Contains(agents, codexDesktopAgent) {
-				ui.ok("Codex Desktop", "reports through this repository's hooks")
-			}
-		case shim.AgentClaude:
-			if _, err := shim.PrepareClaudeSettings(exp); err != nil {
-				return fmt.Errorf("claude: %w", err)
-			}
-			rec.Harnesses = append(rec.Harnesses, a)
-			fmt.Fprintln(out, "  Claude Code  → per-repo settings")
-		case "opencode":
-			// OpenCode routes itself: its plugin reads the repository's binding and picks
-			// the project's key, so it needs no wrapper or shim.
-			if err := (harness.OpenCode{}).ConnectPerRepo(exp); err != nil {
-				return fmt.Errorf("opencode: %w", err)
-			}
-			// The plugin is global and shared across every bound repository, so a
-			// per-repo prompt / tool-content choice cannot ride in it (that would flip
-			// capture on for every other project). It lives only in a committed
-			// .opencode/terma.json overlay, written by install below.
-			fmt.Fprintln(out, "  OpenCode     → per-repo plugin")
-			ui.ok("OpenCode", "reports through terma's plugin")
-		case "omp":
-			// omp routes itself: its hook extension reads the repository's binding and
-			// picks the project's key, so it needs no wrapper or shim.
-			if err := (harness.Omp{}).ConnectPerRepo(exp); err != nil {
-				return fmt.Errorf("omp: %w", err)
-			}
-			// The extension is global and shared across every bound repository, so a
-			// per-repo prompt / tool-content choice cannot ride in it (that would flip
-			// capture on for every other project). It lives only in a committed
-			// .omp/terma.json overlay, written by install below.
-			fmt.Fprintln(out, "  Omp          → per-repo extension")
-			ui.ok("omp", "reports through terma's extension")
-		default:
-			// Every telemetry harness is routed above. One added to the registry without
-			// a case here must not pass for routed: it would export to whatever project
-			// the machine-wide connect last named.
-			return fmt.Errorf("%s: no per-repository routing", a)
-		}
 	}
-
-	if len(rec.Harnesses) == 0 {
-		return nil
-	}
-	if err := shim.SaveRecord(rec); err != nil {
+	if err := routing.SaveRecord(rec); err != nil {
 		return err
 	}
-	var launchedFromShell []string
-	for _, name := range rec.Harnesses {
-		if slices.Contains(agents, name) {
-			launchedFromShell = append(launchedFromShell, name)
-		}
+	dir, err := relayDir()
+	if err != nil {
+		return err
 	}
-	if len(launchedFromShell) == 0 {
-		return nil
+	token, err := ensureRelayToken()
+	if err != nil {
+		return err
 	}
-	err = setupActivation(cmd, ui, launchedFromShell, f)
-	return err
-}
-
-// exportingAgents are the agents among a developer's that terma points at a project —
-// the ones with an exporter, Codex Desktop counted as Codex.
-func exportingAgents(agents []string) []string {
-	var names []string
-	for _, a := range telemetryAgentNames(agents) {
-		if _, err := harness.Lookup(a); err == nil {
-			names = append(names, a)
-		}
+	addr := relayAddr(dir)
+	fmt.Fprintln(ui.detail, "\nPointing agents at the local relay on "+addr+":")
+	err = pointAgentsAtRelay(ctx, targets, addr, token, func(agent, detail string) {
+		fmt.Fprintf(ui.detail, "  %s%s\n", agent, detail)
+		ui.ok(agent, "exports through the local relay; only this repository's sessions leave")
+	}, ui.then)
+	if err != nil {
+		return err
 	}
-	return names
-}
-
-// setupActivation installs the per-repo routing mechanism.
-// The PATH shim is the default and is installed without asking; the shim scripts front
-// the agent binaries and re-invoke terma. `--activation wrapper` opts into printed shell
-// functions instead. Unless the shims already route, the shim directory then goes on
-// PATH in the developer's shell startup file (putShimsOnPath).
-func setupActivation(cmd *cobra.Command, ui *installUI, agents []string, f installFlags) error {
-	mode := strings.TrimSpace(f.activation)
-	if mode == "" {
-		mode = "shim"
+	if slices.Contains(agents, codexDesktopAgent) {
+		ui.ok("Codex Desktop", "reports through the relay and this repository's hooks")
 	}
-	switch mode {
-	case "shim":
-		binDir, err := shim.InstallShims(agents)
-		if err != nil {
-			return err
-		}
-		fmt.Fprintf(ui.detail, "  Routing      → PATH shims for %s in %s\n", joinNames(adapterDisplayNames(agents)), binDir)
-		for _, a := range agents {
-			ui.ok(adapterDisplayNames([]string{a})[0], "shim at "+tildePath(filepath.Join(binDir, a)))
-		}
-		if !allActive(agents) {
-			putShimsOnPath(ui, binDir, agents, f)
-		}
-	case "wrapper":
-		if _, err := shim.InstallShims(agents); err != nil {
-			return err
-		}
-		for _, a := range agents {
-			ui.ok(adapterDisplayNames([]string{a})[0], "routed by a shell function")
-		}
-		if !allActive(agents) {
-			shell := filepath.Base(os.Getenv("SHELL"))
-			file := wrapperFile(shell)
-			ui.reloading = true
-			ui.then(fmt.Sprintf("Add these to your %s so the agents route to this repo's project, then run `%s` in this terminal:\n%s",
-				file, reloadCommand(file), ui.code(shim.WrapperSnippetFor(shell, agents))))
-		}
-	default:
-		return fmt.Errorf("unknown --activation %q (want shim or wrapper)", mode)
+	if _, ok := relayServiceInstalled(); !ok {
+		spawnRelay()
 	}
 	return nil
 }
 
-// wrapperFile is the startup file the wrapper hint names: the one the developer's shell
-// reads functions from. zsh and bash read the file the PATH block goes in (ShellRC); fish
-// reads config.fish, never terma's own conf.d file; any other shell (sh, dash, BusyBox ash)
-// is a POSIX shell whose login shells read ~/.profile.
-func wrapperFile(shell string) string {
-	if rc, ok := shim.ShellRC(); ok && rc.Shell == shell && shell != "fish" {
-		return tildePath(rc.Path)
-	}
-	// Without a home directory each shell's usual file, literally: a path joined onto ""
-	// would be relative, and ~/.profile is not what zsh or bash reads.
-	switch shell {
-	case "zsh":
-		return "~/.zshrc"
-	case "bash":
-		return "~/.bashrc"
-	case "fish":
-		home, err := os.UserHomeDir()
-		if err != nil || home == "" {
-			return "~/.config/fish/config.fish"
-		}
-		return tildePath(filepath.Join(shim.FishConfigDir(home), "config.fish"))
-	}
-	return "~/.profile"
-}
-
-// putShimsOnPath gets the shim directory onto PATH ahead of the real binaries — the one
-// step of per-repo routing that lives in the developer's shell startup file. It writes
-// one marked block at the end of the file without asking: running install is the
-// consent, and --no-path keeps terma out of the file and prints the line instead. The
-// shell install was run from read that file before the block was in it, and terma, a
-// child process, cannot change its parent's PATH — so whatever happens, a next step says
-// how to make this shell read the file again.
-//
-// The block goes last on purpose. A PATH line only wins over the ones that run after it,
-// and a real startup file prepends ~/.local/bin — where the real claude and codex live —
-// more than once; pasted anywhere but the end, terma's line is silently overtaken.
-func putShimsOnPath(ui *installUI, binDir string, agents []string, f installFlags) {
-	ui.reloading = true
-	names := joinNames(adapterDisplayNames(agents))
-	rc, ok := shim.ShellRC()
-	file := "your shell's startup file"
-	if ok {
-		file = tildePath(rc.Path)
-	}
-	manual := func(why string) {
-		line := `export PATH="` + binDir + `:$PATH"`
-		reload := "then start a new shell"
-		if ok {
-			line = rc.PathLine(binDir)
-			reload = "then run `" + reloadCommand(file) + "` in this terminal"
-		}
-		ui.warn("PATH", "the shims are not on PATH yet")
-		ui.then(fmt.Sprintf("%s as the LAST line that touches PATH in %s — a later line that prepends another directory puts the real binaries back in front:\n%s\n%s to route %s through terma.",
-			why, file, ui.code(line), reload, names))
-	}
-	reload := fmt.Sprintf("Run `%s` in this terminal, or open a new terminal, to route %s through terma.", reloadCommand(file), names)
-	if !ok || f.noPath {
-		manual("Add this")
-		return
-	}
-	state, err := rc.State()
-	if err != nil {
-		manual("Could not read " + file + " (" + err.Error() + "). Add this")
-		return
-	}
-	if state == shim.RCLast {
-		ui.ok("PATH", file+" puts the shims first")
-		ui.then(reload)
-		return
-	}
-	// Absent, or overtaken by a later line that puts the real binaries back in front:
-	// either way Ensure appends the block, or moves it to the end.
-	if _, err := rc.Ensure(binDir); err != nil {
-		manual("Could not write " + file + " (" + err.Error() + "). Add this")
-		return
-	}
-	fmt.Fprintf(ui.detail, "  PATH         → %s (last line; `terma shim uninstall` removes it).\n", file)
-	if state == shim.RCOvertaken {
-		ui.ok("PATH", "moved terma's line to the end of "+file+", so the shims come first")
-	} else {
-		ui.ok("PATH", file+" puts the shims first")
-	}
-	ui.then(reload)
-}
-
-// reloadCommand re-reads a startup file in the running shell: `source` where the shell
-// has it (zsh, bash, fish), the POSIX `.` otherwise.
-func reloadCommand(file string) string {
-	switch filepath.Base(os.Getenv("SHELL")) {
-	case "zsh", "bash", "fish":
-		return "source " + file
-	}
-	return ". " + file
-}
-
-// allActive reports whether every routed agent already resolves to terma's shim.
-func allActive(agents []string) bool {
-	for _, a := range agents {
-		if shim.Routable(a) && !shim.Active(a) {
-			return false
+// relayTargets are the developer's agents terma points at the relay, Codex Desktop
+// counted as Codex, in relayAgents' order.
+func relayTargets(agents []string) []string {
+	var out []string
+	for _, a := range relayAgents {
+		if slices.Contains(agents, a) || a == routing.AgentCodex && slices.Contains(agents, codexDesktopAgent) {
+			out = append(out, a)
 		}
 	}
-	return true
+	return out
 }
 
 // installAdapters lists the agents whose committed hooks to wire. --adapters overrides
@@ -943,7 +753,7 @@ func installAdapters(root string, agents []string, override string) []string {
 			continue
 		}
 		// Codex Desktop is captured through the Codex hooks file.
-		selected := slices.Contains(agents, a.Name()) || (a.Name() == shim.AgentCodex && slices.Contains(agents, codexDesktopAgent))
+		selected := slices.Contains(agents, a.Name()) || (a.Name() == routing.AgentCodex && slices.Contains(agents, codexDesktopAgent))
 		if selected || a.Default(root) || adapter.Wired(root, a) {
 			out = append(out, a.Name())
 		}

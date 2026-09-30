@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,14 +13,13 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/migrate"
-	"github.com/miradorlabs/terma-cli/internal/shim"
 )
 
 // oldRoutingRecord writes the record 0.0.2 wrote for a developer routing Codex: no cli
 // field, which today's router reads as "do not route the Codex CLI".
 func oldRoutingRecord(t *testing.T) string {
 	t.Helper()
-	dir, err := shim.RoutingDir()
+	dir, err := routing.RoutingDir()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +36,7 @@ func oldRoutingRecord(t *testing.T) string {
 
 func routesCodexCLI(t *testing.T) bool {
 	t.Helper()
-	rec, ok, err := shim.LoadRecord(testProjectID)
+	rec, ok, err := routing.LoadRecord(testProjectID)
 	if err != nil || !ok {
 		t.Fatalf("LoadRecord: %v %v", ok, err)
 	}

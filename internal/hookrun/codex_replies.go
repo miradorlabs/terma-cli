@@ -3,6 +3,7 @@ package hookrun
 import (
 	"context"
 	"encoding/json"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"os"
 	"path/filepath"
 	"slices"
@@ -11,7 +12,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/session"
-	"github.com/miradorlabs/terma-cli/internal/shim"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -104,7 +104,7 @@ func (e Env) captureCodexReplies(ctx context.Context, r *repo, in *codexHookInpu
 // prompts, and "could not tell" is not consent. A file that does not exist is different:
 // both loaders report that without an error, and it simply is not a source.
 func codexRepliesConsented(r *repo) bool {
-	rec, recorded, err := shim.LoadRecord(r.projectID)
+	rec, recorded, err := routing.LoadRecord(r.projectID)
 	if err != nil {
 		return false
 	}
@@ -114,19 +114,15 @@ func codexRepliesConsented(r *repo) bool {
 	if claim.Enabled() {
 		return recorded && rec.IncludePrompts
 	}
-	if os.Getenv(shim.CodexRoutedEnv) != "1" && rec.Desktop {
-		return recorded && slices.Contains(rec.Harnesses, shim.AgentCodex) &&
+	if rec.Desktop {
+		return recorded && slices.Contains(rec.Harnesses, routing.AgentCodex) &&
 			slices.Contains(rec.Signals, "logs") && rec.IncludePrompts
 	}
 	st, err := (harness.Codex{}).Status()
 	if err != nil {
 		return false
 	}
-	if os.Getenv(shim.CodexRoutedEnv) == "1" {
-		return recorded && slices.Contains(rec.Harnesses, shim.AgentCodex) && rec.IncludePrompts
-	}
-	// Repository hooks can run even when an IDE or TERMA_DISABLE bypasses the
-	// shim. Keep a saved repository opt-out in force for those launches.
+	// A saved repository opt-out stays in force whatever the machine-wide config says.
 	return st.Connected && st.IncludePrompts &&
-		(!recorded || !slices.Contains(rec.Harnesses, shim.AgentCodex) || rec.IncludePrompts)
+		(!recorded || !slices.Contains(rec.Harnesses, routing.AgentCodex) || rec.IncludePrompts)
 }

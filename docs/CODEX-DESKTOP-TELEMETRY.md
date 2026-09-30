@@ -1,9 +1,9 @@
 # Codex Desktop: repository-specific telemetry
 
-Codex Desktop does not launch through the shell shim used by Codex CLI, and Codex
-ignores `otel` in repository config. Terma captures Desktop activity with trusted
-repository hooks and its existing local spool. It installs no background receiver,
-LaunchAgent, or global Codex exporter.
+Codex ignores `otel` in repository config. Terma captures Desktop activity with trusted
+repository hooks and its local spool, and — through the local relay `terma install`
+points Codex at — Codex Desktop's own OTLP export for the sessions this repository's
+hooks claim (docs/RELAY-SPIKE.md, "Codex's app-server").
 
 ## Set up
 
@@ -59,33 +59,11 @@ timing, actual user approval decisions and their source, and native trace spans
 still require Codex's native OTel export. Codex ignores `otel` in project config,
 so that export is machine-wide unless Codex adds a scoped Desktop interface.
 
-Codex CLI launches routed by the Terma shim keep their native OTLP configuration
-and are not converted to Desktop hook telemetry. A separate, unrelated global
-Codex exporter can still export machine-wide data under its own configuration;
-`terma install` does not manage it. `terma desktop status` reports whether one
-is active. If you require exports only from installed repositories, disconnect
-that user-level exporter (use `terma disconnect codex` for a Terma-owned one).
+Codex CLI sessions export through the same relay.
 
-### CLI embedded mode
+### CLI and the shared background server
 
-Codex's shared background server cannot accept the per-launch `-c otel.*`
-overrides Terma uses for repository-specific native telemetry. Routed interactive
-CLI launches (including resume and fork) explicitly select `--no-daemon` when the
-compatibility resolver establishes support from a verified version rule or a
-successful capability probe (see [harness compatibility](HARNESS-COMPATIBILITY.md)). This keeps the existing embedded behavior
-without the startup warning about falling back from the shared server. Older
-versions retain the same telemetry overrides without the new flag. Remote
-connections, noninteractive commands, and launches outside bound repositories
-do not receive an automatic `--no-daemon`.
-
-Hooks and rollout capture are not a complete substitute: they lack native trace
-spans, per-request SSE/WebSocket timing, actual approval decisions and their
-source, and native local-tool execution timing. Hosted tool coverage also depends
-on observed rollout shapes. CLI therefore retains native export alongside hooks.
-
-For Codex-managed local worktrees, a Git-ignored `.terma/settings.json` must be
-copied into the worktree. Add it to `.worktreeinclude` when needed.
-
-See the [Codex configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference),
-[hooks guide](https://learn.chatgpt.com/docs/hooks), and
-[worktree guide](https://learn.chatgpt.com/docs/environments/git-worktrees).
+With no launcher adding overrides, an interactive Codex CLI session runs in Codex's
+shared background server when one runs, like Desktop's threads, and exports through the
+same user-level settings and relay. The server reads those settings only when it starts;
+`terma install` and `terma doctor` say when it needs `codex app-server daemon restart`.

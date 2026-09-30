@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"io"
 	"io/fs"
 	"os"
@@ -113,7 +114,7 @@ func agentHooksCheck(root string, mine []string) doctor.Check {
 			continue
 		}
 		// Codex Desktop is wired through the Codex hooks file.
-		named := slices.Contains(mine, a.Name()) || (a.Name() == shim.AgentCodex && slices.Contains(mine, codexDesktopAgent))
+		named := slices.Contains(mine, a.Name()) || (a.Name() == routing.AgentCodex && slices.Contains(mine, codexDesktopAgent))
 		if !adapter.Wired(root, a) {
 			if named {
 				of++
@@ -268,24 +269,6 @@ func installedBinaryDigest(path string) (string, error) {
 	return fileDigest(installedBinary(path))
 }
 
-// shimPathFix is what gets terma's shims ahead of the real binaries from here. `terma
-// install` writes the PATH line; when it is already written and still last, the shell
-// doctor runs in simply started before it, and no command fixes that.
-func shimPathFix() string {
-	rc, ok := shim.ShellRC()
-	if !ok {
-		shimDir, _ := shim.ShimBinDir()
-		return `put the shim directory first on PATH, as the last PATH line of your shell's startup file: export PATH="` + shimDir + `:$PATH"`
-	}
-	switch state, _ := rc.State(); state {
-	case shim.RCLast:
-		return "run `" + reloadCommand(tildePath(rc.Path)) + "` or open a new terminal — " + tildePath(rc.Path) + " already puts the shims first, and this shell started before it did"
-	case shim.RCOvertaken:
-		return "terma install (a later line in " + tildePath(rc.Path) + " puts the real binaries back in front; install moves terma's line to the end)"
-	}
-	return "terma install (it puts the shim directory on PATH in " + tildePath(rc.Path) + ")"
-}
-
 // addToPathCommand is the command a developer runs to put dir on PATH for good, in their
 // own shell: the line appended to the startup file terma knows for it and read into this
 // shell, or for fish, fish_add_path, which keeps the entry itself. A shell terma does not
@@ -399,17 +382,6 @@ func runDoctor(ctx context.Context, skipCommit bool, progress doctorProgress) do
 
 	// 5. Harness export.
 	timed(doctor.KeyHarness, "agent exporting to Terma", d.agentsExporting)
-	if slices.ContainsFunc(d.harnesses, func(v harnessVerdict) bool { return v.name == shim.AgentCodex }) {
-		timed(doctor.KeyCompatibility, "Codex CLI compatibility", func() doctor.Check {
-			return doctorCodexCompatibility(ctx)
-		})
-	}
-	timed(doctor.KeyRouting, "shell routing active", func() doctor.Check {
-		if claim.Enabled() {
-			return doctor.Check{Status: doctor.Skip, Detail: "the local relay routes every agent; no shell integration needed"}
-		}
-		return shellRoutingCheck(d.harnesses, d.installed(), selectedForRepo(d.projectID, d.cfg.Harnesses))
-	})
 
 	// 5b. Status line: the payload Claude Code hands its status line carries the
 	// plan's own rate-limit windows, the strongest funding evidence a machine
@@ -902,18 +874,16 @@ func doctorHarnessCheck(verdicts []harnessVerdict, otlpURL, projectID string, bo
 	if len(problems) > 0 {
 		return doctor.Check{Status: doctor.Fail, Detail: strings.Join(problems, "; "), Fix: strings.Join(fixes, "; ")}
 	}
-	var connected, installed, pendingShim, repoDecides, silent []string
+	var connected, installed, repoDecides, silent []string
 	for _, v := range verdicts {
 		installed = append(installed, v.displayName)
 		switch v.route {
 		case routeOtherProject:
 			return doctor.Check{Status: doctor.Fail, Detail: v.displayName + " reports to project " + v.otherProject + ", not " + projectID, Fix: "terma install"}
-		case routeLive:
-			connected = append(connected, v.displayName+" (per-repo)")
+		case routeHooks:
+			connected = append(connected, v.displayName+" (repository hooks)")
 		case routeGlobal:
 			connected = append(connected, v.displayName)
-		case routePending:
-			pendingShim = append(pendingShim, v.displayName)
 		case routeRepoDecides:
 			connected = append(connected, v.displayName)
 			repoDecides = append(repoDecides, v.displayName)
@@ -928,26 +898,6 @@ func doctorHarnessCheck(verdicts []harnessVerdict, otlpURL, projectID string, bo
 	}
 	if len(installed) == 0 {
 		return doctor.Check{Status: doctor.Fail, Detail: "no coding agent found (Claude Code, Codex, OpenCode)", Fix: "install one, then terma install"}
-	}
-	// Routing configured but not on PATH is the honest "looks set up, sends nothing
-	// yet" case — the exact gap that made doctor report a repo as fine while its
-	// sessions used the global config. Surfaced with the fix that actually activates it.
-	if len(pendingShim) > 0 {
-		detail := "per-repo routing for " + strings.Join(pendingShim, ", ") + " is configured, but terma's shim directory is not ahead of the agent on your PATH — sessions still use the machine-wide config"
-		if len(connected) > 0 {
-			detail = strings.Join(connected, ", ") + " → " + otlpURL + "; " + detail
-		}
-		status := doctor.Warn
-		fix := shimPathFix()
-		if len(connected) == 0 {
-			status = doctor.Fail
-		}
-		if bound && len(silent) > 0 {
-			status = doctor.Fail
-			detail += "; " + strings.Join(silent, ", ") + " sessions here send nothing because no repository telemetry policy enables their exporters"
-			fix += "; terma install to enable the missing repository policy"
-		}
-		return doctor.Check{Status: status, Detail: detail, Fix: fix, NeedsShellActivationOnly: !bound || len(silent) == 0}
 	}
 	if len(connected) == 0 {
 		return doctor.Check{Status: doctor.Fail, Detail: strings.Join(installed, ", ") + " installed but not exporting to " + otlpURL, Fix: "terma install"}
@@ -1032,4 +982,14 @@ func waitForCommitEvent(ctx context.Context, cfg *config.Config, projectID, sha 
 		case <-time.After(roundTripPoll):
 		}
 	}
+}
+
+// reloadCommand re-reads a startup file in the running shell: `source` where the shell
+// has it (zsh, bash, fish), the POSIX `.` otherwise.
+func reloadCommand(file string) string {
+	switch filepath.Base(os.Getenv("SHELL")) {
+	case "zsh", "bash", "fish":
+		return "source " + file
+	}
+	return ". " + file
 }

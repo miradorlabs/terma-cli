@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"io"
 	"net"
 	"net/http"
@@ -30,7 +31,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/procinfo"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
-	"github.com/miradorlabs/terma-cli/internal/shim"
 )
 
 // The local relay spike (docs/RELAY-SPIKE.md): the agents' global exporters send to
@@ -289,7 +289,7 @@ func relayResolver(cfg *config.Config) func(claim.Claim) (relay.Policy, error) {
 			return relay.Policy{}, relay.ErrNoKey
 		}
 		pol := relay.Policy{Endpoint: projectEndpoint(cfg, c.ProjectID), Key: key}
-		if rec, ok, err := shim.LoadRecord(c.ProjectID); err == nil && ok {
+		if rec, ok, err := routing.LoadRecord(c.ProjectID); err == nil && ok {
 			pol.IncludePrompts, pol.IncludeToolContent = rec.IncludePrompts, rec.IncludeToolContent
 		}
 		return pol, nil
@@ -338,79 +338,11 @@ func newRelaySetupCommand() *cobra.Command {
 				return err
 			}
 			out := cmd.OutOrStdout()
-			// The relay withholds content per project, so the exporters send it all.
-			exp := harness.Exporter{Endpoint: "http://" + addr, APIKey: token, Signals: harness.AllSignals, IncludePrompts: true, IncludeToolContent: true}
-			for name := range strings.SplitSeq(agents, ",") {
-				// Pi has no exporter of its own and no connection to journal: terma's
-				// extension is its exporter, pointed at the relay.
-				switch strings.TrimSpace(name) {
-				case "pi":
-					path, err := harness.WritePiExtension(harness.PiConfig{Endpoint: exp.Endpoint,
-						Headers: map[string]string{"Authorization": "Bearer " + token}, IncludePrompts: true, IncludeToolContent: true,
-						HookCommand: termaHookCommand()})
-					if err != nil {
-						return fmt.Errorf("pi: %w", err)
-					}
-					fmt.Fprintf(out, "Pi exports to the relay at %s (%s).\n", addr, tildePath(path))
-					continue
-				case "omp":
-					// omp's native exporter reads OTEL_* only at startup, before any
-					// extension loads; nothing but a wrapper could set them, and what omp
-					// ran would inherit them. terma's extension exports from its events.
-					path, err := harness.WriteOmpRelayExtension(harness.PiConfig{Endpoint: exp.Endpoint,
-						Headers: map[string]string{"Authorization": "Bearer " + token}, IncludePrompts: true, IncludeToolContent: true,
-						HookCommand: termaHookCommand()})
-					if err != nil {
-						return fmt.Errorf("omp: %w", err)
-					}
-					fmt.Fprintf(out, "omp exports to the relay at %s (%s).\n", addr, tildePath(path))
-					continue
-				case "gemini":
-					// Gemini's settings file has no headers: the token rides the path.
-					settings, ext, err := harness.ConnectGeminiRelay(exp.Endpoint+"/"+token, termaHookCommand())
-					if err != nil {
-						return fmt.Errorf("gemini: %w", err)
-					}
-					fmt.Fprintf(out, "Gemini CLI exports to the relay at %s (%s, %s).\n", addr, tildePath(settings), tildePath(ext))
-					continue
-				case "dsh":
-					path, err := harness.WriteDshPlugin(harness.DshConfig{Endpoint: exp.Endpoint,
-						Headers: map[string]string{"Authorization": "Bearer " + token}, IncludePrompts: true, IncludeToolContent: true,
-						HookCommand: termaHookCommand()})
-					if err != nil {
-						return fmt.Errorf("dsh: %w", err)
-					}
-					fmt.Fprintf(out, "DeepSeek Harness exports to the relay at %s (%s).\n", addr, tildePath(path))
-					continue
-				case "hermes":
-					// Hermes, likewise: terma's plugin is its exporter, and plugins are opt-in.
-					dir, err := harness.WriteHermesPlugin(harness.HermesConfig{Endpoint: exp.Endpoint,
-						Headers: map[string]string{"Authorization": "Bearer " + token}, IncludePrompts: true, IncludeToolContent: true,
-						HookCommand: termaHookCommand()})
-					if err != nil {
-						return fmt.Errorf("hermes: %w", err)
-					}
-					if err := harness.EnableHermesPlugin(cmd.Context()); err != nil {
-						fmt.Fprintf(out, "Hermes: the plugin is written (%s) but not enabled: %v.\n", tildePath(dir), err)
-						continue
-					}
-					fmt.Fprintf(out, "Hermes exports to the relay at %s (%s).\n", addr, tildePath(dir))
-					continue
-				}
-				h, err := harness.Lookup(strings.TrimSpace(name))
-				if err != nil {
-					return err
-				}
-				if err := h.Connect(exp, true); err != nil {
-					return fmt.Errorf("%s: %w", h.DisplayName(), err)
-				}
-				fmt.Fprintf(out, "%s exports to the relay at %s.\n", h.DisplayName(), addr)
-				if h.Name() == shim.AgentCodex {
-					_ = config.WriteFileAtomic(filepath.Join(dir, relayCodexFile), []byte(time.Now().UTC().Format(time.RFC3339Nano)+"\n"), 0o600)
-					if d, ok := codexDaemonPredates(dir); ok {
-						fmt.Fprintf(out, "Codex's background server (pid %d) reads its exporter only when it starts, so its threads — Codex Desktop's, and the TUI's since 0.157 — still export where they did: %s.\n", d.PID, codexDaemonRestart)
-					}
-				}
+			err = pointAgentsAtRelay(cmd.Context(), splitCommas(agents), addr, token, func(agent, detail string) {
+				fmt.Fprintf(out, "%s exports to the relay at %s%s.\n", agent, addr, detail)
+			}, func(note string) { fmt.Fprintln(out, note) })
+			if err != nil {
+				return err
 			}
 			fmt.Fprintln(out, "Hooks in repositories with a binding claim their sessions; nothing else is forwarded.")
 			// A running relay has the old address and token: replace it. Then start one
@@ -428,6 +360,84 @@ func newRelaySetupCommand() *cobra.Command {
 	cmd.Flags().StringVar(&agents, "harness", "claude,codex", "the agents to point at the relay")
 	cmd.Flags().BoolVar(&noStart, "no-start", false, "do not start the relay now (the next hook that claims a session will)")
 	return cmd
+}
+
+// relayAgents are the agents terma can point at the local relay: those with a native
+// exporter configured from their user-level files, and those terma writes an exporter
+// into (Pi, omp, Hermes, DeepSeek Harness). `terma install` points each of the
+// developer's agents at the relay; `terma relay setup` any it is told to.
+var relayAgents = []string{routing.AgentClaude, routing.AgentCodex, "opencode", "omp", "pi", "hermes", "gemini", "dsh"}
+
+// pointAgentsAtRelay configures each of agents to export to the relay at addr with its
+// token, calling done with each agent's name and where it was configured, and note with
+// anything the developer has to do. The relay withholds content per project, so the
+// exporters send it all. An agent terma cannot point at the relay is an error.
+func pointAgentsAtRelay(ctx context.Context, agents []string, addr, token string, done func(agent, detail string), note func(string)) error {
+	dir, err := relayDir()
+	if err != nil {
+		return err
+	}
+	exp := harness.Exporter{Endpoint: "http://" + addr, APIKey: token, Signals: harness.AllSignals, IncludePrompts: true, IncludeToolContent: true}
+	headers := map[string]string{"Authorization": "Bearer " + token}
+	for _, name := range agents {
+		switch name {
+		case "pi":
+			path, err := harness.WritePiExtension(harness.PiConfig{Endpoint: exp.Endpoint, Headers: headers, IncludePrompts: true, IncludeToolContent: true, HookCommand: termaHookCommand()})
+			if err != nil {
+				return fmt.Errorf("pi: %w", err)
+			}
+			done("Pi", " ("+tildePath(path)+")")
+		case "omp":
+			// omp's native exporter reads OTEL_* only at startup, before any extension
+			// loads; nothing but a wrapper could set them, and what omp ran would inherit
+			// them. terma's extension exports from its events.
+			path, err := harness.WriteOmpRelayExtension(harness.PiConfig{Endpoint: exp.Endpoint, Headers: headers, IncludePrompts: true, IncludeToolContent: true, HookCommand: termaHookCommand()})
+			if err != nil {
+				return fmt.Errorf("omp: %w", err)
+			}
+			done("omp", " ("+tildePath(path)+")")
+		case "gemini":
+			// Gemini's settings file has no headers: the token rides the path.
+			settings, ext, err := harness.ConnectGeminiRelay(exp.Endpoint+"/"+token, termaHookCommand())
+			if err != nil {
+				return fmt.Errorf("gemini: %w", err)
+			}
+			done("Gemini CLI", " ("+tildePath(settings)+", "+tildePath(ext)+")")
+		case "dsh":
+			path, err := harness.WriteDshPlugin(harness.DshConfig{Endpoint: exp.Endpoint, Headers: headers, IncludePrompts: true, IncludeToolContent: true, HookCommand: termaHookCommand()})
+			if err != nil {
+				return fmt.Errorf("dsh: %w", err)
+			}
+			done("DeepSeek Harness", " ("+tildePath(path)+")")
+		case "hermes":
+			// Hermes, likewise: terma's plugin is its exporter, and plugins are opt-in.
+			path, err := harness.WriteHermesPlugin(harness.HermesConfig{Endpoint: exp.Endpoint, Headers: headers, IncludePrompts: true, IncludeToolContent: true, HookCommand: termaHookCommand()})
+			if err != nil {
+				return fmt.Errorf("hermes: %w", err)
+			}
+			if err := harness.EnableHermesPlugin(ctx); err != nil {
+				note(fmt.Sprintf("Hermes: the plugin is written (%s) but not enabled: %v.", tildePath(path), err))
+				continue
+			}
+			done("Hermes", " ("+tildePath(path)+")")
+		default:
+			h, err := harness.Lookup(name)
+			if err != nil {
+				return err
+			}
+			if err := h.Connect(exp, true); err != nil {
+				return fmt.Errorf("%s: %w", h.DisplayName(), err)
+			}
+			done(h.DisplayName(), "")
+			if h.Name() == routing.AgentCodex {
+				_ = config.WriteFileAtomic(filepath.Join(dir, relayCodexFile), []byte(time.Now().UTC().Format(time.RFC3339Nano)+"\n"), 0o600)
+				if d, ok := codexDaemonPredates(dir); ok {
+					note(fmt.Sprintf("Codex's background server (pid %d) reads its exporter only when it starts, so its threads — Codex Desktop's, and the TUI's since 0.157 — still export where they did: %s.", d.PID, codexDaemonRestart))
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func ensureRelayToken() (string, error) {
@@ -541,7 +551,9 @@ func spawnRelay() {
 		return
 	}
 	exe, err := os.Executable()
-	if err != nil {
+	// A package's tests run as <package>.test: that binary is no relay, and would only
+	// fail on the flags while the caller waited for it to listen.
+	if err != nil || strings.HasSuffix(filepath.Base(exe), ".test") {
 		return
 	}
 	proc := exec.Command(exe, "relay", "run", "--quiet")
@@ -588,7 +600,7 @@ func relayDoctorCheck(projectID string, agents []string) doctor.Check {
 			Fix: "stop it, or move the relay with `terma relay setup --addr`"}
 	}
 	var wrong []string
-	for _, name := range []string{shim.AgentClaude, shim.AgentCodex, "opencode"} {
+	for _, name := range []string{routing.AgentClaude, routing.AgentCodex, "opencode"} {
 		// OpenCode only for a developer who named it: its plugin is not set up by
 		// default, and most machines have no OpenCode.
 		if (len(agents) > 0 || name == "opencode") && !slices.Contains(agents, name) {
@@ -605,7 +617,7 @@ func relayDoctorCheck(projectID string, agents []string) doctor.Check {
 	if len(wrong) > 0 {
 		return doctor.Check{Status: doctor.Fail, Detail: strings.Join(wrong, " and ") + " not exporting to the local relay", Fix: "terma relay setup"}
 	}
-	if slices.Contains(agents, shim.AgentCodex) || len(agents) == 0 {
+	if slices.Contains(agents, routing.AgentCodex) || len(agents) == 0 {
 		if d, ok := codexDaemonPredates(dir); ok {
 			return doctor.Check{Status: doctor.Warn, Detail: fmt.Sprintf("Codex's background server (pid %d) started before Codex was pointed at the relay, and its threads still export where they did", d.PID),
 				Fix: codexDaemonRestart}

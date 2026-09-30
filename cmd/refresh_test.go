@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -108,25 +109,17 @@ func TestRefreshOutsideARepositoryRefreshesTheMachine(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	sandboxMachine(t)
 	t.Chdir(t.TempDir())
-	binDir, err := shim.InstallShims([]string{shim.AgentClaude})
-	if err != nil {
-		t.Fatal(err)
-	}
-	claude := filepath.Join(binDir, shim.AgentClaude)
-	current, _ := os.ReadFile(claude)
-	if err := os.WriteFile(claude, append(bytes.Clone(current), "# an earlier build\n"...), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	claude := plantLegacyShim(t, routing.AgentClaude)
 
 	out, err := runTerma(t, "update", "--refresh")
 	if err != nil {
 		t.Fatalf("refresh: %v\n%s", err, out)
 	}
-	if !strings.Contains(out, "updated "+claude) || !strings.Contains(out, "inside each repository") {
+	if !strings.Contains(out, "removed: the local relay routes the agents now") || !strings.Contains(out, "inside each repository") {
 		t.Fatalf("output:\n%s", out)
 	}
-	if got, _ := os.ReadFile(claude); !bytes.Equal(got, current) {
-		t.Fatalf("shim not refreshed:\n%s", got)
+	if _, err := os.Stat(claude); !os.IsNotExist(err) {
+		t.Fatalf("the legacy shim was not removed: %v", err)
 	}
 }
 
@@ -309,15 +302,7 @@ func TestRefreshAfterUpgradeRunsOncePerRelease(t *testing.T) {
 	if err := os.WriteFile(settings, stale, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	binDir, err := shim.InstallShims([]string{shim.AgentCodex})
-	if err != nil {
-		t.Fatal(err)
-	}
-	codex := filepath.Join(binDir, shim.AgentCodex)
-	current, _ := os.ReadFile(codex)
-	if err := os.WriteFile(codex, append(bytes.Clone(current), "# an earlier build\n"...), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	codex := plantLegacyShim(t, routing.AgentCodex)
 
 	original := Version
 	Version = "9.9.9"
@@ -328,8 +313,8 @@ func TestRefreshAfterUpgradeRunsOncePerRelease(t *testing.T) {
 	if !strings.Contains(out.String(), "refreshed 1 file(s)") || !strings.Contains(out.String(), "`terma update --refresh` here") {
 		t.Fatalf("output:\n%s", &out)
 	}
-	if got, _ := os.ReadFile(codex); !bytes.Equal(got, current) {
-		t.Fatal("shim not refreshed")
+	if _, err := os.Stat(codex); !os.IsNotExist(err) {
+		t.Fatalf("the legacy shim was not removed: %v", err)
 	}
 	if got, _ := os.ReadFile(settings); !bytes.Equal(got, stale) {
 		t.Fatal("an automatic refresh rewrote a committed file")
@@ -357,15 +342,7 @@ func TestInstallRefreshesTheMachineOnANewRelease(t *testing.T) {
 		return out
 	}
 	install()
-	binDir, err := shim.InstallShims([]string{shim.AgentCodex})
-	if err != nil {
-		t.Fatal(err)
-	}
-	codex := filepath.Join(binDir, shim.AgentCodex)
-	current, _ := os.ReadFile(codex)
-	if err := os.WriteFile(codex, append(bytes.Clone(current), "# an earlier build\n"...), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	codex := plantLegacyShim(t, routing.AgentCodex)
 
 	original := Version
 	Version = "9.9.9"
@@ -373,8 +350,8 @@ func TestInstallRefreshesTheMachineOnANewRelease(t *testing.T) {
 	if out := install(); !strings.Contains(out, "✓ Refreshed     1 file(s) an earlier terma installed") {
 		t.Fatalf("install should refresh the machine as a step:\n%s", out)
 	}
-	if got, _ := os.ReadFile(codex); !bytes.Equal(got, current) {
-		t.Fatal("shim not refreshed")
+	if _, err := os.Stat(codex); !os.IsNotExist(err) {
+		t.Fatalf("the legacy shim was not removed: %v", err)
 	}
 	var after bytes.Buffer
 	refreshAfterUpgrade(context.Background(), os.Getenv("TERMA_CONFIG_DIR"), &after)
@@ -384,4 +361,22 @@ func TestInstallRefreshesTheMachineOnANewRelease(t *testing.T) {
 	if out := install(); strings.Contains(out, "Refreshed") {
 		t.Fatalf("a second install under the same release refreshed again:\n%s", out)
 	}
+}
+
+// plantLegacyShim puts a PATH-shim script where an earlier build installed them, for a
+// refresh to remove.
+func plantLegacyShim(t *testing.T, agent string) string {
+	t.Helper()
+	binDir, err := shim.ShimBinDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(binDir, agent)
+	if err := os.WriteFile(path, []byte("#!/bin/sh\n# terma per-repo routing shim for "+agent+".\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }

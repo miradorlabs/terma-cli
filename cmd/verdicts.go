@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"slices"
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
@@ -10,7 +11,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
-	"github.com/miradorlabs/terma-cli/internal/shim"
 )
 
 // The verdicts `terma status` and `terma doctor` both reach. Each is judged once, here,
@@ -109,17 +109,14 @@ type harnessRoute int
 const (
 	// routeNone: not connected to this host, and nothing routes it here.
 	routeNone harnessRoute = iota
-	// routeOtherProject: connected machine-wide to a different project, with no live
-	// routing to override that. Everything looks wired, and none of the spend arrives.
+	// routeOtherProject: connected machine-wide to a different project. Everything
+	// looks wired, and none of the spend arrives.
 	routeOtherProject
-	// routeLive: per-repo routing is configured and actually fires.
-	routeLive
 	// routeGlobal: the machine-wide config exports signals of its own.
 	routeGlobal
-	// routePending: routing is configured but not delivered — the shims are installed
-	// and their directory is not ahead of the agent on PATH — and nothing else makes it
-	// send, so sessions fall back to the machine-wide config.
-	routePending
+	// routeHooks: the agent reports through the repository's hooks and the spool (Codex
+	// Desktop's route, before the local relay carried its own export).
+	routeHooks
 	// routeRepoDecides: connected machine-wide and exporting no signal of its own, so
 	// only a repository's committed policy makes it send.
 	routeRepoDecides
@@ -130,8 +127,6 @@ const (
 type harnessFacts struct {
 	status harness.Status
 	err    error
-	// routed: a routing record and this project's key exist. live: that routing fires.
-	routed, live bool
 	// repoAsks: the repository the CLI stands in carries a committed policy that
 	// switches this agent's signals on. localScope: the agent can carry one at all.
 	repoAsks, localScope bool
@@ -152,13 +147,10 @@ type harnessVerdict struct {
 
 func gatherHarness(h harness.Harness, projectID, root string) harnessFacts {
 	st, err := h.Status()
-	routed := routedPerRepo(h.Name(), projectID)
 	_, scoped := h.(harness.Scoped)
 	f := harnessFacts{
 		status:     st,
 		err:        err,
-		routed:     routed,
-		live:       routed && perRepoLive(h.Name()),
 		repoAsks:   repoAsks(h, root),
 		localScope: scoped,
 	}
@@ -169,20 +161,6 @@ func gatherHarness(h harness.Harness, projectID, root string) harnessFacts {
 func emissionProblem(h harness.Harness, root, projectID string, f *harnessFacts) (string, string) {
 	if root == "" {
 		return "", ""
-	}
-	// Claude's routed --settings and Codex's -c options override repository and
-	// user settings. Judge the record actually used at launch in that case.
-	if f.live && shim.Routable(h.Name()) {
-		rec, _, err := shim.LoadRecord(projectID)
-		if err != nil {
-			return "could not read per-repo telemetry settings", "terma install"
-		}
-		for _, signal := range rec.Signals {
-			if containsSignal(harness.AllSignals, harness.Signal(signal)) {
-				return "", ""
-			}
-		}
-		return "per-repo routing has no telemetry signals enabled; sessions here send nothing", "terma install --signals traces,logs,metrics"
 	}
 	st := f.status
 	if c, ok := h.(harness.Claude); ok {
@@ -213,7 +191,7 @@ func emissionProblem(h harness.Harness, root, projectID string, f *harnessFacts)
 	}
 	// Leave the missing-policy case to routeRepoDecides, which explains the
 	// machine-wide 'repos decide' arrangement and its plain-install fix.
-	if !f.live && len(f.status.Signals) == 0 && !f.repoAsks {
+	if len(f.status.Signals) == 0 && !f.repoAsks {
 		if scoped, ok := h.(harness.Scoped); ok {
 			local, err := scoped.Local(root).Status()
 			if err == nil && !local.HasPolicy && st.ConfigPath == f.status.ConfigPath {
@@ -227,10 +205,9 @@ func emissionProblem(h harness.Harness, root, projectID string, f *harnessFacts)
 		"review the export switches in the settings file named above (including the traces beta switch); run `terma install --signals traces,logs,metrics` to enable repository telemetry, then restart " + h.DisplayName()
 }
 
-// judgeHarness classifies one agent. The order is the judgement: another project's
-// export fails before anything else unless live routing overrides it, live routing
-// outranks the machine-wide config, and routing that is configured but not live is
-// only "pending" when no repository policy makes the agent send anyway.
+// judgeHarness classifies one agent's machine-wide connection (one made before the local
+// relay, which judges itself: relayDoctorCheck). The order is the judgement: another
+// project's export fails before anything else.
 func judgeHarness(f harnessFacts, otlpURL, projectID string) harnessVerdict {
 	v := harnessVerdict{harnessFacts: f}
 	st := f.status
@@ -239,14 +216,10 @@ func judgeHarness(f harnessFacts, otlpURL, projectID string) harnessVerdict {
 	silent := global && len(st.Signals) == 0
 	v.sendsGlobally = global && !other && !silent
 	switch {
-	case other && !f.live:
+	case other:
 		v.route, v.otherProject = routeOtherProject, st.ProjectID
-	case f.live:
-		v.route = routeLive
 	case global && !silent:
 		v.route = routeGlobal
-	case f.routed && (!silent || !f.repoAsks):
-		v.route = routePending
 	case global:
 		v.route = routeRepoDecides
 	default:
@@ -288,14 +261,14 @@ func selectedForRepo(projectID string, saved []string) []string {
 	if projectID == "" {
 		return selected
 	}
-	rec, ok, err := shim.LoadRecord(projectID)
+	rec, ok, err := routing.LoadRecord(projectID)
 	if err != nil || !ok {
 		return selected
 	}
 	for _, choice := range []struct {
 		name    string
 		enabled bool
-	}{{shim.AgentCodex, rec.CLI}, {codexDesktopAgent, rec.Desktop}} {
+	}{{routing.AgentCodex, rec.CLI}, {codexDesktopAgent, rec.Desktop}} {
 		if choice.enabled && !slices.Contains(selected, choice.name) {
 			selected = append(selected, choice.name)
 		} else if !choice.enabled {
@@ -307,16 +280,16 @@ func selectedForRepo(projectID string, saved []string) []string {
 
 func judgeDesktop(projectID string) harnessVerdict {
 	v := harnessVerdict{name: codexDesktopAgent, displayName: "Codex Desktop"}
-	route, ok, routeErr := shim.LoadRecord(projectID)
+	route, ok, routeErr := routing.LoadRecord(projectID)
 	switch {
 	case routeErr != nil:
 		v.emissionProblem, v.emissionFix = "could not read this repository's Codex desktop route: "+routeErr.Error(), "terma install"
-	case !ok || !route.Desktop || !slices.Contains(route.Harnesses, shim.AgentCodex) || !slices.Contains(route.Signals, "logs"):
+	case !ok || !route.Desktop || !slices.Contains(route.Harnesses, routing.AgentCodex) || !slices.Contains(route.Signals, "logs"):
 		v.emissionProblem, v.emissionFix = "this repository has no Codex Desktop hook route", "terma install --signals logs"
-	case keystore.GetFor(shim.AgentCodex, projectID) == "":
+	case keystore.GetFor(routing.AgentCodex, projectID) == "":
 		v.emissionProblem, v.emissionFix = "this repository has no delivery key", "terma install"
 	default:
-		v.routed, v.live, v.route = true, true, routeLive
+		v.route = routeHooks
 	}
 	return v
 }

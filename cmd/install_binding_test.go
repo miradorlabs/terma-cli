@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,7 +16,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
-	"github.com/miradorlabs/terma-cli/internal/shim"
 )
 
 // boundRepo is a git repository bound to project, the test's own home and agent
@@ -30,7 +30,6 @@ func boundRepo(t *testing.T, bound termaproject.Project, signedIn bool) *fakeAut
 	t.Setenv("ZDOTDIR", "")
 	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
 	t.Setenv("CODEX_HOME", "")
-	t.Setenv(shim.WrapperEnv, "")
 	t.Setenv("PATH", "/usr/bin:/bin")
 	gitRepoHere(t)
 	if signedIn {
@@ -264,7 +263,7 @@ func TestInstallPromptsSwitchSticks(t *testing.T) {
 	boundRepo(t, termaproject.Project{ID: acme.ID, Name: acme.Name, OrganizationID: orgA().ID}, true)
 	prompts := func() bool {
 		t.Helper()
-		rec, ok, err := shim.LoadRecord(acme.ID)
+		rec, ok, err := routing.LoadRecord(acme.ID)
 		if err != nil || !ok {
 			t.Fatalf("no routing record: ok=%v err=%v", ok, err)
 		}

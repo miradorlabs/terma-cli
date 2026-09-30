@@ -317,6 +317,21 @@ Where each agent stands:
 | Cursor | no (its own backend only) | hooks | unaffected; never reaches the relay |
 | omp | through terma's extension (its native exporter is environment-only) | committed hook file, plus the extension's `omp-prompt` | done, no shim |
 
+## What still reads files on disk
+
+The relay's own attribution reads no harness files: everything it knows comes from OTLP and hook payloads. Some hook features from before the relay do read harness files. They stay, because what they capture is exported nowhere else:
+
+| Reader | File | What it captures | Why no OTLP substitute |
+|---|---|---|---|
+| `harness.ReadCodexReplies` | the Codex rollout | the assistant's reply text (`terma.assistant.message`) | Codex exports what was asked, never what it said |
+| `harness.ReadCodexThreadTitle` | `$CODEX_HOME/session_index.jsonl` | the thread's name (`terma.session.title`) | the title conversation exports its spans, not the name it chose |
+| Codex funding capture | the Codex rollout | rate-limit and quota snapshots (`terma.session.quota`) | not in Codex's OTLP |
+| `harness.ReadCodexDesktopActivity` | the Codex rollout | Desktop turn summaries, compactions, approvals | not in Codex's OTLP |
+| `harness.CodexRolloutSpawn` | a subagent's rollout, first line | the subagent's parent link | not in Codex's OTLP |
+| `harness.ClaudeFunding` | `~/.claude.json` | account state and credential-presence hints (`terma.session.account`) | not in Claude's OTLP |
+
+Each read is bounded and confined as `CLAUDE.md` describes, and replies and titles travel under the prompt-consent gate. These should be replaced the day a harness exports the same facts. Nothing new may add such a read.
+
 ## Findings
 
 1. **Session keys:**

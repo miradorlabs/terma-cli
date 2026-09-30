@@ -58,30 +58,26 @@ Project server keys are namespaced by project and never written to the repositor
 
 ## Agent routing
 
-`terma install` stores a repository's project binding and prepares agent launch routing:
+`terma install` stores a repository's project binding and points your agents at a relay
+on your machine (`127.0.0.1:43180`):
 
-- Claude Code receives a per-repository settings document through `claude --settings`.
-- Codex receives telemetry as launch-time `-c` overrides while retaining its original
-  `CODEX_HOME`, login, history, trust, and notifier configuration.
-- Both routes are delivered by PATH shims, or by shell functions printed with
-  `--activation wrapper`.
+- Claude Code and Codex export from their user settings (`~/.claude/settings.json`,
+  `~/.codex/config.toml`), Gemini CLI from `~/.gemini/settings.json`. Their desktop apps
+  and IDE extensions read the same files, so they are routed too.
+- OpenCode, omp, Pi, Hermes and DeepSeek Harness export through an extension terma
+  writes into each.
+- The relay forwards a session only when a hook in an installed repository claimed it,
+  to that repository's project, with the project's key and under its prompt and
+  tool-content choices. Everything else is held briefly in memory and dropped.
 
-The shim directory must appear before the machine-wide agent binary. `terma install`
-appends a marked block to the end of the shell startup file, or moves it there when a
-later PATH edit would put the real binary first; `--no-path` prints the line instead. The block takes effect in shells that read the file
-afterwards: install ends with the command that reloads the current one (`source ~/.zshrc`
-for zsh). `terma doctor` reports when routing is configured but not active.
+Hooks start the relay when it is not running; `terma relay daemon install` keeps it
+running as a per-user service instead (launchd on macOS, systemd on Linux), which also
+catches what an agent exports before its first hook. Codex's background server reads its
+exporter settings only when it starts: `terma install` and `terma doctor` say when it
+needs `codex app-server daemon restart`.
 
-An IDE or launcher that invokes an agent by absolute path bypasses the shim and uses
-machine-wide configuration. `doctor` also checks for a different Terma build elsewhere on
-the machine.
-
-Routing can be bypassed explicitly for one launch:
-
-```sh
-TERMA_DISABLE=1 claude
-TERMA_DISABLE=1 codex
-```
+Earlier versions routed agents through PATH shims; `terma update --refresh` removes
+them, and `terma shim uninstall` does the same on request.
 
 ## Export scope and consent
 
@@ -135,8 +131,7 @@ connecting — hooks load at startup.
 current repository, even if another agent is configured correctly. For Claude it
 combines user settings, `.claude/settings.json`, and `.claude/settings.local.json`,
 including the master telemetry switch and the beta switch required for traces.
-Live shim routing is checked against its own signal list, since its launch settings
-override those files. `terma status` uses the same checks for setup readiness.
+`terma status` uses the same checks for setup readiness.
 
 Doctor and status list remaining setup actions rather than estimating a percentage
 of spend from configuration. Doctor also compares the running executable with the
@@ -151,14 +146,6 @@ These are configuration checks, not proof that a running agent has emitted data.
 Doctor's backend round-trip verifies Terma's hook events separately. Managed Claude
 settings, custom `--settings` arguments, and a running session's inherited environment
 are outside this configuration check.
-
-Shell activation has its own diagnostic in both commands. It reports a missing
-per-project route, a missing PATH setup or inactive wrapper, a startup file this shell
-has not read yet (`source` it or open a new terminal), and a later PATH entry that
-bypasses the shims. It warns
-even when global telemetry still works, and says which settings provide that
-fallback. OpenCode needs no shell integration. Diagnostics never opt in or modify
-your shell startup file; `terma install` does that setup.
 
 ## Updates
 
@@ -192,7 +179,7 @@ An update replaces the binary; what earlier versions wrote stays as it was until
 something rewrites it. So once the new version is in place, `terma update` runs it as
 `terma update --refresh`, which rewrites, with the new version's templates:
 
-- the PATH shims in `~/.config/terma/shim/bin`,
+- (it also removes the PATH shims earlier versions put in `~/.config/terma/shim/bin`),
 - the wrapped Claude Code status line (falling back to the renderer recorded in
   `statusline.json`),
 - the OpenCode plugin, around its own configuration,

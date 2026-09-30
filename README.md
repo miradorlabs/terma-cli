@@ -99,17 +99,18 @@ terma update --auto status  # show the saved preference
 terma update --auto off     # return to notifications only
 ```
 
-Updates verify the release checksum before replacing the binary. Hooks, launch shims,
-CI, and scripted commands never trigger automatic updates. `terma update` upgrades a
+Updates verify the release checksum before replacing the binary. Hooks, the local
+relay, CI, and scripted commands never trigger automatic updates. `terma update` upgrades a
 Homebrew or npm installation through the package manager that owns it. A release binary
 carries its tag, which the updater compares with the latest published release; a source
 build is never updated without `terma update --force`.
 
 The first time a new version runs, it migrates anything it keeps in `~/.config/terma`
 whose format changed, before doing anything else, with no command from you. After an
-update, the new version also refreshes what earlier versions wrote — the agent shims,
-the wrapped Claude Code status line, the OpenCode plugin, and the hooks of the repository
-you ran `terma update` in — keeping every choice you made when you installed. It works
+update, the new version also refreshes what earlier versions wrote — the wrapped Claude
+Code status line, the OpenCode plugin, and the hooks of the repository you ran `terma
+update` in — keeping every choice you made when you installed, and removes the agent
+shims earlier versions put on `PATH`. It works
 from what is on disk, never signs in, and never adds a file. The repository hooks are
 committed files, so they change only when you ask: run `terma update --refresh` in each
 other repository to bring its hooks up to date, then commit them.
@@ -118,22 +119,19 @@ Release, versioning and installer details are in [RELEASING.md](docs/RELEASING.m
 
 ## Per-repository routing
 
-To send two repositories to different Terma projects on one machine, `terma install`
-creates a small directory of agent shims and puts it ahead of the real `claude` and
-`codex` binaries on `PATH`. It adds that directory at the end of your shell startup
-file (`~/.zshrc`, `~/.bashrc`, `~/.bash_profile`, or fish `conf.d`). terma
-cannot change the PATH of the shell that ran it, so install ends with the command that
-does — for zsh, `source ~/.zshrc` — or open a new terminal.
+Your agents export to a relay terma runs on your machine (on `127.0.0.1`), from their own
+user-level settings — which is also what Claude Desktop, Codex Desktop and IDE extensions
+read, so they are covered too. The relay forwards a session only when a hook in a
+repository you ran `terma install` in claimed it, and sends it to that repository's
+project with that project's key. Everything else — personal work, other repositories —
+waits briefly in memory and is dropped: it never leaves your machine. Prompts and model
+responses are sent by default; `terma install --prompts off` stops them for a project,
+and the relay removes them before anything leaves.
 
-`terma doctor` detects when another startup-file entry has moved Terma behind the
-real binary. `terma shim uninstall` removes the managed block; `--no-path` prints the
-line instead, and `--activation wrapper` prints shell functions for users who prefer
-not to use `PATH` shims — POSIX functions for bash and zsh, fish functions when `$SHELL`
-is fish.
-
-An IDE extension that launches an agent by full path can bypass the shims and use the
-machine-wide configuration. See [CONFIGURATION.md](docs/CONFIGURATION.md) for routing,
-profiles, authentication, and export scope.
+Hooks start the relay when it is not running. `terma relay daemon install` runs it as a
+per-user service instead, so it is up before any agent starts; `terma relay status` shows
+what it has done. See [RELAY-SPIKE.md](docs/RELAY-SPIKE.md) for how it decides, and
+[CONFIGURATION.md](docs/CONFIGURATION.md) for profiles, authentication and export scope.
 
 ## What gets collected
 
@@ -226,7 +224,7 @@ update      Update terma
 ```
 
 Authentication, direct telemetry management, project lookup, principal lookup,
-shell completion, configuration, hook execution, shim management, and spool maintenance remain
+shell completion, configuration, hook execution, the local relay, and spool maintenance remain
 available as hidden commands for automation and troubleshooting. Run
 `terma <command> --help` for details.
 

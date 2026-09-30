@@ -87,8 +87,8 @@ func runNate(cmd *cobra.Command) error {
 		fmt.Fprintln(out, "Restored the Codex notifier.")
 	}
 
-	if err := shim.RemoveAll(); err != nil {
-		return fmt.Errorf("remove machine routing: %w", err)
+	if _, err := shim.RemoveLegacy(); err != nil {
+		return fmt.Errorf("remove the PATH shims: %w", err)
 	}
 
 	configDir, err := config.Dir()

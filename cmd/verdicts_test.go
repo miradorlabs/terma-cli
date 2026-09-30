@@ -192,29 +192,6 @@ func TestHarnessVerdictInBothCommands(t *testing.T) {
 			status: "→ connected", statusOK: true,
 		},
 		{
-			name:  "per-repo routing fires",
-			facts: harnessFacts{routed: true, live: true}, bound: true,
-			route:        routeLive,
-			doctorStatus: doctor.Pass, doctorDetail: "Claude Code (per-repo) → " + otlp,
-			status: "→ connected (per-repo routing)", statusOK: true,
-		},
-		{
-			// Same verdict, each command's own emphasis: doctor names the routing,
-			// status says the plainer thing when the machine-wide config delivers too.
-			name:  "per-repo routing fires over a config that already sends here",
-			facts: harnessFacts{status: sending, routed: true, live: true}, bound: true,
-			route:        routeLive,
-			doctorStatus: doctor.Pass, doctorDetail: "Claude Code (per-repo) → " + otlp,
-			status: "→ connected", statusOK: true,
-		},
-		{
-			name:  "live routing overrides a config that reports elsewhere",
-			facts: harnessFacts{status: other, routed: true, live: true}, bound: true,
-			route:        routeLive,
-			doctorStatus: doctor.Pass, doctorDetail: "Claude Code (per-repo) → " + otlp,
-			status: "→ connected (per-repo routing)", statusOK: true,
-		},
-		{
 			name:  "reports to another project",
 			facts: harnessFacts{status: other}, bound: true,
 			route:        routeOtherProject,
@@ -222,26 +199,10 @@ func TestHarnessVerdictInBothCommands(t *testing.T) {
 			status: "→ reporting to project " + elsewhere + ", not this one — run `terma install`", statusOK: false,
 		},
 		{
-			// Neither command calls this working. doctor names the project it goes to;
-			// status names the routing that would fix it and is not live yet.
-			name:  "reports to another project, routing configured but not live",
-			facts: harnessFacts{status: other, routed: true}, bound: true,
-			route:        routeOtherProject,
-			doctorStatus: doctor.Fail, doctorDetail: "Claude Code reports to project " + elsewhere + ", not " + project,
-			status: "→ per-repo routing configured, but terma's shim is not ahead of it on your PATH", statusOK: false,
-		},
-		{
-			name:  "routing configured but not live, nothing else sends",
-			facts: harnessFacts{routed: true}, bound: true,
-			route:        routePending,
-			doctorStatus: doctor.Fail, doctorDetail: "per-repo routing for Claude Code is configured, but terma's shim directory is not ahead of the agent on your PATH — sessions still use the machine-wide config",
-			status: "→ per-repo routing configured, but terma's shim is not ahead of it on your PATH", statusOK: false,
-		},
-		{
 			// Routing that is not live yet changes nothing about a repository that asks:
 			// sessions here do send, through the machine-wide config.
 			name:  "routing not live, but the repository's policy makes it send",
-			facts: harnessFacts{status: silent, routed: true, repoAsks: true, localScope: true}, bound: true,
+			facts: harnessFacts{status: silent, repoAsks: true, localScope: true}, bound: true,
 			route:        routeRepoDecides,
 			doctorStatus: doctor.Pass, doctorDetail: "Claude Code → " + otlp + " (only where a repository asks); this repository asks",
 			status: "→ connected; repositories decide what is sent", statusOK: true,

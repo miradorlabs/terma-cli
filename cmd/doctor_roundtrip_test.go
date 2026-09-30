@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -15,7 +16,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
-	"github.com/miradorlabs/terma-cli/internal/shim"
 )
 
 // Doctor's round-trip reads the scratch commit's terma.commit record back, so it has to
@@ -200,7 +200,7 @@ func TestProjectAPIFromTheRoutingRecord(t *testing.T) {
 	dev, _ := config.EndpointsFor(config.EnvDev)
 	cfg := &config.Config{OTLPURL: prod.OTLPURL, APIURL: "https://api.custom.example"}
 	for id, endpoint := range map[string]string{"dev-project": dev.OTLPURL + "/", "prod-project": prod.OTLPURL} {
-		if err := shim.SaveRecord(shim.Record{ProjectID: id, Endpoint: endpoint, Harnesses: []string{"claude"}}); err != nil {
+		if err := routing.SaveRecord(routing.Record{ProjectID: id, Endpoint: endpoint, Harnesses: []string{"claude"}}); err != nil {
 			t.Fatal(err)
 		}
 	}

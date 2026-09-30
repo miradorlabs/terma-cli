@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"encoding/json"
-	"github.com/miradorlabs/terma-cli/internal/keystore"
-	"github.com/miradorlabs/terma-cli/internal/shim"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -309,56 +307,6 @@ func TestDoctorFailsWhenThisRepositoryHasNoPolicy(t *testing.T) {
 		t.Fatalf("status should call a repository that asks connected:\n%s", status)
 	}
 	_ = repo
-}
-
-// Per-repo routing that is configured but not live (the shim is not on PATH) changes
-// nothing about what a session sends — the machine-wide config still decides. So beside a
-// connect that leaves it to repositories, such a repository sends nothing unless it asks,
-// and both commands must say which: not "connected" from one and a warning from the other.
-func TestStatusAndDoctorAgreeWhenRoutingIsConfiguredButNotLive(t *testing.T) {
-	installRepo(t)
-	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
-	t.Setenv(shim.WrapperEnv, "")
-	fakeClaudeOnPath(t) // the real binary's directory only: terma's shim is not ahead of it
-	if _, err := runTerma(t, "connect", "claude", "--exports", "repos",
-		"--api-key", testServerKey, "--project", testProjectID, "--yes"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--yes"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := (harness.Claude{}).Local(mustGetwd(t)).Disconnect(); err != nil {
-		t.Fatal(err)
-	}
-	if err := shim.SaveRecord(shim.Record{ProjectID: testProjectID, Endpoint: "https://otel.terma.ai", Signals: []string{"logs"}, Harnesses: []string{shim.AgentClaude}}); err != nil {
-		t.Fatal(err)
-	}
-	if err := keystore.SetFor(shim.AgentClaude, testProjectID, testServerKey, keystore.Hosts{}); err != nil {
-		t.Fatal(err)
-	}
-
-	status, _ := runTerma(t, "status")
-	doc, _ := runTerma(t, "doctor", "--skip-commit")
-	if !strings.Contains(status, "shim is not ahead of it") || strings.Contains(status, "~95%") {
-		t.Fatalf("status should say the routing is not live, and not count it:\n%s", status)
-	}
-	if !strings.Contains(doc, "not ahead of the agent on your PATH") {
-		t.Fatalf("doctor should say the routing is not live:\n%s", doc)
-	}
-
-	// The repository asks: sessions send through the machine-wide config, to this project.
-	// That works, and neither command may claim otherwise because the shim is missing.
-	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--yes"); err != nil {
-		t.Fatal(err)
-	}
-	status, _ = runTerma(t, "status")
-	doc, _ = runTerma(t, "doctor", "--skip-commit")
-	if !strings.Contains(status, "Claude Code → connected") || strings.Contains(status, "not ahead") {
-		t.Fatalf("status should call it connected:\n%s", status)
-	}
-	if strings.Contains(doc, "not ahead of the agent") || strings.Contains(doc, "send nothing") {
-		t.Fatalf("doctor should not warn about a repository whose sessions do send:\n%s", doc)
-	}
 }
 
 // Re-installing a repository must not replace a team's narrower policy with defaults.

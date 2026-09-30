@@ -21,9 +21,6 @@ type installUI struct {
 	p      style.Palette
 	warned bool
 	next   []string
-	// reloading says a next step already tells the developer to reload their shell, so
-	// doctor's warning that this shell does not route yet is not news.
-	reloading bool
 }
 
 func newInstallUI(out io.Writer, verbose bool) *installUI {
@@ -51,21 +48,6 @@ func (u *installUI) warn(label, what string) {
 
 func (u *installUI) line(out io.Writer, mark, label, what string) {
 	fmt.Fprintf(out, "  %s %-*s %s\n", mark, stepLabelWidth, label, u.p.Commands(what))
-}
-
-// code draws lines the developer pastes whole — a PATH line, shell functions — the way
-// a quoted command is drawn, each indented under its step; a shell comment stays dim.
-func (u *installUI) code(block string) string {
-	var lines []string
-	for l := range strings.SplitSeq(strings.TrimRight(block, "\n"), "\n") {
-		l = strings.TrimRight(l, " ")
-		if strings.HasPrefix(strings.TrimSpace(l), "#") {
-			lines = append(lines, "    "+u.p.Dim(l))
-		} else {
-			lines = append(lines, "    "+u.p.Command(l))
-		}
-	}
-	return strings.Join(lines, "\n")
 }
 
 // then adds a step left for the developer. Lines after the first keep their own
@@ -101,9 +83,7 @@ func (u *installUI) finish() {
 }
 
 // verify runs doctor behind a spinner and reports it as one step, its fixes as next
-// steps. Warnings solely about shell activation are left out when a next step says to reload
-// the shell: install ran in a shell that predates the PATH block, so doctor, running in
-// the same process, cannot see the shims yet — that is the step, not a second problem.
+// steps.
 func (u *installUI) verify(cmd *cobra.Command) {
 	fmt.Fprintf(u.detail, "\n%s\n", u.p.Bold("Verifying the chain (terma doctor):"))
 	sp := spinner.New(cmd.ErrOrStderr())
@@ -136,11 +116,10 @@ func (u *installUI) verdict(report doctor.Report) {
 	var fixes []string
 	skipped := false
 	for _, c := range report.Checks {
-		switch {
-		case c.Status == doctor.Pass:
-		case c.Status == doctor.Skip:
+		switch c.Status {
+		case doctor.Pass:
+		case doctor.Skip:
 			skipped = skipped || c.Key == doctor.KeyScratch || c.Key == doctor.KeyBackend || c.Key == doctor.KeyProject
-		case (c.Key == doctor.KeyRouting || c.NeedsShellActivationOnly) && u.reloading:
 		default:
 			fix := c.Name + ": " + c.Detail
 			if c.Fix != "" {

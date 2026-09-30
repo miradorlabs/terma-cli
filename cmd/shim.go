@@ -8,37 +8,34 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/shim"
 )
 
-// newShimCommand groups the internal per-repo routing entry points. `prepare` is what a
-// PATH shim or an opt-in shell wrapper calls before it execs the agent; `uninstall`
-// tears down per-repo routing machine-wide (the PATH shims, routing records, and
-// per-project Claude settings).
+// newShimCommand is what is left of per-repository routing through PATH shims, which
+// the local relay replaced: `uninstall` removes the shims an earlier build installed,
+// and `prepare` and `exec` keep the scripts still on a machine starting the real agent,
+// quietly, until they are gone (`terma update --refresh` removes them too).
 func newShimCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:    "shim",
-		Short:  "Per-repository agent routing (internal)",
+		Short:  "Remove the PATH shims earlier builds installed (internal)",
 		Hidden: true,
 	}
-	cmd.AddCommand(newShimPrepareCommand(), newShimExecCommand(), newShimUninstallCommand(), newShimStatusCommand())
+	cmd.AddCommand(newShimPrepareCommand(), newShimExecCommand(), newShimUninstallCommand())
 	return cmd
 }
 
-// newShimExecCommand runs the real agent binary with per-repo routing applied. Flag
-// parsing is disabled so the agent's own flags pass through untouched.
+// newShimExecCommand is the oldest shim scripts' entry point: the real agent, unchanged.
 func newShimExecCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:                "exec <agent> [-- args...]",
-		Short:              "Run an agent with this repository's Terma project applied",
+		Short:              "Run an agent (what an earlier build's shim calls)",
+		Hidden:             true,
 		Args:               cobra.MinimumNArgs(1),
 		DisableFlagParsing: true,
 		RunE: func(_ *cobra.Command, args []string) error {
-			agent := args[0]
 			rest := args[1:]
 			if len(rest) > 0 && rest[0] == "--" {
 				rest = rest[1:]
 			}
-			// On Unix this replaces the process and never returns; an error means the
-			// agent binary could not be found or executed.
-			return shim.Exec(agent, rest)
+			return shim.Exec(args[0], rest)
 		},
 	}
 }
@@ -46,40 +43,28 @@ func newShimExecCommand() *cobra.Command {
 func newShimUninstallCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "uninstall",
-		Short: "Remove per-repo routing from this machine (shims, routing records, Claude settings)",
+		Short: "Remove the PATH shims and their PATH block from this machine",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := shim.RemoveAll(); err != nil {
-				return err
-			}
-			fmt.Fprintln(cmd.OutOrStdout(), "Removed the terma PATH shims, routing records, and per-project Claude settings.")
-			if rc, ok := shim.ShellRC(); ok {
-				fmt.Fprintf(cmd.OutOrStdout(), "Took terma's PATH block out of %s, if it was there. A PATH line you added by hand is yours to remove.\n", tildePath(rc.Path))
-			} else {
-				fmt.Fprintln(cmd.OutOrStdout(), "Remove the shim directory from your PATH in your shell's startup file if you added it.")
-			}
-			return nil
-		},
-	}
-}
-
-func newShimStatusCommand() *cobra.Command {
-	return &cobra.Command{
-		Use:   "status",
-		Short: "Show the per-repo routing shim directory",
-		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			dir, err := shim.ShimBinDir()
+			removed, err := shim.RemoveLegacy()
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "PATH shim directory: %s\n", dir)
+			if !removed {
+				fmt.Fprintln(cmd.OutOrStdout(), "No terma PATH shims on this machine.")
+				return nil
+			}
+			fmt.Fprintln(cmd.OutOrStdout(), "Removed terma's PATH shims, and the block that put them on PATH.")
+			if rc, ok := shim.ShellRC(); ok {
+				fmt.Fprintf(cmd.OutOrStdout(), "Run `%s` or open a new terminal so this shell forgets them.\n", reloadCommand(tildePath(rc.Path)))
+			}
 			return nil
 		},
 	}
 }
 
-// Preparation never starts the agent. The shell retains responsibility for execution.
+// newShimPrepareCommand is what the later shim scripts call before they start the agent:
+// an empty plan, so they start it as it is.
 func newShimPrepareCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:                "prepare <agent> <directory> [-- args...]",
@@ -87,11 +72,7 @@ func newShimPrepareCommand() *cobra.Command {
 		Args:               cobra.MinimumNArgs(2),
 		DisableFlagParsing: true,
 		RunE: func(_ *cobra.Command, args []string) error {
-			rest := args[2:]
-			if len(rest) > 0 && rest[0] == "--" {
-				rest = rest[1:]
-			}
-			return shim.Prepare(args[0], args[1], rest)
+			return shim.PrepareNothing(args[1])
 		},
 	}
 }

@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/miradorlabs/terma-cli/internal/doctor"
-	"github.com/miradorlabs/terma-cli/internal/shim"
 )
 
 // Default output keeps the project, warnings, and actions; -v includes setup details.
@@ -87,47 +86,12 @@ func TestDoctorFixStep(t *testing.T) {
 	}
 }
 
-// The export check can report the same pending shell activation as PATH setup.
-func TestInstallShellReloadIsOnlyRequestedOnce(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("SHELL", "/bin/zsh")
-	t.Setenv("ZDOTDIR", "")
-	bin, err := shim.ShimBinDir()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, missingPolicy := range []bool{false, true} {
-		t.Run(fmt.Sprintf("missing policy=%t", missingPolicy), func(t *testing.T) {
-			var buf bytes.Buffer
-			ui := newInstallUI(&buf, false)
-			putShimsOnPath(ui, bin, []string{"claude"}, installFlags{})
-			verdicts := []harnessVerdict{{displayName: "Claude Code", route: routePending}}
-			if missingPolicy {
-				verdicts = append(verdicts, harnessVerdict{displayName: "Other agent", route: routeRepoDecides})
-			}
-			check := doctorHarnessCheck(verdicts, "https://otel.example.test", testProjectID, true)
-			check.Key = doctor.KeyHarness
-			ui.verdict(doctor.Build([]doctor.Check{check}))
-			ui.finish()
-			out := buf.String()
-			if missingPolicy {
-				if !strings.Contains(out, "enable the missing repository policy") || !strings.Contains(out, "! Verified") {
-					t.Fatalf("missing policy must still be reported:\n%s", out)
-				}
-			} else if strings.Count(out, "source ~/.zshrc") != 1 || strings.Contains(out, "! Verified") {
-				t.Fatalf("pending shell activation should be requested once:\n%s", out)
-			}
-		})
-	}
-}
-
 // install's Verified step: each problem doctor found is a next step — its fix, or its
 // name and detail when it names none — and the full report is one command away. The
 // routing warning is left out only when a next step already says to reload the shell.
 func TestInstallUIVerdict(t *testing.T) {
 	report := doctor.Report{Checks: []doctor.Check{
 		{Key: doctor.KeyAuth, Name: "signed in", Status: doctor.Pass},
-		{Key: doctor.KeyRouting, Name: "shell routing active", Status: doctor.Warn, Detail: "this shell has not activated it", Fix: "run `source ~/.zshrc` or open a new terminal"},
 		{Key: doctor.KeyAgentHooks, Name: "agent hooks run", Status: doctor.Warn, Detail: "Codex hooks untrusted", Fix: "open Codex and trust this project's hooks"},
 		{Key: doctor.KeyHooks, Name: "commit hooks installed", Status: doctor.Fail, Detail: "git wiring was written by an earlier terma", Fix: "terma update --refresh"},
 		{Key: doctor.KeyBackend, Name: "backend receives events", Status: doctor.Fail, Detail: "no event after 30s"},
@@ -135,7 +99,6 @@ func TestInstallUIVerdict(t *testing.T) {
 	}}
 	var buf bytes.Buffer
 	ui := newInstallUI(&buf, false)
-	ui.reloading = true
 	ui.verdict(report)
 	ui.finish()
 	out := buf.String()
@@ -150,15 +113,8 @@ func TestInstallUIVerdict(t *testing.T) {
 			t.Errorf("the verdict should say %q:\n%s", want, out)
 		}
 	}
-	if strings.Contains(out, "source ~/.zshrc") || strings.Contains(out, "Codex hooks untrusted") {
-		t.Errorf("a reload already asked for, or a detail with a fix, is not repeated:\n%s", out)
-	}
-
-	buf.Reset()
-	ui = newInstallUI(&buf, false)
-	ui.verdict(report)
-	if ui.finish(); !strings.Contains(buf.String(), "Run `source ~/.zshrc` or open a new terminal") {
-		t.Errorf("with no reload step queued, the routing fix is the developer's:\n%s", buf.String())
+	if strings.Contains(out, "Codex hooks untrusted") {
+		t.Errorf("a detail with a fix is not repeated:\n%s", out)
 	}
 
 	for want, checks := range map[string][]doctor.Check{

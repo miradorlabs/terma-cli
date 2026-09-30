@@ -26,12 +26,20 @@ import (
 // rewrites files terma wrote with this build's templates, never creates one, never signs
 // in, and never touches a choice: an absent shim, status line or hook file stays absent.
 
-// refreshMachine rewrites the home-directory files every repository shares: the PATH
-// shims, the wrapped Claude status line and the OpenCode plugin. It returns the paths
-// it changed, carrying on past a failure so one broken file does not strand the rest.
+// refreshMachine rewrites the home-directory files every repository shares: the wrapped
+// Claude status line and the OpenCode plugin. It also removes the PATH shims an earlier
+// build installed — the local relay routes the agents now, and a shim left on PATH would
+// run every agent launch through terma for nothing. It returns the paths it changed,
+// carrying on past a failure so one broken file does not strand the rest.
 func refreshMachine() ([]string, error) {
-	changed, err := shim.RefreshShims()
-	errs := []error{err}
+	var changed []string
+	var errs []error
+	if removed, err := shim.RemoveLegacy(); err != nil {
+		errs = append(errs, fmt.Errorf("remove the PATH shims: %w", err))
+	} else if removed {
+		dir, _ := shim.ShimBinDir()
+		changed = append(changed, dir+" — removed: the local relay routes the agents now")
+	}
 	if path, ok, err := (harness.Claude{}).RefreshStatusLine(); err != nil {
 		errs = append(errs, fmt.Errorf("claude status line: %w", err))
 	} else if ok {

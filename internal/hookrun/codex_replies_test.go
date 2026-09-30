@@ -3,6 +3,8 @@ package hookrun
 import (
 	"context"
 	"encoding/json"
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,7 +12,6 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/harness"
-	"github.com/miradorlabs/terma-cli/internal/shim"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -35,11 +36,26 @@ func replyRollout(t *testing.T) string {
 	return path
 }
 
+// enableRelay makes this a relay machine: the relay's token exists (claim.Enabled).
+func enableRelay(t *testing.T) {
+	t.Helper()
+	path, err := claim.TokenPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("token\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func routeCodex(t *testing.T, includePrompts bool) {
 	t.Helper()
-	t.Setenv(shim.CodexRoutedEnv, "1")
-	if err := shim.SaveRecord(shim.Record{ProjectID: "project-a", Endpoint: "https://otel.terma.ai", Signals: []string{"logs"},
-		IncludePrompts: includePrompts, Harnesses: []string{shim.AgentCodex}}); err != nil {
+	enableRelay(t) // consent comes from the project's routing record alone
+	if err := routing.SaveRecord(routing.Record{ProjectID: "project-a", Endpoint: "https://otel.terma.ai", Signals: []string{"logs"},
+		IncludePrompts: includePrompts, Harnesses: []string{routing.AgentCodex}}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -61,12 +77,11 @@ func connectCodexMachineWide(t *testing.T, includePrompts bool) {
 func connectCodexDesktop(t *testing.T, includePrompts bool) {
 	t.Helper()
 	desktop := true
-	if err := shim.SaveRecord(shim.Record{ProjectID: "project-a", Endpoint: "https://otel.terma.ai",
-		Signals: []string{"logs"}, Harnesses: []string{shim.AgentCodex},
+	if err := routing.SaveRecord(routing.Record{ProjectID: "project-a", Endpoint: "https://otel.terma.ai",
+		Signals: []string{"logs"}, Harnesses: []string{routing.AgentCodex},
 		IncludePrompts: includePrompts, Desktop: desktop}); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv(shim.CodexRoutedEnv, "")
 }
 
 func stopCodex(t *testing.T, env Env, path string) []spool.Event {
@@ -142,7 +157,7 @@ func TestCodexRepliesNeedTheConsentPromptsTravelUnder(t *testing.T) {
 		{"routed with prompts overrides machine-wide exclusion", func(t *testing.T) { routeCodex(t, true); connectCodexMachineWide(t, false) }, 2},
 		{"routed exclusion overrides machine-wide prompts", func(t *testing.T) { routeCodex(t, false); connectCodexMachineWide(t, true) }, 0},
 		{"both export prompts", func(t *testing.T) { routeCodex(t, true); connectCodexMachineWide(t, true) }, 2},
-		{"desktop with no repository route", func(t *testing.T) { t.Setenv(shim.CodexRoutedEnv, "") }, 0},
+		{"desktop with no repository route", func(*testing.T) {}, 0},
 		{"desktop route excludes prompts", func(t *testing.T) {
 			connectCodexDesktop(t, false)
 		}, 0},
@@ -155,21 +170,14 @@ func TestCodexRepliesNeedTheConsentPromptsTravelUnder(t *testing.T) {
 		}, 2},
 		{"desktop choice is explicitly off", func(t *testing.T) {
 			falseValue := false
-			if err := shim.SaveRecord(shim.Record{ProjectID: "project-a", Endpoint: "https://otel.terma.ai",
-				Signals: []string{"logs"}, IncludePrompts: true, Harnesses: []string{shim.AgentCodex},
+			if err := routing.SaveRecord(routing.Record{ProjectID: "project-a", Endpoint: "https://otel.terma.ai",
+				Signals: []string{"logs"}, IncludePrompts: true, Harnesses: []string{routing.AgentCodex},
 				Desktop: falseValue}); err != nil {
 				t.Fatal(err)
 			}
-			t.Setenv(shim.CodexRoutedEnv, "")
-		}, 0},
-		{"desktop ignores a dormant repository route", func(t *testing.T) {
-			routeCodex(t, true)
-			t.Setenv(shim.CodexRoutedEnv, "")
-			connectCodexMachineWide(t, false)
 		}, 0},
 		{"unrouted CLI still honors the repository prompt exclusion", func(t *testing.T) {
 			routeCodex(t, false)
-			t.Setenv(shim.CodexRoutedEnv, "")
 			connectCodexMachineWide(t, true)
 		}, 0},
 	} {
@@ -198,14 +206,19 @@ func TestCodexRepliesFailClosedWhenAConsentSourceCannotBeRead(t *testing.T) {
 	}{
 		{"a routing record that does not parse, beside a machine-wide connect that allows prompts", func(t *testing.T) {
 			connectCodexMachineWide(t, true)
-			dir, err := shim.RoutingDir()
+			dir, err := routing.RoutingDir()
 			if err != nil {
 				t.Fatal(err)
 			}
 			writeFile(t, dir, "project-a.json", `{"project_id": "project-a", "include_prompts": tr`)
 		}},
+		// Without the relay the machine-wide config is a consent source too; on a relay
+		// machine it is not (it lets everything out, and the relay withholds per project).
 		{"a machine-wide config that does not parse, beside a routing record that allows prompts", func(t *testing.T) {
-			routeCodex(t, true)
+			if err := routing.SaveRecord(routing.Record{ProjectID: "project-a", Endpoint: "https://otel.terma.ai", Signals: []string{"logs"},
+				IncludePrompts: true, Harnesses: []string{routing.AgentCodex}}); err != nil {
+				t.Fatal(err)
+			}
 			writeFile(t, os.Getenv("CODEX_HOME"), "config.toml", "[otel\nlog_user_prompt = = true\n")
 		}},
 	} {

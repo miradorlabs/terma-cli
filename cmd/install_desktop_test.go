@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"os"
 	"path/filepath"
 	"slices"
@@ -11,7 +12,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
-	"github.com/miradorlabs/terma-cli/internal/shim"
 )
 
 func desktopInstallSandbox(t *testing.T) (string, *fakeAuth) {
@@ -43,28 +43,23 @@ func TestInstallUsesSavedCodexDesktopChoiceWithoutShellShim(t *testing.T) {
 	if err != nil {
 		t.Fatalf("install desktop: %v\n%s", err, out)
 	}
-	if gateway.keysMint.Load() != 1 || keystore.GetFor(shim.AgentCodex, projectID) == "" {
+	if gateway.keysMint.Load() != 1 || keystore.GetFor(routing.AgentCodex, projectID) == "" {
 		t.Fatalf("desktop route/key missing or minted twice (mints=%d):\n%s", gateway.keysMint.Load(), out)
 	}
-	record, ok, err := shim.LoadRecord(projectID)
+	record, ok, err := routing.LoadRecord(projectID)
 	if err != nil || !ok || record.CLI || !record.Desktop {
 		t.Fatalf("desktop-only route choices = %+v, exists=%v, err=%v", record, ok, err)
 	}
 	if _, err := os.Stat(filepath.Join(home, ".zshrc")); !os.IsNotExist(err) {
 		t.Fatalf("desktop-only install edited the shell startup file: %v", err)
 	}
-	shimDir, err := shim.ShimBinDir()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(filepath.Join(shimDir, "codex")); !os.IsNotExist(err) {
-		t.Fatalf("desktop-only install added a Codex CLI PATH shim: %v", err)
-	}
 	if len(codexHooksIn(t, mustGetwd(t))["SessionStart"]) != 1 {
 		t.Fatal("desktop-only install did not wire the Codex SessionStart hook")
 	}
-	if _, err := os.Stat(filepath.Join(home, ".codex", "config.toml")); !os.IsNotExist(err) {
-		t.Fatalf("desktop-only install configured a global Codex exporter: %v", err)
+	// Codex Desktop reads the user-level config, and it now exports to the local relay,
+	// which forwards only the sessions this repository's hooks claim.
+	if cfg, err := os.ReadFile(filepath.Join(home, ".codex", "config.toml")); err != nil || !strings.Contains(string(cfg), "127.0.0.1") {
+		t.Fatalf("desktop-only install did not point Codex at the local relay: %v\n%s", err, cfg)
 	}
 	if !strings.Contains(out, "Settings → Hooks, then select Review") || !strings.Contains(out, "approve each Terma hook command") || !strings.Contains(out, "Codex CLI is not required") {
 		t.Fatalf("install did not explain Desktop-only hook approval:\n%s", out)
@@ -75,21 +70,14 @@ func TestInstallCodexCLIAndDesktopShareOneProjectKey(t *testing.T) {
 	_, gateway := desktopInstallSandbox(t)
 	const projectID = "aaaaaaaa-0000-4000-8000-000000000001"
 	out, err := within(20*time.Second).combined(t, "install", "--harness", "codex,codex-desktop", "--project", projectID,
-		"--no-path", "--yes", "--no-doctor")
+		"--yes", "--no-doctor")
 	if err != nil {
 		t.Fatalf("install both Codex surfaces: %v\n%s", err, out)
 	}
 	if gateway.keysMint.Load() != 1 {
 		t.Fatalf("Codex CLI and desktop minted %d keys, want one", gateway.keysMint.Load())
 	}
-	shimDir, err := shim.ShimBinDir()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(filepath.Join(shimDir, "codex")); err != nil {
-		t.Fatalf("CLI choice did not install its PATH shim: %v", err)
-	}
-	record, ok, err := shim.LoadRecord(projectID)
+	record, ok, err := routing.LoadRecord(projectID)
 	if err != nil || !ok || !record.CLI || !record.Desktop {
 		t.Fatalf("combined route choices = %+v, exists=%v, err=%v", record, ok, err)
 	}
