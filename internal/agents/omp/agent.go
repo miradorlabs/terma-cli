@@ -27,10 +27,10 @@ func (Agent) Plan(root string, install bool) (hookmgr.Plan, error) {
 
 func (Agent) Events() map[string]agents.Handler {
 	return map[string]agents.Handler{
-		"omp-session-start": hookrun.OmpSessionStart,
-		"omp-session-end":   hookrun.OmpSessionEnd,
-		"omp-file-edit":     hookrun.OmpFileEdit,
-		"omp-prompt":        hookrun.OmpPrompt,
+		"omp-session-start": sessionStart,
+		"omp-session-end":   sessionEnd,
+		"omp-file-edit":     fileEdit,
+		"omp-prompt":        hookrun.ExtensionPrompt,
 	}
 }
 

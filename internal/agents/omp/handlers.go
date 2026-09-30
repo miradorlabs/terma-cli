@@ -1,4 +1,4 @@
-package hookrun
+package omp
 
 import (
 	"cmp"
@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 
+	"github.com/miradorlabs/terma-cli/internal/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
@@ -26,7 +27,7 @@ type ompHookInput struct {
 const ompTool = "omp"
 
 func readOmpInput(r io.Reader) (*ompHookInput, error) {
-	in, err := ReadInput[ompHookInput](r)
+	in, err := hookrun.ReadInput[ompHookInput](r)
 	if err != nil {
 		return nil, err
 	}
@@ -36,8 +37,8 @@ func readOmpInput(r io.Reader) (*ompHookInput, error) {
 	return in, nil
 }
 
-// OmpSessionStart records an omp session as active.
-func OmpSessionStart(ctx context.Context, env Env) error {
+// sessionStart records an omp session as active.
+func sessionStart(ctx context.Context, env hookrun.Env) error {
 	in, err := readOmpInput(env.Stdin)
 	if err != nil {
 		env.Logf("%v", err)
@@ -53,13 +54,13 @@ func OmpSessionStart(ctx context.Context, env Env) error {
 		env.Logf("not in a git repository: %v", err)
 		return nil
 	}
-	attrs := map[string]any{AttrSource: "session_start"}
+	attrs := map[string]any{hookrun.AttrSource: "session_start"}
 	env.Announce(r, env.NewSession(r, in.SessionID, ompTool, in.Model), attrs)
 	return nil
 }
 
-// OmpSessionEnd clears the active session; manifests stay for the commit to come.
-func OmpSessionEnd(ctx context.Context, env Env) error {
+// sessionEnd clears the active session; manifests stay for the commit to come.
+func sessionEnd(ctx context.Context, env hookrun.Env) error {
 	in, err := readOmpInput(env.Stdin)
 	if err != nil {
 		env.Logf("%v", err)
@@ -80,8 +81,8 @@ func OmpSessionEnd(ctx context.Context, env Env) error {
 	return nil
 }
 
-// OmpFileEdit adds one edited file to the session's manifest.
-func OmpFileEdit(ctx context.Context, env Env) error {
+// fileEdit adds one edited file to the session's manifest.
+func fileEdit(ctx context.Context, env hookrun.Env) error {
 	in, err := readOmpInput(env.Stdin)
 	if err != nil {
 		env.Logf("%v", err)
@@ -96,6 +97,6 @@ func OmpFileEdit(ctx context.Context, env Env) error {
 		return nil
 	}
 	env.Touch(r, session.Session{ID: in.SessionID, Tool: ompTool, Model: in.Model}, in.Tool,
-		RelativeFiles(r, env.Cwd, []string{in.File}), nil)
+		hookrun.RelativeFiles(r, env.Cwd, []string{in.File}), nil)
 	return nil
 }

@@ -27,14 +27,7 @@ func (Agent) Plan(string, bool) (hookmgr.Plan, error) {
 	return hookmgr.Plan{}, nil
 }
 
-func (Agent) Events() map[string]agents.Handler {
-	return map[string]agents.Handler{
-		"dsh-session-start": hookrun.DshSessionStart,
-		"dsh-prompt":        hookrun.DshPrompt,
-		"dsh-session-end":   hookrun.DshSessionEnd,
-		"dsh-file-edit":     hookrun.DshFileEdit,
-	}
-}
+func (Agent) Events() map[string]agents.Handler { return hookrun.Extension{Tool: "dsh"}.Events("dsh") }
 
 func (Agent) FlushAfter() []string { return []string{"dsh-session-end"} }
 

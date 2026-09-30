@@ -1,4 +1,4 @@
-package hookrun
+package omp
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
+	"github.com/miradorlabs/terma-cli/internal/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -16,23 +17,23 @@ import (
 // The omp hook announces the session, names the files it edits, and the commit that
 // follows carries the session and the tool.
 func TestOmpSessionIsStampedOnItsCommit(t *testing.T) {
-	root := initRepo(t)
+	root := hookruntest.InitRepo(t)
 	ctx := context.Background()
 	sp, _ := spool.Open(t.TempDir())
-	env := func(stdin string, args ...string) Env {
-		return Env{Now: time.Now(), Cwd: root, Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
+	env := func(stdin string, args ...string) hookrun.Env {
+		return hookrun.Env{Now: time.Now(), Cwd: root, Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
 	}
 
-	if err := OmpSessionStart(ctx, env(`{"session_id":"5b8c2f1e-9a1b-4c2d-8e3f-0a1b2c3d4e5f","cwd":"`+root+`"}`)); err != nil {
+	if err := sessionStart(ctx, env(`{"session_id":"5b8c2f1e-9a1b-4c2d-8e3f-0a1b2c3d4e5f","cwd":"`+root+`"}`)); err != nil {
 		t.Fatal(err)
 	}
 	hookruntest.WriteFile(t, root, "src/a.go", "package src\n")
 	hookruntest.WriteFile(t, root, "src/b.go", "package src\n")
 	// One absolute path, one relative to the working directory the hook reported.
-	if err := OmpFileEdit(ctx, env(`{"session_id":"5b8c2f1e-9a1b-4c2d-8e3f-0a1b2c3d4e5f","cwd":"`+root+`","file":"`+filepath.Join(root, "src", "a.go")+`","tool":"write"}`)); err != nil {
+	if err := fileEdit(ctx, env(`{"session_id":"5b8c2f1e-9a1b-4c2d-8e3f-0a1b2c3d4e5f","cwd":"`+root+`","file":"`+filepath.Join(root, "src", "a.go")+`","tool":"write"}`)); err != nil {
 		t.Fatal(err)
 	}
-	if err := OmpFileEdit(ctx, env(`{"session_id":"5b8c2f1e-9a1b-4c2d-8e3f-0a1b2c3d4e5f","file":"src/b.go","tool":"edit"}`)); err != nil {
+	if err := fileEdit(ctx, env(`{"session_id":"5b8c2f1e-9a1b-4c2d-8e3f-0a1b2c3d4e5f","file":"src/b.go","tool":"edit"}`)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -41,7 +42,7 @@ func TestOmpSessionIsStampedOnItsCommit(t *testing.T) {
 	}
 	msgPath := filepath.Join(t.TempDir(), "COMMIT_EDITMSG")
 	_ = os.WriteFile(msgPath, []byte("agent work\n"), 0o644)
-	if err := PrepareCommitMsg(ctx, env("", msgPath, "message")); err != nil {
+	if err := hookrun.PrepareCommitMsg(ctx, env("", msgPath, "message")); err != nil {
 		t.Fatal(err)
 	}
 	data, _ := os.ReadFile(msgPath)
@@ -49,7 +50,7 @@ func TestOmpSessionIsStampedOnItsCommit(t *testing.T) {
 		t.Fatalf("commit not stamped for omp:\n%s", data)
 	}
 
-	if err := OmpSessionEnd(ctx, env(`{"session_id":"5b8c2f1e-9a1b-4c2d-8e3f-0a1b2c3d4e5f","cwd":"`+root+`"}`)); err != nil {
+	if err := sessionEnd(ctx, env(`{"session_id":"5b8c2f1e-9a1b-4c2d-8e3f-0a1b2c3d4e5f","cwd":"`+root+`"}`)); err != nil {
 		t.Fatal(err)
 	}
 	events, _, _ := sp.Pending()
@@ -63,14 +64,14 @@ func TestOmpSessionIsStampedOnItsCommit(t *testing.T) {
 func TestOmpHandlersIgnoreBadInput(t *testing.T) {
 	ctx := context.Background()
 	for _, stdin := range []string{"", "not json", `{"cwd":"/x"}`, `{"session_id":"../../etc"}`} {
-		env := Env{Cwd: t.TempDir(), Stdin: strings.NewReader(stdin)}
-		if err := OmpSessionStart(ctx, env); err != nil {
+		env := hookrun.Env{Cwd: t.TempDir(), Stdin: strings.NewReader(stdin)}
+		if err := sessionStart(ctx, env); err != nil {
 			t.Errorf("start(%q) = %v", stdin, err)
 		}
-		if err := OmpFileEdit(ctx, env); err != nil {
+		if err := fileEdit(ctx, env); err != nil {
 			t.Errorf("edit(%q) = %v", stdin, err)
 		}
-		if err := OmpSessionEnd(ctx, env); err != nil {
+		if err := sessionEnd(ctx, env); err != nil {
 			t.Errorf("end(%q) = %v", stdin, err)
 		}
 	}

@@ -58,9 +58,8 @@ func TestWireNamesAreFrozen(t *testing.T) {
 		StatusUnavailable:       "unavailable",
 		UnknownValue:            "unknown",
 
-		claudeTool:   "claude-code",
-		codexTool:    "codex",
-		opencodeTool: "opencode",
+		claudeTool: "claude-code",
+		codexTool:  "codex",
 	} {
 		if got != want {
 			t.Errorf("wire name %q changed; it must stay %q", got, want)

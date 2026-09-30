@@ -7,7 +7,6 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
-	"github.com/miradorlabs/terma-cli/internal/hookrun"
 )
 
 // Agent is Gemini CLI. Its hooks come from terma's user-level Gemini extension
@@ -30,10 +29,10 @@ func (Agent) Plan(string, bool) (hookmgr.Plan, error) {
 
 func (Agent) Events() map[string]agents.Handler {
 	return map[string]agents.Handler{
-		"gemini-session-start": hookrun.GeminiSessionStart,
-		"gemini-prompt":        hookrun.GeminiPrompt,
-		"gemini-after-tool":    hookrun.GeminiAfterTool,
-		"gemini-session-end":   hookrun.GeminiSessionEnd,
+		"gemini-session-start": sessionStart,
+		"gemini-prompt":        prompt,
+		"gemini-after-tool":    afterTool,
+		"gemini-session-end":   sessionEnd,
 	}
 }
 

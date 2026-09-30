@@ -7,7 +7,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
-	"github.com/miradorlabs/terma-cli/internal/hookrun"
 )
 
 // Agent is OpenCode. It has no repository-scope hooks: Terma's plugin is user-scope,
@@ -28,9 +27,9 @@ func (Agent) Plan(string, bool) (hookmgr.Plan, error) {
 
 func (Agent) Events() map[string]agents.Handler {
 	return map[string]agents.Handler{
-		"opencode-session-start": hookrun.OpenCodeSessionStart,
-		"opencode-session-end":   hookrun.OpenCodeSessionEnd,
-		"opencode-file-edit":     hookrun.OpenCodeFileEdit,
+		"opencode-session-start": sessionStart,
+		"opencode-session-end":   sessionEnd,
+		"opencode-file-edit":     fileEdit,
 	}
 }
 

@@ -28,14 +28,7 @@ func (Agent) Plan(string, bool) (hookmgr.Plan, error) {
 	return hookmgr.Plan{}, nil
 }
 
-func (Agent) Events() map[string]agents.Handler {
-	return map[string]agents.Handler{
-		"pi-session-start": hookrun.PiSessionStart,
-		"pi-prompt":        hookrun.PiPrompt,
-		"pi-session-end":   hookrun.PiSessionEnd,
-		"pi-file-edit":     hookrun.PiFileEdit,
-	}
-}
+func (Agent) Events() map[string]agents.Handler { return hookrun.Extension{Tool: "pi"}.Events("pi") }
 
 func (Agent) FlushAfter() []string { return []string{"pi-session-end"} }
 

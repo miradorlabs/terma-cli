@@ -1,4 +1,4 @@
-package hookrun
+package opencode
 
 import (
 	"cmp"
@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 
+	"github.com/miradorlabs/terma-cli/internal/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
@@ -28,7 +29,7 @@ type opencodeHookInput struct {
 const opencodeTool = "opencode"
 
 func readOpenCodeInput(r io.Reader) (*opencodeHookInput, error) {
-	in, err := ReadInput[opencodeHookInput](r)
+	in, err := hookrun.ReadInput[opencodeHookInput](r)
 	if err != nil {
 		return nil, err
 	}
@@ -38,8 +39,8 @@ func readOpenCodeInput(r io.Reader) (*opencodeHookInput, error) {
 	return in, nil
 }
 
-// OpenCodeSessionStart records an OpenCode session as active.
-func OpenCodeSessionStart(ctx context.Context, env Env) error {
+// sessionStart records an OpenCode session as active.
+func sessionStart(ctx context.Context, env hookrun.Env) error {
 	in, err := readOpenCodeInput(env.Stdin)
 	if err != nil {
 		env.Logf("%v", err)
@@ -55,7 +56,7 @@ func OpenCodeSessionStart(ctx context.Context, env Env) error {
 		env.Logf("not in a git repository: %v", err)
 		return nil
 	}
-	attrs := map[string]any{AttrSource: "session.created"}
+	attrs := map[string]any{hookrun.AttrSource: "session.created"}
 	sess := env.NewSession(r, in.SessionID, opencodeTool, in.Model)
 	if !session.ValidID(in.ParentSessionID) {
 		env.Announce(r, sess, attrs)
@@ -66,14 +67,14 @@ func OpenCodeSessionStart(ctx context.Context, env Env) error {
 	// to the session a person is driving: a child that displaced it would put its own id
 	// on the developer's next hand-written commit. The child's edits still build a
 	// manifest of their own, and that is how they are attributed.
-	attrs[AttrParentSession] = in.ParentSessionID
+	attrs[hookrun.AttrParentSession] = in.ParentSessionID
 	env.PruneManifests(r, sess.UpdatedAt)
 	env.EmitStart(r, sess, attrs)
 	return nil
 }
 
-// OpenCodeSessionEnd clears the active session; manifests stay for the commit to come.
-func OpenCodeSessionEnd(ctx context.Context, env Env) error {
+// sessionEnd clears the active session; manifests stay for the commit to come.
+func sessionEnd(ctx context.Context, env hookrun.Env) error {
 	in, err := readOpenCodeInput(env.Stdin)
 	if err != nil {
 		env.Logf("%v", err)
@@ -92,8 +93,8 @@ func OpenCodeSessionEnd(ctx context.Context, env Env) error {
 	return nil
 }
 
-// OpenCodeFileEdit adds one edited file to the session's manifest.
-func OpenCodeFileEdit(ctx context.Context, env Env) error {
+// fileEdit adds one edited file to the session's manifest.
+func fileEdit(ctx context.Context, env hookrun.Env) error {
 	in, err := readOpenCodeInput(env.Stdin)
 	if err != nil {
 		env.Logf("%v", err)
@@ -108,6 +109,6 @@ func OpenCodeFileEdit(ctx context.Context, env Env) error {
 		return nil
 	}
 	env.Touch(r, session.Session{ID: in.SessionID, Tool: opencodeTool, Model: in.Model}, in.Tool,
-		RelativeFiles(r, env.Cwd, []string{in.File}), nil)
+		hookrun.RelativeFiles(r, env.Cwd, []string{in.File}), nil)
 	return nil
 }

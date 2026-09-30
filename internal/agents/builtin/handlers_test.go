@@ -1,0 +1,55 @@
+package builtin
+
+import (
+	"context"
+	"encoding/json"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/miradorlabs/terma-cli/internal/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
+)
+
+// A session id becomes a file name and a query value, so every handler refuses one that
+// is not safe as either, whichever key its agent names the session by. None may fail
+// the hook over it either: a hook never fails.
+func TestNoHandlerSpoolsAnUnsafeSessionID(t *testing.T) {
+	root, sp := hookruntest.Project(t)
+	t.Setenv("CODEX_HOME", t.TempDir())
+	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
+	unsafe := []string{"../../etc/passwd", "two\nlines", strings.Repeat("a", 4096)}
+	// The control: the same payloads with a safe id are recorded, so a handler that
+	// never read them cannot pass.
+	const safe = "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+	for event, handle := range reg.Handlers() {
+		if event == "statusline" {
+			continue // renders another command's output; it names no session of its own
+		}
+		for _, id := range append([]string{safe}, unsafe...) {
+			payload, _ := json.Marshal(map[string]any{
+				"session_id": id, "conversation_id": id, "conversationId": id, "agent_id": id,
+				"cwd": root, "workspacePaths": []string{root}, "reason": "exit",
+				"file_path": root + "/a.go", "file": root + "/a.go", "tool_name": "Write",
+			})
+			env := hookrun.Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(string(payload)), Spool: sp, Version: "test"}
+			if err := handle(context.Background(), env); err != nil {
+				t.Errorf("%s: a hook must never fail: %v", event, err)
+			}
+		}
+	}
+	recorded := 0
+	for _, e := range hookruntest.Spooled(t, sp) {
+		if e.SessionID == safe {
+			recorded++
+		}
+		for _, id := range unsafe {
+			if e.SessionID == id {
+				t.Errorf("%s spooled with the unsafe session id %q", e.Name, id)
+			}
+		}
+	}
+	if recorded == 0 {
+		t.Fatal("no handler recorded the safe session either: the payloads were not read")
+	}
+}

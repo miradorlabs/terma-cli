@@ -29,12 +29,7 @@ func (Agent) Plan(string, bool) (hookmgr.Plan, error) {
 }
 
 func (Agent) Events() map[string]agents.Handler {
-	return map[string]agents.Handler{
-		"hermes-session-start": hookrun.HermesSessionStart,
-		"hermes-prompt":        hookrun.HermesPrompt,
-		"hermes-session-end":   hookrun.HermesSessionEnd,
-		"hermes-file-edit":     hookrun.HermesFileEdit,
-	}
+	return hookrun.Extension{Tool: "hermes"}.Events("hermes")
 }
 
 func (Agent) FlushAfter() []string { return []string{"hermes-session-end"} }

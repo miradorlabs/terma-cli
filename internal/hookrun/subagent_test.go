@@ -144,34 +144,6 @@ func TestCodexSubagentHooksAndSpawnedThreadParent(t *testing.T) {
 	}
 }
 
-// An OpenCode session the task tool opened names the session that opened it.
-func TestOpenCodeChildSessionNamesItsParent(t *testing.T) {
-	root := initRepo(t)
-	ctx := context.Background()
-	sp, _ := spool.Open(t.TempDir())
-	env := func(stdin string) Env {
-		return Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
-	}
-	if err := OpenCodeSessionStart(ctx, env(`{"session_id":"ses_child","cwd":"`+root+`","parent_session_id":"ses_parent"}`)); err != nil {
-		t.Fatal(err)
-	}
-	if err := OpenCodeSessionStart(ctx, env(`{"session_id":"ses_root","cwd":"`+root+`"}`)); err != nil {
-		t.Fatal(err)
-	}
-	if err := OpenCodeSessionStart(ctx, env(`{"session_id":"ses_odd","cwd":"`+root+`","parent_session_id":"../etc"}`)); err != nil {
-		t.Fatal(err)
-	}
-	events := hookruntest.Spooled(t, sp)
-	if len(events) != 3 || events[0].Attrs["parent_session_id"] != "ses_parent" {
-		t.Fatalf("events: %+v", events)
-	}
-	for _, e := range events[1:] {
-		if _, ok := e.Attrs["parent_session_id"]; ok {
-			t.Fatalf("%s reports a parent: %v", e.SessionID, e.Attrs)
-		}
-	}
-}
-
 // A Codex subagent is a thread the session spawned, with a rollout of its own. Its hooks
 // keep the root's session_id, carry the child thread's id as agent_id, and point
 // transcript_path at the child's rollout.
@@ -260,32 +232,5 @@ func TestCodexRolloutIDFollowsTheTranscriptName(t *testing.T) {
 		if got := codexRolloutID(in); got != tc.want {
 			t.Errorf("%s: %q, want %q", tc.name, got, tc.want)
 		}
-	}
-}
-
-// The active session is what claims a commit no manifest accounts for. A session the
-// task tool opened for a subagent must not displace the one a person is driving, or the
-// developer's next hand-written commit is stamped with the subagent.
-func TestOpenCodeChildSessionNeverBecomesTheActiveOne(t *testing.T) {
-	root := initRepo(t)
-	ctx := context.Background()
-	sp, _ := spool.Open(t.TempDir())
-	env := func(stdin string, args ...string) Env {
-		return Env{Now: time.Now(), Cwd: root, Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
-	}
-	if err := OpenCodeSessionStart(ctx, env(`{"session_id":"ses_person","cwd":"`+root+`"}`)); err != nil {
-		t.Fatal(err)
-	}
-	if err := OpenCodeSessionStart(ctx, env(`{"session_id":"ses_child","cwd":"`+root+`","parent_session_id":"ses_person"}`)); err != nil {
-		t.Fatal(err)
-	}
-	active, _ := hookruntest.Store(t, root).Active(time.Now(), 0)
-	if active == nil || active.ID != "ses_person" {
-		t.Fatalf("active session = %+v, want the person's", active)
-	}
-	// The child is still announced, with its parent.
-	events := hookruntest.Lifecycle(hookruntest.Spooled(t, sp))
-	if len(events) != 2 || events[1].SessionID != "ses_child" || events[1].Attrs[AttrParentSession] != "ses_person" {
-		t.Fatalf("events: %+v", events)
 	}
 }

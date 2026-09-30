@@ -1,9 +1,10 @@
-package hookrun
+package gemini
 
 import (
 	"cmp"
 	"context"
 
+	"github.com/miradorlabs/terma-cli/internal/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
@@ -28,8 +29,8 @@ const geminiTool = "gemini"
 // geminiEditTools are Gemini's tools that change a file.
 var geminiEditTools = map[string]bool{"write_file": true, "replace": true, "edit": true}
 
-func readGeminiInput(env Env) (*geminiHookInput, bool) {
-	in, err := ReadInput[geminiHookInput](env.Stdin)
+func readGeminiInput(env hookrun.Env) (*geminiHookInput, bool) {
+	in, err := hookrun.ReadInput[geminiHookInput](env.Stdin)
 	if err != nil {
 		env.Logf("%v", err)
 		return nil, false
@@ -41,8 +42,8 @@ func readGeminiInput(env Env) (*geminiHookInput, bool) {
 	return in, true
 }
 
-// GeminiSessionStart records a Gemini session as active.
-func GeminiSessionStart(ctx context.Context, env Env) error {
+// sessionStart records a Gemini session as active.
+func sessionStart(ctx context.Context, env hookrun.Env) error {
 	in, ok := readGeminiInput(env)
 	if !ok {
 		return nil
@@ -52,19 +53,19 @@ func GeminiSessionStart(ctx context.Context, env Env) error {
 	if err != nil {
 		return nil
 	}
-	env.Announce(r, env.NewSession(r, in.SessionID, geminiTool, ""), map[string]any{AttrSource: "session_start"})
+	env.Announce(r, env.NewSession(r, in.SessionID, geminiTool, ""), map[string]any{hookrun.AttrSource: "session_start"})
 	return nil
 }
 
-// GeminiPrompt is Gemini's BeforeAgent, at every turn: the caller claims the session
+// prompt is Gemini's BeforeAgent, at every turn: the caller claims the session
 // from the payload and starts the relay; nothing is recorded.
-func GeminiPrompt(_ context.Context, env Env) error {
+func prompt(_ context.Context, env hookrun.Env) error {
 	_, _ = readGeminiInput(env)
 	return nil
 }
 
-// GeminiAfterTool adds the file an editing tool changed to the session's manifest.
-func GeminiAfterTool(ctx context.Context, env Env) error {
+// afterTool adds the file an editing tool changed to the session's manifest.
+func afterTool(ctx context.Context, env hookrun.Env) error {
 	in, ok := readGeminiInput(env)
 	if !ok || !geminiEditTools[in.ToolName] {
 		return nil
@@ -78,12 +79,12 @@ func GeminiAfterTool(ctx context.Context, env Env) error {
 	if err != nil {
 		return nil
 	}
-	env.Touch(r, session.Session{ID: in.SessionID, Tool: geminiTool}, in.ToolName, RelativeFiles(r, env.Cwd, []string{file}), nil)
+	env.Touch(r, session.Session{ID: in.SessionID, Tool: geminiTool}, in.ToolName, hookrun.RelativeFiles(r, env.Cwd, []string{file}), nil)
 	return nil
 }
 
-// GeminiSessionEnd clears the active session; manifests stay for the commit to come.
-func GeminiSessionEnd(ctx context.Context, env Env) error {
+// sessionEnd clears the active session; manifests stay for the commit to come.
+func sessionEnd(ctx context.Context, env hookrun.Env) error {
 	in, ok := readGeminiInput(env)
 	if !ok {
 		return nil
