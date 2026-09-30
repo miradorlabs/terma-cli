@@ -72,6 +72,11 @@ type Options struct {
 	Lookup func(sessionID string, now time.Time) (claim.Claim, bool)
 	// Resolve turns a claim into a Policy, or ErrNoKey.
 	Resolve func(c claim.Claim) (Policy, error)
+	// CatchAll, in global mode, is where a part goes whose hold ran out with nothing
+	// placing it — unclaimed, no session, an ambiguous process — instead of being
+	// dropped: the organization's default project (resolved like any claim), marked
+	// terma.relay.attribution=catch-all. False (or nil) outside global mode.
+	CatchAll func() (claim.Claim, bool)
 	// ClaimCacheTTL and PolicyCacheTTL keep Lookup's and Resolve's answers that long
 	// (0: ask every time). Production uses about a second and a few seconds.
 	ClaimCacheTTL  time.Duration
@@ -264,8 +269,10 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 			// Nothing in the record names a session — Codex's metrics. Its process
 			// might: see decideProcess.
 			if pid == 0 {
-				r.stats.dropped(s, "no_session_id", p.records)
-				continue
+				if _, global := r.catchAll(); !global {
+					r.stats.dropped(s, "no_session_id", p.records)
+					continue
+				}
 			}
 			p.session = procKey(pid)
 		}

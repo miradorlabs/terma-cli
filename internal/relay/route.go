@@ -428,6 +428,16 @@ func (r *Relay) sweep() {
 				// A conversation start waits for the thread's first turn (part.start).
 				limit = max(hold, r.opts.TraceHold)
 			}
+			if !ok && why != whyNoKey && now.Sub(h.at) >= limit {
+				// Global mode: what nothing placed goes to the organization's default
+				// project instead of being dropped, marked as such.
+				if cc, cok := r.catchAll(); cok {
+					if cpol, pok := r.resolve(cc); pok {
+						c, pol, ok, how = cc, cpol, true, attribution{how: "catch-all"}
+						r.stats.add("caught_by_default."+string(h.p.signal), h.p.records)
+					}
+				}
+			}
 			switch {
 			case ok:
 				out = append(out, release{c, pol, h.p, how})
@@ -463,6 +473,14 @@ func (r *Relay) sweep() {
 			r.deliverAttributed(rel.c, rel.pol, rel.p, rel.how)
 		}
 	}
+}
+
+// catchAll is the claim global mode files what nothing placed under, if any.
+func (r *Relay) catchAll() (claim.Claim, bool) {
+	if r.opts.CatchAll == nil {
+		return claim.Claim{}, false
+	}
+	return r.opts.CatchAll()
 }
 
 // Run releases held records as their reasons go away, drops those that outlive the

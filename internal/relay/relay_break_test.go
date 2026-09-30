@@ -797,3 +797,52 @@ func TestRelayRoutesEachRunOfAResumedSession(t *testing.T) {
 	pr.f.mu.Unlock()
 	waitFor(t, func() bool { return pr.r.Stats().Snapshot().Counters["dropped.uncovered_process.logs"] == 1 })
 }
+
+// Global mode: a session no hook claimed, and a record naming no session at all, go to
+// the organization's default project when their hold runs out — marked catch-all —
+// instead of being dropped. A claimed session still goes to its own project.
+func TestRelayCatchAllInGlobalMode(t *testing.T) {
+	u := newUpstream(t)
+	f := newFixture()
+	policies := allPolicies(u)
+	policies["p-default"] = Policy{Endpoint: u.srv.URL, Key: "key-default", IncludePrompts: true, IncludeToolContent: true}
+	r := New(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+		CatchAll: func() (claim.Claim, bool) { return claim.Claim{ProjectID: "p-default"}, true },
+		Resolve: func(c claim.Claim) (Policy, error) {
+			if p, ok := policies[c.ProjectID]; ok {
+				return p, nil
+			}
+			return Policy{}, ErrNoKey
+		}})
+	go r.Run(t.Context())
+	srv := httptest.NewServer(r.Handler())
+	defer srv.Close()
+	body, _ := proto.Marshal(mixedLogs())
+	post(t, srv, "/v1/logs", body, "application/x-protobuf", token, false)
+	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["forwarded.logs"] == 3 })
+	f.mu.Lock()
+	f.now = f.now.Add(2 * time.Minute)
+	f.mu.Unlock()
+	// C (unclaimed) and the sessionless record go to the default; D is claimed for a
+	// project this machine has no key for, and still waits for its key.
+	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["caught_by_default.logs"] == 2 })
+	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["forwarded.logs"] == 5 })
+	byAuth, _ := u.logs(t)
+	if n := len(byAuth["Bearer key-default"]); n != 2 {
+		t.Fatalf("default project got %d records, want 2", n)
+	}
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	for _, req := range u.requests {
+		if req.auth != "Bearer key-default" {
+			continue
+		}
+		var m logspb.LogsData
+		_ = proto.Unmarshal(req.body, &m)
+		for _, rl := range m.ResourceLogs {
+			if got := attr(rl.Resource.Attributes, AttributionAttr); got != "catch-all" {
+				t.Fatalf("a caught record is marked %q", got)
+			}
+		}
+	}
+}

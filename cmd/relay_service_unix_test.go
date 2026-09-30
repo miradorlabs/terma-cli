@@ -45,3 +45,38 @@ func TestServiceRelayTakesOverFromAHooksRelay(t *testing.T) {
 		}
 	}
 }
+
+// The service's relay tells its manager whether to start it again: stopped (by `terma
+// relay setup`, to reread its setup) it exits ExitRestart; with its setup gone (terma
+// uninstalled) it exits 0 and stays stopped.
+func TestServiceRelayExitCodes(t *testing.T) {
+	bin := termaBinary(t)
+	dir := relaySandbox(t)
+	addr := freeAddr(t)
+	if out, err := runTerma(t, "relay", "setup", "--no-start", "--addr", addr, "--harness", "codex"); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	run := func(stop func(*exec.Cmd)) int {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, bin, "relay", "run", "--idle", "0", "--quiet")
+		cmd.Env = os.Environ()
+		if err := cmd.Start(); err != nil {
+			t.Fatal(err)
+		}
+		for deadline := time.Now().Add(10 * time.Second); !squatted(addr); time.Sleep(50 * time.Millisecond) {
+			if time.Now().After(deadline) {
+				t.Fatal("the relay did not listen")
+			}
+		}
+		stop(cmd)
+		_ = cmd.Wait()
+		return cmd.ProcessState.ExitCode()
+	}
+	if code := run(func(*exec.Cmd) { stopRelay(dir) }); code != ExitRestart {
+		t.Fatalf("stopped: exit %d, want %d", code, ExitRestart)
+	}
+	if code := run(func(*exec.Cmd) { _ = os.Remove(filepath.Join(dir, "token")) }); code != 0 {
+		t.Fatalf("setup gone: exit %d, want 0", code)
+	}
+}

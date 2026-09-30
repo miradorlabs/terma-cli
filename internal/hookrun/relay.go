@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -41,11 +42,17 @@ func ClaimFromPayload(ctx context.Context, env Env, payload []byte, tool string)
 	if len(in.Workspaces) > 0 && in.Workspaces[0] != "" {
 		env.Cwd = in.Workspaces[0]
 	}
-	r, err := env.repo(ctx)
-	if err != nil || r.projectID == "" {
+	var c claim.Claim
+	switch r, err := env.repo(ctx); {
+	case err == nil && r.projectID != "":
+		c = claim.Claim{ProjectID: r.projectID, Tool: tool, Repo: r.name, Worktree: r.worktree}
+	case err != nil && env.Policy.Global() && env.Policy.DefaultProjectID != "":
+		// Global mode, outside any repository: a scratch directory, the home directory.
+		c = claim.Claim{ProjectID: env.Policy.DefaultProjectID, Tool: tool, Repo: filepath.Base(env.Cwd)}
+	default:
 		return false
 	}
-	c := claim.Claim{ProjectID: r.projectID, Tool: tool, Repo: r.name, Worktree: r.worktree, PIDs: claimPIDs()}
+	c.PIDs = claimPIDs()
 	// A Codex subagent's telemetry names its own thread (see claimForRelay).
 	if in.AgentID != "" && in.AgentID != id {
 		claim.Write(in.AgentID, c, env.now())

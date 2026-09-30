@@ -110,6 +110,7 @@ func newHookCommand() *cobra.Command {
 				Version: Version,
 				Debug:   os.Getenv("TERMA_DEBUG") != "",
 				Spool:   openSpool(),
+				Policy:  hookPolicy(),
 			}
 			ctx, cancel := context.WithTimeout(cmd.Context(), 5*time.Second)
 			defer cancel()
@@ -152,6 +153,16 @@ func runStatusLine(cmd *cobra.Command, captureDisabled bool) int {
 		fmt.Fprintf(env.Stderr, "terma hook: status line record: %v\n", err)
 	}
 	return hookrun.StatusLine(cmd.Context(), env, hookrun.StatusLineOptions{Renderer: renderer, Indicator: !captureDisabled, OnCapture: func() { spawnFlush() }})
+}
+
+// hookPolicy is the organization's collection policy as `terma setup` recorded it: one
+// small file read, and the default when there is none to read.
+func hookPolicy() config.Policy {
+	cfg, err := config.Load(config.Overrides{})
+	if err != nil {
+		return config.DefaultPolicy()
+	}
+	return cfg.Policy
 }
 
 // openSpool returns the machine spool, or nil when the config dir cannot be used.

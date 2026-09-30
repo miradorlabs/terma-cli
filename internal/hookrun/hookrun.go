@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
@@ -53,6 +54,10 @@ type Env struct {
 	// relay (see claimForRelay), so the caller can start the relay if it is not
 	// running. It may be called more than once.
 	OnClaim func()
+	// Policy is the organization's collection policy (config.Profile.Policy). In global
+	// mode a repository without a binding is placed by its remote, else the default
+	// project, and a session outside any repository goes to the default project.
+	Policy config.Policy
 }
 
 func (e Env) now() time.Time {
@@ -120,6 +125,13 @@ func (e Env) repo(ctx context.Context) (*repo, error) {
 	r.name, r.worktree = checkoutNames(root, gitDir)
 	if f, _, err := project.Resolve(root, gitDir); err == nil {
 		r.projectID = f.Project.ID
+	} else if e.Policy.Global() {
+		// Global mode: no repository opts in, the organization collects everything.
+		remote := ""
+		if gitDir != "" {
+			remote = gitx.RemoteURLFS(gitDir)
+		}
+		r.projectID = e.Policy.ProjectFor(remote)
 	}
 	return r, nil
 }

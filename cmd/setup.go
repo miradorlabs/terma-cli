@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -128,6 +129,14 @@ func runSetup(cmd *cobra.Command, f setupFlags) error {
 		return err
 	}
 	fmt.Fprintln(out, "Collection policy: "+policySummary(pol)+".")
+	if policyChanged(cfg.Policy, pol) {
+		// A running relay read the old one at start: it is stopped to read this one (a
+		// service restarts it; otherwise ensureRelay, below, starts it). Not on every
+		// setup — an agent does not retry an export refused while the relay restarts.
+		if dir, err := relayDir(); err == nil {
+			stopRelay(dir)
+		}
+	}
 
 	// 4. The relay: the machine half of every repository's telemetry.
 	var steps []string
@@ -164,6 +173,13 @@ func fetchPolicy(ctx context.Context, cfg *config.Config) (config.Policy, error)
 		return config.Policy{}, fmt.Errorf("fetch the organization's collection policy: %w", err)
 	}
 	return pol, nil
+}
+
+// policyChanged reports whether the relay's view of the policy is out of date.
+func policyChanged(was, now config.Policy) bool {
+	return was.Mode != now.Mode || was.IncludePrompts != now.IncludePrompts ||
+		was.IncludeToolContent != now.IncludeToolContent || was.DefaultProjectID != now.DefaultProjectID ||
+		!maps.Equal(was.Remotes, now.Remotes)
 }
 
 // policySummary says in a few words what the organization collects.

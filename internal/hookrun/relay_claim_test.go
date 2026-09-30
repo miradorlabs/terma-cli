@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/spool"
@@ -107,6 +109,46 @@ func TestCodexSubagentThreadIsClaimed(t *testing.T) {
 	for _, id := range []string{"root-thread", "child-thread", "child-thread-2"} {
 		if c, ok := claim.Read(id, time.Now()); !ok || c.ProjectID != "project-a" {
 			t.Errorf("%s not claimed: %+v %v", id, c, ok)
+		}
+	}
+}
+
+// Global mode: an unbound repository's session is claimed for the project its remote
+// maps to, else the organization's default; a session outside any repository goes to
+// the default; a bound repository keeps its own. Repo mode claims none of them.
+func TestGlobalModeClaimsEverySession(t *testing.T) {
+	global := config.Policy{Mode: config.ModeGlobal, DefaultProjectID: "p-default",
+		Remotes: map[string]string{"github.com/org/app": "p-app"}}
+	known := initRepo(t)
+	if _, err := gitx.Git(context.Background(), known, "remote", "add", "origin", "git@github.com:org/app.git"); err != nil {
+		t.Fatal(err)
+	}
+	unknown := initRepo(t)
+	scratch := t.TempDir()
+	bound := initRepo(t) // each initRepo moves the config dir: the last one holds the claims
+	relaySetUp(t)
+	if err := project.Save(bound, &project.File{Project: project.Project{ID: "p-bound"}}); err != nil {
+		t.Fatal(err)
+	}
+	claimIn := func(dir, sid string, pol config.Policy) (claim.Claim, bool) {
+		env := Env{Now: time.Now(), Cwd: dir, Stdin: strings.NewReader(""), Policy: pol}
+		ClaimFromPayload(context.Background(), env, []byte(`{"session_id":"`+sid+`","cwd":"`+dir+`"}`), "claude-code")
+		return claim.Read(sid, time.Now())
+	}
+	for _, tc := range []struct{ dir, sid, want string }{
+		{known, "g-known", "p-app"},
+		{unknown, "g-unknown", "p-default"},
+		{scratch, "g-scratch", "p-default"},
+		{bound, "g-bound", "p-bound"},
+	} {
+		c, ok := claimIn(tc.dir, tc.sid, global)
+		if !ok || c.ProjectID != tc.want {
+			t.Errorf("%s: claim %+v, %v; want %s", tc.sid, c, ok, tc.want)
+		}
+	}
+	for _, dir := range []string{known, unknown, scratch} {
+		if _, ok := claimIn(dir, "r-"+filepath.Base(dir), config.DefaultPolicy()); ok {
+			t.Errorf("repo mode claimed a session in %s", dir)
 		}
 	}
 }

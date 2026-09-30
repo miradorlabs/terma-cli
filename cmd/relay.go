@@ -18,6 +18,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -176,7 +177,8 @@ func newRelayRunCommand() *cobra.Command {
 			}
 			minter := newRelayKeyMinter(cmd.Context(), cfg)
 			opts := relay.Options{Token: token, Hold: hold, Dir: filepath.Join(dir, relay.OutboxDir), Resolve: relayResolver(cfg, minter.mint), Version: Version,
-				PeerPID: procinfo.FindSender, ClaimCacheTTL: time.Second, PolicyCacheTTL: 5 * time.Second}
+				CatchAll: relayCatchAll(),
+				PeerPID:  procinfo.FindSender, ClaimCacheTTL: time.Second, PolicyCacheTTL: 5 * time.Second}
 			if os.Getenv("TERMA_RELAY_DEBUG") == "1" {
 				errOut := cmd.ErrOrStderr()
 				opts.Logf = func(f string, a ...any) { fmt.Fprintf(errOut, time.Now().Format("15:04:05.000 ")+f+"\n", a...) }
@@ -207,7 +209,7 @@ func newRelayRunCommand() *cobra.Command {
 			done := make(chan struct{})
 			go func() { r.Run(ctx); close(done) }()
 			self := executableStamp()
-			replaced := false
+			replaced, setupGone := false, false
 			lastPrune := time.Now()
 			for tick := time.NewTicker(time.Second); ; {
 				select {
@@ -217,6 +219,7 @@ func newRelayRunCommand() *cobra.Command {
 					// Setup undone — terma uninstalled, the config directory removed: the
 					// agents no longer point here, so there is nothing to relay for.
 					if _, err := relayToken(); err != nil {
+						setupGone = true
 						cancel()
 						break
 					}
@@ -252,9 +255,13 @@ func newRelayRunCommand() *cobra.Command {
 			if data, err := json.MarshalIndent(r.Stats().Snapshot(), "", "  "); err == nil {
 				_ = config.WriteFileAtomicNoSync(filepath.Join(dir, relayStatsFile), append(data, '\n'), 0o600)
 			}
-			if replaced {
-				// Under a service manager, the new binary starts now; a relay a hook
-				// started is started again by the next hook.
+			// Under a service manager, the new binary starts now; a relay a hook started
+			// is started again by the next hook. The service's relay asks to be started
+			// again whenever it was stopped for any reason but its setup being gone:
+			// `terma relay setup` and `terma setup` stop it so that it rereads the token,
+			// address and policy. Removing the service (launchctl bootout, systemctl
+			// disable, the Windows launcher removed) never restarts it, whatever it exits.
+			if replaced || service && !setupGone {
 				return exitWith(ExitRestart)
 			}
 			return nil
@@ -358,6 +365,26 @@ func relayResolver(cfg *config.Config, mint func(projectID string)) func(claim.C
 			pol.IncludeToolContent = pol.IncludeToolContent && rec.IncludeToolContent
 		}
 		return pol, nil
+	}
+}
+
+// relayCatchAll is where global mode files what nothing placed: the organization's
+// default project. The policy is read again at most every 10 seconds, so a `terma
+// setup` that switches mode takes effect in a running relay (the service outlives it).
+func relayCatchAll() func() (claim.Claim, bool) {
+	var mu sync.Mutex
+	var at time.Time
+	var cached config.Policy
+	return func() (claim.Claim, bool) {
+		mu.Lock()
+		defer mu.Unlock()
+		if time.Since(at) > 10*time.Second {
+			cached, at = hookPolicy(), time.Now()
+		}
+		if !cached.Global() || cached.DefaultProjectID == "" {
+			return claim.Claim{}, false
+		}
+		return claim.Claim{ProjectID: cached.DefaultProjectID}, true
 	}
 }
 
