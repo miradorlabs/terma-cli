@@ -46,7 +46,8 @@ func TestCreateServerKey_PostsToAuthHostAndReturnsPlaintextOnce(t *testing.T) {
 	if gotMethod != http.MethodPost || gotPath != "/v1/api-keys/server" {
 		t.Errorf("called %s %s, want POST /v1/api-keys/server", gotMethod, gotPath)
 	}
-	if gotBody.ProjectID != testProjectID || gotBody.Name != "claude-code@laptop" {
+	if gotBody.ProjectID != testProjectID || gotBody.Name != "claude-code@laptop" ||
+		gotBody.Permissions != (serverKeyPermissions{Ingest: true}) {
 		t.Errorf("request body = %+v", gotBody)
 	}
 	if key != "mir_srv_plaintext" {

@@ -91,9 +91,9 @@ func newTelemetryConnectCommand() *cobra.Command {
 		Long: `Mints a server key for the selected project and writes the harness's telemetry
 configuration.
 
-The key is created server-side and returned exactly once. Where the harness can fetch
-its OTLP headers from a script at startup (Claude Code's otelHeadersHelper), the key
-lands in a 0700 helper script under ~/.config/terma/helpers/ and the harness config gets
+The key is ingest-only; connecting again with the same key name returns the same key
+instead of minting another. Where the harness can fetch its OTLP headers from a script
+at startup (Claude Code's otelHeadersHelper), the key lands in a 0700 helper script under ~/.config/terma/helpers/ and the harness config gets
 only the script's path — so the settings file never holds a credential and stays safe
 to share or keep in dotfiles; pass --inline-key to write the key into the settings
 file instead. Codex has no such mechanism, so its key is always written into

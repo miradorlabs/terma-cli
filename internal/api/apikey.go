@@ -17,9 +17,16 @@ type ServerKey struct {
 }
 
 type createServerKeyRequest struct {
-	ProjectID   string `json:"project_id"`
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
+	ProjectID   string               `json:"project_id"`
+	Name        string               `json:"name"`
+	Description string               `json:"description,omitempty"`
+	Permissions serverKeyPermissions `json:"permissions"`
+}
+
+type serverKeyPermissions struct {
+	Read   bool `json:"read"`
+	Write  bool `json:"write"`
+	Ingest bool `json:"ingest"`
 }
 
 type createServerKeyResponse struct {
@@ -27,12 +34,13 @@ type createServerKeyResponse struct {
 	ServerKey ServerKey `json:"server_key"`
 }
 
-// CreateServerKey mints a server key (ter_srv_…) bound to one project.
+// CreateServerKey returns an ingest-only server key (ter_srv_…) bound to one project.
 //
-// The plaintext key is returned exactly once, by this call — nothing on the server can
-// produce it again. A caller that fails to persist it has to mint a replacement, so the
-// key is returned as a separate value rather than a struct field, forcing every caller
-// to decide what to do with it.
+// The key is ingest-only because everything this machine sends with it is telemetry.
+// The server returns the project's active ingest-only key of the same name when one
+// exists, so re-running install or connect after the local copy was lost gets that
+// key back rather than minting another. The plaintext is returned as a separate value
+// rather than a struct field, forcing every caller to decide what to do with it.
 //
 // This requires a user credential. A server key cannot mint another, so this is one of
 // the few operations TERMA_API_KEY cannot perform; the error says so plainly rather
@@ -54,6 +62,7 @@ func (c *Client) CreateServerKey(ctx context.Context, projectID, name, descripti
 		ProjectID:   projectID,
 		Name:        name,
 		Description: description,
+		Permissions: serverKeyPermissions{Ingest: true},
 	}, &resp); err != nil {
 		return "", ServerKey{}, err
 	}
