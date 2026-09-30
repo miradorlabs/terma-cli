@@ -1,4 +1,4 @@
-package exporter
+package builtin
 
 import (
 	"os"
@@ -6,18 +6,20 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/miradorlabs/terma-cli/internal/agents"
 )
 
 func TestTargetsNormalizeSurfacesAndPreserveOrder(t *testing.T) {
-	got := Targets([]string{"codex-desktop", "claude", "codex", "cursor", "pi", "pi"})
+	got := reg.RelayTargets([]string{"codex-desktop", "claude", "codex", "cursor", "pi", "pi"})
 	want := []string{"claude", "codex", "pi"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("targets = %v, want %v", got, want)
 	}
-	if NameForTool("claude-code") != "claude" || NameForTool("codex") != "codex" || NameForTool("cursor") != "cursor" {
+	if reg.NameForTool("claude-code") != "claude" || reg.NameForTool("codex") != "codex" || reg.NameForTool("cursor") != "cursor" {
 		t.Fatal("hook labels lost their key identity")
 	}
-	if _, err := Lookup("cursor"); err == nil {
+	if _, ok := reg.Find[agents.RelayExporter]("cursor"); ok {
 		t.Fatal("a hooks-only agent was accepted as an exporter")
 	}
 }
@@ -25,7 +27,7 @@ func TestTargetsNormalizeSurfacesAndPreserveOrder(t *testing.T) {
 // Configuring one agent must neither overwrite another agent's files nor set the
 // relay's credentials in the environment inherited by tools.
 func TestConfigureIsolatesAgentFilesAndEnvironment(t *testing.T) {
-	for _, e := range All() {
+	for _, e := range reg.With[agents.RelayExporter]() {
 		t.Run(e.Name(), func(t *testing.T) {
 			home := t.TempDir()
 			t.Setenv("HOME", home)
@@ -62,7 +64,7 @@ func TestConfigureIsolatesAgentFilesAndEnvironment(t *testing.T) {
 			if err := os.MkdirAll(state, 0o700); err != nil {
 				t.Fatal(err)
 			}
-			result, err := e.Configure(t.Context(), Config{Endpoint: "http://127.0.0.1:43180", Token: "private-relay-token", HookCommand: []string{"/usr/local/bin/terma", "hook"}, StateDir: state})
+			result, err := e.ConfigureRelay(t.Context(), agents.RelayConfig{Endpoint: "http://127.0.0.1:43180", Token: "private-relay-token", HookCommand: []string{"/usr/local/bin/terma", "hook"}, StateDir: state})
 			if err != nil {
 				t.Fatal(err)
 			}

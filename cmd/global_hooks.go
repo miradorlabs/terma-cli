@@ -12,7 +12,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
-	"github.com/miradorlabs/terma-cli/internal/relay/exporter"
 )
 
 // Global mode's machine-wide agent hooks. In global mode the organization collects
@@ -134,7 +133,7 @@ func userHooksCover(tool string) bool {
 
 // agentForTool maps a hook's tool label to its agent's name.
 func agentForTool(tool string) string {
-	return exporter.NameForTool(tool)
+	return registered.NameForTool(tool)
 }
 
 // hookYields reports whether this hook invocation leaves the event to another: a

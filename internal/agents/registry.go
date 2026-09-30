@@ -113,6 +113,35 @@ func (r *Registry) EventNames() []string {
 	return slices.Sorted(maps.Keys(r.Handlers()))
 }
 
+// ForTool resolves the agent whose hooks carry label.
+func (r *Registry) ForTool(label string) (Agent, bool) {
+	for _, a := range r.all {
+		if Tool(a) == label {
+			return a, true
+		}
+	}
+	return nil, false
+}
+
+// NameForTool is the name of the agent whose hooks carry label, or label itself.
+func (r *Registry) NameForTool(label string) string {
+	if a, ok := r.ForTool(label); ok {
+		return a.Name()
+	}
+	return label
+}
+
+// RelayTargets names the relay exporters among selected, in registry order.
+func (r *Registry) RelayTargets(selected []string) []string {
+	var out []string
+	for _, e := range r.With[RelayExporter]() {
+		if slices.ContainsFunc(Selections(e), func(s string) bool { return slices.Contains(selected, s) }) {
+			out = append(out, e.Name())
+		}
+	}
+	return out
+}
+
 // With returns the known agents that have capability C.
 func (r *Registry) With[C any]() []C {
 	var out []C

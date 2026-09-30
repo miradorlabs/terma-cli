@@ -10,9 +10,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
-	"github.com/miradorlabs/terma-cli/internal/relay/exporter"
 )
 
 // termaHookCommand is how an extension terma writes into an agent (Pi's, Hermes's)
@@ -68,25 +68,24 @@ func newRelaySetupCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&addr, "addr", "", "the loopback address the relay listens on (default "+defaultRelayAddr+")")
-	cmd.Flags().StringVar(&agents, "harness", "claude,codex", "the agents to point at the relay")
+	cmd.Flags().StringVar(&agents, "harness", strings.Join(registered.RelayTargets(availableAgentNames()), ","), "the agents to point at the relay")
 	cmd.Flags().BoolVar(&noStart, "no-start", false, "do not start the relay now (the next hook that claims a session will)")
 	return cmd
 }
 
-// pointAgentsAtRelay invokes exporter capabilities; configuration and reload
-// requirements belong to the integrations in internal/relay/exporter.
-func pointAgentsAtRelay(ctx context.Context, agents []string, addr, token string, done func(agent, detail string), note func(string)) error {
+// pointAgentsAtRelay has each agent configure its own relay export.
+func pointAgentsAtRelay(ctx context.Context, selected []string, addr, token string, done func(agent, detail string), note func(string)) error {
 	dir, err := relayDir()
 	if err != nil {
 		return err
 	}
-	cfg := exporter.Config{Endpoint: "http://" + addr, Token: token, HookCommand: termaHookCommand(), StateDir: dir}
-	for _, name := range agents {
-		integration, err := exporter.Lookup(name)
-		if err != nil {
-			return err
+	cfg := agents.RelayConfig{Endpoint: "http://" + addr, Token: token, HookCommand: termaHookCommand(), StateDir: dir}
+	for _, name := range selected {
+		integration, ok := registered.Find[agents.RelayExporter](name)
+		if !ok {
+			return fmt.Errorf("unknown relay exporter %q (choose %v)", name, registered.RelayTargets(registered.Names()))
 		}
-		result, err := integration.Configure(ctx, cfg)
+		result, err := integration.ConfigureRelay(ctx, cfg)
 		if err != nil {
 			return fmt.Errorf("%s: %w", integration.DisplayName(), err)
 		}

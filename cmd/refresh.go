@@ -14,7 +14,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/migrate"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
-	"github.com/miradorlabs/terma-cli/internal/relay/exporter"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 	"github.com/miradorlabs/terma-cli/internal/shim"
@@ -106,7 +105,7 @@ func migrateLegacyExporters() error {
 	}); err != nil {
 		return err
 	}
-	if len(exporter.Targets(agents)) == 0 {
+	if len(registered.RelayTargets(agents)) == 0 {
 		return nil
 	}
 	relayPath, err := relayDir()

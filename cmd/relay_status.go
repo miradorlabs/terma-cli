@@ -12,17 +12,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/routing"
-
 	"github.com/spf13/cobra"
 
+	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/flock"
-	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
-	"github.com/miradorlabs/terma-cli/internal/relay/exporter"
 )
 
 func newRelayStatusCommand() *cobra.Command {
@@ -116,7 +113,7 @@ func relayStats(dir string) (relay.Snapshot, bool, error) {
 // through the local relay: the relay can run (or runs) on its address with no one else
 // there, each of the developer's agents sends to it, and this repository's sessions
 // can leave — it is bound and this machine holds its project's key.
-func relayDoctorCheck(projectID string, agents []string) doctor.Check {
+func relayDoctorCheck(projectID string, selected []string) doctor.Check {
 	dir, err := claim.Dir()
 	if err != nil {
 		return doctor.Check{Status: doctor.Fail, Detail: err.Error()}
@@ -129,31 +126,30 @@ func relayDoctorCheck(projectID string, agents []string) doctor.Check {
 		running = true
 	}
 	if !running && squatted(addr) {
-		return doctor.Check{Status: doctor.Fail, Detail: "another process is listening on " + addr + " and receives the agents' telemetry",
+		return doctor.Check{Status: doctor.Fail, Detail: "another process is listening on " + addr + " and receives the selected' telemetry",
 			Fix: "stop it, or move the relay with `terma relay setup --addr`"}
 	}
+	// The developer's selected, or the supported ones when none are recorded.
+	mine := func(e agents.Agent) bool {
+		if len(selected) == 0 {
+			return registered.IsSupported(e.Name())
+		}
+		return slices.ContainsFunc(agents.Selections(e), func(s string) bool { return slices.Contains(selected, s) })
+	}
 	var wrong []string
-	for _, name := range []string{routing.AgentClaude, routing.AgentCodex, "opencode"} {
-		// OpenCode only for a developer who named it: its plugin is not set up by
-		// default, and most machines have no OpenCode.
-		if (len(agents) > 0 || name == "opencode") && !slices.Contains(agents, name) {
-			continue
-		}
-		h, err := harness.Lookup(name)
-		if err != nil {
-			continue
-		}
-		if st, err := h.Status(); err != nil || !st.Connected || strings.TrimRight(st.Endpoint, "/") != "http://"+addr {
-			wrong = append(wrong, h.DisplayName())
+	for _, e := range registered.With[agents.RelayExporter]() {
+		if pointed, known := e.RelayPointed(addr); mine(e) && known && !pointed {
+			wrong = append(wrong, e.DisplayName())
 		}
 	}
 	if len(wrong) > 0 {
 		return doctor.Check{Status: doctor.Fail, Detail: strings.Join(wrong, " and ") + " not exporting to the local relay", Fix: "terma relay setup"}
 	}
-	if slices.Contains(agents, routing.AgentCodex) || len(agents) == 0 {
-		if d, ok := exporter.CodexDaemonPredates(dir); ok {
-			return doctor.Check{Status: doctor.Warn, Detail: fmt.Sprintf("Codex's background server (pid %d) started before Codex was pointed at the relay, and its threads still export where they did", d.PID),
-				Fix: exporter.CodexDaemonRestart}
+	for _, e := range registered.With[agents.RelayExporter]() {
+		if c, ok := e.(agents.RelayChecker); ok && mine(e) {
+			if detail, fix, problem := c.RelayProblem(dir); problem {
+				return doctor.Check{Status: doctor.Warn, Detail: detail, Fix: fix}
+			}
 		}
 	}
 	state := "starts with the next hook"
@@ -163,7 +159,7 @@ func relayDoctorCheck(projectID string, agents []string) doctor.Check {
 	switch {
 	case projectID == "":
 		return doctor.Check{Status: doctor.Warn, Detail: "local relay on " + addr + " (" + state + "); this repository is not bound, so its sessions are never forwarded", Fix: "terma install"}
-	case keystore.Get(projectID) == "" && keystore.GetFor("claude", projectID) == "" && keystore.GetFor("codex", projectID) == "":
+	case keystore.Get(projectID) == "" && !slices.ContainsFunc(registered.With[agents.RelayExporter](), func(e agents.RelayExporter) bool { return keystore.GetFor(e.Name(), projectID) != "" }):
 		return doctor.Check{Status: doctor.Warn, Detail: "local relay on " + addr + " (" + state + "); no key for this project on this machine, so its sessions are dropped", Fix: "terma install"}
 	}
 	return doctor.Check{Status: doctor.Pass, Detail: "through the local relay on " + addr + " (" + state + "); only this repository's sessions are forwarded"}

@@ -19,12 +19,11 @@ import (
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 
+	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/flock"
-	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/relay"
-	"github.com/miradorlabs/terma-cli/internal/relay/exporter"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 )
 
@@ -115,16 +114,19 @@ func heartbeatFacts(dir string) map[string]any {
 	}
 	// Which agents' exporters point at this relay now: one pointed elsewhere since
 	// (a reinstall, a hand edit) sends nothing through it, and says nothing else of it.
-	var pointed []string
-	for _, a := range exporter.Names() {
-		if h, err := harness.Lookup(a); err == nil && exportsToRelay(h, relayAddr(dir)) {
-			pointed = append(pointed, a)
+	var pointed, blocked []string
+	for _, e := range registered.With[agents.RelayExporter]() {
+		if ok, known := e.RelayPointed(relayAddr(dir)); known && ok {
+			pointed = append(pointed, e.Name())
+		}
+		if c, ok := e.(agents.RelayChecker); ok {
+			if _, _, problem := c.RelayProblem(dir); problem {
+				blocked = append(blocked, e.Name())
+			}
 		}
 	}
 	facts["terma.relay.agents_pointed"] = pointed
-	if _, ok := exporter.CodexDaemonPredates(dir); ok {
-		facts["terma.codex.daemon_predates_setup"] = true
-	}
+	facts["terma.relay.agents_blocked"] = blocked
 	return facts
 }
 
@@ -142,17 +144,6 @@ func installKind() string {
 		return "source"
 	}
 	return "script"
-}
-
-// exportsToRelay reports whether h's user-level exporter points at the relay on addr
-// (Gemini's endpoint carries the token as its first path segment).
-func exportsToRelay(h harness.Harness, addr string) bool {
-	st, err := h.Status()
-	if err != nil || !st.Connected {
-		return false
-	}
-	ep := strings.TrimRight(st.Endpoint, "/")
-	return ep == "http://"+addr || strings.HasPrefix(ep, "http://"+addr+"/")
 }
 
 // relayHeartbeatSend delivers a heartbeat to the organization the developer signed in

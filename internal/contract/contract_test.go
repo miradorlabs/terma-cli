@@ -13,7 +13,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
-	"github.com/miradorlabs/terma-cli/internal/relay/exporter"
 )
 
 var update = flag.Bool("update", false, "rewrite the snapshots from the current build")
@@ -125,7 +124,7 @@ func TestManagedConfiguration(t *testing.T) {
 // TestRelayExporterFiles pins what pointing each agent at the local relay writes into
 // its user-level configuration, in a home of its own.
 func TestRelayExporterFiles(t *testing.T) {
-	for _, e := range exporter.All() {
+	for _, e := range builtin.Agents().With[agents.RelayExporter]() {
 		t.Run(e.Name(), func(t *testing.T) {
 			home := t.TempDir()
 			t.Setenv("HOME", home)
@@ -143,7 +142,7 @@ func TestRelayExporterFiles(t *testing.T) {
 			if err := os.MkdirAll(state, 0o700); err != nil {
 				t.Fatal(err)
 			}
-			_, err := e.Configure(t.Context(), exporter.Config{
+			_, err := e.ConfigureRelay(t.Context(), agents.RelayConfig{
 				Endpoint: "http://127.0.0.1:43180", Token: "relay-token",
 				HookCommand: []string{terma, "hook"}, StateDir: state,
 			})

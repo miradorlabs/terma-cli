@@ -20,7 +20,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
-	"github.com/miradorlabs/terma-cli/internal/relay/exporter"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 	"github.com/miradorlabs/terma-cli/internal/serverkey"
@@ -261,7 +260,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	}
 	f.excludePrompts = !include
 	f.excludeToolContent = !resolveToolContent(cmd, cfg.ProjectID, f)
-	if len(exporter.Targets(agents)) > 0 {
+	if len(registered.RelayTargets(agents)) > 0 {
 		if include {
 			ui.summary("Prompts", "prompt text and model responses are sent — `terma install --prompts off` stops them")
 		} else {
@@ -691,7 +690,7 @@ func connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *config.Conf
 	if err != nil {
 		return err
 	}
-	targets := exporter.Targets(agents)
+	targets := registered.RelayTargets(agents)
 	if len(targets) == 0 {
 		return nil
 	}

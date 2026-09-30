@@ -12,7 +12,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/keystore"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
-	"github.com/miradorlabs/terma-cli/internal/relay/exporter"
 )
 
 // relayResolver turns a claim into where its session's telemetry goes: the project's
@@ -27,7 +26,7 @@ import (
 // ceiling, and the developer's routing record for the project can only narrow it.
 func relayResolver(cfg *config.Config, mint func(projectID string)) func(claim.Claim) (relay.Policy, error) {
 	return func(c claim.Claim) (relay.Policy, error) {
-		key := keystore.GetFor(exporter.NameForTool(c.Tool), c.ProjectID)
+		key := keystore.GetFor(registered.NameForTool(c.Tool), c.ProjectID)
 		if key == "" {
 			key = keystore.Get(c.ProjectID)
 		}
@@ -61,7 +60,7 @@ func relayResolver(cfg *config.Config, mint func(projectID string)) func(claim.C
 		}
 		in := relay.Capture{Org: org, Primary: globalPrimary}
 		if c.Tool != "" {
-			in.Harness = exporter.NameForTool(c.Tool)
+			in.Harness = registered.NameForTool(c.Tool)
 		}
 		if rec, ok, err := routing.LoadRecord(c.ProjectID); err != nil {
 			in.RecordErr = err
