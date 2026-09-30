@@ -22,6 +22,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+
+	"github.com/miradorlabs/terma-cli/internal/serverkey"
 )
 
 // Signal is one OTLP telemetry stream.
@@ -346,4 +348,23 @@ func SignalsFromNames(names []string) []Signal {
 		}
 	}
 	return out
+}
+
+// WithoutSignal is signals without drop.
+func WithoutSignal(signals []Signal, drop Signal) []Signal {
+	out := signals[:0]
+	for _, s := range signals {
+		if s != drop {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// MaskKey renders a credential as a recognizable but unusable prefix.
+func MaskKey(key string) string {
+	if key == "" {
+		return ""
+	}
+	return serverkey.Mask(key)
 }

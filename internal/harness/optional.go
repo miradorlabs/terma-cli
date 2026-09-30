@@ -53,18 +53,26 @@ type EmissionChecker interface {
 }
 
 var (
-	_ EmissionChecker = Claude{}
-
 	_ Noter = Codex{}
 
-	_ Credentialed = Claude{}
 	_ Credentialed = Codex{}
 
-	_ Backuper = Claude{}
 	_ Backuper = Codex{}
 
-	_ Scoped = Claude{}
-
-	_ StatusLiner  = Claude{}
 	_ TurnNotifier = Codex{}
 )
+
+// StatusLineState is what a config's status line looks like to Terma.
+type StatusLineState struct {
+	ConfigPath string
+	// Installed: the file holds Terma's command.
+	Installed bool
+	// Renderer is the previous command Terma passes through ("" when none).
+	Renderer string
+	// Replaced: Terma wrapped this file once, and the file now holds a status
+	// line that is not Terma's. Capture has stopped; the user's entry stands.
+	Replaced bool
+	// Overrides lists settings files that outrank this one and define their own
+	// statusLine, so Terma's never runs there.
+	Overrides []string
+}

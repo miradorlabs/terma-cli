@@ -64,7 +64,7 @@ func loadTOML(path string) (*tomlFile, error) {
 		mode:      SettingsMode,
 	}
 
-	writePath, symlinked, err := resolveWritePath(path)
+	writePath, symlinked, err := ResolveWritePath(path)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +154,7 @@ func (f *tomlFile) save(tighten bool) error {
 // backup copies the file alongside itself before the first modification. See
 // settingsFile.backup for the rule behind replace.
 func (f *tomlFile) backup(replace bool) (string, error) {
-	return backupFile(f.writePath, f.existed, replace)
+	return BackupFile(f.writePath, f.existed, replace)
 }
 
 // verifySplice re-parses the spliced text and checks it against what was intended.

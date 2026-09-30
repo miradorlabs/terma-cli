@@ -6,8 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
 // Repository install can wrap the machine's Claude status line without ever
@@ -17,7 +15,7 @@ func TestDisconnectClaudeRestoresStatusLineWithoutTelemetry(t *testing.T) {
 	t.Setenv("TERMA_ENV", "dev")
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
-	c := harness.Claude{}
+	c := claudeHarness(t)
 	path, err := c.ConfigPath()
 	if err != nil {
 		t.Fatal(err)

@@ -1,7 +1,6 @@
 package hookmgr
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/pelletier/go-toml/v2"
@@ -26,16 +25,6 @@ func TestManagedConfig(t *testing.T) {
 	cmd := ManagedHookCommand("$HOME/.local/bin/terma")
 	if got := cmd("codex-stop"); got != `[ -x "$HOME/.local/bin/terma" ] && "$HOME/.local/bin/terma" hook --user codex-stop || true` || !ownedHookCommand(got) {
 		t.Fatalf("managed command %q", got)
-	}
-	claude, err := ClaudeManagedSettings(cmd)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var settings struct {
-		Hooks map[string][]map[string]any `json:"hooks"`
-	}
-	if err := json.Unmarshal(claude, &settings); err != nil || len(settings.Hooks) != len(ClaudeHooks) {
-		t.Fatalf("managed settings: %v, %d events\n%s", err, len(settings.Hooks), claude)
 	}
 	var req struct {
 		Hooks map[string][]struct {

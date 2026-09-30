@@ -3,6 +3,8 @@ package claude
 
 import (
 	"context"
+	"path/filepath"
+	"runtime"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/harness"
@@ -17,40 +19,45 @@ type Agent struct{}
 
 func (Agent) Name() string                       { return "claude" }
 func (Agent) DisplayName() string                { return "Claude Code" }
-func (Agent) Installed(ctx context.Context) bool { return harness.Claude{}.Detect(ctx).Found }
-func (Agent) HooksPath() string                  { return hookmgr.ClaudeSettingsPath }
+func (Agent) Installed(ctx context.Context) bool { return exporter{}.Detect(ctx).Found }
+func (Agent) HooksPath() string                  { return settingsPath }
 func (Agent) Default(string) bool                { return true }
 func (Agent) Plan(root string, install bool) (hookmgr.Plan, error) {
-	return hookmgr.PlanClaudeSettings(root, install)
+	return planSettings(root, install)
 }
 
 func (Agent) Events() map[string]agents.Handler {
 	return map[string]agents.Handler{
-		"session-start": hookrun.SessionStart,
-		"session-end":   hookrun.SessionEnd,
-		"post-tool-use": hookrun.PostToolUse,
-		"stop":          hookrun.Stop,
-		"stop-failure":  hookrun.StopFailure,
+		"session-start": sessionStart,
+		"session-end":   sessionEnd,
+		"post-tool-use": postToolUse,
+		"stop":          stop,
+		"stop-failure":  stopFailure,
 		// Turn start: claims the session for the local relay and starts it (cmd/hook.go
 		// does both from the payload); the handler itself only reads the payload.
-		"user-prompt-submit": hookrun.UserPromptSubmit,
+		"user-prompt-submit": hookrun.TurnStart,
 		// A subagent runs inside the session; both are notification-only for terma.
-		"subagent-start": hookrun.SubagentStart,
-		"subagent-stop":  hookrun.SubagentStop,
+		"subagent-start": subagentStart,
+		"subagent-stop":  subagentStop,
 	}
 }
 
 func (Agent) FlushAfter() []string { return []string{"session-end", "stop", "stop-failure"} }
 
-func (Agent) UserHooksPath() (string, error) { return (harness.Claude{}).ConfigPath() }
+func (Agent) UserHooksPath() (string, error) { return (exporter{}).ConfigPath() }
 func (Agent) PlanUserHooks(dir string, command func(string) string, install bool) (hookmgr.Plan, error) {
-	return hookmgr.PlanClaudeUserHooks(dir, command, install)
+	return planUserHooks(dir, command, install)
 }
-func (Agent) ManagedHookFiles(root string) []string { return harness.ClaudeManagedHookFiles(root) }
+func (Agent) ManagedHookFiles(root string) []string {
+	if runtime.GOOS == "darwin" {
+		return []string{filepath.Join(root, "Library", "Application Support", "ClaudeCode", "managed-settings.json")}
+	}
+	return []string{filepath.Join(root, "etc", "claude-code", "managed-settings.json")}
+}
 
 // ManagedConfig is a managed-settings.json holding terma's hooks.
 func (Agent) ManagedConfig(command func(string) string) (string, []byte, error) {
-	data, err := hookmgr.ClaudeManagedSettings(command)
+	data, err := managedSettings(command)
 	return "claude-managed-settings.json", data, err
 }
 
@@ -60,21 +67,21 @@ func (Agent) ManagedDeploy() string {
 }
 
 // Harness is how terma configures the agent's exporter.
-func (Agent) Harness() harness.Harness { return harness.Claude{} }
+func (Agent) Harness() harness.Harness { return exporter{} }
 
 // RefreshMachine rewrites the status-line wrap.
-func (Agent) RefreshMachine() (string, bool, error) { return harness.Claude{}.RefreshStatusLine() }
+func (Agent) RefreshMachine() (string, bool, error) { return exporter{}.RefreshStatusLine() }
 
 // Renders is the status line: Claude Code's statusLine command once terma has wrapped
 // it. The renderer has its own deadline even when Claude does not cancel it; capture
 // starts detached delivery before waiting for rendering.
 func (Agent) Renders() map[string]agents.RenderHandler {
 	return map[string]agents.RenderHandler{"statusline": func(ctx context.Context, env hookrun.Env) int {
-		renderer, err := harness.StatusLineRenderer()
+		renderer, err := statusLineRenderer()
 		if err != nil {
 			env.Logf("status line record: %v", err)
 		}
-		return hookrun.StatusLine(ctx, env, hookrun.StatusLineOptions{Renderer: renderer, Indicator: env.Spool != nil, OnCapture: env.Flush})
+		return statusLine(ctx, env, statusLineOptions{Renderer: renderer, Indicator: env.Spool != nil, OnCapture: env.Flush})
 	}}
 }
 

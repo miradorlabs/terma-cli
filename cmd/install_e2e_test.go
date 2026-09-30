@@ -175,7 +175,7 @@ func TestInstallE2ELocations(t *testing.T) {
 			if err != nil || bound.Project.ID != testProjectID {
 				t.Fatalf("binding: %+v %v", bound, err)
 			}
-			for _, path := range []string{hookmgr.ClaudeSettingsPath, hooksPathOf("cursor"), hookmgr.CodexHooksPath, hooksPathOf("antigravity")} {
+			for _, path := range []string{hooksPathOf("claude"), hooksPathOf("cursor"), hookmgr.CodexHooksPath, hooksPathOf("antigravity")} {
 				if !bytes.Contains(readInstallFile(t, root, path), []byte("terma hook")) {
 					t.Fatalf("missing hooks in %s", path)
 				}
@@ -210,7 +210,7 @@ func TestInstallE2ELocations(t *testing.T) {
 					t.Fatalf("child inherited parent binding: %s", out)
 				}
 			}
-			for _, path := range []string{hookmgr.ClaudeSettingsPath, hookmgr.CodexHooksPath, hooksPathOf("antigravity"), hookmgr.ShimDir + "/post-commit"} {
+			for _, path := range []string{hooksPathOf("claude"), hookmgr.CodexHooksPath, hooksPathOf("antigravity"), hookmgr.ShimDir + "/post-commit"} {
 				requireAbsent(t, filepath.Join(root, path))
 			}
 			if bytes.Contains(readInstallFile(t, root, hooksPathOf("cursor")), []byte("terma hook")) {
@@ -298,13 +298,13 @@ func TestInstallE2ERejectsBrokenInputsWithoutWrites(t *testing.T) {
 				path = termaproject.FileName
 				body = `{"project":`
 			case "broken_hooks":
-				path = hookmgr.ClaudeSettingsPath
+				path = hooksPathOf("claude")
 				body = `{"hooks":`
 			case "null_hooks":
-				path = hookmgr.ClaudeSettingsPath
+				path = hooksPathOf("claude")
 				body = `{"hooks":null}`
 			case "null_document":
-				path = hookmgr.ClaudeSettingsPath
+				path = hooksPathOf("claude")
 				body = `null`
 			case "shim_collision":
 				path = hookmgr.ShimDir + "/post-commit"
@@ -403,15 +403,15 @@ func TestInstallE2EMixedHooksAndLookalikes(t *testing.T) {
 	s.git(root, "init", "-q")
 	owned, _ := json.Marshal(hookmgr.HookCommand("post-tool-use"))
 	body := `{"hooks":{"PostToolUse":[{"matcher":"Write","hooks":[{"type":"command","command":` + string(owned) + `},{"type":"command","command":"./audit.sh"},{"type":"command","command":"echo 'terma hook post-tool-use'"}]}]}}`
-	s.write(root, hookmgr.ClaudeSettingsPath, body)
+	s.write(root, hooksPathOf("claude"), body)
 	s.write(root, hooksPathOf("cursor"), `{"version":42}`)
 	s.install(root)
-	got := string(readInstallFile(t, root, hookmgr.ClaudeSettingsPath))
+	got := string(readInstallFile(t, root, hooksPathOf("claude")))
 	if !strings.Contains(got, "./audit.sh") || !strings.Contains(got, "echo 'terma hook post-tool-use'") {
 		t.Fatalf("install erased user handlers: %s", got)
 	}
 	s.cli(root, "uninstall", "--yes")
-	got = string(readInstallFile(t, root, hookmgr.ClaudeSettingsPath))
+	got = string(readInstallFile(t, root, hooksPathOf("claude")))
 	if !strings.Contains(got, "./audit.sh") || !strings.Contains(got, "echo 'terma hook post-tool-use'") {
 		t.Fatalf("uninstall erased user handlers: %s", got)
 	}
@@ -454,7 +454,7 @@ func TestInstallE2ENonGitHooksActuallyRun(t *testing.T) {
 	var doc struct {
 		Hooks map[string][]struct{ Hooks []struct{ Command string } }
 	}
-	if err := json.Unmarshal(readInstallFile(t, root, hookmgr.ClaudeSettingsPath), &doc); err != nil {
+	if err := json.Unmarshal(readInstallFile(t, root, hooksPathOf("claude")), &doc); err != nil {
 		t.Fatal(err)
 	}
 	for _, event := range []string{"SessionStart", "PostToolUse"} {
@@ -517,7 +517,7 @@ func TestInstallE2ESymlinkedConfigIsNotModified(t *testing.T) {
 				if err := os.MkdirAll(filepath.Join(root, ".claude"), 0o755); err != nil {
 					t.Fatal(err)
 				}
-				link = filepath.Join(root, hookmgr.ClaudeSettingsPath)
+				link = filepath.Join(root, hooksPathOf("claude"))
 			case "agent_directory":
 				link = filepath.Join(root, ".claude")
 				target = external
@@ -554,26 +554,26 @@ func TestInstallE2EUninstallOwnership(t *testing.T) {
 			s := newInstallSandbox(t)
 			root := s.mkdir("workspace")
 			s.git(root, "init", "-q")
-			s.write(root, hookmgr.ClaudeSettingsPath, `{"env":{"USER_FLAG":"keep","OTEL_LOG_USER_PROMPTS":"0"}}`)
+			s.write(root, hooksPathOf("claude"), `{"env":{"USER_FLAG":"keep","OTEL_LOG_USER_PROMPTS":"0"}}`)
 			s.install(root, "--exclude-prompts=false")
 			switch kind {
 			case "journal_missing":
 				s.env = append(s.env, "TERMA_CONFIG_DIR="+filepath.Join(s.base, "other-machine"))
 			case "user_changed_after_install":
 				var doc map[string]any
-				if err := json.Unmarshal(readInstallFile(t, root, hookmgr.ClaudeSettingsPath), &doc); err != nil {
+				if err := json.Unmarshal(readInstallFile(t, root, hooksPathOf("claude")), &doc); err != nil {
 					t.Fatal(err)
 				}
 				doc["env"].(map[string]any)["OTEL_LOG_USER_PROMPTS"] = "user-choice"
 				data, _ := json.Marshal(doc)
-				s.write(root, hookmgr.ClaudeSettingsPath, string(data))
+				s.write(root, hooksPathOf("claude"), string(data))
 			}
 			out := s.cli(root, "uninstall", "--yes")
 			var doc struct {
 				Env   map[string]string
 				Hooks map[string]any
 			}
-			if err := json.Unmarshal(readInstallFile(t, root, hookmgr.ClaudeSettingsPath), &doc); err != nil {
+			if err := json.Unmarshal(readInstallFile(t, root, hooksPathOf("claude")), &doc); err != nil {
 				t.Fatal(err)
 			}
 			if doc.Env["USER_FLAG"] != "keep" || len(doc.Hooks) != 0 {
@@ -653,8 +653,8 @@ func TestInstallE2EPreservesFileMode(t *testing.T) {
 	s := newInstallSandbox(t)
 	root := s.mkdir("workspace")
 	s.git(root, "init", "-q")
-	s.write(root, hookmgr.ClaudeSettingsPath, `{"user":"keep"}`)
-	path := filepath.Join(root, hookmgr.ClaudeSettingsPath)
+	s.write(root, hooksPathOf("claude"), `{"user":"keep"}`)
+	path := filepath.Join(root, hooksPathOf("claude"))
 	if err := os.Chmod(path, 0o600); err != nil {
 		t.Fatal(err)
 	}

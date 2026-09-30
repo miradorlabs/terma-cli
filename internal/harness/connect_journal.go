@@ -15,7 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
-// journal records exactly what a connect changed, so a disconnect can put it back.
+// Journal records exactly what a connect changed, so a disconnect can put it back.
 //
 // Without it, ownership has to be inferred — "the endpoint points at Terma, so
 // Terma must have written this" — and inference gets it wrong in both directions. A
@@ -28,7 +28,7 @@ import (
 // It lives under ~/.config/terma rather than in the harness's own config, because it is
 // Terma's bookkeeping and has no business in a file the user reads and edits. It can
 // hold a previous Authorization header, so it is written 0600 like the credential file.
-type journal struct {
+type Journal struct {
 	Harness    string `json:"harness"`
 	ConfigPath string `json:"config_path"`
 
@@ -56,7 +56,7 @@ type journal struct {
 	ProjectID string `json:"project_id,omitempty"`
 }
 
-// journalPath keys the record by the config file it describes, not by the harness alone.
+// JournalPath keys the record by the config file it describes, not by the harness alone.
 //
 // One harness can be connected in more than one place — a sandbox under CLAUDE_CONFIG_DIR
 // alongside the real ~/.claude, which is exactly how anyone tests this. A single
@@ -69,7 +69,7 @@ type journal struct {
 // too long, and full of separators. The basename keeps the harness name so the directory
 // stays readable, and ConfigPath inside the file remains the authoritative answer to
 // "which config is this?".
-func journalPath(harness, configPath string) (string, error) {
+func JournalPath(harness, configPath string) (string, error) {
 	dir, err := config.Dir()
 	if err != nil {
 		return "", err
@@ -79,10 +79,10 @@ func journalPath(harness, configPath string) (string, error) {
 	return filepath.Join(dir, "telemetry", name), nil
 }
 
-// loadJournal returns nil when there is no record, which is not an error: a config
+// LoadJournal returns nil when there is no record, which is not an error: a config
 // configured by hand or in another clone simply has none.
-func loadJournal(harness, configPath string) (*journal, error) {
-	path, err := journalPath(harness, configPath)
+func LoadJournal(harness, configPath string) (*Journal, error) {
+	path, err := JournalPath(harness, configPath)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func loadJournal(harness, configPath string) (*journal, error) {
 		return nil, fmt.Errorf("read %s: %w", path, err)
 	}
 
-	var j journal
+	var j Journal
 	if err := json.Unmarshal(data, &j); err != nil {
 		// Absence means there is no local ownership record. Corruption
 		// is different: silently treating a damaged ownership record as absent would let
@@ -130,8 +130,9 @@ func loadJournal(harness, configPath string) (*journal, error) {
 	return &j, nil
 }
 
-func (j *journal) save() error {
-	path, err := journalPath(j.Harness, j.ConfigPath)
+// Save writes the journal, private to this user: it can hold a previous credential.
+func (j *Journal) Save() error {
+	path, err := JournalPath(j.Harness, j.ConfigPath)
 	if err != nil {
 		return err
 	}
@@ -139,8 +140,9 @@ func (j *journal) save() error {
 	return config.WriteJSON(path, j, SettingsMode)
 }
 
-func deleteJournal(harness, configPath string) error {
-	path, err := journalPath(harness, configPath)
+// DeleteJournal removes the journal of the config at configPath.
+func DeleteJournal(harness, configPath string) error {
+	path, err := JournalPath(harness, configPath)
 	if err != nil {
 		return err
 	}
@@ -150,17 +152,17 @@ func deleteJournal(harness, configPath string) error {
 	return nil
 }
 
-// newJournal captures the state before a connect overwrites it. When this is a
+// NewJournal captures the state before a connect overwrites it. When this is a
 // reconnect, previous carries the original ownership chain forward: values that still
 // match the prior install retain their pre-Terma value, while values edited since the
 // prior connect become the new value to restore after this explicit reconnect.
-func newJournal(
+func NewJournal(
 	harnessName, configPath string,
 	existing, installing map[string]string,
 	cleared, clearedSettings map[string]string,
-	previous *journal,
-) *journal {
-	j := &journal{
+	previous *Journal,
+) *Journal {
+	j := &Journal{
 		Harness:           harnessName,
 		ConfigPath:        configPath,
 		Installed:         make(map[string]string, len(installing)),
@@ -180,7 +182,7 @@ func newJournal(
 				continue
 			}
 			j.Installed[key] = installed
-			j.Previous[key] = cloneString(previous.Previous[key])
+			j.Previous[key] = CloneString(previous.Previous[key])
 		}
 		maps.Copy(j.Cleared, previous.Cleared)
 		maps.Copy(j.ClearedSettings, previous.ClearedSettings)
@@ -189,7 +191,7 @@ func newJournal(
 		// intermediate Terma state.
 		for key, installed := range previous.InstalledSettings {
 			j.InstalledSettings[key] = installed
-			j.PreviousSettings[key] = cloneString(previous.PreviousSettings[key])
+			j.PreviousSettings[key] = CloneString(previous.PreviousSettings[key])
 		}
 	}
 
@@ -199,7 +201,7 @@ func newJournal(
 			if priorInstalled, owned := previous.Installed[key]; owned {
 				current, present := existing[key]
 				if present && current == priorInstalled {
-					j.Previous[key] = cloneString(previous.Previous[key])
+					j.Previous[key] = CloneString(previous.Previous[key])
 					continue
 				}
 				// The value was edited or removed after the earlier connect. This
@@ -227,7 +229,8 @@ func newJournal(
 	return j
 }
 
-func cloneString(value *string) *string {
+// CloneString copies what value points at; nil stays nil.
+func CloneString(value *string) *string {
 	if value == nil {
 		return nil
 	}
@@ -235,14 +238,14 @@ func cloneString(value *string) *string {
 	return &cloned
 }
 
-// apply undoes the connect against env, and reports what it did.
+// Apply undoes the connect against env, and reports what it did.
 //
 // A key is only touched when it still holds the value Terma installed. Anything else
 // is somebody's later edit — possibly the whole reason they are disconnecting — and
 // silently discarding it would be the same class of bug as never having journaled.
-func (j *journal) apply(env map[string]string) (DisconnectResult, *journal) {
+func (j *Journal) Apply(env map[string]string) (DisconnectResult, *Journal) {
 	var result DisconnectResult
-	remaining := &journal{
+	remaining := &Journal{
 		Harness:           j.Harness,
 		ConfigPath:        j.ConfigPath,
 		Installed:         map[string]string{},
@@ -258,7 +261,7 @@ func (j *journal) apply(env map[string]string) (DisconnectResult, *journal) {
 		if !present || current != installed {
 			result.Skipped = append(result.Skipped, key)
 			remaining.Installed[key] = installed
-			remaining.Previous[key] = cloneString(j.Previous[key])
+			remaining.Previous[key] = CloneString(j.Previous[key])
 			continue
 		}
 
@@ -284,17 +287,18 @@ func (j *journal) apply(env map[string]string) (DisconnectResult, *journal) {
 	return result, remaining
 }
 
-func (j *journal) empty() bool {
+// Empty reports whether the journal records nothing terma owns.
+func (j *Journal) Empty() bool {
 	return len(j.Installed) == 0 && len(j.Cleared) == 0 && len(j.ClearedSettings) == 0 &&
 		len(j.InstalledSettings) == 0
 }
 
-// pruneJournals removes records whose config file no longer exists — a temp-dir
+// PruneJournals removes records whose config file no longer exists — a temp-dir
 // sandbox that was deleted, a CLAUDE_CONFIG_DIR that came and went. Best-effort by
 // design and called after successful connects and disconnects: a record that cannot be
 // pruned today is retried on the next lifecycle operation, and a prune failure must
 // never fail the operation that triggered it.
-func pruneJournals() {
+func PruneJournals() {
 	dir, err := config.Dir()
 	if err != nil {
 		return

@@ -23,7 +23,7 @@ func (s *installSandbox) claudeEvent(root, cwd, event, id, file string) {
 	var doc struct {
 		Hooks map[string][]struct{ Hooks []struct{ Command string } }
 	}
-	if err := json.Unmarshal(readInstallFile(s.t, root, hookmgr.ClaudeSettingsPath), &doc); err != nil {
+	if err := json.Unmarshal(readInstallFile(s.t, root, hooksPathOf("claude")), &doc); err != nil {
 		s.t.Fatal(err)
 	}
 	payload, err := json.Marshal(map[string]any{"session_id": id, "cwd": cwd, "hook_event_name": event, "tool_name": "Write", "tool_input": map[string]string{"file_path": filepath.Join(root, file)}})
@@ -50,7 +50,7 @@ func TestInstallE2ENonGitToGit(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			originalHooks := readInstallFile(t, root, hookmgr.ClaudeSettingsPath)
+			originalHooks := readInstallFile(t, root, hooksPathOf("claude"))
 			dirs, err := filepath.Glob(filepath.Join(s.base, "config", "workspaces", "*"))
 			if err != nil || len(dirs) != 1 {
 				t.Fatalf("private store reservation: %v %v", dirs, err)
@@ -136,7 +136,7 @@ func TestInstallE2ENonGitToGit(t *testing.T) {
 			if after.Install.HookManager != "git" {
 				t.Fatalf("Git hooks not recorded: %+v", after.Install)
 			}
-			if got := readInstallFile(t, root, hookmgr.ClaudeSettingsPath); !bytes.Equal(originalHooks, got) {
+			if got := readInstallFile(t, root, hooksPathOf("claude")); !bytes.Equal(originalHooks, got) {
 				t.Fatalf("upgrade churned agent hooks or policy:\n%s", got)
 			}
 			nowActive, _ := store.Active(time.Now(), 0)

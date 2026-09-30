@@ -52,7 +52,7 @@ func TestRefreshContinuesAfterExporterMigrationFails(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "team.json"), []byte("broken json"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	claude := harness.Claude{}
+	claude := claudeHarness(t)
 	if _, err := claude.InstallStatusLine(); err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +84,7 @@ func TestRefreshContinuesAfterExporterMigrationFails(t *testing.T) {
 		t.Fatal(err)
 	}
 	var settings struct{ StatusLine struct{ Command string } }
-	if err := json.Unmarshal(status, &settings); err != nil || settings.StatusLine.Command != harness.StatusLineCommand("") {
+	if err := json.Unmarshal(status, &settings); err != nil || settings.StatusLine.Command == "exec terma hook statusline" || !strings.Contains(settings.StatusLine.Command, "terma hook statusline") {
 		t.Fatalf("Claude status line stayed stale: %s (%v)", status, err)
 	}
 	if got, _ := os.ReadFile(pluginPath); !bytes.Equal(got, wantPlugin) {

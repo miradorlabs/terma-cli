@@ -79,3 +79,21 @@ func harnessOf(t *testing.T, name string) harness.Harness {
 	}
 	return h
 }
+
+// claudeHarness is Claude Code's harness, with the capabilities these tests use.
+func claudeHarness(t *testing.T) interface {
+	harness.Scoped
+	harness.StatusLiner
+	harness.Credentialed
+} {
+	t.Helper()
+	h, ok := harnessOf(t, "claude").(interface {
+		harness.Scoped
+		harness.StatusLiner
+		harness.Credentialed
+	})
+	if !ok {
+		t.Fatal("claude's harness lost a capability")
+	}
+	return h
+}

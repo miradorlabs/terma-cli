@@ -14,8 +14,7 @@ func TestEveryHookReaderRefusesOversizedInput(t *testing.T) {
 		read    func(io.Reader) error
 		payload string
 	}{
-		"claude": {func(r io.Reader) error { _, err := readClaudeInput(r); return err }, `{"session_id":"valid"}`},
-		"codex":  {func(r io.Reader) error { _, err := readCodexHookInput(r); return err }, `{"session_id":"valid"}`},
+		"codex": {func(r io.Reader) error { _, err := readCodexHookInput(r); return err }, `{"session_id":"valid"}`},
 	}
 	for name, c := range readers {
 		if err := c.read(strings.NewReader(c.payload)); err != nil {

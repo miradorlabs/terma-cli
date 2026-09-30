@@ -33,14 +33,3 @@ func TestPlannersRefuseAFileTheyCannotRead(t *testing.T) {
 		})
 	}
 }
-
-// Absent is still absent: the contract change must not turn a first install into an error.
-func TestPlannersStillCreateWhatIsMissing(t *testing.T) {
-	plan, err := PlanClaudeSettings(t.TempDir(), true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(plan.Changes) != 1 || plan.Changes[0].Before != nil {
-		t.Fatalf("a missing settings file should be one create, got %+v", plan.Changes)
-	}
-}

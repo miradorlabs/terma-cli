@@ -259,11 +259,11 @@ func TestAskConnectOptionsRefusesImpossibleLocalBeforePrompting(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "Codex has no repository settings") {
 		t.Fatalf("err = %v", err)
 	}
-	_, err = askConnectOptions(connectFlags{scope: "local"}, []harness.Harness{harness.Claude{}}, connectForm{})
+	_, err = askConnectOptions(connectFlags{scope: "local"}, []harness.Harness{harnessOf(t, "claude")}, connectForm{})
 	if err == nil || !strings.Contains(err.Error(), "not inside a git repository") {
 		t.Fatalf("err = %v", err)
 	}
-	if got := localUnavailable([]harness.Harness{harness.Claude{}}, "/repo"); got != "" {
+	if got := localUnavailable([]harness.Harness{harnessOf(t, "claude")}, "/repo"); got != "" {
 		t.Errorf("Claude Code in a repository must be offered local scope, got %q", got)
 	}
 	for names, want := range map[string]string{

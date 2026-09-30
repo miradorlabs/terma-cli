@@ -111,14 +111,15 @@ func TestUserHookFiles(t *testing.T) {
 // --managed-config`.
 func TestManagedConfiguration(t *testing.T) {
 	command := hookmgr.ManagedHookCommand("$HOME/.local/bin/terma")
-	claude, err := hookmgr.ClaudeManagedSettings(command)
-	if err != nil {
-		t.Fatal(err)
+	files := map[string][]byte{}
+	for _, a := range builtin.Agents().With[agents.ManagedHooks]() {
+		name, data, err := a.ManagedConfig(command)
+		if err != nil {
+			t.Fatal(err)
+		}
+		files[a.Name()+"/"+name] = data
 	}
-	check(t, "managed", map[string][]byte{
-		"claude/managed-settings.json": claude,
-		"codex/requirements.toml":      []byte(hookmgr.CodexManagedRequirements(command)),
-	}, "")
+	check(t, "managed", files, "")
 }
 
 // TestRelayExporterFiles pins what pointing each agent at the local relay writes into

@@ -470,14 +470,14 @@ func (c Codex) Status() (Status, error) {
 	// A metrics exporter with analytics disabled is set and sends nothing. Reporting
 	// metrics as on would send someone hunting in Terma for data Codex never sent.
 	if codexAnalyticsDisabled(f.doc) {
-		status.Signals = withoutSignal(status.Signals, SignalMetrics)
+		status.Signals = WithoutSignal(status.Signals, SignalMetrics)
 	}
 
 	// Ownership is by journal only. A config with none is somebody else's work
 	// — a company collector, say — and every
 	// standard otel key in it is theirs. Counting those as managed would let disconnect
 	// delete a telemetry setup Terma never touched.
-	j, err := loadJournal(c.Name(), path)
+	j, err := LoadJournal(c.Name(), path)
 	if err != nil {
 		return Status{}, err
 	}
@@ -793,7 +793,7 @@ func (c Codex) Connect(e Exporter, clearConflicts bool) error {
 	if err != nil {
 		return err
 	}
-	previousJournal, err := loadJournal(c.Name(), path)
+	previousJournal, err := LoadJournal(c.Name(), path)
 	if err != nil {
 		return err
 	}
@@ -847,7 +847,7 @@ func (c Codex) Connect(e Exporter, clearConflicts bool) error {
 		carried = &copied
 	}
 
-	j := newJournal(c.Name(), path, current, rendered, cleared, nil, carried)
+	j := NewJournal(c.Name(), path, current, rendered, cleared, nil, carried)
 
 	maps.Copy(current, rendered)
 	f.otel, err = otelFromCanonical(current)
@@ -856,16 +856,16 @@ func (c Codex) Connect(e Exporter, clearConflicts bool) error {
 	}
 
 	// Ownership first, then the file, with the same rollback as Claude's connect.
-	if err := j.save(); err != nil {
+	if err := j.Save(); err != nil {
 		return err
 	}
-	defer pruneJournals()
+	defer PruneJournals()
 	if err := f.save(e.APIKey != ""); err != nil {
 		var rollbackErr error
 		if previousJournal != nil {
-			rollbackErr = previousJournal.save()
+			rollbackErr = previousJournal.Save()
 		} else {
-			rollbackErr = deleteJournal(c.Name(), path)
+			rollbackErr = DeleteJournal(c.Name(), path)
 		}
 		if rollbackErr != nil {
 			return fmt.Errorf("write config: %w (also failed to restore telemetry journal: %w)", err, rollbackErr)
@@ -885,7 +885,7 @@ func (c Codex) Disconnect() (DisconnectResult, error) {
 	if err != nil {
 		return DisconnectResult{}, err
 	}
-	j, err := loadJournal(c.Name(), path)
+	j, err := LoadJournal(c.Name(), path)
 	if err != nil {
 		return DisconnectResult{}, err
 	}
@@ -899,10 +899,10 @@ func (c Codex) Disconnect() (DisconnectResult, error) {
 	if j == nil {
 		return DisconnectResult{}, nil
 	}
-	result, remaining := j.apply(current)
+	result, remaining := j.Apply(current)
 	sort.Strings(result.Skipped)
 
-	defer pruneJournals()
+	defer PruneJournals()
 	if result.Removed > 0 || result.Restored > 0 {
 		f.otel, err = otelFromCanonical(current)
 		if err != nil {
@@ -913,10 +913,10 @@ func (c Codex) Disconnect() (DisconnectResult, error) {
 		}
 	}
 
-	if remaining != nil && !remaining.empty() {
-		return result, remaining.save()
+	if remaining != nil && !remaining.Empty() {
+		return result, remaining.Save()
 	}
-	return result, deleteJournal(c.Name(), path)
+	return result, DeleteJournal(c.Name(), path)
 }
 
 // Backup exposes the pre-modification copy. Same rule as Claude's: a journal for this
@@ -931,7 +931,7 @@ func (c Codex) Backup(endpoint string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	j, err := loadJournal(c.Name(), path)
+	j, err := LoadJournal(c.Name(), path)
 	if err != nil {
 		return "", err
 	}

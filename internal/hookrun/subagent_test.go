@@ -8,77 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/spool"
-	"github.com/miradorlabs/terma-cli/internal/trailer"
 )
-
-// A Claude Code subagent is a facet of the parent session: the same session_id on
-// every event, the agent named on its start, its edits and its end.
-func TestClaudeSubagentIsAFacetOfTheParentSession(t *testing.T) {
-	root := initRepo(t)
-	ctx := context.Background()
-	sp, _ := spool.Open(t.TempDir())
-	env := func(stdin string) Env {
-		return Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
-	}
-	parent := `"session_id":"sess-claude-9","cwd":"` + root + `","prompt_id":"prompt-1"`
-	const agent = `"agent_id":"a44816aa66a297cdd","agent_type":"Explore"`
-
-	if err := SubagentStart(ctx, env(`{`+parent+`,"hook_event_name":"SubagentStart",`+agent+`,"transcript_path":"/nope"}`)); err != nil {
-		t.Fatal(err)
-	}
-	hookruntest.WriteFile(t, root, "src/sub.go", "package src\n")
-	if err := PostToolUse(ctx, env(`{`+parent+`,"hook_event_name":"PostToolUse",`+agent+`,"tool_name":"Write","tool_input":{"file_path":"src/sub.go"}}`)); err != nil {
-		t.Fatal(err)
-	}
-	if err := SubagentStop(ctx, env(`{`+parent+`,"hook_event_name":"SubagentStop",`+agent+`,"agent_transcript_path":"/nope","last_assistant_message":"secret","stop_hook_active":false}`)); err != nil {
-		t.Fatal(err)
-	}
-	// Without an agent_id there is no subagent to report.
-	if err := SubagentStop(ctx, env(`{`+parent+`,"hook_event_name":"SubagentStop"}`)); err != nil {
-		t.Fatal(err)
-	}
-
-	events := hookruntest.Spooled(t, sp)
-	if got := hookruntest.Names(events); got != "terma.subagent.start terma.files.touched terma.subagent.end" {
-		t.Fatalf("events: %s", got)
-	}
-	for _, e := range events {
-		if e.SessionID != "sess-claude-9" {
-			t.Fatalf("%s keyed on %q, want the parent session", e.Name, e.SessionID)
-		}
-		if e.Attrs["agent_id"] != "a44816aa66a297cdd" || e.Attrs["agent_type"] != "Explore" || e.Attrs["tool"] != "claude-code" {
-			t.Fatalf("%s lacks the agent facet: %v", e.Name, e.Attrs)
-		}
-		for _, k := range []string{"last_assistant_message", "agent_transcript_path", "transcript_path"} {
-			if _, ok := e.Attrs[k]; ok {
-				t.Fatalf("%s carries %s", e.Name, k)
-			}
-		}
-	}
-	if events[0].Attrs["turn_id"] != "prompt-1" || events[0].Attrs["terma.version"] != "test" {
-		t.Fatalf("start attrs: %v", events[0].Attrs)
-	}
-	if events[1].Attrs["files"] != "src/sub.go" {
-		t.Fatalf("touched attrs: %v", events[1].Attrs)
-	}
-
-	// The manifest is the session's: the parent's commit of the subagent's file is stamped.
-	if _, err := gitx.Git(ctx, root, "add", "src/sub.go"); err != nil {
-		t.Fatal(err)
-	}
-	msgPath := filepath.Join(t.TempDir(), "COMMIT_EDITMSG")
-	_ = os.WriteFile(msgPath, []byte("subagent work\n"), 0o644)
-	if err := PrepareCommitMsg(ctx, Env{Now: time.Now(), Cwd: root, Args: []string{msgPath, "message"}, Stdin: strings.NewReader(""), Spool: sp}); err != nil {
-		t.Fatal(err)
-	}
-	data, _ := os.ReadFile(msgPath)
-	if got := trailer.Parse(string(data), "#"); len(got) != 1 || got[0].SessionID != "sess-claude-9" {
-		t.Fatalf("unexpected trailers %+v in:\n%s", got, data)
-	}
-}
 
 // Codex has both shapes: in-thread subagents (hooks with agent_id) and spawned threads
 // (a child rollout naming its parent), and CodexSessionStart reports the latter.

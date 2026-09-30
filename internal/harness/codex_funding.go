@@ -29,7 +29,7 @@ func CodexOAuthAccountID() (string, bool) {
 	if err != nil {
 		return "", false
 	}
-	doc, status := readEvidenceJSON(filepath.Join(home, "auth.json"))
+	doc, status := ReadEvidenceJSON(filepath.Join(home, "auth.json"))
 	if status != "present" {
 		return "", false
 	}
@@ -68,7 +68,7 @@ func CodexOAuthUser() (email, userID string, ok bool) {
 	if err != nil {
 		return "", "", false
 	}
-	doc, status := readEvidenceJSON(filepath.Join(home, "auth.json"))
+	doc, status := ReadEvidenceJSON(filepath.Join(home, "auth.json"))
 	if status != "present" {
 		return "", "", false
 	}
@@ -113,7 +113,7 @@ func codexIDClaims(idToken string) (email, userID string) {
 	if json.Unmarshal(payload, &claims) != nil {
 		return "", ""
 	}
-	if claims.Verified && validEmail(claims.Email) {
+	if claims.Verified && ValidEmail(claims.Email) {
 		email = claims.Email
 	}
 	if evidenceLabel.MatchString(claims.Auth.UserID) {
@@ -286,24 +286,24 @@ func codexQuota(raw json.RawMessage, at time.Time) FundingEvidence {
 	}
 	e.Status = "present"
 	for _, key := range []string{"plan_type", "limit_id", "rate_limit_reached_type"} {
-		copyEvidenceString(e.Attrs, limits, key, key)
+		CopyEvidenceString(e.Attrs, limits, key, key)
 	}
-	copyEvidenceBool(e.Attrs, limits, "spend_control_reached", "spend_control_reached")
+	CopyEvidenceBool(e.Attrs, limits, "spend_control_reached", "spend_control_reached")
 	for _, window := range []string{"primary", "secondary"} {
 		var fields map[string]json.RawMessage
 		if json.Unmarshal(limits[window], &fields) != nil || fields == nil {
 			continue
 		}
-		copyEvidenceNumber(e.Attrs, fields, "used_percent", window+"_used_pct", math.MaxFloat64, false)
-		copyEvidenceNumber(e.Attrs, fields, "window_minutes", window+"_window_minutes", math.MaxInt32, true)
-		copyEvidenceNumber(e.Attrs, fields, "resets_at", window+"_resets_at", math.MaxInt64, true)
+		CopyEvidenceNumber(e.Attrs, fields, "used_percent", window+"_used_pct", math.MaxFloat64, false)
+		CopyEvidenceNumber(e.Attrs, fields, "window_minutes", window+"_window_minutes", math.MaxInt32, true)
+		CopyEvidenceNumber(e.Attrs, fields, "resets_at", window+"_resets_at", math.MaxInt64, true)
 	}
 	var credits map[string]json.RawMessage
 	if json.Unmarshal(limits["credits"], &credits) == nil && credits != nil {
-		copyEvidenceBool(e.Attrs, credits, "has_credits", "has_credits")
-		copyEvidenceBool(e.Attrs, credits, "unlimited", "credits_unlimited")
+		CopyEvidenceBool(e.Attrs, credits, "has_credits", "has_credits")
+		CopyEvidenceBool(e.Attrs, credits, "unlimited", "credits_unlimited")
 		var balance string
-		if json.Unmarshal(credits["balance"], &balance) == nil && validCreditBalance(balance) {
+		if json.Unmarshal(credits["balance"], &balance) == nil && ValidCreditBalance(balance) {
 			e.Attrs["credits_balance"] = balance // Preserve units and precision; never call it USD.
 		}
 	}

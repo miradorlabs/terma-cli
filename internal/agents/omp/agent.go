@@ -30,7 +30,7 @@ func (Agent) Events() map[string]agents.Handler {
 		"omp-session-start": sessionStart,
 		"omp-session-end":   sessionEnd,
 		"omp-file-edit":     fileEdit,
-		"omp-prompt":        hookrun.ExtensionPrompt,
+		"omp-prompt":        hookrun.TurnStart,
 	}
 }
 

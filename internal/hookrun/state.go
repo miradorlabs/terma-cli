@@ -16,8 +16,6 @@ import (
 // names are on developers' disks already: renaming one orphans its files and restarts
 // every sequence and cursor kept there.
 const (
-	// statusLineStateDir is the last quota snapshot each Claude Code session spooled.
-	statusLineStateDir = "statusline"
 	// fundingStateDir is the hash of the last funding evidence spooled per session.
 	fundingStateDir = "funding"
 	// codexFundingCursorDir and codexReplyCursorDir are how far into a Codex rollout
@@ -28,9 +26,6 @@ const (
 	// codexTitleStateDir is when each Codex thread's name that was last spooled was written.
 	codexTitleStateDir = "codex-titles"
 	codexToolStartDir  = "codex-tool-starts"
-	// claudeSubagentDir holds launch evidence per (session, agent), so internal
-	// Claude forks' orphan stop hooks cannot create delegated runs.
-	claudeSubagentDir = "claude-subagents"
 )
 
 // SnapshotStateRetention is how long a status line snapshot or a funding evidence hash

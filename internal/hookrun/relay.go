@@ -72,15 +72,3 @@ func ClaimFromPayload(ctx context.Context, env Env, s PayloadSession, tool strin
 // claimPIDs are the processes this hook runs under, one of which is the agent: a claim
 // covers only records those processes export. Walked once per hook.
 var claimPIDs = sync.OnceValue(procinfo.Ancestors)
-
-// UserPromptSubmit is Claude Code's turn-start hook. terma records nothing for it:
-// the caller claims the session for the local relay from the payload this reads, and
-// starts the relay, so a relay that died between turns is back before the turn's
-// telemetry is exported. It must print nothing — Claude Code hands this hook's stdout
-// to the model as context.
-func UserPromptSubmit(_ context.Context, env Env) error {
-	_, err := ReadInput[struct {
-		SessionID string `json:"session_id"`
-	}](env.Stdin)
-	return err
-}

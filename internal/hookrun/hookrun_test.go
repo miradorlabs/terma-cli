@@ -19,91 +19,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/trailer"
 )
 
-func TestClaudeSessionStampsOnlyItsOwnFiles(t *testing.T) {
-	root := initRepo(t)
-	ctx := context.Background()
-	sp, _ := spool.Open(t.TempDir())
-	now := time.Now()
-	env := func(stdin string, args ...string) Env {
-		return Env{Now: now, Cwd: root, Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
-	}
-
-	if err := SessionStart(ctx, env(`{"session_id":"sess-claude-1","cwd":"`+root+`","hook_event_name":"SessionStart","source":"startup","model":"claude-opus-5"}`)); err != nil {
-		t.Fatal(err)
-	}
-	hookruntest.WriteFile(t, root, "src/agent.go", "package src\n")
-	hookruntest.WriteFile(t, root, "notes/human.md", "mine\n")
-	if err := PostToolUse(ctx, env(`{"session_id":"sess-claude-1","cwd":"`+root+`","tool_name":"Write","tool_input":{"file_path":"`+filepath.Join(root, "src", "agent.go")+`"}}`)); err != nil {
-		t.Fatal(err)
-	}
-
-	// Commit only the human file: no trailer.
-	if _, err := gitx.Git(ctx, root, "add", "notes/human.md"); err != nil {
-		t.Fatal(err)
-	}
-	msgPath := filepath.Join(t.TempDir(), "COMMIT_EDITMSG")
-	_ = os.WriteFile(msgPath, []byte("human note\n"), 0o644)
-	if err := PrepareCommitMsg(ctx, env("", msgPath, "message")); err != nil {
-		t.Fatal(err)
-	}
-	if data, _ := os.ReadFile(msgPath); strings.Contains(string(data), "Agent-Session-Id") {
-		t.Fatalf("human-only commit must not be stamped:\n%s", data)
-	}
-	if _, err := gitx.Git(ctx, root, "commit", "-q", "-F", msgPath); err != nil {
-		t.Fatal(err)
-	}
-
-	// Now the agent's file: stamped with the session that touched it.
-	if _, err := gitx.Git(ctx, root, "add", "src/agent.go"); err != nil {
-		t.Fatal(err)
-	}
-	_ = os.WriteFile(msgPath, []byte("Add agent code\n\n# comment\n"), 0o644)
-	start := time.Now()
-	if err := PrepareCommitMsg(ctx, env("", msgPath, "")); err != nil {
-		t.Fatal(err)
-	}
-	if elapsed := time.Since(start); elapsed > 200*time.Millisecond {
-		t.Logf("warning: prepare-commit-msg took %s", elapsed)
-	}
-	data, _ := os.ReadFile(msgPath)
-	got := trailer.Parse(string(data), "#")
-	if len(got) != 1 || got[0].SessionID != "sess-claude-1" || got[0].Tool != "claude-code" {
-		t.Fatalf("unexpected trailers %+v in:\n%s", got, data)
-	}
-	if _, err := gitx.Git(ctx, root, "commit", "-q", "-F", msgPath); err != nil {
-		t.Fatal(err)
-	}
-	if err := PostCommit(ctx, env("")); err != nil {
-		t.Fatal(err)
-	}
-
-	// The committed file is consumed: a later commit of unrelated work is clean,
-	// even though the session is still active.
-	hookruntest.WriteFile(t, root, "notes/again.md", "more\n")
-	_, _ = gitx.Git(ctx, root, "add", "notes/again.md")
-	_ = os.WriteFile(msgPath, []byte("more notes\n"), 0o644)
-	_ = PrepareCommitMsg(ctx, env("", msgPath, ""))
-	if data, _ := os.ReadFile(msgPath); strings.Contains(string(data), "Agent-Session-Id") {
-		t.Fatalf("work already committed must not re-stamp a later human commit, even with the session still active:\n%s", data)
-	}
-
-	// Spool: start, account snapshot, files touched, stamped, commit.
-	n, _, _ := sp.Pending()
-	if n != 5 {
-		t.Fatalf("expected 5 spooled events, got %d", n)
-	}
-	var names []string
-	res := sp.Flush(ctx, spool.SenderFunc(func(_ context.Context, events []spool.Event) ([]spool.Event, error) {
-		for _, e := range events {
-			names = append(names, e.Name)
-		}
-		return nil, nil
-	}), spool.FlushOptions{})
-	if res.Err != nil || strings.Join(names, " ") != "terma.session.start terma.session.account terma.files.touched terma.commit.stamped terma.commit" {
-		t.Fatalf("unexpected events %v (%v)", names, res.Err)
-	}
-}
-
 func TestActiveSessionFallbackAndMergeSkip(t *testing.T) {
 	root := initRepo(t)
 	ctx := context.Background()
@@ -146,7 +61,7 @@ func TestHandlersNeverFailOutsideARepo(t *testing.T) {
 	ctx := context.Background()
 	env := Env{Cwd: t.TempDir(), Stdin: strings.NewReader(`{"session_id":"s"}`), Args: []string{"/nonexistent"}}
 	for name, fn := range map[string]func(context.Context, Env) error{
-		"start": SessionStart, "end": SessionEnd, "tool": PostToolUse,
+		"start": startSession, "end": endSession, "tool": editFile,
 		"prepare": PrepareCommitMsg, "post": PostCommit, "codex": CodexNotify,
 	} {
 		if err := fn(ctx, env); err != nil {
@@ -154,7 +69,7 @@ func TestHandlersNeverFailOutsideARepo(t *testing.T) {
 		}
 	}
 	bad := Env{Cwd: t.TempDir(), Stdin: strings.NewReader("not json")}
-	if err := SessionStart(ctx, bad); err != nil {
+	if err := startSession(ctx, bad); err != nil {
 		t.Errorf("garbage input must be ignored, got %v", err)
 	}
 }
@@ -207,13 +122,13 @@ func TestPostCommitReportsPerFileLineStats(t *testing.T) {
 	touch := func(at time.Time, sessionID, rel string) {
 		t.Helper()
 		in := `{"session_id":"` + sessionID + `","cwd":"` + root + `","tool_name":"Edit","tool_input":{"file_path":"` + filepath.Join(root, rel) + `"}}`
-		if err := PostToolUse(ctx, env(at, in)); err != nil {
+		if err := editFile(ctx, env(at, in)); err != nil {
 			t.Fatal(err)
 		}
 	}
 
 	for _, id := range []string{"sess-a", "sess-b"} {
-		if err := SessionStart(ctx, env(now, `{"session_id":"`+id+`","cwd":"`+root+`","hook_event_name":"SessionStart","source":"startup"}`)); err != nil {
+		if err := startSession(ctx, env(now, `{"session_id":"`+id+`","cwd":"`+root+`","hook_event_name":"SessionStart","source":"startup"}`)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -301,14 +216,14 @@ func TestPostCommitBoundsFileStats(t *testing.T) {
 	env := func(stdin string, args ...string) Env {
 		return Env{Now: now, Cwd: root, Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
 	}
-	if err := SessionStart(ctx, env(`{"session_id":"sess-wide","cwd":"`+root+`","hook_event_name":"SessionStart"}`)); err != nil {
+	if err := startSession(ctx, env(`{"session_id":"sess-wide","cwd":"`+root+`","hook_event_name":"SessionStart"}`)); err != nil {
 		t.Fatal(err)
 	}
 	total := MaxCommitFileStats + 5
 	for i := range total {
 		rel := fmt.Sprintf("src/f%03d.go", i)
 		hookruntest.WriteFile(t, root, rel, "package p\n")
-		if err := PostToolUse(ctx, env(`{"session_id":"sess-wide","cwd":"`+root+`","tool_name":"Write","tool_input":{"file_path":"`+filepath.Join(root, rel)+`"}}`)); err != nil {
+		if err := editFile(ctx, env(`{"session_id":"sess-wide","cwd":"`+root+`","tool_name":"Write","tool_input":{"file_path":"`+filepath.Join(root, rel)+`"}}`)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -449,11 +364,11 @@ func TestCommitEventsAreOneFilterApart(t *testing.T) {
 	// A human commit, then an agent commit.
 	hookruntest.WriteFile(t, root, "notes/human.md", "mine\n")
 	humanSHA := commit("notes/human.md", "human note")
-	if err := SessionStart(ctx, env(`{"session_id":"sess-1","cwd":"`+root+`","hook_event_name":"SessionStart"}`)); err != nil {
+	if err := startSession(ctx, env(`{"session_id":"sess-1","cwd":"`+root+`","hook_event_name":"SessionStart"}`)); err != nil {
 		t.Fatal(err)
 	}
 	hookruntest.WriteFile(t, root, "src/agent.go", "package src\n")
-	if err := PostToolUse(ctx, env(`{"session_id":"sess-1","cwd":"`+root+`","tool_name":"Write","tool_input":{"file_path":"`+filepath.Join(root, "src", "agent.go")+`"}}`)); err != nil {
+	if err := editFile(ctx, env(`{"session_id":"sess-1","cwd":"`+root+`","tool_name":"Write","tool_input":{"file_path":"`+filepath.Join(root, "src", "agent.go")+`"}}`)); err != nil {
 		t.Fatal(err)
 	}
 	agentSHA := commit("src/agent.go", "Add agent code")

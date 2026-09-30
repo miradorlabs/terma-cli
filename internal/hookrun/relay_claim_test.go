@@ -46,11 +46,11 @@ func TestHooksClaimSessionsForTheRelay(t *testing.T) {
 		return Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(stdin), Spool: sp, OnClaim: func() { claimed++ }}
 	}
 	const claude, codex = "claude-session-1", "codex-thread-1"
-	if err := SessionStart(context.Background(), env(`{"session_id":"`+claude+`","cwd":"`+root+`","model":"m"}`)); err != nil {
+	if err := startSession(context.Background(), env(`{"session_id":"`+claude+`","cwd":"`+root+`","model":"m"}`)); err != nil {
 		t.Fatal(err)
 	}
 	// A Codex session whose first hook is a tool call still claims.
-	if err := CodexPostToolUse(context.Background(), env(`{"session_id":"`+codex+`","cwd":"`+root+`","tool_name":"shell","tool_input":{"command":"ls"}}`)); err != nil {
+	if err := editFile(context.Background(), env(`{"session_id":"`+codex+`","cwd":"`+root+`","tool_name":"shell","tool_input":{"command":"ls"}}`)); err != nil {
 		t.Fatal(err)
 	}
 	// Nothing was spooled for that call, so the hook's payload claims it.
@@ -74,7 +74,7 @@ func TestNoClaimWithoutBindingOrRelay(t *testing.T) {
 	root := initRepo(t)
 	env := Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(`{"session_id":"s1","cwd":"` + root + `"}`)}
 	relaySetUp(t)
-	_ = SessionStart(context.Background(), env)
+	_ = startSession(context.Background(), env)
 	if _, ok := claim.Read("s1", time.Now()); ok {
 		t.Fatal("a repository without a binding claimed its session")
 	}
@@ -84,7 +84,7 @@ func TestNoClaimWithoutBindingOrRelay(t *testing.T) {
 		t.Fatal(err)
 	}
 	env = Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(`{"session_id":"s2","cwd":"` + root + `"}`)}
-	_ = SessionStart(context.Background(), env)
+	_ = startSession(context.Background(), env)
 	if _, ok := claim.Read("s2", time.Now()); ok {
 		t.Fatal("a machine without `terma relay setup` claimed a session")
 	}

@@ -151,10 +151,10 @@ func (rec *codexNotifyRecord) save(path string) error {
 	return config.WriteJSON(path, rec, SettingsMode)
 }
 
-// recordLockWait bounds the wait for another terma's update of a displaced-settings
+// RecordLockWait bounds the wait for another terma's update of a displaced-settings
 // record (the Codex notifier, the Claude status line). Only connect, install and
 // disconnect write one — never a hook — so it may wait.
-const recordLockWait = 5 * time.Second
+const RecordLockWait = 5 * time.Second
 
 // updateCodexNotifyRecord is the one way the record changes: load, edit, save, under a
 // lock. It is a single file for every Codex config on the machine, so two connects
@@ -168,7 +168,7 @@ func updateCodexNotifyRecord(edit func(*codexNotifyRecord)) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), recordLockWait)
+	ctx, cancel := context.WithTimeout(context.Background(), RecordLockWait)
 	defer cancel()
 	unlock, err := flock.Lock(ctx, path+".lock")
 	if err != nil {
@@ -207,7 +207,7 @@ func writeCodexConfig(path string, out []byte) error {
 	if err := toml.Unmarshal(out, &probe); err != nil {
 		return fmt.Errorf("refusing to write malformed Codex config: %w", err)
 	}
-	writePath, _, err := resolveWritePath(path)
+	writePath, _, err := ResolveWritePath(path)
 	if err != nil {
 		return err
 	}

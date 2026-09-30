@@ -102,7 +102,7 @@ func TestTelemetryRejectsUnknownSignalBeforeWriting(t *testing.T) {
 	}
 
 	// Nothing should have been written on the way to that error.
-	h := harness.Claude{}
+	h := claudeHarness(t)
 	st, statusErr := h.Status()
 	if statusErr != nil {
 		t.Fatalf("Status: %v", statusErr)
@@ -667,7 +667,7 @@ func TestTelemetryReconnectReusesInstalledKey(t *testing.T) {
 		t.Errorf("reconnect did not report the reuse:\n%s", out)
 	}
 
-	h := harness.Claude{}
+	h := claudeHarness(t)
 	key, ok := h.CurrentCredential("https://otel.terma.ai", "770e8400-e29b-41d4-a716-446655440000")
 	if !ok || key != "ter_srv_0123456789abcdef" {
 		t.Fatalf("installed key after reconnect = (%q, %v), want the original", key, ok)
@@ -760,7 +760,7 @@ func TestTelemetryConnectKeepsKeysSeparatePerHarness(t *testing.T) {
 	if err := connect("claude", "--project", project, "--yes"); err == nil {
 		t.Fatal("connect claude succeeded with no key and no login — it must have taken Codex's key")
 	}
-	h := harness.Claude{}
+	h := claudeHarness(t)
 	if key, ok := h.CurrentCredential("https://otel.terma.ai", project); ok {
 		t.Fatalf("Claude Code holds %q, want no key installed", harness.MaskKey(key))
 	}
@@ -780,7 +780,7 @@ func TestTelemetryConnectSeveralHarnessesAtOnce(t *testing.T) {
 	if err != nil {
 		t.Fatalf("connect claude codex: %v", err)
 	}
-	for _, h := range []harness.Harness{harness.Claude{}, harness.Codex{}} {
+	for _, h := range []harness.Harness{harnessOf(t, "claude"), harnessOf(t, "codex")} {
 		cur := h.(interface {
 			CurrentCredential(endpoint, projectID string) (string, bool)
 		})

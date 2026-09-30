@@ -1,7 +1,6 @@
 package hookmgr
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -178,77 +177,5 @@ func TestPreCommitAddsLocalHooksAndHookTypes(t *testing.T) {
 	}
 	if got := hookruntest.ReadFile(t, root, ".pre-commit-config.yaml"); strings.Contains(got, "terma") || !strings.Contains(got, "psf/black") {
 		t.Fatalf("uninstall wrong:\n%s", got)
-	}
-}
-
-func TestClaudeSettingsMergeKeepsUnknownKeys(t *testing.T) {
-	root := t.TempDir()
-	hookruntest.WriteFile(t, root, ClaudeSettingsPath, `{
-  "permissions": {"allow": ["Bash(npm test)"]},
-  "hooks": {
-    "PostToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "./lint.sh"}]}]
-  }
-}
-`)
-	plan, err := PlanClaudeSettings(root, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := Apply(root, plan); err != nil {
-		t.Fatal(err)
-	}
-	got := hookruntest.ReadFile(t, root, ClaudeSettingsPath)
-	var doc struct {
-		Permissions json.RawMessage `json:"permissions"`
-		Hooks       map[string][]struct {
-			Matcher string `json:"matcher"`
-			Hooks   []struct {
-				Command string `json:"command"`
-			} `json:"hooks"`
-		} `json:"hooks"`
-	}
-	if err := json.Unmarshal([]byte(got), &doc); err != nil {
-		t.Fatalf("%v:\n%s", err, got)
-	}
-	if string(doc.Permissions) != `{"allow": ["Bash(npm test)"]}` {
-		t.Fatalf("permissions rewritten: %s", doc.Permissions)
-	}
-	if len(doc.Hooks["PostToolUse"]) != 2 || doc.Hooks["PostToolUse"][0].Hooks[0].Command != "./lint.sh" {
-		t.Fatalf("existing PostToolUse hook lost: %+v", doc.Hooks["PostToolUse"])
-	}
-	if doc.Hooks["PostToolUse"][1].Matcher != "Edit|Write|MultiEdit|NotebookEdit|Agent|Task" || doc.Hooks["PostToolUse"][1].Hooks[0].Command != HookCommand("post-tool-use") {
-		t.Fatalf("terma hook wrong: %+v", doc.Hooks["PostToolUse"][1])
-	}
-	if len(doc.Hooks["SessionStart"]) != 1 || len(doc.Hooks["SessionEnd"]) != 1 {
-		t.Fatalf("session hooks missing: %v", doc.Hooks)
-	}
-	if len(doc.Hooks["SubagentStart"]) != 1 || len(doc.Hooks["SubagentStop"]) != 1 || doc.Hooks["SubagentStop"][0].Hooks[0].Command != HookCommand("subagent-stop") {
-		t.Fatalf("subagent hooks missing: %v", doc.Hooks)
-	}
-	if again, _ := PlanClaudeSettings(root, true); !again.Empty() {
-		t.Fatal("install should be idempotent")
-	}
-	un, _ := PlanClaudeSettings(root, false)
-	if err := Apply(root, un); err != nil {
-		t.Fatal(err)
-	}
-	got = hookruntest.ReadFile(t, root, ClaudeSettingsPath)
-	if strings.Contains(got, "terma") || !strings.Contains(got, "./lint.sh") || !strings.Contains(got, "Bash(npm test)") {
-		t.Fatalf("uninstall wrong:\n%s", got)
-	}
-}
-
-func TestClaudeSettingsCreatedAndRemovedWhole(t *testing.T) {
-	root := t.TempDir()
-	plan, _ := PlanClaudeSettings(root, true)
-	if err := Apply(root, plan); err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(hookruntest.ReadFile(t, root, ClaudeSettingsPath), "terma hook session-start") {
-		t.Fatal("file not created")
-	}
-	un, _ := PlanClaudeSettings(root, false)
-	if len(un.Changes) != 1 || un.Changes[0].Action() != "delete" {
-		t.Fatalf("expected a delete, got %+v", un.Changes)
 	}
 }

@@ -24,7 +24,7 @@ type Extension struct {
 func (x Extension) Events(prefix string) map[string]func(context.Context, Env) error {
 	return map[string]func(context.Context, Env) error{
 		prefix + "-session-start": x.sessionStart,
-		prefix + "-prompt":        ExtensionPrompt,
+		prefix + "-prompt":        TurnStart,
 		prefix + "-session-end":   x.sessionEnd,
 		prefix + "-file-edit":     x.fileEdit,
 	}
@@ -111,11 +111,11 @@ func (x Extension) fileEdit(ctx context.Context, env Env) error {
 	return nil
 }
 
-// ExtensionPrompt is an extension's turn-start call. terma records nothing for it: the
-// caller claims the session for the local relay from the payload and starts the relay,
-// so a session whose start the extension missed, or a relay that died between turns, is
-// covered before the turn exports (as UserPromptSubmit is for Claude Code).
-func ExtensionPrompt(_ context.Context, env Env) error {
+// TurnStart is a turn-start hook that records nothing: the caller claims the session
+// for the local relay from the payload and starts the relay, so a session whose start
+// was missed, or a relay that died between turns, is covered before the turn exports.
+// It must print nothing: an agent may hand the hook's stdout to the model.
+func TurnStart(_ context.Context, env Env) error {
 	_, err := readExtensionInput(env.Stdin)
 	return err
 }

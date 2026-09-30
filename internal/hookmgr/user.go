@@ -2,8 +2,6 @@ package hookmgr
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 )
 
@@ -20,23 +18,6 @@ func ManagedHookCommand(terma string) func(event string) string {
 	return func(event string) string {
 		return "[ -x " + q + " ] && " + q + " hook --user " + event + " || true"
 	}
-}
-
-// ClaudeManagedSettings is a managed-settings.json holding terma's hooks.
-func ClaudeManagedSettings(command func(event string) string) ([]byte, error) {
-	dir, err := os.MkdirTemp("", "terma-managed")
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = os.RemoveAll(dir) }()
-	plan, err := planClaude(dir, "managed-settings.json", command, true)
-	if err != nil {
-		return nil, err
-	}
-	if err := Apply(dir, plan); err != nil {
-		return nil, err
-	}
-	return os.ReadFile(filepath.Join(dir, "managed-settings.json"))
 }
 
 // CodexManagedRequirements is the [hooks] table of a Codex requirements.toml holding

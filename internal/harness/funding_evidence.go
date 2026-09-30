@@ -25,11 +25,15 @@ type FundingEvidence struct {
 	Attrs      map[string]any
 }
 
-const evidenceFileLimit = 2 << 20
+// EvidenceFileLimit bounds an evidence file terma reads.
+const EvidenceFileLimit = 2 << 20
 
 var evidenceLabel = regexp.MustCompile(`^[a-zA-Z0-9_.:-]{1,128}$`)
 
-func readEvidenceJSON(path string) (map[string]json.RawMessage, string) {
+// ReadEvidenceJSON reads a regular JSON object file within the bound, with the status
+// "present"; when it cannot, the document is nil and the status says why: missing,
+// unreadable, unsupported, oversized or malformed.
+func ReadEvidenceJSON(path string) (map[string]json.RawMessage, string) {
 	st, err := os.Lstat(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, "missing"
@@ -40,7 +44,7 @@ func readEvidenceJSON(path string) (map[string]json.RawMessage, string) {
 	if !st.Mode().IsRegular() {
 		return nil, "unsupported"
 	}
-	if st.Size() > evidenceFileLimit {
+	if st.Size() > EvidenceFileLimit {
 		return nil, "oversized"
 	}
 	f, err := os.OpenFile(path, os.O_RDONLY|evidenceOpenFlags, 0)
@@ -48,11 +52,11 @@ func readEvidenceJSON(path string) (map[string]json.RawMessage, string) {
 		return nil, "unreadable"
 	}
 	defer f.Close()
-	data, err := io.ReadAll(io.LimitReader(f, evidenceFileLimit+1))
+	data, err := io.ReadAll(io.LimitReader(f, EvidenceFileLimit+1))
 	if err != nil {
 		return nil, "unreadable"
 	}
-	if len(data) > evidenceFileLimit {
+	if len(data) > EvidenceFileLimit {
 		return nil, "oversized"
 	}
 	var doc map[string]json.RawMessage
@@ -62,31 +66,35 @@ func readEvidenceJSON(path string) (map[string]json.RawMessage, string) {
 	return doc, "present"
 }
 
-func copyEvidenceString(dst map[string]any, doc map[string]json.RawMessage, from, to string) {
+// CopyEvidenceString copies doc[from] to dst[to] when it is a bounded label.
+func CopyEvidenceString(dst map[string]any, doc map[string]json.RawMessage, from, to string) {
 	var value string
 	if json.Unmarshal(doc[from], &value) == nil && evidenceLabel.MatchString(value) {
 		dst[to] = value
 	}
 }
 
-func copyEvidenceBool(dst map[string]any, doc map[string]json.RawMessage, from, to string) {
+// CopyEvidenceBool copies doc[from] to dst[to] when it is a boolean.
+func CopyEvidenceBool(dst map[string]any, doc map[string]json.RawMessage, from, to string) {
 	var value *bool
 	if json.Unmarshal(doc[from], &value) == nil && value != nil {
 		dst[to] = *value
 	}
 }
 
-func copyEvidenceNumber(dst map[string]any, doc map[string]json.RawMessage, from, to string, maxValue float64, integer bool) {
+// CopyEvidenceNumber copies doc[from] to dst[to] when it is a finite number in
+// [0, maxValue], and whole when integer is set.
+func CopyEvidenceNumber(dst map[string]any, doc map[string]json.RawMessage, from, to string, maxValue float64, integer bool) {
 	var n *float64
 	if json.Unmarshal(doc[from], &n) == nil && n != nil && !math.IsNaN(*n) && !math.IsInf(*n, 0) && *n >= 0 && *n <= maxValue && (!integer || math.Trunc(*n) == *n) {
 		dst[to] = *n
 	}
 }
 
-// validEmail is a bounded shape check (not RFC 5322): the address rides verbatim into every quota
+// ValidEmail is a bounded shape check (not RFC 5322): the address rides verbatim into every quota
 // spool entry, so it must be non-empty, within the spool budget, and free of separators that would
 // corrupt an attribute value.
-func validEmail(s string) bool {
+func ValidEmail(s string) bool {
 	if len(s) < 3 || len(s) > 254 {
 		return false
 	}
@@ -102,7 +110,8 @@ func validEmail(s string) bool {
 	return true
 }
 
-func validCreditBalance(s string) bool {
+// ValidCreditBalance reports whether s is a decimal credit balance.
+func ValidCreditBalance(s string) bool {
 	if len(s) == 0 || len(s) > 128 {
 		return false
 	}
