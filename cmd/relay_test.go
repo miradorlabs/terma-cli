@@ -253,6 +253,12 @@ func TestRelayServiceDefinitions(t *testing.T) {
 			t.Errorf("unit lacks %q:\n%s", want, unit)
 		}
 	}
+	vbs := windowsLauncher(`C:\Users\a "b"\terma.exe`, env)
+	for _, want := range []string{`env("TERMA_CONFIG_DIR") = "/tmp/a & b"`, `shell.Run """C:\Users\a ""b""\terma.exe"" relay supervise", 0, False`} {
+		if !strings.Contains(vbs, want) {
+			t.Errorf("launcher lacks %q:\n%s", want, vbs)
+		}
+	}
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	a, _ := relayServiceName()
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())

@@ -46,6 +46,9 @@ const (
 	relayStatsFile = "stats.json"
 	relayPIDFile   = "pid"
 	relayErrorFile = "last-error"
+	// relayStopFile asks the relay whose pid it holds to stop: how stopRelay reaches a
+	// relay on Windows, which has no SIGTERM. The relay looks every second.
+	relayStopFile = "stop"
 	// relayCodexFile records when `relay setup` last pointed Codex at the relay, so
 	// doctor can tell a Codex daemon that started before it (and still exports where
 	// it did) from one that reads the relay.
@@ -81,7 +84,7 @@ func newRelayCommand() *cobra.Command {
 		Short:  "Spike: the local OTLP relay that forwards only opted-in repositories' telemetry",
 		Hidden: true,
 	}
-	cmd.AddCommand(newRelayRunCommand(), newRelaySetupCommand(), newRelayStatusCommand(), newRelayDaemonCommand())
+	cmd.AddCommand(newRelayRunCommand(), newRelaySetupCommand(), newRelayStatusCommand(), newRelayDaemonCommand(), newRelaySuperviseCommand())
 	return cmd
 }
 
@@ -198,6 +201,10 @@ func newRelayRunCommand() *cobra.Command {
 						cancel()
 						break
 					}
+					if stopRequested(dir) {
+						cancel()
+						break
+					}
 					if time.Since(lastPrune) > time.Hour {
 						claim.Prune(time.Now())
 						lastPrune = time.Now()
@@ -237,11 +244,24 @@ func newRelayRunCommand() *cobra.Command {
 	return cmd
 }
 
+// stopRequested reports whether stopRelay asked this relay to stop through the stop
+// file, and takes the request. One naming another pid is a dead relay's, and is cleared.
+func stopRequested(dir string) bool {
+	path := filepath.Join(dir, relayStopFile)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	_ = os.Remove(path)
+	pid, _ := strconv.Atoi(strings.TrimSpace(string(data)))
+	return pid == os.Getpid()
+}
+
 // executableStamp identifies the file this process was started from — its size and
 // modification time — so a relay can tell it has been replaced. Empty when unknown.
 func executableStamp() string {
-	exe, err := os.Executable()
-	if err != nil {
+	exe := stableExecutable()
+	if exe == "" {
 		return ""
 	}
 	info, err := os.Stat(exe)
@@ -263,8 +283,15 @@ func stopRelay(dir string) {
 		return
 	}
 	proc, err := os.FindProcess(pid)
-	if err != nil || proc.Signal(syscall.SIGTERM) != nil {
+	if err != nil {
 		return
+	}
+	if proc.Signal(syscall.SIGTERM) != nil {
+		// Windows signals nothing but a kill, which would skip the relay's delivery of
+		// what it accepted: ask through the stop file instead.
+		if config.WriteFileAtomicNoSync(filepath.Join(dir, relayStopFile), []byte(strconv.Itoa(pid)+"\n"), 0o600) != nil {
+			return
+		}
 	}
 	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
 		if unlock, err := flock.TryLock(filepath.Join(dir, relayLockFile)); err == nil {
