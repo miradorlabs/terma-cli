@@ -1,4 +1,4 @@
-package harness
+package omp
 
 import (
 	"os"
@@ -6,24 +6,26 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
 // ompIn sandboxes omp's agent directory (OMP_DIR) and Terma's own, so a connect here
 // writes a throwaway hooks directory and helper.
-func ompIn(t *testing.T) (Omp, string) {
+func ompIn(t *testing.T) (exporter, string) {
 	t.Helper()
 	dir := t.TempDir()
 	t.Setenv(ompConfigOverride, dir)
 	t.Setenv("TERMA_CONFIG_DIR", filepath.Join(dir, "terma"))
-	return Omp{}, filepath.Join(dir, "agent", "hooks", "pre", "terma.ts")
+	return exporter{}, filepath.Join(dir, "agent", "hooks", "pre", "terma.ts")
 }
 
-func ompExporter(t *testing.T, h Omp, helper bool) Exporter {
+func ompExporter(t *testing.T, h exporter, helper bool) harness.Exporter {
 	t.Helper()
-	e := fullExporter()
+	e := baseExporter()
 	e.IncludePrompts, e.IncludeToolContent = true, false
 	if helper {
-		path, err := HelperFilePath(h, "proj_123")
+		path, err := harness.HelperFilePath(h, "proj_123")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -81,7 +83,7 @@ func TestOmpConnectWritesExtensionAndHelper(t *testing.T) {
 	if !reflect.DeepEqual(cfg.Signals, []string{"traces", "logs", "metrics"}) || !cfg.IncludePrompts || cfg.IncludeToolContent {
 		t.Errorf("policy = %v / %v / %v", cfg.Signals, cfg.IncludePrompts, cfg.IncludeToolContent)
 	}
-	if cfg.ResourceAttributes[AttrProjectID] != "proj_123" || cfg.ResourceAttributes[AttrEnduserID] != "dev@example.com" {
+	if cfg.ResourceAttributes[harness.AttrProjectID] != "proj_123" || cfg.ResourceAttributes[harness.AttrEnduserID] != "dev@example.com" {
 		t.Errorf("resource attributes = %v", cfg.ResourceAttributes)
 	}
 	if !reflect.DeepEqual(cfg.HookCommand, []string{"terma", "hook"}) {
@@ -94,7 +96,7 @@ func TestOmpConnectWritesExtensionAndHelper(t *testing.T) {
 	if info, err := os.Stat(e.HelperPath); err != nil || info.Mode().Perm() != 0o700 {
 		t.Fatalf("helper: %v, mode %v", err, info)
 	}
-	if keyFromHelper(e.HelperPath) != e.APIKey {
+	if harness.KeyFromHelper(e.HelperPath) != e.APIKey {
 		t.Fatal("helper does not hold the key")
 	}
 	// The user's own config was never touched, or created.
@@ -111,7 +113,7 @@ func TestOmpStatusRoundTrip(t *testing.T) {
 	}
 
 	e := ompExporter(t, h, true)
-	e.Signals = []Signal{SignalTraces, SignalLogs}
+	e.Signals = []harness.Signal{harness.SignalTraces, harness.SignalLogs}
 	if err := h.Connect(e, false); err != nil {
 		t.Fatal(err)
 	}
@@ -122,10 +124,10 @@ func TestOmpStatusRoundTrip(t *testing.T) {
 	if !st.Exists || !st.Connected || st.Endpoint != e.Endpoint || st.ManagedKeys != 1 {
 		t.Errorf("status = %+v", st)
 	}
-	if !reflect.DeepEqual(st.Signals, []Signal{SignalTraces, SignalLogs}) || !st.IncludePrompts || st.IncludeToolContent {
+	if !reflect.DeepEqual(st.Signals, []harness.Signal{harness.SignalTraces, harness.SignalLogs}) || !st.IncludePrompts || st.IncludeToolContent {
 		t.Errorf("policy = %v / %v / %v", st.Signals, st.IncludePrompts, st.IncludeToolContent)
 	}
-	if st.KeyPrefix != MaskKey(e.APIKey) || strings.Contains(st.KeyPrefix, e.APIKey[len(e.APIKey)-6:]) {
+	if st.KeyPrefix != harness.MaskKey(e.APIKey) || strings.Contains(st.KeyPrefix, e.APIKey[len(e.APIKey)-6:]) {
 		t.Errorf("key prefix = %q", st.KeyPrefix)
 	}
 	if st.ProjectID != "proj_123" {
@@ -185,7 +187,7 @@ func TestOmpInlineKeyIsTightened(t *testing.T) {
 		t.Errorf("mode = %o, want 0600 with the key inline", info.Mode().Perm())
 	}
 	st, _ := h.Status()
-	if !st.Connected || st.KeyPrefix != MaskKey(e.APIKey) {
+	if !st.Connected || st.KeyPrefix != harness.MaskKey(e.APIKey) {
 		t.Errorf("status = %+v", st)
 	}
 	if key, ok := h.CurrentCredential(e.Endpoint, "proj_123"); !ok || key != e.APIKey {
@@ -248,7 +250,7 @@ func TestOmpDisconnectLeavesForeignHelper(t *testing.T) {
 // no identity, so it is safe to commit.
 func TestOmpLocalPolicyCarriesNoCredential(t *testing.T) {
 	root := t.TempDir()
-	local := Omp{root: root}
+	local := exporter{root: root}
 	e := ompExporter(t, local, true)
 	if err := local.Connect(e, false); err != nil {
 		t.Fatal(err)
@@ -267,7 +269,7 @@ func TestOmpLocalPolicyCarriesNoCredential(t *testing.T) {
 	if err != nil || !st.Exists || !st.HasPolicy || st.Connected {
 		t.Errorf("local status = %+v, %v", st, err)
 	}
-	if !reflect.DeepEqual(st.Signals, []Signal{SignalTraces, SignalLogs, SignalMetrics}) {
+	if !reflect.DeepEqual(st.Signals, []harness.Signal{harness.SignalTraces, harness.SignalLogs, harness.SignalMetrics}) {
 		t.Errorf("signals = %v", st.Signals)
 	}
 	if _, ok := local.CurrentCredential(e.Endpoint, "proj_123"); ok {
@@ -299,10 +301,10 @@ func TestOmpConnectPerRepo(t *testing.T) {
 	if !cfg.PerRepo || cfg.HeadersHelper != "" || len(cfg.Headers) != 0 {
 		t.Errorf("per-repo config = %+v", cfg)
 	}
-	if cfg.Endpoint != e.Endpoint || cfg.HelpersDir == "" || cfg.HelperPrefix != "omp-otel-" || cfg.ProjectAttribute != AttrProjectID {
+	if cfg.Endpoint != e.Endpoint || cfg.HelpersDir == "" || cfg.HelperPrefix != "omp-otel-" || cfg.ProjectAttribute != harness.AttrProjectID {
 		t.Errorf("routing fields = %+v", cfg)
 	}
-	if _, present := cfg.ResourceAttributes[AttrProjectID]; present {
+	if _, present := cfg.ResourceAttributes[harness.AttrProjectID]; present {
 		t.Error("a per-repo extension must not pin a project id")
 	}
 	// Content capture is off in the shared floor: one repository's choice must not
@@ -311,11 +313,11 @@ func TestOmpConnectPerRepo(t *testing.T) {
 		t.Errorf("per-repo extension must not carry content capture: %+v", cfg)
 	}
 	// The project's helper holds the key.
-	helper, err := HelperFilePath(h, e.ProjectID)
+	helper, err := harness.HelperFilePath(h, e.ProjectID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if keyFromHelper(helper) != e.APIKey {
+	if harness.KeyFromHelper(helper) != e.APIKey {
 		t.Error("project helper does not hold the key")
 	}
 	if info, _ := os.Stat(path); info.Mode().Perm() != 0o644 {
@@ -324,11 +326,11 @@ func TestOmpConnectPerRepo(t *testing.T) {
 }
 
 func TestOmpConflicts(t *testing.T) {
-	e := Exporter{Endpoint: "https://otel.terma.ai"}
+	e := harness.Exporter{Endpoint: "https://otel.terma.ai"}
 
 	// A shell export pointing elsewhere defeats the extension's set.
-	t.Setenv(otelEndpoint, "https://other.example.com")
-	conflicts, err := (Omp{}).ConflictsWith(e)
+	t.Setenv(harness.EnvOTLPEndpoint, "https://other.example.com")
+	conflicts, err := (exporter{}).ConflictsWith(e)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -337,38 +339,43 @@ func TestOmpConflicts(t *testing.T) {
 	}
 
 	// The same value is no conflict.
-	t.Setenv(otelEndpoint, e.Endpoint)
-	if conflicts, _ := (Omp{}).ConflictsWith(e); len(conflicts) != 0 {
+	t.Setenv(harness.EnvOTLPEndpoint, e.Endpoint)
+	if conflicts, _ := (exporter{}).ConflictsWith(e); len(conflicts) != 0 {
 		t.Errorf("same endpoint should not conflict: %+v", conflicts)
 	}
 
 	// A protocol mismatch would silently disable the export.
-	t.Setenv(otelEndpoint, "")
-	t.Setenv(otelProtocol, "grpc")
-	conflicts, _ = (Omp{}).ConflictsWith(e)
-	if len(conflicts) != 1 || conflicts[0].Key != otelProtocol {
+	t.Setenv(harness.EnvOTLPEndpoint, "")
+	t.Setenv(harness.EnvOTLPProtocol, "grpc")
+	conflicts, _ = (exporter{}).ConflictsWith(e)
+	if len(conflicts) != 1 || conflicts[0].Key != harness.EnvOTLPProtocol {
 		t.Errorf("protocol conflict = %+v", conflicts)
 	}
 
 	// The upstream content switch exported in the shell is advisory, never blocking.
-	t.Setenv(otelProtocol, "")
+	t.Setenv(harness.EnvOTLPProtocol, "")
 	t.Setenv(ompCaptureContentEnv, "true")
-	conflicts, _ = (Omp{}).ConflictsWith(Exporter{Endpoint: e.Endpoint})
+	conflicts, _ = (exporter{}).ConflictsWith(harness.Exporter{Endpoint: e.Endpoint})
 	if len(conflicts) != 1 || !conflicts[0].Advisory {
 		t.Errorf("content-capture conflict should be advisory: %+v", conflicts)
 	}
-	if conflicts, _ := (Omp{}).ConflictsWith(Exporter{Endpoint: e.Endpoint, IncludePrompts: true}); len(conflicts) != 0 {
+	if conflicts, _ := (exporter{}).ConflictsWith(harness.Exporter{Endpoint: e.Endpoint, IncludePrompts: true}); len(conflicts) != 0 {
 		t.Errorf("a matching content export should not conflict: %+v", conflicts)
 	}
 }
 
 func TestOmpConnectNotesWarnAboutRestart(t *testing.T) {
-	notes := (Omp{}).ConnectNotes(Exporter{})
+	notes := (exporter{}).ConnectNotes(harness.Exporter{})
 	joined := strings.Join(notes, " ")
 	if !strings.Contains(joined, "restart") {
 		t.Errorf("notes must say omp loads hooks at startup: %v", notes)
 	}
-	if len((Omp{root: t.TempDir()}).ConnectNotes(Exporter{})) != 0 {
+	if len((exporter{root: t.TempDir()}).ConnectNotes(harness.Exporter{})) != 0 {
 		t.Error("repository scope has no user-facing caveats")
 	}
+}
+
+func baseExporter() harness.Exporter {
+	return harness.Exporter{Endpoint: "https://otel.terma.ai", APIKey: "ter_srv_0123456789abcdef", ProjectID: "proj_123", Signals: harness.AllSignals,
+		ResourceAttributes: map[string]string{harness.AttrServiceName: "omp", harness.AttrEnduserID: "dev@example.com", harness.AttrProjectID: "proj_123"}}
 }

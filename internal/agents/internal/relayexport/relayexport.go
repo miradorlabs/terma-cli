@@ -31,9 +31,3 @@ func NativePointed(h harness.Harness, addr string) bool {
 func Headers(cfg agents.RelayConfig) map[string]string {
 	return map[string]string{"Authorization": "Bearer " + cfg.Token}
 }
-
-// PiConfig is the relay configuration of terma's Pi-family extension.
-func PiConfig(cfg agents.RelayConfig) harness.PiConfig {
-	return harness.PiConfig{Endpoint: cfg.Endpoint, Headers: Headers(cfg),
-		IncludePrompts: true, IncludeToolContent: true, HookCommand: cfg.HookCommand}
-}

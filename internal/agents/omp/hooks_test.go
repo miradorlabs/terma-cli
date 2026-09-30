@@ -1,4 +1,4 @@
-package hookmgr
+package omp
 
 import (
 	"os"
@@ -6,48 +6,49 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
 )
 
 func TestOmpHooksInstallUninstallRoundTrip(t *testing.T) {
 	root := t.TempDir()
 
-	plan, err := PlanOmpHooks(root, true)
+	plan, err := planHooks(root, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if plan.Empty() {
 		t.Fatal("install on an empty repository must plan the hook file")
 	}
-	if len(plan.Changes) != 1 || plan.Changes[0].Path != OmpHooksPath || plan.Changes[0].Before != nil {
+	if len(plan.Changes) != 1 || plan.Changes[0].Path != hooksPath || plan.Changes[0].Before != nil {
 		t.Fatalf("plan = %+v", plan.Changes)
 	}
-	if err := Apply(root, plan); err != nil {
+	if err := hookmgr.Apply(root, plan); err != nil {
 		t.Fatal(err)
 	}
-	got := hookruntest.ReadFile(t, root, OmpHooksPath)
+	got := hookruntest.ReadFile(t, root, hooksPath)
 	if got != ompHooksSource {
 		t.Fatal("installed file differs from the embedded source")
 	}
 
 	// Install is idempotent: the file already matches the render.
-	again, err := PlanOmpHooks(root, true)
+	again, err := planHooks(root, true)
 	if err != nil || !again.Empty() {
 		t.Fatalf("reinstall plan = %+v, %v", again, err)
 	}
 
 	// Uninstall removes exactly that file.
-	un, err := PlanOmpHooks(root, false)
+	un, err := planHooks(root, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(un.Changes) != 1 || un.Changes[0].After != nil {
 		t.Fatalf("uninstall plan = %+v", un.Changes)
 	}
-	if err := Apply(root, un); err != nil {
+	if err := hookmgr.Apply(root, un); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(OmpHooksPath))); err == nil {
+	if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(hooksPath))); err == nil {
 		t.Fatal("hook file still present after uninstall")
 	}
 }
@@ -55,14 +56,14 @@ func TestOmpHooksInstallUninstallRoundTrip(t *testing.T) {
 // A hook file somebody edited is theirs: uninstall leaves it alone and says why.
 func TestOmpHooksUninstallKeepsAnEditedFile(t *testing.T) {
 	root := t.TempDir()
-	plan, _ := PlanOmpHooks(root, true)
-	if err := Apply(root, plan); err != nil {
+	plan, _ := planHooks(root, true)
+	if err := hookmgr.Apply(root, plan); err != nil {
 		t.Fatal(err)
 	}
 	edited := ompHooksSource + "\n// local tweak\n"
-	hookruntest.WriteFile(t, root, OmpHooksPath, edited)
+	hookruntest.WriteFile(t, root, hooksPath, edited)
 
-	un, err := PlanOmpHooks(root, false)
+	un, err := planHooks(root, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,22 +73,22 @@ func TestOmpHooksUninstallKeepsAnEditedFile(t *testing.T) {
 	if len(un.Notes) != 1 || !strings.Contains(un.Notes[0], "local edits") {
 		t.Fatalf("no note explaining the kept file: %v", un.Notes)
 	}
-	if got := hookruntest.ReadFile(t, root, OmpHooksPath); got != edited {
+	if got := hookruntest.ReadFile(t, root, hooksPath); got != edited {
 		t.Fatal("edited hook file was modified")
 	}
 
 	// Reinstalling rewrites terma's file in place, edits and all.
-	re, err := PlanOmpHooks(root, true)
+	re, err := planHooks(root, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(re.Changes) != 1 {
 		t.Fatalf("reinstall plan = %+v", re.Changes)
 	}
-	if err := Apply(root, re); err != nil {
+	if err := hookmgr.Apply(root, re); err != nil {
 		t.Fatal(err)
 	}
-	if got := hookruntest.ReadFile(t, root, OmpHooksPath); got != ompHooksSource {
+	if got := hookruntest.ReadFile(t, root, hooksPath); got != ompHooksSource {
 		t.Fatal("reinstall did not restore the render")
 	}
 }
@@ -114,7 +115,7 @@ func TestOmpHooksSourceNamesItsEvents(t *testing.T) {
 }
 
 func TestOmpHooksUninstallFromNothingIsANoop(t *testing.T) {
-	plan, err := PlanOmpHooks(t.TempDir(), false)
+	plan, err := planHooks(t.TempDir(), false)
 	if err != nil {
 		t.Fatal(err)
 	}

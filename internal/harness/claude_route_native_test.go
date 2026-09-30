@@ -60,7 +60,7 @@ func TestClaudeRouteNativeExport(t *testing.T) {
 	global, _ := (Claude{}).ConfigPath()
 	globalDoc := map[string]any{"env": map[string]string{
 		claudeBetaTracingDetailed: "1", claudeBetaTracingEndpoint: receiver.URL + "/wrongbeta",
-		otelEndpoint: receiver.URL + "/wrong", otelHeaders: "Authorization=Bearer WRONG",
+		EnvOTLPEndpoint: receiver.URL + "/wrong", EnvOTLPHeaders: "Authorization=Bearer WRONG",
 		"OTEL_EXPORTER_OTLP_LOGS_ENDPOINT": receiver.URL + "/wronglogs",
 		"OTEL_EXPORTER_OTLP_LOGS_HEADERS":  "Authorization=Bearer WRONG",
 	}, claudeOtelHeadersHelper: `echo '{"Authorization":"Bearer WRONG"}'`}

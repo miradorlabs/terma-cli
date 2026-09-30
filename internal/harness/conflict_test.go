@@ -243,7 +243,7 @@ func TestBackupTracksTheLatestNonMiradorConfiguration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadSettings: %v", err)
 	}
-	s.env[otelEndpoint] = "https://collector-b.example.com"
+	s.env[EnvOTLPEndpoint] = "https://collector-b.example.com"
 	if err := s.save(false); err != nil {
 		t.Fatalf("save: %v", err)
 	}
@@ -514,7 +514,7 @@ func TestDisconnectRestoresPreviousValuesAndSkipsEdits(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadSettings: %v", err)
 	}
-	s.env[otelProtocol] = "grpc"
+	s.env[EnvOTLPProtocol] = "grpc"
 	if err := s.save(false); err != nil {
 		t.Fatalf("save: %v", err)
 	}
@@ -526,21 +526,21 @@ func TestDisconnectRestoresPreviousValuesAndSkipsEdits(t *testing.T) {
 
 	env := envOf(t, path)
 	// Present before Terma: restored to the original values, not deleted.
-	if env[otelEndpoint] != "https://their-collector.example.com" {
-		t.Errorf("%s = %q, want the pre-Terma collector restored", otelEndpoint, env[otelEndpoint])
+	if env[EnvOTLPEndpoint] != "https://their-collector.example.com" {
+		t.Errorf("%s = %q, want the pre-Terma collector restored", EnvOTLPEndpoint, env[EnvOTLPEndpoint])
 	}
 	if env[otelLogUserPrompts] != "1" {
 		t.Errorf("%s = %q, want the pre-Terma value restored", otelLogUserPrompts, env[otelLogUserPrompts])
 	}
 	// Absent before Terma: removed.
-	if _, ok := env[otelHeaders]; ok {
-		t.Errorf("%s survived; it did not exist before the connect", otelHeaders)
+	if _, ok := env[EnvOTLPHeaders]; ok {
+		t.Errorf("%s survived; it did not exist before the connect", EnvOTLPHeaders)
 	}
 	// Edited after the connect: left alone and reported.
-	if env[otelProtocol] != "grpc" {
-		t.Errorf("%s = %q, want the later edit preserved", otelProtocol, env[otelProtocol])
+	if env[EnvOTLPProtocol] != "grpc" {
+		t.Errorf("%s = %q, want the later edit preserved", EnvOTLPProtocol, env[EnvOTLPProtocol])
 	}
-	if !slices.Contains(result.Skipped, otelProtocol) {
+	if !slices.Contains(result.Skipped, EnvOTLPProtocol) {
 		t.Errorf("skipped = %v, want the edited key reported", result.Skipped)
 	}
 	if result.Restored == 0 {
@@ -602,10 +602,10 @@ func TestReconnectPreservesOriginalJournal(t *testing.T) {
 		t.Fatalf("Disconnect: %v", err)
 	}
 	env := envOf(t, path)
-	if got := env[otelEndpoint]; got != "https://original.example.com" {
+	if got := env[EnvOTLPEndpoint]; got != "https://original.example.com" {
 		t.Errorf("endpoint = %q, want the value from before the first connect", got)
 	}
-	if _, ok := env[otelHeaders]; ok {
+	if _, ok := env[EnvOTLPHeaders]; ok {
 		t.Error("a Terma credential survived the final disconnect")
 	}
 	if got := readJSON(t, path)[claudeOtelHeadersHelper]; got != "/usr/local/bin/headers.sh" {
@@ -696,7 +696,7 @@ func TestDisconnectRefusesCorruptJournal(t *testing.T) {
 	if _, err := c.Disconnect(); err == nil {
 		t.Fatal("Disconnect treated a corrupt ownership journal as an absent journal")
 	}
-	if envOf(t, path)[otelHeaders] == "" {
+	if envOf(t, path)[EnvOTLPHeaders] == "" {
 		t.Error("Disconnect changed settings despite the corrupt ownership journal")
 	}
 }
@@ -1020,7 +1020,7 @@ func TestConnectClearsInlineHeaderWhenSwitchingToHelper(t *testing.T) {
 	if err := c.Connect(old, true); err != nil {
 		t.Fatalf("first connect: %v", err)
 	}
-	if got := envOf(t, path)[otelHeaders]; got == "" {
+	if got := envOf(t, path)[EnvOTLPHeaders]; got == "" {
 		t.Fatal("inline connect should have written the header")
 	}
 
@@ -1037,11 +1037,11 @@ func TestConnectClearsInlineHeaderWhenSwitchingToHelper(t *testing.T) {
 	}
 
 	env := envOf(t, path)
-	if got, ok := env[otelHeaders]; ok {
-		t.Fatalf("%s survived the switch to helper mode with %q; exports would carry the old project's key", otelHeaders, got)
+	if got, ok := env[EnvOTLPHeaders]; ok {
+		t.Fatalf("%s survived the switch to helper mode with %q; exports would carry the old project's key", EnvOTLPHeaders, got)
 	}
-	if got, ok := env[otelResourceAttributes]; ok {
-		t.Fatalf("%s = %q written; the project travels in the journal, never in the user's resource attributes", otelResourceAttributes, got)
+	if got, ok := env[EnvResourceAttributes]; ok {
+		t.Fatalf("%s = %q written; the project travels in the journal, never in the user's resource attributes", EnvResourceAttributes, got)
 	}
 	body, err := os.ReadFile(helper)
 	if err != nil {

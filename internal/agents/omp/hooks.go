@@ -1,23 +1,25 @@
-package hookmgr
+package omp
 
 import (
 	_ "embed"
 	"os"
 	"path/filepath"
+
+	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 )
 
-// OmpHooksPath is where omp loads repository hooks: a .omp/hooks/pre directory, one
+// hooksPath is where omp loads repository hooks: a .omp/hooks/pre directory, one
 // TypeScript file per concern. terma's file installs the attribution wiring — session
 // lifecycle and file edits handed to `terma hook omp-*`.
-const OmpHooksPath = ".omp/hooks/pre/terma.ts"
+const hooksPath = ".omp/hooks/pre/terma.ts"
 
-//go:embed omp_hooks.ts
+//go:embed hooks.ts
 var ompHooksSource string
 
-// PlanOmpHooks plans terma's hook file in or out of the repository. The file is
+// planHooks plans terma's hook file in or out of the repository. The file is
 // generated whole, so install rewrites it and uninstall removes it only when it still
 // matches a terma render — a file somebody edited is theirs to keep.
-func PlanOmpHooks(root string, install bool) (Plan, error) {
+func planHooks(root string, install bool) (hookmgr.Plan, error) {
 	return mergeOmpHooks(root, install)
 }
 
@@ -25,9 +27,9 @@ func PlanOmpHooks(root string, install bool) (Plan, error) {
 // agents, omp's hook file is a TypeScript source: install writes the embedded file
 // with the event list spliced in, and uninstall removes the file only when it still
 // matches a terma render — a file somebody edited is theirs to keep.
-func mergeOmpHooks(root string, install bool) (Plan, error) {
-	p := Plan{}
-	before, err := ReadFile(filepath.Join(root, filepath.FromSlash(OmpHooksPath)))
+func mergeOmpHooks(root string, install bool) (hookmgr.Plan, error) {
+	p := hookmgr.Plan{}
+	before, err := hookmgr.ReadFile(filepath.Join(root, filepath.FromSlash(hooksPath)))
 	if err != nil {
 		return p, err
 	}
@@ -35,15 +37,15 @@ func mergeOmpHooks(root string, install bool) (Plan, error) {
 
 	switch {
 	case install && before == nil:
-		p.Changes = append(p.Changes, Change{Path: OmpHooksPath, After: after})
+		p.Changes = append(p.Changes, hookmgr.Change{Path: hooksPath, After: after})
 	case install && !sameFile(before, after):
-		p.Changes = append(p.Changes, Change{Path: OmpHooksPath, Before: before, After: after})
+		p.Changes = append(p.Changes, hookmgr.Change{Path: hooksPath, Before: before, After: after})
 	case !install && before != nil && sameFile(before, after):
-		p.Changes = append(p.Changes, Change{Path: OmpHooksPath, Before: before})
+		p.Changes = append(p.Changes, hookmgr.Change{Path: hooksPath, Before: before})
 	case !install && before != nil:
 		// A file that no longer matches the render has been edited since install.
 		// It is not terma's to delete; say so rather than leave the impression it was.
-		p.Notes = append(p.Notes, OmpHooksPath+" has local edits — left in place")
+		p.Notes = append(p.Notes, hooksPath+" has local edits — left in place")
 	}
 	return p, nil
 }
@@ -55,10 +57,10 @@ func sameFile(a, b []byte) bool {
 	return string(a) == string(b)
 }
 
-// HasOmp reports whether the repository already carries omp configuration — a .omp
+// hasConfig reports whether the repository already carries omp configuration — a .omp
 // directory — which is when wiring its hooks by default is a help rather than a stray
 // directory in a repository nobody opens in omp.
-func HasOmp(root string) bool {
+func hasConfig(root string) bool {
 	info, err := os.Stat(filepath.Join(root, ".omp"))
 	return err == nil && info.IsDir()
 }

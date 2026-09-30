@@ -1,4 +1,4 @@
-package harness
+package gemini
 
 import (
 	"encoding/json"
@@ -27,8 +27,8 @@ func geminiHome() (string, error) {
 	return os.UserHomeDir()
 }
 
-// GeminiSettingsPath is Gemini's user settings file.
-func GeminiSettingsPath() (string, error) {
+// settingsPath is Gemini's user settings file.
+func settingsPath() (string, error) {
 	home, err := geminiHome()
 	if err != nil {
 		return "", err
@@ -36,8 +36,8 @@ func GeminiSettingsPath() (string, error) {
 	return filepath.Join(home, ".gemini", "settings.json"), nil
 }
 
-// GeminiExtensionDir is where terma's Gemini extension lives.
-func GeminiExtensionDir() (string, error) {
+// extensionDir is where terma's Gemini extension lives.
+func extensionDir() (string, error) {
 	home, err := geminiHome()
 	if err != nil {
 		return "", err
@@ -54,11 +54,11 @@ var geminiHookEvents = []struct{ gemini, terma string }{
 	{"SessionEnd", "gemini-session-end"},
 }
 
-// ConnectGeminiRelay points Gemini's exporter at endpoint (the relay, its token in the
+// connectRelay points Gemini's exporter at endpoint (the relay, its token in the
 // path) and writes terma's extension, whose hooks run hookCommand. Only the telemetry
 // block of the settings file changes; a file that does not parse is left alone.
-func ConnectGeminiRelay(endpoint string, hookCommand []string) (settings, extension string, err error) {
-	if settings, err = GeminiSettingsPath(); err != nil {
+func connectRelay(endpoint string, hookCommand []string) (settings, extension string, err error) {
+	if settings, err = settingsPath(); err != nil {
 		return "", "", err
 	}
 	doc := map[string]any{}
@@ -90,7 +90,7 @@ func ConnectGeminiRelay(endpoint string, hookCommand []string) (settings, extens
 		return "", "", err
 	}
 
-	if extension, err = GeminiExtensionDir(); err != nil {
+	if extension, err = extensionDir(); err != nil {
 		return "", "", err
 	}
 	hooks := map[string]any{}

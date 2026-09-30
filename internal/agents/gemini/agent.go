@@ -10,7 +10,7 @@ import (
 )
 
 // Agent is Gemini CLI. Its hooks come from terma's user-level Gemini extension
-// (harness.ConnectGeminiRelay), which fires in every folder; a repository's own
+// (ConnectGeminiRelay), which fires in every folder; a repository's own
 // .gemini/settings.json hooks need the folder trusted. It is an adapter so `terma hook
 // gemini-*` dispatches from the same table as everyone else's.
 type Agent struct{}

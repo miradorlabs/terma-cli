@@ -125,7 +125,7 @@ func (Codex) SupportsHeadersHelper() bool { return false }
 
 // Detect runs `codex --version`. A missing binary is not-found rather than an error.
 func (Codex) Detect(ctx context.Context) Detection {
-	return DetectBinary(ctx, "codex", semverRE)
+	return DetectBinary(ctx, "codex", SemverRE)
 }
 
 // codexHome is $CODEX_HOME, or ~/.codex. Honouring the variable matters for the same

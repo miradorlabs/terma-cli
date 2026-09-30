@@ -32,7 +32,7 @@ func (c Claude) EmissionStatus(root string) (Status, error) {
 			}
 		}
 	}
-	st.Endpoint = env[otelEndpoint]
+	st.Endpoint = env[EnvOTLPEndpoint]
 	st.Connected = isOn(env[claudeEnableTelemetry]) && st.Endpoint != ""
 	st.Signals = claudeSignals(env)
 	return st, nil

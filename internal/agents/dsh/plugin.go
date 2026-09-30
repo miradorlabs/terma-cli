@@ -1,4 +1,4 @@
-package harness
+package dsh
 
 import (
 	_ "embed"
@@ -16,13 +16,13 @@ import (
 // `terma relay setup --harness dsh` writes it into $DSH_HOME/plugins and inserts it by
 // absolute path into $DSH_HOME/cordis.patch.yml, the home layer every dsh profile loads.
 
-//go:embed dsh/terma.mjs
+//go:embed plugin/terma.mjs
 var dshPluginTemplate string
 
 const dshConfigMarker = "const CONFIG = null /* terma:config */"
 
-// DshConfig is what the plugin is spliced with.
-type DshConfig struct {
+// pluginConfig is what the plugin is spliced with.
+type pluginConfig struct {
 	Version            int               `json:"version"`
 	Endpoint           string            `json:"endpoint"`
 	Headers            map[string]string `json:"headers"`
@@ -31,8 +31,8 @@ type DshConfig struct {
 	HookCommand        []string          `json:"hookCommand"`
 }
 
-// DshHome is dsh's home: DSH_HOME, else ~/.dsh.
-func DshHome() (string, error) {
+// home is dsh's home: DSH_HOME, else ~/.dsh.
+func home() (string, error) {
 	if d := os.Getenv("DSH_HOME"); d != "" {
 		return d, nil
 	}
@@ -43,8 +43,8 @@ func DshHome() (string, error) {
 	return filepath.Join(home, ".dsh"), nil
 }
 
-// RenderDshPlugin splices cfg into the plugin template.
-func RenderDshPlugin(cfg DshConfig) (string, error) {
+// renderPlugin splices cfg into the plugin template.
+func renderPlugin(cfg pluginConfig) (string, error) {
 	cfg.Version = 1
 	if len(cfg.HookCommand) == 0 {
 		cfg.HookCommand = []string{"terma", "hook"}
@@ -59,15 +59,15 @@ func RenderDshPlugin(cfg DshConfig) (string, error) {
 	return strings.Replace(dshPluginTemplate, dshConfigMarker, "const CONFIG = "+string(data)+" /* terma:config */", 1), nil
 }
 
-// WriteDshPlugin writes terma's plugin and makes sure dsh's home patch inserts it,
+// writePlugin writes terma's plugin and makes sure dsh's home patch inserts it,
 // returning the plugin's path. The patch file is a YAML list of operations, so one
 // more entry is appended — every other byte stays — unless the plugin is already there.
-func WriteDshPlugin(cfg DshConfig) (string, error) {
-	home, err := DshHome()
+func writePlugin(cfg pluginConfig) (string, error) {
+	home, err := home()
 	if err != nil {
 		return "", err
 	}
-	text, err := RenderDshPlugin(cfg)
+	text, err := renderPlugin(cfg)
 	if err != nil {
 		return "", err
 	}

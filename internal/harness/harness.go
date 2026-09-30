@@ -324,3 +324,26 @@ func (e *ErrUnsupported) Error() string {
 	}
 	return fmt.Sprintf("%s telemetry is not supported yet", e.Harness)
 }
+
+// SignalNames is signals as the words the config files hold.
+func SignalNames(signals []Signal) []string {
+	out := make([]string, 0, len(signals))
+	for _, s := range signals {
+		out = append(out, string(s))
+	}
+	return out
+}
+
+// SignalsFromNames is the signals names spell, in AllSignals order; unknown words are dropped.
+func SignalsFromNames(names []string) []Signal {
+	var out []Signal
+	for _, s := range AllSignals {
+		for _, n := range names {
+			if Signal(strings.ToLower(strings.TrimSpace(n))) == s {
+				out = append(out, s)
+				break
+			}
+		}
+	}
+	return out
+}

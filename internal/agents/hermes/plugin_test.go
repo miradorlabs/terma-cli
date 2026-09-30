@@ -1,4 +1,4 @@
-package harness
+package hermes
 
 import (
 	"os"
@@ -15,9 +15,9 @@ func TestRenderHermesPluginIsValidPython(t *testing.T) {
 	if err != nil {
 		t.Skip("no python3")
 	}
-	cfg := HermesConfig{Endpoint: "http://127.0.0.1:43180", Headers: map[string]string{"Authorization": `Bearer t0k"en\é`},
+	cfg := pluginConfig{Endpoint: "http://127.0.0.1:43180", Headers: map[string]string{"Authorization": `Bearer t0k"en\é`},
 		IncludePrompts: true, HookCommand: []string{"/Users/x y/.local/bin/terma", "hook"}}
-	text, err := RenderHermesPlugin(cfg)
+	text, err := renderPlugin(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}

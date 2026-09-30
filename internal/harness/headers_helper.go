@@ -59,10 +59,10 @@ func HelperFilePath(h Harness, projectID string) (string, error) {
 // prefix. Nothing else in the script looks like this.
 var helperKeyRE = serverkey.Pattern
 
-// writeHelper writes the script, 0700 in a 0700 directory: it both holds a secret and
+// WriteHelper writes the script, 0700 in a 0700 directory: it both holds a secret and
 // must be executable by the harness running as this user, and nobody else has business
 // with either.
-func writeHelper(path, key string) error {
+func WriteHelper(path, key string) error {
 	if strings.ContainsAny(key, `'"\$`+"`\n") {
 		// A key is prefix+hex so this cannot happen — but if it ever does, refusing
 		// beats writing a script that injects the surprise into a shell.
@@ -80,10 +80,10 @@ echo '{"Authorization": "Bearer %s"}'
 	return config.WriteFileAtomic(path, []byte(script), 0o700)
 }
 
-// keyFromHelper extracts the key from a helper script, or "" when the file is missing
+// KeyFromHelper extracts the key from a helper script, or "" when the file is missing
 // or holds none. Read tolerantly — a hand-edited helper should still yield its key for
 // status display and reuse rather than erroring the whole command.
-func keyFromHelper(path string) string {
+func KeyFromHelper(path string) string {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return ""
@@ -91,17 +91,18 @@ func keyFromHelper(path string) string {
 	return helperKeyRE.FindString(string(data))
 }
 
-func deleteHelper(path string) error {
+// DeleteHelper removes a headers helper script; one already gone is not an error.
+func DeleteHelper(path string) error {
 	if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
 	return nil
 }
 
-// isOwnHelper reports whether a configured otelHeadersHelper value points into
+// IsOwnHelper reports whether a configured otelHeadersHelper value points into
 // Terma's helpers directory — the test that separates "our credential delivery"
 // from "someone else's headers script", which conflict detection must flag.
-func isOwnHelper(value string) bool {
+func IsOwnHelper(value string) bool {
 	dir, err := HelpersDir()
 	if err != nil {
 		return false

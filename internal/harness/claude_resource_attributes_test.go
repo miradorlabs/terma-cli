@@ -11,8 +11,8 @@ import (
 // service.name=claude-code. The exporter's attributes are for Codex and OpenCode.
 func TestRenderNeverWritesResourceAttributes(t *testing.T) {
 	for _, h := range []Harness{Claude{}, Claude{}.Local(t.TempDir())} {
-		if got, ok := h.(Claude).render(fullExporter())[otelResourceAttributes]; ok {
-			t.Fatalf("%s = %q rendered", otelResourceAttributes, got)
+		if got, ok := h.(Claude).render(fullExporter())[EnvResourceAttributes]; ok {
+			t.Fatalf("%s = %q rendered", EnvResourceAttributes, got)
 		}
 	}
 }
@@ -26,8 +26,8 @@ func TestConnectLeavesUsersResourceAttributesAlone(t *testing.T) {
 	if err := c.Connect(fullExporter(), true); err != nil {
 		t.Fatalf("Connect: %v", err)
 	}
-	if got := envOf(t, path)[otelResourceAttributes]; got != theirs {
-		t.Fatalf("after connect %s = %q, want the user's value untouched", otelResourceAttributes, got)
+	if got := envOf(t, path)[EnvResourceAttributes]; got != theirs {
+		t.Fatalf("after connect %s = %q, want the user's value untouched", EnvResourceAttributes, got)
 	}
 	st, err := c.Status()
 	if err != nil {
@@ -46,8 +46,8 @@ func TestConnectLeavesUsersResourceAttributesAlone(t *testing.T) {
 	if _, err := c.Disconnect(); err != nil {
 		t.Fatalf("Disconnect: %v", err)
 	}
-	if got := envOf(t, path)[otelResourceAttributes]; got != theirs {
-		t.Fatalf("after disconnect %s = %q, want the user's value untouched", otelResourceAttributes, got)
+	if got := envOf(t, path)[EnvResourceAttributes]; got != theirs {
+		t.Fatalf("after disconnect %s = %q, want the user's value untouched", EnvResourceAttributes, got)
 	}
 }
 

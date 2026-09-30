@@ -46,10 +46,10 @@ type settingsFile struct {
 const (
 	envKey = "env"
 
-	// settingsMode is what a settings file is written as once it holds a server key.
+	// SettingsMode is what a settings file is written as once it holds a server key.
 	// The default 0644 would leave a live credential readable by every account on the
 	// machine, and the file is only ever read by the harness running as this user.
-	settingsMode fs.FileMode = 0o600
+	SettingsMode fs.FileMode = 0o600
 )
 
 // marshalJSON encodes without HTML escaping; an empty indent compacts. A settings file
@@ -75,7 +75,7 @@ func loadSettings(path string) (*settingsFile, error) {
 		writePath: path,
 		root:      map[string]json.RawMessage{},
 		env:       map[string]string{},
-		mode:      settingsMode,
+		mode:      SettingsMode,
 	}
 
 	writePath, symlinked, err := resolveWritePath(path)
@@ -178,7 +178,7 @@ func (s *settingsFile) save(tighten bool) error {
 
 	mode := s.mode
 	if tighten && mode&0o077 != 0 {
-		mode = settingsMode
+		mode = SettingsMode
 	}
 
 	if err := os.MkdirAll(filepath.Dir(s.writePath), 0o700); err != nil {
@@ -258,7 +258,7 @@ func backupFile(writePath string, existed, replace bool) (string, error) {
 	}
 	// Written 0600 regardless of the source's mode: a backup of a connected config holds
 	// a server key, and inheriting a permissive mode would copy it somewhere readable.
-	if err := config.WriteFileAtomic(path, data, settingsMode); err != nil {
+	if err := config.WriteFileAtomic(path, data, SettingsMode); err != nil {
 		return "", err
 	}
 	return path, nil

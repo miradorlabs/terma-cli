@@ -94,7 +94,7 @@ func TestOpenCodeConnectWritesPluginAndHelper(t *testing.T) {
 	if info, err := os.Stat(e.HelperPath); err != nil || info.Mode().Perm() != 0o700 {
 		t.Fatalf("helper: %v, mode %v", err, info)
 	}
-	if keyFromHelper(e.HelperPath) != e.APIKey {
+	if KeyFromHelper(e.HelperPath) != e.APIKey {
 		t.Fatal("helper does not hold the key")
 	}
 	// The user's own config was never touched, or created.
@@ -239,11 +239,11 @@ func TestOpenCodeConflictsAreAdvisoryOnly(t *testing.T) {
 	if got, _ := h.ConflictsWith(e); len(got) != 0 {
 		t.Fatalf("no env, yet conflicts: %+v", got)
 	}
-	t.Setenv(otelEndpoint, e.Endpoint)
+	t.Setenv(EnvOTLPEndpoint, e.Endpoint)
 	if got, _ := h.ConflictsWith(e); len(got) != 0 {
 		t.Fatalf("same endpoint reported: %+v", got)
 	}
-	t.Setenv(otelEndpoint, "https://other.example.com")
+	t.Setenv(EnvOTLPEndpoint, "https://other.example.com")
 	got, _ := h.ConflictsWith(e)
 	if len(got) != 1 || !got[0].Advisory || got[0].Clearable || got[0].Credential || got[0].Scope != ScopeEnvironment {
 		t.Fatalf("conflicts = %+v", got)

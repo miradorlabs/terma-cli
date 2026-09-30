@@ -86,7 +86,7 @@ func projectFilesAbove() []string {
 // redirectKeys are the settings that decide where telemetry goes, and therefore the ones
 // worth hunting for outside the user file.
 func redirectKeys() []string {
-	keys := []string{otelEndpoint, otelHeaders, claudeBetaTracingEndpoint}
+	keys := []string{EnvOTLPEndpoint, EnvOTLPHeaders, claudeBetaTracingEndpoint}
 	for _, o := range perSignalOverrides {
 		keys = append(keys, o.endpoint, o.headers, o.protocol)
 	}
@@ -316,7 +316,7 @@ func relevantToExporter(key string, e Exporter) bool {
 // agrees is not reported as a conflict.
 func expectedValue(key string, e Exporter) (string, bool) {
 	switch key {
-	case otelEndpoint:
+	case EnvOTLPEndpoint:
 		return e.Endpoint, true
 	}
 	for _, o := range perSignalOverrides {
@@ -324,7 +324,7 @@ func expectedValue(key string, e Exporter) (string, bool) {
 		case o.endpoint:
 			return e.SignalEndpoint(o.signal), true
 		case o.protocol:
-			return protocolHTTPProtobuf, true
+			return ProtocolHTTPProtobuf, true
 		}
 	}
 	return "", false
@@ -347,7 +347,7 @@ func isRedirect(key string) bool {
 // redactIfHeader keeps a header bag out of terminal output: it may hold somebody else's
 // credential, and naming the variable is enough to act on.
 func redactIfHeader(key, value string) string {
-	if key == otelHeaders {
+	if key == EnvOTLPHeaders {
 		return ""
 	}
 	for _, o := range perSignalOverrides {

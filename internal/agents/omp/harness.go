@@ -1,4 +1,4 @@
-package harness
+package omp
 
 import (
 	"context"
@@ -12,9 +12,10 @@ import (
 	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-// Omp configures omp's export to Terma by installing a hook extension.
+// exporter configures omp's export to Terma by installing a hook extension.
 //
 // omp has a native OTLP exporter — spans per model call carrying tokens, effort,
 // service tier and latency — but it is configured exclusively through OTEL_* process
@@ -34,12 +35,12 @@ import (
 // Repository scope is a policy file, <root>/.omp/terma.json, that the extension lays
 // over its global settings: which signals ship and whether prompt and tool content go
 // with them. Nothing about where or with which key, so it is safe to commit.
-type Omp struct {
+type exporter struct {
 	// root, when set, is the repository whose policy file this value acts on.
 	root string
 }
 
-//go:embed omp/terma.ts
+//go:embed extension/terma.ts
 var ompExtensionSource string
 
 const (
@@ -61,28 +62,28 @@ const (
 )
 
 // Name is the token `terma connect` and `--harness` accept.
-func (Omp) Name() string { return "omp" }
+func (exporter) Name() string { return "omp" }
 
 // DisplayName is how the agent is written in prose.
-func (Omp) DisplayName() string { return "Omp" }
+func (exporter) DisplayName() string { return "Omp" }
 
 // SupportsHeadersHelper is true: the extension runs the helper script itself.
-func (Omp) SupportsHeadersHelper() bool { return true }
+func (exporter) SupportsHeadersHelper() bool { return true }
 
 // Local returns the harness bound to the repository at root.
-func (Omp) Local(root string) Harness { return Omp{root: root} }
+func (exporter) Local(root string) harness.Harness { return exporter{root: root} }
 
 // Scope reports which layer this value acts on.
-func (c Omp) Scope() Scope {
+func (c exporter) Scope() harness.Scope {
 	if c.root != "" {
-		return ScopeLocal
+		return harness.ScopeLocal
 	}
-	return ScopeGlobal
+	return harness.ScopeGlobal
 }
 
 // Detect runs `omp --version`. A missing binary is not-found rather than an error.
-func (Omp) Detect(ctx context.Context) Detection {
-	return DetectBinary(ctx, "omp", semverRE)
+func (exporter) Detect(ctx context.Context) harness.Detection {
+	return harness.DetectBinary(ctx, "omp", harness.SemverRE)
 }
 
 // ompAgentDir is where omp keeps its user configuration and hooks: $OMP_DIR/agent,
@@ -99,7 +100,7 @@ func ompAgentDir() (string, error) {
 }
 
 // ConfigPath is the extension file omp loads, or the repository's policy file.
-func (c Omp) ConfigPath() (string, error) {
+func (c exporter) ConfigPath() (string, error) {
 	if c.root != "" {
 		return filepath.Join(c.root, filepath.FromSlash(ompLocalPolicy)), nil
 	}
@@ -144,10 +145,10 @@ type ompPolicy struct {
 
 // config builds what the extension will read. At repository scope only the policy
 // fields are kept; the destination and credential are the global connect's.
-func (c Omp) config(e Exporter) ompConfig {
+func (c exporter) config(e harness.Exporter) ompConfig {
 	cfg := ompConfig{
 		Version:            1,
-		Signals:            signalNames(e.Signals),
+		Signals:            harness.SignalNames(e.Signals),
 		IncludePrompts:     e.IncludePrompts,
 		IncludeToolContent: e.IncludeToolContent,
 	}
@@ -203,18 +204,18 @@ func readOmpExtensionConfig(data []byte) (*ompConfig, bool) {
 }
 
 // Status reads the installed extension back.
-func (c Omp) Status() (Status, error) {
+func (c exporter) Status() (harness.Status, error) {
 	path, err := c.ConfigPath()
 	if err != nil {
-		return Status{}, err
+		return harness.Status{}, err
 	}
-	status := Status{ConfigPath: path}
+	status := harness.Status{ConfigPath: path}
 	data, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return status, nil
 	}
 	if err != nil {
-		return Status{}, fmt.Errorf("read %s: %w", path, err)
+		return harness.Status{}, fmt.Errorf("read %s: %w", path, err)
 	}
 	status.Exists = true
 
@@ -224,7 +225,7 @@ func (c Omp) Status() (Status, error) {
 			return status, nil
 		}
 		status.HasPolicy = true
-		status.Signals = signalsFromNames(policy.Signals)
+		status.Signals = harness.SignalsFromNames(policy.Signals)
 		status.IncludePrompts = policy.IncludePrompts
 		status.IncludeToolContent = policy.IncludeToolContent
 		status.ManagedKeys = 1
@@ -237,21 +238,21 @@ func (c Omp) Status() (Status, error) {
 	}
 	status.ManagedKeys = 1
 	status.Endpoint = cfg.Endpoint
-	status.Signals = signalsFromNames(cfg.Signals)
+	status.Signals = harness.SignalsFromNames(cfg.Signals)
 	status.IncludePrompts = cfg.IncludePrompts
 	status.IncludeToolContent = cfg.IncludeToolContent
-	status.ProjectID = cfg.ResourceAttributes[AttrProjectID]
+	status.ProjectID = cfg.ResourceAttributes[harness.AttrProjectID]
 	// Connected means a destination and a way to authenticate to it.
 	status.Connected = cfg.Endpoint != "" && (cfg.HeadersHelper != "" || cfg.Headers["Authorization"] != "")
-	status.KeyPrefix = MaskKey(ompKey(cfg))
-	status.Conflicts = ompConflicts(Exporter{Endpoint: cfg.Endpoint})
+	status.KeyPrefix = harness.MaskKey(ompKey(cfg))
+	status.Conflicts = ompConflicts(harness.Exporter{Endpoint: cfg.Endpoint})
 	return status, nil
 }
 
 // ompKey is the raw key a config presents, from the helper or inline.
 func ompKey(cfg *ompConfig) string {
-	if cfg.HeadersHelper != "" && isOwnHelper(cfg.HeadersHelper) {
-		if key := keyFromHelper(cfg.HeadersHelper); key != "" {
+	if cfg.HeadersHelper != "" && harness.IsOwnHelper(cfg.HeadersHelper) {
+		if key := harness.KeyFromHelper(cfg.HeadersHelper); key != "" {
 			return key
 		}
 	}
@@ -262,7 +263,7 @@ func ompKey(cfg *ompConfig) string {
 }
 
 // ConflictsWith reports what would defeat or redirect the export e describes.
-func (c Omp) ConflictsWith(e Exporter) ([]Conflict, error) {
+func (c exporter) ConflictsWith(e harness.Exporter) ([]harness.Conflict, error) {
 	return ompConflicts(e), nil
 }
 
@@ -271,18 +272,18 @@ func (c Omp) ConflictsWith(e Exporter) ([]Conflict, error) {
 // exported — a developer who pointed OTEL_EXPORTER_OTLP_ENDPOINT somewhere did so on
 // purpose — so an export that disagrees with the connect is reported rather than
 // fought.
-func ompConflicts(e Exporter) []Conflict {
-	var out []Conflict
+func ompConflicts(e harness.Exporter) []harness.Conflict {
+	var out []harness.Conflict
 
 	// The generic endpoint pointing at another collector takes effect over the
 	// extension's set: process.env was already populated by the shell.
-	if value := os.Getenv(otelEndpoint); value != "" && value != e.Endpoint {
-		out = append(out, Conflict{
-			Key:        otelEndpoint,
+	if value := os.Getenv(harness.EnvOTLPEndpoint); value != "" && value != e.Endpoint {
+		out = append(out, harness.Conflict{
+			Key:        harness.EnvOTLPEndpoint,
 			Value:      value,
 			Reason:     "exported in your shell, where it takes effect regardless of what Terma's extension sets — the export goes there, not to Terma",
 			Credential: true,
-			Scope:      ScopeEnvironment,
+			Scope:      harness.ScopeEnvironment,
 			Clearable:  false,
 		})
 	}
@@ -290,12 +291,12 @@ func ompConflicts(e Exporter) []Conflict {
 	// A protocol mismatch silently disables the export: omp supports http/protobuf
 	// only. The extension pins the variable, but a shell export is still the user's to
 	// unset.
-	if value := strings.ToLower(strings.TrimSpace(os.Getenv(otelProtocol))); value != "" && value != protocolHTTPProtobuf {
-		out = append(out, Conflict{
-			Key:       otelProtocol,
+	if value := strings.ToLower(strings.TrimSpace(os.Getenv(harness.EnvOTLPProtocol))); value != "" && value != harness.ProtocolHTTPProtobuf {
+		out = append(out, harness.Conflict{
+			Key:       harness.EnvOTLPProtocol,
 			Value:     value,
 			Reason:    "omp's exporter supports http/protobuf only; a " + value + " export would disable every signal",
-			Scope:     ScopeEnvironment,
+			Scope:     harness.ScopeEnvironment,
 			Clearable: false,
 		})
 	}
@@ -303,11 +304,11 @@ func ompConflicts(e Exporter) []Conflict {
 	// The upstream content switch exported in the shell outranks the policy the
 	// connect wrote into the extension.
 	if value := os.Getenv(ompCaptureContentEnv); value != "" && !matchesCapture(value, e) {
-		out = append(out, Conflict{
+		out = append(out, harness.Conflict{
 			Key:       ompCaptureContentEnv,
 			Value:     value,
 			Reason:    "exported in your shell, where it decides content capture instead of the repository's policy",
-			Scope:     ScopeEnvironment,
+			Scope:     harness.ScopeEnvironment,
 			Clearable: false,
 			Advisory:  true,
 		})
@@ -317,7 +318,7 @@ func ompConflicts(e Exporter) []Conflict {
 
 // matchesCapture reports whether an exported capture value agrees with the exporter's
 // content posture, so a shell that happens to set the same value is not a conflict.
-func matchesCapture(value string, e Exporter) bool {
+func matchesCapture(value string, e harness.Exporter) bool {
 	want := e.IncludePrompts || e.IncludeToolContent
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "true", "1", "summary":
@@ -331,7 +332,7 @@ func matchesCapture(value string, e Exporter) bool {
 // Connect writes the extension (and its helper script), or the repository's policy
 // file. The file is generated whole, so there is nothing to merge and nothing to
 // journal: disconnect removes exactly this file.
-func (c Omp) Connect(e Exporter, _ bool) error {
+func (c exporter) Connect(e harness.Exporter, _ bool) error {
 	path, err := c.ConfigPath()
 	if err != nil {
 		return err
@@ -354,7 +355,7 @@ func (c Omp) Connect(e Exporter, _ bool) error {
 	// The helper first: the extension about to be written points at it, and an omp
 	// starting between the two writes must find the credential already there.
 	if e.HelperPath != "" {
-		if err := writeHelper(e.HelperPath, e.APIKey); err != nil {
+		if err := harness.WriteHelper(e.HelperPath, e.APIKey); err != nil {
 			return err
 		}
 	}
@@ -366,7 +367,7 @@ func (c Omp) Connect(e Exporter, _ bool) error {
 	// secret, and stays readable like the user's other hooks.
 	mode := fs.FileMode(0o644)
 	if len(cfg.Headers) > 0 {
-		mode = settingsMode
+		mode = harness.SettingsMode
 	}
 	return config.WriteFileAtomic(path, src, mode)
 }
@@ -379,22 +380,22 @@ func (c Omp) Connect(e Exporter, _ bool) error {
 // project rewrites it (idempotently) and adds that project's helper. The extension
 // carries no key and no fixed project — only the endpoint, the helpers directory and
 // the naming convention it resolves a project's helper with at runtime.
-func (Omp) ConnectPerRepo(e Exporter) error {
-	helper, err := HelperFilePath(Omp{}, e.ProjectID)
+func (exporter) ConnectPerRepo(e harness.Exporter) error {
+	helper, err := harness.HelperFilePath(exporter{}, e.ProjectID)
 	if err != nil {
 		return err
 	}
-	if err := writeHelper(helper, e.APIKey); err != nil {
+	if err := harness.WriteHelper(helper, e.APIKey); err != nil {
 		return err
 	}
-	helpersDir, err := HelpersDir()
+	helpersDir, err := harness.HelpersDir()
 	if err != nil {
 		return err
 	}
 	cfg := ompConfig{
 		Version:  1,
 		Endpoint: e.Endpoint,
-		Signals:  signalNames(e.Signals),
+		Signals:  harness.SignalNames(e.Signals),
 		// The extension file is global and shared across every bound repository, so
 		// this repo's content-capture choice must NOT ride in it — otherwise installing
 		// one project would flip prompt / tool-content capture on for every other
@@ -408,10 +409,10 @@ func (Omp) ConnectPerRepo(e Exporter) error {
 		HookCommand:        []string{"terma", "hook"},
 		PerRepo:            true,
 		HelpersDir:         helpersDir,
-		HelperPrefix:       Omp{}.Name() + "-otel-",
-		ProjectAttribute:   AttrProjectID,
+		HelperPrefix:       exporter{}.Name() + "-otel-",
+		ProjectAttribute:   harness.AttrProjectID,
 	}
-	path, err := (Omp{}).ConfigPath()
+	path, err := (exporter{}).ConfigPath()
 	if err != nil {
 		return err
 	}
@@ -428,10 +429,10 @@ func (Omp) ConnectPerRepo(e Exporter) error {
 
 // ompBaseAttributes are the resource attributes a per-repo extension carries for every
 // project — everything but the project id, which the extension stamps per repository.
-func ompBaseAttributes(e Exporter) map[string]string {
+func ompBaseAttributes(e harness.Exporter) map[string]string {
 	out := map[string]string{}
 	for k, v := range e.ResourceAttributes {
-		if k == "" || v == "" || k == AttrProjectID {
+		if k == "" || v == "" || k == harness.AttrProjectID {
 			continue
 		}
 		out[k] = v
@@ -441,17 +442,17 @@ func ompBaseAttributes(e Exporter) map[string]string {
 
 // Disconnect removes the extension and, when Terma wrote it, its helper script — or
 // the repository's policy file.
-func (c Omp) Disconnect() (DisconnectResult, error) {
+func (c exporter) Disconnect() (harness.DisconnectResult, error) {
 	path, err := c.ConfigPath()
 	if err != nil {
-		return DisconnectResult{}, err
+		return harness.DisconnectResult{}, err
 	}
 	data, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
-		return DisconnectResult{}, nil
+		return harness.DisconnectResult{}, nil
 	}
 	if err != nil {
-		return DisconnectResult{}, fmt.Errorf("read %s: %w", path, err)
+		return harness.DisconnectResult{}, fmt.Errorf("read %s: %w", path, err)
 	}
 	// A foreign hook file — no Terma config line — is not Terma's to remove. This is
 	// stricter than the OpenCode plugin, whose path Terma owns outright: the hooks
@@ -460,23 +461,23 @@ func (c Omp) Disconnect() (DisconnectResult, error) {
 	if c.root == "" {
 		cfg, ok := readOmpExtensionConfig(data)
 		if !ok {
-			return DisconnectResult{}, nil
+			return harness.DisconnectResult{}, nil
 		}
-		if cfg.HeadersHelper != "" && isOwnHelper(cfg.HeadersHelper) {
-			if err := deleteHelper(cfg.HeadersHelper); err != nil {
-				return DisconnectResult{}, err
+		if cfg.HeadersHelper != "" && harness.IsOwnHelper(cfg.HeadersHelper) {
+			if err := harness.DeleteHelper(cfg.HeadersHelper); err != nil {
+				return harness.DisconnectResult{}, err
 			}
 		}
 	}
 	if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return DisconnectResult{}, fmt.Errorf("remove %s: %w", path, err)
+		return harness.DisconnectResult{}, fmt.Errorf("remove %s: %w", path, err)
 	}
-	return DisconnectResult{Removed: 1}, nil
+	return harness.DisconnectResult{Removed: 1}, nil
 }
 
 // CurrentCredential returns the key the installed extension already presents to
 // endpoint for projectID, so a reconnect reuses it instead of minting an orphan.
-func (c Omp) CurrentCredential(endpoint, projectID string) (string, bool) {
+func (c exporter) CurrentCredential(endpoint, projectID string) (string, bool) {
 	if c.root != "" {
 		return "", false
 	}
@@ -489,7 +490,7 @@ func (c Omp) CurrentCredential(endpoint, projectID string) (string, bool) {
 		return "", false
 	}
 	cfg, ok := readOmpExtensionConfig(data)
-	if !ok || cfg.Endpoint != endpoint || cfg.ResourceAttributes[AttrProjectID] != projectID {
+	if !ok || cfg.Endpoint != endpoint || cfg.ResourceAttributes[harness.AttrProjectID] != projectID {
 		return "", false
 	}
 	if key := ompKey(cfg); key != "" {
@@ -499,7 +500,7 @@ func (c Omp) CurrentCredential(endpoint, projectID string) (string, bool) {
 }
 
 // ConnectNotes says what is particular about this harness before the user confirms.
-func (c Omp) ConnectNotes(e Exporter) []string {
+func (c exporter) ConnectNotes(e harness.Exporter) []string {
 	var notes []string
 	if c.root == "" {
 		notes = append(notes,

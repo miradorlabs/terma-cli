@@ -26,17 +26,17 @@ import (
 // It is also the better home for the key: a 0700 script, rather than a variable every
 // tool subprocess the agent starts would inherit.
 func (Claude) WriteRouteSettings(settingsPath, helperPath string, e Exporter) error {
-	if err := writeHelper(helperPath, e.APIKey); err != nil {
+	if err := WriteHelper(helperPath, e.APIKey); err != nil {
 		return err
 	}
 	e.HelperPath = helperPath
 	env := Claude{}.render(e)
 	// A route owns its destination, including higher-priority signal overrides.
 	// Empty headers allow the dedicated helper to supply the credential.
-	env[otelHeaders] = ""
+	env[EnvOTLPHeaders] = ""
 	for _, override := range perSignalOverrides {
 		env[override.endpoint] = e.SignalEndpoint(override.signal)
-		env[override.protocol] = protocolHTTPProtobuf
+		env[override.protocol] = ProtocolHTTPProtobuf
 		env[override.headers] = ""
 	}
 	env[claudeBetaTracingDetailed] = "0"

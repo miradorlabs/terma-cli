@@ -61,7 +61,7 @@ func loadTOML(path string) (*tomlFile, error) {
 		writePath: path,
 		doc:       map[string]any{},
 		otel:      map[string]any{},
-		mode:      settingsMode,
+		mode:      SettingsMode,
 	}
 
 	writePath, symlinked, err := resolveWritePath(path)
@@ -143,7 +143,7 @@ func (f *tomlFile) save(tighten bool) error {
 
 	mode := f.mode
 	if tighten && mode&0o077 != 0 {
-		mode = settingsMode
+		mode = SettingsMode
 	}
 	if err := os.MkdirAll(filepath.Dir(f.writePath), 0o700); err != nil {
 		return fmt.Errorf("create %s: %w", filepath.Dir(f.writePath), err)

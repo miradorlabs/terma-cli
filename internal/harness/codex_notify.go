@@ -148,7 +148,7 @@ func (rec *codexNotifyRecord) save(path string) error {
 		}
 		return nil
 	}
-	return config.WriteJSON(path, rec, settingsMode)
+	return config.WriteJSON(path, rec, SettingsMode)
 }
 
 // recordLockWait bounds the wait for another terma's update of a displaced-settings
@@ -211,7 +211,7 @@ func writeCodexConfig(path string, out []byte) error {
 	if err != nil {
 		return err
 	}
-	mode := settingsMode
+	mode := SettingsMode
 	if info, err := os.Stat(writePath); err == nil && info.Mode().Perm()&0o077 == 0 {
 		mode = info.Mode().Perm()
 	}

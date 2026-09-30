@@ -64,7 +64,7 @@ func TestLocalRenderCarriesOnlyWhatToShip(t *testing.T) {
 	env := h.render(localExporter())
 
 	for _, forbidden := range []string{
-		claudeEnableTelemetry, otelEndpoint, otelHeaders, otelProtocol, otelResourceAttributes,
+		claudeEnableTelemetry, EnvOTLPEndpoint, EnvOTLPHeaders, EnvOTLPProtocol, EnvResourceAttributes,
 	} {
 		if v, ok := env[forbidden]; ok {
 			t.Errorf("local render wrote %s=%q — a project file must not carry it", forbidden, v)
@@ -93,7 +93,7 @@ func TestLocalRenderCarriesOnlyWhatToShip(t *testing.T) {
 // The global render is unchanged by the new field: the zero value is the old harness.
 func TestGlobalRenderStillCarriesEverything(t *testing.T) {
 	env := Claude{}.render(localExporter())
-	for _, key := range []string{claudeEnableTelemetry, otelEndpoint, otelProtocol, otelHeaders} {
+	for _, key := range []string{claudeEnableTelemetry, EnvOTLPEndpoint, EnvOTLPProtocol, EnvOTLPHeaders} {
 		if _, ok := env[key]; !ok {
 			t.Errorf("global render lacks %s", key)
 		}
@@ -152,7 +152,7 @@ func TestLocalConnectAndDisconnectRoundTrip(t *testing.T) {
 	if env[otelLogUserPrompts] != "0" || env[otelLogToolContent] != "1" || env[otelLogsExporter] != exporterOTLP {
 		t.Fatalf("env = %v", env)
 	}
-	for _, forbidden := range []string{claudeEnableTelemetry, otelEndpoint, otelHeaders} {
+	for _, forbidden := range []string{claudeEnableTelemetry, EnvOTLPEndpoint, EnvOTLPHeaders} {
 		if _, ok := env[forbidden]; ok {
 			t.Errorf("%s landed in the project file", forbidden)
 		}
@@ -197,7 +197,7 @@ func TestLocalConnectLeavesAProjectEndpointAlone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c := findConflict(conflicts, otelEndpoint)
+	c := findConflict(conflicts, EnvOTLPEndpoint)
 	if c == nil {
 		t.Fatalf("expected the project endpoint to be reported, got %+v", conflicts)
 	}
@@ -209,7 +209,7 @@ func TestLocalConnectLeavesAProjectEndpointAlone(t *testing.T) {
 		t.Fatal(err)
 	}
 	env := envOf(t, path)
-	if env[otelEndpoint] != "https://other.example.com" || env["FOO"] != "bar" {
+	if env[EnvOTLPEndpoint] != "https://other.example.com" || env["FOO"] != "bar" {
 		t.Fatalf("local connect changed keys it does not own: %v", env)
 	}
 }
@@ -301,7 +301,7 @@ func TestLocalDisconnectWithoutJournalRemovesOnlyLocalKeys(t *testing.T) {
 		t.Fatalf("result = %+v, want 2 unjournaled removals", result)
 	}
 	env := envOf(t, path)
-	if env[otelEndpoint] == "" || env[claudeEnableTelemetry] == "" {
+	if env[EnvOTLPEndpoint] == "" || env[claudeEnableTelemetry] == "" {
 		t.Fatalf("local disconnect removed global keys: %v", env)
 	}
 	if _, ok := env[otelTracesExporter]; ok {

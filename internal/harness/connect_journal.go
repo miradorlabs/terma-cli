@@ -136,7 +136,7 @@ func (j *journal) save() error {
 		return err
 	}
 	// 0600: Previous may hold the Authorization header that was there before.
-	return config.WriteJSON(path, j, settingsMode)
+	return config.WriteJSON(path, j, SettingsMode)
 }
 
 func deleteJournal(harness, configPath string) error {

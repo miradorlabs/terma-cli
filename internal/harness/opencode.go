@@ -116,7 +116,7 @@ func (c OpenCode) Scope() Scope {
 
 // Detect runs `opencode --version`. A missing binary is not-found rather than an error.
 func (OpenCode) Detect(ctx context.Context) Detection {
-	return DetectBinary(ctx, "opencode", semverRE)
+	return DetectBinary(ctx, "opencode", SemverRE)
 }
 
 // opencodeConfigDir is where OpenCode keeps its global configuration and plugins:
@@ -149,7 +149,7 @@ func (c OpenCode) ConfigPath() (string, error) {
 func (c OpenCode) config(e Exporter) opencodeConfig {
 	cfg := opencodeConfig{
 		Version:            1,
-		Signals:            signalNames(e.Signals),
+		Signals:            SignalNames(e.Signals),
 		IncludePrompts:     e.IncludePrompts,
 		IncludeToolContent: e.IncludeToolContent,
 	}
@@ -173,27 +173,6 @@ func (c OpenCode) config(e Exporter) opencodeConfig {
 	}
 	cfg.HookCommand = []string{"terma", "hook"}
 	return cfg
-}
-
-func signalNames(signals []Signal) []string {
-	out := make([]string, 0, len(signals))
-	for _, s := range signals {
-		out = append(out, string(s))
-	}
-	return out
-}
-
-func signalsFromNames(names []string) []Signal {
-	var out []Signal
-	for _, s := range AllSignals {
-		for _, n := range names {
-			if Signal(strings.ToLower(strings.TrimSpace(n))) == s {
-				out = append(out, s)
-				break
-			}
-		}
-	}
-	return out
 }
 
 // renderPlugin splices the config into the embedded plugin source.
@@ -253,7 +232,7 @@ func (c OpenCode) Status() (Status, error) {
 			return status, nil
 		}
 		status.HasPolicy = true
-		status.Signals = signalsFromNames(policy.Signals)
+		status.Signals = SignalsFromNames(policy.Signals)
 		status.IncludePrompts = policy.IncludePrompts
 		status.IncludeToolContent = policy.IncludeToolContent
 		status.ManagedKeys = 1
@@ -266,7 +245,7 @@ func (c OpenCode) Status() (Status, error) {
 	}
 	status.ManagedKeys = 1
 	status.Endpoint = cfg.Endpoint
-	status.Signals = signalsFromNames(cfg.Signals)
+	status.Signals = SignalsFromNames(cfg.Signals)
 	status.IncludePrompts = cfg.IncludePrompts
 	status.IncludeToolContent = cfg.IncludeToolContent
 	status.ProjectID = cfg.ResourceAttributes[AttrProjectID]
@@ -279,8 +258,8 @@ func (c OpenCode) Status() (Status, error) {
 
 // opencodeKey is the raw key a config presents, from the helper or inline.
 func opencodeKey(cfg *opencodeConfig) string {
-	if cfg.HeadersHelper != "" && isOwnHelper(cfg.HeadersHelper) {
-		if key := keyFromHelper(cfg.HeadersHelper); key != "" {
+	if cfg.HeadersHelper != "" && IsOwnHelper(cfg.HeadersHelper) {
+		if key := KeyFromHelper(cfg.HeadersHelper); key != "" {
 			return key
 		}
 	}
@@ -299,12 +278,12 @@ func (c OpenCode) ConflictsWith(e Exporter) ([]Conflict, error) {
 }
 
 func opencodeConflicts(e Exporter) []Conflict {
-	value := os.Getenv(otelEndpoint)
+	value := os.Getenv(EnvOTLPEndpoint)
 	if value == "" || value == e.Endpoint {
 		return nil
 	}
 	return []Conflict{{
-		Key:       otelEndpoint,
+		Key:       EnvOTLPEndpoint,
 		Value:     value,
 		Reason:    "exported in your shell — OpenCode's built-in OpenTelemetry export sends its own traces there as well; Terma's plugin is unaffected",
 		Scope:     ScopeEnvironment,
@@ -339,7 +318,7 @@ func (c OpenCode) Connect(e Exporter, _ bool) error {
 	// The helper first: the plugin about to be written points at it, and an OpenCode
 	// starting between the two writes must find the credential already there.
 	if e.HelperPath != "" {
-		if err := writeHelper(e.HelperPath, e.APIKey); err != nil {
+		if err := WriteHelper(e.HelperPath, e.APIKey); err != nil {
 			return err
 		}
 	}
@@ -351,7 +330,7 @@ func (c OpenCode) Connect(e Exporter, _ bool) error {
 	// secret, and stays readable like the user's other plugins.
 	mode := fs.FileMode(0o644)
 	if len(cfg.Headers) > 0 {
-		mode = settingsMode
+		mode = SettingsMode
 	}
 	return config.WriteFileAtomic(path, src, mode)
 }
@@ -369,7 +348,7 @@ func (OpenCode) ConnectPerRepo(e Exporter) error {
 	if err != nil {
 		return err
 	}
-	if err := writeHelper(helper, e.APIKey); err != nil {
+	if err := WriteHelper(helper, e.APIKey); err != nil {
 		return err
 	}
 	helpersDir, err := HelpersDir()
@@ -379,7 +358,7 @@ func (OpenCode) ConnectPerRepo(e Exporter) error {
 	cfg := opencodeConfig{
 		Version:  1,
 		Endpoint: e.Endpoint,
-		Signals:  signalNames(e.Signals),
+		Signals:  SignalNames(e.Signals),
 		// The plugin file is global and shared across every bound repository, so this
 		// repo's content-capture choice must NOT ride in it — otherwise installing one
 		// project would flip prompt / tool-content capture on for every other project
@@ -469,8 +448,8 @@ func (c OpenCode) Disconnect() (DisconnectResult, error) {
 		return DisconnectResult{}, fmt.Errorf("read %s: %w", path, err)
 	}
 	if c.root == "" {
-		if cfg, ok := readPluginConfig(data); ok && cfg.HeadersHelper != "" && isOwnHelper(cfg.HeadersHelper) {
-			if err := deleteHelper(cfg.HeadersHelper); err != nil {
+		if cfg, ok := readPluginConfig(data); ok && cfg.HeadersHelper != "" && IsOwnHelper(cfg.HeadersHelper) {
+			if err := DeleteHelper(cfg.HeadersHelper); err != nil {
 				return DisconnectResult{}, err
 			}
 		}

@@ -8,9 +8,9 @@ import (
 	"time"
 )
 
-// semverRE pulls the version out of what a `--version` prints around it: Claude Code's
+// SemverRE pulls the version out of what a `--version` prints around it: Claude Code's
 // "2.1.159 (Claude Code)", whose parenthetical changes; Codex's "codex-cli 0.152.0".
-var semverRE = regexp.MustCompile(`\d+\.\d+\.\d+[^\s]*`)
+var SemverRE = regexp.MustCompile(`\d+\.\d+\.\d+[^\s]*`)
 
 // detectTimeout bounds the version probe: a hung binary should not hang the command.
 const detectTimeout = 5 * time.Second

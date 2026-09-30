@@ -17,12 +17,12 @@ type Agent struct{}
 
 func (Agent) Name() string                       { return "omp" }
 func (Agent) DisplayName() string                { return "Omp" }
-func (Agent) Installed(ctx context.Context) bool { return harness.Omp{}.Detect(ctx).Found }
-func (Agent) HooksPath() string                  { return hookmgr.OmpHooksPath }
-func (Agent) Default(root string) bool           { return hookmgr.HasOmp(root) }
+func (Agent) Installed(ctx context.Context) bool { return exporter{}.Detect(ctx).Found }
+func (Agent) HooksPath() string                  { return hooksPath }
+func (Agent) Default(root string) bool           { return hasConfig(root) }
 
 func (Agent) Plan(root string, install bool) (hookmgr.Plan, error) {
-	return hookmgr.PlanOmpHooks(root, install)
+	return planHooks(root, install)
 }
 
 func (Agent) Events() map[string]agents.Handler {
@@ -37,7 +37,7 @@ func (Agent) Events() map[string]agents.Handler {
 func (Agent) FlushAfter() []string { return []string{"omp-session-end"} }
 
 // Harness is how terma configures the agent's exporter.
-func (Agent) Harness() harness.Harness { return harness.Omp{} }
+func (Agent) Harness() harness.Harness { return exporter{} }
 
 var (
 	_ agents.Exporting = Agent{}

@@ -423,7 +423,7 @@ func saveStatusLineRecords(recs map[string]*statusLineRecord) error {
 		}
 		return err
 	}
-	return config.WriteJSON(path, recs, settingsMode)
+	return config.WriteJSON(path, recs, SettingsMode)
 }
 
 func loadStatusLineRecord(configPath string) (*statusLineRecord, error) {

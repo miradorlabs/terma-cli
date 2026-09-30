@@ -62,11 +62,6 @@ const (
 	otelLogsExporter    = "OTEL_LOGS_EXPORTER"
 	otelMetricsExporter = "OTEL_METRICS_EXPORTER"
 
-	otelProtocol           = "OTEL_EXPORTER_OTLP_PROTOCOL"
-	otelEndpoint           = "OTEL_EXPORTER_OTLP_ENDPOINT"
-	otelHeaders            = "OTEL_EXPORTER_OTLP_HEADERS"
-	otelResourceAttributes = "OTEL_RESOURCE_ATTRIBUTES"
-
 	// The four content switches. All default off upstream; Terma writes them
 	// explicitly either way so the file states the redaction posture rather than
 	// leaving it to a default that could change.
@@ -80,11 +75,6 @@ const (
 	// what it does instead of depending on an upstream default.
 	exporterOTLP = "otlp"
 	exporterNone = "none"
-
-	// protocolHTTPProtobuf is chosen over grpc because it traverses ordinary HTTPS
-	// proxies and corporate TLS interception, which the gRPC transport frequently
-	// does not.
-	protocolHTTPProtobuf = "http/protobuf"
 
 	// The detailed-beta-tracing pair. Together these send logs and traces to
 	// BETA_TRACING_ENDPOINT *instead of* through the configured exporters — a redirect
@@ -137,9 +127,9 @@ var claudeManagedKeys = []string{
 	otelTracesExporter,
 	otelLogsExporter,
 	otelMetricsExporter,
-	otelProtocol,
-	otelEndpoint,
-	otelHeaders,
+	EnvOTLPProtocol,
+	EnvOTLPEndpoint,
+	EnvOTLPHeaders,
 	otelLogUserPrompts,
 	otelLogAssistantResponse,
 	otelLogToolDetails,
@@ -190,7 +180,7 @@ func (Claude) SupportsHeadersHelper() bool { return true }
 // as an error: connecting an uninstalled harness is allowed, since the config is read
 // whenever it is eventually started.
 func (Claude) Detect(ctx context.Context) Detection {
-	return DetectBinary(ctx, "claude", semverRE)
+	return DetectBinary(ctx, "claude", SemverRE)
 }
 
 // ConfigPath is ~/.claude/settings.json, or $CLAUDE_CONFIG_DIR/settings.json when Claude
@@ -242,8 +232,8 @@ func renderClaude(e Exporter) map[string]string {
 		otelLogsExporter:    exporterFor(e.HasSignal(SignalLogs)),
 		otelMetricsExporter: exporterFor(e.HasSignal(SignalMetrics)),
 
-		otelProtocol: protocolHTTPProtobuf,
-		otelEndpoint: e.Endpoint,
+		EnvOTLPProtocol: ProtocolHTTPProtobuf,
+		EnvOTLPEndpoint: e.Endpoint,
 
 		// Off unless explicitly opted into. Written rather than omitted so the file is
 		// an explicit statement of what is and is not captured.
@@ -263,7 +253,7 @@ func renderClaude(e Exporter) map[string]string {
 	// In helper mode the credential travels through the headers-helper script instead;
 	// writing it here too would defeat the point of keeping it out of the settings file.
 	if e.APIKey != "" && e.HelperPath == "" {
-		env[otelHeaders] = "Authorization=Bearer " + e.APIKey
+		env[EnvOTLPHeaders] = "Authorization=Bearer " + e.APIKey
 	}
 	// e.ResourceAttributes are deliberately not rendered. OTEL_RESOURCE_ATTRIBUTES
 	// belongs to the user; the project travels in the connect
@@ -313,7 +303,7 @@ func (c Claude) Status() (Status, error) {
 	status := Status{
 		ConfigPath: path,
 		Exists:     s.existed,
-		Endpoint:   s.env[otelEndpoint],
+		Endpoint:   s.env[EnvOTLPEndpoint],
 
 		// Absent is off — matching Claude Code's own default rather than reporting a
 		// missing key as unknown.
@@ -346,12 +336,12 @@ func (c Claude) Status() (Status, error) {
 	// someone hunting in Terma for data the harness never sent.
 	status.Signals = claudeSignals(s.env)
 
-	status.KeyPrefix = maskKeyFromHeaders(s.env[otelHeaders])
+	status.KeyPrefix = maskKeyFromHeaders(s.env[EnvOTLPHeaders])
 	// Helper mode keeps the key out of the settings file entirely; the prefix worth
 	// reporting then lives in the helper script.
 	if status.KeyPrefix == "" {
-		if helper := stringSetting(s.root, claudeOtelHeadersHelper); helper != "" && isOwnHelper(helper) {
-			status.KeyPrefix = MaskKey(keyFromHelper(helper))
+		if helper := stringSetting(s.root, claudeOtelHeadersHelper); helper != "" && IsOwnHelper(helper) {
+			status.KeyPrefix = MaskKey(KeyFromHelper(helper))
 		}
 	}
 	// With a journal, ownership is value-based: a key edited since connect is the user's
@@ -417,7 +407,7 @@ func claudeConflicts(env map[string]string, root map[string]json.RawMessage, e E
 
 	// Not an env entry, so nothing above would find it. Terma's own helper is exempt:
 	// it is the credential delivery this connect manages, not a foreign override.
-	if helper := stringSetting(root, claudeOtelHeadersHelper); helper != "" && !isOwnHelper(helper) {
+	if helper := stringSetting(root, claudeOtelHeadersHelper); helper != "" && !IsOwnHelper(helper) {
 		out = append(out, Conflict{
 			Key:        claudeOtelHeadersHelper,
 			Value:      helper,
@@ -432,13 +422,13 @@ func claudeConflicts(env map[string]string, root map[string]json.RawMessage, e E
 	// overwritten — but a connect would replace an export the user set up. Reported
 	// whether or not telemetry is currently switched on: a disabled config still holds
 	// the destination someone chose, and connect would overwrite it just the same.
-	if current := env[otelEndpoint]; current != "" && current != e.Endpoint {
+	if current := env[EnvOTLPEndpoint]; current != "" && current != e.Endpoint {
 		reason := "telemetry is already exporting here; connecting replaces it"
 		if !isOn(env[claudeEnableTelemetry]) {
 			reason = "a previously configured destination; connecting replaces it"
 		}
 		out = append(out, Conflict{
-			Key: otelEndpoint, Value: current, Reason: reason,
+			Key: EnvOTLPEndpoint, Value: current, Reason: reason,
 			Scope: l.scope, Clearable: true,
 		})
 	}
@@ -476,7 +466,7 @@ func claudeConflicts(env map[string]string, root map[string]json.RawMessage, e E
 				Clearable: true,
 			})
 		}
-		if v := env[o.protocol]; v != "" && v != protocolHTTPProtobuf {
+		if v := env[o.protocol]; v != "" && v != ProtocolHTTPProtobuf {
 			out = append(out, Conflict{
 				Key:       o.protocol,
 				Value:     v,
@@ -571,7 +561,7 @@ func (c Claude) Connect(e Exporter, clearConflicts bool) error {
 			}
 			// The generic endpoint is about to be overwritten by the merge anyway;
 			// deleting it here would be a no-op with a confusing name.
-			if conflict.Key == otelEndpoint {
+			if conflict.Key == EnvOTLPEndpoint {
 				continue
 			}
 			if conflict.Key == claudeOtelHeadersHelper {
@@ -659,7 +649,7 @@ func (c Claude) Connect(e Exporter, clearConflicts bool) error {
 	// at it, and a harness starting between the two writes must find the credential
 	// already there. Idempotent, so a re-run after a crash converges.
 	if e.HelperPath != "" {
-		if err := writeHelper(e.HelperPath, e.APIKey); err != nil {
+		if err := WriteHelper(e.HelperPath, e.APIKey); err != nil {
 			return err
 		}
 	}
@@ -682,7 +672,7 @@ func (c Claude) Connect(e Exporter, clearConflicts bool) error {
 	// the settings file holds a path, not a secret, and a repository's local layer
 	// holds no key at all, so the user's own mode survives — a dotfiles-friendly 0644,
 	// or the 0644 a committed file wants.
-	_, inlineKey := env[otelHeaders]
+	_, inlineKey := env[EnvOTLPHeaders]
 	defer pruneJournals()
 	if err := s.save(inlineKey); err != nil {
 		// Put the preceding journal back so a failed reconnect does not replace the
@@ -745,8 +735,8 @@ func (c Claude) Disconnect() (DisconnectResult, error) {
 				}
 				continue
 			}
-			if key == claudeOtelHeadersHelper && isOwnHelper(installed) {
-				if err := deleteHelper(installed); err != nil {
+			if key == claudeOtelHeadersHelper && IsOwnHelper(installed) {
+				if err := DeleteHelper(installed); err != nil {
 					return result, err
 				}
 			}
@@ -843,7 +833,7 @@ func (c Claude) Backup(endpoint string) (string, error) {
 		return s.backup(false)
 	}
 	// No record: fall back to the endpoint, which is the only evidence there is.
-	return s.backup(s.env[otelEndpoint] != endpoint)
+	return s.backup(s.env[EnvOTLPEndpoint] != endpoint)
 }
 
 // ManagedKeys is what Disconnect would remove, for a preview.
@@ -901,19 +891,19 @@ func (c Claude) CurrentCredential(endpoint, projectID string) (string, bool) {
 	if err != nil {
 		return "", false
 	}
-	if s.env[otelEndpoint] != endpoint {
+	if s.env[EnvOTLPEndpoint] != endpoint {
 		return "", false
 	}
 	j, err := loadJournal(c.Name(), path)
 	if err != nil || projectIDOf(j) != projectID {
 		return "", false
 	}
-	if helper := stringSetting(s.root, claudeOtelHeadersHelper); helper != "" && isOwnHelper(helper) {
-		if key := keyFromHelper(helper); serverkey.Is(key) {
+	if helper := stringSetting(s.root, claudeOtelHeadersHelper); helper != "" && IsOwnHelper(helper) {
+		if key := KeyFromHelper(helper); serverkey.Is(key) {
 			return key, true
 		}
 	}
-	if key := keyFromHeaders(s.env[otelHeaders]); serverkey.Is(key) {
+	if key := keyFromHeaders(s.env[EnvOTLPHeaders]); serverkey.Is(key) {
 		return key, true
 	}
 	return "", false

@@ -6,18 +6,17 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/agents/internal/relayexport"
-	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
 // ConfigureRelay writes terma's exporter into Hermes, sending to the local relay.
 func (Agent) ConfigureRelay(ctx context.Context, cfg agents.RelayConfig) (agents.RelayResult, error) {
-	path, err := harness.WriteHermesPlugin(harness.HermesConfig{Endpoint: cfg.Endpoint, Headers: relayexport.Headers(cfg),
+	path, err := writePlugin(pluginConfig{Endpoint: cfg.Endpoint, Headers: relayexport.Headers(cfg),
 		IncludePrompts: true, IncludeToolContent: true, HookCommand: cfg.HookCommand})
 	result := agents.RelayResult{Paths: []string{path}}
 	if err != nil {
 		return result, err
 	}
-	if err := harness.EnableHermesPlugin(ctx); err != nil {
+	if err := enablePlugin(ctx); err != nil {
 		result.Pending = true
 		result.Notes = append(result.Notes, fmt.Sprintf("Hermes: the plugin is written (%s) but not enabled: %v.", path, err))
 	}
