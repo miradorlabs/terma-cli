@@ -75,8 +75,8 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-      - name: Install Pi (latest)
-        run: npm install -g @earendil-works/pi-coding-agent
+      - name: Install Pi and T3 Code (latest)
+        run: npm install -g @earendil-works/pi-coding-agent t3
       - name: Build native test binaries
         run: |
           go build -o live/bin/terma .
