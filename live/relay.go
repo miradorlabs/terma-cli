@@ -27,8 +27,9 @@ type RelayOptions struct {
 	// NoKey leaves the machine without a key for the project: installed, but never
 	// opted in here.
 	NoKey bool
-	// Content writes a routing record that lets prompts and tool content through;
-	// without one the relay withholds both.
+	// Content is the project's routing record: prompts and tool content through, or
+	// both withheld. Always written: with no record the organization's policy decides,
+	// which collects both by default.
 	Content bool
 }
 
@@ -53,10 +54,8 @@ func (sb *Sandbox) UseRelay(o RelayOptions) {
 			t.Fatal(err)
 		}
 	}
-	if o.Content {
-		rec, _ := json.Marshal(map[string]any{"project_id": sb.ProjectID, "include_prompts": true, "include_tool_content": true})
-		sb.writeAbs(filepath.Join(sb.TermaConfig, "routing", sb.ProjectID+".json"), string(rec)+"\n")
-	}
+	rec, _ := json.Marshal(map[string]any{"project_id": sb.ProjectID, "include_prompts": o.Content, "include_tool_content": o.Content})
+	sb.writeAbs(filepath.Join(sb.TermaConfig, "routing", sb.ProjectID+".json"), string(rec)+"\n")
 	// --no-start: the scenario decides whether the relay runs before the agent.
 	// One setup for every agent: a second would stop the relay StartRelay runs.
 	var agents strings.Builder
