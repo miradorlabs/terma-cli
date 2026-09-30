@@ -4,6 +4,9 @@ import (
 	"path/filepath"
 )
 
+// TelemetrySwitch is Claude Code's master switch, which only the user file holds.
+func (Claude) TelemetrySwitch() string { return claudeEnableTelemetry }
+
 // EmissionStatus reads the user and repository settings together, including the
 // developer's settings.local.json. Unlike Status, it describes the combined export
 // switches rather than one file. It does not prove a running agent has reloaded them,

@@ -54,6 +54,8 @@ type Env struct {
 	// relay (see claimForRelay), so the caller can start the relay if it is not
 	// running. It may be called more than once.
 	OnClaim func()
+	// Flush, when set, starts detached delivery of what the spool holds.
+	Flush func()
 	// Policy is the organization's collection policy (config.Profile.Policy). Global
 	// mode places every session in the selected team's DefaultProjectID, including
 	// bound repositories and sessions outside repositories.

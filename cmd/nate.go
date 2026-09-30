@@ -13,6 +13,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/output"
@@ -76,15 +77,21 @@ func runNate(cmd *cobra.Command) error {
 			fmt.Fprintf(out, "Restored %s settings.\n", h.DisplayName())
 		}
 	}
-	if restored, err := (harness.Claude{}).RemoveStatusLine(); err != nil {
-		return fmt.Errorf("restore Claude Code status line: %w", err)
-	} else if restored {
-		fmt.Fprintln(out, "Restored the Claude Code status line.")
-	}
-	if restored, err := (harness.Codex{}).RemoveCodexNotify(); err != nil {
-		return fmt.Errorf("restore Codex notifier: %w", err)
-	} else if restored {
-		fmt.Fprintln(out, "Restored the Codex notifier.")
+	for _, e := range registered.With[agents.Exporting]() {
+		if s, ok := e.Harness().(harness.StatusLiner); ok {
+			if restored, err := s.RemoveStatusLine(); err != nil {
+				return fmt.Errorf("restore %s status line: %w", e.DisplayName(), err)
+			} else if restored {
+				fmt.Fprintf(out, "Restored the %s status line.\n", e.DisplayName())
+			}
+		}
+		if n, ok := e.Harness().(harness.TurnNotifier); ok {
+			if restored, err := n.RemoveNotifier(); err != nil {
+				return fmt.Errorf("restore %s notifier: %w", e.DisplayName(), err)
+			} else if restored {
+				fmt.Fprintf(out, "Restored the %s notifier.\n", e.DisplayName())
+			}
+		}
 	}
 
 	if _, err := shim.RemoveLegacy(); err != nil {

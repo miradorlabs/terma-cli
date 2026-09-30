@@ -192,28 +192,29 @@ func writeManagedConfig(dir, terma string) ([]string, error) {
 		return nil, err
 	}
 	cmd := hookmgr.ManagedHookCommand(terma)
-	claude, err := hookmgr.ClaudeManagedSettings(cmd)
-	if err != nil {
-		return nil, err
+	managed := registered.With[agents.ManagedHooks]()
+	var names, deploy []string
+	files := map[string][]byte{}
+	for _, a := range managed {
+		name, data, err := a.ManagedConfig(cmd)
+		if err != nil {
+			return nil, err
+		}
+		files[name] = data
+		names = append(names, a.DisplayName())
+		deploy = append(deploy, "- `"+name+"` → "+a.ManagedDeploy())
 	}
-	files := map[string][]byte{
-		"claude-managed-settings.json": claude,
-		"codex-requirements.toml":      []byte(hookmgr.CodexManagedRequirements(cmd)),
-		"README.md": []byte(`# terma global mode: managed hooks
+	files["README.md"] = []byte(`# terma global mode: managed hooks
 
-Deploy these so every Claude Code and Codex session on a machine is claimed, with no
+Deploy these so every ` + strings.Join(names, " and ") + ` session on a machine is claimed, with no
 trust step for anyone. Each developer still runs ` + "`terma setup`" + ` once: it points the
 agents' exporters at the machine's relay, whose token is the machine's own.
 
-- ` + "`claude-managed-settings.json`" + ` → macOS ` + "`/Library/Application Support/ClaudeCode/managed-settings.json`" + `,
-  Linux ` + "`/etc/claude-code/managed-settings.json`" + ` (merge its ` + "`hooks`" + ` into a file you already deploy).
-- ` + "`codex-requirements.toml`" + ` → ` + "`/etc/codex/requirements.toml`" + ` (append to one you already deploy), or
-  the same table in your MDM profile for ` + "`com.openai.codex`" + `.
+` + strings.Join(deploy, "\n") + `
 
 The hooks run terma as ` + "`" + terma + "`" + `; terma must be installed there for every user.
 Where these are deployed, ` + "`terma setup`" + ` writes no per-user hooks of its own.
-`),
-	}
+`)
 	var out []string
 	for name, data := range files {
 		p := filepath.Join(dir, name)

@@ -26,7 +26,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
-	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
 	"github.com/miradorlabs/terma-cli/internal/migrate"
@@ -387,8 +386,8 @@ func runDoctor(ctx context.Context, skipCommit bool, progress doctorProgress) do
 	// 5b. Status line: the payload Claude Code hands its status line carries the
 	// plan's own rate-limit windows, the strongest funding evidence a machine
 	// produces. Only worth a line when Claude Code is here and connected.
-	if (harness.Claude{}).Detect(ctx).Found {
-		timed(doctor.KeyStatusLine, "Claude Code status line", d.statusLine)
+	if a, _, ok := statusLineAgent(); ok && a.Installed(ctx) {
+		timed(doctor.KeyStatusLine, a.DisplayName()+" status line", d.statusLine)
 	}
 
 	// 6. Scratch commit.

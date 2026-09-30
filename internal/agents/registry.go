@@ -88,6 +88,17 @@ func (r *Registry) RepoNames() []string {
 	return out
 }
 
+// HooksPaths lists the files agents commit their hooks to, relative to a repository.
+func (r *Registry) HooksPaths() []string {
+	var out []string
+	for _, a := range r.all {
+		if p := a.HooksPath(); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 // WiredNames lists the agents whose committed hooks root carries.
 func (r *Registry) WiredNames(root string) []string {
 	var out []string
@@ -123,6 +134,26 @@ func (r *Registry) ForTool(label string) (Agent, bool) {
 	for _, a := range r.all {
 		if Tool(a) == label {
 			return a, true
+		}
+	}
+	return nil, false
+}
+
+// Render is the render hook for event, when an agent has one.
+func (r *Registry) Render(event string) (RenderHandler, bool) {
+	for _, a := range r.With[Renderer]() {
+		if h, ok := a.Renders()[event]; ok {
+			return h, true
+		}
+	}
+	return nil, false
+}
+
+// WhenHooksOff is what event runs while hooks are switched off, when anything does.
+func (r *Registry) WhenHooksOff(event string) (Handler, bool) {
+	for _, a := range r.With[OffSwitched]() {
+		if h, ok := a.WhenHooksOff()[event]; ok {
+			return h, true
 		}
 	}
 	return nil, false

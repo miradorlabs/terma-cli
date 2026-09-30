@@ -358,7 +358,7 @@ func connectGlobal(cmd *cobra.Command, name string, f connectFlags) error {
 	statusLineNote := ""
 	codexNotifyNote := ""
 	if line, ok := h.(harness.StatusLiner); ok && !f.noStatusLine {
-		statusLineNote, _ = installHarnessStatusLine(line, cmd.ErrOrStderr())
+		statusLineNote, _ = installHarnessStatusLine(h.DisplayName(), line, cmd.ErrOrStderr())
 	}
 	if notifier, ok := h.(harness.TurnNotifier); ok {
 		switch changed, err := notifier.InstallNotifier(); {
@@ -611,13 +611,17 @@ func backupHarnessConfig(h harness.Harness, endpoint string) (string, error) {
 // line and returns the line to say about it, and whether it is in place. A failure is a
 // warning, never a failed connect: the exporters are already written and working.
 func installStatusLine(errOut io.Writer) (string, bool) {
-	return installHarnessStatusLine(harness.Claude{}, errOut)
+	a, s, ok := statusLineAgent()
+	if !ok {
+		return "", false
+	}
+	return installHarnessStatusLine(a.DisplayName(), s, errOut)
 }
 
-func installHarnessStatusLine(c harness.StatusLiner, errOut io.Writer) (string, bool) {
+func installHarnessStatusLine(agent string, c harness.StatusLiner, errOut io.Writer) (string, bool) {
 	changed, err := c.InstallStatusLine()
 	if err != nil {
-		fmt.Fprintf(errOut, "Warning: could not wrap Claude Code's status line (%v); plan usage will not be captured.\n", err)
+		fmt.Fprintf(errOut, "Warning: could not wrap %s's status line (%v); plan usage will not be captured.\n", agent, err)
 		return "", false
 	}
 	st, stErr := c.StatusLineState("")

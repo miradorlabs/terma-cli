@@ -154,7 +154,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	// A dry run is nothing but its plan, so it always says everything.
 	ui := newInstallUI(out, f.verbose || f.dryRun)
 	fmt.Fprintf(out, "%s in %s\n\n", ui.p.Bold("Installing terma"), tildePath(root))
-	for _, path := range []string{termaproject.FileName, hookmgr.ClaudeSettingsPath} {
+	for _, path := range append([]string{termaproject.FileName}, registered.HooksPaths()...) {
 		if err := termaproject.CheckPath(root, path); err != nil {
 			return err
 		}
@@ -344,7 +344,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	// (not merely installed) so it only touches the global config for a developer who
 	// has chosen Claude — which also keeps `--harness none` installs from touching it.
 	// --no-statusline opts out.
-	if !f.noStatusLine && slices.Contains(agents, routing.AgentClaude) {
+	if a, _, ok := statusLineAgent(); ok && !f.noStatusLine && slices.Contains(agents, a.Name()) {
 		if note, ok := installStatusLine(cmd.ErrOrStderr()); ok {
 			fmt.Fprintf(ui.detail, "\n%s\n", note)
 			ui.ok("Status line", "reads your plan's usage windows")
@@ -1221,7 +1221,7 @@ to the same project — remove it machine-wide with 'terma shim uninstall'.`,
 			if err != nil {
 				return err
 			}
-			for _, path := range []string{termaproject.FileName, hookmgr.ClaudeSettingsPath} {
+			for _, path := range append([]string{termaproject.FileName}, registered.HooksPaths()...) {
 				if err := termaproject.CheckPath(root, path); err != nil {
 					return err
 				}

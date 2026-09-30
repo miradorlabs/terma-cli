@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"slices"
 
@@ -79,8 +80,22 @@ type statusLineVerdict struct {
 	renderer  string
 }
 
+// statusLineAgent is the agent whose status line terma wraps, and its harness.
+func statusLineAgent() (agents.Exporting, harness.StatusLiner, bool) {
+	for _, e := range registered.With[agents.Exporting]() {
+		if s, ok := e.Harness().(harness.StatusLiner); ok {
+			return e, s, true
+		}
+	}
+	return nil, nil, false
+}
+
 func judgeStatusLine(repoRoot string) statusLineVerdict {
-	return classifyStatusLine((harness.Claude{}).StatusLineState(repoRoot))
+	_, s, ok := statusLineAgent()
+	if !ok {
+		return statusLineVerdict{}
+	}
+	return classifyStatusLine(s.StatusLineState(repoRoot))
 }
 
 func classifyStatusLine(st harness.StatusLineState, err error) statusLineVerdict {
@@ -163,17 +178,18 @@ func emissionProblem(h harness.Harness, root, projectID string, f *harnessFacts)
 		return "", ""
 	}
 	st := f.status
-	if c, ok := h.(harness.Claude); ok {
+	if c, ok := h.(harness.EmissionChecker); ok {
+		name := h.DisplayName()
 		effective, err := c.EmissionStatus(root)
 		if err != nil {
-			return "could not read effective telemetry settings: " + err.Error(), "repair the Claude Code settings file named above, then restart Claude Code"
+			return "could not read effective telemetry settings: " + err.Error(), "repair the " + name + " settings file named above, then restart " + name
 		}
 		if effective.Endpoint == "" {
 			return "", "" // The routing verdict already reports the missing connection.
 		}
 		if !effective.Connected {
-			return "telemetry is disabled (CLAUDE_CODE_ENABLE_TELEMETRY); sessions here send nothing",
-				"enable CLAUDE_CODE_ENABLE_TELEMETRY in Claude Code's user/repository settings, then restart Claude Code"
+			return "telemetry is disabled (" + c.TelemetrySwitch() + "); sessions here send nothing",
+				"enable " + c.TelemetrySwitch() + " in " + name + "'s user/repository settings, then restart " + name
 		}
 		st = effective
 		f.repoAsks = len(effective.Signals) > 0

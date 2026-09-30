@@ -43,7 +43,18 @@ type TurnNotifier interface {
 	RemoveNotifier() (bool, error)
 }
 
+// EmissionChecker is a harness whose export switches combine several settings files, so
+// what a repository exports is none of them alone.
+type EmissionChecker interface {
+	// EmissionStatus is the combined export for the repository at root.
+	EmissionStatus(root string) (Status, error)
+	// TelemetrySwitch is the setting that turns the whole export on.
+	TelemetrySwitch() string
+}
+
 var (
+	_ EmissionChecker = Claude{}
+
 	_ Noter = Codex{}
 
 	_ Credentialed = Claude{}

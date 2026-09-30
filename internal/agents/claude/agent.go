@@ -48,13 +48,38 @@ func (Agent) PlanUserHooks(dir string, command func(string) string, install bool
 }
 func (Agent) ManagedHookFiles(root string) []string { return harness.ClaudeManagedHookFiles(root) }
 
+// ManagedConfig is a managed-settings.json holding terma's hooks.
+func (Agent) ManagedConfig(command func(string) string) (string, []byte, error) {
+	data, err := hookmgr.ClaudeManagedSettings(command)
+	return "claude-managed-settings.json", data, err
+}
+
+// ManagedDeploy says where managed-settings.json goes.
+func (Agent) ManagedDeploy() string {
+	return "macOS `/Library/Application Support/ClaudeCode/managed-settings.json`,\n  Linux `/etc/claude-code/managed-settings.json` (merge its `hooks` into a file you already deploy)."
+}
+
 // Harness is how terma configures the agent's exporter.
 func (Agent) Harness() harness.Harness { return harness.Claude{} }
 
 // RefreshMachine rewrites the status-line wrap.
 func (Agent) RefreshMachine() (string, bool, error) { return harness.Claude{}.RefreshStatusLine() }
 
+// Renders is the status line: Claude Code's statusLine command once terma has wrapped
+// it. The renderer has its own deadline even when Claude does not cancel it; capture
+// starts detached delivery before waiting for rendering.
+func (Agent) Renders() map[string]agents.RenderHandler {
+	return map[string]agents.RenderHandler{"statusline": func(ctx context.Context, env hookrun.Env) int {
+		renderer, err := harness.StatusLineRenderer()
+		if err != nil {
+			env.Logf("status line record: %v", err)
+		}
+		return hookrun.StatusLine(ctx, env, hookrun.StatusLineOptions{Renderer: renderer, Indicator: env.Spool != nil, OnCapture: env.Flush})
+	}}
+}
+
 var (
+	_ agents.Renderer         = Agent{}
 	_ agents.MachineRefresher = Agent{}
 	_ agents.Exporting        = Agent{}
 	_ agents.Agent            = Agent{}

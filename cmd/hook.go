@@ -13,7 +13,6 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -66,21 +65,16 @@ func newHookCommand() *cobra.Command {
 		// commit of every developer.
 		RunE: func(cmd *cobra.Command, args []string) error {
 			event := args[0]
-			// The status line draws something, so it is the one hook the kill switch
-			// must not silence: with TERMA_HOOKS=0 it still renders and merely does
-			// not capture. Its exit status is the renderer's, so it ends the process
-			// itself rather than returning through cobra.
-			if event == "statusline" {
-				os.Exit(runStatusLine(cmd, HooksDisabled()))
+			// A hook that draws something is the one the kill switch must not silence:
+			// with TERMA_HOOKS=0 it still renders and merely does not capture. Its exit
+			// status is its own, so it ends the process rather than returning through
+			// cobra.
+			if render, ok := registered.Render(event); ok {
+				os.Exit(runRender(cmd, render, args[1:], HooksDisabled()))
 			}
 			if HooksDisabled() {
-				// terma replaced Codex's direct `notify` invocation, so even with capture
-				// off the user's preserved notifier must still fire — the same carve-out
-				// the status line gets above.
-				if event == "codex-notify" && len(args) > 1 {
-					ctx, cancel := context.WithTimeout(cmd.Context(), 5*time.Second)
-					defer cancel()
-					_ = harness.RunPreviousCodexNotify(ctx, args[1])
+				if off, ok := registered.WhenHooksOff(event); ok {
+					_ = off(cmd.Context(), hookrun.Env{Now: time.Now(), Args: args[1:], Stderr: cmd.ErrOrStderr(), Debug: os.Getenv("TERMA_DEBUG") != ""})
 				}
 				return nil
 			}
@@ -142,28 +136,25 @@ func newHookCommand() *cobra.Command {
 	return cmd
 }
 
-// runStatusLine is `terma hook statusline`: Claude Code's statusLine command
-// once Terma has wrapped it. The renderer has its own deadline even when Claude
-// does not cancel it; capture starts detached delivery before waiting for rendering.
-func runStatusLine(cmd *cobra.Command, captureDisabled bool) int {
+// runRender runs a render hook: its output is the hook's reply, and it captures only
+// while hooks are on.
+func runRender(cmd *cobra.Command, render agents.RenderHandler, args []string, captureDisabled bool) int {
 	cwd, _ := os.Getwd()
 	env := hookrun.Env{
 		Now:     time.Now(),
 		Cwd:     cwd,
+		Args:    args,
 		Stdin:   cmd.InOrStdin(),
 		Stdout:  cmd.OutOrStdout(),
 		Stderr:  cmd.ErrOrStderr(),
 		Version: Version,
 		Debug:   os.Getenv("TERMA_DEBUG") != "",
+		Flush:   func() { spawnFlush() },
 	}
 	if !captureDisabled {
 		env.Spool = openSpool()
 	}
-	renderer, err := harness.StatusLineRenderer()
-	if err != nil && env.Debug {
-		fmt.Fprintf(env.Stderr, "terma hook: status line record: %v\n", err)
-	}
-	return hookrun.StatusLine(cmd.Context(), env, hookrun.StatusLineOptions{Renderer: renderer, Indicator: !captureDisabled, OnCapture: func() { spawnFlush() }})
+	return render(cmd.Context(), env)
 }
 
 // hookPolicy is the organization's collection policy as `terma setup` recorded it: one

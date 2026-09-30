@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/harness"
@@ -54,6 +55,17 @@ func (Agent) PlanUserHooks(dir string, command func(string) string, install bool
 	return hookmgr.PlanCodexUserHooks(dir, command, install)
 }
 func (Agent) ManagedHookFiles(root string) []string { return harness.CodexManagedHookFiles(root) }
+
+// ManagedConfig is a requirements.toml holding terma's hooks, which Codex runs with no
+// trust step.
+func (Agent) ManagedConfig(command func(string) string) (string, []byte, error) {
+	return "codex-requirements.toml", []byte(hookmgr.CodexManagedRequirements(command)), nil
+}
+
+// ManagedDeploy says where requirements.toml goes.
+func (Agent) ManagedDeploy() string {
+	return "`/etc/codex/requirements.toml` (append to one you already deploy), or\n  the same table in your MDM profile for `com.openai.codex`."
+}
 
 // Trust reads the question Cursor's hooks cannot raise: Codex refuses to run a hook it
 // has not been shown, so a committed file is inert on a fresh clone until the developer
@@ -114,7 +126,21 @@ func pronoun(n int) string {
 // Harness is how terma configures the agent's exporter.
 func (Agent) Harness() harness.Harness { return harness.Codex{} }
 
+// WhenHooksOff runs the developer's own notifier: terma replaced Codex's direct notify
+// invocation, so it must still fire with capture off.
+func (Agent) WhenHooksOff() map[string]agents.Handler {
+	return map[string]agents.Handler{"codex-notify": func(ctx context.Context, env hookrun.Env) error {
+		if len(env.Args) == 0 {
+			return nil
+		}
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		return harness.RunPreviousCodexNotify(ctx, env.Args[0])
+	}}
+}
+
 var (
+	_ agents.OffSwitched  = Agent{}
 	_ agents.Exporting    = Agent{}
 	_ agents.Agent        = Agent{}
 	_ agents.Trusting     = Agent{}

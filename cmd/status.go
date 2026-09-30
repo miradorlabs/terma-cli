@@ -216,7 +216,7 @@ Nothing is written and no scratch commit is made — run
 						connected = append(connected, v.displayName)
 					}
 					fmt.Fprintf(out, "Agent:       %s %s\n", v.displayName, suffix)
-					if v.name == "claude" && ok {
+					if a, _, lines := statusLineAgent(); lines && v.name == a.Name() && ok {
 						fmt.Fprintf(out, "Status line: %s\n", statusLineSummary(judgeStatusLine(root)))
 					}
 				}
