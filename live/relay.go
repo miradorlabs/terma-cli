@@ -59,16 +59,14 @@ func (sb *Sandbox) UseRelay(o RelayOptions) {
 	if err := os.WriteFile(filepath.Join(sb.TermaConfig, "keys.json"), keys, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	rec, _ := json.Marshal(map[string]any{"project_id": sb.ProjectID, "include_prompts": o.Content, "include_tool_content": o.Content, "signals": []string{"traces", "logs", "metrics"}, "harnesses": []string{"claude", "codex", "opencode"}})
+	// The record names every agent pointed at the relay, as install's does: the relay
+	// withholds a claimed session of an agent the record does not name.
+	agents := append([]string{"claude", "codex", "opencode"}, sb.RelayAgents...)
+	rec, _ := json.Marshal(map[string]any{"project_id": sb.ProjectID, "include_prompts": o.Content, "include_tool_content": o.Content, "signals": []string{"traces", "logs", "metrics"}, "harnesses": agents})
 	sb.writeAbs(filepath.Join(sb.TermaConfig, "routing", sb.ProjectID+".json"), string(rec)+"\n")
 	// --no-start: the scenario decides whether the relay runs before the agent.
 	// One setup for every agent: a second would stop the relay StartRelay runs.
-	var agents strings.Builder
-	agents.WriteString("claude,codex,opencode")
-	for _, a := range sb.RelayAgents {
-		agents.WriteString("," + a)
-	}
-	sb.terma(sb.Repo, "relay", "setup", "--no-start", "--addr", sb.relayAddr, "--harness", agents.String())
+	sb.terma(sb.Repo, "relay", "setup", "--no-start", "--addr", sb.relayAddr, "--harness", strings.Join(agents, ","))
 	t.Cleanup(sb.StopRelay)
 	if o.Start {
 		sb.StartRelay()
