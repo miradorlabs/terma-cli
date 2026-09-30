@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/relay/service"
 )
 
@@ -21,19 +22,18 @@ import (
 // choice is remembered (relay/no-service) until `--relay-service on` or `terma relay
 // daemon install`; without the service, hooks start the relay on demand, as before.
 
-// relayNoServiceFile, in the relay directory, records that the developer opted out.
-const relayNoServiceFile = "no-service"
+// daemon.NoServiceFile, in the relay directory, records that the developer opted out.
 
 // relayServiceWanted says whether install should set the service up: --relay-service
 // when given (recording the choice), else the choice recorded, else yes where a service
 // can run. A test binary, and a test's `TERMA_RELAY_SERVICE=0` (the live suite, the
 // install e2e matrix), never register one with the real service manager.
 func relayServiceWanted(flag string) bool {
-	dir, err := relayDir()
+	dir, err := daemon.Dir()
 	if err != nil {
 		return false
 	}
-	marker := filepath.Join(dir, relayNoServiceFile)
+	marker := filepath.Join(dir, daemon.NoServiceFile)
 	switch flag {
 	case "off":
 		_ = os.MkdirAll(dir, 0o700)
@@ -62,26 +62,26 @@ func relayServiceWanted(flag string) bool {
 func ensureRelay(ctx context.Context, flag string, report func(warn bool, what string)) {
 	if !relayServiceWanted(flag) {
 		if flag == "off" {
-			if removed, _ := removeRelayService(ctx); removed {
+			if removed, _ := daemon.RemoveService(ctx); removed {
 				report(false, "service removed; hooks start the relay on demand")
 			}
 		}
-		spawnRelay()
+		daemon.Spawn()
 		return
 	}
-	if _, ok := relayServiceInstalled(); ok && flag != "on" {
+	if _, ok := daemon.ServiceInstalled(); ok && flag != "on" {
 		// A service definition does not prove its relay is alive. Starting on
 		// demand is harmless while it runs (the relay lock prevents duplicates),
 		// and closes the gap while a stopped service awaits its manager's restart.
-		spawnRelay()
+		daemon.Spawn()
 		return
 	}
-	path, err := installRelayService(ctx)
+	path, err := daemon.InstallService(ctx)
 	if err != nil {
 		report(true, "could not run as a service ("+err.Error()+"); hooks start it on demand")
-		spawnRelay()
+		daemon.Spawn()
 		return
 	}
 	report(false, "runs in the background ("+path+"); `terma setup --relay-service off` stops it")
-	spawnRelay()
+	daemon.Spawn()
 }

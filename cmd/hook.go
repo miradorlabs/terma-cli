@@ -14,6 +14,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/procinfo"
+	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -120,7 +122,7 @@ func newHookCommand() *cobra.Command {
 				}
 			}
 			if claimed {
-				spawnRelay()
+				daemon.Spawn()
 				wireCloneOnFirstUse(ctx, cwd)
 			}
 			if flushesAfter(event) && env.Spool != nil {
@@ -211,7 +213,7 @@ func spawnFlush() {
 	}
 	proc := exec.Command(exe, "spool", "flush", "--quiet")
 	proc.Stdin, proc.Stdout, proc.Stderr = nil, nil, nil
-	detach(proc)
+	procinfo.Detach(proc)
 	if err := proc.Start(); err != nil {
 		return
 	}

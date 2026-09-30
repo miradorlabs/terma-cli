@@ -1,11 +1,7 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
-	"net"
-	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
@@ -20,6 +16,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/keystore"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 )
 
 func newRelayStatusCommand() *cobra.Command {
@@ -28,25 +25,25 @@ func newRelayStatusCommand() *cobra.Command {
 		Short: "Show whether the relay is running and what it has done",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			dir, err := relayDir()
+			dir, err := daemon.Dir()
 			if err != nil {
 				return err
 			}
 			out := cmd.OutOrStdout()
-			snap, running, err := relayStats(dir)
+			snap, running, err := daemon.Stats(dir)
 			if err != nil {
 				return err
 			}
-			if path, ok := relayServiceInstalled(); ok {
+			if path, ok := daemon.ServiceInstalled(); ok {
 				fmt.Fprintf(out, "Service:  installed (%s)\n", path)
 			}
 			if running {
-				fmt.Fprintf(out, "Running on %s since %s.\n", relayAddr(dir), snap.Since.Format(time.RFC3339))
+				fmt.Fprintf(out, "Running on %s since %s.\n", daemon.Addr(dir), snap.Since.Format(time.RFC3339))
 			} else {
-				if squatted(relayAddr(dir)) {
-					fmt.Fprintf(out, "Warning: another process is listening on %s. The agents' telemetry goes to it, not to terma — stop it, or move the relay with `terma relay setup --addr`.\n", relayAddr(dir))
+				if daemon.Squatted(daemon.Addr(dir)) {
+					fmt.Fprintf(out, "Warning: another process is listening on %s. The agents' telemetry goes to it, not to terma — stop it, or move the relay with `terma relay setup --addr`.\n", daemon.Addr(dir))
 				}
-				if data, err := os.ReadFile(filepath.Join(dir, relayErrorFile)); err == nil {
+				if data, err := os.ReadFile(filepath.Join(dir, daemon.ErrorFile)); err == nil {
 					fmt.Fprintf(out, "The relay last failed to start: %s", data)
 				}
 				fmt.Fprintln(out, "Not running. Last run:")
@@ -68,47 +65,6 @@ func newRelayStatusCommand() *cobra.Command {
 	}
 }
 
-// squatted reports whether something answers on the relay's address while the relay
-// is not running: the agents' exporters would be sending to it.
-func squatted(addr string) bool {
-	conn, err := net.DialTimeout("tcp", addr, 300*time.Millisecond)
-	if err != nil {
-		return false
-	}
-	_ = conn.Close()
-	return true
-}
-
-// relayStats reads the running relay's stats, else those the last run left behind.
-func relayStats(dir string) (relay.Snapshot, bool, error) {
-	var snap relay.Snapshot
-	unlock, err := flock.TryLock(filepath.Join(dir, relayLockFile))
-	if err == nil {
-		unlock()
-		data, err := os.ReadFile(filepath.Join(dir, relayStatsFile))
-		if err != nil {
-			return snap, false, nil
-		}
-		return snap, false, json.Unmarshal(data, &snap)
-	}
-	token, err := relayToken()
-	if err != nil {
-		return snap, true, err
-	}
-	req, _ := http.NewRequest(http.MethodGet, "http://"+relayAddr(dir)+"/stats", nil)
-	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := (&http.Client{Timeout: 2 * time.Second}).Do(req)
-	if err != nil {
-		return snap, true, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return snap, true, fmt.Errorf("relay stats: HTTP %s", resp.Status)
-	}
-	body, _ := io.ReadAll(resp.Body)
-	return snap, true, json.Unmarshal(body, &snap)
-}
-
 // relayDoctorCheck is doctor's "agent exporting to Terma" on a machine that exports
 // through the local relay: the relay can run (or runs) on its address with no one else
 // there, each of the developer's agents sends to it, and this repository's sessions
@@ -118,14 +74,14 @@ func relayDoctorCheck(projectID string, selected []string) doctor.Check {
 	if err != nil {
 		return doctor.Check{Status: doctor.Fail, Detail: err.Error()}
 	}
-	addr := relayAddr(dir)
+	addr := daemon.Addr(dir)
 	running := false
-	if unlock, err := flock.TryLock(filepath.Join(dir, relayLockFile)); err == nil {
+	if unlock, err := flock.TryLock(filepath.Join(dir, daemon.LockFile)); err == nil {
 		unlock()
 	} else if flock.IsBusy(err) {
 		running = true
 	}
-	if !running && squatted(addr) {
+	if !running && daemon.Squatted(addr) {
 		return doctor.Check{Status: doctor.Fail, Detail: "another process is listening on " + addr + " and receives the selected' telemetry",
 			Fix: "stop it, or move the relay with `terma relay setup --addr`"}
 	}

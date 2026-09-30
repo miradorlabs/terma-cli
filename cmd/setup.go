@@ -15,6 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/prompt"
+	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/style"
 )
 
@@ -149,8 +150,8 @@ func runSetup(cmd *cobra.Command, f setupFlags) error {
 	// A relay's login and environment are fixed at startup. Scope changes require
 	// restarting it; capture-only changes are picked up from the local caches.
 	if previous.OrganizationID != pol.OrganizationID || previous.AuthURL != pol.AuthURL || previous.TeamID != pol.TeamID {
-		if dir, err := relayDir(); err == nil {
-			stopRelay(dir)
+		if dir, err := daemon.Dir(); err == nil {
+			daemon.Stop(dir)
 		}
 	}
 	fmt.Fprintln(out, "Collection policy: "+policySummary(pol)+".")

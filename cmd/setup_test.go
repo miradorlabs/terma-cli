@@ -12,6 +12,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 )
 
 func TestSetupRecordsCodexDesktopSeparatelyFromCLI(t *testing.T) {
@@ -64,7 +65,7 @@ func TestSetupFetchesThePolicyAndPointsAgentsAtTheRelay(t *testing.T) {
 	if !strings.Contains(out, "Collection policy: sessions in connected repositories") {
 		t.Fatalf("setup did not say the policy:\n%s", out)
 	}
-	token, err := relayToken()
+	token, err := daemon.Token()
 	if err != nil {
 		t.Fatalf("no relay token after setup: %v", err)
 	}

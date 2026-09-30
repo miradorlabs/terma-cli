@@ -24,6 +24,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/relay"
+	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 )
 
@@ -33,11 +34,9 @@ import (
 // machine is named by a random id terma makes on first use (relay/machine-id), so the
 // platform can tell machines apart and count them without knowing whose they are.
 
-const relayMachineIDFile = "machine-id"
-
 // relayMachineID is this machine's random id, made once.
 func relayMachineID(dir string) string {
-	path := filepath.Join(dir, relayMachineIDFile)
+	path := filepath.Join(dir, daemon.MachineIDFile)
 	if data, err := os.ReadFile(path); err == nil {
 		if id := strings.TrimSpace(string(data)); len(id) == 32 {
 			return id
@@ -79,7 +78,7 @@ func heartbeatFacts(dir string) map[string]any {
 		"terma.machine_id": relayMachineID(dir),
 		"terma.install":    installKind(),
 	}
-	if _, ok := relayServiceInstalled(); ok {
+	if _, ok := daemon.ServiceInstalled(); ok {
 		facts["terma.relay.service"] = true
 	} else {
 		facts["terma.relay.service"] = false
@@ -116,7 +115,7 @@ func heartbeatFacts(dir string) map[string]any {
 	// (a reinstall, a hand edit) sends nothing through it, and says nothing else of it.
 	var pointed, blocked []string
 	for _, e := range registered.With[agents.RelayExporter]() {
-		if ok, known := e.RelayPointed(relayAddr(dir)); known && ok {
+		if ok, known := e.RelayPointed(daemon.Addr(dir)); known && ok {
 			pointed = append(pointed, e.Name())
 		}
 		if c, ok := e.(agents.RelayChecker); ok {
@@ -174,23 +173,23 @@ func relayHeartbeatSend(ctx context.Context, beat *logspb.LogsData) error {
 // all work — or which of them does not. A relay that is still starting (a service
 // restarted to read a new policy) is waited for, briefly.
 func relayCheckIn(ctx context.Context) (ok bool, what string) {
-	dir, err := relayDir()
+	dir, err := daemon.Dir()
 	if err != nil {
 		return false, err.Error()
 	}
-	token, err := relayToken()
+	token, err := daemon.Token()
 	if err != nil {
 		return false, err.Error()
 	}
-	addr := relayAddr(dir)
+	addr := daemon.Addr(dir)
 	client := &http.Client{Timeout: 20 * time.Second}
 	var resp *http.Response
 	// Waited for only when one is running (its lock is held) or its service will start
 	// it again; with neither, there is nothing to wait for.
 	wait := 15 * time.Second
-	if unlock, err := flock.TryLock(filepath.Join(dir, relayLockFile)); err == nil {
+	if unlock, err := flock.TryLock(filepath.Join(dir, daemon.LockFile)); err == nil {
 		unlock()
-		if _, service := relayServiceInstalled(); !service {
+		if _, service := daemon.ServiceInstalled(); !service {
 			wait = 0
 		}
 	}

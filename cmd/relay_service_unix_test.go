@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/flock"
+	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 )
 
 // The service's relay (--idle 0) that finds a hook's relay running waits for it to
@@ -22,7 +23,7 @@ func TestServiceRelayTakesOverFromAHooksRelay(t *testing.T) {
 	if out, err := runTerma(t, "relay", "setup", "--no-start", "--addr", addr, "--harness", "codex"); err != nil {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}
-	unlock, err := flock.TryLock(filepath.Join(dir, relayLockFile))
+	unlock, err := flock.TryLock(filepath.Join(dir, daemon.LockFile))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,11 +36,11 @@ func TestServiceRelayTakesOverFromAHooksRelay(t *testing.T) {
 	}
 	defer func() { _ = cmd.Process.Signal(os.Interrupt); _ = cmd.Wait() }()
 	time.Sleep(time.Second)
-	if squatted(addr) {
+	if daemon.Squatted(addr) {
 		t.Fatal("the service relay started beside a running one")
 	}
 	unlock()
-	for deadline := time.Now().Add(10 * time.Second); !squatted(addr); time.Sleep(100 * time.Millisecond) {
+	for deadline := time.Now().Add(10 * time.Second); !daemon.Squatted(addr); time.Sleep(100 * time.Millisecond) {
 		if time.Now().After(deadline) {
 			t.Fatal("the service relay did not take over")
 		}
@@ -64,7 +65,7 @@ func TestServiceRelayExitCodes(t *testing.T) {
 		if err := cmd.Start(); err != nil {
 			t.Fatal(err)
 		}
-		for deadline := time.Now().Add(10 * time.Second); !squatted(addr); time.Sleep(50 * time.Millisecond) {
+		for deadline := time.Now().Add(10 * time.Second); !daemon.Squatted(addr); time.Sleep(50 * time.Millisecond) {
 			if time.Now().After(deadline) {
 				t.Fatal("the relay did not listen")
 			}
@@ -73,7 +74,7 @@ func TestServiceRelayExitCodes(t *testing.T) {
 		_ = cmd.Wait()
 		return cmd.ProcessState.ExitCode()
 	}
-	if code := run(func(*exec.Cmd) { stopRelay(dir) }); code != ExitRestart {
+	if code := run(func(*exec.Cmd) { daemon.Stop(dir) }); code != ExitRestart {
 		t.Fatalf("stopped: exit %d, want %d", code, ExitRestart)
 	}
 	if code := run(func(*exec.Cmd) { _ = os.Remove(filepath.Join(dir, "token")) }); code != 0 {

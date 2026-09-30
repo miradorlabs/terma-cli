@@ -1,4 +1,4 @@
-package cmd
+package daemon
 
 import (
 	"context"
@@ -32,16 +32,16 @@ func TestSupervisedChild(t *testing.T) {
 	os.Exit(0)
 }
 
-func testSupervisor() supervisor {
-	return supervisor{logf: func(string, ...any) {}, stop: func() {}, minPause: time.Millisecond, maxPause: 4 * time.Millisecond,
-		healthy: time.Hour, poll: 5 * time.Millisecond}
+func testSupervisor() Supervisor {
+	return Supervisor{Logf: func(string, ...any) {}, Stop: func() {}, MinPause: time.Millisecond, MaxPause: 4 * time.Millisecond,
+		Healthy: time.Hour, Poll: 5 * time.Millisecond}
 }
 
 // The stop file (how stopRelay reaches a relay on Windows) stops the relay it names, and
 // a stale one naming another pid is cleared without stopping anyone.
 func TestStopFileStopsOnlyTheRelayItNames(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, relayStopFile)
+	path := filepath.Join(dir, StopFile)
 	_ = os.WriteFile(path, []byte("1\n"), 0o600)
 	if stopRequested(dir) {
 		t.Fatal("a stop file naming another pid stopped this relay")
@@ -60,10 +60,10 @@ func TestStopFileStopsOnlyTheRelayItNames(t *testing.T) {
 func TestSuperviseRestartsTheRelayUntilRemoved(t *testing.T) {
 	var starts atomic.Int32
 	sv := testSupervisor()
-	sv.start = func() *exec.Cmd { starts.Add(1); return supervisedChild("fail") }
-	sv.installed = func() bool { return starts.Load() < 3 }
+	sv.Start = func() *exec.Cmd { starts.Add(1); return supervisedChild("fail") }
+	sv.Installed = func() bool { return starts.Load() < 3 }
 	done := make(chan struct{})
-	go func() { superviseRelay(context.Background(), sv); close(done) }()
+	go func() { Supervise(context.Background(), sv); close(done) }()
 	select {
 	case <-done:
 	case <-time.After(30 * time.Second):
@@ -79,10 +79,10 @@ func TestSuperviseRestartsTheRelayUntilRemoved(t *testing.T) {
 func TestSuperviseEndsWithARelayDoneForGood(t *testing.T) {
 	var starts atomic.Int32
 	sv := testSupervisor()
-	sv.start = func() *exec.Cmd { starts.Add(1); return supervisedChild("done") }
-	sv.installed = func() bool { return true }
+	sv.Start = func() *exec.Cmd { starts.Add(1); return supervisedChild("done") }
+	sv.Installed = func() bool { return true }
 	done := make(chan struct{})
-	go func() { superviseRelay(context.Background(), sv); close(done) }()
+	go func() { Supervise(context.Background(), sv); close(done) }()
 	select {
 	case <-done:
 	case <-time.After(30 * time.Second):
@@ -98,11 +98,11 @@ func TestSuperviseStopsTheRelayWhenRemoved(t *testing.T) {
 	var removed, asked atomic.Bool
 	var child *exec.Cmd
 	sv := testSupervisor()
-	sv.start = func() *exec.Cmd { child = supervisedChild("wait"); return child }
-	sv.installed = func() bool { return !removed.Load() }
-	sv.stop = func() { asked.Store(true); _ = child.Process.Kill() }
+	sv.Start = func() *exec.Cmd { child = supervisedChild("wait"); return child }
+	sv.Installed = func() bool { return !removed.Load() }
+	sv.Stop = func() { asked.Store(true); _ = child.Process.Kill() }
 	done := make(chan struct{})
-	go func() { superviseRelay(context.Background(), sv); close(done) }()
+	go func() { Supervise(context.Background(), sv); close(done) }()
 	time.Sleep(100 * time.Millisecond)
 	removed.Store(true)
 	select {

@@ -97,7 +97,8 @@ func repoRoot(t *testing.T) string {
 
 // TestAgentPackagesAreImportedOnlyByTheRegistry holds the import graph: an agent's
 // package is imported by the registry and by nothing else, never by another agent, and
-// the relay core stays free of every harness package.
+// the relay, daemon included, knows no harness and no agent registry: what it needs of
+// the agents comes in through its options.
 func TestAgentPackagesAreImportedOnlyByTheRegistry(t *testing.T) {
 	for _, p := range listPackages(t) {
 		self, isAgent := agentPackage(p.ImportPath)
@@ -112,10 +113,12 @@ func TestAgentPackagesAreImportedOnlyByTheRegistry(t *testing.T) {
 				t.Errorf("%s imports %s: only internal/agents/builtin imports an agent's package", p.ImportPath, imp)
 			}
 		}
-		if p.ImportPath == module+"/internal/relay" || strings.HasPrefix(p.ImportPath, module+"/internal/relay/claim") {
+		if p.ImportPath == module+"/internal/relay" || strings.HasPrefix(p.ImportPath, module+"/internal/relay/") {
 			for _, imp := range p.Imports {
-				if imp == module+"/internal/harness" || strings.HasPrefix(imp, module+"/internal/harness/") {
-					t.Errorf("%s imports %s: the relay core learns about agents only through relay.Options", p.ImportPath, imp)
+				for _, banned := range []string{module + "/internal/harness", module + "/internal/agents"} {
+					if imp == banned || strings.HasPrefix(imp, banned+"/") {
+						t.Errorf("%s imports %s: the relay learns about agents only through its options", p.ImportPath, imp)
+					}
 				}
 			}
 		}

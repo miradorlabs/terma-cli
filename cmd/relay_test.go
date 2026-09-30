@@ -12,6 +12,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 )
 
 func freeAddr(t *testing.T) string {
@@ -46,7 +47,7 @@ func TestRelaySetupPointsAgentsAtTheRelay(t *testing.T) {
 	if err != nil {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}
-	token, err := relayToken()
+	token, err := daemon.Token()
 	if err != nil || len(token) < 32 {
 		t.Fatalf("token = %q, %v", token, err)
 	}
@@ -64,7 +65,7 @@ func TestRelaySetupPointsAgentsAtTheRelay(t *testing.T) {
 	if _, err := runTerma(t, "relay", "setup", "--no-start", "--addr", addr); err != nil {
 		t.Fatal(err)
 	}
-	if again, _ := relayToken(); again != token {
+	if again, _ := daemon.Token(); again != token {
 		t.Fatal("a second setup minted a new token")
 	}
 	for _, h := range []string{"claude", "codex"} {
@@ -96,13 +97,13 @@ func TestRelayRunsOnce(t *testing.T) {
 	if out, err := runTerma(t, "relay", "setup", "--no-start", "--addr", addr, "--harness", "codex"); err != nil {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}
-	unlock, err := flock.TryLock(filepath.Join(dir, relayLockFile))
+	unlock, err := flock.TryLock(filepath.Join(dir, daemon.LockFile))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer unlock()
 	out, err := within(2*time.Second).combined(t, "relay", "run", "--idle", "1h")
-	if err != nil || !strings.Contains(out, "already running") || squatted(addr) {
+	if err != nil || !strings.Contains(out, "already running") || daemon.Squatted(addr) {
 		t.Fatalf("a second relay started: %v\n%s", err, out)
 	}
 }
@@ -123,7 +124,7 @@ func TestRelayReportsASquatter(t *testing.T) {
 	if out, err := within(3*time.Second).combined(t, "relay", "run", "--quiet"); err == nil {
 		t.Fatalf("relay started on a taken port:\n%s", out)
 	}
-	if _, err := os.Stat(filepath.Join(dir, relayErrorFile)); err != nil {
+	if _, err := os.Stat(filepath.Join(dir, daemon.ErrorFile)); err != nil {
 		t.Fatal("the failure was not recorded for status")
 	}
 	out, err := runTerma(t, "relay", "status")
@@ -225,16 +226,5 @@ func TestRelayStatusAgreesWithDoctor(t *testing.T) {
 	}
 	if strings.Contains(out, "none connected") {
 		t.Fatalf("status reads a relayed machine as unconnected:\n%s", out)
-	}
-}
-
-// Separate configuration directories must not share a service.
-func TestRelayServiceNames(t *testing.T) {
-	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
-	a, _ := relayServiceName()
-	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
-	b, _ := relayServiceName()
-	if a == b || !strings.HasPrefix(a, "ai.terma.relay.") {
-		t.Fatalf("service names %q and %q must differ per config directory", a, b)
 	}
 }

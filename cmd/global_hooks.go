@@ -12,6 +12,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
+	"github.com/miradorlabs/terma-cli/internal/procinfo"
+	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 )
 
 // Global mode's machine-wide agent hooks. In global mode the organization collects
@@ -118,7 +120,7 @@ func applyUserHooks(selected []string, install bool) ([]string, error) {
 }
 
 func userHooksRecordPath() (string, error) {
-	dir, err := relayDir()
+	dir, err := daemon.Dir()
 	if err != nil {
 		return "", err
 	}
@@ -162,7 +164,7 @@ func hookYields(user bool, pol config.Policy, tool string) bool {
 // hookExecutable is the terma machine-wide hooks and git's global hooks call: this one,
 // by the path it was started as. A variable so a test (whose executable is the test
 // binary) can name a built terma.
-var hookExecutable = relayServiceExecutable
+var hookExecutable = procinfo.AbsExecutable
 
 // managedRoot prefixes the system paths managed configuration lives at; a test points
 // it at a directory of its own.

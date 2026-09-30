@@ -12,7 +12,9 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/procinfo"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 )
 
 // termaHookCommand is how an extension terma writes into an agent (Pi's, Hermes's)
@@ -20,7 +22,7 @@ import (
 // on an installed machine — so an agent started with another PATH (a desktop app gets
 // the system's) still finds it. A path that cannot be had falls back to PATH.
 func termaHookCommand() []string {
-	if exe, err := relayServiceExecutable(); err == nil {
+	if exe, err := procinfo.AbsExecutable(); err == nil {
 		return []string{exe, "hook"}
 	}
 	return []string{"terma", "hook"}
@@ -34,7 +36,7 @@ func newRelaySetupCommand() *cobra.Command {
 		Short: "Point the agents' global exporters at the local relay",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			dir, err := relayDir()
+			dir, err := daemon.Dir()
 			if err != nil {
 				return err
 			}
@@ -43,9 +45,9 @@ func newRelaySetupCommand() *cobra.Command {
 				return err
 			}
 			if addr == "" {
-				addr = relayAddr(dir)
+				addr = daemon.Addr(dir)
 			}
-			if err := config.WriteFileAtomic(filepath.Join(dir, relayAddrFile), []byte(addr+"\n"), 0o600); err != nil {
+			if err := config.WriteFileAtomic(filepath.Join(dir, daemon.AddrFile), []byte(addr+"\n"), 0o600); err != nil {
 				return err
 			}
 			out := cmd.OutOrStdout()
@@ -58,16 +60,16 @@ func newRelaySetupCommand() *cobra.Command {
 			fmt.Fprintln(out, "Hooks in repositories with a binding claim their sessions; nothing else is forwarded.")
 			// A running relay has the old address and token: replace it. Then start one
 			// now, so the first session does not open against a closed port.
-			stopRelay(dir)
-			if _, ok := relayServiceInstalled(); ok {
+			daemon.Stop(dir)
+			if _, ok := daemon.ServiceInstalled(); ok {
 				// The service manager starts it again, with the new address and token.
 			} else if !noStart {
-				spawnRelay()
+				daemon.Spawn()
 			}
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&addr, "addr", "", "the loopback address the relay listens on (default "+defaultRelayAddr+")")
+	cmd.Flags().StringVar(&addr, "addr", "", "the loopback address the relay listens on (default "+claim.DefaultAddr+")")
 	cmd.Flags().StringVar(&agents, "harness", strings.Join(registered.RelayTargets(availableAgentNames()), ","), "the agents to point at the relay")
 	cmd.Flags().BoolVar(&noStart, "no-start", false, "do not start the relay now (the next hook that claims a session will)")
 	return cmd
@@ -75,7 +77,7 @@ func newRelaySetupCommand() *cobra.Command {
 
 // pointAgentsAtRelay has each agent configure its own relay export.
 func pointAgentsAtRelay(ctx context.Context, selected []string, addr, token string, done func(agent, detail string), note func(string)) error {
-	dir, err := relayDir()
+	dir, err := daemon.Dir()
 	if err != nil {
 		return err
 	}
@@ -108,7 +110,7 @@ func pointAgentsAtRelay(ctx context.Context, selected []string, addr, token stri
 }
 
 func ensureRelayToken() (string, error) {
-	if token, err := relayToken(); err == nil && token != "" {
+	if token, err := daemon.Token(); err == nil && token != "" {
 		return token, nil
 	}
 	path, err := claim.TokenPath()

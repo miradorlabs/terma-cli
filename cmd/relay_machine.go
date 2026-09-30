@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+
+	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 )
 
 // relayReport is how the machine-level relay setup tells its caller what it did: ok
@@ -26,7 +28,7 @@ func connectMachineRelay(ctx context.Context, agents []string, relayService stri
 	if len(targets) == 0 {
 		return nil
 	}
-	dir, err := relayDir()
+	dir, err := daemon.Dir()
 	if err != nil {
 		return err
 	}
@@ -34,7 +36,7 @@ func connectMachineRelay(ctx context.Context, agents []string, relayService stri
 	if err != nil {
 		return err
 	}
-	addr := relayAddr(dir)
+	addr := daemon.Addr(dir)
 	fmt.Fprintln(r.detail, "\nPointing agents at the local relay on "+addr+":")
 	err = pointAgentsAtRelay(ctx, targets, addr, token, func(agent, detail string) {
 		fmt.Fprintf(r.detail, "  %s%s\n", agent, detail)

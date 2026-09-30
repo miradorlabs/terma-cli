@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/flock"
+	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 )
 
 // The heartbeat's facts name this terma's build and setup, never whose machine it is:
@@ -73,7 +74,7 @@ func TestRelayCheckIn(t *testing.T) {
 			fmt.Fprint(w, tc.body)
 		})}
 		go func() { _ = srv.Serve(ln) }()
-		unlock, _ := flock.TryLock(filepath.Join(dir, relayLockFile)) // "running"
+		unlock, _ := flock.TryLock(filepath.Join(dir, daemon.LockFile)) // "running"
 		ok, what := relayCheckIn(t.Context())
 		if unlock != nil {
 			unlock()
