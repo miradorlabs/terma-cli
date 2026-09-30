@@ -18,9 +18,11 @@ import (
 
 // Windows has no per-user service manager that restarts a process: the Run key starts
 // a program once, at logon. `terma relay supervise` is what it starts, and it does what
-// launchd's KeepAlive and systemd's Restart=always do elsewhere — it runs the relay and
-// starts it again whenever it exits (a crash, or the step aside after its binary was
-// replaced), for as long as the service stays installed.
+// launchd's KeepAlive and systemd's Restart=on-failure do elsewhere: it runs the relay
+// and starts it again when it exits asking to be (nonzero: a crash, or the step aside
+// after its binary was replaced), for as long as the service stays installed. A relay
+// that exits 0 is done for good — its token is gone, terma was uninstalled — and the
+// supervisor ends with it.
 
 const (
 	relaySuperviseLock = "supervise.lock"
@@ -43,7 +45,8 @@ type supervisor struct {
 	minPause, maxPause, healthy, poll time.Duration
 }
 
-// superviseRelay runs the relay until ctx ends or the service is removed.
+// superviseRelay runs the relay until ctx ends, the service is removed, or the relay
+// exits 0.
 func superviseRelay(ctx context.Context, sv supervisor) {
 	pause := sv.minPause
 	for ctx.Err() == nil && sv.installed() {
@@ -54,7 +57,8 @@ func superviseRelay(ctx context.Context, sv supervisor) {
 		} else {
 			done := make(chan error, 1)
 			go func() { done <- cmd.Wait() }()
-			if !sv.watch(ctx, cmd, done) {
+			exited, err := sv.watch(ctx, cmd, done)
+			if !exited || err == nil {
 				return
 			}
 		}
@@ -72,17 +76,17 @@ func superviseRelay(ctx context.Context, sv supervisor) {
 	}
 }
 
-// watch waits for the relay to exit, true when it did on its own; when ctx ends or the
-// service is removed it stops the relay — asked, so it delivers what it accepted, and
-// killed only if it will not go — and reports false.
-func (sv supervisor) watch(ctx context.Context, cmd *exec.Cmd, done <-chan error) bool {
+// watch waits for the relay to exit, true (with how it exited) when it did on its own;
+// when ctx ends or the service is removed it stops the relay — asked, so it delivers
+// what it accepted, and killed only if it will not go — and reports false.
+func (sv supervisor) watch(ctx context.Context, cmd *exec.Cmd, done <-chan error) (bool, error) {
 	tick := time.NewTicker(sv.poll)
 	defer tick.Stop()
 	for {
 		select {
 		case err := <-done:
 			sv.logf("relay exited (%v)", err)
-			return true
+			return true, err
 		case <-ctx.Done():
 		case <-tick.C:
 			if sv.installed() {
@@ -96,7 +100,7 @@ func (sv supervisor) watch(ctx context.Context, cmd *exec.Cmd, done <-chan error
 			_ = cmd.Process.Kill()
 			<-done
 		}
-		return false
+		return false, nil
 	}
 }
 

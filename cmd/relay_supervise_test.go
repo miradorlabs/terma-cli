@@ -12,7 +12,8 @@ import (
 )
 
 // supervisedChild is the relay a supervisor test runs: this test binary, re-run into
-// TestSupervisedChild, which exits at once or waits to be stopped.
+// TestSupervisedChild, which exits at once (0 for "done", 75 asking to be restarted
+// for "fail") or waits to be stopped.
 func supervisedChild(mode string) *exec.Cmd {
 	c := exec.Command(os.Args[0], "-test.run=^TestSupervisedChild$")
 	c.Env = append(os.Environ(), "TERMA_SUPERVISED_CHILD="+mode)
@@ -25,6 +26,8 @@ func TestSupervisedChild(t *testing.T) {
 		t.Skip("run only as a supervisor test's child")
 	case "wait":
 		time.Sleep(time.Minute)
+	case "fail":
+		os.Exit(75)
 	}
 	os.Exit(0)
 }
@@ -52,11 +55,12 @@ func TestStopFileStopsOnlyTheRelayItNames(t *testing.T) {
 	}
 }
 
-// A relay that exits is started again, for as long as the service is installed.
+// A relay that exits asking to be restarted is started again, for as long as the
+// service is installed.
 func TestSuperviseRestartsTheRelayUntilRemoved(t *testing.T) {
 	var starts atomic.Int32
 	sv := testSupervisor()
-	sv.start = func() *exec.Cmd { starts.Add(1); return supervisedChild("exit") }
+	sv.start = func() *exec.Cmd { starts.Add(1); return supervisedChild("fail") }
 	sv.installed = func() bool { return starts.Load() < 3 }
 	done := make(chan struct{})
 	go func() { superviseRelay(context.Background(), sv); close(done) }()
@@ -67,6 +71,25 @@ func TestSuperviseRestartsTheRelayUntilRemoved(t *testing.T) {
 	}
 	if starts.Load() != 3 {
 		t.Fatalf("started the relay %d times, want 3", starts.Load())
+	}
+}
+
+// A relay that exits 0 is done for good (its token is gone): it is not started again,
+// and the supervisor ends with it.
+func TestSuperviseEndsWithARelayDoneForGood(t *testing.T) {
+	var starts atomic.Int32
+	sv := testSupervisor()
+	sv.start = func() *exec.Cmd { starts.Add(1); return supervisedChild("done") }
+	sv.installed = func() bool { return true }
+	done := make(chan struct{})
+	go func() { superviseRelay(context.Background(), sv); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(30 * time.Second):
+		t.Fatal("the supervisor kept running after the relay exited 0")
+	}
+	if starts.Load() != 1 {
+		t.Fatalf("started the relay %d times, want 1", starts.Load())
 	}
 }
 
