@@ -702,27 +702,15 @@ func connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *config.Conf
 	if err := routing.SaveRecord(rec); err != nil {
 		return err
 	}
-	dir, err := relayDir()
-	if err != nil {
-		return err
-	}
-	token, err := ensureRelayToken()
-	if err != nil {
-		return err
-	}
-	addr := relayAddr(dir)
-	fmt.Fprintln(ui.detail, "\nPointing agents at the local relay on "+addr+":")
-	err = pointAgentsAtRelay(ctx, targets, addr, token, func(agent, detail string) {
-		fmt.Fprintf(ui.detail, "  %s%s\n", agent, detail)
-		ui.ok(agent, "exports through the local relay; only this repository's sessions leave")
-	}, ui.then)
+	// The machine half is `terma setup`'s; install does it too, so an install without a
+	// setup is complete, and a re-run repairs an agent pointed elsewhere since.
+	err = connectMachineRelay(ctx, agents, f.relayService, relayReport{ok: ui.ok, warn: ui.warn, then: ui.then, detail: ui.detail})
 	if err != nil {
 		return err
 	}
 	if slices.Contains(agents, codexDesktopAgent) {
 		ui.ok("Codex Desktop", "reports through the relay and this repository's hooks")
 	}
-	ensureRelay(ctx, ui, f.relayService)
 	return nil
 }
 

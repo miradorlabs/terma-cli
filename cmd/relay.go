@@ -174,7 +174,8 @@ func newRelayRunCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			opts := relay.Options{Token: token, Hold: hold, Dir: filepath.Join(dir, relay.OutboxDir), Resolve: relayResolver(cfg), Version: Version,
+			minter := newRelayKeyMinter(cmd.Context(), cfg)
+			opts := relay.Options{Token: token, Hold: hold, Dir: filepath.Join(dir, relay.OutboxDir), Resolve: relayResolver(cfg, minter.mint), Version: Version,
 				PeerPID: procinfo.FindSender, ClaimCacheTTL: time.Second, PolicyCacheTTL: 5 * time.Second}
 			if os.Getenv("TERMA_RELAY_DEBUG") == "1" {
 				errOut := cmd.ErrOrStderr()
@@ -328,20 +329,33 @@ func stopRelay(dir string) {
 // relayResolver turns a claim into where its session's telemetry goes: the project's
 // own ingest host (projectEndpoint, the spool's order), the key this machine holds for
 // the claiming agent (else the project's spool key), and what the routing record lets
-// through. No key means the developer never opted in to this project here; no routing
-// record means no one chose, so content is withheld.
-func relayResolver(cfg *config.Config) func(claim.Claim) (relay.Policy, error) {
+// through.
+//
+// No key yet — a repository the platform connected, where no `terma install` ran — asks
+// mint for one in the background (relayKeyMinter): the session's parts wait in the hold
+// meanwhile, as they do for any keyless claim. Content: the organization's policy
+// (fetched by `terma setup`) is the ceiling, and the developer's routing record for the
+// project can only narrow it; a record that exists and cannot be read withholds.
+func relayResolver(cfg *config.Config, mint func(projectID string)) func(claim.Claim) (relay.Policy, error) {
 	return func(c claim.Claim) (relay.Policy, error) {
 		key := keystore.GetFor(harnessForTool(c.Tool), c.ProjectID)
 		if key == "" {
 			key = keystore.Get(c.ProjectID)
 		}
 		if key == "" {
+			if mint != nil {
+				mint(c.ProjectID)
+			}
 			return relay.Policy{}, relay.ErrNoKey
 		}
-		pol := relay.Policy{Endpoint: projectEndpoint(cfg, c.ProjectID), Key: key}
-		if rec, ok, err := routing.LoadRecord(c.ProjectID); err == nil && ok {
-			pol.IncludePrompts, pol.IncludeToolContent = rec.IncludePrompts, rec.IncludeToolContent
+		pol := relay.Policy{Endpoint: projectEndpoint(cfg, c.ProjectID), Key: key,
+			IncludePrompts: cfg.Policy.IncludePrompts, IncludeToolContent: cfg.Policy.IncludeToolContent}
+		switch rec, ok, err := routing.LoadRecord(c.ProjectID); {
+		case err != nil:
+			pol.IncludePrompts, pol.IncludeToolContent = false, false
+		case ok:
+			pol.IncludePrompts = pol.IncludePrompts && rec.IncludePrompts
+			pol.IncludeToolContent = pol.IncludeToolContent && rec.IncludeToolContent
 		}
 		return pol, nil
 	}

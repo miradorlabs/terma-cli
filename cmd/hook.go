@@ -119,6 +119,7 @@ func newHookCommand() *cobra.Command {
 			}
 			if claimed {
 				spawnRelay()
+				wireCloneOnFirstUse(ctx, cwd)
 			}
 			if flushesAfter(event) && env.Spool != nil {
 				spawnFlush()

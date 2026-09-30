@@ -199,9 +199,22 @@ run that reaches them opens a browser login on **production**. A script that run
   weeks because nothing checked, `terma connect` recommended the fork's `terma trace list`
   for as long as its hint stayed unquoted, and the same test stops a cleanup from deleting
   a command a hint names. Quote a command in backticks when a message names one.
-- `terma setup` signs in and records the developer's agents (`config.Profile.Harnesses`) and
-  does nothing else — no project, no key, no connection, no file. Everything per-repository is
-  `terma install`, including what `setup` used to do on the way: per-clone `core.hooksPath`
+- `terma setup` is the machine half: it signs in, records the developer's agents
+  (`config.Profile.Harnesses`), fetches the organization's collection policy
+  (`api.CollectionPolicy`, **a stub** until the account service's endpoint lands; kept as
+  `config.Profile.Policy`: mode `repo` or `global` — global is recorded only — and content
+  defaults), and sets up the relay (`connectMachineRelay`: token, the agents' user-level
+  exporters, the service). No project, no key. The policy is the ceiling on content: a
+  project's routing record can only narrow it (`relayResolver`).
+- The platform (terma-frontend) commits a repository's binding and agent hooks, so `terma
+  install` is optional. What a commit cannot do is done on first use: the relay mints a
+  claimed project's missing key with the signed-in credential (`relayKeyMinter`, stored as
+  the project's key, 10-minute backoff after a failure), and the first claiming hook in a
+  clone whose binding uses terma's own shims sets `core.hooksPath` (`wireCloneOnFirstUse`;
+  one stat afterwards — the hook-restoration record says it was wired). cmd's `TestMain`
+  gives every test a private HOME: a setup test that sandboxed only terma's config dir
+  rewrote the developer's real `~/.codex/config.toml`.
+- Everything else per-repository is `terma install`, including what `setup` used to do on the way: per-clone `core.hooksPath`
   wiring, the Claude status-line wrap, and the **spool key**. That key (`keystore.Get(project)`)
   is what hook events are delivered with; pointing a telemetry agent stores it as a side effect
   (`keystore.SetFor`) and nothing else did, so a developer whose agents are all hooks-only

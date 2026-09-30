@@ -56,12 +56,13 @@ func relayServiceWanted(flag string) bool {
 
 // ensureRelay leaves a relay running for the agents install just pointed at it: the
 // service when wanted (installed, or reinstalled so it runs this build), else one started
-// on demand. It reports what it did for install's output.
-func ensureRelay(ctx context.Context, ui *installUI, flag string) {
+// on demand. It tells report what it did, warn when the developer should know it fell
+// short; nothing when there was nothing to do.
+func ensureRelay(ctx context.Context, flag string, report func(warn bool, what string)) {
 	if !relayServiceWanted(flag) {
 		if flag == "off" {
 			if removed, _ := removeRelayService(ctx); removed {
-				ui.ok("Relay", "service removed; hooks start the relay on demand")
+				report(false, "service removed; hooks start the relay on demand")
 			}
 		}
 		if _, ok := relayServiceInstalled(); !ok {
@@ -74,9 +75,9 @@ func ensureRelay(ctx context.Context, ui *installUI, flag string) {
 	}
 	path, err := installRelayService(ctx)
 	if err != nil {
-		ui.warn("Relay", "could not run as a service ("+err.Error()+"); hooks start it on demand")
+		report(true, "could not run as a service ("+err.Error()+"); hooks start it on demand")
 		spawnRelay()
 		return
 	}
-	ui.ok("Relay", "runs in the background ("+path+"); `terma install --relay-service off` stops it")
+	report(false, "runs in the background ("+path+"); `terma setup --relay-service off` stops it")
 }

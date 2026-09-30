@@ -47,6 +47,9 @@ type Profile struct {
 	// launch surface). `terma install` connects and wires these for a repository without
 	// asking again. It is a preference, not a connection — no endpoint or key.
 	Harnesses []string `json:"harnesses,omitempty"`
+	// Policy is the organization's collection policy as `terma setup` last fetched it;
+	// nil before then, when DefaultPolicy applies.
+	Policy *Policy `json:"policy,omitempty"`
 }
 
 // SelectOrganization records the account scope. Switching accounts never chooses
@@ -93,6 +96,9 @@ type Config struct {
 	// Harnesses is the machine-level list of coding agents recorded by `terma setup`.
 	// It is a preference read by `terma install`, never a connection.
 	Harnesses []string
+
+	// Policy is the organization's collection policy: the profile's, else DefaultPolicy.
+	Policy Policy
 
 	// APIKey is a server key (ter_srv_…) from TERMA_API_KEY. When set it replaces the
 	// OAuth credential entirely — this is the CI and agent path, where a browser
@@ -148,7 +154,11 @@ func Load(o Overrides) (*Config, error) {
 		OrganizationName: profile.OrganizationName,
 		ProjectID:        firstNonEmpty(o.ProjectID, os.Getenv("TERMA_PROJECT_ID")),
 		Harnesses:        profile.Harnesses,
+		Policy:           DefaultPolicy(),
 		APIKey:           strings.TrimSpace(os.Getenv("TERMA_API_KEY")),
+	}
+	if profile.Policy != nil {
+		cfg.Policy = *profile.Policy
 	}
 
 	for _, endpoint := range []struct{ name, value string }{

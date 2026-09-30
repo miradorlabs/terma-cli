@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -15,6 +17,8 @@ import (
 func TestSetupRecordsCodexDesktopSeparatelyFromCLI(t *testing.T) {
 	gateway := newFakeAuth(t)
 	authSandbox(t, gateway)
+	sandboxMachine(t) // setup points the agents' own configuration at the relay
+	t.Setenv("CODEX_HOME", t.TempDir())
 	if _, err := auth.SaveCredential(config.DefaultProfile, storedSession(gateway, orgA())); err != nil {
 		t.Fatal(err)
 	}
@@ -29,8 +33,47 @@ func TestSetupRecordsCodexDesktopSeparatelyFromCLI(t *testing.T) {
 	if !strings.Contains(out, "Codex Desktop") || strings.Contains(out, "Agents recorded: Codex.") {
 		t.Fatalf("setup did not name the separate desktop choice:\n%s", out)
 	}
-	if !strings.Contains(out, "after `terma install` in a repository, open Settings → Hooks → Review") {
+	if !strings.Contains(out, "in a connected repository, open Settings → Hooks → Review") {
 		t.Fatalf("setup did not explain Desktop hook approval:\n%s", out)
+	}
+}
+
+// setup is the machine half of the relay: it records the organization's collection
+// policy and points the developer's agents at the relay, with no repository involved.
+func TestSetupFetchesThePolicyAndPointsAgentsAtTheRelay(t *testing.T) {
+	gateway := newFakeAuth(t)
+	authSandbox(t, gateway)
+	sandboxMachine(t)
+	codexHome := t.TempDir()
+	t.Setenv("CODEX_HOME", codexHome)
+	if _, err := auth.SaveCredential(config.DefaultProfile, storedSession(gateway, orgA())); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runTerma(t, "setup", "--harness", "codex")
+	if err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	file, err := config.LoadFile()
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := file.Profiles[config.DefaultProfile]
+	if p == nil || p.Policy == nil || p.Policy.Mode != config.ModeRepo || !p.Policy.IncludePrompts || p.Policy.FetchedAt.IsZero() {
+		t.Fatalf("policy not recorded: %+v", p)
+	}
+	if !strings.Contains(out, "Collection policy: sessions in connected repositories") {
+		t.Fatalf("setup did not say the policy:\n%s", out)
+	}
+	token, err := relayToken()
+	if err != nil {
+		t.Fatalf("no relay token after setup: %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(codexHome, "config.toml"))
+	if err != nil || !strings.Contains(string(data), "127.0.0.1:43180") || !strings.Contains(string(data), token) {
+		t.Fatalf("Codex not pointed at the relay: %v\n%s", err, data)
+	}
+	if out, err := runTerma(t, "setup", "--harness", "codex", "--relay-service", "sometimes"); err == nil {
+		t.Fatalf("--relay-service sometimes was accepted:\n%s", out)
 	}
 }
 

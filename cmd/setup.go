@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -23,6 +24,9 @@ type setupFlags struct {
 	harnesses string
 	noBrowser bool
 	assumeYes bool
+	// relayService is --relay-service: "on", "off", or "" (keep the recorded choice; on
+	// where a service can run).
+	relayService string
 }
 
 const codexDesktopAgent = "codex-desktop"
@@ -46,22 +50,25 @@ func newSetupCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "setup",
 		Short: "Sign in and choose your coding agents (once per developer)",
-		Long: `Gets this machine ready to use terma. It does two things and nothing more —
-no project, no telemetry configuration, no files touched:
+		Long: `Gets this machine ready to use terma, once per developer:
 
   1. Signs you in (a browser handoff; --no-browser prints the URL instead).
   2. Records which coding agents you work with (including Codex CLI and Codex
-     desktop separately), so ` + "`terma install`" + ` never has to ask again.
+     desktop separately).
+  3. Fetches your organization's collection policy.
+  4. Points those agents' telemetry at terma's local relay, and runs the relay in
+     the background (--relay-service off: started on demand instead). Only sessions
+     in repositories connected to Terma leave this machine.
 
-setup is optional: ` + "`terma install`" + ` signs you in and asks for your agents itself
-when you have not run it. The real configuration — pointing an agent at a project,
-wiring the hooks — happens per repository, in ` + "`terma install`" + `.`,
+A repository your organization connected in Terma needs nothing more: its committed
+hooks claim its sessions. ` + "`terma install`" + ` connects a repository from here instead.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error { return runSetup(cmd, f) },
 	}
 	cmd.Flags().StringVar(&f.harnesses, "harness", "", "comma-separated agents to record ("+strings.Join(availableAgentNames(), ", ")+"); default: a picker")
 	cmd.Flags().BoolVar(&f.noBrowser, "no-browser", false, "print the sign-in URL instead of opening a browser")
 	cmd.Flags().BoolVarP(&f.assumeYes, "yes", "y", false, "skip the browser prompt and picker; record every available installed agent")
+	cmd.Flags().StringVar(&f.relayService, "relay-service", "", "run the local relay as a background service: on or off (default: on, or your last choice)")
 	return cmd
 }
 
@@ -79,6 +86,11 @@ func runSetup(cmd *cobra.Command, f setupFlags) error {
 	}
 	if cfg.APIKey != "" {
 		return errors.New("TERMA_API_KEY is set — setup signs in as a person; unset it first")
+	}
+	switch f.relayService {
+	case "", "on", "off":
+	default:
+		return fmt.Errorf("--relay-service %q: want on or off", f.relayService)
 	}
 
 	// 1. Sign in — reusing the session this machine already has, verified.
@@ -105,12 +117,70 @@ func runSetup(cmd *cobra.Command, f setupFlags) error {
 	} else {
 		fmt.Fprintf(out, "\nAgents recorded: %s.\n", joinNames(adapterDisplayNames(names)))
 	}
-	if slices.Contains(names, codexDesktopAgent) {
-		fmt.Fprintln(out, "Codex Desktop: after `terma install` in a repository, open Settings → Hooks → Review in Codex Desktop and approve Terma's hooks.")
+
+	// 3. What the organization collects. Kept on the profile: hooks and the relay read
+	// it there and never ask the network.
+	pol, err := fetchPolicy(cmd.Context(), cfg)
+	if err != nil {
+		return err
 	}
-	fmt.Fprintf(out, "\n%s Now run `terma install` in each codebase you want to instrument with terma.\n",
+	if err := config.UpdateProfile(cfg.ProfileName, func(p *config.Profile) { p.Policy = &pol }); err != nil {
+		return err
+	}
+	fmt.Fprintln(out, "Collection policy: "+policySummary(pol)+".")
+
+	// 4. The relay: the machine half of every repository's telemetry.
+	var steps []string
+	err = connectMachineRelay(cmd.Context(), names, f.relayService, relayReport{
+		ok:     func(label, what string) { fmt.Fprintf(out, "  %s: %s\n", label, what) },
+		warn:   func(label, what string) { fmt.Fprintf(out, "  %s (needs you): %s\n", label, what) },
+		then:   func(step string) { steps = append(steps, step) },
+		detail: io.Discard,
+	})
+	if err != nil {
+		return err
+	}
+	for i, step := range steps {
+		fmt.Fprintf(out, "%d. %s\n", i+1, step)
+	}
+
+	if slices.Contains(names, codexDesktopAgent) {
+		fmt.Fprintln(out, "Codex Desktop: in a connected repository, open Settings → Hooks → Review in Codex Desktop and approve Terma's hooks.")
+	}
+	fmt.Fprintf(out, "\n%s Repositories connected in Terma report on their own; run `terma install` to connect one from here.\n",
 		style.For(out).Bold("Done!"))
 	return nil
+}
+
+// fetchPolicy asks the organization the developer signed in to for its collection
+// policy.
+func fetchPolicy(ctx context.Context, cfg *config.Config) (config.Policy, error) {
+	client, err := newClient(cfg)
+	if err != nil {
+		return config.Policy{}, err
+	}
+	pol, err := client.CollectionPolicy(ctx)
+	if err != nil {
+		return config.Policy{}, fmt.Errorf("fetch the organization's collection policy: %w", err)
+	}
+	return pol, nil
+}
+
+// policySummary says in a few words what the organization collects.
+func policySummary(p config.Policy) string {
+	scope := "sessions in connected repositories"
+	if p.Global() {
+		scope = "every session on this machine"
+	}
+	switch {
+	case p.IncludePrompts && p.IncludeToolContent:
+		return scope + ", with prompts and tool content"
+	case p.IncludePrompts:
+		return scope + ", with prompts, without tool content"
+	case p.IncludeToolContent:
+		return scope + ", with tool content, without prompts"
+	}
+	return scope + ", without prompts or tool content"
 }
 
 // chooseHarnesses resolves the machine-level agent list: the --harness flag if given,
