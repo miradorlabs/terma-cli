@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
 )
 
 // Every line terma commits into a repository's hook manager must be a no-op on a
@@ -68,7 +70,7 @@ func TestManagerLinesAreInertWithoutTerma(t *testing.T) {
 func TestHuskyUpgradesStaleLineInPlace(t *testing.T) {
 	root := t.TempDir()
 	stale := `command -v terma >/dev/null 2>&1 && { terma hook prepare-commit-msg "$@" || true; } # ` + Marker
-	write(t, root, ".husky/prepare-commit-msg", "#!/bin/sh\n"+stale+"\nnpx commitlint --edit \"$1\"\n")
+	hookruntest.WriteFile(t, root, ".husky/prepare-commit-msg", "#!/bin/sh\n"+stale+"\nnpx commitlint --edit \"$1\"\n")
 	det := Detection{Manager: Husky}
 	plan, err := PlanInstall(root, det)
 	if err != nil {
@@ -78,7 +80,7 @@ func TestHuskyUpgradesStaleLineInPlace(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := "#!/bin/sh\n" + huskyLine("prepare-commit-msg") + "\nnpx commitlint --edit \"$1\"\n"
-	if got := read(t, root, ".husky/prepare-commit-msg"); got != want {
+	if got := hookruntest.ReadFile(t, root, ".husky/prepare-commit-msg"); got != want {
 		t.Fatalf("stale line not upgraded in place:\n%s", got)
 	}
 	if again, _ := PlanInstall(root, det); !again.Empty() {
@@ -88,7 +90,7 @@ func TestHuskyUpgradesStaleLineInPlace(t *testing.T) {
 
 func TestLefthookUpgradesStaleRunInPlace(t *testing.T) {
 	root := t.TempDir()
-	write(t, root, "lefthook.yml", strings.Join([]string{
+	hookruntest.WriteFile(t, root, "lefthook.yml", strings.Join([]string{
 		"prepare-commit-msg:",
 		"  commands:",
 		"    terma:",
@@ -111,7 +113,7 @@ func TestLefthookUpgradesStaleRunInPlace(t *testing.T) {
 	if err := Apply(root, plan); err != nil {
 		t.Fatal(err)
 	}
-	got := read(t, root, "lefthook.yml")
+	got := hookruntest.ReadFile(t, root, "lefthook.yml")
 	var doc map[string]any
 	if err := yaml.Unmarshal([]byte(got), &doc); err != nil {
 		t.Fatal(err)

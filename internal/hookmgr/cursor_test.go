@@ -6,11 +6,13 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
 )
 
 func TestCursorHooksMergeKeepsUnknownKeysAndUserHooks(t *testing.T) {
 	root := t.TempDir()
-	write(t, root, CursorHooksPath, `{
+	hookruntest.WriteFile(t, root, CursorHooksPath, `{
   "version": 1,
   "hooks": {
     "afterFileEdit": [{"command": "./format.sh"}],
@@ -25,7 +27,7 @@ func TestCursorHooksMergeKeepsUnknownKeysAndUserHooks(t *testing.T) {
 	if err := Apply(root, plan); err != nil {
 		t.Fatal(err)
 	}
-	got := read(t, root, CursorHooksPath)
+	got := hookruntest.ReadFile(t, root, CursorHooksPath)
 	var doc struct {
 		Version int `json:"version"`
 		Hooks   map[string][]struct {
@@ -58,7 +60,7 @@ func TestCursorHooksMergeKeepsUnknownKeysAndUserHooks(t *testing.T) {
 	if err := Apply(root, un); err != nil {
 		t.Fatal(err)
 	}
-	got = read(t, root, CursorHooksPath)
+	got = hookruntest.ReadFile(t, root, CursorHooksPath)
 	if strings.Contains(got, "terma") || !strings.Contains(got, "./format.sh") || !strings.Contains(got, "./audit.sh") || !strings.Contains(got, `"version": 1`) {
 		t.Fatalf("uninstall wrong:\n%s", got)
 	}
@@ -71,7 +73,7 @@ func TestCursorUninstallPreservesSchemaVersion(t *testing.T) {
 		t.Run(before, func(t *testing.T) {
 			root := t.TempDir()
 			if before != "" {
-				write(t, root, CursorHooksPath, before)
+				hookruntest.WriteFile(t, root, CursorHooksPath, before)
 			}
 			plan, err := PlanCursorHooks(root, true)
 			if err != nil {
@@ -87,7 +89,7 @@ func TestCursorUninstallPreservesSchemaVersion(t *testing.T) {
 			if err := Apply(root, un); err != nil {
 				t.Fatal(err)
 			}
-			got := read(t, root, CursorHooksPath)
+			got := hookruntest.ReadFile(t, root, CursorHooksPath)
 			want := before
 			if want == "" {
 				want = `{"version":1}`
@@ -101,7 +103,7 @@ func TestCursorUninstallPreservesSchemaVersion(t *testing.T) {
 
 func TestCursorHooksRefusesMalformedFile(t *testing.T) {
 	root := t.TempDir()
-	write(t, root, CursorHooksPath, `{"version": 1, "hooks": [`)
+	hookruntest.WriteFile(t, root, CursorHooksPath, `{"version": 1, "hooks": [`)
 	if _, err := PlanCursorHooks(root, true); err == nil {
 		t.Fatal("a file terma cannot parse must not be rewritten")
 	}
@@ -123,7 +125,7 @@ func TestHasCursor(t *testing.T) {
 // Capture continues through follow-up loops without changing anyone else's limit.
 func TestCursorObservationHooksPreserveUserPolicy(t *testing.T) {
 	root := t.TempDir()
-	write(t, root, CursorHooksPath, `{"version":1,"hooks":{"stop":[{"command":"./continue.sh","loop_limit":2,"timeout":42,"future_option":true}],"beforeSubmitPrompt":[{"command":"./policy.sh","failClosed":true}]}}`)
+	hookruntest.WriteFile(t, root, CursorHooksPath, `{"version":1,"hooks":{"stop":[{"command":"./continue.sh","loop_limit":2,"timeout":42,"future_option":true}],"beforeSubmitPrompt":[{"command":"./policy.sh","failClosed":true}]}}`)
 	p, err := PlanCursorHooks(root, true)
 	if err != nil {
 		t.Fatal(err)
@@ -134,7 +136,7 @@ func TestCursorObservationHooksPreserveUserPolicy(t *testing.T) {
 	var doc struct {
 		Hooks map[string][]map[string]json.RawMessage `json:"hooks"`
 	}
-	if err = json.Unmarshal([]byte(read(t, root, CursorHooksPath)), &doc); err != nil {
+	if err = json.Unmarshal([]byte(hookruntest.ReadFile(t, root, CursorHooksPath)), &doc); err != nil {
 		t.Fatal(err)
 	}
 	if string(doc.Hooks["stop"][0]["loop_limit"]) != "2" || string(doc.Hooks["stop"][1]["loop_limit"]) != "null" {
@@ -172,7 +174,7 @@ func TestCursorObservationHooksPreserveUserPolicy(t *testing.T) {
 	if err = Apply(root, p); err != nil {
 		t.Fatal(err)
 	}
-	got := read(t, root, CursorHooksPath)
+	got := hookruntest.ReadFile(t, root, CursorHooksPath)
 	if strings.Contains(got, "terma") || !strings.Contains(got, "future_option") || !strings.Contains(got, "failClosed") {
 		t.Fatal(got)
 	}

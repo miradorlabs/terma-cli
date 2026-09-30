@@ -1,4 +1,4 @@
-package hookrun
+package antigravity
 
 import (
 	"cmp"
@@ -9,9 +9,20 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/miradorlabs/terma-cli/internal/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
+
+// State directories under the hook state directory: the observation checkpoint, and one
+// record per conversation of the turn agy is in (see turn.go).
+const (
+	antigravityObservationDir = "antigravity-observations"
+	antigravityTurnDir        = "antigravity-turns"
+)
+
+// sourceAntigravityHook is the evidence_source of what agy's hook payloads said.
+const sourceAntigravityHook = "antigravity_hook"
 
 // --- Antigravity adapter ---------------------------------------------------------------
 
@@ -63,7 +74,7 @@ func (in *antigravityHookInput) cwd(fallback string) string {
 }
 
 func readAntigravityInput(r io.Reader) (*antigravityHookInput, error) {
-	in, err := ReadInput[antigravityHookInput](r)
+	in, err := hookrun.ReadInput[antigravityHookInput](r)
 	if err != nil {
 		return nil, err
 	}
@@ -77,26 +88,26 @@ func readAntigravityInput(r io.Reader) (*antigravityHookInput, error) {
 // decision, no injected steps, carry on". Written even when the handler bails out early,
 // because agy documents the object as the contract and terma never wants to be the
 // hook that made an agent print a parse warning.
-func antigravityAck(env Env) {
+func antigravityAck(env hookrun.Env) {
 	if env.Stdout != nil {
 		_, _ = io.WriteString(env.Stdout, "{}\n")
 	}
 }
 
-// AntigravityPreInvocation records the conversation as the active session at the start
-// of each turn, and the turn itself (see antigravity_turn.go). agy has no SessionStart:
+// preInvocation records the conversation as the active session at the start
+// of each turn, and the turn itself (see turn.go). agy has no SessionStart:
 // the first invocation of a fresh conversation (invocation 0 with only the user's message
 // on the transcript) is where a session begins, and later turns refresh the record so the
 // TTL fallback tracks real activity. Every turn's start is observed, so a reader has the
 // moment the person's message arrived and not only the model calls that followed.
-func AntigravityPreInvocation(ctx context.Context, env Env) error {
+func preInvocation(ctx context.Context, env hookrun.Env) error {
 	defer antigravityAck(env)
 	in, err := readAntigravityInput(env.Stdin)
 	if err != nil {
 		env.Logf("%v", err)
 		return nil
 	}
-	invocation, _, invocationKnown := JSONNumber(in.InvocationNum, true)
+	invocation, _, invocationKnown := hookrun.JSONNumber(in.InvocationNum, true)
 	if invocationKnown && invocation != 0 {
 		// A model call in the middle of a turn: nothing about the session changes.
 		return nil
@@ -114,15 +125,15 @@ func AntigravityPreInvocation(ctx context.Context, env Env) error {
 		sess.StartedAt = active.StartedAt
 	}
 	env.SetActive(r, sess)
-	turn := env.beginAntigravityTurn(r, in)
+	turn := beginAntigravityTurn(env, r, in)
 	// A later turn, or a resumed conversation, was announced before.
-	if steps, _, stepsKnown := JSONNumber(in.InitialNumSteps, true); !stepsKnown || steps <= 1 {
+	if steps, _, stepsKnown := hookrun.JSONNumber(in.InitialNumSteps, true); !stepsKnown || steps <= 1 {
 		env.PruneManifests(r, now)
 		env.EmitStart(r, sess, nil)
 	}
-	env.CaptureObservation(ctx, r, Observation{
-		tool: antigravityTool, source: sourceAntigravityHook, stateDir: antigravityObservationDir,
-		sessionID: id, hook: "PreInvocation", turnID: turn, attrs: antigravityObservationAttrs(in, "PreInvocation", turn),
+	env.CaptureObservation(ctx, r, hookrun.Observation{
+		Tool: antigravityTool, Source: sourceAntigravityHook, StateDir: antigravityObservationDir,
+		SessionID: id, Hook: "PreInvocation", TurnID: turn, Attrs: antigravityObservationAttrs(in, "PreInvocation", turn),
 	})
 	return nil
 }
@@ -165,12 +176,12 @@ func antigravityEditedPaths(in *antigravityHookInput) []string {
 	return out
 }
 
-// AntigravityPostToolUse records one finished tool step, and the file it edited when it
+// postToolUse records one finished tool step, and the file it edited when it
 // edited one. Every tool step arrives here (the hook is unmatched), so every step is a
 // `terma.tool.call`: agy has no other export, and a session that only read, searched and
 // ran commands otherwise looks like one that did nothing. `toolCall.args` is opened for
 // one thing, an edit tool's path; a command line, a query or file content is never read.
-func AntigravityPostToolUse(ctx context.Context, env Env) error {
+func postToolUse(ctx context.Context, env hookrun.Env) error {
 	defer antigravityAck(env)
 	in, err := readAntigravityInput(env.Stdin)
 	if err != nil {
@@ -186,20 +197,20 @@ func AntigravityPostToolUse(ctx context.Context, env Env) error {
 	turn := antigravityTurnID(r, id)
 	call, called := antigravityToolCallAttrs(in, turn)
 	if called {
-		call[AttrVersion] = env.Version
-		env.EmitFor(r, spool.Event{Name: EventToolCall, SessionID: id, Repo: r.Name, Attrs: call})
+		call[hookrun.AttrVersion] = env.Version
+		env.EmitFor(r, spool.Event{Name: hookrun.EventToolCall, SessionID: id, Repo: r.Name, Attrs: call})
 	}
 
 	// A payload without a toolCall yields no paths, so this guard is also what makes
 	// in.ToolCall safe to read below.
-	files := RelativeFiles(r, env.Cwd, antigravityEditedPaths(in))
+	files := hookrun.RelativeFiles(r, env.Cwd, antigravityEditedPaths(in))
 	if len(files) == 0 {
 		return nil
 	}
 	// The same ids as the step's terma.tool.call: this event is what that call changed,
 	// not a second call, and the pair is how a reader tells.
 	ids := map[string]any{}
-	for _, k := range []string{AttrToolCallID, "step_idx", AttrTurnID} {
+	for _, k := range []string{hookrun.AttrToolCallID, "step_idx", hookrun.AttrTurnID} {
 		if v, ok := call[k]; ok {
 			ids[k] = v
 		}
@@ -218,45 +229,45 @@ func AntigravityPostToolUse(ctx context.Context, env Env) error {
 // did — a shell command that exits non-zero is a completed step. agy reports no duration,
 // so none is sent.
 func antigravityToolCallAttrs(in *antigravityHookInput, turn string) (map[string]any, bool) {
-	a := EvidenceAttrs(antigravityTool, sourceAntigravityHook, "PostToolUse")
-	if in.ToolCall != nil && ShortLabel(in.ToolCall.Name) {
-		a[AttrToolName] = in.ToolCall.Name
+	a := hookrun.EvidenceAttrs(antigravityTool, sourceAntigravityHook, "PostToolUse")
+	if in.ToolCall != nil && hookrun.ShortLabel(in.ToolCall.Name) {
+		a[hookrun.AttrToolName] = in.ToolCall.Name
 	}
-	if step, _, ok := JSONNumber(in.StepIdx, true); ok {
+	if step, _, ok := hookrun.JSONNumber(in.StepIdx, true); ok {
 		a["step_idx"] = int64(step)
-		a[AttrToolCallID] = "step-" + strconv.FormatUint(uint64(step), 10)
+		a[hookrun.AttrToolCallID] = "step-" + strconv.FormatUint(uint64(step), 10)
 	}
-	if _, named := a[AttrToolName]; !named {
-		if _, identified := a[AttrToolCallID]; !identified {
+	if _, named := a[hookrun.AttrToolName]; !named {
+		if _, identified := a[hookrun.AttrToolCallID]; !identified {
 			return nil, false
 		}
 	}
 	if turn != "" {
-		a[AttrTurnID] = turn
+		a[hookrun.AttrTurnID] = turn
 	}
-	BoundedAttr(a, AttrModel, in.ModelName)
-	a[AttrStatus] = "completed"
+	hookrun.BoundedAttr(a, hookrun.AttrModel, in.ModelName)
+	a[hookrun.AttrStatus] = "completed"
 	if in.Error != "" {
-		a[AttrStatus] = "error"
+		a[hookrun.AttrStatus] = "error"
 	}
 	return a, true
 }
 
-// AntigravityPostInvocation and AntigravityStop record the turn's shape as observations:
+// postInvocation and AntigravityStop record the turn's shape as observations:
 // which model answered, how many model calls the turn took, how it ended. They are
 // evidence of activity, never usage — agy's hooks carry no token counts, and its
 // transcripts carry none either. Do not derive spend or quota from them.
-func AntigravityPostInvocation(ctx context.Context, env Env) error {
+func postInvocation(ctx context.Context, env hookrun.Env) error {
 	return antigravityObserve(ctx, env, "PostInvocation")
 }
 
-// AntigravityStop fires when the execution loop ends: the turn is over and the person
+// stop fires when the execution loop ends: the turn is over and the person
 // is reading. The dispatcher starts a detached spool flush afterwards.
-func AntigravityStop(ctx context.Context, env Env) error {
+func stop(ctx context.Context, env hookrun.Env) error {
 	return antigravityObserve(ctx, env, "Stop")
 }
 
-func antigravityObserve(ctx context.Context, env Env, hook string) error {
+func antigravityObserve(ctx context.Context, env hookrun.Env, hook string) error {
 	defer antigravityAck(env)
 	in, err := readAntigravityInput(env.Stdin)
 	if err != nil {
@@ -277,26 +288,26 @@ func antigravityObserve(ctx context.Context, env Env, hook string) error {
 		}
 	}
 	turn := antigravityTurnID(r, in.id())
-	env.CaptureObservation(ctx, r, Observation{
-		tool: antigravityTool, source: sourceAntigravityHook, stateDir: antigravityObservationDir,
-		sessionID: in.id(), hook: hook, turnID: turn, attrs: antigravityObservationAttrs(in, hook, turn),
+	env.CaptureObservation(ctx, r, hookrun.Observation{
+		Tool: antigravityTool, Source: sourceAntigravityHook, StateDir: antigravityObservationDir,
+		SessionID: in.id(), Hook: hook, TurnID: turn, Attrs: antigravityObservationAttrs(in, hook, turn),
 	})
 	return nil
 }
 
 func antigravityObservationAttrs(in *antigravityHookInput, hook, turn string) map[string]any {
-	a := EvidenceAttrs(antigravityTool, sourceAntigravityHook, hook)
+	a := hookrun.EvidenceAttrs(antigravityTool, sourceAntigravityHook, hook)
 	for _, k := range []string{"usage_status", "funding_status", "quota_status", "account_status"} {
-		a[k] = StatusUnavailable
+		a[k] = hookrun.StatusUnavailable
 	}
-	BoundedAttr(a, AttrModel, in.ModelName)
+	hookrun.BoundedAttr(a, hookrun.AttrModel, in.ModelName)
 	if turn != "" {
-		a[AttrTurnID] = turn
+		a[hookrun.AttrTurnID] = turn
 	}
 	for k, v := range map[string]json.RawMessage{
 		"invocation_num": in.InvocationNum, "initial_num_steps": in.InitialNumSteps, "execution_num": in.ExecutionNum,
 	} {
-		if value, _, ok := JSONNumber(v, true); ok {
+		if value, _, ok := hookrun.JSONNumber(v, true); ok {
 			a[k] = int64(value)
 		}
 	}
@@ -309,9 +320,9 @@ func antigravityObservationAttrs(in *antigravityHookInput, hook, turn string) ma
 		}
 		// An error is not automatically a billing or limit error; only its presence
 		// travels, never its text.
-		a[AttrStatus] = "ok"
+		a[hookrun.AttrStatus] = "ok"
 		if in.Error != "" {
-			a[AttrStatus] = "error"
+			a[hookrun.AttrStatus] = "error"
 		}
 	}
 	return a

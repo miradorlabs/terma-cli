@@ -55,7 +55,7 @@ func TestHooksClaimSessionsForTheRelay(t *testing.T) {
 	}
 	// Nothing was spooled for that call, so the hook's payload claims it.
 	payload := `{"session_id":"` + codex + `","cwd":"` + root + `","tool_name":"shell"}`
-	if !ClaimFromPayload(context.Background(), env(""), []byte(payload), ToolForEvent("codex-post-tool-use")) {
+	if !ClaimFromPayload(context.Background(), env(""), mustPayloadSession(t, payload), "codex") {
 		t.Fatal("a Codex hook that spooled nothing did not claim from its payload")
 	}
 	for sid, tool := range map[string]string{claude: "claude-code", codex: "codex"} {
@@ -105,7 +105,7 @@ func TestCodexSubagentThreadIsClaimed(t *testing.T) {
 		t.Fatal(err)
 	}
 	payload := `{"session_id":"root-thread","agent_id":"child-thread-2","cwd":"` + root + `"}`
-	ClaimFromPayload(context.Background(), Env{Now: time.Now(), Cwd: root}, []byte(payload), "codex")
+	ClaimFromPayload(context.Background(), Env{Now: time.Now(), Cwd: root}, mustPayloadSession(t, payload), "codex")
 	for _, id := range []string{"root-thread", "child-thread", "child-thread-2"} {
 		if c, ok := claim.Read(id, time.Now()); !ok || c.ProjectID != "project-a" {
 			t.Errorf("%s not claimed: %+v %v", id, c, ok)
@@ -130,7 +130,7 @@ func TestGlobalModeClaimsEverySession(t *testing.T) {
 	}
 	claimIn := func(dir, sid string, pol config.Policy) (claim.Claim, bool) {
 		env := Env{Now: time.Now(), Cwd: dir, Stdin: strings.NewReader(""), Policy: pol}
-		ClaimFromPayload(context.Background(), env, []byte(`{"session_id":"`+sid+`","cwd":"`+dir+`"}`), "claude-code")
+		ClaimFromPayload(context.Background(), env, PayloadSession{ID: sid, Cwd: dir}, "claude-code")
 		return claim.Read(sid, time.Now())
 	}
 	for _, tc := range []struct{ dir, sid, want string }{
@@ -149,4 +149,13 @@ func TestGlobalModeClaimsEverySession(t *testing.T) {
 			t.Errorf("repo mode claimed a session in %s", dir)
 		}
 	}
+}
+
+func mustPayloadSession(t *testing.T, payload string) PayloadSession {
+	t.Helper()
+	s, ok := ReadPayloadSession([]byte(payload))
+	if !ok {
+		t.Fatalf("no session in %s", payload)
+	}
+	return s
 }

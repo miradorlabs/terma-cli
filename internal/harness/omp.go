@@ -82,7 +82,7 @@ func (c Omp) Scope() Scope {
 
 // Detect runs `omp --version`. A missing binary is not-found rather than an error.
 func (Omp) Detect(ctx context.Context) Detection {
-	return detectBinary(ctx, "omp", semverRE)
+	return DetectBinary(ctx, "omp", semverRE)
 }
 
 // ompAgentDir is where omp keeps its user configuration and hooks: $OMP_DIR/agent,

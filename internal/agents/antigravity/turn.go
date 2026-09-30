@@ -1,4 +1,4 @@
-package hookrun
+package antigravity
 
 import (
 	"encoding/json"
@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -35,18 +36,18 @@ func antigravityTurnPath(sessionID, root string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, antigravityTurnDir, EvidenceID(sessionID+"\x00"+root)+".json"), nil
+	return filepath.Join(dir, antigravityTurnDir, hookrun.EvidenceID(sessionID+"\x00"+root)+".json"), nil
 }
 
 // beginAntigravityTurn records the turn that starts at invocation 0 and returns its id.
 // A payload without `initialNumSteps` starts a turn terma cannot name: the previous
 // turn's record is removed rather than left to label this one's events.
-func (e Env) beginAntigravityTurn(r *Repo, in *antigravityHookInput) string {
+func beginAntigravityTurn(e hookrun.Env, r *hookrun.Repo, in *antigravityHookInput) string {
 	path, err := antigravityTurnPath(in.id(), r.Root)
 	if err != nil {
 		return ""
 	}
-	steps, _, ok := JSONNumber(in.InitialNumSteps, true)
+	steps, _, ok := hookrun.JSONNumber(in.InitialNumSteps, true)
 	if !ok {
 		_ = os.Remove(path)
 		return ""
@@ -62,19 +63,19 @@ func (e Env) beginAntigravityTurn(r *Repo, in *antigravityHookInput) string {
 		return ""
 	}
 	_, statErr := os.Stat(path)
-	if err := WriteState(path, b); err != nil {
+	if err := hookrun.WriteState(path, b); err != nil {
 		e.Logf("antigravity turn: %v", err)
 		return ""
 	}
 	if os.IsNotExist(statErr) {
-		PruneState(dir, e.Time().Add(-spool.MaxAge))
+		hookrun.PruneState(dir, e.Time().Add(-spool.MaxAge))
 	}
 	return turn.TurnID
 }
 
 // antigravityTurnID is the turn the conversation is in, or "" when terma did not see it
 // begin (hooks installed mid-turn, a pruned record). Missing stays missing.
-func antigravityTurnID(r *Repo, sessionID string) string {
+func antigravityTurnID(r *hookrun.Repo, sessionID string) string {
 	path, err := antigravityTurnPath(sessionID, r.Root)
 	if err != nil {
 		return ""
@@ -84,7 +85,7 @@ func antigravityTurnID(r *Repo, sessionID string) string {
 		return ""
 	}
 	var turn antigravityTurn
-	if json.Unmarshal(b, &turn) != nil || !ShortLabel(turn.TurnID) {
+	if json.Unmarshal(b, &turn) != nil || !hookrun.ShortLabel(turn.TurnID) {
 		return ""
 	}
 	return turn.TurnID

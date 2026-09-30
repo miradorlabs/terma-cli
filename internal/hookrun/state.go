@@ -28,13 +28,9 @@ const (
 	// codexTitleStateDir is when each Codex thread's name that was last spooled was written.
 	codexTitleStateDir = "codex-titles"
 	codexToolStartDir  = "codex-tool-starts"
-	// cursorObservationDir and antigravityObservationDir are the observation
-	// checkpoints, per harness so one harness's stream survives another's arrival.
-	cursorObservationDir      = "cursor-observations"
-	antigravityObservationDir = "antigravity-observations"
-	// antigravityTurnDir holds one record per conversation, beside the observation
-	// checkpoints: the turn agy is in (see antigravity_turn.go).
-	antigravityTurnDir = "antigravity-turns"
+	// cursorObservationDir is Cursor's observation checkpoint, per agent so one agent's
+	// stream survives another's arrival.
+	cursorObservationDir = "cursor-observations"
 	// claudeSubagentDir holds launch evidence per (session, agent), so internal
 	// Claude forks' orphan stop hooks cannot create delegated runs.
 	claudeSubagentDir = "claude-subagents"

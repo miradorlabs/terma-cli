@@ -1,15 +1,17 @@
-package hookmgr
+package antigravity
 
 import (
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 )
 
 // --- Antigravity project hooks ----------------------------------------------------------
 
-// AntigravityHooksPath is Antigravity CLI's workspace hooks file. agy discovers a
+// hooksPath is Antigravity CLI's workspace hooks file. agy discovers a
 // repository's customizations under `.agents/` (rules, skills, plugins and this file),
 // walking up from the working directory to the repository root, and loads them only for
 // a workspace the developer has trusted from inside agy. The file is meant to be
@@ -19,7 +21,7 @@ import (
 // configurable OTLP exporter — its one telemetry switch reports to Google — so there is
 // no export to point anywhere, and everything terma learns about an agy session arrives
 // through these hooks.
-const AntigravityHooksPath = ".agents/hooks.json"
+const hooksPath = ".agents/hooks.json"
 
 // antigravityHookName is the top-level key terma owns in the file. agy's hooks.json is
 // keyed by a hook *name*, each name holding its own per-event handler lists, and named
@@ -32,7 +34,7 @@ const antigravityHookName = "terma"
 // customization root. Any one of them marks a repository people open in Antigravity.
 var antigravityCustomizationRoots = []string{".agents", ".agent", "_agents", "_agent"}
 
-// AntigravityHooks are the adapter shims for Antigravity. Each is a one-liner that
+// committedHooks are the adapter shims for Antigravity. Each is a one-liner that
 // forwards the hook's JSON to the binary; no logic lives here.
 //
 // PreInvocation fires before each model call and carries the invocation number, which
@@ -46,25 +48,25 @@ var antigravityCustomizationRoots = []string{".agents", ".agent", "_agents", "_a
 // agy runs hooks synchronously with a 30-second default timeout; terma's handlers
 // return in milliseconds and the network flush after Stop is detached, so 10 seconds is
 // a ceiling for a wedged filesystem, not a budget.
-var AntigravityHooks = []struct {
+var committedHooks = []struct {
 	Event   string
 	Command string
 	// Grouped events wrap their handlers in a matcher group; flat events list the
 	// handlers directly. The shape is agy's, per event, not a choice.
 	Grouped bool
 }{
-	{"PreInvocation", HookCommand("antigravity-pre-invocation"), false},
-	{"PostToolUse", HookCommand("antigravity-post-tool-use"), true},
-	{"PostInvocation", HookCommand("antigravity-post-invocation"), false},
-	{"Stop", HookCommand("antigravity-stop"), false},
+	{"PreInvocation", hookmgr.HookCommand("antigravity-pre-invocation"), false},
+	{"PostToolUse", hookmgr.HookCommand("antigravity-post-tool-use"), true},
+	{"PostInvocation", hookmgr.HookCommand("antigravity-post-invocation"), false},
+	{"Stop", hookmgr.HookCommand("antigravity-stop"), false},
 }
 
 const antigravityHookTimeout = 10
 
-// HasAntigravity reports whether the repository already carries Antigravity
+// hasConfig reports whether the repository already carries Antigravity
 // configuration — one of agy's customization roots — which is when wiring its hooks by
 // default is a help rather than a stray directory in a repository nobody opens in agy.
-func HasAntigravity(root string) bool {
+func hasConfig(root string) bool {
 	for _, dir := range antigravityCustomizationRoots {
 		if info, err := os.Stat(filepath.Join(root, dir)); err == nil && info.IsDir() {
 			return true
@@ -110,14 +112,14 @@ func renderAntigravityEntry(previous json.RawMessage) (json.RawMessage, error) {
 			entry.Enabled = prev.Enabled
 		}
 	}
-	for _, h := range AntigravityHooks {
-		handler, err := MarshalJSON(antigravityHandler{Type: "command", Command: h.Command, Timeout: antigravityHookTimeout}, "", "")
+	for _, h := range committedHooks {
+		handler, err := hookmgr.MarshalJSON(antigravityHandler{Type: "command", Command: h.Command, Timeout: antigravityHookTimeout}, "", "")
 		if err != nil {
 			return nil, err
 		}
 		value := handler
 		if h.Grouped {
-			if value, err = MarshalJSON(antigravityGroup{Matcher: "", Hooks: []json.RawMessage{handler}}, "", ""); err != nil {
+			if value, err = hookmgr.MarshalJSON(antigravityGroup{Matcher: "", Hooks: []json.RawMessage{handler}}, "", ""); err != nil {
 				return nil, err
 			}
 		}
@@ -132,27 +134,27 @@ func renderAntigravityEntry(previous json.RawMessage) (json.RawMessage, error) {
 			entry.Stop = append(entry.Stop, value)
 		}
 	}
-	return MarshalJSON(entry, "  ", "  ")
+	return hookmgr.MarshalJSON(entry, "  ", "  ")
 }
 
-// PlanAntigravityHooks merges terma's named hook into .agents/hooks.json without
+// planHooks merges terma's named hook into .agents/hooks.json without
 // disturbing anything else in the file: every other named hook is written back
 // byte-for-byte.
-func PlanAntigravityHooks(root string, install bool) (Plan, error) {
-	p := Plan{}
-	path := filepath.Join(root, filepath.FromSlash(AntigravityHooksPath))
-	before, err := ReadFile(path)
+func planHooks(root string, install bool) (hookmgr.Plan, error) {
+	p := hookmgr.Plan{}
+	path := filepath.Join(root, filepath.FromSlash(hooksPath))
+	before, err := hookmgr.ReadFile(path)
 	if err != nil {
 		return p, err
 	}
 	top := map[string]json.RawMessage{}
 	if before != nil {
 		if err := json.Unmarshal(before, &top); err != nil {
-			return p, fmt.Errorf("parse %s: %w", AntigravityHooksPath, err)
+			return p, fmt.Errorf("parse %s: %w", hooksPath, err)
 		}
 	}
 	if top == nil {
-		return p, fmt.Errorf("parse %s: expected a JSON object", AntigravityHooksPath)
+		return p, fmt.Errorf("parse %s: expected a JSON object", hooksPath)
 	}
 	previous, present := top[antigravityHookName]
 	if !install && !present {
@@ -165,7 +167,7 @@ func PlanAntigravityHooks(root string, install bool) (Plan, error) {
 		}
 	}
 	if entry == nil {
-		return p, fmt.Errorf("parse %s terma: expected a JSON object", AntigravityHooksPath)
+		return p, fmt.Errorf("parse %s terma: expected a JSON object", hooksPath)
 	}
 	generated, err := renderAntigravityEntry(previous)
 	if err != nil {
@@ -190,7 +192,7 @@ func PlanAntigravityHooks(root string, install bool) (Plan, error) {
 		}
 		var kept []json.RawMessage
 		for _, handler := range entries {
-			remaining, _, err := WithoutTerma(handler)
+			remaining, _, err := hookmgr.WithoutTerma(handler)
 			if err != nil {
 				return p, err
 			}
@@ -204,7 +206,7 @@ func PlanAntigravityHooks(root string, install bool) (Plan, error) {
 		if len(kept) == 0 {
 			delete(entry, event)
 		} else {
-			encoded, err := MarshalJSON(kept, "", "")
+			encoded, err := hookmgr.MarshalJSON(kept, "", "")
 			if err != nil {
 				return p, err
 			}
@@ -215,34 +217,34 @@ func PlanAntigravityHooks(root string, install bool) (Plan, error) {
 	if len(entry) == 0 {
 		delete(top, antigravityHookName)
 	} else {
-		encoded, err := MarshalJSON(entry, "  ", "  ")
+		encoded, err := hookmgr.MarshalJSON(entry, "  ", "  ")
 		if err != nil {
 			return p, err
 		}
-		if present && SameJSON(previous, encoded) {
+		if present && hookmgr.SameJSON(previous, encoded) {
 			return p, nil
 		}
 		top[antigravityHookName] = encoded
 	}
 	if len(top) == 0 {
-		p.Changes = append(p.Changes, Change{Path: AntigravityHooksPath, Before: before})
+		p.Changes = append(p.Changes, hookmgr.Change{Path: hooksPath, Before: before})
 		return p, nil
 	}
-	out, err := MarshalOrdered(top)
+	out, err := hookmgr.MarshalOrdered(top)
 	if err != nil {
 		return p, err
 	}
-	p.Changes = append(p.Changes, Change{Path: AntigravityHooksPath, Before: before, After: append(out, '\n')})
+	p.Changes = append(p.Changes, hookmgr.Change{Path: hooksPath, Before: before, After: append(out, '\n')})
 	return p, nil
 }
 
-// AntigravityHooksEnabled reports whether terma's entry in the repository's hooks file
+// hooksEnabled reports whether terma's entry in the repository's hooks file
 // is switched on. A missing file or entry is "enabled": there is nothing switched off,
 // and whether the hooks are present is a separate question the plan answers. A file
 // that cannot be read reports enabled for the same reason: this only ever says "you
 // switched it off", and an unreadable file is the plan's error to raise.
-func AntigravityHooksEnabled(root string) bool {
-	data, err := ReadFile(filepath.Join(root, filepath.FromSlash(AntigravityHooksPath)))
+func hooksEnabled(root string) bool {
+	data, err := hookmgr.ReadFile(filepath.Join(root, filepath.FromSlash(hooksPath)))
 	if err != nil || data == nil {
 		return true
 	}

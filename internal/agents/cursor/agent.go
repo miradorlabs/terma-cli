@@ -3,6 +3,7 @@ package cursor
 
 import (
 	"context"
+	"encoding/json"
 	"os/exec"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
@@ -57,7 +58,21 @@ func (Agent) PlanUserHooks(dir string, command func(string) string, install bool
 	return hookmgr.PlanCursorUserHooks(dir, command, install)
 }
 
+// PayloadSession reads Cursor's payload, keyed on conversation_id: the one id every
+// Cursor event carries.
+func (Agent) PayloadSession(payload []byte) (hookrun.PayloadSession, bool) {
+	var in struct {
+		ConversationID string `json:"conversation_id"`
+		Cwd            string `json:"cwd"`
+	}
+	if json.Unmarshal(payload, &in) != nil || in.ConversationID == "" {
+		return hookrun.PayloadSession{}, false
+	}
+	return hookrun.PayloadSession{ID: in.ConversationID, Cwd: in.Cwd}, true
+}
+
 var (
-	_ agents.Agent     = Agent{}
-	_ agents.UserHooks = Agent{}
+	_ agents.PayloadReader = Agent{}
+	_ agents.Agent         = Agent{}
+	_ agents.UserHooks     = Agent{}
 )

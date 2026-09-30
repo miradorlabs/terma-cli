@@ -19,19 +19,19 @@ import (
 // through this; the attributes are the harness's, the ordering and replay identity are
 // shared.
 type Observation struct {
-	// tool names the harness ("cursor"); it also seeds the observation id.
-	tool string
-	// source is the evidence_source attribute on a capture-gap event.
-	source string
-	// stateDir is the checkpoint directory under the config dir, per harness so a
+	// Tool names the harness ("cursor"); it also seeds the observation id.
+	Tool string
+	// Source is the evidence_source attribute on a capture-gap event.
+	Source string
+	// StateDir is the checkpoint directory under the config dir, per harness so a
 	// harness's stream survives another's being introduced.
-	stateDir  string
-	sessionID string
-	hook      string
-	// turnID is the harness's turn identifier when it has one; it travels on the
+	StateDir  string
+	SessionID string
+	Hook      string
+	// TurnID is the harness's turn identifier when it has one; it travels on the
 	// capture-gap event so a lost observation can be placed.
-	turnID string
-	attrs  map[string]any
+	TurnID string
+	Attrs  map[string]any
 }
 
 // ObservationState is a write-ahead checkpoint. A crash between spool append and
@@ -51,7 +51,7 @@ func (e Env) CaptureObservation(ctx context.Context, r *Repo, o Observation) {
 	if e.Spool == nil {
 		return
 	}
-	attrs := o.attrs
+	attrs := o.Attrs
 	if attrs == nil {
 		attrs = map[string]any{}
 	}
@@ -63,11 +63,11 @@ func (e Env) CaptureObservation(ctx context.Context, r *Repo, o Observation) {
 	if err != nil {
 		return
 	}
-	dir = filepath.Join(dir, o.stateDir)
+	dir = filepath.Join(dir, o.StateDir)
 	if err = os.MkdirAll(dir, 0o700); err != nil {
 		return
 	}
-	path := filepath.Join(dir, EvidenceID(o.sessionID+"\x00"+r.Root)+".json")
+	path := filepath.Join(dir, EvidenceID(o.SessionID+"\x00"+r.Root)+".json")
 	// Unlike a redraw, distinct hooks cannot simply be discarded when another hook
 	// holds the lock. Wait briefly, bounded by the hook's deadline.
 	ctx, cancel := context.WithTimeout(ctx, observationLockWait)
@@ -79,16 +79,16 @@ func (e Env) CaptureObservation(ctx context.Context, r *Repo, o Observation) {
 			break
 		}
 		if !isLockBusy(err) {
-			e.Logf("%s capture lock: %v", o.tool, err)
+			e.Logf("%s capture lock: %v", o.Tool, err)
 			return
 		}
 		select {
 		case <-ctx.Done():
-			gap := map[string]any{AttrTool: o.tool, AttrEvidenceSource: o.source, AttrEvidenceStatus: "lock_timeout", AttrHookEvent: o.hook}
-			if o.turnID != "" {
-				gap[AttrTurnID] = o.turnID
+			gap := map[string]any{AttrTool: o.Tool, AttrEvidenceSource: o.Source, AttrEvidenceStatus: "lock_timeout", AttrHookEvent: o.Hook}
+			if o.TurnID != "" {
+				gap[AttrTurnID] = o.TurnID
 			}
-			e.EmitFor(r, spool.Event{Name: EventSessionCapture, SessionID: o.sessionID, Repo: r.Name, Attrs: gap})
+			e.EmitFor(r, spool.Event{Name: EventSessionCapture, SessionID: o.SessionID, Repo: r.Name, Attrs: gap})
 			return
 		case <-time.After(observationLockPoll):
 		}
@@ -98,7 +98,7 @@ func (e Env) CaptureObservation(ctx context.Context, r *Repo, o Observation) {
 	b, err := readCheckpoint(path)
 	fresh := os.IsNotExist(err)
 	if err != nil && !fresh {
-		e.Logf("%s checkpoint read: %v", o.tool, err)
+		e.Logf("%s checkpoint read: %v", o.Tool, err)
 		return
 	}
 	if !fresh && (len(b) > 64<<10 || json.Unmarshal(b, &state) != nil || state.Stream == "") {
@@ -118,12 +118,12 @@ func (e Env) CaptureObservation(ctx context.Context, r *Repo, o Observation) {
 	}
 	if state.Pending != nil {
 		if err = e.Spool.Append(*state.Pending); err != nil {
-			e.Logf("%s pending append: %v", o.tool, err)
+			e.Logf("%s pending append: %v", o.Tool, err)
 			return
 		}
 		state.Pending = nil
 		if err = write(); err != nil {
-			e.Logf("%s checkpoint: %v", o.tool, err)
+			e.Logf("%s checkpoint: %v", o.Tool, err)
 			return
 		}
 	}
@@ -135,19 +135,19 @@ func (e Env) CaptureObservation(ctx context.Context, r *Repo, o Observation) {
 	state.Sequence++
 	state.LastHash, state.At = hash, e.Time()
 	attrs["source_stream"], attrs["observation_sequence"] = state.Stream, state.Sequence
-	attrs["observation_id"] = EvidenceID(fmt.Sprintf("%s\x00%s\x00%d", o.tool, state.Stream, state.Sequence))
-	state.Pending = &spool.Event{Time: e.Time(), Name: EventSessionObservation, SessionID: o.sessionID, Repo: r.Name, Attrs: attrs}
+	attrs["observation_id"] = EvidenceID(fmt.Sprintf("%s\x00%s\x00%d", o.Tool, state.Stream, state.Sequence))
+	state.Pending = &spool.Event{Time: e.Time(), Name: EventSessionObservation, SessionID: o.SessionID, Repo: r.Name, Attrs: attrs}
 	if err = write(); err != nil {
-		e.Logf("%s checkpoint: %v", o.tool, err)
+		e.Logf("%s checkpoint: %v", o.Tool, err)
 		return
 	}
 	if err = e.Spool.Append(*state.Pending); err != nil {
-		e.Logf("%s observation append: %v", o.tool, err)
+		e.Logf("%s observation append: %v", o.Tool, err)
 		return
 	}
 	state.Pending = nil
 	if err = write(); err != nil {
-		e.Logf("%s checkpoint: %v", o.tool, err)
+		e.Logf("%s checkpoint: %v", o.Tool, err)
 	}
 	if fresh {
 		PruneState(dir, e.Time().Add(-spool.MaxAge))

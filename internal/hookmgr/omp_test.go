@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
 )
 
 func TestOmpHooksInstallUninstallRoundTrip(t *testing.T) {
@@ -23,7 +25,7 @@ func TestOmpHooksInstallUninstallRoundTrip(t *testing.T) {
 	if err := Apply(root, plan); err != nil {
 		t.Fatal(err)
 	}
-	got := read(t, root, OmpHooksPath)
+	got := hookruntest.ReadFile(t, root, OmpHooksPath)
 	if got != ompHooksSource {
 		t.Fatal("installed file differs from the embedded source")
 	}
@@ -58,7 +60,7 @@ func TestOmpHooksUninstallKeepsAnEditedFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	edited := ompHooksSource + "\n// local tweak\n"
-	write(t, root, OmpHooksPath, edited)
+	hookruntest.WriteFile(t, root, OmpHooksPath, edited)
 
 	un, err := PlanOmpHooks(root, false)
 	if err != nil {
@@ -70,7 +72,7 @@ func TestOmpHooksUninstallKeepsAnEditedFile(t *testing.T) {
 	if len(un.Notes) != 1 || !strings.Contains(un.Notes[0], "local edits") {
 		t.Fatalf("no note explaining the kept file: %v", un.Notes)
 	}
-	if got := read(t, root, OmpHooksPath); got != edited {
+	if got := hookruntest.ReadFile(t, root, OmpHooksPath); got != edited {
 		t.Fatal("edited hook file was modified")
 	}
 
@@ -85,7 +87,7 @@ func TestOmpHooksUninstallKeepsAnEditedFile(t *testing.T) {
 	if err := Apply(root, re); err != nil {
 		t.Fatal(err)
 	}
-	if got := read(t, root, OmpHooksPath); got != ompHooksSource {
+	if got := hookruntest.ReadFile(t, root, OmpHooksPath); got != ompHooksSource {
 		t.Fatal("reinstall did not restore the render")
 	}
 }

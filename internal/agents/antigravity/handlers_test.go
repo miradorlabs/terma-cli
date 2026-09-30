@@ -1,4 +1,4 @@
-package hookrun
+package antigravity
 
 import (
 	"bytes"
@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
+	"github.com/miradorlabs/terma-cli/internal/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -24,7 +25,7 @@ func antigravityPayload(root, event string, extra string) string {
 }
 
 func TestAntigravityConversationIsStampedOnItsCommit(t *testing.T) {
-	root := initRepo(t)
+	root := hookruntest.InitRepo(t)
 	ctx := context.Background()
 	sp, _ := spool.Open(t.TempDir())
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
@@ -33,10 +34,10 @@ func TestAntigravityConversationIsStampedOnItsCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	var stdout bytes.Buffer
-	env := func(stdin string) Env {
-		return Env{Now: time.Now(), Cwd: hookDir, Stdin: strings.NewReader(stdin), Stdout: &stdout, Spool: sp, Version: "test"}
+	env := func(stdin string) hookrun.Env {
+		return hookrun.Env{Now: time.Now(), Cwd: hookDir, Stdin: strings.NewReader(stdin), Stdout: &stdout, Spool: sp, Version: "test"}
 	}
-	run := func(h func(context.Context, Env) error, stdin string) {
+	run := func(h func(context.Context, hookrun.Env) error, stdin string) {
 		t.Helper()
 		stdout.Reset()
 		if err := h(ctx, env(stdin)); err != nil {
@@ -48,11 +49,11 @@ func TestAntigravityConversationIsStampedOnItsCommit(t *testing.T) {
 	}
 
 	// Turn one: a fresh conversation announces itself on its first invocation only.
-	run(AntigravityPreInvocation, antigravityPayload(root, "PreInvocation", `"initialNumSteps":1,"invocationNum":0`))
-	run(AntigravityPreInvocation, antigravityPayload(root, "PreInvocation", `"initialNumSteps":3,"invocationNum":1`))
+	run(preInvocation, antigravityPayload(root, "PreInvocation", `"initialNumSteps":1,"invocationNum":0`))
+	run(preInvocation, antigravityPayload(root, "PreInvocation", `"initialNumSteps":3,"invocationNum":1`))
 	starts := 0
 	for _, e := range hookruntest.Spooled(t, sp) {
-		if e.Name == EventSessionStart {
+		if e.Name == hookrun.EventSessionStart {
 			starts++
 			if e.Attrs["tool"] != antigravityTool || e.Attrs["model"] != "gemini-3.8-flash-high" {
 				t.Fatalf("start attrs: %v", e.Attrs)
@@ -64,16 +65,16 @@ func TestAntigravityConversationIsStampedOnItsCommit(t *testing.T) {
 	}
 
 	hookruntest.WriteFile(t, root, "hello.txt", "hello\n")
-	run(AntigravityPostToolUse, antigravityPayload(root, "PostToolUse", `"error":"","stepIdx":2,"toolCall":{"args":{"CodeContent":"hello","Description":"Create hello.txt","Overwrite":true,"TargetFile":"`+filepath.Join(root, "hello.txt")+`","toolAction":"Creating file","toolSummary":"Create hello.txt"},"name":"write_to_file"}`))
-	run(AntigravityPostToolUse, antigravityPayload(root, "PostToolUse", `"error":"","stepIdx":4,"toolCall":{"args":{"AllowMultiple":false,"EndLine":1,"Instruction":"Change hello to goodbye","ReplacementContent":"goodbye","StartLine":1,"TargetContent":"hello","TargetFile":"`+filepath.Join(root, "hello.txt")+`","toolAction":"Editing file","toolSummary":"Update hello.txt"},"name":"replace_file_content"}`))
+	run(postToolUse, antigravityPayload(root, "PostToolUse", `"error":"","stepIdx":2,"toolCall":{"args":{"CodeContent":"hello","Description":"Create hello.txt","Overwrite":true,"TargetFile":"`+filepath.Join(root, "hello.txt")+`","toolAction":"Creating file","toolSummary":"Create hello.txt"},"name":"write_to_file"}`))
+	run(postToolUse, antigravityPayload(root, "PostToolUse", `"error":"","stepIdx":4,"toolCall":{"args":{"AllowMultiple":false,"EndLine":1,"Instruction":"Change hello to goodbye","ReplacementContent":"goodbye","StartLine":1,"TargetContent":"hello","TargetFile":"`+filepath.Join(root, "hello.txt")+`","toolAction":"Editing file","toolSummary":"Update hello.txt"},"name":"replace_file_content"}`))
 	// A read is not an edit, and a file outside the repository is not ours.
-	run(AntigravityPostToolUse, antigravityPayload(root, "PostToolUse", `"error":"","stepIdx":6,"toolCall":{"args":{"AbsolutePath":"`+filepath.Join(root, "hello.txt")+`"},"name":"view_file"}`))
-	run(AntigravityPostToolUse, antigravityPayload(root, "PostToolUse", `"error":"","stepIdx":7,"toolCall":{"args":{"TargetFile":"/etc/hosts"},"name":"write_to_file"}`))
+	run(postToolUse, antigravityPayload(root, "PostToolUse", `"error":"","stepIdx":6,"toolCall":{"args":{"AbsolutePath":"`+filepath.Join(root, "hello.txt")+`"},"name":"view_file"}`))
+	run(postToolUse, antigravityPayload(root, "PostToolUse", `"error":"","stepIdx":7,"toolCall":{"args":{"TargetFile":"/etc/hosts"},"name":"write_to_file"}`))
 	// spooled drains, so the steps' events are read once and examined three ways.
 	stepEvents := hookruntest.Spooled(t, sp)
 	touched := 0
 	for _, e := range stepEvents {
-		if e.Name == EventFilesTouched {
+		if e.Name == hookrun.EventFilesTouched {
 			touched++
 			if e.Attrs["files"] != "hello.txt" || e.Attrs["tool"] != antigravityTool {
 				t.Fatalf("files touched attrs: %v", e.Attrs)
@@ -87,7 +88,7 @@ func TestAntigravityConversationIsStampedOnItsCommit(t *testing.T) {
 	// keyed on agy's own step index and placed in the turn it belongs to.
 	var calls []map[string]any
 	for _, e := range stepEvents {
-		if e.Name == EventToolCall {
+		if e.Name == hookrun.EventToolCall {
 			calls = append(calls, e.Attrs)
 		}
 	}
@@ -108,7 +109,7 @@ func TestAntigravityConversationIsStampedOnItsCommit(t *testing.T) {
 	// What a call was given is content, and none of it travels: not the file body, not
 	// the replacement, not a path.
 	for _, e := range stepEvents {
-		if e.Name != EventToolCall {
+		if e.Name != hookrun.EventToolCall {
 			continue
 		}
 		for k, v := range e.Attrs {
@@ -120,17 +121,17 @@ func TestAntigravityConversationIsStampedOnItsCommit(t *testing.T) {
 	// An edit's files-touched event is the same step, not a second call: it says so by
 	// carrying the call's ids.
 	for _, e := range stepEvents {
-		if e.Name == EventFilesTouched && (e.Attrs["turn_id"] != "turn-1" || !strings.HasPrefix(e.Attrs["tool_call_id"].(string), "step-")) {
+		if e.Name == hookrun.EventFilesTouched && (e.Attrs["turn_id"] != "turn-1" || !strings.HasPrefix(e.Attrs["tool_call_id"].(string), "step-")) {
 			t.Errorf("files touched is not tied to its call: %v", e.Attrs)
 		}
 	}
 
-	run(AntigravityPostInvocation, antigravityPayload(root, "PostInvocation", `"initialNumSteps":7,"invocationNum":3`))
-	run(AntigravityStop, antigravityPayload(root, "Stop", `"error":"","executionNum":0,"fullyIdle":true,"terminationReason":"NO_TOOL_CALL"`))
+	run(postInvocation, antigravityPayload(root, "PostInvocation", `"initialNumSteps":7,"invocationNum":3`))
+	run(stop, antigravityPayload(root, "Stop", `"error":"","executionNum":0,"fullyIdle":true,"terminationReason":"NO_TOOL_CALL"`))
 	var stop map[string]any
 	observations := 0
 	for _, e := range hookruntest.Spooled(t, sp) {
-		if e.Name == EventSessionObservation {
+		if e.Name == hookrun.EventSessionObservation {
 			observations++
 			if e.Attrs["hook_event"] == "Stop" {
 				stop = e.Attrs
@@ -164,7 +165,7 @@ func TestAntigravityConversationIsStampedOnItsCommit(t *testing.T) {
 	}
 	msgPath := filepath.Join(t.TempDir(), "COMMIT_EDITMSG")
 	_ = os.WriteFile(msgPath, []byte("agent work\n"), 0o644)
-	if err := PrepareCommitMsg(ctx, Env{Now: time.Now(), Cwd: root, Args: []string{msgPath, "message"}, Stdin: strings.NewReader(""), Spool: sp, Version: "test"}); err != nil {
+	if err := hookrun.PrepareCommitMsg(ctx, hookrun.Env{Now: time.Now(), Cwd: root, Args: []string{msgPath, "message"}, Stdin: strings.NewReader(""), Spool: sp, Version: "test"}); err != nil {
 		t.Fatal(err)
 	}
 	data, _ := os.ReadFile(msgPath)
@@ -177,24 +178,24 @@ func TestAntigravityConversationIsStampedOnItsCommit(t *testing.T) {
 // announcing a second start, and the second turn's Stop keeps the session fresh for the
 // commit that follows.
 func TestAntigravityLaterTurnsRefreshWithoutRestarting(t *testing.T) {
-	root := initRepo(t)
+	root := hookruntest.InitRepo(t)
 	ctx := context.Background()
 	sp, _ := spool.Open(t.TempDir())
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
-	env := func(stdin string) Env {
-		return Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
+	env := func(stdin string) hookrun.Env {
+		return hookrun.Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
 	}
-	if err := AntigravityPreInvocation(ctx, env(antigravityPayload(root, "PreInvocation", `"initialNumSteps":9,"invocationNum":0`))); err != nil {
+	if err := preInvocation(ctx, env(antigravityPayload(root, "PreInvocation", `"initialNumSteps":9,"invocationNum":0`))); err != nil {
 		t.Fatal(err)
 	}
-	if err := AntigravityStop(ctx, env(antigravityPayload(root, "Stop", `"error":"boom","executionNum":1,"fullyIdle":false,"terminationReason":"ERROR"`))); err != nil {
+	if err := stop(ctx, env(antigravityPayload(root, "Stop", `"error":"boom","executionNum":1,"fullyIdle":false,"terminationReason":"ERROR"`))); err != nil {
 		t.Fatal(err)
 	}
 	for _, e := range hookruntest.Spooled(t, sp) {
-		if e.Name == EventSessionStart {
+		if e.Name == hookrun.EventSessionStart {
 			t.Fatal("a continuing conversation must not announce a new session")
 		}
-		if e.Name == EventSessionObservation && e.Attrs["hook_event"] == "Stop" {
+		if e.Name == hookrun.EventSessionObservation && e.Attrs["hook_event"] == "Stop" {
 			if e.Attrs["status"] != "error" || e.Attrs["termination_reason"] != "ERROR" || e.Attrs["turn_id"] != "turn-9" {
 				t.Fatalf("stop attrs: %v", e.Attrs)
 			}
@@ -210,7 +211,7 @@ func TestAntigravityLaterTurnsRefreshWithoutRestarting(t *testing.T) {
 	}
 	msgPath := filepath.Join(t.TempDir(), "COMMIT_EDITMSG")
 	_ = os.WriteFile(msgPath, []byte("work\n"), 0o644)
-	if err := PrepareCommitMsg(ctx, Env{Now: time.Now(), Cwd: root, Args: []string{msgPath, "message"}, Stdin: strings.NewReader(""), Spool: sp}); err != nil {
+	if err := hookrun.PrepareCommitMsg(ctx, hookrun.Env{Now: time.Now(), Cwd: root, Args: []string{msgPath, "message"}, Stdin: strings.NewReader(""), Spool: sp}); err != nil {
 		t.Fatal(err)
 	}
 	if data, _ := os.ReadFile(msgPath); !strings.Contains(string(data), "Agent-Tool: antigravity") {
@@ -222,11 +223,11 @@ func TestAntigravityHandlersIgnoreBadInputAndStillAck(t *testing.T) {
 	ctx := context.Background()
 	t.Setenv(antigravityConversationEnv, "")
 	for _, stdin := range []string{"", "not json", `{"modelName":"x"}`, `{"conversationId":"../../etc"}`, `{"conversationId":"c1","toolCall":{"name":"write_to_file","args":"not-an-object"}}`} {
-		for name, h := range map[string]func(context.Context, Env) error{
-			"pre": AntigravityPreInvocation, "tool": AntigravityPostToolUse, "post": AntigravityPostInvocation, "stop": AntigravityStop,
+		for name, h := range map[string]func(context.Context, hookrun.Env) error{
+			"pre": preInvocation, "tool": postToolUse, "post": postInvocation, "stop": stop,
 		} {
 			var out bytes.Buffer
-			if err := h(ctx, Env{Cwd: t.TempDir(), Stdin: strings.NewReader(stdin), Stdout: &out}); err != nil {
+			if err := h(ctx, hookrun.Env{Cwd: t.TempDir(), Stdin: strings.NewReader(stdin), Stdout: &out}); err != nil {
 				t.Errorf("%s(%q) = %v", name, stdin, err)
 			}
 			if strings.TrimSpace(out.String()) != "{}" {
@@ -239,16 +240,16 @@ func TestAntigravityHandlersIgnoreBadInputAndStillAck(t *testing.T) {
 // agy sets the conversation in the hook's environment as well as the payload; a
 // payload that omits it still finds its session.
 func TestAntigravityConversationFallsBackToTheEnvironment(t *testing.T) {
-	root := initRepo(t)
+	root := hookruntest.InitRepo(t)
 	sp, _ := spool.Open(t.TempDir())
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	t.Setenv(antigravityConversationEnv, "env-conv-1")
 	stdin := `{"workspacePaths":["` + root + `"],"modelName":"gemini-3.8-pro","initialNumSteps":1,"invocationNum":0}`
-	if err := AntigravityPreInvocation(context.Background(), Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(stdin), Spool: sp}); err != nil {
+	if err := preInvocation(context.Background(), hookrun.Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(stdin), Spool: sp}); err != nil {
 		t.Fatal(err)
 	}
 	events := hookruntest.Spooled(t, sp)
-	if len(events) != 2 || events[0].Name != EventSessionStart || events[1].Name != EventSessionObservation {
+	if len(events) != 2 || events[0].Name != hookrun.EventSessionStart || events[1].Name != hookrun.EventSessionObservation {
 		t.Fatalf("events: %+v", events)
 	}
 	for _, e := range events {
@@ -263,41 +264,41 @@ func TestAntigravityConversationFallsBackToTheEnvironment(t *testing.T) {
 // was 0 on both turns of one resumed conversation (agy 1.2.7, 2026-09-18 — the numbers
 // below are that recording). The turn is where it began.
 func TestAntigravityTurnsAreNamedByWhereTheyBegan(t *testing.T) {
-	root := initRepo(t)
+	root := hookruntest.InitRepo(t)
 	ctx := context.Background()
 	sp, _ := spool.Open(t.TempDir())
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
-	run := func(h func(context.Context, Env) error, extra string) {
+	run := func(h func(context.Context, hookrun.Env) error, extra string) {
 		t.Helper()
-		if err := h(ctx, Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(antigravityPayload(root, "", extra)), Spool: sp, Version: "test"}); err != nil {
+		if err := h(ctx, hookrun.Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(antigravityPayload(root, "", extra)), Spool: sp, Version: "test"}); err != nil {
 			t.Fatal(err)
 		}
 	}
 	// A step before terma has seen any turn begin: reported, and placed in no turn.
-	run(AntigravityPostToolUse, `"error":"","stepIdx":0,"toolCall":{"args":{},"name":"view_file"}`)
+	run(postToolUse, `"error":"","stepIdx":0,"toolCall":{"args":{},"name":"view_file"}`)
 
-	run(AntigravityPreInvocation, `"initialNumSteps":1,"invocationNum":0`)
-	run(AntigravityPostToolUse, `"error":"","stepIdx":2,"toolCall":{"args":{"CommandLine":"ls missing"},"name":"run_command"}`)
-	run(AntigravityPostInvocation, `"initialNumSteps":1,"invocationNum":0`)
-	run(AntigravityPreInvocation, `"initialNumSteps":3,"invocationNum":1`)
-	run(AntigravityPostInvocation, `"initialNumSteps":3,"invocationNum":1`)
-	run(AntigravityStop, `"error":"","executionNum":0,"fullyIdle":true,"terminationReason":"NO_TOOL_CALL"`)
+	run(preInvocation, `"initialNumSteps":1,"invocationNum":0`)
+	run(postToolUse, `"error":"","stepIdx":2,"toolCall":{"args":{"CommandLine":"ls missing"},"name":"run_command"}`)
+	run(postInvocation, `"initialNumSteps":1,"invocationNum":0`)
+	run(preInvocation, `"initialNumSteps":3,"invocationNum":1`)
+	run(postInvocation, `"initialNumSteps":3,"invocationNum":1`)
+	run(stop, `"error":"","executionNum":0,"fullyIdle":true,"terminationReason":"NO_TOOL_CALL"`)
 
-	run(AntigravityPreInvocation, `"initialNumSteps":9,"invocationNum":0`)
-	run(AntigravityPostToolUse, `"error":"tool crashed","stepIdx":11,"toolCall":{"args":{},"name":"view_file"}`)
-	run(AntigravityPostInvocation, `"initialNumSteps":9,"invocationNum":0`)
-	run(AntigravityStop, `"error":"","executionNum":0,"fullyIdle":true,"terminationReason":"NO_TOOL_CALL"`)
+	run(preInvocation, `"initialNumSteps":9,"invocationNum":0`)
+	run(postToolUse, `"error":"tool crashed","stepIdx":11,"toolCall":{"args":{},"name":"view_file"}`)
+	run(postInvocation, `"initialNumSteps":9,"invocationNum":0`)
+	run(stop, `"error":"","executionNum":0,"fullyIdle":true,"terminationReason":"NO_TOOL_CALL"`)
 
 	var got []string
 	for _, e := range hookruntest.Spooled(t, sp) {
 		turn, _ := e.Attrs["turn_id"].(string)
 		switch e.Name {
-		case EventToolCall:
+		case hookrun.EventToolCall:
 			got = append(got, "call "+e.Attrs["tool_call_id"].(string)+" "+e.Attrs["status"].(string)+" "+turn)
 			if _, ok := e.Attrs["error"]; ok {
 				t.Error("a tool's error text must not travel")
 			}
-		case EventSessionObservation:
+		case hookrun.EventSessionObservation:
 			got = append(got, e.Attrs["hook_event"].(string)+" "+turn)
 		}
 	}
@@ -347,5 +348,17 @@ func TestAntigravityEditedPaths(t *testing.T) {
 		if strings.Join(got, ",") != strings.Join(want, ",") {
 			t.Errorf("%s: got %v want %v", raw, got, want)
 		}
+	}
+}
+
+// The reader refuses a payload past the bound by name.
+func TestReaderRefusesOversizedInput(t *testing.T) {
+	t.Setenv(antigravityConversationEnv, "")
+	if _, err := readAntigravityInput(strings.NewReader(`{"conversationId":"valid"}`)); err != nil {
+		t.Fatalf("a payload within the bound was refused: %v", err)
+	}
+	pad := strings.Repeat(" ", hookrun.MaxInput)
+	if _, err := readAntigravityInput(strings.NewReader(`{"conversationId":"valid"}` + pad)); err == nil || !strings.Contains(err.Error(), "too large") {
+		t.Fatalf("oversized payload: err = %v, want too large", err)
 	}
 }

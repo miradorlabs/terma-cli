@@ -190,7 +190,7 @@ func (Claude) SupportsHeadersHelper() bool { return true }
 // as an error: connecting an uninstalled harness is allowed, since the config is read
 // whenever it is eventually started.
 func (Claude) Detect(ctx context.Context) Detection {
-	return detectBinary(ctx, "claude", semverRE)
+	return DetectBinary(ctx, "claude", semverRE)
 }
 
 // ConfigPath is ~/.claude/settings.json, or $CLAUDE_CONFIG_DIR/settings.json when Claude

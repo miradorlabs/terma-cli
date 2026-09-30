@@ -1,10 +1,17 @@
 package builtin
 
 import (
+	"encoding/json"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 
+	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/harness"
+	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 )
 
 // hookCommand finds the event a committed hook entry runs. The files differ — JSON with
@@ -67,5 +74,122 @@ func TestSupportCatalogMatchesTheRegistry(t *testing.T) {
 	}
 	for name := range listed {
 		t.Errorf("harness.SupportCatalog lists %q, which is not an adapter", name)
+	}
+}
+
+// committedCommands plans a's committed hooks into a fresh repository and returns every
+// command terma wrote there.
+func committedCommands(t *testing.T, a agents.Agent) []string {
+	t.Helper()
+	plan, err := a.Plan(t.TempDir(), true)
+	if err != nil {
+		t.Fatalf("%s: %v", a.Name(), err)
+	}
+	var out []string
+	var walk func(v any)
+	walk = func(v any) {
+		switch v := v.(type) {
+		case map[string]any:
+			for k, x := range v {
+				if s, ok := x.(string); ok && k == "command" && strings.Contains(s, "terma hook") {
+					out = append(out, s)
+				}
+				walk(x)
+			}
+		case []any:
+			for _, x := range v {
+				walk(x)
+			}
+		}
+	}
+	for _, change := range plan.Changes {
+		var doc any
+		if json.Unmarshal(change.After, &doc) == nil {
+			walk(doc)
+		}
+	}
+	return out
+}
+
+// Every hook entry terma commits must be silent on both streams and exit 0 on a machine
+// without terma. Claude Code prints a hook's stderr in the transcript on a non-zero exit
+// and hands SessionStart and PostToolUse stderr to the model; SessionStart's stdout
+// becomes context as well. The agents run the command with `sh -c` and JSON on stdin.
+func TestCommittedHookCommandsAreInertWithoutTerma(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("sh not installed")
+	}
+	for _, a := range reg.All() {
+		if a.HooksPath() == "" {
+			continue
+		}
+		for _, command := range committedCommands(t, a) {
+			t.Run(a.Name()+"/"+command, func(t *testing.T) {
+				cmd := exec.Command("sh", "-c", command)
+				cmd.Dir = t.TempDir()
+				cmd.Env = []string{"PATH=/usr/bin:/bin", "HOME=" + cmd.Dir}
+				cmd.Stdin = strings.NewReader(`{"session_id":"s1","hook_event_name":"SessionStart","cwd":"` + cmd.Dir + `"}`)
+				var stdout, stderr strings.Builder
+				cmd.Stdout, cmd.Stderr = &stdout, &stderr
+				if err := cmd.Run(); err != nil {
+					t.Fatalf("exit without terma: %v\nstderr: %s", err, stderr.String())
+				}
+				if stdout.Len() != 0 || stderr.Len() != 0 {
+					t.Fatalf("output without terma: stdout %q, stderr %q", stdout.String(), stderr.String())
+				}
+			})
+		}
+	}
+}
+
+// A hooks file that exists and cannot be read is not an absent one: planned as a create,
+// Apply would rename terma-only content over whatever the developer had there. A
+// directory at the file's path fails to read on every platform.
+func TestPlannersRefuseAFileTheyCannotRead(t *testing.T) {
+	for _, a := range reg.All() {
+		if a.HooksPath() == "" || strings.HasSuffix(a.HooksPath(), "/") {
+			continue
+		}
+		root := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(root, filepath.FromSlash(a.HooksPath())), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if plan, err := a.Plan(root, true); err == nil {
+			t.Errorf("%s planned %d change(s) over a file that could not be read", a.Name(), len(plan.Changes))
+		}
+	}
+}
+
+// What install commits, uninstall recognizes as terma's and removes, and a second install
+// changes nothing.
+func TestCommittedHooksRoundTrip(t *testing.T) {
+	for _, a := range reg.All() {
+		if a.HooksPath() == "" {
+			continue
+		}
+		root := t.TempDir()
+		plan, err := a.Plan(root, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := hookmgr.Apply(root, plan); err != nil {
+			t.Fatalf("%s: %v", a.Name(), err)
+		}
+		if again, err := a.Plan(root, true); err != nil || !again.Empty() {
+			t.Errorf("%s: a second install plans %+v (%v)", a.Name(), again.Changes, err)
+		}
+		if !agents.Wired(root, a) {
+			t.Errorf("%s: installed hooks do not read as wired", a.Name())
+		}
+		remove, err := a.Plan(root, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := hookmgr.Apply(root, remove); err != nil {
+			t.Fatalf("%s: %v", a.Name(), err)
+		}
+		if agents.Wired(root, a) {
+			t.Errorf("%s: uninstall left terma's hooks in place", a.Name())
+		}
 	}
 }

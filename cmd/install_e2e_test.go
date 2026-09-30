@@ -175,7 +175,7 @@ func TestInstallE2ELocations(t *testing.T) {
 			if err != nil || bound.Project.ID != testProjectID {
 				t.Fatalf("binding: %+v %v", bound, err)
 			}
-			for _, path := range []string{hookmgr.ClaudeSettingsPath, hookmgr.CursorHooksPath, hookmgr.CodexHooksPath, hookmgr.AntigravityHooksPath} {
+			for _, path := range []string{hookmgr.ClaudeSettingsPath, hookmgr.CursorHooksPath, hookmgr.CodexHooksPath, hooksPathOf("antigravity")} {
 				if !bytes.Contains(readInstallFile(t, root, path), []byte("terma hook")) {
 					t.Fatalf("missing hooks in %s", path)
 				}
@@ -210,7 +210,7 @@ func TestInstallE2ELocations(t *testing.T) {
 					t.Fatalf("child inherited parent binding: %s", out)
 				}
 			}
-			for _, path := range []string{hookmgr.ClaudeSettingsPath, hookmgr.CodexHooksPath, hookmgr.AntigravityHooksPath, hookmgr.ShimDir + "/post-commit"} {
+			for _, path := range []string{hookmgr.ClaudeSettingsPath, hookmgr.CodexHooksPath, hooksPathOf("antigravity"), hookmgr.ShimDir + "/post-commit"} {
 				requireAbsent(t, filepath.Join(root, path))
 			}
 			if bytes.Contains(readInstallFile(t, root, hookmgr.CursorHooksPath), []byte("terma hook")) {
@@ -401,7 +401,8 @@ func TestInstallE2EMixedHooksAndLookalikes(t *testing.T) {
 	s := newInstallSandbox(t)
 	root := s.mkdir("workspace")
 	s.git(root, "init", "-q")
-	body := `{"hooks":{"PostToolUse":[{"matcher":"Write","hooks":[{"type":"command","command":"terma hook post-tool-use"},{"type":"command","command":"./audit.sh"},{"type":"command","command":"echo 'terma hook post-tool-use'"}]}]}}`
+	owned, _ := json.Marshal(hookmgr.HookCommand("post-tool-use"))
+	body := `{"hooks":{"PostToolUse":[{"matcher":"Write","hooks":[{"type":"command","command":` + string(owned) + `},{"type":"command","command":"./audit.sh"},{"type":"command","command":"echo 'terma hook post-tool-use'"}]}]}}`
 	s.write(root, hookmgr.ClaudeSettingsPath, body)
 	s.write(root, hookmgr.CursorHooksPath, `{"version":42}`)
 	s.install(root)
@@ -595,11 +596,12 @@ func TestInstallE2EAntigravityMixedHandlers(t *testing.T) {
 	s := newInstallSandbox(t)
 	root := s.mkdir("workspace")
 	s.git(root, "init", "-q")
-	s.write(root, hookmgr.AntigravityHooksPath, `{"terma":{"enabled":false,"custom":"keep","Stop":[{"type":"command","command":"terma hook antigravity-stop"},{"type":"command","command":"./audit.sh"}]}}`)
+	owned, _ := json.Marshal(hookmgr.HookCommand("antigravity-stop"))
+	s.write(root, hooksPathOf("antigravity"), `{"terma":{"enabled":false,"custom":"keep","Stop":[{"type":"command","command":`+string(owned)+`},{"type":"command","command":"./audit.sh"}]}}`)
 	s.install(root)
 	s.cli(root, "uninstall", "--yes")
-	got := string(readInstallFile(t, root, hookmgr.AntigravityHooksPath))
-	if !strings.Contains(got, "./audit.sh") || !strings.Contains(got, "keep") || !strings.Contains(got, `"enabled": false`) || strings.Contains(got, "terma hook") {
+	got := string(readInstallFile(t, root, hooksPathOf("antigravity")))
+	if !strings.Contains(got, "./audit.sh") || !strings.Contains(got, "keep") || !strings.Contains(got, `"enabled": false`) || strings.Contains(got, "antigravity-stop") {
 		t.Fatalf("user handlers lost: %s", got)
 	}
 }

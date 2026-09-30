@@ -1,4 +1,4 @@
-package harness
+package antigravity
 
 import (
 	"context"
@@ -9,32 +9,28 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+
+	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-// Antigravity is Google's Antigravity CLI (`agy`), the successor to Gemini CLI.
-//
-// It is not a telemetry harness and is absent from the registry: agy has no
-// configurable OTLP exporter (its single telemetry switch reports to Google), so there
-// is no export to point at Terma, and everything terma learns about an agy session
-// arrives through the repository hooks `terma install` writes. What lives here is the
-// part of that integration which has to know agy's file layout: where it is installed,
-// and where it records which workspaces the developer has trusted — because a
-// workspace's hooks.json is loaded only for a trusted workspace, and silently skipped
-// otherwise.
-type Antigravity struct{}
+// agy has no configurable OTLP exporter (its one telemetry switch reports to Google), so
+// everything terma learns about an agy session arrives through the repository hooks.
+// What is here is the part that has to know agy's file layout: where it is installed,
+// and where it records which workspaces the developer trusted, since a workspace's
+// hooks.json loads only for a trusted workspace and is silently skipped otherwise.
 
 var agyVersionRE = regexp.MustCompile(`\d+\.\d+(\.\d+)?`)
 
-// Detect looks for the agy binary and its version.
-func (Antigravity) Detect(ctx context.Context) Detection {
-	return detectBinary(ctx, "agy", agyVersionRE)
+// detect looks for the agy binary and its version.
+func detect(ctx context.Context) harness.Detection {
+	return harness.DetectBinary(ctx, "agy", agyVersionRE)
 }
 
-// SettingsPath is agy's own settings file, ~/.gemini/antigravity-cli/settings.json. It is
+// settingsPath is agy's own settings file, ~/.gemini/antigravity-cli/settings.json. It is
 // agy's, never terma's to write: it holds the trust decisions this package only reads.
 // The parent directory is shared with Gemini CLI, whose settings.json one level up is a
 // different file with different keys.
-func (Antigravity) SettingsPath() (string, error) {
+func settingsPath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
@@ -42,12 +38,12 @@ func (Antigravity) SettingsPath() (string, error) {
 	return filepath.Join(home, ".gemini", "antigravity-cli", "settings.json"), nil
 }
 
-// TrustsWorkspace reports whether the developer has trusted root as an Antigravity
+// trustsWorkspace reports whether the developer has trusted root as an Antigravity
 // workspace. agy records the answer under `trustedWorkspaces` in its settings when the
 // developer accepts the trust prompt on opening a folder; a missing file or list means
 // nothing has been trusted, which is what a fresh machine looks like and not an error.
-func (a Antigravity) TrustsWorkspace(root string) (bool, error) {
-	path, err := a.SettingsPath()
+func trustsWorkspace(root string) (bool, error) {
+	path, err := settingsPath()
 	if err != nil {
 		return false, err
 	}

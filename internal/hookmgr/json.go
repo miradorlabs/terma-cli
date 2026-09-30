@@ -13,12 +13,15 @@ import (
 	"strings"
 )
 
+// committedHookShape is HookCommand's output, with CodexHookCommand's PATH prefix or
+// without it, for any event.
+var committedHookShape = regexp.MustCompile(`^(PATH="[^"]*"; )?command -v terma >/dev/null 2>&1 && terma hook [a-z0-9-]+ \|\| true$`)
+
 // userHookShape is UserHookCommand's (and ManagedHookCommand's) output for any path
 // and event.
 var userHookShape = regexp.MustCompile(`^\[ -x ('(?:[^']|'\\'')+'|"(?:[^"\\]|\\.)+") \] && ('(?:[^']|'\\'')+'|"(?:[^"\\]|\\.)+") hook --user [a-z0-9-]+ \|\| true$`)
 
-// CallsTerma reports whether an entry contains a recognized Terma command, including
-// older unguarded commands. Mentions inside user scripts are not ownership evidence.
+// CallsTerma reports whether an entry contains a command terma generated.
 func CallsTerma(entry json.RawMessage) bool {
 	var v any
 	if json.Unmarshal(entry, &v) != nil {
@@ -102,42 +105,13 @@ func MarshalOrdered(m map[string]json.RawMessage) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// ownedHookCommand recognizes generated commands and their older unguarded forms.
-// Merely mentioning "terma hook" in a user's script is not ownership evidence.
+// ownedHookCommand recognizes a command terma generated, by shape: a committed entry
+// (HookCommand, CodexHookCommand), or a machine-wide one (UserHookCommand,
+// ManagedHookCommand), for any event. Merely mentioning "terma hook" in a user's
+// script is not ownership evidence.
 func ownedHookCommand(command string) bool {
 	command = strings.TrimSpace(command)
-	// A machine-wide entry (UserHookCommand) names terma by an absolute path that
-	// differs per machine and moves when terma does: recognized by shape, so a later
-	// setup replaces it in place.
-	if userHookShape.MatchString(command) {
-		return true
-	}
-	var commands []string
-	for _, h := range ClaudeHooks {
-		commands = append(commands, h.Command)
-	}
-	for _, h := range CursorHooks {
-		commands = append(commands, h.Command)
-	}
-	for _, h := range CodexHooks {
-		commands = append(commands, h.Command)
-	}
-	for _, h := range AntigravityHooks {
-		commands = append(commands, h.Command)
-	}
-	for _, guarded := range commands {
-		// Codex's commands lead with a PATH assignment (CodexHookCommand); the forms an
-		// older terma wrote did not, and must still be recognized to be upgraded in place.
-		plain := guarded
-		if i := strings.Index(plain, "; command -v terma "); i >= 0 {
-			plain = plain[i+2:]
-		}
-		bare := strings.TrimSuffix(strings.TrimPrefix(plain, "command -v terma >/dev/null 2>&1 && "), " || true")
-		if command == guarded || command == plain || command == bare || command == bare+" || true" {
-			return true
-		}
-	}
-	return false
+	return committedHookShape.MatchString(command) || userHookShape.MatchString(command)
 }
 
 // WithoutTerma removes only owned command leaves, retaining unrelated handlers in

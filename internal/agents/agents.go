@@ -80,3 +80,9 @@ func Wired(root string, a Agent) bool {
 	plan, err := a.Plan(root, false)
 	return err != nil || !plan.Empty()
 }
+
+// PayloadReader is an agent whose hook payloads name their session in keys of their own;
+// the others' are read by hookrun.ReadPayloadSession.
+type PayloadReader interface {
+	PayloadSession(payload []byte) (hookrun.PayloadSession, bool)
+}

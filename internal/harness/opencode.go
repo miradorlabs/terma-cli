@@ -116,7 +116,7 @@ func (c OpenCode) Scope() Scope {
 
 // Detect runs `opencode --version`. A missing binary is not-found rather than an error.
 func (OpenCode) Detect(ctx context.Context) Detection {
-	return detectBinary(ctx, "opencode", semverRE)
+	return DetectBinary(ctx, "opencode", semverRE)
 }
 
 // opencodeConfigDir is where OpenCode keeps its global configuration and plugins:

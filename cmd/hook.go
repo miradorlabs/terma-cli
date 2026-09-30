@@ -90,7 +90,7 @@ func newHookCommand() *cobra.Command {
 				return nil
 			}
 			policy := hookPolicy()
-			if _, git := gitHookEvents[event]; !git && hookYields(user, policy, hookrun.ToolForEvent(event)) {
+			if _, git := gitHookEvents[event]; !git && hookYields(user, policy, registered.ToolForEvent(event)) {
 				return nil
 			}
 			cwd, err := os.Getwd()
@@ -121,7 +121,9 @@ func newHookCommand() *cobra.Command {
 			defer cancel()
 			_ = handler(ctx, env)
 			if !claimed {
-				claimed = hookrun.ClaimFromPayload(ctx, env, payload.Bytes(), hookrun.ToolForEvent(event))
+				if s, ok := registered.PayloadSession(event, payload.Bytes()); ok {
+					claimed = hookrun.ClaimFromPayload(ctx, env, s, registered.ToolForEvent(event))
+				}
 			}
 			if claimed {
 				spawnRelay()

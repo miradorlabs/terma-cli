@@ -8,6 +8,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
 )
 
 // codexFile is the shape terma writes and Codex parses: matcher groups, each holding
@@ -73,7 +75,7 @@ func TestCodexEntryHashMatchesCodexCommandHook(t *testing.T) {
 
 func TestCodexHooksMergeKeepsDescriptionAndUserGroups(t *testing.T) {
 	root := t.TempDir()
-	write(t, root, CodexHooksPath, `{
+	hookruntest.WriteFile(t, root, CodexHooksPath, `{
   "description": "team hooks",
   "hooks": {
     "PostToolUse": [{"matcher": "^shell$", "hooks": [{"type": "command", "command": "./audit.sh"}]}],
@@ -88,7 +90,7 @@ func TestCodexHooksMergeKeepsDescriptionAndUserGroups(t *testing.T) {
 	if err := Apply(root, plan); err != nil {
 		t.Fatal(err)
 	}
-	doc := parseCodex(t, read(t, root, CodexHooksPath))
+	doc := parseCodex(t, hookruntest.ReadFile(t, root, CodexHooksPath))
 
 	if doc.Description != "team hooks" {
 		t.Fatalf("description lost: %q", doc.Description)
@@ -161,7 +163,7 @@ func TestCodexHooksMergeKeepsDescriptionAndUserGroups(t *testing.T) {
 	if err := Apply(root, un); err != nil {
 		t.Fatal(err)
 	}
-	after := parseCodex(t, read(t, root, CodexHooksPath))
+	after := parseCodex(t, hookruntest.ReadFile(t, root, CodexHooksPath))
 	if after.Description != "team hooks" {
 		t.Fatalf("uninstall lost the description: %q", after.Description)
 	}
@@ -182,14 +184,14 @@ func TestCodexHooksCreateAndRemoveWholeFile(t *testing.T) {
 	if err := Apply(root, plan); err != nil {
 		t.Fatal(err)
 	}
-	doc := parseCodex(t, read(t, root, CodexHooksPath))
+	doc := parseCodex(t, hookruntest.ReadFile(t, root, CodexHooksPath))
 	if len(doc.Hooks) != len(CodexHooks) {
 		t.Fatalf("want %d events, got %d", len(CodexHooks), len(doc.Hooks))
 	}
 	// Codex parses this file with unknown fields denied, so a key it does not know
 	// would make it reject the whole thing.
 	var top map[string]json.RawMessage
-	if err := json.Unmarshal([]byte(read(t, root, CodexHooksPath)), &top); err != nil {
+	if err := json.Unmarshal([]byte(hookruntest.ReadFile(t, root, CodexHooksPath)), &top); err != nil {
 		t.Fatal(err)
 	}
 	for key := range top {
@@ -209,7 +211,7 @@ func TestCodexHooksCreateAndRemoveWholeFile(t *testing.T) {
 
 func TestCodexHooksRefuseMalformedFile(t *testing.T) {
 	root := t.TempDir()
-	write(t, root, CodexHooksPath, "{not json")
+	hookruntest.WriteFile(t, root, CodexHooksPath, "{not json")
 	if _, err := PlanCodexHooks(root, true); err == nil {
 		t.Fatal("want an error for a file this CLI cannot parse")
 	} else if !strings.Contains(err.Error(), CodexHooksPath) {
@@ -251,7 +253,7 @@ func TestCodexTermaEntriesFindsTermasAmongOthers(t *testing.T) {
 	if entries, err := CodexTermaEntries(root); err != nil || entries != nil {
 		t.Fatalf("a missing file: %v, %v", entries, err)
 	}
-	write(t, root, CodexHooksPath, `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"my-notifier"}]}]}}`)
+	hookruntest.WriteFile(t, root, CodexHooksPath, `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"my-notifier"}]}]}}`)
 	plan, err := PlanCodexHooks(root, true)
 	if err != nil {
 		t.Fatal(err)

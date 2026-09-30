@@ -62,3 +62,9 @@ func newTestRelay(o relay.Options) *relay.Relay {
 	o.Correlators, o.Capturers = registered.With[shape.Correlator](), registered.With[shape.Capturer]()
 	return relay.New(o)
 }
+
+// hooksPathOf is the hooks file the named agent commits.
+func hooksPathOf(name string) string {
+	a, _ := registered.Lookup(name)
+	return a.HooksPath()
+}

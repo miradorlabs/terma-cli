@@ -6,19 +6,15 @@ import (
 	"testing"
 )
 
-// A file that exists and cannot be read is not an absent file. Every planner used to
-// treat the two alike, so an unreadable hooks file was planned as a create and Apply
-// renamed terma-only content over whatever the developer had there. A directory at the
-// file's path fails to read on every platform, and for root too.
+// A file that exists and cannot be read is not an absent file: planned as a create, Apply
+// would rename terma-only content over whatever the developer had there. A directory at
+// the file's path fails to read on every platform. The agents' planners are held to the
+// same in internal/agents/builtin.
 func TestPlannersRefuseAFileTheyCannotRead(t *testing.T) {
 	planners := []struct {
 		path string
 		plan func(root string) (Plan, error)
 	}{
-		{ClaudeSettingsPath, func(root string) (Plan, error) { return PlanClaudeSettings(root, true) }},
-		{CodexHooksPath, func(root string) (Plan, error) { return PlanCodexHooks(root, true) }},
-		{CursorHooksPath, func(root string) (Plan, error) { return PlanCursorHooks(root, true) }},
-		{AntigravityHooksPath, func(root string) (Plan, error) { return PlanAntigravityHooks(root, true) }},
 		{"lefthook.yml", func(root string) (Plan, error) { return planLefthook(root, "lefthook.yml", true) }},
 		{".pre-commit-config.yaml", func(root string) (Plan, error) { return planPreCommit(root, true) }},
 		{".husky/post-commit", func(root string) (Plan, error) { return planHusky(root, true) }},

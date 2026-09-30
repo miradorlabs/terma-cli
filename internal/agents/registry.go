@@ -3,6 +3,8 @@ package agents
 import (
 	"maps"
 	"slices"
+
+	"github.com/miradorlabs/terma-cli/internal/hookrun"
 )
 
 // Registry is the agents a build knows, in the order install plans them, and which of
@@ -121,6 +123,29 @@ func (r *Registry) ForTool(label string) (Agent, bool) {
 		}
 	}
 	return nil, false
+}
+
+// ToolForEvent is the label of the agent whose hooks run event, or "" for a git hook.
+func (r *Registry) ToolForEvent(event string) string {
+	for _, a := range r.all {
+		if _, ok := a.Events()[event]; ok {
+			return Tool(a)
+		}
+	}
+	return ""
+}
+
+// PayloadSession is what the payload of a hook for event says about its session, read
+// the way the agent that owns event writes it.
+func (r *Registry) PayloadSession(event string, payload []byte) (hookrun.PayloadSession, bool) {
+	for _, a := range r.all {
+		if _, ok := a.Events()[event]; ok {
+			if pr, ok := a.(PayloadReader); ok {
+				return pr.PayloadSession(payload)
+			}
+		}
+	}
+	return hookrun.ReadPayloadSession(payload)
 }
 
 // NameForTool is the name of the agent whose hooks carry label, or label itself.

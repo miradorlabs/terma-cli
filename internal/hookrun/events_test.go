@@ -53,18 +53,16 @@ func TestWireNamesAreFrozen(t *testing.T) {
 		AttrHookEvent:      "hook_event",
 
 		sourceCursorHook:        "cursor_hook",
-		sourceAntigravityHook:   "antigravity_hook",
 		sourceCodexRollout:      "codex_rollout",
 		sourceCodexSessionIndex: "codex_session_index",
 		StatusPresent:           "present",
 		StatusUnavailable:       "unavailable",
 		UnknownValue:            "unknown",
 
-		claudeTool:      "claude-code",
-		codexTool:       "codex",
-		opencodeTool:    "opencode",
-		cursorTool:      "cursor",
-		antigravityTool: "antigravity",
+		claudeTool:   "claude-code",
+		codexTool:    "codex",
+		opencodeTool: "opencode",
+		cursorTool:   "cursor",
 	} {
 		if got != want {
 			t.Errorf("wire name %q changed; it must stay %q", got, want)

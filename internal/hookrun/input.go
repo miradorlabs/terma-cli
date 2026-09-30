@@ -8,10 +8,10 @@ import (
 	"math"
 )
 
-// maxHookInput bounds the payload a harness writes to a hook's stdin. Real payloads are
+// MaxInput bounds the payload a harness writes to a hook's stdin. Real payloads are
 // a few kilobytes; the bound is there so a runaway writer cannot make a hook hold the
 // agent up.
-const maxHookInput = 4 << 20
+const MaxInput = 4 << 20
 
 // ReadInput decodes one harness payload into T. It reads one byte past the bound so
 // an oversized payload is refused by name: a payload cut at the bound would fail to
@@ -20,11 +20,11 @@ func ReadInput[T any](r io.Reader) (*T, error) {
 	if r == nil {
 		return nil, errors.New("no hook input")
 	}
-	data, err := io.ReadAll(io.LimitReader(r, maxHookInput+1))
+	data, err := io.ReadAll(io.LimitReader(r, MaxInput+1))
 	if err != nil {
 		return nil, err
 	}
-	if len(data) > maxHookInput {
+	if len(data) > MaxInput {
 		return nil, errors.New("hook input too large")
 	}
 	var in T

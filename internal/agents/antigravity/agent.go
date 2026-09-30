@@ -3,9 +3,9 @@ package antigravity
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
-	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/hookrun"
 )
@@ -19,20 +19,20 @@ type Agent struct{}
 func (Agent) Name() string        { return "antigravity" }
 func (Agent) DisplayName() string { return "Antigravity" }
 func (Agent) Installed(ctx context.Context) bool {
-	return harness.Antigravity{}.Detect(ctx).Found
+	return detect(ctx).Found
 }
-func (Agent) HooksPath() string        { return hookmgr.AntigravityHooksPath }
-func (Agent) Default(root string) bool { return hookmgr.HasAntigravity(root) }
+func (Agent) HooksPath() string        { return hooksPath }
+func (Agent) Default(root string) bool { return hasConfig(root) }
 func (Agent) Plan(root string, install bool) (hookmgr.Plan, error) {
-	return hookmgr.PlanAntigravityHooks(root, install)
+	return planHooks(root, install)
 }
 
 func (Agent) Events() map[string]agents.Handler {
 	return map[string]agents.Handler{
-		"antigravity-pre-invocation":  hookrun.AntigravityPreInvocation,
-		"antigravity-post-tool-use":   hookrun.AntigravityPostToolUse,
-		"antigravity-post-invocation": hookrun.AntigravityPostInvocation,
-		"antigravity-stop":            hookrun.AntigravityStop,
+		"antigravity-pre-invocation":  preInvocation,
+		"antigravity-post-tool-use":   postToolUse,
+		"antigravity-post-invocation": postInvocation,
+		"antigravity-stop":            stop,
 	}
 }
 
@@ -44,13 +44,13 @@ func (Agent) FlushAfter() []string { return []string{"antigravity-stop"} }
 // — a switch `terma install` deliberately preserves. Either way the committed file is
 // inert and nothing says so.
 func (a Agent) Trust(root string) (agents.TrustState, error) {
-	if !hookmgr.AntigravityHooksEnabled(root) {
+	if !hooksEnabled(root) {
 		return agents.TrustState{
 			Detail: `, but terma's entry is switched off ("enabled": false), so agy runs none of them`,
 			Fix:    "remove \"enabled\": false from the terma entry in " + a.HooksPath(),
 		}, nil
 	}
-	trusted, err := (harness.Antigravity{}).TrustsWorkspace(root)
+	trusted, err := trustsWorkspace(root)
 	if err != nil {
 		return agents.TrustState{}, err
 	}
@@ -63,7 +63,25 @@ func (a Agent) Trust(root string) (agents.TrustState, error) {
 	return agents.TrustState{Trusted: true, Detail: " and the workspace is trusted"}, nil
 }
 
+// PayloadSession reads agy's protojson payload: the conversation, and the workspace it
+// runs in (the hook's own directory is <repo>/.agents).
+func (Agent) PayloadSession(payload []byte) (hookrun.PayloadSession, bool) {
+	var in struct {
+		ConversationID string   `json:"conversationId"`
+		WorkspacePaths []string `json:"workspacePaths"`
+	}
+	if json.Unmarshal(payload, &in) != nil || in.ConversationID == "" {
+		return hookrun.PayloadSession{}, false
+	}
+	s := hookrun.PayloadSession{ID: in.ConversationID}
+	if len(in.WorkspacePaths) > 0 {
+		s.Cwd = in.WorkspacePaths[0]
+	}
+	return s, true
+}
+
 var (
-	_ agents.Agent    = Agent{}
-	_ agents.Trusting = Agent{}
+	_ agents.Agent         = Agent{}
+	_ agents.PayloadReader = Agent{}
+	_ agents.Trusting      = Agent{}
 )

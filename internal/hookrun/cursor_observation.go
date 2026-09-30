@@ -119,7 +119,7 @@ func cursorObservationAttrs(in *cursorHookInput, hook string) map[string]any {
 // by earlier versions keeps its sequence.
 func (e Env) captureCursorObservation(ctx context.Context, r *Repo, in *cursorHookInput, hook string) {
 	e.CaptureObservation(ctx, r, Observation{
-		tool: cursorTool, source: sourceCursorHook, stateDir: cursorObservationDir,
-		sessionID: in.id(), hook: hook, turnID: in.GenerationID, attrs: cursorObservationAttrs(in, hook),
+		Tool: cursorTool, Source: sourceCursorHook, StateDir: cursorObservationDir,
+		SessionID: in.id(), Hook: hook, TurnID: in.GenerationID, Attrs: cursorObservationAttrs(in, hook),
 	})
 }
