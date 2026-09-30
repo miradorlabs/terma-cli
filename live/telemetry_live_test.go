@@ -91,7 +91,6 @@ func TestCodexTelemetry(t *testing.T) {
 	})
 }
 
-
 func writeCodexResponse(w http.ResponseWriter, call int32, item map[string]any) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	emit := func(name string, payload map[string]any) {
