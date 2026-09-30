@@ -15,6 +15,7 @@ import (
 // exports before its first hook (Codex's conversation_starts, a Desktop thread's start)
 // and what it exports while no hook has started one. macOS lists the service under
 // Login Items, and says so once when it is added: the cost the developer pays for it.
+// On Windows it is the per-user Run key and `terma relay supervise`.
 // `terma install --relay-service off` (or `terma relay daemon remove`) opts out, and the
 // choice is remembered (relay/no-service) until `--relay-service on` or `terma relay
 // daemon install`; without the service, hooks start the relay on demand, as before.
@@ -50,12 +51,7 @@ func relayServiceWanted(flag string) bool {
 	if exe, err := os.Executable(); err != nil || strings.HasSuffix(filepath.Base(exe), ".test") {
 		return false
 	}
-	name, err := relayServiceName()
-	if err != nil {
-		return false
-	}
-	_, err = relayServicePath(name)
-	return err == nil
+	return relayServiceSupported()
 }
 
 // ensureRelay leaves a relay running for the agents install just pointed at it: the

@@ -35,8 +35,9 @@ const (
 // release. It waits until the lock is free or ctx is done, so a caller that must not
 // hang — a hook — bounds the wait with a deadline.
 //
-// Where the platform has no flock, Lock succeeds without excluding anyone: concurrent
-// hooks there are rare, and the atomic rename still keeps each file whole.
+// Unix locks with flock, Windows with LockFileEx. Where the platform has neither, Lock
+// succeeds without excluding anyone: concurrent hooks there are rare, and the atomic
+// rename still keeps each file whole.
 func Lock(ctx context.Context, path string) (unlock func(), err error) {
 	return lock(ctx, path)
 }

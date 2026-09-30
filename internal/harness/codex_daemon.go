@@ -2,10 +2,8 @@ package harness
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
-	"syscall"
 	"time"
 )
 
@@ -41,8 +39,7 @@ func RunningCodexDaemon() (CodexDaemon, bool) {
 	if json.Unmarshal(data, &rec) != nil || rec.PID <= 1 || rec.Identity.StartSeconds <= 0 {
 		return CodexDaemon{}, false
 	}
-	// Signal 0 checks the process exists; EPERM means it does, under another user.
-	if err := syscall.Kill(rec.PID, 0); err != nil && !errors.Is(err, syscall.EPERM) {
+	if !processAlive(rec.PID) {
 		return CodexDaemon{}, false
 	}
 	return CodexDaemon{PID: rec.PID, Started: time.Unix(rec.Identity.StartSeconds, 0)}, true

@@ -20,14 +20,15 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
-// The relay as a per-user service: launchd on macOS, systemd --user on Linux. `terma
-// install` sets it up by default (relayServiceWanted). Without it hooks start a relay on
-// demand, which cannot close two gaps: what an agent exports before its first hook
-// (Codex's conversation_starts) when no relay runs, and anything exported while none
-// does. The service runs `terma relay run --idle 0` and is restarted by the service
-// manager when it exits nonzero — a crash, or ExitRestart when the relay steps aside for
-// a replaced binary, so an update takes effect without anyone restarting it. A relay
-// that exits 0 found its setup gone (terma uninstalled) and stays stopped.
+// The relay as a per-user service: launchd on macOS, systemd --user on Linux, and on
+// Windows the per-user Run key starting `terma relay supervise` (relay_supervise.go).
+// `terma install` sets it up by default (relayServiceWanted). Without it hooks start a
+// relay on demand, which cannot close two gaps: what an agent exports before its first
+// hook (Codex's conversation_starts) when no relay runs, and anything exported while
+// none does. The service runs `terma relay run --idle 0` and is restarted when it exits
+// nonzero — a crash, or ExitRestart when the relay steps aside for a replaced binary, so
+// an update takes effect without anyone restarting it. A relay that exits 0 found its
+// setup gone (terma uninstalled) and stays stopped.
 
 // relayServiceName is the service's label: one per config directory, so a relay for a
 // sandboxed config (tests, a second profile directory) never collides with the real one.
@@ -59,7 +60,7 @@ func defaultConfigDir() (string, error) {
 // environment, nothing else of the caller's.
 func serviceEnv() map[string]string {
 	env := map[string]string{}
-	for _, k := range []string{"TERMA_CONFIG_DIR", "TERMA_ENV", "XDG_CONFIG_HOME", "HOME", "TERMA_RELAY_HOLD"} {
+	for _, k := range []string{"TERMA_CONFIG_DIR", "TERMA_ENV", "XDG_CONFIG_HOME", "HOME", "USERPROFILE", "TERMA_RELAY_HOLD"} {
 		if v := os.Getenv(k); v != "" {
 			env[k] = v
 		}
@@ -120,6 +121,23 @@ func systemdUnit(exe string, env map[string]string) string {
 	return b.String()
 }
 
+// windowsLauncher is the script the Run key starts at logon: wscript runs it with no
+// window, and it starts `terma relay supervise` hidden (window style 0), not waiting —
+// terma.exe is a console program, and started from the Run key directly it would open
+// a console window at every logon. VBScript doubles a quote inside a string.
+func windowsLauncher(exe string, env map[string]string) string {
+	q := func(s string) string { return `"` + strings.ReplaceAll(s, `"`, `""`) + `"` }
+	var b strings.Builder
+	b.WriteString("' terma's relay at logon: written by `terma relay daemon install`, removed by `terma relay daemon remove`.\r\n")
+	b.WriteString("Set shell = CreateObject(\"WScript.Shell\")\r\n")
+	b.WriteString("Set env = shell.Environment(\"Process\")\r\n")
+	for _, k := range sortedKeys(env) {
+		b.WriteString("env(" + q(k) + ") = " + q(env[k]) + "\r\n")
+	}
+	b.WriteString("shell.Run " + q(`"`+exe+`" relay supervise`) + ", 0, False\r\n")
+	return b.String()
+}
+
 func sortedKeys(m map[string]string) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
@@ -150,8 +168,25 @@ func relayServicePath(name string) (string, error) {
 			base = filepath.Join(home, ".config")
 		}
 		return filepath.Join(base, "systemd", "user", name+".service"), nil
+	case "windows":
+		// The launcher the Run key starts at logon (relay_daemon_windows.go).
+		dir, err := relayDir()
+		if err != nil {
+			return "", err
+		}
+		return filepath.Join(dir, name+".vbs"), nil
 	}
 	return "", fmt.Errorf("a relay service is not supported on %s; hooks start the relay on demand", runtime.GOOS)
+}
+
+// relayServiceSupported reports whether this platform can run the relay as a per-user
+// service: launchd, systemd --user, or Windows's Run key with a supervisor.
+func relayServiceSupported() bool {
+	switch runtime.GOOS {
+	case "darwin", "linux", "windows":
+		return true
+	}
+	return false
 }
 
 func runService(ctx context.Context, name string, args ...string) (string, error) {
@@ -169,6 +204,9 @@ func launchdDomains() []string {
 }
 
 func installRelayService(ctx context.Context) (string, error) {
+	if !relayServiceSupported() {
+		return "", fmt.Errorf("a relay service is not supported on %s; hooks start the relay on demand", runtime.GOOS)
+	}
 	name, err := relayServiceName()
 	if err != nil {
 		return "", err
@@ -220,6 +258,11 @@ func installRelayService(ctx context.Context) (string, error) {
 			return "", fmt.Errorf("systemctl --user enable: %w: %s", err, out)
 		}
 		return path, nil
+	case "windows":
+		if err := installWindowsService(ctx, name, path, exe, dir); err != nil {
+			return "", err
+		}
+		return path, nil
 	}
 	return "", errors.New("unsupported")
 }
@@ -243,6 +286,8 @@ func removeRelayService(ctx context.Context) (bool, error) {
 		}
 	case "linux":
 		_, _ = runService(ctx, "systemctl", "--user", "disable", "--now", name+".service")
+	case "windows":
+		return true, removeWindowsService(ctx, name, path)
 	}
 	if err := os.Remove(path); err != nil {
 		return false, err
@@ -271,7 +316,7 @@ func relayServiceInstalled() (string, bool) {
 func newRelayDaemonCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "daemon",
-		Short: "Run the relay as a per-user service (launchd, systemd --user)",
+		Short: "Run the relay as a per-user service (launchd, systemd --user, Windows's Run key)",
 	}
 	cmd.AddCommand(&cobra.Command{
 		Use:   "install",

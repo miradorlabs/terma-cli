@@ -15,7 +15,7 @@ func IsRelease(version string) bool {
 	if parts == nil || describeVersion.MatchString(version) || strings.Contains(version, "-next") || strings.HasSuffix(version, "-dirty") {
 		return false
 	}
-	for _, part := range strings.Split(parts[4], ".") {
+	for part := range strings.SplitSeq(parts[4], ".") {
 		if numericIdentifier(part) && len(part) > 1 && part[0] == '0' {
 			return false
 		}

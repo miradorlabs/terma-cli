@@ -31,19 +31,15 @@ func Ancestors() []int {
 }
 
 // FindSender returns the process holding the client end of a loopback connection
-// that arrived from port, looking at every process this user may inspect (others
-// refuse, and are skipped): about 3 ms over 900 processes on macOS. The relay runs it
-// once per connection, when the connection's first export arrives — while the socket
-// still exists, so a record held for a claim that comes later keeps its sender.
+// that arrived from port, from the kernel, never a subprocess: on macOS and Linux by
+// looking at every process this user may inspect (others refuse, and are skipped),
+// about 3 ms over 900 processes on macOS; on Windows from the TCP table, which names
+// each connection's owner. The relay runs it once per connection, when the
+// connection's first export arrives — while the socket still exists, so a record held
+// for a claim that comes later keeps its sender.
 func FindSender(port int) (pid int, ok bool) {
 	if !Supported {
 		return 0, false
 	}
-	self := os.Getpid()
-	for _, p := range allPIDs() {
-		if p != self && ownsPort(p, port) {
-			return p, true
-		}
-	}
-	return 0, false
+	return findSender(port, os.Getpid())
 }

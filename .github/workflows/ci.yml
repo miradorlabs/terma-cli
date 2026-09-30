@@ -54,6 +54,25 @@ jobs:
       - name: Hook latency budget
         run: make bench-hook
 
+  # What has a Windows implementation of its own — LockFileEx, the relay's sender from the
+  # TCP table and parents from a process snapshot, the Run-key service and its
+  # supervisor, the stop file, the zip archive and the rename-aside swap — and no other
+  # job runs. Also vets the whole module for Windows, so nothing Unix-only creeps back in.
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go vet ./...
+      - name: Relay, locking, process lookups and updater on Windows
+        run: go test ./internal/relay/... ./internal/flock/... ./internal/procinfo/... ./internal/selfupdate/... -count=1 -timeout=5m
+      - name: The relay's Windows service and supervisor
+        run: go test ./cmd/ -count=1 -timeout=5m -run "TestSupervise|TestStopFile|TestRelayServiceDefinitions"
+
   # The live suite is a separate module; its offline contracts must run in CI too.
   live-contracts:
     runs-on: ubuntu-latest

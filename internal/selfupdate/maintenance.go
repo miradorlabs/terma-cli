@@ -44,7 +44,7 @@ type Cache struct {
 	Failed    bool      `json:"failed,omitempty"`
 	Latest    string    `json:"latest"`
 	Current   string    `json:"current,omitempty"`
-	AttemptAt time.Time `json:"attempt_at,omitempty"`
+	AttemptAt time.Time `json:"attempt_at"`
 }
 
 const cacheFile = "update-check.json"

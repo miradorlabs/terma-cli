@@ -1,10 +1,10 @@
 package procinfo
 
 import (
+	"io"
 	"net"
 	"os"
 	"os/exec"
-	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -12,7 +12,7 @@ import (
 )
 
 func TestAncestorsStartAtTheParent(t *testing.T) {
-	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
+	if !Supported {
 		t.Skip("unsupported")
 	}
 	got := Ancestors()
@@ -26,20 +26,19 @@ func TestAncestorsStartAtTheParent(t *testing.T) {
 
 // A child process connects to a listener here; FindSender names the child — not this
 // process, which holds the server end of the same connection. This is also what pins
-// the proc_info layout on macOS against a real socket.
+// the proc_info layout on macOS, and the TCP table's on Windows, against a real socket.
+// The child is this test binary (TestMain), so no platform needs a netcat.
 func TestFindSenderNamesTheConnectingProcess(t *testing.T) {
 	if !Supported {
 		t.Skip("unsupported")
-	}
-	if _, err := exec.LookPath("/usr/bin/nc"); err != nil {
-		t.Skip("nc not installed")
 	}
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = ln.Close() }()
-	child := exec.Command("/usr/bin/nc", "127.0.0.1", strconv.Itoa(ln.Addr().(*net.TCPAddr).Port))
+	child := exec.Command(os.Args[0], "-test.run=^$")
+	child.Env = append(os.Environ(), connectEnv+"="+ln.Addr().String())
 	stdin, _ := child.StdinPipe()
 	if err := child.Start(); err != nil {
 		t.Fatal(err)
@@ -55,6 +54,23 @@ func TestFindSenderNamesTheConnectingProcess(t *testing.T) {
 	if pid, ok := FindSender(port); !ok || pid != child.Process.Pid {
 		t.Fatalf("FindSender(%d) = %d, %v; want the child %d", port, pid, ok, child.Process.Pid)
 	}
+}
+
+// connectEnv makes the test binary the connecting child: it dials the address and
+// holds the connection until its stdin closes.
+const connectEnv = "PROCINFO_TEST_CONNECT"
+
+func TestMain(m *testing.M) {
+	if addr := os.Getenv(connectEnv); addr != "" {
+		conn, err := net.Dial("tcp", addr)
+		if err != nil {
+			os.Exit(2)
+		}
+		_, _ = io.Copy(io.Discard, os.Stdin)
+		_ = conn.Close()
+		os.Exit(0)
+	}
+	os.Exit(m.Run())
 }
 
 func BenchmarkFindSender(b *testing.B) {
