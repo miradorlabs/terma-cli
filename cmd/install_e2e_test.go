@@ -175,7 +175,7 @@ func TestInstallE2ELocations(t *testing.T) {
 			if err != nil || bound.Project.ID != testProjectID {
 				t.Fatalf("binding: %+v %v", bound, err)
 			}
-			for _, path := range []string{hookmgr.ClaudeSettingsPath, hookmgr.CursorHooksPath, hookmgr.CodexHooksPath, hooksPathOf("antigravity")} {
+			for _, path := range []string{hookmgr.ClaudeSettingsPath, hooksPathOf("cursor"), hookmgr.CodexHooksPath, hooksPathOf("antigravity")} {
 				if !bytes.Contains(readInstallFile(t, root, path), []byte("terma hook")) {
 					t.Fatalf("missing hooks in %s", path)
 				}
@@ -213,7 +213,7 @@ func TestInstallE2ELocations(t *testing.T) {
 			for _, path := range []string{hookmgr.ClaudeSettingsPath, hookmgr.CodexHooksPath, hooksPathOf("antigravity"), hookmgr.ShimDir + "/post-commit"} {
 				requireAbsent(t, filepath.Join(root, path))
 			}
-			if bytes.Contains(readInstallFile(t, root, hookmgr.CursorHooksPath), []byte("terma hook")) {
+			if bytes.Contains(readInstallFile(t, root, hooksPathOf("cursor")), []byte("terma hook")) {
 				t.Fatal("Cursor commands survived")
 			}
 			if out := s.cli(root, "uninstall", "--yes"); !strings.Contains(out, "Nothing") {
@@ -323,7 +323,7 @@ func TestInstallE2ERejectsBrokenInputsWithoutWrites(t *testing.T) {
 			if kind != "broken_binding" {
 				requireAbsent(t, termaproject.Path(root))
 			}
-			requireAbsent(t, filepath.Join(root, hookmgr.CursorHooksPath))
+			requireAbsent(t, filepath.Join(root, hooksPathOf("cursor")))
 		})
 	}
 }
@@ -404,7 +404,7 @@ func TestInstallE2EMixedHooksAndLookalikes(t *testing.T) {
 	owned, _ := json.Marshal(hookmgr.HookCommand("post-tool-use"))
 	body := `{"hooks":{"PostToolUse":[{"matcher":"Write","hooks":[{"type":"command","command":` + string(owned) + `},{"type":"command","command":"./audit.sh"},{"type":"command","command":"echo 'terma hook post-tool-use'"}]}]}}`
 	s.write(root, hookmgr.ClaudeSettingsPath, body)
-	s.write(root, hookmgr.CursorHooksPath, `{"version":42}`)
+	s.write(root, hooksPathOf("cursor"), `{"version":42}`)
 	s.install(root)
 	got := string(readInstallFile(t, root, hookmgr.ClaudeSettingsPath))
 	if !strings.Contains(got, "./audit.sh") || !strings.Contains(got, "echo 'terma hook post-tool-use'") {
@@ -424,7 +424,7 @@ func TestInstallE2EMixedHooksAndLookalikes(t *testing.T) {
 	if len(doc.Hooks["PostToolUse"]) != 1 || len(doc.Hooks["PostToolUse"][0].Hooks) != 2 {
 		t.Fatalf("owned command survived or user group changed: %s", got)
 	}
-	if !strings.Contains(string(readInstallFile(t, root, hookmgr.CursorHooksPath)), "42") {
+	if !strings.Contains(string(readInstallFile(t, root, hooksPathOf("cursor"))), "42") {
 		t.Fatal("user schema version removed")
 	}
 }

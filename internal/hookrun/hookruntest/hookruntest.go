@@ -7,9 +7,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
+	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -65,9 +67,68 @@ func Spooled(t *testing.T, sp *spool.Spool) []spool.Event {
 	res := sp.Flush(context.Background(), spool.SenderFunc(func(_ context.Context, events []spool.Event) ([]spool.Event, error) {
 		out = append(out, events...)
 		return nil, nil
-	}), spool.FlushOptions{})
+	}), spool.FlushOptions{Force: true})
 	if res.Err != nil {
 		t.Fatalf("flush: %v", res.Err)
 	}
 	return out
+}
+
+// Project is a repository bound to project-a and a private spool for its hooks.
+func Project(t *testing.T) (root string, sp *spool.Spool) {
+	t.Helper()
+	root = InitRepo(t)
+	WriteFile(t, root, ".terma/settings.json", `{"project":{"id":"project-a"}}`)
+	sp, err := spool.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return root, sp
+}
+
+// Named is the events called name, in order.
+func Named(events []spool.Event, name string) []spool.Event {
+	var out []spool.Event
+	for _, e := range events {
+		if e.Name == name {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// Num reads a spooled number back: JSON has one numeric type, so every count and
+// duration comes out of the queue as float64 whatever the hook put in.
+func Num(v any) float64 {
+	f, _ := v.(float64)
+	return f
+}
+
+// Names is the events' names, space-separated, for a failure message.
+func Names(events []spool.Event) string {
+	var n []string
+	for _, e := range events {
+		n = append(n, e.Name)
+	}
+	return strings.Join(n, " ")
+}
+
+// Lifecycle drops the funding and observation events hooks spool alongside a session's
+// lifecycle: account snapshots, quota and capture progress, observations.
+func Lifecycle(events []spool.Event) []spool.Event {
+	var out []spool.Event
+	for _, e := range events {
+		switch e.Name {
+		case "terma.session.account", "terma.session.quota", "terma.session.observation", "terma.session.capture":
+			continue
+		}
+		out = append(out, e)
+	}
+	return out
+}
+
+// Store is the session store of the repository at root.
+func Store(t *testing.T, root string) *session.Store {
+	t.Helper()
+	return session.Open(filepath.Join(root, ".git"))
 }

@@ -28,9 +28,6 @@ const (
 	// codexTitleStateDir is when each Codex thread's name that was last spooled was written.
 	codexTitleStateDir = "codex-titles"
 	codexToolStartDir  = "codex-tool-starts"
-	// cursorObservationDir is Cursor's observation checkpoint, per agent so one agent's
-	// stream survives another's arrival.
-	cursorObservationDir = "cursor-observations"
 	// claudeSubagentDir holds launch evidence per (session, agent), so internal
 	// Claude forks' orphan stop hooks cannot create delegated runs.
 	claudeSubagentDir = "claude-subagents"

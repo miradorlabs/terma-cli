@@ -14,50 +14,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/trailer"
 )
 
-// drain delivers everything in the spool to a recorder and returns it in order.
-func drain(t *testing.T, sp *spool.Spool) []spool.Event {
-	t.Helper()
-	var out []spool.Event
-	res := sp.Flush(context.Background(), spool.SenderFunc(func(_ context.Context, events []spool.Event) ([]spool.Event, error) {
-		out = append(out, events...)
-		return nil, nil
-	}), spool.FlushOptions{})
-	if res.Err != nil {
-		t.Fatal(res.Err)
-	}
-	return out
-}
-
-// num reads a spooled number back: JSON has one numeric type, so every count and
-// duration comes out of the queue as float64 whatever the hook put in.
-func num(v any) float64 {
-	f, _ := v.(float64)
-	return f
-}
-
-func names(events []spool.Event) string {
-	var n []string
-	for _, e := range events {
-		n = append(n, e.Name)
-	}
-	return strings.Join(n, " ")
-}
-
-// lifecycle drops the funding and observation side effects other hooks spool alongside
-// (account snapshots, quota capture progress, Cursor observations), which are not what
-// these tests are about.
-func lifecycle(events []spool.Event) []spool.Event {
-	var out []spool.Event
-	for _, e := range events {
-		switch e.Name {
-		case EventSessionAccount, EventSessionQuota, EventSessionObservation, "terma.session.capture":
-			continue
-		}
-		out = append(out, e)
-	}
-	return out
-}
-
 // A Claude Code subagent is a facet of the parent session: the same session_id on
 // every event, the agent named on its start, its edits and its end.
 func TestClaudeSubagentIsAFacetOfTheParentSession(t *testing.T) {
@@ -85,8 +41,8 @@ func TestClaudeSubagentIsAFacetOfTheParentSession(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	events := drain(t, sp)
-	if got := names(events); got != "terma.subagent.start terma.files.touched terma.subagent.end" {
+	events := hookruntest.Spooled(t, sp)
+	if got := hookruntest.Names(events); got != "terma.subagent.start terma.files.touched terma.subagent.end" {
 		t.Fatalf("events: %s", got)
 	}
 	for _, e := range events {
@@ -165,11 +121,11 @@ func TestCodexSubagentHooksAndSpawnedThreadParent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	events := lifecycle(drain(t, sp))
-	if got := names(events); got != "terma.session.start terma.session.start terma.subagent.start terma.files.touched terma.subagent.end" {
+	events := hookruntest.Lifecycle(hookruntest.Spooled(t, sp))
+	if got := hookruntest.Names(events); got != "terma.session.start terma.session.start terma.subagent.start terma.files.touched terma.subagent.end" {
 		t.Fatalf("events: %s", got)
 	}
-	if events[0].SessionID != child || events[0].Attrs["parent_session_id"] != parent || num(events[0].Attrs["agent_depth"]) != 1 || events[0].Attrs["agent_nickname"] != "Boyle" || events[0].Attrs["agent_path"] != "/root/architect" {
+	if events[0].SessionID != child || events[0].Attrs["parent_session_id"] != parent || hookruntest.Num(events[0].Attrs["agent_depth"]) != 1 || events[0].Attrs["agent_nickname"] != "Boyle" || events[0].Attrs["agent_path"] != "/root/architect" {
 		t.Fatalf("spawned thread start: %v", events[0].Attrs)
 	}
 	if _, ok := events[1].Attrs["parent_session_id"]; ok {
@@ -185,63 +141,6 @@ func TestCodexSubagentHooksAndSpawnedThreadParent(t *testing.T) {
 	}
 	if events[2].Attrs["turn_id"] != "turn_3" || events[2].Attrs["model"] != "gpt-6" || events[3].Attrs["files"] != "src/a.go" {
 		t.Fatalf("attrs: %v / %v", events[2].Attrs, events[3].Attrs)
-	}
-}
-
-// Cursor reports a finished subagent under the parent conversation, with the files it
-// modified joining that conversation's manifest.
-func TestCursorSubagentStopRecordsOutcomeAndFiles(t *testing.T) {
-	root := initRepo(t)
-	ctx := context.Background()
-	sp, _ := spool.Open(t.TempDir())
-	elsewhere := t.TempDir()
-	env := func(stdin string) Env {
-		return Env{Now: time.Now(), Cwd: elsewhere, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
-	}
-	common := `"conversation_id":"conv_9a1","model":"claude-opus-5","workspace_roots":["` + root + `"]`
-	if err := CursorSessionStart(ctx, env(`{`+common+`,"hook_event_name":"sessionStart"}`)); err != nil {
-		t.Fatal(err)
-	}
-	hookruntest.WriteFile(t, root, "src/a.go", "package src\n")
-	hookruntest.WriteFile(t, root, "src/b.go", "package src\n")
-	stop := `{` + common + `,"hook_event_name":"subagentStop","subagent_type":"explorer","status":"completed","task":"look around","summary":"done","duration_ms":4200,"message_count":6,"tool_call_count":3,"loop_count":0,"modified_files":["` + filepath.Join(root, "src", "a.go") + `","src/b.go","/elsewhere/c.go"],"agent_transcript_path":"/nope"}`
-	if err := CursorSubagentStop(ctx, env(stop)); err != nil {
-		t.Fatal(err)
-	}
-	if err := CursorSubagentStop(ctx, env(`{`+common+`,"hook_event_name":"subagentStop","subagent_type":"worker","status":"weird","modified_files":[]}`)); err != nil {
-		t.Fatal(err)
-	}
-
-	events := lifecycle(drain(t, sp))
-	if got := names(events); got != "terma.session.start terma.files.touched terma.subagent.end terma.subagent.end" {
-		t.Fatalf("events: %s", got)
-	}
-	touched, end, bare := events[1], events[2], events[3]
-	if touched.SessionID != "conv_9a1" || touched.Attrs["files"] != "src/a.go,src/b.go" || num(touched.Attrs["file_count"]) != 2 || touched.Attrs["tool_name"] != "subagentStop" || touched.Attrs["agent_type"] != "explorer" {
-		t.Fatalf("touched: %v", touched.Attrs)
-	}
-	if end.Attrs["agent_type"] != "explorer" || end.Attrs["status"] != "completed" || num(end.Attrs["duration_ms"]) != 4200 || num(end.Attrs["message_count"]) != 6 || num(end.Attrs["tool_call_count"]) != 3 || end.Attrs["loop_count"] != 0.0 || num(end.Attrs["file_count"]) != 2 {
-		t.Fatalf("end: %v", end.Attrs)
-	}
-	for _, k := range []string{"task", "summary", "agent_transcript_path", "files"} {
-		if _, ok := end.Attrs[k]; ok {
-			t.Fatalf("end carries %s", k)
-		}
-	}
-	if bare.Attrs["status"] != "unknown" || bare.Attrs["file_count"] != 0.0 {
-		t.Fatalf("bare end: %v", bare.Attrs)
-	}
-
-	if _, err := gitx.Git(ctx, root, "add", "src"); err != nil {
-		t.Fatal(err)
-	}
-	msgPath := filepath.Join(t.TempDir(), "COMMIT_EDITMSG")
-	_ = os.WriteFile(msgPath, []byte("subagent work\n"), 0o644)
-	if err := PrepareCommitMsg(ctx, Env{Now: time.Now(), Cwd: root, Args: []string{msgPath, "message"}, Stdin: strings.NewReader(""), Spool: sp}); err != nil {
-		t.Fatal(err)
-	}
-	if data, _ := os.ReadFile(msgPath); !strings.Contains(string(data), "Agent-Session-Id: conv_9a1") {
-		t.Fatalf("the subagent's files did not stamp the conversation's commit:\n%s", data)
 	}
 }
 
@@ -262,7 +161,7 @@ func TestOpenCodeChildSessionNamesItsParent(t *testing.T) {
 	if err := OpenCodeSessionStart(ctx, env(`{"session_id":"ses_odd","cwd":"`+root+`","parent_session_id":"../etc"}`)); err != nil {
 		t.Fatal(err)
 	}
-	events := drain(t, sp)
+	events := hookruntest.Spooled(t, sp)
 	if len(events) != 3 || events[0].Attrs["parent_session_id"] != "ses_parent" {
 		t.Fatalf("events: %+v", events)
 	}
@@ -313,7 +212,7 @@ func TestCodexSpawnedThreadArrivesThroughSubagentStart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	all := drain(t, sp)
+	all := hookruntest.Spooled(t, sp)
 	var start *spool.Event
 	var quotas []spool.Event
 	for i, e := range all {
@@ -327,10 +226,10 @@ func TestCodexSpawnedThreadArrivesThroughSubagentStart(t *testing.T) {
 		}
 	}
 	if start == nil {
-		t.Fatalf("no %s in %s", EventSubagentStart, names(all))
+		t.Fatalf("no %s in %s", EventSubagentStart, hookruntest.Names(all))
 	}
 	if start.SessionID != rootThread || start.Attrs[AttrAgentID] != child || start.Attrs["rollout_status"] != StatusPresent ||
-		start.Attrs[AttrAgentParentID] != rootThread || num(start.Attrs["agent_depth"]) != 1 ||
+		start.Attrs[AttrAgentParentID] != rootThread || hookruntest.Num(start.Attrs["agent_depth"]) != 1 ||
 		start.Attrs["agent_nickname"] != "Holt" || start.Attrs["agent_path"] != "/root/reviewer" {
 		t.Fatalf("spawn record on the start: %v", start.Attrs)
 	}
@@ -339,10 +238,10 @@ func TestCodexSpawnedThreadArrivesThroughSubagentStart(t *testing.T) {
 	}
 	// Read as the session's rollout this was a session_mismatch and no quota at all.
 	if len(quotas) != 1 {
-		t.Fatalf("quota events = %d, want the child's one: %s", len(quotas), names(all))
+		t.Fatalf("quota events = %d, want the child's one: %s", len(quotas), hookruntest.Names(all))
 	}
 	q := quotas[0]
-	if q.SessionID != rootThread || q.Attrs[AttrAgentID] != child || q.Attrs[AttrEvidenceStatus] != StatusPresent || num(q.Attrs["primary_used_pct"]) != 12 {
+	if q.SessionID != rootThread || q.Attrs[AttrAgentID] != child || q.Attrs[AttrEvidenceStatus] != StatusPresent || hookruntest.Num(q.Attrs["primary_used_pct"]) != 12 {
 		t.Fatalf("quota from inside the subagent: session=%s attrs=%v", q.SessionID, q.Attrs)
 	}
 }
@@ -364,86 +263,6 @@ func TestCodexRolloutIDFollowsTheTranscriptName(t *testing.T) {
 	}
 }
 
-// cursor-agent can file a subagent's own afterFileEdit under the subagent's conversation
-// id. Left there, the commit is stamped with a session nobody can open — or, once
-// subagentStop adds the same files to the parent, with two.
-func TestCursorSubagentEditsAreFoldedIntoTheParentConversation(t *testing.T) {
-	root := initRepo(t)
-	ctx := context.Background()
-	sp, _ := spool.Open(t.TempDir())
-	env := func(stdin string, args ...string) Env {
-		return Env{Now: time.Now(), Cwd: root, Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
-	}
-	const parent, child = "conv_parent_1", "conv_child_7"
-	roots := `"workspace_roots":["` + root + `"],"model":"claude-opus-5"`
-
-	if err := CursorSessionStart(ctx, env(`{"conversation_id":"`+parent+`",`+roots+`,"hook_event_name":"sessionStart"}`)); err != nil {
-		t.Fatal(err)
-	}
-	hookruntest.WriteFile(t, root, "src/sub.go", "package src\n")
-	// The subagent's edit, under the subagent's own conversation.
-	if err := CursorFileEdit(ctx, env(`{"conversation_id":"`+child+`",`+roots+`,"hook_event_name":"afterFileEdit","file_path":"`+filepath.Join(root, "src", "sub.go")+`"}`)); err != nil {
-		t.Fatal(err)
-	}
-	stop := `{"conversation_id":"` + child + `","parent_conversation_id":"` + parent + `","subagent_id":"` + child + `",` + roots +
-		`,"hook_event_name":"subagentStop","subagent_type":"worker","status":"completed","generation_id":"gen_4","modified_files":["src/sub.go"]}`
-	if err := CursorSubagentStop(ctx, env(stop)); err != nil {
-		t.Fatal(err)
-	}
-
-	manifests, err := openRepoStore(t, root).Manifests()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(manifests) != 1 || manifests[0].SessionID != parent {
-		t.Fatalf("manifests = %+v, want only the parent conversation's", manifests)
-	}
-
-	var end, touched *spool.Event
-	events := lifecycle(drain(t, sp))
-	for i, e := range events {
-		switch {
-		case e.Name == EventSubagentEnd:
-			end = &events[i]
-		case e.Name == EventFilesTouched && e.Attrs[AttrToolName] == "subagentStop":
-			touched = &events[i]
-		}
-	}
-	if end == nil || end.SessionID != parent || end.Attrs[AttrAgentID] != child || end.Attrs[AttrAgentType] != "worker" {
-		t.Fatalf("subagent end: %+v", end)
-	}
-	if touched == nil || touched.SessionID != parent || touched.Attrs[AttrAgentID] != child || touched.Attrs[AttrTurnID] != "gen_4" || touched.Attrs["files"] != "src/sub.go" {
-		t.Fatalf("files touched: %+v", touched)
-	}
-
-	// The commit carries one trailer, and it is the conversation a person can find.
-	if _, err := gitx.Git(ctx, root, "add", "src/sub.go"); err != nil {
-		t.Fatal(err)
-	}
-	msg := filepath.Join(t.TempDir(), "COMMIT_EDITMSG")
-	if err := os.WriteFile(msg, []byte("Add sub\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := PrepareCommitMsg(ctx, env("", msg, "message")); err != nil {
-		t.Fatal(err)
-	}
-	data, _ := os.ReadFile(msg)
-	if got := trailer.Parse(string(data), "#"); len(got) != 1 || got[0].SessionID != parent {
-		t.Fatalf("trailers = %+v, want exactly the parent's:\n%s", got, data)
-	}
-}
-
-// A subagent hook that names only the conversation that spawned it is filed there.
-func TestCursorHookWithOnlyAParentConversationIsTheParents(t *testing.T) {
-	in, err := readCursorInput(strings.NewReader(`{"parent_conversation_id":"conv_parent_1","hook_event_name":"subagentStop"}`))
-	if err != nil || in.id() != "conv_parent_1" {
-		t.Fatalf("id = %q, err = %v", in.id(), err)
-	}
-	if _, err := readCursorInput(strings.NewReader(`{"parent_conversation_id":"../escape","hook_event_name":"subagentStop"}`)); err == nil {
-		t.Fatal("an unsafe parent id must not stand in for a missing conversation id")
-	}
-}
-
 // The active session is what claims a commit no manifest accounts for. A session the
 // task tool opened for a subagent must not displace the one a person is driving, or the
 // developer's next hand-written commit is stamped with the subagent.
@@ -460,12 +279,12 @@ func TestOpenCodeChildSessionNeverBecomesTheActiveOne(t *testing.T) {
 	if err := OpenCodeSessionStart(ctx, env(`{"session_id":"ses_child","cwd":"`+root+`","parent_session_id":"ses_person"}`)); err != nil {
 		t.Fatal(err)
 	}
-	active, _ := openRepoStore(t, root).Active(time.Now(), 0)
+	active, _ := hookruntest.Store(t, root).Active(time.Now(), 0)
 	if active == nil || active.ID != "ses_person" {
 		t.Fatalf("active session = %+v, want the person's", active)
 	}
 	// The child is still announced, with its parent.
-	events := lifecycle(drain(t, sp))
+	events := hookruntest.Lifecycle(hookruntest.Spooled(t, sp))
 	if len(events) != 2 || events[1].SessionID != "ses_child" || events[1].Attrs[AttrParentSession] != "ses_person" {
 		t.Fatalf("events: %+v", events)
 	}

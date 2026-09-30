@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
 )
 
 func TestStatusLineCancellationStopsRendererGroup(t *testing.T) {
@@ -38,7 +40,7 @@ func TestStatusLineOwnTimeoutCapturesBeforeStoppingRenderer(t *testing.T) {
 		Renderer:  `(sleep 1; printf leaked > "$TERMA_TEST_RENDER_MARKER") & wait`,
 		Indicator: true,
 		OnCapture: func() {
-			if events := spooledQuota(t, sp); len(events) != 1 {
+			if events := hookruntest.Spooled(t, sp); len(events) != 1 {
 				t.Fatalf("capture must be deliverable while rendering: %+v", events)
 			}
 			captured = true

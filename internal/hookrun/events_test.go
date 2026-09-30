@@ -52,7 +52,6 @@ func TestWireNamesAreFrozen(t *testing.T) {
 		AttrEvidenceStatus: "evidence_status",
 		AttrHookEvent:      "hook_event",
 
-		sourceCursorHook:        "cursor_hook",
 		sourceCodexRollout:      "codex_rollout",
 		sourceCodexSessionIndex: "codex_session_index",
 		StatusPresent:           "present",
@@ -62,7 +61,6 @@ func TestWireNamesAreFrozen(t *testing.T) {
 		claudeTool:   "claude-code",
 		codexTool:    "codex",
 		opencodeTool: "opencode",
-		cursorTool:   "cursor",
 	} {
 		if got != want {
 			t.Errorf("wire name %q changed; it must stay %q", got, want)

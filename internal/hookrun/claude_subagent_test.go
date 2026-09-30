@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -29,7 +30,7 @@ func TestClaudeSubagentStopIgnoresInternalForks(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if events := drain(t, sp); len(events) != 0 {
+	if events := hookruntest.Spooled(t, sp); len(events) != 0 {
 		t.Fatalf("internal forks produced %d events, want none", len(events))
 	}
 }
@@ -56,14 +57,14 @@ func TestClaudeSubagentStopRequiresEvidenceForItsSessionAndAgent(t *testing.T) {
 			}
 			// Delivery removes the launch from the spool; later hook processes must
 			// still recognize the agent, including on another turn or a repeated stop.
-			if events := drain(t, sp); len(events) != 1 {
+			if events := hookruntest.Spooled(t, sp); len(events) != 1 {
 				t.Fatalf("launch produced %d events, want one", len(events))
 			}
 			hook(SubagentStop, "another-session", agentID)
 			hook(SubagentStop, sessionID, "internal-fork")
 			hook(SubagentStop, sessionID, agentID)
 			hook(SubagentStop, sessionID, agentID)
-			events := drain(t, sp)
+			events := hookruntest.Spooled(t, sp)
 			if len(events) != 2 {
 				t.Fatalf("got %d stop events, want the two known-agent stops", len(events))
 			}
@@ -91,14 +92,14 @@ func TestClaudeSubagentConcurrentLaunchesSurvive(t *testing.T) {
 	}
 	wg.Wait()
 	// Only the later stop events matter here; launch evidence must survive a flush.
-	drain(t, sp)
+	hookruntest.Spooled(t, sp)
 	for i := range 16 {
 		payload := fmt.Sprintf(`{"session_id":"parent","agent_id":"worker-%d"}`, i)
 		if err := SubagentStop(ctx, Env{Cwd: root, Spool: sp, Stdin: strings.NewReader(payload)}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if events := drain(t, sp); len(events) != 16 {
+	if events := hookruntest.Spooled(t, sp); len(events) != 16 {
 		t.Fatalf("concurrent launches left %d recognized agents, want 16", len(events))
 	}
 }
@@ -114,7 +115,7 @@ func TestClaudeSubagentLaunchEvidenceExpires(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	drain(t, sp)
+	hookruntest.Spooled(t, sp)
 	path, err := claudeSubagentPath("parent", "old")
 	if err != nil {
 		t.Fatal(err)
@@ -129,7 +130,7 @@ func TestClaudeSubagentLaunchEvidenceExpires(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if events := drain(t, sp); len(events) != 1 || events[0].Attrs[AttrAgentID] != "fresh" {
+	if events := hookruntest.Spooled(t, sp); len(events) != 1 || events[0].Attrs[AttrAgentID] != "fresh" {
 		t.Fatalf("expired evidence admitted a stop: %+v", events)
 	}
 	if err := SessionStart(ctx, Env{Cwd: root, Spool: sp, Now: now, Stdin: strings.NewReader(`{"session_id":"next-session"}`)}); err != nil {
@@ -161,7 +162,7 @@ func TestClaudeSubagentUnavailableLaunchStateDoesNotFailHooks(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if events := drain(t, sp); len(events) != 1 || events[0].Name != EventSubagentStart {
+	if events := hookruntest.Spooled(t, sp); len(events) != 1 || events[0].Name != EventSubagentStart {
 		t.Fatalf("want the launch alone when its evidence cannot be saved: %+v", events)
 	}
 }

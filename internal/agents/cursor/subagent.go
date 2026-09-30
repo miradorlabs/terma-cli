@@ -1,14 +1,15 @@
-package hookrun
+package cursor
 
 import (
 	"context"
 	"encoding/json"
 
+	"github.com/miradorlabs/terma-cli/internal/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// CursorSubagentStop is Cursor's subagentStop: a subagent finished, and Cursor reports
+// subagentStop is Cursor's subagentStop: a subagent finished, and Cursor reports
 // its outcome, counts and the files it modified. The event is filed under the
 // conversation that spawned it — parent_conversation_id when Cursor sends one — and
 // names the subagent's own conversation as agent_id.
@@ -22,7 +23,7 @@ import (
 // Only subagentStop is wired. Cursor documents that a subagentStart hook which prints
 // nothing blocks the subagent, and the committed guard prints nothing on a machine
 // without terma: every spawn there would hit that path.
-func CursorSubagentStop(ctx context.Context, env Env) error {
+func subagentStop(ctx context.Context, env hookrun.Env) error {
 	in, err := readCursorInput(env.Stdin)
 	if err != nil {
 		env.Logf("%v", err)
@@ -38,7 +39,7 @@ func CursorSubagentStop(ctx context.Context, env Env) error {
 		id = in.ParentConversationID
 	}
 	sess := session.Session{ID: id, Tool: cursorTool, Model: in.Model}
-	files := RelativeFiles(r, env.Cwd, in.ModifiedFiles)
+	files := hookrun.RelativeFiles(r, env.Cwd, in.ModifiedFiles)
 	for _, child := range []string{in.SubagentID, own} {
 		if !session.ValidID(child) || child == id {
 			continue
@@ -49,34 +50,34 @@ func CursorSubagentStop(ctx context.Context, env Env) error {
 		}
 		files = append(files, moved...)
 	}
-	files = UniqueSorted(files)
+	files = hookrun.UniqueSorted(files)
 
 	// The event is a subagent's by definition, so the type stands even when Cursor sent
 	// no id to hang it on — the one place agentAttrs' gate does not apply.
 	facet := func(attrs map[string]any) map[string]any {
-		AgentAttrs(attrs, in.SubagentID, in.SubagentType)
-		if _, ok := attrs[AttrAgentType]; !ok && ShortLabel(in.SubagentType) {
-			attrs[AttrAgentType] = in.SubagentType
+		hookrun.AgentAttrs(attrs, in.SubagentID, in.SubagentType)
+		if _, ok := attrs[hookrun.AttrAgentType]; !ok && hookrun.ShortLabel(in.SubagentType) {
+			attrs[hookrun.AttrAgentType] = in.SubagentType
 		}
 		return attrs
 	}
-	attrs := facet(map[string]any{AttrTool: cursorTool, AttrSchemaVersion: 1, AttrEvidenceSource: sourceCursorHook})
+	attrs := facet(map[string]any{hookrun.AttrTool: cursorTool, hookrun.AttrSchemaVersion: 1, hookrun.AttrEvidenceSource: sourceCursorHook})
 	switch in.Status {
 	case "completed", "aborted", "error":
-		attrs[AttrStatus] = in.Status
+		attrs[hookrun.AttrStatus] = in.Status
 	default:
-		attrs[AttrStatus] = UnknownValue
+		attrs[hookrun.AttrStatus] = hookrun.UnknownValue
 	}
-	BoundedAttr(attrs, AttrTurnID, in.GenerationID)
+	hookrun.BoundedAttr(attrs, hookrun.AttrTurnID, in.GenerationID)
 	for k, v := range map[string]json.RawMessage{"duration_ms": in.DurationMs, "message_count": in.MessageCount, "tool_call_count": in.ToolCallCount, "loop_count": in.LoopCount} {
-		if value, _, ok := JSONNumber(v, true); ok {
+		if value, _, ok := hookrun.JSONNumber(v, true); ok {
 			attrs[k] = int64(value)
 		}
 	}
-	attrs[AttrFileCount] = len(files)
+	attrs[hookrun.AttrFileCount] = len(files)
 	touched := facet(map[string]any{})
-	BoundedAttr(touched, AttrTurnID, in.GenerationID)
+	hookrun.BoundedAttr(touched, hookrun.AttrTurnID, in.GenerationID)
 	env.Touch(r, sess, "subagentStop", files, touched)
-	env.EmitFor(r, spool.Event{Name: EventSubagentEnd, SessionID: id, Repo: r.Name, Attrs: attrs})
+	env.EmitFor(r, spool.Event{Name: hookrun.EventSubagentEnd, SessionID: id, Repo: r.Name, Attrs: attrs})
 	return nil
 }

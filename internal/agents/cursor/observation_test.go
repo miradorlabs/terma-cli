@@ -1,4 +1,4 @@
-package hookrun
+package cursor
 
 import (
 	"context"
@@ -12,10 +12,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-func cursorPayload(t *testing.T, env Env, turn string, fields map[string]any) string {
+func cursorPayload(t *testing.T, env hookrun.Env, turn string, fields map[string]any) string {
 	t.Helper()
 	p := map[string]any{"conversation_id": "cursor-conversation", "generation_id": turn, "workspace_roots": []string{env.Cwd}, "model": "auto", "model_id": "selected-model", "user_email": "dev@example.test", "cursor_version": "2026.09.10-fd3934a"}
 	maps.Copy(p, fields)
@@ -25,7 +27,7 @@ func cursorPayload(t *testing.T, env Env, turn string, fields map[string]any) st
 	}
 	return string(b)
 }
-func cursorRun(t *testing.T, env Env, hook, turn string, fields map[string]any) {
+func cursorRun(t *testing.T, env hookrun.Env, hook, turn string, fields map[string]any) {
 	t.Helper()
 	env.Stdin = strings.NewReader(cursorPayload(t, env, turn, fields))
 	if err := cursorObserve(context.Background(), env, hook); err != nil {
@@ -35,19 +37,19 @@ func cursorRun(t *testing.T, env Env, hook, turn string, fields map[string]any) 
 func cursorObservations(t *testing.T, sp *spool.Spool) []spool.Event {
 	t.Helper()
 	var out []spool.Event
-	for _, e := range spooledQuota(t, sp) {
-		if e.Name == EventSessionObservation {
+	for _, e := range hookruntest.Spooled(t, sp) {
+		if e.Name == hookrun.EventSessionObservation {
 			out = append(out, e)
 		}
 	}
 	return out
 }
-func cursorStatePath(env Env) string {
-	return filepath.Join(os.Getenv("TERMA_CONFIG_DIR"), "cursor-observations", EvidenceID("cursor-conversation\x00"+env.Cwd)+".json")
+func cursorStatePath(env hookrun.Env) string {
+	return filepath.Join(os.Getenv("TERMA_CONFIG_DIR"), "cursor-observations", hookrun.EvidenceID("cursor-conversation\x00"+env.Cwd)+".json")
 }
 
 func TestCursorOrderedTurnSnapshots(t *testing.T) {
-	env := fundingEnv(t)
+	env := testEnv(t)
 	private := map[string]any{"prompt": "secret-prompt", "text": "secret-response", "transcript_path": "/secret/path", "api_key": "secret-key", "status": "completed", "loop_count": 0, "input_tokens": 100, "output_tokens": 12, "cache_read_tokens": 80, "cache_write_tokens": 0}
 	for _, turn := range []string{"turn-a", "turn-b"} {
 		cursorRun(t, env, "beforeSubmitPrompt", turn, private)
@@ -65,7 +67,7 @@ func TestCursorOrderedTurnSnapshots(t *testing.T) {
 	stream := evs[0].Attrs["source_stream"]
 	for i, e := range evs {
 		a := e.Attrs
-		if a["observation_sequence"] != float64(i+1) || a["source_stream"] != stream || a[AttrProjectID] != "project-a" {
+		if a["observation_sequence"] != float64(i+1) || a["source_stream"] != stream || a[hookrun.AttrProjectID] != "project-a" {
 			t.Fatalf("bad sequence/routing: %+v", e)
 		}
 		if ids[a["observation_id"]] {
@@ -99,7 +101,7 @@ func TestCursorOrderedTurnSnapshots(t *testing.T) {
 }
 
 func TestCursorInvalidOptionalTokensAndContext(t *testing.T) {
-	env := fundingEnv(t)
+	env := testEnv(t)
 	cursorRun(t, env, "stop", "turn", map[string]any{"input_tokens": -1, "output_tokens": "12", "cache_read_tokens": 1.5, "cache_write_tokens": 9007199254740992, "status": "secret-error"})
 	cursorRun(t, env, "stop", "turn", map[string]any{"input_tokens": 0, "output_tokens": nil, "status": "error", "loop_count": 6})
 	cursorRun(t, env, "preCompact", "turn", map[string]any{"context_usage_percent": 85.5, "context_tokens": 120000, "context_window_size": 128000, "trigger": "auto", "messages": []string{"secret-content"}})
@@ -124,14 +126,14 @@ func TestCursorInvalidOptionalTokensAndContext(t *testing.T) {
 }
 
 func TestCursorConcurrentObservations(t *testing.T) {
-	env := fundingEnv(t)
+	env := testEnv(t)
 	var wg sync.WaitGroup
 	for i := range 12 {
 		payload := cursorPayload(t, env, fmt.Sprintf("turn-%d", i), map[string]any{"output_tokens": i})
 		wg.Go(func() {
 			e := env
 			e.Stdin = strings.NewReader(payload)
-			_ = CursorStop(context.Background(), e)
+			_ = stop(context.Background(), e)
 		})
 	}
 	wg.Wait()
@@ -152,7 +154,7 @@ func TestCursorConcurrentObservations(t *testing.T) {
 }
 
 func TestCursorPendingReplayKeepsIdentity(t *testing.T) {
-	env := fundingEnv(t)
+	env := testEnv(t)
 	cursorRun(t, env, "stop", "turn-a", nil)
 	original := cursorObservations(t, env.Spool)[0]
 	path := cursorStatePath(env)
@@ -160,7 +162,7 @@ func TestCursorPendingReplayKeepsIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var state ObservationState
+	var state hookrun.ObservationState
 	if err = json.Unmarshal(b, &state); err != nil {
 		t.Fatal(err)
 	}
@@ -178,7 +180,7 @@ func TestCursorPendingReplayKeepsIdentity(t *testing.T) {
 }
 
 func TestCursorFailedAppendIsRecoveredBeforeNextTurn(t *testing.T) {
-	env := fundingEnv(t)
+	env := testEnv(t)
 	badDir := t.TempDir()
 	badSpool, err := spool.Open(badDir)
 	if err != nil {
@@ -194,7 +196,7 @@ func TestCursorFailedAppendIsRecoveredBeforeNextTurn(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var state ObservationState
+	var state hookrun.ObservationState
 	_ = json.Unmarshal(b, &state)
 	if state.Pending == nil {
 		t.Fatal("failed append lost its evidence")
@@ -207,7 +209,7 @@ func TestCursorFailedAppendIsRecoveredBeforeNextTurn(t *testing.T) {
 }
 
 func TestCursorCorruptCheckpointStartsNewStream(t *testing.T) {
-	env := fundingEnv(t)
+	env := testEnv(t)
 	cursorRun(t, env, "stop", "turn-a", nil)
 	first := cursorObservations(t, env.Spool)[0]
 	if err := os.WriteFile(cursorStatePath(env), []byte("{"), 0o600); err != nil {
@@ -221,15 +223,15 @@ func TestCursorCorruptCheckpointStartsNewStream(t *testing.T) {
 }
 
 func TestCursorPromptRefreshesAttributionAndMissingGenerationIsNotInherited(t *testing.T) {
-	env := fundingEnv(t)
+	env := testEnv(t)
 	cursorRun(t, env, "beforeSubmitPrompt", "turn-a", nil)
-	env.Now = env.Now.Add(ActiveTTL + time.Minute)
+	env.Now = env.Now.Add(hookrun.ActiveTTL + time.Minute)
 	cursorRun(t, env, "beforeSubmitPrompt", "turn-b", nil)
 	r, err := env.Repo(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s, ok := r.Store.Active(env.Now, ActiveTTL); !ok || s.ID != "cursor-conversation" {
+	if s, ok := r.Store.Active(env.Now, hookrun.ActiveTTL); !ok || s.ID != "cursor-conversation" {
 		t.Fatal("prompt did not refresh active session")
 	}
 	cursorRun(t, env, "stop", "", nil)

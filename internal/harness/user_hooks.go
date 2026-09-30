@@ -1,7 +1,6 @@
 package harness
 
 import (
-	"os"
 	"path/filepath"
 	"runtime"
 )
@@ -10,12 +9,6 @@ import (
 func CodexUserHooksPath() (string, error) {
 	path, err := (Codex{}).ConfigPath()
 	return filepath.Join(filepath.Dir(path), "hooks.json"), err
-}
-
-// CursorUserHooksPath is Cursor's machine-wide hooks file.
-func CursorUserHooksPath() (string, error) {
-	home, err := os.UserHomeDir()
-	return filepath.Join(home, ".cursor", "hooks.json"), err
 }
 
 // ClaudeManagedHookFiles locates Claude's administrator-deployed settings.

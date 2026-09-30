@@ -193,3 +193,62 @@ func TestCommittedHooksRoundTrip(t *testing.T) {
 		}
 	}
 }
+
+// Global mode's machine-wide hooks: every agent's user-level file gets terma's entries by
+// absolute path with --user, beside the developer's own; a second setup changes nothing,
+// a moved terma is replaced in place, and removal leaves the developer's own.
+func TestUserHooksInstallIdempotentlyAndRemoveCleanly(t *testing.T) {
+	mine := map[string]string{
+		"claude": `{"env":{"A":"1"},"hooks":{"Stop":[{"hooks":[{"type":"command","command":"say done"}]}]}}`,
+		"codex":  `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"say done"}]}]}}`,
+		"cursor": `{"version":1,"hooks":{"stop":[{"command":"say done"}]}}`,
+	}
+	for _, a := range reg.With[agents.UserHooks]() {
+		t.Run(a.Name(), func(t *testing.T) {
+			own, ok := mine[a.Name()]
+			if !ok {
+				t.Fatalf("no developer's own hooks file for %s in this test", a.Name())
+			}
+			userPath, err := a.UserHooksPath()
+			if err != nil {
+				t.Fatal(err)
+			}
+			dir := t.TempDir()
+			path := filepath.Join(dir, filepath.Base(userPath))
+			if err := os.WriteFile(path, []byte(own), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			apply := func(cmd func(string) string, install bool) hookmgr.Plan {
+				t.Helper()
+				p, err := a.PlanUserHooks(dir, cmd, install)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := hookmgr.Apply(dir, p); err != nil {
+					t.Fatal(err)
+				}
+				return p
+			}
+			first := hookmgr.UserHookCommand("/opt/it's terma/bin/terma")
+			apply(first, true)
+			data, _ := os.ReadFile(path)
+			if !strings.Contains(string(data), `hook --user`) || !strings.Contains(string(data), "say done") {
+				t.Fatalf("after install:\n%s", data)
+			}
+			if p := apply(first, true); !p.Empty() {
+				t.Fatalf("a second install changed %v", p.Changes)
+			}
+			moved := hookmgr.UserHookCommand("/home/dev/.local/bin/terma")
+			apply(moved, true)
+			data, _ = os.ReadFile(path)
+			if strings.Contains(string(data), "/opt/it") || strings.Count(string(data), "hook --user") != strings.Count(string(data), "/home/dev/.local/bin/terma' hook") {
+				t.Fatalf("a moved terma was not replaced in place:\n%s", data)
+			}
+			apply(moved, false)
+			data, _ = os.ReadFile(path)
+			if strings.Contains(string(data), "hook --user") || !strings.Contains(string(data), "say done") {
+				t.Fatalf("after removal:\n%s", data)
+			}
+		})
+	}
+}

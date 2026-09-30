@@ -1,4 +1,4 @@
-package hookrun
+package cursor
 
 import (
 	"cmp"
@@ -7,8 +7,15 @@ import (
 	"errors"
 	"io"
 
+	"github.com/miradorlabs/terma-cli/internal/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
+
+// cursorObservationDir is Cursor's observation checkpoint under the hook state directory.
+const cursorObservationDir = "cursor-observations"
+
+// sourceCursorHook is the evidence_source of what Cursor's hook payloads said.
+const sourceCursorHook = "cursor_hook"
 
 // --- Cursor adapter -----------------------------------------------------------------
 
@@ -94,7 +101,7 @@ func cursorModelParams(in *cursorHookInput, a map[string]any) {
 // has to check the id again. A subagent hook may name only the conversation that spawned
 // it; that is the conversation it is filed under, so it stands in for the missing id.
 func readCursorInput(r io.Reader) (*cursorHookInput, error) {
-	in, err := ReadInput[cursorHookInput](r)
+	in, err := hookrun.ReadInput[cursorHookInput](r)
 	if err != nil {
 		return nil, err
 	}
@@ -107,8 +114,8 @@ func readCursorInput(r io.Reader) (*cursorHookInput, error) {
 	return in, nil
 }
 
-// CursorSessionStart records the conversation as the active session.
-func CursorSessionStart(ctx context.Context, env Env) error {
+// sessionStart records the conversation as the active session.
+func sessionStart(ctx context.Context, env hookrun.Env) error {
 	in, err := readCursorInput(env.Stdin)
 	if err != nil {
 		env.Logf("%v", err)
@@ -120,13 +127,13 @@ func CursorSessionStart(ctx context.Context, env Env) error {
 		env.Logf("not in a git repository: %v", err)
 		return nil
 	}
-	env.Announce(r, env.NewSession(r, in.id(), cursorTool, in.Model), map[string]any{AttrSource: in.ComposerMode})
-	env.captureCursorObservation(ctx, r, in, "sessionStart")
+	env.Announce(r, env.NewSession(r, in.id(), cursorTool, in.Model), map[string]any{hookrun.AttrSource: in.ComposerMode})
+	captureCursorObservation(env, ctx, r, in, "sessionStart")
 	return nil
 }
 
-// CursorSessionEnd clears the active session; manifests stay for the commit to come.
-func CursorSessionEnd(ctx context.Context, env Env) error {
+// sessionEnd clears the active session; manifests stay for the commit to come.
+func sessionEnd(ctx context.Context, env hookrun.Env) error {
 	in, err := readCursorInput(env.Stdin)
 	if err != nil {
 		env.Logf("%v", err)
@@ -138,12 +145,12 @@ func CursorSessionEnd(ctx context.Context, env Env) error {
 		return nil
 	}
 	env.EndSession(r, in.id(), cursorTool, in.Reason)
-	env.captureCursorObservation(ctx, r, in, "sessionEnd")
+	captureCursorObservation(env, ctx, r, in, "sessionEnd")
 	return nil
 }
 
-// CursorFileEdit adds the edited file to the conversation's manifest.
-func CursorFileEdit(ctx context.Context, env Env) error {
+// fileEdit adds the edited file to the conversation's manifest.
+func fileEdit(ctx context.Context, env hookrun.Env) error {
 	in, err := readCursorInput(env.Stdin)
 	if err != nil {
 		env.Logf("%v", err)
@@ -158,8 +165,8 @@ func CursorFileEdit(ctx context.Context, env Env) error {
 		return nil
 	}
 	extra := map[string]any{}
-	BoundedAttr(extra, AttrTurnID, in.GenerationID)
+	hookrun.BoundedAttr(extra, hookrun.AttrTurnID, in.GenerationID)
 	env.Touch(r, session.Session{ID: in.id(), Tool: cursorTool, Model: in.Model}, "afterFileEdit",
-		RelativeFiles(r, env.Cwd, []string{in.FilePath}), extra)
+		hookrun.RelativeFiles(r, env.Cwd, []string{in.FilePath}), extra)
 	return nil
 }

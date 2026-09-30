@@ -40,7 +40,7 @@ func TestCodexDesktopHooksCaptureLocalToolsWithRepositoryConsent(t *testing.T) {
 				"tool_input":    map[string]any{"command": "private command"},
 				"tool_response": map[string]any{"exit_code": 0, "output": "private output"}}, CodexPostToolUse)
 			all := hookruntest.Spooled(t, env.Spool)
-			prompts, calls, approvals := eventsNamed(all, EventUserPrompt), eventsNamed(all, EventToolCall), eventsNamed(all, EventApprovalAsked)
+			prompts, calls, approvals := hookruntest.Named(all, EventUserPrompt), hookruntest.Named(all, EventToolCall), hookruntest.Named(all, EventApprovalAsked)
 			if len(prompts) != 1 || len(calls) != 1 || len(approvals) != 1 {
 				t.Fatalf("prompt/call missing: %+v", all)
 			}

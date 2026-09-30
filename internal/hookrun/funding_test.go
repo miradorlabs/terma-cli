@@ -131,7 +131,7 @@ func TestClaudeAccountChangesAndDuplicateHooks(t *testing.T) {
 	_ = SessionStart(ctx, env)
 	env.Stdin = strings.NewReader(hookInput(env, "Stop"))
 	_ = Stop(ctx, env)
-	evs := spooledQuota(t, env.Spool)
+	evs := hookruntest.Spooled(t, env.Spool)
 	if len(evs) != 2 || evs[1].Name != EventSessionAccount || evs[1].Attrs[AttrProjectID] != "project-a" {
 		t.Fatalf("initial snapshot and duplicate stop: %+v", evs)
 	}
@@ -139,7 +139,7 @@ func TestClaudeAccountChangesAndDuplicateHooks(t *testing.T) {
 	env.Now = env.Now.Add(time.Second)
 	env.Stdin = strings.NewReader(hookInput(env, "Stop"))
 	_ = Stop(ctx, env)
-	evs = spooledQuota(t, env.Spool)
+	evs = hookruntest.Spooled(t, env.Spool)
 	if len(evs) != 1 || evs[0].Attrs["account_id"] != "account-b" {
 		t.Fatalf("account switch: %+v", evs)
 	}
@@ -155,13 +155,13 @@ func TestClaudeAccountChangesAndDuplicateHooks(t *testing.T) {
 		})
 	}
 	wg.Wait()
-	if evs = spooledQuota(t, env.Spool); len(evs) != 0 {
+	if evs = hookruntest.Spooled(t, env.Spool); len(evs) != 0 {
 		t.Fatalf("duplicate snapshot: %+v", evs)
 	}
 	env.Now = env.Now.Add(QuotaHeartbeat + time.Second)
 	env.Stdin = strings.NewReader(hookInput(env, "Stop"))
 	_ = Stop(ctx, env)
-	if evs = spooledQuota(t, env.Spool); len(evs) != 1 {
+	if evs = hookruntest.Spooled(t, env.Spool); len(evs) != 1 {
 		t.Fatalf("missing heartbeat: %+v", evs)
 	}
 }
@@ -173,7 +173,7 @@ func TestStopFailureAllowlist(t *testing.T) {
 		env.Stdin = strings.NewReader(string(b))
 		_ = StopFailure(context.Background(), env)
 	}
-	evs := spooledQuota(t, env.Spool)
+	evs := hookruntest.Spooled(t, env.Spool)
 	limits := 0
 	for _, ev := range evs {
 		if ev.Name == EventSessionLimit {
@@ -204,7 +204,7 @@ func TestStopFailureOmitsAccountIDUnderOverrideCredential(t *testing.T) {
 	b, _ := json.Marshal(map[string]any{"session_id": "funding-session", "cwd": env.Cwd, "error": "billing_error"})
 	env.Stdin = strings.NewReader(string(b))
 	_ = StopFailure(context.Background(), env)
-	for _, ev := range spooledQuota(t, env.Spool) {
+	for _, ev := range hookruntest.Spooled(t, env.Spool) {
 		if ev.Name != EventSessionLimit {
 			continue
 		}
@@ -228,7 +228,7 @@ func TestCodexStopCapturesRolloutAndDeduplicates(t *testing.T) {
 		env.Stdin = strings.NewReader(string(b))
 		_ = CodexStop(context.Background(), env)
 	}
-	evs := spooledQuota(t, env.Spool)
+	evs := hookruntest.Spooled(t, env.Spool)
 	if len(evs) != 1 || evs[0].Name != EventSessionQuota || evs[0].Attrs["plan_type"] != "team" || evs[0].Attrs["source_time"] != at || evs[0].Attrs["has_credits"] != false {
 		t.Fatalf("delivered quota: %+v", evs)
 	}
@@ -248,7 +248,7 @@ func TestCodexNotifyCapturesRolloutWithoutTranscriptPath(t *testing.T) {
 	if err := CodexNotify(context.Background(), env); err != nil {
 		t.Fatal(err)
 	}
-	evs := spooledQuota(t, env.Spool)
+	evs := hookruntest.Spooled(t, env.Spool)
 	var quota *spool.Event
 	for i := range evs {
 		if evs[i].Name == EventSessionQuota {
@@ -280,7 +280,7 @@ func TestFundingRetriesAfterFailedAppend(t *testing.T) {
 	}
 	env.Stdin = strings.NewReader(hookInput(env, "Stop"))
 	_ = Stop(context.Background(), env)
-	if evs := spooledQuota(t, sp); len(evs) != 1 || evs[0].Name != EventSessionAccount {
+	if evs := hookruntest.Spooled(t, sp); len(evs) != 1 || evs[0].Name != EventSessionAccount {
 		t.Fatalf("failed append poisoned deduplication: %+v", evs)
 	}
 }
@@ -314,7 +314,7 @@ func TestCodexSequenceCheckpointAfterSpooling(t *testing.T) {
 		t.Fatal(err)
 	}
 	env.captureCodexFunding(context.Background(), r, in)
-	evs := spooledQuota(t, sp)
+	evs := hookruntest.Spooled(t, sp)
 	if len(evs) != 3 {
 		t.Fatalf("%+v", evs)
 	}
@@ -327,7 +327,7 @@ func TestCodexSequenceCheckpointAfterSpooling(t *testing.T) {
 		seen[id] = true
 	}
 	env.captureCodexFunding(context.Background(), r, in)
-	if evs := spooledQuota(t, sp); len(evs) != 0 {
+	if evs := hookruntest.Spooled(t, sp); len(evs) != 0 {
 		t.Fatal(evs)
 	}
 }

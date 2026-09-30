@@ -61,7 +61,7 @@ func TestCodexSessionStampsItsCommitFromApplyPatch(t *testing.T) {
 	if err := CodexPostToolUse(ctx, env(`{"session_id":"`+id+`","hook_event_name":"PostToolUse","cwd":"`+root+`","model":"gpt-6","permission_mode":"default","tool_name":"apply_patch","tool_use_id":"call_1","turn_id":"turn_1","transcript_path":null,"tool_response":"ok","tool_input":{"command":"`+patch+`"}}`)); err != nil {
 		t.Fatal(err)
 	}
-	touched := eventsNamed(spooledQuota(t, sp), EventFilesTouched)
+	touched := hookruntest.Named(hookruntest.Spooled(t, sp), EventFilesTouched)
 	if len(touched) != 1 || touched[0].Attrs[AttrToolCallID] != "call_1" {
 		t.Fatalf("file touch must carry Codex's tool call id: %+v", touched)
 	}

@@ -1,4 +1,4 @@
-package hookrun
+package cursor
 
 import (
 	"context"
@@ -7,36 +7,27 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/miradorlabs/terma-cli/internal/spool"
+	"github.com/miradorlabs/terma-cli/internal/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
 )
 
-func cursorToolRun(t *testing.T, env Env, hook, turn string, fields map[string]any) {
+func cursorToolRun(t *testing.T, env hookrun.Env, hook, turn string, fields map[string]any) {
 	t.Helper()
 	env.Stdin = strings.NewReader(cursorPayload(t, env, turn, fields))
-	handler := CursorPostToolUse
+	handler := postToolUse
 	if hook == "postToolUseFailure" {
-		handler = CursorPostToolUseFailure
+		handler = postToolUseFailure
 	}
 	if err := handler(context.Background(), env); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func eventsNamed(events []spool.Event, name string) []spool.Event {
-	var out []spool.Event
-	for _, e := range events {
-		if e.Name == name {
-			out = append(out, e)
-		}
-	}
-	return out
-}
-
 // Every tool call Cursor reports is one event keyed on Cursor's own call id, carrying
 // the tool's name, duration and outcome — and none of what the tool was given or gave
 // back. Hook payloads carry tool_input, tool_output and error_message; the event never does.
 func TestCursorToolCallsAreRecordedWithoutContent(t *testing.T) {
-	env := fundingEnv(t)
+	env := testEnv(t)
 	private := map[string]any{
 		"tool_input": map[string]any{"command": "secret-command"}, "tool_output": "secret-output",
 		"error_message": "secret-error", "agent_message": "secret-note", "cwd": "/secret/cwd",
@@ -53,20 +44,20 @@ func TestCursorToolCallsAreRecordedWithoutContent(t *testing.T) {
 	cursorToolRun(t, env, "postToolUseFailure", "turn-a", with(map[string]any{"tool_name": "Read", "tool_use_id": "call-3", "duration": 12, "failure_type": "timeout", "is_interrupt": false}))
 	cursorToolRun(t, env, "postToolUseFailure", "turn-b", with(map[string]any{"tool_name": "Write", "tool_use_id": "call-4", "failure_type": "secret-kind", "is_interrupt": true}))
 
-	all := spooledQuota(t, env.Spool)
-	if touched := eventsNamed(all, EventFilesTouched); len(touched) != 0 {
+	all := hookruntest.Spooled(t, env.Spool)
+	if touched := hookruntest.Named(all, hookrun.EventFilesTouched); len(touched) != 0 {
 		t.Fatalf("a tool call attributed files; that is afterFileEdit's job: %+v", touched)
 	}
-	if obs := eventsNamed(all, EventSessionObservation); len(obs) != 0 {
+	if obs := hookruntest.Named(all, hookrun.EventSessionObservation); len(obs) != 0 {
 		t.Fatalf("a tool call entered the observation stream: %+v", obs)
 	}
-	evs := eventsNamed(all, EventToolCall)
+	evs := hookruntest.Named(all, hookrun.EventToolCall)
 	if len(evs) != 4 {
 		t.Fatalf("events = %d: %+v", len(evs), evs)
 	}
 	for _, e := range evs {
 		a := e.Attrs
-		if e.SessionID != "cursor-conversation" || a[AttrProjectID] != "project-a" || a["tool"] != "cursor" ||
+		if e.SessionID != "cursor-conversation" || a[hookrun.AttrProjectID] != "project-a" || a["tool"] != "cursor" ||
 			a["evidence_source"] != "cursor_hook" || a["ordering"] != "local_receipt" || a["schema_version"] != float64(1) ||
 			a["model"] != "auto" || a["model_id"] != "selected-model" || a["model_param.thinking"] != "high" ||
 			a["cursor.version"] != "2026.09.10-fd3934a" || a["terma.version"] != "test" {
@@ -114,12 +105,12 @@ func TestCursorToolCallsAreRecordedWithoutContent(t *testing.T) {
 // Bad values are dropped one at a time, never repaired, and a payload that names
 // neither a tool nor a call is not an event.
 func TestCursorToolCallValidation(t *testing.T) {
-	env := fundingEnv(t)
+	env := testEnv(t)
 	cursorToolRun(t, env, "postToolUse", "turn", map[string]any{"tool_name": "Shell", "tool_use_id": "bad id\n", "duration": -5})
 	cursorToolRun(t, env, "postToolUse", "turn", map[string]any{"tool_name": strings.Repeat("x", 300), "tool_use_id": "call-ok", "duration": "12"})
 	cursorToolRun(t, env, "postToolUse", "turn", map[string]any{"tool_input": "no name, no id", "duration": 3})
 	cursorToolRun(t, env, "postToolUseFailure", "turn", map[string]any{"tool_name": "Grep", "duration": 1.5, "is_interrupt": "yes"})
-	evs := eventsNamed(spooledQuota(t, env.Spool), EventToolCall)
+	evs := hookruntest.Named(hookruntest.Spooled(t, env.Spool), hookrun.EventToolCall)
 	if len(evs) != 3 {
 		t.Fatalf("events = %d: %+v", len(evs), evs)
 	}

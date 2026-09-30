@@ -3,13 +3,11 @@ package hookrun
 import (
 	"context"
 	"encoding/json"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
-	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -54,9 +52,9 @@ func TestClaudeSubagentCallCarriesTheModelAndTheRollUp(t *testing.T) {
 	sp, _ := spool.Open(t.TempDir())
 	runPostToolUse(t, root, sp, agentToolPayload(root, "Agent", completedAgentResponse, ""))
 
-	events := lifecycle(drain(t, sp))
+	events := hookruntest.Lifecycle(hookruntest.Spooled(t, sp))
 	if len(events) != 1 || events[0].Name != EventSubagentCall {
-		t.Fatalf("events = %s, want one %s", names(events), EventSubagentCall)
+		t.Fatalf("events = %s, want one %s", hookruntest.Names(events), EventSubagentCall)
 	}
 	ev := events[0]
 	if ev.SessionID != "sess-agent-1" {
@@ -75,7 +73,7 @@ func TestClaudeSubagentCallCarriesTheModelAndTheRollUp(t *testing.T) {
 		"duration_ms": 6311, "final_context_tokens": 15385, "tool_call_count": 1,
 		"edit_file_count": 1, "lines_added": 1, "lines_removed": 0, "read_count": 0,
 	} {
-		if got, ok := ev.Attrs[key]; !ok || num(got) != want {
+		if got, ok := ev.Attrs[key]; !ok || hookruntest.Num(got) != want {
 			t.Errorf("%s = %v (present %v), want %v", key, got, ok, want)
 		}
 	}
@@ -95,7 +93,7 @@ func TestClaudeSubagentCallCarriesTheModelAndTheRollUp(t *testing.T) {
 		t.Error("a subagent launched by the main thread has no parent agent")
 	}
 	// The manifest is for edits. Launching a subagent touches no file.
-	if manifests, _ := openRepoStore(t, root).Manifests(); len(manifests) != 0 {
+	if manifests, _ := hookruntest.Store(t, root).Manifests(); len(manifests) != 0 {
 		t.Errorf("an Agent call built a manifest: %+v", manifests)
 	}
 }
@@ -107,9 +105,9 @@ func TestClaudeSubagentCallLaunchedInTheBackgroundHasNoTotals(t *testing.T) {
 	sp, _ := spool.Open(t.TempDir())
 	runPostToolUse(t, root, sp, agentToolPayload(root, "Agent", launchedAgentResponse, ""))
 
-	events := lifecycle(drain(t, sp))
+	events := hookruntest.Lifecycle(hookruntest.Spooled(t, sp))
 	if len(events) != 1 {
-		t.Fatalf("events = %s", names(events))
+		t.Fatalf("events = %s", hookruntest.Names(events))
 	}
 	ev := events[0]
 	if ev.Attrs[AttrStatus] != "async_launched" || ev.Attrs["is_async"] != true || ev.Attrs[AttrModel] != "claude-haiku-4-5-20251001" {
@@ -129,7 +127,7 @@ func TestClaudeSubagentCallNeverCarriesWhatWasSaid(t *testing.T) {
 	for _, response := range []string{completedAgentResponse, launchedAgentResponse} {
 		sp, _ := spool.Open(t.TempDir())
 		runPostToolUse(t, root, sp, agentToolPayload(root, "Agent", response, ""))
-		raw, err := json.Marshal(drain(t, sp))
+		raw, err := json.Marshal(hookruntest.Spooled(t, sp))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -191,15 +189,9 @@ func TestClaudeSubagentCallVariants(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			sp, _ := spool.Open(t.TempDir())
 			runPostToolUse(t, root, sp, agentToolPayload(root, tc.tool, tc.response, tc.extra))
-			tc.check(t, lifecycle(drain(t, sp)))
+			tc.check(t, hookruntest.Lifecycle(hookruntest.Spooled(t, sp)))
 		})
 	}
-}
-
-// openRepoStore is the session store of a test repository: what a hook wrote there.
-func openRepoStore(t *testing.T, root string) *session.Store {
-	t.Helper()
-	return session.Open(filepath.Join(root, ".git"))
 }
 
 // `claude --agent <name>` stamps agent_type on every hook of the session, the main
@@ -211,9 +203,9 @@ func TestAgentTypeWithoutAnAgentIDIsNotASubagent(t *testing.T) {
 	hookruntest.WriteFile(t, root, "src/main.go", "package src\n")
 	runPostToolUse(t, root, sp, `{"session_id":"sess-agent-2","cwd":`+quoteJSON(root)+`,"agent_type":"reviewer","hook_event_name":"PostToolUse","tool_name":"Write","tool_input":{"file_path":"src/main.go"}}`)
 
-	events := lifecycle(drain(t, sp))
+	events := hookruntest.Lifecycle(hookruntest.Spooled(t, sp))
 	if len(events) != 1 || events[0].Name != EventFilesTouched {
-		t.Fatalf("events = %s", names(events))
+		t.Fatalf("events = %s", hookruntest.Names(events))
 	}
 	for _, key := range []string{AttrAgentID, AttrAgentType} {
 		if v, ok := events[0].Attrs[key]; ok {

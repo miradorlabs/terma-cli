@@ -30,16 +30,6 @@ func statusEnv(t *testing.T, stdin string) (Env, *bytes.Buffer, *spool.Spool) {
 	return Env{Now: time.Now(), Cwd: cwd, Stdin: strings.NewReader(stdin), Stdout: &out, Stderr: os.Stderr, Spool: sp, Version: "test"}, &out, sp
 }
 
-func spooledQuota(t *testing.T, sp *spool.Spool) []spool.Event {
-	t.Helper()
-	var got []spool.Event
-	sp.Flush(context.Background(), spool.SenderFunc(func(_ context.Context, evs []spool.Event) ([]spool.Event, error) {
-		got = append(got, evs...)
-		return nil, nil
-	}), spool.FlushOptions{Force: true})
-	return got
-}
-
 func TestStatusLinePassesBytesThroughUnchanged(t *testing.T) {
 	// ANSI, a multi-line payload and no trailing newline: what goes in comes out.
 	in := "\x1b[32mgreen\x1b[0m\nline two\n{\"not\":\"json\""
@@ -80,7 +70,7 @@ func TestStatusLineSurvivesARendererThatIgnoresStdinAndAnOversizedPayload(t *tes
 	if code != 0 || out.String() != "fine\n" {
 		t.Fatalf("code %d out %q", code, out.String())
 	}
-	if evs := spooledQuota(t, sp); len(evs) != 0 {
+	if evs := hookruntest.Spooled(t, sp); len(evs) != 0 {
 		t.Fatalf("oversized input must not be captured: %d events", len(evs))
 	}
 	// And every byte still reaches a renderer that does read it.
@@ -96,7 +86,7 @@ func TestStatusLineCapturesQuotaOncePerChange(t *testing.T) {
 	StatusLine(context.Background(), env, StatusLineOptions{CaptureOnly: true})
 	env.Stdin = strings.NewReader(quotaPayload)
 	StatusLine(context.Background(), env, StatusLineOptions{CaptureOnly: true})
-	evs := spooledQuota(t, sp)
+	evs := hookruntest.Spooled(t, sp)
 	if len(evs) != 1 {
 		t.Fatalf("identical payloads must spool once, got %d", len(evs))
 	}
@@ -118,7 +108,7 @@ func TestStatusLineCapturesQuotaOncePerChange(t *testing.T) {
 	changed := strings.Replace(quotaPayload, `"used_percentage":38`, `"used_percentage":41`, 1)
 	env.Stdin = strings.NewReader(changed)
 	StatusLine(context.Background(), env, StatusLineOptions{CaptureOnly: true})
-	if evs := spooledQuota(t, sp); len(evs) != 1 || evs[0].Attrs["seven_day_used_pct"] != 41.0 {
+	if evs := hookruntest.Spooled(t, sp); len(evs) != 1 || evs[0].Attrs["seven_day_used_pct"] != 41.0 {
 		t.Fatalf("a changed window must spool again: %+v", evs)
 	}
 
@@ -126,7 +116,7 @@ func TestStatusLineCapturesQuotaOncePerChange(t *testing.T) {
 	env.Now = env.Now.Add(QuotaHeartbeat + time.Second)
 	env.Stdin = strings.NewReader(changed)
 	StatusLine(context.Background(), env, StatusLineOptions{CaptureOnly: true})
-	if evs := spooledQuota(t, sp); len(evs) != 1 {
+	if evs := hookruntest.Spooled(t, sp); len(evs) != 1 {
 		t.Fatalf("heartbeat must re-send, got %d", len(evs))
 	}
 }
@@ -138,7 +128,7 @@ func TestStatusLineWithoutWindowsCapturesNothingButStillRenders(t *testing.T) {
 	if out.String() != early {
 		t.Fatalf("render %q", out.String())
 	}
-	if evs := spooledQuota(t, sp); len(evs) != 0 {
+	if evs := hookruntest.Spooled(t, sp); len(evs) != 0 {
 		t.Fatalf("no windows and no fast flag must spool nothing: %+v", evs)
 	}
 	// Malformed JSON: rendered, not captured, exit 0.
@@ -146,7 +136,7 @@ func TestStatusLineWithoutWindowsCapturesNothingButStillRenders(t *testing.T) {
 	if code := StatusLine(context.Background(), env, StatusLineOptions{Renderer: "cat"}); code != 0 || out.String() != "{oops" {
 		t.Fatalf("code %d out %q", code, out.String())
 	}
-	if evs := spooledQuota(t, sp); len(evs) != 0 {
+	if evs := hookruntest.Spooled(t, sp); len(evs) != 0 {
 		t.Fatal("malformed input must not spool")
 	}
 }
@@ -189,7 +179,7 @@ func TestStatusLineWithoutRendererIsSilentButCaptures(t *testing.T) {
 			if code != 0 || out.Len() != 0 {
 				t.Fatalf("code=%d output=%q", code, out.String())
 			}
-			if evs := spooledQuota(t, sp); len(evs) != 1 || captured != 1 {
+			if evs := hookruntest.Spooled(t, sp); len(evs) != 1 || captured != 1 {
 				t.Fatalf("events=%+v callbacks=%d", evs, captured)
 			}
 		})
@@ -211,7 +201,7 @@ func TestStatusLineStampsProjectFromRepository(t *testing.T) {
 			payload := strings.Replace(quotaPayload, `"cwd":"/tmp"`, `"cwd":`+string(mustJSON(nested)), 1)
 			env, _, sp := statusEnv(t, payload)
 			StatusLine(context.Background(), env, StatusLineOptions{CaptureOnly: true})
-			evs := spooledQuota(t, sp)
+			evs := hookruntest.Spooled(t, sp)
 			if len(evs) != 1 || evs[0].Attrs[AttrProjectID] != "proj_sl" || evs[0].Repo != filepath.Base(root) {
 				t.Fatalf("project binding: %+v", evs)
 			}
@@ -239,7 +229,7 @@ func TestStatusLineCapturesPromptResetAndCostChanges(t *testing.T) {
 				env.Now = env.Now.Add(time.Second)
 				StatusLine(context.Background(), env, StatusLineOptions{CaptureOnly: true})
 			}
-			if evs := spooledQuota(t, sp); len(evs) != 2 {
+			if evs := hookruntest.Spooled(t, sp); len(evs) != 2 {
 				t.Fatalf("change must emit once despite unchanged percentages: %+v", evs)
 			}
 		})
@@ -293,7 +283,7 @@ func TestClaudeQuotaSequenceAndUnavailableTransition(t *testing.T) {
 	if !env.captureQuota(&p) {
 		t.Fatal("unavailable transition missing")
 	}
-	evs := spooledQuota(t, sp)
+	evs := hookruntest.Spooled(t, sp)
 	if len(evs) != 3 {
 		t.Fatal(evs)
 	}
@@ -333,7 +323,7 @@ func TestClaudeQuotaCarriesAccountIDAndSchemaV2(t *testing.T) {
 	if !env.captureQuota(&p) {
 		t.Fatal("observation missing")
 	}
-	evs := spooledQuota(t, sp)
+	evs := hookruntest.Spooled(t, sp)
 	if len(evs) != 1 || evs[0].Attrs["account_id"] != "account-q" || evs[0].Attrs["schema_version"] != float64(1) {
 		t.Fatalf("quota record: %+v", evs)
 	}
@@ -356,7 +346,7 @@ func TestClaudeQuotaCarriesOrganizationID(t *testing.T) {
 	if !env.captureQuota(&p) {
 		t.Fatal("observation missing")
 	}
-	evs := spooledQuota(t, sp)
+	evs := hookruntest.Spooled(t, sp)
 	if len(evs) != 1 || evs[0].Attrs["account_id"] != realClaudeAccountID || evs[0].Attrs["organization_id"] != realClaudeOrganizationID {
 		t.Fatalf("quota record: %+v", evs)
 	}
@@ -378,7 +368,7 @@ func TestClaudeQuotaOmitsAccountIDUnderOverrideCredential(t *testing.T) {
 			if !env.captureQuota(&p) {
 				t.Fatal("observation missing")
 			}
-			evs := spooledQuota(t, sp)
+			evs := hookruntest.Spooled(t, sp)
 			if len(evs) != 1 || evs[0].Attrs["schema_version"] != float64(1) {
 				t.Fatalf("quota record: %+v", evs)
 			}
@@ -412,7 +402,7 @@ func TestClaudeQuotaAccountSwitchEmitsNewObservation(t *testing.T) {
 	if !env.captureQuota(&p) {
 		t.Fatal("account switch not captured")
 	}
-	evs := spooledQuota(t, sp)
+	evs := hookruntest.Spooled(t, sp)
 	if len(evs) != 2 || evs[0].Attrs["account_id"] != "account-1" || evs[1].Attrs["account_id"] != "account-2" {
 		t.Fatalf("account switch observations: %+v", evs)
 	}
@@ -446,7 +436,7 @@ func TestClaudeQuotaOrganizationSwitchEmitsNewObservation(t *testing.T) {
 	if !env.captureQuota(&p) {
 		t.Fatal("organization switch not captured")
 	}
-	evs := spooledQuota(t, sp)
+	evs := hookruntest.Spooled(t, sp)
 	if len(evs) != 2 || evs[0].Attrs["organization_id"] != "org-team" || evs[1].Attrs["organization_id"] != "org-personal" ||
 		evs[1].Attrs["account_id"] != "account-1" {
 		t.Fatalf("organization switch observations: %+v", evs)

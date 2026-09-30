@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
 )
 
 // These are terminal byte streams, not strings to sanitize or reflow. Prefixing
@@ -100,7 +102,7 @@ func TestStatusLineOversizedInputPassesThroughWithIndicator(t *testing.T) {
 	if code := StatusLine(context.Background(), env, StatusLineOptions{Renderer: "cat", Indicator: true}); code != 0 || out.String() != "t "+input {
 		t.Fatalf("code %d bytes %d", code, out.Len())
 	}
-	if events := spooledQuota(t, sp); len(events) != 0 {
+	if events := hookruntest.Spooled(t, sp); len(events) != 0 {
 		t.Fatal("oversized input was parsed")
 	}
 }
@@ -113,7 +115,7 @@ func TestStatusLineStartFailureStillCaptures(t *testing.T) {
 	if code == 0 || out.Len() != 0 || errOut.Len() == 0 {
 		t.Fatalf("code=%d out=%q err=%q", code, out.String(), errOut.String())
 	}
-	if evs := spooledQuota(t, sp); len(evs) != 1 {
+	if evs := hookruntest.Spooled(t, sp); len(evs) != 1 {
 		t.Fatal(evs)
 	}
 }

@@ -58,7 +58,7 @@ func TestCodexStopStampsRealChatGPTAccountID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	evs := spooledQuota(t, env.Spool)
+	evs := hookruntest.Spooled(t, env.Spool)
 	if len(evs) == 0 {
 		t.Fatal("no quota evidence spooled from the real rollout")
 	}
@@ -96,7 +96,7 @@ func TestCodexStopOmitsAccountIDOnNullRateLimits(t *testing.T) {
 	if err := CodexStop(context.Background(), env); err != nil {
 		t.Fatal(err)
 	}
-	evs := spooledQuota(t, env.Spool)
+	evs := hookruntest.Spooled(t, env.Spool)
 	sawUnavailable := false
 	for _, ev := range evs {
 		if ev.Attrs["evidence_status"] == "unavailable" {
@@ -122,7 +122,7 @@ func TestCodexStopOmitsAccountIDOnAPIKeyRoute(t *testing.T) {
 	if err := CodexStop(context.Background(), env); err != nil {
 		t.Fatal(err)
 	}
-	for _, ev := range spooledQuota(t, env.Spool) {
+	for _, ev := range hookruntest.Spooled(t, env.Spool) {
 		if _, ok := ev.Attrs["account_id"]; ok {
 			t.Fatalf("account_id stamped on API-key route: %+v", ev.Attrs)
 		}

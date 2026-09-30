@@ -1,38 +1,40 @@
-package hookrun
+package cursor
 
 import (
 	"context"
 	"encoding/json"
+
+	"github.com/miradorlabs/terma-cli/internal/hookrun"
 )
 
 // The four handlers below record observations, not additive usage counters. Cursor may
 // repeat the same parent-turn token snapshot at afterAgentResponse and stop, omit it, or
 // exclude subagents. Never derive billing or quota from these numbers.
 
-// CursorBeforeSubmitPrompt observes a prompt being submitted, and refreshes the active
+// beforeSubmitPrompt observes a prompt being submitted, and refreshes the active
 // session: an IDE conversation can outlive its TTL, and a CLI client may never have
 // sent sessionStart.
-func CursorBeforeSubmitPrompt(ctx context.Context, env Env) error {
+func beforeSubmitPrompt(ctx context.Context, env hookrun.Env) error {
 	return cursorObserve(ctx, env, "beforeSubmitPrompt")
 }
 
-// CursorAfterAgentResponse observes the end of a model response, which is where Cursor
+// afterAgentResponse observes the end of a model response, which is where Cursor
 // reports a token snapshot when it reports one at all.
-func CursorAfterAgentResponse(ctx context.Context, env Env) error {
+func afterAgentResponse(ctx context.Context, env hookrun.Env) error {
 	return cursorObserve(ctx, env, "afterAgentResponse")
 }
 
-// CursorStop observes the end of a turn. The committed entry sets loop_limit to null so
+// stop observes the end of a turn. The committed entry sets loop_limit to null so
 // it keeps firing past Cursor's five follow-up loops.
-func CursorStop(ctx context.Context, env Env) error { return cursorObserve(ctx, env, "stop") }
+func stop(ctx context.Context, env hookrun.Env) error { return cursorObserve(ctx, env, "stop") }
 
-// CursorPreCompact observes a context compaction, the one moment context occupancy is
+// preCompact observes a context compaction, the one moment context occupancy is
 // reported — which is not a billing quota.
-func CursorPreCompact(ctx context.Context, env Env) error {
+func preCompact(ctx context.Context, env hookrun.Env) error {
 	return cursorObserve(ctx, env, "preCompact")
 }
 
-func cursorObserve(ctx context.Context, env Env, hook string) error {
+func cursorObserve(ctx context.Context, env hookrun.Env, hook string) error {
 	in, err := readCursorInput(env.Stdin)
 	if err != nil {
 		env.Logf("%v", err)
@@ -48,17 +50,17 @@ func cursorObserve(ctx context.Context, env Env, hook string) error {
 		// omit sessionStart. A submitted prompt refreshes attribution in both cases.
 		env.SetActive(r, env.NewSession(r, in.id(), cursorTool, in.Model))
 	}
-	env.captureCursorObservation(ctx, r, in, hook)
+	captureCursorObservation(env, ctx, r, in, hook)
 	return nil
 }
 
 func cursorObservationAttrs(in *cursorHookInput, hook string) map[string]any {
-	a := EvidenceAttrs(cursorTool, sourceCursorHook, hook)
+	a := hookrun.EvidenceAttrs(cursorTool, sourceCursorHook, hook)
 	for _, k := range []string{"funding_status", "quota_status", "account_status"} {
-		a[k] = StatusUnavailable
+		a[k] = hookrun.StatusUnavailable
 	}
-	for k, v := range map[string]string{AttrTurnID: in.GenerationID, AttrModel: in.Model, "model_id": in.ModelID, "cursor.version": in.CursorVersion, "provider_session_id": in.SessionID, "account_email": in.UserEmail} {
-		BoundedAttr(a, k, v)
+	for k, v := range map[string]string{hookrun.AttrTurnID: in.GenerationID, hookrun.AttrModel: in.Model, "model_id": in.ModelID, "cursor.version": in.CursorVersion, "provider_session_id": in.SessionID, "account_email": in.UserEmail} {
+		hookrun.BoundedAttr(a, k, v)
 	}
 	if _, ok := a["account_email"]; ok {
 		a["account_status"] = "available"
@@ -68,7 +70,7 @@ func cursorObservationAttrs(in *cursorHookInput, hook string) map[string]any {
 	case "afterAgentResponse", "stop":
 		n, invalid := 0, false
 		for k, v := range map[string]json.RawMessage{"input_tokens": in.InputTokens, "output_tokens": in.OutputTokens, "cache_read_tokens": in.CacheReadTokens, "cache_write_tokens": in.CacheWriteTokens} {
-			value, present, ok := JSONNumber(v, true)
+			value, present, ok := hookrun.JSONNumber(v, true)
 			if present && !ok {
 				invalid = true
 			}
@@ -77,7 +79,7 @@ func cursorObservationAttrs(in *cursorHookInput, hook string) map[string]any {
 				n++
 			}
 		}
-		status := StatusUnavailable
+		status := hookrun.StatusUnavailable
 		if n > 0 {
 			status = "partial"
 		}
@@ -91,18 +93,18 @@ func cursorObservationAttrs(in *cursorHookInput, hook string) map[string]any {
 		if hook == "stop" {
 			switch in.Status {
 			case "completed", "aborted", "error":
-				a[AttrStatus] = in.Status
+				a[hookrun.AttrStatus] = in.Status
 			default:
-				a[AttrStatus] = UnknownValue
+				a[hookrun.AttrStatus] = hookrun.UnknownValue
 			}
-			if v, _, ok := JSONNumber(in.LoopCount, true); ok {
+			if v, _, ok := hookrun.JSONNumber(in.LoopCount, true); ok {
 				a["loop_count"] = int64(v)
 			}
 		}
 	case "preCompact":
 		// Context occupancy is not a subscription allowance or a token usage delta.
 		for k, v := range map[string]json.RawMessage{"context_tokens": in.ContextTokens, "context_window_size": in.ContextWindowSize, "context_usage_percent": in.ContextUsagePercent} {
-			if value, _, ok := JSONNumber(v, k != "context_usage_percent"); ok {
+			if value, _, ok := hookrun.JSONNumber(v, k != "context_usage_percent"); ok {
 				a[k] = value
 			}
 		}
@@ -117,8 +119,8 @@ func cursorObservationAttrs(in *cursorHookInput, hook string) map[string]any {
 // captureCursorObservation records one Cursor hook as an ordered observation. The
 // checkpoint directory and the observation id seed are Cursor's own, so state written
 // by earlier versions keeps its sequence.
-func (e Env) captureCursorObservation(ctx context.Context, r *Repo, in *cursorHookInput, hook string) {
-	e.CaptureObservation(ctx, r, Observation{
+func captureCursorObservation(e hookrun.Env, ctx context.Context, r *hookrun.Repo, in *cursorHookInput, hook string) {
+	e.CaptureObservation(ctx, r, hookrun.Observation{
 		Tool: cursorTool, Source: sourceCursorHook, StateDir: cursorObservationDir,
 		SessionID: in.id(), Hook: hook, TurnID: in.GenerationID, Attrs: cursorObservationAttrs(in, hook),
 	})

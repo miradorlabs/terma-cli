@@ -107,7 +107,6 @@ const (
 
 // Values of evidence_source: where a record's facts were read from.
 const (
-	sourceCursorHook   = "cursor_hook"
 	sourceCodexRollout = "codex_rollout"
 	sourceCodexHook    = "codex_hook"
 	// sourceCodexSessionIndex is $CODEX_HOME/session_index.jsonl, where Codex names threads.

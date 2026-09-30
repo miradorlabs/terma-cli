@@ -4,10 +4,11 @@ package cursor
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
-	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/hookrun"
 )
@@ -28,24 +29,24 @@ func (Agent) Installed(context.Context) bool {
 	}
 	return false
 }
-func (Agent) HooksPath() string        { return hookmgr.CursorHooksPath }
-func (Agent) Default(root string) bool { return hookmgr.HasCursor(root) }
+func (Agent) HooksPath() string        { return hooksPath }
+func (Agent) Default(root string) bool { return hasConfig(root) }
 func (Agent) Plan(root string, install bool) (hookmgr.Plan, error) {
-	return hookmgr.PlanCursorHooks(root, install)
+	return planHooks(root, install)
 }
 
 func (Agent) Events() map[string]agents.Handler {
 	return map[string]agents.Handler{
-		"cursor-session-start":         hookrun.CursorSessionStart,
-		"cursor-session-end":           hookrun.CursorSessionEnd,
-		"cursor-file-edit":             hookrun.CursorFileEdit,
-		"cursor-post-tool-use":         hookrun.CursorPostToolUse,
-		"cursor-post-tool-use-failure": hookrun.CursorPostToolUseFailure,
-		"cursor-before-submit-prompt":  hookrun.CursorBeforeSubmitPrompt,
-		"cursor-after-agent-response":  hookrun.CursorAfterAgentResponse,
-		"cursor-stop":                  hookrun.CursorStop,
-		"cursor-pre-compact":           hookrun.CursorPreCompact,
-		"cursor-subagent-stop":         hookrun.CursorSubagentStop,
+		"cursor-session-start":         sessionStart,
+		"cursor-session-end":           sessionEnd,
+		"cursor-file-edit":             fileEdit,
+		"cursor-post-tool-use":         postToolUse,
+		"cursor-post-tool-use-failure": postToolUseFailure,
+		"cursor-before-submit-prompt":  beforeSubmitPrompt,
+		"cursor-after-agent-response":  afterAgentResponse,
+		"cursor-stop":                  stop,
+		"cursor-pre-compact":           preCompact,
+		"cursor-subagent-stop":         subagentStop,
 	}
 }
 
@@ -53,9 +54,12 @@ func (Agent) FlushAfter() []string {
 	return []string{"cursor-session-end", "cursor-after-agent-response", "cursor-stop"}
 }
 
-func (Agent) UserHooksPath() (string, error) { return harness.CursorUserHooksPath() }
+func (Agent) UserHooksPath() (string, error) {
+	home, err := os.UserHomeDir()
+	return filepath.Join(home, ".cursor", "hooks.json"), err
+}
 func (Agent) PlanUserHooks(dir string, command func(string) string, install bool) (hookmgr.Plan, error) {
-	return hookmgr.PlanCursorUserHooks(dir, command, install)
+	return planUserHooks(dir, command, install)
 }
 
 // PayloadSession reads Cursor's payload, keyed on conversation_id: the one id every

@@ -1,13 +1,14 @@
-package hookrun
+package cursor
 
 import (
 	"context"
 	"encoding/json"
 
+	"github.com/miradorlabs/terma-cli/internal/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// CursorPostToolUse and CursorPostToolUseFailure record one finished tool call.
+// postToolUse and CursorPostToolUseFailure record one finished tool call.
 //
 // Cursor's generic postToolUse pair fires for every tool type — Shell, Read, Write,
 // Grep, Delete, Task and MCP:<tool> alike — and is the one place a tool_use_id and a
@@ -18,17 +19,17 @@ import (
 // machine where terma misbehaves. afterShellExecution and afterMCPExecution restate
 // calls postToolUse already reported, without a tool_use_id and with the command output.
 // Tool inputs, outputs, error messages and the tool's working directory are never read.
-func CursorPostToolUse(ctx context.Context, env Env) error {
+func postToolUse(ctx context.Context, env hookrun.Env) error {
 	return cursorToolCall(ctx, env, "postToolUse")
 }
 
-// CursorPostToolUseFailure handles a tool call that failed or was interrupted: the same
+// postToolUseFailure handles a tool call that failed or was interrupted: the same
 // record as CursorPostToolUse, with the failure type and nothing of the error's text.
-func CursorPostToolUseFailure(ctx context.Context, env Env) error {
+func postToolUseFailure(ctx context.Context, env hookrun.Env) error {
 	return cursorToolCall(ctx, env, "postToolUseFailure")
 }
 
-func cursorToolCall(ctx context.Context, env Env, hook string) error {
+func cursorToolCall(ctx context.Context, env hookrun.Env, hook string) error {
 	in, err := readCursorInput(env.Stdin)
 	if err != nil {
 		env.Logf("%v", err)
@@ -44,8 +45,8 @@ func cursorToolCall(ctx context.Context, env Env, hook string) error {
 		env.Logf("%s names no tool and no call id", hook)
 		return nil
 	}
-	attrs[AttrVersion] = env.Version
-	env.EmitFor(r, spool.Event{Name: EventToolCall, SessionID: in.id(), Repo: r.Name, Attrs: attrs})
+	attrs[hookrun.AttrVersion] = env.Version
+	env.EmitFor(r, spool.Event{Name: hookrun.EventToolCall, SessionID: in.id(), Repo: r.Name, Attrs: attrs})
 	return nil
 }
 
@@ -55,39 +56,39 @@ func cursorToolCall(ctx context.Context, env Env, hook string) error {
 // platform translates. The account email does not ride on a tool call — a call is not a
 // principal record, and the session already says who was signed in.
 func cursorToolCallAttrs(in *cursorHookInput, hook string) (map[string]any, bool) {
-	a := EvidenceAttrs(cursorTool, sourceCursorHook, hook)
-	if ShortLabel(in.ToolName) {
-		a[AttrToolName] = in.ToolName
+	a := hookrun.EvidenceAttrs(cursorTool, sourceCursorHook, hook)
+	if hookrun.ShortLabel(in.ToolName) {
+		a[hookrun.AttrToolName] = in.ToolName
 	}
 	if cursorCallID(in.ToolUseID) {
-		a[AttrToolCallID] = in.ToolUseID
+		a[hookrun.AttrToolCallID] = in.ToolUseID
 	}
-	if _, named := a[AttrToolName]; !named {
-		if _, identified := a[AttrToolCallID]; !identified {
+	if _, named := a[hookrun.AttrToolName]; !named {
+		if _, identified := a[hookrun.AttrToolCallID]; !identified {
 			return nil, false
 		}
 	}
-	for k, v := range map[string]string{AttrTurnID: in.GenerationID, AttrModel: in.Model, "model_id": in.ModelID, "cursor.version": in.CursorVersion} {
-		BoundedAttr(a, k, v)
+	for k, v := range map[string]string{hookrun.AttrTurnID: in.GenerationID, hookrun.AttrModel: in.Model, "model_id": in.ModelID, "cursor.version": in.CursorVersion} {
+		hookrun.BoundedAttr(a, k, v)
 	}
 	cursorModelParams(in, a)
 	// Cursor reports the tool's execution time in milliseconds. Missing stays missing;
 	// a value that is not a non-negative integer is reported as invalid, not repaired.
-	if value, present, ok := JSONNumber(in.Duration, true); ok {
+	if value, present, ok := hookrun.JSONNumber(in.Duration, true); ok {
 		a["duration_ms"] = int64(value)
 	} else if present {
 		a["duration_status"] = "invalid"
 	}
 	switch hook {
 	case "postToolUse":
-		a[AttrStatus] = "completed"
+		a[hookrun.AttrStatus] = "completed"
 	case "postToolUseFailure":
-		a[AttrStatus] = "error"
+		a[hookrun.AttrStatus] = "error"
 		switch in.FailureType {
 		case "error", "timeout", "permission_denied":
 			a["failure_type"] = in.FailureType
 		default:
-			a["failure_type"] = UnknownValue
+			a["failure_type"] = hookrun.UnknownValue
 		}
 		if b, ok := cursorBool(in.IsInterrupt); ok {
 			a["is_interrupt"] = b
