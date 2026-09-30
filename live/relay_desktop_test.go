@@ -18,6 +18,7 @@ import (
 // personal one reaches nothing.
 func TestRelayClaudeDesktop(t *testing.T) {
 	forEachClaudeDesktop(t, func(t *testing.T, b Binary) {
+		Proves(t, "claude-desktop", b.Version, "relay.desktop")
 		track(t)
 		t.Setenv("ANTHROPIC_API_KEY", "synthetic-telemetry-key")
 		sb := New(t, Isolated, WithClaude(b))

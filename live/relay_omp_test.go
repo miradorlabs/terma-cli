@@ -27,6 +27,7 @@ func ompSandbox(t *testing.T, cmd string) func(t *testing.T) *Sandbox {
 // pointed straight at the receiver, and the relay drops none of an opted-in session's.
 func TestRelayWorkloadsOmp(t *testing.T) {
 	forEachOmp(t, func(t *testing.T, b Binary) {
+		ProvesAll(t, b, "relay.equivalent")
 		for _, w := range []struct{ name, cmd string }{{"reply", ""}, {"bash", "printf ok"}} {
 			t.Run(w.name, func(t *testing.T) {
 				runBoth(t, ompSandbox(t, w.cmd), func(t *testing.T, sb *Sandbox) {
@@ -44,6 +45,7 @@ func TestRelayWorkloadsOmp(t *testing.T) {
 // the unclaimed session and drops it, and nothing reaches upstream.
 func TestRelayOmpOutsideARepository(t *testing.T) {
 	forEachOmp(t, func(t *testing.T, b Binary) {
+		ProvesAll(t, b, "relay.only_opted_in")
 		track(t)
 		sb := ompSandbox(t, "")(t)
 		sb.UseRelay(RelayOptions{Start: true, Hold: 3 * time.Second})
@@ -70,6 +72,7 @@ func TestRelayOmpOutsideARepository(t *testing.T) {
 // omp at all (see TestRelayClaudeToolsGetNoExporter for why it matters).
 func TestRelayOmpToolsGetNoExporter(t *testing.T) {
 	forEachOmp(t, func(t *testing.T, b Binary) {
+		ProvesAll(t, b, "relay.tools_no_token")
 		track(t)
 		out, err := os.CreateTemp("", "terma-omp-env-*")
 		if err != nil {

@@ -17,6 +17,7 @@ import (
 // T3 is special to the relay.
 func TestRelayT3(t *testing.T) {
 	forEachT3(t, func(t *testing.T, b Binary) {
+		ProvesAll(t, b, "relay.telemetry")
 		track(t)
 		codexBuilds, claudeBuilds := CodexBinaries(t), ClaudeBinaries(t)
 		if len(codexBuilds) == 0 || len(claudeBuilds) == 0 {

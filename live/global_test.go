@@ -141,6 +141,7 @@ func projectOfSession(sb *Sandbox, sid string) map[string]int {
 
 func TestGlobalModeClaude(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
+		ProvesAll(t, b, "global.placement", "global.commits")
 		track(t)
 		t.Setenv("ANTHROPIC_API_KEY", "synthetic-telemetry-key")
 		sb := New(t, Isolated, WithClaude(b))
@@ -211,6 +212,7 @@ func TestGlobalModeClaude(t *testing.T) {
 // default — instead of being dropped.
 func TestGlobalModeCodex(t *testing.T) {
 	forEachCodex(t, func(t *testing.T, b Binary, _ bool) {
+		ProvesAll(t, b, "global.placement")
 		track(t)
 		t.Setenv("OPENAI_API_KEY", "synthetic-telemetry-key")
 		sb := New(t, Isolated, WithCodex(b))
@@ -291,6 +293,7 @@ func (sb *Sandbox) deployManaged() {
 func TestGlobalModeManagedConfig(t *testing.T) {
 	machineOnly(t)
 	forEachCodex(t, func(t *testing.T, b Binary, _ bool) {
+		ProvesAll(t, b, "global.managed")
 		track(t)
 		t.Setenv("OPENAI_API_KEY", "synthetic-telemetry-key")
 		sb := New(t, Isolated, WithCodex(b))

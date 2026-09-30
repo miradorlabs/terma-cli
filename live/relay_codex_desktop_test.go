@@ -43,6 +43,7 @@ func codexThreadReached(sb *Sandbox, thread string) (any, ok bool) {
 // counter cannot be split.
 func TestRelayCodexDesktop(t *testing.T) {
 	forEachCodex(t, func(t *testing.T, b Binary, _ bool) {
+		Proves(t, "codex-desktop", b.Version, "relay.desktop")
 		track(t)
 		sb, app, personal := codexDesktopSandbox(t, b)
 		work := app.ThreadStart(sb.Repo, true)
@@ -119,6 +120,7 @@ func metricNewest(m *metricspb.Metric) uint64 {
 // turn does must reach nothing.
 func TestRelayCodexDesktopResumedElsewhere(t *testing.T) {
 	forEachCodex(t, func(t *testing.T, b Binary, _ bool) {
+		Proves(t, "codex-desktop", b.Version, "relay.resumed_elsewhere")
 		track(t)
 		sb, app, personal := codexDesktopSandbox(t, b)
 		provider := httptest.NewServer(replyingCodexProvider(new(atomic.Int32)))
@@ -174,6 +176,7 @@ func titleOf(e telemetryEvidence) (title, thread, attribution string) {
 // daemon, reaches nothing — neither its prompt nor its own title.
 func TestRelayCodexDaemonTUI(t *testing.T) {
 	forEachCodex(t, func(t *testing.T, b Binary, _ bool) {
+		ProvesAll(t, b, "relay.daemon")
 		if versionLess(b.Version, "0.157.0") {
 			Record(t.Name(), "not run", "the TUI attaches to a daemon from 0.157")
 			t.Skip("the TUI attaches to a daemon from 0.157")

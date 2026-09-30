@@ -19,6 +19,7 @@ import (
 // Whatever Codex does with the id, nothing the resumed run does may reach upstream.
 func TestRelayCodexResumedElsewhere(t *testing.T) {
 	forEachCodex(t, func(t *testing.T, b Binary, _ bool) {
+		ProvesAll(t, b, "relay.resumed_elsewhere")
 		track(t)
 		t.Setenv("OPENAI_API_KEY", "synthetic-telemetry-key")
 		sb := New(t, Isolated, WithCodex(b))
@@ -91,6 +92,7 @@ func TestRelayLinkedWorktree(t *testing.T) {
 // its requests and tools are the parent's session's, and are forwarded with it.
 func TestRelayClaudeSubagent(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
+		ProvesAll(t, b, "relay.subagents")
 		track(t)
 		t.Setenv("ANTHROPIC_API_KEY", "synthetic-telemetry-key")
 		sb := New(t, Isolated, WithClaude(b))

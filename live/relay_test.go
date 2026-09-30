@@ -221,8 +221,10 @@ func relayMode(content bool) string {
 // claimed session, the project on every resource.
 func TestRelayClaude(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, newest bool) {
+		ProvesAll(t, b, "relay.telemetry")
 		for _, content := range []bool{true, false} {
 			t.Run(relayMode(content), func(t *testing.T) {
+				Proves(t, b.Harness, b.Version, map[bool]string{true: "relay.content_allowed", false: "relay.content_withheld"}[content])
 				track(t)
 				t.Setenv("ANTHROPIC_API_KEY", "synthetic-telemetry-key")
 				sb := New(t, Isolated, WithClaude(b))
@@ -256,8 +258,10 @@ func TestRelayClaude(t *testing.T) {
 // spans pass through their trace.
 func TestRelayCodex(t *testing.T) {
 	forEachCodex(t, func(t *testing.T, b Binary, newest bool) {
+		ProvesAll(t, b, "relay.telemetry")
 		for _, content := range []bool{true, false} {
 			t.Run(relayMode(content), func(t *testing.T) {
+				Proves(t, b.Harness, b.Version, map[bool]string{true: "relay.content_allowed", false: "relay.content_withheld"}[content])
 				track(t)
 				t.Setenv("OPENAI_API_KEY", "synthetic-telemetry-key")
 				sb := New(t, Isolated, WithCodex(b))
@@ -302,6 +306,7 @@ func TestRelayCodex(t *testing.T) {
 // on a machine that holds no key for its project.
 func TestRelayNegativeControls(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
+		ProvesAll(t, b, "relay.only_opted_in")
 		const hold = 3 * time.Second
 		run := func(t *testing.T, sb *Sandbox) string {
 			var calls atomic.Int32
@@ -373,6 +378,7 @@ func TestRelayNegativeControls(t *testing.T) {
 // first export races the relay's start is what the spike is here to measure.
 func TestRelayColdStart(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
+		ProvesAll(t, b, "relay.cold_start")
 		track(t)
 		t.Setenv("ANTHROPIC_API_KEY", "synthetic-telemetry-key")
 		sb := New(t, Isolated, WithClaude(b))
@@ -411,6 +417,7 @@ func TestRelayColdStart(t *testing.T) {
 // and the claim is written the way a hook writes it, seconds later.
 func TestRelayLateClaim(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
+		ProvesAll(t, b, "relay.late_claim")
 		track(t)
 		t.Setenv("ANTHROPIC_API_KEY", "synthetic-telemetry-key")
 		sb := New(t, Isolated, WithClaude(b))
@@ -501,6 +508,7 @@ func reached(r *Receiver) map[string]map[string]bool {
 // personal one reaches nothing.
 func TestRelayConcurrentProjects(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
+		ProvesAll(t, b, "relay.concurrent_projects")
 		track(t)
 		t.Setenv("ANTHROPIC_API_KEY", "synthetic-telemetry-key")
 		sb := New(t, Isolated, WithClaude(b))
@@ -573,6 +581,7 @@ func TestRelayConcurrentProjects(t *testing.T) {
 // records how much of the contract arrived.
 func TestRelayCodexColdStart(t *testing.T) {
 	forEachCodex(t, func(t *testing.T, b Binary, _ bool) {
+		ProvesAll(t, b, "relay.cold_start")
 		track(t)
 		t.Setenv("OPENAI_API_KEY", "synthetic-telemetry-key")
 		sb := New(t, Isolated, WithCodex(b))
@@ -652,6 +661,7 @@ func TestRelayClaudeFileToolsContent(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
 		for _, content := range []bool{false, true} {
 			t.Run(relayMode(content), func(t *testing.T) {
+				Proves(t, b.Harness, b.Version, map[bool]string{true: "relay.content_allowed", false: "relay.content_withheld"}[content])
 				track(t)
 				t.Setenv("ANTHROPIC_API_KEY", "synthetic-telemetry-key")
 				sb := New(t, Isolated, WithClaude(b))
@@ -729,6 +739,7 @@ func (sb *Sandbox) resumeClaude(dir, sid, prompt string) (string, error) {
 // This records what happens rather than assuming it.
 func TestRelayResumedElsewhere(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
+		ProvesAll(t, b, "relay.resumed_elsewhere")
 		track(t)
 		t.Setenv("ANTHROPIC_API_KEY", "synthetic-telemetry-key")
 		sb := New(t, Isolated, WithClaude(b))

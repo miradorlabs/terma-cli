@@ -218,6 +218,7 @@ func bash(cmd string) map[string]any {
 
 func TestRelayWorkloadsClaude(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
+		ProvesAll(t, b, "relay.equivalent")
 		file := func(sb *Sandbox) string { return filepath.Join(sb.Repo, "work.txt") }
 		workloads := []struct {
 			name      string
@@ -318,6 +319,7 @@ func codexWorkloadProvider(calls *atomic.Int32, cmds []string) http.Handler {
 
 func TestRelayWorkloadsCodex(t *testing.T) {
 	forEachCodex(t, func(t *testing.T, b Binary, _ bool) {
+		ProvesAll(t, b, "relay.equivalent")
 		workloads := []struct {
 			name string
 			cmds []string
@@ -381,6 +383,7 @@ func openAIToolCallProvider(calls *atomic.Int32, tool string, args map[string]an
 
 func TestRelayWorkloadsOpenCode(t *testing.T) {
 	forEachOpenCode(t, func(t *testing.T, b Binary, _ bool) {
+		ProvesAll(t, b, "relay.equivalent")
 		for _, w := range []struct{ name, cmd string }{{"reply", ""}, {"bash", "printf ok"}} {
 			t.Run(w.name, func(t *testing.T) {
 				var provider *httptest.Server

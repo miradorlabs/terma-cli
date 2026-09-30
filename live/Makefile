@@ -56,6 +56,14 @@ machines: machine-image
 	docker run --rm --security-opt seccomp=unconfined -v "$(CURDIR)":/work/live -w /work/live \
 	 -e TERMA_LIVE=1 -e TERMA_ENV=dev -e TERMA_LIVE_BINARY=/work/live/bin/linux/terma \
 	 -e TERMA_LIVE_CLAUDE_VERSIONS=installed -e TERMA_LIVE_CODEX_VERSIONS=installed \
-	 -e TERMA_LIVE_KNOWN_UPSTREAM=codex-session-end \
+	 -e TERMA_LIVE_KNOWN_UPSTREAM=codex-session-end -e TERMA_LIVE_REPORT=report/linux \
 	 $(MACHINE_IMAGE):$(CLAUDE_VERSION)-$(CODEX_VERSION) \
 	 ./bin/linux/live.test -test.v -test.timeout 40m -test.run '$(if $(RUN),$(RUN),$(MACHINE_RUN))'
+
+# The compatibility matrix (docs/COMPATIBILITY.md, docs/compat/): merge the latest runs'
+# report/compat.json — this machine's, and the Linux machine's from `make machines` —
+# into the history and render it. RUNS names other runs' files (CI's artefacts).
+RUNS ?= $(wildcard report/compat.json report/linux/compat.json)
+.PHONY: compat
+compat:
+	go run ./compatgen $(foreach r,$(RUNS),-run $(r))

@@ -15,6 +15,13 @@ func TestMain(m *testing.M) {
 		if err := WriteReport(dir); err != nil {
 			os.Stderr.WriteString("live report: " + err.Error() + "\n")
 		}
+		terma := os.Getenv("TERMA_LIVE_BINARY")
+		if terma == "" {
+			terma = "terma"
+		}
+		if err := WriteCompat(dir, Version(terma)); err != nil {
+			os.Stderr.WriteString("live compat: " + err.Error() + "\n")
+		}
 	}
 	os.Exit(code)
 }

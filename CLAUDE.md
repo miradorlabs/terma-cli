@@ -687,6 +687,17 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   asking the running relay for one (`POST /heartbeat?reason=setup` on the relay,
   `relayCheckIn`) — the platform's "installed and working", and the developer's proof the
   relay, their credential and the endpoint work; the stub's 404 reads as "not taken yet".
+- Compatibility matrix (`docs/COMPATIBILITY.md`, generated — never edit it by hand):
+  every live scenario says which harness capability it proves (`Proves` / `ProvesAll`,
+  `live/compat.go`; `Capabilities` is the row list, IDs append-only), and its outcome is
+  written per run to `report/compat.json` (`report/linux/` from `make machines`). `make
+  compat` (`live/compatgen`) merges runs into `docs/compat/history.json` (latest result,
+  first pass, per build × platform × capability; a run that skipped a capability keeps
+  what was known) plus hand-verified surfaces (`docs/compat/manual.json`: apps CI cannot
+  drive), and renders the markdown and `docs/compat/compat.json` for the website. The
+  nightly (`live.yml`) runs macOS and the Linux machine, renders the matrix, and pushes
+  it to the `compat-matrix` branch, whose history each night extends. A new scenario
+  that proves nothing in the matrix is a gap: tag it.
 - `live/relay_workloads_test.go` runs each workload directly and through the relay and
   requires the same telemetry and zero drops; long live matrix runs use frozen copies of
   `bin/terma` and `bin/live.test`, or a rebuild mid-run mixes versions.

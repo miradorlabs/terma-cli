@@ -31,8 +31,10 @@ func openCodeAgentRecords(e telemetryEvidence, sid string) int {
 
 func TestRelayOpenCode(t *testing.T) {
 	forEachOpenCode(t, func(t *testing.T, b Binary, _ bool) {
+		ProvesAll(t, b, "relay.telemetry")
 		for _, content := range []bool{true, false} {
 			t.Run(relayMode(content), func(t *testing.T) {
+				Proves(t, b.Harness, b.Version, map[bool]string{true: "relay.content_allowed", false: "relay.content_withheld"}[content])
 				track(t)
 				sb := New(t, Isolated)
 				var calls atomic.Int32
@@ -81,6 +83,7 @@ func TestRelayOpenCode(t *testing.T) {
 // also never exits there after finishing its turn, terma or not, so it is not driven.
 func TestRelayOpenCodeNegative(t *testing.T) {
 	forEachOpenCode(t, func(t *testing.T, b Binary, _ bool) {
+		ProvesAll(t, b, "relay.only_opted_in")
 		track(t)
 		sb := New(t, Isolated)
 		var calls atomic.Int32

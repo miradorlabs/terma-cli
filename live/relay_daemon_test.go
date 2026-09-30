@@ -31,6 +31,7 @@ func TestRelayDaemon(t *testing.T) {
 		t.Skip("the service test drives launchd")
 	}
 	forEachCodex(t, func(t *testing.T, b Binary, _ bool) {
+		ProvesAll(t, b, "relay.daemon")
 		track(t)
 		t.Setenv("OPENAI_API_KEY", "synthetic-telemetry-key")
 		sb := New(t, Isolated, WithCodex(b))

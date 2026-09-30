@@ -38,6 +38,7 @@ func hermesSession(t *testing.T, sb *Sandbox) string {
 // pointed straight at the receiver, and the relay drops none of an opted-in session's.
 func TestRelayWorkloadsHermes(t *testing.T) {
 	forEachHermes(t, func(t *testing.T, b Binary) {
+		ProvesAll(t, b, "relay.equivalent")
 		for _, w := range []struct {
 			name, tool string
 			args       map[string]any
@@ -62,8 +63,10 @@ func TestRelayWorkloadsHermes(t *testing.T) {
 // prompt, the reply nor the tool's arguments and result do.
 func TestRelayHermes(t *testing.T) {
 	forEachHermes(t, func(t *testing.T, b Binary) {
+		ProvesAll(t, b, "relay.telemetry")
 		for _, content := range []bool{true, false} {
 			t.Run(relayMode(content), func(t *testing.T) {
+				Proves(t, b.Harness, b.Version, map[bool]string{true: "relay.content_allowed", false: "relay.content_withheld"}[content])
 				track(t)
 				sb := hermesSandbox("write_file", map[string]any{"path": "hello.txt", "content": "TERMA_HERMES_FILE\n"})(t)
 				sb.UseRelay(RelayOptions{Start: true, Content: content})
@@ -119,6 +122,7 @@ func TestRelayHermes(t *testing.T) {
 // the unclaimed session and drops it, and nothing reaches upstream.
 func TestRelayHermesOutsideARepository(t *testing.T) {
 	forEachHermes(t, func(t *testing.T, b Binary) {
+		ProvesAll(t, b, "relay.only_opted_in")
 		track(t)
 		sb := hermesSandbox("", nil)(t)
 		sb.UseRelay(RelayOptions{Start: true, Hold: 3 * time.Second})

@@ -48,6 +48,7 @@ func dshSession(t *testing.T, sb *Sandbox) string {
 // pointed straight at the receiver, and the relay drops none of an opted-in session's.
 func TestRelayWorkloadsDsh(t *testing.T) {
 	forEachDsh(t, func(t *testing.T, b Binary) {
+		ProvesAll(t, b, "relay.equivalent")
 		for _, w := range []struct {
 			name  string
 			steps func(sb *Sandbox) []claudeStep
@@ -71,8 +72,10 @@ func TestRelayWorkloadsDsh(t *testing.T) {
 // dsh's session through the relay, content allowed and withheld.
 func TestRelayDsh(t *testing.T) {
 	forEachDsh(t, func(t *testing.T, b Binary) {
+		ProvesAll(t, b, "relay.telemetry")
 		for _, content := range []bool{true, false} {
 			t.Run(relayMode(content), func(t *testing.T) {
+				Proves(t, b.Harness, b.Version, map[bool]string{true: "relay.content_allowed", false: "relay.content_withheld"}[content])
 				track(t)
 				sb := dshSandbox(dshWrite("TERMA_DSH_FILE\n"))(t)
 				sb.UseRelay(RelayOptions{Start: true, Content: content})
@@ -146,6 +149,7 @@ func TestRelayDsh(t *testing.T) {
 // dsh outside any bound repository reaches nothing upstream.
 func TestRelayDshOutsideARepository(t *testing.T) {
 	forEachDsh(t, func(t *testing.T, b Binary) {
+		ProvesAll(t, b, "relay.only_opted_in")
 		track(t)
 		sb := dshSandbox(nil)(t)
 		sb.UseRelay(RelayOptions{Start: true, Hold: 3 * time.Second})

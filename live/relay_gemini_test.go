@@ -38,6 +38,7 @@ func geminiWrite(content string) func(sb *Sandbox) map[string]any {
 // dropped.
 func TestRelayWorkloadsGemini(t *testing.T) {
 	forEachGemini(t, func(t *testing.T, b Binary) {
+		ProvesAll(t, b, "relay.equivalent")
 		for _, w := range []struct {
 			name, tool string
 			args       func(sb *Sandbox) map[string]any
@@ -63,8 +64,10 @@ func TestRelayWorkloadsGemini(t *testing.T) {
 // the prompt (process.command_args) reaches upstream.
 func TestRelayGemini(t *testing.T) {
 	forEachGemini(t, func(t *testing.T, b Binary) {
+		ProvesAll(t, b, "relay.telemetry")
 		for _, content := range []bool{true, false} {
 			t.Run(relayMode(content), func(t *testing.T) {
+				Proves(t, b.Harness, b.Version, map[bool]string{true: "relay.content_allowed", false: "relay.content_withheld"}[content])
 				track(t)
 				sb := geminiSandbox("write_file", geminiWrite("TERMA_GEMINI_FILE\n"))(t)
 				sb.UseRelay(RelayOptions{Start: true, Content: content})
@@ -109,6 +112,7 @@ func TestRelayGemini(t *testing.T) {
 // unclaimed session and drops it, and nothing reaches upstream.
 func TestRelayGeminiOutsideARepository(t *testing.T) {
 	forEachGemini(t, func(t *testing.T, b Binary) {
+		ProvesAll(t, b, "relay.only_opted_in")
 		track(t)
 		sb := geminiSandbox("", nil)(t)
 		sb.UseRelay(RelayOptions{Start: true, Hold: 3 * time.Second})
@@ -135,6 +139,7 @@ func TestRelayGeminiOutsideARepository(t *testing.T) {
 // the endpoint, the token rides its path, and no environment is set.
 func TestRelayGeminiToolsGetNoExporter(t *testing.T) {
 	forEachGemini(t, func(t *testing.T, b Binary) {
+		ProvesAll(t, b, "relay.tools_no_token")
 		track(t)
 		out := filepath.Join(os.TempDir(), "terma-gemini-env-"+time.Now().Format("150405.000000"))
 		t.Cleanup(func() { _ = os.Remove(out) })

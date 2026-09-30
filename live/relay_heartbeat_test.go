@@ -13,6 +13,7 @@ import (
 // reaches the project's ingest.
 func TestRelayHeartbeat(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
+		ProvesAll(t, b, "relay.heartbeat")
 		track(t)
 		t.Setenv("ANTHROPIC_API_KEY", "synthetic-telemetry-key")
 		sb := New(t, Isolated, WithClaude(b))

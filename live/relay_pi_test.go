@@ -35,6 +35,7 @@ func piToolSandbox(tool string, args map[string]any) func(t *testing.T) *Sandbox
 // pointed straight at the receiver, and the relay drops none of an opted-in session's.
 func TestRelayWorkloadsPi(t *testing.T) {
 	forEachPi(t, func(t *testing.T, b Binary) {
+		ProvesAll(t, b, "relay.equivalent")
 		for _, w := range []struct {
 			name, tool string
 			args       map[string]any
@@ -59,6 +60,7 @@ func TestRelayWorkloadsPi(t *testing.T) {
 // holds the unclaimed session and drops it, and nothing reaches upstream.
 func TestRelayPiOutsideARepository(t *testing.T) {
 	forEachPi(t, func(t *testing.T, b Binary) {
+		ProvesAll(t, b, "relay.only_opted_in")
 		track(t)
 		sb := piSandbox("")(t)
 		sb.UseRelay(RelayOptions{Start: true, Hold: 3 * time.Second})
@@ -114,8 +116,10 @@ func TestPiAttribution(t *testing.T) {
 // the prompt, the reply nor the tool's command and output does.
 func TestRelayPi(t *testing.T) {
 	forEachPi(t, func(t *testing.T, b Binary) {
+		ProvesAll(t, b, "relay.telemetry")
 		for _, content := range []bool{true, false} {
 			t.Run(relayMode(content), func(t *testing.T) {
+				Proves(t, b.Harness, b.Version, map[bool]string{true: "relay.content_allowed", false: "relay.content_withheld"}[content])
 				track(t)
 				sb := piToolSandbox("bash", map[string]any{"command": "printf TERMA_PI_TOOL_OUTPUT"})(t)
 				sb.UseRelay(RelayOptions{Start: true, Content: content})
