@@ -3,6 +3,7 @@ package live
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -10,6 +11,9 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // Account stands in for Terma's account service and API gateway where `terma setup`
@@ -22,6 +26,7 @@ type Account struct {
 	mints atomic.Int32
 	mu    sync.Mutex
 	keys  map[string]string // project → minted key
+	beats [][]byte          // heartbeat bodies (OTLP/JSON), in arrival order
 }
 
 // accountOrg is the organization the fake account signs the developer in to.
@@ -53,6 +58,12 @@ func (sb *Sandbox) StartAccount() *Account {
 			a.keys[body.ProjectID] = key
 			a.mu.Unlock()
 			_ = json.NewEncoder(w).Encode(map[string]any{"key": key, "server_key": map[string]any{"id": fmt.Sprint(n), "project_id": body.ProjectID, "name": body.Name, "key_prefix": "ter_srv_"}})
+		case "/v1/relay/heartbeat":
+			body, _ := io.ReadAll(r.Body)
+			a.mu.Lock()
+			a.beats = append(a.beats, body)
+			a.mu.Unlock()
+			fmt.Fprint(w, `{}`)
 		default:
 			http.NotFound(w, r)
 		}
@@ -67,6 +78,20 @@ func (sb *Sandbox) StartAccount() *Account {
 	sb.writeAbs(filepath.Join(sb.TermaConfig, "credentials.json"), string(data)+"\n")
 	sb.ExtraEnv = append(sb.ExtraEnv, "TERMA_AUTH_URL="+a.srv.URL, "TERMA_API_URL="+a.srv.URL, "TERMA_APP_URL="+a.srv.URL)
 	return a
+}
+
+// Heartbeats are the relay heartbeats the account received, decoded.
+func (a *Account) Heartbeats() []*logspb.LogsData {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	var out []*logspb.LogsData
+	for _, b := range a.beats {
+		var m logspb.LogsData
+		if protojson.Unmarshal(b, &m) == nil {
+			out = append(out, &m)
+		}
+	}
+	return out
 }
 
 // KeyFor is the key the account minted for a project, "" if none.

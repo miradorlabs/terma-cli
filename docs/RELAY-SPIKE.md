@@ -371,6 +371,18 @@ For company laptops where the organization wants all AI spend, its policy (fetch
 
 **Not reached in global mode:** Cursor's own telemetry (it goes to Cursor's backend only), Claude Desktop's cowork VM, Goose, Aider, and AI used in a browser. The complete spend figure has to come from the providers' admin exports, reconciled against this.
 
+## Heartbeat
+
+The relay reports on itself to the organization every 15 minutes, for as long as it runs (the first beat a minute after it starts). One `terma.relay.heartbeat` log record, with no project on it, goes to the API gateway (`/v1/relay/heartbeat`, not built yet) with the developer's own sign-in. It says:
+- which terma runs, on which OS and architecture, and how it was installed;
+- a random machine id (never a hostname, path or email);
+- the collection mode and content policy;
+- the agents recorded, and which of them export to the relay;
+- the agent builds seen in forwarded telemetry;
+- when the relay last delivered, its counters by reason, and its queue sizes.
+
+A beat that fails is counted and dropped; the next carries the same cumulative counters. A machine not signed in sends none.
+
 ## Findings
 
 1. **Session keys:**

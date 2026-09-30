@@ -671,6 +671,18 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   service relay (`--idle 0`) that finds a hook-started one waits and takes over. Tests set
   `TERMA_RELAY_SERVICE=0` (and a test binary never registers one). A hook that had to start the relay waits up to 1 s
   for it to listen. `TERMA_RELAY_DEBUG=1` logs every drop.
+- Heartbeat (`internal/relay/heartbeat.go`, `cmd/relay_heartbeat.go`): every 15 minutes
+  (`TERMA_RELAY_HEARTBEAT` for a test; the first a minute after start), for as long as the
+  relay runs, one `terma.relay.heartbeat` OTLP log record — service.name `terma-relay`, **no
+  project**: it is the organization's — posted as OTLP/JSON to the API gateway's
+  `/v1/relay/heartbeat` with the developer's own credential (`api.SendHeartbeat`, a **stub**
+  endpoint until the backend serves it; a failure is counted, `heartbeats_failed`, never
+  queued — counters are cumulative). Facts only: terma version/os/arch/install kind, a
+  random machine id (`relay/machine-id`), mode and content policy, the agents recorded and
+  those whose exporters point at the relay, the agent builds seen in forwarded
+  telemetry (`relay.agent.<service>.version`), when it last delivered, its counters
+  (`relay.count.*`, unclassified keys only as a count), outbox and hold sizes. Never a
+  hostname, a path under HOME or an email (`TestHeartbeatFactsNameNoOne`).
 - `live/relay_workloads_test.go` runs each workload directly and through the relay and
   requires the same telemetry and zero drops; long live matrix runs use frozen copies of
   `bin/terma` and `bin/live.test`, or a rebuild mid-run mixes versions.
@@ -807,6 +819,9 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   `terma-opencode`, spans `chat <model>` with `gen_ai.usage.*` and
   `gen_ai.usage.total_cost`, `execute_tool <tool>`, events named in `event.name` — is
   what the platform's `opencode` aisignal adapter parses.
+- The relay heartbeat (`terma.relay.heartbeat`, OTLP/JSON logs, no project) posted to the
+  API gateway's `/v1/relay/heartbeat` under the developer's CLI token: the endpoint is not
+  built yet (`api.HeartbeatPath`), nor the collection policy's (`api.CollectionPolicy`).
 - Project header under a CLI token: `X-Mirador-Project` (`internal/api/client.go`).
   The shared gateway knows only that name; a Terma-branded header is a 400.
 - `.terma/settings.json` (`internal/project`, JSON): `project{id,name,organization_id,

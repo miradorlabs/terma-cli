@@ -175,10 +175,12 @@ func newRelayRunCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			// TERMA_RELAY_HEARTBEAT shortens the heartbeat's period for a test.
+			beat, _ := time.ParseDuration(os.Getenv("TERMA_RELAY_HEARTBEAT"))
 			minter := newRelayKeyMinter(cmd.Context(), cfg)
 			opts := relay.Options{Token: token, Hold: hold, Dir: filepath.Join(dir, relay.OutboxDir), Resolve: relayResolver(cfg, minter.mint), Version: Version,
-				CatchAll: relayCatchAll(),
-				PeerPID:  procinfo.FindSender, ClaimCacheTTL: time.Second, PolicyCacheTTL: 5 * time.Second}
+				CatchAll: relayCatchAll(), HeartbeatInfo: relayHeartbeatInfo(dir), HeartbeatSend: relayHeartbeatSend, HeartbeatEvery: max(beat, 0),
+				PeerPID: procinfo.FindSender, ClaimCacheTTL: time.Second, PolicyCacheTTL: 5 * time.Second}
 			if os.Getenv("TERMA_RELAY_DEBUG") == "1" {
 				errOut := cmd.ErrOrStderr()
 				opts.Logf = func(f string, a ...any) { fmt.Fprintf(errOut, time.Now().Format("15:04:05.000 ")+f+"\n", a...) }

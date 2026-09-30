@@ -364,6 +364,7 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 		}
 		r.stats.add("attributed_by_process."+string(p.signal), p.records)
 	}
+	r.noteDelivery(p)
 	r.enqueue(c, p)
 }
 
@@ -494,6 +495,9 @@ func (r *Relay) Run(ctx context.Context) {
 	r.janitor(time.Now())
 	r.recoverOutbox()
 	lastJanitor := time.Now()
+	// The first beat a minute after the relay starts — a relay a new build restarted says
+	// so soon — then every HeartbeatEvery.
+	lastBeat := r.opts.Now().Add(min(time.Minute, r.opts.HeartbeatEvery) - r.opts.HeartbeatEvery)
 	for {
 		select {
 		case <-ctx.Done():
@@ -531,6 +535,11 @@ func (r *Relay) Run(ctx context.Context) {
 			if now := time.Now(); now.Sub(lastJanitor) >= time.Minute {
 				r.janitor(now)
 				lastJanitor = now
+			}
+			if now := r.opts.Now(); now.Sub(lastBeat) >= r.opts.HeartbeatEvery {
+				// Off the sweep's goroutine: a slow host must not hold up the relay.
+				go r.heartbeat(ctx)
+				lastBeat = now
 			}
 		}
 	}

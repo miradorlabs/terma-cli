@@ -846,3 +846,89 @@ func TestRelayCatchAllInGlobalMode(t *testing.T) {
 		}
 	}
 }
+
+// The heartbeat is the organization's: it goes every period, whatever the relay
+// delivered, through HeartbeatSend and never to a project's host, with no project on it.
+// It says the machine's facts, the agent builds seen and the relay's counters, and
+// nothing any session said.
+func TestRelayHeartbeat(t *testing.T) {
+	u := newUpstream(t)
+	f := newFixture()
+	var mu sync.Mutex
+	var beats []*logspb.LogsData
+	r := New(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock, Version: "v9.9.9",
+		HeartbeatEvery: time.Minute,
+		HeartbeatInfo: func() map[string]any {
+			return map[string]any{"terma.version": "v9.9.9", "terma.mode": "repo", "terma.agents": []string{"claude", "codex"}}
+		},
+		HeartbeatSend: func(_ context.Context, b *logspb.LogsData) error {
+			mu.Lock()
+			beats = append(beats, b)
+			mu.Unlock()
+			return nil
+		},
+		Resolve: func(c claim.Claim) (Policy, error) {
+			if p, ok := allPolicies(u)[c.ProjectID]; ok {
+				return p, nil
+			}
+			return Policy{}, ErrNoKey
+		}})
+	go r.Run(t.Context())
+	srv := httptest.NewServer(r.Handler())
+	defer srv.Close()
+	count := func() int { mu.Lock(); defer mu.Unlock(); return len(beats) }
+	time.Sleep(20 * time.Millisecond) // Run takes its start time before the clock moves
+	// The first beat comes a minute after the start, delivered or not.
+	f.mu.Lock()
+	f.now = f.now.Add(61 * time.Second)
+	f.mu.Unlock()
+	waitFor(t, func() bool { return count() == 1 })
+
+	logs := logsOf("A", 1)
+	logs.ResourceLogs[0].Resource = &resourcepb.Resource{Attributes: []*commonpb.KeyValue{kv("service.name", "claude-code"), kv("service.version", "2.1.285")}}
+	body, _ := proto.Marshal(logs)
+	post(t, srv, "/v1/logs", body, "application/x-protobuf", token, false)
+	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["forwarded.logs"] == 1 })
+	f.mu.Lock()
+	f.now = f.now.Add(time.Minute)
+	f.mu.Unlock()
+	waitFor(t, func() bool { return count() == 2 })
+	// And on, with nothing delivered.
+	f.mu.Lock()
+	f.now = f.now.Add(time.Minute)
+	f.mu.Unlock()
+	waitFor(t, func() bool { return count() == 3 })
+
+	mu.Lock()
+	beat := beats[1]
+	mu.Unlock()
+	res := beat.ResourceLogs[0].Resource.Attributes
+	if attr(res, ProjectAttr) != "" || attr(res, "service.name") != HeartbeatService {
+		t.Fatalf("heartbeat resource %v", res)
+	}
+	rec := beat.ResourceLogs[0].ScopeLogs[0].LogRecords[0]
+	want := map[string]string{"event.name": HeartbeatEvent, "terma.version": "v9.9.9", "terma.mode": "repo", "relay.agent.claude-code.version": "2.1.285"}
+	for k, v := range want {
+		if got := attr(rec.Attributes, k); got != v {
+			t.Errorf("heartbeat %s = %q, want %q", k, got, v)
+		}
+	}
+	found := map[string]bool{}
+	for _, a := range rec.Attributes {
+		found[a.Key] = true
+	}
+	for _, k := range []string{"relay.count.forwarded.logs", "relay.count.received.logs", "relay.outbox.parts", "relay.uptime_s", "relay.last_delivery_at", "terma.agents"} {
+		if !found[k] {
+			t.Errorf("heartbeat has no %s", k)
+		}
+	}
+	// Nothing of it went to a project's host.
+	byAuth, _ := u.logs(t)
+	for auth, recs := range byAuth {
+		for _, l := range recs {
+			if attr(l.Attributes, "event.name") == HeartbeatEvent {
+				t.Fatalf("a heartbeat went to a project (%s)", auth)
+			}
+		}
+	}
+}
