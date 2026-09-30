@@ -102,7 +102,7 @@ func TestRelayRunsOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer unlock()
-	out, err := within(2*time.Second).combined(t, "relay", "run", "--idle", "0")
+	out, err := within(2*time.Second).combined(t, "relay", "run", "--idle", "1h")
 	if err != nil || !strings.Contains(out, "already running") || squatted(addr) {
 		t.Fatalf("a second relay started: %v\n%s", err, out)
 	}
@@ -235,7 +235,7 @@ func TestRelayStatusAgreesWithDoctor(t *testing.T) {
 func TestRelayServiceDefinitions(t *testing.T) {
 	env := map[string]string{"TERMA_CONFIG_DIR": "/tmp/a & b", "TERMA_ENV": "dev"}
 	plist := launchdPlist("ai.terma.relay.x", "/opt/terma/bin/terma", "/tmp/log", env)
-	for _, want := range []string{"<string>relay</string><string>run</string><string>--idle</string><string>0</string>", "<key>KeepAlive</key><true/>", "/tmp/a &amp; b"} {
+	for _, want := range []string{"<string>relay</string><string>run</string><string>--idle</string><string>0</string>", "<key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>", "/tmp/a &amp; b"} {
 		if !strings.Contains(plist, want) {
 			t.Errorf("plist lacks %q:\n%s", want, plist)
 		}
@@ -248,7 +248,7 @@ func TestRelayServiceDefinitions(t *testing.T) {
 		}
 	}
 	unit := systemdUnit("/opt/terma/bin/terma", env)
-	for _, want := range []string{`ExecStart="/opt/terma/bin/terma" relay run --idle 0 --quiet`, `Environment="TERMA_CONFIG_DIR=/tmp/a & b"`, "Restart=always"} {
+	for _, want := range []string{`ExecStart="/opt/terma/bin/terma" relay run --idle 0 --quiet`, `Environment="TERMA_CONFIG_DIR=/tmp/a & b"`, "Restart=on-failure"} {
 		if !strings.Contains(unit, want) {
 			t.Errorf("unit lacks %q:\n%s", want, unit)
 		}

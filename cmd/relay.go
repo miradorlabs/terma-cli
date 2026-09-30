@@ -128,7 +128,24 @@ func newRelayRunCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			// --idle 0 is the service's relay: it outlasts whichever relay a hook started
+			// while it was down, taking over when that one exits, and a machine whose
+			// relay setup is gone leaves it stopped (exit 0, see ExitRestart).
+			service := idle <= 0
+			if service {
+				if _, err := relayToken(); err != nil {
+					return nil
+				}
+			}
 			unlock, err := flock.TryLock(filepath.Join(dir, relayLockFile))
+			for service && flock.IsBusy(err) {
+				select {
+				case <-cmd.Context().Done():
+					return nil
+				case <-time.After(5 * time.Second):
+				}
+				unlock, err = flock.TryLock(filepath.Join(dir, relayLockFile))
+			}
 			if flock.IsBusy(err) {
 				if !quiet {
 					fmt.Fprintln(cmd.OutOrStdout(), "The relay is already running.")
@@ -154,7 +171,7 @@ func newRelayRunCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			opts := relay.Options{Token: token, Hold: hold, Resolve: relayResolver(cfg), Version: Version,
+			opts := relay.Options{Token: token, Hold: hold, Dir: filepath.Join(dir, relay.OutboxDir), Resolve: relayResolver(cfg), Version: Version,
 				PeerPID: procinfo.FindSender, ClaimCacheTTL: time.Second, PolicyCacheTTL: 5 * time.Second}
 			if os.Getenv("TERMA_RELAY_DEBUG") == "1" {
 				errOut := cmd.ErrOrStderr()
@@ -186,6 +203,7 @@ func newRelayRunCommand() *cobra.Command {
 			done := make(chan struct{})
 			go func() { r.Run(ctx); close(done) }()
 			self := executableStamp()
+			replaced := false
 			lastPrune := time.Now()
 			for tick := time.NewTicker(time.Second); ; {
 				select {
@@ -206,6 +224,7 @@ func newRelayRunCommand() *cobra.Command {
 					// once quiet, and the next hook starts the new one. Not mid-export —
 					// agents do not retry a refused connection.
 					if quiet && d >= time.Minute && self != "" && executableStamp() != self {
+						replaced = true
 						cancel()
 						break
 					}
@@ -224,6 +243,11 @@ func newRelayRunCommand() *cobra.Command {
 			<-done
 			if data, err := json.MarshalIndent(r.Stats().Snapshot(), "", "  "); err == nil {
 				_ = config.WriteFileAtomicNoSync(filepath.Join(dir, relayStatsFile), append(data, '\n'), 0o600)
+			}
+			if replaced {
+				// Under a service manager, the new binary starts now; a relay a hook
+				// started is started again by the next hook.
+				return exitWith(ExitRestart)
 			}
 			return nil
 		},
@@ -487,6 +511,15 @@ func newRelayStatusCommand() *cobra.Command {
 			}
 			for _, k := range snap.Keys() {
 				fmt.Fprintf(out, "  %-44s %d\n", k, snap.Counters[k])
+			}
+			// What waits on disk for delivery: accepted for a claimed session, not yet
+			// taken by its project's host. The next relay sends it.
+			for _, q := range relay.Backlog(filepath.Join(dir, relay.OutboxDir)) {
+				who := q.Project
+				if q.Tool != "" {
+					who += " (" + q.Tool + ")"
+				}
+				fmt.Fprintf(out, "Queued for %s: %d records in %d parts.\n", who, q.Records, q.Parts)
 			}
 			return nil
 		},

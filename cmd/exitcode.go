@@ -19,6 +19,10 @@ const (
 	// ExitIncomplete: the command ran and did not fail, but some work was left
 	// undone — for a flush, events still queued or given up on.
 	ExitIncomplete = 3
+	// ExitRestart: `terma relay run` stepped aside for a newer binary and asks its
+	// service manager to start that one (EX_TEMPFAIL). A relay that exits 0 is done —
+	// its setup is gone — and the service leaves it stopped.
+	ExitRestart = 75
 )
 
 // exitError carries an exit code out of a command without printing an error

@@ -20,12 +20,14 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
-// The relay as a per-user service: launchd on macOS, systemd --user on Linux. Opt-in.
-// Without it hooks start a relay on demand, which cannot close two gaps: what an agent
-// exports before its first hook (Codex's conversation_starts) when no relay runs, and
-// anything exported while none does. The service runs `terma relay run --idle 0` and is
-// restarted by the service manager — also when the relay steps aside for a replaced
-// binary, so an update takes effect without anyone restarting it.
+// The relay as a per-user service: launchd on macOS, systemd --user on Linux. `terma
+// install` sets it up by default (relayServiceWanted). Without it hooks start a relay on
+// demand, which cannot close two gaps: what an agent exports before its first hook
+// (Codex's conversation_starts) when no relay runs, and anything exported while none
+// does. The service runs `terma relay run --idle 0` and is restarted by the service
+// manager when it exits nonzero — a crash, or ExitRestart when the relay steps aside for
+// a replaced binary, so an update takes effect without anyone restarting it. A relay
+// that exits 0 found its setup gone (terma uninstalled) and stays stopped.
 
 // relayServiceName is the service's label: one per config directory, so a relay for a
 // sandboxed config (tests, a second profile directory) never collides with the real one.
@@ -96,7 +98,7 @@ func launchdPlist(label, exe, logPath string, env map[string]string) string {
 	}
 	b.WriteString(`  </dict>
   <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><true/>
+  <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
   <key>ThrottleInterval</key><integer>5</integer>
   <key>ProcessType</key><string>Background</string>
   <key>StandardOutPath</key><string>` + esc(logPath) + `</string>
@@ -114,7 +116,7 @@ func systemdUnit(exe string, env map[string]string) string {
 	for _, k := range sortedKeys(env) {
 		b.WriteString("Environment=" + strconv.Quote(k+"="+env[k]) + "\n")
 	}
-	b.WriteString("Restart=always\nRestartSec=5\n\n[Install]\nWantedBy=default.target\n")
+	b.WriteString("Restart=on-failure\nRestartSec=5\n\n[Install]\nWantedBy=default.target\n")
 	return b.String()
 }
 
@@ -276,6 +278,7 @@ func newRelayDaemonCommand() *cobra.Command {
 		Short: "Install and start the relay service",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			relayServiceWanted("on") // an explicit install clears an opt-out
 			path, err := installRelayService(cmd.Context())
 			if err != nil {
 				return err
@@ -292,6 +295,7 @@ func newRelayDaemonCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			relayServiceWanted("off") // and install does not put it back
 			if removed {
 				fmt.Fprintln(cmd.OutOrStdout(), "The relay service is removed; hooks start the relay on demand.")
 			} else {

@@ -39,6 +39,9 @@ type installFlags struct {
 	noHooks      bool
 	noDoctor     bool
 	noStatusLine bool
+	// relayService is --relay-service: "on", "off", or "" (keep the recorded choice; on
+	// for a first install where a service can run).
+	relayService string
 	// noPath keeps install out of the shell startup file: it prints the PATH line for the
 	// developer to place instead of writing it.
 	noPath   bool
@@ -110,6 +113,7 @@ The keys and per-project configuration live in your home directory; the committe
 	// pass them keep working.
 	_ = cmd.Flags().MarkHidden("activation")
 	_ = cmd.Flags().MarkHidden("no-path")
+	cmd.Flags().StringVar(&f.relayService, "relay-service", "", "run the local relay as a background service: on or off (default: on, or your last choice)")
 	cmd.Flags().BoolVar(&f.noStatusLine, "no-statusline", false, "do not wrap Claude Code's status line (which captures the plan's rate-limit windows)")
 	cmd.Flags().StringVar(&f.identity, "identity", "", "identity stamped on Codex/OpenCode sessions (default: git user.email; \"none\" to omit)")
 	cmd.Flags().StringVar(&f.signals, "signals", "", "comma-separated signals to export: traces, logs, metrics (default all)")
@@ -227,6 +231,12 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 		ui.warn("Project", "unresolved — a real install signs in and selects one"+env)
 	} else {
 		ui.summary("Project", nameOrID(b.Name, b.ID)+env)
+	}
+
+	switch f.relayService {
+	case "", "on", "off":
+	default:
+		return fmt.Errorf("--relay-service %q: want on or off", f.relayService)
 	}
 
 	// Whether the developer's agents send what was said, settled here — once the project
@@ -712,9 +722,7 @@ func connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *config.Conf
 	if slices.Contains(agents, codexDesktopAgent) {
 		ui.ok("Codex Desktop", "reports through the relay and this repository's hooks")
 	}
-	if _, ok := relayServiceInstalled(); !ok {
-		spawnRelay()
-	}
+	ensureRelay(ctx, ui, f.relayService)
 	return nil
 }
 

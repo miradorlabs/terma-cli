@@ -322,7 +322,9 @@ func (sb *Sandbox) baseEnv() []string {
 			env = append(env, "SHELL=/bin/zsh")
 		}
 	}
-	env = append(env, "PATH="+path, "TERM=xterm-256color", "COLORTERM=truecolor")
+	// TERMA_RELAY_SERVICE=0: `terma install` in a sandbox must not register the
+	// sandbox's relay with the developer's service manager; each test runs its own.
+	env = append(env, "PATH="+path, "TERM=xterm-256color", "COLORTERM=truecolor", "TERMA_RELAY_SERVICE=0")
 	// The one terma setting carried across: which environment's auth and API hosts a
 	// run may reach (TERMA_ENV=dev keeps anything that is not the receiver off
 	// production). Everything else of the developer's terma stays out.

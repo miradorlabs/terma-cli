@@ -63,7 +63,8 @@ func envWith(pairs ...string) []string {
 			out = append(out, e)
 		}
 	}
-	return append(out, pairs...)
+	// Never the real service manager: an install would register this sandbox's relay.
+	return append(append(out, "TERMA_RELAY_SERVICE=0"), pairs...)
 }
 
 // withPath returns the current environment with PATH replaced by the given directories.

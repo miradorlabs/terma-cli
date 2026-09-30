@@ -28,6 +28,7 @@ func TestDoctorScratchCommitRoundTrip(t *testing.T) {
 	repo := installRepo(t)
 	t.Setenv("PATH", filepath.Dir(bin)+string(os.PathListSeparator)+os.Getenv("PATH"))
 	t.Setenv("TERMA_HOOKS", "1")
+	t.Setenv("TERMA_RELAY_SERVICE", "0")
 	t.Setenv("TERMA_API_KEY", testServerKey)
 	t.Setenv("TERMA_NO_UPDATE_CHECK", "1")
 	var mu sync.Mutex
