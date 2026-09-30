@@ -498,6 +498,7 @@ func (r *Relay) Run(ctx context.Context) {
 	// The first beat a minute after the relay starts — a relay a new build restarted says
 	// so soon — then every HeartbeatEvery.
 	lastBeat := r.opts.Now().Add(min(time.Minute, r.opts.HeartbeatEvery) - r.opts.HeartbeatEvery)
+	beaten := false
 	for {
 		select {
 		case <-ctx.Done():
@@ -538,7 +539,11 @@ func (r *Relay) Run(ctx context.Context) {
 			}
 			if now := r.opts.Now(); now.Sub(lastBeat) >= r.opts.HeartbeatEvery {
 				// Off the sweep's goroutine: a slow host must not hold up the relay.
-				go r.heartbeat(ctx)
+				reason := HeartbeatInterval
+				if !beaten {
+					reason, beaten = HeartbeatStart, true
+				}
+				go func() { _ = r.heartbeat(ctx, reason) }()
 				lastBeat = now
 			}
 		}

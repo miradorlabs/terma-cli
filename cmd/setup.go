@@ -174,6 +174,14 @@ func runSetup(cmd *cobra.Command, f setupFlags) error {
 		func(step string) { steps = append(steps, step) }); err != nil {
 		return err
 	}
+	// 6. The check-in: the relay reports this machine to the organization now.
+	if len(relayTargets(names)) > 0 {
+		if ok, what := relayCheckIn(cmd.Context()); ok {
+			fmt.Fprintln(out, "  Check-in: "+what)
+		} else {
+			fmt.Fprintln(out, "  Check-in (needs you): "+what)
+		}
+	}
 	for i, step := range steps {
 		fmt.Fprintf(out, "%d. %s\n", i+1, step)
 	}

@@ -383,6 +383,8 @@ The relay reports on itself to the organization every 15 minutes, for as long as
 
 A beat that fails is counted and dropped; the next carries the same cumulative counters. A machine not signed in sends none.
 
+Each beat carries its reason: `start`, `interval`, or `setup`. `terma setup` ends by asking the running relay for a beat. That one is the platform's "installed and working" for the machine, and setup tells the developer whether it arrived.
+
 ## Findings
 
 1. **Session keys:**

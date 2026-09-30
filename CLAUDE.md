@@ -682,7 +682,11 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   those whose exporters point at the relay, the agent builds seen in forwarded
   telemetry (`relay.agent.<service>.version`), when it last delivered, its counters
   (`relay.count.*`, unclassified keys only as a count), outbox and hold sizes. Never a
-  hostname, a path under HOME or an email (`TestHeartbeatFactsNameNoOne`).
+  hostname, a path under HOME or an email (`TestHeartbeatFactsNameNoOne`). Each beat says
+  why (`terma.heartbeat.reason`: `start`, `interval`, or `setup`): `terma setup` ends by
+  asking the running relay for one (`POST /heartbeat?reason=setup` on the relay,
+  `relayCheckIn`) — the platform's "installed and working", and the developer's proof the
+  relay, their credential and the endpoint work; the stub's 404 reads as "not taken yet".
 - `live/relay_workloads_test.go` runs each workload directly and through the relay and
   requires the same telemetry and zero drops; long live matrix runs use frozen copies of
   `bin/terma` and `bin/live.test`, or a rebuild mid-run mixes versions.

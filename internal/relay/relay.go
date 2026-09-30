@@ -230,6 +230,30 @@ func (r *Relay) routes() *http.ServeMux {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(r.stats.Snapshot())
 	})
+	// A heartbeat now, with the reason given (?reason=setup): `terma setup` asks for one
+	// as it finishes, so the developer learns the whole path works — this relay, their
+	// credential, the organization's endpoint — or which part does not.
+	mux.HandleFunc("/heartbeat", func(w http.ResponseWriter, req *http.Request) {
+		if req.Method != http.MethodPost {
+			http.Error(w, "POST only", http.StatusMethodNotAllowed)
+			return
+		}
+		if !r.authorized(req) {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		reason := req.URL.Query().Get("reason")
+		if reason == "" || len(reason) > 32 {
+			reason = "request"
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if err := r.heartbeat(req.Context(), reason); err != nil {
+			w.WriteHeader(http.StatusBadGateway)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
+		_, _ = w.Write([]byte("{}"))
+	})
 	return mux
 }
 

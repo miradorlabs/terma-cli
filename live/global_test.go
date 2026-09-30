@@ -58,6 +58,23 @@ func (sb *Sandbox) UseGlobalSetup(agents string) *Account {
 	if !strings.Contains(out, "every session on this machine") {
 		t.Fatalf("setup did not enter global mode:\n%s", out)
 	}
+	// Setup ends with the machine's check-in, which the account received.
+	if !strings.Contains(out, "Check-in: this machine reported to your organization") {
+		t.Errorf("setup did not report its check-in:\n%s", out)
+	}
+	checkedIn := false
+	for _, beat := range acct.Heartbeats() {
+		for _, rl := range beat.ResourceLogs {
+			for _, sl := range rl.ScopeLogs {
+				for _, rec := range sl.LogRecords {
+					checkedIn = checkedIn || flatten(rec.Attributes)["terma.heartbeat.reason"] == "setup"
+				}
+			}
+		}
+	}
+	if !checkedIn {
+		t.Error("the account received no setup check-in")
+	}
 	// setup started a relay of its own; this one logs what it drops.
 	sb.StopRelay()
 	sb.StartRelay()

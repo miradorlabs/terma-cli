@@ -899,9 +899,25 @@ func TestRelayHeartbeat(t *testing.T) {
 	f.mu.Unlock()
 	waitFor(t, func() bool { return count() == 3 })
 
+	// Asked for one (as `terma setup` does), it beats now, with the reason given.
+	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/heartbeat?reason=setup", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	if resp, err := http.DefaultClient.Do(req); err != nil || resp.StatusCode != http.StatusOK {
+		t.Fatalf("POST /heartbeat: %v %v", resp, err)
+	}
+	if count() != 4 {
+		t.Fatalf("a requested beat was not sent: %d beats", count())
+	}
 	mu.Lock()
 	beat := beats[1]
+	reasons := []string{}
+	for _, b := range beats {
+		reasons = append(reasons, attr(b.ResourceLogs[0].ScopeLogs[0].LogRecords[0].Attributes, HeartbeatReasonAttr))
+	}
 	mu.Unlock()
+	if strings.Join(reasons, ",") != "start,interval,interval,setup" {
+		t.Errorf("beat reasons %v", reasons)
+	}
 	res := beat.ResourceLogs[0].Resource.Attributes
 	if attr(res, ProjectAttr) != "" || attr(res, "service.name") != HeartbeatService {
 		t.Fatalf("heartbeat resource %v", res)

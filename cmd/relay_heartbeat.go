@@ -4,7 +4,11 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -17,7 +21,9 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/harness"
+	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 )
 
@@ -164,4 +170,57 @@ func relayHeartbeatSend(ctx context.Context, beat *logspb.LogsData) error {
 		return err
 	}
 	return client.SendHeartbeat(ctx, body)
+}
+
+// relayCheckIn asks the running relay for a heartbeat now (reason "setup") and says
+// what came of it: the platform's "installed and working" for this machine, and the
+// developer's proof that the relay, their credential and the organization's endpoint
+// all work — or which of them does not. A relay that is still starting (a service
+// restarted to read a new policy) is waited for, briefly.
+func relayCheckIn(ctx context.Context) (ok bool, what string) {
+	dir, err := relayDir()
+	if err != nil {
+		return false, err.Error()
+	}
+	token, err := relayToken()
+	if err != nil {
+		return false, err.Error()
+	}
+	addr := relayAddr(dir)
+	client := &http.Client{Timeout: 20 * time.Second}
+	var resp *http.Response
+	// Waited for only when one is running (its lock is held) or its service will start
+	// it again; with neither, there is nothing to wait for.
+	wait := 15 * time.Second
+	if unlock, err := flock.TryLock(filepath.Join(dir, relayLockFile)); err == nil {
+		unlock()
+		if _, service := relayServiceInstalled(); !service {
+			wait = 0
+		}
+	}
+	for deadline := time.Now().Add(wait); ; time.Sleep(250 * time.Millisecond) {
+		req, _ := http.NewRequestWithContext(ctx, http.MethodPost, "http://"+addr+"/heartbeat?reason="+relay.HeartbeatSetup, nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		resp, err = client.Do(req)
+		if err == nil || time.Now().After(deadline) || ctx.Err() != nil {
+			break
+		}
+	}
+	if err != nil {
+		return false, "the relay did not answer on " + addr + "; `terma relay status` says why"
+	}
+	defer resp.Body.Close()
+	var body struct {
+		Error string `json:"error"`
+	}
+	_ = json.NewDecoder(io.LimitReader(resp.Body, 4096)).Decode(&body)
+	switch {
+	case resp.StatusCode == http.StatusOK:
+		return true, "this machine reported to your organization"
+	case strings.Contains(body.Error, "status 404"):
+		return true, "your organization does not take check-ins yet; the relay will keep trying every 15 minutes"
+	case body.Error != "":
+		return false, "the relay could not reach your organization: " + body.Error
+	}
+	return false, fmt.Sprintf("the relay answered %d", resp.StatusCode)
 }

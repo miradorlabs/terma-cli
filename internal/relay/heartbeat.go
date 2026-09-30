@@ -2,6 +2,7 @@ package relay
 
 import (
 	"context"
+	"errors"
 	"sort"
 	"strings"
 	"time"
@@ -77,29 +78,45 @@ func resourceService(p *part) (name, version string) {
 	return name, version
 }
 
-// heartbeat sends one beat, bounded by the send timeout; its outcome is counted.
-func (r *Relay) heartbeat(ctx context.Context) {
+// Why a beat was sent (HeartbeatReasonAttr): the relay started, its period came round,
+// or `terma setup` asked for one as it finished (HeartbeatSetup), which is the
+// platform's "installed and working" for the machine.
+const (
+	HeartbeatReasonAttr = "terma.heartbeat.reason"
+	HeartbeatStart      = "start"
+	HeartbeatInterval   = "interval"
+	HeartbeatSetup      = "setup"
+)
+
+// errNoHeartbeat is heartbeat's answer on a relay whose heartbeat is off.
+var errNoHeartbeat = errors.New("this relay sends no heartbeat")
+
+// heartbeat sends one beat, bounded by the send timeout; its outcome is counted and
+// returned.
+func (r *Relay) heartbeat(ctx context.Context, reason string) error {
 	if r.opts.HeartbeatInfo == nil || r.opts.HeartbeatSend == nil {
-		return
+		return errNoHeartbeat
 	}
 	ctx, cancel := context.WithTimeout(ctx, sendTimeout)
 	defer cancel()
-	if err := r.opts.HeartbeatSend(ctx, r.heartbeatData()); err != nil {
+	if err := r.opts.HeartbeatSend(ctx, r.heartbeatData(reason)); err != nil {
 		r.stats.add("heartbeats_failed", 1)
 		if r.opts.Logf != nil {
 			r.opts.Logf("heartbeat: %v", err)
 		}
-		return
+		return err
 	}
 	r.stats.add("heartbeats_sent", 1)
+	return nil
 }
 
 // heartbeatData is one beat: HeartbeatInfo's facts, the agent builds seen, when the
 // relay last delivered, its counters since it started and what waits in its outbox.
-func (r *Relay) heartbeatData() *logspb.LogsData {
+func (r *Relay) heartbeatData(reason string) *logspb.LogsData {
 	var attrs []*commonpb.KeyValue
 	add := func(k string, v *commonpb.AnyValue) { attrs = append(attrs, &commonpb.KeyValue{Key: k, Value: v}) }
 	add("event.name", strValue(HeartbeatEvent))
+	add(HeartbeatReasonAttr, strValue(reason))
 	info := r.opts.HeartbeatInfo()
 	for _, k := range sortedKeys(info) {
 		add(k, anyOf(info[k]))
