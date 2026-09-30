@@ -52,8 +52,6 @@ type Check struct {
 	Fix string
 	// Inconclusive means verification could not establish success or failure.
 	Inconclusive bool
-	// NeedsShellActivationOnly means the only remaining fix is activating shell routing.
-	NeedsShellActivationOnly bool
 	// Ready of Of counts agents that can export or run their hooks. Both zero means
 	// the check does not report a count.
 	Ready, Of int

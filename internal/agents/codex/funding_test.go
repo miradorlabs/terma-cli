@@ -132,9 +132,6 @@ func latestCodexQuota(t *testing.T, ctx context.Context, sessionID, transcript s
 }
 
 func TestCodexHasNoRepositoryScope(t *testing.T) {
-	if harness.ScopeOf(Codex{}) != harness.ScopeGlobal {
-		t.Error("a bare harness is global")
-	}
 	if _, ok := harness.Harness(Codex{}).(harness.Scoped); ok {
 		t.Error("Codex has one config file and must not claim a repository scope")
 	}

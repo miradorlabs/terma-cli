@@ -103,10 +103,10 @@ func TestGlobalRenderStillCarriesEverything(t *testing.T) {
 }
 
 func TestScopeOfAndParse(t *testing.T) {
-	if harness.ScopeOf(exporter{}) != harness.ScopeGlobal {
+	if (exporter{}).Scope() != harness.ScopeGlobal {
 		t.Error("a bare harness is global")
 	}
-	if harness.ScopeOf(exporter{}.Local("/repo")) != harness.ScopeLocal {
+	if (exporter{}).Local("/repo").(harness.Scoped).Scope() != harness.ScopeLocal {
 		t.Error("a bound harness is local")
 	}
 	for raw, want := range map[string]harness.Scope{"": harness.ScopeGlobal, "global": harness.ScopeGlobal, " Local ": harness.ScopeLocal} {

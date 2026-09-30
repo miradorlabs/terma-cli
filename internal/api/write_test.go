@@ -131,17 +131,14 @@ func TestDelete_SendsIfMatch(t *testing.T) {
 	}
 }
 
-// TestErrorClassifiers back apply's control flow: a 404 means "create instead",
-// a 412 means "someone else wrote first". Confusing them would either mask a
-// conflict or turn a first-time create into a spurious failure.
+// A 404 is "not found" and nothing near it is.
 func TestErrorClassifiers(t *testing.T) {
 	tests := []struct {
-		status          int
-		wantNotFound    bool
-		wantPrecondFail bool
+		status       int
+		wantNotFound bool
 	}{
 		{status: http.StatusNotFound, wantNotFound: true},
-		{status: http.StatusPreconditionFailed, wantPrecondFail: true},
+		{status: http.StatusPreconditionFailed},
 		{status: http.StatusPreconditionRequired},
 		{status: http.StatusConflict},
 	}
@@ -161,9 +158,6 @@ func TestErrorClassifiers(t *testing.T) {
 
 		if IsNotFound(err) != tc.wantNotFound {
 			t.Errorf("status %d: IsNotFound = %v, want %v", tc.status, IsNotFound(err), tc.wantNotFound)
-		}
-		if IsPreconditionFailed(err) != tc.wantPrecondFail {
-			t.Errorf("status %d: IsPreconditionFailed = %v, want %v", tc.status, IsPreconditionFailed(err), tc.wantPrecondFail)
 		}
 	}
 }

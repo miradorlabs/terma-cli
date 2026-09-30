@@ -190,7 +190,7 @@ func TestOpenCodeLocalPolicyCarriesNoDestination(t *testing.T) {
 	_, _ = opencodeIn(t)
 	repo := t.TempDir()
 	h := exporter{}.Local(repo)
-	if harness.ScopeOf(h) != harness.ScopeLocal {
+	if h.(harness.Scoped).Scope() != harness.ScopeLocal {
 		t.Fatal("Local must bind to the repository scope")
 	}
 	e := opencodeExporter(t, exporter{}, false)

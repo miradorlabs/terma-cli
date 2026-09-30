@@ -156,11 +156,6 @@ func (r *Registry) FlushesAfter(event string) bool {
 	return slices.ContainsFunc(r.all, func(a Agent) bool { return slices.Contains(a.FlushAfter(), event) })
 }
 
-// EventNames lists every hook event, sorted: the names committed into repositories.
-func (r *Registry) EventNames() []string {
-	return slices.Sorted(maps.Keys(r.Handlers()))
-}
-
 // ForTool resolves the agent whose hooks carry label.
 func (r *Registry) ForTool(label string) (Agent, bool) {
 	for _, a := range r.all {

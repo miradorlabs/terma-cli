@@ -114,3 +114,16 @@ func TestNumbersAndFlagsPassUnderAnyKey(t *testing.T) {
 		t.Fatalf("attrs %v, unclassified %v", attrs, unclassified)
 	}
 }
+
+// classify says how the relay treats key when a project's content is withheld: "safe"
+// (passes), "content" (marked or dropped) or "unclassified" (dropped, and counted so that
+// someone classifies it).
+func (ru *rules) classify(key string) string {
+	switch {
+	case ru.contentKey(key):
+		return "content"
+	case safeKey(key):
+		return "safe"
+	}
+	return "unclassified"
+}

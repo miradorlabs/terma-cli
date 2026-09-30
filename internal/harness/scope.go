@@ -51,14 +51,6 @@ type Scoped interface {
 	Scope() Scope
 }
 
-// ScopeOf reports the layer h acts on; a harness without the notion is global.
-func ScopeOf(h Harness) Scope {
-	if s, ok := h.(Scoped); ok {
-		return s.Scope()
-	}
-	return ScopeGlobal
-}
-
 // Reach is which repositories a *global* connect exports from. It is a different
 // question from Scope, which is where the file goes: a global connect always writes the
 // user's own settings, and Reach decides whether that file switches the exporters on for

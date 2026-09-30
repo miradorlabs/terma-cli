@@ -206,11 +206,6 @@ func intendsCapture(key string, e harness.Exporter) bool {
 	return false
 }
 
-// captureConflicts is captureConflictsIn for the user file — the global connect.
-func captureConflicts(e harness.Exporter) []harness.Conflict { //nolint:unused // exercised by capture_scope_test.go; unused runs with tests:false
-	return captureConflictsIn(e, exporter{}.layer())
-}
-
 // captureConflictsIn reports content capture that an outranking scope turns off while
 // this export means to turn it on.
 //

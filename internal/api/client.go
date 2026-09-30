@@ -253,13 +253,6 @@ func IsNotFound(err error) bool {
 	return errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound
 }
 
-// IsPreconditionFailed reports a 412: the resource changed between the read that
-// produced the ETag and the write that presented it.
-func IsPreconditionFailed(err error) bool {
-	var apiErr *APIError
-	return errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusPreconditionFailed
-}
-
 // GetWithMeta is Get plus the ETag, which a later Put or Delete must present.
 func (c *Client) GetWithMeta(ctx context.Context, path string, query url.Values, out any) (*Meta, error) {
 	return c.do(ctx, dataHost, http.MethodGet, path, query, nil, nil, out)

@@ -127,16 +127,6 @@ func (c *Client) cachedCheck(ctx context.Context, dir, current string) (Cache, *
 	return cache, release
 }
 
-// Notice returns an available-update message. Successful lookups are cached for
-// a day; failed lookups retry after 15 minutes.
-func (c *Client) Notice(ctx context.Context, dir, current string) string {
-	if !IsRelease(current) {
-		return ""
-	}
-	cache, _ := c.cachedCheck(ctx, dir, current)
-	return notice(cache, current)
-}
-
 // notice names `terma update` for every installation: it upgrades a package-managed one
 // through its package manager.
 func notice(cache Cache, current string) string {

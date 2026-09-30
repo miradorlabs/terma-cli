@@ -199,13 +199,13 @@ func TestNoticeUsesCache(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 	c := &Client{HTTP: srv.Client(), BaseURL: srv.URL, Version: "1.0.0"}
-	if msg := c.Notice(context.Background(), dir, "1.0.0"); !strings.Contains(msg, "2.0.0") {
+	if msg := noticeOf(c, context.Background(), dir, "1.0.0"); !strings.Contains(msg, "2.0.0") {
 		t.Fatalf("expected a notice, got %q", msg)
 	}
-	if msg := c.Notice(context.Background(), dir, "1.0.0"); !strings.Contains(msg, "2.0.0") || calls != 1 {
+	if msg := noticeOf(c, context.Background(), dir, "1.0.0"); !strings.Contains(msg, "2.0.0") || calls != 1 {
 		t.Fatalf("second notice should come from the cache (calls=%d): %q", calls, msg)
 	}
-	if msg := c.Notice(context.Background(), dir, "2.0.0"); msg != "" {
+	if msg := noticeOf(c, context.Background(), dir, "2.0.0"); msg != "" {
 		t.Fatalf("up to date should be silent, got %q", msg)
 	}
 }
@@ -224,7 +224,7 @@ func TestNoticeAsksNothingForABuildThatIsNotARelease(t *testing.T) {
 	defer srv.Close()
 	c := &Client{HTTP: srv.Client(), BaseURL: srv.URL}
 	for _, version := range []string{"dev", "", "1.2.3-next", "v1.2.3-next"} {
-		if msg := c.Notice(context.Background(), t.TempDir(), version); msg != "" {
+		if msg := noticeOf(c, context.Background(), t.TempDir(), version); msg != "" {
 			t.Errorf("%q: got a notice: %q", version, msg)
 		}
 	}

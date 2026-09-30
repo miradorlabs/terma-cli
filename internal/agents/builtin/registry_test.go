@@ -1,6 +1,7 @@
 package builtin
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -79,7 +80,7 @@ func TestEventNamesAreStable(t *testing.T) {
 		"post-tool-use", "session-end", "session-start", "stop", "stop-failure", "subagent-start", "subagent-stop",
 		"user-prompt-submit",
 	}
-	got := reg.EventNames()
+	got := slices.Sorted(maps.Keys(reg.Handlers()))
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("event names changed:\n got %v\nwant %v", got, want)
 	}

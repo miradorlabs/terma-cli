@@ -31,7 +31,7 @@ func findConflict(conflicts []harness.Conflict, key string) *harness.Conflict {
 // means to capture must say the content will not arrive.
 func TestCaptureConflictsReportsShellOverride(t *testing.T) {
 	t.Setenv(otelLogUserPrompts, "false")
-	got := captureConflicts(captureExporter())
+	got := captureConflictsIn(captureExporter(), exporter{}.layer())
 	c := findConflict(got, otelLogUserPrompts)
 	if c == nil {
 		t.Fatalf("expected %s to be reported, got %+v", otelLogUserPrompts, got)
@@ -50,7 +50,7 @@ func TestCaptureConflictsReportsShellOverride(t *testing.T) {
 // The same key exported as on is not a conflict — it agrees with the intent.
 func TestCaptureConflictsIgnoresAgreeingValue(t *testing.T) {
 	t.Setenv(otelLogUserPrompts, "1")
-	if got := captureConflicts(captureExporter()); len(got) != 0 {
+	if got := captureConflictsIn(captureExporter(), exporter{}.layer()); len(got) != 0 {
 		t.Fatalf("expected no conflict when the export agrees, got %+v", got)
 	}
 }
@@ -61,7 +61,7 @@ func TestCaptureConflictsSilentWhenNotCapturing(t *testing.T) {
 	t.Setenv(otelLogUserPrompts, "0")
 	e := captureExporter()
 	e.IncludePrompts = false
-	for _, c := range captureConflicts(e) {
+	for _, c := range captureConflictsIn(e, exporter{}.layer()) {
 		if c.Key == otelLogUserPrompts {
 			t.Fatalf("reported an override for content Terma is not capturing: %+v", c)
 		}
@@ -83,7 +83,7 @@ func TestCaptureConflictsReportsProjectOverride(t *testing.T) {
 	}
 	t.Chdir(repo)
 
-	got := captureConflicts(captureExporter())
+	got := captureConflictsIn(captureExporter(), exporter{}.layer())
 	c := findConflict(got, otelLogToolContent)
 	if c == nil {
 		t.Fatalf("expected %s to be reported, got %+v", otelLogToolContent, got)
@@ -97,7 +97,7 @@ func TestCaptureConflictsReportsProjectOverride(t *testing.T) {
 func TestCaptureConflictsNeverBlock(t *testing.T) {
 	t.Setenv(otelLogUserPrompts, "0")
 	t.Setenv(otelLogToolContent, "0")
-	for _, c := range captureConflicts(captureExporter()) {
+	for _, c := range captureConflictsIn(captureExporter(), exporter{}.layer()) {
 		if !c.Advisory {
 			t.Fatalf("%s would block a connect", c.Key)
 		}
