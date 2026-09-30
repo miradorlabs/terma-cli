@@ -84,15 +84,15 @@ func TestJournalSaveLoadDelete(t *testing.T) {
 // rather than replaced by a regular file.
 func TestResolveWritePath(t *testing.T) {
 	dir := t.TempDir()
-	real := filepath.Join(dir, "real.json")
-	if err := os.WriteFile(real, []byte("{}"), 0o600); err != nil {
+	target := filepath.Join(dir, "target.json")
+	if err := os.WriteFile(target, []byte("{}"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	link := filepath.Join(dir, "link.json")
-	if err := os.Symlink(real, link); err != nil {
+	if err := os.Symlink(target, link); err != nil {
 		t.Skip("symlinks unavailable")
 	}
-	resolvedReal, _ := filepath.EvalSymlinks(real)
+	resolvedReal, _ := filepath.EvalSymlinks(target)
 	if got, linked, err := ResolveWritePath(link); err != nil || !linked || got != resolvedReal {
 		t.Fatalf("link: %q %v %v", got, linked, err)
 	}

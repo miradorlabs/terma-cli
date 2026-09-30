@@ -124,8 +124,18 @@ func TestCommittedHookCommandsAreInertWithoutTerma(t *testing.T) {
 		}
 		for _, command := range committedCommands(t, a) {
 			t.Run(a.Name()+"/"+command, func(t *testing.T) {
+				dir := t.TempDir()
+				// A command may extend PATH before its guard (Codex's does); where that finds a
+				// real terma, running the command would run it.
+				if i := strings.Index(command, "; command -v terma"); i >= 0 {
+					probe := exec.Command("sh", "-c", command[:i+2]+"command -v terma")
+					probe.Env = []string{"PATH=/usr/bin:/bin", "HOME=" + dir}
+					if probe.Run() == nil {
+						t.Skip("a terma is installed where this command looks for one")
+					}
+				}
 				cmd := exec.Command("sh", "-c", command)
-				cmd.Dir = t.TempDir()
+				cmd.Dir = dir
 				cmd.Env = []string{"PATH=/usr/bin:/bin", "HOME=" + cmd.Dir}
 				cmd.Stdin = strings.NewReader(`{"session_id":"s1","hook_event_name":"SessionStart","cwd":"` + cmd.Dir + `"}`)
 				var stdout, stderr strings.Builder
