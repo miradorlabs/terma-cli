@@ -43,7 +43,7 @@ func newRelayRunCommand() *cobra.Command {
 			res, err := daemon.Run(ctx, daemon.Config{
 				Dir: dir, Addr: addr, Idle: idle,
 				Engine:  relayRunOptions(ctx, cmd, dir, cfg),
-				Workers: []func(context.Context){pollCollectionPolicy},
+				Workers: []func(context.Context){policyRefresher().Run},
 				Listening: func(at net.Addr, hold time.Duration) {
 					if !quiet {
 						fmt.Fprintf(cmd.OutOrStdout(), "Relay listening on %s (hold %s, idle exit %s).\n", at, hold, idle)
@@ -106,8 +106,8 @@ func relayRunOptions(ctx context.Context, cmd *cobra.Command, dir string, cfg *c
 	beat, _ := time.ParseDuration(os.Getenv("TERMA_RELAY_HEARTBEAT"))
 	minter := newRelayKeyMinter(ctx, cfg)
 	opts := relay.Options{Correlators: registered.With[shape.Correlator](), Capturers: registered.With[shape.Capturer](),
-		Hold: hold, Dir: filepath.Join(dir, relay.OutboxDir), Resolve: relayResolver(cfg, minter.mint), Version: Version,
-		CatchAll: relayCatchAll(), HeartbeatInfo: relayHeartbeatInfo(dir), HeartbeatSend: relayHeartbeatSend, HeartbeatEvery: max(beat, 0),
+		Hold: hold, Dir: filepath.Join(dir, relay.OutboxDir), Resolve: relayResolver(cfg, minter.Mint), Version: Version,
+		CatchAll: relayCatchAll(), HeartbeatInfo: relayHeartbeat(dir).Info(), HeartbeatSend: relayHeartbeatSend, HeartbeatEvery: max(beat, 0),
 		PeerPID: procinfo.FindSender, ProcessAlive: harness.ProcessAlive, ClaimCacheTTL: time.Second, PolicyCacheTTL: time.Second}
 	if os.Getenv("TERMA_RELAY_DEBUG") == "1" {
 		errOut := cmd.ErrOrStderr()

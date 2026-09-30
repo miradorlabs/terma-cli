@@ -18,7 +18,7 @@ import (
 // no hostname, no home directory, no account. The machine id is random and stays put.
 func TestHeartbeatFactsNameNoOne(t *testing.T) {
 	dir := relaySandbox(t)
-	facts := heartbeatFacts(dir)
+	facts := relayHeartbeat(dir).Facts()
 	for _, k := range []string{"terma.version", "terma.os", "terma.arch", "terma.machine_id", "terma.install", "terma.mode", "terma.relay.service"} {
 		if _, ok := facts[k]; !ok {
 			t.Errorf("no %s in %v", k, facts)
@@ -33,7 +33,7 @@ func TestHeartbeatFactsNameNoOne(t *testing.T) {
 		}
 	}
 	id := facts["terma.machine_id"]
-	if id == "" || heartbeatFacts(dir)["terma.machine_id"] != id {
+	if id == "" || relayHeartbeat(dir).Facts()["terma.machine_id"] != id {
 		t.Fatalf("machine id %q is not stable", id)
 	}
 }
@@ -48,7 +48,7 @@ func TestRelayCheckIn(t *testing.T) {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}
 	start := time.Now()
-	if ok, what := relayCheckIn(t.Context()); ok || !strings.Contains(what, "did not answer") || time.Since(start) > 3*time.Second {
+	if ok, what := daemon.CheckIn(t.Context()); ok || !strings.Contains(what, "did not answer") || time.Since(start) > 3*time.Second {
 		t.Fatalf("no relay: %v %q after %v", ok, what, time.Since(start))
 	}
 	for _, tc := range []struct {
@@ -75,7 +75,7 @@ func TestRelayCheckIn(t *testing.T) {
 		})}
 		go func() { _ = srv.Serve(ln) }()
 		unlock, _ := flock.TryLock(filepath.Join(dir, daemon.LockFile)) // "running"
-		ok, what := relayCheckIn(t.Context())
+		ok, what := daemon.CheckIn(t.Context())
 		if unlock != nil {
 			unlock()
 		}

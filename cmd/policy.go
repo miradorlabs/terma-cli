@@ -8,6 +8,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
+	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
@@ -64,19 +65,25 @@ func refreshCollectionPolicy(ctx context.Context, cfg *config.Config) error {
 	return nil
 }
 
-func currentTeamPolicy(ctx context.Context, cfg *config.Config, team string) (config.Policy, error) {
+// validatedPolicy is team's last validated policy for cfg's organization and
+// environment: its cache, or the profile's copy of the selected team's. A corrupt cache
+// grants nothing; only a new, validated response repairs it.
+func validatedPolicy(cfg *config.Config, team string) (config.Policy, bool) {
 	cached, ok, err := routing.LoadPolicy(team)
 	if err != nil {
-		// A corrupt cache grants nothing. Only a new, validated response can
-		// repair it; a rejected fetch leaves capture disabled.
-		ok = false
+		return config.Policy{}, false
 	}
 	if ok && !cached.AppliesTo(cfg.OrganizationID, cfg.AuthURL) {
 		ok = false
 	}
-	if err == nil && !ok && cfg.Policy.TeamID == team && cfg.Policy.AppliesTo(cfg.OrganizationID, cfg.AuthURL) && !cfg.Policy.FetchedAt.IsZero() {
+	if !ok && cfg.Policy.TeamID == team && cfg.Policy.AppliesTo(cfg.OrganizationID, cfg.AuthURL) && !cfg.Policy.FetchedAt.IsZero() {
 		cached, ok = cfg.Policy, true
 	}
+	return cached, ok
+}
+
+func currentTeamPolicy(ctx context.Context, cfg *config.Config, team string) (config.Policy, error) {
+	cached, ok := validatedPolicy(cfg, team)
 	if ok && time.Since(cached.FetchedAt) < policyRefreshInterval {
 		return cached, nil
 	}
@@ -91,9 +98,17 @@ func currentTeamPolicy(ctx context.Context, cfg *config.Config, team string) (co
 	return scoped.Policy, nil
 }
 
-func pollCollectionPolicy(ctx context.Context) {
-	for {
-		if cfg, err := loadConfig(); err == nil {
+// policyRefresher keeps every team this machine exports for fresh while the relay runs:
+// the teams with a key here, and the selected team (global mode's default project).
+func policyRefresher() *daemon.PolicyRefresher {
+	return &daemon.PolicyRefresher{
+		Interval: policyRefreshInterval,
+		Discover: 5 * time.Second,
+		Teams: func() []string {
+			cfg, err := loadConfig()
+			if err != nil {
+				return nil
+			}
 			teams := keystore.CollectionProjects()
 			selected := cfg.Policy.TeamID
 			if selected == "" && cfg.Policy.Global() {
@@ -102,23 +117,26 @@ func pollCollectionPolicy(ctx context.Context) {
 			if selected != "" && !slices.Contains(teams, selected) {
 				teams = append(teams, selected)
 			}
-			for _, team := range teams {
-				if ctx.Err() != nil {
-					return
-				}
-				scoped := *cfg
-				scoped.ProjectID = team
-				_, _ = currentTeamPolicy(ctx, &scoped, team)
+			return teams
+		},
+		Fetched: func(team string) time.Time {
+			cfg, err := loadConfig()
+			if err != nil {
+				return time.Time{}
 			}
-		}
-		// Discover newly connected teams promptly. Fresh caches avoid network calls;
-		// each team's policy still refreshes only once per minute.
-		timer := time.NewTimer(5 * time.Second)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return
-		case <-timer.C:
-		}
+			if cached, ok := validatedPolicy(cfg, team); ok {
+				return cached.FetchedAt
+			}
+			return time.Time{}
+		},
+		Refresh: func(ctx context.Context, team string) error {
+			cfg, err := loadConfig()
+			if err != nil {
+				return err
+			}
+			scoped := *cfg
+			scoped.ProjectID = team
+			return refreshCollectionPolicy(ctx, &scoped)
+		},
 	}
 }

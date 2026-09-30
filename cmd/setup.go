@@ -176,7 +176,7 @@ func runSetup(cmd *cobra.Command, f setupFlags) error {
 	}
 	// 6. The check-in: the relay reports this machine to the organization now.
 	if len(registered.RelayTargets(names)) > 0 {
-		if ok, what := relayCheckIn(cmd.Context()); ok {
+		if ok, what := daemon.CheckIn(cmd.Context()); ok {
 			fmt.Fprintln(out, "  Check-in: "+what)
 		} else {
 			fmt.Fprintln(out, "  Check-in (needs you): "+what)
