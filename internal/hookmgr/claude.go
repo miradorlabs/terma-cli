@@ -39,6 +39,17 @@ var ClaudeHooks = []struct {
 // PlanClaudeSettings merges terma's hooks into .claude/settings.json without
 // disturbing anything else in the file (unknown keys survive byte-for-byte).
 func PlanClaudeSettings(root string, install bool) (Plan, error) {
+	return planClaude(root, ClaudeSettingsPath, HookCommand, install)
+}
+
+// PlanClaudeUserHooks merges terma's hooks into Claude Code's user settings
+// (<configDir>/settings.json), with command naming each event: global mode's
+// machine-wide hooks (UserHookCommand).
+func PlanClaudeUserHooks(configDir string, command func(event string) string, install bool) (Plan, error) {
+	return planClaude(configDir, "settings.json", command, install)
+}
+
+func planClaude(root, path string, command func(event string) string, install bool) (Plan, error) {
 	type hookCmd struct {
 		Type    string `json:"type"`
 		Command string `json:"command"`
@@ -50,7 +61,7 @@ func PlanClaudeSettings(root string, install bool) (Plan, error) {
 	}
 	own := make([]eventHook, 0, len(ClaudeHooks))
 	for _, h := range ClaudeHooks {
-		cmd, err := marshalJSON(hookCmd{Type: "command", Command: h.Command, Timeout: 10}, "", "")
+		cmd, err := marshalJSON(hookCmd{Type: "command", Command: command(hookEventOf(h.Command)), Timeout: 10}, "", "")
 		if err != nil {
 			return Plan{}, err
 		}
@@ -60,5 +71,5 @@ func PlanClaudeSettings(root string, install bool) (Plan, error) {
 		}
 		own = append(own, eventHook{Event: h.Event, Entry: entry})
 	}
-	return mergeEventHooks(root, hooksFile{Path: ClaudeSettingsPath}, own, install)
+	return mergeEventHooks(root, hooksFile{Path: path}, own, install)
 }

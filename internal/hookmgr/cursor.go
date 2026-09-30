@@ -56,6 +56,17 @@ func HasCursor(root string) bool {
 // PlanCursorHooks merges terma's hooks into .cursor/hooks.json without disturbing
 // anything else in the file (unknown keys survive byte-for-byte).
 func PlanCursorHooks(root string, install bool) (Plan, error) {
+	return planCursor(root, CursorHooksPath, HookCommand, install)
+}
+
+// PlanCursorUserHooks merges terma's hooks into Cursor's user-level hooks file
+// (<dir>/hooks.json, ~/.cursor), with command naming each event: global mode's
+// machine-wide hooks.
+func PlanCursorUserHooks(dir string, command func(event string) string, install bool) (Plan, error) {
+	return planCursor(dir, "hooks.json", command, install)
+}
+
+func planCursor(root, path string, command func(event string) string, install bool) (Plan, error) {
 	type hookEntry struct {
 		Command   string          `json:"command"`
 		Timeout   int             `json:"timeout,omitempty"`
@@ -63,7 +74,7 @@ func PlanCursorHooks(root string, install bool) (Plan, error) {
 	}
 	own := make([]eventHook, 0, len(CursorHooks))
 	for _, h := range CursorHooks {
-		value := hookEntry{Command: h.Command, Timeout: 10}
+		value := hookEntry{Command: command(hookEventOf(h.Command)), Timeout: 10}
 		if h.Event == "stop" || h.Event == "subagentStop" {
 			// Cursor defaults to skipping stop and subagentStop hooks after five
 			// continuation loops. Observation must continue; terma never requests a loop.
@@ -78,7 +89,7 @@ func PlanCursorHooks(root string, install bool) (Plan, error) {
 	// Cursor refuses a file without its schema version, so terma sets one on a file it
 	// creates. The version survives uninstall because it may predate Terma.
 	return mergeEventHooks(root, hooksFile{
-		Path:     CursorHooksPath,
+		Path:     path,
 		Defaults: map[string]json.RawMessage{"version": json.RawMessage(cursorHooksVersion)},
 	}, own, install)
 }

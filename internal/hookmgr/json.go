@@ -7,9 +7,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"reflect"
+	"regexp"
+	"slices"
 	"sort"
 	"strings"
 )
+
+// userHookShape is UserHookCommand's output for any path and event.
+var userHookShape = regexp.MustCompile(`^\[ -x '(?:[^']|'\\'')+' \] && '(?:[^']|'\\'')+' hook --user [a-z0-9-]+ \|\| true$`)
 
 // callsTerma reports whether an entry contains a recognized Terma command, including
 // older unguarded commands. Mentions inside user scripts are not ownership evidence.
@@ -36,10 +41,8 @@ func anyOwnedCommand(v any) bool {
 			}
 		}
 	case []any:
-		for _, value := range t {
-			if anyOwnedCommand(value) {
-				return true
-			}
+		if slices.ContainsFunc(t, anyOwnedCommand) {
+			return true
 		}
 	}
 	return false
@@ -102,6 +105,12 @@ func marshalOrdered(m map[string]json.RawMessage) ([]byte, error) {
 // Merely mentioning "terma hook" in a user's script is not ownership evidence.
 func ownedHookCommand(command string) bool {
 	command = strings.TrimSpace(command)
+	// A machine-wide entry (UserHookCommand) names terma by an absolute path that
+	// differs per machine and moves when terma does: recognized by shape, so a later
+	// setup replaces it in place.
+	if userHookShape.MatchString(command) {
+		return true
+	}
 	var commands []string
 	for _, h := range ClaudeHooks {
 		commands = append(commands, h.Command)

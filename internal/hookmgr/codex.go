@@ -103,6 +103,18 @@ type codexMatcherGroup struct {
 // level: only `description` and `hooks` may appear, and both are written back as they
 // were read.
 func PlanCodexHooks(root string, install bool) (Plan, error) {
+	return planCodex(root, CodexHooksPath, CodexHookCommand, install)
+}
+
+// PlanCodexUserHooks merges terma's hooks into Codex's user-level hooks file
+// ($CODEX_HOME/hooks.json), with command naming each event: global mode's machine-wide
+// hooks. Codex runs them in every workspace once the developer trusts them — or with
+// no trust step when the organization deploys the same entries as managed config.
+func PlanCodexUserHooks(codexHome string, command func(event string) string, install bool) (Plan, error) {
+	return planCodex(codexHome, "hooks.json", command, install)
+}
+
+func planCodex(root, path string, command func(event string) string, install bool) (Plan, error) {
 	// A group is terma's when one of its handlers calls the binary, which keeps a
 	// developer's own group in the same event untouched. Codex trusts a hook by the hash
 	// of its entry, so a group brought up to date from an older terma is one the
@@ -110,7 +122,7 @@ func PlanCodexHooks(root string, install bool) (Plan, error) {
 	own := make([]eventHook, 0, len(CodexHooks))
 	for _, h := range CodexHooks {
 		handler, err := marshalJSON(codexHookHandler{
-			Type: "command", Command: h.Command, Timeout: h.Timeout, Async: h.Async,
+			Type: "command", Command: command(hookEventOf(h.Command)), Timeout: h.Timeout, Async: h.Async,
 		}, "", "")
 		if err != nil {
 			return Plan{}, err
@@ -121,7 +133,7 @@ func PlanCodexHooks(root string, install bool) (Plan, error) {
 		}
 		own = append(own, eventHook{Event: h.Event, Entry: group})
 	}
-	return mergeEventHooks(root, hooksFile{Path: CodexHooksPath}, own, install)
+	return mergeEventHooks(root, hooksFile{Path: path}, own, install)
 }
 
 // CodexEntry is one of terma's hook entries in .codex/hooks.json, located the way Codex

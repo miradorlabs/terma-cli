@@ -66,6 +66,28 @@ func HookCommand(event string) string {
 	return "command -v terma >/dev/null 2>&1 && terma hook " + event + " || true"
 }
 
+// hookEventOf is the `terma hook <event>` name a committed command runs.
+func hookEventOf(command string) string {
+	_, rest, ok := strings.Cut(command, "terma hook ")
+	if !ok {
+		return ""
+	}
+	event, _, _ := strings.Cut(rest, " ")
+	return event
+}
+
+// UserHookCommand is the command a machine-wide (global mode) hook entry runs: terma by
+// its absolute path — an agent a desktop app started has the system PATH, and nothing
+// here is committed for another machine — with --user, which tells the hook that a
+// repository whose own committed hooks run handles the event itself. A terma that is
+// gone does nothing.
+func UserHookCommand(terma string) func(event string) string {
+	q := "'" + strings.ReplaceAll(terma, "'", `'\''`) + "'"
+	return func(event string) string {
+		return "[ -x " + q + " ] && " + q + " hook --user " + event + " || true"
+	}
+}
+
 // Detection is what Detect found.
 type Detection struct {
 	Manager    Manager

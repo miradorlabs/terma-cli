@@ -149,15 +149,56 @@ func runSetup(cmd *cobra.Command, f setupFlags) error {
 	if err != nil {
 		return err
 	}
+
+	// 5. Global mode: hooks for every session and every commit on the machine, not only
+	// repositories that opted in. Leaving global mode takes them away again.
+	if err := applyGlobalMode(cmd.Context(), names, pol.Global(), func(what string) { fmt.Fprintln(out, "  "+what) },
+		func(step string) { steps = append(steps, step) }); err != nil {
+		return err
+	}
 	for i, step := range steps {
 		fmt.Fprintf(out, "%d. %s\n", i+1, step)
 	}
 
-	if slices.Contains(names, codexDesktopAgent) {
+	if slices.Contains(names, codexDesktopAgent) && !pol.Global() {
 		fmt.Fprintln(out, "Codex Desktop: in a connected repository, open Settings → Hooks → Review in Codex Desktop and approve Terma's hooks.")
+	}
+	if pol.Global() {
+		fmt.Fprintf(out, "\n%s Every session and commit on this machine reports to your organization.\n", style.For(out).Bold("Done!"))
+		return nil
 	}
 	fmt.Fprintf(out, "\n%s Repositories connected in Terma report on their own; run `terma install` to connect one from here.\n",
 		style.For(out).Bold("Done!"))
+	return nil
+}
+
+// applyGlobalMode puts global mode's machine-wide hooks in place (global), or takes
+// away any an earlier global setup left (not global): the agents' user-level hooks and
+// git's global hooks path. said reports what changed; then, what the developer must do.
+func applyGlobalMode(ctx context.Context, agents []string, global bool, said, then func(string)) error {
+	files, err := applyUserHooks(agents, global)
+	if err != nil {
+		return err
+	}
+	for _, f := range files {
+		if global {
+			said("Hooks for every session: " + tildePath(f))
+		} else {
+			said("Machine-wide hooks removed: " + tildePath(f))
+		}
+	}
+	if global && slices.Contains(userHookAgents(agents), "codex") && len(files) > 0 {
+		then("Codex runs its machine-wide hooks once you trust them: in Codex, open `/hooks` (Desktop: Settings → Hooks → Review) and approve Terma's. An organization that deploys them as managed configuration skips this step.")
+	}
+	changed, err := applyGlobalGitHooks(ctx, global)
+	if err != nil {
+		return fmt.Errorf("git's global hooks: %w", err)
+	}
+	if changed && global {
+		said("Git: every repository's commits are stamped (git config --global core.hooksPath); each repository's own hooks still run")
+	} else if changed {
+		said("Git: global hooks path restored")
+	}
 	return nil
 }
 

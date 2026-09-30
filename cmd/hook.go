@@ -55,6 +55,7 @@ func HooksDisabled() bool {
 }
 
 func newHookCommand() *cobra.Command {
+	var user bool
 	cmd := &cobra.Command{
 		Use:    "hook <event> [args...]",
 		Short:  "Internal: the runtime behind every installed hook shim",
@@ -88,6 +89,10 @@ func newHookCommand() *cobra.Command {
 				fmt.Fprintf(cmd.ErrOrStderr(), "terma hook: unknown event %q (ignored)\n", event)
 				return nil
 			}
+			policy := hookPolicy()
+			if _, git := gitHookEvents[event]; !git && hookYields(user, policy, hookrun.ToolForEvent(event)) {
+				return nil
+			}
 			cwd, err := os.Getwd()
 			if err != nil {
 				return nil
@@ -110,7 +115,7 @@ func newHookCommand() *cobra.Command {
 				Version: Version,
 				Debug:   os.Getenv("TERMA_DEBUG") != "",
 				Spool:   openSpool(),
-				Policy:  hookPolicy(),
+				Policy:  policy,
 			}
 			ctx, cancel := context.WithTimeout(cmd.Context(), 5*time.Second)
 			defer cancel()
@@ -128,6 +133,10 @@ func newHookCommand() *cobra.Command {
 			return nil
 		},
 	}
+	// --user marks a machine-wide (global mode) hook entry (hookmgr.UserHookCommand). Only
+	// before the event: what follows it is the event's own arguments, never flags.
+	cmd.Flags().BoolVar(&user, "user", false, "internal: a machine-wide hook entry")
+	cmd.Flags().SetInterspersed(false)
 	return cmd
 }
 
