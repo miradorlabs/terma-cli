@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/miradorlabs/terma-cli/internal/hookmgr"
+	"github.com/miradorlabs/terma-cli/internal/agents/codex"
 	"os"
 	"path/filepath"
 	"strings"
@@ -74,7 +74,7 @@ func TestDoctorAcceptsTrustedCodexHooks(t *testing.T) {
 	}
 	// What Codex writes once the developer trusts the hooks from inside it: a record for
 	// every entry terma installed.
-	trustCodexEntries(t, repo, codexHome, func(hookmgr.CodexEntry) bool { return true })
+	trustCodexEntries(t, repo, codexHome, func(codex.Entry) bool { return true })
 
 	out, _ := runTerma(t, "doctor", "--skip-commit")
 	if !strings.Contains(out, "Codex hooks present and trusted") {
@@ -92,13 +92,13 @@ func TestDoctorRejectsChangedCodexHookAfterTrust(t *testing.T) {
 	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude,codex", "--yes"); err != nil {
 		t.Fatal(err)
 	}
-	trustCodexEntries(t, repo, codexHome, func(hookmgr.CodexEntry) bool { return true })
+	trustCodexEntries(t, repo, codexHome, func(codex.Entry) bool { return true })
 	path := filepath.Join(codexHome, "config.toml")
 	before, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	entries, err := hookmgr.CodexTermaEntries(repo)
+	entries, err := codex.TermaEntries(repo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,9 +138,9 @@ func TestDoctorIgnoresCodexTrustWithoutTheAdapter(t *testing.T) {
 
 // trustCodexEntries writes the trust records Codex keeps in the user's config, for the
 // entries of the repository's hooks file that keep says the developer has trusted.
-func trustCodexEntries(t *testing.T, repo, codexHome string, keep func(hookmgr.CodexEntry) bool) {
+func trustCodexEntries(t *testing.T, repo, codexHome string, keep func(codex.Entry) bool) {
 	t.Helper()
-	entries, err := hookmgr.CodexTermaEntries(repo)
+	entries, err := codex.TermaEntries(repo)
 	if err != nil || len(entries) == 0 {
 		t.Fatalf("terma's Codex entries: %v (%d)", err, len(entries))
 	}
@@ -166,7 +166,7 @@ func TestDoctorNamesTheCodexEntriesANewerTermaAdded(t *testing.T) {
 	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude,codex", "--yes"); err != nil {
 		t.Fatal(err)
 	}
-	trustCodexEntries(t, repo, codexHome, func(e hookmgr.CodexEntry) bool { return !strings.HasPrefix(e.Event, "Subagent") })
+	trustCodexEntries(t, repo, codexHome, func(e codex.Entry) bool { return !strings.HasPrefix(e.Event, "Subagent") })
 
 	out, _ := runTerma(t, "doctor", "--skip-commit")
 	if strings.Contains(out, "Codex hooks present and trusted") {

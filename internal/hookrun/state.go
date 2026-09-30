@@ -18,14 +18,6 @@ import (
 const (
 	// fundingStateDir is the hash of the last funding evidence spooled per session.
 	fundingStateDir = "funding"
-	// codexFundingCursorDir and codexReplyCursorDir are how far into a Codex rollout
-	// the quota capture and the reply capture have read.
-	codexFundingCursorDir = "funding-cursors"
-	codexReplyCursorDir   = "reply-cursors"
-	codexDesktopCursorDir = "desktop-cursors"
-	// codexTitleStateDir is when each Codex thread's name that was last spooled was written.
-	codexTitleStateDir = "codex-titles"
-	codexToolStartDir  = "codex-tool-starts"
 )
 
 // SnapshotStateRetention is how long a status line snapshot or a funding evidence hash
@@ -33,11 +25,6 @@ const (
 // least every quotaHeartbeat, so two idle days means the session is over. The cursors
 // and checkpoints in the other directories are kept for spool.MaxAge, not for this.
 const SnapshotStateRetention = 48 * time.Hour
-
-// codexCaptureTimeout bounds each of a Codex hook's rollout captures, quota and then
-// replies. Stop is synchronous with a three-second timeout in the committed hooks file,
-// and both captures have to finish inside it.
-const codexCaptureTimeout = time.Second
 
 // observationLockWait is how long an observation waits for another hook of the same
 // session to release the checkpoint before it reports a capture gap, and

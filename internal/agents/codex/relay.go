@@ -11,7 +11,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/agents/internal/relayexport"
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
 const (
@@ -23,7 +22,7 @@ const (
 // ConfigureRelay points Codex's exporter at the local relay, noting a background
 // server that will keep exporting where it did until restarted.
 func (a Agent) ConfigureRelay(_ context.Context, cfg agents.RelayConfig) (agents.RelayResult, error) {
-	result, err := relayexport.Native(harness.Codex{}, cfg)
+	result, err := relayexport.Native(Codex{}, cfg)
 	if err != nil {
 		return result, err
 	}
@@ -36,7 +35,7 @@ func (a Agent) ConfigureRelay(_ context.Context, cfg agents.RelayConfig) (agents
 
 // RelayPointed reports whether Codex's exporter sends to the relay at addr.
 func (Agent) RelayPointed(addr string) (bool, bool) {
-	return relayexport.NativePointed(harness.Codex{}, addr), true
+	return relayexport.NativePointed(Codex{}, addr), true
 }
 
 // RelayProblem reports a background server started before Codex was pointed at the
@@ -49,8 +48,8 @@ func (Agent) RelayProblem(stateDir string) (string, string, bool) {
 	return fmt.Sprintf("Codex's background server (pid %d) started before Codex was pointed at the relay, and its threads still export where they did", d.PID), daemonRestart, true
 }
 
-func daemonPredates(dir string) (harness.CodexDaemon, bool) {
-	d, ok := harness.RunningCodexDaemon()
+func daemonPredates(dir string) (CodexDaemon, bool) {
+	d, ok := RunningCodexDaemon()
 	if !ok {
 		return d, false
 	}

@@ -17,7 +17,6 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
 	"github.com/miradorlabs/terma-cli/internal/relay"
@@ -311,7 +310,7 @@ func TestRefreshMigratesExportersBeforeRemovingShim(t *testing.T) {
 	if _, err := os.Stat(shim); !os.IsNotExist(err) {
 		t.Fatalf("shim not removed: %v", err)
 	}
-	st, err := (harness.Codex{}).Status()
+	st, err := harnessOf(t, "codex").Status()
 	if err != nil || !claim.Enabled() || !strings.HasPrefix(st.Endpoint, "http://127.0.0.1:") {
 		t.Fatalf("replacement exporter missing: %+v %v", st, err)
 	}

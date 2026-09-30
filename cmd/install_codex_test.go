@@ -18,7 +18,7 @@ func codexHooksIn(t *testing.T, repo string) map[string][]struct {
 	} `json:"hooks"`
 } {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join(repo, filepath.FromSlash(hookmgr.CodexHooksPath)))
+	data, err := os.ReadFile(filepath.Join(repo, filepath.FromSlash(hooksPathOf("codex"))))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,18 +45,18 @@ func TestInstallWiresCodexHooksWhenAsked(t *testing.T) {
 	}
 	hooks := codexHooksIn(t, repo)
 	for _, want := range []struct{ event, command string }{
-		{"SessionStart", hookmgr.CodexHookCommand("codex-session-start")},
-		{"PreToolUse", hookmgr.CodexHookCommand("codex-pre-tool-use")},
-		{"PermissionRequest", hookmgr.CodexHookCommand("codex-permission-request")},
-		{"PostToolUse", hookmgr.CodexHookCommand("codex-post-tool-use")},
-		{"SessionEnd", hookmgr.CodexHookCommand("codex-session-end")},
+		{"SessionStart", codexHookCommand("codex-session-start")},
+		{"PreToolUse", codexHookCommand("codex-pre-tool-use")},
+		{"PermissionRequest", codexHookCommand("codex-permission-request")},
+		{"PostToolUse", codexHookCommand("codex-post-tool-use")},
+		{"SessionEnd", codexHookCommand("codex-session-end")},
 	} {
 		groups := hooks[want.event]
 		if len(groups) != 1 || len(groups[0].Hooks) != 1 || groups[0].Hooks[0].Command != want.command {
 			t.Fatalf("%s not wired: %+v", want.event, groups)
 		}
 	}
-	if !strings.Contains(out, hookmgr.CodexHooksPath) {
+	if !strings.Contains(out, hooksPathOf("codex")) {
 		t.Fatalf("the plan should name the file it writes:\n%s", out)
 	}
 }
@@ -67,7 +67,7 @@ func TestInstallSkipsCodexHooksByDefault(t *testing.T) {
 	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--yes"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(repo, filepath.FromSlash(hookmgr.CodexHooksPath))); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(repo, filepath.FromSlash(hooksPathOf("codex")))); !os.IsNotExist(err) {
 		t.Fatal("Codex hooks written into a repository that has no .codex directory")
 	}
 }
@@ -94,7 +94,13 @@ func TestUninstallRemovesCodexHooks(t *testing.T) {
 	if _, err := runTerma(t, "uninstall", "--yes"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(repo, filepath.FromSlash(hookmgr.CodexHooksPath))); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(repo, filepath.FromSlash(hooksPathOf("codex")))); !os.IsNotExist(err) {
 		t.Fatal("uninstall left Codex hooks behind")
 	}
+}
+
+// codexHookCommand is what .codex/hooks.json runs for event: Codex gives hooks a minimal
+// PATH, so the committed command extends it before the guard.
+func codexHookCommand(event string) string {
+	return `PATH="${PATH:-/usr/bin:/bin}:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin"; ` + hookmgr.HookCommand(event)
 }

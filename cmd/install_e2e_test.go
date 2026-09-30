@@ -175,7 +175,7 @@ func TestInstallE2ELocations(t *testing.T) {
 			if err != nil || bound.Project.ID != testProjectID {
 				t.Fatalf("binding: %+v %v", bound, err)
 			}
-			for _, path := range []string{hooksPathOf("claude"), hooksPathOf("cursor"), hookmgr.CodexHooksPath, hooksPathOf("antigravity")} {
+			for _, path := range []string{hooksPathOf("claude"), hooksPathOf("cursor"), hooksPathOf("codex"), hooksPathOf("antigravity")} {
 				if !bytes.Contains(readInstallFile(t, root, path), []byte("terma hook")) {
 					t.Fatalf("missing hooks in %s", path)
 				}
@@ -210,7 +210,7 @@ func TestInstallE2ELocations(t *testing.T) {
 					t.Fatalf("child inherited parent binding: %s", out)
 				}
 			}
-			for _, path := range []string{hooksPathOf("claude"), hookmgr.CodexHooksPath, hooksPathOf("antigravity"), hookmgr.ShimDir + "/post-commit"} {
+			for _, path := range []string{hooksPathOf("claude"), hooksPathOf("codex"), hooksPathOf("antigravity"), hookmgr.ShimDir + "/post-commit"} {
 				requireAbsent(t, filepath.Join(root, path))
 			}
 			if bytes.Contains(readInstallFile(t, root, hooksPathOf("cursor")), []byte("terma hook")) {

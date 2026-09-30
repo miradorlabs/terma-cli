@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"maps"
 	"os"
@@ -355,13 +356,25 @@ func spoolEventAllowed(org config.Policy, projectID string, e spool.Event) bool 
 		return false
 	}
 	if e.Name == hookrun.EventAssistantMessage || e.Name == hookrun.EventSessionTitle {
-		return org.IncludePrompts && len(org.ExcludePaths) == 0 && hookrun.CodexRepliesConsented(projectID, org.Global())
+		return org.IncludePrompts && len(org.ExcludePaths) == 0 && contentConsented(e, projectID, org.Global())
 	}
 	rec, recorded, err := routing.LoadRecord(projectID)
 	if err != nil {
 		return false
 	}
 	return !recorded || slices.Contains(rec.Signals, "logs")
+}
+
+// contentConsented asks the agent that spooled e whether what it said may leave: an
+// event no agent owns carries nothing anyone consented to.
+func contentConsented(e spool.Event, projectID string, global bool) bool {
+	tool, _ := e.Attrs[hookrun.AttrTool].(string)
+	a, ok := registered.ForTool(tool)
+	if !ok {
+		return false
+	}
+	c, ok := a.(agents.ContentConsent)
+	return ok && c.ContentConsented(projectID, global)
 }
 
 // projectEndpoint is the ingest host a project's events are delivered to: the one its

@@ -2,8 +2,6 @@ package hookmgr
 
 import (
 	"testing"
-
-	"github.com/pelletier/go-toml/v2"
 )
 
 func TestUserHookCommandShape(t *testing.T) {
@@ -25,29 +23,5 @@ func TestManagedConfig(t *testing.T) {
 	cmd := ManagedHookCommand("$HOME/.local/bin/terma")
 	if got := cmd("codex-stop"); got != `[ -x "$HOME/.local/bin/terma" ] && "$HOME/.local/bin/terma" hook --user codex-stop || true` || !ownedHookCommand(got) {
 		t.Fatalf("managed command %q", got)
-	}
-	var req struct {
-		Hooks map[string][]struct {
-			Hooks []struct {
-				Type    string `toml:"type"`
-				Command string `toml:"command"`
-				Timeout int    `toml:"timeout"`
-				Async   bool   `toml:"async"`
-			} `toml:"hooks"`
-		} `toml:"hooks"`
-	}
-	text := CodexManagedRequirements(cmd)
-	if err := toml.Unmarshal([]byte(text), &req); err != nil {
-		t.Fatalf("requirements.toml does not parse: %v\n%s", err, text)
-	}
-	for _, h := range CodexHooks {
-		groups := req.Hooks[h.Event]
-		if len(groups) != 1 || len(groups[0].Hooks) != 1 {
-			t.Fatalf("%s: %+v", h.Event, groups)
-		}
-		got := groups[0].Hooks[0]
-		if got.Type != "command" || got.Command != cmd(HookEventOf(h.Command)) || got.Timeout != h.Timeout || got.Async != h.Async {
-			t.Errorf("%s: %+v", h.Event, got)
-		}
 	}
 }

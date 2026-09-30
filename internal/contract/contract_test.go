@@ -12,6 +12,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
+	"github.com/miradorlabs/terma-cli/internal/agents/codex"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 )
 
@@ -47,14 +48,15 @@ func TestCommittedHookFiles(t *testing.T) {
 // again.
 func TestCodexTrustKeys(t *testing.T) {
 	root := t.TempDir()
-	plan, err := hookmgr.PlanCodexHooks(root, true)
+	a, _ := builtin.Agents().Lookup("codex")
+	plan, err := a.Plan(root, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := hookmgr.Apply(root, plan); err != nil {
 		t.Fatal(err)
 	}
-	entries, err := hookmgr.CodexTermaEntries(root)
+	entries, err := codex.TermaEntries(root)
 	if err != nil {
 		t.Fatal(err)
 	}

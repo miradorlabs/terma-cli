@@ -28,7 +28,8 @@ type FundingEvidence struct {
 // EvidenceFileLimit bounds an evidence file terma reads.
 const EvidenceFileLimit = 2 << 20
 
-var evidenceLabel = regexp.MustCompile(`^[a-zA-Z0-9_.:-]{1,128}$`)
+// EvidenceLabel is what an evidence value copied as a label may look like.
+var EvidenceLabel = regexp.MustCompile(`^[a-zA-Z0-9_.:-]{1,128}$`)
 
 // ReadEvidenceJSON reads a regular JSON object file within the bound, with the status
 // "present"; when it cannot, the document is nil and the status says why: missing,
@@ -47,7 +48,7 @@ func ReadEvidenceJSON(path string) (map[string]json.RawMessage, string) {
 	if st.Size() > EvidenceFileLimit {
 		return nil, "oversized"
 	}
-	f, err := os.OpenFile(path, os.O_RDONLY|evidenceOpenFlags, 0)
+	f, err := os.OpenFile(path, os.O_RDONLY|EvidenceOpenFlags, 0)
 	if err != nil {
 		return nil, "unreadable"
 	}
@@ -69,7 +70,7 @@ func ReadEvidenceJSON(path string) (map[string]json.RawMessage, string) {
 // CopyEvidenceString copies doc[from] to dst[to] when it is a bounded label.
 func CopyEvidenceString(dst map[string]any, doc map[string]json.RawMessage, from, to string) {
 	var value string
-	if json.Unmarshal(doc[from], &value) == nil && evidenceLabel.MatchString(value) {
+	if json.Unmarshal(doc[from], &value) == nil && EvidenceLabel.MatchString(value) {
 		dst[to] = value
 	}
 }

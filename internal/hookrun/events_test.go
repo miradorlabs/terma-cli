@@ -52,13 +52,9 @@ func TestWireNamesAreFrozen(t *testing.T) {
 		AttrEvidenceStatus: "evidence_status",
 		AttrHookEvent:      "hook_event",
 
-		sourceCodexRollout:      "codex_rollout",
-		sourceCodexSessionIndex: "codex_session_index",
-		StatusPresent:           "present",
-		StatusUnavailable:       "unavailable",
-		UnknownValue:            "unknown",
-
-		codexTool: "codex",
+		StatusPresent:     "present",
+		StatusUnavailable: "unavailable",
+		UnknownValue:      "unknown",
 	} {
 		if got != want {
 			t.Errorf("wire name %q changed; it must stay %q", got, want)

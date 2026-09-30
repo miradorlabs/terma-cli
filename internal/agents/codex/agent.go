@@ -23,25 +23,25 @@ const codexHookReview = "open this repository in Codex Desktop, then go to Setti
 
 func (Agent) Name() string                       { return "codex" }
 func (Agent) DisplayName() string                { return "Codex" }
-func (Agent) Installed(ctx context.Context) bool { return harness.Codex{}.Detect(ctx).Found }
-func (Agent) HooksPath() string                  { return hookmgr.CodexHooksPath }
-func (Agent) Default(root string) bool           { return hookmgr.HasCodex(root) }
+func (Agent) Installed(ctx context.Context) bool { return Codex{}.Detect(ctx).Found }
+func (Agent) HooksPath() string                  { return hooksPath }
+func (Agent) Default(root string) bool           { return hasConfig(root) }
 func (Agent) Plan(root string, install bool) (hookmgr.Plan, error) {
-	return hookmgr.PlanCodexHooks(root, install)
+	return planHooks(root, install)
 }
 
 func (Agent) Events() map[string]agents.Handler {
 	return map[string]agents.Handler{
-		"codex-notify":             hookrun.CodexNotify,
-		"codex-session-start":      hookrun.CodexSessionStart,
-		"codex-user-prompt-submit": hookrun.CodexUserPromptSubmit,
-		"codex-pre-tool-use":       hookrun.CodexPreToolUse,
-		"codex-permission-request": hookrun.CodexPermissionRequest,
-		"codex-session-end":        hookrun.CodexSessionEnd,
-		"codex-post-tool-use":      hookrun.CodexPostToolUse,
-		"codex-stop":               hookrun.CodexStop,
-		"codex-subagent-start":     hookrun.CodexSubagentStart,
-		"codex-subagent-stop":      hookrun.CodexSubagentStop,
+		"codex-notify":             CodexNotify,
+		"codex-session-start":      CodexSessionStart,
+		"codex-user-prompt-submit": CodexUserPromptSubmit,
+		"codex-pre-tool-use":       CodexPreToolUse,
+		"codex-permission-request": CodexPermissionRequest,
+		"codex-session-end":        CodexSessionEnd,
+		"codex-post-tool-use":      CodexPostToolUse,
+		"codex-stop":               CodexStop,
+		"codex-subagent-start":     CodexSubagentStart,
+		"codex-subagent-stop":      CodexSubagentStop,
 	}
 }
 
@@ -49,16 +49,18 @@ func (Agent) FlushAfter() []string {
 	return []string{"codex-notify", "codex-session-end", "codex-stop", "codex-user-prompt-submit"}
 }
 
-func (Agent) UserHooksPath() (string, error) { return harness.CodexUserHooksPath() }
+func (Agent) UserHooksPath() (string, error) { return userHooksPath() }
 func (Agent) PlanUserHooks(dir string, command func(string) string, install bool) (hookmgr.Plan, error) {
-	return hookmgr.PlanCodexUserHooks(dir, command, install)
+	return planUserHooks(dir, command, install)
 }
-func (Agent) ManagedHookFiles(root string) []string { return harness.CodexManagedHookFiles(root) }
+func (Agent) ManagedHookFiles(root string) []string {
+	return []string{filepath.Join(root, "etc", "codex", "requirements.toml")}
+}
 
 // ManagedConfig is a requirements.toml holding terma's hooks, which Codex runs with no
 // trust step.
 func (Agent) ManagedConfig(command func(string) string) (string, []byte, error) {
-	return "codex-requirements.toml", []byte(hookmgr.CodexManagedRequirements(command)), nil
+	return "codex-requirements.toml", []byte(managedRequirements(command)), nil
 }
 
 // ManagedDeploy says where requirements.toml goes.
@@ -72,7 +74,7 @@ func (Agent) ManagedDeploy() string {
 // is a silence worth naming.
 func (c Agent) Trust(root string) (agents.TrustState, error) {
 	hooksPath := filepath.Join(root, filepath.FromSlash(c.HooksPath()))
-	trust, err := (harness.Codex{}).CodexHookTrustFor(hooksPath)
+	trust, err := (Codex{}).CodexHookTrustFor(hooksPath)
 	if err != nil {
 		return agents.TrustState{}, err
 	}
@@ -96,7 +98,7 @@ func (c Agent) Trust(root string) (agents.TrustState, error) {
 	// Codex trusts a hook entry by entry. A file that was trusted before terma added an
 	// entry to it — the two subagent hooks arrived that way — still reads as trusted by
 	// the count, while Codex skips the new ones and says nothing.
-	entries, err := hookmgr.CodexTermaEntries(root)
+	entries, err := TermaEntries(root)
 	if err != nil {
 		return agents.TrustState{}, err
 	}
@@ -123,7 +125,7 @@ func pronoun(n int) string {
 }
 
 // Harness is how terma configures the agent's exporter.
-func (Agent) Harness() harness.Harness { return harness.Codex{} }
+func (Agent) Harness() harness.Harness { return Codex{} }
 
 // WhenHooksOff runs the developer's own notifier: terma replaced Codex's direct notify
 // invocation, so it must still fire with capture off.
@@ -134,16 +136,34 @@ func (Agent) WhenHooksOff() map[string]agents.Handler {
 		}
 		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
-		return harness.RunPreviousCodexNotify(ctx, env.Args[0])
+		return RunPreviousCodexNotify(ctx, env.Args[0])
 	}}
 }
 
+// ContentConsented is the consent replies and thread names travel under.
+func (Agent) ContentConsented(projectID string, global bool) bool {
+	return CodexRepliesConsented(projectID, global)
+}
+
+// RetrustNote is what a refresh that rewrote .codex/hooks.json says.
+func (Agent) RetrustNote() string {
+	return "Codex runs changed hooks only after you trust them again in Codex; `terma doctor` names any it is skipping."
+}
+
 var (
-	_ agents.OffSwitched  = Agent{}
-	_ agents.Exporting    = Agent{}
-	_ agents.Agent        = Agent{}
-	_ agents.Trusting     = Agent{}
-	_ agents.UserHooks    = Agent{}
-	_ agents.ManagedHooks = Agent{}
-	_ agents.Surfaced     = Agent{}
+	_ agents.Retrusting     = Agent{}
+	_ agents.ContentConsent = Agent{}
+	_ agents.OffSwitched    = Agent{}
+	_ agents.Exporting      = Agent{}
+	_ agents.Agent          = Agent{}
+	_ agents.Trusting       = Agent{}
+	_ agents.UserHooks      = Agent{}
+	_ agents.ManagedHooks   = Agent{}
+	_ agents.Surfaced       = Agent{}
 )
+
+// userHooksPath is the user hook file shared by Codex's CLI and Desktop.
+func userHooksPath() (string, error) {
+	path, err := (Codex{}).ConfigPath()
+	return filepath.Join(filepath.Dir(path), "hooks.json"), err
+}

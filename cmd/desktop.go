@@ -11,7 +11,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
-	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 )
@@ -23,7 +22,11 @@ func newDesktopCommand() *cobra.Command {
 }
 
 func statusDesktop(cmd *cobra.Command, _ []string) error {
-	global, err := (harness.Codex{}).Status()
+	codexHarness, err := registered.Harness("codex")
+	if err != nil {
+		return err
+	}
+	global, err := codexHarness.Status()
 	if err != nil {
 		return err
 	}

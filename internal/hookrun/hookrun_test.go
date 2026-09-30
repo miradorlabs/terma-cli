@@ -27,7 +27,7 @@ func TestActiveSessionFallbackAndMergeSkip(t *testing.T) {
 		return Env{Now: now, Cwd: root, Args: args, Stdin: strings.NewReader(stdin), Version: "test"}
 	}
 	// Codex announces a thread but reports no files: fallback attribution.
-	if err := CodexNotify(ctx, env("", `{"type":"agent-turn-complete","thread-id":"thread-9","cwd":"`+root+`","model":"gpt-5.4"}`)); err != nil {
+	if err := (Extension{Tool: "codex"}).sessionStart(ctx, env(`{"session_id":"thread-9","cwd":"`+root+`","model":"gpt-5.4"}`)); err != nil {
 		t.Fatal(err)
 	}
 	hookruntest.WriteFile(t, root, "a.txt", "a\n")
@@ -62,7 +62,7 @@ func TestHandlersNeverFailOutsideARepo(t *testing.T) {
 	env := Env{Cwd: t.TempDir(), Stdin: strings.NewReader(`{"session_id":"s"}`), Args: []string{"/nonexistent"}}
 	for name, fn := range map[string]func(context.Context, Env) error{
 		"start": startSession, "end": endSession, "tool": editFile,
-		"prepare": PrepareCommitMsg, "post": PostCommit, "codex": CodexNotify,
+		"prepare": PrepareCommitMsg, "post": PostCommit,
 	} {
 		if err := fn(ctx, env); err != nil {
 			t.Errorf("%s returned %v outside a repo", name, err)

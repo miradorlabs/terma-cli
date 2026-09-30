@@ -147,3 +147,17 @@ type Renderer interface {
 type OffSwitched interface {
 	WhenHooksOff() map[string]Handler
 }
+
+// ContentConsent is an agent whose hooks spool what was said (a reply, a thread's name),
+// under a consent of its own beyond the organization's prompt policy, checked again at
+// every delivery.
+type ContentConsent interface {
+	ContentConsented(projectID string, global bool) bool
+}
+
+// Retrusting is an agent that runs a changed committed hook only after the developer
+// trusts it again; RetrustNote says so when a refresh rewrote the file.
+type Retrusting interface {
+	Agent
+	RetrustNote() string
+}

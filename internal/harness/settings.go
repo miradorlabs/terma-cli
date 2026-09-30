@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
@@ -72,3 +73,8 @@ func BackupFile(writePath string, existed, replace bool) (string, error) {
 	}
 	return path, nil
 }
+
+// RecordLockWait bounds the wait for another terma's update of a displaced-settings
+// record (a notifier, a status line terma wrapped). Only connect, install and
+// disconnect write one, never a hook, so it may wait.
+const RecordLockWait = 5 * time.Second

@@ -24,20 +24,23 @@ func TestSpoolRepliesUseCurrentNativeCodexConsent(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	t.Setenv("CODEX_HOME", t.TempDir())
 	exporter := harness.Exporter{Endpoint: "https://example.invalid", APIKey: policyTestKey, ProjectID: "team", Signals: []harness.Signal{harness.SignalLogs}, IncludePrompts: true}
-	if err := (harness.Codex{}).Connect(exporter, false); err != nil {
+	if err := harnessOf(t, "codex").Connect(exporter, false); err != nil {
 		t.Fatal(err)
 	}
 	for _, name := range []string{hookrun.EventAssistantMessage, hookrun.EventSessionTitle} {
-		if !spoolEventAllowed(config.DefaultPolicy(), "team", spool.Event{Name: name}) {
+		if !spoolEventAllowed(config.DefaultPolicy(), "team", spool.Event{Name: name, Attrs: map[string]any{hookrun.AttrTool: "codex"}}) {
 			t.Fatalf("queued %s ignored native consent without a routing record", name)
 		}
 	}
+	if spoolEventAllowed(config.DefaultPolicy(), "team", spool.Event{Name: hookrun.EventAssistantMessage}) {
+		t.Fatal("a reply no agent's label vouches for was delivered")
+	}
 	exporter.IncludePrompts = false
-	if err := (harness.Codex{}).Connect(exporter, false); err != nil {
+	if err := harnessOf(t, "codex").Connect(exporter, false); err != nil {
 		t.Fatal(err)
 	}
 	for _, name := range []string{hookrun.EventAssistantMessage, hookrun.EventSessionTitle} {
-		if spoolEventAllowed(config.DefaultPolicy(), "team", spool.Event{Name: name}) {
+		if spoolEventAllowed(config.DefaultPolicy(), "team", spool.Event{Name: name, Attrs: map[string]any{hookrun.AttrTool: "codex"}}) {
 			t.Fatalf("queued %s ignored native prompt opt-out", name)
 		}
 	}

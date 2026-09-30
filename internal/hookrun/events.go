@@ -105,14 +105,6 @@ const (
 	AttrHookEvent      = "hook_event"
 )
 
-// Values of evidence_source: where a record's facts were read from.
-const (
-	sourceCodexRollout = "codex_rollout"
-	sourceCodexHook    = "codex_hook"
-	// sourceCodexSessionIndex is $CODEX_HOME/session_index.jsonl, where Codex names threads.
-	sourceCodexSessionIndex = "codex_session_index"
-)
-
 // Values of evidence_status and of the per-facet *_status attributes. The harness
 // package reports two more, "missing" and "unreadable", which pass through untouched.
 const (

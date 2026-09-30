@@ -1,31 +1,24 @@
 package hookrun
 
 import (
-	"io"
 	"strings"
 	"testing"
 )
 
-// Every reader refuses a payload past the bound by name, whatever the head of it parses
-// as. Claude, Codex and OpenCode used to read a truncated payload instead.
-func TestEveryHookReaderRefusesOversizedInput(t *testing.T) {
-	pad := strings.Repeat(" ", MaxInput)
-	readers := map[string]struct {
-		read    func(io.Reader) error
-		payload string
-	}{
-		"codex": {func(r io.Reader) error { _, err := readCodexHookInput(r); return err }, `{"session_id":"valid"}`},
+// The reader refuses a payload past the bound by name, whatever the head of it parses
+// as, and a missing reader.
+func TestReadInputRefusesOversizedInput(t *testing.T) {
+	type payload struct {
+		SessionID string `json:"session_id"`
 	}
-	for name, c := range readers {
-		if err := c.read(strings.NewReader(c.payload)); err != nil {
-			t.Errorf("%s: a payload within the bound was refused: %v", name, err)
-		}
-		err := c.read(strings.NewReader(c.payload + pad))
-		if err == nil || !strings.Contains(err.Error(), "too large") {
-			t.Errorf("%s: oversized payload: err = %v, want too large", name, err)
-		}
-		if err := c.read(nil); err == nil {
-			t.Errorf("%s: a nil reader was accepted", name)
-		}
+	const valid = `{"session_id":"valid"}`
+	if _, err := ReadInput[payload](strings.NewReader(valid)); err != nil {
+		t.Fatalf("a payload within the bound was refused: %v", err)
+	}
+	if _, err := ReadInput[payload](strings.NewReader(valid + strings.Repeat(" ", MaxInput))); err == nil || !strings.Contains(err.Error(), "too large") {
+		t.Fatalf("oversized payload: err = %v, want too large", err)
+	}
+	if _, err := ReadInput[payload](nil); err == nil {
+		t.Fatal("a nil reader was accepted")
 	}
 }

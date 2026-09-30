@@ -7,7 +7,6 @@ import (
 	"runtime"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
-	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
 // desktop is Codex Desktop's surface name: its threads run in codex app-server, and
@@ -29,7 +28,7 @@ func (a Agent) Surfaces() []agents.Surface {
 			SetupSteps: []string{"Codex Desktop: in a connected repository, open Settings → Hooks → Review in Codex Desktop and approve Terma's hooks."},
 			Reports:    "reports through the relay and this repository's hooks",
 			Warn: func() string {
-				if global, err := (harness.Codex{}).Status(); err == nil && global.Connected {
+				if global, err := (Codex{}).Status(); err == nil && global.Connected {
 					return "also has a user-level exporter; it may send Desktop activity from other repositories"
 				}
 				return ""

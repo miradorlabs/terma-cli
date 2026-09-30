@@ -255,7 +255,7 @@ func TestTelemetryDisconnectLocalRestoresTheFile(t *testing.T) {
 // The checklist itself needs a terminal, but the refusal that comes before it does not: a
 // --scope local that cannot be honoured is an error, never a quiet flip to global.
 func TestAskConnectOptionsRefusesImpossibleLocalBeforePrompting(t *testing.T) {
-	_, err := askConnectOptions(connectFlags{scope: "local"}, []harness.Harness{harness.Codex{}}, connectForm{root: "/repo"})
+	_, err := askConnectOptions(connectFlags{scope: "local"}, []harness.Harness{harnessOf(t, "codex")}, connectForm{root: "/repo"})
 	if err == nil || !strings.Contains(err.Error(), "Codex has no repository settings") {
 		t.Fatalf("err = %v", err)
 	}

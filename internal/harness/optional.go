@@ -52,15 +52,7 @@ type EmissionChecker interface {
 	TelemetrySwitch() string
 }
 
-var (
-	_ Noter = Codex{}
-
-	_ Credentialed = Codex{}
-
-	_ Backuper = Codex{}
-
-	_ TurnNotifier = Codex{}
-)
+var ()
 
 // StatusLineState is what a config's status line looks like to Terma.
 type StatusLineState struct {
