@@ -13,7 +13,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-func (e Env) captureCodexFunding(ctx context.Context, r *repo, in *codexHookInput) {
+func (e Env) captureCodexFunding(ctx context.Context, r *Repo, in *codexHookInput) {
 	if e.Spool == nil || !session.ValidID(in.SessionID) {
 		return
 	}
@@ -24,11 +24,11 @@ func (e Env) captureCodexFunding(ctx context.Context, r *repo, in *codexHookInpu
 	// Inside a subagent the rollout, and so the cursor into it, is the child thread's.
 	// The evidence is still filed under the session, with the agent named.
 	rollout := codexRolloutID(in)
-	path := filepath.Join(dir, codexFundingCursorDir, evidenceID(rollout)+".json")
+	path := filepath.Join(dir, codexFundingCursorDir, EvidenceID(rollout)+".json")
 	if os.MkdirAll(filepath.Dir(path), 0o700) != nil {
 		return
 	}
-	unlock, err := lockEvidence(path + ".lock")
+	unlock, err := LockEvidence(path + ".lock")
 	if err != nil {
 		return
 	}
@@ -36,13 +36,13 @@ func (e Env) captureCodexFunding(ctx context.Context, r *repo, in *codexHookInpu
 	var cursor harness.CodexCursor
 	b, cursorErr := os.ReadFile(path)
 	if cursorErr == nil && json.Unmarshal(b, &cursor) != nil {
-		e.logf("invalid funding cursor; replaying rollout")
+		e.Logf("invalid funding cursor; replaying rollout")
 		cursor = harness.CodexCursor{}
 	}
 	// A session's first capture is when the directory is swept, as for reply cursors:
 	// nothing else ever removed a finished session's cursor.
 	if os.IsNotExist(cursorErr) {
-		defer pruneState(filepath.Dir(path), e.now().Add(-spool.MaxAge))
+		defer PruneState(filepath.Dir(path), e.Time().Add(-spool.MaxAge))
 	}
 	// Resolve the funding owner once (not per evidence): Codex's ChatGPT account, and only when the
 	// session is on the subscription route. Empty on the API-key route or when unreadable — never a
@@ -58,7 +58,7 @@ func (e Env) captureCodexFunding(ctx context.Context, r *repo, in *codexHookInpu
 	ctx, cancel := context.WithTimeout(ctx, codexCaptureTimeout)
 	defer cancel()
 	next, status, readErr := harness.ReadCodexFunding(ctx, rollout, in.TranscriptPath, cursor, func(ev harness.FundingEvidence) error {
-		attrs := agentAttrs(ev.Attrs, in.AgentID, in.AgentType)
+		attrs := AgentAttrs(ev.Attrs, in.AgentID, in.AgentType)
 		attrs[attrTool], attrs[attrVersion] = codexTool, e.Version
 		attrs[attrEvidenceSource], attrs[attrEvidenceStatus] = ev.Source, ev.Status
 		attrs[attrSchemaVersion] = 1
@@ -76,21 +76,21 @@ func (e Env) captureCodexFunding(ctx context.Context, r *repo, in *codexHookInpu
 		if userID != "" && ev.Status == statusPresent {
 			attrs["account_user_id"] = userID
 		}
-		attrs[AttrProjectID] = r.projectID
-		r.stampWorktree(attrs)
+		attrs[AttrProjectID] = r.ProjectID
+		r.StampWorktree(attrs)
 		if !ev.SourceTime.IsZero() {
 			attrs["source_time"] = ev.SourceTime.UTC().Format(time.RFC3339Nano)
 		}
-		return e.Spool.Append(spool.Event{Time: e.now(), Name: EventSessionQuota, SessionID: in.SessionID, Repo: r.name, Attrs: attrs})
+		return e.Spool.Append(spool.Event{Time: e.Time(), Name: EventSessionQuota, SessionID: in.SessionID, Repo: r.Name, Attrs: attrs})
 	})
 	if next != cursor {
 		b, _ := json.Marshal(next)
-		if err := writeState(path, b); err != nil {
-			e.logf("funding cursor: %v", err)
+		if err := WriteState(path, b); err != nil {
+			e.Logf("funding cursor: %v", err)
 		}
 	}
 	if readErr != nil {
-		e.logf("funding capture: %v", readErr)
+		e.Logf("funding capture: %v", readErr)
 	}
 	// Capture progress separately: backlog is not a new unavailable quota.
 	if status != "caught_up" && status != "append_failed" {
@@ -98,6 +98,6 @@ func (e Env) captureCodexFunding(ctx context.Context, r *repo, in *codexHookInpu
 		if status == "not_ready" {
 			name = EventSessionQuota
 		}
-		e.captureFunding(r, in.SessionID, codexTool, name, harness.FundingEvidence{Source: sourceCodexRollout, Status: status, Attrs: agentAttrs(map[string]any{"source_offset": next.Offset}, in.AgentID, in.AgentType)})
+		e.CaptureFunding(r, in.SessionID, codexTool, name, harness.FundingEvidence{Source: sourceCodexRollout, Status: status, Attrs: AgentAttrs(map[string]any{"source_offset": next.Offset}, in.AgentID, in.AgentType)})
 	}
 }

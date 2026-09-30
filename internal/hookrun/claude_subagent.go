@@ -25,7 +25,7 @@ func claudeSubagentPath(sessionID, agentID string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, claudeSubagentDir, evidenceID(sessionID+"\x00"+agentID)+".json"), nil
+	return filepath.Join(dir, claudeSubagentDir, EvidenceID(sessionID+"\x00"+agentID)+".json"), nil
 }
 
 func (e Env) rememberClaudeSubagent(sessionID, agentID string) {
@@ -37,10 +37,10 @@ func (e Env) rememberClaudeSubagent(sessionID, agentID string) {
 		err = os.MkdirAll(filepath.Dir(path), 0o700)
 	}
 	if err == nil {
-		err = writeState(path, []byte("{}\n"))
+		err = WriteState(path, []byte("{}\n"))
 	}
 	if err != nil {
-		e.logf("record Claude subagent launch: %v", err)
+		e.Logf("record Claude subagent launch: %v", err)
 	}
 }
 
@@ -52,12 +52,12 @@ func (e Env) knownClaudeSubagent(sessionID, agentID string) bool {
 	info, err := os.Lstat(path)
 	// Keep the marker after a stop: hooks can keep an agent running or it can be
 	// resumed. SessionStart prunes old markers; enforce the same age on reads.
-	return err == nil && info.Mode().IsRegular() && !info.ModTime().Before(e.now().Add(-spool.MaxAge))
+	return err == nil && info.Mode().IsRegular() && !info.ModTime().Before(e.Time().Add(-spool.MaxAge))
 }
 
 func (e Env) pruneClaudeSubagents() {
 	if dir, err := config.Dir(); err == nil {
-		pruneState(filepath.Join(dir, claudeSubagentDir), e.now().Add(-spool.MaxAge))
+		PruneState(filepath.Join(dir, claudeSubagentDir), e.Time().Add(-spool.MaxAge))
 	}
 }
 
@@ -77,14 +77,14 @@ func SubagentStop(ctx context.Context, env Env) error {
 func claudeSubagent(ctx context.Context, env Env, name string) error {
 	in, err := readClaudeInput(env.Stdin)
 	if err != nil {
-		env.logf("%v", err)
+		env.Logf("%v", err)
 		return nil
 	}
 	if !session.ValidID(in.SessionID) || !session.ValidID(in.AgentID) {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
 	}
@@ -95,14 +95,14 @@ func claudeSubagent(ctx context.Context, env Env, name string) error {
 		// fire SubagentStop. Only a launch establishes a delegated run.
 		return nil
 	}
-	attrs := agentAttrs(map[string]any{attrTool: claudeTool, attrSchemaVersion: 1}, in.AgentID, in.AgentType)
+	attrs := AgentAttrs(map[string]any{attrTool: claudeTool, attrSchemaVersion: 1}, in.AgentID, in.AgentType)
 	if name == EventSubagentStart {
 		attrs[attrVersion] = env.Version
 	}
 	if session.ValidID(in.PromptID) {
 		attrs[attrTurnID] = in.PromptID
 	}
-	env.emitFor(r, spool.Event{Name: name, SessionID: in.SessionID, Repo: r.name, Attrs: attrs})
+	env.EmitFor(r, spool.Event{Name: name, SessionID: in.SessionID, Repo: r.Name, Attrs: attrs})
 	return nil
 }
 
@@ -162,25 +162,25 @@ type claudeAgentResult struct {
 // its context had grown (final_context_tokens — see claudeAgentResult for why that is
 // not what it spent). What a subagent spent is the native export's to say, request by
 // request; no hook reports it for a run.
-func (e Env) claudeSubagentCall(r *repo, in *claudeHookInput) {
+func (e Env) claudeSubagentCall(r *Repo, in *claudeHookInput) {
 	var res claudeAgentResult
 	if len(in.ToolResponse) == 0 || json.Unmarshal(in.ToolResponse, &res) != nil {
-		e.logf("%s tool without a readable response", in.ToolName)
+		e.Logf("%s tool without a readable response", in.ToolName)
 		return
 	}
 	if !session.ValidID(res.AgentID) {
-		e.logf("%s tool response names no agent", in.ToolName)
+		e.Logf("%s tool response names no agent", in.ToolName)
 		return
 	}
 	e.rememberClaudeSubagent(in.SessionID, res.AgentID)
-	attrs := agentAttrs(map[string]any{attrTool: claudeTool, attrSchemaVersion: 1}, res.AgentID, cmp.Or(res.AgentType, in.ToolInput.SubagentType))
+	attrs := AgentAttrs(map[string]any{attrTool: claudeTool, attrSchemaVersion: 1}, res.AgentID, cmp.Or(res.AgentType, in.ToolInput.SubagentType))
 	// A subagent can launch one of its own: the hook then fires inside the launching
 	// agent and names it, which is the new agent's parent.
 	if session.ValidID(in.AgentID) && in.AgentID != res.AgentID {
 		attrs[attrAgentParentID] = in.AgentID
 	}
-	boundedAttr(attrs, attrModel, res.ResolvedModel)
-	boundedAttr(attrs, attrToolCallID, in.ToolUseID)
+	BoundedAttr(attrs, attrModel, res.ResolvedModel)
+	BoundedAttr(attrs, attrToolCallID, in.ToolUseID)
 	if session.ValidID(in.PromptID) {
 		attrs[attrTurnID] = in.PromptID
 	}
@@ -194,7 +194,7 @@ func (e Env) claudeSubagentCall(r *repo, in *claudeHookInput) {
 		attrs["is_async"] = *res.IsAsync
 	}
 	for _, label := range []struct{ key, value string }{{"service_tier", res.Usage.ServiceTier}, {"speed", res.Usage.Speed}} {
-		if shortLabel(label.value) {
+		if ShortLabel(label.value) {
 			attrs[label.key] = label.value
 		}
 	}
@@ -210,9 +210,9 @@ func (e Env) claudeSubagentCall(r *repo, in *claudeHookInput) {
 		"lines_removed":        res.ToolStats.LinesRemoved,
 		"other_tool_count":     res.ToolStats.OtherToolCount,
 	} {
-		if value, _, ok := jsonNumber(raw, true); ok {
+		if value, _, ok := JSONNumber(raw, true); ok {
 			attrs[key] = int64(value)
 		}
 	}
-	e.emitFor(r, spool.Event{Name: EventSubagentCall, SessionID: in.SessionID, Repo: r.name, Attrs: attrs})
+	e.EmitFor(r, spool.Event{Name: EventSubagentCall, SessionID: in.SessionID, Repo: r.Name, Attrs: attrs})
 }

@@ -24,7 +24,7 @@ func CodexPreToolUse(ctx context.Context, env Env) error {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
 	}
@@ -36,7 +36,7 @@ func CodexPreToolUse(ctx context.Context, env Env) error {
 		return nil
 	}
 	if os.MkdirAll(filepath.Dir(path), 0o700) == nil {
-		_ = writeState(path, []byte(strconv.FormatInt(env.now().UnixNano(), 10)))
+		_ = WriteState(path, []byte(strconv.FormatInt(env.Time().UnixNano(), 10)))
 	}
 	return nil
 }
@@ -46,7 +46,7 @@ func codexToolStartPath(in *codexHookInput) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, codexToolStartDir, evidenceID(in.SessionID+"|"+in.ToolUseID)+".json"), nil
+	return filepath.Join(dir, codexToolStartDir, EvidenceID(in.SessionID+"|"+in.ToolUseID)+".json"), nil
 }
 
 func (e Env) codexToolElapsed(in *codexHookInput) (int64, bool) {
@@ -66,7 +66,7 @@ func (e Env) codexToolElapsed(in *codexHookInput) (int64, bool) {
 	if err != nil {
 		return 0, false
 	}
-	d := e.now().Sub(time.Unix(0, start))
+	d := e.Time().Sub(time.Unix(0, start))
 	if d < 0 || d > 24*time.Hour {
 		return 0, false
 	}
@@ -82,7 +82,7 @@ func CodexPermissionRequest(ctx context.Context, env Env) error {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
 	}
@@ -90,21 +90,21 @@ func CodexPermissionRequest(ctx context.Context, env Env) error {
 	if !desktop {
 		return nil
 	}
-	at := env.now()
-	attrs := evidenceAttrs(codexTool, sourceCodexHook, "PermissionRequest")
+	at := env.Time()
+	attrs := EvidenceAttrs(codexTool, sourceCodexHook, "PermissionRequest")
 	attrs["capture_surface"] = codexDesktopSurface
-	attrs["observation_id"] = evidenceID(in.SessionID + "|" + in.TurnID + "|" + in.ToolName + "|" + strconv.FormatInt(at.UnixNano(), 10))
-	boundedAttr(attrs, attrTurnID, in.TurnID)
-	boundedAttr(attrs, attrToolName, in.ToolName)
-	boundedAttr(attrs, "permission_mode", in.PermissionMode)
+	attrs["observation_id"] = EvidenceID(in.SessionID + "|" + in.TurnID + "|" + in.ToolName + "|" + strconv.FormatInt(at.UnixNano(), 10))
+	BoundedAttr(attrs, attrTurnID, in.TurnID)
+	BoundedAttr(attrs, attrToolName, in.ToolName)
+	BoundedAttr(attrs, "permission_mode", in.PermissionMode)
 	if route.IncludeToolContent {
 		var input struct {
 			Description string `json:"description"`
 		}
 		if json.Unmarshal(in.ToolInput, &input) == nil {
-			boundedAttr(attrs, "reason", input.Description)
+			BoundedAttr(attrs, "reason", input.Description)
 		}
 	}
-	env.emitFor(r, spool.Event{Time: at, Name: EventApprovalAsked, SessionID: in.SessionID, Repo: r.name, Attrs: attrs})
+	env.EmitFor(r, spool.Event{Time: at, Name: EventApprovalAsked, SessionID: in.SessionID, Repo: r.Name, Attrs: attrs})
 	return nil
 }

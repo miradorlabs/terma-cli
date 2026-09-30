@@ -42,23 +42,23 @@ func readOpenCodeInput(r io.Reader) (*opencodeHookInput, error) {
 func OpenCodeSessionStart(ctx context.Context, env Env) error {
 	in, err := readOpenCodeInput(env.Stdin)
 	if err != nil {
-		env.logf("%v", err)
+		env.Logf("%v", err)
 		return nil
 	}
 	if !session.ValidID(in.SessionID) {
-		env.logf("ignoring unsafe session id")
+		env.Logf("ignoring unsafe session id")
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
-		env.logf("not in a git repository: %v", err)
+		env.Logf("not in a git repository: %v", err)
 		return nil
 	}
 	attrs := map[string]any{attrSource: "session.created"}
-	sess := env.newSession(r, in.SessionID, opencodeTool, in.Model)
+	sess := env.NewSession(r, in.SessionID, opencodeTool, in.Model)
 	if !session.ValidID(in.ParentSessionID) {
-		env.announce(r, sess, attrs)
+		env.Announce(r, sess, attrs)
 		return nil
 	}
 	// A session the task tool opened for a subagent is announced, never made active. The
@@ -67,8 +67,8 @@ func OpenCodeSessionStart(ctx context.Context, env Env) error {
 	// on the developer's next hand-written commit. The child's edits still build a
 	// manifest of their own, and that is how they are attributed.
 	attrs[attrParentSession] = in.ParentSessionID
-	env.pruneManifests(r, sess.UpdatedAt)
-	env.emitStart(r, sess, attrs)
+	env.PruneManifests(r, sess.UpdatedAt)
+	env.EmitStart(r, sess, attrs)
 	return nil
 }
 
@@ -76,19 +76,19 @@ func OpenCodeSessionStart(ctx context.Context, env Env) error {
 func OpenCodeSessionEnd(ctx context.Context, env Env) error {
 	in, err := readOpenCodeInput(env.Stdin)
 	if err != nil {
-		env.logf("%v", err)
+		env.Logf("%v", err)
 		return nil
 	}
 	if !session.ValidID(in.SessionID) {
-		env.logf("ignoring unsafe session id")
+		env.Logf("ignoring unsafe session id")
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
 	}
-	env.endSession(r, in.SessionID, opencodeTool, in.Reason)
+	env.EndSession(r, in.SessionID, opencodeTool, in.Reason)
 	return nil
 }
 
@@ -96,18 +96,18 @@ func OpenCodeSessionEnd(ctx context.Context, env Env) error {
 func OpenCodeFileEdit(ctx context.Context, env Env) error {
 	in, err := readOpenCodeInput(env.Stdin)
 	if err != nil {
-		env.logf("%v", err)
+		env.Logf("%v", err)
 		return nil
 	}
 	if !session.ValidID(in.SessionID) || in.File == "" {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
 	}
-	env.touch(r, session.Session{ID: in.SessionID, Tool: opencodeTool, Model: in.Model}, in.Tool,
-		relativeFiles(r, env.Cwd, []string{in.File}), nil)
+	env.Touch(r, session.Session{ID: in.SessionID, Tool: opencodeTool, Model: in.Model}, in.Tool,
+		RelativeFiles(r, env.Cwd, []string{in.File}), nil)
 	return nil
 }

@@ -28,9 +28,9 @@ type codexTitleState struct {
 // captureCodexTitle spools the name Codex gave this thread when it is new or renamed.
 // The name restates the developer's first prompt, so it travels under the consent a
 // reply does (codexRepliesConsented).
-func (e Env) captureCodexTitle(ctx context.Context, r *repo, in *codexHookInput) {
-	pol := routing.EffectivePolicy(e.Policy, r.projectID)
-	if e.Spool == nil || !session.ValidID(in.SessionID) || !pol.IncludePrompts || !pol.AllowsSignal("logs") || len(pol.ExcludePaths) > 0 || !CodexRepliesConsented(r.projectID, pol.Global()) {
+func (e Env) captureCodexTitle(ctx context.Context, r *Repo, in *codexHookInput) {
+	pol := routing.EffectivePolicy(e.Policy, r.ProjectID)
+	if e.Spool == nil || !session.ValidID(in.SessionID) || !pol.IncludePrompts || !pol.AllowsSignal("logs") || len(pol.ExcludePaths) > 0 || !CodexRepliesConsented(r.ProjectID, pol.Global()) {
 		return
 	}
 	dir, err := config.Dir()
@@ -38,11 +38,11 @@ func (e Env) captureCodexTitle(ctx context.Context, r *repo, in *codexHookInput)
 		return
 	}
 	dir = filepath.Join(dir, codexTitleStateDir)
-	path := filepath.Join(dir, evidenceID(in.SessionID)+".json")
+	path := filepath.Join(dir, EvidenceID(in.SessionID)+".json")
 	if os.MkdirAll(dir, 0o700) != nil {
 		return
 	}
-	unlock, err := lockEvidence(path + ".lock")
+	unlock, err := LockEvidence(path + ".lock")
 	if err != nil {
 		return
 	}
@@ -56,7 +56,7 @@ func (e Env) captureCodexTitle(ctx context.Context, r *repo, in *codexHookInput)
 	defer cancel()
 	title, found, err := harness.ReadCodexThreadTitle(ctx, in.SessionID)
 	if err != nil {
-		e.logf("codex title: %v", err)
+		e.Logf("codex title: %v", err)
 		return
 	}
 	if !found || title.UpdatedAt.Equal(last.UpdatedAt) {
@@ -64,24 +64,24 @@ func (e Env) captureCodexTitle(ctx context.Context, r *repo, in *codexHookInput)
 	}
 	attrs := map[string]any{
 		attrTool: codexTool, attrSchemaVersion: 1, attrEvidenceSource: sourceCodexSessionIndex,
-		"title": truncateRunes(title.Name, codexTitleMaxText), attrVersion: e.Version, AttrProjectID: r.projectID,
+		"title": truncateRunes(title.Name, codexTitleMaxText), attrVersion: e.Version, AttrProjectID: r.ProjectID,
 	}
-	r.stampWorktree(attrs)
-	at := e.now()
+	r.StampWorktree(attrs)
+	at := e.Time()
 	if !title.UpdatedAt.IsZero() && !title.UpdatedAt.After(at) {
 		at = title.UpdatedAt
 	}
-	if err := e.Spool.Append(spool.Event{Time: at, Name: EventSessionTitle, SessionID: in.SessionID, Repo: r.name, Workspace: r.root, Global: pol.Global(), Attrs: attrs}); err != nil {
-		e.logf("codex title: %v", err)
+	if err := e.Spool.Append(spool.Event{Time: at, Name: EventSessionTitle, SessionID: in.SessionID, Repo: r.Name, Workspace: r.Root, Global: pol.Global(), Attrs: attrs}); err != nil {
+		e.Logf("codex title: %v", err)
 		return
 	}
 	if b, err := json.Marshal(codexTitleState{UpdatedAt: title.UpdatedAt}); err == nil {
-		if err := writeState(path, b); err != nil {
-			e.logf("title state: %v", err)
+		if err := WriteState(path, b); err != nil {
+			e.Logf("title state: %v", err)
 		}
 	}
 	if os.IsNotExist(readErr) {
-		pruneState(dir, e.now().Add(-spool.MaxAge))
+		PruneState(dir, e.Time().Add(-spool.MaxAge))
 	}
 }
 

@@ -40,21 +40,21 @@ func readOmpInput(r io.Reader) (*ompHookInput, error) {
 func OmpSessionStart(ctx context.Context, env Env) error {
 	in, err := readOmpInput(env.Stdin)
 	if err != nil {
-		env.logf("%v", err)
+		env.Logf("%v", err)
 		return nil
 	}
 	if !session.ValidID(in.SessionID) {
-		env.logf("ignoring unsafe session id")
+		env.Logf("ignoring unsafe session id")
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
-		env.logf("not in a git repository: %v", err)
+		env.Logf("not in a git repository: %v", err)
 		return nil
 	}
 	attrs := map[string]any{attrSource: "session_start"}
-	env.announce(r, env.newSession(r, in.SessionID, ompTool, in.Model), attrs)
+	env.Announce(r, env.NewSession(r, in.SessionID, ompTool, in.Model), attrs)
 	return nil
 }
 
@@ -62,21 +62,21 @@ func OmpSessionStart(ctx context.Context, env Env) error {
 func OmpSessionEnd(ctx context.Context, env Env) error {
 	in, err := readOmpInput(env.Stdin)
 	if err != nil {
-		env.logf("%v", err)
+		env.Logf("%v", err)
 		return nil
 	}
 	if !session.ValidID(in.SessionID) {
-		env.logf("ignoring unsafe session id")
+		env.Logf("ignoring unsafe session id")
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
 	}
 	// The extension's id belongs to this session alone, so end it directly rather
 	// than risk clearing an active session another tool started.
-	env.endSession(r, in.SessionID, ompTool, "")
+	env.EndSession(r, in.SessionID, ompTool, "")
 	return nil
 }
 
@@ -84,18 +84,18 @@ func OmpSessionEnd(ctx context.Context, env Env) error {
 func OmpFileEdit(ctx context.Context, env Env) error {
 	in, err := readOmpInput(env.Stdin)
 	if err != nil {
-		env.logf("%v", err)
+		env.Logf("%v", err)
 		return nil
 	}
 	if !session.ValidID(in.SessionID) || in.File == "" {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
 	}
-	env.touch(r, session.Session{ID: in.SessionID, Tool: ompTool, Model: in.Model}, in.Tool,
-		relativeFiles(r, env.Cwd, []string{in.File}), nil)
+	env.Touch(r, session.Session{ID: in.SessionID, Tool: ompTool, Model: in.Model}, in.Tool,
+		RelativeFiles(r, env.Cwd, []string{in.File}), nil)
 	return nil
 }

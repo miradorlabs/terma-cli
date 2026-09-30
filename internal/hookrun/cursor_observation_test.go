@@ -43,7 +43,7 @@ func cursorObservations(t *testing.T, sp *spool.Spool) []spool.Event {
 	return out
 }
 func cursorStatePath(env Env) string {
-	return filepath.Join(os.Getenv("TERMA_CONFIG_DIR"), "cursor-observations", evidenceID("cursor-conversation\x00"+env.Cwd)+".json")
+	return filepath.Join(os.Getenv("TERMA_CONFIG_DIR"), "cursor-observations", EvidenceID("cursor-conversation\x00"+env.Cwd)+".json")
 }
 
 func TestCursorOrderedTurnSnapshots(t *testing.T) {
@@ -225,11 +225,11 @@ func TestCursorPromptRefreshesAttributionAndMissingGenerationIsNotInherited(t *t
 	cursorRun(t, env, "beforeSubmitPrompt", "turn-a", nil)
 	env.Now = env.Now.Add(ActiveTTL + time.Minute)
 	cursorRun(t, env, "beforeSubmitPrompt", "turn-b", nil)
-	r, err := env.repo(context.Background())
+	r, err := env.Repo(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s, ok := r.store.Active(env.Now, ActiveTTL); !ok || s.ID != "cursor-conversation" {
+	if s, ok := r.Store.Active(env.Now, ActiveTTL); !ok || s.ID != "cursor-conversation" {
 		t.Fatal("prompt did not refresh active session")
 	}
 	cursorRun(t, env, "stop", "", nil)

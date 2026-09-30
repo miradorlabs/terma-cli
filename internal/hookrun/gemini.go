@@ -31,11 +31,11 @@ var geminiEditTools = map[string]bool{"write_file": true, "replace": true, "edit
 func readGeminiInput(env Env) (*geminiHookInput, bool) {
 	in, err := readHookInput[geminiHookInput](env.Stdin)
 	if err != nil {
-		env.logf("%v", err)
+		env.Logf("%v", err)
 		return nil, false
 	}
 	if !session.ValidID(in.SessionID) {
-		env.logf("ignoring a missing or unsafe session id")
+		env.Logf("ignoring a missing or unsafe session id")
 		return nil, false
 	}
 	return in, true
@@ -48,11 +48,11 @@ func GeminiSessionStart(ctx context.Context, env Env) error {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
 	}
-	env.announce(r, env.newSession(r, in.SessionID, geminiTool, ""), map[string]any{attrSource: "session_start"})
+	env.Announce(r, env.NewSession(r, in.SessionID, geminiTool, ""), map[string]any{attrSource: "session_start"})
 	return nil
 }
 
@@ -74,11 +74,11 @@ func GeminiAfterTool(ctx context.Context, env Env) error {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
 	}
-	env.touch(r, session.Session{ID: in.SessionID, Tool: geminiTool}, in.ToolName, relativeFiles(r, env.Cwd, []string{file}), nil)
+	env.Touch(r, session.Session{ID: in.SessionID, Tool: geminiTool}, in.ToolName, RelativeFiles(r, env.Cwd, []string{file}), nil)
 	return nil
 }
 
@@ -89,10 +89,10 @@ func GeminiSessionEnd(ctx context.Context, env Env) error {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
 	}
-	env.endSession(r, in.SessionID, geminiTool, "")
+	env.EndSession(r, in.SessionID, geminiTool, "")
 	return nil
 }

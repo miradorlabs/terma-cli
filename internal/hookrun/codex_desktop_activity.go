@@ -14,7 +14,7 @@ import (
 
 // captureCodexDesktopActivity fills the two gaps in repository hooks: model usage
 // and hosted Extension actions. Local tool calls are emitted by PostToolUse.
-func (e Env) captureCodexDesktopActivity(ctx context.Context, r *repo, in *codexHookInput) {
+func (e Env) captureCodexDesktopActivity(ctx context.Context, r *Repo, in *codexHookInput) {
 	if e.Spool == nil || !session.ValidID(in.SessionID) {
 		return
 	}
@@ -30,8 +30,8 @@ func (e Env) captureCodexDesktopActivity(ctx context.Context, r *repo, in *codex
 	if os.MkdirAll(dir, 0o700) != nil {
 		return
 	}
-	path := filepath.Join(dir, evidenceID(codexRolloutID(in))+".json")
-	unlock, err := lockEvidence(path + ".lock")
+	path := filepath.Join(dir, EvidenceID(codexRolloutID(in))+".json")
+	unlock, err := LockEvidence(path + ".lock")
 	if err != nil {
 		return
 	}
@@ -43,16 +43,16 @@ func (e Env) captureCodexDesktopActivity(ctx context.Context, r *repo, in *codex
 	ctx, cancel := context.WithTimeout(ctx, codexCaptureTimeout)
 	defer cancel()
 	next, status, err := harness.ReadCodexDesktopActivity(ctx, codexRolloutID(in), in.TranscriptPath, cursor, func(a harness.CodexDesktopActivity) error {
-		attrs := evidenceAttrs(codexTool, sourceCodexRollout, "desktop")
+		attrs := EvidenceAttrs(codexTool, sourceCodexRollout, "desktop")
 		attrs["capture_surface"] = codexDesktopSurface
-		boundedAttr(attrs, attrTurnID, a.TurnID)
-		boundedAttr(attrs, attrModel, a.Model)
-		boundedAttr(attrs, "trace_id", a.TraceID)
+		BoundedAttr(attrs, attrTurnID, a.TurnID)
+		BoundedAttr(attrs, attrModel, a.Model)
+		BoundedAttr(attrs, "trace_id", a.TraceID)
 		at := a.At
-		if at.IsZero() || at.After(e.now()) {
-			at = e.now()
+		if at.IsZero() || at.After(e.Time()) {
+			at = e.Time()
 		}
-		ev := spool.Event{Time: at, SessionID: in.SessionID, Repo: r.name, Attrs: attrs}
+		ev := spool.Event{Time: at, SessionID: in.SessionID, Repo: r.Name, Attrs: attrs}
 		switch a.Kind {
 		case "model":
 			ev.Name = EventModelCall
@@ -86,7 +86,7 @@ func (e Env) captureCodexDesktopActivity(ctx context.Context, r *repo, in *codex
 		case "turn":
 			ev.Name = EventTurnSummary
 			attrs[attrStatus] = a.Status
-			boundedAttr(attrs, attrReason, a.Reason)
+			BoundedAttr(attrs, attrReason, a.Reason)
 			if a.HasDuration {
 				attrs["duration_ms"] = a.DurationMs
 			}
@@ -101,18 +101,18 @@ func (e Env) captureCodexDesktopActivity(ctx context.Context, r *repo, in *codex
 		}
 		// Spooled directly rather than through emitFor, so the binding is stamped here:
 		// an event with no project id is dropped as unroutable at the next flush.
-		if r.projectID != "" {
-			attrs[AttrProjectID] = r.projectID
+		if r.ProjectID != "" {
+			attrs[AttrProjectID] = r.ProjectID
 		}
-		r.stampWorktree(attrs)
+		r.StampWorktree(attrs)
 		return e.Spool.Append(ev)
 	})
 	if err != nil {
-		e.logf("desktop activity (%s): %v", status, err)
+		e.Logf("desktop activity (%s): %v", status, err)
 	}
 	if next != cursor {
 		if b, err := json.Marshal(next); err == nil {
-			_ = writeState(path, b)
+			_ = WriteState(path, b)
 		}
 	}
 }

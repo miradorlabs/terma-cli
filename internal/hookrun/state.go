@@ -59,7 +59,7 @@ const (
 	observationLockPoll = 10 * time.Millisecond
 )
 
-// writeState replaces one of the state files above: a cursor, a checkpoint, the hash of
+// WriteState replaces one of the state files above: a cursor, a checkpoint, the hash of
 // the last thing spooled. Atomic, so another hook never reads half of one — and not
 // fsynced, on purpose.
 //
@@ -71,17 +71,19 @@ const (
 // what the stable observation ids are for — a duplicate is dropped downstream, a gap
 // is not recoverable. The sync it skips is F_FULLFSYNC on macOS: about ten
 // milliseconds against a fifth of one, on every tool call, inside the agent's turn.
-func writeState(path string, data []byte) error {
+func WriteState(path string, data []byte) error {
 	return config.WriteFileAtomicNoSync(path, data, 0o600)
 }
 
-func evidenceID(s string) string { h := sha256.Sum256([]byte(s)); return hex.EncodeToString(h[:]) }
+// EvidenceID is the stable id for s: a state file's name, an observation's id. The
+// same input is the same id on every run, which is what makes a replay harmless.
+func EvidenceID(s string) string { h := sha256.Sum256([]byte(s)); return hex.EncodeToString(h[:]) }
 
 // quotaHeartbeat is how often an unchanged snapshot is re-sent, so the backend
 // can tell "no change" from "no status line".
 const quotaHeartbeat = 10 * time.Minute
 
-// pruneState ages out a state directory: every `<id>.json` last written before the
+// PruneState ages out a state directory: every `<id>.json` last written before the
 // cutoff, and then the `<id>.json.lock` beside it. The locks used to be left behind —
 // one per session, for ever — because only the data files were matched.
 //
@@ -89,7 +91,7 @@ const quotaHeartbeat = 10 * time.Minute
 // gone, and nothing holds it (the prune takes it before unlinking). A lock's mtime is
 // its creation, so a session that outlives the cutoff keeps its lock through its data
 // file, which every write refreshes.
-func pruneState(dir string, before time.Time) {
+func PruneState(dir string, before time.Time) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return
@@ -111,7 +113,7 @@ func pruneState(dir string, before time.Time) {
 		if _, err := os.Lstat(strings.TrimSuffix(lock, ".lock")); !os.IsNotExist(err) {
 			continue
 		}
-		unlock, err := lockEvidence(lock)
+		unlock, err := LockEvidence(lock)
 		if err != nil {
 			continue
 		}

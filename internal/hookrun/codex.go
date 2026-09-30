@@ -42,12 +42,12 @@ func CodexNotify(ctx context.Context, env Env) error {
 	payload := env.Args[0]
 	defer func() {
 		if err := harness.RunPreviousCodexNotify(ctx, payload); err != nil {
-			env.logf("previous Codex notify: %v", err)
+			env.Logf("previous Codex notify: %v", err)
 		}
 	}()
 	var n codexNotify
 	if err := json.Unmarshal([]byte(payload), &n); err != nil {
-		env.logf("parse codex notify: %v", err)
+		env.Logf("parse codex notify: %v", err)
 		return nil
 	}
 	id := cmp.Or(n.ThreadID, n.TurnID)
@@ -55,7 +55,7 @@ func CodexNotify(ctx context.Context, env Env) error {
 		return nil
 	}
 	env.Cwd = cmp.Or(n.Cwd, env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
 	}
@@ -67,9 +67,9 @@ func CodexNotify(ctx context.Context, env Env) error {
 	env.captureCodexReplies(ctx, r, turn)
 	env.captureCodexTitle(ctx, r, turn)
 	// Not announce: notify fires at the end of every turn and does not age out manifests.
-	sess := env.newSession(r, id, codexTool, n.Model)
-	env.setActive(r, sess)
-	env.emitStart(r, sess, map[string]any{attrSource: n.Type})
+	sess := env.NewSession(r, id, codexTool, n.Model)
+	env.SetActive(r, sess)
+	env.EmitStart(r, sess, map[string]any{attrSource: n.Type})
 	return nil
 }
 
@@ -115,11 +115,11 @@ type codexHookInput struct {
 const codexDesktopSurface = "desktop"
 
 // codexDesktopRoute is the repository-local opt-in for desktop capture.
-func codexDesktopRoute(r *repo) (routing.Record, bool) {
-	if r.projectID == "" {
+func codexDesktopRoute(r *Repo) (routing.Record, bool) {
+	if r.ProjectID == "" {
 		return routing.Record{}, false
 	}
-	rec, ok, err := routing.LoadRecord(r.projectID)
+	rec, ok, err := routing.LoadRecord(r.ProjectID)
 	return rec, err == nil && ok && rec.Desktop &&
 		slices.Contains(rec.Harnesses, routing.AgentCodex) && slices.Contains(rec.Signals, "logs")
 }
@@ -139,27 +139,27 @@ func readCodexHookInput(r io.Reader) (*codexHookInput, error) {
 func CodexSessionStart(ctx context.Context, env Env) error {
 	in, err := readCodexHookInput(env.Stdin)
 	if err != nil {
-		env.logf("%v", err)
+		env.Logf("%v", err)
 		return nil
 	}
 	if !session.ValidID(in.SessionID) {
-		env.logf("ignoring unsafe session id")
+		env.Logf("ignoring unsafe session id")
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
-		env.logf("not in a git repository: %v", err)
+		env.Logf("not in a git repository: %v", err)
 		return nil
 	}
-	sess := env.newSession(r, in.SessionID, codexTool, in.Model)
-	env.setActive(r, sess)
-	env.pruneManifests(r, sess.UpdatedAt)
+	sess := env.NewSession(r, in.SessionID, codexTool, in.Model)
+	env.SetActive(r, sess)
+	env.PruneManifests(r, sess.UpdatedAt)
 	attrs := map[string]any{attrSource: in.Source}
 	if _, desktop := codexDesktopRoute(r); desktop {
 		attrs["capture_surface"] = codexDesktopSurface
 		if dir, err := config.Dir(); err == nil {
-			pruneState(filepath.Join(dir, codexToolStartDir), env.now().Add(-spool.MaxAge))
+			PruneState(filepath.Join(dir, codexToolStartDir), env.Time().Add(-spool.MaxAge))
 		}
 	}
 	// Codex's source dispatches no SessionStart for a thread another thread spawned: the
@@ -169,7 +169,7 @@ func CodexSessionStart(ctx context.Context, env Env) error {
 	if spawn, status := harness.CodexRolloutSpawn(ctx, in.SessionID, in.TranscriptPath); status == statusPresent {
 		codexSpawnAttrs(attrs, attrParentSession, spawn)
 	}
-	env.emitStart(r, sess, attrs)
+	env.EmitStart(r, sess, attrs)
 	return nil
 }
 
@@ -181,7 +181,7 @@ func CodexUserPromptSubmit(ctx context.Context, env Env) error {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
 	}
@@ -189,15 +189,15 @@ func CodexUserPromptSubmit(ctx context.Context, env Env) error {
 	if !desktop || in.TurnID == "" {
 		return nil
 	}
-	attrs := evidenceAttrs(codexTool, sourceCodexHook, "UserPromptSubmit")
+	attrs := EvidenceAttrs(codexTool, sourceCodexHook, "UserPromptSubmit")
 	attrs["capture_surface"] = codexDesktopSurface
 	attrs["prompt_bytes"] = len(in.Prompt)
-	boundedAttr(attrs, attrTurnID, in.TurnID)
-	boundedAttr(attrs, attrModel, in.Model)
+	BoundedAttr(attrs, attrTurnID, in.TurnID)
+	BoundedAttr(attrs, attrModel, in.Model)
 	if route.IncludePrompts {
 		attrs["prompt"] = boundedCodexContent(in.Prompt)
 	}
-	env.emitFor(r, spool.Event{Name: EventUserPrompt, SessionID: in.SessionID, Repo: r.name, Attrs: attrs})
+	env.EmitFor(r, spool.Event{Name: EventUserPrompt, SessionID: in.SessionID, Repo: r.Name, Attrs: attrs})
 	return nil
 }
 
@@ -206,11 +206,11 @@ func CodexUserPromptSubmit(ctx context.Context, env Env) error {
 func CodexStop(ctx context.Context, env Env) error {
 	in, err := readCodexHookInput(env.Stdin)
 	if err != nil {
-		env.logf("%v", err)
+		env.Logf("%v", err)
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
 	}
@@ -231,15 +231,15 @@ func CodexStop(ctx context.Context, env Env) error {
 func CodexSessionEnd(ctx context.Context, env Env) error {
 	in, err := readCodexHookInput(env.Stdin)
 	if err != nil {
-		env.logf("%v", err)
+		env.Logf("%v", err)
 		return nil
 	}
 	if !session.ValidID(in.SessionID) {
-		env.logf("ignoring unsafe session id")
+		env.Logf("ignoring unsafe session id")
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
 	}
@@ -248,7 +248,7 @@ func CodexSessionEnd(ctx context.Context, env Env) error {
 	env.captureCodexDesktopActivity(ctx, r, in)
 	env.captureCodexReplies(ctx, r, in) // whatever a busy Stop left as backlog
 	env.captureCodexTitle(ctx, r, in)
-	env.endSession(r, in.SessionID, codexTool, in.Reason)
+	env.EndSession(r, in.SessionID, codexTool, in.Reason)
 	return nil
 }
 
@@ -260,25 +260,25 @@ func CodexSessionEnd(ctx context.Context, env Env) error {
 func CodexPostToolUse(ctx context.Context, env Env) error {
 	in, err := readCodexHookInput(env.Stdin)
 	if err != nil {
-		env.logf("%v", err)
+		env.Logf("%v", err)
 		return nil
 	}
 	if !session.ValidID(in.SessionID) {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
 	}
 	env.captureCodexFunding(ctx, r, in)
 	if route, desktop := codexDesktopRoute(r); desktop && in.ToolName != "" {
-		attrs := evidenceAttrs(codexTool, sourceCodexHook, "PostToolUse")
+		attrs := EvidenceAttrs(codexTool, sourceCodexHook, "PostToolUse")
 		attrs["capture_surface"] = codexDesktopSurface
-		boundedAttr(attrs, attrToolName, in.ToolName)
-		boundedAttr(attrs, attrToolCallID, in.ToolUseID)
-		boundedAttr(attrs, attrTurnID, in.TurnID)
-		boundedAttr(attrs, attrModel, in.Model)
+		BoundedAttr(attrs, attrToolName, in.ToolName)
+		BoundedAttr(attrs, attrToolCallID, in.ToolUseID)
+		BoundedAttr(attrs, attrTurnID, in.TurnID)
+		BoundedAttr(attrs, attrModel, in.Model)
 		if elapsed, ok := env.codexToolElapsed(in); ok {
 			attrs["duration_ms"] = elapsed
 			attrs["duration_source"] = "hook_elapsed"
@@ -294,7 +294,7 @@ func CodexPostToolUse(ctx context.Context, env Env) error {
 				attrs[attrStatus] = "error"
 			}
 		}
-		env.emitFor(r, spool.Event{Name: EventToolCall, SessionID: in.SessionID, Repo: r.name, Attrs: attrs})
+		env.EmitFor(r, spool.Event{Name: EventToolCall, SessionID: in.SessionID, Repo: r.Name, Attrs: attrs})
 	}
 	env.captureCodexDesktopActivity(ctx, r, in)
 	candidates := codexEditedPaths(in)
@@ -302,13 +302,13 @@ func CodexPostToolUse(ctx context.Context, env Env) error {
 		return nil
 	}
 	// Reported as a set: the call's own path fields and its patch can name the same file.
-	attrs := agentAttrs(map[string]any{}, in.AgentID, in.AgentType)
-	boundedAttr(attrs, attrToolCallID, in.ToolUseID)
+	attrs := AgentAttrs(map[string]any{}, in.AgentID, in.AgentType)
+	BoundedAttr(attrs, attrToolCallID, in.ToolUseID)
 	if _, desktop := codexDesktopRoute(r); desktop {
 		attrs["capture_surface"] = codexDesktopSurface
 	}
-	env.touch(r, session.Session{ID: in.SessionID, Tool: codexTool, Model: in.Model}, in.ToolName,
-		uniqueSorted(relativeFiles(r, env.Cwd, candidates)), attrs)
+	env.Touch(r, session.Session{ID: in.SessionID, Tool: codexTool, Model: in.Model}, in.ToolName,
+		UniqueSorted(RelativeFiles(r, env.Cwd, candidates)), attrs)
 	return nil
 }
 

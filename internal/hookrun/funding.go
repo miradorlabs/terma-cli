@@ -20,10 +20,10 @@ type evidenceState struct {
 	At   time.Time `json:"at"`
 }
 
-// captureFunding spools one piece of funding evidence for the session unless the same
+// CaptureFunding spools one piece of funding evidence for the session unless the same
 // evidence was spooled within the heartbeat. The handler resolves the repository once
 // and hands it to every capture it runs, as captureObservation's callers do.
-func (e Env) captureFunding(r *repo, id, tool, name string, evidence harness.FundingEvidence) {
+func (e Env) CaptureFunding(r *Repo, id, tool, name string, evidence harness.FundingEvidence) {
 	if e.Spool == nil || !session.ValidID(id) {
 		return
 	}
@@ -38,8 +38,8 @@ func (e Env) captureFunding(r *repo, id, tool, name string, evidence harness.Fun
 		attrs["source_time"] = evidence.SourceTime.UTC().Format(time.RFC3339Nano)
 	}
 	// Include project routing in the hash: a resumed session may move projects.
-	attrs[AttrProjectID] = r.projectID
-	r.stampWorktree(attrs)
+	attrs[AttrProjectID] = r.ProjectID
+	r.StampWorktree(attrs)
 	raw, err := json.Marshal(attrs)
 	if err != nil {
 		return
@@ -55,7 +55,7 @@ func (e Env) captureFunding(r *repo, id, tool, name string, evidence harness.Fun
 		return
 	}
 	path := filepath.Join(dir, hex.EncodeToString(key[:16])+".json")
-	unlock, err := lockEvidence(path + ".lock")
+	unlock, err := LockEvidence(path + ".lock")
 	if err != nil {
 		return
 	} // Another invocation is already capturing this session.
@@ -67,17 +67,17 @@ func (e Env) captureFunding(r *repo, id, tool, name string, evidence harness.Fun
 	} else {
 		fresh = os.IsNotExist(err)
 	}
-	next := evidenceState{Hash: hex.EncodeToString(hash[:]), At: e.now()}
+	next := evidenceState{Hash: hex.EncodeToString(hash[:]), At: e.Time()}
 	if prev.Hash == next.Hash && !next.At.Before(prev.At) && next.At.Sub(prev.At) < quotaHeartbeat {
 		return
 	}
-	ev := spool.Event{Time: e.now(), Name: name, SessionID: id, Repo: r.name, Attrs: attrs}
+	ev := spool.Event{Time: e.Time(), Name: name, SessionID: id, Repo: r.Name, Attrs: attrs}
 	if e.Spool.Append(ev) != nil {
 		return
 	} // Retry a failed append at the next hook.
 	data, _ := json.Marshal(next)
-	_ = writeState(path, data)
+	_ = WriteState(path, data)
 	if fresh {
-		pruneState(dir, next.At.Add(-snapshotStateRetention))
+		PruneState(dir, next.At.Add(-snapshotStateRetention))
 	}
 }

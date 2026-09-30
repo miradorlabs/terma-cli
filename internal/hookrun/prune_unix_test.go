@@ -43,7 +43,7 @@ func TestPruneRetiresOrphanedLocks(t *testing.T) {
 	touch("starting.json.lock", now)
 	// An orphan another invocation holds right now.
 	held := touch("held.json.lock", old)
-	unlock, err := lockEvidence(held)
+	unlock, err := LockEvidence(held)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +52,7 @@ func TestPruneRetiresOrphanedLocks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pruneState(dir, cutoff)
+	PruneState(dir, cutoff)
 	unlock()
 
 	for name, want := range map[string]bool{

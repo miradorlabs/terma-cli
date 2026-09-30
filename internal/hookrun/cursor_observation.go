@@ -35,30 +35,30 @@ func CursorPreCompact(ctx context.Context, env Env) error {
 func cursorObserve(ctx context.Context, env Env, hook string) error {
 	in, err := readCursorInput(env.Stdin)
 	if err != nil {
-		env.logf("%v", err)
+		env.Logf("%v", err)
 		return nil
 	}
 	env.Cwd = in.cwd(env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
 	}
 	if hook == "beforeSubmitPrompt" {
 		// IDE conversations can outlive the active manifest's TTL; CLI clients may
 		// omit sessionStart. A submitted prompt refreshes attribution in both cases.
-		env.setActive(r, env.newSession(r, in.id(), cursorTool, in.Model))
+		env.SetActive(r, env.NewSession(r, in.id(), cursorTool, in.Model))
 	}
 	env.captureCursorObservation(ctx, r, in, hook)
 	return nil
 }
 
 func cursorObservationAttrs(in *cursorHookInput, hook string) map[string]any {
-	a := evidenceAttrs(cursorTool, sourceCursorHook, hook)
+	a := EvidenceAttrs(cursorTool, sourceCursorHook, hook)
 	for _, k := range []string{"funding_status", "quota_status", "account_status"} {
 		a[k] = statusUnavailable
 	}
 	for k, v := range map[string]string{attrTurnID: in.GenerationID, attrModel: in.Model, "model_id": in.ModelID, "cursor.version": in.CursorVersion, "provider_session_id": in.SessionID, "account_email": in.UserEmail} {
-		boundedAttr(a, k, v)
+		BoundedAttr(a, k, v)
 	}
 	if _, ok := a["account_email"]; ok {
 		a["account_status"] = "available"
@@ -68,7 +68,7 @@ func cursorObservationAttrs(in *cursorHookInput, hook string) map[string]any {
 	case "afterAgentResponse", "stop":
 		n, invalid := 0, false
 		for k, v := range map[string]json.RawMessage{"input_tokens": in.InputTokens, "output_tokens": in.OutputTokens, "cache_read_tokens": in.CacheReadTokens, "cache_write_tokens": in.CacheWriteTokens} {
-			value, present, ok := jsonNumber(v, true)
+			value, present, ok := JSONNumber(v, true)
 			if present && !ok {
 				invalid = true
 			}
@@ -95,14 +95,14 @@ func cursorObservationAttrs(in *cursorHookInput, hook string) map[string]any {
 			default:
 				a[attrStatus] = unknownValue
 			}
-			if v, _, ok := jsonNumber(in.LoopCount, true); ok {
+			if v, _, ok := JSONNumber(in.LoopCount, true); ok {
 				a["loop_count"] = int64(v)
 			}
 		}
 	case "preCompact":
 		// Context occupancy is not a subscription allowance or a token usage delta.
 		for k, v := range map[string]json.RawMessage{"context_tokens": in.ContextTokens, "context_window_size": in.ContextWindowSize, "context_usage_percent": in.ContextUsagePercent} {
-			if value, _, ok := jsonNumber(v, k != "context_usage_percent"); ok {
+			if value, _, ok := JSONNumber(v, k != "context_usage_percent"); ok {
 				a[k] = value
 			}
 		}
@@ -117,8 +117,8 @@ func cursorObservationAttrs(in *cursorHookInput, hook string) map[string]any {
 // captureCursorObservation records one Cursor hook as an ordered observation. The
 // checkpoint directory and the observation id seed are Cursor's own, so state written
 // by earlier versions keeps its sequence.
-func (e Env) captureCursorObservation(ctx context.Context, r *repo, in *cursorHookInput, hook string) {
-	e.captureObservation(ctx, r, observation{
+func (e Env) captureCursorObservation(ctx context.Context, r *Repo, in *cursorHookInput, hook string) {
+	e.CaptureObservation(ctx, r, Observation{
 		tool: cursorTool, source: sourceCursorHook, stateDir: cursorObservationDir,
 		sessionID: in.id(), hook: hook, turnID: in.GenerationID, attrs: cursorObservationAttrs(in, hook),
 	})

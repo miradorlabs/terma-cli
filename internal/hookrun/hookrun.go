@@ -60,14 +60,17 @@ type Env struct {
 	Policy config.Policy
 }
 
-func (e Env) now() time.Time {
+// Time is when the hook runs: Now when the caller set it, the clock otherwise.
+func (e Env) Time() time.Time {
 	if e.Now.IsZero() {
 		return time.Now()
 	}
 	return e.Now
 }
 
-func (e Env) logf(format string, args ...any) {
+// Logf prints a line to Stderr under --debug, and nothing otherwise: a hook's output
+// can reach the agent, or its model.
+func (e Env) Logf(format string, args ...any) {
 	if e.Debug && e.Stderr != nil {
 		fmt.Fprintf(e.Stderr, "terma hook: "+format+"\n", args...)
 	}
@@ -78,32 +81,34 @@ func (e Env) emit(ev spool.Event) {
 		return
 	}
 	if ev.Time.IsZero() {
-		ev.Time = e.now()
+		ev.Time = e.Time()
 	}
 	if err := e.Spool.Append(ev); err != nil {
-		e.logf("spool append failed: %v", err)
+		e.Logf("spool append failed: %v", err)
 	}
 }
 
-// repo is the resolved repository for the current directory.
-type repo struct {
-	root   string
-	gitDir string
-	store  *session.Store
-	// projectID is the committed binding from .terma/settings.json ("" when the repo has
+// Repo is the resolved repository for the current directory.
+type Repo struct {
+	Root   string
+	GitDir string
+	Store  *session.Store
+	// ProjectID is the committed binding from .terma/settings.json ("" when the repo has
 	// not been installed); the flusher routes events to the project's key by it. A linked
 	// worktree without a binding of its own has its main checkout's (project.Resolve).
-	projectID string
-	// name is the repository events report (their repo): the directory name of the
+	ProjectID string
+	// Name is the repository events report (their repo): the directory Name of the
 	// checkout, or in a linked worktree of its main checkout, so every worktree of one
 	// repository reports as that repository.
-	name string
-	// worktree is git's name for a linked worktree ("" in a main checkout), sent as
+	Name string
+	// Worktree is git's name for a linked Worktree ("" in a main checkout), sent as
 	// AttrWorktree so the work done in one is still told apart.
-	worktree string
+	Worktree string
 }
 
-func (e Env) repo(ctx context.Context) (*repo, error) {
+// Repo resolves the repository (or, outside Git, the bound workspace) the hook runs in,
+// and the project its events belong to.
+func (e Env) Repo(ctx context.Context) (*Repo, error) {
 	// Filesystem first: a git subprocess is a third of the hook budget on macOS.
 	root, gitDir, ok := gitx.LocateFS(e.Cwd)
 	if !ok {
@@ -124,37 +129,37 @@ func (e Env) repo(ctx context.Context) (*repo, error) {
 	if err != nil {
 		return nil, err
 	}
-	r := &repo{root: root, gitDir: gitDir, store: session.Open(stateDir)}
-	r.name, r.worktree = checkoutNames(root, gitDir)
+	r := &Repo{Root: root, GitDir: gitDir, Store: session.Open(stateDir)}
+	r.Name, r.Worktree = CheckoutNames(root, gitDir)
 	if e.Policy.Global() {
 		// Global exports and hook events belong to the selected team, including in
 		// repositories previously bound to another project.
-		r.projectID = e.Policy.DefaultProjectID
+		r.ProjectID = e.Policy.DefaultProjectID
 	} else if f, _, err := project.Resolve(root, gitDir); err == nil {
-		r.projectID = f.Project.ID
+		r.ProjectID = f.Project.ID
 	}
 	return r, nil
 }
 
-// emitFor spools an event stamped with the repository's project binding and, from a
+// EmitFor spools an event stamped with the repository's project binding and, from a
 // linked worktree, which one.
-func (e Env) emitFor(r *repo, ev spool.Event) {
+func (e Env) EmitFor(r *Repo, ev spool.Event) {
 	ev.Global = e.Policy.Global()
 	if r != nil {
-		ev.Workspace = r.root
-		pol := routing.EffectivePolicy(e.Policy, r.projectID)
-		if pol.ExcludesPath(r.root, "") || pol.HasExcludedPath(ev.Attrs, r.root) {
+		ev.Workspace = r.Root
+		pol := routing.EffectivePolicy(e.Policy, r.ProjectID)
+		if pol.ExcludesPath(r.Root, "") || pol.HasExcludedPath(ev.Attrs, r.Root) {
 			return
 		}
 	}
-	if r != nil && (r.projectID != "" || r.worktree != "") {
+	if r != nil && (r.ProjectID != "" || r.Worktree != "") {
 		if ev.Attrs == nil {
 			ev.Attrs = map[string]any{}
 		}
-		if r.projectID != "" {
-			ev.Attrs[AttrProjectID] = r.projectID
+		if r.ProjectID != "" {
+			ev.Attrs[AttrProjectID] = r.ProjectID
 		}
-		r.stampWorktree(ev.Attrs)
+		r.StampWorktree(ev.Attrs)
 	}
 	e.claimForRelay(r, ev)
 	e.emit(ev)
@@ -166,37 +171,37 @@ func (e Env) emitFor(r *repo, ev spool.Event) {
 // mid-way, a Cursor session that skipped sessionStart, a resumed conversation. A
 // repository without a binding claims nothing, and neither does a machine that never
 // ran `terma relay setup`.
-func (e Env) claimForRelay(r *repo, ev spool.Event) {
-	if r == nil || r.projectID == "" || ev.SessionID == "" || !claim.Enabled() {
+func (e Env) claimForRelay(r *Repo, ev spool.Event) {
+	if r == nil || r.ProjectID == "" || ev.SessionID == "" || !claim.Enabled() {
 		return
 	}
 	tool, _ := ev.Attrs[attrTool].(string)
-	c := claim.Claim{ProjectID: r.projectID, Tool: tool, Repo: r.name, Worktree: r.worktree, PIDs: claimPIDs()}
-	claim.Write(ev.SessionID, c, e.now())
+	c := claim.Claim{ProjectID: r.ProjectID, Tool: tool, Repo: r.Name, Worktree: r.Worktree, PIDs: claimPIDs()}
+	claim.Write(ev.SessionID, c, e.Time())
 	// A Codex subagent is a thread of its own: its hooks carry the root's session and the
 	// child thread as agent_id, and its telemetry the child's conversation.id. Claimed
 	// only under the root, everything the subagent did would be dropped. (Claude's
 	// subagents export under the parent's session.id; claiming their agent_id too is
 	// harmless — no export names it.)
 	if agent, _ := ev.Attrs[attrAgentID].(string); agent != "" && agent != ev.SessionID {
-		claim.Write(agent, c, e.now())
+		claim.Write(agent, c, e.Time())
 	}
 	if e.OnClaim != nil {
 		e.OnClaim()
 	}
 }
 
-// stampWorktree names the linked worktree an event came from, for the events that are
+// StampWorktree names the linked worktree an event came from, for the events that are
 // spooled without going through emitFor.
-func (r *repo) stampWorktree(attrs map[string]any) {
-	if r.worktree != "" {
-		attrs[AttrWorktree] = r.worktree
+func (r *Repo) StampWorktree(attrs map[string]any) {
+	if r.Worktree != "" {
+		attrs[AttrWorktree] = r.Worktree
 	}
 }
 
-// checkoutNames names a checkout for events: the repository (in a linked worktree, its
+// CheckoutNames names a checkout for events: the repository (in a linked worktree, its
 // main checkout's directory name) and, for a linked worktree, git's name for it.
-func checkoutNames(root, gitDir string) (name, worktree string) {
+func CheckoutNames(root, gitDir string) (name, worktree string) {
 	name = filepath.Base(root)
 	if wt, main, ok := gitx.LinkedWorktreeFS(gitDir); ok {
 		worktree = wt
@@ -226,21 +231,21 @@ func PrepareCommitMsg(ctx context.Context, env Env) error {
 	case "merge", "squash":
 		return nil
 	}
-	r, err := env.repo(ctx)
-	if err != nil || r.gitDir == "" {
+	r, err := env.Repo(ctx)
+	if err != nil || r.GitDir == "" {
 		return nil
 	}
-	manifests, err := r.store.Manifests()
+	manifests, err := r.Store.Manifests()
 	if err != nil {
-		env.logf("manifests: %v", err)
+		env.Logf("manifests: %v", err)
 	}
-	active, fresh := r.store.Active(env.now(), ActiveTTL)
+	active, fresh := r.Store.Active(env.Time(), ActiveTTL)
 	if len(manifests) == 0 && (active == nil || !fresh) {
 		return nil // nothing could be attributed; skip the git call entirely
 	}
-	staged, err := gitx.StagedFiles(ctx, r.root)
+	staged, err := gitx.StagedFiles(ctx, r.Root)
 	if err != nil {
-		env.logf("staged files: %v", err)
+		env.Logf("staged files: %v", err)
 		return nil
 	}
 	attributions := session.Attribute(staged, manifests, active, fresh)
@@ -249,26 +254,26 @@ func PrepareCommitMsg(ctx context.Context, env Env) error {
 	}
 	original, err := os.ReadFile(msgPath)
 	if err != nil {
-		env.logf("read message: %v", err)
+		env.Logf("read message: %v", err)
 		return nil
 	}
 	trailers := make([]trailer.Trailer, 0, len(attributions))
 	for _, a := range attributions {
 		trailers = append(trailers, trailer.Trailer{SessionID: a.SessionID, Tool: a.Tool})
 	}
-	stamped, changed := trailer.Stamp(string(original), trailers, gitx.CommentCharFS(r.gitDir))
+	stamped, changed := trailer.Stamp(string(original), trailers, gitx.CommentCharFS(r.GitDir))
 	if !changed {
 		return nil
 	}
 	if err := os.WriteFile(msgPath, []byte(stamped), 0o644); err != nil {
-		env.logf("write message: %v", err)
+		env.Logf("write message: %v", err)
 		return nil
 	}
 	ids := make([]string, 0, len(attributions))
 	for _, a := range attributions {
 		ids = append(ids, a.SessionID)
 	}
-	env.emitFor(r, spool.Event{Name: EventCommitStamped, SessionID: ids[0], Repo: r.name, Attrs: map[string]any{
+	env.EmitFor(r, spool.Event{Name: EventCommitStamped, SessionID: ids[0], Repo: r.Name, Attrs: map[string]any{
 		"sessions": strings.Join(ids, ","), "session_count": len(ids), "staged_count": len(staged), attrSource: source,
 	}})
 	return nil
@@ -302,15 +307,15 @@ type commitFileStat struct {
 // is not attributed to work that already shipped. A commit with no trailer gets a
 // count-only event instead, so the share of commits terma attributed is measurable.
 func PostCommit(ctx context.Context, env Env) error {
-	r, err := env.repo(ctx)
-	if err != nil || r.gitDir == "" {
+	r, err := env.Repo(ctx)
+	if err != nil || r.GitDir == "" {
 		return nil
 	}
-	head, err := gitx.LastCommit(ctx, r.root)
+	head, err := gitx.LastCommit(ctx, r.Root)
 	if err != nil || head.SHA == "" {
 		return nil
 	}
-	stamped := trailer.Parse(head.Message, gitx.CommentCharFS(r.gitDir))
+	stamped := trailer.Parse(head.Message, gitx.CommentCharFS(r.GitDir))
 	if len(stamped) == 0 {
 		emitUnattributedCommit(env, r, head) // human-only commit: no manifest to retire
 		return nil
@@ -325,11 +330,11 @@ func PostCommit(ctx context.Context, env Env) error {
 	// every file entry belongs to it and `sessions` already says which.
 	var owners map[string]string
 	if len(ids) > 1 {
-		owners = fileOwners(env, r.store, ids)
+		owners = fileOwners(env, r.Store, ids)
 	}
 	for _, id := range ids {
-		if err := r.store.Consume(id, files); err != nil {
-			env.logf("consume manifest: %v", err)
+		if err := r.Store.Consume(id, files); err != nil {
+			env.Logf("consume manifest: %v", err)
 		}
 	}
 	attrs := commitAttrs(r, head)
@@ -337,7 +342,7 @@ func PostCommit(ctx context.Context, env Env) error {
 	attrs["session_count"] = len(ids)
 	attrs[attrTool] = stamped[0].Tool
 	addFileStats(env, attrs, head.Files, owners)
-	env.emitFor(r, spool.Event{Name: EventCommit, SessionID: ids[0], Repo: r.name, Attrs: attrs})
+	env.EmitFor(r, spool.Event{Name: EventCommit, SessionID: ids[0], Repo: r.Name, Attrs: attrs})
 	return nil
 }
 
@@ -369,18 +374,18 @@ func PostCommit(ctx context.Context, env Env) error {
 // the one git log call, and a squash off git's default squash subject — the only
 // trace once SQUASH_MSG is unlinked; a squash whose message was rewritten counts as
 // the ordinary commit it is.
-func emitUnattributedCommit(env Env, r *repo, head gitx.Commit) {
+func emitUnattributedCommit(env Env, r *Repo, head gitx.Commit) {
 	if head.IsMerge() || head.IsSquash() {
 		return
 	}
-	env.emitFor(r, spool.Event{Name: EventCommitUnattributed, Repo: r.name, Attrs: commitAttrs(r, head)})
+	env.EmitFor(r, spool.Event{Name: EventCommitUnattributed, Repo: r.Name, Attrs: commitAttrs(r, head)})
 }
 
 // commitAttrs is a commit's identity and size — what both commit events share.
 // Everything here was already in hand after post-commit's one `git log`, except
 // the remote, which is read from the config file the way core.commentChar is, so
 // no second subprocess is needed. Nothing in here names a file.
-func commitAttrs(r *repo, head gitx.Commit) map[string]any {
+func commitAttrs(r *Repo, head gitx.Commit) map[string]any {
 	attrs := map[string]any{
 		"sha": head.SHA, attrFileCount: len(head.Files), "author_email": head.AuthorEmail,
 	}
@@ -393,7 +398,7 @@ func commitAttrs(r *repo, head gitx.Commit) map[string]any {
 	// anywhere. The remote is what turns a sha into a link, so it rides along —
 	// stripped of credentials by NormalizeRemote, since this is telemetry. The
 	// branch came free with the log call.
-	if remote := gitx.RemoteURLFS(r.gitDir); remote != "" {
+	if remote := gitx.RemoteURLFS(r.GitDir); remote != "" {
 		attrs["repo_url"] = remote
 	}
 	if head.Branch != "" {
@@ -448,7 +453,7 @@ func addFileStats(env Env, attrs map[string]any, stats []gitx.FileStat, owners m
 	}
 	blob, err := json.Marshal(entries)
 	if err != nil {
-		env.logf("encode file stats: %v", err)
+		env.Logf("encode file stats: %v", err)
 		return
 	}
 	attrs["file_stats"] = string(blob)
@@ -462,7 +467,7 @@ func addFileStats(env Env, attrs map[string]any, stats []gitx.FileStat, owners m
 func fileOwners(env Env, store *session.Store, ids []string) map[string]string {
 	manifests, err := store.Manifests()
 	if err != nil {
-		env.logf("manifests: %v", err)
+		env.Logf("manifests: %v", err)
 		return nil
 	}
 	stamped := make(map[string]bool, len(ids))

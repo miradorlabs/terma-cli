@@ -35,47 +35,47 @@ func antigravityTurnPath(sessionID, root string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, antigravityTurnDir, evidenceID(sessionID+"\x00"+root)+".json"), nil
+	return filepath.Join(dir, antigravityTurnDir, EvidenceID(sessionID+"\x00"+root)+".json"), nil
 }
 
 // beginAntigravityTurn records the turn that starts at invocation 0 and returns its id.
 // A payload without `initialNumSteps` starts a turn terma cannot name: the previous
 // turn's record is removed rather than left to label this one's events.
-func (e Env) beginAntigravityTurn(r *repo, in *antigravityHookInput) string {
-	path, err := antigravityTurnPath(in.id(), r.root)
+func (e Env) beginAntigravityTurn(r *Repo, in *antigravityHookInput) string {
+	path, err := antigravityTurnPath(in.id(), r.Root)
 	if err != nil {
 		return ""
 	}
-	steps, _, ok := jsonNumber(in.InitialNumSteps, true)
+	steps, _, ok := JSONNumber(in.InitialNumSteps, true)
 	if !ok {
 		_ = os.Remove(path)
 		return ""
 	}
-	turn := antigravityTurn{TurnID: "turn-" + strconv.FormatUint(uint64(steps), 10), At: e.now()}
+	turn := antigravityTurn{TurnID: "turn-" + strconv.FormatUint(uint64(steps), 10), At: e.Time()}
 	b, err := json.Marshal(turn)
 	if err != nil {
 		return ""
 	}
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
-		e.logf("antigravity turn: %v", err)
+		e.Logf("antigravity turn: %v", err)
 		return ""
 	}
 	_, statErr := os.Stat(path)
-	if err := writeState(path, b); err != nil {
-		e.logf("antigravity turn: %v", err)
+	if err := WriteState(path, b); err != nil {
+		e.Logf("antigravity turn: %v", err)
 		return ""
 	}
 	if os.IsNotExist(statErr) {
-		pruneState(dir, e.now().Add(-spool.MaxAge))
+		PruneState(dir, e.Time().Add(-spool.MaxAge))
 	}
 	return turn.TurnID
 }
 
 // antigravityTurnID is the turn the conversation is in, or "" when terma did not see it
 // begin (hooks installed mid-turn, a pruned record). Missing stays missing.
-func antigravityTurnID(r *repo, sessionID string) string {
-	path, err := antigravityTurnPath(sessionID, r.root)
+func antigravityTurnID(r *Repo, sessionID string) string {
+	path, err := antigravityTurnPath(sessionID, r.Root)
 	if err != nil {
 		return ""
 	}
@@ -84,7 +84,7 @@ func antigravityTurnID(r *repo, sessionID string) string {
 		return ""
 	}
 	var turn antigravityTurn
-	if json.Unmarshal(b, &turn) != nil || !shortLabel(turn.TurnID) {
+	if json.Unmarshal(b, &turn) != nil || !ShortLabel(turn.TurnID) {
 		return ""
 	}
 	return turn.TurnID

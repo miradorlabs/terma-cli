@@ -58,20 +58,20 @@ const claudeTool = "claude-code"
 func SessionStart(ctx context.Context, env Env) error {
 	in, err := readClaudeInput(env.Stdin)
 	if err != nil {
-		env.logf("%v", err)
+		env.Logf("%v", err)
 		return nil
 	}
 	if !session.ValidID(in.SessionID) {
-		env.logf("ignoring unsafe session id")
+		env.Logf("ignoring unsafe session id")
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
-		env.logf("not in a git repository: %v", err)
+		env.Logf("not in a git repository: %v", err)
 		return nil
 	}
-	env.announce(r, env.newSession(r, in.SessionID, claudeTool, in.Model), map[string]any{attrSource: in.Source})
+	env.Announce(r, env.NewSession(r, in.SessionID, claudeTool, in.Model), map[string]any{attrSource: in.Source})
 	env.pruneClaudeSubagents()
 	env.captureClaudeAccount(r, in)
 	return nil
@@ -82,19 +82,19 @@ func SessionStart(ctx context.Context, env Env) error {
 func SessionEnd(ctx context.Context, env Env) error {
 	in, err := readClaudeInput(env.Stdin)
 	if err != nil {
-		env.logf("%v", err)
+		env.Logf("%v", err)
 		return nil
 	}
 	if !session.ValidID(in.SessionID) {
-		env.logf("ignoring unsafe session id")
+		env.Logf("ignoring unsafe session id")
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
 	}
-	env.endSession(r, in.SessionID, claudeTool, in.Reason)
+	env.EndSession(r, in.SessionID, claudeTool, in.Reason)
 	return nil
 }
 
@@ -102,11 +102,11 @@ func SessionEnd(ctx context.Context, env Env) error {
 func Stop(ctx context.Context, env Env) error {
 	in, err := readClaudeInput(env.Stdin)
 	if err != nil {
-		env.logf("%v", err)
+		env.Logf("%v", err)
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
 	}
@@ -118,14 +118,14 @@ func Stop(ctx context.Context, env Env) error {
 func PostToolUse(ctx context.Context, env Env) error {
 	in, err := readClaudeInput(env.Stdin)
 	if err != nil {
-		env.logf("%v", err)
+		env.Logf("%v", err)
 		return nil
 	}
 	if !session.ValidID(in.SessionID) {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
 	}
@@ -136,8 +136,8 @@ func PostToolUse(ctx context.Context, env Env) error {
 	paths := append([]string{in.ToolInput.FilePath, in.ToolInput.NotebookPath}, editPaths(in)...)
 	// Inside a subagent the payload keeps the parent's session_id and names the agent:
 	// the manifest stays the session's, the event says which agent did the editing.
-	env.touch(r, session.Session{ID: in.SessionID, Tool: claudeTool, Model: in.Model}, in.ToolName,
-		relativeFiles(r, env.Cwd, paths), agentAttrs(map[string]any{}, in.AgentID, in.AgentType))
+	env.Touch(r, session.Session{ID: in.SessionID, Tool: claudeTool, Model: in.Model}, in.ToolName,
+		RelativeFiles(r, env.Cwd, paths), AgentAttrs(map[string]any{}, in.AgentID, in.AgentType))
 	return nil
 }
 

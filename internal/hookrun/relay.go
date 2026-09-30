@@ -43,9 +43,9 @@ func ClaimFromPayload(ctx context.Context, env Env, payload []byte, tool string)
 		env.Cwd = in.Workspaces[0]
 	}
 	var c claim.Claim
-	switch r, err := env.repo(ctx); {
-	case err == nil && r.projectID != "":
-		c = claim.Claim{ProjectID: r.projectID, Tool: tool, Repo: r.name, Worktree: r.worktree}
+	switch r, err := env.Repo(ctx); {
+	case err == nil && r.ProjectID != "":
+		c = claim.Claim{ProjectID: r.ProjectID, Tool: tool, Repo: r.Name, Worktree: r.Worktree}
 	case err != nil && env.Policy.Global() && env.Policy.DefaultProjectID != "":
 		// Global mode, outside any repository: a scratch directory, the home directory.
 		c = claim.Claim{ProjectID: env.Policy.DefaultProjectID, Tool: tool, Repo: filepath.Base(env.Cwd)}
@@ -55,10 +55,10 @@ func ClaimFromPayload(ctx context.Context, env Env, payload []byte, tool string)
 	c.PIDs = claimPIDs()
 	// A Codex subagent's telemetry names its own thread (see claimForRelay).
 	if in.AgentID != "" && in.AgentID != id {
-		claim.Write(in.AgentID, c, env.now())
+		claim.Write(in.AgentID, c, env.Time())
 	}
-	if !claim.Write(id, c, env.now()) {
-		_, live := claim.Read(id, env.now())
+	if !claim.Write(id, c, env.Time()) {
+		_, live := claim.Read(id, env.Time())
 		return live
 	}
 	return true

@@ -93,34 +93,34 @@ func AntigravityPreInvocation(ctx context.Context, env Env) error {
 	defer antigravityAck(env)
 	in, err := readAntigravityInput(env.Stdin)
 	if err != nil {
-		env.logf("%v", err)
+		env.Logf("%v", err)
 		return nil
 	}
-	invocation, _, invocationKnown := jsonNumber(in.InvocationNum, true)
+	invocation, _, invocationKnown := JSONNumber(in.InvocationNum, true)
 	if invocationKnown && invocation != 0 {
 		// A model call in the middle of a turn: nothing about the session changes.
 		return nil
 	}
 	env.Cwd = in.cwd(env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
-		env.logf("not in a git repository: %v", err)
+		env.Logf("not in a git repository: %v", err)
 		return nil
 	}
 	id := in.id()
-	sess := env.newSession(r, id, antigravityTool, in.ModelName)
+	sess := env.NewSession(r, id, antigravityTool, in.ModelName)
 	now := sess.UpdatedAt
-	if active, _ := r.store.Active(now, 0); active != nil && active.ID == id && !active.StartedAt.IsZero() {
+	if active, _ := r.Store.Active(now, 0); active != nil && active.ID == id && !active.StartedAt.IsZero() {
 		sess.StartedAt = active.StartedAt
 	}
-	env.setActive(r, sess)
+	env.SetActive(r, sess)
 	turn := env.beginAntigravityTurn(r, in)
 	// A later turn, or a resumed conversation, was announced before.
-	if steps, _, stepsKnown := jsonNumber(in.InitialNumSteps, true); !stepsKnown || steps <= 1 {
-		env.pruneManifests(r, now)
-		env.emitStart(r, sess, nil)
+	if steps, _, stepsKnown := JSONNumber(in.InitialNumSteps, true); !stepsKnown || steps <= 1 {
+		env.PruneManifests(r, now)
+		env.EmitStart(r, sess, nil)
 	}
-	env.captureObservation(ctx, r, observation{
+	env.CaptureObservation(ctx, r, Observation{
 		tool: antigravityTool, source: sourceAntigravityHook, stateDir: antigravityObservationDir,
 		sessionID: id, hook: "PreInvocation", turnID: turn, attrs: antigravityObservationAttrs(in, "PreInvocation", turn),
 	})
@@ -174,11 +174,11 @@ func AntigravityPostToolUse(ctx context.Context, env Env) error {
 	defer antigravityAck(env)
 	in, err := readAntigravityInput(env.Stdin)
 	if err != nil {
-		env.logf("%v", err)
+		env.Logf("%v", err)
 		return nil
 	}
 	env.Cwd = in.cwd(env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
 	}
@@ -187,12 +187,12 @@ func AntigravityPostToolUse(ctx context.Context, env Env) error {
 	call, called := antigravityToolCallAttrs(in, turn)
 	if called {
 		call[attrVersion] = env.Version
-		env.emitFor(r, spool.Event{Name: EventToolCall, SessionID: id, Repo: r.name, Attrs: call})
+		env.EmitFor(r, spool.Event{Name: EventToolCall, SessionID: id, Repo: r.Name, Attrs: call})
 	}
 
 	// A payload without a toolCall yields no paths, so this guard is also what makes
 	// in.ToolCall safe to read below.
-	files := relativeFiles(r, env.Cwd, antigravityEditedPaths(in))
+	files := RelativeFiles(r, env.Cwd, antigravityEditedPaths(in))
 	if len(files) == 0 {
 		return nil
 	}
@@ -204,7 +204,7 @@ func AntigravityPostToolUse(ctx context.Context, env Env) error {
 			ids[k] = v
 		}
 	}
-	env.touch(r, session.Session{ID: id, Tool: antigravityTool, Model: in.ModelName}, in.ToolCall.Name, files, ids)
+	env.Touch(r, session.Session{ID: id, Tool: antigravityTool, Model: in.ModelName}, in.ToolCall.Name, files, ids)
 	return nil
 }
 
@@ -218,11 +218,11 @@ func AntigravityPostToolUse(ctx context.Context, env Env) error {
 // did — a shell command that exits non-zero is a completed step. agy reports no duration,
 // so none is sent.
 func antigravityToolCallAttrs(in *antigravityHookInput, turn string) (map[string]any, bool) {
-	a := evidenceAttrs(antigravityTool, sourceAntigravityHook, "PostToolUse")
-	if in.ToolCall != nil && shortLabel(in.ToolCall.Name) {
+	a := EvidenceAttrs(antigravityTool, sourceAntigravityHook, "PostToolUse")
+	if in.ToolCall != nil && ShortLabel(in.ToolCall.Name) {
 		a[attrToolName] = in.ToolCall.Name
 	}
-	if step, _, ok := jsonNumber(in.StepIdx, true); ok {
+	if step, _, ok := JSONNumber(in.StepIdx, true); ok {
 		a["step_idx"] = int64(step)
 		a[attrToolCallID] = "step-" + strconv.FormatUint(uint64(step), 10)
 	}
@@ -234,7 +234,7 @@ func antigravityToolCallAttrs(in *antigravityHookInput, turn string) (map[string
 	if turn != "" {
 		a[attrTurnID] = turn
 	}
-	boundedAttr(a, attrModel, in.ModelName)
+	BoundedAttr(a, attrModel, in.ModelName)
 	a[attrStatus] = "completed"
 	if in.Error != "" {
 		a[attrStatus] = "error"
@@ -260,24 +260,24 @@ func antigravityObserve(ctx context.Context, env Env, hook string) error {
 	defer antigravityAck(env)
 	in, err := readAntigravityInput(env.Stdin)
 	if err != nil {
-		env.logf("%v", err)
+		env.Logf("%v", err)
 		return nil
 	}
 	env.Cwd = in.cwd(env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
 	}
 	if hook == "Stop" {
 		// The turn is done: keep the session fresh for the commit that may follow.
-		now := env.now()
-		if active, _ := r.store.Active(now, 0); active != nil && active.ID == in.id() {
+		now := env.Time()
+		if active, _ := r.Store.Active(now, 0); active != nil && active.ID == in.id() {
 			active.UpdatedAt, active.Model = now, cmp.Or(in.ModelName, active.Model)
-			_ = r.store.SetActive(*active)
+			_ = r.Store.SetActive(*active)
 		}
 	}
 	turn := antigravityTurnID(r, in.id())
-	env.captureObservation(ctx, r, observation{
+	env.CaptureObservation(ctx, r, Observation{
 		tool: antigravityTool, source: sourceAntigravityHook, stateDir: antigravityObservationDir,
 		sessionID: in.id(), hook: hook, turnID: turn, attrs: antigravityObservationAttrs(in, hook, turn),
 	})
@@ -285,18 +285,18 @@ func antigravityObserve(ctx context.Context, env Env, hook string) error {
 }
 
 func antigravityObservationAttrs(in *antigravityHookInput, hook, turn string) map[string]any {
-	a := evidenceAttrs(antigravityTool, sourceAntigravityHook, hook)
+	a := EvidenceAttrs(antigravityTool, sourceAntigravityHook, hook)
 	for _, k := range []string{"usage_status", "funding_status", "quota_status", "account_status"} {
 		a[k] = statusUnavailable
 	}
-	boundedAttr(a, attrModel, in.ModelName)
+	BoundedAttr(a, attrModel, in.ModelName)
 	if turn != "" {
 		a[attrTurnID] = turn
 	}
 	for k, v := range map[string]json.RawMessage{
 		"invocation_num": in.InvocationNum, "initial_num_steps": in.InitialNumSteps, "execution_num": in.ExecutionNum,
 	} {
-		if value, _, ok := jsonNumber(v, true); ok {
+		if value, _, ok := JSONNumber(v, true); ok {
 			a[k] = int64(value)
 		}
 	}

@@ -14,11 +14,11 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// observation is one snapshot bound for the spool, with the identity the write-ahead
+// Observation is one snapshot bound for the spool, with the identity the write-ahead
 // checkpoint needs to order it. Every hooks-only harness (Cursor, Antigravity) records
 // through this; the attributes are the harness's, the ordering and replay identity are
 // shared.
-type observation struct {
+type Observation struct {
 	// tool names the harness ("cursor"); it also seeds the observation id.
 	tool string
 	// source is the evidence_source attribute on a capture-gap event.
@@ -45,9 +45,9 @@ type observationState struct {
 	Pending  *spool.Event `json:"pending,omitempty"`
 }
 
-// captureObservation appends o to the spool with a durable per-stream sequence,
+// CaptureObservation appends o to the spool with a durable per-stream sequence,
 // suppressing adjacent identical snapshots for up to the heartbeat interval.
-func (e Env) captureObservation(ctx context.Context, r *repo, o observation) {
+func (e Env) CaptureObservation(ctx context.Context, r *Repo, o Observation) {
 	if e.Spool == nil {
 		return
 	}
@@ -55,10 +55,10 @@ func (e Env) captureObservation(ctx context.Context, r *repo, o observation) {
 	if attrs == nil {
 		attrs = map[string]any{}
 	}
-	attrs[attrVersion], attrs[AttrProjectID] = e.Version, r.projectID
-	r.stampWorktree(attrs)
+	attrs[attrVersion], attrs[AttrProjectID] = e.Version, r.ProjectID
+	r.StampWorktree(attrs)
 	raw, _ := json.Marshal(attrs)
-	hash := evidenceID(string(raw))
+	hash := EvidenceID(string(raw))
 	dir, err := config.Dir()
 	if err != nil {
 		return
@@ -67,19 +67,19 @@ func (e Env) captureObservation(ctx context.Context, r *repo, o observation) {
 	if err = os.MkdirAll(dir, 0o700); err != nil {
 		return
 	}
-	path := filepath.Join(dir, evidenceID(o.sessionID+"\x00"+r.root)+".json")
+	path := filepath.Join(dir, EvidenceID(o.sessionID+"\x00"+r.Root)+".json")
 	// Unlike a redraw, distinct hooks cannot simply be discarded when another hook
 	// holds the lock. Wait briefly, bounded by the hook's deadline.
 	ctx, cancel := context.WithTimeout(ctx, observationLockWait)
 	defer cancel()
 	var unlock func()
 	for {
-		unlock, err = lockEvidence(path + ".lock")
+		unlock, err = LockEvidence(path + ".lock")
 		if err == nil {
 			break
 		}
 		if !isLockBusy(err) {
-			e.logf("%s capture lock: %v", o.tool, err)
+			e.Logf("%s capture lock: %v", o.tool, err)
 			return
 		}
 		select {
@@ -88,7 +88,7 @@ func (e Env) captureObservation(ctx context.Context, r *repo, o observation) {
 			if o.turnID != "" {
 				gap[attrTurnID] = o.turnID
 			}
-			e.emitFor(r, spool.Event{Name: EventSessionCapture, SessionID: o.sessionID, Repo: r.name, Attrs: gap})
+			e.EmitFor(r, spool.Event{Name: EventSessionCapture, SessionID: o.sessionID, Repo: r.Name, Attrs: gap})
 			return
 		case <-time.After(observationLockPoll):
 		}
@@ -98,7 +98,7 @@ func (e Env) captureObservation(ctx context.Context, r *repo, o observation) {
 	b, err := readCheckpoint(path)
 	fresh := os.IsNotExist(err)
 	if err != nil && !fresh {
-		e.logf("%s checkpoint read: %v", o.tool, err)
+		e.Logf("%s checkpoint read: %v", o.tool, err)
 		return
 	}
 	if !fresh && (len(b) > 64<<10 || json.Unmarshal(b, &state) != nil || state.Stream == "") {
@@ -114,43 +114,43 @@ func (e Env) captureObservation(ctx context.Context, r *repo, o observation) {
 		if err != nil {
 			return err
 		}
-		return writeState(path, b)
+		return WriteState(path, b)
 	}
 	if state.Pending != nil {
 		if err = e.Spool.Append(*state.Pending); err != nil {
-			e.logf("%s pending append: %v", o.tool, err)
+			e.Logf("%s pending append: %v", o.tool, err)
 			return
 		}
 		state.Pending = nil
 		if err = write(); err != nil {
-			e.logf("%s checkpoint: %v", o.tool, err)
+			e.Logf("%s checkpoint: %v", o.tool, err)
 			return
 		}
 	}
 	// Suppress only adjacent identical snapshots. Changed hook, turn, model, account,
 	// loop count, missingness or values always retains a new position.
-	if state.LastHash == hash && !e.now().Before(state.At) && e.now().Sub(state.At) < quotaHeartbeat {
+	if state.LastHash == hash && !e.Time().Before(state.At) && e.Time().Sub(state.At) < quotaHeartbeat {
 		return
 	}
 	state.Sequence++
-	state.LastHash, state.At = hash, e.now()
+	state.LastHash, state.At = hash, e.Time()
 	attrs["source_stream"], attrs["observation_sequence"] = state.Stream, state.Sequence
-	attrs["observation_id"] = evidenceID(fmt.Sprintf("%s\x00%s\x00%d", o.tool, state.Stream, state.Sequence))
-	state.Pending = &spool.Event{Time: e.now(), Name: EventSessionObservation, SessionID: o.sessionID, Repo: r.name, Attrs: attrs}
+	attrs["observation_id"] = EvidenceID(fmt.Sprintf("%s\x00%s\x00%d", o.tool, state.Stream, state.Sequence))
+	state.Pending = &spool.Event{Time: e.Time(), Name: EventSessionObservation, SessionID: o.sessionID, Repo: r.Name, Attrs: attrs}
 	if err = write(); err != nil {
-		e.logf("%s checkpoint: %v", o.tool, err)
+		e.Logf("%s checkpoint: %v", o.tool, err)
 		return
 	}
 	if err = e.Spool.Append(*state.Pending); err != nil {
-		e.logf("%s observation append: %v", o.tool, err)
+		e.Logf("%s observation append: %v", o.tool, err)
 		return
 	}
 	state.Pending = nil
 	if err = write(); err != nil {
-		e.logf("%s checkpoint: %v", o.tool, err)
+		e.Logf("%s checkpoint: %v", o.tool, err)
 	}
 	if fresh {
-		pruneState(dir, e.now().Add(-spool.MaxAge))
+		PruneState(dir, e.Time().Add(-spool.MaxAge))
 	}
 }
 

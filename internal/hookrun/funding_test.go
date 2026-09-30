@@ -294,7 +294,7 @@ func TestCodexSequenceCheckpointAfterSpooling(t *testing.T) {
 	}
 	writeFile(t, filepath.Dir(path), filepath.Base(path), data)
 	in := &codexHookInput{SessionID: "funding-session", TranscriptPath: path, Cwd: env.Cwd}
-	r, err := env.repo(context.Background())
+	r, err := env.Repo(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

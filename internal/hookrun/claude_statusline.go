@@ -161,7 +161,7 @@ func StatusLine(ctx context.Context, env Env, opts StatusLineOptions) int {
 		renderer = ""
 	}
 	if harness.IsStatusLineCommand(renderer) {
-		env.logf("status line renderer calls terma itself; ignoring it")
+		env.Logf("status line renderer calls terma itself; ignoring it")
 		renderer = ""
 	}
 
@@ -189,7 +189,7 @@ func StatusLine(ctx context.Context, env Env, opts StatusLineOptions) int {
 		if err := json.Unmarshal(head, &p); err == nil && p.SessionID != "" {
 			payload = &p
 		} else {
-			env.logf("status line payload not captured: %v", err)
+			env.Logf("status line payload not captured: %v", err)
 		}
 	}
 	if payload != nil {
@@ -332,18 +332,18 @@ func (e Env) captureQuota(p *statusLinePayload) bool {
 		}
 	}
 
-	now := e.now()
+	now := e.Time()
 	statePath, err := quotaStatePath(p.SessionID)
 	if err != nil {
-		e.logf("quota state: %v", err)
+		e.Logf("quota state: %v", err)
 		return false
 	}
 	if os.MkdirAll(filepath.Dir(statePath), 0o700) != nil {
 		return false
 	}
-	unlock, err := lockEvidence(statePath + ".lock")
+	unlock, err := LockEvidence(statePath + ".lock")
 	if err != nil {
-		e.logf("quota lock: %v", err)
+		e.Logf("quota lock: %v", err)
 		return false
 	}
 	defer unlock()
@@ -361,7 +361,7 @@ func (e Env) captureQuota(p *statusLinePayload) bool {
 	}
 	if root != "" {
 		repoRoot = root
-		repo, worktree = checkoutNames(root, gitDir)
+		repo, worktree = CheckoutNames(root, gitDir)
 		if f, _, err := project.Resolve(root, gitDir); err == nil {
 			projectID = f.Project.ID
 		}
@@ -388,7 +388,7 @@ func (e Env) captureQuota(p *statusLinePayload) bool {
 		attrTool: claudeTool, attrVersion: e.Version,
 		attrEvidenceSource: "claude_statusline", attrSchemaVersion: 1,
 		"source_stream": next.Stream, "observation_sequence": next.Sequence,
-		"observation_id":   evidenceID(p.SessionID + string(identity)),
+		"observation_id":   EvidenceID(p.SessionID + string(identity)),
 		attrEvidenceStatus: statusPresent, "time_basis": "observed",
 	}
 	if len(quota) == 0 {
@@ -430,7 +430,7 @@ func (e Env) captureQuota(p *statusLinePayload) bool {
 	}
 	ev.Time = now
 	if err := e.Spool.Append(ev); err != nil {
-		e.logf("quota append: %v", err)
+		e.Logf("quota append: %v", err)
 		return false
 	}
 	writeQuotaState(statePath, next)
@@ -494,8 +494,8 @@ func writeQuotaState(path string, s quotaState) {
 	if err != nil {
 		return
 	}
-	_ = writeState(path, data)
+	_ = WriteState(path, data)
 	if fresh {
-		pruneState(dir, s.EmittedAt.Add(-snapshotStateRetention))
+		PruneState(dir, s.EmittedAt.Add(-snapshotStateRetention))
 	}
 }

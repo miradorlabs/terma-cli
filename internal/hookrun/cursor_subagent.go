@@ -25,11 +25,11 @@ import (
 func CursorSubagentStop(ctx context.Context, env Env) error {
 	in, err := readCursorInput(env.Stdin)
 	if err != nil {
-		env.logf("%v", err)
+		env.Logf("%v", err)
 		return nil
 	}
 	env.Cwd = in.cwd(env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
 	}
@@ -38,24 +38,24 @@ func CursorSubagentStop(ctx context.Context, env Env) error {
 		id = in.ParentConversationID
 	}
 	sess := session.Session{ID: id, Tool: cursorTool, Model: in.Model}
-	files := relativeFiles(r, env.Cwd, in.ModifiedFiles)
+	files := RelativeFiles(r, env.Cwd, in.ModifiedFiles)
 	for _, child := range []string{in.SubagentID, own} {
 		if !session.ValidID(child) || child == id {
 			continue
 		}
-		moved, err := r.store.Merge(child, sess, env.now())
+		moved, err := r.Store.Merge(child, sess, env.Time())
 		if err != nil {
-			env.logf("fold subagent manifest: %v", err)
+			env.Logf("fold subagent manifest: %v", err)
 		}
 		files = append(files, moved...)
 	}
-	files = uniqueSorted(files)
+	files = UniqueSorted(files)
 
 	// The event is a subagent's by definition, so the type stands even when Cursor sent
 	// no id to hang it on — the one place agentAttrs' gate does not apply.
 	facet := func(attrs map[string]any) map[string]any {
-		agentAttrs(attrs, in.SubagentID, in.SubagentType)
-		if _, ok := attrs[attrAgentType]; !ok && shortLabel(in.SubagentType) {
+		AgentAttrs(attrs, in.SubagentID, in.SubagentType)
+		if _, ok := attrs[attrAgentType]; !ok && ShortLabel(in.SubagentType) {
 			attrs[attrAgentType] = in.SubagentType
 		}
 		return attrs
@@ -67,16 +67,16 @@ func CursorSubagentStop(ctx context.Context, env Env) error {
 	default:
 		attrs[attrStatus] = unknownValue
 	}
-	boundedAttr(attrs, attrTurnID, in.GenerationID)
+	BoundedAttr(attrs, attrTurnID, in.GenerationID)
 	for k, v := range map[string]json.RawMessage{"duration_ms": in.DurationMs, "message_count": in.MessageCount, "tool_call_count": in.ToolCallCount, "loop_count": in.LoopCount} {
-		if value, _, ok := jsonNumber(v, true); ok {
+		if value, _, ok := JSONNumber(v, true); ok {
 			attrs[k] = int64(value)
 		}
 	}
 	attrs[attrFileCount] = len(files)
 	touched := facet(map[string]any{})
-	boundedAttr(touched, attrTurnID, in.GenerationID)
-	env.touch(r, sess, "subagentStop", files, touched)
-	env.emitFor(r, spool.Event{Name: EventSubagentEnd, SessionID: id, Repo: r.name, Attrs: attrs})
+	BoundedAttr(touched, attrTurnID, in.GenerationID)
+	env.Touch(r, sess, "subagentStop", files, touched)
+	env.EmitFor(r, spool.Event{Name: EventSubagentEnd, SessionID: id, Repo: r.Name, Attrs: attrs})
 	return nil
 }

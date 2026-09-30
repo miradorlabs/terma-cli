@@ -32,18 +32,18 @@ func CodexSubagentStop(ctx context.Context, env Env) error {
 func codexSubagent(ctx context.Context, env Env, name string) error {
 	in, err := readCodexHookInput(env.Stdin)
 	if err != nil {
-		env.logf("%v", err)
+		env.Logf("%v", err)
 		return nil
 	}
 	if !session.ValidID(in.SessionID) || !session.ValidID(in.AgentID) {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
 	}
-	attrs := agentAttrs(map[string]any{attrTool: codexTool, attrSchemaVersion: 1, attrModel: in.Model}, in.AgentID, in.AgentType)
+	attrs := AgentAttrs(map[string]any{attrTool: codexTool, attrSchemaVersion: 1, attrModel: in.Model}, in.AgentID, in.AgentType)
 	if session.ValidID(in.TurnID) {
 		attrs[attrTurnID] = in.TurnID
 	}
@@ -55,7 +55,7 @@ func codexSubagent(ctx context.Context, env Env, name string) error {
 			codexSpawnAttrs(attrs, attrAgentParentID, spawn)
 		}
 	}
-	env.emitFor(r, spool.Event{Name: name, SessionID: in.SessionID, Repo: r.name, Attrs: attrs})
+	env.EmitFor(r, spool.Event{Name: name, SessionID: in.SessionID, Repo: r.Name, Attrs: attrs})
 	return nil
 }
 
@@ -85,10 +85,10 @@ func codexSpawnAttrs(attrs map[string]any, parentKey string, spawn harness.Codex
 	if spawn.Depth > 0 {
 		attrs["agent_depth"] = spawn.Depth
 	}
-	if shortLabel(spawn.AgentNickname) {
+	if ShortLabel(spawn.AgentNickname) {
 		attrs["agent_nickname"] = spawn.AgentNickname
 	}
-	if shortLabel(spawn.AgentPath) {
+	if ShortLabel(spawn.AgentPath) {
 		attrs["agent_path"] = spawn.AgentPath
 	}
 }

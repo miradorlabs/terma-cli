@@ -34,7 +34,10 @@ func readHookInput[T any](r io.Reader) (*T, error) {
 	return &in, nil
 }
 
-func jsonNumber(raw json.RawMessage, integer bool) (float64, bool, bool) {
+// JSONNumber reads a count a payload sent as a JSON number: the value, whether a value
+// was present at all, and whether it is a usable one (finite, not negative, exact as a
+// float64, and whole when integer is set).
+func JSONNumber(raw json.RawMessage, integer bool) (float64, bool, bool) {
 	if len(raw) == 0 || string(raw) == "null" {
 		return 0, false, false
 	}

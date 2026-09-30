@@ -9,8 +9,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-func (e Env) captureClaudeAccount(r *repo, in *claudeHookInput) {
-	e.captureFunding(r, in.SessionID, claudeTool, EventSessionAccount, harness.ClaudeFunding(r.root))
+func (e Env) captureClaudeAccount(r *Repo, in *claudeHookInput) {
+	e.CaptureFunding(r, in.SessionID, claudeTool, EventSessionAccount, harness.ClaudeFunding(r.Root))
 }
 
 // StopFailure is notification-only. Capture the documented category, never
@@ -24,16 +24,16 @@ func StopFailure(ctx context.Context, env Env) error {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
 	}
 	// ~/.claude.json is read once: the same evidence is spooled as the account record and
 	// names the account the limit is reported against. The id is taken first because
 	// captureFunding stamps its own keys onto the evidence's map.
-	evidence := harness.ClaudeFunding(r.root)
+	evidence := harness.ClaudeFunding(r.Root)
 	accountID, owned := oauthAccountID(evidence.Attrs)
-	env.captureFunding(r, in.SessionID, claudeTool, EventSessionAccount, evidence)
+	env.CaptureFunding(r, in.SessionID, claudeTool, EventSessionAccount, evidence)
 	kind := in.Error
 	switch kind {
 	case "rate_limit", "overloaded", "authentication_failed", "oauth_org_not_allowed", "account_on_hold", "billing_error", "invalid_request", "model_not_found", "server_error", "max_output_tokens", "cloud_credential_error", "unknown":
@@ -48,7 +48,7 @@ func StopFailure(ctx context.Context, env Env) error {
 	if owned {
 		attrs[attrAccountID] = accountID
 	}
-	env.emitFor(r, spool.Event{Name: EventSessionLimit, SessionID: in.SessionID, Repo: r.name, Attrs: attrs})
+	env.EmitFor(r, spool.Event{Name: EventSessionLimit, SessionID: in.SessionID, Repo: r.Name, Attrs: attrs})
 	return nil
 }
 

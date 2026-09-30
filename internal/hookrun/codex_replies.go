@@ -23,9 +23,9 @@ const codexReplyMaxText = 16 << 10
 // capture. It runs at the end of a turn (Stop, and notify for a developer who has no
 // repository hooks), holds a cursor per session under a lock the two share, and does
 // nothing at all for a developer whose Codex does not export their prompts.
-func (e Env) captureCodexReplies(ctx context.Context, r *repo, in *codexHookInput) {
-	pol := routing.EffectivePolicy(e.Policy, r.projectID)
-	if e.Spool == nil || !session.ValidID(in.SessionID) || !pol.IncludePrompts || !pol.AllowsSignal("logs") || len(pol.ExcludePaths) > 0 || !CodexRepliesConsented(r.projectID, pol.Global()) {
+func (e Env) captureCodexReplies(ctx context.Context, r *Repo, in *codexHookInput) {
+	pol := routing.EffectivePolicy(e.Policy, r.ProjectID)
+	if e.Spool == nil || !session.ValidID(in.SessionID) || !pol.IncludePrompts || !pol.AllowsSignal("logs") || len(pol.ExcludePaths) > 0 || !CodexRepliesConsented(r.ProjectID, pol.Global()) {
 		return
 	}
 	dir, err := config.Dir()
@@ -35,11 +35,11 @@ func (e Env) captureCodexReplies(ctx context.Context, r *repo, in *codexHookInpu
 	dir = filepath.Join(dir, codexReplyCursorDir)
 	// A subagent's replies are in its own rollout; see codexRolloutID.
 	rollout := codexRolloutID(in)
-	path := filepath.Join(dir, evidenceID(rollout)+".json")
+	path := filepath.Join(dir, EvidenceID(rollout)+".json")
 	if os.MkdirAll(dir, 0o700) != nil {
 		return
 	}
-	unlock, err := lockEvidence(path + ".lock")
+	unlock, err := LockEvidence(path + ".lock")
 	if err != nil {
 		return
 	}
@@ -48,47 +48,47 @@ func (e Env) captureCodexReplies(ctx context.Context, r *repo, in *codexHookInpu
 	b, readErr := os.ReadFile(path)
 	if readErr == nil && json.Unmarshal(b, &cursor) != nil {
 		// Codex's own message ids make the replay the same events, not new ones.
-		e.logf("invalid reply cursor; replaying rollout")
+		e.Logf("invalid reply cursor; replaying rollout")
 		cursor = harness.CodexReplyCursor{}
 	}
 	// Inside Stop's three seconds, beside the funding capture's one.
 	ctx, cancel := context.WithTimeout(ctx, codexCaptureTimeout)
 	defer cancel()
 	next, status, err := harness.ReadCodexReplies(ctx, rollout, in.TranscriptPath, cursor, codexReplyMaxText, func(reply harness.CodexReply) error {
-		attrs := agentAttrs(map[string]any{
+		attrs := AgentAttrs(map[string]any{
 			attrTool: codexTool, attrSchemaVersion: 1, attrEvidenceSource: sourceCodexRollout,
 			"message_id": reply.ID, "role": "assistant",
 			"text": reply.Text, "text_bytes": reply.Bytes, "text_truncated": reply.Truncated,
-			attrVersion: e.Version, AttrProjectID: r.projectID,
+			attrVersion: e.Version, AttrProjectID: r.ProjectID,
 		}, in.AgentID, in.AgentType)
-		r.stampWorktree(attrs)
+		r.StampWorktree(attrs)
 		if _, desktop := codexDesktopRoute(r); desktop {
 			attrs["capture_surface"] = codexDesktopSurface
 		}
 		for k, v := range map[string]string{attrTurnID: reply.TurnID, "trace_id": reply.TraceID, "phase": reply.Phase, attrModel: in.Model} {
-			boundedAttr(attrs, k, v)
+			BoundedAttr(attrs, k, v)
 		}
 		// The event is stamped with when the message was said. Every reply of a turn is
 		// read at its end, and a chain ordered by when terma read them would put each
 		// after the tool calls it introduced.
-		at := e.now()
+		at := e.Time()
 		if !reply.At.IsZero() && !reply.At.After(at) {
 			at = reply.At
 		}
-		return e.Spool.Append(spool.Event{Time: at, Name: EventAssistantMessage, SessionID: in.SessionID, Repo: r.name, Workspace: r.root, Global: pol.Global(), Attrs: attrs})
+		return e.Spool.Append(spool.Event{Time: at, Name: EventAssistantMessage, SessionID: in.SessionID, Repo: r.Name, Workspace: r.Root, Global: pol.Global(), Attrs: attrs})
 	})
 	if err != nil {
-		e.logf("codex replies (%s): %v", status, err)
+		e.Logf("codex replies (%s): %v", status, err)
 	}
 	if next != cursor {
 		if b, err := json.Marshal(next); err == nil {
-			if err := writeState(path, b); err != nil {
-				e.logf("reply cursor: %v", err)
+			if err := WriteState(path, b); err != nil {
+				e.Logf("reply cursor: %v", err)
 			}
 		}
 	}
 	if os.IsNotExist(readErr) {
-		pruneState(dir, e.now().Add(-spool.MaxAge))
+		PruneState(dir, e.Time().Add(-spool.MaxAge))
 	}
 }
 

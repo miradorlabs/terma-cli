@@ -111,16 +111,16 @@ func readCursorInput(r io.Reader) (*cursorHookInput, error) {
 func CursorSessionStart(ctx context.Context, env Env) error {
 	in, err := readCursorInput(env.Stdin)
 	if err != nil {
-		env.logf("%v", err)
+		env.Logf("%v", err)
 		return nil
 	}
 	env.Cwd = in.cwd(env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
-		env.logf("not in a git repository: %v", err)
+		env.Logf("not in a git repository: %v", err)
 		return nil
 	}
-	env.announce(r, env.newSession(r, in.id(), cursorTool, in.Model), map[string]any{attrSource: in.ComposerMode})
+	env.Announce(r, env.NewSession(r, in.id(), cursorTool, in.Model), map[string]any{attrSource: in.ComposerMode})
 	env.captureCursorObservation(ctx, r, in, "sessionStart")
 	return nil
 }
@@ -129,15 +129,15 @@ func CursorSessionStart(ctx context.Context, env Env) error {
 func CursorSessionEnd(ctx context.Context, env Env) error {
 	in, err := readCursorInput(env.Stdin)
 	if err != nil {
-		env.logf("%v", err)
+		env.Logf("%v", err)
 		return nil
 	}
 	env.Cwd = in.cwd(env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
 	}
-	env.endSession(r, in.id(), cursorTool, in.Reason)
+	env.EndSession(r, in.id(), cursorTool, in.Reason)
 	env.captureCursorObservation(ctx, r, in, "sessionEnd")
 	return nil
 }
@@ -146,20 +146,20 @@ func CursorSessionEnd(ctx context.Context, env Env) error {
 func CursorFileEdit(ctx context.Context, env Env) error {
 	in, err := readCursorInput(env.Stdin)
 	if err != nil {
-		env.logf("%v", err)
+		env.Logf("%v", err)
 		return nil
 	}
 	if in.FilePath == "" {
 		return nil
 	}
 	env.Cwd = in.cwd(env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
 	}
 	extra := map[string]any{}
-	boundedAttr(extra, attrTurnID, in.GenerationID)
-	env.touch(r, session.Session{ID: in.id(), Tool: cursorTool, Model: in.Model}, "afterFileEdit",
-		relativeFiles(r, env.Cwd, []string{in.FilePath}), extra)
+	BoundedAttr(extra, attrTurnID, in.GenerationID)
+	env.Touch(r, session.Session{ID: in.id(), Tool: cursorTool, Model: in.Model}, "afterFileEdit",
+		RelativeFiles(r, env.Cwd, []string{in.FilePath}), extra)
 	return nil
 }

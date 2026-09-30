@@ -31,21 +31,21 @@ func CursorPostToolUseFailure(ctx context.Context, env Env) error {
 func cursorToolCall(ctx context.Context, env Env, hook string) error {
 	in, err := readCursorInput(env.Stdin)
 	if err != nil {
-		env.logf("%v", err)
+		env.Logf("%v", err)
 		return nil
 	}
 	env.Cwd = in.cwd(env.Cwd)
-	r, err := env.repo(ctx)
+	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
 	}
 	attrs, ok := cursorToolCallAttrs(in, hook)
 	if !ok {
-		env.logf("%s names no tool and no call id", hook)
+		env.Logf("%s names no tool and no call id", hook)
 		return nil
 	}
 	attrs[attrVersion] = env.Version
-	env.emitFor(r, spool.Event{Name: EventToolCall, SessionID: in.id(), Repo: r.name, Attrs: attrs})
+	env.EmitFor(r, spool.Event{Name: EventToolCall, SessionID: in.id(), Repo: r.Name, Attrs: attrs})
 	return nil
 }
 
@@ -55,8 +55,8 @@ func cursorToolCall(ctx context.Context, env Env, hook string) error {
 // platform translates. The account email does not ride on a tool call — a call is not a
 // principal record, and the session already says who was signed in.
 func cursorToolCallAttrs(in *cursorHookInput, hook string) (map[string]any, bool) {
-	a := evidenceAttrs(cursorTool, sourceCursorHook, hook)
-	if shortLabel(in.ToolName) {
+	a := EvidenceAttrs(cursorTool, sourceCursorHook, hook)
+	if ShortLabel(in.ToolName) {
 		a[attrToolName] = in.ToolName
 	}
 	if cursorCallID(in.ToolUseID) {
@@ -68,12 +68,12 @@ func cursorToolCallAttrs(in *cursorHookInput, hook string) (map[string]any, bool
 		}
 	}
 	for k, v := range map[string]string{attrTurnID: in.GenerationID, attrModel: in.Model, "model_id": in.ModelID, "cursor.version": in.CursorVersion} {
-		boundedAttr(a, k, v)
+		BoundedAttr(a, k, v)
 	}
 	cursorModelParams(in, a)
 	// Cursor reports the tool's execution time in milliseconds. Missing stays missing;
 	// a value that is not a non-negative integer is reported as invalid, not repaired.
-	if value, present, ok := jsonNumber(in.Duration, true); ok {
+	if value, present, ok := JSONNumber(in.Duration, true); ok {
 		a["duration_ms"] = int64(value)
 	} else if present {
 		a["duration_status"] = "invalid"

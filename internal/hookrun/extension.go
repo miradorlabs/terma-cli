@@ -50,20 +50,20 @@ func extensionSessionStart(tool string) func(context.Context, Env) error {
 	return func(ctx context.Context, env Env) error {
 		in, err := readExtensionInput(env.Stdin)
 		if err != nil {
-			env.logf("%v", err)
+			env.Logf("%v", err)
 			return nil
 		}
 		if !session.ValidID(in.SessionID) {
-			env.logf("ignoring unsafe session id")
+			env.Logf("ignoring unsafe session id")
 			return nil
 		}
 		env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-		r, err := env.repo(ctx)
+		r, err := env.Repo(ctx)
 		if err != nil {
-			env.logf("not in a git repository: %v", err)
+			env.Logf("not in a git repository: %v", err)
 			return nil
 		}
-		env.announce(r, env.newSession(r, in.SessionID, tool, in.Model), map[string]any{attrSource: "session_start"})
+		env.Announce(r, env.NewSession(r, in.SessionID, tool, in.Model), map[string]any{attrSource: "session_start"})
 		return nil
 	}
 }
@@ -73,19 +73,19 @@ func extensionSessionEnd(tool string) func(context.Context, Env) error {
 	return func(ctx context.Context, env Env) error {
 		in, err := readExtensionInput(env.Stdin)
 		if err != nil {
-			env.logf("%v", err)
+			env.Logf("%v", err)
 			return nil
 		}
 		if !session.ValidID(in.SessionID) {
-			env.logf("ignoring unsafe session id")
+			env.Logf("ignoring unsafe session id")
 			return nil
 		}
 		env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-		r, err := env.repo(ctx)
+		r, err := env.Repo(ctx)
 		if err != nil {
 			return nil
 		}
-		env.endSession(r, in.SessionID, tool, "")
+		env.EndSession(r, in.SessionID, tool, "")
 		return nil
 	}
 }
@@ -95,19 +95,19 @@ func extensionFileEdit(tool string) func(context.Context, Env) error {
 	return func(ctx context.Context, env Env) error {
 		in, err := readExtensionInput(env.Stdin)
 		if err != nil {
-			env.logf("%v", err)
+			env.Logf("%v", err)
 			return nil
 		}
 		if !session.ValidID(in.SessionID) || in.File == "" {
 			return nil
 		}
 		env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-		r, err := env.repo(ctx)
+		r, err := env.Repo(ctx)
 		if err != nil {
 			return nil
 		}
-		env.touch(r, session.Session{ID: in.SessionID, Tool: tool, Model: in.Model}, in.Tool,
-			relativeFiles(r, env.Cwd, []string{in.File}), nil)
+		env.Touch(r, session.Session{ID: in.SessionID, Tool: tool, Model: in.Model}, in.Tool,
+			RelativeFiles(r, env.Cwd, []string{in.File}), nil)
 		return nil
 	}
 }
