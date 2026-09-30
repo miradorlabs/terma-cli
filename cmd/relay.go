@@ -237,28 +237,6 @@ func newRelayRunCommand() *cobra.Command {
 	return cmd
 }
 
-// putOmpOnRelay installs omp's PATH shim and puts the shim directory on PATH through
-// the startup-file block `terma install` maintains.
-func putOmpOnRelay(out io.Writer) error {
-	binDir, err := shim.InstallShims([]string{shim.AgentOmp})
-	if err != nil {
-		return err
-	}
-	if shim.Active(shim.AgentOmp) {
-		return nil
-	}
-	rc, ok := shim.ShellRC()
-	if !ok {
-		fmt.Fprintf(out, "Add %s to the front of PATH so omp starts through terma's launcher.\n", binDir)
-		return nil
-	}
-	if _, err := rc.Ensure(binDir); err != nil {
-		return err
-	}
-	fmt.Fprintf(out, "omp starts through terma's launcher (%s); run `%s` or open a new terminal.\n", tildePath(rc.Path), reloadCommand(tildePath(rc.Path)))
-	return nil
-}
-
 // executableStamp identifies the file this process was started from — its size and
 // modification time — so a relay can tell it has been replaced. Empty when unknown.
 func executableStamp() string {
@@ -375,6 +353,18 @@ func newRelaySetupCommand() *cobra.Command {
 					}
 					fmt.Fprintf(out, "Pi exports to the relay at %s (%s).\n", addr, tildePath(path))
 					continue
+				case "omp":
+					// omp's native exporter reads OTEL_* only at startup, before any
+					// extension loads; nothing but a wrapper could set them, and what omp
+					// ran would inherit them. terma's extension exports from its events.
+					path, err := harness.WriteOmpRelayExtension(harness.PiConfig{Endpoint: exp.Endpoint,
+						Headers: map[string]string{"Authorization": "Bearer " + token}, IncludePrompts: true, IncludeToolContent: true,
+						HookCommand: termaHookCommand()})
+					if err != nil {
+						return fmt.Errorf("omp: %w", err)
+					}
+					fmt.Fprintf(out, "omp exports to the relay at %s (%s).\n", addr, tildePath(path))
+					continue
 				case "hermes":
 					// Hermes, likewise: terma's plugin is its exporter, and plugins are opt-in.
 					dir, err := harness.WriteHermesPlugin(harness.HermesConfig{Endpoint: exp.Endpoint,
@@ -398,18 +388,10 @@ func newRelaySetupCommand() *cobra.Command {
 					return fmt.Errorf("%s: %w", h.DisplayName(), err)
 				}
 				fmt.Fprintf(out, "%s exports to the relay at %s.\n", h.DisplayName(), addr)
-				// omp reads its exporter's endpoint from the environment before any
-				// extension runs, so the launcher hands it over: a PATH shim, in a bound
-				// repository only (shim.ompRouter).
 				if h.Name() == shim.AgentCodex {
 					_ = config.WriteFileAtomic(filepath.Join(dir, relayCodexFile), []byte(time.Now().UTC().Format(time.RFC3339Nano)+"\n"), 0o600)
 					if d, ok := codexDaemonPredates(dir); ok {
 						fmt.Fprintf(out, "Codex's background server (pid %d) reads its exporter only when it starts, so its threads — Codex Desktop's, and the TUI's since 0.157 — still export where they did: %s.\n", d.PID, codexDaemonRestart)
-					}
-				}
-				if h.Name() == shim.AgentOmp {
-					if err := putOmpOnRelay(out); err != nil {
-						return err
 					}
 				}
 			}

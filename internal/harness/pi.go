@@ -23,9 +23,14 @@ var piExtensionTemplate string
 // piConfigMarker is the line of the template the machine's configuration replaces.
 const piConfigMarker = "const CONFIG: TermaConfig | null = null /* terma:config */"
 
-// PiConfig is what the extension is spliced with.
+// PiConfig is what the extension is spliced with. Agent names the agent on every record
+// and hook ("pi", or "omp" for Pi's fork, whose extension events are the same);
+// Lifecycle says whether the extension reports session start, end and file edits (omp's
+// committed hook file already does) or only claims the session at each prompt.
 type PiConfig struct {
 	Version            int               `json:"version"`
+	Agent              string            `json:"agent"`
+	Lifecycle          bool              `json:"lifecycle"`
 	Endpoint           string            `json:"endpoint"`
 	Headers            map[string]string `json:"headers"`
 	IncludePrompts     bool              `json:"includePrompts"`
@@ -57,6 +62,9 @@ func PiExtensionPath() (string, error) {
 // RenderPiExtension splices cfg into the extension template.
 func RenderPiExtension(cfg PiConfig) (string, error) {
 	cfg.Version = 1
+	if cfg.Agent == "" {
+		cfg.Agent = "pi"
+	}
 	if len(cfg.HookCommand) == 0 {
 		cfg.HookCommand = []string{"terma", "hook"}
 	}
@@ -78,6 +86,33 @@ func WritePiExtension(cfg PiConfig) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	cfg.Agent, cfg.Lifecycle = "pi", true
+	return writePiFamilyExtension(path, cfg)
+}
+
+// OmpRelayExtensionPath is where omp loads terma's relay extension from: its user
+// extensions directory (a file there loads like one in hooks/pre, verified on 18.3).
+// It is a different file from the one `terma connect omp` writes (hooks/pre/terma.ts).
+func OmpRelayExtensionPath() (string, error) {
+	dir, err := ompAgentDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "extensions", "terma-relay.ts"), nil
+}
+
+// WriteOmpRelayExtension writes the same extension for omp, reporting nothing of the
+// session's lifecycle (omp's committed hook file does), and returns its path.
+func WriteOmpRelayExtension(cfg PiConfig) (string, error) {
+	path, err := OmpRelayExtensionPath()
+	if err != nil {
+		return "", err
+	}
+	cfg.Agent, cfg.Lifecycle = "omp", false
+	return writePiFamilyExtension(path, cfg)
+}
+
+func writePiFamilyExtension(path string, cfg PiConfig) (string, error) {
 	text, err := RenderPiExtension(cfg)
 	if err != nil {
 		return "", err

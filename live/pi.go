@@ -50,6 +50,13 @@ func (sb *Sandbox) UsePiProvider(url string) {
 // UsePiExtensionDirect writes terma's Pi extension pointed straight at the receiver,
 // as the direct half of a comparison.
 func (sb *Sandbox) UsePiExtensionDirect() {
+	sb.T.Helper()
+	sb.writePiFamilyExtension(filepath.Join(sb.piAgentDir(), "extensions", "terma.ts"), "pi", true)
+}
+
+// writePiFamilyExtension splices the Pi-family extension template (Pi, omp) pointed at
+// the receiver into path.
+func (sb *Sandbox) writePiFamilyExtension(path, agent string, lifecycle bool) {
 	t := sb.T
 	t.Helper()
 	tmpl, err := os.ReadFile(filepath.Join("..", "internal", "harness", "pi", "terma.ts"))
@@ -58,14 +65,13 @@ func (sb *Sandbox) UsePiExtensionDirect() {
 	}
 	const marker = "const CONFIG: TermaConfig | null = null /* terma:config */"
 	cfg, _ := json.Marshal(map[string]any{
-		"version": 1, "endpoint": sb.Receiver.URL(), "headers": map[string]string{"Authorization": "Bearer " + liveKey},
-		"includePrompts": true, "includeToolContent": true, "hookCommand": []string{"terma", "hook"},
+		"version": 1, "agent": agent, "lifecycle": lifecycle, "endpoint": sb.Receiver.URL(), "headers": map[string]string{"Authorization": "Bearer " + liveKey},
+		"includePrompts": true, "includeToolContent": true, "hookCommand": []string{sb.Terma, "hook"},
 	})
 	if !bytes.Contains(tmpl, []byte(marker)) {
 		t.Fatal("the Pi extension template has no configuration line")
 	}
-	text := strings.Replace(string(tmpl), marker, "const CONFIG: TermaConfig | null = "+string(cfg)+" /* terma:config */", 1)
-	sb.writeAbs(filepath.Join(sb.piAgentDir(), "extensions", "terma.ts"), text)
+	sb.writeAbs(path, strings.Replace(string(tmpl), marker, "const CONFIG: TermaConfig | null = "+string(cfg)+" /* terma:config */", 1))
 }
 
 // PiRun runs one `pi -p` in dir (the live tests run from live/, next to the template

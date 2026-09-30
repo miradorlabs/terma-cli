@@ -4,6 +4,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -22,13 +23,16 @@ func ompSandbox(t *testing.T, cmd string) func(t *testing.T) *Sandbox {
 	}
 }
 
-// omp through the relay: the same telemetry as a direct export, nothing dropped —
-// its native spans (gen_ai.conversation.id), its metrics (by process) and its logs.
+// omp through the relay: terma's extension exports the same telemetry as it does
+// pointed straight at the receiver, and the relay drops none of an opted-in session's.
 func TestRelayWorkloadsOmp(t *testing.T) {
 	forEachOmp(t, func(t *testing.T, b Binary) {
 		for _, w := range []struct{ name, cmd string }{{"reply", ""}, {"bash", "printf ok"}} {
 			t.Run(w.name, func(t *testing.T) {
 				runBoth(t, ompSandbox(t, w.cmd), func(t *testing.T, sb *Sandbox) {
+					if !sb.relayed {
+						sb.UseOmpExtensionDirect()
+					}
 					sb.OmpRun(b, sb.Repo, "Do the task. TERMA_WORKLOAD")
 				})
 			})
@@ -36,8 +40,8 @@ func TestRelayWorkloadsOmp(t *testing.T) {
 	})
 }
 
-// omp outside any repository exports nothing at all: its shim hands it the relay's
-// variables only in a bound repository.
+// omp outside any bound repository: its extension exports to the relay, the relay holds
+// the unclaimed session and drops it, and nothing reaches upstream.
 func TestRelayOmpOutsideARepository(t *testing.T) {
 	forEachOmp(t, func(t *testing.T, b Binary) {
 		track(t)
@@ -52,8 +56,40 @@ func TestRelayOmpOutsideARepository(t *testing.T) {
 		sb.StopRelay()
 		c := sb.RelayStats()
 		noteRelayStats(t.Name(), c)
-		if n := agentRecords(sb.Receiver.evidence()); n != 0 || sum(c, "received.") != 0 {
-			t.Errorf("omp outside a repository exported: %d upstream, relay %v", n, c)
+		if n := agentRecords(sb.Receiver.evidence()); n != 0 {
+			t.Errorf("omp outside a repository reached upstream: %d records, relay %v", n, c)
 		}
+		if sum(c, "received.") == 0 {
+			t.Errorf("the relay received nothing from omp, so the control proves nothing: %v", c)
+		}
+	})
+}
+
+// Nothing omp runs inherits terma's endpoint or its key: terma sets no environment for
+// omp at all (see TestRelayClaudeToolsGetNoExporter for why it matters).
+func TestRelayOmpToolsGetNoExporter(t *testing.T) {
+	forEachOmp(t, func(t *testing.T, b Binary) {
+		track(t)
+		out, err := os.CreateTemp("", "terma-omp-env-*")
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = out.Close()
+		t.Cleanup(func() { _ = os.Remove(out.Name()) })
+		sb := ompSandbox(t, "env | cut -d= -f1 | grep '^OTEL_' > "+out.Name()+"; printf ran >> "+out.Name())(t)
+		sb.UseRelay(RelayOptions{Start: true, Content: true})
+		sb.OmpRun(b, sb.Repo, "Do the task. TERMA_WORKLOAD")
+		time.Sleep(6 * time.Second)
+		data, _ := os.ReadFile(out.Name())
+		if !strings.Contains(string(data), "ran") {
+			t.Fatalf("omp's bash tool never ran: %q", data)
+		}
+		if names := strings.Fields(strings.ReplaceAll(string(data), "ran", "")); len(names) > 0 {
+			t.Errorf("omp's tools inherited exporter settings: %v", names)
+		}
+		if agentRecords(sb.Receiver.evidence()) == 0 {
+			t.Errorf("omp's session reached nothing upstream: %v", sb.RelayStats())
+		}
+		sb.StopRelay()
 	})
 }

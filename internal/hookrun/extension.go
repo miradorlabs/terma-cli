@@ -128,6 +128,10 @@ var (
 	PiPrompt       = extensionPrompt
 )
 
+// OmpPrompt is the claim-only turn start of terma's omp relay extension; omp's
+// committed hook file reports the rest (hookrun/omp.go).
+var OmpPrompt = extensionPrompt
+
 // Hermes's handlers (`terma hook hermes-*`).
 var (
 	HermesSessionStart = extensionSessionStart(hermesTool)

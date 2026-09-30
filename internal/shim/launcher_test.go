@@ -280,33 +280,3 @@ func TestShellFunctionsUseLauncherAndSurviveItsRemoval(t *testing.T) {
 		}
 	}
 }
-
-// A plan may set OpenTelemetry's variables for an agent configured only through its
-// environment (omp). The launcher exports those and nothing else: a plan naming PATH, or
-// a name outside OTEL_'s alphabet, changes nothing — it is data, never shell.
-func TestLauncherExportsOnlyOTELVariables(t *testing.T) {
-	prep := `printf %s 'OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:43180' > "$4/env.0"
-printf %s 'PATH=/nowhere' > "$4/env.1"
-printf %s 'OTEL_BAD-NAME=$(touch PWNED)' > "$4/env.2"
-printf %s 'OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer a b=c' > "$4/env.3"
-printf 'terma-env-v1:4\n' > "$4/envcount"
-printf 'terma-args-v1:0\n' > "$4/count"
-`
-	_, realDir, launcher := launcherFixture(t, prep)
-	agent := "#!/bin/sh\nprintf '%s\\000' \"${OTEL_EXPORTER_OTLP_ENDPOINT-unset}\" \"${OTEL_EXPORTER_OTLP_HEADERS-unset}\" \"$PATH\" \"$@\"\n"
-	if err := os.WriteFile(filepath.Join(realDir, AgentClaude), []byte(agent), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	dir := t.TempDir()
-	t.Chdir(dir)
-	got, stderr, err := runLauncher(t, launcher, []string{"-p", "x"})
-	if err != nil || stderr != "" {
-		t.Fatalf("err=%v stderr=%s", err, stderr)
-	}
-	if len(got) != 5 || got[0] != "http://127.0.0.1:43180" || got[1] != "Authorization=Bearer a b=c" || strings.Contains(got[2], "/nowhere") || got[3] != "-p" {
-		t.Fatalf("agent saw %q", got)
-	}
-	if _, err := os.Stat(filepath.Join(dir, "PWNED")); err == nil {
-		t.Fatal("a plan's variable was evaluated as shell")
-	}
-}

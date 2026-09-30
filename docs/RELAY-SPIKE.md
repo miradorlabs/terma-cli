@@ -132,13 +132,18 @@ The Codex TUI (`TestRelayCodexTUITitle`) forwarded 1,614 of 1,614 records, its t
 
 ### omp
 
-omp (oh-my-pi, PR #21, merged into this branch) exports OTLP natively under the GenAI conventions (`invoke_agent`, `chat`, `execute_tool`, with `gen_ai.conversation.id`). The relay treats `gen_ai.conversation.id` as a session key, and withholds omp's content attributes (`omp.gen_ai.request.messages`, `omp.gen_ai.response.text`). Two things in the branch had to change:
-- **Session ids:** its hook file and extension invented a random session id, so a claim named a session no span belongs to. They now use omp's own (`ctx.sessionManager.getSessionId()`).
-- **Exporter setup:** omp 18.3 reads its `OTEL_*` variables in `initTelemetryExport`, before any hook or extension loads, so the extension's variables came too late and nothing was exported. The launcher now hands them over. The shim protocol gained a versioned, validated environment channel (`OTEL_*` names only, never evaluated). `terma relay setup --harness omp` installs omp's shim.
+omp (oh-my-pi, PR #21, merged into this branch) has a native OTLP exporter configured only by `OTEL_*` variables, which it reads once at startup, before any hook or extension loads. So only a wrapper could configure it, and that was the first route here: a PATH shim handing omp the relay's variables. That route is gone, for two reasons:
+- **Shims are being removed.**
+- **Tools inherited it:** everything omp ran inherited the variables, the relay's token included.
 
-The omp route exports only in a bound repository, so omp elsewhere exports nothing at all: stricter than the agents whose global config the relay filters.
+A committed hook that sets the variables at load exports nothing (verified on 18.3).
 
-**Superseded:** the shims are being removed, and this route depends on one. Its tools also inherit the relay's variables (see "Tools must not inherit the relay"). Without a shim, omp needs an exporter of its own, as Pi and Hermes have.
+omp is a Pi fork with the same extension events, so it runs terma's Pi-family extension (`internal/harness/pi/terma.ts`). `relay setup --harness omp` writes it to `~/.omp/agent/extensions/terma-relay.ts` with `agent: "omp"`:
+- **What it exports:** it exports from omp's own events (usage and cost from `message_end`, tool calls, `omp.user_prompt`) and sets no environment.
+- **Claims:** `lifecycle` is false, so it only claims the session at each prompt (`omp-prompt`). omp's committed hook file already reports session start, end and file edits, under omp's own session id (`ctx.sessionManager.getSessionId()`).
+- **Load locations:** user extensions load from `~/.omp/agent/extensions/` (a file, or a directory's `index.ts`), from `hooks/pre/`, and from `config.yml`'s `extensions:` list. All three were verified on 18.3.
+
+Tests on 18.3: reply and bash workloads direct vs relay; outside a bound repository nothing reaches upstream; and omp's tools inherit no `OTEL_*` (`TestRelayOmpToolsGetNoExporter`).
 
 ### Codex's app-server (Desktop, the daemon)
 
@@ -243,8 +248,7 @@ An agent's tools must never inherit the relay's `OTEL_*` variables, since `OTEL_
 
 Where each agent stands:
 - **Claude Code:** strips them from its tools (`TestRelayClaudeToolsGetNoExporter`, on 2.1.202 and 2.1.284).
-- **omp:** its shim route handed them to omp, and omp's tools inherited them. The shims are being removed.
-- **omp without a shim:** omp's exporter reads `OTEL_*` only at startup, before any hook or extension loads. A committed hook that sets them at load exports nothing (verified on 18.3), so omp needs an exporter of its own, as Pi and Hermes have.
+- **omp:** its first route, through a shim, handed the variables to omp, and omp's tools inherited them. The extension route sets none, and `TestRelayOmpToolsGetNoExporter` checks it.
 
 ### Harness summary
 
@@ -254,7 +258,7 @@ Where each agent stands:
 | Hermes | through terma's plugin | the plugin calls `terma hook hermes-*` | done |
 | Pi | through terma's extension | the extension calls `terma hook pi-*` | done |
 | Cursor | no (its own backend only) | hooks | unaffected; never reaches the relay |
-| omp | natively, configured by environment only | committed hook file | needs its own exporter once shims are gone |
+| omp | through terma's extension (its native exporter is environment-only) | committed hook file, plus the extension's `omp-prompt` | done, no shim |
 
 ## Findings
 

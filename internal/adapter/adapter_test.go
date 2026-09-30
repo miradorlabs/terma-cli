@@ -68,7 +68,7 @@ func TestEventNamesAreStable(t *testing.T) {
 		"cursor-post-tool-use-failure", "cursor-pre-compact", "cursor-session-end", "cursor-session-start",
 		"cursor-stop", "cursor-subagent-stop",
 		"hermes-file-edit", "hermes-prompt", "hermes-session-end", "hermes-session-start",
-		"omp-file-edit", "omp-session-end", "omp-session-start",
+		"omp-file-edit", "omp-prompt", "omp-session-end", "omp-session-start",
 		"opencode-file-edit", "opencode-session-end", "opencode-session-start",
 		"pi-file-edit", "pi-prompt", "pi-session-end", "pi-session-start",
 		"post-tool-use", "session-end", "session-start", "stop", "stop-failure", "subagent-start", "subagent-stop",

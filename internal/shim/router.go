@@ -23,14 +23,7 @@ type router interface {
 }
 
 // routers is the registry of routable agents, in display order.
-var routers = []router{claudeRouter{}, codexRouter{}, ompRouter{}}
-
-// envRouter is a router whose agent reports through the local relay by environment
-// alone. Its route needs no routing record and no key: the repository's binding says
-// it is opted in here, and the relay decides per session what leaves.
-type envRouter interface {
-	routeEnv() map[string]string
-}
+var routers = []router{claudeRouter{}, codexRouter{}}
 
 func routerFor(agent string) (router, bool) {
 	for _, r := range routers {
@@ -59,9 +52,6 @@ func routeFor(agent, cwd string, userArgs []string) route {
 	f, _, err := termaproject.ResolveDir(r.workingDir(cwd, userArgs))
 	if err != nil {
 		return route{}
-	}
-	if er, ok := r.(envRouter); ok {
-		return route{env: er.routeEnv()}
 	}
 	rec, ok, err := LoadRecord(f.Project.ID)
 	if err != nil || !ok || !slices.Contains(rec.Harnesses, agent) {

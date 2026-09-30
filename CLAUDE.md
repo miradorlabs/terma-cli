@@ -660,13 +660,13 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
 - `live/relay_workloads_test.go` runs each workload directly and through the relay and
   requires the same telemetry and zero drops; long live matrix runs use frozen copies of
   `bin/terma` and `bin/live.test`, or a rebuild mid-run mixes versions.
-- omp goes through the relay by environment: its exporter reads `OTEL_*` before any
-  extension loads (omp 18.3), so `relay setup --harness omp` installs its PATH shim, and
-  `shim.ompRouter` (an `envRouter`) hands it the relay's variables in a bound repository
-  only. The shim protocol's environment channel (`env.N` + `envcount`,
-  `terma-env-v1`) carries `OTEL_*` names alone; the launcher exports them without eval.
-  omp's hook file and extension name the session `ctx.sessionManager.getSessionId()`
-  — the `gen_ai.conversation.id` its spans carry — never an invented id.
+- omp goes through the relay by terma's Pi-family extension (`internal/harness/pi/terma.ts`,
+  agent "omp", `~/.omp/agent/extensions/terma-relay.ts`, lifecycle off — omp's committed
+  hook file reports sessions and edits, the extension claims at each prompt with
+  `omp-prompt`), never its native exporter: that reads OTEL_* only at startup, before any
+  extension loads, so only a wrapper could set it, and omp's tools would inherit terma's
+  token. omp's hook file and extension name the session
+  `ctx.sessionManager.getSessionId()` — never an invented id.
 - OpenCode goes through the relay too (`relay setup` points the plugin at it): its
   prompt rides a log body and its reply `gen_ai.completion`, both withheld with content.
   `live/opencode.go` fetches OpenCode builds from npm (`opencode-<os>-<arch>`), and
@@ -701,10 +701,10 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   and reply log bodies are in the relay's `promptBodyEvents`.
 - Shims are being removed: nothing new may depend on one. omp's exporter reads OTEL_*
   only at startup, before any hook or extension loads (verified: a committed hook that
-  sets them at load exports nothing), so without its shim omp needs an exporter of its
-  own like Pi's. Tools an agent runs must never inherit the relay's OTEL_* variables
-  (its token): Claude Code strips them (`TestRelayClaudeToolsGetNoExporter`); omp's shim
-  route did not. cursor-agent's own tracer is fixed to Cursor's backend, so Cursor never
+  sets them at load exports nothing), so omp has an exporter of its own like Pi's. Tools
+  an agent runs must never inherit the relay's OTEL_* variables (its token): Claude Code
+  strips them (`TestRelayClaudeToolsGetNoExporter`); omp gets none
+  (`TestRelayOmpToolsGetNoExporter`). cursor-agent's own tracer is fixed to Cursor's backend, so Cursor never
   reaches the relay (`TestRelayCursorHooks`).
 - Never read harness log files to fill a gap: what the relay knows comes from OTLP and
   hook payloads.

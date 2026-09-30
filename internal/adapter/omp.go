@@ -28,6 +28,7 @@ func (omp) Events() map[string]Handler {
 		"omp-session-start": hookrun.OmpSessionStart,
 		"omp-session-end":   hookrun.OmpSessionEnd,
 		"omp-file-edit":     hookrun.OmpFileEdit,
+		"omp-prompt":        hookrun.OmpPrompt,
 	}
 }
 

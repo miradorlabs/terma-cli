@@ -8,10 +8,14 @@ import (
 	"testing"
 )
 
-// omp (oh-my-pi) exports OTLP natively, configured only by OTEL_* variables; terma
-// claims its sessions through the committed hook file `terma install --adapters omp`
-// writes, and, on a relay machine, hands it the relay's variables through its PATH
-// shim. Only the installed build is tested: the npm package is over a gigabyte.
+// omp (oh-my-pi) has a native exporter, but it reads its OTEL_* variables once at
+// startup, before any extension loads, so only a wrapper could configure it. Through
+// the relay, omp runs terma's Pi-family extension instead (internal/harness/pi/terma.ts,
+// agent "omp", in ~/.omp/agent/extensions), which exports from omp's own events; its
+// sessions are claimed by the committed hook file `terma install --adapters omp` writes
+// and the extension's claim-only omp-prompt. The direct half of a comparison runs the
+// same extension pointed at the receiver. Only the installed build is tested: the npm
+// package is over a gigabyte.
 
 func forEachOmp(t *testing.T, run func(t *testing.T, b Binary)) {
 	t.Helper()
@@ -39,25 +43,22 @@ func (sb *Sandbox) UseOmpProvider(url string) {
 `)
 }
 
-// OmpRun runs one `omp -p` in dir. Relayed, it starts through terma's shim, as it
-// would from a shell with the shim directory on PATH; otherwise straight, exporting
-// to the receiver through the OTEL_* variables omp reads.
+// UseOmpExtensionDirect writes terma's extension for omp pointed straight at the
+// receiver, as the direct half of a comparison.
+func (sb *Sandbox) UseOmpExtensionDirect() {
+	sb.T.Helper()
+	sb.writePiFamilyExtension(filepath.Join(sb.Home, ".omp", "agent", "extensions", "terma-relay.ts"), "omp", false)
+}
+
+// OmpRun runs one `omp -p` in dir.
 func (sb *Sandbox) OmpRun(b Binary, dir, prompt string) string {
 	t := sb.T
 	t.Helper()
-	launcher := b.Path
-	env := sb.termaEnv()
-	if sb.relayed {
-		launcher = filepath.Join(sb.TermaConfig, "shim", "bin", "omp")
-	} else {
-		env = append(env, "OTEL_EXPORTER_OTLP_ENDPOINT="+sb.Receiver.URL(), "OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf",
-			"OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer "+liveKey)
-	}
 	ctx, cancel := context.WithTimeout(context.Background(), scenarioTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, launcher, "-p", prompt, "--model", "fake/m")
+	cmd := exec.CommandContext(ctx, b.Path, "-p", prompt, "--model", "fake/m")
 	cmd.Dir = dir
-	cmd.Env = env
+	cmd.Env = sb.termaEnv()
 	var out bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &out
 	if err := cmd.Run(); err != nil {
