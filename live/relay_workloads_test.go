@@ -55,7 +55,11 @@ func volatile(key string) bool {
 	}
 	for _, v := range []string{"log codex.startup_phase", "span receiving", "span append_items", "span persist_rollout_items",
 		"span realtime_conversation", "span send_raw_response_items", "span record_conversation_items", "span run_hooks_and_record_inputs",
-		"span codex.hooks.command", "log codex.sse_event/"} {
+		"span codex.hooks.command", "log codex.sse_event/",
+		// Codex's process-level work: sign-in checks and file stats, in whatever number
+		// its startup takes (CI saw 19–20 auth and 254–272 fs.get_metadata spans per run,
+		// direct or relayed, with the relay dropping none).
+		"span auth", "span fs.get_metadata"} {
 		if strings.HasPrefix(key, v) {
 			return true
 		}

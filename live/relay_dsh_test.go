@@ -82,8 +82,21 @@ func TestRelayDsh(t *testing.T) {
 				for agentRecords(sb.Receiver.evidence()) == 0 && time.Now().Before(deadline) {
 					time.Sleep(500 * time.Millisecond)
 				}
-				time.Sleep(3 * time.Second)
-				e := sb.Receiver.evidence()
+				// The plugin exports on turn end and on exit: wait for the tool's span, not a
+				// fixed time — on a loaded CI runner three seconds was once not enough.
+				var e telemetryEvidence
+				for deadline := time.Now().Add(20 * time.Second); ; time.Sleep(250 * time.Millisecond) {
+					e = sb.Receiver.evidence()
+					seen := false
+					for _, s := range e.spans {
+						seen = seen || s.Name == "execute_tool write"
+					}
+					if seen || time.Now().After(deadline) {
+						break
+					}
+				}
+				time.Sleep(time.Second) // what the same flush carried after it
+				e = sb.Receiver.evidence()
 				if agentRecords(e) == 0 {
 					t.Fatalf("nothing of the opted-in dsh session reached upstream: %v", sb.RelayStats())
 				}

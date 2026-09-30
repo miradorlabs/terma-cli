@@ -206,3 +206,7 @@ func (sb *Sandbox) CodexLogs(threadID string, timeout time.Duration) (starts, co
 	}
 	return starts, completed
 }
+
+func fixtureCodexArgs(url string) []string {
+	return []string{"-c", `model_provider="telemetry_fixture"`, "-c", `model_providers.telemetry_fixture.name="Telemetry fixture"`, "-c", "model_providers.telemetry_fixture.base_url=" + tomlQuote(url), "-c", `model_providers.telemetry_fixture.wire_api="responses"`, "-c", `model_providers.telemetry_fixture.requires_openai_auth=false`, "-s", "workspace-write"}
+}
