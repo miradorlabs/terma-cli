@@ -1,0 +1,68 @@
+# terma: global mode's hooks for every Codex session on this machine.
+[hooks]
+
+[[hooks.SessionStart]]
+
+[[hooks.SessionStart.hooks]]
+type = "command"
+command = "[ -x \"$HOME/.local/bin/terma\" ] && \"$HOME/.local/bin/terma\" hook --user codex-session-start || true"
+timeout = 10
+
+[[hooks.UserPromptSubmit]]
+
+[[hooks.UserPromptSubmit.hooks]]
+type = "command"
+command = "[ -x \"$HOME/.local/bin/terma\" ] && \"$HOME/.local/bin/terma\" hook --user codex-user-prompt-submit || true"
+timeout = 10
+async = true
+
+[[hooks.PreToolUse]]
+
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = "[ -x \"$HOME/.local/bin/terma\" ] && \"$HOME/.local/bin/terma\" hook --user codex-pre-tool-use || true"
+timeout = 10
+
+[[hooks.PermissionRequest]]
+
+[[hooks.PermissionRequest.hooks]]
+type = "command"
+command = "[ -x \"$HOME/.local/bin/terma\" ] && \"$HOME/.local/bin/terma\" hook --user codex-permission-request || true"
+timeout = 10
+
+[[hooks.PostToolUse]]
+
+[[hooks.PostToolUse.hooks]]
+type = "command"
+command = "[ -x \"$HOME/.local/bin/terma\" ] && \"$HOME/.local/bin/terma\" hook --user codex-post-tool-use || true"
+timeout = 10
+async = true
+
+[[hooks.Stop]]
+
+[[hooks.Stop.hooks]]
+type = "command"
+command = "[ -x \"$HOME/.local/bin/terma\" ] && \"$HOME/.local/bin/terma\" hook --user codex-stop || true"
+timeout = 3
+
+[[hooks.SessionEnd]]
+
+[[hooks.SessionEnd.hooks]]
+type = "command"
+command = "[ -x \"$HOME/.local/bin/terma\" ] && \"$HOME/.local/bin/terma\" hook --user codex-session-end || true"
+timeout = 3
+
+[[hooks.SubagentStart]]
+
+[[hooks.SubagentStart.hooks]]
+type = "command"
+command = "[ -x \"$HOME/.local/bin/terma\" ] && \"$HOME/.local/bin/terma\" hook --user codex-subagent-start || true"
+timeout = 10
+async = true
+
+[[hooks.SubagentStop]]
+
+[[hooks.SubagentStop.hooks]]
+type = "command"
+command = "[ -x \"$HOME/.local/bin/terma\" ] && \"$HOME/.local/bin/terma\" hook --user codex-subagent-stop || true"
+timeout = 3

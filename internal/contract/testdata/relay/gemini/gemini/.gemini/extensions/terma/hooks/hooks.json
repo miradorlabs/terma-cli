@@ -1,0 +1,45 @@
+{
+  "hooks": {
+    "AfterTool": [
+      {
+        "hooks": [
+          {
+            "command": "'/usr/local/bin/terma' 'hook' gemini-after-tool",
+            "type": "command"
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "BeforeAgent": [
+      {
+        "hooks": [
+          {
+            "command": "'/usr/local/bin/terma' 'hook' gemini-prompt",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "command": "'/usr/local/bin/terma' 'hook' gemini-session-end",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "'/usr/local/bin/terma' 'hook' gemini-session-start",
+            "type": "command"
+          }
+        ]
+      }
+    ]
+  }
+}

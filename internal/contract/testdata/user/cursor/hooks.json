@@ -1,0 +1,67 @@
+{
+  "hooks": {
+    "afterAgentResponse": [
+      {
+        "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user cursor-after-agent-response || true",
+        "timeout": 10
+      }
+    ],
+    "afterFileEdit": [
+      {
+        "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user cursor-file-edit || true",
+        "timeout": 10
+      }
+    ],
+    "beforeSubmitPrompt": [
+      {
+        "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user cursor-before-submit-prompt || true",
+        "timeout": 10
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user cursor-post-tool-use || true",
+        "timeout": 10
+      }
+    ],
+    "postToolUseFailure": [
+      {
+        "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user cursor-post-tool-use-failure || true",
+        "timeout": 10
+      }
+    ],
+    "preCompact": [
+      {
+        "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user cursor-pre-compact || true",
+        "timeout": 10
+      }
+    ],
+    "sessionEnd": [
+      {
+        "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user cursor-session-end || true",
+        "timeout": 10
+      }
+    ],
+    "sessionStart": [
+      {
+        "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user cursor-session-start || true",
+        "timeout": 10
+      }
+    ],
+    "stop": [
+      {
+        "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user cursor-stop || true",
+        "timeout": 10,
+        "loop_limit": null
+      }
+    ],
+    "subagentStop": [
+      {
+        "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user cursor-subagent-stop || true",
+        "timeout": 10,
+        "loop_limit": null
+      }
+    ]
+  },
+  "version": 1
+}

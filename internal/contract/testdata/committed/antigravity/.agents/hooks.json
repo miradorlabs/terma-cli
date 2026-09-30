@@ -1,0 +1,37 @@
+{
+  "terma": {
+    "PostInvocation": [
+      {
+        "type": "command",
+        "command": "command -v terma >/dev/null 2>&1 && terma hook antigravity-post-invocation || true",
+        "timeout": 10
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v terma >/dev/null 2>&1 && terma hook antigravity-post-tool-use || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "command -v terma >/dev/null 2>&1 && terma hook antigravity-pre-invocation || true",
+        "timeout": 10
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "command": "command -v terma >/dev/null 2>&1 && terma hook antigravity-stop || true",
+        "timeout": 10
+      }
+    ]
+  }
+}
