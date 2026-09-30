@@ -203,6 +203,9 @@ func launchdDomains() []string {
 }
 
 func installRelayService(ctx context.Context) (string, error) {
+	if !relayServiceSupported() {
+		return "", fmt.Errorf("a relay service is not supported on %s; hooks start the relay on demand", runtime.GOOS)
+	}
 	name, err := relayServiceName()
 	if err != nil {
 		return "", err

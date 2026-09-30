@@ -3,11 +3,22 @@ package selfupdate
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"testing"
 )
 
 // executable writes an empty executable at path, creating its directory.
+// unixLayouts skips a test of the package managers' Unix layouts: on Windows terma
+// names npm's global command without telling the layouts apart (managed.go), and PATH
+// lookups want an .exe.
+func unixLayouts(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix package-manager layouts")
+	}
+}
+
 func executable(t *testing.T, path string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -19,6 +30,7 @@ func executable(t *testing.T, path string) {
 }
 
 func TestManagedByUsesThePackageManagerThatOwnsTheBinary(t *testing.T) {
+	unixLayouts(t)
 	t.Setenv("PATH", "")
 	root, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
@@ -74,6 +86,7 @@ func TestManagedByUsesThePackageManagerThatOwnsTheBinary(t *testing.T) {
 
 // The npm on PATH is used only when the prefix has none, and always with that prefix.
 func TestManagedByFallsBackToNpmOnPathForItsPrefix(t *testing.T) {
+	unixLayouts(t)
 	root, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
