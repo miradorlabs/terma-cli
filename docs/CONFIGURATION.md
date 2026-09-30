@@ -56,6 +56,9 @@ hooks-only agents and `--harness none`. A developer login is required; a telemet
 server key cannot authorize adding a repository. Dry runs leave authentication and
 files untouched. Offline test fixtures explicitly use `TERMA_POLICY_STUB`.
 
+When `TERMA_API_KEY` is set, install uses that server key for the project identity
+and telemetry delivery, and your saved developer login for the policy request.
+
 Validated policies are cached separately in `policies/<team-id>.json`; the selected
 machine policy also lives in your profile. The relay refreshes saved teams' policies
 every minute, while hooks read local files only. A failed fetch retains that team's

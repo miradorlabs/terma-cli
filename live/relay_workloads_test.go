@@ -67,11 +67,12 @@ func volatile(key string) bool {
 	return false
 }
 
-// sometimes are shapes a harness emits on its own schedule, not the workload's: Claude
-// Code's periodic retention sweep of its local transcripts. A run may or may not
-// include them, relay or none.
+// sometimes are shapes whose presence varies independently of the workload: Claude's
+// retention sweep and Codex's rollout persistence metrics (sampled on 1% of thread
+// IDs). Direct and relayed runs have different IDs, so their samples can differ.
+// See Codex rust-v0.158.0, codex-rs/rollout/src/persistence_metrics.rs.
 func sometimes(key string) bool {
-	return key == "log retention_sweep"
+	return key == "log retention_sweep" || strings.HasPrefix(key, "metric codex.rollout.persistence.")
 }
 
 // endedCleanly reports whether the agent ran its session-end hook: Codex sometimes
@@ -160,8 +161,8 @@ func runBoth(t *testing.T, sandbox func(t *testing.T) *Sandbox, run func(t *test
 		if n := sum(c, "dropped."); n > 0 {
 			t.Errorf("the relay dropped %d records of an opted-in session: %v", n, c)
 		}
-		if unshut && sum(c, "received.") != sum(c, "forwarded.") {
-			t.Errorf("the agent exited without its shutdown, and the relay also kept back part of what it did send: %v", c)
+		if sum(c, "received.") != sum(c, "forwarded.") {
+			t.Errorf("the relay kept back part of what the agent sent: %v", c)
 		}
 	})
 }

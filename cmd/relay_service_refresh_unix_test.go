@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
@@ -74,7 +75,7 @@ func TestRefreshKeepsShimWhenRelayCannotListen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = ln.Close() }()
+	t.Cleanup(func() { _ = ln.Close() })
 	if out, err := runTerma(t, "relay", "setup", "--no-start", "--addr", ln.Addr().String(), "--harness", "codex"); err != nil {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}
@@ -82,7 +83,21 @@ func TestRefreshKeepsShimWhenRelayCannotListen(t *testing.T) {
 	if err := routing.SaveRecord(routing.Record{ProjectID: "team", Signals: []string{"logs"}, Harnesses: []string{"codex"}}); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { stopRelay(dir) })
+	// spawnRelay is detached and can still be writing its listen failure after
+	// refresh returns. Keep the port occupied and the private directory alive
+	// until that write completes and the child releases its lock.
+	t.Cleanup(func() {
+		for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+			if _, err := os.Stat(filepath.Join(dir, relayErrorFile)); err != nil {
+				continue
+			}
+			if unlock, err := flock.TryLock(filepath.Join(dir, relayLockFile)); err == nil {
+				unlock()
+				return
+			}
+		}
+		t.Error("failed relay did not finish before sandbox cleanup")
+	})
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
 	proc := exec.CommandContext(ctx, bin, "update", "--refresh")

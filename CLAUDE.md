@@ -264,8 +264,9 @@ developer login to check the team's repository permission.
   the API gateway's `/v1/identity` (`serverKeyBinding`): the account service's
   `/v1/projects` accepts only a signed-in user, and a `--project` or existing binding
   naming another project is refused, since the key could not deliver its events. A server
-  key cannot read collection policy: real installs require a developer login, so unset
-  `TERMA_API_KEY` and run `terma setup` first.
+  key cannot read collection policy: real installs use the saved developer login for
+  policy even when `TERMA_API_KEY` identifies and delivers for the binding. Without a
+  saved login, unset `TERMA_API_KEY` and run `terma setup` first.
 - Per-repo routing is the local relay (below, and `docs/RELAY-SPIKE.md`): `terma install`
   points each of the developer's agents' user-level exporters at the relay
   (`pointAgentsAtRelay`, shared with `terma relay setup`), keeps the project's key in the

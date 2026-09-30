@@ -238,19 +238,21 @@ func fetchPolicy(ctx context.Context, cfg *config.Config) (config.Policy, error)
 	if os.Getenv("TERMA_POLICY_STUB") != "" {
 		client = api.NewAnonymous(cfg.AuthURL, Version)
 	} else {
-		if cfg.APIKey == "" {
-			cred, err := auth.LoadCredential(cfg.ProfileName)
-			if err != nil {
-				return config.Policy{}, err
-			}
-			if cfg.OrganizationID == "" {
-				cfg.OrganizationID = cred.OrganizationID
-			}
-			if cfg.OrganizationID != cred.OrganizationID {
-				return config.Policy{}, errors.New("collection policy login belongs to another organization — run `terma setup`")
-			}
+		cred, err := auth.LoadCredential(cfg.ProfileName)
+		if err != nil {
+			return config.Policy{}, err
 		}
-		client, err = newClient(cfg)
+		if cfg.OrganizationID == "" {
+			cfg.OrganizationID = cred.OrganizationID
+		}
+		if cfg.OrganizationID != cred.OrganizationID {
+			return config.Policy{}, errors.New("collection policy login belongs to another organization — run `terma setup`")
+		}
+		// A server key can identify the binding and deliver its telemetry. Policy
+		// always uses the developer login, even while TERMA_API_KEY is set.
+		policyConfig := *cfg
+		policyConfig.APIKey = ""
+		client, err = api.New(&policyConfig, api.Options{Version: Version, ProjectID: cfg.ProjectID, Credential: cred})
 		if err != nil {
 			return config.Policy{}, err
 		}
