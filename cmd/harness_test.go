@@ -85,11 +85,11 @@ func TestHarnessListSingle(t *testing.T) {
 }
 
 func TestHarnessListUnknown(t *testing.T) {
-	_, err := runTerma(t, "harness", "list", "gemini")
+	_, err := runTerma(t, "harness", "list", "no-such-agent")
 	if err == nil {
 		t.Fatal("expected an error for an unknown harness")
 	}
-	if !strings.Contains(err.Error(), "gemini") {
+	if !strings.Contains(err.Error(), "no-such-agent") {
 		t.Errorf("error did not name the unknown harness: %v", err)
 	}
 	// "Agent" is the word a developer sees everywhere else; harness and adapter are

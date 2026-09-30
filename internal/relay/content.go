@@ -5,6 +5,8 @@ import (
 
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
+	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
+	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
@@ -22,15 +24,24 @@ var (
 	// that write them omit them when content is off: the GenAI semantic conventions'
 	// content attributes (terma's OpenCode plugin writes gen_ai.completion).
 	promptDropFields = []string{"gen_ai.prompt", "gen_ai.completion", "gen_ai.input.messages", "gen_ai.output.messages", "gen_ai.system_instructions",
+		"gen_ai.tool.definitions",
 		// omp's own (omp.gen_ai.*): the request's messages and the response's text.
-		"omp.gen_ai.request.messages", "omp.gen_ai.response.text"}
+		"omp.gen_ai.request.messages", "omp.gen_ai.response.text",
+		// Gemini CLI's gemini_cli.api_request / api_response (0.62).
+		"request_text", "response_text"}
+	// resourcePromptFields are resource attributes that restate what was said: the
+	// process's command line, which carries a prompt passed as an argument (Gemini CLI
+	// stamps process.command_args, `-p "<prompt>"` included, whatever logPrompts says).
+	resourcePromptFields = []string{"process.command_args", "process.command_line"}
 	// promptBodyEvents carry what was said in the log body, not an attribute: the
 	// OpenCode plugin's prompt, the session title, which restates it, Pi's prompt, and
 	// Hermes's prompt and reply.
 	promptBodyEvents = []string{"opencode.user_prompt", "opencode.session.created", "pi.user_prompt", "omp.user_prompt", "hermes.user_prompt", "hermes.assistant_response"}
 	// toolContentFields hold what a tool was called with or returned.
 	toolContentFields = []string{"tool_parameters", "tool_input", "full_command", "bash_command", "arguments", "output",
-		"gen_ai.tool.call.arguments", "gen_ai.tool.call.result", "opencode.tool.file_path"}
+		"gen_ai.tool.call.arguments", "gen_ai.tool.call.result", "opencode.tool.file_path",
+		// Gemini CLI's tool_call and hook_call records (0.62).
+		"function_args", "hook_input", "hook_output", "stdout", "stderr"}
 	// toolContentEvents are span events that exist only to carry tool content: Claude
 	// Code's claude_code.tool span records the command and its output as a
 	// tool.output event (live, 2.1.284), which the golden attribute lists do not see.
@@ -56,9 +67,28 @@ func withhold(p *part, prompts, toolContent bool) int {
 		}
 		return out
 	}
+	resource := func(r *resourcepb.Resource) {
+		if prompts || r == nil {
+			return
+		}
+		kept := r.Attributes[:0]
+		for _, kv := range r.GetAttributes() {
+			if contains(resourcePromptFields, kv.GetKey()) {
+				changed++
+				continue
+			}
+			kept = append(kept, kv)
+		}
+		r.Attributes = kept
+	}
 	switch m := p.msg.(type) {
+	case *metricspb.MetricsData:
+		for _, rm := range m.GetResourceMetrics() {
+			resource(rm.GetResource())
+		}
 	case *logspb.LogsData:
 		for _, rl := range m.GetResourceLogs() {
+			resource(rl.GetResource())
 			for _, sl := range rl.GetScopeLogs() {
 				for _, lr := range sl.GetLogRecords() {
 					lr.Attributes = apply(lr.GetAttributes())
@@ -71,6 +101,7 @@ func withhold(p *part, prompts, toolContent bool) int {
 		}
 	case *tracepb.TracesData:
 		for _, rs := range m.GetResourceSpans() {
+			resource(rs.GetResource())
 			for _, ss := range rs.GetScopeSpans() {
 				for _, sp := range ss.GetSpans() {
 					sp.Attributes = apply(sp.GetAttributes())

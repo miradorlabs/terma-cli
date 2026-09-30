@@ -421,6 +421,38 @@ func TestRelayRefusesWithoutToken(t *testing.T) {
 	}
 }
 
+// The token may lead the path instead of riding a header (an exporter whose file
+// configuration has no headers, Gemini CLI's): accepted exactly, never as a prefix of
+// another segment, and never a way around the header check for a wrong one.
+func TestRelayAcceptsTheTokenInThePath(t *testing.T) {
+	u := newUpstream(t)
+	f := newFixture()
+	r, srv := f.relay(t, u, allPolicies(u))
+	body, _ := proto.Marshal(mixedLogs())
+	for path, want := range map[string]int{
+		"/" + token + "/v1/logs":                http.StatusOK,
+		"/" + token + "x/v1/logs":               http.StatusUnauthorized,
+		"/wrong/v1/logs":                        http.StatusNotFound,
+		"/" + token[:len(token)-1] + "/v1/logs": http.StatusNotFound,
+	} {
+		req, _ := http.NewRequest(http.MethodPost, srv.URL+path, bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/x-protobuf")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+		// A refusal may be a 401 or a 404 (no such route): any 4xx is one.
+		refused := resp.StatusCode/100 == 4
+		if want == http.StatusOK && resp.StatusCode != want || want != http.StatusOK && !refused {
+			t.Errorf("%s: %d, want %d", path, resp.StatusCode, want)
+		}
+	}
+	if c := r.Stats().Snapshot().Counters; c["received.logs"] == 0 {
+		t.Fatalf("the path-token export was not received: %v", c)
+	}
+}
+
 // A host that refuses the key is not asked again for that record; one that fails is
 // retried.
 func TestRelayUpstreamRefusalIsFinal(t *testing.T) {

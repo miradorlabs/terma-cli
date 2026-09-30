@@ -161,7 +161,38 @@ func (r *Relay) Stats() *Stats { return r.stats }
 
 // Handler serves OTLP over HTTP (protobuf or JSON, optionally gzipped) on
 // /v1/{logs,metrics,traces}, and the stats on GET /stats.
+//
+// The token may also lead the path — /<token>/v1/logs — for an exporter configured by
+// a file that has no headers setting (Gemini CLI's otlpEndpoint): headers could then
+// only come from OTEL_EXPORTER_OTLP_HEADERS in the environment, which everything the
+// agent runs would inherit, token and all. An exporter appends /v1/<signal> to its
+// endpoint's path, so an endpoint of http://127.0.0.1:43180/<token> carries it.
 func (r *Relay) Handler() http.Handler {
+	mux := r.routes()
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if rest, ok := r.pathToken(req.URL.Path); ok {
+			req = req.Clone(req.Context())
+			req.URL.Path = rest
+			req.URL.RawPath = ""
+			req.Header.Set("Authorization", "Bearer "+r.opts.Token)
+		}
+		mux.ServeHTTP(w, req)
+	})
+}
+
+// pathToken reports whether path leads with the relay's token, and what follows it.
+func (r *Relay) pathToken(path string) (string, bool) {
+	if r.opts.Token == "" {
+		return "", false
+	}
+	first, rest, ok := strings.Cut(strings.TrimPrefix(path, "/"), "/")
+	if !ok || subtle.ConstantTimeCompare([]byte(first), []byte(r.opts.Token)) != 1 {
+		return "", false
+	}
+	return "/" + rest, true
+}
+
+func (r *Relay) routes() *http.ServeMux {
 	mux := http.NewServeMux()
 	for _, s := range []Signal{Logs, Metrics, Traces} {
 		mux.HandleFunc("/v1/"+string(s), func(w http.ResponseWriter, req *http.Request) { r.export(w, req, s) })

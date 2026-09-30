@@ -706,6 +706,13 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   strips them (`TestRelayClaudeToolsGetNoExporter`); omp gets none
   (`TestRelayOmpToolsGetNoExporter`). cursor-agent's own tracer is fixed to Cursor's backend, so Cursor never
   reaches the relay (`TestRelayCursorHooks`).
+- Gemini CLI exports natively from `~/.gemini/settings.json` (`harness.ConnectGeminiRelay`
+  changes only its `telemetry` block); the file has no headers, so the relay also takes
+  its token as the endpoint path's first segment (`relay.Handler`, exact, constant-time).
+  Its claims come from terma's user-level Gemini extension (`~/.gemini/extensions/terma`,
+  `terma hook gemini-*`). The content gate also strips resource attributes that restate a
+  prompt (`resourcePromptFields`: Gemini's `process.command_args`), and the live leak
+  check covers resources and metric points.
 - Never read harness log files to fill a gap: what the relay knows comes from OTLP and
   hook payloads.
 - OTLP types come from `go.opentelemetry.io/proto/otlp/{logs,metrics,trace}` as
@@ -718,7 +725,7 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
 
 - Trailers: `Agent-Session-Id`, `Agent-Tool` (`internal/trailer`). The Terma backend
   and GitHub App parse these. Tool labels: `claude-code`, `codex`, `opencode`, `cursor`,
-  `antigravity`, `omp`, `pi`, `hermes`.
+  `antigravity`, `omp`, `pi`, `hermes`, `gemini`.
 - Hook event names are committed wiring and must stay stable: `session-start` /
   `session-end` / `post-tool-use` / `stop` / `stop-failure` / `subagent-start` /
   `subagent-stop` / `user-prompt-submit` (Claude Code's `.claude/settings.json`),
@@ -739,6 +746,8 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   committed hook file and extension), `pi-session-start` / `pi-prompt` /
   `pi-session-end` / `pi-file-edit` (called by terma's Pi extension,
   `internal/harness/pi/terma.ts`, which `terma relay setup --harness pi` writes),
+  `gemini-session-start` / `gemini-prompt` / `gemini-after-tool` / `gemini-session-end`
+  (terma's Gemini CLI extension),
   `hermes-session-start` / `hermes-prompt` / `hermes-session-end` / `hermes-file-edit`
   (called by terma's Hermes plugin, `internal/harness/hermes`). Both extensions share
   one handler set (`hookrun/extension.go`) and one payload shape. Cursor sessions are keyed on `conversation_id`, the one id

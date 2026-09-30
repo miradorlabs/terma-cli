@@ -66,7 +66,7 @@ var claimPIDs = sync.OnceValue(procinfo.Ancestors)
 func ToolForEvent(event string) string {
 	for prefix, tool := range map[string]string{
 		"codex-": codexTool, "cursor-": cursorTool, "antigravity-": antigravityTool, "opencode-": opencodeTool,
-		"omp-": ompTool, "pi-": piTool, "hermes-": hermesTool,
+		"omp-": ompTool, "pi-": piTool, "hermes-": hermesTool, "gemini-": geminiTool,
 	} {
 		if strings.HasPrefix(event, prefix) {
 			return tool

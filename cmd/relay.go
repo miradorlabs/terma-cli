@@ -365,6 +365,14 @@ func newRelaySetupCommand() *cobra.Command {
 					}
 					fmt.Fprintf(out, "omp exports to the relay at %s (%s).\n", addr, tildePath(path))
 					continue
+				case "gemini":
+					// Gemini's settings file has no headers: the token rides the path.
+					settings, ext, err := harness.ConnectGeminiRelay(exp.Endpoint+"/"+token, termaHookCommand())
+					if err != nil {
+						return fmt.Errorf("gemini: %w", err)
+					}
+					fmt.Fprintf(out, "Gemini CLI exports to the relay at %s (%s, %s).\n", addr, tildePath(settings), tildePath(ext))
+					continue
 				case "hermes":
 					// Hermes, likewise: terma's plugin is its exporter, and plugins are opt-in.
 					dir, err := harness.WriteHermesPlugin(harness.HermesConfig{Endpoint: exp.Endpoint,

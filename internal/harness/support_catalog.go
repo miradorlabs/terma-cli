@@ -110,6 +110,12 @@ func SupportCatalog() []AgentSupport {
 			Telemetry:   CapabilitySupport{Level: SupportPartial, Note: "Hermes has no usable OTLP export; terma's plugin exports tokens, cost and tool calls through the local relay only; auxiliary calls (titles, compression) fire no hook"},
 		},
 		{
+			Name:        "gemini",
+			DisplayName: "Gemini CLI",
+			Attribution: CapabilitySupport{Level: SupportFull},
+			Telemetry:   CapabilitySupport{Level: SupportPartial, Note: "native OTLP through the local relay only; no cost"},
+		},
+		{
 			Name:        "cursor",
 			DisplayName: "Cursor",
 			Attribution: CapabilitySupport{Level: SupportFull},

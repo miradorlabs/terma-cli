@@ -155,6 +155,41 @@ func leakedFieldsOf(e telemetryEvidence, markers ...string) []string {
 		}
 		hit("log "+r.Attrs["event.name"], "body", r.Body)
 	}
+	// A resource can restate what was said too: Gemini CLI's process.command_args
+	// carries a prompt passed with -p. Metric points are checked for the same reason.
+	for _, s := range e.spans {
+		for k, v := range s.Resource {
+			hit("span resource", k, v)
+		}
+	}
+	for _, r := range e.logs {
+		for k, v := range r.Resource {
+			hit("log resource", k, v)
+		}
+	}
+	for _, m := range e.metrics {
+		for k, v := range m.Resource {
+			hit("metric resource", k, v)
+		}
+		for _, p := range m.Proto.GetSum().GetDataPoints() {
+			for k, v := range flatten(p.GetAttributes()) {
+				hit("metric "+m.Proto.GetName(), k, v)
+			}
+		}
+	}
+	return dedupe(out)
+}
+
+// dedupe keeps the first of each repeated field name, in order.
+func dedupe(in []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, v := range in {
+		if !seen[v] {
+			seen[v] = true
+			out = append(out, v)
+		}
+	}
 	return out
 }
 

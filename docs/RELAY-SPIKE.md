@@ -223,6 +223,38 @@ It passes on 0.20.4:
 
 **Not seen:** auxiliary calls fire no plugin hook (the session-title request; compression, likely), so their spend is not seen.
 
+### Gemini CLI
+
+Gemini CLI (0.62) exports OTLP natively, configured entirely from the user settings file (`~/.gemini/settings.json` `telemetry`). It records `session.id` on every log record and metric point, and `gen_ai.conversation.id` on spans.
+
+The file has no headers setting, and headers could only come from `OTEL_EXPORTER_OTLP_HEADERS`, which Gemini's tools inherit. So the relay also accepts its token as the endpoint path's first segment (`http://127.0.0.1:43180/<token>`; Gemini appends `/v1/<signal>`). The match is exact and constant-time. Nothing is set in any environment, and `TestRelayGeminiToolsGetNoExporter` checks it.
+
+Claims come from terma's user-level Gemini extension (`~/.gemini/extensions/terma`):
+- **Where it fires:** its hooks fire in every folder with no enable step, as children of the exporting process.
+- **Its events:** `SessionStart`, `BeforeAgent` (claim only), `AfterTool` (file edits from `write_file` and `replace`) and `SessionEnd`, calling `terma hook gemini-*` by terma's absolute path.
+
+`relay setup --harness gemini` changes only the settings file's `telemetry` block, and refuses a file it cannot parse.
+
+With prompts off, Gemini still sends two kinds of content:
+- the system prompt and tool definitions (`gen_ai.system_instructions`, `gen_ai.tool.definitions`);
+- the `-p` prompt in the resource's `process.command_args`.
+
+The relay drops them. It now filters resource attributes too (`resourcePromptFields`), and the live leak check now looks at resources and metric points. With the resource filter sabotaged, the withheld run leaked `process.command_args` from spans, logs and metrics, and the test caught it.
+
+Passes on 0.62.0:
+- **Workloads:** a reply, `write_file` and `run_shell_command`, each direct vs relay.
+- **Content:** allowed and withheld.
+- **Negative control:** a session outside any repository.
+- **Tools:** they inherit nothing.
+- **Attribution:** the commit is stamped `Agent-Tool: gemini`.
+
+**Not seen:** Gemini exports no cost.
+
+### Goose, Aider
+
+- **Goose (1.52):** native OTLP, but the config file holds only the endpoint, and Goose copies it into its own environment (`set_var`), so every tool it runs inherits it, token included. It has hooks but no in-process plugin API, so terma cannot give it an exporter of its own. **Not supported** until upstream stops exporting the endpoint to tools.
+- **Aider (0.86):** no OpenTelemetry, no plugin or hook API, no session id. The only in-process route is a `.pth` file that monkeypatches aider internals, and a virtualenv rebuild loses it. **Not supported.** Aider's own auto-commits do run terma's commit hooks.
+
 ### Cursor
 
 cursor-agent (2026.09.08) bundles an OTLP exporter, but its tracer is fixed to Cursor's own backend (`${backendUrl}/v1/traces`, Cursor's token, `service.name=cursor-agent-cli`). Nothing `relay setup` writes redirects it, so Cursor never reaches the relay and is seen through its hooks alone.
@@ -237,6 +269,8 @@ T3 Code (0.0.42) is a local server with a web front end, and runs other agents:
 - **Environment:** it sets no `OTEL_*` of its own and runs no collector.
 
 So the agents' user-level exporters and the repository's hooks work as they do anywhere, and each agent exports from the process that runs its hooks. `TestRelayT3` drives T3's orchestration API with a Codex and a Claude thread in the bound repository and one of each in a personal project.
+
+It passes on 0.0.42: the repository's Codex and Claude threads reach the project, prompts included, and the personal ones reach nothing. T3 keeps its agents running, and their exporters send on their own schedule (Claude's logs every 5 s), so the test waits for the repository's records before stopping T3.
 
 **Not caught:** T3's thread titles run `claude -p` in a temporary directory, so no hook claims them and they are not forwarded.
 
@@ -255,6 +289,9 @@ Where each agent stands:
 | Harness | Exports OTLP? | Claims possible? | Status |
 |---|---|---|---|
 | T3 Code | its agents': a `codex app-server` per thread, Claude's Agent SDK | through those agents' hooks | works through the relay unchanged (`TestRelayT3`) |
+| Gemini CLI | natively, from its settings file; the token in the endpoint's path | terma's user-level Gemini extension | done |
+| Goose | natively, but its tools inherit the endpoint | hooks | not supported (tools would inherit the token) |
+| Aider | no | no | not supported |
 | Hermes | through terma's plugin | the plugin calls `terma hook hermes-*` | done |
 | Pi | through terma's extension | the extension calls `terma hook pi-*` | done |
 | Cursor | no (its own backend only) | hooks | unaffected; never reaches the relay |
