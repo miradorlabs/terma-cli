@@ -15,11 +15,11 @@ import (
 )
 
 // Observation is one snapshot bound for the spool, with the identity the write-ahead
-// checkpoint needs to order it. Every hooks-only harness (Cursor, Antigravity) records
-// through this; the attributes are the harness's, the ordering and replay identity are
+// checkpoint needs to order it. An agent that reports only through its hooks records
+// through this; the attributes are the agent's, the ordering and replay identity are
 // shared.
 type Observation struct {
-	// Tool names the harness ("cursor"); it also seeds the observation id.
+	// Tool is the agent's label; it also seeds the observation id.
 	Tool string
 	// Source is the evidence_source attribute on a capture-gap event.
 	Source string

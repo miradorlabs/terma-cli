@@ -39,7 +39,7 @@ func TestDoctorChecksClaudeEmissionSettings(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			repo := installRepo(t)
-			h := claudeHarness(t)
+			h := harnessOf(t, "claude")
 			if err := h.Connect(harness.Exporter{Endpoint: endpoint, APIKey: testServerKey, Signals: tc.globalSignals}, false); err != nil {
 				t.Fatal(err)
 			}

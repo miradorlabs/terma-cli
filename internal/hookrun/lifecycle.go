@@ -48,9 +48,8 @@ func (e Env) EmitStart(r *Repo, sess session.Session, extra map[string]any) {
 }
 
 // Announce is a session's start: the session becomes the active one, old manifests are
-// aged out, and the start is spooled. An adapter with work of its own between those
-// steps (Codex reads the rollout, Antigravity opens a turn) or without one of them
-// (Codex's notify never prunes) composes them itself, in the order it always had.
+// aged out, and the start is spooled. A handler with work of its own between those
+// steps, or without one of them, composes them itself.
 func (e Env) Announce(r *Repo, sess session.Session, extra map[string]any) {
 	e.SetActive(r, sess)
 	e.PruneManifests(r, sess.UpdatedAt)
@@ -102,9 +101,9 @@ func RelativeFiles(r *Repo, cwd string, paths []string) []string {
 	return files
 }
 
-// UniqueSorted reports a file list as a set. Codex's patches and Cursor's subagent
-// reports are spooled this way and the other agents' lists are not, so it is the
-// caller's choice rather than relativeFiles' habit.
+// UniqueSorted reports a file list as a set. Some agents' lists are reported this way
+// and others keep their order, so it is the caller's choice rather than RelativeFiles'
+// habit.
 func UniqueSorted(files []string) []string {
 	slices.Sort(files)
 	return slices.Compact(files)

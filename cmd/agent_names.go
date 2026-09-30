@@ -23,7 +23,7 @@ func scopedHarnessNames() string {
 
 // statusLineOwner is the agent whose status line terma wraps.
 func statusLineOwner() string {
-	if a, _, ok := statusLineAgent(); ok {
+	if a, ok := statusLineAgent(); ok {
 		return a.DisplayName()
 	}
 	return "the agent"

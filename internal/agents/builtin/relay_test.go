@@ -47,6 +47,9 @@ func TestConfigureIsolatesAgentFilesAndEnvironment(t *testing.T) {
 				"pi": "pi/extensions/terma.ts", "hermes": "hermes/plugins/terma/__init__.py",
 				"gemini": "gemini/.gemini/settings.json", "dsh": "dsh/plugins/terma-relay.mjs",
 			}
+			if _, ok := paths[e.Name()]; !ok {
+				t.Fatalf("this test knows no configuration file for %s", e.Name())
+			}
 			for name, path := range paths {
 				if name == e.Name() {
 					continue
@@ -85,6 +88,20 @@ func TestConfigureIsolatesAgentFilesAndEnvironment(t *testing.T) {
 			}
 			if strings.Contains(strings.Join(result.Notes, " "), "private-relay-token") {
 				t.Fatal("a configuration note exposed the local credential")
+			}
+			for _, p := range result.Paths {
+				if rel, err := filepath.Rel(home, p); err != nil || strings.HasPrefix(rel, "..") {
+					t.Errorf("wrote %s, outside the developer's home", p)
+					continue
+				}
+				if body, _ := os.ReadFile(p); strings.Contains(string(body), "private-relay-token") {
+					if info, _ := os.Stat(p); info.Mode().Perm()&0o077 != 0 {
+						t.Errorf("%s holds the relay's token and is %v", p, info.Mode().Perm())
+					}
+				}
+			}
+			if pointed, known := e.RelayPointed("127.0.0.1:43180"); known && !pointed {
+				t.Error("the exporter it just configured does not read as pointed at the relay")
 			}
 			if e.Name() == "hermes" && (!result.Pending || len(result.Notes) == 0) {
 				t.Fatal("failed activation was reported as ready")

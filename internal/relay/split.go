@@ -74,10 +74,9 @@ func numeric(s string) bool {
 // under the empty key.
 //
 // A log record that names its session and carries a trace id also teaches learn which
-// session the trace belongs to. Codex's logs do, mid-turn; its turn span, the only span
-// that names the session, is exported when the turn ends. Without this, a turn's child
-// spans would wait in the hold for the whole turn, and a turn longer than the hold
-// would lose them.
+// session the trace belongs to. An agent whose only span that names the session is
+// exported when the turn ends needs this: without it, a turn's child spans would wait in
+// the hold for the whole turn, and a turn longer than the hold would lose them.
 func (ru *rules) splitLogs(req *logspb.LogsData, learn func(traceID, session string)) map[string]*part {
 	out := map[string]*part{}
 	for _, rl := range req.GetResourceLogs() {
@@ -119,8 +118,8 @@ func (ru *rules) splitLogs(req *logspb.LogsData, learn func(traceID, session str
 const tracePrefix = "trace:"
 
 // splitTraces divides a traces export by session, span by span. A span that names no
-// session belongs to the session of its trace: Codex puts thread.id on the turn span
-// only, and its children inherit the trace, not the attribute. learn records every
+// session belongs to the session of its trace: an agent may name the session on one
+// span only, and its children inherit the trace, not the attribute. learn records every
 // trace a keyed span names; known answers for the others. A span of a trace nobody
 // has named yet comes back under tracePrefix+traceID, for the relay to hold.
 func (ru *rules) splitTraces(req *tracepb.TracesData, learn func(traceID, session string), known func(traceID string) string) map[string]*part {
@@ -173,8 +172,8 @@ func (ru *rules) splitTraces(req *tracepb.TracesData, learn func(traceID, sessio
 }
 
 // splitMetrics divides a metrics export by session, data point by data point: one
-// metric's points can belong to several sessions (Claude Code stamps session.id on
-// each point), so each session gets a copy of the metric holding only its own points.
+// metric's points can belong to several sessions (an agent may stamp its session on each
+// point), so each session gets a copy of the metric holding only its own points.
 func (ru *rules) splitMetrics(req *metricspb.MetricsData) map[string]*part {
 	out := map[string]*part{}
 	for _, rm := range req.GetResourceMetrics() {

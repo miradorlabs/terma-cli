@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
@@ -89,7 +90,7 @@ func TestHookWiringVerdictInBothCommands(t *testing.T) {
 func TestStatusLineVerdictInBothCommands(t *testing.T) {
 	cases := []struct {
 		name         string
-		st           harness.StatusLineState
+		st           agents.StatusLineState
 		err          error
 		capture      statusLineCapture
 		doctorStatus doctor.Status
@@ -105,28 +106,28 @@ func TestStatusLineVerdictInBothCommands(t *testing.T) {
 		{
 			// An override outranks everything else about the file, installed or not.
 			name:         "overridden by a repository's own settings",
-			st:           harness.StatusLineState{Installed: true, Overrides: []string{".claude/settings.json"}},
+			st:           agents.StatusLineState{Installed: true, Overrides: []string{".claude/settings.json"}},
 			capture:      statusLineOverridden,
 			doctorStatus: doctor.Warn, doctorDetail: "overridden by .claude/settings.json; plan usage is not captured in this repository",
 			status: "overridden here by .claude/settings.json — plan usage is not captured in this repository",
 		},
 		{
 			name:         "capturing, the developer's renderer behind it",
-			st:           harness.StatusLineState{Installed: true, Renderer: "~/bin/line.sh"},
+			st:           agents.StatusLineState{Installed: true, Renderer: "~/bin/line.sh"},
 			capture:      statusLineBehind,
 			doctorStatus: doctor.Pass, doctorDetail: "capturing plan usage; ~/bin/line.sh runs behind it",
 			status: "capturing plan usage; your own (~/bin/line.sh) runs behind it",
 		},
 		{
 			name:         "capturing with terma's default line",
-			st:           harness.StatusLineState{Installed: true},
+			st:           agents.StatusLineState{Installed: true},
 			capture:      statusLineDefault,
 			doctorStatus: doctor.Pass, doctorDetail: "capturing plan usage (terma's default line)",
 			status: "capturing plan usage (terma's default line)",
 		},
 		{
 			name:         "replaced since terma wrapped it",
-			st:           harness.StatusLineState{Replaced: true},
+			st:           agents.StatusLineState{Replaced: true},
 			capture:      statusLineReplaced,
 			doctorStatus: doctor.Warn, doctorDetail: "replaced by your own status line since terma wrapped it; plan usage is not captured",
 			status: "replaced by your own since terma wrapped it — plan usage is NOT captured (run `terma install`)",

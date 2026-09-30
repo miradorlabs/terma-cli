@@ -987,3 +987,12 @@ func (c Codex) CurrentCredential(endpoint, projectID string) (string, bool) {
 	}
 	return "", false
 }
+
+// A capability asked for by type assertion switches off in silence when its method
+// drifts; these make that a build error.
+var (
+	_ harness.Harness      = Codex{}
+	_ harness.Noter        = Codex{}
+	_ harness.Credentialed = Codex{}
+	_ harness.Backuper     = Codex{}
+)

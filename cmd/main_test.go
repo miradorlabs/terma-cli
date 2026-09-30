@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/relay"
@@ -80,22 +81,25 @@ func harnessOf(t *testing.T, name string) harness.Harness {
 	return h
 }
 
-// claudeHarness is Claude Code's harness, with the capabilities these tests use.
-func claudeHarness(t *testing.T) interface {
+// claudeHarness is Claude Code's harness and status line, as these tests use them.
+func claudeHarness(t *testing.T) struct {
 	harness.Scoped
-	harness.StatusLiner
 	harness.Credentialed
+	agents.StatusLiner
 } {
 	t.Helper()
-	h, ok := harnessOf(t, "claude").(interface {
-		harness.Scoped
-		harness.StatusLiner
-		harness.Credentialed
-	})
-	if !ok {
-		t.Fatal("claude's harness lost a capability")
+	h := harnessOf(t, "claude")
+	scoped, ok := h.(harness.Scoped)
+	credentialed, ok2 := h.(harness.Credentialed)
+	line, ok3 := registered.Find[agents.StatusLiner]("claude")
+	if !ok || !ok2 || !ok3 {
+		t.Fatal("claude lost a capability")
 	}
-	return h
+	return struct {
+		harness.Scoped
+		harness.Credentialed
+		agents.StatusLiner
+	}{scoped, credentialed, line}
 }
 
 // codexDesktopAgent is Codex Desktop's surface name.

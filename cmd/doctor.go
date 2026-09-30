@@ -383,7 +383,7 @@ func runDoctor(ctx context.Context, skipCommit bool, progress doctorProgress) do
 	// 5b. Status line: the payload Claude Code hands its status line carries the
 	// plan's own rate-limit windows, the strongest funding evidence a machine
 	// produces. Only worth a line when Claude Code is here and connected.
-	if a, _, ok := statusLineAgent(); ok && a.Installed(ctx) {
+	if a, ok := statusLineAgent(); ok && a.Installed(ctx) {
 		timed(doctor.KeyStatusLine, a.DisplayName()+" status line", d.statusLine)
 	}
 

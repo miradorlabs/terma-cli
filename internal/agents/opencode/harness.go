@@ -497,3 +497,12 @@ func (c exporter) ConnectNotes(e harness.Exporter) []string {
 	}
 	return notes
 }
+
+// A capability asked for by type assertion switches off in silence when its method
+// drifts; these make that a build error.
+var (
+	_ harness.Harness      = exporter{}
+	_ harness.Noter        = exporter{}
+	_ harness.Credentialed = exporter{}
+	_ harness.Scoped       = exporter{}
+)

@@ -320,7 +320,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	// (not merely installed) so it only touches the global config for a developer who
 	// has chosen Claude — which also keeps `--harness none` installs from touching it.
 	// --no-statusline opts out.
-	if a, _, ok := statusLineAgent(); ok && !f.noStatusLine && slices.Contains(agents, a.Name()) {
+	if a, ok := statusLineAgent(); ok && !f.noStatusLine && slices.Contains(agents, a.Name()) {
 		if note, ok := installStatusLine(cmd.ErrOrStderr()); ok {
 			fmt.Fprintf(ui.detail, "\n%s\n", note)
 			ui.ok("Status line", "reads your plan's usage windows")

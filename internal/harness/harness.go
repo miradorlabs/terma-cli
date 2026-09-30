@@ -1,19 +1,14 @@
-// Package harness configures agent CLIs — Claude Code, Codex and OpenCode — to export
-// OpenTelemetry to Terma.
+// Package harness is the kit an agent's exporter configuration is built from: the
+// Exporter a connect describes (endpoint, key, signals, content switches), the Harness
+// interface an agent's exporter implements (internal/agents.Exporting hands it over),
+// connect scope and reach, the ownership journal that lets a disconnect restore exactly
+// what terma displaced, the symlink-safe settings write and backup, the headers helper
+// that keeps a key out of a settings file, and the bounded funding-evidence reader. It
+// names no agent: each agent's package knows its own file layout.
 //
-// Each harness owns exactly one thing: the translation between a Terma Exporter and
-// whatever configuration file and setting names that vendor happens to use. Nothing
-// outside this package knows that Claude Code reads ~/.claude/settings.json and spells
-// its telemetry switch CLAUDE_CODE_ENABLE_TELEMETRY, or that Codex reads an `[otel]`
-// table in ~/.codex/config.toml, which is what keeps `terma telemetry` a single
-// command tree rather than one per vendor.
-//
-// Inside each harness the translation (render) is kept apart from the write (Connect):
-// render is pure, so what a connect would put on disk — including which redaction
-// switches are off — can be computed, compared with what is there and tested without
-// touching a file. It is not part of the interface: the three harnesses render three
-// different things (environment variables, a TOML table, a plugin's config) and nothing
-// outside the package has a use for any of them.
+// An exporter keeps its translation (render) apart from its write (Connect): render is
+// pure, so what a connect would put on disk, including which redaction switches are
+// off, can be computed and compared with what is there without touching a file.
 package harness
 
 import (

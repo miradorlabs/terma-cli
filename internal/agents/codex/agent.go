@@ -164,7 +164,17 @@ func (Agent) UserHooksTrustStep() string {
 	return "Codex runs its machine-wide hooks once you trust them: in Codex, open `/hooks` (Desktop: Settings → Hooks → Review) and approve Terma's. An organization that deploys them as managed configuration skips this step."
 }
 
+// NotifierInstalled reports whether terma's notifier is in Codex's config.
+func (Agent) NotifierInstalled() (bool, error) { return Codex{}.NotifierInstalled() }
+
+// InstallNotifier chains terma's notifier in front of the developer's.
+func (Agent) InstallNotifier() (bool, error) { return Codex{}.InstallNotifier() }
+
+// RemoveNotifier puts back the developer's notifier.
+func (Agent) RemoveNotifier() (bool, error) { return Codex{}.RemoveNotifier() }
+
 var (
+	_ agents.Notifier       = Agent{}
 	_ agents.UserHooksTrust = Agent{}
 	_ agents.Covered        = Agent{}
 	_ agents.SurfaceChecker = Agent{}

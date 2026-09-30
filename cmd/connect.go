@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
+	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/api"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/harness"
@@ -357,10 +358,10 @@ func connectGlobal(cmd *cobra.Command, name string, f connectFlags) error {
 	}
 	statusLineNote := ""
 	notifierNote := ""
-	if line, ok := h.(harness.StatusLiner); ok && !f.noStatusLine {
-		statusLineNote, _ = installHarnessStatusLine(h, line, cmd.ErrOrStderr())
+	if line, ok := registered.Find[agents.StatusLiner](h.Name()); ok && !f.noStatusLine {
+		statusLineNote, _ = installHarnessStatusLine(line, cmd.ErrOrStderr())
 	}
-	if notifier, ok := h.(harness.TurnNotifier); ok {
+	if notifier, ok := registered.Find[agents.Notifier](h.Name()); ok {
 		switch changed, err := notifier.InstallNotifier(); {
 		case err != nil:
 			fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not install %s's funding notifier (%v).\n", h.DisplayName(), err)
@@ -611,20 +612,17 @@ func backupHarnessConfig(h harness.Harness, endpoint string) (string, error) {
 // line and returns the line to say about it, and whether it is in place. A failure is a
 // warning, never a failed connect: the exporters are already written and working.
 func installStatusLine(errOut io.Writer) (string, bool) {
-	a, s, ok := statusLineAgent()
+	s, ok := statusLineAgent()
 	if !ok {
 		return "", false
 	}
-	return installHarnessStatusLine(a, s, errOut)
+	return installHarnessStatusLine(s, errOut)
 }
 
-func installHarnessStatusLine(agent interface {
-	Name() string
-	DisplayName() string
-}, c harness.StatusLiner, errOut io.Writer) (string, bool) {
+func installHarnessStatusLine(c agents.StatusLiner, errOut io.Writer) (string, bool) {
 	changed, err := c.InstallStatusLine()
 	if err != nil {
-		fmt.Fprintf(errOut, "Warning: could not wrap %s's status line (%v); plan usage will not be captured.\n", agent.DisplayName(), err)
+		fmt.Fprintf(errOut, "Warning: could not wrap %s's status line (%v); plan usage will not be captured.\n", c.DisplayName(), err)
 		return "", false
 	}
 	st, stErr := c.StatusLineState("")
@@ -634,7 +632,7 @@ func installHarnessStatusLine(agent interface {
 	case changed && st.Renderer != "":
 		return fmt.Sprintf("Status line: terma now reads the plan's usage windows from it; your own status line (%s) keeps running unchanged behind it.", output.SanitizeTerminal(st.Renderer)), true
 	case changed:
-		return "Status line: terma added one that shows model, context, cost and the plan's usage windows (remove it with `terma disconnect " + agent.Name() + "`, or skip it with --no-statusline).", true
+		return "Status line: terma added one that shows model, context, cost and the plan's usage windows (remove it with `terma disconnect " + c.Name() + "`, or skip it with --no-statusline).", true
 	default:
 		return "Status line: already wrapped by terma.", true
 	}

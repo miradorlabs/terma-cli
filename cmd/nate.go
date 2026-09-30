@@ -15,7 +15,6 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/output"
 )
 
@@ -76,20 +75,18 @@ func runNate(cmd *cobra.Command) error {
 			fmt.Fprintf(out, "Restored %s settings.\n", h.DisplayName())
 		}
 	}
-	for _, e := range registered.With[agents.Exporting]() {
-		if s, ok := e.Harness().(harness.StatusLiner); ok {
-			if restored, err := s.RemoveStatusLine(); err != nil {
-				return fmt.Errorf("restore %s status line: %w", e.DisplayName(), err)
-			} else if restored {
-				fmt.Fprintf(out, "Restored the %s status line.\n", e.DisplayName())
-			}
+	for _, s := range registered.With[agents.StatusLiner]() {
+		if restored, err := s.RemoveStatusLine(); err != nil {
+			return fmt.Errorf("restore %s status line: %w", s.DisplayName(), err)
+		} else if restored {
+			fmt.Fprintf(out, "Restored the %s status line.\n", s.DisplayName())
 		}
-		if n, ok := e.Harness().(harness.TurnNotifier); ok {
-			if restored, err := n.RemoveNotifier(); err != nil {
-				return fmt.Errorf("restore %s notifier: %w", e.DisplayName(), err)
-			} else if restored {
-				fmt.Fprintf(out, "Restored the %s notifier.\n", e.DisplayName())
-			}
+	}
+	for _, n := range registered.With[agents.Notifier]() {
+		if restored, err := n.RemoveNotifier(); err != nil {
+			return fmt.Errorf("restore %s notifier: %w", n.DisplayName(), err)
+		} else if restored {
+			fmt.Fprintf(out, "Restored the %s notifier.\n", n.DisplayName())
 		}
 	}
 

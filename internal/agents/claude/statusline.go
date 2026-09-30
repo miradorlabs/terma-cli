@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/harness"
@@ -285,12 +286,12 @@ func (c exporter) RemoveStatusLine() (bool, error) {
 
 // StatusLineState reports the file's status line as Terma sees it. cwd names
 // the repository whose project and local settings are checked for an override.
-func (c exporter) StatusLineState(cwd string) (harness.StatusLineState, error) {
+func (c exporter) StatusLineState(cwd string) (agents.StatusLineState, error) {
 	path, err := c.ConfigPath()
 	if err != nil {
-		return harness.StatusLineState{}, err
+		return agents.StatusLineState{}, err
 	}
-	st := harness.StatusLineState{ConfigPath: path}
+	st := agents.StatusLineState{ConfigPath: path}
 	s, err := loadSettings(path)
 	if err != nil {
 		return st, err

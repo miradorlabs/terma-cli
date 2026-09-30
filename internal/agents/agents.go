@@ -1,6 +1,3 @@
-// Package agents is the contract a coding agent implements and the registry of the
-// agents a build of terma knows. Each agent lives in its own package below this one;
-// package builtin registers them.
 package agents
 
 import (
@@ -31,72 +28,6 @@ type Agent interface {
 	FlushAfter() []string
 }
 
-// Surface is one way a developer runs an agent, chosen on its own at setup: Codex's CLI
-// and its desktop app are two.
-type Surface struct {
-	Name, DisplayName string
-	Installed         func(context.Context) bool
-	// Needs is what an install must give the surface for it to report at all.
-	Needs Needs
-	// InstallSteps and SetupSteps are what the developer does next for it to report.
-	InstallSteps, SetupSteps []string
-	// Reports says, after an install, how the surface's sessions reach Terma.
-	Reports string
-	// Warn is a condition on this machine the developer should know about, continuing a
-	// sentence that starts with the agent's name; "" when there is none.
-	Warn func() string
-}
-
-// Needs is what a surface cannot report without.
-type Needs struct {
-	Signals []string
-	// Hooks: the agent's committed hooks, wired and applied.
-	Hooks bool
-}
-
-// Surfaced is an agent run as more than one surface.
-type Surfaced interface {
-	Surfaces() []Surface
-}
-
-// TrustState is whether an agent will run the hooks a repository commits. Detail
-// continues a sentence ending in "<agent> hooks present"; Fix applies when not Trusted.
-type TrustState struct {
-	Trusted bool
-	Detail  string
-	Fix     string
-}
-
-// Trusting is an agent that runs committed hooks only once the developer trusts them.
-type Trusting interface {
-	Agent
-	Trust(root string) (TrustState, error)
-}
-
-// UserHooks is an agent whose machine-wide hooks global mode writes.
-type UserHooks interface {
-	Agent
-	UserHooksPath() (string, error)
-	PlanUserHooks(dir string, command func(string) string, install bool) (hookmgr.Plan, error)
-}
-
-// UserHooksTrust is an agent that runs its machine-wide hooks only once the developer
-// trusts them; UserHooksTrustStep says how.
-type UserHooksTrust interface {
-	UserHooksTrustStep() string
-}
-
-// ManagedHooks is an agent whose machine-wide hooks an organization can deploy.
-type ManagedHooks interface {
-	Agent
-	// ManagedHookFiles are where an administrator deploys them, under root.
-	ManagedHookFiles(root string) []string
-	// ManagedConfig is the file an organization deploys, by the name it is written as.
-	ManagedConfig(command func(event string) string) (name string, data []byte, err error)
-	// ManagedDeploy says where that file goes, as Markdown.
-	ManagedDeploy() string
-}
-
 // Selections is every name a developer may select a under, its own first.
 func Selections(a Agent) []string {
 	var out []string
@@ -104,14 +35,6 @@ func Selections(a Agent) []string {
 		out = append(out, s.Name)
 	}
 	return out
-}
-
-// Surfaces is a's surfaces: its own, or the agent itself as its one.
-func Surfaces(a Agent) []Surface {
-	if s, ok := a.(Surfaced); ok {
-		return s.Surfaces()
-	}
-	return []Surface{{Name: a.Name(), DisplayName: a.DisplayName(), Installed: a.Installed}}
 }
 
 // Wired reports whether root's committed hooks file carries a's entries. A file that
@@ -122,70 +45,4 @@ func Wired(root string, a Agent) bool {
 	}
 	plan, err := a.Plan(root, false)
 	return err != nil || !plan.Empty()
-}
-
-// PayloadReader is an agent whose hook payloads name their session in keys of their own;
-// the others' are read by hookrun.ReadPayloadSession.
-type PayloadReader interface {
-	PayloadSession(payload []byte) (hookrun.PayloadSession, bool)
-}
-
-// MachineRefresher is an agent with home-directory files terma rewrites to this build's
-// templates on `terma update --refresh`. It rewrites only a file terma wrote, never
-// creates one, and reports the path it changed.
-type MachineRefresher interface {
-	Agent
-	RefreshMachine() (path string, changed bool, err error)
-}
-
-// RenderHandler is a hook that draws something; its result is the process's exit status.
-type RenderHandler = func(context.Context, hookrun.Env) int
-
-// Renderer is an agent with hooks that render another command's output. They run even
-// with hooks switched off, capturing nothing (env.Spool is nil), never claim a session,
-// and end the process with their own exit status.
-type Renderer interface {
-	Renders() map[string]RenderHandler
-}
-
-// OffSwitched is an agent with events that still owe the developer something when hooks
-// are switched off: what they run instead.
-type OffSwitched interface {
-	WhenHooksOff() map[string]Handler
-}
-
-// ContentConsent is an agent whose hooks spool what was said (a reply, a thread's name),
-// under a consent of its own beyond the organization's prompt policy, checked again at
-// every delivery.
-type ContentConsent interface {
-	ContentConsented(projectID string, global bool) bool
-}
-
-// Retrusting is an agent that runs a changed committed hook only after the developer
-// trusts it again; RetrustNote says so when a refresh rewrote the file.
-type Retrusting interface {
-	Agent
-	RetrustNote() string
-}
-
-// SurfaceStatus is what a surface's own check found in a repository.
-type SurfaceStatus struct {
-	// Ready: the surface's sessions here reach Terma.
-	Ready bool
-	// Problem says why they do not, and Fix what to run.
-	Problem, Fix string
-	// Lines are what `terma agent status` prints, in order.
-	Lines []StatusLine
-}
-
-// StatusLine is one labelled line of a surface's status.
-type StatusLine struct{ Label, Value string }
-
-// SurfaceChecker is an agent whose surfaces check their own readiness in a repository.
-type SurfaceChecker interface {
-	Agent
-	// CheckedSurfaces names the surfaces with a check.
-	CheckedSurfaces() []string
-	// CheckSurface is one of them's status in the repository at root, bound to projectID.
-	CheckSurface(surface, root, projectID string) (SurfaceStatus, error)
 }

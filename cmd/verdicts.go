@@ -79,25 +79,24 @@ type statusLineVerdict struct {
 	renderer  string
 }
 
-// statusLineAgent is the agent whose status line terma wraps, and its harness.
-func statusLineAgent() (agents.Exporting, harness.StatusLiner, bool) {
-	for _, e := range registered.With[agents.Exporting]() {
-		if s, ok := e.Harness().(harness.StatusLiner); ok {
-			return e, s, true
-		}
+// statusLineAgent is the agent whose status line terma wraps.
+func statusLineAgent() (agents.StatusLiner, bool) {
+	s := registered.With[agents.StatusLiner]()
+	if len(s) == 0 {
+		return nil, false
 	}
-	return nil, nil, false
+	return s[0], true
 }
 
 func judgeStatusLine(repoRoot string) statusLineVerdict {
-	_, s, ok := statusLineAgent()
+	s, ok := statusLineAgent()
 	if !ok {
 		return statusLineVerdict{}
 	}
 	return classifyStatusLine(s.StatusLineState(repoRoot))
 }
 
-func classifyStatusLine(st harness.StatusLineState, err error) statusLineVerdict {
+func classifyStatusLine(st agents.StatusLineState, err error) statusLineVerdict {
 	v := statusLineVerdict{err: err, overrides: st.Overrides, renderer: st.Renderer}
 	switch {
 	case err != nil:
@@ -177,7 +176,7 @@ func emissionProblem(h harness.Harness, root, projectID string, f *harnessFacts)
 		return "", ""
 	}
 	st := f.status
-	if c, ok := h.(harness.EmissionChecker); ok {
+	if c, ok := registered.Find[agents.EmissionChecker](h.Name()); ok {
 		name := h.DisplayName()
 		effective, err := c.EmissionStatus(root)
 		if err != nil {

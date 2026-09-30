@@ -6,6 +6,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -14,6 +15,8 @@ import (
 	"strings"
 	"testing"
 	"unicode"
+
+	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
 )
 
 var list = flag.Bool("mentions", false, "log every mention of an agent the test finds")
@@ -21,7 +24,9 @@ var list = flag.Bool("mentions", false, "log every mention of an agent the test 
 const module = "github.com/miradorlabs/terma-cli"
 
 // agents are the coding agents terma integrates with, by the name their package takes.
-var agents = []string{"claude", "codex", "cursor", "antigravity", "opencode", "omp", "pi", "hermes", "gemini", "dsh"}
+// agents are every registered agent's name: the package it lives in, and the word that
+// names it.
+var agents = builtin.Agents().Names()
 
 // agentPackage reports the agent an import path belongs to: internal/agents/<name> and
 // anything below it.
@@ -118,6 +123,24 @@ func TestAgentPackagesAreImportedOnlyByTheRegistry(t *testing.T) {
 	}
 }
 
+// Every package directly under internal/agents is an agent the build registers, the
+// registry itself, or code agents share: an agent left out of builtin would be neither
+// wired nor guarded.
+func TestEveryAgentPackageIsRegistered(t *testing.T) {
+	entries, err := os.ReadDir(filepath.Join(repoRoot(t), "internal", "agents"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if !e.IsDir() || e.Name() == "builtin" || e.Name() == "internal" {
+			continue
+		}
+		if !slices.Contains(agents, e.Name()) {
+			t.Errorf("internal/agents/%s is not registered in internal/agents/builtin", e.Name())
+		}
+	}
+}
+
 // TestNothingElseNamesAnAgent finds, in every shipped file outside an agent's package,
 // the identifiers and strings that name an agent. There are none: what the core needs of
 // an agent it asks through internal/agents.
@@ -151,7 +174,7 @@ func TestNothingElseNamesAnAgent(t *testing.T) {
 	}
 }
 
-var agentWord = regexp.MustCompile(`(?i)(^|[^a-z])(claude|codex|cursor|antigravity|opencode|omp|pi|hermes|gemini|dsh)([^a-z]|$)`)
+var agentWord = regexp.MustCompile(`(?i)(^|[^a-z])(` + strings.Join(agents, "|") + `)([^a-z]|$)`)
 
 // mentions counts the identifiers and string literals in a file that name an agent.
 // Comments are prose and do not count.

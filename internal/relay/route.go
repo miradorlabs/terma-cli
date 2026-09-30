@@ -59,8 +59,8 @@ const (
 	whyProcessRunning = "process_running"    // no session named; attributed only once its process exits
 )
 
-// procPrefix keys a part that names no session and no trace — Codex's metrics — by
-// the process that sent it.
+// procPrefix keys a part that names no session and no trace (an agent's process-level
+// metrics) by the process that sent it.
 const procPrefix = "proc:"
 
 func procKey(pid int) string { return procPrefix + strconv.Itoa(pid) }
@@ -97,12 +97,12 @@ type attribution struct {
 //
 // A part is placed only by what it, or its trace, names. A span of a trace nothing has
 // named waits for the trace to be named (TraceHold): a long turn's child spans precede
-// the span that names the session. What never names a session — Codex's metrics, its
-// process-level spans (auth, file stats) — waits for its process to exit, and goes to
-// that process's project only when the process named exactly one session in its life
-// and that session is claimed (decideExited). Nothing is attributed while the process
-// runs: a shared process (Codex's app-server) that has shown one claimed session may be
-// about to name a personal one. The shared daemon rarely exits, so its unnamed work is
+// the span that names the session. What never names a session (process-level metrics
+// and spans) waits for its process to exit, and goes to that process's project only
+// when the process named exactly one session in its life and that session is claimed
+// (decideExited). Nothing is attributed while the process runs: a process shared by
+// several sessions that has shown one claimed session may be about to name a personal
+// one. The shared daemon rarely exits, so its unnamed work is
 // dropped when its hold runs out: loss, never a guess.
 func (r *Relay) decide(key string, pid int, at time.Time) (claim.Claim, Policy, string, bool, attribution) {
 	if c, global := r.catchAll(); global {

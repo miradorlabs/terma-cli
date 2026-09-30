@@ -168,11 +168,10 @@ func (e Env) EmitFor(r *Repo, ev spool.Event) {
 }
 
 // claimForRelay records, for the local relay, that the event's session belongs to the
-// repository's project. Every adapter's events pass through emitFor, so any hook of a
-// session claims it, not only its start: a Codex session whose hooks were trusted
-// mid-way, a Cursor session that skipped sessionStart, a resumed conversation. A
-// repository without a binding claims nothing, and neither does a machine that never
-// ran `terma relay setup`.
+// repository's project. Every handler's events pass through EmitFor, so any hook of a
+// session claims it, not only its start: a session whose hooks were trusted mid-way,
+// one whose start hook never fired, a resumed conversation. A repository without a
+// binding claims nothing, and neither does a machine that never ran `terma relay setup`.
 func (e Env) claimForRelay(r *Repo, ev spool.Event) {
 	if r == nil || r.ProjectID == "" || ev.SessionID == "" || !claim.Enabled() {
 		return
@@ -180,11 +179,10 @@ func (e Env) claimForRelay(r *Repo, ev spool.Event) {
 	tool, _ := ev.Attrs[AttrTool].(string)
 	c := claim.Claim{ProjectID: r.ProjectID, Tool: tool, Repo: r.Name, Worktree: r.Worktree, PIDs: claimPIDs()}
 	claim.Write(ev.SessionID, c, e.Time())
-	// A Codex subagent is a thread of its own: its hooks carry the root's session and the
-	// child thread as agent_id, and its telemetry the child's conversation.id. Claimed
-	// only under the root, everything the subagent did would be dropped. (Claude's
-	// subagents export under the parent's session.id; claiming their agent_id too is
-	// harmless — no export names it.)
+	// A subagent whose telemetry names its own id (agent_id) as its session is claimed
+	// under that id too; claimed only under the root, everything it did would be dropped.
+	// Where a subagent exports under its parent's session, the extra claim is harmless:
+	// no export names it.
 	if agent, _ := ev.Attrs[AttrAgentID].(string); agent != "" && agent != ev.SessionID {
 		claim.Write(agent, c, e.Time())
 	}

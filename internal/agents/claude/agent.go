@@ -91,7 +91,28 @@ func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
 		agents.CapabilitySupport{Level: agents.SupportFull}
 }
 
+// InstallStatusLine wraps the status line.
+func (Agent) InstallStatusLine() (bool, error) { return exporter{}.InstallStatusLine() }
+
+// StatusLineState reports the status line as terma sees it from cwd.
+func (Agent) StatusLineState(cwd string) (agents.StatusLineState, error) {
+	return exporter{}.StatusLineState(cwd)
+}
+
+// RemoveStatusLine puts back the status line terma wrapped.
+func (Agent) RemoveStatusLine() (bool, error) { return exporter{}.RemoveStatusLine() }
+
+// EmissionStatus reads the user and repository settings together.
+func (Agent) EmissionStatus(root string) (harness.Status, error) {
+	return exporter{}.EmissionStatus(root)
+}
+
+// TelemetrySwitch is Claude Code's master switch.
+func (Agent) TelemetrySwitch() string { return exporter{}.TelemetrySwitch() }
+
 var (
+	_ agents.StatusLiner      = Agent{}
+	_ agents.EmissionChecker  = Agent{}
 	_ agents.Covered          = Agent{}
 	_ agents.Renderer         = Agent{}
 	_ agents.MachineRefresher = Agent{}

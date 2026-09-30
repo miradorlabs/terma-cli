@@ -918,3 +918,12 @@ func projectIDOf(j *harness.Journal) string {
 	}
 	return ""
 }
+
+// A capability asked for by type assertion switches off in silence when its method
+// drifts; these make that a build error.
+var (
+	_ harness.Harness      = exporter{}
+	_ harness.Credentialed = exporter{}
+	_ harness.Backuper     = exporter{}
+	_ harness.Scoped       = exporter{}
+)
