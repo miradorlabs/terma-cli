@@ -150,7 +150,7 @@ func (e Env) captureObservation(ctx context.Context, r *repo, o observation) {
 		e.logf("%s checkpoint: %v", o.tool, err)
 	}
 	if fresh {
-		pruneQuotaState(dir, e.now().Add(-spool.MaxAge))
+		pruneState(dir, e.now().Add(-spool.MaxAge))
 	}
 }
 

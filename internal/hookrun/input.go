@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 )
 
 // maxHookInput bounds the payload a harness writes to a hook's stdin. Real payloads are
@@ -31,4 +32,15 @@ func readHookInput[T any](r io.Reader) (*T, error) {
 		return nil, fmt.Errorf("parse hook input: %w", err)
 	}
 	return &in, nil
+}
+
+func jsonNumber(raw json.RawMessage, integer bool) (float64, bool, bool) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return 0, false, false
+	}
+	var value float64
+	if json.Unmarshal(raw, &value) != nil || math.IsNaN(value) || math.IsInf(value, 0) || value < 0 || value > 9007199254740991 || (integer && math.Trunc(value) != value) {
+		return 0, true, false
+	}
+	return value, true, true
 }

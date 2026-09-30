@@ -47,7 +47,6 @@ func agentPackage(path string) (string, bool) {
 // identities, and these tests' own fixtures.
 var mayNameAgents = map[string]string{
 	module + "/internal/adapter":  "the registry: it lists every agent",
-	module + "/internal/agentid":  "the identities every package may name",
 	module + "/internal/contract": "byte snapshots, named by agent",
 	module + "/internal/boundary": "this test",
 }
@@ -122,8 +121,9 @@ func TestAgentPackagesAreImportedOnlyByTheRegistry(t *testing.T) {
 }
 
 // TestAgentMentionsOnlyShrink counts, in every shipped file outside an agent's package,
-// the identifiers and strings that name an agent, and holds each file to its count in
-// testdata/leaks.txt.
+// the identifiers and strings that name an agent, and holds each package to its count
+// in testdata/leaks.txt. A package, not a file: splitting a file is how code gets ready
+// to move.
 func TestAgentMentionsOnlyShrink(t *testing.T) {
 	root := repoRoot(t)
 	got := map[string]int{}
@@ -142,7 +142,7 @@ func TestAgentMentionsOnlyShrink(t *testing.T) {
 				continue
 			}
 			if n := mentions(t, path); n > 0 {
-				got[rel] = n
+				got[filepath.ToSlash(filepath.Dir(rel))] += n
 			}
 		}
 	}
@@ -157,7 +157,7 @@ func TestAgentMentionsOnlyShrink(t *testing.T) {
 		total += n
 		switch was, ok := want[file]; {
 		case !ok:
-			t.Errorf("%s names an agent %d times: an agent's code belongs in internal/harness/<name>, its identity in internal/agentid", file, n)
+			t.Errorf("%s names an agent %d times: an agent's code belongs in internal/harness/<name>, and the registry (internal/adapter) is what lists them", file, n)
 		case n > was:
 			t.Errorf("%s names agents %d times, up from %d", file, n, was)
 		case n < was:
@@ -313,8 +313,8 @@ func writeBaseline(t *testing.T, path string, got map[string]int) {
 	}
 	sort.Strings(files)
 	var b strings.Builder
-	fmt.Fprintf(&b, "# Identifiers and strings naming a coding agent, per shipped file outside the\n")
-	fmt.Fprintf(&b, "# agents' own packages. This list only shrinks. Total: %d.\n", total)
+	fmt.Fprintf(&b, "# Identifiers and strings naming a coding agent, per package, in shipped files outside\n")
+	fmt.Fprintf(&b, "# the agents' own packages. This list only shrinks. Total: %d.\n", total)
 	for _, file := range files {
 		fmt.Fprintf(&b, "%d %s\n", got[file], file)
 	}

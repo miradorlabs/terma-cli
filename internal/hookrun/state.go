@@ -1,13 +1,18 @@
 package hookrun
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
 // State directories under the config dir. Each holds small files named by a hash,
-// with a `.lock` beside mutable checkpoints; pruneQuotaState ages them out. The
+// with a `.lock` beside mutable checkpoints; pruneState ages them out. The
 // names are on developers' disks already: renaming one orphans its files and restarts
 // every sequence and cursor kept there.
 const (
@@ -68,4 +73,49 @@ const (
 // milliseconds against a fifth of one, on every tool call, inside the agent's turn.
 func writeState(path string, data []byte) error {
 	return config.WriteFileAtomicNoSync(path, data, 0o600)
+}
+
+func evidenceID(s string) string { h := sha256.Sum256([]byte(s)); return hex.EncodeToString(h[:]) }
+
+// quotaHeartbeat is how often an unchanged snapshot is re-sent, so the backend
+// can tell "no change" from "no status line".
+const quotaHeartbeat = 10 * time.Minute
+
+// pruneState ages out a state directory: every `<id>.json` last written before the
+// cutoff, and then the `<id>.json.lock` beside it. The locks used to be left behind —
+// one per session, for ever — because only the data files were matched.
+//
+// A lock goes only when all three hold: it is past the cutoff itself, its data file is
+// gone, and nothing holds it (the prune takes it before unlinking). A lock's mtime is
+// its creation, so a session that outlives the cutoff keeps its lock through its data
+// file, which every write refreshes.
+func pruneState(dir string, before time.Time) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	var locks []string
+	for _, ent := range entries {
+		info, err := ent.Info()
+		if err != nil || ent.IsDir() || !info.ModTime().Before(before) {
+			continue
+		}
+		switch name := ent.Name(); {
+		case strings.HasSuffix(name, ".json"):
+			_ = os.Remove(filepath.Join(dir, name))
+		case strings.HasSuffix(name, ".json.lock"):
+			locks = append(locks, filepath.Join(dir, name))
+		}
+	}
+	for _, lock := range locks {
+		if _, err := os.Lstat(strings.TrimSuffix(lock, ".lock")); !os.IsNotExist(err) {
+			continue
+		}
+		unlock, err := lockEvidence(lock)
+		if err != nil {
+			continue
+		}
+		_ = os.Remove(lock)
+		unlock()
+	}
 }

@@ -73,7 +73,7 @@ func cursorToolCallAttrs(in *cursorHookInput, hook string) (map[string]any, bool
 	cursorModelParams(in, a)
 	// Cursor reports the tool's execution time in milliseconds. Missing stays missing;
 	// a value that is not a non-negative integer is reported as invalid, not repaired.
-	if value, present, ok := cursorNumber(in.Duration, true); ok {
+	if value, present, ok := jsonNumber(in.Duration, true); ok {
 		a["duration_ms"] = int64(value)
 	} else if present {
 		a["duration_status"] = "invalid"

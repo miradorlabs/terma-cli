@@ -52,7 +52,7 @@ func TestPruneRetiresOrphanedLocks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pruneQuotaState(dir, cutoff)
+	pruneState(dir, cutoff)
 	unlock()
 
 	for name, want := range map[string]bool{

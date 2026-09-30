@@ -159,7 +159,7 @@ func CodexSessionStart(ctx context.Context, env Env) error {
 	if _, desktop := codexDesktopRoute(r); desktop {
 		attrs["capture_surface"] = codexDesktopSurface
 		if dir, err := config.Dir(); err == nil {
-			pruneQuotaState(filepath.Join(dir, codexToolStartDir), env.now().Add(-spool.MaxAge))
+			pruneState(filepath.Join(dir, codexToolStartDir), env.now().Add(-spool.MaxAge))
 		}
 	}
 	// Codex's source dispatches no SessionStart for a thread another thread spawned: the

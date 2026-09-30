@@ -96,7 +96,7 @@ func AntigravityPreInvocation(ctx context.Context, env Env) error {
 		env.logf("%v", err)
 		return nil
 	}
-	invocation, _, invocationKnown := cursorNumber(in.InvocationNum, true)
+	invocation, _, invocationKnown := jsonNumber(in.InvocationNum, true)
 	if invocationKnown && invocation != 0 {
 		// A model call in the middle of a turn: nothing about the session changes.
 		return nil
@@ -116,7 +116,7 @@ func AntigravityPreInvocation(ctx context.Context, env Env) error {
 	env.setActive(r, sess)
 	turn := env.beginAntigravityTurn(r, in)
 	// A later turn, or a resumed conversation, was announced before.
-	if steps, _, stepsKnown := cursorNumber(in.InitialNumSteps, true); !stepsKnown || steps <= 1 {
+	if steps, _, stepsKnown := jsonNumber(in.InitialNumSteps, true); !stepsKnown || steps <= 1 {
 		env.pruneManifests(r, now)
 		env.emitStart(r, sess, nil)
 	}
@@ -222,7 +222,7 @@ func antigravityToolCallAttrs(in *antigravityHookInput, turn string) (map[string
 	if in.ToolCall != nil && shortLabel(in.ToolCall.Name) {
 		a[attrToolName] = in.ToolCall.Name
 	}
-	if step, _, ok := cursorNumber(in.StepIdx, true); ok {
+	if step, _, ok := jsonNumber(in.StepIdx, true); ok {
 		a["step_idx"] = int64(step)
 		a[attrToolCallID] = "step-" + strconv.FormatUint(uint64(step), 10)
 	}
@@ -296,7 +296,7 @@ func antigravityObservationAttrs(in *antigravityHookInput, hook, turn string) ma
 	for k, v := range map[string]json.RawMessage{
 		"invocation_num": in.InvocationNum, "initial_num_steps": in.InitialNumSteps, "execution_num": in.ExecutionNum,
 	} {
-		if value, _, ok := cursorNumber(v, true); ok {
+		if value, _, ok := jsonNumber(v, true); ok {
 			a[k] = int64(value)
 		}
 	}

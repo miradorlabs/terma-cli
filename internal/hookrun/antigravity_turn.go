@@ -46,7 +46,7 @@ func (e Env) beginAntigravityTurn(r *repo, in *antigravityHookInput) string {
 	if err != nil {
 		return ""
 	}
-	steps, _, ok := cursorNumber(in.InitialNumSteps, true)
+	steps, _, ok := jsonNumber(in.InitialNumSteps, true)
 	if !ok {
 		_ = os.Remove(path)
 		return ""
@@ -67,7 +67,7 @@ func (e Env) beginAntigravityTurn(r *repo, in *antigravityHookInput) string {
 		return ""
 	}
 	if os.IsNotExist(statErr) {
-		pruneQuotaState(dir, e.now().Add(-spool.MaxAge))
+		pruneState(dir, e.now().Add(-spool.MaxAge))
 	}
 	return turn.TurnID
 }

@@ -98,10 +98,6 @@ func statusLineRendererTimeout(override time.Duration) time.Duration {
 	return defaultRendererTimeout
 }
 
-// quotaHeartbeat is how often an unchanged snapshot is re-sent, so the backend
-// can tell "no change" from "no status line".
-const quotaHeartbeat = 10 * time.Minute
-
 // statusLinePayload is the allowlisted subset of what Claude Code writes. Every
 // other field is ignored; nothing here is content.
 type statusLinePayload struct {
@@ -500,45 +496,6 @@ func writeQuotaState(path string, s quotaState) {
 	}
 	_ = writeState(path, data)
 	if fresh {
-		pruneQuotaState(dir, s.EmittedAt.Add(-snapshotStateRetention))
-	}
-}
-
-// pruneQuotaState ages out a state directory: every `<id>.json` last written before the
-// cutoff, and then the `<id>.json.lock` beside it. The locks used to be left behind —
-// one per session, for ever — because only the data files were matched.
-//
-// A lock goes only when all three hold: it is past the cutoff itself, its data file is
-// gone, and nothing holds it (the prune takes it before unlinking). A lock's mtime is
-// its creation, so a session that outlives the cutoff keeps its lock through its data
-// file, which every write refreshes.
-func pruneQuotaState(dir string, before time.Time) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return
-	}
-	var locks []string
-	for _, ent := range entries {
-		info, err := ent.Info()
-		if err != nil || ent.IsDir() || !info.ModTime().Before(before) {
-			continue
-		}
-		switch name := ent.Name(); {
-		case strings.HasSuffix(name, ".json"):
-			_ = os.Remove(filepath.Join(dir, name))
-		case strings.HasSuffix(name, ".json.lock"):
-			locks = append(locks, filepath.Join(dir, name))
-		}
-	}
-	for _, lock := range locks {
-		if _, err := os.Lstat(strings.TrimSuffix(lock, ".lock")); !os.IsNotExist(err) {
-			continue
-		}
-		unlock, err := lockEvidence(lock)
-		if err != nil {
-			continue
-		}
-		_ = os.Remove(lock)
-		unlock()
+		pruneState(dir, s.EmittedAt.Add(-snapshotStateRetention))
 	}
 }

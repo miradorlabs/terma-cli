@@ -2,8 +2,6 @@ package hookrun
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -44,7 +42,7 @@ func (e Env) captureCodexFunding(ctx context.Context, r *repo, in *codexHookInpu
 	// A session's first capture is when the directory is swept, as for reply cursors:
 	// nothing else ever removed a finished session's cursor.
 	if os.IsNotExist(cursorErr) {
-		defer pruneQuotaState(filepath.Dir(path), e.now().Add(-spool.MaxAge))
+		defer pruneState(filepath.Dir(path), e.now().Add(-spool.MaxAge))
 	}
 	// Resolve the funding owner once (not per evidence): Codex's ChatGPT account, and only when the
 	// session is on the subscription route. Empty on the API-key route or when unreadable — never a
@@ -103,5 +101,3 @@ func (e Env) captureCodexFunding(ctx context.Context, r *repo, in *codexHookInpu
 		e.captureFunding(r, in.SessionID, codexTool, name, harness.FundingEvidence{Source: sourceCodexRollout, Status: status, Attrs: agentAttrs(map[string]any{"source_offset": next.Offset}, in.AgentID, in.AgentType)})
 	}
 }
-
-func evidenceID(s string) string { h := sha256.Sum256([]byte(s)); return hex.EncodeToString(h[:]) }

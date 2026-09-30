@@ -88,7 +88,7 @@ func (e Env) captureCodexReplies(ctx context.Context, r *repo, in *codexHookInpu
 		}
 	}
 	if os.IsNotExist(readErr) {
-		pruneQuotaState(dir, e.now().Add(-spool.MaxAge))
+		pruneState(dir, e.now().Add(-spool.MaxAge))
 	}
 }
 
