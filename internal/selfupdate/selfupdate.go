@@ -9,6 +9,7 @@ package selfupdate
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"bufio"
 	"bytes"
 	"compress/gzip"
@@ -22,6 +23,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -196,9 +198,6 @@ func (c *Client) Apply(ctx context.Context, rel *Release, exePath string, out io
 	if err != nil {
 		return "", err
 	}
-	if runtime.GOOS == "windows" {
-		return "", errors.New("self-update is not supported on Windows yet — download the release from https://github.com/" + Repo + "/releases")
-	}
 	sumsBody, err := c.get(ctx, sums.URL)
 	if err != nil {
 		return "", err
@@ -218,7 +217,7 @@ func (c *Client) Apply(ctx context.Context, rel *Release, exePath string, out io
 	if hex.EncodeToString(got[:]) != want {
 		return "", fmt.Errorf("checksum mismatch for %s — refusing to install", archive.Name)
 	}
-	binary, err := extractBinary(data)
+	binary, err := extractBinaryFor(runtime.GOOS, data)
 	if err != nil {
 		return "", err
 	}
@@ -291,6 +290,30 @@ func isGitHubHost(host string) bool {
 	return false
 }
 
+// extractBinaryFor pulls the executable out of goos's release archive: a zip holding
+// terma.exe on Windows (.goreleaser.yaml's format_overrides), a tar.gz holding terma
+// elsewhere.
+func extractBinaryFor(goos string, archive []byte) ([]byte, error) {
+	if goos != "windows" {
+		return extractBinary(archive)
+	}
+	zr, err := zip.NewReader(bytes.NewReader(archive), int64(len(archive)))
+	if err != nil {
+		return nil, fmt.Errorf("open archive: %w", err)
+	}
+	for _, f := range zr.File {
+		if f.FileInfo().Mode().IsRegular() && path.Base(f.Name) == BinaryName+".exe" {
+			rc, err := f.Open()
+			if err != nil {
+				return nil, fmt.Errorf("read archive: %w", err)
+			}
+			defer func() { _ = rc.Close() }()
+			return io.ReadAll(io.LimitReader(rc, maxDownload))
+		}
+	}
+	return nil, errors.New("archive does not contain terma.exe")
+}
+
 // extractBinary pulls the terma executable out of a tar.gz release archive.
 func extractBinary(archive []byte) ([]byte, error) {
 	gz, err := gzip.NewReader(bytes.NewReader(archive))
@@ -344,8 +367,28 @@ func replaceExecutable(exePath string, binary []byte) error {
 		_ = os.Remove(name)
 		return err
 	}
-	if err := os.Rename(name, exePath); err != nil {
+	if err := swapExecutable(runtime.GOOS, name, exePath); err != nil {
 		_ = os.Remove(name)
+		return err
+	}
+	return nil
+}
+
+// swapExecutable renames the new binary over the old one. Unix replaces a running
+// executable in one rename. Windows refuses to replace a file that is running, but lets
+// it be renamed: the old one steps aside to <exe>.old — removed by the next update, once
+// nothing runs it — and the new one takes its name (from PR #28).
+func swapExecutable(goos, next, exePath string) error {
+	if goos != "windows" {
+		return os.Rename(next, exePath)
+	}
+	old := exePath + ".old"
+	_ = os.Remove(old)
+	if err := os.Rename(exePath, old); err != nil {
+		return fmt.Errorf("move the running terma aside: %w", err)
+	}
+	if err := os.Rename(next, exePath); err != nil {
+		_ = os.Rename(old, exePath)
 		return err
 	}
 	return nil

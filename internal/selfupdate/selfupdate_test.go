@@ -2,6 +2,7 @@ package selfupdate
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -83,12 +84,29 @@ func archiveWith(t *testing.T, name string, content []byte) []byte {
 	return buf.Bytes()
 }
 
-func TestApplyVerifiesChecksumAndSwapsBinary(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("no self-update on windows")
+func zipWith(t *testing.T, name string, content []byte) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	w, err := zw.Create(name)
+	if err != nil {
+		t.Fatal(err)
 	}
+	if _, err := w.Write(content); err != nil {
+		t.Fatal(err)
+	}
+	_ = zw.Close()
+	return buf.Bytes()
+}
+
+func TestApplyVerifiesChecksumAndSwapsBinary(t *testing.T) {
 	newBinary := []byte("#!/bin/sh\necho new\n")
 	archive := archiveWith(t, "terma", newBinary)
+	exeName := "terma"
+	if runtime.GOOS == "windows" {
+		archive = zipWith(t, "terma_Windows/terma.exe", newBinary)
+		exeName = "terma.exe"
+	}
 	sum := sha256.Sum256(archive)
 	assetName := AssetName(runtime.GOOS, runtime.GOARCH)
 
@@ -104,7 +122,7 @@ func TestApplyVerifiesChecksumAndSwapsBinary(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
-	exe := filepath.Join(t.TempDir(), "terma")
+	exe := filepath.Join(t.TempDir(), exeName)
 	if err := os.WriteFile(exe, []byte("old"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +143,7 @@ func TestApplyVerifiesChecksumAndSwapsBinary(t *testing.T) {
 		t.Fatalf("binary not replaced: %q", data)
 	}
 	info, _ := os.Stat(exe)
-	if info.Mode()&0o111 == 0 {
+	if runtime.GOOS != "windows" && info.Mode()&0o111 == 0 {
 		t.Fatal("replacement lost the executable bit")
 	}
 
@@ -137,6 +155,36 @@ func TestApplyVerifiesChecksumAndSwapsBinary(t *testing.T) {
 	}
 	if data, _ := os.ReadFile(exe); !bytes.Equal(data, newBinary) {
 		t.Fatal("a refused update must leave the binary untouched")
+	}
+}
+
+// Windows's release archive is a zip holding terma.exe; a zip without it is refused.
+func TestExtractBinaryReadsWindowsZip(t *testing.T) {
+	got, err := extractBinaryFor("windows", zipWith(t, "terma_Windows_x86_64/terma.exe", []byte("exe")))
+	if err != nil || string(got) != "exe" {
+		t.Fatalf("extract: %q, %v", got, err)
+	}
+	if _, err := extractBinaryFor("windows", zipWith(t, "README.md", []byte("x"))); err == nil {
+		t.Fatal("a zip without terma.exe was accepted")
+	}
+}
+
+// Windows cannot replace a running executable, but can rename it: the old one steps
+// aside to .old (a previous .old is removed first) and the new one takes its name.
+func TestSwapExecutableMovesTheRunningOneAsideOnWindows(t *testing.T) {
+	dir := t.TempDir()
+	exe, next := filepath.Join(dir, "terma.exe"), filepath.Join(dir, ".terma-update-1")
+	_ = os.WriteFile(exe, []byte("old"), 0o755)
+	_ = os.WriteFile(exe+".old", []byte("older"), 0o755)
+	_ = os.WriteFile(next, []byte("new"), 0o755)
+	if err := swapExecutable("windows", next, exe); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(exe); string(data) != "new" {
+		t.Fatalf("terma.exe holds %q, want the new build", data)
+	}
+	if data, _ := os.ReadFile(exe + ".old"); string(data) != "old" {
+		t.Fatalf("terma.exe.old holds %q, want the build that was running", data)
 	}
 }
 
