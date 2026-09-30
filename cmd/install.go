@@ -176,14 +176,8 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	if err != nil {
 		return err
 	}
-	if slices.Contains(agents, codexDesktopAgent) {
-		signals, err := harness.ParseSignals(f.signals)
-		if err != nil {
-			return err
-		}
-		if !slices.Contains(signals, harness.SignalLogs) {
-			return errors.New("codex desktop needs the logs signal to route sessions by repository")
-		}
+	if err := checkSignalNeeds(agents, f.signals); err != nil {
+		return err
 	}
 
 	// 2. Auth. Every real install reads the team's policy, including hooks-only
@@ -275,8 +269,8 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	// overrides it — a colleague re-running install must not rewrite the committed hooks
 	// to match their own agent set.
 	adapters := installAdapters(root, agents, f.adapters)
-	if slices.Contains(agents, codexDesktopAgent) && !slices.Contains(adapters, routing.AgentCodex) {
-		return errors.New("codex desktop needs the Codex repository hooks; include codex in --adapters")
+	if err := checkHookNeeds(agents, adapters); err != nil {
+		return err
 	}
 	det := hookmgr.Detect(root)
 	if gitDir == "" {
@@ -287,14 +281,8 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 		if plan, err = planHooks(root, det, adapters); err != nil {
 			return err
 		}
-	} else if slices.Contains(agents, codexDesktopAgent) {
-		codexPlan, err := hookmgr.PlanCodexHooks(root, true)
-		if err != nil {
-			return err
-		}
-		if !codexPlan.Empty() {
-			return errors.New("codex desktop needs the SessionStart repository hook; run `terma install` without --no-hooks")
-		}
+	} else if err := checkHooksApplied(root, agents, "run `terma install` without --no-hooks"); err != nil {
+		return err
 	}
 
 	if f.dryRun {
@@ -311,8 +299,10 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 			}
 			fmt.Fprintf(out, "\nRepository telemetry: %s (preserve existing policy unless export flags are supplied).\n", path)
 		}
-		if slices.Contains(agents, codexDesktopAgent) {
-			fmt.Fprintln(out, "\nCodex Desktop: a real install writes repository hooks and a local project route. Then open Settings → Hooks → Review in Codex Desktop to approve the Terma entries; Codex CLI is not required.")
+		for _, s := range selectedSurfaces(agents) {
+			for _, step := range s.SetupSteps {
+				fmt.Fprintf(out, "\nAfter a real install — %s\n", step)
+			}
 		}
 		fmt.Fprintln(out, "\nDry run: nothing written.")
 		return nil
@@ -390,14 +380,8 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	} else {
 		adapters = registered.WiredNames(root) // --no-hooks: only what is already wired
 	}
-	if slices.Contains(agents, codexDesktopAgent) {
-		codexPlan, err := hookmgr.PlanCodexHooks(root, true)
-		if err != nil {
-			return err
-		}
-		if !codexPlan.Empty() {
-			return errors.New("codex desktop needs the SessionStart repository hook; run `terma install` without --no-hooks and accept the Codex hook plan")
-		}
+	if err := checkHooksApplied(root, agents, "run `terma install` without --no-hooks and accept the hook plan"); err != nil {
+		return err
 	}
 
 	// The key this machine delivers the repository's hook events with. Pointing a
@@ -467,15 +451,16 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 			return err
 		}
 	}
-	if slices.Contains(agents, codexDesktopAgent) {
-		fmt.Fprintln(ui.detail, "Codex Desktop captures this repository through trusted hooks and Terma's existing spool.")
-		ui.then("Approve Codex Desktop capture:\n" +
-			"a. Open this repository in Codex Desktop and trust the project if prompted.\n" +
-			"b. Open Settings → Hooks, then select Review for the entries from .codex/hooks.json.\n" +
-			"c. Inspect and approve each Terma hook command for full capture. Codex CLI is not required.\n" +
-			"d. Run `terma desktop status` to confirm 'Codex hooks: ready', then start a new Local task in this repository.")
-		if global, err := (harness.Codex{}).Status(); err == nil && global.Connected {
-			ui.warn("Codex", "also has a user-level exporter; it may send Desktop activity from other repositories")
+	for _, s := range selectedSurfaces(agents) {
+		for _, step := range s.InstallSteps {
+			ui.then(step)
+		}
+		if s.Warn == nil {
+			continue
+		}
+		if warning := s.Warn(); warning != "" {
+			_, a, _ := registered.Surface(s.Name)
+			ui.warn(a.DisplayName(), warning)
 		}
 	}
 
@@ -589,8 +574,8 @@ func installNeedsAuth(agents []string, projectRef string, existing *termaproject
 func telemetryAgentNames(agents []string) []string {
 	var names []string
 	for _, name := range agents {
-		if name == codexDesktopAgent {
-			name = routing.AgentCodex
+		if _, a, ok := registered.Surface(name); ok {
+			name = a.Name()
 		}
 		if !slices.Contains(names, name) {
 			names = append(names, name)
@@ -742,8 +727,69 @@ func connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *config.Conf
 	if err != nil {
 		return err
 	}
-	if slices.Contains(agents, codexDesktopAgent) {
-		ui.ok("Codex Desktop", "reports through the relay and this repository's hooks")
+	for _, s := range selectedSurfaces(agents) {
+		if s.Reports != "" {
+			ui.ok(s.DisplayName, s.Reports)
+		}
+	}
+	return nil
+}
+
+// selectedSurfaces are the surfaces the selection names.
+func selectedSurfaces(selected []string) []agents.Surface {
+	var out []agents.Surface
+	for _, name := range selected {
+		if s, _, ok := registered.Surface(name); ok {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// checkSignalNeeds refuses signals a selected surface cannot report without.
+func checkSignalNeeds(selected []string, rawSignals string) error {
+	for _, s := range selectedSurfaces(selected) {
+		if len(s.Needs.Signals) == 0 {
+			continue
+		}
+		signals, err := harness.ParseSignals(rawSignals)
+		if err != nil {
+			return err
+		}
+		for _, want := range s.Needs.Signals {
+			if !slices.Contains(signals, harness.Signal(want)) {
+				return fmt.Errorf("%s needs the %s signal to route sessions by repository", s.DisplayName, want)
+			}
+		}
+	}
+	return nil
+}
+
+// checkHookNeeds refuses adapters without the committed hooks a selected surface needs.
+func checkHookNeeds(selected, adapters []string) error {
+	for _, s := range selectedSurfaces(selected) {
+		if _, a, _ := registered.Surface(s.Name); s.Needs.Hooks && !slices.Contains(adapters, a.Name()) {
+			return fmt.Errorf("%s needs the %s repository hooks; include %s in --adapters", s.DisplayName, a.DisplayName(), a.Name())
+		}
+	}
+	return nil
+}
+
+// checkHooksApplied refuses an install that leaves out committed hooks a selected surface
+// needs: its agent's plan must have nothing left to write.
+func checkHooksApplied(root string, selected []string, hint string) error {
+	for _, s := range selectedSurfaces(selected) {
+		if !s.Needs.Hooks {
+			continue
+		}
+		_, a, _ := registered.Surface(s.Name)
+		plan, err := a.Plan(root, true)
+		if err != nil {
+			return err
+		}
+		if !plan.Empty() {
+			return fmt.Errorf("%s needs its %s repository hooks; %s", s.DisplayName, a.DisplayName(), hint)
+		}
 	}
 	return nil
 }

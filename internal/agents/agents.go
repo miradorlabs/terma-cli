@@ -31,10 +31,32 @@ type Agent interface {
 	FlushAfter() []string
 }
 
-// Selector is an agent a developer can select under more than one name (Codex CLI and
-// Codex Desktop are both Codex).
-type Selector interface {
-	Selections() []string
+// Surface is one way a developer runs an agent, chosen on its own at setup: Codex's CLI
+// and its desktop app are two.
+type Surface struct {
+	Name, DisplayName string
+	Installed         func(context.Context) bool
+	// Needs is what an install must give the surface for it to report at all.
+	Needs Needs
+	// InstallSteps and SetupSteps are what the developer does next for it to report.
+	InstallSteps, SetupSteps []string
+	// Reports says, after an install, how the surface's sessions reach Terma.
+	Reports string
+	// Warn is a condition on this machine the developer should know about, continuing a
+	// sentence that starts with the agent's name; "" when there is none.
+	Warn func() string
+}
+
+// Needs is what a surface cannot report without.
+type Needs struct {
+	Signals []string
+	// Hooks: the agent's committed hooks, wired and applied.
+	Hooks bool
+}
+
+// Surfaced is an agent run as more than one surface.
+type Surfaced interface {
+	Surfaces() []Surface
 }
 
 // TrustState is whether an agent will run the hooks a repository commits. Detail
@@ -71,10 +93,19 @@ type ManagedHooks interface {
 
 // Selections is every name a developer may select a under, its own first.
 func Selections(a Agent) []string {
-	if s, ok := a.(Selector); ok {
-		return s.Selections()
+	var out []string
+	for _, s := range Surfaces(a) {
+		out = append(out, s.Name)
 	}
-	return []string{a.Name()}
+	return out
+}
+
+// Surfaces is a's surfaces: its own, or the agent itself as its one.
+func Surfaces(a Agent) []Surface {
+	if s, ok := a.(Surfaced); ok {
+		return s.Surfaces()
+	}
+	return []Surface{{Name: a.Name(), DisplayName: a.DisplayName(), Installed: a.Installed}}
 }
 
 // Wired reports whether root's committed hooks file carries a's entries. A file that

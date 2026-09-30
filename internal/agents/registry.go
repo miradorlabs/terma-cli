@@ -68,6 +68,18 @@ func (r *Registry) Selected(selection string) (Agent, bool) {
 	return nil, false
 }
 
+// Surface resolves a surface by name, with its agent.
+func (r *Registry) Surface(name string) (Surface, Agent, bool) {
+	for _, a := range r.all {
+		for _, s := range Surfaces(a) {
+			if s.Name == name {
+				return s, a, true
+			}
+		}
+	}
+	return Surface{}, nil, false
+}
+
 // Names lists every known agent's name.
 func (r *Registry) Names() []string {
 	out := make([]string, 0, len(r.all))

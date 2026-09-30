@@ -50,7 +50,6 @@ func (Agent) FlushAfter() []string {
 }
 
 func (Agent) UserHooksPath() (string, error) { return harness.CodexUserHooksPath() }
-func (Agent) Selections() []string           { return []string{"codex", "codex-desktop"} }
 func (Agent) PlanUserHooks(dir string, command func(string) string, install bool) (hookmgr.Plan, error) {
 	return hookmgr.PlanCodexUserHooks(dir, command, install)
 }
@@ -146,5 +145,5 @@ var (
 	_ agents.Trusting     = Agent{}
 	_ agents.UserHooks    = Agent{}
 	_ agents.ManagedHooks = Agent{}
-	_ agents.Selector     = Agent{}
+	_ agents.Surfaced     = Agent{}
 )

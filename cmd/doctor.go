@@ -17,8 +17,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/routing"
-
 	"github.com/spf13/cobra"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
@@ -114,7 +112,7 @@ func agentHooksCheck(root string, mine []string) doctor.Check {
 			continue
 		}
 		// Codex Desktop is wired through the Codex hooks file.
-		named := slices.Contains(mine, a.Name()) || (a.Name() == routing.AgentCodex && slices.Contains(mine, codexDesktopAgent))
+		named := slices.ContainsFunc(agents.Selections(a), func(s string) bool { return slices.Contains(mine, s) })
 		if !agents.Wired(root, a) {
 			if named {
 				of++

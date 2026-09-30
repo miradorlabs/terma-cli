@@ -6,13 +6,12 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
-	"runtime"
 	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/api"
 	"github.com/miradorlabs/terma-cli/internal/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -189,8 +188,14 @@ func runSetup(cmd *cobra.Command, f setupFlags) error {
 		fmt.Fprintf(out, "%d. %s\n", i+1, step)
 	}
 
-	if slices.Contains(names, codexDesktopAgent) && !pol.Global() {
-		fmt.Fprintln(out, "Codex Desktop: in a connected repository, open Settings → Hooks → Review in Codex Desktop and approve Terma's hooks.")
+	if !pol.Global() {
+		for _, n := range names {
+			if s, _, ok := registered.Surface(n); ok {
+				for _, step := range s.SetupSteps {
+					fmt.Fprintln(out, step)
+				}
+			}
+		}
 	}
 	if pol.Global() {
 		fmt.Fprintf(out, "\n%s Every session and commit on this machine reports to your organization.\n", style.For(out).Bold("Done!"))
@@ -367,36 +372,17 @@ func availableAgentNames() []string {
 // harnessSelectionAgents puts available agents first, preserving registry order
 // within each group. Both the form and its result mapping must use this order.
 func harnessSelectionAgents() []agentChoice {
-	var agents []agentChoice
+	var choices []agentChoice
 	for _, available := range []bool{true, false} {
 		for _, a := range registered.All() {
 			if registered.IsSupported(a.Name()) == available {
-				adapterAgent := a
-				display := a.DisplayName()
-				if a.Name() == "codex" {
-					display = "Codex CLI"
-				}
-				agents = append(agents, agentChoice{name: a.Name(), display: display, installed: adapterAgent.Installed})
-				if a.Name() == "codex" {
-					agents = append(agents, agentChoice{name: codexDesktopAgent, display: "Codex Desktop", installed: codexDesktopInstalled})
+				for _, surface := range agents.Surfaces(a) {
+					choices = append(choices, agentChoice{name: surface.Name, display: surface.DisplayName, installed: surface.Installed})
 				}
 			}
 		}
 	}
-	return agents
-}
-
-func codexDesktopInstalled(context.Context) bool {
-	if runtime.GOOS != "darwin" {
-		return false
-	}
-	home, _ := os.UserHomeDir()
-	for _, path := range []string{"/Applications/ChatGPT.app", filepath.Join(home, "Applications", "ChatGPT.app")} {
-		if info, err := os.Stat(path); err == nil && info.IsDir() {
-			return true
-		}
-	}
-	return false
+	return choices
 }
 
 func harnessSelectionForm(ctx context.Context, preselect map[string]bool) *prompt.Form {
@@ -422,10 +408,8 @@ func harnessSelectionForm(ctx context.Context, preselect map[string]bool) *promp
 func parseAgentList(raw string) ([]string, error) {
 	seen := map[string]bool{}
 	for _, n := range splitCommas(raw) {
-		if n != codexDesktopAgent {
-			if _, ok := registered.Lookup(n); !ok {
-				return nil, fmt.Errorf("unknown agent %q (want %s)", n, joinNames(availableAgentNames()))
-			}
+		if _, _, ok := registered.Surface(n); !ok {
+			return nil, fmt.Errorf("unknown agent %q (want %s)", n, joinNames(availableAgentNames()))
 		}
 		if !registered.IsSupported(n) {
 			return nil, fmt.Errorf("agent %q: Coming Soon; available agents: %s", n, joinNames(availableAgentNames()))
@@ -458,10 +442,7 @@ func detectedAgents(ctx context.Context) []string {
 }
 
 func agentDetail(ctx context.Context, name string) string {
-	if name == codexDesktopAgent && codexDesktopInstalled(ctx) {
-		return "installed"
-	}
-	if a, ok := registered.Lookup(name); ok && a.Installed(ctx) {
+	if s, _, ok := registered.Surface(name); ok && s.Installed(ctx) {
 		return "installed"
 	}
 	return ""
@@ -471,16 +452,8 @@ func agentDetail(ctx context.Context, name string) string {
 func adapterDisplayNames(names []string) []string {
 	out := make([]string, 0, len(names))
 	for _, n := range names {
-		if n == codexDesktopAgent {
-			out = append(out, "Codex Desktop")
-			continue
-		}
-		if n == "codex" {
-			out = append(out, "Codex CLI")
-			continue
-		}
-		if a, ok := registered.Lookup(n); ok {
-			out = append(out, a.DisplayName())
+		if s, _, ok := registered.Surface(n); ok {
+			out = append(out, s.DisplayName)
 		} else {
 			out = append(out, n)
 		}

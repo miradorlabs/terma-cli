@@ -144,7 +144,7 @@ func TestHarnessSelectionFiltersSavedAgents(t *testing.T) {
 			wantInstalled = []string{"claude", "codex"}
 		}
 		wantSetup := slices.Clone(wantInstalled)
-		if codexDesktopInstalled(context.Background()) {
+		if desktop, _, _ := registered.Surface(codexDesktopAgent); desktop.Installed(context.Background()) {
 			// Codex Desktop sorts right after the CLI in the picker.
 			if i := slices.Index(wantSetup, "codex"); i >= 0 {
 				wantSetup = slices.Insert(wantSetup, i+1, codexDesktopAgent)
