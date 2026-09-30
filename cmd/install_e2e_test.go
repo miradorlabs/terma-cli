@@ -38,6 +38,7 @@ func newInstallSandbox(t *testing.T) *installSandbox {
 	env := []string{
 		"PATH=" + filepath.Dir(bin) + ":" + filepath.Dir(git) + ":/usr/bin:/bin",
 		"TERMA_ENV=dev", "TERMA_LIVE=0", "TERMA_RELAY_SERVICE=0", "TERMA_CONFIG_DIR=" + filepath.Join(base, "config"),
+		`TERMA_POLICY_STUB={"mode":"repo","include_prompts":true,"include_tool_content":true}`,
 		"CLAUDE_CONFIG_DIR=" + filepath.Join(base, "claude-config"), "XDG_CONFIG_HOME=" + filepath.Join(base, "xdg"),
 		"GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_TERMINAL_PROMPT=0",
 		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@example.com", "GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@example.com",

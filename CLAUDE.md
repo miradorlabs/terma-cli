@@ -22,8 +22,9 @@ go test ./internal/hookrun/ -run TestName
 
 Everything the Makefile runs uses `TERMA_ENV=dev` by default. Outside it, prefix the command
 yourself (`TERMA_ENV=dev go test ./...`): `terma install` and `terma setup` sign in, so a bare
-run that reaches them opens a browser login on **production**. A script that runs
-`terma install` passes `--harness none`, which needs no credential.
+run that reaches them opens a browser login on **production**. Offline install tests
+must set an explicit `TERMA_POLICY_STUB`; `--harness none` alone still needs the
+developer login to check the team's repository permission.
 
 ## Shape
 
@@ -255,14 +256,16 @@ run that reaches them opens a browser login on **production**. A script that run
   is what hook events are delivered with; pointing a telemetry agent stores it as a side effect
   (`keystore.SetFor`) and nothing else did, so a developer whose agents are all hooks-only
   (Cursor, Antigravity) had every event held forever. `ensureSpoolKey` mints one when hooks are
-  wired and none is stored; install signs in for it only when the developer selected an agent —
-  `--harness none` (CI, onboarding a repository) stays credential-free and is told its events
-  are held. Fix-it hints follow the same split: sign-in → `terma setup`; a missing key, an
-  unwired clone, an agent on the wrong project → `terma install`. With a server key
-  (`TERMA_API_KEY`) install signs in to nothing and binds the key's own project, read from
+  wired and none is stored. Every real install checks collection policy with a developer
+  login before writing a binding, including hooks-only agents and `--harness none`;
+  offline fixtures explicitly set `TERMA_POLICY_STUB`. Fix-it hints follow the same
+  split: sign-in → `terma setup`; a missing key, an unwired clone, an agent on the wrong
+  project → `terma install`. A server key (`TERMA_API_KEY`) identifies its own project, read from
   the API gateway's `/v1/identity` (`serverKeyBinding`): the account service's
   `/v1/projects` accepts only a signed-in user, and a `--project` or existing binding
-  naming another project is refused, since the key could not deliver its events.
+  naming another project is refused, since the key could not deliver its events. A server
+  key cannot read collection policy: real installs require a developer login, so unset
+  `TERMA_API_KEY` and run `terma setup` first.
 - Per-repo routing is the local relay (below, and `docs/RELAY-SPIKE.md`): `terma install`
   points each of the developer's agents' user-level exporters at the relay
   (`pointAgentsAtRelay`, shared with `terma relay setup`), keeps the project's key in the
@@ -391,7 +394,7 @@ run that reaches them opens a browser login on **production**. A script that run
   install signs in, `resolveBinding` checks the binding against the projects that
   credential lists: one made in another environment or organization is named and
   replaced, never used — used as-is, its first key mint was refused with the gateway's
-  "run `mirador project list`". A credential-free install keeps it unchecked, and a
+  "run `mirador project list`". An offline policy fixture without a credential keeps it unchecked, and a
   kept binding keeps the environment it recorded. Project-scoped
   reads resolve the Git worktree's `.terma/settings.json`, unless `--project` or
   `TERMA_PROJECT_ID` explicitly overrides it. Machine profiles have no project defaults.
@@ -855,7 +858,8 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   what the platform's `opencode` aisignal adapter parses.
 - The relay heartbeat (`terma.relay.heartbeat`, OTLP/JSON logs, no project) posted to the
   API gateway's `/v1/relay/heartbeat` under the developer's CLI token: the endpoint is not
-  built yet (`api.HeartbeatPath`), nor the collection policy's (`api.CollectionPolicy`).
+  built yet (`api.HeartbeatPath`). Collection policy is served by the account
+  service (`api.CollectionPolicy`).
 - Project header under a CLI token: `X-Mirador-Project` (`internal/api/client.go`).
   The shared gateway knows only that name; a Terma-branded header is a 400.
 - `.terma/settings.json` (`internal/project`, JSON): `project{id,name,organization_id,

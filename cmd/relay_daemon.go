@@ -298,8 +298,8 @@ func removeRelayService(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
-// relayServiceInstalled reports whether this config directory's relay runs as a
-// service, and where its definition is.
+// relayServiceInstalled reports whether this config directory has a relay service
+// definition, and where it is. It does not establish that the relay is running.
 func relayServiceInstalled() (string, bool) {
 	name, err := relayServiceName()
 	if err != nil {

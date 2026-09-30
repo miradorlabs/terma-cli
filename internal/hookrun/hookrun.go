@@ -55,9 +55,9 @@ type Env struct {
 	// relay (see claimForRelay), so the caller can start the relay if it is not
 	// running. It may be called more than once.
 	OnClaim func()
-	// Policy is the organization's collection policy (config.Profile.Policy). In global
-	// mode a repository without a binding is placed by its remote, else the default
-	// project, and a session outside any repository goes to the default project.
+	// Policy is the organization's collection policy (config.Profile.Policy). Global
+	// mode places every session in the selected team's DefaultProjectID, including
+	// bound repositories and sessions outside repositories.
 	Policy config.Policy
 }
 

@@ -2,7 +2,6 @@ package config
 
 import (
 	"slices"
-	"strings"
 	"time"
 )
 
@@ -37,48 +36,8 @@ type Policy struct {
 	AuthURL                   string    `json:"auth_url,omitempty"`
 	// DefaultProjectID is the selected team's project in global mode: every native
 	// export and hook event, including sessionless metrics and non-repository work.
-	DefaultProjectID string `json:"default_project_id,omitempty"`
-	// Remotes preserves mappings from earlier profiles; global pass-through uses
-	// the selected team's DefaultProjectID.
-	Remotes   map[string]string `json:"remotes,omitempty"`
-	FetchedAt time.Time         `json:"fetched_at"`
-}
-
-// ProjectFor is the project global mode files a repository with this remote under: the
-// organization's mapping, else its default project. "" outside global mode.
-func (p Policy) ProjectFor(remote string) string {
-	if !p.Global() {
-		return ""
-	}
-	if id := p.Remotes[NormalizeRemote(remote)]; id != "" {
-		return id
-	}
-	return p.DefaultProjectID
-}
-
-// NormalizeRemote reduces the ways one repository's remote is spelled — scp-style
-// `git@host:org/repo.git`, `ssh://git@host/org/repo`, `https://user@host/org/repo.git/`
-// — to `host/org/repo`, host lower-cased. "" for an empty remote.
-func NormalizeRemote(remote string) string {
-	r := strings.TrimSpace(remote)
-	if r == "" {
-		return ""
-	}
-	if i := strings.Index(r, "://"); i >= 0 {
-		r = r[i+3:]
-	} else if at, colon := strings.Index(r, "@"), strings.Index(r, ":"); colon > 0 && (at < 0 || at < colon) && !strings.Contains(r[:colon], "/") {
-		r = r[:colon] + "/" + r[colon+1:] // scp-style host:path
-	}
-	if at := strings.Index(r, "@"); at >= 0 && at < strings.Index(r+"/", "/") {
-		r = r[at+1:]
-	}
-	r = strings.TrimRight(r, "/")
-	r = strings.TrimSuffix(r, ".git")
-	host, path, _ := strings.Cut(r, "/")
-	if h, _, ok := strings.Cut(host, ":"); ok && !strings.ContainsAny(host[len(h)+1:], "abcdefghijklmnopqrstuvwxyz") {
-		host = h // a port
-	}
-	return strings.ToLower(host) + "/" + path
+	DefaultProjectID string    `json:"default_project_id,omitempty"`
+	FetchedAt        time.Time `json:"fetched_at"`
 }
 
 // DefaultPolicy is what applies before `terma setup` has fetched one: repositories opt

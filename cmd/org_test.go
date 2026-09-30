@@ -19,11 +19,13 @@ import (
 // anything else is a stranger. It counts what the CLI does so a test can say "no
 // browser, no new session" with evidence.
 type fakeAuth struct {
-	srv       *httptest.Server
-	revokes   atomic.Int32
-	whoamis   atomic.Int32
-	keysMint  atomic.Int32
-	deadToken string
+	srv        *httptest.Server
+	revokes    atomic.Int32
+	whoamis    atomic.Int32
+	keysMint   atomic.Int32
+	deadToken  string
+	policyBody string
+	policies   atomic.Int32
 }
 
 var fakeOrgs = []organization{
@@ -60,6 +62,17 @@ func newFakeAuth(t *testing.T) *fakeAuth {
 			_ = json.NewEncoder(w).Encode(listOrganizationsResponse{Organizations: fakeOrgs})
 		case "/v1/projects":
 			_ = json.NewEncoder(w).Encode(listProjectsResponse{Projects: projectsIn(org)})
+		case "/v1/policy":
+			f.policies.Add(1)
+			if r.URL.Query().Get("project_id") == "" {
+				http.Error(w, "missing project_id", http.StatusBadRequest)
+				return
+			}
+			if f.policyBody != "" {
+				fmt.Fprint(w, f.policyBody)
+			} else {
+				fmt.Fprint(w, `{"policy":null}`)
+			}
 		case "/v1/auth/cli/revoke":
 			f.revokes.Add(1)
 			fmt.Fprint(w, `{}`)

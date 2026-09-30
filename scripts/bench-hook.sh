@@ -14,9 +14,9 @@ trap 'rm -rf "$tmp"' EXIT
 export TERMA_CONFIG_DIR="$tmp/home" PATH="$ROOT/bin:$PATH"
 repo="$tmp/repo"; mkdir -p "$repo"; cd "$repo"
 git init -q; git config user.email bench@example.com; git config user.name bench
-# --harness none: the benchmark times the git hook, and an install that selects an agent
-# signs in for its key — on a developer's machine, where the agents are installed, that
-# opened a browser login against production. The hooks below are driven by hand instead.
+# The benchmark measures local hook latency. Use an explicit offline policy fixture
+# so setup cannot open a browser or call the policy service.
+export TERMA_POLICY_STUB='{"mode":"repo","include_prompts":true,"include_tool_content":true}'
 terma install --project proj_bench --harness none --yes >/dev/null
 
 # An agent session with a manifest, so the timed path includes the staged-files

@@ -113,12 +113,10 @@ func TestCodexSubagentThreadIsClaimed(t *testing.T) {
 	}
 }
 
-// Global mode: an unbound repository's session is claimed for the project its remote
-// maps to, else the organization's default; a session outside any repository goes to
-// the default; a bound repository keeps its own. Repo mode claims none of them.
+// Global mode claims every session for the selected team, regardless of remote,
+// repository binding, or whether it is inside a repository. Repo mode requires a binding.
 func TestGlobalModeClaimsEverySession(t *testing.T) {
-	global := config.Policy{Mode: config.ModeGlobal, DefaultProjectID: "p-default",
-		Remotes: map[string]string{"github.com/org/app": "p-app"}}
+	global := config.Policy{Mode: config.ModeGlobal, DefaultProjectID: "p-default"}
 	known := initRepo(t)
 	if _, err := gitx.Git(context.Background(), known, "remote", "add", "origin", "git@github.com:org/app.git"); err != nil {
 		t.Fatal(err)

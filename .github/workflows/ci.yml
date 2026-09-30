@@ -201,6 +201,8 @@ jobs:
           cache: true
       - run: go build -o bin/terma .
       - name: Shim runs under dash and busybox sh
+        env:
+          TERMA_POLICY_STUB: '{"mode":"repo","include_prompts":true,"include_tool_content":true}'
         run: |
           sudo apt-get install -y -q dash busybox >/dev/null
           tmp=$(mktemp -d); cd "$tmp"; git init -q; git config user.email t@example.com; git config user.name t

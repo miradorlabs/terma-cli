@@ -38,9 +38,8 @@ func refreshMachine() ([]string, error) {
 	var changed []string
 	var errs []error
 	if err := migrateLegacyExporters(); err != nil {
-		return nil, fmt.Errorf("migrate PATH-shim exporters to the local relay: %w", err)
-	}
-	if removed, err := shim.RemoveLegacy(); err != nil {
+		errs = append(errs, fmt.Errorf("migrate PATH-shim exporters to the local relay: %w", err))
+	} else if removed, err := shim.RemoveLegacy(); err != nil {
 		errs = append(errs, fmt.Errorf("remove the PATH shims: %w", err))
 	} else if removed {
 		dir, _ := shim.ShimBinDir()
@@ -102,9 +101,24 @@ func migrateLegacyExporters() error {
 			}
 		}
 	}
-	return connectMachineRelay(context.Background(), agents, "", relayReport{
+	if err := connectMachineRelay(context.Background(), agents, "", relayReport{
 		ok: func(string, string) {}, warn: func(string, string) {}, then: func(string) {}, detail: io.Discard,
-	})
+	}); err != nil {
+		return err
+	}
+	if len(relayTargets(agents)) == 0 {
+		return nil
+	}
+	relayPath, err := relayDir()
+	if err != nil {
+		return err
+	}
+	if _, running, err := relayStats(relayPath); err != nil {
+		return fmt.Errorf("verify the replacement relay: %w", err)
+	} else if !running {
+		return errors.New("the replacement relay is not running; keeping the PATH shims")
+	}
+	return nil
 }
 
 // repoRefresh is what a refresh would change in one repository's committed files.

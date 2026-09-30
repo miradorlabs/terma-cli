@@ -137,6 +137,7 @@ func TestRefreshMigratesExportersBeforeRemovingShim(t *testing.T) {
 	sandboxMachine(t)
 	t.Setenv("CODEX_HOME", t.TempDir())
 	t.Setenv("TERMA_RELAY_SERVICE", "0")
+	serveRelayForRefresh(t)
 	shim := plantLegacyShim(t, "codex")
 	rec := routing.Record{ProjectID: "team", Signals: []string{"metrics"}, IncludePrompts: false, IncludeToolContent: false, Harnesses: []string{"codex"}, CLI: true}
 	if err := routing.SaveRecord(rec); err != nil {

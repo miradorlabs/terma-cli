@@ -49,12 +49,15 @@ func (sb *Sandbox) UseRelay(o RelayOptions) {
 	if o.Hold > 0 {
 		sb.ExtraEnv = append(sb.ExtraEnv, "TERMA_RELAY_HOLD="+o.Hold.String())
 	}
+	// Install obtained a hook-delivery key from the account fixture. A no-key
+	// negative control must remove it as well as refuse any subsequent key mint.
+	projectKeys := map[string]string{}
 	if !o.NoKey {
-		// The key the project's events and telemetry are delivered with, and where.
-		keys, _ := json.Marshal(map[string]any{"keys": map[string]string{sb.ProjectID: liveKey}})
-		if err := os.WriteFile(filepath.Join(sb.TermaConfig, "keys.json"), keys, 0o600); err != nil {
-			t.Fatal(err)
-		}
+		projectKeys[sb.ProjectID] = liveKey
+	}
+	keys, _ := json.Marshal(map[string]any{"keys": projectKeys})
+	if err := os.WriteFile(filepath.Join(sb.TermaConfig, "keys.json"), keys, 0o600); err != nil {
+		t.Fatal(err)
 	}
 	rec, _ := json.Marshal(map[string]any{"project_id": sb.ProjectID, "include_prompts": o.Content, "include_tool_content": o.Content, "signals": []string{"traces", "logs", "metrics"}, "harnesses": []string{"claude", "codex", "opencode"}})
 	sb.writeAbs(filepath.Join(sb.TermaConfig, "routing", sb.ProjectID+".json"), string(rec)+"\n")

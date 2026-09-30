@@ -677,6 +677,9 @@ func relayStats(dir string) (relay.Snapshot, bool, error) {
 		return snap, true, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return snap, true, fmt.Errorf("relay stats: HTTP %s", resp.Status)
+	}
 	body, _ := io.ReadAll(resp.Body)
 	return snap, true, json.Unmarshal(body, &snap)
 }

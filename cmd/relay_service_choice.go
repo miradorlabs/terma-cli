@@ -65,12 +65,14 @@ func ensureRelay(ctx context.Context, flag string, report func(warn bool, what s
 				report(false, "service removed; hooks start the relay on demand")
 			}
 		}
-		if _, ok := relayServiceInstalled(); !ok {
-			spawnRelay()
-		}
+		spawnRelay()
 		return
 	}
 	if _, ok := relayServiceInstalled(); ok && flag != "on" {
+		// A service definition does not prove its relay is alive. Starting on
+		// demand is harmless while it runs (the relay lock prevents duplicates),
+		// and closes the gap while a stopped service awaits its manager's restart.
+		spawnRelay()
 		return
 	}
 	path, err := installRelayService(ctx)
@@ -80,4 +82,5 @@ func ensureRelay(ctx context.Context, flag string, report func(warn bool, what s
 		return
 	}
 	report(false, "runs in the background ("+path+"); `terma setup --relay-service off` stops it")
+	spawnRelay()
 }

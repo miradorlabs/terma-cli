@@ -354,15 +354,12 @@ func spoolEventAllowed(org config.Policy, projectID string, e spool.Event) bool 
 	if org.ExcludesPath(e.Workspace, "") || org.HasExcludedPath(e.Attrs, e.Workspace) {
 		return false
 	}
+	if e.Name == hookrun.EventAssistantMessage || e.Name == hookrun.EventSessionTitle {
+		return org.IncludePrompts && len(org.ExcludePaths) == 0 && hookrun.CodexRepliesConsented(projectID, org.Global())
+	}
 	rec, recorded, err := routing.LoadRecord(projectID)
 	if err != nil {
 		return false
-	}
-	if e.Name == hookrun.EventAssistantMessage || e.Name == hookrun.EventSessionTitle {
-		if org.Global() && !recorded {
-			return org.IncludePrompts && len(org.ExcludePaths) == 0
-		}
-		return org.IncludePrompts && len(org.ExcludePaths) == 0 && recorded && rec.IncludePrompts && slices.Contains(rec.Harnesses, "codex") && slices.Contains(rec.Signals, "logs")
 	}
 	return !recorded || slices.Contains(rec.Signals, "logs")
 }

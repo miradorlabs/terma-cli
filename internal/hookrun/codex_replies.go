@@ -25,7 +25,7 @@ const codexReplyMaxText = 16 << 10
 // nothing at all for a developer whose Codex does not export their prompts.
 func (e Env) captureCodexReplies(ctx context.Context, r *repo, in *codexHookInput) {
 	pol := routing.EffectivePolicy(e.Policy, r.projectID)
-	if e.Spool == nil || !session.ValidID(in.SessionID) || !pol.IncludePrompts || !pol.AllowsSignal("logs") || len(pol.ExcludePaths) > 0 || !codexRepliesConsented(r, pol.Global()) {
+	if e.Spool == nil || !session.ValidID(in.SessionID) || !pol.IncludePrompts || !pol.AllowsSignal("logs") || len(pol.ExcludePaths) > 0 || !CodexRepliesConsented(r.projectID, pol.Global()) {
 		return
 	}
 	dir, err := config.Dir()
@@ -92,20 +92,21 @@ func (e Env) captureCodexReplies(ctx context.Context, r *repo, in *codexHookInpu
 	}
 }
 
-// codexRepliesConsented reports whether this developer's Codex exports their prompts in
+// CodexRepliesConsented reports whether this developer's Codex exports their prompts in
 // this repository — the consent a reply travels under. `terma install --exclude-prompts`
 // and `terma connect codex --exclude-prompts` are documented as withholding "prompt text
 // or model responses", and this is the model-response half of that promise.
 //
-// A routed CLI launch is marked by the shim; its runtime overrides govern consent.
-// Desktop launches have no marker. Their repository route alone governs capture.
+// Relay and Desktop configurations use the repository's routing record. Legacy
+// native configurations use Codex's settings. Capture and queued delivery share this
+// check; the caller also applies the current organization policy ceiling.
 //
 // It fails closed. A configuration that is there and cannot be read — a routing record
 // half-written, a config.toml that does not parse — might be the one that withholds
 // prompts, and "could not tell" is not consent. A file that does not exist is different:
 // both loaders report that without an error, and it simply is not a source.
-func codexRepliesConsented(r *repo, global bool) bool {
-	rec, recorded, err := routing.LoadRecord(r.projectID)
+func CodexRepliesConsented(projectID string, global bool) bool {
+	rec, recorded, err := routing.LoadRecord(projectID)
 	if err != nil {
 		return false
 	}

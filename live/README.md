@@ -257,10 +257,12 @@ separate regression check.
 
 ## Sandbox installation
 
-Sandbox installation uses `--harness none --no-browser --no-doctor`: the sandbox has
-no account (its project id is a placeholder), and selecting an agent makes `terma
-install` sign in. Each scenario connects its exporter separately with a dummy key for
-the loopback receiver, which also stores the key hook events are delivered with.
+Sandbox installation uses `--harness none --no-browser --no-doctor` with a local
+account fixture that supplies the developer login, project list, and collection
+policy. Each scenario connects its exporter separately with a dummy key for the
+loopback receiver. Account hosts are persisted in the private profile so relay
+services load the same scoped policy after a restart. No real provider credentials
+are needed for the deterministic telemetry scenarios.
 Terma setup subprocesses have a 30-second deadline, so a login regression fails
 promptly rather than consuming the entire live-suite timeout
-(`TestSandboxSetupWithoutLogin` checks this offline).
+(`TestSandboxSetupWithoutProviderCredentials` checks this offline).

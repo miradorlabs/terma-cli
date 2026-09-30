@@ -10,7 +10,7 @@ import (
 
 // Run this offline too: provider credentials must never be needed to prepare
 // the real CLI's sandbox or install an additional hooks-only adapter.
-func TestSandboxSetupWithoutLogin(t *testing.T) {
+func TestSandboxSetupWithoutProviderCredentials(t *testing.T) {
 	binary := filepath.Join(t.TempDir(), "terma")
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()

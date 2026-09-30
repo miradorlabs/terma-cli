@@ -57,6 +57,10 @@ func (sb *Sandbox) StartAccount() *Account {
 				{"id": "proj_other", "name": "Other", "organization_id": accountOrg},
 			}})
 		case "/v1/policy":
+			if r.URL.Query().Get("project_id") == "" {
+				http.Error(w, "missing policy project_id", http.StatusBadRequest)
+				return
+			}
 			fmt.Fprint(w, `{"policy":{"version":"1.0","terma":{"per_repository":{"members_can_add_repositories":true},"capture":{"exclude_paths":[],"exclude_prompts":false,"exclude_tool_content":false,"signals":["traces","logs","metrics"]}}},"revision":1,"updated_at":"2026-09-30T12:27:05Z"}`)
 		case "/v1/api-keys/server":
 			if a.denyMints.Load() {
@@ -105,7 +109,11 @@ func (sb *Sandbox) StartAccount() *Account {
 		sb.T.Fatal(err)
 	}
 	profiles := file["profiles"].(map[string]any)
-	profiles["default"].(map[string]any)["organization_id"] = accountOrg
+	profile := profiles["default"].(map[string]any)
+	profile["organization_id"] = accountOrg
+	// Services do not inherit ExtraEnv. Persist the selected deployment as setup
+	// does for a custom host, so launchd/systemd use the same scoped policy/login.
+	profile["auth_url"], profile["api_url"], profile["app_url"] = a.srv.URL, a.srv.URL, a.srv.URL
 	data, _ = json.Marshal(file)
 	sb.writeAbs(path, string(data))
 	sb.account = a

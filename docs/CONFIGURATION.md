@@ -51,6 +51,11 @@ selects it explicitly. It reads `GET /v1/policy?project_id=<team-id>` on the aut
 host using your developer login and its existing token refresh flow. Reading policy
 does not create a server key. Telemetry delivery still uses project server keys.
 
+`terma install` also checks this policy before writing a repository binding, including
+hooks-only agents and `--harness none`. A developer login is required; a telemetry
+server key cannot authorize adding a repository. Dry runs leave authentication and
+files untouched. Offline test fixtures explicitly use `TERMA_POLICY_STUB`.
+
 Validated policies are cached separately in `policies/<team-id>.json`; the selected
 machine policy also lives in your profile. The relay refreshes saved teams' policies
 every minute, while hooks read local files only. A failed fetch retains that team's

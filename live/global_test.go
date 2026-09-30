@@ -33,7 +33,6 @@ func globalPolicy() string {
 	data, _ := json.Marshal(map[string]any{
 		"mode": "global", "include_prompts": true, "include_tool_content": true,
 		"default_project_id": globalDefault,
-		"remotes":            map[string]string{"github.com/org/known": globalKnown},
 	})
 	return string(data)
 }

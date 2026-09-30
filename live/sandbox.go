@@ -17,8 +17,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -172,16 +170,13 @@ func New(t *testing.T, mode Mode, opts ...Option) *Sandbox {
 	sb.writeAbs(filepath.Join(sb.ClaudeConfig, ".claude.json"), string(raw)+"\n")
 
 	// The real terma paths: the profile's ingest URL is the receiver, so the
-	// background flushes the hooks start deliver there; the repository is
-	// installed with both adapters' hooks. Harnesses are connected by the
-	// scenario that uses them (connectClaude, connectCodex). All of it works
-	// without a backend when the key is supplied.
+	// background flushes the hooks start deliver there; the repository is installed
+	// with both adapters' hooks. The account fixture provides the developer login
+	// and collection policy every install requires. Providers remain local fixtures.
 	sb.terma(sb.Repo, "config", "set", "--otlp-url", sb.Receiver.URL())
-	// --harness none keeps install credential-free: selecting an agent makes install sign
-	// in, and the sandbox has no account (the project id is a placeholder). The connect a
-	// scenario makes supplies the key hook events are delivered with. --no-browser turns
-	// any sign-in that does creep back in into a failure instead of a browser window, and
-	// --no-doctor keeps install from running doctor's network checks against no backend.
+	sb.StartAccount()
+	// Each scenario connects its own exporter. --no-browser bounds a fixture-login
+	// regression instead of opening a browser; --no-doctor avoids unrelated checks.
 	sb.terma(sb.Repo, "install", "--project", sb.ProjectID, "--harness", "none", "--adapters", "claude,codex", "--yes", "--no-browser", "--no-doctor")
 	return sb
 }
@@ -227,24 +222,13 @@ func (sb *Sandbox) connectHarness(name string) {
 // sessions this repository's hooks claim to the receiver, standing in for Terma. With
 // ExcludeContent it passes the switches install offers (`--prompts off`,
 // `--exclude-tool-content`); without, none, so the project's policy is install's own
-// default. install with an agent needs a key it can reuse and the project its server key
-// belongs to. The key comes from a connect that is then undone — disconnect keeps it, as
-// it does for a developer moving between repositories — and the project from a stand-in
-// for the API gateway's /v1/identity, the one request a server-key install makes.
+// default. The account fixture supplies the developer login used to check policy.
+// A connect that is then undone supplies the receiver's key for install to reuse.
 func (sb *Sandbox) RouteClaude() {
 	sb.T.Helper()
 	if sb.Mode != Isolated {
 		sb.T.Fatal("RouteClaude needs an isolated sandbox")
 	}
-	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/identity" {
-			http.NotFound(w, r)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"project_id":%q,"organization_id":"org_live"}`, sb.ProjectID)
-	}))
-	sb.T.Cleanup(api.Close)
 	sb.terma(sb.Repo, "connect", "claude", "--project", sb.ProjectID, "--api-key", liveKey, "--yes", "--otlp-url", sb.Receiver.URL())
 	sb.terma(sb.Repo, "disconnect", "claude", "--yes")
 	// The relay on a port of its own, forwarding to the receiver; install finds it there.
@@ -253,7 +237,7 @@ func (sb *Sandbox) RouteClaude() {
 	if sb.ExcludeContent {
 		args = append(args, "--prompts", "off", "--exclude-tool-content")
 	}
-	sb.termaWith([]string{"TERMA_API_KEY=" + liveKey, "TERMA_API_URL=" + api.URL}, sb.Repo, args...)
+	sb.terma(sb.Repo, args...)
 	// What install wrote is the only exporter: the relay's, in the user's settings.
 	if user, err := os.ReadFile(filepath.Join(sb.ClaudeConfig, "settings.json")); err != nil || !bytes.Contains(user, []byte(sb.relayAddr)) {
 		sb.T.Fatalf("install did not point Claude Code at the relay (%s): %v\n%s", sb.relayAddr, err, user)

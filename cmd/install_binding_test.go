@@ -147,9 +147,8 @@ func TestInstallKeepsAReachableBinding(t *testing.T) {
 	}
 }
 
-// Wiring hooks with no agent of one's own needs no credential, so nothing checks the
-// binding — and the binding keeps the environment it was made in instead of taking this
-// machine's.
+// An explicit offline policy fixture permits an install without a credential, so
+// nothing checks the binding. It keeps the environment it was made in.
 func TestInstallWithoutACredentialKeepsTheBindingsEnvironment(t *testing.T) {
 	bound := termaproject.Project{ID: testProjectID, Name: "Terma Dev", Environment: config.EnvDev}
 	boundRepo(t, bound, false)

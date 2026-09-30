@@ -30,7 +30,7 @@ type codexTitleState struct {
 // reply does (codexRepliesConsented).
 func (e Env) captureCodexTitle(ctx context.Context, r *repo, in *codexHookInput) {
 	pol := routing.EffectivePolicy(e.Policy, r.projectID)
-	if e.Spool == nil || !session.ValidID(in.SessionID) || !pol.IncludePrompts || !pol.AllowsSignal("logs") || len(pol.ExcludePaths) > 0 || !codexRepliesConsented(r, pol.Global()) {
+	if e.Spool == nil || !session.ValidID(in.SessionID) || !pol.IncludePrompts || !pol.AllowsSignal("logs") || len(pol.ExcludePaths) > 0 || !CodexRepliesConsented(r.projectID, pol.Global()) {
 		return
 	}
 	dir, err := config.Dir()

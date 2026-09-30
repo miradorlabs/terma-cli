@@ -186,13 +186,11 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 		}
 	}
 
-	// 2. Auth, lazily. install signs in only when a step needs a credential — a
-	// telemetry harness to point (mint a key), or a project to look up by name or in a
-	// picker. A hooks-only install against a verbatim project id needs none, and a
-	// server key (TERMA_API_KEY) skips it entirely. A --dry-run never signs in: sign-in
-	// verifies and rewrites the stored credential, which "nothing written" forbids, so a
-	// dry run plans against whatever credential is already present and says so.
-	needsAuth := cfg.APIKey == "" && installNeedsAuth(agents, f.projectRef, existing, !f.noHooks)
+	// 2. Auth. Every real install reads the team's policy, including hooks-only
+	// installs and --harness none. Offline policy fixtures need no policy login;
+	// binding lookup and key minting can still need one. A --dry-run never signs in:
+	// it plans against the credential already present without rewriting it.
+	needsAuth := cfg.APIKey == "" && (os.Getenv("TERMA_POLICY_STUB") == "" || installNeedsAuth(agents, f.projectRef, existing, !f.noHooks))
 	if needsAuth && !f.dryRun {
 		if cfg, err = signInAndReload(cmd, cfg, signInOptions{noBrowser: f.noBrowser}); err != nil {
 			return err
@@ -219,12 +217,12 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	// Point the resolved config at the repo's project so key minting and resource
 	// attributes speak for it.
 	cfg.ProjectID, cfg.ProjectName, cfg.OrganizationID = b.ID, b.Name, b.OrganizationID
-	if len(relayTargets(agents)) > 0 && !f.dryRun {
+	if !f.dryRun {
 		pol, err := fetchPolicy(ctx, cfg)
 		if err != nil {
 			return err
 		}
-		if !pol.Global() && !pol.MembersCanAddRepositories && existing == nil {
+		if !pol.Global() && !pol.MembersCanAddRepositories && (existing == nil || existing.Project.ID != b.ID) {
 			return errors.New("your organization's policy does not allow members to add repositories; connect this repository in Terma first")
 		}
 		if err := saveCollectionPolicy(cfg, &pol); err != nil {
@@ -564,12 +562,13 @@ func resolvePrompts(cmd *cobra.Command, projectID string, f installFlags) (bool,
 	return true, nil
 }
 
-// installNeedsAuth reports whether install must obtain a credential: to point a
-// telemetry harness (mint or list a key), to resolve the project by name or in a picker,
+// installNeedsAuth reports whether install needs a credential beyond the policy
+// fetch: to point a telemetry harness (mint or list a key), to resolve the project
+// by name or in a picker,
 // or to mint the key this machine delivers hook events with — which a developer whose
 // agents are all hooks-only (Cursor, Antigravity) gets from nowhere else. A repository
-// wired with no agent of the developer's own (`--harness none`) is never made to sign in
-// for it: ensureSpoolKey mints when a credential is already there and says so when not.
+// wired with no agent of the developer's own (`--harness none`) needs no key minting
+// login, but still needs a policy login unless using an explicit offline fixture.
 func installNeedsAuth(agents []string, projectRef string, existing *termaproject.File, wantsHooks bool) bool {
 	for _, a := range telemetryAgentNames(agents) {
 		if _, err := harness.Lookup(a); err == nil {
@@ -1022,7 +1021,7 @@ func boundTo(p *project, cfg *config.Config) binding {
 // choose: they confirm or change the project on every install, the bound one marked and
 // kept by Enter — unless the organization has one project, which is taken without asking.
 // Without ask, a binding that checks out is kept and one that does not is an error naming
-// the fix. A hooks-only install that needs no credential keeps the binding unchecked —
+// the fix. An offline policy fixture with no credential keeps the binding unchecked;
 // there is nothing to check it with.
 func resolveBinding(cmd *cobra.Command, cfg *config.Config, existing *termaproject.File, ref string, verify, ask bool) (binding, error) {
 	sp := spinner.New(cmd.ErrOrStderr())
