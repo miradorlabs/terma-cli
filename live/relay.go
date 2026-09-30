@@ -117,6 +117,28 @@ func (sb *Sandbox) StartRelay() {
 	}
 }
 
+// WaitRelayCount waits until the running relay's counters under prefix sum to at least
+// n, and reports whether they did within timeout.
+func (sb *Sandbox) WaitRelayCount(prefix string, n int, timeout time.Duration) bool {
+	for deadline := time.Now().Add(timeout); time.Now().Before(deadline); time.Sleep(250 * time.Millisecond) {
+		if c, ok := sb.relayStatsLive(); ok && sum(c, prefix) >= n {
+			return true
+		}
+	}
+	return false
+}
+
+// WaitRelaySettled waits until the running relay has forwarded or dropped everything
+// it received, and reports whether it did within timeout.
+func (sb *Sandbox) WaitRelaySettled(timeout time.Duration) bool {
+	for deadline := time.Now().Add(timeout); time.Now().Before(deadline); time.Sleep(250 * time.Millisecond) {
+		if c, ok := sb.relayStatsLive(); ok && sum(c, "received.") > 0 && sum(c, "received.") <= sum(c, "forwarded.")+sum(c, "dropped.") {
+			return true
+		}
+	}
+	return false
+}
+
 // waitRelay reports whether the relay answers on its address within timeout.
 func (sb *Sandbox) waitRelay(timeout time.Duration) bool {
 	for deadline := time.Now().Add(timeout); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {

@@ -171,9 +171,10 @@ func titleOf(e telemetryEvidence) (title, thread, attribution string) {
 
 // The interactive TUI attached to Codex's daemon — what a bare `codex` does since
 // 0.157 when a daemon runs. The daemon, not the TUI, runs the thread, its hooks and
-// its export. A thread in the bound repository reaches its project, and its title
-// conversation is adopted into it; then a thread in a personal directory, in the same
-// daemon, reaches nothing — neither its prompt nor its own title.
+// its export. A thread in the bound repository reaches its project, and nothing else
+// does: not its title conversation (unclaimed, and nothing proves it is Codex's own),
+// and not a thread in a personal directory in the same daemon — neither its prompt
+// nor its own title.
 func TestRelayCodexDaemonTUI(t *testing.T) {
 	forEachCodex(t, func(t *testing.T, b Binary, _ bool) {
 		ProvesAll(t, b, "relay.daemon")
@@ -225,10 +226,8 @@ func TestRelayCodexDaemonTUI(t *testing.T) {
 			t.Fatalf("nothing of the repository's daemon thread reached upstream: %v", sb.RelayStats())
 		case calls.Load() < 2:
 			Note(t.Name(), "no title conversation this build")
-		case title == "":
-			t.Errorf("the repository thread's title conversation never reached upstream")
-		case how != "process-sibling" || thread == "" || thread == title:
-			t.Errorf("the title conversation arrived as %q, attributed to %q", how, thread)
+		case title != "":
+			t.Errorf("the unclaimed title conversation %s reached upstream (as %q, for %q)", title, how, thread)
 		}
 
 		personalStart := time.Now()

@@ -306,9 +306,10 @@ func replyingCodexProvider(calls *atomic.Int32) http.Handler {
 
 // The Codex TUI through the relay. After the first reply it starts a conversation of
 // its own to title the thread — its own conversation.id, its own model call and cost,
-// no hook. It is caught: attributed to the thread's project, marked as the relay's
-// inference with the thread it belongs to; and the process's metrics too. Nothing of
-// the session is dropped.
+// no hook, nothing linking it to the thread. Nothing proves it is not the developer's,
+// so it never leaves: only the claimed thread does. The process named two
+// conversations, so its metrics are dropped too (the thread's usage still arrives, in
+// its logs).
 func TestRelayCodexTUITitle(t *testing.T) {
 	forEachCodex(t, func(t *testing.T, b Binary, _ bool) {
 		track(t)
@@ -326,7 +327,7 @@ func TestRelayCodexTUITitle(t *testing.T) {
 		failUnclassified(t, c)
 		e := sb.Receiver.evidence()
 		threads := map[string]bool{}
-		var title, thread string
+		var title string
 		for _, r := range e.logs {
 			if r.Attrs["event.name"] != "codex.conversation_starts" {
 				continue
@@ -334,30 +335,28 @@ func TestRelayCodexTUITitle(t *testing.T) {
 			threads[r.Attrs["conversation.id"]] = true
 			if r.Attrs["approval_policy"] == "never" && r.Attrs["sandbox_policy"] == "read-only" {
 				title = r.Attrs["conversation.id"]
-				if r.Resource["terma.relay.attribution"] != "process-sibling" {
-					t.Errorf("the title conversation arrived without the relay's attribution: %v", r.Resource)
-				}
-				thread = r.Resource["terma.relay.session.id"]
 			}
 		}
-		if calls.Load() < 2 {
+		switch {
+		case calls.Load() < 2:
 			Note(t.Name(), fmt.Sprintf("the TUI made %d model call(s): no title conversation this build", calls.Load()))
-		} else if title == "" {
-			t.Fatalf("the title conversation never reached upstream: %v (conversations %v)", c, threads)
-		}
-		if title != "" && (thread == "" || thread == title || !threads[thread]) {
-			t.Errorf("the title conversation names %q as its thread; conversations %v", thread, threads)
+		case title != "":
+			t.Errorf("the unclaimed title conversation %s reached upstream", title)
+		case len(threads) != 1:
+			t.Errorf("want only the claimed thread upstream, got conversations %v", threads)
 		}
 		for _, r := range e.logs {
 			if r.Resource["service.name"] != "terma-cli" && r.Resource["mirador.project.id"] != sb.ProjectID {
 				t.Errorf("a record reached upstream without the project: %v", r.Attrs)
 			}
 		}
-		if n := sum(c, "dropped.") - sum(c, "dropped.no_session_trace"); n > 0 {
-			t.Errorf("records of the session were dropped: %v", c)
+		// What was dropped is the title conversation's, and the process's work that names
+		// no session; the claimed thread lost nothing.
+		if n := c["dropped.uncovered_process.logs"] + c["dropped.no_key.logs"]; n > 0 {
+			t.Errorf("records of the claimed thread were dropped: %v", c)
 		}
-		if sum(c, "attributed_by_process.metrics") == 0 {
-			t.Errorf("the TUI's metrics were not attributed: %v", c)
+		if n := sum(c, "attributed_by_process."); n > 0 {
+			t.Errorf("a process that named two conversations had %d records attributed to one: %v", n, c)
 		}
 	})
 }

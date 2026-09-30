@@ -651,13 +651,18 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   lost the next turn; it must print nothing (its stdout goes to the model).
 - Routing is one decision (`relay.decide`, `internal/relay/route.go`): a part leaves when
   its session is claimed, covered and keyed, else it waits in the hold for that reason and
-  is dropped under it. A part naming no session (Codex metrics, process-level spans) is
-  attributed by its sender process (`processProject`): all of that process's claimed
-  sessions in one project, or it is ambiguous and dropped — never guessed. An unclaimed
-  conversation is adopted only from a single-workspace Codex client (`codex-tui`,
-  `codex_exec`) and only when its own start carries Codex's internal signature
-  (`approval_policy=never`, `sandbox_policy=read-only`: the TUI's title conversation);
-  inferred attribution is marked on the resource (`terma.relay.attribution`,
+  is dropped under it. Nothing is placed on a guess: a span of a trace nothing has named
+  waits for the trace (`TraceHold`); a part that names no session at all (Codex's
+  metrics, its process-level spans) waits for its **sender to exit**
+  (`Options.ProcessAlive`, `decideExited`, `exitGrace` 10 s for a shutdown flush) and
+  then goes to that process's project only if the process named exactly one session in
+  its life and that session is claimed — while it runs, a shared process (Codex's
+  app-server) that has shown one claimed session may be about to name a personal one.
+  The shared daemon rarely exits, so its unnamed work is dropped (loss, never a leak;
+  Codex's usage also rides its logs). There is no adoption: an unclaimed conversation
+  never leaves, whatever its policies or client (a developer's `codex -a never -s
+  read-only` looks exactly like the TUI's title conversation). Inferred attribution is
+  marked on the resource (`terma.relay.attribution=process`,
   `terma.relay.session.id`). A keyless claim waits too — the key may land mid-session.
 - `claim.Write` is a read-merge-write under a sidecar lock (`<session>.json.lock`, 250 ms,
   falls through): unlocked, 14 of 16 concurrent writers' processes were lost.
@@ -724,8 +729,8 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   and cannot reach the host's loopback. Codex Desktop, and since 0.157 a bare TUI when a
   daemon runs, run threads in `codex app-server`: one process for every workspace, which
   spawns the hooks and exports everything, so only `conversation.id` separates threads,
-  originator is the *first* client's, and adoption rests on evidence (any unclaimed
-  developer thread in the process makes it ambiguous). `session_loop`'s `thread_id`
+  originator is the *first* client's, and nothing it names no session for is attributed
+  while it runs (see routing). `session_loop`'s `thread_id`
   (underscore) is a session key; an unclaimed `codex.conversation_starts` waits
   `TraceHold` (app-server exports it at `thread/start`, the first hook fires at the first
   turn). The daemon reads `[otel]` only at start: `relay setup` and doctor name

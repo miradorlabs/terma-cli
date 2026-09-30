@@ -2,7 +2,6 @@ package relay
 
 import (
 	"context"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -51,12 +50,13 @@ type traceSession struct {
 
 // Why a part cannot leave now. The same reason names the drop when its hold runs out.
 const (
-	whyNoTrace     = "no_session_trace"   // a span of a trace no record has named yet
-	whyUnclaimed   = "unclaimed_expired"  // no hook of an opted-in repository claimed the session
-	whyProcess     = "uncovered_process"  // claimed, but by other processes: resumed elsewhere
-	whyNoKey       = "no_key"             // claimed, but this machine holds no key for the project
-	whyAmbiguous   = "ambiguous_process"  // no session named; its process exports for several projects or sessions not all opted in
-	whyProcessIdle = "no_session_process" // no session named; its process has named none yet
+	whyNoTrace        = "no_session_trace"   // a span of a trace no record has named yet
+	whyUnclaimed      = "unclaimed_expired"  // no hook of an opted-in repository claimed the session
+	whyProcess        = "uncovered_process"  // claimed, but by other processes: resumed elsewhere
+	whyNoKey          = "no_key"             // claimed, but this machine holds no key for the project
+	whyAmbiguous      = "ambiguous_process"  // no session named; its process named more than one session
+	whyProcessIdle    = "no_session_process" // no session named; its process has named none
+	whyProcessRunning = "process_running"    // no session named; attributed only once its process exits
 )
 
 // procPrefix keys a part that names no session and no trace — Codex's metrics — by
@@ -65,184 +65,142 @@ const procPrefix = "proc:"
 
 func procKey(pid int) string { return procPrefix + strconv.Itoa(pid) }
 
-// procWindow is how long a session a process exported counts as that process's for
-// attribution by process: an hour, like the trace index.
-const procWindow = time.Hour
+// maxProcs bounds the process index, and maxProcSessions the sessions one process is
+// remembered to have named: past it the process counts as serving many.
+const (
+	maxProcs        = 4096
+	maxProcSessions = 256
+)
 
-// maxProcs bounds the process → sessions index.
-const maxProcs = 4096
+// exitGrace is how long after a process is seen gone its work waits before it is
+// attributed: an exporter's shutdown flush can still name a session.
+const exitGrace = 10 * time.Second
+
+// procState is what the relay knows of one sending process: every session its records
+// named while it ran, and when it was seen to have exited.
+type procState struct {
+	sessions map[string]bool
+	overflow bool
+	lastSeen time.Time
+	exitedAt time.Time
+}
 
 // attribution says how a part's session was found, when not by the part itself.
 type attribution struct {
 	how     string // "process"
-	session string // the one session the process exported, if it was one
+	session string // the one session the process served
 }
 
-// decide reports whether a part under key, sent by pid and stamped at, may leave now, and if so
-// with which claim and policy, and how its session was found when not by the part
+// decide reports whether a part under key, sent by pid and stamped at, may leave now, and
+// if so with which claim and policy, and how its session was found when not by the part
 // itself; if not, why not.
+//
+// A part is placed only by what it, or its trace, names. A span of a trace nothing has
+// named waits for the trace to be named (TraceHold): a long turn's child spans precede
+// the span that names the session. What never names a session — Codex's metrics, its
+// process-level spans (auth, file stats) — waits for its process to exit, and goes to
+// that process's project only when the process named exactly one session in its life
+// and that session is claimed (decideExited). Nothing is attributed while the process
+// runs: a shared process (Codex's app-server) that has shown one claimed session may be
+// about to name a personal one. The shared daemon rarely exits, so its unnamed work is
+// dropped when its hold runs out: loss, never a guess.
 func (r *Relay) decide(key string, pid int, at time.Time) (claim.Claim, Policy, string, bool, attribution) {
 	if p, ok := strings.CutPrefix(key, procPrefix); ok {
 		n, _ := strconv.Atoi(p)
-		return r.decideProcess(n)
+		return r.decideExited(n)
 	}
 	session := r.sessionFor(key)
 	if session == "" {
-		// A span of a trace nothing has named — mostly process-level work. Its process
-		// may still tell where it belongs.
 		if pid != 0 {
-			if c, pol, _, ok, how := r.decideProcess(pid); ok {
+			if c, pol, _, ok, how := r.decideExited(pid); ok {
 				return c, pol, "", true, how
 			}
 		}
 		return claim.Claim{}, Policy{}, whyNoTrace, false, attribution{}
 	}
-	return r.decideSession(session, pid, at)
+	c, pol, why, ok := r.decideClaimed(session, pid, at)
+	return c, pol, why, ok, attribution{}
 }
 
-// isInternal reports whether session's start said Codex made it for itself: the
-// title generator runs with approval "never" in a read-only sandbox, where a thread a
-// developer started, or resumed from elsewhere, carries the developer's own policies.
-// A session whose start was never seen is not internal: nothing is adopted on a guess.
-func (r *Relay) isInternal(session string) bool {
+// decideExited attributes a part that names no session by its sender, once the sender
+// has exited: to the one session it named in its life, if that session is claimed.
+func (r *Relay) decideExited(pid int) (claim.Claim, Policy, string, bool, attribution) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-	_, ok := r.internal[session]
-	return ok
-}
-
-// singleWorkspace are the Codex clients whose process serves one repository: every
-// real thread it runs is in that repository, so its hooks claim it, and a conversation
-// no hook claimed is Codex's own work for those threads — the title generator the TUI
-// starts after the first prompt. Multi-workspace clients (Desktop, the IDE extension's
-// app server) can hold a personal thread beside a claimed one; nothing is adopted there.
-var singleWorkspace = map[string]bool{"codex-tui": true, "codex_exec": true}
-
-// adoptsLocked reports whether pid is a single-workspace client: every client it has
-// served named itself one. Codex's shared app-server daemon runs threads for the TUI
-// and for Desktop in one process, so one TUI thread does not make it single-workspace.
-// r.mu must be held.
-func (r *Relay) adoptsLocked(pid int) bool {
-	o := r.origins[pid]
-	if len(o) == 0 {
-		return false
-	}
-	for name := range o {
-		if !singleWorkspace[name] {
-			return false
-		}
-	}
-	return true
-}
-
-// processProject is where a process's work belongs: the project that every session
-// the process exported lately and that a hook claimed maps to, under one policy. A
-// single-workspace client's unclaimed sessions (see singleWorkspace) go along with it;
-// anyone else's make the process ambiguous. root is the one claimed session, if there
-// is exactly one. exclude leaves one session out (the one being adopted).
-func (r *Relay) processProject(pid int, exclude string) (c claim.Claim, pol Policy, root, why string, ok bool) {
-	r.mu.Lock()
+	st := r.procs[pid]
 	var sessions []string
-	for s, at := range r.procs[pid] {
-		if s != exclude && r.opts.Now().Sub(at) < procWindow {
+	var exited time.Time
+	overflow := false
+	if st != nil {
+		for s := range st.sessions {
 			sessions = append(sessions, s)
 		}
+		exited, overflow = st.exitedAt, st.overflow
 	}
-	adopts := r.adoptsLocked(pid)
 	r.mu.Unlock()
-	sort.Strings(sessions)
-	var claimed []string
-	for _, s := range sessions {
-		sc, spol, swhy, sok := r.decideClaimed(s, pid, time.Time{})
-		switch {
-		case sok && len(claimed) == 0:
-			c, pol = sc, spol
-			claimed = append(claimed, s)
-		case sok:
-			if sc.ProjectID != c.ProjectID || spol != pol {
-				return claim.Claim{}, Policy{}, "", whyAmbiguous, false
-			}
-			claimed = append(claimed, s)
-		case swhy == whyUnclaimed && adopts && r.isInternal(s):
-			// Codex's own work in this repository: it goes with the claimed threads.
-		case len(sessions) == 1:
-			return claim.Claim{}, Policy{}, "", swhy, false
-		default:
-			return claim.Claim{}, Policy{}, "", whyAmbiguous, false
-		}
+	switch {
+	case st == nil || len(sessions) == 0:
+		return claim.Claim{}, Policy{}, whyProcessIdle, false, attribution{}
+	case exited.IsZero() || r.opts.Now().Sub(exited) < exitGrace:
+		return claim.Claim{}, Policy{}, whyProcessRunning, false, attribution{}
+	case overflow || len(sessions) != 1:
+		return claim.Claim{}, Policy{}, whyAmbiguous, false, attribution{}
 	}
-	if len(claimed) == 0 {
-		if len(sessions) == 0 {
-			return claim.Claim{}, Policy{}, "", whyProcessIdle, false
-		}
-		return claim.Claim{}, Policy{}, "", whyUnclaimed, false
-	}
-	if len(claimed) == 1 {
-		root = claimed[0]
-	}
-	return c, pol, root, "", true
-}
-
-// decideProcess attributes a part that names no session — Codex's metrics, and spans
-// of a trace nothing named — by its sender: it may leave when the sender's work belongs
-// to one project (processProject). A counter cannot be split, so a process working for
-// several projects, or for sessions not all opted in, has its part dropped, not
-// guessed. Codex exec and the TUI serve one repository; their metrics find it this way.
-func (r *Relay) decideProcess(pid int) (claim.Claim, Policy, string, bool, attribution) {
-	c, pol, root, why, ok := r.processProject(pid, "")
+	c, pol, why, ok := r.decideClaimed(sessions[0], pid, time.Time{})
 	if !ok {
 		return claim.Claim{}, Policy{}, why, false, attribution{}
 	}
-	return c, pol, "", true, attribution{how: "process", session: root}
+	return c, pol, "", true, attribution{how: "process", session: sessions[0]}
 }
 
-// learnProcess records that pid exported for session, from a client that named
-// itself originator (Codex's attribute; "" for the others).
-func (r *Relay) learnProcess(pid int, session, originator string) {
+// learnProcess records that pid exported for session.
+func (r *Relay) learnProcess(pid int, session string) {
 	if pid == 0 || session == "" {
 		return
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	m := r.procs[pid]
-	if m == nil {
+	st := r.procs[pid]
+	if st == nil {
 		if len(r.procs) >= maxProcs {
 			r.stats.add("process_index_full", 1)
 			return
 		}
-		m = map[string]time.Time{}
-		r.procs[pid] = m
+		st = &procState{sessions: map[string]bool{}}
+		r.procs[pid] = st
 	}
-	m[session] = r.opts.Now()
-	if originator != "" {
-		o := r.origins[pid]
-		if o == nil {
-			o = map[string]bool{}
-			r.origins[pid] = o
+	st.lastSeen = r.opts.Now()
+	if !st.sessions[session] {
+		if len(st.sessions) >= maxProcSessions {
+			st.overflow = true
+			return
 		}
-		o[originator] = true
+		st.sessions[session] = true
 	}
 }
 
-// decideSession is decide for a part that names its session. A session no hook
-// claimed is adopted into its process's project when the process is a single-workspace
-// client whose claimed sessions all belong to one project: Codex's title conversation.
-func (r *Relay) decideSession(session string, pid int, at time.Time) (claim.Claim, Policy, string, bool, attribution) {
-	c, pol, why, ok := r.decideClaimed(session, pid, at)
-	if ok || why != whyUnclaimed || pid == 0 {
-		return c, pol, why, ok, attribution{}
-	}
+// watchProcesses notes, for each sender still running, whether it has exited; and
+// forgets a process gone long enough that nothing of it can still be held. A relay
+// without Options.ProcessAlive never sees one exit, and attributes nothing by process.
+func (r *Relay) watchProcesses(now time.Time) {
+	alive := r.opts.ProcessAlive
 	r.mu.Lock()
-	adopts := r.adoptsLocked(pid)
-	r.mu.Unlock()
-	if !adopts || !r.isInternal(session) {
-		return c, pol, why, false, attribution{}
+	defer r.mu.Unlock()
+	for pid, st := range r.procs {
+		switch {
+		case !st.exitedAt.IsZero():
+			// Kept past the longest hold a part of it can be in, so the sweep that drops
+			// that part still knows why.
+			if now.Sub(st.exitedAt) > 2*r.opts.TraceHold {
+				delete(r.procs, pid)
+			}
+		case alive != nil && !alive(pid):
+			st.exitedAt = now
+		case now.Sub(st.lastSeen) > 2*r.opts.TraceHold:
+			// Quiet this long with its pid still taken: a process that never exits, or
+			// the pid is another's now. Either way nothing held can be its.
+			delete(r.procs, pid)
+		}
 	}
-	pc, ppol, root, _, pok := r.processProject(pid, session)
-	if !pok {
-		return claim.Claim{}, Policy{}, whyUnclaimed, false, attribution{}
-	}
-	return pc, ppol, "", true, attribution{how: "process-sibling", session: root}
 }
 
 // decideClaimed is decideSession by the session's own claim alone: the placement that
@@ -382,30 +340,16 @@ func (r *Relay) sweep() {
 			delete(r.traces, id)
 		}
 	}
-	for pid, sessions := range r.procs {
-		for s, at := range sessions {
-			if now.Sub(at) >= procWindow {
-				delete(sessions, s)
-			}
-		}
-		if len(sessions) == 0 {
-			delete(r.procs, pid)
-			delete(r.origins, pid)
-		}
-	}
-	for s, at := range r.internal {
-		if now.Sub(at) >= procWindow {
-			delete(r.internal, s)
-		}
-	}
 	r.mu.Unlock()
+	r.watchProcesses(now)
 	r.cache.expire(now)
 
 	r.deliverMu.Lock()
 	defer r.deliverMu.Unlock()
 	for _, key := range keys {
 		hold := r.opts.Hold
-		if strings.HasPrefix(key, tracePrefix) {
+		if strings.HasPrefix(key, tracePrefix) || strings.HasPrefix(key, procPrefix) {
+			// Waiting for a trace to be named, or a process to exit (decide).
 			hold = r.opts.TraceHold
 		}
 		r.mu.Lock()

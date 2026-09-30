@@ -41,13 +41,9 @@ The relay is the way around that. Every agent's global exporter sends to a relay
    - by record for logs, by span for traces, by data point for metrics;
    - using `session.id` (Claude, OpenCode), `conversation.id` (Codex logs), and `thread.id` on Codex's turn span. A numeric `thread.id` is an OS thread, never a session.
    - A span naming no session belongs to its trace's session. The relay learns a trace's session from any span or log record that names both.
-   - **A part naming no session and no named trace is attributed by its process:** Codex's metrics, and its process-level spans. It goes to the project that every claimed session the process exported belongs to, under one policy. When the process has exactly one claimed session, that session is stamped as `terma.relay.session.id`, with `terma.relay.attribution=process`. A process working for several projects, or with sessions not all opted in, is ambiguous; its part is dropped, never guessed.
-   - **Adoption.** A conversation no hook claimed is adopted into its process's project (`terma.relay.attribution=process-sibling`, `terma.relay.session.id` naming the thread) only when all of these hold:
-     - the process is a single-workspace Codex client (`codex-tui`, `codex_exec`);
-     - its claimed sessions all belong to one project;
-     - its own start says Codex made it for itself (`approval_policy=never`, `sandbox_policy=read-only`).
-
-     That is the TUI's title conversation. A thread the developer started or resumed carries their own policies and is never adopted.
+   - **Nothing is placed on a guess.** A span of a trace nothing has named waits, up to 30 minutes, for the trace to be named, and then goes where its session goes.
+   - **A part that names no session at all** (Codex's metrics, its process-level spans such as `auth` and file stats) waits for the process that sent it to exit. It then goes to that process's project only if the process named exactly one session in its life and that session is claimed. It is marked `terma.relay.attribution=process`, with the session as `terma.relay.session.id`. While a process runs, nothing it sends without a session is attributed: a shared process (Codex's app-server, serving Desktop and the TUI) that has shown one claimed session may be about to name a personal one. The shared daemon rarely exits, so its unnamed work is dropped: loss, never a leak. Codex's token usage also arrives in its logs, which are routed exactly.
+   - **No adoption.** A conversation no hook claimed never leaves, whatever its policies or client. The TUI's title conversation (approval `never`, read-only sandbox) looks exactly like a developer's `codex -a never -s read-only`, so it is dropped with the rest.
 5. **It learns which process sent each connection** (`procinfo.FindSender`: the kernel's `proc_info` on macOS, `/proc` on Linux). It does this once per connection, on the connection's first export, while the socket still exists.
 6. **Each session's part is then handled one of three ways:**
    - **Claimed, from a process the claim names, with this machine holding the project's key:**
@@ -184,7 +180,7 @@ The daemon is one process per `CODEX_HOME`, reached at `$CODEX_HOME/app-server-c
 Tests (`live/codex_appserver.go` drives app-server over stdio JSON-RPC the way Desktop does, and a sandbox daemon with a TUI attached to it):
 - **`TestRelayCodexDesktop`:** one process holds a repository thread and a personal thread. The first reaches its project, the second nothing.
 - **`TestRelayCodexDesktopResumedElsewhere`:** a thread is resumed from a personal directory after a restart, and nothing of the resumed turn leaves.
-- **`TestRelayCodexDaemonTUI`:** a TUI attached to the daemon, verified by the claim naming the daemon's pid. The repository thread and its adopted title reach the project. A personal thread in the same daemon, and its title, reach nothing.
+- **`TestRelayCodexDaemonTUI`:** a TUI attached to the daemon, verified by the claim naming the daemon's pid. The repository thread reaches the project; its title conversation, a personal thread in the same daemon and that thread's title reach nothing.
 
 All three pass on 0.157.0 through 0.159.1. The daemon test needs a short `CODEX_HOME`, because a socket path is limited to 104 bytes.
 
@@ -392,8 +388,8 @@ Each beat carries its reason: `start`, `interval`, or `setup`. `terma setup` end
    - **OpenCode's plugin** stamps `session.id` on its logs and spans.
    - **Codex** stamps `conversation.id` on its logs and on no metric. It names the conversation on its turn span only, as `thread.id`; elsewhere `thread.id` is an OS thread number.
 2. **Codex's spans need the trace join.** A turn's child spans are exported before the turn span that names the session, as each ends. The relay learns their trace from Codex's own mid-turn logs, which carry both the conversation and the trace id. That cut unattributable spans from about 310 to about 140 per run and raised forwarded records from about 456 to about 628. A turn longer than the ordinary hold keeps its children.
-3. **Codex's metrics name no session, and are attributed by process.** A Codex exec or TUI process serves one repository, so its metrics go to that project, marked `terma.relay.attribution=process` with the inferred session. The live contract runs the same metric checks through the relay as without it. So are Codex's process-level spans (hook runtime, rollout persistence) and one log event per run that names nothing. A Codex run now reaches upstream whole: 936 of 936 records.
-3b. **Codex's TUI titles each thread in a second conversation** of its own: its own id, its own model call and cost, no hook, started about 7 s after the first reply (0.158, live). It is adopted into the thread's project by its process and its internal-thread signature.
+3. **Codex's metrics name no session, and are attributed by process once it exits.** A `codex exec` that named one claimed session has its metrics, process-level spans and nameless log events go to that project about 10 seconds after it exits, marked `terma.relay.attribution=process`. The live contract runs the same metric checks through the relay as without it. A process that named more than one session — a TUI that ran its title conversation, the shared daemon — has them dropped. (Until a review found it could leak, this attributed by process while the process ran.)
+3b. **Codex's TUI titles each thread in a second conversation** of its own: its own id, its own model call and cost, no hook, started about 7 s after the first reply (0.158, live). Nothing links it to the thread, and its signature is one a developer can produce, so it is not collected; the title itself is read from Codex's session index.
 4. **Content lives in more places than the attribute goldens show:**
    - Claude's `claude_code.tool` span carries a `tool.output` event, holding `bash_command`, and for file tools `content` and `diff`.
    - OpenCode's plugin puts the prompt in a log **body** and the reply in `gen_ai.completion`.
@@ -428,9 +424,9 @@ Each beat carries its reason: `start`, `interval`, or `setup`. `terma setup` end
 | Relay killed mid-session | **Broke:** the next turn was lost. Fixed (`UserPromptSubmit`). |
 | Hold full of never-named traces | **Broke:** new arrivals were refused. Fixed (evict the oldest, unnamed traces first). |
 | Concurrent hooks merging one claim | **Broke:** 14 of 16 writers' processes were lost. Fixed (sidecar lock); the test fails without it. |
-| Codex metrics and process-level spans | **Lost:** about 470 records a run. Now attributed by process, and the full metric contract runs through the relay. |
-| Codex TUI title conversation | **Lost:** never claimed. Now adopted by process and signature. |
-| A TUI resuming a personal thread | Not adopted: the resumed thread starts with the developer's policies. |
+| Codex metrics and process-level spans | **Lost:** about 470 records a run. Now attributed once their process exits having named one claimed session; dropped for a process that served several. |
+| Codex TUI title conversation | Not collected: unclaimed, and nothing proves it is Codex's own. (Adopting it by signature could collect a personal conversation; removed after review.) |
+| A shared process's unnamed trace (review) | **Leaked:** sent with the one claimed session the process had shown, before a personal thread named the trace. Now waits for the trace to be named. |
 | A claim before its key (`terma install` mid-session) | **Broke:** dropped at once. Now held, and released when the key appears. |
 | A hook restarting the relay, with the agent exporting at once (Claude 2.1.280) | **Broke:** the turn was lost. Fixed: the restarting hook waits until the relay listens. |
 | A relay outliving its setup or its binary | **Broke:** it ran on. Fixed: it exits when its token is gone, or when quiet after a binary change. |

@@ -91,6 +91,10 @@ type Options struct {
 	// PeerPID names the process behind a connection from its remote port
 	// (procinfo.FindSender). Without it the session alone decides.
 	PeerPID func(port int) (int, bool)
+	// ProcessAlive reports whether a sender still runs: what names no session is
+	// attributed to its process only once the process exits (decideExited). Without it
+	// nothing is attributed by process.
+	ProcessAlive func(pid int) bool
 	// HTTP sends upstream; a no-redirect client with a 15-second timeout when nil.
 	HTTP *http.Client
 	// Dir is the outbox: where parts that may leave wait for delivery, on disk, so a
@@ -125,9 +129,7 @@ type Relay struct {
 	heldN     int
 	heldBytes int
 	traces    map[string]traceSession
-	procs     map[int]map[string]time.Time // sender pid → sessions it exported, and when
-	origins   map[int]map[string]bool      // sender pid → every client it served (Codex's originator)
-	internal  map[string]time.Time         // sessions whose start says Codex made them for itself
+	procs     map[int]*procState // sender pid → the sessions it named, and whether it exited
 	outbox    outbox
 	senders   map[route]*sender
 	// lastDelivery and agentVersions are what heartbeats report: when the relay last
@@ -175,7 +177,7 @@ func New(opts Options) *Relay {
 		opts: opts, stats: newStats(),
 		cache:  lookupCache{claims: map[string]cachedClaim{}, policies: map[string]cachedPolicy{}},
 		held:   map[string][]heldPart{},
-		traces: map[string]traceSession{}, procs: map[int]map[string]time.Time{}, origins: map[int]map[string]bool{}, internal: map[string]time.Time{}, senders: map[route]*sender{}, outbox: outbox{dir: opts.Dir},
+		traces: map[string]traceSession{}, procs: map[int]*procState{}, senders: map[route]*sender{}, outbox: outbox{dir: opts.Dir},
 		agentVersions: map[string]string{},
 		lastSeen:      opts.Now(), sendCtx: sendCtx, cancelSend: cancel, stopping: make(chan struct{}),
 	}
@@ -294,19 +296,14 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 		p.at = earliest(p.msg)
 		r.stats.received(s, p.records)
 		if p.session != "" && !strings.HasPrefix(p.session, tracePrefix) {
-			r.learnProcess(pid, p.session, originatorOf(p))
+			r.learnProcess(pid, p.session)
 			p.start = conversationStart(p)
-			if p.start && internalStart(p) {
-				r.mu.Lock()
-				r.internal[p.session] = r.opts.Now()
-				r.mu.Unlock()
-			}
 		}
 	}
 	for _, p := range parts {
 		if p.session == "" {
 			// Nothing in the record names a session — Codex's metrics. Its process
-			// might: see decideProcess.
+			// might, once it exits: see decideExited.
 			if pid == 0 {
 				if _, global := r.catchAll(); !global {
 					r.stats.dropped(s, "no_session_id", p.records)

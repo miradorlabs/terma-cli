@@ -283,6 +283,9 @@ func TestRelayCodex(t *testing.T) {
 					t.Logf("content upstream received: %v", leakedFields(sb.Receiver.evidence()))
 				}
 				checkTelemetrySchemaAt(t, sb.Receiver.evidence(), "codex", "relay/codex-"+relayMode(content), newest)
+				// Codex's metrics name no session: they are attributed once `codex exec`
+				// has exited, and the relay has seen it gone for its grace.
+				sb.WaitRelayCount("attributed_by_process.metrics", 1, 30*time.Second)
 				sb.StopRelay()
 				c := sb.RelayStats()
 				noteRelayStats(t.Name(), c)

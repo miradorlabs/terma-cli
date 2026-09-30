@@ -144,6 +144,9 @@ func runBoth(t *testing.T, sandbox func(t *testing.T) *Sandbox, run func(t *test
 		sb.UseRelay(RelayOptions{Start: true, Content: true})
 		run(t, sb)
 		time.Sleep(6 * time.Second)
+		// What names no session waits for its process to exit, and a grace after: let the
+		// relay settle everything it holds before it is stopped.
+		sb.WaitRelaySettled(30 * time.Second)
 		relayed := telemetryShape(sb.Receiver.evidence())
 		sb.StopRelay()
 		c := sb.RelayStats()
