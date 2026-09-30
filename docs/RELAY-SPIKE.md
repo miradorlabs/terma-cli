@@ -27,7 +27,8 @@ The relay is the way around that. Every agent's global exporter sends to a relay
    - **Only on relay machines:** hooks write claims only where `terma relay setup` has run.
 3. **Running the relay.** There are two modes.
    - **On demand:** any claiming hook starts the relay (`terma relay run --quiet`, detached) when its lock is free. A hook that had to start it waits, up to a second, until it listens, so the turn's first export finds it. After a recorded start failure, hooks back off for a minute.
-   - **As a service** (`terma relay daemon install`): a per-user launchd agent on macOS, or a systemd user unit on Linux, always on and restarted by the system.
+   - **As a service, the default:** `terma install` sets up a per-user launchd agent on macOS, a systemd user unit on Linux, or on Windows a Run-key entry starting `terma relay supervise`. macOS shows it under Login Items when it is added. `terma install --relay-service off` (or `terma relay daemon remove`) opts out, and the choice is remembered.
+   - **Restarts:** the service manager restarts the relay only when it exits nonzero: a crash, or exit 75 after it stepped aside for an updated binary. A relay whose setup is gone exits 0 and stays stopped. A service relay that finds a hook-started one running waits for it and takes over.
 
    **When the relay exits:**
    - after 8 idle hours (on demand);
@@ -52,7 +53,13 @@ The relay is the way around that. Every agent's global exporter sends to a relay
    - **Claimed, from a process the claim names, with this machine holding the project's key:**
      - apply the content policy;
      - stamp `mirador.project.id` on the resource;
-     - POST it in native OTLP (protobuf) to the project's own ingest host, with retries per project.
+     - write it to the project's **outbox on disk** (`relay/outbox/<project>/<tool>/`) before the export is answered, so a crash, a restart or a gateway outage loses nothing the relay accepted. Only claimed parts, with their content policy applied, are ever written;
+     - one sender per project delivers the outbox oldest first, in native OTLP (protobuf) to the project's own ingest host, merging up to 64 parts per request:
+       - network errors, 408, 429, 404 and 5xx back off from 1 s to 2 minutes, spread ±20%, never sooner than the host's `Retry-After`;
+       - a refused key (401, 403) is retried every 5 minutes up to an hour, never dropped: the next `terma install` stores a new one;
+       - any other 4xx sets the part aside in `.dead/`;
+       - OTLP partial success is counted and never resent;
+     - bounded at 256 MiB and 14 days; `.dead/` at 32 MiB.
    - **Claimed, but no key:** held like an unclaimed part, and released if the key appears within the hold (a `terma install` moments after the session started); otherwise dropped (`no_key`).
    - **Unclaimed, or from a process the claim doesn't name:**
      - **Held** in memory: 2 minutes normally (`TERMA_RELAY_HOLD`), 30 minutes for spans waiting on their trace.
@@ -82,14 +89,16 @@ The relay is the way around that. Every agent's global exporter sends to a relay
      - tool and agent descriptions, stop sequences, and `file_path`.
 
      **Tested by sabotage:** with `process.command_args` taken off the content list, as though Gemini had just added it, the withheld run leaked nothing. It failed instead, naming the key as unclassified. The same sabotage before the safe list leaked the prompt.
-8. **OTLP/JSON is accepted**, with its hex ids converted before decoding. **On stop**, the relay keeps delivering accepted records for 5 seconds.
-9. **Claims and policies are cached** for 1 s and 5 s, so a busy session costs one file read a second. The claim's read-merge-write runs under a sidecar lock: without it, 14 of 16 concurrent writers' processes were lost. `TERMA_RELAY_DEBUG=1` logs every drop with its key, sender and claim.
-10. **`terma doctor` and `terma status`** replace their export check with the same relay check:
+8. **OTLP/JSON is accepted**, with its hex ids converted before decoding. **On stop**, the relay keeps delivering for 5 seconds; what is left stays in the outbox for the next relay (`queued_at_exit`, then `recovered_from_outbox`).
+9. **Resumed sessions.** Claude and Codex keep a session id across a resume in any directory. A claim keeps each placement (up to 8): resumed in another bound repository, the session gets a new one, and the first run's records — from its own processes, however late — still go to the first project. When a record's sender is unknown, its time picks the placement. Resumed where no bound repository's hook runs, the new process is covered by no placement, and its records are dropped as before.
+10. **Claims and policies are cached** for 1 s and 5 s, so a busy session costs one file read a second. The claim's read-merge-write runs under a sidecar lock: without it, 14 of 16 concurrent writers' processes were lost. `TERMA_RELAY_DEBUG=1` logs every drop with its key, sender and claim.
+11. **`terma doctor` and `terma status`** replace their export check with the same relay check:
    - the relay runs, or can run, on its address with no one else there;
    - each agent exports to it;
    - this repository is bound, with a key on this machine.
 
-   **`terma relay status`** prints the counters by reason, which are also written to `relay/stats.json` on exit.
+   **`terma relay status`** prints the counters by reason, which are also written to `relay/stats.json` on exit, and what waits in the outbox per project.
+12. **Windows:** `LockFileEx` locks, the sender from `GetExtendedTcpTable`, a stop file in place of SIGTERM, detached starts without a console, and self-update that renames the running `terma.exe` aside. It builds, vets and lints, and CI runs its tests on `windows-latest`; it has not run on a developer's Windows machine.
 
 ## What was run
 

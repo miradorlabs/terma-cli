@@ -574,7 +574,12 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   no OTLP dependency — every hook imports it) are forwarded, per project, with that
   project's key and host (`projectEndpoint`), content filtered by its routing record.
   Unclaimed records are held 2 minutes in memory, then dropped; nothing unclaimed touches
-  disk. Claims come from `emitFor` and, for hooks that spool nothing, from the payload
+  disk. A part that may leave is written — content policy applied — to its route's outbox
+  (`relay/outbox/<project>/<tool>/`, `internal/relay/outbox.go`) before the export is
+  answered, and one sender per route delivers it (`forward.go`: merged requests, jittered
+  backoff 1 s → 2 min honouring Retry-After, a refused key retried 5 min → 1 h and never
+  dropped, other 4xx to `.dead/`, OTLP partial success counted); a restart delivers what
+  the last relay left (`recovered_from_outbox`). Bounds: 256 MiB / 14 days, `.dead/` 32 MiB. Claims come from `emitFor` and, for hooks that spool nothing, from the payload
   (`hookrun.ClaimFromPayload`, fed a bounded copy of stdin in `cmd/hook.go`); hooks write
   none unless `relay/token` exists. `relay setup` and the claiming hook start the relay
   (`spawnRelay`, single instance on `relay/relay.lock`, a minute's backoff after a failed
@@ -588,10 +593,14 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   own thread and is claimed too. OTLP/JSON trace and span ids are hex and must be
   converted before protojson (`otlpjson.go`). A session's records leave in arrival order
   (`deliverMu`, held parts first). Every change to the relay's routing keeps
-  `received = forwarded + dropped` (`TestRelayAccountsForEveryRecordUnderLoad`).
+  `received = forwarded + dropped + queued_at_exit` (`TestRelayAccountsForEveryRecordUnderLoad`).
+  A claim keeps up to 8 placements (`claim.Placement`): a session resumed in another bound
+  repository gets a new one, and each record goes by the placement covering its sender, or,
+  sender unknown, the one in effect at the record's time (`claim.At`) — the first run's late
+  records stay with the first project.
 - The sender of a connection is found with the kernel (`procinfo.FindSender`:
   `proc_info` on macOS, offsets pinned by a test against a real socket; `/proc` on
-  Linux) once per connection at its first export, while the socket exists — never with
+  Linux; `GetExtendedTcpTable` on Windows, untested on a real machine) once per connection at its first export, while the socket exists — never with
   lsof or another subprocess. A trace's session is learnt from spans *and* log records
   (Codex's mid-turn logs carry the trace id; its turn span arrives when the turn ends),
   and trace-keyed spans wait `TraceHold` (30 min); a full hold evicts the oldest, unnamed
@@ -610,11 +619,15 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   `terma.relay.session.id`). A keyless claim waits too — the key may land mid-session.
 - `claim.Write` is a read-merge-write under a sidecar lock (`<session>.json.lock`, 250 ms,
   falls through): unlocked, 14 of 16 concurrent writers' processes were lost.
-- The relay can run as a per-user service (`terma relay daemon install|remove`, launchd /
-  systemd --user, named per config directory so sandboxes never collide): the only way to
-  catch what an agent exports before its first hook. It exits when quiet after its binary
-  is replaced (the service manager restarts the new one), when its token is gone, and on
-  `relay setup` (which restarts it). A hook that had to start the relay waits up to 1 s
+- The relay runs as a per-user service by default: `terma install` sets it up
+  (`ensureRelay`, `cmd/relay_service_choice.go`; `--relay-service off`, or `terma relay daemon
+  remove`, opts out and is remembered in `relay/no-service`). launchd / systemd --user /
+  on Windows the Run key starting `terma relay supervise`, named per config directory so
+  sandboxes never collide: the only way to catch what an agent exports before its first
+  hook. The manager restarts it only on a nonzero exit: `ExitRestart` (75) after stepping
+  aside for a replaced binary, or a crash; exit 0 (its token gone) leaves it stopped. A
+  service relay (`--idle 0`) that finds a hook-started one waits and takes over. Tests set
+  `TERMA_RELAY_SERVICE=0` (and a test binary never registers one). A hook that had to start the relay waits up to 1 s
   for it to listen. `TERMA_RELAY_DEBUG=1` logs every drop.
 - `live/relay_workloads_test.go` runs each workload directly and through the relay and
   requires the same telemetry and zero drops; long live matrix runs use frozen copies of
