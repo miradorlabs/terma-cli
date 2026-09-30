@@ -113,7 +113,10 @@ func (e Env) repo(ctx context.Context) (*repo, error) {
 		}
 	}
 	if gitDir == "" {
-		if _, err := project.Load(root); err != nil {
+		// Outside Git a workspace is one `terma install` bound — except in global mode,
+		// where every directory's sessions count: the scratch directory, the home
+		// directory. They keep a private store under the config directory (StateDir).
+		if _, err := project.Load(root); err != nil && (!e.Policy.Global() || !errors.Is(err, project.ErrNotFound)) {
 			return nil, err
 		}
 	}
