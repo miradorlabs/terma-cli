@@ -1,13 +1,11 @@
 //go:build windows
 
-package cmd
+package service
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -15,12 +13,11 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/flock"
-	"github.com/miradorlabs/terma-cli/internal/relay/service"
 )
 
 // On Windows the relay's service is a value under the per-user Run key — no
 // administrator, nothing to register — naming wscript and the launcher script
-// (windowsLauncher), which starts `terma relay supervise` hidden at every logon. The
+// (Windows), which starts `terma relay supervise` hidden at every logon. The
 // registry is written through its API, never `reg.exe`.
 
 const runKeyPath = `Software\Microsoft\Windows\CurrentVersion\Run`
@@ -30,12 +27,12 @@ const runKeyPath = `Software\Microsoft\Windows\CurrentVersion\Run`
 // delivers what it accepted within its grace.
 const supervisorWait = 20 * time.Second
 
-func installWindowsService(_ context.Context, name, path, exe, dir string) error {
+func (m Manager) installWindows(path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
-	launcher := []byte(service.Windows(exe, serviceEnv()))
-	if have, err := os.ReadFile(path); err == nil && string(have) == string(launcher) && supervisorRunning(dir) {
+	launcher := []byte(Windows(m.Exe, m.Env))
+	if have, err := os.ReadFile(path); err == nil && string(have) == string(launcher) && supervisorRunning(m.StateDir) {
 		return nil // installed as it is, and running
 	}
 	if err := config.WriteFileAtomic(path, launcher, 0o600); err != nil {
@@ -50,26 +47,24 @@ func installWindowsService(_ context.Context, name, path, exe, dir string) error
 	if os.Getenv("SystemRoot") == "" {
 		wscript = "wscript.exe"
 	}
-	if err := key.SetStringValue(name, `"`+wscript+`" //B //Nologo "`+path+`"`); err != nil {
+	if err := key.SetStringValue(m.Name, `"`+wscript+`" //B //Nologo "`+path+`"`); err != nil {
 		return fmt.Errorf("write the Run key: %w", err)
 	}
 	// A supervisor started from the launcher this replaced retires on its own; start
 	// this one's now rather than at the next logon.
-	if !waitSupervisorGone(dir) {
+	if !waitSupervisorGone(m.StateDir) {
 		return errors.New("the previous relay supervisor did not stop; the new one starts at the next logon")
 	}
-	sup := exec.Command(exe, "relay", "supervise")
-	detach(sup)
-	if err := sup.Start(); err != nil {
-		return err
+	if m.StartSupervisor == nil {
+		return nil
 	}
-	return sup.Process.Release()
+	return m.StartSupervisor()
 }
 
-func removeWindowsService(_ context.Context, name, path string) error {
+func (m Manager) removeWindows(path string) error {
 	key, err := registry.OpenKey(registry.CURRENT_USER, runKeyPath, registry.SET_VALUE)
 	if err == nil {
-		if err := key.DeleteValue(name); err != nil && !errors.Is(err, registry.ErrNotExist) {
+		if err := key.DeleteValue(m.Name); err != nil && !errors.Is(err, registry.ErrNotExist) {
 			_ = key.Close()
 			return fmt.Errorf("remove the Run key's value: %w", err)
 		}
@@ -79,18 +74,14 @@ func removeWindowsService(_ context.Context, name, path string) error {
 		return err
 	}
 	// Without its launcher the supervisor stops the relay and exits.
-	dir, err := relayDir()
-	if err != nil {
-		return err
-	}
-	if !waitSupervisorGone(dir) {
-		stopRelay(dir)
+	if !waitSupervisorGone(m.StateDir) && m.StopRelay != nil {
+		m.StopRelay()
 	}
 	return nil
 }
 
 func supervisorRunning(dir string) bool {
-	unlock, err := flock.TryLock(filepath.Join(dir, relaySuperviseLock))
+	unlock, err := flock.TryLock(filepath.Join(dir, SuperviseLock))
 	if err == nil {
 		unlock()
 		return false

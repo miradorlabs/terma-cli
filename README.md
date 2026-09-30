@@ -130,7 +130,7 @@ and the relay removes them before anything leaves.
 
 Hooks start the relay when it is not running. `terma relay daemon install` runs it as a
 per-user service instead, so it is up before any agent starts; `terma relay status` shows
-what it has done. See [RELAY-SPIKE.md](docs/RELAY-SPIKE.md) for how it decides, and
+what it has done. See [RELAY.md](docs/RELAY.md) for how it decides, and
 [CONFIGURATION.md](docs/CONFIGURATION.md) for profiles, authentication and export scope.
 
 ## What gets collected

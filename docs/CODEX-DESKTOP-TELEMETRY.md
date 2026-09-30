@@ -3,7 +3,7 @@
 Codex ignores `otel` in repository config. Terma captures Desktop activity with trusted
 repository hooks and its local spool, and — through the local relay `terma install`
 points Codex at — Codex Desktop's own OTLP export for the sessions this repository's
-hooks claim (docs/RELAY-SPIKE.md, "Codex's app-server").
+hooks claim (docs/RELAY.md, "Codex's app-server").
 
 ## Set up
 

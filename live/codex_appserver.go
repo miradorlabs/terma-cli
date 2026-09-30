@@ -18,7 +18,7 @@ import (
 
 // Codex Desktop, the IDE extension and — since 0.157, by default — the interactive TUI
 // run their threads in `codex app-server`, one process serving every workspace: it
-// spawns the hooks and exports all the telemetry (docs/RELAY-SPIKE.md, "Codex's
+// spawns the hooks and exports all the telemetry (docs/RELAY.md, "Codex's
 // app-server"). AppServer drives one over stdio JSON-RPC the way Desktop does:
 // initialize with a client name, then thread/start (or thread/resume) with a cwd and
 // turn/start, waiting for turn/completed. Verified against the 0.159 schema

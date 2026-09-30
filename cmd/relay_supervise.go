@@ -14,6 +14,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/flock"
+	"github.com/miradorlabs/terma-cli/internal/relay/service"
 )
 
 // Windows has no per-user service manager that restarts a process: the Run key starts
@@ -24,10 +25,8 @@ import (
 // that exits 0 is done for good — its token is gone, terma was uninstalled — and the
 // supervisor ends with it.
 
-const (
-	relaySuperviseLock = "supervise.lock"
-	relaySupervisorPID = "supervisor.pid"
-)
+// relaySupervisorPID records the running supervisor; its lock is service.SuperviseLock.
+const relaySupervisorPID = "supervisor.pid"
 
 // supervisor is what superviseRelay needs, so a test can drive it without a relay.
 type supervisor struct {
@@ -114,7 +113,7 @@ func newRelaySuperviseCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			unlock, err := flock.TryLock(filepath.Join(dir, relaySuperviseLock))
+			unlock, err := flock.TryLock(filepath.Join(dir, service.SuperviseLock))
 			if flock.IsBusy(err) {
 				return nil // another supervisor runs this relay
 			}
@@ -122,11 +121,11 @@ func newRelaySuperviseCommand() *cobra.Command {
 				return err
 			}
 			defer unlock()
-			name, err := relayServiceName()
+			svc, err := relayService()
 			if err != nil {
 				return err
 			}
-			definition, err := relayServicePath(name)
+			definition, err := svc.Path()
 			if err != nil {
 				return err
 			}

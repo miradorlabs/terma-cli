@@ -454,7 +454,7 @@ func (r *Relay) withholdQueued(sig Signal, body []byte, pol Policy) []byte {
 	if pol.RequireClaim && hasCatchAll(&part{signal: sig, msg: msg}) {
 		return nil
 	}
-	if pathExcluded(&part{signal: sig, msg: msg}, pol.ExcludePaths) {
+	if pathExcluded(msg, pol.ExcludePaths) {
 		return nil
 	}
 	unclassified := map[string]int{}

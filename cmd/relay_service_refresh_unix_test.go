@@ -28,11 +28,11 @@ func TestRefreshRestartsRelayWithStaleServiceDefinition(t *testing.T) {
 			if out, err := runTerma(t, "relay", "setup", "--no-start", "--addr", addr, "--harness", "codex"); err != nil {
 				t.Fatalf("setup: %v\n%s", err, out)
 			}
-			name, err := relayServiceName()
+			svc, err := relayService()
 			if err != nil {
 				t.Fatal(err)
 			}
-			path, err := relayServicePath(name)
+			path, err := svc.Path()
 			if err != nil {
 				t.Fatal(err)
 			}

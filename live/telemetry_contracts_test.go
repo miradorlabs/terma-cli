@@ -309,7 +309,7 @@ func awaitTelemetry(t *testing.T, sb *Sandbox, check func(contractReporter, tele
 }
 
 // checkCodexTelemetry checks one Codex session's export. relayed is the local relay's
-// contract (docs/RELAY-SPIKE.md): Codex's metrics name no session and arrive
+// contract (docs/RELAY.md): Codex's metrics name no session and arrive
 // attributed by process — the project, the inferred session and the attribution on
 // their resource — and a project that withholds tool content loses the tool call's
 // arguments too, stricter than Codex's own switch, which only drops the output.

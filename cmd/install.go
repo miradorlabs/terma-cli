@@ -261,7 +261,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	}
 	f.excludePrompts = !include
 	f.excludeToolContent = !resolveToolContent(cmd, cfg.ProjectID, f)
-	if len(relayTargets(agents)) > 0 {
+	if len(exporter.Targets(agents)) > 0 {
 		if include {
 			ui.summary("Prompts", "prompt text and model responses are sent — `terma install --prompts off` stops them")
 		} else {
@@ -679,7 +679,7 @@ func resolveInstallHarnesses(cmd *cobra.Command, cfg *config.Config, f installFl
 }
 
 // connectHarnessesForRepo points the developer's agents at this repository's project
-// through the local relay (docs/RELAY-SPIKE.md): the project's key for each agent with a
+// through the local relay (docs/RELAY.md): the project's key for each agent with a
 // native exporter (the keystore — the relay sends the project's sessions with it), the
 // project's routing record (its signals and what content may leave: the relay's policy
 // for it), and each agent's user-level exporter pointed at the relay, which is started.
@@ -691,7 +691,7 @@ func connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *config.Conf
 	if err != nil {
 		return err
 	}
-	targets := relayTargets(agents)
+	targets := exporter.Targets(agents)
 	if len(targets) == 0 {
 		return nil
 	}
@@ -748,9 +748,6 @@ func connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *config.Conf
 	}
 	return nil
 }
-
-// relayTargets resolves selected agent surfaces through the exporter registry.
-func relayTargets(agents []string) []string { return exporter.Targets(agents) }
 
 // installAdapters lists the agents whose committed hooks to wire. --adapters overrides
 // it outright; otherwise it is the union of the agents the repository's hooks files

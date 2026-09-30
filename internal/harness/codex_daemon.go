@@ -10,7 +10,7 @@ import (
 // Codex's app-server daemon (0.157+ runs the interactive TUI's threads in it by
 // default, and Codex Desktop's) reads the [otel] exporter once, when it starts: a
 // config change reaches its threads only after `codex app-server daemon restart`
-// (docs/RELAY-SPIKE.md). Its record is $CODEX_HOME/app-server-daemon/daemon.pid:
+// (docs/RELAY.md). Its record is $CODEX_HOME/app-server-daemon/daemon.pid:
 // {"pid":…, "processIdentity":{"startSeconds":…}, …}.
 
 // CodexDaemon is a running Codex app-server daemon.

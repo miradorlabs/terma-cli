@@ -1,4 +1,4 @@
-# Local relay spike
+# Local relay
 
 ## Why
 

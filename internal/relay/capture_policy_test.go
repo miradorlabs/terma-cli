@@ -2,12 +2,14 @@ package relay
 
 import (
 	"context"
-	"github.com/miradorlabs/terma-cli/internal/relay/claim"
-	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
+
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"

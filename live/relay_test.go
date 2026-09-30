@@ -20,7 +20,7 @@ import (
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 )
 
-// The local relay spike (docs/RELAY-SPIKE.md), end to end: real Claude Code and Codex
+// The local relay (docs/RELAY.md), end to end: real Claude Code and Codex
 // builds export through their global configuration to `terma relay run` on loopback,
 // hooks in the installed repository claim their sessions, and the receiver stands in
 // for Terma upstream. What these prove:
@@ -378,7 +378,7 @@ func TestRelayNegativeControls(t *testing.T) {
 
 // The relay is not running when the agent starts: the first hook that claims the
 // session starts it. This records what arrived rather than failing on it — how the
-// first export races the relay's start is what the spike is here to measure.
+// first export races the relay's start is what this scenario measures.
 func TestRelayColdStart(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
 		ProvesAll(t, b, "relay.cold_start")

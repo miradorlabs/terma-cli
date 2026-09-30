@@ -3,7 +3,7 @@
 // the marked block in the shell's startup file that put them on PATH, and Claude Code's
 // per-project settings documents — and keeps the scripts still installed on a machine
 // working until they are gone. Agents are routed by the local relay now
-// (docs/RELAY-SPIKE.md); nothing here installs anything.
+// (docs/RELAY.md); nothing here installs anything.
 //
 // It also knows the developer's shell startup file (ShellRC), which doctor names when it
 // tells a developer how to put terma's own directory on PATH.

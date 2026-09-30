@@ -146,7 +146,7 @@ in an installed repository claimed it, to that repository's project, with its ke
 under its content policy. Everything else is held briefly in memory and dropped; nothing
 unclaimed goes on the wire. Agents without a usable exporter get one terma writes into
 them (OpenCode, omp, Pi, Hermes, DeepSeek Harness). The design, what it catches and misses,
-and every attempt to break it are in [RELAY-SPIKE.md](RELAY-SPIKE.md).
+and every attempt to break it are in [RELAY.md](RELAY.md).
 
 The costs: a process on the developer's machine (started by hooks, or a per-user service,
 which macOS announces as a background item), and exporter settings that are machine-wide
@@ -154,16 +154,24 @@ which macOS announces as a background item), and exporter settings that are mach
 
 ### Relay package boundaries
 
-`internal/relay` owns OTLP admission, attribution, filtering and delivery. Its focused
-subpackages keep the other responsibilities out of command handlers:
+`internal/relay` owns OTLP admission, attribution, filtering and delivery, and the
+capture decision for a claim (`CapturePolicy`: team policy as the ceiling, the routing
+record narrowing it). Its focused subpackages keep the other responsibilities out of
+command handlers:
 
 - `claim`: the small, local session-claim store that hooks can import without OTLP.
 - `exporter`: the `Exporter` interface and registry for machine-level exporter setup.
   Native exporters and extension exporters implement the same configuration operation.
   The registry also owns hook-label normalization and surface selection, so adding an
   exporter does not require another agent-name switch in `cmd`.
-- `service`: rendering launchd, systemd and Windows service definitions. The CLI owns
-  service-manager execution, relay startup and user-facing reporting.
+- `service`: the per-user service — launchd, systemd and Windows definitions, and the
+  `Manager` that installs, removes and finds them. The CLI decides when, starts the
+  relay itself, and reports.
+
+`cmd` keeps what reads this machine's state and talks to the developer: the resolver
+that loads the profile, keys and routing record for `CapturePolicy` (`relay_policy.go`),
+`relay run` (`relay_run.go`), starting and stopping it (`relay_lifecycle.go`), setup
+(`relay_setup.go`), and status and doctor (`relay_status.go`).
 
 Repository routing records narrow team capture with their saved harness list as well
 as signals and content. A claimed session from an unselected harness is withheld on

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/relay/service"
 )
 
 // The relay runs as a per-user service by default: `terma install` sets it up wherever
@@ -51,7 +52,7 @@ func relayServiceWanted(flag string) bool {
 	if exe, err := os.Executable(); err != nil || strings.HasSuffix(filepath.Base(exe), ".test") {
 		return false
 	}
-	return relayServiceSupported()
+	return service.Supported()
 }
 
 // ensureRelay leaves a relay running for the agents install just pointed at it: the

@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Stats counts what the relay did with every record, by reason, so a spike run (and
+// Stats counts what the relay did with every record, by reason, so a run (and
 // the live canary) can say exactly what was forwarded and why the rest was not. A
 // record is a log record, a span or a metric data point.
 type Stats struct {

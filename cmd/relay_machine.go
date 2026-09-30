@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+
+	"github.com/miradorlabs/terma-cli/internal/relay/exporter"
 )
 
 // relayReport is how the machine-level relay setup tells its caller what it did: ok
@@ -22,7 +24,7 @@ type relayReport struct {
 // itself, as a service unless the developer opted out. It needs no project: which
 // sessions leave is the claims' business, per repository.
 func connectMachineRelay(ctx context.Context, agents []string, relayService string, r relayReport) error {
-	targets := relayTargets(agents)
+	targets := exporter.Targets(agents)
 	if len(targets) == 0 {
 		return nil
 	}

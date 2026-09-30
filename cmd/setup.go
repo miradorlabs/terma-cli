@@ -18,6 +18,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/prompt"
+	"github.com/miradorlabs/terma-cli/internal/relay/exporter"
 	"github.com/miradorlabs/terma-cli/internal/style"
 )
 
@@ -179,7 +180,7 @@ func runSetup(cmd *cobra.Command, f setupFlags) error {
 		return err
 	}
 	// 6. The check-in: the relay reports this machine to the organization now.
-	if len(relayTargets(names)) > 0 {
+	if len(exporter.Targets(names)) > 0 {
 		if ok, what := relayCheckIn(cmd.Context()); ok {
 			fmt.Fprintln(out, "  Check-in: "+what)
 		} else {

@@ -267,7 +267,7 @@ developer login to check the team's repository permission.
   key cannot read collection policy: real installs use the saved developer login for
   policy even when `TERMA_API_KEY` identifies and delivers for the binding. Without a
   saved login, unset `TERMA_API_KEY` and run `terma setup` first.
-- Per-repo routing is the local relay (below, and `docs/RELAY-SPIKE.md`): `terma install`
+- Per-repo routing is the local relay (below, and `docs/RELAY.md`): `terma install`
   points each of the developer's agents' user-level exporters at the relay
   (`pointAgentsAtRelay`, shared with `terma relay setup`), keeps the project's key in the
   keystore and its policy in the routing record (`internal/routing`: `routing/<id>.json`,
@@ -622,9 +622,9 @@ exploration it superseded (`pocs/funding-observer` and two handover files in the
 removed on 2026-09-21; it is in the history before that. The one piece of it still cited, the
 provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
 
-## Local relay (spike)
+## Local relay
 
-- `docs/RELAY-SPIKE.md`. `terma relay setup|run|status` (hidden): the agents' global
+- `docs/RELAY.md`. `terma relay setup|run|status` (hidden): the agents' global
   exporters send to `127.0.0.1:43180` with a local token (`relay/token`); only sessions a
   hook in a bound repository claimed (`relay/claims/<session>.json`, `internal/relay/claim`,
   no OTLP dependency — every hook imports it) are forwarded, per project, with that
@@ -789,7 +789,7 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   ties the list to the withheld-mode goldens.
 - Never read harness log files to fill a gap: what the relay knows comes from OTLP and
   hook payloads. The pre-relay hook readers (Codex rollouts and `session_index.jsonl`,
-  `~/.claude.json`; listed in `docs/RELAY-SPIKE.md`, "What still reads files on disk")
+  `~/.claude.json`; listed in `docs/RELAY.md`, "What still reads files on disk")
   stay only because what they capture — Codex's replies, thread titles, quota, Claude's
   account state — is exported nowhere else; nothing new may add one.
 - OTLP types come from `go.opentelemetry.io/proto/otlp/{logs,metrics,trace}` as

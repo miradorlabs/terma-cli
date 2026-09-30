@@ -1,5 +1,6 @@
-// Package service renders per-user relay service definitions. Service-manager
-// execution remains with the CLI, which owns lifecycle and reporting.
+// Package service is the relay's per-user service: the definitions (Launchd, Systemd,
+// Windows) and the Manager that installs, removes and finds them. The CLI decides when
+// to, and reports what happened.
 package service
 
 import (

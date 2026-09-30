@@ -122,7 +122,7 @@ func heartbeatFacts(dir string) map[string]any {
 		}
 	}
 	facts["terma.relay.agents_pointed"] = pointed
-	if _, ok := codexDaemonPredates(dir); ok {
+	if _, ok := exporter.CodexDaemonPredates(dir); ok {
 		facts["terma.codex.daemon_predates_setup"] = true
 	}
 	return facts
