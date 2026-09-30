@@ -146,3 +146,64 @@ func TestHookYields(t *testing.T) {
 		}
 	}
 }
+
+// Where the organization deployed terma's hooks as managed configuration, setup writes
+// none of its own for that agent — and takes away any it wrote before the deployment —
+// while a repository's committed hooks still step aside for it.
+func TestSetupGlobalModeDefersToManagedHooks(t *testing.T) {
+	codexHome := globalSandbox(t)
+	t.Setenv("TERMA_POLICY_STUB", globalStub)
+	if out, err := runTerma(t, "setup", "--harness", "claude,codex"); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	// The organization deploys Codex's hooks afterwards.
+	root := t.TempDir()
+	prev := managedRoot
+	managedRoot = root
+	t.Cleanup(func() { managedRoot = prev })
+	out := t.TempDir()
+	if _, err := writeManagedConfig(out, "$HOME/.local/bin/terma"); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(filepath.Join(out, "codex-requirements.toml"))
+	if err := os.MkdirAll(filepath.Join(root, "etc", "codex"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "etc", "codex", "requirements.toml"), data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	setupOut, err := runTerma(t, "setup", "--harness", "claude,codex")
+	if err != nil {
+		t.Fatalf("setup: %v\n%s", err, setupOut)
+	}
+	codex, _ := os.ReadFile(filepath.Join(codexHome, "hooks.json"))
+	claude, _ := os.ReadFile(filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), "settings.json"))
+	if strings.Contains(string(codex), "hook --user") {
+		t.Fatalf("setup kept its own Codex hooks beside the managed ones:\n%s", codex)
+	}
+	if !strings.Contains(string(claude), "hook --user") {
+		t.Fatal("Claude Code, with no managed hooks, lost its machine-wide ones")
+	}
+	if strings.Contains(setupOut, "`/hooks`") {
+		t.Fatalf("setup asked to trust hooks the organization manages:\n%s", setupOut)
+	}
+	if !userHooksCover("codex") || !userHooksCover("claude-code") {
+		t.Fatal("the agents' repository hooks would not step aside")
+	}
+}
+
+// --managed-config writes the files an organization deploys and needs no sign-in.
+func TestSetupWritesManagedConfig(t *testing.T) {
+	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	dir := t.TempDir()
+	out, err := runTerma(t, "setup", "--managed-config", dir)
+	if err != nil {
+		t.Fatalf("setup --managed-config: %v\n%s", err, out)
+	}
+	for _, f := range []string{"README.md", "claude-managed-settings.json", "codex-requirements.toml"} {
+		data, err := os.ReadFile(filepath.Join(dir, f))
+		if err != nil || (f != "README.md" && !strings.Contains(string(data), `"$HOME/.local/bin/terma" hook --user`) && !strings.Contains(string(data), `\"$HOME/.local/bin/terma\" hook --user`)) {
+			t.Errorf("%s: %v\n%s", f, err, data)
+		}
+	}
+}

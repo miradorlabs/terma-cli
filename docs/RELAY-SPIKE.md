@@ -355,6 +355,22 @@ The relay's own attribution reads no harness files: everything it knows comes fr
 
 Each read is bounded and confined as `CLAUDE.md` describes, and replies and titles travel under the prompt-consent gate. These should be replaced the day a harness exports the same facts. Nothing new may add such a read.
 
+## Global mode
+
+For company laptops where the organization wants all AI spend, its policy (fetched by `terma setup`; the endpoint is a stub until the account service ships it) can say **global**. Then every session and commit on the machine is collected, not only those in repositories that opted in. `terma setup` puts it in place and a setup back in repo mode takes all of it away:
+
+- **Placement.** A bound repository keeps its project. An unbound one goes to the project its origin remote maps to, else the organization's default project. A directory outside any repository goes to the default. The relay sends whatever nothing placed by the end of its hold (unclaimed, sessionless, an ambiguous process) to the default project, marked `terma.relay.attribution=catch-all`, instead of dropping it.
+- **Machine-wide agent hooks.** terma's entries go in Claude Code's, Codex's and Cursor's user-level hooks files. For those agents they are the hooks that act, and a repository's committed hooks step aside, because Codex skips repository hooks until each developer trusts them. Codex asks the developer to trust the machine-wide entries once.
+- **Managed configuration.** `terma setup --managed-config <dir>` writes the same hooks as Claude Code's managed settings and Codex's `requirements.toml`, for IT to deploy. Codex runs managed hooks with no trust step (codex-rs `hooks/src/engine/discovery.rs`: managed layers are trusted). Where they are deployed, setup writes none of its own. The exporter settings stay per user, because each machine's relay has its own token.
+- **Commits.** `git config --global core.hooksPath` points at a directory with a script for every git hook name. terma runs for `prepare-commit-msg` and `post-commit`, and then the hook git would have run: the repository's own, or the developer's own global directory, which is recorded and restored. A repository that sets its own `core.hooksPath` (husky, `terma install`'s shims) outranks it and is stamped by its committed line.
+
+**Verified with the real agents:**
+- Claude Code 2.1.285 in a bound repository, one with a mapped remote, one with an unknown remote, and a directory outside any repository. Each session reaches its project exactly once, with a key the relay minted, and each commit carries the session that wrote it.
+- Codex 0.158.0 outside any repository and in an unknown one. Its threads and its metrics reach the default project.
+- Both on macOS, and on a fresh Linux machine in Docker (`make machines` in `live/`), which also deploys the managed configuration to `/etc` and runs Codex without its trust bypass.
+
+**Not reached in global mode:** Cursor's own telemetry (it goes to Cursor's backend only), Claude Desktop's cowork VM, Goose, Aider, and AI used in a browser. The complete spend figure has to come from the providers' admin exports, reconciled against this.
+
 ## Findings
 
 1. **Session keys:**

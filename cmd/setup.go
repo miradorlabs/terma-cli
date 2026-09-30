@@ -28,6 +28,11 @@ type setupFlags struct {
 	// relayService is --relay-service: "on", "off", or "" (keep the recorded choice; on
 	// where a service can run).
 	relayService string
+	// managedConfig is --managed-config: write global mode's hooks as managed
+	// configuration into this directory, for an organization to deploy, and do nothing
+	// else. managedTerma is the path those hooks call terma by.
+	managedConfig string
+	managedTerma  string
 }
 
 const codexDesktopAgent = "codex-desktop"
@@ -70,11 +75,24 @@ hooks claim its sessions. ` + "`terma install`" + ` connects a repository from h
 	cmd.Flags().BoolVar(&f.noBrowser, "no-browser", false, "print the sign-in URL instead of opening a browser")
 	cmd.Flags().BoolVarP(&f.assumeYes, "yes", "y", false, "skip the browser prompt and picker; record every available installed agent")
 	cmd.Flags().StringVar(&f.relayService, "relay-service", "", "run the local relay as a background service: on or off (default: on, or your last choice)")
+	cmd.Flags().StringVar(&f.managedConfig, "managed-config", "", "write global mode's hooks as managed configuration into this directory, for your organization to deploy, and exit")
+	cmd.Flags().StringVar(&f.managedTerma, "managed-terma", "$HOME/.local/bin/terma", "with --managed-config: where terma is installed on the machines")
 	return cmd
 }
 
 func runSetup(cmd *cobra.Command, f setupFlags) error {
 	out := cmd.OutOrStdout()
+	if f.managedConfig != "" {
+		files, err := writeManagedConfig(f.managedConfig, f.managedTerma)
+		if err != nil {
+			return err
+		}
+		for _, p := range files {
+			fmt.Fprintln(out, "Wrote "+tildePath(p))
+		}
+		fmt.Fprintln(out, "Deploy them as the README there says; each developer still runs `terma setup` once.")
+		return nil
+	}
 	cfg, err := loadConfig()
 	if err != nil {
 		return err
@@ -181,13 +199,9 @@ func applyGlobalMode(ctx context.Context, agents []string, global bool, said, th
 		return err
 	}
 	for _, f := range files {
-		if global {
-			said("Hooks for every session: " + tildePath(f))
-		} else {
-			said("Machine-wide hooks removed: " + tildePath(f))
-		}
+		said("Machine-wide hooks updated: " + tildePath(f))
 	}
-	if global && slices.Contains(userHookAgents(agents), "codex") && len(files) > 0 {
+	if global && slices.Contains(userHookAgents(agents), "codex") && !managedHooksDeployed("codex") && len(files) > 0 {
 		then("Codex runs its machine-wide hooks once you trust them: in Codex, open `/hooks` (Desktop: Settings → Hooks → Review) and approve Terma's. An organization that deploys them as managed configuration skips this step.")
 	}
 	changed, err := applyGlobalGitHooks(ctx, global)

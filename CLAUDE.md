@@ -214,6 +214,35 @@ run that reaches them opens a browser login on **production**. A script that run
   one stat afterwards — the hook-restoration record says it was wired). cmd's `TestMain`
   gives every test a private HOME: a setup test that sandboxed only terma's config dir
   rewrote the developer's real `~/.codex/config.toml`.
+- **Global mode** (`config.ModeGlobal`, the organization's policy): company laptops where
+  the organization wants all AI spend — invasive on purpose, never the default. What
+  changes, all of it written by `terma setup` and removed by a setup back in repo mode:
+  - Placement: a bound repository keeps its binding; an unbound one is placed by its origin
+    (`Policy.ProjectFor`: `Remotes`, `config.NormalizeRemote`), else `DefaultProjectID`; a
+    directory outside any repository goes to the default and gets the private workspace
+    store (`hookrun.Env.Policy`, `repo()`). The relay files whatever nothing placed by the
+    end of its hold under the default (`relay.Options.CatchAll`, marked
+    `terma.relay.attribution=catch-all`) instead of dropping it.
+  - Machine-wide agent hooks (`cmd/global_hooks.go`): terma's entries in Claude Code's,
+    Codex's and Cursor's user-level hooks files, `terma hook --user <event>` by absolute
+    path (`hookmgr.UserHookCommand`, recognized by shape). For the agents they cover they
+    are the ones that act — a repository's committed hooks step aside (`hookYields`, from
+    `relay/user-hooks.json`) because Codex skips repository hooks until trusted; outside
+    global mode a `--user` hook does nothing. Codex asks the developer to trust them once.
+  - Managed configuration (`terma setup --managed-config <dir>`): the same hooks as
+    Claude Code's `managed-settings.json` and Codex's `requirements.toml` `[hooks]`, calling
+    terma through `$HOME` (`hookmgr.ManagedHookCommand`), which Codex runs with no trust
+    step. Where they are deployed (`managedHooksDeployed`) setup writes none of its own.
+  - Commits (`cmd/global_git.go`): `git config --global core.hooksPath` → a directory with
+    a script per git hook name: terma for prepare-commit-msg / post-commit, then the hook
+    git ran before (the repository's `.git/hooks`, or the developer's own global directory,
+    recorded in `.previous-hooks-path` and restored). A repository's local core.hooksPath
+    (husky, `terma install`'s shims) outranks it.
+  - Tests: `live/global_test.go` runs it with real agents (safe anywhere: the sandbox owns
+    HOME and git's global config); `make machines` (in `live/`) runs it, and the core relay
+    contracts, on a fresh Linux machine in Docker (`live/machine/Dockerfile`, seccomp
+    unconfined for Codex's bwrap), including the managed-config scenario that writes
+    `/etc` (`TERMA_MACHINE=1` only).
 - Everything else per-repository is `terma install`, including what `setup` used to do on the way: per-clone `core.hooksPath`
   wiring, the Claude status-line wrap, and the **spool key**. That key (`keystore.Get(project)`)
   is what hook events are delivered with; pointing a telemetry agent stores it as a side effect

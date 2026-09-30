@@ -235,3 +235,77 @@ func TestGlobalModeCodex(t *testing.T) {
 		}
 	})
 }
+
+// machineOnly skips a scenario that writes the machine's own configuration (/etc):
+// it runs only on the throwaway machine `make machines` starts.
+func machineOnly(t *testing.T) {
+	t.Helper()
+	if os.Getenv("TERMA_MACHINE") != "1" {
+		t.Skip("writes the machine's system configuration: runs only under `make machines`")
+	}
+}
+
+// deployManaged puts the files `terma setup --managed-config` writes where an
+// organization's deployment would: Codex's system requirements and Claude Code's managed
+// settings.
+func (sb *Sandbox) deployManaged() {
+	t := sb.T
+	t.Helper()
+	out := filepath.Join(sb.Dir, "managed")
+	sb.terma(sb.Home, "setup", "--managed-config", out, "--managed-terma", sb.Terma)
+	for from, to := range map[string]string{
+		"codex-requirements.toml":      "/etc/codex/requirements.toml",
+		"claude-managed-settings.json": "/etc/claude-code/managed-settings.json",
+	} {
+		data, err := os.ReadFile(filepath.Join(out, from))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(to, data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Remove(to) })
+	}
+}
+
+// Global mode deployed by the organization as managed configuration: setup writes no
+// per-user hooks for Claude Code or Codex, and the managed ones claim every session —
+// Codex's without anyone trusting them (its hook trust is not bypassed here).
+func TestGlobalModeManagedConfig(t *testing.T) {
+	machineOnly(t)
+	forEachCodex(t, func(t *testing.T, b Binary, _ bool) {
+		track(t)
+		t.Setenv("OPENAI_API_KEY", "synthetic-telemetry-key")
+		sb := New(t, Isolated, WithCodex(b))
+		sb.deployManaged()
+		sb.UseGlobalSetup("claude,codex")
+		for _, f := range []string{filepath.Join(sb.CodexHome, "hooks.json"), filepath.Join(sb.ClaudeConfig, "settings.json")} {
+			if data, _ := os.ReadFile(f); strings.Contains(string(data), "hook --user") {
+				t.Errorf("setup wrote per-user hooks beside the managed ones: %s", f)
+			}
+		}
+		scratch := filepath.Join(sb.Dir, "scratch")
+		_ = os.MkdirAll(scratch, 0o700)
+		var calls atomic.Int32
+		provider := httptest.NewServer(codexTelemetryProvider(t, &calls))
+		defer provider.Close()
+		sb.WorkDir = scratch
+		sb.CodexHooksUntrusted = true
+		run := sb.CodexExec(RouteAPIKey, telemetryPrompt, fixtureCodexArgs(provider.URL)...)
+		got := map[string]int{}
+		agent := func(l LogRecord) bool { return l.Attrs["conversation.id"] == run.ThreadID }
+		sb.Receiver.WaitLogs(60*time.Second, agent)
+		time.Sleep(2 * time.Second)
+		for _, l := range sb.Receiver.Logs() {
+			if agent(l) {
+				got[l.Resource["mirador.project.id"]]++
+			}
+		}
+		if len(got) != 1 || got[globalDefault] == 0 {
+			t.Errorf("thread %s filed under %v, want only %s: the managed hooks did not claim it", run.ThreadID, got, globalDefault)
+		}
+		if starts := sb.Delivered("terma.session.start", run.ThreadID, 30*time.Second); len(starts) != 1 {
+			t.Errorf("thread announced %d times, want once", len(starts))
+		}
+	})
+}

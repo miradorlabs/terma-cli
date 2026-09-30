@@ -13,8 +13,9 @@ import (
 	"strings"
 )
 
-// userHookShape is UserHookCommand's output for any path and event.
-var userHookShape = regexp.MustCompile(`^\[ -x '(?:[^']|'\\'')+' \] && '(?:[^']|'\\'')+' hook --user [a-z0-9-]+ \|\| true$`)
+// userHookShape is UserHookCommand's (and ManagedHookCommand's) output for any path
+// and event.
+var userHookShape = regexp.MustCompile(`^\[ -x ('(?:[^']|'\\'')+'|"(?:[^"\\]|\\.)+") \] && ('(?:[^']|'\\'')+'|"(?:[^"\\]|\\.)+") hook --user [a-z0-9-]+ \|\| true$`)
 
 // callsTerma reports whether an entry contains a recognized Terma command, including
 // older unguarded commands. Mentions inside user scripts are not ownership evidence.

@@ -6,7 +6,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
+	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/harness"
@@ -81,29 +83,29 @@ func applyUserHooks(agents []string, install bool) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	targets := userHookAgents(agents)
-	if !install {
-		targets = []string{"claude", "codex", "cursor"}
-	}
+	covered := userHookAgents(agents)
 	var changed []string
-	for _, a := range targets {
+	for _, a := range []string{"claude", "codex", "cursor"} {
+		// Written for the developer's agents in global mode, unless the organization's
+		// managed hooks run for one — then setup's would run as well, and go.
+		want := install && slices.Contains(covered, a) && !managedHooksDeployed(a)
 		dir, file, err := userHooksDir(a)
 		if err != nil {
 			return changed, err
 		}
-		if !install {
+		if !want {
 			if _, err := os.Stat(filepath.Join(dir, file)); errors.Is(err, fs.ErrNotExist) {
 				continue
 			}
 		}
-		plan, err := planUserHooks(a, dir, terma, install)
+		plan, err := planUserHooks(a, dir, terma, want)
 		if err != nil {
 			return changed, err
 		}
 		if plan.Empty() {
 			continue
 		}
-		if install {
+		if want {
 			if err := os.MkdirAll(dir, 0o700); err != nil {
 				return changed, err
 			}
@@ -123,7 +125,9 @@ func applyUserHooks(agents []string, install bool) ([]string, error) {
 		}
 		return changed, nil
 	}
-	return changed, config.WriteJSON(rec, userHooksRecord{Agents: userHookAgents(agents)}, 0o600)
+	// Recorded whichever hooks run for it — setup's or the organization's managed ones:
+	// either way a repository's committed hooks step aside for it.
+	return changed, config.WriteJSON(rec, userHooksRecord{Agents: covered}, 0o600)
 }
 
 func userHooksRecordPath() (string, error) {
@@ -175,3 +179,78 @@ func hookYields(user bool, pol config.Policy, tool string) bool {
 // by the path it was started as. A variable so a test (whose executable is the test
 // binary) can name a built terma.
 var hookExecutable = relayServiceExecutable
+
+// managedRoot prefixes the system paths managed configuration lives at; a test points
+// it at a directory of its own.
+var managedRoot = "/"
+
+// managedHookFiles are where an organization deploys global mode's hooks as managed
+// configuration, per agent: Claude Code's managed settings and Codex's system
+// requirements. An agent whose managed file carries terma's hooks gets none from setup:
+// both would run.
+func managedHookFiles(agent string) []string {
+	switch agent {
+	case "claude":
+		if runtime.GOOS == "darwin" {
+			return []string{filepath.Join(managedRoot, "Library", "Application Support", "ClaudeCode", "managed-settings.json")}
+		}
+		return []string{filepath.Join(managedRoot, "etc", "claude-code", "managed-settings.json")}
+	case "codex":
+		return []string{filepath.Join(managedRoot, "etc", "codex", "requirements.toml")}
+	}
+	return nil
+}
+
+// managedHooksDeployed reports whether the organization deployed terma's hooks for agent
+// as managed configuration.
+func managedHooksDeployed(agent string) bool {
+	for _, f := range managedHookFiles(agent) {
+		if data, err := os.ReadFile(f); err == nil && strings.Contains(string(data), " hook --user ") {
+			return true
+		}
+	}
+	return false
+}
+
+// writeManagedConfig writes global mode's hooks as managed configuration into dir, for
+// an organization to deploy to every machine (MDM, configuration management), and a
+// README saying where each file goes. terma is the path the hooks call it by on those
+// machines ($HOME is expanded per user). It needs no sign-in.
+func writeManagedConfig(dir, terma string) ([]string, error) {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, err
+	}
+	cmd := hookmgr.ManagedHookCommand(terma)
+	claude, err := hookmgr.ClaudeManagedSettings(cmd)
+	if err != nil {
+		return nil, err
+	}
+	files := map[string][]byte{
+		"claude-managed-settings.json": claude,
+		"codex-requirements.toml":      []byte(hookmgr.CodexManagedRequirements(cmd)),
+		"README.md": []byte(`# terma global mode: managed hooks
+
+Deploy these so every Claude Code and Codex session on a machine is claimed, with no
+trust step for anyone. Each developer still runs ` + "`terma setup`" + ` once: it points the
+agents' exporters at the machine's relay, whose token is the machine's own.
+
+- ` + "`claude-managed-settings.json`" + ` → macOS ` + "`/Library/Application Support/ClaudeCode/managed-settings.json`" + `,
+  Linux ` + "`/etc/claude-code/managed-settings.json`" + ` (merge its ` + "`hooks`" + ` into a file you already deploy).
+- ` + "`codex-requirements.toml`" + ` → ` + "`/etc/codex/requirements.toml`" + ` (append to one you already deploy), or
+  the same table in your MDM profile for ` + "`com.openai.codex`" + `.
+
+The hooks run terma as ` + "`" + terma + "`" + `; terma must be installed there for every user.
+Where these are deployed, ` + "`terma setup`" + ` writes no per-user hooks of its own.
+`),
+	}
+	var out []string
+	for name, data := range files {
+		p := filepath.Join(dir, name)
+		if err := config.WriteFileAtomic(p, data, 0o644); err != nil {
+			return out, err
+		}
+		out = append(out, p)
+	}
+	slices.Sort(out)
+	return out, nil
+}
