@@ -30,6 +30,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/relay/shape"
 )
 
 // ProjectAttr is the resource attribute the relay stamps on everything it forwards:
@@ -67,6 +68,11 @@ var ErrNoKey = errors.New("no key for this project on this machine")
 
 // Options configure a relay.
 type Options struct {
+	// Correlators and Capturers are every known agent's telemetry shape: how its
+	// records name their session, and where they carry content. Without them nothing
+	// is placed in a session, and withheld content passes only the safe keys.
+	Correlators []shape.Correlator
+	Capturers   []shape.Capturer
 	// Token is what the agents' exporters present as `Authorization: Bearer <token>`.
 	Token string
 	// Hold and TraceHold: DefaultHold and DefaultTraceHold (at least Hold) when zero.
@@ -121,6 +127,7 @@ type Options struct {
 // accepted and ages out what never may be.
 type Relay struct {
 	opts  Options
+	rules *rules
 	stats *Stats
 	cache lookupCache
 
@@ -178,7 +185,7 @@ func New(opts Options) *Relay {
 	}
 	sendCtx, cancel := context.WithCancel(context.Background())
 	return &Relay{
-		opts: opts, stats: newStats(),
+		opts: opts, rules: compose(opts.Correlators, opts.Capturers), stats: newStats(),
 		cache:  lookupCache{claims: map[string]cachedClaim{}, policies: map[string]cachedPolicy{}},
 		held:   map[string][]heldPart{},
 		traces: map[string]traceSession{}, procs: map[int]*procState{}, senders: map[route]*sender{}, outbox: outbox{dir: opts.Dir},
@@ -301,7 +308,7 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 		r.stats.received(s, p.records)
 		if p.session != "" && !strings.HasPrefix(p.session, tracePrefix) {
 			r.learnProcess(pid, p.session)
-			p.start = conversationStart(p)
+			p.start = r.rules.conversationStart(p)
 		}
 	}
 	for _, p := range parts {
@@ -361,18 +368,18 @@ func (r *Relay) decode(s Signal, body []byte, isJSON bool) (map[string]*part, er
 		if err := unmarshal(body, &m); err != nil {
 			return nil, err
 		}
-		return splitLogs(&m, r.learnTrace), nil
+		return r.rules.splitLogs(&m, r.learnTrace), nil
 	case Traces:
 		var m tracepb.TracesData
 		if err := unmarshal(body, &m); err != nil {
 			return nil, err
 		}
-		return splitTraces(&m, r.learnTrace, r.traceOf), nil
+		return r.rules.splitTraces(&m, r.learnTrace, r.traceOf), nil
 	default:
 		var m metricspb.MetricsData
 		if err := unmarshal(body, &m); err != nil {
 			return nil, err
 		}
-		return splitMetrics(&m), nil
+		return r.rules.splitMetrics(&m), nil
 	}
 }

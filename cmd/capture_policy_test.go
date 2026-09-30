@@ -114,7 +114,7 @@ func TestRelayRespectsSignalSelection(t *testing.T) {
 				t.Fatal(err)
 			}
 			cfg := &config.Config{Policy: config.DefaultPolicy(), OTLPURL: "http://127.0.0.1:1"}
-			r := relay.New(relay.Options{Token: "token", Dir: t.TempDir(), Resolve: relayResolver(cfg, nil), Lookup: func(string, time.Time) (claim.Claim, bool) {
+			r := newTestRelay(relay.Options{Token: "token", Dir: t.TempDir(), Resolve: relayResolver(cfg, nil), Lookup: func(string, time.Time) (claim.Claim, bool) {
 				return claim.Claim{ProjectID: "team", Tool: "codex"}, true
 			}})
 			m := &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{{Name: "chat", Attributes: []*commonpb.KeyValue{{Key: "session.id", Value: &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: "session"}}}}}}}}}}}
@@ -164,7 +164,7 @@ func TestRelayRespectsHarnessSelection(t *testing.T) {
 				t.Fatal(err)
 			}
 			cfg := &config.Config{Policy: config.DefaultPolicy(), OTLPURL: host.URL}
-			r := relay.New(relay.Options{Token: "test-token", Dir: t.TempDir(), Resolve: relayResolver(cfg, nil), Lookup: func(string, time.Time) (claim.Claim, bool) {
+			r := newTestRelay(relay.Options{Token: "test-token", Dir: t.TempDir(), Resolve: relayResolver(cfg, nil), Lookup: func(string, time.Time) (claim.Claim, bool) {
 				return claim.Claim{ProjectID: "team", Tool: test.tool}, true
 			}})
 			ctx, cancel := context.WithCancel(t.Context())
@@ -239,7 +239,7 @@ func TestQueuedRelayExportsRespectHarnessDeselection(t *testing.T) {
 	}
 	dir := t.TempDir()
 	cfg := &config.Config{Policy: config.DefaultPolicy(), OTLPURL: host.URL}
-	r := relay.New(relay.Options{Token: "test-token", Dir: dir, Resolve: relayResolver(cfg, nil), Lookup: func(string, time.Time) (claim.Claim, bool) {
+	r := newTestRelay(relay.Options{Token: "test-token", Dir: dir, Resolve: relayResolver(cfg, nil), Lookup: func(string, time.Time) (claim.Claim, bool) {
 		return claim.Claim{ProjectID: "team", Tool: "codex"}, true
 	}})
 	ctx, cancel := context.WithCancel(t.Context())

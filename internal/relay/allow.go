@@ -93,10 +93,10 @@ func setOf(keys ...string) map[string]bool {
 	return m
 }
 
-// contentKey reports whether key is one content.go knows carries what was said.
-func contentKey(key string) bool {
-	return contains(promptFields, key) || contains(promptDropFields, key) || contains(toolContentFields, key) ||
-		contains(resourcePromptFields, key)
+// contentKey reports whether key is one an agent declares carries content.
+func (ru *rules) contentKey(key string) bool {
+	return contains(ru.promptFields, key) || contains(ru.promptDropFields, key) || contains(ru.toolContentFields, key) ||
+		contains(ru.resourcePromptFields, key)
 }
 
 // safeKey reports whether key is classified as never carrying content. A number or a
@@ -113,12 +113,12 @@ func safeKey(key string) bool {
 	return false
 }
 
-// Classify says how the relay treats key when a project's content is withheld: "safe"
-// (passes), "content" (marked or dropped by content.go) or "unclassified" (dropped, and
-// counted so that someone classifies it).
-func Classify(key string) string {
+// classify says how the relay treats key when a project's content is withheld: "safe"
+// (passes), "content" (marked or dropped) or "unclassified" (dropped, and counted so that
+// someone classifies it).
+func (ru *rules) classify(key string) string {
 	switch {
-	case contentKey(key):
+	case ru.contentKey(key):
 		return "content"
 	case safeKey(key):
 		return "safe"

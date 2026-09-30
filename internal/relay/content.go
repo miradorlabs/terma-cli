@@ -12,66 +12,16 @@ import (
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
-// The global exporters send content (the relay cannot tell a repository's policy
-// before it sees the session), so the relay enforces each project's own: what its
-// routing record withholds never leaves the machine. The sets are the difference
-// between live/golden/<harness>/telemetry-content.json and telemetry-redacted.json,
-// plus the prompt and reply fields both exports carry but blank.
-var (
-	// promptFields hold what was said. The harnesses blank them rather than drop
-	// them when prompts are off, and the relay does the same, with each harness's own
-	// marker, so the backend sees the shape it already parses.
-	promptFields = []string{"prompt", "response", "user_prompt"}
-	// promptDropFields hold what was said and are removed outright, as the exporters
-	// that write them omit them when content is off: the GenAI semantic conventions'
-	// content attributes (terma's OpenCode plugin writes gen_ai.completion).
-	promptDropFields = []string{"gen_ai.prompt", "gen_ai.completion", "gen_ai.input.messages", "gen_ai.output.messages", "gen_ai.system_instructions",
-		"gen_ai.tool.definitions",
-		// omp's own (omp.gen_ai.*): the request's messages and the response's text.
-		"omp.gen_ai.request.messages", "omp.gen_ai.response.text",
-		// Gemini CLI's gemini_cli.api_request / api_response (0.62).
-		"request_text", "response_text",
-		// Free text that may restate or reason about what was said, in the harnesses'
-		// own events (the first unclassified-key survey, 2026-09-30): errors, reasons,
-		// Gemini's model-router reasoning, tool and agent descriptions, stop sequences,
-		// and keys too generic to vouch for.
-		"error", "reason", "reasoning", "routing.reasoning", "metadata", "value", "key", "from", "db", "query_script",
-		"gen_ai.tool.description", "gen_ai.agent.description", "gen_ai.request.stop_sequences"}
-	// resourcePromptFields are resource attributes that restate what was said: the
-	// process's command line, which carries a prompt passed as an argument (Gemini CLI
-	// stamps process.command_args, `-p "<prompt>"` included, whatever logPrompts says).
-	resourcePromptFields = []string{"process.command_args", "process.command_line"}
-	// promptBodyEvents carry what was said in the log body, not an attribute: the
-	// OpenCode plugin's prompt, the session title, which restates it, Pi's prompt, and
-	// Hermes's prompt and reply.
-	promptBodyEvents = []string{"opencode.user_prompt", "opencode.session.created", "pi.user_prompt", "omp.user_prompt", "hermes.user_prompt", "hermes.assistant_response", "dsh.user_prompt", "dsh.assistant_response"}
-	// toolContentFields hold what a tool was called with or returned.
-	toolContentFields = []string{"tool_parameters", "tool_input", "full_command", "bash_command", "arguments", "output",
-		"gen_ai.tool.call.arguments", "gen_ai.tool.call.result", "opencode.tool.file_path",
-		// Gemini CLI's tool_call and hook_call records (0.62).
-		"function_args", "hook_input", "hook_output", "stdout", "stderr",
-		// What a tool acted on or returned, as named elsewhere.
-		"file_path", "result"}
-	// toolContentEvents are span events that exist only to carry tool content: Claude
-	// Code's claude_code.tool span records the command and its output as a
-	// tool.output event (live, 2.1.284), which the golden attribute lists do not see.
-	toolContentEvents = []string{"tool.output", "tool.input"}
-)
-
-const (
-	claudeRedacted = "<REDACTED>"
-	codexRedacted  = "[REDACTED]"
-)
-
 // withhold applies a project's content policy to one session's part, in place, and
-// returns how many records it changed.
-func withhold(p *part, prompts, toolContent bool, unclassified map[string]int) int {
+// returns how many records it changed. The exporters send content, so the relay
+// enforces each project's own.
+func (ru *rules) withhold(p *part, prompts, toolContent bool, unclassified map[string]int) int {
 	if prompts && toolContent {
 		return 0
 	}
 	changed := 0
 	apply := func(attrs []*commonpb.KeyValue) []*commonpb.KeyValue {
-		out, did := withholdAttrs(attrs, prompts, toolContent, unclassified)
+		out, did := ru.withholdAttrs(attrs, prompts, toolContent, unclassified)
 		if did {
 			changed++
 		}
@@ -84,7 +34,7 @@ func withhold(p *part, prompts, toolContent bool, unclassified map[string]int) i
 		kept := r.Attributes[:0]
 		for _, kv := range r.GetAttributes() {
 			switch key := kv.GetKey(); {
-			case contains(resourcePromptFields, key):
+			case contains(ru.resourcePromptFields, key):
 				if !prompts {
 					changed++
 					continue
@@ -148,10 +98,10 @@ func withhold(p *part, prompts, toolContent bool, unclassified map[string]int) i
 					body := lr.GetBody().GetStringValue()
 					switch {
 					case lr.GetBody().GetValue() == nil || plain && body == "":
-					case !prompts && contains(promptBodyEvents, event):
+					case !prompts && contains(ru.promptBodyEvents, event):
 						lr.Body = &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: ""}}
 						changed++
-					case !plain || !bodyNamesItsEvent(body, event):
+					case !plain || !ru.bodyNamesItsEvent(body, event):
 						// A body is free text: kept only when it just names its event.
 						lr.Body = &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: ""}}
 						changed++
@@ -178,7 +128,7 @@ func withhold(p *part, prompts, toolContent bool, unclassified map[string]int) i
 					sp.Attributes = apply(sp.GetAttributes())
 					events := sp.GetEvents()[:0]
 					for _, ev := range sp.GetEvents() {
-						if !toolContent && contains(toolContentEvents, ev.GetName()) {
+						if !toolContent && contains(ru.toolContentEvents, ev.GetName()) {
 							changed++
 							continue
 						}
@@ -193,28 +143,23 @@ func withhold(p *part, prompts, toolContent bool, unclassified map[string]int) i
 	return changed
 }
 
-func withholdAttrs(attrs []*commonpb.KeyValue, prompts, toolContent bool, unclassified map[string]int) ([]*commonpb.KeyValue, bool) {
-	marker := claudeRedacted
-	for _, kv := range attrs {
-		if k := kv.GetKey(); k == "conversation.id" || k == "thread.id" {
-			marker = codexRedacted
-		}
-	}
+func (ru *rules) withholdAttrs(attrs []*commonpb.KeyValue, prompts, toolContent bool, unclassified map[string]int) ([]*commonpb.KeyValue, bool) {
+	marker := ru.marker(attrs)
 	changed := false
 	out := attrs[:0]
 	for _, kv := range attrs {
 		key := kv.GetKey()
 		switch {
-		case !toolContent && contains(toolContentFields, key):
+		case !toolContent && contains(ru.toolContentFields, key):
 			changed = true
 			continue
-		case !prompts && contains(promptDropFields, key):
+		case !prompts && contains(ru.promptDropFields, key):
 			changed = true
 			continue
-		case !prompts && contains(promptFields, key) && kv.GetValue().GetStringValue() != marker:
+		case !prompts && contains(ru.promptFields, key) && kv.GetValue().GetStringValue() != marker:
 			kv.Value = &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: marker}}
 			changed = true
-		case !contentKey(key) && !safeKey(key) && !scalarNonText(kv.GetValue()):
+		case !ru.contentKey(key) && !safeKey(key) && !scalarNonText(kv.GetValue()):
 			// Withheld content passes only what is known to be safe (allow.go).
 			unclassified[key]++
 			changed = true
@@ -251,10 +196,18 @@ func numericOrBool(s string) bool {
 	return err == nil && !strings.ContainsAny(s, "xXpPiInN_")
 }
 
-// bodyNamesItsEvent reports whether a log body says no more than which event it is —
-// Claude Code's is `claude_code.<event>`, others repeat event.name.
-func bodyNamesItsEvent(body, event string) bool {
-	return body == event || body == "claude_code."+event || event != "" && strings.HasSuffix(body, "."+event)
+// bodyNamesItsEvent reports whether a log body says no more than which event it is: the
+// event's name, or an agent's prefix before it.
+func (ru *rules) bodyNamesItsEvent(body, event string) bool {
+	if body == event {
+		return true
+	}
+	for _, prefix := range ru.bodyPrefixes {
+		if body == prefix+event {
+			return true
+		}
+	}
+	return event != "" && strings.HasSuffix(body, "."+event)
 }
 
 func attrString(attrs []*commonpb.KeyValue, key string) string {

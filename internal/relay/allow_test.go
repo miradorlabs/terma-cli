@@ -33,7 +33,7 @@ func TestClassificationCoversTheGoldens(t *testing.T) {
 		}
 		for surface, keys := range surfaces {
 			for _, k := range keys {
-				if c := Classify(strings.TrimPrefix(k, "resource/")); c == "unclassified" {
+				if c := testRules.classify(strings.TrimPrefix(k, "resource/")); c == "unclassified" {
 					t.Errorf("%s %s: %q is unclassified", filepath.Base(f), surface, k)
 				}
 			}
@@ -45,7 +45,7 @@ func TestClassificationCoversTheGoldens(t *testing.T) {
 // the gate did to it.
 func TestNoKeyIsBothSafeAndContent(t *testing.T) {
 	for key := range safeKeys {
-		if contentKey(key) {
+		if testRules.contentKey(key) {
 			t.Errorf("%q is listed as safe and as content", key)
 		}
 	}
@@ -70,7 +70,7 @@ func TestWithheldContentPassesOnlyWhatIsClassified(t *testing.T) {
 	}
 	unclassified := map[string]int{}
 	p := record()
-	withhold(p, false, false, unclassified)
+	testRules.withhold(p, false, false, unclassified)
 	rl := p.msg.(*logspb.LogsData).ResourceLogs[0]
 	recs := rl.ScopeLogs[0].LogRecords
 	for _, want := range []string{"x.new_text", "resource/host.fancy"} {
@@ -93,7 +93,7 @@ func TestWithheldContentPassesOnlyWhatIsClassified(t *testing.T) {
 
 	unclassified = map[string]int{}
 	p = record()
-	if n := withhold(p, true, true, unclassified); n != 0 || len(unclassified) != 0 {
+	if n := testRules.withhold(p, true, true, unclassified); n != 0 || len(unclassified) != 0 {
 		t.Fatalf("content allowed, yet the gate changed %d records: %v", n, unclassified)
 	}
 }
@@ -108,7 +108,7 @@ func TestNumbersAndFlagsPassUnderAnyKey(t *testing.T) {
 		}
 	}
 	unclassified := map[string]int{}
-	attrs, _ := withholdAttrs([]*commonpb.KeyValue{kv("num_hooks", "3"), kv("x.new_note", "3 files"),
+	attrs, _ := testRules.withholdAttrs([]*commonpb.KeyValue{kv("num_hooks", "3"), kv("x.new_note", "3 files"),
 		{Key: "x.count", Value: &commonpb.AnyValue{Value: &commonpb.AnyValue_IntValue{IntValue: 4}}}}, false, false, unclassified)
 	if attr(attrs, "num_hooks") != "3" || len(attrs) != 2 || unclassified["x.new_note"] != 1 {
 		t.Fatalf("attrs %v, unclassified %v", attrs, unclassified)

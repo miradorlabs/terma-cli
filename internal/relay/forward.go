@@ -458,7 +458,7 @@ func (r *Relay) withholdQueued(sig Signal, body []byte, pol Policy) []byte {
 		return nil
 	}
 	unclassified := map[string]int{}
-	n := withhold(&part{signal: sig, msg: msg}, pol.IncludePrompts, pol.IncludeToolContent, unclassified)
+	n := r.rules.withhold(&part{signal: sig, msg: msg}, pol.IncludePrompts, pol.IncludeToolContent, unclassified)
 	if n == 0 && len(unclassified) == 0 {
 		return body
 	}

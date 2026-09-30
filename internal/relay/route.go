@@ -328,7 +328,7 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 		return
 	}
 	unclassified := map[string]int{}
-	if n := withhold(p, pol.IncludePrompts, pol.IncludeToolContent, unclassified); n > 0 {
+	if n := r.rules.withhold(p, pol.IncludePrompts, pol.IncludeToolContent, unclassified); n > 0 {
 		r.stats.add("withheld_content_records", n)
 	}
 	for key, n := range unclassified {

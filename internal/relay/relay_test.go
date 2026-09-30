@@ -118,7 +118,7 @@ func (f *fixture) clock() time.Time {
 }
 
 func (f *fixture) relay(t *testing.T, u *upstream, policies map[string]Policy) (*Relay, *httptest.Server) {
-	r := New(Options{Dir: t.TempDir(),
+	r := newRelay(Options{Dir: t.TempDir(),
 		Token:  token,
 		Hold:   time.Minute,
 		Lookup: f.lookup,
@@ -242,7 +242,7 @@ func TestRelayRoutesLogsPerClaimedSession(t *testing.T) {
 				t.Fatalf("p1 prompt = %q", v)
 			}
 			for _, lr := range got["Bearer key-p2"] {
-				if v := attr(lr.Attributes, "prompt"); v != "" && v != codexRedacted {
+				if v := attr(lr.Attributes, "prompt"); v != "" && v != "[REDACTED]" {
 					t.Fatalf("p2 prompt leaked: %q", v)
 				}
 				if attr(lr.Attributes, "arguments") != "" || attr(lr.Attributes, "output") != "" {

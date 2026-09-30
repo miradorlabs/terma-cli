@@ -21,7 +21,7 @@ func TestCaptureWithholdsProviderErrorAndOtherAttributeChannels(t *testing.T) {
 		span := &tracepb.Span{Status: &tracepb.Status{Code: tracepb.Status_STATUS_CODE_ERROR, Message: "PRIVATE_CONTENT"}, Links: []*tracepb.Span_Link{{Attributes: []*commonpb.KeyValue{kv("gen_ai.prompt", "PRIVATE_CONTENT")}}}}
 		scope := &commonpb.InstrumentationScope{Attributes: []*commonpb.KeyValue{kv("gen_ai.prompt", "PRIVATE_CONTENT")}}
 		p := &part{signal: Traces, msg: &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{ScopeSpans: []*tracepb.ScopeSpans{{Scope: scope, Spans: []*tracepb.Span{span}}}}}}}
-		withhold(p, flags[0], flags[1], map[string]int{})
+		testRules.withhold(p, flags[0], flags[1], map[string]int{})
 		if !flags[0] || !flags[1] {
 			if span.Status.Message != "" || span.Status.Code != tracepb.Status_STATUS_CODE_ERROR {
 				t.Fatal("provider error text survived or status code changed")
@@ -50,7 +50,7 @@ func TestQueuedExportsRespectSignalAndCoverageChanges(t *testing.T) {
 			policy := test.policy
 			policy.Endpoint = host.URL
 			policy.Key = "key"
-			r := New(Options{Dir: t.TempDir(), Resolve: func(claim.Claim) (Policy, error) { return policy, nil }})
+			r := newRelay(Options{Dir: t.TempDir(), Resolve: func(claim.Claim) (Policy, error) { return policy, nil }})
 			m := logsOf("session", 1)
 			m.ResourceLogs[0].Resource = &resourcepb.Resource{Attributes: []*commonpb.KeyValue{kv(AttributionAttr, "catch-all")}}
 			body, err := proto.Marshal(m)
@@ -76,7 +76,7 @@ func TestQueuedExportsRespectSignalAndCoverageChanges(t *testing.T) {
 }
 
 func TestQueuedCapturePolicyFiltersPathsAndCorruptBodies(t *testing.T) {
-	r := New(Options{})
+	r := newRelay(Options{})
 	m := &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{{Attributes: []*commonpb.KeyValue{kv("tool_input", `{"file_path":"src/secrets/passwords.txt"}`)}}}}}}}}
 	b, err := proto.Marshal(m)
 	if err != nil {

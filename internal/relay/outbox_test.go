@@ -53,7 +53,7 @@ func TestRelayOutboxSurvivesARestart(t *testing.T) {
 		return Policy{Endpoint: host.URL, Key: "k", IncludePrompts: true, IncludeToolContent: true}, nil
 	}
 
-	first := New(Options{Dir: dir, Token: token, Lookup: f.lookup, Resolve: resolve, Grace: 50 * time.Millisecond})
+	first := newRelay(Options{Dir: dir, Token: token, Lookup: f.lookup, Resolve: resolve, Grace: 50 * time.Millisecond})
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() { first.Run(ctx); close(done) }()
@@ -77,7 +77,7 @@ func TestRelayOutboxSurvivesARestart(t *testing.T) {
 	}
 
 	up.Store(true)
-	second := New(Options{Dir: dir, Token: token, Lookup: f.lookup, Resolve: resolve})
+	second := newRelay(Options{Dir: dir, Token: token, Lookup: f.lookup, Resolve: resolve})
 	go second.Run(t.Context())
 	waitFor(t, func() bool { return second.Stats().Snapshot().Counters["forwarded.logs"] == 6 })
 	if c := second.Stats().Snapshot().Counters; c["recovered_from_outbox"] != 6 {
@@ -128,7 +128,7 @@ func TestRelayKeylessOutboxDoesNotKeepTheRelayBusy(t *testing.T) {
 		t.Fatal(err)
 	}
 	f := newFixture()
-	r := New(Options{Dir: dir, Token: token, Lookup: f.lookup, Now: f.clock})
+	r := newRelay(Options{Dir: dir, Token: token, Lookup: f.lookup, Now: f.clock})
 	go r.Run(t.Context())
 	waitFor(t, func() bool { _, idle := r.Idle(); return idle })
 	if n := countFiles(t, dir); n != 1 {
@@ -153,7 +153,7 @@ func TestOutboxJanitorBounds(t *testing.T) {
 	if err := o.put(rt, fresh, body); err != nil {
 		t.Fatal(err)
 	}
-	r := New(Options{Dir: dir, Token: token})
+	r := newRelay(Options{Dir: dir, Token: token})
 	removed := r.sweepOutbox(time.Now())
 	if removed[rt] != 1 || r.Stats().Snapshot().Counters["dropped.outbox_expired.logs"] != 4 {
 		t.Fatalf("removed %v: %v", removed, r.Stats().Snapshot().Counters)
@@ -246,7 +246,7 @@ func TestRelayQueuedPartsFollowTheCurrentContentPolicy(t *testing.T) {
 			return Policy{Endpoint: host.URL, Key: "k", IncludePrompts: prompts, IncludeToolContent: true}, nil
 		}
 	}
-	first := New(Options{Dir: dir, Token: token, Lookup: f.lookup, Resolve: policy(true), Grace: 50 * time.Millisecond})
+	first := newRelay(Options{Dir: dir, Token: token, Lookup: f.lookup, Resolve: policy(true), Grace: 50 * time.Millisecond})
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() { first.Run(ctx); close(done) }()
@@ -259,7 +259,7 @@ func TestRelayQueuedPartsFollowTheCurrentContentPolicy(t *testing.T) {
 	<-done
 
 	up.Store(true)
-	second := New(Options{Dir: dir, Token: token, Lookup: f.lookup, Resolve: policy(false)})
+	second := newRelay(Options{Dir: dir, Token: token, Lookup: f.lookup, Resolve: policy(false)})
 	go second.Run(t.Context())
 	waitFor(t, func() bool { return second.Stats().Snapshot().Counters["forwarded.logs"] == 1 })
 	mu.Lock()

@@ -132,7 +132,7 @@ func TestRelayBoundsTheHoldByBytes(t *testing.T) {
 // When the hold is full, spans of traces nothing has named go before a session's
 // records: they are mostly process-level work that never will be named.
 func TestRelayEvictsUnnamedTracesFirst(t *testing.T) {
-	r := New(Options{Dir: t.TempDir(), Token: token, Lookup: func(string, time.Time) (claim.Claim, bool) { return claim.Claim{}, false }})
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Lookup: func(string, time.Time) (claim.Claim, bool) { return claim.Claim{}, false }})
 	big := strings.Repeat("x", 30<<20)
 	r.route(&part{signal: Traces, session: tracePrefix + "t1", msg: logsOf("x", 1, kv("blob", big)), records: 1})
 	r.route(&part{signal: Logs, session: "S", msg: logsOf("S", 1, kv("blob", big)), records: 1})
@@ -178,7 +178,7 @@ func TestRelayReadsTheSessionFromTheResource(t *testing.T) {
 
 // A span flood with a fresh trace id each cannot grow the trace index without bound.
 func TestRelayBoundsTheTraceIndex(t *testing.T) {
-	r := New(Options{Dir: t.TempDir(), Token: token, Lookup: func(string, time.Time) (claim.Claim, bool) { return claim.Claim{}, false }, Resolve: func(claim.Claim) (Policy, error) { return Policy{}, ErrNoKey }})
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Lookup: func(string, time.Time) (claim.Claim, bool) { return claim.Claim{}, false }, Resolve: func(claim.Claim) (Policy, error) { return Policy{}, ErrNoKey }})
 	for i := range maxTraces + 10 {
 		r.learnTrace(fmt.Sprintf("%032x", i), "s")
 	}
@@ -193,7 +193,7 @@ func TestRelayBoundsTheTraceIndex(t *testing.T) {
 func TestRelayAccountsForEveryRecordUnderLoad(t *testing.T) {
 	u := newUpstream(t)
 	f := newFixture()
-	r := New(Options{Dir: t.TempDir(),
+	r := newRelay(Options{Dir: t.TempDir(),
 		Token: token, Hold: 50 * time.Millisecond, Lookup: f.lookup,
 		Resolve: func(c claim.Claim) (Policy, error) {
 			if p, ok := allPolicies(u)[c.ProjectID]; ok {
@@ -267,7 +267,7 @@ func TestRelayDrainsOnStop(t *testing.T) {
 	}))
 	defer slow.Close()
 	f := newFixture()
-	r := New(Options{Dir: t.TempDir(), Token: token, Lookup: f.lookup, Grace: 5 * time.Second,
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Lookup: f.lookup, Grace: 5 * time.Second,
 		Resolve: func(claim.Claim) (Policy, error) {
 			return Policy{Endpoint: slow.URL, Key: "k", IncludePrompts: true, IncludeToolContent: true}, nil
 		}})
@@ -304,7 +304,7 @@ func TestRelayRetriesATransientFailure(t *testing.T) {
 	}))
 	defer flaky.Close()
 	f := newFixture()
-	r := New(Options{Dir: t.TempDir(), Token: token, Lookup: f.lookup,
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Lookup: f.lookup,
 		Resolve: func(claim.Claim) (Policy, error) {
 			return Policy{Endpoint: flaky.URL, Key: "k", IncludePrompts: true, IncludeToolContent: true}, nil
 		}})
@@ -350,7 +350,7 @@ func FuzzDecode(f *testing.F) {
 	f.Add(seed, false)
 	f.Add([]byte(`{"resourceLogs":[{"scopeLogs":[{"logRecords":[{"attributes":[{"key":"session.id","value":{"stringValue":"A"}}]}]}]}]}`), true)
 	f.Add([]byte(`{"resourceSpans":[{"scopeSpans":[{"spans":[{"traceId":"00","name":"x"}]}]}]}`), true)
-	r := New(Options{Dir: f.TempDir(), Token: token})
+	r := newRelay(Options{Dir: f.TempDir(), Token: token})
 	f.Fuzz(func(t *testing.T, body []byte, isJSON bool) {
 		for _, s := range []Signal{Logs, Metrics, Traces} {
 			parts, err := r.decode(s, body, isJSON)
@@ -376,7 +376,7 @@ func TestRelayClaimCoversOnlyItsProcesses(t *testing.T) {
 	f := newFixture()
 	f.claims["A"] = claim.Claim{ProjectID: "p1", PIDs: []int{100, 101}}
 	var sender atomic.Int64
-	r := New(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
 		PeerPID: func(int) (int, bool) { pid := int(sender.Load()); return pid, pid != 0 },
 		Resolve: func(c claim.Claim) (Policy, error) { return allPolicies(u)[c.ProjectID], nil }})
 	ctx := t.Context()
@@ -419,7 +419,7 @@ func TestRelayClaimCoversOnlyItsProcesses(t *testing.T) {
 func TestRelayLearnsTracesFromLogs(t *testing.T) {
 	u := newUpstream(t)
 	f := newFixture()
-	r := New(Options{Dir: t.TempDir(), Token: token, Hold: time.Second, Lookup: f.lookup, Now: f.clock,
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Second, Lookup: f.lookup, Now: f.clock,
 		Resolve: func(c claim.Claim) (Policy, error) { return allPolicies(u)[c.ProjectID], nil }})
 	ctx := t.Context()
 	go r.Run(ctx)
@@ -460,7 +460,7 @@ func BenchmarkRelayExport(b *testing.B) {
 	}
 	sink := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	defer sink.Close()
-	r := New(Options{Dir: b.TempDir(), Token: token, Resolve: func(claim.Claim) (Policy, error) {
+	r := newRelay(Options{Dir: b.TempDir(), Token: token, Resolve: func(claim.Claim) (Policy, error) {
 		return Policy{Endpoint: sink.URL, Key: "k", IncludePrompts: false, IncludeToolContent: false}, nil
 	}})
 	ctx := b.Context()
@@ -495,7 +495,7 @@ type procRelay struct {
 
 func newProcRelay(t *testing.T) *procRelay {
 	pr := &procRelay{t: t, u: newUpstream(t), f: newFixture()}
-	pr.r = New(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: pr.f.lookup, Now: pr.f.clock,
+	pr.r = newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: pr.f.lookup, Now: pr.f.clock,
 		PeerPID:      func(int) (int, bool) { pid := int(pr.sender.Load()); return pid, pid != 0 },
 		ProcessAlive: func(pid int) bool { _, gone := pr.dead.Load(pid); return !gone },
 		Resolve: func(c claim.Claim) (Policy, error) {
@@ -686,7 +686,7 @@ func TestRelayWaitsForAKey(t *testing.T) {
 	u := newUpstream(t)
 	f := newFixture()
 	var keyed atomic.Bool
-	r := New(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
 		Resolve: func(c claim.Claim) (Policy, error) {
 			if c.ProjectID == "p3" && keyed.Load() {
 				return Policy{Endpoint: u.srv.URL, Key: "key-p3"}, nil
@@ -814,7 +814,7 @@ func TestRelayCatchAllInGlobalMode(t *testing.T) {
 	f := newFixture()
 	policies := allPolicies(u)
 	policies["p-default"] = Policy{Endpoint: u.srv.URL, Key: "key-default", IncludePrompts: true, IncludeToolContent: true}
-	r := New(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
 		CatchAll: func() (claim.Claim, bool) { return claim.Claim{ProjectID: "p-default"}, true },
 		Resolve: func(c claim.Claim) (Policy, error) {
 			if p, ok := policies[c.ProjectID]; ok {
@@ -857,7 +857,7 @@ func TestRelayHeartbeat(t *testing.T) {
 	f := newFixture()
 	var mu sync.Mutex
 	var beats []*logspb.LogsData
-	r := New(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock, Version: "v9.9.9",
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock, Version: "v9.9.9",
 		HeartbeatEvery: time.Minute,
 		HeartbeatInfo: func() map[string]any {
 			return map[string]any{"terma.version": "v9.9.9", "terma.mode": "repo", "terma.agents": []string{"claude", "codex"}}
@@ -957,7 +957,7 @@ func TestRelayRetriesAFailedSenderLookup(t *testing.T) {
 	f := newFixture()
 	f.claims["A"] = claim.Claim{ProjectID: "p1", PIDs: []int{101}}
 	var lookups atomic.Int32
-	r := New(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
 		PeerPID: func(int) (int, bool) {
 			if lookups.Add(1) == 1 {
 				return 0, false

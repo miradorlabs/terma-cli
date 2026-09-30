@@ -26,7 +26,7 @@ func serveRelayForRefresh(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv := httptest.NewServer(relay.New(relay.Options{Token: token}).Handler())
+	srv := httptest.NewServer(newTestRelay(relay.Options{Token: token}).Handler())
 	t.Cleanup(srv.Close)
 	if err := config.WriteFileAtomic(filepath.Join(dir, relayAddrFile), []byte(strings.TrimPrefix(srv.URL, "http://")), 0o600); err != nil {
 		t.Fatal(err)

@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
+	"github.com/miradorlabs/terma-cli/internal/relay"
+	"github.com/miradorlabs/terma-cli/internal/relay/shape"
 )
 
 // TestMain gives the whole package a private home before any test runs. Commands write
@@ -53,4 +55,10 @@ func runIsolated(m *testing.M) int {
 		_ = os.Setenv(k, v)
 	}
 	return m.Run()
+}
+
+// newTestRelay is relay.New with the registered agents' telemetry shapes, as relay run has.
+func newTestRelay(o relay.Options) *relay.Relay {
+	o.Correlators, o.Capturers = registered.With[shape.Correlator](), registered.With[shape.Capturer]()
+	return relay.New(o)
 }

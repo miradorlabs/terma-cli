@@ -23,6 +23,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/procinfo"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/relay/shape"
 )
 
 func newRelayRunCommand() *cobra.Command {
@@ -172,7 +173,8 @@ func relayRunOptions(cmd *cobra.Command, dir, token string, cfg *config.Config) 
 	}
 	beat, _ := time.ParseDuration(os.Getenv("TERMA_RELAY_HEARTBEAT"))
 	minter := newRelayKeyMinter(cmd.Context(), cfg)
-	opts := relay.Options{Token: token, Hold: hold, Dir: filepath.Join(dir, relay.OutboxDir), Resolve: relayResolver(cfg, minter.mint), Version: Version,
+	opts := relay.Options{Correlators: registered.With[shape.Correlator](), Capturers: registered.With[shape.Capturer](),
+		Token: token, Hold: hold, Dir: filepath.Join(dir, relay.OutboxDir), Resolve: relayResolver(cfg, minter.mint), Version: Version,
 		CatchAll: relayCatchAll(), HeartbeatInfo: relayHeartbeatInfo(dir), HeartbeatSend: relayHeartbeatSend, HeartbeatEvery: max(beat, 0),
 		PeerPID: procinfo.FindSender, ProcessAlive: harness.ProcessAlive, ClaimCacheTTL: time.Second, PolicyCacheTTL: time.Second}
 	if os.Getenv("TERMA_RELAY_DEBUG") == "1" {

@@ -78,7 +78,7 @@ func TestRelayAdmissionStopsGlobalCoverageWithStaleCatchAll(t *testing.T) {
 	if err := keystore.Set("team", policyTestKey, keystore.Hosts{OTLP: upstream.URL}); err != nil {
 		t.Fatal(err)
 	}
-	r := relay.New(relay.Options{Token: "token", Dir: t.TempDir(), Hold: 30 * time.Millisecond, TraceHold: 30 * time.Millisecond,
+	r := newTestRelay(relay.Options{Token: "token", Dir: t.TempDir(), Hold: 30 * time.Millisecond, TraceHold: 30 * time.Millisecond,
 		CatchAll: relayCatchAll(), Resolve: relayResolver(cfg, nil), PolicyCacheTTL: time.Second})
 	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan struct{})

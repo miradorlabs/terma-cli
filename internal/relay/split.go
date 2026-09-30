@@ -23,21 +23,6 @@ const (
 	Traces  Signal = "traces"
 )
 
-// sessionKeys are the attributes that name the session a record belongs to, in the
-// order they are tried: Claude Code's session.id (logs, spans and metric points),
-// Codex's conversation.id (logs) and thread.id (its session_task.turn span). Codex's
-// metrics carry none of them (live/golden/codex, 0.158), so they are dropped as
-// unattributable. On every other Codex span thread.id is the tracing library's OS
-// thread number (with thread.name "tokio-rt-worker"), not a conversation, so a
-// thread.id that is a number is never a session: those spans go by their trace.
-// gen_ai.conversation.id is the GenAI semantic conventions' session, which omp stamps
-// on its invoke_agent, chat and execute_tool spans. thread_id (underscore) is on Codex's
-// session_loop span, the root of a trace holding the thread's own work — turn context,
-// rollout persistence, its hook commands, shutdown (0.158, app-server and exec alike):
-// without it that trace names no thread, and in an app-server running several threads
-// it could only be dropped as ambiguous. A numeric value of either is never a session.
-var sessionKeys = []string{"session.id", "conversation.id", "gen_ai.conversation.id", "thread.id", "thread_id"}
-
 // The export requests are decoded as LogsData, MetricsData and TracesData: the same
 // message on the wire and in JSON (field 1, repeated resource entries), without the
 // collector packages' gRPC and gateway dependencies, which every hook would link.
@@ -54,17 +39,19 @@ type part struct {
 	// at is when its earliest record happened, zero when none says: which placement of a
 	// resumed session it belongs to, when its process does not decide (claim.At).
 	at time.Time
-	// start holds a Codex conversation start: unclaimed, it waits as long as a trace
-	// (Options.TraceHold), because the hook that claims it may be a long way off.
+	// start holds a conversation start an agent declared: unclaimed, it waits as long as
+	// a trace (Options.TraceHold), because the hook that claims it may be a long way off.
 	start bool
 }
 
-func sessionOf(attrs, resource []*commonpb.KeyValue) string {
+// sessionOf is the session a record names: the first session key, by rank, on its own
+// attributes, then on its resource's.
+func (ru *rules) sessionOf(attrs, resource []*commonpb.KeyValue) string {
 	for _, set := range [][]*commonpb.KeyValue{attrs, resource} {
-		for _, key := range sessionKeys {
+		for _, key := range ru.sessionKeys {
 			for _, kv := range set {
-				if kv.GetKey() == key {
-					if v := kv.GetValue().GetStringValue(); v != "" && (key != "thread.id" && key != "thread_id" || !numeric(v)) {
+				if kv.GetKey() == key.Attr {
+					if v := kv.GetValue().GetStringValue(); v != "" && (!key.RejectNumeric || !numeric(v)) {
 						return v
 					}
 				}
@@ -91,7 +78,7 @@ func numeric(s string) bool {
 // that names the session, is exported when the turn ends. Without this, a turn's child
 // spans would wait in the hold for the whole turn, and a turn longer than the hold
 // would lose them.
-func splitLogs(req *logspb.LogsData, learn func(traceID, session string)) map[string]*part {
+func (ru *rules) splitLogs(req *logspb.LogsData, learn func(traceID, session string)) map[string]*part {
 	out := map[string]*part{}
 	for _, rl := range req.GetResourceLogs() {
 		res := rl.GetResource().GetAttributes()
@@ -99,7 +86,7 @@ func splitLogs(req *logspb.LogsData, learn func(traceID, session string)) map[st
 			bySession := map[string][]*logspb.LogRecord{}
 			var order []string
 			for _, lr := range sl.GetLogRecords() {
-				s := sessionOf(lr.GetAttributes(), res)
+				s := ru.sessionOf(lr.GetAttributes(), res)
 				if s != "" && len(lr.GetTraceId()) > 0 {
 					learn(hex.EncodeToString(lr.GetTraceId()), s)
 				}
@@ -136,12 +123,12 @@ const tracePrefix = "trace:"
 // only, and its children inherit the trace, not the attribute. learn records every
 // trace a keyed span names; known answers for the others. A span of a trace nobody
 // has named yet comes back under tracePrefix+traceID, for the relay to hold.
-func splitTraces(req *tracepb.TracesData, learn func(traceID, session string), known func(traceID string) string) map[string]*part {
+func (ru *rules) splitTraces(req *tracepb.TracesData, learn func(traceID, session string), known func(traceID string) string) map[string]*part {
 	for _, rs := range req.GetResourceSpans() {
 		res := rs.GetResource().GetAttributes()
 		for _, ss := range rs.GetScopeSpans() {
 			for _, sp := range ss.GetSpans() {
-				if s := sessionOf(sp.GetAttributes(), res); s != "" && len(sp.GetTraceId()) > 0 {
+				if s := ru.sessionOf(sp.GetAttributes(), res); s != "" && len(sp.GetTraceId()) > 0 {
 					learn(hex.EncodeToString(sp.GetTraceId()), s)
 				}
 			}
@@ -154,7 +141,7 @@ func splitTraces(req *tracepb.TracesData, learn func(traceID, session string), k
 			bySession := map[string][]*tracepb.Span{}
 			var order []string
 			for _, sp := range ss.GetSpans() {
-				s := sessionOf(sp.GetAttributes(), res)
+				s := ru.sessionOf(sp.GetAttributes(), res)
 				if s == "" && len(sp.GetTraceId()) > 0 {
 					id := hex.EncodeToString(sp.GetTraceId())
 					if s = known(id); s == "" {
@@ -188,7 +175,7 @@ func splitTraces(req *tracepb.TracesData, learn func(traceID, session string), k
 // splitMetrics divides a metrics export by session, data point by data point: one
 // metric's points can belong to several sessions (Claude Code stamps session.id on
 // each point), so each session gets a copy of the metric holding only its own points.
-func splitMetrics(req *metricspb.MetricsData) map[string]*part {
+func (ru *rules) splitMetrics(req *metricspb.MetricsData) map[string]*part {
 	out := map[string]*part{}
 	for _, rm := range req.GetResourceMetrics() {
 		res := rm.GetResource().GetAttributes()
@@ -197,7 +184,7 @@ func splitMetrics(req *metricspb.MetricsData) map[string]*part {
 			counts := map[string]int{}
 			var order []string
 			for _, m := range sm.GetMetrics() {
-				for s, piece := range splitMetric(m, res) {
+				for s, piece := range ru.splitMetric(m, res) {
 					if _, seen := bySession[s]; !seen {
 						order = append(order, s)
 					}
@@ -231,7 +218,7 @@ type metricPiece struct {
 
 // splitMetric groups one metric's data points by session, each group a shallow copy
 // of the metric (name, unit, temporality) holding only those points.
-func splitMetric(m *metricspb.Metric, res []*commonpb.KeyValue) map[string]metricPiece {
+func (ru *rules) splitMetric(m *metricspb.Metric, res []*commonpb.KeyValue) map[string]metricPiece {
 	out := map[string]metricPiece{}
 	shell := func() *metricspb.Metric {
 		return &metricspb.Metric{Name: m.GetName(), Description: m.GetDescription(), Unit: m.GetUnit(), Metadata: m.GetMetadata()}
@@ -240,7 +227,7 @@ func splitMetric(m *metricspb.Metric, res []*commonpb.KeyValue) map[string]metri
 	case *metricspb.Metric_Sum:
 		groups := map[string][]*metricspb.NumberDataPoint{}
 		for _, dp := range d.Sum.GetDataPoints() {
-			s := sessionOf(dp.GetAttributes(), res)
+			s := ru.sessionOf(dp.GetAttributes(), res)
 			groups[s] = append(groups[s], dp)
 		}
 		for s, pts := range groups {
@@ -251,7 +238,7 @@ func splitMetric(m *metricspb.Metric, res []*commonpb.KeyValue) map[string]metri
 	case *metricspb.Metric_Gauge:
 		groups := map[string][]*metricspb.NumberDataPoint{}
 		for _, dp := range d.Gauge.GetDataPoints() {
-			s := sessionOf(dp.GetAttributes(), res)
+			s := ru.sessionOf(dp.GetAttributes(), res)
 			groups[s] = append(groups[s], dp)
 		}
 		for s, pts := range groups {
@@ -262,7 +249,7 @@ func splitMetric(m *metricspb.Metric, res []*commonpb.KeyValue) map[string]metri
 	case *metricspb.Metric_Histogram:
 		groups := map[string][]*metricspb.HistogramDataPoint{}
 		for _, dp := range d.Histogram.GetDataPoints() {
-			s := sessionOf(dp.GetAttributes(), res)
+			s := ru.sessionOf(dp.GetAttributes(), res)
 			groups[s] = append(groups[s], dp)
 		}
 		for s, pts := range groups {
@@ -273,7 +260,7 @@ func splitMetric(m *metricspb.Metric, res []*commonpb.KeyValue) map[string]metri
 	case *metricspb.Metric_ExponentialHistogram:
 		groups := map[string][]*metricspb.ExponentialHistogramDataPoint{}
 		for _, dp := range d.ExponentialHistogram.GetDataPoints() {
-			s := sessionOf(dp.GetAttributes(), res)
+			s := ru.sessionOf(dp.GetAttributes(), res)
 			groups[s] = append(groups[s], dp)
 		}
 		for s, pts := range groups {
@@ -284,7 +271,7 @@ func splitMetric(m *metricspb.Metric, res []*commonpb.KeyValue) map[string]metri
 	case *metricspb.Metric_Summary:
 		groups := map[string][]*metricspb.SummaryDataPoint{}
 		for _, dp := range d.Summary.GetDataPoints() {
-			s := sessionOf(dp.GetAttributes(), res)
+			s := ru.sessionOf(dp.GetAttributes(), res)
 			groups[s] = append(groups[s], dp)
 		}
 		for s, pts := range groups {
@@ -305,10 +292,9 @@ func cloneResource(r *resourcepb.Resource) *resourcepb.Resource {
 	return proto.Clone(r).(*resourcepb.Resource)
 }
 
-// conversationStart reports whether p holds a Codex conversation start. An app-server
-// thread (Desktop, the daemon) exports it at thread/start, and its first hook fires at
-// its first turn — whenever the developer types the first prompt.
-func conversationStart(p *part) bool {
+// conversationStart reports whether p holds an event an agent declared a conversation
+// start (shape.Correlation.StartEvents).
+func (ru *rules) conversationStart(p *part) bool {
 	m, ok := p.msg.(*logspb.LogsData)
 	if !ok {
 		return false
@@ -317,7 +303,7 @@ func conversationStart(p *part) bool {
 		for _, sl := range rl.GetScopeLogs() {
 			for _, lr := range sl.GetLogRecords() {
 				for _, kv := range lr.GetAttributes() {
-					if kv.GetKey() == "event.name" && kv.GetValue().GetStringValue() == "codex.conversation_starts" {
+					if kv.GetKey() == "event.name" && contains(ru.startEvents, kv.GetValue().GetStringValue()) {
 						return true
 					}
 				}

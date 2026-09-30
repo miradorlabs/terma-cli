@@ -1,5 +1,5 @@
 # Identifiers and strings naming a coding agent, per package, in shipped files outside
-# the agents' own packages. This list only shrinks. Total: 1638.
+# the agents' own packages. This list only shrinks. Total: 1621.
 147 cmd
 1 internal/api
 850 internal/harness
@@ -7,7 +7,6 @@
 470 internal/hookrun
 2 internal/migrate
 2 internal/output
-17 internal/relay
 6 internal/routing
 3 internal/shim
 2 internal/style
