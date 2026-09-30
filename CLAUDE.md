@@ -674,6 +674,14 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   `terma hook gemini-*`). The content gate also strips resource attributes that restate a
   prompt (`resourcePromptFields`: Gemini's `process.command_args`), and the live leak
   check covers resources and metric points.
+- With a project's content withheld the relay passes only attribute keys classified safe
+  (`internal/relay/allow.go`, one set for every harness; a key that is content anywhere
+  is content). Content keys keep content.go's marker/drop; any other key — on records,
+  spans, span events, metric points, resources — is dropped and counted as
+  `unclassified.<key>` (bounded), and a log body that does more than name its event is
+  emptied. Live scenarios with content withheld fail on any unclassified key
+  (`failUnclassified`): classify it, never widen the rule. `TestClassificationCoversTheGoldens`
+  ties the list to the withheld-mode goldens.
 - Never read harness log files to fill a gap: what the relay knows comes from OTLP and
   hook payloads. The pre-relay hook readers (Codex rollouts and `session_index.jsonl`,
   `~/.claude.json`; listed in `docs/RELAY-SPIKE.md`, "What still reads files on disk")

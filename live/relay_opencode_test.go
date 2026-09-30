@@ -64,7 +64,9 @@ func TestRelayOpenCode(t *testing.T) {
 					t.Errorf("content withheld, but it reached upstream in: %v", leaked)
 				}
 				sb.StopRelay()
-				noteRelayStats(t.Name(), sb.RelayStats())
+				c := sb.RelayStats()
+				noteRelayStats(t.Name(), c)
+				failUnclassified(t, c)
 			})
 		}
 	})
@@ -104,6 +106,8 @@ func TestRelayOpenCodeNegative(t *testing.T) {
 			t.Errorf("the opted-in run itself never arrived: %v", sb.RelayStats())
 		}
 		sb.StopRelay()
-		noteRelayStats(t.Name(), sb.RelayStats())
+		c := sb.RelayStats()
+		noteRelayStats(t.Name(), c)
+		failUnclassified(t, c)
 	})
 }

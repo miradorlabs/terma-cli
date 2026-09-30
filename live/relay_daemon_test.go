@@ -60,7 +60,9 @@ func TestRelayDaemon(t *testing.T) {
 			checkCodexTelemetry(r, e, run.ThreadID, sb.ProjectID, false, true)
 			checkOnlyClaimed(r, e, "conversation.id", run.ThreadID, sb.ProjectID)
 		})
-		noteRelayStats(t.Name(), sb.RelayStats())
+		c := sb.RelayStats()
+		noteRelayStats(t.Name(), c)
+		failUnclassified(t, c)
 		sb.terma(sb.Repo, "relay", "daemon", "remove")
 		for deadline := time.Now().Add(15 * time.Second); sb.waitRelay(200*time.Millisecond) && time.Now().Before(deadline); {
 			time.Sleep(300 * time.Millisecond)

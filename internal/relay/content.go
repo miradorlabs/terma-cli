@@ -2,6 +2,8 @@ package relay
 
 import (
 	"slices"
+	"strconv"
+	"strings"
 
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
@@ -28,7 +30,13 @@ var (
 		// omp's own (omp.gen_ai.*): the request's messages and the response's text.
 		"omp.gen_ai.request.messages", "omp.gen_ai.response.text",
 		// Gemini CLI's gemini_cli.api_request / api_response (0.62).
-		"request_text", "response_text"}
+		"request_text", "response_text",
+		// Free text that may restate or reason about what was said, in the harnesses'
+		// own events (the first unclassified-key survey, 2026-09-30): errors, reasons,
+		// Gemini's model-router reasoning, tool and agent descriptions, stop sequences,
+		// and keys too generic to vouch for.
+		"error", "reason", "reasoning", "routing.reasoning", "metadata", "value", "key", "from", "db", "query_script",
+		"gen_ai.tool.description", "gen_ai.agent.description", "gen_ai.request.stop_sequences"}
 	// resourcePromptFields are resource attributes that restate what was said: the
 	// process's command line, which carries a prompt passed as an argument (Gemini CLI
 	// stamps process.command_args, `-p "<prompt>"` included, whatever logPrompts says).
@@ -41,7 +49,9 @@ var (
 	toolContentFields = []string{"tool_parameters", "tool_input", "full_command", "bash_command", "arguments", "output",
 		"gen_ai.tool.call.arguments", "gen_ai.tool.call.result", "opencode.tool.file_path",
 		// Gemini CLI's tool_call and hook_call records (0.62).
-		"function_args", "hook_input", "hook_output", "stdout", "stderr"}
+		"function_args", "hook_input", "hook_output", "stdout", "stderr",
+		// What a tool acted on or returned, as named elsewhere.
+		"file_path", "result"}
 	// toolContentEvents are span events that exist only to carry tool content: Claude
 	// Code's claude_code.tool span records the command and its output as a
 	// tool.output event (live, 2.1.284), which the golden attribute lists do not see.
@@ -55,25 +65,32 @@ const (
 
 // withhold applies a project's content policy to one session's part, in place, and
 // returns how many records it changed.
-func withhold(p *part, prompts, toolContent bool) int {
+func withhold(p *part, prompts, toolContent bool, unclassified map[string]int) int {
 	if prompts && toolContent {
 		return 0
 	}
 	changed := 0
 	apply := func(attrs []*commonpb.KeyValue) []*commonpb.KeyValue {
-		out, did := withholdAttrs(attrs, prompts, toolContent)
+		out, did := withholdAttrs(attrs, prompts, toolContent, unclassified)
 		if did {
 			changed++
 		}
 		return out
 	}
 	resource := func(r *resourcepb.Resource) {
-		if prompts || r == nil {
+		if r == nil {
 			return
 		}
 		kept := r.Attributes[:0]
 		for _, kv := range r.GetAttributes() {
-			if contains(resourcePromptFields, kv.GetKey()) {
+			switch key := kv.GetKey(); {
+			case contains(resourcePromptFields, key):
+				if !prompts {
+					changed++
+					continue
+				}
+			case !safeKey(key):
+				unclassified["resource/"+key]++
 				changed++
 				continue
 			}
@@ -85,6 +102,19 @@ func withhold(p *part, prompts, toolContent bool) int {
 	case *metricspb.MetricsData:
 		for _, rm := range m.GetResourceMetrics() {
 			resource(rm.GetResource())
+			for _, sm := range rm.GetScopeMetrics() {
+				for _, mt := range sm.GetMetrics() {
+					for _, pt := range mt.GetSum().GetDataPoints() {
+						pt.Attributes = apply(pt.GetAttributes())
+					}
+					for _, pt := range mt.GetGauge().GetDataPoints() {
+						pt.Attributes = apply(pt.GetAttributes())
+					}
+					for _, pt := range mt.GetHistogram().GetDataPoints() {
+						pt.Attributes = apply(pt.GetAttributes())
+					}
+				}
+			}
 		}
 	case *logspb.LogsData:
 		for _, rl := range m.GetResourceLogs() {
@@ -92,7 +122,16 @@ func withhold(p *part, prompts, toolContent bool) int {
 			for _, sl := range rl.GetScopeLogs() {
 				for _, lr := range sl.GetLogRecords() {
 					lr.Attributes = apply(lr.GetAttributes())
-					if !prompts && contains(promptBodyEvents, attrString(lr.GetAttributes(), "event.name")) && lr.GetBody().GetStringValue() != "" {
+					event := attrString(lr.GetAttributes(), "event.name")
+					_, plain := lr.GetBody().GetValue().(*commonpb.AnyValue_StringValue)
+					body := lr.GetBody().GetStringValue()
+					switch {
+					case lr.GetBody().GetValue() == nil || plain && body == "":
+					case !prompts && contains(promptBodyEvents, event):
+						lr.Body = &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: ""}}
+						changed++
+					case !plain || !bodyNamesItsEvent(body, event):
+						// A body is free text: kept only when it just names its event.
 						lr.Body = &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: ""}}
 						changed++
 					}
@@ -122,7 +161,7 @@ func withhold(p *part, prompts, toolContent bool) int {
 	return changed
 }
 
-func withholdAttrs(attrs []*commonpb.KeyValue, prompts, toolContent bool) ([]*commonpb.KeyValue, bool) {
+func withholdAttrs(attrs []*commonpb.KeyValue, prompts, toolContent bool, unclassified map[string]int) ([]*commonpb.KeyValue, bool) {
 	marker := claudeRedacted
 	for _, kv := range attrs {
 		if k := kv.GetKey(); k == "conversation.id" || k == "thread.id" {
@@ -132,20 +171,58 @@ func withholdAttrs(attrs []*commonpb.KeyValue, prompts, toolContent bool) ([]*co
 	changed := false
 	out := attrs[:0]
 	for _, kv := range attrs {
+		key := kv.GetKey()
 		switch {
-		case !toolContent && contains(toolContentFields, kv.GetKey()):
+		case !toolContent && contains(toolContentFields, key):
 			changed = true
 			continue
-		case !prompts && contains(promptDropFields, kv.GetKey()):
+		case !prompts && contains(promptDropFields, key):
 			changed = true
 			continue
-		case !prompts && contains(promptFields, kv.GetKey()) && kv.GetValue().GetStringValue() != marker:
+		case !prompts && contains(promptFields, key) && kv.GetValue().GetStringValue() != marker:
 			kv.Value = &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: marker}}
 			changed = true
+		case !contentKey(key) && !safeKey(key) && !scalarNonText(kv.GetValue()):
+			// Withheld content passes only what is known to be safe (allow.go).
+			unclassified[key]++
+			changed = true
+			continue
 		}
 		out = append(out, kv)
 	}
 	return out, changed
+}
+
+// scalarNonText reports whether v is a number or a boolean — a count, a size, a flag
+// or a numeric id — which cannot carry what was said, whatever its key. Claude Code and
+// Codex send many of theirs as strings ("3", "true"), which count the same when the
+// whole string is one.
+func scalarNonText(v *commonpb.AnyValue) bool {
+	switch x := v.GetValue().(type) {
+	case *commonpb.AnyValue_IntValue, *commonpb.AnyValue_DoubleValue, *commonpb.AnyValue_BoolValue:
+		return true
+	case *commonpb.AnyValue_StringValue:
+		return numericOrBool(x.StringValue)
+	}
+	return false
+}
+
+// numericOrBool reports whether s is, whole, a decimal number or true/false.
+func numericOrBool(s string) bool {
+	if s == "true" || s == "false" {
+		return true
+	}
+	if s == "" || len(s) > 32 {
+		return false
+	}
+	_, err := strconv.ParseFloat(s, 64)
+	return err == nil && !strings.ContainsAny(s, "xXpPiInN_")
+}
+
+// bodyNamesItsEvent reports whether a log body says no more than which event it is —
+// Claude Code's is `claude_code.<event>`, others repeat event.name.
+func bodyNamesItsEvent(body, event string) bool {
+	return body == event || body == "claude_code."+event || event != "" && strings.HasSuffix(body, "."+event)
 }
 
 func attrString(attrs []*commonpb.KeyValue, key string) string {

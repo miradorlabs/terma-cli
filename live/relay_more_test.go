@@ -39,6 +39,7 @@ func TestRelayCodexResumedElsewhere(t *testing.T) {
 		sb.StopRelay()
 		c := sb.RelayStats()
 		noteRelayStats(t.Name(), c)
+		failUnclassified(t, c)
 		prompts := 0
 		for _, r := range e.logs {
 			if r.Attrs["event.name"] == "codex.user_prompt" && strings.Contains(r.Attrs["prompt"], "TERMA_PERSONAL_WORK") {
@@ -80,7 +81,9 @@ func TestRelayLinkedWorktree(t *testing.T) {
 			t.Errorf("a linked worktree's session reached upstream as %v", got)
 		}
 		sb.StopRelay()
-		noteRelayStats(t.Name(), sb.RelayStats())
+		c := sb.RelayStats()
+		noteRelayStats(t.Name(), c)
+		failUnclassified(t, c)
 	})
 }
 
@@ -117,6 +120,7 @@ func TestRelayClaudeSubagent(t *testing.T) {
 		sb.StopRelay()
 		c := sb.RelayStats()
 		noteRelayStats(t.Name(), c)
+		failUnclassified(t, c)
 		if sum(c, "dropped.") != 0 {
 			t.Errorf("a subagent's records were dropped: %v", c)
 		}
@@ -144,6 +148,7 @@ func TestRelayCodexUntrustedHooks(t *testing.T) {
 		sb.StopRelay()
 		c := sb.RelayStats()
 		noteRelayStats(t.Name(), c)
+		failUnclassified(t, c)
 		if sum(c, "received.") == 0 || sum(c, "forwarded.") != 0 {
 			t.Errorf("want received and nothing forwarded: %v", c)
 		}
@@ -180,7 +185,9 @@ func TestRelayCodexLongTurn(t *testing.T) {
 			checkOnlyClaimed(r, e, "conversation.id", run.ThreadID, sb.ProjectID)
 		})
 		sb.StopRelay()
-		noteRelayStats(t.Name(), sb.RelayStats())
+		c := sb.RelayStats()
+		noteRelayStats(t.Name(), c)
+		failUnclassified(t, c)
 	})
 }
 
@@ -255,7 +262,9 @@ func TestRelayClaudeInteractiveRestart(t *testing.T) {
 		}
 		sb.StopRelay()
 		Note(t.Name(), fmt.Sprintf("interactive restart: user_prompt records per turn %v (the relay died after turn 1)", counts))
-		noteRelayStats(t.Name(), sb.RelayStats())
+		c := sb.RelayStats()
+		noteRelayStats(t.Name(), c)
+		failUnclassified(t, c)
 	})
 }
 
@@ -312,6 +321,7 @@ func TestRelayCodexTUITitle(t *testing.T) {
 		sb.StopRelay()
 		c := sb.RelayStats()
 		noteRelayStats(t.Name(), c)
+		failUnclassified(t, c)
 		e := sb.Receiver.evidence()
 		threads := map[string]bool{}
 		var title, thread string

@@ -96,6 +96,7 @@ func TestRelayGemini(t *testing.T) {
 				sb.StopRelay()
 				c := sb.RelayStats()
 				noteRelayStats(t.Name(), c)
+				failUnclassified(t, c)
 				if n := sum(c, "dropped."); n > 0 {
 					t.Errorf("the relay dropped %d records of an opted-in session: %v", n, c)
 				}
@@ -120,6 +121,7 @@ func TestRelayGeminiOutsideARepository(t *testing.T) {
 		sb.StopRelay()
 		c := sb.RelayStats()
 		noteRelayStats(t.Name(), c)
+		failUnclassified(t, c)
 		if n := agentRecords(sb.Receiver.evidence()); n != 0 {
 			t.Errorf("Gemini outside a repository reached upstream: %d records, relay %v", n, c)
 		}

@@ -3,6 +3,7 @@ package relay
 import (
 	"maps"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -22,6 +23,30 @@ func (s *Stats) add(key string, n int) {
 	s.mu.Lock()
 	s.counters[key] += n
 	s.mu.Unlock()
+}
+
+// maxUnclassified bounds how many distinct unclassified keys are counted by name: a
+// hostile or broken exporter must not grow the stats without limit.
+const maxUnclassified = 256
+
+// unclassified counts a key the content gate dropped for not being classified, by name
+// while fewer than maxUnclassified are, then as unclassified_overflow.
+func (s *Stats) unclassified(key string, n int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	name := "unclassified." + key
+	if _, ok := s.counters[name]; !ok {
+		distinct := 0
+		for k := range s.counters {
+			if strings.HasPrefix(k, "unclassified.") {
+				distinct++
+			}
+		}
+		if distinct >= maxUnclassified {
+			name = "unclassified_overflow"
+		}
+	}
+	s.counters[name] += n
 }
 
 func (s *Stats) received(sig Signal, n int)  { s.add("received."+string(sig), n) }

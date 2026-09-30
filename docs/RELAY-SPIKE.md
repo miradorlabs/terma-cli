@@ -68,6 +68,20 @@ The relay is the way around that. Every agent's global exporter sends to a relay
      - `tool_parameters`, `tool_input`, `full_command`, `bash_command`, `arguments` and `output` are removed;
      - so are `gen_ai.tool.call.arguments`, `gen_ai.tool.call.result` and `opencode.tool.file_path`;
      - so are the `tool.output` and `tool.input` span events.
+   - **Everything else, with either off: only what is classified safe leaves** (`internal/relay/allow.go`). Removing known content fields is not enough on its own: a harness release that adds one would leak until someone noticed. It happened twice while this was built:
+     - Gemini CLI's `process.command_args` carries the `-p` prompt;
+     - Claude 2.1.280–281 sent prompts with prompts off.
+
+     So every attribute key — on records, spans, span events, metric points and resources — is either content (marked or dropped as above) or classified safe, and a key that is neither is dropped. Log bodies are free text: one that does more than name its event is emptied.
+
+     What a gap costs is visible: the relay counts each unclassified key by name (`unclassified.<key>` in its stats, bounded at 256 names), and every live scenario with content withheld fails on any, naming them. A new harness field is then a loss someone sees on the next canary run, never a leak. The safe list starts from what the harnesses sent with content withheld (the live goldens; `TestClassificationCoversTheGoldens` holds the two together) and from what terma's own exporters send.
+
+     **Numbers and booleans pass under any key**, as does a string that is wholly one ("3", "true"): a count or a flag cannot carry what was said. Everything else was classified by hand from a survey of every harness's withheld-content run. That survey found about 230 keys the goldens never showed, from Claude Code (hooks, plugins, managed settings), Codex (its app server, hooks, tracing), OpenCode and Gemini CLI. Keys whose values could be free text are content:
+     - `error`, `reason`, `result`, `reasoning`, `routing.reasoning` (Gemini's model-router reasoning);
+     - `metadata`, `value`, `key`, `from`, `db`, `query_script`;
+     - tool and agent descriptions, stop sequences, and `file_path`.
+
+     **Tested by sabotage:** with `process.command_args` taken off the content list, as though Gemini had just added it, the withheld run leaked nothing. It failed instead, naming the key as unclassified. The same sabotage before the safe list leaked the prompt.
 8. **OTLP/JSON is accepted**, with its hex ids converted before decoding. **On stop**, the relay keeps delivering accepted records for 5 seconds.
 9. **Claims and policies are cached** for 1 s and 5 s, so a busy session costs one file read a second. The claim's read-merge-write runs under a sidecar lock: without it, 14 of 16 concurrent writers' processes were lost. `TERMA_RELAY_DEBUG=1` logs every drop with its key, sender and claim.
 10. **`terma doctor` and `terma status`** replace their export check with the same relay check:

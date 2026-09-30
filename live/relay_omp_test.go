@@ -56,6 +56,7 @@ func TestRelayOmpOutsideARepository(t *testing.T) {
 		sb.StopRelay()
 		c := sb.RelayStats()
 		noteRelayStats(t.Name(), c)
+		failUnclassified(t, c)
 		if n := agentRecords(sb.Receiver.evidence()); n != 0 {
 			t.Errorf("omp outside a repository reached upstream: %d records, relay %v", n, c)
 		}

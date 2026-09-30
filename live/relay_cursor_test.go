@@ -68,6 +68,7 @@ func TestRelayCursorHooks(t *testing.T) {
 	sb.StopRelay()
 	c := sb.RelayStats()
 	noteRelayStats(t.Name(), c)
+	failUnclassified(t, c)
 	if n := sum(c, "received."); n != 0 {
 		t.Errorf("the relay received %d records on a Cursor-only machine: %v", n, c)
 	}

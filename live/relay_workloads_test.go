@@ -144,6 +144,7 @@ func runBoth(t *testing.T, sandbox func(t *testing.T) *Sandbox, run func(t *test
 		sb.StopRelay()
 		c := sb.RelayStats()
 		noteRelayStats(t.Name(), c)
+		failUnclassified(t, c)
 		if len(direct) == 0 {
 			t.Fatal("the direct run delivered nothing to compare with")
 		}

@@ -99,6 +99,26 @@ func agentRecords(e telemetryEvidence) int {
 	return n
 }
 
+// failUnclassified fails a scenario whose withheld content met an attribute key the
+// relay has not classified (internal/relay/allow.go): the relay dropped it, as it must,
+// and someone has to decide whether it is safe metadata to let through or content.
+func failUnclassified(t *testing.T, c map[string]int) {
+	t.Helper()
+	var keys []string
+	for k := range c {
+		if rest, ok := strings.CutPrefix(k, "unclassified."); ok {
+			keys = append(keys, rest)
+		}
+	}
+	if c["unclassified_overflow"] > 0 {
+		keys = append(keys, "(and more: unclassified_overflow)")
+	}
+	if len(keys) > 0 {
+		sort.Strings(keys)
+		t.Errorf("withheld content met %d unclassified key(s) — classify each in internal/relay/allow.go as safe, or as content in content.go: %s", len(keys), strings.Join(keys, ", "))
+	}
+}
+
 func noteRelayStats(name string, c map[string]int) {
 	// Totals per counter family — every drop reason by name, whatever it is.
 	totals := map[string]int{}
@@ -223,6 +243,7 @@ func TestRelayClaude(t *testing.T) {
 				sb.StopRelay()
 				c := sb.RelayStats()
 				noteRelayStats(t.Name(), c)
+				failUnclassified(t, c)
 				if n := sum(c, "dropped.unclaimed"); n > 0 {
 					t.Errorf("an opted-in session lost %d records waiting for its claim: %v", n, c)
 				}
@@ -261,6 +282,7 @@ func TestRelayCodex(t *testing.T) {
 				sb.StopRelay()
 				c := sb.RelayStats()
 				noteRelayStats(t.Name(), c)
+				failUnclassified(t, c)
 				if n := sum(c, "dropped.unclaimed"); n > 0 {
 					t.Errorf("an opted-in session lost %d records waiting for its claim: %v", n, c)
 				}
@@ -298,6 +320,7 @@ func TestRelayNegativeControls(t *testing.T) {
 			sb.StopRelay()
 			c := sb.RelayStats()
 			noteRelayStats(t.Name(), c)
+			failUnclassified(t, c)
 			if sum(c, "received.") == 0 {
 				t.Fatalf("the relay received nothing, so the control proves nothing: %v", c)
 			}
@@ -371,7 +394,9 @@ func TestRelayColdStart(t *testing.T) {
 			}
 		}
 		sb.StopRelay()
-		noteRelayStats(t.Name(), sb.RelayStats())
+		c := sb.RelayStats()
+		noteRelayStats(t.Name(), c)
+		failUnclassified(t, c)
 		if len(failures) == 0 {
 			Note(t.Name(), "cold start: the whole contract arrived")
 		} else {
@@ -418,6 +443,7 @@ func TestRelayLateClaim(t *testing.T) {
 		sb.StopRelay()
 		c := sb.RelayStats()
 		noteRelayStats(t.Name(), c)
+		failUnclassified(t, c)
 		if c["released_after_hold"] == 0 || sum(c, "forwarded.") == 0 || sum(c, "dropped.unclaimed") != 0 {
 			t.Errorf("want everything held and then released by the late claim: %v", c)
 		}
@@ -536,7 +562,9 @@ func TestRelayConcurrentProjects(t *testing.T) {
 			t.Errorf("the personal session reached upstream: %v", leaked)
 		}
 		sb.StopRelay()
-		noteRelayStats(t.Name(), sb.RelayStats())
+		c := sb.RelayStats()
+		noteRelayStats(t.Name(), c)
+		failUnclassified(t, c)
 	})
 }
 
@@ -567,6 +595,7 @@ func TestRelayCodexColdStart(t *testing.T) {
 		sb.StopRelay()
 		c := sb.RelayStats()
 		noteRelayStats(t.Name(), c)
+		failUnclassified(t, c)
 		if sum(c, "forwarded.") == 0 {
 			t.Fatalf("the hook-started relay forwarded nothing: %v", c)
 		}
@@ -663,7 +692,9 @@ func TestRelayClaudeFileToolsContent(t *testing.T) {
 					t.Error(f)
 				}
 				sb.StopRelay()
-				noteRelayStats(t.Name(), sb.RelayStats())
+				c := sb.RelayStats()
+				noteRelayStats(t.Name(), c)
+				failUnclassified(t, c)
 				if content {
 					Note(t.Name(), "file contents upstream in: "+strings.Join(found, ", "))
 				}
@@ -726,7 +757,9 @@ func TestRelayResumedElsewhere(t *testing.T) {
 			}
 		}
 		sb.StopRelay()
-		noteRelayStats(t.Name(), sb.RelayStats())
+		c := sb.RelayStats()
+		noteRelayStats(t.Name(), c)
+		failUnclassified(t, c)
 		switch {
 		case resumed != sid:
 			Note(t.Name(), "resume elsewhere: Claude gave the resumed run a new session id, so the claim does not follow it")

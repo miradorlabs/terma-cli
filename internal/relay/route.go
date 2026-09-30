@@ -347,8 +347,12 @@ const (
 // for an inferred session, how it was found) on the part and hands it to the
 // project's destination. deliverMu is held.
 func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attribution) {
-	if n := withhold(p, pol.IncludePrompts, pol.IncludeToolContent); n > 0 {
+	unclassified := map[string]int{}
+	if n := withhold(p, pol.IncludePrompts, pol.IncludeToolContent, unclassified); n > 0 {
 		r.stats.add("withheld_content_records", n)
+	}
+	for key, n := range unclassified {
+		r.stats.unclassified(key, n)
 	}
 	stamp(p, ProjectAttr, c.ProjectID)
 	if how.how != "" {

@@ -85,6 +85,7 @@ func TestRelayCodexDesktop(t *testing.T) {
 		sb.StopRelay()
 		c := sb.RelayStats()
 		noteRelayStats(t.Name(), c)
+		failUnclassified(t, c)
 		if sum(c, "received.metrics") == sum(c, "dropped.no_session_process.metrics") {
 			// Only the TUI clients' own few; the app-server exported none (0.158, even on a
 			// clean stop), so the metrics check above had nothing of the daemon's to judge.
@@ -148,7 +149,9 @@ func TestRelayCodexDesktopResumedElsewhere(t *testing.T) {
 		}
 		Note(t.Name(), fmt.Sprintf("conversation_starts forwarded for the thread: %d", starts))
 		sb.StopRelay()
-		noteRelayStats(t.Name(), sb.RelayStats())
+		c := sb.RelayStats()
+		noteRelayStats(t.Name(), c)
+		failUnclassified(t, c)
 	})
 }
 
@@ -252,6 +255,7 @@ func TestRelayCodexDaemonTUI(t *testing.T) {
 		sb.StopRelay()
 		c := sb.RelayStats()
 		noteRelayStats(t.Name(), c)
+		failUnclassified(t, c)
 		if sum(c, "dropped.unclaimed") == 0 {
 			t.Errorf("the personal thread was never received and dropped: %v", c)
 		}
