@@ -1,9 +1,12 @@
 package agents
 
 import (
+	"fmt"
 	"maps"
 	"slices"
+	"strings"
 
+	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hookrun"
 )
 
@@ -165,6 +168,32 @@ func (r *Registry) RelayTargets(selected []string) []string {
 		}
 	}
 	return out
+}
+
+// Harnesses is every exporting agent's harness, in registry order.
+func (r *Registry) Harnesses() []harness.Harness {
+	var out []harness.Harness
+	for _, e := range r.With[Exporting]() {
+		out = append(out, e.Harness())
+	}
+	return out
+}
+
+// HarnessNames lists the exporting agents' names.
+func (r *Registry) HarnessNames() []string {
+	var out []string
+	for _, e := range r.With[Exporting]() {
+		out = append(out, e.Name())
+	}
+	return out
+}
+
+// Harness resolves an exporting agent's harness by name.
+func (r *Registry) Harness(name string) (harness.Harness, error) {
+	if e, ok := r.Find[Exporting](strings.ToLower(strings.TrimSpace(name))); ok {
+		return e.Harness(), nil
+	}
+	return nil, fmt.Errorf("unknown agent %q (want %s)", name, strings.Join(r.HarnessNames(), " or "))
 }
 
 // With returns the known agents that have capability C.

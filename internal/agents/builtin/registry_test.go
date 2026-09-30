@@ -3,8 +3,12 @@ package builtin
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+
+	"github.com/miradorlabs/terma-cli/internal/agents"
+	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
 // The registry is the single source every command reads. These are the invariants
@@ -152,3 +156,63 @@ func TestEventNamesAreUnique(t *testing.T) {
 }
 
 var reg = Agents()
+
+// An exporting agent's harness answers to the agent's name: `terma connect <name>` and
+// the registry resolve the same thing.
+func TestHarnessesAnswerToTheirAgentsName(t *testing.T) {
+	for _, e := range reg.With[agents.Exporting]() {
+		if got := e.Harness().Name(); got != e.Name() {
+			t.Errorf("%s's harness is named %q", e.Name(), got)
+		}
+	}
+	if got := reg.HarnessNames(); !slices.Equal(got, []string{"claude", "codex", "opencode", "omp"}) {
+		t.Errorf("harnesses %q", got)
+	}
+}
+
+func TestHarnessRejectsAnUnknownAgent(t *testing.T) {
+	if _, err := reg.Harness("gemini"); err == nil {
+		t.Fatal("gemini has no harness terma configures, and was resolved")
+	}
+	for _, name := range reg.HarnessNames() {
+		if _, err := reg.Harness(name); err != nil {
+			t.Errorf("Harness(%q): %v", name, err)
+		}
+	}
+}
+
+// Every harness answers a status query against an empty sandbox: a stub that errors
+// would make `telemetry status` report it as broken.
+func TestEveryHarnessReportsStatusInASandbox(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	t.Setenv("CLAUDE_CONFIG_DIR", dir)
+	t.Setenv("CODEX_HOME", dir)
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("TERMA_CONFIG_DIR", filepath.Join(dir, "terma"))
+	for _, h := range reg.Harnesses() {
+		st, err := h.Status()
+		if err != nil {
+			t.Errorf("%s.Status: %v", h.Name(), err)
+			continue
+		}
+		if st.Connected || st.Exists {
+			t.Errorf("%s reported connected=%v exists=%v in an empty sandbox", h.Name(), st.Connected, st.Exists)
+		}
+	}
+}
+
+// Every harness is a full agent in the support catalog, so the two views never disagree
+// about an agent terma exports for.
+func TestSupportCatalogCoversEveryHarness(t *testing.T) {
+	for _, h := range reg.Harnesses() {
+		a, ok := harness.LookupSupport(h.Name())
+		if !ok {
+			t.Errorf("harness %q is not in the support catalog", h.Name())
+			continue
+		}
+		if a.Telemetry.Level != harness.SupportFull || a.Support != harness.SupportFull {
+			t.Errorf("%s exports telemetry but the catalog says telemetry %q, overall %q", h.Name(), a.Telemetry.Level, a.Support)
+		}
+	}
+}

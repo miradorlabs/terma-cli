@@ -1,6 +1,10 @@
 package agents
 
-import "context"
+import (
+	"context"
+
+	"github.com/miradorlabs/terma-cli/internal/harness"
+)
 
 // RelayConfig is where an agent's telemetry reaches the local relay. Token is never
 // printed or put in an agent's tool environment.
@@ -45,4 +49,10 @@ func Tool(a Agent) string {
 		return l.Tool()
 	}
 	return a.Name()
+}
+
+// Exporting is an agent whose OTLP exporter terma configures in the agent's own settings.
+type Exporting interface {
+	Agent
+	Harness() harness.Harness
 }

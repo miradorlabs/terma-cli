@@ -67,7 +67,7 @@ func runNate(cmd *cobra.Command) error {
 	// These journals live in Terma's config directory. Restore what Terma displaced
 	// before that directory is deleted; after it is gone, the original values cannot
 	// be recovered.
-	for _, h := range harness.All() {
+	for _, h := range registered.Harnesses() {
 		result, err := h.Disconnect()
 		if err != nil {
 			return fmt.Errorf("restore %s settings: %w", h.DisplayName(), err)

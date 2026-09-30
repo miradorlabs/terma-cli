@@ -232,7 +232,7 @@ func judgeHarness(f harnessFacts, otlpURL, projectID string) harnessVerdict {
 // empty outside a repository, where no repository policy can be asking.
 func judgeHarnesses(ctx context.Context, otlpURL, projectID, root string) []harnessVerdict {
 	var out []harnessVerdict
-	for _, h := range harness.All() {
+	for _, h := range registered.Harnesses() {
 		if !h.Detect(ctx).Found {
 			continue
 		}

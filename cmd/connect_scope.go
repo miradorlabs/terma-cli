@@ -193,7 +193,7 @@ func localHarness(ctx context.Context, h harness.Harness) (harness.Harness, erro
 // that stays in the global connect — so it needs no project, no sign-in and no network,
 // and the file stays safe to commit.
 func runLocalConnect(cmd *cobra.Command, name string, f connectFlags) error {
-	global, err := harness.Lookup(name)
+	global, err := registered.Harness(name)
 	if err != nil {
 		return err
 	}
@@ -386,7 +386,7 @@ func describeShipment(st harness.Status) string {
 func repoPolicyHarnesses(adapters []string) []harness.Harness {
 	var out []harness.Harness
 	for _, a := range adapters {
-		h, err := harness.Lookup(a)
+		h, err := registered.Harness(a)
 		if err != nil {
 			continue
 		}

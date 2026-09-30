@@ -228,7 +228,7 @@ Nothing is written and no scratch commit is made — run
 			// A repository's own policy narrows what its sessions ship. Said next to
 			// the agent it applies to, since the global line cannot show it.
 			if repoErr == nil {
-				for _, h := range harness.All() {
+				for _, h := range registered.Harnesses() {
 					scoped, ok := h.(harness.Scoped)
 					if !ok {
 						continue

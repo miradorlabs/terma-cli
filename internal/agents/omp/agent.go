@@ -36,6 +36,10 @@ func (Agent) Events() map[string]agents.Handler {
 
 func (Agent) FlushAfter() []string { return []string{"omp-session-end"} }
 
+// Harness is how terma configures the agent's exporter.
+func (Agent) Harness() harness.Harness { return harness.Omp{} }
+
 var (
-	_ agents.Agent = Agent{}
+	_ agents.Exporting = Agent{}
+	_ agents.Agent     = Agent{}
 )

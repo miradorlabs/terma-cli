@@ -571,7 +571,7 @@ func resolvePrompts(cmd *cobra.Command, projectID string, f installFlags) (bool,
 // login, but still needs a policy login unless using an explicit offline fixture.
 func installNeedsAuth(agents []string, projectRef string, existing *termaproject.File, wantsHooks bool) bool {
 	for _, a := range telemetryAgentNames(agents) {
-		if _, err := harness.Lookup(a); err == nil {
+		if _, err := registered.Harness(a); err == nil {
 			return true
 		}
 	}
@@ -714,7 +714,7 @@ func connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *config.Conf
 	sp := spinner.New(cmd.ErrOrStderr())
 	defer sp.Stop()
 	for _, a := range targets {
-		h, err := harness.Lookup(a)
+		h, err := registered.Harness(a)
 		if err != nil {
 			continue // an exporter terma writes: it sends with the project's spool key
 		}
@@ -1293,7 +1293,7 @@ to the same project — remove it machine-wide with 'terma shim uninstall'.`,
 			// Every harness that reads a repository policy, not only the ones some
 			// install chose: uninstall removes whatever of terma's is here, and a policy
 			// that is not there is nothing to remove.
-			for _, h := range harness.All() {
+			for _, h := range registered.Harnesses() {
 				scoped, ok := h.(harness.Scoped)
 				if !ok {
 					continue

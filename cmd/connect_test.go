@@ -67,7 +67,7 @@ func TestTelemetryRejectsUnknownHarness(t *testing.T) {
 		t.Errorf("error = %q, want it to name the harness", err)
 	}
 	// The message should point at what is available rather than just refusing.
-	for _, name := range harness.Names() {
+	for _, name := range registered.HarnessNames() {
 		if !strings.Contains(err.Error(), name) {
 			t.Errorf("error = %q, want it to list the supported harness %q", err, name)
 		}

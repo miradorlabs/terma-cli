@@ -15,7 +15,7 @@ import (
 
 func newTelemetryStatusCommand() *cobra.Command {
 	return &cobra.Command{
-		Use:    "status [" + strings.Join(harness.Names(), "|") + "]",
+		Use:    "status [" + strings.Join(registered.HarnessNames(), "|") + "]",
 		Short:  "Show which harnesses are connected",
 		Hidden: true,
 		Long: `Reads each harness's own configuration and reports what is installed there.
@@ -33,9 +33,9 @@ send, not whether anything has arrived. With no argument it reports every harnes
 				return err
 			}
 
-			targets := harness.All()
+			targets := registered.Harnesses()
 			if len(args) == 1 {
-				h, err := harness.Lookup(args[0])
+				h, err := registered.Harness(args[0])
 				if err != nil {
 					return err
 				}

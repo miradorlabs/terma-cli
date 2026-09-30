@@ -45,7 +45,7 @@ writes a repository's own policy into its committed .claude/settings.json instea
 only what to ship, never where or with which key, so one repository can send less
 than the machine does. Claude Code and OpenCode; Codex reads a single config file.
 
-Supported: ` + strings.Join(harness.Names(), ", ") + `.`,
+Supported: ` + strings.Join(registered.HarnessNames(), ", ") + `.`,
 	}
 	cmd.AddCommand(newTelemetryConnectCommand(), newTelemetryStatusCommand(), newTelemetryDisconnectCommand())
 	return cmd
@@ -85,7 +85,7 @@ func newTelemetryConnectCommand() *cobra.Command {
 	var f connectFlags
 
 	cmd := &cobra.Command{
-		Use:    "connect <" + strings.Join(harness.Names(), "|") + "> [<harness>...]",
+		Use:    "connect <" + strings.Join(registered.HarnessNames(), "|") + "> [<harness>...]",
 		Short:  "Point one or more agent harnesses at Terma",
 		Hidden: true,
 		Long: `Mints a server key for the selected project and writes the harness's telemetry
@@ -142,7 +142,7 @@ func runTelemetryConnectAll(cmd *cobra.Command, names []string, f connectFlags) 
 	var hs []harness.Harness
 	seen := map[string]bool{}
 	for _, name := range names {
-		h, err := harness.Lookup(name)
+		h, err := registered.Harness(name)
 		if err != nil {
 			return err
 		}
@@ -213,7 +213,7 @@ func runTelemetryConnect(cmd *cobra.Command, name string, f connectFlags) error 
 // connectGlobal writes a harness's user-level telemetry settings and reports what it
 // did about the key.
 func connectGlobal(cmd *cobra.Command, name string, f connectFlags) error {
-	h, err := harness.Lookup(name)
+	h, err := registered.Harness(name)
 	if err != nil {
 		return err
 	}

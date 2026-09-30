@@ -310,38 +310,6 @@ type Harness interface {
 	Disconnect() (DisconnectResult, error)
 }
 
-// registry is fixed at compile time. A harness is a code-level integration — it has to
-// know a vendor's file format and variable names — so there is nothing a runtime
-// registration would enable.
-var registry = []Harness{Claude{}, Codex{}, OpenCode{}, Omp{}}
-
-// All returns every known harness, in the order they are listed by `--help`.
-func All() []Harness {
-	out := make([]Harness, len(registry))
-	copy(out, registry)
-	return out
-}
-
-// Names lists the tokens accepted by connect/status/disconnect.
-func Names() []string {
-	out := make([]string, 0, len(registry))
-	for _, h := range registry {
-		out = append(out, h.Name())
-	}
-	return out
-}
-
-// Lookup resolves a command-line token to a harness.
-func Lookup(name string) (Harness, error) {
-	want := strings.ToLower(strings.TrimSpace(name))
-	for _, h := range registry {
-		if h.Name() == want {
-			return h, nil
-		}
-	}
-	return nil, fmt.Errorf("unknown agent %q (want %s)", name, strings.Join(Names(), " or "))
-}
-
 // ErrUnsupported is returned by a harness that is registered but not yet implemented,
 // so `--help` can name it before it works. No registered harness returns it today; it
 // stays so the next one can be listed before it is finished.

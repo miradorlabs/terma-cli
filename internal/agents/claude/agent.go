@@ -48,7 +48,11 @@ func (Agent) PlanUserHooks(dir string, command func(string) string, install bool
 }
 func (Agent) ManagedHookFiles(root string) []string { return harness.ClaudeManagedHookFiles(root) }
 
+// Harness is how terma configures the agent's exporter.
+func (Agent) Harness() harness.Harness { return harness.Claude{} }
+
 var (
+	_ agents.Exporting    = Agent{}
 	_ agents.Agent        = Agent{}
 	_ agents.UserHooks    = Agent{}
 	_ agents.ManagedHooks = Agent{}

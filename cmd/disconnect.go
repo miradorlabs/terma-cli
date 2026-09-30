@@ -14,7 +14,7 @@ func newTelemetryDisconnectCommand() *cobra.Command {
 	var scopeFlag string
 
 	cmd := &cobra.Command{
-		Use:    "disconnect <" + strings.Join(harness.Names(), "|") + ">",
+		Use:    "disconnect <" + strings.Join(registered.HarnessNames(), "|") + ">",
 		Short:  "Stop a harness exporting to Terma",
 		Hidden: true,
 		Long: `Removes the telemetry settings Terma wrote, and nothing else.
@@ -31,7 +31,7 @@ instead, and leaves your global connect as it is.`,
 			if err != nil {
 				return err
 			}
-			h, err := harness.Lookup(args[0])
+			h, err := registered.Harness(args[0])
 			if err != nil {
 				return err
 			}

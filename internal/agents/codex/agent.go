@@ -111,7 +111,11 @@ func pronoun(n int) string {
 	return "them"
 }
 
+// Harness is how terma configures the agent's exporter.
+func (Agent) Harness() harness.Harness { return harness.Codex{} }
+
 var (
+	_ agents.Exporting    = Agent{}
 	_ agents.Agent        = Agent{}
 	_ agents.Trusting     = Agent{}
 	_ agents.UserHooks    = Agent{}

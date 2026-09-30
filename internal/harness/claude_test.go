@@ -445,38 +445,6 @@ func TestParseSignals(t *testing.T) {
 	}
 }
 
-func TestLookupRejectsUnknownHarness(t *testing.T) {
-	if _, err := Lookup("gemini"); err == nil {
-		t.Fatal("Lookup accepted an unknown harness")
-	}
-	for _, name := range Names() {
-		if _, err := Lookup(name); err != nil {
-			t.Errorf("Lookup(%q): %v", name, err)
-		}
-	}
-}
-
-// Every registered harness must answer a status query against an empty sandbox — a
-// stub that errors would make `telemetry status` report it as broken.
-func TestEveryHarnessReportsStatusInASandbox(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("CLAUDE_CONFIG_DIR", dir)
-	t.Setenv("CODEX_HOME", dir)
-	t.Setenv("XDG_CONFIG_HOME", dir)
-	t.Setenv("TERMA_CONFIG_DIR", filepath.Join(dir, "terma"))
-
-	for _, h := range All() {
-		st, err := h.Status()
-		if err != nil {
-			t.Errorf("%s.Status: %v", h.Name(), err)
-			continue
-		}
-		if st.Connected || st.Exists {
-			t.Errorf("%s reported connected=%v exists=%v in an empty sandbox", h.Name(), st.Connected, st.Exists)
-		}
-	}
-}
-
 func TestBackupCopiesTheOriginal(t *testing.T) {
 	const original = `{"model":"opus"}`
 	c, path := claudeIn(t, original)

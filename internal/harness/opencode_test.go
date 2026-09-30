@@ -254,11 +254,7 @@ func TestOpenCodeServiceNameAndRegistry(t *testing.T) {
 	if ServiceName(OpenCode{}) != "opencode" {
 		t.Error("service name")
 	}
-	h, err := Lookup("opencode")
-	if err != nil || h.Name() != "opencode" {
-		t.Fatalf("Lookup: %v", err)
-	}
-	if _, ok := h.(Scoped); !ok {
+	if _, ok := Harness(OpenCode{}).(Scoped); !ok {
 		t.Error("OpenCode has a repository policy file and must be Scoped")
 	}
 }

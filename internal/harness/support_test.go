@@ -44,24 +44,6 @@ func TestSupportCatalogCursorIsPartial(t *testing.T) {
 	}
 }
 
-// Every telemetry harness in the registry is a full agent in the catalog, so the two
-// views never disagree about an agent terma actively exports for.
-func TestSupportCatalogCoversTelemetryRegistry(t *testing.T) {
-	for _, h := range All() {
-		a, ok := LookupSupport(h.Name())
-		if !ok {
-			t.Errorf("telemetry harness %q is not in the support catalog", h.Name())
-			continue
-		}
-		if a.Telemetry.Level != SupportFull {
-			t.Errorf("%s exports telemetry but catalog says %q", h.Name(), a.Telemetry.Level)
-		}
-		if a.Support != SupportFull {
-			t.Errorf("%s is a telemetry harness but catalog overall is %q", h.Name(), a.Support)
-		}
-	}
-}
-
 func TestOverallLevel(t *testing.T) {
 	full := CapabilitySupport{Level: SupportFull}
 	none := CapabilitySupport{Level: SupportNone}
