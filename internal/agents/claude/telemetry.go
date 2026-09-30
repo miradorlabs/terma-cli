@@ -15,6 +15,7 @@ func (Agent) CaptureRules() shape.CaptureRules {
 		ToolContentFields: []string{"tool_parameters", "tool_input", "full_command", "bash_command"},
 		ToolContentEvents: []string{"tool.output", "tool.input"},
 		BodyPrefixes:      []string{"claude_code."},
+		SafeKeys:          []string{"plugin.name", "plugin.scope", "plugin_id_hash", "marketplace.name", "managed_settings.trigger", "managed_settings.sources", "managed_settings.source_behavior", "managed_settings.helper.state", "managed_settings.helper.applied"},
 	}
 }
 

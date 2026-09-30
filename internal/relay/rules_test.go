@@ -86,7 +86,7 @@ func TestNoDeclaredContentKeyIsSafe(t *testing.T) {
 	for _, c := range testCapturers {
 		r := c.CaptureRules()
 		for _, key := range slices.Concat(r.PromptFields, r.PromptDropFields, r.ResourcePromptFields, r.ToolContentFields) {
-			if safeKey(key) {
+			if testRules.safeKey(key) {
 				t.Errorf("%T declares %q as content, and allow.go lists it safe", c, key)
 			}
 		}

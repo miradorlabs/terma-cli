@@ -26,6 +26,8 @@ type rules struct {
 	toolContentEvents    []string
 	markers              []shape.CaptureRules
 	bodyPrefixes         []string
+	safeKeys             map[string]bool
+	safePrefixes         []string
 }
 
 // defaultMarker replaces a prompt field that no agent's marker keys claim.
@@ -58,6 +60,7 @@ func compose(correlators []shape.Correlator, capturers []shape.Capturer) *rules 
 	r.sessionKeys = slices.SortedFunc(maps.Values(byAttr), func(a, b shape.SessionKey) int {
 		return cmp.Or(cmp.Compare(a.Rank, b.Rank), strings.Compare(a.Attr, b.Attr))
 	})
+	r.safeKeys, r.safePrefixes = maps.Clone(genericSafeKeys), slices.Clone(genericSafePrefixes)
 	all := []shape.CaptureRules{generic}
 	for _, c := range capturers {
 		all = append(all, c.CaptureRules())
@@ -70,6 +73,10 @@ func compose(correlators []shape.Correlator, capturers []shape.Capturer) *rules 
 		r.toolContentFields = union(r.toolContentFields, c.ToolContentFields)
 		r.toolContentEvents = union(r.toolContentEvents, c.ToolContentEvents)
 		r.bodyPrefixes = union(r.bodyPrefixes, c.BodyPrefixes)
+		for _, k := range c.SafeKeys {
+			r.safeKeys[k] = true
+		}
+		r.safePrefixes = union(r.safePrefixes, c.SafePrefixes)
 		if c.Marker != "" && len(c.MarkerKeys) > 0 {
 			r.markers = append(r.markers, shape.CaptureRules{Marker: c.Marker, MarkerKeys: slices.Clone(c.MarkerKeys)})
 		}

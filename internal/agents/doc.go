@@ -38,7 +38,8 @@
 //	Notifier         the end-of-turn notifier terma chains in front of the developer's
 //	EmissionChecker  an export that several settings files decide together
 //
-// How the relay places and redacts the agent's records is declared through
-// internal/relay/shape (Correlator and Capturer), and how completely terma supports
-// it through Covered (support.go).
+// How the relay places and redacts the agent's records, and which of its keys are safe
+// to pass, is declared through internal/relay/shape (Correlator and Capturer); the
+// relay pins the safe keys everyone declares. How completely terma supports the agent
+// is Covered (support.go).
 package agents

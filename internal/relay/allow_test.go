@@ -44,7 +44,7 @@ func TestClassificationCoversTheGoldens(t *testing.T) {
 // A key is safe or content, never both: a content key listed as safe would pass whatever
 // the gate did to it.
 func TestNoKeyIsBothSafeAndContent(t *testing.T) {
-	for key := range safeKeys {
+	for key := range testRules.safeKeys {
 		if testRules.contentKey(key) {
 			t.Errorf("%q is listed as safe and as content", key)
 		}
@@ -122,7 +122,7 @@ func (ru *rules) classify(key string) string {
 	switch {
 	case ru.contentKey(key):
 		return "content"
-	case safeKey(key):
+	case testRules.safeKey(key):
 		return "safe"
 	}
 	return "unclassified"

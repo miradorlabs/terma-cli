@@ -55,7 +55,6 @@ var mayNameAgents = map[string]string{
 // global are the files that name agents by rule rather than by leak, each with the
 // rule. Nothing else belongs here.
 var global = map[string]string{
-	"internal/relay/allow.go": "the one safe-key table for every agent: a key that is content anywhere is content",
 	"internal/style/style.go": "the environment variables coding agents set, terma's or not, to tell a model from a person",
 	"internal/api/ai.go":      "the gateway's pagination cursor",
 }

@@ -13,6 +13,7 @@ func (Agent) CaptureRules() shape.CaptureRules {
 	return shape.CaptureRules{
 		PromptBodyEvents:  []string{"opencode.user_prompt", "opencode.session.created"},
 		ToolContentFields: []string{"opencode.tool.file_path"},
+		SafeKeys:          []string{"opencode.version", "opencode.agent", "opencode.message.id", "opencode.parent_message.id", "opencode.project.id", "opencode.session.directory"},
 	}
 }
 

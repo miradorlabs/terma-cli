@@ -28,6 +28,8 @@ func (Agent) CaptureRules() shape.CaptureRules {
 		ToolContentFields: []string{"arguments", "output"},
 		Marker:            "[REDACTED]",
 		MarkerKeys:        []string{"conversation.id", "thread.id"},
+		SafeKeys:          []string{"codex.request.reasoning_effort", "codex.turn.reasoning_effort", "auth.env_codex_api_key_enabled", "auth.env_codex_api_key_present", "auth.env_openai_api_key_present", "auth.env_refresh_token_url_override_present", "auth.header_attached", "auth.retry_after_unauthorized", "app_server.api_version", "app_server.client_name", "app_server.client_version", "app_server.connection_id", "codex.op"},
+		SafePrefixes:      []string{"codex.turn.token_usage.", "codex.usage."},
 	}
 }
 

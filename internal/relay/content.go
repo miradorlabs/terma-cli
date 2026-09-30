@@ -39,7 +39,7 @@ func (ru *rules) withhold(p *part, prompts, toolContent bool, unclassified map[s
 					changed++
 					continue
 				}
-			case !safeKey(key):
+			case !ru.safeKey(key):
 				unclassified["resource/"+key]++
 				changed++
 				continue
@@ -162,7 +162,7 @@ func (ru *rules) withholdAttrs(attrs []*commonpb.KeyValue, prompts, toolContent 
 		case !prompts && contains(ru.promptFields, key) && kv.GetValue().GetStringValue() != marker:
 			kv.Value = &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: marker}}
 			changed = true
-		case !ru.contentKey(key) && !safeKey(key) && !scalarNonText(kv.GetValue()):
+		case !ru.contentKey(key) && !ru.safeKey(key) && !scalarNonText(kv.GetValue()):
 			// Withheld content passes only what is known to be safe (allow.go).
 			unclassified[key]++
 			changed = true

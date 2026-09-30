@@ -1,7 +1,8 @@
 // Package shape is what a coding agent declares about its telemetry for the local
 // relay: how its records name their session (Correlator) and where they carry content
-// (Capturer). Agents declare; the relay enforces. A declaration can only add
-// withholding: which keys are safe stays the relay's own reviewed list.
+// (Capturer). Agents declare; the relay enforces. The safe keys an agent declares are
+// pinned, composed with everyone's, in the relay's tests, so a declaration alone widens
+// nothing that leaves a machine.
 package shape
 
 // SessionKey is an attribute that names the session a record belongs to.
@@ -51,6 +52,11 @@ type CaptureRules struct {
 	MarkerKeys []string
 	// BodyPrefixes are how the agent's log bodies name their event (<prefix><event>).
 	BodyPrefixes []string
+	// SafeKeys and SafePrefixes are keys only this agent emits that never carry what
+	// was said; with content withheld they pass. A key another agent declares as
+	// content stays content.
+	SafeKeys     []string
+	SafePrefixes []string
 }
 
 // Capturer is an agent whose telemetry the relay withholds content from.

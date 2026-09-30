@@ -9,7 +9,10 @@ func (Agent) Correlation() shape.Correlation {
 
 // CaptureRules are where the plugin's telemetry carries content.
 func (Agent) CaptureRules() shape.CaptureRules {
-	return shape.CaptureRules{PromptBodyEvents: []string{"dsh.user_prompt", "dsh.assistant_response"}}
+	return shape.CaptureRules{
+		PromptBodyEvents: []string{"dsh.user_prompt", "dsh.assistant_response"},
+		SafeKeys:         []string{"dsh.turn", "dsh.purpose"},
+	}
 }
 
 var (
