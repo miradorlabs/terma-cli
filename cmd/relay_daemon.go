@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"html"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,6 +17,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/relay/service"
 )
 
 // The relay as a per-user service: launchd on macOS, systemd --user on Linux, and on
@@ -77,80 +77,6 @@ func relayServiceExecutable() (string, error) {
 		return "", err
 	}
 	return filepath.Abs(exe)
-}
-
-func launchdPlist(label, exe, logPath string, env map[string]string) string {
-	esc := html.EscapeString
-	var b strings.Builder
-	b.WriteString(`<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key><string>` + esc(label) + `</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>` + esc(exe) + `</string><string>relay</string><string>run</string><string>--idle</string><string>0</string><string>--quiet</string>
-  </array>
-  <key>EnvironmentVariables</key>
-  <dict>
-`)
-	for _, k := range sortedKeys(env) {
-		b.WriteString("    <key>" + esc(k) + "</key><string>" + esc(env[k]) + "</string>\n")
-	}
-	b.WriteString(`  </dict>
-  <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
-  <key>ThrottleInterval</key><integer>5</integer>
-  <key>ProcessType</key><string>Background</string>
-  <key>StandardOutPath</key><string>` + esc(logPath) + `</string>
-  <key>StandardErrorPath</key><string>` + esc(logPath) + `</string>
-</dict>
-</plist>
-`)
-	return b.String()
-}
-
-func systemdUnit(exe string, env map[string]string) string {
-	var b strings.Builder
-	b.WriteString("[Unit]\nDescription=terma local OTLP relay\n\n[Service]\n")
-	b.WriteString("ExecStart=" + strconv.Quote(exe) + " relay run --idle 0 --quiet\n")
-	for _, k := range sortedKeys(env) {
-		b.WriteString("Environment=" + strconv.Quote(k+"="+env[k]) + "\n")
-	}
-	b.WriteString("Restart=on-failure\nRestartSec=5\n\n[Install]\nWantedBy=default.target\n")
-	return b.String()
-}
-
-// windowsLauncher is the script the Run key starts at logon: wscript runs it with no
-// window, and it starts `terma relay supervise` hidden (window style 0), not waiting —
-// terma.exe is a console program, and started from the Run key directly it would open
-// a console window at every logon. VBScript doubles a quote inside a string.
-func windowsLauncher(exe string, env map[string]string) string {
-	q := func(s string) string { return `"` + strings.ReplaceAll(s, `"`, `""`) + `"` }
-	var b strings.Builder
-	b.WriteString("' terma's relay at logon: written by `terma relay daemon install`, removed by `terma relay daemon remove`.\r\n")
-	b.WriteString("Set shell = CreateObject(\"WScript.Shell\")\r\n")
-	b.WriteString("Set env = shell.Environment(\"Process\")\r\n")
-	for _, k := range sortedKeys(env) {
-		b.WriteString("env(" + q(k) + ") = " + q(env[k]) + "\r\n")
-	}
-	b.WriteString("shell.Run " + q(`"`+exe+`" relay supervise`) + ", 0, False\r\n")
-	return b.String()
-}
-
-func sortedKeys(m map[string]string) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	for i := range keys {
-		for j := i + 1; j < len(keys); j++ {
-			if keys[j] < keys[i] {
-				keys[i], keys[j] = keys[j], keys[i]
-			}
-		}
-	}
-	return keys
 }
 
 // relayServicePath is where the service definition lives.
@@ -233,7 +159,7 @@ func installRelayService(ctx context.Context) (string, error) {
 	}
 	switch runtime.GOOS {
 	case "darwin":
-		plist := launchdPlist(name, exe, filepath.Join(dir, "daemon.log"), serviceEnv())
+		plist := service.Launchd(name, exe, filepath.Join(dir, "daemon.log"), serviceEnv())
 		if err := config.WriteFileAtomic(path, []byte(plist), 0o644); err != nil {
 			return "", err
 		}
@@ -248,7 +174,7 @@ func installRelayService(ctx context.Context) (string, error) {
 		}
 		return "", lastErr
 	case "linux":
-		if err := config.WriteFileAtomic(path, []byte(systemdUnit(exe, serviceEnv())), 0o644); err != nil {
+		if err := config.WriteFileAtomic(path, []byte(service.Systemd(exe, serviceEnv())), 0o644); err != nil {
 			return "", err
 		}
 		if out, err := runService(ctx, "systemctl", "--user", "daemon-reload"); err != nil {

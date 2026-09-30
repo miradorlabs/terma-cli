@@ -2,6 +2,7 @@ package adapter
 
 import (
 	"context"
+	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/hookrun"
 	"os/exec"
@@ -46,4 +47,10 @@ func (cursor) Events() map[string]Handler {
 
 func (cursor) FlushAfter() []string {
 	return []string{"cursor-session-end", "cursor-after-agent-response", "cursor-stop"}
+}
+
+func (cursor) UserHooksPath() (string, error) { return harness.CursorUserHooksPath() }
+func (cursor) UserHookSelections() []string   { return []string{"cursor"} }
+func (cursor) PlanUserHooks(dir string, command func(string) string, install bool) (hookmgr.Plan, error) {
+	return hookmgr.PlanCursorUserHooks(dir, command, install)
 }

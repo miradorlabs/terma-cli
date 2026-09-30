@@ -152,6 +152,25 @@ The costs: a process on the developer's machine (started by hooks, or a per-user
 which macOS announces as a background item), and exporter settings that are machine-wide
 — correct only because the relay, not the exporter, decides what leaves.
 
+### Relay package boundaries
+
+`internal/relay` owns OTLP admission, attribution, filtering and delivery. Its focused
+subpackages keep the other responsibilities out of command handlers:
+
+- `claim`: the small, local session-claim store that hooks can import without OTLP.
+- `exporter`: the `Exporter` interface and registry for machine-level exporter setup.
+  Native exporters and extension exporters implement the same configuration operation.
+  The registry also owns hook-label normalization and surface selection, so adding an
+  exporter does not require another agent-name switch in `cmd`.
+- `service`: rendering launchd, systemd and Windows service definitions. The CLI owns
+  service-manager execution, relay startup and user-facing reporting.
+
+Repository routing records narrow team capture with their saved harness list as well
+as signals and content. A claimed session from an unselected harness is withheld on
+admission and queued delivery. Global catch-all delivery has no harness claim and
+continues to follow the selected team's global policy. Codex's CLI and Desktop share
+one native exporter; the separate surface flags still control hook capture and setup.
+
 ## The shim, and why it chains `.git/hooks`
 
 With `core.hooksPath=.terma/hooks`, `git rev-parse --git-path hooks` returns the shim
@@ -169,6 +188,13 @@ data. The dashboard shows which harness produced spend, but nothing in the pipel
 special-cased on it: a new harness is a new adapter, not a new hook type. The
 adapters are registered once, in `internal/adapter`, and install, uninstall, doctor and
 hook dispatch all read that registry.
+
+Commands ask for capabilities rather than checking an agent's name: `adapter.UserHooks`
+and `adapter.ManagedHooks` handle machine-wide hook planning and locations;
+`harness.StatusLiner` and `harness.TurnNotifier` handle optional usage capture on connect
+and cleanup on disconnect. Every implementation has a compile-time interface assertion.
+Keep vendor file layouts and behavior in the implementation, and keep command handlers
+responsible for selection, confirmation and reporting.
 
 Not every harness offers a file to write environment variables into. OpenCode reads its
 OTEL_* variables from the process environment only, so its adapter is a plugin: one

@@ -15,6 +15,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/flock"
+	"github.com/miradorlabs/terma-cli/internal/relay/service"
 )
 
 // On Windows the relay's service is a value under the per-user Run key — no
@@ -33,7 +34,7 @@ func installWindowsService(_ context.Context, name, path, exe, dir string) error
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
-	launcher := []byte(windowsLauncher(exe, serviceEnv()))
+	launcher := []byte(service.Windows(exe, serviceEnv()))
 	if have, err := os.ReadFile(path); err == nil && string(have) == string(launcher) && supervisorRunning(dir) {
 		return nil // installed as it is, and running
 	}

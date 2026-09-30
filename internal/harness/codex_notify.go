@@ -75,6 +75,18 @@ func (c Codex) CodexNotify() (CodexNotifyStatus, error) {
 	return st, nil
 }
 
+// NotifierInstalled reports whether Terma's turn notifier is still present.
+func (c Codex) NotifierInstalled() (bool, error) {
+	state, err := c.CodexNotify()
+	return state.Terma, err
+}
+
+// InstallNotifier installs turn capture while chaining the developer's notifier.
+func (c Codex) InstallNotifier() (bool, error) { return c.InstallCodexNotify() }
+
+// RemoveNotifier restores the notifier that preceded Terma's turn capture.
+func (c Codex) RemoveNotifier() (bool, error) { return c.RemoveCodexNotify() }
+
 // codexNotifyRecord is what terma remembers about the notifiers it displaced: one chain
 // per Codex config file. It was a single record, so connecting under a second
 // CODEX_HOME overwrote the first config's notifier — or, installing over no notifier

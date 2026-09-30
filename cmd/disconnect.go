@@ -49,25 +49,25 @@ instead, and leaves your global connect as it is.`,
 			// Terma's Codex notifier lives outside the telemetry key set, so it can
 			// linger after the keys are gone (removed by hand or by an older CLI). That
 			// still needs restoring, so it counts as work to do.
-			codexNotifierLeftover := false
-			if h.Name() == "codex" && scope == harness.ScopeGlobal {
-				if ns, nerr := (harness.Codex{}).CodexNotify(); nerr == nil {
-					codexNotifierLeftover = ns.Terma
+			notifierLeftover := false
+			if notifier, ok := h.(harness.TurnNotifier); ok && scope == harness.ScopeGlobal {
+				if installed, nerr := notifier.NotifierInstalled(); nerr == nil {
+					notifierLeftover = installed
 				}
 			}
 			// Repository install can wrap the user-level status line without a
 			// global telemetry connection. It still belongs to this disconnect.
-			claudeStatusLineLeftover := false
-			if h.Name() == "claude" && scope == harness.ScopeGlobal {
-				if line, lineErr := (harness.Claude{}).StatusLineState(""); lineErr == nil {
-					claudeStatusLineLeftover = line.Installed || line.Replaced
+			statusLineLeftover := false
+			if renderer, ok := h.(harness.StatusLiner); ok && scope == harness.ScopeGlobal {
+				if line, lineErr := renderer.StatusLineState(""); lineErr == nil {
+					statusLineLeftover = line.Installed || line.Replaced
 				}
 			}
 			// Keyed off the settings actually present, not off Connected. A config with
 			// telemetry switched off, or with the endpoint deleted, is not "connected" —
 			// but it still has Terma's server key sitting in it, and that is the state
 			// where walking away would be worst.
-			if st.ManagedKeys == 0 && !codexNotifierLeftover && !claudeStatusLineLeftover {
+			if st.ManagedKeys == 0 && !notifierLeftover && !statusLineLeftover {
 				fmt.Fprintf(out, "%s has no Terma telemetry settings%s. Nothing to do.\n", h.DisplayName(), scopeSuffix(scope))
 				return nil
 			}
@@ -102,16 +102,16 @@ instead, and leaves your global connect as it is.`,
 			if err != nil {
 				return err
 			}
-			if h.Name() == "claude" && scope == harness.ScopeGlobal {
-				switch restored, err := (harness.Claude{}).RemoveStatusLine(); {
+			if renderer, ok := h.(harness.StatusLiner); ok && scope == harness.ScopeGlobal {
+				switch restored, err := renderer.RemoveStatusLine(); {
 				case err != nil:
 					fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not restore the status line (%v).\n", err)
 				case restored:
 					fmt.Fprintln(out, "Status line: restored to what it was before terma wrapped it.")
 				}
 			}
-			if h.Name() == "codex" && scope == harness.ScopeGlobal {
-				switch restored, err := (harness.Codex{}).RemoveCodexNotify(); {
+			if notifier, ok := h.(harness.TurnNotifier); ok && scope == harness.ScopeGlobal {
+				switch restored, err := notifier.RemoveNotifier(); {
 				case err != nil:
 					fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not restore the previous Codex notifier (%v).\n", err)
 				case restored:

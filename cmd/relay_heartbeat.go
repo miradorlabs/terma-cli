@@ -24,6 +24,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/relay"
+	"github.com/miradorlabs/terma-cli/internal/relay/exporter"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 )
 
@@ -115,7 +116,7 @@ func heartbeatFacts(dir string) map[string]any {
 	// Which agents' exporters point at this relay now: one pointed elsewhere since
 	// (a reinstall, a hand edit) sends nothing through it, and says nothing else of it.
 	var pointed []string
-	for _, a := range relayAgents {
+	for _, a := range exporter.Names() {
 		if h, err := harness.Lookup(a); err == nil && exportsToRelay(h, relayAddr(dir)) {
 			pointed = append(pointed, a)
 		}

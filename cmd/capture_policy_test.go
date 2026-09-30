@@ -132,6 +132,79 @@ func TestRelayRespectsSignalSelection(t *testing.T) {
 	}
 }
 
+// An exporter configured by another repository must not bypass this repository's
+// saved harness selection, even when its committed hooks claim a session here.
+func TestRelayRespectsHarnessSelection(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		harness  string
+		tool     string
+		selected bool
+	}{
+		{"unselected codex", "claude", "codex", false},
+		{"selected codex", "codex", "codex", true},
+		{"claude hook label", "claude", "claude-code", true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+			arrived := make(chan []byte, 1)
+			host := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				body, _ := io.ReadAll(req.Body)
+				arrived <- body
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer host.Close()
+			if err := keystore.Set("team", policyTestKey, keystore.Hosts{OTLP: host.URL}); err != nil {
+				t.Fatal(err)
+			}
+			rec := routing.Record{ProjectID: "team", Signals: []string{"traces"}, IncludePrompts: true, IncludeToolContent: true, Harnesses: []string{test.harness}}
+			if err := routing.SaveRecord(rec); err != nil {
+				t.Fatal(err)
+			}
+			cfg := &config.Config{Policy: config.DefaultPolicy(), OTLPURL: host.URL}
+			r := relay.New(relay.Options{Token: "test-token", Dir: t.TempDir(), Resolve: relayResolver(cfg, nil), Lookup: func(string, time.Time) (claim.Claim, bool) {
+				return claim.Claim{ProjectID: "team", Tool: test.tool}, true
+			}})
+			ctx, cancel := context.WithCancel(t.Context())
+			done := make(chan struct{})
+			go func() { r.Run(ctx); close(done) }()
+			defer func() { cancel(); <-done }()
+			span := &tracepb.Span{Name: "chat", Attributes: []*commonpb.KeyValue{
+				{Key: "session.id", Value: &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: "session"}}},
+				{Key: "gen_ai.prompt", Value: &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: "PRIVATE_CONTENT"}}},
+			}}
+			m := &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{span}}}}}}
+
+			body, err := proto.Marshal(m)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req := httptest.NewRequest(http.MethodPost, "/v1/traces", bytes.NewReader(body))
+			req.Header.Set("Authorization", "Bearer test-token")
+			req.Header.Set("Content-Type", "application/x-protobuf")
+			w := httptest.NewRecorder()
+			r.Handler().ServeHTTP(w, req)
+			if w.Code != http.StatusOK {
+				t.Fatalf("status %d", w.Code)
+			}
+			if !test.selected {
+				if r.Stats().Snapshot().Counters["dropped.policy_signal.traces"] != 1 {
+					t.Fatal("an unselected harness was admitted to the delivery queue")
+				}
+				return
+			}
+			select {
+			case out := <-arrived:
+				if !bytes.Contains(out, []byte("PRIVATE_CONTENT")) {
+					t.Fatal("selected harness lost permitted content")
+				}
+			case <-time.After(3 * time.Second):
+				t.Fatal("selected harness was not delivered")
+			}
+		})
+	}
+}
+
 func TestRefreshMigratesExportersBeforeRemovingShim(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	sandboxMachine(t)

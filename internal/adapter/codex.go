@@ -46,6 +46,13 @@ func (codex) FlushAfter() []string {
 	return []string{"codex-notify", "codex-session-end", "codex-stop", "codex-user-prompt-submit"}
 }
 
+func (codex) UserHooksPath() (string, error) { return harness.CodexUserHooksPath() }
+func (codex) UserHookSelections() []string   { return []string{"codex", "codex-desktop"} }
+func (codex) PlanUserHooks(dir string, command func(string) string, install bool) (hookmgr.Plan, error) {
+	return hookmgr.PlanCodexUserHooks(dir, command, install)
+}
+func (codex) ManagedHookFiles(root string) []string { return harness.CodexManagedHookFiles(root) }
+
 // Trust reads the question Cursor's hooks cannot raise: Codex refuses to run a hook it
 // has not been shown, so a committed file is inert on a fresh clone until the developer
 // trusts it once, from inside Codex. The wiring looks perfect and nothing runs, which

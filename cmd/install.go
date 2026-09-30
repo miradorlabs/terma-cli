@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/miradorlabs/terma-cli/internal/relay/exporter"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"io"
 	"os"
@@ -748,17 +749,8 @@ func connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *config.Conf
 	return nil
 }
 
-// relayTargets are the developer's agents terma points at the relay, Codex Desktop
-// counted as Codex, in relayAgents' order.
-func relayTargets(agents []string) []string {
-	var out []string
-	for _, a := range relayAgents {
-		if slices.Contains(agents, a) || a == routing.AgentCodex && slices.Contains(agents, codexDesktopAgent) {
-			out = append(out, a)
-		}
-	}
-	return out
-}
+// relayTargets resolves selected agent surfaces through the exporter registry.
+func relayTargets(agents []string) []string { return exporter.Targets(agents) }
 
 // installAdapters lists the agents whose committed hooks to wire. --adapters overrides
 // it outright; otherwise it is the union of the agents the repository's hooks files

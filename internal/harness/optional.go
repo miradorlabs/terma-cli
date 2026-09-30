@@ -4,8 +4,8 @@ package harness
 // for one with a type assertion and carries on without it, so a method that drifted —
 // a renamed parameter, a changed result — would not fail to compile. It would stop
 // matching, and the capability would switch itself off: key reuse silently minting a
-// new key on every connect, for one. The assertions below are what turns that into a
-// build error. (Scoped, the fourth, is declared with the scope it describes.)
+// new key on every connect, for one. The assertions below turn that into a build
+// error. Scoped is declared with the scope it describes.
 
 // Noter is a harness with something to say before the user confirms a connect: a side
 // effect of its own, or a limit of what its switches can do.
@@ -27,6 +27,22 @@ type Backuper interface {
 	Backup(endpoint string) (path string, err error)
 }
 
+// StatusLiner is a harness whose user-level status line can capture plan usage.
+// Commands invoke it for machine-level capture, not repository policy.
+type StatusLiner interface {
+	InstallStatusLine() (bool, error)
+	StatusLineState(cwd string) (StatusLineState, error)
+	RemoveStatusLine() (bool, error)
+}
+
+// TurnNotifier captures funding evidence at the end of a turn while preserving
+// the developer's existing notifier.
+type TurnNotifier interface {
+	NotifierInstalled() (bool, error)
+	InstallNotifier() (bool, error)
+	RemoveNotifier() (bool, error)
+}
+
 var (
 	_ Noter = Codex{}
 	_ Noter = OpenCode{}
@@ -43,4 +59,7 @@ var (
 	_ Scoped = Claude{}
 	_ Scoped = OpenCode{}
 	_ Scoped = Omp{}
+
+	_ StatusLiner  = Claude{}
+	_ TurnNotifier = Codex{}
 )

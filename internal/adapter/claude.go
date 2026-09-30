@@ -38,3 +38,10 @@ func (claude) Events() map[string]Handler {
 }
 
 func (claude) FlushAfter() []string { return []string{"session-end", "stop", "stop-failure"} }
+
+func (claude) UserHooksPath() (string, error) { return (harness.Claude{}).ConfigPath() }
+func (claude) UserHookSelections() []string   { return []string{"claude"} }
+func (claude) PlanUserHooks(dir string, command func(string) string, install bool) (hookmgr.Plan, error) {
+	return hookmgr.PlanClaudeUserHooks(dir, command, install)
+}
+func (claude) ManagedHookFiles(root string) []string { return harness.ClaudeManagedHookFiles(root) }

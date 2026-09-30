@@ -6,13 +6,13 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"strings"
 
+	"github.com/miradorlabs/terma-cli/internal/adapter"
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
+	"github.com/miradorlabs/terma-cli/internal/relay/exporter"
 )
 
 // Global mode's machine-wide agent hooks. In global mode the organization collects
@@ -39,40 +39,15 @@ type userHooksRecord struct {
 // developer's: Codex Desktop counts as Codex (it runs the same hooks).
 func userHookAgents(agents []string) []string {
 	var out []string
-	for _, a := range []string{"claude", "codex", "cursor"} {
-		if slices.Contains(agents, a) || a == "codex" && slices.Contains(agents, codexDesktopAgent) {
-			out = append(out, a)
+	for _, a := range adapter.UserHookAdapters() {
+		for _, choice := range a.UserHookSelections() {
+			if slices.Contains(agents, choice) {
+				out = append(out, a.Name())
+				break
+			}
 		}
 	}
 	return out
-}
-
-// userHooksDir is where an agent keeps its user-level hooks file, and the file's name.
-func userHooksDir(agent string) (dir, file string, err error) {
-	switch agent {
-	case "claude":
-		path, err := harness.Claude{}.ConfigPath()
-		return filepath.Dir(path), "settings.json", err
-	case "codex":
-		path, err := harness.Codex{}.ConfigPath()
-		return filepath.Dir(path), "hooks.json", err
-	case "cursor":
-		home, err := os.UserHomeDir()
-		return filepath.Join(home, ".cursor"), "hooks.json", err
-	}
-	return "", "", errors.New("no user-level hooks for " + agent)
-}
-
-func planUserHooks(agent, dir, terma string, install bool) (hookmgr.Plan, error) {
-	cmd := hookmgr.UserHookCommand(terma)
-	switch agent {
-	case "claude":
-		return hookmgr.PlanClaudeUserHooks(dir, cmd, install)
-	case "codex":
-		return hookmgr.PlanCodexUserHooks(dir, cmd, install)
-	default:
-		return hookmgr.PlanCursorUserHooks(dir, cmd, install)
-	}
 }
 
 // applyUserHooks writes terma's machine-wide hooks for the developer's agents (install)
@@ -85,11 +60,12 @@ func applyUserHooks(agents []string, install bool) ([]string, error) {
 	}
 	covered := userHookAgents(agents)
 	var changed []string
-	for _, a := range []string{"claude", "codex", "cursor"} {
+	for _, a := range adapter.UserHookAdapters() {
 		// Written for the developer's agents in global mode, unless the organization's
 		// managed hooks run for one — then setup's would run as well, and go.
-		want := install && slices.Contains(covered, a) && !managedHooksDeployed(a)
-		dir, file, err := userHooksDir(a)
+		want := install && slices.Contains(covered, a.Name()) && !managedHooksDeployed(a.Name())
+		path, err := a.UserHooksPath()
+		dir, file := filepath.Dir(path), filepath.Base(path)
 		if err != nil {
 			return changed, err
 		}
@@ -98,7 +74,7 @@ func applyUserHooks(agents []string, install bool) ([]string, error) {
 				continue
 			}
 		}
-		plan, err := planUserHooks(a, dir, terma, want)
+		plan, err := a.PlanUserHooks(dir, hookmgr.UserHookCommand(terma), want)
 		if err != nil {
 			return changed, err
 		}
@@ -158,10 +134,7 @@ func userHooksCover(tool string) bool {
 
 // agentForTool maps a hook's tool label to its agent's name.
 func agentForTool(tool string) string {
-	if tool == "claude-code" {
-		return "claude"
-	}
-	return tool
+	return exporter.NameForTool(tool)
 }
 
 // hookYields reports whether this hook invocation leaves the event to another: a
@@ -189,16 +162,15 @@ var managedRoot = "/"
 // requirements. An agent whose managed file carries terma's hooks gets none from setup:
 // both would run.
 func managedHookFiles(agent string) []string {
-	switch agent {
-	case "claude":
-		if runtime.GOOS == "darwin" {
-			return []string{filepath.Join(managedRoot, "Library", "Application Support", "ClaudeCode", "managed-settings.json")}
-		}
-		return []string{filepath.Join(managedRoot, "etc", "claude-code", "managed-settings.json")}
-	case "codex":
-		return []string{filepath.Join(managedRoot, "etc", "codex", "requirements.toml")}
+	a, ok := adapter.Lookup(agent)
+	if !ok {
+		return nil
 	}
-	return nil
+	managed, ok := a.(adapter.ManagedHooks)
+	if !ok {
+		return nil
+	}
+	return managed.ManagedHookFiles(managedRoot)
 }
 
 // managedHooksDeployed reports whether the organization deployed terma's hooks for agent
