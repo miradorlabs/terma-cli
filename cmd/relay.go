@@ -326,6 +326,17 @@ func harnessForTool(tool string) string {
 	return tool
 }
 
+// termaHookCommand is how an extension terma writes into an agent (Pi's, Hermes's)
+// reaches `terma hook`: this terma by the path it was started as — ~/.local/bin/terma
+// on an installed machine — so an agent started with another PATH (a desktop app gets
+// the system's) still finds it. A path that cannot be had falls back to PATH.
+func termaHookCommand() []string {
+	if exe, err := relayServiceExecutable(); err == nil {
+		return []string{exe, "hook"}
+	}
+	return []string{"terma", "hook"}
+}
+
 func newRelaySetupCommand() *cobra.Command {
 	var addr, agents string
 	var noStart bool
@@ -354,13 +365,29 @@ func newRelaySetupCommand() *cobra.Command {
 			for name := range strings.SplitSeq(agents, ",") {
 				// Pi has no exporter of its own and no connection to journal: terma's
 				// extension is its exporter, pointed at the relay.
-				if strings.TrimSpace(name) == "pi" {
+				switch strings.TrimSpace(name) {
+				case "pi":
 					path, err := harness.WritePiExtension(harness.PiConfig{Endpoint: exp.Endpoint,
-						Headers: map[string]string{"Authorization": "Bearer " + token}, IncludePrompts: true, IncludeToolContent: true})
+						Headers: map[string]string{"Authorization": "Bearer " + token}, IncludePrompts: true, IncludeToolContent: true,
+						HookCommand: termaHookCommand()})
 					if err != nil {
 						return fmt.Errorf("pi: %w", err)
 					}
 					fmt.Fprintf(out, "Pi exports to the relay at %s (%s).\n", addr, tildePath(path))
+					continue
+				case "hermes":
+					// Hermes, likewise: terma's plugin is its exporter, and plugins are opt-in.
+					dir, err := harness.WriteHermesPlugin(harness.HermesConfig{Endpoint: exp.Endpoint,
+						Headers: map[string]string{"Authorization": "Bearer " + token}, IncludePrompts: true, IncludeToolContent: true,
+						HookCommand: termaHookCommand()})
+					if err != nil {
+						return fmt.Errorf("hermes: %w", err)
+					}
+					if err := harness.EnableHermesPlugin(cmd.Context()); err != nil {
+						fmt.Fprintf(out, "Hermes: the plugin is written (%s) but not enabled: %v.\n", tildePath(dir), err)
+						continue
+					}
+					fmt.Fprintf(out, "Hermes exports to the relay at %s (%s).\n", addr, tildePath(dir))
 					continue
 				}
 				h, err := harness.Lookup(strings.TrimSpace(name))

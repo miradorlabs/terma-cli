@@ -138,6 +138,8 @@ omp (oh-my-pi, PR #21, merged into this branch) exports OTLP natively under the 
 
 The omp route exports only in a bound repository, so omp elsewhere exports nothing at all: stricter than the agents whose global config the relay filters.
 
+**Superseded:** the shims are being removed, and this route depends on one. Its tools also inherit the relay's variables (see "Tools must not inherit the relay"). Without a shim, omp needs an exporter of its own, as Pi and Hermes have.
+
 ### Codex's app-server (Desktop, the daemon)
 
 Codex Desktop, the IDE extension and, since 0.157, the interactive TUI run their threads in `codex app-server`. A bare `codex` with a daemon running attaches to it (`daemon_auto_start`, stable and on). Any `-c` override or `--dangerously-bypass-hook-trust` runs the TUI in-process instead; so do `codex exec` and terma's own Codex shim.
@@ -200,13 +202,59 @@ Tested on the installed 0.99.1 (`live/relay_pi_test.go`):
 
 Pi is not yet selectable in `terma setup` ("Coming Soon"). The relay is its only route.
 
-### Other harnesses
+### Hermes
+
+Hermes (Nous Research, 0.20.4) has no usable OTLP export. Its NeMo Relay exporter names no session, drops usage on streamed calls and carries the whole system prompt. Its shell hooks are user-level only and do not fire in its TUI, which is the default front end. Its Python plugins run in every front end, so terma's plugin (`internal/harness/hermes`) is its exporter:
+- **Installation:** `terma relay setup --harness hermes` writes the plugin into `$HERMES_HOME/plugins/terma/` and enables it with `hermes plugins enable terma` (plugins are opt-in).
+- **Spans:** a `chat <model>` span per provider call, with `gen_ai.usage.*` and Hermes's own cost estimate (`agent.usage_pricing`, as its Langfuse plugin uses; none on a subscription-included route), and an `execute_tool <tool>` span per tool call.
+- **Logs:** a `hermes.user_prompt` and a `hermes.assistant_response` log per turn, whose bodies the relay withholds with content.
+- **Hooks:** it calls `terma hook hermes-*` by terma's absolute path. `hermes-prompt` claims without announcing, and `write_file` and `patch` report their file. The workspace comes from Hermes's `resolve_agent_cwd()`; in the TUI the process's own cwd is where its backend started.
+
+It passes on 0.20.4:
+- **Workloads:** a reply and a file write, each direct vs relay.
+- **Content:** allowed and withheld. The withheld case was sabotaged: without the two log events in the gate, both bodies leaked, and the test caught it.
+- **Negative control:** a session outside any repository reaches nothing upstream.
+- **Attribution:** the commit is stamped `Agent-Tool: hermes`.
+
+**Not seen:** auxiliary calls fire no plugin hook (the session-title request; compression, likely), so their spend is not seen.
+
+### Cursor
+
+cursor-agent (2026.09.08) bundles an OTLP exporter, but its tracer is fixed to Cursor's own backend (`${backendUrl}/v1/traces`, Cursor's token, `service.name=cursor-agent-cli`). Nothing `relay setup` writes redirects it, so Cursor never reaches the relay and is seen through its hooks alone.
+
+`TestRelayCursorHooks` covers Cursor on a relay machine. Its hooks deliver through the spool as before, stay silent, and claim the conversation under `cursor`, harmlessly, since nothing exports under it. The relay receives nothing. Cursor itself needs a `CURSOR_API_KEY`, so it runs in the credentialed suite only.
+
+### T3 Code
+
+T3 Code (0.0.42) is a local server with a web front end, and runs other agents:
+- **Codex:** one `codex app-server` per T3 thread, in the thread's workspace.
+- **Claude Code:** through the Agent SDK, with setting sources user, project and local.
+- **Environment:** it sets no `OTEL_*` of its own and runs no collector.
+
+So the agents' user-level exporters and the repository's hooks work as they do anywhere, and each agent exports from the process that runs its hooks. `TestRelayT3` drives T3's orchestration API with a Codex and a Claude thread in the bound repository and one of each in a personal project.
+
+**Not caught:** T3's thread titles run `claude -p` in a temporary directory, so no hook claims them and they are not forwarded.
+
+### Tools must not inherit the relay
+
+An agent's tools must never inherit the relay's `OTEL_*` variables, since `OTEL_EXPORTER_OTLP_HEADERS` carries its token. If they did:
+- an OTel-instrumented program under test would export to the relay (and be dropped), not to its own collector;
+- cursor-agent merges `OTEL_EXPORTER_OTLP_HEADERS` into what it sends Cursor's backend.
+
+Where each agent stands:
+- **Claude Code:** strips them from its tools (`TestRelayClaudeToolsGetNoExporter`, on 2.1.202 and 2.1.284).
+- **omp:** its shim route handed them to omp, and omp's tools inherited them. The shims are being removed.
+- **omp without a shim:** omp's exporter reads `OTEL_*` only at startup, before any hook or extension loads. A committed hook that sets them at load exports nothing (verified on 18.3), so omp needs an exporter of its own, as Pi and Hermes have.
+
+### Harness summary
 
 | Harness | Exports OTLP? | Claims possible? | Status |
 |---|---|---|---|
-| Hermes (Nous Research) | no usage telemetry (Langfuse plugin; content-free gateway monitoring) | shell hooks (`on_session_start`, `post_llm_call`, …) in user config | needs a terma plugin that exports OTLP, and user-level hooks |
-| T3 Code | its agents': it runs `codex app-server`, Claude's Agent SDK and `cursor-agent` | through those agents' hooks | a multi-workspace client: no adoption (safe); not driven yet |
-| Cursor | no | hooks (terma already wires them) | nothing reaches the relay; its events go through terma's spool |
+| T3 Code | its agents': a `codex app-server` per thread, Claude's Agent SDK | through those agents' hooks | works through the relay unchanged (`TestRelayT3`) |
+| Hermes | through terma's plugin | the plugin calls `terma hook hermes-*` | done |
+| Pi | through terma's extension | the extension calls `terma hook pi-*` | done |
+| Cursor | no (its own backend only) | hooks | unaffected; never reaches the relay |
+| omp | natively, configured by environment only | committed hook file | needs its own exporter once shims are gone |
 
 ## Findings
 

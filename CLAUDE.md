@@ -691,9 +691,23 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   `codex app-server daemon restart` (`harness.RunningCodexDaemon`), never run it.
   `live/codex_appserver.go` drives app-server over stdio JSON-RPC and a sandbox daemon
   (short `CODEX_HOME`: SUN_LEN); `live/claude_desktop.go` reproduces Desktop's launch.
-- Pi has no exporter: terma's extension (`internal/harness/pi/terma.ts`, written by
-  `relay setup --harness pi`) exports GenAI spans and prompt logs under Pi's session id
-  and calls `terma hook pi-*`; `pi-prompt` claims without announcing.
+- Pi and Hermes have no usable exporter: terma writes one into each — Pi's extension
+  (`internal/harness/pi/terma.ts`), Hermes's Python plugin (`internal/harness/hermes`,
+  `$HERMES_HOME/plugins/terma`, enabled through `hermes plugins enable terma`; plugin
+  hooks fire in every front end, shell hooks not in the TUI) — exporting GenAI spans
+  (usage, cost) and prompt/reply logs under the agent's own session id, and calling
+  `terma hook <agent>-*` by terma's absolute path (`termaHookCommand`: a desktop-started
+  agent has the system PATH). `<agent>-prompt` claims without announcing. Their prompt
+  and reply log bodies are in the relay's `promptBodyEvents`.
+- Shims are being removed: nothing new may depend on one. omp's exporter reads OTEL_*
+  only at startup, before any hook or extension loads (verified: a committed hook that
+  sets them at load exports nothing), so without its shim omp needs an exporter of its
+  own like Pi's. Tools an agent runs must never inherit the relay's OTEL_* variables
+  (its token): Claude Code strips them (`TestRelayClaudeToolsGetNoExporter`); omp's shim
+  route did not. cursor-agent's own tracer is fixed to Cursor's backend, so Cursor never
+  reaches the relay (`TestRelayCursorHooks`).
+- Never read harness log files to fill a gap: what the relay knows comes from OTLP and
+  hook payloads.
 - OTLP types come from `go.opentelemetry.io/proto/otlp/{logs,metrics,trace}` as
   `*Data` messages (wire-identical to the export requests); never import the collector
   packages, which pull gRPC into every hook. Under the relay the machine-wide Codex config
@@ -704,7 +718,7 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
 
 - Trailers: `Agent-Session-Id`, `Agent-Tool` (`internal/trailer`). The Terma backend
   and GitHub App parse these. Tool labels: `claude-code`, `codex`, `opencode`, `cursor`,
-  `antigravity`, `omp`, `pi`.
+  `antigravity`, `omp`, `pi`, `hermes`.
 - Hook event names are committed wiring and must stay stable: `session-start` /
   `session-end` / `post-tool-use` / `stop` / `stop-failure` / `subagent-start` /
   `subagent-stop` / `user-prompt-submit` (Claude Code's `.claude/settings.json`),
@@ -724,7 +738,10 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   the OpenCode plugin), `omp-session-start` / `omp-session-end` / `omp-file-edit` (omp's
   committed hook file and extension), `pi-session-start` / `pi-prompt` /
   `pi-session-end` / `pi-file-edit` (called by terma's Pi extension,
-  `internal/harness/pi/terma.ts`, which `terma relay setup --harness pi` writes). Cursor sessions are keyed on `conversation_id`, the one id
+  `internal/harness/pi/terma.ts`, which `terma relay setup --harness pi` writes),
+  `hermes-session-start` / `hermes-prompt` / `hermes-session-end` / `hermes-file-edit`
+  (called by terma's Hermes plugin, `internal/harness/hermes`). Both extensions share
+  one handler set (`hookrun/extension.go`) and one payload shape. Cursor sessions are keyed on `conversation_id`, the one id
   present on every Cursor event; `afterFileEdit` has no `session_id`.
 - Spool event names the platform parses (`gateways/otel/.../termacli_logs.go` and
   `termacli_entitlement_logs.go`): `terma.session.start`, `terma.files.touched`,

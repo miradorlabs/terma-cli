@@ -104,6 +104,12 @@ func SupportCatalog() []AgentSupport {
 			Telemetry:   CapabilitySupport{Level: SupportPartial, Note: "Pi has no OTLP export; terma's extension exports tokens, cost and tool calls through the local relay only"},
 		},
 		{
+			Name:        "hermes",
+			DisplayName: "Hermes",
+			Attribution: CapabilitySupport{Level: SupportFull},
+			Telemetry:   CapabilitySupport{Level: SupportPartial, Note: "Hermes has no usable OTLP export; terma's plugin exports tokens, cost and tool calls through the local relay only; auxiliary calls (titles, compression) fire no hook"},
+		},
+		{
 			Name:        "cursor",
 			DisplayName: "Cursor",
 			Attribution: CapabilitySupport{Level: SupportFull},
