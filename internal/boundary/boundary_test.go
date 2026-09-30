@@ -27,10 +27,10 @@ const module = "github.com/miradorlabs/terma-cli"
 // agents are the coding agents terma integrates with, by the name their package takes.
 var agents = []string{"claude", "codex", "cursor", "antigravity", "opencode", "omp", "pi", "hermes", "gemini", "dsh"}
 
-// agentPackage reports the agent an import path belongs to: internal/harness/<name> and
+// agentPackage reports the agent an import path belongs to: internal/agents/<name> and
 // anything below it.
 func agentPackage(path string) (string, bool) {
-	rest, ok := strings.CutPrefix(path, module+"/internal/harness/")
+	rest, ok := strings.CutPrefix(path, module+"/internal/agents/")
 	if !ok {
 		return "", false
 	}
@@ -43,10 +43,11 @@ func agentPackage(path string) (string, bool) {
 	return "", false
 }
 
-// mayNameAgents are the packages whose job is to name agents: the registry, the
-// identities, and these tests' own fixtures.
+// mayNameAgents are the packages whose job is to name agents: the registry, the code a
+// few agents share (internal/agents/internal/...), and these tests' own fixtures.
 var mayNameAgents = map[string]string{
-	module + "/internal/adapter":  "the registry: it lists every agent",
+	module + "/internal/agents":   "the registry: it lists every agent",
+	module + "/internal/adapter":  "the registry until it becomes internal/agents",
 	module + "/internal/contract": "byte snapshots, named by agent",
 	module + "/internal/boundary": "this test",
 }
@@ -105,9 +106,9 @@ func TestAgentPackagesAreImportedOnlyByTheRegistry(t *testing.T) {
 			case !ok:
 			case isAgent && other == self:
 			case isAgent:
-				t.Errorf("%s imports %s: one agent never imports another; share through the kit", p.ImportPath, imp)
-			case p.ImportPath != module+"/internal/adapter":
-				t.Errorf("%s imports %s: only the registry (internal/adapter) imports an agent's package", p.ImportPath, imp)
+				t.Errorf("%s imports %s: one agent never imports another; share through internal/agents/internal", p.ImportPath, imp)
+			case p.ImportPath != module+"/internal/agents" && p.ImportPath != module+"/internal/adapter":
+				t.Errorf("%s imports %s: only the registry (internal/agents) imports an agent's package", p.ImportPath, imp)
 			}
 		}
 		if p.ImportPath == module+"/internal/relay" || strings.HasPrefix(p.ImportPath, module+"/internal/relay/claim") {
@@ -130,6 +131,9 @@ func TestAgentMentionsOnlyShrink(t *testing.T) {
 	for _, p := range listPackages(t) {
 		if _, ok := agentPackage(p.ImportPath); ok {
 			continue
+		}
+		if strings.HasPrefix(p.ImportPath, module+"/internal/agents/internal/") {
+			continue // shared by a few agents, and invisible to everything else
 		}
 		if _, ok := mayNameAgents[p.ImportPath]; ok {
 			continue
@@ -157,7 +161,7 @@ func TestAgentMentionsOnlyShrink(t *testing.T) {
 		total += n
 		switch was, ok := want[file]; {
 		case !ok:
-			t.Errorf("%s names an agent %d times: an agent's code belongs in internal/harness/<name>, and the registry (internal/adapter) is what lists them", file, n)
+			t.Errorf("%s names an agent %d times: an agent's code belongs in internal/agents/<name>, and the registry (internal/agents) is what lists them", file, n)
 		case n > was:
 			t.Errorf("%s names agents %d times, up from %d", file, n, was)
 		case n < was:
