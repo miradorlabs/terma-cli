@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -33,8 +32,6 @@ type setupFlags struct {
 	managedTerma  string
 }
 
-const codexDesktopAgent = "codex-desktop"
-
 // agentChoice is an onboarding surface. Codex CLI and Codex desktop share one
 // repository adapter, but developers choose independently how they launch it.
 type agentChoice struct {
@@ -57,8 +54,8 @@ func newSetupCommand() *cobra.Command {
 		Long: `Gets this machine ready to use terma, once per developer:
 
   1. Signs you in (a browser handoff; --no-browser prints the URL instead).
-  2. Records which coding agents you work with (including Codex CLI and Codex
-     desktop separately).
+  2. Records which coding agents you work with (an agent's CLI and desktop app
+     separately).
   3. Fetches your organization's collection policy.
   4. Points those agents' telemetry at terma's local relay, and runs the relay in
      the background (--relay-service off: started on demand instead). Only sessions
@@ -217,8 +214,10 @@ func applyGlobalMode(ctx context.Context, agents []string, global bool, said, th
 	for _, f := range files {
 		said("Machine-wide hooks updated: " + tildePath(f))
 	}
-	if global && slices.Contains(userHookAgents(agents), "codex") && !managedHooksDeployed("codex") && len(files) > 0 {
-		then("Codex runs its machine-wide hooks once you trust them: in Codex, open `/hooks` (Desktop: Settings → Hooks → Review) and approve Terma's. An organization that deploys them as managed configuration skips this step.")
+	if global && len(files) > 0 {
+		for _, step := range userHooksTrustSteps(agents) {
+			then(step)
+		}
 	}
 	changed, err := applyGlobalGitHooks(ctx, global)
 	if err != nil {

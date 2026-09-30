@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
-	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 )
 
@@ -58,7 +57,7 @@ func TestEveryCommittedHookHasAHandler(t *testing.T) {
 // rejects.
 func TestSupportCatalogMatchesTheRegistry(t *testing.T) {
 	listed := map[string]string{}
-	for _, agent := range harness.SupportCatalog() {
+	for _, agent := range reg.SupportCatalog() {
 		listed[agent.Name] = agent.DisplayName
 	}
 	for _, a := range reg.All() {

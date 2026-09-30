@@ -41,7 +41,14 @@ func (Agent) Harness() harness.Harness { return exporter{} }
 // RefreshMachine rewrites the plugin.
 func (Agent) RefreshMachine() (string, bool, error) { return exporter{}.RefreshPlugin() }
 
+// Coverage is how completely terma supports the agent.
+func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
+	return agents.CapabilitySupport{Level: agents.SupportFull},
+		agents.CapabilitySupport{Level: agents.SupportFull}
+}
+
 var (
+	_ agents.Covered          = Agent{}
 	_ agents.MachineRefresher = Agent{}
 	_ agents.Exporting        = Agent{}
 	_ agents.Agent            = Agent{}

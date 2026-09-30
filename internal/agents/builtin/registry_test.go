@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
-	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
 // The registry is the single source every command reads. These are the invariants
@@ -206,12 +205,12 @@ func TestEveryHarnessReportsStatusInASandbox(t *testing.T) {
 // about an agent terma exports for.
 func TestSupportCatalogCoversEveryHarness(t *testing.T) {
 	for _, h := range reg.Harnesses() {
-		a, ok := harness.LookupSupport(h.Name())
+		a, ok := reg.LookupSupport(h.Name())
 		if !ok {
 			t.Errorf("harness %q is not in the support catalog", h.Name())
 			continue
 		}
-		if a.Telemetry.Level != harness.SupportFull || a.Support != harness.SupportFull {
+		if a.Telemetry.Level != agents.SupportFull || a.Support != agents.SupportFull {
 			t.Errorf("%s exports telemetry but the catalog says telemetry %q, overall %q", h.Name(), a.Telemetry.Level, a.Support)
 		}
 	}

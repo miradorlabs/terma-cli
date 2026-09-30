@@ -80,6 +80,12 @@ type UserHooks interface {
 	PlanUserHooks(dir string, command func(string) string, install bool) (hookmgr.Plan, error)
 }
 
+// UserHooksTrust is an agent that runs its machine-wide hooks only once the developer
+// trusts them; UserHooksTrustStep says how.
+type UserHooksTrust interface {
+	UserHooksTrustStep() string
+}
+
 // ManagedHooks is an agent whose machine-wide hooks an organization can deploy.
 type ManagedHooks interface {
 	Agent

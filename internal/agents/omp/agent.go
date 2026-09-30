@@ -39,7 +39,14 @@ func (Agent) FlushAfter() []string { return []string{"omp-session-end"} }
 // Harness is how terma configures the agent's exporter.
 func (Agent) Harness() harness.Harness { return exporter{} }
 
+// Coverage is how completely terma supports the agent.
+func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
+	return agents.CapabilitySupport{Level: agents.SupportFull},
+		agents.CapabilitySupport{Level: agents.SupportFull, Note: "tokens, effort, service tier and latency ride omp's native OTLP spans; estimated cost is posted as a companion record the server joins by session"}
+}
+
 var (
+	_ agents.Covered   = Agent{}
 	_ agents.Exporting = Agent{}
 	_ agents.Agent     = Agent{}
 )

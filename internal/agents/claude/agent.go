@@ -85,7 +85,14 @@ func (Agent) Renders() map[string]agents.RenderHandler {
 	}}
 }
 
+// Coverage is how completely terma supports the agent.
+func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
+	return agents.CapabilitySupport{Level: agents.SupportFull},
+		agents.CapabilitySupport{Level: agents.SupportFull}
+}
+
 var (
+	_ agents.Covered          = Agent{}
 	_ agents.Renderer         = Agent{}
 	_ agents.MachineRefresher = Agent{}
 	_ agents.Exporting        = Agent{}

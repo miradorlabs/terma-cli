@@ -20,8 +20,8 @@ func newSessionCommand() *cobra.Command {
 		Use:     "session",
 		Aliases: []string{"sessions"},
 		Short:   "List and inspect the coding sessions your agents ran",
-		Long: `A session is one conversation with a coding agent — Claude Code, Codex, or another
-connected harness — rolled up with its token usage, cost, tool calls and git activity.
+		Long: `A session is one conversation with a coding agent, rolled up with its token usage,
+cost, tool calls and git activity.
 
 A session is identified by its session id together with its source system, so
 ` + "`get`, `events` and `git`" + ` take both. Copy them from ` + "`session list`" + `.
@@ -45,7 +45,7 @@ type sessionSelectFlags struct {
 }
 
 func (f *sessionSelectFlags) bind(fl *pflag.FlagSet, withFilter bool) {
-	fl.StringSliceVar(&f.sources, "source", nil, "source system (repeatable): claude-code, codex, …")
+	fl.StringSliceVar(&f.sources, "source", nil, "source system (repeatable): "+sourceExamples()+", …")
 	fl.StringSliceVar(&f.users, "user", nil, "user by name, email, alias or id (repeatable)")
 	fl.StringSliceVar(&f.apiKeys, "api-key", nil, "API key by label, alias or id (repeatable; never the secret)")
 	fl.StringSliceVar(&f.models, "model", nil, "sessions that used this model (repeatable)")
@@ -268,7 +268,7 @@ that is new or has changed, as it happens.`,
 
 // sessionIdentityFlag adds the --source flag every session-scoped read needs.
 func sessionIdentityFlag(cmd *cobra.Command, source *string) {
-	cmd.Flags().StringVar(source, "source", "", "the session's source system, e.g. claude-code (required)")
+	cmd.Flags().StringVar(source, "source", "", "the session's source system, e.g. "+sourceExamples()+" (required)")
 	_ = cmd.MarkFlagRequired("source")
 }
 

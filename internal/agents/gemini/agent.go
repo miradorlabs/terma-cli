@@ -38,6 +38,13 @@ func (Agent) Events() map[string]agents.Handler {
 
 func (Agent) FlushAfter() []string { return []string{"gemini-session-end"} }
 
+// Coverage is how completely terma supports the agent.
+func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
+	return agents.CapabilitySupport{Level: agents.SupportFull},
+		agents.CapabilitySupport{Level: agents.SupportPartial, Note: "native OTLP through the local relay only; no cost"}
+}
+
 var (
-	_ agents.Agent = Agent{}
+	_ agents.Covered = Agent{}
+	_ agents.Agent   = Agent{}
 )

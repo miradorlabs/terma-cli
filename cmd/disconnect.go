@@ -23,7 +23,7 @@ The server key stays live — it is bound to the project, not to this machine, a
 be in use elsewhere. Revoke it in the web app when you are done with it; the key's
 masked prefix is printed so you can find it in the list.
 
---scope local removes the repository's own policy from its .claude/settings.json
+--scope local removes the repository's own policy from its committed settings
 instead, and leaves your global connect as it is.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -113,7 +113,7 @@ instead, and leaves your global connect as it is.`,
 			if notifier, ok := h.(harness.TurnNotifier); ok && scope == harness.ScopeGlobal {
 				switch restored, err := notifier.RemoveNotifier(); {
 				case err != nil:
-					fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not restore the previous Codex notifier (%v).\n", err)
+					fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not restore the previous %s notifier (%v).\n", h.DisplayName(), err)
 				case restored:
 					fmt.Fprintln(out, "Notifier: restored to what ran before terma connected.")
 				}
@@ -144,6 +144,6 @@ instead, and leaves your global connect as it is.`,
 	}
 
 	cmd.Flags().BoolVarP(&assumeYes, "yes", "y", false, "skip the confirmation prompt")
-	cmd.Flags().StringVar(&scopeFlag, "scope", "", "which layer to remove: global (your user settings, default) or local (this repository's .claude/settings.json)")
+	cmd.Flags().StringVar(&scopeFlag, "scope", "", "which layer to remove: global (your user settings, default) or local (this repository's own settings)")
 	return cmd
 }

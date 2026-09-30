@@ -97,3 +97,6 @@ func claudeHarness(t *testing.T) interface {
 	}
 	return h
 }
+
+// codexDesktopAgent is Codex Desktop's surface name.
+const codexDesktopAgent = "codex-desktop"

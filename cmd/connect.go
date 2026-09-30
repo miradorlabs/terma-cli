@@ -41,9 +41,9 @@ terminal, connect shows a checklist to untick what should stay; --exclude-prompt
 --exclude-tool-content and --signals decide the same thing without one.
 
 A connect is global by default — this machine, every repository. --scope local
-writes a repository's own policy into its committed .claude/settings.json instead:
-only what to ship, never where or with which key, so one repository can send less
-than the machine does. Claude Code and OpenCode; Codex reads a single config file.
+writes a repository's own policy into its committed settings instead: only what to
+ship, never where or with which key, so one repository can send less than the machine
+does (` + scopedHarnessNames() + `).
 
 Supported: ` + strings.Join(registered.HarnessNames(), ", ") + `.`,
 	}
@@ -92,12 +92,12 @@ func newTelemetryConnectCommand() *cobra.Command {
 configuration.
 
 The key is created server-side and returned exactly once. Where the harness can fetch
-its OTLP headers from a script at startup (Claude Code's otelHeadersHelper), the key
-lands in a 0700 helper script under ~/.config/terma/helpers/ and the harness config gets
-only the script's path — so the settings file never holds a credential and stays safe
-to share or keep in dotfiles; pass --inline-key to write the key into the settings
-file instead. Codex has no such mechanism, so its key is always written into
-config.toml. Either way, a file that holds the key is tightened to 0600.
+its OTLP headers from a script at startup, the key lands in a 0700 helper script under
+~/.config/terma/helpers/ and the harness config gets only the script's path — so the
+settings file never holds a credential and stays safe to share or keep in dotfiles;
+pass --inline-key to write the key into the settings file instead. A harness with no
+such mechanism always gets the key in its config. Either way, a file that holds the
+key is tightened to 0600.
 
 Your existing settings are preserved — only Terma's own keys are written, and
 ` + "`terma disconnect`" + ` removes exactly those. Reconnecting to the same project
@@ -109,10 +109,10 @@ key of its own, so one agent's key can be revoked without touching the other's.
 
 On a terminal, a checklist first asks what to send and where; every box has a flag,
 and --yes takes the flags and defaults without asking. --scope local writes the
-repository you are in rather than your user settings: its .claude/settings.json gets
-the signal and content switches — nothing else, so it is safe to commit — and Claude
-Code applies them over your global connect inside that repository. It needs no
-project, key or sign-in. Claude Code and OpenCode; Codex reads a single config file.`,
+repository you are in rather than your user settings: its committed settings get the
+signal and content switches — nothing else, so it is safe to commit — and the agent
+applies them over your global connect inside that repository. It needs no project,
+key or sign-in (` + scopedHarnessNames() + `).`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runTelemetryConnectAll(cmd, args, f)
@@ -120,16 +120,16 @@ project, key or sign-in. Claude Code and OpenCode; Codex reads a single config f
 	}
 
 	fl := cmd.Flags()
-	fl.StringVar(&f.scope, "scope", "", "where to write: global (this machine, default) or local (this repository's own settings; Claude Code and OpenCode)")
+	fl.StringVar(&f.scope, "scope", "", "where to write: global (this machine, default) or local (this repository's own settings; "+scopedHarnessNames()+")")
 	fl.StringVar(&f.signals, "signals", "", "comma-separated signals to export: traces, logs, metrics (default all; none to ship nothing)")
 	fl.StringVar(&f.exports, "exports", "", "which repositories export: everywhere (this machine, default) or repos (only those whose committed terma policy turns it on)")
 	fl.BoolVar(&f.excludePrompts, "exclude-prompts", false, "do not export prompt text or model responses")
 	fl.BoolVar(&f.excludeToolContent, "exclude-tool-content", false, "do not export tool parameters, input, or output")
-	fl.BoolVar(&f.noStatusLine, "no-statusline", false, "leave Claude Code's status line alone (by default terma wraps it to read the plan's rate-limit windows; the configured command keeps running unchanged)")
+	fl.BoolVar(&f.noStatusLine, "no-statusline", false, "leave "+statusLineOwner()+"'s status line alone (by default terma wraps it to read the plan's rate-limit windows; the configured command keeps running unchanged)")
 	fl.StringVar(&f.keyName, "key-name", "", "name for the minted key (defaults to <harness>@<hostname>)")
 	fl.StringVar(&f.apiKey, "api-key", "", "install this existing server key (ter_srv_…) instead of minting a new one")
-	fl.StringVar(&f.identity, "identity", "", "value for enduser.id on Codex and OpenCode sessions (defaults to your global git email; \"none\" to omit). Claude Code reports the account it is signed in with")
-	fl.BoolVar(&f.inlineKey, "inline-key", false, "store the key in the settings file instead of a Terma headers-helper script (Claude Code; Codex always stores it inline)")
+	fl.StringVar(&f.identity, "identity", "", "value for enduser.id on the sessions of agents that take one (defaults to your global git email; \"none\" to omit); an agent that reports its signed-in account keeps that")
+	fl.BoolVar(&f.inlineKey, "inline-key", false, "store the key in the settings file instead of a Terma headers-helper script, for agents that read one")
 	fl.BoolVarP(&f.assumeYes, "yes", "y", false, "skip the confirmation prompt")
 	fl.BoolVar(&f.force, "force", false, "remove conflicting per-signal OTLP settings instead of refusing to connect")
 	return cmd
@@ -176,7 +176,7 @@ func runTelemetryConnectAll(cmd *cobra.Command, names []string, f connectFlags) 
 	if scope == harness.ScopeLocal {
 		for _, h := range hs {
 			if _, ok := h.(harness.Scoped); !ok {
-				return fmt.Errorf("%s has no repository settings — --scope local applies to harnesses that read one (Claude Code, OpenCode)", h.DisplayName())
+				return fmt.Errorf("%s has no repository settings — --scope local applies to harnesses that read one (%s)", h.DisplayName(), scopedHarnessNames())
 			}
 		}
 	}
@@ -356,26 +356,26 @@ func connectGlobal(cmd *cobra.Command, name string, f connectFlags) error {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not store the project key for the spool (%v); `terma spool flush` will not deliver until it is stored.\n", err)
 	}
 	statusLineNote := ""
-	codexNotifyNote := ""
+	notifierNote := ""
 	if line, ok := h.(harness.StatusLiner); ok && !f.noStatusLine {
-		statusLineNote, _ = installHarnessStatusLine(h.DisplayName(), line, cmd.ErrOrStderr())
+		statusLineNote, _ = installHarnessStatusLine(h, line, cmd.ErrOrStderr())
 	}
 	if notifier, ok := h.(harness.TurnNotifier); ok {
 		switch changed, err := notifier.InstallNotifier(); {
 		case err != nil:
 			fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not install %s's funding notifier (%v).\n", h.DisplayName(), err)
 		case changed:
-			codexNotifyNote = "Notifier: terma will capture plan and quota at the end of each turn; any previous notifier keeps running behind it."
+			notifierNote = "Notifier: terma will capture plan and quota at the end of each turn; any previous notifier keeps running behind it."
 		default:
-			codexNotifyNote = "Notifier: terma's plan and quota capture is already installed."
+			notifierNote = "Notifier: terma's plan and quota capture is already installed."
 		}
 	}
 	fmt.Fprintf(out, "\nConnected. Restart %s, then run a prompt.\n", h.DisplayName())
 	if statusLineNote != "" {
 		fmt.Fprintln(out, statusLineNote)
 	}
-	if codexNotifyNote != "" {
-		fmt.Fprintln(out, codexNotifyNote)
+	if notifierNote != "" {
+		fmt.Fprintln(out, notifierNote)
 	}
 	fmt.Fprintln(out, "See its sessions with `terma session list`.")
 	return nil
@@ -403,7 +403,7 @@ func printConnectPlan(
 		// rather than as the arrangement the user asked for.
 		fmt.Fprintf(out, "  Exports from:    repositories that carry a terma policy — every exporter here is left off\n")
 		fmt.Fprintln(out, "\n  Signals:")
-		fmt.Fprintln(out, "    decided by each repository's committed .claude/settings.json")
+		fmt.Fprintln(out, "    decided by each repository's committed terma policy")
 		fmt.Fprintf(out, "\n    Prompts:      %s (a repository may narrow this, never widen the machine's reach)\n", onOff(!f.excludePrompts))
 		fmt.Fprintf(out, "    Tool content: %s\n", onOff(!f.excludeToolContent))
 	} else {
@@ -615,13 +615,16 @@ func installStatusLine(errOut io.Writer) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	return installHarnessStatusLine(a.DisplayName(), s, errOut)
+	return installHarnessStatusLine(a, s, errOut)
 }
 
-func installHarnessStatusLine(agent string, c harness.StatusLiner, errOut io.Writer) (string, bool) {
+func installHarnessStatusLine(agent interface {
+	Name() string
+	DisplayName() string
+}, c harness.StatusLiner, errOut io.Writer) (string, bool) {
 	changed, err := c.InstallStatusLine()
 	if err != nil {
-		fmt.Fprintf(errOut, "Warning: could not wrap %s's status line (%v); plan usage will not be captured.\n", agent, err)
+		fmt.Fprintf(errOut, "Warning: could not wrap %s's status line (%v); plan usage will not be captured.\n", agent.DisplayName(), err)
 		return "", false
 	}
 	st, stErr := c.StatusLineState("")
@@ -631,7 +634,7 @@ func installHarnessStatusLine(agent string, c harness.StatusLiner, errOut io.Wri
 	case changed && st.Renderer != "":
 		return fmt.Sprintf("Status line: terma now reads the plan's usage windows from it; your own status line (%s) keeps running unchanged behind it.", output.SanitizeTerminal(st.Renderer)), true
 	case changed:
-		return "Status line: terma added one that shows model, context, cost and the plan's usage windows (remove it with `terma disconnect claude`, or skip it with --no-statusline).", true
+		return "Status line: terma added one that shows model, context, cost and the plan's usage windows (remove it with `terma disconnect " + agent.Name() + "`, or skip it with --no-statusline).", true
 	default:
 		return "Status line: already wrapped by terma.", true
 	}

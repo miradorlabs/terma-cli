@@ -36,6 +36,18 @@ type userHooksRecord struct {
 
 // userHookAgents are the agents with a user-level hooks file terma writes, among the
 // developer's: Codex Desktop counts as Codex (it runs the same hooks).
+// userHooksTrustSteps are what the selected agents need of the developer before their
+// machine-wide hooks run, unless an organization deployed them as managed configuration.
+func userHooksTrustSteps(selected []string) []string {
+	var steps []string
+	for _, name := range userHookAgents(selected) {
+		if a, ok := registered.Find[agents.UserHooksTrust](name); ok && !managedHooksDeployed(name) {
+			steps = append(steps, a.UserHooksTrustStep())
+		}
+	}
+	return steps
+}
+
 func userHookAgents(selected []string) []string {
 	var out []string
 	for _, a := range registered.With[agents.UserHooks]() {

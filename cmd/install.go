@@ -69,13 +69,12 @@ not run ` + "`terma setup`" + `, asks which agents you use if you have not chose
      without a terminal, or with --yes, an existing binding is kept. A binding to a
      project your account cannot see is not used: install says why and chooses again.
   2. Points each of your agents at that project, through the local relay: their own
-     exporters send to a relay on this machine (Claude Code's and Codex's user
-     settings, Gemini CLI's; terma's plugin for OpenCode, omp, Pi, Hermes and DeepSeek
-     Harness), and the relay forwards only the sessions this repository's hooks claim,
-     with the project's key. Nothing else leaves the machine. Keys stay in your home
+     exporters (or terma's plugin, for an agent without a usable one) send to a relay
+     on this machine, and the relay forwards only the sessions this repository's hooks
+     claim, with the project's key. Nothing else leaves the machine. Keys stay in your home
      directory, namespaced by project — never in the repository. Prompt text and model
      responses are sent (your last choice for the project, on for a first install);
-     --prompts off stops them. Codex Desktop also reports through repository hooks.
+     --prompts off stops them. A desktop app also reports through repository hooks.
   3. Enables repository telemetry, including for machines configured to export only
      from installed repositories. Existing repository policies are preserved unless
      --signals or a content flag changes them.
@@ -101,8 +100,8 @@ The keys and per-project configuration live in your home directory; the committe
 	cmd.Flags().BoolVar(&f.noHooks, "no-hooks", false, "do not install commit hooks or agent hooks")
 	cmd.Flags().BoolVar(&f.noDoctor, "no-doctor", false, "do not run `terma doctor` to verify the chain after installing")
 	cmd.Flags().StringVar(&f.relayService, "relay-service", "", "run the local relay as a background service: on or off (default: on, or your last choice)")
-	cmd.Flags().BoolVar(&f.noStatusLine, "no-statusline", false, "do not wrap Claude Code's status line (which captures the plan's rate-limit windows)")
-	cmd.Flags().StringVar(&f.identity, "identity", "", "identity stamped on Codex/OpenCode sessions (default: git user.email; \"none\" to omit)")
+	cmd.Flags().BoolVar(&f.noStatusLine, "no-statusline", false, "do not wrap "+statusLineOwner()+"'s status line (which captures the plan's rate-limit windows)")
+	cmd.Flags().StringVar(&f.identity, "identity", "", "identity stamped on the sessions of agents that take one (default: git user.email; \"none\" to omit)")
 	cmd.Flags().StringVar(&f.signals, "signals", "", "comma-separated signals to export: traces, logs, metrics (default all)")
 	cmd.Flags().StringVar(&f.prompts, "prompts", "", "send prompt text and model responses: on or off (default: your last choice for this project, on for a first install)")
 	cmd.Flags().BoolVar(&f.excludePrompts, "exclude-prompts", false, "do not export prompt text or model responses")

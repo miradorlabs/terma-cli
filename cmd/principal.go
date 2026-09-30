@@ -56,7 +56,7 @@ func newPrincipalListCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&kind, "kind", "", "user or api_key")
-	cmd.Flags().StringVar(&source, "source", "", "source system, e.g. claude-code, codex")
+	cmd.Flags().StringVar(&source, "source", "", "source system, e.g. "+sourceExamples())
 	return cmd
 }
 

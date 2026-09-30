@@ -124,7 +124,7 @@ whichever session it belonged to. Defaults to the last 24 hours grouped by user.
 
   terma usage --user dawson --since today
   terma usage --group-by model --since 7d
-  terma usage --source codex --since yesterday --until today
+  terma usage --source <source system> --since yesterday --until today
 
 Numbers come from counters sampled over time, so a window's edges are interpolated
 to the nearest sample; for a per-session ledger use ` + "`terma session list`" + `.`,

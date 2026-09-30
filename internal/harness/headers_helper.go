@@ -72,9 +72,9 @@ func WriteHelper(path, key string) error {
 		return fmt.Errorf("create %s: %w", filepath.Dir(path), err)
 	}
 	script := fmt.Sprintf(`#!/bin/sh
-# Written by 'terma telemetry connect'. Claude Code runs this to fetch the
-# Authorization header for its OTLP export, so the key never sits in
-# settings.json. Managed by 'terma telemetry disconnect'; do not edit.
+# Written by 'terma telemetry connect'. The agent runs this to fetch the
+# Authorization header for its OTLP export, so the key never sits in its
+# settings file. Managed by 'terma telemetry disconnect'; do not edit.
 echo '{"Authorization": "Bearer %s"}'
 `, key)
 	return config.WriteFileAtomic(path, []byte(script), 0o700)

@@ -16,6 +16,8 @@ import (
 	"text/tabwriter"
 	"unicode/utf8"
 
+	"github.com/miradorlabs/terma-cli/internal/style"
+
 	"golang.org/x/term"
 	"gopkg.in/yaml.v3"
 )
@@ -32,26 +34,8 @@ const (
 	FormatCSV   Format = "csv"
 )
 
-// agentEnvVars are set by the coding agents that shell out to CLIs. Their presence
-// means the consumer is a model, not a person reading a terminal.
-var agentEnvVars = []string{
-	"CLAUDECODE",
-	"CLAUDE_CODE",
-	"CURSOR_TRACE_ID",
-	"CLINE_ACTIVE",
-	"GITHUB_COPILOT_CLI",
-	"AIDER_MODEL",
-}
-
-// AgentMode reports whether the CLI is being driven by an agent harness.
-func AgentMode() bool {
-	for _, key := range agentEnvVars {
-		if os.Getenv(key) != "" {
-			return true
-		}
-	}
-	return false
-}
+// AgentMode reports whether the CLI is being driven by a coding agent.
+func AgentMode() bool { return style.AgentMode() }
 
 // Interactive reports whether stdout is a terminal a human is likely watching.
 func Interactive() bool {

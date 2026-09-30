@@ -50,7 +50,7 @@ func Terminal(w io.Writer) bool {
 		w = h.w
 	}
 	f, ok := w.(*os.File)
-	if !ok || agentMode() || os.Getenv("TERM") == "dumb" {
+	if !ok || AgentMode() || os.Getenv("TERM") == "dumb" {
 		return false
 	}
 	return term.IsTerminal(int(f.Fd()))
@@ -64,15 +64,15 @@ func enabled(f *os.File) bool {
 	if os.Getenv("NO_COLOR") != "" || os.Getenv("TERM") == "dumb" {
 		return false
 	}
-	if agentMode() {
+	if AgentMode() {
 		return false
 	}
 	return term.IsTerminal(int(f.Fd()))
 }
 
-// agentEnvVars mirrors output.AgentMode: a coding agent driving the CLI reads text,
-// and escape sequences in it are noise. Duplicated rather than imported so this
-// package stays a leaf that output and prompt can both depend on.
+// agentEnvVars are set by the coding agents that shell out to CLIs, terma's or not. Their
+// presence means the reader is a model: it reads text, and escape sequences in it are
+// noise.
 var agentEnvVars = []string{
 	"CLAUDECODE",
 	"CLAUDE_CODE",
@@ -82,7 +82,8 @@ var agentEnvVars = []string{
 	"AIDER_MODEL",
 }
 
-func agentMode() bool {
+// AgentMode reports whether the CLI is being driven by a coding agent.
+func AgentMode() bool {
 	for _, key := range agentEnvVars {
 		if os.Getenv(key) != "" {
 			return true

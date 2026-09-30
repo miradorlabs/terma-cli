@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/miradorlabs/terma-cli/internal/harness"
+	"github.com/miradorlabs/terma-cli/internal/agents"
 )
 
 // runHarness is a run that must succeed, read from stdout alone: these tests parse
@@ -49,12 +49,12 @@ func TestHarnessBareDefaultsToList(t *testing.T) {
 func TestHarnessListJSON(t *testing.T) {
 	out := runHarness(t, "harness", "list", "-o", "json")
 	var report struct {
-		Harnesses []harness.AgentSupport `json:"harnesses"`
+		Harnesses []agents.AgentSupport `json:"harnesses"`
 	}
 	if err := json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatalf("parse json: %v\n%s", err, out)
 	}
-	byName := map[string]harness.AgentSupport{}
+	byName := map[string]agents.AgentSupport{}
 	for _, a := range report.Harnesses {
 		byName[a.Name] = a
 	}
@@ -62,13 +62,13 @@ func TestHarnessListJSON(t *testing.T) {
 	if !ok {
 		t.Fatalf("cursor missing from json:\n%s", out)
 	}
-	if cursor.Support != harness.SupportPartial {
+	if cursor.Support != agents.SupportPartial {
 		t.Errorf("cursor support = %q, want partial", cursor.Support)
 	}
-	if cursor.Telemetry.Level != harness.SupportPartial {
+	if cursor.Telemetry.Level != agents.SupportPartial {
 		t.Errorf("cursor telemetry = %q, want partial", cursor.Telemetry.Level)
 	}
-	if claude := byName["claude"]; claude.Support != harness.SupportFull {
+	if claude := byName["claude"]; claude.Support != agents.SupportFull {
 		t.Errorf("claude support = %q, want full", claude.Support)
 	}
 }

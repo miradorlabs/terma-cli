@@ -153,7 +153,20 @@ func (Agent) RetrustNote() string {
 	return "Codex runs changed hooks only after you trust them again in Codex; `terma doctor` names any it is skipping."
 }
 
+// Coverage is how completely terma supports the agent.
+func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
+	return agents.CapabilitySupport{Level: agents.SupportFull},
+		agents.CapabilitySupport{Level: agents.SupportFull, Note: "export is machine-wide; it cannot be scoped to a repository"}
+}
+
+// UserHooksTrustStep is how the developer trusts the machine-wide hooks.
+func (Agent) UserHooksTrustStep() string {
+	return "Codex runs its machine-wide hooks once you trust them: in Codex, open `/hooks` (Desktop: Settings → Hooks → Review) and approve Terma's. An organization that deploys them as managed configuration skips this step."
+}
+
 var (
+	_ agents.UserHooksTrust = Agent{}
+	_ agents.Covered        = Agent{}
 	_ agents.SurfaceChecker = Agent{}
 	_ agents.Retrusting     = Agent{}
 	_ agents.ContentConsent = Agent{}

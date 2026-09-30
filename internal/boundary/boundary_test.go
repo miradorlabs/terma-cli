@@ -1,26 +1,22 @@
 package boundary
 
 import (
-	"bufio"
 	"encoding/json"
 	"flag"
-	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"testing"
 	"unicode"
 )
 
-var update = flag.Bool("update", false, "rewrite testdata/leaks.txt from the current tree")
+var list = flag.Bool("mentions", false, "log every mention of an agent the test finds")
 
 const module = "github.com/miradorlabs/terma-cli"
 
@@ -55,6 +51,8 @@ var mayNameAgents = map[string]string{
 // rule. Nothing else belongs here.
 var global = map[string]string{
 	"internal/relay/allow.go": "the one safe-key table for every agent: a key that is content anywhere is content",
+	"internal/style/style.go": "the environment variables coding agents set, terma's or not, to tell a model from a person",
+	"internal/api/ai.go":      "the gateway's pagination cursor",
 }
 
 type pkg struct {
@@ -120,11 +118,10 @@ func TestAgentPackagesAreImportedOnlyByTheRegistry(t *testing.T) {
 	}
 }
 
-// TestAgentMentionsOnlyShrink counts, in every shipped file outside an agent's package,
-// the identifiers and strings that name an agent, and holds each package to its count
-// in testdata/leaks.txt. A package, not a file: splitting a file is how code gets ready
-// to move.
-func TestAgentMentionsOnlyShrink(t *testing.T) {
+// TestNothingElseNamesAnAgent finds, in every shipped file outside an agent's package,
+// the identifiers and strings that name an agent. There are none: what the core needs of
+// an agent it asks through internal/agents.
+func TestNothingElseNamesAnAgent(t *testing.T) {
 	root := repoRoot(t)
 	got := map[string]int{}
 	for _, p := range listPackages(t) {
@@ -149,31 +146,9 @@ func TestAgentMentionsOnlyShrink(t *testing.T) {
 			}
 		}
 	}
-	baselinePath := filepath.Join("testdata", "leaks.txt")
-	if *update {
-		writeBaseline(t, baselinePath, got)
-		return
+	for dir, n := range got {
+		t.Errorf("%s names an agent %d times: an agent's code belongs in internal/agents/<name>, and internal/agents/builtin is what lists them (-mentions lists each)", dir, n)
 	}
-	want := readBaseline(t, baselinePath)
-	total, wantTotal := 0, 0
-	for file, n := range got {
-		total += n
-		switch was, ok := want[file]; {
-		case !ok:
-			t.Errorf("%s names an agent %d times: an agent's code belongs in internal/agents/<name>, and internal/agents/builtin is what lists them", file, n)
-		case n > was:
-			t.Errorf("%s names agents %d times, up from %d", file, n, was)
-		case n < was:
-			t.Errorf("%s names agents %d times, down from %d: record the progress with -update", file, n, was)
-		}
-	}
-	for file, was := range want {
-		wantTotal += was
-		if _, ok := got[file]; !ok {
-			t.Errorf("%s no longer names an agent (was %d): record the progress with -update", file, was)
-		}
-	}
-	t.Logf("agent mentions outside agent packages: %d (baseline %d)", total, wantTotal)
 }
 
 var agentWord = regexp.MustCompile(`(?i)(^|[^a-z])(claude|codex|cursor|antigravity|opencode|omp|pi|hermes|gemini|dsh)([^a-z]|$)`)
@@ -182,7 +157,8 @@ var agentWord = regexp.MustCompile(`(?i)(^|[^a-z])(claude|codex|cursor|antigravi
 // Comments are prose and do not count.
 func mentions(t *testing.T, path string) int {
 	t.Helper()
-	f, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.SkipObjectResolution)
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,11 +170,17 @@ func mentions(t *testing.T, path string) int {
 		case *ast.Ident:
 			if identNamesAgent(x.Name) {
 				n++
+				if *list {
+					t.Logf("%s: %s", fset.Position(x.Pos()), x.Name)
+				}
 			}
 		case *ast.BasicLit:
 			if x.Kind == token.STRING {
 				if s, err := strconv.Unquote(x.Value); err == nil && stringNamesAgent(s) {
 					n++
+					if *list {
+						t.Logf("%s: %q", fset.Position(x.Pos()), s)
+					}
 				}
 			}
 		}
@@ -274,57 +256,4 @@ func words(name string) []string {
 // (PIDs, IDs), which stays with the acronym instead of starting a word.
 func plural(runes []rune, i int) bool {
 	return runes[i] == 's' && (i+1 == len(runes) || !unicode.IsLower(runes[i+1]))
-}
-
-func readBaseline(t *testing.T, path string) map[string]int {
-	t.Helper()
-	f, err := os.Open(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return map[string]int{}
-		}
-		t.Fatal(err)
-	}
-	defer func() { _ = f.Close() }()
-	out := map[string]int{}
-	sc := bufio.NewScanner(f)
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		count, file, ok := strings.Cut(line, " ")
-		n, err := strconv.Atoi(count)
-		if !ok || err != nil {
-			t.Fatalf("%s: bad line %q", path, line)
-		}
-		out[file] = n
-	}
-	if err := sc.Err(); err != nil {
-		t.Fatal(err)
-	}
-	return out
-}
-
-func writeBaseline(t *testing.T, path string, got map[string]int) {
-	t.Helper()
-	files := make([]string, 0, len(got))
-	total := 0
-	for file, n := range got {
-		files = append(files, file)
-		total += n
-	}
-	sort.Strings(files)
-	var b strings.Builder
-	fmt.Fprintf(&b, "# Identifiers and strings naming a coding agent, per package, in shipped files outside\n")
-	fmt.Fprintf(&b, "# the agents' own packages. This list only shrinks. Total: %d.\n", total)
-	for _, file := range files {
-		fmt.Fprintf(&b, "%d %s\n", got[file], file)
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(b.String()), 0o644); err != nil {
-		t.Fatal(err)
-	}
 }

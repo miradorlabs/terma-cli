@@ -31,6 +31,13 @@ func (Agent) Events() map[string]agents.Handler { return hookrun.Extension{Tool:
 
 func (Agent) FlushAfter() []string { return []string{"dsh-session-end"} }
 
+// Coverage is how completely terma supports the agent.
+func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
+	return agents.CapabilitySupport{Level: agents.SupportFull},
+		agents.CapabilitySupport{Level: agents.SupportPartial, Note: "dsh's own export goes to DeepSeek; terma's plugin exports tokens (auxiliary calls included) and tool calls through the local relay only; no cost"}
+}
+
 var (
-	_ agents.Agent = Agent{}
+	_ agents.Covered = Agent{}
+	_ agents.Agent   = Agent{}
 )

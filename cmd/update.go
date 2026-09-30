@@ -31,9 +31,8 @@ the one that owns this copy of terma, not whichever one is first on PATH.
 
 Every command a new version runs first migrates anything it keeps in the config
 directory whose format changed. After the new version is in place, update also refreshes
-what earlier versions wrote — the agent shims, the wrapped Claude Code status line, the
-OpenCode plugin, and the hooks of the repository you run it in — keeping every choice
-you made at install time. It works from
+what earlier versions wrote — the agents' status line wrap and plugins, and the hooks
+of the repository you run it in — keeping every choice you made at install time. It works from
 what is on disk: it signs in to nothing and never adds a file. --refresh runs just that
 step; inside each other repository terma is installed in, run it to update the hooks
 there (they are committed files, so they change only when you ask).
@@ -41,7 +40,7 @@ there (they are committed files, so they change only when you ask).
 Normal interactive commands check daily and notify you when a newer version exists.
 Use --auto on to install those updates automatically, or --auto off for notices only.
 Automatic updates run after successful interactive commands, never inside agent hooks,
-launch shims, scripts, or CI. Package-managed installations receive notices only.
+scripts, or CI. Package-managed installations receive notices only.
 
 Updates compare the installed release version with the latest published release.
 Source builds are not updated automatically; use --force to switch one to the latest
@@ -97,7 +96,7 @@ release.`,
 	cmd.Flags().BoolVar(&check, "check", false, "check for a newer published release without installing")
 	cmd.Flags().BoolVar(&force, "force", false, "replace a source/development build with the latest published release")
 	cmd.Flags().StringVar(&automatic, "auto", "", "automatic updates: on, off, or status (default: off)")
-	cmd.Flags().BoolVar(&refresh, "refresh", false, "only migrate saved state and refresh what terma installed (shims, status line, OpenCode plugin, this repository's hooks) to this version; runs by itself after an update")
+	cmd.Flags().BoolVar(&refresh, "refresh", false, "only migrate saved state and refresh what terma installed (agents' status lines and plugins, this repository's hooks) to this version; runs by itself after an update")
 	cmd.MarkFlagsMutuallyExclusive("auto", "check", "force", "refresh")
 	return cmd
 }

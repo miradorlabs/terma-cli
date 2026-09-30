@@ -894,7 +894,7 @@ func doctorHarnessCheck(verdicts []harnessVerdict, otlpURL, projectID string, bo
 		}
 	}
 	if len(installed) == 0 {
-		return doctor.Check{Status: doctor.Fail, Detail: "no coding agent found (Claude Code, Codex, OpenCode)", Fix: "install one, then terma install"}
+		return doctor.Check{Status: doctor.Fail, Detail: "no coding agent found (" + supportedAgentNames() + ")", Fix: "install one, then terma install"}
 	}
 	if len(connected) == 0 {
 		return doctor.Check{Status: doctor.Fail, Detail: strings.Join(installed, ", ") + " installed but not exporting to " + otlpURL, Fix: "terma install"}

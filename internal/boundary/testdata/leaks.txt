@@ -1,7 +1,0 @@
-# Identifiers and strings naming a coding agent, per package, in shipped files outside
-# the agents' own packages. This list only shrinks. Total: 67.
-38 cmd
-1 internal/api
-24 internal/harness
-2 internal/output
-2 internal/style

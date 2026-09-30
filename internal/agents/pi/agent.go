@@ -32,6 +32,13 @@ func (Agent) Events() map[string]agents.Handler { return hookrun.Extension{Tool:
 
 func (Agent) FlushAfter() []string { return []string{"pi-session-end"} }
 
+// Coverage is how completely terma supports the agent.
+func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
+	return agents.CapabilitySupport{Level: agents.SupportFull},
+		agents.CapabilitySupport{Level: agents.SupportPartial, Note: "Pi has no OTLP export; terma's extension exports tokens, cost and tool calls through the local relay only"}
+}
+
 var (
-	_ agents.Agent = Agent{}
+	_ agents.Covered = Agent{}
+	_ agents.Agent   = Agent{}
 )

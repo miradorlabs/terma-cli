@@ -179,7 +179,7 @@ func localRoot(ctx context.Context) (string, error) {
 func localHarness(ctx context.Context, h harness.Harness) (harness.Harness, error) {
 	scoped, ok := h.(harness.Scoped)
 	if !ok {
-		return nil, fmt.Errorf("%s has no repository settings — --scope local applies to harnesses that read one (Claude Code, OpenCode)", h.DisplayName())
+		return nil, fmt.Errorf("%s has no repository settings — --scope local applies to harnesses that read one (%s)", h.DisplayName(), scopedHarnessNames())
 	}
 	root, err := localRoot(ctx)
 	if err != nil {

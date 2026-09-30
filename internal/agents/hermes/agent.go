@@ -34,6 +34,13 @@ func (Agent) Events() map[string]agents.Handler {
 
 func (Agent) FlushAfter() []string { return []string{"hermes-session-end"} }
 
+// Coverage is how completely terma supports the agent.
+func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
+	return agents.CapabilitySupport{Level: agents.SupportFull},
+		agents.CapabilitySupport{Level: agents.SupportPartial, Note: "Hermes has no usable OTLP export; terma's plugin exports tokens, cost and tool calls through the local relay only; auxiliary calls (titles, compression) fire no hook"}
+}
+
 var (
-	_ agents.Agent = Agent{}
+	_ agents.Covered = Agent{}
+	_ agents.Agent   = Agent{}
 )

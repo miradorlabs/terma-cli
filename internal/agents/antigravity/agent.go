@@ -80,7 +80,14 @@ func (Agent) PayloadSession(payload []byte) (hookrun.PayloadSession, bool) {
 	return s, true
 }
 
+// Coverage is how completely terma supports the agent.
+func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
+	return agents.CapabilitySupport{Level: agents.SupportFull},
+		agents.CapabilitySupport{Level: agents.SupportPartial, Note: "hooks only: model, turns, every tool step and termination; no token counts, plan, quota, cost or tool durations — agy has no OTLP export; backend mapping of tool calls pending"}
+}
+
 var (
+	_ agents.Covered       = Agent{}
 	_ agents.Agent         = Agent{}
 	_ agents.PayloadReader = Agent{}
 	_ agents.Trusting      = Agent{}

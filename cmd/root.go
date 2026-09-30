@@ -53,8 +53,8 @@ func NewRootCommand() *cobra.Command {
 		Long: `terma connects your coding agents to Terma and stamps the commits they produce.
 
   terma setup     optional, once per developer — signs you in and records which
-                  coding agents you use (including Codex CLI and Codex Desktop
-                  as separate choices). No project or telemetry connection.
+                  coding agents you use (an agent's CLI and desktop app are
+                  separate choices). No project or telemetry connection.
   terma install   run in each repository — signs you in if setup has not, binds the
                   repo to a Terma project, points your agents at that project per
                   repository, and (offer to) wire the commit and agent hooks. A

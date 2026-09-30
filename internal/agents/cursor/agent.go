@@ -75,7 +75,14 @@ func (Agent) PayloadSession(payload []byte) (hookrun.PayloadSession, bool) {
 	return hookrun.PayloadSession{ID: in.ConversationID, Cwd: in.Cwd}, true
 }
 
+// Coverage is how completely terma supports the agent.
+func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
+	return agents.CapabilitySupport{Level: agents.SupportFull},
+		agents.CapabilitySupport{Level: agents.SupportPartial, Note: "ordered hook observations, every tool call and optional token snapshots; plan, quota and billed cost unavailable; backend mapping of tool calls pending"}
+}
+
 var (
+	_ agents.Covered       = Agent{}
 	_ agents.PayloadReader = Agent{}
 	_ agents.Agent         = Agent{}
 	_ agents.UserHooks     = Agent{}
