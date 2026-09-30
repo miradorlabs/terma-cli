@@ -101,7 +101,7 @@ func TestOmpHooksSourceNamesItsEvents(t *testing.T) {
 	// omp's hook loader treats every export as a hook factory; a stray helper export
 	// would make the hook fail to load.
 	exports := 0
-	for _, line := range strings.Split(ompHooksSource, "\n") {
+	for line := range strings.SplitSeq(ompHooksSource, "\n") {
 		if strings.HasPrefix(line, "export ") {
 			exports++
 		}

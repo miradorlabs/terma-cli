@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -405,12 +406,7 @@ func splitLines(data []byte) []string {
 }
 
 func containsMarker(lines []string) bool {
-	for _, l := range lines {
-		if ownedHuskyLine(l) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(lines, ownedHuskyLine)
 }
 
 func removeMarked(lines []string) []string {
