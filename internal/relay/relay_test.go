@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -117,7 +118,7 @@ func (f *fixture) clock() time.Time {
 }
 
 func (f *fixture) relay(t *testing.T, u *upstream, policies map[string]Policy) (*Relay, *httptest.Server) {
-	r := New(Options{
+	r := New(Options{Dir: t.TempDir(),
 		Token:  token,
 		Hold:   time.Minute,
 		Lookup: f.lookup,
@@ -453,21 +454,43 @@ func TestRelayAcceptsTheTokenInThePath(t *testing.T) {
 	}
 }
 
-// A host that refuses the key is not asked again for that record; one that fails is
-// retried.
+// A host that refuses a body for good (400) is not asked again for it: it is dropped,
+// set aside in .dead/ and never retried.
 func TestRelayUpstreamRefusalIsFinal(t *testing.T) {
 	u := newUpstream(t)
-	u.status = http.StatusForbidden
+	u.status = http.StatusBadRequest
 	f := newFixture()
 	r, srv := f.relay(t, u, allPolicies(u))
 	body, _ := proto.Marshal(mixedLogs())
 	post(t, srv, "/v1/logs", body, "application/x-protobuf", token, false)
-	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["dropped.upstream_refused_403.logs"] == 3 })
+	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["dropped.upstream_refused_400.logs"] == 3 })
 	// Session C is still held, waiting for a claim: the relay is not idle.
 	if _, ok := r.Idle(); ok {
 		t.Fatal("a relay holding records is not idle")
 	}
 	if c := r.Stats().Snapshot().Counters; c["upstream_retries"] != 0 {
 		t.Fatalf("a refusal was retried: %v", c)
+	}
+	if n := countFiles(t, filepath.Join(r.opts.Dir, deadDir)); n == 0 {
+		t.Fatal("a refused part was not set aside in .dead/")
+	}
+}
+
+// A refused key (401, 403) is configuration, fixed on this machine by the next
+// `terma install`: the part stays queued and is asked again, slowly — never dropped.
+func TestRelayRefusedKeyIsRetriedNotDropped(t *testing.T) {
+	u := newUpstream(t)
+	u.status = http.StatusForbidden
+	f := newFixture()
+	r, srv := f.relay(t, u, allPolicies(u))
+	body, _ := proto.Marshal(mixedLogs())
+	post(t, srv, "/v1/logs", body, "application/x-protobuf", token, false)
+	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["upstream_retries"] >= 2 })
+	c := r.Stats().Snapshot().Counters
+	if sum(c, "dropped.upstream_") != 0 || sum(c, "forwarded.") != 0 {
+		t.Fatalf("a refused key dropped or delivered: %v", c)
+	}
+	if n := countFiles(t, r.opts.Dir); n != 2 {
+		t.Fatalf("outbox holds %d parts, want the two projects' 2", n)
 	}
 }

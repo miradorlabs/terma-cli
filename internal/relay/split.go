@@ -2,6 +2,8 @@ package relay
 
 import (
 	"encoding/hex"
+	"math"
+	"time"
 
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
@@ -49,6 +51,9 @@ type part struct {
 	records int
 	// pid is the process that exported it, 0 when unknown (see Options.PeerPID).
 	pid int
+	// at is when its earliest record happened, zero when none says: which placement of a
+	// resumed session it belongs to, when its process does not decide (claim.At).
+	at time.Time
 	// start holds a Codex conversation start: unclaimed, it waits as long as a trace
 	// (Options.TraceHold), because the hook that claims it may be a long way off.
 	start bool
@@ -372,4 +377,74 @@ func internalStart(p *part) bool {
 		}
 	}
 	return false
+}
+
+// earliest is the time of a part's earliest record: a log record's time (else when it
+// was observed), a span's start, a data point's time. Zero when none carries one.
+func earliest(msg proto.Message) time.Time {
+	var first uint64
+	see := func(t uint64) {
+		if t != 0 && (first == 0 || t < first) {
+			first = t
+		}
+	}
+	switch m := msg.(type) {
+	case *logspb.LogsData:
+		for _, rl := range m.GetResourceLogs() {
+			for _, sl := range rl.GetScopeLogs() {
+				for _, lr := range sl.GetLogRecords() {
+					if t := lr.GetTimeUnixNano(); t != 0 {
+						see(t)
+					} else {
+						see(lr.GetObservedTimeUnixNano())
+					}
+				}
+			}
+		}
+	case *tracepb.TracesData:
+		for _, rs := range m.GetResourceSpans() {
+			for _, ss := range rs.GetScopeSpans() {
+				for _, sp := range ss.GetSpans() {
+					see(sp.GetStartTimeUnixNano())
+				}
+			}
+		}
+	case *metricspb.MetricsData:
+		for _, rm := range m.GetResourceMetrics() {
+			for _, sm := range rm.GetScopeMetrics() {
+				for _, mt := range sm.GetMetrics() {
+					eachPointTime(mt, see)
+				}
+			}
+		}
+	}
+	if first == 0 || first > math.MaxInt64 {
+		return time.Time{}
+	}
+	return time.Unix(0, int64(first))
+}
+
+func eachPointTime(m *metricspb.Metric, see func(uint64)) {
+	switch d := m.GetData().(type) {
+	case *metricspb.Metric_Sum:
+		for _, p := range d.Sum.GetDataPoints() {
+			see(p.GetTimeUnixNano())
+		}
+	case *metricspb.Metric_Gauge:
+		for _, p := range d.Gauge.GetDataPoints() {
+			see(p.GetTimeUnixNano())
+		}
+	case *metricspb.Metric_Histogram:
+		for _, p := range d.Histogram.GetDataPoints() {
+			see(p.GetTimeUnixNano())
+		}
+	case *metricspb.Metric_ExponentialHistogram:
+		for _, p := range d.ExponentialHistogram.GetDataPoints() {
+			see(p.GetTimeUnixNano())
+		}
+	case *metricspb.Metric_Summary:
+		for _, p := range d.Summary.GetDataPoints() {
+			see(p.GetTimeUnixNano())
+		}
+	}
 }

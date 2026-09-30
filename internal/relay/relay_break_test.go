@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -131,7 +132,7 @@ func TestRelayBoundsTheHoldByBytes(t *testing.T) {
 // When the hold is full, spans of traces nothing has named go before a session's
 // records: they are mostly process-level work that never will be named.
 func TestRelayEvictsUnnamedTracesFirst(t *testing.T) {
-	r := New(Options{Token: token, Lookup: func(string, time.Time) (claim.Claim, bool) { return claim.Claim{}, false }})
+	r := New(Options{Dir: t.TempDir(), Token: token, Lookup: func(string, time.Time) (claim.Claim, bool) { return claim.Claim{}, false }})
 	big := strings.Repeat("x", 30<<20)
 	r.route(&part{signal: Traces, session: tracePrefix + "t1", msg: logsOf("x", 1, kv("blob", big)), records: 1})
 	r.route(&part{signal: Logs, session: "S", msg: logsOf("S", 1, kv("blob", big)), records: 1})
@@ -177,7 +178,7 @@ func TestRelayReadsTheSessionFromTheResource(t *testing.T) {
 
 // A span flood with a fresh trace id each cannot grow the trace index without bound.
 func TestRelayBoundsTheTraceIndex(t *testing.T) {
-	r := New(Options{Token: token, Lookup: func(string, time.Time) (claim.Claim, bool) { return claim.Claim{}, false }, Resolve: func(claim.Claim) (Policy, error) { return Policy{}, ErrNoKey }})
+	r := New(Options{Dir: t.TempDir(), Token: token, Lookup: func(string, time.Time) (claim.Claim, bool) { return claim.Claim{}, false }, Resolve: func(claim.Claim) (Policy, error) { return Policy{}, ErrNoKey }})
 	for i := range maxTraces + 10 {
 		r.learnTrace(fmt.Sprintf("%032x", i), "s")
 	}
@@ -192,7 +193,7 @@ func TestRelayBoundsTheTraceIndex(t *testing.T) {
 func TestRelayAccountsForEveryRecordUnderLoad(t *testing.T) {
 	u := newUpstream(t)
 	f := newFixture()
-	r := New(Options{
+	r := New(Options{Dir: t.TempDir(),
 		Token: token, Hold: 50 * time.Millisecond, Lookup: f.lookup,
 		Resolve: func(c claim.Claim) (Policy, error) {
 			if p, ok := allPolicies(u)[c.ProjectID]; ok {
@@ -253,13 +254,20 @@ func sum(c map[string]int, prefix string) int {
 // slow host, within its grace.
 func TestRelayDrainsOnStop(t *testing.T) {
 	var got atomic.Int64
-	slow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	slow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(20 * time.Millisecond)
-		got.Add(1)
+		body, _ := io.ReadAll(r.Body)
+		var m logspb.LogsData
+		_ = proto.Unmarshal(body, &m)
+		for _, rl := range m.ResourceLogs {
+			for _, sl := range rl.ScopeLogs {
+				got.Add(int64(len(sl.LogRecords)))
+			}
+		}
 	}))
 	defer slow.Close()
 	f := newFixture()
-	r := New(Options{Token: token, Lookup: f.lookup, Grace: 5 * time.Second,
+	r := New(Options{Dir: t.TempDir(), Token: token, Lookup: f.lookup, Grace: 5 * time.Second,
 		Resolve: func(claim.Claim) (Policy, error) {
 			return Policy{Endpoint: slow.URL, Key: "k", IncludePrompts: true, IncludeToolContent: true}, nil
 		}})
@@ -276,7 +284,7 @@ func TestRelayDrainsOnStop(t *testing.T) {
 	<-done
 	c := r.Stats().Snapshot().Counters
 	if got.Load() != 30 || c["forwarded.logs"] != 30 || sum(c, "dropped.") != 0 {
-		t.Fatalf("host got %d of 30: %v", got.Load(), c)
+		t.Fatalf("host got %d records of 30: %v", got.Load(), c)
 	}
 }
 
@@ -296,7 +304,7 @@ func TestRelayRetriesATransientFailure(t *testing.T) {
 	}))
 	defer flaky.Close()
 	f := newFixture()
-	r := New(Options{Token: token, Lookup: f.lookup,
+	r := New(Options{Dir: t.TempDir(), Token: token, Lookup: f.lookup,
 		Resolve: func(claim.Claim) (Policy, error) {
 			return Policy{Endpoint: flaky.URL, Key: "k", IncludePrompts: true, IncludeToolContent: true}, nil
 		}})
@@ -342,7 +350,7 @@ func FuzzDecode(f *testing.F) {
 	f.Add(seed, false)
 	f.Add([]byte(`{"resourceLogs":[{"scopeLogs":[{"logRecords":[{"attributes":[{"key":"session.id","value":{"stringValue":"A"}}]}]}]}]}`), true)
 	f.Add([]byte(`{"resourceSpans":[{"scopeSpans":[{"spans":[{"traceId":"00","name":"x"}]}]}]}`), true)
-	r := New(Options{Token: token})
+	r := New(Options{Dir: f.TempDir(), Token: token})
 	f.Fuzz(func(t *testing.T, body []byte, isJSON bool) {
 		for _, s := range []Signal{Logs, Metrics, Traces} {
 			parts, err := r.decode(s, body, isJSON)
@@ -368,7 +376,7 @@ func TestRelayClaimCoversOnlyItsProcesses(t *testing.T) {
 	f := newFixture()
 	f.claims["A"] = claim.Claim{ProjectID: "p1", PIDs: []int{100, 101}}
 	var sender atomic.Int64
-	r := New(Options{Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+	r := New(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
 		PeerPID: func(int) (int, bool) { pid := int(sender.Load()); return pid, pid != 0 },
 		Resolve: func(c claim.Claim) (Policy, error) { return allPolicies(u)[c.ProjectID], nil }})
 	ctx := t.Context()
@@ -411,7 +419,7 @@ func TestRelayClaimCoversOnlyItsProcesses(t *testing.T) {
 func TestRelayLearnsTracesFromLogs(t *testing.T) {
 	u := newUpstream(t)
 	f := newFixture()
-	r := New(Options{Token: token, Hold: time.Second, Lookup: f.lookup, Now: f.clock,
+	r := New(Options{Dir: t.TempDir(), Token: token, Hold: time.Second, Lookup: f.lookup, Now: f.clock,
 		Resolve: func(c claim.Claim) (Policy, error) { return allPolicies(u)[c.ProjectID], nil }})
 	ctx := t.Context()
 	go r.Run(ctx)
@@ -452,7 +460,7 @@ func BenchmarkRelayExport(b *testing.B) {
 	}
 	sink := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	defer sink.Close()
-	r := New(Options{Token: token, Resolve: func(claim.Claim) (Policy, error) {
+	r := New(Options{Dir: b.TempDir(), Token: token, Resolve: func(claim.Claim) (Policy, error) {
 		return Policy{Endpoint: sink.URL, Key: "k", IncludePrompts: false, IncludeToolContent: false}, nil
 	}})
 	ctx := b.Context()
@@ -486,7 +494,7 @@ type procRelay struct {
 
 func newProcRelay(t *testing.T) *procRelay {
 	pr := &procRelay{t: t, u: newUpstream(t), f: newFixture()}
-	pr.r = New(Options{Token: token, Hold: time.Minute, Lookup: pr.f.lookup, Now: pr.f.clock,
+	pr.r = New(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: pr.f.lookup, Now: pr.f.clock,
 		PeerPID: func(int) (int, bool) { pid := int(pr.sender.Load()); return pid, pid != 0 },
 		Resolve: func(c claim.Claim) (Policy, error) {
 			if p, ok := allPolicies(pr.u)[c.ProjectID]; ok {
@@ -618,7 +626,7 @@ func TestRelayWaitsForAKey(t *testing.T) {
 	u := newUpstream(t)
 	f := newFixture()
 	var keyed atomic.Bool
-	r := New(Options{Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+	r := New(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
 		Resolve: func(c claim.Claim) (Policy, error) {
 			if c.ProjectID == "p3" && keyed.Load() {
 				return Policy{Endpoint: u.srv.URL, Key: "key-p3"}, nil
@@ -762,4 +770,30 @@ func TestRelayAdoptsNothingAmbiguous(t *testing.T) {
 	if c := pr.r.Stats().Snapshot().Counters; c["dropped.unclaimed_expired.logs"] != 4 {
 		t.Fatalf("stats = %v", c)
 	}
+}
+
+// A session resumed in another bound repository: records from the first run's process
+// still go to the first project, even after the move; the second run's go to the second.
+func TestRelayRoutesEachRunOfAResumedSession(t *testing.T) {
+	pr := newProcRelay(t)
+	pr.f.mu.Lock()
+	pr.f.claims["R"] = claim.Claim{ProjectID: "p2", PIDs: []int{200}, Placements: []claim.Placement{
+		{ProjectID: "p1", PIDs: []int{100}, Since: pr.f.now.Add(-time.Hour)},
+		{ProjectID: "p2", PIDs: []int{200}, Since: pr.f.now.Add(-time.Minute)},
+	}}
+	pr.f.mu.Unlock()
+	pr.send(100, "/v1/logs", logsOf("R", 1))
+	pr.send(200, "/v1/logs", logsOf("R", 2))
+	waitFor(t, func() bool { return pr.r.Stats().Snapshot().Counters["forwarded.logs"] == 3 })
+	byAuth, _ := pr.u.logs(t)
+	if len(byAuth["Bearer key-p1"]) != 1 || len(byAuth["Bearer key-p2"]) != 2 {
+		t.Fatalf("p1 got %d, p2 got %d", len(byAuth["Bearer key-p1"]), len(byAuth["Bearer key-p2"]))
+	}
+	// A process neither run named — the session resumed where no bound repository's
+	// hook ran — is held and dropped, as ever.
+	pr.send(300, "/v1/logs", logsOf("R", 1))
+	pr.f.mu.Lock()
+	pr.f.now = pr.f.now.Add(2 * time.Minute)
+	pr.f.mu.Unlock()
+	waitFor(t, func() bool { return pr.r.Stats().Snapshot().Counters["dropped.uncovered_process.logs"] == 1 })
 }

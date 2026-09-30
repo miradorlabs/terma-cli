@@ -78,10 +78,10 @@ type attribution struct {
 	session string // the one session the process exported, if it was one
 }
 
-// decide reports whether a part under key, sent by pid, may leave now, and if so
+// decide reports whether a part under key, sent by pid and stamped at, may leave now, and if so
 // with which claim and policy, and how its session was found when not by the part
 // itself; if not, why not.
-func (r *Relay) decide(key string, pid int) (claim.Claim, Policy, string, bool, attribution) {
+func (r *Relay) decide(key string, pid int, at time.Time) (claim.Claim, Policy, string, bool, attribution) {
 	if p, ok := strings.CutPrefix(key, procPrefix); ok {
 		n, _ := strconv.Atoi(p)
 		return r.decideProcess(n)
@@ -97,7 +97,7 @@ func (r *Relay) decide(key string, pid int) (claim.Claim, Policy, string, bool, 
 		}
 		return claim.Claim{}, Policy{}, whyNoTrace, false, attribution{}
 	}
-	return r.decideSession(session, pid)
+	return r.decideSession(session, pid, at)
 }
 
 // isInternal reports whether session's start said Codex made it for itself: the
@@ -153,7 +153,7 @@ func (r *Relay) processProject(pid int, exclude string) (c claim.Claim, pol Poli
 	sort.Strings(sessions)
 	var claimed []string
 	for _, s := range sessions {
-		sc, spol, swhy, sok := r.decideClaimed(s, pid)
+		sc, spol, swhy, sok := r.decideClaimed(s, pid, time.Time{})
 		switch {
 		case sok && len(claimed) == 0:
 			c, pol = sc, spol
@@ -227,8 +227,8 @@ func (r *Relay) learnProcess(pid int, session, originator string) {
 // decideSession is decide for a part that names its session. A session no hook
 // claimed is adopted into its process's project when the process is a single-workspace
 // client whose claimed sessions all belong to one project: Codex's title conversation.
-func (r *Relay) decideSession(session string, pid int) (claim.Claim, Policy, string, bool, attribution) {
-	c, pol, why, ok := r.decideClaimed(session, pid)
+func (r *Relay) decideSession(session string, pid int, at time.Time) (claim.Claim, Policy, string, bool, attribution) {
+	c, pol, why, ok := r.decideClaimed(session, pid, at)
 	if ok || why != whyUnclaimed || pid == 0 {
 		return c, pol, why, ok, attribution{}
 	}
@@ -245,13 +245,15 @@ func (r *Relay) decideSession(session string, pid int) (claim.Claim, Policy, str
 	return pc, ppol, "", true, attribution{how: "process-sibling", session: root}
 }
 
-// decideClaimed is decideSession by the session's own claim alone.
-func (r *Relay) decideClaimed(session string, pid int) (claim.Claim, Policy, string, bool) {
+// decideClaimed is decideSession by the session's own claim alone: the placement that
+// covers pid, and among several the one in effect at the part's time (claim.At).
+func (r *Relay) decideClaimed(session string, pid int, at time.Time) (claim.Claim, Policy, string, bool) {
 	c, ok := r.lookup(session)
 	if !ok {
 		return claim.Claim{}, Policy{}, whyUnclaimed, false
 	}
-	if !c.Covers(pid) {
+	c, ok = c.At(pid, at)
+	if !ok {
 		return claim.Claim{}, Policy{}, whyProcess, false
 	}
 	pol, ok := r.resolve(c)
@@ -266,7 +268,7 @@ func (r *Relay) decideClaimed(session string, pid int) (claim.Claim, Policy, str
 func (r *Relay) route(p *part) {
 	r.deliverMu.Lock()
 	defer r.deliverMu.Unlock()
-	if c, pol, _, ok, how := r.decide(p.session, p.pid); ok {
+	if c, pol, _, ok, how := r.decide(p.session, p.pid, p.at); ok {
 		r.mu.Lock()
 		waiting := len(r.held[p.session]) > 0
 		r.mu.Unlock()
@@ -362,7 +364,7 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 		}
 		r.stats.add("attributed_by_process."+string(p.signal), p.records)
 	}
-	r.destination(pol).enqueue(p)
+	r.enqueue(c, p)
 }
 
 // sweep releases held parts whose reason went away, in arrival order, drops those whose
@@ -420,7 +422,7 @@ func (r *Relay) sweep() {
 		// from a process the claim does not cover) holds up nothing: order matters only
 		// among parts that leave, and those belong to other runs.
 		for _, h := range parts {
-			c, pol, why, ok, how := r.decide(key, h.p.pid)
+			c, pol, why, ok, how := r.decide(key, h.p.pid, h.p.at)
 			limit := hold
 			if h.p.start && why == whyUnclaimed {
 				// A conversation start waits for the thread's first turn (part.start).
@@ -469,6 +471,11 @@ func (r *Relay) sweep() {
 func (r *Relay) Run(ctx context.Context) {
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
+	// The janitor weighs files by their modification times, so it keeps the wall clock,
+	// never Options.Now.
+	r.janitor(time.Now())
+	r.recoverOutbox()
+	lastJanitor := time.Now()
 	for {
 		select {
 		case <-ctx.Done():
@@ -499,9 +506,39 @@ func (r *Relay) Run(ctx context.Context) {
 				<-done
 			}
 			r.cancelSend()
+			r.countQueuedAtExit()
 			return
 		case <-tick.C:
 			r.sweep()
+			if now := time.Now(); now.Sub(lastJanitor) >= time.Minute {
+				r.janitor(now)
+				lastJanitor = now
+			}
+		}
+	}
+}
+
+// janitor bounds the outbox and tells the senders what it removed.
+func (r *Relay) janitor(now time.Time) {
+	for rt, n := range r.sweepOutbox(now) {
+		r.mu.Lock()
+		s := r.senders[rt]
+		r.mu.Unlock()
+		if s != nil {
+			s.delivered(n)
+		}
+	}
+}
+
+// countQueuedAtExit counts what a stopping relay leaves in the outbox: not lost — the
+// next relay delivers it — so that every record received is forwarded, dropped or
+// queued.
+func (r *Relay) countQueuedAtExit() {
+	routes, _ := r.outbox.routes()
+	for _, rt := range routes {
+		entries, _ := r.outbox.list(rt)
+		for _, e := range entries {
+			r.stats.add("queued_at_exit."+string(e.signal), e.records)
 		}
 	}
 }
@@ -513,8 +550,8 @@ func (r *Relay) Idle() (time.Duration, bool) {
 	if r.heldN > 0 {
 		return 0, false
 	}
-	for _, d := range r.dests {
-		if d.busy() {
+	for _, s := range r.senders {
+		if s.busy() {
 			return 0, false
 		}
 	}

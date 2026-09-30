@@ -81,7 +81,11 @@ type Options struct {
 	PeerPID func(port int) (int, bool)
 	// HTTP sends upstream; a no-redirect client with a 15-second timeout when nil.
 	HTTP *http.Client
-	// Grace is how long a stopping relay keeps delivering what it accepted (5 s).
+	// Dir is the outbox: where parts that may leave wait for delivery, on disk, so a
+	// crash or restart loses none (outbox.go). Required for anything to leave.
+	Dir string
+	// Grace is how long a stopping relay keeps delivering what it accepted (5 s); what
+	// it could not send stays in the outbox for the next relay.
 	Grace time.Duration
 	// Now is the clock; time.Now when nil.
 	Now func() time.Time
@@ -112,7 +116,8 @@ type Relay struct {
 	procs      map[int]map[string]time.Time // sender pid → sessions it exported, and when
 	origins    map[int]map[string]bool      // sender pid → every client it served (Codex's originator)
 	internal   map[string]time.Time         // sessions whose start says Codex made them for itself
-	dests      map[string]*destination
+	outbox     outbox
+	senders    map[route]*sender
 	lastSeen   time.Time
 	wg         sync.WaitGroup
 	sendCtx    context.Context
@@ -151,7 +156,7 @@ func New(opts Options) *Relay {
 		opts: opts, stats: newStats(),
 		cache:  lookupCache{claims: map[string]cachedClaim{}, policies: map[string]cachedPolicy{}},
 		held:   map[string][]heldPart{},
-		traces: map[string]traceSession{}, procs: map[int]map[string]time.Time{}, origins: map[int]map[string]bool{}, internal: map[string]time.Time{}, dests: map[string]*destination{},
+		traces: map[string]traceSession{}, procs: map[int]map[string]time.Time{}, origins: map[int]map[string]bool{}, internal: map[string]time.Time{}, senders: map[route]*sender{}, outbox: outbox{dir: opts.Dir},
 		lastSeen: opts.Now(), sendCtx: sendCtx, cancelSend: cancel, stopping: make(chan struct{}),
 	}
 }
@@ -242,6 +247,7 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 	pid := r.senderPID(req)
 	for _, p := range parts {
 		p.pid = pid
+		p.at = earliest(p.msg)
 		r.stats.received(s, p.records)
 		if p.session != "" && !strings.HasPrefix(p.session, tracePrefix) {
 			r.learnProcess(pid, p.session, originatorOf(p))

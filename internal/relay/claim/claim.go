@@ -40,7 +40,8 @@ const TTL = 4 * time.Hour
 // minutes, not one each.
 const Refresh = 5 * time.Minute
 
-// Claim says which project a session's telemetry belongs to.
+// Claim says which project a session's telemetry belongs to. Its top-level fields are
+// the session's latest placement; Placements keeps the earlier ones too.
 type Claim struct {
 	ProjectID string    `json:"project_id"`
 	Tool      string    `json:"tool,omitempty"`
@@ -53,18 +54,75 @@ type Claim struct {
 	// is not covered. Every hook of the session adds its own; the most recent maxPIDs
 	// are kept. Empty (a platform where they cannot be read) matches any sender.
 	PIDs []int `json:"pids,omitempty"`
+	// Placements are where the session has run, oldest first, the last being the
+	// top-level fields. A session keeps its id across `claude --resume` and `codex
+	// resume` in any directory: resumed in another bound repository, it gets a second
+	// placement, and the first run's records — from its own processes, or stamped before
+	// the move — still go to the first run's project, however late they arrive. Empty in
+	// a claim an earlier build wrote: the top-level fields are then its one placement.
+	Placements []Placement `json:"placements,omitempty"`
+}
+
+// Placement is one run of a session in one repository.
+type Placement struct {
+	ProjectID string    `json:"project_id"`
+	Tool      string    `json:"tool,omitempty"`
+	Repo      string    `json:"repo,omitempty"`
+	Worktree  string    `json:"worktree,omitempty"`
+	PIDs      []int     `json:"pids,omitempty"`
+	Since     time.Time `json:"since"`
 }
 
 // maxPIDs bounds a claim's process list: a few runs of one session, each with its
 // chain of ancestors.
 const maxPIDs = 64
 
-// Covers reports whether pid may send under this claim.
+// maxPlacements bounds a session's placement history.
+const maxPlacements = 8
+
+// Covers reports whether pid may send under this claim's latest placement.
 func (c Claim) Covers(pid int) bool {
-	if len(c.PIDs) == 0 || pid == 0 {
+	return covers(c.PIDs, pid)
+}
+
+func covers(pids []int, pid int) bool {
+	if len(pids) == 0 || pid == 0 {
 		return true
 	}
-	return slices.Contains(c.PIDs, pid)
+	return slices.Contains(pids, pid)
+}
+
+func (c Claim) placements() []Placement {
+	if len(c.Placements) > 0 {
+		return c.Placements
+	}
+	return []Placement{{ProjectID: c.ProjectID, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree, PIDs: c.PIDs}}
+}
+
+// At is the claim as it applies to a record pid sent, stamped at (zero: unknown): the
+// placement whose processes include pid — the latest to start by at, when several do
+// (one process serving more than one run, such as Codex's app-server) — as a claim of
+// its own. False when no placement covers pid: the session was resumed by a process
+// no hook of a bound repository ran under.
+func (c Claim) At(pid int, at time.Time) (Claim, bool) {
+	var best *Placement
+	all := c.placements()
+	for i := range all {
+		p := &all[i]
+		if !covers(p.PIDs, pid) {
+			continue
+		}
+		// A later placement that had started by the record's time wins; with no time,
+		// the latest does.
+		if best == nil || at.IsZero() || !p.Since.After(at) {
+			best = p
+		}
+	}
+	if best == nil {
+		return Claim{}, false
+	}
+	return Claim{ProjectID: best.ProjectID, Tool: best.Tool, Repo: best.Repo, Worktree: best.Worktree,
+		PIDs: best.PIDs, ClaimedAt: c.ClaimedAt, Placements: c.Placements}, true
 }
 
 // Dir is the relay directory, under the config dir.
@@ -150,6 +208,9 @@ var lockWait = 250 * time.Millisecond
 // written less than Refresh ago. It reports whether it wrote. Errors are swallowed: a
 // hook never fails for want of a claim, the session is only not exported.
 //
+// A claim for another project than the latest placement's — the session resumed in
+// another bound repository — starts a new placement, keeping the earlier ones.
+//
 // The read-merge-write runs under a sidecar lock: two runs of one session (a resume
 // in the repository while the first still exports) each add their processes, and
 // without it one run's would be lost and its records dropped as another process's.
@@ -162,7 +223,7 @@ func Write(sessionID string, c Claim, now time.Time) bool {
 		return false
 	}
 	// The fast path needs no lock: a fresh claim already naming these processes.
-	if prev, ok := read(p); ok && prev.ProjectID == c.ProjectID && subset(c.PIDs, prev.PIDs) {
+	if prev, ok := read(p); ok && samePlace(prev, c) && subset(c.PIDs, prev.PIDs) {
 		if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < Refresh {
 			return false
 		}
@@ -176,19 +237,44 @@ func Write(sessionID string, c Claim, now time.Time) bool {
 	if err == nil {
 		defer unlock()
 	}
+	now = now.UTC()
 	prev, havePrev := read(p)
-	if havePrev && prev.ProjectID == c.ProjectID {
+	placements := []Placement{}
+	switch {
+	case !havePrev:
+	case samePlace(prev, c):
 		if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < Refresh && subset(c.PIDs, prev.PIDs) {
 			return false
 		}
 		c.PIDs = merge(prev.PIDs, c.PIDs)
+		if c.Tool == "" {
+			c.Tool = prev.Tool
+		}
+		placements = prev.placements()
+		placements = placements[:len(placements)-1]
+	default:
+		placements = prev.placements()
 	}
-	c.ClaimedAt = now.UTC()
+	since := now
+	if havePrev && samePlace(prev, c) {
+		since = prev.placements()[len(prev.placements())-1].Since
+	}
+	placements = append(placements, Placement{ProjectID: c.ProjectID, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree, PIDs: c.PIDs, Since: since})
+	if len(placements) > maxPlacements {
+		placements = placements[len(placements)-maxPlacements:]
+	}
+	c.Placements = placements
+	c.ClaimedAt = now
 	data, err := json.Marshal(c)
 	if err != nil {
 		return false
 	}
 	return config.WriteFileAtomicNoSync(p, data, 0o600) == nil
+}
+
+// samePlace reports whether c continues prev's latest placement: the same project.
+func samePlace(prev, c Claim) bool {
+	return prev.ProjectID == c.ProjectID
 }
 
 func subset(a, b []int) bool {

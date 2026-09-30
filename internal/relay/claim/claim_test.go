@@ -116,3 +116,59 @@ func TestConcurrentWritersKeepEveryProcess(t *testing.T) {
 		}
 	}
 }
+
+// A session resumed in another bound repository gets a second placement and keeps the
+// first: each run's processes, and a record's time when its process cannot be told,
+// say which project it belongs to.
+func TestClaimKeepsEachPlacementOfAResumedSession(t *testing.T) {
+	enable(t)
+	t0 := time.Now().Add(-time.Hour).Truncate(time.Second)
+	t1 := t0.Add(30 * time.Minute)
+	Write("s", Claim{ProjectID: "p1", Tool: "claude-code", PIDs: []int{10}}, t0)
+	if !Write("s", Claim{ProjectID: "p2", Tool: "claude-code", PIDs: []int{20}}, t1) {
+		t.Fatal("a resume in another project did not write")
+	}
+	c, ok := Read("s", t1)
+	if !ok || len(c.Placements) != 2 || c.ProjectID != "p2" {
+		t.Fatalf("claim %+v", c)
+	}
+	for _, tc := range []struct {
+		pid  int
+		at   time.Time
+		want string
+	}{
+		{10, t1.Add(time.Minute), "p1"}, // the first run's process, however late
+		{20, t0, "p2"},                  // the second run's, however early its clock
+		{0, t0.Add(time.Minute), "p1"},  // no process: the placement in effect then
+		{0, t1.Add(time.Minute), "p2"},
+		{0, time.Time{}, "p2"}, // no time either: the latest
+	} {
+		got, ok := c.At(tc.pid, tc.at)
+		if !ok || got.ProjectID != tc.want {
+			t.Errorf("At(%d, %v) = %q, %v; want %q", tc.pid, tc.at, got.ProjectID, ok, tc.want)
+		}
+	}
+	if _, ok := c.At(99, t1); ok {
+		t.Fatal("a process neither run named is covered")
+	}
+	// Back in the first repository: a third placement, not a merge into the first.
+	Write("s", Claim{ProjectID: "p1", PIDs: []int{30}}, t1.Add(time.Minute))
+	c, _ = Read("s", t1.Add(time.Minute))
+	if len(c.Placements) != 3 {
+		t.Fatalf("placements %+v", c.Placements)
+	}
+	if got, _ := c.At(20, time.Time{}); got.ProjectID != "p2" {
+		t.Fatalf("the middle run moved: %+v", got)
+	}
+}
+
+// A claim an earlier build wrote has no placements: its top-level fields are its one.
+func TestClaimWithoutPlacements(t *testing.T) {
+	c := Claim{ProjectID: "p", PIDs: []int{10}}
+	if got, ok := c.At(10, time.Now()); !ok || got.ProjectID != "p" {
+		t.Fatalf("At = %+v, %v", got, ok)
+	}
+	if _, ok := c.At(11, time.Now()); ok {
+		t.Fatal("covered another process")
+	}
+}
