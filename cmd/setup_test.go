@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/miradorlabs/terma-cli/internal/adapter"
+	"github.com/spf13/cobra"
+
 	"github.com/miradorlabs/terma-cli/internal/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/spf13/cobra"
 )
 
 func TestSetupRecordsCodexDesktopSeparatelyFromCLI(t *testing.T) {
@@ -79,11 +79,11 @@ func TestSetupFetchesThePolicyAndPointsAgentsAtTheRelay(t *testing.T) {
 
 func TestHarnessSelectionComingSoon(t *testing.T) {
 	chosen := map[string]bool{}
-	for _, name := range adapter.Names() {
+	for _, name := range registered.Names() {
 		chosen[name] = true
 	}
 	form := harnessSelectionForm(context.Background(), chosen)
-	wantOrder := []string{"claude", "codex", codexDesktopAgent, "omp", "cursor", "opencode", "pi", "hermes", "gemini", "dsh", "antigravity"}
+	wantOrder := []string{"claude", "codex", codexDesktopAgent, "cursor", "opencode", "omp", "pi", "hermes", "gemini", "dsh", "antigravity", "GitHub Copilot"}
 	if len(form.Items) != len(wantOrder) {
 		t.Fatalf("picker has %d items, want %d", len(form.Items), len(wantOrder))
 	}
@@ -93,14 +93,14 @@ func TestHarnessSelectionComingSoon(t *testing.T) {
 			display = "Codex Desktop"
 		} else if name == "codex" {
 			display = "Codex CLI"
-		} else if a, ok := adapter.Lookup(name); ok {
+		} else if a, ok := registered.Lookup(name); ok {
 			display = a.DisplayName()
 		}
 		if form.Items[i].Label != display {
 			t.Errorf("picker row %d = %q, want %q", i, form.Items[i].Label, display)
 		}
 		item := form.Items[i]
-		available := agentAvailable(name)
+		available := registered.IsSupported(name)
 		if available {
 			if item.Disabled || item.Selected != chosen[name] {
 				t.Errorf("%s should be selectable with its saved choice: %+v", name, item)
@@ -137,18 +137,15 @@ func TestHarnessSelectionFlags(t *testing.T) {
 func TestHarnessSelectionFiltersSavedAgents(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 	cmd := &cobra.Command{}
-	for _, saved := range [][]string{adapter.Names(), {"cursor", "opencode", "antigravity"}} {
+	for _, saved := range [][]string{registered.Names(), {"cursor", "opencode", "antigravity"}} {
 		cfg := &config.Config{Harnesses: saved}
 		wantInstalled := []string(nil)
 		if slices.Contains(saved, "claude") {
 			wantInstalled = []string{"claude", "codex"}
 		}
-		if slices.Contains(saved, "omp") {
-			wantInstalled = append(wantInstalled, "omp")
-		}
 		wantSetup := slices.Clone(wantInstalled)
 		if codexDesktopInstalled(context.Background()) {
-			// Codex Desktop sorts right after the CLI in the picker, ahead of omp.
+			// Codex Desktop sorts right after the CLI in the picker.
 			if i := slices.Index(wantSetup, "codex"); i >= 0 {
 				wantSetup = slices.Insert(wantSetup, i+1, codexDesktopAgent)
 			} else {

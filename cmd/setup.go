@@ -13,7 +13,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/miradorlabs/terma-cli/internal/adapter"
 	"github.com/miradorlabs/terma-cli/internal/api"
 	"github.com/miradorlabs/terma-cli/internal/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -349,22 +348,17 @@ func chooseHarnesses(cmd *cobra.Command, cfg *config.Config, f setupFlags) ([]st
 	}
 	var names []string
 	for i, a := range harnessSelectionAgents() {
-		if agentAvailable(a.Name()) && result[i].Selected {
+		if registered.IsSupported(a.Name()) && result[i].Selected {
 			names = append(names, a.Name())
 		}
 	}
 	return names, nil
 }
 
-// agentAvailable gates onboarding while the remaining integrations are coming soon.
-func agentAvailable(name string) bool {
-	return name == "claude" || name == "codex" || name == codexDesktopAgent || name == "omp"
-}
-
 func availableAgentNames() []string {
 	var names []string
 	for _, a := range harnessSelectionAgents() {
-		if agentAvailable(a.Name()) {
+		if registered.IsSupported(a.Name()) {
 			names = append(names, a.Name())
 		}
 	}
@@ -376,8 +370,8 @@ func availableAgentNames() []string {
 func harnessSelectionAgents() []agentChoice {
 	var agents []agentChoice
 	for _, available := range []bool{true, false} {
-		for _, a := range adapter.All() {
-			if agentAvailable(a.Name()) == available {
+		for _, a := range registered.All() {
+			if registered.IsSupported(a.Name()) == available {
 				adapterAgent := a
 				display := a.DisplayName()
 				if a.Name() == "codex" {
@@ -410,7 +404,7 @@ func harnessSelectionForm(ctx context.Context, preselect map[string]bool) *promp
 	form := &prompt.Form{Title: "Which coding agents do you use? (space toggles, enter confirms)"}
 	for _, a := range harnessSelectionAgents() {
 		item := prompt.Item{Label: a.DisplayName(), Kind: prompt.Check}
-		if agentAvailable(a.Name()) {
+		if registered.IsSupported(a.Name()) {
 			item.Detail = agentDetail(ctx, a.Name())
 			item.Selected = preselect[a.Name()]
 		} else {
@@ -418,6 +412,9 @@ func harnessSelectionForm(ctx context.Context, preselect map[string]bool) *promp
 			item.Reason = "Coming Soon"
 		}
 		form.Items = append(form.Items, item)
+	}
+	for _, name := range registered.UpcomingNames() {
+		form.Items = append(form.Items, prompt.Item{Label: name, Kind: prompt.Check, Disabled: true, Reason: "Coming Soon"})
 	}
 	return form
 }
@@ -427,11 +424,11 @@ func parseAgentList(raw string) ([]string, error) {
 	seen := map[string]bool{}
 	for _, n := range splitCommas(raw) {
 		if n != codexDesktopAgent {
-			if _, ok := adapter.Lookup(n); !ok {
+			if _, ok := registered.Lookup(n); !ok {
 				return nil, fmt.Errorf("unknown agent %q (want %s)", n, joinNames(availableAgentNames()))
 			}
 		}
-		if !agentAvailable(n) {
+		if !registered.IsSupported(n) {
 			return nil, fmt.Errorf("agent %q: Coming Soon; available agents: %s", n, joinNames(availableAgentNames()))
 		}
 		seen[n] = true
@@ -443,7 +440,7 @@ func parseAgentList(raw string) ([]string, error) {
 func selectedInRegistryOrder(chosen map[string]bool) []string {
 	var names []string
 	for _, a := range harnessSelectionAgents() {
-		if agentAvailable(a.Name()) && chosen[a.Name()] {
+		if registered.IsSupported(a.Name()) && chosen[a.Name()] {
 			names = append(names, a.Name())
 		}
 	}
@@ -454,7 +451,7 @@ func selectedInRegistryOrder(chosen map[string]bool) []string {
 func detectedAgents(ctx context.Context) []string {
 	var names []string
 	for _, a := range harnessSelectionAgents() {
-		if agentAvailable(a.Name()) && a.Installed(ctx) {
+		if registered.IsSupported(a.Name()) && a.Installed(ctx) {
 			names = append(names, a.Name())
 		}
 	}
@@ -465,7 +462,7 @@ func agentDetail(ctx context.Context, name string) string {
 	if name == codexDesktopAgent && codexDesktopInstalled(ctx) {
 		return "installed"
 	}
-	if a, ok := adapter.Lookup(name); ok && a.Installed(ctx) {
+	if a, ok := registered.Lookup(name); ok && a.Installed(ctx) {
 		return "installed"
 	}
 	return ""
@@ -483,7 +480,7 @@ func adapterDisplayNames(names []string) []string {
 			out = append(out, "Codex CLI")
 			continue
 		}
-		if a, ok := adapter.Lookup(n); ok {
+		if a, ok := registered.Lookup(n); ok {
 			out = append(out, a.DisplayName())
 		} else {
 			out = append(out, n)

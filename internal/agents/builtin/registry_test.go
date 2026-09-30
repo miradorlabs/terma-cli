@@ -1,4 +1,4 @@
-package adapter
+package builtin
 
 import (
 	"os"
@@ -13,7 +13,7 @@ import (
 func TestRegistryIsConsistent(t *testing.T) {
 	names := map[string]bool{}
 	owners := map[string]string{}
-	for _, a := range All() {
+	for _, a := range reg.All() {
 		if a.Name() == "" || a.Name() != strings.ToLower(a.Name()) {
 			t.Errorf("adapter name %q must be a lowercase token", a.Name())
 		}
@@ -44,15 +44,15 @@ func TestRegistryIsConsistent(t *testing.T) {
 			}
 		}
 	}
-	if len(Handlers()) != len(owners) {
-		t.Errorf("Handlers() has %d entries, adapters declare %d", len(Handlers()), len(owners))
+	if len(reg.Handlers()) != len(owners) {
+		t.Errorf("reg.Handlers() has %d entries, adapters declare %d", len(reg.Handlers()), len(owners))
 	}
 	for _, name := range []string{"claude", "cursor", "codex", "opencode", "omp", "antigravity"} {
-		if _, ok := Lookup(name); !ok {
-			t.Errorf("Lookup(%q) failed", name)
+		if _, ok := reg.Lookup(name); !ok {
+			t.Errorf("reg.Lookup(%q) failed", name)
 		}
 	}
-	if _, ok := Lookup("zed"); ok {
+	if _, ok := reg.Lookup("zed"); ok {
 		t.Error("Lookup accepted an unknown adapter")
 	}
 }
@@ -76,16 +76,16 @@ func TestEventNamesAreStable(t *testing.T) {
 		"post-tool-use", "session-end", "session-start", "stop", "stop-failure", "subagent-start", "subagent-stop",
 		"user-prompt-submit",
 	}
-	got := EventNames()
+	got := reg.EventNames()
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("event names changed:\n got %v\nwant %v", got, want)
 	}
 	for _, event := range []string{"stop", "cursor-stop", "codex-stop", "antigravity-stop", "session-end"} {
-		if !FlushesAfter(event) {
+		if !reg.FlushesAfter(event) {
 			t.Errorf("%s should flush the spool", event)
 		}
 	}
-	if FlushesAfter("post-tool-use") || FlushesAfter("antigravity-post-tool-use") {
+	if reg.FlushesAfter("post-tool-use") || reg.FlushesAfter("antigravity-post-tool-use") {
 		t.Error("a per-tool-call hook must not start a flush")
 	}
 }
@@ -96,7 +96,7 @@ func TestDefaultsFollowTheRepositoryLayout(t *testing.T) {
 	root := t.TempDir()
 	defaults := func() []string {
 		var out []string
-		for _, a := range All() {
+		for _, a := range reg.All() {
 			if a.Default(root) {
 				out = append(out, a.Name())
 			}
@@ -115,7 +115,7 @@ func TestDefaultsFollowTheRepositoryLayout(t *testing.T) {
 		t.Fatalf("defaults = %v", got)
 	}
 	// Every repo-scope adapter plans a file on an empty repository; OpenCode plans none.
-	for _, a := range All() {
+	for _, a := range reg.All() {
 		p, err := a.Plan(t.TempDir(), true)
 		if err != nil {
 			t.Fatalf("%s: %v", a.Name(), err)
@@ -129,8 +129,8 @@ func TestDefaultsFollowTheRepositoryLayout(t *testing.T) {
 			}
 		}
 	}
-	if strings.Join(RepoNames(), ",") != "claude,cursor,codex,omp,antigravity" {
-		t.Fatalf("RepoNames = %v", RepoNames())
+	if strings.Join(reg.RepoNames(), ",") != "claude,cursor,codex,omp,antigravity" {
+		t.Fatalf("RepoNames = %v", reg.RepoNames())
 	}
 }
 
@@ -138,7 +138,7 @@ func TestDefaultsFollowTheRepositoryLayout(t *testing.T) {
 // would not fail anywhere: the later one would simply take the other agent's payloads.
 func TestEventNamesAreUnique(t *testing.T) {
 	owner := map[string]string{}
-	for _, a := range All() {
+	for _, a := range reg.All() {
 		for event := range a.Events() {
 			if other, taken := owner[event]; taken {
 				t.Errorf("%q is claimed by both %s and %s", event, other, a.Name())
@@ -146,7 +146,9 @@ func TestEventNamesAreUnique(t *testing.T) {
 			owner[event] = a.Name()
 		}
 	}
-	if len(owner) != len(Handlers()) {
-		t.Fatalf("Handlers has %d events, the adapters declare %d", len(Handlers()), len(owner))
+	if len(owner) != len(reg.Handlers()) {
+		t.Fatalf("Handlers has %d events, the adapters declare %d", len(reg.Handlers()), len(owner))
 	}
 }
+
+var reg = Agents()

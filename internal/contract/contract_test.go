@@ -10,7 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/miradorlabs/terma-cli/internal/adapter"
+	"github.com/miradorlabs/terma-cli/internal/agents"
+	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/relay/exporter"
 )
@@ -23,7 +24,7 @@ const terma = "/usr/local/bin/terma"
 // TestCommittedHookFiles pins what `terma install` commits into a repository for each
 // agent, rendered into an empty one.
 func TestCommittedHookFiles(t *testing.T) {
-	for _, a := range adapter.All() {
+	for _, a := range builtin.Agents().All() {
 		if a.HooksPath() == "" {
 			continue // an agent whose hooks are user-scope commits nothing
 		}
@@ -91,7 +92,7 @@ func TestGitHookFiles(t *testing.T) {
 
 // TestUserHookFiles pins the machine-wide hooks files global mode writes.
 func TestUserHookFiles(t *testing.T) {
-	for _, a := range adapter.UserHookAdapters() {
+	for _, a := range builtin.Agents().With[agents.UserHooks]() {
 		t.Run(a.Name(), func(t *testing.T) {
 			dir := t.TempDir()
 			plan, err := a.PlanUserHooks(dir, hookmgr.UserHookCommand(terma), true)

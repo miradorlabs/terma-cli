@@ -11,7 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/miradorlabs/terma-cli/internal/adapter"
+	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hookrun"
@@ -22,17 +22,17 @@ import (
 // line. Every other event belongs to an agent adapter and is dispatched from the
 // adapter registry: the names are part of the committed wiring and must stay stable
 // across versions, which is why each adapter declares its own.
-var gitHookEvents = map[string]adapter.Handler{
+var gitHookEvents = map[string]agents.Handler{
 	"prepare-commit-msg": hookrun.PrepareCommitMsg,
 	"post-commit":        hookrun.PostCommit,
 }
 
 // hookHandler resolves an event name to its handler.
-func hookHandler(event string) (adapter.Handler, bool) {
+func hookHandler(event string) (agents.Handler, bool) {
 	if h, ok := gitHookEvents[event]; ok {
 		return h, true
 	}
-	h, ok := adapter.Handlers()[event]
+	h, ok := registered.Handlers()[event]
 	return h, ok
 }
 
@@ -42,7 +42,7 @@ func hookHandler(event string) (adapter.Handler, bool) {
 // strand the final turn until another hook fires, so there is none. Sender backoff
 // still applies. prepare-commit-msg never flushes — it has a 50 ms budget.
 func flushesAfter(event string) bool {
-	return event == "post-commit" || adapter.FlushesAfter(event)
+	return event == "post-commit" || registered.FlushesAfter(event)
 }
 
 // HooksDisabled reports the developer's kill switch: `TERMA_HOOKS=0` in the

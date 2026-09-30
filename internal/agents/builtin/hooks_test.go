@@ -1,4 +1,4 @@
-package adapter
+package builtin
 
 import (
 	"regexp"
@@ -17,8 +17,8 @@ var hookCommand = regexp.MustCompile(`terma hook ([a-z][a-z-]*)`)
 // lists together, and the failure is silent on every side — a committed hook naming an
 // event with no handler does nothing, for ever, in every repository that ran install.
 func TestEveryCommittedHookHasAHandler(t *testing.T) {
-	handlers := Handlers()
-	for _, a := range All() {
+	handlers := reg.Handlers()
+	for _, a := range reg.All() {
 		if a.HooksPath() == "" {
 			continue
 		}
@@ -54,7 +54,7 @@ func TestSupportCatalogMatchesTheRegistry(t *testing.T) {
 	for _, agent := range harness.SupportCatalog() {
 		listed[agent.Name] = agent.DisplayName
 	}
-	for _, a := range All() {
+	for _, a := range reg.All() {
 		name, ok := listed[a.Name()]
 		if !ok {
 			t.Errorf("adapter %q is missing from harness.SupportCatalog", a.Name())

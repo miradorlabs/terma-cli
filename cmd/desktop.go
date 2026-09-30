@@ -3,13 +3,14 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 	"os"
 	"slices"
 
+	"github.com/miradorlabs/terma-cli/internal/routing"
+
 	"github.com/spf13/cobra"
 
-	"github.com/miradorlabs/terma-cli/internal/adapter"
+	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
@@ -55,8 +56,8 @@ func statusDesktop(cmd *cobra.Command, _ []string) error {
 		fmt.Fprintf(cmd.OutOrStdout(), "Prompt text:   %s\n", onOff(route.IncludePrompts))
 		fmt.Fprintf(cmd.OutOrStdout(), "Tool content:  %s\n", onOff(route.IncludeToolContent))
 	}
-	if codex, found := adapter.Lookup("codex"); found {
-		if trusting, found := codex.(adapter.Trusting); found {
+	if codex, found := registered.Lookup("codex"); found {
+		if trusting, found := codex.(agents.Trusting); found {
 			trust, err := trusting.Trust(root)
 			if err != nil {
 				return err

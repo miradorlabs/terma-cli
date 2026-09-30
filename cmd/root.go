@@ -11,6 +11,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/agents"
+
 	"github.com/spf13/cobra"
 
 	"github.com/miradorlabs/terma-cli/internal/api"
@@ -227,7 +229,12 @@ func migrateState(ctx context.Context, args []string) {
 // Execute runs the command line and returns the process's exit status: 0, 1 for a
 // failure, or the code a command chose to mean something more specific (see
 // exitcode.go).
-func Execute() int {
+// registered is the agents this build knows, handed in by main.
+var registered *agents.Registry
+
+// Execute runs terma with the agents it was built with and returns the exit code.
+func Execute(known *agents.Registry) int {
+	registered = known
 	// The first SIGINT/SIGTERM cancels the running command's context so an in-flight
 	// request unwinds promptly instead of waiting out the HTTP timeout. Default signal
 	// handling is then restored, so a second signal still force-terminates.

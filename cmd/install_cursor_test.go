@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/miradorlabs/terma-cli/internal/adapter"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 )
 
@@ -61,7 +60,7 @@ func TestInstallAdaptersLeavesComingSoonAgentsOut(t *testing.T) {
 func wireAdapters(t *testing.T, root string, names ...string) {
 	t.Helper()
 	for _, name := range names {
-		a, ok := adapter.Lookup(name)
+		a, ok := registered.Lookup(name)
 		if !ok {
 			t.Fatalf("no adapter %q", name)
 		}
@@ -132,7 +131,7 @@ func TestInstallWiresCursorHooksWhenAsked(t *testing.T) {
 			t.Errorf("%s = %v, want one entry running %q", event, entries, command)
 		}
 	}
-	if got := strings.Join(adapter.WiredNames(repo), ","); got != "claude,cursor" {
+	if got := strings.Join(registered.WiredNames(repo), ","); got != "claude,cursor" {
 		t.Errorf("wired adapters = %q, want claude,cursor", got)
 	}
 
@@ -164,7 +163,7 @@ func TestInstallLeavesCursorAloneWhileComingSoon(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(repo, ".cursor", "hooks.json")); err == nil {
 		t.Fatal("a repository with a .cursor directory got Cursor hooks by default")
 	}
-	if strings.Contains(out, ".cursor") || slices.Contains(adapter.WiredNames(repo), "cursor") {
+	if strings.Contains(out, ".cursor") || slices.Contains(registered.WiredNames(repo), "cursor") {
 		t.Fatalf("install offered Cursor's hooks:\n%s", out)
 	}
 }
@@ -208,8 +207,8 @@ func TestInstallReRunDoesNotChurnBinding(t *testing.T) {
 	if !bytes.Equal(first, second) {
 		t.Fatalf("re-install churned the committed binding:\n--- first ---\n%s\n--- second ---\n%s", first, second)
 	}
-	if !slices.Contains(adapter.WiredNames(repo), "claude") {
-		t.Fatalf("committed adapter was lost on re-install: %v", adapter.WiredNames(repo))
+	if !slices.Contains(registered.WiredNames(repo), "claude") {
+		t.Fatalf("committed adapter was lost on re-install: %v", registered.WiredNames(repo))
 	}
 	// A developer who also uses Cursor wires its hooks — a file of its own — and still
 	// leaves the binding as it was: their agents are not the team's record.
@@ -223,7 +222,7 @@ func TestInstallReRunDoesNotChurnBinding(t *testing.T) {
 	if !bytes.Equal(first, third) {
 		t.Fatalf("another developer's agents churned the committed binding:\n--- first ---\n%s\n--- third ---\n%s", first, third)
 	}
-	if got := strings.Join(adapter.WiredNames(repo), ","); got != "claude,cursor" {
+	if got := strings.Join(registered.WiredNames(repo), ","); got != "claude,cursor" {
 		t.Fatalf("wired adapters = %q, want claude,cursor", got)
 	}
 }

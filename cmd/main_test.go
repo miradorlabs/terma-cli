@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+
+	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
 )
 
 // TestMain gives the whole package a private home before any test runs. Commands write
@@ -21,6 +23,7 @@ func TestMain(m *testing.M) {
 }
 
 func runIsolated(m *testing.M) int {
+	registered = builtin.Agents()
 	if out, err := exec.Command("go", "env", "GOCACHE", "GOMODCACHE", "GOPATH").Output(); err == nil {
 		vals := strings.Split(strings.TrimSpace(string(out)), "\n")
 		for i, k := range []string{"GOCACHE", "GOMODCACHE", "GOPATH"} {

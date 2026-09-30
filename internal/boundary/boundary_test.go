@@ -43,13 +43,12 @@ func agentPackage(path string) (string, bool) {
 	return "", false
 }
 
-// mayNameAgents are the packages whose job is to name agents: the registry, the code a
-// few agents share (internal/agents/internal/...), and these tests' own fixtures.
+// mayNameAgents are the packages whose job is to name agents: the one that registers
+// them, and these tests' own fixtures.
 var mayNameAgents = map[string]string{
-	module + "/internal/agents":   "the registry: it lists every agent",
-	module + "/internal/adapter":  "the registry until it becomes internal/agents",
-	module + "/internal/contract": "byte snapshots, named by agent",
-	module + "/internal/boundary": "this test",
+	module + "/internal/agents/builtin": "registers every agent",
+	module + "/internal/contract":       "byte snapshots, named by agent",
+	module + "/internal/boundary":       "this test",
 }
 
 // global are the files that name agents by rule rather than by leak, each with the
@@ -107,8 +106,8 @@ func TestAgentPackagesAreImportedOnlyByTheRegistry(t *testing.T) {
 			case isAgent && other == self:
 			case isAgent:
 				t.Errorf("%s imports %s: one agent never imports another; share through internal/agents/internal", p.ImportPath, imp)
-			case p.ImportPath != module+"/internal/agents" && p.ImportPath != module+"/internal/adapter":
-				t.Errorf("%s imports %s: only the registry (internal/agents) imports an agent's package", p.ImportPath, imp)
+			case p.ImportPath != module+"/internal/agents/builtin":
+				t.Errorf("%s imports %s: only internal/agents/builtin imports an agent's package", p.ImportPath, imp)
 			}
 		}
 		if p.ImportPath == module+"/internal/relay" || strings.HasPrefix(p.ImportPath, module+"/internal/relay/claim") {
@@ -161,7 +160,7 @@ func TestAgentMentionsOnlyShrink(t *testing.T) {
 		total += n
 		switch was, ok := want[file]; {
 		case !ok:
-			t.Errorf("%s names an agent %d times: an agent's code belongs in internal/agents/<name>, and the registry (internal/agents) is what lists them", file, n)
+			t.Errorf("%s names an agent %d times: an agent's code belongs in internal/agents/<name>, and internal/agents/builtin is what lists them", file, n)
 		case n > was:
 			t.Errorf("%s names agents %d times, up from %d", file, n, was)
 		case n < was:

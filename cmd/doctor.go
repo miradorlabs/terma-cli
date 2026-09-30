@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 	"io"
 	"io/fs"
 	"os"
@@ -18,9 +17,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/routing"
+
 	"github.com/spf13/cobra"
 
-	"github.com/miradorlabs/terma-cli/internal/adapter"
+	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
@@ -109,13 +110,13 @@ func agentHooksCheck(root string, mine []string) doctor.Check {
 			fix = f
 		}
 	}
-	for _, a := range adapter.All() {
+	for _, a := range registered.All() {
 		if a.HooksPath() == "" {
 			continue
 		}
 		// Codex Desktop is wired through the Codex hooks file.
 		named := slices.Contains(mine, a.Name()) || (a.Name() == routing.AgentCodex && slices.Contains(mine, codexDesktopAgent))
-		if !adapter.Wired(root, a) {
+		if !agents.Wired(root, a) {
 			if named {
 				of++
 				parts = append(parts, a.DisplayName()+" hooks missing")
@@ -141,7 +142,7 @@ func agentHooksCheck(root string, mine []string) doctor.Check {
 			continue
 		}
 		part := a.DisplayName() + " hooks present"
-		trusting, gated := a.(adapter.Trusting)
+		trusting, gated := a.(agents.Trusting)
 		if !gated || !used {
 			if used {
 				ready++

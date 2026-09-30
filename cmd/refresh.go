@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"slices"
 
-	"github.com/miradorlabs/terma-cli/internal/adapter"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
@@ -162,7 +161,7 @@ func planRepoRefresh(ctx context.Context) (*repoRefresh, error) {
 			r.plan.det, r.plan.hooks = det, existingFilesOnly(hooks)
 		}
 	}
-	plans, err := planAdapters(root, adapter.WiredNames(root), true)
+	plans, err := planAdapters(root, registered.WiredNames(root), true)
 	if err != nil {
 		return nil, err
 	}

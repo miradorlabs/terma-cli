@@ -12,7 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/miradorlabs/terma-cli/internal/adapter"
+	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
@@ -384,12 +384,12 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 			ui.ok("Hooks", plan.summary(adapters))
 			afterMerge = plan.hooks.Notes
 		default:
-			adapters = adapter.WiredNames(root) // declined: only what is already wired
+			adapters = registered.WiredNames(root) // declined: only what is already wired
 			ui.warn("Hooks", "not written — commits are not stamped until they are")
 			ui.then("Run `terma install` again and accept the hooks when you are ready.")
 		}
 	} else {
-		adapters = adapter.WiredNames(root) // --no-hooks: only what is already wired
+		adapters = registered.WiredNames(root) // --no-hooks: only what is already wired
 	}
 	if slices.Contains(agents, codexDesktopAgent) {
 		codexPlan, err := hookmgr.PlanCodexHooks(root, true)
@@ -406,7 +406,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	// no longer connects anything — so without this step a developer whose agents are
 	// all hooks-only would see "Installed." while every commit, tool call and observation
 	// sat in the spool, held for a key that no command would ever mint.
-	if installedHooks || len(adapter.WiredNames(root)) > 0 {
+	if installedHooks || len(registered.WiredNames(root)) > 0 {
 		sp := spinner.New(cmd.ErrOrStderr())
 		sp.Start("Preparing hook event delivery…")
 		k := ensureSpoolKey(ctx, cfg)
@@ -754,7 +754,7 @@ func connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *config.Conf
 // already wire, the agents this install configures, and any adapter whose directory the
 // repository already carries (a .codex directory is a clear sign the repo is opened in
 // Codex) — restricted to adapters that actually write a hooks file, and to agents that
-// are available: one still coming soon (agentAvailable — Cursor, Antigravity) is wired
+// are available: one still coming soon (not supported by this build) is wired
 // only when --adapters names it, whatever directory the repository carries. Hooks a
 // colleague committed for one are left as they are, not rewritten or removed.
 //
@@ -762,18 +762,17 @@ func connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *config.Conf
 // grows the committed set, while a colleague re-running install with a narrower selection
 // never removes hooks someone else committed — so the files grow on purpose and never
 // churn down.
-func installAdapters(root string, agents []string, override string) []string {
+func installAdapters(root string, selected []string, override string) []string {
 	if list := splitCommas(override); len(list) > 0 {
 		return list
 	}
 	var out []string
-	for _, a := range adapter.All() {
-		if a.HooksPath() == "" || !agentAvailable(a.Name()) {
+	for _, a := range registered.All() {
+		if a.HooksPath() == "" || !registered.IsSupported(a.Name()) {
 			continue
 		}
-		// Codex Desktop is captured through the Codex hooks file.
-		selected := slices.Contains(agents, a.Name()) || (a.Name() == routing.AgentCodex && slices.Contains(agents, codexDesktopAgent))
-		if selected || a.Default(root) || adapter.Wired(root, a) {
+		chosen := slices.ContainsFunc(agents.Selections(a), func(s string) bool { return slices.Contains(selected, s) })
+		if chosen || a.Default(root) || agents.Wired(root, a) {
 			out = append(out, a.Name())
 		}
 	}
@@ -879,7 +878,7 @@ func (p hookPlan) explain() []string {
 	for _, c := range p.hooks.Changes {
 		what[shownPath(c.Path)] = "stamps each commit with the agent session that wrote it"
 	}
-	for _, a := range adapter.All() {
+	for _, a := range registered.All() {
 		if path := a.HooksPath(); path != "" {
 			what[path] = "reports each " + a.DisplayName() + " session and the files it edits"
 		}
@@ -911,7 +910,7 @@ func (p hookPlan) summary(adapters []string) string {
 	}
 	var agents []string
 	for _, name := range adapters {
-		if a, ok := adapter.Lookup(name); ok {
+		if a, ok := registered.Lookup(name); ok {
 			agents = append(agents, a.DisplayName())
 		}
 	}
@@ -1162,13 +1161,13 @@ func serverKeyBinding(ctx context.Context, cfg *config.Config, existing *termapr
 func planAdapters(root string, names []string, install bool) ([]hookmgr.Plan, error) {
 	want := map[string]bool{}
 	for _, name := range names {
-		if _, ok := adapter.Lookup(name); !ok {
-			return nil, fmt.Errorf("unknown agent %q (want %s)", name, joinNames(adapter.RepoNames()))
+		if _, ok := registered.Lookup(name); !ok {
+			return nil, fmt.Errorf("unknown agent %q (want %s)", name, joinNames(registered.RepoNames()))
 		}
 		want[name] = true
 	}
 	var plans []hookmgr.Plan
-	for _, a := range adapter.All() {
+	for _, a := range registered.All() {
 		if !want[a.Name()] {
 			continue
 		}
@@ -1249,7 +1248,7 @@ to the same project — remove it machine-wide with 'terma shim uninstall'.`,
 			if err := hookmgr.Validate(root, hooks); err != nil {
 				return err
 			}
-			plans, err := planAdapters(root, adapter.Names(), false)
+			plans, err := planAdapters(root, registered.Names(), false)
 			if err != nil {
 				return err
 			}

@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/miradorlabs/terma-cli/internal/adapter"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 )
 
@@ -51,7 +50,7 @@ func TestInstallWiresAntigravityHooksWhenAsked(t *testing.T) {
 	if len(terma.PostToolUse) != 1 || terma.PostToolUse[0].Matcher != "" || terma.PostToolUse[0].Hooks[0]["command"] != hookmgr.HookCommand("antigravity-post-tool-use") {
 		t.Errorf("PostToolUse = %+v", terma.PostToolUse)
 	}
-	if got := strings.Join(adapter.WiredNames(repo), ","); got != "claude,antigravity" {
+	if got := strings.Join(registered.WiredNames(repo), ","); got != "claude,antigravity" {
 		t.Errorf("wired adapters = %q, want claude,antigravity", got)
 	}
 
@@ -77,8 +76,8 @@ func TestInstallLeavesAntigravityAloneWhileComingSoon(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(repo, ".agents", "hooks.json")); err == nil {
 		t.Fatal("a repository with a .agents directory got Antigravity hooks by default")
 	}
-	if slices.Contains(adapter.WiredNames(repo), "antigravity") {
-		t.Errorf("antigravity is wired: %v", adapter.WiredNames(repo))
+	if slices.Contains(registered.WiredNames(repo), "antigravity") {
+		t.Errorf("antigravity is wired: %v", registered.WiredNames(repo))
 	}
 }
 

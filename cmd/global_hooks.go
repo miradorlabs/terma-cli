@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/miradorlabs/terma-cli/internal/adapter"
+	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/relay/exporter"
@@ -37,11 +37,11 @@ type userHooksRecord struct {
 
 // userHookAgents are the agents with a user-level hooks file terma writes, among the
 // developer's: Codex Desktop counts as Codex (it runs the same hooks).
-func userHookAgents(agents []string) []string {
+func userHookAgents(selected []string) []string {
 	var out []string
-	for _, a := range adapter.UserHookAdapters() {
-		for _, choice := range a.UserHookSelections() {
-			if slices.Contains(agents, choice) {
+	for _, a := range registered.With[agents.UserHooks]() {
+		for _, choice := range agents.Selections(a) {
+			if slices.Contains(selected, choice) {
 				out = append(out, a.Name())
 				break
 			}
@@ -53,15 +53,15 @@ func userHookAgents(agents []string) []string {
 // applyUserHooks writes terma's machine-wide hooks for the developer's agents (install)
 // or removes every one terma wrote (not install), and records which agents have them.
 // It reports the files it changed.
-func applyUserHooks(agents []string, install bool) ([]string, error) {
+func applyUserHooks(selected []string, install bool) ([]string, error) {
 	terma, err := hookExecutable()
 	if err != nil {
 		return nil, err
 	}
-	covered := userHookAgents(agents)
+	covered := userHookAgents(selected)
 	var changed []string
-	for _, a := range adapter.UserHookAdapters() {
-		// Written for the developer's agents in global mode, unless the organization's
+	for _, a := range registered.With[agents.UserHooks]() {
+		// Written for the developer's selected in global mode, unless the organization's
 		// managed hooks run for one — then setup's would run as well, and go.
 		want := install && slices.Contains(covered, a.Name()) && !managedHooksDeployed(a.Name())
 		path, err := a.UserHooksPath()
@@ -162,11 +162,11 @@ var managedRoot = "/"
 // requirements. An agent whose managed file carries terma's hooks gets none from setup:
 // both would run.
 func managedHookFiles(agent string) []string {
-	a, ok := adapter.Lookup(agent)
+	a, ok := registered.Lookup(agent)
 	if !ok {
 		return nil
 	}
-	managed, ok := a.(adapter.ManagedHooks)
+	managed, ok := a.(agents.ManagedHooks)
 	if !ok {
 		return nil
 	}

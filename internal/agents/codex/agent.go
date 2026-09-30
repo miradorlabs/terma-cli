@@ -1,4 +1,5 @@
-package adapter
+// Package codex integrates Codex, the CLI and Desktop.
+package codex
 
 import (
 	"context"
@@ -6,29 +7,30 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/hookrun"
 )
 
-// codex covers OpenAI's Codex CLI and Desktop repository hooks in .codex/hooks.json.
+// Agent covers OpenAI's Codex CLI and Desktop repository hooks in .codex/hooks.json.
 // The CLI's user-level notifier (`notify` in ~/.codex/config.toml, written by
 // `terma connect codex`) reaches the same handler set through codex-notify.
-type codex struct{}
+type Agent struct{}
 
 const codexHookReview = "open this repository in Codex Desktop, then go to Settings → Hooks → Review and approve the Terma entries (or run /hooks in Codex CLI)"
 
-func (codex) Name() string                       { return "codex" }
-func (codex) DisplayName() string                { return "Codex" }
-func (codex) Installed(ctx context.Context) bool { return harness.Codex{}.Detect(ctx).Found }
-func (codex) HooksPath() string                  { return hookmgr.CodexHooksPath }
-func (codex) Default(root string) bool           { return hookmgr.HasCodex(root) }
-func (codex) Plan(root string, install bool) (hookmgr.Plan, error) {
+func (Agent) Name() string                       { return "codex" }
+func (Agent) DisplayName() string                { return "Codex" }
+func (Agent) Installed(ctx context.Context) bool { return harness.Codex{}.Detect(ctx).Found }
+func (Agent) HooksPath() string                  { return hookmgr.CodexHooksPath }
+func (Agent) Default(root string) bool           { return hookmgr.HasCodex(root) }
+func (Agent) Plan(root string, install bool) (hookmgr.Plan, error) {
 	return hookmgr.PlanCodexHooks(root, install)
 }
 
-func (codex) Events() map[string]Handler {
-	return map[string]Handler{
+func (Agent) Events() map[string]agents.Handler {
+	return map[string]agents.Handler{
 		"codex-notify":             hookrun.CodexNotify,
 		"codex-session-start":      hookrun.CodexSessionStart,
 		"codex-user-prompt-submit": hookrun.CodexUserPromptSubmit,
@@ -42,40 +44,40 @@ func (codex) Events() map[string]Handler {
 	}
 }
 
-func (codex) FlushAfter() []string {
+func (Agent) FlushAfter() []string {
 	return []string{"codex-notify", "codex-session-end", "codex-stop", "codex-user-prompt-submit"}
 }
 
-func (codex) UserHooksPath() (string, error) { return harness.CodexUserHooksPath() }
-func (codex) UserHookSelections() []string   { return []string{"codex", "codex-desktop"} }
-func (codex) PlanUserHooks(dir string, command func(string) string, install bool) (hookmgr.Plan, error) {
+func (Agent) UserHooksPath() (string, error) { return harness.CodexUserHooksPath() }
+func (Agent) Selections() []string           { return []string{"codex", "codex-desktop"} }
+func (Agent) PlanUserHooks(dir string, command func(string) string, install bool) (hookmgr.Plan, error) {
 	return hookmgr.PlanCodexUserHooks(dir, command, install)
 }
-func (codex) ManagedHookFiles(root string) []string { return harness.CodexManagedHookFiles(root) }
+func (Agent) ManagedHookFiles(root string) []string { return harness.CodexManagedHookFiles(root) }
 
 // Trust reads the question Cursor's hooks cannot raise: Codex refuses to run a hook it
 // has not been shown, so a committed file is inert on a fresh clone until the developer
 // trusts it once, from inside Codex. The wiring looks perfect and nothing runs, which
 // is a silence worth naming.
-func (c codex) Trust(root string) (TrustState, error) {
+func (c Agent) Trust(root string) (agents.TrustState, error) {
 	hooksPath := filepath.Join(root, filepath.FromSlash(c.HooksPath()))
 	trust, err := (harness.Codex{}).CodexHookTrustFor(hooksPath)
 	if err != nil {
-		return TrustState{}, err
+		return agents.TrustState{}, err
 	}
 	switch {
 	case !trust.Reviewed():
-		return TrustState{
+		return agents.TrustState{
 			Detail: ", but Codex has not been shown them yet, so it runs none of them",
 			Fix:    codexHookReview,
 		}, nil
 	case trust.Trusted == 0:
-		return TrustState{
+		return agents.TrustState{
 			Detail: ", but none are trusted, so Codex runs none of them",
 			Fix:    codexHookReview,
 		}, nil
 	case trust.Disabled > 0:
-		return TrustState{
+		return agents.TrustState{
 			Detail: fmt.Sprintf(", but %d is switched off in Codex", trust.Disabled),
 			Fix:    "open this repository in Codex Desktop and re-enable Terma's hooks in Settings → Hooks (or use /hooks in Codex CLI)",
 		}, nil
@@ -85,7 +87,7 @@ func (c codex) Trust(root string) (TrustState, error) {
 	// the count, while Codex skips the new ones and says nothing.
 	entries, err := hookmgr.CodexTermaEntries(root)
 	if err != nil {
-		return TrustState{}, err
+		return agents.TrustState{}, err
 	}
 	var skipped []string
 	for _, e := range entries {
@@ -94,12 +96,12 @@ func (c codex) Trust(root string) (TrustState, error) {
 		}
 	}
 	if len(skipped) > 0 {
-		return TrustState{
+		return agents.TrustState{
 			Detail: fmt.Sprintf(", but Codex needs to review %s, so it skips %s", strings.Join(skipped, ", "), pronoun(len(skipped))),
 			Fix:    codexHookReview + "; include any new or changed entries",
 		}, nil
 	}
-	return TrustState{Trusted: true, Detail: " and trusted"}, nil
+	return agents.TrustState{Trusted: true, Detail: " and trusted"}, nil
 }
 
 func pronoun(n int) string {
@@ -108,3 +110,11 @@ func pronoun(n int) string {
 	}
 	return "them"
 }
+
+var (
+	_ agents.Agent        = Agent{}
+	_ agents.Trusting     = Agent{}
+	_ agents.UserHooks    = Agent{}
+	_ agents.ManagedHooks = Agent{}
+	_ agents.Selector     = Agent{}
+)
