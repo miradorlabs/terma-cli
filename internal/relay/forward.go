@@ -12,6 +12,9 @@ import (
 	"sync"
 	"time"
 
+	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
+	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 
@@ -191,6 +194,10 @@ func (s *sender) loop() {
 			}
 			continue
 		}
+		// The project's content policy as it stands now, not as it stood when the part
+		// was queued: a project that turned prompts off since sends none of the prompts
+		// still waiting (they stay on disk until delivered, filtered).
+		body = s.r.withholdQueued(batch[0].signal, body, pol)
 		out, wait, detail, rejected := s.send(ctx, pol, batch[0].signal, body)
 		switch out {
 		case sent:
@@ -413,4 +420,38 @@ func (r *Relay) recoverOutbox() {
 		s.mu.Unlock()
 		s.poke()
 	}
+}
+
+// withholdQueued applies pol's content policy to a queued body before it is sent. A
+// body that no longer decodes is sent as it is: it was filtered when it was queued.
+func (r *Relay) withholdQueued(sig Signal, body []byte, pol Policy) []byte {
+	if pol.IncludePrompts && pol.IncludeToolContent {
+		return body
+	}
+	var msg proto.Message
+	switch sig {
+	case Logs:
+		msg = &logspb.LogsData{}
+	case Traces:
+		msg = &tracepb.TracesData{}
+	default:
+		msg = &metricspb.MetricsData{}
+	}
+	if proto.Unmarshal(body, msg) != nil {
+		return body
+	}
+	unclassified := map[string]int{}
+	n := withhold(&part{signal: sig, msg: msg}, pol.IncludePrompts, pol.IncludeToolContent, unclassified)
+	if n == 0 && len(unclassified) == 0 {
+		return body
+	}
+	r.stats.add("withheld_at_send_records", n)
+	for key, c := range unclassified {
+		r.stats.unclassified(key, c)
+	}
+	out, err := proto.Marshal(msg)
+	if err != nil {
+		return body
+	}
+	return out
 }

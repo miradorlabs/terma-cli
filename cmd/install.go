@@ -248,6 +248,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 		return err
 	}
 	f.excludePrompts = !include
+	f.excludeToolContent = !resolveToolContent(cmd, cfg.ProjectID, f)
 	if len(relayTargets(agents)) > 0 {
 		if include {
 			ui.summary("Prompts", "prompt text and model responses are sent — `terma install --prompts off` stops them")
@@ -506,6 +507,20 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	}
 	ui.finish()
 	return nil
+}
+
+// resolveToolContent decides whether the developer's agents send tool input and output,
+// the way resolvePrompts decides prompts: --exclude-tool-content when given, else the
+// choice this developer made for the project last time (its routing record), on for a
+// first install. A bare re-install used to switch tool content back on.
+func resolveToolContent(cmd *cobra.Command, projectID string, f installFlags) bool {
+	if cmd.Flags().Changed("exclude-tool-content") {
+		return !f.excludeToolContent
+	}
+	if rec, ok, err := routing.LoadRecord(projectID); err == nil && ok {
+		return rec.IncludeToolContent
+	}
+	return true
 }
 
 // resolvePrompts decides whether the developer's agents send prompt text and model

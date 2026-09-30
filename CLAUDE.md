@@ -339,6 +339,9 @@ run that reaches them opens a browser login on **production**. A script that run
   `selfupdate.NeedsRefresh`, so source builds and tests never touch home files) before
   verifying, and records it; the repository half is its own hook plan, which rewrites a
   stale committed file as it adds a missing one.
+- Tool content follows the same rule (`resolveToolContent`): `--exclude-tool-content`
+  when given, else the last choice for the project; a bare re-install used to switch it
+  back on.
 - Prompt capture (`resolvePrompts`): `--prompts on|off` (`--exclude-prompts` is the older,
   hidden spelling); otherwise install never asks: it keeps this developer's last choice for
   the project (`routing.Record.IncludePrompts`), on for a first install, and its Prompts line
@@ -616,7 +619,9 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   no OTLP dependency — every hook imports it) are forwarded, per project, with that
   project's key and host (`projectEndpoint`), content filtered by its routing record.
   Unclaimed records are held 2 minutes in memory, then dropped; nothing unclaimed touches
-  disk. A part that may leave is written — content policy applied — to its route's outbox
+  disk. A part that may leave is written — content policy applied, and applied again at
+  delivery (`withholdQueued`: a project that turned prompts off since sends none of the
+  prompts still queued) — to its route's outbox
   (`relay/outbox/<project>/<tool>/`, `internal/relay/outbox.go`) before the export is
   answered, and one sender per route delivers it (`forward.go`: merged requests, jittered
   backoff 1 s → 2 min honouring Retry-After, a refused key retried 5 min → 1 h and never
@@ -629,8 +634,10 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   `conversation_starts` before any hook and never retries it.
 - A claim is scoped to processes, not just a session: it carries the hook's ancestors
   (`internal/procinfo`), and the relay forwards a record only from a process the claim
-  names (`procinfo.PeerPID` per connection; an unresolved sender falls back to the
-  session and is counted). Claude keeps a session id across `--resume` in any directory,
+  names (`procinfo.PeerPID` per connection, retried at the connection's next exports if
+  it failed; an unresolved sender is covered only by a claim that names no processes —
+  a platform where hooks cannot read them — and never widens one that does: counted
+  `sender_unresolved`, held and dropped). Claude keeps a session id across `--resume` in any directory,
   so a session-only claim forwarded personal work. A Codex subagent's `agent_id` is its
   own thread and is claimed too. OTLP/JSON trace and span ids are hex and must be
   converted before protojson (`otlpjson.go`). A session's records leave in arrival order

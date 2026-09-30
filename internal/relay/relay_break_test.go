@@ -400,14 +400,14 @@ func TestRelayClaimCoversOnlyItsProcesses(t *testing.T) {
 	}
 	send(101) // the claiming agent
 	send(555) // the same session, resumed by another process
-	send(0)   // a sender that cannot be resolved
-	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["forwarded.logs"] == 2 })
+	send(0)   // a sender that cannot be resolved: it may be the resumed one too
+	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["forwarded.logs"] == 1 })
 	f.mu.Lock()
 	f.now = f.now.Add(2 * time.Minute)
 	f.mu.Unlock()
 	r.sweep()
 	c := r.Stats().Snapshot().Counters
-	if c["dropped.uncovered_process.logs"] != 1 || c["forwarded.logs"] != 2 || c["sender_unresolved"] != 1 {
+	if c["dropped.uncovered_process.logs"] != 2 || c["forwarded.logs"] != 1 || c["sender_unresolved"] == 0 {
 		t.Fatalf("stats = %v", c)
 	}
 }
@@ -954,5 +954,47 @@ func TestRelayHeartbeat(t *testing.T) {
 				t.Fatalf("a heartbeat went to a project (%s)", auth)
 			}
 		}
+	}
+}
+
+// A failed sender lookup is tried again at the connection's next export, not kept for
+// the connection's life: the socket may not have been in the kernel's table yet.
+func TestRelayRetriesAFailedSenderLookup(t *testing.T) {
+	u := newUpstream(t)
+	f := newFixture()
+	f.claims["A"] = claim.Claim{ProjectID: "p1", PIDs: []int{101}}
+	var lookups atomic.Int32
+	r := New(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+		PeerPID: func(int) (int, bool) {
+			if lookups.Add(1) == 1 {
+				return 0, false
+			}
+			return 101, true
+		},
+		Resolve: func(c claim.Claim) (Policy, error) { return allPolicies(u)[c.ProjectID], nil }})
+	go r.Run(t.Context())
+	srv := httptest.NewUnstartedServer(r.Handler())
+	srv.Config.ConnContext = r.ConnContext
+	srv.Start()
+	defer srv.Close()
+	client := &http.Client{} // keep-alive: both exports on one connection
+	for range 2 {
+		body, _ := proto.Marshal(logsOf("A", 1))
+		req, _ := http.NewRequest(http.MethodPost, srv.URL+"/v1/logs", bytes.NewReader(body))
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/x-protobuf")
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}
+	// The first export's sender was unknown: it waits, and is dropped when its hold runs
+	// out (loss, never a widened claim). The second found the sender, which the claim
+	// covers.
+	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["forwarded.logs"] >= 1 })
+	if n := lookups.Load(); n != 2 {
+		t.Fatalf("looked up %d times, want a retry after the failure", n)
 	}
 }

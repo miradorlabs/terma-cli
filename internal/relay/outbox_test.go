@@ -2,12 +2,14 @@ package relay
 
 import (
 	"context"
+	"io"
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -216,5 +218,58 @@ func TestBackoffAndJitter(t *testing.T) {
 	}
 	if retryAfter("120") != 2*time.Minute || retryAfter("99999") != maxRetryAfter || retryAfter("soon") != 0 {
 		t.Fatal("retryAfter")
+	}
+}
+
+// A part queued while the project allowed prompts, delivered after it stopped: it leaves
+// under the policy that stands at delivery, so the prompt never reaches upstream (the
+// review's reproduction: queue a prompt, restart with prompts off).
+func TestRelayQueuedPartsFollowTheCurrentContentPolicy(t *testing.T) {
+	var up atomic.Bool
+	var got [][]byte
+	var mu sync.Mutex
+	host := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !up.Load() {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		b, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		got = append(got, b)
+		mu.Unlock()
+	}))
+	defer host.Close()
+	dir := t.TempDir()
+	f := newFixture()
+	policy := func(prompts bool) func(claim.Claim) (Policy, error) {
+		return func(claim.Claim) (Policy, error) {
+			return Policy{Endpoint: host.URL, Key: "k", IncludePrompts: prompts, IncludeToolContent: true}, nil
+		}
+	}
+	first := New(Options{Dir: dir, Token: token, Lookup: f.lookup, Resolve: policy(true), Grace: 50 * time.Millisecond})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { first.Run(ctx); close(done) }()
+	srv := httptest.NewServer(first.Handler())
+	body, _ := proto.Marshal(logsOf("A", 1, kv("event.name", "user_prompt"), kv("prompt", "TERMA_QUEUED_SECRET")))
+	post(t, srv, "/v1/logs", body, "application/x-protobuf", token, false)
+	srv.Close()
+	waitFor(t, func() bool { return first.Stats().Snapshot().Counters["upstream_retries"] >= 1 })
+	cancel()
+	<-done
+
+	up.Store(true)
+	second := New(Options{Dir: dir, Token: token, Lookup: f.lookup, Resolve: policy(false)})
+	go second.Run(t.Context())
+	waitFor(t, func() bool { return second.Stats().Snapshot().Counters["forwarded.logs"] == 1 })
+	mu.Lock()
+	defer mu.Unlock()
+	for _, b := range got {
+		if strings.Contains(string(b), "TERMA_QUEUED_SECRET") {
+			t.Fatal("a prompt queued before prompts were turned off reached upstream")
+		}
+	}
+	if c := second.Stats().Snapshot().Counters; c["withheld_at_send_records"] == 0 {
+		t.Fatalf("nothing was withheld at delivery: %v", c)
 	}
 }

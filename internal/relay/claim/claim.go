@@ -85,11 +85,15 @@ func (c Claim) Covers(pid int) bool {
 	return covers(c.PIDs, pid)
 }
 
+// covers reports whether a placement naming pids covers a record pid sent. A placement
+// that names none (a platform where a hook cannot read its processes) covers any
+// sender; one that names some covers only those — never a sender the relay could not
+// identify (pid 0), which would otherwise let a session resumed elsewhere through.
 func covers(pids []int, pid int) bool {
-	if len(pids) == 0 || pid == 0 {
+	if len(pids) == 0 {
 		return true
 	}
-	return slices.Contains(pids, pid)
+	return pid != 0 && slices.Contains(pids, pid)
 }
 
 func (c Claim) placements() []Placement {

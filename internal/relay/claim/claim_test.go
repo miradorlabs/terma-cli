@@ -84,8 +84,11 @@ func TestClaimMergesProcesses(t *testing.T) {
 	if !c.Covers(10) || !c.Covers(21) || c.Covers(99) {
 		t.Fatalf("claim %v", c.PIDs)
 	}
-	if !(Claim{}).Covers(99) || !c.Covers(0) {
-		t.Fatal("a claim without processes, or a sender that could not be resolved, is covered")
+	if !(Claim{}).Covers(99) || !(Claim{}).Covers(0) {
+		t.Fatal("a claim naming no processes (a platform that cannot read them) covers any sender")
+	}
+	if c.Covers(0) {
+		t.Fatal("a sender the relay could not identify widened a claim that names its processes")
 	}
 }
 
@@ -139,13 +142,23 @@ func TestClaimKeepsEachPlacementOfAResumedSession(t *testing.T) {
 	}{
 		{10, t1.Add(time.Minute), "p1"}, // the first run's process, however late
 		{20, t0, "p2"},                  // the second run's, however early its clock
-		{0, t0.Add(time.Minute), "p1"},  // no process: the placement in effect then
-		{0, t1.Add(time.Minute), "p2"},
-		{0, time.Time{}, "p2"}, // no time either: the latest
 	} {
 		got, ok := c.At(tc.pid, tc.at)
 		if !ok || got.ProjectID != tc.want {
 			t.Errorf("At(%d, %v) = %q, %v; want %q", tc.pid, tc.at, got.ProjectID, ok, tc.want)
+		}
+	}
+	if _, ok := c.At(0, t1); ok {
+		t.Fatal("a sender the relay could not identify was covered by placements that name processes")
+	}
+	// Where processes cannot be read, the placements name none: a record's time decides.
+	blind := Claim{ProjectID: "p2", Placements: []Placement{{ProjectID: "p1", Since: t0}, {ProjectID: "p2", Since: t1}}}
+	for _, tc := range []struct {
+		at   time.Time
+		want string
+	}{{t0.Add(time.Minute), "p1"}, {t1.Add(time.Minute), "p2"}, {time.Time{}, "p2"}} {
+		if got, ok := blind.At(0, tc.at); !ok || got.ProjectID != tc.want {
+			t.Errorf("blind At(0, %v) = %q, %v; want %q", tc.at, got.ProjectID, ok, tc.want)
 		}
 	}
 	if _, ok := c.At(99, t1); ok {

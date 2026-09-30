@@ -315,3 +315,34 @@ func TestYesAnswer(t *testing.T) {
 		}
 	}
 }
+
+// --exclude-tool-content sticks like --prompts: a re-install without it keeps the last
+// choice instead of switching tool content back on (a review reproduced exactly that).
+func TestInstallToolContentChoiceSticks(t *testing.T) {
+	acme := projectsIn(orgA().ID)[0]
+	boundRepo(t, termaproject.Project{ID: acme.ID, Name: acme.Name, OrganizationID: orgA().ID}, true)
+	toolContent := func() bool {
+		t.Helper()
+		rec, ok, err := routing.LoadRecord(acme.ID)
+		if err != nil || !ok {
+			t.Fatalf("no routing record: ok=%v err=%v", ok, err)
+		}
+		return rec.IncludeToolContent
+	}
+	for _, step := range []struct {
+		args []string
+		want bool
+	}{
+		{nil, true}, // a first install sends it
+		{[]string{"--exclude-tool-content"}, false},
+		{nil, false}, // kept, not re-defaulted
+		{[]string{"--exclude-tool-content=false"}, true},
+	} {
+		if out, err := routeCodex(t, step.args...); err != nil {
+			t.Fatalf("install %v: %v\n%s", step.args, err, out)
+		}
+		if got := toolContent(); got != step.want {
+			t.Fatalf("after install %v: tool content included = %v, want %v", step.args, got, step.want)
+		}
+	}
+}
