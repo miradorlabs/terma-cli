@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/miradorlabs/terma-cli/internal/doctor"
-	"github.com/miradorlabs/terma-cli/internal/shim"
+	"github.com/miradorlabs/terma-cli/internal/shellrc"
 )
 
 // What else is installed on the machine running the tests is none of their business.
@@ -156,7 +156,7 @@ func TestDoctorGivesTheCommandThatPutsTermaOnPath(t *testing.T) {
 	if out, err := exec.Command("/bin/sh", "-c", echo).CombinedOutput(); err != nil {
 		t.Fatalf("%s: %v\n%s", echo, err, out)
 	}
-	rc, _ := shim.ShellRC()
+	rc, _ := shellrc.ShellRC()
 	if data, _ := os.ReadFile(filepath.Join(home, ".zshrc")); string(data) != rc.PathLine(dir)+"\n" {
 		t.Fatalf("~/.zshrc = %q, want %q", data, rc.PathLine(dir)+"\n")
 	}

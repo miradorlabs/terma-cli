@@ -58,7 +58,7 @@ func routeCodex(t *testing.T, includePrompts bool) {
 	t.Helper()
 	enableRelay(t) // consent comes from the project's routing record alone
 	if err := routing.SaveRecord(routing.Record{ProjectID: "project-a", Endpoint: "https://otel.terma.ai", Signals: []string{"logs"},
-		IncludePrompts: includePrompts, Harnesses: []string{routing.AgentCodex}}); err != nil {
+		IncludePrompts: includePrompts, Harnesses: []string{name}}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -79,10 +79,9 @@ func connectCodexMachineWide(t *testing.T, includePrompts bool) {
 
 func connectCodexDesktop(t *testing.T, includePrompts bool) {
 	t.Helper()
-	desktop := true
 	if err := routing.SaveRecord(routing.Record{ProjectID: "project-a", Endpoint: "https://otel.terma.ai",
-		Signals: []string{"logs"}, Harnesses: []string{routing.AgentCodex},
-		IncludePrompts: includePrompts, Desktop: desktop}); err != nil {
+		Signals: []string{"logs"}, Harnesses: []string{name},
+		IncludePrompts: includePrompts, Surfaces: []string{desktop}}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -172,10 +171,8 @@ func TestCodexRepliesNeedTheConsentPromptsTravelUnder(t *testing.T) {
 			hookruntest.WriteFile(t, os.Getenv("CODEX_HOME"), "config.toml", "[otel\ninvalid\n")
 		}, 2},
 		{"desktop choice is explicitly off", func(t *testing.T) {
-			falseValue := false
 			if err := routing.SaveRecord(routing.Record{ProjectID: "project-a", Endpoint: "https://otel.terma.ai",
-				Signals: []string{"logs"}, IncludePrompts: true, Harnesses: []string{routing.AgentCodex},
-				Desktop: falseValue}); err != nil {
+				Signals: []string{"logs"}, IncludePrompts: true, Harnesses: []string{name}}); err != nil {
 				t.Fatal(err)
 			}
 		}, 0},
@@ -219,7 +216,7 @@ func TestCodexRepliesFailClosedWhenAConsentSourceCannotBeRead(t *testing.T) {
 		// machine it is not (it lets everything out, and the relay withholds per project).
 		{"a machine-wide config that does not parse, beside a routing record that allows prompts", func(t *testing.T) {
 			if err := routing.SaveRecord(routing.Record{ProjectID: "project-a", Endpoint: "https://otel.terma.ai", Signals: []string{"logs"},
-				IncludePrompts: true, Harnesses: []string{routing.AgentCodex}}); err != nil {
+				IncludePrompts: true, Harnesses: []string{name}}); err != nil {
 				t.Fatal(err)
 			}
 			hookruntest.WriteFile(t, os.Getenv("CODEX_HOME"), "config.toml", "[otel\nlog_user_prompt = = true\n")

@@ -25,13 +25,13 @@ var primaryCommands = []string{
 // troubleshooting run, and what terma's own fix-it hints name (`terma login`, `terma
 // connect codex`, `terma spool flush`) — so every one of them must keep working.
 var advancedCommands = []string{
-	"config", "connect", "desktop", "disconnect", "harness", "hook", "login", "logout", "nate",
-	"principal", "project", "relay", "shim", "spool", "telemetry", "version", "whoami",
+	"agent", "config", "connect", "disconnect", "harness", "hook", "login", "logout", "nate",
+	"principal", "project", "relay", "spool", "telemetry", "version", "whoami",
 }
 
 // removedCommands are gone, not hidden: product decisions to drop them, so no message
 // may name them and `terma <name>` is an unknown command.
-var removedCommands = []string{"blame"}
+var removedCommands = []string{"blame", "desktop", "shim"}
 
 func commandNamed(root *cobra.Command, name string) *cobra.Command {
 	for _, c := range root.Commands() {

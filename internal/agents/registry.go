@@ -80,6 +80,26 @@ func (r *Registry) Surface(name string) (Surface, Agent, bool) {
 	return Surface{}, nil, false
 }
 
+// CheckedSurfaces names every surface with a check of its own.
+func (r *Registry) CheckedSurfaces() []string {
+	var out []string
+	for _, c := range r.With[SurfaceChecker]() {
+		out = append(out, c.CheckedSurfaces()...)
+	}
+	return out
+}
+
+// CheckSurface runs the named surface's own check; ok is false when it has none.
+func (r *Registry) CheckSurface(surface, root, projectID string) (st SurfaceStatus, ok bool, err error) {
+	for _, c := range r.With[SurfaceChecker]() {
+		if slices.Contains(c.CheckedSurfaces(), surface) {
+			st, err = c.CheckSurface(surface, root, projectID)
+			return st, true, err
+		}
+	}
+	return SurfaceStatus{}, false, nil
+}
+
 // Names lists every known agent's name.
 func (r *Registry) Names() []string {
 	out := make([]string, 0, len(r.all))

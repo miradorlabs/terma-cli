@@ -31,7 +31,7 @@ import (
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/session"
-	"github.com/miradorlabs/terma-cli/internal/shim"
+	"github.com/miradorlabs/terma-cli/internal/shellrc"
 	"github.com/miradorlabs/terma-cli/internal/spinner"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 	"github.com/miradorlabs/terma-cli/internal/trailer"
@@ -194,7 +194,6 @@ func otherTermas(primary string) []string {
 		return nil
 	}
 	primaryInfo, _ := os.Stat(primary)
-	shimDir, _ := shim.ShimBinDir()
 	name := "terma"
 	if runtime.GOOS == "windows" {
 		name += ".exe"
@@ -202,7 +201,7 @@ func otherTermas(primary string) []string {
 	var out []string
 	seen := map[string]bool{}
 	for _, dir := range append(filepath.SplitList(os.Getenv("PATH")), wellKnownBinDirs()...) {
-		if dir == "" || filepath.Clean(dir) == filepath.Clean(shimDir) {
+		if dir == "" {
 			continue
 		}
 		candidate := filepath.Join(dir, name)
@@ -271,9 +270,9 @@ func installedBinaryDigest(path string) (string, error) {
 // own shell: the line appended to the startup file terma knows for it and read into this
 // shell, or for fish, fish_add_path, which keeps the entry itself. A shell terma does not
 // know gets the line for this shell alone. terma never runs it: this is the developer's
-// own binary directory, not the shim block install manages.
+// own startup file.
 func addToPathCommand(dir string) string {
-	rc, ok := shim.ShellRC()
+	rc, ok := shellrc.ShellRC()
 	if !ok {
 		return `export PATH="` + dir + `:$PATH"`
 	}

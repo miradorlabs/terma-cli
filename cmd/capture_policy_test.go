@@ -7,9 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -290,33 +288,6 @@ func TestQueuedRelayExportsRespectHarnessDeselection(t *testing.T) {
 	}
 	if n := requests.Load(); n != 1 {
 		t.Fatalf("deselected harness retried delivery: %d requests", n)
-	}
-}
-
-func TestRefreshMigratesExportersBeforeRemovingShim(t *testing.T) {
-	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
-	sandboxMachine(t)
-	t.Setenv("CODEX_HOME", t.TempDir())
-	t.Setenv("TERMA_RELAY_SERVICE", "0")
-	serveRelayForRefresh(t)
-	shim := plantLegacyShim(t, "codex")
-	rec := routing.Record{ProjectID: "team", Signals: []string{"metrics"}, IncludePrompts: false, IncludeToolContent: false, Harnesses: []string{"codex"}, CLI: true}
-	if err := routing.SaveRecord(rec); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := refreshMachine(); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(shim); !os.IsNotExist(err) {
-		t.Fatalf("shim not removed: %v", err)
-	}
-	st, err := harnessOf(t, "codex").Status()
-	if err != nil || !claim.Enabled() || !strings.HasPrefix(st.Endpoint, "http://127.0.0.1:") {
-		t.Fatalf("replacement exporter missing: %+v %v", st, err)
-	}
-	after, ok, err := routing.LoadRecord("team")
-	if err != nil || !ok || after.IncludePrompts || after.IncludeToolContent || len(after.Signals) != 1 || after.Signals[0] != "metrics" {
-		t.Fatalf("upgrade changed consent: %+v %v", after, err)
 	}
 }
 

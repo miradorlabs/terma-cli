@@ -7,7 +7,8 @@
 //
 // The rules a migration keeps, because of where it runs:
 //
-//   - Append-only IDs. Never renumber, reuse or delete one: a machine may have run it.
+//   - Append-only IDs. Never renumber or reuse one: a machine may have recorded it. A
+//     migration only pre-release state needed is retired, its ID kept (retiredThrough).
 //   - Idempotent. A crash between the change and the record runs it again.
 //   - Readable by the previous build. Another terma may share the machine (doctor warns
 //     when one does) and read the same files next, so a migration adds and fills in; it
@@ -28,6 +29,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -136,6 +138,9 @@ func Run(ctx context.Context, dir string, retry bool) ([]string, error) {
 		// Unreadable is not "none applied": running everything again is safe (each
 		// migration is idempotent), and rewriting the record repairs it.
 		s = State{}
+	}
+	if f := s.Failed; f != nil && !slices.ContainsFunc(migrations, func(m Migration) bool { return m.ID == f.ID }) {
+		s.Failed = nil // a retired migration's failure holds nothing back
 	}
 	if f := s.Failed; f != nil && !retry && time.Since(f.At) < RetryAfter {
 		return nil, fmt.Errorf("%s: %s", f.Name, f.Error)

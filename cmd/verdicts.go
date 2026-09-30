@@ -10,7 +10,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
-	"github.com/miradorlabs/terma-cli/internal/keystore"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 )
 
@@ -259,53 +258,66 @@ func judgeHarnesses(ctx context.Context, otlpURL, projectID, root string) []harn
 	return out
 }
 
-// judgeSelectedHarnesses keeps the CLI and desktop Codex surfaces distinct for a
-// developer who selected desktop during setup. A desktop-only choice must never
-// be reported as a missing CLI PATH shim.
-func judgeSelectedHarnesses(ctx context.Context, otlpURL, projectID, root string, selected []string) []harnessVerdict {
-	selected = selectedForRepo(projectID, selected)
+// judgeSelectedHarnesses keeps an agent's surfaces distinct for a developer who
+// selected one with a check of its own (Codex Desktop): a desktop-only choice must never
+// be reported as a missing CLI.
+func judgeSelectedHarnesses(ctx context.Context, otlpURL, projectID, root string, saved []string) []harnessVerdict {
+	selected := selectedForRepo(projectID, saved)
 	verdicts := judgeHarnesses(ctx, otlpURL, projectID, root)
-	if !slices.Contains(selected, codexDesktopAgent) {
+	var checked []harnessVerdict
+	for _, name := range selected {
+		if v, ok := judgeSurface(name, root, projectID); ok {
+			checked = append(checked, v)
+		}
+	}
+	if len(checked) == 0 {
 		return verdicts
 	}
 	verdicts = slices.DeleteFunc(verdicts, func(v harnessVerdict) bool { return !slices.Contains(selected, v.name) })
-	return append(verdicts, judgeDesktop(projectID))
+	return append(verdicts, checked...)
 }
 
+// selectedForRepo is the saved selection as this repository's routing record narrows it:
+// for an agent run as more than one surface, the surfaces the record routes here. A
+// record that names no surface (one an earlier build wrote) leaves the selection alone,
+// so a surface's own check still says what is missing.
 func selectedForRepo(projectID string, saved []string) []string {
 	selected := slices.Clone(saved)
 	if projectID == "" {
 		return selected
 	}
 	rec, ok, err := routing.LoadRecord(projectID)
-	if err != nil || !ok {
+	if err != nil || !ok || len(rec.Surfaces) == 0 {
 		return selected
 	}
-	for _, choice := range []struct {
-		name    string
-		enabled bool
-	}{{routing.AgentCodex, rec.CLI}, {codexDesktopAgent, rec.Desktop}} {
-		if choice.enabled && !slices.Contains(selected, choice.name) {
-			selected = append(selected, choice.name)
-		} else if !choice.enabled {
-			selected = slices.DeleteFunc(selected, func(name string) bool { return name == choice.name })
+	for _, a := range registered.With[agents.Surfaced]() {
+		for _, s := range a.Surfaces() {
+			routed := slices.Contains(rec.Surfaces, s.Name)
+			if routed && !slices.Contains(selected, s.Name) {
+				selected = append(selected, s.Name)
+			} else if !routed {
+				selected = slices.DeleteFunc(selected, func(name string) bool { return name == s.Name })
+			}
 		}
 	}
 	return selected
 }
 
-func judgeDesktop(projectID string) harnessVerdict {
-	v := harnessVerdict{name: codexDesktopAgent, displayName: "Codex Desktop"}
-	route, ok, routeErr := routing.LoadRecord(projectID)
+// judgeSurface is the verdict of a surface with a check of its own.
+func judgeSurface(surface, root, projectID string) (harnessVerdict, bool) {
+	st, ok, err := registered.CheckSurface(surface, root, projectID)
+	if !ok {
+		return harnessVerdict{}, false
+	}
+	s, _, _ := registered.Surface(surface)
+	v := harnessVerdict{name: surface, displayName: s.DisplayName}
 	switch {
-	case routeErr != nil:
-		v.emissionProblem, v.emissionFix = "could not read this repository's Codex desktop route: "+routeErr.Error(), "terma install"
-	case !ok || !route.Desktop || !slices.Contains(route.Harnesses, routing.AgentCodex) || !slices.Contains(route.Signals, "logs"):
-		v.emissionProblem, v.emissionFix = "this repository has no Codex Desktop hook route", "terma install --signals logs"
-	case keystore.GetFor(routing.AgentCodex, projectID) == "":
-		v.emissionProblem, v.emissionFix = "this repository has no delivery key", "terma install"
+	case err != nil:
+		v.emissionProblem, v.emissionFix = "could not check "+s.DisplayName+": "+err.Error(), "terma install"
+	case !st.Ready:
+		v.emissionProblem, v.emissionFix = st.Problem, st.Fix
 	default:
 		v.route = routeHooks
 	}
-	return v
+	return v, true
 }

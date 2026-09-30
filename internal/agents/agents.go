@@ -161,3 +161,25 @@ type Retrusting interface {
 	Agent
 	RetrustNote() string
 }
+
+// SurfaceStatus is what a surface's own check found in a repository.
+type SurfaceStatus struct {
+	// Ready: the surface's sessions here reach Terma.
+	Ready bool
+	// Problem says why they do not, and Fix what to run.
+	Problem, Fix string
+	// Lines are what `terma agent status` prints, in order.
+	Lines []StatusLine
+}
+
+// StatusLine is one labelled line of a surface's status.
+type StatusLine struct{ Label, Value string }
+
+// SurfaceChecker is an agent whose surfaces check their own readiness in a repository.
+type SurfaceChecker interface {
+	Agent
+	// CheckedSurfaces names the surfaces with a check.
+	CheckedSurfaces() []string
+	// CheckSurface is one of them's status in the repository at root, bound to projectID.
+	CheckSurface(surface, root, projectID string) (SurfaceStatus, error)
+}

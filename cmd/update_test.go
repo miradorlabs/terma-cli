@@ -45,7 +45,7 @@ func TestAutomaticUpdatePreference(t *testing.T) {
 func TestAutomaticUpdateCommandEligibility(t *testing.T) {
 	t.Setenv("CI", "")
 	t.Setenv("TERMA_NO_UPDATE_CHECK", "")
-	for _, name := range []string{"hook", "shim", "spool", "update", "version", "completion"} {
+	for _, name := range []string{"hook", "spool", "update", "version", "completion"} {
 		root := NewRootCommand()
 		root.InitDefaultCompletionCmd()
 		cmd, _, err := root.Find([]string{name})

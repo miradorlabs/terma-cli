@@ -9,27 +9,15 @@
 package routing
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
-	"slices"
-	"strconv"
-	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
-)
-
-// The agents a record names, by the names the keystore and the records use.
-const (
-	// AgentClaude is Claude Code.
-	AgentClaude = "claude"
-	// AgentCodex is Codex (CLI and Desktop).
-	AgentCodex = "codex"
 )
 
 // Record is a project's routing configuration on this machine, written by `terma
@@ -42,13 +30,15 @@ type Record struct {
 	ProjectID          string            `json:"project_id"`
 	Endpoint           string            `json:"endpoint"`
 	Signals            []string          `json:"signals"`
-	CLI                bool              `json:"cli"`
-	Desktop            bool              `json:"desktop"`
 	IncludePrompts     bool              `json:"include_prompts"`
 	IncludeToolContent bool              `json:"include_tool_content"`
 	ResourceAttributes map[string]string `json:"resource_attributes,omitempty"`
 	// Harnesses names the agents routed to this project for this developer.
 	Harnesses []string `json:"harnesses"`
+	// Surfaces names the ways the developer runs them that are routed here (an
+	// agents.Surface: Codex's CLI and desktop app are two; an agent with one surface is
+	// named by it).
+	Surfaces []string `json:"surfaces,omitempty"`
 }
 
 func dir(parts ...string) (string, error) {
@@ -106,65 +96,4 @@ func LoadRecord(projectID string) (rec Record, ok bool, err error) {
 		return Record{}, false, err
 	}
 	return rec, true, nil
-}
-
-// MigrateCodexCLIRoutes gives every routing record written before the cli field (0.0.2
-// and earlier) the meaning it had then: a record that routes codex routes the Codex CLI,
-// and nothing routes Codex Desktop. Without it the router reads the missing field as
-// false and silently stops exporting that developer's Codex CLI sessions. A record that
-// already says either way is left alone, as is every field this build does not know; a
-// record that does not parse is not this migration's to repair. It stops between records
-// when ctx is done; the records it has not reached are migrated on a later start.
-func MigrateCodexCLIRoutes(ctx context.Context) error {
-	dir, err := RoutingDir()
-	if err != nil {
-		return err
-	}
-	entries, err := os.ReadDir(dir)
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	var errs []error
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
-			continue
-		}
-		if err := ctx.Err(); err != nil {
-			return errors.Join(append(errs, err)...)
-		}
-		errs = append(errs, addCLIField(filepath.Join(dir, e.Name())))
-	}
-	return errors.Join(errs...)
-}
-
-func addCLIField(path string) error {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	var rec map[string]json.RawMessage
-	if json.Unmarshal(data, &rec) != nil || rec == nil {
-		return nil
-	}
-	if _, ok := rec["cli"]; ok {
-		return nil
-	}
-	var harnesses []string
-	_ = json.Unmarshal(rec["harnesses"], &harnesses)
-	rec["cli"] = json.RawMessage(strconv.FormatBool(slices.Contains(harnesses, AgentCodex)))
-	if _, ok := rec["desktop"]; !ok {
-		rec["desktop"] = json.RawMessage("false")
-	}
-	out, err := json.MarshalIndent(rec, "", "  ")
-	if err != nil {
-		return err
-	}
-	info, err := os.Stat(path)
-	if err != nil {
-		return err
-	}
-	return config.WriteFileAtomic(path, append(out, '\n'), info.Mode().Perm())
 }

@@ -9,7 +9,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -22,7 +21,6 @@ import (
 
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
-	"github.com/miradorlabs/terma-cli/internal/shim"
 )
 
 // sandboxMachine keeps a refresh away from the developer's real shims, status line and
@@ -110,18 +108,16 @@ func TestRefreshOutsideARepositoryRefreshesTheMachine(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	sandboxMachine(t)
 	t.Chdir(t.TempDir())
-	claude := plantLegacyShim(t, routing.AgentClaude)
+	statusLine := plantStaleStatusLine(t)
 
 	out, err := runTerma(t, "update", "--refresh")
 	if err != nil {
 		t.Fatalf("refresh: %v\n%s", err, out)
 	}
-	if !strings.Contains(out, "removed: the local relay routes the agents now") || !strings.Contains(out, "inside each repository") {
+	if !strings.Contains(out, statusLine) || !strings.Contains(out, "inside each repository") {
 		t.Fatalf("output:\n%s", out)
 	}
-	if _, err := os.Stat(claude); !os.IsNotExist(err) {
-		t.Fatalf("the legacy shim was not removed: %v", err)
-	}
+	requireRefreshed(t, statusLine)
 }
 
 func TestRefreshIsExclusiveWithTheOtherModes(t *testing.T) {
@@ -303,7 +299,7 @@ func TestRefreshAfterUpgradeRunsOncePerRelease(t *testing.T) {
 	if err := os.WriteFile(settings, stale, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	codex := plantLegacyShim(t, routing.AgentCodex)
+	statusLine := plantStaleStatusLine(t)
 
 	original := Version
 	Version = "9.9.9"
@@ -314,9 +310,7 @@ func TestRefreshAfterUpgradeRunsOncePerRelease(t *testing.T) {
 	if !strings.Contains(out.String(), "refreshed 1 file(s)") || !strings.Contains(out.String(), "`terma update --refresh` here") {
 		t.Fatalf("output:\n%s", &out)
 	}
-	if _, err := os.Stat(codex); !os.IsNotExist(err) {
-		t.Fatalf("the legacy shim was not removed: %v", err)
-	}
+	requireRefreshed(t, statusLine)
 	if got, _ := os.ReadFile(settings); !bytes.Equal(got, stale) {
 		t.Fatal("an automatic refresh rewrote a committed file")
 	}
@@ -343,7 +337,7 @@ func TestInstallRefreshesTheMachineOnANewRelease(t *testing.T) {
 		return out
 	}
 	install()
-	codex := plantLegacyShim(t, routing.AgentCodex)
+	statusLine := plantStaleStatusLine(t)
 
 	original := Version
 	Version = "9.9.9"
@@ -351,9 +345,7 @@ func TestInstallRefreshesTheMachineOnANewRelease(t *testing.T) {
 	if out := install(); !strings.Contains(out, "✓ Refreshed     1 file(s) an earlier terma installed") {
 		t.Fatalf("install should refresh the machine as a step:\n%s", out)
 	}
-	if _, err := os.Stat(codex); !os.IsNotExist(err) {
-		t.Fatalf("the legacy shim was not removed: %v", err)
-	}
+	requireRefreshed(t, statusLine)
 	var after bytes.Buffer
 	refreshAfterUpgrade(context.Background(), os.Getenv("TERMA_CONFIG_DIR"), &after)
 	if after.Len() != 0 {
@@ -364,20 +356,28 @@ func TestInstallRefreshesTheMachineOnANewRelease(t *testing.T) {
 	}
 }
 
-// plantLegacyShim puts a PATH-shim script where an earlier build installed them, for a
-// refresh to remove.
-func plantLegacyShim(t *testing.T, agent string) string {
+// plantStaleStatusLine wraps Claude Code's status line the way an earlier build did, and
+// returns the settings file a machine refresh rewrites.
+func plantStaleStatusLine(t *testing.T) string {
 	t.Helper()
-	binDir, err := shim.ShimBinDir()
+	c := claudeHarness(t)
+	if _, err := c.InstallStatusLine(); err != nil {
+		t.Fatal(err)
+	}
+	path, err := c.ConfigPath()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(binDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	path := filepath.Join(binDir, agent)
-	if err := os.WriteFile(path, []byte("#!/bin/sh\n# terma per-repo routing shim for "+agent+".\n"), 0o755); err != nil {
+	if err := os.WriteFile(path, []byte(`{"statusLine":{"type":"command","command":"exec terma hook statusline"}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	return path
+}
+
+// requireRefreshed fails unless the stale wrap at path was rewritten.
+func requireRefreshed(t *testing.T, path string) {
+	t.Helper()
+	if data, _ := os.ReadFile(path); strings.Contains(string(data), `"exec terma hook statusline"`) {
+		t.Fatalf("the stale status line was not refreshed:\n%s", data)
+	}
 }

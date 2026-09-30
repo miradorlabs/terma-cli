@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 	"slices"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
@@ -14,36 +12,24 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/migrate"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
-	"github.com/miradorlabs/terma-cli/internal/shim"
 	"github.com/miradorlabs/terma-cli/internal/style"
 )
 
 // A refresh brings what earlier versions of terma wrote up to this build, so an update
 // takes effect without re-running `terma install`. Re-running install is not the same
 // thing: several of its choices are flags it never records (--signals, --exclude-prompts,
-// --identity, --no-statusline, --activation), so a bare re-run would put them back to
-// their defaults, and it signs in. A refresh works only from what is on disk. It
-// rewrites files terma wrote with this build's templates, never creates one, never signs
-// in, and never touches a choice: an absent shim, status line or hook file stays absent.
+// --identity, --no-statusline), so a bare re-run would put them back to their
+// defaults, and it signs in. A refresh works only from what is on disk. It rewrites
+// files terma wrote with this build's templates, never creates one, never signs in, and
+// never touches a choice: an absent status line or hook file stays absent.
 
 // refreshMachine rewrites the home-directory files every repository shares, each agent's
-// (agents.MachineRefresher). It also removes the PATH shims an earlier
-// build installed — the local relay routes the agents now, and a shim left on PATH would
-// run every agent launch through terma for nothing. It returns the paths it changed,
-// carrying on past a failure so one broken file does not strand the rest.
+// (agents.MachineRefresher). It returns the paths it changed, carrying on past a failure
+// so one broken file does not strand the rest.
 func refreshMachine() ([]string, error) {
 	var changed []string
 	var errs []error
-	if err := migrateLegacyExporters(); err != nil {
-		errs = append(errs, fmt.Errorf("migrate PATH-shim exporters to the local relay: %w", err))
-	} else if removed, err := shim.RemoveLegacy(); err != nil {
-		errs = append(errs, fmt.Errorf("remove the PATH shims: %w", err))
-	} else if removed {
-		dir, _ := shim.ShimBinDir()
-		changed = append(changed, dir+" — removed: the local relay routes the agents now")
-	}
 	for _, a := range registered.With[agents.MachineRefresher]() {
 		if path, ok, err := a.RefreshMachine(); err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", a.Name(), err))
@@ -52,69 +38,6 @@ func refreshMachine() ([]string, error) {
 		}
 	}
 	return changed, errors.Join(errs...)
-}
-
-// Configure the replacement before removing an installed shim. Routing records
-// retain the project's capture choices and keys; a refresh never rewrites them.
-func migrateLegacyExporters() error {
-	bin, err := shim.ShimBinDir()
-	if err != nil {
-		return err
-	}
-	installed, err := os.ReadDir(bin)
-	if os.IsNotExist(err) || len(installed) == 0 {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	dir, err := routing.RoutingDir()
-	if err != nil {
-		return err
-	}
-	entries, err := os.ReadDir(dir)
-	if os.IsNotExist(err) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	var agents []string
-	for _, e := range entries {
-		if e.IsDir() || filepath.Ext(e.Name()) != ".json" {
-			continue
-		}
-		rec, ok, err := routing.LoadRecord(e.Name()[:len(e.Name())-5])
-		if err != nil {
-			return err
-		}
-		if !ok {
-			continue
-		}
-		for _, a := range rec.Harnesses {
-			if !slices.Contains(agents, a) {
-				agents = append(agents, a)
-			}
-		}
-	}
-	if err := connectMachineRelay(context.Background(), agents, "", relayReport{
-		ok: func(string, string) {}, warn: func(string, string) {}, then: func(string) {}, detail: io.Discard,
-	}); err != nil {
-		return err
-	}
-	if len(registered.RelayTargets(agents)) == 0 {
-		return nil
-	}
-	relayPath, err := relayDir()
-	if err != nil {
-		return err
-	}
-	if _, running, err := relayStats(relayPath); err != nil {
-		return fmt.Errorf("verify the replacement relay: %w", err)
-	} else if !running {
-		return errors.New("the replacement relay is not running; keeping the PATH shims")
-	}
-	return nil
 }
 
 // repoRefresh is what a refresh would change in one repository's committed files.

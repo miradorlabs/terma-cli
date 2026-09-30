@@ -14,6 +14,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hookrun"
 )
 
+// name is the agent's name, in the keystore and the routing records too.
+const name = "codex"
+
 // Agent covers OpenAI's Codex CLI and Desktop repository hooks in .codex/hooks.json.
 // The CLI's user-level notifier (`notify` in ~/.codex/config.toml, written by
 // `terma connect codex`) reaches the same handler set through codex-notify.
@@ -21,7 +24,7 @@ type Agent struct{}
 
 const codexHookReview = "open this repository in Codex Desktop, then go to Settings → Hooks → Review and approve the Terma entries (or run /hooks in Codex CLI)"
 
-func (Agent) Name() string                       { return "codex" }
+func (Agent) Name() string                       { return name }
 func (Agent) DisplayName() string                { return "Codex" }
 func (Agent) Installed(ctx context.Context) bool { return Codex{}.Detect(ctx).Found }
 func (Agent) HooksPath() string                  { return hooksPath }
@@ -151,6 +154,7 @@ func (Agent) RetrustNote() string {
 }
 
 var (
+	_ agents.SurfaceChecker = Agent{}
 	_ agents.Retrusting     = Agent{}
 	_ agents.ContentConsent = Agent{}
 	_ agents.OffSwitched    = Agent{}

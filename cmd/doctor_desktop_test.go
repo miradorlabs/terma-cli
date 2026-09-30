@@ -2,11 +2,13 @@ package cmd
 
 import (
 	"context"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
+
+	"github.com/miradorlabs/terma-cli/internal/routing"
 
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
@@ -15,12 +17,11 @@ import (
 func TestDesktopOnlySelectionDoesNotRequireCodexCLIShim(t *testing.T) {
 	t.Setenv("CODEX_HOME", t.TempDir())
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
-	cli, desktop := false, true
 	if err := routing.SaveRecord(routing.Record{ProjectID: testProjectID, Endpoint: "https://otel.terma.ai", Signals: []string{"logs"},
-		Harnesses: []string{routing.AgentCodex}, CLI: cli, Desktop: desktop}); err != nil {
+		Harnesses: []string{"codex"}, Surfaces: []string{codexDesktopAgent}}); err != nil {
 		t.Fatal(err)
 	}
-	selected := selectedForRepo(testProjectID, []string{routing.AgentCodex})
+	selected := selectedForRepo(testProjectID, []string{"codex"})
 	if !slices.Equal(selected, []string{codexDesktopAgent}) {
 		t.Fatalf("effective choices = %v", selected)
 	}
@@ -29,7 +30,7 @@ func TestDesktopOnlySelectionDoesNotRequireCodexCLIShim(t *testing.T) {
 	for _, verdict := range verdicts {
 		names = append(names, verdict.name)
 	}
-	if slices.Contains(names, routing.AgentCodex) || !slices.Contains(names, codexDesktopAgent) {
+	if slices.Contains(names, "codex") || !slices.Contains(names, codexDesktopAgent) {
 		t.Fatalf("desktop-only choice produced agent verdicts %v", names)
 	}
 }
@@ -54,19 +55,38 @@ func TestDesktopVerdictUsesLocalRouteAndKey(t *testing.T) {
 	if err := os.MkdirAll(os.Getenv("CODEX_HOME"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	desktop := true
 	if err := routing.SaveRecord(routing.Record{ProjectID: testProjectID, Endpoint: "https://otel.terma.ai",
-		Signals: []string{"logs"}, Harnesses: []string{routing.AgentCodex},
-		IncludePrompts: true, IncludeToolContent: true, Desktop: desktop}); err != nil {
+		Signals: []string{"logs"}, Harnesses: []string{"codex"},
+		IncludePrompts: true, IncludeToolContent: true, Surfaces: []string{codexDesktopAgent}}); err != nil {
 		t.Fatal(err)
 	}
-	if got := judgeDesktop(testProjectID).emissionProblem; got != "this repository has no delivery key" {
-		t.Fatalf("missing key verdict = %q", got)
+	if got, _ := judgeSurface(codexDesktopAgent, "", testProjectID); got.emissionProblem != "this repository has no delivery key" {
+		t.Fatalf("missing key verdict = %q", got.emissionProblem)
 	}
-	if err := keystore.SetFor(routing.AgentCodex, testProjectID, "ter_srv_0123456789abcdef01234567", keystore.Hosts{}); err != nil {
+	if err := keystore.SetFor("codex", testProjectID, "ter_srv_0123456789abcdef01234567", keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
-	if verdict := judgeDesktop(testProjectID); verdict.emissionProblem != "" || verdict.route != routeHooks {
+	if verdict, _ := judgeSurface(codexDesktopAgent, "", testProjectID); verdict.emissionProblem != "" || verdict.route != routeHooks {
 		t.Fatalf("local desktop verdict = %+v", verdict)
 	}
+}
+
+// A record an earlier build wrote names no surface: the desktop verdict is still judged,
+// and says to install again, rather than disappearing with the choice.
+func TestARecordWithoutSurfacesStillJudgesTheDesktop(t *testing.T) {
+	t.Setenv("CODEX_HOME", t.TempDir())
+	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	if err := routing.SaveRecord(routing.Record{ProjectID: testProjectID, Endpoint: "https://otel.terma.ai", Signals: []string{"logs"},
+		Harnesses: []string{"codex"}}); err != nil {
+		t.Fatal(err)
+	}
+	for _, v := range judgeSelectedHarnesses(context.Background(), "https://otel.terma.ai", testProjectID, "", []string{codexDesktopAgent}) {
+		if v.name == codexDesktopAgent {
+			if v.emissionFix == "" || !strings.Contains(v.emissionFix, "terma install") {
+				t.Fatalf("desktop verdict without a surface route = %+v", v)
+			}
+			return
+		}
+	}
+	t.Fatal("the desktop verdict disappeared")
 }

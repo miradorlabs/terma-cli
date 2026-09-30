@@ -29,24 +29,17 @@ import (
 )
 
 type installFlags struct {
-	projectRef string
-	harnesses  string
-	adapters   string
-	// activation and noPath configured the PATH shims, which are gone; accepted and ignored.
-	// activation was how per-repo agent routing was delivered: "shim", "wrapper", or ""
-	// (ask). Codex and Claude Code route to this repo's project through it.
-	activation   string
+	projectRef   string
+	harnesses    string
+	adapters     string
 	noHooks      bool
 	noDoctor     bool
 	noStatusLine bool
 	// relayService is --relay-service: "on", "off", or "" (keep the recorded choice; on
 	// for a first install where a service can run).
 	relayService string
-	// noPath keeps install out of the shell startup file: it prints the PATH line for the
-	// developer to place instead of writing it.
-	noPath   bool
-	identity string
-	signals  string
+	identity     string
+	signals      string
 	// prompts is --prompts: "on", "off", or "" (keep what this developer chose for the
 	// project last time, on for a first install).
 	prompts            string
@@ -105,14 +98,8 @@ The keys and per-project configuration live in your home directory; the committe
 	cmd.Flags().StringVar(&f.projectRef, "project", "", "Terma project (name or id) to bind the repository to")
 	cmd.Flags().StringVar(&f.harnesses, "harness", "", "comma-separated agents to configure ("+strings.Join(availableAgentNames(), ", ")+"); default: what `terma setup` recorded, else a picker")
 	cmd.Flags().StringVar(&f.adapters, "adapters", "", "comma-separated agents whose committed hooks to wire (default: the configured agents that have one)")
-	cmd.Flags().StringVar(&f.activation, "activation", "", "no effect: agents are routed by the local relay")
 	cmd.Flags().BoolVar(&f.noHooks, "no-hooks", false, "do not install commit hooks or agent hooks")
 	cmd.Flags().BoolVar(&f.noDoctor, "no-doctor", false, "do not run `terma doctor` to verify the chain after installing")
-	cmd.Flags().BoolVar(&f.noPath, "no-path", false, "no effect: install no longer changes your shell's startup file")
-	// Both routed agents through PATH shims, which are gone; kept so the scripts that
-	// pass them keep working.
-	_ = cmd.Flags().MarkHidden("activation")
-	_ = cmd.Flags().MarkHidden("no-path")
 	cmd.Flags().StringVar(&f.relayService, "relay-service", "", "run the local relay as a background service: on or off (default: on, or your last choice)")
 	cmd.Flags().BoolVar(&f.noStatusLine, "no-statusline", false, "do not wrap Claude Code's status line (which captures the plan's rate-limit windows)")
 	cmd.Flags().StringVar(&f.identity, "identity", "", "identity stamped on Codex/OpenCode sessions (default: git user.email; \"none\" to omit)")
@@ -686,8 +673,7 @@ func connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *config.Conf
 		IncludePrompts:     !f.excludePrompts,
 		IncludeToolContent: !f.excludeToolContent,
 		Harnesses:          targets,
-		CLI:                slices.Contains(agents, routing.AgentCodex),
-		Desktop:            slices.Contains(agents, codexDesktopAgent),
+		Surfaces:           routedSurfaces(agents, targets),
 	}
 	if !cmd.Flags().Changed("signals") {
 		if prev, ok, err := routing.LoadRecord(cfg.ProjectID); err != nil {
@@ -733,6 +719,17 @@ func connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *config.Conf
 		}
 	}
 	return nil
+}
+
+// routedSurfaces are the selected surfaces of the agents routed to the project.
+func routedSurfaces(selected, targets []string) []string {
+	var out []string
+	for _, name := range selected {
+		if _, a, ok := registered.Surface(name); ok && slices.Contains(targets, a.Name()) {
+			out = append(out, name)
+		}
+	}
+	return out
 }
 
 // selectedSurfaces are the surfaces the selection names.
@@ -1255,11 +1252,11 @@ func newUninstallCommand() *cobra.Command {
 		Use:   "uninstall",
 		Short: "Remove everything terma install wrote to this repository",
 		Long: `Symmetric with install: removes terma's hook wiring (only terma's lines from
-shared hook files), its agent hooks (Claude Code, Cursor, Codex, Antigravity),
-.terma/settings.json, the per-clone git configuration, and the local session state.
-Removing the binding un-routes this checkout; the home-dir routing state (keys, routing
-records) is kept, since it is shared with any other worktree or clone bound
-to the same project — remove it machine-wide with 'terma shim uninstall'.`,
+shared hook files), each agent's committed hooks, .terma/settings.json, the per-clone
+git configuration, and the local session state. Removing the binding un-routes this
+checkout; the home-dir routing state (keys, routing records) is kept, since it is shared
+with any other worktree or clone bound to the same project — remove it machine-wide
+with 'terma nate'.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
 			out := cmd.OutOrStdout()
@@ -1353,7 +1350,7 @@ to the same project — remove it machine-wide with 'terma shim uninstall'.`,
 			// repository bound to that project — so it is left in place, exactly as the
 			// keystore keys are. Removing .terma/settings.json below un-binds this checkout,
 			// which is what stops routing here; other checkouts of the same project keep
-			// working. `terma shim uninstall` is the machine-level teardown.
+			// working. `terma nate` is the machine-level teardown.
 			if gitDir != "" {
 				if err := unwireRepo(ctx, root, gitDir); err != nil {
 					return err
@@ -1385,7 +1382,7 @@ to the same project — remove it machine-wide with 'terma shim uninstall'.`,
 			} else {
 				fmt.Fprintln(out, "Uninstalled.")
 			}
-			fmt.Fprintln(out, "Per-repo routing (a PATH shim and routing records) stays on your machine — run `terma shim uninstall` when you no longer route any repo.")
+			fmt.Fprintln(out, "This machine's routing records and keys stay — run `terma nate` when you no longer route any repository.")
 			return nil
 		},
 	}

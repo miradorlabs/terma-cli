@@ -17,7 +17,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/output"
-	"github.com/miradorlabs/terma-cli/internal/shim"
 )
 
 const termaModulePath = "github.com/miradorlabs/terma-cli"
@@ -92,10 +91,6 @@ func runNate(cmd *cobra.Command) error {
 				fmt.Fprintf(out, "Restored the %s notifier.\n", e.DisplayName())
 			}
 		}
-	}
-
-	if _, err := shim.RemoveLegacy(); err != nil {
-		return fmt.Errorf("remove the PATH shims: %w", err)
 	}
 
 	configDir, err := config.Dir()

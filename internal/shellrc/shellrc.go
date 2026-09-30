@@ -1,25 +1,14 @@
-package shim
+// Package shellrc is the developer's shell startup file: which one their login shell
+// reads, and the one line that puts a directory first on PATH in that shell, which
+// doctor quotes for terma's own directory.
+package shellrc
 
 import (
 	"cmp"
-	"errors"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
-
-	"github.com/miradorlabs/terma-cli/internal/config"
-)
-
-// Earlier builds put the shim directory on PATH through one marked block at the end of
-// the developer's shell startup file. RC finds that file, and Remove takes the block out
-// again, leaving every other byte. PathLine is the one line that puts a directory first
-// on PATH in the file's own shell, which doctor quotes for terma's own directory.
-
-const (
-	rcBegin = "# >>> terma per-repo routing >>>"
-	rcEnd   = "# <<< terma per-repo routing <<<"
 )
 
 // RC is the developer's shell startup file.
@@ -96,66 +85,6 @@ func escapeDoubleQuoted(s string, backtick bool) string {
 		s = strings.ReplaceAll(s, "`", "\\`")
 	}
 	return s
-}
-
-// Remove takes terma's block out of the file, leaving the rest as it was. A fish file
-// that held nothing else is deleted. It reports whether anything was removed.
-func (rc RC) Remove() (bool, error) {
-	data, err := os.ReadFile(rc.Path)
-	if errors.Is(err, fs.ErrNotExist) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	before, after, found := splitBlock(string(data))
-	if !found {
-		return false, nil
-	}
-	// The blank line install put ahead of the block goes with it.
-	rest := strings.TrimSuffix(before, "\n") + after
-	if strings.TrimSpace(rest) == "" && rc.Shell == "fish" {
-		return true, os.Remove(rc.Path)
-	}
-	return true, rc.write(rest)
-}
-
-func (rc RC) write(content string) error {
-	if err := os.MkdirAll(filepath.Dir(rc.Path), 0o755); err != nil {
-		return err
-	}
-	mode := fs.FileMode(0o644)
-	if fi, err := os.Stat(rc.Path); err == nil {
-		mode = fi.Mode().Perm()
-	}
-	// A startup file is often a symlink into a dotfiles repository. Write through it:
-	// renaming a temporary file over the link would replace it with a regular file.
-	target := rc.Path
-	if resolved, err := filepath.EvalSymlinks(rc.Path); err == nil {
-		target = resolved
-	}
-	return config.WriteFileAtomic(target, []byte(content), mode)
-}
-
-// splitBlock cuts content around terma's block: what precedes the begin marker, and what
-// follows the end marker's line. found is false when either marker is missing, in which
-// case the file is treated as not carrying the block at all.
-func splitBlock(content string) (before, after string, found bool) {
-	start := strings.Index(content, rcBegin)
-	if start < 0 {
-		return content, "", false
-	}
-	end := strings.Index(content[start:], rcEnd)
-	if end < 0 {
-		return content, "", false
-	}
-	end += start + len(rcEnd)
-	if nl := strings.IndexByte(content[end:], '\n'); nl >= 0 {
-		end += nl + 1
-	} else {
-		end = len(content)
-	}
-	return content[:start], content[end:], true
 }
 
 func exists(path string) bool {

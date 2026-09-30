@@ -16,9 +16,8 @@ func TestCodexDesktopHooksCaptureLocalToolsWithRepositoryConsent(t *testing.T) {
 	for _, allow := range []bool{false, true} {
 		t.Run(map[bool]string{false: "redacted", true: "content"}[allow], func(t *testing.T) {
 			env := fundingEnv(t)
-			desktop := true
 			if err := routing.SaveRecord(routing.Record{ProjectID: "project-a", Endpoint: "https://otel.terma.ai",
-				Signals: []string{"logs"}, Harnesses: []string{routing.AgentCodex}, Desktop: desktop,
+				Signals: []string{"logs"}, Harnesses: []string{name}, Surfaces: []string{desktop},
 				IncludePrompts: allow, IncludeToolContent: allow}); err != nil {
 				t.Fatal(err)
 			}

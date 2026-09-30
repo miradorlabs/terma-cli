@@ -2,11 +2,15 @@ package codex
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
+	"github.com/miradorlabs/terma-cli/internal/keystore"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
 // desktop is Codex Desktop's surface name: its threads run in codex app-server, and
@@ -24,7 +28,7 @@ func (a Agent) Surfaces() []agents.Surface {
 				"a. Open this repository in Codex Desktop and trust the project if prompted.\n" +
 				"b. Open Settings → Hooks, then select Review for the entries from .codex/hooks.json.\n" +
 				"c. Inspect and approve each Terma hook command for full capture. Codex CLI is not required.\n" +
-				"d. Run `terma desktop status` to confirm 'Codex hooks: ready', then start a new Local task in this repository."},
+				"d. Run `terma agent status codex-desktop` to confirm 'Codex hooks: ready', then start a new Local task in this repository."},
 			SetupSteps: []string{"Codex Desktop: in a connected repository, open Settings → Hooks → Review in Codex Desktop and approve Terma's hooks."},
 			Reports:    "reports through the relay and this repository's hooks",
 			Warn: func() string {
@@ -35,6 +39,64 @@ func (a Agent) Surfaces() []agents.Surface {
 			},
 		},
 	}
+}
+
+// CheckedSurfaces is Codex Desktop: the CLI's readiness is its exporter's, which doctor
+// judges for every harness.
+func (Agent) CheckedSurfaces() []string { return []string{desktop} }
+
+// CheckSurface is Codex Desktop's readiness in the repository at root: a route that
+// names the desktop surface with the logs signal, a delivery key, and hooks the
+// developer trusted.
+func (a Agent) CheckSurface(_, root, projectID string) (agents.SurfaceStatus, error) {
+	route, recorded, err := routing.LoadRecord(projectID)
+	if err != nil {
+		return agents.SurfaceStatus{}, fmt.Errorf("read this repository's Codex Desktop route: %w", err)
+	}
+	var st agents.SurfaceStatus
+	routed := recorded && slices.Contains(route.Surfaces, desktop) && slices.Contains(route.Harnesses, name) && slices.Contains(route.Signals, "logs")
+	switch {
+	case !routed:
+		st.Problem, st.Fix = "this repository has no Codex Desktop hook route", "terma install --signals logs"
+	case keystore.GetFor(name, projectID) == "" && keystore.Get(projectID) == "":
+		st.Problem, st.Fix = "this repository has no delivery key", "terma install"
+	default:
+		st.Ready = true
+	}
+	global, err := (Codex{}).Status()
+	if err != nil {
+		return st, err
+	}
+	st.Lines = append(st.Lines, agents.StatusLine{Label: "Repository", Value: projectID},
+		agents.StatusLine{Label: "Desktop route", Value: readiness(st.Ready)},
+		agents.StatusLine{Label: "Global export", Value: map[bool]string{true: "on (may include other repositories)", false: "off"}[global.Connected]})
+	if recorded {
+		st.Lines = append(st.Lines, agents.StatusLine{Label: "Prompt text", Value: onOff(route.IncludePrompts)},
+			agents.StatusLine{Label: "Tool content", Value: onOff(route.IncludeToolContent)})
+	}
+	trust, err := a.Trust(root)
+	if err != nil {
+		return st, err
+	}
+	st.Lines = append(st.Lines, agents.StatusLine{Label: "Codex hooks", Value: readiness(trust.Trusted)})
+	if !trust.Trusted && trust.Fix != "" {
+		st.Lines = append(st.Lines, agents.StatusLine{Label: "Next", Value: trust.Fix})
+	}
+	return st, nil
+}
+
+func readiness(ready bool) string {
+	if ready {
+		return "ready"
+	}
+	return "not ready"
+}
+
+func onOff(on bool) string {
+	if on {
+		return "on"
+	}
+	return "off"
 }
 
 // desktopInstalled finds the ChatGPT app Codex Desktop ships in (macOS only).

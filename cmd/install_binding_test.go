@@ -45,7 +45,7 @@ func boundRepo(t *testing.T, bound termaproject.Project, signedIn bool) *fakeAut
 
 func routeCodex(t *testing.T, extra ...string) (string, error) {
 	t.Helper()
-	args := append([]string{"install", "--harness", "codex", "--no-hooks", "--no-path", "--no-doctor", "--no-browser"}, extra...)
+	args := append([]string{"install", "--harness", "codex", "--no-hooks", "--no-doctor", "--no-browser"}, extra...)
 	return within(20*time.Second).combined(t, args...)
 }
 

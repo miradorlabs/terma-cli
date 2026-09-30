@@ -1,13 +1,14 @@
 package cmd
 
 import (
-	"github.com/miradorlabs/terma-cli/internal/routing"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/miradorlabs/terma-cli/internal/routing"
 
 	"github.com/miradorlabs/terma-cli/internal/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -43,11 +44,11 @@ func TestInstallUsesSavedCodexDesktopChoiceWithoutShellShim(t *testing.T) {
 	if err != nil {
 		t.Fatalf("install desktop: %v\n%s", err, out)
 	}
-	if gateway.keysMint.Load() != 1 || keystore.GetFor(routing.AgentCodex, projectID) == "" {
+	if gateway.keysMint.Load() != 1 || keystore.GetFor("codex", projectID) == "" {
 		t.Fatalf("desktop route/key missing or minted twice (mints=%d):\n%s", gateway.keysMint.Load(), out)
 	}
 	record, ok, err := routing.LoadRecord(projectID)
-	if err != nil || !ok || record.CLI || !record.Desktop {
+	if err != nil || !ok || slices.Contains(record.Surfaces, "codex") || !slices.Contains(record.Surfaces, codexDesktopAgent) {
 		t.Fatalf("desktop-only route choices = %+v, exists=%v, err=%v", record, ok, err)
 	}
 	if _, err := os.Stat(filepath.Join(home, ".zshrc")); !os.IsNotExist(err) {
@@ -78,7 +79,7 @@ func TestInstallCodexCLIAndDesktopShareOneProjectKey(t *testing.T) {
 		t.Fatalf("Codex CLI and desktop minted %d keys, want one", gateway.keysMint.Load())
 	}
 	record, ok, err := routing.LoadRecord(projectID)
-	if err != nil || !ok || !record.CLI || !record.Desktop {
+	if err != nil || !ok || !slices.Contains(record.Surfaces, "codex") || !slices.Contains(record.Surfaces, codexDesktopAgent) {
 		t.Fatalf("combined route choices = %+v, exists=%v, err=%v", record, ok, err)
 	}
 }

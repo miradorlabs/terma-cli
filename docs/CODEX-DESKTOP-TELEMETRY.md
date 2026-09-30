@@ -18,7 +18,7 @@ hooks claim (docs/RELAY.md, "Codex's app-server").
       repository's `.codex/hooks.json`. If hooks are disabled, enable them there.
    3. Inspect the `terma hook …` commands and approve each Terma entry
       for full capture. Codex skips any entry you leave untrusted.
-4. Run `terma desktop status` in the repository. **Codex hooks: ready** confirms
+4. Run `terma agent status codex-desktop` in the repository. **Codex hooks: ready** confirms
    that the current definitions are trusted. Then start a new **Local** task in
    that repository and send a test message. Run `terma doctor` to verify
    delivery. Codex CLI is not required; its `/hooks` command is an alternative

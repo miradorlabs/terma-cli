@@ -16,12 +16,28 @@ import (
 // The registry is append-only and ordered: an ID a machine has recorded must always
 // mean the same migration, and Run relies on the order.
 func TestRegistryIsOrderedAndNamed(t *testing.T) {
-	last := 0
+	last := retiredThrough
 	for _, m := range migrations {
 		if m.ID <= last || m.Name == "" || m.Run == nil {
 			t.Fatalf("migration %d (%q) out of order, unnamed or empty after %d", m.ID, m.Name, last)
 		}
 		last = m.ID
+	}
+}
+
+// A retired migration's failure, recorded by the build that had it, holds nothing back.
+func TestARetiredFailureIsCleared(t *testing.T) {
+	dir := t.TempDir()
+	ran := false
+	with(t, Migration{ID: retiredThrough + 1, Name: "next", Run: func(context.Context) error { ran = true; return nil }})
+	if err := save(dir, State{Failed: &Failure{ID: retiredThrough, Name: "retired", At: time.Now(), Error: "boom"}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Run(context.Background(), dir, false); err != nil || !ran {
+		t.Fatalf("run = %v, ran %v", err, ran)
+	}
+	if s, _ := Load(dir); s.Failed != nil || s.Applied != retiredThrough+1 {
+		t.Fatalf("state %+v", s)
 	}
 }
 

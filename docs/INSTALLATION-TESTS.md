@@ -98,7 +98,7 @@ those additions are removed; older unmarked types are conservatively preserved.
 Git's `extensions.worktreeConfig` remains enabled after uninstall: other worktrees
 may use it. Terma's hook-path override is removed from the scope where it was
 installed. Home-directory routing records and project keys remain because another
-workspace may use the same project; `terma shim uninstall` is the separate
+workspace may use the same project; `terma nate` is the separate
 machine-wide operation.
 
 ## Limits

@@ -118,10 +118,10 @@ func CodexRepliesConsented(projectID string, global bool) bool {
 		if global && !recorded {
 			return true
 		}
-		return recorded && rec.IncludePrompts && slices.Contains(rec.Harnesses, routing.AgentCodex) && slices.Contains(rec.Signals, "logs")
+		return recorded && rec.IncludePrompts && slices.Contains(rec.Harnesses, name) && slices.Contains(rec.Signals, "logs")
 	}
-	if rec.Desktop {
-		return recorded && slices.Contains(rec.Harnesses, routing.AgentCodex) &&
+	if slices.Contains(rec.Surfaces, desktop) {
+		return recorded && slices.Contains(rec.Harnesses, name) &&
 			slices.Contains(rec.Signals, "logs") && rec.IncludePrompts
 	}
 	st, err := (Codex{}).Status()
@@ -130,5 +130,5 @@ func CodexRepliesConsented(projectID string, global bool) bool {
 	}
 	// A saved repository opt-out stays in force whatever the machine-wide config says.
 	return st.Connected && st.IncludePrompts &&
-		(!recorded || !slices.Contains(rec.Harnesses, routing.AgentCodex) || rec.IncludePrompts)
+		(!recorded || !slices.Contains(rec.Harnesses, name) || rec.IncludePrompts)
 }

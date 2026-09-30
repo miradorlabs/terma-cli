@@ -146,8 +146,8 @@ func codexDesktopRoute(r *hookrun.Repo) (routing.Record, bool) {
 		return routing.Record{}, false
 	}
 	rec, ok, err := routing.LoadRecord(r.ProjectID)
-	return rec, err == nil && ok && rec.Desktop &&
-		slices.Contains(rec.Harnesses, routing.AgentCodex) && slices.Contains(rec.Signals, "logs")
+	return rec, err == nil && ok && slices.Contains(rec.Surfaces, desktop) &&
+		slices.Contains(rec.Harnesses, name) && slices.Contains(rec.Signals, "logs")
 }
 
 func readCodexHookInput(r io.Reader) (*codexHookInput, error) {
