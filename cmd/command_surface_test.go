@@ -132,12 +132,23 @@ func TestEveryCommandAMessageNamesExists(t *testing.T) {
 			exists[alias] = true
 		}
 	}
-	for _, dir := range []string{".", filepath.Join("..", "internal")} {
+	// The shipped source, and what people read: the README and docs/ (generated history
+	// under docs/compat is a record, not advice).
+	shipped := func(path string) bool {
+		switch {
+		case strings.HasSuffix(path, ".go"):
+			return !strings.HasSuffix(path, "_test.go")
+		case strings.HasSuffix(path, ".md"):
+			return !strings.Contains(filepath.ToSlash(path), "docs/compat/")
+		}
+		return false
+	}
+	for _, dir := range []string{".", filepath.Join("..", "internal"), filepath.Join("..", "docs"), filepath.Join("..", "README.md")} {
 		err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
-			if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			if d.IsDir() || !shipped(path) {
 				return nil
 			}
 			data, err := os.ReadFile(path)
