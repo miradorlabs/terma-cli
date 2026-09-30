@@ -369,7 +369,7 @@ func (e Env) captureQuota(p *statusLinePayload) bool {
 	accountID, orgID, _ := claudeOAuthAccount(repoRoot)
 	next := quotaState{EmittedAt: now, Quota: quota, FastMode: p.FastMode, Model: p.Model.ID,
 		PromptID: p.PromptID, Resets: resets, Cost: p.Cost.TotalCostUSD, ProjectID: projectID, AccountID: accountID, OrgID: orgID}
-	if prev != nil && !quotaChanged(*prev, next) && now.Sub(prev.EmittedAt) < quotaHeartbeat {
+	if prev != nil && !quotaChanged(*prev, next) && now.Sub(prev.EmittedAt) < QuotaHeartbeat {
 		return false
 	}
 
@@ -385,23 +385,23 @@ func (e Env) captureQuota(p *statusLinePayload) bool {
 	// different observation must not collide with the previous sequence number.
 	identity, _ := json.Marshal(next)
 	attrs := map[string]any{
-		attrTool: claudeTool, attrVersion: e.Version,
-		attrEvidenceSource: "claude_statusline", attrSchemaVersion: 1,
+		AttrTool: claudeTool, AttrVersion: e.Version,
+		AttrEvidenceSource: "claude_statusline", AttrSchemaVersion: 1,
 		"source_stream": next.Stream, "observation_sequence": next.Sequence,
 		"observation_id":   EvidenceID(p.SessionID + string(identity)),
-		attrEvidenceStatus: statusPresent, "time_basis": "observed",
+		AttrEvidenceStatus: StatusPresent, "time_basis": "observed",
 	}
 	if len(quota) == 0 {
-		attrs[attrEvidenceStatus] = statusUnavailable
+		attrs[AttrEvidenceStatus] = StatusUnavailable
 	}
 	if next.AccountID != "" {
-		attrs[attrAccountID] = next.AccountID
+		attrs[AttrAccountID] = next.AccountID
 	}
 	if next.OrgID != "" {
-		attrs[attrOrganizationID] = next.OrgID
+		attrs[AttrOrganizationID] = next.OrgID
 	}
 	if p.Model.ID != "" {
-		attrs[attrModel] = p.Model.ID
+		attrs[AttrModel] = p.Model.ID
 	}
 	if p.Version != "" {
 		attrs["claude.version"] = p.Version
@@ -496,6 +496,6 @@ func writeQuotaState(path string, s quotaState) {
 	}
 	_ = WriteState(path, data)
 	if fresh {
-		PruneState(dir, s.EmittedAt.Add(-snapshotStateRetention))
+		PruneState(dir, s.EmittedAt.Add(-SnapshotStateRetention))
 	}
 }

@@ -69,7 +69,7 @@ func CodexNotify(ctx context.Context, env Env) error {
 	// Not announce: notify fires at the end of every turn and does not age out manifests.
 	sess := env.NewSession(r, id, codexTool, n.Model)
 	env.SetActive(r, sess)
-	env.EmitStart(r, sess, map[string]any{attrSource: n.Type})
+	env.EmitStart(r, sess, map[string]any{AttrSource: n.Type})
 	return nil
 }
 
@@ -125,7 +125,7 @@ func codexDesktopRoute(r *Repo) (routing.Record, bool) {
 }
 
 func readCodexHookInput(r io.Reader) (*codexHookInput, error) {
-	in, err := readHookInput[codexHookInput](r)
+	in, err := ReadInput[codexHookInput](r)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +155,7 @@ func CodexSessionStart(ctx context.Context, env Env) error {
 	sess := env.NewSession(r, in.SessionID, codexTool, in.Model)
 	env.SetActive(r, sess)
 	env.PruneManifests(r, sess.UpdatedAt)
-	attrs := map[string]any{attrSource: in.Source}
+	attrs := map[string]any{AttrSource: in.Source}
 	if _, desktop := codexDesktopRoute(r); desktop {
 		attrs["capture_surface"] = codexDesktopSurface
 		if dir, err := config.Dir(); err == nil {
@@ -166,8 +166,8 @@ func CodexSessionStart(ctx context.Context, env Env) error {
 	// child arrives as the root's SubagentStart, which is where the spawn record is read.
 	// That has not been seen live, and this is one line of one file: if a build does
 	// start a spawned thread as a session, its start still names its parent.
-	if spawn, status := harness.CodexRolloutSpawn(ctx, in.SessionID, in.TranscriptPath); status == statusPresent {
-		codexSpawnAttrs(attrs, attrParentSession, spawn)
+	if spawn, status := harness.CodexRolloutSpawn(ctx, in.SessionID, in.TranscriptPath); status == StatusPresent {
+		codexSpawnAttrs(attrs, AttrParentSession, spawn)
 	}
 	env.EmitStart(r, sess, attrs)
 	return nil
@@ -192,8 +192,8 @@ func CodexUserPromptSubmit(ctx context.Context, env Env) error {
 	attrs := EvidenceAttrs(codexTool, sourceCodexHook, "UserPromptSubmit")
 	attrs["capture_surface"] = codexDesktopSurface
 	attrs["prompt_bytes"] = len(in.Prompt)
-	BoundedAttr(attrs, attrTurnID, in.TurnID)
-	BoundedAttr(attrs, attrModel, in.Model)
+	BoundedAttr(attrs, AttrTurnID, in.TurnID)
+	BoundedAttr(attrs, AttrModel, in.Model)
 	if route.IncludePrompts {
 		attrs["prompt"] = boundedCodexContent(in.Prompt)
 	}
@@ -275,10 +275,10 @@ func CodexPostToolUse(ctx context.Context, env Env) error {
 	if route, desktop := codexDesktopRoute(r); desktop && in.ToolName != "" {
 		attrs := EvidenceAttrs(codexTool, sourceCodexHook, "PostToolUse")
 		attrs["capture_surface"] = codexDesktopSurface
-		BoundedAttr(attrs, attrToolName, in.ToolName)
-		BoundedAttr(attrs, attrToolCallID, in.ToolUseID)
-		BoundedAttr(attrs, attrTurnID, in.TurnID)
-		BoundedAttr(attrs, attrModel, in.Model)
+		BoundedAttr(attrs, AttrToolName, in.ToolName)
+		BoundedAttr(attrs, AttrToolCallID, in.ToolUseID)
+		BoundedAttr(attrs, AttrTurnID, in.TurnID)
+		BoundedAttr(attrs, AttrModel, in.Model)
 		if elapsed, ok := env.codexToolElapsed(in); ok {
 			attrs["duration_ms"] = elapsed
 			attrs["duration_source"] = "hook_elapsed"
@@ -289,9 +289,9 @@ func CodexPostToolUse(ctx context.Context, env Env) error {
 		}
 		if success, known := codexToolSuccess(in.ToolResponse); known {
 			if success {
-				attrs[attrStatus] = "completed"
+				attrs[AttrStatus] = "completed"
 			} else {
-				attrs[attrStatus] = "error"
+				attrs[AttrStatus] = "error"
 			}
 		}
 		env.EmitFor(r, spool.Event{Name: EventToolCall, SessionID: in.SessionID, Repo: r.Name, Attrs: attrs})
@@ -303,7 +303,7 @@ func CodexPostToolUse(ctx context.Context, env Env) error {
 	}
 	// Reported as a set: the call's own path fields and its patch can name the same file.
 	attrs := AgentAttrs(map[string]any{}, in.AgentID, in.AgentType)
-	BoundedAttr(attrs, attrToolCallID, in.ToolUseID)
+	BoundedAttr(attrs, AttrToolCallID, in.ToolUseID)
 	if _, desktop := codexDesktopRoute(r); desktop {
 		attrs["capture_surface"] = codexDesktopSurface
 	}

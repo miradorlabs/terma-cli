@@ -44,7 +44,7 @@ func cursorToolCall(ctx context.Context, env Env, hook string) error {
 		env.Logf("%s names no tool and no call id", hook)
 		return nil
 	}
-	attrs[attrVersion] = env.Version
+	attrs[AttrVersion] = env.Version
 	env.EmitFor(r, spool.Event{Name: EventToolCall, SessionID: in.id(), Repo: r.Name, Attrs: attrs})
 	return nil
 }
@@ -57,17 +57,17 @@ func cursorToolCall(ctx context.Context, env Env, hook string) error {
 func cursorToolCallAttrs(in *cursorHookInput, hook string) (map[string]any, bool) {
 	a := EvidenceAttrs(cursorTool, sourceCursorHook, hook)
 	if ShortLabel(in.ToolName) {
-		a[attrToolName] = in.ToolName
+		a[AttrToolName] = in.ToolName
 	}
 	if cursorCallID(in.ToolUseID) {
-		a[attrToolCallID] = in.ToolUseID
+		a[AttrToolCallID] = in.ToolUseID
 	}
-	if _, named := a[attrToolName]; !named {
-		if _, identified := a[attrToolCallID]; !identified {
+	if _, named := a[AttrToolName]; !named {
+		if _, identified := a[AttrToolCallID]; !identified {
 			return nil, false
 		}
 	}
-	for k, v := range map[string]string{attrTurnID: in.GenerationID, attrModel: in.Model, "model_id": in.ModelID, "cursor.version": in.CursorVersion} {
+	for k, v := range map[string]string{AttrTurnID: in.GenerationID, AttrModel: in.Model, "model_id": in.ModelID, "cursor.version": in.CursorVersion} {
 		BoundedAttr(a, k, v)
 	}
 	cursorModelParams(in, a)
@@ -80,14 +80,14 @@ func cursorToolCallAttrs(in *cursorHookInput, hook string) (map[string]any, bool
 	}
 	switch hook {
 	case "postToolUse":
-		a[attrStatus] = "completed"
+		a[AttrStatus] = "completed"
 	case "postToolUseFailure":
-		a[attrStatus] = "error"
+		a[AttrStatus] = "error"
 		switch in.FailureType {
 		case "error", "timeout", "permission_denied":
 			a["failure_type"] = in.FailureType
 		default:
-			a["failure_type"] = unknownValue
+			a["failure_type"] = UnknownValue
 		}
 		if b, ok := cursorBool(in.IsInterrupt); ok {
 			a["is_interrupt"] = b

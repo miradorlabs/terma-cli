@@ -40,13 +40,13 @@ func StopFailure(ctx context.Context, env Env) error {
 	case "":
 		return nil
 	default:
-		kind = unknownValue
+		kind = UnknownValue
 	}
 	attrs := map[string]any{
-		attrTool: claudeTool, "error_type": kind, attrEvidenceSource: "claude_stop_failure", attrSchemaVersion: 1, attrVersion: env.Version,
+		AttrTool: claudeTool, "error_type": kind, AttrEvidenceSource: "claude_stop_failure", AttrSchemaVersion: 1, AttrVersion: env.Version,
 	}
 	if owned {
-		attrs[attrAccountID] = accountID
+		attrs[AttrAccountID] = accountID
 	}
 	env.EmitFor(r, spool.Event{Name: EventSessionLimit, SessionID: in.SessionID, Repo: r.Name, Attrs: attrs})
 	return nil
@@ -76,7 +76,7 @@ func claudeOAuthAccount(root string) (accountID, orgID string, ok bool) {
 	if accountID, ok = oauthAccountID(attrs); !ok {
 		return "", "", false
 	}
-	orgID, _ = attrs[attrOrganizationID].(string)
+	orgID, _ = attrs[AttrOrganizationID].(string)
 	return accountID, orgID, true
 }
 
@@ -91,7 +91,7 @@ func oauthAccountID(attrs map[string]any) (string, bool) {
 	if !harness.OAuthAccountIsEffective(attrs) {
 		return "", false
 	}
-	id, ok := attrs[attrAccountID].(string)
+	id, ok := attrs[AttrAccountID].(string)
 	if !ok || id == "" {
 		return "", false
 	}

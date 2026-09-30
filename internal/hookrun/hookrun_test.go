@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"maps"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -14,42 +13,11 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
+	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 	"github.com/miradorlabs/terma-cli/internal/trailer"
 )
-
-func initRepo(t *testing.T) string {
-	t.Helper()
-	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
-	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git not installed")
-	}
-	dir := t.TempDir()
-	ctx := context.Background()
-	for _, args := range [][]string{
-		{"init", "-q", "-b", "main"},
-		{"config", "user.email", "dev@example.com"},
-		{"config", "user.name", "Dev"},
-		{"config", "commit.gpgsign", "false"},
-	} {
-		if _, err := gitx.Git(ctx, dir, args...); err != nil {
-			t.Fatalf("git %v: %v", args, err)
-		}
-	}
-	resolved, _ := filepath.EvalSymlinks(dir)
-	return resolved
-}
-
-func writeFile(t *testing.T, root, rel, content string) {
-	t.Helper()
-	path := filepath.Join(root, rel)
-	_ = os.MkdirAll(filepath.Dir(path), 0o755)
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
 
 func TestClaudeSessionStampsOnlyItsOwnFiles(t *testing.T) {
 	root := initRepo(t)
@@ -63,8 +31,8 @@ func TestClaudeSessionStampsOnlyItsOwnFiles(t *testing.T) {
 	if err := SessionStart(ctx, env(`{"session_id":"sess-claude-1","cwd":"`+root+`","hook_event_name":"SessionStart","source":"startup","model":"claude-opus-5"}`)); err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, root, "src/agent.go", "package src\n")
-	writeFile(t, root, "notes/human.md", "mine\n")
+	hookruntest.WriteFile(t, root, "src/agent.go", "package src\n")
+	hookruntest.WriteFile(t, root, "notes/human.md", "mine\n")
 	if err := PostToolUse(ctx, env(`{"session_id":"sess-claude-1","cwd":"`+root+`","tool_name":"Write","tool_input":{"file_path":"`+filepath.Join(root, "src", "agent.go")+`"}}`)); err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +79,7 @@ func TestClaudeSessionStampsOnlyItsOwnFiles(t *testing.T) {
 
 	// The committed file is consumed: a later commit of unrelated work is clean,
 	// even though the session is still active.
-	writeFile(t, root, "notes/again.md", "more\n")
+	hookruntest.WriteFile(t, root, "notes/again.md", "more\n")
 	_, _ = gitx.Git(ctx, root, "add", "notes/again.md")
 	_ = os.WriteFile(msgPath, []byte("more notes\n"), 0o644)
 	_ = PrepareCommitMsg(ctx, env("", msgPath, ""))
@@ -147,7 +115,7 @@ func TestActiveSessionFallbackAndMergeSkip(t *testing.T) {
 	if err := CodexNotify(ctx, env("", `{"type":"agent-turn-complete","thread-id":"thread-9","cwd":"`+root+`","model":"gpt-5.4"}`)); err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, root, "a.txt", "a\n")
+	hookruntest.WriteFile(t, root, "a.txt", "a\n")
 	_, _ = gitx.Git(ctx, root, "add", "a.txt")
 	msgPath := filepath.Join(t.TempDir(), "MSG")
 	_ = os.WriteFile(msgPath, []byte("work\n"), 0o644)
@@ -249,10 +217,10 @@ func TestPostCommitReportsPerFileLineStats(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	writeFile(t, root, "src/a.go", "package a\nfunc A() {}\n")
-	writeFile(t, root, "src/b.go", "package b\n")
-	writeFile(t, root, "assets/logo.bin", "\x00\x01\x02logo\x00")
-	writeFile(t, root, "src/shared.go", "package shared\n")
+	hookruntest.WriteFile(t, root, "src/a.go", "package a\nfunc A() {}\n")
+	hookruntest.WriteFile(t, root, "src/b.go", "package b\n")
+	hookruntest.WriteFile(t, root, "assets/logo.bin", "\x00\x01\x02logo\x00")
+	hookruntest.WriteFile(t, root, "src/shared.go", "package shared\n")
 	touch(now, "sess-a", "src/a.go")
 	touch(now, "sess-a", "src/shared.go")
 	touch(now.Add(time.Minute), "sess-b", "src/b.go")
@@ -339,7 +307,7 @@ func TestPostCommitBoundsFileStats(t *testing.T) {
 	total := MaxCommitFileStats + 5
 	for i := range total {
 		rel := fmt.Sprintf("src/f%03d.go", i)
-		writeFile(t, root, rel, "package p\n")
+		hookruntest.WriteFile(t, root, rel, "package p\n")
 		if err := PostToolUse(ctx, env(`{"session_id":"sess-wide","cwd":"`+root+`","tool_name":"Write","tool_input":{"file_path":"`+filepath.Join(root, rel)+`"}}`)); err != nil {
 			t.Fatal(err)
 		}
@@ -376,20 +344,6 @@ func TestPostCommitBoundsFileStats(t *testing.T) {
 	}
 }
 
-// spooled flushes the spool and returns every event in it, in order.
-func spooled(t *testing.T, sp *spool.Spool) []spool.Event {
-	t.Helper()
-	var out []spool.Event
-	res := sp.Flush(context.Background(), spool.SenderFunc(func(_ context.Context, events []spool.Event) ([]spool.Event, error) {
-		out = append(out, events...)
-		return nil, nil
-	}), spool.FlushOptions{})
-	if res.Err != nil {
-		t.Fatalf("flush: %v", res.Err)
-	}
-	return out
-}
-
 // keysOf is the sorted attribute names of an event: the shape a consumer sees.
 func keysOf(attrs map[string]any) []string { return slices.Sorted(maps.Keys(attrs)) }
 
@@ -410,7 +364,7 @@ func TestPostCommitOnAnUnstampedCommitEmitsOnlyACount(t *testing.T) {
 	if err := project.Save(root, &project.File{Project: project.Project{ID: "proj_test"}}); err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, root, "notes/human.md", "mine\nall mine\n")
+	hookruntest.WriteFile(t, root, "notes/human.md", "mine\nall mine\n")
 	if _, err := gitx.Git(ctx, root, "add", "notes/human.md"); err != nil {
 		t.Fatal(err)
 	}
@@ -422,7 +376,7 @@ func TestPostCommitOnAnUnstampedCommitEmitsOnlyACount(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	events := spooled(t, sp)
+	events := hookruntest.Spooled(t, sp)
 	if len(events) != 1 || events[0].Name != EventCommitUnattributed {
 		t.Fatalf("an unstamped commit must spool exactly one %s, got %+v", EventCommitUnattributed, events)
 	}
@@ -493,12 +447,12 @@ func TestCommitEventsAreOneFilterApart(t *testing.T) {
 	}
 
 	// A human commit, then an agent commit.
-	writeFile(t, root, "notes/human.md", "mine\n")
+	hookruntest.WriteFile(t, root, "notes/human.md", "mine\n")
 	humanSHA := commit("notes/human.md", "human note")
 	if err := SessionStart(ctx, env(`{"session_id":"sess-1","cwd":"`+root+`","hook_event_name":"SessionStart"}`)); err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, root, "src/agent.go", "package src\n")
+	hookruntest.WriteFile(t, root, "src/agent.go", "package src\n")
 	if err := PostToolUse(ctx, env(`{"session_id":"sess-1","cwd":"`+root+`","tool_name":"Write","tool_input":{"file_path":"`+filepath.Join(root, "src", "agent.go")+`"}}`)); err != nil {
 		t.Fatal(err)
 	}
@@ -509,7 +463,7 @@ func TestCommitEventsAreOneFilterApart(t *testing.T) {
 	// an exact set of two names.
 	byName := map[string][]spool.Event{}
 	var all []string
-	for _, ev := range spooled(t, sp) {
+	for _, ev := range hookruntest.Spooled(t, sp) {
 		all = append(all, ev.Name)
 		if ev.Name == EventCommit || ev.Name == EventCommitUnattributed {
 			byName[ev.Name] = append(byName[ev.Name], ev)
@@ -562,7 +516,7 @@ func TestPostCommitSkipsMergeAndSquashCommits(t *testing.T) {
 	}
 	commit := func(rel, msg string) {
 		t.Helper()
-		writeFile(t, root, rel, msg+"\n")
+		hookruntest.WriteFile(t, root, rel, msg+"\n")
 		git("add", rel)
 		git("commit", "-q", "-m", msg)
 	}
@@ -604,4 +558,10 @@ func TestPostCommitSkipsMergeAndSquashCommits(t *testing.T) {
 	if n := pending(); n != 1 {
 		t.Fatalf("an ordinary unstamped commit must spool one event, got %d", n)
 	}
+}
+
+// initRepo is hookruntest.InitRepo with a private Claude config directory as well.
+func initRepo(t *testing.T) string {
+	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
+	return hookruntest.InitRepo(t)
 }

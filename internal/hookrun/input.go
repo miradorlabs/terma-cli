@@ -13,10 +13,10 @@ import (
 // agent up.
 const maxHookInput = 4 << 20
 
-// readHookInput decodes one harness payload into T. It reads one byte past the bound so
+// ReadInput decodes one harness payload into T. It reads one byte past the bound so
 // an oversized payload is refused by name: a payload cut at the bound would fail to
 // parse, or worse parse, and neither says what went wrong.
-func readHookInput[T any](r io.Reader) (*T, error) {
+func ReadInput[T any](r io.Reader) (*T, error) {
 	if r == nil {
 		return nil, errors.New("no hook input")
 	}

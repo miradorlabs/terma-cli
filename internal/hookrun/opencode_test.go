@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
+	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -25,8 +26,8 @@ func TestOpenCodeSessionIsStampedOnItsCommit(t *testing.T) {
 	if err := OpenCodeSessionStart(ctx, env(`{"session_id":"ses_abc123","cwd":"`+root+`"}`)); err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, root, "src/a.go", "package src\n")
-	writeFile(t, root, "src/b.go", "package src\n")
+	hookruntest.WriteFile(t, root, "src/a.go", "package src\n")
+	hookruntest.WriteFile(t, root, "src/b.go", "package src\n")
 	// One absolute path, one relative to the working directory the plugin reported.
 	if err := OpenCodeFileEdit(ctx, env(`{"session_id":"ses_abc123","cwd":"`+root+`","file":"`+filepath.Join(root, "src", "a.go")+`","tool":"edit"}`)); err != nil {
 		t.Fatal(err)

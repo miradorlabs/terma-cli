@@ -92,7 +92,7 @@ func TestCursorUninstallPreservesSchemaVersion(t *testing.T) {
 			if want == "" {
 				want = `{"version":1}`
 			}
-			if !sameJSON([]byte(got), []byte(want)) {
+			if !SameJSON([]byte(got), []byte(want)) {
 				t.Fatalf("schema changed: %s", got)
 			}
 		})

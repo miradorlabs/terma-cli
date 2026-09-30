@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
+	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -28,8 +29,8 @@ func TestCursorConversationIsStampedOnItsCommit(t *testing.T) {
 	if err := CursorSessionStart(ctx, env(`{`+strings.ReplaceAll(common, "%s", "sessionStart")+`,"session_id":"sess_ignored","composer_mode":"agent"}`)); err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, root, "src/a.go", "package src\n")
-	writeFile(t, root, "src/b.go", "package src\n")
+	hookruntest.WriteFile(t, root, "src/a.go", "package src\n")
+	hookruntest.WriteFile(t, root, "src/b.go", "package src\n")
 	if err := CursorFileEdit(ctx, env(`{`+strings.ReplaceAll(common, "%s", "afterFileEdit")+`,"file_path":"`+filepath.Join(root, "src", "a.go")+`","edits":[{"old_string":"","new_string":"x"}]}`)); err != nil {
 		t.Fatal(err)
 	}

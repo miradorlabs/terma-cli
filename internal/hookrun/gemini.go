@@ -29,7 +29,7 @@ const geminiTool = "gemini"
 var geminiEditTools = map[string]bool{"write_file": true, "replace": true, "edit": true}
 
 func readGeminiInput(env Env) (*geminiHookInput, bool) {
-	in, err := readHookInput[geminiHookInput](env.Stdin)
+	in, err := ReadInput[geminiHookInput](env.Stdin)
 	if err != nil {
 		env.Logf("%v", err)
 		return nil, false
@@ -52,7 +52,7 @@ func GeminiSessionStart(ctx context.Context, env Env) error {
 	if err != nil {
 		return nil
 	}
-	env.Announce(r, env.NewSession(r, in.SessionID, geminiTool, ""), map[string]any{attrSource: "session_start"})
+	env.Announce(r, env.NewSession(r, in.SessionID, geminiTool, ""), map[string]any{AttrSource: "session_start"})
 	return nil
 }
 

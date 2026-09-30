@@ -83,26 +83,26 @@ const AttrWorktree = "worktree"
 // Attribute keys more than one adapter writes. A key only one event carries stays a
 // literal beside the code that explains it.
 const (
-	attrTool           = "tool"
-	attrModel          = "model"
-	attrVersion        = "terma.version"
-	attrSource         = "source"
-	attrReason         = "reason"
-	attrStatus         = "status"
-	attrTurnID         = "turn_id"
-	attrToolName       = "tool_name"
-	attrToolCallID     = "tool_call_id"
-	attrAgentID        = "agent_id"
-	attrAgentType      = "agent_type"
-	attrAgentParentID  = "agent_parent_id"
-	attrParentSession  = "parent_session_id"
-	attrFileCount      = "file_count"
-	attrAccountID      = "account_id"
-	attrOrganizationID = "organization_id"
-	attrSchemaVersion  = "schema_version"
-	attrEvidenceSource = "evidence_source"
-	attrEvidenceStatus = "evidence_status"
-	attrHookEvent      = "hook_event"
+	AttrTool           = "tool"
+	AttrModel          = "model"
+	AttrVersion        = "terma.version"
+	AttrSource         = "source"
+	AttrReason         = "reason"
+	AttrStatus         = "status"
+	AttrTurnID         = "turn_id"
+	AttrToolName       = "tool_name"
+	AttrToolCallID     = "tool_call_id"
+	AttrAgentID        = "agent_id"
+	AttrAgentType      = "agent_type"
+	AttrAgentParentID  = "agent_parent_id"
+	AttrParentSession  = "parent_session_id"
+	AttrFileCount      = "file_count"
+	AttrAccountID      = "account_id"
+	AttrOrganizationID = "organization_id"
+	AttrSchemaVersion  = "schema_version"
+	AttrEvidenceSource = "evidence_source"
+	AttrEvidenceStatus = "evidence_status"
+	AttrHookEvent      = "hook_event"
 )
 
 // Values of evidence_source: where a record's facts were read from.
@@ -118,10 +118,10 @@ const (
 // Values of evidence_status and of the per-facet *_status attributes. The harness
 // package reports two more, "missing" and "unreadable", which pass through untouched.
 const (
-	statusPresent     = "present"
-	statusUnavailable = "unavailable"
+	StatusPresent     = "present"
+	StatusUnavailable = "unavailable"
 )
 
-// unknownValue replaces a word from a harness that is outside the vocabulary terma
+// UnknownValue replaces a word from a harness that is outside the vocabulary terma
 // forwards, so a new upstream value arrives as a known one instead of as free text.
-const unknownValue = "unknown"
+const UnknownValue = "unknown"

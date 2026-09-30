@@ -59,21 +59,21 @@ func (e Env) captureCodexFunding(ctx context.Context, r *Repo, in *codexHookInpu
 	defer cancel()
 	next, status, readErr := harness.ReadCodexFunding(ctx, rollout, in.TranscriptPath, cursor, func(ev harness.FundingEvidence) error {
 		attrs := AgentAttrs(ev.Attrs, in.AgentID, in.AgentType)
-		attrs[attrTool], attrs[attrVersion] = codexTool, e.Version
-		attrs[attrEvidenceSource], attrs[attrEvidenceStatus] = ev.Source, ev.Status
-		attrs[attrSchemaVersion] = 1
+		attrs[AttrTool], attrs[AttrVersion] = codexTool, e.Version
+		attrs[AttrEvidenceSource], attrs[AttrEvidenceStatus] = ev.Source, ev.Status
+		attrs[AttrSchemaVersion] = 1
 		// Stamp the account only onto a real, present ChatGPT quota snapshot. A record with no OpenAI
 		// rate-limit evidence (ev.Status != "present": rate_limits:null, or a session run through
 		// --oss/--local-provider/a custom model_provider that emits none) is not this ChatGPT account's
 		// usage, so it must not carry the id.
-		if accountID != "" && ev.Status == statusPresent {
-			attrs[attrAccountID] = accountID
+		if accountID != "" && ev.Status == StatusPresent {
+			attrs[AttrAccountID] = accountID
 		}
 		// Same gate as account_id: the per-user identity belongs only on a real ChatGPT quota snapshot.
-		if userEmail != "" && ev.Status == statusPresent {
+		if userEmail != "" && ev.Status == StatusPresent {
 			attrs["account_email"] = userEmail
 		}
-		if userID != "" && ev.Status == statusPresent {
+		if userID != "" && ev.Status == StatusPresent {
 			attrs["account_user_id"] = userID
 		}
 		attrs[AttrProjectID] = r.ProjectID

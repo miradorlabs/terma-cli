@@ -31,9 +31,9 @@ func (e Env) CaptureFunding(r *Repo, id, tool, name string, evidence harness.Fun
 	if attrs == nil {
 		attrs = map[string]any{}
 	}
-	attrs[attrTool], attrs[attrVersion] = tool, e.Version
-	attrs[attrEvidenceSource], attrs[attrEvidenceStatus] = evidence.Source, evidence.Status
-	attrs[attrSchemaVersion] = 1
+	attrs[AttrTool], attrs[AttrVersion] = tool, e.Version
+	attrs[AttrEvidenceSource], attrs[AttrEvidenceStatus] = evidence.Source, evidence.Status
+	attrs[AttrSchemaVersion] = 1
 	if !evidence.SourceTime.IsZero() {
 		attrs["source_time"] = evidence.SourceTime.UTC().Format(time.RFC3339Nano)
 	}
@@ -68,7 +68,7 @@ func (e Env) CaptureFunding(r *Repo, id, tool, name string, evidence harness.Fun
 		fresh = os.IsNotExist(err)
 	}
 	next := evidenceState{Hash: hex.EncodeToString(hash[:]), At: e.Time()}
-	if prev.Hash == next.Hash && !next.At.Before(prev.At) && next.At.Sub(prev.At) < quotaHeartbeat {
+	if prev.Hash == next.Hash && !next.At.Before(prev.At) && next.At.Sub(prev.At) < QuotaHeartbeat {
 		return
 	}
 	ev := spool.Event{Time: e.Time(), Name: name, SessionID: id, Repo: r.Name, Attrs: attrs}
@@ -78,6 +78,6 @@ func (e Env) CaptureFunding(r *Repo, id, tool, name string, evidence harness.Fun
 	data, _ := json.Marshal(next)
 	_ = WriteState(path, data)
 	if fresh {
-		PruneState(dir, next.At.Add(-snapshotStateRetention))
+		PruneState(dir, next.At.Add(-SnapshotStateRetention))
 	}
 }

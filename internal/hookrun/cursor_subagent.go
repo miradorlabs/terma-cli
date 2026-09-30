@@ -55,27 +55,27 @@ func CursorSubagentStop(ctx context.Context, env Env) error {
 	// no id to hang it on — the one place agentAttrs' gate does not apply.
 	facet := func(attrs map[string]any) map[string]any {
 		AgentAttrs(attrs, in.SubagentID, in.SubagentType)
-		if _, ok := attrs[attrAgentType]; !ok && ShortLabel(in.SubagentType) {
-			attrs[attrAgentType] = in.SubagentType
+		if _, ok := attrs[AttrAgentType]; !ok && ShortLabel(in.SubagentType) {
+			attrs[AttrAgentType] = in.SubagentType
 		}
 		return attrs
 	}
-	attrs := facet(map[string]any{attrTool: cursorTool, attrSchemaVersion: 1, attrEvidenceSource: sourceCursorHook})
+	attrs := facet(map[string]any{AttrTool: cursorTool, AttrSchemaVersion: 1, AttrEvidenceSource: sourceCursorHook})
 	switch in.Status {
 	case "completed", "aborted", "error":
-		attrs[attrStatus] = in.Status
+		attrs[AttrStatus] = in.Status
 	default:
-		attrs[attrStatus] = unknownValue
+		attrs[AttrStatus] = UnknownValue
 	}
-	BoundedAttr(attrs, attrTurnID, in.GenerationID)
+	BoundedAttr(attrs, AttrTurnID, in.GenerationID)
 	for k, v := range map[string]json.RawMessage{"duration_ms": in.DurationMs, "message_count": in.MessageCount, "tool_call_count": in.ToolCallCount, "loop_count": in.LoopCount} {
 		if value, _, ok := JSONNumber(v, true); ok {
 			attrs[k] = int64(value)
 		}
 	}
-	attrs[attrFileCount] = len(files)
+	attrs[AttrFileCount] = len(files)
 	touched := facet(map[string]any{})
-	BoundedAttr(touched, attrTurnID, in.GenerationID)
+	BoundedAttr(touched, AttrTurnID, in.GenerationID)
 	env.Touch(r, sess, "subagentStop", files, touched)
 	env.EmitFor(r, spool.Event{Name: EventSubagentEnd, SessionID: id, Repo: r.Name, Attrs: attrs})
 	return nil

@@ -34,10 +34,10 @@ type Observation struct {
 	attrs  map[string]any
 }
 
-// observationState is a write-ahead checkpoint. A crash between spool append and
+// ObservationState is a write-ahead checkpoint. A crash between spool append and
 // checkpoint acknowledgement replays Pending with the same observation ID. Ordering is
 // local receipt order, not an invented provider timestamp/order.
-type observationState struct {
+type ObservationState struct {
 	Stream   string       `json:"stream"`
 	Sequence uint64       `json:"sequence"`
 	LastHash string       `json:"last_hash"`
@@ -55,7 +55,7 @@ func (e Env) CaptureObservation(ctx context.Context, r *Repo, o Observation) {
 	if attrs == nil {
 		attrs = map[string]any{}
 	}
-	attrs[attrVersion], attrs[AttrProjectID] = e.Version, r.ProjectID
+	attrs[AttrVersion], attrs[AttrProjectID] = e.Version, r.ProjectID
 	r.StampWorktree(attrs)
 	raw, _ := json.Marshal(attrs)
 	hash := EvidenceID(string(raw))
@@ -84,9 +84,9 @@ func (e Env) CaptureObservation(ctx context.Context, r *Repo, o Observation) {
 		}
 		select {
 		case <-ctx.Done():
-			gap := map[string]any{attrTool: o.tool, attrEvidenceSource: o.source, attrEvidenceStatus: "lock_timeout", attrHookEvent: o.hook}
+			gap := map[string]any{AttrTool: o.tool, AttrEvidenceSource: o.source, AttrEvidenceStatus: "lock_timeout", AttrHookEvent: o.hook}
 			if o.turnID != "" {
-				gap[attrTurnID] = o.turnID
+				gap[AttrTurnID] = o.turnID
 			}
 			e.EmitFor(r, spool.Event{Name: EventSessionCapture, SessionID: o.sessionID, Repo: r.Name, Attrs: gap})
 			return
@@ -94,7 +94,7 @@ func (e Env) CaptureObservation(ctx context.Context, r *Repo, o Observation) {
 		}
 	}
 	defer unlock()
-	var state observationState
+	var state ObservationState
 	b, err := readCheckpoint(path)
 	fresh := os.IsNotExist(err)
 	if err != nil && !fresh {
@@ -103,7 +103,7 @@ func (e Env) CaptureObservation(ctx context.Context, r *Repo, o Observation) {
 	}
 	if !fresh && (len(b) > 64<<10 || json.Unmarshal(b, &state) != nil || state.Stream == "") {
 		// A new stream makes the loss of the old ordering boundary visible.
-		state = observationState{}
+		state = ObservationState{}
 		attrs["capture_gap"] = "invalid_checkpoint"
 	}
 	if state.Stream == "" {
@@ -129,7 +129,7 @@ func (e Env) CaptureObservation(ctx context.Context, r *Repo, o Observation) {
 	}
 	// Suppress only adjacent identical snapshots. Changed hook, turn, model, account,
 	// loop count, missingness or values always retains a new position.
-	if state.LastHash == hash && !e.Time().Before(state.At) && e.Time().Sub(state.At) < quotaHeartbeat {
+	if state.LastHash == hash && !e.Time().Before(state.At) && e.Time().Sub(state.At) < QuotaHeartbeat {
 		return
 	}
 	state.Sequence++

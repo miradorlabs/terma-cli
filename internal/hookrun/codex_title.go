@@ -63,8 +63,8 @@ func (e Env) captureCodexTitle(ctx context.Context, r *Repo, in *codexHookInput)
 		return
 	}
 	attrs := map[string]any{
-		attrTool: codexTool, attrSchemaVersion: 1, attrEvidenceSource: sourceCodexSessionIndex,
-		"title": truncateRunes(title.Name, codexTitleMaxText), attrVersion: e.Version, AttrProjectID: r.ProjectID,
+		AttrTool: codexTool, AttrSchemaVersion: 1, AttrEvidenceSource: sourceCodexSessionIndex,
+		"title": truncateRunes(title.Name, codexTitleMaxText), AttrVersion: e.Version, AttrProjectID: r.ProjectID,
 	}
 	r.StampWorktree(attrs)
 	at := e.Time()

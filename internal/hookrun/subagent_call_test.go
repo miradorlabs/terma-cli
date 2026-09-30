@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -62,9 +63,9 @@ func TestClaudeSubagentCallCarriesTheModelAndTheRollUp(t *testing.T) {
 		t.Errorf("filed under %q, want the parent session", ev.SessionID)
 	}
 	for key, want := range map[string]any{
-		attrTool: claudeTool, attrAgentID: "acb384f0c825d61ec", attrAgentType: "general-purpose",
-		attrModel: "claude-haiku-4-5-20251001", attrToolCallID: "toolu_014qGq4PjQrSYtjabLXYacte",
-		attrTurnID: "prompt-7", attrStatus: "completed", "service_tier": "standard", "speed": "standard",
+		AttrTool: claudeTool, AttrAgentID: "acb384f0c825d61ec", AttrAgentType: "general-purpose",
+		AttrModel: "claude-haiku-4-5-20251001", AttrToolCallID: "toolu_014qGq4PjQrSYtjabLXYacte",
+		AttrTurnID: "prompt-7", AttrStatus: "completed", "service_tier": "standard", "speed": "standard",
 	} {
 		if ev.Attrs[key] != want {
 			t.Errorf("%s = %v, want %v", key, ev.Attrs[key], want)
@@ -90,7 +91,7 @@ func TestClaudeSubagentCallCarriesTheModelAndTheRollUp(t *testing.T) {
 	if _, ok := ev.Attrs["is_async"]; ok {
 		t.Error("is_async was not in the payload and must not be invented")
 	}
-	if _, ok := ev.Attrs[attrAgentParentID]; ok {
+	if _, ok := ev.Attrs[AttrAgentParentID]; ok {
 		t.Error("a subagent launched by the main thread has no parent agent")
 	}
 	// The manifest is for edits. Launching a subagent touches no file.
@@ -111,7 +112,7 @@ func TestClaudeSubagentCallLaunchedInTheBackgroundHasNoTotals(t *testing.T) {
 		t.Fatalf("events = %s", names(events))
 	}
 	ev := events[0]
-	if ev.Attrs[attrStatus] != "async_launched" || ev.Attrs["is_async"] != true || ev.Attrs[attrModel] != "claude-haiku-4-5-20251001" {
+	if ev.Attrs[AttrStatus] != "async_launched" || ev.Attrs["is_async"] != true || ev.Attrs[AttrModel] != "claude-haiku-4-5-20251001" {
 		t.Errorf("launch record: %+v", ev.Attrs)
 	}
 	for _, key := range []string{"duration_ms", "final_context_tokens", "tool_call_count", "lines_added"} {
@@ -147,17 +148,17 @@ func TestClaudeSubagentCallVariants(t *testing.T) {
 		check                       func(*testing.T, []spool.Event)
 	}{
 		{"the tool was called Task before it was Agent", "Task", completedAgentResponse, "", func(t *testing.T, evs []spool.Event) {
-			if len(evs) != 1 || evs[0].Attrs[attrAgentID] != "acb384f0c825d61ec" {
+			if len(evs) != 1 || evs[0].Attrs[AttrAgentID] != "acb384f0c825d61ec" {
 				t.Errorf("events = %+v", evs)
 			}
 		}},
 		{"a subagent that launches another is its parent", "Agent", completedAgentResponse, `"agent_id":"parent-agent-9","agent_type":"planner",`, func(t *testing.T, evs []spool.Event) {
-			if len(evs) != 1 || evs[0].Attrs[attrAgentParentID] != "parent-agent-9" || evs[0].Attrs[attrAgentID] != "acb384f0c825d61ec" {
+			if len(evs) != 1 || evs[0].Attrs[AttrAgentParentID] != "parent-agent-9" || evs[0].Attrs[AttrAgentID] != "acb384f0c825d61ec" {
 				t.Errorf("events = %+v", evs)
 			}
 		}},
 		{"a status outside the vocabulary arrives as unknown, not as free text", "Agent", `{"status":"something new <script>","agentId":"a1"}`, "", func(t *testing.T, evs []spool.Event) {
-			if len(evs) != 1 || evs[0].Attrs[attrStatus] != unknownValue {
+			if len(evs) != 1 || evs[0].Attrs[AttrStatus] != UnknownValue {
 				t.Errorf("events = %+v", evs)
 			}
 		}},
@@ -207,14 +208,14 @@ func openRepoStore(t *testing.T, root string) *session.Store {
 func TestAgentTypeWithoutAnAgentIDIsNotASubagent(t *testing.T) {
 	root := initRepo(t)
 	sp, _ := spool.Open(t.TempDir())
-	writeFile(t, root, "src/main.go", "package src\n")
+	hookruntest.WriteFile(t, root, "src/main.go", "package src\n")
 	runPostToolUse(t, root, sp, `{"session_id":"sess-agent-2","cwd":`+quoteJSON(root)+`,"agent_type":"reviewer","hook_event_name":"PostToolUse","tool_name":"Write","tool_input":{"file_path":"src/main.go"}}`)
 
 	events := lifecycle(drain(t, sp))
 	if len(events) != 1 || events[0].Name != EventFilesTouched {
 		t.Fatalf("events = %s", names(events))
 	}
-	for _, key := range []string{attrAgentID, attrAgentType} {
+	for _, key := range []string{AttrAgentID, AttrAgentType} {
 		if v, ok := events[0].Attrs[key]; ok {
 			t.Errorf("%s = %v on a main-thread edit", key, v)
 		}

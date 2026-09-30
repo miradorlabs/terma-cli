@@ -111,13 +111,13 @@ func renderAntigravityEntry(previous json.RawMessage) (json.RawMessage, error) {
 		}
 	}
 	for _, h := range AntigravityHooks {
-		handler, err := marshalJSON(antigravityHandler{Type: "command", Command: h.Command, Timeout: antigravityHookTimeout}, "", "")
+		handler, err := MarshalJSON(antigravityHandler{Type: "command", Command: h.Command, Timeout: antigravityHookTimeout}, "", "")
 		if err != nil {
 			return nil, err
 		}
 		value := handler
 		if h.Grouped {
-			if value, err = marshalJSON(antigravityGroup{Matcher: "", Hooks: []json.RawMessage{handler}}, "", ""); err != nil {
+			if value, err = MarshalJSON(antigravityGroup{Matcher: "", Hooks: []json.RawMessage{handler}}, "", ""); err != nil {
 				return nil, err
 			}
 		}
@@ -132,7 +132,7 @@ func renderAntigravityEntry(previous json.RawMessage) (json.RawMessage, error) {
 			entry.Stop = append(entry.Stop, value)
 		}
 	}
-	return marshalJSON(entry, "  ", "  ")
+	return MarshalJSON(entry, "  ", "  ")
 }
 
 // PlanAntigravityHooks merges terma's named hook into .agents/hooks.json without
@@ -141,7 +141,7 @@ func renderAntigravityEntry(previous json.RawMessage) (json.RawMessage, error) {
 func PlanAntigravityHooks(root string, install bool) (Plan, error) {
 	p := Plan{}
 	path := filepath.Join(root, filepath.FromSlash(AntigravityHooksPath))
-	before, err := readFile(path)
+	before, err := ReadFile(path)
 	if err != nil {
 		return p, err
 	}
@@ -190,7 +190,7 @@ func PlanAntigravityHooks(root string, install bool) (Plan, error) {
 		}
 		var kept []json.RawMessage
 		for _, handler := range entries {
-			remaining, _, err := withoutTerma(handler)
+			remaining, _, err := WithoutTerma(handler)
 			if err != nil {
 				return p, err
 			}
@@ -204,7 +204,7 @@ func PlanAntigravityHooks(root string, install bool) (Plan, error) {
 		if len(kept) == 0 {
 			delete(entry, event)
 		} else {
-			encoded, err := marshalJSON(kept, "", "")
+			encoded, err := MarshalJSON(kept, "", "")
 			if err != nil {
 				return p, err
 			}
@@ -215,11 +215,11 @@ func PlanAntigravityHooks(root string, install bool) (Plan, error) {
 	if len(entry) == 0 {
 		delete(top, antigravityHookName)
 	} else {
-		encoded, err := marshalJSON(entry, "  ", "  ")
+		encoded, err := MarshalJSON(entry, "  ", "  ")
 		if err != nil {
 			return p, err
 		}
-		if present && sameJSON(previous, encoded) {
+		if present && SameJSON(previous, encoded) {
 			return p, nil
 		}
 		top[antigravityHookName] = encoded
@@ -228,7 +228,7 @@ func PlanAntigravityHooks(root string, install bool) (Plan, error) {
 		p.Changes = append(p.Changes, Change{Path: AntigravityHooksPath, Before: before})
 		return p, nil
 	}
-	out, err := marshalOrdered(top)
+	out, err := MarshalOrdered(top)
 	if err != nil {
 		return p, err
 	}
@@ -242,7 +242,7 @@ func PlanAntigravityHooks(root string, install bool) (Plan, error) {
 // that cannot be read reports enabled for the same reason: this only ever says "you
 // switched it off", and an unreadable file is the plan's error to raise.
 func AntigravityHooksEnabled(root string) bool {
-	data, err := readFile(filepath.Join(root, filepath.FromSlash(AntigravityHooksPath)))
+	data, err := ReadFile(filepath.Join(root, filepath.FromSlash(AntigravityHooksPath)))
 	if err != nil || data == nil {
 		return true
 	}

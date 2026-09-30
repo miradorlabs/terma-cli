@@ -45,8 +45,8 @@ func (e Env) captureCodexDesktopActivity(ctx context.Context, r *Repo, in *codex
 	next, status, err := harness.ReadCodexDesktopActivity(ctx, codexRolloutID(in), in.TranscriptPath, cursor, func(a harness.CodexDesktopActivity) error {
 		attrs := EvidenceAttrs(codexTool, sourceCodexRollout, "desktop")
 		attrs["capture_surface"] = codexDesktopSurface
-		BoundedAttr(attrs, attrTurnID, a.TurnID)
-		BoundedAttr(attrs, attrModel, a.Model)
+		BoundedAttr(attrs, AttrTurnID, a.TurnID)
+		BoundedAttr(attrs, AttrModel, a.Model)
 		BoundedAttr(attrs, "trace_id", a.TraceID)
 		at := a.At
 		if at.IsZero() || at.After(e.Time()) {
@@ -64,9 +64,9 @@ func (e Env) captureCodexDesktopActivity(ctx context.Context, r *Repo, in *codex
 			attrs["reasoning_output_tokens"] = a.ReasoningOutputTokens
 		case "tool":
 			ev.Name = EventToolCall
-			attrs[attrToolCallID] = a.ID
-			attrs[attrToolName] = a.ToolName
-			attrs[attrStatus] = "completed"
+			attrs[AttrToolCallID] = a.ID
+			attrs[AttrToolName] = a.ToolName
+			attrs[AttrStatus] = "completed"
 			if a.HasDuration {
 				attrs["duration_ms"] = a.DurationMs
 				attrs["duration_source"] = "rollout_item"
@@ -85,8 +85,8 @@ func (e Env) captureCodexDesktopActivity(ctx context.Context, r *Repo, in *codex
 			}
 		case "turn":
 			ev.Name = EventTurnSummary
-			attrs[attrStatus] = a.Status
-			BoundedAttr(attrs, attrReason, a.Reason)
+			attrs[AttrStatus] = a.Status
+			BoundedAttr(attrs, AttrReason, a.Reason)
 			if a.HasDuration {
 				attrs["duration_ms"] = a.DurationMs
 			}

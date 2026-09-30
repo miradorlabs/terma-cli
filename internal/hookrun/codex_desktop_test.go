@@ -3,10 +3,12 @@ package hookrun
 import (
 	"context"
 	"encoding/json"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
 func TestCodexDesktopHooksCaptureLocalToolsWithRepositoryConsent(t *testing.T) {
@@ -37,7 +39,7 @@ func TestCodexDesktopHooksCaptureLocalToolsWithRepositoryConsent(t *testing.T) {
 				"tool_name": "functions.exec", "tool_use_id": "call_1",
 				"tool_input":    map[string]any{"command": "private command"},
 				"tool_response": map[string]any{"exit_code": 0, "output": "private output"}}, CodexPostToolUse)
-			all := spooled(t, env.Spool)
+			all := hookruntest.Spooled(t, env.Spool)
 			prompts, calls, approvals := eventsNamed(all, EventUserPrompt), eventsNamed(all, EventToolCall), eventsNamed(all, EventApprovalAsked)
 			if len(prompts) != 1 || len(calls) != 1 || len(approvals) != 1 {
 				t.Fatalf("prompt/call missing: %+v", all)

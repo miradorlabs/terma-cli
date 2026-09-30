@@ -46,7 +46,7 @@ func CodexManagedRequirements(command func(event string) string) string {
 	var b strings.Builder
 	b.WriteString("# terma: global mode's hooks for every Codex session on this machine.\n[hooks]\n")
 	for _, h := range CodexHooks {
-		fmt.Fprintf(&b, "\n[[hooks.%s]]\n\n[[hooks.%s.hooks]]\ntype = \"command\"\ncommand = %s\ntimeout = %d\n", h.Event, h.Event, tomlString(command(hookEventOf(h.Command))), h.Timeout)
+		fmt.Fprintf(&b, "\n[[hooks.%s]]\n\n[[hooks.%s.hooks]]\ntype = \"command\"\ncommand = %s\ntimeout = %d\n", h.Event, h.Event, tomlString(command(HookEventOf(h.Command))), h.Timeout)
 		if h.Async {
 			b.WriteString("async = true\n")
 		}

@@ -56,16 +56,16 @@ func (e Env) captureCodexReplies(ctx context.Context, r *Repo, in *codexHookInpu
 	defer cancel()
 	next, status, err := harness.ReadCodexReplies(ctx, rollout, in.TranscriptPath, cursor, codexReplyMaxText, func(reply harness.CodexReply) error {
 		attrs := AgentAttrs(map[string]any{
-			attrTool: codexTool, attrSchemaVersion: 1, attrEvidenceSource: sourceCodexRollout,
+			AttrTool: codexTool, AttrSchemaVersion: 1, AttrEvidenceSource: sourceCodexRollout,
 			"message_id": reply.ID, "role": "assistant",
 			"text": reply.Text, "text_bytes": reply.Bytes, "text_truncated": reply.Truncated,
-			attrVersion: e.Version, AttrProjectID: r.ProjectID,
+			AttrVersion: e.Version, AttrProjectID: r.ProjectID,
 		}, in.AgentID, in.AgentType)
 		r.StampWorktree(attrs)
 		if _, desktop := codexDesktopRoute(r); desktop {
 			attrs["capture_surface"] = codexDesktopSurface
 		}
-		for k, v := range map[string]string{attrTurnID: reply.TurnID, "trace_id": reply.TraceID, "phase": reply.Phase, attrModel: in.Model} {
+		for k, v := range map[string]string{AttrTurnID: reply.TurnID, "trace_id": reply.TraceID, "phase": reply.Phase, AttrModel: in.Model} {
 			BoundedAttr(attrs, k, v)
 		}
 		// The event is stamped with when the message was said. Every reply of a turn is

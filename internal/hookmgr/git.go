@@ -66,7 +66,7 @@ func planShim(root string, install bool) (Plan, error) {
 	p := Plan{Manager: GitShim}
 	for _, hook := range GitHooks {
 		rel := ShimDir + "/" + hook
-		before, err := readFile(filepath.Join(root, filepath.FromSlash(rel)))
+		before, err := ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
 		if err != nil {
 			return p, err
 		}
@@ -110,7 +110,7 @@ func planHusky(root string, install bool) (Plan, error) {
 	p := Plan{Manager: Husky}
 	for _, hook := range GitHooks {
 		rel := ".husky/" + hook
-		before, err := readFile(filepath.Join(root, filepath.FromSlash(rel)))
+		before, err := ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
 		if err != nil {
 			return p, err
 		}
@@ -164,7 +164,7 @@ func lefthookRun(hook string) string {
 func planLefthook(root, configPath string, install bool) (Plan, error) {
 	p := Plan{Manager: Lefthook}
 	path := filepath.Join(root, configPath)
-	before, err := readFile(path)
+	before, err := ReadFile(path)
 	if err != nil {
 		return p, err
 	}
@@ -260,7 +260,7 @@ func planPreCommit(root string, install bool) (Plan, error) {
 	p := Plan{Manager: PreCommit}
 	configPath := ".pre-commit-config.yaml"
 	path := filepath.Join(root, configPath)
-	before, err := readFile(path)
+	before, err := ReadFile(path)
 	if err != nil {
 		return p, err
 	}

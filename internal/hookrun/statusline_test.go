@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -122,7 +123,7 @@ func TestStatusLineCapturesQuotaOncePerChange(t *testing.T) {
 	}
 
 	// The heartbeat re-sends an unchanged snapshot after ten minutes.
-	env.Now = env.Now.Add(quotaHeartbeat + time.Second)
+	env.Now = env.Now.Add(QuotaHeartbeat + time.Second)
 	env.Stdin = strings.NewReader(changed)
 	StatusLine(context.Background(), env, StatusLineOptions{CaptureOnly: true})
 	if evs := spooledQuota(t, sp); len(evs) != 1 {
@@ -202,7 +203,7 @@ func TestStatusLineStampsProjectFromRepository(t *testing.T) {
 			if !nonGit {
 				root = initRepo(t)
 			}
-			writeFile(t, root, ".terma/settings.json", `{"project":{"id":"proj_sl"}}`)
+			hookruntest.WriteFile(t, root, ".terma/settings.json", `{"project":{"id":"proj_sl"}}`)
 			nested := filepath.Join(root, "nested")
 			if err := os.MkdirAll(nested, 0o755); err != nil {
 				t.Fatal(err)

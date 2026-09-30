@@ -26,7 +26,7 @@ type ompHookInput struct {
 const ompTool = "omp"
 
 func readOmpInput(r io.Reader) (*ompHookInput, error) {
-	in, err := readHookInput[ompHookInput](r)
+	in, err := ReadInput[ompHookInput](r)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func OmpSessionStart(ctx context.Context, env Env) error {
 		env.Logf("not in a git repository: %v", err)
 		return nil
 	}
-	attrs := map[string]any{attrSource: "session_start"}
+	attrs := map[string]any{AttrSource: "session_start"}
 	env.Announce(r, env.NewSession(r, in.SessionID, ompTool, in.Model), attrs)
 	return nil
 }

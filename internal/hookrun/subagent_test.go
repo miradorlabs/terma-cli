@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
+	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 	"github.com/miradorlabs/terma-cli/internal/trailer"
 )
@@ -72,7 +73,7 @@ func TestClaudeSubagentIsAFacetOfTheParentSession(t *testing.T) {
 	if err := SubagentStart(ctx, env(`{`+parent+`,"hook_event_name":"SubagentStart",`+agent+`,"transcript_path":"/nope"}`)); err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, root, "src/sub.go", "package src\n")
+	hookruntest.WriteFile(t, root, "src/sub.go", "package src\n")
 	if err := PostToolUse(ctx, env(`{`+parent+`,"hook_event_name":"PostToolUse",`+agent+`,"tool_name":"Write","tool_input":{"file_path":"src/sub.go"}}`)); err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +156,7 @@ func TestCodexSubagentHooksAndSpawnedThreadParent(t *testing.T) {
 	if err := CodexSubagentStart(ctx, env(`{"session_id":"`+parent+`","hook_event_name":"SubagentStart","cwd":"`+root+`",`+agent+`}`)); err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, root, "src/a.go", "package src\n")
+	hookruntest.WriteFile(t, root, "src/a.go", "package src\n")
 	patch := "apply_patch <<'PATCH'\\n*** Begin Patch\\n*** Update File: src/a.go\\n@@\\n-old\\n+new\\n*** End Patch\\nPATCH"
 	if err := CodexPostToolUse(ctx, env(`{"session_id":"`+parent+`","hook_event_name":"PostToolUse","cwd":"`+root+`",`+agent+`,"tool_name":"apply_patch","tool_input":{"command":"`+patch+`"}}`)); err != nil {
 		t.Fatal(err)
@@ -201,8 +202,8 @@ func TestCursorSubagentStopRecordsOutcomeAndFiles(t *testing.T) {
 	if err := CursorSessionStart(ctx, env(`{`+common+`,"hook_event_name":"sessionStart"}`)); err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, root, "src/a.go", "package src\n")
-	writeFile(t, root, "src/b.go", "package src\n")
+	hookruntest.WriteFile(t, root, "src/a.go", "package src\n")
+	hookruntest.WriteFile(t, root, "src/b.go", "package src\n")
 	stop := `{` + common + `,"hook_event_name":"subagentStop","subagent_type":"explorer","status":"completed","task":"look around","summary":"done","duration_ms":4200,"message_count":6,"tool_call_count":3,"loop_count":0,"modified_files":["` + filepath.Join(root, "src", "a.go") + `","src/b.go","/elsewhere/c.go"],"agent_transcript_path":"/nope"}`
 	if err := CursorSubagentStop(ctx, env(stop)); err != nil {
 		t.Fatal(err)
@@ -328,12 +329,12 @@ func TestCodexSpawnedThreadArrivesThroughSubagentStart(t *testing.T) {
 	if start == nil {
 		t.Fatalf("no %s in %s", EventSubagentStart, names(all))
 	}
-	if start.SessionID != rootThread || start.Attrs[attrAgentID] != child || start.Attrs["rollout_status"] != statusPresent ||
-		start.Attrs[attrAgentParentID] != rootThread || num(start.Attrs["agent_depth"]) != 1 ||
+	if start.SessionID != rootThread || start.Attrs[AttrAgentID] != child || start.Attrs["rollout_status"] != StatusPresent ||
+		start.Attrs[AttrAgentParentID] != rootThread || num(start.Attrs["agent_depth"]) != 1 ||
 		start.Attrs["agent_nickname"] != "Holt" || start.Attrs["agent_path"] != "/root/reviewer" {
 		t.Fatalf("spawn record on the start: %v", start.Attrs)
 	}
-	if _, ok := start.Attrs[attrParentSession]; ok {
+	if _, ok := start.Attrs[AttrParentSession]; ok {
 		t.Error("the child is a facet of the root's session, not a session with a parent")
 	}
 	// Read as the session's rollout this was a session_mismatch and no quota at all.
@@ -341,7 +342,7 @@ func TestCodexSpawnedThreadArrivesThroughSubagentStart(t *testing.T) {
 		t.Fatalf("quota events = %d, want the child's one: %s", len(quotas), names(all))
 	}
 	q := quotas[0]
-	if q.SessionID != rootThread || q.Attrs[attrAgentID] != child || q.Attrs[attrEvidenceStatus] != statusPresent || num(q.Attrs["primary_used_pct"]) != 12 {
+	if q.SessionID != rootThread || q.Attrs[AttrAgentID] != child || q.Attrs[AttrEvidenceStatus] != StatusPresent || num(q.Attrs["primary_used_pct"]) != 12 {
 		t.Fatalf("quota from inside the subagent: session=%s attrs=%v", q.SessionID, q.Attrs)
 	}
 }
@@ -379,7 +380,7 @@ func TestCursorSubagentEditsAreFoldedIntoTheParentConversation(t *testing.T) {
 	if err := CursorSessionStart(ctx, env(`{"conversation_id":"`+parent+`",`+roots+`,"hook_event_name":"sessionStart"}`)); err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, root, "src/sub.go", "package src\n")
+	hookruntest.WriteFile(t, root, "src/sub.go", "package src\n")
 	// The subagent's edit, under the subagent's own conversation.
 	if err := CursorFileEdit(ctx, env(`{"conversation_id":"`+child+`",`+roots+`,"hook_event_name":"afterFileEdit","file_path":"`+filepath.Join(root, "src", "sub.go")+`"}`)); err != nil {
 		t.Fatal(err)
@@ -404,14 +405,14 @@ func TestCursorSubagentEditsAreFoldedIntoTheParentConversation(t *testing.T) {
 		switch {
 		case e.Name == EventSubagentEnd:
 			end = &events[i]
-		case e.Name == EventFilesTouched && e.Attrs[attrToolName] == "subagentStop":
+		case e.Name == EventFilesTouched && e.Attrs[AttrToolName] == "subagentStop":
 			touched = &events[i]
 		}
 	}
-	if end == nil || end.SessionID != parent || end.Attrs[attrAgentID] != child || end.Attrs[attrAgentType] != "worker" {
+	if end == nil || end.SessionID != parent || end.Attrs[AttrAgentID] != child || end.Attrs[AttrAgentType] != "worker" {
 		t.Fatalf("subagent end: %+v", end)
 	}
-	if touched == nil || touched.SessionID != parent || touched.Attrs[attrAgentID] != child || touched.Attrs[attrTurnID] != "gen_4" || touched.Attrs["files"] != "src/sub.go" {
+	if touched == nil || touched.SessionID != parent || touched.Attrs[AttrAgentID] != child || touched.Attrs[AttrTurnID] != "gen_4" || touched.Attrs["files"] != "src/sub.go" {
 		t.Fatalf("files touched: %+v", touched)
 	}
 
@@ -465,7 +466,7 @@ func TestOpenCodeChildSessionNeverBecomesTheActiveOne(t *testing.T) {
 	}
 	// The child is still announced, with its parent.
 	events := lifecycle(drain(t, sp))
-	if len(events) != 2 || events[1].SessionID != "ses_child" || events[1].Attrs[attrParentSession] != "ses_person" {
+	if len(events) != 2 || events[1].SessionID != "ses_child" || events[1].Attrs[AttrParentSession] != "ses_person" {
 		t.Fatalf("events: %+v", events)
 	}
 }

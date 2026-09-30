@@ -95,12 +95,12 @@ func claudeSubagent(ctx context.Context, env Env, name string) error {
 		// fire SubagentStop. Only a launch establishes a delegated run.
 		return nil
 	}
-	attrs := AgentAttrs(map[string]any{attrTool: claudeTool, attrSchemaVersion: 1}, in.AgentID, in.AgentType)
+	attrs := AgentAttrs(map[string]any{AttrTool: claudeTool, AttrSchemaVersion: 1}, in.AgentID, in.AgentType)
 	if name == EventSubagentStart {
-		attrs[attrVersion] = env.Version
+		attrs[AttrVersion] = env.Version
 	}
 	if session.ValidID(in.PromptID) {
-		attrs[attrTurnID] = in.PromptID
+		attrs[AttrTurnID] = in.PromptID
 	}
 	env.EmitFor(r, spool.Event{Name: name, SessionID: in.SessionID, Repo: r.Name, Attrs: attrs})
 	return nil
@@ -173,22 +173,22 @@ func (e Env) claudeSubagentCall(r *Repo, in *claudeHookInput) {
 		return
 	}
 	e.rememberClaudeSubagent(in.SessionID, res.AgentID)
-	attrs := AgentAttrs(map[string]any{attrTool: claudeTool, attrSchemaVersion: 1}, res.AgentID, cmp.Or(res.AgentType, in.ToolInput.SubagentType))
+	attrs := AgentAttrs(map[string]any{AttrTool: claudeTool, AttrSchemaVersion: 1}, res.AgentID, cmp.Or(res.AgentType, in.ToolInput.SubagentType))
 	// A subagent can launch one of its own: the hook then fires inside the launching
 	// agent and names it, which is the new agent's parent.
 	if session.ValidID(in.AgentID) && in.AgentID != res.AgentID {
-		attrs[attrAgentParentID] = in.AgentID
+		attrs[AttrAgentParentID] = in.AgentID
 	}
-	BoundedAttr(attrs, attrModel, res.ResolvedModel)
-	BoundedAttr(attrs, attrToolCallID, in.ToolUseID)
+	BoundedAttr(attrs, AttrModel, res.ResolvedModel)
+	BoundedAttr(attrs, AttrToolCallID, in.ToolUseID)
 	if session.ValidID(in.PromptID) {
-		attrs[attrTurnID] = in.PromptID
+		attrs[AttrTurnID] = in.PromptID
 	}
 	switch res.Status {
 	case "async_launched", "completed":
-		attrs[attrStatus] = res.Status
+		attrs[AttrStatus] = res.Status
 	default:
-		attrs[attrStatus] = unknownValue
+		attrs[AttrStatus] = UnknownValue
 	}
 	if res.IsAsync != nil {
 		attrs["is_async"] = *res.IsAsync

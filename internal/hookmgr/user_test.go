@@ -115,7 +115,7 @@ func TestManagedConfig(t *testing.T) {
 			t.Fatalf("%s: %+v", h.Event, groups)
 		}
 		got := groups[0].Hooks[0]
-		if got.Type != "command" || got.Command != cmd(hookEventOf(h.Command)) || got.Timeout != h.Timeout || got.Async != h.Async {
+		if got.Type != "command" || got.Command != cmd(HookEventOf(h.Command)) || got.Timeout != h.Timeout || got.Async != h.Async {
 			t.Errorf("%s: %+v", h.Event, got)
 		}
 	}

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -15,7 +16,7 @@ import (
 // naming, a rename appending another for the same id, other threads interleaved.
 func titleIndex(t *testing.T, lines ...string) {
 	t.Helper()
-	writeFile(t, os.Getenv("CODEX_HOME"), "session_index.jsonl", strings.Join(lines, "\n")+"\n")
+	hookruntest.WriteFile(t, os.Getenv("CODEX_HOME"), "session_index.jsonl", strings.Join(lines, "\n")+"\n")
 }
 
 func titleLine(id, name, at string) string {
@@ -31,7 +32,7 @@ func stopCodexTitles(t *testing.T, env Env) []spool.Event {
 		t.Fatal(err)
 	}
 	var titles []spool.Event
-	for _, e := range spooled(t, env.Spool) {
+	for _, e := range hookruntest.Spooled(t, env.Spool) {
 		if e.Name == EventSessionTitle {
 			titles = append(titles, e)
 		}

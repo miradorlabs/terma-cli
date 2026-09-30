@@ -59,17 +59,17 @@ func planClaude(root, path string, command func(event string) string, install bo
 		Matcher string            `json:"matcher,omitempty"`
 		Hooks   []json.RawMessage `json:"hooks"`
 	}
-	own := make([]eventHook, 0, len(ClaudeHooks))
+	own := make([]EventHook, 0, len(ClaudeHooks))
 	for _, h := range ClaudeHooks {
-		cmd, err := marshalJSON(hookCmd{Type: "command", Command: command(hookEventOf(h.Command)), Timeout: 10}, "", "")
+		cmd, err := MarshalJSON(hookCmd{Type: "command", Command: command(HookEventOf(h.Command)), Timeout: 10}, "", "")
 		if err != nil {
 			return Plan{}, err
 		}
-		entry, err := marshalJSON(hookEntry{Matcher: h.Matcher, Hooks: []json.RawMessage{cmd}}, "", "")
+		entry, err := MarshalJSON(hookEntry{Matcher: h.Matcher, Hooks: []json.RawMessage{cmd}}, "", "")
 		if err != nil {
 			return Plan{}, err
 		}
-		own = append(own, eventHook{Event: h.Event, Entry: entry})
+		own = append(own, EventHook{Event: h.Event, Entry: entry})
 	}
-	return mergeEventHooks(root, hooksFile{Path: path}, own, install)
+	return MergeEventHooks(root, HooksFile{Path: path}, own, install)
 }

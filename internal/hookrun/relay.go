@@ -88,7 +88,7 @@ func ToolForEvent(event string) string {
 // telemetry is exported. It must print nothing — Claude Code hands this hook's stdout
 // to the model as context.
 func UserPromptSubmit(_ context.Context, env Env) error {
-	_, err := readHookInput[struct {
+	_, err := ReadInput[struct {
 		SessionID string `json:"session_id"`
 	}](env.Stdin)
 	return err

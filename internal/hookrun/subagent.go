@@ -33,9 +33,9 @@ func AgentAttrs(attrs map[string]any, id, kind string) map[string]any {
 	if !session.ValidID(id) {
 		return attrs
 	}
-	attrs[attrAgentID] = id
+	attrs[AttrAgentID] = id
 	if ShortLabel(kind) {
-		attrs[attrAgentType] = kind
+		attrs[AttrAgentType] = kind
 	}
 	return attrs
 }

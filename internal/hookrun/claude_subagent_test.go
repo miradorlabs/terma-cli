@@ -68,7 +68,7 @@ func TestClaudeSubagentStopRequiresEvidenceForItsSessionAndAgent(t *testing.T) {
 				t.Fatalf("got %d stop events, want the two known-agent stops", len(events))
 			}
 			for _, event := range events {
-				if event.Name != EventSubagentEnd || event.SessionID != sessionID || event.Attrs[attrAgentID] != agentID {
+				if event.Name != EventSubagentEnd || event.SessionID != sessionID || event.Attrs[AttrAgentID] != agentID {
 					t.Errorf("unexpected stop: %+v", event)
 				}
 			}
@@ -129,7 +129,7 @@ func TestClaudeSubagentLaunchEvidenceExpires(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if events := drain(t, sp); len(events) != 1 || events[0].Attrs[attrAgentID] != "fresh" {
+	if events := drain(t, sp); len(events) != 1 || events[0].Attrs[AttrAgentID] != "fresh" {
 		t.Fatalf("expired evidence admitted a stop: %+v", events)
 	}
 	if err := SessionStart(ctx, Env{Cwd: root, Spool: sp, Now: now, Stdin: strings.NewReader(`{"session_id":"next-session"}`)}); err != nil {

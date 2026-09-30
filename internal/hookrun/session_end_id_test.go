@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -37,7 +38,7 @@ func TestSessionEndIgnoresAnUnsafeSessionID(t *testing.T) {
 					t.Fatalf("%q: a hook must never fail: %v", id, err)
 				}
 			}
-			if events := spooled(t, sp); len(events) != 0 {
+			if events := hookruntest.Spooled(t, sp); len(events) != 0 {
 				t.Fatalf("spooled %d event(s) for unsafe ids: %+v", len(events), events)
 			}
 		})

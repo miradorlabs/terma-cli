@@ -40,11 +40,11 @@ const (
 	claudeSubagentDir = "claude-subagents"
 )
 
-// snapshotStateRetention is how long a status line snapshot or a funding evidence hash
+// SnapshotStateRetention is how long a status line snapshot or a funding evidence hash
 // outlives its last write. Both are rewritten whenever a live session spools one, at
 // least every quotaHeartbeat, so two idle days means the session is over. The cursors
 // and checkpoints in the other directories are kept for spool.MaxAge, not for this.
-const snapshotStateRetention = 48 * time.Hour
+const SnapshotStateRetention = 48 * time.Hour
 
 // codexCaptureTimeout bounds each of a Codex hook's rollout captures, quota and then
 // replies. Stop is synchronous with a three-second timeout in the committed hooks file,
@@ -79,9 +79,9 @@ func WriteState(path string, data []byte) error {
 // same input is the same id on every run, which is what makes a replay harmless.
 func EvidenceID(s string) string { h := sha256.Sum256([]byte(s)); return hex.EncodeToString(h[:]) }
 
-// quotaHeartbeat is how often an unchanged snapshot is re-sent, so the backend
+// QuotaHeartbeat is how often an unchanged snapshot is re-sent, so the backend
 // can tell "no change" from "no status line".
-const quotaHeartbeat = 10 * time.Minute
+const QuotaHeartbeat = 10 * time.Minute
 
 // PruneState ages out a state directory: every `<id>.json` last written before the
 // cutoff, and then the `<id>.json.lock` beside it. The locks used to be left behind —

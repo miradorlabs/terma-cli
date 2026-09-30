@@ -28,7 +28,7 @@ type opencodeHookInput struct {
 const opencodeTool = "opencode"
 
 func readOpenCodeInput(r io.Reader) (*opencodeHookInput, error) {
-	in, err := readHookInput[opencodeHookInput](r)
+	in, err := ReadInput[opencodeHookInput](r)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +55,7 @@ func OpenCodeSessionStart(ctx context.Context, env Env) error {
 		env.Logf("not in a git repository: %v", err)
 		return nil
 	}
-	attrs := map[string]any{attrSource: "session.created"}
+	attrs := map[string]any{AttrSource: "session.created"}
 	sess := env.NewSession(r, in.SessionID, opencodeTool, in.Model)
 	if !session.ValidID(in.ParentSessionID) {
 		env.Announce(r, sess, attrs)
@@ -66,7 +66,7 @@ func OpenCodeSessionStart(ctx context.Context, env Env) error {
 	// to the session a person is driving: a child that displaced it would put its own id
 	// on the developer's next hand-written commit. The child's edits still build a
 	// manifest of their own, and that is how they are attributed.
-	attrs[attrParentSession] = in.ParentSessionID
+	attrs[AttrParentSession] = in.ParentSessionID
 	env.PruneManifests(r, sess.UpdatedAt)
 	env.EmitStart(r, sess, attrs)
 	return nil

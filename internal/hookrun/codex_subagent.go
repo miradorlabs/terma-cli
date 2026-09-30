@@ -43,16 +43,16 @@ func codexSubagent(ctx context.Context, env Env, name string) error {
 	if err != nil {
 		return nil
 	}
-	attrs := AgentAttrs(map[string]any{attrTool: codexTool, attrSchemaVersion: 1, attrModel: in.Model}, in.AgentID, in.AgentType)
+	attrs := AgentAttrs(map[string]any{AttrTool: codexTool, AttrSchemaVersion: 1, AttrModel: in.Model}, in.AgentID, in.AgentType)
 	if session.ValidID(in.TurnID) {
-		attrs[attrTurnID] = in.TurnID
+		attrs[AttrTurnID] = in.TurnID
 	}
 	if name == EventSubagentStart {
-		attrs[attrVersion] = env.Version
+		attrs[AttrVersion] = env.Version
 		spawn, status := harness.CodexRolloutSpawn(ctx, in.AgentID, in.TranscriptPath)
 		attrs["rollout_status"] = status
-		if status == statusPresent {
-			codexSpawnAttrs(attrs, attrAgentParentID, spawn)
+		if status == StatusPresent {
+			codexSpawnAttrs(attrs, AttrAgentParentID, spawn)
 		}
 	}
 	env.EmitFor(r, spool.Event{Name: name, SessionID: in.SessionID, Repo: r.Name, Attrs: attrs})

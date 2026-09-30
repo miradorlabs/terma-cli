@@ -175,7 +175,7 @@ func (e Env) claimForRelay(r *Repo, ev spool.Event) {
 	if r == nil || r.ProjectID == "" || ev.SessionID == "" || !claim.Enabled() {
 		return
 	}
-	tool, _ := ev.Attrs[attrTool].(string)
+	tool, _ := ev.Attrs[AttrTool].(string)
 	c := claim.Claim{ProjectID: r.ProjectID, Tool: tool, Repo: r.Name, Worktree: r.Worktree, PIDs: claimPIDs()}
 	claim.Write(ev.SessionID, c, e.Time())
 	// A Codex subagent is a thread of its own: its hooks carry the root's session and the
@@ -183,7 +183,7 @@ func (e Env) claimForRelay(r *Repo, ev spool.Event) {
 	// only under the root, everything the subagent did would be dropped. (Claude's
 	// subagents export under the parent's session.id; claiming their agent_id too is
 	// harmless — no export names it.)
-	if agent, _ := ev.Attrs[attrAgentID].(string); agent != "" && agent != ev.SessionID {
+	if agent, _ := ev.Attrs[AttrAgentID].(string); agent != "" && agent != ev.SessionID {
 		claim.Write(agent, c, e.Time())
 	}
 	if e.OnClaim != nil {
@@ -274,7 +274,7 @@ func PrepareCommitMsg(ctx context.Context, env Env) error {
 		ids = append(ids, a.SessionID)
 	}
 	env.EmitFor(r, spool.Event{Name: EventCommitStamped, SessionID: ids[0], Repo: r.Name, Attrs: map[string]any{
-		"sessions": strings.Join(ids, ","), "session_count": len(ids), "staged_count": len(staged), attrSource: source,
+		"sessions": strings.Join(ids, ","), "session_count": len(ids), "staged_count": len(staged), AttrSource: source,
 	}})
 	return nil
 }
@@ -340,7 +340,7 @@ func PostCommit(ctx context.Context, env Env) error {
 	attrs := commitAttrs(r, head)
 	attrs["sessions"] = strings.Join(ids, ",")
 	attrs["session_count"] = len(ids)
-	attrs[attrTool] = stamped[0].Tool
+	attrs[AttrTool] = stamped[0].Tool
 	addFileStats(env, attrs, head.Files, owners)
 	env.EmitFor(r, spool.Event{Name: EventCommit, SessionID: ids[0], Repo: r.Name, Attrs: attrs})
 	return nil
@@ -387,7 +387,7 @@ func emitUnattributedCommit(env Env, r *Repo, head gitx.Commit) {
 // no second subprocess is needed. Nothing in here names a file.
 func commitAttrs(r *Repo, head gitx.Commit) map[string]any {
 	attrs := map[string]any{
-		"sha": head.SHA, attrFileCount: len(head.Files), "author_email": head.AuthorEmail,
+		"sha": head.SHA, AttrFileCount: len(head.Files), "author_email": head.AuthorEmail,
 	}
 	// A merge or an empty commit has no diff: no totals, rather than zeros that
 	// read like "nothing changed".

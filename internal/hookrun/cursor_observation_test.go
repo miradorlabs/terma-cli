@@ -160,7 +160,7 @@ func TestCursorPendingReplayKeepsIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var state observationState
+	var state ObservationState
 	if err = json.Unmarshal(b, &state); err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +194,7 @@ func TestCursorFailedAppendIsRecoveredBeforeNextTurn(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var state observationState
+	var state ObservationState
 	_ = json.Unmarshal(b, &state)
 	if state.Pending == nil {
 		t.Fatal("failed append lost its evidence")

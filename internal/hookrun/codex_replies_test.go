@@ -3,13 +3,15 @@ package hookrun
 import (
 	"context"
 	"encoding/json"
-	"github.com/miradorlabs/terma-cli/internal/relay/claim"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/spool"
@@ -25,7 +27,7 @@ const (
 func replyRollout(t *testing.T) string {
 	t.Helper()
 	path := filepath.Join(os.Getenv("CODEX_HOME"), "sessions", "2026", "09", "19", "rollout-2026-09-19T12-18-12-"+replySession+".jsonl")
-	writeFile(t, filepath.Dir(path), filepath.Base(path), strings.Join([]string{
+	hookruntest.WriteFile(t, filepath.Dir(path), filepath.Base(path), strings.Join([]string{
 		`{"type":"session_meta","payload":{"id":"` + replySession + `"}}`,
 		`{"timestamp":"2026-09-19T18:18:39.000Z","type":"event_msg","payload":{"type":"task_started","turn_id":"` + replyTurn + `","trace_id":"` + replyTrace + `"}}`,
 		`{"timestamp":"2026-09-19T18:18:39.200Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"SECRET PROMPT the developer typed"}]}}`,
@@ -92,7 +94,7 @@ func stopCodex(t *testing.T, env Env, path string) []spool.Event {
 		t.Fatal(err)
 	}
 	var replies []spool.Event
-	for _, e := range spooled(t, env.Spool) {
+	for _, e := range hookruntest.Spooled(t, env.Spool) {
 		if e.Name == EventAssistantMessage {
 			replies = append(replies, e)
 		}
@@ -166,7 +168,7 @@ func TestCodexRepliesNeedTheConsentPromptsTravelUnder(t *testing.T) {
 		}, 2},
 		{"desktop route does not depend on global exporter syntax", func(t *testing.T) {
 			connectCodexDesktop(t, true)
-			writeFile(t, os.Getenv("CODEX_HOME"), "config.toml", "[otel\ninvalid\n")
+			hookruntest.WriteFile(t, os.Getenv("CODEX_HOME"), "config.toml", "[otel\ninvalid\n")
 		}, 2},
 		{"desktop choice is explicitly off", func(t *testing.T) {
 			falseValue := false
@@ -210,7 +212,7 @@ func TestCodexRepliesFailClosedWhenAConsentSourceCannotBeRead(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			writeFile(t, dir, "project-a.json", `{"project_id": "project-a", "include_prompts": tr`)
+			hookruntest.WriteFile(t, dir, "project-a.json", `{"project_id": "project-a", "include_prompts": tr`)
 		}},
 		// Without the relay the machine-wide config is a consent source too; on a relay
 		// machine it is not (it lets everything out, and the relay withholds per project).
@@ -219,7 +221,7 @@ func TestCodexRepliesFailClosedWhenAConsentSourceCannotBeRead(t *testing.T) {
 				IncludePrompts: true, Harnesses: []string{routing.AgentCodex}}); err != nil {
 				t.Fatal(err)
 			}
-			writeFile(t, os.Getenv("CODEX_HOME"), "config.toml", "[otel\nlog_user_prompt = = true\n")
+			hookruntest.WriteFile(t, os.Getenv("CODEX_HOME"), "config.toml", "[otel\nlog_user_prompt = = true\n")
 		}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
@@ -245,7 +247,7 @@ func TestCodexRepliesReplayFromACorruptCursor(t *testing.T) {
 	cursors, _ := os.ReadDir(filepath.Join(os.Getenv("TERMA_CONFIG_DIR"), "reply-cursors"))
 	for _, f := range cursors {
 		if strings.HasSuffix(f.Name(), ".json") {
-			writeFile(t, filepath.Join(os.Getenv("TERMA_CONFIG_DIR"), "reply-cursors"), f.Name(), "{not json")
+			hookruntest.WriteFile(t, filepath.Join(os.Getenv("TERMA_CONFIG_DIR"), "reply-cursors"), f.Name(), "{not json")
 		}
 	}
 	var logged strings.Builder
@@ -273,7 +275,7 @@ func TestCodexNotifyAndStopDoNotDoubleReplies(t *testing.T) {
 		t.Fatal(err)
 	}
 	total := 0
-	for _, e := range spooled(t, env.Spool) {
+	for _, e := range hookruntest.Spooled(t, env.Spool) {
 		if e.Name == EventAssistantMessage {
 			total++
 			if strings.Contains(e.Attrs["text"].(string), "NOT READ") {

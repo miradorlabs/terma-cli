@@ -17,9 +17,9 @@ import (
 // and event.
 var userHookShape = regexp.MustCompile(`^\[ -x ('(?:[^']|'\\'')+'|"(?:[^"\\]|\\.)+") \] && ('(?:[^']|'\\'')+'|"(?:[^"\\]|\\.)+") hook --user [a-z0-9-]+ \|\| true$`)
 
-// callsTerma reports whether an entry contains a recognized Terma command, including
+// CallsTerma reports whether an entry contains a recognized Terma command, including
 // older unguarded commands. Mentions inside user scripts are not ownership evidence.
-func callsTerma(entry json.RawMessage) bool {
+func CallsTerma(entry json.RawMessage) bool {
 	var v any
 	if json.Unmarshal(entry, &v) != nil {
 		return false
@@ -49,9 +49,9 @@ func anyOwnedCommand(v any) bool {
 	return false
 }
 
-// sameJSON compares two documents by value, so a reformatted but unchanged entry does
+// SameJSON compares two documents by value, so a reformatted but unchanged entry does
 // not read as a change.
-func sameJSON(a, b json.RawMessage) bool {
+func SameJSON(a, b json.RawMessage) bool {
 	var x, y any
 	if json.Unmarshal(a, &x) != nil || json.Unmarshal(b, &y) != nil {
 		return false
@@ -59,11 +59,11 @@ func sameJSON(a, b json.RawMessage) bool {
 	return reflect.DeepEqual(x, y)
 }
 
-// marshalJSON encodes without HTML escaping. A hook command carries `>` and `&&`, and
+// MarshalJSON encodes without HTML escaping. A hook command carries `>` and `&&`, and
 // encoding/json's default would commit them as `\u003e` and `\u0026`: valid JSON that
 // nobody reviewing the file can read, and a rewrite of any user hook that carries a
 // redirect. An empty indent compacts.
-func marshalJSON(v any, prefix, indent string) ([]byte, error) {
+func MarshalJSON(v any, prefix, indent string) ([]byte, error) {
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)
@@ -76,10 +76,10 @@ func marshalJSON(v any, prefix, indent string) ([]byte, error) {
 	return bytes.TrimRight(buf.Bytes(), "\n"), nil
 }
 
-// marshalOrdered writes the top-level object with sorted keys and each value's
+// MarshalOrdered writes the top-level object with sorted keys and each value's
 // bytes verbatim, so settings terma does not own survive byte-for-byte (their
 // indentation included) and the committed file diffs stably across installs.
-func marshalOrdered(m map[string]json.RawMessage) ([]byte, error) {
+func MarshalOrdered(m map[string]json.RawMessage) ([]byte, error) {
 	keys := make([]string, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)
@@ -140,9 +140,9 @@ func ownedHookCommand(command string) bool {
 	return false
 }
 
-// withoutTerma removes only owned command leaves, retaining unrelated handlers in
+// WithoutTerma removes only owned command leaves, retaining unrelated handlers in
 // the same group and their matcher/options. A nil result is an entirely owned entry.
-func withoutTerma(entry json.RawMessage) (json.RawMessage, bool, error) {
+func WithoutTerma(entry json.RawMessage) (json.RawMessage, bool, error) {
 	var obj map[string]json.RawMessage
 	if err := json.Unmarshal(entry, &obj); err != nil {
 		return nil, false, err
@@ -162,7 +162,7 @@ func withoutTerma(entry json.RawMessage) (json.RawMessage, bool, error) {
 	var kept []json.RawMessage
 	changed := false
 	for _, handler := range handlers {
-		remaining, removed, err := withoutTerma(handler)
+		remaining, removed, err := WithoutTerma(handler)
 		if err != nil {
 			return nil, false, err
 		}
@@ -177,11 +177,11 @@ func withoutTerma(entry json.RawMessage) (json.RawMessage, bool, error) {
 	if len(kept) == 0 {
 		return nil, true, nil
 	}
-	encoded, err := marshalJSON(kept, "", "")
+	encoded, err := MarshalJSON(kept, "", "")
 	if err != nil {
 		return nil, false, err
 	}
 	obj["hooks"] = encoded
-	out, err := marshalJSON(obj, "", "")
+	out, err := MarshalJSON(obj, "", "")
 	return out, true, err
 }

@@ -63,7 +63,7 @@ func (in *antigravityHookInput) cwd(fallback string) string {
 }
 
 func readAntigravityInput(r io.Reader) (*antigravityHookInput, error) {
-	in, err := readHookInput[antigravityHookInput](r)
+	in, err := ReadInput[antigravityHookInput](r)
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +186,7 @@ func AntigravityPostToolUse(ctx context.Context, env Env) error {
 	turn := antigravityTurnID(r, id)
 	call, called := antigravityToolCallAttrs(in, turn)
 	if called {
-		call[attrVersion] = env.Version
+		call[AttrVersion] = env.Version
 		env.EmitFor(r, spool.Event{Name: EventToolCall, SessionID: id, Repo: r.Name, Attrs: call})
 	}
 
@@ -199,7 +199,7 @@ func AntigravityPostToolUse(ctx context.Context, env Env) error {
 	// The same ids as the step's terma.tool.call: this event is what that call changed,
 	// not a second call, and the pair is how a reader tells.
 	ids := map[string]any{}
-	for _, k := range []string{attrToolCallID, "step_idx", attrTurnID} {
+	for _, k := range []string{AttrToolCallID, "step_idx", AttrTurnID} {
 		if v, ok := call[k]; ok {
 			ids[k] = v
 		}
@@ -220,24 +220,24 @@ func AntigravityPostToolUse(ctx context.Context, env Env) error {
 func antigravityToolCallAttrs(in *antigravityHookInput, turn string) (map[string]any, bool) {
 	a := EvidenceAttrs(antigravityTool, sourceAntigravityHook, "PostToolUse")
 	if in.ToolCall != nil && ShortLabel(in.ToolCall.Name) {
-		a[attrToolName] = in.ToolCall.Name
+		a[AttrToolName] = in.ToolCall.Name
 	}
 	if step, _, ok := JSONNumber(in.StepIdx, true); ok {
 		a["step_idx"] = int64(step)
-		a[attrToolCallID] = "step-" + strconv.FormatUint(uint64(step), 10)
+		a[AttrToolCallID] = "step-" + strconv.FormatUint(uint64(step), 10)
 	}
-	if _, named := a[attrToolName]; !named {
-		if _, identified := a[attrToolCallID]; !identified {
+	if _, named := a[AttrToolName]; !named {
+		if _, identified := a[AttrToolCallID]; !identified {
 			return nil, false
 		}
 	}
 	if turn != "" {
-		a[attrTurnID] = turn
+		a[AttrTurnID] = turn
 	}
-	BoundedAttr(a, attrModel, in.ModelName)
-	a[attrStatus] = "completed"
+	BoundedAttr(a, AttrModel, in.ModelName)
+	a[AttrStatus] = "completed"
 	if in.Error != "" {
-		a[attrStatus] = "error"
+		a[AttrStatus] = "error"
 	}
 	return a, true
 }
@@ -287,11 +287,11 @@ func antigravityObserve(ctx context.Context, env Env, hook string) error {
 func antigravityObservationAttrs(in *antigravityHookInput, hook, turn string) map[string]any {
 	a := EvidenceAttrs(antigravityTool, sourceAntigravityHook, hook)
 	for _, k := range []string{"usage_status", "funding_status", "quota_status", "account_status"} {
-		a[k] = statusUnavailable
+		a[k] = StatusUnavailable
 	}
-	BoundedAttr(a, attrModel, in.ModelName)
+	BoundedAttr(a, AttrModel, in.ModelName)
 	if turn != "" {
-		a[attrTurnID] = turn
+		a[AttrTurnID] = turn
 	}
 	for k, v := range map[string]json.RawMessage{
 		"invocation_num": in.InvocationNum, "initial_num_steps": in.InitialNumSteps, "execution_num": in.ExecutionNum,
@@ -309,9 +309,9 @@ func antigravityObservationAttrs(in *antigravityHookInput, hook, turn string) ma
 		}
 		// An error is not automatically a billing or limit error; only its presence
 		// travels, never its text.
-		a[attrStatus] = "ok"
+		a[AttrStatus] = "ok"
 		if in.Error != "" {
-			a[attrStatus] = "error"
+			a[AttrStatus] = "error"
 		}
 	}
 	return a

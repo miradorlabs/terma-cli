@@ -6,17 +6,17 @@ import (
 	"path/filepath"
 )
 
-// eventHook is one entry terma owns in an agent's hooks file: the event it is filed
+// EventHook is one entry terma owns in an agent's hooks file: the event it is filed
 // under, and the entry as that agent spells it.
-type eventHook struct {
+type EventHook struct {
 	Event string
 	Entry json.RawMessage
 }
 
-// hooksFile is an agent's hooks file as mergeEventHooks needs to know it: a JSON object
+// HooksFile is an agent's hooks file as mergeEventHooks needs to know it: a JSON object
 // whose "hooks" member maps an event to a list of entries. Claude Code, Codex and
 // Cursor all keep theirs that way and differ only in what an entry looks like.
-type hooksFile struct {
+type HooksFile struct {
 	// Path is relative to the repository root, slash-separated.
 	Path string
 	// Defaults are top-level members terma sets when it writes the file and the file
@@ -25,16 +25,16 @@ type hooksFile struct {
 	Defaults map[string]json.RawMessage
 }
 
-// mergeEventHooks plans terma's entries into, or out of, an agent's hooks file without
+// MergeEventHooks plans terma's entries into, or out of, an agent's hooks file without
 // disturbing anything else in it: the developer's own entries in the same event, and
 // every other top-level member, survive as they were read.
 //
 // An entry is terma's when it calls the binary (callsTerma), which is what makes install
 // idempotent and lets an entry from an older terma be brought up to date where it
 // stands rather than duplicated. Nothing changing is an empty plan.
-func mergeEventHooks(root string, file hooksFile, own []eventHook, install bool) (Plan, error) {
+func MergeEventHooks(root string, file HooksFile, own []EventHook, install bool) (Plan, error) {
 	p := Plan{}
-	before, err := readFile(filepath.Join(root, filepath.FromSlash(file.Path)))
+	before, err := ReadFile(filepath.Join(root, filepath.FromSlash(file.Path)))
 	if err != nil {
 		return p, err
 	}
@@ -64,12 +64,12 @@ func mergeEventHooks(root string, file hooksFile, own []eventHook, install bool)
 		var kept []json.RawMessage
 		present := false
 		for _, entry := range entries {
-			if install && !present && sameJSON(entry, h.Entry) {
+			if install && !present && SameJSON(entry, h.Entry) {
 				kept = append(kept, entry)
 				present = true
 				continue
 			}
-			remaining, removed, err := withoutTerma(entry)
+			remaining, removed, err := WithoutTerma(entry)
 			if err != nil {
 				return p, err
 			}
@@ -97,7 +97,7 @@ func mergeEventHooks(root string, file hooksFile, own []eventHook, install bool)
 	} else {
 		// The hooks section is terma's to format; every other top-level value is
 		// written back exactly as it was read.
-		raw, err := marshalJSON(events, "  ", "  ")
+		raw, err := MarshalJSON(events, "  ", "  ")
 		if err != nil {
 			return p, err
 		}
@@ -116,7 +116,7 @@ func mergeEventHooks(root string, file hooksFile, own []eventHook, install bool)
 		p.Changes = append(p.Changes, Change{Path: file.Path, Before: before})
 		return p, nil
 	}
-	out, err := marshalOrdered(top)
+	out, err := MarshalOrdered(top)
 	if err != nil {
 		return p, err
 	}

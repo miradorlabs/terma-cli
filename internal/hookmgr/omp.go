@@ -27,7 +27,7 @@ func PlanOmpHooks(root string, install bool) (Plan, error) {
 // matches a terma render — a file somebody edited is theirs to keep.
 func mergeOmpHooks(root string, install bool) (Plan, error) {
 	p := Plan{}
-	before, err := readFile(filepath.Join(root, filepath.FromSlash(OmpHooksPath)))
+	before, err := ReadFile(filepath.Join(root, filepath.FromSlash(OmpHooksPath)))
 	if err != nil {
 		return p, err
 	}

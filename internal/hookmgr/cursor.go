@@ -72,23 +72,23 @@ func planCursor(root, path string, command func(event string) string, install bo
 		Timeout   int             `json:"timeout,omitempty"`
 		LoopLimit json.RawMessage `json:"loop_limit,omitempty"`
 	}
-	own := make([]eventHook, 0, len(CursorHooks))
+	own := make([]EventHook, 0, len(CursorHooks))
 	for _, h := range CursorHooks {
-		value := hookEntry{Command: command(hookEventOf(h.Command)), Timeout: 10}
+		value := hookEntry{Command: command(HookEventOf(h.Command)), Timeout: 10}
 		if h.Event == "stop" || h.Event == "subagentStop" {
 			// Cursor defaults to skipping stop and subagentStop hooks after five
 			// continuation loops. Observation must continue; terma never requests a loop.
 			value.LoopLimit = json.RawMessage("null")
 		}
-		entry, err := marshalJSON(value, "", "")
+		entry, err := MarshalJSON(value, "", "")
 		if err != nil {
 			return Plan{}, err
 		}
-		own = append(own, eventHook{Event: h.Event, Entry: entry})
+		own = append(own, EventHook{Event: h.Event, Entry: entry})
 	}
 	// Cursor refuses a file without its schema version, so terma sets one on a file it
 	// creates. The version survives uninstall because it may predate Terma.
-	return mergeEventHooks(root, hooksFile{
+	return MergeEventHooks(root, HooksFile{
 		Path:     path,
 		Defaults: map[string]json.RawMessage{"version": json.RawMessage(cursorHooksVersion)},
 	}, own, install)

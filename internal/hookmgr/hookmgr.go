@@ -66,8 +66,8 @@ func HookCommand(event string) string {
 	return "command -v terma >/dev/null 2>&1 && terma hook " + event + " || true"
 }
 
-// hookEventOf is the `terma hook <event>` name a committed command runs.
-func hookEventOf(command string) string {
+// HookEventOf is the `terma hook <event>` name a committed command runs.
+func HookEventOf(command string) string {
 	_, rest, ok := strings.Cut(command, "terma hook ")
 	if !ok {
 		return ""
@@ -250,10 +250,10 @@ func removeEmptyParents(root, dir string) {
 	}
 }
 
-// readFile returns a file's bytes, or nil when it does not exist. Every other failure
+// ReadFile returns a file's bytes, or nil when it does not exist. Every other failure
 // is returned: a file that is there and cannot be read is not an absent one, and
 // planning it as a create would let Apply rename terma-only content over it.
-func readFile(path string) ([]byte, error) {
+func ReadFile(path string) ([]byte, error) {
 	data, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil

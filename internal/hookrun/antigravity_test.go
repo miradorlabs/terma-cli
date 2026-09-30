@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
+	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -50,7 +51,7 @@ func TestAntigravityConversationIsStampedOnItsCommit(t *testing.T) {
 	run(AntigravityPreInvocation, antigravityPayload(root, "PreInvocation", `"initialNumSteps":1,"invocationNum":0`))
 	run(AntigravityPreInvocation, antigravityPayload(root, "PreInvocation", `"initialNumSteps":3,"invocationNum":1`))
 	starts := 0
-	for _, e := range spooled(t, sp) {
+	for _, e := range hookruntest.Spooled(t, sp) {
 		if e.Name == EventSessionStart {
 			starts++
 			if e.Attrs["tool"] != antigravityTool || e.Attrs["model"] != "gemini-3.8-flash-high" {
@@ -62,14 +63,14 @@ func TestAntigravityConversationIsStampedOnItsCommit(t *testing.T) {
 		t.Fatalf("expected one session start, got %d", starts)
 	}
 
-	writeFile(t, root, "hello.txt", "hello\n")
+	hookruntest.WriteFile(t, root, "hello.txt", "hello\n")
 	run(AntigravityPostToolUse, antigravityPayload(root, "PostToolUse", `"error":"","stepIdx":2,"toolCall":{"args":{"CodeContent":"hello","Description":"Create hello.txt","Overwrite":true,"TargetFile":"`+filepath.Join(root, "hello.txt")+`","toolAction":"Creating file","toolSummary":"Create hello.txt"},"name":"write_to_file"}`))
 	run(AntigravityPostToolUse, antigravityPayload(root, "PostToolUse", `"error":"","stepIdx":4,"toolCall":{"args":{"AllowMultiple":false,"EndLine":1,"Instruction":"Change hello to goodbye","ReplacementContent":"goodbye","StartLine":1,"TargetContent":"hello","TargetFile":"`+filepath.Join(root, "hello.txt")+`","toolAction":"Editing file","toolSummary":"Update hello.txt"},"name":"replace_file_content"}`))
 	// A read is not an edit, and a file outside the repository is not ours.
 	run(AntigravityPostToolUse, antigravityPayload(root, "PostToolUse", `"error":"","stepIdx":6,"toolCall":{"args":{"AbsolutePath":"`+filepath.Join(root, "hello.txt")+`"},"name":"view_file"}`))
 	run(AntigravityPostToolUse, antigravityPayload(root, "PostToolUse", `"error":"","stepIdx":7,"toolCall":{"args":{"TargetFile":"/etc/hosts"},"name":"write_to_file"}`))
 	// spooled drains, so the steps' events are read once and examined three ways.
-	stepEvents := spooled(t, sp)
+	stepEvents := hookruntest.Spooled(t, sp)
 	touched := 0
 	for _, e := range stepEvents {
 		if e.Name == EventFilesTouched {
@@ -128,7 +129,7 @@ func TestAntigravityConversationIsStampedOnItsCommit(t *testing.T) {
 	run(AntigravityStop, antigravityPayload(root, "Stop", `"error":"","executionNum":0,"fullyIdle":true,"terminationReason":"NO_TOOL_CALL"`))
 	var stop map[string]any
 	observations := 0
-	for _, e := range spooled(t, sp) {
+	for _, e := range hookruntest.Spooled(t, sp) {
 		if e.Name == EventSessionObservation {
 			observations++
 			if e.Attrs["hook_event"] == "Stop" {
@@ -189,7 +190,7 @@ func TestAntigravityLaterTurnsRefreshWithoutRestarting(t *testing.T) {
 	if err := AntigravityStop(ctx, env(antigravityPayload(root, "Stop", `"error":"boom","executionNum":1,"fullyIdle":false,"terminationReason":"ERROR"`))); err != nil {
 		t.Fatal(err)
 	}
-	for _, e := range spooled(t, sp) {
+	for _, e := range hookruntest.Spooled(t, sp) {
 		if e.Name == EventSessionStart {
 			t.Fatal("a continuing conversation must not announce a new session")
 		}
@@ -203,7 +204,7 @@ func TestAntigravityLaterTurnsRefreshWithoutRestarting(t *testing.T) {
 		}
 	}
 	// The active-session fallback still claims the commit: the turn kept it fresh.
-	writeFile(t, root, "b.txt", "x\n")
+	hookruntest.WriteFile(t, root, "b.txt", "x\n")
 	if _, err := gitx.Git(ctx, root, "add", "b.txt"); err != nil {
 		t.Fatal(err)
 	}
@@ -246,7 +247,7 @@ func TestAntigravityConversationFallsBackToTheEnvironment(t *testing.T) {
 	if err := AntigravityPreInvocation(context.Background(), Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(stdin), Spool: sp}); err != nil {
 		t.Fatal(err)
 	}
-	events := spooled(t, sp)
+	events := hookruntest.Spooled(t, sp)
 	if len(events) != 2 || events[0].Name != EventSessionStart || events[1].Name != EventSessionObservation {
 		t.Fatalf("events: %+v", events)
 	}
@@ -288,7 +289,7 @@ func TestAntigravityTurnsAreNamedByWhereTheyBegan(t *testing.T) {
 	run(AntigravityStop, `"error":"","executionNum":0,"fullyIdle":true,"terminationReason":"NO_TOOL_CALL"`)
 
 	var got []string
-	for _, e := range spooled(t, sp) {
+	for _, e := range hookruntest.Spooled(t, sp) {
 		turn, _ := e.Attrs["turn_id"].(string)
 		switch e.Name {
 		case EventToolCall:

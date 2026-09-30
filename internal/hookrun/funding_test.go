@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -25,7 +26,7 @@ func fundingEnv(t *testing.T) Env {
 	t.Setenv("ANTHROPIC_API_KEY", "")
 	t.Setenv("ANTHROPIC_AUTH_TOKEN", "")
 	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "")
-	writeFile(t, root, ".terma/settings.json", `{"project":{"id":"project-a"}}`)
+	hookruntest.WriteFile(t, root, ".terma/settings.json", `{"project":{"id":"project-a"}}`)
 	sp, err := spool.Open(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -52,7 +53,7 @@ func writeRealClaudeAccount(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, os.Getenv("CLAUDE_CONFIG_DIR"), ".claude.json", string(b))
+	hookruntest.WriteFile(t, os.Getenv("CLAUDE_CONFIG_DIR"), ".claude.json", string(b))
 }
 
 // A configured apiKeyHelper supplies an API credential that outranks the stored OAuth login, so the
@@ -67,7 +68,7 @@ func TestClaudeAccountWithheldWhenApiKeyHelperConfigured(t *testing.T) {
 	}
 
 	// A configured apiKeyHelper in repo settings now outranks the OAuth login.
-	writeFile(t, filepath.Join(env.Cwd, ".claude"), "settings.json", `{"apiKeyHelper":"/usr/local/bin/get-key"}`)
+	hookruntest.WriteFile(t, filepath.Join(env.Cwd, ".claude"), "settings.json", `{"apiKeyHelper":"/usr/local/bin/get-key"}`)
 	if id, _, ok := claudeOAuthAccount(env.Cwd); ok {
 		t.Fatalf("apiKeyHelper configured: expected the account withheld, got %q", id)
 	}
@@ -125,7 +126,7 @@ func TestClaudeAccountWithheldOnYesCloudFlag(t *testing.T) {
 func TestClaudeAccountChangesAndDuplicateHooks(t *testing.T) {
 	env := fundingEnv(t)
 	ctx := context.Background()
-	writeFile(t, os.Getenv("CLAUDE_CONFIG_DIR"), ".claude.json", `{"oauthAccount":{"accountUuid":"account-a","hasExtraUsageEnabled":false}}`)
+	hookruntest.WriteFile(t, os.Getenv("CLAUDE_CONFIG_DIR"), ".claude.json", `{"oauthAccount":{"accountUuid":"account-a","hasExtraUsageEnabled":false}}`)
 	env.Stdin = strings.NewReader(hookInput(env, "SessionStart"))
 	_ = SessionStart(ctx, env)
 	env.Stdin = strings.NewReader(hookInput(env, "Stop"))
@@ -134,7 +135,7 @@ func TestClaudeAccountChangesAndDuplicateHooks(t *testing.T) {
 	if len(evs) != 2 || evs[1].Name != EventSessionAccount || evs[1].Attrs[AttrProjectID] != "project-a" {
 		t.Fatalf("initial snapshot and duplicate stop: %+v", evs)
 	}
-	writeFile(t, os.Getenv("CLAUDE_CONFIG_DIR"), ".claude.json", `{"oauthAccount":{"accountUuid":"account-b"}}`)
+	hookruntest.WriteFile(t, os.Getenv("CLAUDE_CONFIG_DIR"), ".claude.json", `{"oauthAccount":{"accountUuid":"account-b"}}`)
 	env.Now = env.Now.Add(time.Second)
 	env.Stdin = strings.NewReader(hookInput(env, "Stop"))
 	_ = Stop(ctx, env)
@@ -157,7 +158,7 @@ func TestClaudeAccountChangesAndDuplicateHooks(t *testing.T) {
 	if evs = spooledQuota(t, env.Spool); len(evs) != 0 {
 		t.Fatalf("duplicate snapshot: %+v", evs)
 	}
-	env.Now = env.Now.Add(quotaHeartbeat + time.Second)
+	env.Now = env.Now.Add(QuotaHeartbeat + time.Second)
 	env.Stdin = strings.NewReader(hookInput(env, "Stop"))
 	_ = Stop(ctx, env)
 	if evs = spooledQuota(t, env.Spool); len(evs) != 1 {
@@ -166,7 +167,7 @@ func TestClaudeAccountChangesAndDuplicateHooks(t *testing.T) {
 }
 func TestStopFailureAllowlist(t *testing.T) {
 	env := fundingEnv(t)
-	writeFile(t, os.Getenv("CLAUDE_CONFIG_DIR"), ".claude.json", `{"oauthAccount":{"accountUuid":"account-l"}}`)
+	hookruntest.WriteFile(t, os.Getenv("CLAUDE_CONFIG_DIR"), ".claude.json", `{"oauthAccount":{"accountUuid":"account-l"}}`)
 	for _, kind := range []string{"rate_limit", "billing_error", "account_on_hold", "future-secret-type"} {
 		b, _ := json.Marshal(map[string]any{"session_id": "funding-session", "cwd": env.Cwd, "error": kind, "error_details": "secret-details", "last_assistant_message": "secret-response"})
 		env.Stdin = strings.NewReader(string(b))
@@ -198,7 +199,7 @@ func TestStopFailureAllowlist(t *testing.T) {
 // under an override credential (env API key / auth token / cloud provider).
 func TestStopFailureOmitsAccountIDUnderOverrideCredential(t *testing.T) {
 	env := fundingEnv(t)
-	writeFile(t, os.Getenv("CLAUDE_CONFIG_DIR"), ".claude.json", `{"oauthAccount":{"accountUuid":"account-l"}}`)
+	hookruntest.WriteFile(t, os.Getenv("CLAUDE_CONFIG_DIR"), ".claude.json", `{"oauthAccount":{"accountUuid":"account-l"}}`)
 	t.Setenv("ANTHROPIC_API_KEY", "sk-test")
 	b, _ := json.Marshal(map[string]any{"session_id": "funding-session", "cwd": env.Cwd, "error": "billing_error"})
 	env.Stdin = strings.NewReader(string(b))
@@ -221,7 +222,7 @@ func TestCodexStopCapturesRolloutAndDeduplicates(t *testing.T) {
 	id := "funding-session"
 	path := filepath.Join(os.Getenv("CODEX_HOME"), "sessions", "2026", "09", "15", "rollout-day-"+id+".jsonl")
 	at := env.Now.UTC().Format(time.RFC3339Nano)
-	writeFile(t, filepath.Dir(path), filepath.Base(path), `{"type":"session_meta","payload":{"id":"funding-session"}}`+"\n"+`{"timestamp":"`+at+`","type":"event_msg","payload":{"type":"token_count","rate_limits":{"plan_type":"team","credits":{"has_credits":false,"balance":"0"}}}}`+"\n")
+	hookruntest.WriteFile(t, filepath.Dir(path), filepath.Base(path), `{"type":"session_meta","payload":{"id":"funding-session"}}`+"\n"+`{"timestamp":"`+at+`","type":"event_msg","payload":{"type":"token_count","rate_limits":{"plan_type":"team","credits":{"has_credits":false,"balance":"0"}}}}`+"\n")
 	b, _ := json.Marshal(map[string]any{"session_id": id, "cwd": env.Cwd, "transcript_path": path})
 	for range 2 {
 		env.Stdin = strings.NewReader(string(b))
@@ -238,7 +239,7 @@ func TestCodexNotifyCapturesRolloutWithoutTranscriptPath(t *testing.T) {
 	id := "funding-session"
 	path := filepath.Join(os.Getenv("CODEX_HOME"), "sessions", "2026", "09", "17", "rollout-day-"+id+".jsonl")
 	at := env.Now.UTC().Format(time.RFC3339Nano)
-	writeFile(t, filepath.Dir(path), filepath.Base(path), `{"type":"session_meta","payload":{"id":"funding-session"}}`+"\n"+
+	hookruntest.WriteFile(t, filepath.Dir(path), filepath.Base(path), `{"type":"session_meta","payload":{"id":"funding-session"}}`+"\n"+
 		`{"timestamp":"`+at+`","type":"event_msg","payload":{"type":"token_count","rate_limits":{"plan_type":"team","primary":{"used_percent":42}}}}`+"\n")
 	payload, _ := json.Marshal(map[string]any{
 		"type": "agent-turn-complete", "thread-id": id, "turn-id": "turn-real", "cwd": env.Cwd, "model": "gpt-5.6-sol",
@@ -292,7 +293,7 @@ func TestCodexSequenceCheckpointAfterSpooling(t *testing.T) {
 	for _, pct := range []string{"98", "100", "100"} {
 		data += `{"timestamp":"2026-09-16T10:00:00Z","type":"event_msg","payload":{"type":"token_count","rate_limits":{"plan_type":"team","primary":{"used_percent":` + pct + `}}}}` + "\n"
 	}
-	writeFile(t, filepath.Dir(path), filepath.Base(path), data)
+	hookruntest.WriteFile(t, filepath.Dir(path), filepath.Base(path), data)
 	in := &codexHookInput{SessionID: "funding-session", TranscriptPath: path, Cwd: env.Cwd}
 	r, err := env.Repo(context.Background())
 	if err != nil {

@@ -119,21 +119,21 @@ func planCodex(root, path string, command func(event string) string, install boo
 	// developer's own group in the same event untouched. Codex trusts a hook by the hash
 	// of its entry, so a group brought up to date from an older terma is one the
 	// developer is asked to trust again; doctor reports that until they do.
-	own := make([]eventHook, 0, len(CodexHooks))
+	own := make([]EventHook, 0, len(CodexHooks))
 	for _, h := range CodexHooks {
-		handler, err := marshalJSON(codexHookHandler{
-			Type: "command", Command: command(hookEventOf(h.Command)), Timeout: h.Timeout, Async: h.Async,
+		handler, err := MarshalJSON(codexHookHandler{
+			Type: "command", Command: command(HookEventOf(h.Command)), Timeout: h.Timeout, Async: h.Async,
 		}, "", "")
 		if err != nil {
 			return Plan{}, err
 		}
-		group, err := marshalJSON(codexMatcherGroup{Hooks: []json.RawMessage{handler}}, "", "")
+		group, err := MarshalJSON(codexMatcherGroup{Hooks: []json.RawMessage{handler}}, "", "")
 		if err != nil {
 			return Plan{}, err
 		}
-		own = append(own, eventHook{Event: h.Event, Entry: group})
+		own = append(own, EventHook{Event: h.Event, Entry: group})
 	}
-	return mergeEventHooks(root, hooksFile{Path: path}, own, install)
+	return MergeEventHooks(root, HooksFile{Path: path}, own, install)
 }
 
 // CodexEntry is one of terma's hook entries in .codex/hooks.json, located the way Codex
@@ -169,7 +169,7 @@ func (e CodexEntry) Key() string {
 // trusted: they have no record, Codex skips them, and nothing says so. A missing file
 // has no entries.
 func CodexTermaEntries(root string) ([]CodexEntry, error) {
-	before, err := readFile(filepath.Join(root, filepath.FromSlash(CodexHooksPath)))
+	before, err := ReadFile(filepath.Join(root, filepath.FromSlash(CodexHooksPath)))
 	if err != nil || before == nil {
 		return nil, err
 	}
@@ -186,7 +186,7 @@ func CodexTermaEntries(root string) ([]CodexEntry, error) {
 	for _, h := range CodexHooks {
 		for g, group := range doc.Hooks[h.Event] {
 			for i, handler := range group.Hooks {
-				if callsTerma(handler) {
+				if CallsTerma(handler) {
 					entry := CodexEntry{Event: h.Event, Group: g, Handler: i}
 					entry.Hash, err = codexEntryHash(entry, group.Matcher, handler)
 					if err != nil {

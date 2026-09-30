@@ -55,9 +55,9 @@ func cursorObserve(ctx context.Context, env Env, hook string) error {
 func cursorObservationAttrs(in *cursorHookInput, hook string) map[string]any {
 	a := EvidenceAttrs(cursorTool, sourceCursorHook, hook)
 	for _, k := range []string{"funding_status", "quota_status", "account_status"} {
-		a[k] = statusUnavailable
+		a[k] = StatusUnavailable
 	}
-	for k, v := range map[string]string{attrTurnID: in.GenerationID, attrModel: in.Model, "model_id": in.ModelID, "cursor.version": in.CursorVersion, "provider_session_id": in.SessionID, "account_email": in.UserEmail} {
+	for k, v := range map[string]string{AttrTurnID: in.GenerationID, AttrModel: in.Model, "model_id": in.ModelID, "cursor.version": in.CursorVersion, "provider_session_id": in.SessionID, "account_email": in.UserEmail} {
 		BoundedAttr(a, k, v)
 	}
 	if _, ok := a["account_email"]; ok {
@@ -77,7 +77,7 @@ func cursorObservationAttrs(in *cursorHookInput, hook string) map[string]any {
 				n++
 			}
 		}
-		status := statusUnavailable
+		status := StatusUnavailable
 		if n > 0 {
 			status = "partial"
 		}
@@ -91,9 +91,9 @@ func cursorObservationAttrs(in *cursorHookInput, hook string) map[string]any {
 		if hook == "stop" {
 			switch in.Status {
 			case "completed", "aborted", "error":
-				a[attrStatus] = in.Status
+				a[AttrStatus] = in.Status
 			default:
-				a[attrStatus] = unknownValue
+				a[AttrStatus] = UnknownValue
 			}
 			if v, _, ok := JSONNumber(in.LoopCount, true); ok {
 				a["loop_count"] = int64(v)

@@ -94,8 +94,8 @@ func CodexPermissionRequest(ctx context.Context, env Env) error {
 	attrs := EvidenceAttrs(codexTool, sourceCodexHook, "PermissionRequest")
 	attrs["capture_surface"] = codexDesktopSurface
 	attrs["observation_id"] = EvidenceID(in.SessionID + "|" + in.TurnID + "|" + in.ToolName + "|" + strconv.FormatInt(at.UnixNano(), 10))
-	BoundedAttr(attrs, attrTurnID, in.TurnID)
-	BoundedAttr(attrs, attrToolName, in.ToolName)
+	BoundedAttr(attrs, AttrTurnID, in.TurnID)
+	BoundedAttr(attrs, AttrToolName, in.ToolName)
 	BoundedAttr(attrs, "permission_mode", in.PermissionMode)
 	if route.IncludeToolContent {
 		var input struct {

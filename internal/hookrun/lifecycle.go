@@ -42,7 +42,7 @@ func (e Env) PruneManifests(r *Repo, now time.Time) {
 // EmitStart spools the session's start. extra is what only one agent knows: where the
 // session came from, the session that spawned it.
 func (e Env) EmitStart(r *Repo, sess session.Session, extra map[string]any) {
-	attrs := map[string]any{attrTool: sess.Tool, attrModel: sess.Model, attrVersion: e.Version}
+	attrs := map[string]any{AttrTool: sess.Tool, AttrModel: sess.Model, AttrVersion: e.Version}
 	maps.Copy(attrs, extra)
 	e.EmitFor(r, spool.Event{Name: EventSessionStart, SessionID: sess.ID, Repo: r.Name, Attrs: attrs})
 }
@@ -62,7 +62,7 @@ func (e Env) Announce(r *Repo, sess session.Session, extra map[string]any) {
 func (e Env) EndSession(r *Repo, id, tool, reason string) {
 	_ = r.Store.ClearActive(id)
 	e.EmitFor(r, spool.Event{Name: EventSessionEnd, SessionID: id, Repo: r.Name, Attrs: map[string]any{
-		attrTool: tool, attrReason: reason,
+		AttrTool: tool, AttrReason: reason,
 	}})
 }
 
@@ -78,7 +78,7 @@ func (e Env) Touch(r *Repo, sess session.Session, toolName string, files []strin
 		return
 	}
 	attrs := map[string]any{
-		attrTool: sess.Tool, attrToolName: toolName, "files": strings.Join(files, ","), attrFileCount: len(files),
+		AttrTool: sess.Tool, AttrToolName: toolName, "files": strings.Join(files, ","), AttrFileCount: len(files),
 	}
 	maps.Copy(attrs, extra)
 	e.EmitFor(r, spool.Event{Name: EventFilesTouched, SessionID: sess.ID, Repo: r.Name, Attrs: attrs})

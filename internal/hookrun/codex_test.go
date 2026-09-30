@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
+	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -42,8 +43,8 @@ func TestCodexSessionStampsItsCommitFromApplyPatch(t *testing.T) {
 	if err := CodexSessionStart(ctx, env(`{"session_id":"`+id+`","hook_event_name":"SessionStart","cwd":"`+root+`","model":"gpt-6","source":"startup","permission_mode":"default","transcript_path":null}`)); err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, root, "src/a.go", "package src\n")
-	writeFile(t, root, "src/b.go", "package src\n")
+	hookruntest.WriteFile(t, root, "src/a.go", "package src\n")
+	hookruntest.WriteFile(t, root, "src/b.go", "package src\n")
 
 	patch := strings.Join([]string{
 		"apply_patch <<'PATCH'",
@@ -61,7 +62,7 @@ func TestCodexSessionStampsItsCommitFromApplyPatch(t *testing.T) {
 		t.Fatal(err)
 	}
 	touched := eventsNamed(spooledQuota(t, sp), EventFilesTouched)
-	if len(touched) != 1 || touched[0].Attrs[attrToolCallID] != "call_1" {
+	if len(touched) != 1 || touched[0].Attrs[AttrToolCallID] != "call_1" {
 		t.Fatalf("file touch must carry Codex's tool call id: %+v", touched)
 	}
 

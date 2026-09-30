@@ -42,7 +42,7 @@ type claudeHookInput struct {
 }
 
 func readClaudeInput(r io.Reader) (*claudeHookInput, error) {
-	in, err := readHookInput[claudeHookInput](r)
+	in, err := ReadInput[claudeHookInput](r)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func SessionStart(ctx context.Context, env Env) error {
 		env.Logf("not in a git repository: %v", err)
 		return nil
 	}
-	env.Announce(r, env.NewSession(r, in.SessionID, claudeTool, in.Model), map[string]any{attrSource: in.Source})
+	env.Announce(r, env.NewSession(r, in.SessionID, claudeTool, in.Model), map[string]any{AttrSource: in.Source})
 	env.pruneClaudeSubagents()
 	env.captureClaudeAccount(r, in)
 	return nil

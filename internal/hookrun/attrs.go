@@ -17,7 +17,7 @@ func BoundedAttr(attrs map[string]any, key, v string) {
 // hooks, and that the only order terma can vouch for is the order it received them in.
 func EvidenceAttrs(tool, source, hook string) map[string]any {
 	return map[string]any{
-		attrTool: tool, attrSchemaVersion: 1, attrEvidenceSource: source,
-		attrHookEvent: hook, "ordering": "local_receipt",
+		AttrTool: tool, AttrSchemaVersion: 1, AttrEvidenceSource: source,
+		AttrHookEvent: hook, "ordering": "local_receipt",
 	}
 }

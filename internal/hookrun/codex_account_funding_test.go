@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
 )
 
 // testdata/codex_rollout_real.jsonl are REAL rate-limit records (event_msg/token_count) captured from
@@ -40,7 +42,7 @@ func realRolloutTranscript(t *testing.T, env Env, sessionID string) string {
 	}
 	path := filepath.Join(os.Getenv("CODEX_HOME"), "sessions", "2026", "09", "16", "rollout-day-"+sessionID+".jsonl")
 	content := `{"type":"session_meta","payload":{"id":"` + sessionID + `"}}` + "\n" + string(lines)
-	writeFile(t, filepath.Dir(path), filepath.Base(path), content)
+	hookruntest.WriteFile(t, filepath.Dir(path), filepath.Base(path), content)
 	return path
 }
 
@@ -88,7 +90,7 @@ func TestCodexStopOmitsAccountIDOnNullRateLimits(t *testing.T) {
 	path := filepath.Join(os.Getenv("CODEX_HOME"), "sessions", "2026", "09", "16", "rollout-day-"+id+".jsonl")
 	content := `{"type":"session_meta","payload":{"id":"` + id + `"}}` + "\n" +
 		`{"timestamp":"2026-09-16T08:20:00.000Z","type":"event_msg","payload":{"type":"token_count","rate_limits":null}}` + "\n"
-	writeFile(t, filepath.Dir(path), filepath.Base(path), content)
+	hookruntest.WriteFile(t, filepath.Dir(path), filepath.Base(path), content)
 	b, _ := json.Marshal(map[string]any{"session_id": id, "cwd": env.Cwd, "transcript_path": path})
 	env.Stdin = strings.NewReader(string(b))
 	if err := CodexStop(context.Background(), env); err != nil {

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
+	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -23,7 +24,7 @@ func TestWorktreeEventsReportTheMainRepositoryAndProject(t *testing.T) {
 	if _, err := gitx.Git(ctx, main, "commit", "-q", "--allow-empty", "-m", "init"); err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, main, ".terma/settings.json", `{"project":{"id":"proj-main"}}`)
+	hookruntest.WriteFile(t, main, ".terma/settings.json", `{"project":{"id":"proj-main"}}`)
 	wt := filepath.Join(t.TempDir(), "feature-x")
 	if _, err := gitx.Git(ctx, main, "worktree", "add", "-q", wt); err != nil {
 		t.Fatal(err)
@@ -43,12 +44,12 @@ func TestWorktreeEventsReportTheMainRepositoryAndProject(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	writeFile(t, wt, "src/agent.go", "package src\n")
+	hookruntest.WriteFile(t, wt, "src/agent.go", "package src\n")
 	run(wt, `{"session_id":"sess-wt","cwd":"`+wt+`","hook_event_name":"SessionStart","source":"startup"}`, SessionStart)
 	run(wt, `{"session_id":"sess-wt","cwd":"`+wt+`","tool_name":"Write","tool_input":{"file_path":"`+filepath.Join(wt, "src", "agent.go")+`"}}`, PostToolUse)
 	run(main, `{"session_id":"sess-main","cwd":"`+main+`","hook_event_name":"SessionStart","source":"startup"}`, SessionStart)
 
-	events := spooled(t, sp)
+	events := hookruntest.Spooled(t, sp)
 	if len(events) < 3 {
 		t.Fatalf("events: %+v", events)
 	}
@@ -70,7 +71,7 @@ func TestCodexDesktopActivityCarriesTheProject(t *testing.T) {
 	env := fundingEnv(t)
 	connectCodexDesktop(t, false)
 	path := filepath.Join(os.Getenv("CODEX_HOME"), "sessions", "2026", "09", "19", "rollout-2026-09-19T12-18-12-"+replySession+".jsonl")
-	writeFile(t, filepath.Dir(path), filepath.Base(path), strings.Join([]string{
+	hookruntest.WriteFile(t, filepath.Dir(path), filepath.Base(path), strings.Join([]string{
 		`{"type":"session_meta","payload":{"id":"` + replySession + `"}}`,
 		`{"timestamp":"2026-09-19T18:18:39Z","type":"event_msg","payload":{"type":"task_started","turn_id":"` + replyTurn + `","trace_id":"` + replyTrace + `"}}`,
 		`{"type":"turn_context","payload":{"turn_id":"` + replyTurn + `","model":"gpt-6-sol"}}`,
@@ -83,7 +84,7 @@ func TestCodexDesktopActivityCarriesTheProject(t *testing.T) {
 		t.Fatal(err)
 	}
 	activity := 0
-	for _, e := range spooled(t, env.Spool) {
+	for _, e := range hookruntest.Spooled(t, env.Spool) {
 		if e.Name != EventModelCall && e.Name != EventTurnSummary {
 			continue
 		}

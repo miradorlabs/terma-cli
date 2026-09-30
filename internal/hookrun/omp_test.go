@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
+	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -25,8 +26,8 @@ func TestOmpSessionIsStampedOnItsCommit(t *testing.T) {
 	if err := OmpSessionStart(ctx, env(`{"session_id":"5b8c2f1e-9a1b-4c2d-8e3f-0a1b2c3d4e5f","cwd":"`+root+`"}`)); err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, root, "src/a.go", "package src\n")
-	writeFile(t, root, "src/b.go", "package src\n")
+	hookruntest.WriteFile(t, root, "src/a.go", "package src\n")
+	hookruntest.WriteFile(t, root, "src/b.go", "package src\n")
 	// One absolute path, one relative to the working directory the hook reported.
 	if err := OmpFileEdit(ctx, env(`{"session_id":"5b8c2f1e-9a1b-4c2d-8e3f-0a1b2c3d4e5f","cwd":"`+root+`","file":"`+filepath.Join(root, "src", "a.go")+`","tool":"write"}`)); err != nil {
 		t.Fatal(err)

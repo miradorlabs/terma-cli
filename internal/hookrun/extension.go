@@ -35,7 +35,7 @@ const (
 )
 
 func readExtensionInput(r io.Reader) (*extensionHookInput, error) {
-	in, err := readHookInput[extensionHookInput](r)
+	in, err := ReadInput[extensionHookInput](r)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ func extensionSessionStart(tool string) func(context.Context, Env) error {
 			env.Logf("not in a git repository: %v", err)
 			return nil
 		}
-		env.Announce(r, env.NewSession(r, in.SessionID, tool, in.Model), map[string]any{attrSource: "session_start"})
+		env.Announce(r, env.NewSession(r, in.SessionID, tool, in.Model), map[string]any{AttrSource: "session_start"})
 		return nil
 	}
 }

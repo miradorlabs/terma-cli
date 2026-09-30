@@ -94,7 +94,7 @@ func cursorModelParams(in *cursorHookInput, a map[string]any) {
 // has to check the id again. A subagent hook may name only the conversation that spawned
 // it; that is the conversation it is filed under, so it stands in for the missing id.
 func readCursorInput(r io.Reader) (*cursorHookInput, error) {
-	in, err := readHookInput[cursorHookInput](r)
+	in, err := ReadInput[cursorHookInput](r)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +120,7 @@ func CursorSessionStart(ctx context.Context, env Env) error {
 		env.Logf("not in a git repository: %v", err)
 		return nil
 	}
-	env.Announce(r, env.NewSession(r, in.id(), cursorTool, in.Model), map[string]any{attrSource: in.ComposerMode})
+	env.Announce(r, env.NewSession(r, in.id(), cursorTool, in.Model), map[string]any{AttrSource: in.ComposerMode})
 	env.captureCursorObservation(ctx, r, in, "sessionStart")
 	return nil
 }
@@ -158,7 +158,7 @@ func CursorFileEdit(ctx context.Context, env Env) error {
 		return nil
 	}
 	extra := map[string]any{}
-	BoundedAttr(extra, attrTurnID, in.GenerationID)
+	BoundedAttr(extra, AttrTurnID, in.GenerationID)
 	env.Touch(r, session.Session{ID: in.id(), Tool: cursorTool, Model: in.Model}, "afterFileEdit",
 		RelativeFiles(r, env.Cwd, []string{in.FilePath}), extra)
 	return nil
