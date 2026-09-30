@@ -31,6 +31,7 @@ type extensionHookInput struct {
 const (
 	piTool     = "pi"
 	hermesTool = "hermes"
+	dshTool    = "dsh"
 )
 
 func readExtensionInput(r io.Reader) (*extensionHookInput, error) {
@@ -131,6 +132,14 @@ var (
 // OmpPrompt is the claim-only turn start of terma's omp relay extension; omp's
 // committed hook file reports the rest (hookrun/omp.go).
 var OmpPrompt = extensionPrompt
+
+// DeepSeek Harness's handlers (`terma hook dsh-*`).
+var (
+	DshSessionStart = extensionSessionStart(dshTool)
+	DshSessionEnd   = extensionSessionEnd(dshTool)
+	DshFileEdit     = extensionFileEdit(dshTool)
+	DshPrompt       = extensionPrompt
+)
 
 // Hermes's handlers (`terma hook hermes-*`).
 var (

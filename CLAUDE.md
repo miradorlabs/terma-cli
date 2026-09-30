@@ -691,7 +691,9 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   `codex app-server daemon restart` (`harness.RunningCodexDaemon`), never run it.
   `live/codex_appserver.go` drives app-server over stdio JSON-RPC and a sandbox daemon
   (short `CODEX_HOME`: SUN_LEN); `live/claude_desktop.go` reproduces Desktop's launch.
-- Pi and Hermes have no usable exporter: terma writes one into each — Pi's extension
+- Pi, Hermes and DeepSeek Harness have no usable exporter: terma writes one into each —
+  dsh's Cordis plugin (`$DSH_HOME/plugins/terma-relay.mjs`, inserted in
+  `cordis.patch.yml`, auxiliary calls spanned through `llm/stream`), Pi's extension
   (`internal/harness/pi/terma.ts`), Hermes's Python plugin (`internal/harness/hermes`,
   `$HERMES_HOME/plugins/terma`, enabled through `hermes plugins enable terma`; plugin
   hooks fire in every front end, shell hooks not in the TUI) — exporting GenAI spans
@@ -725,7 +727,7 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
 
 - Trailers: `Agent-Session-Id`, `Agent-Tool` (`internal/trailer`). The Terma backend
   and GitHub App parse these. Tool labels: `claude-code`, `codex`, `opencode`, `cursor`,
-  `antigravity`, `omp`, `pi`, `hermes`, `gemini`.
+  `antigravity`, `omp`, `pi`, `hermes`, `gemini`, `dsh`.
 - Hook event names are committed wiring and must stay stable: `session-start` /
   `session-end` / `post-tool-use` / `stop` / `stop-failure` / `subagent-start` /
   `subagent-stop` / `user-prompt-submit` (Claude Code's `.claude/settings.json`),
@@ -747,7 +749,8 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   `pi-session-end` / `pi-file-edit` (called by terma's Pi extension,
   `internal/harness/pi/terma.ts`, which `terma relay setup --harness pi` writes),
   `gemini-session-start` / `gemini-prompt` / `gemini-after-tool` / `gemini-session-end`
-  (terma's Gemini CLI extension),
+  (terma's Gemini CLI extension), `dsh-session-start` / `dsh-prompt` / `dsh-session-end` /
+  `dsh-file-edit` (terma's DeepSeek Harness plugin, `internal/harness/dsh/terma.mjs`),
   `hermes-session-start` / `hermes-prompt` / `hermes-session-end` / `hermes-file-edit`
   (called by terma's Hermes plugin, `internal/harness/hermes`). Both extensions share
   one handler set (`hookrun/extension.go`) and one payload shape. Cursor sessions are keyed on `conversation_id`, the one id

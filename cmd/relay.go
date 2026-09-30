@@ -373,6 +373,15 @@ func newRelaySetupCommand() *cobra.Command {
 					}
 					fmt.Fprintf(out, "Gemini CLI exports to the relay at %s (%s, %s).\n", addr, tildePath(settings), tildePath(ext))
 					continue
+				case "dsh":
+					path, err := harness.WriteDshPlugin(harness.DshConfig{Endpoint: exp.Endpoint,
+						Headers: map[string]string{"Authorization": "Bearer " + token}, IncludePrompts: true, IncludeToolContent: true,
+						HookCommand: termaHookCommand()})
+					if err != nil {
+						return fmt.Errorf("dsh: %w", err)
+					}
+					fmt.Fprintf(out, "DeepSeek Harness exports to the relay at %s (%s).\n", addr, tildePath(path))
+					continue
 				case "hermes":
 					// Hermes, likewise: terma's plugin is its exporter, and plugins are opt-in.
 					dir, err := harness.WriteHermesPlugin(harness.HermesConfig{Endpoint: exp.Endpoint,

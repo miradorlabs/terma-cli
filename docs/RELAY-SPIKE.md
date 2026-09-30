@@ -250,6 +250,25 @@ Passes on 0.62.0:
 
 **Not seen:** Gemini exports no cost.
 
+### DeepSeek Harness
+
+DeepSeek Harness (`dsh`, `@deepseek-ai/dsh`, 0.2.0-rc.2) sends its own OTLP to DeepSeek's collector, without usage. Its Cordis plugins load from the user's home layer, `$DSH_HOME/cordis.patch.yml`, which every profile loads. terma's plugin (`internal/harness/dsh/terma.mjs`) is its exporter:
+- **Installation:** `relay setup --harness dsh` writes it to `$DSH_HOME/plugins/terma-relay.mjs` and appends one insert entry to the patch file, keeping every other byte, and only if the entry is missing.
+- **Spans:** a `chat` span per model response, with usage from the `assistant/message` session event, and one per auxiliary call too, from the `llm/stream` waterfall (the session title, with its `dsh.purpose`). Plus an `execute_tool` span per tool call.
+- **Logs:** a `dsh.user_prompt` and a `dsh.assistant_response` log per turn.
+- **Hooks:** it calls `terma hook dsh-*` (session start, a claim-only prompt, `write` and `edit` files, session end at exit) through the same handlers as Pi and Hermes.
+
+It sets no environment, because dsh passes its own to every tool.
+
+Passes on 0.2.0-rc.2:
+- **Workloads:** reply, write and bash, each direct vs relay.
+- **Content:** allowed and withheld. The withheld case was sabotaged, both log bodies leaked, and the test caught it.
+- **Negative control:** a session outside any repository.
+- **Attribution:** the commit is stamped `Agent-Tool: dsh`.
+- **Auxiliary calls:** the title call is spanned, which Hermes cannot show.
+
+**Not seen:** dsh computes no cost.
+
 ### Goose, Aider
 
 - **Goose (1.52):** native OTLP, but the config file holds only the endpoint, and Goose copies it into its own environment (`set_var`), so every tool it runs inherits it, token included. It has hooks but no in-process plugin API, so terma cannot give it an exporter of its own. **Not supported** until upstream stops exporting the endpoint to tools.
@@ -290,6 +309,7 @@ Where each agent stands:
 |---|---|---|---|
 | T3 Code | its agents': a `codex app-server` per thread, Claude's Agent SDK | through those agents' hooks | works through the relay unchanged (`TestRelayT3`) |
 | Gemini CLI | natively, from its settings file; the token in the endpoint's path | terma's user-level Gemini extension | done |
+| DeepSeek Harness | through terma's Cordis plugin | the plugin calls `terma hook dsh-*` | done |
 | Goose | natively, but its tools inherit the endpoint | hooks | not supported (tools would inherit the token) |
 | Aider | no | no | not supported |
 | Hermes | through terma's plugin | the plugin calls `terma hook hermes-*` | done |

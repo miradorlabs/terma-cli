@@ -116,6 +116,12 @@ func SupportCatalog() []AgentSupport {
 			Telemetry:   CapabilitySupport{Level: SupportPartial, Note: "native OTLP through the local relay only; no cost"},
 		},
 		{
+			Name:        "dsh",
+			DisplayName: "DeepSeek Harness",
+			Attribution: CapabilitySupport{Level: SupportFull},
+			Telemetry:   CapabilitySupport{Level: SupportPartial, Note: "dsh's own export goes to DeepSeek; terma's plugin exports tokens (auxiliary calls included) and tool calls through the local relay only; no cost"},
+		},
+		{
 			Name:        "cursor",
 			DisplayName: "Cursor",
 			Attribution: CapabilitySupport{Level: SupportFull},
