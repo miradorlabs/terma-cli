@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -202,6 +204,93 @@ func TestRelayRespectsHarnessSelection(t *testing.T) {
 				t.Fatal("selected harness was not delivered")
 			}
 		})
+	}
+}
+
+func TestQueuedRelayExportsRespectHarnessDeselection(t *testing.T) {
+	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	attempted := make(chan []byte, 1)
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	unblock := func() { releaseOnce.Do(func() { close(release) }) }
+	defer unblock()
+	var requests atomic.Int32
+	host := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		requests.Add(1)
+		body, _ := io.ReadAll(req.Body)
+		select {
+		case attempted <- body:
+		default:
+		}
+		select {
+		case <-release:
+		case <-req.Context().Done():
+			return
+		}
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer host.Close()
+	if err := keystore.Set("team", policyTestKey, keystore.Hosts{OTLP: host.URL}); err != nil {
+		t.Fatal(err)
+	}
+	rec := routing.Record{ProjectID: "team", Signals: []string{"traces"}, IncludePrompts: true, IncludeToolContent: true, Harnesses: []string{"codex"}}
+	if err := routing.SaveRecord(rec); err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	cfg := &config.Config{Policy: config.DefaultPolicy(), OTLPURL: host.URL}
+	r := relay.New(relay.Options{Token: "test-token", Dir: dir, Resolve: relayResolver(cfg, nil), Lookup: func(string, time.Time) (claim.Claim, bool) {
+		return claim.Claim{ProjectID: "team", Tool: "codex"}, true
+	}})
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() { r.Run(ctx); close(done) }()
+	defer func() { unblock(); cancel(); <-done }()
+	span := &tracepb.Span{Name: "chat", Attributes: []*commonpb.KeyValue{
+		{Key: "session.id", Value: &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: "session"}}},
+		{Key: "gen_ai.prompt", Value: &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: "PRIVATE_CONTENT"}}},
+	}}
+	body, err := proto.Marshal(&tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{span}}}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/traces", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer test-token")
+	req.Header.Set("Content-Type", "application/x-protobuf")
+	w := httptest.NewRecorder()
+	r.Handler().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status %d", w.Code)
+	}
+	select {
+	case sent := <-attempted:
+		if !bytes.Contains(sent, []byte("PRIVATE_CONTENT")) {
+			t.Fatal("selected harness was not admitted with its permitted content")
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("the selected harness never attempted delivery")
+	}
+	// The first delivery is still blocked. Remove Codex while its accepted part
+	// remains on disk, then let the retry re-read the saved harness selection.
+	rec.Harnesses = []string{"claude"}
+	if err := routing.SaveRecord(rec); err != nil {
+		t.Fatal(err)
+	}
+	unblock()
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(10 * time.Millisecond) {
+		entries, err := filepath.Glob(filepath.Join(dir, "team", "codex", "*.pb"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if r.Stats().Snapshot().Counters["dropped.policy_signal_or_content.traces"] == 1 && len(entries) == 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("deselected harness remained queued: %v %+v", entries, r.Stats().Snapshot())
+		}
+	}
+	if n := requests.Load(); n != 1 {
+		t.Fatalf("deselected harness retried delivery: %d requests", n)
 	}
 }
 
