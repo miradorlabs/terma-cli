@@ -136,10 +136,10 @@ func TestGlobalModeClaimsEverySession(t *testing.T) {
 		return claim.Read(sid, time.Now())
 	}
 	for _, tc := range []struct{ dir, sid, want string }{
-		{known, "g-known", "p-app"},
+		{known, "g-known", "p-default"},
 		{unknown, "g-unknown", "p-default"},
 		{scratch, "g-scratch", "p-default"},
-		{bound, "g-bound", "p-bound"},
+		{bound, "g-bound", "p-default"},
 	} {
 		c, ok := claimIn(tc.dir, tc.sid, global)
 		if !ok || c.ProjectID != tc.want {

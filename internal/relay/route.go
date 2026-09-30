@@ -105,6 +105,15 @@ type attribution struct {
 // about to name a personal one. The shared daemon rarely exits, so its unnamed work is
 // dropped when its hold runs out: loss, never a guess.
 func (r *Relay) decide(key string, pid int, at time.Time) (claim.Claim, Policy, string, bool, attribution) {
+	if c, global := r.catchAll(); global {
+		pol, ok := r.resolve(c)
+		if !ok {
+			return claim.Claim{}, Policy{}, whyNoKey, false, attribution{}
+		}
+		if !pol.RequireClaim {
+			return c, pol, "", true, attribution{how: "catch-all"}
+		}
+	}
 	if p, ok := strings.CutPrefix(key, procPrefix); ok {
 		n, _ := strconv.Atoi(p)
 		return r.decideExited(n)
@@ -307,6 +316,17 @@ const (
 // for an inferred session, how it was found) on the part and hands it to the
 // project's destination. deliverMu is held.
 func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attribution) {
+	if len(pol.ExcludePaths) > 0 {
+		pol.IncludePrompts, pol.IncludeToolContent = false, false
+	}
+	if pathExcluded(p, pol.ExcludePaths) {
+		r.stats.dropped(p.signal, "policy_path", p.records)
+		return
+	}
+	if pol.Signals != nil && !contains(pol.Signals, string(p.signal)) {
+		r.stats.dropped(p.signal, "policy_signal", p.records)
+		return
+	}
 	unclassified := map[string]int{}
 	if n := withhold(p, pol.IncludePrompts, pol.IncludeToolContent, unclassified); n > 0 {
 		r.stats.add("withheld_content_records", n)
@@ -377,7 +397,7 @@ func (r *Relay) sweep() {
 				// Global mode: what nothing placed goes to the organization's default
 				// project instead of being dropped, marked as such.
 				if cc, cok := r.catchAll(); cok {
-					if cpol, pok := r.resolve(cc); pok {
+					if cpol, pok := r.resolve(cc); pok && !cpol.RequireClaim {
 						c, pol, ok, how = cc, cpol, true, attribution{how: "catch-all"}
 						r.stats.add("caught_by_default."+string(h.p.signal), h.p.records)
 					}

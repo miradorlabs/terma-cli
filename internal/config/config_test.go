@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -309,5 +310,33 @@ func TestSameAccounts(t *testing.T) {
 		if got := SameAccounts(c.a, c.b); got != c.want {
 			t.Errorf("SameAccounts(%q, %q) = %v, want %v", c.a, c.b, got, c.want)
 		}
+	}
+}
+
+// Policy polling and foreground agent selection both merge this file. Concurrent
+// updates must preserve every independent choice, rather than last-writer winning.
+func TestUpdateProfileConcurrentChoices(t *testing.T) {
+	seedConfig(t, nil)
+	const updates = 16
+	errs := make(chan error, updates)
+	start := make(chan struct{})
+	for i := range updates {
+		go func() {
+			<-start
+			errs <- UpdateProfile(DefaultProfile, func(p *Profile) { p.Harnesses = append(p.Harnesses, fmt.Sprint(i)) })
+		}()
+	}
+	close(start)
+	for range updates {
+		if err := <-errs; err != nil {
+			t.Fatal(err)
+		}
+	}
+	file, err := LoadFile()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := len(file.Profiles[DefaultProfile].Harnesses); got != updates {
+		t.Fatalf("lost concurrent preferences: got %d, want %d", got, updates)
 	}
 }

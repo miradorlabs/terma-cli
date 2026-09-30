@@ -55,6 +55,10 @@ type Policy struct {
 	Key                string
 	IncludePrompts     bool
 	IncludeToolContent bool
+	// Nil preserves older callers' all-signals policy; empty disables all signals.
+	Signals      []string
+	ExcludePaths []string
+	RequireClaim bool
 }
 
 // ErrNoKey is Resolve's answer for a project this machine holds no key for: the

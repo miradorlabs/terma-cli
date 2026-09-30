@@ -24,6 +24,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/miradorlabs/terma-cli/internal/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/flock"
@@ -175,12 +176,22 @@ func newRelayRunCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if cfg.OrganizationID == "" && os.Getenv("TERMA_POLICY_STUB") == "" {
+				if cred, err := auth.LoadCredential(cfg.ProfileName); err == nil && cred.CheckEnvironment(cfg.AuthURL) == nil {
+					cfg.OrganizationID = cred.OrganizationID
+				}
+			}
+			// Before the first successful policy fetch, capture is disabled. The
+			// background poll will authorize it without delaying the loopback listener.
+			if cfg.Policy.FetchedAt.IsZero() || cfg.Policy.TeamID == "" && os.Getenv("TERMA_POLICY_STUB") == "" {
+				cfg.Policy = config.Policy{Mode: config.ModeRepo, Signals: []string{}, OrganizationID: cfg.OrganizationID, AuthURL: cfg.AuthURL}
+			}
 			// TERMA_RELAY_HEARTBEAT shortens the heartbeat's period for a test.
 			beat, _ := time.ParseDuration(os.Getenv("TERMA_RELAY_HEARTBEAT"))
 			minter := newRelayKeyMinter(cmd.Context(), cfg)
 			opts := relay.Options{Token: token, Hold: hold, Dir: filepath.Join(dir, relay.OutboxDir), Resolve: relayResolver(cfg, minter.mint), Version: Version,
 				CatchAll: relayCatchAll(), HeartbeatInfo: relayHeartbeatInfo(dir), HeartbeatSend: relayHeartbeatSend, HeartbeatEvery: max(beat, 0),
-				PeerPID: procinfo.FindSender, ProcessAlive: harness.ProcessAlive, ClaimCacheTTL: time.Second, PolicyCacheTTL: 5 * time.Second}
+				PeerPID: procinfo.FindSender, ProcessAlive: harness.ProcessAlive, ClaimCacheTTL: time.Second, PolicyCacheTTL: time.Second}
 			if os.Getenv("TERMA_RELAY_DEBUG") == "1" {
 				errOut := cmd.ErrOrStderr()
 				opts.Logf = func(f string, a ...any) { fmt.Fprintf(errOut, time.Now().Format("15:04:05.000 ")+f+"\n", a...) }
@@ -210,6 +221,7 @@ func newRelayRunCommand() *cobra.Command {
 			go func() { _ = srv.Serve(ln) }()
 			done := make(chan struct{})
 			go func() { r.Run(ctx); close(done) }()
+			go pollCollectionPolicy(ctx)
 			self := executableStamp()
 			replaced, setupGone := false, false
 			lastPrune := time.Now()
@@ -357,14 +369,49 @@ func relayResolver(cfg *config.Config, mint func(projectID string)) func(claim.C
 			}
 			return relay.Policy{}, relay.ErrNoKey
 		}
+		org := cfg.Policy
+		// Reread the profile so a refreshed policy also governs queued exports. The
+		// resolver's cache bounds these local reads; hooks never fetch the network.
+		if file, err := config.LoadFile(); err != nil {
+			return relay.Policy{}, err
+		} else if p := file.Profiles[cfg.ProfileName]; p != nil {
+			if p.OrganizationID != cfg.OrganizationID {
+				return relay.Policy{}, errors.New("organization changed; restart the relay")
+			}
+			if p.Policy == nil || !p.Policy.AppliesTo(cfg.OrganizationID, cfg.AuthURL) || p.Policy.TeamID == "" && os.Getenv("TERMA_POLICY_STUB") == "" {
+				org = config.Policy{Mode: config.ModeRepo, Signals: []string{}, OrganizationID: cfg.OrganizationID, AuthURL: cfg.AuthURL}
+			} else {
+				org = *p.Policy
+			}
+		}
+		globalPrimary := org.Global() && (org.TeamID == "" || org.TeamID == c.ProjectID)
+		org = routing.EffectivePolicy(org, c.ProjectID)
+		if cfg.ProfileName != "" && org.FetchedAt.IsZero() && os.Getenv("TERMA_POLICY_STUB") == "" {
+			// A new team's first exports wait for its background fetch, just as they
+			// wait for a missing key. Unknown policy must neither grant nor drop them.
+			return relay.Policy{}, errors.New("no validated collection policy for this team")
+		}
 		pol := relay.Policy{Endpoint: projectEndpoint(cfg, c.ProjectID), Key: key,
-			IncludePrompts: cfg.Policy.IncludePrompts, IncludeToolContent: cfg.Policy.IncludeToolContent}
+			IncludePrompts: org.IncludePrompts, IncludeToolContent: org.IncludeToolContent, Signals: org.Signals, ExcludePaths: org.ExcludePaths, RequireClaim: !globalPrimary || !org.Global()}
+		// Native exporters do not identify the source files of arbitrary prompt,
+		// response and tool blobs. With exclusions active, such text cannot be proven
+		// safe; forward metadata and filter named excluded paths instead.
+		if len(org.ExcludePaths) > 0 {
+			pol.IncludePrompts, pol.IncludeToolContent = false, false
+		}
 		switch rec, ok, err := routing.LoadRecord(c.ProjectID); {
 		case err != nil:
 			pol.IncludePrompts, pol.IncludeToolContent = false, false
+			pol.Signals = []string{}
 		case ok:
 			pol.IncludePrompts = pol.IncludePrompts && rec.IncludePrompts
 			pol.IncludeToolContent = pol.IncludeToolContent && rec.IncludeToolContent
+			pol.Signals = []string{}
+			for _, s := range rec.Signals {
+				if org.AllowsSignal(s) {
+					pol.Signals = append(pol.Signals, s)
+				}
+			}
 		}
 		return pol, nil
 	}

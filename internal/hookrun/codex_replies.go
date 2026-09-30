@@ -24,7 +24,8 @@ const codexReplyMaxText = 16 << 10
 // repository hooks), holds a cursor per session under a lock the two share, and does
 // nothing at all for a developer whose Codex does not export their prompts.
 func (e Env) captureCodexReplies(ctx context.Context, r *repo, in *codexHookInput) {
-	if e.Spool == nil || !session.ValidID(in.SessionID) || !codexRepliesConsented(r) {
+	pol := routing.EffectivePolicy(e.Policy, r.projectID)
+	if e.Spool == nil || !session.ValidID(in.SessionID) || !pol.IncludePrompts || !pol.AllowsSignal("logs") || len(pol.ExcludePaths) > 0 || !codexRepliesConsented(r, pol.Global()) {
 		return
 	}
 	dir, err := config.Dir()
@@ -74,7 +75,7 @@ func (e Env) captureCodexReplies(ctx context.Context, r *repo, in *codexHookInpu
 		if !reply.At.IsZero() && !reply.At.After(at) {
 			at = reply.At
 		}
-		return e.Spool.Append(spool.Event{Time: at, Name: EventAssistantMessage, SessionID: in.SessionID, Repo: r.name, Attrs: attrs})
+		return e.Spool.Append(spool.Event{Time: at, Name: EventAssistantMessage, SessionID: in.SessionID, Repo: r.name, Workspace: r.root, Global: pol.Global(), Attrs: attrs})
 	})
 	if err != nil {
 		e.logf("codex replies (%s): %v", status, err)
@@ -103,7 +104,7 @@ func (e Env) captureCodexReplies(ctx context.Context, r *repo, in *codexHookInpu
 // half-written, a config.toml that does not parse — might be the one that withholds
 // prompts, and "could not tell" is not consent. A file that does not exist is different:
 // both loaders report that without an error, and it simply is not a source.
-func codexRepliesConsented(r *repo) bool {
+func codexRepliesConsented(r *repo, global bool) bool {
 	rec, recorded, err := routing.LoadRecord(r.projectID)
 	if err != nil {
 		return false
@@ -112,7 +113,10 @@ func codexRepliesConsented(r *repo) bool {
 	// purpose — the relay withholds them per project — so it says nothing about this
 	// repository. Only the project's own routing record can consent.
 	if claim.Enabled() {
-		return recorded && rec.IncludePrompts
+		if global && !recorded {
+			return true
+		}
+		return recorded && rec.IncludePrompts && slices.Contains(rec.Harnesses, routing.AgentCodex) && slices.Contains(rec.Signals, "logs")
 	}
 	if rec.Desktop {
 		return recorded && slices.Contains(rec.Harnesses, routing.AgentCodex) &&

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -15,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/miradorlabs/terma-cli/internal/adapter"
+	"github.com/miradorlabs/terma-cli/internal/api"
 	"github.com/miradorlabs/terma-cli/internal/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/prompt"
@@ -64,7 +64,7 @@ func newSetupCommand() *cobra.Command {
   3. Fetches your organization's collection policy.
   4. Points those agents' telemetry at terma's local relay, and runs the relay in
      the background (--relay-service off: started on demand instead). Only sessions
-     in repositories connected to Terma leave this machine.
+     allowed by the selected team's collection policy leave this machine.
 
 A repository your organization connected in Terma needs nothing more: its committed
 hooks claim its sessions. ` + "`terma install`" + ` connects a repository from here instead.`,
@@ -139,22 +139,26 @@ func runSetup(cmd *cobra.Command, f setupFlags) error {
 
 	// 3. What the organization collects. Kept on the profile: hooks and the relay read
 	// it there and never ask the network.
+	if err := selectPolicyTeam(cmd, cfg); err != nil {
+		return err
+	}
 	pol, err := fetchPolicy(cmd.Context(), cfg)
 	if err != nil {
 		return err
 	}
-	if err := config.UpdateProfile(cfg.ProfileName, func(p *config.Profile) { p.Policy = &pol }); err != nil {
+	previous := cfg.Policy
+	cfg.Policy = pol
+	if err := saveCollectionPolicy(cfg, &pol); err != nil {
 		return err
 	}
-	fmt.Fprintln(out, "Collection policy: "+policySummary(pol)+".")
-	if policyChanged(cfg.Policy, pol) {
-		// A running relay read the old one at start: it is stopped to read this one (a
-		// service restarts it; otherwise ensureRelay, below, starts it). Not on every
-		// setup — an agent does not retry an export refused while the relay restarts.
+	// A relay's login and environment are fixed at startup. Scope changes require
+	// restarting it; capture-only changes are picked up from the local caches.
+	if previous.OrganizationID != pol.OrganizationID || previous.AuthURL != pol.AuthURL || previous.TeamID != pol.TeamID {
 		if dir, err := relayDir(); err == nil {
 			stopRelay(dir)
 		}
 	}
+	fmt.Fprintln(out, "Collection policy: "+policySummary(pol)+".")
 
 	// 4. The relay: the machine half of every repository's telemetry.
 	var steps []string
@@ -227,22 +231,72 @@ func applyGlobalMode(ctx context.Context, agents []string, global bool, said, th
 // fetchPolicy asks the organization the developer signed in to for its collection
 // policy.
 func fetchPolicy(ctx context.Context, cfg *config.Config) (config.Policy, error) {
-	client, err := newClient(cfg)
-	if err != nil {
-		return config.Policy{}, err
+	var client *api.Client
+	var err error
+	// An explicit offline fixture needs no credential. Production always uses the
+	// normal client, which loads and refreshes the developer's login token.
+	if os.Getenv("TERMA_POLICY_STUB") != "" {
+		client = api.NewAnonymous(cfg.AuthURL, Version)
+	} else {
+		if cfg.APIKey == "" {
+			cred, err := auth.LoadCredential(cfg.ProfileName)
+			if err != nil {
+				return config.Policy{}, err
+			}
+			if cfg.OrganizationID == "" {
+				cfg.OrganizationID = cred.OrganizationID
+			}
+			if cfg.OrganizationID != cred.OrganizationID {
+				return config.Policy{}, errors.New("collection policy login belongs to another organization — run `terma setup`")
+			}
+		}
+		client, err = newClient(cfg)
+		if err != nil {
+			return config.Policy{}, err
+		}
 	}
 	pol, err := client.CollectionPolicy(ctx)
 	if err != nil {
 		return config.Policy{}, fmt.Errorf("fetch the organization's collection policy: %w", err)
 	}
+	pol.OrganizationID, pol.AuthURL = cfg.OrganizationID, cfg.AuthURL
+	pol.TeamID = firstNonEmpty(cfg.ProjectID, pol.DefaultProjectID)
+	if pol.Global() && os.Getenv("TERMA_POLICY_STUB") == "" {
+		pol.DefaultProjectID = cfg.ProjectID
+	}
+
 	return pol, nil
 }
 
-// policyChanged reports whether the relay's view of the policy is out of date.
-func policyChanged(was, now config.Policy) bool {
-	return was.Mode != now.Mode || was.IncludePrompts != now.IncludePrompts ||
-		was.IncludeToolContent != now.IncludeToolContent || was.DefaultProjectID != now.DefaultProjectID ||
-		!maps.Equal(was.Remotes, now.Remotes)
+// selectPolicyTeam names which team's policy the developer is setting up. It
+// reads membership with the login token; it never creates a telemetry key.
+func selectPolicyTeam(cmd *cobra.Command, cfg *config.Config) error {
+	if os.Getenv("TERMA_POLICY_STUB") != "" {
+		return nil
+	}
+	if cfg.ProjectID == "" && cfg.Policy.TeamID != "" {
+		cfg.ProjectID = cfg.Policy.TeamID
+		return nil
+	}
+	client, err := newClient(cfg)
+	if err != nil {
+		return err
+	}
+	projects, err := availableProjects(cmd.Context(), client)
+	if err != nil {
+		return err
+	}
+	var team *project
+	if cfg.ProjectID != "" {
+		team, err = matchProject(projects, cfg.ProjectID)
+	} else {
+		team, err = soleOrPick(cmd, projects, "")
+	}
+	if err != nil {
+		return err
+	}
+	cfg.ProjectID = team.ID
+	return nil
 }
 
 // policySummary says in a few words what the organization collects.

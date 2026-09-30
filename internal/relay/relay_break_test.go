@@ -807,8 +807,8 @@ func TestRelayRoutesEachRunOfAResumedSession(t *testing.T) {
 }
 
 // Global mode: a session no hook claimed, and a record naming no session at all, go to
-// the organization's default project when their hold runs out — marked catch-all —
-// instead of being dropped. A claimed session still goes to its own project.
+// the selected team's project immediately, under its capture policy. Claims and
+// process attribution do not narrow global coverage.
 func TestRelayCatchAllInGlobalMode(t *testing.T) {
 	u := newUpstream(t)
 	f := newFixture()
@@ -827,17 +827,10 @@ func TestRelayCatchAllInGlobalMode(t *testing.T) {
 	defer srv.Close()
 	body, _ := proto.Marshal(mixedLogs())
 	post(t, srv, "/v1/logs", body, "application/x-protobuf", token, false)
-	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["forwarded.logs"] == 3 })
-	f.mu.Lock()
-	f.now = f.now.Add(31 * time.Minute) // past the trace hold the sessionless record waits
-	f.mu.Unlock()
-	// C (unclaimed) and the sessionless record go to the default; D is claimed for a
-	// project this machine has no key for, and still waits for its key.
-	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["caught_by_default.logs"] == 2 })
-	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["forwarded.logs"] == 5 })
+	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["forwarded.logs"] == 6 })
 	byAuth, _ := u.logs(t)
-	if n := len(byAuth["Bearer key-default"]); n != 2 {
-		t.Fatalf("default project got %d records, want 2", n)
+	if n := len(byAuth["Bearer key-default"]); n != 6 {
+		t.Fatalf("default project got %d records, want 6", n)
 	}
 	u.mu.Lock()
 	defer u.mu.Unlock()

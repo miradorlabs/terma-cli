@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -29,7 +30,7 @@ func fundingEnv(t *testing.T) Env {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return Env{Now: time.Now(), Cwd: root, Spool: sp, Version: "test"}
+	return Env{Now: time.Now(), Cwd: root, Spool: sp, Version: "test", Policy: config.DefaultPolicy()}
 }
 func hookInput(env Env, event string) string {
 	b, _ := json.Marshal(map[string]any{"session_id": "funding-session", "cwd": env.Cwd, "hook_event_name": event})

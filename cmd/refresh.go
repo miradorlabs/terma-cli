@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"slices"
 
 	"github.com/miradorlabs/terma-cli/internal/adapter"
@@ -13,6 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/migrate"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 	"github.com/miradorlabs/terma-cli/internal/shim"
 	"github.com/miradorlabs/terma-cli/internal/style"
@@ -34,6 +37,9 @@ import (
 func refreshMachine() ([]string, error) {
 	var changed []string
 	var errs []error
+	if err := migrateLegacyExporters(); err != nil {
+		return nil, fmt.Errorf("migrate PATH-shim exporters to the local relay: %w", err)
+	}
 	if removed, err := shim.RemoveLegacy(); err != nil {
 		errs = append(errs, fmt.Errorf("remove the PATH shims: %w", err))
 	} else if removed {
@@ -51,6 +57,54 @@ func refreshMachine() ([]string, error) {
 		changed = append(changed, path)
 	}
 	return changed, errors.Join(errs...)
+}
+
+// Configure the replacement before removing an installed shim. Routing records
+// retain the project's capture choices and keys; a refresh never rewrites them.
+func migrateLegacyExporters() error {
+	bin, err := shim.ShimBinDir()
+	if err != nil {
+		return err
+	}
+	installed, err := os.ReadDir(bin)
+	if os.IsNotExist(err) || len(installed) == 0 {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	dir, err := routing.RoutingDir()
+	if err != nil {
+		return err
+	}
+	entries, err := os.ReadDir(dir)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	var agents []string
+	for _, e := range entries {
+		if e.IsDir() || filepath.Ext(e.Name()) != ".json" {
+			continue
+		}
+		rec, ok, err := routing.LoadRecord(e.Name()[:len(e.Name())-5])
+		if err != nil {
+			return err
+		}
+		if !ok {
+			continue
+		}
+		for _, a := range rec.Harnesses {
+			if !slices.Contains(agents, a) {
+				agents = append(agents, a)
+			}
+		}
+	}
+	return connectMachineRelay(context.Background(), agents, "", relayReport{
+		ok: func(string, string) {}, warn: func(string, string) {}, then: func(string) {}, detail: io.Discard,
+	})
 }
 
 // repoRefresh is what a refresh would change in one repository's committed files.
@@ -213,5 +267,7 @@ func refreshAfterUpgrade(ctx context.Context, dir string, out io.Writer) {
 	if repo, _ := planRepoRefresh(ctx); repo != nil && !repo.plan.empty() {
 		fmt.Fprintln(out, "This repository's hooks were written by an earlier terma. Run `terma update --refresh` here to update them.")
 	}
-	_ = selfupdate.SaveRefreshed(dir, Version)
+	if err == nil {
+		_ = selfupdate.SaveRefreshed(dir, Version)
+	}
 }

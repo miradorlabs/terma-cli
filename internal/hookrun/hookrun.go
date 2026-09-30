@@ -24,6 +24,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 	"github.com/miradorlabs/terma-cli/internal/trailer"
@@ -126,15 +127,12 @@ func (e Env) repo(ctx context.Context) (*repo, error) {
 	}
 	r := &repo{root: root, gitDir: gitDir, store: session.Open(stateDir)}
 	r.name, r.worktree = checkoutNames(root, gitDir)
-	if f, _, err := project.Resolve(root, gitDir); err == nil {
+	if e.Policy.Global() {
+		// Global exports and hook events belong to the selected team, including in
+		// repositories previously bound to another project.
+		r.projectID = e.Policy.DefaultProjectID
+	} else if f, _, err := project.Resolve(root, gitDir); err == nil {
 		r.projectID = f.Project.ID
-	} else if e.Policy.Global() {
-		// Global mode: no repository opts in, the organization collects everything.
-		remote := ""
-		if gitDir != "" {
-			remote = gitx.RemoteURLFS(gitDir)
-		}
-		r.projectID = e.Policy.ProjectFor(remote)
 	}
 	return r, nil
 }
@@ -142,6 +140,14 @@ func (e Env) repo(ctx context.Context) (*repo, error) {
 // emitFor spools an event stamped with the repository's project binding and, from a
 // linked worktree, which one.
 func (e Env) emitFor(r *repo, ev spool.Event) {
+	ev.Global = e.Policy.Global()
+	if r != nil {
+		ev.Workspace = r.root
+		pol := routing.EffectivePolicy(e.Policy, r.projectID)
+		if pol.ExcludesPath(r.root, "") || pol.HasExcludedPath(ev.Attrs, r.root) {
+			return
+		}
+	}
 	if r != nil && (r.projectID != "" || r.worktree != "") {
 		if ev.Attrs == nil {
 			ev.Attrs = map[string]any{}

@@ -200,12 +200,18 @@ run that reaches them opens a browser login on **production**. A script that run
   for as long as its hint stayed unquoted, and the same test stops a cleanup from deleting
   a command a hint names. Quote a command in backticks when a message names one.
 - `terma setup` is the machine half: it signs in, records the developer's agents
-  (`config.Profile.Harnesses`), fetches the organization's collection policy
-  (`api.CollectionPolicy`, **a stub** until the account service's endpoint lands; kept as
-  `config.Profile.Policy`: mode `repo` or `global` — global is recorded only — and content
-  defaults), and sets up the relay (`connectMachineRelay`: token, the agents' user-level
-  exporters, the service). No project, no key. The policy is the ceiling on content: a
-  project's routing record can only narrow it (`relayResolver`).
+  (`config.Profile.Harnesses`), selects a team, and fetches its policy with the
+  developer's login token (`api.CollectionPolicy`, GET `/v1/policy?project_id=<team>`
+  on the auth host). Reading policy never creates a server key. Cached team policies
+  live under `policies/`; the selected team's machine-wide coverage also lives in
+  `config.Profile.Policy`. The relay refreshes them every minute; hooks stay local.
+  Failed fetches retain each team's last validated policy; an unfetched team cannot
+  export. A policy from another team, organization, or environment grants nothing.
+  A temporary rejection of developer tokens must not trigger permissive defaults or
+  a server-key workaround. Routing records can only narrow signals and content.
+  Both the native outbox and hook spool enforce policy again at delivery. Path
+  exclusions withhold named excluded paths and free text whose source files cannot
+  be established.
 - The platform (terma-frontend) commits a repository's binding and agent hooks, so `terma
   install` is optional. What a commit cannot do is done on first use: the relay mints a
   claimed project's missing key with the signed-in credential (`relayKeyMinter`, stored as
@@ -217,12 +223,13 @@ run that reaches them opens a browser login on **production**. A script that run
 - **Global mode** (`config.ModeGlobal`, the organization's policy): company laptops where
   the organization wants all AI spend — invasive on purpose, never the default. What
   changes, all of it written by `terma setup` and removed by a setup back in repo mode:
-  - Placement: a bound repository keeps its binding; an unbound one is placed by its origin
-    (`Policy.ProjectFor`: `Remotes`, `config.NormalizeRemote`), else `DefaultProjectID`; a
-    directory outside any repository goes to the default and gets the private workspace
-    store (`hookrun.Env.Policy`, `repo()`). The relay files whatever nothing placed by the
-    end of its hold under the default (`relay.Options.CatchAll`, marked
-    `terma.relay.attribution=catch-all`) instead of dropping it.
+  - Placement: all native exports and hook events go to the selected team's
+    `DefaultProjectID`. A directory outside any repository gets the private workspace
+    store (`hookrun.Env.Policy`, `repo()`). The relay forwards all native exports
+    immediately to the selected team's project under its capture rules, without
+    requiring a session or a process claim (`relay.Options.CatchAll`, marked
+    `terma.relay.attribution=catch-all`). A switch back to repository coverage also
+    withholds queued catch-all exports.
   - Machine-wide agent hooks (`cmd/global_hooks.go`): terma's entries in Claude Code's,
     Codex's and Cursor's user-level hooks files, `terma hook --user <event>` by absolute
     path (`hookmgr.UserHookCommand`, recognized by shape). For the agents they cover they
@@ -929,8 +936,9 @@ it does not prove that a running agent has reloaded its settings or sent telemet
   the package manager, the old binary execs the new one's `update --refresh` — the old
   process cannot run new templates. It rewrites only files terma already wrote (the status-line wrap, the OpenCode plugin, and the current repository's hooks: the commit
   hooks through the binding's manager, the agent hooks its files already wire), never creates one, never signs in, and never changes a
-  choice — except that it removes the PATH shims an earlier build installed (the relay
-  routes the agents now; a shim left on PATH would run every agent launch through terma). Re-running `terma install` is not a substitute: it re-defaults every flag it
+  choice — except that it migrates recorded agents to the relay before removing
+  PATH shims an earlier build installed, preserving routing signals and content
+  choices. A failed migration leaves the shims in place and is retried. Re-running `terma install` is not a substitute: it re-defaults every flag it
   does not record. The first interactive command under a newer release refreshes the
   home-directory files once (`refreshed.json`, upward only, so two builds on PATH do not
   take turns) and only *reports* stale committed files. Per repository, doctor and status

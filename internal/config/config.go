@@ -8,15 +8,18 @@
 package config
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/miradorlabs/terma-cli/internal/flock"
 	"io/fs"
 	"net"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 const (
@@ -57,6 +60,7 @@ type Profile struct {
 func (p *Profile) SelectOrganization(id, name string) {
 	if p.OrganizationID != id {
 		p.OrganizationName = ""
+		p.Policy = nil
 	}
 	p.OrganizationID = id
 	if name != "" {
@@ -159,6 +163,9 @@ func Load(o Overrides) (*Config, error) {
 	}
 	if profile.Policy != nil {
 		cfg.Policy = *profile.Policy
+		if !cfg.Policy.AppliesTo(cfg.OrganizationID, cfg.AuthURL) {
+			cfg.Policy = Policy{Mode: ModeRepo, Signals: []string{}}
+		}
 	}
 
 	for _, endpoint := range []struct{ name, value string }{
@@ -280,19 +287,41 @@ func SaveFile(file *File) error {
 
 // UpdateProfile applies mutate to the named profile and persists the result.
 func UpdateProfile(name string, mutate func(*Profile)) error {
+	return UpdateFile(func(file *File) {
+		if name == "" {
+			name = file.ActiveProfile
+		}
+		profile := file.Profiles[name]
+		if profile == nil {
+			profile = &Profile{}
+		}
+		mutate(profile)
+		file.Profiles[name] = profile
+	})
+}
+
+// UpdateFile serializes a config read/merge/write across foreground commands and
+// the relay's policy refresh. Mutate runs under the sidecar lock.
+func UpdateFile(mutate func(*File)) error {
+	dir, err := Dir()
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	unlock, err := flock.Lock(ctx, filepath.Join(dir, configFileName+".lock"))
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	file, err := LoadFile()
 	if err != nil {
 		return err
 	}
-	if name == "" {
-		name = file.ActiveProfile
-	}
-	profile := file.Profiles[name]
-	if profile == nil {
-		profile = &Profile{}
-	}
-	mutate(profile)
-	file.Profiles[name] = profile
+	mutate(file)
 	return SaveFile(file)
 }
 

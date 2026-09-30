@@ -10,6 +10,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/harness"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -28,7 +29,8 @@ type codexTitleState struct {
 // The name restates the developer's first prompt, so it travels under the consent a
 // reply does (codexRepliesConsented).
 func (e Env) captureCodexTitle(ctx context.Context, r *repo, in *codexHookInput) {
-	if e.Spool == nil || !session.ValidID(in.SessionID) || !codexRepliesConsented(r) {
+	pol := routing.EffectivePolicy(e.Policy, r.projectID)
+	if e.Spool == nil || !session.ValidID(in.SessionID) || !pol.IncludePrompts || !pol.AllowsSignal("logs") || len(pol.ExcludePaths) > 0 || !codexRepliesConsented(r, pol.Global()) {
 		return
 	}
 	dir, err := config.Dir()
@@ -69,7 +71,7 @@ func (e Env) captureCodexTitle(ctx context.Context, r *repo, in *codexHookInput)
 	if !title.UpdatedAt.IsZero() && !title.UpdatedAt.After(at) {
 		at = title.UpdatedAt
 	}
-	if err := e.Spool.Append(spool.Event{Time: at, Name: EventSessionTitle, SessionID: in.SessionID, Repo: r.name, Attrs: attrs}); err != nil {
+	if err := e.Spool.Append(spool.Event{Time: at, Name: EventSessionTitle, SessionID: in.SessionID, Repo: r.name, Workspace: r.root, Global: pol.Global(), Attrs: attrs}); err != nil {
 		e.logf("codex title: %v", err)
 		return
 	}

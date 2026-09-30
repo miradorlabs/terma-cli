@@ -40,7 +40,9 @@ async function load(config, worktree) {
   const line = `const CONFIG = ${JSON.stringify(config)}`
   const spliced = src.replace(/^const CONFIG = null \/\* terma:config \*\/$/m, line)
   expect(spliced).not.toBe(src)
-  const path = join(dir, `plugin-${Math.random().toString(36).slice(2)}.js`)
+  // Bun caches directory listings during module resolution. Give each generated
+  // module a fresh directory so later imports see files created after the first.
+  const path = join(mkdtempSync(join(dir, "module-")), "plugin.js")
   writeFileSync(path, spliced)
   const mod = await import(path)
   const exportsList = Object.keys(mod)
@@ -249,7 +251,7 @@ test("a subagent's OpenRouter request names its parent and agent in the trace fi
 
 test("a null CONFIG makes the plugin inert", async () => {
   const src = readFileSync(join(import.meta.dir, "terma.js"), "utf8")
-  const path = join(dir, "raw.js")
+  const path = join(mkdtempSync(join(dir, "module-")), "raw.js")
   writeFileSync(path, src)
   const mod = await import(path)
   const hooks = await mod.TermaPlugin({ directory: dir, worktree: dir })

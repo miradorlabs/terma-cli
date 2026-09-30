@@ -37,6 +37,8 @@ type RelayOptions struct {
 func (sb *Sandbox) UseRelay(o RelayOptions) {
 	t := sb.T
 	t.Helper()
+	acct := sb.StartAccount()
+	acct.denyMints.Store(o.NoKey)
 	sb.relayed = true
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -54,7 +56,7 @@ func (sb *Sandbox) UseRelay(o RelayOptions) {
 			t.Fatal(err)
 		}
 	}
-	rec, _ := json.Marshal(map[string]any{"project_id": sb.ProjectID, "include_prompts": o.Content, "include_tool_content": o.Content})
+	rec, _ := json.Marshal(map[string]any{"project_id": sb.ProjectID, "include_prompts": o.Content, "include_tool_content": o.Content, "signals": []string{"traces", "logs", "metrics"}, "harnesses": []string{"claude", "codex", "opencode"}})
 	sb.writeAbs(filepath.Join(sb.TermaConfig, "routing", sb.ProjectID+".json"), string(rec)+"\n")
 	// --no-start: the scenario decides whether the relay runs before the agent.
 	// One setup for every agent: a second would stop the relay StartRelay runs.

@@ -219,6 +219,19 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	// Point the resolved config at the repo's project so key minting and resource
 	// attributes speak for it.
 	cfg.ProjectID, cfg.ProjectName, cfg.OrganizationID = b.ID, b.Name, b.OrganizationID
+	if len(relayTargets(agents)) > 0 && !f.dryRun {
+		pol, err := fetchPolicy(ctx, cfg)
+		if err != nil {
+			return err
+		}
+		if !pol.Global() && !pol.MembersCanAddRepositories && existing == nil {
+			return errors.New("your organization's policy does not allow members to add repositories; connect this repository in Terma first")
+		}
+		if err := saveCollectionPolicy(cfg, &pol); err != nil {
+			return err
+		}
+		cfg.Policy = pol
+	}
 
 	if gitDir == "" {
 		ui.warn("Git hooks", "skipped — not a Git repository, so commits are not stamped")
@@ -691,6 +704,13 @@ func connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *config.Conf
 		Harnesses:          targets,
 		CLI:                slices.Contains(agents, routing.AgentCodex),
 		Desktop:            slices.Contains(agents, codexDesktopAgent),
+	}
+	if !cmd.Flags().Changed("signals") {
+		if prev, ok, err := routing.LoadRecord(cfg.ProjectID); err != nil {
+			return err
+		} else if ok {
+			rec.Signals = prev.Signals
+		}
 	}
 	sp := spinner.New(cmd.ErrOrStderr())
 	defer sp.Stop()

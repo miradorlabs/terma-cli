@@ -98,20 +98,38 @@ func withhold(p *part, prompts, toolContent bool, unclassified map[string]int) i
 		}
 		r.Attributes = kept
 	}
+	exemplars := func(values []*metricspb.Exemplar) {
+		for _, value := range values {
+			value.FilteredAttributes = apply(value.FilteredAttributes)
+		}
+	}
 	switch m := p.msg.(type) {
 	case *metricspb.MetricsData:
 		for _, rm := range m.GetResourceMetrics() {
 			resource(rm.GetResource())
 			for _, sm := range rm.GetScopeMetrics() {
+				if sm.Scope != nil {
+					sm.Scope.Attributes = apply(sm.Scope.Attributes)
+				}
 				for _, mt := range sm.GetMetrics() {
 					for _, pt := range mt.GetSum().GetDataPoints() {
 						pt.Attributes = apply(pt.GetAttributes())
+						exemplars(pt.Exemplars)
 					}
 					for _, pt := range mt.GetGauge().GetDataPoints() {
 						pt.Attributes = apply(pt.GetAttributes())
+						exemplars(pt.Exemplars)
 					}
 					for _, pt := range mt.GetHistogram().GetDataPoints() {
 						pt.Attributes = apply(pt.GetAttributes())
+						exemplars(pt.Exemplars)
+					}
+					for _, pt := range mt.GetExponentialHistogram().GetDataPoints() {
+						pt.Attributes = apply(pt.Attributes)
+						exemplars(pt.Exemplars)
+					}
+					for _, pt := range mt.GetSummary().GetDataPoints() {
+						pt.Attributes = apply(pt.Attributes)
 					}
 				}
 			}
@@ -120,6 +138,9 @@ func withhold(p *part, prompts, toolContent bool, unclassified map[string]int) i
 		for _, rl := range m.GetResourceLogs() {
 			resource(rl.GetResource())
 			for _, sl := range rl.GetScopeLogs() {
+				if sl.Scope != nil {
+					sl.Scope.Attributes = apply(sl.Scope.Attributes)
+				}
 				for _, lr := range sl.GetLogRecords() {
 					lr.Attributes = apply(lr.GetAttributes())
 					event := attrString(lr.GetAttributes(), "event.name")
@@ -142,7 +163,18 @@ func withhold(p *part, prompts, toolContent bool, unclassified map[string]int) i
 		for _, rs := range m.GetResourceSpans() {
 			resource(rs.GetResource())
 			for _, ss := range rs.GetScopeSpans() {
+				if ss.Scope != nil {
+					ss.Scope.Attributes = apply(ss.Scope.Attributes)
+				}
 				for _, sp := range ss.GetSpans() {
+					// Provider errors can repeat either prompts or tool input/output.
+					if sp.Status != nil && sp.Status.Message != "" {
+						sp.Status.Message = ""
+						changed++
+					}
+					for _, link := range sp.Links {
+						link.Attributes = apply(link.Attributes)
+					}
 					sp.Attributes = apply(sp.GetAttributes())
 					events := sp.GetEvents()[:0]
 					for _, ev := range sp.GetEvents() {

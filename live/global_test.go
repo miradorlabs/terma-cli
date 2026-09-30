@@ -17,9 +17,8 @@ import (
 // set up the way a developer's machine gets it: the real `terma setup`, signed in to an
 // account whose policy is global, which writes the agents' machine-wide hooks and git's
 // global hooks path. Then real agents in four places, each of which must reach its
-// project: the bound repository (its binding), an unbound repository whose remote the
-// organization maps (that project), an unbound one it does not (the default), and a
-// directory outside any repository (the default). Commits in the repositories carry
+// configured global destination: a bound repository, an unbound repository with a
+// known remote, an unknown one, and a directory outside any repository. Commits in the repositories carry
 // their session. Nothing is installed per repository.
 //
 // The sandbox's HOME, agent config and git global config are all its own, so this is
@@ -156,8 +155,8 @@ func TestGlobalModeClaude(t *testing.T) {
 			name, dir, want string
 			commit          bool
 		}{
-			{"bound", sb.Repo, sb.ProjectID, true},
-			{"known-remote", known, globalKnown, true},
+			{"bound", sb.Repo, globalDefault, true},
+			{"known-remote", known, globalDefault, true},
 			{"unknown-remote", unknown, globalDefault, true},
 			{"outside-any-repository", scratch, globalDefault, false},
 		} {
@@ -191,8 +190,8 @@ func TestGlobalModeClaude(t *testing.T) {
 				}
 			})
 		}
-		// Every project's records went with its own minted key.
-		for _, p := range []string{sb.ProjectID, globalKnown, globalDefault} {
+		// All global records went with the selected team's key.
+		for _, p := range []string{globalDefault} {
 			if acct.KeyFor(p) == "" {
 				t.Errorf("no key was minted for %s", p)
 			}

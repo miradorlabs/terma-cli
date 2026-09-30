@@ -34,11 +34,16 @@ import (
 
 // Event is one thing that happened on this machine worth telling the backend.
 type Event struct {
-	Time      time.Time      `json:"time"`
-	Name      string         `json:"name"`
-	SessionID string         `json:"session_id,omitempty"`
-	Repo      string         `json:"repo,omitempty"`
-	Attrs     map[string]any `json:"attrs,omitempty"`
+	Time      time.Time `json:"time"`
+	Name      string    `json:"name"`
+	SessionID string    `json:"session_id,omitempty"`
+	Repo      string    `json:"repo,omitempty"`
+	// Workspace is local policy context; the OTLP encoder never exports it.
+	Workspace string `json:"workspace,omitempty"`
+	// Global records the coverage used at capture, for withholding queued events
+	// when the organization switches back to repository opt-in. Local only.
+	Global bool           `json:"global,omitempty"`
+	Attrs  map[string]any `json:"attrs,omitempty"`
 }
 
 // Sender delivers a batch. Send must respect context cancellation.

@@ -138,18 +138,13 @@ func newConfigUseCommand() *cobra.Command {
 		Short: "Switch the active profile",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			file, err := config.LoadFile()
-			if err != nil {
-				return err
-			}
 			name := args[0]
-			if _, ok := file.Profiles[name]; !ok {
-				// Creating it implicitly is friendlier than erroring: `config set` and
-				// `login` both work against a profile that does not exist yet.
-				file.Profiles[name] = &config.Profile{}
-			}
-			file.ActiveProfile = name
-			if err := config.SaveFile(file); err != nil {
+			if err := config.UpdateFile(func(file *config.File) {
+				if _, ok := file.Profiles[name]; !ok {
+					file.Profiles[name] = &config.Profile{}
+				}
+				file.ActiveProfile = name
+			}); err != nil {
 				return err
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "Active profile is now %s.\n", name)

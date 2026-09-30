@@ -217,6 +217,28 @@ func Projects() []string {
 	return out
 }
 
+// CollectionProjects includes teams whose only saved key belongs to an agent.
+func CollectionProjects() []string {
+	f, err := load()
+	if err != nil {
+		return nil
+	}
+	ids := map[string]bool{}
+	for id := range f.Keys {
+		ids[id] = true
+	}
+	for _, keys := range f.HarnessKeys {
+		for id := range keys {
+			ids[id] = true
+		}
+	}
+	var out []string
+	for id := range ids {
+		out = append(out, id)
+	}
+	return out
+}
+
 // Mask shows the key's prefix only, for status output.
 func Mask(key string) string { return serverkey.Mask(key) }
 

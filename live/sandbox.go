@@ -50,6 +50,7 @@ const (
 
 // Sandbox is one test's isolated world.
 type Sandbox struct {
+	account      *Account
 	T            *testing.T
 	Mode         Mode
 	Dir          string

@@ -165,11 +165,14 @@ func runStatusLine(cmd *cobra.Command, captureDisabled bool) int {
 }
 
 // hookPolicy is the organization's collection policy as `terma setup` recorded it: one
-// small file read, and the default when there is none to read.
+// small local read; without a validated scope content capture stays disabled.
 func hookPolicy() config.Policy {
 	cfg, err := config.Load(config.Overrides{})
 	if err != nil {
-		return config.DefaultPolicy()
+		return config.Policy{Mode: config.ModeRepo, Signals: []string{}}
+	}
+	if cfg.Policy.FetchedAt.IsZero() || cfg.Policy.TeamID == "" && os.Getenv("TERMA_POLICY_STUB") == "" {
+		return config.Policy{Mode: config.ModeRepo, Signals: []string{}, OrganizationID: cfg.OrganizationID, AuthURL: cfg.AuthURL}
 	}
 	return cfg.Policy
 }

@@ -37,11 +37,15 @@ func runIsolated(m *testing.M) int {
 	defer func() { _ = os.RemoveAll(home) }()
 	for k, v := range map[string]string{
 		"HOME":              home,
+		"SHELL":             "/bin/zsh",
 		"XDG_CONFIG_HOME":   home + "/.config",
 		"CLAUDE_CONFIG_DIR": home + "/.claude",
 		"CODEX_HOME":        home + "/.codex",
 		"TERMA_CONFIG_DIR":  home + "/.config/terma",
 		"GEMINI_CLI_HOME":   home,
+		// Command unit tests are offline; policy integration tests explicitly clear
+		// this override and exercise the real authenticated HTTP path.
+		"TERMA_POLICY_STUB": `{"mode":"repo","include_prompts":true,"include_tool_content":true}`,
 	} {
 		_ = os.Setenv(k, v)
 	}

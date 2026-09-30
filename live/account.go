@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -21,12 +22,13 @@ import (
 // per project (/v1/api-keys/server), each recorded so a scenario can tell which key
 // the relay sent a project's records with.
 type Account struct {
-	srv   *httptest.Server
-	token string
-	mints atomic.Int32
-	mu    sync.Mutex
-	keys  map[string]string // project → minted key
-	beats [][]byte          // heartbeat bodies (OTLP/JSON), in arrival order
+	srv       *httptest.Server
+	token     string
+	mints     atomic.Int32
+	denyMints atomic.Bool
+	mu        sync.Mutex
+	keys      map[string]string // project → minted key
+	beats     [][]byte          // heartbeat bodies (OTLP/JSON), in arrival order
 }
 
 // accountOrg is the organization the fake account signs the developer in to.
@@ -34,6 +36,9 @@ const accountOrg = "11111111-1111-4111-8111-111111111111"
 
 // StartAccount serves the fake account service until the test ends.
 func (sb *Sandbox) StartAccount() *Account {
+	if sb.account != nil {
+		return sb.account
+	}
 	a := &Account{token: "ter_cli_" + accountOrg, keys: map[string]string{}}
 	a.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer "+a.token {
@@ -46,7 +51,18 @@ func (sb *Sandbox) StartAccount() *Account {
 			_ = json.NewEncoder(w).Encode(map[string]any{"organization_id": accountOrg, "auth_type": "cli_token", "user_id": "u-live", "email": "live@terma.test"})
 		case "/v1/organizations":
 			_ = json.NewEncoder(w).Encode(map[string]any{"organizations": []map[string]any{{"id": accountOrg, "name": "Live", "role": "admin"}}})
+		case "/v1/projects":
+			_ = json.NewEncoder(w).Encode(map[string]any{"projects": []map[string]any{
+				{"id": sb.ProjectID, "name": "Live", "organization_id": accountOrg},
+				{"id": "proj_other", "name": "Other", "organization_id": accountOrg},
+			}})
+		case "/v1/policy":
+			fmt.Fprint(w, `{"policy":{"version":"1.0","terma":{"per_repository":{"members_can_add_repositories":true},"capture":{"exclude_paths":[],"exclude_prompts":false,"exclude_tool_content":false,"signals":["traces","logs","metrics"]}}},"revision":1,"updated_at":"2026-09-30T12:27:05Z"}`)
 		case "/v1/api-keys/server":
+			if a.denyMints.Load() {
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
 			var body struct {
 				ProjectID string `json:"project_id"`
 				Name      string `json:"name"`
@@ -77,6 +93,22 @@ func (sb *Sandbox) StartAccount() *Account {
 	data, _ := json.MarshalIndent(creds, "", "  ")
 	sb.writeAbs(filepath.Join(sb.TermaConfig, "credentials.json"), string(data)+"\n")
 	sb.ExtraEnv = append(sb.ExtraEnv, "TERMA_AUTH_URL="+a.srv.URL, "TERMA_API_URL="+a.srv.URL, "TERMA_APP_URL="+a.srv.URL)
+	// Mirror the organization selection that login persists, keeping the existing
+	// private sandbox's endpoint settings.
+	path := filepath.Join(sb.TermaConfig, "config.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		sb.T.Fatal(err)
+	}
+	var file map[string]any
+	if err := json.Unmarshal(data, &file); err != nil {
+		sb.T.Fatal(err)
+	}
+	profiles := file["profiles"].(map[string]any)
+	profiles["default"].(map[string]any)["organization_id"] = accountOrg
+	data, _ = json.Marshal(file)
+	sb.writeAbs(path, string(data))
+	sb.account = a
 	return a
 }
 

@@ -198,6 +198,14 @@ func (s *sender) loop() {
 		// was queued: a project that turned prompts off since sends none of the prompts
 		// still waiting (they stay on disk until delivered, filtered).
 		body = s.r.withholdQueued(batch[0].signal, body, pol)
+		if pol.Signals != nil && !contains(pol.Signals, string(batch[0].signal)) || body == nil {
+			for _, e := range batch {
+				s.r.stats.dropped(e.signal, "policy_signal_or_content", e.records)
+			}
+			s.r.outbox.remove(s.route, batch)
+			s.delivered(len(batch))
+			continue
+		}
 		out, wait, detail, rejected := s.send(ctx, pol, batch[0].signal, body)
 		switch out {
 		case sent:
@@ -423,9 +431,12 @@ func (r *Relay) recoverOutbox() {
 }
 
 // withholdQueued applies pol's content policy to a queued body before it is sent. A
-// body that no longer decodes is sent as it is: it was filtered when it was queued.
+// body that no longer decodes cannot be checked against a stricter policy and is dropped.
 func (r *Relay) withholdQueued(sig Signal, body []byte, pol Policy) []byte {
-	if pol.IncludePrompts && pol.IncludeToolContent {
+	if len(pol.ExcludePaths) > 0 {
+		pol.IncludePrompts, pol.IncludeToolContent = false, false
+	}
+	if pol.IncludePrompts && pol.IncludeToolContent && len(pol.ExcludePaths) == 0 && !pol.RequireClaim {
 		return body
 	}
 	var msg proto.Message
@@ -438,7 +449,13 @@ func (r *Relay) withholdQueued(sig Signal, body []byte, pol Policy) []byte {
 		msg = &metricspb.MetricsData{}
 	}
 	if proto.Unmarshal(body, msg) != nil {
-		return body
+		return nil
+	}
+	if pol.RequireClaim && hasCatchAll(&part{signal: sig, msg: msg}) {
+		return nil
+	}
+	if pathExcluded(&part{signal: sig, msg: msg}, pol.ExcludePaths) {
+		return nil
 	}
 	unclassified := map[string]int{}
 	n := withhold(&part{signal: sig, msg: msg}, pol.IncludePrompts, pol.IncludeToolContent, unclassified)
@@ -451,7 +468,7 @@ func (r *Relay) withholdQueued(sig Signal, body []byte, pol Policy) []byte {
 	}
 	out, err := proto.Marshal(msg)
 	if err != nil {
-		return body
+		return nil
 	}
 	return out
 }

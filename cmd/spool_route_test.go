@@ -77,7 +77,7 @@ func routeProject(t *testing.T, projectID, key, endpoint string) {
 	if endpoint == "" {
 		return
 	}
-	if err := routing.SaveRecord(routing.Record{ProjectID: projectID, Endpoint: endpoint, Harnesses: []string{"claude"}}); err != nil {
+	if err := routing.SaveRecord(routing.Record{ProjectID: projectID, Endpoint: endpoint, Signals: []string{"logs"}, Harnesses: []string{"claude"}}); err != nil {
 		t.Fatal(err)
 	}
 }

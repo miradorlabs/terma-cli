@@ -1,0 +1,134 @@
+package api
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"strings"
+	"testing"
+
+	"github.com/miradorlabs/terma-cli/internal/auth"
+	"github.com/miradorlabs/terma-cli/internal/config"
+	"time"
+)
+
+const testCapture = `"capture":{"exclude_paths":[],"exclude_prompts":true,"exclude_tool_content":false,"signals":["traces","logs"]}`
+
+func TestCollectionPolicyWireContract(t *testing.T) {
+	t.Setenv("TERMA_POLICY_STUB", "")
+	for _, mode := range []string{"global", "per_repository"} {
+		t.Run(mode, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/v1/policy" || r.URL.Query().Get("project_id") != "team" || r.Header.Get("Authorization") != "Bearer mir_cli_live" || r.Header.Get(projectHeader) != "" {
+					t.Errorf("wrong policy authentication/URL")
+				}
+				fmt.Fprintf(w, `{"policy":{"version":"1.0","terma":{%s,"%s":{"members_can_pause":true,"members_can_add_repositories":true}}},"revision":4,"updated_at":"2026-09-30T12:27:05.490205Z"}`, testCapture, mode)
+			}))
+			defer srv.Close()
+			c := newSplitTestClient(t, "http://127.0.0.1:1", srv.URL, liveCredential(), "team")
+			p, err := c.CollectionPolicy(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if p.Global() != (mode == "global") || p.IncludePrompts || !p.IncludeToolContent || p.AllowsSignal("metrics") || !p.AllowsSignal("logs") || p.Revision != 4 || p.FetchedAt.IsZero() {
+				t.Fatalf("wrong translated policy: %+v", p)
+			}
+			if mode == "global" && !p.MembersCanPause || mode == "per_repository" && !p.MembersCanAddRepositories {
+				t.Fatal("permissions lost")
+			}
+		})
+	}
+}
+
+// Opt-in smoke test: use TERMA_POLICY_SMOKE_LOGIN=1 for the saved dev login and
+// normal refresh, or supply a dev access token via TERMA_POLICY_SMOKE_TOKEN_FILE.
+// No secret enters source or test output.
+func TestCollectionPolicyDev(t *testing.T) {
+	keyFile := os.Getenv("TERMA_POLICY_SMOKE_TOKEN_FILE")
+	useLogin := os.Getenv("TERMA_POLICY_SMOKE_LOGIN") == "1"
+	if keyFile == "" && !useLogin {
+		t.Skip("requires an explicit dev developer token file")
+	}
+	t.Setenv("TERMA_POLICY_STUB", "")
+	endpoints, err := config.EndpointsFor(config.EnvDev)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := &config.Config{AuthURL: endpoints.AuthURL, APIURL: endpoints.APIURL, ProjectID: os.Getenv("TERMA_POLICY_SMOKE_PROJECT")}
+	if endpoint := os.Getenv("TERMA_POLICY_SMOKE_AUTH_URL"); endpoint != "" {
+		cfg.AuthURL = endpoint
+	}
+	opts := Options{Version: "policy-smoke-test"}
+	if useLogin {
+		cfg.ProfileName = config.DefaultProfile
+	} else {
+		key, err := os.ReadFile(keyFile)
+		if err != nil {
+			t.Fatal("could not read policy smoke-test token")
+		}
+		opts.Credential = &auth.Credential{AccessToken: strings.TrimSpace(string(key)), AuthURL: cfg.AuthURL, ExpiresAt: time.Now().Add(time.Hour)}
+	}
+	c, err := New(cfg, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.projectID == "" {
+		var response struct {
+			Projects []struct {
+				ID string `json:"id"`
+			} `json:"projects"`
+		}
+		if err := c.AuthGet(t.Context(), "/v1/projects", nil, &response); err != nil {
+			t.Fatal(err)
+		}
+		if len(response.Projects) == 0 {
+			t.Fatal("no dev team available for policy smoke test")
+		}
+		c.projectID = response.Projects[0].ID
+	}
+	p, err := c.CollectionPolicy(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Mode != config.ModeRepo && p.Mode != config.ModeGlobal {
+		t.Fatal("unsupported deployed policy")
+	}
+	t.Logf("dev policy parsed: mode=%s revision=%d include_prompts=%t include_tool_content=%t signals=%v", p.Mode, p.Revision, p.IncludePrompts, p.IncludeToolContent, p.Signals)
+}
+
+func TestCollectionPolicyMissingInvalidAndUnavailable(t *testing.T) {
+	t.Setenv("TERMA_POLICY_STUB", "")
+	valid := fmt.Sprintf(`{"policy":{"version":"1.0","terma":{%s,"global":{}}},"revision":1,"updated_at":"2026-09-30T12:27:05Z"}`, testCapture)
+	for _, tt := range []struct {
+		name, body string
+		status     int
+		wantError  bool
+	}{
+		{"unset", `{}`, 200, false},
+		{"null", `{"policy":null}`, 200, false},
+		{"empty document", `{"policy":{}}`, 200, true},
+		{"unknown version", strings.Replace(valid, `"1.0"`, `"2.0"`, 1), 200, true},
+		{"missing capture switch", strings.Replace(valid, `"exclude_prompts":true,`, "", 1), 200, true},
+		{"unknown signal", strings.Replace(valid, `"logs"`, `"unknown"`, 1), 200, true},
+		{"both modes", strings.Replace(valid, `"global":{}`, `"global":{},"per_repository":{}`, 1), 200, true},
+		{"no modes", strings.Replace(valid, `,"global":{}`, "", 1), 200, true},
+		{"unavailable", `{}`, 503, true},
+		{"forbidden", `{}`, 403, true},
+		{"missing endpoint", `{}`, 404, true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(tt.status); fmt.Fprint(w, tt.body) }))
+			defer srv.Close()
+			c := newTestClient(t, srv.URL, liveCredential(), "team")
+			p, err := c.CollectionPolicy(context.Background())
+			if (err != nil) != tt.wantError {
+				t.Fatalf("policy=%+v error=%v", p, err)
+			}
+			if !tt.wantError && (p.Global() || !p.MembersCanAddRepositories) {
+				t.Fatal("unset policy granted global coverage")
+			}
+		})
+	}
+}

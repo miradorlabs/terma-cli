@@ -43,6 +43,43 @@ one does not inherit it. Everything from a worktree reports as its main reposito
 (`repo`) with a `worktree` attribute naming it, and `terma status` / `terma doctor` say
 when a worktree is bound through its main checkout.
 
+## Team collection policy
+
+`terma setup` selects the team whose policy applies to this machine, using the
+previous choice, the organization's only team, or a picker. `--project <team>`
+selects it explicitly. It reads `GET /v1/policy?project_id=<team-id>` on the auth
+host using your developer login and its existing token refresh flow. Reading policy
+does not create a server key. Telemetry delivery still uses project server keys.
+
+Validated policies are cached separately in `policies/<team-id>.json`; the selected
+machine policy also lives in your profile. The relay refreshes saved teams' policies
+every minute, while hooks read local files only. A failed fetch retains that team's
+last validated policy. Without one, its capture remains disabled until a fetch
+succeeds. An explicit unset policy from the backend keeps repository opt-in and
+local capture choices. Invalid responses and older revisions cannot replace a
+validated policy. Cached grants cannot cross teams, organizations, or environments.
+
+`per_repository` forwards sessions claimed by connected repository hooks. `global`
+forwards all native exports immediately to the configured global destination, including
+exports without a session ID. Both modes enforce `capture.signals`,
+`exclude_prompts`, and `exclude_tool_content`. Local routing choices can narrow
+capture. Reinstalling without an explicit `--signals` keeps the saved signal list.
+Queued native exports, assistant replies, and titles are checked again at delivery.
+Global mode forwards to the selected team's project. Reading another team's
+repository policy does not change machine-wide coverage.
+
+`exclude_paths` uses repository-relative globs, including `**` across directories.
+An excluded directory covers its descendants; a basename such as `.env` also matches
+in nested directories. Exports naming an excluded file are withheld. Native exporters
+do not reliably identify which files supplied arbitrary prompts, responses, or tool
+output, so **nonempty path exclusions also withhold free-text capture**. Metadata
+continues to flow for allowed signals. This conservative fallback prevents file
+contents from escaping through text without a source path.
+
+The policy's `members_can_add_repositories` setting prevents a new repository install
+when disabled. `members_can_pause` is retained with the policy for pause controls;
+this release does not add a pause command.
+
 ## Local files
 
 ```text
@@ -50,6 +87,7 @@ when a worktree is bound through its main checkout.
   config.json        profiles, organization, endpoints, preferred agents
   credentials.json   CLI credentials, one per organization and profile (0600)
   keys.json          project server keys and per-harness keys (0600)
+  policies/          validated policies, one per team (0600)
   spool/             queued events
 ```
 
@@ -66,7 +104,7 @@ on your machine (`127.0.0.1:43180`):
   and IDE extensions read the same files, so they are routed too.
 - OpenCode, omp, Pi, Hermes and DeepSeek Harness export through an extension terma
   writes into each.
-- The relay forwards a session only when a hook in an installed repository claimed it,
+- In repository mode, the relay forwards a session only when a hook in an installed repository claimed it,
   to that repository's project, with the project's key and under its prompt and
   tool-content choices. Everything else is held briefly in memory and dropped.
 

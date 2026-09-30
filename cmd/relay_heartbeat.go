@@ -88,6 +88,10 @@ func heartbeatFacts(dir string) map[string]any {
 		facts["terma.mode"] = cfg.Policy.Mode
 		facts["terma.policy.include_prompts"] = cfg.Policy.IncludePrompts
 		facts["terma.policy.include_tool_content"] = cfg.Policy.IncludeToolContent
+		facts["terma.policy.revision"] = int(cfg.Policy.Revision)
+		if cfg.Policy.Signals != nil {
+			facts["terma.policy.signals"] = cfg.Policy.Signals
+		}
 		if !cfg.Policy.FetchedAt.IsZero() {
 			facts["terma.policy.fetched_at"] = cfg.Policy.FetchedAt.UTC().Format(time.RFC3339)
 		}

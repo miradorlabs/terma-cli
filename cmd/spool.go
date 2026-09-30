@@ -121,6 +121,9 @@ func describeFlush(res flushResult) (delivered string, undelivered []string) {
 	if res.Dropped > 0 {
 		undelivered = append(undelivered, fmt.Sprintf("dropped %d unreadable", res.Dropped))
 	}
+	if res.Withheld > 0 {
+		undelivered = append(undelivered, fmt.Sprintf("withheld %d by capture policy", res.Withheld))
+	}
 	return delivered, undelivered
 }
 
@@ -174,11 +177,11 @@ func newSpoolStatusCommand() *cobra.Command {
 // gone for reasons of time and disk, Unroutable events can never be delivered,
 // and only Dropped means the queue itself was unreadable.
 type flushResult struct {
-	Sent, Held, Failed, Expired, Pruned, Dropped, Unroutable int
-	Skipped                                                  bool
-	Reason                                                   spool.SkipReason
-	NextAttempt                                              time.Time
-	Err                                                      error
+	Sent, Held, Failed, Expired, Pruned, Dropped, Unroutable, Withheld int
+	Skipped                                                            bool
+	Reason                                                             spool.SkipReason
+	NextAttempt                                                        time.Time
+	Err                                                                error
 	// Failures names each project whose send failed, once per pass, in the order
 	// they failed. Doctor reads it to tell its own project's failure from another's.
 	Failures []projectFailure
@@ -222,7 +225,7 @@ func (r flushResult) Lost() bool {
 // flushSpool delivers everything queued. Events are routed by the project id the
 // hook stamped on them, each project with its own server key from the keystore, to
 // its own ingest host (projectEndpoint). Events whose project has no key here yet
-// are held for a later flush; ones with no project at all can never be routed, and
+// or no validated collection policy are held for a later flush; ones with no project at all can never be routed, and
 // are counted apart from events that simply aged out so the two failures stay
 // distinguishable. A project whose send fails keeps its events queued without
 // holding up any other project's (spool.PartialDelivery), and backs off on its own:
@@ -244,10 +247,30 @@ func flushSpool(ctx context.Context, force bool, minInterval time.Duration) (flu
 	router := spool.SenderFunc(func(ctx context.Context, events []spool.Event) ([]spool.Event, error) {
 		byProject := map[string][]spool.Event{}
 		var held []spool.Event
+		policies := map[string]config.Policy{}
+		policyErrors := map[string]error{}
 		for _, e := range events {
 			id, _ := e.Attrs[hookrun.AttrProjectID].(string)
 			if id == "" {
 				res.Unroutable++
+				continue
+			}
+			pol, checked := policies[id]
+			if !checked && policyErrors[id] == nil {
+				var err error
+				pol, err = currentTeamPolicy(ctx, cfg, id)
+				if err != nil {
+					policyErrors[id] = err
+				} else {
+					policies[id] = pol
+				}
+			}
+			if policyErrors[id] != nil {
+				held = append(held, e)
+				continue
+			}
+			if !spoolEventAllowed(pol, id, e) {
+				res.Withheld++
 				continue
 			}
 			byProject[id] = append(byProject[id], e)
@@ -319,6 +342,29 @@ func flushSpool(ctx context.Context, force bool, minInterval time.Duration) (flu
 	res.NextAttempt = s.NextAttempt()
 	res.Err = r.Err
 	return res, nil
+}
+
+// Replies and titles bypass the native relay. Recheck its same policy ceiling on
+// every delivery, including events captured before the organization tightened it.
+func spoolEventAllowed(org config.Policy, projectID string, e spool.Event) bool {
+	org = routing.EffectivePolicy(org, projectID)
+	if !org.AllowsSignal("logs") || e.Global && !org.Global() {
+		return false
+	}
+	if org.ExcludesPath(e.Workspace, "") || org.HasExcludedPath(e.Attrs, e.Workspace) {
+		return false
+	}
+	rec, recorded, err := routing.LoadRecord(projectID)
+	if err != nil {
+		return false
+	}
+	if e.Name == hookrun.EventAssistantMessage || e.Name == hookrun.EventSessionTitle {
+		if org.Global() && !recorded {
+			return org.IncludePrompts && len(org.ExcludePaths) == 0
+		}
+		return org.IncludePrompts && len(org.ExcludePaths) == 0 && recorded && rec.IncludePrompts && slices.Contains(rec.Harnesses, "codex") && slices.Contains(rec.Signals, "logs")
+	}
+	return !recorded || slices.Contains(rec.Signals, "logs")
 }
 
 // projectEndpoint is the ingest host a project's events are delivered to: the one its
