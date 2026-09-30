@@ -98,9 +98,12 @@ func (ru *rules) withhold(p *part, prompts, toolContent bool, unclassified map[s
 					body := lr.GetBody().GetStringValue()
 					switch {
 					case lr.GetBody().GetValue() == nil || plain && body == "":
-					case !prompts && contains(ru.promptBodyEvents, event):
-						lr.Body = &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: ""}}
-						changed++
+					case contains(ru.promptBodyEvents, event):
+						// The body is what was said: it follows the prompt policy alone.
+						if !prompts {
+							lr.Body = &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: ""}}
+							changed++
+						}
 					case !plain || !ru.bodyNamesItsEvent(body, event):
 						// A body is free text: kept only when it just names its event.
 						lr.Body = &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: ""}}
@@ -202,12 +205,7 @@ func (ru *rules) bodyNamesItsEvent(body, event string) bool {
 	if body == event {
 		return true
 	}
-	for _, prefix := range ru.bodyPrefixes {
-		if body == prefix+event {
-			return true
-		}
-	}
-	return event != "" && strings.HasSuffix(body, "."+event)
+	return event != "" && slices.ContainsFunc(ru.bodyPrefixes, func(prefix string) bool { return body == prefix+event })
 }
 
 func attrString(attrs []*commonpb.KeyValue, key string) string {

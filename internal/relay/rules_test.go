@@ -2,8 +2,6 @@ package relay
 
 import (
 	"fmt"
-	"maps"
-	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -13,7 +11,6 @@ import (
 
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
-	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
 	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/protobuf/proto"
@@ -23,18 +20,45 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/shape"
 )
 
-// Between them the agents declare exactly what the relay's own tables held.
-func TestComposedRulesMatchTheLegacyTables(t *testing.T) {
+// What the agents declare between them, pinned: a change here changes what leaves a
+// machine, and is made on purpose.
+var (
+	pinnedPromptFields     = []string{"prompt", "response", "user_prompt"}
+	pinnedPromptDropFields = []string{"gen_ai.prompt", "gen_ai.completion", "gen_ai.input.messages", "gen_ai.output.messages", "gen_ai.system_instructions",
+		"gen_ai.tool.definitions",
+		// omp's own (omp.gen_ai.*): the request's messages and the response's text.
+		"omp.gen_ai.request.messages", "omp.gen_ai.response.text",
+		// Gemini CLI's gemini_cli.api_request / api_response (0.62).
+		"request_text", "response_text",
+		// Free text that may restate or reason about what was said, in the harnesses'
+		// own events (the first unclassified-key survey, 2026-09-30): errors, reasons,
+		// Gemini's model-router reasoning, tool and agent descriptions, stop sequences,
+		// and keys too generic to vouch for.
+		"error", "reason", "reasoning", "routing.reasoning", "metadata", "value", "key", "from", "db", "query_script",
+		"gen_ai.tool.description", "gen_ai.agent.description", "gen_ai.request.stop_sequences"}
+	pinnedResourcePromptFields = []string{"process.command_args", "process.command_line"}
+	pinnedPromptBodyEvents     = []string{"opencode.user_prompt", "opencode.session.created", "pi.user_prompt", "omp.user_prompt", "hermes.user_prompt", "hermes.assistant_response", "dsh.user_prompt", "dsh.assistant_response"}
+	pinnedToolContentFields    = []string{"tool_parameters", "tool_input", "full_command", "bash_command", "arguments", "output",
+		"gen_ai.tool.call.arguments", "gen_ai.tool.call.result", "opencode.tool.file_path",
+		// Gemini CLI's tool_call and hook_call records (0.62).
+		"function_args", "hook_input", "hook_output", "stdout", "stderr",
+		// What a tool acted on or returned, as named elsewhere.
+		"file_path", "result"}
+	pinnedToolContentEvents = []string{"tool.output", "tool.input"}
+	pinnedSessionKeys       = []string{"session.id", "conversation.id", "gen_ai.conversation.id", "thread.id", "thread_id"}
+)
+
+func TestComposedRulesArePinned(t *testing.T) {
 	for _, s := range []struct {
 		name      string
 		got, want []string
 	}{
-		{"prompt fields", testRules.promptFields, legacyPromptFields},
-		{"prompt drop fields", testRules.promptDropFields, legacyPromptDropFields},
-		{"prompt body events", testRules.promptBodyEvents, legacyPromptBodyEvents},
-		{"resource prompt fields", testRules.resourcePromptFields, legacyResourcePromptFields},
-		{"tool content fields", testRules.toolContentFields, legacyToolContentFields},
-		{"tool content events", testRules.toolContentEvents, legacyToolContentEvents},
+		{"prompt fields", testRules.promptFields, pinnedPromptFields},
+		{"prompt drop fields", testRules.promptDropFields, pinnedPromptDropFields},
+		{"prompt body events", testRules.promptBodyEvents, pinnedPromptBodyEvents},
+		{"resource prompt fields", testRules.resourcePromptFields, pinnedResourcePromptFields},
+		{"tool content fields", testRules.toolContentFields, pinnedToolContentFields},
+		{"tool content events", testRules.toolContentEvents, pinnedToolContentEvents},
 		{"start events", testRules.startEvents, []string{"codex.conversation_starts"}},
 	} {
 		if got, want := slices.Sorted(slices.Values(s.got)), slices.Sorted(slices.Values(s.want)); !slices.Equal(got, want) {
@@ -48,8 +72,8 @@ func TestComposedRulesMatchTheLegacyTables(t *testing.T) {
 			numericRejected = append(numericRejected, k.Attr)
 		}
 	}
-	if !slices.Equal(keys, legacySessionKeys) {
-		t.Errorf("session key precedence = %q, want %q", keys, legacySessionKeys)
+	if !slices.Equal(keys, pinnedSessionKeys) {
+		t.Errorf("session key precedence = %q, want %q", keys, pinnedSessionKeys)
 	}
 	if !slices.Equal(numericRejected, []string{"thread.id", "thread_id"}) {
 		t.Errorf("numeric ids rejected for %q", numericRejected)
@@ -85,111 +109,6 @@ func TestEveryExportingAgentDeclaresItsShape(t *testing.T) {
 	}
 }
 
-// The composed rules withhold, record by record, exactly what the legacy tables did.
-func TestComposedRulesWithholdAsTheLegacyTablesDid(t *testing.T) {
-	rng := rand.New(rand.NewSource(1))
-	for i := range 3000 {
-		prompts, toolContent := rng.Intn(2) == 0, rng.Intn(2) == 0
-		msg := randomExport(rng)
-		want, got := &part{msg: proto.Clone(msg)}, &part{msg: proto.Clone(msg)}
-		wantU, gotU := map[string]int{}, map[string]int{}
-		wantN := legacyWithhold(want, prompts, toolContent, wantU)
-		gotN := testRules.withhold(got, prompts, toolContent, gotU)
-		if wantN != gotN || !maps.Equal(wantU, gotU) || !proto.Equal(want.msg, got.msg) {
-			t.Fatalf("case %d (prompts %v, tool content %v): changed %d, want %d; unclassified %v, want %v\n got %v\nwant %v",
-				i, prompts, toolContent, gotN, wantN, gotU, wantU, got.msg, want.msg)
-		}
-		if logs, ok := msg.(*logspb.LogsData); ok {
-			if got, want := testRules.conversationStart(&part{msg: logs}), legacyConversationStart(&part{msg: logs}); got != want {
-				t.Fatalf("case %d: conversation start %v, want %v", i, got, want)
-			}
-			for _, rl := range logs.ResourceLogs {
-				for _, sl := range rl.ScopeLogs {
-					for _, lr := range sl.LogRecords {
-						res := rl.GetResource().GetAttributes()
-						if got, want := testRules.sessionOf(lr.Attributes, res), legacySessionOf(lr.Attributes, res); got != want {
-							t.Fatalf("case %d: session %q, want %q", i, got, want)
-						}
-					}
-				}
-			}
-		}
-	}
-}
-
-var keyPool = func() []string {
-	pool := slices.Concat(legacyPromptFields, legacyPromptDropFields, legacyResourcePromptFields, legacyToolContentFields,
-		legacySessionKeys, []string{"event.name", "tool_name", "gen_ai.usage.input_tokens", "x.new_note", "blob", "seq"})
-	return slices.Compact(slices.Sorted(slices.Values(pool)))
-}()
-
-func randomExport(rng *rand.Rand) proto.Message {
-	value := func() string {
-		return []string{"SECRET", "42", "[REDACTED]", "<REDACTED>", "", "0x1f"}[rng.Intn(6)]
-	}
-	attrs := func() []*commonpb.KeyValue {
-		var out []*commonpb.KeyValue
-		for range rng.Intn(6) {
-			key := keyPool[rng.Intn(len(keyPool))]
-			if key == "event.name" {
-				out = append(out, kv(key, randomEvent(rng)))
-				continue
-			}
-			if rng.Intn(8) == 0 {
-				out = append(out, &commonpb.KeyValue{Key: key, Value: &commonpb.AnyValue{Value: &commonpb.AnyValue_IntValue{IntValue: 7}}})
-				continue
-			}
-			out = append(out, kv(key, value()))
-		}
-		return out
-	}
-	resource := func() *resourcepb.Resource { return &resourcepb.Resource{Attributes: attrs()} }
-	switch rng.Intn(3) {
-	case 0:
-		var recs []*logspb.LogRecord
-		for range 1 + rng.Intn(3) {
-			lr := &logspb.LogRecord{Attributes: attrs()}
-			event := randomEvent(rng)
-			lr.Attributes = append(lr.Attributes, kv("event.name", event))
-			switch rng.Intn(5) {
-			case 0:
-				lr.Body = &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: event}}
-			case 1:
-				lr.Body = &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: "claude_code." + event}}
-			case 2:
-				lr.Body = &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: "SECRET"}}
-			case 3:
-				lr.Body = &commonpb.AnyValue{Value: &commonpb.AnyValue_IntValue{IntValue: 1}}
-			}
-			recs = append(recs, lr)
-		}
-		return &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{Resource: resource(),
-			ScopeLogs: []*logspb.ScopeLogs{{Scope: &commonpb.InstrumentationScope{Attributes: attrs()}, LogRecords: recs}}}}}
-	case 1:
-		sp := &tracepb.Span{Attributes: attrs(), Links: []*tracepb.Span_Link{{Attributes: attrs()}}}
-		if rng.Intn(2) == 0 {
-			sp.Status = &tracepb.Status{Message: "SECRET"}
-		}
-		for _, name := range []string{"tool.output", "tool.input", "exception", "note"}[:rng.Intn(5)] {
-			sp.Events = append(sp.Events, &tracepb.Span_Event{Name: name, Attributes: attrs()})
-		}
-		return &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{Resource: resource(),
-			ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{sp}}}}}}
-	default:
-		pt := &metricspb.NumberDataPoint{Attributes: attrs(), Exemplars: []*metricspb.Exemplar{{FilteredAttributes: attrs()}}}
-		return &metricspb.MetricsData{ResourceMetrics: []*metricspb.ResourceMetrics{{Resource: resource(),
-			ScopeMetrics: []*metricspb.ScopeMetrics{{Metrics: []*metricspb.Metric{
-				{Name: "m", Data: &metricspb.Metric_Sum{Sum: &metricspb.Sum{DataPoints: []*metricspb.NumberDataPoint{pt}}}},
-				{Name: "h", Data: &metricspb.Metric_Histogram{Histogram: &metricspb.Histogram{DataPoints: []*metricspb.HistogramDataPoint{{Attributes: attrs()}}}}},
-			}}}}}}
-	}
-}
-
-func randomEvent(rng *rand.Rand) string {
-	events := slices.Concat(legacyPromptBodyEvents, []string{"codex.conversation_starts", "user_prompt", "api_request", ""})
-	return events[rng.Intn(len(events))]
-}
-
 // The policy matrix: for every agent, in repository and global mode, under each
 // combination of the team's prompt and tool content policy, every field the agent
 // declares as content leaves only when the policy allows it. Values are sentinels, so
@@ -221,8 +140,7 @@ func TestPolicyMatrixPerAgent(t *testing.T) {
 						}
 						check("prompt field", rules.PromptFields, prompts)
 						check("prompt drop field", rules.PromptDropFields, prompts)
-						// A body is free text: it is kept only when no content is withheld.
-						check("prompt body event", rules.PromptBodyEvents, prompts && toolContent)
+						check("prompt body event", rules.PromptBodyEvents, prompts)
 						check("resource prompt field", rules.ResourcePromptFields, prompts)
 						check("tool content field", rules.ToolContentFields, toolContent)
 						check("tool content event", rules.ToolContentEvents, toolContent)
@@ -302,4 +220,44 @@ func deliverThroughRelay(t *testing.T, global bool, pol Policy, sessionKey strin
 		all.Write(req.body)
 	}
 	return all.String()
+}
+
+// With content withheld a log body passes only when it names its own event, whole or
+// after a declared prefix; a body ending in the event's name is still free text.
+func TestWithheldBodyOnlyNamesItsEvent(t *testing.T) {
+	for body, kept := range map[string]bool{
+		"api_request":             true,
+		"claude_code.api_request": true,
+		"PRIVATE.api_request":     false,
+		"api_request PRIVATE":     false,
+	} {
+		lr := &logspb.LogRecord{Attributes: []*commonpb.KeyValue{kv("event.name", "api_request")},
+			Body: &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: body}}}
+		testRules.withhold(&part{msg: &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{lr}}}}}}}, false, false, map[string]int{})
+		if got := lr.Body.GetStringValue() == body; got != kept {
+			t.Errorf("body %q kept %v, want %v", body, got, kept)
+		}
+	}
+}
+
+// Each record names its session by the first key in precedence order; a numeric thread
+// id is an OS thread and names none.
+func TestSessionKeyPrecedence(t *testing.T) {
+	for _, c := range []struct {
+		attrs []*commonpb.KeyValue
+		want  string
+	}{
+		{[]*commonpb.KeyValue{kv("thread.id", "T"), kv("conversation.id", "C"), kv("session.id", "S")}, "S"},
+		{[]*commonpb.KeyValue{kv("thread.id", "T"), kv("gen_ai.conversation.id", "G"), kv("conversation.id", "C")}, "C"},
+		{[]*commonpb.KeyValue{kv("thread_id", "U"), kv("thread.id", "T")}, "T"},
+		{[]*commonpb.KeyValue{kv("thread.id", "4242"), kv("thread_id", "U")}, "U"},
+		{[]*commonpb.KeyValue{kv("thread.id", "4242")}, ""},
+	} {
+		if got := testRules.sessionOf(c.attrs, nil); got != c.want {
+			t.Errorf("%v: session %q, want %q", c.attrs, got, c.want)
+		}
+	}
+	if got := testRules.sessionOf(nil, []*commonpb.KeyValue{kv("session.id", "R")}); got != "R" {
+		t.Errorf("resource session %q, want R", got)
+	}
 }
