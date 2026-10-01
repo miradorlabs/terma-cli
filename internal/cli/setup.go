@@ -11,11 +11,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/miradorlabs/terma-cli/internal/account/api"
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 	"github.com/miradorlabs/terma-cli/internal/ui/prompt"
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
@@ -133,13 +133,13 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 	if err := app.selectPolicyTeam(cmd, cfg); err != nil {
 		return err
 	}
-	pol, err := app.fetchPolicy(cmd.Context(), cfg)
+	pol, err := app.policies().Fetch(cmd.Context(), cfg)
 	if err != nil {
 		return err
 	}
 	previous := cfg.Policy
 	cfg.Policy = pol
-	if err := saveCollectionPolicy(cfg, &pol); err != nil {
+	if err := routing.StorePolicy(cfg, &pol); err != nil {
 		return err
 	}
 	// A relay's login and scope are fixed at startup; capture-only changes need no restart.
@@ -219,45 +219,6 @@ func (app *App) applyGlobalMode(ctx context.Context, agents []string, global boo
 		said("Git: global hooks path restored")
 	}
 	return nil
-}
-
-// fetchPolicy asks the developer's organization for its collection policy.
-func (app *App) fetchPolicy(ctx context.Context, cfg *config.Config) (config.Policy, error) {
-	var client *api.Client
-	var err error
-	// Only an explicit offline fixture skips the developer's login.
-	if config.PolicyStub() != "" {
-		client = api.NewAnonymous(cfg.AuthURL, app.version)
-	} else {
-		cred, err := auth.LoadCredential(cfg.ProfileName)
-		if err != nil {
-			return config.Policy{}, err
-		}
-		if cfg.OrganizationID == "" {
-			cfg.OrganizationID = cred.OrganizationID
-		}
-		if cfg.OrganizationID != cred.OrganizationID {
-			return config.Policy{}, errors.New("collection policy login belongs to another organization — run `terma setup`")
-		}
-		// Policy always uses the developer login, even while TERMA_API_KEY is set.
-		policyConfig := *cfg
-		policyConfig.APIKey = ""
-		client, err = api.New(&policyConfig, api.Options{Version: app.version, ProjectID: cfg.ProjectID, Credential: cred})
-		if err != nil {
-			return config.Policy{}, err
-		}
-	}
-	pol, err := client.CollectionPolicy(ctx)
-	if err != nil {
-		return config.Policy{}, fmt.Errorf("fetch the organization's collection policy: %w", err)
-	}
-	pol.OrganizationID, pol.AuthURL = cfg.OrganizationID, cfg.AuthURL
-	pol.TeamID = cmp.Or(cfg.ProjectID, pol.DefaultProjectID)
-	if pol.Global() && config.PolicyStub() == "" {
-		pol.DefaultProjectID = cfg.ProjectID
-	}
-
-	return pol, nil
 }
 
 // selectPolicyTeam picks the team whose policy is set up; it never creates a telemetry key.

@@ -711,7 +711,7 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   service relay (`--idle 0`) that finds a hook-started one waits and takes over. Tests set
   `TERMA_RELAY_SERVICE=0` (and a test binary never registers one). A hook that had to start the relay waits up to 1 s
   for it to listen. `TERMA_RELAY_DEBUG=1` logs every drop.
-- Heartbeat (`internal/relay/heartbeat.go`, `internal/cli/relay_heartbeat.go`): every 15 minutes
+- Heartbeat (`internal/relay/heartbeat.go`, `internal/relay/daemon/heartbeat.go`): every 15 minutes
   (`TERMA_RELAY_HEARTBEAT` for a test; the first a minute after start), for as long as the
   relay runs, one `terma.relay.heartbeat` OTLP log record — service.name `terma-relay`, **no
   project**: it is the organization's — posted as OTLP/JSON to the API gateway's

@@ -6,18 +6,12 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
 
-	"github.com/miradorlabs/terma-cli/internal/account/auth"
-	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/procinfo"
-	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
-	"github.com/miradorlabs/terma-cli/internal/relay/shape"
 )
 
 func (app *App) newRelayRunCommand() *cobra.Command {
@@ -33,16 +27,18 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			cfg, err := app.relayRunConfig()
+			cfg, err := app.loadConfig()
 			if err != nil {
 				return err
 			}
+			daemon.Prepare(cfg)
 			ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 			defer stop()
+			deps := app.relayDeps()
 			res, err := daemon.Run(ctx, daemon.Config{
 				Dir: dir, Addr: addr, Idle: idle,
-				Engine:  app.relayRunOptions(ctx, cmd, dir, cfg),
-				Workers: []func(context.Context){app.policyRefresher().Run},
+				Engine:  deps.Engine(ctx, dir, cfg, daemon.SettingsFromEnv(), cmd.ErrOrStderr()),
+				Workers: []func(context.Context){deps.Refresher().Run},
 				Listening: func(at net.Addr, hold time.Duration) {
 					if !quiet {
 						fmt.Fprintf(cmd.OutOrStdout(), "Relay listening on %s (hold %s, idle exit %s).\n", at, hold, idle)
@@ -68,42 +64,4 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 	cmd.Flags().StringVar(&addr, "addr", "", "listen here instead of the address `terma relay setup` recorded")
 	cmd.Flags().BoolVar(&quiet, "quiet", false, "print nothing")
 	return cmd
-}
-
-// relayRunConfig is the configuration a relay routes with; capture stays off until the
-// background poll's first successful policy fetch.
-func (app *App) relayRunConfig() (*config.Config, error) {
-	cfg, err := app.loadConfig()
-	if err != nil {
-		return nil, err
-	}
-	if cfg.OrganizationID == "" && config.PolicyStub() == "" {
-		if cred, err := auth.LoadCredential(cfg.ProfileName); err == nil && cred.CheckEnvironment(cfg.AuthURL) == nil {
-			cfg.OrganizationID = cred.OrganizationID
-		}
-	}
-	if !cfg.Policy.Validated() {
-		cfg.Policy = config.NoPolicy(cfg.OrganizationID, cfg.AuthURL)
-	}
-	return cfg, nil
-}
-
-// relayRunOptions wires the relay to this machine; TERMA_RELAY_HOLD and
-// TERMA_RELAY_HEARTBEAT shorten its timings for tests, TERMA_RELAY_DEBUG=1 logs drops.
-func (app *App) relayRunOptions(ctx context.Context, cmd *cobra.Command, dir string, cfg *config.Config) relay.Options {
-	hold := relay.DefaultHold
-	if v, err := time.ParseDuration(os.Getenv("TERMA_RELAY_HOLD")); err == nil && v > 0 {
-		hold = v
-	}
-	beat, _ := time.ParseDuration(os.Getenv("TERMA_RELAY_HEARTBEAT"))
-	minter := app.newRelayKeyMinter(ctx, cfg)
-	opts := relay.Options{Correlators: app.agents.With[shape.Correlator](), Capturers: app.agents.With[shape.Capturer](),
-		Hold: hold, Dir: filepath.Join(dir, relay.OutboxDir), Resolve: app.relayResolver(cfg, minter.Mint), Version: app.version,
-		CatchAll: relayCatchAll(), HeartbeatInfo: app.relayHeartbeat(dir).Info(), HeartbeatSend: app.relayHeartbeatSend, HeartbeatEvery: max(beat, 0),
-		PeerPID: procinfo.FindSender, ProcessAlive: procinfo.Alive, ClaimCacheTTL: time.Second, PolicyCacheTTL: time.Second}
-	if os.Getenv("TERMA_RELAY_DEBUG") == "1" {
-		errOut := cmd.ErrOrStderr()
-		opts.Logf = func(f string, a ...any) { fmt.Fprintf(errOut, time.Now().Format("15:04:05.000 ")+f+"\n", a...) }
-	}
-	return opts
 }

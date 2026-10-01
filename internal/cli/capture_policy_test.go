@@ -66,7 +66,7 @@ func TestPolicyRefreshFiltersAlreadyQueuedReplies(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg.ProjectID = "team"
-	if err := testApp.refreshCollectionPolicy(t.Context(), cfg); err != nil {
+	if err := testApp.policies().Refresh(t.Context(), cfg); err != nil {
 		t.Fatal(err)
 	}
 	s := spoolForTest(t)
@@ -80,7 +80,7 @@ func TestPolicyRefreshFiltersAlreadyQueuedReplies(t *testing.T) {
 		}
 	}
 	revision.Store(2)
-	if err := testApp.refreshCollectionPolicy(t.Context(), cfg); err != nil {
+	if err := testApp.policies().Refresh(t.Context(), cfg); err != nil {
 		t.Fatal(err)
 	}
 	res, err := testApp.flushSpool(t.Context(), true, 0)
@@ -111,7 +111,7 @@ func TestRelayRespectsSignalSelection(t *testing.T) {
 				t.Fatal(err)
 			}
 			cfg := &config.Config{Policy: config.DefaultPolicy(), OTLPURL: "http://127.0.0.1:1"}
-			r := newTestRelay(relay.Options{Token: "token", Dir: t.TempDir(), Resolve: testApp.relayResolver(cfg, nil), Lookup: func(string, time.Time) (claim.Claim, bool) {
+			r := newTestRelay(relay.Options{Token: "token", Dir: t.TempDir(), Resolve: testApp.relayDeps().Resolver(cfg, nil), Lookup: func(string, time.Time) (claim.Claim, bool) {
 				return claim.Claim{ProjectID: "team", Tool: "codex"}, true
 			}})
 			m := &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{{Name: "chat", Attributes: []*commonpb.KeyValue{{Key: "session.id", Value: &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: "session"}}}}}}}}}}}
@@ -161,7 +161,7 @@ func TestRelayRespectsHarnessSelection(t *testing.T) {
 				t.Fatal(err)
 			}
 			cfg := &config.Config{Policy: config.DefaultPolicy(), OTLPURL: host.URL}
-			r := newTestRelay(relay.Options{Token: "test-token", Dir: t.TempDir(), Resolve: testApp.relayResolver(cfg, nil), Lookup: func(string, time.Time) (claim.Claim, bool) {
+			r := newTestRelay(relay.Options{Token: "test-token", Dir: t.TempDir(), Resolve: testApp.relayDeps().Resolver(cfg, nil), Lookup: func(string, time.Time) (claim.Claim, bool) {
 				return claim.Claim{ProjectID: "team", Tool: test.tool}, true
 			}})
 			ctx, cancel := context.WithCancel(t.Context())
@@ -236,7 +236,7 @@ func TestQueuedRelayExportsRespectHarnessDeselection(t *testing.T) {
 	}
 	dir := t.TempDir()
 	cfg := &config.Config{Policy: config.DefaultPolicy(), OTLPURL: host.URL}
-	r := newTestRelay(relay.Options{Token: "test-token", Dir: dir, Resolve: testApp.relayResolver(cfg, nil), Lookup: func(string, time.Time) (claim.Claim, bool) {
+	r := newTestRelay(relay.Options{Token: "test-token", Dir: dir, Resolve: testApp.relayDeps().Resolver(cfg, nil), Lookup: func(string, time.Time) (claim.Claim, bool) {
 		return claim.Claim{ProjectID: "team", Tool: "codex"}, true
 	}})
 	ctx, cancel := context.WithCancel(t.Context())
@@ -358,15 +358,15 @@ func TestPolicyRefreshOutageRetainsValidatedPolicy(t *testing.T) {
 			p.Revision, p.IncludePrompts = 9, false
 			p.FetchedAt = time.Now().Add(-time.Hour)
 			cfg := &config.Config{ProfileName: config.DefaultProfile, OrganizationID: "org-test", AuthURL: srv.URL, APIURL: srv.URL, Policy: p}
-			if err := saveCollectionPolicy(cfg, &p); err != nil {
+			if err := routing.StorePolicy(cfg, &p); err != nil {
 				t.Fatal(err)
 			}
-			got, err := testApp.currentTeamPolicy(context.Background(), cfg, "team")
+			got, err := testApp.policies().Current(context.Background(), cfg, "team")
 			if err != nil || got.IncludePrompts || got.Revision != 9 {
 				t.Fatalf("outage widened capture: %+v %v", got, err)
 			}
 			cfg.Policy = config.DefaultPolicy()
-			if _, err := testApp.currentTeamPolicy(context.Background(), cfg, "unknown"); err == nil {
+			if _, err := testApp.policies().Current(context.Background(), cfg, "unknown"); err == nil {
 				t.Fatal("unfetched policy defaulted to capture during rejection")
 			}
 			if keystore.Get("team") != "" {
@@ -381,17 +381,17 @@ func TestPolicyCacheRejectsOlderRevisionAndOrganizationChanges(t *testing.T) {
 	cfg := &config.Config{ProfileName: config.DefaultProfile, ProjectID: "team", AuthURL: "https://auth-dev.terma.ai"}
 	p := config.DefaultPolicy()
 	p.AuthURL, p.TeamID, p.Revision, p.FetchedAt = cfg.AuthURL, "team", 9, time.Now()
-	if err := saveCollectionPolicy(cfg, &p); err != nil {
+	if err := routing.StorePolicy(cfg, &p); err != nil {
 		t.Fatal(err)
 	}
 	p.Revision = 8
-	if err := saveCollectionPolicy(cfg, &p); err == nil {
+	if err := routing.StorePolicy(cfg, &p); err == nil {
 		t.Fatal("accepted older revision")
 	}
 	if err := config.UpdateProfile(cfg.ProfileName, func(profile *config.Profile) { profile.SelectOrganization("other", "Other") }); err != nil {
 		t.Fatal(err)
 	}
-	if err := saveCollectionPolicy(cfg, &p); err == nil {
+	if err := routing.StorePolicy(cfg, &p); err == nil {
 		t.Fatal("saved stale organization response")
 	}
 	file, err := config.LoadFile()
@@ -423,7 +423,7 @@ func TestPolicyGlobalDestinationIsTheRequestedTeam(t *testing.T) {
 	defer srv.Close()
 	seedPolicyLogin(t, srv.URL)
 	cfg := &config.Config{ProfileName: config.DefaultProfile, OrganizationID: "org-test", AuthURL: srv.URL, APIURL: srv.URL, ProjectID: "chosen", Policy: config.Policy{DefaultProjectID: "other"}}
-	p, err := testApp.fetchPolicy(t.Context(), cfg)
+	p, err := testApp.policies().Fetch(t.Context(), cfg)
 	if err != nil || p.DefaultProjectID != "chosen" || p.TeamID != "chosen" {
 		t.Fatalf("policy=%+v error=%v", p, err)
 	}
@@ -445,11 +445,11 @@ func TestPolicyRefreshOtherTeamKeepsSelectedCoverage(t *testing.T) {
 	seedPolicyLogin(t, srv.URL)
 	selected := config.Policy{Mode: config.ModeGlobal, TeamID: "selected", OrganizationID: "org-test", AuthURL: srv.URL, DefaultProjectID: "selected", Revision: 9, FetchedAt: time.Now()}
 	cfg := &config.Config{ProfileName: config.DefaultProfile, OrganizationID: "org-test", AuthURL: srv.URL, ProjectID: "selected", Policy: selected}
-	if err := saveCollectionPolicy(cfg, &selected); err != nil {
+	if err := routing.StorePolicy(cfg, &selected); err != nil {
 		t.Fatal(err)
 	}
 	cfg.ProjectID = "other"
-	if err := testApp.refreshCollectionPolicy(t.Context(), cfg); err != nil {
+	if err := testApp.policies().Refresh(t.Context(), cfg); err != nil {
 		t.Fatal(err)
 	}
 	file, err := config.LoadFile()

@@ -18,7 +18,7 @@ import (
 // id is random and stable.
 func TestHeartbeatFactsNameNoOne(t *testing.T) {
 	dir := relaySandbox(t)
-	facts := testApp.relayHeartbeat(dir).Facts()
+	facts := testApp.relayDeps().Heartbeat(dir).Facts()
 	for _, k := range []string{"terma.version", "terma.os", "terma.arch", "terma.machine_id", "terma.install", "terma.mode", "terma.relay.service"} {
 		if _, ok := facts[k]; !ok {
 			t.Errorf("no %s in %v", k, facts)
@@ -33,7 +33,7 @@ func TestHeartbeatFactsNameNoOne(t *testing.T) {
 		}
 	}
 	id := facts["terma.machine_id"]
-	if id == "" || testApp.relayHeartbeat(dir).Facts()["terma.machine_id"] != id {
+	if id == "" || testApp.relayDeps().Heartbeat(dir).Facts()["terma.machine_id"] != id {
 		t.Fatalf("machine id %q is not stable", id)
 	}
 }

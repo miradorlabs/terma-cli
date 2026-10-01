@@ -77,3 +77,48 @@ func EffectivePolicy(fallback config.Policy, team string) config.Policy {
 	}
 	return config.NoPolicy("", "")
 }
+
+// StorePolicy records a freshly fetched policy: the team's cache, and the profile's
+// machine-wide coverage when it is the profile's team. It serializes with login changes
+// and refuses a policy fetched under an organization the profile has since left.
+func StorePolicy(cfg *config.Config, pol *config.Policy) error {
+	var rejected error
+	err := config.UpdateProfile(cfg.ProfileName, func(p *config.Profile) {
+		if p.OrganizationID == "" && cfg.OrganizationID != "" {
+			p.SelectOrganization(cfg.OrganizationID, "")
+		}
+		if p.OrganizationID != cfg.OrganizationID {
+			rejected = errors.New("organization changed while fetching collection policy")
+			return
+		}
+		if pol.TeamID != "" {
+			if err := SavePolicy(*pol); err != nil {
+				rejected = err
+				return
+			}
+		}
+		if p.Policy == nil || p.Policy.TeamID == pol.TeamID || cfg.Policy.TeamID == pol.TeamID {
+			p.Policy = pol
+		}
+	})
+	if err != nil {
+		return err
+	}
+	return rejected
+}
+
+// ValidatedPolicy is team's last validated policy for cfg's organization and
+// environment; a corrupt cache grants nothing.
+func ValidatedPolicy(cfg *config.Config, team string) (config.Policy, bool) {
+	cached, ok, err := LoadPolicy(team)
+	if err != nil {
+		return config.Policy{}, false
+	}
+	if ok && !cached.AppliesTo(cfg.OrganizationID, cfg.AuthURL) {
+		ok = false
+	}
+	if !ok && cfg.Policy.TeamID == team && cfg.Policy.AppliesTo(cfg.OrganizationID, cfg.AuthURL) && !cfg.Policy.FetchedAt.IsZero() {
+		cached, ok = cfg.Policy, true
+	}
+	return cached, ok
+}

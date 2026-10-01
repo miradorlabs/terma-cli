@@ -198,14 +198,14 @@ func (app *App) runInstall(cmd *cobra.Command, f installFlags) error {
 	cfg.ProjectID, cfg.ProjectName, cfg.OrganizationID = b.ID, b.Name, b.OrganizationID
 	var admitting *config.Policy
 	if !f.dryRun {
-		pol, err := app.fetchPolicy(ctx, cfg)
+		pol, err := app.policies().Fetch(ctx, cfg)
 		if err != nil {
 			return err
 		}
 		if err := install.Admit(pol, existing, b); err != nil {
 			return err
 		}
-		if err := saveCollectionPolicy(cfg, &pol); err != nil {
+		if err := routing.StorePolicy(cfg, &pol); err != nil {
 			return err
 		}
 		cfg.Policy, admitting = pol, &pol

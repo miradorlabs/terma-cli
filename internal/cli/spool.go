@@ -225,7 +225,7 @@ func (app *App) flushSpool(ctx context.Context, force bool, minInterval time.Dur
 			pol, checked := policies[id]
 			if !checked && policyErrors[id] == nil {
 				var err error
-				pol, err = app.currentTeamPolicy(ctx, cfg, id)
+				pol, err = app.policies().Current(ctx, cfg, id)
 				if err != nil {
 					policyErrors[id] = err
 				} else {

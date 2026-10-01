@@ -57,7 +57,9 @@ Unclaimed records never touch disk. The daemon (`relay/daemon`) is the process a
 the engine: its state directory, the run loop, `Spawn` and `Stop` for hooks, the Windows
 supervisor and the per-user service, the policy for a claim (`Resolver`), key minting,
 the heartbeat, and `PolicyRefresher`, which keeps each team's collection policy fresh
-while it runs. The relay never imports an agent. What it needs of one, it gets through
+while it runs. `daemon.Deps.Engine` assembles all of it; the command line hands it only
+what reaches the network or the registry (minting a key, sending a heartbeat, fetching a
+policy, the agents' declarations), so the daemon is tested with fakes. The relay never imports an agent. What it needs of one, it gets through
 `relay.Options`: how records name their session (`shape.Correlator`), where they carry
 content (`shape.Capturer`), and which keys are safe to pass.
 
@@ -111,6 +113,7 @@ wired, but `install` does not wire them by default.
 | Exporter kit | `internal/harness` (exporter configuration, journal, settings writes) |
 | Account | `internal/account/api`, `internal/account/auth`, `internal/account/keystore`, `internal/account/serverkey` |
 | Terminal | `internal/ui/style`, `internal/ui/output`, `internal/ui/prompt`, `internal/ui/spinner` |
+| Collection policy | `internal/policy` (fetched with the developer's login; `internal/routing` keeps the validated cache) |
 | State and plumbing | `internal/config`, `internal/project`, `internal/routing`, `internal/migrate`, `internal/selfupdate`, `internal/gitx`, `internal/flock`, `internal/procinfo`, `internal/shellrc` |
 | Guards (tests only) | `internal/boundary`, `internal/contract` |
 
@@ -127,6 +130,7 @@ wired, but `install` does not wire them by default.
   - The relay engine (the `internal/relay` package itself) imports no `internal/routing`: it
     takes a resolved `relay.Policy`, which the daemon builds (`daemon.CapturePolicy`).
   - `doctor` imports neither `account/api`, `spool` nor the relay daemon.
+  - The relay, daemon included, imports neither `account/api` nor `internal/policy`.
   - `install` imports nothing under `account` and not `spool`; `connect` neither, nor
     `install`, which never imports `connect` either.
   - `hookrun` and `hookmgr` never import each other.
