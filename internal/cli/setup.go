@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -231,6 +232,12 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 // moveRelay records addr as where the relay listens and stops one running elsewhere; the
 // relay step that follows points the agents there and starts it again.
 func moveRelay(addr string) error {
+	// The agents send to it and the relay takes telemetry from local senders only.
+	if host, _, err := net.SplitHostPort(addr); err != nil {
+		return fmt.Errorf("--relay-addr %q: want host:port (%w)", addr, err)
+	} else if ip := net.ParseIP(host); host != "localhost" && (ip == nil || !ip.IsLoopback()) {
+		return fmt.Errorf("--relay-addr %q: the relay listens on a loopback address, such as 127.0.0.1:4319", addr)
+	}
 	dir, err := daemon.Dir()
 	if err != nil {
 		return err

@@ -26,8 +26,9 @@ stamp a trailer?), the event spool, and the backend round-trip.
 Every failure names the command that fixes it, and the report ends with the
 remaining steps to complete setup.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			printContext(cmd.OutOrStdout(), doctor.Context(app.doctorEnv(cmd.Context(), skipCommit)))
-			if app.executeDoctor(cmd, skipCommit).Failed() {
+			env := app.doctorEnv(cmd.Context(), skipCommit)
+			printContext(cmd.OutOrStdout(), doctor.Context(env))
+			if app.executeDoctor(cmd, env).Failed() {
 				return errors.New("some checks failed")
 			}
 			return nil
@@ -55,7 +56,7 @@ func printContext(w io.Writer, rows []doctor.Row) {
 
 // executeDoctor is shared by `terma doctor` and install's verification; the caller decides
 // what a failure means.
-func (app *App) executeDoctor(cmd *cobra.Command, skipCommit bool) doctor.Report {
+func (app *App) executeDoctor(cmd *cobra.Command, env doctor.Env) doctor.Report {
 	out := cmd.OutOrStdout()
 	if notice := captureNotice(); notice != "" {
 		fmt.Fprintln(style.Highlight(out), notice)
@@ -63,7 +64,7 @@ func (app *App) executeDoctor(cmd *cobra.Command, skipCommit bool) doctor.Report
 	// Streamed: the round-trip wait is long enough that a report printed at the end looks
 	// like a hang.
 	sp := spinner.New(cmd.ErrOrStderr())
-	report := app.runDoctor(cmd.Context(), skipCommit, doctor.Progress{
+	report := doctor.Run(cmd.Context(), env, doctor.Progress{
 		Start: func(name string) { sp.Start(name + "…") },
 		Note:  sp.Update,
 		Done: func(c doctor.Check) {

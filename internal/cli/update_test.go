@@ -172,3 +172,18 @@ func TestUpdateOnTheLatestReleaseRefreshes(t *testing.T) {
 		t.Errorf("--check refreshed:\n%s", &out)
 	}
 }
+
+// A failed check refreshes nothing: the error is the whole answer.
+func TestUpdateThatCannotCheckRefreshesNothing(t *testing.T) {
+	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	srv := httptest.NewServer(http.NotFoundHandler())
+	defer srv.Close()
+	c := &selfupdate.Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0"}
+	var out bytes.Buffer
+	if err := testApp.updateOrRefresh(context.Background(), c, t.TempDir(), "unused", &out, false, false); err == nil {
+		t.Fatalf("update without a release should fail:\n%s", &out)
+	}
+	if strings.Contains(out.String(), "efresh") {
+		t.Errorf("a failed update refreshed:\n%s", &out)
+	}
+}

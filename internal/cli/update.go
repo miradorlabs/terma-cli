@@ -111,20 +111,19 @@ const (
 	refreshTimeout  = time.Minute
 )
 
-// updateOrRefresh is `terma update`: when no newer version is installed, this version's
+// updateOrRefresh is `terma update`: when there is nothing newer to install, this version's
 // refresh is the update, so running it again always brings what terma installed up to date.
+// A failed check or install refreshes nothing: its error is the whole answer.
 func (app *App) updateOrRefresh(ctx context.Context, client *selfupdate.Client, dir, exe string, out io.Writer, check, force bool) error {
-	installed, err := app.runUpdate(ctx, client, dir, exe, out, check, force)
-	if installed || check {
+	installing, err := app.runUpdate(ctx, client, dir, exe, out, check, force)
+	if installing || check || err != nil {
 		return err
 	}
-	if refreshErr := app.runRefresh(ctx, out); err == nil {
-		err = refreshErr
-	}
-	return err
+	return app.runRefresh(ctx, out)
 }
 
-// runUpdate reports whether it installed a new version (whose own refresh then ran).
+// runUpdate reports whether it went on to install a newer version, whose own refresh then
+// runs; false with no error means there was nothing newer to install.
 func (app *App) runUpdate(ctx context.Context, client *selfupdate.Client, dir, exe string, out io.Writer, check, force bool) (bool, error) {
 	current := client.Version
 	download, cancel := context.WithTimeout(ctx, downloadTimeout)
