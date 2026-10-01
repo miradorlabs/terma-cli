@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # PostToolUse orchestrator: run the Go edit-time checks in the one order they depend
-# on — go fix, then format, then lint.
+# on — go fix, then format, then lint, then the boundary tests.
 #
 # Claude Code runs every command hook in a matcher array CONCURRENTLY, not in array
 # order (https://code.claude.com/docs/en/hooks). Registering go-fix/format/lint as
@@ -11,8 +11,8 @@
 #
 # The hook payload arrives once on stdin, and each script reads all of it, so it is
 # captured here and replayed to each. go-fix and format-go are best-effort (they exit
-# 0); lint-go's exit status is meaningful and, as the last command, becomes this
-# script's — so a lint failure still surfaces to Claude.
+# 0); lint-go and boundary-go exit 2 with findings for Claude, and the worse of the two
+# is this script's.
 
 set -u
 
@@ -22,3 +22,7 @@ input="$(cat)"
 printf '%s' "$input" | "$dir/go-fix.sh"
 printf '%s' "$input" | "$dir/format-go.sh"
 printf '%s' "$input" | "$dir/lint-go.sh"
+lint=$?
+printf '%s' "$input" | "$dir/boundary-go.sh"
+boundary=$?
+exit $(( lint > boundary ? lint : boundary ))
