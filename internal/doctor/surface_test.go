@@ -1,29 +1,24 @@
 package doctor
 
-import (
-	"testing"
-
-	"github.com/miradorlabs/terma-cli/internal/account/keystore"
-)
-
-const testKey = "ter_srv_minted0123456789abcdefghijklmnopqrstuv"
+import "testing"
 
 // Either key serves a surface: the agent's own, or the project's.
 func TestASurfaceIsKeyedByItsAgentsKeyOrTheProjects(t *testing.T) {
-	for _, store := range []func() error{
-		func() error { return keystore.SetFor("agent-a", "p1", testKey, keystore.Hosts{}) },
-		func() error { return keystore.Set("p1", testKey, keystore.Hosts{}) },
+	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	for _, stored := range []map[[2]string]string{
+		{{"agent-a", "p1"}: "ter_srv_…"},
+		{{"", "p1"}: "ter_srv_…"},
 	} {
-		t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
-		in := SurfaceInput(t.TempDir(), "p1")
-		if in.Keyed("agent-a") {
-			t.Fatal("keyed with no key stored")
-		}
-		if err := store(); err != nil {
-			t.Fatal(err)
-		}
+		keys := Keys(func(agent, project string) string { return stored[[2]string{agent, project}] })
+		in := SurfaceInput(keys, t.TempDir(), "p1")
 		if !in.Keyed("agent-a") {
-			t.Fatal("a stored key did not serve")
+			t.Fatalf("a stored key did not serve: %v", stored)
 		}
+		if other := SurfaceInput(keys, t.TempDir(), "p2"); other.Keyed("agent-a") {
+			t.Fatal("another project's key served")
+		}
+	}
+	if SurfaceInput(nil, t.TempDir(), "p1").Keyed("agent-a") {
+		t.Fatal("keyed with no keystore at all")
 	}
 }

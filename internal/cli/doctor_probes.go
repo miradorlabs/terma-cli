@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
@@ -38,7 +39,7 @@ func (app *App) doctorProbes(cfg *config.Config) doctor.Probes {
 				return doctor.SpoolState{}
 			}
 			n, _, _ := s.Pending()
-			return doctor.SpoolState{Open: true, Queued: n, WriteErr: s.Writable()}
+			return doctor.SpoolState{Open: true, Queued: n, WriteErr: s.Writable(), NextAttempt: s.NextAttempt(), Windows: s.RetryWindows(time.Now())}
 		},
 		Deliver: func(ctx context.Context) (doctor.Delivery, error) {
 			res, err := app.flushSpool(ctx, true, 0)
@@ -57,6 +58,15 @@ func (app *App) doctorProbes(cfg *config.Config) doctor.Probes {
 		Relay:          relayFacts,
 		Endpoint:       func(projectID string) string { return app.delivery().Endpoint(cfg, projectID) },
 		CommitRecorded: app.commitRecorded(cfg),
+		Credential: func() (doctor.Credential, error) {
+			cred, err := auth.LoadCredential(cfg.ProfileName)
+			if err != nil {
+				return doctor.Credential{}, err
+			}
+			return doctor.Credential{Email: cred.UserEmail, OrganizationID: cred.OrganizationID,
+				OtherEnvironment: cred.CheckEnvironment(cfg.AuthURL) != nil}, nil
+		},
+		Keys: storedKeys,
 	}
 }
 
@@ -81,11 +91,6 @@ func (app *App) commitRecorded(cfg *config.Config) func(ctx context.Context, pro
 	}
 }
 
-func (app *App) binaryCheck() doctor.Check {
-	exe, _ := os.Executable()
-	return doctor.BinaryCheck(exe, app.binDirs())
-}
-
 // relayFacts are the local relay's state for doctor and status.
 func relayFacts() doctor.Relay {
 	dir, err := claim.Dir()
@@ -95,4 +100,16 @@ func relayFacts() doctor.Relay {
 	r := doctor.Relay{Dir: dir, Addr: daemon.Addr(dir), Running: daemon.Running(dir)}
 	r.Squatted = !r.Running && daemon.Squatted(r.Addr)
 	return r
+}
+
+// storedKeys are the delivery keys in this machine's keystore, masked.
+func storedKeys(agent, projectID string) string {
+	key := keystore.Get(projectID)
+	if agent != "" {
+		key = keystore.GetFor(agent, projectID)
+	}
+	if key == "" {
+		return ""
+	}
+	return keystore.Mask(key)
 }

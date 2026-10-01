@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
@@ -213,7 +212,7 @@ func HarnessCheck(reg *agents.Registry, verdicts []HarnessVerdict, otlpURL, proj
 
 // RelayCheck is doctor's "agent exporting to Terma" through the local relay: its address
 // is free, the developer's agents send to it, and this repository is bound and keyed.
-func RelayCheck(reg *agents.Registry, relay Relay, projectID string, selected []string) Check {
+func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID string, selected []string) Check {
 	if relay.Err != nil {
 		return Check{Status: Fail, Detail: relay.Err.Error()}
 	}
@@ -251,7 +250,7 @@ func RelayCheck(reg *agents.Registry, relay Relay, projectID string, selected []
 	switch {
 	case projectID == "":
 		return Check{Status: Warn, Detail: "local relay on " + addr + " (" + state + "); this repository is not bound, so its sessions are never forwarded", Fix: "terma install"}
-	case keystore.Get(projectID) == "" && !slices.ContainsFunc(reg.With[agents.RelayExporter](), func(e agents.RelayExporter) bool { return keystore.GetFor(e.Name(), projectID) != "" }):
+	case !keys.has("", projectID) && !slices.ContainsFunc(reg.With[agents.RelayExporter](), func(e agents.RelayExporter) bool { return keys.has(e.Name(), projectID) }):
 		return Check{Status: Warn, Detail: "local relay on " + addr + " (" + state + "); no key for this project on this machine, so its sessions are dropped", Fix: "terma install"}
 	}
 	return Check{Status: Pass, Detail: "through the local relay on " + addr + " (" + state + "); only this repository's sessions are forwarded"}

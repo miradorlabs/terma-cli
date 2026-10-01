@@ -234,14 +234,6 @@ func statusRow(name string, e telemetryStatus) []string {
 	return []string{name, e.Installed, e.State, e.Signals, e.Prompts, e.ToolContent}
 }
 
-func describeShipment(st harness.Status) string {
-	signals := "nothing"
-	if len(st.Signals) > 0 {
-		signals = connect.JoinSignals(st.Signals)
-	}
-	return fmt.Sprintf("%s; prompts %s; tool content %s", signals, connect.OnOff(st.IncludePrompts), connect.OnOff(st.IncludeToolContent))
-}
-
 // writeRepoPolicy skips a conflict rather than failing: the hooks and binding are already
 // written, and failing would leave the repository half-onboarded.
 func writeRepoPolicy(

@@ -3,13 +3,12 @@ package doctor
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/account/auth"
-	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
@@ -42,6 +41,26 @@ type Probes struct {
 	Relay func() Relay
 	// CommitRecorded reports whether projectID's data API holds sha's terma.commit event.
 	CommitRecorded func(ctx context.Context, projectID, sha string, from, to time.Time) (bool, error)
+	// Credential is the signed-in developer, or why there is none.
+	Credential func() (Credential, error)
+	// Keys are the delivery keys stored on this machine.
+	Keys Keys
+}
+
+// Credential is the signed-in developer as doctor needs them.
+type Credential struct {
+	Email, OrganizationID string
+	// OtherEnvironment is a credential signed in against another environment.
+	OtherEnvironment bool
+}
+
+// Keys reports, masked, the delivery key stored for agent ("" for the project's own) in
+// projectID; "" when there is none.
+type Keys func(agent, projectID string) string
+
+// has reports whether agent's key, or else the project's, is stored.
+func (k Keys) has(agent, projectID string) bool {
+	return k != nil && (agent != "" && k(agent, projectID) != "" || k("", projectID) != "")
 }
 
 // Relay is the local relay as a run finds it: its state directory and address, whether
@@ -57,6 +76,9 @@ type SpoolState struct {
 	Open     bool
 	Queued   int
 	WriteErr error
+	// NextAttempt ends the spool-wide retry window; Windows are each project's.
+	NextAttempt time.Time
+	Windows     map[string]time.Time
 }
 
 // Delivery is what one flush of the queue did.
@@ -189,14 +211,18 @@ func (d *run) signedIn() Check {
 	if cfg.APIKey != "" {
 		return Check{Status: Pass, Detail: "using TERMA_API_KEY"}
 	}
-	cred, err := auth.LoadCredential(cfg.ProfileName)
+	var cred Credential
+	err := errors.New("no credential probe")
+	if d.env.Probes.Credential != nil {
+		cred, err = d.env.Probes.Credential()
+	}
 	if err != nil {
 		return Check{Status: Fail, Detail: "no credential for this environment", Fix: "terma setup"}
 	}
-	if err := cred.CheckEnvironment(cfg.AuthURL); err != nil {
+	if cred.OtherEnvironment {
 		return Check{Status: Fail, Detail: "signed in against a different environment", Fix: "terma setup"}
 	}
-	who := cmp.Or(cred.UserEmail, "your account")
+	who := cmp.Or(cred.Email, "your account")
 	env := ""
 	if cfg.Environment != config.EnvProd {
 		env = " [" + cfg.Environment + "]"
@@ -249,9 +275,9 @@ func (d *run) agentHooks() Check {
 
 func (d *run) agentsExporting() Check {
 	if claim.Enabled() {
-		return RelayCheck(d.env.Agents, d.env.Probes.Relay(), d.projectID, d.cfg.Harnesses)
+		return RelayCheck(d.env.Agents, d.env.Probes.Relay(), d.env.Probes.Keys, d.projectID, d.cfg.Harnesses)
 	}
-	verdicts := JudgeSelectedHarnesses(d.ctx, d.env.Agents, d.cfg.OTLPURL, d.projectID, d.env.Root, d.cfg.Harnesses)
+	verdicts := JudgeSelectedHarnesses(d.ctx, d.env.Agents, d.env.Probes.Keys, d.cfg.OTLPURL, d.projectID, d.env.Root, d.cfg.Harnesses)
 	return HarnessCheck(d.env.Agents, verdicts, d.cfg.OTLPURL, d.projectID, d.installed())
 }
 
@@ -288,7 +314,7 @@ func (d *run) eventSpool() Check {
 	if s.WriteErr != nil {
 		return Check{Status: Fail, Detail: "events cannot be written to the spool: " + s.WriteErr.Error(), Fix: "check permissions and free space on the config directory"}
 	}
-	if d.projectID != "" && keystore.Get(d.projectID) == "" {
+	if d.projectID != "" && !d.env.Probes.Keys.has("", d.projectID) {
 		name := d.cfg.ProjectName
 		if d.bound != nil {
 			name = d.bound.Project.Name
@@ -306,7 +332,7 @@ func BackendCheck(ctx context.Context, p Probes, projectID, scratchSHA string, b
 			Detail: "resolve the missing or conflicting Terma executables before verifying hook delivery",
 			Fix:    binary.Fix}
 	}
-	if projectID != "" && keystore.Get(projectID) == "" {
+	if projectID != "" && !p.Keys.has("", projectID) {
 		return Check{Status: Skip, Detail: "no project key on this machine; nothing can be delivered", Fix: "terma install"}
 	}
 	res, err := p.Deliver(ctx)

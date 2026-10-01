@@ -64,7 +64,7 @@ func TestDoctorChecksClaudeEmissionSettings(t *testing.T) {
 			if !tc.wantFailure && check.Status != doctor.Pass {
 				t.Fatalf("working export did not pass: %+v", check)
 			}
-			status, ok := statusAgent(v, true)
+			status, ok := doctor.AgentSummary(v, true)
 			if ok == tc.wantFailure {
 				t.Fatalf("status disagrees with doctor: %s", status)
 			}

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 
@@ -270,12 +269,12 @@ func JudgeHarnesses(ctx context.Context, reg *agents.Registry, otlpURL, projectI
 
 // JudgeSelectedHarnesses judges a selected surface by its own check, so a desktop-only
 // choice is never reported as a missing CLI.
-func JudgeSelectedHarnesses(ctx context.Context, reg *agents.Registry, otlpURL, projectID, root string, saved []string) []HarnessVerdict {
+func JudgeSelectedHarnesses(ctx context.Context, reg *agents.Registry, keys Keys, otlpURL, projectID, root string, saved []string) []HarnessVerdict {
 	selected := SelectedForRepo(reg, projectID, saved)
 	verdicts := JudgeHarnesses(ctx, reg, otlpURL, projectID, root)
 	var checked []HarnessVerdict
 	for _, name := range selected {
-		if v, ok := JudgeSurface(reg, name, root, projectID); ok {
+		if v, ok := JudgeSurface(reg, keys, name, root, projectID); ok {
 			checked = append(checked, v)
 		}
 	}
@@ -312,17 +311,15 @@ func SelectedForRepo(reg *agents.Registry, projectID string, saved []string) []s
 
 // SurfaceInput is what a surface's own check reads: the project's routing record and
 // whether a delivery key is stored, the agent's own or the project's.
-func SurfaceInput(root, projectID string) agents.SurfaceInput {
-	in := agents.SurfaceInput{Root: root, ProjectID: projectID, Keyed: func(agent string) bool {
-		return keystore.GetFor(agent, projectID) != "" || keystore.Get(projectID) != ""
-	}}
+func SurfaceInput(keys Keys, root, projectID string) agents.SurfaceInput {
+	in := agents.SurfaceInput{Root: root, ProjectID: projectID, Keyed: func(agent string) bool { return keys.has(agent, projectID) }}
 	in.Route, in.Recorded, in.RouteErr = routing.LoadRecord(projectID)
 	return in
 }
 
 // JudgeSurface is the verdict of a surface with a check of its own.
-func JudgeSurface(reg *agents.Registry, surface, root, projectID string) (HarnessVerdict, bool) {
-	st, ok, err := reg.CheckSurface(surface, SurfaceInput(root, projectID))
+func JudgeSurface(reg *agents.Registry, keys Keys, surface, root, projectID string) (HarnessVerdict, bool) {
+	st, ok, err := reg.CheckSurface(surface, SurfaceInput(keys, root, projectID))
 	if !ok {
 		return HarnessVerdict{}, false
 	}

@@ -75,7 +75,7 @@ func TestHookWiringVerdictInBothCommands(t *testing.T) {
 			if want := cmp.Or(tc.doctorFix, "terma install"); check.Status == doctor.Fail && check.Fix != want {
 				t.Errorf("a failed wiring check should name the fix %q, got %q", want, check.Fix)
 			}
-			state, wired := statusHooks(tc.w)
+			state, wired := doctor.HooksSummary(tc.w)
 			if state != tc.statusState || wired != tc.statusWired {
 				t.Errorf("status = %q, %v; want %q, %v", state, wired, tc.statusState, tc.statusWired)
 			}
@@ -145,7 +145,7 @@ func TestStatusLineVerdictInBothCommands(t *testing.T) {
 			if check.Status != tc.doctorStatus || check.Detail != tc.doctorDetail {
 				t.Errorf("doctor = %v %q; want %v %q", check.Status, check.Detail, tc.doctorStatus, tc.doctorDetail)
 			}
-			if got := statusLineSummary(v); got != tc.status {
+			if got := doctor.StatusLineSummary(v); got != tc.status {
 				t.Errorf("status = %q; want %q", got, tc.status)
 			}
 			// Capturing is the only state doctor passes and status does not flag.
@@ -249,7 +249,7 @@ func TestHarnessVerdictInBothCommands(t *testing.T) {
 			if check.Status != tc.doctorStatus || check.Detail != tc.doctorDetail {
 				t.Errorf("doctor = %v %q\n         want %v %q", check.Status, check.Detail, tc.doctorStatus, tc.doctorDetail)
 			}
-			got, ok := statusAgent(v, tc.bound)
+			got, ok := doctor.AgentSummary(v, tc.bound)
 			if got != tc.status || ok != tc.statusOK {
 				t.Errorf("status = %q, %v\n         want %q, %v", got, ok, tc.status, tc.statusOK)
 			}

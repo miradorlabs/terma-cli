@@ -110,7 +110,7 @@ var bans = []struct {
 	{"internal/relay$", []string{"internal/routing"}, "the engine takes a resolved policy; the daemon resolves it"},
 	{"internal/relay", []string{"internal/account/api", "internal/policy"}, "the relay reaches the network only through what the command line injects"},
 	{"internal/policy", []string{"internal/cli", "internal/agents", "internal/relay", "internal/hooks"}, "the collection policy is fetched and kept for whoever asks, knowing none of them"},
-	{"internal/doctor", []string{"internal/account/api", "internal/spool", "internal/relay/daemon"}, "doctor reaches the network, the spool and the relay only through its probes"},
+	{"internal/doctor", []string{"internal/account", "internal/spool", "internal/relay/daemon"}, "doctor reaches credentials, keys, the network, the spool and the relay only through its probes"},
 	{"internal/install", []string{"internal/account", "internal/spool", "internal/connect", "internal/refresh", "internal/doctor"}, "install signs in and reaches the network only through its steps"},
 	{"internal/delivery", []string{"internal/cli", "internal/agents", "internal/relay", "internal/install", "internal/connect", "internal/doctor", "internal/account/auth"}, "delivery sends what the spool holds with each project's key, asking the agents only through its router"},
 	{"internal/setup", []string{"internal/account", "internal/spool", "internal/cli", "internal/relay", "internal/install", "internal/connect"}, "setup signs in, prompts and reaches the relay only through its steps"},

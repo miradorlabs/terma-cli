@@ -35,7 +35,7 @@ func (app *App) statusAgentSurface(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	st, ok, err := app.agents.CheckSurface(args[0], doctor.SurfaceInput(root, binding.Project.ID))
+	st, ok, err := app.agents.CheckSurface(args[0], doctor.SurfaceInput(storedKeys, root, binding.Project.ID))
 	if err != nil {
 		return err
 	}
