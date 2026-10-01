@@ -183,17 +183,17 @@ func TestProjectAPIFromTheRoutingRecord(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if got := testApp.projectAPI(cfg, "dev-project"); got != dev.APIURL {
+	if got := testApp.delivery().API(cfg, "dev-project"); got != dev.APIURL {
 		t.Fatalf("projectAPI(dev) = %q, want %q", got, dev.APIURL)
 	}
-	if got := testApp.projectAPI(cfg, "prod-project"); got != cfg.APIURL {
+	if got := testApp.delivery().API(cfg, "prod-project"); got != cfg.APIURL {
 		t.Fatalf("projectAPI(prod) = %q, want the profile's own %q", got, cfg.APIURL)
 	}
-	if got := testApp.projectAPI(cfg, "unknown-project"); got != cfg.APIURL {
+	if got := testApp.delivery().API(cfg, "unknown-project"); got != cfg.APIURL {
 		t.Fatalf("projectAPI(unknown) = %q", got)
 	}
 	t.Setenv("TERMA_API_URL", "https://api.override.example")
-	if got := testApp.projectAPI(cfg, "dev-project"); got != cfg.APIURL {
+	if got := testApp.delivery().API(cfg, "dev-project"); got != cfg.APIURL {
 		t.Fatalf("an explicit TERMA_API_URL must win, got %q", got)
 	}
 }

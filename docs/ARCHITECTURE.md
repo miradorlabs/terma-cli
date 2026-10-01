@@ -105,7 +105,7 @@ wired, but `install` does not wire them by default.
 |---|---|
 | Entry point | `cmd/terma` |
 | Command line | `internal/cli` |
-| Workflows | `internal/install`, `internal/doctor`, `internal/connect`, `internal/globalmode`, `internal/refresh` |
+| Workflows | `internal/install`, `internal/doctor`, `internal/connect`, `internal/globalmode`, `internal/refresh`, `internal/delivery` |
 | Agents | `internal/agents` (contract, registry), `internal/agents/builtin`, `internal/agents/<name>`, `internal/agents/internal/*` (shared by a few agents), `internal/agents/agentstest` (a made-up agent for workflow tests) |
 | Hook runtime | `internal/hooks/dispatch`, `internal/hooks/hookrun`, `internal/hooks/hookmgr`, `internal/hooks/hookruntest` |
 | Relay | `internal/relay` (engine), `internal/relay/daemon`, `internal/relay/claim`, `internal/relay/shape`, `internal/relay/service` |

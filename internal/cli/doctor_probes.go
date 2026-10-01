@@ -55,7 +55,7 @@ func (app *App) doctorProbes(cfg *config.Config) doctor.Probes {
 			return d, nil
 		},
 		Relay:          relayFacts,
-		Endpoint:       func(projectID string) string { return app.projectEndpoint(cfg, projectID) },
+		Endpoint:       func(projectID string) string { return app.delivery().Endpoint(cfg, projectID) },
 		CommitRecorded: app.commitRecorded(cfg),
 	}
 }
@@ -67,7 +67,7 @@ func (app *App) commitRecorded(cfg *config.Config) func(ctx context.Context, pro
 		// Query the project the scratch event used, independently of command overrides.
 		queryConfig := *cfg
 		queryConfig.ProjectID = projectID
-		if api := app.projectAPI(cfg, projectID); api != cfg.APIURL {
+		if api := app.delivery().API(cfg, projectID); api != cfg.APIURL {
 			if key := keystore.Get(projectID); key != "" {
 				queryConfig.APIURL, queryConfig.APIKey = api, key
 			}

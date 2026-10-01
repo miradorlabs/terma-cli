@@ -403,10 +403,10 @@ func TestPolicyCacheRejectsOlderRevisionAndOrganizationChanges(t *testing.T) {
 func TestQueuedGlobalHookEventsAreWithheldAfterCoverageChange(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	e := spool.Event{Name: "terma.session.start", Global: true}
-	if !testApp.spoolEventAllowed(config.Policy{Mode: config.ModeGlobal}, "global-project", e) {
+	if !testApp.delivery().Allowed(config.Policy{Mode: config.ModeGlobal}, "global-project", e) {
 		t.Fatal("global metadata withheld in global mode")
 	}
-	if testApp.spoolEventAllowed(config.DefaultPolicy(), "global-project", e) {
+	if testApp.delivery().Allowed(config.DefaultPolicy(), "global-project", e) {
 		t.Fatal("queued global event escaped after switch to repository mode")
 	}
 }

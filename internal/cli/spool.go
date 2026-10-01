@@ -11,12 +11,11 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
-	"github.com/miradorlabs/terma-cli/internal/routing"
+	"github.com/miradorlabs/terma-cli/internal/delivery"
 
 	"github.com/spf13/cobra"
 
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
-	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -88,7 +87,7 @@ The exit status distinguishes the outcomes a script needs apart:
 
 // describeFlush words a flush pass: what was delivered, then one clause per reason an
 // event was not; `terma spool flush` and doctor share it so they agree on the terms.
-func describeFlush(res flushResult) (delivered string, undelivered []string) {
+func describeFlush(res delivery.Result) (delivered string, undelivered []string) {
 	delivered = fmt.Sprintf("%d event%s", res.Sent, plural(res.Sent))
 	if res.Held > 0 {
 		undelivered = append(undelivered, fmt.Sprintf("holding %d for a project key (run `terma install` in their repositories)", res.Held))
@@ -147,7 +146,7 @@ func newSpoolStatusCommand() *cobra.Command {
 			keys := keystore.Projects()
 			slices.Sort(keys)
 			fmt.Fprintf(out, "Project keys:    %d\n", len(keys))
-			unroutable, held := queuedByRouting(s, n)
+			unroutable, held := delivery.Queued(s, n)
 			if unroutable > 0 {
 				fmt.Fprintf(out, "Unroutable:      %d event%s with no project id — they cannot be delivered (they leave the queue at the next flush)\n", unroutable, plural(unroutable))
 			}
@@ -164,232 +163,40 @@ func newSpoolStatusCommand() *cobra.Command {
 	}
 }
 
-// flushResult summarizes one delivery pass; its counters are disjoint, one per reason.
-type flushResult struct {
-	Sent, Held, Failed, Expired, Pruned, Dropped, Unroutable, Withheld int
-	Skipped                                                            bool
-	Reason                                                             spool.SkipReason
-	NextAttempt                                                        time.Time
-	Err                                                                error
-	// Failures names each failed project once, in order; doctor tells its own from another's.
-	Failures []projectFailure
-	// Waiting names each project skipped because its retry window was open.
-	Waiting   []projectWait
-	Endpoints []string
-}
-
-// projectFailure is a project's failed delivery; RetryAt is zero when the pass ran out of time.
-type projectFailure struct {
-	ProjectID, Endpoint string
-	Err                 error
-	RetryAt             time.Time
-}
-
-type projectWait struct {
-	ProjectID string
-	RetryAt   time.Time
-}
-
-// Lost reports whether the pass discarded events rather than delivering or holding them.
-func (r flushResult) Lost() bool {
-	return r.Expired > 0 || r.Pruned > 0 || r.Dropped > 0 || r.Unroutable > 0
-}
-
-// flushSpool delivers everything queued, each project with its own key to its own host.
-// A keyless or policy-less project's events are held; a failing one backs off alone.
-func (app *App) flushSpool(ctx context.Context, force bool, minInterval time.Duration) (flushResult, error) {
-	s := openSpool()
-	if s == nil {
-		return flushResult{}, errors.New("cannot open the spool directory")
-	}
-	cfg, err := app.loadConfig()
-	if err != nil {
-		return flushResult{}, err
-	}
-	var res flushResult
-	now := time.Now()
-	failed := map[string]bool{}
-	waiting := map[string]bool{}
-	accepted := map[string]bool{}
-	router := spool.SenderFunc(func(ctx context.Context, events []spool.Event) ([]spool.Event, error) {
-		byProject := map[string][]spool.Event{}
-		var held []spool.Event
-		policies := map[string]config.Policy{}
-		policyErrors := map[string]error{}
-		for _, e := range events {
-			id, _ := e.Attrs[hookrun.AttrProjectID].(string)
-			if id == "" {
-				res.Unroutable++
-				continue
-			}
-			pol, checked := policies[id]
-			if !checked && policyErrors[id] == nil {
-				var err error
-				pol, err = app.policies().Current(ctx, cfg, id)
-				if err != nil {
-					policyErrors[id] = err
-				} else {
-					policies[id] = pol
-				}
-			}
-			if policyErrors[id] != nil {
-				held = append(held, e)
-				continue
-			}
-			if !app.spoolEventAllowed(pol, id, e) {
-				res.Withheld++
-				continue
-			}
-			byProject[id] = append(byProject[id], e)
-		}
-		var undelivered []spool.Event
-		var errs []error
-		for _, id := range slices.Sorted(maps.Keys(byProject)) {
-			batch := byProject[id]
-			key := keystore.Get(id)
-			if key == "" {
-				// No key yet; MaxAge already dropped anything too old to wait.
-				held = append(held, batch...)
-				continue
-			}
-			if failed[id] {
-				// Refused earlier in this pass: one question per host per pass.
-				undelivered = append(undelivered, batch...)
-				continue
-			}
-			if next := s.RetryAt(id); !force && now.Before(next) {
-				if !waiting[id] {
-					waiting[id] = true
-					res.Waiting = append(res.Waiting, projectWait{ProjectID: id, RetryAt: next})
-				}
-				undelivered = append(undelivered, batch...)
-				continue
-			}
-			endpoint := app.projectEndpoint(cfg, id)
-			sender := &spool.OTLPSender{Endpoint: endpoint, APIKey: key, ProjectID: id, Version: app.version}
-			if _, err := sender.Send(ctx, batch); err != nil {
-				failed[id] = true
-				f := projectFailure{ProjectID: id, Endpoint: endpoint, Err: err}
-				// A pass cut short by its own deadline learned nothing about the host.
-				if ctx.Err() == nil {
-					f.RetryAt = s.DestinationFailed(id, time.Now())
-				}
-				res.Failures = append(res.Failures, f)
-				errs = append(errs, fmt.Errorf("%s (%s): %w", id, endpoint, err))
-				undelivered = append(undelivered, batch...)
-				continue
-			}
-			s.DestinationDelivered(id, time.Now())
-			accepted[endpoint] = true
-			res.Sent += len(batch)
-		}
-		if len(undelivered) > 0 {
-			return held, &spool.PartialDelivery{Undelivered: undelivered, Err: errors.Join(errs...)}
-		}
-		return held, nil
-	})
-	r := s.Flush(ctx, router, spool.FlushOptions{Force: force, MinInterval: minInterval, Now: now})
-	res.Endpoints = slices.Sorted(maps.Keys(accepted))
-	// Loss is the spool's to report; Sent is the router's per-project count.
-	res.Held = r.Held
-	res.Failed = r.Failed
-	res.Expired = r.Expired
-	res.Pruned = r.Pruned
-	res.Dropped = r.Dropped
-	res.Skipped = r.Skipped
-	res.Reason = r.Reason
-	res.NextAttempt = s.NextAttempt()
-	res.Err = r.Err
-	return res, nil
-}
-
-// spoolEventAllowed rechecks the policy ceiling on every delivery, since replies and titles
-// bypass the relay and may predate a tightened policy.
-func (app *App) spoolEventAllowed(org config.Policy, projectID string, e spool.Event) bool {
-	org = routing.EffectivePolicy(org, projectID)
-	if !org.AllowsSignal("logs") || e.Global && !org.Global() {
-		return false
-	}
-	if org.ExcludesPath(e.Workspace, "") || org.HasExcludedPath(e.Attrs, e.Workspace) {
-		return false
-	}
-	if e.Name == hookrun.EventAssistantMessage || e.Name == hookrun.EventSessionTitle {
-		return org.IncludePrompts && len(org.ExcludePaths) == 0 && app.contentConsented(e, projectID, org.Global())
-	}
-	rec, recorded, err := routing.LoadRecord(projectID)
-	if err != nil {
-		return false
-	}
-	return !recorded || slices.Contains(rec.Signals, "logs")
-}
-
-// contentConsented asks the agent that spooled e whether its content may leave.
-func (app *App) contentConsented(e spool.Event, projectID string, global bool) bool {
-	tool, _ := e.Attrs[hookrun.AttrTool].(string)
-	a, ok := app.agents.ForTool(tool)
-	if !ok {
-		return false
-	}
-	c, ok := a.(agents.ContentConsent)
-	return ok && c.ContentConsented(hookrun.ConsentFor(projectID, global))
-}
-
-// projectEndpoint is a project's ingest host: the one its key was stored with, since only
-// its environment accepts the key, then the routing record, then the profile.
-func (app *App) projectEndpoint(cfg *config.Config, projectID string) string {
-	if app.flags.otlpURL != "" || os.Getenv("TERMA_OTLP_URL") != "" {
-		return cfg.OTLPURL
-	}
-	if h, ok := keystore.HostsFor(projectID); ok && h.OTLP != "" {
-		return h.OTLP
-	}
-	if rec, ok, err := routing.LoadRecord(projectID); err == nil && ok && rec.Endpoint != "" {
-		return strings.TrimRight(rec.Endpoint, "/")
-	}
-	return cfg.OTLPURL
-}
-
-// projectAPI is a project's data API, placed like projectEndpoint; the routing record counts
-// only when it names another built-in environment's ingest host.
-func (app *App) projectAPI(cfg *config.Config, projectID string) string {
-	if app.flags.apiURL != "" || os.Getenv("TERMA_API_URL") != "" {
-		return cfg.APIURL
-	}
-	if h, ok := keystore.HostsFor(projectID); ok && h.API != "" {
-		return h.API
-	}
-	if rec, ok, err := routing.LoadRecord(projectID); err == nil && ok && strings.TrimRight(rec.Endpoint, "/") != cfg.OTLPURL {
-		if e, ok := config.EndpointsByOTLP(rec.Endpoint); ok {
-			return e.APIURL
-		}
-	}
-	return cfg.APIURL
-}
-
-// queuedByRouting counts queued events with no project id, and per project those waiting
-// for a key, reading only the pending count so the split matches it.
-func queuedByRouting(s *spool.Spool, pending int) (int, map[string]int) {
-	events, err := s.Peek(pending)
-	if err != nil {
-		return 0, nil
-	}
-	unroutable := 0
-	counts := map[string]int{}
-	for _, e := range events {
-		id, _ := e.Attrs[hookrun.AttrProjectID].(string)
-		switch {
-		case id == "":
-			unroutable++
-		case keystore.Get(id) == "":
-			counts[id]++
-		}
-	}
-	return unroutable, counts
-}
-
 func plural(n int) string {
 	if n == 1 {
 		return ""
 	}
 	return "s"
+}
+
+// delivery is how this build sends the spool.
+func (app *App) delivery() delivery.Router {
+	return delivery.Router{
+		Version:    app.version,
+		OTLPPinned: app.flags.otlpURL != "" || os.Getenv("TERMA_OTLP_URL") != "",
+		APIPinned:  app.flags.apiURL != "" || os.Getenv("TERMA_API_URL") != "",
+		Policy:     app.policies().Current,
+		Consent: func(tool string, c hookrun.Consent) bool {
+			a, ok := app.agents.ForTool(tool)
+			if !ok {
+				return false
+			}
+			consent, ok := a.(agents.ContentConsent)
+			return ok && consent.ContentConsented(c)
+		},
+	}
+}
+
+// flushSpool delivers everything queued.
+func (app *App) flushSpool(ctx context.Context, force bool, minInterval time.Duration) (delivery.Result, error) {
+	s := openSpool()
+	if s == nil {
+		return delivery.Result{}, errors.New("cannot open the spool directory")
+	}
+	cfg, err := app.loadConfig()
+	if err != nil {
+		return delivery.Result{}, err
+	}
+	return app.delivery().Flush(ctx, s, cfg, force, minInterval), nil
 }

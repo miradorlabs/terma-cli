@@ -13,6 +13,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/delivery"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -183,12 +184,12 @@ func TestSpoolFlushDeliversUnderTheProjectKey(t *testing.T) {
 
 // describeFlush gives one clause per reason, in a fixed order, and none for a quiet pass.
 func TestDescribeFlushNamesEveryReasonOnce(t *testing.T) {
-	delivered, undelivered := describeFlush(flushResult{Sent: 1})
+	delivered, undelivered := describeFlush(delivery.Result{Sent: 1})
 	if delivered != "1 event" || len(undelivered) != 0 {
 		t.Fatalf("a clean pass = %q, %q", delivered, undelivered)
 	}
 
-	delivered, undelivered = describeFlush(flushResult{Sent: 2, Held: 3, Expired: 4, Pruned: 5, Unroutable: 6, Dropped: 7})
+	delivered, undelivered = describeFlush(delivery.Result{Sent: 2, Held: 3, Expired: 4, Pruned: 5, Unroutable: 6, Dropped: 7})
 	if delivered != "2 events" {
 		t.Errorf("delivered = %q", delivered)
 	}

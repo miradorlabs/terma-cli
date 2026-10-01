@@ -93,7 +93,7 @@ developer login to check the team's repository permission.
   A project in its window is not asked (its events re-queue, counted as `Failed`, exit
   3) until it closes; `--force` (doctor) ignores windows. `spool status` lists them,
   `status` flags this project's.
-  Each project goes to its key's own environment (`projectEndpoint`, `projectAPI`):
+  Each project goes to its key's own environment (`delivery.Router.Endpoint`, `Router.API`):
   `keys.json` files `hosts` per project with the key (`keystore.Set`/`SetFor` take a
   `keystore.Hosts`, `keystore.HostsOf(cfg)` in production; a built-in environment is
   recorded by name and resolved through the current table). A key already on file
@@ -645,7 +645,7 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   exporters send to `127.0.0.1:43180` with a local token (`relay/token`); only sessions a
   hook in a bound repository claimed (`relay/claims/<session>.json`, `internal/relay/claim`,
   no OTLP dependency — every hook imports it) are forwarded, per project, with that
-  project's key and host (`projectEndpoint`), content filtered by its routing record.
+  project's key and host (`delivery.Router.Endpoint`), content filtered by its routing record.
   Unclaimed records are held 2 minutes in memory, then dropped; nothing unclaimed touches
   disk. A part that may leave is written — content policy applied, and applied again at
   delivery (`withholdQueued`: a project that turned prompts off since sends none of the

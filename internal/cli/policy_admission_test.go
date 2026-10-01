@@ -29,11 +29,11 @@ func TestSpoolRepliesUseCurrentNativeCodexConsent(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, name := range []string{hookrun.EventAssistantMessage, hookrun.EventSessionTitle} {
-		if !testApp.spoolEventAllowed(config.DefaultPolicy(), "team", spool.Event{Name: name, Attrs: map[string]any{hookrun.AttrTool: "codex"}}) {
+		if !testApp.delivery().Allowed(config.DefaultPolicy(), "team", spool.Event{Name: name, Attrs: map[string]any{hookrun.AttrTool: "codex"}}) {
 			t.Fatalf("queued %s ignored native consent without a routing record", name)
 		}
 	}
-	if testApp.spoolEventAllowed(config.DefaultPolicy(), "team", spool.Event{Name: hookrun.EventAssistantMessage}) {
+	if testApp.delivery().Allowed(config.DefaultPolicy(), "team", spool.Event{Name: hookrun.EventAssistantMessage}) {
 		t.Fatal("a reply no agent's label vouches for was delivered")
 	}
 	exporter.IncludePrompts = false
@@ -41,7 +41,7 @@ func TestSpoolRepliesUseCurrentNativeCodexConsent(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, name := range []string{hookrun.EventAssistantMessage, hookrun.EventSessionTitle} {
-		if testApp.spoolEventAllowed(config.DefaultPolicy(), "team", spool.Event{Name: name, Attrs: map[string]any{hookrun.AttrTool: "codex"}}) {
+		if testApp.delivery().Allowed(config.DefaultPolicy(), "team", spool.Event{Name: name, Attrs: map[string]any{hookrun.AttrTool: "codex"}}) {
 			t.Fatalf("queued %s ignored native prompt opt-out", name)
 		}
 	}
