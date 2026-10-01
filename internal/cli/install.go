@@ -274,7 +274,7 @@ func (app *App) runInstall(cmd *cobra.Command, f installFlags) error {
 	// A newer release's first install refreshes the machine before doctor checks it, and
 	// records it so the refresh after the command has nothing left to do.
 	if dir, err := config.Dir(); err == nil && selfupdate.NeedsRefresh(dir, app.version) {
-		changed, err := app.refreshMachine()
+		changed, err := app.refresher().Machine()
 		for _, p := range changed {
 			fmt.Fprintf(ui.detail, "  updated %s\n", p)
 		}

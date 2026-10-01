@@ -359,7 +359,7 @@ developer login to check the team's repository permission.
   to `cmd.OutOrStdout()`. Doctor runs behind a spinner as the `Verified` step and leaves
   out the routing warning when a next step already says to reload the shell (install's
   own process always predates the PATH block). The first install under a newer release
-  also does the machine half of `update --refresh` (`refreshMachine`, gated on
+  also does the machine half of `update --refresh` (`refresh.Refresher.Machine`, gated on
   `selfupdate.NeedsRefresh`, so source builds and tests never touch home files) before
   verifying, and records it; the repository half is its own hook plan, which rewrites a
   stale committed file as it adds a missing one.
@@ -954,7 +954,7 @@ it does not prove that a running agent has reloaded its settings or sent telemet
   the binary's path: that prefix's brew, or npm with `--prefix`); automatic updates only
   notify those. Failed checks retry after 15 minutes; auto-install attempts are throttled
   daily.
-- Refresh (`internal/cli/refresh.go`, `terma update --refresh`): after replacing itself or running
+- Refresh (`internal/refresh`, `terma update --refresh`): after replacing itself or running
   the package manager, the old binary execs the new one's `update --refresh` — the old
   process cannot run new templates. It rewrites only files terma already wrote (the status-line wrap, the OpenCode plugin, and the current repository's hooks: the commit
   hooks through the binding's manager, the agent hooks its files already wire), never creates one, never signs in, and never changes a
@@ -966,7 +966,7 @@ it does not prove that a running agent has reloaded its settings or sent telemet
   are out of date → `terma update --refresh` (`doctor.HookWiring.Stale`, and `doctor.AgentHooksCheck`
   for the agents' files); files that are missing → `terma install`. The binding's
   `terma_version` is the terma that last wrote the committed files: install stamps it only
-  when it wrote one, refresh when it rewrote one (`stampVersion`, the checkout's own
+  when it wrote one, refresh when it rewrote one (`Refresher.Stamp`, the checkout's own
   binding) — never a trigger, since contents decide staleness. `update --refresh` is a contract
   between releases: an older binary invokes it on a newer one, so it must keep working.
 - Migrations (`internal/migrate`, registry in `migrations.go`): a change to the shape of

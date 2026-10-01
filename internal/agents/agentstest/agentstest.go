@@ -62,8 +62,22 @@ func (u UserHooked) PlanUserHooks(dir string, command func(string) string, insta
 	return hookmgr.MergeEventHooks(dir, hookmgr.HooksFile{Path: filepath.Base(u.Path)}, []hookmgr.EventHook{g}, install)
 }
 
+// Refreshing is an Agent with a home-directory file a refresh rewrites: Path when it
+// changed, Err when it could not.
+type Refreshing struct {
+	Agent
+	Path string
+	Err  error
+}
+
+// RefreshMachine reports Path, or Err.
+func (r Refreshing) RefreshMachine() (string, bool, error) {
+	return r.Path, r.Path != "" && r.Err == nil, r.Err
+}
+
 var (
-	_ agents.Agent     = Agent{}
-	_ agents.Labeled   = Agent{}
-	_ agents.UserHooks = UserHooked{}
+	_ agents.MachineRefresher = Refreshing{}
+	_ agents.Agent            = Agent{}
+	_ agents.Labeled          = Agent{}
+	_ agents.UserHooks        = UserHooked{}
 )
