@@ -2,7 +2,22 @@
 """Compare real third-party renderers directly and through terma, without installing them.
 
 Download dependencies separately; this runner performs no package installation.
-See docs/STATUSLINE-COMPATIBILITY.md for pinned revisions and commands.
+Pinned: ccstatusline npm 2.2.29 (tarball SHA-1 803cabb20d0e3974a5b2dcb0d8154d5f54136ce3,
+source 1c2f718849c7d7bea6be8997fba8e26751468d5c) and hell0github/claude-statusline at
+8bb8b43df58db2ba7ee8fe7b3d1363f9735e1743. Last run: 23 cases, each with capture on and off.
+
+    make build
+    npm pack ccstatusline@2.2.29 --ignore-scripts --pack-destination /tmp/deps
+    tar -xzf /tmp/deps/ccstatusline-2.2.29.tgz -C /tmp/deps
+    git clone https://github.com/hell0github/claude-statusline.git /tmp/shell-statusline
+    git -C /tmp/shell-statusline checkout 8bb8b43df58db2ba7ee8fe7b3d1363f9735e1743
+    python3 scripts/test-statusline-compat.py --terma bin/terma \
+      --ccstatusline-js /tmp/deps/package/dist/ccstatusline.js \
+      --claude-statusline-root /tmp/shell-statusline --report /tmp/statusline-compat.json
+
+Byte preservation is what is tested, not visual equivalence: a renderer that moves the
+cursor, prints carriage returns or fills the line can lay out differently after the
+two-column marker.
 """
 import argparse
 import copy

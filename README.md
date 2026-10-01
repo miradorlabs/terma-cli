@@ -27,14 +27,12 @@ hooks; existing sessions and tracked edits carry on without losing attribution.
 Bare repositories are rejected because they have no working directory.
 
 Run `make test-install-e2e` for the isolated install/uninstall subprocess suite.
-See [the installation test matrix](docs/INSTALLATION-TESTS.md) for coverage and limits.
 Restart running agents after installation so they load the new configuration.
 
 Codex desktop uses a separate backend from the `codex` shell command. Select
 **Codex Desktop** in `terma setup` (or use `--harness codex-desktop` with
 `terma install`). Install then configures repository hooks and a local project
 route. Trust the hooks in the app and check `terma agent status codex-desktop` from that repository.
-See [Codex desktop telemetry](docs/CODEX-DESKTOP-TELEMETRY.md).
 
 Then verify the installation:
 
@@ -109,13 +107,10 @@ The first time a new version runs, it migrates anything it keeps in `~/.config/t
 whose format changed, before doing anything else, with no command from you. After an
 update, the new version also refreshes what earlier versions wrote — the wrapped Claude
 Code status line, the OpenCode plugin, and the hooks of the repository you ran `terma
-update` in — keeping every choice you made when you installed, and removes the agent
-shims earlier versions put on `PATH`. It works
+update` in — keeping every choice you made when you installed. It works
 from what is on disk, never signs in, and never adds a file. The repository hooks are
 committed files, so they change only when you ask: run `terma update --refresh` in each
 other repository to bring its hooks up to date, then commit them.
-
-Release, versioning and installer details are in [RELEASING.md](docs/RELEASING.md).
 
 ## Per-repository routing
 
@@ -130,8 +125,8 @@ and the relay removes them before anything leaves.
 
 Hooks start the relay when it is not running. `terma relay daemon install` runs it as a
 per-user service instead, so it is up before any agent starts; `terma relay status` shows
-what it has done. See [RELAY.md](docs/RELAY.md) for how it decides, and
-[CONFIGURATION.md](docs/CONFIGURATION.md) for profiles, authentication and export scope.
+what it has done. [RELAY.md](docs/RELAY.md) records how it was tested and what it
+withstood.
 
 ## What gets collected
 
@@ -149,30 +144,13 @@ Commit attribution works like this:
 
 Hooks never make a network request. They append to a local queue, and delivery happens
 after commits and session ends with retry and backoff. The prepare-commit-msg path is
-tested against a sub-50 ms budget. Read the full behavior, hook-manager integration,
-and spool guarantees in [INSTRUMENTATION.md](docs/INSTRUMENTATION.md) and
-[DESIGN.md](docs/DESIGN.md).
+tested against a sub-50 ms budget.
 
 ## Supported agents
 
-Terma currently supports Claude Code, Codex, Cursor, OpenCode, Omp, and Antigravity. The
-support level differs by agent:
-
-- Claude Code and Codex provide commit attribution plus native telemetry paths.
-- OpenCode uses a dependency-free plugin for model, tool, session, and file events.
-- Omp exports tokens, effort, service tier, and latency through its native OTLP spans,
-  wired by a user-scope hook extension; estimated cost is posted as a companion record,
-  and commit attribution rides repository hooks.
-- Cursor provides commit attribution and ordered hook observations; billed-cost and
-  quota mapping depend on platform integration.
-- Antigravity provides session, turn, tool, and file observations but has no token or
-  cost export.
-
-See the adapter contracts for exact event names, privacy boundaries, and verification
-status: [Cursor](docs/CURSOR-INSTRUMENTATION.md),
-[Antigravity](docs/ANTIGRAVITY-INSTRUMENTATION.md),
-[Codex and subagents](docs/SUBAGENT-INSTRUMENTATION.md), and
-[funding evidence](docs/FUNDING-INSTRUMENTATION.md).
+Terma supports Claude Code (CLI and Desktop) and Codex (CLI and Desktop): commit
+attribution through repository hooks, and each agent's native telemetry through the local
+relay.
 
 ## Read usage and attribution
 
@@ -186,8 +164,7 @@ terma session list --user dawson --since yesterday
 agents, queue state, and remaining setup steps. `doctor` performs the end-to-end check,
 including a scratch commit in a temporary worktree. `usage`, `session`, and
 `principal` use the active profile and repository's project; output automatically becomes JSON
-when stdout is not a terminal. See [INSIGHTS.md](docs/INSIGHTS.md) for time windows,
-filters, pagination, and JSON semantics.
+when stdout is not a terminal.
 
 Organization and project names are shown without UUIDs in normal output. IDs remain
 available with `terma org list -o json` and `terma project list -o json`; lists and
@@ -240,23 +217,11 @@ terma is one binary with three roles:
 Each coding agent is a plugin: one package under `internal/agents/<name>`, behind the
 interfaces in `internal/agents`, and registered in `internal/agents/builtin`. Nothing
 else names an agent, and `internal/boundary` tests that this holds.
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) has the diagram, the package map and every
-rule the tests enforce.
 
 ## Documentation
 
-- [Architecture](docs/ARCHITECTURE.md) — the command line, the hooks, the relay daemon, agents as plugins, and the boundaries the tests hold
-- [Configuration and authentication](docs/CONFIGURATION.md) — profiles, credentials, project routing, export scope, and environment variables
-- [Instrumentation guide](docs/INSTRUMENTATION.md) — hooks, commit stamping, queues, status lines, and hook managers
-- [Insights](docs/INSIGHTS.md) — usage, sessions, principals, filters, and machine-readable output
-- [Design notes](docs/DESIGN.md) — the decisions behind the hook path and its performance guarantees
 - [Security](SECURITY.md) — login flow, privacy boundaries, and threat model
-- [Development](docs/DEVELOPMENT.md) — build, test, lint, benchmark, and dev-backend workflows
-- [Releasing](docs/RELEASING.md) — versioning, release assets, signing, installers, and smoke tests
-- [Cursor instrumentation](docs/CURSOR-INSTRUMENTATION.md)
-- [Antigravity instrumentation](docs/ANTIGRAVITY-INSTRUMENTATION.md)
-- [Subagent instrumentation](docs/SUBAGENT-INSTRUMENTATION.md)
-- [Funding instrumentation](docs/FUNDING-INSTRUMENTATION.md)
+- [Local relay](docs/RELAY.md) — what was run against the real agents, and what it withstood
 - [Agent-facing CLI guide](https://terma.ai/cli/llms.txt)
 
 ## License

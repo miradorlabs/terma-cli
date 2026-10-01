@@ -76,7 +76,7 @@ func sometimes(key string) bool {
 }
 
 // endedCleanly reports whether the agent ran its session-end hook: Codex sometimes
-// exits without its shutdown (docs/CODEX-SESSION-END.md), and then neither the hook
+// exits without its shutdown (TestCodexSessionEndProbe), and then neither the hook
 // nor the shutdown's own telemetry — session_loop, op.dispatch.shutdown, the last
 // metrics flush — ever leaves the process, relay or not.
 func (sb *Sandbox) endedCleanly() bool {

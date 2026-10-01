@@ -507,7 +507,7 @@ func checkCodexHistogram(t contractReporter, e telemetryEvidence, name string, f
 }
 
 // upstreamCodexSessionEnd is Codex exiting without running its synchronous SessionEnd
-// hook — intermittent in 0.158.0, reproduced without Terma (docs/CODEX-SESSION-END.md).
+// hook — intermittent in 0.158.0, reproduced without Terma (TestCodexSessionEndProbe).
 const upstreamCodexSessionEnd = "codex-session-end"
 
 // knownUpstream reports whether this run tolerates a documented upstream failure,

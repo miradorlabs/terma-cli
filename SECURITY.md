@@ -127,7 +127,7 @@ Without a validated policy, forwarding waits for a successful fetch. A failed fe
 including a denied request, retains the last validated policy **without an age-based
 expiry**. A failed refresh is therefore not an immediate revocation of existing
 capture. Invalid responses, older revisions, and another team's policy cannot widen
-the cached grant. See [Configuration](docs/CONFIGURATION.md) for the policy contract.
+the cached grant.
 
 Team policy limits signals, prompts, tool content, and file paths. A project's local
 `routing/<project-id>.json` can only narrow those limits. Prompts and tool content are

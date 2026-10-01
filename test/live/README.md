@@ -1,9 +1,8 @@
 # live
 
 Real harnesses and the real `terma` binary, with credential-free fixture scenarios
-and separate authenticated provider scenarios, against the
-collection matrix in `docs/collection-matrix.html`. A cell there is either a
-passing test here or a claim.
+and separate authenticated provider scenarios. Each scenario names the capability it
+proves (`compat.go`), and the generated compatibility matrix is built from their results.
 
 ```sh
 make test                      # offline value contracts; no harnesses or credentials
@@ -47,9 +46,7 @@ scenarios explicitly. A passing offline run does not establish provider
 compatibility; `make live` runs those scenarios and propagates a failing test's
 exit status to the caller.
 
-The [telemetry contracts](../docs/TELEMETRY-TESTS.md) describe the event/field
-assertions, content-exclusion checks, schema baselines, CI coverage and known
-limits. The receiver retains complete OTLP payloads; telemetry tests validate
+The receiver retains complete OTLP payloads; telemetry tests validate
 logs, traces and metric values together.
 
 ## Credentials and modes
@@ -91,7 +88,7 @@ the authentic API billing route.
 The main CI workflow runs this module's offline contracts with the race detector
 and the credential-free telemetry scenarios against pinned real harness builds,
 tolerating only Codex's documented SessionEnd race there
-(`TERMA_LIVE_KNOWN_UPSTREAM=codex-session-end`; see docs/CODEX-SESSION-END.md).
+(`TERMA_LIVE_KNOWN_UPSTREAM=codex-session-end`; see `TestCodexSessionEndProbe`).
 `Live harness contracts` runs nightly and on manual dispatch against the latest
 three releases. Claude uses GitHub OIDC with Anthropic workload identity
 federation; no Anthropic API-key secret is needed. The workflow contains the
@@ -228,8 +225,7 @@ TERMA_LIVE=1 TERMA_LIVE_BINARY=../bin/terma \
 Supply the key through the environment, never a command argument. This verifies
 CLI collection only, not plan classification, billing reconciliation, full token
 coverage or IDE behavior. The same project hooks are installed for the IDE;
-its authenticated live check remains manual (see `docs/CURSOR-INSTRUMENTATION.md`
-in the parent repository).
+its authenticated live check remains manual.
 
 
 `TestCursorBillingSession` is the narrower conversation-billing check: two real

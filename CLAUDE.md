@@ -8,8 +8,7 @@ counterparts; the product-specific code is everything else.
 
 The layout — one binary (`cmd/terma`), its command line (`internal/cli`), the hook
 runtime (`internal/hooks`), the relay daemon (`internal/relay`) and the coding agents as
-plugins (`internal/agents/<name>`) — is drawn in `docs/ARCHITECTURE.md`, and
-`internal/boundary` turns it into tests.
+plugins (`internal/agents/<name>`) — is what `internal/boundary` turns into tests.
 
 ## Commands
 
@@ -48,7 +47,9 @@ developer login to check the team's repository permission.
   are never wired by default (`install.Adapters`), whatever directory the repository
   carries or a colleague committed — only `--adapters` names one — and uninstall, doctor
   and `terma hook` still cover them.
-- Hooks are thin shims; **all logic is in the binary** (`terma hook <event>`, run by
+- Hooks are thin shims; **all logic is in the binary**: a committed file costs a PR per
+  repository to change, the binary a `terma update`, so logic in the file would freeze its
+  first version into every repository (`terma hook <event>`, run by
   `internal/hooks/dispatch` over the runtime in `internal/hooks/hookrun`). dispatch takes git
   hooks first without touching the registry, then the owning agent's render hook (it still
   renders under `TERMA_HOOKS=0`, returning its status as the exit code), its hooks-off
@@ -65,7 +66,16 @@ developer login to check the team's repository permission.
   `post-commit` reads HEAD in one `git log` call. A git subprocess is ~13 ms on macOS.
 - Attribution (`internal/session.Attribute`): manifests decide; the active-session
   fallback applies only when the active session has **no** manifest. Empty manifests
-  are kept after `Consume` as evidence that files are tracked. Every writer of the store
+  are kept after `Consume` as evidence that files are tracked. The active-session fallback is a
+  session announced within four hours; merge and squash commits are never stamped, and
+  `post-commit` retires committed files from their manifests. `terma.commit`'s `file_stats` /
+  `lines_added` are the **commit's** delta — a human's edits in the same commit are inside them
+  — so they are an upper bound on agent-written change and a UI must say so. A commit with no
+  trailer emits `terma.commit.unattributed` (the coverage denominator): its own event name so
+  `terma.commit` readers keep `sessions`, and only identity and size — **no file paths, no
+  `file_stats`**; anything added must pass that test. Count coverage with
+  `event.name IN ('terma.commit', 'terma.commit.unattributed')`, never a prefix match
+  (`terma.commit.stamped` is the same commit's prepare-commit-msg record). Every writer of the store
   — `Touch`, `Consume`, `Prune`, and `SetActive` / `ClearActive` on the active session
   that `Touch` also refreshes — runs under one store-wide lock (`store.lock`, via
   `internal/flock`, 250 ms cap); readers take nothing, since every write is an atomic
@@ -290,6 +300,10 @@ developer login to check the team's repository permission.
   keystore and its policy in the routing record (`internal/routing`: `routing/<id>.json`,
   signals, prompts, tool content — what the relay enforces for the project), and starts
   the relay. Hooks in the repository claim its sessions; nothing else leaves the machine.
+  The relay replaced launch wrappers because a wrapper never reaches what does not start
+  from a shell (Claude Desktop, Codex Desktop, IDE extensions, a Dock-started app) and both
+  agents refuse repository-level exporter settings; machine-wide exporters are safe only
+  because the relay, not the exporter, decides what leaves.
   There are no PATH shims, wrappers or startup-file edits: the pre-relay shims and
   `terma shim` were removed before release, and nothing cleans up after them (a dev
   machine that ran one deletes `~/.config/terma/shim` and the marked PATH block itself).
@@ -474,7 +488,7 @@ developer login to check the team's repository permission.
   one session's roll-up only as the `summary/stream` feed, which `session get` reads one
   frame of under a 15-second bound. Names never travel on the wire: `--user`/`--api-key` resolve
   through `/v1/ai/principals` (`principalIndex`), and a substring that lands on two
-  people is an error, never a guess. Semantics for agents live in `docs/INSIGHTS.md`.
+  people is an error, never a guess.
 
 ## Funding attribution (in progress)
 
@@ -493,7 +507,6 @@ developer login to check the team's repository permission.
   Durable cursors advance after spooling; observation IDs allow replay deduplication.
   Backlog/read status uses `terma.session.capture`, separate from provider quota.
   Native OTel remains the usage counter; these events are funding evidence only.
-  See `docs/FUNDING-INSTRUMENTATION.md` for schemas, limits and delivery semantics.
 
 - Status line (`internal/agents/claude/statusline_hook.go`, `internal/agents/claude/statusline.go`):
   `terma install` (when Claude Code is one of the developer's agents; `--no-statusline` opts out)
@@ -519,7 +532,7 @@ developer login to check the team's repository permission.
   capturing, so the mark means "watching", not "installed". No previous renderer
   means silent capture, and an empty renderer output stays empty. Preserve original
   stdout bytes after the prefix, stderr and exit status; cancel the entire renderer
-  process group. Compatibility checks live in `docs/STATUSLINE-COMPATIBILITY.md`. Live-verified 2026-09-15: a
+  process group. Real third-party renderers are compared by `scripts/test-statusline-compat.py` (pinned versions in its docstring). Live-verified 2026-09-15: a
   Team seat gets `rate_limits` too, not only Pro/Max as documented.
 - Antigravity CLI (`agy`, Google's Gemini CLI successor; `internal/agents/antigravity/hooks.go`,
   `internal/agents/antigravity/handlers.go`, `internal/agents/antigravity/harness.go`): hooks only, no
@@ -546,13 +559,12 @@ developer login to check the team's repository permission.
   on both turns of a resumed conversation), so `turn_id` is `turn-<initialNumSteps at
   invocation 0>`, recorded by `PreInvocation` (`internal/agents/antigravity/turn.go`,
   `antigravity-turns/`) and read back by the turn's other hooks.
-  Live-verified on agy 1.2.4, 2026-09-16, and 1.2.7, 2026-09-18; see
-  `docs/ANTIGRAVITY-INSTRUMENTATION.md`.
+  Live-verified on agy 1.2.4, 2026-09-16, and 1.2.7, 2026-09-18.
 - Cursor IDE/CLI hooks capture `terma.session.observation` with conversation/generation
   IDs and durable local sequence. Response/Stop tokens are optional snapshots, never
   additive counters. Context occupancy is not billing quota; plan and funding stay
   unavailable. Checkpoints preserve pending spool appends and stable replay IDs.
-  See `docs/CURSOR-INSTRUMENTATION.md`; account email is hook-supplied, no auth files
+  Account email is hook-supplied, no auth files
   or transcripts are read. Response/Stop trigger detached flushes; stop has
   `loop_limit: null` so observations continue beyond five follow-up loops.
   Tool calls (`internal/agents/cursor/tool.go`): `postToolUse` / `postToolUseFailure`
@@ -564,7 +576,7 @@ developer login to check the team's repository permission.
   call's critical path and fail open only by default (a schema-mismatched reply or
   `failClosed` blocks), and `afterShellExecution` / `afterMCPExecution` restate the
   same calls without a `tool_use_id` and with their output.
-- Subagents (`internal/hooks/hookrun/subagent.go`, `docs/SUBAGENT-INSTRUMENTATION.md`) have two
+- Subagents (`internal/hooks/hookrun/subagent.go`) have two
   shapes and the events keep them apart. Claude Code and Codex run a subagent *inside* the
   session: the hook payload keeps the parent's `session_id` and adds `agent_id` /
   `agent_type`, so terma spools `terma.subagent.start` / `terma.subagent.end` under the
@@ -588,7 +600,15 @@ developer login to check the team's repository permission.
   `final_context_tokens`; the by-class numbers are not sent (the native export has that
   request under its own id) and a test keeps them out. The response also holds
   the task's `description`, its `prompt` and the reply `content`; `claudeAgentResult` has
-  no field for them, and a test plants sentinels in all three.
+  no field for them, and a test plants sentinels in all three. An `agent_id` alone does not
+  prove a delegated run: Claude's internal forks (background-agent summaries on a 30 s timer,
+  prompt suggestions, `/btw`) fire `SubagentStop` with fresh ids and no start (2.1.282, live
+  2026-09-25: 107 orphan ends to 4 launches). So a stop is spooled only after launch evidence —
+  `SubagentStart` or a successful Agent/Task response — for that `(session_id, agent_id)`, kept
+  as a marker under `claude-subagents/` for 14 days (`internal/agents/claude/subagent.go`).
+  A run's spend is the native export's: `api_request` events carry
+  `query_source=agent:builtin:<Type>` and `agent.name` (the type, never the run), and only
+  Claude's trace spans carry `agent_id`, the one native field that could tie requests to a run.
   **Codex**: a subagent is a thread the session spawned. Its hooks carry the root's
   `session_id`, the child thread's id as `agent_id`, and the child's own rollout as
   `transcript_path` (`hook_runtime.rs`, read 2026-09-17; not seen live). `SubagentStart`
@@ -615,8 +635,6 @@ developer login to check the team's repository permission.
   subagent entries existed has a file that counts as trusted and two hooks Codex skips in
   silence, so the adapter compares entries (`codex.TermaEntries`,
   `hookTrust.TrustedKeys`) and doctor names what is skipped.
-- `docs/collection-matrix.html` is the harness × information × mechanism matrix (open it
-  in a browser). Update a cell when a mechanism ships or a live check changes it.
 - `test/live/` runs the real harness binaries with real credentials through the real `terma`
   binary and checks the matrix's promises across the hook spool, an in-test OTLP receiver
   and a pseudo-terminal (`make live` there; own Go module, built in Docker, run natively).
@@ -712,14 +730,14 @@ developer login to check the team's repository permission.
   asking the running relay for one (`POST /heartbeat?reason=setup` on the relay,
   `daemon.CheckIn`) — the platform's "installed and working", and the developer's proof the
   relay, their credential and the endpoint work; the stub's 404 reads as "not taken yet".
-- Compatibility matrix (`docs/COMPATIBILITY.md`, generated — never edit it by hand):
+- Compatibility matrix (generated, gitignored on `main`; published on the `compat-matrix` branch):
   every live scenario says which harness capability it proves (`Proves` / `ProvesAll`,
   `test/live/compat.go`; `Capabilities` is the row list, IDs append-only), and its outcome is
   written per run to `report/compat.json` (`report/linux/` from `make machines`). `make
-  compat` (`test/live/compatgen`) merges runs into `docs/compat/history.json` (latest result,
-  first pass, per build × platform × capability; a run that skipped a capability keeps
-  what was known) plus hand-verified surfaces (`docs/compat/manual.json`: apps CI cannot
-  drive), and renders the markdown and `docs/compat/compat.json` for the website. The
+  compat` (`test/live/compatgen`) merges runs into a history (latest result, first pass, per
+  build × platform × capability; a run that skipped a capability keeps what was known)
+  plus hand-verified surfaces (`docs/compat/manual.json`: apps CI cannot drive — the one
+  committed input), and renders the markdown matrix and the website's JSON beside it. The
   nightly (`live.yml`) runs macOS and the Linux machine, renders the matrix, and pushes
   it to the `compat-matrix` branch, whose history each night extends. A new scenario
   that proves nothing in the matrix is a gap: tag it.
@@ -843,15 +861,14 @@ developer login to check the team's repository permission.
   status and available timing), `terma.compaction` (rollout compaction records), and
   `terma.approval.requested` (an approval request; the eventual decision is unavailable).
   `terma.tool.call` (Cursor `postToolUse` / `postToolUseFailure`,
-  keyed on Cursor's `tool_use_id` as `tool_call_id`; `docs/CURSOR-INSTRUMENTATION.md`,
-  "Tool calls" — and Antigravity's `PostToolUse`, keyed on `step-<stepIdx>`, unique only
-  within its conversation; `docs/ANTIGRAVITY-INSTRUMENTATION.md`, "Tool calls and turns")
+  keyed on Cursor's `tool_use_id` as `tool_call_id` — and Antigravity's `PostToolUse`, keyed on `step-<stepIdx>`, unique only
+  within its conversation)
   carries a terma-made `turn_id`, as do Antigravity's observations.
   Every event from a linked git worktree carries `worktree` (git's name for it) and reports
   the main repository as `repo`; no adapter reads `worktree` yet.
   Still awaiting the adapter: `terma.subagent.start` / `terma.subagent.end` /
   `terma.subagent.call` and the `parent_session_id` / `agent_id` / `agent_type` /
-  `agent_parent_id` attributes (`docs/SUBAGENT-INSTRUMENTATION.md`) are spooled today but
+  `agent_parent_id` attributes are spooled today but
   no adapter folds them yet — they sit in the raw log store only. `terma.subagent.call` is
   deduplicated on `tool_call_id` and carries no token counts; `final_context_tokens` is a
   size, never a spend.
@@ -887,7 +904,7 @@ developer login to check the team's repository permission.
   `scripts/test-install.sh` only; cleartext is accepted from loopback and nowhere else.
 - The agent-facing guide at `https://terma.ai/cli/llms.txt` lives in terma-frontend
   (`public/cli/llms.txt`), not here. When a command, flag or output shape changes, that
-  page needs the same change; the README and `docs/INSIGHTS.md` are what it summarises.
+  page needs the same change; it summarises the README and the read commands' behaviour.
 - Homebrew: the cask's quarantine strip is a `custom_block` carrying `preflight_steps`.
   GoReleaser's `hooks.pre.install` renders the `preflight do` block Homebrew deprecated
   (2026-08-04) and warns about on every install; `scripts/test-cask.sh` fails on it.
@@ -898,7 +915,7 @@ There is no local account service, so a CLI login always uses the dev auth plane
 `TERMA_ENV=local` = local terma-frontend (`localhost:3000`, serves `/cli/auth`) in front
 of `*-dev.mirador.org`; `TERMA_ENV=dev` = the deployed `dev.terma.ai` app in front of the
 same backend. `terma config set --app-url/--auth-url/--api-url/--otlp-url` stores the same
-thing on a profile. See docs/DEVELOPMENT.md, "Working against the dev backend".
+thing on a profile.
 
 `terma status` and `terma doctor` must agree about whether a setup works: both treat a
 harness exporting to the right host but a *different project* as not connected
@@ -908,6 +925,22 @@ The shared emission check fails zero-signal repository setups, reads Claude's me
 user/shared/private settings, and checks live routing's own signals. A route record
 alone is not evidence of emission. Doctor verifies configuration and hook delivery;
 it does not prove that a running agent has reloaded its settings or sent telemetry.
+
+## Releasing
+
+Tagging `v*` on `main` is the whole process (`release.yml`: GoReleaser, signed provenance,
+the Homebrew cask, npm, then a smoke install). What lives outside the repository:
+- The `miradorlabs/homebrew-tap` repo and the `HOMEBREW_TAP_TOKEN` secret (`contents:write`
+  on it). Without it the release still publishes; the cask push and macOS smoke test fail.
+- npm has no token: `@miradorlabs/terma` names a Trusted Publisher on npmjs.com
+  (organization `miradorlabs`, repository `terma-cli`, workflow `release.yml`, environment
+  `npm`, which deploys from `v*` tags only). Renaming the workflow or the environment, or
+  moving the repository, breaks publishing until that entry is updated.
+- Before announcing a release, check `https://terma.ai/install.sh` reaches a release asset
+  and `npm view @miradorlabs/terma version` is the intended version.
+
+Trailers, identities and session events are attribution among colleagues, not
+authentication: anyone with commit access can forge them (`SECURITY.md`).
 
 ## Gotchas
 
@@ -977,8 +1010,7 @@ it does not prove that a running agent has reloaded its settings or sent telemet
 
 `make test-install-e2e` builds the actual CLI and exercises install/uninstall as
 subprocesses with private configuration and no inherited credentials or exporters.
-The matrix is documented in `docs/INSTALLATION-TESTS.md` and is also part of
-`make check`. Installation uses `project.Locate`: Git determines a worktree root;
+It is also part of `make check`. Installation uses `project.Locate`: Git determines a worktree root;
 outside Git, the nearest binding or the first install's current directory does.
 Non-Git session state lives under the config directory, keyed by canonical root.
 Install reserves that directory before hooks can run, even with no session yet.

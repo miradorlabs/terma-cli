@@ -10,6 +10,11 @@ import (
 
 // This opt-in diagnostic removes Terma's hook handlers from the equation.
 // A shell builtin writes each marker; no spool, receiver or child CLI is involved.
+// On Codex 0.158.0 it missed SessionEnd in 3 of 10 runs: `codex exec` gives its in-process
+// app-server five seconds to shut down (codex-rs/app-server/src/in_process.rs) while the
+// cleanup before run_session_end_hooks allows ten, so the process can exit first. No terma
+// timeout can recover it; TERMA_LIVE_KNOWN_UPSTREAM=codex-session-end tolerates it in PR CI.
+// Run with TERMA_LIVE_CODEX_LIFECYCLE_PROBE=1 and TERMA_LIVE_CODEX_RUST_LOG for native logs.
 func TestCodexSessionEndProbe(t *testing.T) {
 	if os.Getenv("TERMA_LIVE_CODEX_LIFECYCLE_PROBE") != "1" {
 		t.Skip("set TERMA_LIVE_CODEX_LIFECYCLE_PROBE=1 to investigate native shutdown")

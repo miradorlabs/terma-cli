@@ -201,7 +201,7 @@ jobs:
           rm -rf docs/compat
           cp -R "$tmp/COMPATIBILITY.md" docs/COMPATIBILITY.md
           cp -R "$tmp/compat" docs/compat
-          git add docs/COMPATIBILITY.md docs/compat
+          git add -f docs/COMPATIBILITY.md docs/compat
           if git diff --cached --quiet; then exit 0; fi
           git commit -q -m "compat: nightly matrix, $(date -u +%F)"
           git push -q origin compat-matrix
