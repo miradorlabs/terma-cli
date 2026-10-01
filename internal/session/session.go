@@ -5,6 +5,8 @@ package session
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -70,10 +72,13 @@ const (
 	activeFile   = "session.json"
 	manifestsDir = "manifests"
 	manifestExt  = ".json"
-	lockFile     = "store.lock"
-	dirMode      = 0o700
-	fileMode     = 0o600
-	maxIDLen     = 128
+	// A delta is one touch recorded while another writer held the store: <id>~<random>.delta.
+	deltaExt = ".delta"
+	deltaSep = "~"
+	lockFile = "store.lock"
+	dirMode  = 0o700
+	fileMode = 0o600
+	maxIDLen = 128
 )
 
 // Open addresses state under its Git or private storage root without creating it.
@@ -154,17 +159,22 @@ func (s *Store) clearActive(id string) error {
 const hookLockWait = 250 * time.Millisecond
 
 // lock serializes every writer of the store, since concurrent hooks read, edit and
-// rename the same manifest (unlocked, 24 concurrent touches kept 1 file). Never nest it:
-// a second flock waits on the first even in one process. A lock that cannot be had
-// returns a no-op, so the write still happens.
+// rename the same manifest. Never nest it: a second flock waits on the first even in one
+// process. A lock that cannot be had returns a no-op, so the write still happens.
 func (s *Store) lock() (unlock func()) {
+	unlock, _ = s.acquire()
+	return unlock
+}
+
+// acquire is lock, reporting whether the lock is held.
+func (s *Store) acquire() (unlock func(), held bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), s.lockWait)
 	defer cancel()
 	unlock, err := flock.Lock(ctx, filepath.Join(s.dir, lockFile))
 	if err != nil {
-		return func() {}
+		return func() {}, false
 	}
-	return unlock
+	return unlock, true
 }
 
 // Touch records that sess edited files (repo-relative) at at, and refreshes the
@@ -177,34 +187,28 @@ func (s *Store) Touch(sess Session, files []string, at time.Time) error {
 	if err := os.MkdirAll(s.dir, dirMode); err != nil {
 		return err
 	}
-	defer s.lock()()
-	m, err := s.manifest(sess.ID)
+	unlock, held := s.acquire()
+	defer unlock()
+	touched := newManifest(sess, at)
+	for _, f := range files {
+		if f = Normalize(f); f != "" {
+			touched.Files[f] = at
+		}
+	}
+	if !held {
+		// Another writer's read-modify-write would overwrite this one's: a delta of its
+		// own survives, and the next locked writer folds it in.
+		return s.writeDelta(touched)
+	}
+	m, deltas, err := s.load(sess.ID)
 	if err != nil {
 		return err
 	}
-	if m == nil {
-		m = &Manifest{
-			SessionID:   sess.ID,
-			Tool:        sess.Tool,
-			ToolVersion: sess.ToolVersion,
-			StartedAt:   at,
-			Files:       map[string]time.Time{},
-		}
-	}
-	if m.Tool == "" {
-		m.Tool, m.ToolVersion = sess.Tool, sess.ToolVersion
-	}
-	for _, f := range files {
-		f = Normalize(f)
-		if f == "" {
-			continue
-		}
-		m.Files[f] = at
-	}
-	m.UpdatedAt = at
+	m = fold(m, touched)
 	if err := writeJSON(s.manifestPath(sess.ID), m); err != nil {
 		return err
 	}
+	removeAll(deltas)
 	if active, _ := s.Active(at, 0); active != nil && active.ID == sess.ID {
 		active.UpdatedAt = at
 		_ = writeJSON(filepath.Join(s.dir, activeFile), active)
@@ -212,54 +216,147 @@ func (s *Store) Touch(sess Session, files []string, at time.Time) error {
 	return nil
 }
 
-// Manifests lists every recorded session, oldest first.
+func newManifest(sess Session, at time.Time) *Manifest {
+	return &Manifest{SessionID: sess.ID, Tool: sess.Tool, ToolVersion: sess.ToolVersion, StartedAt: at, UpdatedAt: at, Files: map[string]time.Time{}}
+}
+
+// fold adds src's files to dst (the later touch wins) and returns dst, or a copy of src
+// when dst is nil.
+func fold(dst, src *Manifest) *Manifest {
+	if dst == nil {
+		dst = &Manifest{SessionID: src.SessionID, Tool: src.Tool, ToolVersion: src.ToolVersion, StartedAt: src.StartedAt, Files: map[string]time.Time{}}
+	}
+	if dst.Tool == "" {
+		dst.Tool, dst.ToolVersion = src.Tool, src.ToolVersion
+	}
+	if dst.StartedAt.IsZero() || !src.StartedAt.IsZero() && src.StartedAt.Before(dst.StartedAt) {
+		dst.StartedAt = src.StartedAt
+	}
+	if src.UpdatedAt.After(dst.UpdatedAt) {
+		dst.UpdatedAt = src.UpdatedAt
+	}
+	for f, touched := range src.Files {
+		if prev, ok := dst.Files[f]; !ok || touched.After(prev) {
+			dst.Files[f] = touched
+		}
+	}
+	return dst
+}
+
+// writeDelta records m under a name no other writer can choose.
+func (s *Store) writeDelta(m *Manifest) error {
+	var b [8]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return err
+	}
+	return writeJSON(filepath.Join(s.dir, manifestsDir, m.SessionID+deltaSep+hex.EncodeToString(b[:])+deltaExt), m)
+}
+
+// load is id's manifest with its deltas folded in, and the deltas' paths, which a locked
+// writer removes once it has written the result. A delta that appears later is kept.
+func (s *Store) load(id string) (*Manifest, []string, error) {
+	m, err := s.manifest(id)
+	if err != nil {
+		return nil, nil, err
+	}
+	paths, _ := filepath.Glob(filepath.Join(s.dir, manifestsDir, id+deltaSep+"*"+deltaExt))
+	var folded []string
+	for _, p := range paths {
+		var d Manifest
+		if readJSON(p, &d) != nil || d.SessionID != id {
+			continue
+		}
+		if d.Files == nil {
+			d.Files = map[string]time.Time{}
+		}
+		m = fold(m, &d)
+		folded = append(folded, p)
+	}
+	return m, folded, nil
+}
+
+func removeAll(paths []string) {
+	for _, p := range paths {
+		_ = os.Remove(p)
+	}
+}
+
+// Manifests lists every recorded session, deltas folded in, oldest first.
 func (s *Store) Manifests() ([]Manifest, error) {
+	out, _, err := s.manifests()
+	return out, err
+}
+
+// manifests is Manifests, with each session's delta paths.
+func (s *Store) manifests() ([]Manifest, map[string][]string, error) {
 	entries, err := os.ReadDir(filepath.Join(s.dir, manifestsDir))
 	if errors.Is(err, fs.ErrNotExist) {
-		return nil, nil
+		return nil, nil, nil
 	}
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	var out []Manifest
+	byID := map[string]*Manifest{}
+	deltas := map[string][]string{}
 	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), manifestExt) {
+		name := e.Name()
+		if e.IsDir() {
+			continue
+		}
+		var id string
+		switch {
+		case strings.HasSuffix(name, deltaExt):
+			id, _, _ = strings.Cut(strings.TrimSuffix(name, deltaExt), deltaSep)
+		case strings.HasSuffix(name, manifestExt):
+			id = strings.TrimSuffix(name, manifestExt)
+		default:
 			continue
 		}
 		var m Manifest
-		if err := readJSON(filepath.Join(s.dir, manifestsDir, e.Name()), &m); err != nil {
+		if err := readJSON(filepath.Join(s.dir, manifestsDir, name), &m); err != nil {
 			continue // a torn write is skipped, never fatal to a commit
 		}
 		// Revalidate on read: the id reaches a commit message (a newline forges trailers)
-		// and Prune's manifestPath ("../../x" deletes elsewhere), so it must equal its file name.
-		if !ValidID(m.SessionID) || e.Name() != m.SessionID+manifestExt {
+		// and Prune's manifestPath ("../../x" deletes elsewhere), so it must match its file name.
+		if !ValidID(m.SessionID) || id != m.SessionID {
 			continue
-		}
-		// Tool and ToolVersion reach the commit message too: no line breaks.
-		if isMultiline(m.Tool) || isMultiline(m.ToolVersion) {
-			m.Tool, m.ToolVersion = "", ""
 		}
 		if m.Files == nil {
 			m.Files = map[string]time.Time{}
 		}
-		out = append(out, m)
+		if strings.HasSuffix(name, deltaExt) {
+			deltas[id] = append(deltas[id], filepath.Join(s.dir, manifestsDir, name))
+		}
+		byID[id] = fold(byID[id], &m)
+	}
+	out := make([]Manifest, 0, len(byID))
+	for _, m := range byID {
+		// Tool and ToolVersion reach the commit message too: no line breaks.
+		if isMultiline(m.Tool) || isMultiline(m.ToolVersion) {
+			m.Tool, m.ToolVersion = "", ""
+		}
+		out = append(out, *m)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].StartedAt.Before(out[j].StartedAt) })
-	return out, nil
+	return out, deltas, nil
 }
 
 // Consume removes files a commit carried from a session's manifest; an emptied manifest
 // is kept as evidence the session reports edits, so the fallback never claims for it.
 func (s *Store) Consume(sessionID string, files []string) error {
 	defer s.lock()()
-	m, err := s.manifest(sessionID)
+	m, deltas, err := s.load(sessionID)
 	if err != nil || m == nil {
 		return err
 	}
 	for _, f := range files {
 		delete(m.Files, Normalize(f))
 	}
-	return writeJSON(s.manifestPath(sessionID), m)
+	if err := writeJSON(s.manifestPath(sessionID), m); err != nil {
+		return err
+	}
+	removeAll(deltas)
+	return nil
 }
 
 // Merge folds fromID's manifest into into's (later touch wins), retires it and its
@@ -272,37 +369,36 @@ func (s *Store) Merge(fromID string, into Session, at time.Time) ([]string, erro
 		return nil, nil
 	}
 	defer s.lock()()
-	src, err := s.manifest(fromID)
+	src, srcDeltas, err := s.load(fromID)
 	if err != nil || src == nil {
 		return nil, err
 	}
-	dst, err := s.manifest(into.ID)
+	dst, dstDeltas, err := s.load(into.ID)
 	if err != nil {
 		return nil, err
 	}
 	if dst == nil {
-		dst = &Manifest{SessionID: into.ID, Tool: into.Tool, ToolVersion: into.ToolVersion, StartedAt: at, Files: map[string]time.Time{}}
+		dst = newManifest(into, at)
 	}
-	if dst.Tool == "" {
-		dst.Tool, dst.ToolVersion = src.Tool, src.ToolVersion
-	}
-	files := make([]string, 0, len(src.Files))
-	for f, touched := range src.Files {
-		if prev, ok := dst.Files[f]; !ok || touched.After(prev) {
-			dst.Files[f] = touched
-		}
-		files = append(files, f)
-	}
+	started, updated := dst.StartedAt, dst.UpdatedAt
+	dst = fold(dst, src)
+	dst.StartedAt, dst.UpdatedAt = started, updated
 	if at.After(dst.UpdatedAt) {
 		dst.UpdatedAt = at
+	}
+	files := make([]string, 0, len(src.Files))
+	for f := range src.Files {
+		files = append(files, f)
 	}
 	// Target first: a hook killed in between leaves the files in both manifests, not neither.
 	if err := writeJSON(s.manifestPath(into.ID), dst); err != nil {
 		return nil, err
 	}
+	removeAll(dstDeltas)
 	if err := os.Remove(s.manifestPath(fromID)); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return nil, err
 	}
+	removeAll(srcDeltas)
 	_ = s.clearActive(fromID)
 	slices.Sort(files)
 	return files, nil
@@ -312,14 +408,16 @@ func (s *Store) Merge(fromID string, into Session, at time.Time) ([]string, erro
 func (s *Store) Prune(before time.Time) (int, error) {
 	// Locked, so a manifest a Touch just revived is not removed as stale.
 	defer s.lock()()
-	manifests, err := s.Manifests()
+	manifests, deltas, err := s.manifests()
 	if err != nil {
 		return 0, err
 	}
 	n := 0
 	for _, m := range manifests {
 		if m.UpdatedAt.Before(before) {
-			if err := os.Remove(s.manifestPath(m.SessionID)); err == nil {
+			// Its deltas go too, or they would bring the session back.
+			removeAll(deltas[m.SessionID])
+			if err := os.Remove(s.manifestPath(m.SessionID)); err == nil || len(deltas[m.SessionID]) > 0 {
 				n++
 			}
 		}

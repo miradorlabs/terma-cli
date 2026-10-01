@@ -104,8 +104,8 @@ func TestPruneDoesNotWaitOnItsOwnLock(t *testing.T) {
 	}
 }
 
-// patient gives a store a wait no test will outlast, so exclusion tests do not measure
-// the machine (hookLockWait kept 15 of 24 files on a loaded CI runner).
+// patient gives a store a wait no test will outlast, so tests of the lock's exclusion do
+// not measure the machine.
 func patient(s *Store) *Store {
 	s.lockWait = time.Minute
 	return s
@@ -180,4 +180,85 @@ func TestConcurrentMergesAndTouchesLoseNothing(t *testing.T) {
 	if got := len(manifests[0].Files); got != own+children {
 		t.Fatalf("the parent's manifest kept %d of %d files", got, own+children)
 	}
+}
+
+// Touches that all miss the lock keep every file, and the next locked writer folds them
+// into the manifest and leaves no delta behind.
+func TestContendedTouchesLoseNothing(t *testing.T) {
+	store := Open(t.TempDir())
+	store.lockWait = time.Millisecond
+	if err := os.MkdirAll(store.dir, dirMode); err != nil {
+		t.Fatal(err)
+	}
+	release, err := flock.Lock(context.Background(), filepath.Join(store.dir, lockFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sess := Session{ID: "sess-1", Tool: "codex"}
+	const writers = 24
+	var wg sync.WaitGroup
+	for i := range writers {
+		wg.Go(func() {
+			if err := store.Touch(sess, []string{fmt.Sprintf("file-%02d.go", i)}, time.Now()); err != nil {
+				t.Errorf("touch %d: %v", i, err)
+			}
+		})
+	}
+	wg.Wait()
+	if got := fileCount(t, store); got != writers {
+		t.Fatalf("contended touches kept %d of %d files", got, writers)
+	}
+
+	release()
+	if err := store.Touch(sess, []string{"last.go"}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if got := fileCount(t, store); got != writers+1 {
+		t.Fatalf("the fold kept %d of %d files", got, writers+1)
+	}
+	if deltas, _ := filepath.Glob(filepath.Join(store.dir, manifestsDir, "*"+deltaExt)); len(deltas) != 0 {
+		t.Fatalf("the locked touch left %d deltas", len(deltas))
+	}
+}
+
+// Consume and Prune see a session's deltas: a committed file is retired wherever it was
+// recorded, and a stale session leaves nothing behind to revive it.
+func TestConsumeAndPruneFoldDeltas(t *testing.T) {
+	store := Open(t.TempDir())
+	long := time.Now().Add(-30 * 24 * time.Hour)
+	sess := Session{ID: "sess-1", Tool: "codex"}
+	if err := store.Touch(sess, []string{"a.go"}, long); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.writeDelta(&Manifest{SessionID: sess.ID, Tool: "codex", StartedAt: long, UpdatedAt: long, Files: map[string]time.Time{"b.go": long, "c.go": long}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Consume(sess.ID, []string{"b.go"}); err != nil {
+		t.Fatal(err)
+	}
+	manifests, err := store.Manifests()
+	if err != nil || len(manifests) != 1 || len(manifests[0].Files) != 2 || !manifests[0].Files["c.go"].Equal(long) {
+		t.Fatalf("after consume: %+v, %v", manifests, err)
+	}
+	if err := store.writeDelta(&Manifest{SessionID: sess.ID, StartedAt: long, UpdatedAt: long, Files: map[string]time.Time{"d.go": long}}); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := store.Prune(time.Now().Add(-24 * time.Hour)); err != nil || n != 1 {
+		t.Fatalf("prune = %d, %v", n, err)
+	}
+	if manifests, _ := store.Manifests(); len(manifests) != 0 {
+		t.Fatalf("a pruned session came back: %+v", manifests)
+	}
+}
+
+func fileCount(t *testing.T, store *Store) int {
+	t.Helper()
+	manifests, err := store.Manifests()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(manifests) != 1 {
+		t.Fatalf("manifests = %d, want 1", len(manifests))
+	}
+	return len(manifests[0].Files)
 }
