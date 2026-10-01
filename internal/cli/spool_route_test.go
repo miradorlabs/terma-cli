@@ -200,9 +200,9 @@ func TestSpoolFlushARefusedProjectWaitsAlone(t *testing.T) {
 	if queued := queuedProjects(t); len(queued) != 1 || queued[0] != routeDevProject {
 		t.Fatalf("queue = %v, want the refused project's event only", queued)
 	}
-	status, err := runTerma(t, "spool", "status")
-	if err != nil || !strings.Contains(status, "Retrying:        team "+routeDevProject+" after") {
-		t.Fatalf("spool status does not name the waiting project (%v):\n%s", err, status)
+	// Only the refused project waits out a retry window (doctor reports it as failing delivery).
+	if windows := openSpool().RetryWindows(time.Now()); len(windows) != 1 || windows[routeDevProject].IsZero() {
+		t.Fatalf("retry windows = %v, want only %s's", windows, routeDevProject)
 	}
 
 	if _, err := runTerma(t, "spool", "flush", "--force"); err == nil {

@@ -84,17 +84,4 @@ func TestHookKillSwitch(t *testing.T) {
 		t.Fatalf("not stamped with the switch off:\n%s", got)
 	}
 
-	// `terma pause` is the same switch for every process on the machine.
-	if out, err := runTerma(t, "pause"); err != nil {
-		t.Fatalf("pause: %v\n%s", err, out)
-	}
-	if got := stamp(); got != original {
-		t.Fatalf("stamped while paused:\n%s", got)
-	}
-	if out, err := runTerma(t, "resume"); err != nil {
-		t.Fatalf("resume: %v\n%s", err, out)
-	}
-	if got := stamp(); !strings.Contains(got, "Agent-Session-Id: sess-kill-switch") {
-		t.Fatalf("not stamped after resume:\n%s", got)
-	}
 }

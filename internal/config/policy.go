@@ -23,7 +23,6 @@ type Policy struct {
 	// Signals nil means all; an empty list means collect nothing.
 	Signals                   []string  `json:"signals"`
 	ExcludePaths              []string  `json:"exclude_paths,omitempty"`
-	MembersCanPause           bool      `json:"members_can_pause"`
 	MembersCanAddRepositories bool      `json:"members_can_add_repositories"`
 	Revision                  int64     `json:"revision"`
 	UpdatedAt                 time.Time `json:"updated_at,omitempty"`

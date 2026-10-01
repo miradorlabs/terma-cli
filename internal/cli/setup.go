@@ -57,8 +57,10 @@ func (a agentChoice) Installed(ctx context.Context) bool {
 func (app *App) newSetupCommand() *cobra.Command {
 	var f setupFlags
 	cmd := &cobra.Command{
-		Use:   "setup",
-		Short: "Sign in and choose your coding agents (once per developer)",
+		Use: "setup",
+		// login was its own command; onboarding emails already sent say `terma login`.
+		Aliases: []string{"login"},
+		Short:   "Sign in and choose your coding agents (once per developer)",
 		Long: `Gets this machine ready to use terma, once per developer:
 
   1. Signs you in (a browser handoff; --no-browser prints the URL instead).

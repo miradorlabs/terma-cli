@@ -85,8 +85,7 @@ func (d Deps) Engine(ctx context.Context, dir string, cfg *config.Config, s Sett
 	opts := relay.Options{Correlators: d.Correlators, Capturers: d.Capturers,
 		Hold: s.Hold, Dir: filepath.Join(dir, relay.OutboxDir), Resolve: d.Resolver(cfg, minter.Mint), Version: d.Version,
 		CatchAll: d.CatchAll(), HeartbeatSend: d.SendHeartbeat, HeartbeatEvery: s.Heartbeat,
-		PeerPID: procinfo.FindSender, ProcessAlive: procinfo.Alive, ClaimCacheTTL: time.Second, PolicyCacheTTL: time.Second,
-		Paused: func() bool { return config.Paused() && d.HookPolicy != nil && d.HookPolicy().PauseAllowed() }}
+		PeerPID: procinfo.FindSender, ProcessAlive: procinfo.Alive, ClaimCacheTTL: time.Second, PolicyCacheTTL: time.Second}
 	if s.Debug && logw != nil {
 		opts.Logf = func(f string, a ...any) { fmt.Fprintf(logw, time.Now().Format("15:04:05.000 ")+f+"\n", a...) }
 	}

@@ -58,9 +58,6 @@ func printContext(w io.Writer, rows []doctor.Row) {
 // what a failure means.
 func (app *App) executeDoctor(cmd *cobra.Command, env doctor.Env) doctor.Report {
 	out := cmd.OutOrStdout()
-	if notice := captureNotice(); notice != "" {
-		fmt.Fprintln(style.Highlight(out), notice)
-	}
 	// Streamed: the round-trip wait is long enough that a report printed at the end looks
 	// like a hang.
 	sp := spinner.New(cmd.ErrOrStderr())

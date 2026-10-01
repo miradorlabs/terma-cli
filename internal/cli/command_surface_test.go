@@ -12,16 +12,17 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// primaryCommands is what `terma --help` lists, short on purpose; a new command belongs
-// in advancedCommands unless a developer needs it day to day.
+// primaryCommands is terma's whole surface (MIR-80): what `terma --help` lists, and the
+// only commands a message may tell someone to run. Each is safe to run again.
 var primaryCommands = []string{
-	"doctor", "install", "org", "setup", "status", "uninstall", "update",
+	"doctor", "install", "setup", "teardown", "uninstall", "update",
 }
 
-// advancedCommands are hidden, not removed: automation and terma's own fix-it hints run them.
+// advancedCommands are hidden: other programs run them (hook, relay, spool, version),
+// Terma's engineers do (config, nate), or the e2e suites still do (status, connect,
+// disconnect, telemetry; MIR-80 removes them once those move to the primary commands).
 var advancedCommands = []string{
-	"config", "connect", "disconnect", "harness", "hook", "login", "logout", "nate",
-	"pause", "relay", "resume", "spool", "team", "telemetry", "version", "whoami",
+	"config", "connect", "disconnect", "hook", "nate", "relay", "spool", "status", "telemetry", "version",
 }
 
 func commandNamed(root *cobra.Command, name string) *cobra.Command {
@@ -158,5 +159,56 @@ func TestCompletionIsHiddenNotRemoved(t *testing.T) {
 	out, err := runTerma(t, "completion", "zsh")
 	if err != nil || !strings.Contains(out, "compdef") {
 		t.Fatalf("`terma completion zsh` = %v, output %.200q", err, out)
+	}
+}
+
+// hiddenCommandSources implement or drive a hidden command; their own help may name it.
+// Every other shipped line a person reads names only a primary command.
+var hiddenCommandSources = []string{
+	"internal/cli/config.go", "internal/cli/connect.go", "internal/cli/connect_scope.go",
+	"internal/cli/connect_status.go", "internal/cli/disconnect.go", "internal/cli/hook.go",
+	"internal/cli/nate.go", "internal/cli/relay_daemon.go", "internal/cli/relay_run.go",
+	"internal/cli/relay_setup.go", "internal/cli/relay_supervise.go", "internal/cli/spool.go",
+	"internal/cli/status.go", "internal/connect/", "internal/relay/service/windows.go",
+}
+
+// The fix-it hints, errors and help a developer reads name one of the six commands, so
+// nobody is sent to a command they were never meant to learn.
+func TestMessagesNameOnlyPrimaryCommands(t *testing.T) {
+	root := filepath.Join("..", "..")
+	err := filepath.WalkDir(filepath.Join(root, "internal"), func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		rel, _ := filepath.Rel(root, path)
+		rel = filepath.ToSlash(rel)
+		for _, src := range hiddenCommandSources {
+			if rel == src || strings.HasSuffix(src, "/") && strings.HasPrefix(rel, src) {
+				return nil
+			}
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		for i, line := range strings.Split(string(data), "\n") {
+			if strings.HasPrefix(strings.TrimSpace(line), "//") {
+				continue
+			}
+			named := append(namedCommand.FindAllStringSubmatch(line, -1), unquotedCommand.FindAllStringSubmatch(line, -1)...)
+			for _, m := range named {
+				// `terma hook` is named to say what agents and git run, never as advice.
+				if !slices.Contains(primaryCommands, m[1]) && m[1] != "hook" {
+					t.Errorf("%s:%d tells someone to run `terma %s`, which is not one of %v: %s", rel, i+1, m[1], primaryCommands, strings.TrimSpace(line))
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }

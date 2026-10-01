@@ -10,12 +10,17 @@ they produce so agent spend can be traced to shipped code.
 
 ## The workflow
 
-Terma has two onboarding commands with different owners:
+Terma has six commands, and every one is safe to run again. Two of them onboard, with
+different owners:
 
 | Command | Run it | What it does |
 |---|---|---|
 | `terma setup` | Once per developer (optional) | Signs you in, records which coding agents you use, fetches your organization's collection policy, and points those agents at the local relay. It writes no repository files. |
 | `terma install` | Once per repository | Binds the repository to a Terma team, configures per-repository agent routing, and offers to install commit and agent hooks. |
+
+`terma doctor` checks the result, `terma update` keeps terma current, and two commands undo
+the onboarding: `terma uninstall` in a repository, `terma teardown` on the machine. Run
+`terma setup` again to repair the machine or, with `--org`, switch organization.
 
 Repository telemetry is enabled by `terma install`; no extra telemetry flag is needed.
 Run it from any subdirectory: Git worktrees and submodules use their own root.
@@ -90,8 +95,7 @@ on by default; automatic installation is opt-in:
 
 ```sh
 terma update --check        # check without installing
-terma update                # install the latest published release
-terma update --refresh      # bring this repository's hooks up to the installed version
+terma update                # install the latest release, or refresh what terma installed
 terma update --auto on      # automatically install future releases
 terma update --auto status  # show the saved preference
 terma update --auto off     # return to notifications only
@@ -109,8 +113,9 @@ update, the new version also refreshes what earlier versions wrote — the wrapp
 Code status line, the OpenCode plugin, and the hooks of the repository you ran `terma
 update` in — keeping every choice you made when you installed. It works
 from what is on disk, never signs in, and never adds a file. The repository hooks are
-committed files, so they change only when you ask: run `terma update --refresh` in each
-other repository to bring its hooks up to date, then commit them.
+committed files, so they change only when you ask: run `terma update` in each other
+repository to bring its hooks up to date, then commit them. On the latest release,
+`terma update` does just that refresh.
 
 ## Per-repository routing
 
@@ -129,16 +134,15 @@ Either way the relay runs as the setup or install that configured it, whoever st
 later. `terma update` rewrites a service an earlier terma wrote; `terma install` does the
 same, and also replaces a relay that cannot deliver for you (another environment, or one
 a hook started while the service waits).
-`terma relay status` shows whether it runs and what it has forwarded, dropped and queued.
+`terma doctor` shows whether it runs and delivers; `terma teardown` stops it and removes
+its service.
 
 ## What gets collected
 
 Terma uses fast, local hooks. Each committed hook is a guarded one-liner that calls
 `terma hook <event>`; the binary owns the session files, touched-file manifests,
 commit trailers, and local event spool. On a machine without Terma, hooks are silent
-and inert. `terma pause` stops all capture on the machine, hooks and the relay alike,
-until `terma resume`; events already queued are still delivered. `TERMA_HOOKS=0` turns
-the hooks off for one shell or process.
+and inert. `TERMA_HOOKS=0` turns the hooks off for one shell or process.
 
 Commit attribution works like this:
 
@@ -160,18 +164,16 @@ relay.
 ## Check the setup
 
 ```bash
-terma status
 terma doctor
 ```
 
-`status` is the quick local view of sign-in, team binding, hooks, connected
-agents, queue state, and remaining setup steps. `doctor` performs the end-to-end check,
-including a scratch commit in a temporary worktree. Output automatically becomes JSON
-when stdout is not a terminal.
+`doctor` opens with what this machine collects and what the repository has in progress
+(the active session, uncommitted agent edits), then checks every link end to end —
+sign-in, team binding, hooks, the agents' export, a scratch commit in a temporary
+worktree, the queue, and the backend round-trip. Every failure names its fix.
 
-Organization and team names are shown without UUIDs in normal output. IDs remain
-available with `terma org list -o json` and `terma team list -o json`; lists and
-pickers show them when a name is missing or duplicated.
+Organization and team names are shown without UUIDs in normal output; pickers show the
+ID when a name is missing or duplicated, and a name that matches nothing lists yours.
 
 Choose the team for each repository with `terma install`. Reads use that repository's
 binding; use `--team <id>` for a one-command override or when outside a repository.
@@ -186,22 +188,19 @@ prompt, tool-content, and global-versus-local scope controls.
 
 ## Commands
 
-The normal command surface is intentionally small:
+The command surface is intentionally small, and every command is safe to run again:
 
 ```text
-setup       Sign in and choose agents
+setup       Sign in, choose agents, point them at the local relay (--org switches)
 install     Configure this repository
-status      Show local connections, queue, and setup readiness
 doctor      Verify the full chain
-org         List and switch organizations
-uninstall   Remove repository installation files
-update      Update terma
+update      Update terma, or refresh what it installed
+uninstall   Remove terma from this repository
+teardown    Undo setup on this machine (--sign-out also signs out)
 ```
 
-Authentication, direct telemetry management, team lookup,
-shell completion, configuration, hook execution, the local relay, and spool maintenance remain
-available as hidden commands for automation and troubleshooting. Run
-`terma <command> --help` for details.
+Hidden commands remain for the programs that run them — hook execution, the local
+relay, spool delivery, shell completion — and for Terma's own engineers.
 
 ## Architecture
 

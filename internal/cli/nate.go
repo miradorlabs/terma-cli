@@ -10,14 +10,11 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
-	"strings"
 
 	"github.com/spf13/cobra"
 
-	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
-	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
@@ -59,39 +56,8 @@ func (app *App) runNate(cmd *cobra.Command) error {
 
 	// Only home-directory state: a repository's committed wiring is `terma uninstall`'s.
 
-	// Restore what Terma displaced before its config directory, which holds the journals, goes.
-	for _, h := range app.agents.Harnesses() {
-		result, err := h.Disconnect()
-		if err != nil {
-			return fmt.Errorf("restore %s settings: %w", h.DisplayName(), err)
-		}
-		if result.Removed+result.Restored > 0 {
-			fmt.Fprintf(out, "Restored %s settings.\n", h.DisplayName())
-		}
-	}
-	for _, s := range app.agents.With[agents.StatusLiner]() {
-		if restored, err := s.RemoveStatusLine(); err != nil {
-			return fmt.Errorf("restore %s status line: %w", s.DisplayName(), err)
-		} else if restored {
-			fmt.Fprintf(out, "Restored the %s status line.\n", s.DisplayName())
-		}
-	}
-	for _, n := range app.agents.With[agents.Notifier]() {
-		if restored, err := n.RemoveNotifier(); err != nil {
-			return fmt.Errorf("restore %s notifier: %w", n.DisplayName(), err)
-		} else if restored {
-			fmt.Fprintf(out, "Restored the %s notifier.\n", n.DisplayName())
-		}
-	}
-
-	// Global mode's hooks and the relay service point into the config directory and at this binary.
-	if err := app.globalMode().Apply(cmd.Context(), nil, false, func(what string) { fmt.Fprintln(out, strings.TrimSpace(what)) }, func(string) {}); err != nil {
-		return fmt.Errorf("restore machine-wide hooks: %w", err)
-	}
-	if removed, err := daemon.RemoveService(cmd.Context()); err != nil {
-		return fmt.Errorf("remove the relay service: %w", err)
-	} else if removed {
-		fmt.Fprintln(out, "Removed the relay service.")
+	if err := app.undoSetup(cmd.Context(), out); err != nil {
+		return err
 	}
 
 	configDir, err := config.Dir()
