@@ -43,14 +43,13 @@ func TestDoctorNamesTheMainCheckoutForAWorktree(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	d := &doctorRun{root: root, gitDir: gitDir}
-	if c := d.repositoryBound(); c.Status != doctor.Fail || !strings.Contains(c.Detail, "or its main checkout "+main) {
+	if c, _ := doctor.RepositoryCheck(root, gitDir, nil); c.Status != doctor.Fail || !strings.Contains(c.Detail, "or its main checkout "+main) {
 		t.Fatalf("unbound worktree: %+v", c)
 	}
 	if err := termaproject.Save(main, &termaproject.File{Project: termaproject.Project{ID: testProjectID, Name: "Main"}}); err != nil {
 		t.Fatal(err)
 	}
-	if c := d.repositoryBound(); c.Status != doctor.Pass || c.Detail != "Main (through the main checkout "+main+")" {
+	if c, _ := doctor.RepositoryCheck(root, gitDir, nil); c.Status != doctor.Pass || c.Detail != "Main (through the main checkout "+main+")" {
 		t.Fatalf("bound through main: %+v", c)
 	}
 }

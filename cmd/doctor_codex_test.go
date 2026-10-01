@@ -1,11 +1,12 @@
 package cmd
 
 import (
-	"github.com/miradorlabs/terma-cli/internal/agents/codex"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/miradorlabs/terma-cli/internal/agents/codex"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 )

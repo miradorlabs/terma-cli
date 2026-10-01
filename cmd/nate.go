@@ -15,6 +15,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/output"
 )
 
@@ -97,14 +98,14 @@ func runNate(cmd *cobra.Command) error {
 	if err := removeTermaConfigDir(configDir); err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "Removed local state from %s.\n", tildePath(configDir))
+	fmt.Fprintf(out, "Removed local state from %s.\n", output.TildePath(configDir))
 
 	paths := nateBinaryCandidates()
 	for _, path := range paths {
 		if err := nateRemoveBinary(cmd, path); err != nil {
 			return fmt.Errorf("remove Terma executable %s: %w", path, err)
 		}
-		fmt.Fprintf(out, "Removed executable %s.\n", tildePath(path))
+		fmt.Fprintf(out, "Removed executable %s.\n", output.TildePath(path))
 	}
 	if len(paths) == 0 {
 		fmt.Fprintln(out, "No installed Terma executable was found.")
@@ -168,7 +169,7 @@ func installedTermaBinaries() []string {
 		paths = append(paths, candidate)
 		// The official npm command is a JavaScript launcher beside a vendored Go
 		// executable. Remove both; deleting only the launcher would leave the binary.
-		if target := installedBinary(candidate); target != candidate {
+		if target := doctor.InstalledBinary(candidate); target != candidate {
 			if target, err = filepath.Abs(target); err == nil && !seen[target] && isTermaBinary(target) {
 				seen[target] = true
 				paths = append(paths, target)
@@ -186,7 +187,7 @@ func isTermaBinary(path string) bool {
 	if err != nil || info.IsDir() || info.Mode()&(fs.ModeSymlink|0o111) == 0 {
 		return false
 	}
-	build, err := buildinfo.ReadFile(installedBinary(path))
+	build, err := buildinfo.ReadFile(doctor.InstalledBinary(path))
 	return err == nil && build.Main.Path == termaModulePath
 }
 

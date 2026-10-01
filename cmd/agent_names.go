@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
+	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
@@ -23,7 +24,7 @@ func scopedHarnessNames() string {
 
 // statusLineOwner is the agent whose status line terma wraps.
 func statusLineOwner() string {
-	if a, ok := statusLineAgent(); ok {
+	if a, ok := doctor.StatusLineAgent(registered); ok {
 		return a.DisplayName()
 	}
 	return "the agent"
@@ -36,13 +37,4 @@ func sourceExamples() string {
 		labels = append(labels, agents.Tool(a))
 	}
 	return strings.Join(labels, ", ")
-}
-
-// supportedAgentNames lists the supported agents for prose.
-func supportedAgentNames() string {
-	var names []string
-	for _, a := range registered.Supported() {
-		names = append(names, a.DisplayName())
-	}
-	return strings.Join(names, ", ")
 }

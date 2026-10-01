@@ -12,9 +12,9 @@ import (
 func TestDoctorReportsEachCheckAsItFinishes(t *testing.T) {
 	userSandbox(t)
 	var started, finished []string
-	report := runDoctor(context.Background(), true, doctorProgress{
-		start: func(name string) { started = append(started, name) },
-		done: func(c doctor.Check) {
+	report := runDoctor(context.Background(), true, doctor.Progress{
+		Start: func(name string) { started = append(started, name) },
+		Done: func(c doctor.Check) {
 			if len(finished) != len(started)-1 && len(finished) != len(started) {
 				t.Errorf("check %q finished out of step with starts %v", c.Name, started)
 			}

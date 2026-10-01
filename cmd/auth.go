@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -104,7 +105,7 @@ would leave live tokens that anyone holding a copy could keep using.`,
 			for _, cred := range creds {
 				if err := revokeSession(cmd.Context(), cfg, cred); err != nil {
 					fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not revoke the session for %s server-side (%v).\n",
-						firstNonEmpty(cred.OrganizationID, "this organization"), err)
+						cmp.Or(cred.OrganizationID, "this organization"), err)
 				}
 			}
 			if err := auth.DeleteCredential(cfg.ProfileName); err != nil {
@@ -156,11 +157,11 @@ func newWhoamiCommand() *cobra.Command {
 			} else if identity.UserID != "" {
 				pairs = append(pairs, [2]string{"user", identity.UserID})
 			}
-			pairs = append(pairs, [2]string{"organization", nameOrID(cfg.OrganizationName, identity.OrganizationID)})
+			pairs = append(pairs, [2]string{"organization", cmp.Or(cfg.OrganizationName, identity.OrganizationID)})
 			// whoami describes the credential, which is org-scoped; the project
 			// comes from the repository binding or a one-command override.
 			if cfg.ProjectID != "" {
-				pairs = append(pairs, [2]string{"project", nameOrID(cfg.ProjectName, cfg.ProjectID)})
+				pairs = append(pairs, [2]string{"project", cmp.Or(cfg.ProjectName, cfg.ProjectID)})
 			} else {
 				pairs = append(pairs, [2]string{"project", "(no repository project)"})
 			}
@@ -208,9 +209,9 @@ func (r orgRef) matches(id, name string) bool {
 }
 
 // hint is what the browser page is told to preselect.
-func (r orgRef) hint() string { return firstNonEmpty(r.ID, r.Name) }
+func (r orgRef) hint() string { return cmp.Or(r.ID, r.Name) }
 
-func (r orgRef) String() string { return firstNonEmpty(r.Name, r.ID) }
+func (r orgRef) String() string { return cmp.Or(r.Name, r.ID) }
 
 type signInOptions struct {
 	// org is the organization to sign into. Empty means whichever is active, or
@@ -234,8 +235,8 @@ type signInResult struct {
 // signedInAs is the one sentence that says who is signed in and where, without its
 // full stop so a caller can qualify it.
 func (r *signInResult) signedInAs() string {
-	return fmt.Sprintf("Signed in as %s in %s", firstNonEmpty(r.cred.UserEmail, "your account"),
-		nameOrID(r.orgName, r.cred.OrganizationID))
+	return fmt.Sprintf("Signed in as %s in %s", cmp.Or(r.cred.UserEmail, "your account"),
+		cmp.Or(r.orgName, r.cred.OrganizationID))
 }
 
 // signInAndReload signs in and returns the configuration as the sign-in left
@@ -289,7 +290,7 @@ func signIn(cmd *cobra.Command, cfg *config.Config, opts signInOptions) (*signIn
 	client := api.NewAnonymous(cfg.AuthURL, Version)
 	cred, err := auth.Login(ctx, client, auth.LoginOptions{
 		AppURL:       cfg.AppURL,
-		Label:        firstNonEmpty(opts.label, auth.DefaultLabel()),
+		Label:        cmp.Or(opts.label, auth.DefaultLabel()),
 		Organization: want.hint(),
 		NoBrowser:    opts.noBrowser,
 		Out:          errOut,
@@ -303,7 +304,7 @@ func signIn(cmd *cobra.Command, cfg *config.Config, opts signInOptions) (*signIn
 	}
 	if !want.empty() && !want.matches(cred.OrganizationID, orgName) {
 		fmt.Fprintf(errOut, "Note: you approved %s in the browser rather than %s. Signed in to %s.\n",
-			nameOrID(orgName, cred.OrganizationID), want, nameOrID(orgName, cred.OrganizationID))
+			cmp.Or(orgName, cred.OrganizationID), want, cmp.Or(orgName, cred.OrganizationID))
 	}
 
 	replaced, err := auth.SaveCredential(cfg.ProfileName, cred)
@@ -489,12 +490,6 @@ func revokeSession(ctx context.Context, cfg *config.Config, cred *auth.Credentia
 // applyLogin records the account scope. Project selection belongs to repositories.
 func applyLogin(p *config.Profile, cred *auth.Credential, orgName string) {
 	p.SelectOrganization(cred.OrganizationID, orgName)
-}
-
-// nameOrID uses the human name for terminal output, falling back to the ID when
-// no name is known. Structured output retains IDs for scripts and diagnostics.
-func nameOrID(name, id string) string {
-	return firstNonEmpty(name, id)
 }
 
 // waitForBrowserEnter runs before starting login, so the user can take their time.

@@ -95,10 +95,24 @@ func repoRoot(t *testing.T) string {
 	return dir
 }
 
+// bans are imports a package and everything below it never make, each with why.
+var bans = []struct {
+	pkg    string
+	banned []string
+	why    string
+}{
+	{"internal/relay", []string{"internal/harness", "internal/agents"}, "the relay learns about agents only through its options"},
+	{"internal/doctor", []string{"internal/api", "internal/spool"}, "doctor reaches the network and the spool only through its probes"},
+}
+
+// within reports whether path is pkg or below it.
+func within(path, pkg string) bool {
+	return path == module+"/"+pkg || strings.HasPrefix(path, module+"/"+pkg+"/")
+}
+
 // TestAgentPackagesAreImportedOnlyByTheRegistry holds the import graph: an agent's
 // package is imported by the registry and by nothing else, never by another agent, and
-// the relay, daemon included, knows no harness and no agent registry: what it needs of
-// the agents comes in through its options.
+// no package makes an import its bans forbid.
 func TestAgentPackagesAreImportedOnlyByTheRegistry(t *testing.T) {
 	for _, p := range listPackages(t) {
 		self, isAgent := agentPackage(p.ImportPath)
@@ -113,12 +127,13 @@ func TestAgentPackagesAreImportedOnlyByTheRegistry(t *testing.T) {
 				t.Errorf("%s imports %s: only internal/agents/builtin imports an agent's package", p.ImportPath, imp)
 			}
 		}
-		if p.ImportPath == module+"/internal/relay" || strings.HasPrefix(p.ImportPath, module+"/internal/relay/") {
+		for _, ban := range bans {
+			if !within(p.ImportPath, ban.pkg) {
+				continue
+			}
 			for _, imp := range p.Imports {
-				for _, banned := range []string{module + "/internal/harness", module + "/internal/agents"} {
-					if imp == banned || strings.HasPrefix(imp, banned+"/") {
-						t.Errorf("%s imports %s: the relay learns about agents only through its options", p.ImportPath, imp)
-					}
+				if slices.ContainsFunc(ban.banned, func(b string) bool { return within(imp, b) }) {
+					t.Errorf("%s imports %s: %s", p.ImportPath, imp, ban.why)
 				}
 			}
 		}

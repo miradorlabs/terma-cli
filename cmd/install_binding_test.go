@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/miradorlabs/terma-cli/internal/routing"
 
 	"github.com/spf13/cobra"
 

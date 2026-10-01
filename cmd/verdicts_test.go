@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"cmp"
 	"errors"
 	"strings"
 	"testing"
@@ -18,7 +19,7 @@ import (
 func TestHookWiringVerdictInBothCommands(t *testing.T) {
 	cases := []struct {
 		name         string
-		w            hookWiring
+		w            doctor.HookWiring
 		doctorStatus doctor.Status
 		doctorDetail string
 		// doctorFix is the fix a failed check names; empty means `terma install`.
@@ -28,19 +29,19 @@ func TestHookWiringVerdictInBothCommands(t *testing.T) {
 	}{
 		{
 			name:         "wired through a hook manager",
-			w:            hookWiring{manager: hookmgr.Husky},
+			w:            doctor.HookWiring{Manager: hookmgr.Husky},
 			doctorStatus: doctor.Pass, doctorDetail: string(hookmgr.Husky),
 			statusState: "wired", statusWired: true,
 		},
 		{
 			name:         "wired through terma's shims",
-			w:            hookWiring{manager: hookmgr.GitShim, hooksPath: hookmgr.ShimDir},
+			w:            doctor.HookWiring{Manager: hookmgr.GitShim, HooksPath: hookmgr.ShimDir},
 			doctorStatus: doctor.Pass, doctorDetail: string(hookmgr.GitShim) + " shims, core.hooksPath set",
 			statusState: "wired", statusWired: true,
 		},
 		{
 			name:         "an install would still write files",
-			w:            hookWiring{manager: hookmgr.Lefthook, changes: 2, stale: 1},
+			w:            doctor.HookWiring{Manager: hookmgr.Lefthook, Changes: 2, Stale: 1},
 			doctorStatus: doctor.Fail, doctorDetail: string(hookmgr.Lefthook) + " wiring is missing (2 file change(s))",
 			doctorFix:   "terma install",
 			statusState: "NOT wired (run `terma install`)", statusWired: false,
@@ -49,14 +50,14 @@ func TestHookWiringVerdictInBothCommands(t *testing.T) {
 			// Every file is there, written by an earlier terma: a refresh rewrites them
 			// without the sign-in and questions a re-install brings.
 			name:         "an earlier terma wrote the files",
-			w:            hookWiring{manager: hookmgr.GitShim, hooksPath: hookmgr.ShimDir, changes: 2, stale: 2},
+			w:            doctor.HookWiring{Manager: hookmgr.GitShim, HooksPath: hookmgr.ShimDir, Changes: 2, Stale: 2},
 			doctorStatus: doctor.Fail, doctorDetail: string(hookmgr.GitShim) + " wiring was written by an earlier terma (2 file(s) out of date)",
 			doctorFix:   "terma update --refresh",
 			statusState: "out of date (run `terma update --refresh`)", statusWired: false,
 		},
 		{
 			name:         "shims committed, this clone not pointed at them",
-			w:            hookWiring{manager: hookmgr.GitShim, unpointed: true},
+			w:            doctor.HookWiring{Manager: hookmgr.GitShim, Unpointed: true},
 			doctorStatus: doctor.Fail, doctorDetail: "shims are committed but git is not pointed at them in this clone (core.hooksPath=unset)",
 			statusState: "NOT wired (run `terma install`)", statusWired: false,
 		},
@@ -65,18 +66,18 @@ func TestHookWiringVerdictInBothCommands(t *testing.T) {
 			// compute, and status read it as nothing left to write and credited commit
 			// stamping. Neither calls it wired now, and both say why.
 			name:         "the plan cannot be computed",
-			w:            hookWiring{manager: hookmgr.Husky, err: errors.New("read .husky/pre-commit: permission denied")},
+			w:            doctor.HookWiring{Manager: hookmgr.Husky, Err: errors.New("read .husky/pre-commit: permission denied")},
 			doctorStatus: doctor.Fail, doctorDetail: "read .husky/pre-commit: permission denied",
 			statusState: "could not be checked — read .husky/pre-commit: permission denied", statusWired: false,
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			check := doctorHooksCheck(tc.w)
+			check := doctor.HooksCheck(tc.w)
 			if check.Status != tc.doctorStatus || check.Detail != tc.doctorDetail {
 				t.Errorf("doctor = %v %q; want %v %q", check.Status, check.Detail, tc.doctorStatus, tc.doctorDetail)
 			}
-			if want := firstNonEmpty(tc.doctorFix, "terma install"); check.Status == doctor.Fail && check.Fix != want {
+			if want := cmp.Or(tc.doctorFix, "terma install"); check.Status == doctor.Fail && check.Fix != want {
 				t.Errorf("a failed wiring check should name the fix %q, got %q", want, check.Fix)
 			}
 			state, wired := statusHooks(tc.w)
@@ -92,14 +93,14 @@ func TestStatusLineVerdictInBothCommands(t *testing.T) {
 		name         string
 		st           agents.StatusLineState
 		err          error
-		capture      statusLineCapture
+		capture      doctor.StatusLineCapture
 		doctorStatus doctor.Status
 		doctorDetail string
 		status       string
 	}{
 		{
 			name: "settings unreadable", err: errors.New("permission denied"),
-			capture:      statusLineUnknown,
+			capture:      doctor.StatusLineUnknown,
 			doctorStatus: doctor.Warn, doctorDetail: "permission denied",
 			status: "unknown (permission denied)",
 		},
@@ -107,45 +108,45 @@ func TestStatusLineVerdictInBothCommands(t *testing.T) {
 			// An override outranks everything else about the file, installed or not.
 			name:         "overridden by a repository's own settings",
 			st:           agents.StatusLineState{Installed: true, Overrides: []string{".claude/settings.json"}},
-			capture:      statusLineOverridden,
+			capture:      doctor.StatusLineOverridden,
 			doctorStatus: doctor.Warn, doctorDetail: "overridden by .claude/settings.json; plan usage is not captured in this repository",
 			status: "overridden here by .claude/settings.json — plan usage is not captured in this repository",
 		},
 		{
 			name:         "capturing, the developer's renderer behind it",
 			st:           agents.StatusLineState{Installed: true, Renderer: "~/bin/line.sh"},
-			capture:      statusLineBehind,
+			capture:      doctor.StatusLineBehind,
 			doctorStatus: doctor.Pass, doctorDetail: "capturing plan usage; ~/bin/line.sh runs behind it",
 			status: "capturing plan usage; your own (~/bin/line.sh) runs behind it",
 		},
 		{
 			name:         "capturing with terma's default line",
 			st:           agents.StatusLineState{Installed: true},
-			capture:      statusLineDefault,
+			capture:      doctor.StatusLineDefault,
 			doctorStatus: doctor.Pass, doctorDetail: "capturing plan usage (terma's default line)",
 			status: "capturing plan usage (terma's default line)",
 		},
 		{
 			name:         "replaced since terma wrapped it",
 			st:           agents.StatusLineState{Replaced: true},
-			capture:      statusLineReplaced,
+			capture:      doctor.StatusLineReplaced,
 			doctorStatus: doctor.Warn, doctorDetail: "replaced by your own status line since terma wrapped it; plan usage is not captured",
 			status: "replaced by your own since terma wrapped it — plan usage is NOT captured (run `terma install`)",
 		},
 		{
 			name:         "never wrapped",
-			capture:      statusLineNotWrapped,
+			capture:      doctor.StatusLineNotWrapped,
 			doctorStatus: doctor.Warn, doctorDetail: "not wrapped; plan usage is not captured",
 			status: "not wrapped — plan usage is NOT captured (run `terma install`)",
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			v := classifyStatusLine(tc.st, tc.err)
-			if v.capture != tc.capture {
-				t.Fatalf("capture = %v, want %v", v.capture, tc.capture)
+			v := doctor.ClassifyStatusLine(tc.st, tc.err)
+			if v.Capture != tc.capture {
+				t.Fatalf("capture = %v, want %v", v.Capture, tc.capture)
 			}
-			check := doctorStatusLineCheck(v)
+			check := doctor.StatusLineCheck(v)
 			if check.Status != tc.doctorStatus || check.Detail != tc.doctorDetail {
 				t.Errorf("doctor = %v %q; want %v %q", check.Status, check.Detail, tc.doctorStatus, tc.doctorDetail)
 			}
@@ -154,9 +155,9 @@ func TestStatusLineVerdictInBothCommands(t *testing.T) {
 			}
 			// Capturing is the only state doctor passes, and the only one status does
 			// not flag: the two agree on which states work.
-			capturing := v.capture == statusLineBehind || v.capture == statusLineDefault
+			capturing := v.Capture == doctor.StatusLineBehind || v.Capture == doctor.StatusLineDefault
 			if (check.Status == doctor.Pass) != capturing || strings.HasPrefix(tc.status, "capturing") != capturing {
-				t.Errorf("the commands disagree about whether %v captures", v.capture)
+				t.Errorf("the commands disagree about whether %v captures", v.Capture)
 			}
 		})
 	}
@@ -177,9 +178,9 @@ func TestHarnessVerdictInBothCommands(t *testing.T) {
 
 	cases := []struct {
 		name         string
-		facts        harnessFacts
+		facts        doctor.HarnessFacts
 		bound        bool
-		route        harnessRoute
+		route        doctor.Route
 		doctorStatus doctor.Status
 		doctorDetail string
 		status       string
@@ -187,15 +188,15 @@ func TestHarnessVerdictInBothCommands(t *testing.T) {
 	}{
 		{
 			name:  "machine-wide config sends to this project",
-			facts: harnessFacts{status: sending}, bound: true,
-			route:        routeGlobal,
+			facts: doctor.HarnessFacts{Status: sending}, bound: true,
+			route:        doctor.RouteGlobal,
 			doctorStatus: doctor.Pass, doctorDetail: "Claude Code → " + otlp,
 			status: "→ connected", statusOK: true,
 		},
 		{
 			name:  "reports to another project",
-			facts: harnessFacts{status: other}, bound: true,
-			route:        routeOtherProject,
+			facts: doctor.HarnessFacts{Status: other}, bound: true,
+			route:        doctor.RouteOtherProject,
 			doctorStatus: doctor.Fail, doctorDetail: "Claude Code reports to project " + elsewhere + ", not " + project,
 			status: "→ reporting to project " + elsewhere + ", not this one — run `terma install`", statusOK: false,
 		},
@@ -203,22 +204,22 @@ func TestHarnessVerdictInBothCommands(t *testing.T) {
 			// Routing that is not live yet changes nothing about a repository that asks:
 			// sessions here do send, through the machine-wide config.
 			name:  "routing not live, but the repository's policy makes it send",
-			facts: harnessFacts{status: silent, repoAsks: true, localScope: true}, bound: true,
-			route:        routeRepoDecides,
+			facts: doctor.HarnessFacts{Status: silent, RepoAsks: true, LocalScope: true}, bound: true,
+			route:        doctor.RouteRepoDecides,
 			doctorStatus: doctor.Pass, doctorDetail: "Claude Code → " + otlp + " (only where a repository asks); this repository asks",
 			status: "→ connected; repositories decide what is sent", statusOK: true,
 		},
 		{
 			name:  "silent machine-wide config, and this repository neither routes nor asks",
-			facts: harnessFacts{status: silent, localScope: true}, bound: true,
-			route:        routeRepoDecides,
+			facts: doctor.HarnessFacts{Status: silent, LocalScope: true}, bound: true,
+			route:        doctor.RouteRepoDecides,
 			doctorStatus: doctor.Fail, doctorDetail: "Claude Code → " + otlp + " (only where a repository asks); this repository does not route Claude Code to its project, so its sessions send nothing",
 			status: "→ no telemetry: this repository neither routes it nor asks for it — sessions here send nothing (run `terma install`)", statusOK: false,
 		},
 		{
 			name:  "silent machine-wide config, outside any installed repository",
-			facts: harnessFacts{status: silent, localScope: true}, bound: false,
-			route:        routeRepoDecides,
+			facts: doctor.HarnessFacts{Status: silent, LocalScope: true}, bound: false,
+			route:        doctor.RouteRepoDecides,
 			doctorStatus: doctor.Pass, doctorDetail: "Claude Code → " + otlp + " (only where a repository asks)",
 			status: "→ connected; repositories decide what is sent", statusOK: true,
 		},
@@ -228,34 +229,34 @@ func TestHarnessVerdictInBothCommands(t *testing.T) {
 			// repository has one, so doctor passed what status said sends nothing. Only a
 			// hand-edited config reaches it — connect always writes Codex's signals.
 			name:  "silent config for an agent with no repository scope",
-			facts: harnessFacts{status: silent}, bound: true,
-			route:        routeRepoDecides,
+			facts: doctor.HarnessFacts{Status: silent}, bound: true,
+			route:        doctor.RouteRepoDecides,
 			doctorStatus: doctor.Fail, doctorDetail: "Claude Code → " + otlp + " (only where a repository asks); this repository does not route Claude Code to its project, so its sessions send nothing",
 			status: "→ no telemetry: this repository neither routes it nor asks for it — sessions here send nothing (run `terma install`)", statusOK: false,
 		},
 		{
 			name:  "not connected",
-			facts: harnessFacts{}, bound: true,
-			route:        routeNone,
+			facts: doctor.HarnessFacts{}, bound: true,
+			route:        doctor.RouteNone,
 			doctorStatus: doctor.Fail, doctorDetail: "Claude Code installed but not exporting to " + otlp,
 			status: "→ not connected", statusOK: false,
 		},
 		{
 			name:  "configuration unreadable",
-			facts: harnessFacts{err: errors.New("permission denied")}, bound: true,
-			route:        routeNone,
+			facts: doctor.HarnessFacts{Err: errors.New("permission denied")}, bound: true,
+			route:        doctor.RouteNone,
 			doctorStatus: doctor.Fail, doctorDetail: "Claude Code installed but not exporting to " + otlp,
 			status: "(error)", statusOK: false,
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			v := judgeHarness(tc.facts, otlp, project)
-			v.name, v.displayName = "claude", "Claude Code"
-			if v.route != tc.route {
-				t.Fatalf("route = %v, want %v", v.route, tc.route)
+			v := doctor.JudgeHarness(tc.facts, otlp, project)
+			v.Name, v.DisplayName = "claude", "Claude Code"
+			if v.Route != tc.route {
+				t.Fatalf("route = %v, want %v", v.Route, tc.route)
 			}
-			check := doctorHarnessCheck([]harnessVerdict{v}, otlp, project, tc.bound)
+			check := doctor.HarnessCheck(registered, []doctor.HarnessVerdict{v}, otlp, project, tc.bound)
 			if check.Status != tc.doctorStatus || check.Detail != tc.doctorDetail {
 				t.Errorf("doctor = %v %q\n         want %v %q", check.Status, check.Detail, tc.doctorStatus, tc.doctorDetail)
 			}

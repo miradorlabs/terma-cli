@@ -9,6 +9,9 @@ import (
 	"testing"
 	"time"
 
+	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
+	"google.golang.org/protobuf/proto"
+
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hookrun"
@@ -16,8 +19,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/spool"
-	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
-	"google.golang.org/protobuf/proto"
 )
 
 func TestSpoolRepliesUseCurrentNativeCodexConsent(t *testing.T) {

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/api"
 	"github.com/miradorlabs/terma-cli/internal/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/output"
 	"github.com/miradorlabs/terma-cli/internal/prompt"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/style"
@@ -84,7 +86,7 @@ func runSetup(cmd *cobra.Command, f setupFlags) error {
 			return err
 		}
 		for _, p := range files {
-			fmt.Fprintln(out, "Wrote "+tildePath(p))
+			fmt.Fprintln(out, "Wrote "+output.TildePath(p))
 		}
 		fmt.Fprintln(out, "Deploy them as the README there says; each developer still runs `terma setup` once.")
 		return nil
@@ -213,7 +215,7 @@ func applyGlobalMode(ctx context.Context, agents []string, global bool, said, th
 		return err
 	}
 	for _, f := range files {
-		said("Machine-wide hooks updated: " + tildePath(f))
+		said("Machine-wide hooks updated: " + output.TildePath(f))
 	}
 	if global && len(files) > 0 {
 		for _, step := range userHooksTrustSteps(agents) {
@@ -266,7 +268,7 @@ func fetchPolicy(ctx context.Context, cfg *config.Config) (config.Policy, error)
 		return config.Policy{}, fmt.Errorf("fetch the organization's collection policy: %w", err)
 	}
 	pol.OrganizationID, pol.AuthURL = cfg.OrganizationID, cfg.AuthURL
-	pol.TeamID = firstNonEmpty(cfg.ProjectID, pol.DefaultProjectID)
+	pol.TeamID = cmp.Or(cfg.ProjectID, pol.DefaultProjectID)
 	if pol.Global() && os.Getenv("TERMA_POLICY_STUB") == "" {
 		pol.DefaultProjectID = cfg.ProjectID
 	}
@@ -461,16 +463,6 @@ func adapterDisplayNames(names []string) []string {
 	return out
 }
 
-// lookPathAny reports whether any of the given binaries is on PATH.
-func firstNonEmpty(values ...string) string {
-	for _, v := range values {
-		if v != "" {
-			return v
-		}
-	}
-	return ""
-}
-
 // setupHeaderInfo is the column beside the logo: the product, who terma is signed in
 // as right now (and where it is pointed), and the working directory. It reads only local
 // state — no network — so it is safe to show before signing in.
@@ -486,8 +478,8 @@ func setupHeaderInfo(cfg *config.Config, p style.Palette) []string {
 			info = append(info, p.Dim("not signed in — setup will sign you in"))
 			break
 		}
-		who := firstNonEmpty(cred.UserEmail, "signed in")
-		org := firstNonEmpty(cfg.OrganizationName, cfg.OrganizationID)
+		who := cmp.Or(cred.UserEmail, "signed in")
+		org := cmp.Or(cfg.OrganizationName, cfg.OrganizationID)
 		if org != "" {
 			who += "  " + p.Dim("("+org+")")
 		}
@@ -495,22 +487,7 @@ func setupHeaderInfo(cfg *config.Config, p style.Palette) []string {
 	}
 
 	if cwd, err := os.Getwd(); err == nil {
-		info = append(info, p.Dim(tildePath(cwd)))
+		info = append(info, p.Dim(output.TildePath(cwd)))
 	}
 	return info
-}
-
-// tildePath abbreviates the home directory to ~, as a shell prompt would.
-func tildePath(path string) string {
-	home, err := os.UserHomeDir()
-	if err != nil || home == "" {
-		return path
-	}
-	if path == home {
-		return "~"
-	}
-	if strings.HasPrefix(path, home+string(os.PathSeparator)) {
-		return "~" + path[len(home):]
-	}
-	return path
 }

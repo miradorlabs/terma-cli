@@ -87,20 +87,20 @@ func (u *installUI) finish() {
 func (u *installUI) verify(cmd *cobra.Command) {
 	fmt.Fprintf(u.detail, "\n%s\n", u.p.Bold("Verifying the chain (terma doctor):"))
 	sp := spinner.New(cmd.ErrOrStderr())
-	report := runDoctor(cmd.Context(), false, doctorProgress{
-		start: func(name string) {
+	report := runDoctor(cmd.Context(), false, doctor.Progress{
+		Start: func(name string) {
 			if u.detail == io.Discard {
 				sp.Start("Verifying installation…")
 			} else {
 				sp.Start("Verifying: " + name + "…")
 			}
 		},
-		note: func(note string) {
+		Note: func(note string) {
 			if u.detail != io.Discard {
 				sp.Update(note)
 			}
 		},
-		done: func(c doctor.Check) {
+		Done: func(c doctor.Check) {
 			sp.Stop()
 			doctor.RenderCheck(u.detail, c, doctor.NameWidth)
 		},

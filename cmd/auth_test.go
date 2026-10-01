@@ -1,9 +1,10 @@
 package cmd
 
 import (
+	"testing"
+
 	"github.com/miradorlabs/terma-cli/internal/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"testing"
 )
 
 func TestApplyLoginUpdatesOrganization(t *testing.T) {

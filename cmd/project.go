@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -91,15 +92,15 @@ func newProjectShowCommand() *cobra.Command {
 				return fmt.Errorf("no project bound to this repository — run `terma install` or pass --project")
 			}
 
-			organizationID := firstNonEmpty(cfg.ProjectOrganizationID, cfg.OrganizationID)
+			organizationID := cmp.Or(cfg.ProjectOrganizationID, cfg.OrganizationID)
 			organizationName := cfg.OrganizationName
 			if organizationID != cfg.OrganizationID {
 				organizationName = ""
 			}
 			current := project{ID: cfg.ProjectID, Name: cfg.ProjectName, OrganizationID: organizationID}
 			return output.KeyValues(cmd.OutOrStdout(), format, [][2]string{
-				{"name", nameOrID(cfg.ProjectName, cfg.ProjectID)},
-				{"organization", nameOrID(organizationName, organizationID)},
+				{"name", cmp.Or(cfg.ProjectName, cfg.ProjectID)},
+				{"organization", cmp.Or(organizationName, organizationID)},
 				{"profile", cfg.ProfileName},
 			}, current)
 		},

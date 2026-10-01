@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 
@@ -134,7 +135,7 @@ Choose a project for each repository with ` + "`terma install`" + `.`,
 			if err != nil {
 				return err
 			}
-			where := nameOrID(res.orgName, res.cred.OrganizationID)
+			where := cmp.Or(res.orgName, res.cred.OrganizationID)
 			switch {
 			case res.reused && before == res.cred.OrganizationID:
 				fmt.Fprintf(out, "Already using %s.\n", where)

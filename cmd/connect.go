@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/api"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
 	"github.com/miradorlabs/terma-cli/internal/output"
@@ -396,7 +398,7 @@ func printConnectPlan(
 	f connectFlags,
 ) {
 	printDetection(out, h, detection)
-	fmt.Fprintf(out, "  Terma project: %s\n", nameOrID(cfg.ProjectName, cfg.ProjectID))
+	fmt.Fprintf(out, "  Terma project: %s\n", cmp.Or(cfg.ProjectName, cfg.ProjectID))
 	fmt.Fprintf(out, "  Endpoint:        %s\n", cfg.OTLPURL)
 
 	if reach == harness.ReachRepos {
@@ -612,7 +614,7 @@ func backupHarnessConfig(h harness.Harness, endpoint string) (string, error) {
 // line and returns the line to say about it, and whether it is in place. A failure is a
 // warning, never a failed connect: the exporters are already written and working.
 func installStatusLine(errOut io.Writer) (string, bool) {
-	s, ok := statusLineAgent()
+	s, ok := doctor.StatusLineAgent(registered)
 	if !ok {
 		return "", false
 	}

@@ -2,13 +2,14 @@ package cmd
 
 import (
 	"context"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/miradorlabs/terma-cli/internal/routing"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
@@ -289,8 +290,7 @@ func TestDoctorBackendWarnsForAnotherProjectsRefusal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	d := doctorRun{ctx: context.Background(), cfg: cfg, projectID: routeProdProject}
-	check := d.backendReceives()
+	check := doctor.BackendCheck(context.Background(), doctorProbes(cfg), routeProdProject, "", doctor.Check{}, doctor.Progress{})
 	if check.Status == doctor.Fail {
 		t.Fatalf("another project's refusal must not fail this repository's check: %+v", check)
 	}
@@ -314,8 +314,7 @@ func TestDoctorBackendFailsOnThisProjectsRefusal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	d := doctorRun{ctx: context.Background(), cfg: cfg, projectID: routeDevProject}
-	check := d.backendReceives()
+	check := doctor.BackendCheck(context.Background(), doctorProbes(cfg), routeDevProject, "", doctor.Check{}, doctor.Progress{})
 	if check.Status != doctor.Fail || !strings.Contains(check.Detail, "this project's events were not delivered: refused by "+dev.URL) {
 		t.Fatalf("this project's refusal must fail, naming the host: %+v", check)
 	}

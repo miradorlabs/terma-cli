@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"cmp"
 	"fmt"
 	"maps"
 	"slices"
@@ -89,8 +90,8 @@ func newConfigShowCommand() *cobra.Command {
 				{"auth url", cfg.AuthURL},
 				{"app url", cfg.AppURL},
 				{"otlp url", cfg.OTLPURL},
-				{"organization", nameOrID(cfg.OrganizationName, cfg.OrganizationID)},
-				{"project", nameOrID(cfg.ProjectName, cfg.ProjectID)},
+				{"organization", cmp.Or(cfg.OrganizationName, cfg.OrganizationID)},
+				{"project", cmp.Or(cfg.ProjectName, cfg.ProjectID)},
 				{"auth", authMode},
 			}, view)
 		},
@@ -121,7 +122,7 @@ func newConfigProfilesCommand() *cobra.Command {
 				if name == file.ActiveProfile {
 					marker = "*"
 				}
-				rows = append(rows, []string{marker, name, nameOrID(file.Profiles[name].OrganizationName, file.Profiles[name].OrganizationID)})
+				rows = append(rows, []string{marker, name, cmp.Or(file.Profiles[name].OrganizationName, file.Profiles[name].OrganizationID)})
 			}
 
 			return output.Render(cmd.OutOrStdout(), format, output.Table{

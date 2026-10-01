@@ -67,11 +67,10 @@ func Token() (string, error) {
 // Running reports whether a relay holds the state directory's lock.
 func Running(dir string) bool {
 	unlock, err := flock.TryLock(filepath.Join(dir, LockFile))
-	if err != nil {
-		return true
+	if err == nil {
+		unlock()
 	}
-	unlock()
-	return false
+	return flock.IsBusy(err)
 }
 
 // Squatted reports whether something answers on addr while the relay is not running:

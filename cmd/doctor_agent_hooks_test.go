@@ -16,7 +16,7 @@ func TestAgentHooksCheckRejectsMalformedSettings(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, ".claude", "settings.json"), []byte(`{"hooks":`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	c := agentHooksCheck(root, []string{"claude"})
+	c := doctor.AgentHooksCheck(registered, root, []string{"claude"})
 	if c.Status != doctor.Warn || c.Ready != 0 || c.Of != 1 {
 		t.Fatalf("malformed settings: %+v, want warning and 0/1 ready", c)
 	}
@@ -30,18 +30,18 @@ func TestAgentHooksCheckRejectsMalformedSettings(t *testing.T) {
 // wire it — never an agent nobody named.
 func TestAgentHooksCheckReadsTheRepository(t *testing.T) {
 	root := t.TempDir()
-	if c := agentHooksCheck(root, nil); c.Status != doctor.Skip {
+	if c := doctor.AgentHooksCheck(registered, root, nil); c.Status != doctor.Skip {
 		t.Fatalf("nothing wired, no agents named: status = %v (%s), want skip", c.Status, c.Detail)
 	}
 
 	wireAdapters(t, root, "claude")
-	c := agentHooksCheck(root, nil)
+	c := doctor.AgentHooksCheck(registered, root, nil)
 	if c.Status != doctor.Pass || c.Detail != "Claude Code hooks present" {
 		t.Fatalf("claude wired, no agents named: %v %q", c.Status, c.Detail)
 	}
 
 	// A developer who uses Cursor in a repository wired only for Claude Code.
-	c = agentHooksCheck(root, []string{"cursor"})
+	c = doctor.AgentHooksCheck(registered, root, []string{"cursor"})
 	if c.Status != doctor.Warn || !strings.Contains(c.Detail, "Cursor hooks missing") || c.Fix != "terma install" {
 		t.Fatalf("cursor named but not wired: %v %q fix %q", c.Status, c.Detail, c.Fix)
 	}
@@ -75,7 +75,7 @@ func TestAgentHooksCheckSendsStaleHooksToRefresh(t *testing.T) {
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	c := agentHooksCheck(root, []string{"claude"})
+	c := doctor.AgentHooksCheck(registered, root, []string{"claude"})
 	if c.Status != doctor.Warn || !strings.Contains(c.Detail, "Claude Code hooks out of date") || c.Fix != "terma update --refresh" {
 		t.Fatalf("stale hooks: %v %q fix %q", c.Status, c.Detail, c.Fix)
 	}

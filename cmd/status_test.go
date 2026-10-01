@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
@@ -65,7 +66,7 @@ func TestHarnessState(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got, ok := statusAgent(judgeHarness(harnessFacts{status: tc.st, err: tc.err}, otlp, tc.project), false)
+			got, ok := statusAgent(doctor.JudgeHarness(doctor.HarnessFacts{Status: tc.st, Err: tc.err}, otlp, tc.project), false)
 			if got != tc.want || ok != tc.ok {
 				t.Fatalf("statusAgent = %q, %v; want %q, %v", got, ok, tc.want, tc.ok)
 			}

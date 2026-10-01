@@ -4,14 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/miradorlabs/terma-cli/internal/agents"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 	"maps"
 	"os"
 	"slices"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/miradorlabs/terma-cli/internal/agents"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 
 	"github.com/spf13/cobra"
 
@@ -205,16 +206,6 @@ type projectFailure struct {
 type projectWait struct {
 	ProjectID string
 	RetryAt   time.Time
-}
-
-// failureFor returns the failure recorded for projectID, if any.
-func (r flushResult) failureFor(projectID string) (projectFailure, bool) {
-	for _, f := range r.Failures {
-		if f.ProjectID == projectID {
-			return f, true
-		}
-	}
-	return projectFailure{}, false
 }
 
 // Lost reports whether the pass discarded events rather than delivering or

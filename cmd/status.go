@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"cmp"
 	"fmt"
 	"strings"
 	"time"
@@ -20,32 +21,19 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/style"
 )
 
-// repoAsks reports whether the repository at root carries a committed policy that switches
-// a harness's signals on. It is the other half of a machine-wide connect made with
-// `--exports repos`: that connect holds the endpoint and the key and exports nothing, so
-// whether a session here sends anything is this file's decision.
-func repoAsks(h harness.Harness, root string) bool {
-	scoped, ok := h.(harness.Scoped)
-	if !ok || root == "" {
-		return false
-	}
-	st, err := scoped.Local(root).Status()
-	return err == nil && len(st.Signals) > 0
-}
-
 // statusHooks is status's wording for the commit-hook verdict, and whether commit
 // stamping counts toward coverage. A plan that could not be computed is not "nothing
 // left to write": status used to read it that way and credit commit stamping while
 // doctor failed the same repository — and an unreadable hooks file is exactly what
 // makes a plan fail. Reinstalling cannot fix what it cannot read, so the reason is
 // given rather than the usual advice.
-func statusHooks(w hookWiring) (string, bool) {
+func statusHooks(w doctor.HookWiring) (string, bool) {
 	switch {
-	case w.err != nil:
-		return "could not be checked — " + w.err.Error(), false
-	case w.changes == 0 && !w.unpointed:
+	case w.Err != nil:
+		return "could not be checked — " + w.Err.Error(), false
+	case w.Changes == 0 && !w.Unpointed:
 		return "wired", true
-	case w.changes > 0 && w.stale == w.changes && !w.unpointed:
+	case w.Changes > 0 && w.Stale == w.Changes && !w.Unpointed:
 		return "out of date (run `terma update --refresh`)", false
 	default:
 		return "NOT wired (run `terma install`)", false
@@ -56,52 +44,57 @@ func statusHooks(w hookWiring) (string, bool) {
 // reaches this project. Exporting to the right host but the wrong project is the case
 // worth spelling out: everything looks wired, and none of the spend arrives. `terma
 // doctor` fails on it, so status must not call it connected. bound says the CLI
-// stands in an installed repository.
-func statusAgent(v harnessVerdict, bound bool) (string, bool) {
-	if v.emissionProblem != "" {
-		return "→ " + v.emissionProblem + " — " + v.emissionFix, false
+// stands in an installed repository. Whether it reaches the project is doctor's
+// judgement (HarnessVerdict.Reaches), so the two cannot disagree.
+func statusAgent(v doctor.HarnessVerdict, bound bool) (string, bool) {
+	return statusAgentLine(v, bound), v.Reaches(bound)
+}
+
+func statusAgentLine(v doctor.HarnessVerdict, bound bool) string {
+	if v.EmissionProblem != "" {
+		return "→ " + v.EmissionProblem + " — " + v.EmissionFix
 	}
-	switch v.route {
-	case routeGlobal:
-		return "→ connected", true
-	case routeHooks:
-		return "→ connected (repository hooks)", true
-	case routeOtherProject:
-		return "→ reporting to project " + v.otherProject + ", not this one — run `terma install`", false
-	case routeRepoDecides:
+	switch v.Route {
+	case doctor.RouteGlobal:
+		return "→ connected"
+	case doctor.RouteHooks:
+		return "→ connected (repository hooks)"
+	case doctor.RouteOtherProject:
+		return "→ reporting to project " + v.OtherProject + ", not this one — run `terma install`"
+	case doctor.RouteRepoDecides:
 		// A machine-wide connect that exports no signal of its own is "connected" in
 		// general and says nothing about *here*. In a bound repository the question
 		// has an answer — this repository routes the agent, asks for it, or neither —
 		// and doctor gives it; status must give the same one, or it reports readiness
 		// for a repository whose sessions send nothing.
-		if bound && !v.repoAsks {
-			return "→ no telemetry: this repository neither routes it nor asks for it — sessions here send nothing (run `terma install`)", false
+		if bound && !v.RepoAsks {
+			return "→ no telemetry: this repository neither routes it nor asks for it — sessions here send nothing (run `terma install`)"
 		}
 		// Pointed somewhere, holding a key, exporting no signal. Nothing but a
 		// repository's own policy can make this send, which is `--exports repos`
 		// however it was arrived at. Saying "connected" alone would read as working;
 		// saying "not connected" would read as broken. It is neither.
-		return "→ connected; repositories decide what is sent", true
+		return "→ connected; repositories decide what is sent"
 	}
-	if v.err != nil {
-		return "(error)", false
+	if v.Err != nil {
+		return "(error)"
 	}
-	return "→ not connected", false
+	return "→ not connected"
 }
 
 // statusLineSummary is one line on whether Claude Code's status line feeds terma the
 // plan's usage windows, and why not when it does not.
-func statusLineSummary(v statusLineVerdict) string {
-	switch v.capture {
-	case statusLineUnknown:
-		return "unknown (" + v.err.Error() + ")"
-	case statusLineOverridden:
-		return "overridden here by " + strings.Join(v.overrides, ", ") + " — plan usage is not captured in this repository"
-	case statusLineBehind:
-		return "capturing plan usage; your own (" + output.SanitizeTerminal(v.renderer) + ") runs behind it"
-	case statusLineDefault:
+func statusLineSummary(v doctor.StatusLineVerdict) string {
+	switch v.Capture {
+	case doctor.StatusLineUnknown:
+		return "unknown (" + v.Err.Error() + ")"
+	case doctor.StatusLineOverridden:
+		return "overridden here by " + strings.Join(v.Overrides, ", ") + " — plan usage is not captured in this repository"
+	case doctor.StatusLineBehind:
+		return "capturing plan usage; your own (" + output.SanitizeTerminal(v.Renderer) + ") runs behind it"
+	case doctor.StatusLineDefault:
 		return "capturing plan usage (terma's default line)"
-	case statusLineReplaced:
+	case doctor.StatusLineReplaced:
 		return "replaced by your own since terma wrapped it — plan usage is NOT captured (run `terma install`)"
 	}
 	return "not wrapped — plan usage is NOT captured (run `terma install`)"
@@ -134,7 +127,7 @@ Nothing is written and no scratch commit is made — run
 					authOK = false
 					fmt.Fprintln(out, "Account:     not signed in — run `terma setup`")
 				} else {
-					fmt.Fprintf(out, "Account:     %s in %s\n", firstNonEmpty(cred.UserEmail, "signed in"), nameOrID(cfg.OrganizationName, cred.OrganizationID))
+					fmt.Fprintf(out, "Account:     %s in %s\n", cmp.Or(cred.UserEmail, "signed in"), cmp.Or(cfg.OrganizationName, cred.OrganizationID))
 				}
 			}
 			// Say where this is pointed whenever it is not production, by a named
@@ -161,18 +154,18 @@ Nothing is written and no scratch commit is made — run
 				fmt.Fprintf(out, "Repository:  %s — not installed (run `terma install`)\n", root)
 			} else {
 				projectID, repoBound = bound.Project.ID, true
-				fmt.Fprintf(out, "Repository:  %s → %s%s\n", root, nameOrID(bound.Project.Name, bound.Project.ID), throughMain(root, from))
+				fmt.Fprintf(out, "Repository:  %s → %s%s\n", root, cmp.Or(bound.Project.Name, bound.Project.ID), doctor.ThroughMain(root, from))
 				if gitDir == "" {
 					fmt.Fprintln(out, "Hooks:       Git hooks skipped (not a Git repository)")
 				} else {
-					wiring := judgeHookWiring(ctx, root, bound)
+					wiring := doctor.JudgeHookWiring(ctx, root, bound)
 					var state string
 					state, hooksOK = statusHooks(wiring)
-					fmt.Fprintf(out, "Hooks:       %s via %s\n", state, wiring.manager)
+					fmt.Fprintf(out, "Hooks:       %s via %s\n", state, wiring.Manager)
 				}
 				// The agents' own hooks, judged the way doctor judges them: an agent that
 				// cannot run its hooks yet costs its share of commit stamping in both.
-				if agentHooks = agentHooksCheck(root, selectedForRepo(projectID, cfg.Harnesses)); agentHooks.Status == doctor.Warn {
+				if agentHooks = doctor.AgentHooksCheck(registered, root, doctor.SelectedForRepo(registered, projectID, cfg.Harnesses)); agentHooks.Status == doctor.Warn {
 					fmt.Fprintf(out, "Agent hooks: %d of %d agents can run theirs — %s\n", agentHooks.Ready, agentHooks.Of, agentHooks.Fix)
 				}
 				stateDir, err := termaproject.StateDir(root, gitDir)
@@ -201,7 +194,7 @@ Nothing is written and no scratch commit is made — run
 			// doctor gives (relayDoctorCheck), so the two never disagree.
 			var export doctor.Check
 			if claim.Enabled() {
-				export = relayDoctorCheck(projectID, cfg.Harnesses)
+				export = doctor.RelayCheck(registered, projectID, cfg.Harnesses)
 				export.Key = doctor.KeyHarness
 				fmt.Fprintf(out, "Agents:      %s\n", export.Detail)
 				if export.Fix != "" {
@@ -209,21 +202,21 @@ Nothing is written and no scratch commit is made — run
 				}
 			} else {
 				var connected []string
-				verdicts := judgeSelectedHarnesses(ctx, cfg.OTLPURL, projectID, root, cfg.Harnesses)
+				verdicts := doctor.JudgeSelectedHarnesses(ctx, registered, cfg.OTLPURL, projectID, root, cfg.Harnesses)
 				for _, v := range verdicts {
 					suffix, ok := statusAgent(v, repoBound)
 					if ok {
-						connected = append(connected, v.displayName)
+						connected = append(connected, v.DisplayName)
 					}
-					fmt.Fprintf(out, "Agent:       %s %s\n", v.displayName, suffix)
-					if a, lines := statusLineAgent(); lines && v.name == a.Name() && ok {
-						fmt.Fprintf(out, "Status line: %s\n", statusLineSummary(judgeStatusLine(root)))
+					fmt.Fprintf(out, "Agent:       %s %s\n", v.DisplayName, suffix)
+					if a, lines := doctor.StatusLineAgent(registered); lines && v.Name == a.Name() && ok {
+						fmt.Fprintf(out, "Status line: %s\n", statusLineSummary(doctor.JudgeStatusLine(registered, root)))
 					}
 				}
 				if len(connected) == 0 {
 					fmt.Fprintln(out, "Agent:       none connected — run `terma install`")
 				}
-				export = doctorHarnessCheck(verdicts, cfg.OTLPURL, projectID, repoBound)
+				export = doctor.HarnessCheck(registered, verdicts, cfg.OTLPURL, projectID, repoBound)
 			}
 			// A repository's own policy narrows what its sessions ship. Said next to
 			// the agent it applies to, since the global line cannot show it.
@@ -266,7 +259,7 @@ Nothing is written and no scratch commit is made — run
 				fmt.Fprintln(out, line)
 			}
 
-			checks := []doctor.Check{doctorBinaryCheck(), export, agentHooks,
+			checks := []doctor.Check{binaryCheck(), export, agentHooks,
 				{Key: doctor.KeyBackend, Status: doctor.Skip}}
 			if !authOK {
 				checks = append(checks, doctor.Check{Status: doctor.Fail, Fix: "terma setup"})

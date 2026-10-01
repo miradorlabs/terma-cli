@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -11,6 +10,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/miradorlabs/terma-cli/internal/routing"
 
 	"github.com/miradorlabs/terma-cli/internal/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -20,8 +21,8 @@ import (
 
 // Doctor's round-trip reads the scratch commit's terma.commit record back, so it has to
 // ask the way the log store documents: a since/until window, not a `window` parameter it
-// does not. A miss is polled again rather than reported.
-func TestWaitForCommitEventAsksForAWindow(t *testing.T) {
+// does not.
+func TestCommitRecordedAsksForAWindow(t *testing.T) {
 	const sha = "0123456789abcdef0123456789abcdef01234567"
 
 	var mu sync.Mutex
@@ -65,22 +66,19 @@ func TestWaitForCommitEventAsksForAWindow(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	var notes []string
-	progress := doctorProgress{note: func(text string) { notes = append(notes, text) }}
-	started := time.Now()
+	from, to := time.Now().Add(-time.Hour).Truncate(time.Second), time.Now().Add(time.Hour).Truncate(time.Second)
 	cfg.ProjectID = "another-project"
-	found, err := waitForCommitEvent(ctx, cfg, "repo-project", sha, progress)
-	if err != nil || !found {
-		t.Fatalf("waitForCommitEvent = %v, %v; want the second poll to find the record", found, err)
+	recorded := commitRecorded(cfg)
+	for i, want := range []bool{false, true} {
+		if found, err := recorded(ctx, "repo-project", sha, from, to); err != nil || found != want {
+			t.Fatalf("read %d = %v, %v; want %v", i, found, err, want)
+		}
 	}
 
 	mu.Lock()
 	defer mu.Unlock()
 	if len(queries) != 2 {
 		t.Fatalf("made %d queries, want a miss and then a hit", len(queries))
-	}
-	if len(notes) != len(queries) {
-		t.Errorf("noted progress %d times over %d polls", len(notes), len(queries))
 	}
 	for i, q := range queries {
 		if q.Has("window") {
@@ -94,8 +92,8 @@ func TestWaitForCommitEventAsksForAWindow(t *testing.T) {
 		if errS != nil || errU != nil {
 			t.Fatalf("query %d window not RFC3339: %q..%q", i, q.Get("since"), q.Get("until"))
 		}
-		if since.After(started) || until.Before(started) || until.Sub(since) != 2*commitLogWindow {
-			t.Errorf("query %d window %v..%v does not bracket the scratch commit by %v", i, since, until, commitLogWindow)
+		if !since.Equal(from) || !until.Equal(to) {
+			t.Errorf("query %d window %v..%v, want %v..%v", i, since, until, from, to)
 		}
 	}
 }
@@ -116,18 +114,9 @@ func TestDoctorBackendReadErrorIsInconclusive(t *testing.T) {
 	if err := keystore.Set("repo-project", "ter_srv_test", keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
-	d := doctorRun{ctx: context.Background(), cfg: cfg, projectID: "repo-project", scratchSHA: "scratch"}
-	check := d.backendReceives()
+	check := doctor.BackendCheck(context.Background(), doctorProbes(cfg), "repo-project", "scratch", doctor.Check{}, doctor.Progress{})
 	if check.Status != doctor.Warn || !check.Inconclusive || !strings.Contains(check.Detail, "could not confirm") {
 		t.Fatalf("API read failure is not proof of delivery failure: %+v", check)
-	}
-}
-
-func TestDoctorSkipsBackendProbeWhenHookBinaryDiffers(t *testing.T) {
-	d := doctorRun{binaryCheck: doctor.Check{Status: doctor.Warn, Fix: "replace the stale binary"}}
-	check := d.backendReceives()
-	if check.Status != doctor.Warn || !check.Inconclusive || check.Fix != d.binaryCheck.Fix {
-		t.Fatalf("must identify the binary mismatch before flushing or polling: %+v", check)
 	}
 }
 
@@ -135,7 +124,7 @@ func TestDoctorSkipsBackendProbeWhenHookBinaryDiffers(t *testing.T) {
 // is read back from that environment's data API, with the project's own key. The
 // signed-in credential is bound to the profile's auth host, and asking the profile's
 // API for the project's scratch commit found nothing on every run.
-func TestWaitForCommitEventReadsTheProjectsOwnEnvironment(t *testing.T) {
+func TestCommitRecordedReadsTheProjectsOwnEnvironment(t *testing.T) {
 	const sha = "0123456789abcdef0123456789abcdef01234567"
 	profileAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Errorf("the active profile's API was asked for another environment's project: %s", r.URL)
@@ -178,9 +167,9 @@ func TestWaitForCommitEventReadsTheProjectsOwnEnvironment(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	found, err := waitForCommitEvent(ctx, cfg, "dev-project", sha, doctorProgress{})
+	found, err := commitRecorded(cfg)(ctx, "dev-project", sha, time.Now().Add(-time.Hour), time.Now().Add(time.Hour))
 	if err != nil || !found {
-		t.Fatalf("waitForCommitEvent = %v, %v", found, err)
+		t.Fatalf("commitRecorded = %v, %v", found, err)
 	}
 	mu.Lock()
 	defer mu.Unlock()

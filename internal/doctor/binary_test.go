@@ -1,4 +1,4 @@
-package cmd
+package doctor
 
 import (
 	"crypto/sha256"
@@ -10,12 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/shellrc"
 )
-
-// What else is installed on the machine running the tests is none of their business.
-func init() { wellKnownBinDirs = func() []string { return nil } }
 
 func writeTerma(t *testing.T, dir, body string) string {
 	t.Helper()
@@ -34,14 +30,14 @@ func TestDoctorComparesPATHBinaryWithRunningBuild(t *testing.T) {
 	current := writeTerma(t, t.TempDir(), "new build")
 	installed := writeTerma(t, t.TempDir(), "old build")
 	t.Setenv("PATH", filepath.Dir(installed))
-	check := doctorBinaryCheckFor(current)
-	if check.Status != doctor.Warn || !strings.Contains(check.Detail, "hooks run a different build") || !strings.Contains(check.Fix, filepath.Dir(current)) {
+	check := BinaryCheck(current, nil)
+	if check.Status != Warn || !strings.Contains(check.Detail, "hooks run a different build") || !strings.Contains(check.Fix, filepath.Dir(current)) {
 		t.Fatalf("stale hook binary must be reported: %+v", check)
 	}
 	if err := os.WriteFile(installed, []byte("new build"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	if check := doctorBinaryCheckFor(current); check.Status != doctor.Pass {
+	if check := BinaryCheck(current, nil); check.Status != Pass {
 		t.Fatalf("identical copy should pass: %+v", check)
 	}
 }
@@ -51,7 +47,7 @@ func TestDoctorRecognizesOfficialNpmLauncher(t *testing.T) {
 		t.Skip("npm's Windows command wrapper has a different layout")
 	}
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
-	launcher, err := os.ReadFile(filepath.Join("..", "npm", "bin", "terma.js"))
+	launcher, err := os.ReadFile(filepath.Join("..", "..", "npm", "bin", "terma.js"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,16 +69,16 @@ func TestDoctorRecognizesOfficialNpmLauncher(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", bin)
-	if check := doctorBinaryCheckFor(current); check.Status != doctor.Pass {
+	if check := BinaryCheck(current, nil); check.Status != Pass {
 		t.Fatalf("official npm launcher should delegate to this build: %+v", check)
 	}
-	if others := otherTermas(filepath.Join(bin, "terma")); len(others) != 0 {
+	if others := otherTermas(filepath.Join(bin, "terma"), nil); len(others) != 0 {
 		t.Fatalf("npm launcher should compare its vendor binary: %v", others)
 	}
 	if err := os.WriteFile(vendor, []byte("old Go build"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if check := doctorBinaryCheckFor(current); check.Status != doctor.Warn {
+	if check := BinaryCheck(current, nil); check.Status != Warn {
 		t.Fatalf("stale vendor binary must still be reported: %+v", check)
 	}
 	if err := os.WriteFile(vendor, []byte("same Go build"), 0o755); err != nil {
@@ -91,7 +87,7 @@ func TestDoctorRecognizesOfficialNpmLauncher(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(pkg, "bin", "terma.js"), append(launcher, []byte("\n// changed\n")...), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if check := doctorBinaryCheckFor(current); check.Status != doctor.Warn {
+	if check := BinaryCheck(current, nil); check.Status != Warn {
 		t.Fatalf("edited npm launcher must not be trusted: %+v", check)
 	}
 }
@@ -113,17 +109,14 @@ func TestOtherTermasReportsOnlyADifferentBuild(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", strings.Join([]string{filepath.Dir(primary), sameBuild, linked, notExecutable, "", t.TempDir()}, string(os.PathListSeparator)))
-	if others := otherTermas(primary); len(others) != 0 {
+	if others := otherTermas(primary, nil); len(others) != 0 {
 		t.Fatalf("nothing here disagrees with the primary: %v", others)
 	}
 
 	// A stale copy where PATH does not look — the system directory an app started from
 	// the Dock searches first — found through the well-known list.
 	stale := writeTerma(t, t.TempDir(), "build B, from this morning")
-	saved := wellKnownBinDirs
-	wellKnownBinDirs = func() []string { return []string{filepath.Dir(stale), filepath.Dir(stale)} }
-	t.Cleanup(func() { wellKnownBinDirs = saved })
-	others := otherTermas(primary)
+	others := otherTermas(primary, []string{filepath.Dir(stale), filepath.Dir(stale)})
 	if len(others) != 1 || !strings.Contains(others[0], filepath.Base(filepath.Dir(stale))) || !strings.Contains(others[0], "installed ") {
 		t.Fatalf("the stale copy should be reported once, with when it was installed: %v", others)
 	}
@@ -142,9 +135,9 @@ func TestDoctorGivesTheCommandThatPutsTermaOnPath(t *testing.T) {
 	current := writeTerma(t, filepath.Join(t.TempDir(), "it's a build"), "this build")
 	dir := filepath.Dir(current)
 
-	check := doctorBinaryCheckFor(current)
-	command := addToPathCommand(dir)
-	if check.Status != doctor.Fail || !strings.Contains(check.Fix, "run `"+command+"` to put "+dir+" on PATH") || strings.Count(check.Fix, "`") != 2 {
+	check := BinaryCheck(current, nil)
+	command := AddToPathCommand(dir)
+	if check.Status != Fail || !strings.Contains(check.Fix, "run `"+command+"` to put "+dir+" on PATH") || strings.Count(check.Fix, "`") != 2 {
 		t.Fatalf("the fix should be the one quoted command: %+v", check)
 	}
 	echo, reload, ok := strings.Cut(command, " && ")
@@ -162,11 +155,11 @@ func TestDoctorGivesTheCommandThatPutsTermaOnPath(t *testing.T) {
 	}
 
 	t.Setenv("SHELL", "/usr/bin/fish")
-	if got, want := addToPathCommand("/opt/terma"), `fish_add_path --move --prepend "/opt/terma"`; got != want {
+	if got, want := AddToPathCommand("/opt/terma"), `fish_add_path --move --prepend "/opt/terma"`; got != want {
 		t.Errorf("fish: %q, want %q", got, want)
 	}
 	t.Setenv("SHELL", "/bin/dash")
-	if got, want := addToPathCommand("/opt/terma"), `export PATH="/opt/terma:$PATH"`; got != want {
+	if got, want := AddToPathCommand("/opt/terma"), `export PATH="/opt/terma:$PATH"`; got != want {
 		t.Errorf("an unknown shell: %q, want %q", got, want)
 	}
 }

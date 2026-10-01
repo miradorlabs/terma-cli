@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -15,10 +16,12 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
+	"github.com/miradorlabs/terma-cli/internal/output"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
@@ -139,7 +142,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	}
 	// A dry run is nothing but its plan, so it always says everything.
 	ui := newInstallUI(out, f.verbose || f.dryRun)
-	fmt.Fprintf(out, "%s in %s\n\n", ui.p.Bold("Installing terma"), tildePath(root))
+	fmt.Fprintf(out, "%s in %s\n\n", ui.p.Bold("Installing terma"), output.TildePath(root))
 	for _, path := range append([]string{termaproject.FileName}, registered.HooksPaths()...) {
 		if err := termaproject.CheckPath(root, path); err != nil {
 			return err
@@ -221,7 +224,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	if b.ID == "" && b.Name == "" {
 		ui.warn("Project", "unresolved — a real install signs in and selects one"+env)
 	} else {
-		ui.summary("Project", nameOrID(b.Name, b.ID)+env)
+		ui.summary("Project", cmp.Or(b.Name, b.ID)+env)
 	}
 
 	switch f.relayService {
@@ -320,7 +323,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	// (not merely installed) so it only touches the global config for a developer who
 	// has chosen Claude — which also keeps `--harness none` installs from touching it.
 	// --no-statusline opts out.
-	if a, ok := statusLineAgent(); ok && !f.noStatusLine && slices.Contains(agents, a.Name()) {
+	if a, ok := doctor.StatusLineAgent(registered); ok && !f.noStatusLine && slices.Contains(agents, a.Name()) {
 		if note, ok := installStatusLine(cmd.ErrOrStderr()); ok {
 			fmt.Fprintf(ui.detail, "\n%s\n", note)
 			ui.ok("Status line", "reads your plan's usage windows")
@@ -1138,11 +1141,11 @@ func resolveBinding(cmd *cobra.Command, cfg *config.Config, existing *termaproje
 // organization it belongs to, which the developer may be able to switch to.
 func unreachableBinding(existing *termaproject.File, cfg *config.Config) string {
 	p := existing.Project
-	org := nameOrID(cfg.OrganizationName, cfg.OrganizationID)
+	org := cmp.Or(cfg.OrganizationName, cfg.OrganizationID)
 	if org == "" {
 		org = "your organization"
 	}
-	msg := fmt.Sprintf("this repository is bound to %s, which is not a project in %s", nameOrID(p.Name, p.ID), org)
+	msg := fmt.Sprintf("this repository is bound to %s, which is not a project in %s", cmp.Or(p.Name, p.ID), org)
 	switch {
 	case !config.SameAccounts(p.Environment, cfg.Environment):
 		return fmt.Sprintf("%s: it was bound in %s, and terma is using %s", msg, environmentLabel(p.Environment), environmentLabel(cfg.Environment))

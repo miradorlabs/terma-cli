@@ -2,6 +2,7 @@ package agents
 
 import (
 	"context"
+	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/hookrun"
@@ -45,4 +46,13 @@ func Wired(root string, a Agent) bool {
 	}
 	plan, err := a.Plan(root, false)
 	return err != nil || !plan.Empty()
+}
+
+// DisplayNames lists agents' display names for prose.
+func DisplayNames[A interface{ DisplayName() string }](as []A) string {
+	names := make([]string, 0, len(as))
+	for _, a := range as {
+		names = append(names, a.DisplayName())
+	}
+	return strings.Join(names, ", ")
 }

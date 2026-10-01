@@ -109,7 +109,7 @@ func TestDoctorScratchCommitRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sha, check := scratchCommit(ctx, repo, bound)
+	sha, check := doctor.ScratchCommit(ctx, repo, bound)
 	if check.Status != doctor.Pass {
 		t.Fatalf("scratch: %+v", check)
 	}
@@ -117,8 +117,7 @@ func TestDoctorScratchCommitRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d := doctorRun{ctx: ctx, cfg: cfg, projectID: testProjectID, scratchSHA: sha}
-	if check := d.backendReceives(); check.Status != doctor.Pass || !strings.Contains(check.Detail, "round-trip confirmed") {
+	if check := doctor.BackendCheck(ctx, doctorProbes(cfg), testProjectID, sha, doctor.Check{}, doctor.Progress{}); check.Status != doctor.Pass || !strings.Contains(check.Detail, "round-trip confirmed") {
 		t.Fatalf("backend: %+v", check)
 	}
 }
@@ -151,7 +150,7 @@ func TestDoctorScratchCommitWithUncommittedHooks(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	if _, check := scratchCommit(ctx, repo, bound); check.Status != doctor.Pass {
+	if _, check := doctor.ScratchCommit(ctx, repo, bound); check.Status != doctor.Pass {
 		t.Fatalf("uncommitted hooks: %+v", check)
 	}
 }

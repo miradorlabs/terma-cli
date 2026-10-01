@@ -12,6 +12,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/output"
 	"github.com/miradorlabs/terma-cli/internal/procinfo"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
@@ -94,7 +95,7 @@ func pointAgentsAtRelay(ctx context.Context, selected []string, addr, token stri
 		if !result.Pending {
 			paths := make([]string, 0, len(result.Paths))
 			for _, path := range result.Paths {
-				paths = append(paths, tildePath(path))
+				paths = append(paths, output.TildePath(path))
 			}
 			detail := ""
 			if len(paths) > 0 {

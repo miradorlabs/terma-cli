@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"cmp"
 	"fmt"
 	"strings"
 
@@ -45,7 +46,7 @@ func (k matchKind[T]) labels(items []T) map[string]string {
 	labels := map[string]string{}
 	for _, item := range items {
 		name, id := k.name(item), k.id(item)
-		label := nameOrID(name, id)
+		label := cmp.Or(name, id)
 		if name != "" && counts[strings.ToLower(name)] > 1 {
 			label = fmt.Sprintf("%s (%s)", name, id)
 		}
