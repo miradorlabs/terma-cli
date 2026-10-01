@@ -340,26 +340,3 @@ func workspaceHere(ctx context.Context) (root, gitDir string, err error) {
 	}
 	return termaproject.Locate(ctx, cwd)
 }
-
-// setupCommand loads configuration, format and client, running preconditions first so a
-// missing project is reported ahead of a sign-in error.
-func (app *App) setupCommand(preconditions ...func(*config.Config) error) (*config.Config, *api.Client, output.Format, error) {
-	cfg, err := app.loadConfig()
-	if err != nil {
-		return nil, nil, "", err
-	}
-	for _, check := range preconditions {
-		if err := check(cfg); err != nil {
-			return nil, nil, "", err
-		}
-	}
-	format, err := app.resolveFormat()
-	if err != nil {
-		return nil, nil, "", err
-	}
-	client, err := app.newClient(cfg)
-	if err != nil {
-		return nil, nil, "", err
-	}
-	return cfg, client, format, nil
-}

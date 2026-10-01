@@ -61,12 +61,6 @@ type signInResult struct {
 	reused  bool
 }
 
-// signedInAs has no full stop so a caller can qualify it.
-func (r *signInResult) signedInAs() string {
-	return fmt.Sprintf("Signed in as %s in %s", cmp.Or(r.cred.UserEmail, "your account"),
-		cmp.Or(r.orgName, r.cred.OrganizationID))
-}
-
 // signInAndReload reloads because signing in points the profile at the credential's
 // organization, so the configuration loaded before it is stale.
 func (app *App) signInAndReload(cmd *cobra.Command, cfg *config.Config, opts signInOptions) (*config.Config, error) {
