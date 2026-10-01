@@ -80,8 +80,8 @@ The relay is the way around that. Every agent's global exporter sends to a relay
      What a gap costs is visible: the relay counts each unclassified key by name (`unclassified.<key>` in its stats, bounded at 256 names), and every live scenario with content withheld fails on any, naming them. A new harness field is then a loss someone sees on the next canary run, never a leak. The safe list starts from what the harnesses sent with content withheld (the live goldens; `TestClassificationCoversTheGoldens` holds the two together) and from what terma's own exporters send.
 
      **Numbers and booleans pass under any key**, as does a string that is wholly one ("3", "true"): a count or a flag cannot carry what was said. Everything else was classified by hand from a survey of every harness's withheld-content run. That survey found about 230 keys the goldens never showed, from Claude Code (hooks, plugins, managed settings), Codex (its app server, hooks, tracing), OpenCode and Gemini CLI. Keys whose values could be free text are content:
-     - `error`, `reason`, `result`, `reasoning`, `routing.reasoning` (Gemini's model-router reasoning);
-     - `metadata`, `value`, `key`, `from`, `db`, `query_script`;
+     - `error`, `reason`, `result`, `reasoning`, and Gemini's `routing.reasoning` (its model-router reasoning, declared by Gemini's package);
+     - `metadata`, `value`, `key`, `from`, `db`, and Codex's `query_script`;
      - tool and agent descriptions, stop sequences, and `file_path`.
 
      **Tested by sabotage:** with `process.command_args` taken off the content list, as though Gemini had just added it, the withheld run leaked nothing. It failed instead, naming the key as unclassified. The same sabotage before the safe list leaked the prompt.

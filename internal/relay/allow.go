@@ -26,24 +26,21 @@ var genericSafeKeys = setOf(
 	// Where in the code a span was opened: source locations and threads.
 	"code.file.path", "code.line.number", "code.module.name", "thread.name",
 	// Hooks, plugins, managed settings and skills.
-	"hook_name", "hook_type", "hook_source", "hook_matcher", "hook_event", "handler_type",
-	"enabled_via", "mode", "phase", "phases",
+	"hook_name", "hook_type", "hook_source", "hook_event",
+	"mode", "phase", "phases",
 	"trigger", "stage", "kind", "outcome",
 	// App servers, hooks, tracing and runtimes.
 	"rpc.method", "rpc.request_id", "rpc.system", "rpc.transport",
-	"execution_mode", "environment_id",
-	"build_mode", "bundle_shape", "catalog_surface", "refresh_strategy", "tool_origin",
-	"transport", "api.path", "startup.phase", "startup.status", "installation.id", "error_kind",
+	"environment_id",
+	"transport", "error_kind",
 	"method", "provider", "version", "level", "role", "format",
 	"language", "http.method", "server.address",
 	"feature", "mcp_tool",
-	"routing.decision_model", "routing.decision_source", "routing.approval_mode", "os_platform", "os_arch",
-	"os_release", "start_time", "end_time", "model.provided",
+	"os_platform", "os_release", "start_time", "end_time",
 	// Semantic-convention gen_ai attributes, and exporter settings.
 	"cwd", "gen_ai.tool.call_id", "gen_ai.token.type", "gen_ai.output.type",
 	"gen_ai.prompt.name", "gen_ai.agent.name", "gen_ai.request.seed", "gen_ai.request.presence_penalty",
 	"gen_ai.request.max_tokens", "gen_ai.request.frequency_penalty", "gen_ai.request.choice.count",
-	"read_progress",
 	// The process an exporter runs in — never its arguments (process.command_args).
 	"process.pid", "process.owner", "process.command", "process.executable.name", "process.executable.path",
 	"process.runtime.name", "process.runtime.version", "process.runtime.description",

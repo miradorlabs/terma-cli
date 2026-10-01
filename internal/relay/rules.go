@@ -35,7 +35,7 @@ var generic = shape.CaptureRules{
 	PromptDropFields: []string{"gen_ai.prompt", "gen_ai.completion", "gen_ai.input.messages", "gen_ai.output.messages",
 		"gen_ai.system_instructions", "gen_ai.tool.definitions", "gen_ai.tool.description", "gen_ai.agent.description",
 		"gen_ai.request.stop_sequences",
-		"error", "reason", "reasoning", "routing.reasoning", "metadata", "value", "key", "from", "db", "query_script"},
+		"error", "reason", "reasoning", "metadata", "value", "key", "from", "db"},
 	ResourcePromptFields: []string{"process.command_args", "process.command_line"},
 	ToolContentFields:    []string{"gen_ai.tool.call.arguments", "gen_ai.tool.call.result", "file_path", "result"},
 }
