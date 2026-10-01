@@ -2,8 +2,12 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"net"
+	"path/filepath"
 
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 )
 
@@ -49,5 +53,25 @@ func (app *App) connectMachineRelay(ctx context.Context, agents []string, relayS
 			r.ok("Relay", what)
 		}
 	})
+	return nil
+}
+
+// moveRelay records addr as where the relay listens and stops one running elsewhere; the
+// relay step that follows points the agents there and starts it again.
+func moveRelay(addr string) error {
+	// The agents send to it and the relay takes telemetry from local senders only.
+	if host, _, err := net.SplitHostPort(addr); err != nil {
+		return fmt.Errorf("--relay-addr %q: want host:port (%w)", addr, err)
+	} else if ip := net.ParseIP(host); host != "localhost" && (ip == nil || !ip.IsLoopback()) {
+		return fmt.Errorf("--relay-addr %q: the relay listens on a loopback address, such as 127.0.0.1:4319", addr)
+	}
+	dir, err := daemon.Dir()
+	if err != nil {
+		return err
+	}
+	if err := config.WriteFileAtomic(filepath.Join(dir, daemon.AddrFile), []byte(addr+"\n"), 0o600); err != nil {
+		return err
+	}
+	daemon.Stop(dir)
 	return nil
 }
