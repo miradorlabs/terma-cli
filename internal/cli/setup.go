@@ -14,6 +14,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/globalmode"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
@@ -79,7 +80,7 @@ hooks claim its sessions. ` + "`terma install`" + ` connects a repository from h
 func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 	out := cmd.OutOrStdout()
 	if f.managedConfig != "" {
-		files, err := app.writeManagedConfig(f.managedConfig, f.managedTerma)
+		files, err := globalmode.WriteManaged(app.agents, f.managedConfig, f.managedTerma)
 		if err != nil {
 			return err
 		}
@@ -161,7 +162,7 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 		return err
 	}
 
-	if err := app.applyGlobalMode(cmd.Context(), names, pol.Global(), func(what string) { fmt.Fprintln(out, "  "+what) },
+	if err := app.globalMode().Apply(cmd.Context(), names, pol.Global(), func(what string) { fmt.Fprintln(out, "  "+what) },
 		func(step string) { steps = append(steps, step) }); err != nil {
 		return err
 	}
@@ -191,33 +192,6 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 	}
 	fmt.Fprintf(out, "\n%s Repositories connected in Terma report on their own; run `terma install` to connect one from here.\n",
 		style.For(out).Bold("Done!"))
-	return nil
-}
-
-// applyGlobalMode installs global mode's user-level agent hooks and global git hooks path,
-// or removes them; said reports each change and then each step left to the developer.
-func (app *App) applyGlobalMode(ctx context.Context, agents []string, global bool, said, then func(string)) error {
-	files, err := app.applyUserHooks(agents, global)
-	if err != nil {
-		return err
-	}
-	for _, f := range files {
-		said("Machine-wide hooks updated: " + output.TildePath(f))
-	}
-	if global && len(files) > 0 {
-		for _, step := range app.userHooksTrustSteps(agents) {
-			then(step)
-		}
-	}
-	changed, err := app.applyGlobalGitHooks(ctx, global)
-	if err != nil {
-		return fmt.Errorf("git's global hooks: %w", err)
-	}
-	if changed && global {
-		said("Git: every repository's commits are stamped (git config --global core.hooksPath); each repository's own hooks still run")
-	} else if changed {
-		said("Git: global hooks path restored")
-	}
 	return nil
 }
 

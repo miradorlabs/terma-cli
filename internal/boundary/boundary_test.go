@@ -113,6 +113,7 @@ var bans = []struct {
 	{"internal/doctor", []string{"internal/account/api", "internal/spool", "internal/relay/daemon"}, "doctor reaches the network, the spool and the relay only through its probes"},
 	{"internal/install", []string{"internal/account", "internal/spool", "internal/connect"}, "install signs in and reaches the network only through its steps"},
 	{"internal/connect", []string{"internal/account", "internal/spool", "internal/install", "internal/cli"}, "connect signs in and mints keys only through its steps"},
+	{"internal/globalmode", []string{"internal/account", "internal/spool", "internal/cli", "internal/relay", "internal/install", "internal/connect"}, "global mode writes this machine's files and nothing else"},
 	{"internal/hooks/hookrun", []string{"internal/hooks/hookmgr"}, "running a hook and planning hook files are separate halves"},
 	{"internal/hooks/hookmgr", []string{"internal/hooks/hookrun"}, "running a hook and planning hook files are separate halves"},
 	{"internal/hooks/hookrun", []string{"internal/agents", "internal/cli", "internal/account", "internal/harness"}, "the hook runtime knows no agent, command, account or exporter; agents build on it"},
@@ -158,6 +159,9 @@ func TestAgentPackagesAreImportedOnlyByTheRegistry(t *testing.T) {
 			}
 		}
 		for _, imp := range p.Imports {
+			if imp == module+"/internal/agents/agentstest" {
+				t.Errorf("%s imports %s: the made-up agent is for tests only", p.ImportPath, imp)
+			}
 			for pkg, by := range onlyImportedBy {
 				if imp == module+"/"+pkg && p.ImportPath != module+"/"+by {
 					t.Errorf("%s imports %s: only %s does", p.ImportPath, imp, by)
@@ -185,7 +189,7 @@ func TestEveryAgentPackageIsRegistered(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, e := range entries {
-		if !e.IsDir() || e.Name() == "builtin" || e.Name() == "internal" {
+		if !e.IsDir() || e.Name() == "builtin" || e.Name() == "internal" || e.Name() == "agentstest" {
 			continue
 		}
 		if !slices.Contains(agents, e.Name()) {

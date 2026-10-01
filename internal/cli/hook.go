@@ -52,7 +52,7 @@ func (app *App) hookDeps() dispatch.Deps {
 	return dispatch.Deps{
 		Agents: app.agents,
 		Policy: hookPolicy,
-		Yields: app.hookYields,
+		Yields: app.globalMode().Yields,
 		Spool:  openSpool,
 		Claimed: func(ctx context.Context, cwd string) {
 			daemon.Spawn()

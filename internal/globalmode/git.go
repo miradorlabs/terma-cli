@@ -1,4 +1,4 @@
-package cli
+package globalmode
 
 import (
 	"context"
@@ -58,8 +58,9 @@ func globalGitHookScript(hook, terma, previous string) string {
 	return b.String()
 }
 
-// applyGlobalGitHooks reports whether it changed git's configuration.
-func (app *App) applyGlobalGitHooks(ctx context.Context, install bool) (bool, error) {
+// ApplyGitHooks points git's global core.hooksPath at terma's hooks, or restores what it
+// replaced; it reports whether git's configuration changed.
+func (m Machine) ApplyGitHooks(ctx context.Context, install bool) (bool, error) {
 	dir, err := globalGitHooksPath()
 	if err != nil {
 		return false, err
@@ -82,7 +83,7 @@ func (app *App) applyGlobalGitHooks(ctx context.Context, install bool) (bool, er
 		}
 		return true, os.RemoveAll(dir)
 	}
-	terma, err := app.hookExecutable()
+	terma, err := m.Terma()
 	if err != nil {
 		return false, err
 	}

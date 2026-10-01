@@ -9,6 +9,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/globalmode"
 	"github.com/miradorlabs/terma-cli/internal/policy"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/relay/shape"
@@ -36,8 +37,13 @@ func (app *App) relayDeps() daemon.Deps {
 // profile's own team's changes.
 func (app *App) policies() policy.Source {
 	return policy.Source{Version: app.version, ModeChanged: func(ctx context.Context, cfg *config.Config, pol config.Policy) error {
-		return app.applyGlobalMode(ctx, cfg.Harnesses, pol.Global(), func(string) {}, func(string) {})
+		return app.globalMode().Apply(ctx, cfg.Harnesses, pol.Global(), func(string) {}, func(string) {})
 	}}
+}
+
+// globalMode is this machine as global mode writes it.
+func (app *App) globalMode() globalmode.Machine {
+	return globalmode.Machine{Agents: app.agents, Terma: app.hookExecutable, ManagedRoot: app.managedRoot, RelayDir: daemon.Dir}
 }
 
 func (app *App) createProjectKey(ctx context.Context, cfg *config.Config, projectID string) (string, error) {

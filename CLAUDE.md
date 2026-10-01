@@ -247,17 +247,17 @@ developer login to check the team's repository permission.
     requiring a session or a process claim (`relay.Options.CatchAll`, marked
     `terma.relay.attribution=catch-all`). A switch back to repository coverage also
     withholds queued catch-all exports.
-  - Machine-wide agent hooks (`internal/cli/global_hooks.go`): terma's entries in Claude Code's,
+  - Machine-wide agent hooks (`internal/globalmode`): terma's entries in Claude Code's,
     Codex's and Cursor's user-level hooks files, `terma hook --user <event>` by absolute
     path (`hookmgr.UserHookCommand`, recognized by shape). For the agents they cover they
-    are the ones that act — a repository's committed hooks step aside (`hookYields`, from
+    are the ones that act — a repository's committed hooks step aside (`globalmode.Machine.Yields`, from
     `relay/user-hooks.json`) because Codex skips repository hooks until trusted; outside
     global mode a `--user` hook does nothing. Codex asks the developer to trust them once.
   - Managed configuration (`terma setup --managed-config <dir>`): the same hooks as
     Claude Code's `managed-settings.json` and Codex's `requirements.toml` `[hooks]`, calling
     terma through `$HOME` (`hookmgr.ManagedHookCommand`), which Codex runs with no trust
-    step. Where they are deployed (`managedHooksDeployed`) setup writes none of its own.
-  - Commits (`internal/cli/global_git.go`): `git config --global core.hooksPath` → a directory with
+    step. Where they are deployed (`Machine.ManagedDeployed`) setup writes none of its own.
+  - Commits (`internal/globalmode/git.go`): `git config --global core.hooksPath` → a directory with
     a script per git hook name: terma for prepare-commit-msg / post-commit, then the hook
     git ran before (the repository's `.git/hooks`, or the developer's own global directory,
     recorded in `.previous-hooks-path` and restored). A repository's local core.hooksPath

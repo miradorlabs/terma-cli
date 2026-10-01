@@ -11,6 +11,8 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/globalmode"
+	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 )
 
 // globalSandbox makes the hooks setup writes call a built terma (the test binary is none).
@@ -73,7 +75,7 @@ func TestSetupGlobalModeInstallsAndRemovesMachineHooks(t *testing.T) {
 		}
 	}
 	hooksDir := gitOut(t, t.TempDir(), "config", "--global", "--get", "core.hooksPath")
-	if sameDir(hooksDir, mine) {
+	if filepath.Clean(strings.TrimSpace(hooksDir)) == filepath.Clean(mine) {
 		t.Fatal("git's global hooks path was not pointed at terma's")
 	}
 
@@ -108,7 +110,7 @@ func TestSetupGlobalModeInstallsAndRemovesMachineHooks(t *testing.T) {
 	if strings.Contains(string(claude)+string(codex), "hook --user") {
 		t.Fatalf("machine-wide hooks left after global mode ended:\n%s\n%s", claude, codex)
 	}
-	if got := gitOut(t, t.TempDir(), "config", "--global", "--get", "core.hooksPath"); !sameDir(got, mine) {
+	if got := gitOut(t, t.TempDir(), "config", "--global", "--get", "core.hooksPath"); filepath.Clean(strings.TrimSpace(got)) != filepath.Clean(mine) {
 		t.Fatalf("git's global hooks path = %q, want the developer's %q back", got, mine)
 	}
 }
@@ -119,11 +121,14 @@ func TestHookYields(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	global := config.Policy{Mode: config.ModeGlobal, DefaultProjectID: "p"}
 	repo := config.DefaultPolicy()
-	if testApp.hookYields(false, global, "claude-code") {
+	if testApp.globalMode().Yields(false, global, "claude-code") {
 		t.Fatal("a repository hook yielded with no machine-wide hooks recorded")
 	}
-	path, _ := userHooksRecordPath()
-	if err := config.WriteJSON(path, userHooksRecord{Agents: []string{"claude", "codex"}}, 0o600); err != nil {
+	dir, err := daemon.Dir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := config.WriteJSON(filepath.Join(dir, "user-hooks.json"), map[string][]string{"agents": {"claude", "codex"}}, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {
@@ -138,7 +143,7 @@ func TestHookYields(t *testing.T) {
 		{true, repo, "claude-code", true}, // leftover from global mode
 		{false, repo, "claude-code", false},
 	} {
-		if got := testApp.hookYields(tc.user, tc.pol, tc.tool); got != tc.yield {
+		if got := testApp.globalMode().Yields(tc.user, tc.pol, tc.tool); got != tc.yield {
 			t.Errorf("hookYields(user=%v, %s, %s) = %v", tc.user, tc.pol.Mode, tc.tool, got)
 		}
 	}
@@ -158,7 +163,7 @@ func TestSetupGlobalModeDefersToManagedHooks(t *testing.T) {
 	testApp.managedRoot = root
 	t.Cleanup(func() { testApp.managedRoot = prev })
 	out := t.TempDir()
-	if _, err := testApp.writeManagedConfig(out, "$HOME/.local/bin/terma"); err != nil {
+	if _, err := globalmode.WriteManaged(testApp.agents, out, "$HOME/.local/bin/terma"); err != nil {
 		t.Fatal(err)
 	}
 	data, _ := os.ReadFile(filepath.Join(out, "codex-requirements.toml"))
@@ -183,7 +188,8 @@ func TestSetupGlobalModeDefersToManagedHooks(t *testing.T) {
 	if strings.Contains(setupOut, "`/hooks`") {
 		t.Fatalf("setup asked to trust hooks the organization manages:\n%s", setupOut)
 	}
-	if !testApp.userHooksCover("codex") || !testApp.userHooksCover("claude-code") {
+	gm, global := testApp.globalMode(), config.Policy{Mode: config.ModeGlobal}
+	if !gm.Yields(false, global, "codex") || !gm.Yields(false, global, "claude-code") {
 		t.Fatal("the agents' repository hooks would not step aside")
 	}
 }
