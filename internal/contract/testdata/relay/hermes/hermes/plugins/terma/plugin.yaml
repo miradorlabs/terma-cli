@@ -1,0 +1,4 @@
+name: terma
+version: "1"
+description: "Terma: exports this agent's usage, cost and tool calls to the local Terma relay, and claims sessions in opted-in repositories."
+hooks: [on_session_start, on_session_end, on_session_finalize, pre_llm_call, post_llm_call, post_api_request, post_tool_call]

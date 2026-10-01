@@ -15,61 +15,28 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
-// journal records exactly what a connect changed, so a disconnect can put it back.
-//
-// Without it, ownership has to be inferred — "the endpoint points at Terma, so
-// Terma must have written this" — and inference gets it wrong in both directions. A
-// config someone assembled by hand against the Terma endpoint looks like Terma's
-// and gets deleted wholesale on disconnect; a Terma config whose endpoint was edited
-// out looks like the user's and gets treated as the state worth preserving. Recording
-// the values removes the guess: a key is Terma's if Terma wrote it and it still
-// holds what Terma wrote.
-//
-// It lives under ~/.config/terma rather than in the harness's own config, because it is
-// Terma's bookkeeping and has no business in a file the user reads and edits. It can
-// hold a previous Authorization header, so it is written 0600 like the credential file.
-type journal struct {
+// Journal records what a connect changed, so a disconnect restores exactly that: a key is
+// Terma's only while it holds what Terma wrote. It can hold a previous credential (0600).
+type Journal struct {
 	Harness    string `json:"harness"`
 	ConfigPath string `json:"config_path"`
 
-	// Installed is what Terma wrote, keyed by variable. A key whose current value no
-	// longer matches has been edited since, and disconnect leaves it alone.
 	Installed map[string]string `json:"installed"`
-	// Previous is what each of those keys held beforehand. A nil value means the key
-	// was absent, which is different from being present and empty — restoring the two
-	// differently is the whole point of the pointer.
+	// Previous is what each key held before; nil means absent, which restores differently from empty.
 	Previous map[string]*string `json:"previous"`
-	// Cleared holds conflicting settings --force removed, so disconnect can put those
-	// back too. They were never Terma's, and taking them was the price of connecting.
+	// Cleared holds conflicting settings --force removed, so disconnect can put them back.
 	Cleared map[string]string `json:"cleared,omitempty"`
-	// ClearedSettings is the same record for top-level settings. Keeping these separate
-	// from Cleared matters: restoring a setting such as otelHeadersHelper inside `env`
-	// produces a different, invalid configuration.
+	// ClearedSettings is Cleared for top-level settings, which restored inside env would be invalid.
 	ClearedSettings map[string]string `json:"cleared_settings,omitempty"`
-	// InstalledSettings / PreviousSettings mirror Installed / Previous for the top-level
-	// settings Terma writes — today the otelHeadersHelper path. Same ownership rule:
-	// touched on disconnect only while still holding what Terma wrote.
+	// InstalledSettings and PreviousSettings mirror Installed and Previous for top-level settings.
 	InstalledSettings map[string]string  `json:"installed_settings,omitempty"`
 	PreviousSettings  map[string]*string `json:"previous_settings,omitempty"`
-	// ProjectID is the Terma project the connect reported to. Status and key reuse
-	// read it back.
-	ProjectID string `json:"project_id,omitempty"`
+	ProjectID         string             `json:"project_id,omitempty"`
 }
 
-// journalPath keys the record by the config file it describes, not by the harness alone.
-//
-// One harness can be connected in more than one place — a sandbox under CLAUDE_CONFIG_DIR
-// alongside the real ~/.claude, which is exactly how anyone tests this. A single
-// per-harness record makes those two collide: connecting the sandbox overwrites the
-// record for the real config, and every later read finds a journal describing a file it
-// was not asked about. Each config gets its own record instead, so the two are simply
-// independent.
-//
-// The path is hashed rather than embedded because it is an absolute filesystem path:
-// too long, and full of separators. The basename keeps the harness name so the directory
-// stays readable, and ConfigPath inside the file remains the authoritative answer to
-// "which config is this?".
-func journalPath(harness, configPath string) (string, error) {
+// JournalPath keys the record by a hash of the config path, so a sandboxed config and the
+// real one beside it never overwrite each other's record.
+func JournalPath(harness, configPath string) (string, error) {
 	dir, err := config.Dir()
 	if err != nil {
 		return "", err
@@ -79,10 +46,9 @@ func journalPath(harness, configPath string) (string, error) {
 	return filepath.Join(dir, "telemetry", name), nil
 }
 
-// loadJournal returns nil when there is no record, which is not an error: a config
-// configured by hand or in another clone simply has none.
-func loadJournal(harness, configPath string) (*journal, error) {
-	path, err := journalPath(harness, configPath)
+// LoadJournal returns nil, not an error, when there is no record.
+func LoadJournal(harness, configPath string) (*Journal, error) {
+	path, err := JournalPath(harness, configPath)
 	if err != nil {
 		return nil, err
 	}
@@ -94,16 +60,13 @@ func loadJournal(harness, configPath string) (*journal, error) {
 		return nil, fmt.Errorf("read %s: %w", path, err)
 	}
 
-	var j journal
+	var j Journal
 	if err := json.Unmarshal(data, &j); err != nil {
-		// Absence means there is no local ownership record. Corruption
-		// is different: silently treating a damaged ownership record as absent would let
-		// disconnect delete values that a user changed after connecting.
+		// Corruption is not absence: treating it as absent would let disconnect delete a user's edits.
 		return nil, fmt.Errorf("parse %s: %w (repair or remove it explicitly, then retry)", path, err)
 	}
 	if j.ConfigPath != configPath {
-		// A hash collision, or a file moved by hand. Not this config's record, so it is
-		// as good as absent rather than an error about someone else's file.
+		// A hash collision or a file moved by hand: not this config's record.
 		return nil, nil
 	}
 	if j.Harness != harness || j.ConfigPath == "" || j.Installed == nil || j.Previous == nil {
@@ -114,8 +77,6 @@ func loadJournal(harness, configPath string) (*journal, error) {
 			return nil, fmt.Errorf("parse %s: missing previous value for %s (repair or remove it explicitly, then retry)", path, key)
 		}
 	}
-	// Older journals predate the settings maps; absent means "none installed", which
-	// initialized-empty expresses without failing the whole record.
 	if j.InstalledSettings == nil {
 		j.InstalledSettings = map[string]string{}
 	}
@@ -130,17 +91,18 @@ func loadJournal(harness, configPath string) (*journal, error) {
 	return &j, nil
 }
 
-func (j *journal) save() error {
-	path, err := journalPath(j.Harness, j.ConfigPath)
+// Save writes the journal, private to this user: it can hold a previous credential.
+func (j *Journal) Save() error {
+	path, err := JournalPath(j.Harness, j.ConfigPath)
 	if err != nil {
 		return err
 	}
-	// 0600: Previous may hold the Authorization header that was there before.
-	return config.WriteJSON(path, j, settingsMode)
+	return config.WriteJSON(path, j, SettingsMode)
 }
 
-func deleteJournal(harness, configPath string) error {
-	path, err := journalPath(harness, configPath)
+// DeleteJournal removes the journal of the config at configPath.
+func DeleteJournal(harness, configPath string) error {
+	path, err := JournalPath(harness, configPath)
 	if err != nil {
 		return err
 	}
@@ -150,17 +112,15 @@ func deleteJournal(harness, configPath string) error {
 	return nil
 }
 
-// newJournal captures the state before a connect overwrites it. When this is a
-// reconnect, previous carries the original ownership chain forward: values that still
-// match the prior install retain their pre-Terma value, while values edited since the
-// prior connect become the new value to restore after this explicit reconnect.
-func newJournal(
+// NewJournal captures the state before a connect; on a reconnect, unchanged keys keep
+// their pre-Terma value and keys edited since become the value to restore.
+func NewJournal(
 	harnessName, configPath string,
 	existing, installing map[string]string,
 	cleared, clearedSettings map[string]string,
-	previous *journal,
-) *journal {
-	j := &journal{
+	previous *Journal,
+) *Journal {
+	j := &Journal{
 		Harness:           harnessName,
 		ConfigPath:        configPath,
 		Installed:         make(map[string]string, len(installing)),
@@ -171,25 +131,20 @@ func newJournal(
 		PreviousSettings:  map[string]*string{},
 	}
 
-	// Carry keys from an earlier connect that this connect does not write. Render can
-	// omit a conditional key (for example the traces beta switch), but disconnect still
-	// owns it if it remains unchanged in the file.
+	// A conditional key this connect omits is still owned while it stays unchanged.
 	if previous != nil {
 		for key, installed := range previous.Installed {
 			if _, overwritten := installing[key]; overwritten {
 				continue
 			}
 			j.Installed[key] = installed
-			j.Previous[key] = cloneString(previous.Previous[key])
+			j.Previous[key] = CloneString(previous.Previous[key])
 		}
 		maps.Copy(j.Cleared, previous.Cleared)
 		maps.Copy(j.ClearedSettings, previous.ClearedSettings)
-		// Settings ownership carries the same way env ownership does: the pre-Terma
-		// value survives reconnects so the eventual disconnect restores it, not an
-		// intermediate Terma state.
 		for key, installed := range previous.InstalledSettings {
 			j.InstalledSettings[key] = installed
-			j.PreviousSettings[key] = cloneString(previous.PreviousSettings[key])
+			j.PreviousSettings[key] = CloneString(previous.PreviousSettings[key])
 		}
 	}
 
@@ -199,12 +154,10 @@ func newJournal(
 			if priorInstalled, owned := previous.Installed[key]; owned {
 				current, present := existing[key]
 				if present && current == priorInstalled {
-					j.Previous[key] = cloneString(previous.Previous[key])
+					j.Previous[key] = CloneString(previous.Previous[key])
 					continue
 				}
-				// The value was edited or removed after the earlier connect. This
-				// reconnect deliberately overwrites that edit, so restore the edit—not
-				// stale pre-history—when it is later disconnected.
+				// Edited since the earlier connect: restore the edit, not stale pre-history.
 				if present {
 					current := current
 					j.Previous[key] = &current
@@ -215,7 +168,6 @@ func newJournal(
 			}
 		}
 		if prior, ok := existing[key]; ok {
-			// Copied, not aliased: the loop variable would otherwise be shared.
 			prior := prior
 			j.Previous[key] = &prior
 		} else {
@@ -227,7 +179,8 @@ func newJournal(
 	return j
 }
 
-func cloneString(value *string) *string {
+// CloneString copies what value points at; nil stays nil.
+func CloneString(value *string) *string {
 	if value == nil {
 		return nil
 	}
@@ -235,14 +188,10 @@ func cloneString(value *string) *string {
 	return &cloned
 }
 
-// apply undoes the connect against env, and reports what it did.
-//
-// A key is only touched when it still holds the value Terma installed. Anything else
-// is somebody's later edit — possibly the whole reason they are disconnecting — and
-// silently discarding it would be the same class of bug as never having journaled.
-func (j *journal) apply(env map[string]string) (DisconnectResult, *journal) {
+// Apply undoes the connect against env, touching only keys that still hold what Terma installed.
+func (j *Journal) Apply(env map[string]string) (DisconnectResult, *Journal) {
 	var result DisconnectResult
-	remaining := &journal{
+	remaining := &Journal{
 		Harness:           j.Harness,
 		ConfigPath:        j.ConfigPath,
 		Installed:         map[string]string{},
@@ -258,7 +207,7 @@ func (j *journal) apply(env map[string]string) (DisconnectResult, *journal) {
 		if !present || current != installed {
 			result.Skipped = append(result.Skipped, key)
 			remaining.Installed[key] = installed
-			remaining.Previous[key] = cloneString(j.Previous[key])
+			remaining.Previous[key] = CloneString(j.Previous[key])
 			continue
 		}
 
@@ -284,17 +233,14 @@ func (j *journal) apply(env map[string]string) (DisconnectResult, *journal) {
 	return result, remaining
 }
 
-func (j *journal) empty() bool {
+// Empty reports whether the journal records nothing terma owns.
+func (j *Journal) Empty() bool {
 	return len(j.Installed) == 0 && len(j.Cleared) == 0 && len(j.ClearedSettings) == 0 &&
 		len(j.InstalledSettings) == 0
 }
 
-// pruneJournals removes records whose config file no longer exists — a temp-dir
-// sandbox that was deleted, a CLAUDE_CONFIG_DIR that came and went. Best-effort by
-// design and called after successful connects and disconnects: a record that cannot be
-// pruned today is retried on the next lifecycle operation, and a prune failure must
-// never fail the operation that triggered it.
-func pruneJournals() {
+// PruneJournals removes, best-effort, records whose config file no longer exists.
+func PruneJournals() {
 	dir, err := config.Dir()
 	if err != nil {
 		return
@@ -316,8 +262,7 @@ func pruneJournals() {
 			ConfigPath string `json:"config_path"`
 		}
 		if json.Unmarshal(data, &record) != nil || record.ConfigPath == "" {
-			// Unparseable records are left in place: deleting what cannot be read is how
-			// an ownership record for a live config gets lost.
+			// Deleting what cannot be read could lose a live config's ownership record.
 			continue
 		}
 		if _, err := os.Stat(record.ConfigPath); errors.Is(err, fs.ErrNotExist) {

@@ -1,11 +1,15 @@
 BINARY := bin/terma
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
-LDFLAGS := -s -w -X github.com/miradorlabs/terma-cli/cmd.Version=$(VERSION)
+LDFLAGS := -s -w -X main.version=$(VERSION)
 
 # Everything here that runs terma's code runs it against the dev environment. `terma
 # install` and `terma setup` sign in, so a test or a script that reaches them would
 # otherwise open a browser login on production. Override with `TERMA_ENV=… make test`.
 export TERMA_ENV ?= dev
+# Tests run git; a developer's own global git config (global mode's hooks path among it)
+# must not reach them.
+export GIT_CONFIG_GLOBAL = /dev/null
+export GIT_CONFIG_NOSYSTEM = 1
 
 # golangci-lint is pinned in one file, which CI's action reads too, and built from source
 # with this machine's Go. A released binary refuses a module whose `go` directive is newer
@@ -16,13 +20,13 @@ GOLANGCI_LINT := bin/golangci-lint-$(GOLANGCI_LINT_VERSION)
 
 .PHONY: build
 build:
-	go build -ldflags "$(LDFLAGS)" -o $(BINARY) .
+	go build -ldflags "$(LDFLAGS)" -o $(BINARY) ./cmd/terma
 
 # Install onto PATH as `terma`. Plain `go install` would name it `terma-cli`
 # after the module path, so the binary is placed explicitly.
 .PHONY: install
 install:
-	go build -ldflags "$(LDFLAGS)" -o "$(shell go env GOPATH)/bin/terma" .
+	go build -ldflags "$(LDFLAGS)" -o "$(shell go env GOPATH)/bin/terma" ./cmd/terma
 	@echo "installed $(shell go env GOPATH)/bin/terma"
 	@command -v terma >/dev/null 2>&1 || echo "note: $(shell go env GOPATH)/bin is not on your PATH"
 
@@ -33,7 +37,7 @@ test:
 # Builds and exercises the real CLI in isolated workspaces; no login or live backend.
 .PHONY: test-install-e2e
 test-install-e2e:
-	go test ./cmd -run '^TestInstallE2E' -count=1 -v
+	go test ./internal/cli -run '^TestInstallE2E' -count=1 -v
 
 .PHONY: cover
 cover:
@@ -82,7 +86,7 @@ $(GOLANGCI_LINT): .golangci-lint-version
 # bun is not installed, so `make check` still works on a Go-only machine.
 .PHONY: test-plugin
 test-plugin:
-	@if command -v bun >/dev/null 2>&1; then (cd internal/harness/opencode && bun test); \
+	@if command -v bun >/dev/null 2>&1; then (cd internal/agents/opencode/plugin && bun test); \
 	else echo "bun not installed; skipping OpenCode plugin tests"; fi
 
 .PHONY: check
@@ -130,5 +134,5 @@ dist:
 		if [ "$$os" = "windows" ]; then ext=".exe"; fi; \
 		echo "building dist/terma-$$os-$$arch$$ext"; \
 		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -ldflags "$(LDFLAGS)" \
-			-o dist/terma-$$os-$$arch$$ext . || exit 1; \
+			-o dist/terma-$$os-$$arch$$ext ./cmd/terma || exit 1; \
 	done

@@ -7,6 +7,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -63,8 +65,7 @@ func TestTryLockReportsAHeldLockAsBusy(t *testing.T) {
 	again()
 }
 
-// A lock file lives in a directory other processes can write to; TryLock must not be
-// walked through a link into locking, or creating, a file somewhere else.
+// TryLock never follows a planted link to lock or create a file elsewhere.
 func TestTryLockRefusesASymlink(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "elsewhere")
@@ -77,5 +78,30 @@ func TestTryLockRefusesASymlink(t *testing.T) {
 	}
 	if _, err := os.Stat(target); !os.IsNotExist(err) {
 		t.Fatal("the link's target was created")
+	}
+}
+
+// Locked creates the file's directory and runs one caller at a time.
+func TestLockedSerializesItsCallers(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "new", "state.json")
+	var inside, overlapped atomic.Int32
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Go(func() {
+			if err := Locked(path, 5*time.Second, func() error {
+				if inside.Add(1) > 1 {
+					overlapped.Add(1)
+				}
+				time.Sleep(2 * time.Millisecond)
+				inside.Add(-1)
+				return nil
+			}); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+	wg.Wait()
+	if overlapped.Load() != 0 {
+		t.Fatalf("%d callers ran inside the lock together", overlapped.Load())
 	}
 }

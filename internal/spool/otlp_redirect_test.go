@@ -9,9 +9,8 @@ import (
 	"time"
 )
 
-// Every export carries the project's mir_srv_ key in an Authorization header. Go
-// keeps that header across a same-host https→http downgrade, so the sender refuses
-// redirects outright — the same rule internal/api applies.
+// The sender refuses redirects: Go keeps the key's Authorization header across a
+// same-host https→http downgrade.
 func TestOTLPSenderRefusesRedirects(t *testing.T) {
 	var followed bool
 	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -14,8 +14,8 @@ Terma has two onboarding commands with different owners:
 
 | Command | Run it | What it does |
 |---|---|---|
-| `terma setup` | Once per developer (optional) | Signs you in and records which coding agents you use. It does not bind a project or write repository files. |
-| `terma install` | Once per repository | Binds the repository to a Terma project, configures per-repository agent routing, and offers to install commit and agent hooks. |
+| `terma setup` | Once per developer (optional) | Signs you in, records which coding agents you use, fetches your organization's collection policy, and points those agents at the local relay. It writes no repository files. |
+| `terma install` | Once per repository | Binds the repository to a Terma team, configures per-repository agent routing, and offers to install commit and agent hooks. |
 
 Repository telemetry is enabled by `terma install`; no extra telemetry flag is needed.
 Run it from any subdirectory: Git worktrees and submodules use their own root.
@@ -26,15 +26,12 @@ If you later run `git init` in that same folder, rerun `terma install` to add Gi
 hooks; existing sessions and tracked edits carry on without losing attribution.
 Bare repositories are rejected because they have no working directory.
 
-Run `make test-install-e2e` for the isolated install/uninstall subprocess suite.
-See [the installation test matrix](docs/INSTALLATION-TESTS.md) for coverage and limits.
 Restart running agents after installation so they load the new configuration.
 
-Codex desktop uses a separate backend from the `codex` shell command. Select
-**Codex Desktop** in `terma setup` (or use `--harness codex-desktop` with
-`terma install`). Install then configures repository hooks and a local project
-route. Trust the hooks in the app and check `terma desktop status` from that repository.
-See [Codex desktop telemetry](docs/CODEX-DESKTOP-TELEMETRY.md).
+Each agent is one choice for its CLI and its desktop app, which share the agent's
+user-level settings: **Claude Code & Desktop** and **Codex TUI & Desktop**. Codex runs
+Terma's hooks once you approve them with `/hooks` (in the desktop app: Settings → Hooks →
+Review).
 
 Then verify the installation:
 
@@ -44,14 +41,15 @@ terma install     # run inside each repository
 terma doctor      # verify the chain end to end
 ```
 
-`terma install` binds the repository to a project: the only one, when your
-organization has one; otherwise it asks, offering the one in an existing
-`.terma/settings.json` first (Enter keeps it), or takes `--project <name-or-id>`. A bound project your account cannot see is never used:
-install says why and lets you choose another. Use `--yes` for non-interactive setup
-(it keeps an existing binding), or `--harness none` when you only want commit hooks.
-It shows the project, prompt-capture setting, warnings, and what is left for you
+`terma install` binds the repository to a team without asking: the one in an existing
+`.terma/settings.json`, else the team you chose at `terma setup`, else your
+organization's only team. It asks only when none of these decides; `--team <name-or-id>`
+names another. A bound team your account cannot see is never used: install says why and
+lets you choose another. Use `--yes` for non-interactive setup, or `--harness none` when
+you only want commit hooks.
+It shows the team, prompt-capture setting, warnings, and what is left for you
 to do; `-v` / `--verbose` also shows setup steps and every file and setting it wrote. The committed settings
-file contains a project reference, never a secret.
+file contains a team reference, never a secret.
 
 ## Install
 
@@ -99,48 +97,44 @@ terma update --auto status  # show the saved preference
 terma update --auto off     # return to notifications only
 ```
 
-Updates verify the release checksum before replacing the binary. Hooks, launch shims,
-CI, and scripted commands never trigger automatic updates. `terma update` upgrades a
+Updates verify the release checksum before replacing the binary. Hooks, the local
+relay, CI, and scripted commands never trigger automatic updates. `terma update` upgrades a
 Homebrew or npm installation through the package manager that owns it. A release binary
 carries its tag, which the updater compares with the latest published release; a source
 build is never updated without `terma update --force`.
 
 The first time a new version runs, it migrates anything it keeps in `~/.config/terma`
 whose format changed, before doing anything else, with no command from you. After an
-update, the new version also refreshes what earlier versions wrote — the agent shims,
-the wrapped Claude Code status line, the OpenCode plugin, and the hooks of the repository
-you ran `terma update` in — keeping every choice you made when you installed. It works
+update, the new version also refreshes what earlier versions wrote — the wrapped Claude
+Code status line, the OpenCode plugin, and the hooks of the repository you ran `terma
+update` in — keeping every choice you made when you installed. It works
 from what is on disk, never signs in, and never adds a file. The repository hooks are
 committed files, so they change only when you ask: run `terma update --refresh` in each
 other repository to bring its hooks up to date, then commit them.
 
-Release, versioning and installer details are in [RELEASING.md](docs/RELEASING.md).
-
 ## Per-repository routing
 
-To send two repositories to different Terma projects on one machine, `terma install`
-creates a small directory of agent shims and puts it ahead of the real `claude` and
-`codex` binaries on `PATH`. It adds that directory at the end of your shell startup
-file (`~/.zshrc`, `~/.bashrc`, `~/.bash_profile`, or fish `conf.d`). terma
-cannot change the PATH of the shell that ran it, so install ends with the command that
-does — for zsh, `source ~/.zshrc` — or open a new terminal.
+Your agents export to a relay terma runs on your machine (on `127.0.0.1`), from their own
+user-level settings — which is also what Claude Desktop, Codex Desktop and IDE extensions
+read, so they are covered too. The relay forwards a session only when a hook in a
+repository you ran `terma install` in claimed it, and sends it to that repository's
+team with that team's key. Everything else — personal work, other repositories —
+waits briefly in memory and is dropped: it never leaves your machine. Prompts and model
+responses are sent by default; `terma install --prompts off` stops them for a team,
+and the relay removes them before anything leaves.
 
-`terma doctor` detects when another startup-file entry has moved Terma behind the
-real binary. `terma shim uninstall` removes the managed block; `--no-path` prints the
-line instead, and `--activation wrapper` prints shell functions for users who prefer
-not to use `PATH` shims — POSIX functions for bash and zsh, fish functions when `$SHELL`
-is fish.
-
-An IDE extension that launches an agent by full path can bypass the shims and use the
-machine-wide configuration. See [CONFIGURATION.md](docs/CONFIGURATION.md) for routing,
-profiles, authentication, and export scope.
+`terma setup` and `terma install` run the relay as a per-user background service, so it
+is up before any agent starts; with `--relay-service off`, hooks start it on demand.
+`terma relay status` shows whether it runs and what it has forwarded, dropped and queued.
 
 ## What gets collected
 
 Terma uses fast, local hooks. Each committed hook is a guarded one-liner that calls
 `terma hook <event>`; the binary owns the session files, touched-file manifests,
 commit trailers, and local event spool. On a machine without Terma, hooks are silent
-and inert. Set `TERMA_HOOKS=0` to disable them on a machine where Terma is installed.
+and inert. `terma pause` stops all capture on the machine, hooks and the relay alike,
+until `terma resume`; events already queued are still delivered. `TERMA_HOOKS=0` turns
+the hooks off for one shell or process.
 
 Commit attribution works like this:
 
@@ -151,60 +145,40 @@ Commit attribution works like this:
 
 Hooks never make a network request. They append to a local queue, and delivery happens
 after commits and session ends with retry and backoff. The prepare-commit-msg path is
-tested against a sub-50 ms budget. Read the full behavior, hook-manager integration,
-and spool guarantees in [INSTRUMENTATION.md](docs/INSTRUMENTATION.md) and
-[DESIGN.md](docs/DESIGN.md).
+tested against a sub-50 ms budget.
 
 ## Supported agents
 
-Terma currently supports Claude Code, Codex, Cursor, OpenCode, and Antigravity. The
-support level differs by agent:
+Terma supports Claude Code (CLI and Desktop) and Codex (CLI and Desktop): commit
+attribution through repository hooks, and each agent's native telemetry through the local
+relay.
 
-- Claude Code and Codex provide commit attribution plus native telemetry paths.
-- OpenCode uses a dependency-free plugin for model, tool, session, and file events.
-- Cursor provides commit attribution and ordered hook observations; billed-cost and
-  quota mapping depend on platform integration.
-- Antigravity provides session, turn, tool, and file observations but has no token or
-  cost export.
-
-See the adapter contracts for exact event names, privacy boundaries, and verification
-status: [Cursor](docs/CURSOR-INSTRUMENTATION.md),
-[Antigravity](docs/ANTIGRAVITY-INSTRUMENTATION.md),
-[Codex and subagents](docs/SUBAGENT-INSTRUMENTATION.md), and
-[funding evidence](docs/FUNDING-INSTRUMENTATION.md).
-
-## Read usage and attribution
+## Check the setup
 
 ```bash
 terma status
-terma usage --user dawson --since today
-terma session list --user dawson --since yesterday
+terma doctor
 ```
 
-`status` is the quick local view of sign-in, project binding, hooks, connected
+`status` is the quick local view of sign-in, team binding, hooks, connected
 agents, queue state, and remaining setup steps. `doctor` performs the end-to-end check,
-including a scratch commit in a temporary worktree. `usage`, `session`, and
-`principal` use the active profile and repository's project; output automatically becomes JSON
-when stdout is not a terminal. See [INSIGHTS.md](docs/INSIGHTS.md) for time windows,
-filters, pagination, and JSON semantics.
+including a scratch commit in a temporary worktree. Output automatically becomes JSON
+when stdout is not a terminal.
 
-Organization and project names are shown without UUIDs in normal output. IDs remain
-available with `terma org list -o json` and `terma project list -o json`; lists and
+Organization and team names are shown without UUIDs in normal output. IDs remain
+available with `terma org list -o json` and `terma team list -o json`; lists and
 pickers show them when a name is missing or duplicated.
 
-Choose the project for each repository with `terma install`. Reads use that repository's
-binding; use `--project <id>` for a one-command override or when outside a repository.
-Switching organizations never changes a repository's project.
+Choose the team for each repository with `terma install`. Reads use that repository's
+binding; use `--team <id>` for a one-command override or when outside a repository.
+Switching organizations never changes a repository's team.
 
 ## Privacy and security
 
 Authentication uses a browser handoff with PKCE and a loopback callback. Credentials
-and project keys stay in the user's configuration directory with restrictive file
+and team keys stay in the user's configuration directory with restrictive file
 permissions; repository settings contain no secrets. Export choices support signal,
 prompt, tool-content, and global-versus-local scope controls.
-
-Read [SECURITY.md](SECURITY.md) for the threat model, consent behavior, credential
-storage, hook guarantees, and reporting instructions.
 
 ## Commands
 
@@ -215,31 +189,31 @@ setup       Sign in and choose agents
 install     Configure this repository
 status      Show local connections, queue, and setup readiness
 doctor      Verify the full chain
-session     Inspect agent sessions
-usage       Summarize usage and cost
 org         List and switch organizations
 uninstall   Remove repository installation files
 update      Update terma
 ```
 
-Authentication, direct telemetry management, project lookup, principal lookup,
-shell completion, configuration, hook execution, shim management, and spool maintenance remain
+Authentication, direct telemetry management, team lookup,
+shell completion, configuration, hook execution, the local relay, and spool maintenance remain
 available as hidden commands for automation and troubleshooting. Run
 `terma <command> --help` for details.
 
+## Architecture
+
+terma is one binary with three roles:
+
+- the **command line** (`internal/cli`), which `cmd/terma` starts;
+- the **hooks** that coding agents and git run (`terma hook <event>`, `internal/hooks`);
+- a **local relay daemon** (`terma relay run`, `internal/relay`). It forwards an
+  agent's own telemetry only for sessions an opted-in repository claimed.
+
+Each coding agent is a plugin: one package under `internal/agents/<name>`, behind the
+interfaces in `internal/agents`, and registered in `internal/agents/builtin`. Nothing
+else names an agent, and `internal/boundary` tests that this holds.
+
 ## Documentation
 
-- [Configuration and authentication](docs/CONFIGURATION.md) — profiles, credentials, project routing, export scope, and environment variables
-- [Instrumentation guide](docs/INSTRUMENTATION.md) — hooks, commit stamping, queues, status lines, and hook managers
-- [Insights](docs/INSIGHTS.md) — usage, sessions, principals, filters, and machine-readable output
-- [Design notes](docs/DESIGN.md) — the decisions behind the hook path and its performance guarantees
-- [Security](SECURITY.md) — login flow, privacy boundaries, and threat model
-- [Development](docs/DEVELOPMENT.md) — build, test, lint, benchmark, and dev-backend workflows
-- [Releasing](docs/RELEASING.md) — versioning, release assets, signing, installers, and smoke tests
-- [Cursor instrumentation](docs/CURSOR-INSTRUMENTATION.md)
-- [Antigravity instrumentation](docs/ANTIGRAVITY-INSTRUMENTATION.md)
-- [Subagent instrumentation](docs/SUBAGENT-INSTRUMENTATION.md)
-- [Funding instrumentation](docs/FUNDING-INSTRUMENTATION.md)
 - [Agent-facing CLI guide](https://terma.ai/cli/llms.txt)
 
 ## License

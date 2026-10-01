@@ -3,11 +3,19 @@ package selfupdate
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"testing"
 )
 
-// executable writes an empty executable at path, creating its directory.
+// unixLayouts skips on Windows, where terma does not tell npm's layouts apart.
+func unixLayouts(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix package-manager layouts")
+	}
+}
+
 func executable(t *testing.T, path string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -19,6 +27,7 @@ func executable(t *testing.T, path string) {
 }
 
 func TestManagedByUsesThePackageManagerThatOwnsTheBinary(t *testing.T) {
+	unixLayouts(t)
 	t.Setenv("PATH", "")
 	root, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
@@ -48,8 +57,7 @@ func TestManagedByUsesThePackageManagerThatOwnsTheBinary(t *testing.T) {
 		// A custom prefix keeps no npm of its own, and PATH has none here either.
 		{"npm prefix without npm", filepath.Join(root, "custom", "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "npm", nil,
 			filepath.Join(root, "custom", "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "", ""},
-		// A project's own dependency is that project's to upgrade, in that project: a
-		// global install would not change the copy that runs.
+		// A project's own dependency is upgraded in that project.
 		{"npm project", filepath.Join(root, "app", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "npm", nil,
 			filepath.Join(root, "app", "node_modules", "@miradorlabs", "terma", "vendor", "terma"),
 			"npm install @miradorlabs/terma@latest", filepath.Join(root, "app")},
@@ -74,6 +82,7 @@ func TestManagedByUsesThePackageManagerThatOwnsTheBinary(t *testing.T) {
 
 // The npm on PATH is used only when the prefix has none, and always with that prefix.
 func TestManagedByFallsBackToNpmOnPathForItsPrefix(t *testing.T) {
+	unixLayouts(t)
 	root, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
 		t.Fatal(err)

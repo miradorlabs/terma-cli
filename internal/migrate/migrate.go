@@ -1,23 +1,7 @@
-// Package migrate brings the state an earlier terma left in the config directory up to
-// what this build reads, so an update needs nothing more from the developer.
-//
-// A migration runs once per machine, in order, the first time a newer build starts —
-// whatever command that is, hooks included — before the command reads any state. The
-// last one applied is recorded in migrations.json, one small read on every start.
-//
-// The rules a migration keeps, because of where it runs:
-//
-//   - Append-only IDs. Never renumber, reuse or delete one: a machine may have run it.
-//   - Idempotent. A crash between the change and the record runs it again.
-//   - Readable by the previous build. Another terma may share the machine (doctor warns
-//     when one does) and read the same files next, so a migration adds and fills in; it
-//     never removes or repurposes. Dropping what nothing reads any more is a later
-//     migration's job, once no supported build reads it.
-//   - Precise. Recognize the old shape exactly (a missing key, not a false one) and leave
-//     anything else alone: a fresh machine runs every migration against state this
-//     build wrote.
-//   - Home directory only. A repository's committed files are shared with colleagues on
-//     other versions; `terma update --refresh` rewrites those, on request.
+// Package migrate brings state an earlier terma left in the config directory up to what
+// this build reads, once per machine, before any command (hooks included) reads it.
+// Migrations have append-only IDs, are idempotent, recognize the old shape exactly,
+// leave state the previous build can read, and touch the home directory only.
 package migrate
 
 import (
@@ -28,6 +12,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -36,21 +21,17 @@ import (
 
 // Migration is one change to the state under the config directory.
 type Migration struct {
-	// ID orders migrations and records them as done.
-	ID int
-	// Name says what it changes, for messages.
+	ID   int
 	Name string
-	// Run makes the change. It stops early when ctx is done, leaving state the next
-	// start can finish from; that is how a hook keeps to its bound.
+	// Run stops early when ctx is done, leaving state the next start can finish from.
 	Run func(ctx context.Context) error
 }
 
 // State is what migrations.json records.
 type State struct {
 	// Applied is the ID of the last migration that completed.
-	Applied int `json:"applied"`
-	// Failed is the migration that stopped the last run, until one gets past it.
-	Failed *Failure `json:"failed,omitempty"`
+	Applied int      `json:"applied"`
+	Failed  *Failure `json:"failed,omitempty"`
 }
 
 // Failure is a migration that returned an error.
@@ -61,8 +42,8 @@ type Failure struct {
 	Error string    `json:"error"`
 }
 
-// RetryAfter is how long a start that is not asked to retry leaves a failed migration
-// alone, so a hook firing on every tool call does not repeat a failure each time.
+// RetryAfter is how long an ordinary start leaves a failed migration alone, so hooks do
+// not repeat it on every tool call.
 const RetryAfter = 15 * time.Minute
 
 const (
@@ -102,9 +83,7 @@ func Remaining(s State) int {
 	return n
 }
 
-// Pending reports whether this build has migrations the state under dir has not had.
-// A config directory that does not exist has nothing to migrate. A newer build's record
-// (an ID beyond this build's) is not pending: there is nothing an older build can add.
+// Pending reports whether this build has migrations the existing state under dir has not had.
 func Pending(dir string) bool {
 	if _, err := os.Stat(dir); err != nil {
 		return false
@@ -113,15 +92,9 @@ func Pending(dir string) bool {
 	return err != nil || s.Applied < Latest()
 }
 
-// Run applies the pending migrations in order, recording each as it completes, and
-// returns the names of those it applied. It stops at the first failure, which it
-// records; a later run starts again from there. retry says whether to attempt a
-// migration that failed less than RetryAfter ago. Concurrent starts wait on one lock,
-// and the ones that get it second find nothing left to do.
-//
-// ctx bounds the whole run, not only the wait for the lock: it is checked before each
-// migration and passed into it. A run that ctx cuts short is not a failure — nothing is
-// recorded against the migration, and the next start carries on where it stopped.
+// Run applies pending migrations in order under one lock and returns their names; it
+// records the first failure and stops (retry ignores RetryAfter). A run ctx cuts short
+// records no failure.
 func Run(ctx context.Context, dir string, retry bool) ([]string, error) {
 	if !Pending(dir) {
 		return nil, nil
@@ -133,9 +106,11 @@ func Run(ctx context.Context, dir string, retry bool) ([]string, error) {
 	defer unlock()
 	s, err := Load(dir)
 	if err != nil {
-		// Unreadable is not "none applied": running everything again is safe (each
-		// migration is idempotent), and rewriting the record repairs it.
+		// Unreadable: running everything again is safe, and the rewrite repairs it.
 		s = State{}
+	}
+	if f := s.Failed; f != nil && !slices.ContainsFunc(migrations, func(m Migration) bool { return m.ID == f.ID }) {
+		s.Failed = nil
 	}
 	if f := s.Failed; f != nil && !retry && time.Since(f.At) < RetryAfter {
 		return nil, fmt.Errorf("%s: %s", f.Name, f.Error)

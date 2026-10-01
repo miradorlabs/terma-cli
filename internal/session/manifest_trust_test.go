@@ -7,8 +7,7 @@ import (
 	"time"
 )
 
-// writeRawManifest plants a manifest file the way a hostile or corrupted writer
-// would, bypassing Touch's validation.
+// writeRawManifest plants a manifest file bypassing Touch's validation.
 func writeRawManifest(t *testing.T, s *Store, name, body string) {
 	t.Helper()
 	dir := filepath.Join(s.dir, manifestsDir)
@@ -20,8 +19,7 @@ func writeRawManifest(t *testing.T, s *Store, name, body string) {
 	}
 }
 
-// A manifest's session id becomes a path (Prune removes it) and a commit-message
-// trailer, so it has to survive the same check on the way in as on the way out.
+// A manifest's session id is validated on read as on write: it becomes a path and a trailer.
 func TestManifestsRejectsUnsafeSessionID(t *testing.T) {
 	for _, tc := range []struct{ name, id string }{
 		{"traversal", "../../victim"},
@@ -44,8 +42,7 @@ func TestManifestsRejectsUnsafeSessionID(t *testing.T) {
 	}
 }
 
-// A manifest whose id does not match its file name breaks the invariant that
-// manifestPath addresses the file the manifest was read from.
+// A manifest whose id does not match its file name is skipped.
 func TestManifestsRequiresIDToMatchFileName(t *testing.T) {
 	s := newStore(t)
 	writeRawManifest(t, s, "a.json", `{"session_id":"b","files":{}}`)
@@ -58,8 +55,7 @@ func TestManifestsRequiresIDToMatchFileName(t *testing.T) {
 	}
 }
 
-// Prune must never remove a path outside the manifests directory, however the id
-// inside a manifest file is spelled.
+// Prune never removes a path outside the manifests directory.
 func TestPruneStaysInsideManifestsDir(t *testing.T) {
 	gitDir := filepath.Join(t.TempDir(), ".git")
 	if err := os.MkdirAll(gitDir, dirMode); err != nil {
@@ -81,8 +77,7 @@ func TestPruneStaysInsideManifestsDir(t *testing.T) {
 	}
 }
 
-// A tool label is not an identifier, so it is held to the weaker rule: it may not
-// break out of the single line its trailer occupies.
+// A tool label may not break out of its trailer line.
 func TestManifestsStripsMultilineToolLabel(t *testing.T) {
 	s := newStore(t)
 	writeRawManifest(t, s, "s1.json",
@@ -99,8 +94,7 @@ func TestManifestsStripsMultilineToolLabel(t *testing.T) {
 	}
 }
 
-// Attribute is the function that feeds the trailer builder; nothing it returns may
-// carry a line break.
+// Nothing Attribute returns carries a line break.
 func TestAttributeNeverReturnsMultilineID(t *testing.T) {
 	s := newStore(t)
 	writeRawManifest(t, s, "planted.json",
@@ -127,4 +121,26 @@ func quote(s string) string {
 		}
 	}
 	return string(append(out, '"'))
+}
+
+// A delta is trusted no more than a manifest: its id must be safe and match its file name.
+func TestDeltasRequireASafeIDMatchingTheirFileName(t *testing.T) {
+	for _, tc := range []struct{ name, file, id string }{
+		{"another session", "a~0001.delta", "b"},
+		{"traversal", "x~0001.delta", "../../victim"},
+		{"newline", "x~0001.delta", "x\nCo-authored-by: Attacker <a@evil.test>"},
+		{"no separator", "x.delta", "x"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := newStore(t)
+			writeRawManifest(t, s, tc.file, `{"session_id":`+quote(tc.id)+`,"files":{"a.go":"2026-01-01T00:00:00Z"}}`)
+			got, err := s.Manifests()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(got) != 0 {
+				t.Fatalf("expected the delta to be ignored, got %+v", got)
+			}
+		})
+	}
 }

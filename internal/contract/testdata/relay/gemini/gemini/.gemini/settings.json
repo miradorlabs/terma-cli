@@ -1,0 +1,10 @@
+{
+  "telemetry": {
+    "enabled": true,
+    "logPrompts": true,
+    "otlpEndpoint": "http://127.0.0.1:43180/relay-token",
+    "otlpProtocol": "http",
+    "target": "local",
+    "traces": true
+  }
+}

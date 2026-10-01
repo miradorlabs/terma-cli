@@ -1,0 +1,3 @@
+- insert:
+    - id: terma
+      name: '$ROOT/dsh/plugins/terma-relay.mjs'

@@ -1,0 +1,106 @@
+package cli
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
+)
+
+func codexHooksIn(t *testing.T, repo string) map[string][]struct {
+	Matcher *string `json:"matcher"`
+	Hooks   []struct {
+		Command string `json:"command"`
+		Async   bool   `json:"async"`
+	} `json:"hooks"`
+} {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(repo, filepath.FromSlash(hooksPathOf("codex"))))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Hooks map[string][]struct {
+			Matcher *string `json:"matcher"`
+			Hooks   []struct {
+				Command string `json:"command"`
+				Async   bool   `json:"async"`
+			} `json:"hooks"`
+		} `json:"hooks"`
+	}
+	if err := json.Unmarshal(data, &doc); err != nil {
+		t.Fatalf("%v:\n%s", err, data)
+	}
+	return doc.Hooks
+}
+
+func TestInstallWiresCodexHooksWhenAsked(t *testing.T) {
+	repo := installRepo(t)
+	out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude,codex", "--yes")
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	hooks := codexHooksIn(t, repo)
+	for _, want := range []struct{ event, command string }{
+		{"SessionStart", codexHookCommand("codex-session-start")},
+		{"PreToolUse", codexHookCommand("codex-pre-tool-use")},
+		{"PermissionRequest", codexHookCommand("codex-permission-request")},
+		{"PostToolUse", codexHookCommand("codex-post-tool-use")},
+		{"SessionEnd", codexHookCommand("codex-session-end")},
+	} {
+		groups := hooks[want.event]
+		if len(groups) != 1 || len(groups[0].Hooks) != 1 || groups[0].Hooks[0].Command != want.command {
+			t.Fatalf("%s not wired: %+v", want.event, groups)
+		}
+	}
+	if !strings.Contains(out, hooksPathOf("codex")) {
+		t.Fatalf("the plan should name the file it writes:\n%s", out)
+	}
+}
+
+// A repository without the agent's own directory gains no hooks file for it…
+func TestInstallSkipsCodexHooksByDefault(t *testing.T) {
+	repo := installRepo(t)
+	if _, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(repo, filepath.FromSlash(hooksPathOf("codex")))); !os.IsNotExist(err) {
+		t.Fatal("Codex hooks written into a repository that has no .codex directory")
+	}
+}
+
+// …but one that already has the agent's configuration gets them without being asked.
+func TestInstallWiresCodexHooksWhereCodexIsUsed(t *testing.T) {
+	repo := installRepo(t)
+	if err := os.MkdirAll(filepath.Join(repo, ".codex"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	if len(codexHooksIn(t, repo)["PostToolUse"]) != 1 {
+		t.Fatal("a repository with a .codex directory should get the hooks by default")
+	}
+}
+
+func TestUninstallRemovesCodexHooks(t *testing.T) {
+	repo := installRepo(t)
+	if _, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude,codex", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runTerma(t, "uninstall", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(repo, filepath.FromSlash(hooksPathOf("codex")))); !os.IsNotExist(err) {
+		t.Fatal("uninstall left Codex hooks behind")
+	}
+}
+
+// codexHookCommand is the committed command for event, which extends the agent's minimal
+// hook PATH before the guard.
+func codexHookCommand(event string) string {
+	return `PATH="${PATH:-/usr/bin:/bin}:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin"; ` + hookmgr.HookCommand(event)
+}

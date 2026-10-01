@@ -51,7 +51,7 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 func TestLoadRejectsMissingID(t *testing.T) {
 	root := t.TempDir()
 	writeRaw(t, root, []byte(`{"project":{"name":"x"}}`))
-	if _, err := Load(root); err == nil || !strings.Contains(err.Error(), "no project id") {
+	if _, err := Load(root); err == nil || !strings.Contains(err.Error(), "no team id") {
 		t.Fatalf("expected a missing-id error, got %v", err)
 	}
 }
@@ -74,8 +74,7 @@ func TestFindWalksUp(t *testing.T) {
 	}
 }
 
-// A binding written when install still recorded its adapters loads, and the next Save
-// leaves the list out: the repository's hooks files are the record now.
+// A binding carrying an "adapters" list loads, and Save leaves the list out.
 func TestRetiredAdaptersFieldIsDroppedOnSave(t *testing.T) {
 	root := t.TempDir()
 	writeRaw(t, root, []byte(`{"project":{"id":"p"},"install":{"hook_manager":"git","adapters":["claude","cursor"]}}`))
@@ -95,8 +94,7 @@ func TestRetiredAdaptersFieldIsDroppedOnSave(t *testing.T) {
 	}
 }
 
-// Removing the binding must not take the committed hook shims under .terma/hooks/
-// down with it.
+// Removing the binding keeps the hook shims under .terma/hooks/.
 func TestRemoveKeepsHooksDir(t *testing.T) {
 	root := t.TempDir()
 	if err := Save(root, &File{Project: Project{ID: "p"}}); err != nil {

@@ -2,6 +2,7 @@ package selfupdate
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -83,12 +84,29 @@ func archiveWith(t *testing.T, name string, content []byte) []byte {
 	return buf.Bytes()
 }
 
-func TestApplyVerifiesChecksumAndSwapsBinary(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("no self-update on windows")
+func zipWith(t *testing.T, name string, content []byte) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	w, err := zw.Create(name)
+	if err != nil {
+		t.Fatal(err)
 	}
+	if _, err := w.Write(content); err != nil {
+		t.Fatal(err)
+	}
+	_ = zw.Close()
+	return buf.Bytes()
+}
+
+func TestApplyVerifiesChecksumAndSwapsBinary(t *testing.T) {
 	newBinary := []byte("#!/bin/sh\necho new\n")
 	archive := archiveWith(t, "terma", newBinary)
+	exeName := "terma"
+	if runtime.GOOS == "windows" {
+		archive = zipWith(t, "terma_Windows/terma.exe", newBinary)
+		exeName = "terma.exe"
+	}
 	sum := sha256.Sum256(archive)
 	assetName := AssetName(runtime.GOOS, runtime.GOARCH)
 
@@ -104,7 +122,7 @@ func TestApplyVerifiesChecksumAndSwapsBinary(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
-	exe := filepath.Join(t.TempDir(), "terma")
+	exe := filepath.Join(t.TempDir(), exeName)
 	if err := os.WriteFile(exe, []byte("old"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +143,7 @@ func TestApplyVerifiesChecksumAndSwapsBinary(t *testing.T) {
 		t.Fatalf("binary not replaced: %q", data)
 	}
 	info, _ := os.Stat(exe)
-	if info.Mode()&0o111 == 0 {
+	if runtime.GOOS != "windows" && info.Mode()&0o111 == 0 {
 		t.Fatal("replacement lost the executable bit")
 	}
 
@@ -140,6 +158,35 @@ func TestApplyVerifiesChecksumAndSwapsBinary(t *testing.T) {
 	}
 }
 
+// Windows's release archive is a zip holding terma.exe; a zip without it is refused.
+func TestExtractBinaryReadsWindowsZip(t *testing.T) {
+	got, err := extractBinaryFor("windows", zipWith(t, "terma_Windows_x86_64/terma.exe", []byte("exe")))
+	if err != nil || string(got) != "exe" {
+		t.Fatalf("extract: %q, %v", got, err)
+	}
+	if _, err := extractBinaryFor("windows", zipWith(t, "README.md", []byte("x"))); err == nil {
+		t.Fatal("a zip without terma.exe was accepted")
+	}
+}
+
+// On Windows the old executable steps aside to .old (replacing a previous one) first.
+func TestSwapExecutableMovesTheRunningOneAsideOnWindows(t *testing.T) {
+	dir := t.TempDir()
+	exe, next := filepath.Join(dir, "terma.exe"), filepath.Join(dir, ".terma-update-1")
+	_ = os.WriteFile(exe, []byte("old"), 0o755)
+	_ = os.WriteFile(exe+".old", []byte("older"), 0o755)
+	_ = os.WriteFile(next, []byte("new"), 0o755)
+	if err := swapExecutable("windows", next, exe); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(exe); string(data) != "new" {
+		t.Fatalf("terma.exe holds %q, want the new build", data)
+	}
+	if data, _ := os.ReadFile(exe + ".old"); string(data) != "old" {
+		t.Fatalf("terma.exe.old holds %q, want the build that was running", data)
+	}
+}
+
 func TestNoticeUsesCache(t *testing.T) {
 	dir := t.TempDir()
 	calls := 0
@@ -151,20 +198,18 @@ func TestNoticeUsesCache(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 	c := &Client{HTTP: srv.Client(), BaseURL: srv.URL, Version: "1.0.0"}
-	if msg := c.Notice(context.Background(), dir, "1.0.0"); !strings.Contains(msg, "2.0.0") {
+	if msg := noticeOf(c, context.Background(), dir, "1.0.0"); !strings.Contains(msg, "2.0.0") {
 		t.Fatalf("expected a notice, got %q", msg)
 	}
-	if msg := c.Notice(context.Background(), dir, "1.0.0"); !strings.Contains(msg, "2.0.0") || calls != 1 {
+	if msg := noticeOf(c, context.Background(), dir, "1.0.0"); !strings.Contains(msg, "2.0.0") || calls != 1 {
 		t.Fatalf("second notice should come from the cache (calls=%d): %q", calls, msg)
 	}
-	if msg := c.Notice(context.Background(), dir, "2.0.0"); msg != "" {
+	if msg := noticeOf(c, context.Background(), dir, "2.0.0"); msg != "" {
 		t.Fatalf("up to date should be silent, got %q", msg)
 	}
 }
 
-// A local build can never be told it is out of date, so it must not ask. It used to:
-// the lookup ran first and Newer discarded the answer, which put a live request — three
-// seconds of timeout when offline — behind every command of every dev build and test.
+// A local build never looks up the latest release: it can never be out of date.
 func TestNoticeAsksNothingForABuildThatIsNotARelease(t *testing.T) {
 	calls := 0
 	mux := http.NewServeMux()
@@ -176,7 +221,7 @@ func TestNoticeAsksNothingForABuildThatIsNotARelease(t *testing.T) {
 	defer srv.Close()
 	c := &Client{HTTP: srv.Client(), BaseURL: srv.URL}
 	for _, version := range []string{"dev", "", "1.2.3-next", "v1.2.3-next"} {
-		if msg := c.Notice(context.Background(), t.TempDir(), version); msg != "" {
+		if msg := noticeOf(c, context.Background(), t.TempDir(), version); msg != "" {
 			t.Errorf("%q: got a notice: %q", version, msg)
 		}
 	}

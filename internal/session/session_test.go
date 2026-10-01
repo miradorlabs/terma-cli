@@ -78,8 +78,7 @@ func TestTouchAndAttribute(t *testing.T) {
 		t.Fatalf("unexpected files: %+v", got[0].Files)
 	}
 
-	// Pure human work: nothing, even with a fresh active session? No — the
-	// fallback only applies when there is no manifest evidence at all.
+	// Pure human work: nothing, since the fallback needs no manifest at all.
 	active := &Session{ID: "s9", Tool: "claude-code"}
 	if got := Attribute([]string{"human.txt"}, manifests, active, true); len(got) != 1 || got[0].SessionID != "s9" {
 		t.Fatalf("expected the fresh active session as fallback, got %+v", got)
@@ -116,8 +115,7 @@ func TestConsumeRemovesCommittedFiles(t *testing.T) {
 	if len(manifests) != 1 || len(manifests[0].Files) != 0 {
 		t.Fatalf("emptied manifest should be kept as evidence the session reports edits: %+v", manifests)
 	}
-	// With the manifest present but empty, a fresh active session must not fall
-	// back onto a later human commit.
+	// An empty manifest still keeps the fallback off a later human commit.
 	active := &Session{ID: "s1", Tool: "claude-code"}
 	if got := Attribute([]string{"human.txt"}, manifests, active, true); len(got) != 0 {
 		t.Fatalf("session with a (consumed) manifest claimed human work: %+v", got)
@@ -146,8 +144,7 @@ func TestPruneDropsOldManifests(t *testing.T) {
 	}
 }
 
-// A subagent that edited under an id of its own is folded into the conversation that
-// spawned it, so the commit is stamped once, for the session a person can find.
+// A subagent's manifest folds into its parent's, so the commit is stamped once.
 func TestMergeFoldsOneSessionIntoAnother(t *testing.T) {
 	store := Open(t.TempDir())
 	early := time.Date(2026, 9, 21, 10, 0, 0, 0, time.UTC)

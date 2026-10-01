@@ -8,8 +8,7 @@ import (
 	"testing"
 )
 
-// The project id in this file becomes a path component (harness.HelperFilePath), and
-// the file is committed — so it arrives from whoever wrote the repository.
+// A committed project id becomes a path component, so traversal shapes are refused.
 func TestLoadRejectsUnsafeProjectID(t *testing.T) {
 	for _, tc := range []struct{ name, id string }{
 		{"traversal", "../../../../home/.zshenv"},
@@ -24,7 +23,7 @@ func TestLoadRejectsUnsafeProjectID(t *testing.T) {
 			writeID(t, root, tc.id)
 			if _, err := Load(root); err == nil {
 				t.Fatalf("expected %q to be rejected", tc.id)
-			} else if !strings.Contains(err.Error(), "invalid project id") {
+			} else if !strings.Contains(err.Error(), "invalid team id") {
 				t.Fatalf("expected an invalid-id error, got %v", err)
 			}
 		})

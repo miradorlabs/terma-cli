@@ -1,0 +1,122 @@
+package relay
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
+	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
+	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
+)
+
+// Every key the live goldens record with content withheld is classified here.
+func TestClassificationCoversTheGoldens(t *testing.T) {
+	files, _ := filepath.Glob(filepath.Join("..", "..", "test", "e2e", "golden", "*", "telemetry-redacted.json"))
+	withheld, _ := filepath.Glob(filepath.Join("..", "..", "test", "e2e", "golden", "relay", "*-withheld.json"))
+	files = append(files, withheld...)
+	if len(files) == 0 {
+		t.Fatal("no goldens found")
+	}
+	for _, f := range files {
+		data, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var surfaces map[string][]string
+		if err := json.Unmarshal(data, &surfaces); err != nil {
+			t.Fatalf("%s: %v", f, err)
+		}
+		for surface, keys := range surfaces {
+			for _, k := range keys {
+				if c := testRules.classify(strings.TrimPrefix(k, "resource/")); c == "unclassified" {
+					t.Errorf("%s %s: %q is unclassified", filepath.Base(f), surface, k)
+				}
+			}
+		}
+	}
+}
+
+// A key is safe or content, never both.
+func TestNoKeyIsBothSafeAndContent(t *testing.T) {
+	for key := range testRules.safeKeys {
+		if testRules.contentKey(key) {
+			t.Errorf("%q is listed as safe and as content", key)
+		}
+	}
+}
+
+// With content withheld, unknown attributes and free-text bodies are dropped and counted;
+// with content allowed, nothing is touched.
+func TestWithheldContentPassesOnlyWhatIsClassified(t *testing.T) {
+	record := func() *part {
+		return &part{signal: Logs, session: "A", msg: &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{
+			Resource: &resourcepb.Resource{Attributes: []*commonpb.KeyValue{kv("service.name", "x"), kv("process.command_args", "-p secret"), kv("host.fancy", "new")}},
+			ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{
+				{Body: &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: "the prompt, in a new place"}},
+					Attributes: []*commonpb.KeyValue{kv("event.name", "x.new_event"), kv("session.id", "A"), kv("input_tokens", "3"), kv("x.new_text", "secret")}},
+				{Body: &commonpb.AnyValue{Value: &commonpb.AnyValue_KvlistValue{KvlistValue: &commonpb.KeyValueList{Values: []*commonpb.KeyValue{kv("text", "secret")}}}},
+					Attributes: []*commonpb.KeyValue{kv("event.name", "x.structured")}},
+				{Body: &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: "claude_code.api_request"}},
+					Attributes: []*commonpb.KeyValue{kv("event.name", "api_request")}},
+			}}},
+		}}}}
+	}
+	unclassified := map[string]int{}
+	p := record()
+	testRules.withhold(p, false, false, unclassified)
+	rl := p.msg.(*logspb.LogsData).ResourceLogs[0]
+	recs := rl.ScopeLogs[0].LogRecords
+	for _, want := range []string{"x.new_text", "resource/host.fancy"} {
+		if unclassified[want] == 0 {
+			t.Errorf("%s was not counted as unclassified: %v", want, unclassified)
+		}
+	}
+	if attr(recs[0].Attributes, "x.new_text") != "" || attr(recs[0].Attributes, "input_tokens") != "3" {
+		t.Errorf("attributes after the gate: %v", recs[0].Attributes)
+	}
+	if attr(rl.Resource.Attributes, "process.command_args") != "" || attr(rl.Resource.Attributes, "host.fancy") != "" || attr(rl.Resource.Attributes, "service.name") != "x" {
+		t.Errorf("resource after the gate: %v", rl.Resource.Attributes)
+	}
+	if recs[0].Body.GetStringValue() != "" || recs[1].Body.GetKvlistValue() != nil {
+		t.Errorf("a body that says more than its event left: %v / %v", recs[0].Body, recs[1].Body)
+	}
+	if recs[2].Body.GetStringValue() != "claude_code.api_request" {
+		t.Errorf("a body that only names its event was blanked: %v", recs[2].Body)
+	}
+
+	unclassified = map[string]int{}
+	p = record()
+	if n := testRules.withhold(p, true, true, unclassified); n != 0 || len(unclassified) != 0 {
+		t.Fatalf("content allowed, yet the gate changed %d records: %v", n, unclassified)
+	}
+}
+
+// A number or flag passes under any key, even as a string that is wholly one; anything more is text.
+func TestNumbersAndFlagsPassUnderAnyKey(t *testing.T) {
+	for v, want := range map[string]bool{"3": true, "-12.5": true, "true": true, "false": true, "0": true,
+		"": false, "3 files": false, "0x1f": false, "NaN": false, "Inf": false, "1_000": false, "yes": false, "1e999999": false} {
+		if got := numericOrBool(v); got != want {
+			t.Errorf("numericOrBool(%q) = %v, want %v", v, got, want)
+		}
+	}
+	unclassified := map[string]int{}
+	attrs, _ := testRules.withholdAttrs([]*commonpb.KeyValue{kv("num_hooks", "3"), kv("x.new_note", "3 files"),
+		{Key: "x.count", Value: &commonpb.AnyValue{Value: &commonpb.AnyValue_IntValue{IntValue: 4}}}}, false, false, unclassified)
+	if attr(attrs, "num_hooks") != "3" || len(attrs) != 2 || unclassified["x.new_note"] != 1 {
+		t.Fatalf("attrs %v, unclassified %v", attrs, unclassified)
+	}
+}
+
+// classify says how the relay treats key with content withheld: "safe", "content" or "unclassified".
+func (ru *rules) classify(key string) string {
+	switch {
+	case ru.contentKey(key):
+		return "content"
+	case testRules.safeKey(key):
+		return "safe"
+	}
+	return "unclassified"
+}

@@ -8,14 +8,13 @@ import (
 var releaseVersion = regexp.MustCompile(`^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$`)
 var describeVersion = regexp.MustCompile(`^v?[0-9]+\.[0-9]+\.[0-9]+.*-[0-9]+-g[0-9a-f]{7,40}(?:-dirty)?$`)
 
-// IsRelease reports whether version belongs to the numbered release sequence.
-// Unversioned, dirty, and snapshot builds are never replaced automatically.
+// IsRelease reports whether version is a numbered release, not a source, dirty or snapshot build.
 func IsRelease(version string) bool {
 	parts := releaseVersion.FindStringSubmatch(version)
 	if parts == nil || describeVersion.MatchString(version) || strings.Contains(version, "-next") || strings.HasSuffix(version, "-dirty") {
 		return false
 	}
-	for _, part := range strings.Split(parts[4], ".") {
+	for part := range strings.SplitSeq(parts[4], ".") {
 		if numericIdentifier(part) && len(part) > 1 && part[0] == '0' {
 			return false
 		}
@@ -23,8 +22,7 @@ func IsRelease(version string) bool {
 	return true
 }
 
-// Newer compares numbered versions, including semantic prerelease ordering.
-// Unknown build identifiers are not guessed to be version zero.
+// Newer reports whether candidate is a later release than current, prereleases included.
 func Newer(current, candidate string) bool {
 	if !IsRelease(current) || !IsRelease(candidate) {
 		return false

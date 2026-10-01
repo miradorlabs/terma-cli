@@ -5,18 +5,17 @@ import (
 	"testing"
 )
 
-// A remote is emitted as telemetry, so anything that could carry a secret has to
-// be stripped before it leaves the machine.
+// A remote leaves the machine as telemetry, so anything that could carry a secret is stripped.
 func TestNormalizeRemoteStripsCredentials(t *testing.T) {
 	for _, tc := range []struct{ name, in, want string }{
 		{
 			name: "https with token",
-			in:   "https://dawson:ghp_supersecrettoken@github.com/miradorlabs/terma-cli.git",
+			in:   "https://alex:ghp_supersecrettoken@github.com/miradorlabs/terma-cli.git",
 			want: "https://github.com/miradorlabs/terma-cli",
 		},
 		{
 			name: "https with user only",
-			in:   "https://dawson@github.com/miradorlabs/terma-cli",
+			in:   "https://alex@github.com/miradorlabs/terma-cli",
 			want: "https://github.com/miradorlabs/terma-cli",
 		},
 		{

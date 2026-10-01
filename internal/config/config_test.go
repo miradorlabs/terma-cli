@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -64,8 +65,7 @@ func TestLoad_PrecedenceIsFlagThenEnvThenProfile(t *testing.T) {
 }
 
 func TestLoad_FallsBackToDefaultsWithNoConfigFile(t *testing.T) {
-	// Asserts production defaults, so it must not inherit the developer's TERMA_ENV:
-	// the suite is run against dev, and this failed there for no reason of its own.
+	// Asserts production defaults, so it must not inherit the developer's TERMA_ENV.
 	t.Setenv("TERMA_ENV", "")
 	seedConfig(t, nil)
 
@@ -130,10 +130,8 @@ func TestSaveFile_WritesConfigWorldReadableButNotTheCredentialFile(t *testing.T)
 	}
 }
 
-// TestLoad_RefusesCleartextRemoteEndpoints guards the CLI's most damaging misconfiguration:
-// every one of these URLs carries a secret (the auth host receives the PKCE verifier and the
-// refresh token; the api host receives the access token), so an http:// endpoint would put
-// them on the wire in the clear with nothing else in the CLI noticing.
+// TestLoad_RefusesCleartextRemoteEndpoints: every host receives a secret, so http to a
+// remote host is refused.
 func TestLoad_RefusesCleartextRemoteEndpoints(t *testing.T) {
 	seedConfig(t, nil)
 
@@ -157,8 +155,7 @@ func TestLoad_RefusesCleartextRemoteEndpoints(t *testing.T) {
 	}
 }
 
-// TestLoad_AllowsCleartextLoopback keeps local development working — a local stack has no
-// certificate, and its traffic never leaves the machine.
+// TestLoad_AllowsCleartextLoopback keeps a local stack without a certificate working.
 func TestLoad_AllowsCleartextLoopback(t *testing.T) {
 	seedConfig(t, nil)
 
@@ -176,8 +173,7 @@ func TestLoad_AllowsCleartextLoopback(t *testing.T) {
 	}
 }
 
-// TestLoad_RejectsNonHTTPSchemes stops a config from pointing the CLI at something that is
-// not a web endpoint at all — file:// would be handed to the browser opener verbatim.
+// TestLoad_RejectsNonHTTPSchemes: file:// would be handed to the browser opener verbatim.
 func TestLoad_RejectsNonHTTPSchemes(t *testing.T) {
 	seedConfig(t, nil)
 
@@ -190,13 +186,9 @@ func TestLoad_RejectsNonHTTPSchemes(t *testing.T) {
 	}
 }
 
-// TestLoad_DefaultsToProductionOnEveryHost is the guarantee that matters now that the
-// CLI ships publicly: with no configuration at all, all three endpoints are production.
-// Nothing else is built in, so no user can be pointed at internal infrastructure by
-// accident, and no internal hostname needs to live in this repo.
+// TestLoad_DefaultsToProductionOnEveryHost: with no configuration, every endpoint is production.
 func TestLoad_DefaultsToProductionOnEveryHost(t *testing.T) {
-	// Asserts production defaults, so it must not inherit the developer's TERMA_ENV:
-	// the suite is run against dev, and this failed there for no reason of its own.
+	// Asserts production defaults, so it must not inherit the developer's TERMA_ENV.
 	t.Setenv("TERMA_ENV", "")
 	seedConfig(t, nil)
 
@@ -215,12 +207,9 @@ func TestLoad_DefaultsToProductionOnEveryHost(t *testing.T) {
 	}
 }
 
-// TestLoad_EndpointsAreOverriddenIndependently keeps the escape hatch usable: pointing
-// one host at another deployment must not silently drag the other two along, nor reset
-// them.
+// TestLoad_EndpointsAreOverriddenIndependently: overriding one host leaves the others alone.
 func TestLoad_EndpointsAreOverriddenIndependently(t *testing.T) {
-	// Asserts production defaults, so it must not inherit the developer's TERMA_ENV:
-	// the suite is run against dev, and this failed there for no reason of its own.
+	// Asserts production defaults, so it must not inherit the developer's TERMA_ENV.
 	t.Setenv("TERMA_ENV", "")
 	seedConfig(t, nil)
 
@@ -236,9 +225,7 @@ func TestLoad_EndpointsAreOverriddenIndependently(t *testing.T) {
 	}
 }
 
-// TestLoad_EndpointPrecedence pins the resolution order. The profile is what an internal
-// developer configures once; the environment variable is what CI sets per-job; the flag
-// is the one-off.
+// TestLoad_EndpointPrecedence pins the order: flag, environment variable, profile.
 func TestLoad_EndpointPrecedence(t *testing.T) {
 	seedConfig(t, &File{
 		ActiveProfile: DefaultProfile,
@@ -291,8 +278,7 @@ func TestProfileSelectOrganization(t *testing.T) {
 	}
 }
 
-// A binding records the environment it was made in; whether it can be read under another
-// comes down to whether the two share an account service.
+// Two environments are interchangeable for a binding when they share an account service.
 func TestSameAccounts(t *testing.T) {
 	for _, c := range []struct {
 		a, b string
@@ -309,5 +295,32 @@ func TestSameAccounts(t *testing.T) {
 		if got := SameAccounts(c.a, c.b); got != c.want {
 			t.Errorf("SameAccounts(%q, %q) = %v, want %v", c.a, c.b, got, c.want)
 		}
+	}
+}
+
+// Concurrent UpdateFile calls keep every independent change.
+func TestUpdateProfileConcurrentChoices(t *testing.T) {
+	seedConfig(t, nil)
+	const updates = 16
+	errs := make(chan error, updates)
+	start := make(chan struct{})
+	for i := range updates {
+		go func() {
+			<-start
+			errs <- UpdateProfile(DefaultProfile, func(p *Profile) { p.Harnesses = append(p.Harnesses, fmt.Sprint(i)) })
+		}()
+	}
+	close(start)
+	for range updates {
+		if err := <-errs; err != nil {
+			t.Fatal(err)
+		}
+	}
+	file, err := LoadFile()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := len(file.Profiles[DefaultProfile].Harnesses); got != updates {
+		t.Fatalf("lost concurrent preferences: got %d, want %d", got, updates)
 	}
 }

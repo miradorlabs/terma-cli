@@ -1,9 +1,5 @@
-// Package doctor is the report model behind `terma doctor`: checks and actionable
-// setup readiness, without estimating spend from configuration.
-//
-// Every onboarding failure mode that is
-// not surfaced here becomes a support thread, so the checks are explicit about
-// what they verified and each failure carries the one command that fixes it.
+// Package doctor runs `terma doctor`'s checks in order and judges the verdicts status
+// shares with it, reaching the spool and the platform's APIs only through Probes.
 package doctor
 
 import (
@@ -12,15 +8,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/style"
+	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
 // Status is a check's outcome.
 type Status int
 
-// The outcomes. Warn is something that works today and will not for long, or works
-// only in part; Skip is a check that did not apply here, which is not a pass and must
-// not be counted as one. Checks are reported in the order they run, never by outcome.
+// The outcomes. Warn works only in part or not for long; Skip did not apply and is never
+// counted as a pass.
 const (
 	Pass Status = iota
 	Warn
@@ -43,19 +38,14 @@ func (s Status) String() string {
 
 // Check is one verification and what it found.
 type Check struct {
-	// Key identifies the check across doctor and status.
 	Key    string
 	Name   string
 	Status Status
 	Detail string
 	// Fix is the command or step that turns a Fail/Warn into a Pass.
-	Fix string
-	// Inconclusive means verification could not establish success or failure.
+	Fix          string
 	Inconclusive bool
-	// NeedsShellActivationOnly means the only remaining fix is activating shell routing.
-	NeedsShellActivationOnly bool
-	// Ready of Of counts agents that can export or run their hooks. Both zero means
-	// the check does not report a count.
+	// Ready of Of counts agents that can export or run their hooks; both zero means no count.
 	Ready, Of int
 	Duration  time.Duration
 }
@@ -77,37 +67,29 @@ func (r Report) Failed() bool {
 
 // Check keys shared by doctor and status.
 const (
-	KeyBinary = "binary"
-	// KeyState: saved state an update has not finished migrating (internal/migrate).
-	KeyState   = "state"
-	KeyAuth    = "auth"
-	KeyProject = "project"
-	KeyHooks   = "hooks"
-	// KeyAgentHooks: the agents' own hooks (session start, files touched) are wired and
-	// each agent will run them — which for Codex and Antigravity takes the developer's
-	// trust, given from inside the agent.
+	KeyBinary        = "binary"
+	KeyState         = "state"
+	KeyAuth          = "auth"
+	KeyProject       = "team"
+	KeyHooks         = "hooks"
 	KeyAgentHooks    = "agent-hooks"
 	KeyHarness       = "harness"
 	KeyCompatibility = "compatibility"
-	// KeyRouting reports whether shell integration actually routes agent launches.
-	KeyRouting = "routing"
-	// KeyStatusLine: Claude Code's status line feeds terma the plan's usage windows.
-	KeyStatusLine = "statusline"
-	KeyScratch    = "scratch-commit"
-	KeySpool      = "spool"
-	KeyBackend    = "backend"
-	KeyGitHubApp  = "github-app"
+	KeyRouting       = "routing"
+	KeyStatusLine    = "statusline"
+	KeyScratch       = "scratch-commit"
+	KeySpool         = "spool"
+	KeyBackend       = "backend"
+	KeyGitHubApp     = "github-app"
 )
 
 // Build assembles a report from checks.
 func Build(checks []Check) Report { return Report{Checks: checks} }
 
-// NameWidth is the column the check names are padded to. Fixed rather than measured
-// so a report streamed one check at a time lines up the same as one printed at once.
+// NameWidth is the fixed column check names pad to, so a streamed report lines up.
 const NameWidth = 24
 
-// RenderCheck prints one check's line — and its fix, when it needs one — as soon as
-// the check is known, so a slow report reads as progress rather than silence.
+// RenderCheck prints one check's line, and its fix when it needs one.
 func RenderCheck(w io.Writer, c Check, width int) {
 	p := style.For(w)
 	status := fmt.Sprintf("%-4s", c.Status)
@@ -127,8 +109,7 @@ func RenderCheck(w io.Writer, c Check, width int) {
 	}
 }
 
-// fixText draws the command in a fix so it stands out: the terma command a fix leads
-// with (most are one, bare — "terma install"), and any other quoted in its sentence.
+// fixText draws the terma command a fix leads with, and any quoted in it, as commands.
 func fixText(p style.Palette, fix string) string {
 	if !strings.HasPrefix(fix, "terma ") {
 		return p.Commands(fix)

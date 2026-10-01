@@ -1,0 +1,14 @@
+prepare-commit-msg:
+  commands:
+    terma:
+      run: command -v terma >/dev/null 2>&1 && terma hook prepare-commit-msg {1} {2} {3} || true
+      skip:
+        - merge
+        - rebase
+post-commit:
+  commands:
+    terma:
+      run: command -v terma >/dev/null 2>&1 && terma hook post-commit || true
+      skip:
+        - merge
+        - rebase
