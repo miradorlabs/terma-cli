@@ -390,7 +390,7 @@ func (app *App) ensureSpoolKey(ctx context.Context, cfg *config.Config) spoolKey
 	client, err := app.newClient(cfg)
 	var key string
 	if err == nil {
-		key, _, err = client.CreateServerKey(ctx, cfg.ProjectID, "terma-cli@"+harness.Hostname(),
+		key, _, err = client.CreateServerKey(ctx, cfg.ProjectID, "terma-cli@"+hostname(),
 			"Created by terma install, for hook events")
 	}
 	switch {

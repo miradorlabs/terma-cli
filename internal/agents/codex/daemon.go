@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/harness"
+	"github.com/miradorlabs/terma-cli/internal/procinfo"
 )
 
 // Codex's app-server daemon reads [otel] only when it starts, so a config change reaches
@@ -37,7 +37,7 @@ func RunningCodexDaemon() (CodexDaemon, bool) {
 	if json.Unmarshal(data, &rec) != nil || rec.PID <= 1 || rec.Identity.StartSeconds <= 0 {
 		return CodexDaemon{}, false
 	}
-	if !harness.ProcessAlive(rec.PID) {
+	if !procinfo.Alive(rec.PID) {
 		return CodexDaemon{}, false
 	}
 	return CodexDaemon{PID: rec.PID, Started: time.Unix(rec.Identity.StartSeconds, 0)}, true

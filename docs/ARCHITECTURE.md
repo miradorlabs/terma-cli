@@ -117,7 +117,7 @@ wired, but `install` does not wire them by default.
   - `doctor` imports neither `account/api` nor `spool`.
   - `install` imports nothing under `account` and not `spool`.
   - `hookrun` and `hookmgr` never import each other.
-  - The hook runtime imports no agent, command or account package.
+  - The hook runtime imports no agent, command, account or exporter-kit package.
   - The account packages import nothing but the platform's own.
   - The terminal packages import nothing of terma's.
   - Only `cmd/terma` imports `internal/cli` and `builtin`.

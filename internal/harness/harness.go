@@ -1,6 +1,6 @@
 // Package harness is the agent-neutral kit an exporter configuration is built from: the
 // Exporter a connect describes, the Harness interface, connect scope, the ownership
-// journal, symlink-safe settings writes, the headers helper and the funding-evidence reader.
+// journal, symlink-safe settings writes, and the headers helper.
 package harness
 
 import (

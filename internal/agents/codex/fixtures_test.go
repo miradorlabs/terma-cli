@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/harness"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
 const testCodexID = "019947ab-1234-7000-8000-123456789abc"
@@ -47,7 +48,7 @@ func writeEvidenceFile(t *testing.T, path, data string) {
 	}
 }
 
-func quotaAttrs(e harness.FundingEvidence) map[string]any {
+func quotaAttrs(e hookrun.FundingEvidence) map[string]any {
 	out := map[string]any{}
 	for k, v := range e.Attrs {
 		switch k {

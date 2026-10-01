@@ -11,7 +11,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/harness"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
 // CodexCursor holds no transcript text: an offset past acknowledged records, an anchor
@@ -42,7 +42,7 @@ func cursorAnchor(f *os.File, offset int64) string {
 
 // ReadCodexFunding emits each newly observed quota, unchanged and null ones included, at
 // most 1 MiB and 256 records per call; the caller spools before persisting the cursor.
-func ReadCodexFunding(ctx context.Context, sessionID, transcript string, cursor CodexCursor, emit func(harness.FundingEvidence) error) (CodexCursor, string, error) {
+func ReadCodexFunding(ctx context.Context, sessionID, transcript string, cursor CodexCursor, emit func(hookrun.FundingEvidence) error) (CodexCursor, string, error) {
 	f, status := openCodexRollout(ctx, sessionID, transcript)
 	if f == nil {
 		return cursor, status, nil
@@ -64,7 +64,7 @@ func ReadCodexFunding(ctx context.Context, sessionID, transcript string, cursor 
 	if cursor.Identity == "" || reset {
 		cursor = CodexCursor{Identity: identity, Stream: fundingHash(identity + old.Stream + fmt.Sprint(old.Offset))}
 	}
-	send := func(e harness.FundingEvidence, offset int64) error {
+	send := func(e hookrun.FundingEvidence, offset int64) error {
 		if e.Attrs == nil {
 			e.Attrs = map[string]any{}
 		}
@@ -77,7 +77,7 @@ func ReadCodexFunding(ctx context.Context, sessionID, transcript string, cursor 
 		return emit(e)
 	}
 	gap := func(reason string, offset int64) error {
-		return send(harness.FundingEvidence{Source: "codex_rollout", Status: "gap", Attrs: map[string]any{"gap_reason": reason}}, offset)
+		return send(hookrun.FundingEvidence{Source: "codex_rollout", Status: "gap", Attrs: map[string]any{"gap_reason": reason}}, offset)
 	}
 	if reset {
 		if err := gap("rollout_replaced_or_truncated", 0); err != nil {
@@ -143,7 +143,7 @@ func ReadCodexFunding(ctx context.Context, sessionID, transcript string, cursor 
 				cursor.TurnID = ""
 			} else if rec.Type == "turn_context" || (rec.Type == "event_msg" && (rec.Payload.Type == "task_started" || rec.Payload.Type == "turn_started")) {
 				cursor.TurnID = ""
-				if harness.EvidenceLabel.MatchString(rec.Payload.TurnID) {
+				if hookrun.EvidenceLabel.MatchString(rec.Payload.TurnID) {
 					cursor.TurnID = rec.Payload.TurnID
 				}
 			} else if rec.Type == "event_msg" {

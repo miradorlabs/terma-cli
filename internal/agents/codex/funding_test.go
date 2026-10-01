@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/harness"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
 func TestCodexFundingTailAndIdentity(t *testing.T) {
@@ -101,13 +102,13 @@ func TestCodexFundingRejectsSymlinksAndReportsUnreadableDiscovery(t *testing.T) 
 
 // latestCodexQuota reads a rollout as the hooks do and returns the newest quota, or the
 // reader's status when the open was refused.
-func latestCodexQuota(t *testing.T, ctx context.Context, sessionID, transcript string) harness.FundingEvidence {
+func latestCodexQuota(t *testing.T, ctx context.Context, sessionID, transcript string) hookrun.FundingEvidence {
 	t.Helper()
-	var last *harness.FundingEvidence
+	var last *hookrun.FundingEvidence
 	cursor, status := CodexCursor{}, ""
 	for range 64 {
 		var err error
-		cursor, status, err = ReadCodexFunding(ctx, sessionID, transcript, cursor, func(e harness.FundingEvidence) error {
+		cursor, status, err = ReadCodexFunding(ctx, sessionID, transcript, cursor, func(e hookrun.FundingEvidence) error {
 			if e.Status != "gap" {
 				last = &e
 			}
@@ -121,7 +122,7 @@ func latestCodexQuota(t *testing.T, ctx context.Context, sessionID, transcript s
 		}
 	}
 	if last == nil {
-		return harness.FundingEvidence{Source: "codex_rollout", Status: status}
+		return hookrun.FundingEvidence{Source: "codex_rollout", Status: status}
 	}
 	return *last
 }

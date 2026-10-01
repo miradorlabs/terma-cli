@@ -2,7 +2,6 @@ package harness
 
 import (
 	"context"
-	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -50,17 +49,4 @@ func GitEmail(ctx context.Context) string {
 		return ""
 	}
 	return strings.TrimSpace(string(out))
-}
-
-// Hostname is the fallback identity when git has no email configured, and the default
-// suffix for a minted key's name.
-func Hostname() string {
-	name, err := os.Hostname()
-	if err != nil || name == "" {
-		return "unknown-host"
-	}
-	if short, _, found := strings.Cut(name, "."); found && short != "" {
-		return short
-	}
-	return name
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 )
 
@@ -20,7 +19,7 @@ func (app *App) createProjectKey(ctx context.Context, cfg *config.Config, projec
 	if err != nil {
 		return "", err
 	}
-	key, _, err := client.CreateServerKey(ctx, projectID, "terma-relay@"+harness.Hostname(),
+	key, _, err := client.CreateServerKey(ctx, projectID, "terma-relay@"+hostname(),
 		"Created by the terma relay, for a repository connected in Terma")
 	return key, err
 }

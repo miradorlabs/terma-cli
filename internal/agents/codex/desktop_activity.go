@@ -8,7 +8,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/harness"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
 // CodexDesktopActivity is a completed response or hosted action from the rollout; only
@@ -144,25 +144,25 @@ func codexDesktopActivityFrom(line []byte, cursor *CodexDesktopCursor, sessionID
 		return CodexDesktopActivity{}, false
 	}
 	if rec.Type == "turn_context" {
-		if harness.EvidenceLabel.MatchString(rec.Payload.TurnID) {
+		if hookrun.EvidenceLabel.MatchString(rec.Payload.TurnID) {
 			if cursor.TurnID != rec.Payload.TurnID {
 				cursor.TraceID = ""
 			}
 			cursor.TurnID = rec.Payload.TurnID
 		}
-		if harness.EvidenceLabel.MatchString(rec.Payload.Model) {
+		if hookrun.EvidenceLabel.MatchString(rec.Payload.Model) {
 			cursor.Model = rec.Payload.Model
 		}
 		return CodexDesktopActivity{}, false
 	}
-	if rec.Payload.TurnID != "" && harness.EvidenceLabel.MatchString(rec.Payload.TurnID) {
+	if rec.Payload.TurnID != "" && hookrun.EvidenceLabel.MatchString(rec.Payload.TurnID) {
 		if cursor.TurnID != rec.Payload.TurnID {
 			cursor.TraceID = ""
 		}
 		cursor.TurnID = rec.Payload.TurnID
 	}
 	if rec.Type == "event_msg" && rec.Payload.Type == "task_started" {
-		if harness.EvidenceLabel.MatchString(rec.Payload.TraceID) {
+		if hookrun.EvidenceLabel.MatchString(rec.Payload.TraceID) {
 			cursor.TraceID = rec.Payload.TraceID
 		}
 		return CodexDesktopActivity{}, false

@@ -10,7 +10,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/miradorlabs/terma-cli/internal/harness"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
 // Codex exports prompts and tool content but never its replies, which exist only in the
@@ -159,7 +159,7 @@ func codexReplyFrom(line []byte, cursor *CodexReplyCursor, sessionID string, max
 		// turn_context repeats the turn id without its trace id; only a different turn ends this one.
 		if rec.Payload.TurnID != cursor.TurnID {
 			cursor.TurnID, cursor.TraceID = "", ""
-			if harness.EvidenceLabel.MatchString(rec.Payload.TurnID) {
+			if hookrun.EvidenceLabel.MatchString(rec.Payload.TurnID) {
 				cursor.TurnID = rec.Payload.TurnID
 			}
 		}
@@ -187,10 +187,10 @@ func codexReplyFrom(line []byte, cursor *CodexReplyCursor, sessionID string, max
 		ID: rec.Payload.ID, Bytes: len(full), Text: full,
 		TurnID: cursor.TurnID, TraceID: cursor.TraceID, At: rec.Timestamp,
 	}
-	if !harness.EvidenceLabel.MatchString(reply.ID) {
+	if !hookrun.EvidenceLabel.MatchString(reply.ID) {
 		reply.ID = fundingHash(sessionID + cursor.Identity + fmt.Sprint(cursor.Offset))
 	}
-	if harness.EvidenceLabel.MatchString(rec.Payload.Phase) {
+	if hookrun.EvidenceLabel.MatchString(rec.Payload.Phase) {
 		reply.Phase = rec.Payload.Phase
 	}
 	if maxText > 0 && len(full) > maxText {

@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/harness"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
 const codexTailLimit = 1 << 20
@@ -26,7 +26,7 @@ func CodexOAuthAccountID() (string, bool) {
 	if err != nil {
 		return "", false
 	}
-	doc, status := harness.ReadEvidenceJSON(filepath.Join(home, "auth.json"))
+	doc, status := hookrun.ReadEvidenceJSON(filepath.Join(home, "auth.json"))
 	if status != "present" {
 		return "", false
 	}
@@ -43,7 +43,7 @@ func CodexOAuthAccountID() (string, bool) {
 		AccountID string `json:"account_id"`
 	}
 	// Shape-checked: an unvalidated id would ride verbatim into every quota spool entry.
-	if json.Unmarshal(doc["tokens"], &tokens) != nil || !harness.EvidenceLabel.MatchString(tokens.AccountID) {
+	if json.Unmarshal(doc["tokens"], &tokens) != nil || !hookrun.EvidenceLabel.MatchString(tokens.AccountID) {
 		return "", false
 	}
 	return tokens.AccountID, true
@@ -57,7 +57,7 @@ func CodexOAuthUser() (email, userID string, ok bool) {
 	if err != nil {
 		return "", "", false
 	}
-	doc, status := harness.ReadEvidenceJSON(filepath.Join(home, "auth.json"))
+	doc, status := hookrun.ReadEvidenceJSON(filepath.Join(home, "auth.json"))
 	if status != "present" {
 		return "", "", false
 	}
@@ -100,10 +100,10 @@ func codexIDClaims(idToken string) (email, userID string) {
 	if json.Unmarshal(payload, &claims) != nil {
 		return "", ""
 	}
-	if claims.Verified && harness.ValidEmail(claims.Email) {
+	if claims.Verified && hookrun.ValidEmail(claims.Email) {
 		email = claims.Email
 	}
-	if harness.EvidenceLabel.MatchString(claims.Auth.UserID) {
+	if hookrun.EvidenceLabel.MatchString(claims.Auth.UserID) {
 		userID = claims.Auth.UserID
 	}
 	return email, userID
@@ -119,7 +119,7 @@ func findCodexRollout(ctx context.Context, root *os.Root, dir, id string, depth 
 	if depth > 3 || *budget <= 0 || ctx.Err() != nil {
 		return ""
 	}
-	f, err := root.OpenFile(dir, os.O_RDONLY|harness.EvidenceOpenFlags, 0)
+	f, err := root.OpenFile(dir, os.O_RDONLY|hookrun.EvidenceOpenFlags, 0)
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
 			*readFailed = true
@@ -158,7 +158,7 @@ func findCodexRollout(ctx context.Context, root *os.Root, dir, id string, depth 
 // name this thread. A nil file comes with the reason as status.
 func openCodexRollout(ctx context.Context, sessionID, transcript string) (*os.File, string) {
 	status := "missing"
-	if !harness.EvidenceLabel.MatchString(sessionID) || strings.ContainsAny(sessionID, `/\`) {
+	if !hookrun.EvidenceLabel.MatchString(sessionID) || strings.ContainsAny(sessionID, `/\`) {
 		status = "invalid_session"
 		return nil, status
 	}
@@ -222,7 +222,7 @@ func openCodexRollout(ctx context.Context, sessionID, transcript string) (*os.Fi
 		status = "unsupported"
 		return nil, status
 	}
-	f, err := root.OpenFile(rel, os.O_RDONLY|harness.EvidenceOpenFlags, 0)
+	f, err := root.OpenFile(rel, os.O_RDONLY|hookrun.EvidenceOpenFlags, 0)
 	if err != nil {
 		status = "unreadable"
 		return nil, status
@@ -257,8 +257,8 @@ func openCodexRollout(ctx context.Context, sessionID, transcript string) (*os.Fi
 	return f, "present"
 }
 
-func codexQuota(raw json.RawMessage, at time.Time) harness.FundingEvidence {
-	e := harness.FundingEvidence{Source: "codex_rollout", Status: "unavailable", SourceTime: at, Attrs: map[string]any{}}
+func codexQuota(raw json.RawMessage, at time.Time) hookrun.FundingEvidence {
+	e := hookrun.FundingEvidence{Source: "codex_rollout", Status: "unavailable", SourceTime: at, Attrs: map[string]any{}}
 	if string(raw) == "null" {
 		return e
 	}
@@ -269,24 +269,24 @@ func codexQuota(raw json.RawMessage, at time.Time) harness.FundingEvidence {
 	}
 	e.Status = "present"
 	for _, key := range []string{"plan_type", "limit_id", "rate_limit_reached_type"} {
-		harness.CopyEvidenceString(e.Attrs, limits, key, key)
+		hookrun.CopyEvidenceString(e.Attrs, limits, key, key)
 	}
-	harness.CopyEvidenceBool(e.Attrs, limits, "spend_control_reached", "spend_control_reached")
+	hookrun.CopyEvidenceBool(e.Attrs, limits, "spend_control_reached", "spend_control_reached")
 	for _, window := range []string{"primary", "secondary"} {
 		var fields map[string]json.RawMessage
 		if json.Unmarshal(limits[window], &fields) != nil || fields == nil {
 			continue
 		}
-		harness.CopyEvidenceNumber(e.Attrs, fields, "used_percent", window+"_used_pct", math.MaxFloat64, false)
-		harness.CopyEvidenceNumber(e.Attrs, fields, "window_minutes", window+"_window_minutes", math.MaxInt32, true)
-		harness.CopyEvidenceNumber(e.Attrs, fields, "resets_at", window+"_resets_at", math.MaxInt64, true)
+		hookrun.CopyEvidenceNumber(e.Attrs, fields, "used_percent", window+"_used_pct", math.MaxFloat64, false)
+		hookrun.CopyEvidenceNumber(e.Attrs, fields, "window_minutes", window+"_window_minutes", math.MaxInt32, true)
+		hookrun.CopyEvidenceNumber(e.Attrs, fields, "resets_at", window+"_resets_at", math.MaxInt64, true)
 	}
 	var credits map[string]json.RawMessage
 	if json.Unmarshal(limits["credits"], &credits) == nil && credits != nil {
-		harness.CopyEvidenceBool(e.Attrs, credits, "has_credits", "has_credits")
-		harness.CopyEvidenceBool(e.Attrs, credits, "unlimited", "credits_unlimited")
+		hookrun.CopyEvidenceBool(e.Attrs, credits, "has_credits", "has_credits")
+		hookrun.CopyEvidenceBool(e.Attrs, credits, "unlimited", "credits_unlimited")
 		var balance string
-		if json.Unmarshal(credits["balance"], &balance) == nil && harness.ValidCreditBalance(balance) {
+		if json.Unmarshal(credits["balance"], &balance) == nil && hookrun.ValidCreditBalance(balance) {
 			e.Attrs["credits_balance"] = balance // Preserve units and precision; never call it USD.
 		}
 	}

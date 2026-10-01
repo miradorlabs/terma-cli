@@ -111,7 +111,7 @@ var bans = []struct {
 	{"internal/install", []string{"internal/account", "internal/spool"}, "install signs in and reaches the network only through its steps"},
 	{"internal/hooks/hookrun", []string{"internal/hooks/hookmgr"}, "running a hook and planning hook files are separate halves"},
 	{"internal/hooks/hookmgr", []string{"internal/hooks/hookrun"}, "running a hook and planning hook files are separate halves"},
-	{"internal/hooks", []string{"internal/agents", "internal/cli", "internal/account"}, "the hook runtime knows no agent, command or account; agents build on it"},
+	{"internal/hooks", []string{"internal/agents", "internal/cli", "internal/account", "internal/harness"}, "the hook runtime knows no agent, command, account or exporter; agents build on it"},
 	{"internal/account", []string{"internal/agents", "internal/hooks", "internal/relay", "internal/cli", "internal/ui"}, "the account packages talk to the platform and nothing else"},
 	{"internal/ui", []string{"internal/account", "internal/agents", "internal/hooks", "internal/relay", "internal/cli", "internal/config"}, "terminal output depends on nothing of terma's"},
 }

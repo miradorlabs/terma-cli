@@ -1,6 +1,6 @@
 //go:build windows
 
-package harness
+package procinfo
 
 import "golang.org/x/sys/windows"
 

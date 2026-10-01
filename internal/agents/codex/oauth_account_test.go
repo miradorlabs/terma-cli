@@ -69,7 +69,7 @@ func TestCodexOAuthAccountID_EnvKeyDoesNotSuppress(t *testing.T) {
 	}
 }
 
-// An oversized or malformed account_id (harness.ReadEvidenceJSON permits 2 MiB) is
+// An oversized or malformed account_id (hookrun.ReadEvidenceJSON permits 2 MiB) is
 // shape-checked before it can reach a spool entry.
 func TestCodexOAuthAccountID_RejectsMalformedID(t *testing.T) {
 	for name, id := range map[string]string{

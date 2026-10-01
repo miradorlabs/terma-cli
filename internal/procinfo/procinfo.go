@@ -1,6 +1,6 @@
-// Package procinfo tells the local relay which processes a hook runs under and which
-// process owns the other end of a loopback connection, so a claim covers only the
-// agent process that made it.
+// Package procinfo tells the local relay which processes a hook runs under, which
+// process owns the other end of a loopback connection, and whether a process still
+// runs, so a claim covers only the agent process that made it.
 package procinfo
 
 import "os"

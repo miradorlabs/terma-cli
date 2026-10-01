@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -21,7 +20,7 @@ type evidenceState struct {
 }
 
 // CaptureFunding spools funding evidence for the session unless the same evidence was spooled within the heartbeat.
-func (e Env) CaptureFunding(r *Repo, id, tool, name string, evidence harness.FundingEvidence) {
+func (e Env) CaptureFunding(r *Repo, id, tool, name string, evidence FundingEvidence) {
 	if e.Spool == nil || !session.ValidID(id) {
 		return
 	}

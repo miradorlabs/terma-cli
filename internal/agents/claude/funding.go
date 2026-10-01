@@ -6,13 +6,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/miradorlabs/terma-cli/internal/harness"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
 // readFunding reads the stored login's metadata and visible credential hints: the hook's view,
 // never the credential a request used. It reads no credential store and runs no apiKeyHelper.
-func readFunding(repoRoot string) harness.FundingEvidence {
-	e := harness.FundingEvidence{Source: "claude_account", Status: "unreadable", Attrs: map[string]any{}}
+func readFunding(repoRoot string) hookrun.FundingEvidence {
+	e := hookrun.FundingEvidence{Source: "claude_account", Status: "unreadable", Attrs: map[string]any{}}
 	configPath, err := (exporter{}).ConfigPath()
 	if err != nil {
 		return e
@@ -25,7 +25,7 @@ func readFunding(repoRoot string) harness.FundingEvidence {
 		}
 		accountPath = filepath.Join(home, ".claude.json")
 	}
-	doc, status := harness.ReadEvidenceJSON(accountPath)
+	doc, status := hookrun.ReadEvidenceJSON(accountPath)
 	e.Status = status
 	if status == "present" {
 		var account map[string]json.RawMessage
@@ -43,12 +43,12 @@ func readFunding(repoRoot string) harness.FundingEvidence {
 				"userRateLimitTier": "user_rate_limit_tier", "organizationRateLimitTier": "organization_rate_limit_tier",
 				"organizationRole": "organization_role",
 			} {
-				harness.CopyEvidenceString(e.Attrs, account, from, to)
+				hookrun.CopyEvidenceString(e.Attrs, account, from, to)
 			}
-			harness.CopyEvidenceBool(e.Attrs, account, "hasExtraUsageEnabled", "extra_usage_enabled")
+			hookrun.CopyEvidenceBool(e.Attrs, account, "hasExtraUsageEnabled", "extra_usage_enabled")
 			// CopyEvidenceString forbids '@', so the email goes through ValidEmail.
 			var email string
-			if json.Unmarshal(account["emailAddress"], &email) == nil && harness.ValidEmail(email) {
+			if json.Unmarshal(account["emailAddress"], &email) == nil && hookrun.ValidEmail(email) {
 				e.Attrs["account_email"] = email
 			}
 		}
@@ -74,7 +74,7 @@ func readFunding(repoRoot string) harness.FundingEvidence {
 	}
 	helper := "not_found"
 	for _, path := range paths {
-		settings, status := harness.ReadEvidenceJSON(path)
+		settings, status := hookrun.ReadEvidenceJSON(path)
 		if status != "present" && status != "missing" {
 			if helper != "configured" {
 				helper = "unknown"

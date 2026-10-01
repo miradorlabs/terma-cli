@@ -1,6 +1,6 @@
 //go:build unix
 
-package harness
+package procinfo
 
 import (
 	"errors"

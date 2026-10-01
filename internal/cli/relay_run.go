@@ -14,7 +14,6 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/procinfo"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
@@ -101,7 +100,7 @@ func (app *App) relayRunOptions(ctx context.Context, cmd *cobra.Command, dir str
 	opts := relay.Options{Correlators: app.agents.With[shape.Correlator](), Capturers: app.agents.With[shape.Capturer](),
 		Hold: hold, Dir: filepath.Join(dir, relay.OutboxDir), Resolve: app.relayResolver(cfg, minter.Mint), Version: app.version,
 		CatchAll: relayCatchAll(), HeartbeatInfo: app.relayHeartbeat(dir).Info(), HeartbeatSend: app.relayHeartbeatSend, HeartbeatEvery: max(beat, 0),
-		PeerPID: procinfo.FindSender, ProcessAlive: harness.ProcessAlive, ClaimCacheTTL: time.Second, PolicyCacheTTL: time.Second}
+		PeerPID: procinfo.FindSender, ProcessAlive: procinfo.Alive, ClaimCacheTTL: time.Second, PolicyCacheTTL: time.Second}
 	if os.Getenv("TERMA_RELAY_DEBUG") == "1" {
 		errOut := cmd.ErrOrStderr()
 		opts.Logf = func(f string, a ...any) { fmt.Fprintf(errOut, time.Now().Format("15:04:05.000 ")+f+"\n", a...) }

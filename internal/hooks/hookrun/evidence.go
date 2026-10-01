@@ -1,4 +1,4 @@
-package harness
+package hookrun
 
 import (
 	"encoding/json"

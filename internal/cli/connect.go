@@ -434,7 +434,7 @@ func (app *App) resolveKey(ctx context.Context, cfg *config.Config, h harness.Ha
 
 	name := strings.TrimSpace(f.keyName)
 	if name == "" {
-		name = h.Name() + "@" + harness.Hostname()
+		name = h.Name() + "@" + hostname()
 	}
 
 	client, err := app.newClient(cfg)

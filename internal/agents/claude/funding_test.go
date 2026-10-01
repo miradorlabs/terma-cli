@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/miradorlabs/terma-cli/internal/harness"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
 func writeEvidenceFile(t *testing.T, path, data string) {
@@ -88,7 +88,7 @@ func TestClaudeFundingMissingMalformedAndSpecialFiles(t *testing.T) {
 	t.Setenv("CLAUDE_CONFIG_DIR", dir)
 	path := filepath.Join(dir, ".claude.json")
 	for _, tc := range []struct{ data, status string }{
-		{`{}`, "missing"}, {`{"oauthAccount":null}`, "missing"}, {`{"oauthAccount":[]}`, "malformed"}, {`{`, "malformed"}, {strings.Repeat("x", harness.EvidenceFileLimit+1), "oversized"},
+		{`{}`, "missing"}, {`{"oauthAccount":null}`, "missing"}, {`{"oauthAccount":[]}`, "malformed"}, {`{`, "malformed"}, {strings.Repeat("x", hookrun.EvidenceFileLimit+1), "oversized"},
 	} {
 		writeEvidenceFile(t, path, tc.data)
 		if e := readFunding(""); e.Status != tc.status {

@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/harness"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
 func sequenceFixture(t *testing.T, records string) string {
@@ -37,10 +37,10 @@ func appendRollout(t *testing.T, path, text string) {
 		t.Fatal(err)
 	}
 }
-func readSequence(t *testing.T, path string, c CodexCursor) (CodexCursor, string, []harness.FundingEvidence) {
+func readSequence(t *testing.T, path string, c CodexCursor) (CodexCursor, string, []hookrun.FundingEvidence) {
 	t.Helper()
-	var evs []harness.FundingEvidence
-	next, status, err := ReadCodexFunding(context.Background(), testCodexID, path, c, func(e harness.FundingEvidence) error { evs = append(evs, e); return nil })
+	var evs []hookrun.FundingEvidence
+	next, status, err := ReadCodexFunding(context.Background(), testCodexID, path, c, func(e hookrun.FundingEvidence) error { evs = append(evs, e); return nil })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +74,7 @@ func TestCodexSequenceTurnsRepeatedValuesAndPartialWrites(t *testing.T) {
 func TestCodexSequenceAppendFailureReplaysStableID(t *testing.T) {
 	path := sequenceFixture(t, quotaRecord(testCodexLimits)+quotaRecord("null"))
 	var ids []any
-	c, _, err := ReadCodexFunding(context.Background(), testCodexID, path, CodexCursor{}, func(e harness.FundingEvidence) error {
+	c, _, err := ReadCodexFunding(context.Background(), testCodexID, path, CodexCursor{}, func(e hookrun.FundingEvidence) error {
 		ids = append(ids, e.Attrs["observation_id"])
 		if len(ids) == 2 {
 			return errors.New("disk full")

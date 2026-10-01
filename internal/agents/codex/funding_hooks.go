@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
@@ -51,7 +50,7 @@ func captureCodexFunding(e hookrun.Env, ctx context.Context, r *hookrun.Repo, in
 	userEmail, userID, _ := CodexOAuthUser()
 	ctx, cancel := context.WithTimeout(ctx, codexCaptureTimeout)
 	defer cancel()
-	next, status, readErr := ReadCodexFunding(ctx, rollout, in.TranscriptPath, cursor, func(ev harness.FundingEvidence) error {
+	next, status, readErr := ReadCodexFunding(ctx, rollout, in.TranscriptPath, cursor, func(ev hookrun.FundingEvidence) error {
 		attrs := hookrun.AgentAttrs(ev.Attrs, in.AgentID, in.AgentType)
 		attrs[hookrun.AttrTool], attrs[hookrun.AttrVersion] = codexTool, e.Version
 		attrs[hookrun.AttrEvidenceSource], attrs[hookrun.AttrEvidenceStatus] = ev.Source, ev.Status
@@ -89,6 +88,6 @@ func captureCodexFunding(e hookrun.Env, ctx context.Context, r *hookrun.Repo, in
 		if status == "not_ready" {
 			name = hookrun.EventSessionQuota
 		}
-		e.CaptureFunding(r, in.SessionID, codexTool, name, harness.FundingEvidence{Source: sourceCodexRollout, Status: status, Attrs: hookrun.AgentAttrs(map[string]any{"source_offset": next.Offset}, in.AgentID, in.AgentType)})
+		e.CaptureFunding(r, in.SessionID, codexTool, name, hookrun.FundingEvidence{Source: sourceCodexRollout, Status: status, Attrs: hookrun.AgentAttrs(map[string]any{"source_offset": next.Offset}, in.AgentID, in.AgentType)})
 	}
 }
