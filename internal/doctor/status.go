@@ -132,11 +132,11 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 	// A repository's own policy narrows what its sessions ship; the global line cannot show it.
 	if env.RepoErr == nil {
 		for _, h := range reg.Harnesses() {
-			scoped, ok := h.(harness.Scoped)
+			local, ok := h.Local(root)
 			if !ok {
 				continue
 			}
-			st, err := scoped.Local(root).Status()
+			st, err := local.Status()
 			if err != nil || st.ManagedKeys == 0 {
 				continue
 			}

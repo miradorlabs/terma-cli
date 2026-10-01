@@ -11,12 +11,22 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
+const (
+	name        = "omp"
+	displayName = "Omp"
+)
+
 // Agent is Omp: attribution through a committed hook file, telemetry through a
 // user-scope extension.
 type Agent struct {
 	relayexport.Own
-	exporter
 }
+
+// Name is the agent's token.
+func (Agent) Name() string { return name }
+
+// DisplayName is how prose names the agent.
+func (Agent) DisplayName() string { return displayName }
 
 func (Agent) Installed(ctx context.Context) bool { return exporter{}.Detect(ctx).Found }
 func (Agent) HooksPath() string                  { return hooksPath }

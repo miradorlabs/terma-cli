@@ -120,7 +120,8 @@ func TestInstallStatusLineRefusesUnknownTypeAndRepositoryScope(t *testing.T) {
 	if _, err := c.InstallStatusLine(); err == nil {
 		t.Fatal("unknown type must be refused")
 	}
-	if _, err := c.Local(t.TempDir()).(exporter).InstallStatusLine(); err == nil {
+	local, _ := c.Local(t.TempDir())
+	if _, err := local.(exporter).InstallStatusLine(); err == nil {
 		t.Fatal("repository scope must be refused")
 	}
 }

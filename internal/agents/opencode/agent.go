@@ -10,9 +10,20 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
+const (
+	name        = "opencode"
+	displayName = "OpenCode"
+)
+
 // Agent is OpenCode, whose events come from terma's user-scope plugin; it has no
 // repository-scope hooks.
-type Agent struct{ exporter }
+type Agent struct{}
+
+// Name is the agent's token.
+func (Agent) Name() string { return name }
+
+// DisplayName is how prose names the agent.
+func (Agent) DisplayName() string { return displayName }
 
 func (Agent) Installed(ctx context.Context) bool { return exporter{}.Detect(ctx).Found }
 func (Agent) HooksPath() string                  { return "" }

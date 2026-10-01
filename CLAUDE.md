@@ -129,10 +129,11 @@ developer login to check the team's repository permission.
 - Agent-agnostic core: an agent's file layout is known only in its own package.
   `hookrun` speaks in events (session start/end, files touched) and the tool label
   travels as data. `internal/harness` is the kit an agent's exporter is built from; its
-  `Harness` interface is what a command needs and no more. What only some exporters can
-  do is an optional interface (`harness.Noter`, `Credentialed`, `Backuper`, `Scoped`),
-  asserted with `var _` in each agent's `harness.go` — a capability asked for by type
-  assertion does not fail to compile when its method drifts, it silently switches off.
+  `Harness` interface is complete: every exporter spells out `Local`, `CurrentCredential`,
+  `Backup` and `ConnectNotes`, answering "none" where it has none (Codex's `Local` is
+  `(nil, false)`). There is no embeddable default and no type assertion — a capability
+  asked for by assertion, or filled in by a default, silently switches off when a method
+  drifts; a required method fails to compile.
 - Shared file plumbing — use these, never a private copy (there were six atomic writers
   and four flocks):
   `config.WriteFileAtomic` (durable: fsync file and directory) for anything written at

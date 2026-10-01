@@ -102,7 +102,7 @@ func Global(ctx context.Context, reg *agents.Registry, h harness.Harness, cfg *c
 		fmt.Fprintf(w.Out, "\nReusing the key already configured for this project (%s) — nothing new minted.\n", key.Prefix)
 	}
 	// The backup is best-effort: a failure is reported, never blocking.
-	if backup, err := backupHarnessConfig(h, cfg.OTLPURL); err != nil {
+	if backup, err := h.Backup(cfg.OTLPURL); err != nil {
 		fmt.Fprintf(w.Err, "Warning: could not back up %s (%v).\n", configPath, err)
 	} else if backup != "" {
 		fmt.Fprintf(w.Out, "\nBacked up %s\n", backup)

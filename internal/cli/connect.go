@@ -162,7 +162,7 @@ func (app *App) runTelemetryConnectAll(cmd *cobra.Command, names []string, f con
 	}
 	if scope == harness.ScopeLocal {
 		for _, h := range hs {
-			if _, ok := h.(harness.Scoped); !ok {
+			if _, ok := h.Local(""); !ok {
 				return fmt.Errorf("%s has no repository settings — --scope local applies to harnesses that read one (%s)", h.DisplayName(), app.scopedHarnessNames())
 			}
 		}
@@ -251,10 +251,8 @@ func (app *App) resolveKey(ctx context.Context, cfg *config.Config, h harness.Ha
 
 	// Reuse the key for this exact endpoint and project, per harness: minting on every
 	// tweak leaves live orphaned keys, and one agent's key can be revoked alone.
-	if cur, ok := h.(harness.Credentialed); ok {
-		if existing, ok := cur.CurrentCredential(cfg.OTLPURL, cfg.ProjectID); ok {
-			return existing, api.ServerKey{KeyPrefix: harness.MaskKey(existing)}, false, true, nil
-		}
+	if existing, ok := h.CurrentCredential(cfg.OTLPURL, cfg.ProjectID); ok {
+		return existing, api.ServerKey{KeyPrefix: harness.MaskKey(existing)}, false, true, nil
 	}
 	// Pointed elsewhere now, it may have been connected to this project before.
 	if remembered := keystore.GetFor(h.Name(), cfg.ProjectID); remembered != "" {

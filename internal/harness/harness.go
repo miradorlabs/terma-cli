@@ -224,6 +224,17 @@ type Harness interface {
 
 	// Disconnect restores keys still holding what Terma wrote and leaves changed ones alone.
 	Disconnect() (DisconnectResult, error)
+
+	// Local is the exporter bound to the repository at root's settings file; false for an
+	// agent with no repository scope. It writes nothing.
+	Local(root string) (Harness, bool)
+	// CurrentCredential reads back the key configured for endpoint and project, so a
+	// reconnect reuses it; keys are per agent so one can be revoked alone.
+	CurrentCredential(endpoint, projectID string) (key string, ok bool)
+	// Backup snapshots the configuration before a connect; "" for none taken.
+	Backup(endpoint string) (path string, err error)
+	// ConnectNotes are said before the developer confirms a connect.
+	ConnectNotes(e Exporter) []string
 }
 
 // ErrUnsupported is returned by an agent that is registered but not yet implemented.

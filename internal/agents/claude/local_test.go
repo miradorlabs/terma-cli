@@ -31,7 +31,8 @@ func localClaudeIn(t *testing.T, settings string) (harness.Harness, string) {
 	sandbox := t.TempDir()
 	t.Setenv("CLAUDE_CONFIG_DIR", sandbox)
 	t.Setenv("TERMA_CONFIG_DIR", filepath.Join(sandbox, "terma"))
-	return exporter{}.Local(repo), path
+	h, _ := exporter{}.Local(repo)
+	return h, path
 }
 
 const hooksOnly = `{
@@ -100,11 +101,8 @@ func TestGlobalRenderStillCarriesEverything(t *testing.T) {
 }
 
 func TestScopeOfAndParse(t *testing.T) {
-	if (exporter{}).Scope() != harness.ScopeGlobal {
-		t.Error("a bare harness is global")
-	}
-	if (exporter{}).Local("/repo").(harness.Scoped).Scope() != harness.ScopeLocal {
-		t.Error("a bound harness is local")
+	if _, ok := (exporter{}).Local("/repo"); !ok {
+		t.Error("Claude Code has a repository scope")
 	}
 	for raw, want := range map[string]harness.Scope{"": harness.ScopeGlobal, "global": harness.ScopeGlobal, " Local ": harness.ScopeLocal} {
 		got, err := harness.ParseScope(raw)

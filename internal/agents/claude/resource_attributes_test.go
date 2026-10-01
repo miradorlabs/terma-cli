@@ -9,7 +9,8 @@ import (
 
 // OTEL_RESOURCE_ATTRIBUTES is the user's; Claude Code stamps user.id, user.email and service.name itself.
 func TestRenderNeverWritesResourceAttributes(t *testing.T) {
-	for _, h := range []harness.Harness{exporter{}, exporter{}.Local(t.TempDir())} {
+	local, _ := exporter{}.Local(t.TempDir())
+	for _, h := range []harness.Harness{exporter{}, local} {
 		if got, ok := h.(exporter).render(fullExporter())[harness.EnvResourceAttributes]; ok {
 			t.Fatalf("%s = %q rendered", harness.EnvResourceAttributes, got)
 		}

@@ -27,16 +27,8 @@ const claudeProjectSettings = ".claude/settings.json"
 // claudeProjectLocalSettings is the gitignored per-developer project file; terma only scans it.
 const claudeProjectLocalSettings = ".claude/settings.local.json"
 
-// Local returns the harness bound to the repository at root.
-func (exporter) Local(root string) harness.Harness { return exporter{root: root} }
-
-// Scope reports which layer this value acts on.
-func (c exporter) Scope() harness.Scope {
-	if c.root != "" {
-		return harness.ScopeLocal
-	}
-	return harness.ScopeGlobal
-}
+// Local is the exporter bound to the repository at root.
+func (exporter) Local(root string) (harness.Harness, bool) { return exporter{root: root}, true }
 
 const (
 	// claudeEnableTelemetry is the master switch; without it every OTEL_* variable is inert.
@@ -118,13 +110,13 @@ func (c exporter) managedKeys() []string {
 }
 
 // Name is the token `terma connect` and `--harness` accept.
-func (exporter) Name() string { return "claude" }
+func (exporter) Name() string { return name }
 
 // ServiceName is Claude Code's own default; terma writes no OTEL_RESOURCE_ATTRIBUTES.
 func (exporter) ServiceName() string { return "claude-code" }
 
 // DisplayName is how the agent is written in prose.
-func (exporter) DisplayName() string { return "Claude Code" }
+func (exporter) DisplayName() string { return displayName }
 
 // SupportsHeadersHelper is true: Claude Code has the otelHeadersHelper setting.
 func (exporter) SupportsHeadersHelper() bool { return true }
@@ -749,9 +741,9 @@ func projectIDOf(j *harness.Journal) string {
 }
 
 // A capability asked for by type assertion switches off in silence when its method drifts.
+// ConnectNotes has nothing to say.
+func (exporter) ConnectNotes(harness.Exporter) []string { return nil }
+
 var (
-	_ harness.Harness      = exporter{}
-	_ harness.Credentialed = exporter{}
-	_ harness.Backuper     = exporter{}
-	_ harness.Scoped       = exporter{}
+	_ harness.Harness = exporter{}
 )

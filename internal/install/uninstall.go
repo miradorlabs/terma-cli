@@ -8,7 +8,6 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
-	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/session"
@@ -87,11 +86,11 @@ func (r Removal) Apply(ctx context.Context, reg *agents.Registry, warn func(stri
 	}
 	// Every scoped harness, not only the ones an install chose.
 	for _, h := range reg.Harnesses() {
-		scoped, ok := h.(harness.Scoped)
+		local, ok := h.Local(r.Root)
 		if !ok {
 			continue
 		}
-		if _, err := scoped.Local(r.Root).Disconnect(); err != nil {
+		if _, err := local.Disconnect(); err != nil {
 			warn(fmt.Sprintf("could not remove %s's repository policy: %v", h.DisplayName(), err))
 		}
 	}

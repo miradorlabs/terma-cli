@@ -27,15 +27,6 @@ func ParseScope(raw string) (Scope, error) {
 	}
 }
 
-// Scoped is an agent that can also be configured at repository scope.
-type Scoped interface {
-	Harness
-	// Local returns this agent bound to the project settings file of the repository at root.
-	Local(root string) Harness
-	// Scope reports which layer this value acts on.
-	Scope() Scope
-}
-
 // Reach is which repositories a global connect exports from. Nothing stores it: connected
 // and exporting no signal is ReachRepos, since only a repository policy can make it send.
 type Reach string

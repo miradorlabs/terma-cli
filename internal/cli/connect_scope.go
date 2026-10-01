@@ -137,7 +137,7 @@ func localUnavailable(hs []harness.Harness, root string) string {
 		return "not inside a git repository"
 	}
 	for _, h := range hs {
-		if _, ok := h.(harness.Scoped); !ok {
+		if _, ok := h.Local(root); !ok {
 			return h.DisplayName() + " has no repository settings"
 		}
 	}
@@ -154,15 +154,15 @@ func localRoot(ctx context.Context) (string, error) {
 }
 
 func (app *App) localHarness(ctx context.Context, h harness.Harness) (harness.Harness, error) {
-	scoped, ok := h.(harness.Scoped)
-	if !ok {
+	if _, ok := h.Local(""); !ok {
 		return nil, fmt.Errorf("%s has no repository settings — --scope local applies to harnesses that read one (%s)", h.DisplayName(), app.scopedHarnessNames())
 	}
 	root, err := localRoot(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return scoped.Local(root), nil
+	local, _ := h.Local(root)
+	return local, nil
 }
 
 // runLocalConnect needs no project, sign-in or network: a repository's settings carry
@@ -202,11 +202,14 @@ func scopeSuffix(scope harness.Scope) string {
 }
 
 func localLayerStatus(h harness.Harness, root string, global telemetryStatus) (telemetryStatus, bool) {
-	scoped, ok := h.(harness.Scoped)
-	if !ok || root == "" {
+	if root == "" {
 		return telemetryStatus{}, false
 	}
-	st, err := scoped.Local(root).Status()
+	local, ok := h.Local(root)
+	if !ok {
+		return telemetryStatus{}, false
+	}
+	st, err := local.Status()
 	if err != nil || st.ManagedKeys == 0 {
 		return telemetryStatus{}, false
 	}
@@ -241,7 +244,7 @@ func writeRepoPolicy(
 	ui *installUI,
 	root string,
 	cfg *config.Config,
-	hs []harness.Scoped,
+	hs []harness.Harness,
 	f installFlags,
 ) ([]string, error) {
 	signals, err := harness.ParseSignals(f.signals)
@@ -250,8 +253,7 @@ func writeRepoPolicy(
 	}
 	var written []string
 	for _, h := range hs {
-		local := h.Local(root)
-		status, err := local.Status()
+		status, err := h.Status()
 		if err != nil {
 			return nil, err
 		}
@@ -265,7 +267,7 @@ func writeRepoPolicy(
 			IncludePrompts:     !f.excludePrompts,
 			IncludeToolContent: !f.excludeToolContent,
 		}
-		conflicts, err := local.ConflictsWith(intended)
+		conflicts, err := h.ConflictsWith(intended)
 		if err != nil {
 			return nil, err
 		}
@@ -276,7 +278,7 @@ func writeRepoPolicy(
 			ui.Then(fmt.Sprintf("Resolve %s's OTLP settings in this repository, then run `terma connect %s --scope local` here.", h.DisplayName(), h.Name()))
 			continue
 		}
-		path, err := local.ConfigPath()
+		path, err := h.ConfigPath()
 		if err != nil {
 			return nil, err
 		}
@@ -284,7 +286,7 @@ func writeRepoPolicy(
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return nil, err
 		}
-		if err := local.Connect(intended, false); err != nil {
+		if err := h.Connect(intended, false); err != nil {
 			return nil, fmt.Errorf("write %s repository policy: %w", h.Name(), err)
 		}
 		after, err := os.ReadFile(path)

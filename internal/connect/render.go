@@ -57,11 +57,7 @@ func printConnectPlan(
 }
 
 func printConnectNotes(out io.Writer, h harness.Harness, e harness.Exporter) {
-	n, ok := h.(harness.Noter)
-	if !ok {
-		return
-	}
-	notes := n.ConnectNotes(e)
+	notes := h.ConnectNotes(e)
 	if len(notes) == 0 {
 		return
 	}
@@ -160,13 +156,6 @@ func unclearable(conflicts []harness.Conflict) []string {
 		}
 	}
 	return out
-}
-
-func backupHarnessConfig(h harness.Harness, endpoint string) (string, error) {
-	if b, ok := h.(harness.Backuper); ok {
-		return b.Backup(endpoint)
-	}
-	return "", nil
 }
 
 // InstallStatusLine wraps c's status line and says how; it only warns on failure, since

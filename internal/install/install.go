@@ -119,8 +119,8 @@ func (p Plan) PrintDryRun(w io.Writer, signIn bool) error {
 	if signIn {
 		fmt.Fprintln(w, "\nA real install would sign in first (not done for a dry run).")
 	}
-	for _, h := range PolicyHarnesses(p.Agents, p.Adapters) {
-		path, err := h.Local(p.Root).ConfigPath()
+	for _, h := range PolicyHarnesses(p.Agents, p.Adapters, p.Root) {
+		path, err := h.ConfigPath()
 		if err != nil {
 			return err
 		}
@@ -158,7 +158,7 @@ type Steps struct {
 	// developer must do first.
 	SpoolKey func(ctx context.Context) (state, fix string)
 	// RepoPolicy writes the repository's export policy, returning the files it wrote.
-	RepoPolicy func(ctx context.Context, hs []harness.Scoped) ([]string, error)
+	RepoPolicy func(ctx context.Context, hs []harness.Harness) ([]string, error)
 }
 
 // Options are an install's own choices.
@@ -246,7 +246,7 @@ func Apply(ctx context.Context, p Plan, o Options, s Steps, r Reporter) error {
 	}
 
 	if s.RepoPolicy != nil {
-		paths, err := s.RepoPolicy(ctx, PolicyHarnesses(reg, adapters))
+		paths, err := s.RepoPolicy(ctx, PolicyHarnesses(reg, adapters, p.Root))
 		if err != nil {
 			return err
 		}

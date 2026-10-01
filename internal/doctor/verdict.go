@@ -173,7 +173,7 @@ func (v HarnessVerdict) Reaches(bound bool) bool {
 // GatherHarness reads what judging one agent needs off the machine.
 func GatherHarness(reg *agents.Registry, h harness.Harness, projectID, root string) HarnessFacts {
 	st, err := h.Status()
-	_, scoped := h.(harness.Scoped)
+	_, scoped := h.Local(root)
 	f := HarnessFacts{
 		Status:     st,
 		Err:        err,
@@ -204,8 +204,8 @@ func emissionProblem(reg *agents.Registry, h harness.Harness, root, projectID st
 		}
 		st = effective
 		f.RepoAsks = len(effective.Signals) > 0
-	} else if scoped, ok := h.(harness.Scoped); ok {
-		local, err := scoped.Local(root).Status()
+	} else if scoped, ok := h.Local(root); ok {
+		local, err := scoped.Status()
 		if err != nil {
 			return "could not read repository telemetry settings: " + err.Error(), "repair the repository telemetry settings file"
 		}
@@ -218,8 +218,8 @@ func emissionProblem(reg *agents.Registry, h harness.Harness, root, projectID st
 	}
 	// The missing-policy case is RouteRepoDecides's to explain.
 	if len(f.Status.Signals) == 0 && !f.RepoAsks {
-		if scoped, ok := h.(harness.Scoped); ok {
-			local, err := scoped.Local(root).Status()
+		if scoped, ok := h.Local(root); ok {
+			local, err := scoped.Status()
 			if err == nil && !local.HasPolicy && st.ConfigPath == f.Status.ConfigPath {
 				return "", ""
 			}
@@ -339,10 +339,13 @@ func JudgeSurface(reg *agents.Registry, keys Keys, surface, root, projectID stri
 // RepoAsks reports whether the repository at root carries a committed policy that switches
 // a harness's signals on, the half of an `--exports repos` connect that decides.
 func RepoAsks(h harness.Harness, root string) bool {
-	scoped, ok := h.(harness.Scoped)
-	if !ok || root == "" {
+	if root == "" {
 		return false
 	}
-	st, err := scoped.Local(root).Status()
+	local, ok := h.Local(root)
+	if !ok {
+		return false
+	}
+	st, err := local.Status()
 	return err == nil && len(st.Signals) > 0
 }

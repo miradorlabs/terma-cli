@@ -5,7 +5,6 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
-	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
 // Agent names in help text come from the registry, so a new agent is named wherever it applies.
@@ -13,7 +12,7 @@ import (
 func (app *App) scopedHarnessNames() string {
 	var names []string
 	for _, e := range app.agents.With[agents.Exporting]() {
-		if _, ok := e.Harness().(harness.Scoped); ok {
+		if _, ok := e.Harness().Local(""); ok {
 			names = append(names, e.DisplayName())
 		}
 	}

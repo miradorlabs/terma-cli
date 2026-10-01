@@ -12,9 +12,20 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
+const (
+	name        = "claude"
+	displayName = "Claude Code"
+)
+
 // Agent is Claude Code: hooks in .claude/settings.json, wired by default because a repository
 // loses nothing by gaining that file.
-type Agent struct{ exporter }
+type Agent struct{}
+
+// Name is the agent's token.
+func (Agent) Name() string { return name }
+
+// DisplayName is how prose names the agent.
+func (Agent) DisplayName() string { return displayName }
 
 func (Agent) Installed(ctx context.Context) bool { return exporter{}.Detect(ctx).Found }
 func (Agent) HooksPath() string                  { return settingsPath }
@@ -83,6 +94,25 @@ func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
 	return agents.CapabilitySupport{Level: agents.SupportFull},
 		agents.CapabilitySupport{Level: agents.SupportFull}
 }
+
+// InstallStatusLine wraps the user's status line.
+func (Agent) InstallStatusLine() (bool, error) { return exporter{}.InstallStatusLine() }
+
+// StatusLineState is the status line as cwd's settings leave it.
+func (Agent) StatusLineState(cwd string) (agents.StatusLineState, error) {
+	return exporter{}.StatusLineState(cwd)
+}
+
+// RemoveStatusLine restores the user's own status line.
+func (Agent) RemoveStatusLine() (bool, error) { return exporter{}.RemoveStatusLine() }
+
+// EmissionStatus is what the merged settings at root export.
+func (Agent) EmissionStatus(root string) (harness.Status, error) {
+	return exporter{}.EmissionStatus(root)
+}
+
+// TelemetrySwitch is the setting that turns Claude Code's telemetry on.
+func (Agent) TelemetrySwitch() string { return exporter{}.TelemetrySwitch() }
 
 var (
 	_ agents.StatusLiner      = Agent{}

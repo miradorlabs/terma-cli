@@ -223,7 +223,7 @@ func (app *App) installSteps(cmd *cobra.Command, ui *installUI, cfg *config.Conf
 			k := app.ensureSpoolKey(ctx, cfg)
 			return k.state, k.fix
 		},
-		RepoPolicy: func(ctx context.Context, hs []harness.Scoped) ([]string, error) {
+		RepoPolicy: func(ctx context.Context, hs []harness.Harness) ([]string, error) {
 			return writeRepoPolicy(ctx, ui, plan.Root, cfg, hs, f)
 		},
 	}

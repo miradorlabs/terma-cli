@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
@@ -128,7 +127,7 @@ func latestCodexQuota(t *testing.T, ctx context.Context, sessionID, transcript s
 }
 
 func TestCodexHasNoRepositoryScope(t *testing.T) {
-	if _, ok := harness.Harness(exporter{}).(harness.Scoped); ok {
+	if _, ok := (exporter{}).Local(t.TempDir()); ok {
 		t.Error("Codex has one config file and must not claim a repository scope")
 	}
 }

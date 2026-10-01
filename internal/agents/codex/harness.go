@@ -94,7 +94,7 @@ func (exporter) Name() string { return name }
 func (exporter) ServiceName() string { return codexServiceName }
 
 // DisplayName is how the agent is written in prose.
-func (exporter) DisplayName() string { return "Codex" }
+func (exporter) DisplayName() string { return displayName }
 
 // SupportsHeadersHelper is false: Codex's headers are literal strings in config.toml.
 func (exporter) SupportsHeadersHelper() bool { return false }
@@ -886,9 +886,9 @@ func (c exporter) CurrentCredential(endpoint, projectID string) (string, bool) {
 }
 
 // A drifted optional method is a build error here, not a silent switch-off.
+// Local is unsupported: Codex strips `otel` from a project's config.
+func (exporter) Local(string) (harness.Harness, bool) { return nil, false }
+
 var (
-	_ harness.Harness      = exporter{}
-	_ harness.Noter        = exporter{}
-	_ harness.Credentialed = exporter{}
-	_ harness.Backuper     = exporter{}
+	_ harness.Harness = exporter{}
 )

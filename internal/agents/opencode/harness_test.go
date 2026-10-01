@@ -188,8 +188,8 @@ func TestOpenCodeDisconnectRemovesPluginAndHelper(t *testing.T) {
 func TestOpenCodeLocalPolicyCarriesNoDestination(t *testing.T) {
 	_, _ = opencodeIn(t)
 	repo := t.TempDir()
-	h := exporter{}.Local(repo)
-	if h.(harness.Scoped).Scope() != harness.ScopeLocal {
+	h, ok := exporter{}.Local(repo)
+	if !ok {
 		t.Fatal("Local must bind to the repository scope")
 	}
 	e := opencodeExporter(t, exporter{}, false)
@@ -254,7 +254,7 @@ func TestOpenCodeServiceNameAndRegistry(t *testing.T) {
 	if harness.ServiceName(exporter{}) != "opencode" {
 		t.Error("service name")
 	}
-	if _, ok := harness.Harness(exporter{}).(harness.Scoped); !ok {
+	if _, ok := (exporter{}).Local(t.TempDir()); !ok {
 		t.Error("OpenCode has a repository policy file and must be Scoped")
 	}
 }

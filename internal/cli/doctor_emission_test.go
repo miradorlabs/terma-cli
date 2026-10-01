@@ -108,7 +108,7 @@ func TestDoctorChecksOpenCodeRepositoryPolicy(t *testing.T) {
 			if err := h.Connect(harness.Exporter{Endpoint: endpoint, APIKey: testServerKey, Signals: harness.AllSignals}, false); err != nil {
 				t.Fatal(err)
 			}
-			if err := h.(harness.Scoped).Local(repo).Connect(harness.Exporter{Signals: signals}, false); err != nil {
+			if err := local(t, h, repo).Connect(harness.Exporter{Signals: signals}, false); err != nil {
 				t.Fatal(err)
 			}
 			if err := keystore.SetFor("opencode", testProjectID, testServerKey, keystore.Hosts{}); err != nil {

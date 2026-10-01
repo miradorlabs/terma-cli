@@ -78,16 +78,8 @@ func (exporter) DisplayName() string { return "OpenCode" }
 // SupportsHeadersHelper is true: the plugin runs the helper script itself.
 func (exporter) SupportsHeadersHelper() bool { return true }
 
-// Local returns the harness bound to the repository at root.
-func (exporter) Local(root string) harness.Harness { return exporter{root: root} }
-
-// Scope reports which layer this value acts on.
-func (c exporter) Scope() harness.Scope {
-	if c.root != "" {
-		return harness.ScopeLocal
-	}
-	return harness.ScopeGlobal
-}
+// Local is the exporter bound to the repository at root.
+func (exporter) Local(root string) (harness.Harness, bool) { return exporter{root: root}, true }
 
 // Detect runs `opencode --version`; a missing binary is not-found, not an error.
 func (exporter) Detect(ctx context.Context) harness.Detection {
@@ -448,9 +440,9 @@ func (c exporter) ConnectNotes(e harness.Exporter) []string {
 	return notes
 }
 
+// Backup takes none.
+func (exporter) Backup(string) (string, error) { return "", nil }
+
 var (
-	_ harness.Harness      = exporter{}
-	_ harness.Noter        = exporter{}
-	_ harness.Credentialed = exporter{}
-	_ harness.Scoped       = exporter{}
+	_ harness.Harness = exporter{}
 )

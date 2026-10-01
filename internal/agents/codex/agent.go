@@ -15,10 +15,19 @@ import (
 )
 
 // name keys the keystore and routing records too.
-const name = "codex"
+const (
+	name        = "codex"
+	displayName = "Codex"
+)
 
 // Agent covers Codex's repository hooks in .codex/hooks.json and its user-level notifier.
-type Agent struct{ exporter }
+type Agent struct{}
+
+// Name is the agent's token.
+func (Agent) Name() string { return name }
+
+// DisplayName is how prose names the agent.
+func (Agent) DisplayName() string { return displayName }
 
 const codexHookReview = "open this repository in Codex Desktop, then go to Settings → Hooks → Review and approve the Terma entries (or run /hooks in Codex CLI)"
 
@@ -153,6 +162,15 @@ func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
 func (Agent) UserHooksTrustStep() string {
 	return "Codex runs its machine-wide hooks once you trust them: in Codex, open `/hooks` (Desktop: Settings → Hooks → Review) and approve Terma's. An organization that deploys them as managed configuration skips this step."
 }
+
+// NotifierInstalled reports whether terma's notifier is in Codex's config.
+func (Agent) NotifierInstalled() (bool, error) { return exporter{}.NotifierInstalled() }
+
+// InstallNotifier puts terma's notifier in front of the user's own.
+func (Agent) InstallNotifier() (bool, error) { return exporter{}.InstallNotifier() }
+
+// RemoveNotifier restores the user's own notifier.
+func (Agent) RemoveNotifier() (bool, error) { return exporter{}.RemoveNotifier() }
 
 var (
 	_ agents.Notifier       = Agent{}

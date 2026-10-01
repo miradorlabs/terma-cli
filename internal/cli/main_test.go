@@ -80,23 +80,28 @@ func harnessOf(t *testing.T, name string) harness.Harness {
 
 // claudeHarness is the status-line agent's harness with the capabilities these tests use.
 func claudeHarness(t *testing.T) struct {
-	harness.Scoped
-	harness.Credentialed
+	harness.Harness
 	agents.StatusLiner
 } {
 	t.Helper()
-	h := harnessOf(t, "claude")
-	scoped, ok := h.(harness.Scoped)
-	credentialed, ok2 := h.(harness.Credentialed)
-	line, ok3 := testApp.agents.Find[agents.StatusLiner]("claude")
-	if !ok || !ok2 || !ok3 {
-		t.Fatal("claude lost a capability")
+	line, ok := testApp.agents.Find[agents.StatusLiner]("claude")
+	if !ok {
+		t.Fatal("claude lost its status line")
 	}
 	return struct {
-		harness.Scoped
-		harness.Credentialed
+		harness.Harness
 		agents.StatusLiner
-	}{scoped, credentialed, line}
+	}{harnessOf(t, "claude"), line}
 }
 
 const codexDesktopAgent = "codex-desktop"
+
+// local is h bound to the repository at root, which it must support.
+func local(t *testing.T, h harness.Harness, root string) harness.Harness {
+	t.Helper()
+	l, ok := h.Local(root)
+	if !ok {
+		t.Fatalf("%s has no repository scope", h.Name())
+	}
+	return l
+}

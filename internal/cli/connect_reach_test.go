@@ -247,7 +247,7 @@ func TestDoctorFailsWhenThisRepositoryHasNoPolicy(t *testing.T) {
 	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--yes"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := claudeHarness(t).Local(mustGetwd(t)).Disconnect(); err != nil {
+	if _, err := local(t, claudeHarness(t).Harness, mustGetwd(t)).Disconnect(); err != nil {
 		t.Fatal(err)
 	}
 	out, _ := runTerma(t, "doctor", "--skip-commit")
@@ -327,7 +327,7 @@ func TestInstallUpgradesHooksOnlyRepository(t *testing.T) {
 	if _, err := runTerma(t, args...); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := claudeHarness(t).Local(mustGetwd(t)).Disconnect(); err != nil {
+	if _, err := local(t, claudeHarness(t).Harness, mustGetwd(t)).Disconnect(); err != nil {
 		t.Fatal(err)
 	}
 	out, err := runTerma(t, args...)
