@@ -16,7 +16,7 @@ func dshSandbox(steps func(sb *Sandbox) []claudeStep) func(t *testing.T) *Sandbo
 	return func(t *testing.T) *Sandbox {
 		sb := New(t, Isolated)
 		sb.RelayAgents = []string{"dsh"}
-		sb.terma(sb.Repo, "install", "--team", sb.ProjectID, "--harness", "none", "--yes", "--no-browser", "--no-doctor")
+		sb.terma(sb.Repo, "install", "--team", sb.ProjectID, "--harness", "none", "--yes", "--no-browser")
 		var s []claudeStep
 		if steps != nil {
 			s = steps(sb)

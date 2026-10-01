@@ -192,34 +192,36 @@ func Apply(ctx context.Context, p Plan, o Options, s Steps, r Reporter) error {
 			r.OK("Status line", "reads your plan's usage windows")
 		} else {
 			r.Warn("Status line", "not wrapped — your plan's usage windows are not captured")
+			r.Then("Run `terma doctor` to see why the status line was not wrapped.")
 		}
 	}
 
 	installedHooks := p.GitDir != "" && p.Existing != nil && p.Existing.Install.HookManager != ""
 	adapters := p.Adapters
 	var written []string
-	var afterMerge []string
 	if !p.NoHooks {
 		p.Hooks.Print(r.Detail())
 		write := o.AssumeYes
 		if !p.Hooks.Empty() && !write && s.Confirm != nil {
 			var err error
-			if write, err = s.Confirm("Write terma's hooks to "+output.And(p.Hooks.Files())+"?", p.Hooks.Explain()); err != nil {
+			if write, err = s.Confirm("Write terma's hooks to this repository?", p.Hooks.Explain()); err != nil {
 				return err
 			}
 		}
 		switch {
 		case p.Hooks.Empty():
 			installedHooks = p.GitDir != ""
-			r.OK("Hooks", p.Hooks.Summary(adapters)+" — already in place")
+			r.Summary("Hooks", "already in place")
 		case write:
 			if err := p.Hooks.Apply(p.Root); err != nil {
 				return err
 			}
 			installedHooks = p.GitDir != ""
 			written = p.Hooks.Paths()
-			r.OK("Hooks", p.Hooks.Summary(adapters))
-			afterMerge = p.Hooks.hooks.Notes
+			r.Summary("Hooks", output.And(p.Hooks.Files()))
+			for _, n := range p.Hooks.hooks.Notes {
+				fmt.Fprintln(r.Detail(), "  After merging: "+n)
+			}
 		default:
 			adapters = reg.WiredNames(p.Root)
 			r.Warn("Hooks", "not written — commits are not stamped until they are")
@@ -260,15 +262,20 @@ func Apply(ctx context.Context, p Plan, o Options, s Steps, r Reporter) error {
 		}
 	}
 	for _, s := range SelectedSurfaces(reg, p.Selected) {
+		// An agent that already trusts this repository's hooks needs no approval step.
+		if _, a, _ := reg.Surface(s.Name); a != nil {
+			if t, ok := a.(agents.Trusting); ok {
+				if st, err := t.Trust(p.Root); err == nil && st.Trusted {
+					continue
+				}
+			}
+		}
 		for _, step := range s.InstallSteps {
 			r.Then(step)
 		}
 	}
 	if p.GitDir != "" && len(written) > 0 {
-		r.Commit("Commit these files and open a PR — merging it onboards the repository:", append(written, termaproject.FileName))
-	}
-	for _, n := range afterMerge {
-		r.Then("After merging: " + n)
+		r.Commit("Commit the new files; once merged, everyone who clones this repository is set up:", append(written, termaproject.FileName))
 	}
 	return nil
 }

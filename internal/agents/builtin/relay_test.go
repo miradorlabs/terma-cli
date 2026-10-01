@@ -10,8 +10,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 )
 
-func TestTargetsNormalizeSurfacesAndPreserveOrder(t *testing.T) {
-	got := reg.RelayTargets([]string{"codex-desktop", "claude", "codex", "cursor", "pi", "pi"})
+// Targets keep the selection's order once each, and drop a name that exports nothing.
+func TestTargetsDropNonExportersAndPreserveOrder(t *testing.T) {
+	got := reg.RelayTargets([]string{"claude", "codex", "cursor", "pi", "pi", "unknown"})
 	want := []string{"claude", "codex", "pi"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("targets = %v, want %v", got, want)

@@ -24,7 +24,7 @@ import (
 func TestRelayCursorHooks(t *testing.T) {
 	track(t)
 	sb := New(t, Isolated)
-	sb.terma(sb.Repo, "install", "--harness", "none", "--no-browser", "--no-doctor", "--team", sb.ProjectID, "--adapters", "cursor", "--yes")
+	sb.terma(sb.Repo, "install", "--harness", "none", "--no-browser", "--team", sb.ProjectID, "--adapters", "cursor", "--yes")
 	sb.UseRelay(RelayOptions{Start: true})
 	raw, err := os.ReadFile(filepath.Join(sb.Repo, ".cursor", "hooks.json"))
 	if err != nil {

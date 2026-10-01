@@ -28,7 +28,7 @@ func TestInstallWithAServerKeyBindsTheKeysProject(t *testing.T) {
 	run := termaRun{within: 30 * time.Second, env: gw}
 
 	repo := installRepo(t) // its config dir is replaced by the gateway's when run sets env
-	out, err := run.combined(t, "install", "--harness", "none", "--team", keyProject, "--adapters", "claude", "--yes", "--no-doctor", "--no-browser")
+	out, err := run.combined(t, "install", "--harness", "none", "--team", keyProject, "--adapters", "claude", "--yes", "--no-browser")
 	if err != nil {
 		t.Fatalf("install with a server key and its own project: %v\n%s", err, out)
 	}
@@ -47,12 +47,12 @@ func TestInstallWithAServerKeyBindsTheKeysProject(t *testing.T) {
 	}
 
 	// Re-running without --project keeps the key's project.
-	if out, err := run.combined(t, "install", "--harness", "none", "--adapters", "claude", "--yes", "--no-doctor", "--no-browser"); err != nil {
+	if out, err := run.combined(t, "install", "--harness", "none", "--adapters", "claude", "--yes", "--no-browser"); err != nil {
 		t.Fatalf("reinstall: %v\n%s", err, out)
 	}
 
 	// Another project is refused, by name, and the binding is left alone.
-	out, err = run.combined(t, "install", "--harness", "none", "--team", "22222222-2222-4333-8444-555555555555", "--adapters", "claude", "--yes", "--no-doctor", "--no-browser")
+	out, err = run.combined(t, "install", "--harness", "none", "--team", "22222222-2222-4333-8444-555555555555", "--adapters", "claude", "--yes", "--no-browser")
 	if err == nil || !strings.Contains(err.Error(), keyProject) {
 		t.Fatalf("a --project the key does not belong to was accepted: %v\n%s", err, out)
 	}

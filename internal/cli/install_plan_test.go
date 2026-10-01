@@ -18,7 +18,7 @@ func TestInstallPrintsWhatTheHookManagerNeedsFromEachClone(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(repo, "lefthook.yml"), []byte("pre-commit:\n  commands: {}\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude", "--yes", "--no-doctor")
+	out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude", "--yes", "--verbose")
 	if err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}
@@ -84,7 +84,7 @@ func TestInstallDryRunUnauthenticatedNoProject(t *testing.T) {
 // --no-hooks writes no hooks file whatever --adapters asks.
 func TestInstallRecordsNoAdapters(t *testing.T) {
 	repo := installRepo(t)
-	if out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude", "--yes", "--no-doctor"); err != nil {
+	if out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude", "--yes"); err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}
 	path := termaproject.Path(repo)
@@ -100,7 +100,7 @@ func TestInstallRecordsNoAdapters(t *testing.T) {
 	if err := os.WriteFile(path, []byte(legacy), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if out, err := runTerma(t, "install", "--harness", "none", "--adapters", "cursor", "--no-hooks", "--yes", "--no-doctor"); err != nil {
+	if out, err := runTerma(t, "install", "--harness", "none", "--adapters", "cursor", "--no-hooks", "--yes"); err != nil {
 		t.Fatalf("re-install --no-hooks: %v\n%s", err, out)
 	}
 	if data, err = os.ReadFile(path); err != nil {
@@ -121,24 +121,24 @@ func TestInstallRecordsNoAdapters(t *testing.T) {
 // asks for no commit.
 func TestInstallListsTheFilesToCommit(t *testing.T) {
 	installRepo(t)
-	out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude,cursor", "--yes", "--no-doctor")
+	out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude,cursor", "--yes")
 	if err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}
-	_, list, ok := strings.Cut(out, "Commit these files")
+	_, list, ok := strings.Cut(out, "Commit the new files")
 	if !ok {
 		t.Fatalf("install did not ask for a commit:\n%s", out)
 	}
-	for _, want := range []string{".terma/hooks/post-commit", ".claude/settings.json", ".cursor/hooks.json", termaproject.FileName, "git add "} {
+	for _, want := range []string{"git add .terma .claude/settings.json .cursor/hooks.json"} {
 		if !strings.Contains(list, want) {
 			t.Errorf("commit list is missing %s:\n%s", want, list)
 		}
 	}
-	out, err = runTerma(t, "install", "--harness", "none", "--yes", "--no-doctor")
+	out, err = runTerma(t, "install", "--harness", "none", "--yes")
 	if err != nil {
 		t.Fatalf("re-install: %v\n%s", err, out)
 	}
-	if strings.Contains(out, "Commit these files") {
+	if strings.Contains(out, "Commit the new files") {
 		t.Fatalf("a re-install that wrote nothing asked for a commit:\n%s", out)
 	}
 }

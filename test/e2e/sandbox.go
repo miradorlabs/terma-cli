@@ -176,8 +176,8 @@ func New(t *testing.T, mode Mode, opts ...Option) *Sandbox {
 	sb.terma(sb.Repo, "config", "set", "--otlp-url", sb.Receiver.URL())
 	sb.StartAccount()
 	// Each scenario connects its own exporter. --no-browser bounds a fixture-login
-	// regression instead of opening a browser; --no-doctor avoids unrelated checks.
-	sb.terma(sb.Repo, "install", "--team", sb.ProjectID, "--harness", "none", "--adapters", "claude,codex", "--yes", "--no-browser", "--no-doctor")
+	// regression instead of opening a browser.
+	sb.terma(sb.Repo, "install", "--team", sb.ProjectID, "--harness", "none", "--adapters", "claude,codex", "--yes", "--no-browser")
 	return sb
 }
 
@@ -233,7 +233,7 @@ func (sb *Sandbox) RouteClaude() {
 	sb.terma(sb.Repo, "disconnect", "claude", "--yes")
 	// The relay on a port of its own, forwarding to the receiver; install finds it there.
 	sb.UseRelay(RelayOptions{Start: true, Content: !sb.ExcludeContent})
-	args := []string{"install", "--team", sb.ProjectID, "--harness", "claude", "--yes", "--no-browser", "--no-doctor"}
+	args := []string{"install", "--team", sb.ProjectID, "--harness", "claude", "--yes", "--no-browser"}
 	if sb.ExcludeContent {
 		args = append(args, "--prompts", "off", "--exclude-tool-content")
 	}

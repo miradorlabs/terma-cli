@@ -30,7 +30,7 @@ func TestInstallChecksRepositoryPermissionWithoutNativeExporters(t *testing.T) {
 				t.Fatal(err)
 			}
 			id := projectsIn(orgA().ID)[0].ID
-			out, err := within(5*time.Second).combined(t, "install", "--harness", "none", "--adapters", agent, "--team", id, "--yes", "--no-doctor", "--no-browser")
+			out, err := within(5*time.Second).combined(t, "install", "--harness", "none", "--adapters", agent, "--team", id, "--yes", "--no-browser")
 			if err == nil || !strings.Contains(err.Error(), "does not allow members to add repositories") {
 				t.Fatalf("install bypassed repository permission: %v\n%s", err, out)
 			}
@@ -50,7 +50,7 @@ func TestInstallDeniedRepositoryPermissionStillAllowsExistingBinding(t *testing.
 	f := boundRepo(t, termaproject.Project{ID: projectsIn(orgA().ID)[0].ID, OrganizationID: orgA().ID}, true)
 	t.Setenv("TERMA_POLICY_STUB", "")
 	f.policyBody = `{"policy":{"version":"1.0","terma":{"per_repository":{"members_can_add_repositories":false},"capture":{"exclude_paths":[],"exclude_prompts":true,"exclude_tool_content":false,"signals":["logs"]}}},"revision":1,"updated_at":"2026-09-30T12:27:05Z"}`
-	if out, err := within(5*time.Second).combined(t, "install", "--harness", "none", "--adapters", "cursor", "--yes", "--no-doctor", "--no-browser"); err != nil {
+	if out, err := within(5*time.Second).combined(t, "install", "--harness", "none", "--adapters", "cursor", "--yes", "--no-browser"); err != nil {
 		t.Fatalf("existing connected repository was refused: %v\n%s", err, out)
 	}
 	if f.policies.Load() != 1 || f.keysMint.Load() != 1 {
@@ -98,7 +98,7 @@ func TestInstallWithServerKeyUsesDeveloperLoginForPolicy(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			out, err := within(5*time.Second).combined(t, "install", "--harness", "none", "--adapters", "cursor", "--team", id, "--yes", "--no-doctor", "--no-browser")
+			out, err := within(5*time.Second).combined(t, "install", "--harness", "none", "--adapters", "cursor", "--team", id, "--yes", "--no-browser")
 			switch {
 			case tc.loginOrg == "":
 				if !errors.Is(err, auth.ErrNotLoggedIn) {

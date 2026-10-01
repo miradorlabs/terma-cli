@@ -45,7 +45,7 @@ func boundRepo(t *testing.T, bound termaproject.Project, signedIn bool) *fakeAut
 
 func routeCodex(t *testing.T, extra ...string) (string, error) {
 	t.Helper()
-	args := append([]string{"install", "--harness", "codex", "--no-hooks", "--no-doctor", "--no-browser"}, extra...)
+	args := append([]string{"install", "--harness", "codex", "--no-hooks", "--no-browser"}, extra...)
 	return within(20*time.Second).combined(t, args...)
 }
 
@@ -146,7 +146,7 @@ func TestInstallWithoutACredentialKeepsTheBindingsEnvironment(t *testing.T) {
 	bound := termaproject.Project{ID: testProjectID, Name: "Terma Dev", Environment: config.EnvDev}
 	boundRepo(t, bound, false)
 
-	out, err := within(20*time.Second).combined(t, "install", "--harness", "none", "--adapters", "claude", "--yes", "--no-doctor", "--no-browser")
+	out, err := within(20*time.Second).combined(t, "install", "--harness", "none", "--adapters", "claude", "--yes", "--no-browser")
 	if err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}
@@ -208,7 +208,7 @@ func TestInstallStampsTheVersionOnlyWhenItWritesCommittedFiles(t *testing.T) {
 	repo := installRepo(t)
 	install := func() {
 		t.Helper()
-		if out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude", "--yes", "--no-doctor"); err != nil {
+		if out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude", "--yes"); err != nil {
 			t.Fatalf("install: %v\n%s", err, out)
 		}
 	}
@@ -262,8 +262,8 @@ func TestInstallPromptsSwitchSticks(t *testing.T) {
 		line string
 	}{
 		// a first install sends them, unasked, and says how to stop it
-		{nil, true, "prompt text and model responses are sent — `terma install --prompts off` stops them"},
-		{[]string{"--prompts", "off"}, false, "prompt text and model responses are not sent — `terma install --prompts on` sends them"},
+		{nil, true, "sent — `terma install --prompts off` stops them"},
+		{[]string{"--prompts", "off"}, false, "not sent — `terma install --prompts on` sends them"},
 		{nil, false, ""}, // kept, not re-defaulted
 		{[]string{"--prompts", "on"}, true, ""},
 		{[]string{"--exclude-prompts"}, false, ""}, // the older spelling still works

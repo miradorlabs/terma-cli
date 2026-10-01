@@ -54,8 +54,6 @@ type Workflow struct {
 	ApplySteps func(cfg *config.Config, p Plan) Steps
 	// RefreshMachine refreshes the home-directory files an earlier terma wrote.
 	RefreshMachine func() ([]string, error)
-	// Verify runs doctor; nil leaves it as a next step.
-	Verify func()
 }
 
 // Open checks the files an install writes and resolves the workspace's binding.
@@ -153,18 +151,14 @@ func Run(ctx context.Context, reg *agents.Registry, cfg *config.Config, req Requ
 			_ = selfupdate.SaveRefreshed(dir, req.Version)
 		}
 	}
-	// Skipped without a terminal: doctor makes a scratch commit and a network round-trip.
-	if w.Verify == nil {
-		r.Then("Run `terma doctor` to verify the chain end to end.")
-	} else {
-		w.Verify()
-	}
+	r.Then("Run `terma doctor` any time to check everything works.")
 	return plan, nil
 }
 
 func summarize(r Reporter, plan Plan, b Binding, env, gitDir string) {
 	if gitDir == "" {
 		r.Warn("Git hooks", "skipped — not a Git repository, so commits are not stamped")
+		r.Then("Run `terma install` inside a Git repository to stamp its commits.")
 	}
 	if env != config.EnvProd {
 		env = " (" + env + ")"
@@ -179,9 +173,9 @@ func summarize(r Reporter, plan Plan, b Binding, env, gitDir string) {
 	// Nothing asks, so the line names the command that changes it.
 	if len(plan.Agents.RelayTargets(plan.Selected)) > 0 {
 		if plan.Prompts {
-			r.Summary("Prompts", "prompt text and model responses are sent — `terma install --prompts off` stops them")
+			r.Summary("Prompts", "sent — `terma install --prompts off` stops them")
 		} else {
-			r.Summary("Prompts", "prompt text and model responses are not sent — `terma install --prompts on` sends them")
+			r.Summary("Prompts", "not sent — `terma install --prompts on` sends them")
 		}
 	}
 }

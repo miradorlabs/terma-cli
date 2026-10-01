@@ -14,7 +14,7 @@ func ompSandbox(t *testing.T, cmd string) func(t *testing.T) *Sandbox {
 	return func(t *testing.T) *Sandbox {
 		sb := New(t, Isolated)
 		sb.RelayAgents = []string{"omp"}
-		sb.terma(sb.Repo, "install", "--team", sb.ProjectID, "--harness", "none", "--adapters", "omp", "--yes", "--no-browser", "--no-doctor")
+		sb.terma(sb.Repo, "install", "--team", sb.ProjectID, "--harness", "none", "--adapters", "omp", "--yes", "--no-browser")
 		var calls atomic.Int32
 		provider := httptest.NewServer(openAIToolProvider(&calls, cmd))
 		t.Cleanup(provider.Close)

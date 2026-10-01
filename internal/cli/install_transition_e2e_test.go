@@ -110,7 +110,7 @@ func TestInstallE2ENonGitToGit(t *testing.T) {
 				}
 			}
 
-			args := []string{"install", "--harness", "none", "--yes", "--no-doctor"}
+			args := []string{"install", "--harness", "none", "--yes"}
 			s.cli(nested, append(args, "--dry-run")...)
 			s.cli(nested, append(args, "--no-hooks")...)
 			requireAbsent(t, filepath.Join(root, hookmgr.ShimDir))

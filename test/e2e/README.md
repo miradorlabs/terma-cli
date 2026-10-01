@@ -257,7 +257,7 @@ separate regression check.
 
 ## Sandbox installation
 
-Sandbox installation uses `--harness none --no-browser --no-doctor` with a local
+Sandbox installation uses `--harness none --no-browser` with a local
 account fixture that supplies the developer login, project list, and collection
 policy. Each scenario connects its exporter separately with a dummy key for the
 loopback receiver. Account hosts are persisted in the private profile so relay

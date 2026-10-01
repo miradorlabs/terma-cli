@@ -154,7 +154,7 @@ func TestUninstallKeepsAValueTermaNeverWrites(t *testing.T) {
 	if err := os.WriteFile(path, []byte(`{"env":{"OTEL_LOGS_EXPORTER":"console"}}`+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--yes", "--no-doctor"); err != nil {
+	if _, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--yes"); err != nil {
 		t.Fatal(err)
 	}
 	out, err := runTerma(t, "uninstall", "--yes")
@@ -292,7 +292,7 @@ func TestInstallPreservesExistingRepositoryPolicy(t *testing.T) {
 	for _, signals := range []string{"logs", "none"} {
 		t.Run(signals, func(t *testing.T) {
 			repo := installRepo(t)
-			args := []string{"install", "--harness", "none", "--team", testProjectID, "--yes", "--no-doctor"}
+			args := []string{"install", "--harness", "none", "--team", testProjectID, "--yes"}
 			if out, err := runTerma(t, append(args, "--signals", signals, "--exclude-prompts", "--exclude-tool-content")...); err != nil {
 				t.Fatalf("%v\n%s", err, out)
 			}
@@ -323,7 +323,7 @@ func TestInstallPreservesExistingRepositoryPolicy(t *testing.T) {
 
 func TestInstallUpgradesHooksOnlyRepository(t *testing.T) {
 	repo := installRepo(t)
-	args := []string{"install", "--harness", "none", "--team", testProjectID, "--yes", "--no-doctor"}
+	args := []string{"install", "--harness", "none", "--team", testProjectID, "--yes"}
 	if _, err := runTerma(t, args...); err != nil {
 		t.Fatal(err)
 	}
@@ -337,7 +337,7 @@ func TestInstallUpgradesHooksOnlyRepository(t *testing.T) {
 	if got := readClaudeSettings(t, filepath.Join(repo, ".claude", "settings.json"))["OTEL_LOGS_EXPORTER"]; got != "otlp" {
 		t.Fatalf("reinstall did not enable telemetry: %q", got)
 	}
-	_, files, ok := strings.Cut(out, "Commit these files")
+	_, files, ok := strings.Cut(out, "Commit the new files")
 	if !ok || !strings.Contains(files, ".claude/settings.json") {
 		t.Fatalf("policy-only upgrade omitted commit instructions:\n%s", out)
 	}
@@ -345,7 +345,7 @@ func TestInstallUpgradesHooksOnlyRepository(t *testing.T) {
 
 func TestInstallPreservesManuallyChangedRepositoryPolicy(t *testing.T) {
 	repo := installRepo(t)
-	args := []string{"install", "--harness", "none", "--team", testProjectID, "--yes", "--no-doctor"}
+	args := []string{"install", "--harness", "none", "--team", testProjectID, "--yes"}
 	if _, err := runTerma(t, args...); err != nil {
 		t.Fatal(err)
 	}

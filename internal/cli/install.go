@@ -1,11 +1,13 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -30,7 +32,6 @@ type installFlags struct {
 	harnesses    string
 	adapters     string
 	noHooks      bool
-	noDoctor     bool
 	noStatusLine bool
 	// relayService and prompts are "on", "off", or "" to keep the last choice.
 	relayService       string
@@ -90,7 +91,6 @@ The keys and per-team configuration live in your home directory; the committed
 	cmd.Flags().StringVar(&f.harnesses, "harness", "", "comma-separated agents to configure ("+strings.Join(app.availableAgentNames(), ", ")+"); default: what `terma setup` recorded, else a picker")
 	cmd.Flags().StringVar(&f.adapters, "adapters", "", "comma-separated agents whose committed hooks to wire (default: the configured agents that have one)")
 	cmd.Flags().BoolVar(&f.noHooks, "no-hooks", false, "do not install commit hooks or agent hooks")
-	cmd.Flags().BoolVar(&f.noDoctor, "no-doctor", false, "do not run `terma doctor` to verify the chain after installing")
 	cmd.Flags().StringVar(&f.relayService, "relay-service", "", "run the local relay as a background service: on or off (default: on, or your last choice)")
 	cmd.Flags().BoolVar(&f.noStatusLine, "no-statusline", false, "do not wrap "+app.statusLineOwner()+"'s status line (which captures the plan's rate-limit windows)")
 	cmd.Flags().StringVar(&f.identity, "identity", "", "identity stamped on the sessions of agents that take one (default: git user.email; \"none\" to omit)")
@@ -131,7 +131,7 @@ func (app *App) runInstall(cmd *cobra.Command, f installFlags) error {
 	}
 	// A dry run is nothing but its plan, so it always says everything.
 	ui := newInstallUI(out, f.verbose || f.dryRun)
-	fmt.Fprintf(out, "%s in %s\n\n", ui.p.Bold("Installing terma"), output.TildePath(root))
+	fmt.Fprintf(out, "%s in %s\n", ui.p.Bold("Installing terma"), output.TildePath(root))
 	existing, err := install.Open(app.agents, root, gitDir)
 	if err != nil {
 		return err
@@ -181,18 +181,26 @@ func (app *App) runInstall(cmd *cobra.Command, f installFlags) error {
 			return app.installSteps(cmd, ui, cfg, agents, f, plan)
 		},
 	}
-	// Skipped without a terminal: doctor makes a scratch commit and a network round-trip.
-	if !f.noDoctor && canPrompt() {
-		flow.Verify = func() { ui.verify(cmd, app.runDoctor) }
-	}
-	_, err = install.Run(ctx, app.agents, cfg, req, flow, ui)
+	plan, err := install.Run(ctx, app.agents, cfg, req, flow, ui)
 	if unbound {
 		fmt.Fprintln(out, "Cancelled. Nothing was written.")
 		return nil
 	}
+	if f.dryRun {
+		ui.printLines()
+	}
 	if err != nil || f.dryRun {
 		return err
 	}
+	// The hooks call terma by name: an install they cannot run is not done.
+	if exe, err := os.Executable(); err == nil {
+		if c := doctor.BinaryCheck(exe, app.binDirs()); c.Status == doctor.Fail {
+			ui.Warn("terma", "not on your PATH, so the hooks cannot run it")
+			ui.next = append([]string{"Put terma on your PATH: `" + doctor.AddToPathCommand(filepath.Dir(exe)) + "`"}, ui.next...)
+		}
+	}
+	ui.title = "Installed — this repository reports to " + cmp.Or(plan.Binding.Name, plan.Binding.ID, "your team")
+	ui.warnTitle = "Almost done — finish the steps marked ! below"
 	ui.finish()
 	return nil
 }
@@ -201,6 +209,9 @@ func (app *App) runInstall(cmd *cobra.Command, f installFlags) error {
 func (app *App) installSteps(cmd *cobra.Command, ui *installUI, cfg *config.Config, agents []string, f installFlags, plan install.Plan) install.Steps {
 	steps := install.Steps{
 		Confirm: func(question string, explain []string) (bool, error) {
+			if !f.verbose {
+				explain = nil
+			}
 			yes, err := confirmExplained(cmd, question, explain, true)
 			if errors.Is(err, errCancelled) {
 				return false, err

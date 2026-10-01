@@ -2,17 +2,13 @@ package cli
 
 import (
 	"cmp"
-	"context"
 	"fmt"
 	"io"
 	"slices"
 	"strings"
 
-	"github.com/spf13/cobra"
-
-	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/install"
-	"github.com/miradorlabs/terma-cli/internal/ui/spinner"
+	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
@@ -23,7 +19,9 @@ type installUI struct {
 	detail io.Writer
 	p      style.Palette
 	warned bool
-	next   []string
+	// lines are the checklist, printed together at finish so prompts never split it.
+	lines []string
+	next  []string
 	// title closes a run that needs nothing more; warnTitle, when set, one that does.
 	title, warnTitle string
 }
@@ -42,12 +40,16 @@ const stepLabelWidth = 13
 func (u *installUI) OK(label, what string) { u.line(u.detail, u.p.OK("✓"), label, what) }
 
 // Summary keeps user-facing choices visible without exposing setup internals.
-func (u *installUI) Summary(label, what string) { u.line(u.out, u.p.OK("✓"), label, what) }
+func (u *installUI) Summary(label, what string) { u.keep(u.p.OK("✓"), label, what) }
 
 // Warn reports a step that needs the developer, whose fix is a next step.
 func (u *installUI) Warn(label, what string) {
 	u.warned = true
-	u.line(u.out, u.p.Warn("!"), label, what)
+	u.keep(u.p.Warn("!"), label, what)
+}
+
+func (u *installUI) keep(mark, label, what string) {
+	u.lines = append(u.lines, fmt.Sprintf("  %s %-*s %s", mark, stepLabelWidth, label, u.p.Commands(what)))
 }
 
 // Commit adds the step that commits paths, led by why.
@@ -69,7 +71,19 @@ func (u *installUI) Then(step string) {
 	}
 }
 
+// printLines prints the checklist so far.
+func (u *installUI) printLines() {
+	if len(u.lines) > 0 {
+		fmt.Fprintln(u.out)
+		for _, l := range u.lines {
+			fmt.Fprintln(u.out, l)
+		}
+	}
+	u.lines = nil
+}
+
 func (u *installUI) finish() {
+	u.printLines()
 	if u.warned {
 		fmt.Fprintf(u.out, "\n%s %s\n", u.p.Warn("!"), u.p.Bold(cmp.Or(u.warnTitle, u.title+" — the steps marked ! need you")))
 	} else {
@@ -79,105 +93,26 @@ func (u *installUI) finish() {
 		return
 	}
 	fmt.Fprintf(u.out, "\n%s\n", u.p.Bold("Next steps:"))
-	for i, step := range u.next {
+	for _, step := range u.next {
 		lines := strings.Split(u.p.Commands(step), "\n")
-		fmt.Fprintf(u.out, "  %s %s\n", u.p.Brand(fmt.Sprintf("%d.", i+1)), lines[0])
+		fmt.Fprintf(u.out, "  %s %s\n", u.p.Brand("•"), lines[0])
 		for _, l := range lines[1:] {
-			if l == "" {
-				fmt.Fprintln(u.out)
-				continue
-			}
-			fmt.Fprintf(u.out, "     %s\n", l)
+			fmt.Fprintf(u.out, "    %s\n", l)
 		}
 	}
 }
 
-func (u *installUI) verify(cmd *cobra.Command, runDoctor func(context.Context, bool, doctor.Progress) doctor.Report) {
-	fmt.Fprintf(u.detail, "\n%s\n", u.p.Bold("Verifying the chain (terma doctor):"))
-	sp := spinner.New(cmd.ErrOrStderr())
-	report := runDoctor(cmd.Context(), false, doctor.Progress{
-		Start: func(name string) {
-			if u.detail == io.Discard {
-				sp.Start("Verifying installation…")
-			} else {
-				sp.Start("Verifying: " + name + "…")
-			}
-		},
-		Note: func(note string) {
-			if u.detail != io.Discard {
-				sp.Update(note)
-			}
-		},
-		Done: func(c doctor.Check) {
-			sp.Stop()
-			doctor.RenderCheck(u.detail, c, doctor.NameWidth)
-		},
-	})
-	sp.Stop()
-	if notice := captureNotice(); notice != "" {
-		u.Then(notice)
-	}
-	u.verdict(report)
-}
-
-// verdict reports a doctor run as the Verified step, each problem's fix a next step.
-func (u *installUI) verdict(report doctor.Report) {
-	var fixes []string
-	skipped := false
-	for _, c := range report.Checks {
-		switch c.Status {
-		case doctor.Pass:
-		case doctor.Skip:
-			skipped = skipped || c.Key == doctor.KeyScratch || c.Key == doctor.KeyBackend || c.Key == doctor.KeyProject
-		default:
-			fix := c.Name + ": " + c.Detail
-			if c.Fix != "" {
-				fix = doctorFixStep(c.Fix)
-			}
-			if !slices.Contains(fixes, fix) {
-				fixes = append(fixes, fix)
-			}
-		}
-	}
-	switch {
-	case len(fixes) > 0:
-		u.Warn("Verified", fmt.Sprintf("terma doctor found %d thing(s) to fix", len(fixes)))
-		for _, f := range fixes {
-			u.Then(f)
-		}
-		u.Then("Run `terma doctor` for the full report.")
-	case skipped:
-		u.OK("Verified", "terma doctor: the checks that ran passed; some were skipped")
-	default:
-		u.OK("Verified", "terma doctor: all checks passed")
-	}
-}
-
-// doctorFixStep turns a doctor fix into a next step, quoting a leading terma command.
-func doctorFixStep(fix string) string {
-	if strings.HasPrefix(fix, "terma ") {
-		command, rest := fix, ""
-		if i := strings.IndexAny(fix, "(—;"); i > 0 {
-			command, rest = strings.TrimSpace(fix[:i]), " "+fix[i:]
-		}
-		return "Run `" + command + "`" + rest + "."
-	}
-	return strings.ToUpper(fix[:1]) + fix[1:]
-}
-
-// commitList is the next step naming the committed files to merge, each once, led by lead.
+// commitList is the next step that commits paths, led by lead; terma's own directory is
+// added whole.
 func commitList(p style.Palette, lead string, paths []string) string {
 	var unique []string
-	for _, p := range paths {
-		if !slices.Contains(unique, p) {
-			unique = append(unique, p)
+	for _, path := range paths {
+		if strings.HasPrefix(path, termaproject.Dir+"/") {
+			path = termaproject.Dir
+		}
+		if !slices.Contains(unique, path) {
+			unique = append(unique, path)
 		}
 	}
-	var b strings.Builder
-	b.WriteString(lead)
-	for _, p := range unique {
-		b.WriteString("\n  " + p)
-	}
-	b.WriteString("\n\n  " + p.Command("git add "+strings.Join(unique, " ")))
-	return b.String()
+	return lead + "\n  " + p.Command("git add "+strings.Join(unique, " "))
 }

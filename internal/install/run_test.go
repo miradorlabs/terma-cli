@@ -34,7 +34,6 @@ func workflow(log *[]string, pol config.Policy) Workflow {
 		},
 		FetchPolicy: func(context.Context, *config.Config) (config.Policy, error) { note("fetch"); return pol, nil },
 		ApplySteps:  func(*config.Config, Plan) Steps { note("apply"); return Steps{} },
-		Verify:      func() { note("verify") },
 	}
 }
 
@@ -56,7 +55,7 @@ func TestAnInstallWritesOnlyOnceAdmitted(t *testing.T) {
 	if _, err := Run(t.Context(), registry(), cfg, req, workflow(&log, admitting()), &report{}); err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"sign-in", "bind", "fetch", "apply", "verify"}; !slices.Equal(log, want) {
+	if want := []string{"sign-in", "bind", "fetch", "apply"}; !slices.Equal(log, want) {
 		t.Fatalf("steps = %v, want %v", log, want)
 	}
 	if f, err := termaproject.Load(req.Root); err != nil || f.Project.ID != "p1" {

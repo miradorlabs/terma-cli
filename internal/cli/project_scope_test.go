@@ -116,13 +116,13 @@ func TestInstallKeepsProjectChoiceInEachRepo(t *testing.T) {
 	t.Setenv("TERMA_API_KEY", "")
 	for i, repo := range repos {
 		t.Chdir(repo)
-		if out, err := runTerma(t, "install", "--harness", "none", "--team", ids[i], "--yes", "--no-doctor"); err != nil {
+		if out, err := runTerma(t, "install", "--harness", "none", "--team", ids[i], "--yes"); err != nil {
 			t.Fatalf("install repository %d: %v\n%s", i, err, out)
 		}
 	}
 	for i, repo := range repos {
 		t.Chdir(repo)
-		if out, err := runTerma(t, "install", "--harness", "none", "--yes", "--no-doctor"); err != nil {
+		if out, err := runTerma(t, "install", "--harness", "none", "--yes"); err != nil {
 			t.Fatalf("reinstall repository %d: %v\n%s", i, err, out)
 		}
 		bound, err := termaproject.Load(repo)

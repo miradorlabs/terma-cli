@@ -22,7 +22,7 @@ func piToolSandbox(tool string, args map[string]any) func(t *testing.T) *Sandbox
 	return func(t *testing.T) *Sandbox {
 		sb := New(t, Isolated)
 		sb.RelayAgents = []string{"pi"}
-		sb.terma(sb.Repo, "install", "--team", sb.ProjectID, "--harness", "none", "--yes", "--no-browser", "--no-doctor")
+		sb.terma(sb.Repo, "install", "--team", sb.ProjectID, "--harness", "none", "--yes", "--no-browser")
 		var calls atomic.Int32
 		provider := httptest.NewServer(openAIToolCallProvider(&calls, tool, args))
 		t.Cleanup(provider.Close)

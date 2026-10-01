@@ -112,7 +112,7 @@ func TestE2E_InstallLifecycle(t *testing.T) {
 	// --no-browser and the deadline guard against reaching auth.Login.
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	rerun := exec.CommandContext(ctx, bin, "install", "--harness", "none", "--yes", "--no-browser", "--no-doctor")
+	rerun := exec.CommandContext(ctx, bin, "install", "--harness", "none", "--yes", "--no-browser")
 	rerun.Dir, rerun.Env = repo, env
 	if out, err := rerun.CombinedOutput(); err != nil {
 		t.Fatalf("re-install of a bound repo must not need a sign-in: %v\n%s", err, out)

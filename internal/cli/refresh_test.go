@@ -37,7 +37,7 @@ func sandboxMachine(t *testing.T) {
 func TestRefreshUpdatesTheRepositoryFromItsBinding(t *testing.T) {
 	repo := installRepo(t)
 	sandboxMachine(t)
-	if out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude", "--yes", "--no-doctor"); err != nil {
+	if out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude", "--yes"); err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}
 	// What an earlier build wrote: its version in the binding…
@@ -86,7 +86,7 @@ func TestRefreshUpdatesTheRepositoryFromItsBinding(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if after.Install.Version != testApp.version || !strings.Contains(out, "git add .claude/settings.json "+termaproject.FileName) {
+	if after.Install.Version != testApp.version || !strings.Contains(out, "git add .claude/settings.json .terma") {
 		t.Fatalf("refresh should stamp terma_version %q and list the binding: %q\n%s", testApp.version, after.Install.Version, out)
 	}
 	after.Install.Version = bound.Install.Version
@@ -282,7 +282,7 @@ func tarGzWith(t *testing.T, name string, body []byte) []byte {
 func TestRefreshAfterUpgradeRunsOncePerRelease(t *testing.T) {
 	repo := installRepo(t)
 	sandboxMachine(t)
-	if out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude", "--yes", "--no-doctor"); err != nil {
+	if out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude", "--yes"); err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}
 	settings := filepath.Join(repo, ".claude", "settings.json")
@@ -321,7 +321,7 @@ func TestInstallRefreshesTheMachineOnANewRelease(t *testing.T) {
 	sandboxMachine(t)
 	install := func() string {
 		t.Helper()
-		out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude", "--yes", "--no-doctor", "--verbose")
+		out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude", "--yes", "--verbose")
 		if err != nil {
 			t.Fatalf("install: %v\n%s", err, out)
 		}
