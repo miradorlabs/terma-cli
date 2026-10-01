@@ -55,6 +55,8 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 		add("Capture", "paused on this machine — run `terma resume` to start it again")
 	case cfg.Policy.Validated() && cfg.Policy.Expired(time.Now()):
 		add("Capture", "off: the collection policy has not been refreshed for over a week — run `terma setup`")
+	case cfg.Policy.Validated():
+		add("Collecting", "%s", PolicySummary(cfg.Policy))
 	}
 	// Name the backend whenever it is not production, by environment or by host overrides.
 	switch {
@@ -278,4 +280,21 @@ func onOff(v bool) string {
 		return "on"
 	}
 	return "off"
+}
+
+// PolicySummary is what a collection policy collects, in one line.
+func PolicySummary(p config.Policy) string {
+	scope := "sessions in connected repositories"
+	if p.Global() {
+		scope = "every session on this machine"
+	}
+	switch {
+	case p.IncludePrompts && p.IncludeToolContent:
+		return scope + ", with prompts and tool content"
+	case p.IncludePrompts:
+		return scope + ", with prompts, without tool content"
+	case p.IncludeToolContent:
+		return scope + ", with tool content, without prompts"
+	}
+	return scope + ", without prompts or tool content"
 }

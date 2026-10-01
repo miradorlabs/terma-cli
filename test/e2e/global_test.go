@@ -57,7 +57,7 @@ func (sb *Sandbox) UseGlobalSetup(agents string) *Account {
 		t.Fatalf("setup did not enter global mode:\n%s", out)
 	}
 	// Setup ends with the machine's check-in, which the ingest received.
-	if !strings.Contains(out, "Check-in: this machine reported to your organization") {
+	if !strings.Contains(out, "this machine reported to your organization") {
 		t.Errorf("setup did not report its check-in:\n%s", out)
 	}
 	checkedIn := len(sb.Receiver.WaitLogs(time.Second, func(l LogRecord) bool { return l.Attrs["terma.heartbeat.reason"] == "setup" })) > 0

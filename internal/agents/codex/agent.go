@@ -160,7 +160,7 @@ func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
 
 // UserHooksTrustStep is how the developer trusts the machine-wide hooks.
 func (Agent) UserHooksTrustStep() string {
-	return "Codex runs its machine-wide hooks once you trust them: in Codex, open `/hooks` (Desktop: Settings → Hooks → Review) and approve Terma's. An organization that deploys them as managed configuration skips this step."
+	return "Approve Terma's hooks in Codex: run `/hooks` (in the desktop app: Settings → Hooks → Review)."
 }
 
 // NotifierInstalled reports whether terma's notifier is in Codex's config.

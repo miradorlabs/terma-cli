@@ -49,24 +49,23 @@ func relayServiceWanted(flag string) bool {
 func ensureRelay(ctx context.Context, flag string, report func(warn bool, what string)) {
 	if !relayServiceWanted(flag) {
 		if flag == "off" {
-			if removed, _ := daemon.RemoveService(ctx); removed {
-				report(false, "service removed; hooks start the relay on demand")
-			}
+			_, _ = daemon.RemoveService(ctx)
 		}
+		report(false, "starts when an agent needs it")
 		daemon.Spawn()
 		return
 	}
 	if _, ok := daemon.ServiceInstalled(); ok && flag != "on" {
 		// A service definition does not prove its relay is alive; the lock prevents duplicates.
+		report(false, "running in the background")
 		daemon.Spawn()
 		return
 	}
-	path, err := daemon.InstallService(ctx)
-	if err != nil {
-		report(true, "could not run as a service ("+err.Error()+"); hooks start it on demand")
+	if _, err := daemon.InstallService(ctx); err != nil {
+		report(true, "could not run in the background ("+err.Error()+"); it starts when an agent needs it")
 		daemon.Spawn()
 		return
 	}
-	report(false, "runs in the background ("+path+"); `terma setup --relay-service off` stops it")
+	report(false, "running in the background")
 	daemon.Spawn()
 }

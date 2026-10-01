@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/globalmode"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/setup"
@@ -32,6 +32,7 @@ type setupFlags struct {
 	// call terma at managedTerma.
 	managedConfig string
 	managedTerma  string
+	verbose       bool
 }
 
 // agentChoice is an onboarding surface: one repository adapter may be offered as several
@@ -72,6 +73,7 @@ hooks claim its sessions. ` + "`terma install`" + ` connects a repository from h
 	cmd.Flags().BoolVar(&f.noBrowser, "no-browser", false, "print the sign-in URL instead of opening a browser")
 	cmd.Flags().BoolVarP(&f.assumeYes, "yes", "y", false, "skip the browser prompt and picker; record every available installed agent")
 	cmd.Flags().StringVar(&f.relayService, "relay-service", "", "run the local relay as a background service: on or off (default: on, or your last choice)")
+	cmd.Flags().BoolVarP(&f.verbose, "verbose", "v", false, "show each step and what it wrote")
 	cmd.Flags().StringVar(&f.managedConfig, "managed-config", "", "write global mode's hooks as managed configuration into this directory, for your organization to deploy, and exit")
 	cmd.Flags().StringVar(&f.managedTerma, "managed-terma", "$HOME/.local/bin/terma", "with --managed-config: where terma is installed on the machines")
 	return cmd
@@ -106,50 +108,75 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 		return fmt.Errorf("--relay-service %q: want on or off", f.relayService)
 	}
 
-	var steps []string
+	ui := newInstallUI(out, f.verbose)
+	ui.title, ui.warnTitle = "Setup complete", "Almost done — finish the steps marked ! below"
 	recorded := false
+	team := ""
 	res, err := setup.Run(cmd.Context(), app.agents, cfg, setup.Steps{
 		SignIn: func(_ context.Context, cfg *config.Config) (*config.Config, error) {
-			return app.signInAndReload(cmd, cfg, signInOptions{noBrowser: f.noBrowser, pauseBeforeBrowser: !f.assumeYes})
+			cfg, err := app.signInAndReload(cmd, cfg, signInOptions{noBrowser: f.noBrowser, pauseBeforeBrowser: !f.assumeYes})
+			if err == nil {
+				fmt.Fprintln(out)
+				ui.Summary("Signed in", signedInAs(cfg))
+			}
+			return cfg, err
 		},
 		// A machine-level preference, not a connection.
 		ChooseAgents: func(_ context.Context, cfg *config.Config) ([]string, error) {
-			fmt.Fprintln(out)
 			return app.chooseHarnesses(cmd, cfg, f)
 		},
 		Recorded: func(names []string) {
 			recorded = true
 			if len(names) == 0 {
-				fmt.Fprintln(out, "\nNo agents recorded. `terma install` will ask you to pick some in each repository.")
+				ui.Warn("Agents", "none chosen")
+				ui.Then("Run `terma install` in a repository; it asks which agents to connect.")
 			} else {
-				fmt.Fprintf(out, "\nAgents recorded: %s.\n", joinNames(app.adapterDisplayNames(names)))
+				ui.Summary("Agents", joinNames(app.adapterDisplayNames(names)))
 			}
 		},
-		SelectTeam:  func(_ context.Context, cfg *config.Config) error { return app.selectPolicyTeam(cmd, cfg) },
+		SelectTeam: func(_ context.Context, cfg *config.Config) error {
+			name, err := app.selectPolicyTeam(cmd, cfg)
+			team = name
+			return err
+		},
 		FetchPolicy: app.policies().Fetch,
 		StopRelay: func() {
 			if dir, err := daemon.Dir(); err == nil {
 				daemon.Stop(dir)
 			}
 		},
-		Fetched: func(pol config.Policy) { fmt.Fprintln(out, "Collection policy: "+policySummary(pol)+".") },
+		Fetched: func(pol config.Policy) {
+			if team != "" {
+				ui.Summary("Team", team)
+			}
+			ui.Summary("Collects", doctor.PolicySummary(pol))
+		},
 		ConnectRelay: func(ctx context.Context, names []string) error {
 			return app.connectMachineRelay(ctx, names, f.relayService, relayReport{
-				ok:     func(label, what string) { fmt.Fprintf(out, "  %s: %s\n", label, what) },
-				warn:   func(label, what string) { fmt.Fprintf(out, "  %s (needs you): %s\n", label, what) },
-				then:   func(step string) { steps = append(steps, step) },
-				detail: io.Discard,
+				ok: func(label, what string) {
+					if label == "Relay" {
+						ui.Summary(label, what)
+					} else {
+						ui.OK(label, what)
+					}
+				},
+				warn: func(label, what string) {
+					ui.Warn(label, what)
+					ui.Then("Run `terma doctor` to see what is wrong and how to fix it.")
+				},
+				then:   ui.Then,
+				detail: ui.Detail(),
 			})
 		},
 		ApplyMode: func(ctx context.Context, names []string, global bool) error {
-			return app.globalMode().Apply(ctx, names, global, func(what string) { fmt.Fprintln(out, "  "+what) },
-				func(step string) { steps = append(steps, step) })
+			return app.globalMode().Apply(ctx, names, global, func(what string) { ui.OK("Machine", what) }, ui.Then)
 		},
 		CheckIn: func(ctx context.Context) {
 			if ok, what := daemon.CheckIn(ctx); ok {
-				fmt.Fprintln(out, "  Check-in: "+what)
+				ui.Summary("Check-in", what)
 			} else {
-				fmt.Fprintln(out, "  Check-in (needs you): "+what)
+				ui.Warn("Check-in", what)
+				ui.Then("Run `terma doctor` to see why this machine could not report to your organization.")
 			}
 		},
 	})
@@ -166,45 +193,52 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 	if err != nil {
 		return err
 	}
-	names, pol := res.Agents, res.Policy
-	for i, step := range steps {
-		fmt.Fprintf(out, "%d. %s\n", i+1, step)
-	}
-
-	if !pol.Global() {
-		for _, n := range names {
+	if !res.Policy.Global() {
+		for _, n := range res.Agents {
 			if s, _, ok := app.agents.Surface(n); ok {
 				for _, step := range s.SetupSteps {
-					fmt.Fprintln(out, step)
+					ui.Then(step)
 				}
 			}
 		}
+		ui.Then("Run `terma install` in each repository you want to connect.")
 	}
-	if pol.Global() {
-		fmt.Fprintf(out, "\n%s Every session and commit on this machine reports to your organization.\n", style.For(out).Bold("Done!"))
-		return nil
+	if res.Policy.Global() {
+		ui.title = "Setup complete — every session and commit on this machine reports to " + cmp.Or(team, "your organization")
 	}
-	fmt.Fprintf(out, "\n%s Repositories connected in Terma report on their own; run `terma install` to connect one from here.\n",
-		style.For(out).Bold("Done!"))
+	ui.Then("Run `terma status` any time to see what terma is collecting.")
+	ui.finish()
 	return nil
 }
 
-// selectPolicyTeam picks the team whose policy is set up; it never creates a telemetry key.
-func (app *App) selectPolicyTeam(cmd *cobra.Command, cfg *config.Config) error {
-	if config.PolicyStub() != "" {
-		return nil
+// signedInAs is who the sign-in left this profile as: the email and organization.
+func signedInAs(cfg *config.Config) string {
+	who := "signed in"
+	if cred, err := auth.LoadCredential(cfg.ProfileName); err == nil && cred.UserEmail != "" {
+		who = cred.UserEmail
 	}
-	if cfg.ProjectID == "" && cfg.Policy.TeamID != "" {
+	if org := cmp.Or(cfg.OrganizationName, cfg.OrganizationID); org != "" {
+		who += " (" + org + ")"
+	}
+	return who
+}
+
+// selectPolicyTeam picks the team whose policy is set up, and returns its name; it never
+// creates a telemetry key.
+func (app *App) selectPolicyTeam(cmd *cobra.Command, cfg *config.Config) (string, error) {
+	if config.PolicyStub() != "" {
+		return "", nil
+	}
+	if cfg.ProjectID == "" {
 		cfg.ProjectID = cfg.Policy.TeamID
-		return nil
 	}
 	client, err := app.newClient(cfg)
 	if err != nil {
-		return err
+		return "", err
 	}
 	projects, err := availableProjects(cmd.Context(), client)
 	if err != nil {
-		return err
+		return "", err
 	}
 	var team *project
 	if cfg.ProjectID != "" {
@@ -213,26 +247,10 @@ func (app *App) selectPolicyTeam(cmd *cobra.Command, cfg *config.Config) error {
 		team, err = soleOrPick(cmd, projects, "")
 	}
 	if err != nil {
-		return err
+		return "", err
 	}
 	cfg.ProjectID = team.ID
-	return nil
-}
-
-func policySummary(p config.Policy) string {
-	scope := "sessions in connected repositories"
-	if p.Global() {
-		scope = "every session on this machine"
-	}
-	switch {
-	case p.IncludePrompts && p.IncludeToolContent:
-		return scope + ", with prompts and tool content"
-	case p.IncludePrompts:
-		return scope + ", with prompts, without tool content"
-	case p.IncludeToolContent:
-		return scope + ", with tool content, without prompts"
-	}
-	return scope + ", without prompts or tool content"
+	return cmp.Or(team.Name, team.ID), nil
 }
 
 // chooseHarnesses resolves the machine-level agent list: --harness, else a picker,
@@ -253,6 +271,7 @@ func (app *App) chooseHarnesses(cmd *cobra.Command, cfg *config.Config, f setupF
 		return app.selectedInRegistryOrder(preselect), nil
 	}
 
+	fmt.Fprintln(cmd.OutOrStdout())
 	form := app.harnessSelectionForm(ctx, preselect)
 	result, err := prompt.Run(form)
 	if errors.Is(err, prompt.ErrCancelled) {

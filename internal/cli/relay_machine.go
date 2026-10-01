@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"fmt"
 	"io"
 
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
@@ -33,10 +32,8 @@ func (app *App) connectMachineRelay(ctx context.Context, agents []string, relayS
 		return err
 	}
 	addr := daemon.Addr(dir)
-	fmt.Fprintln(r.detail, "\nPointing agents at the local relay on "+addr+":")
 	err = app.pointAgentsAtRelay(ctx, targets, addr, token, func(agent, detail string) {
-		fmt.Fprintf(r.detail, "  %s%s\n", agent, detail)
-		r.ok(agent, "exports through the local relay; only opted-in sessions leave")
+		r.ok(agent, "sends to the local relay"+detail)
 	}, r.then)
 	if err != nil {
 		return err

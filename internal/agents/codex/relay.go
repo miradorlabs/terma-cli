@@ -22,13 +22,22 @@ const (
 // ConfigureRelay points Codex's exporter at the local relay, noting a daemon that keeps
 // exporting where it did until restarted.
 func (a Agent) ConfigureRelay(_ context.Context, cfg agents.RelayConfig) (agents.RelayResult, error) {
+	already := relayexport.NativePointed(exporter{}, strings.TrimPrefix(cfg.Endpoint, "http://"))
 	result, err := relayexport.Native(exporter{}, cfg)
 	if err != nil {
 		return result, err
 	}
 	_ = config.WriteFileAtomic(filepath.Join(cfg.StateDir, setupFile), []byte(time.Now().UTC().Format(time.RFC3339Nano)+"\n"), 0o600)
-	if d, ok := daemonPredates(cfg.StateDir); ok {
-		result.Notes = append(result.Notes, fmt.Sprintf("Codex's background server (pid %d) reads its exporter only when it starts, so its threads — Codex Desktop's, and the TUI's since 0.157 — still export where they did: %s.", d.PID, daemonRestart))
+	// The background server and the desktop app's own server read the exporter only at start.
+	_, daemon := daemonPredates(cfg.StateDir)
+	app := !already && desktopInstalled(context.Background())
+	switch {
+	case daemon && app:
+		result.Notes = append(result.Notes, "Restart Codex so it starts sending to Terma: quit and reopen the desktop app, and run `codex app-server daemon restart` (running work may be interrupted).")
+	case daemon:
+		result.Notes = append(result.Notes, "Restart Codex's background server so it starts sending to Terma: `codex app-server daemon restart` (running work may be interrupted).")
+	case app:
+		result.Notes = append(result.Notes, "Quit and reopen the Codex desktop app so it starts sending to Terma.")
 	}
 	return result, nil
 }

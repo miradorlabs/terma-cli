@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"io"
@@ -23,6 +24,8 @@ type installUI struct {
 	p      style.Palette
 	warned bool
 	next   []string
+	// title closes a run that needs nothing more; warnTitle, when set, one that does.
+	title, warnTitle string
 }
 
 func newInstallUI(out io.Writer, verbose bool) *installUI {
@@ -30,7 +33,7 @@ func newInstallUI(out io.Writer, verbose bool) *installUI {
 	if verbose {
 		detail = out
 	}
-	return &installUI{out: out, detail: detail, p: style.For(out)}
+	return &installUI{out: out, detail: detail, p: style.For(out), title: "terma installed"}
 }
 
 const stepLabelWidth = 13
@@ -68,9 +71,9 @@ func (u *installUI) Then(step string) {
 
 func (u *installUI) finish() {
 	if u.warned {
-		fmt.Fprintf(u.out, "\n%s %s\n", u.p.Warn("!"), u.p.Bold("terma installed — the steps marked ! need you"))
+		fmt.Fprintf(u.out, "\n%s %s\n", u.p.Warn("!"), u.p.Bold(cmp.Or(u.warnTitle, u.title+" — the steps marked ! need you")))
 	} else {
-		fmt.Fprintf(u.out, "\n%s %s\n", u.p.OK("✓"), u.p.Bold("terma installed"))
+		fmt.Fprintf(u.out, "\n%s %s\n", u.p.OK("✓"), u.p.Bold(u.title))
 	}
 	if len(u.next) == 0 {
 		return
