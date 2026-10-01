@@ -69,6 +69,16 @@ a desktop app chosen apart), the relay exporter, the status line, and the notifi
 implements (`var _ agents.X = Agent{}`), so a method that drifts fails the build instead
 of silently switching off.
 
+`agents.Agent` is the one plugin contract. `harness.Harness` is not a second hierarchy
+beside it. It is the interface of the exporter-configuration kit (`internal/harness`):
+connect, status, scope, the ownership journal and the settings writes. An agent whose
+own settings file holds an OTLP exporter uses that kit and hands its `Harness` over
+through the `agents.Exporting` capability. Nothing registers a harness, and nothing
+reaches one except through its agent. The registry's harness lookups (`Harnesses`,
+`Harness(name)`) are `With[agents.Exporting]` underneath. Agents without such an
+exporter, such as Pi or Gemini through the relay or Cursor with hooks only, have no
+harness at all.
+
 Adding an agent means adding one package, plus one line in `builtin`.
 `internal/contract` keeps byte snapshots of every file terma writes for an agent:
 committed hooks, machine-wide hooks, managed configuration and relay exporter settings.
