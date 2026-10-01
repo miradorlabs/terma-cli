@@ -39,7 +39,7 @@ func (app *App) newSpoolFlushCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "flush",
 		Short: "Deliver queued events to Terma now",
-		Long: `Deliver everything queued, one request per project.
+		Long: `Deliver everything queued, one request per team.
 
 The exit status distinguishes the outcomes a script needs apart:
 

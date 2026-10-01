@@ -49,7 +49,6 @@ var mayNameAgents = map[string]string{
 // global are the files that name agents by rule rather than by leak, each with the rule.
 var global = map[string]string{
 	"internal/ui/style/style.go": "the environment variables coding agents set, terma's or not, to tell a model from a person",
-	"internal/account/api/ai.go": "the gateway's pagination cursor",
 }
 
 type pkg struct {
