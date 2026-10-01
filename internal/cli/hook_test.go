@@ -83,5 +83,4 @@ func TestHookKillSwitch(t *testing.T) {
 	if got := stamp(); !strings.Contains(got, "Agent-Session-Id: sess-kill-switch") {
 		t.Fatalf("not stamped with the switch off:\n%s", got)
 	}
-
 }
