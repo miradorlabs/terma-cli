@@ -5,6 +5,7 @@ package install
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -12,9 +13,11 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
@@ -30,25 +33,82 @@ type Plan struct {
 	Hooks              HookPlan
 	NoHooks            bool
 	Binding            Binding
+	// Prompts and ToolContent are what the developer's agents send for the project, and
+	// Record the routing record they were resolved from, nil when there is none.
+	Prompts, ToolContent bool
+	Record               *routing.Record
+	// admitted is the organization's policy the plan was admitted under; Apply needs one.
+	admitted *config.Policy
 }
 
-// Build plans an install of the selected agents into the workspace at root.
-func Build(reg *agents.Registry, root, gitDir string, existing *termaproject.File, selected, adapters []string, noHooks bool, b Binding) (Plan, error) {
-	p := Plan{Agents: reg, Root: root, GitDir: gitDir, Existing: existing, Selected: selected, NoHooks: noHooks, Binding: b}
+// Input is what an install plans from.
+type Input struct {
+	Root, GitDir string
+	// Existing is nil for a first install.
+	Existing *termaproject.File
+	// Selected are the developer's agents; Adapters, when given, names the wired agents outright.
+	Selected, Adapters []string
+	NoHooks            bool
+	Binding            Binding
+	// Prompts and ToolContent are explicit choices, nil to keep the project's last.
+	Prompts, ToolContent *bool
+	// Policy is the organization's validated policy, which admits the install; nil plans
+	// a dry run that cannot be applied.
+	Policy *config.Policy
+}
+
+// Build plans an install into the workspace at in.Root.
+func Build(reg *agents.Registry, in Input) (Plan, error) {
+	p := Plan{Agents: reg, Root: in.Root, GitDir: in.GitDir, Existing: in.Existing, Selected: in.Selected, NoHooks: in.NoHooks, Binding: in.Binding}
+	if in.Policy != nil {
+		if err := Admit(*in.Policy, in.Existing, in.Binding); err != nil {
+			return Plan{}, err
+		}
+		p.admitted = in.Policy
+	}
+	// A record that exists and cannot be read is not "no choice": rewriting it from
+	// defaults would switch content its developer turned off back on.
+	if in.Binding.ID != "" {
+		rec, ok, err := routing.LoadRecord(in.Binding.ID)
+		if err != nil {
+			return Plan{}, fmt.Errorf("read the routing record for %s: %w", in.Binding.ID, err)
+		}
+		if ok {
+			p.Record = &rec
+		}
+	}
+	p.Prompts, p.ToolContent = true, true
+	if p.Record != nil {
+		p.Prompts, p.ToolContent = p.Record.IncludePrompts, p.Record.IncludeToolContent
+	}
+	if in.Prompts != nil {
+		p.Prompts = *in.Prompts
+	}
+	if in.ToolContent != nil {
+		p.ToolContent = *in.ToolContent
+	}
 	// The wired adapters are a team decision: a colleague's re-install keeps them all.
-	p.Adapters = Adapters(reg, root, selected, adapters)
-	if err := CheckHookNeeds(reg, selected, p.Adapters); err != nil {
+	p.Adapters = Adapters(reg, in.Root, in.Selected, in.Adapters)
+	if err := CheckHookNeeds(reg, in.Selected, p.Adapters); err != nil {
 		return Plan{}, err
 	}
-	if gitDir != "" {
-		p.Detection = hookmgr.Detect(root)
+	if in.GitDir != "" {
+		p.Detection = hookmgr.Detect(in.Root)
 	}
-	if noHooks {
-		return p, CheckHooksApplied(reg, root, selected, "run `terma install` without --no-hooks")
+	if in.NoHooks {
+		return p, CheckHooksApplied(reg, in.Root, in.Selected, "run `terma install` without --no-hooks")
 	}
 	var err error
-	p.Hooks, err = PlanHooks(reg, root, p.Detection, p.Adapters)
+	p.Hooks, err = PlanHooks(reg, in.Root, p.Detection, p.Adapters)
 	return p, err
+}
+
+// Admit refuses a new binding the organization's policy keeps for its admins.
+func Admit(pol config.Policy, existing *termaproject.File, b Binding) error {
+	if !pol.Global() && !pol.MembersCanAddRepositories && (existing == nil || existing.Project.ID != b.ID) {
+		return errors.New("your organization's policy does not allow members to add repositories; connect this repository in Terma first")
+	}
+	return nil
 }
 
 // PrintDryRun says what an install would do.
@@ -108,6 +168,9 @@ type Options struct {
 
 // Apply carries out the plan.
 func Apply(ctx context.Context, p Plan, o Options, s Steps, r Reporter) error {
+	if p.admitted == nil {
+		return errors.New("install: a plan is applied only once the organization's policy admits it")
+	}
 	reg := p.Agents
 	// Reserve the private store now, so hooks before and after a later git init choose the same one.
 	if p.GitDir == "" {

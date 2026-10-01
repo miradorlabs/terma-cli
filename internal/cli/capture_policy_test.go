@@ -313,7 +313,11 @@ func TestReinstallKeepsSignalChoiceUnlessExplicit(t *testing.T) {
 			}
 			f.signals = "none"
 		}
-		if err := testApp.connectHarnessesForRepo(cmd, ui, cfg, []string{"codex"}, f); err != nil {
+		prev, _, err := routing.LoadRecord("team")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := testApp.connectHarnessesForRepo(cmd, ui, cfg, []string{"codex"}, f, &prev); err != nil {
 			t.Fatal(err)
 		}
 		r, _, err := routing.LoadRecord("team")

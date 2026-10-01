@@ -3,16 +3,20 @@ package install
 import (
 	"context"
 	"io"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
 type report struct {
@@ -28,7 +32,8 @@ func (r *report) Detail() io.Writer               { return io.Discard }
 
 func plan(t *testing.T, root string, existing *termaproject.File) Plan {
 	t.Helper()
-	p, err := Build(builtin.Agents(), root, root+"/.git", existing, nil, []string{"claude"}, false, Binding{ID: "proj_1", Name: "One"})
+	p, err := Build(builtin.Agents(), Input{Root: root, GitDir: root + "/.git", Existing: existing, Adapters: []string{"claude"},
+		Binding: Binding{ID: "proj_1", Name: "One"}, Policy: &config.Policy{Mode: config.ModeRepo, MembersCanAddRepositories: true}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,5 +106,66 @@ func TestApplyThatWritesNothingKeepsTheBinding(t *testing.T) {
 	}
 	if again.Install.Version != "v1" || !again.Install.InstalledAt.Equal(first) || r.commit != nil {
 		t.Fatalf("an install that wrote nothing churned the binding: %+v, commit %v", again.Install, r.commit)
+	}
+}
+
+// A plan built without a policy, as a dry run is, cannot be applied.
+func TestApplyNeedsAnAdmittedPlan(t *testing.T) {
+	root := hookruntest.InitRepo(t)
+	p, err := Build(builtin.Agents(), Input{Root: root, GitDir: root + "/.git", Adapters: []string{"claude"}, Binding: Binding{ID: "proj_1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Apply(context.Background(), p, Options{AssumeYes: true}, Steps{}, &report{}); err == nil {
+		t.Fatal("an unadmitted plan was applied")
+	}
+	if _, err := termaproject.Load(root); err == nil {
+		t.Fatal("the refused plan wrote a binding")
+	}
+}
+
+// A new binding is refused where the organization keeps adding repositories for its
+// admins; a repository already bound to the project is not new.
+func TestAdmitKeepsNewRepositoriesForAdmins(t *testing.T) {
+	closed := config.Policy{Mode: config.ModeRepo}
+	b := Binding{ID: "proj_1"}
+	if err := Admit(closed, nil, b); err == nil {
+		t.Fatal("a new repository was admitted")
+	}
+	if err := Admit(closed, &termaproject.File{Project: termaproject.Project{ID: "proj_1"}}, b); err != nil {
+		t.Fatalf("a bound repository was refused: %v", err)
+	}
+	if err := Admit(config.Policy{Mode: config.ModeGlobal}, nil, b); err != nil {
+		t.Fatalf("global mode refused: %v", err)
+	}
+}
+
+// The project's last choice stands unless the developer makes one, and a record that
+// cannot be read stops the plan rather than being rewritten from defaults.
+func TestBuildResolvesContentFromTheRoutingRecord(t *testing.T) {
+	root := hookruntest.InitRepo(t)
+	in := Input{Root: root, GitDir: root + "/.git", Adapters: []string{"claude"}, Binding: Binding{ID: "proj_1"}}
+	if p, err := Build(builtin.Agents(), in); err != nil || !p.Prompts || !p.ToolContent || p.Record != nil {
+		t.Fatalf("no record: %+v, %v", p, err)
+	}
+	if err := routing.SaveRecord(routing.Record{ProjectID: "proj_1", IncludePrompts: false, IncludeToolContent: true, Harnesses: []string{"claude"}}); err != nil {
+		t.Fatal(err)
+	}
+	if p, err := Build(builtin.Agents(), in); err != nil || p.Prompts || !p.ToolContent || p.Record == nil {
+		t.Fatalf("the record's prompts-off did not stand: %+v, %v", p, err)
+	}
+	in.Prompts = new(true)
+	if p, err := Build(builtin.Agents(), in); err != nil || !p.Prompts {
+		t.Fatalf("an explicit choice did not win: %+v, %v", p, err)
+	}
+	dir, err := config.Dir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "routing", "proj_1.json"), []byte("{torn"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Build(builtin.Agents(), in); err == nil {
+		t.Fatal("an unreadable routing record was planned over")
 	}
 }

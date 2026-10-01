@@ -162,6 +162,16 @@ func (app *App) runInstall(cmd *cobra.Command, f installFlags) error {
 	if err := install.CheckSignalNeeds(app.agents, agents, f.signals); err != nil {
 		return err
 	}
+	// Flags that disagree are refused before anything signs in or prints.
+	prompts, toolContent, err := contentChoices(cmd, f)
+	if err != nil {
+		return err
+	}
+	switch f.relayService {
+	case "", "on", "off":
+	default:
+		return fmt.Errorf("--relay-service %q: want on or off", f.relayService)
+	}
 
 	// Every real install reads the team's policy, even hooks-only; only an offline policy
 	// fixture skips that login. A --dry-run never signs in.
@@ -186,19 +196,27 @@ func (app *App) runInstall(cmd *cobra.Command, f installFlags) error {
 		b = install.Binding{}
 	}
 	cfg.ProjectID, cfg.ProjectName, cfg.OrganizationID = b.ID, b.Name, b.OrganizationID
+	var admitting *config.Policy
 	if !f.dryRun {
 		pol, err := app.fetchPolicy(ctx, cfg)
 		if err != nil {
 			return err
 		}
-		if !pol.Global() && !pol.MembersCanAddRepositories && (existing == nil || existing.Project.ID != b.ID) {
-			return errors.New("your organization's policy does not allow members to add repositories; connect this repository in Terma first")
+		if err := install.Admit(pol, existing, b); err != nil {
+			return err
 		}
 		if err := saveCollectionPolicy(cfg, &pol); err != nil {
 			return err
 		}
-		cfg.Policy = pol
+		cfg.Policy, admitting = pol, &pol
 	}
+	// Built once, so a dry run prints exactly the plan an install applies.
+	plan, err := install.Build(app.agents, install.Input{Root: root, GitDir: gitDir, Existing: existing, Selected: agents,
+		Adapters: splitCommas(f.adapters), NoHooks: f.noHooks, Binding: b, Prompts: prompts, ToolContent: toolContent, Policy: admitting})
+	if err != nil {
+		return err
+	}
+	f.excludePrompts, f.excludeToolContent = !plan.Prompts, !plan.ToolContent
 
 	if gitDir == "" {
 		ui.Warn("Git hooks", "skipped — not a Git repository, so commits are not stamped")
@@ -213,33 +231,15 @@ func (app *App) runInstall(cmd *cobra.Command, f installFlags) error {
 		ui.summary("Project", cmp.Or(b.Name, b.ID)+env)
 	}
 
-	switch f.relayService {
-	case "", "on", "off":
-	default:
-		return fmt.Errorf("--relay-service %q: want on or off", f.relayService)
-	}
-
-	// Settled once the project is known, so the last choice for it stands; nothing asks,
-	// so the line names the command that changes it.
-	include, err := resolvePrompts(cmd, cfg.ProjectID, f)
-	if err != nil {
-		return err
-	}
-	f.excludePrompts = !include
-	f.excludeToolContent = !resolveToolContent(cmd, cfg.ProjectID, f)
+	// Nothing asks, so the line names the command that changes it.
 	if len(app.agents.RelayTargets(agents)) > 0 {
-		if include {
+		if plan.Prompts {
 			ui.summary("Prompts", "prompt text and model responses are sent — `terma install --prompts off` stops them")
 		} else {
 			ui.summary("Prompts", "prompt text and model responses are not sent — `terma install --prompts on` sends them")
 		}
 	}
 
-	// Built once, so a dry run prints exactly the plan an install applies.
-	plan, err := install.Build(app.agents, root, gitDir, existing, agents, splitCommas(f.adapters), f.noHooks, b)
-	if err != nil {
-		return err
-	}
 	if f.dryRun {
 		return plan.PrintDryRun(out, needsAuth)
 	}
@@ -252,7 +252,7 @@ func (app *App) runInstall(cmd *cobra.Command, f installFlags) error {
 			return err == nil && yes, nil
 		},
 		// The per-developer half: home-directory state, no committed file.
-		Connect: func(context.Context) error { return app.connectHarnessesForRepo(cmd, ui, cfg, agents, f) },
+		Connect: func(context.Context) error { return app.connectHarnessesForRepo(cmd, ui, cfg, agents, f, plan.Record) },
 		SpoolKey: func(ctx context.Context) (string, string) {
 			sp := spinner.New(cmd.ErrOrStderr())
 			sp.Start("Preparing hook event delivery…")
@@ -299,40 +299,29 @@ func (app *App) runInstall(cmd *cobra.Command, f installFlags) error {
 	return nil
 }
 
-// resolveToolContent keeps the project's last choice unless the flag is given.
-func resolveToolContent(cmd *cobra.Command, projectID string, f installFlags) bool {
-	if cmd.Flags().Changed("exclude-tool-content") {
-		return !f.excludeToolContent
-	}
-	if rec, ok, err := routing.LoadRecord(projectID); err == nil && ok {
-		return rec.IncludeToolContent
-	}
-	return true
-}
-
-// resolvePrompts never asks: the flag, else the project's last choice, else on.
-func resolvePrompts(cmd *cobra.Command, projectID string, f installFlags) (bool, error) {
-	explicit := strings.ToLower(strings.TrimSpace(f.prompts))
+// contentChoices are the explicit --prompts / --exclude-prompts and
+// --exclude-tool-content choices, nil where the developer made none.
+func contentChoices(cmd *cobra.Command, f installFlags) (prompts, toolContent *bool, err error) {
 	excluded := cmd.Flags().Changed("exclude-prompts") && f.excludePrompts
-	switch explicit {
+	switch strings.ToLower(strings.TrimSpace(f.prompts)) {
 	case "on":
 		if excluded {
-			return false, errors.New("--prompts on and --exclude-prompts disagree; pass one")
+			return nil, nil, errors.New("--prompts on and --exclude-prompts disagree; pass one")
 		}
-		return true, nil
+		prompts = new(true)
 	case "off":
-		return false, nil
+		prompts = new(false)
 	case "":
+		if excluded {
+			prompts = new(false)
+		}
 	default:
-		return false, fmt.Errorf("--prompts %q: want on or off", f.prompts)
+		return nil, nil, fmt.Errorf("--prompts %q: want on or off", f.prompts)
 	}
-	if excluded {
-		return false, nil
+	if cmd.Flags().Changed("exclude-tool-content") {
+		toolContent = new(!f.excludeToolContent)
 	}
-	if rec, ok, err := routing.LoadRecord(projectID); err == nil && ok && projectID != "" {
-		return rec.IncludePrompts, nil
-	}
-	return true, nil
+	return prompts, toolContent, nil
 }
 
 // installNeedsAuth includes minting the spool key, which hooks-only agents get from
@@ -437,7 +426,7 @@ func (app *App) resolveInstallHarnesses(cmd *cobra.Command, cfg *config.Config, 
 
 // connectHarnessesForRepo writes no committed file: keys, the routing record and the
 // relay are home-directory state (docs/RELAY.md).
-func (app *App) connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *config.Config, agents []string, f installFlags) error {
+func (app *App) connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *config.Config, agents []string, f installFlags, prev *routing.Record) error {
 	ctx := cmd.Context()
 	signals, err := harness.ParseSignals(f.signals)
 	if err != nil {
@@ -456,12 +445,8 @@ func (app *App) connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *
 		Harnesses:          targets,
 		Surfaces:           install.RoutedSurfaces(app.agents, agents, targets),
 	}
-	if !cmd.Flags().Changed("signals") {
-		if prev, ok, err := routing.LoadRecord(cfg.ProjectID); err != nil {
-			return err
-		} else if ok {
-			rec.Signals = prev.Signals
-		}
+	if !cmd.Flags().Changed("signals") && prev != nil {
+		rec.Signals = prev.Signals
 	}
 	sp := spinner.New(cmd.ErrOrStderr())
 	defer sp.Stop()
