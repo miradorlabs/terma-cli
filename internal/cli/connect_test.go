@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/miradorlabs/terma-cli/internal/connect"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
@@ -316,7 +317,7 @@ func TestTelemetryCodexProfileOverridesAreReportedNotBlocking(t *testing.T) {
 // A conflict key reaching the terminal is stripped of control characters.
 func TestPrintConflictsSanitizesEveryField(t *testing.T) {
 	var out bytes.Buffer
-	printConflicts(&out, []harness.Conflict{{
+	connect.PrintConflicts(&out, []harness.Conflict{{
 		Key:    "evil\x1b[31m.config.toml:otel.exporter",
 		Value:  "https://x\x1b[0m",
 		Reason: "because\x07",

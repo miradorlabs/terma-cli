@@ -6,14 +6,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/connect"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 	"github.com/miradorlabs/terma-cli/internal/ui/prompt"
@@ -64,9 +65,9 @@ func askConnectOptions(f connectFlags, hs []harness.Harness, ask connectForm) (c
 	form := &prompt.Form{Title: fmt.Sprintf("What should %s send to Terma?", joinNames(names))}
 	for i, s := range harness.AllSignals {
 		item := prompt.Item{
-			Label:    signalLabel(s),
+			Label:    connect.SignalLabel(s),
 			Detail:   signalDetails[s],
-			Selected: containsSignal(signals, s),
+			Selected: slices.Contains(signals, s),
 		}
 		if i == 0 {
 			item.Heading = "Data"
@@ -164,8 +165,8 @@ func (app *App) localHarness(ctx context.Context, h harness.Harness) (harness.Ha
 	return scoped.Local(root), nil
 }
 
-// runLocalConnect writes only what a repository ships, never where or with which key, so
-// it needs no project, sign-in or network and the file stays safe to commit.
+// runLocalConnect needs no project, sign-in or network: a repository's settings carry
+// only what to ship.
 func (app *App) runLocalConnect(cmd *cobra.Command, name string, f connectFlags) error {
 	global, err := app.agents.Harness(name)
 	if err != nil {
@@ -183,114 +184,14 @@ func (app *App) runLocalConnect(cmd *cobra.Command, name string, f connectFlags)
 		return err
 	}
 	ctx := cmd.Context()
-	out := cmd.OutOrStdout()
 	h, err := app.localHarness(ctx, global)
 	if err != nil {
 		return err
 	}
 	root, _ := localRoot(ctx)
-	configPath, err := h.ConfigPath()
-	if err != nil {
-		return err
-	}
-
-	intended := harness.Exporter{
-		// Carried, never written: an outranking per-signal redirect is judged against it.
-		Endpoint:           cfg.OTLPURL,
-		Signals:            signals,
-		IncludePrompts:     !f.excludePrompts,
-		IncludeToolContent: !f.excludeToolContent,
-	}
-	conflicts, err := h.ConflictsWith(intended)
-	if err != nil {
-		return err
-	}
-
-	printLocalConnectPlan(out, global, global.Detect(ctx), cfg, root, configPath, intended)
-	printConflicts(out, conflicts, f.force)
-	conflicts, _ = partitionConflicts(conflicts)
-	if blocking := unclearable(conflicts); len(blocking) > 0 {
-		return fmt.Errorf(
-			"%s has settings Terma does not change: %s — remove or adjust them, then retry",
-			global.DisplayName(), output.SanitizeTerminal(strings.Join(blocking, ", ")))
-	}
-	if len(conflicts) > 0 && !f.force {
-		return fmt.Errorf(
-			"%s already has OTLP settings in this repository that would override this connect — remove them, or pass --force to have Terma remove them",
-			global.DisplayName())
-	}
-
-	if !f.assumeYes {
-		ok, err := confirm(cmd, fmt.Sprintf("Write this repository's telemetry settings for %s?", global.DisplayName()))
-		if err != nil {
-			return err
-		}
-		if !ok {
-			fmt.Fprintln(out, "Cancelled. Nothing was written.")
-			return nil
-		}
-	}
-
-	if err := h.Connect(intended, f.force); err != nil {
-		return err
-	}
-	fmt.Fprintf(out, "\nWritten %s.\n", configPath)
-	fmt.Fprintf(out, "Commit it so every session in this repository ships the same data. Restart %s for it to take effect.\n", global.DisplayName())
-	return nil
-}
-
-// printLocalConnectPlan names the global connect under the policy: with nothing under it
-// the policy ships nothing, and the reader should learn that here.
-func printLocalConnectPlan(
-	out io.Writer,
-	global harness.Harness,
-	detection harness.Detection,
-	cfg *config.Config,
-	root, configPath string,
-	e harness.Exporter,
-) {
-	printDetection(out, global, detection)
-	fmt.Fprintf(out, "  Scope:       this repository (%s)\n", root)
-	st, err := global.Status()
-	if err == nil && st.Connected && st.Endpoint == cfg.OTLPURL {
-		fmt.Fprintf(out, "  Exports via: your global %s connect (%s)\n", global.DisplayName(), st.Endpoint)
-	} else {
-		fmt.Fprintf(out, "  Exports via: nothing yet — %s is not connected to Terma on this machine.\n", global.DisplayName())
-		fmt.Fprintf(out, "               This file decides what to ship; `terma connect %s` says where.\n", global.Name())
-	}
-
-	printDataPlan(out, e.Signals, e.IncludePrompts, e.IncludeToolContent)
-
-	fmt.Fprintln(out, "\n  This will update:")
-	fmt.Fprintf(out, "    %s  (what to ship — the endpoint and key stay in your user settings)\n", configPath)
-	fmt.Fprintln(out)
-}
-
-func printDetection(out io.Writer, h harness.Harness, detection harness.Detection) {
-	if detection.Found {
-		version := detection.Version
-		if version == "" {
-			version = "version unknown"
-		}
-		fmt.Fprintf(out, "%s found: %s\n", h.DisplayName(), version)
-		return
-	}
-	// Not an error: the config is read whenever the agent is eventually started.
-	fmt.Fprintf(out, "%s not found on PATH — the configuration will still be written.\n", h.DisplayName())
-}
-
-func printDataPlan(out io.Writer, signals []harness.Signal, prompts, toolContent bool) {
-	fmt.Fprintln(out, "\n  Signals:")
-	for _, s := range harness.AllSignals {
-		mark := " "
-		if containsSignal(signals, s) {
-			mark = "✓"
-		}
-		fmt.Fprintf(out, "    %s %s\n", mark, signalLabel(s))
-	}
-	fmt.Fprintln(out)
-	fmt.Fprintf(out, "    Prompts:      %s\n", onOff(prompts))
-	fmt.Fprintf(out, "    Tool content: %s\n", onOff(toolContent))
+	return connect.Local(ctx, global, h, cfg, root, f.options(signals, harness.ReachEverywhere),
+		connect.Steps{Confirm: func(q string) (bool, error) { return confirm(cmd, q) }},
+		connect.IO{Out: cmd.OutOrStdout(), Err: cmd.ErrOrStderr()})
 }
 
 func scopeSuffix(scope harness.Scope) string {
@@ -320,12 +221,12 @@ func localLayerStatus(h harness.Harness, root string, global telemetryStatus) (t
 	if !global.exporting {
 		entry.State = "local settings, not exporting"
 	}
-	entry.Signals = joinSignals(st.Signals)
+	entry.Signals = connect.JoinSignals(st.Signals)
 	if entry.Signals == "" {
 		entry.Signals = "none"
 	}
-	entry.Prompts = onOff(st.IncludePrompts)
-	entry.ToolContent = onOff(st.IncludeToolContent)
+	entry.Prompts = connect.OnOff(st.IncludePrompts)
+	entry.ToolContent = connect.OnOff(st.IncludeToolContent)
 	return entry, true
 }
 
@@ -336,9 +237,9 @@ func statusRow(name string, e telemetryStatus) []string {
 func describeShipment(st harness.Status) string {
 	signals := "nothing"
 	if len(st.Signals) > 0 {
-		signals = joinSignals(st.Signals)
+		signals = connect.JoinSignals(st.Signals)
 	}
-	return fmt.Sprintf("%s; prompts %s; tool content %s", signals, onOff(st.IncludePrompts), onOff(st.IncludeToolContent))
+	return fmt.Sprintf("%s; prompts %s; tool content %s", signals, connect.OnOff(st.IncludePrompts), connect.OnOff(st.IncludeToolContent))
 }
 
 // writeRepoPolicy skips a conflict rather than failing: the hooks and binding are already
@@ -380,7 +281,7 @@ func writeRepoPolicy(
 		if err != nil {
 			return nil, err
 		}
-		conflicts, _ = partitionConflicts(conflicts)
+		conflicts, _ = connect.Partition(conflicts)
 		if len(conflicts) > 0 {
 			ui.Warn("Repo policy", fmt.Sprintf("%s skipped — this repository already has OTLP settings for it (%s)",
 				h.DisplayName(), output.SanitizeTerminal(strings.Join(conflictKeys(conflicts), ", "))))

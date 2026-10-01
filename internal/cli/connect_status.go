@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/connect"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
@@ -119,7 +120,7 @@ func describeStatus(ctx context.Context, h harness.Harness, cfg *config.Config) 
 	entry.Endpoint = st.Endpoint
 	entry.ProjectID = st.ProjectID
 	entry.KeyPrefix = st.KeyPrefix
-	blocking, advisory := partitionConflicts(st.Conflicts)
+	blocking, advisory := connect.Partition(st.Conflicts)
 	for _, c := range blocking {
 		entry.Conflicts = append(entry.Conflicts, c.Key)
 	}
@@ -150,11 +151,11 @@ func describeStatus(ctx context.Context, h harness.Harness, cfg *config.Config) 
 		entry.exporting = true
 	}
 
-	entry.Signals = joinSignals(st.Signals)
+	entry.Signals = connect.JoinSignals(st.Signals)
 	if entry.Signals == "" {
 		entry.Signals = "none"
 	}
-	entry.Prompts = onOff(st.IncludePrompts)
-	entry.ToolContent = onOff(st.IncludeToolContent)
+	entry.Prompts = connect.OnOff(st.IncludePrompts)
+	entry.ToolContent = connect.OnOff(st.IncludeToolContent)
 	return entry
 }

@@ -30,9 +30,11 @@ place.
 registry `builtin.Agents()` returns and the version `-ldflags` stamps, then exits with
 `App.Execute`'s status. Everything a command reads, it reads through the `App`: the
 agents, the version, the global flags, and the seams tests replace. The package holds no
-other state. Commands stay thin: `install` builds an `install.Plan` and applies it, and
-`doctor` runs `doctor.Run`. Each one supplies what its package must not reach itself,
-such as sign-in, key minting and the network, as `install.Steps` or `doctor.Probes`.
+other state. Commands stay thin: `install` builds an `install.Plan` and applies it,
+`doctor` runs `doctor.Run`, and `telemetry connect` runs `connect.Global` or
+`connect.Local`. Each one supplies what its package must not reach itself, such as
+sign-in, key minting and the network, as `install.Steps`, `doctor.Probes` or
+`connect.Steps`.
 
 **The hooks** (`internal/hooks`). A committed hooks file calls `terma hook <event>`,
 guarded so that a machine without terma does nothing. `dispatch` runs it: the git hooks
@@ -95,7 +97,7 @@ wired, but `install` does not wire them by default.
 |---|---|
 | Entry point | `cmd/terma` |
 | Command line | `internal/cli` |
-| Workflows | `internal/install`, `internal/doctor` |
+| Workflows | `internal/install`, `internal/doctor`, `internal/connect` |
 | Agents | `internal/agents` (contract, registry), `internal/agents/builtin`, `internal/agents/<name>`, `internal/agents/internal/*` (shared by a few agents) |
 | Hook runtime | `internal/hooks/dispatch`, `internal/hooks/hookrun`, `internal/hooks/hookmgr`, `internal/hooks/hookruntest` |
 | Relay | `internal/relay` (engine), `internal/relay/daemon`, `internal/relay/claim`, `internal/relay/shape`, `internal/relay/service` |
@@ -119,7 +121,8 @@ wired, but `install` does not wire them by default.
   - The relay engine (the `internal/relay` package itself) imports no `internal/routing`: it
     takes a resolved `relay.Policy`, which the daemon builds (`daemon.CapturePolicy`).
   - `doctor` imports neither `account/api` nor `spool`.
-  - `install` imports nothing under `account` and not `spool`.
+  - `install` imports nothing under `account` and not `spool`; `connect` neither, nor
+    `install`, which never imports `connect` either.
   - `hookrun` and `hookmgr` never import each other.
   - The hook runtime (`hookrun`, `hookmgr`, `hookruntest`) imports no agent, command,
     account or exporter-kit package. `dispatch` reads the registry, and imports neither the
