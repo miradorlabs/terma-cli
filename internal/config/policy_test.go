@@ -29,3 +29,17 @@ func TestNoPolicyCollectsNothing(t *testing.T) {
 		t.Fatalf("NoPolicy = %+v", p)
 	}
 }
+
+// A policy expires MaxPolicyAge after it was validated; one never fetched has no age.
+func TestPolicyExpires(t *testing.T) {
+	now := time.Now()
+	if (Policy{FetchedAt: now.Add(-MaxPolicyAge + time.Minute)}).Expired(now) {
+		t.Fatal("expired before MaxPolicyAge")
+	}
+	if !(Policy{FetchedAt: now.Add(-MaxPolicyAge - time.Minute)}).Expired(now) {
+		t.Fatal("still valid after MaxPolicyAge")
+	}
+	if (Policy{}).Expired(now) {
+		t.Fatal("a policy never fetched reports an age")
+	}
+}

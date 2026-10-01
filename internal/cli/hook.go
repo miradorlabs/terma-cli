@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -68,7 +69,7 @@ func hookPolicy() config.Policy {
 	if err != nil {
 		return config.NoPolicy("", "")
 	}
-	if !cfg.Policy.Validated() {
+	if !cfg.Policy.Validated() || cfg.Policy.Expired(time.Now()) {
 		return config.NoPolicy(cfg.OrganizationID, cfg.AuthURL)
 	}
 	return cfg.Policy

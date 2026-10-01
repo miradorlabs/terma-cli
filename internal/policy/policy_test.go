@@ -46,8 +46,8 @@ func TestRefreshStoresThePolicyForItsTeam(t *testing.T) {
 	}
 }
 
-// A fresh policy is used as it is; a stale one whose refresh fails is kept; a team never
-// validated gets nothing.
+// A fresh policy is used as it is; a stale one whose refresh fails is kept until it
+// expires; a team never validated gets nothing.
 func TestCurrentKeepsTheLastValidatedPolicy(t *testing.T) {
 	cfg := setUp(t, refused)
 	fresh := cache(t, time.Now())
@@ -59,6 +59,12 @@ func TestCurrentKeepsTheLastValidatedPolicy(t *testing.T) {
 	stale := cache(t, time.Now().Add(-time.Hour))
 	if got, err := (Source{}).Current(t.Context(), cfg, team); err != nil || !got.FetchedAt.Equal(stale.FetchedAt) {
 		t.Fatalf("stale with a failed refresh: %+v, %v", got, err)
+	}
+
+	cfg = setUp(t, refused)
+	cache(t, time.Now().Add(-config.MaxPolicyAge-time.Hour))
+	if got, err := (Source{}).Current(t.Context(), cfg, team); err == nil {
+		t.Fatalf("expired with a failed refresh: %+v", got)
 	}
 
 	cfg = setUp(t, refused)

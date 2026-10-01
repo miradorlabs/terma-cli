@@ -66,16 +66,21 @@ func SavePolicy(p config.Policy) error {
 }
 
 // EffectivePolicy is team's cached policy, else an unscoped or same-team fallback, else
-// collect nothing; it never borrows another team's grant.
+// collect nothing; it never borrows another team's grant, and an expired one grants
+// nothing.
 func EffectivePolicy(fallback config.Policy, team string) config.Policy {
 	p, ok, err := LoadPolicy(team)
-	if err == nil && ok && p.AppliesTo(fallback.OrganizationID, fallback.AuthURL) {
-		return p
+	switch {
+	case err == nil && ok && p.AppliesTo(fallback.OrganizationID, fallback.AuthURL):
+	case err == nil && !ok && (fallback.TeamID == "" || fallback.TeamID == team):
+		p = fallback
+	default:
+		return config.NoPolicy("", "")
 	}
-	if err == nil && !ok && (fallback.TeamID == "" || fallback.TeamID == team) {
-		return fallback
+	if p.Expired(time.Now()) {
+		return config.NoPolicy(p.OrganizationID, p.AuthURL)
 	}
-	return config.NoPolicy("", "")
+	return p
 }
 
 // StorePolicy records a freshly fetched policy: the team's cache, and the profile's

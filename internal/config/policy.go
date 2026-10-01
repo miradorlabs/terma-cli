@@ -35,6 +35,15 @@ type Policy struct {
 	FetchedAt        time.Time `json:"fetched_at"`
 }
 
+// MaxPolicyAge is how long a validated policy governs collection without a successful
+// refresh; after it, nothing is collected until a refresh succeeds.
+const MaxPolicyAge = 7 * 24 * time.Hour
+
+// Expired reports whether p was validated more than MaxPolicyAge before now.
+func (p Policy) Expired(now time.Time) bool {
+	return !p.FetchedAt.IsZero() && now.Sub(p.FetchedAt) > MaxPolicyAge
+}
+
 // DefaultPolicy applies before `terma setup` has fetched one: repository mode, content on.
 func DefaultPolicy() Policy {
 	return Policy{Mode: ModeRepo, IncludePrompts: true, IncludeToolContent: true, MembersCanAddRepositories: true}

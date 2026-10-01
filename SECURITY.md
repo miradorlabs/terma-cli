@@ -124,10 +124,10 @@ including hooks-only installs and `--harness none`. A telemetry key cannot autho
 that policy request. Validated policies are cached by team, organization, and auth
 environment; the relay refreshes them in the background, normally once per minute.
 Without a validated policy, forwarding waits for a successful fetch. A failed fetch,
-including a denied request, retains the last validated policy **without an age-based
-expiry**. A failed refresh is therefore not an immediate revocation of existing
-capture. Invalid responses, older revisions, and another team's policy cannot widen
-the cached grant.
+including a denied request, retains the last validated policy for at most seven days
+after it was fetched; after that it grants nothing until a fetch succeeds. A failed
+refresh is therefore not an immediate revocation of existing capture. Invalid
+responses, older revisions, and another team's policy cannot widen the cached grant.
 
 Team policy limits signals, prompts, tool content, and file paths. A project's local
 `routing/<project-id>.json` can only narrow those limits. Prompts and tool content are
@@ -198,7 +198,7 @@ not an exact measurement of agent authorship.
   and process checks do not make hostile code running as you trustworthy.
 - **Root, or anyone who can read your disk.** Full-disk encryption is the control.
 - **Immediate revocation from a failed policy refresh.** The last validated policy can
-  remain active during outages or denied refreshes. Revoking a developer login and
+  remain active for up to seven days during outages or denied refreshes. Revoking a developer login and
   revoking project telemetry keys are separate actions; cached policy is not proof
   that the developer still has access.
 - **A hook kill switch as a telemetry pause.** `TERMA_HOOKS=0` stops hook capture and
