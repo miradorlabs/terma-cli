@@ -101,11 +101,11 @@ func TestCodexSequenceCheckpointAfterSpooling(t *testing.T) {
 	if err := os.Remove(dir); err != nil {
 		t.Fatal(err)
 	}
-	captureCodexFunding(env, context.Background(), r, in)
+	captureCodexFunding(context.Background(), env, r, in)
 	if err := os.Mkdir(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	captureCodexFunding(env, context.Background(), r, in)
+	captureCodexFunding(context.Background(), env, r, in)
 	evs := hookruntest.Spooled(t, sp)
 	if len(evs) != 3 {
 		t.Fatalf("%+v", evs)
@@ -118,7 +118,7 @@ func TestCodexSequenceCheckpointAfterSpooling(t *testing.T) {
 		}
 		seen[id] = true
 	}
-	captureCodexFunding(env, context.Background(), r, in)
+	captureCodexFunding(context.Background(), env, r, in)
 	if evs := hookruntest.Spooled(t, sp); len(evs) != 0 {
 		t.Fatal(evs)
 	}

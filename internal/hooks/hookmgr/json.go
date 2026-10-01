@@ -9,7 +9,6 @@ import (
 	"reflect"
 	"regexp"
 	"slices"
-	"sort"
 	"strings"
 )
 
@@ -81,7 +80,7 @@ func MarshalOrdered(m map[string]json.RawMessage) ([]byte, error) {
 	for k := range m {
 		keys = append(keys, k)
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 	var buf bytes.Buffer
 	buf.WriteString("{\n")
 	for i, k := range keys {

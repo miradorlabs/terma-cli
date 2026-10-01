@@ -2,7 +2,7 @@ package relay
 
 import (
 	"maps"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -71,6 +71,6 @@ func (s Snapshot) Keys() []string {
 	for k := range s.Counters {
 		keys = append(keys, k)
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 	return keys
 }

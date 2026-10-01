@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"slices"
-	"sort"
 	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/account/serverkey"
@@ -113,7 +112,7 @@ func (e Exporter) ResourceAttributesValue() string {
 		}
 		keys = append(keys, k)
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 
 	pairs := make([]string, 0, len(keys))
 	for _, k := range keys {

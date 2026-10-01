@@ -13,7 +13,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-func captureCodexFunding(e hookrun.Env, ctx context.Context, r *hookrun.Repo, in *codexHookInput) {
+func captureCodexFunding(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in *codexHookInput) {
 	if e.Spool == nil || !session.ValidID(in.SessionID) {
 		return
 	}

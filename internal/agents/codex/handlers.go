@@ -79,10 +79,10 @@ func notifyHook(ctx context.Context, env hookrun.Env) error {
 	}
 	// notify carries no transcript_path; the confined reader finds the rollout by thread id.
 	turn := &codexHookInput{SessionID: id, Cwd: n.Cwd, Model: n.Model, TurnID: n.TurnID}
-	captureCodexFunding(env, ctx, r, turn)
-	captureCodexDesktopActivity(env, ctx, r, turn)
-	captureCodexReplies(env, ctx, r, turn)
-	captureCodexTitle(env, ctx, r, turn)
+	captureCodexFunding(ctx, env, r, turn)
+	captureCodexDesktopActivity(ctx, env, r, turn)
+	captureCodexReplies(ctx, env, r, turn)
+	captureCodexTitle(ctx, env, r, turn)
 	// Not announce: notify fires every turn and does not age out manifests.
 	sess := env.NewSession(r, id, codexTool, n.Model)
 	env.SetActive(r, sess)
@@ -205,10 +205,10 @@ func stop(ctx context.Context, env hookrun.Env) error {
 	if err != nil {
 		return nil
 	}
-	captureCodexFunding(env, ctx, r, in)
-	captureCodexDesktopActivity(env, ctx, r, in)
-	captureCodexReplies(env, ctx, r, in)
-	captureCodexTitle(env, ctx, r, in)
+	captureCodexFunding(ctx, env, r, in)
+	captureCodexDesktopActivity(ctx, env, r, in)
+	captureCodexReplies(ctx, env, r, in)
+	captureCodexTitle(ctx, env, r, in)
 	return nil
 }
 
@@ -226,10 +226,10 @@ func sessionEnd(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	// The end is spooled after the evidence.
-	captureCodexFunding(env, ctx, r, in)
-	captureCodexDesktopActivity(env, ctx, r, in)
-	captureCodexReplies(env, ctx, r, in)
-	captureCodexTitle(env, ctx, r, in)
+	captureCodexFunding(ctx, env, r, in)
+	captureCodexDesktopActivity(ctx, env, r, in)
+	captureCodexReplies(ctx, env, r, in)
+	captureCodexTitle(ctx, env, r, in)
 	env.EndSession(r, in.SessionID, codexTool, in.Reason)
 	return nil
 }
@@ -250,7 +250,7 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	if err != nil {
 		return nil
 	}
-	captureCodexFunding(env, ctx, r, in)
+	captureCodexFunding(ctx, env, r, in)
 	if route, desktop := codexDesktopRoute(r); desktop && in.ToolName != "" {
 		attrs := hookrun.EvidenceAttrs(codexTool, sourceCodexHook, "PostToolUse")
 		attrs["capture_surface"] = codexDesktopSurface
@@ -275,7 +275,7 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 		}
 		env.EmitFor(r, spool.Event{Name: hookrun.EventToolCall, SessionID: in.SessionID, Repo: r.Name, Attrs: attrs})
 	}
-	captureCodexDesktopActivity(env, ctx, r, in)
+	captureCodexDesktopActivity(ctx, env, r, in)
 	candidates := codexEditedPaths(in)
 	if len(candidates) == 0 {
 		return nil

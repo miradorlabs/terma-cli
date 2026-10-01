@@ -7,7 +7,6 @@ import (
 	"maps"
 	"os"
 	"slices"
-	"sort"
 	"strings"
 	"time"
 
@@ -146,7 +145,7 @@ func newSpoolStatusCommand() *cobra.Command {
 				fmt.Fprintf(out, "Retrying:        project %s after %s — its last delivery failed (`terma spool flush --force` retries now)\n", id, windows[id].Local().Format(time.Kitchen))
 			}
 			keys := keystore.Projects()
-			sort.Strings(keys)
+			slices.Sort(keys)
 			fmt.Fprintf(out, "Project keys:    %d\n", len(keys))
 			unroutable, held := queuedByRouting(s, n)
 			if unroutable > 0 {
@@ -156,7 +155,7 @@ func newSpoolStatusCommand() *cobra.Command {
 			for id := range held {
 				ids = append(ids, id)
 			}
-			sort.Strings(ids)
+			slices.Sort(ids)
 			for _, id := range ids {
 				fmt.Fprintf(out, "Held:            %d event%s for project %s — no key here yet (run `terma install` in that repository)\n", held[id], plural(held[id]), id)
 			}

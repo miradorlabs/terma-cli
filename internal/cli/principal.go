@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -231,7 +232,7 @@ func (ix *principalIndex) resolve(kind, query string) ([]api.AIPrincipal, error)
 		for _, who := range order {
 			names = append(names, groups[who][0].DisplayName())
 		}
-		sort.Strings(names)
+		slices.Sort(names)
 		return nil, fmt.Errorf("%q matches several principals (%s) — use the full name or the id", query, strings.Join(names, ", "))
 	}
 }

@@ -16,9 +16,9 @@ import (
 )
 
 // gitHookEvents are the events no agent declares; every name is committed wiring.
-var gitHookEvents = map[string]agents.Handler{
-	"prepare-commit-msg": hookrun.PrepareCommitMsg,
-	"post-commit":        hookrun.PostCommit,
+var gitHookEvents = map[string]agents.Event{
+	"prepare-commit-msg": {Handler: hookrun.PrepareCommitMsg},
+	"post-commit":        {Handler: hookrun.PostCommit, Flush: true},
 }
 
 // Request is one hook invocation.
@@ -58,8 +58,8 @@ const handlerTimeout = 5 * time.Second
 
 // Run handles the request and returns the status the process exits with.
 func Run(ctx context.Context, d Deps, r Request) int {
-	if h, ok := gitHookEvents[r.Event]; ok {
-		run(ctx, d, r, h, false, "")
+	if e, ok := gitHookEvents[r.Event]; ok {
+		run(ctx, d, r, e.Handler, e.Flush, "")
 		return 0
 	}
 	if render, ok := d.Agents.Render(r.Event); ok {
@@ -124,7 +124,7 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 	if claimed {
 		d.Claimed(ctx, r.Cwd)
 	}
-	if (flush || r.Event == "post-commit") && env.Spool != nil {
+	if flush && env.Spool != nil {
 		d.Flush()
 	}
 }

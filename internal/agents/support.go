@@ -76,11 +76,7 @@ func (r *Registry) SupportCatalog() []AgentSupport {
 
 // SupportNames lists the tokens the catalog accepts.
 func (r *Registry) SupportNames() []string {
-	var out []string
-	for _, a := range r.SupportCatalog() {
-		out = append(out, a.Name)
-	}
-	return out
+	return collect(r.SupportCatalog(), func(a AgentSupport) (string, bool) { return a.Name, true })
 }
 
 // LookupSupport resolves a command-line token to its catalog entry.

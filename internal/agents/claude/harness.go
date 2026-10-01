@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/account/serverkey"
@@ -641,7 +640,7 @@ func (c exporter) Disconnect() (harness.DisconnectResult, error) {
 		result.Unjournaled = result.Removed > 0
 	}
 
-	sort.Strings(result.Skipped)
+	slices.Sort(result.Skipped)
 	defer harness.PruneJournals()
 	if result.Removed > 0 || result.Restored > 0 {
 		if err := s.save(false); err != nil {

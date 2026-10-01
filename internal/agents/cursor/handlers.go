@@ -116,7 +116,7 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	env.Announce(r, env.NewSession(r, in.id(), cursorTool, in.Model), map[string]any{hookrun.AttrSource: in.ComposerMode})
-	captureCursorObservation(env, ctx, r, in, "sessionStart")
+	captureCursorObservation(ctx, env, r, in, "sessionStart")
 	return nil
 }
 
@@ -133,7 +133,7 @@ func sessionEnd(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	env.EndSession(r, in.id(), cursorTool, in.Reason)
-	captureCursorObservation(env, ctx, r, in, "sessionEnd")
+	captureCursorObservation(ctx, env, r, in, "sessionEnd")
 	return nil
 }
 

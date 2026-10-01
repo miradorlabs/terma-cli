@@ -14,7 +14,7 @@ import (
 
 // captureCodexDesktopActivity fills the two gaps in repository hooks: model usage and
 // hosted Extension actions.
-func captureCodexDesktopActivity(e hookrun.Env, ctx context.Context, r *hookrun.Repo, in *codexHookInput) {
+func captureCodexDesktopActivity(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in *codexHookInput) {
 	if e.Spool == nil || !session.ValidID(in.SessionID) {
 		return
 	}

@@ -9,7 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -172,7 +172,7 @@ func (c exporter) RuntimeArgs(e harness.Exporter) []string {
 	for k := range values {
 		keys = append(keys, k)
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 	args := make([]string, 0, len(keys)*2)
 	for _, k := range keys {
 		args = append(args, "-c", "otel."+k+"="+values[k])
@@ -801,7 +801,7 @@ func (c exporter) Disconnect() (harness.DisconnectResult, error) {
 		return harness.DisconnectResult{}, nil
 	}
 	result, remaining := j.Apply(current)
-	sort.Strings(result.Skipped)
+	slices.Sort(result.Skipped)
 
 	defer harness.PruneJournals()
 	if result.Removed > 0 || result.Restored > 0 {

@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -303,7 +304,7 @@ func (s *Store) Merge(fromID string, into Session, at time.Time) ([]string, erro
 		return nil, err
 	}
 	_ = s.clearActive(fromID)
-	sort.Strings(files)
+	slices.Sort(files)
 	return files, nil
 }
 
@@ -410,7 +411,7 @@ func Attribute(staged []string, manifests []Manifest, active *Session, activeFre
 		if len(hit) == 0 {
 			continue
 		}
-		sort.Strings(hit)
+		slices.Sort(hit)
 		out = append(out, Attribution{SessionID: m.SessionID, Tool: m.ToolLabel(), Files: hit})
 	}
 	if len(out) == 0 && active != nil && activeFresh && !activeHasManifest && len(stagedSet) > 0 {

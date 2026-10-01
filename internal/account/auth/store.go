@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"time"
 
@@ -232,7 +233,7 @@ func DeleteCredentialFor(profile, organizationID string) error {
 		for k := range p.Organizations {
 			remaining = append(remaining, k)
 		}
-		sort.Strings(remaining)
+		slices.Sort(remaining)
 		if len(remaining) > 0 {
 			p.Active = remaining[0]
 		}

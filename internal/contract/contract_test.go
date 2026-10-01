@@ -6,7 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"testing"
 
@@ -192,7 +192,7 @@ func check(t *testing.T, dir string, files map[string][]byte, root string) {
 	for name := range files {
 		names = append(names, name)
 	}
-	sort.Strings(names)
+	slices.Sort(names)
 	for _, name := range names {
 		got := files[name]
 		if root != "" {

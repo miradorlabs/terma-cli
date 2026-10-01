@@ -21,7 +21,7 @@ const codexReplyMaxText = 16 << 10
 
 // captureCodexReplies spools the messages recorded since the last capture, under a
 // per-session cursor, and only where prompts are consented.
-func captureCodexReplies(e hookrun.Env, ctx context.Context, r *hookrun.Repo, in *codexHookInput) {
+func captureCodexReplies(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in *codexHookInput) {
 	pol := routing.EffectivePolicy(e.Policy, r.ProjectID)
 	if e.Spool == nil || !session.ValidID(in.SessionID) || !pol.IncludePrompts || !pol.AllowsSignal("logs") || len(pol.ExcludePaths) > 0 || !repliesConsented(r.ProjectID, pol.Global()) {
 		return

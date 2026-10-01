@@ -85,7 +85,11 @@ reaches one except through its agent. The registry's harness lookups (`Harnesses
 the choices. Agents without such an exporter, such as Pi or Gemini through the relay or
 Cursor with hooks only, have no harness at all.
 
-Adding an agent means adding one package, plus one line in `builtin`.
+Adding an agent means adding one package, plus one line in `builtin`. What it commits
+to is pinned where a reviewer sees it change: its hook event names
+(`internal/agents/builtin`'s tests), the safe keys it adds to the relay's union
+(`internal/relay/safe_pin_test.go`), and the bytes of every file it writes
+(`internal/contract`).
 `internal/contract` keeps byte snapshots of every file terma writes for an agent:
 committed hooks, machine-wide hooks, managed configuration and relay exporter settings.
 

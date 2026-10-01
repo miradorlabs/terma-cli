@@ -4,7 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"sort"
+	"slices"
 	"strings"
 	"testing"
 
@@ -52,7 +52,7 @@ func sortedKeys(m map[string]string) []string {
 	for k := range m {
 		out = append(out, k)
 	}
-	sort.Strings(out)
+	slices.Sort(out)
 	return out
 }
 
@@ -70,7 +70,7 @@ func TestLocalRenderCarriesOnlyWhatToShip(t *testing.T) {
 		}
 	}
 	want := append([]string{}, claudeLocalKeys...)
-	sort.Strings(want)
+	slices.Sort(want)
 	if got := sortedKeys(env); !reflect.DeepEqual(got, want) {
 		t.Fatalf("local render keys = %v, want exactly %v", got, want)
 	}

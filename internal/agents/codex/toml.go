@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -315,7 +315,7 @@ func renderOtelTable(otel map[string]any) (string, error) {
 	for k := range otel {
 		keys = append(keys, k)
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 
 	var b strings.Builder
 	b.WriteString("[" + otelTable + "]\n")
@@ -386,7 +386,7 @@ func renderTOMLValue(v any) (string, error) {
 		for k := range x {
 			keys = append(keys, k)
 		}
-		sort.Strings(keys)
+		slices.Sort(keys)
 		parts := make([]string, 0, len(keys))
 		for _, k := range keys {
 			s, err := renderTOMLValue(x[k])

@@ -56,7 +56,11 @@ func HookEventOf(command string) string {
 // UserHookCommand is the command a machine-wide hook entry runs: terma by absolute path,
 // since a desktop-started agent has the system PATH, with --user.
 func UserHookCommand(terma string) func(event string) string {
-	q := "'" + strings.ReplaceAll(terma, "'", `'\''`) + "'"
+	return userHookCommand("'" + strings.ReplaceAll(terma, "'", `'\''`) + "'")
+}
+
+// userHookCommand runs terma, quoted as q, when it is there to run.
+func userHookCommand(q string) func(event string) string {
 	return func(event string) string {
 		return "[ -x " + q + " ] && " + q + " hook --user " + event + " || true"
 	}

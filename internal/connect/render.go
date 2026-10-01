@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"slices"
-	"sort"
 	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
@@ -197,7 +196,7 @@ func JoinSignals(signals []harness.Signal) string {
 	for _, s := range signals {
 		parts = append(parts, string(s))
 	}
-	sort.Strings(parts)
+	slices.Sort(parts)
 	return strings.Join(parts, ",")
 }
 

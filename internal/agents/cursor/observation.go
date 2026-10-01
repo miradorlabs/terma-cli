@@ -39,7 +39,7 @@ func cursorObserve(ctx context.Context, env hookrun.Env, hook string) error {
 		// A conversation can outlive the active TTL, and the CLI may omit sessionStart.
 		env.SetActive(r, env.NewSession(r, in.id(), cursorTool, in.Model))
 	}
-	captureCursorObservation(env, ctx, r, in, hook)
+	captureCursorObservation(ctx, env, r, in, hook)
 	return nil
 }
 
@@ -106,7 +106,7 @@ func cursorObservationAttrs(in *cursorHookInput, hook string) map[string]any {
 }
 
 // captureCursorObservation records one Cursor hook as an ordered observation.
-func captureCursorObservation(e hookrun.Env, ctx context.Context, r *hookrun.Repo, in *cursorHookInput, hook string) {
+func captureCursorObservation(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in *cursorHookInput, hook string) {
 	e.CaptureObservation(ctx, r, hookrun.Observation{
 		Tool: cursorTool, Source: sourceCursorHook, StateDir: cursorObservationDir,
 		SessionID: in.id(), Hook: hook, TurnID: in.GenerationID, Attrs: cursorObservationAttrs(in, hook),
