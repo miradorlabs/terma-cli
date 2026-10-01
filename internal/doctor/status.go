@@ -50,8 +50,11 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 			add("Account", "%s in %s", cmp.Or(cred.Email, "signed in"), cmp.Or(cfg.OrganizationName, cred.OrganizationID))
 		}
 	}
-	if config.Paused() && cfg.Policy.PauseAllowed() {
+	switch {
+	case config.Paused() && cfg.Policy.PauseAllowed():
 		add("Capture", "paused on this machine — run `terma resume` to start it again")
+	case cfg.Policy.Validated() && cfg.Policy.Expired(time.Now()):
+		add("Capture", "off: the collection policy has not been refreshed for over a week — run `terma setup`")
 	}
 	// Name the backend whenever it is not production, by environment or by host overrides.
 	switch {

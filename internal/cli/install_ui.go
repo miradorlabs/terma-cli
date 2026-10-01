@@ -111,6 +111,9 @@ func (u *installUI) verify(cmd *cobra.Command, runDoctor func(context.Context, b
 		},
 	})
 	sp.Stop()
+	if notice := captureNotice(); notice != "" {
+		u.Then(notice)
+	}
 	u.verdict(report)
 }
 

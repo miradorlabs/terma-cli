@@ -49,3 +49,28 @@ func TestPauseHonoursTheOrganization(t *testing.T) {
 		})
 	}
 }
+
+// status says when capture is off, and why: a pause, or a policy gone unrefreshed.
+func TestStatusSaysWhyCaptureIsOff(t *testing.T) {
+	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	if out, err := runTerma(t, "pause"); err != nil {
+		t.Fatalf("pause: %v\n%s", err, out)
+	}
+	if out, _ := runTerma(t, "status"); !strings.Contains(out, "paused on this machine") {
+		t.Fatalf("status does not say capture is paused:\n%s", out)
+	}
+	if out, err := runTerma(t, "resume"); err != nil {
+		t.Fatalf("resume: %v\n%s", err, out)
+	}
+	if err := config.UpdateProfile(config.DefaultProfile, func(p *config.Profile) {
+		p.Policy = &config.Policy{Mode: config.ModeRepo, TeamID: "team", Revision: 1, FetchedAt: time.Now().Add(-config.MaxPolicyAge - time.Hour)}
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if out, _ := runTerma(t, "status"); !strings.Contains(out, "has not been refreshed for over a week") {
+		t.Fatalf("status does not say the policy expired:\n%s", out)
+	}
+	if notice := captureNotice(); !strings.Contains(notice, "`terma setup`") {
+		t.Fatalf("notice = %q", notice)
+	}
+}

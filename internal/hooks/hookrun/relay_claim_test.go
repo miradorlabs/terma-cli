@@ -12,6 +12,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -49,6 +50,30 @@ func TestHooksClaimSessionsForTheRelay(t *testing.T) {
 	}
 	if claimed == 0 {
 		t.Fatal("OnClaim was never called")
+	}
+}
+
+// An expired policy collects nothing, but a hook still claims its session, since the claim
+// is what starts the relay that refreshes the policy.
+func TestAnExpiredPolicyStillClaims(t *testing.T) {
+	root := initRepo(t)
+	hookruntest.RelayOn(t)
+	if err := project.Save(root, &project.File{Project: project.Project{ID: "project-a"}}); err != nil {
+		t.Fatal(err)
+	}
+	expired := config.Policy{Mode: config.ModeRepo, TeamID: "project-a", Revision: 1, FetchedAt: time.Now().Add(-config.MaxPolicyAge - time.Hour)}
+	if err := routing.SavePolicy(expired); err != nil {
+		t.Fatal(err)
+	}
+	sp, _ := spool.Open(t.TempDir())
+	claimed := false
+	env := Env{Now: time.Now(), Cwd: root, Spool: sp, Policy: expired, OnClaim: func() { claimed = true },
+		Stdin: strings.NewReader(`{"session_id":"expired-session","cwd":"` + root + `","model":"m"}`)}
+	if err := startSession(context.Background(), env); err != nil {
+		t.Fatal(err)
+	}
+	if c, ok := claim.Read("expired-session", time.Now()); !ok || c.ProjectID != "project-a" || !claimed {
+		t.Fatalf("claim = %+v, %v; OnClaim called = %v", c, ok, claimed)
 	}
 }
 
