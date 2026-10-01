@@ -282,7 +282,7 @@ func TestRelayDoctorFailsARelayInAnotherEnvironment(t *testing.T) {
 	}
 	record("prod")
 	c := doctor.RelayCheck(testApp.agents, relayFacts(), storedKeys, "proj_x", "dev", nil)
-	if c.Status != doctor.Fail || !strings.Contains(c.Detail, "delivers to the prod environment, not this profile's dev") || c.Fix != "terma relay daemon install" {
+	if c.Status != doctor.Fail || !strings.Contains(c.Detail, "delivers to the prod environment, not this profile's dev") || c.Fix != "terma install" {
 		t.Fatalf("a production relay on a dev profile: %+v", c)
 	}
 	record("dev")

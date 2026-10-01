@@ -227,7 +227,7 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 	if running && relay.Environment != "" && env != "" && relay.Environment != env {
 		return Check{Status: Fail,
 			Detail: "the local relay on " + addr + " delivers to the " + relay.Environment + " environment, not this profile's " + env + ", so it forwards none of this profile's sessions",
-			Fix:    "terma relay daemon install"}
+			Fix:    "terma install"}
 	}
 	mine := func(e agents.Agent) bool {
 		if len(selected) == 0 {
@@ -247,12 +247,12 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 	if relay.ServiceInstalled && !relay.ServiceCurrent {
 		return Check{Status: Warn,
 			Detail: "the relay service was written by an earlier terma, or for another binary or environment, so the system may not start this relay",
-			Fix:    "terma relay daemon install"}
+			Fix:    "terma install"}
 	}
 	if relay.ServiceInstalled && running && relay.HookStarted {
 		return Check{Status: Warn,
 			Detail: "a relay a hook started holds " + addr + ", so the relay service waits behind it and misses what agents export before their first hook",
-			Fix:    "terma relay daemon install"}
+			Fix:    "terma install"}
 	}
 	for _, e := range reg.With[agents.RelayExporter]() {
 		if c, ok := e.(agents.RelayChecker); ok && mine(e) {

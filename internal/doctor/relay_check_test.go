@@ -48,8 +48,8 @@ func TestRelayCheckJudgesTheRelayItself(t *testing.T) {
 			if c.Status != tc.status || !strings.Contains(c.Detail, tc.want) {
 				t.Fatalf("RelayCheck = %+v, want %v containing %q", c, tc.status, tc.want)
 			}
-			if c.Status != Pass && c.Fix != "terma relay daemon install" {
-				t.Fatalf("fix = %q, want the command that rewrites and restarts the service", c.Fix)
+			if c.Status != Pass && c.Fix != "terma install" {
+				t.Fatalf("fix = %q, want terma install, which replaces the relay and rewrites its service", c.Fix)
 			}
 		})
 	}

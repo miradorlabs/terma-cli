@@ -38,7 +38,11 @@ func (app *App) connectMachineRelay(ctx context.Context, agents []string, relayS
 	if err != nil {
 		return err
 	}
-	ensureRelay(ctx, relayService, func(warn bool, what string) {
+	env := ""
+	if cfg, err := app.loadConfig(); err == nil {
+		env = cfg.Environment
+	}
+	ensureRelay(ctx, relayService, env, func(warn bool, what string) {
 		if warn {
 			r.warn("Relay", what)
 		} else {

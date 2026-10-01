@@ -127,7 +127,8 @@ and the relay removes them before anything leaves.
 is up before any agent starts; with `--relay-service off`, hooks start it on demand.
 Either way the relay runs as the setup or install that configured it, whoever starts it
 later. `terma install` and `terma update` rewrite a service an earlier terma wrote, and
-`terma relay daemon install` rewrites and restarts it at once.
+`terma install` also replaces a relay that cannot deliver for you (another environment,
+or one a hook started while the service waits).
 `terma relay status` shows whether it runs and what it has forwarded, dropped and queued.
 
 ## What gets collected
