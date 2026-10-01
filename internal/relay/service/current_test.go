@@ -79,10 +79,7 @@ func TestOnlyTheDefinitionThisTermaWritesIsCurrent(t *testing.T) {
 		t.Fatal("the definition Install writes does not read as current")
 	}
 
-	earlier := strings.Replace(def, "run", "serve", 1)
-	if earlier == def {
-		t.Fatal("the definition names no `relay run` to replace")
-	}
+	earlier := earlierCommand(t, def)
 	writeDefinition(t, m, earlier)
 	if m.Current() {
 		t.Fatal("an earlier terma's definition, running a removed command, reads as current")
@@ -103,4 +100,21 @@ func TestOnlyTheDefinitionThisTermaWritesIsCurrent(t *testing.T) {
 	if !m.Current() {
 		t.Fatal("checking other managers changed the installed definition")
 	}
+}
+
+// earlierCommand is def as an earlier terma wrote it: the relay started with a command
+// this build no longer has, in each platform's own syntax.
+func earlierCommand(t *testing.T, def string) string {
+	t.Helper()
+	for _, cmd := range [][2]string{
+		{"<string>relay</string><string>run</string>", "<string>relay</string><string>serve</string>"}, // launchd
+		{" relay run ", " relay serve "},     // systemd
+		{" relay supervise", " relay serve"}, // the Windows launcher
+	} {
+		if strings.Contains(def, cmd[0]) {
+			return strings.Replace(def, cmd[0], cmd[1], 1)
+		}
+	}
+	t.Fatalf("the definition starts no relay command this test knows:\n%s", def)
+	return ""
 }

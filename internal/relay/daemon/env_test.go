@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"testing"
 	"time"
@@ -47,8 +48,12 @@ func TestRecordEnvKeepsOnlyWhatPlacesTheRelay(t *testing.T) {
 	if _, leaked := env["TERMA_API_KEY"]; leaked {
 		t.Fatal("RecordEnv recorded a credential")
 	}
-	if info, err := os.Stat(filepath.Join(dir, EnvFile)); err != nil || info.Mode().Perm() != 0o600 {
-		t.Fatalf("the record is not private: %v, %v", info, err)
+	info, err := os.Stat(filepath.Join(dir, EnvFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
+		t.Fatalf("the record is not private: mode %v", info.Mode().Perm())
 	}
 	if err := os.WriteFile(filepath.Join(dir, EnvFile), []byte("{not json"), 0o600); err != nil {
 		t.Fatal(err)
