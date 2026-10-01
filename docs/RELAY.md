@@ -98,7 +98,7 @@ The relay is the way around that. Every agent's global exporter sends to a relay
 
 ## What was run
 
-The scenarios are in `live/relay_test.go`, `live/relay_more_test.go` and `live/relay_opencode_test.go`. They drive real harness binaries against deterministic fake model providers, and the in-test receiver stands in for Terma upstream.
+The scenarios are in `test/live/relay_test.go`, `test/live/relay_more_test.go` and `test/live/relay_opencode_test.go`. They drive real harness binaries against deterministic fake model providers, and the in-test receiver stands in for Terma upstream.
 
 Harness coverage: Claude Code, Codex and OpenCode, the three agents terma supports that export OTLP. Cursor and Antigravity have no exporter; they're hooks-only and never touch the relay.
 
@@ -135,7 +135,7 @@ Later additions, run on the installed builds and the last four Codex releases:
 
 ### Workload equivalence
 
-`live/relay_workloads_test.go` runs every workload twice against identical fake providers, once exporting directly and once through the relay. It then requires the same telemetry upstream (every log event as many times, every span and metric name) and zero drops.
+`test/live/relay_workloads_test.go` runs every workload twice against identical fake providers, once exporting directly and once through the relay. It then requires the same telemetry upstream (every log event as many times, every span and metric name) and zero drops.
 
 | Harness | Workloads |
 |---|---|
@@ -177,7 +177,7 @@ The daemon is one process per `CODEX_HOME`, reached at `$CODEX_HOME/app-server-c
 - **Metrics:** the app-server exported no OTLP metrics in any run, 0.157.0 through 0.159.1, including after a clean SIGTERM. The only session-less counters seen come from the TUI client processes, and those name no session and are dropped.
 - **The exporter is read once:** the daemon reads `[otel]` when it starts. A change reaches it only after `codex app-server daemon restart`, and Codex warns that running work may be interrupted. `relay setup` says so when a daemon predates it, and doctor warns until the daemon has restarted (read from `$CODEX_HOME/app-server-daemon/daemon.pid`). terma never restarts it.
 
-Tests (`live/codex_appserver.go` drives app-server over stdio JSON-RPC the way Desktop does, and a sandbox daemon with a TUI attached to it):
+Tests (`test/live/codex_appserver.go` drives app-server over stdio JSON-RPC the way Desktop does, and a sandbox daemon with a TUI attached to it):
 - **`TestRelayCodexDesktop`:** one process holds a repository thread and a personal thread. The first reaches its project, the second nothing.
 - **`TestRelayCodexDesktopResumedElsewhere`:** a thread is resumed from a personal directory after a restart, and nothing of the resumed turn leaves.
 - **`TestRelayCodexDaemonTUI`:** a TUI attached to the daemon, verified by the claim naming the daemon's pid. The repository thread reaches the project; its title conversation, a personal thread in the same daemon and that thread's title reach nothing.
@@ -194,7 +194,7 @@ Claude Desktop's Code tab never runs the `claude` on PATH, so terma's per-reposi
 - **Service name:** `service.name=claude-code-desktop`, set through `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES`. The relay routes by session, never by service name. The backend's adapter must accept the Desktop name.
 - **Worktree mode:** "use worktree" creates linked worktrees at `<repo>/.claude/worktrees/<name>`, which find the main checkout's binding.
 
-`TestRelayClaudeDesktop` (`live/claude_desktop.go`) reproduces that launch on the pinned build and on the newest. On one relay it runs a repository session, a worktree session and a personal session. The first two reach the project with its key, and their hooks ran. The personal session was received and dropped. It passes on 2.1.202 and 2.1.284.
+`TestRelayClaudeDesktop` (`test/live/claude_desktop.go`) reproduces that launch on the pinned build and on the newest. On one relay it runs a repository session, a worktree session and a personal session. The first two reach the project with its key, and their hooks ran. The personal session was received and dropped. It passes on 2.1.202 and 2.1.284.
 
 **Not covered:** Desktop's cowork mode (`claude-code-vm`) runs Claude Code in a Linux VM:
 - with user settings only (so no repository hooks, and no claims);
@@ -218,7 +218,7 @@ Every record names Pi's own session id as `session.id`. The extension also calls
 
 The relay withholds the prompt body, `gen_ai.completion` and the tool arguments and results when content is off.
 
-Tested on the installed 0.99.1 (`live/relay_pi_test.go`):
+Tested on the installed 0.99.1 (`test/live/relay_pi_test.go`):
 - **Workload equivalence:** reply, bash, and write, each direct vs relay, with zero drops.
 - **Content:** allowed and withheld. The withheld case was sabotaged: without `pi.user_prompt` in the gate, the prompt body leaked, and the test caught it.
 - **Negative control:** Pi outside any bound repository sends to the relay, and nothing reaches upstream.
@@ -363,7 +363,7 @@ For company laptops where the organization wants all AI spend, its policy (fetch
 **Verified with the real agents:**
 - Claude Code 2.1.285 in a bound repository, one with a mapped remote, one with an unknown remote, and a directory outside any repository. Each session reaches its project exactly once, with a key the relay minted, and each commit carries the session that wrote it.
 - Codex 0.158.0 outside any repository and in an unknown one. Its threads and its metrics reach the default project.
-- Both on macOS, and on a fresh Linux machine in Docker (`make machines` in `live/`), which also deploys the managed configuration to `/etc` and runs Codex without its trust bypass.
+- Both on macOS, and on a fresh Linux machine in Docker (`make machines` in `test/live/`), which also deploys the managed configuration to `/etc` and runs Codex without its trust bypass.
 
 **Not reached in global mode:** Cursor's own telemetry (it goes to Cursor's backend only), Claude Desktop's cowork VM, Goose, Aider, and AI used in a browser. The complete spend figure has to come from the providers' admin exports, reconciled against this.
 
@@ -462,4 +462,4 @@ cd live && make telemetry          # includes TestRelay*, no credentials
 TERMA_LIVE_CLAUDE_VERSIONS=last6 TERMA_LIVE_CODEX_VERSIONS=last6 TERMA_LIVE_OPENCODE_VERSIONS=last4 make live RUN='TestRelay.*'
 ```
 
-The nightly `live.yml` runs them on the last three releases of each harness. Relay goldens are in `live/golden/relay/` (`LIVE_UPDATE_GOLDEN=1`).
+The nightly `live.yml` runs them on the last three releases of each harness. Relay goldens are in `test/live/golden/relay/` (`LIVE_UPDATE_GOLDEN=1`).

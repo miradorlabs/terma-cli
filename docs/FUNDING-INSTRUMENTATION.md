@@ -215,8 +215,8 @@ Authentic API routes passed on 2026-09-15 for Claude 2.1.270–2.1.272 and Codex
 0.153.3–0.154.0. Claude delivers headless per-request usage and credential-presence
 account evidence; Codex delivers completed-response usage with `auth_mode=ApiKey`
 and its hook's quota-availability status. Missing API quota is not zero quota.
-The corresponding field-name baselines are `live/golden/claude/*-apikey.json` and
-`live/golden/codex/response_completed-apikey.json`. This verifies collection;
+The corresponding field-name baselines are `test/live/golden/claude/*-apikey.json` and
+`test/live/golden/codex/response_completed-apikey.json`. This verifies collection;
 provider billing reconciliation and mixed-auth live coverage remain separate.
 
 ## Cursor IDE and CLI

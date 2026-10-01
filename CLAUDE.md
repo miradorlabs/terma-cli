@@ -263,9 +263,9 @@ developer login to check the team's repository permission.
     git ran before (the repository's `.git/hooks`, or the developer's own global directory,
     recorded in `.previous-hooks-path` and restored). A repository's local core.hooksPath
     (husky, `terma install`'s shims) outranks it.
-  - Tests: `live/global_test.go` runs it with real agents (safe anywhere: the sandbox owns
-    HOME and git's global config); `make machines` (in `live/`) runs it, and the core relay
-    contracts, on a fresh Linux machine in Docker (`live/machine/Dockerfile`, seccomp
+  - Tests: `test/live/global_test.go` runs it with real agents (safe anywhere: the sandbox owns
+    HOME and git's global config); `make machines` (in `test/live/`) runs it, and the core relay
+    contracts, on a fresh Linux machine in Docker (`test/live/machine/Dockerfile`, seccomp
     unconfined for Codex's bwrap), including the managed-config scenario that writes
     `/etc` (`TERMA_MACHINE=1` only).
 - Everything else per-repository is `terma install`, including what `setup` used to do on the way: per-clone `core.hooksPath`
@@ -333,7 +333,7 @@ developer login to check the team's repository permission.
   `updated_at` sent. The name restates the first prompt, so it is the one other read of
   conversation content and travels under the same `repliesConsented` gate.
 - Codex names no edited file: `PostToolUse` carries the tool call, and the paths live in
-  the apply_patch envelope inside `tool_input.command` (`hookrun.applyPatchPaths`). That
+  the apply_patch envelope inside `tool_input.command` (`applyPatchPaths` in internal/agents/codex). That
   hook is `async` in the committed file because it fires on every tool call and nothing
   terma returns can change what Codex does; `SessionEnd` asks for Codex's maximum
   3-second timeout and fires late — on close, or 30 minutes idle — so it only clears
@@ -364,10 +364,10 @@ developer login to check the team's repository permission.
   `selfupdate.NeedsRefresh`, so source builds and tests never touch home files) before
   verifying, and records it; the repository half is its own hook plan, which rewrites a
   stale committed file as it adds a missing one.
-- Tool content follows the same rule (`resolveToolContent`): `--exclude-tool-content`
+- Tool content follows the same rule (`contentChoices` in `internal/cli/install.go`): `--exclude-tool-content`
   when given, else the last choice for the project; a bare re-install used to switch it
   back on.
-- Prompt capture (`resolvePrompts`): `--prompts on|off` (`--exclude-prompts` is the older,
+- Prompt capture (`contentChoices`): `--prompts on|off` (`--exclude-prompts` is the older,
   hidden spelling); otherwise install never asks: it keeps this developer's last choice for
   the project (`routing.Record.IncludePrompts`), on for a first install, and its Prompts line
   names the `terma install --prompts off|on` that changes it. It lands in the routing record
@@ -384,7 +384,7 @@ developer login to check the team's repository permission.
   cannot clear, refuse what needs `--force`, ask — and resolving, storing and asking for a
   key come in as `connect.Steps`, so the package imports no account or spool code.
 - Connect scope (`internal/harness/scope.go`): Claude Code's exporter is global; its `.Local(root)`
-  writes `<root>/.claude/settings.json` and renders only `claudeLocalKeys` — the three
+  writes `<root>/.claude/settings.json` and renders only `claudeLocalKeys` (internal/agents/claude) — the three
   exporters, the four capture switches, the traces beta flag — never the endpoint, key
   or master switch. A local file is a policy, not a connection: its
   `Status().Connected` is false, and `status`/`doctor` judge connectedness from the
@@ -544,7 +544,7 @@ developer login to check the team's repository permission.
   not a second call. agy names no turn: `invocationNum` restarts each turn,
   `initialNumSteps` moves each *invocation*, and Stop's `executionNum` is per process (0
   on both turns of a resumed conversation), so `turn_id` is `turn-<initialNumSteps at
-  invocation 0>`, recorded by `PreInvocation` (`hookrun/antigravity_turn.go`,
+  invocation 0>`, recorded by `PreInvocation` (`internal/agents/antigravity/turn.go`,
   `antigravity-turns/`) and read back by the turn's other hooks.
   Live-verified on agy 1.2.4, 2026-09-16, and 1.2.7, 2026-09-18; see
   `docs/ANTIGRAVITY-INSTRUMENTATION.md`.
@@ -617,14 +617,14 @@ developer login to check the team's repository permission.
   `hookTrust.TrustedKeys`) and doctor names what is skipped.
 - `docs/collection-matrix.html` is the harness × information × mechanism matrix (open it
   in a browser). Update a cell when a mechanism ships or a live check changes it.
-- `live/` runs the real harness binaries with real credentials through the real `terma`
+- `test/live/` runs the real harness binaries with real credentials through the real `terma`
   binary and checks the matrix's promises across the hook spool, an in-test OTLP receiver
   and a pseudo-terminal (`make live` there; own Go module, built in Docker, run natively).
   Interactive sessions go through a pty because the status line and the trust dialog only
   exist there; `golden/` holds each surface's attribute names so drift fails a test. A
   scenario without its credential is reported as not run, never as a pass.
 
-`pocs/funding-model` is the estimator for *who paid* for a model call (seat allowance,
+`prototypes/funding-model` is the estimator for *who paid* for a model call (seat allowance,
 usage credits, API metering) and an evaluation harness that runs it over simulated
 organisations with known truth and the providers' exports rendered from that truth. It
 is a separate Go module with no dependencies and runs only through Docker (`make eval`
@@ -632,13 +632,13 @@ there); `model/` is written to move to the backend unchanged. The estimator neve
 determines a route: it scores evidence (account snapshot from `~/.claude.json`,
 credential hints, per-request `speed`, Codex `auth_mode`) and is corrected by
 reconciliation against simulated user × model × day USD reports. The local
-`pocs/funding-model/cmd/funding-reconcile` pilot preserves the actual exports' grain and units (Claude
+`prototypes/funding-model/cmd/funding-reconcile` pilot preserves the actual exports' grain and units (Claude
 account/model/period USD; OpenAI workspace/product/interval credits); see
-`pocs/funding-model/replay/README.md`. Do not feed real exports to the simulation
+`prototypes/funding-model/replay/README.md`. Do not feed real exports to the simulation
 reconciler or price real calls with its illustrative tables. The earlier Codex
 exploration it superseded (`pocs/funding-observer` and two handover files in the root) was
 removed on 2026-09-21; it is in the history before that. The one piece of it still cited, the
-provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
+provider report schema evidence, lives in `prototypes/funding-model/replay/evidence/`.
 
 ## Local relay
 
@@ -730,16 +730,16 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   relay, their credential and the endpoint work; the stub's 404 reads as "not taken yet".
 - Compatibility matrix (`docs/COMPATIBILITY.md`, generated — never edit it by hand):
   every live scenario says which harness capability it proves (`Proves` / `ProvesAll`,
-  `live/compat.go`; `Capabilities` is the row list, IDs append-only), and its outcome is
+  `test/live/compat.go`; `Capabilities` is the row list, IDs append-only), and its outcome is
   written per run to `report/compat.json` (`report/linux/` from `make machines`). `make
-  compat` (`live/compatgen`) merges runs into `docs/compat/history.json` (latest result,
+  compat` (`test/live/compatgen`) merges runs into `docs/compat/history.json` (latest result,
   first pass, per build × platform × capability; a run that skipped a capability keeps
   what was known) plus hand-verified surfaces (`docs/compat/manual.json`: apps CI cannot
   drive), and renders the markdown and `docs/compat/compat.json` for the website. The
   nightly (`live.yml`) runs macOS and the Linux machine, renders the matrix, and pushes
   it to the `compat-matrix` branch, whose history each night extends. A new scenario
   that proves nothing in the matrix is a gap: tag it.
-- `live/relay_workloads_test.go` runs each workload directly and through the relay and
+- `test/live/relay_workloads_test.go` runs each workload directly and through the relay and
   requires the same telemetry and zero drops; long live matrix runs use frozen copies of
   `bin/terma` and `bin/live.test`, or a rebuild mid-run mixes versions.
 - omp goes through the relay by terma's Pi-family extension (`internal/agents/internal/pifamily/terma.ts`,
@@ -751,7 +751,7 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   `ctx.sessionManager.getSessionId()` — never an invented id.
 - OpenCode goes through the relay too (`relay setup` points the plugin at it): its
   prompt rides a log body and its reply `gen_ai.completion`, both withheld with content.
-  `live/opencode.go` fetches OpenCode builds from npm (`opencode-<os>-<arch>`), and
+  `test/live/opencode.go` fetches OpenCode builds from npm (`opencode-<os>-<arch>`), and
   `openAIChatProvider` is its fake model.
 - Session keys: `session.id` (Claude, every signal), `conversation.id` (Codex logs), and
   `thread.id` on Codex's turn span only — a numeric `thread.id` is an OS thread and is
@@ -771,8 +771,8 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   `TraceHold` (app-server exports it at `thread/start`, the first hook fires at the first
   turn). The daemon reads `[otel]` only at start: `relay setup` and doctor name
   `codex app-server daemon restart` (`runningDaemon` in internal/agents/codex), never run it.
-  `live/codex_appserver.go` drives app-server over stdio JSON-RPC and a sandbox daemon
-  (short `CODEX_HOME`: SUN_LEN); `live/claude_desktop.go` reproduces Desktop's launch.
+  `test/live/codex_appserver.go` drives app-server over stdio JSON-RPC and a sandbox daemon
+  (short `CODEX_HOME`: SUN_LEN); `test/live/claude_desktop.go` reproduces Desktop's launch.
 - Pi, Hermes and DeepSeek Harness have no usable exporter: terma writes one into each —
   dsh's Cordis plugin (`$DSH_HOME/plugins/terma-relay.mjs`, inserted in
   `cordis.patch.yml`, auxiliary calls spanned through `llm/stream`), Pi's extension
@@ -814,7 +814,7 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   `*Data` messages (wire-identical to the export requests); never import the collector
   packages, which pull gRPC into every hook. Under the relay the machine-wide Codex config
   always allows prompts, so `repliesConsented` takes consent from the routing record
-  alone. `live/relay_test.go` is the e2e proof and nightly canary (`golden/relay/`).
+  alone. `test/live/relay_test.go` is the e2e proof and nightly canary (`golden/relay/`).
 
 ## Contracts other repos depend on
 

@@ -14,8 +14,8 @@ import (
 
 // Every key the live goldens record with content withheld is classified here.
 func TestClassificationCoversTheGoldens(t *testing.T) {
-	files, _ := filepath.Glob(filepath.Join("..", "..", "live", "golden", "*", "telemetry-redacted.json"))
-	withheld, _ := filepath.Glob(filepath.Join("..", "..", "live", "golden", "relay", "*-withheld.json"))
+	files, _ := filepath.Glob(filepath.Join("..", "..", "test", "live", "golden", "*", "telemetry-redacted.json"))
+	withheld, _ := filepath.Glob(filepath.Join("..", "..", "test", "live", "golden", "relay", "*-withheld.json"))
 	files = append(files, withheld...)
 	if len(files) == 0 {
 		t.Fatal("no goldens found")
