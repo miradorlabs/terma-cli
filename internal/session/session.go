@@ -306,7 +306,10 @@ func (s *Store) manifests() ([]Manifest, map[string][]string, error) {
 		var id string
 		switch {
 		case strings.HasSuffix(name, deltaExt):
-			id, _, _ = strings.Cut(strings.TrimSuffix(name, deltaExt), deltaSep)
+			var named bool
+			if id, _, named = strings.Cut(strings.TrimSuffix(name, deltaExt), deltaSep); !named {
+				continue // not a name writeDelta makes, so nothing would fold it
+			}
 		case strings.HasSuffix(name, manifestExt):
 			id = strings.TrimSuffix(name, manifestExt)
 		default:

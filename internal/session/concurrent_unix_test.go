@@ -262,3 +262,102 @@ func fileCount(t *testing.T, store *Store) int {
 	}
 	return len(manifests[0].Files)
 }
+
+// Writers that get the lock and writers that miss it, racing a Consume that folds deltas
+// mid-flight, keep every file: a fold removes only the deltas it read.
+func TestMixedLockedAndContendedWritersLoseNothing(t *testing.T) {
+	for round := range 20 {
+		dir := t.TempDir()
+		steady := patient(Open(dir))
+		hasty := Open(dir)
+		hasty.lockWait = time.Microsecond
+		sess := Session{ID: "sess-1", Tool: "codex"}
+		const writers = 32
+		var wg sync.WaitGroup
+		for i := range writers {
+			store := steady
+			if i%2 == 1 {
+				store = hasty
+			}
+			wg.Go(func() {
+				if err := store.Touch(sess, []string{fmt.Sprintf("file-%02d.go", i)}, time.Now()); err != nil {
+					t.Errorf("touch %d: %v", i, err)
+				}
+			})
+		}
+		for range 4 {
+			wg.Go(func() {
+				if err := steady.Consume(sess.ID, []string{"never-touched.go"}); err != nil {
+					t.Errorf("consume: %v", err)
+				}
+			})
+		}
+		wg.Wait()
+		if got := fileCount(t, steady); got != writers {
+			t.Fatalf("round %d: kept %d of %d files", round, got, writers)
+		}
+	}
+}
+
+// A merge folds both sessions' deltas into the target and leaves none of either behind.
+func TestMergeFoldsDeltasOfBothSessions(t *testing.T) {
+	store := Open(t.TempDir())
+	now := time.Now()
+	child, parent := Session{ID: "conv-child", Tool: "cursor"}, Session{ID: "conv-parent", Tool: "cursor"}
+	if err := store.Touch(child, []string{"child.go"}, now); err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range []*Manifest{
+		{SessionID: child.ID, Tool: "cursor", StartedAt: now, UpdatedAt: now, Files: map[string]time.Time{"child-late.go": now}},
+		{SessionID: parent.ID, Tool: "cursor", StartedAt: now, UpdatedAt: now, Files: map[string]time.Time{"parent.go": now}},
+	} {
+		if err := store.writeDelta(d); err != nil {
+			t.Fatal(err)
+		}
+	}
+	moved, err := store.Merge(child.ID, parent, now)
+	if err != nil || len(moved) != 2 {
+		t.Fatalf("merge moved %v, %v", moved, err)
+	}
+	manifests, err := store.Manifests()
+	if err != nil || len(manifests) != 1 || manifests[0].SessionID != parent.ID {
+		t.Fatalf("manifests = %+v, %v", manifests, err)
+	}
+	for _, f := range []string{"child.go", "child-late.go", "parent.go"} {
+		if _, ok := manifests[0].Files[f]; !ok {
+			t.Errorf("the merged manifest lost %s: %v", f, manifests[0].Files)
+		}
+	}
+	if deltas, _ := filepath.Glob(filepath.Join(store.dir, manifestsDir, "*"+deltaExt)); len(deltas) != 0 {
+		t.Fatalf("the merge left %d deltas", len(deltas))
+	}
+}
+
+// A session whose every touch missed the lock has no manifest file, yet it claims the
+// commit that carries its files, as a manifest's session would.
+func TestASessionKnownOnlyByDeltasIsAttributed(t *testing.T) {
+	store := Open(t.TempDir())
+	store.lockWait = time.Millisecond
+	if err := os.MkdirAll(store.dir, dirMode); err != nil {
+		t.Fatal(err)
+	}
+	release, err := flock.Lock(context.Background(), filepath.Join(store.dir, lockFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	if err := store.Touch(Session{ID: "sess-1", Tool: "codex", ToolVersion: "0.158.0"}, []string{"a.go"}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(store.manifestPath("sess-1")); !os.IsNotExist(err) {
+		t.Fatalf("a contended touch wrote the manifest itself: %v", err)
+	}
+	manifests, err := store.Manifests()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := Attribute([]string{"a.go", "b.go"}, manifests, nil, false)
+	if len(got) != 1 || got[0].SessionID != "sess-1" || got[0].Tool != "codex/0.158.0" || len(got[0].Files) != 1 {
+		t.Fatalf("attribution = %+v", got)
+	}
+}

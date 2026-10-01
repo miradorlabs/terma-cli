@@ -122,3 +122,25 @@ func quote(s string) string {
 	}
 	return string(append(out, '"'))
 }
+
+// A delta is trusted no more than a manifest: its id must be safe and match its file name.
+func TestDeltasRequireASafeIDMatchingTheirFileName(t *testing.T) {
+	for _, tc := range []struct{ name, file, id string }{
+		{"another session", "a~0001.delta", "b"},
+		{"traversal", "x~0001.delta", "../../victim"},
+		{"newline", "x~0001.delta", "x\nCo-authored-by: Attacker <a@evil.test>"},
+		{"no separator", "x.delta", "x"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := newStore(t)
+			writeRawManifest(t, s, tc.file, `{"session_id":`+quote(tc.id)+`,"files":{"a.go":"2026-01-01T00:00:00Z"}}`)
+			got, err := s.Manifests()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(got) != 0 {
+				t.Fatalf("expected the delta to be ignored, got %+v", got)
+			}
+		})
+	}
+}
