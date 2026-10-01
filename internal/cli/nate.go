@@ -10,12 +10,14 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
+	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
@@ -80,6 +82,16 @@ func (app *App) runNate(cmd *cobra.Command) error {
 		} else if restored {
 			fmt.Fprintf(out, "Restored the %s notifier.\n", n.DisplayName())
 		}
+	}
+
+	// Global mode's hooks and the relay service point into the config directory and at this binary.
+	if err := app.globalMode().Apply(cmd.Context(), nil, false, func(what string) { fmt.Fprintln(out, strings.TrimSpace(what)) }, func(string) {}); err != nil {
+		return fmt.Errorf("restore machine-wide hooks: %w", err)
+	}
+	if removed, err := daemon.RemoveService(cmd.Context()); err != nil {
+		return fmt.Errorf("remove the relay service: %w", err)
+	} else if removed {
+		fmt.Fprintln(out, "Removed the relay service.")
 	}
 
 	configDir, err := config.Dir()

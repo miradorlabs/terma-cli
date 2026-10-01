@@ -209,3 +209,25 @@ func TestSetupWritesManagedConfig(t *testing.T) {
 		}
 	}
 }
+
+// nate puts back what global mode changed outside the config directory it deletes: git's
+// global hooks path and the agents' machine-wide hooks.
+func TestNateRestoresGlobalMode(t *testing.T) {
+	globalSandbox(t)
+	mine := t.TempDir()
+	gitOut(t, t.TempDir(), "config", "--global", "core.hooksPath", mine)
+	t.Setenv("TERMA_POLICY_STUB", globalStub)
+	if out, err := runTerma(t, "setup", "--harness", "claude,codex"); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	stubNateBinary(t, filepath.Join(t.TempDir(), "terma"))
+	if out, err := runTerma(t, "nate", "--yes"); err != nil {
+		t.Fatalf("nate: %v\n%s", err, out)
+	}
+	if got := gitOut(t, t.TempDir(), "config", "--global", "--get", "core.hooksPath"); filepath.Clean(strings.TrimSpace(got)) != filepath.Clean(mine) {
+		t.Errorf("core.hooksPath = %q, want the developer's own %q", got, mine)
+	}
+	if data, _ := os.ReadFile(filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), "settings.json")); strings.Contains(string(data), "hook --user") {
+		t.Errorf("machine-wide hooks survived nate:\n%s", data)
+	}
+}

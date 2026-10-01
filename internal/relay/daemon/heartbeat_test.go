@@ -1,4 +1,4 @@
-package cli
+package daemon
 
 import (
 	"fmt"
@@ -11,14 +11,14 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/flock"
-	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 )
 
 // The heartbeat names this terma's build and setup, never whose machine it is; the machine
 // id is random and stable.
 func TestHeartbeatFactsNameNoOne(t *testing.T) {
-	dir := relaySandbox(t)
-	facts := testApp.relayDeps().Heartbeat(dir).Facts()
+	dir, _ := setUpRelay(t)
+	h := Heartbeat{Dir: dir, Version: "v1.2.3", InstallKind: "script", Agents: func(string) ([]string, []string) { return nil, nil }}
+	facts := h.Facts()
 	for _, k := range []string{"terma.version", "terma.os", "terma.arch", "terma.machine_id", "terma.install", "terma.mode", "terma.relay.service"} {
 		if _, ok := facts[k]; !ok {
 			t.Errorf("no %s in %v", k, facts)
@@ -33,7 +33,7 @@ func TestHeartbeatFactsNameNoOne(t *testing.T) {
 		}
 	}
 	id := facts["terma.machine_id"]
-	if id == "" || testApp.relayDeps().Heartbeat(dir).Facts()["terma.machine_id"] != id {
+	if id == "" || h.Facts()["terma.machine_id"] != id {
 		t.Fatalf("machine id %q is not stable", id)
 	}
 }
@@ -41,13 +41,18 @@ func TestHeartbeatFactsNameNoOne(t *testing.T) {
 // setup's check-in reports the beat as sent, endpoint not there yet (the stub's 404),
 // another failure, or no relay at all.
 func TestRelayCheckIn(t *testing.T) {
-	dir := relaySandbox(t)
-	addr := freeAddr(t)
-	if out, err := runTerma(t, "relay", "setup", "--no-start", "--addr", addr, "--harness", "codex"); err != nil {
-		t.Fatalf("setup: %v\n%s", err, out)
+	dir, _ := setUpRelay(t)
+	free, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := free.Addr().String()
+	_ = free.Close()
+	if err := os.WriteFile(filepath.Join(dir, AddrFile), []byte(addr), 0o600); err != nil {
+		t.Fatal(err)
 	}
 	start := time.Now()
-	if ok, what := daemon.CheckIn(t.Context()); ok || !strings.Contains(what, "did not answer") || time.Since(start) > 3*time.Second {
+	if ok, what := CheckIn(t.Context()); ok || !strings.Contains(what, "did not answer") || time.Since(start) > 3*time.Second {
 		t.Fatalf("no relay: %v %q after %v", ok, what, time.Since(start))
 	}
 	for _, tc := range []struct {
@@ -73,8 +78,8 @@ func TestRelayCheckIn(t *testing.T) {
 			fmt.Fprint(w, tc.body)
 		})}
 		go func() { _ = srv.Serve(ln) }()
-		unlock, _ := flock.TryLock(filepath.Join(dir, daemon.LockFile)) // "running"
-		ok, what := daemon.CheckIn(t.Context())
+		unlock, _ := flock.TryLock(filepath.Join(dir, LockFile)) // "running"
+		ok, what := CheckIn(t.Context())
 		if unlock != nil {
 			unlock()
 		}
