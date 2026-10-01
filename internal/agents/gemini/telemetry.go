@@ -14,6 +14,7 @@ func (Agent) CaptureRules() shape.CaptureRules {
 		PromptDropFields:     []string{"request_text", "response_text"},
 		ResourcePromptFields: []string{"process.command_args"},
 		ToolContentFields:    []string{"function_args", "hook_input", "hook_output", "stdout", "stderr"},
+		SafeKeys:             []string{"embedding_model", "core_tools_enabled", "approval_mode", "mcp_tools", "mcp_tools_count", "mcp_server_name", "output_format", "extensions", "extension_ids", "extension_name", "extension_id", "auth_type", "function_name", "tool_type", "operation", "mimetype", "extension", "programming_language", "finish_reasons", "decision_model", "decision_source"},
 	}
 }
 
