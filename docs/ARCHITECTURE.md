@@ -10,7 +10,8 @@ place.
                   ┌──────────────────────────── terma (cmd/terma) ────────────────────────────┐
  developer ──────▶│ internal/cli          the command tree, run by cli.App                    │
                   │   ├─ internal/install   one plan: dry run prints it, Apply carries it out │
-                  │   └─ internal/doctor    the checks, in order; probes reach network/spool  │
+                  │   ├─ internal/doctor    the checks, in order; probes reach network/spool  │
+                  │   └─ internal/connect   an agent's exporter, machine-wide or per repo     │
                   │                                                                           │
  agent hooks ────▶│ terma hook <event> → hooks/dispatch → hooks/hookrun → internal/spool ─────┼──▶ Terma ingest
  git hooks   ────▶│   (prepare-commit-msg stamps trailers: internal/trailer, internal/session)│
@@ -79,9 +80,10 @@ connect, status, scope, the ownership journal and the settings writes. An agent 
 own settings file holds an OTLP exporter uses that kit and hands its `Harness` over
 through the `agents.Exporting` capability. Nothing registers a harness, and nothing
 reaches one except through its agent. The registry's harness lookups (`Harnesses`,
-`Harness(name)`) are `With[agents.Exporting]` underneath. Agents without such an
-exporter, such as Pi or Gemini through the relay or Cursor with hooks only, have no
-harness at all.
+`HarnessNames`, `Harness(name)`) are one-line projections over `With[agents.Exporting]`;
+`Harness(name)` also normalizes a name a developer typed and words the error that lists
+the choices. Agents without such an exporter, such as Pi or Gemini through the relay or
+Cursor with hooks only, have no harness at all.
 
 Adding an agent means adding one package, plus one line in `builtin`.
 `internal/contract` keeps byte snapshots of every file terma writes for an agent:

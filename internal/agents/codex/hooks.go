@@ -59,13 +59,6 @@ type codexHookHandler struct {
 	Async   bool   `json:"async,omitempty"`
 }
 
-// codexMatcherGroup carries no matcher from terma: which calls edit files is the binary's
-// question, and a committed regex goes stale when Codex adds an edit tool.
-type codexMatcherGroup struct {
-	Matcher *string           `json:"matcher,omitempty"`
-	Hooks   []json.RawMessage `json:"hooks"`
-}
-
 // planHooks merges terma's hooks into .codex/hooks.json; Codex denies unknown fields, so
 // only `description` and `hooks` are written at the top level.
 func planHooks(root string, install bool) (hookmgr.Plan, error) {
@@ -82,17 +75,14 @@ func planCodex(root, path string, command func(event string) string, install boo
 	// updated group must be trusted again; doctor reports it until then.
 	own := make([]hookmgr.EventHook, 0, len(committedHooks))
 	for _, h := range committedHooks {
-		handler, err := hookmgr.MarshalJSON(codexHookHandler{
+		// No matcher from terma: which calls edit files is the binary's to decide.
+		entry, err := hookmgr.Group(h.Event, "", codexHookHandler{
 			Type: "command", Command: command(hookmgr.HookEventOf(h.Command)), Timeout: h.Timeout, Async: h.Async,
-		}, "", "")
+		})
 		if err != nil {
 			return hookmgr.Plan{}, err
 		}
-		group, err := hookmgr.MarshalJSON(codexMatcherGroup{Hooks: []json.RawMessage{handler}}, "", "")
-		if err != nil {
-			return hookmgr.Plan{}, err
-		}
-		own = append(own, hookmgr.EventHook{Event: h.Event, Entry: group})
+		own = append(own, entry)
 	}
 	return hookmgr.MergeEventHooks(root, hookmgr.HooksFile{Path: path}, own, install)
 }

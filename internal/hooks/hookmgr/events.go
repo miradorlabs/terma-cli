@@ -111,3 +111,17 @@ func MergeEventHooks(root string, file HooksFile, own []EventHook, install bool)
 	p.Changes = append(p.Changes, Change{Path: file.Path, Before: before, After: append(out, '\n')})
 	return p, nil
 }
+
+// Group is an event's entry wrapping one handler, {"matcher": …, "hooks": [handler]}, the
+// shape of hooks files whose events take matcher groups; an empty matcher is left out.
+func Group(event, matcher string, handler any) (EventHook, error) {
+	h, err := MarshalJSON(handler, "", "")
+	if err != nil {
+		return EventHook{}, err
+	}
+	g, err := MarshalJSON(struct {
+		Matcher string            `json:"matcher,omitempty"`
+		Hooks   []json.RawMessage `json:"hooks"`
+	}{matcher, []json.RawMessage{h}}, "", "")
+	return EventHook{Event: event, Entry: g}, err
+}

@@ -1,7 +1,6 @@
 package claude
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 
@@ -47,21 +46,13 @@ func planClaude(root, path string, command func(event string) string, install bo
 		Command string `json:"command"`
 		Timeout int    `json:"timeout,omitempty"`
 	}
-	type hookEntry struct {
-		Matcher string            `json:"matcher,omitempty"`
-		Hooks   []json.RawMessage `json:"hooks"`
-	}
 	own := make([]hookmgr.EventHook, 0, len(committedHooks))
 	for _, h := range committedHooks {
-		cmd, err := hookmgr.MarshalJSON(hookCmd{Type: "command", Command: command(hookmgr.HookEventOf(h.Command)), Timeout: 10}, "", "")
+		entry, err := hookmgr.Group(h.Event, h.Matcher, hookCmd{Type: "command", Command: command(hookmgr.HookEventOf(h.Command)), Timeout: 10})
 		if err != nil {
 			return hookmgr.Plan{}, err
 		}
-		entry, err := hookmgr.MarshalJSON(hookEntry{Matcher: h.Matcher, Hooks: []json.RawMessage{cmd}}, "", "")
-		if err != nil {
-			return hookmgr.Plan{}, err
-		}
-		own = append(own, hookmgr.EventHook{Event: h.Event, Entry: entry})
+		own = append(own, entry)
 	}
 	return hookmgr.MergeEventHooks(root, hookmgr.HooksFile{Path: path}, own, install)
 }
