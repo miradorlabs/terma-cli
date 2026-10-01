@@ -113,6 +113,7 @@ var bans = []struct {
 	{"internal/doctor", []string{"internal/account/api", "internal/spool", "internal/relay/daemon"}, "doctor reaches the network, the spool and the relay only through its probes"},
 	{"internal/install", []string{"internal/account", "internal/spool", "internal/connect", "internal/refresh", "internal/doctor"}, "install signs in and reaches the network only through its steps"},
 	{"internal/delivery", []string{"internal/cli", "internal/agents", "internal/relay", "internal/install", "internal/connect", "internal/doctor", "internal/account/auth"}, "delivery sends what the spool holds with each project's key, asking the agents only through its router"},
+	{"internal/setup", []string{"internal/account", "internal/spool", "internal/cli", "internal/relay", "internal/install", "internal/connect"}, "setup signs in, prompts and reaches the relay only through its steps"},
 	{"internal/refresh", []string{"internal/account", "internal/spool", "internal/cli", "internal/connect"}, "a refresh rewrites what terma wrote, from disk alone"},
 	{"internal/connect", []string{"internal/account", "internal/spool", "internal/install", "internal/cli"}, "connect signs in and mints keys only through its steps"},
 	{"internal/globalmode", []string{"internal/account", "internal/spool", "internal/cli", "internal/relay", "internal/install", "internal/connect"}, "global mode writes this machine's files and nothing else"},

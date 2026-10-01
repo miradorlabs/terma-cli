@@ -216,7 +216,7 @@ developer login to check the team's repository permission.
   weeks because nothing checked, `terma connect` recommended the fork's `terma trace list`
   for as long as its hint stayed unquoted, and the same test stops a cleanup from deleting
   a command a hint names. Quote a command in backticks when a message names one.
-- `terma setup` is the machine half: it signs in, records the developer's agents
+- `terma setup` is the machine half (`internal/setup`): it signs in, records the developer's agents
   (`config.Profile.Harnesses`), selects a team, and fetches its policy with the
   developer's login token (`api.CollectionPolicy`, GET `/v1/policy?project_id=<team>`
   on the auth host). Reading policy never creates a server key. Cached team policies

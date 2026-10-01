@@ -16,7 +16,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/globalmode"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
-	"github.com/miradorlabs/terma-cli/internal/routing"
+	"github.com/miradorlabs/terma-cli/internal/setup"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 	"github.com/miradorlabs/terma-cli/internal/ui/prompt"
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
@@ -98,7 +98,7 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 		fmt.Fprintln(out, style.Header(p, app.setupHeaderInfo(cfg, p)))
 	}
 	if cfg.APIKey != "" {
-		return errors.New("TERMA_API_KEY is set — setup signs in as a person; unset it first")
+		return setup.ErrServerKey
 	}
 	switch f.relayService {
 	case "", "on", "off":
@@ -106,13 +106,51 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 		return fmt.Errorf("--relay-service %q: want on or off", f.relayService)
 	}
 
-	if cfg, err = app.signInAndReload(cmd, cfg, signInOptions{noBrowser: f.noBrowser, pauseBeforeBrowser: !f.assumeYes}); err != nil {
-		return err
-	}
-
-	// A machine-level preference, not a connection.
-	fmt.Fprintln(out)
-	names, err := app.chooseHarnesses(cmd, cfg, f)
+	var steps []string
+	res, err := setup.Run(cmd.Context(), app.agents, cfg, setup.Steps{
+		SignIn: func(_ context.Context, cfg *config.Config) (*config.Config, error) {
+			return app.signInAndReload(cmd, cfg, signInOptions{noBrowser: f.noBrowser, pauseBeforeBrowser: !f.assumeYes})
+		},
+		// A machine-level preference, not a connection.
+		ChooseAgents: func(_ context.Context, cfg *config.Config) ([]string, error) {
+			fmt.Fprintln(out)
+			return app.chooseHarnesses(cmd, cfg, f)
+		},
+		Recorded: func(names []string) {
+			if len(names) == 0 {
+				fmt.Fprintln(out, "\nNo agents recorded. `terma install` will ask you to pick some in each repository.")
+			} else {
+				fmt.Fprintf(out, "\nAgents recorded: %s.\n", joinNames(app.adapterDisplayNames(names)))
+			}
+		},
+		SelectTeam:  func(_ context.Context, cfg *config.Config) error { return app.selectPolicyTeam(cmd, cfg) },
+		FetchPolicy: app.policies().Fetch,
+		StopRelay: func() {
+			if dir, err := daemon.Dir(); err == nil {
+				daemon.Stop(dir)
+			}
+		},
+		Fetched: func(pol config.Policy) { fmt.Fprintln(out, "Collection policy: "+policySummary(pol)+".") },
+		ConnectRelay: func(ctx context.Context, names []string) error {
+			return app.connectMachineRelay(ctx, names, f.relayService, relayReport{
+				ok:     func(label, what string) { fmt.Fprintf(out, "  %s: %s\n", label, what) },
+				warn:   func(label, what string) { fmt.Fprintf(out, "  %s (needs you): %s\n", label, what) },
+				then:   func(step string) { steps = append(steps, step) },
+				detail: io.Discard,
+			})
+		},
+		ApplyMode: func(ctx context.Context, names []string, global bool) error {
+			return app.globalMode().Apply(ctx, names, global, func(what string) { fmt.Fprintln(out, "  "+what) },
+				func(step string) { steps = append(steps, step) })
+		},
+		CheckIn: func(ctx context.Context) {
+			if ok, what := daemon.CheckIn(ctx); ok {
+				fmt.Fprintln(out, "  Check-in: "+what)
+			} else {
+				fmt.Fprintln(out, "  Check-in (needs you): "+what)
+			}
+		},
+	})
 	if errors.Is(err, errCancelled) {
 		fmt.Fprintln(out, "Cancelled. Nothing was recorded.")
 		return nil
@@ -120,59 +158,7 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 	if err != nil {
 		return err
 	}
-	if err := config.UpdateProfile(cfg.ProfileName, func(p *config.Profile) { p.Harnesses = names }); err != nil {
-		return err
-	}
-
-	if len(names) == 0 {
-		fmt.Fprintln(out, "\nNo agents recorded. `terma install` will ask you to pick some in each repository.")
-	} else {
-		fmt.Fprintf(out, "\nAgents recorded: %s.\n", joinNames(app.adapterDisplayNames(names)))
-	}
-
-	// Kept on the profile: hooks and the relay read policy there, never the network.
-	if err := app.selectPolicyTeam(cmd, cfg); err != nil {
-		return err
-	}
-	pol, err := app.policies().Fetch(cmd.Context(), cfg)
-	if err != nil {
-		return err
-	}
-	previous := cfg.Policy
-	cfg.Policy = pol
-	if err := routing.StorePolicy(cfg, &pol); err != nil {
-		return err
-	}
-	// A relay's login and scope are fixed at startup; capture-only changes need no restart.
-	if previous.OrganizationID != pol.OrganizationID || previous.AuthURL != pol.AuthURL || previous.TeamID != pol.TeamID {
-		if dir, err := daemon.Dir(); err == nil {
-			daemon.Stop(dir)
-		}
-	}
-	fmt.Fprintln(out, "Collection policy: "+policySummary(pol)+".")
-
-	var steps []string
-	err = app.connectMachineRelay(cmd.Context(), names, f.relayService, relayReport{
-		ok:     func(label, what string) { fmt.Fprintf(out, "  %s: %s\n", label, what) },
-		warn:   func(label, what string) { fmt.Fprintf(out, "  %s (needs you): %s\n", label, what) },
-		then:   func(step string) { steps = append(steps, step) },
-		detail: io.Discard,
-	})
-	if err != nil {
-		return err
-	}
-
-	if err := app.globalMode().Apply(cmd.Context(), names, pol.Global(), func(what string) { fmt.Fprintln(out, "  "+what) },
-		func(step string) { steps = append(steps, step) }); err != nil {
-		return err
-	}
-	if len(app.agents.RelayTargets(names)) > 0 {
-		if ok, what := daemon.CheckIn(cmd.Context()); ok {
-			fmt.Fprintln(out, "  Check-in: "+what)
-		} else {
-			fmt.Fprintln(out, "  Check-in (needs you): "+what)
-		}
-	}
+	names, pol := res.Agents, res.Policy
 	for i, step := range steps {
 		fmt.Fprintf(out, "%d. %s\n", i+1, step)
 	}
