@@ -81,7 +81,7 @@ func (c *Client) postToken(ctx context.Context, body tokenRequest) (*tokenRespon
 
 	var out tokenResponse
 	if err := decode(resp, &out); err != nil {
-		var apiErr *APIError
+		var apiErr *Error
 		if errors.As(err, &apiErr) && apiErr.Unauthenticated() {
 			return nil, fmt.Errorf("%w: %s", auth.ErrNotLoggedIn, apiErr.Message)
 		}

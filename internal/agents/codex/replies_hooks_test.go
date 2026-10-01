@@ -65,14 +65,14 @@ func routeCodex(t *testing.T, includePrompts bool) {
 
 func connectCodexMachineWide(t *testing.T, includePrompts bool) {
 	t.Helper()
-	err := (Codex{}).Connect(harness.Exporter{
+	err := (exporter{}).Connect(harness.Exporter{
 		Endpoint: "https://otel.terma.ai", APIKey: "ter_srv_0123456789abcdef01234567", ProjectID: "project-a",
 		Signals: []harness.Signal{harness.SignalLogs}, IncludePrompts: includePrompts,
 	}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if st, err := (Codex{}).Status(); err != nil || !st.Connected || st.IncludePrompts != includePrompts {
+	if st, err := (exporter{}).Status(); err != nil || !st.Connected || st.IncludePrompts != includePrompts {
 		t.Fatalf("machine-wide connect did not take: %+v %v", st, err)
 	}
 }
@@ -90,7 +90,7 @@ func stopCodex(t *testing.T, env hookrun.Env, path string) []spool.Event {
 	t.Helper()
 	b, _ := json.Marshal(map[string]any{"session_id": replySession, "cwd": env.Cwd, "transcript_path": path, "model": "gpt-5.6-luna"})
 	env.Stdin = strings.NewReader(string(b))
-	if err := CodexStop(context.Background(), env); err != nil {
+	if err := stop(context.Background(), env); err != nil {
 		t.Fatal(err)
 	}
 	var replies []spool.Event
@@ -202,7 +202,7 @@ func TestCodexRepliesFailClosedWhenAConsentSourceCannotBeRead(t *testing.T) {
 	}{
 		{"a routing record that does not parse, beside a machine-wide connect that allows prompts", func(t *testing.T) {
 			connectCodexMachineWide(t, true)
-			dir, err := routing.RoutingDir()
+			dir, err := routing.Dir()
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -262,7 +262,7 @@ func TestCodexNotifyAndStopDoNotDoubleReplies(t *testing.T) {
 		"last-assistant-message": "NOT READ FROM HERE"})
 	notify := env
 	notify.Args = []string{string(payload)}
-	if err := CodexNotify(context.Background(), notify); err != nil {
+	if err := notifyHook(context.Background(), notify); err != nil {
 		t.Fatal(err)
 	}
 	total := 0

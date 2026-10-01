@@ -567,7 +567,7 @@ func TestQueryMetric_SurfacesPrometheusError(t *testing.T) {
 
 func TestAIStreamError(t *testing.T) {
 	err := AIStreamError(&Event{Name: "error", Data: `{"code":"UNAVAILABLE","message":"backend went away"}`})
-	apiErr, ok := err.(*APIError)
+	apiErr, ok := err.(*Error)
 	if !ok || apiErr.Message != "backend went away" || apiErr.Code != "UNAVAILABLE" {
 		t.Fatalf("err = %#v", err)
 	}

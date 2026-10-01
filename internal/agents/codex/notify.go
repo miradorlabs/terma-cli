@@ -29,24 +29,24 @@ const (
 	codexNotifyState  = "codex-notify.json"
 )
 
-// CodexNotifyCommand is the argv Codex runs; the JSON payload is appended.
-var CodexNotifyCommand = []string{"terma", "hook", "codex-notify"}
+// notifyCommand is the argv Codex runs; the JSON payload is appended.
+var notifyCommand = []string{"terma", "hook", "codex-notify"}
 
-// CodexNotifyStatus reports whether config.toml routes notify to terma or elsewhere.
-type CodexNotifyStatus struct {
+// notifyStatus reports whether config.toml routes notify to terma or elsewhere.
+type notifyStatus struct {
 	ConfigPath string
 	Configured bool // notify is set at all
 	Terma      bool // notify is terma's
 	Value      string
 }
 
-// CodexNotify inspects the notify setting.
-func (c Codex) CodexNotify() (CodexNotifyStatus, error) {
+// notifySetting inspects the notify setting.
+func (c exporter) notifySetting() (notifyStatus, error) {
 	path, err := c.ConfigPath()
 	if err != nil {
-		return CodexNotifyStatus{}, err
+		return notifyStatus{}, err
 	}
-	st := CodexNotifyStatus{ConfigPath: path}
+	st := notifyStatus{ConfigPath: path}
 	data, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return st, nil
@@ -70,16 +70,16 @@ func (c Codex) CodexNotify() (CodexNotifyStatus, error) {
 }
 
 // NotifierInstalled reports whether Terma's turn notifier is still present.
-func (c Codex) NotifierInstalled() (bool, error) {
-	state, err := c.CodexNotify()
+func (c exporter) NotifierInstalled() (bool, error) {
+	state, err := c.notifySetting()
 	return state.Terma, err
 }
 
 // InstallNotifier installs turn capture while chaining the developer's notifier.
-func (c Codex) InstallNotifier() (bool, error) { return c.InstallCodexNotify() }
+func (c exporter) InstallNotifier() (bool, error) { return c.installNotify() }
 
 // RemoveNotifier restores the notifier that preceded Terma's turn capture.
-func (c Codex) RemoveNotifier() (bool, error) { return c.RemoveCodexNotify() }
+func (c exporter) RemoveNotifier() (bool, error) { return c.removeNotify() }
 
 // codexNotifyRecord keeps one displaced notifier per Codex config file, so a second
 // CODEX_HOME cannot overwrite the first's.
@@ -196,10 +196,10 @@ func writeCodexConfig(path string, out []byte) error {
 	return config.WriteFileAtomic(writePath, out, mode)
 }
 
-// InstallCodexNotify points notify at terma, recording and chaining any notifier already
+// installNotify points notify at terma, recording and chaining any notifier already
 // configured.
-func (c Codex) InstallCodexNotify() (changed bool, err error) {
-	st, err := c.CodexNotify()
+func (c exporter) installNotify() (changed bool, err error) {
+	st, err := c.notifySetting()
 	if err != nil {
 		return false, err
 	}
@@ -219,7 +219,7 @@ func (c Codex) InstallCodexNotify() (changed bool, err error) {
 		return false, fmt.Errorf("clear stale Codex notify record: %w", err)
 	}
 	data, _ := os.ReadFile(st.ConfigPath)
-	line := codexNotifyKey + " = " + renderStringArray(CodexNotifyCommand) + " " + codexNotifyMarker
+	line := codexNotifyKey + " = " + renderStringArray(notifyCommand) + " " + codexNotifyMarker
 	out := replaceTopLevel(data, codexNotifyKey, line)
 	if err := writeCodexConfig(st.ConfigPath, out); err != nil {
 		return false, err
@@ -228,7 +228,7 @@ func (c Codex) InstallCodexNotify() (changed bool, err error) {
 }
 
 func loadCodexNotifyChain() ([]string, error) {
-	current, err := (Codex{}).ConfigPath()
+	current, err := (exporter{}).ConfigPath()
 	if err != nil {
 		return nil, err
 	}
@@ -243,8 +243,8 @@ func loadCodexNotifyChainFor(configPath string) ([]string, error) {
 	return rec.Chains[configPath], nil
 }
 
-// RunPreviousCodexNotify forwards the payload to the preserved notifier, best effort.
-func RunPreviousCodexNotify(ctx context.Context, payload string) error {
+// runPreviousNotify forwards the payload to the preserved notifier, best effort.
+func runPreviousNotify(ctx context.Context, payload string) error {
 	previous, err := loadCodexNotifyChain()
 	if err != nil || len(previous) == 0 {
 		return err
@@ -257,9 +257,9 @@ func RunPreviousCodexNotify(ctx context.Context, payload string) error {
 	return cmd.Run()
 }
 
-// RemoveCodexNotify removes terma's notify entry and restores the notifier it displaced.
-func (c Codex) RemoveCodexNotify() (changed bool, err error) {
-	st, err := c.CodexNotify()
+// removeNotify removes terma's notify entry and restores the notifier it displaced.
+func (c exporter) removeNotify() (changed bool, err error) {
+	st, err := c.notifySetting()
 	if err != nil || !st.Terma {
 		return false, err
 	}
@@ -284,7 +284,7 @@ func (c Codex) RemoveCodexNotify() (changed bool, err error) {
 
 // isTermaNotify matches the exact argv prefix, not any path containing these words.
 func isTermaNotify(argv []string) bool {
-	return len(argv) >= len(CodexNotifyCommand) && slices.Equal(argv[:len(CodexNotifyCommand)], CodexNotifyCommand)
+	return len(argv) >= len(notifyCommand) && slices.Equal(argv[:len(notifyCommand)], notifyCommand)
 }
 
 func tomlAssignment(line string) (key, value string, ok bool) {

@@ -18,10 +18,10 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-// Codex configures the Codex CLI's export through the `[otel]` table of config.toml.
-// Codex reads no OTEL_* variables and has no headers helper, so the key is written
+// exporter configures the exporter CLI's export through the `[otel]` table of config.toml.
+// exporter reads no OTEL_* variables and has no headers helper, so the key is written
 // inline and the file tightened to 0600.
-type Codex struct{}
+type exporter struct{}
 
 const (
 	// `exporter` is the log exporter; metrics defaults to "statsig", OpenAI's own
@@ -87,20 +87,20 @@ var codexSignalKeys = []struct {
 }
 
 // Name is the token `terma connect` and `--harness` accept.
-func (Codex) Name() string { return "codex" }
+func (exporter) Name() string { return "codex" }
 
 // ServiceName is codex_cli_rs, the originator Codex stamps for its CLI; Desktop and the
 // IDE extensions report their own.
-func (Codex) ServiceName() string { return codexServiceName }
+func (exporter) ServiceName() string { return codexServiceName }
 
 // DisplayName is how the agent is written in prose.
-func (Codex) DisplayName() string { return "Codex" }
+func (exporter) DisplayName() string { return "Codex" }
 
 // SupportsHeadersHelper is false: Codex's headers are literal strings in config.toml.
-func (Codex) SupportsHeadersHelper() bool { return false }
+func (exporter) SupportsHeadersHelper() bool { return false }
 
 // Detect runs `codex --version`. A missing binary is not-found rather than an error.
-func (Codex) Detect(ctx context.Context) harness.Detection {
+func (exporter) Detect(ctx context.Context) harness.Detection {
 	return harness.DetectBinary(ctx, "codex", harness.SemverRE)
 }
 
@@ -118,7 +118,7 @@ func codexHome() (string, error) {
 }
 
 // ConfigPath is $CODEX_HOME/config.toml.
-func (Codex) ConfigPath() (string, error) {
+func (exporter) ConfigPath() (string, error) {
 	dir, err := codexHome()
 	if err != nil {
 		return "", err
@@ -128,7 +128,7 @@ func (Codex) ConfigPath() (string, error) {
 
 // Render maps an Exporter onto the otel table as TOML text, span attributes one entry at
 // a time; an unselected signal is left as it was (for metrics, OpenAI's own route).
-func (Codex) render(e harness.Exporter) map[string]string {
+func (exporter) render(e harness.Exporter) map[string]string {
 	out := map[string]string{
 		codexLogUserPrompt: mustRenderTOML(e.IncludePrompts),
 	}
@@ -149,7 +149,7 @@ func (Codex) render(e harness.Exporter) map[string]string {
 
 // RuntimeArgs configures one launch through -c overrides; they carry Authorization, so
 // callers must never log them.
-func (c Codex) RuntimeArgs(e harness.Exporter) []string {
+func (c exporter) RuntimeArgs(e harness.Exporter) []string {
 	values := c.render(e)
 	// Codex splits override paths on every dot without TOML quoting, so dotted attribute
 	// names travel inside the inline table value.
@@ -355,7 +355,7 @@ func otelFromCanonical(values map[string]string) (map[string]any, error) {
 }
 
 // Status reads back what is currently installed.
-func (c Codex) Status() (harness.Status, error) {
+func (c exporter) Status() (harness.Status, error) {
 	path, err := c.ConfigPath()
 	if err != nil {
 		return harness.Status{}, err
@@ -431,7 +431,7 @@ func (c Codex) Status() (harness.Status, error) {
 
 // ConflictsWith reports what in the existing config would replace, defeat, or outrank
 // the export e describes.
-func (c Codex) ConflictsWith(e harness.Exporter) ([]harness.Conflict, error) {
+func (c exporter) ConflictsWith(e harness.Exporter) ([]harness.Conflict, error) {
 	path, err := c.ConfigPath()
 	if err != nil {
 		return nil, err
@@ -688,7 +688,7 @@ func tomlInt(v any) (int64, bool) {
 // Connect merges Terma's keys into the otel table, leaving everything else as it was.
 // A key an earlier connect wrote and this one does not goes back to its pre-Terma value
 // while it still holds Terma's, or a narrower reconnect would keep sending more.
-func (c Codex) Connect(e harness.Exporter, clearConflicts bool) error {
+func (c exporter) Connect(e harness.Exporter, clearConflicts bool) error {
 	rendered := c.render(e)
 
 	path, err := c.ConfigPath()
@@ -779,7 +779,7 @@ func (c Codex) Connect(e harness.Exporter, clearConflicts bool) error {
 }
 
 // Disconnect undoes the recorded connect; without a journal nothing here is Terma's.
-func (c Codex) Disconnect() (harness.DisconnectResult, error) {
+func (c exporter) Disconnect() (harness.DisconnectResult, error) {
 	path, err := c.ConfigPath()
 	if err != nil {
 		return harness.DisconnectResult{}, err
@@ -822,7 +822,7 @@ func (c Codex) Disconnect() (harness.DisconnectResult, error) {
 
 // Backup exposes the pre-modification copy: kept when a journal makes the file Terma's
 // work, otherwise only when the config points at endpoint.
-func (c Codex) Backup(endpoint string) (string, error) {
+func (c exporter) Backup(endpoint string) (string, error) {
 	path, err := c.ConfigPath()
 	if err != nil {
 		return "", err
@@ -849,7 +849,7 @@ func (c Codex) Backup(endpoint string) (string, error) {
 
 // ConnectNotes says that connecting metrics takes them from OpenAI's own route and that
 // excluding tool content cannot exclude tool arguments.
-func (Codex) ConnectNotes(e harness.Exporter) []string {
+func (exporter) ConnectNotes(e harness.Exporter) []string {
 	var notes []string
 	if e.HasSignal(harness.SignalMetrics) {
 		notes = append(notes, "Codex sends metrics to OpenAI (statsig) unless configured otherwise; after this connect they go to Terma instead.")
@@ -862,7 +862,7 @@ func (Codex) ConnectNotes(e harness.Exporter) []string {
 
 // CurrentCredential returns the key installed for both endpoint and projectID, so a
 // reconnect reuses it instead of minting an orphan.
-func (c Codex) CurrentCredential(endpoint, projectID string) (string, bool) {
+func (c exporter) CurrentCredential(endpoint, projectID string) (string, bool) {
 	path, err := c.ConfigPath()
 	if err != nil {
 		return "", false
@@ -887,8 +887,8 @@ func (c Codex) CurrentCredential(endpoint, projectID string) (string, bool) {
 
 // A drifted optional method is a build error here, not a silent switch-off.
 var (
-	_ harness.Harness      = Codex{}
-	_ harness.Noter        = Codex{}
-	_ harness.Credentialed = Codex{}
-	_ harness.Backuper     = Codex{}
+	_ harness.Harness      = exporter{}
+	_ harness.Noter        = exporter{}
+	_ harness.Credentialed = exporter{}
+	_ harness.Backuper     = exporter{}
 )

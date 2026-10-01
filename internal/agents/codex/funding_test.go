@@ -105,10 +105,10 @@ func TestCodexFundingRejectsSymlinksAndReportsUnreadableDiscovery(t *testing.T) 
 func latestCodexQuota(t *testing.T, ctx context.Context, sessionID, transcript string) hookrun.FundingEvidence {
 	t.Helper()
 	var last *hookrun.FundingEvidence
-	cursor, status := CodexCursor{}, ""
+	cursor, status := quotaCursor{}, ""
 	for range 64 {
 		var err error
-		cursor, status, err = ReadCodexFunding(ctx, sessionID, transcript, cursor, func(e hookrun.FundingEvidence) error {
+		cursor, status, err = readFunding(ctx, sessionID, transcript, cursor, func(e hookrun.FundingEvidence) error {
 			if e.Status != "gap" {
 				last = &e
 			}
@@ -128,7 +128,7 @@ func latestCodexQuota(t *testing.T, ctx context.Context, sessionID, transcript s
 }
 
 func TestCodexHasNoRepositoryScope(t *testing.T) {
-	if _, ok := harness.Harness(Codex{}).(harness.Scoped); ok {
+	if _, ok := harness.Harness(exporter{}).(harness.Scoped); ok {
 		t.Error("Codex has one config file and must not claim a repository scope")
 	}
 }

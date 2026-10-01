@@ -51,15 +51,15 @@ type codexNotify struct {
 
 const codexTool = "codex"
 
-// CodexNotify marks the thread active and drains its rollout quota; being user-scope, it
+// notifyHook marks the thread active and drains its rollout quota; being user-scope, it
 // is the funding capture setup can guarantee in every repository.
-func CodexNotify(ctx context.Context, env hookrun.Env) error {
+func notifyHook(ctx context.Context, env hookrun.Env) error {
 	if len(env.Args) == 0 {
 		return nil
 	}
 	payload := env.Args[0]
 	defer func() {
-		if err := RunPreviousCodexNotify(ctx, payload); err != nil {
+		if err := runPreviousNotify(ctx, payload); err != nil {
 			env.Logf("previous Codex notify: %v", err)
 		}
 	}()
@@ -135,8 +135,8 @@ func readCodexHookInput(r io.Reader) (*codexHookInput, error) {
 	return in, nil
 }
 
-// CodexSessionStart records the Codex session as active.
-func CodexSessionStart(ctx context.Context, env hookrun.Env) error {
+// sessionStart records the Codex session as active.
+func sessionStart(ctx context.Context, env hookrun.Env) error {
 	in, err := readCodexHookInput(env.Stdin)
 	if err != nil {
 		env.Logf("%v", err)
@@ -164,16 +164,16 @@ func CodexSessionStart(ctx context.Context, env hookrun.Env) error {
 	}
 	// Codex fires no SessionStart for a spawned thread (it arrives as SubagentStart); this
 	// covers a build that does.
-	if spawn, status := CodexRolloutSpawn(ctx, in.SessionID, in.TranscriptPath); status == hookrun.StatusPresent {
+	if spawn, status := rolloutSpawn(ctx, in.SessionID, in.TranscriptPath); status == hookrun.StatusPresent {
 		codexSpawnAttrs(attrs, hookrun.AttrParentSession, spawn)
 	}
 	env.EmitStart(r, sess, attrs)
 	return nil
 }
 
-// CodexUserPromptSubmit records a desktop turn; the prompt travels only where the
+// userPromptSubmit records a desktop turn; the prompt travels only where the
 // repository opted into prompt content.
-func CodexUserPromptSubmit(ctx context.Context, env hookrun.Env) error {
+func userPromptSubmit(ctx context.Context, env hookrun.Env) error {
 	in, err := readCodexHookInput(env.Stdin)
 	if err != nil || !session.ValidID(in.SessionID) {
 		return nil
@@ -199,8 +199,8 @@ func CodexUserPromptSubmit(ctx context.Context, env hookrun.Env) error {
 	return nil
 }
 
-// CodexStop drains the thread's quota, replies and name before starting delivery.
-func CodexStop(ctx context.Context, env hookrun.Env) error {
+// stop drains the thread's quota, replies and name before starting delivery.
+func stop(ctx context.Context, env hookrun.Env) error {
 	in, err := readCodexHookInput(env.Stdin)
 	if err != nil {
 		env.Logf("%v", err)
@@ -218,10 +218,10 @@ func CodexStop(ctx context.Context, env hookrun.Env) error {
 	return nil
 }
 
-// CodexSessionEnd clears the active session; manifests stay for the commit to come.
+// sessionEnd clears the active session; manifests stay for the commit to come.
 // Codex fires it late (on close, or half an hour idle) or never, so it only clears state
 // and hookrun.ActiveTTL ages out the rest.
-func CodexSessionEnd(ctx context.Context, env hookrun.Env) error {
+func sessionEnd(ctx context.Context, env hookrun.Env) error {
 	in, err := readCodexHookInput(env.Stdin)
 	if err != nil {
 		env.Logf("%v", err)
@@ -245,9 +245,9 @@ func CodexSessionEnd(ctx context.Context, env hookrun.Env) error {
 	return nil
 }
 
-// CodexPostToolUse records a Desktop tool call and adds the files its patch edited to the
+// postToolUse records a Desktop tool call and adds the files its patch edited to the
 // manifest; Codex has no file-edit event.
-func CodexPostToolUse(ctx context.Context, env hookrun.Env) error {
+func postToolUse(ctx context.Context, env hookrun.Env) error {
 	in, err := readCodexHookInput(env.Stdin)
 	if err != nil {
 		env.Logf("%v", err)

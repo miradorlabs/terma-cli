@@ -11,9 +11,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
-// CodexDesktopActivity is a completed response or hosted action from the rollout; only
+// desktopActivity is a completed response or hosted action from the rollout; only
 // categories no hook reports are read, so no action counts twice.
-type CodexDesktopActivity struct {
+type desktopActivity struct {
 	Kind, ID, TurnID, TraceID, Model, ToolName, Input     string
 	Status, Reason                                        string
 	InputTokens, CachedInputTokens, CacheWriteInputTokens int64
@@ -23,8 +23,8 @@ type CodexDesktopActivity struct {
 	At, StartedAt                                         time.Time
 }
 
-// CodexDesktopCursor stores only position and turn metadata, never content.
-type CodexDesktopCursor struct {
+// desktopCursor stores only position and turn metadata, never content.
+type desktopCursor struct {
 	Identity string `json:"identity"`
 	Offset   int64  `json:"offset"`
 	Anchor   string `json:"anchor"`
@@ -34,9 +34,9 @@ type CodexDesktopCursor struct {
 	Skipping bool   `json:"skipping,omitempty"`
 }
 
-// ReadCodexDesktopActivity reads at most 1 MiB and 128 relevant records per hook; the
+// readDesktopActivity reads at most 1 MiB and 128 relevant records per hook; the
 // caller appends each activity before persisting the cursor.
-func ReadCodexDesktopActivity(ctx context.Context, sessionID, transcript string, cursor CodexDesktopCursor, emit func(CodexDesktopActivity) error) (CodexDesktopCursor, string, error) {
+func readDesktopActivity(ctx context.Context, sessionID, transcript string, cursor desktopCursor, emit func(desktopActivity) error) (desktopCursor, string, error) {
 	f, status := openCodexRollout(ctx, sessionID, transcript)
 	if f == nil {
 		return cursor, status, nil
@@ -55,10 +55,10 @@ func ReadCodexDesktopActivity(ctx context.Context, sessionID, transcript string,
 	identity := fundingHash(rolloutFileIdentity(st) + string(first))
 	if cursor.Identity != identity || cursor.Offset < 0 || cursor.Offset > st.Size() ||
 		(cursor.Offset > 0 && cursor.Anchor != cursorAnchor(f, cursor.Offset)) {
-		cursor = CodexDesktopCursor{Identity: identity}
+		cursor = desktopCursor{Identity: identity}
 	}
 	old := cursor
-	checkpoint := func(s string, e error) (CodexDesktopCursor, string, error) {
+	checkpoint := func(s string, e error) (desktopCursor, string, error) {
 		cursor.Anchor = cursorAnchor(f, cursor.Offset)
 		return cursor, s, e
 	}
@@ -109,7 +109,7 @@ func ReadCodexDesktopActivity(ctx context.Context, sessionID, transcript string,
 	return checkpoint("caught_up", nil)
 }
 
-func codexDesktopActivityFrom(line []byte, cursor *CodexDesktopCursor, sessionID string) (CodexDesktopActivity, bool) {
+func codexDesktopActivityFrom(line []byte, cursor *desktopCursor, sessionID string) (desktopActivity, bool) {
 	var rec struct {
 		Timestamp time.Time `json:"timestamp"`
 		Type      string    `json:"type"`
@@ -141,7 +141,7 @@ func codexDesktopActivityFrom(line []byte, cursor *CodexDesktopCursor, sessionID
 		} `json:"payload"`
 	}
 	if json.Unmarshal(line, &rec) != nil {
-		return CodexDesktopActivity{}, false
+		return desktopActivity{}, false
 	}
 	if rec.Type == "turn_context" {
 		if hookrun.EvidenceLabel.MatchString(rec.Payload.TurnID) {
@@ -153,7 +153,7 @@ func codexDesktopActivityFrom(line []byte, cursor *CodexDesktopCursor, sessionID
 		if hookrun.EvidenceLabel.MatchString(rec.Payload.Model) {
 			cursor.Model = rec.Payload.Model
 		}
-		return CodexDesktopActivity{}, false
+		return desktopActivity{}, false
 	}
 	if rec.Payload.TurnID != "" && hookrun.EvidenceLabel.MatchString(rec.Payload.TurnID) {
 		if cursor.TurnID != rec.Payload.TurnID {
@@ -165,9 +165,9 @@ func codexDesktopActivityFrom(line []byte, cursor *CodexDesktopCursor, sessionID
 		if hookrun.EvidenceLabel.MatchString(rec.Payload.TraceID) {
 			cursor.TraceID = rec.Payload.TraceID
 		}
-		return CodexDesktopActivity{}, false
+		return desktopActivity{}, false
 	}
-	a := CodexDesktopActivity{TurnID: cursor.TurnID, TraceID: cursor.TraceID, Model: cursor.Model, At: rec.Timestamp}
+	a := desktopActivity{TurnID: cursor.TurnID, TraceID: cursor.TraceID, Model: cursor.Model, At: rec.Timestamp}
 	switch {
 	case rec.Type == "token_usage_record":
 		a.Kind, a.ID = "model", rec.Payload.ResponseID
@@ -197,7 +197,7 @@ func codexDesktopActivityFrom(line []byte, cursor *CodexDesktopCursor, sessionID
 			a.TTFTMs, a.HasTTFT = *rec.Payload.TTFTMs, true
 		}
 	default:
-		return CodexDesktopActivity{}, false
+		return desktopActivity{}, false
 	}
 	if a.ID == "" {
 		a.ID = fundingHash(sessionID + cursor.Identity + fmt.Sprint(cursor.Offset))

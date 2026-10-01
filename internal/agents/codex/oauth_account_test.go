@@ -9,7 +9,7 @@ import (
 )
 
 // codex_auth_chatgpt.json is a real auth.json shape, tokens replaced and the account id
-// anonymized, pinning CodexOAuthAccountID against the true file.
+// anonymized, pinning oauthAccountID against the true file.
 const wantChatGPTAccount = "a5c616f7-0e91-49d4-bcfb-000000000001"
 
 func writeCodexHome(t *testing.T, authJSON []byte) string {
@@ -29,7 +29,7 @@ func TestCodexOAuthAccountID_ChatGPTRoute(t *testing.T) {
 		t.Fatal(err)
 	}
 	writeCodexHome(t, data)
-	id, ok := CodexOAuthAccountID()
+	id, ok := oauthAccountID()
 	if !ok || id != wantChatGPTAccount {
 		t.Fatalf("CodexOAuthAccountID() = %q,%v; want %q,true", id, ok, wantChatGPTAccount)
 	}
@@ -48,7 +48,7 @@ func TestCodexOAuthAccountID_APIKeyRoutesDenied(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			b, _ := json.Marshal(doc)
 			writeCodexHome(t, b)
-			if id, ok := CodexOAuthAccountID(); ok {
+			if id, ok := oauthAccountID(); ok {
 				t.Errorf("expected no attribution on API-key route, got %q", id)
 			}
 		})
@@ -64,7 +64,7 @@ func TestCodexOAuthAccountID_EnvKeyDoesNotSuppress(t *testing.T) {
 	})
 	writeCodexHome(t, b)
 	t.Setenv("OPENAI_API_KEY", "sk-env-key")
-	if id, ok := CodexOAuthAccountID(); !ok || id != wantChatGPTAccount {
+	if id, ok := oauthAccountID(); !ok || id != wantChatGPTAccount {
 		t.Fatalf("CodexOAuthAccountID() = %q,%v; want %q,true (env key must not suppress the file route)", id, ok, wantChatGPTAccount)
 	}
 }
@@ -83,7 +83,7 @@ func TestCodexOAuthAccountID_RejectsMalformedID(t *testing.T) {
 				"auth_mode": "chatgpt",
 			})
 			writeCodexHome(t, b)
-			if got, ok := CodexOAuthAccountID(); ok {
+			if got, ok := oauthAccountID(); ok {
 				t.Errorf("expected rejection of malformed account id, got %q", got)
 			}
 		})
@@ -94,20 +94,20 @@ func TestCodexOAuthAccountID_MissingOrEmpty(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("CODEX_HOME", home)
 	t.Setenv("OPENAI_API_KEY", "")
-	if _, ok := CodexOAuthAccountID(); ok {
+	if _, ok := oauthAccountID(); ok {
 		t.Error("expected no attribution when auth.json is absent")
 	}
 	writeCodexHome(t, []byte(`{"auth_mode":"chatgpt","tokens":{}}`))
-	if _, ok := CodexOAuthAccountID(); ok {
+	if _, ok := oauthAccountID(); ok {
 		t.Error("expected no attribution when tokens.account_id is empty")
 	}
 	// An absent auth_mode is not proof of the chatgpt route.
 	writeCodexHome(t, []byte(`{"tokens":{"account_id":"`+wantChatGPTAccount+`"}}`))
-	if _, ok := CodexOAuthAccountID(); ok {
+	if _, ok := oauthAccountID(); ok {
 		t.Error("expected no attribution when auth_mode is absent (unproven route)")
 	}
 	writeCodexHome(t, []byte(`{"auth_mode":null,"tokens":{"account_id":"`+wantChatGPTAccount+`"}}`))
-	if _, ok := CodexOAuthAccountID(); ok {
+	if _, ok := oauthAccountID(); ok {
 		t.Error("expected no attribution when auth_mode is null")
 	}
 }

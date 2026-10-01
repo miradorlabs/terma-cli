@@ -36,14 +36,14 @@ func dir(parts ...string) (string, error) {
 	return filepath.Join(append([]string{base}, parts...)...), nil
 }
 
-// RoutingDir holds one <projectID>.json per routed project.
-func RoutingDir() (string, error) { return dir("routing") }
+// Dir holds one <projectID>.json per routed project.
+func Dir() (string, error) { return dir("routing") }
 
 func recordPath(projectID string) (string, error) {
 	if !termaproject.ValidID(projectID) {
 		return "", fmt.Errorf("unsafe project id %q", projectID)
 	}
-	d, err := RoutingDir()
+	d, err := Dir()
 	if err != nil {
 		return "", err
 	}

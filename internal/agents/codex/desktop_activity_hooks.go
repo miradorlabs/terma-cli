@@ -36,13 +36,13 @@ func captureCodexDesktopActivity(e hookrun.Env, ctx context.Context, r *hookrun.
 		return
 	}
 	defer unlock()
-	var cursor CodexDesktopCursor
+	var cursor desktopCursor
 	if b, err := os.ReadFile(path); err == nil {
 		_ = json.Unmarshal(b, &cursor)
 	}
 	ctx, cancel := context.WithTimeout(ctx, codexCaptureTimeout)
 	defer cancel()
-	next, status, err := ReadCodexDesktopActivity(ctx, codexRolloutID(in), in.TranscriptPath, cursor, func(a CodexDesktopActivity) error {
+	next, status, err := readDesktopActivity(ctx, codexRolloutID(in), in.TranscriptPath, cursor, func(a desktopActivity) error {
 		attrs := hookrun.EvidenceAttrs(codexTool, sourceCodexRollout, "desktop")
 		attrs["capture_surface"] = codexDesktopSurface
 		hookrun.BoundedAttr(attrs, hookrun.AttrTurnID, a.TurnID)

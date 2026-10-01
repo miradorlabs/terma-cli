@@ -15,10 +15,10 @@ import (
 
 // Codex exports prompts and tool content but never its replies, which exist only in the
 // rollout. This is the one place terma reads conversation content, and only under
-// CodexRepliesConsented: both or neither of prompt and reply travel.
+// repliesConsented: both or neither of prompt and reply travel.
 
-// CodexReply is one assistant message from a rollout.
-type CodexReply struct {
+// reply is one assistant message from a rollout.
+type reply struct {
 	// ID is Codex's own message id (`msg_…`), else derived from the record's position.
 	ID string
 	// Text is cut to the caller's limit on a rune boundary; Bytes is the full length.
@@ -35,9 +35,9 @@ type CodexReply struct {
 	At time.Time
 }
 
-// CodexReplyCursor holds no transcript text: an offset, an anchor that detects a rewritten
+// replyCursor holds no transcript text: an offset, an anchor that detects a rewritten
 // file, and the current turn, which spans hook invocations.
-type CodexReplyCursor struct {
+type replyCursor struct {
 	Identity string `json:"identity"`
 	Offset   int64  `json:"offset"`
 	Anchor   string `json:"anchor"`
@@ -50,10 +50,10 @@ type CodexReplyCursor struct {
 // "backlog" for the next turn's hook.
 const codexReplyBatch = 32
 
-// ReadCodexReplies emits the messages since cursor, oldest first, and the cursor to persist
+// readRolloutReplies emits the messages since cursor, oldest first, and the cursor to persist
 // once they are spooled; a crash in between replays the same ids. Status is "caught_up",
 // "backlog", "incomplete" (mid-record), or why the rollout could not be opened.
-func ReadCodexReplies(ctx context.Context, sessionID, transcript string, cursor CodexReplyCursor, maxText int, emit func(CodexReply) error) (CodexReplyCursor, string, error) {
+func readRolloutReplies(ctx context.Context, sessionID, transcript string, cursor replyCursor, maxText int, emit func(reply) error) (replyCursor, string, error) {
 	f, status := openCodexRollout(ctx, sessionID, transcript)
 	if f == nil {
 		return cursor, status, nil
@@ -72,10 +72,10 @@ func ReadCodexReplies(ctx context.Context, sessionID, transcript string, cursor 
 	identity := fundingHash(rolloutFileIdentity(st) + string(first))
 	if cursor.Identity != identity || cursor.Offset < 0 || cursor.Offset > st.Size() ||
 		(cursor.Offset > 0 && cursor.Anchor != cursorAnchor(f, cursor.Offset)) {
-		cursor = CodexReplyCursor{Identity: identity}
+		cursor = replyCursor{Identity: identity}
 	}
 	old := cursor
-	checkpoint := func(status string, err error) (CodexReplyCursor, string, error) {
+	checkpoint := func(status string, err error) (replyCursor, string, error) {
 		cursor.Anchor = cursorAnchor(f, cursor.Offset)
 		return cursor, status, err
 	}
@@ -134,7 +134,7 @@ func ReadCodexReplies(ctx context.Context, sessionID, transcript string, cursor 
 
 // codexReplyFrom keeps the cursor's turn current and returns a non-empty assistant
 // message; an unparseable record is left alone.
-func codexReplyFrom(line []byte, cursor *CodexReplyCursor, sessionID string, maxText int) (CodexReply, bool) {
+func codexReplyFrom(line []byte, cursor *replyCursor, sessionID string, maxText int) (reply, bool) {
 	var rec struct {
 		Timestamp time.Time `json:"timestamp"`
 		Type      string    `json:"type"`
@@ -152,7 +152,7 @@ func codexReplyFrom(line []byte, cursor *CodexReplyCursor, sessionID string, max
 		} `json:"payload"`
 	}
 	if json.Unmarshal(line, &rec) != nil {
-		return CodexReply{}, false
+		return reply{}, false
 	}
 	switch {
 	case rec.Type == "turn_context", rec.Type == "event_msg" && (rec.Payload.Type == "task_started" || rec.Payload.Type == "turn_started"):
@@ -166,12 +166,12 @@ func codexReplyFrom(line []byte, cursor *CodexReplyCursor, sessionID string, max
 		if codexTraceID(rec.Payload.TraceID) {
 			cursor.TraceID = rec.Payload.TraceID
 		}
-		return CodexReply{}, false
+		return reply{}, false
 	case rec.Type == "event_msg" && (rec.Payload.Type == "task_complete" || rec.Payload.Type == "turn_complete" || rec.Payload.Type == "turn_aborted"):
 		cursor.TurnID, cursor.TraceID = "", ""
-		return CodexReply{}, false
+		return reply{}, false
 	case rec.Type != "response_item" || rec.Payload.Type != "message" || rec.Payload.Role != "assistant":
-		return CodexReply{}, false
+		return reply{}, false
 	}
 	var text strings.Builder
 	for _, part := range rec.Payload.Content {
@@ -181,9 +181,9 @@ func codexReplyFrom(line []byte, cursor *CodexReplyCursor, sessionID string, max
 	}
 	full := text.String()
 	if strings.TrimSpace(full) == "" {
-		return CodexReply{}, false
+		return reply{}, false
 	}
-	reply := CodexReply{
+	reply := reply{
 		ID: rec.Payload.ID, Bytes: len(full), Text: full,
 		TurnID: cursor.TurnID, TraceID: cursor.TraceID, At: rec.Timestamp,
 	}

@@ -35,8 +35,8 @@ func TestCodexNotifyWritesThroughSymlinkAndKeepsTheMode(t *testing.T) {
 		run  func() (bool, error)
 		want bool
 	}{
-		{"install", func() (bool, error) { return Codex{}.InstallCodexNotify() }, true},
-		{"remove", func() (bool, error) { return Codex{}.RemoveCodexNotify() }, false},
+		{"install", func() (bool, error) { return exporter{}.installNotify() }, true},
+		{"remove", func() (bool, error) { return exporter{}.removeNotify() }, false},
 	} {
 		if _, err := step.run(); err != nil {
 			t.Fatalf("%s: %v", step.name, err)

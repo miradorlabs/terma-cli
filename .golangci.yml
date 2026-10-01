@@ -25,10 +25,8 @@ linters:
     # repository has not adopted.
     revive:
       rules:
-        # Every exported identifier says what it is for. The stuttering check is off:
-        # harness.Harness and doctor.Doctor-style names are deliberate here.
+        # Every exported identifier says what it is for, without repeating its package.
         - name: exported
-          arguments: [disableStutteringCheck]
         - name: package-comments
         # `max`, `copy`, `real` as variable names compile, and shadow the builtin for
         # the rest of the scope.

@@ -208,7 +208,7 @@ func TestClient_SurfacesGatewayErrorEnvelope(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected an error")
 	}
-	apiErr, ok := err.(*APIError)
+	apiErr, ok := err.(*Error)
 	if !ok {
 		t.Fatalf("expected *APIError, got %T", err)
 	}
@@ -397,19 +397,19 @@ func TestClient_StampsTheIssuingHostOnLogin(t *testing.T) {
 func TestAPIErrorKeepsItsMessage(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		err  APIError
+		err  Error
 		want string
 	}{
-		{"envelope", APIError{StatusCode: 403, Code: "forbidden", Message: "no access", RequestID: "req_1"}, "no access (forbidden, request_id=req_1)"},
-		{"shared gateway project hint", APIError{StatusCode: 400, Code: "INVALID_ARGUMENT", Message: "missing X-Mirador-Project header — run `mirador project use <project>` or pass --project", RequestID: "req_1"}, "no project selected — run `terma install` in this repository or pass --project (INVALID_ARGUMENT, request_id=req_1)"},
-		{"shared gateway project remedy", APIError{StatusCode: 400, Code: "INVALID_ARGUMENT", Message: "no such project in this organization — run `mirador project list`"}, "no such project in this organization — run `terma project list` (INVALID_ARGUMENT)"},
-		{"shared gateway sign-in remedy", APIError{StatusCode: 403, Code: "PERMISSION_DENIED", Message: "listing organizations requires a user credential — run `mirador login`"}, "listing organizations requires a user credential — run `terma login` (PERMISSION_DENIED)"},
-		{"code only", APIError{StatusCode: 404, Code: "not_found", Message: "no such session"}, "no such session (not_found)"},
-		{"request id without a code", APIError{StatusCode: 500, Message: "boom", RequestID: "req_2"}, "boom (status 500) (request_id=req_2)"},
-		{"plain body", APIError{StatusCode: 502, Message: "upstream connect error"}, "upstream connect error (status 502)"},
-		{"stream error without a code", APIError{Message: "stream closed"}, "stream closed"},
-		{"nothing at all", APIError{StatusCode: 500}, "request failed with status 500"},
-		{"nothing, not even a status", APIError{}, "request failed"},
+		{"envelope", Error{StatusCode: 403, Code: "forbidden", Message: "no access", RequestID: "req_1"}, "no access (forbidden, request_id=req_1)"},
+		{"shared gateway project hint", Error{StatusCode: 400, Code: "INVALID_ARGUMENT", Message: "missing X-Mirador-Project header — run `mirador project use <project>` or pass --project", RequestID: "req_1"}, "no project selected — run `terma install` in this repository or pass --project (INVALID_ARGUMENT, request_id=req_1)"},
+		{"shared gateway project remedy", Error{StatusCode: 400, Code: "INVALID_ARGUMENT", Message: "no such project in this organization — run `mirador project list`"}, "no such project in this organization — run `terma project list` (INVALID_ARGUMENT)"},
+		{"shared gateway sign-in remedy", Error{StatusCode: 403, Code: "PERMISSION_DENIED", Message: "listing organizations requires a user credential — run `mirador login`"}, "listing organizations requires a user credential — run `terma login` (PERMISSION_DENIED)"},
+		{"code only", Error{StatusCode: 404, Code: "not_found", Message: "no such session"}, "no such session (not_found)"},
+		{"request id without a code", Error{StatusCode: 500, Message: "boom", RequestID: "req_2"}, "boom (status 500) (request_id=req_2)"},
+		{"plain body", Error{StatusCode: 502, Message: "upstream connect error"}, "upstream connect error (status 502)"},
+		{"stream error without a code", Error{Message: "stream closed"}, "stream closed"},
+		{"nothing at all", Error{StatusCode: 500}, "request failed with status 500"},
+		{"nothing, not even a status", Error{}, "request failed"},
 	} {
 		if got := tc.err.Error(); got != tc.want {
 			t.Errorf("%s: got %q, want %q", tc.name, got, tc.want)

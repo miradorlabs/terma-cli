@@ -13,7 +13,7 @@ import (
 )
 
 // testdata/codex_rollout_real.jsonl holds real rate-limit records only (a team plan, weekly
-// window at 91%); with a real auth.json shape they pin that CodexStop stamps the account id.
+// window at 91%); with a real auth.json shape they pin that stop stamps the account id.
 const realCodexAccountID = "a5c616f7-0e91-49d4-bcfb-000000000001"
 
 func writeRealCodexAuth(t *testing.T, mode string, apiKey any) {
@@ -52,7 +52,7 @@ func TestCodexStopStampsRealChatGPTAccountID(t *testing.T) {
 	path := realRolloutTranscript(t, env, id)
 	b, _ := json.Marshal(map[string]any{"session_id": id, "cwd": env.Cwd, "transcript_path": path})
 	env.Stdin = strings.NewReader(string(b))
-	if err := CodexStop(context.Background(), env); err != nil {
+	if err := stop(context.Background(), env); err != nil {
 		t.Fatal(err)
 	}
 
@@ -90,7 +90,7 @@ func TestCodexStopOmitsAccountIDOnNullRateLimits(t *testing.T) {
 	hookruntest.WriteFile(t, filepath.Dir(path), filepath.Base(path), content)
 	b, _ := json.Marshal(map[string]any{"session_id": id, "cwd": env.Cwd, "transcript_path": path})
 	env.Stdin = strings.NewReader(string(b))
-	if err := CodexStop(context.Background(), env); err != nil {
+	if err := stop(context.Background(), env); err != nil {
 		t.Fatal(err)
 	}
 	evs := hookruntest.Spooled(t, env.Spool)
@@ -116,7 +116,7 @@ func TestCodexStopOmitsAccountIDOnAPIKeyRoute(t *testing.T) {
 	path := realRolloutTranscript(t, env, id)
 	b, _ := json.Marshal(map[string]any{"session_id": id, "cwd": env.Cwd, "transcript_path": path})
 	env.Stdin = strings.NewReader(string(b))
-	if err := CodexStop(context.Background(), env); err != nil {
+	if err := stop(context.Background(), env); err != nil {
 		t.Fatal(err)
 	}
 	for _, ev := range hookruntest.Spooled(t, env.Spool) {

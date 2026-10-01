@@ -22,7 +22,7 @@ const (
 // ConfigureRelay points Codex's exporter at the local relay, noting a daemon that keeps
 // exporting where it did until restarted.
 func (a Agent) ConfigureRelay(_ context.Context, cfg agents.RelayConfig) (agents.RelayResult, error) {
-	result, err := relayexport.Native(Codex{}, cfg)
+	result, err := relayexport.Native(exporter{}, cfg)
 	if err != nil {
 		return result, err
 	}
@@ -35,7 +35,7 @@ func (a Agent) ConfigureRelay(_ context.Context, cfg agents.RelayConfig) (agents
 
 // RelayPointed reports whether Codex's exporter sends to the relay at addr.
 func (Agent) RelayPointed(addr string) (bool, bool) {
-	return relayexport.NativePointed(Codex{}, addr), true
+	return relayexport.NativePointed(exporter{}, addr), true
 }
 
 // RelayProblem reports a daemon started before Codex was pointed at the relay.
@@ -47,8 +47,8 @@ func (Agent) RelayProblem(stateDir string) (string, string, bool) {
 	return fmt.Sprintf("Codex's background server (pid %d) started before Codex was pointed at the relay, and its threads still export where they did", d.PID), daemonRestart, true
 }
 
-func daemonPredates(dir string) (CodexDaemon, bool) {
-	d, ok := RunningCodexDaemon()
+func daemonPredates(dir string) (daemon, bool) {
+	d, ok := runningDaemon()
 	if !ok {
 		return d, false
 	}

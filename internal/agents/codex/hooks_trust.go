@@ -15,8 +15,8 @@ const (
 	codexHookEnabledKey  = "enabled"
 )
 
-// CodexHookTrust is what the user's Codex config says about one hooks file.
-type CodexHookTrust struct {
+// hookTrust is what the user's Codex config says about one hooks file.
+type hookTrust struct {
 	ConfigPath string
 	// Entries is how many hooks from this file Codex has a record for.
 	Entries int
@@ -31,16 +31,16 @@ type CodexHookTrust struct {
 }
 
 // Reviewed reports whether Codex has any record for this file; a fresh clone has none.
-func (t CodexHookTrust) Reviewed() bool { return t.Entries > 0 }
+func (t hookTrust) Reviewed() bool { return t.Entries > 0 }
 
-// CodexHookTrustFor reports what the user's Codex config records about the hooks file at
+// hookTrustFor reports what the user's Codex config records about the hooks file at
 // hooksPath; an unreadable or absent config means nothing is trusted.
-func (c Codex) CodexHookTrustFor(hooksPath string) (CodexHookTrust, error) {
+func (c exporter) hookTrustFor(hooksPath string) (hookTrust, error) {
 	path, err := c.ConfigPath()
 	if err != nil {
-		return CodexHookTrust{}, err
+		return hookTrust{}, err
 	}
-	trust := CodexHookTrust{ConfigPath: path}
+	trust := hookTrust{ConfigPath: path}
 	f, err := loadTOML(path)
 	if err != nil {
 		return trust, err

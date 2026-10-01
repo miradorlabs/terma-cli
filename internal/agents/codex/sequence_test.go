@@ -37,10 +37,10 @@ func appendRollout(t *testing.T, path, text string) {
 		t.Fatal(err)
 	}
 }
-func readSequence(t *testing.T, path string, c CodexCursor) (CodexCursor, string, []hookrun.FundingEvidence) {
+func readSequence(t *testing.T, path string, c quotaCursor) (quotaCursor, string, []hookrun.FundingEvidence) {
 	t.Helper()
 	var evs []hookrun.FundingEvidence
-	next, status, err := ReadCodexFunding(context.Background(), testCodexID, path, c, func(e hookrun.FundingEvidence) error { evs = append(evs, e); return nil })
+	next, status, err := readFunding(context.Background(), testCodexID, path, c, func(e hookrun.FundingEvidence) error { evs = append(evs, e); return nil })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +50,7 @@ func TestCodexSequenceTurnsRepeatedValuesAndPartialWrites(t *testing.T) {
 	start := "{\"type\":\"event_msg\",\"payload\":{\"type\":\"task_started\",\"turn_id\":\"turn-a\"}}\n"
 	q := quotaRecord(testCodexLimits)
 	path := sequenceFixture(t, start+q+q+q[:len(q)/2])
-	c, status, evs := readSequence(t, path, CodexCursor{})
+	c, status, evs := readSequence(t, path, quotaCursor{})
 	if status != "incomplete" || len(evs) != 2 {
 		t.Fatalf("%s %+v", status, evs)
 	}
@@ -74,7 +74,7 @@ func TestCodexSequenceTurnsRepeatedValuesAndPartialWrites(t *testing.T) {
 func TestCodexSequenceAppendFailureReplaysStableID(t *testing.T) {
 	path := sequenceFixture(t, quotaRecord(testCodexLimits)+quotaRecord("null"))
 	var ids []any
-	c, _, err := ReadCodexFunding(context.Background(), testCodexID, path, CodexCursor{}, func(e hookrun.FundingEvidence) error {
+	c, _, err := readFunding(context.Background(), testCodexID, path, quotaCursor{}, func(e hookrun.FundingEvidence) error {
 		ids = append(ids, e.Attrs["observation_id"])
 		if len(ids) == 2 {
 			return errors.New("disk full")
@@ -89,14 +89,14 @@ func TestCodexSequenceAppendFailureReplaysStableID(t *testing.T) {
 		t.Fatal(evs)
 	}
 	// Simulate append succeeding but the checkpoint being lost.
-	_, _, all := readSequence(t, path, CodexCursor{})
+	_, _, all := readSequence(t, path, quotaCursor{})
 	if all[0].Attrs["observation_id"] != ids[0] || all[1].Attrs["observation_id"] != ids[1] {
 		t.Fatal("unstable replay IDs")
 	}
 }
 func TestCodexSequenceBoundedBacklogAndOversizedRecord(t *testing.T) {
 	path := sequenceFixture(t, strings.Repeat(quotaRecord(testCodexLimits), 300))
-	c, status, evs := readSequence(t, path, CodexCursor{})
+	c, status, evs := readSequence(t, path, quotaCursor{})
 	if status != "backlog" || len(evs) != 256 {
 		t.Fatalf("%s %d", status, len(evs))
 	}
@@ -116,7 +116,7 @@ func TestCodexSequenceBoundedBacklogAndOversizedRecord(t *testing.T) {
 }
 func TestCodexSequenceReplacementAndArchive(t *testing.T) {
 	path := sequenceFixture(t, quotaRecord(testCodexLimits))
-	c, _, _ := readSequence(t, path, CodexCursor{})
+	c, _, _ := readSequence(t, path, quotaCursor{})
 	archived := filepath.Join(os.Getenv("CODEX_HOME"), "archived_sessions", filepath.Base(path))
 	if err := os.MkdirAll(filepath.Dir(archived), 0o700); err != nil {
 		t.Fatal(err)
@@ -147,7 +147,7 @@ func TestCodexSequenceReplacementAndArchive(t *testing.T) {
 
 func TestCodexSequenceTruncationAndNoQuota(t *testing.T) {
 	path := sequenceFixture(t, quotaRecord(testCodexLimits))
-	c, _, _ := readSequence(t, path, CodexCursor{})
+	c, _, _ := readSequence(t, path, quotaCursor{})
 	b, _ := os.ReadFile(path)
 	head, _, _ := strings.Cut(string(b), "\n")
 	if err := os.WriteFile(path, []byte(head+"\n"), 0o600); err != nil {
@@ -167,7 +167,7 @@ func TestCodexSequenceTruncationAndNoQuota(t *testing.T) {
 
 func TestCodexSequenceSkippedPartialLineStaysIncomplete(t *testing.T) {
 	path := sequenceFixture(t, quotaRecord(testCodexLimits))
-	c, _, _ := readSequence(t, path, CodexCursor{})
+	c, _, _ := readSequence(t, path, quotaCursor{})
 	appendRollout(t, path, strings.Repeat("x", codexTailLimit))
 	c, _, evs := readSequence(t, path, c)
 	if len(evs) != 1 || evs[0].Status != "gap" {

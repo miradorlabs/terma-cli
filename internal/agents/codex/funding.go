@@ -18,10 +18,10 @@ import (
 
 const codexTailLimit = 1 << 20
 
-// CodexOAuthAccountID returns the ChatGPT account id when auth.json's route is the
+// oauthAccountID returns the ChatGPT account id when auth.json's route is the
 // subscription (auth_mode "chatgpt", no OPENAI_API_KEY in the file). A shell
 // OPENAI_API_KEY alone does not authenticate Codex, so it does not suppress this.
-func CodexOAuthAccountID() (string, bool) {
+func oauthAccountID() (string, bool) {
 	home, err := codexHome()
 	if err != nil {
 		return "", false
@@ -49,10 +49,10 @@ func CodexOAuthAccountID() (string, bool) {
 	return tokens.AccountID, true
 }
 
-// CodexOAuthUser returns the ChatGPT user_id and login email under CodexOAuthAccountID's
+// oauthUser returns the ChatGPT user_id and login email under oauthAccountID's
 // gate: Codex's export carries only the shared workspace account_id, so the id_token is
 // the one source of a durable principal.
-func CodexOAuthUser() (email, userID string, ok bool) {
+func oauthUser() (email, userID string, ok bool) {
 	home, err := codexHome()
 	if err != nil {
 		return "", "", false

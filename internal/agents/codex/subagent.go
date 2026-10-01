@@ -11,14 +11,14 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// CodexSubagentStart announces a thread the session spawned with the spawn record from
+// subagentStart announces a thread the session spawned with the spawn record from
 // the child's rollout, rollout_status saying whether it was read.
-func CodexSubagentStart(ctx context.Context, env hookrun.Env) error {
+func subagentStart(ctx context.Context, env hookrun.Env) error {
 	return codexSubagent(ctx, env, hookrun.EventSubagentStart)
 }
 
-// CodexSubagentStop handles Codex's per-turn subagent end, told apart by turn_id.
-func CodexSubagentStop(ctx context.Context, env hookrun.Env) error {
+// subagentStop handles Codex's per-turn subagent end, told apart by turn_id.
+func subagentStop(ctx context.Context, env hookrun.Env) error {
 	return codexSubagent(ctx, env, hookrun.EventSubagentEnd)
 }
 
@@ -42,7 +42,7 @@ func codexSubagent(ctx context.Context, env hookrun.Env, name string) error {
 	}
 	if name == hookrun.EventSubagentStart {
 		attrs[hookrun.AttrVersion] = env.Version
-		spawn, status := CodexRolloutSpawn(ctx, in.AgentID, in.TranscriptPath)
+		spawn, status := rolloutSpawn(ctx, in.AgentID, in.TranscriptPath)
 		attrs["rollout_status"] = status
 		if status == hookrun.StatusPresent {
 			codexSpawnAttrs(attrs, hookrun.AttrAgentParentID, spawn)
@@ -64,7 +64,7 @@ func codexRolloutID(in *codexHookInput) string {
 
 // codexSpawnAttrs copies the spawning thread (under parentKey) and Codex's labels for the
 // child, a random nickname and a "/root/<task>" path.
-func codexSpawnAttrs(attrs map[string]any, parentKey string, spawn CodexThreadSpawn) {
+func codexSpawnAttrs(attrs map[string]any, parentKey string, spawn threadSpawn) {
 	if !session.ValidID(spawn.ParentThreadID) {
 		return
 	}

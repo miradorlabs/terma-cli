@@ -24,7 +24,7 @@ const codexHookReview = "open this repository in Codex Desktop, then go to Setti
 
 func (Agent) Name() string                       { return name }
 func (Agent) DisplayName() string                { return "Codex" }
-func (Agent) Installed(ctx context.Context) bool { return Codex{}.Detect(ctx).Found }
+func (Agent) Installed(ctx context.Context) bool { return exporter{}.Detect(ctx).Found }
 func (Agent) HooksPath() string                  { return hooksPath }
 func (Agent) Default(root string) bool           { return hasConfig(root) }
 func (Agent) Plan(root string, install bool) (hookmgr.Plan, error) {
@@ -33,16 +33,16 @@ func (Agent) Plan(root string, install bool) (hookmgr.Plan, error) {
 
 func (Agent) Events() map[string]agents.Handler {
 	return map[string]agents.Handler{
-		"codex-notify":             CodexNotify,
-		"codex-session-start":      CodexSessionStart,
-		"codex-user-prompt-submit": CodexUserPromptSubmit,
-		"codex-pre-tool-use":       CodexPreToolUse,
-		"codex-permission-request": CodexPermissionRequest,
-		"codex-session-end":        CodexSessionEnd,
-		"codex-post-tool-use":      CodexPostToolUse,
-		"codex-stop":               CodexStop,
-		"codex-subagent-start":     CodexSubagentStart,
-		"codex-subagent-stop":      CodexSubagentStop,
+		"codex-notify":             notifyHook,
+		"codex-session-start":      sessionStart,
+		"codex-user-prompt-submit": userPromptSubmit,
+		"codex-pre-tool-use":       preToolUse,
+		"codex-permission-request": permissionRequest,
+		"codex-session-end":        sessionEnd,
+		"codex-post-tool-use":      postToolUse,
+		"codex-stop":               stop,
+		"codex-subagent-start":     subagentStart,
+		"codex-subagent-stop":      subagentStop,
 	}
 }
 
@@ -72,7 +72,7 @@ func (Agent) ManagedDeploy() string {
 // trusts it from inside Codex, and nothing says so.
 func (c Agent) Trust(root string) (agents.TrustState, error) {
 	hooksPath := filepath.Join(root, filepath.FromSlash(c.HooksPath()))
-	trust, err := (Codex{}).CodexHookTrustFor(hooksPath)
+	trust, err := (exporter{}).hookTrustFor(hooksPath)
 	if err != nil {
 		return agents.TrustState{}, err
 	}
@@ -122,7 +122,7 @@ func pronoun(n int) string {
 }
 
 // Harness is how terma configures the agent's exporter.
-func (Agent) Harness() harness.Harness { return Codex{} }
+func (Agent) Harness() harness.Harness { return exporter{} }
 
 // WhenHooksOff runs the developer's own notifier: terma replaced Codex's direct notify
 // invocation, so it must still fire with capture off.
@@ -133,13 +133,13 @@ func (Agent) WhenHooksOff() map[string]agents.Handler {
 		}
 		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
-		return RunPreviousCodexNotify(ctx, env.Args[0])
+		return runPreviousNotify(ctx, env.Args[0])
 	}}
 }
 
 // ContentConsented is the consent replies and thread names travel under.
 func (Agent) ContentConsented(projectID string, global bool) bool {
-	return CodexRepliesConsented(projectID, global)
+	return repliesConsented(projectID, global)
 }
 
 // RetrustNote is what a refresh that rewrote .codex/hooks.json says.
@@ -159,13 +159,13 @@ func (Agent) UserHooksTrustStep() string {
 }
 
 // NotifierInstalled reports whether terma's notifier is in Codex's config.
-func (Agent) NotifierInstalled() (bool, error) { return Codex{}.NotifierInstalled() }
+func (Agent) NotifierInstalled() (bool, error) { return exporter{}.NotifierInstalled() }
 
 // InstallNotifier chains terma's notifier in front of the developer's.
-func (Agent) InstallNotifier() (bool, error) { return Codex{}.InstallNotifier() }
+func (Agent) InstallNotifier() (bool, error) { return exporter{}.InstallNotifier() }
 
 // RemoveNotifier puts back the developer's notifier.
-func (Agent) RemoveNotifier() (bool, error) { return Codex{}.RemoveNotifier() }
+func (Agent) RemoveNotifier() (bool, error) { return exporter{}.RemoveNotifier() }
 
 var (
 	_ agents.Notifier       = Agent{}
@@ -185,6 +185,6 @@ var (
 
 // userHooksPath is the user hook file shared by Codex's CLI and Desktop.
 func userHooksPath() (string, error) {
-	path, err := (Codex{}).ConfigPath()
+	path, err := (exporter{}).ConfigPath()
 	return filepath.Join(filepath.Dir(path), "hooks.json"), err
 }

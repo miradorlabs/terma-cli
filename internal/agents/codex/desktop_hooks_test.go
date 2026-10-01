@@ -28,17 +28,17 @@ func TestCodexDesktopHooksCaptureLocalToolsWithRepositoryConsent(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			run(map[string]any{"session_id": replySession, "cwd": env.Cwd, "turn_id": replyTurn, "prompt": "private prompt"}, CodexUserPromptSubmit)
+			run(map[string]any{"session_id": replySession, "cwd": env.Cwd, "turn_id": replyTurn, "prompt": "private prompt"}, userPromptSubmit)
 			run(map[string]any{"session_id": replySession, "cwd": env.Cwd, "turn_id": replyTurn,
-				"tool_name": "functions.exec", "tool_use_id": "call_1"}, CodexPreToolUse)
+				"tool_name": "functions.exec", "tool_use_id": "call_1"}, preToolUse)
 			env.Now = env.Now.Add(1500 * time.Millisecond)
 			run(map[string]any{"session_id": replySession, "cwd": env.Cwd, "turn_id": replyTurn,
 				"tool_name": "functions.exec", "permission_mode": "default",
-				"tool_input": map[string]any{"description": "private approval reason"}}, CodexPermissionRequest)
+				"tool_input": map[string]any{"description": "private approval reason"}}, permissionRequest)
 			run(map[string]any{"session_id": replySession, "cwd": env.Cwd, "turn_id": replyTurn,
 				"tool_name": "functions.exec", "tool_use_id": "call_1",
 				"tool_input":    map[string]any{"command": "private command"},
-				"tool_response": map[string]any{"exit_code": 0, "output": "private output"}}, CodexPostToolUse)
+				"tool_response": map[string]any{"exit_code": 0, "output": "private output"}}, postToolUse)
 			all := hookruntest.Spooled(t, env.Spool)
 			prompts, calls, approvals := hookruntest.Named(all, hookrun.EventUserPrompt), hookruntest.Named(all, hookrun.EventToolCall), hookruntest.Named(all, hookrun.EventApprovalAsked)
 			if len(prompts) != 1 || len(calls) != 1 || len(approvals) != 1 {

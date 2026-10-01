@@ -33,24 +33,24 @@ func captureCodexFunding(e hookrun.Env, ctx context.Context, r *hookrun.Repo, in
 		return
 	}
 	defer unlock()
-	var cursor CodexCursor
+	var cursor quotaCursor
 	b, cursorErr := os.ReadFile(path)
 	if cursorErr == nil && json.Unmarshal(b, &cursor) != nil {
 		e.Logf("invalid funding cursor; replaying rollout")
-		cursor = CodexCursor{}
+		cursor = quotaCursor{}
 	}
 	// A session's first capture sweeps the directory: nothing else removes a finished cursor.
 	if os.IsNotExist(cursorErr) {
 		defer hookrun.PruneState(filepath.Dir(path), e.Time().Add(-spool.MaxAge))
 	}
 	// Resolved once: empty on the API-key route or when unreadable, never a guessed id.
-	accountID, _ := CodexOAuthAccountID()
+	accountID, _ := oauthAccountID()
 	// A Team workspace's account_id cannot tell members apart, so the email and the durable
 	// user_id, which the native export never carries, travel too.
-	userEmail, userID, _ := CodexOAuthUser()
+	userEmail, userID, _ := oauthUser()
 	ctx, cancel := context.WithTimeout(ctx, codexCaptureTimeout)
 	defer cancel()
-	next, status, readErr := ReadCodexFunding(ctx, rollout, in.TranscriptPath, cursor, func(ev hookrun.FundingEvidence) error {
+	next, status, readErr := readFunding(ctx, rollout, in.TranscriptPath, cursor, func(ev hookrun.FundingEvidence) error {
 		attrs := hookrun.AgentAttrs(ev.Attrs, in.AgentID, in.AgentType)
 		attrs[hookrun.AttrTool], attrs[hookrun.AttrVersion] = codexTool, e.Version
 		attrs[hookrun.AttrEvidenceSource], attrs[hookrun.AttrEvidenceStatus] = ev.Source, ev.Status

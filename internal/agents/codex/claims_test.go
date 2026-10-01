@@ -30,7 +30,7 @@ func TestCodexDesktopActivityCarriesTheProject(t *testing.T) {
 	}, "\n")+"\n")
 	b, _ := json.Marshal(map[string]any{"session_id": replySession, "cwd": env.Cwd, "transcript_path": path, "model": "gpt-6-sol"})
 	env.Stdin = strings.NewReader(string(b))
-	if err := CodexStop(context.Background(), env); err != nil {
+	if err := stop(context.Background(), env); err != nil {
 		t.Fatal(err)
 	}
 	activity := 0
@@ -59,7 +59,7 @@ func TestCodexSubagentThreadIsClaimed(t *testing.T) {
 	sp, _ := spool.Open(t.TempDir())
 	env := hookrun.Env{Now: time.Now(), Cwd: root, Spool: sp,
 		Stdin: strings.NewReader(`{"session_id":"root-thread","agent_id":"child-thread","agent_type":"worker","cwd":"` + root + `"}`)}
-	if err := CodexSubagentStart(context.Background(), env); err != nil {
+	if err := subagentStart(context.Background(), env); err != nil {
 		t.Fatal(err)
 	}
 	payload := `{"session_id":"root-thread","agent_id":"child-thread-2","cwd":"` + root + `"}`

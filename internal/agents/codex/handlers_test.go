@@ -23,7 +23,7 @@ func TestCodexSessionStartAnnouncesSession(t *testing.T) {
 		t.Fatal(err)
 	}
 	env := hookrun.Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(`{"session_id":"` + id + `","cwd":"` + root + `"}`)}
-	if err := CodexSessionStart(context.Background(), env); err != nil {
+	if err := sessionStart(context.Background(), env); err != nil {
 		t.Fatal(err)
 	}
 	// A trusted hook can announce a repository session without a global exporter.
@@ -39,7 +39,7 @@ func TestCodexSessionStampsItsCommitFromApplyPatch(t *testing.T) {
 	}
 	const id = "01a08bd5-0487-74b1-9d82-45e619c574fa"
 
-	if err := CodexSessionStart(ctx, env(`{"session_id":"`+id+`","hook_event_name":"SessionStart","cwd":"`+root+`","model":"gpt-6","source":"startup","permission_mode":"default","transcript_path":null}`)); err != nil {
+	if err := sessionStart(ctx, env(`{"session_id":"`+id+`","hook_event_name":"SessionStart","cwd":"`+root+`","model":"gpt-6","source":"startup","permission_mode":"default","transcript_path":null}`)); err != nil {
 		t.Fatal(err)
 	}
 	hookruntest.WriteFile(t, root, "src/a.go", "package src\n")
@@ -57,7 +57,7 @@ func TestCodexSessionStampsItsCommitFromApplyPatch(t *testing.T) {
 		"*** End Patch",
 		"PATCH",
 	}, "\\n")
-	if err := CodexPostToolUse(ctx, env(`{"session_id":"`+id+`","hook_event_name":"PostToolUse","cwd":"`+root+`","model":"gpt-6","permission_mode":"default","tool_name":"apply_patch","tool_use_id":"call_1","turn_id":"turn_1","transcript_path":null,"tool_response":"ok","tool_input":{"command":"`+patch+`"}}`)); err != nil {
+	if err := postToolUse(ctx, env(`{"session_id":"`+id+`","hook_event_name":"PostToolUse","cwd":"`+root+`","model":"gpt-6","permission_mode":"default","tool_name":"apply_patch","tool_use_id":"call_1","turn_id":"turn_1","transcript_path":null,"tool_response":"ok","tool_input":{"command":"`+patch+`"}}`)); err != nil {
 		t.Fatal(err)
 	}
 	touched := hookruntest.Named(hookruntest.Spooled(t, sp), hookrun.EventFilesTouched)
@@ -79,7 +79,7 @@ func TestCodexSessionStampsItsCommitFromApplyPatch(t *testing.T) {
 		t.Fatalf("commit not stamped for Codex:\n%s", data)
 	}
 
-	if err := CodexSessionEnd(ctx, env(`{"session_id":"`+id+`","hook_event_name":"SessionEnd","cwd":"`+root+`","reason":"closed","transcript_path":null}`)); err != nil {
+	if err := sessionEnd(ctx, env(`{"session_id":"`+id+`","hook_event_name":"SessionEnd","cwd":"`+root+`","reason":"closed","transcript_path":null}`)); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -91,7 +91,7 @@ func TestCodexPostToolUseIgnoresCallsWithoutAPatch(t *testing.T) {
 	sp, _ := spool.Open(t.TempDir())
 	env := hookrun.Env{Now: time.Now(), Cwd: root, Spool: sp, Version: "test",
 		Stdin: strings.NewReader(`{"session_id":"01a08bd5-0487-74b1-9d82-45e619c574fa","hook_event_name":"PostToolUse","cwd":"` + root + `","model":"gpt-6","permission_mode":"default","tool_name":"shell","tool_use_id":"c1","turn_id":"t1","transcript_path":null,"tool_response":"","tool_input":{"command":"go test ./..."}}`)}
-	if err := CodexPostToolUse(ctx, env); err != nil {
+	if err := postToolUse(ctx, env); err != nil {
 		t.Fatal(err)
 	}
 	msgPath := filepath.Join(t.TempDir(), "COMMIT_EDITMSG")
@@ -139,9 +139,9 @@ func TestCodexHooksNeverFailOnBadInput(t *testing.T) {
 	ctx := context.Background()
 	for _, bad := range []string{"", "{", `{"session_id":""}`, `{"session_id":"../../etc/passwd"}`} {
 		for name, fn := range map[string]func(context.Context, hookrun.Env) error{
-			"session-start": CodexSessionStart,
-			"session-end":   CodexSessionEnd,
-			"post-tool-use": CodexPostToolUse,
+			"session-start": sessionStart,
+			"session-end":   sessionEnd,
+			"post-tool-use": postToolUse,
 		} {
 			env := hookrun.Env{Now: time.Now(), Cwd: t.TempDir(), Stdin: strings.NewReader(bad), Version: "test"}
 			if err := fn(ctx, env); err != nil {

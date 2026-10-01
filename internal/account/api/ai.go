@@ -245,7 +245,7 @@ func AIStreamError(f *Event) error {
 	if json.Unmarshal([]byte(f.Data), &detail) != nil || detail.Message == "" {
 		return fmt.Errorf("the stream reported an error and closed")
 	}
-	return &APIError{Code: detail.Code, Message: detail.Message}
+	return &Error{Code: detail.Code, Message: detail.Message}
 }
 
 // AIPrincipalQuery selects principals; Filter is AIP-160 over kind and source_system.

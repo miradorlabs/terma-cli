@@ -20,7 +20,7 @@ func codexHomeWith(t *testing.T, body string) {
 func TestCodexHookTrustUnreviewed(t *testing.T) {
 	// A fresh machine: Codex has never been shown this repository's hooks.
 	codexHomeWith(t, "model = \"gpt-6\"\n")
-	trust, err := (Codex{}).CodexHookTrustFor("/repo/.codex/hooks.json")
+	trust, err := (exporter{}).hookTrustFor("/repo/.codex/hooks.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +45,7 @@ trusted_hash = "sha256:ccc"
 [hooks.state."/Users/dev/.codex/hooks.json:stop:0:0"]
 trusted_hash = "sha256:ddd"
 `)
-	trust, err := (Codex{}).CodexHookTrustFor("/repo/.codex/hooks.json")
+	trust, err := (exporter{}).hookTrustFor("/repo/.codex/hooks.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +70,7 @@ func TestCodexHookTrustSeenButNotTrusted(t *testing.T) {
 [hooks.state."/repo/.codex/hooks.json:session_start:0:0"]
 enabled = true
 `)
-	trust, err := (Codex{}).CodexHookTrustFor("/repo/.codex/hooks.json")
+	trust, err := (exporter{}).hookTrustFor("/repo/.codex/hooks.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +85,7 @@ enabled = true
 func TestCodexHookTrustWithoutAConfig(t *testing.T) {
 	// No config.toml at all reads as "not trusted", not as an error.
 	codexHomeWith(t, "")
-	trust, err := (Codex{}).CodexHookTrustFor("/repo/.codex/hooks.json")
+	trust, err := (exporter{}).hookTrustFor("/repo/.codex/hooks.json")
 	if err != nil {
 		t.Fatal(err)
 	}

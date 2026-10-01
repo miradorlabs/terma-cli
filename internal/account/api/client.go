@@ -27,15 +27,15 @@ const (
 	maxPlainErrorLen = 200
 )
 
-// APIError is a structured failure from the gateway; its Message names the fix.
-type APIError struct {
+// Error is a structured failure from the gateway; its Message names the fix.
+type Error struct {
 	StatusCode int
 	Code       string
 	Message    string
 	RequestID  string
 }
 
-func (e *APIError) Error() string {
+func (e *Error) Error() string {
 	msg := e.Message
 	// The shared gateway's remedies name its original CLI; give terma's commands instead.
 	if e.Code == "INVALID_ARGUMENT" && strings.Contains(msg, "missing X-Mirador-Project header") {
@@ -71,7 +71,7 @@ var gatewayRemedies = strings.NewReplacer(
 )
 
 // Unauthenticated reports whether the credential itself was rejected.
-func (e *APIError) Unauthenticated() bool { return e.StatusCode == http.StatusUnauthorized }
+func (e *Error) Unauthenticated() bool { return e.StatusCode == http.StatusUnauthorized }
 
 // Client talks to the API gateway as the signed-in developer or a server key; an
 // unexpected 401 gets one refresh and one retry, and a second is a real logout.
@@ -210,7 +210,7 @@ func (m *Meta) Created() bool { return m != nil && m.StatusCode == http.StatusCr
 
 // IsNotFound reports whether err is a 404.
 func IsNotFound(err error) bool {
-	var apiErr *APIError
+	var apiErr *Error
 	return errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound
 }
 
@@ -385,7 +385,7 @@ func parseError(resp *http.Response) error {
 			Details []map[string]any `json:"details"`
 		} `json:"error"`
 	}
-	apiErr := &APIError{StatusCode: resp.StatusCode}
+	apiErr := &Error{StatusCode: resp.StatusCode}
 	if json.Unmarshal(body, &envelope) == nil && envelope.Error.Message != "" {
 		apiErr.Code = envelope.Error.Code
 		apiErr.Message = envelope.Error.Message

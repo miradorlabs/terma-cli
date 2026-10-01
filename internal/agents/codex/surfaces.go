@@ -32,7 +32,7 @@ func (a Agent) Surfaces() []agents.Surface {
 			SetupSteps: []string{"Codex Desktop: in a connected repository, open Settings → Hooks → Review in Codex Desktop and approve Terma's hooks."},
 			Reports:    "reports through the relay and this repository's hooks",
 			Warn: func() string {
-				if global, err := (Codex{}).Status(); err == nil && global.Connected {
+				if global, err := (exporter{}).Status(); err == nil && global.Connected {
 					return "also has a user-level exporter; it may send Desktop activity from other repositories"
 				}
 				return ""
@@ -62,7 +62,7 @@ func (a Agent) CheckSurface(_, root, projectID string) (agents.SurfaceStatus, er
 	default:
 		st.Ready = true
 	}
-	global, err := (Codex{}).Status()
+	global, err := (exporter{}).Status()
 	if err != nil {
 		return st, err
 	}

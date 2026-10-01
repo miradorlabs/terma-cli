@@ -11,7 +11,7 @@ import (
 
 func TestCodexRuntimeArgs(t *testing.T) {
 	exp := harness.Exporter{Endpoint: "https://otel.example.com", APIKey: "test-\"key", Signals: []harness.Signal{harness.SignalLogs, harness.SignalTraces, harness.SignalMetrics}, ResourceAttributes: map[string]string{harness.AttrProjectID: "project-a", "user.email": "person@example.com"}}
-	args := (Codex{}).RuntimeArgs(exp)
+	args := (exporter{}).RuntimeArgs(exp)
 	var assignments []string
 	for i := 0; i < len(args); i += 2 {
 		if args[i] != "-c" {
@@ -54,7 +54,7 @@ func TestCodexRuntimeArgs(t *testing.T) {
 	}
 	exp.Signals = []harness.Signal{harness.SignalLogs}
 	exp.IncludeToolContent = true
-	args = (Codex{}).RuntimeArgs(exp)
+	args = (exporter{}).RuntimeArgs(exp)
 	joined := strings.Join(args, " ")
 	// Unselected signals are turned off explicitly, or Codex would fall through to another
 	// project's user-level exporters.

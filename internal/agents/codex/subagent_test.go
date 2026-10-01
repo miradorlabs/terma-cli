@@ -13,7 +13,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// CodexSessionStart reports a spawned thread's parent from its child rollout.
+// sessionStart reports a spawned thread's parent from its child rollout.
 func TestCodexSubagentHooksAndSpawnedThreadParent(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	ctx := context.Background()
@@ -33,22 +33,22 @@ func TestCodexSubagentHooksAndSpawnedThreadParent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := CodexSessionStart(ctx, env(`{"session_id":"`+child+`","hook_event_name":"SessionStart","cwd":"`+root+`","model":"gpt-6","source":"startup","permission_mode":"default","transcript_path":"`+rollout+`"}`)); err != nil {
+	if err := sessionStart(ctx, env(`{"session_id":"`+child+`","hook_event_name":"SessionStart","cwd":"`+root+`","model":"gpt-6","source":"startup","permission_mode":"default","transcript_path":"`+rollout+`"}`)); err != nil {
 		t.Fatal(err)
 	}
-	if err := CodexSessionStart(ctx, env(`{"session_id":"`+parent+`","hook_event_name":"SessionStart","cwd":"`+root+`","model":"gpt-6","source":"startup","permission_mode":"default","transcript_path":null}`)); err != nil {
+	if err := sessionStart(ctx, env(`{"session_id":"`+parent+`","hook_event_name":"SessionStart","cwd":"`+root+`","model":"gpt-6","source":"startup","permission_mode":"default","transcript_path":null}`)); err != nil {
 		t.Fatal(err)
 	}
 	const agent = `"agent_id":"agent_7","agent_type":"reviewer","turn_id":"turn_3","model":"gpt-6","permission_mode":"default","transcript_path":null`
-	if err := CodexSubagentStart(ctx, env(`{"session_id":"`+parent+`","hook_event_name":"SubagentStart","cwd":"`+root+`",`+agent+`}`)); err != nil {
+	if err := subagentStart(ctx, env(`{"session_id":"`+parent+`","hook_event_name":"SubagentStart","cwd":"`+root+`",`+agent+`}`)); err != nil {
 		t.Fatal(err)
 	}
 	hookruntest.WriteFile(t, root, "src/a.go", "package src\n")
 	patch := "apply_patch <<'PATCH'\\n*** Begin Patch\\n*** Update File: src/a.go\\n@@\\n-old\\n+new\\n*** End Patch\\nPATCH"
-	if err := CodexPostToolUse(ctx, env(`{"session_id":"`+parent+`","hook_event_name":"PostToolUse","cwd":"`+root+`",`+agent+`,"tool_name":"apply_patch","tool_input":{"command":"`+patch+`"}}`)); err != nil {
+	if err := postToolUse(ctx, env(`{"session_id":"`+parent+`","hook_event_name":"PostToolUse","cwd":"`+root+`",`+agent+`,"tool_name":"apply_patch","tool_input":{"command":"`+patch+`"}}`)); err != nil {
 		t.Fatal(err)
 	}
-	if err := CodexSubagentStop(ctx, env(`{"session_id":"`+parent+`","hook_event_name":"SubagentStop","cwd":"`+root+`",`+agent+`,"agent_transcript_path":null,"last_assistant_message":"secret","stop_hook_active":false}`)); err != nil {
+	if err := subagentStop(ctx, env(`{"session_id":"`+parent+`","hook_event_name":"SubagentStop","cwd":"`+root+`",`+agent+`,"agent_transcript_path":null,"last_assistant_message":"secret","stop_hook_active":false}`)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -103,13 +103,13 @@ func TestCodexSpawnedThreadArrivesThroughSubagentStart(t *testing.T) {
 		return `{"session_id":"` + rootThread + `","hook_event_name":"` + event + `","cwd":"` + root + `","agent_id":"` + child + `","agent_type":"reviewer","turn_id":"turn_1","model":"gpt-6","transcript_path":"` + rollout + `"` + extra + `}`
 	}
 
-	if err := CodexSubagentStart(ctx, env(hook("SubagentStart", ""))); err != nil {
+	if err := subagentStart(ctx, env(hook("SubagentStart", ""))); err != nil {
 		t.Fatal(err)
 	}
-	if err := CodexSubagentStop(ctx, env(hook("SubagentStop", `,"stop_hook_active":false`))); err != nil {
+	if err := subagentStop(ctx, env(hook("SubagentStop", `,"stop_hook_active":false`))); err != nil {
 		t.Fatal(err)
 	}
-	if err := CodexStop(ctx, env(hook("Stop", `,"stop_hook_active":false`))); err != nil {
+	if err := stop(ctx, env(hook("Stop", `,"stop_hook_active":false`))); err != nil {
 		t.Fatal(err)
 	}
 

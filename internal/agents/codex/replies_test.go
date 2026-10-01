@@ -36,10 +36,10 @@ func replyTaskComplete(turn string) string {
 	return fmt.Sprintf(`{"timestamp":"2026-09-19T18:19:48.000Z","type":"event_msg","payload":{"type":"task_complete","turn_id":%q,"last_agent_message":"never read from here"}}`+"\n", turn)
 }
 
-func readReplies(t *testing.T, path string, c CodexReplyCursor, maxText int) (CodexReplyCursor, string, []CodexReply) {
+func readReplies(t *testing.T, path string, c replyCursor, maxText int) (replyCursor, string, []reply) {
 	t.Helper()
-	var out []CodexReply
-	next, status, err := ReadCodexReplies(context.Background(), testCodexID, path, c, maxText, func(r CodexReply) error { out = append(out, r); return nil })
+	var out []reply
+	next, status, err := readRolloutReplies(context.Background(), testCodexID, path, c, maxText, func(r reply) error { out = append(out, r); return nil })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,11 +58,11 @@ func TestCodexRepliesCarryTheirTurnAndCodexsOwnIdentity(t *testing.T) {
 			replyTaskComplete(replyTurnA)+
 			replyTaskStarted(replyTurnB, replyTraceB)+
 			replyMessage("assistant", "msg_a3", "final_answer", "2026-09-19T18:21:00.000Z", "Done."))
-	cursor, status, replies := readReplies(t, path, CodexReplyCursor{}, 1<<10)
+	cursor, status, replies := readReplies(t, path, replyCursor{}, 1<<10)
 	if status != "caught_up" || len(replies) != 3 {
 		t.Fatalf("status %s, replies %+v", status, replies)
 	}
-	want := []CodexReply{
+	want := []reply{
 		{ID: "msg_a1", Text: "I'll look at the command list first.", Phase: "commentary", TurnID: replyTurnA, TraceID: replyTraceA},
 		{ID: "msg_a2", Text: "Three of them can go.", Phase: "final_answer", TurnID: replyTurnA, TraceID: replyTraceA},
 		{ID: "msg_a3", Text: "Done.", Phase: "final_answer", TurnID: replyTurnB, TraceID: replyTraceB},
@@ -93,7 +93,7 @@ func TestCodexRepliesCarryTheirTurnAndCodexsOwnIdentity(t *testing.T) {
 func TestCodexRepliesKeepTheTurnBetweenReads(t *testing.T) {
 	half := replyMessage("assistant", "msg_a1", "commentary", "2026-09-19T18:18:41.265Z", "Working on it.")
 	path := sequenceFixture(t, replyTaskStarted(replyTurnA, replyTraceA)+replyTurnContext(replyTurnA)+half[:len(half)/2])
-	cursor, status, replies := readReplies(t, path, CodexReplyCursor{}, 1<<10)
+	cursor, status, replies := readReplies(t, path, replyCursor{}, 1<<10)
 	if status != "incomplete" || len(replies) != 0 || cursor.TurnID != replyTurnA || cursor.TraceID != replyTraceA {
 		t.Fatalf("status %s replies %v cursor %+v — a half-written record is not read, and the turn is remembered", status, replies, cursor)
 	}
@@ -113,14 +113,14 @@ func TestCodexRepliesAreBoundedAndAlwaysIdentified(t *testing.T) {
 		replyMessage("assistant", "msg_blank", "commentary", "2026-09-19T18:18:42.000Z", "  \n ")+
 		replyMessage("assistant", "", "commentary", "2026-09-19T18:18:43.000Z", "no id of its own")+
 		replyMessage("assistant", "not a safe label/../x", "commentary", "2026-09-19T18:18:44.000Z", "an id terma will not use"))
-	_, _, replies := readReplies(t, path, CodexReplyCursor{}, 21)
+	_, _, replies := readReplies(t, path, replyCursor{}, 21)
 	if len(replies) != 3 {
 		t.Fatalf("replies: %+v", replies)
 	}
 	if r := replies[0]; !r.Truncated || r.Bytes != 80 || r.Text != strings.Repeat("é", 10) {
 		t.Errorf("long reply = %q (truncated=%v bytes=%d); want 10 whole runes of 80 bytes", r.Text, r.Truncated, r.Bytes)
 	}
-	_, _, again := readReplies(t, path, CodexReplyCursor{}, 21)
+	_, _, again := readReplies(t, path, replyCursor{}, 21)
 	for i := 1; i < 3; i++ {
 		if replies[i].ID == "" || len(replies[i].ID) != 64 || replies[i].ID != again[i].ID || replies[1].ID == replies[2].ID {
 			t.Errorf("reply %d: id %q (replay %q) — want a derived id, distinct and stable", i, replies[i].ID, again[i].ID)
@@ -137,7 +137,7 @@ func TestCodexRepliesSurviveARewrittenRolloutAndABacklog(t *testing.T) {
 		body.WriteString(replyMessage("assistant", fmt.Sprintf("msg_%03d", i), "commentary", "2026-09-19T18:18:41.000Z", fmt.Sprintf("step %d", i)))
 	}
 	path := sequenceFixture(t, body.String())
-	cursor, status, first := readReplies(t, path, CodexReplyCursor{}, 1<<10)
+	cursor, status, first := readReplies(t, path, replyCursor{}, 1<<10)
 	if status != "backlog" || len(first) != codexReplyBatch {
 		t.Fatalf("status %s, %d replies", status, len(first))
 	}
@@ -160,7 +160,7 @@ func TestCodexRepliesAreNotAcknowledgedUntilSpooled(t *testing.T) {
 		replyMessage("assistant", "msg_a1", "commentary", "2026-09-19T18:18:41.000Z", "one")+
 		replyMessage("assistant", "msg_a2", "final_answer", "2026-09-19T18:18:42.000Z", "two"))
 	calls := 0
-	cursor, status, err := ReadCodexReplies(context.Background(), testCodexID, path, CodexReplyCursor{}, 1<<10, func(CodexReply) error {
+	cursor, status, err := readRolloutReplies(context.Background(), testCodexID, path, replyCursor{}, 1<<10, func(reply) error {
 		if calls++; calls == 2 {
 			return errors.New("spool is full")
 		}

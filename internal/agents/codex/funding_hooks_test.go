@@ -42,7 +42,7 @@ func TestCodexStopCapturesRolloutAndDeduplicates(t *testing.T) {
 	b, _ := json.Marshal(map[string]any{"session_id": id, "cwd": env.Cwd, "transcript_path": path})
 	for range 2 {
 		env.Stdin = strings.NewReader(string(b))
-		_ = CodexStop(context.Background(), env)
+		_ = stop(context.Background(), env)
 	}
 	evs := hookruntest.Spooled(t, env.Spool)
 	if len(evs) != 1 || evs[0].Name != hookrun.EventSessionQuota || evs[0].Attrs["plan_type"] != "team" || evs[0].Attrs["source_time"] != at || evs[0].Attrs["has_credits"] != false {
@@ -61,7 +61,7 @@ func TestCodexNotifyCapturesRolloutWithoutTranscriptPath(t *testing.T) {
 		"type": "agent-turn-complete", "thread-id": id, "turn-id": "turn-real", "cwd": env.Cwd, "model": "gpt-5.6-sol",
 	})
 	env.Args = []string{string(payload)}
-	if err := CodexNotify(context.Background(), env); err != nil {
+	if err := notifyHook(context.Background(), env); err != nil {
 		t.Fatal(err)
 	}
 	evs := hookruntest.Spooled(t, env.Spool)

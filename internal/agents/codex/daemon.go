@@ -12,21 +12,21 @@ import (
 // Codex's app-server daemon reads [otel] only when it starts, so a config change reaches
 // its threads only after `codex app-server daemon restart`.
 
-// CodexDaemon is a running Codex app-server daemon.
-type CodexDaemon struct {
+// daemon is a running Codex app-server daemon.
+type daemon struct {
 	PID     int
 	Started time.Time
 }
 
-// RunningCodexDaemon reports the daemon for $CODEX_HOME if its record names a live process.
-func RunningCodexDaemon() (CodexDaemon, bool) {
+// runningDaemon reports the daemon for $CODEX_HOME if its record names a live process.
+func runningDaemon() (daemon, bool) {
 	home, err := codexHome()
 	if err != nil {
-		return CodexDaemon{}, false
+		return daemon{}, false
 	}
 	data, err := os.ReadFile(filepath.Join(home, "app-server-daemon", "daemon.pid"))
 	if err != nil || len(data) > 64<<10 {
-		return CodexDaemon{}, false
+		return daemon{}, false
 	}
 	var rec struct {
 		PID      int `json:"pid"`
@@ -35,10 +35,10 @@ func RunningCodexDaemon() (CodexDaemon, bool) {
 		} `json:"processIdentity"`
 	}
 	if json.Unmarshal(data, &rec) != nil || rec.PID <= 1 || rec.Identity.StartSeconds <= 0 {
-		return CodexDaemon{}, false
+		return daemon{}, false
 	}
 	if !procinfo.Alive(rec.PID) {
-		return CodexDaemon{}, false
+		return daemon{}, false
 	}
-	return CodexDaemon{PID: rec.PID, Started: time.Unix(rec.Identity.StartSeconds, 0)}, true
+	return daemon{PID: rec.PID, Started: time.Unix(rec.Identity.StartSeconds, 0)}, true
 }

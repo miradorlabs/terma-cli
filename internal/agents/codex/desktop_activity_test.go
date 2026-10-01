@@ -17,9 +17,9 @@ func TestCodexDesktopActivityReadsUsageAndHostedActionsOnly(t *testing.T) {
 		`{"timestamp":"2026-09-19T18:18:43Z","type":"event_msg","payload":{"type":"item_completed","turn_id":"` + replyTurnA + `","started_at_ms":1790000001000,"completed_at_ms":1790000001220,"item":{"type":"ContextCompaction","id":"item_compact"}}}`,
 		`{"timestamp":"2026-09-19T18:18:44Z","type":"event_msg","payload":{"type":"task_complete","turn_id":"` + replyTurnA + `","started_at":1790000000,"duration_ms":4400,"time_to_first_token_ms":300}}`,
 	}, "\n")+"\n")
-	var got []CodexDesktopActivity
-	read := func(c CodexDesktopCursor) (CodexDesktopCursor, string) {
-		next, status, err := ReadCodexDesktopActivity(context.Background(), testCodexID, path, c, func(a CodexDesktopActivity) error {
+	var got []desktopActivity
+	read := func(c desktopCursor) (desktopCursor, string) {
+		next, status, err := readDesktopActivity(context.Background(), testCodexID, path, c, func(a desktopActivity) error {
 			got = append(got, a)
 			return nil
 		})
@@ -28,7 +28,7 @@ func TestCodexDesktopActivityReadsUsageAndHostedActionsOnly(t *testing.T) {
 		}
 		return next, status
 	}
-	next, status := read(CodexDesktopCursor{})
+	next, status := read(desktopCursor{})
 	if status != "caught_up" || len(got) != 4 {
 		t.Fatalf("status %q, activities %+v", status, got)
 	}

@@ -29,7 +29,7 @@ func stopCodexTitles(t *testing.T, env hookrun.Env) []spool.Event {
 	t.Helper()
 	b, _ := json.Marshal(map[string]any{"session_id": replySession, "cwd": env.Cwd, "model": "gpt-6-sol"})
 	env.Stdin = strings.NewReader(string(b))
-	if err := CodexStop(context.Background(), env); err != nil {
+	if err := stop(context.Background(), env); err != nil {
 		t.Fatal(err)
 	}
 	var titles []spool.Event

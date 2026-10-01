@@ -55,7 +55,7 @@ func (app *App) newConfigShowCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			path, err := config.ConfigPath()
+			path, err := config.Path()
 			if err != nil {
 				return err
 			}

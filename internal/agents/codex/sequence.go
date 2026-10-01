@@ -14,9 +14,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
-// CodexCursor holds no transcript text: an offset past acknowledged records, an anchor
+// quotaCursor holds no transcript text: an offset past acknowledged records, an anchor
 // that detects a rewritten file, and the turn carried across bounded reads.
-type CodexCursor struct {
+type quotaCursor struct {
 	SeenQuota bool   `json:"seen_quota,omitempty"`
 	Identity  string `json:"identity"`
 	Stream    string `json:"stream"`
@@ -40,9 +40,9 @@ func cursorAnchor(f *os.File, offset int64) string {
 	return fundingHash(string(b))
 }
 
-// ReadCodexFunding emits each newly observed quota, unchanged and null ones included, at
+// readFunding emits each newly observed quota, unchanged and null ones included, at
 // most 1 MiB and 256 records per call; the caller spools before persisting the cursor.
-func ReadCodexFunding(ctx context.Context, sessionID, transcript string, cursor CodexCursor, emit func(hookrun.FundingEvidence) error) (CodexCursor, string, error) {
+func readFunding(ctx context.Context, sessionID, transcript string, cursor quotaCursor, emit func(hookrun.FundingEvidence) error) (quotaCursor, string, error) {
 	f, status := openCodexRollout(ctx, sessionID, transcript)
 	if f == nil {
 		return cursor, status, nil
@@ -62,7 +62,7 @@ func ReadCodexFunding(ctx context.Context, sessionID, transcript string, cursor 
 	reset := cursor.Identity != "" && (cursor.Identity != identity || cursor.Offset < 0 || cursor.Offset > st.Size() || (cursor.Offset > 0 && cursor.Anchor != cursorAnchor(f, cursor.Offset)))
 	old := cursor
 	if cursor.Identity == "" || reset {
-		cursor = CodexCursor{Identity: identity, Stream: fundingHash(identity + old.Stream + fmt.Sprint(old.Offset))}
+		cursor = quotaCursor{Identity: identity, Stream: fundingHash(identity + old.Stream + fmt.Sprint(old.Offset))}
 	}
 	send := func(e hookrun.FundingEvidence, offset int64) error {
 		if e.Attrs == nil {
@@ -84,7 +84,7 @@ func ReadCodexFunding(ctx context.Context, sessionID, transcript string, cursor 
 			return old, "append_failed", err
 		}
 	}
-	checkpoint := func(status string, err error) (CodexCursor, string, error) {
+	checkpoint := func(status string, err error) (quotaCursor, string, error) {
 		cursor.Anchor = cursorAnchor(f, cursor.Offset)
 		return cursor, status, err
 	}

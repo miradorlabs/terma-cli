@@ -23,7 +23,7 @@ const codexReplyMaxText = 16 << 10
 // per-session cursor, and only where prompts are consented.
 func captureCodexReplies(e hookrun.Env, ctx context.Context, r *hookrun.Repo, in *codexHookInput) {
 	pol := routing.EffectivePolicy(e.Policy, r.ProjectID)
-	if e.Spool == nil || !session.ValidID(in.SessionID) || !pol.IncludePrompts || !pol.AllowsSignal("logs") || len(pol.ExcludePaths) > 0 || !CodexRepliesConsented(r.ProjectID, pol.Global()) {
+	if e.Spool == nil || !session.ValidID(in.SessionID) || !pol.IncludePrompts || !pol.AllowsSignal("logs") || len(pol.ExcludePaths) > 0 || !repliesConsented(r.ProjectID, pol.Global()) {
 		return
 	}
 	dir, err := config.Dir()
@@ -42,16 +42,16 @@ func captureCodexReplies(e hookrun.Env, ctx context.Context, r *hookrun.Repo, in
 		return
 	}
 	defer unlock()
-	var cursor CodexReplyCursor
+	var cursor replyCursor
 	b, readErr := os.ReadFile(path)
 	if readErr == nil && json.Unmarshal(b, &cursor) != nil {
 		e.Logf("invalid reply cursor; replaying rollout")
-		cursor = CodexReplyCursor{}
+		cursor = replyCursor{}
 	}
 	// Inside Stop's three seconds, beside the funding capture's one.
 	ctx, cancel := context.WithTimeout(ctx, codexCaptureTimeout)
 	defer cancel()
-	next, status, err := ReadCodexReplies(ctx, rollout, in.TranscriptPath, cursor, codexReplyMaxText, func(reply CodexReply) error {
+	next, status, err := readRolloutReplies(ctx, rollout, in.TranscriptPath, cursor, codexReplyMaxText, func(reply reply) error {
 		attrs := hookrun.AgentAttrs(map[string]any{
 			hookrun.AttrTool: codexTool, hookrun.AttrSchemaVersion: 1, hookrun.AttrEvidenceSource: sourceCodexRollout,
 			"message_id": reply.ID, "role": "assistant",
@@ -88,10 +88,10 @@ func captureCodexReplies(e hookrun.Env, ctx context.Context, r *hookrun.Repo, in
 	}
 }
 
-// CodexRepliesConsented reports whether prompts, and so replies, may leave for this
+// repliesConsented reports whether prompts, and so replies, may leave for this
 // repository. It fails closed: a source that exists and cannot be read might be the one
 // that withholds prompts; a missing file is simply not a source.
-func CodexRepliesConsented(projectID string, global bool) bool {
+func repliesConsented(projectID string, global bool) bool {
 	rec, recorded, err := routing.LoadRecord(projectID)
 	if err != nil {
 		return false
@@ -108,7 +108,7 @@ func CodexRepliesConsented(projectID string, global bool) bool {
 		return recorded && slices.Contains(rec.Harnesses, name) &&
 			slices.Contains(rec.Signals, "logs") && rec.IncludePrompts
 	}
-	st, err := (Codex{}).Status()
+	st, err := (exporter{}).Status()
 	if err != nil {
 		return false
 	}

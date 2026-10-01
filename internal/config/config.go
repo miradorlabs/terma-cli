@@ -209,7 +209,7 @@ func isLoopbackHost(host string) bool {
 
 // LoadFile reads config.json; a missing file is an empty one.
 func LoadFile() (*File, error) {
-	path, err := ConfigPath()
+	path, err := Path()
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +235,7 @@ func LoadFile() (*File, error) {
 
 // SaveFile writes config.json atomically, creating the config directory if needed.
 func SaveFile(file *File) error {
-	path, err := ConfigPath()
+	path, err := Path()
 	if err != nil {
 		return err
 	}
@@ -303,8 +303,8 @@ func Dir() (string, error) {
 	return filepath.Join(home, ".config", dirName), nil
 }
 
-// ConfigPath is where config.json lives, under Dir.
-func ConfigPath() (string, error) {
+// Path is where config.json lives, under Dir.
+func Path() (string, error) {
 	dir, err := Dir()
 	if err != nil {
 		return "", err

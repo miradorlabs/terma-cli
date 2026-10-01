@@ -11,7 +11,7 @@ import (
 func TestRunningCodexDaemon(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("CODEX_HOME", home)
-	if _, ok := RunningCodexDaemon(); ok {
+	if _, ok := runningDaemon(); ok {
 		t.Fatal("no record, yet a daemon")
 	}
 	dir := filepath.Join(home, "app-server-daemon")
@@ -25,13 +25,13 @@ func TestRunningCodexDaemon(t *testing.T) {
 		}
 	}
 	write(os.Getpid(), 1790672124)
-	d, ok := RunningCodexDaemon()
+	d, ok := runningDaemon()
 	if !ok || d.PID != os.Getpid() || !d.Started.Equal(time.Unix(1790672124, 0)) {
 		t.Fatalf("daemon = %+v, %v", d, ok)
 	}
 	// A record left behind by a daemon that exited names no live process.
 	write(1<<22-3, 1790672124)
-	if _, ok := RunningCodexDaemon(); ok {
+	if _, ok := runningDaemon(); ok {
 		t.Fatal("a dead daemon's record counted as running")
 	}
 }

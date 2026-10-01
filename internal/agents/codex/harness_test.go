@@ -13,7 +13,7 @@ import (
 )
 
 // codexIn points Codex's config at a temp dir, never the developer's real one.
-func codexIn(t *testing.T, contents string) (Codex, string) {
+func codexIn(t *testing.T, contents string) (exporter, string) {
 	t.Helper()
 	dir := t.TempDir()
 	t.Setenv("CODEX_HOME", dir)
@@ -25,7 +25,7 @@ func codexIn(t *testing.T, contents string) (Codex, string) {
 			t.Fatalf("seed config: %v", err)
 		}
 	}
-	return Codex{}, path
+	return exporter{}, path
 }
 
 func readText(t *testing.T, path string) string {
@@ -67,7 +67,7 @@ model = "gpt-5-mini"
 `
 
 func TestCodexRenderWritesOneExporterPerSignal(t *testing.T) {
-	env := Codex{}.render(codexExporter())
+	env := exporter{}.render(codexExporter())
 
 	want := map[string]string{
 		"trace_exporter":   `{ otlp-http = { endpoint = "https://otel.terma.ai/v1/traces", headers = { Authorization = "Bearer ter_srv_0123456789abcdef" }, protocol = "binary" } }`,
@@ -87,7 +87,7 @@ func TestCodexRenderWritesOneExporterPerSignal(t *testing.T) {
 // An unselected signal is left alone, not written as "none": for metrics that would
 // switch off OpenAI's own route.
 func TestCodexRenderLeavesUnselectedSignalsAlone(t *testing.T) {
-	env := Codex{}.render(harness.Exporter{Endpoint: termaEndpoint, Signals: []harness.Signal{harness.SignalLogs}})
+	env := exporter{}.render(harness.Exporter{Endpoint: termaEndpoint, Signals: []harness.Signal{harness.SignalLogs}})
 	if _, ok := env["exporter"]; !ok {
 		t.Error("the log exporter was not written")
 	}
@@ -99,7 +99,7 @@ func TestCodexRenderLeavesUnselectedSignalsAlone(t *testing.T) {
 }
 
 func TestCodexRenderContentSwitches(t *testing.T) {
-	on := Codex{}.render(harness.Exporter{Signals: harness.AllSignals, IncludePrompts: true, IncludeToolContent: true})
+	on := exporter{}.render(harness.Exporter{Signals: harness.AllSignals, IncludePrompts: true, IncludeToolContent: true})
 	if on["log_user_prompt"] != "true" {
 		t.Errorf("log_user_prompt = %q, want true", on["log_user_prompt"])
 	}
@@ -108,7 +108,7 @@ func TestCodexRenderContentSwitches(t *testing.T) {
 		t.Errorf("tool_result = %q, want it unwritten when tool content is on", v)
 	}
 
-	off := Codex{}.render(harness.Exporter{Signals: harness.AllSignals})
+	off := exporter{}.render(harness.Exporter{Signals: harness.AllSignals})
 	if off["log_user_prompt"] != "false" || off["tool_result"] != "{ max_bytes = 0 }" {
 		t.Errorf("exclusions rendered as %v", off)
 	}
@@ -298,7 +298,7 @@ func TestCodexDisconnectRestoresOriginalTextExactly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Disconnect: %v", err)
 	}
-	if result.Removed != len(Codex{}.render(codexExporter())) {
+	if result.Removed != len(exporter{}.render(codexExporter())) {
 		t.Errorf("removed %d keys, want every key the connect wrote", result.Removed)
 	}
 	if got := readText(t, path); got != codexSeed {
@@ -829,7 +829,7 @@ func TestCodexConnectWritesThroughSymlink(t *testing.T) {
 
 func TestCodexConfigPathHonoursCodexHome(t *testing.T) {
 	t.Setenv("CODEX_HOME", "/tmp/elsewhere")
-	path, err := Codex{}.ConfigPath()
+	path, err := exporter{}.ConfigPath()
 	if err != nil {
 		t.Fatalf("ConfigPath: %v", err)
 	}
@@ -840,20 +840,20 @@ func TestCodexConfigPathHonoursCodexHome(t *testing.T) {
 
 func TestCodexDetectDoesNotFailWhenAbsent(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
-	if d := (Codex{}).Detect(context.Background()); d.Found {
+	if d := (exporter{}).Detect(context.Background()); d.Found {
 		t.Fatalf("Detect reported a harness found on an empty PATH: %+v", d)
 	}
 }
 
 func TestCodexConnectNotes(t *testing.T) {
-	notes := Codex{}.ConnectNotes(codexExporter())
+	notes := exporter{}.ConnectNotes(codexExporter())
 	if len(notes) != 2 {
 		t.Fatalf("notes = %v, want the metrics route and the tool-arguments limit", notes)
 	}
 	quiet := codexExporter()
 	quiet.Signals = []harness.Signal{harness.SignalTraces}
 	quiet.IncludeToolContent = true
-	if notes := (Codex{}).ConnectNotes(quiet); len(notes) != 0 {
+	if notes := (exporter{}).ConnectNotes(quiet); len(notes) != 0 {
 		t.Fatalf("notes = %v, want none", notes)
 	}
 }
