@@ -400,10 +400,10 @@ func (r *Relay) recoverOutbox() {
 
 // withholdQueued drops a queued body that no longer decodes: it cannot be checked against a stricter policy.
 func (r *Relay) withholdQueued(sig Signal, body []byte, pol Policy) []byte {
-	if len(pol.ExcludePaths) > 0 {
+	if pol.Excludes != nil {
 		pol.IncludePrompts, pol.IncludeToolContent = false, false
 	}
-	if pol.IncludePrompts && pol.IncludeToolContent && len(pol.ExcludePaths) == 0 && !pol.RequireClaim {
+	if pol.IncludePrompts && pol.IncludeToolContent && pol.Excludes == nil && !pol.RequireClaim {
 		return body
 	}
 	var msg proto.Message
@@ -421,7 +421,7 @@ func (r *Relay) withholdQueued(sig Signal, body []byte, pol Policy) []byte {
 	if pol.RequireClaim && hasCatchAll(&part{signal: sig, msg: msg}) {
 		return nil
 	}
-	if pathExcluded(msg, pol.ExcludePaths) {
+	if pathExcluded(msg, pol.Excludes) {
 		return nil
 	}
 	unclassified := map[string]int{}

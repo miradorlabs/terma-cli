@@ -100,13 +100,14 @@ func repoRoot(t *testing.T) string {
 	return dir
 }
 
-// bans are imports a package and everything below it never make.
+// bans are imports a package and everything below it never make; a package ending in $ is that package alone.
 var bans = []struct {
 	pkg    string
 	banned []string
 	why    string
 }{
 	{"internal/relay", []string{"internal/harness", "internal/agents"}, "the relay learns about agents only through its options"},
+	{"internal/relay$", []string{"internal/routing"}, "the engine takes a resolved policy; the daemon resolves it"},
 	{"internal/doctor", []string{"internal/account/api", "internal/spool"}, "doctor reaches the network and the spool only through its probes"},
 	{"internal/install", []string{"internal/account", "internal/spool"}, "install signs in and reaches the network only through its steps"},
 	{"internal/hooks/hookrun", []string{"internal/hooks/hookmgr"}, "running a hook and planning hook files are separate halves"},
@@ -156,7 +157,7 @@ func TestAgentPackagesAreImportedOnlyByTheRegistry(t *testing.T) {
 			}
 		}
 		for _, ban := range bans {
-			if !within(p.ImportPath, ban.pkg) {
+			if pkg, exact := strings.CutSuffix(ban.pkg, "$"); exact && p.ImportPath != module+"/"+pkg || !exact && !within(p.ImportPath, ban.pkg) {
 				continue
 			}
 			for _, imp := range p.Imports {

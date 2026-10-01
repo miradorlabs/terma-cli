@@ -277,10 +277,10 @@ const (
 
 // deliverAttributed applies the content policy, stamps the project and enqueues. deliverMu is held.
 func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attribution) {
-	if len(pol.ExcludePaths) > 0 {
+	if pol.Excludes != nil {
 		pol.IncludePrompts, pol.IncludeToolContent = false, false
 	}
-	if pathExcluded(p.msg, pol.ExcludePaths) {
+	if pathExcluded(p.msg, pol.Excludes) {
 		r.stats.dropped(p.signal, "policy_path", p.records)
 		return
 	}

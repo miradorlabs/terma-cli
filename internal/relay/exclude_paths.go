@@ -7,24 +7,21 @@ import (
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
-
-	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
 // pathExcluded reports whether any attribute names an excluded file, before content
 // filtering removes them; reflection reaches attributes wherever OTLP keeps them.
-func pathExcluded(msg proto.Message, patterns []string) bool {
-	if len(patterns) == 0 {
+func pathExcluded(msg proto.Message, excludes func(any) bool) bool {
+	if excludes == nil {
 		return false
 	}
-	pol := config.Policy{ExcludePaths: patterns}
-	return excludedIn(msg.ProtoReflect(), pol)
+	return excludedIn(msg.ProtoReflect(), excludes)
 }
 
-func excludedIn(m protoreflect.Message, pol config.Policy) bool {
+func excludedIn(m protoreflect.Message, excludes func(any) bool) bool {
 	// protojson leaves an empty key out, and an attribute without one names nothing.
 	if kv, ok := m.Interface().(*commonpb.KeyValue); ok && kv.GetKey() != "" {
-		if pol.HasExcludedPath(map[string]any{kv.GetKey(): anyValueJSON(kv.GetValue())}, "") {
+		if excludes(map[string]any{kv.GetKey(): anyValueJSON(kv.GetValue())}) {
 			return true
 		}
 	}
@@ -36,22 +33,22 @@ func excludedIn(m protoreflect.Message, pol config.Policy) bool {
 		switch {
 		case fd.IsMap():
 			v.Map().Range(func(_ protoreflect.MapKey, mv protoreflect.Value) bool {
-				found = excludedIn(mv.Message(), pol)
+				found = excludedIn(mv.Message(), excludes)
 				return !found
 			})
 		case fd.IsList():
 			for i, list := 0, v.List(); i < list.Len() && !found; i++ {
-				found = excludedIn(list.Get(i).Message(), pol)
+				found = excludedIn(list.Get(i).Message(), excludes)
 			}
 		default:
-			found = excludedIn(v.Message(), pol)
+			found = excludedIn(v.Message(), excludes)
 		}
 		return !found
 	})
 	return found
 }
 
-// anyValueJSON is v in protojson's shape, the one config.Policy.HasExcludedPath reads.
+// anyValueJSON is v in protojson's shape, the one Policy.Excludes reads.
 func anyValueJSON(v *commonpb.AnyValue) any {
 	switch x := v.GetValue().(type) {
 	case *commonpb.AnyValue_StringValue:

@@ -1,4 +1,4 @@
-package relay
+package daemon
 
 import (
 	"errors"
@@ -62,8 +62,9 @@ func TestCapturePolicy(t *testing.T) {
 				!slices.Equal(got.Signals, test.want.signals) || (got.Signals == nil) != (test.want.signals == nil) {
 				t.Fatalf("got prompts=%v tools=%v requireClaim=%v signals=%#v, want %+v", got.IncludePrompts, got.IncludeToolContent, got.RequireClaim, got.Signals, test.want)
 			}
-			if !slices.Equal(got.ExcludePaths, test.in.Org.ExcludePaths) {
-				t.Fatalf("exclusions %v, want the organization's %v", got.ExcludePaths, test.in.Org.ExcludePaths)
+			named := map[string]any{"file_path": map[string]any{"stringValue": "secrets/prod.env"}}
+			if excluded := got.Excludes != nil && got.Excludes(named); excluded != (len(test.in.Org.ExcludePaths) > 0) {
+				t.Fatalf("a value naming secrets/prod.env excluded=%v, want the organization's %v", excluded, test.in.Org.ExcludePaths)
 			}
 		})
 	}

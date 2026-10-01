@@ -1,9 +1,10 @@
-package relay
+package daemon
 
 import (
 	"slices"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
@@ -25,10 +26,10 @@ type Capture struct {
 // Path exclusions withhold all free text, since exporters do not name its source files,
 // and a record withholds an agent it does not name: another repository may have pointed
 // that agent's exporter at the relay machine-wide.
-func CapturePolicy(in Capture) Policy {
+func CapturePolicy(in Capture) relay.Policy {
 	org := in.Org
-	pol := Policy{IncludePrompts: org.IncludePrompts, IncludeToolContent: org.IncludeToolContent, Signals: org.Signals,
-		ExcludePaths: org.ExcludePaths, RequireClaim: !in.Primary || !org.Global()}
+	pol := relay.Policy{IncludePrompts: org.IncludePrompts, IncludeToolContent: org.IncludeToolContent, Signals: org.Signals,
+		Excludes: excludes(org.ExcludePaths), RequireClaim: !in.Primary || !org.Global()}
 	if len(org.ExcludePaths) > 0 {
 		pol.IncludePrompts, pol.IncludeToolContent = false, false
 	}
@@ -51,4 +52,14 @@ func CapturePolicy(in Capture) Policy {
 		}
 	}
 	return pol
+}
+
+// excludes matches values naming one of patterns, nil when there are none. It keeps its
+// own copy, so a policy refreshed later never changes a decision already made.
+func excludes(patterns []string) func(any) bool {
+	if len(patterns) == 0 {
+		return nil
+	}
+	p := config.Policy{ExcludePaths: slices.Clone(patterns)}
+	return func(v any) bool { return p.HasExcludedPath(v, "") }
 }

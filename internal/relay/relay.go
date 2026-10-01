@@ -47,8 +47,10 @@ type Policy struct {
 	IncludePrompts     bool
 	IncludeToolContent bool
 	// Signals nil allows every signal; empty allows none.
-	Signals      []string
-	ExcludePaths []string
+	Signals []string
+	// Excludes reports whether an attribute, in protojson's shape, names an excluded
+	// file; nil when nothing is excluded.
+	Excludes     func(value any) bool
 	RequireClaim bool
 }
 

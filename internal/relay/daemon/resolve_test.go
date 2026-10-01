@@ -63,3 +63,19 @@ func TestResolverGrantsOnlyAValidatedPolicyOfThisLogin(t *testing.T) {
 		})
 	}
 }
+
+// A profile removed while the relay runs grants nothing: the policy it started with is
+// not evidence of the one in force.
+func TestResolverGrantsNothingOnceTheProfileIsGone(t *testing.T) {
+	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	t.Setenv("TERMA_POLICY_STUB", "")
+	cfg := &config.Config{ProfileName: "default", OrganizationID: "org_a",
+		Policy: config.Policy{Mode: config.ModeRepo, IncludePrompts: true, IncludeToolContent: true, OrganizationID: "org_a", TeamID: "p1", FetchedAt: time.Now()}}
+	if err := keystore.Set("p1", mintedKey, keystore.HostsOf(cfg)); err != nil {
+		t.Fatal(err)
+	}
+	resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "" }, Endpoint: func(string) string { return "https://otel.example" }})
+	if pol, err := resolve(claim.Claim{ProjectID: "p1"}); err == nil {
+		t.Fatalf("granted %+v with no profile on file", pol)
+	}
+}

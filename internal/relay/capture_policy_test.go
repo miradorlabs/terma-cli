@@ -82,7 +82,7 @@ func TestQueuedCapturePolicyFiltersPathsAndCorruptBodies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := r.withholdQueued(Traces, b, Policy{ExcludePaths: []string{"**/secrets/**"}}); got != nil {
+	if got := r.withholdQueued(Traces, b, Policy{Excludes: excluding("**/secrets/**")}); got != nil {
 		t.Fatal("queued excluded path survived")
 	}
 	if got := r.withholdQueued(Traces, []byte{0xff}, Policy{}); got != nil {

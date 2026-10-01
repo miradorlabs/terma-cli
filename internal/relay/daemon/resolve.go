@@ -42,7 +42,10 @@ func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Polic
 		// Reread the profile so a refreshed policy also governs queued exports.
 		if file, err := config.LoadFile(); err != nil {
 			return relay.Policy{}, err
-		} else if p := file.Profiles[cfg.ProfileName]; p != nil {
+		} else if p := file.Profiles[cfg.ProfileName]; p == nil && cfg.ProfileName != "" {
+			// The startup policy would outlive a sign-out or a removed profile.
+			return relay.Policy{}, errors.New("profile removed; restart the relay")
+		} else if p != nil {
 			if p.OrganizationID != cfg.OrganizationID {
 				return relay.Policy{}, errors.New("organization changed; restart the relay")
 			}
@@ -58,7 +61,7 @@ func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Polic
 			// Unknown policy must neither grant nor drop: a new team's exports wait for its fetch.
 			return relay.Policy{}, errors.New("no validated collection policy for this team")
 		}
-		in := relay.Capture{Org: org, Primary: globalPrimary}
+		in := Capture{Org: org, Primary: globalPrimary}
 		if c.Tool != "" {
 			in.Harness = r.AgentName(c.Tool)
 		}
@@ -67,7 +70,7 @@ func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Polic
 		} else if ok {
 			in.Record = &rec
 		}
-		pol := relay.CapturePolicy(in)
+		pol := CapturePolicy(in)
 		pol.Endpoint, pol.Key = r.Endpoint(c.ProjectID), key
 		return pol, nil
 	}

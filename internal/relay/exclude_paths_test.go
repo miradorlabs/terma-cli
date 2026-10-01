@@ -95,7 +95,7 @@ func TestPathExcludedMatchesTheJSONWalk(t *testing.T) {
 		"JSON-encoded arguments": true, "nested kvlist": true, "body kvlist": true, "span event": true, "span link": true, "metric exemplar": true}
 	for name, msg := range cases {
 		for _, patterns := range [][]string{{"secrets"}, {"7"}, nil} {
-			got, want := pathExcluded(msg, patterns), pathExcludedJSON(msg, patterns)
+			got, want := pathExcluded(msg, excluding(patterns...)), pathExcludedJSON(msg, patterns)
 			if len(patterns) == 0 {
 				want = false
 			}
@@ -107,4 +107,13 @@ func TestPathExcludedMatchesTheJSONWalk(t *testing.T) {
 			}
 		}
 	}
+}
+
+// excluding is the matcher the daemon builds for patterns.
+func excluding(patterns ...string) func(any) bool {
+	if len(patterns) == 0 {
+		return nil
+	}
+	p := config.Policy{ExcludePaths: patterns}
+	return func(v any) bool { return p.HasExcludedPath(v, "") }
 }
