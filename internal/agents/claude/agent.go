@@ -33,7 +33,7 @@ func (Agent) Events() map[string]agents.Handler {
 		"post-tool-use": postToolUse,
 		"stop":          stop,
 		"stop-failure":  stopFailure,
-		// Turn start: claims the session for the local relay and starts it (cmd/hook.go
+		// Turn start: claims the session for the local relay and starts it (internal/cli/hook.go
 		// does both from the payload); the handler itself only reads the payload.
 		"user-prompt-submit": hookrun.TurnStart,
 		// A subagent runs inside the session; both are notification-only for terma.

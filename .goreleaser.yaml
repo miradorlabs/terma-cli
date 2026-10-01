@@ -11,10 +11,8 @@ before:
 
 builds:
   - id: terma
-    main: .
-    # The module is github.com/miradorlabs/terma-cli, so `go build` would name the
-    # binary `terma-cli`. Everything a user installs — and every hook shim calls —
-    # is `terma`.
+    main: ./cmd/terma
+    # Everything a user installs — and every hook shim calls — is `terma`.
     binary: terma
     env:
       - CGO_ENABLED=0

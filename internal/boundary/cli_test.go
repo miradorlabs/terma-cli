@@ -12,9 +12,10 @@ import (
 )
 
 // cli is the command tree's package directory.
-const cli = "cmd"
+const cli = "internal/cli"
 
-// TestTheCLIKeepsNoState holds the command tree to its app: no package-level variable
+// TestTheCLIKeepsNoState holds the command tree to one package and its app: it has no
+// subdirectories, and no package-level variable
 // of the CLI's is assigned, incremented or has its address taken anywhere in the
 // package, tests included. A lookup table or an error sentinel is a variable Go cannot
 // make a constant; one that changes is state, and state lives in the app.
@@ -28,6 +29,9 @@ func TestTheCLIKeepsNoState(t *testing.T) {
 	var files []*ast.File
 	vars := map[string]bool{}
 	for _, e := range entries {
+		if e.IsDir() {
+			t.Errorf("%s/%s: the command line is one package; what a command needs beneath it is a package of its own under internal", cli, e.Name())
+		}
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".go") {
 			continue
 		}

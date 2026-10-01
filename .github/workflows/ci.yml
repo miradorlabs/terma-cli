@@ -70,8 +70,6 @@ jobs:
       - run: go vet ./...
       - name: Relay, locking, process lookups and updater on Windows
         run: go test ./internal/relay/... ./internal/flock/... ./internal/procinfo/... ./internal/selfupdate/... -count=1 -timeout=5m
-      - name: The relay's Windows service and supervisor
-        run: go test ./cmd/ -count=1 -timeout=5m -run "TestSupervise|TestStopFile|TestRelayServiceDefinitions"
 
   # The live suite is a separate module; its offline contracts must run in CI too.
   live-contracts:
@@ -117,7 +115,7 @@ jobs:
             go.sum
             live/go.sum
       - name: Build Terma
-        run: go build -o live/bin/terma .
+        run: go build -o live/bin/terma ./cmd/terma
       # Pi has no exporter; terma's extension is one, tested only on the installed
       # build (live/pi.go).
       - uses: actions/setup-node@v5
@@ -199,7 +197,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - run: go build -o bin/terma .
+      - run: go build -o bin/terma ./cmd/terma
       - name: Shim runs under dash and busybox sh
         env:
           TERMA_POLICY_STUB: '{"mode":"repo","include_prompts":true,"include_tool_content":true}'

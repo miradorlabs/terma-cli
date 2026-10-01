@@ -16,7 +16,7 @@ vet:
 	$(GO) sh -c 'gofmt -l . && go vet ./...'
 # The terma binary the sandboxes call, and the test binary, both for this host.
 build:
-	$(GO) sh -c 'cd /src && go build -o live/bin/terma . && cd live && go test -c -o bin/live.test .'
+	$(GO) sh -c 'cd /src && go build -o live/bin/terma ./cmd/terma && cd live && go test -c -o bin/live.test .'
 # Offline contracts exercise malformed evidence without launching harnesses.
 test: build
 	TERMA_LIVE=0 ./bin/live.test -test.v -test.timeout 1m
@@ -50,7 +50,7 @@ machine-image:
 	docker build --build-arg CLAUDE_VERSION=$(CLAUDE_VERSION) --build-arg CODEX_VERSION=$(CODEX_VERSION) \
 	 -t $(MACHINE_IMAGE):$(CLAUDE_VERSION)-$(CODEX_VERSION) machine
 machines: machine-image
-	$(LINUX_GO) sh -c 'cd /src && go build -o live/bin/linux/terma . && cd live && go test -c -o bin/linux/live.test .'
+	$(LINUX_GO) sh -c 'cd /src && go build -o live/bin/linux/terma ./cmd/terma && cd live && go test -c -o bin/linux/live.test .'
 	# seccomp unconfined: Codex runs tool commands in bwrap, which needs the user
 	# namespaces Docker's default profile forbids and a developer's machine allows.
 	docker run --rm --security-opt seccomp=unconfined -v "$(CURDIR)":/work/live -w /work/live \

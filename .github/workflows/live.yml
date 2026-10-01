@@ -82,7 +82,7 @@ jobs:
         run: npm install -g @earendil-works/pi-coding-agent t3
       - name: Build native test binaries
         run: |
-          go build -o live/bin/terma .
+          go build -o live/bin/terma ./cmd/terma
           cd live
           go test -c -o bin/live.test .
       - name: Run live contracts (subscription coverage is opt-in)

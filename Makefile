@@ -16,13 +16,13 @@ GOLANGCI_LINT := bin/golangci-lint-$(GOLANGCI_LINT_VERSION)
 
 .PHONY: build
 build:
-	go build -ldflags "$(LDFLAGS)" -o $(BINARY) .
+	go build -ldflags "$(LDFLAGS)" -o $(BINARY) ./cmd/terma
 
 # Install onto PATH as `terma`. Plain `go install` would name it `terma-cli`
 # after the module path, so the binary is placed explicitly.
 .PHONY: install
 install:
-	go build -ldflags "$(LDFLAGS)" -o "$(shell go env GOPATH)/bin/terma" .
+	go build -ldflags "$(LDFLAGS)" -o "$(shell go env GOPATH)/bin/terma" ./cmd/terma
 	@echo "installed $(shell go env GOPATH)/bin/terma"
 	@command -v terma >/dev/null 2>&1 || echo "note: $(shell go env GOPATH)/bin is not on your PATH"
 
@@ -33,7 +33,7 @@ test:
 # Builds and exercises the real CLI in isolated workspaces; no login or live backend.
 .PHONY: test-install-e2e
 test-install-e2e:
-	go test ./cmd -run '^TestInstallE2E' -count=1 -v
+	go test ./internal/cli -run '^TestInstallE2E' -count=1 -v
 
 .PHONY: cover
 cover:
@@ -130,5 +130,5 @@ dist:
 		if [ "$$os" = "windows" ]; then ext=".exe"; fi; \
 		echo "building dist/terma-$$os-$$arch$$ext"; \
 		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -ldflags "$(LDFLAGS)" \
-			-o dist/terma-$$os-$$arch$$ext . || exit 1; \
+			-o dist/terma-$$os-$$arch$$ext ./cmd/terma || exit 1; \
 	done
