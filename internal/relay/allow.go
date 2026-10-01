@@ -16,51 +16,46 @@ import "strings"
 // pinned in this package's tests: widening what leaves a machine is a reviewed edit
 // here, whoever declares it. A key that is content for any agent is content.
 
-// genericSafeKeys are attribute keys that never carry what was said, for any agent.
+// genericSafeKeys are the safe keys no one agent owns: semantic conventions, terma's own,
+// keys several agents send, and survey keys no agent's golden places yet. An agent's own
+// keys are its shape.CaptureRules.SafeKeys.
 var genericSafeKeys = setOf(
 	// Identity and correlation.
-	"session.id", "conversation.id", "thread.id", "thread_id", "gen_ai.conversation.id", "prompt.id", "request_id",
-	"message.uuid", "turn.id", "call_id", "tool_use_id", "gen_ai.tool.call.id", "gen_ai.response.id", "user.id",
-	"event.name", "event.kind", "event.sequence", "event.timestamp", "interaction.sequence", "span.type",
+	"session.id", "gen_ai.conversation.id",
+	"tool_use_id", "gen_ai.tool.call.id", "gen_ai.response.id",
+	"event.name", "event.timestamp",
 	"mirador.project.id", "terma.relay.attribution", "terma.relay.session.id",
 	// Models, providers and settings.
 	"model", "gen_ai.request.model", "gen_ai.response.model", "gen_ai.system", "gen_ai.provider.name",
-	"gen_ai.operation.name", "gen_ai.response.finish_reasons", "provider_name", "slug", "speed", "stop_reason",
-	"reasoning_effort", "reasoning_summary", "model_reasoning_effort",
-	"approval_policy", "sandbox_policy", "sandbox", "auth_mode", "originator",
-	"app.version", "terminal.type", "session_source", "source", "start_type", "query_source", "query_source_safe",
-	"parent.source", "tool_source", "mcp_server", "mcp_server_origin", "mcp_servers", "agent_name", "tmp_mem_enabled",
-	"endpoint", "http.response.status_code", "status", "success", "decision", "attempt", "queued_sends",
-	"llm_request.context", "type", "token_type",
+	"gen_ai.operation.name", "gen_ai.response.finish_reasons",
+	"terminal.type", "source",
+	"endpoint", "http.response.status_code", "status", "success", "decision", "attempt",
 	// Tools, by name and shape — never their input or output.
-	"tool_name", "tool_name_safe", "tool", "tool_namespace", "gen_ai.tool.name", "bash_argv0", "bash_command_class",
-	"command_category", "tool_input_size_bytes", "tool_result_size_bytes", "tool_result_seq", "output_truncated",
+	"tool_name", "tool", "gen_ai.tool.name",
 	// Counts, sizes, costs and timings.
-	"input_tokens", "output_tokens", "cache_read_tokens", "cache_creation_tokens", "cost_usd", "cost_usd_micros",
-	"input_token_count", "output_token_count", "cached_token_count", "cache_write_token_count", "reasoning_token_count",
-	"tool_token_count", "prompt_length", "user_prompt_length", "response_length", "duration_ms", "ttft_ms",
-	"first_content_ms", "interaction.duration_ms", "busy_ns", "idle_ns",
+	"input_tokens", "output_tokens", "cache_read_tokens",
+	"prompt_length", "response_length", "duration_ms", "ttft_ms",
 	// Where in the code a span was opened: source locations and threads.
-	"code.file.path", "code.line.number", "code.module.name", "target", "thread.name",
+	"code.file.path", "code.line.number", "code.module.name", "thread.name",
 	// Classified from the first unclassified-key survey of every harness's withheld-content
 	// run (2026-09-30), string-valued ones (numbers and booleans pass whatever their key).
 	// Hooks, plugins, managed settings and skills.
-	"hook_name", "hook_type", "hook_source", "hook_matcher", "hook_event", "hook_event_name", "handler_type",
+	"hook_name", "hook_type", "hook_source", "hook_matcher", "hook_event", "handler_type",
 	"enabled_via", "mode", "phase", "phases",
 	"trigger", "stage", "kind", "outcome",
 	// App servers, hooks, tracing and runtimes.
-	"rpc.method", "rpc.request_id", "rpc.system", "rpc.transport", "submission.id", "turn_id",
+	"rpc.method", "rpc.request_id", "rpc.system", "rpc.transport", "submission.id",
 	"hook.command_outcome", "hook.display_order", "hook.event_name", "hook.execution_mode", "hook.handler_type",
 	"hook.scope", "hook.source", "hook.timeout_sec", "execution_mode", "environment_id", "unified_exec_process_id",
-	"build_mode", "bundle_shape", "catalog_surface", "refresh_strategy", "tool_type", "tool_origin", "wire_api",
+	"build_mode", "bundle_shape", "catalog_surface", "refresh_strategy", "tool_type", "tool_origin",
 	"transport", "api.path", "startup.phase", "startup.status", "installation.id", "error_kind", "operation",
-	"method", "provider", "prompt_id", "version", "level", "role", "format", "output_format", "mimetype",
+	"method", "provider", "version", "level", "role", "format", "output_format", "mimetype",
 	"language", "programming_language", "http.method", "server.address", "extension", "extensions",
 	"extension_id", "extension_ids", "extension_name", "feature", "function_name", "mcp_tool", "mcp_tools",
 	"mcp_server_name", "embedding_model", "auth_type", "approval_mode", "decision_model", "decision_source",
 	"routing.decision_model", "routing.decision_source", "routing.approval_mode", "os_platform", "os_arch",
 	"os_release", "finish_reasons", "start_time", "end_time", "model.provided",
-	// OpenCode (terma's plugin) and Gemini CLI.
+	// Semantic-convention gen_ai attributes, and exporter settings.
 	"cwd", "gen_ai.tool.call_id", "gen_ai.token.type", "gen_ai.output.type",
 	"gen_ai.prompt.name", "gen_ai.agent.name", "gen_ai.request.seed", "gen_ai.request.presence_penalty",
 	"gen_ai.request.max_tokens", "gen_ai.request.frequency_penalty", "gen_ai.request.choice.count",
@@ -69,7 +64,7 @@ var genericSafeKeys = setOf(
 	"process.pid", "process.owner", "process.command", "process.executable.name", "process.executable.path",
 	"process.runtime.name", "process.runtime.version", "process.runtime.description",
 	// Resource attributes.
-	"service.name", "service.version", "host.arch", "host.name", "os.type", "os.version", "os", "os_version", "env",
+	"service.name", "service.version", "host.arch", "host.name", "os.type", "os.version",
 	"telemetry.sdk.language", "telemetry.sdk.name", "telemetry.sdk.version",
 )
 
