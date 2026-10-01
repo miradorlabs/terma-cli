@@ -15,13 +15,13 @@ import (
 // primaryCommands is what `terma --help` lists, short on purpose; a new command belongs
 // in advancedCommands unless a developer needs it day to day.
 var primaryCommands = []string{
-	"doctor", "install", "org", "session", "setup", "status", "uninstall", "update", "usage",
+	"doctor", "install", "org", "setup", "status", "uninstall", "update",
 }
 
 // advancedCommands are hidden, not removed: automation and terma's own fix-it hints run them.
 var advancedCommands = []string{
 	"agent", "config", "connect", "disconnect", "harness", "hook", "login", "logout", "nate",
-	"pause", "principal", "project", "relay", "resume", "spool", "telemetry", "version", "whoami",
+	"pause", "project", "relay", "resume", "spool", "telemetry", "version", "whoami",
 }
 
 func commandNamed(root *cobra.Command, name string) *cobra.Command {
@@ -101,7 +101,7 @@ func TestAdvancedCommandsAreHiddenNotRemoved(t *testing.T) {
 var namedCommand = regexp.MustCompile("`terma ([a-z][a-z-]*)[^`\n]*`")
 
 // unquotedCommand finds the two unquoted shapes: a doctor `Fix: "terma install"` and a
-// sentence ending `with: terma session list`.
+// sentence ending `with: terma doctor`.
 var unquotedCommand = regexp.MustCompile(`(?:Fix:\s*"|[Ww]ith: )terma ([a-z][a-z-]*)`)
 
 // Every `terma <name>` the shipped source and docs name must be a command that exists,

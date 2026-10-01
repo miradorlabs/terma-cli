@@ -74,7 +74,9 @@ type LogQuery struct {
 
 func (q LogQuery) values() url.Values {
 	v := url.Values{}
-	setIfNotEmpty(v, "filter", q.Filter)
+	if q.Filter != "" {
+		v.Set("filter", q.Filter)
+	}
 	if !q.Since.IsZero() {
 		v.Set("since", q.Since.UTC().Format(time.RFC3339))
 	}

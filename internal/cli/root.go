@@ -91,9 +91,6 @@ spend will be attributed.`,
 		app.newNateCommand(),
 		app.newDoctorCommand(),
 		app.newStatusCommand(),
-		app.newSessionCommand(),
-		app.newUsageCommand(),
-		app.newPrincipalCommand(),        // advanced: hidden from the primary workflow
 		app.newTelemetryConnectCommand(), // advanced: install configures telemetry normally
 		app.newTelemetryDisconnectCommand(),
 		app.newHarnessCommand(),
@@ -205,10 +202,8 @@ type App struct {
 	flags   globalFlags
 	binDirs func() []string
 	// hookExecutable is the terma machine-wide and global git hooks call, by its start path.
-	hookExecutable func() (string, error)
-	managedRoot    string
-	// sessionGetWait bounds `session get`: the gateway's roll-up feed has no request timeout.
-	sessionGetWait       time.Duration
+	hookExecutable       func() (string, error)
+	managedRoot          string
 	runUpdateStep        func(ctx context.Context, out io.Writer, argv ...string) error
 	nateBinaryCandidates func() []string
 	nateRemoveBinary     func(cmd *cobra.Command, path string) error
@@ -217,7 +212,7 @@ type App struct {
 // New is the command line for the agents this build knows, at version.
 func New(known *agents.Registry, version string) *App {
 	app := &App{agents: known, version: version, binDirs: doctor.WellKnownBinDirs, hookExecutable: procinfo.AbsExecutable,
-		managedRoot: "/", sessionGetWait: 15 * time.Second, runUpdateStep: runUpdateStep, nateRemoveBinary: removeNateBinary}
+		managedRoot: "/", runUpdateStep: runUpdateStep, nateRemoveBinary: removeNateBinary}
 	app.nateBinaryCandidates = app.installedTermaBinaries
 	return app
 }
@@ -382,13 +377,4 @@ func (app *App) setupCommand(preconditions ...func(*config.Config) error) (*conf
 		return nil, nil, "", err
 	}
 	return cfg, client, format, nil
-}
-
-// setupProjectCommand is the preamble every project-scoped read shares.
-func (app *App) setupProjectCommand(cmd *cobra.Command) (context.Context, *api.Client, output.Format, error) {
-	_, client, format, err := app.setupCommand(requireProject)
-	if err != nil {
-		return nil, nil, "", err
-	}
-	return cmd.Context(), client, format, nil
 }

@@ -2,21 +2,17 @@ package cli
 
 import (
 	"encoding/json"
-	"fmt"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 )
 
-func TestProjectReadsFollowRepositoryBinding(t *testing.T) {
+func TestProjectShowFollowsRepositoryBinding(t *testing.T) {
 	t.Setenv("TERMA_PROJECT_ID", "")
 	for _, id := range []string{"repo-a", "repo-b"} {
 		t.Run(id, func(t *testing.T) {
@@ -29,32 +25,16 @@ func TestProjectReadsFollowRepositoryBinding(t *testing.T) {
 				t.Fatal(err)
 			}
 			t.Chdir(subdir)
-			run := termaRun{env: fakeGateway(t, func(w http.ResponseWriter, r *http.Request) {
-				if got := r.Header.Get("X-Mirador-Project"); got != id {
-					t.Errorf("read sent project %q, want repository %q", got, id)
-				}
-				fmt.Fprint(w, `{"principals":[]}`)
-			})}
-			run.env["TERMA_API_KEY"] = ""
-			t.Setenv("TERMA_CONFIG_DIR", run.env["TERMA_CONFIG_DIR"])
-			if _, err := auth.SaveCredential(config.DefaultProfile, &auth.Credential{
-				AccessToken: "ter_cli_test", OrganizationID: "org-test",
-				AuthURL: run.env["TERMA_AUTH_URL"], ExpiresAt: time.Now().Add(time.Hour),
-			}); err != nil {
-				t.Fatal(err)
-			}
+			t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 			if err := config.UpdateProfile(config.DefaultProfile, func(p *config.Profile) {
 				p.OrganizationID, p.OrganizationName = "another-org", "Another organization"
 			}); err != nil {
 				t.Fatal(err)
 			}
-			if out, err := run.combined(t, "principal", "list"); err != nil {
-				t.Fatalf("read from subdirectory: %v\n%s", err, out)
-			}
 			out, err := runTerma(t, "project", "show", "-o", "json")
 			var got project
 			if err != nil || json.Unmarshal([]byte(out), &got) != nil || got.ID != id || got.Name != "Project "+id || got.OrganizationID != "repo-org" {
-				t.Fatalf("project show disagrees with API scope: %v\n%s", err, out)
+				t.Fatalf("project show disagrees with the binding: %v\n%s", err, out)
 			}
 			file, _ := config.LoadFile()
 			if file.Profiles[config.DefaultProfile].OrganizationID != "another-org" {

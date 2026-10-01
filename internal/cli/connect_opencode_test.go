@@ -24,7 +24,7 @@ func TestTelemetryConnectOpenCodeInstallsThePlugin(t *testing.T) {
 	}
 	plugin := filepath.Join(xdg, "opencode", "plugins", "terma.js")
 	helper := filepath.Join(termaDir, "helpers", "opencode-otel-770e8400-e29b-41d4-a716-446655440000")
-	for _, want := range []string{plugin, helper, "restart it after connecting", "`terma session list`", "no separate metrics stream"} {
+	for _, want := range []string{plugin, helper, "restart it after connecting", "no separate metrics stream"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output lacks %q:\n%s", want, out)
 		}

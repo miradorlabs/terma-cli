@@ -137,7 +137,6 @@ func Global(ctx context.Context, reg *agents.Registry, h harness.Harness, cfg *c
 	for _, n := range notes {
 		fmt.Fprintln(w.Out, n)
 	}
-	fmt.Fprintln(w.Out, "See its sessions with `terma session list`.")
 	return nil
 }
 

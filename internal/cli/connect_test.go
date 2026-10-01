@@ -182,9 +182,6 @@ func TestTelemetryCodexConnectStatusDisconnect(t *testing.T) {
 	if !strings.Contains(out, "written into this file") {
 		t.Errorf("the plan did not say the key goes inline:\n%s", out)
 	}
-	if !strings.Contains(out, "`terma session list`") {
-		t.Errorf("connect did not say where the sessions show up:\n%s", out)
-	}
 	if strings.Contains(out, "helpers") {
 		t.Errorf("a headers helper was mentioned for a harness that has none:\n%s", out)
 	}
@@ -506,30 +503,6 @@ func TestTelemetryDisconnectCleansPartiallyDisabledConfig(t *testing.T) {
 	}
 	if !strings.Contains(string(data), "vim") {
 		t.Errorf("disconnect removed an unrelated setting:\n%s", data)
-	}
-}
-
-// The closing hint must name a command that runs here.
-func TestTelemetryConnectEndsOnACommandThatExists(t *testing.T) {
-	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
-	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
-
-	out, _, err := termaRun{}.exec(t,
-		"telemetry", "connect", "claude",
-		"--api-key", "ter_srv_test",
-		"--project", "770e8400-e29b-41d4-a716-446655440000",
-		"--yes",
-	)
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-
-	got := out
-	if !strings.Contains(got, "`terma session list`") {
-		t.Errorf("connect did not say where the sessions show up:\n%s", got)
-	}
-	if strings.Contains(got, "terma trace") {
-		t.Errorf("connect still names the trace command, which terma does not have:\n%s", got)
 	}
 }
 

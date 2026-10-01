@@ -152,18 +152,16 @@ Terma supports Claude Code (CLI and Desktop) and Codex (CLI and Desktop): commit
 attribution through repository hooks, and each agent's native telemetry through the local
 relay.
 
-## Read usage and attribution
+## Check the setup
 
 ```bash
 terma status
-terma usage --user alex --since today
-terma session list --user alex --since yesterday
+terma doctor
 ```
 
 `status` is the quick local view of sign-in, project binding, hooks, connected
 agents, queue state, and remaining setup steps. `doctor` performs the end-to-end check,
-including a scratch commit in a temporary worktree. `usage`, `session`, and
-`principal` use the active profile and repository's project; output automatically becomes JSON
+including a scratch commit in a temporary worktree. Output automatically becomes JSON
 when stdout is not a terminal.
 
 Organization and project names are shown without UUIDs in normal output. IDs remain
@@ -190,14 +188,12 @@ setup       Sign in and choose agents
 install     Configure this repository
 status      Show local connections, queue, and setup readiness
 doctor      Verify the full chain
-session     Inspect agent sessions
-usage       Summarize usage and cost
 org         List and switch organizations
 uninstall   Remove repository installation files
 update      Update terma
 ```
 
-Authentication, direct telemetry management, project lookup, principal lookup,
+Authentication, direct telemetry management, project lookup,
 shell completion, configuration, hook execution, the local relay, and spool maintenance remain
 available as hidden commands for automation and troubleshooting. Run
 `terma <command> --help` for details.

@@ -30,7 +30,7 @@ type AgentSupport struct {
 	DisplayName string `json:"display_name"`
 	// Attribution is stamping commits with the session and tool that produced them.
 	Attribution CapabilitySupport `json:"attribution"`
-	// Telemetry is exporting OTLP usage so `usage` and `session` can report spend.
+	// Telemetry is exporting OTLP usage so Terma can report spend.
 	Telemetry CapabilitySupport `json:"telemetry"`
 	// Support is the overall level, folded by Overall.
 	Support SupportLevel `json:"support"`

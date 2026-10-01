@@ -20,8 +20,7 @@ func (app *App) newHarnessListCommand() *cobra.Command {
 Two capabilities are reported per agent:
 
   attribution  stamps commits with the session and tool that produced them
-  telemetry    exports usage to Terma so ` + "`terma usage`" + ` and ` + "`terma session`" + ` can
-               report spend and cost
+  telemetry    exports usage to Terma, which reports spend and cost
 
 An agent is "full" when both work completely, "partial" when either has gaps; the
 notes column says which. An agent with no telemetry export of its own reports through

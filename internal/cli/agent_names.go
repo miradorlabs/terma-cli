@@ -25,11 +25,3 @@ func (app *App) statusLineOwner() string {
 	}
 	return "the agent"
 }
-
-func (app *App) sourceExamples() string {
-	var labels []string
-	for _, a := range app.agents.Supported() {
-		labels = append(labels, agents.Tool(a))
-	}
-	return strings.Join(labels, ", ")
-}
