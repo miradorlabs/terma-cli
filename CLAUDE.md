@@ -156,7 +156,7 @@ developer login to check the team's repository permission.
   directory and holds `path+".lock"` around `fn` (the claim store keeps its own, since it
   writes even without the lock).
 - `internal/hooks/hookmgr` by file: `hookmgr.go` is the vocabulary (`Manager`, `Detect`,
-  `Change`, `Plan`, `Apply`); `git.go` the four git hook managers; `user.go` the
+  `Change`, `Plan`, `Apply`); `git.go` terma's own shims and the shared line edits, and `husky.go`, `lefthook.go`, `precommit.go` the other three git hook managers; `user.go` the
   machine-wide hooks; `json.go` the unescaped, key-ordered JSON. Each agent's planner is
   its own package's `hooks.go`. The event-keyed hooks files (Claude, Codex, Cursor) share
   `MergeEventHooks` (`events.go`): a planner only builds its entries, and

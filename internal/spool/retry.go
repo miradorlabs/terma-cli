@@ -1,9 +1,12 @@
 package spool
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -91,4 +94,68 @@ func (s *Spool) RetryWindows(now time.Time) map[string]time.Time {
 		}
 	}
 	return open
+}
+
+// NextAttempt is when the spool-wide backoff ends; zero when none is in force.
+func (s *Spool) NextAttempt() time.Time {
+	next, _ := s.backoff()
+	return next
+}
+
+// recordFailure doubles the previous wait (30s..1h); the file holds
+// "<next-unix> <wait-seconds>" so the window survives between processes.
+func (s *Spool) recordFailure(now time.Time) {
+	wait := minBackoff
+	if _, prev := s.backoff(); prev > 0 {
+		wait = prev * 2
+	}
+	if wait > maxBackoff {
+		wait = maxBackoff
+	}
+	_ = os.WriteFile(filepath.Join(s.dir, backoffFile),
+		[]byte(strconv.FormatInt(now.Add(wait).Unix(), 10)+" "+strconv.FormatInt(int64(wait/time.Second), 10)),
+		fileMode)
+}
+
+func (s *Spool) backoff() (next time.Time, wait time.Duration) {
+	data, err := os.ReadFile(filepath.Join(s.dir, backoffFile))
+	if err != nil {
+		return time.Time{}, 0
+	}
+	fields := bytes.Fields(data)
+	if len(fields) == 0 {
+		return time.Time{}, 0
+	}
+	unix, err := strconv.ParseInt(string(fields[0]), 10, 64)
+	if err != nil {
+		return time.Time{}, 0
+	}
+	next = time.Unix(unix, 0)
+	if len(fields) > 1 {
+		if secs, err := strconv.ParseInt(string(fields[1]), 10, 64); err == nil {
+			wait = time.Duration(secs) * time.Second
+		}
+	}
+	return next, wait
+}
+
+func (s *Spool) clearBackoff() {
+	_ = os.Remove(filepath.Join(s.dir, backoffFile))
+}
+
+// LastFlush is when a flush last ran to completion, or zero.
+func (s *Spool) LastFlush() time.Time {
+	data, err := os.ReadFile(filepath.Join(s.dir, lastFlushFile))
+	if err != nil {
+		return time.Time{}
+	}
+	unix, err := strconv.ParseInt(strings.TrimSpace(string(data)), 10, 64)
+	if err != nil {
+		return time.Time{}
+	}
+	return time.Unix(unix, 0)
+}
+
+func (s *Spool) recordFlush(now time.Time) {
+	_ = os.WriteFile(filepath.Join(s.dir, lastFlushFile), []byte(strconv.FormatInt(now.Unix(), 10)), fileMode)
 }

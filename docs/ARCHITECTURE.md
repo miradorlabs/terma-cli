@@ -150,6 +150,8 @@ wired, but `install` does not wire them by default.
   - The account packages import nothing but the platform's own.
   - The terminal packages import nothing of terma's.
   - Only `cmd/terma` imports `internal/cli` and `builtin`.
+- No source file outgrows its job: past 450 lines it is split by responsibility, or
+  `internal/boundary/size_test.go` says why it is one.
 - `internal/cli` has no subdirectories, and no package-level variable of its own is
   ever assigned or has its address taken, tests included.
 

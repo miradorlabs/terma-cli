@@ -70,10 +70,10 @@ type opencodePolicy struct {
 }
 
 // Name is the token `terma connect` and `--harness` accept.
-func (exporter) Name() string { return "opencode" }
+func (exporter) Name() string { return name }
 
 // DisplayName is how the agent is written in prose.
-func (exporter) DisplayName() string { return "OpenCode" }
+func (exporter) DisplayName() string { return displayName }
 
 // SupportsHeadersHelper is true: the plugin runs the helper script itself.
 func (exporter) SupportsHeadersHelper() bool { return true }
