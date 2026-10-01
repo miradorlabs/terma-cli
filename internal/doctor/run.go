@@ -38,8 +38,18 @@ type Probes struct {
 	// Deliver flushes every project's queued events, retry windows ignored.
 	Deliver  func(ctx context.Context) (Delivery, error)
 	Endpoint func(projectID string) string
+	// Relay is the local relay as the machine finds it.
+	Relay func() Relay
 	// CommitRecorded reports whether projectID's data API holds sha's terma.commit event.
 	CommitRecorded func(ctx context.Context, projectID, sha string, from, to time.Time) (bool, error)
+}
+
+// Relay is the local relay as a run finds it: its state directory and address, whether
+// it runs, and whether something else listens there instead.
+type Relay struct {
+	Dir, Addr         string
+	Running, Squatted bool
+	Err               error
 }
 
 // SpoolState is the event queue as a run finds it.
@@ -239,7 +249,7 @@ func (d *run) agentHooks() Check {
 
 func (d *run) agentsExporting() Check {
 	if claim.Enabled() {
-		return RelayCheck(d.env.Agents, d.projectID, d.cfg.Harnesses)
+		return RelayCheck(d.env.Agents, d.env.Probes.Relay(), d.projectID, d.cfg.Harnesses)
 	}
 	verdicts := JudgeSelectedHarnesses(d.ctx, d.env.Agents, d.cfg.OTLPURL, d.projectID, d.env.Root, d.cfg.Harnesses)
 	return HarnessCheck(d.env.Agents, verdicts, d.cfg.OTLPURL, d.projectID, d.installed())

@@ -9,6 +9,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -52,6 +54,7 @@ func (app *App) doctorProbes(cfg *config.Config) doctor.Probes {
 			}
 			return d, nil
 		},
+		Relay:          relayFacts,
 		Endpoint:       func(projectID string) string { return app.projectEndpoint(cfg, projectID) },
 		CommitRecorded: app.commitRecorded(cfg),
 	}
@@ -81,4 +84,15 @@ func (app *App) commitRecorded(cfg *config.Config) func(ctx context.Context, pro
 func (app *App) binaryCheck() doctor.Check {
 	exe, _ := os.Executable()
 	return doctor.BinaryCheck(exe, app.binDirs())
+}
+
+// relayFacts are the local relay's state for doctor and status.
+func relayFacts() doctor.Relay {
+	dir, err := claim.Dir()
+	if err != nil {
+		return doctor.Relay{Err: err}
+	}
+	r := doctor.Relay{Dir: dir, Addr: daemon.Addr(dir), Running: daemon.Running(dir)}
+	r.Squatted = !r.Running && daemon.Squatted(r.Addr)
+	return r
 }

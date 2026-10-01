@@ -11,8 +11,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/migrate"
-	"github.com/miradorlabs/terma-cli/internal/relay/claim"
-	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
@@ -215,14 +213,12 @@ func HarnessCheck(reg *agents.Registry, verdicts []HarnessVerdict, otlpURL, proj
 
 // RelayCheck is doctor's "agent exporting to Terma" through the local relay: its address
 // is free, the developer's agents send to it, and this repository is bound and keyed.
-func RelayCheck(reg *agents.Registry, projectID string, selected []string) Check {
-	dir, err := claim.Dir()
-	if err != nil {
-		return Check{Status: Fail, Detail: err.Error()}
+func RelayCheck(reg *agents.Registry, relay Relay, projectID string, selected []string) Check {
+	if relay.Err != nil {
+		return Check{Status: Fail, Detail: relay.Err.Error()}
 	}
-	addr := daemon.Addr(dir)
-	running := daemon.Running(dir)
-	if !running && daemon.Squatted(addr) {
+	dir, addr, running := relay.Dir, relay.Addr, relay.Running
+	if !running && relay.Squatted {
 		return Check{Status: Fail, Detail: "another process is listening on " + addr + " and receives the agents' telemetry",
 			Fix: "stop it, or move the relay with `terma relay setup --addr`"}
 	}

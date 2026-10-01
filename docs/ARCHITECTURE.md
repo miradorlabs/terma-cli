@@ -122,7 +122,7 @@ wired, but `install` does not wire them by default.
   - The relay imports neither `internal/harness` nor `internal/agents`.
   - The relay engine (the `internal/relay` package itself) imports no `internal/routing`: it
     takes a resolved `relay.Policy`, which the daemon builds (`daemon.CapturePolicy`).
-  - `doctor` imports neither `account/api` nor `spool`.
+  - `doctor` imports neither `account/api`, `spool` nor the relay daemon.
   - `install` imports nothing under `account` and not `spool`; `connect` neither, nor
     `install`, which never imports `connect` either.
   - `hookrun` and `hookmgr` never import each other.

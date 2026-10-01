@@ -170,7 +170,7 @@ Nothing is written and no scratch commit is made — run
 			// Through the relay one line gives doctor's own verdict (doctor.RelayCheck).
 			var export doctor.Check
 			if claim.Enabled() {
-				export = doctor.RelayCheck(app.agents, projectID, cfg.Harnesses)
+				export = doctor.RelayCheck(app.agents, relayFacts(), projectID, cfg.Harnesses)
 				export.Key = doctor.KeyHarness
 				fmt.Fprintf(out, "Agents:      %s\n", export.Detail)
 				if export.Fix != "" {

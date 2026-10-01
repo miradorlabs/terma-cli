@@ -108,7 +108,7 @@ var bans = []struct {
 }{
 	{"internal/relay", []string{"internal/harness", "internal/agents"}, "the relay learns about agents only through its options"},
 	{"internal/relay$", []string{"internal/routing"}, "the engine takes a resolved policy; the daemon resolves it"},
-	{"internal/doctor", []string{"internal/account/api", "internal/spool"}, "doctor reaches the network and the spool only through its probes"},
+	{"internal/doctor", []string{"internal/account/api", "internal/spool", "internal/relay/daemon"}, "doctor reaches the network, the spool and the relay only through its probes"},
 	{"internal/install", []string{"internal/account", "internal/spool", "internal/connect"}, "install signs in and reaches the network only through its steps"},
 	{"internal/connect", []string{"internal/account", "internal/spool", "internal/install", "internal/cli"}, "connect signs in and mints keys only through its steps"},
 	{"internal/hooks/hookrun", []string{"internal/hooks/hookmgr"}, "running a hook and planning hook files are separate halves"},

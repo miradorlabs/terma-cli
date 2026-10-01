@@ -141,31 +141,31 @@ func TestRelayDoctorCheck(t *testing.T) {
 	if out, err := runTerma(t, "relay", "setup", "--no-start", "--addr", addr); err != nil {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}
-	if c := doctor.RelayCheck(testApp.agents, "", nil); c.Status != doctor.Warn || !strings.Contains(c.Detail, "not bound") {
+	if c := doctor.RelayCheck(testApp.agents, relayFacts(), "", nil); c.Status != doctor.Warn || !strings.Contains(c.Detail, "not bound") {
 		t.Fatalf("unbound: %+v", c)
 	}
-	if c := doctor.RelayCheck(testApp.agents, "proj_x", nil); c.Status != doctor.Warn || !strings.Contains(c.Detail, "no key") {
+	if c := doctor.RelayCheck(testApp.agents, relayFacts(), "proj_x", nil); c.Status != doctor.Warn || !strings.Contains(c.Detail, "no key") {
 		t.Fatalf("no key: %+v", c)
 	}
 	keys := `{"keys":{"proj_x":"ter_srv_1"}}`
 	if err := os.WriteFile(filepath.Join(filepath.Dir(dir), "keys.json"), []byte(keys), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if c := doctor.RelayCheck(testApp.agents, "proj_x", nil); c.Status != doctor.Pass {
+	if c := doctor.RelayCheck(testApp.agents, relayFacts(), "proj_x", nil); c.Status != doctor.Pass {
 		t.Fatalf("ready: %+v", c)
 	}
 	squatter, err := net.Listen("tcp", addr)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c := doctor.RelayCheck(testApp.agents, "proj_x", nil); c.Status != doctor.Fail || !strings.Contains(c.Detail, "another process") {
+	if c := doctor.RelayCheck(testApp.agents, relayFacts(), "proj_x", nil); c.Status != doctor.Fail || !strings.Contains(c.Detail, "another process") {
 		t.Fatalf("squatted: %+v", c)
 	}
 	_ = squatter.Close()
 	if out, err := runTerma(t, "telemetry", "disconnect", "codex", "--yes"); err != nil {
 		t.Fatalf("disconnect: %v\n%s", err, out)
 	}
-	if c := doctor.RelayCheck(testApp.agents, "proj_x", nil); c.Status != doctor.Fail || !strings.Contains(c.Detail, "Codex") || c.Fix != "terma relay setup" {
+	if c := doctor.RelayCheck(testApp.agents, relayFacts(), "proj_x", nil); c.Status != doctor.Fail || !strings.Contains(c.Detail, "Codex") || c.Fix != "terma relay setup" {
 		t.Fatalf("codex pointed elsewhere: %+v", c)
 	}
 }
@@ -196,11 +196,11 @@ func TestRelayCodexDaemonPredatesSetup(t *testing.T) {
 	if !strings.Contains(out, "`codex app-server daemon restart`") {
 		t.Errorf("setup did not name the daemon restart:\n%s", out)
 	}
-	if c := doctor.RelayCheck(testApp.agents, "proj_x", nil); c.Status != doctor.Warn || !strings.Contains(c.Fix, "codex app-server daemon restart") {
+	if c := doctor.RelayCheck(testApp.agents, relayFacts(), "proj_x", nil); c.Status != doctor.Warn || !strings.Contains(c.Fix, "codex app-server daemon restart") {
 		t.Fatalf("a daemon from before the setup: %+v", c)
 	}
 	record(time.Now().Add(time.Minute)) // restarted since
-	if c := doctor.RelayCheck(testApp.agents, "proj_x", nil); c.Status != doctor.Pass {
+	if c := doctor.RelayCheck(testApp.agents, relayFacts(), "proj_x", nil); c.Status != doctor.Pass {
 		t.Fatalf("a daemon started after the setup: %+v", c)
 	}
 }
