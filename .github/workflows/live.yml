@@ -1,4 +1,4 @@
-name: Live harness contracts
+name: E2E harness contracts
 
 on:
   workflow_dispatch:
@@ -14,11 +14,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: live-harness-contracts
+  group: e2e-harness-contracts
   cancel-in-progress: false
 
 jobs:
-  live:
+  e2e:
     runs-on: macos-latest
     timeout-minutes: 90
     environment: live-harnesses
@@ -31,20 +31,20 @@ jobs:
       ANTHROPIC_ORGANIZATION_ID: 0a8c23d6-3675-41b0-9a37-31be453eadb1
       ANTHROPIC_SERVICE_ACCOUNT_ID: svac_01YCaxYCodudV3vAUrEyWTah
       ANTHROPIC_WORKSPACE_ID: wrkspc_01Ug36g2VPKLUSFZ9LZXFTvU
-      TERMA_LIVE_CLAUDE_VERSIONS: last3
-      TERMA_LIVE_CODEX_VERSIONS: last3
-      TERMA_LIVE_OPENCODE_VERSIONS: last3
-      TERMA_LIVE_GEMINI_VERSIONS: last3
-      TERMA_LIVE_DSH_VERSIONS: last3
-      TERMA_LIVE_KNOWN_UPSTREAM: codex-session-end
+      TERMA_E2E_CLAUDE_VERSIONS: last3
+      TERMA_E2E_CODEX_VERSIONS: last3
+      TERMA_E2E_OPENCODE_VERSIONS: last3
+      TERMA_E2E_GEMINI_VERSIONS: last3
+      TERMA_E2E_DSH_VERSIONS: last3
+      TERMA_E2E_KNOWN_UPSTREAM: codex-session-end
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
         with:
-          go-version-file: test/live/go.mod
+          go-version-file: test/e2e/go.mod
           cache-dependency-path: |
             go.sum
-            test/live/go.sum
+            test/e2e/go.sum
       - name: Require coverage credentials
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -74,7 +74,7 @@ jobs:
           echo 'API and subscription contracts enabled.' >> "$GITHUB_STEP_SUMMARY"
           umask 077
           printf '%s' "$CODEX_AUTH_JSON" > "$RUNNER_TEMP/terma-codex-auth.json"
-          printf 'TERMA_LIVE_CODEX_AUTH=%s/terma-codex-auth.json\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+          printf 'TERMA_E2E_CODEX_AUTH=%s/terma-codex-auth.json\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v5
         with:
           node-version: 22
@@ -82,43 +82,43 @@ jobs:
         run: npm install -g @earendil-works/pi-coding-agent t3
       - name: Build native test binaries
         run: |
-          go build -o test/live/bin/terma ./cmd/terma
-          cd test/live
-          go test -c -o bin/live.test .
-      - name: Run live contracts (subscription coverage is opt-in)
-        working-directory: test/live
+          go build -o test/e2e/bin/terma ./cmd/terma
+          cd test/e2e
+          go test -c -o bin/e2e.test .
+      - name: Run e2e contracts (subscription coverage is opt-in)
+        working-directory: test/e2e
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           CLAUDE_CODE_OAUTH_TOKEN: ${{ inputs.include_subscriptions && secrets.CLAUDE_CODE_OAUTH_TOKEN || '' }}
-          TERMA_LIVE: "1"
-          TERMA_LIVE_BINARY: ${{ github.workspace }}/test/live/bin/terma
-        run: ./bin/live.test -test.v -test.timeout 75m
+          TERMA_E2E: "1"
+          TERMA_E2E_BINARY: ${{ github.workspace }}/test/e2e/bin/terma
+        run: ./bin/e2e.test -test.v -test.timeout 75m
       - name: Publish coverage summary
         if: always()
         run: |
-          if [ -f test/live/report/latest.md ]; then
-            cat test/live/report/latest.md >> "$GITHUB_STEP_SUMMARY"
+          if [ -f test/e2e/report/latest.md ]; then
+            cat test/e2e/report/latest.md >> "$GITHUB_STEP_SUMMARY"
           fi
       - name: Upload summary
         if: always()
         uses: actions/upload-artifact@v5
         with:
-          name: live-harness-report
-          path: test/live/report/
+          name: e2e-harness-report
+          path: test/e2e/report/
           retention-days: 7
       - name: Upload this platform's compatibility rows
         if: always()
         uses: actions/upload-artifact@v5
         with:
           name: compat-macos
-          path: test/live/report/compat.json
+          path: test/e2e/report/compat.json
           if-no-files-found: ignore
           retention-days: 30
       - name: Remove temporary login
         if: always()
         run: rm -f "$RUNNER_TEMP/terma-codex-auth.json"
 
-  # The same night on a fresh Linux machine (test/live/machine/Dockerfile): global mode, the
+  # The same night on a fresh Linux machine (test/e2e/machine/Dockerfile): global mode, the
   # managed configuration and the core relay contracts with real Claude Code and Codex.
   machines:
     runs-on: ubuntu-latest
@@ -128,7 +128,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Run the machine scenarios
-        working-directory: test/live
+        working-directory: test/e2e
         # The agents' newest releases; the rows record the versions they turn out to be.
         run: make machines HOST_ARCH=amd64 CLAUDE_VERSION=latest CODEX_VERSION=latest
       - name: Upload this platform's compatibility rows
@@ -136,7 +136,7 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: compat-linux
-          path: test/live/report/linux/compat.json
+          path: test/e2e/report/linux/compat.json
           if-no-files-found: ignore
           retention-days: 30
 
@@ -146,7 +146,7 @@ jobs:
   # branch, which each scheduled run extends and pushes: that branch's
   # docs/compat/compat.json is the published matrix.
   compat:
-    needs: [live, machines]
+    needs: [e2e, machines]
     if: always()
     runs-on: ubuntu-latest
     permissions:
@@ -160,14 +160,14 @@ jobs:
           fi
       - uses: actions/setup-go@v6
         with:
-          go-version-file: test/live/go.mod
-          cache-dependency-path: test/live/go.sum
+          go-version-file: test/e2e/go.mod
+          cache-dependency-path: test/e2e/go.sum
       - uses: actions/download-artifact@v5
         with:
           pattern: compat-*
-          path: test/live/runs
+          path: test/e2e/runs
       - name: Render the matrix
-        working-directory: test/live
+        working-directory: test/e2e
         run: |
           runs=$(find runs -name compat.json | sort | sed 's/^/-run /' | tr '\n' ' ')
           if [ -z "$runs" ]; then

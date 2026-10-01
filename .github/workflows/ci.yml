@@ -71,20 +71,20 @@ jobs:
       - name: Relay, locking, process lookups and updater on Windows
         run: go test ./internal/relay/... ./internal/flock/... ./internal/procinfo/... ./internal/selfupdate/... -count=1 -timeout=5m
 
-  # The live suite is a separate module; its offline contracts must run in CI too.
+  # The e2e suite is a separate module; its offline contracts must run in CI too.
   live-contracts:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: test/live
+        working-directory: test/e2e
     env:
-      TERMA_LIVE: "0"
+      TERMA_E2E: "0"
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
         with:
-          go-version-file: test/live/go.mod
-          cache-dependency-path: test/live/go.sum
+          go-version-file: test/e2e/go.mod
+          cache-dependency-path: test/e2e/go.sum
       - run: go vet ./...
       - run: go test -race ./...
 
@@ -95,39 +95,39 @@ jobs:
     timeout-minutes: 70
     env:
       TERMA_ENV: dev
-      TERMA_LIVE: "1"
-      TERMA_LIVE_CLAUDE_VERSIONS: "2.1.283"
-      TERMA_LIVE_CODEX_VERSIONS: "0.158.0"
-      TERMA_LIVE_OPENCODE_VERSIONS: "1.18.33"
-      TERMA_LIVE_GEMINI_VERSIONS: "0.62.0"
-      TERMA_LIVE_DSH_VERSIONS: "0.2.0-rc.2"
-      TERMA_LIVE_BINARY: ${{ github.workspace }}/test/live/bin/terma
+      TERMA_E2E: "1"
+      TERMA_E2E_CLAUDE_VERSIONS: "2.1.283"
+      TERMA_E2E_CODEX_VERSIONS: "0.158.0"
+      TERMA_E2E_OPENCODE_VERSIONS: "1.18.33"
+      TERMA_E2E_GEMINI_VERSIONS: "0.62.0"
+      TERMA_E2E_DSH_VERSIONS: "0.2.0-rc.2"
+      TERMA_E2E_BINARY: ${{ github.workspace }}/test/e2e/bin/terma
       # Codex 0.158.0 sometimes exits without running its SessionEnd hook, with or
       # without Terma (TestCodexSessionEndProbe). Pull requests report it instead of
-      # failing on it; the nightly live workflow stays strict.
-      TERMA_LIVE_KNOWN_UPSTREAM: codex-session-end
+      # failing on it; the nightly e2e workflow stays strict.
+      TERMA_E2E_KNOWN_UPSTREAM: codex-session-end
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
         with:
-          go-version-file: test/live/go.mod
+          go-version-file: test/e2e/go.mod
           cache-dependency-path: |
             go.sum
-            test/live/go.sum
+            test/e2e/go.sum
       - name: Build Terma
-        run: go build -o test/live/bin/terma ./cmd/terma
+        run: go build -o test/e2e/bin/terma ./cmd/terma
       # Pi has no exporter; terma's extension is one, tested only on the installed
-      # build (test/live/pi.go).
+      # build (test/e2e/pi.go).
       - uses: actions/setup-node@v5
         with:
           node-version: 22
       - name: Install Pi and T3 Code
         # Pi has no exporter (terma's extension is one); T3 Code runs Codex and Claude
-        # Code itself. Gemini CLI and DeepSeek Harness install on demand (test/live/gemini.go,
-        # test/live/dsh.go). Hermes, omp and Cursor run only where installed or credentialed.
+        # Code itself. Gemini CLI and DeepSeek Harness install on demand (test/e2e/gemini.go,
+        # test/e2e/dsh.go). Hermes, omp and Cursor run only where installed or credentialed.
         run: npm install -g @earendil-works/pi-coding-agent@0.99.1 t3@0.0.42
       - name: Assert harness telemetry (no provider credentials)
-        working-directory: test/live
+        working-directory: test/e2e
         # TestRelay* is the local relay: the same
         # harnesses exporting globally through `terma relay run`, and nothing but the
         # claimed session reaching the receiver.
@@ -135,8 +135,8 @@ jobs:
       - name: Publish coverage summary
         if: always()
         run: |
-          if [ -f test/live/report/latest.md ]; then
-            cat test/live/report/latest.md >> "$GITHUB_STEP_SUMMARY"
+          if [ -f test/e2e/report/latest.md ]; then
+            cat test/e2e/report/latest.md >> "$GITHUB_STEP_SUMMARY"
           fi
 
   # The OpenCode plugin is ~450 lines of JavaScript that writes into a user's

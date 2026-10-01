@@ -11,7 +11,7 @@ status=0
 while read -r root d; do
   lint="$root/bin/golangci-lint-$(cat "$root/.golangci-lint-version" 2>/dev/null)"
   [ -x "$lint" ] || continue
-  # From the package's own directory, so a nested module (test/live/) lints as itself.
+  # From the package's own directory, so a nested module (test/e2e/) lints as itself.
   out="$(cd "$d" && "$lint" run . 2>&1)" && continue
   printf '%s\n' "$out" >&2
   status=2

@@ -13,7 +13,7 @@ import (
 )
 
 // docPath is a repository path standing on its own in prose.
-var docPath = regexp.MustCompile(`(?:^|[^\w/.-])((?:internal|cmd|docs|scripts|live|npm)/[\w./-]*[\w/])`)
+var docPath = regexp.MustCompile(`(?:^|[^\w/.-])((?:internal|cmd|docs|scripts|test|npm)/[\w./-]*[\w/])`)
 
 // goSymbol is a path that ends in a Go identifier (internal/selfupdate.AssetName).
 var goSymbol = regexp.MustCompile(`^(.*)\.[A-Z]\w*$`)

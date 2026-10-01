@@ -16,7 +16,7 @@ make lint               # pinned golangci-lint; doc comments required on exporte
 make test-install-e2e   # the built CLI installing into scratch repositories
 make bench-hook         # prepare-commit-msg must stay under 50 ms
 go test ./internal/hooks/hookrun/ -run TestName
-cd test/live && make live   # real agent binaries; needs their credentials
+cd test/e2e && make run   # real agent binaries; needs their credentials
 ```
 
 Run everything with `TERMA_ENV=dev` (the Makefile sets it). Without it, `terma setup` and
@@ -38,7 +38,7 @@ internal/install/       per-repository install; internal/setup/ is the per-machi
 internal/boundary/      tests that enforce this layout
 internal/account/, internal/config/, internal/harness/, internal/ui/output/
                         forked from ../mirador-cli; keep them close to it
-test/live/              tests against the real agent binaries (its own Go module)
+test/e2e/               tests against the real agent binaries (its own Go module)
 npm/, install.sh        distribution
 ```
 
