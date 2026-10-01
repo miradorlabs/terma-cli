@@ -24,7 +24,7 @@ The linter's version lives in `.golangci-lint-version`, which CI reads too. `mak
 builds it from source rather than using one from your PATH, because a released
 golangci-lint refuses a module whose `go` directive is newer than the Go it was built with.
 Test files are linted, and exported identifiers need a doc comment. The OpenCode plugin is driven the
-way OpenCode would with `bun test internal/harness/opencode`; `make check` runs it when
+way OpenCode would with `bun test internal/agents/opencode/plugin`; `make check` runs it when
 bun is present.
 
 Go 1.27, no CGO. Packages under `internal/`: `hookmgr` (what install writes),

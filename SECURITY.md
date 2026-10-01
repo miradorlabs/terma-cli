@@ -226,14 +226,14 @@ security@terma.ai.
 
 Properties worth re-checking after any change:
 
-- The verifier never appears in a URL, a log, or a file (`internal/auth` tests).
+- The verifier never appears in a URL, a log, or a file (`internal/account/auth` tests).
 - No credential or key is rendered by `-o json` (`config show`, `status`, `doctor`).
 - `prepare-commit-msg` makes no network call and stays under budget (`make bench-hook`).
 - Manifest attribution uses touched staged files, and an empty manifest does not fall
-  back to the active session (`internal/session` and `internal/hookrun` tests).
+  back to the active session (`internal/session` and `internal/hooks/hookrun` tests).
 - The event for an unstamped commit names no file and carries no credential
-  (`internal/hookrun` `TestPostCommitOnAnUnstampedCommitEmitsOnlyACount`).
-- The shim never chains itself (`internal/hookmgr` `TestShimNeverChainsItself`).
+  (`internal/hooks/hookrun` `TestPostCommitOnAnUnstampedCommitEmitsOnlyACount`).
+- The shim never chains itself (`internal/hooks/hookmgr` `TestShimNeverChainsItself`).
 - Events without a project key are held, not dropped (`internal/spool` held-event test).
 - Relay exports require the local token, and repository-mode records satisfy the
   session/trace claim and sender checks (`internal/relay` and `internal/relay/claim`).
@@ -243,12 +243,12 @@ Properties worth re-checking after any change:
   and provider error messages; unclassified textual attributes are dropped
   (`internal/relay` allowlist and capture-policy tests).
 - Queued native exports, Codex replies, and titles obey the current delivery policy
-  (`internal/relay`, `internal/hookrun`, and `cmd` capture-policy tests).
+  (`internal/relay`, `internal/hooks/hookrun`, `internal/agents/codex` and `internal/cli` capture-policy tests).
 - Policy fetches use developer authentication, reject incomplete or older policies,
-  and keep teams and environments separate (`internal/api`, `internal/routing`, and
-  `cmd` policy tests).
+  and keep teams and environments separate (`internal/account/api`, `internal/routing`,
+  `internal/relay/daemon` and `internal/cli` policy tests).
 - Codex rollout reads remain confined and bounded; replies and titles require their
-  applicable content consent (`internal/harness` and `internal/hookrun` tests).
+  applicable content consent (`internal/agents/codex` and `internal/hooks/hookrun` tests).
 - Queue permissions and the spool, outbox, and refused-export bounds match the claims
   above (`internal/spool` and `internal/relay` tests).
 - No project id becomes a filesystem path or script name without validation

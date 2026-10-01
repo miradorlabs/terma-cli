@@ -1,9 +1,8 @@
-// Package doctor is the report model behind `terma doctor`: checks and actionable
-// setup readiness, without estimating spend from configuration.
-//
-// Every onboarding failure mode that is
-// not surfaced here becomes a support thread, so the checks are explicit about
-// what they verified and each failure carries the one command that fixes it.
+// Package doctor runs `terma doctor`'s checks in order (Run) and judges what status
+// shares with it (the verdicts), reaching the event spool and the platform's APIs only
+// through Probes; the report says what each check verified and the one command that
+// fixes a failure. Every onboarding failure mode not surfaced here becomes a support
+// thread.
 package doctor
 
 import (

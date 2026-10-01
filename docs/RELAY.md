@@ -157,7 +157,7 @@ omp (oh-my-pi, PR #21, merged into this branch) has a native OTLP exporter confi
 
 A committed hook that sets the variables at load exports nothing (verified on 18.3).
 
-omp is a Pi fork with the same extension events, so it runs terma's Pi-family extension (`internal/harness/pi/terma.ts`). `relay setup --harness omp` writes it to `~/.omp/agent/extensions/terma-relay.ts` with `agent: "omp"`:
+omp is a Pi fork with the same extension events, so it runs terma's Pi-family extension (`internal/agents/internal/pifamily/terma.ts`). `relay setup --harness omp` writes it to `~/.omp/agent/extensions/terma-relay.ts` with `agent: "omp"`:
 - **What it exports:** it exports from omp's own events (usage and cost from `message_end`, tool calls, `omp.user_prompt`) and sets no environment.
 - **Claims:** `lifecycle` is false, so it only claims the session at each prompt (`omp-prompt`). omp's committed hook file already reports session start, end and file edits, under omp's own session id (`ctx.sessionManager.getSessionId()`).
 - **Load locations:** user extensions load from `~/.omp/agent/extensions/` (a file, or a directory's `index.ts`), from `hooks/pre/`, and from `config.yml`'s `extensions:` list. All three were verified on 18.3.
@@ -205,7 +205,7 @@ Nothing it does reaches the relay, so it is lost rather than leaked.
 
 ### Pi
 
-Pi (`@earendil-works/pi-coding-agent`) has no OpenTelemetry, so terma's extension (`internal/harness/pi/terma.ts`) is its exporter. `terma relay setup --harness pi` writes it into Pi's agent directory (`PI_CODING_AGENT_DIR`, else `~/.pi/agent`) pointed at the relay. It emits OTLP/JSON under the GenAI conventions:
+Pi (`@earendil-works/pi-coding-agent`) has no OpenTelemetry, so terma's extension (`internal/agents/internal/pifamily/terma.ts`) is its exporter. `terma relay setup --harness pi` writes it into Pi's agent directory (`PI_CODING_AGENT_DIR`, else `~/.pi/agent`) pointed at the relay. It emits OTLP/JSON under the GenAI conventions:
 - a `chat <model>` span per model response, with usage and cost;
 - an `execute_tool <tool>` span per tool call;
 - a `pi.user_prompt` log per prompt.
@@ -228,7 +228,7 @@ Pi is not yet selectable in `terma setup` ("Coming Soon"). The relay is its only
 
 ### Hermes
 
-Hermes (Nous Research, 0.20.4) has no usable OTLP export. Its NeMo Relay exporter names no session, drops usage on streamed calls and carries the whole system prompt. Its shell hooks are user-level only and do not fire in its TUI, which is the default front end. Its Python plugins run in every front end, so terma's plugin (`internal/harness/hermes`) is its exporter:
+Hermes (Nous Research, 0.20.4) has no usable OTLP export. Its NeMo Relay exporter names no session, drops usage on streamed calls and carries the whole system prompt. Its shell hooks are user-level only and do not fire in its TUI, which is the default front end. Its Python plugins run in every front end, so terma's plugin (`internal/agents/hermes/plugin`) is its exporter:
 - **Installation:** `terma relay setup --harness hermes` writes the plugin into `$HERMES_HOME/plugins/terma/` and enables it with `hermes plugins enable terma` (plugins are opt-in).
 - **Spans:** a `chat <model>` span per provider call, with `gen_ai.usage.*` and Hermes's own cost estimate (`agent.usage_pricing`, as its Langfuse plugin uses; none on a subscription-included route), and an `execute_tool <tool>` span per tool call.
 - **Logs:** a `hermes.user_prompt` and a `hermes.assistant_response` log per turn, whose bodies the relay withholds with content.
@@ -271,7 +271,7 @@ Passes on 0.62.0:
 
 ### DeepSeek Harness
 
-DeepSeek Harness (`dsh`, `@deepseek-ai/dsh`, 0.2.0-rc.2) sends its own OTLP to DeepSeek's collector, without usage. Its Cordis plugins load from the user's home layer, `$DSH_HOME/cordis.patch.yml`, which every profile loads. terma's plugin (`internal/harness/dsh/terma.mjs`) is its exporter:
+DeepSeek Harness (`dsh`, `@deepseek-ai/dsh`, 0.2.0-rc.2) sends its own OTLP to DeepSeek's collector, without usage. Its Cordis plugins load from the user's home layer, `$DSH_HOME/cordis.patch.yml`, which every profile loads. terma's plugin (`internal/agents/dsh/plugin/terma.mjs`) is its exporter:
 - **Installation:** `relay setup --harness dsh` writes it to `$DSH_HOME/plugins/terma-relay.mjs` and appends one insert entry to the patch file, keeping every other byte, and only if the entry is missing.
 - **Spans:** a `chat` span per model response, with usage from the `assistant/message` session event, and one per auxiliary call too, from the `llm/stream` waterfall (the session title, with its `dsh.purpose`). Plus an `execute_tool` span per tool call.
 - **Logs:** a `dsh.user_prompt` and a `dsh.assistant_response` log per turn.

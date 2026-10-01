@@ -1,9 +1,15 @@
 # terma-cli
 
 Public Go CLI (`terma`) that connects coding agents to Terma and stamps the commits they
-produce. Sibling of `../mirador-cli`, from which `internal/{auth,api,config,harness,output}`
-were forked and rebranded (TERMA_* env, `~/.config/terma`). Keep those packages close to
-their mirador counterparts; the product-specific code is everything else.
+produce. Sibling of `../mirador-cli`, from which `internal/account/{auth,api}`,
+`internal/config`, `internal/harness` and `internal/ui/output` were forked and rebranded
+(TERMA_* env, `~/.config/terma`). Keep those packages close to their mirador
+counterparts; the product-specific code is everything else.
+
+The layout — one binary (`cmd/terma`), its command line (`internal/cli`), the hook
+runtime (`internal/hooks`), the relay daemon (`internal/relay`) and the coding agents as
+plugins (`internal/agents/<name>`) — is drawn in `docs/ARCHITECTURE.md`, and
+`internal/boundary` turns it into tests.
 
 ## Commands
 
@@ -17,7 +23,7 @@ make bench-hook       # prepare-commit-msg budget (<50 ms end to end), enforced 
 make release-dry-run  # goreleaser snapshot, nothing published
 make test-install-e2e # built CLI: root discovery, non-Git workspaces, ownership, uninstall
 make test-install     # what CI runs: tagged goreleaser render, then install.sh (+ the cask on macOS) over loopback
-go test ./internal/hookrun/ -run TestName
+go test ./internal/hooks/hookrun/ -run TestName
 ```
 
 Everything the Makefile runs uses `TERMA_ENV=dev` by default. Outside it, prefix the command
@@ -28,20 +34,22 @@ developer login to check the team's repository permission.
 
 ## Shape
 
-- Adapters (`internal/adapter`) are the one list of coding agents at repository scope:
-  each says which file it writes (`hookmgr.Plan*`), which `terma hook <event>` names it
-  handles (`hookrun.*`), which events flush, and — when the agent gates committed hooks
-  behind a trust decision (Codex, Antigravity) — how to read that decision back.
-  `install`, `uninstall`, `doctor` and `terma hook` iterate the registry; a new agent is
-  one file there plus its hookmgr/hookrun halves, never another hand-written triplet in
-  `cmd/`. The telemetry registry (`harness.All`) is a different, narrower list: only
-  agents with a configurable OTLP exporter. Cursor and Antigravity are adapters but not
-  harnesses. While `agentAvailable` (cmd/setup.go) says an agent is coming soon — Cursor,
-  Antigravity, OpenCode — `installAdapters` never wires its hooks by default, whatever
-  directory the repository carries or a colleague committed; only `--adapters` names one.
-  uninstall, doctor and `terma hook` still cover them.
+- Agents are plugins: each coding agent is one package, `internal/agents/<name>`, with
+  its hook handlers, hook-file planner, exporter configuration and relay shapes, and
+  `internal/agents/builtin` is the only list of them (`builtin.Agents()`, which
+  `cmd/terma` hands the command line). Every agent implements `agents.Agent` — which file
+  it writes (`Plan`), which `terma hook <event>` names it handles (`Events`), which events
+  flush — and only the optional capabilities it has (`internal/agents/doc.go` is the
+  map), found with `Registry.With[C]()` / `Find[C](name)` and asserted with `var _` in
+  the agent's package. `install`, `uninstall`, `doctor` and `terma hook` iterate the
+  registry; a new agent is a new package and a line in `builtin`, never a branch in the
+  core. Nothing outside `internal/agents` names an agent (`internal/boundary`). Only
+  Claude Code and Codex are supported (`Registry.Support`); an unsupported agent's hooks
+  are never wired by default (`install.Adapters`), whatever directory the repository
+  carries or a colleague committed — only `--adapters` names one — and uninstall, doctor
+  and `terma hook` still cover them.
 - Hooks are thin shims; **all logic is in the binary** (`terma hook <event>`,
-  `internal/hookrun`). Never put logic in `hookmgr.ShimScript` or the husky/lefthook/
+  `internal/hooks/hookrun`). Never put logic in `hookmgr.ShimScript` or the husky/lefthook/
   pre-commit lines beyond "call terma, never fail, chain". Every committed entry is
   guarded (`command -v terma … || true`) so a colleague without terma sees nothing, in
   git or in their agent; the harness entries share one string, `hookmgr.HookCommand`,
@@ -115,14 +123,13 @@ developer login to check the team's repository permission.
   the queue is not evidence about writing it.
 - Environments (`internal/config/endpoints.go`): prod is public; `dev`/`local` are
   hidden (`--env`, `TERMA_ENV`, or a profile). Never mention them in help text.
-- Harness-agnostic: `internal/harness` is the only place that knows a harness's
-  file layout. `hookrun` speaks in events (session start/end, files touched) and
-  the tool label travels as data. The `Harness` interface is what a command needs and no
-  more: how a harness translates an exporter (`render`) is unexported, because the three
-  translate into three different things. What only some harnesses can do is an optional
-  interface in `internal/harness/optional.go` (`Noter`, `Credentialed`, `Backuper`, and
-  `Scoped`), each with a `var _` assertion — a capability asked for by type assertion
-  does not fail to compile when its method drifts, it silently switches off.
+- Agent-agnostic core: an agent's file layout is known only in its own package.
+  `hookrun` speaks in events (session start/end, files touched) and the tool label
+  travels as data. `internal/harness` is the kit an agent's exporter is built from; its
+  `Harness` interface is what a command needs and no more. What only some exporters can
+  do is an optional interface (`harness.Noter`, `Credentialed`, `Backuper`, `Scoped`),
+  asserted with `var _` in each agent's `harness.go` — a capability asked for by type
+  assertion does not fail to compile when its method drifts, it silently switches off.
 - Shared file plumbing — use these, never a private copy (there were six atomic writers
   and four flocks):
   `config.WriteFileAtomic` (durable: fsync file and directory) for anything written at
@@ -141,33 +148,33 @@ developer login to check the team's repository permission.
   sidecar, never the file the rename replaces. **Any file that is read, edited and
   renamed back needs the lock** — the session store, `keys.json`, `codex-notify.json` and
   `statusline.json` each lost updates without it (16 concurrent writers kept 1 entry).
-- `internal/hookmgr` by file: `hookmgr.go` is the vocabulary (`Manager`, `Detect`,
-  `Change`, `Plan`, `Apply`); `git.go` the four git hook managers; `claude.go`,
-  `codex.go`, `cursor.go`, `antigravity.go` one agent each; `json.go` the unescaped,
-  key-ordered JSON. The three event-keyed hooks files (Claude, Codex, Cursor) share
-  `mergeEventHooks` (`events.go`): a planner only builds its entries, and
-  `hooksFile.Defaults` carries Cursor's `version` rule. Antigravity's file is keyed by
-  hook name and plans itself. `readFile` returns an error for anything but "not there".
-- `internal/hookrun` by file: `events.go` holds every spool event name and the repeated
+- `internal/hooks/hookmgr` by file: `hookmgr.go` is the vocabulary (`Manager`, `Detect`,
+  `Change`, `Plan`, `Apply`); `git.go` the four git hook managers; `user.go` the
+  machine-wide hooks; `json.go` the unescaped, key-ordered JSON. Each agent's planner is
+  its own package's `hooks.go`. The event-keyed hooks files (Claude, Codex, Cursor) share
+  `MergeEventHooks` (`events.go`): a planner only builds its entries, and
+  `HooksFile.Defaults` carries Cursor's `version` rule. Antigravity's file is keyed by
+  hook name and plans itself. `ReadFile` returns an error for anything but "not there".
+- `internal/hooks/hookrun` by file: `events.go` holds every spool event name and the repeated
   attribute keys and values (`TestWireNamesAreFrozen` pins the strings — add a constant,
-  never rename one); `input.go` is the one bounded payload reader (`readHookInput[T]`,
+  never rename one); `input.go` is the one bounded payload reader (`ReadInput[T]`,
   4 MiB, an oversized payload is refused by name); `lifecycle.go` the session
   start / end / files-touched steps every agent shares (`announce`, `endSession`,
   `touch`); `attrs.go` the evidence header and the bounded-string guard; `state.go` the
   state directory names and timing constants. A handler resolves the repository once
   and passes the `*repo` down. Only Codex patches and Cursor's `subagentStop` dedupe and
-  sort their `files` list (`uniqueSorted`, at the call site); every other agent keeps
+  sort their `files` list (`hookrun.UniqueSorted`, at the call site); every other agent keeps
   the reported order.
 - doctor: `terma on PATH` warns when a *different build* of terma (by content hash — it
-  never runs what it finds) sits elsewhere on PATH or in `wellKnownBinDirs`: an app started
+  never runs what it finds) sits elsewhere on PATH or in `doctor.WellKnownBinDirs`: an app started
   from the Dock gets the system PATH, so `/usr/local/bin/terma` is what Cursor's hooks run,
-  and a build from before `.terma/settings.json` does not see the binding. Tests blank
-  `wellKnownBinDirs`. When no terma is on PATH at all (a `make build` run as bin/terma),
+  and a build from before `.terma/settings.json` does not see the binding. The test app
+  blanks them (`App.binDirs`). When no terma is on PATH at all (a `make build` run as bin/terma),
   or another build is ahead of this one, the fix is the one quoted command that puts this
-  build's directory on PATH in the developer's shell (`addToPathCommand`: the PATH line
+  build's directory on PATH in the developer's shell (`doctor.AddToPathCommand`: the PATH line
   appended to the startup file and sourced; `fish_add_path` for fish). It lands after
   whatever else the startup file holds. The hooks check is two: `commit hooks installed` (git wiring, all or
-  nothing) and `agent hooks run` (`agentHooksCheck`, shared with status — a fraction,
+  nothing) and `agent hooks run` (`doctor.AgentHooksCheck`, shared with status — a fraction,
   `Check.Ready`/`Of`). A commit is stamped with the session that touched its files and a
   session exists only because its agent's hooks announced it. The readiness checklist
   names agents awaiting trust instead of assigning speculative spend percentages.
@@ -180,15 +187,16 @@ developer login to check the team's repository permission.
   killed `worktree add` leaving a registration locked "initializing" that `prune`
   skips. Removal forces twice for that lock, and each run first clears its own
   abandoned ones (`<tmp>/terma-doctor-*/wt`, directory gone) — nothing else.
-- The command surface is small on purpose (`cmd/command_surface_test.go`). `terma --help`
+- The command surface is small on purpose (`internal/cli/command_surface_test.go`). `terma --help`
   lists `primaryCommands` — setup, install, status, doctor, session, usage, org,
   uninstall, update — and everything else is `Hidden: true`, **not removed**: login/logout/
   whoami, connect/disconnect/telemetry/harness, project, principal, config, spool, version,
-  hook, shim — and cobra's `completion`, hidden (`CompletionOptions.HiddenDefaultCmd`), not
+  hook, agent — and cobra's `completion`, hidden (`CompletionOptions.HiddenDefaultCmd`), not
   removed: the Homebrew cask's `generate_completions_from_executable` runs `terma
   completion <shell>` during `brew install`, and a failing command fails the install.
-  `blame` was removed outright (2026-09-28, a product call: not part of terma for now;
-  `removedCommands`) — no message may name it. doctor's round-trip still reads
+  `blame` was removed outright (2026-09-28, a product call: not part of terma for now),
+  and `desktop` and `shim` with the code behind them (`removedCommands`) — no message may
+  name one. doctor's round-trip still reads
   `terma.commit` back through `api.CommitLog` (`commitLogWindow`). Hidden commands are what automation and CI run and what terma's own fix-it
   hints name, so they must keep working; `project` is advanced because `install` binds a
   repository to its project and the selection only scopes the read commands elsewhere. A new
@@ -215,10 +223,10 @@ developer login to check the team's repository permission.
   be established.
 - The platform (terma-frontend) commits a repository's binding and agent hooks, so `terma
   install` is optional. What a commit cannot do is done on first use: the relay mints a
-  claimed project's missing key with the signed-in credential (`relayKeyMinter`, stored as
+  claimed project's missing key with the signed-in credential (`daemon.KeyMinter`, stored as
   the project's key, 10-minute backoff after a failure), and the first claiming hook in a
   clone whose binding uses terma's own shims sets `core.hooksPath` (`wireCloneOnFirstUse`;
-  one stat afterwards — the hook-restoration record says it was wired). cmd's `TestMain`
+  one stat afterwards — the hook-restoration record says it was wired). internal/cli's `TestMain`
   gives every test a private HOME: a setup test that sandboxed only terma's config dir
   rewrote the developer's real `~/.codex/config.toml`.
 - **Global mode** (`config.ModeGlobal`, the organization's policy): company laptops where
@@ -231,7 +239,7 @@ developer login to check the team's repository permission.
     requiring a session or a process claim (`relay.Options.CatchAll`, marked
     `terma.relay.attribution=catch-all`). A switch back to repository coverage also
     withholds queued catch-all exports.
-  - Machine-wide agent hooks (`cmd/global_hooks.go`): terma's entries in Claude Code's,
+  - Machine-wide agent hooks (`internal/cli/global_hooks.go`): terma's entries in Claude Code's,
     Codex's and Cursor's user-level hooks files, `terma hook --user <event>` by absolute
     path (`hookmgr.UserHookCommand`, recognized by shape). For the agents they cover they
     are the ones that act — a repository's committed hooks step aside (`hookYields`, from
@@ -241,7 +249,7 @@ developer login to check the team's repository permission.
     Claude Code's `managed-settings.json` and Codex's `requirements.toml` `[hooks]`, calling
     terma through `$HOME` (`hookmgr.ManagedHookCommand`), which Codex runs with no trust
     step. Where they are deployed (`managedHooksDeployed`) setup writes none of its own.
-  - Commits (`cmd/global_git.go`): `git config --global core.hooksPath` → a directory with
+  - Commits (`internal/cli/global_git.go`): `git config --global core.hooksPath` → a directory with
     a script per git hook name: terma for prepare-commit-msg / post-commit, then the hook
     git ran before (the repository's `.git/hooks`, or the developer's own global directory,
     recorded in `.previous-hooks-path` and restored). A repository's local core.hooksPath
@@ -269,23 +277,20 @@ developer login to check the team's repository permission.
   saved login, unset `TERMA_API_KEY` and run `terma setup` first.
 - Per-repo routing is the local relay (below, and `docs/RELAY.md`): `terma install`
   points each of the developer's agents' user-level exporters at the relay
-  (`pointAgentsAtRelay`, shared with `terma relay setup`), keeps the project's key in the
+  (`connectMachineRelay`, shared with `terma relay setup`), keeps the project's key in the
   keystore and its policy in the routing record (`internal/routing`: `routing/<id>.json`,
   signals, prompts, tool content — what the relay enforces for the project), and starts
   the relay. Hooks in the repository claim its sessions; nothing else leaves the machine.
-  There are no PATH shims, wrappers or startup-file edits any more: `internal/shim` only
-  removes what earlier builds installed (`RemoveLegacy`: the scripts, their marked PATH
-  block, Claude's per-project settings — never the routing records) and keeps a legacy
-  script working until then (`terma shim prepare` answers an empty plan, `terma shim exec`
-  execs the real agent). `terma update --refresh` removes them, as does `terma shim
-  uninstall`. install's `--activation` and `--no-path` are accepted and ignored. Codex's
-  CLI TUI therefore runs in Codex's daemon when one runs (no `-c` overrides force it
-  in-process). Any test that can reach `RemoveLegacy` must sandbox `HOME` and set `SHELL`.
+  There are no PATH shims, wrappers or startup-file edits: the pre-relay shims and
+  `terma shim` were removed before release, and nothing cleans up after them (a dev
+  machine that ran one deletes `~/.config/terma/shim` and the marked PATH block itself).
+  Codex's CLI TUI therefore runs in Codex's daemon when one runs (no `-c` overrides force
+  it in-process).
 - Codex is split across two scopes and neither is optional. Telemetry supports user-level and runtime configuration: Codex strips `otel` (with `notify`, `profile`, `profiles` and the provider keys)
   out of a project's `.codex/config.toml` and warns at startup, so `--scope local` has
   nothing to write. `terma connect codex` and `terma install` write user-level
   `config.toml` (install's points at the local relay). The repository half is hooks
-  (`internal/hookmgr/codex.go`): `SessionStart`, `PostToolUse`, `Stop` and `SessionEnd` in
+  (`internal/agents/codex/hooks.go`): `SessionStart`, `PostToolUse`, `Stop` and `SessionEnd` in
   `.codex/hooks.json`, which Codex loads only for a trusted project *and* only after the
   developer trusts each entry from inside Codex. Until then the file is inert and
   nothing says so, which is why `doctor` reads the `[hooks.state]` record in the user's
@@ -337,7 +342,7 @@ developer login to check the team's repository permission.
   policy is the only thing that can make it send, and `status`/`doctor` read it back
   that way. Codex cannot be narrowed (one config file, no project otel), so setup
   connects it everywhere and says so rather than silencing it.
-- install's output (`cmd/install_ui.go`, `installUI`): one marked line per step (`ok`, or
+- install's output (`internal/cli/install_ui.go`, `installUI`): one marked line per step (`ok`, or
   `warn` for one that needs the developer), a verdict, then numbered next steps (`then`) —
   the reload, the files to commit, a declined PATH line, Codex Desktop approval, doctor's
   fixes. Everything long-form (the plan's file list, policies written, git wiring, doctor's
@@ -381,14 +386,14 @@ developer login to check the team's repository permission.
   holding a value Terma writes (`renderedByTerma`: `otlp`/`none`, `0`/`1`) — a developer's
   own `OTEL_LOGS_EXPORTER=console` stays.
   `enduser.id` / `mirador.project.id` resource attributes are Codex and OpenCode only.
-- Sessions (`internal/auth/store.go`): `credentials.json` holds, per profile, one
+- Sessions (`internal/account/auth/store.go`): `credentials.json` holds, per profile, one
   credential per organization plus which is active (`{active, organizations}`).
   `cmd.signIn` is the only way a command obtains a credential: verify the stored one
   (`/v1/whoami`, which also refreshes it), reuse it, and open the browser only when
   the organization has none. `SaveCredential` activates and reports the session it
   displaced (revoked best-effort); `UpdateCredential` is the refresh path and never
   changes which organization is active. `logout` revokes every stored session.
-- `terma org use` (`cmd/org.go`) changes account scope only. `terma install` selects
+- `terma org use` (`internal/cli/org.go`) changes account scope only. `terma install` selects
   and saves projects per repository. An organization with one project is bound to it
   without asking (`soleOrPick`). With several, on a terminal it asks every time, the bound
   project marked and kept by Enter; without one, or with `--yes`, it keeps the binding. When
@@ -418,35 +423,35 @@ developer login to check the team's repository permission.
   `.claude/worktrees/agent-…` among them — group as that repository. `install` and
   `refresh` read through it but write the checkout's own files; `uninstall` reads only the
   checkout's own binding, so it never acts on the main checkout's.
-- Terminal courtesies (`internal/style`, `internal/spinner`): colour and the
+- Terminal courtesies (`internal/ui/style`, `internal/ui/spinner`): colour and the
   four-square spinner draw only on a terminal a person is watching — never in a
   buffer, a pipe, an agent (`CLAUDECODE` and friends), `NO_COLOR` or `TERM=dumb` —
   so tests compare plain strings. `doctor` streams each check as it finishes
-  (`doctorProgress`) and polls the round-trip every second. A command a message tells
+  (`doctor.Progress`) and polls the round-trip every second. A command a message tells
   the reader to run is quoted in backticks, and on a terminal it is drawn as one
   (`Palette.Command`, bold brand purple) with the backticks dropped, so a copy is the
   command alone: `Palette.Commands` for a string, `style.Highlight(w)` for a writer
   (status, refresh, the top-level error line), doctor's `fixText` for a fix that leads
   with a bare `terma …`. Plain output keeps the backticks.
-- Interactive prompts (`internal/prompt`): a pure form model plus a raw-mode driver on
+- Interactive prompts (`internal/ui/prompt`): a pure form model plus a raw-mode driver on
   `x/term`, no TUI dependency. Shown only when `canPrompt()` (stdin/stdout/stderr are
   terminals, no agent env var); every box has a flag and `--yes` skips the form. The
-  pickers (`cmd/pick.go`: the install project picker, `terma org use`) are a `Choice`
+  pickers (`internal/cli/pick.go`: the install project picker, `terma org use`) are a `Choice`
   form through `prompt.Choose` — arrow keys, Enter picks, Esc is `errCancelled`, the
   cursor starting on the default or current row; the numbered list answered by number
   or name is the fallback when stdout is a terminal and stdin is not.
-- OpenCode (`internal/harness/opencode.go`; plugin `internal/harness/opencode/terma.js`,
+- OpenCode (`internal/agents/opencode/harness.go`; plugin `internal/agents/opencode/plugin/terma.js`,
   embedded): the harness is a dependency-free plugin written whole into
   `~/.config/opencode/plugins/terma.js` with one `const CONFIG = {...}` line spliced in
   (the raw template ships `CONFIG = null` and is inert). The user's `opencode.json` is
   never touched; the key stays in the headers-helper script. `bun test
-  internal/harness/opencode` drives the plugin the way OpenCode would (`make check` runs
+  internal/agents/opencode/plugin` drives the plugin the way OpenCode would (`make check` runs
   it when bun is present). Local scope is `<root>/.opencode/terma.json`, policy only.
-- The `project` package is imported as `termaproject` in `cmd/` because `cmd` has a
-  ported `type project struct`.
-- Read commands (`usage`, `session`, `principal`; `cmd/usage.go`, `cmd/session.go`,
-  `cmd/principal.go`) are thin over the API gateway's `/v1/ai/*` and
-  `/v1/metrics/query` (`internal/api/ai*.go`, `metrics.go`). `usage` is PromQL
+- The `project` package is imported as `termaproject` in `internal/cli` because the
+  command line has a ported `type project struct`.
+- Read commands (`usage`, `session`, `principal`; `internal/cli/usage.go`, `internal/cli/session.go`,
+  `internal/cli/principal.go`) are thin over the API gateway's `/v1/ai/*` and
+  `/v1/metrics/query` (`internal/account/api`: `ai*.go`, `metrics.go`). `usage` is PromQL
   `increase()` over the `terma.ai.*` counters — the same idiom as the terma-frontend
   insights page — so it measures spend *inside* the window; `session list` selects by
   a session's **last activity** (`--since` → the gateway's `active_after`; the gateway has
@@ -477,7 +482,7 @@ developer login to check the team's repository permission.
   Native OTel remains the usage counter; these events are funding evidence only.
   See `docs/FUNDING-INSTRUMENTATION.md` for schemas, limits and delivery semantics.
 
-- Status line (`internal/hookrun/statusline.go`, `internal/harness/claude_statusline.go`):
+- Status line (`internal/agents/claude/statusline_hook.go`, `internal/agents/claude/statusline.go`):
   `terma install` (when Claude Code is one of the developer's agents; `--no-statusline` opts out)
   and a global `connect claude` put `terma hook statusline` in front of the user's
   `statusLine.command` and records what it replaced in `~/.config/terma/statusline.json`.
@@ -503,8 +508,8 @@ developer login to check the team's repository permission.
   stdout bytes after the prefix, stderr and exit status; cancel the entire renderer
   process group. Compatibility checks live in `docs/STATUSLINE-COMPATIBILITY.md`. Live-verified 2026-09-15: a
   Team seat gets `rate_limits` too, not only Pro/Max as documented.
-- Antigravity CLI (`agy`, Google's Gemini CLI successor; `internal/hookmgr/antigravity.go`,
-  `internal/hookrun/antigravity.go`, `internal/harness/antigravity.go`): hooks only, no
+- Antigravity CLI (`agy`, Google's Gemini CLI successor; `internal/agents/antigravity/hooks.go`,
+  `internal/agents/antigravity/handlers.go`, `internal/agents/antigravity/harness.go`): hooks only, no
   OTLP export. `.agents/hooks.json` is keyed by hook *name*; terma owns the `terma` key
   whole (other names untouched, a developer's `"enabled": false` preserved) with
   `PreInvocation` / `PostToolUse` (unmatched) / `PostInvocation` / `Stop`, never
@@ -537,7 +542,7 @@ developer login to check the team's repository permission.
   See `docs/CURSOR-INSTRUMENTATION.md`; account email is hook-supplied, no auth files
   or transcripts are read. Response/Stop trigger detached flushes; stop has
   `loop_limit: null` so observations continue beyond five follow-up loops.
-  Tool calls (`internal/hookrun/cursor_tool.go`): `postToolUse` / `postToolUseFailure`
+  Tool calls (`internal/agents/cursor/tool.go`): `postToolUse` / `postToolUseFailure`
   spool `terma.tool.call` — `tool_name`, `tool_call_id` (Cursor's `tool_use_id`),
   `duration_ms`, `status`, `failure_type`, `is_interrupt` — bypassing the observation
   checkpoint because the native id is the replay key. `tool_input`, `tool_output`,
@@ -546,7 +551,7 @@ developer login to check the team's repository permission.
   call's critical path and fail open only by default (a schema-mismatched reply or
   `failClosed` blocks), and `afterShellExecution` / `afterMCPExecution` restate the
   same calls without a `tool_use_id` and with their output.
-- Subagents (`internal/hookrun/subagent.go`, `docs/SUBAGENT-INSTRUMENTATION.md`) have two
+- Subagents (`internal/hooks/hookrun/subagent.go`, `docs/SUBAGENT-INSTRUMENTATION.md`) have two
   shapes and the events keep them apart. Claude Code and Codex run a subagent *inside* the
   session: the hook payload keeps the parent's `session_id` and adds `agent_id` /
   `agent_type`, so terma spools `terma.subagent.start` / `terma.subagent.end` under the
@@ -595,7 +600,7 @@ developer login to check the team's repository permission.
   No transcript, task text, description or last message is read.
   Codex trusts hooks entry by entry: a developer who trusted terma's before the two
   subagent entries existed has a file that counts as trusted and two hooks Codex skips in
-  silence, so the adapter compares entries (`hookmgr.CodexTermaEntries`,
+  silence, so the adapter compares entries (`codex.TermaEntries`,
   `CodexHookTrust.TrustedKeys`) and doctor names what is skipped.
 - `docs/collection-matrix.html` is the harness × information × mechanism matrix (open it
   in a browser). Update a cell when a mechanism ships or a live check changes it.
@@ -614,7 +619,7 @@ there); `model/` is written to move to the backend unchanged. The estimator neve
 determines a route: it scores evidence (account snapshot from `~/.claude.json`,
 credential hints, per-request `speed`, Codex `auth_mode`) and is corrected by
 reconciliation against simulated user × model × day USD reports. The local
-`cmd/funding-reconcile` pilot preserves the actual exports' grain and units (Claude
+`pocs/funding-model/cmd/funding-reconcile` pilot preserves the actual exports' grain and units (Claude
 account/model/period USD; OpenAI workspace/product/interval credits); see
 `pocs/funding-model/replay/README.md`. Do not feed real exports to the simulation
 reconciler or price real calls with its illustrative tables. The earlier Codex
@@ -638,9 +643,9 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   backoff 1 s → 2 min honouring Retry-After, a refused key retried 5 min → 1 h and never
   dropped, other 4xx to `.dead/`, OTLP partial success counted); a restart delivers what
   the last relay left (`recovered_from_outbox`). Bounds: 256 MiB / 14 days, `.dead/` 32 MiB. Claims come from `emitFor` and, for hooks that spool nothing, from the payload
-  (`hookrun.ClaimFromPayload`, fed a bounded copy of stdin in `cmd/hook.go`); hooks write
+  (`hookrun.ClaimFromPayload`, fed a bounded copy of stdin in `internal/cli/hook.go`); hooks write
   none unless `relay/token` exists. `relay setup` and the claiming hook start the relay
-  (`spawnRelay`, single instance on `relay/relay.lock`, a minute's backoff after a failed
+  (`daemon.Spawn`, single instance on `relay/relay.lock`, a minute's backoff after a failed
   start recorded in `relay/last-error`); it idles 8 hours, because Codex emits
   `conversation_starts` before any hook and never retries it.
 - A claim is scoped to processes, not just a session: it carries the hook's ancestors
@@ -685,7 +690,7 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
 - `claim.Write` is a read-merge-write under a sidecar lock (`<session>.json.lock`, 250 ms,
   falls through): unlocked, 14 of 16 concurrent writers' processes were lost.
 - The relay runs as a per-user service by default: `terma install` sets it up
-  (`ensureRelay`, `cmd/relay_service_choice.go`; `--relay-service off`, or `terma relay daemon
+  (`ensureRelay`, `internal/cli/relay_service_choice.go`; `--relay-service off`, or `terma relay daemon
   remove`, opts out and is remembered in `relay/no-service`). launchd / systemd --user /
   on Windows the Run key starting `terma relay supervise`, named per config directory so
   sandboxes never collide: the only way to catch what an agent exports before its first
@@ -694,7 +699,7 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   service relay (`--idle 0`) that finds a hook-started one waits and takes over. Tests set
   `TERMA_RELAY_SERVICE=0` (and a test binary never registers one). A hook that had to start the relay waits up to 1 s
   for it to listen. `TERMA_RELAY_DEBUG=1` logs every drop.
-- Heartbeat (`internal/relay/heartbeat.go`, `cmd/relay_heartbeat.go`): every 15 minutes
+- Heartbeat (`internal/relay/heartbeat.go`, `internal/cli/relay_heartbeat.go`): every 15 minutes
   (`TERMA_RELAY_HEARTBEAT` for a test; the first a minute after start), for as long as the
   relay runs, one `terma.relay.heartbeat` OTLP log record — service.name `terma-relay`, **no
   project**: it is the organization's — posted as OTLP/JSON to the API gateway's
@@ -708,7 +713,7 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   hostname, a path under HOME or an email (`TestHeartbeatFactsNameNoOne`). Each beat says
   why (`terma.heartbeat.reason`: `start`, `interval`, or `setup`): `terma setup` ends by
   asking the running relay for one (`POST /heartbeat?reason=setup` on the relay,
-  `relayCheckIn`) — the platform's "installed and working", and the developer's proof the
+  `daemon.CheckIn`) — the platform's "installed and working", and the developer's proof the
   relay, their credential and the endpoint work; the stub's 404 reads as "not taken yet".
 - Compatibility matrix (`docs/COMPATIBILITY.md`, generated — never edit it by hand):
   every live scenario says which harness capability it proves (`Proves` / `ProvesAll`,
@@ -724,7 +729,7 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
 - `live/relay_workloads_test.go` runs each workload directly and through the relay and
   requires the same telemetry and zero drops; long live matrix runs use frozen copies of
   `bin/terma` and `bin/live.test`, or a rebuild mid-run mixes versions.
-- omp goes through the relay by terma's Pi-family extension (`internal/harness/pi/terma.ts`,
+- omp goes through the relay by terma's Pi-family extension (`internal/agents/internal/pifamily/terma.ts`,
   agent "omp", `~/.omp/agent/extensions/terma-relay.ts`, lifecycle off — omp's committed
   hook file reports sessions and edits, the extension claims at each prompt with
   `omp-prompt`), never its native exporter: that reads OTEL_* only at startup, before any
@@ -758,7 +763,7 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
 - Pi, Hermes and DeepSeek Harness have no usable exporter: terma writes one into each —
   dsh's Cordis plugin (`$DSH_HOME/plugins/terma-relay.mjs`, inserted in
   `cordis.patch.yml`, auxiliary calls spanned through `llm/stream`), Pi's extension
-  (`internal/harness/pi/terma.ts`), Hermes's Python plugin (`internal/harness/hermes`,
+  (`internal/agents/internal/pifamily/terma.ts`), Hermes's Python plugin (`internal/agents/hermes/plugin`,
   `$HERMES_HOME/plugins/terma`, enabled through `hermes plugins enable terma`; plugin
   hooks fire in every front end, shell hooks not in the TUI) — exporting GenAI spans
   (usage, cost) and prompt/reply logs under the agent's own session id, and calling
@@ -822,12 +827,12 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   the OpenCode plugin), `omp-session-start` / `omp-session-end` / `omp-file-edit` (omp's
   committed hook file and extension), `pi-session-start` / `pi-prompt` /
   `pi-session-end` / `pi-file-edit` (called by terma's Pi extension,
-  `internal/harness/pi/terma.ts`, which `terma relay setup --harness pi` writes),
+  `internal/agents/internal/pifamily/terma.ts`, which `terma relay setup --harness pi` writes),
   `gemini-session-start` / `gemini-prompt` / `gemini-after-tool` / `gemini-session-end`
   (terma's Gemini CLI extension), `dsh-session-start` / `dsh-prompt` / `dsh-session-end` /
-  `dsh-file-edit` (terma's DeepSeek Harness plugin, `internal/harness/dsh/terma.mjs`),
+  `dsh-file-edit` (terma's DeepSeek Harness plugin, `internal/agents/dsh/plugin/terma.mjs`),
   `hermes-session-start` / `hermes-prompt` / `hermes-session-end` / `hermes-file-edit`
-  (called by terma's Hermes plugin, `internal/harness/hermes`). Both extensions share
+  (called by terma's Hermes plugin, `internal/agents/hermes/plugin`). Both extensions share
   one handler set (`hookrun/extension.go`) and one payload shape. Cursor sessions are keyed on `conversation_id`, the one id
   present on every Cursor event; `afterFileEdit` has no `session_id`.
 - Spool event names the platform parses (`gateways/otel/.../termacli_logs.go` and
@@ -861,15 +866,15 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   API gateway's `/v1/relay/heartbeat` under the developer's CLI token: the endpoint is not
   built yet (`api.HeartbeatPath`). Collection policy is served by the account
   service (`api.CollectionPolicy`).
-- Project header under a CLI token: `X-Mirador-Project` (`internal/api/client.go`).
+- Project header under a CLI token: `X-Mirador-Project` (`internal/account/api/client.go`).
   The shared gateway knows only that name; a Terma-branded header is a 400.
 - `.terma/settings.json` (`internal/project`, JSON): `project{id,name,organization_id,
   environment}`, `install{hook_manager,hooks,terma_version,installed_at}`. No
   secrets, ever, and nothing per-developer: which agents a developer routes, and how, is
   home-directory state (`config.Profile.Harnesses`, the routing record), so a colleague
   re-running install never churns the committed file. Which agents' hooks are wired is
-  not recorded either — the committed hooks files are the record (`adapter.WiredNames`:
-  an adapter is wired when its uninstall plan is non-empty). An `install.adapters` list
+  not recorded either — the committed hooks files are the record (`Registry.WiredNames`:
+  an agent is wired when its committed hooks file carries its entries). An `install.adapters` list
   once lived here and grew with each colleague's own agents; a binding that carries it
   loads and drops it on the next `Save`. Lives inside the same `.terma/` dir as the hook
   shims (`.terma/hooks/`).
@@ -900,7 +905,7 @@ thing on a profile. See docs/DEVELOPMENT.md, "Working against the dev backend".
 
 `terma status` and `terma doctor` must agree about whether a setup works: both treat a
 harness exporting to the right host but a *different project* as not connected
-(`harnessState` in `cmd/status.go`, the `KeyHarness` check in `cmd/doctor.go`). Keep the
+(`statusAgent` in `internal/cli/status.go` takes its verdict from `doctor.HarnessVerdict.Reaches`, which the `KeyHarness` check counts). Keep the
 two in step — a status that says "connected" while doctor fails is worse than either.
 The shared emission check fails zero-signal repository setups, reads Claude's merged
 user/shared/private settings, and checks live routing's own signals. A route record
@@ -910,7 +915,7 @@ it does not prove that a running agent has reloaded its settings or sent telemet
 ## Gotchas
 
 - A command test that can reach `auth.Login` must pass `--no-browser` and run under a
-  deadline (`runTermaWithin`): the browser path opens the developer's real browser and
+  deadline (`within(d).combined`): the browser path opens the developer's real browser and
   waits five minutes.
 - macOS: the first execution of a freshly written script pays ~200 ms in the OS exec
   policy check. It is one-time per file; `bench-hook` takes a median to ignore it.
@@ -937,18 +942,16 @@ it does not prove that a running agent has reloaded its settings or sent telemet
   the binary's path: that prefix's brew, or npm with `--prefix`); automatic updates only
   notify those. Failed checks retry after 15 minutes; auto-install attempts are throttled
   daily.
-- Refresh (`cmd/refresh.go`, `terma update --refresh`): after replacing itself or running
+- Refresh (`internal/cli/refresh.go`, `terma update --refresh`): after replacing itself or running
   the package manager, the old binary execs the new one's `update --refresh` — the old
   process cannot run new templates. It rewrites only files terma already wrote (the status-line wrap, the OpenCode plugin, and the current repository's hooks: the commit
   hooks through the binding's manager, the agent hooks its files already wire), never creates one, never signs in, and never changes a
-  choice — except that it migrates recorded agents to the relay before removing
-  PATH shims an earlier build installed, preserving routing signals and content
-  choices. A failed migration leaves the shims in place and is retried. Re-running `terma install` is not a substitute: it re-defaults every flag it
+  choice. Re-running `terma install` is not a substitute: it re-defaults every flag it
   does not record. The first interactive command under a newer release refreshes the
   home-directory files once (`refreshed.json`, upward only, so two builds on PATH do not
   take turns) and only *reports* stale committed files. Per repository, doctor and status
   name the same fix: committed hooks that exist but differ from this build's templates
-  are out of date → `terma update --refresh` (`hookWiring.stale`, and `agentHooksCheck`
+  are out of date → `terma update --refresh` (`doctor.HookWiring.Stale`, and `doctor.AgentHooksCheck`
   for the agents' files); files that are missing → `terma install`. The binding's
   `terma_version` is the terma that last wrote the committed files: install stamps it only
   when it wrote one, refresh when it rewrote one (`stampVersion`, the checkout's own
@@ -969,9 +972,9 @@ it does not prove that a running agent has reloaded its settings or sent telemet
   current state; leave state the previous build can still read — add and fill in, never
   remove or repurpose, since another terma may share the machine; home directory only
   (committed repository files are `--refresh`'s, on request). doctor has a `saved state
-  migrated` line only when one is pending or failed. The first, ID 1, fills in `cli` on
-  routing records 0.0.2 wrote: without it the router read the missing field as false and
-  stopped routing the Codex CLI.
+  migrated` line only when one is pending or failed. The registry is empty: ID 1 (it
+  filled in `cli` on routing records 0.0.2 wrote) was retired with the field before
+  release (`retiredThrough`), and its ID is never reused.
 
 ## Workspace installation regression tests
 

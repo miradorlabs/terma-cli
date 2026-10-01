@@ -185,10 +185,10 @@ records for a future platform worker; it is independent of the Terma CLI and hoo
 Unit tests exercise two generations with identical usage, changes within a turn,
 missing/zero/invalid values, private-content exclusion, concurrent capture,
 crash replay, failed append recovery, corrupt state and install/uninstall merging.
-The synthetic `live/TestCursorHookDelivery` passed on 2026-09-16 through the
+The synthetic ``TestCursorHookDelivery` (live/cursor_test.go)` passed on 2026-09-16 through the
 installed shims, rebuilt Terma binary and loopback OTLP receiver, including the
 kill switch and explicit zero preservation. The opt-in
-`live/TestCursorCLITurnObservations` covers two authenticated headless CLI turns,
+``TestCursorCLITurnObservations` (live/cursor_test.go)` covers two authenticated headless CLI turns,
 raw-hook-to-OTLP preservation and commit attribution. It skips without a CLI key;
 an offline pass is not an authenticated provider compatibility result.
 
