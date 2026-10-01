@@ -31,7 +31,8 @@ func ParseScope(raw string) (Scope, error) {
 // and exporting no signal is ReachRepos, since only a repository policy can make it send.
 type Reach string
 
-// The two reaches of a global connect; repos writes every exporter off for repositories to switch on.
+// The two reaches of a global connect; repos writes every exporter off for repositories to
+// switch on, so it is refused for a LocalOffOnly harness.
 const (
 	ReachEverywhere Reach = "everywhere"
 	ReachRepos      Reach = "repos"

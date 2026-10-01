@@ -29,39 +29,17 @@ func TestParseReach(t *testing.T) {
 	}
 }
 
-// The narrow mode keeps in the user file what a repository cannot hold (destination,
-// credential, master switch) and switches no exporter on.
-func TestConnectExportsReposLeavesExportersOffButStaysConnected(t *testing.T) {
+// Claude Code ignores a repository that turns telemetry on, so the narrow mode, which
+// leaves that to repositories, is refused before anything is written.
+func TestConnectExportsReposIsRefusedForAnOffOnlyAgent(t *testing.T) {
 	userSettings := userSandbox(t)
 	out, err := runTerma(t, "connect", "claude", "--exports", "repos",
-		"--api-key", testServerKey, "--team", testProjectID, "--identity", "dev@example.com", "--yes")
-	if err != nil {
-		t.Fatalf("%v\n%s", err, out)
+		"--api-key", testServerKey, "--team", testProjectID, "--yes")
+	if err == nil || !strings.Contains(err.Error(), "ignores a repository that turns telemetry on") {
+		t.Fatalf("narrow mode was accepted: %v\n%s", err, out)
 	}
-	settings := readClaudeSettings(t, userSettings)
-
-	for _, key := range []string{"OTEL_TRACES_EXPORTER", "OTEL_LOGS_EXPORTER", "OTEL_METRICS_EXPORTER"} {
-		if settings[key] != "none" {
-			t.Fatalf("%s = %q, want \"none\" — repositories are supposed to decide", key, settings[key])
-		}
-	}
-	if settings["CLAUDE_CODE_ENABLE_TELEMETRY"] != "1" {
-		t.Fatalf("the master switch must stay on: %q", settings["CLAUDE_CODE_ENABLE_TELEMETRY"])
-	}
-	if settings["OTEL_EXPORTER_OTLP_ENDPOINT"] == "" {
-		t.Fatal("the endpoint must stay in the user file")
-	}
-	// This agent's settings never carry OTEL_RESOURCE_ATTRIBUTES, whatever --identity said.
-	if v, ok := settings["OTEL_RESOURCE_ATTRIBUTES"]; ok {
-		t.Fatalf("OTEL_RESOURCE_ATTRIBUTES=%q written into the user file", v)
-	}
-
-	status, err := runTerma(t, "status")
-	if err != nil {
-		t.Fatalf("%v\n%s", err, status)
-	}
-	if !strings.Contains(status, "repositories decide what is sent") {
-		t.Fatalf("status should explain the arrangement:\n%s", status)
+	if _, err := os.Stat(userSettings); err == nil {
+		t.Fatalf("a refused connect wrote %s", userSettings)
 	}
 }
 
@@ -192,43 +170,6 @@ func readClaudeSettings(t *testing.T, path string) map[string]string {
 		doc.Env = map[string]string{}
 	}
 	return doc.Env
-}
-
-// A narrowed machine in a repository with no policy sends nothing; doctor must say so.
-func TestDoctorFailsWhenThisRepositoryHasNoPolicy(t *testing.T) {
-	repo := installRepo(t)
-	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
-	fakeClaudeOnPath(t)
-	if _, err := runTerma(t, "connect", "claude", "--exports", "repos",
-		"--api-key", testServerKey, "--team", testProjectID, "--yes"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--yes"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := local(t, claudeHarness(t).Harness, mustGetwd(t)).Disconnect(); err != nil {
-		t.Fatal(err)
-	}
-	out, _ := runTerma(t, "doctor", "--skip-commit")
-	if !strings.Contains(out, "FAIL  agent exporting to Terma") {
-		t.Fatalf("doctor must fail the export check when no signals can be sent:\n%s", out)
-	}
-	if !strings.Contains(out, "only where a repository asks") {
-		t.Fatalf("doctor should describe the arrangement:\n%s", out)
-	}
-	if !strings.Contains(out, "send nothing") {
-		t.Fatalf("doctor should say this repository sends nothing:\n%s", out)
-	}
-	if !strings.Contains(out, "terma install") {
-		t.Fatalf("doctor should say how to fix it:\n%s", out)
-	}
-	// status must tell the same story.
-	status, _ := runTerma(t, "status")
-	if !strings.Contains(status, "sessions here send nothing") || strings.Contains(status, "~95%") {
-		t.Fatalf("status disagrees with doctor about a repository that sends nothing:\n%s", status)
-	}
-
-	_ = repo
 }
 
 // Re-installing a repository must not replace a team's narrower policy with defaults.

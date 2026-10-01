@@ -303,3 +303,9 @@ func Partition(conflicts []Conflict) (blocking, advisory []Conflict) {
 	}
 	return blocking, advisory
 }
+
+// LocalOffOnly is a harness whose agent ignores repository settings that turn telemetry
+// on, so its repository scope can only switch signals and content off.
+type LocalOffOnly interface {
+	LocalOffOnly()
+}

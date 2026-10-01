@@ -227,6 +227,10 @@ func emissionProblem(reg *agents.Registry, h harness.Harness, root, projectID st
 			return "", ""
 		}
 	}
+	if _, offOnly := h.(harness.LocalOffOnly); offOnly {
+		return fmt.Sprintf("no OTLP telemetry signals enabled by %s; sessions here send nothing", st.ConfigPath),
+			"run `terma setup` to point " + h.DisplayName() + " at the relay machine-wide (a repository cannot turn its telemetry on), then restart it"
+	}
 	return fmt.Sprintf("no OTLP telemetry signals enabled by %s; sessions here send nothing", st.ConfigPath),
 		"review the export switches in the settings file named above (including the traces beta switch); run `terma install --signals traces,logs,metrics` to enable repository telemetry, then restart " + h.DisplayName()
 }

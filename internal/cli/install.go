@@ -186,10 +186,9 @@ func (app *App) runInstall(cmd *cobra.Command, f installFlags) error {
 		fmt.Fprintln(out, "Cancelled. Nothing was written.")
 		return nil
 	}
-	if f.dryRun {
-		ui.printLines()
-	}
+	// What already succeeded is still shown when a later step fails or is declined.
 	if err != nil || f.dryRun {
+		ui.printLines()
 		return err
 	}
 	// The hooks call terma by name: an install they cannot run is not done.

@@ -252,6 +252,10 @@ func (c exporter) ManagedKeys() []string { return c.managedKeys() }
 // ConnectNotes has nothing to say.
 func (exporter) ConnectNotes(harness.Exporter) []string { return nil }
 
+// LocalOffOnly marks Claude Code's repository scope: project settings may only switch off.
+func (exporter) LocalOffOnly() {}
+
 var (
-	_ harness.Harness = exporter{}
+	_ harness.Harness      = exporter{}
+	_ harness.LocalOffOnly = exporter{}
 )

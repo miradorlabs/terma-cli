@@ -191,6 +191,7 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 		return nil
 	}
 	if err != nil {
+		ui.printLines()
 		return err
 	}
 	if !res.Policy.Global() {

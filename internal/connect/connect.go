@@ -57,6 +57,9 @@ func Global(ctx context.Context, reg *agents.Registry, h harness.Harness, cfg *c
 	// `--exports repos` switches nothing on globally, but still writes what a committed
 	// policy cannot hold: endpoint, key, identity and the master switch.
 	if o.Reach == harness.ReachRepos {
+		if _, offOnly := h.(harness.LocalOffOnly); offOnly {
+			return fmt.Errorf("%s ignores a repository that turns telemetry on, so --exports repos would send nothing; connect without it", h.DisplayName())
+		}
 		signals = nil
 	}
 	// ConfigPath first: if the file cannot be located, a key minted below would be stranded.

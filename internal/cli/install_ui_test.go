@@ -71,3 +71,15 @@ func TestInstallUIFinish(t *testing.T) {
 		t.Fatalf("a warning is the verdict, and no steps means no list:\n%s", buf.String())
 	}
 }
+
+// A run that stops early still shows what already succeeded, once.
+func TestInstallUIPrintsTheChecklistWhenStoppedEarly(t *testing.T) {
+	var buf bytes.Buffer
+	ui := newInstallUI(&buf, false)
+	ui.Summary("Team", "Acme Web")
+	ui.printLines()
+	ui.printLines()
+	if got := buf.String(); got != "\n  ✓ Team          Acme Web\n" {
+		t.Fatalf("got %q", got)
+	}
+}
