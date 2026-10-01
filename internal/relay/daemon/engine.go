@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 	"time"
 
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
@@ -20,7 +19,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/shape"
 	"github.com/miradorlabs/terma-cli/internal/routing"
-	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 )
 
 // PolicyRefreshInterval is how often each team's collection policy is fetched again.
@@ -38,10 +36,7 @@ type Deps struct {
 	Endpoint func(cfg *config.Config, projectID string) string
 	// CreateKey mints a project's key under cfg's sign-in.
 	CreateKey func(ctx context.Context, cfg *config.Config, projectID string) (string, error)
-	// RelayAgents are the agents whose exporters send to the relay at addr, and those
-	// something keeps from it.
-	RelayAgents func(dir, addr string) (pointed, blocked []string)
-	// SendHeartbeat delivers a heartbeat with the developer's credential.
+	// SendHeartbeat delivers a heartbeat with a project's key.
 	SendHeartbeat func(ctx context.Context, beat *logspb.LogsData) error
 	// HookPolicy is the organization's policy as a hook reads it.
 	HookPolicy func() config.Policy
@@ -89,7 +84,7 @@ func (d Deps) Engine(ctx context.Context, dir string, cfg *config.Config, s Sett
 	minter := NewKeyMinter(ctx, cfg, d.CreateKey)
 	opts := relay.Options{Correlators: d.Correlators, Capturers: d.Capturers,
 		Hold: s.Hold, Dir: filepath.Join(dir, relay.OutboxDir), Resolve: d.Resolver(cfg, minter.Mint), Version: d.Version,
-		CatchAll: d.CatchAll(), HeartbeatInfo: d.Heartbeat(dir).Info(), HeartbeatSend: d.SendHeartbeat, HeartbeatEvery: s.Heartbeat,
+		CatchAll: d.CatchAll(), HeartbeatSend: d.SendHeartbeat, HeartbeatEvery: s.Heartbeat,
 		PeerPID: procinfo.FindSender, ProcessAlive: procinfo.Alive, ClaimCacheTTL: time.Second, PolicyCacheTTL: time.Second,
 		Paused: func() bool { return config.Paused() && d.HookPolicy != nil && d.HookPolicy().PauseAllowed() }}
 	if s.Debug && logw != nil {
@@ -106,12 +101,6 @@ func (d Deps) Resolver(cfg *config.Config, mint func(projectID string)) func(cla
 
 // CatchAll is global mode's claim for everything an agent exports.
 func (d Deps) CatchAll() func() (claim.Claim, bool) { return CatchAll(d.HookPolicy) }
-
-// Heartbeat is what the relay's heartbeat says about this machine.
-func (d Deps) Heartbeat(dir string) Heartbeat {
-	return Heartbeat{Dir: dir, Version: d.Version, InstallKind: InstallKind(d.Version),
-		Agents: func(addr string) (pointed, blocked []string) { return d.RelayAgents(dir, addr) }}
-}
 
 // Refresher keeps fresh, while the relay runs, every team with a key here and the
 // selected team.
@@ -154,19 +143,4 @@ func (d Deps) Refresher() *PolicyRefresher {
 			return d.RefreshPolicy(ctx, &scoped)
 		},
 	}
-}
-
-// InstallKind is the package manager that owns this terma, "source", or "script".
-func InstallKind(version string) string {
-	exe, err := os.Executable()
-	if err != nil {
-		return "unknown"
-	}
-	if m, ok := selfupdate.ManagedBy(exe); ok {
-		return strings.ToLower(m.Name)
-	}
-	if !strings.HasPrefix(version, "v") || strings.Contains(version, "-g") || version == "dev" {
-		return "source"
-	}
-	return "script"
 }

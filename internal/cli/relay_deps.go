@@ -1,16 +1,21 @@
 package cli
 
 import (
+	"bytes"
+	"cmp"
 	"context"
-	"errors"
+	"fmt"
+	"net/http"
+	"slices"
 
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
-	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 
-	"github.com/miradorlabs/terma-cli/internal/agents"
+	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/globalmode"
 	"github.com/miradorlabs/terma-cli/internal/policy"
+	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/relay/shape"
 )
@@ -25,7 +30,6 @@ func (app *App) relayDeps() daemon.Deps {
 		AgentName:     app.agents.NameForTool,
 		Endpoint:      app.delivery().Endpoint,
 		CreateKey:     app.createProjectKey,
-		RelayAgents:   app.relayAgents,
 		SendHeartbeat: app.relayHeartbeatSend,
 		HookPolicy:    hookPolicy,
 		LoadConfig:    app.loadConfig,
@@ -58,37 +62,47 @@ func (app *App) createProjectKey(ctx context.Context, cfg *config.Config, projec
 	return key, err
 }
 
-func (app *App) relayAgents(dir, addr string) (pointed, blocked []string) {
-	for _, e := range app.agents.With[agents.RelayExporter]() {
-		if ok, known := e.RelayPointed(addr); known && ok {
-			pointed = append(pointed, e.Name())
-		}
-		if c, ok := e.(agents.RelayChecker); ok {
-			if _, _, problem := c.RelayProblem(dir); problem {
-				blocked = append(blocked, e.Name())
-			}
-		}
-	}
-	return pointed, blocked
-}
-
-// relayHeartbeatSend delivers a heartbeat with the developer's credential; signed out,
-// nothing is sent.
+// relayHeartbeatSend delivers a heartbeat to a project's ingest with that project's key: the
+// selected team's, minted if missing, else any project's held here; with none, nothing is sent.
 func (app *App) relayHeartbeatSend(ctx context.Context, beat *logspb.LogsData) error {
 	cfg, err := config.Load(config.Overrides{})
 	if err != nil {
 		return err
 	}
-	if cfg.APIKey != "" {
-		return errors.New("a server key is not a developer's sign-in: heartbeats go with one")
+	selected := cmp.Or(cfg.Policy.TeamID, cfg.Policy.DefaultProjectID, cfg.ProjectID)
+	if selected != "" && keystore.Get(selected) == "" && cfg.APIKey == "" {
+		if key, err := app.createProjectKey(ctx, cfg, selected); err == nil && key != "" {
+			_ = keystore.Set(selected, key, keystore.HostsOf(cfg))
+		}
 	}
-	body, err := protojson.Marshal(beat)
+	others := keystore.CollectionProjects()
+	slices.Sort(others)
+	for _, projectID := range append([]string{selected}, others...) {
+		if key := keystore.Get(projectID); projectID != "" && key != "" {
+			return sendHeartbeat(ctx, app.delivery().Endpoint(cfg, projectID), key, beat)
+		}
+	}
+	return relay.ErrNoKey
+}
+
+func sendHeartbeat(ctx context.Context, endpoint, key string, beat *logspb.LogsData) error {
+	body, err := proto.Marshal(beat)
 	if err != nil {
 		return err
 	}
-	client, err := app.newClient(cfg)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint+"/v1/logs", bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
-	return client.SendHeartbeat(ctx, body)
+	req.Header.Set("Content-Type", "application/x-protobuf")
+	req.Header.Set("Authorization", "Bearer "+key)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode/100 != 2 {
+		return fmt.Errorf("the ingest answered HTTP %d", resp.StatusCode)
+	}
+	return nil
 }

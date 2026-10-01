@@ -26,7 +26,6 @@ const (
 	ErrorFile = "last-error"
 	// StopFile asks the relay whose pid it holds to stop, since Windows has no SIGTERM.
 	StopFile          = "stop"
-	MachineIDFile     = "machine-id"
 	NoServiceFile     = "no-service"
 	SupervisorPIDFile = "supervisor.pid"
 )

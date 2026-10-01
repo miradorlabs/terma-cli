@@ -13,33 +13,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/flock"
 )
 
-// The heartbeat names this terma's build and setup, never whose machine it is; the machine
-// id is random and stable.
-func TestHeartbeatFactsNameNoOne(t *testing.T) {
-	dir, _ := setUpRelay(t)
-	h := Heartbeat{Dir: dir, Version: "v1.2.3", InstallKind: "script", Agents: func(string) ([]string, []string) { return nil, nil }}
-	facts := h.Facts()
-	for _, k := range []string{"terma.version", "terma.os", "terma.arch", "terma.machine_id", "terma.install", "terma.mode", "terma.relay.service"} {
-		if _, ok := facts[k]; !ok {
-			t.Errorf("no %s in %v", k, facts)
-		}
-	}
-	host, _ := os.Hostname()
-	home, _ := os.UserHomeDir()
-	for k, v := range facts {
-		s := fmt.Sprint(v)
-		if host != "" && strings.Contains(s, host) || home != "" && strings.Contains(s, home) || strings.Contains(s, "@") {
-			t.Errorf("%s = %q names the machine or its owner", k, s)
-		}
-	}
-	id := facts["terma.machine_id"]
-	if id == "" || h.Facts()["terma.machine_id"] != id {
-		t.Fatalf("machine id %q is not stable", id)
-	}
-}
-
-// setup's check-in reports the beat as sent, endpoint not there yet (the stub's 404),
-// another failure, or no relay at all.
+// setup's check-in reports the beat as sent, no project key here yet, another failure,
+// or no relay at all.
 func TestRelayCheckIn(t *testing.T) {
 	dir, _ := setUpRelay(t)
 	free, err := net.Listen("tcp", "127.0.0.1:0")
@@ -62,7 +37,7 @@ func TestRelayCheckIn(t *testing.T) {
 		says   string
 	}{
 		{200, `{}`, true, "reported to your organization"},
-		{502, `{"error":"request failed with status 404"}`, true, "does not take check-ins yet"},
+		{502, `{"error":"no key for this project on this machine"}`, true, "once a repository is connected"},
 		{502, `{"error":"invalid token"}`, false, "invalid token"},
 	} {
 		ln, err := net.Listen("tcp", addr)

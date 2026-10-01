@@ -73,8 +73,7 @@ type Options struct {
 	Resolve func(c claim.Claim) (Policy, error)
 	// CatchAll, in global mode, is where a part whose hold ran out unplaced goes instead of being dropped.
 	CatchAll func() (claim.Claim, bool)
-	// HeartbeatInfo and HeartbeatSend, both set, turn the heartbeat on; HeartbeatEvery is its period.
-	HeartbeatInfo  func() map[string]any
+	// HeartbeatSend, set, turns the heartbeat on; HeartbeatEvery is its period.
 	HeartbeatSend  func(ctx context.Context, beat *logspb.LogsData) error
 	HeartbeatEvery time.Duration
 	// ClaimCacheTTL and PolicyCacheTTL keep Lookup's and Resolve's answers that long (0: ask every time).
@@ -110,21 +109,19 @@ type Relay struct {
 	// deliverMu keeps a session's parts in arrival order; taken before mu, never after.
 	deliverMu sync.Mutex
 
-	mu            sync.Mutex
-	held          map[string][]heldPart
-	heldN         int
-	heldBytes     int
-	traces        map[string]traceSession
-	procs         map[int]*procState // sender pid → the sessions it named, and whether it exited
-	outbox        outbox
-	senders       map[route]*sender
-	lastDelivery  time.Time
-	agentVersions map[string]string
-	lastSeen      time.Time
-	wg            sync.WaitGroup
-	sendCtx       context.Context
-	cancelSend    context.CancelFunc
-	stopping      chan struct{}
+	mu         sync.Mutex
+	held       map[string][]heldPart
+	heldN      int
+	heldBytes  int
+	traces     map[string]traceSession
+	procs      map[int]*procState // sender pid → the sessions it named, and whether it exited
+	outbox     outbox
+	senders    map[route]*sender
+	lastSeen   time.Time
+	wg         sync.WaitGroup
+	sendCtx    context.Context
+	cancelSend context.CancelFunc
+	stopping   chan struct{}
 }
 
 // New returns a relay. Run must be started for anything to leave.
@@ -162,8 +159,7 @@ func New(opts Options) *Relay {
 		cache:  lookupCache{claims: map[string]cachedClaim{}, policies: map[string]cachedPolicy{}},
 		held:   map[string][]heldPart{},
 		traces: map[string]traceSession{}, procs: map[int]*procState{}, senders: map[route]*sender{}, outbox: outbox{dir: opts.Dir},
-		agentVersions: map[string]string{},
-		lastSeen:      opts.Now(), sendCtx: sendCtx, cancelSend: cancel, stopping: make(chan struct{}),
+		lastSeen: opts.Now(), sendCtx: sendCtx, cancelSend: cancel, stopping: make(chan struct{}),
 	}
 }
 

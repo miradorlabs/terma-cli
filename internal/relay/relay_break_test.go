@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -808,8 +809,8 @@ func TestRelayCatchAllInGlobalMode(t *testing.T) {
 	}
 }
 
-// The heartbeat goes every period through HeartbeatSend, never to a project's host, and
-// carries the machine's facts and counters but nothing any session said.
+// The heartbeat goes every period through HeartbeatSend, never the outbox, and names
+// terma's version, the machine and the reason, timestamped when sent.
 func TestRelayHeartbeat(t *testing.T) {
 	u := newUpstream(t)
 	f := newFixture()
@@ -817,9 +818,6 @@ func TestRelayHeartbeat(t *testing.T) {
 	var beats []*logspb.LogsData
 	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock, Version: "v9.9.9",
 		HeartbeatEvery: time.Minute,
-		HeartbeatInfo: func() map[string]any {
-			return map[string]any{"terma.version": "v9.9.9", "terma.mode": "repo", "terma.agents": []string{"claude", "codex"}}
-		},
 		HeartbeatSend: func(_ context.Context, b *logspb.LogsData) error {
 			mu.Lock()
 			beats = append(beats, b)
@@ -842,20 +840,10 @@ func TestRelayHeartbeat(t *testing.T) {
 	f.now = f.now.Add(61 * time.Second)
 	f.mu.Unlock()
 	waitFor(t, func() bool { return count() == 1 })
-
-	logs := logsOf("A", 1)
-	logs.ResourceLogs[0].Resource = &resourcepb.Resource{Attributes: []*commonpb.KeyValue{kv("service.name", "claude-code"), kv("service.version", "2.1.285")}}
-	body, _ := proto.Marshal(logs)
-	post(t, srv, "/v1/logs", body, "application/x-protobuf", token, false)
-	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["forwarded.logs"] == 1 })
 	f.mu.Lock()
 	f.now = f.now.Add(time.Minute)
 	f.mu.Unlock()
 	waitFor(t, func() bool { return count() == 2 })
-	f.mu.Lock()
-	f.now = f.now.Add(time.Minute)
-	f.mu.Unlock()
-	waitFor(t, func() bool { return count() == 3 })
 
 	// Asked for one (as `terma setup` does), it beats now, with the reason given.
 	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/heartbeat?reason=setup", nil)
@@ -863,46 +851,35 @@ func TestRelayHeartbeat(t *testing.T) {
 	if resp, err := http.DefaultClient.Do(req); err != nil || resp.StatusCode != http.StatusOK {
 		t.Fatalf("POST /heartbeat: %v %v", resp, err)
 	}
-	if count() != 4 {
+	if count() != 3 {
 		t.Fatalf("a requested beat was not sent: %d beats", count())
 	}
 	mu.Lock()
-	beat := beats[1]
+	defer mu.Unlock()
 	reasons := []string{}
 	for _, b := range beats {
 		reasons = append(reasons, attr(b.ResourceLogs[0].ScopeLogs[0].LogRecords[0].Attributes, HeartbeatReasonAttr))
 	}
-	mu.Unlock()
-	if strings.Join(reasons, ",") != "start,interval,interval,setup" {
+	if strings.Join(reasons, ",") != "start,interval,setup" {
 		t.Errorf("beat reasons %v", reasons)
 	}
-	res := beat.ResourceLogs[0].Resource.Attributes
-	if attr(res, ProjectAttr) != "" || attr(res, "service.name") != HeartbeatService {
+	beat := beats[2]
+	if res := beat.ResourceLogs[0].Resource.Attributes; attr(res, "service.name") != HeartbeatService || attr(res, "service.version") != "v9.9.9" {
 		t.Fatalf("heartbeat resource %v", res)
 	}
+	host, _ := os.Hostname()
 	rec := beat.ResourceLogs[0].ScopeLogs[0].LogRecords[0]
-	want := map[string]string{"event.name": HeartbeatEvent, "terma.version": "v9.9.9", "terma.mode": "repo", "relay.agent.claude-code.version": "2.1.285"}
+	want := map[string]string{"event.name": HeartbeatEvent, "terma.version": "v9.9.9", "host.name": host}
 	for k, v := range want {
 		if got := attr(rec.Attributes, k); got != v {
 			t.Errorf("heartbeat %s = %q, want %q", k, got, v)
 		}
 	}
-	found := map[string]bool{}
-	for _, a := range rec.Attributes {
-		found[a.Key] = true
+	if len(rec.Attributes) != 4 {
+		t.Errorf("heartbeat says more than its four facts: %v", rec.Attributes)
 	}
-	for _, k := range []string{"relay.count.forwarded.logs", "relay.count.received.logs", "relay.outbox.parts", "relay.uptime_s", "relay.last_delivery_at", "terma.agents"} {
-		if !found[k] {
-			t.Errorf("heartbeat has no %s", k)
-		}
-	}
-	byAuth, _ := u.logs(t)
-	for auth, recs := range byAuth {
-		for _, l := range recs {
-			if attr(l.Attributes, "event.name") == HeartbeatEvent {
-				t.Fatalf("a heartbeat went to a project (%s)", auth)
-			}
-		}
+	if rec.TimeUnixNano != uint64(f.clock().UnixNano()) {
+		t.Errorf("heartbeat time %d, want the send time", rec.TimeUnixNano)
 	}
 }
 

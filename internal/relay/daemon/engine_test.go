@@ -57,7 +57,6 @@ func TestTheEngineStartsNothing(t *testing.T) {
 		},
 		RefreshPolicy: func(context.Context, *config.Config) error { t.Fatal("fetched while assembling"); return nil },
 		HookPolicy:    func() config.Policy { return config.Policy{} },
-		RelayAgents:   func(string, string) ([]string, []string) { return nil, nil },
 	}
 	var log bytes.Buffer
 	opts := d.Engine(t.Context(), t.TempDir(), &config.Config{}, Settings{Hold: time.Second, Heartbeat: time.Minute}, &log)

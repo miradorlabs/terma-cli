@@ -130,7 +130,6 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 		}
 		r.stats.add("attributed_by_process."+string(p.signal), p.records)
 	}
-	r.noteDelivery(p)
 	r.enqueue(c, p)
 }
 
