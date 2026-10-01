@@ -226,7 +226,7 @@ func (app *App) fetchPolicy(ctx context.Context, cfg *config.Config) (config.Pol
 	var client *api.Client
 	var err error
 	// Only an explicit offline fixture skips the developer's login.
-	if os.Getenv("TERMA_POLICY_STUB") != "" {
+	if config.PolicyStub() != "" {
 		client = api.NewAnonymous(cfg.AuthURL, app.version)
 	} else {
 		cred, err := auth.LoadCredential(cfg.ProfileName)
@@ -253,7 +253,7 @@ func (app *App) fetchPolicy(ctx context.Context, cfg *config.Config) (config.Pol
 	}
 	pol.OrganizationID, pol.AuthURL = cfg.OrganizationID, cfg.AuthURL
 	pol.TeamID = cmp.Or(cfg.ProjectID, pol.DefaultProjectID)
-	if pol.Global() && os.Getenv("TERMA_POLICY_STUB") == "" {
+	if pol.Global() && config.PolicyStub() == "" {
 		pol.DefaultProjectID = cfg.ProjectID
 	}
 
@@ -262,7 +262,7 @@ func (app *App) fetchPolicy(ctx context.Context, cfg *config.Config) (config.Pol
 
 // selectPolicyTeam picks the team whose policy is set up; it never creates a telemetry key.
 func (app *App) selectPolicyTeam(cmd *cobra.Command, cfg *config.Config) error {
-	if os.Getenv("TERMA_POLICY_STUB") != "" {
+	if config.PolicyStub() != "" {
 		return nil
 	}
 	if cfg.ProjectID == "" && cfg.Policy.TeamID != "" {

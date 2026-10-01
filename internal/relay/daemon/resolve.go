@@ -2,7 +2,6 @@ package daemon
 
 import (
 	"errors"
-	"os"
 	"sync"
 	"time"
 
@@ -49,15 +48,15 @@ func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Polic
 			if p.OrganizationID != cfg.OrganizationID {
 				return relay.Policy{}, errors.New("organization changed; restart the relay")
 			}
-			if p.Policy == nil || !p.Policy.AppliesTo(cfg.OrganizationID, cfg.AuthURL) || p.Policy.TeamID == "" && os.Getenv("TERMA_POLICY_STUB") == "" {
-				org = config.Policy{Mode: config.ModeRepo, Signals: []string{}, OrganizationID: cfg.OrganizationID, AuthURL: cfg.AuthURL}
+			if p.Policy == nil || !p.Policy.AppliesTo(cfg.OrganizationID, cfg.AuthURL) || p.Policy.TeamID == "" && config.PolicyStub() == "" {
+				org = config.NoPolicy(cfg.OrganizationID, cfg.AuthURL)
 			} else {
 				org = *p.Policy
 			}
 		}
 		globalPrimary := org.Global() && (org.TeamID == "" || org.TeamID == c.ProjectID)
 		org = routing.EffectivePolicy(org, c.ProjectID)
-		if cfg.ProfileName != "" && org.FetchedAt.IsZero() && os.Getenv("TERMA_POLICY_STUB") == "" {
+		if cfg.ProfileName != "" && org.FetchedAt.IsZero() && config.PolicyStub() == "" {
 			// Unknown policy must neither grant nor drop: a new team's exports wait for its fetch.
 			return relay.Policy{}, errors.New("no validated collection policy for this team")
 		}

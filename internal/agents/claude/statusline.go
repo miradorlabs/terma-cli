@@ -15,6 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/harness"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 )
 
 // The status-line payload carries the plan's rate-limit windows, and the only way to see it is to
@@ -128,9 +129,9 @@ func (c exporter) InstallStatusLine() (bool, error) {
 		previousCommand = prev.Command
 	}
 	entry["type"] = json.RawMessage(`"command"`)
-	cmdJSON, _ := marshalJSON(statusLineCommand(previousCommand), "")
+	cmdJSON, _ := hookmgr.MarshalJSON(statusLineCommand(previousCommand), "", "")
 	entry["command"] = cmdJSON
-	installed, err := marshalJSON(entry, "")
+	installed, err := hookmgr.MarshalJSON(entry, "", "")
 	if err != nil {
 		return false, err
 	}
@@ -186,8 +187,8 @@ func (c exporter) RefreshStatusLine() (string, bool, error) {
 	}
 	entry := maps.Clone(cur.Options)
 	entry["type"] = json.RawMessage(`"command"`)
-	entry["command"], _ = marshalJSON(want, "")
-	installed, err := marshalJSON(entry, "")
+	entry["command"], _ = hookmgr.MarshalJSON(want, "", "")
+	installed, err := hookmgr.MarshalJSON(entry, "", "")
 	if err != nil {
 		return path, false, err
 	}

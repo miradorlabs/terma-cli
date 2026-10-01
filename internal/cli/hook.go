@@ -66,10 +66,10 @@ func (app *App) hookDeps() dispatch.Deps {
 func hookPolicy() config.Policy {
 	cfg, err := config.Load(config.Overrides{})
 	if err != nil {
-		return config.Policy{Mode: config.ModeRepo, Signals: []string{}}
+		return config.NoPolicy("", "")
 	}
-	if cfg.Policy.FetchedAt.IsZero() || cfg.Policy.TeamID == "" && os.Getenv("TERMA_POLICY_STUB") == "" {
-		return config.Policy{Mode: config.ModeRepo, Signals: []string{}, OrganizationID: cfg.OrganizationID, AuthURL: cfg.AuthURL}
+	if !cfg.Policy.Validated() {
+		return config.NoPolicy(cfg.OrganizationID, cfg.AuthURL)
 	}
 	return cfg.Policy
 }

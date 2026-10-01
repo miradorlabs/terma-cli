@@ -14,6 +14,13 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
+// The agent's hooks, as its events name them.
+var (
+	sessionStart = Agent{}.Events()["omp-session-start"]
+	sessionEnd   = Agent{}.Events()["omp-session-end"]
+	fileEdit     = Agent{}.Events()["omp-file-edit"]
+)
+
 // The omp hook announces the session, names the files it edits, and the commit that
 // follows carries the session and the tool.
 func TestOmpSessionIsStampedOnItsCommit(t *testing.T) {

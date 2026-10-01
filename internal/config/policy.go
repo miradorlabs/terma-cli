@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"slices"
 	"time"
 )
@@ -51,4 +52,19 @@ func (p Policy) Global() bool { return p.Mode == ModeGlobal }
 func (p Policy) AppliesTo(organizationID, authURL string) bool {
 	return (p.OrganizationID == "" || p.OrganizationID == organizationID) &&
 		(p.AuthURL == "" || p.AuthURL == authURL)
+}
+
+// NoPolicy is what applies to a login until its team's policy is validated: repositories
+// opt in and nothing is collected.
+func NoPolicy(organizationID, authURL string) Policy {
+	return Policy{Mode: ModeRepo, Signals: []string{}, OrganizationID: organizationID, AuthURL: authURL}
+}
+
+// PolicyStub is the offline test override, TERMA_POLICY_STUB, read here and nowhere else.
+func PolicyStub() string { return os.Getenv("TERMA_POLICY_STUB") }
+
+// Validated reports whether p is a team's fetched policy; an offline stub stands in for
+// the team.
+func (p Policy) Validated() bool {
+	return !p.FetchedAt.IsZero() && (p.TeamID != "" || PolicyStub() != "")
 }

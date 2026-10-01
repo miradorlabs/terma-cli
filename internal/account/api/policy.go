@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
@@ -19,7 +18,7 @@ func (c *Client) CollectionPolicy(ctx context.Context) (config.Policy, error) {
 		return config.Policy{}, err
 	}
 	p := config.DefaultPolicy()
-	if raw := os.Getenv("TERMA_POLICY_STUB"); raw != "" {
+	if raw := config.PolicyStub(); raw != "" {
 		if err := json.Unmarshal([]byte(raw), &p); err != nil {
 			return config.Policy{}, fmt.Errorf("TERMA_POLICY_STUB: %w", err)
 		}

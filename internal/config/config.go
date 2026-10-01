@@ -141,7 +141,7 @@ func Load(o Overrides) (*Config, error) {
 	if profile.Policy != nil {
 		cfg.Policy = *profile.Policy
 		if !cfg.Policy.AppliesTo(cfg.OrganizationID, cfg.AuthURL) {
-			cfg.Policy = Policy{Mode: ModeRepo, Signals: []string{}}
+			cfg.Policy = NoPolicy("", "")
 		}
 	}
 

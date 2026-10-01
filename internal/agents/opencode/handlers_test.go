@@ -14,6 +14,13 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
+// The agent's hooks, as its events name them.
+var (
+	sessionStart = Agent{}.Events()["opencode-session-start"]
+	sessionEnd   = Agent{}.Events()["opencode-session-end"]
+	fileEdit     = Agent{}.Events()["opencode-file-edit"]
+)
+
 // The OpenCode plugin announces the session, names the files it edits, and the commit
 // that follows carries the session and the tool.
 func TestOpenCodeSessionIsStampedOnItsCommit(t *testing.T) {

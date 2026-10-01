@@ -87,7 +87,7 @@ var codexSignalKeys = []struct {
 }
 
 // Name is the token `terma connect` and `--harness` accept.
-func (exporter) Name() string { return "codex" }
+func (exporter) Name() string { return name }
 
 // ServiceName is codex_cli_rs, the originator Codex stamps for its CLI; Desktop and the
 // IDE extensions report their own.

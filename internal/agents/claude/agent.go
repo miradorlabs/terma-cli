@@ -14,10 +14,8 @@ import (
 
 // Agent is Claude Code: hooks in .claude/settings.json, wired by default because a repository
 // loses nothing by gaining that file.
-type Agent struct{}
+type Agent struct{ exporter }
 
-func (Agent) Name() string                       { return "claude" }
-func (Agent) DisplayName() string                { return "Claude Code" }
 func (Agent) Installed(ctx context.Context) bool { return exporter{}.Detect(ctx).Found }
 func (Agent) HooksPath() string                  { return settingsPath }
 func (Agent) Default(string) bool                { return true }
@@ -85,25 +83,6 @@ func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
 	return agents.CapabilitySupport{Level: agents.SupportFull},
 		agents.CapabilitySupport{Level: agents.SupportFull}
 }
-
-// InstallStatusLine wraps the status line.
-func (Agent) InstallStatusLine() (bool, error) { return exporter{}.InstallStatusLine() }
-
-// StatusLineState reports the status line as terma sees it from cwd.
-func (Agent) StatusLineState(cwd string) (agents.StatusLineState, error) {
-	return exporter{}.StatusLineState(cwd)
-}
-
-// RemoveStatusLine puts back the status line terma wrapped.
-func (Agent) RemoveStatusLine() (bool, error) { return exporter{}.RemoveStatusLine() }
-
-// EmissionStatus reads the user and repository settings together.
-func (Agent) EmissionStatus(root string) (harness.Status, error) {
-	return exporter{}.EmissionStatus(root)
-}
-
-// TelemetrySwitch is Claude Code's master switch.
-func (Agent) TelemetrySwitch() string { return exporter{}.TelemetrySwitch() }
 
 var (
 	_ agents.StatusLiner      = Agent{}

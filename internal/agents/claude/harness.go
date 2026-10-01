@@ -12,6 +12,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/account/serverkey"
 	"github.com/miradorlabs/terma-cli/internal/harness"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 )
 
 // exporter configures Claude Code's OpenTelemetry export through the `env` block of its
@@ -541,7 +542,7 @@ func (c exporter) Connect(e harness.Exporter, clearConflicts bool) error {
 	}
 	s.merge(env)
 	for key, value := range settings {
-		encoded, err := marshalJSON(value, "")
+		encoded, err := hookmgr.MarshalJSON(value, "", "")
 		if err != nil {
 			return err
 		}
@@ -605,7 +606,7 @@ func (c exporter) Disconnect() (harness.DisconnectResult, error) {
 				}
 			}
 			if prior := j.PreviousSettings[key]; prior != nil {
-				encoded, err := marshalJSON(*prior, "")
+				encoded, err := hookmgr.MarshalJSON(*prior, "", "")
 				if err != nil {
 					return result, err
 				}
@@ -622,7 +623,7 @@ func (c exporter) Disconnect() (harness.DisconnectResult, error) {
 				remaining.ClearedSettings[key] = value
 				continue
 			}
-			encoded, err := marshalJSON(value, "")
+			encoded, err := hookmgr.MarshalJSON(value, "", "")
 			if err != nil {
 				return result, err
 			}

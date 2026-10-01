@@ -13,6 +13,8 @@ import (
 // the session id its telemetry carries too.
 type Extension struct {
 	Tool string
+	// Source is the session start's source attribute, "session_start" when empty.
+	Source string
 }
 
 // Events is the extension's <prefix>-session-start, -prompt, -session-end and -file-edit handlers.
@@ -31,6 +33,9 @@ type extensionHookInput struct {
 	Model     string `json:"model"`
 	File      string `json:"file"`
 	Tool      string `json:"tool"`
+	Reason    string `json:"reason"`
+	// ParentSessionID is set on a session an agent opened for a subagent.
+	ParentSessionID string `json:"parent_session_id"`
 }
 
 func readExtensionInput(r io.Reader) (*extensionHookInput, error) {
@@ -54,7 +59,17 @@ func (x Extension) sessionStart(ctx context.Context, env Env) error {
 	if !ok {
 		return nil
 	}
-	env.Announce(r, env.NewSession(r, in.SessionID, x.Tool, in.Model), map[string]any{AttrSource: "session_start"})
+	attrs := map[string]any{AttrSource: cmp.Or(x.Source, "session_start")}
+	sess := env.NewSession(r, in.SessionID, x.Tool, in.Model)
+	if !session.ValidID(in.ParentSessionID) {
+		env.Announce(r, sess, attrs)
+		return nil
+	}
+	// A subagent's session is announced, never made active: it would claim the
+	// developer's next hand-written commit. Its edits still build its own manifest.
+	attrs[AttrParentSession] = in.ParentSessionID
+	env.PruneManifests(r, sess.UpdatedAt)
+	env.EmitStart(r, sess, attrs)
 	return nil
 }
 
@@ -68,7 +83,7 @@ func (x Extension) sessionEnd(ctx context.Context, env Env) error {
 	if !ok {
 		return nil
 	}
-	env.EndSession(r, in.SessionID, x.Tool, "")
+	env.EndSession(r, in.SessionID, x.Tool, in.Reason)
 	return nil
 }
 

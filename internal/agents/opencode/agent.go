@@ -7,14 +7,13 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
 // Agent is OpenCode, whose events come from terma's user-scope plugin; it has no
 // repository-scope hooks.
-type Agent struct{}
+type Agent struct{ exporter }
 
-func (Agent) Name() string                       { return "opencode" }
-func (Agent) DisplayName() string                { return "OpenCode" }
 func (Agent) Installed(ctx context.Context) bool { return exporter{}.Detect(ctx).Found }
 func (Agent) HooksPath() string                  { return "" }
 func (Agent) Default(string) bool                { return false }
@@ -23,11 +22,9 @@ func (Agent) Plan(string, bool) (hookmgr.Plan, error) {
 }
 
 func (Agent) Events() map[string]agents.Handler {
-	return map[string]agents.Handler{
-		"opencode-session-start": sessionStart,
-		"opencode-session-end":   sessionEnd,
-		"opencode-file-edit":     fileEdit,
-	}
+	events := hookrun.Extension{Tool: "opencode", Source: "session.created"}.Events("opencode")
+	delete(events, "opencode-prompt") // the plugin calls no prompt hook
+	return events
 }
 
 func (Agent) FlushAfter() []string { return []string{"opencode-session-end"} }

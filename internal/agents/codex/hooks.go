@@ -1,7 +1,6 @@
 package codex
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -167,13 +166,11 @@ func codexEntryHash(entry Entry, matcher *string, raw json.RawMessage) (string, 
 	if matcher != nil {
 		identity["matcher"] = *matcher
 	}
-	var buf bytes.Buffer
-	encoder := json.NewEncoder(&buf)
-	encoder.SetEscapeHTML(false)
-	if err := encoder.Encode(identity); err != nil {
+	b, err := hookmgr.MarshalJSON(identity, "", "")
+	if err != nil {
 		return "", err
 	}
-	sum := sha256.Sum256(bytes.TrimSuffix(buf.Bytes(), []byte{'\n'}))
+	sum := sha256.Sum256(b)
 	return fmt.Sprintf("sha256:%x", sum), nil
 }
 

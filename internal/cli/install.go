@@ -175,7 +175,7 @@ func (app *App) runInstall(cmd *cobra.Command, f installFlags) error {
 
 	// Every real install reads the team's policy, even hooks-only; only an offline policy
 	// fixture skips that login. A --dry-run never signs in.
-	needsAuth := cfg.APIKey == "" && (os.Getenv("TERMA_POLICY_STUB") == "" || app.installNeedsAuth(agents, f.projectRef, existing, !f.noHooks))
+	needsAuth := cfg.APIKey == "" && (config.PolicyStub() == "" || app.installNeedsAuth(agents, f.projectRef, existing, !f.noHooks))
 	if needsAuth && !f.dryRun {
 		if cfg, err = app.signInAndReload(cmd, cfg, signInOptions{noBrowser: f.noBrowser}); err != nil {
 			return err

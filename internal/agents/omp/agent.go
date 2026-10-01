@@ -13,10 +13,11 @@ import (
 
 // Agent is Omp: attribution through a committed hook file, telemetry through a
 // user-scope extension.
-type Agent struct{ relayexport.Own }
+type Agent struct {
+	relayexport.Own
+	exporter
+}
 
-func (Agent) Name() string                       { return "omp" }
-func (Agent) DisplayName() string                { return "Omp" }
 func (Agent) Installed(ctx context.Context) bool { return exporter{}.Detect(ctx).Found }
 func (Agent) HooksPath() string                  { return hooksPath }
 func (Agent) Default(root string) bool           { return hasConfig(root) }
@@ -26,12 +27,7 @@ func (Agent) Plan(root string, install bool) (hookmgr.Plan, error) {
 }
 
 func (Agent) Events() map[string]agents.Handler {
-	return map[string]agents.Handler{
-		"omp-session-start": sessionStart,
-		"omp-session-end":   sessionEnd,
-		"omp-file-edit":     fileEdit,
-		"omp-prompt":        hookrun.TurnStart,
-	}
+	return hookrun.Extension{Tool: "omp"}.Events("omp")
 }
 
 func (Agent) FlushAfter() []string { return []string{"omp-session-end"} }

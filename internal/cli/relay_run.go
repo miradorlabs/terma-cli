@@ -77,13 +77,13 @@ func (app *App) relayRunConfig() (*config.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	if cfg.OrganizationID == "" && os.Getenv("TERMA_POLICY_STUB") == "" {
+	if cfg.OrganizationID == "" && config.PolicyStub() == "" {
 		if cred, err := auth.LoadCredential(cfg.ProfileName); err == nil && cred.CheckEnvironment(cfg.AuthURL) == nil {
 			cfg.OrganizationID = cred.OrganizationID
 		}
 	}
-	if cfg.Policy.FetchedAt.IsZero() || cfg.Policy.TeamID == "" && os.Getenv("TERMA_POLICY_STUB") == "" {
-		cfg.Policy = config.Policy{Mode: config.ModeRepo, Signals: []string{}, OrganizationID: cfg.OrganizationID, AuthURL: cfg.AuthURL}
+	if !cfg.Policy.Validated() {
+		cfg.Policy = config.NoPolicy(cfg.OrganizationID, cfg.AuthURL)
 	}
 	return cfg, nil
 }

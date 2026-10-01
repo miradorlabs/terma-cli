@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 )
 
 // A save keeps the shell operators hookmgr writes unescaped, so a connect never churns a committed file.
@@ -41,7 +43,7 @@ func TestSaveLeavesShellOperatorsReadable(t *testing.T) {
 
 // The pre-encoded status line entry stays unescaped too.
 func TestStatusLineCommandIsWrittenUnescaped(t *testing.T) {
-	encoded, err := marshalJSON(statusLineCommand("my-line --flag"), "")
+	encoded, err := hookmgr.MarshalJSON(statusLineCommand("my-line --flag"), "", "")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -12,6 +12,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/harness"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 )
 
 const envKey = "env"
@@ -29,19 +30,6 @@ type settingsFile struct {
 	symlinked bool
 	// mode is kept, so a file tighter than 0600 is not loosened.
 	mode fs.FileMode
-}
-
-// marshalJSON encodes without HTML escaping (an empty indent compacts): hook commands carry `>` and
-// `&&`, and hookmgr writes the same file unescaped, so the two must not take turns re-encoding it.
-func marshalJSON(v any, indent string) ([]byte, error) {
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetEscapeHTML(false)
-	enc.SetIndent("", indent)
-	if err := enc.Encode(v); err != nil {
-		return nil, err
-	}
-	return bytes.TrimRight(buf.Bytes(), "\n"), nil
 }
 
 func loadSettings(path string) (*settingsFile, error) {
@@ -114,7 +102,7 @@ func (s *settingsFile) save(tighten bool) error {
 	if len(s.env) == 0 {
 		delete(s.root, envKey)
 	} else {
-		encoded, err := marshalJSON(s.env, "")
+		encoded, err := hookmgr.MarshalJSON(s.env, "", "")
 		if err != nil {
 			return fmt.Errorf("encode %q: %w", envKey, err)
 		}
@@ -132,7 +120,7 @@ func (s *settingsFile) save(tighten bool) error {
 		return nil
 	}
 
-	data, err := marshalJSON(s.root, "  ")
+	data, err := hookmgr.MarshalJSON(s.root, "", "  ")
 	if err != nil {
 		return fmt.Errorf("encode %s: %w", s.writePath, err)
 	}

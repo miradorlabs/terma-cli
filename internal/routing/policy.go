@@ -75,5 +75,5 @@ func EffectivePolicy(fallback config.Policy, team string) config.Policy {
 	if err == nil && !ok && (fallback.TeamID == "" || fallback.TeamID == team) {
 		return fallback
 	}
-	return config.Policy{Mode: config.ModeRepo, Signals: []string{}}
+	return config.NoPolicy("", "")
 }
