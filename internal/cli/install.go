@@ -56,11 +56,10 @@ func (app *App) newInstallCommand() *cobra.Command {
 not run ` + "`terma setup`" + `, asks which agents you use if you have not chosen, then:
 
   1. Binds the repository to a Terma team and records it in .terma/settings.json —
-     committed, no secrets. An organization with one team is bound to it without
-     asking. With several, on a terminal you choose the team every time, the one
-     already bound offered first (Enter keeps it); --team names it instead, and
-     without a terminal, or with --yes, an existing binding is kept. A binding to a
-     team your account cannot see is not used: install says why and chooses again.
+     committed, no secrets. A repository already bound keeps its team; otherwise it
+     takes the team you chose at setup, or the only one your organization has, and
+     asks only when neither decides. --team names another. A binding to a team your
+     account cannot see is not used: install says why and chooses again.
   2. Points each of your agents at that team, through the local relay: their own
      exporters (or terma's plugin, for an agent without a usable one) send to a relay
      on this machine, and the relay forwards only the sessions this repository's hooks

@@ -87,16 +87,18 @@ func (app *App) resolveBinding(cmd *cobra.Command, cfg *config.Config, existing 
 		reason := unreachableBinding(existing, cfg)
 		fmt.Fprintf(cmd.ErrOrStderr(), "%s%s.\n", strings.ToUpper(reason[:1]), reason[1:])
 		current = ""
-	case bound && !ask:
+	case bound:
 		return install.Kept(existing), nil
 	}
-
+	// The team chosen at setup binds the repository without asking again.
+	if selected := cmp.Or(cfg.Policy.TeamID, cfg.Policy.DefaultProjectID); selected != "" {
+		if i := slices.IndexFunc(projects, func(p project) bool { return p.ID == selected }); i >= 0 {
+			return boundTo(&projects[i], cfg), nil
+		}
+	}
 	p, err := soleOrPick(cmd, projects, current)
 	if err != nil {
 		return install.Binding{}, err
-	}
-	if bound && p.ID == current {
-		return install.Kept(existing), nil
 	}
 	return boundTo(p, cfg), nil
 }

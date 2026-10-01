@@ -41,11 +41,12 @@ terma install     # run inside each repository
 terma doctor      # verify the chain end to end
 ```
 
-`terma install` binds the repository to a team: the only one, when your
-organization has one; otherwise it asks, offering the one in an existing
-`.terma/settings.json` first (Enter keeps it), or takes `--team <name-or-id>`. A bound team your account cannot see is never used:
-install says why and lets you choose another. Use `--yes` for non-interactive setup
-(it keeps an existing binding), or `--harness none` when you only want commit hooks.
+`terma install` binds the repository to a team without asking: the one in an existing
+`.terma/settings.json`, else the team you chose at `terma setup`, else your
+organization's only team. It asks only when none of these decides; `--team <name-or-id>`
+names another. A bound team your account cannot see is never used: install says why and
+lets you choose another. Use `--yes` for non-interactive setup, or `--harness none` when
+you only want commit hooks.
 It shows the team, prompt-capture setting, warnings, and what is left for you
 to do; `-v` / `--verbose` also shows setup steps and every file and setting it wrote. The committed settings
 file contains a team reference, never a secret.

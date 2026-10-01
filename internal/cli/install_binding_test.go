@@ -332,3 +332,32 @@ func TestInstallToolContentChoiceSticks(t *testing.T) {
 		}
 	}
 }
+
+// An unbound repository takes the team chosen at setup without asking for one.
+func TestInstallBindsTheTeamChosenAtSetup(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
+	t.Setenv("CODEX_HOME", "")
+	t.Setenv("PATH", "/usr/bin:/bin")
+	gitRepoHere(t)
+	if _, err := auth.SaveCredential(config.DefaultProfile, storedSession(f, orgA())); err != nil {
+		t.Fatal(err)
+	}
+	chosen := projectsIn(orgA().ID)[1] // not the first, so nothing else picks it
+	if err := config.UpdateProfile(config.DefaultProfile, func(p *config.Profile) {
+		p.OrganizationID = orgA().ID
+		p.Policy = &config.Policy{Mode: config.ModeRepo, TeamID: chosen.ID, OrganizationID: orgA().ID, AuthURL: os.Getenv("TERMA_AUTH_URL"), IncludePrompts: true, FetchedAt: time.Now()}
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// No terminal: a prompt would fail the install.
+	if out, err := routeCodex(t); err != nil {
+		t.Fatalf("install asked for a team, or failed: %v\n%s", err, out)
+	}
+	if got := bindingNow(t); got.ID != chosen.ID {
+		t.Fatalf("binding = %+v, want setup's team %s", got, chosen.Name)
+	}
+}
