@@ -147,9 +147,6 @@ func (app *App) runInstall(cmd *cobra.Command, f installFlags) error {
 	if err != nil {
 		return err
 	}
-	if err := install.CheckSignalNeeds(app.agents, agents, f.signals); err != nil {
-		return err
-	}
 	// Flags that disagree are refused before anything signs in or prints.
 	prompts, toolContent, err := contentChoices(cmd, f)
 	if err != nil {

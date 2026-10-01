@@ -6,6 +6,10 @@ LDFLAGS := -s -w -X main.version=$(VERSION)
 # install` and `terma setup` sign in, so a test or a script that reaches them would
 # otherwise open a browser login on production. Override with `TERMA_ENV=… make test`.
 export TERMA_ENV ?= dev
+# Tests run git; a developer's own global git config (global mode's hooks path among it)
+# must not reach them.
+export GIT_CONFIG_GLOBAL = /dev/null
+export GIT_CONFIG_NOSYSTEM = 1
 
 # golangci-lint is pinned in one file, which CI's action reads too, and built from source
 # with this machine's Go. A released binary refuses a module whose `go` directive is newer

@@ -119,7 +119,7 @@ func codexDesktopRoute(r *hookrun.Repo) (hookrun.Route, bool) {
 		return hookrun.Route{}, false
 	}
 	rec, ok, err := r.Route()
-	return rec, err == nil && ok && slices.Contains(rec.Surfaces, desktop) &&
+	return rec, err == nil && ok && slices.Contains(rec.Surfaces, name) &&
 		slices.Contains(rec.Harnesses, name) && slices.Contains(rec.Signals, "logs")
 }
 

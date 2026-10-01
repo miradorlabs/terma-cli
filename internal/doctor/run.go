@@ -277,7 +277,7 @@ func (d *run) agentsExporting() Check {
 	if claim.Enabled() {
 		return RelayCheck(d.env.Agents, d.env.Probes.Relay(), d.env.Probes.Keys, d.projectID, d.cfg.Harnesses)
 	}
-	verdicts := JudgeSelectedHarnesses(d.ctx, d.env.Agents, d.env.Probes.Keys, d.cfg.OTLPURL, d.projectID, d.env.Root, d.cfg.Harnesses)
+	verdicts := JudgeHarnesses(d.ctx, d.env.Agents, d.cfg.OTLPURL, d.projectID, d.env.Root)
 	return HarnessCheck(d.env.Agents, verdicts, d.cfg.OTLPURL, d.projectID, d.installed())
 }
 

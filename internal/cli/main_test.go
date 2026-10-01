@@ -94,8 +94,6 @@ func claudeHarness(t *testing.T) struct {
 	}{harnessOf(t, "claude"), line}
 }
 
-const codexDesktopAgent = "codex-desktop"
-
 // local is h bound to the repository at root, which it must support.
 func local(t *testing.T, h harness.Harness, root string) harness.Harness {
 	t.Helper()

@@ -28,10 +28,10 @@ Bare repositories are rejected because they have no working directory.
 
 Restart running agents after installation so they load the new configuration.
 
-Codex desktop uses a separate backend from the `codex` shell command. Select
-**Codex Desktop** in `terma setup` (or use `--harness codex-desktop` with
-`terma install`). Install then configures repository hooks and a local team
-route. Trust the hooks in the app and check `terma agent status codex-desktop` from that repository.
+Each agent is one choice for its CLI and its desktop app, which share the agent's
+user-level settings: **Claude Code & Desktop** and **Codex TUI & Desktop**. Codex runs
+Terma's hooks once you approve them with `/hooks` (in the desktop app: Settings → Hooks →
+Review).
 
 Then verify the installation:
 

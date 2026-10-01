@@ -102,7 +102,7 @@ func repliesConsented(c hookrun.Consent) bool {
 		}
 		return recorded && rec.IncludePrompts && slices.Contains(rec.Harnesses, name) && slices.Contains(rec.Signals, "logs")
 	}
-	if slices.Contains(rec.Surfaces, desktop) {
+	if slices.Contains(rec.Surfaces, name) {
 		return recorded && slices.Contains(rec.Harnesses, name) &&
 			slices.Contains(rec.Signals, "logs") && rec.IncludePrompts
 	}

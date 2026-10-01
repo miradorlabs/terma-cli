@@ -15,30 +15,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 )
 
-func TestSetupRecordsCodexDesktopSeparatelyFromCLI(t *testing.T) {
-	gateway := newFakeAuth(t)
-	authSandbox(t, gateway)
-	sandboxMachine(t) // setup points the agents' own configuration at the relay
-	t.Setenv("CODEX_HOME", t.TempDir())
-	if _, err := auth.SaveCredential(config.DefaultProfile, storedSession(gateway, orgA())); err != nil {
-		t.Fatal(err)
-	}
-	out, err := runTerma(t, "setup", "--harness", "codex-desktop")
-	if err != nil {
-		t.Fatalf("setup: %v\n%s", err, out)
-	}
-	cfg, err := testApp.loadConfig()
-	if err != nil || !slices.Equal(cfg.Harnesses, []string{codexDesktopAgent}) {
-		t.Fatalf("saved agent choices = %v, %v", cfg.Harnesses, err)
-	}
-	if !strings.Contains(out, "Codex Desktop") || strings.Contains(out, "Agents recorded: Codex.") {
-		t.Fatalf("setup did not name the separate desktop choice:\n%s", out)
-	}
-	if !strings.Contains(out, "in a connected repository, open Settings → Hooks → Review") {
-		t.Fatalf("setup did not explain Desktop hook approval:\n%s", out)
-	}
-}
-
 // setup records the collection policy and points the agents at the relay, no repository involved.
 func TestSetupFetchesThePolicyAndPointsAgentsAtTheRelay(t *testing.T) {
 	gateway := newFakeAuth(t)
@@ -83,18 +59,14 @@ func TestHarnessSelectionComingSoon(t *testing.T) {
 		chosen[name] = true
 	}
 	form := testApp.harnessSelectionForm(context.Background(), chosen)
-	wantOrder := []string{"claude", "codex", codexDesktopAgent, "cursor", "opencode", "omp", "pi", "hermes", "gemini", "dsh", "antigravity", "GitHub Copilot"}
+	wantOrder := []string{"claude", "codex", "cursor", "opencode", "omp", "pi", "hermes", "gemini", "dsh", "antigravity", "GitHub Copilot"}
 	if len(form.Items) != len(wantOrder) {
 		t.Fatalf("picker has %d items, want %d", len(form.Items), len(wantOrder))
 	}
 	for i, name := range wantOrder {
 		display := name
-		if name == codexDesktopAgent {
-			display = "Codex Desktop"
-		} else if name == "codex" {
-			display = "Codex CLI"
-		} else if a, ok := testApp.agents.Lookup(name); ok {
-			display = a.DisplayName()
+		if s, _, ok := testApp.agents.Surface(name); ok {
+			display = s.DisplayName
 		}
 		if form.Items[i].Label != display {
 			t.Errorf("picker row %d = %q, want %q", i, form.Items[i].Label, display)
@@ -128,10 +100,6 @@ func TestHarnessSelectionFlags(t *testing.T) {
 	if err != nil || !slices.Equal(got, []string{"claude", "codex"}) {
 		t.Fatalf("available selection = %v, %v", got, err)
 	}
-	got, err = testApp.parseAgentList("codex-desktop,codex,claude,codex-desktop")
-	if err != nil || !slices.Equal(got, []string{"claude", "codex", codexDesktopAgent}) {
-		t.Fatalf("independent desktop selection = %v, %v", got, err)
-	}
 }
 
 func TestHarnessSelectionFiltersSavedAgents(t *testing.T) {
@@ -143,18 +111,15 @@ func TestHarnessSelectionFiltersSavedAgents(t *testing.T) {
 		if slices.Contains(saved, "claude") {
 			wantInstalled = []string{"claude", "codex"}
 		}
-		wantSetup := slices.Clone(wantInstalled)
-		if desktop, _, _ := testApp.agents.Surface(codexDesktopAgent); desktop.Installed(context.Background()) {
-			// The desktop surface sorts right after the CLI in the picker.
-			if i := slices.Index(wantSetup, "codex"); i >= 0 {
-				wantSetup = slices.Insert(wantSetup, i+1, codexDesktopAgent)
-			} else {
-				wantSetup = append(wantSetup, codexDesktopAgent)
-			}
-			if len(wantInstalled) == 0 {
-				wantInstalled = append(wantInstalled, codexDesktopAgent)
+		if len(wantInstalled) == 0 {
+			// With no CLI on PATH, an installed desktop app still counts.
+			for _, n := range []string{"claude", "codex"} {
+				if s, _, _ := testApp.agents.Surface(n); s.Installed(context.Background()) {
+					wantInstalled = append(wantInstalled, n)
+				}
 			}
 		}
+		wantSetup := slices.Clone(wantInstalled)
 		got, err := testApp.chooseHarnesses(cmd, cfg, setupFlags{assumeYes: true})
 		if err != nil || !slices.Equal(got, wantSetup) {
 			t.Fatalf("setup selection = %v, %v; want %v", got, err, wantSetup)

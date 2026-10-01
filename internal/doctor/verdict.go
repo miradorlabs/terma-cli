@@ -267,24 +267,6 @@ func JudgeHarnesses(ctx context.Context, reg *agents.Registry, otlpURL, projectI
 	return out
 }
 
-// JudgeSelectedHarnesses judges a selected surface by its own check, so a desktop-only
-// choice is never reported as a missing CLI.
-func JudgeSelectedHarnesses(ctx context.Context, reg *agents.Registry, keys Keys, otlpURL, projectID, root string, saved []string) []HarnessVerdict {
-	selected := SelectedForRepo(reg, projectID, saved)
-	verdicts := JudgeHarnesses(ctx, reg, otlpURL, projectID, root)
-	var checked []HarnessVerdict
-	for _, name := range selected {
-		if v, ok := JudgeSurface(reg, keys, name, root, projectID); ok {
-			checked = append(checked, v)
-		}
-	}
-	if len(checked) == 0 {
-		return verdicts
-	}
-	verdicts = slices.DeleteFunc(verdicts, func(v HarnessVerdict) bool { return !slices.Contains(selected, v.Name) })
-	return append(verdicts, checked...)
-}
-
 // SelectedForRepo is the saved selection narrowed to the surfaces this repository's
 // routing record routes here; a record naming none leaves it alone.
 func SelectedForRepo(reg *agents.Registry, projectID string, saved []string) []string {
@@ -307,33 +289,6 @@ func SelectedForRepo(reg *agents.Registry, projectID string, saved []string) []s
 		}
 	}
 	return selected
-}
-
-// SurfaceInput is what a surface's own check reads: the project's routing record and
-// whether a delivery key is stored, the agent's own or the project's.
-func SurfaceInput(keys Keys, root, projectID string) agents.SurfaceInput {
-	in := agents.SurfaceInput{Root: root, ProjectID: projectID, Keyed: func(agent string) bool { return keys.has(agent, projectID) }}
-	in.Route, in.Recorded, in.RouteErr = routing.LoadRecord(projectID)
-	return in
-}
-
-// JudgeSurface is the verdict of a surface with a check of its own.
-func JudgeSurface(reg *agents.Registry, keys Keys, surface, root, projectID string) (HarnessVerdict, bool) {
-	st, ok, err := reg.CheckSurface(surface, SurfaceInput(keys, root, projectID))
-	if !ok {
-		return HarnessVerdict{}, false
-	}
-	s, _, _ := reg.Surface(surface)
-	v := HarnessVerdict{Name: surface, DisplayName: s.DisplayName}
-	switch {
-	case err != nil:
-		v.EmissionProblem, v.EmissionFix = "could not check "+s.DisplayName+": "+err.Error(), "terma install"
-	case !st.Ready:
-		v.EmissionProblem, v.EmissionFix = st.Problem, st.Fix
-	default:
-		v.Route = RouteHooks
-	}
-	return v, true
 }
 
 // RepoAsks reports whether the repository at root carries a committed policy that switches

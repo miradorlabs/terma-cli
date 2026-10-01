@@ -89,14 +89,11 @@ func Build(reg *agents.Registry, in Input) (Plan, error) {
 	}
 	// The wired adapters are a team decision: a colleague's re-install keeps them all.
 	p.Adapters = Adapters(reg, in.Root, in.Selected, in.Adapters)
-	if err := CheckHookNeeds(reg, in.Selected, p.Adapters); err != nil {
-		return Plan{}, err
-	}
 	if in.GitDir != "" {
 		p.Detection = hookmgr.Detect(in.Root)
 	}
 	if in.NoHooks {
-		return p, CheckHooksApplied(reg, in.Root, in.Selected, "run `terma install` without --no-hooks")
+		return p, nil
 	}
 	var err error
 	p.Hooks, err = PlanHooks(reg, in.Root, p.Detection, p.Adapters)
@@ -231,10 +228,6 @@ func Apply(ctx context.Context, p Plan, o Options, s Steps, r Reporter) error {
 	} else {
 		adapters = reg.WiredNames(p.Root)
 	}
-	if err := CheckHooksApplied(reg, p.Root, p.Selected, "run `terma install` without --no-hooks and accept the hook plan"); err != nil {
-		return err
-	}
-
 	// Without a spool key every hook event waits in the spool.
 	if s.SpoolKey != nil && (installedHooks || len(reg.WiredNames(p.Root)) > 0) {
 		if state, fix := s.SpoolKey(ctx); fix == "" {
@@ -269,13 +262,6 @@ func Apply(ctx context.Context, p Plan, o Options, s Steps, r Reporter) error {
 	for _, s := range SelectedSurfaces(reg, p.Selected) {
 		for _, step := range s.InstallSteps {
 			r.Then(step)
-		}
-		if s.Warn == nil {
-			continue
-		}
-		if warning := s.Warn(); warning != "" {
-			_, a, _ := reg.Surface(s.Name)
-			r.Warn(a.DisplayName(), warning)
 		}
 	}
 	if p.GitDir != "" && len(written) > 0 {

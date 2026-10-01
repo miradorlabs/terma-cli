@@ -20,7 +20,6 @@
 // Surfaces (surfaces.go)
 //
 //	Surfaced        more than one way to run the agent, chosen apart (a CLI, a desktop app)
-//	SurfaceChecker  a surface's own readiness check in a repository
 //
 // Telemetry (telemetry.go)
 //

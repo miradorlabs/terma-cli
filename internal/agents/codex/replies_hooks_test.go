@@ -82,7 +82,7 @@ func connectCodexDesktop(t *testing.T, includePrompts bool) {
 	t.Helper()
 	if err := routing.SaveRecord(routing.Record{ProjectID: "project-a", Endpoint: "https://otel.terma.ai",
 		Signals: []string{"logs"}, Harnesses: []string{name},
-		IncludePrompts: includePrompts, Surfaces: []string{desktop}}); err != nil {
+		IncludePrompts: includePrompts, Surfaces: []string{name}}); err != nil {
 		t.Fatal(err)
 	}
 }

@@ -29,7 +29,7 @@ func (Agent) Name() string { return name }
 // DisplayName is how prose names the agent.
 func (Agent) DisplayName() string { return displayName }
 
-const codexHookReview = "open this repository in Codex Desktop, then go to Settings → Hooks → Review and approve the Terma entries (or run /hooks in Codex CLI)"
+const codexHookReview = "approve Terma's hooks in Codex: run /hooks in this repository (in the desktop app: Settings → Hooks → Review)"
 
 func (Agent) Installed(ctx context.Context) bool { return exporter{}.Detect(ctx).Found }
 func (Agent) HooksPath() string                  { return hooksPath }
@@ -97,7 +97,7 @@ func (c Agent) Trust(root string) (agents.TrustState, error) {
 	case trust.Disabled > 0:
 		return agents.TrustState{
 			Detail: fmt.Sprintf(", but %d is switched off in Codex", trust.Disabled),
-			Fix:    "open this repository in Codex Desktop and re-enable Terma's hooks in Settings → Hooks (or use /hooks in Codex CLI)",
+			Fix:    "re-enable Terma's hooks in Codex: run /hooks in this repository (in the desktop app: Settings → Hooks)",
 		}, nil
 	}
 	// A file trusted before terma added an entry still counts as trusted while Codex skips the
@@ -176,7 +176,6 @@ var (
 	_ agents.Notifier       = Agent{}
 	_ agents.UserHooksTrust = Agent{}
 	_ agents.Covered        = Agent{}
-	_ agents.SurfaceChecker = Agent{}
 	_ agents.Retrusting     = Agent{}
 	_ agents.ContentConsent = Agent{}
 	_ agents.OffSwitched    = Agent{}

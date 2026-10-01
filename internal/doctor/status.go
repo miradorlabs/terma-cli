@@ -121,7 +121,7 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 		}
 	} else {
 		var connected []string
-		verdicts := JudgeSelectedHarnesses(ctx, reg, p.Keys, cfg.OTLPURL, projectID, root, cfg.Harnesses)
+		verdicts := JudgeHarnesses(ctx, reg, cfg.OTLPURL, projectID, root)
 		for _, v := range verdicts {
 			suffix, ok := AgentSummary(v, repoBound)
 			if ok {

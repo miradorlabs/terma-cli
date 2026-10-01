@@ -24,7 +24,7 @@ func TestDoctorReportsCodexHooksAwaitingTrust(t *testing.T) {
 	if !strings.Contains(out, "has not been shown them") {
 		t.Fatalf("doctor should say Codex has not been shown the hooks:\n%s", out)
 	}
-	if !strings.Contains(out, "Settings → Hooks → Review") || !strings.Contains(out, "/hooks in Codex CLI") {
+	if !strings.Contains(out, "Settings → Hooks → Review") || !strings.Contains(out, "run /hooks in this repository") {
 		t.Fatalf("doctor should explain trust for both Desktop-only and CLI users:\n%s", out)
 	}
 	// A warning about one agent, not a verdict on the repository: the other agent's hooks run.

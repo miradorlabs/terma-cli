@@ -131,7 +131,7 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 				ui.Warn("Agents", "none chosen")
 				ui.Then("Run `terma install` in a repository; it asks which agents to connect.")
 			} else {
-				ui.Summary("Agents", joinNames(app.adapterDisplayNames(names)))
+				ui.Summary("Agents", strings.Join(app.adapterDisplayNames(names), ", "))
 			}
 		},
 		SelectTeam: func(_ context.Context, cfg *config.Config) error {

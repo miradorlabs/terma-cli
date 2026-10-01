@@ -25,6 +25,7 @@ func globalSandbox(t *testing.T) (codexHome string) {
 	codexHome = t.TempDir()
 	t.Setenv("CODEX_HOME", codexHome)
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(t.TempDir(), "gitconfig")) // global mode writes it
 	prev := testApp.hookExecutable
 	testApp.hookExecutable = func() (string, error) { return bin, nil }
 	t.Cleanup(func() { testApp.hookExecutable = prev })

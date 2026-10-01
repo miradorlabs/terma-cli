@@ -1,7 +1,6 @@
 package install
 
 import (
-	"fmt"
 	"slices"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
@@ -29,54 +28,6 @@ func SelectedSurfaces(reg *agents.Registry, selected []string) []agents.Surface 
 		}
 	}
 	return out
-}
-
-// CheckSignalNeeds refuses signals a selected surface cannot report without.
-func CheckSignalNeeds(reg *agents.Registry, selected []string, rawSignals string) error {
-	for _, s := range SelectedSurfaces(reg, selected) {
-		if len(s.Needs.Signals) == 0 {
-			continue
-		}
-		signals, err := harness.ParseSignals(rawSignals)
-		if err != nil {
-			return err
-		}
-		for _, want := range s.Needs.Signals {
-			if !slices.Contains(signals, harness.Signal(want)) {
-				return fmt.Errorf("%s needs the %s signal to route sessions by repository", s.DisplayName, want)
-			}
-		}
-	}
-	return nil
-}
-
-// CheckHookNeeds refuses adapters without the committed hooks a selected surface needs.
-func CheckHookNeeds(reg *agents.Registry, selected, adapters []string) error {
-	for _, s := range SelectedSurfaces(reg, selected) {
-		if _, a, _ := reg.Surface(s.Name); s.Needs.Hooks && !slices.Contains(adapters, a.Name()) {
-			return fmt.Errorf("%s needs the %s repository hooks; include %s in --adapters", s.DisplayName, a.DisplayName(), a.Name())
-		}
-	}
-	return nil
-}
-
-// CheckHooksApplied refuses an install that leaves out committed hooks a selected surface
-// needs: its agent's plan must have nothing left to write.
-func CheckHooksApplied(reg *agents.Registry, root string, selected []string, hint string) error {
-	for _, s := range SelectedSurfaces(reg, selected) {
-		if !s.Needs.Hooks {
-			continue
-		}
-		_, a, _ := reg.Surface(s.Name)
-		plan, err := a.Plan(root, true)
-		if err != nil {
-			return err
-		}
-		if !plan.Empty() {
-			return fmt.Errorf("%s needs its %s repository hooks; %s", s.DisplayName, a.DisplayName(), hint)
-		}
-	}
-	return nil
 }
 
 // Adapters lists the agents whose committed hooks to wire: override when given, else the
