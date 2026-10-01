@@ -92,8 +92,7 @@ func TestDoctorRecognizesOfficialNpmLauncher(t *testing.T) {
 	}
 }
 
-// Only a different build is reported, not the same build, a link, a non-executable or the
-// shim directory.
+// Only a different build is reported, not the same build, a link or a non-executable.
 func TestOtherTermasReportsOnlyADifferentBuild(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	primary := writeTerma(t, t.TempDir(), "build A")

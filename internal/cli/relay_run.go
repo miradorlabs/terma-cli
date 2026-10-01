@@ -59,7 +59,7 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 			return nil
 		},
 	}
-	// Long, because an agent may export before its first hook (docs/RELAY.md).
+	// Long, because an agent may export before its first hook.
 	cmd.Flags().DurationVar(&idle, "idle", 8*time.Hour, "exit after this long with no export and nothing held or queued (0: never)")
 	cmd.Flags().StringVar(&addr, "addr", "", "listen here instead of the address `terma relay setup` recorded")
 	cmd.Flags().BoolVar(&quiet, "quiet", false, "print nothing")

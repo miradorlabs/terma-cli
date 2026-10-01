@@ -23,7 +23,7 @@ repository. The agent hook files
 themselves record which adapters are wired. Install also writes per-developer
 keys, collection policies, and routing configuration under the user's configuration
 directory, updates the selected agents' user settings or extensions, and can install a
-per-user relay service. It no longer installs PATH shims or edits shell startup files.
+per-user relay service. It edits no shell startup file.
 The paths below use the default configuration directory; `XDG_CONFIG_HOME` and
 `TERMA_CONFIG_DIR` can change it.
 
@@ -151,11 +151,10 @@ agent's first hook. The relay also sends organization-level health heartbeats us
 the developer login: a random machine id, versions, settings, delivery and loss counts,
 and queue sizes, without conversation content. Failed heartbeats are not queued.
 
-Advanced `terma connect` can still configure an exporter to send directly upstream.
+Advanced `terma connect` can configure an exporter to send directly upstream.
 Relay claims and redaction protect only traffic sent through the relay; a direct
-exporter follows its agent's own capture settings. Current relay installation does
-not inject project keys into Codex launch arguments. Earlier PATH shims are removed
-by `terma update --refresh` or `terma shim uninstall`.
+exporter follows its agent's own capture settings. Relay installation passes no project
+key in Codex launch arguments.
 
 ## Content stored on the machine
 

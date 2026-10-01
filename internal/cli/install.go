@@ -314,7 +314,7 @@ func (app *App) resolveInstallHarnesses(cmd *cobra.Command, cfg *config.Config, 
 }
 
 // connectHarnessesForRepo writes no committed file: keys, the routing record and the
-// relay are home-directory state (docs/RELAY.md).
+// relay are home-directory state.
 func (app *App) connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *config.Config, agents []string, f installFlags, plan install.Plan) error {
 	ctx := cmd.Context()
 	signals, err := harness.ParseSignals(f.signals)

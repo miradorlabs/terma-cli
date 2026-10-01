@@ -36,7 +36,7 @@ func TestCompatHistory(t *testing.T) {
 		{Harness: "codex", Version: "0.158.0", Capability: "relay.telemetry", Result: "fail", Platform: "linux/arm64", At: day1},
 		{Harness: "codex", Version: "0.158.0", Capability: "relay.daemon", Result: "pass", Platform: "linux/arm64", At: day1},
 	})
-	if err := run([]string{r1}, hist, filepath.Join(dir, "none.json"), md, web, day1); err != nil {
+	if err := run([]string{r1}, hist, md, web, day1); err != nil {
 		t.Fatal(err)
 	}
 	r2 := writeRun(t, dir, "r2.json", []live.CompatRow{
@@ -44,7 +44,7 @@ func TestCompatHistory(t *testing.T) {
 		{Harness: "codex", Version: "0.158.0", Capability: "relay.daemon", Result: "not run", Platform: "linux/arm64", At: day2},
 		{Harness: "codex", Version: "0.158.0", Capability: "relay.telemetry", Result: "pass", Platform: "darwin/arm64", At: day2},
 	})
-	if err := run([]string{r2}, hist, filepath.Join(dir, "none.json"), md, web, day2); err != nil {
+	if err := run([]string{r2}, hist, md, web, day2); err != nil {
 		t.Fatal(err)
 	}
 	var entries []Entry

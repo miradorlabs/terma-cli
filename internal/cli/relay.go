@@ -4,7 +4,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// The local relay (docs/RELAY.md) forwards only what hooks in opted-in repositories
+// The local relay forwards only what hooks in opted-in repositories
 // claimed; its commands are hidden because install and setup run them.
 
 func (app *App) newRelayCommand() *cobra.Command {

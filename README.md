@@ -14,7 +14,7 @@ Terma has two onboarding commands with different owners:
 
 | Command | Run it | What it does |
 |---|---|---|
-| `terma setup` | Once per developer (optional) | Signs you in and records which coding agents you use. It does not bind a project or write repository files. |
+| `terma setup` | Once per developer (optional) | Signs you in, records which coding agents you use, fetches your organization's collection policy, and points those agents at the local relay. It writes no repository files. |
 | `terma install` | Once per repository | Binds the repository to a Terma project, configures per-repository agent routing, and offers to install commit and agent hooks. |
 
 Repository telemetry is enabled by `terma install`; no extra telemetry flag is needed.
@@ -26,7 +26,6 @@ If you later run `git init` in that same folder, rerun `terma install` to add Gi
 hooks; existing sessions and tracked edits carry on without losing attribution.
 Bare repositories are rejected because they have no working directory.
 
-Run `make test-install-e2e` for the isolated install/uninstall subprocess suite.
 Restart running agents after installation so they load the new configuration.
 
 Codex desktop uses a separate backend from the `codex` shell command. Select
@@ -123,10 +122,9 @@ waits briefly in memory and is dropped: it never leaves your machine. Prompts an
 responses are sent by default; `terma install --prompts off` stops them for a project,
 and the relay removes them before anything leaves.
 
-Hooks start the relay when it is not running. `terma relay daemon install` runs it as a
-per-user service instead, so it is up before any agent starts; `terma relay status` shows
-what it has done. [RELAY.md](docs/RELAY.md) records how it was tested and what it
-withstood.
+`terma setup` and `terma install` run the relay as a per-user background service, so it
+is up before any agent starts; with `--relay-service off`, hooks start it on demand.
+`terma relay status` shows whether it runs and what it has forwarded, dropped and queued.
 
 ## What gets collected
 
@@ -221,7 +219,6 @@ else names an agent, and `internal/boundary` tests that this holds.
 ## Documentation
 
 - [Security](SECURITY.md) — login flow, privacy boundaries, and threat model
-- [Local relay](docs/RELAY.md) — what was run against the real agents, and what it withstood
 - [Agent-facing CLI guide](https://terma.ai/cli/llms.txt)
 
 ## License

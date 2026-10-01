@@ -52,7 +52,7 @@ func TestShellRCNamesTheFileTheShellReads(t *testing.T) {
 	if rc, ok := ShellRC(); !ok || rc.Path != filepath.Join(home, ".config", "fish", "conf.d", "terma.fish") {
 		t.Fatalf("fish: %+v %v", rc, ok)
 	}
-	if line := (RC{Shell: "fish"}).PathLine(filepath.Join(home, ".config/terma/shim/bin")); line != `fish_add_path --move --prepend "$HOME/.config/terma/shim/bin"` {
+	if line := (RC{Shell: "fish"}).PathLine(filepath.Join(home, ".local/bin")); line != `fish_add_path --move --prepend "$HOME/.local/bin"` {
 		t.Fatalf("fish line: %s", line)
 	}
 

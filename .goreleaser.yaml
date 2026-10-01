@@ -77,7 +77,7 @@ homebrew_casks:
   - name: terma
     ids: [terma]
     binaries: [terma]
-    # The tap repo must exist before the first release — see CLAUDE.md, "Releasing".
+    # The tap repo and the HOMEBREW_TAP_TOKEN secret must exist before a release, or the cask push fails.
     repository:
       owner: miradorlabs
       name: homebrew-tap

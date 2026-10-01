@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// The local relay (docs/RELAY.md). UseRelay points the sandbox's agents
+// The local relay. UseRelay points the sandbox's agents
 // at a relay on loopback instead of at the receiver; the receiver then stands in for
 // Terma upstream, and what reaches it is what the relay chose to forward.
 

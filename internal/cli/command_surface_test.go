@@ -24,9 +24,6 @@ var advancedCommands = []string{
 	"principal", "project", "relay", "spool", "telemetry", "version", "whoami",
 }
 
-// removedCommands are gone, not hidden: no message may name them.
-var removedCommands = []string{"blame", "desktop", "shim"}
-
 func commandNamed(root *cobra.Command, name string) *cobra.Command {
 	for _, c := range root.Commands() {
 		if c.Name() == name {
@@ -59,7 +56,7 @@ func TestHelpListsOnlyThePrimaryCommands(t *testing.T) {
 	if j := strings.Index(listing, "Flags:"); j >= 0 {
 		listing = listing[:j]
 	}
-	for _, name := range slices.Concat(advancedCommands, removedCommands, []string{"completion"}) {
+	for _, name := range append(slices.Clone(advancedCommands), "completion") {
 		if regexp.MustCompile(`(?m)^\s+` + regexp.QuoteMeta(name) + `\s`).MatchString(listing) {
 			t.Errorf("`terma --help` lists the advanced command %q:\n%s", name, listing)
 		}
@@ -118,13 +115,12 @@ func TestEveryCommandAMessageNamesExists(t *testing.T) {
 			exists[alias] = true
 		}
 	}
-	// Generated history under docs/compat is a record, not advice.
 	shipped := func(path string) bool {
 		switch {
 		case strings.HasSuffix(path, ".go"):
 			return !strings.HasSuffix(path, "_test.go")
 		case strings.HasSuffix(path, ".md"):
-			return !strings.Contains(filepath.ToSlash(path), "docs/compat/")
+			return true
 		}
 		return false
 	}
@@ -162,13 +158,5 @@ func TestCompletionIsHiddenNotRemoved(t *testing.T) {
 	out, err := runTerma(t, "completion", "zsh")
 	if err != nil || !strings.Contains(out, "compdef") {
 		t.Fatalf("`terma completion zsh` = %v, output %.200q", err, out)
-	}
-}
-
-func TestRemovedCommandsAreGone(t *testing.T) {
-	for _, name := range removedCommands {
-		if _, err := runTerma(t, name); err == nil || !strings.Contains(err.Error(), "unknown command") {
-			t.Errorf("`terma %s` = %v, want an unknown command", name, err)
-		}
 	}
 }

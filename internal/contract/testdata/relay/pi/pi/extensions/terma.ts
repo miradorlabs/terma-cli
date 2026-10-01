@@ -7,8 +7,8 @@
 // `CONFIG = null` and is inert). CONFIG.agent names the agent on every record and hook.
 //
 // omp has a native exporter, but it reads its OTEL_* variables once at startup, before
-// any extension loads, so only something that wraps the agent — a PATH shim — could
-// configure it, and anything omp then ran would inherit terma's endpoint and token. This
+// any extension loads, so only the process that launches omp could set them, and
+// anything omp then ran would inherit terma's endpoint and token. This
 // extension sets no environment: it exports from omp's own events, as it does for Pi.
 // For omp, CONFIG.lifecycle is false: omp's committed hook file already reports session
 // start, end and file edits, and this extension only claims the session at each prompt.

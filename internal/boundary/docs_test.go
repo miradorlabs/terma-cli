@@ -18,17 +18,14 @@ var docPath = regexp.MustCompile(`(?:^|[^\w/.-])((?:internal|cmd|docs|scripts|li
 // goSymbol is a path that ends in a Go identifier (internal/selfupdate.AssetName).
 var goSymbol = regexp.MustCompile(`^(.*)\.[A-Z]\w*$`)
 
-// TestDocsNamePathsThatExist requires every repository path the README, CLAUDE.md,
+// TestDocsNamePathsThatExist requires every repository path the README, AGENTS.md,
 // SECURITY.md and docs/ name to exist.
 func TestDocsNamePathsThatExist(t *testing.T) {
 	root := repoRoot(t)
-	docs := []string{"README.md", "CLAUDE.md", "SECURITY.md"}
+	docs := []string{"README.md", "AGENTS.md", "SECURITY.md"}
 	err := filepath.WalkDir(filepath.Join(root, "docs"), func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
-		}
-		if d.IsDir() && d.Name() == "compat" {
-			return filepath.SkipDir // generated history: a record, not advice
 		}
 		if strings.HasSuffix(path, ".md") {
 			rel, _ := filepath.Rel(root, path)
@@ -105,7 +102,7 @@ func TestDocsNameSymbolsThatExist(t *testing.T) {
 			}
 		}
 	}
-	docs := []string{"README.md", "CLAUDE.md", "SECURITY.md"}
+	docs := []string{"README.md", "AGENTS.md", "SECURITY.md"}
 	matches, _ := filepath.Glob(filepath.Join(root, "docs", "*.md"))
 	for _, m := range matches {
 		rel, _ := filepath.Rel(root, m)

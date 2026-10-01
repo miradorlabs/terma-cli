@@ -32,7 +32,7 @@ func desktopInstallSandbox(t *testing.T) (string, *fakeAuth) {
 	return home, f
 }
 
-func TestInstallUsesSavedCodexDesktopChoiceWithoutShellShim(t *testing.T) {
+func TestInstallUsesSavedCodexDesktopChoice(t *testing.T) {
 	home, gateway := desktopInstallSandbox(t)
 	if err := config.UpdateProfile(config.DefaultProfile, func(p *config.Profile) {
 		p.Harnesses = []string{codexDesktopAgent}

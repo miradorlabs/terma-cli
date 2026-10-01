@@ -48,7 +48,7 @@ func TestInstallUIFinish(t *testing.T) {
 	ui := newInstallUI(&buf, false)
 	ui.Summary("Project", "Acme Web")
 	ui.OK("Status line", "reads your plan's usage windows")
-	ui.OK("Claude Code", "shim at ~/.config/terma/shim/bin/claude")
+	ui.OK("Claude Code", "exports to the local relay")
 	ui.OK("Hook events", "delivered with this project's key")
 	fmt.Fprintln(ui.detail, "only with --verbose")
 	ui.Then("Run `source ~/.zshrc`.")
@@ -67,9 +67,9 @@ func TestInstallUIFinish(t *testing.T) {
 	if ui.detail == io.Discard {
 		t.Fatal("--verbose discards the detail")
 	}
-	ui.Warn("PATH", "the shims are not on PATH yet")
+	ui.Warn("Codex", "hooks await trust in Codex")
 	ui.finish()
-	if !strings.Contains(buf.String(), "! PATH") || !strings.Contains(buf.String(), "! terma installed — the steps marked ! need you") || strings.Contains(buf.String(), "Next steps") {
+	if !strings.Contains(buf.String(), "! Codex") || !strings.Contains(buf.String(), "! terma installed — the steps marked ! need you") || strings.Contains(buf.String(), "Next steps") {
 		t.Fatalf("a warning is the verdict, and no steps means no list:\n%s", buf.String())
 	}
 }

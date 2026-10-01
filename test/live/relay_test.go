@@ -20,7 +20,7 @@ import (
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 )
 
-// The local relay (docs/RELAY.md), end to end: real Claude Code and Codex
+// The local relay, end to end: real Claude Code and Codex
 // builds export through their global configuration to `terma relay run` on loopback,
 // hooks in the installed repository claim their sessions, and the receiver stands in
 // for Terma upstream. What these prove:

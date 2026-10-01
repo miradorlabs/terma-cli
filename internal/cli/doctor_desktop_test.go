@@ -14,7 +14,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 )
 
-func TestDesktopOnlySelectionDoesNotRequireCodexCLIShim(t *testing.T) {
+func TestDesktopOnlySelectionJudgesOnlyCodexDesktop(t *testing.T) {
 	t.Setenv("CODEX_HOME", t.TempDir())
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	if err := routing.SaveRecord(routing.Record{ProjectID: testProjectID, Endpoint: "https://otel.terma.ai", Signals: []string{"logs"},
