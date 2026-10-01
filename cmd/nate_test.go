@@ -24,11 +24,11 @@ func nateTestEnvironment(t *testing.T) (home, configDir, workspace string) {
 
 func stubNateBinary(t *testing.T, path string) {
 	t.Helper()
-	oldCandidates, oldRemove := nateBinaryCandidates, nateRemoveBinary
-	nateBinaryCandidates = func() []string { return []string{path} }
-	nateRemoveBinary = removeNateBinary
+	oldCandidates, oldRemove := testApp.nateBinaryCandidates, testApp.nateRemoveBinary
+	testApp.nateBinaryCandidates = func() []string { return []string{path} }
+	testApp.nateRemoveBinary = removeNateBinary
 	t.Cleanup(func() {
-		nateBinaryCandidates, nateRemoveBinary = oldCandidates, oldRemove
+		testApp.nateBinaryCandidates, testApp.nateRemoveBinary = oldCandidates, oldRemove
 	})
 }
 

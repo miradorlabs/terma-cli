@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"slices"
@@ -12,6 +13,8 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
+	"github.com/miradorlabs/terma-cli/internal/doctor"
+	"github.com/miradorlabs/terma-cli/internal/procinfo"
 
 	"github.com/spf13/cobra"
 
@@ -26,10 +29,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/style"
 )
 
-// Version is stamped at build time via -ldflags: the release tag by GoReleaser,
-// `git describe` by `make build`. "dev" is the unset sentinel.
-var Version = "dev"
-
 type globalFlags struct {
 	profile   string
 	env       string
@@ -41,12 +40,10 @@ type globalFlags struct {
 	output    string
 }
 
-var flags globalFlags
-
 // NewRootCommand builds the whole command tree. It is a constructor rather than a
 // package variable so that every test gets a tree of its own, with its own flags and
 // output streams.
-func NewRootCommand() *cobra.Command {
+func (app *App) NewRootCommand() *cobra.Command {
 	root := &cobra.Command{
 		Use:   "terma",
 		Short: "Attribute AI coding spend to the sessions, files, and commits that produced it",
@@ -65,9 +62,9 @@ Then ` + "`terma doctor`" + ` verifies the whole chain end to end and predicts h
 spend will be attributed.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		Version:       Version,
+		Version:       app.version,
 		PersistentPostRun: func(cmd *cobra.Command, _ []string) {
-			printUpdateNotice(cmd)
+			app.printUpdateNotice(cmd)
 		},
 	}
 
@@ -77,53 +74,53 @@ spend will be attributed.`,
 	root.CompletionOptions.HiddenDefaultCmd = true
 
 	pf := root.PersistentFlags()
-	pf.StringVar(&flags.profile, "profile", "", "configuration profile to use")
+	pf.StringVar(&app.flags.profile, "profile", "", "configuration profile to use")
 	// The environment and endpoint overrides are for Terma's own engineers (and
 	// self-hosted deployments). Hidden: users get production and nothing to choose.
-	pf.StringVar(&flags.env, "env", "", "built-in environment: prod, dev, local")
-	pf.StringVar(&flags.apiURL, "api-url", "", "Terma data API base URL")
-	pf.StringVar(&flags.authURL, "auth-url", "", "Terma auth API base URL")
-	pf.StringVar(&flags.appURL, "app-url", "", "Terma app base URL (used by login)")
-	pf.StringVar(&flags.otlpURL, "otlp-url", "", "Terma OTLP ingest URL (used by connect)")
+	pf.StringVar(&app.flags.env, "env", "", "built-in environment: prod, dev, local")
+	pf.StringVar(&app.flags.apiURL, "api-url", "", "Terma data API base URL")
+	pf.StringVar(&app.flags.authURL, "auth-url", "", "Terma auth API base URL")
+	pf.StringVar(&app.flags.appURL, "app-url", "", "Terma app base URL (used by login)")
+	pf.StringVar(&app.flags.otlpURL, "otlp-url", "", "Terma OTLP ingest URL (used by connect)")
 	for _, name := range []string{"env", "api-url", "auth-url", "app-url", "otlp-url"} {
 		_ = pf.MarkHidden(name)
 	}
-	pf.StringVarP(&flags.projectID, "project", "p", "", "project override for this command (default: current repository's binding)")
-	pf.StringVarP(&flags.output, "output", "o", "", "output format: table, json, yaml, csv")
+	pf.StringVarP(&app.flags.projectID, "project", "p", "", "project override for this command (default: current repository's binding)")
+	pf.StringVarP(&app.flags.output, "output", "o", "", "output format: table, json, yaml, csv")
 
 	root.AddCommand(
 		// Onboarding: the commands the README leads with.
-		newSetupCommand(),
-		newInstallCommand(),
-		newUninstallCommand(),
-		newNateCommand(),
-		newDoctorCommand(),
-		newStatusCommand(),
+		app.newSetupCommand(),
+		app.newInstallCommand(),
+		app.newUninstallCommand(),
+		app.newNateCommand(),
+		app.newDoctorCommand(),
+		app.newStatusCommand(),
 		// Insight: what the connected agents did, for whom, and what it cost.
-		newSessionCommand(),
-		newUsageCommand(),
-		newPrincipalCommand(), // advanced: hidden from the primary workflow
+		app.newSessionCommand(),
+		app.newUsageCommand(),
+		app.newPrincipalCommand(), // advanced: hidden from the primary workflow
 		// Harness connections (also reachable under the `telemetry` group).
-		newTelemetryConnectCommand(), // advanced: install configures telemetry normally
-		newTelemetryDisconnectCommand(),
-		newHarnessCommand(),
-		newTelemetryCommand(),
+		app.newTelemetryConnectCommand(), // advanced: install configures telemetry normally
+		app.newTelemetryDisconnectCommand(),
+		app.newHarnessCommand(),
+		app.newTelemetryCommand(),
 		// Account and configuration.
-		newLoginCommand(),
-		newLogoutCommand(),
-		newWhoamiCommand(),
-		newProjectCommand(),
-		newOrgCommand(),
-		newConfigCommand(),
+		app.newLoginCommand(),
+		app.newLogoutCommand(),
+		app.newWhoamiCommand(),
+		app.newProjectCommand(),
+		app.newOrgCommand(),
+		app.newConfigCommand(),
 		// Maintenance.
-		newUpdateCommand(),
-		newSpoolCommand(),
-		newVersionCommand(),
+		app.newUpdateCommand(),
+		app.newSpoolCommand(),
+		app.newVersionCommand(),
 		// Internal: the target of every installed hook shim.
-		newHookCommand(),
-		newAgentCommand(),
+		app.newHookCommand(),
+		app.newAgentCommand(),
 		// The local OTLP relay (docs/RELAY.md).
-		newRelayCommand(),
+		app.newRelayCommand(),
 	)
 	return root
 }
@@ -131,31 +128,31 @@ spend will be attributed.`,
 // newHarnessCommand groups the per-harness views: `list` for the static support
 // catalog, `status` for what each harness's own config actually says. A bare
 // `terma harness` shows the support catalog, the more useful default.
-func newHarnessCommand() *cobra.Command {
-	list := newHarnessListCommand()
+func (app *App) newHarnessCommand() *cobra.Command {
+	list := app.newHarnessListCommand()
 	cmd := &cobra.Command{
 		Use:    "harness",
 		Short:  "Show supported coding agents and their connection status",
 		Hidden: true,
 		Args:   cobra.MaximumNArgs(1),
-		RunE:   runHarnessList,
+		RunE:   app.runHarnessList,
 	}
-	cmd.AddCommand(list, newTelemetryStatusCommand())
+	cmd.AddCommand(list, app.newTelemetryStatusCommand())
 	return cmd
 }
 
-func newVersionCommand() *cobra.Command {
+func (app *App) newVersionCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:    "version",
 		Short:  "Print the terma version",
 		Hidden: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfg, err := loadConfig()
+			cfg, err := app.loadConfig()
 			env := ""
 			if err == nil && cfg.Environment != config.EnvProd {
 				env = " (" + cfg.Environment + ")"
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "terma %s%s\n", Version, env)
+			fmt.Fprintf(cmd.OutOrStdout(), "terma %s%s\n", app.version, env)
 			return nil
 		},
 	}
@@ -164,30 +161,30 @@ func newVersionCommand() *cobra.Command {
 // printUpdateNotice runs daily update maintenance after interactive commands, and the
 // first time a new release runs one, the refresh of what earlier versions installed —
 // never from a hook or a spool flush (those must stay silent and fast).
-func printUpdateNotice(cmd *cobra.Command) {
+func (app *App) printUpdateNotice(cmd *cobra.Command) {
 	// nate deliberately removes the updater's state and the running executable. Its
 	// post-run must not recreate either half of the installation it just removed.
 	if cmd.Name() == "nate" {
 		return
 	}
-	if !automaticUpdatesAllowed(cmd, canPrompt()) {
+	if !app.automaticUpdatesAllowed(cmd, canPrompt()) {
 		return
 	}
 	dir, err := config.Dir()
 	if err != nil {
 		return
 	}
-	refreshAfterUpgrade(cmd.Context(), dir, cmd.ErrOrStderr())
+	app.refreshAfterUpgrade(cmd.Context(), dir, cmd.ErrOrStderr())
 	exe, err := os.Executable()
 	if err != nil {
 		return
 	}
-	client := &selfupdate.Client{Version: Version}
+	client := &selfupdate.Client{Version: app.version}
 	client.Maintain(cmd.Context(), dir, exe, cmd.ErrOrStderr())
 }
 
-func automaticUpdatesAllowed(cmd *cobra.Command, interactive bool) bool {
-	if !interactive || (flags.output != "" && flags.output != "table") || os.Getenv("CI") != "" || os.Getenv("TERMA_NO_UPDATE_CHECK") == "1" {
+func (app *App) automaticUpdatesAllowed(cmd *cobra.Command, interactive bool) bool {
+	if !interactive || (app.flags.output != "" && app.flags.output != "table") || os.Getenv("CI") != "" || os.Getenv("TERMA_NO_UPDATE_CHECK") == "1" {
 		return false
 	}
 	for c := cmd; c != nil; c = c.Parent() {
@@ -224,15 +221,42 @@ func migrateState(ctx context.Context, args []string) {
 	}
 }
 
+// App is terma's command line: what every command reads, held for one run.
+type App struct {
+	// agents are the agents this build knows, and version its release tag ("dev" for a
+	// source build).
+	agents  *agents.Registry
+	version string
+	flags   globalFlags
+	// binDirs are where doctor looks for other terma builds besides PATH.
+	binDirs func() []string
+	// hookExecutable is the terma machine-wide hooks and git's global hooks call: this
+	// one, by the path it was started as.
+	hookExecutable func() (string, error)
+	// managedRoot prefixes the system paths managed configuration lives at.
+	managedRoot string
+	// sessionGetWait bounds `session get`: the gateway serves a single session's
+	// roll-up only as a live feed, which has no request timeout.
+	sessionGetWait time.Duration
+	// runUpdateStep runs one program of an update attached to the terminal.
+	runUpdateStep func(ctx context.Context, out io.Writer, argv ...string) error
+	// nateBinaryCandidates and nateRemoveBinary find and delete installed termas.
+	nateBinaryCandidates func() []string
+	nateRemoveBinary     func(cmd *cobra.Command, path string) error
+}
+
+// New is the command line for the agents this build knows, at version.
+func New(known *agents.Registry, version string) *App {
+	app := &App{agents: known, version: version, binDirs: doctor.WellKnownBinDirs, hookExecutable: procinfo.AbsExecutable,
+		managedRoot: "/", sessionGetWait: 15 * time.Second, runUpdateStep: runUpdateStep, nateRemoveBinary: removeNateBinary}
+	app.nateBinaryCandidates = app.installedTermaBinaries
+	return app
+}
+
 // Execute runs the command line and returns the process's exit status: 0, 1 for a
 // failure, or the code a command chose to mean something more specific (see
 // exitcode.go).
-// registered is the agents this build knows, handed in by main.
-var registered *agents.Registry
-
-// Execute runs terma with the agents it was built with and returns the exit code.
-func Execute(known *agents.Registry) int {
-	registered = known
+func (app *App) Execute() int {
 	// The first SIGINT/SIGTERM cancels the running command's context so an in-flight
 	// request unwinds promptly instead of waiting out the HTTP timeout. Default signal
 	// handling is then restored, so a second signal still force-terminates.
@@ -256,7 +280,7 @@ func Execute(known *agents.Registry) int {
 
 	migrateState(ctx, os.Args[1:])
 
-	if err := NewRootCommand().ExecuteContext(ctx); err != nil {
+	if err := app.NewRootCommand().ExecuteContext(ctx); err != nil {
 		// A command that has already explained itself on stdout ends the process
 		// with its own code, and prints nothing more.
 		if code, ok := exitCodeOf(err); ok {
@@ -289,24 +313,24 @@ func Execute(known *agents.Registry) int {
 	return 0
 }
 
-func loadConfig() (*config.Config, error) {
+func (app *App) loadConfig() (*config.Config, error) {
 	return config.Load(config.Overrides{
-		Profile:   flags.profile,
-		Env:       flags.env,
-		APIURL:    flags.apiURL,
-		AuthURL:   flags.authURL,
-		AppURL:    flags.appURL,
-		OTLPURL:   flags.otlpURL,
-		ProjectID: flags.projectID,
+		Profile:   app.flags.profile,
+		Env:       app.flags.env,
+		APIURL:    app.flags.apiURL,
+		AuthURL:   app.flags.authURL,
+		AppURL:    app.flags.appURL,
+		OTLPURL:   app.flags.otlpURL,
+		ProjectID: app.flags.projectID,
 	})
 }
 
-func resolveFormat() (output.Format, error) {
-	return output.Resolve(flags.output)
+func (app *App) resolveFormat() (output.Format, error) {
+	return output.Resolve(app.flags.output)
 }
 
-func loadProjectConfig() (*config.Config, error) {
-	cfg, err := loadConfig()
+func (app *App) loadProjectConfig() (*config.Config, error) {
+	cfg, err := app.loadConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -343,8 +367,8 @@ func resolveRepoProject(cfg *config.Config) error {
 // newClient builds an authenticated client. Commands that read project-scoped data
 // call requireProject first so the missing-project case is a clear local message
 // rather than a 400 from the gateway.
-func newClient(cfg *config.Config) (*api.Client, error) {
-	return api.New(cfg, api.Options{Version: Version, ProjectID: cfg.ProjectID})
+func (app *App) newClient(cfg *config.Config) (*api.Client, error) {
+	return api.New(cfg, api.Options{Version: app.version, ProjectID: cfg.ProjectID})
 }
 
 func requireProject(cfg *config.Config) error {
@@ -385,8 +409,8 @@ func workspaceHere(ctx context.Context) (root, gitDir string, err error) {
 // output format and a client. A command's own preconditions run on the configuration
 // before the format or the credential is looked at, so a missing project is reported
 // ahead of a sign-in error rather than hidden behind it.
-func setupCommand(preconditions ...func(*config.Config) error) (*config.Config, *api.Client, output.Format, error) {
-	cfg, err := loadConfig()
+func (app *App) setupCommand(preconditions ...func(*config.Config) error) (*config.Config, *api.Client, output.Format, error) {
+	cfg, err := app.loadConfig()
 	if err != nil {
 		return nil, nil, "", err
 	}
@@ -395,11 +419,11 @@ func setupCommand(preconditions ...func(*config.Config) error) (*config.Config, 
 			return nil, nil, "", err
 		}
 	}
-	format, err := resolveFormat()
+	format, err := app.resolveFormat()
 	if err != nil {
 		return nil, nil, "", err
 	}
-	client, err := newClient(cfg)
+	client, err := app.newClient(cfg)
 	if err != nil {
 		return nil, nil, "", err
 	}
@@ -407,8 +431,8 @@ func setupCommand(preconditions ...func(*config.Config) error) (*config.Config, 
 }
 
 // setupProjectCommand is the preamble every project-scoped read shares.
-func setupProjectCommand(cmd *cobra.Command) (context.Context, *api.Client, output.Format, error) {
-	_, client, format, err := setupCommand(requireProject)
+func (app *App) setupProjectCommand(cmd *cobra.Command) (context.Context, *api.Client, output.Format, error) {
+	_, client, format, err := app.setupCommand(requireProject)
 	if err != nil {
 		return nil, nil, "", err
 	}

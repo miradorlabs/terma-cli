@@ -113,11 +113,11 @@ func TestDoctorScratchCommitRoundTrip(t *testing.T) {
 	if check.Status != doctor.Pass {
 		t.Fatalf("scratch: %+v", check)
 	}
-	cfg, err := loadConfig()
+	cfg, err := testApp.loadConfig()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if check := doctor.BackendCheck(ctx, doctorProbes(cfg), testProjectID, sha, doctor.Check{}, doctor.Progress{}); check.Status != doctor.Pass || !strings.Contains(check.Detail, "round-trip confirmed") {
+	if check := doctor.BackendCheck(ctx, testApp.doctorProbes(cfg), testProjectID, sha, doctor.Check{}, doctor.Progress{}); check.Status != doctor.Pass || !strings.Contains(check.Detail, "round-trip confirmed") {
 		t.Fatalf("backend: %+v", check)
 	}
 }

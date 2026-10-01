@@ -11,18 +11,18 @@ import (
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 )
 
-func newAgentCommand() *cobra.Command {
+func (app *App) newAgentCommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "agent", Short: "Inspect how an agent's surface reports from this repository", Hidden: true}
 	cmd.AddCommand(&cobra.Command{
 		Use:   "status <surface>",
 		Short: "Show whether a surface's sessions in this repository reach Terma",
 		Args:  cobra.ExactArgs(1),
-		RunE:  statusAgentSurface,
+		RunE:  app.statusAgentSurface,
 	})
 	return cmd
 }
 
-func statusAgentSurface(cmd *cobra.Command, args []string) error {
+func (app *App) statusAgentSurface(cmd *cobra.Command, args []string) error {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
@@ -34,12 +34,12 @@ func statusAgentSurface(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	st, ok, err := registered.CheckSurface(args[0], root, binding.Project.ID)
+	st, ok, err := app.agents.CheckSurface(args[0], root, binding.Project.ID)
 	if err != nil {
 		return err
 	}
 	if !ok {
-		return fmt.Errorf("no status for %q (want %s)", args[0], strings.Join(registered.CheckedSurfaces(), " or "))
+		return fmt.Errorf("no status for %q (want %s)", args[0], strings.Join(app.agents.CheckedSurfaces(), " or "))
 	}
 	width := 0
 	for _, l := range st.Lines {

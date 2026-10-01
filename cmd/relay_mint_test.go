@@ -23,7 +23,7 @@ func TestRelayResolverMintsAndCapsContent(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	cfg := &config.Config{OTLPURL: "https://otel.example", Policy: config.DefaultPolicy()}
 	var asked []string
-	resolve := relayResolver(cfg, func(p string) { asked = append(asked, p) })
+	resolve := testApp.relayResolver(cfg, func(p string) { asked = append(asked, p) })
 	c := claim.Claim{ProjectID: "p1", Tool: "codex"}
 	if _, err := resolve(c); !errors.Is(err, relay.ErrNoKey) || len(asked) != 1 || asked[0] != "p1" {
 		t.Fatalf("keyless: err %v, asked %v", err, asked)

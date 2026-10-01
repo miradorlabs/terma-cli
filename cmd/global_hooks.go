@@ -12,7 +12,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
-	"github.com/miradorlabs/terma-cli/internal/procinfo"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 )
 
@@ -40,19 +39,19 @@ type userHooksRecord struct {
 // developer's: Codex Desktop counts as Codex (it runs the same hooks).
 // userHooksTrustSteps are what the selected agents need of the developer before their
 // machine-wide hooks run, unless an organization deployed them as managed configuration.
-func userHooksTrustSteps(selected []string) []string {
+func (app *App) userHooksTrustSteps(selected []string) []string {
 	var steps []string
-	for _, name := range userHookAgents(selected) {
-		if a, ok := registered.Find[agents.UserHooksTrust](name); ok && !managedHooksDeployed(name) {
+	for _, name := range app.userHookAgents(selected) {
+		if a, ok := app.agents.Find[agents.UserHooksTrust](name); ok && !app.managedHooksDeployed(name) {
 			steps = append(steps, a.UserHooksTrustStep())
 		}
 	}
 	return steps
 }
 
-func userHookAgents(selected []string) []string {
+func (app *App) userHookAgents(selected []string) []string {
 	var out []string
-	for _, a := range registered.With[agents.UserHooks]() {
+	for _, a := range app.agents.With[agents.UserHooks]() {
 		for _, choice := range agents.Selections(a) {
 			if slices.Contains(selected, choice) {
 				out = append(out, a.Name())
@@ -66,17 +65,17 @@ func userHookAgents(selected []string) []string {
 // applyUserHooks writes terma's machine-wide hooks for the developer's agents (install)
 // or removes every one terma wrote (not install), and records which agents have them.
 // It reports the files it changed.
-func applyUserHooks(selected []string, install bool) ([]string, error) {
-	terma, err := hookExecutable()
+func (app *App) applyUserHooks(selected []string, install bool) ([]string, error) {
+	terma, err := app.hookExecutable()
 	if err != nil {
 		return nil, err
 	}
-	covered := userHookAgents(selected)
+	covered := app.userHookAgents(selected)
 	var changed []string
-	for _, a := range registered.With[agents.UserHooks]() {
+	for _, a := range app.agents.With[agents.UserHooks]() {
 		// Written for the developer's selected in global mode, unless the organization's
 		// managed hooks run for one — then setup's would run as well, and go.
-		want := install && slices.Contains(covered, a.Name()) && !managedHooksDeployed(a.Name())
+		want := install && slices.Contains(covered, a.Name()) && !app.managedHooksDeployed(a.Name())
 		path, err := a.UserHooksPath()
 		dir, file := filepath.Dir(path), filepath.Base(path)
 		if err != nil {
@@ -129,7 +128,7 @@ func userHooksRecordPath() (string, error) {
 
 // userHooksCover reports whether a machine-wide hook handles tool's events: global mode
 // wrote them for that agent.
-func userHooksCover(tool string) bool {
+func (app *App) userHooksCover(tool string) bool {
 	path, err := userHooksRecordPath()
 	if err != nil {
 		return false
@@ -142,40 +141,31 @@ func userHooksCover(tool string) bool {
 	if json.Unmarshal(data, &rec) != nil {
 		return false
 	}
-	return slices.Contains(rec.Agents, agentForTool(tool))
+	return slices.Contains(rec.Agents, app.agentForTool(tool))
 }
 
 // agentForTool maps a hook's tool label to its agent's name.
-func agentForTool(tool string) string {
-	return registered.NameForTool(tool)
+func (app *App) agentForTool(tool string) string {
+	return app.agents.NameForTool(tool)
 }
 
 // hookYields reports whether this hook invocation leaves the event to another: a
 // machine-wide one (user) outside global mode — leftover from before the organization
 // left it — or a repository's committed one in global mode, for an agent whose
 // machine-wide hooks handle it.
-func hookYields(user bool, pol config.Policy, tool string) bool {
+func (app *App) hookYields(user bool, pol config.Policy, tool string) bool {
 	if user {
 		return !pol.Global()
 	}
-	return pol.Global() && userHooksCover(tool)
+	return pol.Global() && app.userHooksCover(tool)
 }
-
-// hookExecutable is the terma machine-wide hooks and git's global hooks call: this one,
-// by the path it was started as. A variable so a test (whose executable is the test
-// binary) can name a built terma.
-var hookExecutable = procinfo.AbsExecutable
-
-// managedRoot prefixes the system paths managed configuration lives at; a test points
-// it at a directory of its own.
-var managedRoot = "/"
 
 // managedHookFiles are where an organization deploys global mode's hooks as managed
 // configuration, per agent: Claude Code's managed settings and Codex's system
 // requirements. An agent whose managed file carries terma's hooks gets none from setup:
 // both would run.
-func managedHookFiles(agent string) []string {
-	a, ok := registered.Lookup(agent)
+func (app *App) managedHookFiles(agent string) []string {
+	a, ok := app.agents.Lookup(agent)
 	if !ok {
 		return nil
 	}
@@ -183,13 +173,13 @@ func managedHookFiles(agent string) []string {
 	if !ok {
 		return nil
 	}
-	return managed.ManagedHookFiles(managedRoot)
+	return managed.ManagedHookFiles(app.managedRoot)
 }
 
 // managedHooksDeployed reports whether the organization deployed terma's hooks for agent
 // as managed configuration.
-func managedHooksDeployed(agent string) bool {
-	for _, f := range managedHookFiles(agent) {
+func (app *App) managedHooksDeployed(agent string) bool {
+	for _, f := range app.managedHookFiles(agent) {
 		if data, err := os.ReadFile(f); err == nil && strings.Contains(string(data), " hook --user ") {
 			return true
 		}
@@ -201,12 +191,12 @@ func managedHooksDeployed(agent string) bool {
 // an organization to deploy to every machine (MDM, configuration management), and a
 // README saying where each file goes. terma is the path the hooks call it by on those
 // machines ($HOME is expanded per user). It needs no sign-in.
-func writeManagedConfig(dir, terma string) ([]string, error) {
+func (app *App) writeManagedConfig(dir, terma string) ([]string, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, err
 	}
 	cmd := hookmgr.ManagedHookCommand(terma)
-	managed := registered.With[agents.ManagedHooks]()
+	managed := app.agents.With[agents.ManagedHooks]()
 	var names, deploy []string
 	files := map[string][]byte{}
 	for _, a := range managed {

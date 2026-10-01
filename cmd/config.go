@@ -28,7 +28,7 @@ type configView struct {
 	Auth             string `json:"auth"`
 }
 
-func newConfigCommand() *cobra.Command {
+func (app *App) newConfigCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:    "config",
 		Short:  "Inspect and switch configuration profiles",
@@ -38,21 +38,21 @@ between, or two projects you compare.
 
 Credentials are stored per profile too, so switching profiles switches identity.`,
 	}
-	cmd.AddCommand(newConfigShowCommand(), newConfigProfilesCommand(), newConfigUseCommand(), newConfigSetCommand())
+	cmd.AddCommand(app.newConfigShowCommand(), app.newConfigProfilesCommand(), newConfigUseCommand(), app.newConfigSetCommand())
 	return cmd
 }
 
-func newConfigShowCommand() *cobra.Command {
+func (app *App) newConfigShowCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "show",
 		Short: "Show the resolved configuration",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfg, err := loadProjectConfig()
+			cfg, err := app.loadProjectConfig()
 			if err != nil {
 				return err
 			}
-			format, err := resolveFormat()
+			format, err := app.resolveFormat()
 			if err != nil {
 				return err
 			}
@@ -98,14 +98,14 @@ func newConfigShowCommand() *cobra.Command {
 	}
 }
 
-func newConfigProfilesCommand() *cobra.Command {
+func (app *App) newConfigProfilesCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:     "profiles",
 		Aliases: []string{"list"},
 		Short:   "List configured profiles",
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			format, err := resolveFormat()
+			format, err := app.resolveFormat()
 			if err != nil {
 				return err
 			}
@@ -154,7 +154,7 @@ func newConfigUseCommand() *cobra.Command {
 	}
 }
 
-func newConfigSetCommand() *cobra.Command {
+func (app *App) newConfigSetCommand() *cobra.Command {
 	var apiURL, authURL, appURL, otlpURL string
 
 	cmd := &cobra.Command{
@@ -170,7 +170,7 @@ deployment and switch between them.`,
 			if apiURL == "" && authURL == "" && appURL == "" && otlpURL == "" {
 				return fmt.Errorf("nothing to set — pass --api-url, --auth-url, --app-url, or --otlp-url")
 			}
-			cfg, err := loadConfig()
+			cfg, err := app.loadConfig()
 			if err != nil {
 				return err
 			}

@@ -51,7 +51,6 @@ func TestCommitRecordedAsksForAWindow(t *testing.T) {
 	t.Setenv("TERMA_API_KEY", "")
 	t.Setenv("TERMA_ENV", "")
 	t.Setenv("TERMA_PROFILE", "")
-	flags = globalFlags{}
 	if _, err := auth.SaveCredential(config.DefaultProfile, &auth.Credential{
 		AccessToken: "ter_cli_test", OrganizationID: "org-test", AuthURL: srv.URL,
 		ExpiresAt: time.Now().Add(time.Hour),
@@ -59,7 +58,7 @@ func TestCommitRecordedAsksForAWindow(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cfg, err := loadConfig()
+	cfg, err := testApp.loadConfig()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +67,7 @@ func TestCommitRecordedAsksForAWindow(t *testing.T) {
 
 	from, to := time.Now().Add(-time.Hour).Truncate(time.Second), time.Now().Add(time.Hour).Truncate(time.Second)
 	cfg.ProjectID = "another-project"
-	recorded := commitRecorded(cfg)
+	recorded := testApp.commitRecorded(cfg)
 	for i, want := range []bool{false, true} {
 		if found, err := recorded(ctx, "repo-project", sha, from, to); err != nil || found != want {
 			t.Fatalf("read %d = %v, %v; want %v", i, found, err, want)
@@ -106,15 +105,14 @@ func TestDoctorBackendReadErrorIsInconclusive(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 	t.Setenv("TERMA_API_URL", srv.URL)
-	flags = globalFlags{}
-	cfg, err := loadConfig()
+	cfg, err := testApp.loadConfig()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := keystore.Set("repo-project", "ter_srv_test", keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
-	check := doctor.BackendCheck(context.Background(), doctorProbes(cfg), "repo-project", "scratch", doctor.Check{}, doctor.Progress{})
+	check := doctor.BackendCheck(context.Background(), testApp.doctorProbes(cfg), "repo-project", "scratch", doctor.Check{}, doctor.Progress{})
 	if check.Status != doctor.Warn || !check.Inconclusive || !strings.Contains(check.Detail, "could not confirm") {
 		t.Fatalf("API read failure is not proof of delivery failure: %+v", check)
 	}
@@ -145,7 +143,6 @@ func TestCommitRecordedReadsTheProjectsOwnEnvironment(t *testing.T) {
 	for _, v := range []string{"TERMA_API_URL", "TERMA_AUTH_URL", "TERMA_API_KEY", "TERMA_ENV", "TERMA_PROFILE"} {
 		t.Setenv(v, "")
 	}
-	flags = globalFlags{}
 	if err := config.UpdateProfile(config.DefaultProfile, func(p *config.Profile) {
 		p.APIURL, p.AuthURL = profileAPI.URL, profileAPI.URL
 	}); err != nil {
@@ -160,14 +157,14 @@ func TestCommitRecordedReadsTheProjectsOwnEnvironment(t *testing.T) {
 	if err := keystore.Set("dev-project", "ter_srv_dev", keystore.Hosts{OTLP: "http://127.0.0.1:1", API: projectAPI.URL}); err != nil {
 		t.Fatal(err)
 	}
-	cfg, err := loadConfig()
+	cfg, err := testApp.loadConfig()
 	if err != nil {
 		t.Fatal(err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	found, err := commitRecorded(cfg)(ctx, "dev-project", sha, time.Now().Add(-time.Hour), time.Now().Add(time.Hour))
+	found, err := testApp.commitRecorded(cfg)(ctx, "dev-project", sha, time.Now().Add(-time.Hour), time.Now().Add(time.Hour))
 	if err != nil || !found {
 		t.Fatalf("commitRecorded = %v, %v", found, err)
 	}
@@ -184,7 +181,6 @@ func TestCommitRecordedReadsTheProjectsOwnEnvironment(t *testing.T) {
 func TestProjectAPIFromTheRoutingRecord(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	t.Setenv("TERMA_API_URL", "")
-	flags = globalFlags{}
 	prod, _ := config.EndpointsFor(config.EnvProd)
 	dev, _ := config.EndpointsFor(config.EnvDev)
 	cfg := &config.Config{OTLPURL: prod.OTLPURL, APIURL: "https://api.custom.example"}
@@ -193,17 +189,17 @@ func TestProjectAPIFromTheRoutingRecord(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if got := projectAPI(cfg, "dev-project"); got != dev.APIURL {
+	if got := testApp.projectAPI(cfg, "dev-project"); got != dev.APIURL {
 		t.Fatalf("projectAPI(dev) = %q, want %q", got, dev.APIURL)
 	}
-	if got := projectAPI(cfg, "prod-project"); got != cfg.APIURL {
+	if got := testApp.projectAPI(cfg, "prod-project"); got != cfg.APIURL {
 		t.Fatalf("projectAPI(prod) = %q, want the profile's own %q", got, cfg.APIURL)
 	}
-	if got := projectAPI(cfg, "unknown-project"); got != cfg.APIURL {
+	if got := testApp.projectAPI(cfg, "unknown-project"); got != cfg.APIURL {
 		t.Fatalf("projectAPI(unknown) = %q", got)
 	}
 	t.Setenv("TERMA_API_URL", "https://api.override.example")
-	if got := projectAPI(cfg, "dev-project"); got != cfg.APIURL {
+	if got := testApp.projectAPI(cfg, "dev-project"); got != cfg.APIURL {
 		t.Fatalf("an explicit TERMA_API_URL must win, got %q", got)
 	}
 }

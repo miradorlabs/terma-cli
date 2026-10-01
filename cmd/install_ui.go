@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"slices"
@@ -93,7 +94,7 @@ func (u *installUI) finish() {
 
 // verify runs doctor behind a spinner and reports it as one step, its fixes as next
 // steps.
-func (u *installUI) verify(cmd *cobra.Command) {
+func (u *installUI) verify(cmd *cobra.Command, runDoctor func(context.Context, bool, doctor.Progress) doctor.Report) {
 	fmt.Fprintf(u.detail, "\n%s\n", u.p.Bold("Verifying the chain (terma doctor):"))
 	sp := spinner.New(cmd.ErrOrStderr())
 	report := runDoctor(cmd.Context(), false, doctor.Progress{

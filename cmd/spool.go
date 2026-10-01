@@ -22,7 +22,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-func newSpoolCommand() *cobra.Command {
+func (app *App) newSpoolCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:    "spool",
 		Short:  "Manage the local event queue hooks write to",
@@ -31,11 +31,11 @@ func newSpoolCommand() *cobra.Command {
 The spool is delivered later — in the background after a commit or session end,
 or on demand here. A backend outage costs nothing at commit time.`,
 	}
-	cmd.AddCommand(newSpoolFlushCommand(), newSpoolStatusCommand())
+	cmd.AddCommand(app.newSpoolFlushCommand(), newSpoolStatusCommand())
 	return cmd
 }
 
-func newSpoolFlushCommand() *cobra.Command {
+func (app *App) newSpoolFlushCommand() *cobra.Command {
 	var force, quiet bool
 	var minInterval time.Duration
 	cmd := &cobra.Command{
@@ -53,7 +53,7 @@ The exit status distinguishes the outcomes a script needs apart:
      their project's retry window (--force overrides), or given up on for age,
      disk pressure, or being unreadable`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			res, err := flushSpool(cmd.Context(), force, minInterval)
+			res, err := app.flushSpool(cmd.Context(), force, minInterval)
 			// A background flush has no reader and no caller to inform.
 			if quiet {
 				return nil
@@ -222,12 +222,12 @@ func (r flushResult) Lost() bool {
 // distinguishable. A project whose send fails keeps its events queued without
 // holding up any other project's (spool.PartialDelivery), and backs off on its own:
 // until its window closes it is not asked again, unless force says to.
-func flushSpool(ctx context.Context, force bool, minInterval time.Duration) (flushResult, error) {
+func (app *App) flushSpool(ctx context.Context, force bool, minInterval time.Duration) (flushResult, error) {
 	s := openSpool()
 	if s == nil {
 		return flushResult{}, errors.New("cannot open the spool directory")
 	}
-	cfg, err := loadConfig()
+	cfg, err := app.loadConfig()
 	if err != nil {
 		return flushResult{}, err
 	}
@@ -250,7 +250,7 @@ func flushSpool(ctx context.Context, force bool, minInterval time.Duration) (flu
 			pol, checked := policies[id]
 			if !checked && policyErrors[id] == nil {
 				var err error
-				pol, err = currentTeamPolicy(ctx, cfg, id)
+				pol, err = app.currentTeamPolicy(ctx, cfg, id)
 				if err != nil {
 					policyErrors[id] = err
 				} else {
@@ -261,7 +261,7 @@ func flushSpool(ctx context.Context, force bool, minInterval time.Duration) (flu
 				held = append(held, e)
 				continue
 			}
-			if !spoolEventAllowed(pol, id, e) {
+			if !app.spoolEventAllowed(pol, id, e) {
 				res.Withheld++
 				continue
 			}
@@ -295,8 +295,8 @@ func flushSpool(ctx context.Context, force bool, minInterval time.Duration) (flu
 				undelivered = append(undelivered, batch...)
 				continue
 			}
-			endpoint := projectEndpoint(cfg, id)
-			sender := &spool.OTLPSender{Endpoint: endpoint, APIKey: key, ProjectID: id, Version: Version}
+			endpoint := app.projectEndpoint(cfg, id)
+			sender := &spool.OTLPSender{Endpoint: endpoint, APIKey: key, ProjectID: id, Version: app.version}
 			if _, err := sender.Send(ctx, batch); err != nil {
 				failed[id] = true
 				f := projectFailure{ProjectID: id, Endpoint: endpoint, Err: err}
@@ -338,7 +338,7 @@ func flushSpool(ctx context.Context, force bool, minInterval time.Duration) (flu
 
 // Replies and titles bypass the native relay. Recheck its same policy ceiling on
 // every delivery, including events captured before the organization tightened it.
-func spoolEventAllowed(org config.Policy, projectID string, e spool.Event) bool {
+func (app *App) spoolEventAllowed(org config.Policy, projectID string, e spool.Event) bool {
 	org = routing.EffectivePolicy(org, projectID)
 	if !org.AllowsSignal("logs") || e.Global && !org.Global() {
 		return false
@@ -347,7 +347,7 @@ func spoolEventAllowed(org config.Policy, projectID string, e spool.Event) bool 
 		return false
 	}
 	if e.Name == hookrun.EventAssistantMessage || e.Name == hookrun.EventSessionTitle {
-		return org.IncludePrompts && len(org.ExcludePaths) == 0 && contentConsented(e, projectID, org.Global())
+		return org.IncludePrompts && len(org.ExcludePaths) == 0 && app.contentConsented(e, projectID, org.Global())
 	}
 	rec, recorded, err := routing.LoadRecord(projectID)
 	if err != nil {
@@ -358,9 +358,9 @@ func spoolEventAllowed(org config.Policy, projectID string, e spool.Event) bool 
 
 // contentConsented asks the agent that spooled e whether what it said may leave: an
 // event no agent owns carries nothing anyone consented to.
-func contentConsented(e spool.Event, projectID string, global bool) bool {
+func (app *App) contentConsented(e spool.Event, projectID string, global bool) bool {
 	tool, _ := e.Attrs[hookrun.AttrTool].(string)
-	a, ok := registered.ForTool(tool)
+	a, ok := app.agents.ForTool(tool)
 	if !ok {
 		return false
 	}
@@ -377,8 +377,8 @@ func contentConsented(e spool.Event, projectID string, global bool) bool {
 // explicit --otlp-url or TERMA_OTLP_URL still wins. A key stored before its hosts were
 // recorded falls back to the routing record `terma install` writes for a telemetry
 // agent, and a project with neither to the active profile's host.
-func projectEndpoint(cfg *config.Config, projectID string) string {
-	if flags.otlpURL != "" || os.Getenv("TERMA_OTLP_URL") != "" {
+func (app *App) projectEndpoint(cfg *config.Config, projectID string) string {
+	if app.flags.otlpURL != "" || os.Getenv("TERMA_OTLP_URL") != "" {
 		return cfg.OTLPURL
 	}
 	if h, ok := keystore.HostsFor(projectID); ok && h.OTLP != "" {
@@ -395,8 +395,8 @@ func projectEndpoint(cfg *config.Config, projectID string) string {
 // placed by its routing record — only when that names another built-in environment's
 // ingest host, since a profile with a custom data API and the stock ingest host would
 // otherwise be sent to the stock API. An explicit --api-url or TERMA_API_URL wins.
-func projectAPI(cfg *config.Config, projectID string) string {
-	if flags.apiURL != "" || os.Getenv("TERMA_API_URL") != "" {
+func (app *App) projectAPI(cfg *config.Config, projectID string) string {
+	if app.flags.apiURL != "" || os.Getenv("TERMA_API_URL") != "" {
 		return cfg.APIURL
 	}
 	if h, ok := keystore.HostsFor(projectID); ok && h.API != "" {

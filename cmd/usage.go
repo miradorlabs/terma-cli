@@ -109,7 +109,7 @@ type usageReport struct {
 	Queries []string            `json:"queries"`
 }
 
-func newUsageCommand() *cobra.Command {
+func (app *App) newUsageCommand() *cobra.Command {
 	var (
 		sel          sessionSelectFlags
 		since, until string
@@ -143,7 +143,7 @@ to the nearest sample; for a per-session ledger use ` + "`terma session list`" +
 				return fmt.Errorf("the window from --since to --until is shorter than a second")
 			}
 
-			ctx, client, format, err := setupProjectCommand(cmd)
+			ctx, client, format, err := app.setupProjectCommand(cmd)
 			if err != nil {
 				return err
 			}
@@ -244,7 +244,7 @@ to the nearest sample; for a per-session ledger use ` + "`terma session list`" +
 			return output.Render(cmd.OutOrStdout(), format, usageTable(report, by, groupBy), report)
 		},
 	}
-	sel.bind(cmd.Flags(), false)
+	sel.bind(cmd.Flags(), false, app.sourceExamples())
 	cmd.Flags().StringVar(&since, "since", "", "window start: RFC 3339, a date, a relative age (24h, 7d), today, yesterday (default 24h)")
 	cmd.Flags().StringVar(&until, "until", "", "window end (same forms; default now)")
 	cmd.Flags().StringVar(&groupBy, "group-by", "user", strings.Join(usageGroupNames, ", "))

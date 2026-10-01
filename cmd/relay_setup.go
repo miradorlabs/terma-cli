@@ -29,7 +29,7 @@ func termaHookCommand() []string {
 	return []string{"terma", "hook"}
 }
 
-func newRelaySetupCommand() *cobra.Command {
+func (app *App) newRelaySetupCommand() *cobra.Command {
 	var addr, agents string
 	var noStart bool
 	cmd := &cobra.Command{
@@ -52,7 +52,7 @@ func newRelaySetupCommand() *cobra.Command {
 				return err
 			}
 			out := cmd.OutOrStdout()
-			err = pointAgentsAtRelay(cmd.Context(), splitCommas(agents), addr, token, func(agent, detail string) {
+			err = app.pointAgentsAtRelay(cmd.Context(), splitCommas(agents), addr, token, func(agent, detail string) {
 				fmt.Fprintf(out, "%s exports to the relay at %s%s.\n", agent, addr, detail)
 			}, func(note string) { fmt.Fprintln(out, note) })
 			if err != nil {
@@ -71,22 +71,22 @@ func newRelaySetupCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&addr, "addr", "", "the loopback address the relay listens on (default "+claim.DefaultAddr+")")
-	cmd.Flags().StringVar(&agents, "harness", strings.Join(registered.RelayTargets(availableAgentNames()), ","), "the agents to point at the relay")
+	cmd.Flags().StringVar(&agents, "harness", strings.Join(app.agents.RelayTargets(app.availableAgentNames()), ","), "the agents to point at the relay")
 	cmd.Flags().BoolVar(&noStart, "no-start", false, "do not start the relay now (the next hook that claims a session will)")
 	return cmd
 }
 
 // pointAgentsAtRelay has each agent configure its own relay export.
-func pointAgentsAtRelay(ctx context.Context, selected []string, addr, token string, done func(agent, detail string), note func(string)) error {
+func (app *App) pointAgentsAtRelay(ctx context.Context, selected []string, addr, token string, done func(agent, detail string), note func(string)) error {
 	dir, err := daemon.Dir()
 	if err != nil {
 		return err
 	}
 	cfg := agents.RelayConfig{Endpoint: "http://" + addr, Token: token, HookCommand: termaHookCommand(), StateDir: dir}
 	for _, name := range selected {
-		integration, ok := registered.Find[agents.RelayExporter](name)
+		integration, ok := app.agents.Find[agents.RelayExporter](name)
 		if !ok {
-			return fmt.Errorf("unknown relay exporter %q (choose %v)", name, registered.RelayTargets(registered.Names()))
+			return fmt.Errorf("unknown relay exporter %q (choose %v)", name, app.agents.RelayTargets(app.agents.Names()))
 		}
 		result, err := integration.ConfigureRelay(ctx, cfg)
 		if err != nil {

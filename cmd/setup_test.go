@@ -27,7 +27,7 @@ func TestSetupRecordsCodexDesktopSeparatelyFromCLI(t *testing.T) {
 	if err != nil {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}
-	cfg, err := loadConfig()
+	cfg, err := testApp.loadConfig()
 	if err != nil || !slices.Equal(cfg.Harnesses, []string{codexDesktopAgent}) {
 		t.Fatalf("saved agent choices = %v, %v", cfg.Harnesses, err)
 	}
@@ -80,10 +80,10 @@ func TestSetupFetchesThePolicyAndPointsAgentsAtTheRelay(t *testing.T) {
 
 func TestHarnessSelectionComingSoon(t *testing.T) {
 	chosen := map[string]bool{}
-	for _, name := range registered.Names() {
+	for _, name := range testApp.agents.Names() {
 		chosen[name] = true
 	}
-	form := harnessSelectionForm(context.Background(), chosen)
+	form := testApp.harnessSelectionForm(context.Background(), chosen)
 	wantOrder := []string{"claude", "codex", codexDesktopAgent, "cursor", "opencode", "omp", "pi", "hermes", "gemini", "dsh", "antigravity", "GitHub Copilot"}
 	if len(form.Items) != len(wantOrder) {
 		t.Fatalf("picker has %d items, want %d", len(form.Items), len(wantOrder))
@@ -94,14 +94,14 @@ func TestHarnessSelectionComingSoon(t *testing.T) {
 			display = "Codex Desktop"
 		} else if name == "codex" {
 			display = "Codex CLI"
-		} else if a, ok := registered.Lookup(name); ok {
+		} else if a, ok := testApp.agents.Lookup(name); ok {
 			display = a.DisplayName()
 		}
 		if form.Items[i].Label != display {
 			t.Errorf("picker row %d = %q, want %q", i, form.Items[i].Label, display)
 		}
 		item := form.Items[i]
-		available := registered.IsSupported(name)
+		available := testApp.agents.IsSupported(name)
 		if available {
 			if item.Disabled || item.Selected != chosen[name] {
 				t.Errorf("%s should be selectable with its saved choice: %+v", name, item)
@@ -117,19 +117,19 @@ func TestHarnessSelectionFlags(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			cmd := &cobra.Command{}
 			cfg := &config.Config{}
-			if _, err := chooseHarnesses(cmd, cfg, setupFlags{harnesses: "claude," + name}); err == nil || !strings.Contains(err.Error(), "Coming Soon") {
+			if _, err := testApp.chooseHarnesses(cmd, cfg, setupFlags{harnesses: "claude," + name}); err == nil || !strings.Contains(err.Error(), "Coming Soon") {
 				t.Fatalf("setup error = %v", err)
 			}
-			if _, err := resolveInstallHarnesses(cmd, cfg, installFlags{harnesses: name}); err == nil || !strings.Contains(err.Error(), "Coming Soon") {
+			if _, err := testApp.resolveInstallHarnesses(cmd, cfg, installFlags{harnesses: name}); err == nil || !strings.Contains(err.Error(), "Coming Soon") {
 				t.Fatalf("install error = %v", err)
 			}
 		})
 	}
-	got, err := parseAgentList("codex,claude,codex")
+	got, err := testApp.parseAgentList("codex,claude,codex")
 	if err != nil || !slices.Equal(got, []string{"claude", "codex"}) {
 		t.Fatalf("available selection = %v, %v", got, err)
 	}
-	got, err = parseAgentList("codex-desktop,codex,claude,codex-desktop")
+	got, err = testApp.parseAgentList("codex-desktop,codex,claude,codex-desktop")
 	if err != nil || !slices.Equal(got, []string{"claude", "codex", codexDesktopAgent}) {
 		t.Fatalf("independent desktop selection = %v, %v", got, err)
 	}
@@ -138,14 +138,14 @@ func TestHarnessSelectionFlags(t *testing.T) {
 func TestHarnessSelectionFiltersSavedAgents(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 	cmd := &cobra.Command{}
-	for _, saved := range [][]string{registered.Names(), {"cursor", "opencode", "antigravity"}} {
+	for _, saved := range [][]string{testApp.agents.Names(), {"cursor", "opencode", "antigravity"}} {
 		cfg := &config.Config{Harnesses: saved}
 		wantInstalled := []string(nil)
 		if slices.Contains(saved, "claude") {
 			wantInstalled = []string{"claude", "codex"}
 		}
 		wantSetup := slices.Clone(wantInstalled)
-		if desktop, _, _ := registered.Surface(codexDesktopAgent); desktop.Installed(context.Background()) {
+		if desktop, _, _ := testApp.agents.Surface(codexDesktopAgent); desktop.Installed(context.Background()) {
 			// Codex Desktop sorts right after the CLI in the picker.
 			if i := slices.Index(wantSetup, "codex"); i >= 0 {
 				wantSetup = slices.Insert(wantSetup, i+1, codexDesktopAgent)
@@ -156,11 +156,11 @@ func TestHarnessSelectionFiltersSavedAgents(t *testing.T) {
 				wantInstalled = append(wantInstalled, codexDesktopAgent)
 			}
 		}
-		got, err := chooseHarnesses(cmd, cfg, setupFlags{assumeYes: true})
+		got, err := testApp.chooseHarnesses(cmd, cfg, setupFlags{assumeYes: true})
 		if err != nil || !slices.Equal(got, wantSetup) {
 			t.Fatalf("setup selection = %v, %v; want %v", got, err, wantSetup)
 		}
-		got, err = resolveInstallHarnesses(cmd, cfg, installFlags{assumeYes: true, dryRun: true})
+		got, err = testApp.resolveInstallHarnesses(cmd, cfg, installFlags{assumeYes: true, dryRun: true})
 		if err != nil || !slices.Equal(got, wantInstalled) {
 			t.Fatalf("install selection = %v, %v; want %v", got, err, wantInstalled)
 		}

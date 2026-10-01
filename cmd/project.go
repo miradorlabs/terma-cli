@@ -24,7 +24,7 @@ type listProjectsResponse struct {
 	Projects []project `json:"projects"`
 }
 
-func newProjectCommand() *cobra.Command {
+func (app *App) newProjectCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "project",
 		Aliases: []string{"projects"},
@@ -32,20 +32,20 @@ func newProjectCommand() *cobra.Command {
 		// Advanced: install owns project selection and repository binding.
 		Hidden: true,
 		Long: `Projects are selected per repository by terma install.
-Read commands use the current repository's install.Binding, or an explicit --project override.`,
+Read commands use the current repository's binding, or an explicit --project override.`,
 	}
-	cmd.AddCommand(newProjectListCommand(), newProjectShowCommand())
+	cmd.AddCommand(app.newProjectListCommand(), app.newProjectShowCommand())
 	return cmd
 }
 
-func newProjectListCommand() *cobra.Command {
+func (app *App) newProjectListCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List projects in the current organization",
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfg, client, format, err := setupCommand(resolveRepoProject)
+			cfg, client, format, err := app.setupCommand(resolveRepoProject)
 			if err != nil {
 				return err
 			}
@@ -73,18 +73,18 @@ func newProjectListCommand() *cobra.Command {
 	}
 }
 
-func newProjectShowCommand() *cobra.Command {
+func (app *App) newProjectShowCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:    "show",
 		Short:  "Show this repository's project",
 		Hidden: true,
 		Args:   cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfg, err := loadProjectConfig()
+			cfg, err := app.loadProjectConfig()
 			if err != nil {
 				return err
 			}
-			format, err := resolveFormat()
+			format, err := app.resolveFormat()
 			if err != nil {
 				return err
 			}

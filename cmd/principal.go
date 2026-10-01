@@ -12,7 +12,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/output"
 )
 
-func newPrincipalCommand() *cobra.Command {
+func (app *App) newPrincipalCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "principal",
 		Aliases: []string{"principals"},
@@ -27,11 +27,11 @@ name as well as an id and resolves it through this catalog, so you rarely need t
 commands directly. They are here for when a match is ambiguous, or to see what the
 catalog knows.`,
 	}
-	cmd.AddCommand(newPrincipalListCommand(), newPrincipalFindCommand())
+	cmd.AddCommand(app.newPrincipalListCommand(), app.newPrincipalFindCommand())
 	return cmd
 }
 
-func newPrincipalListCommand() *cobra.Command {
+func (app *App) newPrincipalListCommand() *cobra.Command {
 	var kind, source string
 	cmd := &cobra.Command{
 		Use:     "list",
@@ -42,7 +42,7 @@ func newPrincipalListCommand() *cobra.Command {
 			if err := validatePrincipalKind(kind); err != nil {
 				return err
 			}
-			ctx, client, format, err := setupProjectCommand(cmd)
+			ctx, client, format, err := app.setupProjectCommand(cmd)
 			if err != nil {
 				return err
 			}
@@ -56,11 +56,11 @@ func newPrincipalListCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&kind, "kind", "", "user or api_key")
-	cmd.Flags().StringVar(&source, "source", "", "source system, e.g. "+sourceExamples())
+	cmd.Flags().StringVar(&source, "source", "", "source system, e.g. "+app.sourceExamples())
 	return cmd
 }
 
-func newPrincipalFindCommand() *cobra.Command {
+func (app *App) newPrincipalFindCommand() *cobra.Command {
 	var kind string
 	cmd := &cobra.Command{
 		Use:   "find <name-or-id>",
@@ -73,7 +73,7 @@ func newPrincipalFindCommand() *cobra.Command {
 			if err := validatePrincipalKind(kind); err != nil {
 				return err
 			}
-			ctx, client, format, err := setupProjectCommand(cmd)
+			ctx, client, format, err := app.setupProjectCommand(cmd)
 			if err != nil {
 				return err
 			}

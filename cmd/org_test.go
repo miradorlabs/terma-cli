@@ -124,7 +124,6 @@ func authSandbox(t *testing.T, f *fakeAuth) {
 	t.Setenv("TERMA_ENV", "")
 	t.Setenv("TERMA_PROFILE", "")
 	t.Chdir(t.TempDir())
-	flags = globalFlags{}
 }
 
 func storedSession(f *fakeAuth, org organization) *auth.Credential {

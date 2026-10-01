@@ -21,7 +21,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/shape"
 )
 
-func newRelayRunCommand() *cobra.Command {
+func (app *App) newRelayRunCommand() *cobra.Command {
 	var idle time.Duration
 	var addr string
 	var quiet bool
@@ -34,7 +34,7 @@ func newRelayRunCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			cfg, err := relayRunConfig()
+			cfg, err := app.relayRunConfig()
 			if err != nil {
 				return err
 			}
@@ -42,8 +42,8 @@ func newRelayRunCommand() *cobra.Command {
 			defer stop()
 			res, err := daemon.Run(ctx, daemon.Config{
 				Dir: dir, Addr: addr, Idle: idle,
-				Engine:  relayRunOptions(ctx, cmd, dir, cfg),
-				Workers: []func(context.Context){policyRefresher().Run},
+				Engine:  app.relayRunOptions(ctx, cmd, dir, cfg),
+				Workers: []func(context.Context){app.policyRefresher().Run},
 				Listening: func(at net.Addr, hold time.Duration) {
 					if !quiet {
 						fmt.Fprintf(cmd.OutOrStdout(), "Relay listening on %s (hold %s, idle exit %s).\n", at, hold, idle)
@@ -78,8 +78,8 @@ func newRelayRunCommand() *cobra.Command {
 // relayRunConfig is the configuration a relay routes with. Before the first successful
 // policy fetch, capture is disabled; the background poll authorizes it without
 // delaying the loopback listener.
-func relayRunConfig() (*config.Config, error) {
-	cfg, err := loadConfig()
+func (app *App) relayRunConfig() (*config.Config, error) {
+	cfg, err := app.loadConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -98,16 +98,16 @@ func relayRunConfig() (*config.Config, error) {
 // and catch-all resolvers, the heartbeat, and how senders are found. TERMA_RELAY_HOLD
 // and TERMA_RELAY_HEARTBEAT shorten the hold and the heartbeat's period for a test;
 // TERMA_RELAY_DEBUG=1 logs every drop.
-func relayRunOptions(ctx context.Context, cmd *cobra.Command, dir string, cfg *config.Config) relay.Options {
+func (app *App) relayRunOptions(ctx context.Context, cmd *cobra.Command, dir string, cfg *config.Config) relay.Options {
 	hold := relay.DefaultHold
 	if v, err := time.ParseDuration(os.Getenv("TERMA_RELAY_HOLD")); err == nil && v > 0 {
 		hold = v
 	}
 	beat, _ := time.ParseDuration(os.Getenv("TERMA_RELAY_HEARTBEAT"))
-	minter := newRelayKeyMinter(ctx, cfg)
-	opts := relay.Options{Correlators: registered.With[shape.Correlator](), Capturers: registered.With[shape.Capturer](),
-		Hold: hold, Dir: filepath.Join(dir, relay.OutboxDir), Resolve: relayResolver(cfg, minter.Mint), Version: Version,
-		CatchAll: relayCatchAll(), HeartbeatInfo: relayHeartbeat(dir).Info(), HeartbeatSend: relayHeartbeatSend, HeartbeatEvery: max(beat, 0),
+	minter := app.newRelayKeyMinter(ctx, cfg)
+	opts := relay.Options{Correlators: app.agents.With[shape.Correlator](), Capturers: app.agents.With[shape.Capturer](),
+		Hold: hold, Dir: filepath.Join(dir, relay.OutboxDir), Resolve: app.relayResolver(cfg, minter.Mint), Version: app.version,
+		CatchAll: relayCatchAll(), HeartbeatInfo: app.relayHeartbeat(dir).Info(), HeartbeatSend: app.relayHeartbeatSend, HeartbeatEvery: max(beat, 0),
 		PeerPID: procinfo.FindSender, ProcessAlive: harness.ProcessAlive, ClaimCacheTTL: time.Second, PolicyCacheTTL: time.Second}
 	if os.Getenv("TERMA_RELAY_DEBUG") == "1" {
 		errOut := cmd.ErrOrStderr()

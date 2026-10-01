@@ -44,7 +44,7 @@ func commandNamed(root *cobra.Command, name string) *cobra.Command {
 
 func TestHelpListsOnlyThePrimaryCommands(t *testing.T) {
 	var visible []string
-	for _, c := range NewRootCommand().Commands() {
+	for _, c := range testApp.NewRootCommand().Commands() {
 		// cobra's own `help` and `completion` are not terma's to list or hide.
 		if c.IsAvailableCommand() && c.Name() != "help" && c.Name() != "completion" {
 			visible = append(visible, c.Name())
@@ -77,7 +77,7 @@ func TestHelpListsOnlyThePrimaryCommands(t *testing.T) {
 // that it is wired, and it runs nothing.
 func TestAdvancedCommandsAreHiddenNotRemoved(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
-	root := NewRootCommand()
+	root := testApp.NewRootCommand()
 	var known []string
 	for _, c := range root.Commands() {
 		known = append(known, c.Name())
@@ -124,7 +124,7 @@ var unquotedCommand = regexp.MustCompile(`(?:Fix:\s*"|[Ww]ith: )terma ([a-z][a-z
 // requires each `terma <name>` it finds to be a command that exists — hidden or not,
 // which is also what stops a cleanup from removing a command the hints still name.
 func TestEveryCommandAMessageNamesExists(t *testing.T) {
-	root := NewRootCommand()
+	root := testApp.NewRootCommand()
 	exists := map[string]bool{"help": true, "completion": true}
 	for _, c := range root.Commands() {
 		exists[c.Name()] = true

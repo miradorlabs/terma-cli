@@ -46,35 +46,35 @@ func TestAutomaticUpdateCommandEligibility(t *testing.T) {
 	t.Setenv("CI", "")
 	t.Setenv("TERMA_NO_UPDATE_CHECK", "")
 	for _, name := range []string{"hook", "spool", "update", "version", "completion"} {
-		root := NewRootCommand()
+		root := testApp.NewRootCommand()
 		root.InitDefaultCompletionCmd()
 		cmd, _, err := root.Find([]string{name})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if automaticUpdatesAllowed(cmd, true) {
+		if testApp.automaticUpdatesAllowed(cmd, true) {
 			t.Fatalf("updates allowed in %s", name)
 		}
 	}
-	root := NewRootCommand()
+	root := testApp.NewRootCommand()
 	cmd, _, _ := root.Find([]string{"status"})
-	if !automaticUpdatesAllowed(cmd, true) || automaticUpdatesAllowed(cmd, false) {
+	if !testApp.automaticUpdatesAllowed(cmd, true) || testApp.automaticUpdatesAllowed(cmd, false) {
 		t.Fatal("interactive eligibility wrong")
 	}
 	t.Setenv("CI", "1")
-	if automaticUpdatesAllowed(cmd, true) {
+	if testApp.automaticUpdatesAllowed(cmd, true) {
 		t.Fatal("CI enabled updates")
 	}
 	t.Setenv("CI", "")
 	t.Setenv("TERMA_NO_UPDATE_CHECK", "1")
-	if automaticUpdatesAllowed(cmd, true) {
+	if testApp.automaticUpdatesAllowed(cmd, true) {
 		t.Fatal("opt-out ignored")
 	}
 	t.Setenv("TERMA_NO_UPDATE_CHECK", "")
 	if err := root.PersistentFlags().Set("output", "json"); err != nil {
 		t.Fatal(err)
 	}
-	if automaticUpdatesAllowed(cmd, true) {
+	if testApp.automaticUpdatesAllowed(cmd, true) {
 		t.Fatal("JSON enabled updates")
 	}
 }
@@ -99,7 +99,7 @@ func TestUpdateCheckAndSourceBuildGuard(t *testing.T) {
 				t.Fatal(err)
 			}
 			var out bytes.Buffer
-			if err := runUpdate(context.Background(), c, dir, exe, &out, true, false); err != nil {
+			if err := testApp.runUpdate(context.Background(), c, dir, exe, &out, true, false); err != nil {
 				t.Fatal(err)
 			}
 			if calls != 1 {
@@ -114,7 +114,7 @@ func TestUpdateCheckAndSourceBuildGuard(t *testing.T) {
 			}
 
 			if version != "1.0.0" {
-				err := runUpdate(context.Background(), c, dir, exe, &out, false, false)
+				err := testApp.runUpdate(context.Background(), c, dir, exe, &out, false, false)
 				if err == nil || !strings.Contains(err.Error(), "--force") {
 					t.Fatalf("source build not guarded: %v", err)
 				}
@@ -129,7 +129,7 @@ func TestUpdateCheckExplainsMissingRelease(t *testing.T) {
 	c := &selfupdate.Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0"}
 	var out bytes.Buffer
 	dir := t.TempDir()
-	if err := runUpdate(context.Background(), c, dir, "unused", &out, true, false); err != nil {
+	if err := testApp.runUpdate(context.Background(), c, dir, "unused", &out, true, false); err != nil {
 		t.Fatal(err)
 	}
 	if !selfupdate.LoadCache(dir).Failed {

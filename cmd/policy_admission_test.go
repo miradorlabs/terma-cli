@@ -29,11 +29,11 @@ func TestSpoolRepliesUseCurrentNativeCodexConsent(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, name := range []string{hookrun.EventAssistantMessage, hookrun.EventSessionTitle} {
-		if !spoolEventAllowed(config.DefaultPolicy(), "team", spool.Event{Name: name, Attrs: map[string]any{hookrun.AttrTool: "codex"}}) {
+		if !testApp.spoolEventAllowed(config.DefaultPolicy(), "team", spool.Event{Name: name, Attrs: map[string]any{hookrun.AttrTool: "codex"}}) {
 			t.Fatalf("queued %s ignored native consent without a routing record", name)
 		}
 	}
-	if spoolEventAllowed(config.DefaultPolicy(), "team", spool.Event{Name: hookrun.EventAssistantMessage}) {
+	if testApp.spoolEventAllowed(config.DefaultPolicy(), "team", spool.Event{Name: hookrun.EventAssistantMessage}) {
 		t.Fatal("a reply no agent's label vouches for was delivered")
 	}
 	exporter.IncludePrompts = false
@@ -41,7 +41,7 @@ func TestSpoolRepliesUseCurrentNativeCodexConsent(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, name := range []string{hookrun.EventAssistantMessage, hookrun.EventSessionTitle} {
-		if spoolEventAllowed(config.DefaultPolicy(), "team", spool.Event{Name: name, Attrs: map[string]any{hookrun.AttrTool: "codex"}}) {
+		if testApp.spoolEventAllowed(config.DefaultPolicy(), "team", spool.Event{Name: name, Attrs: map[string]any{hookrun.AttrTool: "codex"}}) {
 			t.Fatalf("queued %s ignored native prompt opt-out", name)
 		}
 	}
@@ -57,7 +57,7 @@ func TestRelayAdmissionStopsGlobalCoverageWithStaleCatchAll(t *testing.T) {
 		fmt.Fprint(w, `{}`)
 	}))
 	defer upstream.Close()
-	cfg, err := loadConfig()
+	cfg, err := testApp.loadConfig()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +83,7 @@ func TestRelayAdmissionStopsGlobalCoverageWithStaleCatchAll(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := newTestRelay(relay.Options{Token: "token", Dir: t.TempDir(), Hold: 30 * time.Millisecond, TraceHold: 30 * time.Millisecond,
-		CatchAll: relayCatchAll(), Resolve: relayResolver(cfg, nil), PolicyCacheTTL: time.Second})
+		CatchAll: relayCatchAll(), Resolve: testApp.relayResolver(cfg, nil), PolicyCacheTTL: time.Second})
 	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan struct{})
 	go func() { r.Run(ctx); close(done) }()

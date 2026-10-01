@@ -66,7 +66,7 @@ func TestFlushSpoolSeparatesUnroutableFromExpired(t *testing.T) {
 	appendEvent(t, s, "", time.Now())
 	appendEvent(t, s, spoolTestProject, time.Now().Add(-2*spool.MaxAge))
 
-	res, err := flushSpool(context.Background(), true, 0)
+	res, err := testApp.flushSpool(context.Background(), true, 0)
 	if err != nil {
 		t.Fatalf("flushSpool: %v", err)
 	}

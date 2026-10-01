@@ -44,10 +44,10 @@ func saveCollectionPolicy(cfg *config.Config, pol *config.Policy) error {
 
 // refreshCollectionPolicy uses the developer login, never a telemetry key. A
 // rejected request cannot replace the last validated team's capture policy.
-func refreshCollectionPolicy(ctx context.Context, cfg *config.Config) error {
+func (app *App) refreshCollectionPolicy(ctx context.Context, cfg *config.Config) error {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	pol, err := fetchPolicy(ctx, cfg)
+	pol, err := app.fetchPolicy(ctx, cfg)
 	if err != nil {
 		return err
 	}
@@ -60,7 +60,7 @@ func refreshCollectionPolicy(ctx context.Context, cfg *config.Config) error {
 		return err
 	}
 	if p := file.Profiles[cfg.ProfileName]; p != nil && p.Policy != nil && p.Policy.TeamID == pol.TeamID {
-		return applyGlobalMode(ctx, cfg.Harnesses, pol.Global(), func(string) {}, func(string) {})
+		return app.applyGlobalMode(ctx, cfg.Harnesses, pol.Global(), func(string) {}, func(string) {})
 	}
 	return nil
 }
@@ -82,14 +82,14 @@ func validatedPolicy(cfg *config.Config, team string) (config.Policy, bool) {
 	return cached, ok
 }
 
-func currentTeamPolicy(ctx context.Context, cfg *config.Config, team string) (config.Policy, error) {
+func (app *App) currentTeamPolicy(ctx context.Context, cfg *config.Config, team string) (config.Policy, error) {
 	cached, ok := validatedPolicy(cfg, team)
 	if ok && time.Since(cached.FetchedAt) < policyRefreshInterval {
 		return cached, nil
 	}
 	scoped := *cfg
 	scoped.ProjectID = team
-	if err := refreshCollectionPolicy(ctx, &scoped); err != nil {
+	if err := app.refreshCollectionPolicy(ctx, &scoped); err != nil {
 		if ok {
 			return cached, nil
 		}
@@ -100,12 +100,12 @@ func currentTeamPolicy(ctx context.Context, cfg *config.Config, team string) (co
 
 // policyRefresher keeps every team this machine exports for fresh while the relay runs:
 // the teams with a key here, and the selected team (global mode's default project).
-func policyRefresher() *daemon.PolicyRefresher {
+func (app *App) policyRefresher() *daemon.PolicyRefresher {
 	return &daemon.PolicyRefresher{
 		Interval: policyRefreshInterval,
 		Discover: 5 * time.Second,
 		Teams: func() []string {
-			cfg, err := loadConfig()
+			cfg, err := app.loadConfig()
 			if err != nil {
 				return nil
 			}
@@ -120,7 +120,7 @@ func policyRefresher() *daemon.PolicyRefresher {
 			return teams
 		},
 		Fetched: func(team string) time.Time {
-			cfg, err := loadConfig()
+			cfg, err := app.loadConfig()
 			if err != nil {
 				return time.Time{}
 			}
@@ -130,13 +130,13 @@ func policyRefresher() *daemon.PolicyRefresher {
 			return time.Time{}
 		},
 		Refresh: func(ctx context.Context, team string) error {
-			cfg, err := loadConfig()
+			cfg, err := app.loadConfig()
 			if err != nil {
 				return err
 			}
 			scoped := *cfg
 			scoped.ProjectID = team
-			return refreshCollectionPolicy(ctx, &scoped)
+			return app.refreshCollectionPolicy(ctx, &scoped)
 		},
 	}
 }

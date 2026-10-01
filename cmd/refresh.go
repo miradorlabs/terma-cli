@@ -28,10 +28,10 @@ import (
 // refreshMachine rewrites the home-directory files every repository shares, each agent's
 // (agents.MachineRefresher). It returns the paths it changed, carrying on past a failure
 // so one broken file does not strand the rest.
-func refreshMachine() ([]string, error) {
+func (app *App) refreshMachine() ([]string, error) {
 	var changed []string
 	var errs []error
-	for _, a := range registered.With[agents.MachineRefresher]() {
+	for _, a := range app.agents.With[agents.MachineRefresher]() {
 		if path, ok, err := a.RefreshMachine(); err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", a.Name(), err))
 		} else if ok {
@@ -54,7 +54,7 @@ type repoRefresh struct {
 // workspace terma installed; a workspace outside Git has agent hooks and no commit hooks.
 // Only files that exist are refreshed; one that is gone was removed by someone, and
 // bringing it back is `terma install`'s decision.
-func planRepoRefresh(ctx context.Context) (*repoRefresh, error) {
+func (app *App) planRepoRefresh(ctx context.Context) (*repoRefresh, error) {
 	root, gitDir, err := workspaceHere(ctx)
 	if err != nil {
 		return nil, nil
@@ -76,7 +76,7 @@ func planRepoRefresh(ctx context.Context) (*repoRefresh, error) {
 			det = hookmgr.Detection{}
 		}
 	}
-	plan, err := install.PlanHooks(registered, root, det, registered.WiredNames(root))
+	plan, err := install.PlanHooks(app.agents, root, det, app.agents.WiredNames(root))
 	if err != nil {
 		return nil, err
 	}
@@ -87,22 +87,22 @@ func planRepoRefresh(ctx context.Context) (*repoRefresh, error) {
 // stampVersion records this build as the terma that last wrote the repository's
 // committed files, in the checkout's own binding (a linked worktree reading its main
 // checkout's has none to stamp). It reports whether the file changed.
-func stampVersion(root string) (bool, error) {
+func (app *App) stampVersion(root string) (bool, error) {
 	bound, err := termaproject.Load(root)
 	if errors.Is(err, termaproject.ErrNotFound) {
 		return false, nil
 	}
-	if err != nil || bound.Install.Version == Version {
+	if err != nil || bound.Install.Version == app.version {
 		return false, err
 	}
-	bound.Install.Version = Version
+	bound.Install.Version = app.version
 	return true, termaproject.Save(root, bound)
 }
 
 // runRefresh is `terma update --refresh`: the machine's files, then the repository
 // around the working directory, reported as it goes. Saved state is migrated first,
 // retrying a migration that failed, so the files are rewritten from current state.
-func runRefresh(ctx context.Context, out io.Writer) error {
+func (app *App) runRefresh(ctx context.Context, out io.Writer) error {
 	out = style.Highlight(out)
 	var migrateErr error
 	if dir, err := config.Dir(); err == nil {
@@ -115,13 +115,13 @@ func runRefresh(ctx context.Context, out io.Writer) error {
 			migrateErr = fmt.Errorf("migrate saved state: %w", migrateErr)
 		}
 	}
-	machine, machineErr := refreshMachine()
-	repo, repoErr := planRepoRefresh(ctx)
+	machine, machineErr := app.refreshMachine()
+	repo, repoErr := app.planRepoRefresh(ctx)
 	var repoChanged []string
 	if repo != nil && !repo.plan.Empty() {
 		if repoErr = repo.plan.Apply(repo.root); repoErr == nil {
 			repoChanged = repo.plan.Paths()
-			if stamped, err := stampVersion(repo.root); err != nil {
+			if stamped, err := app.stampVersion(repo.root); err != nil {
 				repoErr = err
 			} else if stamped {
 				repoChanged = append(repoChanged, termaproject.FileName)
@@ -131,9 +131,9 @@ func runRefresh(ctx context.Context, out io.Writer) error {
 
 	switch {
 	case len(machine) == 0 && len(repoChanged) == 0:
-		fmt.Fprintf(out, "Nothing to refresh: what terma installed already matches %s.\n", Version)
+		fmt.Fprintf(out, "Nothing to refresh: what terma installed already matches %s.\n", app.version)
 	default:
-		fmt.Fprintf(out, "Refreshed for terma %s:\n", Version)
+		fmt.Fprintf(out, "Refreshed for terma %s:\n", app.version)
 		for _, p := range machine {
 			fmt.Fprintf(out, "  updated %s\n", p)
 		}
@@ -149,7 +149,7 @@ func runRefresh(ctx context.Context, out io.Writer) error {
 	if len(repoChanged) > 0 {
 		fmt.Fprintln(out)
 		printCommitList(out, "These are committed files. Commit them so every clone runs the same hooks:", repoChanged)
-		for _, a := range registered.With[agents.Retrusting]() {
+		for _, a := range app.agents.With[agents.Retrusting]() {
 			if slices.Contains(repoChanged, a.HooksPath()) {
 				fmt.Fprintf(out, "\n%s\n", a.RetrustNote())
 			}
@@ -161,7 +161,7 @@ func runRefresh(ctx context.Context, out io.Writer) error {
 	err := errors.Join(migrateErr, machineErr, repoErr)
 	if err == nil {
 		if dir, dirErr := config.Dir(); dirErr == nil {
-			err = selfupdate.SaveRefreshed(dir, Version)
+			err = selfupdate.SaveRefreshed(dir, app.version)
 		}
 	}
 	return err
@@ -173,22 +173,22 @@ func runRefresh(ctx context.Context, out io.Writer) error {
 // home-directory files; committed files change only when the developer asks, so for the
 // current repository it says what is out of date instead. It stays quiet when nothing
 // changed, and records the release either way so it runs once.
-func refreshAfterUpgrade(ctx context.Context, dir string, out io.Writer) {
+func (app *App) refreshAfterUpgrade(ctx context.Context, dir string, out io.Writer) {
 	out = style.Highlight(out)
-	if !selfupdate.NeedsRefresh(dir, Version) {
+	if !selfupdate.NeedsRefresh(dir, app.version) {
 		return
 	}
-	changed, err := refreshMachine()
+	changed, err := app.refreshMachine()
 	if len(changed) > 0 {
-		fmt.Fprintf(out, "terma %s refreshed %d file(s) an earlier version installed.\n", Version, len(changed))
+		fmt.Fprintf(out, "terma %s refreshed %d file(s) an earlier version installed.\n", app.version, len(changed))
 	}
 	if err != nil {
-		fmt.Fprintf(out, "terma %s could not refresh what an earlier version installed (%v). Run `terma update --refresh` to retry.\n", Version, err)
+		fmt.Fprintf(out, "terma %s could not refresh what an earlier version installed (%v). Run `terma update --refresh` to retry.\n", app.version, err)
 	}
-	if repo, _ := planRepoRefresh(ctx); repo != nil && !repo.plan.Empty() {
+	if repo, _ := app.planRepoRefresh(ctx); repo != nil && !repo.plan.Empty() {
 		fmt.Fprintln(out, "This repository's hooks were written by an earlier terma. Run `terma update --refresh` here to update them.")
 	}
 	if err == nil {
-		_ = selfupdate.SaveRefreshed(dir, Version)
+		_ = selfupdate.SaveRefreshed(dir, app.version)
 	}
 }

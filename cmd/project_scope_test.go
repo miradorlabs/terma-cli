@@ -71,8 +71,7 @@ func TestUnboundRepositoryRequiresProject(t *testing.T) {
 	// An unbound checkout and a directory outside git both need an explicit choice.
 	for _, dir := range []string{repo, t.TempDir()} {
 		t.Chdir(dir)
-		flags = globalFlags{}
-		cfg, err := loadConfig()
+		cfg, err := testApp.loadConfig()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -89,7 +88,7 @@ func TestUnboundRepositoryRequiresProject(t *testing.T) {
 		t.Fatalf("nested checkout: %v %s", err, out)
 	}
 	t.Chdir(nested)
-	cfg, err := loadProjectConfig()
+	cfg, err := testApp.loadProjectConfig()
 	if err != nil || cfg.ProjectID != "" {
 		t.Fatalf("nested checkout inherited a project: %+v, %v", cfg, err)
 	}
@@ -101,14 +100,15 @@ func TestProjectScopeExplicitOverrideAndBinding(t *testing.T) {
 	if err := termaproject.Save(repo, &termaproject.File{Project: termaproject.Project{ID: "bound-repo", Name: "Repository"}}); err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { testApp.flags = globalFlags{} })
 	for _, tc := range []struct{ flag, env, want string }{
 		{"", "", "bound-repo"},
 		{"", "env-project", "env-project"},
 		{"flag-project", "env-project", "flag-project"},
 	} {
-		flags = globalFlags{projectID: tc.flag}
+		testApp.flags = globalFlags{projectID: tc.flag}
 		t.Setenv("TERMA_PROJECT_ID", tc.env)
-		cfg, err := loadProjectConfig()
+		cfg, err := testApp.loadProjectConfig()
 		if err != nil || cfg.ProjectID != tc.want {
 			t.Fatalf("scope: %+v, %v; want %s", cfg, err, tc.want)
 		}
@@ -116,7 +116,7 @@ func TestProjectScopeExplicitOverrideAndBinding(t *testing.T) {
 			t.Fatal("explicit override retained the repository's display name")
 		}
 	}
-	flags = globalFlags{}
+	testApp.flags = globalFlags{}
 	t.Setenv("TERMA_PROJECT_ID", "")
 	if err := os.MkdirAll(filepath.Dir(termaproject.Path(repo)), 0755); err != nil {
 		t.Fatal(err)
@@ -124,7 +124,7 @@ func TestProjectScopeExplicitOverrideAndBinding(t *testing.T) {
 	if err := os.WriteFile(termaproject.Path(repo), []byte("{invalid"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := loadProjectConfig(); err == nil {
+	if _, err := testApp.loadProjectConfig(); err == nil {
 		t.Fatal("invalid JSON binding was accepted")
 	}
 }

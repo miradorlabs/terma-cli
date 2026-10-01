@@ -41,7 +41,7 @@ func principalsThen(t *testing.T, rest http.HandlerFunc) http.HandlerFunc {
 }
 
 func TestInsightCommandTree(t *testing.T) {
-	root := NewRootCommand()
+	root := testApp.NewRootCommand()
 	for _, path := range []string{"session list", "session get", "session events", "session git", "usage", "principal list", "principal find"} {
 		fields := strings.Fields(path)
 		cmd, _, err := root.Find(fields)

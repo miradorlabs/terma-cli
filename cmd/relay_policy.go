@@ -9,9 +9,9 @@ import (
 
 // relayResolver turns a claim into its session's policy (daemon.Resolver) with this
 // CLI's agents and ingest hosts.
-func relayResolver(cfg *config.Config, mint func(projectID string)) func(claim.Claim) (relay.Policy, error) {
-	return daemon.Resolver(cfg, daemon.ResolverDeps{Mint: mint, AgentName: registered.NameForTool,
-		Endpoint: func(projectID string) string { return projectEndpoint(cfg, projectID) }})
+func (app *App) relayResolver(cfg *config.Config, mint func(projectID string)) func(claim.Claim) (relay.Policy, error) {
+	return daemon.Resolver(cfg, daemon.ResolverDeps{Mint: mint, AgentName: app.agents.NameForTool,
+		Endpoint: func(projectID string) string { return app.projectEndpoint(cfg, projectID) }})
 }
 
 // relayCatchAll is global mode's catch-all, read from the policy setup recorded.

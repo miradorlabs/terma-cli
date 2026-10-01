@@ -21,11 +21,11 @@ func TestDesktopOnlySelectionDoesNotRequireCodexCLIShim(t *testing.T) {
 		Harnesses: []string{"codex"}, Surfaces: []string{codexDesktopAgent}}); err != nil {
 		t.Fatal(err)
 	}
-	selected := doctor.SelectedForRepo(registered, testProjectID, []string{"codex"})
+	selected := doctor.SelectedForRepo(testApp.agents, testProjectID, []string{"codex"})
 	if !slices.Equal(selected, []string{codexDesktopAgent}) {
 		t.Fatalf("effective choices = %v", selected)
 	}
-	verdicts := doctor.JudgeSelectedHarnesses(context.Background(), registered, "https://otel.terma.ai", testProjectID, "", selected)
+	verdicts := doctor.JudgeSelectedHarnesses(context.Background(), testApp.agents, "https://otel.terma.ai", testProjectID, "", selected)
 	var names []string
 	for _, verdict := range verdicts {
 		names = append(names, verdict.Name)
@@ -41,7 +41,7 @@ func TestDesktopChoiceCountsCodexHookTrust(t *testing.T) {
 	if out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "codex", "--yes", "--no-doctor"); err != nil {
 		t.Fatalf("wire Codex hooks: %v\n%s", err, out)
 	}
-	check := doctor.AgentHooksCheck(registered, repo, []string{codexDesktopAgent})
+	check := doctor.AgentHooksCheck(testApp.agents, repo, []string{codexDesktopAgent})
 	if check.Of != 1 || check.Status != doctor.Warn {
 		t.Fatalf("desktop choice did not check the required Codex hook trust: %+v", check)
 	}
@@ -60,13 +60,13 @@ func TestDesktopVerdictUsesLocalRouteAndKey(t *testing.T) {
 		IncludePrompts: true, IncludeToolContent: true, Surfaces: []string{codexDesktopAgent}}); err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := doctor.JudgeSurface(registered, codexDesktopAgent, "", testProjectID); got.EmissionProblem != "this repository has no delivery key" {
+	if got, _ := doctor.JudgeSurface(testApp.agents, codexDesktopAgent, "", testProjectID); got.EmissionProblem != "this repository has no delivery key" {
 		t.Fatalf("missing key verdict = %q", got.EmissionProblem)
 	}
 	if err := keystore.SetFor("codex", testProjectID, "ter_srv_0123456789abcdef01234567", keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
-	if verdict, _ := doctor.JudgeSurface(registered, codexDesktopAgent, "", testProjectID); verdict.EmissionProblem != "" || verdict.Route != doctor.RouteHooks {
+	if verdict, _ := doctor.JudgeSurface(testApp.agents, codexDesktopAgent, "", testProjectID); verdict.EmissionProblem != "" || verdict.Route != doctor.RouteHooks {
 		t.Fatalf("local desktop verdict = %+v", verdict)
 	}
 }
@@ -80,7 +80,7 @@ func TestARecordWithoutSurfacesStillJudgesTheDesktop(t *testing.T) {
 		Harnesses: []string{"codex"}}); err != nil {
 		t.Fatal(err)
 	}
-	for _, v := range doctor.JudgeSelectedHarnesses(context.Background(), registered, "https://otel.terma.ai", testProjectID, "", []string{codexDesktopAgent}) {
+	for _, v := range doctor.JudgeSelectedHarnesses(context.Background(), testApp.agents, "https://otel.terma.ai", testProjectID, "", []string{codexDesktopAgent}) {
 		if v.Name == codexDesktopAgent {
 			if v.EmissionFix == "" || !strings.Contains(v.EmissionFix, "terma install") {
 				t.Fatalf("desktop verdict without a surface route = %+v", v)

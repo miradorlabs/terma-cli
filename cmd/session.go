@@ -15,7 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/output"
 )
 
-func newSessionCommand() *cobra.Command {
+func (app *App) newSessionCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "session",
 		Aliases: []string{"sessions"},
@@ -30,10 +30,10 @@ A session is identified by its session id together with its source system, so
 app) as well as an id; names are resolved through ` + "`terma principal`" + `.`,
 	}
 	cmd.AddCommand(
-		newSessionListCommand(),
-		newSessionGetCommand(),
-		newSessionEventsCommand(),
-		newSessionGitCommand(),
+		app.newSessionListCommand(),
+		app.newSessionGetCommand(),
+		app.newSessionEventsCommand(),
+		app.newSessionGitCommand(),
 	)
 	return cmd
 }
@@ -44,8 +44,8 @@ type sessionSelectFlags struct {
 	filter                                     string
 }
 
-func (f *sessionSelectFlags) bind(fl *pflag.FlagSet, withFilter bool) {
-	fl.StringSliceVar(&f.sources, "source", nil, "source system (repeatable): "+sourceExamples()+", …")
+func (f *sessionSelectFlags) bind(fl *pflag.FlagSet, withFilter bool, sources string) {
+	fl.StringSliceVar(&f.sources, "source", nil, "source system (repeatable): "+sources+", …")
 	fl.StringSliceVar(&f.users, "user", nil, "user by name, email, alias or id (repeatable)")
 	fl.StringSliceVar(&f.apiKeys, "api-key", nil, "API key by label, alias or id (repeatable; never the secret)")
 	fl.StringSliceVar(&f.models, "model", nil, "sessions that used this model (repeatable)")
@@ -139,7 +139,7 @@ func money(usd float64) string { return fmt.Sprintf("%.4f", usd) }
 // walk that fills one page client-side stops at the same number.
 const defaultSessionPageSize = 100
 
-func newSessionListCommand() *cobra.Command {
+func (app *App) newSessionListCommand() *cobra.Command {
 	var (
 		sel            sessionSelectFlags
 		since, until   string
@@ -187,7 +187,7 @@ that is new or has changed, as it happens.`,
 			if err != nil {
 				return err
 			}
-			ctx, client, format, err := setupProjectCommand(cmd)
+			ctx, client, format, err := app.setupProjectCommand(cmd)
 			if err != nil {
 				return err
 			}
@@ -255,7 +255,7 @@ that is new or has changed, as it happens.`,
 			return output.Render(cmd.OutOrStdout(), format, sessionTable(view.Sessions), view)
 		},
 	}
-	sel.bind(cmd.Flags(), true)
+	sel.bind(cmd.Flags(), true, app.sourceExamples())
 	cmd.Flags().StringVar(&since, "since", "", "sessions last active at or after: RFC 3339, a date, a relative age (24h, 7d), today, yesterday")
 	cmd.Flags().StringVar(&until, "until", "", "sessions last active before (same forms; applied client-side)")
 	cmd.Flags().StringVar(&sortBy, "sort", "", "rank by "+strings.Join(api.AISessionSorts, ", ")+", highest first (default recency)")
@@ -267,8 +267,8 @@ that is new or has changed, as it happens.`,
 }
 
 // sessionIdentityFlag adds the --source flag every session-scoped read needs.
-func sessionIdentityFlag(cmd *cobra.Command, source *string) {
-	cmd.Flags().StringVar(source, "source", "", "the session's source system, e.g. "+sourceExamples()+" (required)")
+func (app *App) sessionIdentityFlag(cmd *cobra.Command, source *string) {
+	cmd.Flags().StringVar(source, "source", "", "the session's source system, e.g. "+app.sourceExamples()+" (required)")
 	_ = cmd.MarkFlagRequired("source")
 }
 
@@ -277,11 +277,7 @@ func sessionNotFound(source, id string) error {
 	return fmt.Errorf("no %s session %q in this project — copy the session id and source from `terma session list`", source, id)
 }
 
-// sessionGetWait bounds `session get`. The gateway serves a single session's roll-up
-// only as a live feed, which has no request timeout; a variable so a test can shorten it.
-var sessionGetWait = 15 * time.Second
-
-func newSessionGetCommand() *cobra.Command {
+func (app *App) newSessionGetCommand() *cobra.Command {
 	var source string
 	cmd := &cobra.Command{
 		Use:     "get <session-id>",
@@ -289,7 +285,7 @@ func newSessionGetCommand() *cobra.Command {
 		Short:   "Show one session's roll-up",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ctx, client, format, err := setupProjectCommand(cmd)
+			ctx, client, format, err := app.setupProjectCommand(cmd)
 			if err != nil {
 				return err
 			}
@@ -297,7 +293,7 @@ func newSessionGetCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			s, err := client.GetAISession(ctx, args[0], source, sessionGetWait)
+			s, err := client.GetAISession(ctx, args[0], source, app.sessionGetWait)
 			if err != nil {
 				if api.IsNotFound(err) {
 					return sessionNotFound(source, args[0])
@@ -327,7 +323,7 @@ func newSessionGetCommand() *cobra.Command {
 			return output.KeyValues(cmd.OutOrStdout(), format, pairs, v)
 		},
 	}
-	sessionIdentityFlag(cmd, &source)
+	app.sessionIdentityFlag(cmd, &source)
 	return cmd
 }
 
@@ -352,7 +348,7 @@ func usageBreakdown(u *api.AITokenUsage) string {
 
 var toolEventKinds = []string{api.AIEventToolCall, api.AIEventToolResult, api.AIEventToolDecision}
 
-func newSessionEventsCommand() *cobra.Command {
+func (app *App) newSessionEventsCommand() *cobra.Command {
 	var (
 		source, tool, since, until string
 		kinds                      []string
@@ -377,7 +373,7 @@ connected to export; a harness connected with --exclude-prompts carries none.`,
 			if err != nil {
 				return err
 			}
-			ctx, client, format, err := setupProjectCommand(cmd)
+			ctx, client, format, err := app.setupProjectCommand(cmd)
 			if err != nil {
 				return err
 			}
@@ -424,7 +420,7 @@ connected to export; a harness connected with --exclude-prompts carries none.`,
 			return output.Render(cmd.OutOrStdout(), format, table, resp)
 		},
 	}
-	sessionIdentityFlag(cmd, &source)
+	app.sessionIdentityFlag(cmd, &source)
 	fl := cmd.Flags()
 	fl.StringSliceVar(&kinds, "kind", nil, "keep only these kinds (repeatable): "+strings.Join(api.AIEventKinds, ", "))
 	fl.StringVar(&tool, "tool", "", "keep only events of this tool")
@@ -470,7 +466,7 @@ func gitRow(a api.AIGitActivity) []string {
 	}
 }
 
-func newSessionGitCommand() *cobra.Command {
+func (app *App) newSessionGitCommand() *cobra.Command {
 	var source string
 	var follow bool
 	cmd := &cobra.Command{
@@ -482,7 +478,7 @@ ledger. --follow tails the live feed; each frame replaces the earlier one with t
 same activity_id as the evidence planes coalesce.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ctx, client, format, err := setupProjectCommand(cmd)
+			ctx, client, format, err := app.setupProjectCommand(cmd)
 			if err != nil {
 				return err
 			}
@@ -517,7 +513,7 @@ same activity_id as the evidence planes coalesce.`,
 			return output.Render(cmd.OutOrStdout(), format, gitTable(resp.Activities), resp)
 		},
 	}
-	sessionIdentityFlag(cmd, &source)
+	app.sessionIdentityFlag(cmd, &source)
 	cmd.Flags().BoolVar(&follow, "follow", false, "tail live updates until interrupted")
 	return cmd
 }

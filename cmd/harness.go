@@ -13,9 +13,9 @@ import (
 // newHarnessListCommand reports terma's static support for each coding agent: what it
 // can do with it, and where a capability is missing. This is the catalog, not a
 // connection — `terma harness status` reads each harness's own config for that.
-func newHarnessListCommand() *cobra.Command {
+func (app *App) newHarnessListCommand() *cobra.Command {
 	return &cobra.Command{
-		Use:     "list [" + strings.Join(registered.SupportNames(), "|") + "]",
+		Use:     "list [" + strings.Join(app.agents.SupportNames(), "|") + "]",
 		Aliases: []string{"ls"},
 		Short:   "Show which coding agents terma supports, and how fully",
 		Long: `Lists every coding agent terma integrates with and how completely each one works.
@@ -33,21 +33,21 @@ its hooks: the model, turns and tool calls, without token counts or cost.
 This is what terma can do, not what is wired up in this repository or on this machine —
 run ` + "`terma harness status`" + ` for that.`,
 		Args: cobra.MaximumNArgs(1),
-		RunE: runHarnessList,
+		RunE: app.runHarnessList,
 	}
 }
 
-func runHarnessList(cmd *cobra.Command, args []string) error {
-	format, err := resolveFormat()
+func (app *App) runHarnessList(cmd *cobra.Command, args []string) error {
+	format, err := app.resolveFormat()
 	if err != nil {
 		return err
 	}
 
-	catalog := registered.SupportCatalog()
+	catalog := app.agents.SupportCatalog()
 	if len(args) == 1 {
-		a, ok := registered.LookupSupport(args[0])
+		a, ok := app.agents.LookupSupport(args[0])
 		if !ok {
-			return fmt.Errorf("unknown agent %q (want %s)", args[0], strings.Join(registered.SupportNames(), ", "))
+			return fmt.Errorf("unknown agent %q (want %s)", args[0], strings.Join(app.agents.SupportNames(), ", "))
 		}
 		catalog = []agents.AgentSupport{a}
 	}

@@ -16,7 +16,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/output"
 )
 
-func newLoginCommand() *cobra.Command {
+func (app *App) newLoginCommand() *cobra.Command {
 	var noBrowser, force bool
 	var label, org string
 
@@ -40,11 +40,11 @@ its own credential in the profile; ` + "`terma org use`" + ` switches between th
                        replaces for that organization is revoked`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfg, err := loadConfig()
+			cfg, err := app.loadConfig()
 			if err != nil {
 				return err
 			}
-			res, err := signIn(cmd, cfg, signInOptions{
+			res, err := app.signIn(cmd, cfg, signInOptions{
 				org:       parseOrgRef(org),
 				force:     force,
 				noBrowser: noBrowser,
@@ -72,7 +72,7 @@ its own credential in the profile; ` + "`terma org use`" + ` switches between th
 	return cmd
 }
 
-func newLogoutCommand() *cobra.Command {
+func (app *App) newLogoutCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:    "logout",
 		Short:  "Revoke this machine's credentials",
@@ -84,7 +84,7 @@ Revoking server-side is what makes this meaningful: deleting the local file alon
 would leave live tokens that anyone holding a copy could keep using.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfg, err := loadConfig()
+			cfg, err := app.loadConfig()
 			if err != nil {
 				return err
 			}
@@ -103,7 +103,7 @@ would leave live tokens that anyone holding a copy could keep using.`,
 			// A failed revoke must not strand the local credential — the user asked to be
 			// logged out, so report it and still clear the file.
 			for _, cred := range creds {
-				if err := revokeSession(cmd.Context(), cfg, cred); err != nil {
+				if err := app.revokeSession(cmd.Context(), cfg, cred); err != nil {
 					fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not revoke the session for %s server-side (%v).\n",
 						cmp.Or(cred.OrganizationID, "this organization"), err)
 				}
@@ -129,14 +129,14 @@ type identityResponse struct {
 	Email          string `json:"email"`
 }
 
-func newWhoamiCommand() *cobra.Command {
+func (app *App) newWhoamiCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:    "whoami",
 		Short:  "Show the identity and scope of the current credential",
 		Hidden: true,
 		Args:   cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfg, client, format, err := setupCommand(resolveRepoProject)
+			cfg, client, format, err := app.setupCommand(resolveRepoProject)
 			if err != nil {
 				return err
 			}
@@ -242,12 +242,12 @@ func (r *signInResult) signedInAs() string {
 // signInAndReload signs in and returns the configuration as the sign-in left
 // it: signing in points the profile at the credential's organization, so the
 // configuration loaded before it is stale.
-func signInAndReload(cmd *cobra.Command, cfg *config.Config, opts signInOptions) (*config.Config, error) {
-	_, err := signIn(cmd, cfg, opts)
+func (app *App) signInAndReload(cmd *cobra.Command, cfg *config.Config, opts signInOptions) (*config.Config, error) {
+	_, err := app.signIn(cmd, cfg, opts)
 	if err != nil {
 		return nil, err
 	}
-	return loadConfig()
+	return app.loadConfig()
 }
 
 // signIn is the one way a command obtains a credential. It prefers a session the
@@ -255,7 +255,7 @@ func signInAndReload(cmd *cobra.Command, cfg *config.Config, opts signInOptions)
 // is not handed back — and opens the browser only when there is none for the
 // organization asked for. Every path ends with the credential active in the store and
 // the profile pointed at its organization.
-func signIn(cmd *cobra.Command, cfg *config.Config, opts signInOptions) (*signInResult, error) {
+func (app *App) signIn(cmd *cobra.Command, cfg *config.Config, opts signInOptions) (*signInResult, error) {
 	if cfg.APIKey != "" {
 		return nil, errors.New("TERMA_API_KEY is set — unset it to sign in as a user, or keep using the server key")
 	}
@@ -268,13 +268,13 @@ func signIn(cmd *cobra.Command, cfg *config.Config, opts signInOptions) (*signIn
 		// working credential to list the organizations with. Without one the browser
 		// resolves it — the page preselects by name as well as by id.
 		if want.ID == "" && want.Name != "" {
-			if org, err := resolveOrganization(ctx, cfg, want); err == nil {
+			if org, err := app.resolveOrganization(ctx, cfg, want); err == nil {
 				want = orgRef{ID: org.ID, Name: org.Name}
 			} else if !errors.Is(err, errNoWorkingCredential) {
 				return nil, err
 			}
 		}
-		if res, ok, err := reuseStoredSession(ctx, cfg, want); err != nil {
+		if res, ok, err := app.reuseStoredSession(ctx, cfg, want); err != nil {
 			return nil, err
 		} else if ok {
 			return res, nil
@@ -287,7 +287,7 @@ func signIn(cmd *cobra.Command, cfg *config.Config, opts signInOptions) (*signIn
 		}
 	}
 
-	client := api.NewAnonymous(cfg.AuthURL, Version)
+	client := api.NewAnonymous(cfg.AuthURL, app.version)
 	cred, err := auth.Login(ctx, client, auth.LoginOptions{
 		AppURL:       cfg.AppURL,
 		Label:        cmp.Or(opts.label, auth.DefaultLabel()),
@@ -315,7 +315,7 @@ func signIn(cmd *cobra.Command, cfg *config.Config, opts signInOptions) (*signIn
 	// of live sessions. Best-effort: it may already be dead, which is often why the
 	// user is here.
 	if replaced != nil {
-		_ = revokeSession(ctx, cfg, replaced)
+		_ = app.revokeSession(ctx, cfg, replaced)
 	}
 	if err := config.UpdateProfile(cfg.ProfileName, func(p *config.Profile) { applyLogin(p, cred, orgName) }); err != nil {
 		return nil, err
@@ -327,7 +327,7 @@ func signIn(cmd *cobra.Command, cfg *config.Config, opts signInOptions) (*signIn
 // for (the active one when none was), verifies it still works, and makes it active. A
 // dead credential is dropped so it is not tried again. ok is false when there is
 // nothing usable and the caller should open the browser.
-func reuseStoredSession(ctx context.Context, cfg *config.Config, want orgRef) (*signInResult, bool, error) {
+func (app *App) reuseStoredSession(ctx context.Context, cfg *config.Config, want orgRef) (*signInResult, bool, error) {
 	var cred *auth.Credential
 	var err error
 	switch {
@@ -343,7 +343,7 @@ func reuseStoredSession(ctx context.Context, cfg *config.Config, want orgRef) (*
 		return nil, false, nil
 	}
 
-	verified, identity, err := verifyCredential(ctx, cfg, cred)
+	verified, identity, err := app.verifyCredential(ctx, cfg, cred)
 	if errors.Is(err, auth.ErrNotLoggedIn) {
 		_ = auth.DeleteCredentialFor(cfg.ProfileName, cred.OrganizationID)
 		return nil, false, nil
@@ -364,7 +364,7 @@ func reuseStoredSession(ctx context.Context, cfg *config.Config, want orgRef) (*
 	if orgName == "" {
 		// Switching to a parked credential whose name the profile no longer holds:
 		// one listing names it. Not fatal if it cannot.
-		if org, err := lookupOrganization(ctx, cfg, verified, verified.OrganizationID); err == nil {
+		if org, err := app.lookupOrganization(ctx, cfg, verified, verified.OrganizationID); err == nil {
 			orgName = org.Name
 		}
 	}
@@ -381,8 +381,8 @@ func reuseStoredSession(ctx context.Context, cfg *config.Config, want orgRef) (*
 // verifyCredential asks the auth host who the credential is, refreshing it if the
 // access token is spent. It returns the credential as it now stands — possibly a
 // rotated pair, already persisted for its organization.
-func verifyCredential(ctx context.Context, cfg *config.Config, cred *auth.Credential) (*auth.Credential, identityResponse, error) {
-	client, err := api.New(cfg, api.Options{Version: Version, Credential: cred})
+func (app *App) verifyCredential(ctx context.Context, cfg *config.Config, cred *auth.Credential) (*auth.Credential, identityResponse, error) {
+	client, err := api.New(cfg, api.Options{Version: app.version, Credential: cred})
 	if err != nil {
 		return nil, identityResponse{}, err
 	}
@@ -404,9 +404,9 @@ var errNoWorkingCredential = errors.New("no working credential")
 // workingClient returns a client on the first stored credential that still works,
 // the active one first. It is how a command lists organizations before it knows which
 // one it wants.
-func workingClient(ctx context.Context, cfg *config.Config) (*api.Client, error) {
+func (app *App) workingClient(ctx context.Context, cfg *config.Config) (*api.Client, error) {
 	if cfg.APIKey != "" {
-		return newClient(cfg)
+		return app.newClient(cfg)
 	}
 	creds, err := auth.Credentials(cfg.ProfileName)
 	if err != nil {
@@ -416,7 +416,7 @@ func workingClient(ctx context.Context, cfg *config.Config) (*api.Client, error)
 		if cred.CheckEnvironment(cfg.AuthURL) != nil {
 			continue
 		}
-		client, err := api.New(cfg, api.Options{Version: Version, Credential: cred})
+		client, err := api.New(cfg, api.Options{Version: app.version, Credential: cred})
 		if err != nil {
 			continue
 		}
@@ -442,8 +442,8 @@ func fetchOrganizations(ctx context.Context, client *api.Client) ([]organization
 
 // resolveOrganization turns a reference into one of the organizations the user
 // belongs to, using whichever stored credential still works.
-func resolveOrganization(ctx context.Context, cfg *config.Config, ref orgRef) (*organization, error) {
-	client, err := workingClient(ctx, cfg)
+func (app *App) resolveOrganization(ctx context.Context, cfg *config.Config, ref orgRef) (*organization, error) {
+	client, err := app.workingClient(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -455,8 +455,8 @@ func resolveOrganization(ctx context.Context, cfg *config.Config, ref orgRef) (*
 }
 
 // lookupOrganization names an organization by id using a specific credential.
-func lookupOrganization(ctx context.Context, cfg *config.Config, cred *auth.Credential, id string) (*organization, error) {
-	client, err := api.New(cfg, api.Options{Version: Version, Credential: cred})
+func (app *App) lookupOrganization(ctx context.Context, cfg *config.Config, cred *auth.Credential, id string) (*organization, error) {
+	client, err := api.New(cfg, api.Options{Version: app.version, Credential: cred})
 	if err != nil {
 		return nil, err
 	}
@@ -479,8 +479,8 @@ func matchOrganization(orgs []organization, query string) (*organization, error)
 }
 
 // revokeSession ends one stored session server-side.
-func revokeSession(ctx context.Context, cfg *config.Config, cred *auth.Credential) error {
-	client, err := api.New(cfg, api.Options{Version: Version, Credential: cred})
+func (app *App) revokeSession(ctx context.Context, cfg *config.Config, cred *auth.Credential) error {
+	client, err := api.New(cfg, api.Options{Version: app.version, Credential: cred})
 	if err != nil {
 		return err
 	}

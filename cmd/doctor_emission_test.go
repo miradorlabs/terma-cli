@@ -54,9 +54,9 @@ func TestDoctorChecksClaudeEmissionSettings(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			v := doctor.JudgeHarness(doctor.GatherHarness(registered, h, testProjectID, repo), endpoint, testProjectID)
+			v := doctor.JudgeHarness(doctor.GatherHarness(testApp.agents, h, testProjectID, repo), endpoint, testProjectID)
 			v.Name, v.DisplayName = h.Name(), h.DisplayName()
-			check := doctor.HarnessCheck(registered, []doctor.HarnessVerdict{v}, endpoint, testProjectID, true)
+			check := doctor.HarnessCheck(testApp.agents, []doctor.HarnessVerdict{v}, endpoint, testProjectID, true)
 			if (check.Status == doctor.Fail) != tc.wantFailure || !strings.Contains(check.Detail, tc.wantDetail) {
 				t.Fatalf("doctor = %+v; want failure %v containing %q", check, tc.wantFailure, tc.wantDetail)
 			}
@@ -70,7 +70,7 @@ func TestDoctorChecksClaudeEmissionSettings(t *testing.T) {
 			if tc.wantFailure {
 				// Another installed agent must not conceal a silent Claude setup.
 				healthy := doctor.HarnessVerdict{DisplayName: "Codex", Route: doctor.RouteGlobal}
-				check = doctor.HarnessCheck(registered, []doctor.HarnessVerdict{healthy, v}, endpoint, testProjectID, true)
+				check = doctor.HarnessCheck(testApp.agents, []doctor.HarnessVerdict{healthy, v}, endpoint, testProjectID, true)
 				check.Key = doctor.KeyHarness
 				if !doctor.Build([]doctor.Check{check}).Failed() || check.Fix == "" {
 					t.Fatalf("silent Claude should fail with a remedy even alongside Codex: %+v", check)
@@ -113,9 +113,9 @@ func TestDoctorChecksOpenCodeRepositoryPolicy(t *testing.T) {
 			if err := keystore.SetFor("opencode", testProjectID, testServerKey, keystore.Hosts{}); err != nil {
 				t.Fatal(err)
 			}
-			v := doctor.JudgeHarness(doctor.GatherHarness(registered, h, testProjectID, repo), endpoint, testProjectID)
+			v := doctor.JudgeHarness(doctor.GatherHarness(testApp.agents, h, testProjectID, repo), endpoint, testProjectID)
 			v.Name, v.DisplayName = h.Name(), h.DisplayName()
-			check := doctor.HarnessCheck(registered, []doctor.HarnessVerdict{v}, endpoint, testProjectID, true)
+			check := doctor.HarnessCheck(testApp.agents, []doctor.HarnessVerdict{v}, endpoint, testProjectID, true)
 			if (check.Status == doctor.Pass) != (len(signals) > 0) {
 				t.Fatalf("repository signals %v: %+v", signals, check)
 			}

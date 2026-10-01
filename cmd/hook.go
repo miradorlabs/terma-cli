@@ -29,11 +29,11 @@ var gitHookEvents = map[string]agents.Handler{
 }
 
 // hookHandler resolves an event name to its handler.
-func hookHandler(event string) (agents.Handler, bool) {
+func (app *App) hookHandler(event string) (agents.Handler, bool) {
 	if h, ok := gitHookEvents[event]; ok {
 		return h, true
 	}
-	h, ok := registered.Handlers()[event]
+	h, ok := app.agents.Handlers()[event]
 	return h, ok
 }
 
@@ -42,8 +42,8 @@ func hookHandler(event string) (agents.Handler, bool) {
 // work is invisible. Each adapter names its end-of-turn events; a throttle here can
 // strand the final turn until another hook fires, so there is none. Sender backoff
 // still applies. prepare-commit-msg never flushes — it has a 50 ms budget.
-func flushesAfter(event string) bool {
-	return event == "post-commit" || registered.FlushesAfter(event)
+func (app *App) flushesAfter(event string) bool {
+	return event == "post-commit" || app.agents.FlushesAfter(event)
 }
 
 // HooksDisabled reports the developer's kill switch: `TERMA_HOOKS=0` in the
@@ -55,7 +55,7 @@ func HooksDisabled() bool {
 	return os.Getenv("TERMA_HOOKS") == "0"
 }
 
-func newHookCommand() *cobra.Command {
+func (app *App) newHookCommand() *cobra.Command {
 	var user bool
 	cmd := &cobra.Command{
 		Use:    "hook <event> [args...]",
@@ -71,22 +71,22 @@ func newHookCommand() *cobra.Command {
 			// with TERMA_HOOKS=0 it still renders and merely does not capture. Its exit
 			// status is its own, so it ends the process rather than returning through
 			// cobra.
-			if render, ok := registered.Render(event); ok {
-				os.Exit(runRender(cmd, render, args[1:], HooksDisabled()))
+			if render, ok := app.agents.Render(event); ok {
+				os.Exit(app.runRender(cmd, render, args[1:], HooksDisabled()))
 			}
 			if HooksDisabled() {
-				if off, ok := registered.WhenHooksOff(event); ok {
+				if off, ok := app.agents.WhenHooksOff(event); ok {
 					_ = off(cmd.Context(), hookrun.Env{Now: time.Now(), Args: args[1:], Stderr: cmd.ErrOrStderr(), Debug: os.Getenv("TERMA_DEBUG") != ""})
 				}
 				return nil
 			}
-			handler, ok := hookHandler(event)
+			handler, ok := app.hookHandler(event)
 			if !ok {
 				fmt.Fprintf(cmd.ErrOrStderr(), "terma hook: unknown event %q (ignored)\n", event)
 				return nil
 			}
 			policy := hookPolicy()
-			if _, git := gitHookEvents[event]; !git && hookYields(user, policy, registered.ToolForEvent(event)) {
+			if _, git := gitHookEvents[event]; !git && app.hookYields(user, policy, app.agents.ToolForEvent(event)) {
 				return nil
 			}
 			cwd, err := os.Getwd()
@@ -108,7 +108,7 @@ func newHookCommand() *cobra.Command {
 				OnClaim: func() { claimed = true },
 				Stdout:  cmd.OutOrStdout(),
 				Stderr:  cmd.ErrOrStderr(),
-				Version: Version,
+				Version: app.version,
 				Debug:   os.Getenv("TERMA_DEBUG") != "",
 				Spool:   openSpool(),
 				Policy:  policy,
@@ -117,15 +117,15 @@ func newHookCommand() *cobra.Command {
 			defer cancel()
 			_ = handler(ctx, env)
 			if !claimed {
-				if s, ok := registered.PayloadSession(event, payload.Bytes()); ok {
-					claimed = hookrun.ClaimFromPayload(ctx, env, s, registered.ToolForEvent(event))
+				if s, ok := app.agents.PayloadSession(event, payload.Bytes()); ok {
+					claimed = hookrun.ClaimFromPayload(ctx, env, s, app.agents.ToolForEvent(event))
 				}
 			}
 			if claimed {
 				daemon.Spawn()
 				wireCloneOnFirstUse(ctx, cwd)
 			}
-			if flushesAfter(event) && env.Spool != nil {
+			if app.flushesAfter(event) && env.Spool != nil {
 				spawnFlush()
 			}
 			return nil
@@ -140,7 +140,7 @@ func newHookCommand() *cobra.Command {
 
 // runRender runs a render hook: its output is the hook's reply, and it captures only
 // while hooks are on.
-func runRender(cmd *cobra.Command, render agents.RenderHandler, args []string, captureDisabled bool) int {
+func (app *App) runRender(cmd *cobra.Command, render agents.RenderHandler, args []string, captureDisabled bool) int {
 	cwd, _ := os.Getwd()
 	env := hookrun.Env{
 		Now:     time.Now(),
@@ -149,7 +149,7 @@ func runRender(cmd *cobra.Command, render agents.RenderHandler, args []string, c
 		Stdin:   cmd.InOrStdin(),
 		Stdout:  cmd.OutOrStdout(),
 		Stderr:  cmd.ErrOrStderr(),
-		Version: Version,
+		Version: app.version,
 		Debug:   os.Getenv("TERMA_DEBUG") != "",
 		Flush:   func() { spawnFlush() },
 	}

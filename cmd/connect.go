@@ -25,7 +25,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/style"
 )
 
-func newTelemetryCommand() *cobra.Command {
+func (app *App) newTelemetryCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "telemetry",
 		Hidden:  true,
@@ -46,11 +46,11 @@ terminal, connect shows a checklist to untick what should stay; --exclude-prompt
 A connect is global by default — this machine, every repository. --scope local
 writes a repository's own policy into its committed settings instead: only what to
 ship, never where or with which key, so one repository can send less than the machine
-does (` + scopedHarnessNames() + `).
+does (` + app.scopedHarnessNames() + `).
 
-Supported: ` + strings.Join(registered.HarnessNames(), ", ") + `.`,
+Supported: ` + strings.Join(app.agents.HarnessNames(), ", ") + `.`,
 	}
-	cmd.AddCommand(newTelemetryConnectCommand(), newTelemetryStatusCommand(), newTelemetryDisconnectCommand())
+	cmd.AddCommand(app.newTelemetryConnectCommand(), app.newTelemetryStatusCommand(), app.newTelemetryDisconnectCommand())
 	return cmd
 }
 
@@ -84,11 +84,11 @@ type connectFlags struct {
 	force        bool
 }
 
-func newTelemetryConnectCommand() *cobra.Command {
+func (app *App) newTelemetryConnectCommand() *cobra.Command {
 	var f connectFlags
 
 	cmd := &cobra.Command{
-		Use:    "connect <" + strings.Join(registered.HarnessNames(), "|") + "> [<harness>...]",
+		Use:    "connect <" + strings.Join(app.agents.HarnessNames(), "|") + "> [<harness>...]",
 		Short:  "Point one or more agent harnesses at Terma",
 		Hidden: true,
 		Long: `Mints a server key for the selected project and writes the harness's telemetry
@@ -115,20 +115,20 @@ and --yes takes the flags and defaults without asking. --scope local writes the
 repository you are in rather than your user settings: its committed settings get the
 signal and content switches — nothing else, so it is safe to commit — and the agent
 applies them over your global connect inside that repository. It needs no project,
-key or sign-in (` + scopedHarnessNames() + `).`,
+key or sign-in (` + app.scopedHarnessNames() + `).`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runTelemetryConnectAll(cmd, args, f)
+			return app.runTelemetryConnectAll(cmd, args, f)
 		},
 	}
 
 	fl := cmd.Flags()
-	fl.StringVar(&f.scope, "scope", "", "where to write: global (this machine, default) or local (this repository's own settings; "+scopedHarnessNames()+")")
+	fl.StringVar(&f.scope, "scope", "", "where to write: global (this machine, default) or local (this repository's own settings; "+app.scopedHarnessNames()+")")
 	fl.StringVar(&f.signals, "signals", "", "comma-separated signals to export: traces, logs, metrics (default all; none to ship nothing)")
 	fl.StringVar(&f.exports, "exports", "", "which repositories export: everywhere (this machine, default) or repos (only those whose committed terma policy turns it on)")
 	fl.BoolVar(&f.excludePrompts, "exclude-prompts", false, "do not export prompt text or model responses")
 	fl.BoolVar(&f.excludeToolContent, "exclude-tool-content", false, "do not export tool parameters, input, or output")
-	fl.BoolVar(&f.noStatusLine, "no-statusline", false, "leave "+statusLineOwner()+"'s status line alone (by default terma wraps it to read the plan's rate-limit windows; the configured command keeps running unchanged)")
+	fl.BoolVar(&f.noStatusLine, "no-statusline", false, "leave "+app.statusLineOwner()+"'s status line alone (by default terma wraps it to read the plan's rate-limit windows; the configured command keeps running unchanged)")
 	fl.StringVar(&f.keyName, "key-name", "", "name for the minted key (defaults to <harness>@<hostname>)")
 	fl.StringVar(&f.apiKey, "api-key", "", "install this existing server key (ter_srv_…) instead of minting a new one")
 	fl.StringVar(&f.identity, "identity", "", "value for enduser.id on the sessions of agents that take one (defaults to your global git email; \"none\" to omit); an agent that reports its signed-in account keeps that")
@@ -141,11 +141,11 @@ key or sign-in (` + scopedHarnessNames() + `).`,
 // runTelemetryConnectAll connects each named harness in turn, each with its own key.
 // Names are resolved up front so a typo in the last one is refused before the first
 // is touched.
-func runTelemetryConnectAll(cmd *cobra.Command, names []string, f connectFlags) error {
+func (app *App) runTelemetryConnectAll(cmd *cobra.Command, names []string, f connectFlags) error {
 	var hs []harness.Harness
 	seen := map[string]bool{}
 	for _, name := range names {
-		h, err := registered.Harness(name)
+		h, err := app.agents.Harness(name)
 		if err != nil {
 			return err
 		}
@@ -179,7 +179,7 @@ func runTelemetryConnectAll(cmd *cobra.Command, names []string, f connectFlags) 
 	if scope == harness.ScopeLocal {
 		for _, h := range hs {
 			if _, ok := h.(harness.Scoped); !ok {
-				return fmt.Errorf("%s has no repository settings — --scope local applies to harnesses that read one (%s)", h.DisplayName(), scopedHarnessNames())
+				return fmt.Errorf("%s has no repository settings — --scope local applies to harnesses that read one (%s)", h.DisplayName(), app.scopedHarnessNames())
 			}
 		}
 	}
@@ -191,7 +191,7 @@ func runTelemetryConnectAll(cmd *cobra.Command, names []string, f connectFlags) 
 			}
 			fmt.Fprintf(out, "— %s —\n", h.Name())
 		}
-		if err := runTelemetryConnect(cmd, h.Name(), f); err != nil {
+		if err := app.runTelemetryConnect(cmd, h.Name(), f); err != nil {
 			if len(hs) > 1 {
 				return fmt.Errorf("connect %s: %w", h.Name(), err)
 			}
@@ -201,22 +201,22 @@ func runTelemetryConnectAll(cmd *cobra.Command, names []string, f connectFlags) 
 	return nil
 }
 
-func runTelemetryConnect(cmd *cobra.Command, name string, f connectFlags) error {
+func (app *App) runTelemetryConnect(cmd *cobra.Command, name string, f connectFlags) error {
 	scope, err := harness.ParseScope(f.scope)
 	if err != nil {
 		return err
 	}
 	if scope == harness.ScopeLocal {
-		return runLocalConnect(cmd, name, f)
+		return app.runLocalConnect(cmd, name, f)
 	}
-	err = connectGlobal(cmd, name, f)
+	err = app.connectGlobal(cmd, name, f)
 	return err
 }
 
 // connectGlobal writes a harness's user-level telemetry settings and reports what it
 // did about the key.
-func connectGlobal(cmd *cobra.Command, name string, f connectFlags) error {
-	h, err := registered.Harness(name)
+func (app *App) connectGlobal(cmd *cobra.Command, name string, f connectFlags) error {
+	h, err := app.agents.Harness(name)
 	if err != nil {
 		return err
 	}
@@ -236,7 +236,7 @@ func connectGlobal(cmd *cobra.Command, name string, f connectFlags) error {
 		signals = nil
 	}
 
-	cfg, err := loadConfig()
+	cfg, err := app.loadConfig()
 	if err != nil {
 		return err
 	}
@@ -324,7 +324,7 @@ func connectGlobal(cmd *cobra.Command, name string, f connectFlags) error {
 		}
 	}
 
-	key, keyMeta, minted, reused, err := resolveKey(ctx, cfg, h, f)
+	key, keyMeta, minted, reused, err := app.resolveKey(ctx, cfg, h, f)
 	if err != nil {
 		return err
 	}
@@ -360,10 +360,10 @@ func connectGlobal(cmd *cobra.Command, name string, f connectFlags) error {
 	}
 	statusLineNote := ""
 	notifierNote := ""
-	if line, ok := registered.Find[agents.StatusLiner](h.Name()); ok && !f.noStatusLine {
+	if line, ok := app.agents.Find[agents.StatusLiner](h.Name()); ok && !f.noStatusLine {
 		statusLineNote, _ = installHarnessStatusLine(line, cmd.ErrOrStderr())
 	}
-	if notifier, ok := registered.Find[agents.Notifier](h.Name()); ok {
+	if notifier, ok := app.agents.Find[agents.Notifier](h.Name()); ok {
 		switch changed, err := notifier.InstallNotifier(); {
 		case err != nil:
 			fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not install %s's funding notifier (%v).\n", h.DisplayName(), err)
@@ -452,7 +452,7 @@ func printConnectNotes(out io.Writer, h harness.Harness, e harness.Exporter) {
 // resolveKey either installs a key the caller already holds or mints a new one. The
 // bool reports which happened, because only a key this invocation created is the
 // caller's to clean up if a later step fails.
-func resolveKey(ctx context.Context, cfg *config.Config, h harness.Harness, f connectFlags) (key string, meta api.ServerKey, minted, reused bool, err error) {
+func (app *App) resolveKey(ctx context.Context, cfg *config.Config, h harness.Harness, f connectFlags) (key string, meta api.ServerKey, minted, reused bool, err error) {
 	if key := strings.TrimSpace(f.apiKey); key != "" {
 		if !serverkey.Is(key) {
 			return "", api.ServerKey{}, false, false, errors.New("--api-key expects a server key (ter_srv_…)")
@@ -485,7 +485,7 @@ func resolveKey(ctx context.Context, cfg *config.Config, h harness.Harness, f co
 		name = h.Name() + "@" + harness.Hostname()
 	}
 
-	client, err := newClient(cfg)
+	client, err := app.newClient(cfg)
 	if err != nil {
 		return "", api.ServerKey{}, false, false, err
 	}
@@ -613,8 +613,8 @@ func backupHarnessConfig(h harness.Harness, endpoint string) (string, error) {
 // installStatusLine puts `terma hook statusline` in front of Claude Code's status
 // line and returns the line to say about it, and whether it is in place. A failure is a
 // warning, never a failed connect: the exporters are already written and working.
-func installStatusLine(errOut io.Writer) (string, bool) {
-	s, ok := doctor.StatusLineAgent(registered)
+func (app *App) installStatusLine(errOut io.Writer) (string, bool) {
+	s, ok := doctor.StatusLineAgent(app.agents)
 	if !ok {
 		return "", false
 	}

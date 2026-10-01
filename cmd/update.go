@@ -17,7 +17,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 )
 
-func newUpdateCommand() *cobra.Command {
+func (app *App) newUpdateCommand() *cobra.Command {
 	var check, force, refresh bool
 	var automatic string
 	cmd := &cobra.Command{
@@ -49,7 +49,7 @@ release.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			out := cmd.OutOrStdout()
 			if refresh {
-				return runRefresh(cmd.Context(), out)
+				return app.runRefresh(cmd.Context(), out)
 			}
 			dir, err := config.Dir()
 			if err != nil {
@@ -90,7 +90,7 @@ release.`,
 				return fmt.Errorf("cannot start update (another check or update may be running): %w", err)
 			}
 			defer unlock()
-			return runUpdate(cmd.Context(), &selfupdate.Client{Version: Version}, dir, exe, out, check, force)
+			return app.runUpdate(cmd.Context(), &selfupdate.Client{Version: app.version}, dir, exe, out, check, force)
 		},
 	}
 	cmd.Flags().BoolVar(&check, "check", false, "check for a newer published release without installing")
@@ -110,7 +110,7 @@ const (
 	refreshTimeout  = time.Minute
 )
 
-func runUpdate(ctx context.Context, client *selfupdate.Client, dir, exe string, out io.Writer, check, force bool) error {
+func (app *App) runUpdate(ctx context.Context, client *selfupdate.Client, dir, exe string, out io.Writer, check, force bool) error {
 	current := client.Version
 	download, cancel := context.WithTimeout(ctx, downloadTimeout)
 	defer cancel()
@@ -148,7 +148,7 @@ func runUpdate(ctx context.Context, client *selfupdate.Client, dir, exe string, 
 		return nil
 	}
 	if m, ok := selfupdate.ManagedBy(exe); ok {
-		return upgradeManaged(ctx, m, current, rel.Version(), out)
+		return app.upgradeManaged(ctx, m, current, rel.Version(), out)
 	}
 	if runtime.GOOS == "windows" {
 		return errors.New("download the latest release from https://github.com/" + selfupdate.Repo + "/releases; in-place updates on Windows are not supported yet")
@@ -159,14 +159,14 @@ func runUpdate(ctx context.Context, client *selfupdate.Client, dir, exe string, 
 	}
 	selfupdate.SaveCache(dir, selfupdate.Cache{CheckedAt: time.Now(), Current: installed, Latest: installed})
 	fmt.Fprintf(out, "Updated terma %s → %s (%s).\n", current, installed, exe)
-	finishUpdate(ctx, exe, out)
+	app.finishUpdate(ctx, exe, out)
 	return nil
 }
 
 // upgradeManaged upgrades a package-managed installation with the package manager that
 // owns it, then has the upgraded binary finish the update. When that package manager
 // cannot be found, or it fails, the developer is given the command to run.
-func upgradeManaged(ctx context.Context, m selfupdate.Manager, current, latest string, out io.Writer) error {
+func (app *App) upgradeManaged(ctx context.Context, m selfupdate.Manager, current, latest string, out io.Writer) error {
 	if m.Project != "" {
 		return fmt.Errorf("this terma is a dependency of the project in %s; run `%s` there", m.Project, m.Command)
 	}
@@ -176,29 +176,29 @@ func upgradeManaged(ctx context.Context, m selfupdate.Manager, current, latest s
 	fmt.Fprintf(out, "Upgrading terma %s → %s with %s: %s\n", current, latest, m.Name, strings.Join(m.Argv, " "))
 	ctx, cancel := context.WithTimeout(ctx, upgradeTimeout)
 	defer cancel()
-	if err := runUpdateStep(ctx, out, m.Argv...); err != nil {
+	if err := app.runUpdateStep(ctx, out, m.Argv...); err != nil {
 		return fmt.Errorf("%s could not upgrade terma (%w); run `%s` yourself", m.Name, err, m.Command)
 	}
-	finishUpdate(ctx, m.Terma, out)
+	app.finishUpdate(ctx, m.Terma, out)
 	return nil
 }
 
 // finishUpdate has the new binary refresh what earlier versions wrote. This process is
 // still the old version, so the refresh must run in the new one. The update itself has
 // succeeded either way; a refresh that fails says how to retry.
-func finishUpdate(ctx context.Context, terma string, out io.Writer) {
+func (app *App) finishUpdate(ctx context.Context, terma string, out io.Writer) {
 	ctx, cancel := context.WithTimeout(ctx, refreshTimeout)
 	defer cancel()
 	fmt.Fprintln(out)
-	if err := runUpdateStep(ctx, out, terma, "update", "--refresh"); err != nil {
+	if err := app.runUpdateStep(ctx, out, terma, "update", "--refresh"); err != nil {
 		fmt.Fprintf(out, "The new version is installed, but refreshing what terma installed failed (%v). Run `terma update --refresh` to retry.\n", err)
 	}
 }
 
 // runUpdateStep runs one program of an update — a package manager, or the new terma
 // finishing it — attached to the terminal, so a password prompt or progress reaches the
-// developer. Tests replace it.
-var runUpdateStep = func(ctx context.Context, out io.Writer, argv ...string) error {
+// developer.
+func runUpdateStep(ctx context.Context, out io.Writer, argv ...string) error {
 	c := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	c.Stdin, c.Stdout, c.Stderr = os.Stdin, out, os.Stderr
 	return c.Run()

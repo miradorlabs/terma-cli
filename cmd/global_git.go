@@ -78,7 +78,7 @@ func globalGitHookScript(hook, terma, previous string) string {
 // applyGlobalGitHooks points git's global core.hooksPath at terma's hooks (install),
 // remembering what it replaces, or puts back what was there (not install). It reports
 // whether it changed git's configuration.
-func applyGlobalGitHooks(ctx context.Context, install bool) (bool, error) {
+func (app *App) applyGlobalGitHooks(ctx context.Context, install bool) (bool, error) {
 	dir, err := globalGitHooksPath()
 	if err != nil {
 		return false, err
@@ -101,7 +101,7 @@ func applyGlobalGitHooks(ctx context.Context, install bool) (bool, error) {
 		}
 		return true, os.RemoveAll(dir)
 	}
-	terma, err := hookExecutable()
+	terma, err := app.hookExecutable()
 	if err != nil {
 		return false, err
 	}

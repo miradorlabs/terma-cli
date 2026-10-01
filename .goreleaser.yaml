@@ -26,7 +26,7 @@ builds:
     # The version is the git tag so `terma version` matches the release someone
     # downloaded, and so `terma update` can compare against the latest tag.
     ldflags:
-      - -s -w -X github.com/miradorlabs/terma-cli/cmd.Version={{.Version}}
+      - -s -w -X main.version={{.Version}}
     mod_timestamp: "{{ .CommitTimestamp }}"
 
 archives:

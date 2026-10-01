@@ -22,7 +22,7 @@ type listOrganizationsResponse struct {
 	Organizations []organization `json:"organizations"`
 }
 
-func newOrgCommand() *cobra.Command {
+func (app *App) newOrgCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "org",
 		Aliases: []string{"orgs", "organization", "organizations"},
@@ -35,18 +35,18 @@ that organization preselected.
 Projects are selected per repository with ` + "`terma install`" + `. Switching
 organizations does not change repository bindings.`,
 	}
-	cmd.AddCommand(newOrgListCommand(), newOrgUseCommand())
+	cmd.AddCommand(app.newOrgListCommand(), app.newOrgUseCommand())
 	return cmd
 }
 
-func newOrgListCommand() *cobra.Command {
+func (app *App) newOrgListCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List organizations you belong to",
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfg, client, format, err := setupCommand()
+			cfg, client, format, err := app.setupCommand()
 			if err != nil {
 				return err
 			}
@@ -79,7 +79,7 @@ func newOrgListCommand() *cobra.Command {
 	}
 }
 
-func newOrgUseCommand() *cobra.Command {
+func (app *App) newOrgUseCommand() *cobra.Command {
 	var noBrowser bool
 	cmd := &cobra.Command{
 		Use:   "use [name-or-id]",
@@ -91,7 +91,7 @@ preselected. With no argument on a terminal it presents a picker.
 Choose a project for each repository with ` + "`terma install`" + `.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := loadConfig()
+			cfg, err := app.loadConfig()
 			if err != nil {
 				return err
 			}
@@ -105,7 +105,7 @@ Choose a project for each repository with ` + "`terma install`" + `.`,
 			if len(args) == 1 {
 				want = parseOrgRef(args[0])
 			} else {
-				client, err := workingClient(ctx, cfg)
+				client, err := app.workingClient(ctx, cfg)
 				if errors.Is(err, errNoWorkingCredential) {
 					return fmt.Errorf("%w: sign in first with `terma login`, or name the organization: `terma org use <name-or-id>`", auth.ErrNotLoggedIn)
 				}
@@ -131,7 +131,7 @@ Choose a project for each repository with ` + "`terma install`" + `.`,
 			}
 
 			before := cfg.OrganizationID
-			res, err := signIn(cmd, cfg, signInOptions{org: want, noBrowser: noBrowser})
+			res, err := app.signIn(cmd, cfg, signInOptions{org: want, noBrowser: noBrowser})
 			if err != nil {
 				return err
 			}

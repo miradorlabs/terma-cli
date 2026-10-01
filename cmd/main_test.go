@@ -22,12 +22,19 @@ import (
 //
 // Go's caches stay where they are: under a fresh HOME, every `go build` a test runs
 // (termaBinary) would download and compile the world again.
+// testApp is the command line every test runs, with this build's agents. What else is
+// installed on the machine running the tests is none of their business.
+var testApp = func() *App {
+	app := New(builtin.Agents(), "dev")
+	app.binDirs = func() []string { return nil }
+	return app
+}()
+
 func TestMain(m *testing.M) {
 	os.Exit(runIsolated(m))
 }
 
 func runIsolated(m *testing.M) int {
-	registered = builtin.Agents()
 	if out, err := exec.Command("go", "env", "GOCACHE", "GOMODCACHE", "GOPATH").Output(); err == nil {
 		vals := strings.Split(strings.TrimSpace(string(out)), "\n")
 		for i, k := range []string{"GOCACHE", "GOMODCACHE", "GOPATH"} {
@@ -61,20 +68,20 @@ func runIsolated(m *testing.M) int {
 
 // newTestRelay is relay.New with the registered agents' telemetry shapes, as relay run has.
 func newTestRelay(o relay.Options) *relay.Relay {
-	o.Correlators, o.Capturers = registered.With[shape.Correlator](), registered.With[shape.Capturer]()
+	o.Correlators, o.Capturers = testApp.agents.With[shape.Correlator](), testApp.agents.With[shape.Capturer]()
 	return relay.New(o)
 }
 
 // hooksPathOf is the hooks file the named agent commits.
 func hooksPathOf(name string) string {
-	a, _ := registered.Lookup(name)
+	a, _ := testApp.agents.Lookup(name)
 	return a.HooksPath()
 }
 
 // harnessOf is the named agent's harness.
 func harnessOf(t *testing.T, name string) harness.Harness {
 	t.Helper()
-	h, err := registered.Harness(name)
+	h, err := testApp.agents.Harness(name)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +98,7 @@ func claudeHarness(t *testing.T) struct {
 	h := harnessOf(t, "claude")
 	scoped, ok := h.(harness.Scoped)
 	credentialed, ok2 := h.(harness.Credentialed)
-	line, ok3 := registered.Find[agents.StatusLiner]("claude")
+	line, ok3 := testApp.agents.Find[agents.StatusLiner]("claude")
 	if !ok || !ok2 || !ok3 {
 		t.Fatal("claude lost a capability")
 	}

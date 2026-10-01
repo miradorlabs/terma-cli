@@ -14,7 +14,7 @@ import (
 // The command tree is the whole user-facing surface; a subcommand lost in a refactor
 // would not fail any other test here.
 func TestTelemetryCommandTree(t *testing.T) {
-	root := NewRootCommand()
+	root := testApp.NewRootCommand()
 
 	for _, path := range []string{"telemetry connect", "telemetry status", "telemetry disconnect"} {
 		fields := strings.Fields(path)
@@ -36,7 +36,7 @@ func TestTelemetryCommandTree(t *testing.T) {
 // Every capture flag is a privacy decision. A flag renamed or dropped silently would
 // change what leaves the machine.
 func TestTelemetryConnectFlags(t *testing.T) {
-	root := NewRootCommand()
+	root := testApp.NewRootCommand()
 	cmd, _, err := root.Find([]string{"telemetry", "connect"})
 	if err != nil {
 		t.Fatalf("find: %v", err)
@@ -67,7 +67,7 @@ func TestTelemetryRejectsUnknownHarness(t *testing.T) {
 		t.Errorf("error = %q, want it to name the harness", err)
 	}
 	// The message should point at what is available rather than just refusing.
-	for _, name := range registered.HarnessNames() {
+	for _, name := range testApp.agents.HarnessNames() {
 		if !strings.Contains(err.Error(), name) {
 			t.Errorf("error = %q, want it to list the supported harness %q", err, name)
 		}

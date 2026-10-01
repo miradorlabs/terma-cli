@@ -159,7 +159,7 @@ func TestInstallListsTheFilesToCommit(t *testing.T) {
 // Every file the question names gets its own line.
 func TestInstallHookQuestionExplainsEachFile(t *testing.T) {
 	repo := installRepo(t)
-	plan, err := install.PlanHooks(registered, repo, hookmgr.Detect(repo), []string{"claude", "codex"})
+	plan, err := install.PlanHooks(testApp.agents, repo, hookmgr.Detect(repo), []string{"claude", "codex"})
 	if err != nil {
 		t.Fatal(err)
 	}

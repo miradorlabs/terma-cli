@@ -23,8 +23,8 @@ type relayReport struct {
 // the developer's agents' user-level exporters pointed at the relay, and the relay
 // itself, as a service unless the developer opted out. It needs no project: which
 // sessions leave is the claims' business, per repository.
-func connectMachineRelay(ctx context.Context, agents []string, relayService string, r relayReport) error {
-	targets := registered.RelayTargets(agents)
+func (app *App) connectMachineRelay(ctx context.Context, agents []string, relayService string, r relayReport) error {
+	targets := app.agents.RelayTargets(agents)
 	if len(targets) == 0 {
 		return nil
 	}
@@ -38,7 +38,7 @@ func connectMachineRelay(ctx context.Context, agents []string, relayService stri
 	}
 	addr := daemon.Addr(dir)
 	fmt.Fprintln(r.detail, "\nPointing agents at the local relay on "+addr+":")
-	err = pointAgentsAtRelay(ctx, targets, addr, token, func(agent, detail string) {
+	err = app.pointAgentsAtRelay(ctx, targets, addr, token, func(agent, detail string) {
 		fmt.Fprintf(r.detail, "  %s%s\n", agent, detail)
 		r.ok(agent, "exports through the local relay; only opted-in sessions leave")
 	}, r.then)

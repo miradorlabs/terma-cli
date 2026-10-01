@@ -16,10 +16,10 @@ import (
 )
 
 // relayHeartbeat is the heartbeat's facts about this terma and its agents.
-func relayHeartbeat(dir string) daemon.Heartbeat {
-	return daemon.Heartbeat{Dir: dir, Version: Version, InstallKind: installKind(),
+func (app *App) relayHeartbeat(dir string) daemon.Heartbeat {
+	return daemon.Heartbeat{Dir: dir, Version: app.version, InstallKind: app.installKind(),
 		Agents: func(addr string) (pointed, blocked []string) {
-			for _, e := range registered.With[agents.RelayExporter]() {
+			for _, e := range app.agents.With[agents.RelayExporter]() {
 				if ok, known := e.RelayPointed(addr); known && ok {
 					pointed = append(pointed, e.Name())
 				}
@@ -35,7 +35,7 @@ func relayHeartbeat(dir string) daemon.Heartbeat {
 
 // installKind is how this terma was installed: the package manager that owns it, a
 // source build, or the install script's.
-func installKind() string {
+func (app *App) installKind() string {
 	exe, err := os.Executable()
 	if err != nil {
 		return "unknown"
@@ -43,7 +43,7 @@ func installKind() string {
 	if m, ok := selfupdate.ManagedBy(exe); ok {
 		return strings.ToLower(m.Name)
 	}
-	if !strings.HasPrefix(Version, "v") || strings.Contains(Version, "-g") || Version == "dev" {
+	if !strings.HasPrefix(app.version, "v") || strings.Contains(app.version, "-g") || app.version == "dev" {
 		return "source"
 	}
 	return "script"
@@ -52,7 +52,7 @@ func installKind() string {
 // relayHeartbeatSend delivers a heartbeat to the organization the developer signed in
 // to, with their credential (api.SendHeartbeat). Not signed in, there is no organization
 // to tell, and nothing is sent.
-func relayHeartbeatSend(ctx context.Context, beat *logspb.LogsData) error {
+func (app *App) relayHeartbeatSend(ctx context.Context, beat *logspb.LogsData) error {
 	cfg, err := config.Load(config.Overrides{})
 	if err != nil {
 		return err
@@ -64,7 +64,7 @@ func relayHeartbeatSend(ctx context.Context, beat *logspb.LogsData) error {
 	if err != nil {
 		return err
 	}
-	client, err := newClient(cfg)
+	client, err := app.newClient(cfg)
 	if err != nil {
 		return err
 	}

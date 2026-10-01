@@ -238,9 +238,9 @@ func TestSessionGet_ReadsTheSummaryFeed(t *testing.T) {
 // read. The wait is shortened here; runInsights' own deadline would fail this test
 // with a context error if the command's did not fire first.
 func TestSessionGet_SilentFeedIsAnErrorNotAHang(t *testing.T) {
-	previous := sessionGetWait
-	sessionGetWait = 100 * time.Millisecond
-	t.Cleanup(func() { sessionGetWait = previous })
+	previous := testApp.sessionGetWait
+	testApp.sessionGetWait = 100 * time.Millisecond
+	t.Cleanup(func() { testApp.sessionGetWait = previous })
 
 	_, _, err := runInsights(t, principalsThen(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")

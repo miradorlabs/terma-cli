@@ -47,7 +47,7 @@ func TestHookKillSwitch(t *testing.T) {
 
 	run := func(stdin string, args ...string) {
 		t.Helper()
-		c := newHookCommand()
+		c := testApp.newHookCommand()
 		c.SetArgs(args)
 		c.SetIn(strings.NewReader(stdin))
 		c.SetOut(io.Discard)

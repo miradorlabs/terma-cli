@@ -176,7 +176,7 @@ func TestResolveBindingTakesTheOnlyProjectWithoutAsking(t *testing.T) {
 		if _, err := auth.SaveCredential(config.DefaultProfile, storedSession(f, org)); err != nil {
 			t.Fatal(err)
 		}
-		cfg, err := loadConfig()
+		cfg, err := testApp.loadConfig()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -184,7 +184,7 @@ func TestResolveBindingTakesTheOnlyProjectWithoutAsking(t *testing.T) {
 		cmd := &cobra.Command{}
 		cmd.SetContext(context.Background())
 		cmd.SetErr(&stderr)
-		b, err := resolveBinding(cmd, cfg, existing, "", true, true)
+		b, err := testApp.resolveBinding(cmd, cfg, existing, "", true, true)
 		return b, stderr.String(), err
 	}
 
@@ -251,8 +251,8 @@ func TestInstallStampsTheVersionOnlyWhenItWritesCommittedFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	install()
-	if got, _ := termaproject.Load(repo); got.Install.Version != Version {
-		t.Fatalf("an install that rewrote the hooks left terma_version at %q, want %q", got.Install.Version, Version)
+	if got, _ := termaproject.Load(repo); got.Install.Version != testApp.version {
+		t.Fatalf("an install that rewrote the hooks left terma_version at %q, want %q", got.Install.Version, testApp.version)
 	}
 }
 

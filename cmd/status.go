@@ -100,18 +100,18 @@ func statusLineSummary(v doctor.StatusLineVerdict) string {
 	return "not wrapped — plan usage is NOT captured (run `terma install`)"
 }
 
-func newStatusCommand() *cobra.Command {
+func (app *App) newStatusCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "status",
 		Short: "Show connections, queued events, and setup readiness",
-		Long: `A quick, local view of this machine and repository: sign-in, project install.Binding,
+		Long: `A quick, local view of this machine and repository: sign-in, project binding,
 hook wiring, connected agents, the event spool, and remaining setup steps.
 Nothing is written and no scratch commit is made — run
 ` + "`terma doctor`" + ` for the end-to-end verification.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
 			out := style.Highlight(cmd.OutOrStdout())
-			cfg, err := loadConfig()
+			cfg, err := app.loadConfig()
 			if err != nil {
 				return err
 			}
@@ -165,7 +165,7 @@ Nothing is written and no scratch commit is made — run
 				}
 				// The agents' own hooks, judged the way doctor judges them: an agent that
 				// cannot run its hooks yet costs its share of commit stamping in both.
-				if agentHooks = doctor.AgentHooksCheck(registered, root, doctor.SelectedForRepo(registered, projectID, cfg.Harnesses)); agentHooks.Status == doctor.Warn {
+				if agentHooks = doctor.AgentHooksCheck(app.agents, root, doctor.SelectedForRepo(app.agents, projectID, cfg.Harnesses)); agentHooks.Status == doctor.Warn {
 					fmt.Fprintf(out, "Agent hooks: %d of %d agents can run theirs — %s\n", agentHooks.Ready, agentHooks.Of, agentHooks.Fix)
 				}
 				stateDir, err := termaproject.StateDir(root, gitDir)
@@ -194,7 +194,7 @@ Nothing is written and no scratch commit is made — run
 			// doctor gives (relayDoctorCheck), so the two never disagree.
 			var export doctor.Check
 			if claim.Enabled() {
-				export = doctor.RelayCheck(registered, projectID, cfg.Harnesses)
+				export = doctor.RelayCheck(app.agents, projectID, cfg.Harnesses)
 				export.Key = doctor.KeyHarness
 				fmt.Fprintf(out, "Agents:      %s\n", export.Detail)
 				if export.Fix != "" {
@@ -202,26 +202,26 @@ Nothing is written and no scratch commit is made — run
 				}
 			} else {
 				var connected []string
-				verdicts := doctor.JudgeSelectedHarnesses(ctx, registered, cfg.OTLPURL, projectID, root, cfg.Harnesses)
+				verdicts := doctor.JudgeSelectedHarnesses(ctx, app.agents, cfg.OTLPURL, projectID, root, cfg.Harnesses)
 				for _, v := range verdicts {
 					suffix, ok := statusAgent(v, repoBound)
 					if ok {
 						connected = append(connected, v.DisplayName)
 					}
 					fmt.Fprintf(out, "Agent:       %s %s\n", v.DisplayName, suffix)
-					if a, lines := doctor.StatusLineAgent(registered); lines && v.Name == a.Name() && ok {
-						fmt.Fprintf(out, "Status line: %s\n", statusLineSummary(doctor.JudgeStatusLine(registered, root)))
+					if a, lines := doctor.StatusLineAgent(app.agents); lines && v.Name == a.Name() && ok {
+						fmt.Fprintf(out, "Status line: %s\n", statusLineSummary(doctor.JudgeStatusLine(app.agents, root)))
 					}
 				}
 				if len(connected) == 0 {
 					fmt.Fprintln(out, "Agent:       none connected — run `terma install`")
 				}
-				export = doctor.HarnessCheck(registered, verdicts, cfg.OTLPURL, projectID, repoBound)
+				export = doctor.HarnessCheck(app.agents, verdicts, cfg.OTLPURL, projectID, repoBound)
 			}
 			// A repository's own policy narrows what its sessions ship. Said next to
 			// the agent it applies to, since the global line cannot show it.
 			if repoErr == nil {
-				for _, h := range registered.Harnesses() {
+				for _, h := range app.agents.Harnesses() {
 					scoped, ok := h.(harness.Scoped)
 					if !ok {
 						continue
@@ -259,7 +259,7 @@ Nothing is written and no scratch commit is made — run
 				fmt.Fprintln(out, line)
 			}
 
-			checks := []doctor.Check{binaryCheck(), export, agentHooks,
+			checks := []doctor.Check{app.binaryCheck(), export, agentHooks,
 				{Key: doctor.KeyBackend, Status: doctor.Skip}}
 			if !authOK {
 				checks = append(checks, doctor.Check{Status: doctor.Fail, Fix: "terma setup"})

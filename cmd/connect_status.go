@@ -13,9 +13,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/output"
 )
 
-func newTelemetryStatusCommand() *cobra.Command {
+func (app *App) newTelemetryStatusCommand() *cobra.Command {
 	return &cobra.Command{
-		Use:    "status [" + strings.Join(registered.HarnessNames(), "|") + "]",
+		Use:    "status [" + strings.Join(app.agents.HarnessNames(), "|") + "]",
 		Short:  "Show which harnesses are connected",
 		Hidden: true,
 		Long: `Reads each harness's own configuration and reports what is installed there.
@@ -24,18 +24,18 @@ This is the harness's view, not Terma's: it says what the harness is configured 
 send, not whether anything has arrived. With no argument it reports every harness.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := loadConfig()
+			cfg, err := app.loadConfig()
 			if err != nil {
 				return err
 			}
-			format, err := resolveFormat()
+			format, err := app.resolveFormat()
 			if err != nil {
 				return err
 			}
 
-			targets := registered.Harnesses()
+			targets := app.agents.Harnesses()
 			if len(args) == 1 {
-				h, err := registered.Harness(args[0])
+				h, err := app.agents.Harness(args[0])
 				if err != nil {
 					return err
 				}

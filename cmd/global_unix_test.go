@@ -24,9 +24,9 @@ func globalSandbox(t *testing.T) (codexHome string) {
 	codexHome = t.TempDir()
 	t.Setenv("CODEX_HOME", codexHome)
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
-	prev := hookExecutable
-	hookExecutable = func() (string, error) { return bin, nil }
-	t.Cleanup(func() { hookExecutable = prev })
+	prev := testApp.hookExecutable
+	testApp.hookExecutable = func() (string, error) { return bin, nil }
+	t.Cleanup(func() { testApp.hookExecutable = prev })
 	if _, err := auth.SaveCredential(config.DefaultProfile, storedSession(gateway, orgA())); err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +122,7 @@ func TestHookYields(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	global := config.Policy{Mode: config.ModeGlobal, DefaultProjectID: "p"}
 	repo := config.DefaultPolicy()
-	if hookYields(false, global, "claude-code") {
+	if testApp.hookYields(false, global, "claude-code") {
 		t.Fatal("a repository hook yielded with no machine-wide hooks recorded")
 	}
 	path, _ := userHooksRecordPath()
@@ -141,7 +141,7 @@ func TestHookYields(t *testing.T) {
 		{true, repo, "claude-code", true}, // leftover from global mode
 		{false, repo, "claude-code", false},
 	} {
-		if got := hookYields(tc.user, tc.pol, tc.tool); got != tc.yield {
+		if got := testApp.hookYields(tc.user, tc.pol, tc.tool); got != tc.yield {
 			t.Errorf("hookYields(user=%v, %s, %s) = %v", tc.user, tc.pol.Mode, tc.tool, got)
 		}
 	}
@@ -158,11 +158,11 @@ func TestSetupGlobalModeDefersToManagedHooks(t *testing.T) {
 	}
 	// The organization deploys Codex's hooks afterwards.
 	root := t.TempDir()
-	prev := managedRoot
-	managedRoot = root
-	t.Cleanup(func() { managedRoot = prev })
+	prev := testApp.managedRoot
+	testApp.managedRoot = root
+	t.Cleanup(func() { testApp.managedRoot = prev })
 	out := t.TempDir()
-	if _, err := writeManagedConfig(out, "$HOME/.local/bin/terma"); err != nil {
+	if _, err := testApp.writeManagedConfig(out, "$HOME/.local/bin/terma"); err != nil {
 		t.Fatal(err)
 	}
 	data, _ := os.ReadFile(filepath.Join(out, "codex-requirements.toml"))
@@ -187,7 +187,7 @@ func TestSetupGlobalModeDefersToManagedHooks(t *testing.T) {
 	if strings.Contains(setupOut, "`/hooks`") {
 		t.Fatalf("setup asked to trust hooks the organization manages:\n%s", setupOut)
 	}
-	if !userHooksCover("codex") || !userHooksCover("claude-code") {
+	if !testApp.userHooksCover("codex") || !testApp.userHooksCover("claude-code") {
 		t.Fatal("the agents' repository hooks would not step aside")
 	}
 }

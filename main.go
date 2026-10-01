@@ -10,4 +10,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
 )
 
-func main() { os.Exit(cmd.Execute(builtin.Agents())) }
+// version is stamped at build time via -ldflags: the release tag by GoReleaser, `git
+// describe` by `make build`. "dev" is the unset sentinel.
+var version = "dev"
+
+func main() { os.Exit(cmd.New(builtin.Agents(), version).Execute()) }

@@ -9,15 +9,15 @@ import (
 )
 
 // newRelayKeyMinter mints claimed projects' keys with the signed-in credential.
-func newRelayKeyMinter(ctx context.Context, cfg *config.Config) *daemon.KeyMinter {
-	return daemon.NewKeyMinter(ctx, cfg, createProjectKey)
+func (app *App) newRelayKeyMinter(ctx context.Context, cfg *config.Config) *daemon.KeyMinter {
+	return daemon.NewKeyMinter(ctx, cfg, app.createProjectKey)
 }
 
 // createProjectKey mints a server key for projectID with the signed-in credential.
-func createProjectKey(ctx context.Context, cfg *config.Config, projectID string) (string, error) {
+func (app *App) createProjectKey(ctx context.Context, cfg *config.Config, projectID string) (string, error) {
 	scoped := *cfg
 	scoped.ProjectID = projectID
-	client, err := newClient(&scoped)
+	client, err := app.newClient(&scoped)
 	if err != nil {
 		return "", err
 	}

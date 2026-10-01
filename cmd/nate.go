@@ -21,12 +21,7 @@ import (
 
 const termaModulePath = "github.com/miradorlabs/terma-cli"
 
-var (
-	nateBinaryCandidates = installedTermaBinaries
-	nateRemoveBinary     = removeNateBinary
-)
-
-func newNateCommand() *cobra.Command {
+func (app *App) newNateCommand() *cobra.Command {
 	var assumeYes bool
 	cmd := &cobra.Command{
 		Use:    "nate",
@@ -37,7 +32,7 @@ func newNateCommand() *cobra.Command {
 Terma state, then delete installed Terma executables. This is intended for testing
 onboarding from a clean machine.
 
-Repositories are left alone: their hooks and install.Binding are committed files shared with
+Repositories are left alone: their hooks and binding are committed files shared with
 everyone who works in them. Remove a repository's install with 'terma uninstall'.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if !assumeYes {
@@ -50,14 +45,14 @@ everyone who works in them. Remove a repository's install with 'terma uninstall'
 					return nil
 				}
 			}
-			return runNate(cmd)
+			return app.runNate(cmd)
 		},
 	}
 	cmd.Flags().BoolVarP(&assumeYes, "yes", "y", false, "skip the confirmation prompt")
 	return cmd
 }
 
-func runNate(cmd *cobra.Command) error {
+func (app *App) runNate(cmd *cobra.Command) error {
 	out := cmd.OutOrStdout()
 
 	// Only home-directory state. The current repository's install is committed wiring
@@ -67,7 +62,7 @@ func runNate(cmd *cobra.Command) error {
 	// These journals live in Terma's config directory. Restore what Terma displaced
 	// before that directory is deleted; after it is gone, the original values cannot
 	// be recovered.
-	for _, h := range registered.Harnesses() {
+	for _, h := range app.agents.Harnesses() {
 		result, err := h.Disconnect()
 		if err != nil {
 			return fmt.Errorf("restore %s settings: %w", h.DisplayName(), err)
@@ -76,14 +71,14 @@ func runNate(cmd *cobra.Command) error {
 			fmt.Fprintf(out, "Restored %s settings.\n", h.DisplayName())
 		}
 	}
-	for _, s := range registered.With[agents.StatusLiner]() {
+	for _, s := range app.agents.With[agents.StatusLiner]() {
 		if restored, err := s.RemoveStatusLine(); err != nil {
 			return fmt.Errorf("restore %s status line: %w", s.DisplayName(), err)
 		} else if restored {
 			fmt.Fprintf(out, "Restored the %s status line.\n", s.DisplayName())
 		}
 	}
-	for _, n := range registered.With[agents.Notifier]() {
+	for _, n := range app.agents.With[agents.Notifier]() {
 		if restored, err := n.RemoveNotifier(); err != nil {
 			return fmt.Errorf("restore %s notifier: %w", n.DisplayName(), err)
 		} else if restored {
@@ -100,9 +95,9 @@ func runNate(cmd *cobra.Command) error {
 	}
 	fmt.Fprintf(out, "Removed local state from %s.\n", output.TildePath(configDir))
 
-	paths := nateBinaryCandidates()
+	paths := app.nateBinaryCandidates()
 	for _, path := range paths {
-		if err := nateRemoveBinary(cmd, path); err != nil {
+		if err := app.nateRemoveBinary(cmd, path); err != nil {
 			return fmt.Errorf("remove Terma executable %s: %w", path, err)
 		}
 		fmt.Fprintf(out, "Removed executable %s.\n", output.TildePath(path))
@@ -139,7 +134,7 @@ func samePath(a, b string) bool {
 // pinned official npm launcher). A coincidental program named terma is not ours to
 // delete. The executable running this command is sorted last so another removal
 // failure leaves a working command that can report it.
-func installedTermaBinaries() []string {
+func (app *App) installedTermaBinaries() []string {
 	name := "terma"
 	if runtime.GOOS == "windows" {
 		name += ".exe"
@@ -152,7 +147,7 @@ func installedTermaBinaries() []string {
 	if path, err := exec.LookPath(name); err == nil {
 		candidates = append(candidates, path)
 	}
-	for _, dir := range append(filepath.SplitList(os.Getenv("PATH")), wellKnownBinDirs()...) {
+	for _, dir := range append(filepath.SplitList(os.Getenv("PATH")), app.binDirs()...) {
 		if dir != "" {
 			candidates = append(candidates, filepath.Join(dir, name))
 		}

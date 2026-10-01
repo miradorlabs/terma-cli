@@ -89,8 +89,8 @@ func TestRefreshUpdatesTheRepositoryFromItsBinding(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if after.Install.Version != Version || !strings.Contains(out, "git add .claude/settings.json "+termaproject.FileName) {
-		t.Fatalf("refresh should stamp terma_version %q and list the binding: %q\n%s", Version, after.Install.Version, out)
+	if after.Install.Version != testApp.version || !strings.Contains(out, "git add .claude/settings.json "+termaproject.FileName) {
+		t.Fatalf("refresh should stamp terma_version %q and list the binding: %q\n%s", testApp.version, after.Install.Version, out)
 	}
 	after.Install.Version = bound.Install.Version
 	if after.Project != bound.Project || !after.Install.InstalledAt.Equal(bound.Install.InstalledAt) || after.Install.HookManager != bound.Install.HookManager {
@@ -134,15 +134,15 @@ func TestRefreshIsExclusiveWithTheOtherModes(t *testing.T) {
 func recordSteps(t *testing.T, fail string) *[][]string {
 	t.Helper()
 	var steps [][]string
-	original := runUpdateStep
-	runUpdateStep = func(_ context.Context, _ io.Writer, argv ...string) error {
+	original := testApp.runUpdateStep
+	testApp.runUpdateStep = func(_ context.Context, _ io.Writer, argv ...string) error {
 		steps = append(steps, argv)
 		if filepath.Base(argv[0]) == fail {
 			return errors.New("exit status 1")
 		}
 		return nil
 	}
-	t.Cleanup(func() { runUpdateStep = original })
+	t.Cleanup(func() { testApp.runUpdateStep = original })
 	return &steps
 }
 
@@ -175,7 +175,7 @@ func TestUpdateUpgradesThroughThePackageManager(t *testing.T) {
 
 	steps := recordSteps(t, "")
 	var out bytes.Buffer
-	if err := runUpdate(context.Background(), latestRelease(t, "v2.0.0"), t.TempDir(), exe, &out, false, false); err != nil {
+	if err := testApp.runUpdate(context.Background(), latestRelease(t, "v2.0.0"), t.TempDir(), exe, &out, false, false); err != nil {
 		t.Fatalf("update: %v\n%s", err, &out)
 	}
 	want := [][]string{{brew, "upgrade", "--cask", "terma"}, {filepath.Join(prefix, "bin", "terma"), "update", "--refresh"}}
@@ -185,7 +185,7 @@ func TestUpdateUpgradesThroughThePackageManager(t *testing.T) {
 
 	// A failed upgrade names the command, and nothing refreshes.
 	steps = recordSteps(t, "brew")
-	err = runUpdate(context.Background(), latestRelease(t, "v2.0.0"), t.TempDir(), exe, &out, false, false)
+	err = testApp.runUpdate(context.Background(), latestRelease(t, "v2.0.0"), t.TempDir(), exe, &out, false, false)
 	if err == nil || !strings.Contains(err.Error(), "brew upgrade terma") || len(*steps) != 1 {
 		t.Fatalf("failed upgrade: %v, ran %q", err, *steps)
 	}
@@ -195,7 +195,7 @@ func TestUpdateUpgradesThroughThePackageManager(t *testing.T) {
 		t.Fatal(err)
 	}
 	steps = recordSteps(t, "")
-	err = runUpdate(context.Background(), latestRelease(t, "v2.0.0"), t.TempDir(), exe, &out, false, false)
+	err = testApp.runUpdate(context.Background(), latestRelease(t, "v2.0.0"), t.TempDir(), exe, &out, false, false)
 	if err == nil || !strings.Contains(err.Error(), "brew upgrade terma") || len(*steps) != 0 {
 		t.Fatalf("no brew: %v, ran %q", err, *steps)
 	}
@@ -218,7 +218,7 @@ func TestUpdateSendsAProjectDependencyToItsProject(t *testing.T) {
 	}
 	steps := recordSteps(t, "")
 	var out bytes.Buffer
-	err = runUpdate(context.Background(), latestRelease(t, "v2.0.0"), t.TempDir(), exe, &out, false, false)
+	err = testApp.runUpdate(context.Background(), latestRelease(t, "v2.0.0"), t.TempDir(), exe, &out, false, false)
 	if err == nil || !strings.Contains(err.Error(), project) || !strings.Contains(err.Error(), "`npm install @miradorlabs/terma@latest`") || strings.Contains(err.Error(), " -g ") || len(*steps) != 0 {
 		t.Fatalf("project dependency: %v, ran %q", err, *steps)
 	}
@@ -253,7 +253,7 @@ func TestUpdateRefreshesWithTheReplacedBinary(t *testing.T) {
 		steps := recordSteps(t, fail)
 		var out bytes.Buffer
 		client := &selfupdate.Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0"}
-		if err := runUpdate(context.Background(), client, t.TempDir(), exe, &out, false, false); err != nil {
+		if err := testApp.runUpdate(context.Background(), client, t.TempDir(), exe, &out, false, false); err != nil {
 			t.Fatalf("update: %v\n%s", err, &out)
 		}
 		if want := [][]string{{exe, "update", "--refresh"}}; !slices.EqualFunc(*steps, want, slices.Equal) {
@@ -301,12 +301,12 @@ func TestRefreshAfterUpgradeRunsOncePerRelease(t *testing.T) {
 	}
 	statusLine := plantStaleStatusLine(t)
 
-	original := Version
-	Version = "9.9.9"
-	t.Cleanup(func() { Version = original })
+	original := testApp.version
+	testApp.version = "9.9.9"
+	t.Cleanup(func() { testApp.version = original })
 	dir := os.Getenv("TERMA_CONFIG_DIR")
 	var out bytes.Buffer
-	refreshAfterUpgrade(context.Background(), dir, &out)
+	testApp.refreshAfterUpgrade(context.Background(), dir, &out)
 	if !strings.Contains(out.String(), "refreshed 1 file(s)") || !strings.Contains(out.String(), "`terma update --refresh` here") {
 		t.Fatalf("output:\n%s", &out)
 	}
@@ -316,7 +316,7 @@ func TestRefreshAfterUpgradeRunsOncePerRelease(t *testing.T) {
 	}
 
 	out.Reset()
-	refreshAfterUpgrade(context.Background(), dir, &out)
+	testApp.refreshAfterUpgrade(context.Background(), dir, &out)
 	if out.Len() != 0 {
 		t.Fatalf("second run under the same release was not silent:\n%s", &out)
 	}
@@ -339,15 +339,15 @@ func TestInstallRefreshesTheMachineOnANewRelease(t *testing.T) {
 	install()
 	statusLine := plantStaleStatusLine(t)
 
-	original := Version
-	Version = "9.9.9"
-	t.Cleanup(func() { Version = original })
+	original := testApp.version
+	testApp.version = "9.9.9"
+	t.Cleanup(func() { testApp.version = original })
 	if out := install(); !strings.Contains(out, "✓ Refreshed     1 file(s) an earlier terma installed") {
 		t.Fatalf("install should refresh the machine as a step:\n%s", out)
 	}
 	requireRefreshed(t, statusLine)
 	var after bytes.Buffer
-	refreshAfterUpgrade(context.Background(), os.Getenv("TERMA_CONFIG_DIR"), &after)
+	testApp.refreshAfterUpgrade(context.Background(), os.Getenv("TERMA_CONFIG_DIR"), &after)
 	if after.Len() != 0 {
 		t.Fatalf("the refresh after the command ran again:\n%s", &after)
 	}

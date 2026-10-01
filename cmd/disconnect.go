@@ -10,12 +10,12 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-func newTelemetryDisconnectCommand() *cobra.Command {
+func (app *App) newTelemetryDisconnectCommand() *cobra.Command {
 	var assumeYes bool
 	var scopeFlag string
 
 	cmd := &cobra.Command{
-		Use:    "disconnect <" + strings.Join(registered.HarnessNames(), "|") + ">",
+		Use:    "disconnect <" + strings.Join(app.agents.HarnessNames(), "|") + ">",
 		Short:  "Stop a harness exporting to Terma",
 		Hidden: true,
 		Long: `Removes the telemetry settings Terma wrote, and nothing else.
@@ -32,12 +32,12 @@ instead, and leaves your global connect as it is.`,
 			if err != nil {
 				return err
 			}
-			h, err := registered.Harness(args[0])
+			h, err := app.agents.Harness(args[0])
 			if err != nil {
 				return err
 			}
 			if scope == harness.ScopeLocal {
-				if h, err = localHarness(cmd.Context(), h); err != nil {
+				if h, err = app.localHarness(cmd.Context(), h); err != nil {
 					return err
 				}
 			}
@@ -51,7 +51,7 @@ instead, and leaves your global connect as it is.`,
 			// linger after the keys are gone (removed by hand or by an older CLI). That
 			// still needs restoring, so it counts as work to do.
 			notifierLeftover := false
-			if notifier, ok := registered.Find[agents.Notifier](h.Name()); ok && scope == harness.ScopeGlobal {
+			if notifier, ok := app.agents.Find[agents.Notifier](h.Name()); ok && scope == harness.ScopeGlobal {
 				if installed, nerr := notifier.NotifierInstalled(); nerr == nil {
 					notifierLeftover = installed
 				}
@@ -59,7 +59,7 @@ instead, and leaves your global connect as it is.`,
 			// Repository install can wrap the user-level status line without a
 			// global telemetry connection. It still belongs to this disconnect.
 			statusLineLeftover := false
-			if renderer, ok := registered.Find[agents.StatusLiner](h.Name()); ok && scope == harness.ScopeGlobal {
+			if renderer, ok := app.agents.Find[agents.StatusLiner](h.Name()); ok && scope == harness.ScopeGlobal {
 				if line, lineErr := renderer.StatusLineState(""); lineErr == nil {
 					statusLineLeftover = line.Installed || line.Replaced
 				}
@@ -103,7 +103,7 @@ instead, and leaves your global connect as it is.`,
 			if err != nil {
 				return err
 			}
-			if renderer, ok := registered.Find[agents.StatusLiner](h.Name()); ok && scope == harness.ScopeGlobal {
+			if renderer, ok := app.agents.Find[agents.StatusLiner](h.Name()); ok && scope == harness.ScopeGlobal {
 				switch restored, err := renderer.RemoveStatusLine(); {
 				case err != nil:
 					fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not restore the status line (%v).\n", err)
@@ -111,7 +111,7 @@ instead, and leaves your global connect as it is.`,
 					fmt.Fprintln(out, "Status line: restored to what it was before terma wrapped it.")
 				}
 			}
-			if notifier, ok := registered.Find[agents.Notifier](h.Name()); ok && scope == harness.ScopeGlobal {
+			if notifier, ok := app.agents.Find[agents.Notifier](h.Name()); ok && scope == harness.ScopeGlobal {
 				switch restored, err := notifier.RemoveNotifier(); {
 				case err != nil:
 					fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not restore the previous %s notifier (%v).\n", h.DisplayName(), err)

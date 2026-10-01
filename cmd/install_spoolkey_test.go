@@ -47,7 +47,7 @@ func TestInstallGivesAHooksOnlyDeveloperAKeyToDeliverWith(t *testing.T) {
 	}
 	// A hooks-only project has no routing record, so the key's own hosts are the only
 	// record of which environment its events belong to.
-	cfg, err := loadConfig()
+	cfg, err := testApp.loadConfig()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +115,7 @@ func TestInstallNeedsAuth(t *testing.T) {
 		{"a hooks-only agent needs a key to deliver with", []string{"cursor"}, "", bound, true, true},
 		{"…unless it installs no hooks", []string{"cursor"}, "", bound, false, false},
 	} {
-		if got := installNeedsAuth(c.agents, c.ref, c.existing, c.hooks); got != c.want {
+		if got := testApp.installNeedsAuth(c.agents, c.ref, c.existing, c.hooks); got != c.want {
 			t.Errorf("%s: installNeedsAuth = %v, want %v", c.name, got, c.want)
 		}
 	}
@@ -123,7 +123,7 @@ func TestInstallNeedsAuth(t *testing.T) {
 	if err := keystore.Set(id, "ter_srv_0123456789abcdef01234567", keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
-	if installNeedsAuth([]string{"cursor"}, "", bound, true) {
+	if testApp.installNeedsAuth([]string{"cursor"}, "", bound, true) {
 		t.Error("a machine that already holds the project's key must not sign in for one")
 	}
 }

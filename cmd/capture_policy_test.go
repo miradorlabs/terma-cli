@@ -61,12 +61,12 @@ func TestPolicyRefreshFiltersAlreadyQueuedReplies(t *testing.T) {
 		t.Fatal(err)
 	}
 	seedPolicyLogin(t, srv.URL)
-	cfg, err := loadConfig()
+	cfg, err := testApp.loadConfig()
 	if err != nil {
 		t.Fatal(err)
 	}
 	cfg.ProjectID = "team"
-	if err := refreshCollectionPolicy(t.Context(), cfg); err != nil {
+	if err := testApp.refreshCollectionPolicy(t.Context(), cfg); err != nil {
 		t.Fatal(err)
 	}
 	s := spoolForTest(t)
@@ -80,10 +80,10 @@ func TestPolicyRefreshFiltersAlreadyQueuedReplies(t *testing.T) {
 		}
 	}
 	revision.Store(2)
-	if err := refreshCollectionPolicy(t.Context(), cfg); err != nil {
+	if err := testApp.refreshCollectionPolicy(t.Context(), cfg); err != nil {
 		t.Fatal(err)
 	}
-	res, err := flushSpool(t.Context(), true, 0)
+	res, err := testApp.flushSpool(t.Context(), true, 0)
 	if err != nil || res.Err != nil || res.Sent != 1 || res.Withheld != 2 {
 		t.Fatalf("flush: %+v, %v", res, err)
 	}
@@ -111,7 +111,7 @@ func TestRelayRespectsSignalSelection(t *testing.T) {
 				t.Fatal(err)
 			}
 			cfg := &config.Config{Policy: config.DefaultPolicy(), OTLPURL: "http://127.0.0.1:1"}
-			r := newTestRelay(relay.Options{Token: "token", Dir: t.TempDir(), Resolve: relayResolver(cfg, nil), Lookup: func(string, time.Time) (claim.Claim, bool) {
+			r := newTestRelay(relay.Options{Token: "token", Dir: t.TempDir(), Resolve: testApp.relayResolver(cfg, nil), Lookup: func(string, time.Time) (claim.Claim, bool) {
 				return claim.Claim{ProjectID: "team", Tool: "codex"}, true
 			}})
 			m := &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{{Name: "chat", Attributes: []*commonpb.KeyValue{{Key: "session.id", Value: &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: "session"}}}}}}}}}}}
@@ -161,7 +161,7 @@ func TestRelayRespectsHarnessSelection(t *testing.T) {
 				t.Fatal(err)
 			}
 			cfg := &config.Config{Policy: config.DefaultPolicy(), OTLPURL: host.URL}
-			r := newTestRelay(relay.Options{Token: "test-token", Dir: t.TempDir(), Resolve: relayResolver(cfg, nil), Lookup: func(string, time.Time) (claim.Claim, bool) {
+			r := newTestRelay(relay.Options{Token: "test-token", Dir: t.TempDir(), Resolve: testApp.relayResolver(cfg, nil), Lookup: func(string, time.Time) (claim.Claim, bool) {
 				return claim.Claim{ProjectID: "team", Tool: test.tool}, true
 			}})
 			ctx, cancel := context.WithCancel(t.Context())
@@ -236,7 +236,7 @@ func TestQueuedRelayExportsRespectHarnessDeselection(t *testing.T) {
 	}
 	dir := t.TempDir()
 	cfg := &config.Config{Policy: config.DefaultPolicy(), OTLPURL: host.URL}
-	r := newTestRelay(relay.Options{Token: "test-token", Dir: dir, Resolve: relayResolver(cfg, nil), Lookup: func(string, time.Time) (claim.Claim, bool) {
+	r := newTestRelay(relay.Options{Token: "test-token", Dir: dir, Resolve: testApp.relayResolver(cfg, nil), Lookup: func(string, time.Time) (claim.Claim, bool) {
 		return claim.Claim{ProjectID: "team", Tool: "codex"}, true
 	}})
 	ctx, cancel := context.WithCancel(t.Context())
@@ -303,7 +303,7 @@ func TestReinstallKeepsSignalChoiceUnlessExplicit(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg := &config.Config{ProjectID: "team", OTLPURL: "http://127.0.0.1:1"}
-	cmd := newInstallCommand()
+	cmd := testApp.newInstallCommand()
 	ui := newInstallUI(io.Discard, false)
 	for _, explicit := range []bool{false, true} {
 		f := installFlags{}
@@ -313,7 +313,7 @@ func TestReinstallKeepsSignalChoiceUnlessExplicit(t *testing.T) {
 			}
 			f.signals = "none"
 		}
-		if err := connectHarnessesForRepo(cmd, ui, cfg, []string{"codex"}, f); err != nil {
+		if err := testApp.connectHarnessesForRepo(cmd, ui, cfg, []string{"codex"}, f); err != nil {
 			t.Fatal(err)
 		}
 		r, _, err := routing.LoadRecord("team")
@@ -357,12 +357,12 @@ func TestPolicyRefreshOutageRetainsValidatedPolicy(t *testing.T) {
 			if err := saveCollectionPolicy(cfg, &p); err != nil {
 				t.Fatal(err)
 			}
-			got, err := currentTeamPolicy(context.Background(), cfg, "team")
+			got, err := testApp.currentTeamPolicy(context.Background(), cfg, "team")
 			if err != nil || got.IncludePrompts || got.Revision != 9 {
 				t.Fatalf("outage widened capture: %+v %v", got, err)
 			}
 			cfg.Policy = config.DefaultPolicy()
-			if _, err := currentTeamPolicy(context.Background(), cfg, "unknown"); err == nil {
+			if _, err := testApp.currentTeamPolicy(context.Background(), cfg, "unknown"); err == nil {
 				t.Fatal("unfetched policy defaulted to capture during rejection")
 			}
 			if keystore.Get("team") != "" {
@@ -399,10 +399,10 @@ func TestPolicyCacheRejectsOlderRevisionAndOrganizationChanges(t *testing.T) {
 func TestQueuedGlobalHookEventsAreWithheldAfterCoverageChange(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	e := spool.Event{Name: "terma.session.start", Global: true}
-	if !spoolEventAllowed(config.Policy{Mode: config.ModeGlobal}, "global-project", e) {
+	if !testApp.spoolEventAllowed(config.Policy{Mode: config.ModeGlobal}, "global-project", e) {
 		t.Fatal("global metadata withheld in global mode")
 	}
-	if spoolEventAllowed(config.DefaultPolicy(), "global-project", e) {
+	if testApp.spoolEventAllowed(config.DefaultPolicy(), "global-project", e) {
 		t.Fatal("queued global event escaped after switch to repository mode")
 	}
 }
@@ -419,7 +419,7 @@ func TestPolicyGlobalDestinationIsTheRequestedTeam(t *testing.T) {
 	defer srv.Close()
 	seedPolicyLogin(t, srv.URL)
 	cfg := &config.Config{ProfileName: config.DefaultProfile, OrganizationID: "org-test", AuthURL: srv.URL, APIURL: srv.URL, ProjectID: "chosen", Policy: config.Policy{DefaultProjectID: "other"}}
-	p, err := fetchPolicy(t.Context(), cfg)
+	p, err := testApp.fetchPolicy(t.Context(), cfg)
 	if err != nil || p.DefaultProjectID != "chosen" || p.TeamID != "chosen" {
 		t.Fatalf("policy=%+v error=%v", p, err)
 	}
@@ -445,7 +445,7 @@ func TestPolicyRefreshOtherTeamKeepsSelectedCoverage(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg.ProjectID = "other"
-	if err := refreshCollectionPolicy(t.Context(), cfg); err != nil {
+	if err := testApp.refreshCollectionPolicy(t.Context(), cfg); err != nil {
 		t.Fatal(err)
 	}
 	file, err := config.LoadFile()

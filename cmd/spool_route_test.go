@@ -62,7 +62,6 @@ func routingSandbox(t *testing.T) {
 	t.Helper()
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	t.Setenv("TERMA_OTLP_URL", "")
-	flags = globalFlags{}
 	if err := config.UpdateProfile(config.DefaultProfile, func(p *config.Profile) { p.OTLPURL = "http://127.0.0.1:1" }); err != nil {
 		t.Fatal(err)
 	}
@@ -285,12 +284,12 @@ func TestDoctorBackendWarnsForAnotherProjectsRefusal(t *testing.T) {
 	s := spoolForTest(t)
 	appendEvent(t, s, routeDevProject, time.Now())
 	appendEvent(t, s, routeProdProject, time.Now())
-	cfg, err := loadConfig()
+	cfg, err := testApp.loadConfig()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	check := doctor.BackendCheck(context.Background(), doctorProbes(cfg), routeProdProject, "", doctor.Check{}, doctor.Progress{})
+	check := doctor.BackendCheck(context.Background(), testApp.doctorProbes(cfg), routeProdProject, "", doctor.Check{}, doctor.Progress{})
 	if check.Status == doctor.Fail {
 		t.Fatalf("another project's refusal must not fail this repository's check: %+v", check)
 	}
@@ -309,12 +308,12 @@ func TestDoctorBackendFailsOnThisProjectsRefusal(t *testing.T) {
 	dev := newIngestHost(t, "ter_srv_dev")
 	routeProject(t, routeDevProject, "ter_srv_revoked", dev.URL)
 	appendEvent(t, spoolForTest(t), routeDevProject, time.Now())
-	cfg, err := loadConfig()
+	cfg, err := testApp.loadConfig()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	check := doctor.BackendCheck(context.Background(), doctorProbes(cfg), routeDevProject, "", doctor.Check{}, doctor.Progress{})
+	check := doctor.BackendCheck(context.Background(), testApp.doctorProbes(cfg), routeDevProject, "", doctor.Check{}, doctor.Progress{})
 	if check.Status != doctor.Fail || !strings.Contains(check.Detail, "this project's events were not delivered: refused by "+dev.URL) {
 		t.Fatalf("this project's refusal must fail, naming the host: %+v", check)
 	}

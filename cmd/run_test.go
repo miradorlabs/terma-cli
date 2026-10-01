@@ -31,7 +31,9 @@ func (r termaRun) exec(t *testing.T, args ...string) (stdout, stderr string, err
 	for k, v := range r.env {
 		t.Setenv(k, v)
 	}
-	flags = globalFlags{}
+	// A run's flags are its own: a test that reads the configuration after it does not
+	// inherit them.
+	defer func() { testApp.flags = globalFlags{} }()
 
 	ctx := context.Background()
 	if r.within > 0 {
@@ -40,7 +42,7 @@ func (r termaRun) exec(t *testing.T, args ...string) (stdout, stderr string, err
 		defer cancel()
 	}
 
-	root := NewRootCommand()
+	root := testApp.NewRootCommand()
 	root.PersistentPostRun = nil
 	var out, errOut bytes.Buffer
 	root.SetOut(&out)

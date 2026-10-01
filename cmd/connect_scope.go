@@ -171,10 +171,10 @@ func localRoot(ctx context.Context) (string, error) {
 }
 
 // localHarness binds h to the repository the CLI runs in, or explains why it cannot.
-func localHarness(ctx context.Context, h harness.Harness) (harness.Harness, error) {
+func (app *App) localHarness(ctx context.Context, h harness.Harness) (harness.Harness, error) {
 	scoped, ok := h.(harness.Scoped)
 	if !ok {
-		return nil, fmt.Errorf("%s has no repository settings — --scope local applies to harnesses that read one (%s)", h.DisplayName(), scopedHarnessNames())
+		return nil, fmt.Errorf("%s has no repository settings — --scope local applies to harnesses that read one (%s)", h.DisplayName(), app.scopedHarnessNames())
 	}
 	root, err := localRoot(ctx)
 	if err != nil {
@@ -187,8 +187,8 @@ func localHarness(ctx context.Context, h harness.Harness) (harness.Harness, erro
 // ship, in its committed .claude/settings.json. Nothing about where or with which key —
 // that stays in the global connect — so it needs no project, no sign-in and no network,
 // and the file stays safe to commit.
-func runLocalConnect(cmd *cobra.Command, name string, f connectFlags) error {
-	global, err := registered.Harness(name)
+func (app *App) runLocalConnect(cmd *cobra.Command, name string, f connectFlags) error {
+	global, err := app.agents.Harness(name)
 	if err != nil {
 		return err
 	}
@@ -199,13 +199,13 @@ func runLocalConnect(cmd *cobra.Command, name string, f connectFlags) error {
 	if err != nil {
 		return err
 	}
-	cfg, err := loadConfig()
+	cfg, err := app.loadConfig()
 	if err != nil {
 		return err
 	}
 	ctx := cmd.Context()
 	out := cmd.OutOrStdout()
-	h, err := localHarness(ctx, global)
+	h, err := app.localHarness(ctx, global)
 	if err != nil {
 		return err
 	}

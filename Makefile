@@ -1,6 +1,6 @@
 BINARY := bin/terma
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
-LDFLAGS := -s -w -X github.com/miradorlabs/terma-cli/cmd.Version=$(VERSION)
+LDFLAGS := -s -w -X main.version=$(VERSION)
 
 # Everything here that runs terma's code runs it against the dev environment. `terma
 # install` and `terma setup` sign in, so a test or a script that reaches them would

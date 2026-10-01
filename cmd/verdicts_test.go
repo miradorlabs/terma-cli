@@ -256,7 +256,7 @@ func TestHarnessVerdictInBothCommands(t *testing.T) {
 			if v.Route != tc.route {
 				t.Fatalf("route = %v, want %v", v.Route, tc.route)
 			}
-			check := doctor.HarnessCheck(registered, []doctor.HarnessVerdict{v}, otlp, project, tc.bound)
+			check := doctor.HarnessCheck(testApp.agents, []doctor.HarnessVerdict{v}, otlp, project, tc.bound)
 			if check.Status != tc.doctorStatus || check.Detail != tc.doctorDetail {
 				t.Errorf("doctor = %v %q\n         want %v %q", check.Status, check.Detail, tc.doctorStatus, tc.doctorDetail)
 			}
