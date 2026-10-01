@@ -18,14 +18,10 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/serverkey"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
-	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/harness"
-	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/install"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/routing"
-	"github.com/miradorlabs/terma-cli/internal/selfupdate"
-	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 	"github.com/miradorlabs/terma-cli/internal/ui/spinner"
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
@@ -139,19 +135,13 @@ func (app *App) runInstall(cmd *cobra.Command, f installFlags) error {
 	// A dry run is nothing but its plan, so it always says everything.
 	ui := newInstallUI(out, f.verbose || f.dryRun)
 	fmt.Fprintf(out, "%s in %s\n\n", ui.p.Bold("Installing terma"), output.TildePath(root))
-	for _, path := range append([]string{termaproject.FileName}, app.agents.HooksPaths()...) {
-		if err := termaproject.CheckPath(root, path); err != nil {
-			return err
-		}
-	}
-	// A linked worktree keeps its main checkout's project; the binding it writes is its own.
-	existing, _, err := termaproject.Resolve(root, gitDir)
-	if err != nil && !errors.Is(err, termaproject.ErrNotFound) {
+	existing, err := install.Open(app.agents, root, gitDir)
+	if err != nil {
 		return err
 	}
 
 	// Agents are resolved first because they decide whether sign-in is needed.
-	agents, err := app.resolveInstallHarnesses(cmd, cfg, f)
+	agents, chosen, err := app.resolveInstallHarnesses(cmd, cfg, f)
 	if errors.Is(err, errCancelled) {
 		fmt.Fprintln(out, "Cancelled. Nothing was written.")
 		return nil
@@ -173,76 +163,49 @@ func (app *App) runInstall(cmd *cobra.Command, f installFlags) error {
 		return fmt.Errorf("--relay-service %q: want on or off", f.relayService)
 	}
 
-	// Every real install reads the team's policy, even hooks-only; only an offline policy
-	// fixture skips that login. A --dry-run never signs in.
-	needsAuth := cfg.APIKey == "" && (config.PolicyStub() == "" || app.installNeedsAuth(agents, f.projectRef, existing, !f.noHooks))
-	if needsAuth && !f.dryRun {
-		if cfg, err = app.signInAndReload(cmd, cfg, signInOptions{noBrowser: f.noBrowser}); err != nil {
-			return err
-		}
+	req := install.Request{Root: root, GitDir: gitDir, Existing: existing, ProjectRef: f.projectRef, Selected: agents,
+		RecordSelected: chosen && !f.dryRun, Adapters: splitCommas(f.adapters), NoHooks: f.noHooks, DryRun: f.dryRun,
+		Prompts: prompts, Content: toolContent, AssumeYes: f.assumeYes, CanAsk: canPrompt(), Version: app.version, Now: time.Now()}
+	// A picker left before anything is written; a confirm declined later is the plan's own.
+	unbound := false
+	flow := install.Workflow{
+		SignIn: func(_ context.Context, cfg *config.Config) (*config.Config, error) {
+			return app.signInAndReload(cmd, cfg, signInOptions{noBrowser: f.noBrowser})
+		},
+		Bind: func(_ context.Context, cfg *config.Config, existing *termaproject.File, ref string, verify, ask bool) (install.Binding, error) {
+			b, err := app.resolveBinding(cmd, cfg, existing, ref, verify, ask)
+			unbound = errors.Is(err, errCancelled)
+			if errors.Is(err, auth.ErrNotLoggedIn) {
+				return b, fmt.Errorf("%w: %w", install.ErrNotSignedIn, err)
+			}
+			return b, err
+		},
+		FetchPolicy:    app.policies().Fetch,
+		HasKey:         func(projectID string) bool { return keystore.Get(projectID) != "" },
+		RefreshMachine: app.refresher().Machine,
+		ApplySteps: func(cfg *config.Config, plan install.Plan) install.Steps {
+			f.excludePrompts, f.excludeToolContent = !plan.Prompts, !plan.ToolContent
+			return app.installSteps(cmd, ui, cfg, agents, f, plan)
+		},
 	}
-
-	b, err := app.resolveBinding(cmd, cfg, existing, f.projectRef, needsAuth, !f.assumeYes && !f.dryRun && canPrompt())
-	if errors.Is(err, errCancelled) {
+	// Skipped without a terminal: doctor makes a scratch commit and a network round-trip.
+	if !f.noDoctor && canPrompt() {
+		flow.Verify = func() { ui.verify(cmd, app.runDoctor) }
+	}
+	_, err = install.Run(ctx, app.agents, cfg, req, flow, ui)
+	if unbound {
 		fmt.Fprintln(out, "Cancelled. Nothing was written.")
 		return nil
 	}
-	if err != nil {
-		// A signed-out dry run plans against an unresolved project: its files do not
-		// depend on the project id.
-		if !f.dryRun || !errors.Is(err, auth.ErrNotLoggedIn) {
-			return err
-		}
-		b = install.Binding{}
-	}
-	cfg.ProjectID, cfg.ProjectName, cfg.OrganizationID = b.ID, b.Name, b.OrganizationID
-	var admitting *config.Policy
-	if !f.dryRun {
-		pol, err := app.policies().Fetch(ctx, cfg)
-		if err != nil {
-			return err
-		}
-		if err := install.Admit(pol, existing, b); err != nil {
-			return err
-		}
-		if err := routing.StorePolicy(cfg, &pol); err != nil {
-			return err
-		}
-		cfg.Policy, admitting = pol, &pol
-	}
-	// Built once, so a dry run prints exactly the plan an install applies.
-	plan, err := install.Build(app.agents, install.Input{Root: root, GitDir: gitDir, Existing: existing, Selected: agents,
-		Adapters: splitCommas(f.adapters), NoHooks: f.noHooks, Binding: b, Prompts: prompts, ToolContent: toolContent, Policy: admitting})
-	if err != nil {
+	if err != nil || f.dryRun {
 		return err
 	}
-	f.excludePrompts, f.excludeToolContent = !plan.Prompts, !plan.ToolContent
+	ui.finish()
+	return nil
+}
 
-	if gitDir == "" {
-		ui.Warn("Git hooks", "skipped — not a Git repository, so commits are not stamped")
-	}
-	env := ""
-	if cfg.Environment != config.EnvProd {
-		env = " (" + cfg.Environment + ")"
-	}
-	if b.ID == "" && b.Name == "" {
-		ui.Warn("Project", "unresolved — a real install signs in and selects one"+env)
-	} else {
-		ui.summary("Project", cmp.Or(b.Name, b.ID)+env)
-	}
-
-	// Nothing asks, so the line names the command that changes it.
-	if len(app.agents.RelayTargets(agents)) > 0 {
-		if plan.Prompts {
-			ui.summary("Prompts", "prompt text and model responses are sent — `terma install --prompts off` stops them")
-		} else {
-			ui.summary("Prompts", "prompt text and model responses are not sent — `terma install --prompts on` sends them")
-		}
-	}
-
-	if f.dryRun {
-		return plan.PrintDryRun(out, needsAuth)
-	}
+// installSteps are what an install does outside the repository.
+func (app *App) installSteps(cmd *cobra.Command, ui *installUI, cfg *config.Config, agents []string, f installFlags, plan install.Plan) install.Steps {
 	steps := install.Steps{
 		Confirm: func(question string, explain []string) (bool, error) {
 			yes, err := confirmExplained(cmd, question, explain, true)
@@ -261,42 +224,14 @@ func (app *App) runInstall(cmd *cobra.Command, f installFlags) error {
 			return k.state, k.fix
 		},
 		RepoPolicy: func(ctx context.Context, hs []harness.Scoped) ([]string, error) {
-			return writeRepoPolicy(ctx, ui, root, cfg, hs, f)
+			return writeRepoPolicy(ctx, ui, plan.Root, cfg, hs, f)
 		},
 	}
 	// The status line is a global setting, wrapped only for a developer who chose its agent.
 	if a, ok := doctor.StatusLineAgent(app.agents); ok && !f.noStatusLine && slices.Contains(agents, a.Name()) {
 		steps.StatusLine = func() (string, bool) { return app.installStatusLine(cmd.ErrOrStderr()) }
 	}
-	if err := install.Apply(ctx, plan, install.Options{AssumeYes: f.assumeYes, Version: app.version, Now: time.Now()}, steps, ui); err != nil {
-		return err
-	}
-	// A newer release's first install refreshes the machine before doctor checks it, and
-	// records it so the refresh after the command has nothing left to do.
-	if dir, err := config.Dir(); err == nil && selfupdate.NeedsRefresh(dir, app.version) {
-		changed, err := app.refresher().Machine()
-		for _, p := range changed {
-			fmt.Fprintf(ui.detail, "  updated %s\n", p)
-		}
-		if err != nil {
-			ui.Warn("Refreshed", "some files an earlier terma installed could not be updated ("+err.Error()+")")
-			ui.Then("Run `terma update --refresh` to retry.")
-		} else {
-			if len(changed) > 0 {
-				ui.OK("Refreshed", fmt.Sprintf("%d file(s) an earlier terma installed", len(changed)))
-			}
-			_ = selfupdate.SaveRefreshed(dir, app.version)
-		}
-	}
-
-	// Skipped without a terminal: doctor makes a scratch commit and a network round-trip.
-	if f.noDoctor || !canPrompt() {
-		ui.Then("Run `terma doctor` to verify the chain end to end.")
-	} else {
-		ui.verify(cmd, app.runDoctor)
-	}
-	ui.finish()
-	return nil
+	return steps
 }
 
 // contentChoices are the explicit --prompts / --exclude-prompts and
@@ -322,46 +257,6 @@ func contentChoices(cmd *cobra.Command, f installFlags) (prompts, toolContent *b
 		toolContent = new(!f.excludeToolContent)
 	}
 	return prompts, toolContent, nil
-}
-
-// installNeedsAuth includes minting the spool key, which hooks-only agents get from
-// nowhere else.
-func (app *App) installNeedsAuth(agents []string, projectRef string, existing *termaproject.File, wantsHooks bool) bool {
-	for _, a := range app.telemetryAgentNames(agents) {
-		if _, err := app.agents.Harness(a); err == nil {
-			return true
-		}
-	}
-	ref := strings.TrimSpace(projectRef)
-	if (ref == "" && existing == nil) || (ref != "" && projectRefNeedsLookup(ref)) {
-		return true
-	}
-	projectID := ref
-	if projectID == "" {
-		projectID = existing.Project.ID
-	}
-	return wantsHooks && len(agents) > 0 && keystore.Get(projectID) == ""
-}
-
-func (app *App) telemetryAgentNames(agents []string) []string {
-	var names []string
-	for _, name := range agents {
-		if _, a, ok := app.agents.Surface(name); ok {
-			name = a.Name()
-		}
-		if !slices.Contains(names, name) {
-			names = append(names, name)
-		}
-	}
-	return names
-}
-
-func projectRefNeedsLookup(ref string) bool {
-	ref = strings.TrimSpace(ref)
-	if ref == "" {
-		return true
-	}
-	return !termaproject.ValidID(ref)
 }
 
 // spoolKey's fix, when set, is what the developer must do before events are delivered.
@@ -394,34 +289,27 @@ func (app *App) ensureSpoolKey(ctx context.Context, cfg *config.Config) spoolKey
 	return spoolKey{state: "Project key stored for this machine (" + keystore.Mask(key) + ")"}
 }
 
-// resolveInstallHarnesses never reads the committed binding: agents are a per-developer choice.
-func (app *App) resolveInstallHarnesses(cmd *cobra.Command, cfg *config.Config, f installFlags) ([]string, error) {
+// resolveInstallHarnesses never reads the committed binding: agents are a per-developer
+// choice. chosen is a choice made just now, which the install records once admitted.
+func (app *App) resolveInstallHarnesses(cmd *cobra.Command, cfg *config.Config, f installFlags) (names []string, chosen bool, err error) {
 	if h := strings.TrimSpace(f.harnesses); h != "" {
 		if strings.EqualFold(h, "none") {
-			return nil, nil
+			return nil, false, nil
 		}
-		return app.parseAgentList(f.harnesses)
+		names, err := app.parseAgentList(f.harnesses)
+		return names, false, err
 	}
 	if len(cfg.Harnesses) > 0 {
-		chosen := map[string]bool{}
+		recorded := map[string]bool{}
 		for _, name := range cfg.Harnesses {
-			chosen[name] = true
+			recorded[name] = true
 		}
-		if names := app.selectedInRegistryOrder(chosen); len(names) > 0 {
-			return names, nil
+		if names := app.selectedInRegistryOrder(recorded); len(names) > 0 {
+			return names, false, nil
 		}
 	}
-	names, err := app.chooseHarnesses(cmd, cfg, setupFlags{assumeYes: f.assumeYes})
-	if err != nil {
-		return nil, err
-	}
-	if f.dryRun {
-		return names, nil
-	}
-	if err := config.UpdateProfile(cfg.ProfileName, func(p *config.Profile) { p.Harnesses = names }); err != nil {
-		return nil, err
-	}
-	return names, nil
+	names, err = app.chooseHarnesses(cmd, cfg, setupFlags{assumeYes: f.assumeYes})
+	return names, err == nil, err
 }
 
 // connectHarnessesForRepo writes no committed file: keys, the routing record and the
@@ -670,55 +558,25 @@ with 'terma nate'.`,
 			if err != nil {
 				return err
 			}
-			for _, path := range append([]string{termaproject.FileName}, app.agents.HooksPaths()...) {
-				if err := termaproject.CheckPath(root, path); err != nil {
-					return err
-				}
-			}
-			existing, err := termaproject.Load(root)
-			if err != nil && !errors.Is(err, termaproject.ErrNotFound) {
-				return err
-			}
-			det := hookmgr.Detect(root)
-			if existing != nil && existing.Install.HookManager != "" {
-				det.Manager = hookmgr.Manager(existing.Install.HookManager)
-				if det.Manager == hookmgr.GitShim {
-					det.ConfigPath = hookmgr.ShimDir
-				}
-			}
-			var hooks hookmgr.Plan
-			if gitDir != "" {
-				hooks, err = hookmgr.PlanUninstall(root, det)
-				if err != nil {
-					return err
-				}
-			}
-			if err := hookmgr.Validate(root, hooks); err != nil {
-				return err
-			}
-			plans, err := install.PlanAdapters(app.agents, root, app.agents.Names(), false)
+			rm, err := install.PlanRemoval(ctx, app.agents, root, gitDir)
 			if err != nil {
 				return err
 			}
-			changes := append([]hookmgr.Change{}, hooks.Changes...)
-			for _, p := range plans {
-				changes = append(changes, p.Changes...)
-			}
-			for _, note := range hooks.Notes {
+			for _, note := range rm.Hooks.Notes {
 				fmt.Fprintln(out, note)
 			}
-			if len(changes) == 0 && existing == nil {
+			if rm.Empty() {
 				fmt.Fprintln(out, "Nothing of terma's is installed here.")
 				return nil
 			}
 			fmt.Fprintln(out, "Files:")
-			for _, c := range changes {
+			for _, c := range rm.Changes() {
 				fmt.Fprintf(out, "  %-7s %s\n", c.Action(), c.Path)
 			}
-			if existing != nil {
+			if rm.Existing != nil {
 				fmt.Fprintf(out, "  %-7s %s\n", "delete", termaproject.FileName)
 			}
-			if gitDir != "" && gitx.ConfigGet(ctx, root, "core.hooksPath") == hookmgr.ShimDir {
+			if rm.RestoresHooksPath {
 				fmt.Fprintln(out, "  restore git config core.hooksPath")
 			}
 			if !assumeYes {
@@ -731,51 +589,8 @@ with 'terma nate'.`,
 					return nil
 				}
 			}
-			if err := hookmgr.Apply(root, hooks); err != nil {
+			if err := rm.Apply(ctx, app.agents, func(warning string) { fmt.Fprintf(cmd.ErrOrStderr(), "Warning: %s\n", warning) }); err != nil {
 				return err
-			}
-			for _, p := range plans {
-				if err := hookmgr.Apply(root, p); err != nil {
-					return err
-				}
-			}
-			// Every scoped harness, not only the ones an install chose.
-			for _, h := range app.agents.Harnesses() {
-				scoped, ok := h.(harness.Scoped)
-				if !ok {
-					continue
-				}
-				if _, err := scoped.Local(root).Disconnect(); err != nil {
-					fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not remove %s's repository policy: %v\n", h.DisplayName(), err)
-				}
-			}
-			// Routing records and keys are per project, shared with other checkouts, so they
-			// stay; removing the binding is what stops routing here.
-			if gitDir != "" {
-				if err := install.Unwire(ctx, root, gitDir); err != nil {
-					return err
-				}
-			}
-			if err := termaproject.Remove(root); err != nil {
-				return err
-			}
-			stateDir, err := termaproject.StateDir(root, gitDir)
-			if err != nil {
-				return err
-			}
-			if err := session.Open(stateDir).Remove(); err != nil {
-				return err
-			}
-			if stateDir != gitDir {
-				// A workspace that gained Git keeps private session storage, but its hook
-				// restoration journal lives in the worktree metadata.
-				if gitDir != "" {
-					if err := session.Open(gitDir).Remove(); err != nil {
-						return err
-					}
-				}
-				// Remove the reservation only when empty; leave any unrelated files.
-				_ = os.Remove(stateDir)
 			}
 			if gitDir != "" {
 				fmt.Fprintln(out, "Uninstalled. Commit the removals if the install was committed.")

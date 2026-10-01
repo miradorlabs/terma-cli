@@ -29,6 +29,7 @@ func (r *report) Warn(label, _ string)            { r.warn = append(r.warn, labe
 func (r *report) Then(step string)                { r.then = append(r.then, step) }
 func (r *report) Commit(_ string, paths []string) { r.commit = paths }
 func (r *report) Detail() io.Writer               { return io.Discard }
+func (r *report) Summary(label, _ string)         { r.ok = append(r.ok, label) }
 
 func plan(t *testing.T, root string, existing *termaproject.File) Plan {
 	t.Helper()

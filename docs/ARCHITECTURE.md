@@ -31,10 +31,11 @@ place.
 registry `builtin.Agents()` returns and the version `-ldflags` stamps, then exits with
 `App.Execute`'s status. Everything a command reads, it reads through the `App`: the
 agents, the version, the global flags, and the seams tests replace. The package holds no
-other state. Commands stay thin: `install` builds an `install.Plan` and applies it,
-`doctor` runs `doctor.Run`, and `telemetry connect` runs `connect.Global` or
-`connect.Local`. Each one supplies what its package must not reach itself, such as
-sign-in, key minting and the network, as `install.Steps`, `doctor.Probes` or
+other state. Commands stay thin: `install` runs `install.Run` (sign-in, the binding,
+admission, the plan, then everything that writes), `setup` runs `setup.Run`, `doctor`
+runs `doctor.Run`, and `telemetry connect` runs `connect.Global` or `connect.Local`. Each
+one supplies what its package must not reach itself, such as sign-in, key minting and
+the network, as `install.Workflow` and `install.Steps`, `setup.Steps`, `doctor.Probes` or
 `connect.Steps`.
 
 **The hooks** (`internal/hooks`). A committed hooks file calls `terma hook <event>`,

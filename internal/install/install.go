@@ -137,8 +137,10 @@ func (p Plan) PrintDryRun(w io.Writer, signIn bool) error {
 
 // Reporter is how an install reports, a line per step.
 type Reporter interface {
-	// OK reports a step done; Warn one that needs the developer.
+	// OK reports a step done; Warn one that needs the developer; Summary a choice the
+	// developer should see even when steps are quiet.
 	OK(label, what string)
+	Summary(label, what string)
 	Warn(label, what string)
 	// Then is a next step for the developer, and Commit the files they commit.
 	Then(step string)

@@ -38,8 +38,8 @@ const stepLabelWidth = 13
 // OK reports a step that did what it should.
 func (u *installUI) OK(label, what string) { u.line(u.detail, u.p.OK("✓"), label, what) }
 
-// summary keeps user-facing choices visible without exposing setup internals.
-func (u *installUI) summary(label, what string) { u.line(u.out, u.p.OK("✓"), label, what) }
+// Summary keeps user-facing choices visible without exposing setup internals.
+func (u *installUI) Summary(label, what string) { u.line(u.out, u.p.OK("✓"), label, what) }
 
 // Warn reports a step that needs the developer, whose fix is a next step.
 func (u *installUI) Warn(label, what string) {

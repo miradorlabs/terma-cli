@@ -46,7 +46,7 @@ func TestInstallIsConciseUnlessVerbose(t *testing.T) {
 func TestInstallUIFinish(t *testing.T) {
 	var buf bytes.Buffer
 	ui := newInstallUI(&buf, false)
-	ui.summary("Project", "Acme Web")
+	ui.Summary("Project", "Acme Web")
 	ui.OK("Status line", "reads your plan's usage windows")
 	ui.OK("Claude Code", "shim at ~/.config/terma/shim/bin/claude")
 	ui.OK("Hook events", "delivered with this project's key")

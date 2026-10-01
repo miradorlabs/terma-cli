@@ -9,6 +9,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/install"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 )
 
@@ -92,6 +93,7 @@ func TestInstallNeedsAuth(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	const id = "770e8400-e29b-41d4-a716-446655440000"
 	bound := &termaproject.File{Project: termaproject.Project{ID: id}}
+	hasKey := func(id string) bool { return keystore.Get(id) != "" }
 	for _, c := range []struct {
 		name     string
 		agents   []string
@@ -109,7 +111,7 @@ func TestInstallNeedsAuth(t *testing.T) {
 		{"a hooks-only agent needs a key to deliver with", []string{"cursor"}, "", bound, true, true},
 		{"…unless it installs no hooks", []string{"cursor"}, "", bound, false, false},
 	} {
-		if got := testApp.installNeedsAuth(c.agents, c.ref, c.existing, c.hooks); got != c.want {
+		if got := install.NeedsAuth(testApp.agents, install.Request{Selected: c.agents, ProjectRef: c.ref, Existing: c.existing, NoHooks: !c.hooks}, hasKey); got != c.want {
 			t.Errorf("%s: installNeedsAuth = %v, want %v", c.name, got, c.want)
 		}
 	}
@@ -117,7 +119,7 @@ func TestInstallNeedsAuth(t *testing.T) {
 	if err := keystore.Set(id, "ter_srv_0123456789abcdef01234567", keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
-	if testApp.installNeedsAuth([]string{"cursor"}, "", bound, true) {
+	if install.NeedsAuth(testApp.agents, install.Request{Selected: []string{"cursor"}, Existing: bound}, hasKey) {
 		t.Error("a machine that already holds the project's key must not sign in for one")
 	}
 }
