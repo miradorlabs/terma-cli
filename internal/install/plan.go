@@ -114,15 +114,15 @@ func Kept(existing *termaproject.File) Binding {
 
 // PolicyHarnesses is the subset of an install's adapters whose harness reads a
 // repository's own export policy.
-func PolicyHarnesses(reg *agents.Registry, adapters []string) []harness.Harness {
-	var out []harness.Harness
+func PolicyHarnesses(reg *agents.Registry, adapters []string) []harness.Scoped {
+	var out []harness.Scoped
 	for _, a := range adapters {
 		h, err := reg.Harness(a)
 		if err != nil {
 			continue
 		}
-		if _, ok := h.(harness.Scoped); ok {
-			out = append(out, h)
+		if s, ok := h.(harness.Scoped); ok {
+			out = append(out, s)
 		}
 	}
 	return out

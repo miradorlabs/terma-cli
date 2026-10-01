@@ -260,7 +260,7 @@ func (app *App) runInstall(cmd *cobra.Command, f installFlags) error {
 			k := app.ensureSpoolKey(ctx, cfg)
 			return k.state, k.fix
 		},
-		RepoPolicy: func(ctx context.Context, hs []harness.Harness) ([]string, error) {
+		RepoPolicy: func(ctx context.Context, hs []harness.Scoped) ([]string, error) {
 			return writeRepoPolicy(ctx, ui, root, cfg, hs, f)
 		},
 	}

@@ -249,7 +249,7 @@ func writeRepoPolicy(
 	ui *installUI,
 	root string,
 	cfg *config.Config,
-	hs []harness.Harness,
+	hs []harness.Scoped,
 	f installFlags,
 ) ([]string, error) {
 	signals, err := harness.ParseSignals(f.signals)
@@ -258,11 +258,7 @@ func writeRepoPolicy(
 	}
 	var written []string
 	for _, h := range hs {
-		scoped, ok := h.(harness.Scoped)
-		if !ok {
-			continue
-		}
-		local := scoped.Local(root)
+		local := h.Local(root)
 		status, err := local.Status()
 		if err != nil {
 			return nil, err
