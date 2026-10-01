@@ -77,60 +77,27 @@ func TestConnectExportsRejectsUnknownValue(t *testing.T) {
 	}
 }
 
-// A repository policy turns exporters on over the narrow global connect, end to end.
-func TestRepoPolicyOverNarrowGlobalConnect(t *testing.T) {
-	repo := installRepo(t)
-	claudeDir := t.TempDir()
-	t.Setenv("CLAUDE_CONFIG_DIR", claudeDir)
-	fakeClaudeOnPath(t)
-	userSettings := filepath.Join(claudeDir, "settings.json")
-	if _, err := runTerma(t, "connect", "claude", "--exports", "repos",
-		"--api-key", testServerKey, "--team", testProjectID, "--yes"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--yes"); err != nil {
-		t.Fatal(err)
-	}
-	project := readClaudeSettings(t, filepath.Join(repo, ".claude", "settings.json"))
-	if project["OTEL_TRACES_EXPORTER"] != "otlp" || project["OTEL_LOGS_EXPORTER"] != "otlp" {
-		t.Fatalf("the repository should switch its signals on: %+v", project)
-	}
-	if project["OTEL_METRICS_EXPORTER"] != "otlp" {
-		t.Fatalf("plain install should enable metrics too: %q", project["OTEL_METRICS_EXPORTER"])
-	}
-	for _, key := range []string{"OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_EXPORTER_OTLP_HEADERS", "OTEL_RESOURCE_ATTRIBUTES"} {
-		if _, ok := project[key]; ok {
-			t.Fatalf("%s must never be written into a committed repository policy", key)
-		}
-	}
-	if strings.Contains(strings.Join(valuesOf(project), " "), "ter_srv_") {
-		t.Fatal("a credential reached the committed file")
-	}
-	user := readClaudeSettings(t, userSettings)
-	if user["OTEL_TRACES_EXPORTER"] != "none" {
-		t.Fatalf("the user file should still leave exporters off: %q", user["OTEL_TRACES_EXPORTER"])
-	}
-}
-
-func TestInstallEnablesRepositoryTelemetryByDefault(t *testing.T) {
+// Claude Code ignores a repository that turns telemetry on, so a plain install writes none.
+func TestInstallWritesNoTelemetryIntoTheRepository(t *testing.T) {
 	repo := installRepo(t)
 	if _, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--yes"); err != nil {
 		t.Fatal(err)
 	}
-	settings := readClaudeSettings(t, filepath.Join(repo, ".claude", "settings.json"))
-	for _, key := range []string{"OTEL_TRACES_EXPORTER", "OTEL_LOGS_EXPORTER", "OTEL_METRICS_EXPORTER"} {
-		if settings[key] != "otlp" {
-			t.Fatalf("plain install must enable %s, got %q", key, settings[key])
-		}
+	path := filepath.Join(repo, ".claude", "settings.json")
+	if settings := readClaudeSettings(t, path); len(settings) != 0 {
+		t.Fatalf("plain install wrote telemetry settings: %+v", settings)
+	}
+	if data, _ := os.ReadFile(path); !strings.Contains(string(data), "terma hook") {
+		t.Fatalf("the hooks are missing:\n%s", data)
 	}
 }
 
 func TestUninstallRemovesRepoPolicy(t *testing.T) {
 	repo := installRepo(t)
-	if _, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--yes"); err != nil {
+	if _, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--yes", "--prompts", "off"); err != nil {
 		t.Fatal(err)
 	}
-	if settings := readClaudeSettings(t, filepath.Join(repo, ".claude", "settings.json")); settings["OTEL_TRACES_EXPORTER"] != "otlp" {
+	if settings := readClaudeSettings(t, filepath.Join(repo, ".claude", "settings.json")); settings["OTEL_LOG_USER_PROMPTS"] != "0" {
 		t.Fatalf("policy not written: %+v", settings)
 	}
 	if _, err := runTerma(t, "uninstall", "--yes"); err != nil {
@@ -138,7 +105,7 @@ func TestUninstallRemovesRepoPolicy(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(repo, ".claude", "settings.json")); err == nil {
 		settings := readClaudeSettings(t, filepath.Join(repo, ".claude", "settings.json"))
-		if _, ok := settings["OTEL_TRACES_EXPORTER"]; ok {
+		if _, ok := settings["OTEL_LOG_USER_PROMPTS"]; ok {
 			t.Fatalf("uninstall left the repository policy behind: %+v", settings)
 		}
 	}
@@ -209,14 +176,6 @@ func fakeClaudeOnPath(t *testing.T) {
 
 const testServerKey = "ter_srv_0123456789abcdef"
 
-func valuesOf(m map[string]string) []string {
-	out := make([]string, 0, len(m))
-	for _, v := range m {
-		out = append(out, v)
-	}
-	return out
-}
-
 func readClaudeSettings(t *testing.T, path string) map[string]string {
 	t.Helper()
 	data, err := os.ReadFile(path)
@@ -269,21 +228,6 @@ func TestDoctorFailsWhenThisRepositoryHasNoPolicy(t *testing.T) {
 		t.Fatalf("status disagrees with doctor about a repository that sends nothing:\n%s", status)
 	}
 
-	// With a policy, doctor says so rather than staying quiet about the arrangement.
-	if _, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--yes"); err != nil {
-		t.Fatal(err)
-	}
-	out, _ = runTerma(t, "doctor", "--skip-commit")
-	if !strings.Contains(out, "this repository asks") {
-		t.Fatalf("doctor should confirm the repository has a policy:\n%s", out)
-	}
-	if strings.Contains(out, "has no policy") {
-		t.Fatalf("doctor still warns after the policy was written:\n%s", out)
-	}
-	status, _ = runTerma(t, "status")
-	if strings.Contains(status, "send nothing") || !strings.Contains(status, "Claude Code → connected") {
-		t.Fatalf("status should call a repository that asks connected:\n%s", status)
-	}
 	_ = repo
 }
 
@@ -314,8 +258,8 @@ func TestInstallPreservesExistingRepositoryPolicy(t *testing.T) {
 			if out, err := runTerma(t, append(args, "--signals", "metrics")...); err != nil {
 				t.Fatalf("%v\n%s", err, out)
 			}
-			if got := readClaudeSettings(t, path)["OTEL_METRICS_EXPORTER"]; got != "otlp" {
-				t.Fatalf("explicit policy update did not enable metrics: %q", got)
+			if got := readClaudeSettings(t, path)["OTEL_METRICS_EXPORTER"]; got == "none" {
+				t.Fatalf("explicit policy update did not stop switching metrics off: %q", got)
 			}
 		})
 	}
@@ -323,7 +267,7 @@ func TestInstallPreservesExistingRepositoryPolicy(t *testing.T) {
 
 func TestInstallUpgradesHooksOnlyRepository(t *testing.T) {
 	repo := installRepo(t)
-	args := []string{"install", "--harness", "none", "--team", testProjectID, "--yes"}
+	args := []string{"install", "--harness", "none", "--team", testProjectID, "--yes", "--prompts", "off"}
 	if _, err := runTerma(t, args...); err != nil {
 		t.Fatal(err)
 	}
@@ -334,8 +278,8 @@ func TestInstallUpgradesHooksOnlyRepository(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n%s", err, out)
 	}
-	if got := readClaudeSettings(t, filepath.Join(repo, ".claude", "settings.json"))["OTEL_LOGS_EXPORTER"]; got != "otlp" {
-		t.Fatalf("reinstall did not enable telemetry: %q", got)
+	if got := readClaudeSettings(t, filepath.Join(repo, ".claude", "settings.json"))["OTEL_LOG_USER_PROMPTS"]; got != "0" {
+		t.Fatalf("reinstall did not write the policy back: %q", got)
 	}
 	_, files, ok := strings.Cut(out, "Commit the new files")
 	if !ok || !strings.Contains(files, ".claude/settings.json") {
@@ -346,7 +290,7 @@ func TestInstallUpgradesHooksOnlyRepository(t *testing.T) {
 func TestInstallPreservesManuallyChangedRepositoryPolicy(t *testing.T) {
 	repo := installRepo(t)
 	args := []string{"install", "--harness", "none", "--team", testProjectID, "--yes"}
-	if _, err := runTerma(t, args...); err != nil {
+	if _, err := runTerma(t, append(args, "--signals", "logs", "--prompts", "off")...); err != nil {
 		t.Fatal(err)
 	}
 	path := filepath.Join(repo, ".claude", "settings.json")
@@ -393,4 +337,26 @@ func mustGetwd(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return dir
+}
+
+// A repository an earlier terma filled with on values is cleaned by the next install.
+func TestInstallClearsAnEarlierTermasTelemetrySettings(t *testing.T) {
+	repo := installRepo(t)
+	path := filepath.Join(repo, ".claude", "settings.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	old := `{"env":{"CLAUDE_CODE_ENHANCED_TELEMETRY_BETA":"1","OTEL_LOGS_EXPORTER":"otlp","OTEL_LOG_ASSISTANT_RESPONSES":"1","OTEL_LOG_TOOL_CONTENT":"1","OTEL_LOG_TOOL_DETAILS":"1","OTEL_LOG_USER_PROMPTS":"1","OTEL_METRICS_EXPORTER":"otlp","OTEL_TRACES_EXPORTER":"otlp"}}`
+	if err := os.WriteFile(path, []byte(old+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--yes"); err != nil {
+		t.Fatalf("install: %v\n%s", err, out)
+	}
+	if settings := readClaudeSettings(t, path); len(settings) != 0 {
+		t.Fatalf("the earlier settings survived: %+v", settings)
+	}
+	if data, _ := os.ReadFile(path); !strings.Contains(string(data), "terma hook") {
+		t.Fatalf("the hooks are missing:\n%s", data)
+	}
 }

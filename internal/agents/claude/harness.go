@@ -84,8 +84,9 @@ var claudeManagedKeys = []string{
 	otelLogToolContent,
 }
 
-// claudeLocalKeys is what a repository-scope connect writes, clears and removes: what to ship,
-// never where or with which credential. The beta switch is here because traces need it.
+// claudeLocalKeys is what a repository-scope connect may switch off, clears and removes:
+// never where, with which credential, or anything turned on. The beta switch is listed so an
+// earlier terma's copy is removed.
 var claudeLocalKeys = []string{
 	claudeEnhancedTelemetry,
 	otelTracesExporter,
@@ -161,22 +162,25 @@ func (c exporter) Status() (harness.Status, error) {
 	// The caller compares Endpoint against its own to decide whether this is terma.
 	status.Connected = isOn(s.env[claudeEnableTelemetry]) && status.Endpoint != ""
 
-	for _, sig := range harness.AllSignals {
-		var key string
-		switch sig {
-		case harness.SignalTraces:
-			key = otelTracesExporter
-		case harness.SignalLogs:
-			key = otelLogsExporter
-		case harness.SignalMetrics:
-			key = otelMetricsExporter
+	status.Signals = claudeSignals(s.env)
+	// A repository can only switch things off, so what it leaves unsaid is the user level's.
+	if c.root != "" {
+		status.IncludePrompts = s.env[otelLogUserPrompts] != boolValue(false)
+		status.IncludeToolContent = s.env[otelLogToolContent] != boolValue(false)
+		status.Signals = nil
+		keys := map[harness.Signal]string{harness.SignalTraces: otelTracesExporter, harness.SignalLogs: otelLogsExporter, harness.SignalMetrics: otelMetricsExporter}
+		for _, sig := range harness.AllSignals {
+			if s.env[keys[sig]] != exporterNone {
+				status.Signals = append(status.Signals, sig)
+			}
 		}
-		if _, exists := s.env[key]; c.root != "" && exists {
-			status.HasPolicy = true
+		// Only an off value is a policy; an earlier terma's on values are left to the next connect to clear.
+		for _, key := range claudeLocalKeys {
+			if v := s.env[key]; v == exporterNone || v == boolValue(false) {
+				status.HasPolicy = true
+			}
 		}
 	}
-
-	status.Signals = claudeSignals(s.env)
 
 	status.KeyPrefix = maskKeyFromHeaders(s.env[harness.EnvOTLPHeaders])
 	// In helper mode the key lives in the helper script.

@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -70,19 +71,14 @@ func TestTelemetryConnectLocalWritesOnlyWhatToShip(t *testing.T) {
 	if _, ok := doc["hooks"]; !ok {
 		t.Fatal("the hooks block was lost")
 	}
+	// Only what the repository switches off: Claude Code ignores a project that turns anything on.
 	want := map[string]string{
-		"OTEL_TRACES_EXPORTER":         "otlp",
-		"OTEL_LOGS_EXPORTER":           "otlp",
 		"OTEL_METRICS_EXPORTER":        "none",
 		"OTEL_LOG_USER_PROMPTS":        "0",
 		"OTEL_LOG_ASSISTANT_RESPONSES": "0",
-		"OTEL_LOG_TOOL_DETAILS":        "1",
-		"OTEL_LOG_TOOL_CONTENT":        "1",
 	}
-	for key, value := range want {
-		if env[key] != value {
-			t.Errorf("%s = %q, want %q", key, env[key], value)
-		}
+	if !reflect.DeepEqual(env, want) {
+		t.Errorf("env = %v, want %v", env, want)
 	}
 	for _, forbidden := range []string{"CLAUDE_CODE_ENABLE_TELEMETRY", "OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_EXPORTER_OTLP_HEADERS", "OTEL_RESOURCE_ATTRIBUTES"} {
 		if v, ok := env[forbidden]; ok {
@@ -203,7 +199,7 @@ func TestTelemetryStatusWithoutALocalLayerIsOneRow(t *testing.T) {
 func TestTelemetryDisconnectLocalRestoresTheFile(t *testing.T) {
 	_, settings := localRepo(t)
 	before, _ := os.ReadFile(settings)
-	if out, err := runTerma(t, "connect", "claude", "--scope", "local", "--yes"); err != nil {
+	if out, err := runTerma(t, "connect", "claude", "--scope", "local", "--yes", "--signals", "logs"); err != nil {
 		t.Fatalf("connect: %v\n%s", err, out)
 	}
 
@@ -212,7 +208,7 @@ func TestTelemetryDisconnectLocalRestoresTheFile(t *testing.T) {
 		t.Fatalf("global disconnect: %v\n%s", err, out)
 	}
 	env, _ := envIn(t, settings)
-	if env["OTEL_TRACES_EXPORTER"] != "otlp" {
+	if env["OTEL_TRACES_EXPORTER"] != "none" {
 		t.Fatal("a global disconnect reached into the repository's file")
 	}
 

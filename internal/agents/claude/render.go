@@ -7,15 +7,16 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-// render maps an Exporter onto Claude Code's variables, cut down to claudeLocalKeys at
-// repository scope.
+// render maps an Exporter onto Claude Code's variables. At repository scope only the off
+// values remain: Claude Code ignores project settings that enable or redirect telemetry,
+// and honours only those that switch a signal or content off.
 func (c exporter) render(e harness.Exporter) map[string]string {
 	env := renderClaude(e)
 	if c.root == "" {
 		return env
 	}
-	for key := range env {
-		if !slices.Contains(claudeLocalKeys, key) {
+	for key, value := range env {
+		if !slices.Contains(claudeLocalKeys, key) || value != exporterNone && value != boolValue(false) {
 			delete(env, key)
 		}
 	}

@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"slices"
 	"strings"
 	"testing"
 
@@ -48,45 +47,24 @@ func localExporter() harness.Exporter {
 	return e
 }
 
-func sortedKeys(m map[string]string) []string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
-	}
-	slices.Sort(out)
-	return out
-}
-
-// A committed project file may say what to ship, never where or with which key.
-func TestLocalRenderCarriesOnlyWhatToShip(t *testing.T) {
+// A committed project file can only switch telemetry off: Claude Code ignores one that
+// enables or redirects it, so all-on writes nothing.
+func TestLocalRenderCarriesOnlyOffValues(t *testing.T) {
 	local, _ := localClaudeIn(t, "")
 	h := local.(exporter)
-	env := h.render(localExporter())
-
-	for _, forbidden := range []string{
-		claudeEnableTelemetry, harness.EnvOTLPEndpoint, harness.EnvOTLPHeaders, harness.EnvOTLPProtocol, harness.EnvResourceAttributes,
-	} {
-		if v, ok := env[forbidden]; ok {
-			t.Errorf("local render wrote %s=%q — a project file must not carry it", forbidden, v)
-		}
-	}
-	want := append([]string{}, claudeLocalKeys...)
-	slices.Sort(want)
-	if got := sortedKeys(env); !reflect.DeepEqual(got, want) {
-		t.Fatalf("local render keys = %v, want exactly %v", got, want)
-	}
-	if env[otelTracesExporter] != exporterOTLP || env[claudeEnhancedTelemetry] != "1" {
-		t.Error("traces on must write the exporter and the beta switch it depends on")
+	if env := h.render(localExporter()); len(env) != 0 {
+		t.Fatalf("an all-on repository wrote %v", env)
 	}
 
 	e := localExporter()
 	e.Signals = []harness.Signal{harness.SignalLogs}
-	env = h.render(e)
-	if _, ok := env[claudeEnhancedTelemetry]; ok {
-		t.Error("traces off must not opt the repository into the beta")
+	e.IncludePrompts = false
+	want := map[string]string{
+		otelTracesExporter: exporterNone, otelMetricsExporter: exporterNone,
+		otelLogUserPrompts: "0", otelLogAssistantResponse: "0",
 	}
-	if env[otelTracesExporter] != exporterNone {
-		t.Error("an unselected signal is written as an explicit none, so the file reads as a policy")
+	if env := h.render(e); !reflect.DeepEqual(env, want) {
+		t.Fatalf("local render = %v, want %v", env, want)
 	}
 }
 
@@ -128,7 +106,7 @@ func TestLocalConfigPathIsTheProjectFile(t *testing.T) {
 	}
 }
 
-// A local connect adds an env block beside the hooks, and disconnect puts the file back exactly.
+// A local connect adds its off values beside the hooks, and disconnect puts the file back exactly.
 func TestLocalConnectAndDisconnectRoundTrip(t *testing.T) {
 	h, path := localClaudeIn(t, hooksOnly)
 
@@ -141,14 +119,8 @@ func TestLocalConnectAndDisconnectRoundTrip(t *testing.T) {
 	if _, ok := doc["hooks"]; !ok {
 		t.Fatal("connect dropped the hooks block")
 	}
-	env := envOf(t, path)
-	if env[otelLogUserPrompts] != "0" || env[otelLogToolContent] != "1" || env[otelLogsExporter] != exporterOTLP {
+	if env := envOf(t, path); !reflect.DeepEqual(env, map[string]string{otelLogUserPrompts: "0", otelLogAssistantResponse: "0"}) {
 		t.Fatalf("env = %v", env)
-	}
-	for _, forbidden := range []string{claudeEnableTelemetry, harness.EnvOTLPEndpoint, harness.EnvOTLPHeaders} {
-		if _, ok := env[forbidden]; ok {
-			t.Errorf("%s landed in the project file", forbidden)
-		}
 	}
 	if _, ok := doc[claudeOtelHeadersHelper]; ok {
 		t.Error("a headers helper has no place in a project file")
@@ -167,8 +139,8 @@ func TestLocalConnectAndDisconnectRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("disconnect: %v", err)
 	}
-	if result.Removed != len(claudeLocalKeys) || result.Unjournaled {
-		t.Fatalf("disconnect = %+v, want %d removals from the journal", result, len(claudeLocalKeys))
+	if result.Removed != 2 || result.Unjournaled {
+		t.Fatalf("disconnect = %+v, want 2 removals from the journal", result)
 	}
 	after, _ := os.ReadFile(path)
 	if envOf(t, path) != nil {
@@ -176,6 +148,23 @@ func TestLocalConnectAndDisconnectRoundTrip(t *testing.T) {
 	}
 	if _, ok := readJSON(t, path)["hooks"]; !ok {
 		t.Fatalf("hooks lost on disconnect:\n%s", after)
+	}
+}
+
+// An earlier terma's on values are cleared by the next connect, the hooks kept.
+func TestLocalConnectClearsAnEarlierTermasOnValues(t *testing.T) {
+	h, path := localClaudeIn(t, `{"env":{"CLAUDE_CODE_ENHANCED_TELEMETRY_BETA":"1","OTEL_LOGS_EXPORTER":"otlp","OTEL_METRICS_EXPORTER":"otlp","OTEL_TRACES_EXPORTER":"otlp","OTEL_LOG_USER_PROMPTS":"1","OTEL_LOG_ASSISTANT_RESPONSES":"1","OTEL_LOG_TOOL_DETAILS":"1","OTEL_LOG_TOOL_CONTENT":"1"},"hooks":{"Stop":[]}}`)
+	if st, err := h.Status(); err != nil || st.HasPolicy {
+		t.Fatalf("on values read as a policy: %+v, %v", st, err)
+	}
+	if err := h.Connect(localExporter(), false); err != nil {
+		t.Fatal(err)
+	}
+	if env := envOf(t, path); env != nil {
+		t.Fatalf("on values survived: %v", env)
+	}
+	if _, ok := readJSON(t, path)["hooks"]; !ok {
+		t.Fatal("hooks lost")
 	}
 }
 
@@ -204,7 +193,7 @@ func TestLocalConnectLeavesAProjectEndpointAlone(t *testing.T) {
 	}
 }
 
-// A local layer is a policy: present, not connected.
+// A local layer is a policy: present, not connected, and what it leaves unsaid is inherited.
 func TestLocalStatusReportsPresenceNotConnection(t *testing.T) {
 	h, _ := localClaudeIn(t, hooksOnly)
 	e := localExporter()
@@ -227,8 +216,8 @@ func TestLocalStatusReportsPresenceNotConnection(t *testing.T) {
 	if !st.IncludePrompts || st.IncludeToolContent {
 		t.Errorf("prompts=%v tool=%v, want on/off", st.IncludePrompts, st.IncludeToolContent)
 	}
-	if st.ManagedKeys != len(claudeLocalKeys) {
-		t.Errorf("managed keys = %d, want %d", st.ManagedKeys, len(claudeLocalKeys))
+	if !st.HasPolicy || st.ManagedKeys != 3 {
+		t.Errorf("policy=%v managed keys = %d, want a policy of 3", st.HasPolicy, st.ManagedKeys)
 	}
 	if len(st.Conflicts) != 0 {
 		t.Errorf("unexpected conflicts: %+v", st.Conflicts)
