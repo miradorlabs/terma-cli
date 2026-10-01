@@ -43,9 +43,8 @@ func TestCollectionPolicyWireContract(t *testing.T) {
 	}
 }
 
-// Opt-in smoke test: use TERMA_POLICY_SMOKE_LOGIN=1 for the saved dev login and
-// normal refresh, or supply a dev access token via TERMA_POLICY_SMOKE_TOKEN_FILE.
-// No secret enters source or test output.
+// Opt-in smoke test: TERMA_POLICY_SMOKE_LOGIN=1 for the saved dev login, or a dev token
+// in TERMA_POLICY_SMOKE_TOKEN_FILE.
 func TestCollectionPolicyDev(t *testing.T) {
 	keyFile := os.Getenv("TERMA_POLICY_SMOKE_TOKEN_FILE")
 	useLogin := os.Getenv("TERMA_POLICY_SMOKE_LOGIN") == "1"

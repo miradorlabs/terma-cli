@@ -23,45 +23,35 @@ import (
 
 // Config is what a relay runs with.
 type Config struct {
-	// Dir is the state directory (Dir).
 	Dir string
 	// Addr is where to listen: what setup recorded when empty.
 	Addr string
-	// Idle is how long the relay runs with no export and nothing held or queued before
-	// it exits. Zero is the service's relay: it waits out a relay a hook started, and
-	// never idles.
+	// Idle is how long a quiet relay runs before it exits; zero is the service's relay, which never idles.
 	Idle time.Duration
 	// Engine is the engine's options; Run sets its Token.
 	Engine relay.Options
-	// Workers run beside the engine until it stops, and are waited for (the policy
-	// refresher).
-	Workers []func(ctx context.Context)
-	// Listening is told the address once the relay listens.
+	// Workers run beside the engine until it stops, and are waited for.
+	Workers   []func(ctx context.Context)
 	Listening func(addr net.Addr, hold time.Duration)
 }
 
 // Result is how a relay's run ended.
 type Result struct {
-	// AlreadyRunning: another relay holds the lock, and this one did not run.
 	AlreadyRunning bool
-	// Service: this was the service's relay (Config.Idle zero).
-	Service bool
-	// Replaced: a newer terma replaced this binary, and the relay stepped aside.
+	Service        bool
+	// Replaced means a newer terma replaced this binary and the relay stepped aside.
 	Replaced bool
-	// SetupGone: the relay's setup was undone (its token removed): nothing to relay for.
+	// SetupGone means the relay's token was removed: nothing to relay for.
 	SetupGone bool
 }
 
-// Restart reports whether whatever runs the relay should start it again: after it
-// stepped aside for a replaced binary, and, for the service's relay, whenever it
-// stopped for any reason but its setup being gone.
+// Restart reports whether whatever runs the relay should start it again.
 func (r Result) Restart() bool {
 	return r.Replaced || r.Service && !r.SetupGone && !r.AlreadyRunning
 }
 
-// Run runs the relay until ctx ends, its setup is gone, a stop is requested, its binary
-// is replaced or it has been idle for Config.Idle. What it accepted is delivered, its
-// workers stopped and its counters saved before it returns.
+// Run runs the relay until ctx ends, it is told to stop or it idles, delivering what it
+// accepted and saving its counters before it returns.
 func Run(ctx context.Context, c Config) (Result, error) {
 	res := Result{Service: c.Idle <= 0}
 	if res.Service {
@@ -118,8 +108,6 @@ func Run(ctx context.Context, c Config) (Result, error) {
 
 	var serveErr error
 	res.Replaced, res.SetupGone, serveErr = watch(ctx, r, c.Dir, c.Idle, served)
-	// Stop taking exports, let the ones in flight finish, then let the engine deliver
-	// what it accepted before the workers and the process go.
 	shutdown, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelShutdown()
 	_ = srv.Shutdown(shutdown)
@@ -132,9 +120,8 @@ func Run(ctx context.Context, c Config) (Result, error) {
 	return res, serveErr
 }
 
-// lock takes the relay's single-instance lock. With wait (the service's relay) it
-// waits out a relay a hook started. A nil unlock means this relay must not run: busy
-// when another holds the lock, neither when ctx ended the wait.
+// lock takes the single-instance lock, with wait waiting out a hook-started relay; a nil
+// unlock means this relay must not run.
 func lock(ctx context.Context, dir string, wait bool) (unlock func(), busy bool, err error) {
 	path := filepath.Join(dir, LockFile)
 	unlock, err = flock.TryLock(path)
@@ -152,8 +139,7 @@ func lock(ctx context.Context, dir string, wait bool) (unlock func(), busy bool,
 	return unlock, false, err
 }
 
-// listen opens the relay's address. A hook started this relay with nowhere to print,
-// so a failure is also written where status reads it (and Spawn backs off).
+// listen writes a failure where status reads it, since a hook-started relay has nowhere to print.
 func listen(dir, addr string) (net.Listener, error) {
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -165,9 +151,6 @@ func listen(dir, addr string) (net.Listener, error) {
 	return ln, nil
 }
 
-// watch checks the running relay every second until it should stop (ctx ended, its
-// setup gone, a stop requested, its binary replaced, idle for idle, or its server
-// failed) and says why.
 func watch(ctx context.Context, r *relay.Relay, dir string, idle time.Duration, served <-chan error) (replaced, setupGone bool, err error) {
 	self := executableStamp()
 	lastPrune := time.Now()
@@ -185,8 +168,6 @@ func watch(ctx context.Context, r *relay.Relay, dir string, idle time.Duration, 
 		case <-tick.C:
 		}
 		d, quiet := r.Idle()
-		// Setup undone (terma uninstalled, the config directory removed): the agents no
-		// longer point here, so there is nothing to relay for.
 		if _, err := Token(); err != nil {
 			return false, true, nil
 		}
@@ -197,9 +178,7 @@ func watch(ctx context.Context, r *relay.Relay, dir string, idle time.Duration, 
 			claim.Prune(time.Now())
 			lastPrune = time.Now()
 		}
-		// A newer terma replaced this binary (update, reinstall): step aside once quiet,
-		// and the next hook or the service starts the new one. Not mid-export: agents do
-		// not retry a refused connection.
+		// A replaced binary steps aside only once quiet: agents do not retry a refused connection.
 		if quiet && d >= time.Minute && self != "" && executableStamp() != self {
 			return true, false, nil
 		}
@@ -209,8 +188,7 @@ func watch(ctx context.Context, r *relay.Relay, dir string, idle time.Duration, 
 	}
 }
 
-// stopRequested reports whether Stop asked this relay to stop through the stop file,
-// and takes the request. One naming another pid is a dead relay's, and is cleared.
+// stopRequested takes Stop's request; one naming another pid is a dead relay's, and is cleared.
 func stopRequested(dir string) bool {
 	path := filepath.Join(dir, StopFile)
 	data, err := os.ReadFile(path)
@@ -222,8 +200,7 @@ func stopRequested(dir string) bool {
 	return pid == os.Getpid()
 }
 
-// executableStamp identifies the file this process was started from, its size and
-// modification time, so a relay can tell it has been replaced. Empty when unknown.
+// executableStamp lets a relay tell its binary was replaced; empty when unknown.
 func executableStamp() string {
 	exe := procinfo.StableExecutable()
 	if exe == "" {

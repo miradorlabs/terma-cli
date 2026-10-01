@@ -22,7 +22,6 @@ func fundingEnv(t *testing.T) hookrun.Env {
 	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
 	t.Setenv("CODEX_HOME", t.TempDir())
 	// A test launched from routed Codex must not inherit its parent's consent mode.
-	// Routed cases opt in explicitly through routeCodex.
 	t.Setenv("ANTHROPIC_API_KEY", "")
 	t.Setenv("ANTHROPIC_AUTH_TOKEN", "")
 	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "")

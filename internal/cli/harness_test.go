@@ -8,8 +8,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 )
 
-// runHarness is a run that must succeed, read from stdout alone: these tests parse
-// what `harness list` prints, and a warning on stderr is not part of it.
+// runHarness reads stdout alone: a warning on stderr is not part of what is parsed.
 func runHarness(t *testing.T, args ...string) string {
 	t.Helper()
 	stdout, _, err := termaRun{}.exec(t, args...)
@@ -19,8 +18,7 @@ func runHarness(t *testing.T, args ...string) string {
 	return stdout
 }
 
-// The table view is the human answer to "which harnesses are supported": every agent
-// appears, and Cursor's missing telemetry reads as partial with a note.
+// Every agent appears in the table, and missing telemetry reads as partial with a note.
 func TestHarnessListTable(t *testing.T) {
 	out := runHarness(t, "harness", "list", "-o", "table")
 	for _, want := range []string{"Claude Code", "Codex", "OpenCode", "Cursor", "ATTRIBUTION", "TELEMETRY", "SUPPORT"} {
@@ -44,8 +42,7 @@ func TestHarnessBareDefaultsToList(t *testing.T) {
 	}
 }
 
-// JSON carries the full per-capability structure, including levels the table flattens
-// to a word, so a script can act on the gap.
+// JSON carries the per-capability levels the table flattens to a word.
 func TestHarnessListJSON(t *testing.T) {
 	out := runHarness(t, "harness", "list", "-o", "json")
 	var report struct {
@@ -92,8 +89,7 @@ func TestHarnessListUnknown(t *testing.T) {
 	if !strings.Contains(err.Error(), "no-such-agent") {
 		t.Errorf("error did not name the unknown harness: %v", err)
 	}
-	// "Agent" is the word a developer sees everywhere else; harness and adapter are
-	// terma's own names for the two registries.
+	// "Agent" is the word a developer sees; harness and adapter are internal names.
 	if !strings.Contains(err.Error(), "unknown agent") {
 		t.Errorf("error should call it an agent: %v", err)
 	}

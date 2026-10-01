@@ -9,50 +9,25 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 )
 
-// --- Antigravity project hooks ----------------------------------------------------------
-
-// hooksPath is Antigravity CLI's workspace hooks file. agy discovers a
-// repository's customizations under `.agents/` (rules, skills, plugins and this file),
-// walking up from the working directory to the repository root, and loads them only for
-// a workspace the developer has trusted from inside agy. The file is meant to be
-// committed; doctor reports the trust gap while it is pending.
-//
-// This is the only thing terma can put in a repository for Antigravity. agy has no
-// configurable OTLP exporter — its one telemetry switch reports to Google — so there is
-// no export to point anywhere, and everything terma learns about an agy session arrives
-// through these hooks.
+// hooksPath is agy's workspace hooks file, loaded only for a trusted workspace. agy has no
+// configurable OTLP exporter, so everything terma learns arrives through these hooks.
 const hooksPath = ".agents/hooks.json"
 
-// antigravityHookName is the top-level key terma owns in the file. agy's hooks.json is
-// keyed by a hook *name*, each name holding its own per-event handler lists, and named
-// hooks from different sources are merged at load time. Owning one name means an
-// install never has to search another author's arrays for its own entries: the whole
-// entry is terma's to write, and uninstall removes exactly that key.
+// antigravityHookName is the top-level key terma owns whole in the file, which agy keys
+// by hook name; uninstall removes exactly that key.
 const antigravityHookName = "terma"
 
 // antigravityCustomizationRoots are the directories agy treats as a workspace's
-// customization root. Any one of them marks a repository people open in Antigravity.
+// customization root.
 var antigravityCustomizationRoots = []string{".agents", ".agent", "_agents", "_agent"}
 
-// committedHooks are the adapter shims for Antigravity. Each is a one-liner that
-// forwards the hook's JSON to the binary; no logic lives here.
-//
-// PreInvocation fires before each model call and carries the invocation number, which
-// is how a turn's start is recognised. PostToolUse fires after every tool step —
-// unmatched, because which tool names carry a file edit is a question for the binary
-// (agy adds tools per model family) and a regex frozen into a committed file would go
-// stale. PostInvocation and Stop carry the turn's shape: invocation count, termination
-// reason, whether the loop is idle. There is no PreToolUse entry: agy requires a
-// decision from that hook and terma never decides anything for an agent.
-//
-// agy runs hooks synchronously with a 30-second default timeout; terma's handlers
-// return in milliseconds and the network flush after Stop is detached, so 10 seconds is
-// a ceiling for a wedged filesystem, not a budget.
+// committedHooks are terma's agy hooks. PostToolUse is unmatched, since a matcher frozen
+// into a committed file would go stale as agy adds tools; there is no PreToolUse, which
+// demands a decision. The timeout is a ceiling for a wedged filesystem, not a budget.
 var committedHooks = []struct {
 	Event   string
 	Command string
-	// Grouped events wrap their handlers in a matcher group; flat events list the
-	// handlers directly. The shape is agy's, per event, not a choice.
+	// Grouped events wrap their handlers in a matcher group, as agy requires per event.
 	Grouped bool
 }{
 	{"PreInvocation", hookmgr.HookCommand("antigravity-pre-invocation"), false},
@@ -63,9 +38,8 @@ var committedHooks = []struct {
 
 const antigravityHookTimeout = 10
 
-// hasConfig reports whether the repository already carries Antigravity
-// configuration — one of agy's customization roots — which is when wiring its hooks by
-// default is a help rather than a stray directory in a repository nobody opens in agy.
+// hasConfig reports whether the repository has one of agy's customization roots, so
+// wiring its hooks by default adds no stray directory.
 func hasConfig(root string) bool {
 	for _, dir := range antigravityCustomizationRoots {
 		if info, err := os.Stat(filepath.Join(root, dir)); err == nil && info.IsDir() {
@@ -75,22 +49,21 @@ func hasConfig(root string) bool {
 	return false
 }
 
-// antigravityHandler is one command entry. The field names are agy's own contract.
+// antigravityHandler is one command entry; field names are agy's contract.
 type antigravityHandler struct {
 	Type    string `json:"type"`
 	Command string `json:"command"`
 	Timeout int    `json:"timeout,omitempty"`
 }
 
-// antigravityGroup is one element of a grouped event's array. An empty matcher matches
-// every tool.
+// antigravityGroup is one element of a grouped event's array; an empty matcher matches all.
 type antigravityGroup struct {
 	Matcher string            `json:"matcher"`
 	Hooks   []json.RawMessage `json:"hooks"`
 }
 
-// antigravityEntry is terma's named hook. Field order is the file's order; Enabled is
-// copied through from what the developer wrote, never set by terma.
+// antigravityEntry is terma's named hook, in the file's field order; Enabled is the
+// developer's, never set by terma.
 type antigravityEntry struct {
 	Enabled        json.RawMessage   `json:"enabled,omitempty"`
 	PreInvocation  []json.RawMessage `json:"PreInvocation,omitempty"`
@@ -99,9 +72,8 @@ type antigravityEntry struct {
 	Stop           []json.RawMessage `json:"Stop,omitempty"`
 }
 
-// renderAntigravityEntry builds terma's entry, carrying over an `enabled` value the
-// developer set on the previous one: switching terma's hooks off is their call, and an
-// install must not silently switch them back on. doctor reports the switch.
+// renderAntigravityEntry builds terma's entry, carrying over the developer's `enabled`
+// so an install never switches their choice back on.
 func renderAntigravityEntry(previous json.RawMessage) (json.RawMessage, error) {
 	entry := antigravityEntry{}
 	if len(previous) > 0 {
@@ -137,9 +109,8 @@ func renderAntigravityEntry(previous json.RawMessage) (json.RawMessage, error) {
 	return hookmgr.MarshalJSON(entry, "  ", "  ")
 }
 
-// planHooks merges terma's named hook into .agents/hooks.json without
-// disturbing anything else in the file: every other named hook is written back
-// byte-for-byte.
+// planHooks merges terma's named hook into .agents/hooks.json, writing every other named
+// hook back byte-for-byte.
 func planHooks(root string, install bool) (hookmgr.Plan, error) {
 	p := hookmgr.Plan{}
 	path := filepath.Join(root, filepath.FromSlash(hooksPath))
@@ -238,11 +209,8 @@ func planHooks(root string, install bool) (hookmgr.Plan, error) {
 	return p, nil
 }
 
-// hooksEnabled reports whether terma's entry in the repository's hooks file
-// is switched on. A missing file or entry is "enabled": there is nothing switched off,
-// and whether the hooks are present is a separate question the plan answers. A file
-// that cannot be read reports enabled for the same reason: this only ever says "you
-// switched it off", and an unreadable file is the plan's error to raise.
+// hooksEnabled is false only when terma's entry says `"enabled": false`; a missing or
+// unreadable file is the plan's question.
 func hooksEnabled(root string) bool {
 	data, err := hookmgr.ReadFile(filepath.Join(root, filepath.FromSlash(hooksPath)))
 	if err != nil || data == nil {

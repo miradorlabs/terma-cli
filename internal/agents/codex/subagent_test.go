@@ -13,8 +13,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// Codex has both shapes: in-thread subagents (hooks with agent_id) and spawned threads
-// (a child rollout naming its parent), and CodexSessionStart reports the latter.
+// CodexSessionStart reports a spawned thread's parent from its child rollout.
 func TestCodexSubagentHooksAndSpawnedThreadParent(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	ctx := context.Background()
@@ -37,7 +36,6 @@ func TestCodexSubagentHooksAndSpawnedThreadParent(t *testing.T) {
 	if err := CodexSessionStart(ctx, env(`{"session_id":"`+child+`","hook_event_name":"SessionStart","cwd":"`+root+`","model":"gpt-6","source":"startup","permission_mode":"default","transcript_path":"`+rollout+`"}`)); err != nil {
 		t.Fatal(err)
 	}
-	// A root thread: no rollout to read, no parent to report.
 	if err := CodexSessionStart(ctx, env(`{"session_id":"`+parent+`","hook_event_name":"SessionStart","cwd":"`+root+`","model":"gpt-6","source":"startup","permission_mode":"default","transcript_path":null}`)); err != nil {
 		t.Fatal(err)
 	}
@@ -77,9 +75,8 @@ func TestCodexSubagentHooksAndSpawnedThreadParent(t *testing.T) {
 	}
 }
 
-// A Codex subagent is a thread the session spawned, with a rollout of its own. Its hooks
-// keep the root's session_id, carry the child thread's id as agent_id, and point
-// transcript_path at the child's rollout.
+// A spawned thread's hooks keep the root's session_id, name the child as agent_id, and
+// point transcript_path at the child's own rollout.
 func TestCodexSpawnedThreadArrivesThroughSubagentStart(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	ctx := context.Background()
@@ -109,7 +106,6 @@ func TestCodexSpawnedThreadArrivesThroughSubagentStart(t *testing.T) {
 	if err := CodexSubagentStart(ctx, env(hook("SubagentStart", ""))); err != nil {
 		t.Fatal(err)
 	}
-	// The end of the child's turn: capture runs against the rollout the hook names.
 	if err := CodexSubagentStop(ctx, env(hook("SubagentStop", `,"stop_hook_active":false`))); err != nil {
 		t.Fatal(err)
 	}
@@ -151,8 +147,7 @@ func TestCodexSpawnedThreadArrivesThroughSubagentStart(t *testing.T) {
 	}
 }
 
-// A hook that names an agent and a transcript that is not that agent's is the session's
-// rollout still: only the file's own name says whose it is.
+// A transcript that is not the named agent's is the session's: only the file name decides.
 func TestCodexRolloutIDFollowsTheTranscriptName(t *testing.T) {
 	for _, tc := range []struct{ name, agent, transcript, want string }{
 		{"the child's rollout", "child-1", "/h/sessions/2026/09/21/rollout-2026-09-21T10-00-00-child-1.jsonl", "child-1"},

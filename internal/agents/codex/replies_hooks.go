@@ -16,14 +16,11 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// codexReplyMaxText bounds one message's text. A reply is prose; one that runs past this
-// is almost always a file the model recited, and the head of it is what a reader wants.
+// codexReplyMaxText bounds one message: a longer reply is almost always a recited file.
 const codexReplyMaxText = 16 << 10
 
-// captureCodexReplies spools the assistant messages Codex has recorded since the last
-// capture. It runs at the end of a turn (Stop, and notify for a developer who has no
-// repository hooks), holds a cursor per session under a lock the two share, and does
-// nothing at all for a developer whose Codex does not export their prompts.
+// captureCodexReplies spools the messages recorded since the last capture, under a
+// per-session cursor, and only where prompts are consented.
 func captureCodexReplies(e hookrun.Env, ctx context.Context, r *hookrun.Repo, in *codexHookInput) {
 	pol := routing.EffectivePolicy(e.Policy, r.ProjectID)
 	if e.Spool == nil || !session.ValidID(in.SessionID) || !pol.IncludePrompts || !pol.AllowsSignal("logs") || len(pol.ExcludePaths) > 0 || !CodexRepliesConsented(r.ProjectID, pol.Global()) {
@@ -48,7 +45,6 @@ func captureCodexReplies(e hookrun.Env, ctx context.Context, r *hookrun.Repo, in
 	var cursor CodexReplyCursor
 	b, readErr := os.ReadFile(path)
 	if readErr == nil && json.Unmarshal(b, &cursor) != nil {
-		// Codex's own message ids make the replay the same events, not new ones.
 		e.Logf("invalid reply cursor; replaying rollout")
 		cursor = CodexReplyCursor{}
 	}
@@ -69,9 +65,8 @@ func captureCodexReplies(e hookrun.Env, ctx context.Context, r *hookrun.Repo, in
 		for k, v := range map[string]string{hookrun.AttrTurnID: reply.TurnID, "trace_id": reply.TraceID, "phase": reply.Phase, hookrun.AttrModel: in.Model} {
 			hookrun.BoundedAttr(attrs, k, v)
 		}
-		// The event is stamped with when the message was said. Every reply of a turn is
-		// read at its end, and a chain ordered by when terma read them would put each
-		// after the tool calls it introduced.
+		// Stamped with when the message was said: read at the turn's end, every reply would
+		// otherwise sort after the tool calls it introduced.
 		at := e.Time()
 		if !reply.At.IsZero() && !reply.At.After(at) {
 			at = reply.At
@@ -93,27 +88,16 @@ func captureCodexReplies(e hookrun.Env, ctx context.Context, r *hookrun.Repo, in
 	}
 }
 
-// CodexRepliesConsented reports whether this developer's Codex exports their prompts in
-// this repository — the consent a reply travels under. `terma install --exclude-prompts`
-// and `terma connect codex --exclude-prompts` are documented as withholding "prompt text
-// or model responses", and this is the model-response half of that promise.
-//
-// Relay and Desktop configurations use the repository's routing record. Legacy
-// native configurations use Codex's settings. Capture and queued delivery share this
-// check; the caller also applies the current organization policy ceiling.
-//
-// It fails closed. A configuration that is there and cannot be read — a routing record
-// half-written, a config.toml that does not parse — might be the one that withholds
-// prompts, and "could not tell" is not consent. A file that does not exist is different:
-// both loaders report that without an error, and it simply is not a source.
+// CodexRepliesConsented reports whether prompts, and so replies, may leave for this
+// repository. It fails closed: a source that exists and cannot be read might be the one
+// that withholds prompts; a missing file is simply not a source.
 func CodexRepliesConsented(projectID string, global bool) bool {
 	rec, recorded, err := routing.LoadRecord(projectID)
 	if err != nil {
 		return false
 	}
-	// Through the local relay the machine-wide Codex config lets prompts out on
-	// purpose — the relay withholds them per project — so it says nothing about this
-	// repository. Only the project's own routing record can consent.
+	// Under the relay the machine-wide config allows prompts on purpose, so only the project's
+	// routing record can consent.
 	if claim.Enabled() {
 		if global && !recorded {
 			return true
@@ -128,7 +112,6 @@ func CodexRepliesConsented(projectID string, global bool) bool {
 	if err != nil {
 		return false
 	}
-	// A saved repository opt-out stays in force whatever the machine-wide config says.
 	return st.Connected && st.IncludePrompts &&
 		(!recorded || !slices.Contains(rec.Harnesses, name) || rec.IncludePrompts)
 }

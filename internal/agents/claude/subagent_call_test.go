@@ -12,10 +12,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// The payloads below are Claude Code 2.1.278's, captured live on 2026-09-21 and reduced:
-// ids shortened, and the three places conversation content appears — the task's
-// description, its prompt, the subagent's reply — replaced with sentinels, so a test can
-// say that none of it reaches the spool.
+// The payloads below are reduced live payloads whose description, prompt and reply are sentinels,
+// so a test can say none of it reaches the spool.
 const (
 	sentinelDescription = "NEVER-EXPORT-DESCRIPTION"
 	sentinelPrompt      = "NEVER-EXPORT-PROMPT"
@@ -46,8 +44,7 @@ func runPostToolUse(t *testing.T, root string, sp *spool.Spool, payload string) 
 	}
 }
 
-// A subagent the parent waited for: the Agent tool's response is the one hook that names
-// the subagent's model, and the only record of what it used that is keyed to the agent.
+// A waited-for subagent's Agent tool response names its model and how the run went.
 func TestClaudeSubagentCallCarriesTheModelAndTheRollUp(t *testing.T) {
 	root := newRepo(t)
 	sp, _ := spool.Open(t.TempDir())
@@ -78,10 +75,7 @@ func TestClaudeSubagentCallCarriesTheModelAndTheRollUp(t *testing.T) {
 			t.Errorf("%s = %v (present %v), want %v", key, got, ok, want)
 		}
 	}
-	// The response's `usage` is the subagent's LAST request, not the run: this fixture's run made two
-	// (input / cache read / cache write 10/0/13060, then 8/13060/2192), and usage is the second. Sent on
-	// beside the run's duration those numbers read as what the run spent — and were taken for it. The
-	// native export already carries that request under its own id, so they are not sent at all.
+	// `usage` is the subagent's last request, not the run, so its numbers are not sent.
 	for _, key := range []string{"total_tokens", "input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens", "thinking_tokens"} {
 		if got, ok := ev.Attrs[key]; ok {
 			t.Errorf("%s = %v: one request's usage must never travel as a run's", key, got)
@@ -93,14 +87,12 @@ func TestClaudeSubagentCallCarriesTheModelAndTheRollUp(t *testing.T) {
 	if _, ok := ev.Attrs[hookrun.AttrAgentParentID]; ok {
 		t.Error("a subagent launched by the main thread has no parent agent")
 	}
-	// The manifest is for edits. Launching a subagent touches no file.
 	if manifests, _ := hookruntest.Store(t, root).Manifests(); len(manifests) != 0 {
 		t.Errorf("an Agent call built a manifest: %+v", manifests)
 	}
 }
 
-// Launched in the background, the call returns at once: the id and the model, and no
-// totals. They must stay absent — a zero would read as a subagent that used nothing.
+// A background launch has no totals, and they stay absent: a zero would read as nothing used.
 func TestClaudeSubagentCallLaunchedInTheBackgroundHasNoTotals(t *testing.T) {
 	root := newRepo(t)
 	sp, _ := spool.Open(t.TempDir())
@@ -121,8 +113,7 @@ func TestClaudeSubagentCallLaunchedInTheBackgroundHasNoTotals(t *testing.T) {
 	}
 }
 
-// The response holds the task's prompt and the subagent's reply. No field of
-// claudeAgentResult decodes them, and this is what would notice one being added.
+// No field of claudeAgentResult decodes the task's prompt or the reply.
 func TestClaudeSubagentCallNeverCarriesWhatWasSaid(t *testing.T) {
 	root := newRepo(t)
 	for _, response := range []string{completedAgentResponse, launchedAgentResponse} {
@@ -195,9 +186,7 @@ func TestClaudeSubagentCallVariants(t *testing.T) {
 	}
 }
 
-// `claude --agent <name>` stamps agent_type on every hook of the session, the main
-// thread's included. Only agent_id says a hook fired inside a subagent, so a type
-// without one must not make an edit look like a subagent's.
+// `claude --agent <name>` stamps agent_type on every hook; without agent_id it is not a subagent.
 func TestAgentTypeWithoutAnAgentIDIsNotASubagent(t *testing.T) {
 	root := newRepo(t)
 	sp, _ := spool.Open(t.TempDir())

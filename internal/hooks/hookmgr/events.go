@@ -13,25 +13,17 @@ type EventHook struct {
 	Entry json.RawMessage
 }
 
-// HooksFile is an agent's hooks file as mergeEventHooks needs to know it: a JSON object
-// whose "hooks" member maps an event to a list of entries. Claude Code, Codex and
-// Cursor all keep theirs that way and differ only in what an entry looks like.
+// HooksFile is an agent's hooks file whose "hooks" member maps an event to a list of entries.
 type HooksFile struct {
 	// Path is relative to the repository root, slash-separated.
 	Path string
-	// Defaults are top-level members terma sets when it writes the file and the file
-	// has none of its own — Cursor refuses a hooks file without its schema version.
-	// Defaults are preserved on uninstall: an identical value may predate Terma.
+	// Defaults are top-level members set when the file has none, kept on uninstall since
+	// an identical value may predate terma.
 	Defaults map[string]json.RawMessage
 }
 
-// MergeEventHooks plans terma's entries into, or out of, an agent's hooks file without
-// disturbing anything else in it: the developer's own entries in the same event, and
-// every other top-level member, survive as they were read.
-//
-// An entry is terma's when it calls the binary (callsTerma), which is what makes install
-// idempotent and lets an entry from an older terma be brought up to date where it
-// stands rather than duplicated. Nothing changing is an empty plan.
+// MergeEventHooks plans terma's entries into, or out of, an agent's hooks file, leaving
+// the developer's entries and every other member as they were read.
 func MergeEventHooks(root string, file HooksFile, own []EventHook, install bool) (Plan, error) {
 	p := Plan{}
 	before, err := ReadFile(filepath.Join(root, filepath.FromSlash(file.Path)))
@@ -95,8 +87,6 @@ func MergeEventHooks(root string, file HooksFile, own []EventHook, install bool)
 	if len(events) == 0 {
 		delete(top, "hooks")
 	} else {
-		// The hooks section is terma's to format; every other top-level value is
-		// written back exactly as it was read.
 		raw, err := MarshalJSON(events, "  ", "  ")
 		if err != nil {
 			return p, err
@@ -110,8 +100,6 @@ func MergeEventHooks(root string, file HooksFile, own []EventHook, install bool)
 			}
 		}
 	}
-	// Uninstall from a file that held nothing but what terma wrote: remove it rather
-	// than leave an empty shell behind.
 	if !install && before != nil && len(top) == 0 {
 		p.Changes = append(p.Changes, Change{Path: file.Path, Before: before})
 		return p, nil

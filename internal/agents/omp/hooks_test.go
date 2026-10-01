@@ -93,8 +93,7 @@ func TestOmpHooksUninstallKeepsAnEditedFile(t *testing.T) {
 	}
 }
 
-// The committed hook names its events in a comment, which is also what the
-// adapter/contract test greps for: the two must stay in step with the handlers.
+// The committed hook names its events, which builtin's hook tests grep for.
 func TestOmpHooksSourceNamesItsEvents(t *testing.T) {
 	for _, event := range []string{"omp-session-start", "omp-session-end", "omp-file-edit"} {
 		if !strings.Contains(ompHooksSource, "terma hook "+event) {

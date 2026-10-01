@@ -2,9 +2,8 @@ package daemon
 
 import "testing"
 
-// A relay is started again after it stepped aside for a replaced binary, and the
-// service's relay whenever it stopped for any reason but its setup being gone; a relay
-// that found another running is not.
+// A relay restarts after stepping aside for a replaced binary, and a service relay unless
+// its setup is gone; one that found another running does not.
 func TestRestart(t *testing.T) {
 	for _, c := range []struct {
 		res  Result

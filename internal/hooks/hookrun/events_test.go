@@ -2,9 +2,7 @@ package hookrun
 
 import "testing"
 
-// The platform's adapters parse these strings. The constants exist so the Go code says
-// one name once; this pins what they hold, so tidying a constant cannot rename a field
-// on the wire.
+// The wire strings the platform parses are pinned, so tidying a constant cannot rename one.
 func TestWireNamesAreFrozen(t *testing.T) {
 	for got, want := range map[string]string{
 		EventSessionStart:       "terma.session.start",

@@ -22,8 +22,8 @@ func captureCodexFunding(e hookrun.Env, ctx context.Context, r *hookrun.Repo, in
 	if err != nil {
 		return
 	}
-	// Inside a subagent the rollout, and so the cursor into it, is the child thread's.
-	// The evidence is still filed under the session, with the agent named.
+	// Inside a subagent the cursor follows the child's rollout; evidence stays under the
+	// session, with the agent named.
 	rollout := codexRolloutID(in)
 	path := filepath.Join(dir, codexFundingCursorDir, hookrun.EvidenceID(rollout)+".json")
 	if os.MkdirAll(filepath.Dir(path), 0o700) != nil {
@@ -40,22 +40,15 @@ func captureCodexFunding(e hookrun.Env, ctx context.Context, r *hookrun.Repo, in
 		e.Logf("invalid funding cursor; replaying rollout")
 		cursor = CodexCursor{}
 	}
-	// A session's first capture is when the directory is swept, as for reply cursors:
-	// nothing else ever removed a finished session's cursor.
+	// A session's first capture sweeps the directory: nothing else removes a finished cursor.
 	if os.IsNotExist(cursorErr) {
 		defer hookrun.PruneState(filepath.Dir(path), e.Time().Add(-spool.MaxAge))
 	}
-	// Resolve the funding owner once (not per evidence): Codex's ChatGPT account, and only when the
-	// session is on the subscription route. Empty on the API-key route or when unreadable — never a
-	// stale or guessed id.
+	// Resolved once: empty on the API-key route or when unreadable, never a guessed id.
 	accountID, _ := CodexOAuthAccountID()
-	// The per-user identity behind a shared Team workspace account_id: Codex's account_id cannot tell
-	// members apart, so also resolve the signed-in email and the stable opaque user_id (subscription
-	// route only). account_email is emitted raw (the platform's terma-cli identity convention, renamed
-	// to user.email downstream); account_user_id is the durable per-user principal the native OTel wire
-	// never exposes.
+	// A Team workspace's account_id cannot tell members apart, so the email and the durable
+	// user_id, which the native export never carries, travel too.
 	userEmail, userID, _ := CodexOAuthUser()
-	// Keep capture below Codex Stop's three-second timeout.
 	ctx, cancel := context.WithTimeout(ctx, codexCaptureTimeout)
 	defer cancel()
 	next, status, readErr := ReadCodexFunding(ctx, rollout, in.TranscriptPath, cursor, func(ev harness.FundingEvidence) error {
@@ -63,14 +56,11 @@ func captureCodexFunding(e hookrun.Env, ctx context.Context, r *hookrun.Repo, in
 		attrs[hookrun.AttrTool], attrs[hookrun.AttrVersion] = codexTool, e.Version
 		attrs[hookrun.AttrEvidenceSource], attrs[hookrun.AttrEvidenceStatus] = ev.Source, ev.Status
 		attrs[hookrun.AttrSchemaVersion] = 1
-		// Stamp the account only onto a real, present ChatGPT quota snapshot. A record with no OpenAI
-		// rate-limit evidence (ev.Status != "present": rate_limits:null, or a session run through
-		// --oss/--local-provider/a custom model_provider that emits none) is not this ChatGPT account's
-		// usage, so it must not carry the id.
+		// Only a present ChatGPT quota snapshot carries the account: without rate-limit evidence
+		// (a local or custom provider) it is not this account's usage.
 		if accountID != "" && ev.Status == hookrun.StatusPresent {
 			attrs[hookrun.AttrAccountID] = accountID
 		}
-		// Same gate as account_id: the per-user identity belongs only on a real ChatGPT quota snapshot.
 		if userEmail != "" && ev.Status == hookrun.StatusPresent {
 			attrs["account_email"] = userEmail
 		}

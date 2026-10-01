@@ -8,8 +8,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-// Native points an agent's own OTLP exporter at the relay, sending everything: the
-// relay withholds content per project.
+// Native points an agent's own OTLP exporter at the relay with all content; the relay
+// withholds it per project.
 func Native(h harness.Harness, cfg agents.RelayConfig) (agents.RelayResult, error) {
 	return agents.RelayResult{}, h.Connect(harness.Exporter{
 		Endpoint: cfg.Endpoint, APIKey: cfg.Token, Signals: harness.AllSignals,

@@ -8,14 +8,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// matchKind says how to read one kind of named thing — a project, an organization —
-// and what to call it when nothing, or more than one thing, matches.
+// matchKind says how to resolve one kind of named thing and how to word a failed match.
 type matchKind[T any] struct {
 	noun string
-	// list is the command that prints the candidates, quoted the way a message
-	// quotes it, so the "no match" error can say where to look.
-	list string
-	// title heads the picker.
+	// list is the quoted command that prints the candidates, for the "no match" error.
+	list  string
 	title string
 	id    func(T) string
 	name  func(T) string
@@ -55,10 +52,8 @@ func (k matchKind[T]) labels(items []T) map[string]string {
 	return labels
 }
 
-// index resolves query against ids first, then exact names, then a unique
-// case-insensitive prefix. An ambiguous prefix is an error rather than a guess:
-// silently picking one of several would send reads, or a sign-in, somewhere the
-// user did not intend.
+// index resolves query by id, then exact name, then unique case-insensitive prefix; an
+// ambiguous prefix is an error rather than a guess.
 func (k matchKind[T]) index(items []T, query string) (int, error) {
 	query = strings.TrimSpace(query)
 	for i := range items {
@@ -101,9 +96,7 @@ func (k matchKind[T]) match(items []T, query string) (*T, error) {
 	return &items[i], nil
 }
 
-// pick prompts for one of items on a terminal. A typed name resolves exactly as the
-// command's argument would, so the picker and the argument agree on what a string
-// means.
+// pick prompts for one of items, resolving a typed name exactly as the argument would.
 func (k matchKind[T]) pick(cmd *cobra.Command, items []T, row func(T) pickRow) (*T, error) {
 	rows := make([]pickRow, 0, len(items))
 	for _, item := range items {

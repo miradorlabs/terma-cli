@@ -9,15 +9,10 @@ import (
 	"time"
 )
 
-// The log store's query surface lives at /v1/logs — the same door the OTLP exporter
-// posts to, read back with a filter. It is how a commit is joined to the session that
-// produced it: the post-commit hook exports a `terma.commit` record carrying the
-// commit sha and the stamped session id, and this reads it back by sha.
+// The log store's query surface at /v1/logs, where a `terma.commit` record is read back by sha.
 const logsQueryPath = "/v1/logs"
 
-// LogRecord is one record from the log store. Every attribute value comes back as a
-// string, nested under "attributes" (the event's own) and "resource_attributes" (the
-// exporter's); the typed accessors read those rather than exposing the raw maps.
+// LogRecord is one record from the log store, read through its typed accessors.
 type LogRecord struct {
 	EventName          string         `json:"event_name"`
 	Body               string         `json:"body"`
@@ -26,9 +21,7 @@ type LogRecord struct {
 	ResourceAttributes map[string]any `json:"resource_attributes"`
 }
 
-// Attr returns an event attribute as a string, or "" when absent. Values arrive as
-// strings today; a number or bool is coerced rather than dropped, so a future typed
-// encoding does not silently read as empty.
+// Attr returns an event attribute as a string, or "" when absent; a number or bool is coerced.
 func (r *LogRecord) Attr(key string) string { return coerceAttr(r.Attributes[key]) }
 
 // ResourceAttr is Attr for the exporter's resource attributes.
@@ -58,8 +51,7 @@ func coerceAttr(v any) string {
 	}
 }
 
-// logsResponse is the query envelope. The store names the array "logs"; an earlier
-// build named it "records", so both are read and concatenated.
+// logsResponse is the query envelope; both "logs" and the older "records" are read.
 type logsResponse struct {
 	Logs    []LogRecord `json:"logs"`
 	Records []LogRecord `json:"records"`
@@ -71,9 +63,8 @@ func (resp logsResponse) all() []LogRecord {
 	return append(out, resp.Records...)
 }
 
-// LogQuery selects log records. Filter is the store's expression over attribute.<key>,
-// status, severity and tag; the window is [Since, Until) and the store caps its span
-// (currently 840h), so callers centre a tight window rather than scanning from now.
+// LogQuery selects log records in [Since, Until); the store caps the span, so callers
+// centre a tight window rather than scanning from now.
 type LogQuery struct {
 	Filter string
 	Since  time.Time
@@ -96,8 +87,7 @@ func (q LogQuery) values() url.Values {
 	return v
 }
 
-// QueryLogs runs one log query and returns the matching records, as the store orders
-// them. An empty match is an empty slice, not an error.
+// QueryLogs runs one log query and returns the matching records in the store's order.
 func (c *Client) QueryLogs(ctx context.Context, q LogQuery) ([]LogRecord, error) {
 	var resp logsResponse
 	if err := c.Get(ctx, logsQueryPath, q.values(), &resp); err != nil {
@@ -106,10 +96,8 @@ func (c *Client) QueryLogs(ctx context.Context, q LogQuery) ([]LogRecord, error)
 	return resp.all(), nil
 }
 
-// CommitLog fetches the terma.commit record a connected agent reported for one commit
-// sha, searching the [since, until) window. It returns (nil, nil) when the store holds
-// no such record — the commit carried no Agent-Session-Id trailer, or its event has
-// not reached the backend yet.
+// CommitLog fetches the terma.commit record for sha in [since, until), or (nil, nil) when
+// the store holds none.
 func (c *Client) CommitLog(ctx context.Context, sha string, since, until time.Time) (*LogRecord, error) {
 	recs, err := c.QueryLogs(ctx, LogQuery{
 		Filter: `attribute.event.name="terma.commit" AND attribute.sha=` + logQuote(sha),
@@ -126,8 +114,6 @@ func (c *Client) CommitLog(ctx context.Context, sha string, since, until time.Ti
 	return &recs[0], nil
 }
 
-// logQuote wraps a value for the log filter grammar, escaping the two characters that
-// would end the quoted string or the escape itself.
 func logQuote(v string) string {
 	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(v) + `"`
 }

@@ -4,8 +4,7 @@ package harness
 
 import "golang.org/x/sys/windows"
 
-// processAlive reports whether pid names a running process: one that can be opened and
-// has no exit code yet. Access denied means it exists, under another user.
+// Access denied means the process exists under another user.
 func processAlive(pid int) bool {
 	h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(pid))
 	if err != nil {

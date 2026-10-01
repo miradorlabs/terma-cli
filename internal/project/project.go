@@ -1,13 +1,5 @@
 // Package project reads and writes .terma/settings.json, the committed, secret-free
-// file that binds a repository to a Terma project.
-//
-// It carries only what every clone needs to agree on: which project telemetry
-// belongs to and which environment it lives in. Credentials never go here — they
-// stay in each developer's home directory (see `terma install`).
-//
-// The file lives inside the same .terma/ directory that holds the committed git-hook
-// shims (.terma/hooks/), mirroring the .claude/settings.json and .cursor/hooks.json
-// layout other agents use.
+// file that binds a repository to a Terma project; nothing per-developer goes there.
 package project
 
 import (
@@ -26,8 +18,7 @@ import (
 )
 
 const (
-	// Dir is the committed directory at the repository root that holds the binding
-	// file and the git-hook shims.
+	// Dir is the committed directory holding the binding file and the git-hook shims.
 	Dir = ".terma"
 	// SettingsName is the binding file inside Dir.
 	SettingsName = "settings.json"
@@ -45,22 +36,14 @@ type File struct {
 type Project struct {
 	ID   string `json:"id"`
 	Name string `json:"name,omitempty"`
-	// OrganizationID is informational — the project id is globally unique — but
-	// lets status/doctor name the org without a round trip.
+	// OrganizationID is informational: it names the org without a round trip.
 	OrganizationID string `json:"organization_id,omitempty"`
-	// Environment is the built-in environment (prod when empty). Committed so a
-	// repo pointed at pre-production says so in one place.
+	// Environment is the built-in environment; empty is production.
 	Environment string `json:"environment,omitempty"`
 }
 
-// Install records what `terma install` wired, so uninstall is exact and doctor
-// knows what to check.
-//
-// Which agents' hooks are wired is not recorded: the committed hooks files say it
-// themselves (adapter.WiredNames), and which agents a developer uses is home-directory
-// state (config.Profile.Harnesses). A list here once copied the second into the first,
-// so each colleague's own agents churned a file the whole team shares. A binding that
-// still carries "adapters" loads, and loses it on the next Save.
+// Install records what `terma install` wired; which agents are wired is left to the
+// committed hooks files, so a colleague's install never churns this one.
 type Install struct {
 	HookManager string    `json:"hook_manager,omitempty"`
 	Hooks       []string  `json:"hooks,omitempty"`
@@ -71,23 +54,14 @@ type Install struct {
 // ErrNotFound is returned when the repository has no binding file.
 var ErrNotFound = errors.New(FileName + " not found")
 
-// safeID is what a project id is allowed to look like. Real ids are UUIDs; the
-// charset is widened to the slug shapes the backend has also issued, and matches
-// session.ValidID so the two identifiers that become file names obey one rule.
+// safeID matches session.ValidID's charset: both ids become file names.
 var safeID = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 
 // maxIDLen bounds an id long before any filesystem does.
 const maxIDLen = 128
 
-// ValidID reports whether id is safe to use as a path component.
-//
-// This file is committed, so it arrives from whoever wrote the repository — cloning
-// an untrusted one and running `terma install` is the ordinary workflow, not an edge
-// case. The id becomes a path component in the helpers directory (see
-// harness.HelperFilePath), and filepath.Join collapses "..", so an unchecked id like
-// "../../../../.zshenv" would place a 0700 script holding a live server key at a
-// path the repository chose. A leading dot is refused as well: a hidden file is not
-// a project id, and the pattern would otherwise admit "." and "..".
+// ValidID reports whether id is safe as a path component: the file comes from whoever
+// wrote the repository, and an id like "../../.zshenv" would place a key-holding script there.
 func ValidID(id string) bool {
 	return id != "" && len(id) <= maxIDLen && safeID.MatchString(id) && !strings.HasPrefix(id, ".")
 }
@@ -112,13 +86,8 @@ func Load(root string) (*File, error) {
 	}
 }
 
-// Resolve reads the binding for the checkout at root, whose git directory is gitDir ("" to
-// find it). The checkout's own binding wins. A linked git worktree without one uses its
-// main checkout's: a new worktree does not get a gitignored binding, and without this
-// every event from it carried no project and was dropped at the next flush. It follows
-// git's own link between the two, never directory nesting, so a separate repository
-// inside a bound one still does not inherit it. from is the root the binding was read
-// from; a missing binding is ErrNotFound, as from Load.
+// Resolve reads the binding for the checkout at root (gitDir "" to find it), else, in a
+// linked worktree, its main checkout's, since worktrees do not copy a gitignored binding.
 func Resolve(root, gitDir string) (f *File, from string, err error) {
 	f, err = Load(root)
 	if !errors.Is(err, ErrNotFound) {
@@ -138,10 +107,8 @@ func Resolve(root, gitDir string) (f *File, from string, err error) {
 	return mf, main, merr
 }
 
-// ResolveDir finds the binding for dir: the nearest one above it (Find), else, when dir
-// is in a linked worktree with none of its own, the main checkout's (Resolve). root is
-// the checkout it applies to — Find's directory, or the worktree's own root, which is
-// where that worktree's agents run and are trusted.
+// ResolveDir finds the binding for dir through Find, else Resolve; root is the checkout
+// it applies to, a worktree's own root included.
 func ResolveDir(dir string) (f *File, root string, err error) {
 	if root, err := Find(dir); err == nil {
 		f, err := Load(root)
@@ -179,21 +146,17 @@ func Save(root string, f *File) error {
 	return config.WriteFileAtomic(Path(root), append(body, '\n'), 0o644)
 }
 
-// Remove deletes the binding and the .terma
-// directory when nothing else (the hook shims) is left in it. A missing file is not
-// an error.
+// Remove deletes the binding, and the .terma directory when nothing else is in it.
 func Remove(root string) error {
 	if err := os.Remove(Path(root)); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
-	// Best effort: os.Remove of a non-empty directory fails, which is the intent —
-	// the hook shims under .terma/hooks/ must survive removing the binding.
+	// Fails, as intended, while hook shims remain under .terma/hooks/.
 	_ = os.Remove(filepath.Join(root, Dir))
 	return nil
 }
 
-// Find walks up from dir to the first directory holding a binding file and returns
-// that directory. Used by hooks invoked from a subdirectory.
+// Find walks up from dir to the first directory holding a binding file.
 func Find(dir string) (string, error) {
 	dir = filepath.Clean(dir)
 	for {

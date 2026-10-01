@@ -11,9 +11,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
-// A repository can have perfect Codex wiring and still run none of it: Codex refuses a
-// hook it has not been shown. That silence is the failure mode this adapter introduces,
-// so doctor has to be the thing that breaks it.
+// An agent that gates hooks behind trust runs none of them until trusted, in silence, so
+// doctor has to say so.
 func TestDoctorReportsCodexHooksAwaitingTrust(t *testing.T) {
 	installRepo(t)
 	codexHome := t.TempDir()
@@ -32,24 +31,20 @@ func TestDoctorReportsCodexHooksAwaitingTrust(t *testing.T) {
 	if !strings.Contains(out, "Settings → Hooks → Review") || !strings.Contains(out, "/hooks in Codex CLI") {
 		t.Fatalf("doctor should explain trust for both Desktop-only and CLI users:\n%s", out)
 	}
-	// It is a warning about Codex, not a verdict on the repository: the commit hooks are
-	// in and Claude Code's run, so commit stamping is worth half of what it could be —
-	// not nothing, which is what one untrusted agent used to cost.
+	// A warning about one agent, not a verdict on the repository: the other agent's hooks run.
 	if !strings.Contains(out, "ok    commit hooks installed") || !strings.Contains(out, "warn  agent hooks run") {
 		t.Fatalf("the commit hooks pass; only the agent hooks warn:\n%s", out)
 	}
 	if !strings.Contains(out, "Setup needs attention:") || strings.Contains(out, "Predicted coverage") {
 		t.Fatalf("doctor should report readiness without an invented percentage:\n%s", out)
 	}
-	// status tells the same story, with the same number.
 	status, _ := runTerma(t, "status")
 	if !strings.Contains(status, "1 of 2 agents can run theirs") {
 		t.Fatalf("status should name the agent hooks too:\n%s", status)
 	}
 }
 
-// An agent this developer does not use is not theirs to trust: a colleague's Codex hooks,
-// committed in the repository, cost nothing here.
+// A colleague's committed hooks for an agent this developer does not use cost nothing.
 func TestDoctorDoesNotChargeForAnAgentTheDeveloperDoesNotUse(t *testing.T) {
 	installRepo(t)
 	t.Setenv("CODEX_HOME", t.TempDir())
@@ -73,8 +68,7 @@ func TestDoctorAcceptsTrustedCodexHooks(t *testing.T) {
 	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude,codex", "--yes"); err != nil {
 		t.Fatal(err)
 	}
-	// What Codex writes once the developer trusts the hooks from inside it: a record for
-	// every entry terma installed.
+	// The agent writes a trust record for every entry once the developer trusts them.
 	trustCodexEntries(t, repo, codexHome, func(codex.Entry) bool { return true })
 
 	out, _ := runTerma(t, "doctor", "--skip-commit")
@@ -123,8 +117,7 @@ func TestDoctorRejectsChangedCodexHookAfterTrust(t *testing.T) {
 	}
 }
 
-// A repository installed without the Codex adapter is not missing anything, and must
-// not be nagged about a trust prompt that does not apply to it.
+// A repository installed without the adapter is not nagged about its trust prompt.
 func TestDoctorIgnoresCodexTrustWithoutTheAdapter(t *testing.T) {
 	installRepo(t)
 	t.Setenv("CODEX_HOME", t.TempDir())
@@ -137,8 +130,6 @@ func TestDoctorIgnoresCodexTrustWithoutTheAdapter(t *testing.T) {
 	}
 }
 
-// trustCodexEntries writes the trust records Codex keeps in the user's config, for the
-// entries of the repository's hooks file that keep says the developer has trusted.
 func trustCodexEntries(t *testing.T, repo, codexHome string, keep func(codex.Entry) bool) {
 	t.Helper()
 	entries, err := codex.TermaEntries(repo)
@@ -157,9 +148,8 @@ func trustCodexEntries(t *testing.T, repo, codexHome string, keep func(codex.Ent
 	}
 }
 
-// Codex trusts a hook entry by entry. A developer who trusted terma's hooks before the
-// two subagent entries existed has a file that counts as trusted and two hooks Codex
-// skips without a word — which is every subagent in that repository going unrecorded.
+// Trust is per entry: entries added after the developer trusted the file are skipped in
+// silence, and doctor names them.
 func TestDoctorNamesTheCodexEntriesANewerTermaAdded(t *testing.T) {
 	repo := installRepo(t)
 	codexHome := t.TempDir()

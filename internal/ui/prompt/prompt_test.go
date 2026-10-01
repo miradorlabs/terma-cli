@@ -132,8 +132,7 @@ func TestDecodeKeys(t *testing.T) {
 	}
 }
 
-// The frame is what the user reads; the line count is what the redraw backs up over.
-// The two have to agree or every keypress smears the form down the screen.
+// The line count render returns matches the frame it draws.
 func TestRenderCountsEveryLineItWrites(t *testing.T) {
 	f := form()
 	f.Items[4].Disabled, f.Items[4].Reason = true, "Codex has no repository settings"
@@ -165,9 +164,7 @@ func TestRenderCountsEveryLineItWrites(t *testing.T) {
 	}
 }
 
-// A line wider than the terminal wraps onto several physical rows. The redraw backs up
-// over physical rows, so render must count them — otherwise every up/down keypress
-// smears a fresh copy of the form down the screen. Guards that reported bug.
+// A line wider than the terminal counts as the physical rows it wraps onto.
 func TestRenderCountsWrappedPhysicalRows(t *testing.T) {
 	f := &Form{
 		Title: strings.Repeat("x", 45),
@@ -190,8 +187,7 @@ func TestRenderCountsWrappedPhysicalRows(t *testing.T) {
 	}
 }
 
-// A paste, or a pty that batches, delivers several keys in one read. Every one of them
-// has to count, in order.
+// Several keys in one read each count, in order.
 func TestTokensSplitsBatchedInput(t *testing.T) {
 	got := tokens([]byte("\x1b[B \x1b[A\r"))
 	want := []string{"\x1b[B", " ", "\x1b[A", "\r"}

@@ -17,9 +17,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-// Exercises the installed Claude binary without provider credentials or inference:
-// both the Messages API and all OTLP destinations are local test servers.
-// Run with TERMA_CLAUDE_NATIVE_TEST=1; optionally select TERMA_CLAUDE_BINARY.
+// Runs the installed Claude Code against local Messages API and OTLP servers, without credentials.
+// Run with TERMA_CLAUDE_NATIVE_TEST=1; TERMA_CLAUDE_BINARY selects the binary.
 func TestClaudeRouteNativeExport(t *testing.T) {
 	if os.Getenv("TERMA_CLAUDE_NATIVE_TEST") != "1" {
 		t.Skip("set TERMA_CLAUDE_NATIVE_TEST=1 for the native Claude contract test")
@@ -128,7 +127,7 @@ func TestClaudeRouteNativeExport(t *testing.T) {
 	linked := addRouteWorktree(t, root)
 	run(linked)
 	assertExport()
-	// The helper does not require Terma. Losing it must not prevent agent use either.
+	// Losing the helper must not prevent agent use.
 	if err := os.Remove(helper); err != nil {
 		t.Fatal(err)
 	}

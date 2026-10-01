@@ -6,10 +6,8 @@ import (
 	"strings"
 )
 
-// Windows is the script the Run key starts at logon: wscript runs it with no
-// window, and it starts `terma relay supervise` hidden (window style 0), not waiting —
-// terma.exe is a console program, and started from the Run key directly it would open
-// a console window at every logon. VBScript doubles a quote inside a string.
+// Windows is the script the Run key starts at logon: terma.exe started directly would open a
+// console window at every logon, so wscript starts it hidden.
 func Windows(exe string, env map[string]string) string {
 	q := func(s string) string { return `"` + strings.ReplaceAll(s, `"`, `""`) + `"` }
 	var b strings.Builder

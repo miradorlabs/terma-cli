@@ -1,9 +1,5 @@
-// Package selfupdate replaces the running binary with the latest GitHub release.
-//
-// Hooks are thin shims that never change; this is how the logic behind them gets
-// new versions without anyone re-running install. The swap is atomic (download to
-// a sibling temp file, verify the release checksum, rename over the executable) so
-// a hook that fires mid-update runs either the old binary or the new one, never a
+// Package selfupdate replaces the running binary with the latest GitHub release,
+// verified against its checksum and renamed into place so a hook never runs a
 // half-written file.
 package selfupdate
 
@@ -42,9 +38,7 @@ const CheckInterval = 24 * time.Hour
 // RetryInterval bounds how long a failed release lookup suppresses another check.
 const RetryInterval = 15 * time.Minute
 
-// maxDownload bounds a release archive and any file read out of it. The binary is a
-// few tens of megabytes; this is the ceiling that keeps a wrong or hostile asset from
-// being read into memory whole.
+// maxDownload bounds a release archive and any file read out of it.
 const maxDownload = 256 << 20
 
 // userAgentPrefix precedes the version in the User-Agent GitHub sees.
@@ -75,8 +69,7 @@ type Client struct {
 	Version string // the running version, for User-Agent
 }
 
-// httpClient is the configured client, or one with a timeout: a release lookup must
-// not hang a command on a network that has gone quiet.
+// httpClient is the configured client, or one with a timeout, with redirects held to checkDownloadOrigin.
 func (c *Client) httpClient() *http.Client {
 	client := &http.Client{Timeout: 30 * time.Second}
 	if c.HTTP != nil {
@@ -138,8 +131,7 @@ func (c *Client) Latest(ctx context.Context) (*Release, error) {
 	return &rel, nil
 }
 
-// AssetName is the archive goreleaser publishes for a platform, matching the
-// name_template in .goreleaser.yaml (terma_Darwin_arm64.tar.gz, terma_Linux_x86_64.tar.gz).
+// AssetName is the archive .goreleaser.yaml publishes for a platform (terma_Linux_x86_64.tar.gz).
 func AssetName(goos, goarch string) string {
 	arch := goarch
 	if goarch == "amd64" {
@@ -173,7 +165,6 @@ func PickAsset(rel *Release, goos, goarch string) (archive, checksums *Asset, er
 }
 
 // ParseChecksums reads goreleaser's checksums.txt ("<sha256>  <file>" per line).
-// Lines that do not carry a hex digest are ignored.
 func ParseChecksums(r io.Reader) map[string]string {
 	out := map[string]string{}
 	sc := bufio.NewScanner(r)
@@ -247,19 +238,8 @@ func (c *Client) get(ctx context.Context, target string) ([]byte, error) {
 	return io.ReadAll(io.LimitReader(resp.Body, maxDownload))
 }
 
-// checkDownloadOrigin refuses an asset URL that does not come from GitHub.
-//
-// Both the archive and checksums.txt are fetched from the browser_download_url in the
-// release payload — a value this code does not choose. If that payload is ever
-// controlled (a compromised release, a proxy in front of the API, a BaseURL pointed
-// somewhere unexpected), an arbitrary URL would be fetched and its bytes considered
-// for installation as the running binary. The checksum is no defence there: it comes
-// from the same payload, so an attacker who supplies the archive supplies its hash.
-// Pinning the origin means the release metadata can only ever redirect the download
-// within GitHub, which is the trust anchor this updater already relies on.
-//
-// An explicit BaseURL (tests, and a GitHub Enterprise host) is honoured as an origin
-// too: it was configured by whoever built this client, not named by a release.
+// checkDownloadOrigin refuses an asset URL outside GitHub or an explicit BaseURL: the
+// checksum comes from the same payload as the URL, so it is no defence on its own.
 func (c *Client) checkDownloadOrigin(target string) error {
 	u, err := url.Parse(target)
 	if err != nil {
@@ -290,9 +270,7 @@ func isGitHubHost(host string) bool {
 	return false
 }
 
-// extractBinaryFor pulls the executable out of goos's release archive: a zip holding
-// terma.exe on Windows (.goreleaser.yaml's format_overrides), a tar.gz holding terma
-// elsewhere.
+// extractBinaryFor pulls the executable out of goos's archive: a zip on Windows, else a tar.gz.
 func extractBinaryFor(goos string, archive []byte) ([]byte, error) {
 	if goos != "windows" {
 		return extractBinary(archive)
@@ -337,8 +315,7 @@ func extractBinary(archive []byte) ([]byte, error) {
 	return nil, errors.New("archive does not contain the terma binary")
 }
 
-// replaceExecutable writes the new binary beside the old one and renames it into
-// place, so the swap is atomic for any hook that fires during it.
+// replaceExecutable writes the new binary beside the old one and renames it into place.
 func replaceExecutable(exePath string, binary []byte) error {
 	resolved, err := filepath.EvalSymlinks(exePath)
 	if err == nil {
@@ -374,10 +351,8 @@ func replaceExecutable(exePath string, binary []byte) error {
 	return nil
 }
 
-// swapExecutable renames the new binary over the old one. Unix replaces a running
-// executable in one rename. Windows refuses to replace a file that is running, but lets
-// it be renamed: the old one steps aside to <exe>.old — removed by the next update, once
-// nothing runs it — and the new one takes its name (from PR #28).
+// swapExecutable renames the new binary over the old one. Windows will not replace a
+// running file but lets it be renamed, so the old one steps aside to <exe>.old first.
 func swapExecutable(goos, next, exePath string) error {
 	if goos != "windows" {
 		return os.Rename(next, exePath)

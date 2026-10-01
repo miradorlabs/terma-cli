@@ -55,7 +55,6 @@ func (f *sessionSelectFlags) bind(fl *pflag.FlagSet, withFilter bool, sources st
 	}
 }
 
-// selector resolves the names in the flags to ids through the catalog.
 func (f *sessionSelectFlags) selector(index *principalIndex) (sessionSelector, error) {
 	userIDs, err := index.resolveIDs(api.AIPrincipalUser, f.users)
 	if err != nil {
@@ -75,17 +74,15 @@ func (f *sessionSelectFlags) selector(index *principalIndex) (sessionSelector, e
 	}, nil
 }
 
-// sessionView is a session with its principal ids labelled, so a JSON consumer does
-// not have to make a second call to learn who "u_1f3a" is.
+// sessionView is a session with its principal ids labelled, saving a JSON consumer a lookup.
 type sessionView struct {
 	api.AISession
 	UserName   string `json:"user_name,omitempty"`
 	APIKeyName string `json:"api_key_name,omitempty"`
 }
 
-// sessionListView is what `session list` renders. Pagination is the gateway's own,
-// so it is there only when the rows are one of the gateway's pages: a walk (--all,
-// --until) gathers rows across pages and has none to report.
+// sessionListView is what `session list` renders; a walk across pages (--all, --until) has
+// no gateway pagination to report.
 type sessionListView struct {
 	Sessions   []sessionView     `json:"sessions"`
 	Pagination *api.AIPagination `json:"pagination,omitempty"`
@@ -100,7 +97,6 @@ func viewSession(s api.AISession, index *principalIndex) sessionView {
 	}
 }
 
-// who is the one column a table has for identity: the person, else the key.
 func (v sessionView) who() string {
 	switch {
 	case v.UserName != "":
@@ -135,8 +131,7 @@ func sessionTable(sessions []sessionView) output.Table {
 
 func money(usd float64) string { return fmt.Sprintf("%.4f", usd) }
 
-// defaultSessionPageSize is the gateway's page size when --page-size is not given. A
-// walk that fills one page client-side stops at the same number.
+// defaultSessionPageSize is the gateway's default page size, also used by client-side walks.
 const defaultSessionPageSize = 100
 
 func (app *App) newSessionListCommand() *cobra.Command {
@@ -177,9 +172,7 @@ that is new or has changed, as it happens.`,
 			if follow && (all || page != 0 || until != "") {
 				return fmt.Errorf("--follow streams the first page of the catalog; it cannot be combined with --all, --page or --until")
 			}
-			// A page number names one of the server's pages, and --until drops rows
-			// from them, so "page 2" of the filtered list is not something either side
-			// can address.
+			// --until filters the server's pages, so a page of the filtered list is unaddressable.
 			if until != "" && page != 0 {
 				return fmt.Errorf("--until is applied after the server pages the list, so it cannot be combined with --page; use --all, or a larger --page-size")
 			}
@@ -214,7 +207,6 @@ that is new or has changed, as it happens.`,
 
 			view := sessionListView{Sessions: []sessionView{}}
 			if all || until != "" {
-				// limit is how many rows fill a page of ours; zero is every row.
 				limit := pageSize
 				switch {
 				case all:
@@ -224,8 +216,7 @@ that is new or has changed, as it happens.`,
 				}
 				full := false
 				err = client.ForEachAISession(ctx, q, func(s api.AISession) bool {
-					// A session that reports no last activity cannot be placed before
-					// --until, so it is left out rather than guessed at.
+					// A session with no last activity cannot be placed before --until.
 					if until != "" && (s.LastActivityAt == nil || !s.LastActivityAt.Before(window.until)) {
 						return true
 					}
@@ -266,13 +257,11 @@ that is new or has changed, as it happens.`,
 	return cmd
 }
 
-// sessionIdentityFlag adds the --source flag every session-scoped read needs.
 func (app *App) sessionIdentityFlag(cmd *cobra.Command, source *string) {
 	cmd.Flags().StringVar(source, "source", "", "the session's source system, e.g. "+app.sourceExamples()+" (required)")
 	_ = cmd.MarkFlagRequired("source")
 }
 
-// sessionNotFound names the fix for a 404 on a session-scoped read.
 func sessionNotFound(source, id string) error {
 	return fmt.Errorf("no %s session %q in this project — copy the session id and source from `terma session list`", source, id)
 }
@@ -377,9 +366,7 @@ connected to export; a harness connected with --exclude-prompts carries none.`,
 			if err != nil {
 				return err
 			}
-			// The gateway is sent the window, and the same half-open check stays in the
-			// loop below: a gateway that does not know a parameter ignores it without
-			// saying so.
+			// The loop rechecks the window: a gateway ignores a parameter it does not know.
 			q := api.AISessionEventQuery{StartTime: window.since}
 			if until != "" {
 				q.EndTime = window.until
@@ -432,8 +419,7 @@ connected to export; a harness connected with --exclude-prompts carries none.`,
 	return cmd
 }
 
-// eventContent flattens an event's parts for a table cell: parts in order, newlines
-// folded to spaces so one event stays on one row.
+// eventContent flattens an event's parts into one table row.
 func eventContent(e api.AISessionEvent, width int) string {
 	parts := slices.Clone(e.Content)
 	slices.SortStableFunc(parts, func(a, b api.AIContentPart) int {

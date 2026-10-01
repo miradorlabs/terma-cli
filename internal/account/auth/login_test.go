@@ -30,8 +30,7 @@ func (r *recordingExchanger) ExchangeCode(_ context.Context, code, verifier stri
 	return &Credential{AccessToken: "mir_cli_test", ExpiresAt: time.Now().Add(time.Hour)}, nil
 }
 
-// browser drives the login flow the way the approval page does: read the URL the
-// CLI printed, then GET its loopback callback with a code and the echoed state.
+// browser drives the login flow the way the approval page does.
 func browser(t *testing.T, authURL string, code string, overrideState string) {
 	t.Helper()
 	parsed, err := url.Parse(authURL)
@@ -55,8 +54,6 @@ func browser(t *testing.T, authURL string, code string, overrideState string) {
 	_, _ = io.Copy(io.Discard, resp.Body)
 }
 
-// captureAuthURL scrapes the URL out of what Login writes to its output writer.
-// The CLI always prints it (browser or not), so this mirrors what a user copies.
 type urlCapture struct {
 	ch   chan string
 	seen bool
@@ -120,7 +117,6 @@ func TestLogin_ExchangesCodeWithTheVerifierAndPort(t *testing.T) {
 		t.Errorf("code = %q, want the one delivered to the callback", exchanger.code)
 	}
 
-	// The verifier must never appear in the browser URL — only its hash does.
 	parsed, _ := url.Parse(authURL)
 	challenge := parsed.Query().Get("challenge")
 	sum := sha256.Sum256([]byte(exchanger.verifier))
@@ -131,8 +127,6 @@ func TestLogin_ExchangesCodeWithTheVerifierAndPort(t *testing.T) {
 		t.Error("the PKCE verifier leaked into the browser URL")
 	}
 
-	// The port redeemed must be the port advertised, or the server's binding check
-	// would reject every real login.
 	wantPort, _ := strconv.Atoi(parsed.Query().Get("port"))
 	if exchanger.port != wantPort {
 		t.Errorf("exchanged port = %d, advertised %d", exchanger.port, wantPort)
@@ -169,7 +163,6 @@ func TestCredentialExpired(t *testing.T) {
 	}{
 		{"zero expiry is treated as expired", Credential{}, true},
 		{"past expiry", Credential{ExpiresAt: time.Now().Add(-time.Minute)}, true},
-		// Inside the skew: a token this close to expiry would die mid-request.
 		{"expiring within the skew", Credential{ExpiresAt: time.Now().Add(30 * time.Second)}, true},
 		{"comfortably live", Credential{ExpiresAt: time.Now().Add(time.Hour)}, false},
 	}
@@ -190,7 +183,6 @@ func TestNewPKCE_ProducesAValidS256Pair(t *testing.T) {
 	if len(pkce.Verifier) < 43 || len(pkce.Verifier) > 128 {
 		t.Errorf("verifier length %d is outside the RFC 7636 range", len(pkce.Verifier))
 	}
-	// The server rejects any challenge that is not exactly 43 base64url characters.
 	if len(pkce.Challenge) != 43 {
 		t.Errorf("challenge length = %d, want 43", len(pkce.Challenge))
 	}
@@ -204,8 +196,7 @@ func TestNewPKCE_ProducesAValidS256Pair(t *testing.T) {
 	}
 }
 
-// callbackWithHost issues a raw callback with a chosen Host header, which is how a DNS
-// rebinding attack reaches a loopback listener.
+// callbackWithHost issues a raw callback with a chosen Host header, as DNS rebinding does.
 func callbackWithHost(t *testing.T, port int, host, code, state string) *http.Response {
 	t.Helper()
 	target := fmt.Sprintf("http://127.0.0.1:%d/callback?code=%s&state=%s",
@@ -237,9 +228,7 @@ func portFrom(t *testing.T, authURL string) (port int, state string) {
 	return p, parsed.Query().Get("state")
 }
 
-// TestLogin_RejectsCallbackFromAForeignHost covers DNS rebinding: a page served from a
-// domain that resolves to 127.0.0.1 reaches this listener carrying its own Host, and the
-// same-origin policy would then let it read the response.
+// TestLogin_RejectsCallbackFromAForeignHost refuses a DNS-rebinding page's callback.
 func TestLogin_RejectsCallbackFromAForeignHost(t *testing.T) {
 	exchanger := &recordingExchanger{}
 	capture := &urlCapture{ch: make(chan string, 1)}
@@ -264,7 +253,6 @@ func TestLogin_RejectsCallbackFromAForeignHost(t *testing.T) {
 		t.Error("a code delivered under a foreign Host must never be exchanged")
 	}
 
-	// The real callback must still work — the guard is not simply blocking everything.
 	browser(t, authURL, "mir_cod_real", "")
 	if err := <-done; err != nil {
 		t.Fatalf("Login: %v", err)
@@ -274,9 +262,7 @@ func TestLogin_RejectsCallbackFromAForeignHost(t *testing.T) {
 	}
 }
 
-// TestLogin_WrongStateDoesNotCancelThePendingLogin closes a denial of service: any local
-// process, and any web page that guesses the port, can hit the callback. If a mismatched
-// state aborted the login, an attacker could stop a user from ever logging in.
+// TestLogin_WrongStateDoesNotCancelThePendingLogin proves a mismatched callback cannot deny the login.
 func TestLogin_WrongStateDoesNotCancelThePendingLogin(t *testing.T) {
 	exchanger := &recordingExchanger{}
 	capture := &urlCapture{ch: make(chan string, 1)}
@@ -291,7 +277,6 @@ func TestLogin_WrongStateDoesNotCancelThePendingLogin(t *testing.T) {
 
 	authURL := <-capture.ch
 
-	// Three hostile attempts, then the genuine one.
 	for i := range 3 {
 		browser(t, authURL, fmt.Sprintf("mir_cod_attacker%d", i), "not-the-state-we-issued")
 	}
@@ -305,9 +290,8 @@ func TestLogin_WrongStateDoesNotCancelThePendingLogin(t *testing.T) {
 	}
 }
 
-// TestLogin_HostileCallbacksAloneNeverAuthenticate is the other half of the DoS fix: a
-// mismatched state must not merely be non-fatal, it must never authenticate. With no
-// legitimate callback the login fails closed, on the timeout, having exchanged nothing.
+// TestLogin_HostileCallbacksAloneNeverAuthenticate proves mismatched callbacks alone fail closed
+// on the timeout, having exchanged nothing.
 func TestLogin_HostileCallbacksAloneNeverAuthenticate(t *testing.T) {
 	exchanger := &recordingExchanger{}
 	capture := &urlCapture{ch: make(chan string, 1)}

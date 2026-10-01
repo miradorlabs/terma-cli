@@ -7,10 +7,7 @@ import (
 	"testing"
 )
 
-// The settings file is shared with hookmgr, which writes hook guards unescaped on
-// purpose. A save here used to re-encode them as > and & — inside values this
-// package never touched — so `terma install --telemetry` and a global connect churned
-// a file customers commit.
+// A save keeps the shell operators hookmgr writes unescaped, so a connect never churns a committed file.
 func TestSaveLeavesShellOperatorsReadable(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "settings.json")
 	const guard = `command -v terma >/dev/null 2>&1 && terma hook stop || true`
@@ -42,8 +39,7 @@ func TestSaveLeavesShellOperatorsReadable(t *testing.T) {
 	}
 }
 
-// The status line entry is pre-encoded before it joins the document, so the final
-// encoder alone would not have kept its redirect readable.
+// The pre-encoded status line entry stays unescaped too.
 func TestStatusLineCommandIsWrittenUnescaped(t *testing.T) {
 	encoded, err := marshalJSON(statusLineCommand("my-line --flag"), "")
 	if err != nil {

@@ -8,23 +8,15 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// postToolUse and CursorPostToolUseFailure record one finished tool call.
-//
-// Cursor's generic postToolUse pair fires for every tool type — Shell, Read, Write,
-// Grep, Delete, Task and MCP:<tool> alike — and is the one place a tool_use_id and a
-// duration arrive together, so it is the pair wired. The before* hooks are permission
-// gates on the critical path of every call: a hook process before each tool runs,
-// nothing observational once the post hook carries the duration, and a fail-open
-// default that a schema mismatch or `failClosed` would turn into a blocked action on a
-// machine where terma misbehaves. afterShellExecution and afterMCPExecution restate
-// calls postToolUse already reported, without a tool_use_id and with the command output.
-// Tool inputs, outputs, error messages and the tool's working directory are never read.
+// postToolUse records one finished tool call: the generic pair is the one place a
+// tool_use_id and a duration arrive together. Tool inputs, outputs, error messages and
+// the tool's working directory are never read.
 func postToolUse(ctx context.Context, env hookrun.Env) error {
 	return cursorToolCall(ctx, env, "postToolUse")
 }
 
-// postToolUseFailure handles a tool call that failed or was interrupted: the same
-// record as CursorPostToolUse, with the failure type and nothing of the error's text.
+// postToolUseFailure is postToolUse's record for a failed call, with the failure type
+// and nothing of the error's text.
 func postToolUseFailure(ctx context.Context, env hookrun.Env) error {
 	return cursorToolCall(ctx, env, "postToolUseFailure")
 }
@@ -50,11 +42,8 @@ func cursorToolCall(ctx context.Context, env hookrun.Env, hook string) error {
 	return nil
 }
 
-// cursorToolCallAttrs is the event body: identifiers, the tool's name, its timing and
-// its outcome. A payload naming neither a tool nor a call is not a tool call terma can
-// describe and is dropped. Cursor's failure vocabulary is kept as its own words; the
-// platform translates. The account email does not ride on a tool call — a call is not a
-// principal record, and the session already says who was signed in.
+// cursorToolCallAttrs is the event body, false for a payload naming neither a tool nor a
+// call; failure types stay in Cursor's words, and no account email rides on a call.
 func cursorToolCallAttrs(in *cursorHookInput, hook string) (map[string]any, bool) {
 	a := hookrun.EvidenceAttrs(cursorTool, sourceCursorHook, hook)
 	if hookrun.ShortLabel(in.ToolName) {
@@ -72,8 +61,7 @@ func cursorToolCallAttrs(in *cursorHookInput, hook string) (map[string]any, bool
 		hookrun.BoundedAttr(a, k, v)
 	}
 	cursorModelParams(in, a)
-	// Cursor reports the tool's execution time in milliseconds. Missing stays missing;
-	// a value that is not a non-negative integer is reported as invalid, not repaired.
+	// Missing stays missing; a value not a non-negative integer is invalid, not repaired.
 	if value, present, ok := hookrun.JSONNumber(in.Duration, true); ok {
 		a["duration_ms"] = int64(value)
 	} else if present {
@@ -97,9 +85,8 @@ func cursorToolCallAttrs(in *cursorHookInput, hook string) (map[string]any, bool
 	return a, true
 }
 
-// cursorCallID admits a tool_use_id: one token, printable, at most 256 bytes. The id is
-// an opaque identifier that becomes a replay key, so whitespace and control characters
-// are rejected rather than trimmed.
+// cursorCallID admits a tool_use_id of one printable token up to 256 bytes; as a replay
+// key it is rejected, never trimmed.
 func cursorCallID(v string) bool {
 	if v == "" || len(v) > 256 {
 		return false
@@ -112,7 +99,6 @@ func cursorCallID(v string) bool {
 	return true
 }
 
-// cursorBool reads an optional boolean; anything but true or false is absent.
 func cursorBool(raw json.RawMessage) (bool, bool) {
 	switch string(raw) {
 	case "true":

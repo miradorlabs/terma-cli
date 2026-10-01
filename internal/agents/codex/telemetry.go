@@ -2,13 +2,8 @@ package codex
 
 import "github.com/miradorlabs/terma-cli/internal/relay/shape"
 
-// Correlation names a Codex thread: conversation.id on logs, thread.id on the turn span,
-// thread_id on session_loop. A numeric thread id is an OS thread, never a session.
-// app-server exports conversation_starts at thread/start, long before the first hook.
-// The turn span is exported when the turn ends, and its children carry only the trace:
-// the mid-turn logs that carry both teach the relay the trace's session. Codex's
-// metrics and process-level spans name no session; the relay places them by process
-// exit, and app-server, shared by every thread, rarely exits.
+// Correlation names a Codex thread by conversation.id, thread.id or thread_id; a numeric
+// thread id is an OS thread, never a session.
 func (Agent) Correlation() shape.Correlation {
 	return shape.Correlation{
 		SessionKeys: []shape.SessionKey{

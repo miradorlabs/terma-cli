@@ -8,8 +8,7 @@ import (
 	"testing"
 )
 
-// Repository install can wrap the machine's Claude status line without ever
-// connecting machine-wide telemetry. Disconnect must still undo that wrap.
+// Disconnect undoes a status-line wrap that install made without a machine-wide connect.
 func TestDisconnectClaudeRestoresStatusLineWithoutTelemetry(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("TERMA_ENV", "dev")

@@ -18,59 +18,34 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-// Codex configures the Codex CLI's OpenTelemetry export.
-//
-// Codex does not read the OTEL_* environment variables. Its export is configured in the
-// `[otel]` table of config.toml, one exporter per signal, each carrying its own endpoint
-// and headers — so there is no generic endpoint for a per-signal override to leak a
-// credential through, and no headers-helper mechanism to keep the key out of the file.
-// The key is written inline and the file tightened to 0600. The key names are Codex's
-// own contract (codex-rs/config, OtelConfigToml); they are constants here so a rename
-// upstream is a one-line, compile-time-visible change.
-//
-// Verified against Codex 0.152. What each signal carries:
-//
-//   - traces: spans per turn and model request, with gen_ai.usage.* token counts;
-//   - logs: codex.* events — conversation starts, API requests, codex.sse_event with
-//     per-response token counts, codex.user_prompt, codex.tool_decision,
-//     codex.tool_result, and codex.turn_cost with the estimated USD;
-//   - metrics: counters and histograms including codex.turn.token_usage and
-//     codex.turn.cost_microusd.
+// Codex configures the Codex CLI's export through the `[otel]` table of config.toml.
+// Codex reads no OTEL_* variables and has no headers helper, so the key is written
+// inline and the file tightened to 0600.
 type Codex struct{}
 
 const (
-	// The three exporters. `exporter` is the log exporter — the name predates the other
-	// two — and each defaults to "none" except metrics, which defaults to "statsig":
-	// OpenAI's own analytics. Connecting the metrics signal replaces that.
+	// `exporter` is the log exporter; metrics defaults to "statsig", OpenAI's own
+	// analytics, which connecting the metrics signal replaces.
 	codexLogExporter     = "exporter"
 	codexTraceExporter   = "trace_exporter"
 	codexMetricsExporter = "metrics_exporter"
 
-	// codexLogUserPrompt is the one content switch. Off upstream; with it off the
-	// codex.user_prompt event carries "[REDACTED]" and the prompt's length. Codex never
-	// exports model response text, so this is the whole of the prompts posture.
+	// codexLogUserPrompt is the only content switch: Codex never exports response text.
 	codexLogUserPrompt = "log_user_prompt"
 
-	// codexToolResult caps the bytes of tool output on the codex.tool_result event
-	// (2048 upstream). Zero drops the output. Tool *arguments* — the command that ran —
-	// are logged regardless; Codex has no switch for those.
+	// codexToolResult caps tool output bytes (2048 upstream, zero drops it); tool
+	// arguments are logged regardless.
 	codexToolResult         = "tool_result"
 	codexToolResultMaxBytes = "max_bytes"
 
-	// codexSpanAttributes are stamped on every span, and only spans. It is the only
-	// per-user attribute Codex accepts: resource attributes are not configurable, so
-	// logs and metrics carry Codex's own service.name and env and nothing of Terma's.
-	//
-	// The table may hold the user's own attributes too, so Terma owns entries in it,
-	// never the table. In the flat view the journal works on, an entry is keyed
-	// `span_attributes/<attribute>`; the slash cannot appear in an otel key, so the
-	// first one splits the path unambiguously even for attributes that contain dots.
+	// codexSpanAttributes is the only per-user attribute Codex accepts, on spans only.
+	// Terma owns entries, never the table, keyed `span_attributes/<attribute>` in the flat
+	// view; a slash cannot appear in an otel key, so the split is unambiguous.
 	codexSpanAttributes      = "span_attributes"
 	codexSpanAttributePrefix = codexSpanAttributes + "/"
 
-	// The analytics opt-out is its own table, not an otel key. When `enabled` is false
-	// Codex installs no metrics exporter at all, whatever `metrics_exporter` says — the
-	// one way a metrics connect can look right and send nothing.
+	// With analytics `enabled` false Codex installs no metrics exporter at all, whatever
+	// `metrics_exporter` says.
 	codexAnalyticsTable      = "analytics"
 	codexAnalyticsEnabledKey = "enabled"
 
@@ -82,22 +57,19 @@ const (
 	codexEndpointKey = "endpoint"
 	codexHeadersKey  = "headers"
 	codexProtocolKey = "protocol"
-	// codexProtocolBinary is http/protobuf in Codex's spelling; json is the other.
+	// codexProtocolBinary is http/protobuf in Codex's spelling.
 	codexProtocolBinary = "binary"
 
 	codexAuthorizationHeader = "Authorization"
 
-	// codexServiceName is the originator the codex CLI stamps as service.name.
 	codexServiceName = "codex_cli_rs"
 
 	codexConfigFile = "config.toml"
-	// codexProfileSuffix names the profile files under CODEX_HOME: `<name>.config.toml`,
-	// layered over config.toml while that profile is selected with --profile.
+	// Profile files layer over config.toml only while selected with --profile.
 	codexProfileSuffix = ".config.toml"
 
-	// The administrator-managed layers, which outrank everything the user writes: a
-	// managed_config.toml (see codexManagedConflicts for where), and on macOS the
-	// managed preference an MDM profile delivers, a base64-encoded config.toml.
+	// Administrator-managed layers outrank the user file; the macOS managed preference is a
+	// base64-encoded config.toml.
 	codexManagedConfigUnix       = "/etc/codex/managed_config.toml"
 	codexManagedConfigWindows    = "managed_config.toml"
 	codexManagedPreferenceDomain = "com.openai.codex"
@@ -117,16 +89,14 @@ var codexSignalKeys = []struct {
 // Name is the token `terma connect` and `--harness` accept.
 func (Codex) Name() string { return "codex" }
 
-// ServiceName is not configurable: Codex stamps its originator on every resource, and
-// for the codex CLI that is codex_cli_rs. Desktop and the IDE extensions report under
-// their own.
+// ServiceName is codex_cli_rs, the originator Codex stamps for its CLI; Desktop and the
+// IDE extensions report their own.
 func (Codex) ServiceName() string { return codexServiceName }
 
 // DisplayName is how the agent is written in prose.
 func (Codex) DisplayName() string { return "Codex" }
 
-// SupportsHeadersHelper is false: Codex's headers are literal strings in config.toml
-// and nothing else, so the key is written inline and the file's mode tightened.
+// SupportsHeadersHelper is false: Codex's headers are literal strings in config.toml.
 func (Codex) SupportsHeadersHelper() bool { return false }
 
 // Detect runs `codex --version`. A missing binary is not-found rather than an error.
@@ -134,8 +104,7 @@ func (Codex) Detect(ctx context.Context) harness.Detection {
 	return harness.DetectBinary(ctx, "codex", harness.SemverRE)
 }
 
-// codexHome is $CODEX_HOME, or ~/.codex. Honouring the variable matters for the same
-// reason CLAUDE_CONFIG_DIR does: writing where Codex does not read is a connect that
+// codexHome honours $CODEX_HOME: writing where Codex does not read is a connect that
 // silently does nothing.
 func codexHome() (string, error) {
 	if dir := strings.TrimSpace(os.Getenv("CODEX_HOME")); dir != "" {
@@ -157,15 +126,8 @@ func (Codex) ConfigPath() (string, error) {
 	return filepath.Join(dir, codexConfigFile), nil
 }
 
-// Render maps an Exporter onto the otel table. Values are TOML text — the canonical
-// rendering of each value, which is also the form the ownership journal records. Span
-// attributes are rendered one entry at a time, as `span_attributes/<attribute>`, so a
-// connect adds Terma's two to whatever the table already holds.
-//
-// Only the exporters for the selected signals are written. Codex's exporters are
-// self-contained, so an unselected signal is simply left as it was: for logs and traces
-// that is off, and for metrics it is OpenAI's own statsig route, which is not Terma's
-// to switch off on the way past.
+// Render maps an Exporter onto the otel table as TOML text, span attributes one entry at
+// a time; an unselected signal is left as it was (for metrics, OpenAI's own route).
 func (Codex) render(e harness.Exporter) map[string]string {
 	out := map[string]string{
 		codexLogUserPrompt: mustRenderTOML(e.IncludePrompts),
@@ -175,8 +137,7 @@ func (Codex) render(e harness.Exporter) map[string]string {
 			out[sk.key] = mustRenderTOML(codexOTLPExporter(e, sk.signal))
 		}
 	}
-	// Written only when excluding: with content on, Codex's own cap (or one the user
-	// chose) stays in force. A stale zero from an earlier exclude is undone by Connect.
+	// Written only when excluding, so Codex's or the user's own cap otherwise stays.
 	if !e.IncludeToolContent {
 		out[codexToolResult] = mustRenderTOML(map[string]any{codexToolResultMaxBytes: int64(0)})
 	}
@@ -186,13 +147,12 @@ func (Codex) render(e harness.Exporter) map[string]string {
 	return out
 }
 
-// RuntimeArgs configures this launch without changing Codex's home or persisted
-// settings. Authorization is deliberately passed in argv, just like the exporter
-// endpoint; callers must never log these arguments.
+// RuntimeArgs configures one launch through -c overrides; they carry Authorization, so
+// callers must never log them.
 func (c Codex) RuntimeArgs(e harness.Exporter) []string {
 	values := c.render(e)
-	// Attribute names contain dots. Codex splits override paths on every dot,
-	// without TOML key quoting, so carry attributes inside the inline table value.
+	// Codex splits override paths on every dot without TOML quoting, so dotted attribute
+	// names travel inside the inline table value.
 	for k := range values {
 		if strings.HasPrefix(k, codexSpanAttributePrefix) {
 			delete(values, k)
@@ -201,12 +161,8 @@ func (c Codex) RuntimeArgs(e harness.Exporter) []string {
 	if attrs := codexSpanAttributeValues(e.ResourceAttributes); len(attrs) > 0 {
 		values[codexSpanAttributes] = mustRenderTOML(attrs)
 	}
-	// Per-repo -c overrides must be authoritative for every signal, not just the selected
-	// ones. A prior machine-wide `connect codex` may have left another project's exporters
-	// in the user-level config.toml; Codex would fall through to them for any signal this
-	// repo does not override, exporting this repo's telemetry to that other project. Turn
-	// the unselected signals off explicitly so a per-repo run sends exactly this project's
-	// chosen signals and nothing else.
+	// Unselected signals are turned off explicitly: otherwise Codex falls through to the
+	// user-level config, which may export to another project.
 	for _, key := range []string{codexLogExporter, codexTraceExporter, codexMetricsExporter} {
 		if _, ok := values[key]; !ok {
 			values[key] = mustRenderTOML(codexExporterNone)
@@ -227,10 +183,8 @@ func (c Codex) RuntimeArgs(e harness.Exporter) []string {
 	return args
 }
 
-// codexOTLPExporter is the exporter value for one signal: otlp-http, binary protocol
-// (which traverses ordinary HTTPS proxies, as with Claude), the signal-specific URL —
-// Codex uses an exporter endpoint as-is, so it must carry /v1/<signal> — and the
-// Authorization header inline.
+// codexOTLPExporter is otlp-http with the binary protocol at the signal URL: Codex uses
+// an exporter endpoint as-is, so it must carry /v1/<signal>.
 func codexOTLPExporter(e harness.Exporter, s harness.Signal) map[string]any {
 	inner := map[string]any{
 		codexEndpointKey: e.SignalEndpoint(s),
@@ -242,8 +196,7 @@ func codexOTLPExporter(e harness.Exporter, s harness.Signal) map[string]any {
 	return map[string]any{codexExporterOTLPHTTP: inner}
 }
 
-// codexSpanAttributeValues is the resource attributes minus service.name: Codex stamps
-// its own on the resource, and repeating it as a span attribute would only confuse.
+// codexSpanAttributeValues omits service.name, which Codex stamps on the resource itself.
 func codexSpanAttributeValues(attrs map[string]string) map[string]any {
 	out := map[string]any{}
 	for k, v := range attrs {
@@ -264,7 +217,6 @@ func mustRenderTOML(v any) string {
 	return s
 }
 
-// codexExporterShape is what a parsed exporter value says about itself.
 type codexExporterShape struct {
 	// Kind is none, statsig, otlp-http, otlp-grpc, "" when absent, or "unknown".
 	Kind     string
@@ -297,24 +249,20 @@ func codexExporterOf(v any) codexExporterShape {
 	return codexExporterShape{Kind: "unknown"}
 }
 
-// codexBaseEndpoint strips the /v1/<signal> suffix Codex needs on an exporter endpoint,
-// giving back the base URL a Terma profile is configured with. An endpoint without
-// the suffix is returned as-is: it is misconfigured, and status should say where it
-// points rather than hide it.
+// codexBaseEndpoint strips the /v1/<signal> suffix; an endpoint without it is returned
+// as-is, so status says where it points.
 func codexBaseEndpoint(endpoint string, s harness.Signal) string {
 	return strings.TrimSuffix(endpoint, "/v1/"+string(s))
 }
 
-// codexTermaExporter reports whether v is an exporter Terma would have written for
-// endpoint and signal — otlp-http at exactly the signal URL. The key is not compared:
-// a reconnect with a different key is still the same destination.
+// codexTermaExporter reports otlp-http at exactly the signal URL; the key is not
+// compared, since a reconnect with a new key is the same destination.
 func codexTermaExporter(v any, endpoint string, s harness.Signal) bool {
 	shape := codexExporterOf(v)
 	return shape.Kind == codexExporterOTLPHTTP && endpoint != "" &&
 		shape.Endpoint == (harness.Exporter{Endpoint: endpoint}).SignalEndpoint(s)
 }
 
-// codexKeyFromExporter extracts the bearer token from an exporter's headers, or "".
 func codexKeyFromExporter(v any) string {
 	shape := codexExporterOf(v)
 	for name, value := range shape.Headers {
@@ -333,8 +281,7 @@ func codexSpanAttribute(otel map[string]any, key string) string {
 	return s
 }
 
-// codexToolContentOn reads the tool_result cap: absent means Codex's default, which
-// sends output; only an explicit zero drops it.
+// codexToolContentOn: absent means Codex's default, which sends output.
 func codexToolContentOn(otel map[string]any) bool {
 	table, ok := otel[codexToolResult].(map[string]any)
 	if !ok {
@@ -356,19 +303,15 @@ func codexAnalyticsDisabled(doc map[string]any) bool {
 	return ok && !v
 }
 
-// canonicalOtel renders the table as the flat view the journal works on: each key as
-// TOML text, except span_attributes, whose entries appear one by one under
-// `span_attributes/<attribute>` so that ownership can stop at the entry. A value that
-// cannot be rendered is reported rather than dropped: silently losing it would make
-// disconnect unable to restore it.
+// canonicalOtel flattens the table for the journal, span attributes one entry each.
+// An unrenderable value is an error: dropped, disconnect could not restore it.
 func canonicalOtel(otel map[string]any) (map[string]string, error) {
 	out := make(map[string]string, len(otel))
 	for k, v := range otel {
 		if k == codexSpanAttributes {
 			attrs, ok := v.(map[string]any)
 			if !ok {
-				// Codex itself would refuse this file; say so rather than fold a
-				// scalar into a table it never was.
+				// Codex itself would refuse this file.
 				return nil, fmt.Errorf("%s.%s is %s, want a table (fix the file, then retry)",
 					otelTable, k, tomlTypeName(v))
 			}
@@ -390,8 +333,6 @@ func canonicalOtel(otel map[string]any) (map[string]string, error) {
 	return out, nil
 }
 
-// otelFromCanonical is the inverse of canonicalOtel. A span_attributes table with no
-// entries left is omitted rather than written empty.
 func otelFromCanonical(values map[string]string) (map[string]any, error) {
 	out := make(map[string]any, len(values))
 	for k, text := range values {
@@ -432,9 +373,7 @@ func (c Codex) Status() (harness.Status, error) {
 		ProjectID:          codexSpanAttribute(f.otel, harness.AttrProjectID),
 	}
 
-	// The endpoint is whichever OTLP destination the first configured signal uses, and
-	// the signals are those sharing it. Codex has no on/off switch beyond the exporters
-	// themselves, so an OTLP exporter present is telemetry on.
+	// Codex has no switch beyond the exporters, so an OTLP exporter present is telemetry on.
 	for _, sk := range codexSignalKeys {
 		shape := codexExporterOf(f.otel[sk.key])
 		if shape.Kind != codexExporterOTLPHTTP && shape.Kind != codexExporterOTLPGRPC {
@@ -446,8 +385,7 @@ func (c Codex) Status() (harness.Status, error) {
 		}
 		if codexTermaExporter(f.otel[sk.key], status.Endpoint, sk.signal) {
 			status.Signals = append(status.Signals, sk.signal)
-			// Only a Terma key is worth naming. The exporter may carry somebody
-			// else's bearer token, and even its head has no business in a status line.
+			// Only a Terma key is named: the exporter may carry somebody else's bearer token.
 			if key := codexKeyFromExporter(f.otel[sk.key]); status.KeyPrefix == "" && serverkey.Is(key) {
 				status.KeyPrefix = harness.MaskKey(key)
 			}
@@ -455,9 +393,7 @@ func (c Codex) Status() (harness.Status, error) {
 	}
 	status.Connected = status.Endpoint != ""
 
-	// Compared against the endpoint actually configured here, so status reports whether
-	// this file is internally consistent. Computed before the analytics check below
-	// drops metrics, so that check is what gets reported.
+	// Computed before the analytics check below drops metrics.
 	status.Conflicts = codexConflicts(f, harness.Exporter{
 		Endpoint:           status.Endpoint,
 		Signals:            status.Signals,
@@ -468,16 +404,13 @@ func (c Codex) Status() (harness.Status, error) {
 			harness.AttrProjectID: status.ProjectID,
 		},
 	})
-	// A metrics exporter with analytics disabled is set and sends nothing. Reporting
-	// metrics as on would send someone hunting in Terma for data Codex never sent.
+	// A metrics exporter with analytics disabled sends nothing.
 	if codexAnalyticsDisabled(f.doc) {
 		status.Signals = harness.WithoutSignal(status.Signals, harness.SignalMetrics)
 	}
 
-	// Ownership is by journal only. A config with none is somebody else's work
-	// — a company collector, say — and every
-	// standard otel key in it is theirs. Counting those as managed would let disconnect
-	// delete a telemetry setup Terma never touched.
+	// Ownership is by journal only: a config without one is somebody else's (a company
+	// collector, say), and disconnect must not delete it.
 	j, err := harness.LoadJournal(c.Name(), path)
 	if err != nil {
 		return harness.Status{}, err
@@ -510,14 +443,9 @@ func (c Codex) ConflictsWith(e harness.Exporter) ([]harness.Conflict, error) {
 	return codexConflicts(f, e), nil
 }
 
-// codexConflicts finds, for each signal e exports: an exporter already pointing
-// somewhere else (replaced by the connect, so it needs consent); the analytics opt-out
-// that silences metrics regardless of the exporter; and the same keys in files that
-// outrank the user config, which Terma cannot change.
-//
-// There is no credential-disclosure case here. Each Codex exporter carries its own
-// headers, so nothing Terma writes for one signal can be inherited by another
-// destination.
+// codexConflicts finds, per exported signal: an exporter pointing elsewhere (needs
+// consent), the analytics opt-out, and the same keys in layers above the user config.
+// Each exporter carries its own headers, so there is no credential-disclosure case.
 func codexConflicts(f *tomlFile, e harness.Exporter) []harness.Conflict {
 	var out []harness.Conflict
 
@@ -529,7 +457,7 @@ func codexConflicts(f *tomlFile, e harness.Exporter) []harness.Conflict {
 		key := otelTable + "." + sk.key
 		switch shape.Kind {
 		case "", codexExporterNone, codexExporterStatsig:
-			// Off, or Codex's own default route. Nothing of the user's is being replaced.
+			// Off, or Codex's own default route: nothing of the user's is replaced.
 			continue
 		case codexExporterOTLPHTTP:
 			if shape.Endpoint == e.SignalEndpoint(sk.signal) {
@@ -560,8 +488,7 @@ func codexConflicts(f *tomlFile, e harness.Exporter) []harness.Conflict {
 		}
 	}
 
-	// Not an otel key, and not Terma's to flip: it is the user's opt-out from OpenAI's
-	// analytics as well as the metrics switch. Refuse the metrics signal instead.
+	// The user's analytics opt-out is not Terma's to flip; refuse the metrics signal instead.
 	if e.HasSignal(harness.SignalMetrics) && codexAnalyticsDisabled(f.doc) {
 		out = append(out, harness.Conflict{
 			Key:   codexAnalyticsTable + "." + codexAnalyticsEnabledKey,
@@ -578,10 +505,8 @@ func codexConflicts(f *tomlFile, e harness.Exporter) []harness.Conflict {
 	return out
 }
 
-// codexLayer is one configuration layer above the user file, for reporting.
 type codexLayer struct {
-	// source qualifies each conflict key — a path, a profile file name, or the managed
-	// preference id — so a status report cannot mistake it for the user config.
+	// source qualifies each conflict key so a report cannot mistake it for the user config.
 	source string
 	scope  string
 	// where opens every reason: what the layer is and when Codex applies it.
@@ -590,16 +515,9 @@ type codexLayer struct {
 	advisory bool
 }
 
-// codexManagedConflicts reports settings an administrator has placed above the user
-// config: managed_config.toml, and on macOS the managed preference an MDM profile
-// delivers. A project's .codex/config.toml is deliberately not scanned: Codex refuses
-// `otel` from project-local config, so a setting there is inert and must not block.
-//
-// On macOS and Linux the file is /etc/codex/managed_config.toml. On Windows it is
-// $CODEX_HOME/managed_config.toml, which Codex 0.150 and later ignore with a startup
-// warning while earlier builds apply above the user config. It is read regardless: a
-// file that is there is either live or a leftover Codex itself complains about, and
-// neither is Terma's to overlook.
+// codexManagedConflicts reports managed_config.toml and the macOS MDM preference. A
+// project's .codex/config.toml is not scanned: Codex refuses `otel` there. Windows's
+// $CODEX_HOME copy, ignored by newer Codex builds, is read anyway.
 func codexManagedConflicts(e harness.Exporter) []harness.Conflict {
 	var out []harness.Conflict
 	path := codexManagedConfigUnix
@@ -630,8 +548,7 @@ func codexManagedConflicts(e harness.Exporter) []harness.Conflict {
 	return out
 }
 
-// codexManagedPreference reads the MDM-delivered config through `defaults`, which
-// consults the same managed-preferences domain Codex does. Absent is the ordinary case.
+// codexManagedPreference reads the managed-preferences domain Codex consults.
 func codexManagedPreference() ([]byte, bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -646,11 +563,8 @@ func codexManagedPreference() ([]byte, bool) {
 	return decoded, true
 }
 
-// codexProfileConflicts reports settings in profile files — `<name>.config.toml` beside
-// config.toml — which Codex layers over the user config only while that profile is
-// selected with --profile. Which profile a session will use is not knowable here, so
-// every profile is scanned and each finding is advisory: named, so the user can decide,
-// but not a reason to refuse the connect that the plain configuration asked for.
+// codexProfileConflicts scans every profile file, since which one a session selects is
+// unknowable here; each finding is advisory.
 func codexProfileConflicts(e harness.Exporter) []harness.Conflict {
 	home, err := codexHome()
 	if err != nil {
@@ -682,21 +596,16 @@ func codexProfileConflicts(e harness.Exporter) []harness.Conflict {
 	return out
 }
 
-// codexConflictsInLayer reports every setting in a higher-precedence layer that would
-// change what the export e describes: an exporter for a selected signal (any value,
-// including an explicit "none" — the layer decides the destination, and the user-level
-// exporter is never consulted), the two content switches when they contradict the
-// posture Terma is writing, an attribution attribute set to something else, and the
-// analytics opt-out that silences metrics. Codex merges layers table by table, so each
-// of these overrides exactly the key it names.
+// codexConflictsInLayer reports what a higher layer overrides of e: an exporter for a
+// selected signal (even "none"), a contradicting content switch, another attribution
+// attribute, the analytics opt-out. Codex merges layers table by table.
 func codexConflictsInLayer(data []byte, layer codexLayer, e harness.Exporter) []harness.Conflict {
 	var doc struct {
 		Otel      map[string]any `toml:"otel"`
 		Analytics map[string]any `toml:"analytics"`
 	}
 	if unmarshalTOMLLenient(data, &doc) != nil {
-		// A file this CLI cannot parse is not this CLI's to complain about; Codex will
-		// report its own parse error.
+		// A file this CLI cannot parse is Codex's to report.
 		return nil
 	}
 
@@ -776,13 +685,9 @@ func tomlInt(v any) (int64, bool) {
 	}
 }
 
-// Connect merges Terma's keys into the otel table, leaving every other key — in the
-// table and in the file — as it was.
-//
-// A key an earlier connect installed that this one does not write (the metrics exporter
-// on a reconnect with fewer signals, the tool-result cap once content is back on) is
-// put back to its pre-Terma value here, provided it still holds what Terma wrote.
-// Otherwise a reconnect that asked for less would silently keep sending more.
+// Connect merges Terma's keys into the otel table, leaving everything else as it was.
+// A key an earlier connect wrote and this one does not goes back to its pre-Terma value
+// while it still holds Terma's, or a narrower reconnect would keep sending more.
 func (c Codex) Connect(e harness.Exporter, clearConflicts bool) error {
 	rendered := c.render(e)
 
@@ -810,8 +715,7 @@ func (c Codex) Connect(e harness.Exporter, clearConflicts bool) error {
 				continue
 			}
 			key := strings.TrimPrefix(conflict.Key, otelTable+".")
-			// About to be overwritten by the merge anyway; the journal records the
-			// prior value as Previous, and disconnect restores it from there.
+			// Overwritten by the merge anyway; the journal keeps the prior value for disconnect.
 			if _, overwritten := rendered[key]; overwritten {
 				continue
 			}
@@ -822,9 +726,7 @@ func (c Codex) Connect(e harness.Exporter, clearConflicts bool) error {
 		}
 	}
 
-	// carried is the earlier record minus the keys restored here, so the new journal
-	// does not inherit ownership of a key this connect just gave back. previousJournal
-	// itself is kept intact for the rollback below.
+	// carried drops the keys restored here, so the new journal does not own them.
 	carried := previousJournal
 	if previousJournal != nil {
 		copied := *previousJournal
@@ -856,7 +758,7 @@ func (c Codex) Connect(e harness.Exporter, clearConflicts bool) error {
 		return err
 	}
 
-	// Ownership first, then the file, with the same rollback as Claude's connect.
+	// Ownership first, then the file; a failed write restores the previous journal.
 	if err := j.Save(); err != nil {
 		return err
 	}
@@ -876,7 +778,7 @@ func (c Codex) Connect(e harness.Exporter, clearConflicts bool) error {
 	return nil
 }
 
-// Disconnect undoes the recorded connect, or without a record removes the managed keys.
+// Disconnect undoes the recorded connect; without a journal nothing here is Terma's.
 func (c Codex) Disconnect() (harness.DisconnectResult, error) {
 	path, err := c.ConfigPath()
 	if err != nil {
@@ -895,8 +797,6 @@ func (c Codex) Disconnect() (harness.DisconnectResult, error) {
 		return harness.DisconnectResult{}, err
 	}
 
-	// Without a journal there is nothing here that Terma wrote — see Status — so
-	// there is nothing to undo, and certainly not a foreign telemetry setup to delete.
 	if j == nil {
 		return harness.DisconnectResult{}, nil
 	}
@@ -920,9 +820,8 @@ func (c Codex) Disconnect() (harness.DisconnectResult, error) {
 	return result, harness.DeleteJournal(c.Name(), path)
 }
 
-// Backup exposes the pre-modification copy. Same rule as Claude's: a journal for this
-// file means its contents are Terma's work and the stored backup is kept; without
-// one, whether the config points at endpoint is the only evidence.
+// Backup exposes the pre-modification copy: kept when a journal makes the file Terma's
+// work, otherwise only when the config points at endpoint.
 func (c Codex) Backup(endpoint string) (string, error) {
 	path, err := c.ConfigPath()
 	if err != nil {
@@ -948,9 +847,8 @@ func (c Codex) Backup(endpoint string) (string, error) {
 	return f.backup(!pointsAtTerma)
 }
 
-// ConnectNotes are the two things a Codex connect does, or cannot do, that the plan's
-// generic lines do not say: connecting metrics takes them away from OpenAI's own
-// route, and excluding tool content cannot exclude the tool's arguments.
+// ConnectNotes says that connecting metrics takes them from OpenAI's own route and that
+// excluding tool content cannot exclude tool arguments.
 func (Codex) ConnectNotes(e harness.Exporter) []string {
 	var notes []string
 	if e.HasSignal(harness.SignalMetrics) {
@@ -962,9 +860,8 @@ func (Codex) ConnectNotes(e harness.Exporter) []string {
 	return notes
 }
 
-// CurrentCredential returns the key already installed for endpoint and projectID, so a
-// reconnect reuses it instead of minting an orphan. Both must match, for the reasons
-// given on Claude's.
+// CurrentCredential returns the key installed for both endpoint and projectID, so a
+// reconnect reuses it instead of minting an orphan.
 func (c Codex) CurrentCredential(endpoint, projectID string) (string, bool) {
 	path, err := c.ConfigPath()
 	if err != nil {
@@ -988,8 +885,7 @@ func (c Codex) CurrentCredential(endpoint, projectID string) (string, bool) {
 	return "", false
 }
 
-// A capability asked for by type assertion switches off in silence when its method
-// drifts; these make that a build error.
+// A drifted optional method is a build error here, not a silent switch-off.
 var (
 	_ harness.Harness      = Codex{}
 	_ harness.Noter        = Codex{}

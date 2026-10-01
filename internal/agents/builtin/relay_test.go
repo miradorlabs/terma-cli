@@ -24,8 +24,8 @@ func TestTargetsNormalizeSurfacesAndPreserveOrder(t *testing.T) {
 	}
 }
 
-// Configuring one agent must neither overwrite another agent's files nor set the
-// relay's credentials in the environment inherited by tools.
+// Configuring one agent neither overwrites another's files nor puts the relay's
+// credentials in the environment tools inherit.
 func TestConfigureIsolatesAgentFilesAndEnvironment(t *testing.T) {
 	for _, e := range reg.With[agents.RelayExporter]() {
 		t.Run(e.Name(), func(t *testing.T) {

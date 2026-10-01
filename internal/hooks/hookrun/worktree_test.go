@@ -13,10 +13,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// A linked worktree of a repository whose binding is gitignored has none of its own. Its
-// events used to carry no project and be dropped at the next flush, and to report the
-// worktree's directory as the repository. They carry the main checkout's project, its
-// repository name, and which worktree they came from.
+// A linked worktree without its own binding reports the main checkout's project and
+// repository name, and which worktree it is.
 func TestWorktreeEventsReportTheMainRepositoryAndProject(t *testing.T) {
 	main := initRepo(t)
 	ctx := context.Background()

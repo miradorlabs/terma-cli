@@ -16,8 +16,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// InitRepo creates a git repository with a private terma config directory, and returns
-// its resolved path.
+// InitRepo creates a git repository with a private terma config directory and returns its resolved path.
 func InitRepo(t *testing.T) string {
 	t.Helper()
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
@@ -98,8 +97,7 @@ func Named(events []spool.Event, name string) []spool.Event {
 	return out
 }
 
-// Num reads a spooled number back: JSON has one numeric type, so every count and
-// duration comes out of the queue as float64 whatever the hook put in.
+// Num reads a spooled number back, which JSON decodes as float64 whatever the hook put in.
 func Num(v any) float64 {
 	f, _ := v.(float64)
 	return f
@@ -114,8 +112,7 @@ func Names(events []spool.Event) string {
 	return strings.Join(n, " ")
 }
 
-// Lifecycle drops the funding and observation events hooks spool alongside a session's
-// lifecycle: account snapshots, quota and capture progress, observations.
+// Lifecycle drops the funding and observation events spooled alongside a session's lifecycle.
 func Lifecycle(events []spool.Event) []spool.Event {
 	var out []spool.Event
 	for _, e := range events {

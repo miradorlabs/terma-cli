@@ -8,16 +8,14 @@ import (
 	"testing"
 )
 
-// docPath is a repository path in prose: internal/…, cmd/…, docs/…, scripts/…, live/…
-// or npm/…, standing on its own.
+// docPath is a repository path standing on its own in prose.
 var docPath = regexp.MustCompile(`(?:^|[^\w/.-])((?:internal|cmd|docs|scripts|live|npm)/[\w./-]*[\w/])`)
 
-// goSymbol is a path that ends in a Go identifier: internal/selfupdate.AssetName.
+// goSymbol is a path that ends in a Go identifier (internal/selfupdate.AssetName).
 var goSymbol = regexp.MustCompile(`^(.*)\.[A-Z]\w*$`)
 
-// TestDocsNamePathsThatExist reads what people and agents read — the README, CLAUDE.md,
-// SECURITY.md and docs/ — and requires every repository path it names to exist. Paths
-// moved under refactors for months while the docs still sent readers to the old ones.
+// TestDocsNamePathsThatExist requires every repository path the README, CLAUDE.md,
+// SECURITY.md and docs/ name to exist.
 func TestDocsNamePathsThatExist(t *testing.T) {
 	root := repoRoot(t)
 	docs := []string{"README.md", "CLAUDE.md", "SECURITY.md"}

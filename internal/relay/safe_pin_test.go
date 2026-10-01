@@ -8,11 +8,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/shape"
 )
 
-// pinnedSafeKeys and pinnedSafePrefixes are every attribute key, and key family, that
-// may leave a machine with a project's content withheld: the generic ones and every
-// registered agent's declarations together. Changing either is changing what leaves
-// customers' machines, so it is an edit here, reviewed as one. There is no generator;
-// the list is written by hand.
+// pinnedSafeKeys and pinnedSafePrefixes are every key that may leave a machine with content
+// withheld; written by hand, so widening them is a reviewed edit.
 var pinnedSafeKeys = []string{
 	"agent_name", "api.path", "app.version", "app_server.api_version",
 	"app_server.client_name", "app_server.client_version", "app_server.connection_id",
@@ -102,8 +99,7 @@ type capturer shape.CaptureRules
 
 func (c capturer) CaptureRules() shape.CaptureRules { return shape.CaptureRules(c) }
 
-// A key one agent declares safe and another declares content is content, exactly or
-// under a safe prefix, whichever registers first.
+// A key one agent declares safe and another content is content, whichever registers first.
 func TestContentOutranksSafeAcrossAgents(t *testing.T) {
 	safe := capturer{SafeKeys: []string{"x.detail"}, SafePrefixes: []string{"y."}}
 	content := capturer{ToolContentFields: []string{"x.detail"}, PromptDropFields: []string{"y.prompt"}}

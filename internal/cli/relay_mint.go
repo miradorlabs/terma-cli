@@ -13,7 +13,6 @@ func (app *App) newRelayKeyMinter(ctx context.Context, cfg *config.Config) *daem
 	return daemon.NewKeyMinter(ctx, cfg, app.createProjectKey)
 }
 
-// createProjectKey mints a server key for projectID with the signed-in credential.
 func (app *App) createProjectKey(ctx context.Context, cfg *config.Config, projectID string) (string, error) {
 	scoped := *cfg
 	scoped.ProjectID = projectID

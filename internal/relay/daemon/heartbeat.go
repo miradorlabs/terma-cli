@@ -22,11 +22,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 )
 
-// The facts the relay's heartbeat reports about this machine's terma
-// (internal/relay/heartbeat.go): which build runs where and how it is set up. Settings
-// and versions only — no hostname, no account, no path under the home directory. The
-// machine is named by a random id terma makes on first use (relay/machine-id), so the
-// platform can tell machines apart and count them without knowing whose they are.
+// The heartbeat's facts are settings and versions only, never a hostname, account or home
+// path; a random machine id lets the platform count machines without knowing whose they are.
 
 // MachineID is this machine's random id, made once.
 func MachineID(dir string) string {
@@ -52,13 +49,11 @@ type Heartbeat struct {
 	Dir         string
 	Version     string
 	InstallKind string
-	// Agents says which agents' exporters send to the relay at addr now, and which have
-	// a condition keeping their telemetry from it.
+	// Agents says which agents' exporters send to the relay at addr now.
 	Agents func(addr string) (pointed, blocked []string)
 }
 
-// Info returns what each heartbeat says, read again at most every minute: setup can
-// change the mode or the agents while the relay runs.
+// Info returns what each heartbeat says, reread at most every minute since setup can change it.
 func (h Heartbeat) Info() func() map[string]any {
 	var mu sync.Mutex
 	var at time.Time
@@ -116,19 +111,14 @@ func (h Heartbeat) Facts() map[string]any {
 			facts["terma.auto_update"] = prefs.Auto
 		}
 	}
-	// Which agents' exporters point at this relay now: one pointed elsewhere since
-	// (a reinstall, a hand edit) sends nothing through it, and says nothing else of it.
 	pointed, blocked := h.Agents(Addr(h.Dir))
 	facts["terma.relay.agents_pointed"] = pointed
 	facts["terma.relay.agents_blocked"] = blocked
 	return facts
 }
 
-// CheckIn asks the running relay for a heartbeat now (reason "setup") and says
-// what came of it: the platform's "installed and working" for this machine, and the
-// developer's proof that the relay, their credential and the organization's endpoint
-// all work — or which of them does not. A relay that is still starting (a service
-// restarted to read a new policy) is waited for, briefly.
+// CheckIn asks the running relay for a setup heartbeat now, proving the relay, credential and
+// endpoint work, and briefly waits for a relay that is still starting.
 func CheckIn(ctx context.Context) (ok bool, what string) {
 	dir, err := Dir()
 	if err != nil {
@@ -141,8 +131,7 @@ func CheckIn(ctx context.Context) (ok bool, what string) {
 	addr := Addr(dir)
 	client := &http.Client{Timeout: 20 * time.Second}
 	var resp *http.Response
-	// Waited for only when one is running (its lock is held) or its service will start
-	// it again; with neither, there is nothing to wait for.
+	// Waited for only when one is running or its service will start it again.
 	wait := 15 * time.Second
 	if unlock, err := flock.TryLock(filepath.Join(dir, LockFile)); err == nil {
 		unlock()

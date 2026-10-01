@@ -17,8 +17,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/trailer"
 )
 
-// Claude's internal summary forks emit SubagentStop with a fresh id, without
-// SubagentStart or an Agent call. A custom --agent can supply a nonempty type too.
+// Internal forks fire SubagentStop with a fresh id and no launch; a custom --agent can supply a type.
 func TestClaudeSubagentStopIgnoresInternalForks(t *testing.T) {
 	root := newRepo(t)
 	sp, _ := spool.Open(t.TempDir())
@@ -58,8 +57,7 @@ func TestClaudeSubagentStopRequiresEvidenceForItsSessionAndAgent(t *testing.T) {
 			} else {
 				runPostToolUse(t, root, sp, agentToolPayload(root, launch, launchedAgentResponse, ""))
 			}
-			// Delivery removes the launch from the spool; later hook processes must
-			// still recognize the agent, including on another turn or a repeated stop.
+			// Delivery removes the launch from the spool; later hooks must still recognize the agent.
 			if events := hookruntest.Spooled(t, sp); len(events) != 1 {
 				t.Fatalf("launch produced %d events, want one", len(events))
 			}
@@ -94,7 +92,6 @@ func TestClaudeSubagentConcurrentLaunchesSurvive(t *testing.T) {
 		})
 	}
 	wg.Wait()
-	// Only the later stop events matter here; launch evidence must survive a flush.
 	hookruntest.Spooled(t, sp)
 	for i := range 16 {
 		payload := fmt.Sprintf(`{"session_id":"parent","agent_id":"worker-%d"}`, i)
@@ -170,8 +167,7 @@ func TestClaudeSubagentUnavailableLaunchStateDoesNotFailHooks(t *testing.T) {
 	}
 }
 
-// A Claude Code subagent is a facet of the parent session: the same session_id on
-// every event, the agent named on its start, its edits and its end.
+// A subagent is a facet of the parent session: same session_id, the agent named on its events.
 func TestClaudeSubagentIsAFacetOfTheParentSession(t *testing.T) {
 	root := newRepo(t)
 	ctx := context.Background()
@@ -192,7 +188,6 @@ func TestClaudeSubagentIsAFacetOfTheParentSession(t *testing.T) {
 	if err := subagentStop(ctx, env(`{`+parent+`,"hook_event_name":"SubagentStop",`+agent+`,"agent_transcript_path":"/nope","last_assistant_message":"secret","stop_hook_active":false}`)); err != nil {
 		t.Fatal(err)
 	}
-	// Without an agent_id there is no subagent to report.
 	if err := subagentStop(ctx, env(`{`+parent+`,"hook_event_name":"SubagentStop"}`)); err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +216,7 @@ func TestClaudeSubagentIsAFacetOfTheParentSession(t *testing.T) {
 		t.Fatalf("touched attrs: %v", events[1].Attrs)
 	}
 
-	// The manifest is the session's: the parent's commit of the subagent's file is stamped.
+	// The parent's commit of the subagent's file is stamped.
 	if _, err := gitx.Git(ctx, root, "add", "src/sub.go"); err != nil {
 		t.Fatal(err)
 	}

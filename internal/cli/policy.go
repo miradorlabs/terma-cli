@@ -14,8 +14,8 @@ import (
 
 const policyRefreshInterval = time.Minute
 
-// saveCollectionPolicy serializes refreshes with login changes. Each team has a
-// separate revision; refreshing another team must not change machine-wide coverage.
+// saveCollectionPolicy serializes with login changes; refreshing another team must not
+// change machine-wide coverage.
 func saveCollectionPolicy(cfg *config.Config, pol *config.Policy) error {
 	var rejected error
 	err := config.UpdateProfile(cfg.ProfileName, func(p *config.Profile) {
@@ -42,8 +42,8 @@ func saveCollectionPolicy(cfg *config.Config, pol *config.Policy) error {
 	return rejected
 }
 
-// refreshCollectionPolicy uses the developer login, never a telemetry key. A
-// rejected request cannot replace the last validated team's capture policy.
+// refreshCollectionPolicy uses the developer login, never a telemetry key; a rejection
+// keeps the last validated policy.
 func (app *App) refreshCollectionPolicy(ctx context.Context, cfg *config.Config) error {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
@@ -65,9 +65,8 @@ func (app *App) refreshCollectionPolicy(ctx context.Context, cfg *config.Config)
 	return nil
 }
 
-// validatedPolicy is team's last validated policy for cfg's organization and
-// environment: its cache, or the profile's copy of the selected team's. A corrupt cache
-// grants nothing; only a new, validated response repairs it.
+// validatedPolicy is team's last validated policy for cfg's organization and environment;
+// a corrupt cache grants nothing.
 func validatedPolicy(cfg *config.Config, team string) (config.Policy, bool) {
 	cached, ok, err := routing.LoadPolicy(team)
 	if err != nil {
@@ -98,8 +97,8 @@ func (app *App) currentTeamPolicy(ctx context.Context, cfg *config.Config, team 
 	return scoped.Policy, nil
 }
 
-// policyRefresher keeps every team this machine exports for fresh while the relay runs:
-// the teams with a key here, and the selected team (global mode's default project).
+// policyRefresher keeps fresh, while the relay runs, every team with a key here and the
+// selected team.
 func (app *App) policyRefresher() *daemon.PolicyRefresher {
 	return &daemon.PolicyRefresher{
 		Interval: policyRefreshInterval,

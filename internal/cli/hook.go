@@ -19,16 +19,13 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// gitHookEvents are the two git hooks, run by the committed shims or the hook manager
-// line. Every other event belongs to an agent adapter and is dispatched from the
-// adapter registry: the names are part of the committed wiring and must stay stable
-// across versions, which is why each adapter declares its own.
+// gitHookEvents are the only events not declared by an adapter; every name is committed
+// wiring and must stay stable.
 var gitHookEvents = map[string]agents.Handler{
 	"prepare-commit-msg": hookrun.PrepareCommitMsg,
 	"post-commit":        hookrun.PostCommit,
 }
 
-// hookHandler resolves an event name to its handler.
 func (app *App) hookHandler(event string) (agents.Handler, bool) {
 	if h, ok := gitHookEvents[event]; ok {
 		return h, true
@@ -37,20 +34,13 @@ func (app *App) hookHandler(event string) (agents.Handler, bool) {
 	return h, ok
 }
 
-// flushesAfter reports the events that kick off a detached spool flush afterwards: the
-// natural moments when new events exist and a few hundred milliseconds of background
-// work is invisible. Each adapter names its end-of-turn events; a throttle here can
-// strand the final turn until another hook fires, so there is none. Sender backoff
-// still applies. prepare-commit-msg never flushes — it has a 50 ms budget.
+// flushesAfter has no throttle: one could strand the final turn until another hook fires.
+// prepare-commit-msg never flushes, with its 50 ms budget.
 func (app *App) flushesAfter(event string) bool {
 	return event == "post-commit" || app.agents.FlushesAfter(event)
 }
 
-// HooksDisabled reports the developer's kill switch: `TERMA_HOOKS=0` in the
-// environment turns every hook into an immediate exit 0 — nothing is stamped,
-// recorded or spooled — on a machine that has terma installed. It is the same
-// convention as `HUSKY=0` and `LEFTHOOK=0`. A machine without terma needs no
-// switch: every committed hook line is guarded so the commit proceeds untouched.
+// HooksDisabled reports the kill switch `TERMA_HOOKS=0`, which makes every hook exit 0 at once.
 func HooksDisabled() bool {
 	return os.Getenv("TERMA_HOOKS") == "0"
 }
@@ -62,15 +52,11 @@ func (app *App) newHookCommand() *cobra.Command {
 		Short:  "Internal: the runtime behind every installed hook shim",
 		Hidden: true,
 		Args:   cobra.MinimumNArgs(1),
-		// Hooks must exit 0 whatever happens; the shims add `|| true` as well, but
-		// belt and braces is the right posture for something that runs on every
-		// commit of every developer.
+		// Hooks exit 0 whatever happens, on top of the shims' `|| true`.
 		RunE: func(cmd *cobra.Command, args []string) error {
 			event := args[0]
-			// A hook that draws something is the one the kill switch must not silence:
-			// with TERMA_HOOKS=0 it still renders and merely does not capture. Its exit
-			// status is its own, so it ends the process rather than returning through
-			// cobra.
+			// A render hook still renders under TERMA_HOOKS=0, and ends the process with its
+			// own exit status rather than returning through cobra.
 			if render, ok := app.agents.Render(event); ok {
 				os.Exit(app.runRender(cmd, render, args[1:], HooksDisabled()))
 			}
@@ -93,11 +79,9 @@ func (app *App) newHookCommand() *cobra.Command {
 			if err != nil {
 				return nil
 			}
-			// Stdout is the hook's reply to the agent. Most handlers write nothing
-			// there — Claude Code feeds SessionStart's stdout to the model — and the
-			// ones that must (agy expects `{}`) do so themselves.
-			// The payload is kept, bounded, so a hook whose handler spooled nothing can
-			// still claim its session for the local relay (hookrun.ClaimFromPayload).
+			// Stdout is the hook's reply to the agent, which may feed it to the model. A
+			// bounded copy of the payload lets a hook that spooled nothing still claim
+			// its session (hookrun.ClaimFromPayload).
 			payload := &boundedBuffer{max: 4 << 20}
 			claimed := false
 			env := hookrun.Env{
@@ -131,15 +115,12 @@ func (app *App) newHookCommand() *cobra.Command {
 			return nil
 		},
 	}
-	// --user marks a machine-wide (global mode) hook entry (hookmgr.UserHookCommand). Only
-	// before the event: what follows it is the event's own arguments, never flags.
+	// --user only before the event: what follows it is the event's own arguments.
 	cmd.Flags().BoolVar(&user, "user", false, "internal: a machine-wide hook entry")
 	cmd.Flags().SetInterspersed(false)
 	return cmd
 }
 
-// runRender runs a render hook: its output is the hook's reply, and it captures only
-// while hooks are on.
 func (app *App) runRender(cmd *cobra.Command, render agents.RenderHandler, args []string, captureDisabled bool) int {
 	cwd, _ := os.Getwd()
 	env := hookrun.Env{
@@ -159,8 +140,7 @@ func (app *App) runRender(cmd *cobra.Command, render agents.RenderHandler, args 
 	return render(cmd.Context(), env)
 }
 
-// hookPolicy is the organization's collection policy as `terma setup` recorded it: one
-// small local read; without a validated scope content capture stays disabled.
+// hookPolicy is one small local read; without a validated scope content capture stays off.
 func hookPolicy() config.Policy {
 	cfg, err := config.Load(config.Overrides{})
 	if err != nil {
@@ -172,8 +152,8 @@ func hookPolicy() config.Policy {
 	return cfg.Policy
 }
 
-// openSpool returns the machine spool, or nil when the config dir cannot be used.
-// A nil spool drops events; it never fails a hook.
+// openSpool returns nil when the config dir cannot be used: a nil spool drops events,
+// never failing a hook.
 func openSpool() *spool.Spool {
 	dir, err := config.Dir()
 	if err != nil {
@@ -186,8 +166,7 @@ func openSpool() *spool.Spool {
 	return s
 }
 
-// boundedBuffer keeps the first max bytes written to it and discards the rest: a
-// copy of a hook's payload that an oversized one cannot inflate.
+// boundedBuffer keeps the first max bytes, so an oversized payload cannot inflate it.
 type boundedBuffer struct {
 	buf []byte
 	max int
@@ -200,12 +179,10 @@ func (b *boundedBuffer) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// Bytes is what was kept.
+// Bytes returns what was kept.
 func (b *boundedBuffer) Bytes() []byte { return b.buf }
 
-// spawnFlush starts `terma spool flush --quiet` detached from the hook, so the
-// hook returns immediately and the network happens in the background. Failures
-// are silent: the next flush picks up whatever this one leaves.
+// spawnFlush is silent on failure: the next flush picks up whatever this one leaves.
 func spawnFlush() {
 	exe, err := os.Executable()
 	if err != nil {

@@ -86,9 +86,8 @@ func TestDoctorFixStep(t *testing.T) {
 	}
 }
 
-// install's Verified step: each problem doctor found is a next step — its fix, or its
-// name and detail when it names none — and the full report is one command away. The
-// routing warning is left out only when a next step already says to reload the shell.
+// install's Verified step turns each doctor problem into a next step, and omits the routing
+// warning only when a next step already says to reload the shell.
 func TestInstallUIVerdict(t *testing.T) {
 	report := doctor.Report{Checks: []doctor.Check{
 		{Key: doctor.KeyAuth, Name: "signed in", Status: doctor.Pass},

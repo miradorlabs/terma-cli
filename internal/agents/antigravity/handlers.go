@@ -14,28 +14,19 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// State directories under the hook state directory: the observation checkpoint, and one
-// record per conversation of the turn agy is in (see turn.go).
 const (
 	antigravityObservationDir = "antigravity-observations"
 	antigravityTurnDir        = "antigravity-turns"
 )
 
-// sourceAntigravityHook is the evidence_source of what agy's hook payloads said.
 const sourceAntigravityHook = "antigravity_hook"
 
-// --- Antigravity adapter ---------------------------------------------------------------
-
-// antigravityHookInput is the JSON Antigravity CLI writes to a hook's stdin (protojson,
-// so every key is camelCase). Every event carries the conversation id, the model, the
-// workspace roots and the paths of agy's own transcript and artifact directory; the
-// per-event fields are declared where terma reads them. Verified against agy 1.2.4.
+// antigravityHookInput is the protojson agy writes to a hook's stdin, the fields terma reads.
 type antigravityHookInput struct {
 	ConversationID string   `json:"conversationId"`
 	WorkspacePaths []string `json:"workspacePaths"`
 	ModelName      string   `json:"modelName"`
-	// Error is "" on success and the tool's or the loop's failure text otherwise. Only
-	// its presence is recorded: the text is content.
+	// Error is failure text; only its presence is recorded, since the text is content.
 	Error string `json:"error"`
 	// PostToolUse.
 	StepIdx  json.RawMessage `json:"stepIdx"`
@@ -54,18 +45,14 @@ type antigravityHookInput struct {
 
 const antigravityTool = "antigravity"
 
-// antigravityConversationEnv is set in every hook's environment by agy, and is the same
-// id the payload carries. It is the fallback for a payload that omits it.
+// antigravityConversationEnv carries the payload's conversation id, the fallback when it is omitted.
 const antigravityConversationEnv = "ANTIGRAVITY_CONVERSATION_ID"
 
-// id is the session key: agy's conversation, which every event carries.
 func (in *antigravityHookInput) id() string {
 	return cmp.Or(in.ConversationID, os.Getenv(antigravityConversationEnv))
 }
 
-// cwd is the workspace agy is working in. Hooks run from the directory that holds
-// hooks.json (`<workspace>/.agents`), so the process directory would do, but the first
-// workspace path is what agy itself calls the workspace and is the repository.
+// cwd is the first workspace path, which agy calls the workspace; hooks run in its .agents.
 func (in *antigravityHookInput) cwd(fallback string) string {
 	if len(in.WorkspacePaths) > 0 && in.WorkspacePaths[0] != "" {
 		return in.WorkspacePaths[0]
@@ -84,22 +71,16 @@ func readAntigravityInput(r io.Reader) (*antigravityHookInput, error) {
 	return in, nil
 }
 
-// antigravityAck is what every agy hook expects on stdout: an empty object means "no
-// decision, no injected steps, carry on". Written even when the handler bails out early,
-// because agy documents the object as the contract and terma never wants to be the
-// hook that made an agent print a parse warning.
+// antigravityAck writes the empty object every agy hook expects on stdout, even when the
+// handler bails out early, so agy never prints a parse warning.
 func antigravityAck(env hookrun.Env) {
 	if env.Stdout != nil {
 		_, _ = io.WriteString(env.Stdout, "{}\n")
 	}
 }
 
-// preInvocation records the conversation as the active session at the start
-// of each turn, and the turn itself (see turn.go). agy has no SessionStart:
-// the first invocation of a fresh conversation (invocation 0 with only the user's message
-// on the transcript) is where a session begins, and later turns refresh the record so the
-// TTL fallback tracks real activity. Every turn's start is observed, so a reader has the
-// moment the person's message arrived and not only the model calls that followed.
+// preInvocation marks the conversation active and records the turn at each turn's start.
+// agy has no SessionStart: invocation 0 of a fresh conversation is where a session begins.
 func preInvocation(ctx context.Context, env hookrun.Env) error {
 	defer antigravityAck(env)
 	in, err := readAntigravityInput(env.Stdin)
@@ -109,7 +90,7 @@ func preInvocation(ctx context.Context, env hookrun.Env) error {
 	}
 	invocation, _, invocationKnown := hookrun.JSONNumber(in.InvocationNum, true)
 	if invocationKnown && invocation != 0 {
-		// A model call in the middle of a turn: nothing about the session changes.
+		// A model call in the middle of a turn.
 		return nil
 	}
 	env.Cwd = in.cwd(env.Cwd)
@@ -138,20 +119,18 @@ func preInvocation(ctx context.Context, env hookrun.Env) error {
 	return nil
 }
 
-// antigravityEditTools are the tool names whose arguments name a file the agent
-// changed. agy exposes different edit tools per model family; the path argument is
-// TargetFile for its own tools and follows the model vendor's convention otherwise.
+// antigravityEditTools are the tools whose arguments name a changed file; agy exposes
+// edit tools per model family, its own taking TargetFile, the others the vendor's key.
 var antigravityEditTools = map[string]bool{
 	"write_to_file": true, "replace_file_content": true, "multi_replace_file_content": true,
 	"create_file": true, "edit_file": true, "delete_file": true,
 	"str_replace_editor": true, "notebook_edit": true,
 }
 
-// antigravityPathKeys are the argument names that carry the edited file's path.
 var antigravityPathKeys = []string{"TargetFile", "target_file", "file_path", "path", "notebook_path"}
 
-// antigravityEditedPaths pulls the edited file out of a tool call, or nothing for a
-// tool that reads. str_replace_editor's `view` command reads too.
+// antigravityEditedPaths pulls the edited file out of a tool call; str_replace_editor's
+// `view` reads.
 func antigravityEditedPaths(in *antigravityHookInput) []string {
 	if in.ToolCall == nil || !antigravityEditTools[in.ToolCall.Name] || len(in.ToolCall.Args) == 0 {
 		return nil
@@ -176,11 +155,8 @@ func antigravityEditedPaths(in *antigravityHookInput) []string {
 	return out
 }
 
-// postToolUse records one finished tool step, and the file it edited when it
-// edited one. Every tool step arrives here (the hook is unmatched), so every step is a
-// `terma.tool.call`: agy has no other export, and a session that only read, searched and
-// ran commands otherwise looks like one that did nothing. `toolCall.args` is opened for
-// one thing, an edit tool's path; a command line, a query or file content is never read.
+// postToolUse records every tool step as a `terma.tool.call`, since agy has no other
+// export, and the file an edit changed; `toolCall.args` is opened only for that path.
 func postToolUse(ctx context.Context, env hookrun.Env) error {
 	defer antigravityAck(env)
 	in, err := readAntigravityInput(env.Stdin)
@@ -201,14 +177,12 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 		env.EmitFor(r, spool.Event{Name: hookrun.EventToolCall, SessionID: id, Repo: r.Name, Attrs: call})
 	}
 
-	// A payload without a toolCall yields no paths, so this guard is also what makes
-	// in.ToolCall safe to read below.
+	// No toolCall yields no paths, so this guard also makes in.ToolCall safe below.
 	files := hookrun.RelativeFiles(r, env.Cwd, antigravityEditedPaths(in))
 	if len(files) == 0 {
 		return nil
 	}
-	// The same ids as the step's terma.tool.call: this event is what that call changed,
-	// not a second call, and the pair is how a reader tells.
+	// The step's terma.tool.call ids: this is what that call changed, not a second call.
 	ids := map[string]any{}
 	for _, k := range []string{hookrun.AttrToolCallID, "step_idx", hookrun.AttrTurnID} {
 		if v, ok := call[k]; ok {
@@ -219,15 +193,9 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	return nil
 }
 
-// antigravityToolCallAttrs is the body of a step's terma.tool.call: the tool's name, the
-// step's identity, the turn and how it ended. agy issues no call id; the step index is
-// its own, only grows within a conversation — across turns and resumes alike — and is
-// what makes a redelivered event the same event, so it becomes `tool_call_id`. A payload
-// naming neither a tool nor a step is dropped.
-//
-// `status` is agy's own reading: `error` is set when the tool failed, not when what it ran
-// did — a shell command that exits non-zero is a completed step. agy reports no duration,
-// so none is sent.
+// antigravityToolCallAttrs is the body of a step's terma.tool.call. agy issues no call id;
+// its step index only grows within a conversation, so it becomes `tool_call_id`. `status`
+// is agy's: a shell command that exits non-zero is a completed step.
 func antigravityToolCallAttrs(in *antigravityHookInput, turn string) (map[string]any, bool) {
 	a := hookrun.EvidenceAttrs(antigravityTool, sourceAntigravityHook, "PostToolUse")
 	if in.ToolCall != nil && hookrun.ShortLabel(in.ToolCall.Name) {
@@ -253,16 +221,12 @@ func antigravityToolCallAttrs(in *antigravityHookInput, turn string) (map[string
 	return a, true
 }
 
-// postInvocation and AntigravityStop record the turn's shape as observations:
-// which model answered, how many model calls the turn took, how it ended. They are
-// evidence of activity, never usage — agy's hooks carry no token counts, and its
-// transcripts carry none either. Do not derive spend or quota from them.
+// postInvocation and stop record the turn's shape as observations: evidence of activity,
+// never usage, since agy reports no token counts.
 func postInvocation(ctx context.Context, env hookrun.Env) error {
 	return antigravityObserve(ctx, env, "PostInvocation")
 }
 
-// stop fires when the execution loop ends: the turn is over and the person
-// is reading. The dispatcher starts a detached spool flush afterwards.
 func stop(ctx context.Context, env hookrun.Env) error {
 	return antigravityObserve(ctx, env, "Stop")
 }
@@ -280,7 +244,7 @@ func antigravityObserve(ctx context.Context, env hookrun.Env, hook string) error
 		return nil
 	}
 	if hook == "Stop" {
-		// The turn is done: keep the session fresh for the commit that may follow.
+		// Keep the session fresh for the commit that may follow.
 		now := env.Time()
 		if active, _ := r.Store.Active(now, 0); active != nil && active.ID == in.id() {
 			active.UpdatedAt, active.Model = now, cmp.Or(in.ModelName, active.Model)
@@ -318,8 +282,7 @@ func antigravityObservationAttrs(in *antigravityHookInput, hook, turn string) ma
 		if in.FullyIdle != nil {
 			a["fully_idle"] = *in.FullyIdle
 		}
-		// An error is not automatically a billing or limit error; only its presence
-		// travels, never its text.
+		// Only an error's presence travels, never its text.
 		a[hookrun.AttrStatus] = "ok"
 		if in.Error != "" {
 			a[hookrun.AttrStatus] = "error"

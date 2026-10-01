@@ -10,9 +10,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
-// Agent is DeepSeek Harness. terma's user-level Cordis plugin (internal/harness/dsh)
-// calls the binary with the events below; it is an adapter so `terma hook dsh-*`
-// dispatches from the same table as everyone else's.
+// Agent is DeepSeek Harness, whose events come from terma's user-level Cordis plugin.
 type Agent struct{}
 
 func (Agent) Name() string        { return "dsh" }

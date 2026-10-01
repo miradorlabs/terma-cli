@@ -9,9 +9,7 @@ import (
 	"time"
 )
 
-// Lock files exist only where lockEvidence takes a real flock, which is why this is a
-// Unix test. Before the fix every finished session left its `.json.lock` behind: the
-// prune matched `.json` alone.
+// The prune retires a finished session's lock with its data file, and only unheld orphans otherwise.
 func TestPruneRetiresOrphanedLocks(t *testing.T) {
 	dir := t.TempDir()
 	now := time.Now()
@@ -33,7 +31,7 @@ func TestPruneRetiresOrphanedLocks(t *testing.T) {
 	// A finished session: both halves are old, and both go in one pass.
 	touch("finished.json", old)
 	touch("finished.json.lock", old)
-	// What earlier versions left behind: a lock whose data file is long gone.
+	// A lock whose data file is long gone.
 	touch("orphan.json.lock", old)
 	// A session older than the cutoff that is still writing: its lock is old by
 	// creation, and its data file says it is alive.

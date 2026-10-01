@@ -18,10 +18,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
-// termaHookCommand is how an extension terma writes into an agent (Pi's, Hermes's)
-// reaches `terma hook`: this terma by the path it was started as — ~/.local/bin/terma
-// on an installed machine — so an agent started with another PATH (a desktop app gets
-// the system's) still finds it. A path that cannot be had falls back to PATH.
+// termaHookCommand is how an extension terma writes reaches `terma hook`: by this binary's
+// absolute path, since a desktop-started agent has the system PATH.
 func termaHookCommand() []string {
 	if exe, err := procinfo.AbsExecutable(); err == nil {
 		return []string{exe, "hook"}
@@ -59,8 +57,7 @@ func (app *App) newRelaySetupCommand() *cobra.Command {
 				return err
 			}
 			fmt.Fprintln(out, "Hooks in repositories with a binding claim their sessions; nothing else is forwarded.")
-			// A running relay has the old address and token: replace it. Then start one
-			// now, so the first session does not open against a closed port.
+			// A running relay has the old address and token: replace it.
 			daemon.Stop(dir)
 			if _, ok := daemon.ServiceInstalled(); ok {
 				// The service manager starts it again, with the new address and token.
@@ -76,7 +73,6 @@ func (app *App) newRelaySetupCommand() *cobra.Command {
 	return cmd
 }
 
-// pointAgentsAtRelay has each agent configure its own relay export.
 func (app *App) pointAgentsAtRelay(ctx context.Context, selected []string, addr, token string, done func(agent, detail string), note func(string)) error {
 	dir, err := daemon.Dir()
 	if err != nil {

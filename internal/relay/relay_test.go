@@ -88,8 +88,7 @@ func kv(k, v string) *commonpb.KeyValue {
 	return &commonpb.KeyValue{Key: k, Value: strValue(v)}
 }
 
-// fixture: sessions A (project p1) and B (p2) are claimed with keys, C is unclaimed,
-// D is claimed for a project this machine has no key for.
+// fixture: A (p1) and B (p2) are claimed with keys, C is unclaimed, D is claimed but keyless.
 type fixture struct {
 	mu     sync.Mutex
 	claims map[string]claim.Claim
@@ -206,8 +205,7 @@ func waitFor(t *testing.T, cond func() bool) {
 	}
 }
 
-// Each session's records go to its own project with its own key; the unclaimed one
-// waits, the keyless and the unattributable ones are dropped; nothing crosses over.
+// Each session's records go to its own project with its own key, and nothing crosses over.
 func TestRelayRoutesLogsPerClaimedSession(t *testing.T) {
 	for _, enc := range []struct {
 		name, contentType string
@@ -250,7 +248,7 @@ func TestRelayRoutesLogsPerClaimedSession(t *testing.T) {
 				}
 			}
 			c := r.Stats().Snapshot().Counters
-			// C (unclaimed) and D (keyless) wait: a claim or a key may still come.
+			// C and D wait: a claim or a key may still come.
 			if c["received.logs"] != 6 || c["dropped.no_session_id.logs"] != 1 || c["held_parts"] != 2 {
 				t.Fatalf("stats = %v", c)
 			}
@@ -266,8 +264,7 @@ func TestRelayRoutesLogsPerClaimedSession(t *testing.T) {
 	}
 }
 
-// An unclaimed session's records are released if the claim arrives inside the hold
-// and dropped, never sent, if it does not.
+// An unclaimed session's records are released by a claim inside the hold, else dropped.
 func TestRelayHoldReleasesOrExpires(t *testing.T) {
 	u := newUpstream(t)
 	f := newFixture()
@@ -276,7 +273,6 @@ func TestRelayHoldReleasesOrExpires(t *testing.T) {
 	post(t, srv, "/v1/logs", body, "application/x-protobuf", token, false)
 	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["forwarded.logs"] == 3 })
 
-	// C is claimed for p1 30 seconds later: released.
 	f.mu.Lock()
 	f.now = f.now.Add(30 * time.Second)
 	f.claims["C"] = claim.Claim{ProjectID: "p1"}
@@ -284,7 +280,6 @@ func TestRelayHoldReleasesOrExpires(t *testing.T) {
 	r.sweep()
 	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["forwarded.logs"] == 4 })
 
-	// A new unclaimed session E, never claimed: dropped once the hold is over.
 	e := &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{{Attributes: []*commonpb.KeyValue{kv("session.id", "E"), kv("prompt", "personal")}}}}}}}}
 	body, _ = proto.Marshal(e)
 	post(t, srv, "/v1/logs", body, "application/x-protobuf", token, false)
@@ -301,8 +296,7 @@ func TestRelayHoldReleasesOrExpires(t *testing.T) {
 	}
 }
 
-// Metric data points are split per session: one metric can carry several sessions'
-// points, and each project gets a copy with only its own.
+// One metric carrying several sessions' points reaches each project with only its own.
 func TestRelaySplitsMetricPoints(t *testing.T) {
 	u := newUpstream(t)
 	f := newFixture()
@@ -313,7 +307,7 @@ func TestRelaySplitsMetricPoints(t *testing.T) {
 	m := &metricspb.MetricsData{ResourceMetrics: []*metricspb.ResourceMetrics{{ScopeMetrics: []*metricspb.ScopeMetrics{{Metrics: []*metricspb.Metric{
 		{Name: "claude_code.token.usage", Data: &metricspb.Metric_Sum{Sum: &metricspb.Sum{IsMonotonic: true, AggregationTemporality: metricspb.AggregationTemporality_AGGREGATION_TEMPORALITY_DELTA,
 			DataPoints: []*metricspb.NumberDataPoint{point("A", 10), point("B", 20), point("C", 30)}}}},
-		// Codex's metrics name no session: dropped.
+		// Metrics naming no session are dropped.
 		{Name: "codex.turn.token_usage", Data: &metricspb.Metric_Histogram{Histogram: &metricspb.Histogram{DataPoints: []*metricspb.HistogramDataPoint{{Count: 1}}}}},
 	}}}}}}
 	body, _ := proto.Marshal(m)
@@ -341,10 +335,8 @@ func TestRelaySplitsMetricPoints(t *testing.T) {
 	}
 }
 
-// Spans split the same way, and Codex's spans name their session as thread.id — on
-// the turn span only. Its children inherit the trace, so a span naming no session
-// belongs to its trace's: at once when the trace is known, after a hold when the child
-// arrives first.
+// A span naming no session belongs to its trace's: at once when the trace is known, after a
+// hold when the child arrives first.
 func TestRelaySplitsSpans(t *testing.T) {
 	u := newUpstream(t)
 	f := newFixture()
@@ -363,7 +355,6 @@ func TestRelaySplitsSpans(t *testing.T) {
 	if c := r.Stats().Snapshot().Counters; c["dropped.no_session_id.traces"] != 1 || c["held_parts"] != 1 {
 		t.Fatalf("stats = %v", c)
 	}
-	// The early child's trace is named by a keyed span in a later export.
 	later := &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{
 		{Name: "session_task.turn", TraceId: early, Attributes: []*commonpb.KeyValue{kv("thread.id", "B")}},
 	}}}}}}
@@ -373,10 +364,8 @@ func TestRelaySplitsSpans(t *testing.T) {
 	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["forwarded.traces"] == 5 })
 }
 
-// Codex's session_loop names its thread as thread_id (underscore), at the root of the
-// trace that holds the thread's own work; it is exported last, when the loop ends.
-// Its trace's spans wait for it and then go with the thread. A numeric thread_id is
-// an OS thread, never a session.
+// A root span exported last that names thread_id releases its trace's spans; a numeric
+// thread_id is an OS thread, never a session.
 func TestRelayNamesTracesBySessionLoop(t *testing.T) {
 	u := newUpstream(t)
 	f := newFixture()
@@ -405,8 +394,7 @@ func TestRelayNamesTracesBySessionLoop(t *testing.T) {
 	}
 }
 
-// Only the agents' exporters, holding the local token, can send; nothing else on the
-// machine can inject telemetry into a project.
+// Only exporters holding the local token can inject telemetry into a project.
 func TestRelayRefusesWithoutToken(t *testing.T) {
 	u := newUpstream(t)
 	f := newFixture()
@@ -422,9 +410,7 @@ func TestRelayRefusesWithoutToken(t *testing.T) {
 	}
 }
 
-// The token may lead the path instead of riding a header (an exporter whose file
-// configuration has no headers, Gemini CLI's): accepted exactly, never as a prefix of
-// another segment, and never a way around the header check for a wrong one.
+// A token leading the path is accepted exactly, never as a prefix of another segment.
 func TestRelayAcceptsTheTokenInThePath(t *testing.T) {
 	u := newUpstream(t)
 	f := newFixture()
@@ -454,8 +440,7 @@ func TestRelayAcceptsTheTokenInThePath(t *testing.T) {
 	}
 }
 
-// A host that refuses a body for good (400) is not asked again for it: it is dropped,
-// set aside in .dead/ and never retried.
+// A body a host refuses for good (400) is set aside in .dead/ and never retried.
 func TestRelayUpstreamRefusalIsFinal(t *testing.T) {
 	u := newUpstream(t)
 	u.status = http.StatusBadRequest
@@ -476,8 +461,7 @@ func TestRelayUpstreamRefusalIsFinal(t *testing.T) {
 	}
 }
 
-// A refused key (401, 403) is configuration, fixed on this machine by the next
-// `terma install`: the part stays queued and is asked again, slowly — never dropped.
+// A part refused for its key (401, 403) stays queued and is retried slowly, never dropped.
 func TestRelayRefusedKeyIsRetriedNotDropped(t *testing.T) {
 	u := newUpstream(t)
 	u.status = http.StatusForbidden

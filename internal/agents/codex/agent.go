@@ -14,12 +14,10 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
-// name is the agent's name, in the keystore and the routing records too.
+// name keys the keystore and routing records too.
 const name = "codex"
 
-// Agent covers OpenAI's Codex CLI and Desktop repository hooks in .codex/hooks.json.
-// The CLI's user-level notifier (`notify` in ~/.codex/config.toml, written by
-// `terma connect codex`) reaches the same handler set through codex-notify.
+// Agent covers Codex's repository hooks in .codex/hooks.json and its user-level notifier.
 type Agent struct{}
 
 const codexHookReview = "open this repository in Codex Desktop, then go to Settings → Hooks → Review and approve the Terma entries (or run /hooks in Codex CLI)"
@@ -60,8 +58,7 @@ func (Agent) ManagedHookFiles(root string) []string {
 	return []string{filepath.Join(root, "etc", "codex", "requirements.toml")}
 }
 
-// ManagedConfig is a requirements.toml holding terma's hooks, which Codex runs with no
-// trust step.
+// ManagedConfig is a requirements.toml of terma's hooks, which Codex runs with no trust step.
 func (Agent) ManagedConfig(command func(string) string) (string, []byte, error) {
 	return "codex-requirements.toml", []byte(managedRequirements(command)), nil
 }
@@ -71,10 +68,8 @@ func (Agent) ManagedDeploy() string {
 	return "`/etc/codex/requirements.toml` (append to one you already deploy), or\n  the same table in your MDM profile for `com.openai.codex`."
 }
 
-// Trust reads the question Cursor's hooks cannot raise: Codex refuses to run a hook it
-// has not been shown, so a committed file is inert on a fresh clone until the developer
-// trusts it once, from inside Codex. The wiring looks perfect and nothing runs, which
-// is a silence worth naming.
+// Trust reads Codex's trust records: a committed hooks file is inert until the developer
+// trusts it from inside Codex, and nothing says so.
 func (c Agent) Trust(root string) (agents.TrustState, error) {
 	hooksPath := filepath.Join(root, filepath.FromSlash(c.HooksPath()))
 	trust, err := (Codex{}).CodexHookTrustFor(hooksPath)
@@ -98,9 +93,8 @@ func (c Agent) Trust(root string) (agents.TrustState, error) {
 			Fix:    "open this repository in Codex Desktop and re-enable Terma's hooks in Settings → Hooks (or use /hooks in Codex CLI)",
 		}, nil
 	}
-	// Codex trusts a hook entry by entry. A file that was trusted before terma added an
-	// entry to it — the two subagent hooks arrived that way — still reads as trusted by
-	// the count, while Codex skips the new ones and says nothing.
+	// A file trusted before terma added an entry still counts as trusted while Codex skips the
+	// new entry in silence.
 	entries, err := TermaEntries(root)
 	if err != nil {
 		return agents.TrustState{}, err

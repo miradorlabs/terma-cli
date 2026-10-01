@@ -12,8 +12,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
-// configView is the machine-readable shape of `config show`. It deliberately has no
-// field for the API key — only a description of which credential type is in play.
+// configView has no field for the API key, only which credential type is in play.
 type configView struct {
 	Profile          string `json:"profile"`
 	ConfigFile       string `json:"config_file"`
@@ -66,9 +65,6 @@ func (app *App) newConfigShowCommand() *cobra.Command {
 				authMode = "server key (TERMA_API_KEY)"
 			}
 
-			// A purpose-built struct rather than cfg: the machine-readable view must
-			// describe how the CLI is authenticating without ever emitting the
-			// credential itself.
 			view := configView{
 				Profile:          cfg.ProfileName,
 				ConfigFile:       path,
@@ -114,8 +110,7 @@ func (app *App) newConfigProfilesCommand() *cobra.Command {
 				return err
 			}
 
-			// By name: a map's order changes from one run to the next, and a list that
-			// reshuffles itself reads as though something changed.
+			// By name: a map's order changes from run to run.
 			rows := make([][]string, 0, len(file.Profiles))
 			for _, name := range slices.Sorted(maps.Keys(file.Profiles)) {
 				marker := " "

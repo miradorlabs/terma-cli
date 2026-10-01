@@ -1,10 +1,5 @@
-// Package spinner draws terma's mark — four squares lighting up in turn — beside a
-// line of text while a command waits on something, so a long check reads as work in
-// progress rather than a hang.
-//
-// It draws only on a terminal a person is watching. Anywhere else (a pipe, a file, an
-// agent harness) every method is a no-op, so the spinner can be started and stopped
-// unconditionally and never leaves escape sequences in captured output.
+// Package spinner animates terma's mark beside a line of text while a command waits;
+// anywhere but a terminal a person watches, every method is a no-op.
 package spinner
 
 import (
@@ -16,10 +11,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
-// frames is the web app's loading mark on one terminal cell: the four quadrants of
-// the square lit two at a time, sweeping clockwise — top-left, top, top-right, right,
-// bottom-right, bottom, bottom-left, left — the way the SVG fades each square in
-// after the one before it.
+// frames is the web app's loading mark on one cell: quadrants lit two at a time, clockwise.
 var frames = []string{"▘", "▀", "▝", "▐", "▗", "▄", "▖", "▌"}
 
 const interval = 150 * time.Millisecond
@@ -36,8 +28,7 @@ type Spinner struct {
 	active bool
 }
 
-// New returns a spinner that draws on w when w is a terminal, and one that does
-// nothing otherwise.
+// New returns a spinner that draws on w only when w is a terminal.
 func New(w io.Writer) *Spinner {
 	if !style.Terminal(w) {
 		return &Spinner{}
@@ -45,8 +36,7 @@ func New(w io.Writer) *Spinner {
 	return &Spinner{w: w, p: style.For(w)}
 }
 
-// Start begins animating beside text. Starting an already running spinner just
-// changes its text.
+// Start begins animating beside text, or changes the text of a running spinner.
 func (s *Spinner) Start(text string) {
 	if s.w == nil {
 		return
@@ -73,8 +63,7 @@ func (s *Spinner) Update(text string) {
 	s.mu.Unlock()
 }
 
-// Stop ends the animation and clears its line, so whatever is printed next starts on
-// a clean one. It returns only once the last frame is gone.
+// Stop ends the animation and clears its line, returning once the last frame is gone.
 func (s *Spinner) Stop() {
 	if s.w == nil {
 		return

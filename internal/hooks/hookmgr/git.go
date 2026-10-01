@@ -13,10 +13,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// --- shim scripts -------------------------------------------------------------
-
-// ShimScript is the committed fallback hook. It is also the shape every manager's
-// entry follows: guard, run terma without ever failing the commit, then chain.
+// ShimScript is the committed fallback hook: guard, run terma without ever failing the commit, then chain.
 func ShimScript(hook string) string {
 	return shimScript(hook, true)
 }
@@ -93,15 +90,8 @@ func planShim(root string, install bool) (Plan, error) {
 	return p, nil
 }
 
-// --- husky -----------------------------------------------------------------------
-
-// huskyLine is the one line terma adds to a husky hook file. Husky runs hook files
-// with `sh -e` and forwards git's arguments, and a hook file's exit status is its
-// last line's. The line therefore ends in `|| true`: an earlier form guarded the
-// call with `command -v terma && { ... }` and nothing after it, so on a machine
-// without terma the guard's own status (1) became the hook's, and husky failed the
-// commit of every colleague who had not installed terma. The whole point of the
-// guard is that they never notice it.
+// huskyLine ends in `|| true` because husky runs a hook file with `sh -e` and its status
+// is the last line's: without it, a machine without terma fails every commit.
 func huskyLine(hook string) string {
 	return fmt.Sprintf(`command -v terma >/dev/null 2>&1 && terma hook %s "$@" || true # %s`, hook, Marker)
 }
@@ -127,8 +117,7 @@ func planHusky(root string, install bool) (Plan, error) {
 			}
 			p.Changes = append(p.Changes, Change{Path: rel, Before: before, After: after, Mode: 0o755})
 		case install && has:
-			// A line from an older terma is rewritten where it stands, so a repository
-			// that installed before a fix picks it up on the next `terma install`.
+			// A line from an older terma is rewritten where it stands.
 			if kept, changed := replaceMarked(lines, line); changed {
 				p.Changes = append(p.Changes, Change{Path: rel, Before: before, After: []byte(strings.Join(kept, "\n") + "\n"), Mode: 0o755})
 			}
@@ -147,12 +136,8 @@ func planHusky(root string, install bool) (Plan, error) {
 	return p, nil
 }
 
-// --- lefthook -------------------------------------------------------------------
-
-// lefthookRun is the command lefthook runs for one hook. Lefthook hands it to `sh -c`
-// and forwards git's arguments as {1} {2} {3}. The `command -v` guard keeps a machine
-// without terma from printing "terma: command not found" on every commit, and the
-// trailing `|| true` keeps the guard's own status from failing the hook.
+// lefthookRun is guarded and ends in `|| true`, so a machine without terma prints
+// nothing and never fails the hook.
 func lefthookRun(hook string) string {
 	run := "terma hook " + hook
 	if hook == "prepare-commit-msg" {
@@ -245,13 +230,9 @@ func planLefthook(root, configPath string, install bool) (Plan, error) {
 	return p, nil
 }
 
-// --- pre-commit -----------------------------------------------------------------
-
 const preCommitRepo = "local"
 
-// preCommitEntry is the `entry` of terma's local pre-commit hook: pre-commit splits
-// it and appends the stage's arguments. The `command -v` guard and the closing
-// `exit 0` keep a machine without terma silent and the hook green.
+// preCommitEntry is guarded and ends in `exit 0`, so a machine without terma stays silent and green.
 func preCommitEntry(hook string) string {
 	return "sh -c 'command -v terma >/dev/null 2>&1 && { terma hook " + hook + " \"$@\" || true; }; exit 0' --"
 }
@@ -282,7 +263,6 @@ func planPreCommit(root string, install bool) (Plan, error) {
 		repos = &yaml.Node{Kind: yaml.SequenceNode}
 		mapSet(rootMap, "repos", repos)
 	}
-	// Find (or create) the `repo: local` entry and its hooks list.
 	var local, hooks *yaml.Node
 	for _, r := range repos.Content {
 		if v := mapGet(r, "repo"); v != nil && v.Value == preCommitRepo {
@@ -315,8 +295,6 @@ func planPreCommit(root string, install bool) (Plan, error) {
 			entry := &yaml.Node{Kind: yaml.MappingNode}
 			mapSet(entry, "id", scalar(id))
 			mapSet(entry, "name", scalar("terma "+hook))
-			// pre-commit passes the commit message path (and source) as arguments
-			// for these stages; `|| true` keeps a terma failure from failing the hook.
 			mapSet(entry, "entry", scalar(preCommitEntry(hook)))
 			mapSet(entry, "language", scalar("system"))
 			mapSet(entry, "stages", &yaml.Node{Kind: yaml.SequenceNode, Content: []*yaml.Node{scalar(hook)}})
@@ -392,8 +370,6 @@ func planPreCommit(root string, install bool) (Plan, error) {
 	return p, nil
 }
 
-// --- line and YAML helpers ------------------------------------------------------
-
 func splitLines(data []byte) []string {
 	if data == nil {
 		return nil
@@ -419,8 +395,7 @@ func removeMarked(lines []string) []string {
 	return out
 }
 
-// replaceMarked rewrites every terma line as line, reporting whether anything
-// differed. The position of the line in the file is the user's and is kept.
+// replaceMarked rewrites every terma line as line in place, reporting whether anything differed.
 func replaceMarked(lines []string, line string) ([]string, bool) {
 	out := make([]string, 0, len(lines))
 	changed := false

@@ -8,9 +8,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-// A harness can be wired to the right host and still send this project's spend
-// somewhere else. `terma doctor` fails on that; status must agree with it, or the
-// two commands disagree about whether the setup works.
+// A harness wired to the right host but another project is not connected, in status as in doctor.
 func TestHarnessState(t *testing.T) {
 	const otlp = "https://otel-dev.mirador.org"
 	const project = "6796a71f-7949-40f1-bde8-b87a74071686"
@@ -34,9 +32,7 @@ func TestHarnessState(t *testing.T) {
 			want: "→ connected", ok: true, project: "",
 		},
 		{
-			// Pointed at Terma and holding a key, but exporting nothing of its own:
-			// only a repository's committed policy can make this send. Connected is
-			// the truth; "connected" alone is not.
+			// Exporting nothing of its own: connected, but only a repository policy makes it send.
 			name: "connected with every exporter off",
 			st:   harness.Status{Connected: true, Endpoint: otlp, ProjectID: project},
 			want: "→ connected; repositories decide what is sent", ok: true, project: project,

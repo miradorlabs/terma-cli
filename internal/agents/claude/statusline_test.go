@@ -39,7 +39,6 @@ func TestInstallStatusLineWrapsAndKeepsEveryOption(t *testing.T) {
 	if doc["model"] != "opus" || doc["hooks"] == nil {
 		t.Fatal("unrelated settings must survive")
 	}
-	// Idempotent.
 	if changed, err := c.InstallStatusLine(); err != nil || changed {
 		t.Fatalf("second install: changed=%v err=%v", changed, err)
 	}
@@ -92,7 +91,6 @@ func TestRemoveStatusLineLeavesAUserReplacementAlone(t *testing.T) {
 	if _, err := c.InstallStatusLine(); err != nil {
 		t.Fatal(err)
 	}
-	// The user swaps in a new tool by hand.
 	doc := readJSON(t, path)
 	doc["statusLine"] = map[string]any{"type": "command", "command": "bun x ccstatusline"}
 	data, _ := json.Marshal(doc)
@@ -109,7 +107,6 @@ func TestRemoveStatusLineLeavesAUserReplacementAlone(t *testing.T) {
 	if statusLineOf(t, path)["command"] != "bun x ccstatusline" {
 		t.Fatal("user's entry changed")
 	}
-	// Re-installing wraps the new one.
 	if _, err := c.InstallStatusLine(); err != nil {
 		t.Fatal(err)
 	}
@@ -132,10 +129,8 @@ func TestStatusLineCommandFallbackRunsThePreviousRendererWithoutTerma(t *testing
 	if _, err := exec.LookPath("sh"); err != nil {
 		t.Skip("no sh")
 	}
-	// A previous command with quotes and a newline, run through the installed
-	// string on a PATH without terma: the fallback branch must reproduce it.
+	// A previous command with quotes and a newline, run on a PATH without terma, is reproduced.
 	previous := "printf '%s|%s' \"it's\" 'two\nlines'"
-	// A PATH with the system tools but no terma on it.
 	cmd := exec.Command("sh", "-c", statusLineCommand(previous))
 	cmd.Env = []string{"PATH=/usr/bin:/bin"}
 	out, err := cmd.Output()

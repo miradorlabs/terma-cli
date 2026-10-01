@@ -11,16 +11,14 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 )
 
-// A session id becomes a file name and a query value, so every handler refuses one that
-// is not safe as either, whichever key its agent names the session by. None may fail
-// the hook over it either: a hook never fails.
+// Every handler refuses a session id unsafe as a file name or query value, whichever key
+// carries it, without failing the hook.
 func TestNoHandlerSpoolsAnUnsafeSessionID(t *testing.T) {
 	root, sp := hookruntest.Project(t)
 	t.Setenv("CODEX_HOME", t.TempDir())
 	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
 	unsafe := []string{"../../etc/passwd", "two\nlines", strings.Repeat("a", 4096)}
-	// The control: the same payloads with a safe id are recorded, so a handler that
-	// never read them cannot pass.
+	// Control: with a safe id the same payloads are recorded.
 	const safe = "7c9e6679-7425-40de-944b-e07fc1f90ae7"
 	for event, handle := range reg.Handlers() {
 		if event == "statusline" {

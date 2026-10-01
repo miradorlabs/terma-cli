@@ -10,8 +10,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-// opencodeIn sandboxes OpenCode's config directory (XDG_CONFIG_HOME) and Terma's own,
-// so a connect here writes a throwaway plugins directory and helper.
+// opencodeIn sandboxes OpenCode's config directory (XDG_CONFIG_HOME) and terma's own.
 func opencodeIn(t *testing.T) (exporter, string) {
 	t.Helper()
 	dir := t.TempDir()
@@ -34,8 +33,8 @@ func opencodeExporter(t *testing.T, h exporter, helper bool) harness.Exporter {
 	return e
 }
 
-// The embedded plugin and the Go side share one line: the config placeholder. If
-// either drifts, every connect would install an inert plugin.
+// The embedded plugin has exactly one config placeholder, or every connect installs an
+// inert plugin.
 func TestOpenCodeTemplateHasOneConfigLineAndOneExport(t *testing.T) {
 	if n := strings.Count(opencodePluginSource, opencodeConfigPlaceholder); n != 1 {
 		t.Fatalf("placeholder appears %d times, want 1", n)
@@ -99,7 +98,7 @@ func TestOpenCodeConnectWritesPluginAndHelper(t *testing.T) {
 	if harness.KeyFromHelper(e.HelperPath) != e.APIKey {
 		t.Fatal("helper does not hold the key")
 	}
-	// The user's own config was never touched, or created.
+	// The user's own config was never touched.
 	if _, err := os.Stat(filepath.Join(filepath.Dir(filepath.Dir(path)), "opencode.json")); err == nil {
 		t.Fatal("connect wrote opencode.json")
 	}
@@ -232,9 +231,8 @@ func TestOpenCodeLocalPolicyCarriesNoDestination(t *testing.T) {
 	}
 }
 
-// OpenCode's native export is a separate stream driven by the shell; it is reported so a
-// second copy of the data is not a mystery, and it never blocks — nothing about it can
-// disclose Terma's key.
+// OpenCode's shell-driven native export is reported but never blocks: it cannot disclose
+// terma's key.
 func TestOpenCodeConflictsAreAdvisoryOnly(t *testing.T) {
 	h, _ := opencodeIn(t)
 	e := opencodeExporter(t, h, true)
@@ -268,9 +266,8 @@ func TestOpenCodeDetectDoesNotFailWhenAbsent(t *testing.T) {
 	}
 }
 
-// ConnectPerRepo installs one global plugin in per-repo mode plus this project's helper.
-// The plugin file names no fixed project and holds no key — the project is resolved from
-// each session's repository at runtime, and the key lives in the per-project helper.
+// ConnectPerRepo installs one keyless, projectless plugin in per-repo mode plus this
+// project's helper.
 func TestOpenCodeConnectPerRepo(t *testing.T) {
 	h, pluginPath := opencodeIn(t)
 	e := harness.Exporter{
@@ -303,22 +300,16 @@ func TestOpenCodeConnectPerRepo(t *testing.T) {
 	if cfg.HelperPrefix != "opencode-otel-" || cfg.ProjectAttribute != harness.AttrProjectID {
 		t.Fatalf("per-repo fields wrong: %+v", cfg)
 	}
-	// The shared plugin must never carry one repo's content-capture choice, even though
-	// this exporter asked for both: otherwise installing this project would flip prompt
-	// and tool-content capture on for every other project with no policy of its own.
-	// Content capture is opt-in per repository via its committed .opencode/terma.json.
+	// One repository's content choice must not ride in the shared plugin.
 	if cfg.IncludePrompts || cfg.IncludeToolContent {
 		t.Fatalf("shared per-repo plugin leaked content capture: prompts=%v toolContent=%v", cfg.IncludePrompts, cfg.IncludeToolContent)
 	}
-	// The project id must not be baked into a plugin shared across projects.
 	if _, ok := cfg.ResourceAttributes[harness.AttrProjectID]; ok {
 		t.Fatalf("project id must not be in the shared plugin: %+v", cfg.ResourceAttributes)
 	}
-	// The key never sits in the plugin file.
 	if strings.Contains(string(data), e.APIKey) {
 		t.Fatal("the key reached the plugin file")
 	}
-	// The project's helper carries the key.
 	helper, err := harness.HelperFilePath(h, "proj_123")
 	if err != nil {
 		t.Fatal(err)

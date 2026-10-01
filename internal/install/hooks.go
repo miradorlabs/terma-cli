@@ -11,8 +11,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
-// HookPlan is everything install would write into the repository for hooks: the
-// commit hooks through the detected manager, and each wired agent's own hooks file.
+// HookPlan is everything install would write into the repository for hooks.
 type HookPlan struct {
 	reg    *agents.Registry
 	det    hookmgr.Detection
@@ -72,9 +71,7 @@ func (p HookPlan) Print(out io.Writer) {
 			fmt.Fprintf(out, "  %-7s %s\n", c.Action(), c.Path)
 		}
 	}
-	// What the hook manager needs from each clone (`lefthook install`, `pre-commit
-	// install …`, husky's prepare script). Without these lines the hooks are committed
-	// and never run, and nothing says why.
+	// Without the manager's per-clone step the committed hooks never run, silently.
 	if len(p.hooks.Notes) > 0 {
 		fmt.Fprintln(out, "\nAfter merging:")
 		for _, n := range p.hooks.Notes {
@@ -83,8 +80,7 @@ func (p HookPlan) Print(out io.Writer) {
 	}
 }
 
-// Files names what the plan writes for a question that fits on a line: terma's own hook
-// shims as their directory, every other file by its path.
+// Files names what the plan writes, terma's hook shims as their directory.
 func (p HookPlan) Files() []string {
 	var files []string
 	for _, path := range p.Paths() {
@@ -95,8 +91,6 @@ func (p HookPlan) Files() []string {
 	return files
 }
 
-// shownPath is how a question names a file the plan writes: terma's hook shims by their
-// directory, every other file by its path.
 func shownPath(path string) string {
 	if strings.HasPrefix(path, hookmgr.ShimDir+"/") {
 		return hookmgr.ShimDir + "/"
@@ -104,9 +98,7 @@ func shownPath(path string) string {
 	return path
 }
 
-// Explain says what each file in files() is for, a line apiece, and what committing them
-// means — the lines under the question that asks to write them, so a developer knows what
-// a yes does before giving it.
+// Explain says what each file in Files is for, a line apiece, and what committing them means.
 func (p HookPlan) Explain() []string {
 	what := map[string]string{}
 	for _, c := range p.hooks.Changes {
@@ -135,8 +127,7 @@ func (p HookPlan) Explain() []string {
 		"and on a machine without terma they do nothing.")
 }
 
-// Summary says what the hooks do once installed: commit stamping through the hook
-// manager, and the agents whose own hooks report their sessions.
+// Summary says what the hooks do once installed.
 func (p HookPlan) Summary(adapters []string) string {
 	var parts []string
 	if p.det.Manager != "" {
@@ -157,8 +148,7 @@ func (p HookPlan) Summary(adapters []string) string {
 	return strings.Join(parts, "; ")
 }
 
-// Paths lists the files the plan writes or deletes, relative to the root, in the order
-// print shows them.
+// Paths lists the files the plan writes or deletes, relative to the root, in Print's order.
 func (p HookPlan) Paths() []string {
 	var paths []string
 	for _, c := range p.hooks.Changes {
@@ -185,7 +175,6 @@ func (p HookPlan) Apply(root string) error {
 	return nil
 }
 
-// managerOrEmpty is the hook manager a binding records, none when hooks were not installed.
 func managerOrEmpty(det hookmgr.Detection, installed bool) string {
 	if !installed {
 		return ""
@@ -193,7 +182,6 @@ func managerOrEmpty(det hookmgr.Detection, installed bool) string {
 	return string(det.Manager)
 }
 
-// hooksOrNil are the git hooks a binding records, none when hooks were not installed.
 func hooksOrNil(installed bool) []string {
 	if !installed {
 		return nil
@@ -201,8 +189,7 @@ func hooksOrNil(installed bool) []string {
 	return hookmgr.GitHooks
 }
 
-// PlanAdapters computes each named adapter's repository changes, in registry order so
-// the plan reads the same way every time whatever order --adapters listed them in.
+// PlanAdapters computes each named adapter's repository changes, in registry order.
 func PlanAdapters(reg *agents.Registry, root string, names []string, install bool) ([]hookmgr.Plan, error) {
 	want := map[string]bool{}
 	for _, name := range names {
@@ -228,9 +215,7 @@ func PlanAdapters(reg *agents.Registry, root string, names []string, install boo
 	return plans, nil
 }
 
-// ExistingOnly keeps the plan's changes to files that are already there: what a
-// refresh rewrites. The notes are for a first install (what each clone must run) and
-// are dropped.
+// ExistingOnly keeps the changes to files already there, what a refresh rewrites.
 func (p HookPlan) ExistingOnly() HookPlan {
 	p.hooks = existingOnly(p.hooks)
 	p.agents = slices.Clone(p.agents)

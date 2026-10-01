@@ -15,7 +15,6 @@ import (
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 )
 
-// report records what Apply reports.
 type report struct {
 	ok, warn, then []string
 	commit         []string
@@ -81,8 +80,7 @@ func TestApplyLeavesDeclinedHooksUnwritten(t *testing.T) {
 	}
 }
 
-// A colleague's install that writes nothing keeps the binding's version and install
-// time: the committed file does not churn.
+// An install that writes nothing keeps the binding's version and install time.
 func TestApplyThatWritesNothingKeepsTheBinding(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	first := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)

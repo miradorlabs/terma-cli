@@ -2,23 +2,11 @@ package relay
 
 import "strings"
 
-// With a project's content withheld, a record leaves with the attributes known to say
-// nothing of what was said, and no others. Removing the content fields the agents
-// declare is not enough on its own: a release that adds one (a command line that
-// carries a prompt, say) would leak until someone noticed. So every attribute key is
-// classified. A content key keeps the treatment content.go gives it (a marker, or
-// dropped); a safe key passes; any other key is dropped, and counted by name (Stats:
-// unclassified.<key>) so that the live suite fails on it and a person decides which it
-// is. A new field is then a visible loss, never a leak.
-//
-// The safe keys are these, which no one agent owns, and the ones each agent declares
-// for its own telemetry (shape.CaptureRules.SafeKeys, SafePrefixes). The composed set is
-// pinned in this package's tests: widening what leaves a machine is a reviewed edit
-// here, whoever declares it. A key that is content for any agent is content.
+// With content withheld, only attribute keys classified safe leave: any other key is
+// dropped and counted as unclassified.<key>, so a field a new agent release adds is a
+// visible loss, never a leak. The composed set is pinned in this package's tests.
 
-// genericSafeKeys are the safe keys no one agent owns: semantic conventions, terma's own,
-// keys several agents send, and survey keys no agent's golden places yet. An agent's own
-// keys are its shape.CaptureRules.SafeKeys.
+// genericSafeKeys are the safe keys no one agent owns; an agent's own are its shape.CaptureRules.SafeKeys.
 var genericSafeKeys = setOf(
 	// Identity and correlation.
 	"session.id", "gen_ai.conversation.id",
@@ -37,8 +25,6 @@ var genericSafeKeys = setOf(
 	"prompt_length", "response_length", "duration_ms", "ttft_ms",
 	// Where in the code a span was opened: source locations and threads.
 	"code.file.path", "code.line.number", "code.module.name", "thread.name",
-	// Classified from the first unclassified-key survey of every harness's withheld-content
-	// run (2026-09-30), string-valued ones (numbers and booleans pass whatever their key).
 	// Hooks, plugins, managed settings and skills.
 	"hook_name", "hook_type", "hook_source", "hook_matcher", "hook_event", "handler_type",
 	"enabled_via", "mode", "phase", "phases",
@@ -63,7 +49,6 @@ var genericSafeKeys = setOf(
 	// The process an exporter runs in — never its arguments (process.command_args).
 	"process.pid", "process.owner", "process.command", "process.executable.name", "process.executable.path",
 	"process.runtime.name", "process.runtime.version", "process.runtime.description",
-	// Resource attributes.
 	"service.name", "service.version", "host.arch", "host.name", "os.type", "os.version",
 	"telemetry.sdk.language", "telemetry.sdk.name", "telemetry.sdk.version",
 )
@@ -79,15 +64,12 @@ func setOf(keys ...string) map[string]bool {
 	return m
 }
 
-// contentKey reports whether key is one an agent declares carries content.
 func (ru *rules) contentKey(key string) bool {
 	return contains(ru.promptFields, key) || contains(ru.promptDropFields, key) || contains(ru.toolContentFields, key) ||
 		contains(ru.resourcePromptFields, key)
 }
 
-// safeKey reports whether key is classified as never carrying content: safe, and not
-// content for any agent, exactly or under a safe prefix. A number or a boolean under any
-// key is safe too (content.go, scalarNonText); this is for strings.
+// safeKey is for strings: a key that is content for any agent is never safe.
 func (ru *rules) safeKey(key string) bool {
 	if ru.contentKey(key) {
 		return false

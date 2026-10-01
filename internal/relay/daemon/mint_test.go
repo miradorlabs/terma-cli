@@ -13,8 +13,7 @@ import (
 
 const mintedKey = "ter_srv_minted0123456789abcdefghijklmnopqrstuv"
 
-// The relay mints a missing key once, stores it as the project's, and after a failure
-// does not ask again until the backoff passes.
+// A missing key is minted once and stored; after a failure none is asked for until the backoff passes.
 func TestKeyMinter(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	cfg := &config.Config{Policy: config.DefaultPolicy()}

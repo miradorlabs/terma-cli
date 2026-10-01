@@ -1,7 +1,5 @@
-// Package gitx is the thin git surface the hooks and installers need. Everything
-// shells out to git itself: reproducing index parsing or config resolution in Go
-// would be faster but would also be a second implementation of git's rules, and
-// the hooks' budget is met with one or two invocations (a few milliseconds each).
+// Package gitx is the thin git surface hooks and installers need: bounded git
+// subprocesses, plus filesystem reads for the hook hot path.
 package gitx
 
 import (
@@ -17,14 +15,12 @@ import (
 	"time"
 )
 
-// Timeout bounds any single git call from a hook. A wedged git (a stuck lock, a
-// network filesystem) must fail the attribution, never hang the commit.
+// Timeout bounds any single git call from a hook, so a wedged git never hangs a commit.
 const Timeout = 2 * time.Second
 
 // ErrNotRepo is returned for a directory git does not consider a repository.
 var ErrNotRepo = errors.New("not a git repository")
 
-// errNoCommit is returned when HEAD has no commit to read.
 var errNoCommit = errors.New("no commit at HEAD")
 
 func run(ctx context.Context, dir string, args ...string) (string, error) {
@@ -39,8 +35,7 @@ func runWithin(ctx context.Context, timeout time.Duration, dir string, args ...s
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	if err := cmd.Run(); err != nil {
-		// A git killed at its deadline reports only "signal: killed", which reads
-		// as git crashing rather than as the bound doing its job.
+		// A git killed at its deadline reports only "signal: killed".
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return "", fmt.Errorf("git %s: did not finish within %s", subcommand(args), timeout)
 		}
@@ -56,9 +51,7 @@ func runWithin(ctx context.Context, timeout time.Duration, dir string, args ...s
 	return strings.TrimRight(stdout.String(), "\n"), nil
 }
 
-// subcommand names the git command in args for an error message, past any leading
-// global options: doctor's scratch commit starts with -c pairs, and its failures
-// read "git -c: …".
+// subcommand names the git command in args, past leading global options such as -c.
 func subcommand(args []string) string {
 	for i := 0; i < len(args); i++ {
 		switch a := args[i]; {
@@ -75,8 +68,7 @@ func subcommand(args []string) string {
 	return ""
 }
 
-// Locate resolves the worktree root and the metadata directory in one git call —
-// the hooks' hot path, where every invocation counts against the budget.
+// Locate resolves the worktree root and the git directory in one git call.
 func Locate(ctx context.Context, dir string) (root, gitDir string, err error) {
 	out, err := run(ctx, dir, "rev-parse", "--show-toplevel", "--absolute-git-dir")
 	if err != nil {
@@ -89,8 +81,7 @@ func Locate(ctx context.Context, dir string) (root, gitDir string, err error) {
 	return filepath.Clean(lines[0]), filepath.Clean(lines[1]), nil
 }
 
-// StagedFiles lists the repo-relative paths in the index that differ from HEAD
-// (added, modified, renamed destinations). Slash-separated, NUL-safe.
+// StagedFiles lists the repo-relative paths added, modified or renamed in the index.
 func StagedFiles(ctx context.Context, dir string) ([]string, error) {
 	out, err := run(ctx, dir, "diff", "--cached", "--name-only", "--diff-filter=ACMR", "-z")
 	if err != nil {
@@ -165,8 +156,7 @@ func Relativize(root, path string) string {
 	return filepath.ToSlash(rel)
 }
 
-// NormalizeRemote turns a git remote into a browsable https URL, or "" when it
-// cannot be one. Exported for testing and for callers holding a remote already.
+// NormalizeRemote turns a git remote into a browsable https URL, or "" when it cannot be one.
 func NormalizeRemote(raw string) string {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -187,7 +177,7 @@ func NormalizeRemote(raw string) string {
 	if err != nil || u.Host == "" {
 		return ""
 	}
-	// Drop userinfo (may hold a token) and any ssh/git scheme.
+	// Userinfo may hold a token.
 	u.User = nil
 	switch u.Scheme {
 	case "http", "https", "ssh", "git":
@@ -205,9 +195,7 @@ func Git(ctx context.Context, dir string, args ...string) (string, error) {
 	return run(ctx, dir, args...)
 }
 
-// GitWithin is Git with its own bound, for a command that is not a hook's to wait
-// on: doctor's scratch worktree checks out the whole of HEAD, which no repository of
-// any size finishes inside a hook's Timeout.
+// GitWithin is Git with its own bound, for work such as a full checkout that outlasts Timeout.
 func GitWithin(ctx context.Context, timeout time.Duration, dir string, args ...string) (string, error) {
 	return runWithin(ctx, timeout, dir, args...)
 }

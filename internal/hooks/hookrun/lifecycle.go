@@ -12,11 +12,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// An adapter reads its agent's payload and decides what it means. What a session's
-// start, its end and its edits then do to local state and to the spool is the same for
-// every agent, and lives here so the adapters cannot drift apart. The differences that
-// are real travel as arguments: the attributes only one agent has, and whether a file
-// list is reported as a set.
+// The session start, end and edit steps every agent shares, so the agents cannot drift apart.
 
 // NewSession is the record of a session seen now in r.
 func (e Env) NewSession(r *Repo, id, tool, model string) session.Session {
@@ -24,8 +20,7 @@ func (e Env) NewSession(r *Repo, id, tool, model string) session.Session {
 	return session.Session{ID: id, Tool: tool, Model: model, Cwd: r.Root, StartedAt: now, UpdatedAt: now}
 }
 
-// SetActive records sess as the session an unattributed commit falls back to. A failure
-// is logged and the hook carries on: the event is still worth spooling.
+// SetActive records sess as the session an unattributed commit falls back to; a failure is only logged.
 func (e Env) SetActive(r *Repo, sess session.Session) {
 	if err := r.Store.SetActive(sess); err != nil {
 		e.Logf("record session: %v", err)
@@ -39,25 +34,21 @@ func (e Env) PruneManifests(r *Repo, now time.Time) {
 	}
 }
 
-// EmitStart spools the session's start. extra is what only one agent knows: where the
-// session came from, the session that spawned it.
+// EmitStart spools the session's start, with extra attributes only one agent knows.
 func (e Env) EmitStart(r *Repo, sess session.Session, extra map[string]any) {
 	attrs := map[string]any{AttrTool: sess.Tool, AttrModel: sess.Model, AttrVersion: e.Version}
 	maps.Copy(attrs, extra)
 	e.EmitFor(r, spool.Event{Name: EventSessionStart, SessionID: sess.ID, Repo: r.Name, Attrs: attrs})
 }
 
-// Announce is a session's start: the session becomes the active one, old manifests are
-// aged out, and the start is spooled. A handler with work of its own between those
-// steps, or without one of them, composes them itself.
+// Announce makes the session active, ages out old manifests and spools the start.
 func (e Env) Announce(r *Repo, sess session.Session, extra map[string]any) {
 	e.SetActive(r, sess)
 	e.PruneManifests(r, sess.UpdatedAt)
 	e.EmitStart(r, sess, extra)
 }
 
-// EndSession clears the active session and spools the end. Manifests stay: the work may
-// still be uncommitted.
+// EndSession clears the active session and spools the end; manifests stay, the work may be uncommitted.
 func (e Env) EndSession(r *Repo, id, tool, reason string) {
 	_ = r.Store.ClearActive(id)
 	e.EmitFor(r, spool.Event{Name: EventSessionEnd, SessionID: id, Repo: r.Name, Attrs: map[string]any{
@@ -65,9 +56,7 @@ func (e Env) EndSession(r *Repo, id, tool, reason string) {
 	}})
 }
 
-// Touch adds repo-relative files to the session's manifest and spools them. toolName is
-// the agent's name for what made the edit. Nothing is spooled when the manifest did not
-// take the files: the event would claim an attribution no commit can carry.
+// Touch adds files to the session's manifest and spools them, only if the manifest took them.
 func (e Env) Touch(r *Repo, sess session.Session, toolName string, files []string, extra map[string]any) {
 	if len(files) == 0 {
 		return
@@ -83,8 +72,7 @@ func (e Env) Touch(r *Repo, sess session.Session, toolName string, files []strin
 	e.EmitFor(r, spool.Event{Name: EventFilesTouched, SessionID: sess.ID, Repo: r.Name, Attrs: attrs})
 }
 
-// RelativeFiles resolves reported paths against the working directory and keeps the
-// ones inside the repository, in the order they were reported.
+// RelativeFiles keeps the reported paths inside the repository, repo-relative and in reported order.
 func RelativeFiles(r *Repo, cwd string, paths []string) []string {
 	var files []string
 	for _, p := range paths {
@@ -101,9 +89,7 @@ func RelativeFiles(r *Repo, cwd string, paths []string) []string {
 	return files
 }
 
-// UniqueSorted reports a file list as a set. Some agents' lists are reported this way
-// and others keep their order, so it is the caller's choice rather than RelativeFiles'
-// habit.
+// UniqueSorted reports a file list as a set, for the agents whose lists are sets.
 func UniqueSorted(files []string) []string {
 	slices.Sort(files)
 	return slices.Compact(files)

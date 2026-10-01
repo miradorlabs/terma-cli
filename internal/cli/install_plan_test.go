@@ -12,8 +12,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
-// A hook manager that needs something run in each clone says so in the plan. Without
-// these lines a lefthook or pre-commit repository commits hooks that never run.
+// A hook manager that needs something run in each clone says so in the plan.
 func TestInstallPrintsWhatTheHookManagerNeedsFromEachClone(t *testing.T) {
 	repo := installRepo(t)
 	if err := os.WriteFile(filepath.Join(repo, "lefthook.yml"), []byte("pre-commit:\n  commands: {}\n"), 0o644); err != nil {
@@ -47,10 +46,7 @@ func TestInstallDryRunListsTheFilesAndWritesNothing(t *testing.T) {
 	}
 }
 
-// A --dry-run must never sign in — sign-in verifies and rewrites the stored credential,
-// which "nothing written" forbids. Even with a telemetry harness (which a real install
-// would sign in for) and no credential present, the dry run plans and exits cleanly
-// rather than trying to log in.
+// A --dry-run never signs in, even with a telemetry agent and no credential.
 func TestInstallDryRunDoesNotSignIn(t *testing.T) {
 	installRepo(t)
 	out, err := runTerma(t, "install", "--harness", "claude", "--project", testProjectID,
@@ -61,16 +57,12 @@ func TestInstallDryRunDoesNotSignIn(t *testing.T) {
 	if !strings.Contains(out, "would sign in first") || !strings.Contains(out, "Dry run: nothing written.") {
 		t.Fatalf("dry run did not note the skipped sign-in:\n%s", out)
 	}
-	// No credential store was written by the dry run.
 	if _, err := os.Stat(filepath.Join(os.Getenv("TERMA_CONFIG_DIR"), "credentials.json")); !os.IsNotExist(err) {
 		t.Fatalf("dry run wrote credentials (stat err = %v)", err)
 	}
 }
 
-// A dry run with no stored credential and no --project must still print the plan.
-// Skipping sign-in (A4) left the project picker unable to reach the API, which used to
-// fail the command before anything was printed — arguably the most common way to try
-// `terma install --dry-run`. It plans against an unresolved project instead.
+// A dry run with no credential and no --project still prints the plan.
 func TestInstallDryRunUnauthenticatedNoProject(t *testing.T) {
 	installRepo(t)
 	out, err := runTerma(t, "install", "--harness", "claude",
@@ -88,10 +80,8 @@ func TestInstallDryRunUnauthenticatedNoProject(t *testing.T) {
 	}
 }
 
-// The committed binding says nothing about which agents are wired — that is the hooks
-// files' to say, and a list there churned with each colleague's own agents. A binding
-// from an install that still wrote one loses it on the next install, and --no-hooks
-// writes no agent's hooks file whatever --adapters asks for.
+// The binding records no agent list (an old one is dropped on the next install), and
+// --no-hooks writes no hooks file whatever --adapters asks.
 func TestInstallRecordsNoAdapters(t *testing.T) {
 	repo := installRepo(t)
 	if out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude", "--yes", "--no-doctor"); err != nil {
@@ -127,9 +117,8 @@ func TestInstallRecordsNoAdapters(t *testing.T) {
 	}
 }
 
-// An install that writes hooks names every file it wrote, so the developer commits them
-// all; the hooks do nothing for a colleague until they are merged. A re-run that writes
-// nothing asks for no commit.
+// An install that writes hooks names every file to commit; a re-run that writes nothing
+// asks for no commit.
 func TestInstallListsTheFilesToCommit(t *testing.T) {
 	installRepo(t)
 	out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude,cursor", "--yes", "--no-doctor")
@@ -154,9 +143,7 @@ func TestInstallListsTheFilesToCommit(t *testing.T) {
 	}
 }
 
-// The question that asks to write the hooks names the files; the lines under it say what
-// each one does and what committing them means, so a developer knows what a yes does.
-// Every file the question names gets its own line.
+// The hooks question names each file it would write, with a line on what each one does.
 func TestInstallHookQuestionExplainsEachFile(t *testing.T) {
 	repo := installRepo(t)
 	plan, err := install.PlanHooks(testApp.agents, repo, hookmgr.Detect(repo), []string{"claude", "codex"})
@@ -181,8 +168,7 @@ func TestInstallHookQuestionExplainsEachFile(t *testing.T) {
 	}
 }
 
-// With detail, the question stands alone, the detail sits indented under it, and the
-// answer is typed on a line of its own; without, the answer follows the question.
+// With detail, the answer goes on its own line under it; without, it follows the question.
 func TestConfirmPromptPutsTheDetailBeforeTheAnswer(t *testing.T) {
 	p := style.Plain()
 	if got, want := confirmPrompt(p, "Write them?", nil, true), "? Write them? [Y/n] "; got != want {

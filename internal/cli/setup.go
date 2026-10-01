@@ -25,18 +25,16 @@ type setupFlags struct {
 	harnesses string
 	noBrowser bool
 	assumeYes bool
-	// relayService is --relay-service: "on", "off", or "" (keep the recorded choice; on
-	// where a service can run).
+	// relayService is --relay-service: "on", "off", or "" to keep the recorded choice.
 	relayService string
-	// managedConfig is --managed-config: write global mode's hooks as managed
-	// configuration into this directory, for an organization to deploy, and do nothing
-	// else. managedTerma is the path those hooks call terma by.
+	// managedConfig is --managed-config's directory for global mode's managed hooks, which
+	// call terma at managedTerma.
 	managedConfig string
 	managedTerma  string
 }
 
-// agentChoice is an onboarding surface. Codex CLI and Codex desktop share one
-// repository adapter, but developers choose independently how they launch it.
+// agentChoice is an onboarding surface: one repository adapter may be offered as several
+// launch surfaces a developer picks independently.
 type agentChoice struct {
 	name      string
 	display   string
@@ -95,9 +93,6 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 	if err != nil {
 		return err
 	}
-	// A welcome for a person watching: the logo, and beside it who and where terma is
-	// pointed right now. Suppressed off a terminal (a pipe, an agent, NO_COLOR), like the
-	// spinner.
 	if p := style.For(out); p.Enabled() {
 		fmt.Fprintln(out, style.Header(p, app.setupHeaderInfo(cfg, p)))
 	}
@@ -110,12 +105,11 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 		return fmt.Errorf("--relay-service %q: want on or off", f.relayService)
 	}
 
-	// 1. Sign in — reusing the session this machine already has, verified.
 	if cfg, err = app.signInAndReload(cmd, cfg, signInOptions{noBrowser: f.noBrowser, pauseBeforeBrowser: !f.assumeYes}); err != nil {
 		return err
 	}
 
-	// 2. Which agents this developer uses. A machine-level preference, not a connection.
+	// A machine-level preference, not a connection.
 	fmt.Fprintln(out)
 	names, err := app.chooseHarnesses(cmd, cfg, f)
 	if errors.Is(err, errCancelled) {
@@ -135,8 +129,7 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 		fmt.Fprintf(out, "\nAgents recorded: %s.\n", joinNames(app.adapterDisplayNames(names)))
 	}
 
-	// 3. What the organization collects. Kept on the profile: hooks and the relay read
-	// it there and never ask the network.
+	// Kept on the profile: hooks and the relay read policy there, never the network.
 	if err := app.selectPolicyTeam(cmd, cfg); err != nil {
 		return err
 	}
@@ -149,8 +142,7 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 	if err := saveCollectionPolicy(cfg, &pol); err != nil {
 		return err
 	}
-	// A relay's login and environment are fixed at startup. Scope changes require
-	// restarting it; capture-only changes are picked up from the local caches.
+	// A relay's login and scope are fixed at startup; capture-only changes need no restart.
 	if previous.OrganizationID != pol.OrganizationID || previous.AuthURL != pol.AuthURL || previous.TeamID != pol.TeamID {
 		if dir, err := daemon.Dir(); err == nil {
 			daemon.Stop(dir)
@@ -158,7 +150,6 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 	}
 	fmt.Fprintln(out, "Collection policy: "+policySummary(pol)+".")
 
-	// 4. The relay: the machine half of every repository's telemetry.
 	var steps []string
 	err = app.connectMachineRelay(cmd.Context(), names, f.relayService, relayReport{
 		ok:     func(label, what string) { fmt.Fprintf(out, "  %s: %s\n", label, what) },
@@ -170,13 +161,10 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 		return err
 	}
 
-	// 5. Global mode: hooks for every session and every commit on the machine, not only
-	// repositories that opted in. Leaving global mode takes them away again.
 	if err := app.applyGlobalMode(cmd.Context(), names, pol.Global(), func(what string) { fmt.Fprintln(out, "  "+what) },
 		func(step string) { steps = append(steps, step) }); err != nil {
 		return err
 	}
-	// 6. The check-in: the relay reports this machine to the organization now.
 	if len(app.agents.RelayTargets(names)) > 0 {
 		if ok, what := daemon.CheckIn(cmd.Context()); ok {
 			fmt.Fprintln(out, "  Check-in: "+what)
@@ -206,9 +194,8 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 	return nil
 }
 
-// applyGlobalMode puts global mode's machine-wide hooks in place (global), or takes
-// away any an earlier global setup left (not global): the agents' user-level hooks and
-// git's global hooks path. said reports what changed; then, what the developer must do.
+// applyGlobalMode installs global mode's user-level agent hooks and global git hooks path,
+// or removes them; said reports each change and then each step left to the developer.
 func (app *App) applyGlobalMode(ctx context.Context, agents []string, global bool, said, then func(string)) error {
 	files, err := app.applyUserHooks(agents, global)
 	if err != nil {
@@ -234,13 +221,11 @@ func (app *App) applyGlobalMode(ctx context.Context, agents []string, global boo
 	return nil
 }
 
-// fetchPolicy asks the organization the developer signed in to for its collection
-// policy.
+// fetchPolicy asks the developer's organization for its collection policy.
 func (app *App) fetchPolicy(ctx context.Context, cfg *config.Config) (config.Policy, error) {
 	var client *api.Client
 	var err error
-	// An explicit offline fixture needs no credential. Production always uses the
-	// normal client, which loads and refreshes the developer's login token.
+	// Only an explicit offline fixture skips the developer's login.
 	if os.Getenv("TERMA_POLICY_STUB") != "" {
 		client = api.NewAnonymous(cfg.AuthURL, app.version)
 	} else {
@@ -254,8 +239,7 @@ func (app *App) fetchPolicy(ctx context.Context, cfg *config.Config) (config.Pol
 		if cfg.OrganizationID != cred.OrganizationID {
 			return config.Policy{}, errors.New("collection policy login belongs to another organization — run `terma setup`")
 		}
-		// A server key can identify the binding and deliver its telemetry. Policy
-		// always uses the developer login, even while TERMA_API_KEY is set.
+		// Policy always uses the developer login, even while TERMA_API_KEY is set.
 		policyConfig := *cfg
 		policyConfig.APIKey = ""
 		client, err = api.New(&policyConfig, api.Options{Version: app.version, ProjectID: cfg.ProjectID, Credential: cred})
@@ -276,8 +260,7 @@ func (app *App) fetchPolicy(ctx context.Context, cfg *config.Config) (config.Pol
 	return pol, nil
 }
 
-// selectPolicyTeam names which team's policy the developer is setting up. It
-// reads membership with the login token; it never creates a telemetry key.
+// selectPolicyTeam picks the team whose policy is set up; it never creates a telemetry key.
 func (app *App) selectPolicyTeam(cmd *cobra.Command, cfg *config.Config) error {
 	if os.Getenv("TERMA_POLICY_STUB") != "" {
 		return nil
@@ -307,7 +290,6 @@ func (app *App) selectPolicyTeam(cmd *cobra.Command, cfg *config.Config) error {
 	return nil
 }
 
-// policySummary says in a few words what the organization collects.
 func policySummary(p config.Policy) string {
 	scope := "sessions in connected repositories"
 	if p.Global() {
@@ -324,10 +306,8 @@ func policySummary(p config.Policy) string {
 	return scope + ", without prompts or tool content"
 }
 
-// chooseHarnesses resolves the machine-level agent list: the --harness flag if given,
-// else a checkbox picker with coming-soon agents disabled (preselecting available
-// agents already recorded or detected), else — with --yes or no terminal — the
-// available recorded or detected agents.
+// chooseHarnesses resolves the machine-level agent list: --harness, else a picker,
+// else (with --yes or no terminal) the available recorded or detected agents.
 func (app *App) chooseHarnesses(cmd *cobra.Command, cfg *config.Config, f setupFlags) ([]string, error) {
 	if strings.TrimSpace(f.harnesses) != "" {
 		return app.parseAgentList(f.harnesses)
@@ -371,8 +351,8 @@ func (app *App) availableAgentNames() []string {
 	return names
 }
 
-// harnessSelectionAgents puts available agents first, preserving registry order
-// within each group. Both the form and its result mapping must use this order.
+// harnessSelectionAgents puts available agents first in registry order; the form and its
+// result mapping must share this order.
 func (app *App) harnessSelectionAgents() []agentChoice {
 	var choices []agentChoice
 	for _, available := range []bool{true, false} {
@@ -406,7 +386,6 @@ func (app *App) harnessSelectionForm(ctx context.Context, preselect map[string]b
 	return form
 }
 
-// parseAgentList validates a comma-separated list of adapter names.
 func (app *App) parseAgentList(raw string) ([]string, error) {
 	seen := map[string]bool{}
 	for _, n := range splitCommas(raw) {
@@ -421,7 +400,6 @@ func (app *App) parseAgentList(raw string) ([]string, error) {
 	return app.selectedInRegistryOrder(seen), nil
 }
 
-// selectedInRegistryOrder returns available chosen adapter names in registry order.
 func (app *App) selectedInRegistryOrder(chosen map[string]bool) []string {
 	var names []string
 	for _, a := range app.harnessSelectionAgents() {
@@ -432,7 +410,6 @@ func (app *App) selectedInRegistryOrder(chosen map[string]bool) []string {
 	return names
 }
 
-// detectedAgents lists the supported agents whose binary is present on this machine.
 func (app *App) detectedAgents(ctx context.Context) []string {
 	var names []string
 	for _, a := range app.harnessSelectionAgents() {
@@ -450,7 +427,6 @@ func (app *App) agentDetail(ctx context.Context, name string) string {
 	return ""
 }
 
-// adapterDisplayNames maps adapter tokens to their display names, in the given order.
 func (app *App) adapterDisplayNames(names []string) []string {
 	out := make([]string, 0, len(names))
 	for _, n := range names {
@@ -463,9 +439,8 @@ func (app *App) adapterDisplayNames(names []string) []string {
 	return out
 }
 
-// setupHeaderInfo is the column beside the logo: the product, who terma is signed in
-// as right now (and where it is pointed), and the working directory. It reads only local
-// state — no network — so it is safe to show before signing in.
+// setupHeaderInfo is the column beside the logo; it reads only local state, so it is safe
+// to show before signing in.
 func (app *App) setupHeaderInfo(cfg *config.Config, p style.Palette) []string {
 	info := []string{p.Bold("Terma CLI") + " " + p.Dim("("+app.version+")")}
 

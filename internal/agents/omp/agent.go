@@ -10,9 +10,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
-// Agent is Omp. Its attribution wiring is a committed hook file at .omp/hooks/pre/terma.ts
-// that hands session lifecycle and file edits to `terma hook omp-*`; telemetry export
-// lives in the user-scope extension `terma connect omp` writes into ~/.omp/agent/hooks/pre.
+// Agent is Omp: attribution through a committed hook file, telemetry through a
+// user-scope extension.
 type Agent struct{}
 
 func (Agent) Name() string                       { return "omp" }

@@ -11,17 +11,11 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
-// cursorObservationDir is Cursor's observation checkpoint under the hook state directory.
 const cursorObservationDir = "cursor-observations"
 
-// sourceCursorHook is the evidence_source of what Cursor's hook payloads said.
 const sourceCursorHook = "cursor_hook"
 
-// --- Cursor adapter -----------------------------------------------------------------
-
-// cursorHookInput is the JSON Cursor writes to a hook's stdin. Every event carries the
-// conversation id, the model and the workspace roots; sessionStart and sessionEnd add a
-// session id of their own. Only the fields terma reads are declared.
+// cursorHookInput is what Cursor writes to a hook's stdin, the fields terma reads.
 type cursorHookInput struct {
 	ConversationID      string          `json:"conversation_id"`
 	SessionID           string          `json:"session_id"`
@@ -46,9 +40,8 @@ type cursorHookInput struct {
 	ContextUsagePercent json.RawMessage `json:"context_usage_percent"`
 	Trigger             string          `json:"trigger"`
 	SubagentType        string          `json:"subagent_type"`
-	// SubagentID and ParentConversationID are what subagentStop carries beside, or
-	// instead of, the conversation id: the subagent's own conversation and the one that
-	// spawned it. A subagent's afterFileEdit can arrive under the first.
+	// subagentStop's own and spawning conversations; a subagent's afterFileEdit can
+	// arrive under SubagentID.
 	SubagentID           string          `json:"subagent_id"`
 	ParentConversationID string          `json:"parent_conversation_id"`
 	DurationMs           json.RawMessage `json:"duration_ms"`
@@ -68,15 +61,12 @@ type cursorHookInput struct {
 
 const cursorTool = "cursor"
 
-// id is the session key. The conversation id comes first because it is the one
-// identifier present on every event: afterFileEdit has no session_id, and keying on
-// anything else would put the edits in a different manifest from the session.
+// id is the session key: the conversation id first, since afterFileEdit has no session_id.
 func (in *cursorHookInput) id() string {
 	return cmp.Or(in.ConversationID, in.SessionID)
 }
 
-// cwd is the workspace Cursor is working in. User-level hooks run from ~/.cursor, so
-// the process directory says nothing; the first workspace root is the repository.
+// cwd is the first workspace root: user-level hooks run from ~/.cursor.
 func (in *cursorHookInput) cwd(fallback string) string {
 	if len(in.WorkspaceRoots) > 0 && in.WorkspaceRoots[0] != "" {
 		return in.WorkspaceRoots[0]
@@ -84,8 +74,8 @@ func (in *cursorHookInput) cwd(fallback string) string {
 	return fallback
 }
 
-// cursorModelParams copies the allowlisted model parameters onto an event. Model
-// selection is evidence, not proof of the model billed (e.g. Auto).
+// cursorModelParams copies the allowlisted model parameters onto an event; a selection
+// is evidence, not proof of the model billed (Auto).
 func cursorModelParams(in *cursorHookInput, a map[string]any) {
 	for _, p := range in.ModelParams {
 		switch p.ID {
@@ -97,9 +87,8 @@ func cursorModelParams(in *cursorHookInput, a map[string]any) {
 	}
 }
 
-// readCursorInput refuses a payload without a safe conversation id, so no Cursor handler
-// has to check the id again. A subagent hook may name only the conversation that spawned
-// it; that is the conversation it is filed under, so it stands in for the missing id.
+// readCursorInput refuses a payload without a safe conversation id; a subagent hook's
+// spawning conversation stands in for a missing one.
 func readCursorInput(r io.Reader) (*cursorHookInput, error) {
 	in, err := hookrun.ReadInput[cursorHookInput](r)
 	if err != nil {
@@ -114,7 +103,6 @@ func readCursorInput(r io.Reader) (*cursorHookInput, error) {
 	return in, nil
 }
 
-// sessionStart records the conversation as the active session.
 func sessionStart(ctx context.Context, env hookrun.Env) error {
 	in, err := readCursorInput(env.Stdin)
 	if err != nil {
@@ -149,7 +137,6 @@ func sessionEnd(ctx context.Context, env hookrun.Env) error {
 	return nil
 }
 
-// fileEdit adds the edited file to the conversation's manifest.
 func fileEdit(ctx context.Context, env hookrun.Env) error {
 	in, err := readCursorInput(env.Stdin)
 	if err != nil {

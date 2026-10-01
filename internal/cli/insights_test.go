@@ -12,16 +12,13 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/api"
 )
 
-// runInsights executes the command tree against a fake gateway, authenticated with a
-// server key so no credential file is involved, and returns what a consumer would see.
-// It runs under a deadline: a read that waits on a feed must fail a test, not hang it.
+// runInsights runs under a deadline: a read that waits on a feed must fail a test, not hang it.
 func runInsights(t *testing.T, handler http.HandlerFunc, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
 	run := termaRun{within: 30 * time.Second, env: fakeGateway(t, handler)}
 	return run.exec(t, append([]string{"-o", "json"}, args...)...)
 }
 
-// The principal catalog every insight command loads first.
 const principalsJSON = `{"principals":[
 	{"kind":"user","id":"u-dawson-cc","name":"dawson@mirador.org","source_system":"claude-code"},
 	{"kind":"user","id":"u-dawson-cx","name":"dawson@mirador.org","source_system":"codex"},
@@ -57,8 +54,7 @@ func TestInsightCommandTree(t *testing.T) {
 	}
 }
 
-// "How much did Dawson use today?" — the name becomes the ids the catalog knows for
-// that person, on every agent they use, and the window becomes an absolute bound on
+// A name becomes the person's ids on every agent, and the window an absolute bound on
 // the session's last activity.
 func TestSessionList_ResolvesNameAndWindow(t *testing.T) {
 	var got url.Values
@@ -102,7 +98,6 @@ func TestSessionList_AmbiguousNameIsAnError(t *testing.T) {
 	_, _, err := runInsights(t, principalsThen(t, func(w http.ResponseWriter, r *http.Request) {
 		t.Fatalf("no session read should happen; got %s", r.URL.Path)
 	}), "session", "list", "--user", "da")
-	// Dana is named by the alias she chose, Dawson by the email the provider reported.
 	if err == nil || !strings.Contains(err.Error(), "Dana") || !strings.Contains(err.Error(), "dawson@mirador.org") {
 		t.Fatalf("err = %v, want both candidates named", err)
 	}
@@ -167,7 +162,6 @@ func TestSessionList_AllFollowsPages(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &view); err != nil || len(view.Sessions) != 2 || strings.Join(pages, ",") != "1,2" {
 		t.Fatalf("pages=%v sessions=%d err=%v", pages, len(view.Sessions), err)
 	}
-	// The rows are no single page of the gateway's, so none is claimed.
 	if view.Pagination != nil {
 		t.Fatalf("pagination = %+v on a walk", view.Pagination)
 	}
@@ -256,8 +250,6 @@ func TestSessionGitFollow_EmitsEnvelopesAndReportsRotation(t *testing.T) {
 	}
 }
 
-// The usage report is six PromQL queries over one window, joined by group and
-// labelled with names from the catalog.
 func TestUsage_BuildsPromQLAndJoinsNames(t *testing.T) {
 	var queries []string
 	stdout, _, err := runInsights(t, principalsThen(t, func(w http.ResponseWriter, r *http.Request) {
@@ -299,8 +291,7 @@ func TestUsage_BuildsPromQLAndJoinsNames(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &report); err != nil {
 		t.Fatalf("stdout is not JSON: %v\n%s", err, stdout)
 	}
-	// The codex row came back at zero on every counter: that person was idle there, and
-	// an idle row must not be reported as "used, cost nothing".
+	// An all-zero row is idle and must not be reported as "used, cost nothing".
 	if report.Basis != "metrics_window" || report.GroupBy != "user" || len(report.Rows) != 1 {
 		t.Fatalf("report = %+v", report)
 	}

@@ -22,8 +22,7 @@ const (
 	routeDevProject  = "bbbbbbbb-0000-4000-8000-00000000000b"
 )
 
-// ingestHost stands in for one environment's OTLP ingest host. It accepts only
-// its own key and answers any other the way the real host does.
+// ingestHost stands in for one environment's ingest host, accepting only its own key.
 type ingestHost struct {
 	*httptest.Server
 	mu   sync.Mutex
@@ -55,9 +54,8 @@ func (h *ingestHost) keysSeen() []string {
 	return append([]string(nil), h.auth...)
 }
 
-// routingSandbox gives a test its own config dir with no explicit ingest override,
-// and a profile default that no one listens on: a regression that ignores the
-// routing record fails here, fast, instead of sending test keys to a real host.
+// routingSandbox gives a test its own config dir and a profile host no one listens on, so
+// ignoring the routing record fails fast.
 func routingSandbox(t *testing.T) {
 	t.Helper()
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
@@ -67,8 +65,7 @@ func routingSandbox(t *testing.T) {
 	}
 }
 
-// routeProject stores a key for a project and the routing record `terma install`
-// writes, naming the host the project's agents export to.
+// routeProject stores a project's key and the routing record naming its host.
 func routeProject(t *testing.T, projectID, key, endpoint string) {
 	t.Helper()
 	if err := keystore.Set(projectID, key, keystore.Hosts{}); err != nil {
@@ -96,11 +93,8 @@ func queuedProjects(t *testing.T) []string {
 	return ids
 }
 
-// A developer with one repository bound to a dev-deployment project and another to a
-// production one had every flush refused with "invalid OTLP API key": the flusher sent
-// both projects to the active profile's host, so the dev project's key went to
-// production. Each project's events go to the host its routing record names — the
-// one its agents already export to — and no key is ever shown to the other host.
+// Each project's events go to the host its routing record names, and no key is shown to
+// another host.
 func TestSpoolFlushSendsEachProjectToItsOwnHost(t *testing.T) {
 	routingSandbox(t)
 	prod := newIngestHost(t, "ter_srv_prod")
@@ -135,8 +129,7 @@ func TestSpoolFlushSendsEachProjectToItsOwnHost(t *testing.T) {
 	}
 }
 
-// One project refused must not hold up another. The refused project is named with
-// the host that refused it, its events stay queued, and the other project's leave.
+// A refused project is named with its host and its events stay queued; the other's leave.
 func TestSpoolFlushOneRefusedProjectDoesNotHoldUpAnother(t *testing.T) {
 	routingSandbox(t)
 	prod := newIngestHost(t, "ter_srv_prod")
@@ -144,7 +137,7 @@ func TestSpoolFlushOneRefusedProjectDoesNotHoldUpAnother(t *testing.T) {
 	routeProject(t, routeProdProject, "ter_srv_prod", prod.URL)
 	routeProject(t, routeDevProject, "ter_srv_revoked", dev.URL)
 	s := spoolForTest(t)
-	// The refused project first, where it blocked everything behind it.
+	// The refused project first.
 	for _, id := range []string{routeDevProject, routeDevProject, routeProdProject} {
 		appendEvent(t, s, id, time.Now())
 	}
@@ -169,10 +162,8 @@ func TestSpoolFlushOneRefusedProjectDoesNotHoldUpAnother(t *testing.T) {
 	}
 }
 
-// A refused project backs off on its own. A spool-wide window made a hook's next
-// flush, which honours it, skip every project for up to an hour; the next flush
-// delivers the other project's new events and does not ask the refusing host again
-// until its window closes. --force (what doctor runs) asks at once.
+// A refused project backs off alone: the next flush delivers the others without asking
+// it again, and --force (doctor) asks at once.
 func TestSpoolFlushARefusedProjectWaitsAlone(t *testing.T) {
 	routingSandbox(t)
 	prod := newIngestHost(t, "ter_srv_prod")
@@ -222,10 +213,7 @@ func TestSpoolFlushARefusedProjectWaitsAlone(t *testing.T) {
 	}
 }
 
-// A key is filed with the hosts of the environment it was minted in, so a project
-// with no routing record — hooks-only agents, `--harness none` — reaches its own
-// ingest host too. The record-less fallback to the active profile's host sent such a
-// project's key to whichever environment the developer had signed in to last.
+// A project with no routing record reaches the hosts stored with its key.
 func TestSpoolFlushUsesTheHostsStoredWithTheKey(t *testing.T) {
 	routingSandbox(t)
 	dev := newIngestHost(t, "ter_srv_dev")
@@ -254,8 +242,7 @@ func TestSpoolFlushUsesTheHostsStoredWithTheKey(t *testing.T) {
 	}
 }
 
-// --otlp-url and TERMA_OTLP_URL are an explicit choice, a local collector or a test
-// server, and still decide over the routing record.
+// --otlp-url and TERMA_OTLP_URL still decide over the routing record.
 func TestSpoolFlushOverrideWinsOverTheRoutingRecord(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	override := newIngestHost(t, "ter_srv_prod")
@@ -271,10 +258,7 @@ func TestSpoolFlushOverrideWinsOverTheRoutingRecord(t *testing.T) {
 	}
 }
 
-// Doctor flushes every project's events, not only its repository's. Another project's
-// refusal used to fail this repository's check as "check network / OTLP endpoint"
-// followed by the active profile's host — not the host that refused, and not this
-// repository's problem. It is a warning here, naming the project and its host.
+// Another project's refusal is a doctor warning naming that project and its host.
 func TestDoctorBackendWarnsForAnotherProjectsRefusal(t *testing.T) {
 	routingSandbox(t)
 	prod := newIngestHost(t, "ter_srv_prod")

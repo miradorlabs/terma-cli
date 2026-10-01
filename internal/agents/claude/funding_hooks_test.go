@@ -24,37 +24,29 @@ func writeRealClaudeAccount(t *testing.T) {
 	hookruntest.WriteFile(t, os.Getenv("CLAUDE_CONFIG_DIR"), ".claude.json", string(b))
 }
 
-// A configured apiKeyHelper supplies an API credential that outranks the stored OAuth login, so the
-// cached account is not the funding owner and must be withheld — like the env/cloud overrides.
+// A configured apiKeyHelper outranks the stored OAuth login, so the cached account is withheld.
 func TestClaudeAccountWithheldWhenApiKeyHelperConfigured(t *testing.T) {
 	env := newFundingEnv(t)
 	writeRealClaudeAccount(t)
 
-	// Control: with no apiKeyHelper, the OAuth account is the funding owner.
 	if id, _, ok := claudeOAuthAccount(env.Cwd); !ok || id != realClaudeAccountID {
 		t.Fatalf("baseline: claudeOAuthAccount = %q,%v; want %q,true", id, ok, realClaudeAccountID)
 	}
 
-	// A configured apiKeyHelper in repo settings now outranks the OAuth login.
 	hookruntest.WriteFile(t, filepath.Join(env.Cwd, ".claude"), "settings.json", `{"apiKeyHelper":"/usr/local/bin/get-key"}`)
 	if id, _, ok := claudeOAuthAccount(env.Cwd); ok {
 		t.Fatalf("apiKeyHelper configured: expected the account withheld, got %q", id)
 	}
 }
 
-// A settings.json that is not a regular file is rejected by the Lstat-based evidence reader as
-// unsupported, so api_key_helper_state is "unknown" — a hidden apiKeyHelper cannot be ruled out, so the
-// cached account is withheld. A symlinked settings.json (the dotfiles case that surfaced this) and a
-// directory both hit the same non-regular -> unsupported path; a directory is used here so the test
-// runs on every OS (Windows symlink creation needs elevated privileges).
+// A non-regular settings.json makes the helper state "unknown", which withholds the account; a
+// directory stands in for a symlink so the test runs on Windows.
 func TestClaudeAccountWithheldWhenHelperStateUnknown(t *testing.T) {
 	env := newFundingEnv(t)
 	writeRealClaudeAccount(t)
 	if id, _, ok := claudeOAuthAccount(env.Cwd); !ok || id != realClaudeAccountID {
 		t.Fatalf("baseline: claudeOAuthAccount = %q,%v; want %q,true", id, ok, realClaudeAccountID)
 	}
-	// A directory at settings.json is a non-regular file: readEvidenceJSON reports unsupported, so the
-	// helper state is "unknown" and the account is withheld.
 	if err := os.MkdirAll(filepath.Join(env.Cwd, ".claude", "settings.json"), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -63,9 +55,7 @@ func TestClaudeAccountWithheldWhenHelperStateUnknown(t *testing.T) {
 	}
 }
 
-// A VISIBLE CLAUDE_CODE_OAUTH_TOKEN is an externally supplied credential that may belong to a
-// different account than the cached profile, so the cached id is withheld. (When Claude strips the
-// token from the hook it is indistinguishable from interactive login and the cached profile stands.)
+// A visible CLAUDE_CODE_OAUTH_TOKEN may belong to another account, so the cached id is withheld.
 func TestClaudeAccountWithheldWhenOAuthTokenVisible(t *testing.T) {
 	env := newFundingEnv(t)
 	writeRealClaudeAccount(t)
@@ -78,8 +68,7 @@ func TestClaudeAccountWithheldWhenOAuthTokenVisible(t *testing.T) {
 	}
 }
 
-// Claude Code enables a cloud route on "yes" (its isOn accepts 1/true/yes), not only 1/true, so the
-// cached OAuth account must be withheld there too — funding parses the flag with the same truthiness.
+// A cloud route enabled with "yes" withholds the cached account too.
 func TestClaudeAccountWithheldOnYesCloudFlag(t *testing.T) {
 	env := newFundingEnv(t)
 	writeRealClaudeAccount(t)
@@ -165,8 +154,7 @@ func TestStopFailureAllowlist(t *testing.T) {
 	}
 }
 
-// The cached OAuth account must not be attributed to a failure that occurred
-// under an override credential (env API key / auth token / cloud provider).
+// A failure under an override credential is not attributed to the cached OAuth account.
 func TestStopFailureOmitsAccountIDUnderOverrideCredential(t *testing.T) {
 	env := newFundingEnv(t)
 	hookruntest.WriteFile(t, os.Getenv("CLAUDE_CONFIG_DIR"), ".claude.json", `{"oauthAccount":{"accountUuid":"account-l"}}`)
@@ -195,7 +183,7 @@ func TestFundingRetriesAfterFailedAppend(t *testing.T) {
 		t.Fatal(err)
 	}
 	env.Spool = sp
-	// Remove the empty spool directory so the first append fails even as root.
+	// Remove the spool directory so the first append fails even as root.
 	if err := os.Remove(dir); err != nil {
 		t.Fatal(err)
 	}
@@ -211,10 +199,8 @@ func TestFundingRetriesAfterFailedAppend(t *testing.T) {
 	}
 }
 
-// realClaudeAccountID and realClaudeOrganizationID are the account and organization UUIDs in testdata/claude_account_real.json — the real captured
-// ~/.claude.json oauthAccount shape (Team plan, stripe_subscription billing), with the ids anonymized
-// to match the platform's real_claude_account.json fixture. writeRealClaudeAccount lands it as the
-// hook's .claude.json so the funding tests run against the true wire shape, not a stub.
+// realClaudeAccountID and realClaudeOrganizationID are the anonymized ids in
+// testdata/claude_account_real.json, a real ~/.claude.json oauthAccount shape.
 const (
 	realClaudeAccountID      = "a1111111-1111-4111-8111-111111111111"
 	realClaudeOrganizationID = "b2222222-2222-4222-8222-222222222222"

@@ -20,7 +20,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 )
 
-// countFiles counts the regular files under dir, temporary ones aside.
 func countFiles(t *testing.T, dir string) int {
 	t.Helper()
 	n := 0
@@ -33,9 +32,7 @@ func countFiles(t *testing.T, dir string) int {
 	return n
 }
 
-// What a relay accepted for a claimed session and could not deliver — the gateway
-// down, then the relay stopped — is delivered by the next relay on the same outbox:
-// nothing acknowledged is lost to a restart, and every record is accounted for.
+// What a stopped relay could not deliver is delivered by the next relay on the same outbox.
 func TestRelayOutboxSurvivesARestart(t *testing.T) {
 	var up atomic.Bool
 	var got atomic.Int64
@@ -89,8 +86,7 @@ func TestRelayOutboxSurvivesARestart(t *testing.T) {
 	waitFor(t, func() bool { return countFiles(t, dir) == 0 })
 }
 
-// Only claimed parts reach the disk: a session no hook claimed, a project with no key
-// and a record naming no session are held in memory and dropped there.
+// Only claimed, keyed parts reach the disk; everything else is held and dropped in memory.
 func TestRelayWritesNothingUnclaimed(t *testing.T) {
 	u := newUpstream(t)
 	u.status = http.StatusServiceUnavailable // so claimed parts stay on disk to be seen
@@ -136,8 +132,7 @@ func TestRelayKeylessOutboxDoesNotKeepTheRelayBusy(t *testing.T) {
 	}
 }
 
-// The janitor drops what is past its age, then the oldest past the size bound, and
-// counts each as dropped.
+// The janitor drops what is past its age, then the oldest past the size bound, counting each.
 func TestOutboxJanitorBounds(t *testing.T) {
 	dir := t.TempDir()
 	o := outbox{dir}
@@ -221,9 +216,7 @@ func TestBackoffAndJitter(t *testing.T) {
 	}
 }
 
-// A part queued while the project allowed prompts, delivered after it stopped: it leaves
-// under the policy that stands at delivery, so the prompt never reaches upstream (the
-// review's reproduction: queue a prompt, restart with prompts off).
+// A part queued while prompts were allowed leaves under the policy at delivery, without them.
 func TestRelayQueuedPartsFollowTheCurrentContentPolicy(t *testing.T) {
 	var up atomic.Bool
 	var got [][]byte

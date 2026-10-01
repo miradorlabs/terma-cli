@@ -20,7 +20,6 @@ func TestCodexNotifyBareInstallClearsStaleRecord(t *testing.T) {
 	if _, err := c.InstallCodexNotify(); err != nil {
 		t.Fatalf("first install: %v", err)
 	}
-	// The user strips terma's notify by hand, leaving no notifier behind.
 	if err := os.WriteFile(path, []byte("model = \"gpt-5.4\"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -44,15 +43,14 @@ func TestRunPreviousCodexNotifyGuardsOnlyTermaArgv(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// A user program whose path merely contains "terma" and "codex-notify" is not
-	// terma's own notifier, so it must not be refused as a recursive chain.
+	// A user program whose path merely contains "terma" and "codex-notify" is not refused as
+	// a recursive chain.
 	if err := saveCodexNotifyChain(cp, []string{"/opt/terma-tools/codex-notify-desktop"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := RunPreviousCodexNotify(context.Background(), "{}"); err != nil && strings.Contains(err.Error(), "recursive") {
 		t.Fatalf("legitimate notifier refused as recursive: %v", err)
 	}
-	// terma's actual argv must still be refused.
 	if err := saveCodexNotifyChain(cp, CodexNotifyCommand); err != nil {
 		t.Fatal(err)
 	}
@@ -179,9 +177,7 @@ func TestCodexNotifyChainsAndRestoresUserProgram(t *testing.T) {
 	}
 }
 
-// One record used to serve every Codex config on the machine. Connecting under a second
-// CODEX_HOME overwrote the first config's displaced notifier, or — installing over no
-// notifier there — deleted it, and the first disconnect had nothing to restore.
+// Each Codex config keeps its own displaced notifier, including a config that had none.
 func TestCodexNotifyKeepsOneChainPerConfig(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	homeA, homeB, homeC := t.TempDir(), t.TempDir(), t.TempDir()
@@ -193,7 +189,7 @@ func TestCodexNotifyKeepsOneChainPerConfig(t *testing.T) {
 	}
 	write(homeA, "notify = [\"notifier-A\"]\n")
 	write(homeB, "notify = [\"notifier-B\"]\n")
-	write(homeC, "model = \"gpt-5.4\"\n") // no notifier: this install used to delete the record
+	write(homeC, "model = \"gpt-5.4\"\n")
 
 	for _, home := range []string{homeA, homeB, homeC} {
 		t.Setenv("CODEX_HOME", home)

@@ -79,19 +79,10 @@ func CheckHooksApplied(reg *agents.Registry, root string, selected []string, hin
 	return nil
 }
 
-// Adapters lists the agents whose committed hooks to wire. --adapters overrides
-// it outright; otherwise it is the union of the agents the repository's hooks files
-// already wire, the agents this install configures, and any adapter whose directory the
-// repository already carries (a .codex directory is a clear sign the repo is opened in
-// Codex) — restricted to adapters that actually write a hooks file, and to agents that
-// are available: one still coming soon (not supported by this build) is wired
-// only when --adapters names it, whatever directory the repository carries. Hooks a
-// colleague committed for one are left as they are, not rewritten or removed.
-//
-// A union (rather than replacing with the current selection) means selecting more agents
-// grows the committed set, while a colleague re-running install with a narrower selection
-// never removes hooks someone else committed — so the files grow on purpose and never
-// churn down.
+// Adapters lists the agents whose committed hooks to wire: override when given, else the
+// union of the selected, the already wired and those whose directory the repository
+// carries, among supported agents. A union, so a colleague's narrower re-install never
+// removes hooks someone else committed.
 func Adapters(reg *agents.Registry, root string, selected, override []string) []string {
 	if len(override) > 0 {
 		return override
@@ -114,18 +105,15 @@ type Binding struct {
 	ID, Name, OrganizationID, Environment string
 }
 
-// Kept is the repository's Binding as it stands, environment included: a
-// colleague confirming the project must not rewrite the committed file to match their
-// own setup.
+// Kept is the repository's Binding as it stands, so a colleague's confirmation does not
+// rewrite the committed file.
 func Kept(existing *termaproject.File) Binding {
 	p := existing.Project
 	return Binding{ID: p.ID, Name: p.Name, OrganizationID: p.OrganizationID, Environment: p.Environment}
 }
 
 // PolicyHarnesses is the subset of an install's adapters whose harness reads a
-// repository's own export policy. Cursor and Codex are wired for hooks and nothing
-// else: Cursor has no local OTLP exporter policy, and Codex ignores an otel table
-// in a project's config.
+// repository's own export policy.
 func PolicyHarnesses(reg *agents.Registry, adapters []string) []harness.Harness {
 	var out []harness.Harness
 	for _, a := range adapters {

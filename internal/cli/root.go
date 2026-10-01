@@ -41,9 +41,7 @@ type globalFlags struct {
 	output    string
 }
 
-// NewRootCommand builds the whole command tree. It is a constructor rather than a
-// package variable so that every test gets a tree of its own, with its own flags and
-// output streams.
+// NewRootCommand builds a fresh command tree, so every test gets its own flags and streams.
 func (app *App) NewRootCommand() *cobra.Command {
 	root := &cobra.Command{
 		Use:   "terma",
@@ -69,15 +67,12 @@ spend will be attributed.`,
 		},
 	}
 
-	// Shell completion stays, hidden: the Homebrew cask generates its completion files by
-	// running `terma completion <shell>` during install, and fails the install if it
-	// cannot. It is not a command a developer needs listed.
+	// Hidden, not removed: the Homebrew cask runs `terma completion <shell>` during install.
 	root.CompletionOptions.HiddenDefaultCmd = true
 
 	pf := root.PersistentFlags()
 	pf.StringVar(&app.flags.profile, "profile", "", "configuration profile to use")
-	// The environment and endpoint overrides are for Terma's own engineers (and
-	// self-hosted deployments). Hidden: users get production and nothing to choose.
+	// Environment and endpoint overrides are for Terma's own engineers.
 	pf.StringVar(&app.flags.env, "env", "", "built-in environment: prod, dev, local")
 	pf.StringVar(&app.flags.apiURL, "api-url", "", "Terma data API base URL")
 	pf.StringVar(&app.flags.authURL, "auth-url", "", "Terma auth API base URL")
@@ -90,45 +85,35 @@ spend will be attributed.`,
 	pf.StringVarP(&app.flags.output, "output", "o", "", "output format: table, json, yaml, csv")
 
 	root.AddCommand(
-		// Onboarding: the commands the README leads with.
 		app.newSetupCommand(),
 		app.newInstallCommand(),
 		app.newUninstallCommand(),
 		app.newNateCommand(),
 		app.newDoctorCommand(),
 		app.newStatusCommand(),
-		// Insight: what the connected agents did, for whom, and what it cost.
 		app.newSessionCommand(),
 		app.newUsageCommand(),
-		app.newPrincipalCommand(), // advanced: hidden from the primary workflow
-		// Harness connections (also reachable under the `telemetry` group).
+		app.newPrincipalCommand(),        // advanced: hidden from the primary workflow
 		app.newTelemetryConnectCommand(), // advanced: install configures telemetry normally
 		app.newTelemetryDisconnectCommand(),
 		app.newHarnessCommand(),
 		app.newTelemetryCommand(),
-		// Account and configuration.
 		app.newLoginCommand(),
 		app.newLogoutCommand(),
 		app.newWhoamiCommand(),
 		app.newProjectCommand(),
 		app.newOrgCommand(),
 		app.newConfigCommand(),
-		// Maintenance.
 		app.newUpdateCommand(),
 		app.newSpoolCommand(),
 		app.newVersionCommand(),
-		// Internal: the target of every installed hook shim.
 		app.newHookCommand(),
 		app.newAgentCommand(),
-		// The local OTLP relay (docs/RELAY.md).
 		app.newRelayCommand(),
 	)
 	return root
 }
 
-// newHarnessCommand groups the per-harness views: `list` for the static support
-// catalog, `status` for what each harness's own config actually says. A bare
-// `terma harness` shows the support catalog, the more useful default.
 func (app *App) newHarnessCommand() *cobra.Command {
 	list := app.newHarnessListCommand()
 	cmd := &cobra.Command{
@@ -159,12 +144,10 @@ func (app *App) newVersionCommand() *cobra.Command {
 	}
 }
 
-// printUpdateNotice runs daily update maintenance after interactive commands, and the
-// first time a new release runs one, the refresh of what earlier versions installed —
-// never from a hook or a spool flush (those must stay silent and fast).
+// printUpdateNotice runs update maintenance after interactive commands, never from a
+// hook or a spool flush, which must stay silent and fast.
 func (app *App) printUpdateNotice(cmd *cobra.Command) {
-	// nate deliberately removes the updater's state and the running executable. Its
-	// post-run must not recreate either half of the installation it just removed.
+	// nate removes the updater's state and the executable; its post-run must not recreate them.
 	if cmd.Name() == "nate" {
 		return
 	}
@@ -197,14 +180,8 @@ func (app *App) automaticUpdatesAllowed(cmd *cobra.Command, interactive bool) bo
 	return true
 }
 
-// migrateState brings the state an earlier terma left behind up to this build before any
-// command reads it (internal/migrate). It runs on every start, hooks included, because
-// after an upgrade a hook is as likely as anything to be the new build's first run; when
-// nothing is pending it costs one small read. It never fails the command: a hook or a
-// launch shim stays silent and gives migrating about a second — the bound covers the
-// migrations themselves, which stop between steps and carry on at the next start — and
-// anything else says what failed on a terminal a person is watching. Tests do not come through here, so none
-// can migrate a developer's real config directory.
+// migrateState runs pending migrations before any command, hooks included, since a hook
+// may be a new build's first run; hooks get about a second and never fail.
 func migrateState(ctx context.Context, args []string) {
 	dir, err := config.Dir()
 	if err != nil || !migrate.Pending(dir) {
@@ -224,24 +201,16 @@ func migrateState(ctx context.Context, args []string) {
 
 // App is terma's command line: what every command reads, held for one run.
 type App struct {
-	// agents are the agents this build knows, and version its release tag ("dev" for a
-	// source build).
 	agents  *agents.Registry
 	version string
 	flags   globalFlags
-	// binDirs are where doctor looks for other terma builds besides PATH.
 	binDirs func() []string
-	// hookExecutable is the terma machine-wide hooks and git's global hooks call: this
-	// one, by the path it was started as.
+	// hookExecutable is the terma machine-wide and global git hooks call, by its start path.
 	hookExecutable func() (string, error)
-	// managedRoot prefixes the system paths managed configuration lives at.
-	managedRoot string
-	// sessionGetWait bounds `session get`: the gateway serves a single session's
-	// roll-up only as a live feed, which has no request timeout.
-	sessionGetWait time.Duration
-	// runUpdateStep runs one program of an update attached to the terminal.
-	runUpdateStep func(ctx context.Context, out io.Writer, argv ...string) error
-	// nateBinaryCandidates and nateRemoveBinary find and delete installed termas.
+	managedRoot    string
+	// sessionGetWait bounds `session get`: the gateway's roll-up feed has no request timeout.
+	sessionGetWait       time.Duration
+	runUpdateStep        func(ctx context.Context, out io.Writer, argv ...string) error
 	nateBinaryCandidates func() []string
 	nateRemoveBinary     func(cmd *cobra.Command, path string) error
 }
@@ -254,13 +223,9 @@ func New(known *agents.Registry, version string) *App {
 	return app
 }
 
-// Execute runs the command line and returns the process's exit status: 0, 1 for a
-// failure, or the code a command chose to mean something more specific (see
-// exitcode.go).
+// Execute runs the command line and returns the process's exit status (see exitcode.go).
 func (app *App) Execute() int {
-	// The first SIGINT/SIGTERM cancels the running command's context so an in-flight
-	// request unwinds promptly instead of waiting out the HTTP timeout. Default signal
-	// handling is then restored, so a second signal still force-terminates.
+	// The first signal cancels the context; a second one force-terminates.
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 	defer signal.Stop(sigCh)
@@ -282,8 +247,7 @@ func (app *App) Execute() int {
 	migrateState(ctx, os.Args[1:])
 
 	if err := app.NewRootCommand().ExecuteContext(ctx); err != nil {
-		// A command that has already explained itself on stdout ends the process
-		// with its own code, and prints nothing more.
+		// A command that already explained itself on stdout ends with its own code.
 		if code, ok := exitCodeOf(err); ok {
 			return code
 		}
@@ -297,7 +261,6 @@ func (app *App) Execute() int {
 			default:
 			}
 		}
-		// An error's fix is usually a command to run, so it is drawn as one.
 		errOut := style.Highlight(os.Stderr)
 		label := style.For(os.Stderr).Fail("Error:")
 		if errors.Is(err, auth.ErrNotLoggedIn) {
@@ -341,10 +304,8 @@ func (app *App) loadProjectConfig() (*config.Config, error) {
 	return cfg, nil
 }
 
-// resolveRepoProject supplies the repository's project only when the caller has
-// not given a command/env override. Git's worktree root prevents a nested checkout
-// from inheriting the parent repository's binding; a linked worktree without one of its
-// own uses its main checkout's (project.Resolve). No profile is changed.
+// resolveRepoProject supplies the repository's binding unless a flag or env var gave a
+// project; a nested checkout never inherits its parent's.
 func resolveRepoProject(cfg *config.Config) error {
 	if cfg.ProjectID != "" {
 		return nil
@@ -365,9 +326,6 @@ func resolveRepoProject(cfg *config.Config) error {
 	return nil
 }
 
-// newClient builds an authenticated client. Commands that read project-scoped data
-// call requireProject first so the missing-project case is a clear local message
-// rather than a 400 from the gateway.
 func (app *App) newClient(cfg *config.Config) (*api.Client, error) {
 	return api.New(cfg, api.Options{Version: app.version, ProjectID: cfg.ProjectID})
 }
@@ -382,10 +340,8 @@ func requireProject(cfg *config.Config) error {
 	return errors.New("no project bound to this repository — run `terma install` inside a repository, or pass --project for this command")
 }
 
-// repoHere locates the repository the CLI runs in: its worktree root and its git
-// directory. outside is the caller's own sentence for a directory that is in no
-// repository ("terma install runs inside a git repository"); left empty, git's own
-// error comes back, for a caller that wraps it or only needs to know.
+// repoHere locates the worktree root and git directory; outside, when non-empty, replaces
+// git's error for a directory in no repository.
 func repoHere(ctx context.Context, outside string) (root, gitDir string, err error) {
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -406,10 +362,8 @@ func workspaceHere(ctx context.Context) (root, gitDir string, err error) {
 	return termaproject.Locate(ctx, cwd)
 }
 
-// setupCommand is the preamble every signed-in read shares: the configuration, the
-// output format and a client. A command's own preconditions run on the configuration
-// before the format or the credential is looked at, so a missing project is reported
-// ahead of a sign-in error rather than hidden behind it.
+// setupCommand loads configuration, format and client, running preconditions first so a
+// missing project is reported ahead of a sign-in error.
 func (app *App) setupCommand(preconditions ...func(*config.Config) error) (*config.Config, *api.Client, output.Format, error) {
 	cfg, err := app.loadConfig()
 	if err != nil {

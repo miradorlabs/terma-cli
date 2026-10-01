@@ -65,9 +65,8 @@ func TestShellRCNamesTheFileTheShellReads(t *testing.T) {
 	}
 }
 
-// TestPathLineEscapesHostilePaths proves a directory whose path contains shell
-// metacharacters is written inert: sourced in /bin/sh it neither runs a command
-// substitution nor breaks the line, and PATH still receives the literal directory.
+// TestPathLineEscapesHostilePaths: a path with shell metacharacters, sourced in /bin/sh,
+// runs nothing and puts the literal directory on PATH.
 func TestPathLineEscapesHostilePaths(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("POSIX shell rc")

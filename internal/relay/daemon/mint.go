@@ -9,17 +9,10 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
-// A repository the platform connected has its binding and hooks committed, and no
-// `terma install` ran in it: this machine holds no key for its project. Its sessions are
-// claimed — the repository opted in, and the developer signed in with `terma setup` —
-// so the relay mints the project's key itself, once, with the signed-in credential, and
-// stores it as the project's key (keystore.Set): the relay sends with it, and so does
-// the spool, whose hook events were held for want of one. Minting runs off the export
-// path; the session's parts wait in the hold meanwhile (no_key), which the next sweep
-// releases. A failure — not signed in, refused — is not retried for KeyMintBackoff.
+// A repository the platform connected has no key on this machine until the relay mints one
+// with the signed-in credential, off the export path, while the session's parts wait.
 
-// KeyMintBackoff is how long a project whose key could not be minted waits before the
-// relay tries again.
+// KeyMintBackoff is how long a project whose key could not be minted waits before a retry.
 const KeyMintBackoff = 10 * time.Minute
 
 // KeyMinter mints the keys of claimed projects this machine holds none for.

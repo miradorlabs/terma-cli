@@ -17,17 +17,15 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 )
 
-// Env is what a doctor run reads: the registry, the configuration, where the CLI stands,
-// and the probes for what this package does not reach itself.
+// Env is what a doctor run reads.
 type Env struct {
 	Agents *agents.Registry
 	// Config is the loaded configuration; ConfigErr says why there is none.
 	Config    *config.Config
 	ConfigErr error
-	// Exe is the running executable, and BinDirs where else a terma may be installed.
-	Exe     string
-	BinDirs []string
-	// Root and GitDir are the workspace the CLI stands in; RepoErr says why there is none.
+	// Exe is the running executable; BinDirs is where else a terma may be installed.
+	Exe          string
+	BinDirs      []string
 	Root, GitDir string
 	RepoErr      error
 	SkipCommit   bool
@@ -36,32 +34,26 @@ type Env struct {
 
 // Probes reach the event spool and the platform's APIs for a run.
 type Probes struct {
-	// Spool reports the event queue.
 	Spool func() SpoolState
 	// Deliver flushes every project's queued events, retry windows ignored.
-	Deliver func(ctx context.Context) (Delivery, error)
-	// Endpoint is the ingest host a project's events go to.
+	Deliver  func(ctx context.Context) (Delivery, error)
 	Endpoint func(projectID string) string
-	// CommitRecorded reports whether projectID's data API holds the terma.commit event for
-	// sha recorded between from and to.
+	// CommitRecorded reports whether projectID's data API holds sha's terma.commit event.
 	CommitRecorded func(ctx context.Context, projectID, sha string, from, to time.Time) (bool, error)
 }
 
 // SpoolState is the event queue as a run finds it.
 type SpoolState struct {
-	Open   bool
-	Queued int
-	// WriteErr is why one more event could not be written.
+	Open     bool
+	Queued   int
 	WriteErr error
 }
 
 // Delivery is what one flush of the queue did.
 type Delivery struct {
-	Sent int
-	// Err is set when the pass failed; Failures names each project whose send failed.
-	Err      error
-	Failures []Failure
-	// Endpoints are the ingest hosts that accepted events.
+	Sent      int
+	Err       error
+	Failures  []Failure
 	Endpoints []string
 	// Delivered words what was sent, and Undelivered what was not.
 	Delivered   string
@@ -76,8 +68,7 @@ type Failure struct {
 	Refused, KeyRefused bool
 }
 
-// Progress is how a run reports as it goes: a check starting, a word about what a long
-// one waits on, and a check finishing. Every field is optional.
+// Progress is how a run reports as it goes; every field is optional.
 type Progress struct {
 	Start func(name string)
 	Note  func(text string)
@@ -102,9 +93,7 @@ func (p Progress) finished(c Check) {
 	}
 }
 
-// Run runs every check. The checks are ordered so each later one can assume the earlier
-// ones' facts (a repo, a binding, ...), and a missing prerequisite is reported as a skip
-// rather than a second failure.
+// Run runs every check in order, so a missing prerequisite is a skip, not a second failure.
 func Run(ctx context.Context, env Env, progress Progress) Report {
 	var checks []Check
 	add := func(c Check) {
@@ -119,20 +108,16 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 		add(c)
 	}
 
-	// 1. Binary.
 	var binaryCheck Check
 	timed(KeyBinary, "terma on PATH", func() Check {
 		binaryCheck = BinaryCheck(env.Exe, env.BinDirs)
 		return binaryCheck
 	})
 
-	// 1b. Saved state. Every start migrates it, so this is a line only when an update
-	// left a migration pending or failed.
 	if c, ok := stateCheck(); ok {
 		timed(KeyState, "saved state migrated", func() Check { return c })
 	}
 
-	// 2. Sign-in.
 	if env.ConfigErr != nil {
 		add(Check{Key: KeyAuth, Name: "configuration", Status: Fail, Detail: env.ConfigErr.Error()})
 		return Build(checks)
@@ -141,7 +126,6 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 	d := &run{ctx: ctx, env: env, cfg: cfg, progress: progress, binaryCheck: binaryCheck}
 	timed(KeyAuth, "signed in", d.signedIn)
 
-	// 3. Repository binding.
 	d.nonGit = env.RepoErr == nil && env.GitDir == ""
 	timed(KeyProject, "repository bound", func() Check {
 		c, bound := RepositoryCheck(env.Root, env.GitDir, env.RepoErr)
@@ -153,52 +137,36 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 		d.projectID = d.bound.Project.ID
 	}
 
-	// 4. Hooks + adapters.
 	timed(KeyHooks, "commit hooks installed", d.commitHooks)
 
-	// 4b. The agents' own hooks. A commit is stamped with the session that touched its
-	// files, and a session exists only because its agent's hooks announced it — so this
-	// is its own check, and a fraction: one agent that cannot run its hooks yet costs
-	// that agent's commits, not the whole repository's.
+	// A fraction, not a verdict: one agent that cannot run its hooks costs only its own commits.
 	timed(KeyAgentHooks, "agent hooks run", d.agentHooks)
 
-	// 5. Harness export.
 	timed(KeyHarness, "agent exporting to Terma", d.agentsExporting)
 
-	// 5b. Status line: the payload Claude Code hands its status line carries the
-	// plan's own rate-limit windows, the strongest funding evidence a machine
-	// produces. Only worth a line when Claude Code is here and connected.
 	if a, ok := StatusLineAgent(env.Agents); ok && a.Installed(ctx) {
 		timed(KeyStatusLine, a.DisplayName()+" status line", d.statusLine)
 	}
 
-	// 6. Scratch commit.
 	timed(KeyScratch, "scratch commit stamped", d.scratchCommit)
 
-	// 7. Spool + backend round-trip.
 	timed(KeySpool, "event spool", d.eventSpool)
 	timed(KeyBackend, "backend receives events", func() Check {
 		return BackendCheck(ctx, env.Probes, d.projectID, d.scratchSHA, binaryCheck, progress)
 	})
 
-	// (A future GitHub App will report merge/revert/CI outcomes; until it ships there is
-	// nothing to check and nothing to suggest, so it is not listed here.)
-
 	return Build(checks)
 }
 
-// run carries what one check establishes for the ones after it: Run orders the checks
-// so each can assume the earlier ones' facts.
+// run carries what one check establishes for the ones after it.
 type run struct {
-	ctx      context.Context
-	env      Env
-	cfg      *config.Config
-	progress Progress
-	nonGit   bool
-	// bound is set by the binding check, and projectID follows it.
-	bound     *termaproject.File
-	projectID string
-	// scratchSHA is set by ScratchCommit, for the backend check to read back.
+	ctx         context.Context
+	env         Env
+	cfg         *config.Config
+	progress    Progress
+	nonGit      bool
+	bound       *termaproject.File
+	projectID   string
 	scratchSHA  string
 	binaryCheck Check
 }
@@ -306,9 +274,7 @@ func (d *run) eventSpool() Check {
 		return Check{Status: Fail, Detail: "cannot open the spool directory"}
 	}
 	n := s.Queued
-	// Reading a queue proves nothing about writing one, and a spool that
-	// cannot be appended to is how a commit goes unbilled without anyone
-	// hearing about it: the hook swallows the error by design.
+	// Reading a queue proves nothing about writing one, and the hook swallows append errors.
 	if s.WriteErr != nil {
 		return Check{Status: Fail, Detail: "events cannot be written to the spool: " + s.WriteErr.Error(), Fix: "check permissions and free space on the config directory"}
 	}
@@ -323,8 +289,7 @@ func (d *run) eventSpool() Check {
 }
 
 // BackendCheck flushes every project's queued events and reads the scratch commit's
-// event back from its project's data API. A binary check that did not pass makes it
-// inconclusive: hooks may run another build.
+// event back; a failed binary check makes it inconclusive, as hooks may run another build.
 func BackendCheck(ctx context.Context, p Probes, projectID, scratchSHA string, binary Check, progress Progress) Check {
 	if binary.Status == Warn || binary.Status == Fail {
 		return Check{Status: Warn, Inconclusive: true,
@@ -338,11 +303,8 @@ func BackendCheck(ctx context.Context, p Probes, projectID, scratchSHA string, b
 	if err != nil {
 		return Check{Status: Fail, Detail: err.Error(), Fix: "terma install"}
 	}
-	// The flush delivers every project's queued events, not only this repository's.
-	// Another project's refusal says nothing about this repository's chain — it read
-	// as this repository's credentials failing — so it is a warning here, named with
-	// its own project and host. This project's refusal, or a failure no project owns
-	// (a lock, the deadline), fails the check.
+	// Another project's refusal says nothing about this repository, so it only warns; this
+	// project's, or a failure no project owns (a lock, the deadline), fails.
 	var others []string
 	var othersFix string
 	if res.Err != nil {
@@ -371,7 +333,6 @@ func BackendCheck(ctx context.Context, p Probes, projectID, scratchSHA string, b
 	if scratchSHA == "" {
 		return Check{Status: Skip, Inconclusive: true, Detail: detail + "; no scratch commit event to verify", Fix: othersFix}
 	}
-	// Round-trip: the scratch commit's event must be readable back.
 	if ok, err := waitForCommit(ctx, p, projectID, scratchSHA, progress); err != nil {
 		return Check{Status: Warn, Inconclusive: true, Detail: detail + "; could not confirm the round-trip via the API (" + err.Error() + ")", Fix: "terma doctor"}
 	} else if !ok {
@@ -383,9 +344,7 @@ func BackendCheck(ctx context.Context, p Probes, projectID, scratchSHA string, b
 	return Check{Status: Pass, Detail: detail + "; round-trip confirmed"}
 }
 
-// describeFailure words one project's failed delivery with the host that refused it:
-// the host is the half of the story a developer with projects in two environments
-// cannot guess.
+// describeFailure names the host, which a developer with projects in two environments cannot guess.
 func describeFailure(f Failure) string {
 	if f.Refused {
 		return "refused by " + f.Endpoint + " (" + f.Err.Error() + ")"
@@ -393,9 +352,7 @@ func describeFailure(f Failure) string {
 	return "not sent to " + f.Endpoint + " (" + f.Err.Error() + ")"
 }
 
-// failureFix is the next step for a failed delivery. A refused key is not a network
-// problem, and pointing at the network for one sent a developer to check a
-// connection that was working.
+// failureFix is the next step for a failed delivery; a refused key is not a network problem.
 func failureFix(f Failure) string {
 	if f.KeyRefused {
 		return "the key this machine holds for project " + f.ProjectID + " was refused by " + f.Endpoint + " — it may have been revoked, or belong to another environment"
@@ -403,29 +360,21 @@ func failureFix(f Failure) string {
 	return "check the network and " + f.Endpoint + ", then run `terma spool flush --force`"
 }
 
-// roundTripWait bounds how long doctor waits for the scratch commit to be readable
-// back; roundTripPoll is how often it looks. Polling every second rather than every
-// few means the check ends within a second of the event landing, instead of waiting
-// out the rest of a long interval.
+// roundTripWait bounds the wait for the scratch commit to be readable back.
 const (
 	roundTripWait = 20 * time.Second
 	roundTripPoll = time.Second
 )
 
-// commitLogWindow is how far the terma.commit lookup reaches on each side of the time
-// it centres on. The log store caps a query's span, so the lookup asks for a tight
-// window around the commit rather than scanning back from now.
+// commitLogWindow is the lookup's reach either side of its start: the log store caps a query's span.
 const commitLogWindow = time.Hour
 
-// waitForCommit polls the project's data API for the scratch commit's event.
 func waitForCommit(ctx context.Context, p Probes, projectID, sha string, progress Progress) (bool, error) {
 	started := time.Now()
 	deadline := started.Add(roundTripWait)
 	for {
 		progress.noting(fmt.Sprintf("backend receives events… waiting for the round-trip (%ds of %ds)",
 			int(time.Since(started).Seconds()), int(roundTripWait.Seconds())))
-		// The scratch commit was made moments before this started, so its record sits
-		// inside the window.
 		found, err := p.CommitRecorded(ctx, projectID, sha, started.Add(-commitLogWindow), started.Add(commitLogWindow))
 		if err != nil || found {
 			return found, err

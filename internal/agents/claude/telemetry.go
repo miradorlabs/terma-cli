@@ -7,8 +7,7 @@ func (Agent) Correlation() shape.Correlation {
 	return shape.Correlation{SessionKeys: []shape.SessionKey{shape.SessionID}}
 }
 
-// CaptureRules are where Claude Code's telemetry carries content. Tool content also rides
-// the claude_code.tool span's tool.output event, which the golden attribute lists miss.
+// CaptureRules are where Claude Code's telemetry carries content, the tool.output span event included.
 func (Agent) CaptureRules() shape.CaptureRules {
 	return shape.CaptureRules{
 		PromptFields:      []string{"prompt", "response", "user_prompt"},

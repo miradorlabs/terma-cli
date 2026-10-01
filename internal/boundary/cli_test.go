@@ -11,14 +11,10 @@ import (
 	"testing"
 )
 
-// cli is the command tree's package directory.
 const cli = "internal/cli"
 
-// TestTheCLIKeepsNoState holds the command tree to one package and its app: it has no
-// subdirectories, and no package-level variable
-// of the CLI's is assigned, incremented or has its address taken anywhere in the
-// package, tests included. A lookup table or an error sentinel is a variable Go cannot
-// make a constant; one that changes is state, and state lives in the app.
+// TestTheCLIKeepsNoState holds the command tree to one package with no subdirectories,
+// whose package-level variables are never assigned or addressed: state lives in the app.
 func TestTheCLIKeepsNoState(t *testing.T) {
 	dir := filepath.Join(repoRoot(t), cli)
 	entries, err := os.ReadDir(dir)
@@ -97,8 +93,7 @@ func TestTheCLIKeepsNoState(t *testing.T) {
 	}
 }
 
-// root is the variable an assignment target or an address starts from: x in x,
-// x.f.g, x[i] and (*x).
+// root is the variable an assignment target starts from: x in x.f.g, x[i] and (*x).
 func root(e ast.Expr) string {
 	for {
 		switch x := e.(type) {
@@ -118,8 +113,7 @@ func root(e ast.Expr) string {
 	}
 }
 
-// locals are the names a function declares itself: its parameters, results and
-// receiver, and its own variables, which shadow the package's.
+// locals are the names a function declares itself, which shadow the package's.
 func locals(fn *ast.FuncDecl) map[string]bool {
 	out := map[string]bool{}
 	add := func(fl *ast.FieldList) {

@@ -8,8 +8,7 @@ import (
 	"testing"
 )
 
-// Both durabilities replace the file whole, at the mode asked for, and leave no temp
-// file behind — the only difference between them is the fsync.
+// Both durabilities replace the file whole, at the mode asked for, leaving no temp file.
 func TestWriteFileAtomicVariants(t *testing.T) {
 	for name, write := range map[string]func(string, []byte, os.FileMode) error{
 		"durable": WriteFileAtomic,
@@ -45,8 +44,7 @@ func TestWriteFileAtomicLeavesTheOldFileWhenItCannotWrite(t *testing.T) {
 	}
 }
 
-// WriteJSON is the whole recipe, so a first write on a new machine needs nothing done
-// for it beforehand.
+// WriteJSON creates its directory, so a first write needs nothing beforehand.
 func TestWriteJSONCreatesItsDirectory(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "not", "there", "yet", "keys.json")
 	if err := WriteJSON(path, map[string]string{"a": "b"}, 0o600); err != nil {

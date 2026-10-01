@@ -13,44 +13,30 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-// Codex exports what the developer said and what its tools did, and never what it
-// answered: its OTel events carry `prompt`, tool `arguments` and tool `output`, and a
-// `response.completed` that is token counts and nothing else. There is no event for the
-// model's reply and no switch that adds one (checked against every record of a live
-// 0.155.1 session, 2026-09-19). So a Codex session on the platform reads as a person
-// talking to tools — the replies exist only in the rollout, which this reads.
-//
-// It is the one place terma reads conversation content, and it does so only for a
-// developer whose Codex already exports their prompts (see hookrun.codexRepliesConsented):
-// the reply to a prompt is no more private than the prompt, and both or neither travel.
+// Codex exports prompts and tool content but never its replies, which exist only in the
+// rollout. This is the one place terma reads conversation content, and only under
+// CodexRepliesConsented: both or neither of prompt and reply travel.
 
 // CodexReply is one assistant message from a rollout.
 type CodexReply struct {
-	// ID is the replay identity: Codex's own message id (`msg_…`) when the record has
-	// one, else derived from where the record sits in the file.
+	// ID is Codex's own message id (`msg_…`), else derived from the record's position.
 	ID string
-	// Text is the message, cut to the caller's limit on a rune boundary. Bytes is its
-	// full length and Truncated says whether the two differ.
+	// Text is cut to the caller's limit on a rune boundary; Bytes is the full length.
 	Text      string
 	Bytes     int
 	Truncated bool
-	// Phase is Codex's own label for the message — "commentary" for what it says between
-	// tool calls, "final_answer" for the turn's reply — or "" when the record has none.
+	// Phase is "commentary" between tool calls, "final_answer" for the reply, or "".
 	Phase string
-	// TurnID is the rollout's turn id. TraceID is the turn's OTel trace id, which is what
-	// the platform's Codex adapter calls a turn: the id every natively exported event of
-	// the turn carries. Without it the message is still in the session, but in no turn.
+	// TraceID is the turn's OTel trace id, which the platform calls a turn; TurnID is the
+	// rollout's own.
 	TurnID  string
 	TraceID string
-	// At is when Codex recorded the message, which is when it was said — not when the
-	// Stop hook got round to reading it.
+	// At is when Codex recorded the message, not when the hook read it.
 	At time.Time
 }
 
-// CodexReplyCursor is where a session's reply capture has got to. Like CodexCursor it
-// holds no transcript text: an offset past the acknowledged records, an anchor that
-// detects a truncated or rewritten file, and the turn the next record belongs to, which
-// has to survive between hook invocations because a turn's records span several.
+// CodexReplyCursor holds no transcript text: an offset, an anchor that detects a rewritten
+// file, and the current turn, which spans hook invocations.
 type CodexReplyCursor struct {
 	Identity string `json:"identity"`
 	Offset   int64  `json:"offset"`
@@ -60,19 +46,13 @@ type CodexReplyCursor struct {
 	Skipping bool   `json:"skipping,omitempty"`
 }
 
-// codexReplyBatch bounds one invocation: the Stop hook has three seconds for everything
-// it does, and a session captured for the first time half-way through has a history to
-// catch up on. What is left is "backlog", read by the next turn's hook.
+// codexReplyBatch bounds one invocation inside Stop's three seconds; the rest is
+// "backlog" for the next turn's hook.
 const codexReplyBatch = 32
 
-// ReadCodexReplies emits the assistant messages recorded since cursor, oldest first, and
-// returns the cursor to persist once they are spooled. The caller spools before it
-// acknowledges; a crash in between replays the same ids. maxText bounds each message.
-//
-// Status is "caught_up", "backlog" (more to read: the batch or the byte budget ran out),
-// "incomplete" (the file ends mid-record — Codex is still writing), or the reason the
-// rollout could not be opened. A rollout that was replaced or truncated is read again
-// from the start: the ids are Codex's own, so what was already sent is sent as itself.
+// ReadCodexReplies emits the messages since cursor, oldest first, and the cursor to persist
+// once they are spooled; a crash in between replays the same ids. Status is "caught_up",
+// "backlog", "incomplete" (mid-record), or why the rollout could not be opened.
 func ReadCodexReplies(ctx context.Context, sessionID, transcript string, cursor CodexReplyCursor, maxText int, emit func(CodexReply) error) (CodexReplyCursor, string, error) {
 	f, status := openCodexRollout(ctx, sessionID, transcript)
 	if f == nil {
@@ -120,16 +100,14 @@ func ReadCodexReplies(ctx context.Context, sessionID, transcript string, cursor 
 				cursor.Offset += int64(len(data))
 				return checkpoint("backlog", nil)
 			}
-			// The end of a read chunk is not an oversized record: come back to this
-			// line's start with the whole budget.
+			// The end of a read chunk is not an oversized record: reread from this line's start.
 			if len(data) < codexTailLimit {
 				if cursor.Offset+int64(len(data)) < st.Size() {
 					return checkpoint("backlog", nil)
 				}
 				return checkpoint("incomplete", nil)
 			}
-			// A record larger than the budget — a tool's output, not a reply — is
-			// stepped over; what it says about the turn is unknown, so the turn is too.
+			// A record over the budget is a tool's output, not a reply: stepped over, turn unknown.
 			cursor.Offset += int64(len(data))
 			cursor.Skipping, cursor.TurnID, cursor.TraceID = true, "", ""
 			return checkpoint("backlog", nil)
@@ -154,9 +132,8 @@ func ReadCodexReplies(ctx context.Context, sessionID, transcript string, cursor 
 	return checkpoint("caught_up", nil)
 }
 
-// codexReplyFrom reads one rollout record: it keeps the cursor's turn current, and returns
-// the record as a reply when it is an assistant message with something in it. A record
-// that does not parse says nothing about the turn either way and is left alone.
+// codexReplyFrom keeps the cursor's turn current and returns a non-empty assistant
+// message; an unparseable record is left alone.
 func codexReplyFrom(line []byte, cursor *CodexReplyCursor, sessionID string, maxText int) (CodexReply, bool) {
 	var rec struct {
 		Timestamp time.Time `json:"timestamp"`
@@ -179,8 +156,7 @@ func codexReplyFrom(line []byte, cursor *CodexReplyCursor, sessionID string, max
 	}
 	switch {
 	case rec.Type == "turn_context", rec.Type == "event_msg" && (rec.Payload.Type == "task_started" || rec.Payload.Type == "turn_started"):
-		// turn_context repeats the turn's id without its trace id; only a record that
-		// names a different turn ends the one the cursor is in.
+		// turn_context repeats the turn id without its trace id; only a different turn ends this one.
 		if rec.Payload.TurnID != cursor.TurnID {
 			cursor.TurnID, cursor.TraceID = "", ""
 			if harness.EvidenceLabel.MatchString(rec.Payload.TurnID) {
@@ -227,8 +203,7 @@ func codexReplyFrom(line []byte, cursor *CodexReplyCursor, sessionID string, max
 	return reply, true
 }
 
-// codexTraceID admits an OTel trace id as Codex writes it: 32 lowercase hex digits, and
-// not the all-zero id that means "no trace".
+// codexTraceID admits 32 lowercase hex digits, not the all-zero "no trace" id.
 func codexTraceID(s string) bool {
 	if len(s) != 32 || s == strings.Repeat("0", 32) {
 		return false

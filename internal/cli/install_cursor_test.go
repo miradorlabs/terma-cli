@@ -14,32 +14,28 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/install"
 )
 
-// installAdapters unions what the repository's hooks files wire, the configured agents,
-// and directory-present agents — so a selection grows the wired hooks and a narrower
-// re-run never removes them. An agent still coming soon is left out of all three.
+// install.Adapters unions wired, configured and directory-present agents, so a narrower
+// re-run never removes hooks; coming-soon agents are left out of all three.
 func TestInstallAdaptersUnionGrowsNeverShrinks(t *testing.T) {
 	root := t.TempDir()
 
-	// Selecting more agents wires their committed hooks too (opencode has no hooks file,
-	// and cursor is coming soon).
+	// Selecting more agents wires their committed hooks too.
 	got := install.Adapters(testApp.agents, root, []string{"claude", "cursor", "codex", "opencode"}, nil)
 	if strings.Join(got, ",") != "claude,codex" {
 		t.Fatalf("selecting agents should grow adapters, got %v", got)
 	}
-	// A narrower re-run keeps what a colleague's install committed (no churn-down).
+	// A narrower re-run keeps what a colleague committed.
 	wireAdapters(t, root, "codex")
 	if got := install.Adapters(testApp.agents, root, []string{"claude"}, nil); strings.Join(got, ",") != "claude,codex" {
 		t.Fatalf("a narrower re-run must not drop committed adapters, got %v", got)
 	}
-	// --adapters overrides outright.
 	if got := install.Adapters(testApp.agents, root, []string{"claude", "cursor"}, splitCommas("codex")); strings.Join(got, ",") != "codex" {
 		t.Fatalf("--adapters should override, got %v", got)
 	}
 }
 
-// Cursor and Antigravity are coming soon, so install offers neither's hooks: not for a
-// repository that carries the agent's directory, and not to refresh a file a colleague
-// committed — which stays as it is. --adapters is the only way to wire one.
+// Coming-soon agents get no hooks from install, whether the repository carries their
+// directory or a colleague committed their file; only --adapters wires one.
 func TestInstallAdaptersLeavesComingSoonAgentsOut(t *testing.T) {
 	root := t.TempDir()
 	for _, dir := range []string{".cursor", ".agents"} {
@@ -56,8 +52,7 @@ func TestInstallAdaptersLeavesComingSoonAgentsOut(t *testing.T) {
 	}
 }
 
-// wireAdapters writes the named adapters' hooks files into root, as a colleague's
-// install would have committed them.
+// wireAdapters writes the named adapters' hooks files into root, as a colleague would have.
 func wireAdapters(t *testing.T, root string, names ...string) {
 	t.Helper()
 	for _, name := range names {
@@ -75,9 +70,8 @@ func wireAdapters(t *testing.T, root string, names ...string) {
 	}
 }
 
-// installRepo is a fresh git repository the test runs from, with Terma's own directory
-// sandboxed so nothing here can read a real credential — which is also what makes the
-// project id below get accepted verbatim instead of resolved against an organization.
+// installRepo is a fresh git repository with Terma's directory sandboxed, so no real
+// credential is read and the project id is accepted verbatim.
 func installRepo(t *testing.T) string {
 	t.Helper()
 	repo := t.TempDir()
@@ -87,8 +81,7 @@ func installRepo(t *testing.T) string {
 		}
 	}
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
-	// Sandbox Claude's config too, so a test that ever wires Claude (which would wrap the
-	// status line) never touches the developer's real ~/.claude/settings.json.
+	// Sandboxed so a wired status line never touches the developer's real settings.
 	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
 	t.Chdir(repo)
 	realDir, _ := filepath.EvalSymlinks(repo)
@@ -150,8 +143,8 @@ func TestInstallWiresCursorHooksWhenAsked(t *testing.T) {
 	}
 }
 
-// Cursor is coming soon: a repository people open in Cursor (it has a .cursor directory)
-// gets no Cursor hooks from a plain install, and the plan does not name the file.
+// A coming-soon agent's directory in the repository gets no hooks from a plain install,
+// and the plan does not name its file.
 func TestInstallLeavesCursorAloneWhileComingSoon(t *testing.T) {
 	repo := installRepo(t)
 	if err := os.MkdirAll(filepath.Join(repo, ".cursor", "rules"), 0o755); err != nil {
@@ -175,8 +168,7 @@ func TestInstallRejectsUnknownAdapter(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "zed") || !strings.Contains(err.Error(), "unknown agent") {
 		t.Fatalf("err = %v", err)
 	}
-	// The message is the only place a reader learns what they could have typed, so it
-	// has to keep naming every adapter that writes a repo-scope file.
+	// The message must keep naming every adapter that writes a repo-scope file.
 	for _, adapter := range []string{"claude", "cursor", "codex"} {
 		if !strings.Contains(err.Error(), adapter) {
 			t.Fatalf("error should offer %q: %v", adapter, err)
@@ -184,9 +176,7 @@ func TestInstallRejectsUnknownAdapter(t *testing.T) {
 	}
 }
 
-// A colleague who clones an already-onboarded repo and runs `terma install` must not
-// churn the committed binding: installed_at/terma_version are preserved and the wired
-// adapters stay what the repo already committed, so re-running produces no diff.
+// Re-running install in an onboarded repository leaves the committed binding unchanged.
 func TestInstallReRunDoesNotChurnBinding(t *testing.T) {
 	repo := installRepo(t)
 	if out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude", "--yes"); err != nil {
@@ -197,7 +187,6 @@ func TestInstallReRunDoesNotChurnBinding(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Re-run with no --adapters, as a second developer would.
 	if out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--yes"); err != nil {
 		t.Fatalf("re-install: %v\n%s", err, out)
 	}
@@ -211,8 +200,7 @@ func TestInstallReRunDoesNotChurnBinding(t *testing.T) {
 	if !slices.Contains(testApp.agents.WiredNames(repo), "claude") {
 		t.Fatalf("committed adapter was lost on re-install: %v", testApp.agents.WiredNames(repo))
 	}
-	// A developer who also uses Cursor wires its hooks — a file of its own — and still
-	// leaves the binding as it was: their agents are not the team's record.
+	// A developer's extra agent gets its own hooks file; the binding stays the team's.
 	if out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude,cursor", "--yes"); err != nil {
 		t.Fatalf("re-install with cursor: %v\n%s", err, out)
 	}

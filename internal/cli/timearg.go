@@ -7,12 +7,8 @@ import (
 	"time"
 )
 
-// parseTimeArg reads a point in time the way a person types one on a command line.
-// It accepts what the gateway accepts — an RFC 3339 timestamp, or a relative age
-// (90s, 15m, 2h, 7d) meaning "that long ago" — plus the shorthands people actually
-// reach for: now, today, yesterday, and a bare date. The shorthands resolve in local
-// time, so "today" is the caller's today. Whatever the input, the gateway is sent an
-// absolute timestamp.
+// parseTimeArg reads an RFC 3339 timestamp, a relative age (90s, 15m, 2h, 7d ago), or now,
+// today, yesterday or a bare date in local time, and returns an absolute time.
 func parseTimeArg(raw string, now time.Time) (time.Time, error) {
 	value := strings.ToLower(strings.TrimSpace(raw))
 	switch value {
@@ -42,8 +38,7 @@ func startOfDay(t time.Time) time.Time {
 	return time.Date(y, m, d, 0, 0, 0, 0, t.Location())
 }
 
-// parseRelativeAge extends time.ParseDuration with the day unit the gateway also
-// takes. Ages are positive; the flag name carries the direction.
+// parseRelativeAge is time.ParseDuration plus the day unit; ages are positive.
 func parseRelativeAge(raw string) (time.Duration, bool) {
 	if days, ok := strings.CutSuffix(raw, "d"); ok {
 		n, err := strconv.Atoi(days)
@@ -64,8 +59,8 @@ type timeWindow struct {
 	since, until time.Time
 }
 
-// resolveWindow turns --since/--until into absolute bounds. An empty until is now;
-// an empty since is defaultSince before until, or unbounded when that is zero.
+// resolveWindow turns --since/--until into bounds: until defaults to now, since to
+// defaultSince before until (unbounded when zero).
 func resolveWindow(since, until string, defaultSince time.Duration, now time.Time) (timeWindow, error) {
 	w := timeWindow{until: now}
 	if until != "" {

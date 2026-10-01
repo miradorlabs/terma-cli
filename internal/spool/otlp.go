@@ -11,15 +11,11 @@ import (
 	"time"
 )
 
-// OTLPSender delivers spooled events to the ingest host as OTLP/HTTP JSON log
-// records — the same door a harness's own exporter uses, with the same project
-// server key, so the backend needs nothing terma-specific to accept them. Each
-// event becomes one log record named after the event (`terma.commit`, ...) with
-// its attributes flattened onto the record.
+// OTLPSender delivers each event as one OTLP/HTTP JSON log record named after it, with
+// the project's server key, so the ingest host needs nothing terma-specific.
 type OTLPSender struct {
 	// Endpoint is the OTLP base URL; /v1/logs is appended.
-	Endpoint string
-	// APIKey is the project's server key (ter_srv_…).
+	Endpoint  string
 	APIKey    string
 	ProjectID string
 	Version   string
@@ -77,13 +73,8 @@ func attrOf(key string, v any) otlpAttr {
 	return a
 }
 
-// newHTTPClient builds the transport this sender delivers on, with redirects refused
-// for the same reason internal/api does it: every request here carries the project's
-// server key in an Authorization header. Go drops that header when a redirect
-// crosses to another host, but keeps it on a same-host https→http downgrade, which
-// would put a live server key on the wire in cleartext. An OTLP collector has no
-// reason to redirect a log export, so a redirect here is a misconfiguration or an
-// attack rather than a path worth following.
+// newHTTPClient refuses redirects: Go keeps the Authorization header on a same-host
+// https→http downgrade, which would send the server key in cleartext.
 func newHTTPClient() *http.Client {
 	return &http.Client{
 		Timeout: sendTimeout,
@@ -167,9 +158,7 @@ func (o *OTLPSender) send(ctx context.Context, events []Event) error {
 	return nil
 }
 
-// IngestError is the ingest host answering with a non-2xx status. It is typed so a
-// caller can tell a refused key (401, 403), which no retry will fix, from a host
-// having a bad day.
+// IngestError is a non-2xx answer from the ingest host.
 type IngestError struct {
 	Status int
 	Detail string

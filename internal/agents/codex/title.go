@@ -11,15 +11,9 @@ import (
 	"time"
 )
 
-// Codex names a thread with a hidden side conversation of its own: its own conversation
-// id, a fixed "Generate a concise, single-line task title…" prompt, and nothing on the
-// wire that points back at the thread it names. Its answer is never exported either. The
-// name lands in one place: $CODEX_HOME/session_index.jsonl, keyed by the thread it names
-// (checked on 0.157.1, 2026-09-27: written ~6 ms after the side conversation's last
-// response, for the parent's id; the side conversation's own id is persisted nowhere).
-// A rename appends another line for the same id.
+// Codex names a thread in a hidden side conversation whose answer is never exported; the
+// name lands only in $CODEX_HOME/session_index.jsonl, one line per name or rename.
 
-// codexSessionIndex is the file under CODEX_HOME where Codex keeps thread names.
 const codexSessionIndex = "session_index.jsonl"
 
 // CodexThreadTitle is the name Codex last gave a thread and when it did.
@@ -28,9 +22,8 @@ type CodexThreadTitle struct {
 	UpdatedAt time.Time
 }
 
-// ReadCodexThreadTitle returns the latest name session_index.jsonl holds for threadID.
-// found is false when the file or the thread has none yet: a quick first turn can end
-// before the side conversation answers, and the next capture picks the name up.
+// ReadCodexThreadTitle returns the latest name session_index.jsonl holds for threadID;
+// found is false before the side conversation answers, and the next capture picks it up.
 func ReadCodexThreadTitle(ctx context.Context, threadID string) (title CodexThreadTitle, found bool, err error) {
 	home, err := codexHome()
 	if err != nil {

@@ -1,5 +1,5 @@
-// Package pifamily is terma's exporter extension for Pi and for omp, Pi's fork, whose
-// extension events are the same: one template, spliced with the machine's configuration.
+// Package pifamily is terma's exporter extension for the agents that share one extension
+// API: one template, spliced with the machine's configuration.
 package pifamily
 
 import (
@@ -18,13 +18,10 @@ import (
 //go:embed terma.ts
 var template string
 
-// configMarker is the line of the template the machine's configuration replaces.
 const configMarker = "const CONFIG: TermaConfig | null = null /* terma:config */"
 
-// Config is what the extension is spliced with. Agent names the agent on every record
-// and hook; Lifecycle says whether the extension reports session start, end and file
-// edits, or only claims the session at each prompt (omp's committed hook file reports
-// the rest).
+// Config is what the extension is spliced with; without Lifecycle it only claims the
+// session at each prompt and leaves start, end and edits to a committed hook file.
 type Config struct {
 	Version            int               `json:"version"`
 	Agent              string            `json:"agent"`
@@ -36,8 +33,7 @@ type Config struct {
 	HookCommand        []string          `json:"hookCommand"`
 }
 
-// ForRelay is the configuration that exports to the local relay: all content, since the
-// relay applies each project's policy.
+// ForRelay exports all content to the local relay, which applies each project's policy.
 func ForRelay(agent string, lifecycle bool, cfg agents.RelayConfig) Config {
 	return Config{Agent: agent, Lifecycle: lifecycle, Endpoint: cfg.Endpoint, Headers: relayexport.Headers(cfg),
 		IncludePrompts: true, IncludeToolContent: true, HookCommand: cfg.HookCommand}
@@ -59,8 +55,7 @@ func Render(cfg Config) (string, error) {
 	return strings.Replace(template, configMarker, "const CONFIG: TermaConfig | null = "+string(data)+" /* terma:config */", 1), nil
 }
 
-// Write renders cfg to path. The file holds the relay's local token, so it is private
-// to this user.
+// Write renders cfg to path, private to this user since it holds the relay's token.
 func Write(path string, cfg Config) (string, error) {
 	text, err := Render(cfg)
 	if err != nil {

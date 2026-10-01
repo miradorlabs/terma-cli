@@ -1,11 +1,7 @@
-// Package hookrun implements `terma hook <event>`: the runtime behind every shim.
-//
-// Each handler does the least it can and exits: parse what the harness or git
-// handed over, update local state under the repo's git dir, append an event to the
-// spool. Nothing here talks to the network. The two guardrails are enforced by
-// construction — prepare-commit-msg reads and writes local files only, and every
-// handler returns nil on anything it cannot understand, because a hook that fails
-// a commit uninstalls the product.
+// Package hookrun is the agent-neutral runtime behind `terma hook <event>`: parse the
+// payload, update local state, append to the spool, never touch the network. Every
+// handler returns nil on what it cannot understand, because a hook that fails a commit
+// uninstalls the product.
 package hookrun
 
 import (
@@ -29,8 +25,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/trailer"
 )
 
-// ActiveTTL bounds the fallback: an announced session older than this no longer
-// claims commits that no manifest attributes.
+// ActiveTTL is how long an announced session claims commits no manifest attributes.
 const ActiveTTL = 4 * time.Hour
 
 // ManifestRetention is how long a session's touched-files record is kept.
@@ -45,20 +40,14 @@ type Env struct {
 	Stdout io.Writer
 	Stderr io.Writer
 	// Spool may be nil (no config dir yet): events are then dropped, never fatal.
-	Spool *spool.Spool
-	// Version is the terma version, recorded on events.
+	Spool   *spool.Spool
 	Version string
-	// Debug prints what happened to Stderr.
-	Debug bool
-	// OnClaim, when set, is called after this hook claimed a session for the local
-	// relay (see claimForRelay), so the caller can start the relay if it is not
-	// running. It may be called more than once.
+	Debug   bool
+	// OnClaim, when set, is called after a relay claim so the caller can start the relay.
 	OnClaim func()
 	// Flush, when set, starts detached delivery of what the spool holds.
 	Flush func()
-	// Policy is the organization's collection policy (config.Profile.Policy). Global
-	// mode places every session in the selected team's DefaultProjectID, including
-	// bound repositories and sessions outside repositories.
+	// Policy is the organization's collection policy; global mode places every session in its DefaultProjectID.
 	Policy config.Policy
 }
 
@@ -70,8 +59,7 @@ func (e Env) Time() time.Time {
 	return e.Now
 }
 
-// Logf prints a line to Stderr under --debug, and nothing otherwise: a hook's output
-// can reach the agent, or its model.
+// Logf prints a line to Stderr under --debug only, since a hook's output can reach the model.
 func (e Env) Logf(format string, args ...any) {
 	if e.Debug && e.Stderr != nil {
 		fmt.Fprintf(e.Stderr, "terma hook: "+format+"\n", args...)
@@ -95,21 +83,15 @@ type Repo struct {
 	Root   string
 	GitDir string
 	Store  *session.Store
-	// ProjectID is the committed binding from .terma/settings.json ("" when the repo has
-	// not been installed); the flusher routes events to the project's key by it. A linked
-	// worktree without a binding of its own has its main checkout's (project.Resolve).
+	// ProjectID is the binding, a linked worktree's falling back to its main checkout's.
 	ProjectID string
-	// Name is the repository events report (their repo): the directory Name of the
-	// checkout, or in a linked worktree of its main checkout, so every worktree of one
-	// repository reports as that repository.
+	// Name is the checkout's directory name, a linked worktree's main checkout's.
 	Name string
-	// Worktree is git's name for a linked Worktree ("" in a main checkout), sent as
-	// AttrWorktree so the work done in one is still told apart.
+	// Worktree is git's name for a linked worktree, "" in a main checkout.
 	Worktree string
 }
 
-// Repo resolves the repository (or, outside Git, the bound workspace) the hook runs in,
-// and the project its events belong to.
+// Repo resolves the repository, or outside Git the bound workspace, and its project.
 func (e Env) Repo(ctx context.Context) (*Repo, error) {
 	// Filesystem first: a git subprocess is a third of the hook budget on macOS.
 	root, gitDir, ok := gitx.LocateFS(e.Cwd)
@@ -120,9 +102,7 @@ func (e Env) Repo(ctx context.Context) (*Repo, error) {
 		}
 	}
 	if gitDir == "" {
-		// Outside Git a workspace is one `terma install` bound — except in global mode,
-		// where every directory's sessions count: the scratch directory, the home
-		// directory. They keep a private store under the config directory (StateDir).
+		// Outside Git only a bound workspace counts, except in global mode.
 		if _, err := project.Load(root); err != nil && (!e.Policy.Global() || !errors.Is(err, project.ErrNotFound)) {
 			return nil, err
 		}
@@ -134,8 +114,6 @@ func (e Env) Repo(ctx context.Context) (*Repo, error) {
 	r := &Repo{Root: root, GitDir: gitDir, Store: session.Open(stateDir)}
 	r.Name, r.Worktree = CheckoutNames(root, gitDir)
 	if e.Policy.Global() {
-		// Global exports and hook events belong to the selected team, including in
-		// repositories previously bound to another project.
 		r.ProjectID = e.Policy.DefaultProjectID
 	} else if f, _, err := project.Resolve(root, gitDir); err == nil {
 		r.ProjectID = f.Project.ID
@@ -167,11 +145,8 @@ func (e Env) EmitFor(r *Repo, ev spool.Event) {
 	e.emit(ev)
 }
 
-// claimForRelay records, for the local relay, that the event's session belongs to the
-// repository's project. Every handler's events pass through EmitFor, so any hook of a
-// session claims it, not only its start: a session whose hooks were trusted mid-way,
-// one whose start hook never fired, a resumed conversation. A repository without a
-// binding claims nothing, and neither does a machine that never ran `terma relay setup`.
+// claimForRelay claims the event's session for the repository's project on every hook,
+// not only at start, since a start hook may never have fired.
 func (e Env) claimForRelay(r *Repo, ev spool.Event) {
 	if r == nil || r.ProjectID == "" || ev.SessionID == "" || !claim.Enabled() {
 		return
@@ -179,10 +154,7 @@ func (e Env) claimForRelay(r *Repo, ev spool.Event) {
 	tool, _ := ev.Attrs[AttrTool].(string)
 	c := claim.Claim{ProjectID: r.ProjectID, Tool: tool, Repo: r.Name, Worktree: r.Worktree, PIDs: claimPIDs()}
 	claim.Write(ev.SessionID, c, e.Time())
-	// A subagent whose telemetry names its own id (agent_id) as its session is claimed
-	// under that id too; claimed only under the root, everything it did would be dropped.
-	// Where a subagent exports under its parent's session, the extra claim is harmless:
-	// no export names it.
+	// A subagent whose telemetry uses its agent_id as session id would otherwise be dropped.
 	if agent, _ := ev.Attrs[AttrAgentID].(string); agent != "" && agent != ev.SessionID {
 		claim.Write(agent, c, e.Time())
 	}
@@ -191,16 +163,14 @@ func (e Env) claimForRelay(r *Repo, ev spool.Event) {
 	}
 }
 
-// StampWorktree names the linked worktree an event came from, for the events that are
-// spooled without going through emitFor.
+// StampWorktree names the linked worktree on an event spooled without EmitFor.
 func (r *Repo) StampWorktree(attrs map[string]any) {
 	if r.Worktree != "" {
 		attrs[AttrWorktree] = r.Worktree
 	}
 }
 
-// CheckoutNames names a checkout for events: the repository (in a linked worktree, its
-// main checkout's directory name) and, for a linked worktree, git's name for it.
+// CheckoutNames is the repository name events report and, in a linked worktree, git's name for it.
 func CheckoutNames(root, gitDir string) (name, worktree string) {
 	name = filepath.Base(root)
 	if wt, main, ok := gitx.LinkedWorktreeFS(gitDir); ok {
@@ -212,12 +182,8 @@ func CheckoutNames(root, gitDir string) (name, worktree string) {
 	return name, worktree
 }
 
-// --- git hooks -------------------------------------------------------------------------
-
-// PrepareCommitMsg stamps the message file named by Args[0] with a trailer for
-// every session whose manifest intersects the staged files (falling back to a fresh
-// active session). Args[1] is git's message source; merges and squashes are left
-// alone. Local state only, no network, budgeted well under 50 ms.
+// PrepareCommitMsg stamps a trailer for every session whose manifest meets the staged
+// files, or the fresh active one; local state only, under 50 ms.
 func PrepareCommitMsg(ctx context.Context, env Env) error {
 	if len(env.Args) == 0 {
 		return nil
@@ -279,33 +245,22 @@ func PrepareCommitMsg(ctx context.Context, env Env) error {
 	return nil
 }
 
-// MaxCommitFileStats bounds the per-file detail on a commit event. A vendored
-// dependency bump or a formatting sweep touches thousands of files, and every
-// event lands in a JSONL spool with a 16 MB ceiling that drops the oldest events
-// when it is hit — one commit must not push everything else out of the queue.
-// `file_count` stays the true total and `file_stats_truncated` says the list was
-// cut, so the number is never quietly wrong.
+// MaxCommitFileStats bounds per-file detail so one sweeping commit cannot push the 16 MiB
+// spool's oldest events out; file_count stays the true total.
 const MaxCommitFileStats = 50
 
-// commitFileStat is one entry of the `file_stats` attribute.
-//
-// Added and Deleted are pointers so a binary file, for which git reports no counts
-// at all, is encoded as `{"path":…,"binary":true}` rather than as a zero that reads
-// like "nothing changed".
+// commitFileStat counts are pointers so a binary file is not reported as zero lines changed.
 type commitFileStat struct {
 	Path    string `json:"path"`
 	Added   *int   `json:"added,omitempty"`
 	Deleted *int   `json:"deleted,omitempty"`
 	Binary  bool   `json:"binary,omitempty"`
-	// SessionID is the session whose manifest claims this file, set only when the
-	// commit carries more than one session (with one, every file is that session's).
+	// SessionID is set only when the commit carries more than one session.
 	SessionID string `json:"session_id,omitempty"`
 }
 
-// PostCommit records the new commit's sha against the sessions stamped into its
-// message and retires the committed files from their manifests, so the next commit
-// is not attributed to work that already shipped. A commit with no trailer gets a
-// count-only event instead, so the share of commits terma attributed is measurable.
+// PostCommit records the commit against its stamped sessions and retires its files from
+// their manifests; an unstamped commit gets a count-only event.
 func PostCommit(ctx context.Context, env Env) error {
 	r, err := env.Repo(ctx)
 	if err != nil || r.GitDir == "" {
@@ -325,9 +280,7 @@ func PostCommit(ctx context.Context, env Env) error {
 	for _, t := range stamped {
 		ids = append(ids, t.SessionID)
 	}
-	// Which session touched which file, read *before* Consume below empties the
-	// manifests. Only a multi-session commit needs it: when one session is stamped,
-	// every file entry belongs to it and `sessions` already says which.
+	// Read before Consume empties the manifests.
 	var owners map[string]string
 	if len(ids) > 1 {
 		owners = fileOwners(env, r.Store, ids)
@@ -346,34 +299,9 @@ func PostCommit(ctx context.Context, env Env) error {
 	return nil
 }
 
-// emitUnattributedCommit spools the count-only event for a commit that carries no
-// trailer: the denominator of "what share of commits did terma attribute".
-//
-// Why a separate event name and not a `terma.commit` with an attributed=false
-// flag: every consumer of `terma.commit` relies on `sessions` always being present
-// (the dashboard is built against that), and a flag would make `sessions`,
-// `session_count`, `tool` and `file_stats` conditional on every one of them. With
-// its own name, nothing that reads `terma.commit` has to change, neither event
-// needs a discriminator attribute, and coverage is still one log filter:
-// `event.name IN ('terma.commit', 'terma.commit.unattributed')`, grouped by name.
-// (Not a prefix match: `terma.commit.stamped` is prepare-commit-msg's record of the
-// same commit and would double count.)
-//
-// THE BOUNDARY. Terma had no part in this commit, so this event is a count, never
-// a manifest of what a human changed. It carries the attributes both commit events
-// share to identify and size a commit — sha, repo_url, branch, author_email,
-// file_count, lines_added, lines_deleted, plus terma.repo and project_id — and
-// nothing about the contents: no file paths, no `file_stats`. Anything added here
-// has to pass that test. The line totals are the commit's size, not what was in
-// it, and they are the same numbers `terma.commit` reports for a stamped commit, so
-// the two populations stay comparable.
-//
-// Merge and squash commits are skipped the way prepare-commit-msg skips them, or
-// they would sit in the denominator of a ratio they can never join. post-commit
-// gets no source argument, so a merge is read off the parent count that came with
-// the one git log call, and a squash off git's default squash subject — the only
-// trace once SQUASH_MSG is unlinked; a squash whose message was rewritten counts as
-// the ordinary commit it is.
+// emitUnattributedCommit spools the coverage denominator: a commit's identity and size,
+// never its file paths, since terma had no part in it. Merges and squashes are skipped
+// as prepare-commit-msg skips them.
 func emitUnattributedCommit(env Env, r *Repo, head gitx.Commit) {
 	if head.IsMerge() || head.IsSquash() {
 		return
@@ -381,23 +309,15 @@ func emitUnattributedCommit(env Env, r *Repo, head gitx.Commit) {
 	env.EmitFor(r, spool.Event{Name: EventCommitUnattributed, Repo: r.Name, Attrs: commitAttrs(r, head)})
 }
 
-// commitAttrs is a commit's identity and size — what both commit events share.
-// Everything here was already in hand after post-commit's one `git log`, except
-// the remote, which is read from the config file the way core.commentChar is, so
-// no second subprocess is needed. Nothing in here names a file.
+// commitAttrs is a commit's identity and size, with no second git subprocess and no file names.
 func commitAttrs(r *Repo, head gitx.Commit) map[string]any {
 	attrs := map[string]any{
 		"sha": head.SHA, AttrFileCount: len(head.Files), "author_email": head.AuthorEmail,
 	}
-	// A merge or an empty commit has no diff: no totals, rather than zeros that
-	// read like "nothing changed".
+	// No diff means no totals, rather than zeros.
 	if len(head.Files) > 0 {
 		attrs["lines_added"], attrs["lines_deleted"] = lineTotals(head.Files)
 	}
-	// The repo label is only a directory name, which cannot address a commit
-	// anywhere. The remote is what turns a sha into a link, so it rides along —
-	// stripped of credentials by NormalizeRemote, since this is telemetry. The
-	// branch came free with the log call.
 	if remote := gitx.RemoteURLFS(r.GitDir); remote != "" {
 		attrs["repo_url"] = remote
 	}
@@ -407,7 +327,6 @@ func commitAttrs(r *Repo, head gitx.Commit) map[string]any {
 	return attrs
 }
 
-// lineTotals sums the commit's delta. A binary file has no counts and adds zero.
 func lineTotals(stats []gitx.FileStat) (added, deleted int) {
 	for _, f := range stats {
 		added += f.Added
@@ -416,25 +335,11 @@ func lineTotals(stats []gitx.FileStat) (added, deleted int) {
 	return added, deleted
 }
 
-// addFileStats attaches the commit's per-file line detail to the event.
-//
-// READ THIS BEFORE LABELLING THESE NUMBERS IN A UI. The per-file `added`/`deleted`
-// here, like the `lines_added` / `lines_deleted` totals from commitAttrs, are the
-// *commit's* delta, straight from `git --numstat`. They are not a measurement of
-// what the agent wrote. If a human edited the same file in the same commit, or
-// hand-fixed the agent's work before committing, their lines are inside these
-// numbers and nothing here can separate them: the manifests record that a session
-// *touched* a file, not which lines it produced. `session_id` on an entry says
-// which session touched that file, with the same caveat — a file both a session
-// and a human edited is still attributed to the session. Treat every one of these
-// as an upper bound on agent-written change, and label it as one.
-//
-// The list is encoded as a JSON string rather than as nested values because the
-// attributes are flattened to OTLP scalars on delivery: a nested array would be
-// rendered with fmt.Sprint and arrive as unparseable Go syntax.
+// addFileStats attaches the commit's numstat delta, an upper bound on what an agent
+// wrote, as a JSON string because delivery flattens attributes to OTLP scalars.
 func addFileStats(env Env, attrs map[string]any, stats []gitx.FileStat, owners map[string]string) {
 	if len(stats) == 0 {
-		return // a merge or an empty commit has no diff to report
+		return
 	}
 	reported := stats
 	if len(reported) > MaxCommitFileStats {
@@ -461,9 +366,7 @@ func addFileStats(env Env, attrs map[string]any, stats []gitx.FileStat, owners m
 	attrs["file_stats_truncated"] = len(entries) < len(stats)
 }
 
-// fileOwners maps each repo-relative path to the stamped session that touched it
-// last. Manifests are read whole (they are small, local JSON) and must be read
-// before Consume, which is what empties them.
+// fileOwners maps each path to the stamped session that touched it last.
 func fileOwners(env Env, store *session.Store, ids []string) map[string]string {
 	manifests, err := store.Manifests()
 	if err != nil {
@@ -481,9 +384,7 @@ func fileOwners(env Env, store *session.Store, ids []string) map[string]string {
 			continue
 		}
 		for f, at := range m.Files {
-			// Two sessions can both have touched a file. The later touch wins;
-			// Manifests is ordered oldest session first, so an exact tie keeps the
-			// session that started first and the result is deterministic.
+			// Manifests is oldest first, so a tie keeps the earlier session deterministically.
 			if prev, seen := touchedAt[f]; seen && !at.After(prev) {
 				continue
 			}

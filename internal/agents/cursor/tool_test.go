@@ -23,9 +23,8 @@ func cursorToolRun(t *testing.T, env hookrun.Env, hook, turn string, fields map[
 	}
 }
 
-// Every tool call Cursor reports is one event keyed on Cursor's own call id, carrying
-// the tool's name, duration and outcome — and none of what the tool was given or gave
-// back. Hook payloads carry tool_input, tool_output and error_message; the event never does.
+// Every tool call is one event keyed on Cursor's call id, with name, duration and outcome,
+// and none of tool_input, tool_output or error_message.
 func TestCursorToolCallsAreRecordedWithoutContent(t *testing.T) {
 	env := testEnv(t)
 	private := map[string]any{

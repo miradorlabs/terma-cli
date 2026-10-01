@@ -26,7 +26,7 @@ func TestActiveSessionFallbackAndMergeSkip(t *testing.T) {
 	env := func(stdin string, args ...string) Env {
 		return Env{Now: now, Cwd: root, Args: args, Stdin: strings.NewReader(stdin), Version: "test"}
 	}
-	// Codex announces a thread but reports no files: fallback attribution.
+	// A session announced with no files falls back to active-session attribution.
 	if err := (Extension{Tool: "codex"}).sessionStart(ctx, env(`{"session_id":"thread-9","cwd":"`+root+`","model":"gpt-5.4"}`)); err != nil {
 		t.Fatal(err)
 	}
@@ -74,8 +74,6 @@ func TestHandlersNeverFailOutsideARepo(t *testing.T) {
 	}
 }
 
-// commitEvent flushes the spool and returns the attributes of the single
-// terma.commit event in it.
 func commitEvent(t *testing.T, sp *spool.Spool) map[string]any {
 	t.Helper()
 	var commits []spool.Event
@@ -96,8 +94,7 @@ func commitEvent(t *testing.T, sp *spool.Spool) map[string]any {
 	return commits[0].Attrs
 }
 
-// fileStats decodes the file_stats attribute into the shape it has on the wire —
-// generic maps, so the test sees the actual JSON keys rather than the Go struct.
+// fileStats decodes file_stats as generic maps, so the test sees the wire's JSON keys.
 func fileStats(t *testing.T, attrs map[string]any) []map[string]any {
 	t.Helper()
 	raw, ok := attrs["file_stats"].(string)
@@ -167,7 +164,7 @@ func TestPostCommitReportsPerFileLineStats(t *testing.T) {
 	if got := attrs["file_count"]; got != float64(4) {
 		t.Fatalf("file_count = %v, want 4", got)
 	}
-	// 2 + 1 + 1 lines of Go; the binary file contributes no counts at all.
+	// 2 + 1 + 1 lines; the binary file contributes no counts.
 	if got, want := attrs["lines_added"], float64(4); got != want {
 		t.Fatalf("lines_added = %v, want %v", got, want)
 	}
@@ -259,11 +256,9 @@ func TestPostCommitBoundsFileStats(t *testing.T) {
 	}
 }
 
-// keysOf is the sorted attribute names of an event: the shape a consumer sees.
 func keysOf(attrs map[string]any) []string { return slices.Sorted(maps.Keys(attrs)) }
 
-// commitIdentity is what both commit events carry — enough to identify and size a
-// commit, nothing about its contents. The unattributed event is exactly this.
+// commitIdentity is what both commit events carry, and all the unattributed one does.
 var commitIdentity = []string{"author_email", "branch", "file_count", "lines_added", "lines_deleted", AttrProjectID, "repo_url", "sha"}
 
 func TestPostCommitOnAnUnstampedCommitEmitsOnlyACount(t *testing.T) {
@@ -271,8 +266,7 @@ func TestPostCommitOnAnUnstampedCommitEmitsOnlyACount(t *testing.T) {
 	ctx := context.Background()
 	sp, _ := spool.Open(t.TempDir())
 	env := Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(""), Spool: sp, Version: "test"}
-	// A remote carrying a credential and a project binding, so the event has every
-	// field it is allowed to carry and the test can see what happened to each.
+	// A credentialed remote and a binding, so the event carries every field it may.
 	if _, err := gitx.Git(ctx, root, "remote", "add", "origin", "https://dev:ghp_secret@github.com/o/r.git"); err != nil {
 		t.Fatal(err)
 	}
@@ -314,8 +308,7 @@ func TestPostCommitOnAnUnstampedCommitEmitsOnlyACount(t *testing.T) {
 			t.Errorf("%s = %v, want %v", k, ev.Attrs[k], v)
 		}
 	}
-	// The boundary: a count, never a manifest. No value may name the file, and the
-	// credential in the remote must not survive.
+	// No value may name the file, and the remote's credential must not survive.
 	blob, _ := json.Marshal(ev.Attrs)
 	for _, leak := range []string{"human.md", "notes", "ghp_secret", "file_stats"} {
 		if strings.Contains(string(blob), leak) {
@@ -324,9 +317,7 @@ func TestPostCommitOnAnUnstampedCommitEmitsOnlyACount(t *testing.T) {
 	}
 }
 
-// The coverage query is one filter on the event name, grouped by name: the two
-// commit events must be told apart by it, share the identity attributes, and the
-// stamped one must be the pre-existing terma.commit, untouched.
+// The two commit events differ by name alone, share the identity attributes, and leave terma.commit unchanged.
 func TestCommitEventsAreOneFilterApart(t *testing.T) {
 	root := initRepo(t)
 	ctx := context.Background()
@@ -373,9 +364,7 @@ func TestCommitEventsAreOneFilterApart(t *testing.T) {
 	}
 	agentSHA := commit("src/agent.go", "Add agent code")
 
-	// The spool also holds terma.commit.stamped — prepare-commit-msg's record of the
-	// agent commit — which a prefix match would count a second time. The filter is
-	// an exact set of two names.
+	// terma.commit.stamped is also spooled, so a prefix match would double count.
 	byName := map[string][]spool.Event{}
 	var all []string
 	for _, ev := range hookruntest.Spooled(t, sp) {
@@ -395,8 +384,6 @@ func TestCommitEventsAreOneFilterApart(t *testing.T) {
 		t.Fatalf("shas: stamped=%v (want %s) unstamped=%v (want %s)", stamped.Attrs["sha"], agentSHA, unstamped.Attrs["sha"], humanSHA)
 	}
 
-	// terma.commit is unchanged: the identity attributes plus the session and the
-	// per-file detail, with its session id on the event.
 	wantStamped := slices.Sorted(slices.Values(append(slices.Clone(commitIdentity),
 		"file_stats", "file_stats_reported", "file_stats_truncated", "session_count", "sessions", "tool")))
 	if got := keysOf(stamped.Attrs); !slices.Equal(got, wantStamped) {
@@ -408,7 +395,6 @@ func TestCommitEventsAreOneFilterApart(t *testing.T) {
 	if got := keysOf(unstamped.Attrs); !slices.Equal(got, commitIdentity) {
 		t.Fatalf("unattributed event shape\n got %v\nwant %v", got, commitIdentity)
 	}
-	// Both carry the same identity, so a dashboard can compare the two populations.
 	for _, k := range []string{"author_email", "branch", "repo_url", AttrProjectID} {
 		if stamped.Attrs[k] != unstamped.Attrs[k] {
 			t.Errorf("%s differs between the two commit events: %v vs %v", k, stamped.Attrs[k], unstamped.Attrs[k])
@@ -416,8 +402,7 @@ func TestCommitEventsAreOneFilterApart(t *testing.T) {
 	}
 }
 
-// Merge and squash commits are never stamped, so counting them would only ever
-// lower coverage; post-commit leaves them out the way prepare-commit-msg does.
+// Merge and squash commits, never stamped, are left out of the unattributed count.
 func TestPostCommitSkipsMergeAndSquashCommits(t *testing.T) {
 	root := initRepo(t)
 	ctx := context.Background()
@@ -475,7 +460,7 @@ func TestPostCommitSkipsMergeAndSquashCommits(t *testing.T) {
 	}
 }
 
-// initRepo is hookruntest.InitRepo with a private Claude config directory as well.
+// initRepo is hookruntest.InitRepo with a private agent config directory as well.
 func initRepo(t *testing.T) string {
 	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
 	return hookruntest.InitRepo(t)

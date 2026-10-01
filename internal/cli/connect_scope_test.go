@@ -11,9 +11,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-// localRepo is a git repository whose .claude/settings.json already carries the hooks
-// `terma install` writes, with the user-level file and Terma's directory sandboxed so
-// nothing here reaches the developer's real configuration. The test runs from inside it.
+// localRepo carries the hooks `terma install` writes, with user-level files sandboxed;
+// the test runs from inside it.
 func localRepo(t *testing.T) (repo, settings string) {
 	t.Helper()
 	repo = t.TempDir()
@@ -52,8 +51,7 @@ func envIn(t *testing.T, path string) (map[string]string, map[string]json.RawMes
 	return env, doc
 }
 
-// A local connect is the offline half: no project, no key, no sign-in — this test passes
-// none of them and would fail with "not signed in" if the command tried to mint.
+// A local connect needs no project, key or sign-in; minting would fail "not signed in".
 func TestTelemetryConnectLocalWritesOnlyWhatToShip(t *testing.T) {
 	_, settings := localRepo(t)
 
@@ -102,7 +100,6 @@ func TestTelemetryConnectLocalRefusesCodex(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "no repository settings") {
 		t.Fatalf("err = %v, want a refusal naming the missing repository scope\n%s", err, out)
 	}
-	// Refused before anything is written, for every harness named.
 	_, err = runTerma(t, "connect", "claude", "codex", "--scope", "local", "--yes")
 	if err == nil || !strings.Contains(err.Error(), "Codex") {
 		t.Fatalf("err = %v, want the multi-harness connect refused up front", err)
@@ -119,8 +116,7 @@ func TestTelemetryConnectLocalNeedsARepository(t *testing.T) {
 	}
 }
 
-// The key, its name, the identity and the delivery mode are the global connect's. Taking
-// them on a local connect would silently drop them; refusing says where they belong.
+// Global-only flags on a local connect are refused rather than silently dropped.
 func TestTelemetryConnectLocalRejectsGlobalOnlyFlags(t *testing.T) {
 	localRepo(t)
 	for _, args := range [][]string{
@@ -139,8 +135,7 @@ func TestTelemetryConnectLocalRejectsGlobalOnlyFlags(t *testing.T) {
 	}
 }
 
-// The local layer is its own row under the global one, in both renderings. It is never
-// "connected": with no global connect it says so.
+// The local layer is its own row in both renderings, never "connected" on its own.
 func TestTelemetryStatusListsTheLocalLayer(t *testing.T) {
 	localRepo(t)
 	if out, err := runTerma(t, "connect", "claude", "--scope", "local", "--yes", "--exclude-tool-content"); err != nil {
@@ -180,7 +175,6 @@ func TestTelemetryStatusListsTheLocalLayer(t *testing.T) {
 		t.Errorf("table lacks the local row:\n%s", table)
 	}
 
-	// The one-line view says the same thing beside the agent.
 	status, err := runTerma(t, "status")
 	if err != nil {
 		t.Fatalf("status: %v\n%s", err, status)
@@ -190,8 +184,7 @@ func TestTelemetryStatusListsTheLocalLayer(t *testing.T) {
 	}
 }
 
-// Outside a repository, or in one without a layer, nothing extra is reported — the JSON
-// shape existing consumers read is unchanged apart from the scope field.
+// Outside a repository, or in one without a layer, nothing extra is reported.
 func TestTelemetryStatusWithoutALocalLayerIsOneRow(t *testing.T) {
 	localRepo(t)
 	out, err := runTerma(t, "harness", "status", "claude", "-o", "json")
@@ -214,7 +207,6 @@ func TestTelemetryDisconnectLocalRestoresTheFile(t *testing.T) {
 		t.Fatalf("connect: %v\n%s", err, out)
 	}
 
-	// The global file has nothing to remove, and says so about the right layer.
 	out, err := runTerma(t, "disconnect", "claude", "--yes")
 	if err != nil || !strings.Contains(out, "no Terma telemetry settings. Nothing to do.") {
 		t.Fatalf("global disconnect: %v\n%s", err, out)
@@ -252,8 +244,7 @@ func TestTelemetryDisconnectLocalRestoresTheFile(t *testing.T) {
 	}
 }
 
-// The checklist itself needs a terminal, but the refusal that comes before it does not: a
-// --scope local that cannot be honoured is an error, never a quiet flip to global.
+// A --scope local that cannot be honoured is an error, never a quiet flip to global.
 func TestAskConnectOptionsRefusesImpossibleLocalBeforePrompting(t *testing.T) {
 	_, err := askConnectOptions(connectFlags{scope: "local"}, []harness.Harness{harnessOf(t, "codex")}, connectForm{root: "/repo"})
 	if err == nil || !strings.Contains(err.Error(), "Codex has no repository settings") {

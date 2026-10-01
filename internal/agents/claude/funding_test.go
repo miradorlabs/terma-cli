@@ -36,12 +36,7 @@ func TestClaudeFundingSnapshotAndHints(t *testing.T) {
 	if _, ok := e.Attrs["oauth_token_present"]; ok {
 		t.Fatal("stripped OAuth variable treated as observed")
 	}
-	// This session stacks competing credentials (an env API key and auth token, Bedrock,
-	// and a configured apiKeyHelper), so the cached OAuth login is NOT what it is using.
-	// account_id stays as raw evidence beside those hints, but the email is the cached
-	// login's and must be withheld — attributing it would tie that login to a session it
-	// did not run (on a shared machine it could be a different person's email entirely).
-	// A genuine OAuth session still gets it: see TestClaudeFundingEmailGatedByEffectiveCredential.
+	// Competing credentials keep account_id as raw evidence but withhold the cached login's email.
 	if _, ok := e.Attrs["account_email"]; ok {
 		t.Fatalf("account_email attributed to a session using a different credential: %+v", e)
 	}
@@ -62,10 +57,8 @@ func TestClaudeFundingSnapshotAndHints(t *testing.T) {
 	}
 }
 
-// account_email is captured for a genuine OAuth session (A1's keep-email intent) and
-// withheld the moment a competing credential appears — the same gate that governs
-// account_id attribution, so the cached login is never claimed for a session it did not
-// run. account_id stays as raw evidence in both cases.
+// account_email is captured for a genuine OAuth session and withheld once a competing
+// credential appears, the same gate as account_id attribution.
 func TestClaudeFundingEmailGatedByEffectiveCredential(t *testing.T) {
 	dir, repo := t.TempDir(), t.TempDir()
 	t.Setenv("CLAUDE_CONFIG_DIR", dir)
@@ -80,7 +73,6 @@ func TestClaudeFundingEmailGatedByEffectiveCredential(t *testing.T) {
 	if e.Attrs["account_email"] != "me@example.test" {
 		t.Fatalf("a genuine OAuth session keeps account_email: %+v", e)
 	}
-	// A competing credential appears: the cached login is no longer the effective one.
 	t.Setenv("ANTHROPIC_API_KEY", "never-export-key")
 	e = readFunding(repo)
 	if _, ok := e.Attrs["account_email"]; ok {

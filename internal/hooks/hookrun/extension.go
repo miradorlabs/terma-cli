@@ -9,18 +9,13 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
-// Extension is the hooks of an agent that has none terma can commit and no exporter of
-// its own: terma writes an extension into it that exports its telemetry itself and calls
-// `terma hook <prefix>-*` with one JSON shape, composed from the agent's own events. The
-// session id is the agent's own, the session.id its extension stamps on every record, so
-// a claim names the session the relay sees. Only the tool label differs between agents.
+// Extension is the hooks a terma-written agent extension calls, in one JSON shape, under
+// the session id its telemetry carries too.
 type Extension struct {
-	// Tool is the agent's label.
 	Tool string
 }
 
-// Events is the extension's events: <prefix>-session-start, -prompt, -session-end and
-// -file-edit.
+// Events is the extension's <prefix>-session-start, -prompt, -session-end and -file-edit handlers.
 func (x Extension) Events(prefix string) map[string]func(context.Context, Env) error {
 	return map[string]func(context.Context, Env) error{
 		prefix + "-session-start": x.sessionStart,
@@ -30,7 +25,6 @@ func (x Extension) Events(prefix string) map[string]func(context.Context, Env) e
 	}
 }
 
-// extensionHookInput is what an extension writes to stdin.
 type extensionHookInput struct {
 	SessionID string `json:"session_id"`
 	Cwd       string `json:"cwd"`
@@ -50,7 +44,6 @@ func readExtensionInput(r io.Reader) (*extensionHookInput, error) {
 	return in, nil
 }
 
-// sessionStart records an extension-driven session as active.
 func (x Extension) sessionStart(ctx context.Context, env Env) error {
 	in, err := readExtensionInput(env.Stdin)
 	if err != nil {
@@ -71,7 +64,6 @@ func (x Extension) sessionStart(ctx context.Context, env Env) error {
 	return nil
 }
 
-// sessionEnd clears the active session; manifests stay for the commit to come.
 func (x Extension) sessionEnd(ctx context.Context, env Env) error {
 	in, err := readExtensionInput(env.Stdin)
 	if err != nil {
@@ -91,7 +83,6 @@ func (x Extension) sessionEnd(ctx context.Context, env Env) error {
 	return nil
 }
 
-// fileEdit adds one edited file to the session's manifest.
 func (x Extension) fileEdit(ctx context.Context, env Env) error {
 	in, err := readExtensionInput(env.Stdin)
 	if err != nil {
@@ -111,10 +102,8 @@ func (x Extension) fileEdit(ctx context.Context, env Env) error {
 	return nil
 }
 
-// TurnStart is a turn-start hook that records nothing: the caller claims the session
-// for the local relay from the payload and starts the relay, so a session whose start
-// was missed, or a relay that died between turns, is covered before the turn exports.
-// It must print nothing: an agent may hand the hook's stdout to the model.
+// TurnStart records nothing: its caller claims the session and starts the relay before the
+// turn exports. It must print nothing, since stdout may reach the model.
 func TurnStart(_ context.Context, env Env) error {
 	_, err := readExtensionInput(env.Stdin)
 	return err

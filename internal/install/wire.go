@@ -23,10 +23,8 @@ func Wire(ctx context.Context, out io.Writer, root string, bound *termaproject.F
 	if err != nil {
 		return err
 	}
-	// Older installs wrote shared --local config. Restore that owned setting
-	// before recording the new worktree override, or we'd remember our own shim
-	// and lose the user's original hook path. Never migrate shared config from
-	// a linked checkout: the owning main checkout must do that first.
+	// Restore a shared --local setting first, or the new override would record our own
+	// shim as the previous path; only the main checkout may migrate it.
 	if session.PreviousHooksScope(gitDir) == "--local" {
 		local, localErr := gitx.Git(ctx, root, "config", "--local", "--get", "core.hooksPath")
 		if localErr == nil && local == hookmgr.ShimDir && filepath.Clean(gitx.CommonDirFS(gitDir)) != filepath.Clean(gitDir) {
@@ -94,15 +92,13 @@ func Unwire(ctx context.Context, root, gitDir string) error {
 	return err
 }
 
-// Linked worktrees share --local config. Use Git's per-worktree scope so changing
-// one checkout never redirects or disables hooks in another checkout. Enable it
-// for the first install too, before another worktree might be added.
+// hooksConfigScope enables Git's per-worktree scope, since linked worktrees share
+// --local config and one checkout must never redirect another's hooks.
 func hooksConfigScope(ctx context.Context, root, gitDir string) (string, error) {
 	common := gitx.CommonDirFS(gitDir)
 
 	if gitx.ConfigGet(ctx, root, "extensions.worktreeConfig") != "true" {
-		// Git requires these main-worktree-only settings to move out of the
-		// shared config when enabling worktreeConfig (notably separate git dirs).
+		// Git requires these main-worktree-only settings out of the shared config first.
 		for _, key := range []string{"core.worktree", "core.bare"} {
 			value, err := gitx.Git(ctx, root, "config", "--local", "--get", key)
 			if err != nil || (key == "core.bare" && strings.ToLower(value) != "true") {

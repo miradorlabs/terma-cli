@@ -10,9 +10,7 @@ import (
 	"testing"
 )
 
-// TERMA_HOOKS=0 is the developer's kill switch: `terma hook` exits at once and a
-// commit that would have been stamped is left alone. Anything else leaves the hooks
-// on.
+// TERMA_HOOKS=0 leaves a commit unstamped; any other value leaves the hooks on.
 func TestHookKillSwitch(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not installed")
@@ -35,7 +33,6 @@ func TestHookKillSwitch(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	t.Setenv("TERMA_HOOKS", "")
 
-	// The hook locates the repository from the working directory, as git runs it.
 	wd, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
@@ -56,8 +53,7 @@ func TestHookKillSwitch(t *testing.T) {
 			t.Fatalf("terma hook %s: %v", strings.Join(args, " "), err)
 		}
 	}
-	// An announced session with no manifest: the staged file below is attributed to
-	// it by the active-session fallback, so prepare-commit-msg has something to stamp.
+	// No manifest, so the active-session fallback attributes the staged file below.
 	run(`{"session_id":"sess-kill-switch","cwd":"`+root+`","hook_event_name":"SessionStart","source":"startup"}`, "session-start")
 	if err := os.WriteFile(filepath.Join(root, "a.txt"), []byte("x\n"), 0o644); err != nil {
 		t.Fatal(err)

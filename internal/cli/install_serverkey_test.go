@@ -12,10 +12,8 @@ import (
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 )
 
-// A server key (TERMA_API_KEY) is scoped to one project, and the account service that
-// lists projects accepts only a signed-in user. Install binds the key's own project,
-// read from the API gateway's /v1/identity. This offline fixture uses the package's
-// explicit policy stub; real installs use a developer login for policy.
+// A server key binds the project the gateway's /v1/identity names, since only a signed-in
+// user can list projects; policy still comes from the explicit stub.
 func TestInstallWithAServerKeyBindsTheKeysProject(t *testing.T) {
 	const keyProject, keyOrg = "11111111-2222-4333-8444-555555555555", "99999999-8888-4777-8666-555555555555"
 	var paths []string

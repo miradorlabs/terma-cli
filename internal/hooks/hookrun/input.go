@@ -8,14 +8,10 @@ import (
 	"math"
 )
 
-// MaxInput bounds the payload a harness writes to a hook's stdin. Real payloads are
-// a few kilobytes; the bound is there so a runaway writer cannot make a hook hold the
-// agent up.
+// MaxInput bounds a hook's stdin payload, so a runaway writer cannot hold the agent up.
 const MaxInput = 4 << 20
 
-// ReadInput decodes one harness payload into T. It reads one byte past the bound so
-// an oversized payload is refused by name: a payload cut at the bound would fail to
-// parse, or worse parse, and neither says what went wrong.
+// ReadInput decodes one payload into T, refusing an oversized one by name rather than parsing a cut one.
 func ReadInput[T any](r io.Reader) (*T, error) {
 	if r == nil {
 		return nil, errors.New("no hook input")
@@ -34,9 +30,8 @@ func ReadInput[T any](r io.Reader) (*T, error) {
 	return &in, nil
 }
 
-// JSONNumber reads a count a payload sent as a JSON number: the value, whether a value
-// was present at all, and whether it is a usable one (finite, not negative, exact as a
-// float64, and whole when integer is set).
+// JSONNumber reads a JSON count: the value, whether one was present, and whether it is
+// finite, non-negative, exact as a float64 and whole when integer is set.
 func JSONNumber(raw json.RawMessage, integer bool) (float64, bool, bool) {
 	if len(raw) == 0 || string(raw) == "null" {
 		return 0, false, false

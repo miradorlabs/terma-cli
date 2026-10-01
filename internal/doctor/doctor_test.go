@@ -52,8 +52,7 @@ func TestRenderCheck(t *testing.T) {
 	}
 }
 
-// A fix's command is drawn only on a terminal; plain output is the fix as written, which
-// is what scripts and the other tests read.
+// A fix's command is drawn only on a terminal; plain output is the fix as written.
 func TestFixTextIsPlainOffATerminal(t *testing.T) {
 	for _, fix := range []string{"terma install", "terma install (a later line puts the real binaries back in front)", "run `source ~/.zshrc` or open a new terminal"} {
 		if got := fixText(style.Plain(), fix); got != fix {

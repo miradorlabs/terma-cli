@@ -15,9 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
-// WellKnownBinDirs are where a terma binary gets installed besides wherever PATH points
-// today: the install script's and Homebrew's directories, Go's, and the system one that
-// apps started outside a shell search first.
+// WellKnownBinDirs are where a terma binary gets installed besides wherever PATH points.
 func WellKnownBinDirs() []string {
 	dirs := []string{"/usr/local/bin", "/opt/homebrew/bin", "/usr/bin"}
 	if home, err := os.UserHomeDir(); err == nil {
@@ -29,11 +27,8 @@ func WellKnownBinDirs() []string {
 	return dirs
 }
 
-// otherTermas lists the terma binaries on this machine that are a different build from
-// primary (the one `terma` resolves to here), each with when it was installed. It looks
-// along PATH and in binDirs, never in terma's own shim directory, and compares
-// contents — it does not run what it finds. A copy of the same build, or a link to the
-// same file, is not reported: having two is only a problem when they disagree.
+// otherTermas lists the terma binaries along PATH and in binDirs that are a different
+// build from primary, comparing contents and never running what it finds.
 func otherTermas(primary string, binDirs []string) []string {
 	want, err := installedBinaryDigest(primary)
 	if err != nil {
@@ -51,7 +46,7 @@ func otherTermas(primary string, binDirs []string) []string {
 			continue
 		}
 		candidate := filepath.Join(dir, name)
-		info, err := os.Stat(candidate) // follows symlinks: a link to primary is primary
+		info, err := os.Stat(candidate)
 		if err != nil || info.IsDir() || info.Mode()&0o111 == 0 || os.SameFile(info, primaryInfo) {
 			continue
 		}
@@ -81,14 +76,12 @@ func fileDigest(path string) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
-// npmLauncherDigest pins the published npm launcher. A path named terma in an
-// npm layout is not enough to trust it: the launcher is executable JavaScript,
-// and doctor must never run a PATH candidate to learn where it points.
+// npmLauncherDigest pins the published npm launcher, which doctor must never run to
+// learn where it points.
 const npmLauncherDigest = "a90d18d5df9946c37f39c80fe34f178202a1f65bf58abffaf0eb1f6f4f15cedb"
 
-// InstalledBinary resolves only the official npm launcher to its vendor binary.
-// For every other PATH entry, including an edited npm launcher, compare the file
-// itself. npm's bin link and the package-local bin file both lead to this path.
+// InstalledBinary resolves the official npm launcher to its vendor binary, and anything
+// else, an edited launcher included, to itself.
 func InstalledBinary(path string) string {
 	if runtime.GOOS == "windows" {
 		return path
@@ -112,11 +105,8 @@ func installedBinaryDigest(path string) (string, error) {
 	return fileDigest(InstalledBinary(path))
 }
 
-// AddToPathCommand is the command a developer runs to put dir on PATH for good, in their
-// own shell: the line appended to the startup file terma knows for it and read into this
-// shell, or for fish, fish_add_path, which keeps the entry itself. A shell terma does not
-// know gets the line for this shell alone. terma never runs it: this is the developer's
-// own startup file.
+// AddToPathCommand is the command a developer runs to put dir on PATH for good in their
+// own shell; terma never runs it.
 func AddToPathCommand(dir string) string {
 	rc, ok := shellrc.ShellRC()
 	if !ok {
@@ -130,8 +120,7 @@ func AddToPathCommand(dir string) string {
 	return "echo '" + strings.ReplaceAll(line, "'", `'\''`) + "' >> " + file + " && " + ReloadCommand(file)
 }
 
-// shellPath writes a path for a command line: ~/… when that needs no quoting, else the
-// full path in single quotes.
+// shellPath writes ~/… when that needs no quoting, else the full path in single quotes.
 func shellPath(path string) string {
 	const plain = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/._-~"
 	if short := output.TildePath(path); !strings.ContainsFunc(short, func(r rune) bool { return !strings.ContainsRune(plain, r) }) {
@@ -155,12 +144,8 @@ func BinaryCheck(exe string, binDirs []string) Check {
 				Fix:    "run `" + AddToPathCommand(filepath.Dir(exe)) + "` to put " + filepath.Dir(exe) + " first on PATH, or replace " + path + " with this build; then run `terma doctor`"}
 		}
 	}
-	// Hooks call `terma` by name, and the name does not resolve the same way
-	// everywhere: an app started from the Dock gets the system's PATH, not the
-	// shell's, so a second copy in /usr/local/bin is the one Cursor's hooks run. When
-	// that copy is another build, the same repository behaves two ways depending on
-	// where the agent was launched — and a build from before .terma/settings.json
-	// does not see the binding at all.
+	// An app started from the Dock gets the system PATH, so its hooks may run a second
+	// copy in /usr/local/bin instead of this one.
 	if others := otherTermas(path, binDirs); len(others) > 0 {
 		return Check{Status: Warn,
 			Detail: path + binaryBuildLabel(path) + "; a different build is also installed: " + strings.Join(others, ", "),
@@ -186,8 +171,7 @@ func binaryBuildLabel(path string) string {
 	return ""
 }
 
-// ReloadCommand re-reads a startup file in the running shell: `source` where the shell
-// has it (zsh, bash, fish), the POSIX `.` otherwise.
+// ReloadCommand re-reads a startup file in the running shell.
 func ReloadCommand(file string) string {
 	switch filepath.Base(os.Getenv("SHELL")) {
 	case "zsh", "bash", "fish":

@@ -33,7 +33,6 @@ func TestClaudeSessionStampsOnlyItsOwnFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Commit only the human file: no trailer.
 	if _, err := gitx.Git(ctx, root, "add", "notes/human.md"); err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +48,6 @@ func TestClaudeSessionStampsOnlyItsOwnFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Now the agent's file: stamped with the session that touched it.
 	if _, err := gitx.Git(ctx, root, "add", "src/agent.go"); err != nil {
 		t.Fatal(err)
 	}
@@ -73,8 +71,7 @@ func TestClaudeSessionStampsOnlyItsOwnFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// The committed file is consumed: a later commit of unrelated work is clean,
-	// even though the session is still active.
+	// The committed file is consumed: a later unrelated commit is clean though the session is active.
 	hookruntest.WriteFile(t, root, "notes/again.md", "more\n")
 	_, _ = gitx.Git(ctx, root, "add", "notes/again.md")
 	_ = os.WriteFile(msgPath, []byte("more notes\n"), 0o644)
@@ -83,7 +80,6 @@ func TestClaudeSessionStampsOnlyItsOwnFiles(t *testing.T) {
 		t.Fatalf("work already committed must not re-stamp a later human commit, even with the session still active:\n%s", data)
 	}
 
-	// Spool: start, account snapshot, files touched, stamped, commit.
 	n, _, _ := sp.Pending()
 	if n != 5 {
 		t.Fatalf("expected 5 spooled events, got %d", n)

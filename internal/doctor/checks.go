@@ -17,19 +17,10 @@ import (
 )
 
 // AgentHooksCheck reports, for the agents wired in this repository, whether their hooks
-// are in place and whether the agent will run them. It is shared by doctor and status so
-// the two cannot disagree about it.
+// are in place and whether the agent will run them; doctor and status share it.
 //
-// The repository's hooks files are the record of what is wired (adapter.Wired). An agent
-// they wire is checked whoever uses it: wiring an older terma wrote is stale for everyone.
-// An agent they do not wire is missing only when this developer named it among their
-// agents (mine) — a repository nobody opens in Cursor is not missing anything, and a
-// developer who has not said which agents they use is not told about every agent terma
-// knows. Trust is different: some agents refuse to run a committed hook until the
-// developer has trusted it, or the repository, once from inside the agent — the wiring
-// looks perfect and nothing runs, a silence worth naming — but only for an agent this
-// developer uses (mine; empty means "has not said", so all of them). A colleague's agent
-// is naturally untrusted here and costs this developer nothing.
+// A wired agent is checked whoever uses it, an unwired one is missing only when named in
+// mine, and trust is judged only for the developer's own agents (mine; empty means all).
 func AgentHooksCheck(reg *agents.Registry, root string, mine []string) Check {
 	var parts []string
 	var fix string
@@ -45,7 +36,7 @@ func AgentHooksCheck(reg *agents.Registry, root string, mine []string) Check {
 		if a.HooksPath() == "" {
 			continue
 		}
-		// Codex Desktop is wired through the Codex hooks file.
+		// A surface is wired through its agent's hooks file.
 		named := slices.ContainsFunc(agents.Selections(a), func(s string) bool { return slices.Contains(mine, s) })
 		if !agents.Wired(root, a) {
 			if named {
@@ -66,8 +57,6 @@ func AgentHooksCheck(reg *agents.Registry, root string, mine []string) Check {
 			continue
 		}
 		if !plan.Empty() {
-			// Wired, so the file is there: an earlier terma wrote it, and a refresh
-			// rewrites it without re-asking everything install asks.
 			parts = append(parts, a.DisplayName()+" hooks out of date")
 			problem("terma update --refresh")
 			continue
@@ -84,7 +73,7 @@ func AgentHooksCheck(reg *agents.Registry, root string, mine []string) Check {
 		trust, err := trusting.Trust(root)
 		switch {
 		case err != nil:
-			// Unreadable is not untrusted: say so, and do not count it against anyone.
+			// Unreadable is not untrusted.
 			part += " (could not read " + a.DisplayName() + "'s trust record: " + err.Error() + ")"
 			ready++
 		case !trust.Trusted:
@@ -102,8 +91,7 @@ func AgentHooksCheck(reg *agents.Registry, root string, mine []string) Check {
 	return Check{Status: status, Detail: strings.Join(parts, "; "), Fix: fix, Ready: ready, Of: of}
 }
 
-// stateCheck reports saved state this build has not finished migrating, and has nothing
-// to say (false) when every migration it has is applied.
+// stateCheck reports saved state this build has not finished migrating.
 func stateCheck() (Check, bool) {
 	dir, err := config.Dir()
 	if err != nil || !migrate.Pending(dir) {
@@ -119,8 +107,7 @@ func stateCheck() (Check, bool) {
 	return Check{Status: Warn, Detail: fmt.Sprintf("%d migration(s) from this update not applied yet", migrate.Remaining(s)), Fix: "terma update --refresh"}, true
 }
 
-// HooksCheck is doctor's wording for the commit-hook verdict. An unreadable plan
-// fails here; status does not look at why a plan could not be computed.
+// HooksCheck is doctor's wording for the commit-hook verdict.
 func HooksCheck(w HookWiring) Check {
 	switch {
 	case w.Err != nil:
@@ -156,9 +143,7 @@ func StatusLineCheck(v StatusLineVerdict) Check {
 	return Check{Status: Warn, Detail: "not wrapped; plan usage is not captured", Fix: "terma install"}
 }
 
-// HarnessCheck folds every agent's verdict into doctor's one export check. bound
-// says the CLI stands in an installed repository, the only place "this repository does
-// not route it" means anything.
+// HarnessCheck folds every agent's verdict into doctor's one export check.
 func HarnessCheck(reg *agents.Registry, verdicts []HarnessVerdict, otlpURL, projectID string, bound bool) (check Check) {
 	// Count working agents independently of another agent's failure.
 	defer func() {
@@ -194,10 +179,7 @@ func HarnessCheck(reg *agents.Registry, verdicts []HarnessVerdict, otlpURL, proj
 		case RouteRepoDecides:
 			connected = append(connected, v.DisplayName)
 			repoDecides = append(repoDecides, v.DisplayName)
-			// An agent that cannot carry a repository policy at all (Codex) cannot be
-			// asked for by one either, so it is as silent here as one whose repository
-			// simply has none. doctor used to skip it and report "this repository asks"
-			// for a config status said sent nothing.
+			// An agent that cannot carry a repository policy is as silent as one without.
 			if !v.RepoAsks {
 				silent = append(silent, v.DisplayName)
 			}
@@ -213,9 +195,6 @@ func HarnessCheck(reg *agents.Registry, verdicts []HarnessVerdict, otlpURL, proj
 	if len(repoDecides) == 0 {
 		return Check{Status: Pass, Detail: detail}
 	}
-	// A globally-connected-but-silent harness that this repository neither routes nor
-	// carries a committed policy for is the one case worth a word — and only in the
-	// repository the developer is standing in.
 	qualifier := "only where a repository asks"
 	if len(repoDecides) < len(connected) {
 		qualifier = strings.Join(repoDecides, ", ") + ": " + qualifier
@@ -234,10 +213,8 @@ func HarnessCheck(reg *agents.Registry, verdicts []HarnessVerdict, otlpURL, proj
 	}
 }
 
-// RelayCheck is doctor's "agent exporting to Terma" on a machine that exports
-// through the local relay: the relay can run (or runs) on its address with no one else
-// there, each of the developer's agents sends to it, and this repository's sessions
-// can leave — it is bound and this machine holds its project's key.
+// RelayCheck is doctor's "agent exporting to Terma" through the local relay: its address
+// is free, the developer's agents send to it, and this repository is bound and keyed.
 func RelayCheck(reg *agents.Registry, projectID string, selected []string) Check {
 	dir, err := claim.Dir()
 	if err != nil {
@@ -249,7 +226,6 @@ func RelayCheck(reg *agents.Registry, projectID string, selected []string) Check
 		return Check{Status: Fail, Detail: "another process is listening on " + addr + " and receives the agents' telemetry",
 			Fix: "stop it, or move the relay with `terma relay setup --addr`"}
 	}
-	// The developer's selected, or the supported ones when none are recorded.
 	mine := func(e agents.Agent) bool {
 		if len(selected) == 0 {
 			return reg.IsSupported(e.Name())

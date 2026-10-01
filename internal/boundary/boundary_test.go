@@ -23,13 +23,9 @@ var list = flag.Bool("mentions", false, "log every mention of an agent the test 
 
 const module = "github.com/miradorlabs/terma-cli"
 
-// agents are the coding agents terma integrates with, by the name their package takes.
-// agents are every registered agent's name: the package it lives in, and the word that
-// names it.
+// agents are every registered agent's name: its package and the word that names it.
 var agents = builtin.Agents().Names()
 
-// agentPackage reports the agent an import path belongs to: internal/agents/<name> and
-// anything below it.
 func agentPackage(path string) (string, bool) {
 	rest, ok := strings.CutPrefix(path, module+"/internal/agents/")
 	if !ok {
@@ -44,16 +40,13 @@ func agentPackage(path string) (string, bool) {
 	return "", false
 }
 
-// mayNameAgents are the packages whose job is to name agents: the one that registers
-// them, and these tests' own fixtures.
 var mayNameAgents = map[string]string{
 	module + "/internal/agents/builtin": "registers every agent",
 	module + "/internal/contract":       "byte snapshots, named by agent",
 	module + "/internal/boundary":       "this test",
 }
 
-// global are the files that name agents by rule rather than by leak, each with the
-// rule. Nothing else belongs here.
+// global are the files that name agents by rule rather than by leak, each with the rule.
 var global = map[string]string{
 	"internal/ui/style/style.go": "the environment variables coding agents set, terma's or not, to tell a model from a person",
 	"internal/account/api/ai.go": "the gateway's pagination cursor",
@@ -82,9 +75,8 @@ func listPackages(t *testing.T) []pkg {
 			t.Fatal(err)
 		}
 		pkgs = append(pkgs, p)
-		// go test caches a result by what the test process itself reads, and go list
-		// reads in a process of its own: read each package's directory and files here,
-		// or a change to the import graph is answered from the cache.
+		// go test caches by what this process reads, and go list reads in its own: read
+		// the files here or an import-graph change is answered from the cache.
 		if _, err := os.ReadDir(p.Dir); err != nil {
 			t.Fatal(err)
 		}
@@ -106,7 +98,7 @@ func repoRoot(t *testing.T) string {
 	return dir
 }
 
-// bans are imports a package and everything below it never make, each with why.
+// bans are imports a package and everything below it never make.
 var bans = []struct {
 	pkg    string
 	banned []string
@@ -122,20 +114,18 @@ var bans = []struct {
 	{"internal/ui", []string{"internal/account", "internal/agents", "internal/hooks", "internal/relay", "internal/cli", "internal/config"}, "terminal output depends on nothing of terma's"},
 }
 
-// onlyImportedBy are packages one entry point imports, and nothing else outside tests.
+// onlyImportedBy are packages only one entry point imports outside tests.
 var onlyImportedBy = map[string]string{
 	"internal/cli":            "cmd/terma",
 	"internal/agents/builtin": "cmd/terma",
 }
 
-// within reports whether path is pkg or below it.
 func within(path, pkg string) bool {
 	return path == module+"/"+pkg || strings.HasPrefix(path, module+"/"+pkg+"/")
 }
 
-// TestAgentPackagesAreImportedOnlyByTheRegistry holds the import graph: an agent's
-// package is imported by the registry and by nothing else, never by another agent, and
-// no package makes an import its bans forbid.
+// TestAgentPackagesAreImportedOnlyByTheRegistry holds the import graph: only the registry
+// imports an agent's package, no agent imports another, and no ban is broken.
 func TestAgentPackagesAreImportedOnlyByTheRegistry(t *testing.T) {
 	for _, p := range listPackages(t) {
 		self, isAgent := agentPackage(p.ImportPath)
@@ -170,9 +160,8 @@ func TestAgentPackagesAreImportedOnlyByTheRegistry(t *testing.T) {
 	}
 }
 
-// Every package directly under internal/agents is an agent the build registers, the
-// registry itself, or code agents share: an agent left out of builtin would be neither
-// wired nor guarded.
+// Every package directly under internal/agents is a registered agent, the registry, or
+// shared code: an unregistered agent would be neither wired nor guarded.
 func TestEveryAgentPackageIsRegistered(t *testing.T) {
 	entries, err := os.ReadDir(filepath.Join(repoRoot(t), "internal", "agents"))
 	if err != nil {
@@ -188,9 +177,8 @@ func TestEveryAgentPackageIsRegistered(t *testing.T) {
 	}
 }
 
-// TestNothingElseNamesAnAgent finds, in every shipped file outside an agent's package,
-// the identifiers and strings that name an agent. There are none: what the core needs of
-// an agent it asks through internal/agents.
+// TestNothingElseNamesAnAgent finds identifiers and strings naming an agent in shipped
+// files outside an agent's package; there must be none.
 func TestNothingElseNamesAnAgent(t *testing.T) {
 	root := repoRoot(t)
 	got := map[string]int{}
@@ -223,16 +211,27 @@ func TestNothingElseNamesAnAgent(t *testing.T) {
 
 var agentWord = regexp.MustCompile(`(?i)(^|[^a-z])(` + strings.Join(agents, "|") + `)([^a-z]|$)`)
 
-// mentions counts the identifiers and string literals in a file that name an agent.
-// Comments are prose and do not count.
+// mentions counts the identifiers, string literals and comments in a file that name an
+// agent.
 func mentions(t *testing.T, path string) int {
 	t.Helper()
 	fset := token.NewFileSet()
-	f, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
+	f, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution|parser.ParseComments)
 	if err != nil {
 		t.Fatal(err)
 	}
 	n := 0
+	for _, g := range f.Comments {
+		for _, c := range g.List {
+			if strings.HasPrefix(c.Text, "//go:") || !stringNamesAgent(c.Text) {
+				continue
+			}
+			n++
+			if *list {
+				t.Logf("%s: %s", fset.Position(c.Pos()), c.Text)
+			}
+		}
+	}
 	ast.Inspect(f, func(node ast.Node) bool {
 		switch x := node.(type) {
 		case *ast.ImportSpec:
@@ -259,8 +258,8 @@ func mentions(t *testing.T, path string) int {
 	return n
 }
 
-// identNamesAgent splits a Go identifier into its words (captureCodexFunding → capture,
-// codex, funding) and reports whether one is an agent's name.
+// identNamesAgent reports whether a word of a Go identifier (captureCodexFunding →
+// capture, codex, funding) is an agent's name.
 func identNamesAgent(name string) bool {
 	lower := strings.ToLower(name)
 	if strings.Contains(lower, "opencode") || strings.Contains(lower, "antigravity") {
@@ -269,8 +268,7 @@ func identNamesAgent(name string) bool {
 	ws := words(name)
 	for i, w := range ws {
 		if w == "cursor" {
-			// A read position (fundingCursor, nextCursor) far more often than the editor:
-			// the editor leads a longer name (cursorTool, CursorSubagentStop).
+			// Usually a read position (nextCursor); the editor leads a name (cursorTool).
 			if i == 0 && len(ws) > 1 {
 				return true
 			}
@@ -283,11 +281,9 @@ func identNamesAgent(name string) bool {
 	return false
 }
 
-// cursorAgent is the editor in a string: its name, its directory, its hook events and
-// its environment, never a read position ("funding cursor", "next_cursor").
+// cursorAgent is the editor in a string, never a read position ("next_cursor").
 var cursorAgent = regexp.MustCompile(`^cursor$|^cursor[-_.]|^CURSOR_|^\.cursor|(^|[^A-Za-z])Cursor([^A-Za-z]|$)`)
 
-// stringNamesAgent reports whether a string literal names an agent.
 func stringNamesAgent(s string) bool {
 	for _, m := range agentWord.FindAllStringSubmatch(s, -1) {
 		if !strings.EqualFold(m[2], "cursor") {
@@ -322,8 +318,7 @@ func words(name string) []string {
 	return out
 }
 
-// plural reports whether runes[i] is the s that pluralises the acronym before it
-// (PIDs, IDs), which stays with the acronym instead of starting a word.
+// plural reports whether runes[i] is the s pluralising the acronym before it (PIDs).
 func plural(runes []rune, i int) bool {
 	return runes[i] == 's' && (i+1 == len(runes) || !unicode.IsLower(runes[i+1]))
 }

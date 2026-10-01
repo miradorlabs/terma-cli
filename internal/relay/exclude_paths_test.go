@@ -16,8 +16,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
-// pathExcludedJSON is the filter as it was: the part through protojson and back, every
-// map with a "key" handed to HasExcludedPath. pathExcluded must decide as it did.
+// pathExcludedJSON is a reference filter through protojson that pathExcluded must agree with.
 func pathExcludedJSON(msg proto.Message, patterns []string) bool {
 	b, err := protojson.Marshal(msg)
 	if err != nil {

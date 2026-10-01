@@ -20,29 +20,21 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/shape"
 )
 
-// What the agents declare between them, pinned: a change here changes what leaves a
-// machine, and is made on purpose.
+// What the agents declare between them, pinned: a change here changes what leaves a machine.
 var (
 	pinnedPromptFields     = []string{"prompt", "response", "user_prompt"}
 	pinnedPromptDropFields = []string{"gen_ai.prompt", "gen_ai.completion", "gen_ai.input.messages", "gen_ai.output.messages", "gen_ai.system_instructions",
 		"gen_ai.tool.definitions",
-		// omp's own (omp.gen_ai.*): the request's messages and the response's text.
 		"omp.gen_ai.request.messages", "omp.gen_ai.response.text",
-		// Gemini CLI's gemini_cli.api_request / api_response (0.62).
 		"request_text", "response_text",
-		// Free text that may restate or reason about what was said, in the harnesses'
-		// own events (the first unclassified-key survey, 2026-09-30): errors, reasons,
-		// Gemini's model-router reasoning, tool and agent descriptions, stop sequences,
-		// and keys too generic to vouch for.
+		// Free text that may restate what was said, and keys too generic to vouch for.
 		"error", "reason", "reasoning", "routing.reasoning", "metadata", "value", "key", "from", "db", "query_script",
 		"gen_ai.tool.description", "gen_ai.agent.description", "gen_ai.request.stop_sequences"}
 	pinnedResourcePromptFields = []string{"process.command_args", "process.command_line"}
 	pinnedPromptBodyEvents     = []string{"opencode.user_prompt", "opencode.session.created", "pi.user_prompt", "omp.user_prompt", "hermes.user_prompt", "hermes.assistant_response", "dsh.user_prompt", "dsh.assistant_response"}
 	pinnedToolContentFields    = []string{"tool_parameters", "tool_input", "full_command", "bash_command", "arguments", "output",
 		"gen_ai.tool.call.arguments", "gen_ai.tool.call.result", "opencode.tool.file_path",
-		// Gemini CLI's tool_call and hook_call records (0.62).
 		"function_args", "hook_input", "hook_output", "stdout", "stderr",
-		// What a tool acted on or returned, as named elsewhere.
 		"file_path", "result"}
 	pinnedToolContentEvents = []string{"tool.output", "tool.input"}
 	pinnedSessionKeys       = []string{"session.id", "conversation.id", "gen_ai.conversation.id", "thread.id", "thread_id"}
@@ -80,8 +72,7 @@ func TestComposedRulesArePinned(t *testing.T) {
 	}
 }
 
-// A key an agent declares as content must not also be on the safe list, or a record
-// from another agent would carry it out.
+// A key one agent declares as content is never on the safe list, or another agent's record would carry it out.
 func TestNoDeclaredContentKeyIsSafe(t *testing.T) {
 	for _, c := range testCapturers {
 		r := c.CaptureRules()
@@ -93,8 +84,7 @@ func TestNoDeclaredContentKeyIsSafe(t *testing.T) {
 	}
 }
 
-// Every known agent's shape is composed, supported or not: an unsupported agent's
-// committed hooks still claim sessions, and its content must still be withheld.
+// Every known agent's shape is composed, supported or not: its committed hooks still claim sessions.
 func TestEveryExportingAgentDeclaresItsShape(t *testing.T) {
 	reg := builtin.Agents()
 	for _, a := range reg.All() {
@@ -109,10 +99,8 @@ func TestEveryExportingAgentDeclaresItsShape(t *testing.T) {
 	}
 }
 
-// The policy matrix: for every agent, in repository and global mode, under each
-// combination of the team's prompt and tool content policy, every field the agent
-// declares as content leaves only when the policy allows it. Values are sentinels, so
-// a field that leaves shows in the bytes upstream receives.
+// For every agent, mode and content policy, each declared content field leaves only when
+// the policy allows it; sentinel values show in the bytes upstream receives.
 func TestPolicyMatrixPerAgent(t *testing.T) {
 	for _, c := range testCapturers {
 		agent := strings.TrimPrefix(fmt.Sprintf("%T", c), "*")
@@ -153,9 +141,7 @@ func TestPolicyMatrixPerAgent(t *testing.T) {
 
 func sentinel(key string) string { return "SENTINEL<" + key + ">" }
 
-// deliverThroughRelay posts one log export and one trace export carrying every content
-// field in rules through a running relay, in repository mode (a claimed session) or
-// global mode (no claim, the catch-all), and returns what upstream received.
+// deliverThroughRelay posts every content field in rules through a running relay and returns what upstream received.
 func deliverThroughRelay(t *testing.T, global bool, pol Policy, sessionKey string, rules shape.CaptureRules) string {
 	t.Helper()
 	u := newUpstream(t)
@@ -222,8 +208,7 @@ func deliverThroughRelay(t *testing.T, global bool, pol Policy, sessionKey strin
 	return all.String()
 }
 
-// With content withheld a log body passes only when it names its own event, whole or
-// after a declared prefix; a body ending in the event's name is still free text.
+// With content withheld a log body passes only when it names its own event, whole or after a declared prefix.
 func TestWithheldBodyOnlyNamesItsEvent(t *testing.T) {
 	for body, kept := range map[string]bool{
 		"api_request":             true,

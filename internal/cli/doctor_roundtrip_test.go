@@ -19,9 +19,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 )
 
-// Doctor's round-trip reads the scratch commit's terma.commit record back, so it has to
-// ask the way the log store documents: a since/until window, not a `window` parameter it
-// does not.
+// The round-trip asks the log store for a since/until window, not a `window` parameter.
 func TestCommitRecordedAsksForAWindow(t *testing.T) {
 	const sha = "0123456789abcdef0123456789abcdef01234567"
 
@@ -118,10 +116,7 @@ func TestDoctorBackendReadErrorIsInconclusive(t *testing.T) {
 	}
 }
 
-// A repository whose project lives in another environment than the active profile's
-// is read back from that environment's data API, with the project's own key. The
-// signed-in credential is bound to the profile's auth host, and asking the profile's
-// API for the project's scratch commit found nothing on every run.
+// A project in another environment is read back from its own data API with its own key.
 func TestCommitRecordedReadsTheProjectsOwnEnvironment(t *testing.T) {
 	const sha = "0123456789abcdef0123456789abcdef01234567"
 	profileAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -175,9 +170,8 @@ func TestCommitRecordedReadsTheProjectsOwnEnvironment(t *testing.T) {
 	}
 }
 
-// Where a key's hosts were never recorded, a routing record naming another built-in
-// environment's ingest host places the project; one naming the profile's own ingest
-// host changes nothing, so a profile with a custom data API keeps it.
+// Without recorded hosts, only a routing record naming another built-in environment's
+// ingest host moves the project, so a profile's custom data API stays.
 func TestProjectAPIFromTheRoutingRecord(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	t.Setenv("TERMA_API_URL", "")

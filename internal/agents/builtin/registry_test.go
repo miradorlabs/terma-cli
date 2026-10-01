@@ -11,9 +11,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 )
 
-// The registry is the single source every command reads. These are the invariants
-// that make that safe: one name per adapter, one adapter per event, and no flush after
-// an event nobody handles.
+// One name per adapter, one adapter per event, and no flush after an unhandled event.
 func TestRegistryIsConsistent(t *testing.T) {
 	names := map[string]bool{}
 	owners := map[string]string{}
@@ -37,8 +35,7 @@ func TestRegistryIsConsistent(t *testing.T) {
 			}
 			owners[event] = a.Name()
 			if a.Name() != "claude" && !strings.HasPrefix(event, a.Name()+"-") {
-				// Claude Code's events predate the prefix convention and are committed
-				// wiring; every later adapter namespaces its own.
+				// Claude Code's committed events predate the prefix convention.
 				t.Errorf("%s: event %q should be prefixed with the adapter name", a.Name(), event)
 			}
 		}
@@ -61,8 +58,7 @@ func TestRegistryIsConsistent(t *testing.T) {
 	}
 }
 
-// Committed hook event names are wiring other repositories depend on: renaming one
-// breaks every repository that installed the old name. This pins the set.
+// Committed hook event names are pinned: renaming one breaks every repository that installed it.
 func TestEventNamesAreStable(t *testing.T) {
 	want := []string{
 		"antigravity-post-invocation", "antigravity-post-tool-use", "antigravity-pre-invocation", "antigravity-stop",
@@ -94,8 +90,7 @@ func TestEventNamesAreStable(t *testing.T) {
 	}
 }
 
-// Only Claude Code is wired into a repository unconditionally; every other adapter
-// waits for evidence the repository is used with its agent.
+// Only Claude Code is wired unconditionally; every other adapter waits for its directory.
 func TestDefaultsFollowTheRepositoryLayout(t *testing.T) {
 	root := t.TempDir()
 	defaults := func() []string {
@@ -138,8 +133,7 @@ func TestDefaultsFollowTheRepositoryLayout(t *testing.T) {
 	}
 }
 
-// Handlers folds every adapter's events into one map, so two adapters claiming one name
-// would not fail anywhere: the later one would simply take the other agent's payloads.
+// Two adapters claiming one event would fail nowhere else: Handlers keeps the later one.
 func TestEventNamesAreUnique(t *testing.T) {
 	owner := map[string]string{}
 	for _, a := range reg.All() {
@@ -157,8 +151,7 @@ func TestEventNamesAreUnique(t *testing.T) {
 
 var reg = Agents()
 
-// An exporting agent's harness answers to the agent's name: `terma connect <name>` and
-// the registry resolve the same thing.
+// An exporting agent's harness answers to the agent's name.
 func TestHarnessesAnswerToTheirAgentsName(t *testing.T) {
 	for _, e := range reg.With[agents.Exporting]() {
 		if got := e.Harness().Name(); got != e.Name() {
@@ -181,8 +174,7 @@ func TestHarnessRejectsAnUnknownAgent(t *testing.T) {
 	}
 }
 
-// Every harness answers a status query against an empty sandbox: a stub that errors
-// would make `telemetry status` report it as broken.
+// Every harness answers a status query against an empty sandbox without error.
 func TestEveryHarnessReportsStatusInASandbox(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
@@ -202,8 +194,7 @@ func TestEveryHarnessReportsStatusInASandbox(t *testing.T) {
 	}
 }
 
-// Every harness is a full agent in the support catalog, so the two views never disagree
-// about an agent terma exports for.
+// Every harness is a full agent in the support catalog.
 func TestSupportCatalogCoversEveryHarness(t *testing.T) {
 	for _, h := range reg.Harnesses() {
 		a, ok := reg.LookupSupport(h.Name())

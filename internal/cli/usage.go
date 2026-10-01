@@ -14,9 +14,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
-// usageGroups maps --group-by to the metric labels a row is keyed by. Principal ids
-// are only meaningful with their source system — Claude Code's user ids and Codex's
-// are different namespaces — so those groups carry it.
+// usageGroups maps --group-by to metric labels; principal groups carry source_system
+// because each agent's principal ids are their own namespace.
 var usageGroups = map[string][]string{
 	"user":     {"source_system", "user_id"},
 	"api-key":  {"source_system", "api_key_id"},
@@ -28,10 +27,8 @@ var usageGroups = map[string][]string{
 
 var usageGroupNames = []string{"user", "api-key", "source", "model", "provider", "none"}
 
-// usageMetrics are the terma.ai.* counters the platform derives from settled model
-// calls. They share one label set — source_system, provider, model, user_id,
-// api_key_id — so a single group-by applies to all of them. model_call.total also
-// carries status, which the sum folds away.
+// usageMetrics are the terma.ai.* counters, which share one label set so one group-by
+// applies to all of them.
 var usageMetrics = []struct{ field, name string }{
 	{"cost_usd", "terma.ai.cost.usd.total"},
 	{"input_tokens", "terma.ai.tokens.input.total"},
@@ -49,9 +46,8 @@ var usageLabelHeaders = map[string]string{
 	"provider":      "PROVIDER",
 }
 
-// usageRow is one group's spend inside the window. Token and call counts are rounded
-// to whole numbers: the counters are integers, and the small extrapolation
-// increase() applies at the window edges is not a fraction of a token anyone wants.
+// usageRow is one group's spend inside the window, counts rounded to whole numbers since
+// increase() extrapolates at the window edges.
 type usageRow struct {
 	Group            map[string]string `json:"group,omitempty"`
 	Name             string            `json:"name,omitempty"`
@@ -96,9 +92,7 @@ func (r *usageRow) add(o usageRow) {
 }
 
 type usageReport struct {
-	// Basis says how the numbers were produced, so a consumer never has to guess:
-	// metrics_window is spend that happened inside [since, until), whichever
-	// session it belonged to.
+	// Basis is metrics_window: spend inside [since, until), whichever session it belonged to.
 	Basis   string              `json:"basis"`
 	Since   time.Time           `json:"since"`
 	Until   time.Time           `json:"until"`
@@ -209,8 +203,7 @@ to the nearest sample; for a per-session ledger use ` + "`terma session list`" +
 			for _, key := range order {
 				r := rows[key]
 				r.TotalTokens = r.InputTokens + r.OutputTokens + r.CacheReadTokens + r.CacheWriteTokens
-				// A series that exists but did not move is a model or person that was idle
-				// in this window. Listing it at zero would read as "used, cost nothing".
+				// A series that did not move was idle; at zero it would read as "used, cost nothing".
 				if r.CostUSD == 0 && r.TotalTokens == 0 && r.ModelCalls == 0 {
 					continue
 				}
@@ -251,9 +244,8 @@ to the nearest sample; for a per-session ledger use ` + "`terma session list`" +
 	return cmd
 }
 
-// usageQuery is the PromQL the web app's insights page runs, spelled out: the increase
-// of one counter over the window, summed by the group labels. Metric names carry
-// dots, so they are selected through __name__ rather than written bare.
+// usageQuery is the insights page's PromQL: one counter's increase over the window, summed
+// by the group labels, selected through __name__ because metric names carry dots.
 func usageQuery(metric string, by, matchers []string, window time.Duration) string {
 	selector := `__name__="` + metric + `"`
 	if len(matchers) > 0 {
@@ -285,8 +277,7 @@ func usageKey(labels map[string]string, by []string) string {
 	return strings.Join(parts, "\x00")
 }
 
-// usageTable lays the report out for a person. For the principal groupings the name
-// leads and the id — a 64-hex digest nobody reads — is shortened; JSON keeps it whole.
+// usageTable lays the report out for a person, shortening principal ids; JSON keeps them whole.
 func usageTable(report usageReport, by []string, groupBy string) output.Table {
 	named := groupBy == "user" || groupBy == "api-key"
 	var headers []string
@@ -317,8 +308,7 @@ func usageTable(report usageReport, by []string, groupBy string) output.Table {
 			name := r.Name
 			switch {
 			case id == "" && groupBy == "user":
-				// Traffic attributed to an API key rather than a person (OpenRouter,
-				// Cloudflare). Group by api-key to see which one.
+				// Traffic attributed to an API key rather than a person; group by api-key to see which.
 				name = "(no user id)"
 			case id == "":
 				name = "(no key id)"

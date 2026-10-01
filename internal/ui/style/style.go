@@ -1,10 +1,5 @@
-// Package style is the one place the CLI decides whether, and how, to colour what it
-// prints. Every command asks it for a Palette bound to the writer it is about to use,
-// and gets back either ANSI-wrapped text or the text untouched.
-//
-// Colour is a terminal courtesy, never part of the output: a pipe, a file, an agent
-// harness, NO_COLOR, and TERM=dumb all get plain text, and tests that capture output in
-// a buffer see exactly the strings they compare against.
+// Package style decides whether and how the CLI colours output: only a terminal a
+// person watches gets colour, never a pipe, a buffer, an agent, NO_COLOR or TERM=dumb.
 package style
 
 import (
@@ -20,14 +15,11 @@ import (
 // Palette wraps text in the CLI's colours, or leaves it alone when disabled.
 type Palette struct {
 	enabled bool
-	// brand is the escape that selects terma's purple, chosen for the terminal's
-	// colour depth so the mark looks the same in a truecolor terminal and a 256-colour
-	// one instead of falling back to whatever the theme calls magenta.
+	// brand is terma's purple at the terminal's colour depth.
 	brand string
 }
 
-// For returns the palette for w: coloured when w is a terminal a person is reading,
-// plain for anything else. Only *os.File writers can be terminals; a buffer never is.
+// For returns the palette for w: coloured only when w is a terminal a person is reading.
 func For(w io.Writer) Palette {
 	if h, ok := w.(highlighter); ok {
 		return h.p
@@ -42,9 +34,8 @@ func For(w io.Writer) Palette {
 // Plain is the palette that colours nothing, for callers that already know.
 func Plain() Palette { return Palette{} }
 
-// Terminal reports whether w is a terminal a person is watching — the gate for
-// progress that redraws in place. NO_COLOR does not turn this off: it asks for no
-// colour, not for no feedback.
+// Terminal reports whether w is a terminal a person is watching, for progress that
+// redraws in place; NO_COLOR asks for no colour, not no feedback.
 func Terminal(w io.Writer) bool {
 	if h, ok := w.(highlighter); ok {
 		w = h.w
@@ -59,7 +50,6 @@ func Terminal(w io.Writer) bool {
 // Enabled reports whether this palette colours anything.
 func (p Palette) Enabled() bool { return p.enabled }
 
-// enabled is the gate every terminal courtesy in this package runs through.
 func enabled(f *os.File) bool {
 	if os.Getenv("NO_COLOR") != "" || os.Getenv("TERM") == "dumb" {
 		return false
@@ -70,9 +60,8 @@ func enabled(f *os.File) bool {
 	return term.IsTerminal(int(f.Fd()))
 }
 
-// agentEnvVars are set by the coding agents that shell out to CLIs, terma's or not. Their
-// presence means the reader is a model: it reads text, and escape sequences in it are
-// noise.
+// agentEnvVars are set by coding agents that run CLIs; any of them means the reader is a
+// model, to which escape sequences are noise.
 var agentEnvVars = []string{
 	"CLAUDECODE",
 	"CLAUDE_CODE",
@@ -99,10 +88,8 @@ const (
 	brandBasic     = "\x1b[95m"
 )
 
-// BrandSequence is the raw escape for the brand colour, chosen for the terminal
-// this process was started from. It is for output a program renders on the
-// user's behalf without a TTY of its own — Claude Code's status line reads a
-// pipe and draws the escapes itself — and it honours NO_COLOR like the palette.
+// BrandSequence is the raw brand escape for output another program draws from a pipe,
+// such as an agent's status line; it honours NO_COLOR.
 func BrandSequence() string {
 	if os.Getenv("NO_COLOR") != "" {
 		return ""
@@ -151,28 +138,23 @@ func (p Palette) Bold(s string) string { return p.wrap(bold, s) }
 // Dim is for the explanatory text beside a choice, and for what was skipped.
 func (p Palette) Dim(s string) string { return p.wrap(dim, s) }
 
-// OK colours a status word for something that passed. OK, Warn and Fail use the colours
-// the web app gives the same three states.
+// OK colours a status word for something that passed.
 func (p Palette) OK(s string) string { return p.wrap(green, s) }
 
 // Warn colours a status word for something that works but wants attention.
 func (p Palette) Warn(s string) string { return p.wrap(yellow, s) }
 
-// Fail colours a status word for something that does not work, bold as well as red so
-// it survives a terminal theme in which red is hard to see.
+// Fail colours a status word for something that does not work, bold for themes where red is faint.
 func (p Palette) Fail(s string) string { return p.wrap(red+bold, s) }
 
-// Command is something the reader is meant to run or paste: bold in terma's purple, so
-// it stands out of the sentence around it.
+// Command is something the reader is meant to run or paste, bold in terma's purple.
 func (p Palette) Command(s string) string { return p.wrap(bold+p.brand, s) }
 
-// quoted is a command the way every message in this CLI names one: in backticks, on
-// one line.
+// quoted is a command as every message names one: in backticks, on one line.
 var quoted = regexp.MustCompile("`([^`\n]+)`")
 
-// Commands draws every quoted command in s as a Command and drops its backticks, which
-// were only there to mark it — so what is copied off the terminal is the command alone.
-// Plain text keeps them: a pipe, an agent or a test reads the quotes as the marker.
+// Commands draws every quoted command in s as a Command without its backticks, so a copy
+// is the command alone; plain text keeps them.
 func (p Palette) Commands(s string) string {
 	if !p.enabled {
 		return s
@@ -180,10 +162,8 @@ func (p Palette) Commands(s string) string {
 	return quoted.ReplaceAllStringFunc(s, func(m string) string { return p.Command(m[1 : len(m)-1]) })
 }
 
-// Highlight is w with its quoted commands drawn as Commands, for a command whose
-// messages name others to run; w itself when w gets plain text. Each write is styled on
-// its own, so a quoted command must not be split across two — fmt's print functions
-// write all they format at once.
+// Highlight is w with its quoted commands drawn as Commands; each write is styled on its
+// own, so a quoted command must not span two.
 func Highlight(w io.Writer) io.Writer {
 	p := For(w)
 	if !p.enabled {
@@ -204,9 +184,8 @@ func (h highlighter) Write(b []byte) (int, error) {
 	return len(b), nil
 }
 
-// logoLines renders the four rounded squares from docs/assets/terma-logo-dark.svg.
-// A terminal cell is roughly twice as tall as it is wide, so each six-column tile
-// occupies three rows. Half blocks round the corners; the opposite diagonal is dim.
+// logoLines renders the logo's four rounded squares; a cell is twice as tall as wide,
+// so each six-column tile takes three rows.
 func logoLines(p Palette) (lines []string, width int) {
 	tile := []string{"▄████▄", "██████", "▀████▀"}
 	const gap = "  "
@@ -221,10 +200,7 @@ func logoLines(p Palette) (lines []string, width int) {
 	return lines, width
 }
 
-// Header draws the logo with an information column to its right — for `terma setup`,
-// "Terma CLI", the signed-in account, and the working directory — vertically centred
-// against the logo. On a terminal too narrow to sit them side by side, the column is
-// stacked beneath the logo instead. Callers gate it on an Enabled palette.
+// Header draws the logo with info centred to its right, or beneath it on a narrow terminal.
 func Header(p Palette, info []string) string {
 	lines, w := logoLines(p)
 	widest := 0
@@ -267,8 +243,7 @@ func Header(p Palette, info []string) string {
 	return b.String()
 }
 
-// ansiSGR matches the colour escapes the palette emits, so a coloured string's visible
-// width can be measured.
+// ansiSGR matches the colour escapes the palette emits.
 var ansiSGR = regexp.MustCompile("\x1b\\[[0-9;]*m")
 
 // visibleWidth is the column count a string occupies, ignoring colour escapes.

@@ -42,9 +42,7 @@ send, not whether anything has arrived. With no argument it reports every harnes
 				targets = []harness.Harness{h}
 			}
 
-			// A repository's local layer gets a row of its own under the global one: what
-			// the user file says, then what this repository narrows it to. Only when run
-			// inside a repository that has one.
+			// A repository's local layer gets its own row under the global one.
 			root, _ := localRoot(cmd.Context())
 
 			rows := make([][]string, 0, len(targets))
@@ -71,12 +69,10 @@ type telemetryStatusReport struct {
 	Harnesses []telemetryStatus `json:"harnesses"`
 }
 
-// telemetryStatus is the machine-readable view. KeyPrefix is the masked head only —
-// the key itself is never rendered, in any format.
+// telemetryStatus carries only the key's masked head; the key is never rendered.
 type telemetryStatus struct {
 	Harness string `json:"harness"`
-	// Scope is global for the harness's user-level file, local for a repository's own
-	// layer (harness.Scope). A local entry follows its global one.
+	// Scope is a harness.Scope; a local entry follows its global one.
 	Scope       string `json:"scope"`
 	Installed   string `json:"installed"`
 	Version     string `json:"version,omitempty"`
@@ -88,18 +84,13 @@ type telemetryStatus struct {
 	Signals     string `json:"signals,omitempty"`
 	Prompts     string `json:"prompts,omitempty"`
 	ToolContent string `json:"tool_content,omitempty"`
-	// Conflicts names the per-signal overrides that make Endpoint above only part of
-	// the truth. Reporting a Terma endpoint while a per-signal override quietly sends
-	// that signal — and the credential — elsewhere is the failure this exists to prevent.
+	// Conflicts names per-signal overrides that send a signal, and the credential, elsewhere.
 	Conflicts []string `json:"conflicts,omitempty"`
-	// Warnings names overrides that apply only in a mode the user selects explicitly —
-	// a Codex profile. They do not make the harness "overridden", since whether they
-	// apply to the next session is not knowable here.
+	// Warnings names overrides that apply only under an explicitly selected profile.
 	Warnings []string `json:"warnings,omitempty"`
 	Error    string   `json:"error,omitempty"`
 
-	// exporting is whether telemetry reaches this profile's Terma endpoint at all —
-	// what decides whether a repository's local layer is in effect or waiting.
+	// exporting decides whether a repository's local layer is in effect or waiting.
 	exporting bool
 }
 
@@ -114,8 +105,7 @@ func describeStatus(ctx context.Context, h harness.Harness, cfg *config.Config) 
 
 	st, err := h.Status()
 	if err != nil {
-		// An unsupported harness is a state, not a failure — reporting it as an error
-		// would make `terma harness status` exit non-zero just for listing Codex.
+		// A state, not a failure: `terma harness status` must not exit non-zero for listing it.
 		if _, ok := errors.AsType[*harness.ErrUnsupported](err); ok {
 			entry.State = "unsupported"
 			return entry
@@ -139,8 +129,7 @@ func describeStatus(ctx context.Context, h harness.Harness, cfg *config.Config) 
 
 	switch {
 	case !st.Connected:
-		// Settings left behind after the switch was turned off still hold the key, and
-		// `disconnect` still has work to do — so this is not the same as "nothing here".
+		// Settings left behind still hold the key, so `disconnect` still has work to do.
 		if st.ManagedKeys > 0 {
 			entry.State = "settings present, not exporting"
 			return entry
@@ -148,17 +137,12 @@ func describeStatus(ctx context.Context, h harness.Harness, cfg *config.Config) 
 		entry.State = "not connected"
 		return entry
 	case len(blocking) > 0:
-		// Say this rather than "connected": some signal is going somewhere else, and the
-		// endpoint column alone would be a lie.
+		// Some signal is going somewhere else; the endpoint column alone would be a lie.
 		entry.State = "connected, overridden"
 		entry.exporting = true
 	case st.Endpoint != cfg.OTLPURL:
-		// Telemetry is on, but aimed somewhere other than this profile's endpoint.
-		// Saying "connected" would be wrong in the way that costs the most time to
-		// discover — and naming only the state would leave the reader diffing JSON to
-		// learn *where*. Both endpoints in one line: the harness's actual destination,
-		// and the one the active profile expected. A dev-connected harness read under
-		// the prod profile is the everyday way to land here.
+		// Both endpoints, so the reader learns where without diffing JSON; a dev-connected
+		// harness read under the prod profile lands here.
 		entry.State = fmt.Sprintf("connected to %s (this profile expects %s)",
 			output.SanitizeTerminal(st.Endpoint), output.SanitizeTerminal(cfg.OTLPURL))
 	default:

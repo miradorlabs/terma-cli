@@ -11,13 +11,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
-// pathExcluded examines OTLP key/value attributes before content filtering removes
-// them. A part belongs to one session; a named excluded file withholds that part.
-//
-// Every message is visited by reflection, so an attribute anywhere — resource, scope,
-// record, span event, link, metric point, exemplar, a kvlist nested in a body — is
-// checked without listing where OTLP keeps them. Each attribute is handed to
-// config.Policy.HasExcludedPath in protojson's shape, the one it reads.
+// pathExcluded reports whether any attribute names an excluded file, before content
+// filtering removes them; reflection reaches attributes wherever OTLP keeps them.
 func pathExcluded(msg proto.Message, patterns []string) bool {
 	if len(patterns) == 0 {
 		return false
@@ -56,8 +51,7 @@ func excludedIn(m protoreflect.Message, pol config.Policy) bool {
 	return found
 }
 
-// anyValueJSON is v as protojson renders it and encoding/json decodes it: a one-key
-// map naming the variant, 64-bit integers as strings, bytes as standard base64.
+// anyValueJSON is v in protojson's shape, the one config.Policy.HasExcludedPath reads.
 func anyValueJSON(v *commonpb.AnyValue) any {
 	switch x := v.GetValue().(type) {
 	case *commonpb.AnyValue_StringValue:

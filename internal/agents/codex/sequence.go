@@ -14,9 +14,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-// CodexCursor contains no transcript text. Offset points past acknowledged records;
-// Anchor detects truncation/rewrite, including regrowth beyond the previous offset.
-// TurnID is carried across bounded reads, never inferred from the capturing hook.
+// CodexCursor holds no transcript text: an offset past acknowledged records, an anchor
+// that detects a rewritten file, and the turn carried across bounded reads.
 type CodexCursor struct {
 	SeenQuota bool   `json:"seen_quota,omitempty"`
 	Identity  string `json:"identity"`
@@ -41,11 +40,8 @@ func cursorAnchor(f *os.File, offset int64) string {
 	return fundingHash(string(b))
 }
 
-// ReadCodexFunding emits each newly observed quota, including unchanged and null
-// records. The caller must spool before acknowledging and persist the returned
-// cursor. A crash between append and checkpoint replays stable observation IDs.
-// At most 1 MiB and 256 evidence records are processed per invocation. backlog and
-// incomplete mean retry later, not lost data; gap events identify skipped data.
+// ReadCodexFunding emits each newly observed quota, unchanged and null ones included, at
+// most 1 MiB and 256 records per call; the caller spools before persisting the cursor.
 func ReadCodexFunding(ctx context.Context, sessionID, transcript string, cursor CodexCursor, emit func(harness.FundingEvidence) error) (CodexCursor, string, error) {
 	f, status := openCodexRollout(ctx, sessionID, transcript)
 	if f == nil {
@@ -112,8 +108,7 @@ func ReadCodexFunding(ctx context.Context, sessionID, transcript string, cursor 
 				cursor.Offset += int64(len(data))
 				return checkpoint("backlog", nil)
 			}
-			// Do not mistake the end of a read chunk for an oversized line. Retry
-			// from this line's start with the full budget on the next invocation.
+			// The end of a read chunk is not an oversized line: retry from its start next time.
 			if len(data) < codexTailLimit {
 				if cursor.Offset+int64(len(data)) < st.Size() {
 					return checkpoint("backlog", nil)

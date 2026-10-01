@@ -16,9 +16,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// CodexPreToolUse records a local start time for a supported tool. The next
-// PostToolUse carries the same tool_use_id. This is elapsed wall time, including
-// approval waits and hook overhead; it is not Codex's native execution duration.
+// CodexPreToolUse records a local start time for PostToolUse's elapsed wall time, which
+// includes approval waits and is not Codex's execution duration.
 func CodexPreToolUse(ctx context.Context, env hookrun.Env) error {
 	in, err := readCodexHookInput(env.Stdin)
 	if err != nil || !session.ValidID(in.SessionID) || in.ToolUseID == "" {
@@ -74,9 +73,8 @@ func codexToolElapsed(e hookrun.Env, in *codexHookInput) (int64, bool) {
 	return d.Milliseconds(), true
 }
 
-// CodexPermissionRequest records a request for approval. Codex does not report
-// the eventual user decision through a repository hook, so this event must not
-// be presented as an approval or a denial.
+// CodexPermissionRequest records an approval request; Codex reports no decision to
+// repository hooks, so it is neither an approval nor a denial.
 func CodexPermissionRequest(ctx context.Context, env hookrun.Env) error {
 	in, err := readCodexHookInput(env.Stdin)
 	if err != nil || !session.ValidID(in.SessionID) {

@@ -8,16 +8,14 @@ import (
 	"fmt"
 )
 
-// PKCE holds one login attempt's proof-of-possession pair. The verifier never
-// leaves this process; only the challenge travels through the browser, so a code
-// intercepted in the URL bar or a browser history entry is not redeemable.
+// PKCE holds one login attempt's proof-of-possession pair; only the challenge leaves this
+// process, so an intercepted code is not redeemable.
 type PKCE struct {
 	Verifier  string
 	Challenge string
 }
 
-// NewPKCE generates an RFC 7636 S256 pair. 32 random bytes hex-encode to 64
-// characters, inside the spec's 43-128 range.
+// NewPKCE generates an RFC 7636 S256 pair.
 func NewPKCE() (*PKCE, error) {
 	verifier, err := randomHex(32)
 	if err != nil {
@@ -30,9 +28,7 @@ func NewPKCE() (*PKCE, error) {
 	}, nil
 }
 
-// newState generates the CSRF value echoed back through the redirect. The CLI
-// refuses a callback whose state does not match, so another page cannot drive a
-// code into this listener.
+// newState generates the CSRF value a callback must echo back.
 func newState() (string, error) {
 	return randomHex(16)
 }

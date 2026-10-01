@@ -6,22 +6,15 @@ import (
 	"time"
 )
 
-// PolicyRefresher keeps each team's collection policy fresh while the relay runs: every
-// Discover it asks which teams there are, and refreshes each whose last attempt is
-// Interval old, at most one fetch in flight per team. A refused fetch waits as long as
-// a successful one before the next attempt, and leaves the last validated policy in
-// force (Refresh never replaces it with anything unvalidated). A team found while
-// another's fetch hangs is refreshed without waiting for it.
+// PolicyRefresher keeps each team's collection policy fresh while the relay runs, one fetch
+// in flight per team; a failed fetch leaves the last validated policy in force.
 type PolicyRefresher struct {
-	// Interval is how often a team's policy is fetched.
 	Interval time.Duration
 	// Discover is how often the teams are listed, so a newly connected one is found.
 	Discover time.Duration
-	// Teams lists the teams whose policy to keep: the scopes the machine exports for.
-	Teams func() []string
+	Teams    func() []string
 	// Fetched is when team's validated policy was fetched, zero when there is none.
 	Fetched func(team string) time.Time
-	// Refresh fetches, validates and saves team's policy.
 	Refresh func(ctx context.Context, team string) error
 	// Now and After are the clock; time.Now and time.After when nil.
 	Now   func() time.Time
@@ -61,7 +54,6 @@ func (p *PolicyRefresher) Run(ctx context.Context) {
 	}
 }
 
-// due marks and returns the teams to fetch now.
 func (p *PolicyRefresher) due() []string {
 	p.mu.Lock()
 	defer p.mu.Unlock()

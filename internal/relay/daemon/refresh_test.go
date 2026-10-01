@@ -9,8 +9,7 @@ import (
 	"time"
 )
 
-// clock is a PolicyRefresher's time, advanced by the test: each discovery waits on
-// ticks, and says so on waiting.
+// clock is a PolicyRefresher's time, advanced by the test.
 type clock struct {
 	mu      sync.Mutex
 	now     time.Time
@@ -33,7 +32,6 @@ func (c *clock) After(time.Duration) <-chan time.Time {
 	return c.ticks
 }
 
-// step advances the clock and lets one discovery run, returning once it has.
 func (c *clock) step(t *testing.T, d time.Duration) {
 	t.Helper()
 	c.mu.Lock()
@@ -101,8 +99,7 @@ func contains(s []string, v string) bool {
 
 func none(string) time.Time { return time.Time{} }
 
-// A team with no validated policy is fetched at once, then once per Interval however
-// often the teams are listed.
+// A team with no validated policy is fetched at once, then once per Interval.
 func TestRefresherFetchesEachTeamOncePerInterval(t *testing.T) {
 	r := startRefresher(t, func() []string { return []string{"a"} }, none, func(context.Context, string) error { return nil })
 	r.fetched(t, "a")
@@ -138,8 +135,7 @@ func TestRefresherThrottlesARefusedFetch(t *testing.T) {
 	r.fetched(t, "a")
 }
 
-// A team connected while another's fetch hangs is fetched without waiting for it, and
-// the hanging one is not fetched twice at once.
+// A team connected while another's fetch hangs is fetched at once; the hanging one is not fetched twice.
 func TestRefresherDiscoversATeamWhileAFetchHangs(t *testing.T) {
 	var mu sync.Mutex
 	teams := []string{"a"}

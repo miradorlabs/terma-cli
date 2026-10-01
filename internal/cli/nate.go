@@ -55,13 +55,9 @@ everyone who works in them. Remove a repository's install with 'terma uninstall'
 func (app *App) runNate(cmd *cobra.Command) error {
 	out := cmd.OutOrStdout()
 
-	// Only home-directory state. The current repository's install is committed wiring
-	// shared with colleagues, and which repository that is depends on where nate ran;
-	// removing it is `terma uninstall`'s job, with its own file list and prompt.
+	// Only home-directory state: a repository's committed wiring is `terma uninstall`'s.
 
-	// These journals live in Terma's config directory. Restore what Terma displaced
-	// before that directory is deleted; after it is gone, the original values cannot
-	// be recovered.
+	// Restore what Terma displaced before its config directory, which holds the journals, goes.
 	for _, h := range app.agents.Harnesses() {
 		result, err := h.Disconnect()
 		if err != nil {
@@ -130,10 +126,8 @@ func samePath(a, b string) bool {
 	return errA == nil && errB == nil && filepath.Clean(a) == filepath.Clean(b)
 }
 
-// installedTermaBinaries finds only executables built from this module (plus the
-// pinned official npm launcher). A coincidental program named terma is not ours to
-// delete. The executable running this command is sorted last so another removal
-// failure leaves a working command that can report it.
+// installedTermaBinaries finds only executables built from this module (plus the npm
+// launcher), sorting the running one last so a later failure can still be reported.
 func (app *App) installedTermaBinaries() []string {
 	name := "terma"
 	if runtime.GOOS == "windows" {
@@ -162,8 +156,7 @@ func (app *App) installedTermaBinaries() []string {
 		}
 		seen[candidate] = true
 		paths = append(paths, candidate)
-		// The official npm command is a JavaScript launcher beside a vendored Go
-		// executable. Remove both; deleting only the launcher would leave the binary.
+		// The npm command is a launcher beside a vendored binary; remove both.
 		if target := doctor.InstalledBinary(candidate); target != candidate {
 			if target, err = filepath.Abs(target); err == nil && !seen[target] && isTermaBinary(target) {
 				seen[target] = true
@@ -194,8 +187,7 @@ func removeNateBinary(cmd *cobra.Command, path string) error {
 	if !errors.Is(err, fs.ErrPermission) || !output.Interactive() || runtime.GOOS == "windows" {
 		return err
 	}
-	// The install script uses /usr/local/bin when a terminal can authorize sudo. Do
-	// the symmetric thing here after the explicit destructive confirmation above.
+	// The install script uses /usr/local/bin when sudo is available; mirror it.
 	sudo, lookErr := exec.LookPath("sudo")
 	if lookErr != nil {
 		return err

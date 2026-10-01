@@ -10,9 +10,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
-// Registry is the agents a build knows, in the order install plans them, and which of
-// them it supports. A known agent's committed hooks still run, and uninstall and doctor
-// still cover them; only supported agents are offered by setup and install.
+// Registry is the agents a build knows, in install order; only supported ones are
+// offered by setup and install, though every known agent's hooks still run.
 type Registry struct {
 	all       []Agent
 	supported map[string]bool
@@ -196,8 +195,7 @@ func (r *Registry) ToolForEvent(event string) string {
 	return ""
 }
 
-// PayloadSession is what the payload of a hook for event says about its session, read
-// the way the agent that owns event writes it.
+// PayloadSession reads a hook payload's session the way the agent that owns event writes it.
 func (r *Registry) PayloadSession(event string, payload []byte) (hookrun.PayloadSession, bool) {
 	for _, a := range r.all {
 		if _, ok := a.Events()[event]; ok {

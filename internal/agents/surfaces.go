@@ -2,8 +2,8 @@ package agents
 
 import "context"
 
-// Surface is one way a developer runs an agent, chosen on its own at setup: Codex's CLI
-// and its desktop app are two.
+// Surface is one way a developer runs an agent, chosen on its own at setup (a CLI, a
+// desktop app).
 type Surface struct {
 	Name, DisplayName string
 	Installed         func(context.Context) bool
@@ -13,16 +13,15 @@ type Surface struct {
 	InstallSteps, SetupSteps []string
 	// Reports says, after an install, how the surface's sessions reach Terma.
 	Reports string
-	// Warn is a condition on this machine the developer should know about, continuing a
-	// sentence that starts with the agent's name; "" when there is none.
+	// Warn is a machine condition worth knowing, continuing a sentence that starts with
+	// the agent's name; "" when there is none.
 	Warn func() string
 }
 
 // Needs is what a surface cannot report without.
 type Needs struct {
 	Signals []string
-	// Hooks: the agent's committed hooks, wired and applied.
-	Hooks bool
+	Hooks   bool
 }
 
 // Surfaced is an agent run as more than one surface.
@@ -40,11 +39,10 @@ func Surfaces(a Agent) []Surface {
 
 // SurfaceStatus is what a surface's own check found in a repository.
 type SurfaceStatus struct {
-	// Ready: the surface's sessions here reach Terma.
-	Ready bool
-	// Problem says why they do not, and Fix what to run.
+	// Ready means the surface's sessions here reach Terma; Problem says why not, Fix what to run.
+	Ready        bool
 	Problem, Fix string
-	// Lines are what `terma agent status` prints, in order.
+	// Lines are what `terma agent status` prints.
 	Lines []StatusLine
 }
 
@@ -54,8 +52,6 @@ type StatusLine struct{ Label, Value string }
 // SurfaceChecker is an agent whose surfaces check their own readiness in a repository.
 type SurfaceChecker interface {
 	Agent
-	// CheckedSurfaces names the surfaces with a check.
 	CheckedSurfaces() []string
-	// CheckSurface is one of them's status in the repository at root, bound to projectID.
 	CheckSurface(surface, root, projectID string) (SurfaceStatus, error)
 }

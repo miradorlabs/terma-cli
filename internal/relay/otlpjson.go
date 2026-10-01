@@ -6,11 +6,8 @@ import (
 	"encoding/json"
 )
 
-// OTLP/JSON departs from protobuf's JSON mapping in one place: trace and span ids are
-// hex strings, not base64 (the OTLP specification, "JSON Protobuf Encoding").
-// protojson reads them as base64, silently, so a 16-byte trace id comes back as 24
-// bytes of noise and every trace join and parent link breaks. hexIDsToBase64 rewrites
-// those fields before protojson sees them.
+// OTLP/JSON sends trace and span ids as hex, which protojson silently reads as base64,
+// breaking every trace join; hexIDsToBase64 rewrites them first.
 var otlpIDFields = map[string]bool{"traceId": true, "spanId": true, "parentSpanId": true}
 
 func hexIDsToBase64(body []byte) ([]byte, error) {

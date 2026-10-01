@@ -5,9 +5,8 @@ import (
 	"errors"
 )
 
-// ServerKey is the non-secret half of a minted key — everything safe to print, store,
-// or show in a table. The plaintext key is deliberately not a field here so it cannot
-// be rendered by accident alongside the rest.
+// ServerKey is the non-secret half of a minted key; the plaintext is not a field, so it
+// cannot be rendered by accident.
 type ServerKey struct {
 	ID        string `json:"id"`
 	ProjectID string `json:"project_id"`
@@ -27,16 +26,8 @@ type createServerKeyResponse struct {
 	ServerKey ServerKey `json:"server_key"`
 }
 
-// CreateServerKey mints a server key (ter_srv_…) bound to one project.
-//
-// The plaintext key is returned exactly once, by this call — nothing on the server can
-// produce it again. A caller that fails to persist it has to mint a replacement, so the
-// key is returned as a separate value rather than a struct field, forcing every caller
-// to decide what to do with it.
-//
-// This requires a user credential. A server key cannot mint another, so this is one of
-// the few operations TERMA_API_KEY cannot perform; the error says so plainly rather
-// than surfacing a bare 403.
+// CreateServerKey mints a server key bound to one project and returns its plaintext,
+// which nothing can produce again; it needs a user credential, not TERMA_API_KEY.
 func (c *Client) CreateServerKey(ctx context.Context, projectID, name, description string) (key string, meta ServerKey, err error) {
 	if c.apiKey != "" {
 		return "", ServerKey{}, errors.New(

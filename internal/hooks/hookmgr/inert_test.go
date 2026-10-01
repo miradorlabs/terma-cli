@@ -12,14 +12,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 )
 
-// Every line terma commits into a repository's hook manager must be a no-op on a
-// machine without terma: exit 0, print nothing, leave the message alone. A colleague
-// who never installed terma must not be able to tell the hooks are there. Each case
-// runs the rendered line the way its manager runs it, with a terma-less PATH.
-//
-// Husky is the case that bit: it runs the hook file with `sh -e`, the file's exit
-// status is its last line's, and when terma created the file the terma line is the
-// only line. A guard with nothing after it made the guard's status the commit's.
+// Every manager line terma commits exits 0, prints nothing and leaves the message alone
+// on a machine without terma, run the way its manager runs it.
 func TestManagerLinesAreInertWithoutTerma(t *testing.T) {
 	if _, err := exec.LookPath("sh"); err != nil {
 		t.Skip("sh not installed")
@@ -64,9 +58,7 @@ func TestManagerLinesAreInertWithoutTerma(t *testing.T) {
 	}
 }
 
-// A repository that installed an older terma carries the older line. Re-running
-// `terma install` rewrites it where it stands, keeping the user's own lines and
-// their order, and is idempotent afterwards.
+// An older terma line is rewritten where it stands, keeping the user's lines and order, idempotently.
 func TestHuskyUpgradesStaleLineInPlace(t *testing.T) {
 	root := t.TempDir()
 	stale := `command -v terma >/dev/null 2>&1 && { terma hook prepare-commit-msg "$@" || true; } # ` + Marker

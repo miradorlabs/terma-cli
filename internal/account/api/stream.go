@@ -11,8 +11,7 @@ import (
 	"strings"
 )
 
-// Event is one Server-Sent Events frame. Data is the raw JSON payload; the caller
-// decodes it according to Name.
+// Event is one Server-Sent Events frame; the caller decodes Data according to Name.
 type Event struct {
 	ID   string
 	Name string
@@ -25,24 +24,17 @@ type Stream struct {
 	scanner *bufio.Scanner
 }
 
-// maxFrameBytes bounds one frame. A log record with large attributes can exceed
-// bufio.Scanner's 64 KiB default, which would end the stream mid-flight with
-// ErrTooLong rather than skipping one record.
+// maxFrameBytes raises bufio.Scanner's 64 KiB default, which a large record exceeds,
+// ending the stream with ErrTooLong.
 const maxFrameBytes = 4 << 20
 
-// Stream opens a long-lived SSE connection to the data plane.
-//
-// It bypasses the shared http.Client because that one carries a request timeout,
-// which for a streaming response covers reading the body too — a 30-second timeout
-// would sever a healthy tail. Cancellation is the caller's ctx instead.
+// Stream opens a long-lived SSE connection to the data plane, governed by ctx alone.
 func (c *Client) Stream(ctx context.Context, path string, query url.Values, lastEventID string) (*Stream, error) {
 	if err := c.refreshIfNeeded(ctx); err != nil {
 		return nil, err
 	}
 
-	// A zero Timeout is the point: http.Client's timeout spans reading the body, so
-	// the shared 30-second client would sever a healthy tail. ctx governs instead.
-	// Redirects are refused here for the same reason as the unary client.
+	// No Timeout: http.Client's spans reading the body and would sever a healthy tail.
 	client := &http.Client{Transport: c.http.Transport, CheckRedirect: refuseRedirects}
 
 	gen := c.currentGen()
@@ -51,9 +43,6 @@ func (c *Client) Stream(ctx context.Context, path string, query url.Values, last
 		return nil, err
 	}
 
-	// A 401 on a token we believed was live means it was revoked or rotated elsewhere;
-	// one refresh-and-retry recovers a tail whose token expired mid-stream, exactly as
-	// the unary path in do() does.
 	if resp.StatusCode == http.StatusUnauthorized && c.canRefresh() {
 		resp.Body.Close()
 		if refreshErr := c.refreshIfCurrent(ctx, gen); refreshErr != nil {
@@ -102,8 +91,7 @@ func (s *Stream) Next() (*Event, error) {
 	for s.scanner.Scan() {
 		line := s.scanner.Text()
 
-		// A blank line terminates a frame. Frames carrying only a comment (the
-		// keep-alive some proxies inject) have no data and are skipped.
+		// A blank line ends a frame; a comment-only keep-alive has no data and is skipped.
 		if line == "" {
 			if len(data) == 0 {
 				event = Event{}
@@ -142,5 +130,5 @@ func (s *Stream) Next() (*Event, error) {
 	return nil, io.EOF
 }
 
-// Close ends the stream by closing the response it reads from.
+// Close ends the stream.
 func (s *Stream) Close() error { return s.resp.Body.Close() }

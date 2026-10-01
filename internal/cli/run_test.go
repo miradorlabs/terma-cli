@@ -9,30 +9,24 @@ import (
 	"time"
 )
 
-// termaRun is how a test executes the command tree, and the only place one is built
-// for execution. The zero value runs with no deadline and no extra environment.
+// termaRun is the one way a test executes the command tree; the zero value has no
+// deadline and no extra environment.
 type termaRun struct {
-	// within bounds the run. A path that would wait at the browser, or on a feed,
-	// then fails the test in seconds instead of hanging it for the login timeout.
+	// within bounds the run, so a wait at the browser or on a feed fails in seconds.
 	within time.Duration
-	// env is set for the length of the test before the command runs.
-	env map[string]string
+	env    map[string]string
 }
 
-// within is a run bounded by d. It is a call rather than a literal because a composite
-// literal cannot open an if statement, which is where most runs are written.
+// within is a run bounded by d, a call because a composite literal cannot open an if.
 func within(d time.Duration) termaRun { return termaRun{within: d} }
 
-// exec runs `terma args...` and returns the two streams apart. Every run drops the
-// update notice — a network call, and a line on stderr that belongs to no test — and
-// starts from zeroed global flags, so one test's --project is never the next one's.
+// exec runs `terma args...` without the update notice and returns the two streams apart.
 func (r termaRun) exec(t *testing.T, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
 	for k, v := range r.env {
 		t.Setenv(k, v)
 	}
-	// A run's flags are its own: a test that reads the configuration after it does not
-	// inherit them.
+	// A run's flags are its own; the next test starts from zero.
 	defer func() { testApp.flags = globalFlags{} }()
 
 	ctx := context.Background()
@@ -52,23 +46,20 @@ func (r termaRun) exec(t *testing.T, args ...string) (stdout, stderr string, err
 	return out.String(), errOut.String(), err
 }
 
-// combined is exec with the streams read as one, which is what an assertion about
-// what the developer saw wants.
+// combined is exec with the streams read as one.
 func (r termaRun) combined(t *testing.T, args ...string) (string, error) {
 	t.Helper()
 	stdout, stderr, err := r.exec(t, args...)
 	return stdout + stderr, err
 }
 
-// runTerma is the everyday form: no deadline, no extra environment, one stream.
 func runTerma(t *testing.T, args ...string) (string, error) {
 	t.Helper()
 	return termaRun{}.combined(t, args...)
 }
 
-// fakeGateway serves handler as the API and the auth host, and returns the
-// environment that points a run at it: authenticated with a server key, so no
-// credential file is involved and no sign-in can be reached.
+// fakeGateway serves handler as the API and auth host and returns the environment for it,
+// with a server key so no sign-in can be reached.
 func fakeGateway(t *testing.T, handler http.HandlerFunc) map[string]string {
 	t.Helper()
 	srv := httptest.NewServer(handler)

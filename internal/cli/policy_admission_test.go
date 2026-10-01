@@ -47,8 +47,8 @@ func TestSpoolRepliesUseCurrentNativeCodexConsent(t *testing.T) {
 	}
 }
 
-// CatchAll deliberately still holds its 10-second global cache. The one-second
-// resolver cache must nevertheless stop admitting new unclaimed records in repo mode.
+// CatchAll keeps its 10-second cache, but the one-second resolver cache must still stop
+// admitting unclaimed records in repo mode.
 func TestRelayAdmissionStopsGlobalCoverageWithStaleCatchAll(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	arrived := make(chan struct{}, 2)

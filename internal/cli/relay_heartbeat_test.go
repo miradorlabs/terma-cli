@@ -14,8 +14,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 )
 
-// The heartbeat's facts name this terma's build and setup, never whose machine it is:
-// no hostname, no home directory, no account. The machine id is random and stays put.
+// The heartbeat names this terma's build and setup, never whose machine it is; the machine
+// id is random and stable.
 func TestHeartbeatFactsNameNoOne(t *testing.T) {
 	dir := relaySandbox(t)
 	facts := testApp.relayHeartbeat(dir).Facts()
@@ -38,9 +38,8 @@ func TestHeartbeatFactsNameNoOne(t *testing.T) {
 	}
 }
 
-// setup's check-in says what came of the relay's beat: sent; the organization's
-// endpoint not there yet (the stub's 404, not the developer's problem); another
-// failure; or no relay at all — at once, when nothing will start one.
+// setup's check-in reports the beat as sent, endpoint not there yet (the stub's 404),
+// another failure, or no relay at all.
 func TestRelayCheckIn(t *testing.T) {
 	dir := relaySandbox(t)
 	addr := freeAddr(t)

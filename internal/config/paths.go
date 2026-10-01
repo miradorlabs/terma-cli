@@ -5,9 +5,8 @@ import (
 	"strings"
 )
 
-// ExcludesPath matches repository-relative globs, including ** across directories.
-// A basename pattern (.env) also matches that basename in a nested directory.
-// Ancestors are checked so excluding a directory excludes everything under it.
+// ExcludesPath matches repository-relative globs (** spans directories, a basename
+// matches at any depth, an excluded directory excludes its contents).
 func (p Policy) ExcludesPath(name, root string) bool {
 	name = strings.ReplaceAll(name, "\\", "/")
 	root = strings.TrimRight(strings.ReplaceAll(root, "\\", "/"), "/")
@@ -29,9 +28,7 @@ func (p Policy) ExcludesPath(name, root string) bool {
 			if globPath(patternParts, candidateParts) {
 				return true
 			}
-			// Native telemetry often names an absolute file without its workspace
-			// root. Check each possible relative suffix rather than authorize it
-			// merely because the exporter omitted that context.
+			// An absolute path outside root is checked by every relative suffix, never allowed outright.
 			absolute := strings.HasPrefix(candidate, "/") || len(candidate) > 2 && candidate[1] == ':' && candidate[2] == '/'
 			if absolute && !strings.HasPrefix(pattern, "/") {
 				for i := 1; i < len(candidateParts); i++ {

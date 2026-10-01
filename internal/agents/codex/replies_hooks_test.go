@@ -24,7 +24,7 @@ const (
 	replyTrace   = "ae2a5e6f8e0168ae5ec2efa2c8772b02"
 )
 
-// replyRollout writes a one-turn rollout in Codex 0.155.1's shapes and returns its path.
+// replyRollout writes a one-turn rollout in Codex's shapes and returns its path.
 func replyRollout(t *testing.T) string {
 	t.Helper()
 	path := filepath.Join(os.Getenv("CODEX_HOME"), "sessions", "2026", "09", "19", "rollout-2026-09-19T12-18-12-"+replySession+".jsonl")
@@ -102,9 +102,8 @@ func stopCodex(t *testing.T, env hookrun.Env, path string) []spool.Event {
 	return replies
 }
 
-// Codex exports what the developer said and what its tools did, never what it answered.
-// For a developer whose Codex exports their prompts, the end of a turn spools the replies
-// — in the turn the platform knows by its trace id, stamped with when they were said.
+// With prompts consented, a turn's end spools Codex's replies in the turn named by its
+// trace id, stamped with when they were said.
 func TestCodexStopSpoolsWhatCodexSaid(t *testing.T) {
 	env := fundingEnv(t)
 	routeCodex(t, true)
@@ -131,20 +130,19 @@ func TestCodexStopSpoolsWhatCodexSaid(t *testing.T) {
 	if replies[1].Attrs["message_id"] != "msg_a2" || replies[1].Attrs["phase"] != "final_answer" {
 		t.Errorf("second reply: %v", replies[1].Attrs)
 	}
-	// Only what Codex said. The developer's own words already travel — in Codex's export.
+	// Only what Codex said: the developer's words already travel in Codex's export.
 	for _, r := range replies {
 		if strings.Contains(r.Attrs["text"].(string), "SECRET PROMPT") {
 			t.Fatal("the developer's prompt was captured as a reply")
 		}
 	}
-	// A second hook for the same turn — Stop again, or notify beside it — adds nothing.
+	// A second hook for the same turn adds nothing.
 	if again := stopCodex(t, env, path); len(again) != 0 {
 		t.Fatalf("replies spooled twice: %+v", again)
 	}
 }
 
-// A reply travels under the consent its prompt does, and under no other. `--exclude-prompts`
-// is documented as withholding "prompt text or model responses"; this is the second half.
+// A reply travels under the consent its prompt does, and no other.
 func TestCodexRepliesNeedTheConsentPromptsTravelUnder(t *testing.T) {
 	for _, c := range []struct {
 		name  string
@@ -187,7 +185,7 @@ func TestCodexRepliesNeedTheConsentPromptsTravelUnder(t *testing.T) {
 			if got := len(stopCodex(t, env, replyRollout(t))); got != c.want {
 				t.Fatalf("spooled %d replies, want %d", got, c.want)
 			}
-			// Without consent the rollout is not so much as opened for replies: no cursor.
+			// Without consent the rollout is not opened for replies: no cursor.
 			dir, _ := os.ReadDir(filepath.Join(os.Getenv("TERMA_CONFIG_DIR"), "reply-cursors"))
 			if c.want == 0 && len(dir) != 0 {
 				t.Fatalf("a reply cursor was written without consent: %v", dir)
@@ -196,9 +194,7 @@ func TestCodexRepliesNeedTheConsentPromptsTravelUnder(t *testing.T) {
 	}
 }
 
-// "Could not tell" is not consent. A configuration that exists and cannot be read might be
-// the one that withholds prompts, so the one place terma reads what was said fails closed —
-// even when the *other* configuration, read fine, says yes.
+// A consent source that exists and cannot be read fails closed, even when the other says yes.
 func TestCodexRepliesFailClosedWhenAConsentSourceCannotBeRead(t *testing.T) {
 	for _, c := range []struct {
 		name  string
@@ -212,8 +208,7 @@ func TestCodexRepliesFailClosedWhenAConsentSourceCannotBeRead(t *testing.T) {
 			}
 			hookruntest.WriteFile(t, dir, "project-a.json", `{"project_id": "project-a", "include_prompts": tr`)
 		}},
-		// Without the relay the machine-wide config is a consent source too; on a relay
-		// machine it is not (it lets everything out, and the relay withholds per project).
+		// Without the relay the machine-wide config is a consent source too; with it, it is not.
 		{"a machine-wide config that does not parse, beside a routing record that allows prompts", func(t *testing.T) {
 			if err := routing.SaveRecord(routing.Record{ProjectID: "project-a", Endpoint: "https://otel.terma.ai", Signals: []string{"logs"},
 				IncludePrompts: true, Harnesses: []string{name}}); err != nil {
@@ -235,8 +230,7 @@ func TestCodexRepliesFailClosedWhenAConsentSourceCannotBeRead(t *testing.T) {
 	}
 }
 
-// A cursor that does not parse is replaced, and says so — as the funding cursor does. The
-// replay is harmless: the ids are Codex's own, so it is the same events again, not new ones.
+// A cursor that does not parse is replaced and reported; the replay repeats Codex's own ids.
 func TestCodexRepliesReplayFromACorruptCursor(t *testing.T) {
 	env := fundingEnv(t)
 	routeCodex(t, true)
@@ -259,8 +253,7 @@ func TestCodexRepliesReplayFromACorruptCursor(t *testing.T) {
 	}
 }
 
-// Codex's notify reaches the same capture for a developer with no repository hooks, and
-// the two share one locked cursor: a turn's replies are spooled once however many fire.
+// notify shares Stop's locked cursor, so a turn's replies are spooled once.
 func TestCodexNotifyAndStopDoNotDoubleReplies(t *testing.T) {
 	env := fundingEnv(t)
 	routeCodex(t, true)

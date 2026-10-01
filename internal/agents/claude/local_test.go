@@ -11,10 +11,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-// localClaudeIn builds a repository with a project settings file already holding
-// something Terma did not write — the session hooks `terma install` puts there — and
-// returns the harness bound to it. The user-level file and Terma's own directory are
-// sandboxed too, so nothing here can touch the developer's real configuration.
+// localClaudeIn builds a sandboxed repository whose project file already holds terma's session
+// hooks and returns the harness bound to it.
 func localClaudeIn(t *testing.T, settings string) (harness.Harness, string) {
 	t.Helper()
 	repo := t.TempDir()
@@ -58,8 +56,7 @@ func sortedKeys(m map[string]string) []string {
 	return out
 }
 
-// A project file is committed and read by everyone who clones the repository. It may
-// say what to ship; it must never say where, or with which key.
+// A committed project file may say what to ship, never where or with which key.
 func TestLocalRenderCarriesOnlyWhatToShip(t *testing.T) {
 	local, _ := localClaudeIn(t, "")
 	h := local.(exporter)
@@ -92,7 +89,7 @@ func TestLocalRenderCarriesOnlyWhatToShip(t *testing.T) {
 	}
 }
 
-// The global render is unchanged by the new field: the zero value is the old harness.
+// The zero value is still the global harness.
 func TestGlobalRenderStillCarriesEverything(t *testing.T) {
 	env := exporter{}.render(localExporter())
 	for _, key := range []string{claudeEnableTelemetry, harness.EnvOTLPEndpoint, harness.EnvOTLPProtocol, harness.EnvOTLPHeaders} {
@@ -133,8 +130,7 @@ func TestLocalConfigPathIsTheProjectFile(t *testing.T) {
 	}
 }
 
-// The project file already carries the session hooks; a local connect adds an env
-// block beside them and touches nothing else. Disconnect puts the file back exactly.
+// A local connect adds an env block beside the hooks, and disconnect puts the file back exactly.
 func TestLocalConnectAndDisconnectRoundTrip(t *testing.T) {
 	h, path := localClaudeIn(t, hooksOnly)
 
@@ -164,7 +160,6 @@ func TestLocalConnectAndDisconnectRoundTrip(t *testing.T) {
 		t.Errorf("mode = %o, want 0644 — nothing secret was written", info.Mode().Perm())
 	}
 
-	// The user file was never touched — not even created.
 	userPath, _ := exporter{}.ConfigPath()
 	if _, err := os.Stat(userPath); err == nil {
 		t.Error("a local connect wrote the user-level settings file")
@@ -186,9 +181,7 @@ func TestLocalConnectAndDisconnectRoundTrip(t *testing.T) {
 	}
 }
 
-// Someone else's endpoint in the project file is a conflict for the connect to report —
-// never something the local layer deletes on the way past because its own render
-// happens not to include that key.
+// A project file's own endpoint is a conflict to report, never something the local layer deletes.
 func TestLocalConnectLeavesAProjectEndpointAlone(t *testing.T) {
 	h, path := localClaudeIn(t, `{"env":{"OTEL_EXPORTER_OTLP_ENDPOINT":"https://other.example.com","FOO":"bar"}}`)
 
@@ -213,8 +206,7 @@ func TestLocalConnectLeavesAProjectEndpointAlone(t *testing.T) {
 	}
 }
 
-// A local layer says what to ship. It is present, not connected: the destination and
-// the key are the global connect's, and status has to let the caller tell the two apart.
+// A local layer is a policy: present, not connected.
 func TestLocalStatusReportsPresenceNotConnection(t *testing.T) {
 	h, _ := localClaudeIn(t, hooksOnly)
 	e := localExporter()
@@ -245,8 +237,7 @@ func TestLocalStatusReportsPresenceNotConnection(t *testing.T) {
 	}
 }
 
-// Without a journal only a value Terma writes is Terma's to remove: a developer's own
-// exporter ("console") and switch values Terma never renders stay where they are.
+// Without a journal only a value terma writes is removed; a developer's own "console" stays.
 func TestLocalDisconnectWithoutJournalKeepsValuesTermaNeverWrites(t *testing.T) {
 	h, path := localClaudeIn(t, `{"env":{
 		"OTEL_LOGS_EXPORTER":"console",
@@ -272,7 +263,6 @@ func TestLocalDisconnectWithoutJournalKeepsValuesTermaNeverWrites(t *testing.T) 
 		t.Fatal("a switch value Terma writes survived")
 	}
 
-	// Nothing of Terma's: nothing removed, and not reported as an unjournaled removal.
 	h, path = localClaudeIn(t, `{"env":{"OTEL_LOGS_EXPORTER":"console"}}`)
 	if result, err := h.Disconnect(); err != nil || result.Removed != 0 || result.Unjournaled {
 		t.Fatalf("result = %+v, err %v", result, err)
@@ -282,9 +272,7 @@ func TestLocalDisconnectWithoutJournalKeepsValuesTermaNeverWrites(t *testing.T) 
 	}
 }
 
-// A colleague's committed layer arrives without this machine's journal. Disconnect still
-// removes exactly the local keys, and leaves the rest of the env block — including an
-// endpoint a global disconnect would have owned — where it found it.
+// A colleague's committed layer, with no journal here, loses only the local keys.
 func TestLocalDisconnectWithoutJournalRemovesOnlyLocalKeys(t *testing.T) {
 	h, path := localClaudeIn(t, `{"env":{
 		"OTEL_TRACES_EXPORTER":"otlp",
@@ -308,20 +296,15 @@ func TestLocalDisconnectWithoutJournalRemovesOnlyLocalKeys(t *testing.T) {
 	}
 }
 
-// What outranks the repository's settings.json is its settings.local.json and the shell.
-// The user file is below it and the working directory is irrelevant: a redirect in
-// either must not be reported against a local connect.
+// Only settings.local.json and the shell outrank a repository's settings.json.
 func TestLocalConflictsComeFromWhatOutranksTheProjectFile(t *testing.T) {
 	h, path := localClaudeIn(t, "")
 	repo := filepath.Dir(filepath.Dir(path))
 
-	// A user-file redirect: below the project file, so not a conflict here.
 	userPath, _ := exporter{}.ConfigPath()
 	if err := os.WriteFile(userPath, []byte(`{"env":{"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT":"https://elsewhere.example.com"}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	// Run from an unrelated repository with its own project override: that is not the
-	// repository being connected, so it is noise.
 	other := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(other, ".git"), 0o755); err != nil {
 		t.Fatal(err)
@@ -343,7 +326,6 @@ func TestLocalConflictsComeFromWhatOutranksTheProjectFile(t *testing.T) {
 		t.Fatalf("expected no conflicts, got %+v", conflicts)
 	}
 
-	// The same repository's settings.local.json does outrank it.
 	if err := os.WriteFile(filepath.Join(repo, ".claude", "settings.local.json"),
 		[]byte(`{"env":{"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT":"https://mine.example.com","OTEL_LOG_TOOL_CONTENT":"0"}}`), 0o644); err != nil {
 		t.Fatal(err)
@@ -365,8 +347,7 @@ func TestLocalConflictsComeFromWhatOutranksTheProjectFile(t *testing.T) {
 	}
 }
 
-// Seen from the global connect, a repository's Terma policy is still an override of the
-// user file — and is named as one the user set on purpose, with the command to change it.
+// From the global connect, a repository's terma policy is named as one, with the command to change it.
 func TestGlobalConflictsNameTermaOwnedLocalLayer(t *testing.T) {
 	h, path := localClaudeIn(t, hooksOnly)
 	e := localExporter()
@@ -387,7 +368,6 @@ func TestGlobalConflictsNameTermaOwnedLocalLayer(t *testing.T) {
 	if !strings.Contains(c.Reason, "Terma policy") || !strings.Contains(c.Reason, "--scope local") {
 		t.Errorf("reason = %q, want it to name the policy and the command", c.Reason)
 	}
-	// The local layer's exporter switches are not redirects: nothing blocking.
 	if blocking := unclearableKeys(conflicts); len(blocking) != 0 {
 		t.Errorf("a Terma-written local layer must never block the global connect: %v", blocking)
 	}

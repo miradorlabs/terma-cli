@@ -8,9 +8,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 )
 
-// relayReport is how the machine-level relay setup tells its caller what it did: ok
-// and warn per step (label, what), then for a step the developer must take, and
-// detail for the long form. `terma setup` and `terma install` each render it their way.
+// relayReport is how the machine-level relay setup reports to setup or install: ok and
+// warn per step, then for a developer's step, detail for the long form.
 type relayReport struct {
 	ok     func(label, what string)
 	warn   func(label, what string)
@@ -18,11 +17,8 @@ type relayReport struct {
 	detail io.Writer
 }
 
-// connectMachineRelay is the machine half of the relay, done once per machine by
-// `terma setup` (and by `terma install` when setup has not): the local token, each of
-// the developer's agents' user-level exporters pointed at the relay, and the relay
-// itself, as a service unless the developer opted out. It needs no project: which
-// sessions leave is the claims' business, per repository.
+// connectMachineRelay is the machine half of the relay: the token, each agent's user-level
+// exporter pointed at it, and the relay itself; claims decide per repository what leaves.
 func (app *App) connectMachineRelay(ctx context.Context, agents []string, relayService string, r relayReport) error {
 	targets := app.agents.RelayTargets(agents)
 	if len(targets) == 0 {

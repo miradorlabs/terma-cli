@@ -56,28 +56,23 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 			if res.AlreadyRunning && !quiet {
 				fmt.Fprintln(cmd.OutOrStdout(), "The relay is already running.")
 			}
-			// Under a service manager, the new binary starts now; a relay a hook started is
-			// started again by the next hook. `terma relay setup` and `terma setup` stop
-			// the service's relay so that it rereads the token, address and policy.
-			// Removing the service never restarts it, whatever it exits.
+			// Exit for the service manager to restart this as the new binary; a
+			// hook-started relay is restarted by the next hook.
 			if res.Restart() {
 				return exitWith(ExitRestart)
 			}
 			return nil
 		},
 	}
-	// Long, because a relay that is not running when an agent starts loses what the
-	// agent exports before its first hook: Codex's conversation_starts comes before
-	// SessionStart (docs/RELAY.md). A relay a hook started stays for the next one.
+	// Long, because an agent may export before its first hook (docs/RELAY.md).
 	cmd.Flags().DurationVar(&idle, "idle", 8*time.Hour, "exit after this long with no export and nothing held or queued (0: never)")
 	cmd.Flags().StringVar(&addr, "addr", "", "listen here instead of the address `terma relay setup` recorded")
 	cmd.Flags().BoolVar(&quiet, "quiet", false, "print nothing")
 	return cmd
 }
 
-// relayRunConfig is the configuration a relay routes with. Before the first successful
-// policy fetch, capture is disabled; the background poll authorizes it without
-// delaying the loopback listener.
+// relayRunConfig is the configuration a relay routes with; capture stays off until the
+// background poll's first successful policy fetch.
 func (app *App) relayRunConfig() (*config.Config, error) {
 	cfg, err := app.loadConfig()
 	if err != nil {
@@ -94,10 +89,8 @@ func (app *App) relayRunConfig() (*config.Config, error) {
 	return cfg, nil
 }
 
-// relayRunOptions wires the relay to this machine: its token and outbox, the policy
-// and catch-all resolvers, the heartbeat, and how senders are found. TERMA_RELAY_HOLD
-// and TERMA_RELAY_HEARTBEAT shorten the hold and the heartbeat's period for a test;
-// TERMA_RELAY_DEBUG=1 logs every drop.
+// relayRunOptions wires the relay to this machine; TERMA_RELAY_HOLD and
+// TERMA_RELAY_HEARTBEAT shorten its timings for tests, TERMA_RELAY_DEBUG=1 logs drops.
 func (app *App) relayRunOptions(ctx context.Context, cmd *cobra.Command, dir string, cfg *config.Config) relay.Options {
 	hold := relay.DefaultHold
 	if v, err := time.ParseDuration(os.Getenv("TERMA_RELAY_HOLD")); err == nil && v > 0 {

@@ -9,11 +9,7 @@ import (
 	"time"
 )
 
-// commitLogsBody is a verbatim /v1/logs response captured from the dev backend for a
-// real terma.commit record. It is the contract this decoder is written against: the
-// records live under "logs", every attribute value is a string, and the event's own
-// attributes are nested under "attributes" while the exporter's are under
-// "resource_attributes".
+// commitLogsBody is a verbatim /v1/logs response for a terma.commit record, the decoder's contract.
 const commitLogsBody = `{
   "logs": [
     {
@@ -78,7 +74,6 @@ func TestCommitLog_DecodesRealRecordAndBuildsQuery(t *testing.T) {
 		t.Fatal("record = nil, want the terma.commit record")
 	}
 
-	// The filter names the event and the sha, and the window travels as since/until.
 	wantFilter := `attribute.event.name="terma.commit" AND attribute.sha="` + sha + `"`
 	if gotQuery["filter"] != wantFilter {
 		t.Errorf("filter = %q\nwant     %q", gotQuery["filter"], wantFilter)
@@ -90,7 +85,6 @@ func TestCommitLog_DecodesRealRecordAndBuildsQuery(t *testing.T) {
 		t.Errorf("limit = %q", gotQuery["limit"])
 	}
 
-	// The string-valued, nested attributes decode through the typed accessors.
 	if rec.EventName != "terma.commit" {
 		t.Errorf("event_name = %q", rec.EventName)
 	}
@@ -116,7 +110,6 @@ func TestCommitLog_DecodesRealRecordAndBuildsQuery(t *testing.T) {
 
 func TestCommitLog_MissIsNilNotError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		// The shape a miss actually returns: an empty logs array, no records key.
 		fmt.Fprint(w, `{"logs":[],"project_id":"p","range_start":"2026-09-15T23:00:00Z","range_end":"2026-09-16T00:00:00Z"}`)
 	}))
 	defer srv.Close()

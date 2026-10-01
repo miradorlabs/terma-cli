@@ -16,9 +16,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// Codex Desktop's activity (model calls, turn summaries, compactions) is spooled without
-// emitFor, and went without a project id — so the flush dropped every one as
-// unroutable. It carries the repository's binding like every other event.
+// Codex Desktop's activity, spooled without Env.EmitFor, carries the repository's binding.
 func TestCodexDesktopActivityCarriesTheProject(t *testing.T) {
 	env := fundingEnv(t)
 	connectCodexDesktop(t, false)
@@ -50,8 +48,8 @@ func TestCodexDesktopActivityCarriesTheProject(t *testing.T) {
 	}
 }
 
-// A Codex subagent exports under its own thread id, which its hooks name as agent_id:
-// both ids are claimed, from a spooled event and from a bare payload alike.
+// A subagent's own thread id (agent_id) is claimed too, from a spooled event or a bare
+// payload.
 func TestCodexSubagentThreadIsClaimed(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	hookruntest.RelayOn(t)

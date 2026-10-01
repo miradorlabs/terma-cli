@@ -13,15 +13,11 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-// claudeIn points Claude Code's config at a temp dir, so every test here works against
-// a throwaway file rather than the developer's real ~/.claude/settings.json.
+// claudeIn points the config, and terma's journal directory, at a temp dir.
 func claudeIn(t *testing.T, contents string) (exporter, string) {
 	t.Helper()
 	dir := t.TempDir()
 	t.Setenv("CLAUDE_CONFIG_DIR", dir)
-	// Connect also writes its ownership journal. Keep that out of the developer's real
-	// ~/.config/terma directory: overwriting a live journal here would make a later real
-	// disconnect lose the values it is supposed to restore.
 	t.Setenv("TERMA_CONFIG_DIR", filepath.Join(dir, "terma"))
 
 	path := filepath.Join(dir, "settings.json")
@@ -103,8 +99,7 @@ func TestRenderDefaultsExcludeContent(t *testing.T) {
 	}
 }
 
-// The content switches are the privacy contract. Each must be off unless its own flag
-// asked for it, and neither flag may turn on the other's variables.
+// Each content flag turns on only its own switches.
 func TestRenderContentSwitchesAreIndependent(t *testing.T) {
 	prompts := exporter{}.render(harness.Exporter{Signals: harness.AllSignals, IncludePrompts: true})
 	if prompts["OTEL_LOG_USER_PROMPTS"] != "1" || prompts["OTEL_LOG_ASSISTANT_RESPONSES"] != "1" {
@@ -123,8 +118,7 @@ func TestRenderContentSwitchesAreIndependent(t *testing.T) {
 	}
 }
 
-// A signal left out is written as an explicit "none" rather than omitted, so the file
-// states what it does instead of leaning on an upstream default.
+// A signal left out is written as an explicit "none".
 func TestRenderDisablesUnselectedSignals(t *testing.T) {
 	env := exporter{}.render(harness.Exporter{Signals: []harness.Signal{harness.SignalLogs}})
 
@@ -136,13 +130,11 @@ func TestRenderDisablesUnselectedSignals(t *testing.T) {
 			t.Errorf("%s = %q, want an explicit none", key, env[key])
 		}
 	}
-	// The beta flag opts into an unreleased feature; a logs-only connect must not.
 	if _, ok := env["CLAUDE_CODE_ENHANCED_TELEMETRY_BETA"]; ok {
 		t.Error("the enhanced-telemetry beta was enabled for a connect that asked for no traces")
 	}
 }
 
-// Merging must never cost the user a setting this CLI does not know about.
 func TestConnectPreservesUnrelatedSettings(t *testing.T) {
 	c, path := claudeIn(t, `{
   "model": "opus",
@@ -164,7 +156,6 @@ func TestConnectPreservesUnrelatedSettings(t *testing.T) {
 			t.Errorf("%q was dropped by the merge", key)
 		}
 	}
-	// A nested object must survive intact, not be flattened or reordered into nonsense.
 	perms, _ := doc["permissions"].(map[string]any)
 	allow, _ := perms["allow"].([]any)
 	if len(allow) != 1 || allow[0] != "Bash(git:*)" {
@@ -175,7 +166,6 @@ func TestConnectPreservesUnrelatedSettings(t *testing.T) {
 	if env["EDITOR"] != "vim" {
 		t.Errorf("unrelated env var EDITOR = %q, want vim", env["EDITOR"])
 	}
-	// A stale value from a previous connect must be overwritten, not merged around.
 	if env["OTEL_LOG_USER_PROMPTS"] != "0" {
 		t.Errorf("OTEL_LOG_USER_PROMPTS = %q, want the new value 0", env["OTEL_LOG_USER_PROMPTS"])
 	}
@@ -192,8 +182,7 @@ func TestConnectCreatesFileWhenAbsent(t *testing.T) {
 	}
 }
 
-// The settings file now holds a live server key. Leaving it world-readable would put
-// that credential in reach of every account on the machine.
+// The settings file now holds a live server key.
 func TestConnectTightensFilePermissions(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("unix file modes")
@@ -212,8 +201,7 @@ func TestConnectTightensFilePermissions(t *testing.T) {
 	}
 }
 
-// A file we cannot parse must not be written to: merging into it would mean discarding
-// settings we were never able to see.
+// Merging into an unparseable file would discard settings it cannot see.
 func TestConnectRefusesMalformedSettings(t *testing.T) {
 	const original = `{"model": "opus",,,`
 	c, path := claudeIn(t, original)
@@ -240,8 +228,6 @@ func TestDisconnectRemovesOnlyManagedKeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Disconnect: %v", err)
 	}
-	// Every managed key was absent before this connect, so undoing it removes them all
-	// rather than restoring anything.
 	if result.Removed != len(claudeManagedKeys) {
 		t.Errorf("removed %d keys, want %d", result.Removed, len(claudeManagedKeys))
 	}
@@ -260,8 +246,7 @@ func TestDisconnectRemovesOnlyManagedKeys(t *testing.T) {
 	}
 }
 
-// Connect then disconnect on an otherwise-empty file should leave no trace, not an
-// orphaned `"env": {}`.
+// Connect then disconnect on an empty file leaves no orphaned `"env": {}`.
 func TestDisconnectRestoresAnUntouchedFile(t *testing.T) {
 	c, path := claudeIn(t, `{"model":"opus"}`)
 
@@ -334,9 +319,7 @@ func TestStatusRoundTrip(t *testing.T) {
 	}
 }
 
-// The exporter can be set while the beta flag is not, in which case Claude Code emits
-// no spans at all. Reporting traces as on there would send someone hunting in Terma
-// for data that was never sent.
+// Without the beta flag Claude Code emits no spans, so traces are not on.
 func TestStatusDoesNotClaimTracesWithoutTheBetaFlag(t *testing.T) {
 	c, _ := claudeIn(t, `{"env":{
 		"CLAUDE_CODE_ENABLE_TELEMETRY":"1",
@@ -359,7 +342,7 @@ func TestStatusDoesNotClaimTracesWithoutTheBetaFlag(t *testing.T) {
 	}
 }
 
-// Status output lands in terminals, screenshots and bug reports.
+// Status output lands in screenshots.
 func TestStatusNeverReturnsTheWholeKey(t *testing.T) {
 	const key = "ter_srv_0123456789abcdef0123456789abcdef"
 	c, _ := claudeIn(t, "")
@@ -385,8 +368,7 @@ func TestStatusNeverReturnsTheWholeKey(t *testing.T) {
 	}
 }
 
-// Writing to ~/.claude while Claude Code reads elsewhere is a connect that silently
-// does nothing.
+// Writing to ~/.claude while Claude Code reads elsewhere would silently do nothing.
 func TestConfigPathHonoursClaudeConfigDir(t *testing.T) {
 	t.Setenv("CLAUDE_CONFIG_DIR", "/tmp/elsewhere")
 
@@ -399,8 +381,7 @@ func TestConfigPathHonoursClaudeConfigDir(t *testing.T) {
 	}
 }
 
-// A value carrying a comma or an equals sign would corrupt the whole
-// OTEL_RESOURCE_ATTRIBUTES encoding, silently changing the other attributes.
+// A comma or equals sign would corrupt the other OTEL_RESOURCE_ATTRIBUTES entries.
 func TestResourceAttributesRejectSeparators(t *testing.T) {
 	e := harness.Exporter{ResourceAttributes: map[string]string{
 		harness.AttrServiceName: "claude-code",
@@ -420,7 +401,6 @@ func TestParseSignals(t *testing.T) {
 	}{
 		{in: "", want: harness.AllSignals},
 		{in: "traces", want: []harness.Signal{harness.SignalTraces}},
-		// Canonical order regardless of input order, and deduplicated.
 		{in: "metrics,traces", want: []harness.Signal{harness.SignalTraces, harness.SignalMetrics}},
 		{in: "logs,logs", want: []harness.Signal{harness.SignalLogs}},
 		{in: " TRACES , logs ", want: []harness.Signal{harness.SignalTraces, harness.SignalLogs}},
@@ -466,7 +446,6 @@ func TestBackupCopiesTheOriginal(t *testing.T) {
 		t.Fatalf("backup = %q, want a verbatim copy", data)
 	}
 
-	// Connecting afterwards must not disturb the backup.
 	if err := c.Connect(fullExporter(), false); err != nil {
 		t.Fatalf("Connect: %v", err)
 	}
@@ -489,8 +468,7 @@ func TestBackupIsSkippedWhenThereIsNoFile(t *testing.T) {
 }
 
 func TestDetectDoesNotFailWhenClaudeIsAbsent(t *testing.T) {
-	// An empty PATH guarantees the lookup misses, which must read as "not installed"
-	// rather than as an error — connecting an uninstalled harness is allowed.
+	// An empty PATH must read as not installed, not as an error.
 	t.Setenv("PATH", t.TempDir())
 
 	if d := (exporter{}).Detect(context.Background()); d.Found {

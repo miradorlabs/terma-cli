@@ -1,6 +1,5 @@
 // Package service is the relay's per-user service: the definitions (Launchd, Systemd,
-// Windows) and the Manager that installs, removes and finds them. The CLI decides when
-// to, and reports what happened.
+// Windows) and the Manager that installs, removes and finds them.
 package service
 
 import (

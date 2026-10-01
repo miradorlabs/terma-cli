@@ -13,8 +13,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
-// desktop is Codex Desktop's surface name: its threads run in codex app-server, and
-// reach Terma through the relay and the repository's trusted hooks.
+// desktop's threads run in codex app-server and reach Terma through the relay and the
+// repository's trusted hooks.
 const desktop = "codex-desktop"
 
 // Surfaces are Codex's CLI and its desktop app, chosen apart at setup.
@@ -45,9 +45,8 @@ func (a Agent) Surfaces() []agents.Surface {
 // judges for every harness.
 func (Agent) CheckedSurfaces() []string { return []string{desktop} }
 
-// CheckSurface is Codex Desktop's readiness in the repository at root: a route that
-// names the desktop surface with the logs signal, a delivery key, and hooks the
-// developer trusted.
+// CheckSurface is Codex Desktop's readiness at root: a desktop route with logs, a delivery
+// key, and trusted hooks.
 func (a Agent) CheckSurface(_, root, projectID string) (agents.SurfaceStatus, error) {
 	route, recorded, err := routing.LoadRecord(projectID)
 	if err != nil {
@@ -99,7 +98,6 @@ func onOff(on bool) string {
 	return "off"
 }
 
-// desktopInstalled finds the ChatGPT app Codex Desktop ships in (macOS only).
 func desktopInstalled(context.Context) bool {
 	if runtime.GOOS != "darwin" {
 		return false

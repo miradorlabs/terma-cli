@@ -57,8 +57,7 @@ func TestInstallUsesSavedCodexDesktopChoiceWithoutShellShim(t *testing.T) {
 	if len(codexHooksIn(t, mustGetwd(t))["SessionStart"]) != 1 {
 		t.Fatal("desktop-only install did not wire the Codex SessionStart hook")
 	}
-	// Codex Desktop reads the user-level config, and it now exports to the local relay,
-	// which forwards only the sessions this repository's hooks claim.
+	// The desktop app reads the user-level config, which now exports to the local relay.
 	if cfg, err := os.ReadFile(filepath.Join(home, ".codex", "config.toml")); err != nil || !strings.Contains(string(cfg), "127.0.0.1") {
 		t.Fatalf("desktop-only install did not point Codex at the local relay: %v\n%s", err, cfg)
 	}

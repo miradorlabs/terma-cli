@@ -42,8 +42,7 @@ exporter = { otlp-http = { endpoint = "https://otel.terma.ai/v1/logs", protocol 
 log_user_prompt = true
 `
 
-// The whole point of splicing instead of re-serializing: a hand-written file keeps its
-// comments, blank lines and key order, and the new table is simply appended.
+// A hand-written file keeps its comments, blank lines and key order; the table is appended.
 func TestSpliceAppendsWhenNoOtelTable(t *testing.T) {
 	const raw = `# my codex config
 model = "gpt-5"   # trailing comment
@@ -71,8 +70,7 @@ func TestSpliceIntoEmptyFile(t *testing.T) {
 	}
 }
 
-// A table in the middle is replaced in place; the comment that introduces the *next*
-// table stays with it, and everything else is untouched byte for byte.
+// A table in the middle is replaced in place; the next table's comment stays with it.
 func TestSpliceReplacesTableInPlace(t *testing.T) {
 	const raw = `model = "gpt-5"
 
@@ -102,8 +100,7 @@ command = "foo"
 	}
 }
 
-// Sub-tables and root-level dotted keys are all the same table to TOML, and would
-// collide with a fresh `[otel]` header. Every piece is folded into the one block.
+// Sub-tables and root-level dotted keys are folded into the one `[otel]` block.
 func TestSpliceFoldsSubtablesAndDottedKeys(t *testing.T) {
 	const raw = `otel.environment = "prod"
 model = "gpt-5"
@@ -151,7 +148,7 @@ z = 2
 	}
 }
 
-// An emptied table disappears without leaving a doubled blank line or a bare header.
+// An emptied table leaves no doubled blank line or bare header.
 func TestSpliceRemovesEmptyTable(t *testing.T) {
 	for name, tc := range map[string]struct{ raw, want string }{
 		"middle": {
@@ -188,7 +185,7 @@ func TestSplicePreservesCRLF(t *testing.T) {
 	}
 }
 
-// The safety net: a scanner mistake is caught by re-parsing rather than written.
+// A scanner mistake is caught by re-parsing rather than written.
 func TestVerifySpliceRejectsAChangedDocument(t *testing.T) {
 	original := mustParse(t, "model = \"a\"\n")
 	if err := verifySplice(original, map[string]any{}, []byte("model = \"b\"\n")); err == nil {
@@ -234,8 +231,7 @@ func TestRenderTOMLValueRoundTrips(t *testing.T) {
 	}
 }
 
-// Keys inside an inline table are sorted, so the same value always renders the same
-// text — which is what lets rendered text stand in for the value in the journal.
+// Inline table keys are sorted, so the same value always renders the same text.
 func TestRenderTOMLValueIsCanonical(t *testing.T) {
 	a, _ := parseTOMLValue(`{ b = 1, a = 2 }`)
 	b, _ := parseTOMLValue(`{ a = 2, b = 1 }`)

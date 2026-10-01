@@ -12,8 +12,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-// codexIn points Codex's config at a temp dir, so every test here works against a
-// throwaway file rather than the developer's real ~/.codex/config.toml.
+// codexIn points Codex's config at a temp dir, never the developer's real one.
 func codexIn(t *testing.T, contents string) (Codex, string) {
 	t.Helper()
 	dir := t.TempDir()
@@ -51,8 +50,7 @@ func codexExporter() harness.Exporter {
 	return e
 }
 
-// A realistic config.toml: comments, a trailing comment, nested MCP tables, an env
-// table whose values look like secrets, and a profile. None of it may change.
+// A realistic config.toml, none of which a connect may change.
 const codexSeed = `# Codex configuration
 model = "gpt-5"          # my model
 model_reasoning_effort = "high"
@@ -77,8 +75,7 @@ func TestCodexRenderWritesOneExporterPerSignal(t *testing.T) {
 		"metrics_exporter": `{ otlp-http = { endpoint = "https://otel.terma.ai/v1/metrics", headers = { Authorization = "Bearer ter_srv_0123456789abcdef" }, protocol = "binary" } }`,
 		"log_user_prompt":  "false",
 		"tool_result":      "{ max_bytes = 0 }",
-		// service.name is Codex's own; only the attribution keys go on spans, and each
-		// is its own entry so the table's other attributes are never Terma's.
+		// Each attribution key is its own span_attributes entry; service.name is Codex's own.
 		"span_attributes/enduser.id":         `"dev@example.com"`,
 		"span_attributes/mirador.project.id": `"proj_123"`,
 	}
@@ -87,9 +84,8 @@ func TestCodexRenderWritesOneExporterPerSignal(t *testing.T) {
 	}
 }
 
-// Codex's exporters are self-contained, so an unselected signal is left alone rather
-// than written as "none": for metrics that would switch off OpenAI's own route, which
-// is not Terma's to do.
+// An unselected signal is left alone, not written as "none": for metrics that would
+// switch off OpenAI's own route.
 func TestCodexRenderLeavesUnselectedSignalsAlone(t *testing.T) {
 	env := Codex{}.render(harness.Exporter{Endpoint: termaEndpoint, Signals: []harness.Signal{harness.SignalLogs}})
 	if _, ok := env["exporter"]; !ok {
@@ -107,7 +103,7 @@ func TestCodexRenderContentSwitches(t *testing.T) {
 	if on["log_user_prompt"] != "true" {
 		t.Errorf("log_user_prompt = %q, want true", on["log_user_prompt"])
 	}
-	// With content on, Codex's own cap — or one the user chose — stays in force.
+	// With content on, Codex's or the user's own cap stays in force.
 	if v, ok := on["tool_result"]; ok {
 		t.Errorf("tool_result = %q, want it unwritten when tool content is on", v)
 	}
@@ -118,8 +114,7 @@ func TestCodexRenderContentSwitches(t *testing.T) {
 	}
 }
 
-// The file is hand-written and full of things this CLI knows nothing about. A connect
-// appends one table and changes no other byte.
+// A connect appends one table and changes no other byte of a hand-written file.
 func TestCodexConnectPreservesFileByteForByte(t *testing.T) {
 	c, path := codexIn(t, codexSeed)
 
@@ -136,7 +131,6 @@ func TestCodexConnectPreservesFileByteForByte(t *testing.T) {
 			t.Errorf("%s missing from the written table", key)
 		}
 	}
-	// And the rest still parses to exactly what it was.
 	doc := mustParse(t, got)
 	delete(doc, "otel")
 	if !reflect.DeepEqual(doc, mustParse(t, codexSeed)) {
@@ -144,8 +138,8 @@ func TestCodexConnectPreservesFileByteForByte(t *testing.T) {
 	}
 }
 
-// An existing table is rewritten in place. Keys in it that Terma does not own — the
-// user's environment — survive; the next table's comment stays with the next table.
+// An existing table is rewritten in place: the user's keys survive, and the next table's
+// comment stays with the next table.
 func TestCodexConnectRewritesExistingTableInPlace(t *testing.T) {
 	const seed = `model = "gpt-5"
 
@@ -177,9 +171,8 @@ command = "foo"
 	}
 }
 
-// span_attributes is the user's table as much as Terma's. An attribute already in it
-// survives the connect alongside Terma's two, and the disconnect gives back exactly
-// the original text.
+// A user attribute in span_attributes survives the connect, and disconnect gives back the
+// original text.
 func TestCodexConnectPreservesCustomSpanAttributes(t *testing.T) {
 	const seed = "[otel]\nspan_attributes = { team = \"payments\" }\n"
 	c, path := codexIn(t, seed)
@@ -199,9 +192,7 @@ func TestCodexConnectPreservesCustomSpanAttributes(t *testing.T) {
 	}
 }
 
-// An attribute added after the connect is the user's and stays; Terma's own entries
-// are still recognized and removed, since ownership stops at the entry rather than at
-// the table.
+// An attribute added after the connect stays; Terma's own entries are still removed.
 func TestCodexDisconnectRemovesOnlyItsOwnSpanAttributes(t *testing.T) {
 	c, path := codexIn(t, "")
 	if err := c.Connect(codexExporter(), false); err != nil {
@@ -230,8 +221,7 @@ func TestCodexDisconnectRemovesOnlyItsOwnSpanAttributes(t *testing.T) {
 	}
 }
 
-// Terma overwrites an attribute of its own name that the user had set, and puts
-// the user's value back on disconnect.
+// Terma overwrites a same-named user attribute and puts the user's value back on disconnect.
 func TestCodexDisconnectRestoresOverwrittenSpanAttribute(t *testing.T) {
 	const seed = "[otel]\nspan_attributes = { \"enduser.id\" = \"someone@example.com\" }\n"
 	c, path := codexIn(t, seed)
@@ -263,7 +253,7 @@ func TestCodexConnectCreatesFileWhenAbsent(t *testing.T) {
 	}
 }
 
-// config.toml now holds a live server key, and Codex has no other place to put it.
+// A connect that writes a live server key leaves config.toml owner-only.
 func TestCodexConnectTightensFilePermissions(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("unix file modes")
@@ -298,8 +288,7 @@ func TestCodexConnectRefusesMalformedConfig(t *testing.T) {
 	}
 }
 
-// Connect then disconnect leaves the file exactly as it was — not a parsed-and-reprinted
-// version of it.
+// Connect then disconnect leaves the file byte for byte as it was.
 func TestCodexDisconnectRestoresOriginalTextExactly(t *testing.T) {
 	c, path := codexIn(t, codexSeed)
 	if err := c.Connect(codexExporter(), false); err != nil {
@@ -346,8 +335,7 @@ func TestCodexDisconnectOnCleanFileIsANoop(t *testing.T) {
 	}
 }
 
-// A key edited since the connect is the user's, and disconnect names it rather than
-// deleting it.
+// A key edited since the connect is the user's: disconnect names it rather than deleting it.
 func TestCodexDisconnectLeavesEditedKeysAlone(t *testing.T) {
 	c, path := codexIn(t, "")
 	if err := c.Connect(codexExporter(), false); err != nil {
@@ -435,8 +423,7 @@ func TestCodexStatusNeverReturnsTheWholeKey(t *testing.T) {
 	}
 }
 
-// A metrics exporter is set but analytics are off: Codex installs no metrics exporter at
-// all. Reporting metrics as on would send someone hunting for data never sent.
+// A metrics exporter with analytics off is not reported as metrics on.
 func TestCodexStatusDropsMetricsWhenAnalyticsDisabled(t *testing.T) {
 	c, _ := codexIn(t, "[analytics]\nenabled = false\n")
 	if err := c.Connect(codexExporter(), false); err != nil {
@@ -513,8 +500,7 @@ func TestCodexConflictsReportForeignExporter(t *testing.T) {
 	})
 }
 
-// `[analytics] enabled = false` is the user's opt-out from OpenAI's analytics as well as
-// the metrics switch. Terma refuses the metrics signal rather than flipping it.
+// Terma refuses the metrics signal rather than flipping the user's analytics opt-out.
 func TestCodexConflictsReportAnalyticsOptOut(t *testing.T) {
 	c, _ := codexIn(t, "[analytics]\nenabled = false\n")
 	conflicts, err := c.ConflictsWith(termaExporter())
@@ -524,8 +510,7 @@ func TestCodexConflictsReportAnalyticsOptOut(t *testing.T) {
 	if len(conflicts) != 1 || conflicts[0].Key != "analytics.enabled" || conflicts[0].Clearable {
 		t.Fatalf("got %+v, want analytics.enabled reported as unclearable", conflicts)
 	}
-	// The key this replaced never existed in Codex; a config using it opts out of
-	// nothing, and must not be treated as if it did.
+	// The key this replaced never existed in Codex, so it opts out of nothing.
 	c, _ = codexIn(t, "analytics_enabled = false\n")
 	conflicts, err = c.ConflictsWith(termaExporter())
 	if err != nil {
@@ -543,9 +528,7 @@ func TestCodexConflictsReportAnalyticsOptOut(t *testing.T) {
 	}
 }
 
-// Codex refuses `otel` from project-local config — repository contents do not get to
-// choose where credentials go — so an exporter in .codex/config.toml is inert and must
-// not block a connect.
+// An exporter in a project's .codex/config.toml is inert, so it does not block a connect.
 func TestCodexIgnoresProjectConfig(t *testing.T) {
 	c, _ := codexIn(t, "")
 	repo := t.TempDir()
@@ -569,10 +552,8 @@ func TestCodexIgnoresProjectConfig(t *testing.T) {
 	}
 }
 
-// A profile file beside config.toml is applied over it only while that profile is
-// selected, and can carry its own exporters. Terma cannot know which profile a
-// session will use, so every one is reported — as advisory, naming the file — rather
-// than allowed to block the connect that the plain configuration asked for.
+// Every profile file's exporters are reported as advisory, naming the file, never
+// blocking.
 func TestCodexConflictsReportProfileFiles(t *testing.T) {
 	c, path := codexIn(t, "")
 	profile := filepath.Join(filepath.Dir(path), "work.config.toml")
@@ -590,7 +571,6 @@ func TestCodexConflictsReportProfileFiles(t *testing.T) {
 	if !strings.Contains(conflicts[0].Key, "work.config.toml") || !strings.Contains(conflicts[0].Reason, "--profile work") {
 		t.Errorf("conflict %+v does not name the profile", conflicts[0])
 	}
-	// A profile that sets no exporter for a selected signal is no conflict at all.
 	if err := os.WriteFile(profile, []byte("model = \"gpt-5\"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -599,9 +579,7 @@ func TestCodexConflictsReportProfileFiles(t *testing.T) {
 	}
 }
 
-// Managed layers are read the same way; the file itself cannot be written in a test,
-// so the parser is exercised directly. An explicit "none" counts: it decides the
-// signal's destination just as surely as an endpoint does.
+// Managed layers parse the same way, and an explicit "none" counts as a destination.
 func TestCodexConflictsInManagedLayer(t *testing.T) {
 	layer := codexLayer{source: "/etc/codex/managed_config.toml", scope: harness.ScopeManaged, where: "managed"}
 	data := []byte("[otel]\nexporter = \"none\"\ntrace_exporter = { otlp-grpc = { endpoint = \"https://collector.example.com:4317\" } }\n")
@@ -624,10 +602,8 @@ func TestCodexConflictsInManagedLayer(t *testing.T) {
 	}
 }
 
-// The privacy posture the plan promises can be overturned by a higher layer without
-// any exporter changing hands: the content switches, the attribution, and the analytics
-// opt-out all merge over the user config key by key. Each is checked against what
-// Terma is about to write, and reported only when it contradicts it.
+// A higher layer's content switches, attribution and analytics opt-out are reported only
+// when they contradict what Terma is about to write.
 func TestCodexConflictsInLayerCoverPrivacySettings(t *testing.T) {
 	layer := codexLayer{source: "work.config.toml", scope: harness.ScopeProfile, where: "profile", advisory: true}
 	data := []byte(`[analytics]
@@ -661,8 +637,6 @@ span_attributes = { "mirador.project.id" = "proj_other", team = "payments" }
 		t.Fatalf("conflict keys = %v, want %v", keys, want)
 	}
 
-	// The same layer agrees with a connect that captures everything for that project
-	// and does not export metrics: nothing to report.
 	agreeing := harness.Exporter{
 		Endpoint: termaEndpoint, Signals: []harness.Signal{harness.SignalTraces, harness.SignalLogs},
 		IncludePrompts: true, IncludeToolContent: true,
@@ -673,9 +647,8 @@ span_attributes = { "mirador.project.id" = "proj_other", team = "payments" }
 	}
 }
 
-// No released build ever wrote a Codex config without a journal, so a config without
-// one is somebody else's — here, a company collector with its own bearer token.
-// Nothing in it is Terma's to count, name, or remove.
+// A config without a journal is somebody else's, here a company collector: nothing in it
+// is Terma's to count, name or remove.
 func TestCodexWithoutJournalTouchesNothing(t *testing.T) {
 	const seed = `[otel]
 environment = "prod"
@@ -712,9 +685,7 @@ span_attributes = { team = "payments" }
 	}
 }
 
-// A reconnect asking for less must take away what the earlier connect added: the
-// metrics exporter goes back to what it was, whether that was an explicit statsig or
-// nothing at all.
+// A reconnect asking for less puts the metrics exporter back to what it was.
 func TestCodexReconnectWithFewerSignalsRestoresTheMetricsExporter(t *testing.T) {
 	for name, seed := range map[string]string{"explicit statsig": "[otel]\nmetrics_exporter = \"statsig\"\n", "absent": ""} {
 		t.Run(name, func(t *testing.T) {
@@ -739,8 +710,7 @@ func TestCodexReconnectWithFewerSignalsRestoresTheMetricsExporter(t *testing.T) 
 				t.Fatalf("metrics_exporter = %v, want the user's statsig back", got)
 			}
 
-			// And the journal agrees: a disconnect now has nothing to say about metrics.
-			// A file that only ever held Terma's table goes away with it.
+			// The journal agrees, and a file that held only Terma's table goes away.
 			if _, err := c.Disconnect(); err != nil {
 				t.Fatalf("Disconnect: %v", err)
 			}
@@ -760,8 +730,7 @@ func fileExists(path string) bool {
 	return err == nil
 }
 
-// The tool-result cap is only written to exclude content. Turning content back on must
-// remove that zero — or put back the cap the user had chosen.
+// Turning content back on removes the zero cap or restores the user's own.
 func TestCodexReconnectWithToolContentOnLiftsTheCap(t *testing.T) {
 	c, path := codexIn(t, "[otel]\ntool_result = { max_bytes = 8192 }\n")
 
@@ -834,8 +803,7 @@ func TestCodexBackupCopiesTheOriginal(t *testing.T) {
 	}
 }
 
-// A dotfiles setup: config.toml is a link into a repo. The write must land on the
-// target and leave the link in place.
+// A symlinked config.toml is written through, leaving the link in place.
 func TestCodexConnectWritesThroughSymlink(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("symlinks")

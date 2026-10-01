@@ -109,7 +109,7 @@ wired, but `install` does not wire them by default.
 `internal/boundary` turns this document into failing tests:
 
 - Only `builtin` imports an agent's package, and no agent imports another.
-- Nothing outside `internal/agents` names an agent, by identifier or in a string. Run
+- Nothing outside `internal/agents` names an agent, by identifier, in a string or in a comment. Run
   `go test ./internal/boundary -mentions` to list each mention it finds.
 - Every directory under `internal/agents` is registered.
 - Import directions:

@@ -10,10 +10,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
-// Agent is Pi (@earendil-works/pi-coding-agent). Like OpenCode it has no repository-scope
-// hooks: terma's user-scope extension (internal/harness/pi/terma.ts) calls the binary
-// with the events below. It is an adapter so `terma hook pi-*` dispatches from the same
-// table as everyone else's.
+// Agent is Pi (@earendil-works/pi-coding-agent), whose events come from terma's
+// user-scope extension; it has no repository-scope hooks.
 type Agent struct{}
 
 func (Agent) Name() string        { return "pi" }

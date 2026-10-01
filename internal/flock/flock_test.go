@@ -8,9 +8,8 @@ import (
 	"time"
 )
 
-// The contract every platform's lock keeps (flock on Unix, LockFileEx on Windows): one
-// holder at a time, TryLock says "busy" rather than failing, Lock waits and can be
-// cancelled, and a released lock can be taken again.
+// Every platform's lock: one holder at a time, TryLock reports busy, Lock waits and
+// can be cancelled, and a released lock can be taken again.
 func TestLockExcludesAndReleases(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "x.lock")
 	unlock, err := TryLock(path)

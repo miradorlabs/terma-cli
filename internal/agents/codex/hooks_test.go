@@ -15,8 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 )
 
-// codexFile is the shape terma writes and Codex parses: matcher groups, each holding
-// command handlers.
+// codexFile is the shape terma writes and Codex parses.
 type codexFile struct {
 	Description string `json:"description"`
 	Hooks       map[string][]struct {
@@ -105,8 +104,7 @@ func TestCodexHooksMergeKeepsDescriptionAndUserGroups(t *testing.T) {
 	if post[0].Matcher == nil || *post[0].Matcher != "^shell$" || post[0].Hooks[0].Command != "./audit.sh" {
 		t.Fatalf("user's PostToolUse group changed: %+v", post[0])
 	}
-	// terma's group carries no matcher: which tool calls touched a file is decided in
-	// the binary, not by a regex frozen into a committed file.
+	// terma's group carries no matcher: the binary decides which calls touched a file.
 	if post[1].Matcher != nil {
 		t.Fatalf("terma's group should carry no matcher, got %q", *post[1].Matcher)
 	}
@@ -145,7 +143,6 @@ func TestCodexHooksMergeKeepsDescriptionAndUserGroups(t *testing.T) {
 	if len(end) != 1 || end[0].Hooks[0].Command != hookCommand("codex-session-end") {
 		t.Fatalf("SessionEnd missing: %+v", end)
 	}
-	// Codex caps SessionEnd at 3 seconds and defaults to 1; ask for the maximum.
 	if end[0].Hooks[0].Timeout != 3 {
 		t.Fatalf("SessionEnd timeout = %d, want Codex's maximum of 3", end[0].Hooks[0].Timeout)
 	}
@@ -191,8 +188,7 @@ func TestCodexHooksCreateAndRemoveWholeFile(t *testing.T) {
 	if len(doc.Hooks) != len(committedHooks) {
 		t.Fatalf("want %d events, got %d", len(committedHooks), len(doc.Hooks))
 	}
-	// Codex parses this file with unknown fields denied, so a key it does not know
-	// would make it reject the whole thing.
+	// Codex denies unknown fields, so an unknown key would reject the whole file.
 	var top map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(hookruntest.ReadFile(t, root, hooksPath)), &top); err != nil {
 		t.Fatal(err)
@@ -235,8 +231,7 @@ func TestHasCodex(t *testing.T) {
 	}
 }
 
-// The key is how Codex names an entry in its trust records, after the hooks file's
-// path — read off a developer's own ~/.codex/config.toml: `…/hooks.json:subagent_start:0:0`.
+// The key is how Codex names an entry in its trust records: `…/hooks.json:subagent_start:0:0`.
 func TestCodexEntryKeyIsCodexsOwn(t *testing.T) {
 	for entry, want := range map[Entry]string{
 		{Event: "SessionStart"}:                        "session_start:0:0",
@@ -272,7 +267,6 @@ func TestCodexTermaEntriesFindsTermasAmongOthers(t *testing.T) {
 		t.Fatalf("entries = %d, want one per hook terma installs (%d): %+v", len(entries), len(committedHooks), entries)
 	}
 	for _, e := range entries {
-		// The developer's own Stop group came first, so terma's is the second group.
 		if want := map[bool]int{true: 1, false: 0}[e.Event == "Stop"]; e.Group != want || e.Handler != 0 {
 			t.Errorf("%s at %d:%d, want %d:0", e.Event, e.Group, e.Handler, want)
 		}

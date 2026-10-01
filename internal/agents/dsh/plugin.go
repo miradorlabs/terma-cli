@@ -11,17 +11,14 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
-// DeepSeek Harness (dsh) sends its own OTLP to DeepSeek's collector, without usage.
-// terma's Cordis plugin (dsh/terma.mjs) is its exporter and calls `terma hook dsh-*`;
-// `terma relay setup --harness dsh` writes it into $DSH_HOME/plugins and inserts it by
-// absolute path into $DSH_HOME/cordis.patch.yml, the home layer every dsh profile loads.
+// dsh's own OTLP goes to DeepSeek's collector without usage, so terma's Cordis plugin is
+// its exporter, inserted into cordis.patch.yml, the home layer every dsh profile loads.
 
 //go:embed plugin/terma.mjs
 var dshPluginTemplate string
 
 const dshConfigMarker = "const CONFIG = null /* terma:config */"
 
-// pluginConfig is what the plugin is spliced with.
 type pluginConfig struct {
 	Version            int               `json:"version"`
 	Endpoint           string            `json:"endpoint"`
@@ -43,7 +40,6 @@ func home() (string, error) {
 	return filepath.Join(home, ".dsh"), nil
 }
 
-// renderPlugin splices cfg into the plugin template.
 func renderPlugin(cfg pluginConfig) (string, error) {
 	cfg.Version = 1
 	if len(cfg.HookCommand) == 0 {
@@ -59,9 +55,8 @@ func renderPlugin(cfg pluginConfig) (string, error) {
 	return strings.Replace(dshPluginTemplate, dshConfigMarker, "const CONFIG = "+string(data)+" /* terma:config */", 1), nil
 }
 
-// writePlugin writes terma's plugin and makes sure dsh's home patch inserts it,
-// returning the plugin's path. The patch file is a YAML list of operations, so one
-// more entry is appended — every other byte stays — unless the plugin is already there.
+// writePlugin writes terma's plugin and appends its insert to dsh's home patch, a YAML
+// list of operations, unless it is already there; every other byte stays.
 func writePlugin(cfg pluginConfig) (string, error) {
 	home, err := home()
 	if err != nil {

@@ -9,17 +9,14 @@ import (
 	"testing"
 )
 
-// Every doctor run whose checkout outlasted its deadline left a registration behind,
-// locked "initializing" — `git worktree prune` passes over those for ever. The next
-// run clears them, and only them: doctor's own naming, directory gone. A live scratch
-// worktree and anyone else's stale one are not doctor's to touch.
+// Doctor clears only its own stale scratch registrations, never a live one or anyone else's.
 func TestDoctorClearsOnlyItsOwnStaleScratchWorktrees(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not installed")
 	}
 	t.Setenv("GIT_CONFIG_GLOBAL", "/dev/null")
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
-	// Resolved, so paths compare with git's listing (macOS temp dirs are behind /private).
+	// Resolved: macOS temp dirs are behind /private in git's listing.
 	base, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
 		t.Fatal(err)

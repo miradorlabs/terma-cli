@@ -1,11 +1,6 @@
-// Package routing holds what this machine knows about routing a repository's agents to
-// its Terma project: one record per project (routing/<id>.json under the config
-// directory) naming the developer's agents for it, its signals and its content policy.
-// The local relay reads it to decide what of a claimed session may leave; install writes
-// it; nothing in it is a secret.
-//
-// It was the half of the shim package that was not a shim: terma no longer wraps the
-// agents' binaries, so this is all of per-repository routing that remains.
+// Package routing keeps one secret-free record per project under the config directory:
+// the developer's agents for it, its signals and its content policy, which install
+// writes and the local relay enforces.
 package routing
 
 import (
@@ -20,12 +15,7 @@ import (
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 )
 
-// Record is a project's routing configuration on this machine, written by `terma
-// install` under config.Dir(): which of the developer's agents report to the project,
-// with which signals, and what content may leave — the policy the local relay enforces
-// for the project's sessions (relay.Policy). It holds no secret: the key stays in the
-// keystore, keyed by harness and project, so revoking one project's key never exposes
-// another's.
+// Record is a project's routing configuration on this machine; its key stays in the keystore.
 type Record struct {
 	ProjectID          string            `json:"project_id"`
 	Endpoint           string            `json:"endpoint"`
@@ -33,11 +23,8 @@ type Record struct {
 	IncludePrompts     bool              `json:"include_prompts"`
 	IncludeToolContent bool              `json:"include_tool_content"`
 	ResourceAttributes map[string]string `json:"resource_attributes,omitempty"`
-	// Harnesses names the agents routed to this project for this developer.
-	Harnesses []string `json:"harnesses"`
-	// Surfaces names the ways the developer runs them that are routed here (an
-	// agents.Surface: Codex's CLI and desktop app are two; an agent with one surface is
-	// named by it).
+	Harnesses          []string          `json:"harnesses"`
+	// Surfaces names the agents.Surface values routed here; an agent with one surface is named by it.
 	Surfaces []string `json:"surfaces,omitempty"`
 }
 

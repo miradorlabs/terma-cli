@@ -6,11 +6,8 @@ import (
 	"strings"
 )
 
-// sessionSelector is what the --source/--user/--api-key/--model/--provider flags
-// select, rendered to the AIP-160 filter the session endpoints take: values within a
-// field are ORed, fields are ANDed, and a hand-written --filter expression is ANDed
-// on. Principal fields carry ids — names are resolved before this point (see
-// principalIndex).
+// sessionSelector renders the session flags as an AIP-160 filter: values in a field are
+// ORed, fields and --filter are ANDed. Principal fields carry ids (see principalIndex).
 type sessionSelector struct {
 	sources, userIDs, apiKeyIDs, models, providers []string
 	extra                                          string
@@ -36,8 +33,7 @@ func (s sessionSelector) filter() string {
 	add("source_system", "=", s.sources)
 	add("user_id", "=", s.userIDs)
 	add("api_key_id", "=", s.apiKeyIDs)
-	// model and provider are membership tests — the session used this one — spelled
-	// `:` in AIP-160.
+	// model and provider are membership tests, spelled `:` in AIP-160.
 	add("model", ":", s.models)
 	add("provider", ":", s.providers)
 	if extra := strings.TrimSpace(s.extra); extra != "" {
@@ -49,17 +45,15 @@ func (s sessionSelector) filter() string {
 	return strings.Join(groups, " AND ")
 }
 
-// aipQuote renders an AIP-160 string literal. Only the quote and the backslash need
-// escaping; everything else, including Unicode, passes through.
+// aipQuote escapes only the quote and the backslash; Unicode passes through.
 func aipQuote(v string) string {
 	v = strings.ReplaceAll(v, `\`, `\\`)
 	v = strings.ReplaceAll(v, `"`, `\"`)
 	return `"` + v + `"`
 }
 
-// promMatcher renders one PromQL label matcher: exact for a single value, an
-// alternation regex (which PromQL anchors on both ends) for several. Empty when
-// there is nothing to match, so callers can append unconditionally.
+// promMatcher is exact for one value and an anchored alternation for several; empty
+// when there is nothing to match, so callers can append unconditionally.
 func promMatcher(label string, values []string) string {
 	values = dedupe(values)
 	switch len(values) {
@@ -75,15 +69,13 @@ func promMatcher(label string, values []string) string {
 	return label + `=~"` + promQuote(strings.Join(quoted, "|")) + `"`
 }
 
-// promQuote escapes a PromQL double-quoted string literal.
 func promQuote(v string) string {
 	v = strings.ReplaceAll(v, `\`, `\\`)
 	v = strings.ReplaceAll(v, `"`, `\"`)
 	return v
 }
 
-// dedupe drops blank and repeated values, keeping first-seen order so a rendered
-// filter reads in the order the flags were given.
+// dedupe keeps first-seen order so a rendered filter reads in the order the flags were given.
 func dedupe(values []string) []string {
 	out := make([]string, 0, len(values))
 	for _, v := range values {

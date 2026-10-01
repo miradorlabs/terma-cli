@@ -14,15 +14,13 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// evidenceState contains only a hash, never credential or provider file contents.
+// evidenceState holds only a hash, never credential or provider file contents.
 type evidenceState struct {
 	Hash string    `json:"hash"`
 	At   time.Time `json:"at"`
 }
 
-// CaptureFunding spools one piece of funding evidence for the session unless the same
-// evidence was spooled within the heartbeat. The handler resolves the repository once
-// and hands it to every capture it runs, as captureObservation's callers do.
+// CaptureFunding spools funding evidence for the session unless the same evidence was spooled within the heartbeat.
 func (e Env) CaptureFunding(r *Repo, id, tool, name string, evidence harness.FundingEvidence) {
 	if e.Spool == nil || !session.ValidID(id) {
 		return
@@ -58,7 +56,7 @@ func (e Env) CaptureFunding(r *Repo, id, tool, name string, evidence harness.Fun
 	unlock, err := LockEvidence(path + ".lock")
 	if err != nil {
 		return
-	} // Another invocation is already capturing this session.
+	}
 	defer unlock()
 	var prev evidenceState
 	fresh := false

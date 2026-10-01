@@ -71,8 +71,7 @@ func TestDesktopVerdictUsesLocalRouteAndKey(t *testing.T) {
 	}
 }
 
-// A record an earlier build wrote names no surface: the desktop verdict is still judged,
-// and says to install again, rather than disappearing with the choice.
+// A record that names no surface still gets a desktop verdict that says to install again.
 func TestARecordWithoutSurfacesStillJudgesTheDesktop(t *testing.T) {
 	t.Setenv("CODEX_HOME", t.TempDir())
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())

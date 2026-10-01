@@ -9,9 +9,8 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// Detach starts the background process with no console of its own — a hook's console
-// would otherwise flash a window, and close it under the relay — and in its own process
-// group, so the Ctrl-C that ends the agent does not end the relay or flush too.
+// Detach starts the process with no console and in its own process group, so neither a
+// closing console nor the agent's Ctrl-C ends it.
 func Detach(proc *exec.Cmd) {
 	proc.SysProcAttr = &syscall.SysProcAttr{
 		CreationFlags: windows.DETACHED_PROCESS | windows.CREATE_NEW_PROCESS_GROUP,

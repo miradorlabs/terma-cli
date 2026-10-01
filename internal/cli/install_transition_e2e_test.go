@@ -70,8 +70,7 @@ func TestInstallE2ENonGitToGit(t *testing.T) {
 			}
 
 			s.git(root, "init", "-q")
-			// The root has changed from non-Git to Git, but new events must already use
-			// the same store, even before install is run again.
+			// After git init, new events must use the same store before install runs again.
 			if kind == "new_session_during_transition" || kind == "first_event_after_git_init" {
 				activeID = "after-git"
 				s.claudeEvent(root, nested, "SessionStart", activeID, "")

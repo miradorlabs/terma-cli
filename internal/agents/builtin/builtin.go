@@ -15,8 +15,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents/pi"
 )
 
-// Agents is every agent terma knows, in the order install plans them, the ones it
-// supports, and the ones only announced.
+// Agents is every agent terma knows in install order, the supported ones, and the ones
+// only announced.
 func Agents() *agents.Registry {
 	return agents.New(
 		claude.Agent{},

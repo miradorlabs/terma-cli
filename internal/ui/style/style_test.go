@@ -7,8 +7,7 @@ import (
 	"testing"
 )
 
-// Only a terminal gets colour. A buffer is what every test captures, and what the
-// strings they compare against are written for.
+// Only a terminal gets colour, never a buffer.
 func TestForABufferIsPlain(t *testing.T) {
 	p := For(&bytes.Buffer{})
 	if p.Enabled() {

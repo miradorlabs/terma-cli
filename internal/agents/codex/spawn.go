@@ -6,10 +6,8 @@ import (
 	"encoding/json"
 )
 
-// CodexThreadSpawn is the parent link a Codex rollout records when another thread spawned
-// this one (multi-agent): session_meta.payload.source.subagent.thread_spawn. A root
-// thread's source is a plain string ("cli", "exec", "vscode"); a review subagent's is
-// {"subagent": "review"}, which is not a spawn either.
+// CodexThreadSpawn is session_meta.payload.source.subagent.thread_spawn, the parent link
+// of a spawned thread; root and review threads have none.
 type CodexThreadSpawn struct {
 	ParentThreadID string
 	Depth          int
@@ -17,9 +15,8 @@ type CodexThreadSpawn struct {
 	AgentPath      string
 }
 
-// CodexRolloutSpawn reads the rollout's first line for a spawn record, through the same
-// confined open as the funding reader. Status is "present" with a spawn, "root" when the thread
-// was not spawned, or the open failure ("missing", "unreadable", "session_mismatch", ...).
+// CodexRolloutSpawn reads the rollout's first line through the confined open. Status is
+// "present", "root" when not spawned, or the open failure.
 func CodexRolloutSpawn(ctx context.Context, sessionID, transcript string) (CodexThreadSpawn, string) {
 	f, status := openCodexRollout(ctx, sessionID, transcript)
 	if f == nil {

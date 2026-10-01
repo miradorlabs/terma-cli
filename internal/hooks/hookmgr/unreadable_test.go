@@ -6,10 +6,7 @@ import (
 	"testing"
 )
 
-// A file that exists and cannot be read is not an absent file: planned as a create, Apply
-// would rename terma-only content over whatever the developer had there. A directory at
-// the file's path fails to read on every platform. The agents' planners are held to the
-// same in internal/agents/builtin.
+// A file that exists and cannot be read is refused, not planned as a create over the developer's content.
 func TestPlannersRefuseAFileTheyCannotRead(t *testing.T) {
 	planners := []struct {
 		path string

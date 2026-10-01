@@ -16,11 +16,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/trailer"
 )
 
-// ScratchCommit proves the installed hook chain works: a detached temporary
-// worktree gets a seeded session manifest and one file, is committed through the
-// real hooks, and the resulting message is checked for the trailer. The worktree
-// and its unreferenced commit are removed afterwards; nothing touches the user's
-// branch.
+// ScratchCommit proves the hook chain works by committing a seeded session's file in a
+// temporary detached worktree and checking the message for the trailer.
 func ScratchCommit(ctx context.Context, root string, bound *termaproject.File) (string, Check) {
 	if gitx.HeadSHA(ctx, root) == "" {
 		return "", Check{Status: Skip, Detail: "repository has no commits yet"}
@@ -41,13 +38,8 @@ func ScratchCommit(ctx context.Context, root string, bound *termaproject.File) (
 		return "", Check{Status: Fail, Detail: "could not create a temporary worktree: " + err.Error(), Fix: "`terma doctor --skip-commit` runs every other check"}
 	}
 	defer cleanup()
-	// Seed the binding into the worktree so the post-commit hook attributes the scratch
-	// commit to this project — the round-trip needs a routable terma.commit event. The
-	// worktree is a checkout of HEAD, so a repository that commits .terma/settings.json
-	// already has it; one that gitignores its own binding (like terma-cli) does not. This
-	// build's hooks would find the main checkout's through the worktree link
-	// (project.Resolve), but the hooks run whatever terma is on PATH, and a build from
-	// before that would spool a commit event with no project id, dropped as unroutable.
+	// Seed the binding, which may be gitignored, since the hooks run whatever terma is on
+	// PATH and an older build cannot find the main checkout's.
 	if bound != nil {
 		_ = termaproject.Save(wt, bound)
 	}
@@ -69,10 +61,8 @@ func ScratchCommit(ctx context.Context, root string, bound *termaproject.File) (
 		return "", Check{Status: Fail, Detail: err.Error()}
 	}
 	commitArgs := []string{"-c", "commit.gpgsign=false"}
-	// A new worktree has its own config.worktree and checks out HEAD. Immediately
-	// after install, neither the per-worktree core.hooksPath nor the uncommitted
-	// shim files exist there. Point the scratch commit at the hooks this checkout
-	// actually runs, including files the developer has yet to commit.
+	// Right after install the new worktree has neither the per-worktree core.hooksPath nor
+	// the uncommitted shims, so point it at the hooks this checkout runs.
 	if gitx.ConfigGet(ctx, root, "core.hooksPath") != "" {
 		hooksPath, err := gitx.Git(ctx, root, "config", "--path", "--get", "core.hooksPath")
 		if err != nil {
@@ -101,31 +91,21 @@ func ScratchCommit(ctx context.Context, root string, bound *termaproject.File) (
 }
 
 const (
-	// scratchGitTimeout bounds the scratch worktree's checkout, commit and removal.
-	// They ran under gitx.Timeout, a hook's 2-second budget: a checkout of 9,270
-	// files and 2.7 GB takes 11 s, so doctor failed that repository on every run
-	// with "git worktree: signal: killed". The commit runs the repository's own
-	// hooks too, which are not terma's to budget.
+	// scratchGitTimeout is not a hook's 2-second gitx.Timeout: a 2.7 GB checkout takes 11 s.
 	scratchGitTimeout = 2 * time.Minute
-	// scratchDirPrefix and scratchWorktreeName name the scratch worktree
-	// (<tmp>/terma-doctor-*/wt), so a later run can recognise one an earlier run
-	// could not clean up.
+	// scratchDirPrefix and scratchWorktreeName let a later run recognise an abandoned one.
 	scratchDirPrefix    = "terma-doctor-"
 	scratchWorktreeName = "wt"
 )
 
-// removeScratchWorktree unregisters a scratch worktree. --force twice, because an
-// add killed mid-checkout leaves its registration locked ("initializing"), and
-// `git worktree prune` passes over a locked one for ever. It runs even when doctor
-// is interrupted, since that is when a half-made worktree is most likely.
+// removeScratchWorktree forces twice: a killed add leaves its registration locked, which
+// prune skips; it runs even when doctor is interrupted.
 func removeScratchWorktree(ctx context.Context, root, wt string) {
 	_, _ = gitx.GitWithin(context.WithoutCancel(ctx), scratchGitTimeout, root, "worktree", "remove", "--force", "--force", wt)
 }
 
-// clearStaleScratchWorktrees removes what earlier runs could not: registrations of
-// a scratch worktree whose directory is gone. Before scratchGitTimeout, every run
-// against a large repository left one behind, locked. Only doctor's own naming is
-// touched, and only once the directory no longer exists.
+// clearStaleScratchWorktrees removes registrations of doctor's own scratch worktrees
+// whose directory is gone.
 func clearStaleScratchWorktrees(ctx context.Context, root string) {
 	out, err := gitx.Git(ctx, root, "worktree", "list", "--porcelain")
 	if err != nil {

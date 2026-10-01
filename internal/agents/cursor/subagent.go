@@ -9,20 +9,10 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// subagentStop is Cursor's subagentStop: a subagent finished, and Cursor reports
-// its outcome, counts and the files it modified. The event is filed under the
-// conversation that spawned it — parent_conversation_id when Cursor sends one — and
-// names the subagent's own conversation as agent_id.
-//
-// The modified files join the parent's manifest. So does any manifest the subagent built
-// for itself: cursor-agent can file a subagent's afterFileEdit under the subagent's
-// conversation id, and left there the commit would be stamped with a session nobody can
-// find, or with two. Folding it in stamps the commit once, for the conversation a person
-// can open.
-//
-// Only subagentStop is wired. Cursor documents that a subagentStart hook which prints
-// nothing blocks the subagent, and the committed guard prints nothing on a machine
-// without terma: every spawn there would hit that path.
+// subagentStop files a finished subagent under the conversation that spawned it, naming
+// its own as agent_id. Its files and any manifest it built under its own id join the
+// parent's, so the commit is stamped once. subagentStart is never wired: a hook that
+// prints nothing blocks the spawn.
 func subagentStop(ctx context.Context, env hookrun.Env) error {
 	in, err := readCursorInput(env.Stdin)
 	if err != nil {
@@ -52,8 +42,7 @@ func subagentStop(ctx context.Context, env hookrun.Env) error {
 	}
 	files = hookrun.UniqueSorted(files)
 
-	// The event is a subagent's by definition, so the type stands even when Cursor sent
-	// no id to hang it on — the one place agentAttrs' gate does not apply.
+	// The event is a subagent's by definition, so the type stands without an id.
 	facet := func(attrs map[string]any) map[string]any {
 		hookrun.AgentAttrs(attrs, in.SubagentID, in.SubagentType)
 		if _, ok := attrs[hookrun.AttrAgentType]; !ok && hookrun.ShortLabel(in.SubagentType) {

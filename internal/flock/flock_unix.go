@@ -21,8 +21,7 @@ func lock(ctx context.Context, path string) (func(), error) {
 			f.Close()
 			return nil, err
 		}
-		// Non-blocking and polled rather than a blocking LOCK_EX: a blocked flock cannot
-		// be cancelled, and the callers that matter most are the ones with a deadline.
+		// Polled rather than a blocking LOCK_EX, which cannot be cancelled.
 		err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
 		if err == nil {
 			break

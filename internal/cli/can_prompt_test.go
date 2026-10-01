@@ -8,10 +8,8 @@ import (
 	"testing"
 )
 
-// A prompt is shown only when canPrompt says a person is there: a terminal on both ends
-// and no agent driving it. prompt.Interactive answers the stdin half alone, and install
-// and setup asked it directly — so an agent with a pty got the raw-mode picker and the
-// question about its shell startup file. canPrompt is the only caller it should have.
+// canPrompt is prompt.Interactive's only caller: Interactive checks stdin alone, so an
+// agent with a pty would get the raw-mode picker.
 func TestPromptsAreGatedOnCanPrompt(t *testing.T) {
 	direct := regexp.MustCompile(`\bprompt\.Interactive\(\)`)
 	files, err := filepath.Glob("*.go")

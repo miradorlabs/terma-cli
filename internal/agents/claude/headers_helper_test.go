@@ -10,8 +10,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-// helperExporter is fullExporter delivered through the headers helper instead of an
-// inline header — the default a bare `telemetry connect` now installs.
+// helperExporter is fullExporter delivered through the headers helper.
 func helperExporter(t *testing.T) harness.Exporter {
 	t.Helper()
 	e := fullExporter()
@@ -23,8 +22,7 @@ func helperExporter(t *testing.T) harness.Exporter {
 	return e
 }
 
-// The point of the mechanism: after a helper-mode connect, the settings file holds a
-// path and no key, and the key lives in a 0700 script only Terma manages.
+// After a helper-mode connect the settings file holds a path, and the key lives in a 0700 script.
 func TestHelperConnectKeepsKeyOutOfSettings(t *testing.T) {
 	c, path := claudeIn(t, `{"model":"opus"}`)
 	e := helperExporter(t)
@@ -65,8 +63,7 @@ func TestHelperConnectKeepsKeyOutOfSettings(t *testing.T) {
 	}
 }
 
-// With no credential in the settings file there is nothing to tighten for, so the
-// user's own mode — including a dotfiles-friendly 0644 — survives a helper-mode connect.
+// A helper-mode connect keeps the user's own settings mode, a dotfiles 0644 included.
 func TestHelperConnectPreservesSettingsMode(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("unix file modes")
@@ -88,8 +85,7 @@ func TestHelperConnectPreservesSettingsMode(t *testing.T) {
 	}
 }
 
-// Terma's own helper is credential delivery, not a foreign override; flagging it
-// would make every reconnect fight its own previous install.
+// Terma's own helper is not a conflict, or every reconnect would fight the previous install.
 func TestOwnHelperIsNotAConflict(t *testing.T) {
 	c, _ := claudeIn(t, "")
 	t.Chdir(t.TempDir())
@@ -106,8 +102,7 @@ func TestOwnHelperIsNotAConflict(t *testing.T) {
 		t.Fatalf("got %+v, want none — the configured helper is Terma's own", conflicts)
 	}
 
-	// Status must also read the key's prefix out of the helper, or a helper-mode
-	// connect would report as keyless.
+	// Status reads the key's prefix out of the helper.
 	st, err := c.Status()
 	if err != nil {
 		t.Fatalf("Status: %v", err)
@@ -120,8 +115,7 @@ func TestOwnHelperIsNotAConflict(t *testing.T) {
 	}
 }
 
-// Disconnect owns the helper it wrote: setting removed, script deleted — a leftover
-// script would strand a live key on disk with nothing pointing at it.
+// Disconnect removes its helper setting and deletes the script, which holds a live key.
 func TestDisconnectRemovesOwnHelper(t *testing.T) {
 	c, path := claudeIn(t, `{"model":"opus"}`)
 	e := helperExporter(t)
@@ -144,8 +138,7 @@ func TestDisconnectRemovesOwnHelper(t *testing.T) {
 	}
 }
 
-// A helper the user repointed after connecting is their edit, same as an edited env
-// key: left alone, reported, and the file it points at is not Terma's to delete.
+// A helper the user repointed is their edit: left alone and reported.
 func TestDisconnectSkipsRepointedHelper(t *testing.T) {
 	c, path := claudeIn(t, "")
 	e := helperExporter(t)
@@ -180,8 +173,7 @@ func TestDisconnectSkipsRepointedHelper(t *testing.T) {
 	}
 }
 
-// CurrentCredential is the reuse path: same endpoint + same project returns the
-// installed key, from either delivery mechanism; any mismatch refuses.
+// CurrentCredential returns the installed key only for the same endpoint and project.
 func TestCurrentCredential(t *testing.T) {
 	t.Run("helper mode", func(t *testing.T) {
 		c, _ := claudeIn(t, "")
@@ -215,14 +207,12 @@ func TestCurrentCredential(t *testing.T) {
 	})
 }
 
-// Journals for configs that no longer exist are litter; a connect elsewhere sweeps
-// them. The record for a live config must survive the same sweep.
+// A connect sweeps journals for configs that no longer exist and keeps the live one.
 func TestConnectPrunesStaleJournals(t *testing.T) {
 	termaHome := t.TempDir()
 	t.Setenv("TERMA_CONFIG_DIR", termaHome)
 	c := exporter{}
 
-	// Connect a sandbox, then delete the whole config dir — the temp-dir workflow.
 	sandbox, err := os.MkdirTemp("", "prune-sandbox-*")
 	if err != nil {
 		t.Fatalf("mkdtemp: %v", err)
@@ -235,7 +225,6 @@ func TestConnectPrunesStaleJournals(t *testing.T) {
 		t.Fatalf("remove sandbox: %v", err)
 	}
 
-	// A later connect in a different, live config prunes the orphaned record.
 	live := t.TempDir()
 	t.Setenv("CLAUDE_CONFIG_DIR", live)
 	if err := c.Connect(fullExporter(), false); err != nil {
@@ -255,10 +244,8 @@ func TestConnectPrunesStaleJournals(t *testing.T) {
 	}
 }
 
-// A reconnect must not make Terma's own helper path the "previous" value of the
-// setting: the later disconnect would then put it back, pointing Claude Code at a
-// script the same disconnect deleted. Found by the e2e suite (reconnect with a
-// different capture posture, then disconnect).
+// A reconnect must not record terma's own helper path as the previous value, or disconnect would
+// restore a path to the script it deleted.
 func TestHelperSurvivesReconnectThenDisconnect(t *testing.T) {
 	c, path := claudeIn(t, `{"model":"opus"}`)
 	e := helperExporter(t)
@@ -288,9 +275,7 @@ func TestHelperSurvivesReconnectThenDisconnect(t *testing.T) {
 	}
 }
 
-// The backend now mints ter_srv_ keys; older ter_srv_ keys stay valid. Both must
-// round-trip through the helper: a prefix the regex does not know would make a
-// fresh connect report as keyless and leave the spool without a key to deliver with.
+// A ter_srv_ key round-trips through the helper, or a connect would report as keyless.
 func TestCurrentCredentialAcceptsTermaPrefix(t *testing.T) {
 	c, _ := claudeIn(t, "")
 	e := helperExporter(t)

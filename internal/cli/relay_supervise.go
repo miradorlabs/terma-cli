@@ -44,8 +44,7 @@ func newRelaySuperviseCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			// The definition as it was when this supervisor started: an install that
-			// rewrites it (a new binary path, another environment) retires this one.
+			// An install that rewrites the definition retires this supervisor.
 			want, err := os.ReadFile(definition)
 			if err != nil {
 				return fmt.Errorf("the relay service is not installed: %w", err)

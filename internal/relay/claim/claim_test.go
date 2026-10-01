@@ -68,8 +68,7 @@ func TestReadRejectsStaleAndUnsafe(t *testing.T) {
 	}
 }
 
-// Each hook of a session adds the processes it ran under; a hook whose processes are
-// already named, inside Refresh, writes nothing.
+// Each hook adds its processes; one whose processes are already named, inside Refresh, writes nothing.
 func TestClaimMergesProcesses(t *testing.T) {
 	enable(t)
 	now := time.Now()
@@ -92,8 +91,7 @@ func TestClaimMergesProcesses(t *testing.T) {
 	}
 }
 
-// Concurrent hooks of one session each add their processes: none is lost. Unlocked,
-// the read-merge-write kept whichever writer renamed last.
+// Concurrent hooks of one session each add their processes: none is lost.
 func TestConcurrentWritersKeepEveryProcess(t *testing.T) {
 	enable(t)
 	saved := lockWait
@@ -120,9 +118,7 @@ func TestConcurrentWritersKeepEveryProcess(t *testing.T) {
 	}
 }
 
-// A session resumed in another bound repository gets a second placement and keeps the
-// first: each run's processes, and a record's time when its process cannot be told,
-// say which project it belongs to.
+// A session resumed in another repository gets a second placement; process, else time, picks the project.
 func TestClaimKeepsEachPlacementOfAResumedSession(t *testing.T) {
 	enable(t)
 	t0 := time.Now().Add(-time.Hour).Truncate(time.Second)
@@ -175,7 +171,7 @@ func TestClaimKeepsEachPlacementOfAResumedSession(t *testing.T) {
 	}
 }
 
-// A claim an earlier build wrote has no placements: its top-level fields are its one.
+// A claim without placements has its top-level fields as its one placement.
 func TestClaimWithoutPlacements(t *testing.T) {
 	c := Claim{ProjectID: "p", PIDs: []int{10}}
 	if got, ok := c.At(10, time.Now()); !ok || got.ProjectID != "p" {

@@ -12,25 +12,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// primaryCommands is what `terma --help` lists. It is short on purpose: setup and
-// install are the whole onboarding, status and doctor say whether it worked, and the
-// rest read what it produced or keep the tool itself in order. A command added without
-// `Hidden: true` lengthens this list and fails here — put it in advancedCommands instead,
-// or add it to this list because a developer needs it in the normal course of things.
+// primaryCommands is what `terma --help` lists, short on purpose; a new command belongs
+// in advancedCommands unless a developer needs it day to day.
 var primaryCommands = []string{
 	"doctor", "install", "org", "session", "setup", "status", "uninstall", "update", "usage",
 }
 
-// advancedCommands are hidden, not removed. They are what automation, CI and
-// troubleshooting run, and what terma's own fix-it hints name (`terma login`, `terma
-// connect codex`, `terma spool flush`) — so every one of them must keep working.
+// advancedCommands are hidden, not removed: automation and terma's own fix-it hints run them.
 var advancedCommands = []string{
 	"agent", "config", "connect", "disconnect", "harness", "hook", "login", "logout", "nate",
 	"principal", "project", "relay", "spool", "telemetry", "version", "whoami",
 }
 
-// removedCommands are gone, not hidden: product decisions to drop them, so no message
-// may name them and `terma <name>` is an unknown command.
+// removedCommands are gone, not hidden: no message may name them.
 var removedCommands = []string{"blame", "desktop", "shim"}
 
 func commandNamed(root *cobra.Command, name string) *cobra.Command {
@@ -72,9 +66,8 @@ func TestHelpListsOnlyThePrimaryCommands(t *testing.T) {
 	}
 }
 
-// Hidden is a statement about the help text and nothing else. Every advanced command is
-// still there, still hidden, and still answers — `--help` on each is the cheapest proof
-// that it is wired, and it runs nothing.
+// Every advanced command is still there, hidden, and answers `--help`, the cheapest proof
+// that it is wired.
 func TestAdvancedCommandsAreHiddenNotRemoved(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	root := testApp.NewRootCommand()
@@ -106,23 +99,16 @@ func TestAdvancedCommandsAreHiddenNotRemoved(t *testing.T) {
 	}
 }
 
-// namedCommand finds a command terma tells someone to run: `terma <name> …`, quoted in
-// backticks on one line — which is how every hint, error and help text writes it. (The
-// closing backtick on the same line is what keeps a Go raw string that merely *begins*
-// "terma connects your coding agents…" from reading as a command called "connects".)
+// namedCommand requires the closing backtick on the same line, so a raw string that begins
+// "terma connects …" is not read as a command called "connects".
 var namedCommand = regexp.MustCompile("`terma ([a-z][a-z-]*)[^`\n]*`")
 
-// unquotedCommand finds the two shapes a hint takes without backticks: a doctor check's
-// `Fix: "terma install"`, and a sentence that ends in the command to run (`with: terma
-// session list`). `terma connect` told everyone to run `terma trace list` — a command
-// from the CLI this one was forked from — for as long as the hint stayed unquoted.
+// unquotedCommand finds the two unquoted shapes: a doctor `Fix: "terma install"` and a
+// sentence ending `with: terma session list`.
 var unquotedCommand = regexp.MustCompile(`(?:Fix:\s*"|[Ww]ith: )terma ([a-z][a-z-]*)`)
 
-// A message that names a command is a promise that running it works. `terma login` went
-// on recommending `terma use` long after that command was removed, because nothing
-// checked. This reads every hint, error, help text and comment in the shipped source and
-// requires each `terma <name>` it finds to be a command that exists — hidden or not,
-// which is also what stops a cleanup from removing a command the hints still name.
+// Every `terma <name>` the shipped source and docs name must be a command that exists,
+// hidden or not.
 func TestEveryCommandAMessageNamesExists(t *testing.T) {
 	root := testApp.NewRootCommand()
 	exists := map[string]bool{"help": true, "completion": true}
@@ -132,8 +118,7 @@ func TestEveryCommandAMessageNamesExists(t *testing.T) {
 			exists[alias] = true
 		}
 	}
-	// The shipped source, and what people read: the README and docs/ (generated history
-	// under docs/compat is a record, not advice).
+	// Generated history under docs/compat is a record, not advice.
 	shipped := func(path string) bool {
 		switch {
 		case strings.HasSuffix(path, ".go"):
@@ -171,9 +156,8 @@ func TestEveryCommandAMessageNamesExists(t *testing.T) {
 	}
 }
 
-// Shell completion is hidden from the listing, not switched off: the Homebrew cask runs
-// `terma completion <shell>` during install to generate its completion files, and a
-// failure there fails the install.
+// Completion is hidden, not switched off: the Homebrew cask runs `terma completion <shell>`
+// during install, and a failure there fails the install.
 func TestCompletionIsHiddenNotRemoved(t *testing.T) {
 	out, err := runTerma(t, "completion", "zsh")
 	if err != nil || !strings.Contains(out, "compdef") {
@@ -181,7 +165,6 @@ func TestCompletionIsHiddenNotRemoved(t *testing.T) {
 	}
 }
 
-// blame was removed outright: running it is an unknown command.
 func TestRemovedCommandsAreGone(t *testing.T) {
 	for _, name := range removedCommands {
 		if _, err := runTerma(t, name); err == nil || !strings.Contains(err.Error(), "unknown command") {

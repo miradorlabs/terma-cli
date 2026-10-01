@@ -11,8 +11,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-// The command tree is the whole user-facing surface; a subcommand lost in a refactor
-// would not fail any other test here.
+// A subcommand lost in a refactor would fail no other test.
 func TestTelemetryCommandTree(t *testing.T) {
 	root := testApp.NewRootCommand()
 
@@ -22,8 +21,7 @@ func TestTelemetryCommandTree(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", path, err)
 		}
-		// Find falls back to the closest parent when a leaf is missing, so the resolved
-		// name has to be checked rather than trusted.
+		// Find falls back to the closest parent when a leaf is missing.
 		if leaf := fields[len(fields)-1]; cmd.Name() != leaf {
 			t.Fatalf("`terma %s` resolves to %q — the command does not exist", path, cmd.CommandPath())
 		}
@@ -33,8 +31,7 @@ func TestTelemetryCommandTree(t *testing.T) {
 	}
 }
 
-// Every capture flag is a privacy decision. A flag renamed or dropped silently would
-// change what leaves the machine.
+// Every capture flag is a privacy decision; renaming one changes what leaves the machine.
 func TestTelemetryConnectFlags(t *testing.T) {
 	root := testApp.NewRootCommand()
 	cmd, _, err := root.Find([]string{"telemetry", "connect"})
@@ -48,8 +45,7 @@ func TestTelemetryConnectFlags(t *testing.T) {
 		}
 	}
 
-	// Capture is the default; the exclusion flags default to false so a bare connect
-	// exports everything, and redaction is the explicit choice.
+	// Capture is the default; redaction is the explicit choice.
 	for _, name := range []string{"exclude-prompts", "exclude-tool-content"} {
 		if got := cmd.Flags().Lookup(name).DefValue; got != "false" {
 			t.Errorf("--%s defaults to %q, want false — a bare connect captures content", name, got)
@@ -66,7 +62,6 @@ func TestTelemetryRejectsUnknownHarness(t *testing.T) {
 	if !strings.Contains(err.Error(), "gemini") {
 		t.Errorf("error = %q, want it to name the harness", err)
 	}
-	// The message should point at what is available rather than just refusing.
 	for _, name := range testApp.agents.HarnessNames() {
 		if !strings.Contains(err.Error(), name) {
 			t.Errorf("error = %q, want it to list the supported harness %q", err, name)
@@ -80,8 +75,7 @@ func TestTelemetryConnectRequiresAHarness(t *testing.T) {
 	}
 }
 
-// `--signals` is validated before anything is minted or written: a typo'd signal would
-// otherwise leave a harness looking connected and emitting nothing.
+// `--signals` is validated before anything is minted or written.
 func TestTelemetryRejectsUnknownSignalBeforeWriting(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("CLAUDE_CONFIG_DIR", dir)
@@ -101,7 +95,6 @@ func TestTelemetryRejectsUnknownSignalBeforeWriting(t *testing.T) {
 		t.Errorf("error = %q, want it to name the bad signal", err)
 	}
 
-	// Nothing should have been written on the way to that error.
 	h := claudeHarness(t)
 	st, statusErr := h.Status()
 	if statusErr != nil {
@@ -112,8 +105,7 @@ func TestTelemetryRejectsUnknownSignalBeforeWriting(t *testing.T) {
 	}
 }
 
-// --api-key installs a credential verbatim; a value that is not a server key would be
-// written into the config and fail only later, at export time.
+// --api-key refuses a value that is not a server key, which would fail only at export time.
 func TestTelemetryRejectsNonServerKey(t *testing.T) {
 	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
@@ -132,8 +124,7 @@ func TestTelemetryRejectsNonServerKey(t *testing.T) {
 	}
 }
 
-// status must work without a credential — it only reads local files — so it stays
-// usable when a login has expired.
+// status needs no credential, so it stays usable when a login has expired.
 func TestTelemetryStatusNeedsNoCredential(t *testing.T) {
 	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
 	t.Setenv("CODEX_HOME", t.TempDir())
@@ -162,8 +153,8 @@ func TestTelemetryStatusReportsCodexNotConnected(t *testing.T) {
 	}
 }
 
-// The Codex lifecycle end to end: connect writes the key and funding notifier,
-// status reads the export back, and disconnect restores the file byte for byte.
+// Connect writes the key and funding notifier, status reads the export back, and
+// disconnect restores the file byte for byte.
 func TestTelemetryCodexConnectStatusDisconnect(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("CODEX_HOME", dir)
@@ -230,8 +221,8 @@ func TestTelemetryCodexConnectStatusDisconnect(t *testing.T) {
 	}
 }
 
-// With analytics disabled Codex sends no metrics whatever the exporter says. A full
-// connect must refuse rather than report metrics connected; without metrics it works.
+// With analytics disabled the agent sends no metrics, so a full connect refuses; without
+// metrics it works.
 func TestTelemetryCodexRefusesMetricsWhenAnalyticsDisabled(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("CODEX_HOME", dir)
@@ -271,10 +262,8 @@ func TestTelemetryCodexRefusesMetricsWhenAnalyticsDisabled(t *testing.T) {
 	}
 }
 
-// A dormant profile that overturns the privacy posture — or points a signal elsewhere —
-// is reported before the confirmation, with the profile named, but does not block a
-// connect that the plain configuration asked for; status likewise lists it as a warning
-// rather than calling the harness overridden.
+// A dormant profile that overturns the privacy posture is named before the confirmation
+// but does not block; status lists it as a warning, not as overridden.
 func TestTelemetryCodexProfileOverridesAreReportedNotBlocking(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("CODEX_HOME", dir)
@@ -324,8 +313,7 @@ func TestTelemetryCodexProfileOverridesAreReportedNotBlocking(t *testing.T) {
 	}
 }
 
-// A conflict key can carry a file name, and a file name can carry anything. What
-// reaches the terminal must be stripped of control characters, key included.
+// A conflict key reaching the terminal is stripped of control characters.
 func TestPrintConflictsSanitizesEveryField(t *testing.T) {
 	var out bytes.Buffer
 	printConflicts(&out, []harness.Conflict{{
@@ -342,8 +330,7 @@ func TestPrintConflictsSanitizesEveryField(t *testing.T) {
 	}
 }
 
-// --inline-key is Claude's opt-out of the helper; for Codex inline is the only mode,
-// and the flag must be accepted rather than rejected as inapplicable.
+// --inline-key is accepted by a harness whose only mode is inline.
 func TestTelemetryCodexInlineKeyFlagIsAccepted(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("CODEX_HOME", dir)
@@ -366,9 +353,8 @@ func TestTelemetryCodexInlineKeyFlagIsAccepted(t *testing.T) {
 	}
 }
 
-// The P1: a pre-existing per-signal endpoint would keep exporting to whoever owns it
-// while inheriting the Authorization header Terma writes for the generic endpoint.
-// Connect must refuse before minting a key or writing anything.
+// A pre-existing per-signal endpoint would inherit the Authorization header, so connect
+// refuses before minting a key or writing anything.
 func TestTelemetryConnectRefusesOnPerSignalConflict(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("CLAUDE_CONFIG_DIR", dir)
@@ -391,12 +377,10 @@ func TestTelemetryConnectRefusesOnPerSignalConflict(t *testing.T) {
 	if !strings.Contains(err.Error(), "--force") {
 		t.Errorf("error = %q, want it to name the escape hatch", err)
 	}
-	// The plan must name the offending variable so the user can go and look at it.
 	if !strings.Contains(out, "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT") {
 		t.Errorf("output did not name the conflicting variable:\n%s", out)
 	}
 
-	// Nothing may have been written — above all, not the key.
 	after, err := os.ReadFile(filepath.Join(dir, "settings.json"))
 	if err != nil {
 		t.Fatalf("read: %v", err)
@@ -437,11 +421,8 @@ func TestTelemetryConnectProceedsWithForce(t *testing.T) {
 	}
 }
 
-// --identity none is the only way to keep a real email address out of a global config.
-// --identity is for Codex and OpenCode. Claude Code identifies the person itself
-// (user.id and user.email on every metric and event), and OTEL_RESOURCE_ATTRIBUTES is
-// the user's own variable, so whatever the flag says, nothing of it reaches Claude
-// Code's settings file.
+// --identity none keeps a real email out of a global config, and an agent that identifies
+// the person itself never gets OTEL_RESOURCE_ATTRIBUTES.
 func TestTelemetryIdentityFlagNeverReachesClaude(t *testing.T) {
 	for _, tc := range []struct{ name, identity string }{
 		{name: "default", identity: ""},
@@ -479,8 +460,7 @@ func TestTelemetryIdentityFlagNeverReachesClaude(t *testing.T) {
 	}
 }
 
-// Disconnect must clean up a config whose telemetry was switched off but whose key is
-// still on disk — the state where walking away is worst.
+// Disconnect cleans up a config whose telemetry was switched off but whose key is on disk.
 func TestTelemetryDisconnectCleansPartiallyDisabledConfig(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("CLAUDE_CONFIG_DIR", dir)
@@ -528,12 +508,7 @@ func TestTelemetryDisconnectCleansPartiallyDisabledConfig(t *testing.T) {
 	}
 }
 
-// The success message hands the user a command to run, so it has to be a command that
-// works. The trace filter grammar accepts status, severity, tag and attribute.<key>; a
-// bare `service.name` is rejected as an undeclared identifier, which is what the first
-// version of this message printed.
-// Connect used to end with `terma trace list --filter …`, a command of the CLI this one
-// was forked from. The closing hint has to name something that runs here.
+// The closing hint must name a command that runs here.
 func TestTelemetryConnectEndsOnACommandThatExists(t *testing.T) {
 	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
@@ -557,9 +532,7 @@ func TestTelemetryConnectEndsOnACommandThatExists(t *testing.T) {
 	}
 }
 
-// A bare connect captures everything: all three signals, prompt text, and tool
-// content. The exclusion flags are the redaction path, and each turns off only its
-// own capture.
+// A bare connect captures everything; each exclusion flag turns off only its own capture.
 func TestTelemetryConnectCapturesContentByDefault(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -632,13 +605,10 @@ func TestTelemetryConnectCapturesContentByDefault(t *testing.T) {
 	}
 }
 
-// Reconnecting the same project must reuse the installed key rather than minting an
-// orphan. The proof is structural: the second connect has no --api-key and no stored
-// login, so if it tried to mint it would fail with "not logged in" — succeeding at all
-// means the key came from the existing config.
+// Reconnecting the same project reuses the installed key: with no --api-key and no login,
+// a mint would fail.
 func TestTelemetryReconnectReusesInstalledKey(t *testing.T) {
-	// Asserts production defaults, so it must not inherit the developer's TERMA_ENV:
-	// the suite is run against dev, and this failed there for no reason of its own.
+	// Asserts production defaults, so it must not inherit the suite's TERMA_ENV=dev.
 	t.Setenv("TERMA_ENV", "")
 	dir := t.TempDir()
 	t.Setenv("CLAUDE_CONFIG_DIR", dir)
@@ -657,8 +627,7 @@ func TestTelemetryReconnectReusesInstalledKey(t *testing.T) {
 		t.Fatalf("first connect: %v", err)
 	}
 
-	// Same project, no key supplied, no login available — and different capture flags,
-	// because tweaking settings is exactly when accidental re-minting used to happen.
+	// Different capture flags: tweaking settings is when re-minting would happen.
 	out, err := connect("--exclude-prompts")
 	if err != nil {
 		t.Fatalf("reconnect tried to mint instead of reusing: %v", err)
@@ -674,8 +643,7 @@ func TestTelemetryReconnectReusesInstalledKey(t *testing.T) {
 	}
 }
 
-// --inline-key opts out of the helper: the key goes into the settings file, which is
-// then tightened, and no helper setting appears.
+// --inline-key writes the key into a tightened settings file and no helper setting.
 func TestTelemetryInlineKeyFlag(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("CLAUDE_CONFIG_DIR", dir)
@@ -702,8 +670,7 @@ func TestTelemetryInlineKeyFlag(t *testing.T) {
 	}
 }
 
-// The default connect delivers the key through the helper: settings carry a path, the
-// key does not appear in them at all.
+// The default connect's settings carry the helper's path, never the key.
 func TestTelemetryDefaultConnectUsesHelper(t *testing.T) {
 	dir := t.TempDir()
 	miradorHome := t.TempDir()
@@ -740,9 +707,8 @@ func TestTelemetryDefaultConnectUsesHelper(t *testing.T) {
 	}
 }
 
-// Keys are per harness: a second harness does not borrow the key the first holds.
-// Structural proof — the second connect has no --api-key and no login, so the only way
-// it can end without an error is by taking Codex's key, which it must not.
+// Keys are per harness: with no --api-key and no login, the second connect must fail
+// rather than borrow the first harness's key.
 func TestTelemetryConnectKeepsKeysSeparatePerHarness(t *testing.T) {
 	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
 	t.Setenv("CODEX_HOME", t.TempDir())
@@ -766,10 +732,8 @@ func TestTelemetryConnectKeepsKeysSeparatePerHarness(t *testing.T) {
 	}
 }
 
-// Several harnesses in one command: each is connected with the key supplied.
 func TestTelemetryConnectSeveralHarnessesAtOnce(t *testing.T) {
-	// Asserts production defaults, so it must not inherit the developer's TERMA_ENV:
-	// the suite is run against dev, and this failed there for no reason of its own.
+	// Asserts production defaults, so it must not inherit the suite's TERMA_ENV=dev.
 	t.Setenv("TERMA_ENV", "")
 	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
 	t.Setenv("CODEX_HOME", t.TempDir())

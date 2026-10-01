@@ -17,33 +17,24 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
-// SuperviseLock is the lock `terma relay supervise` holds while it runs, under the
-// relay's directory: how an install on Windows tells a supervisor is running.
+// SuperviseLock is the lock `terma relay supervise` holds while it runs, under the relay's directory.
 const SuperviseLock = "supervise.lock"
 
-// Manager installs, removes and finds the relay's per-user service for one config
-// directory: launchd on macOS, systemd --user on Linux, and on Windows the per-user Run
-// key starting `terma relay supervise`. The service runs `terma relay run --idle 0` and
-// is restarted only when it exits nonzero.
+// Manager installs, removes and finds the relay's per-user service for one config directory;
+// the service is restarted only when it exits nonzero.
 type Manager struct {
-	// Name is the service's label (Label).
 	Name string
 	// Exe is the terma the service runs; only Install needs it.
-	Exe string
-	// StateDir is the relay's directory: the Windows launcher and the launchd log live
-	// there, and the supervisor's lock.
+	Exe      string
 	StateDir string
-	// Env is the environment the service runs with.
-	Env map[string]string
-	// StopRelay stops a relay a hook started, so the service can take its port and
-	// lock; it returns once that relay has exited.
+	Env      map[string]string
+	// StopRelay stops a hook-started relay so the service can take its port and lock.
 	StopRelay func()
 	// StartSupervisor starts `terma relay supervise` now, detached (Windows).
 	StartSupervisor func() error
 }
 
-// Label is the service's name: one per config directory, so a relay for a sandboxed
-// config (tests, a second profile directory) never collides with the real one.
+// Label is the service's name, one per config directory so a sandbox never collides with the real one.
 func Label(configDir, defaultDir string) string {
 	name := "ai.terma.relay"
 	if defaultDir == "" || filepath.Clean(configDir) != filepath.Clean(defaultDir) {
@@ -82,14 +73,12 @@ func (m Manager) Path() (string, error) {
 		}
 		return filepath.Join(base, "systemd", "user", m.Name+".service"), nil
 	case "windows":
-		// The launcher the Run key starts at logon (manager_windows.go).
 		return filepath.Join(m.StateDir, m.Name+".vbs"), nil
 	}
 	return "", errUnsupported()
 }
 
-// Installed reports whether the service definition exists, and where. It does not
-// establish that the relay is running.
+// Installed reports whether the service definition exists, and where, not whether the relay runs.
 func (m Manager) Installed() (string, bool) {
 	path, err := m.Path()
 	if err != nil {
@@ -99,8 +88,7 @@ func (m Manager) Installed() (string, bool) {
 	return path, err == nil
 }
 
-// Install writes the service definition and starts it, taking over from a relay a
-// hook started, and returns where the definition is.
+// Install writes the service definition and starts it, and returns where the definition is.
 func (m Manager) Install(ctx context.Context) (string, error) {
 	if !Supported() {
 		return "", errUnsupported()
@@ -152,8 +140,7 @@ func (m Manager) Install(ctx context.Context) (string, error) {
 	return "", errors.New("unsupported")
 }
 
-// Remove stops the service and removes its definition, reporting whether there was
-// one to remove.
+// Remove stops the service and removes its definition, reporting whether there was one.
 func (m Manager) Remove(ctx context.Context) (bool, error) {
 	path, err := m.Path()
 	if err != nil {
@@ -188,8 +175,7 @@ func run(ctx context.Context, name string, args ...string) (string, error) {
 	return strings.TrimSpace(string(out)), err
 }
 
-// launchdDomains are the launchd domains to try: a login session's, then the user's
-// background one (a machine with nobody logged in at the console, such as CI).
+// launchdDomains end with the user's background domain for a machine nobody is logged in to, such as CI.
 func launchdDomains() []string {
 	uid := strconv.Itoa(os.Getuid())
 	return []string{"gui/" + uid, "user/" + uid}

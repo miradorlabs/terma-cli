@@ -38,8 +38,7 @@ func relaySandbox(t *testing.T) string {
 	return dir
 }
 
-// setup points both agents at the relay with the local token, and the connect journal
-// it leaves is what `terma telemetry disconnect` reverts.
+// setup points the agents at the relay with the local token, journaled for disconnect.
 func TestRelaySetupPointsAgentsAtTheRelay(t *testing.T) {
 	relaySandbox(t)
 	addr := freeAddr(t)
@@ -79,8 +78,7 @@ func TestRelaySetupPointsAgentsAtTheRelay(t *testing.T) {
 	}
 }
 
-// Without setup there is no token, and the relay refuses to run rather than accept
-// telemetry from anyone.
+// Without setup there is no token, and the relay refuses to run.
 func TestRelayRunNeedsSetup(t *testing.T) {
 	relaySandbox(t)
 	out, err := within(5*time.Second).combined(t, "relay", "run", "--addr", freeAddr(t))
@@ -89,8 +87,7 @@ func TestRelayRunNeedsSetup(t *testing.T) {
 	}
 }
 
-// Two relays never run at once: hooks that race to start one leave exactly one. A
-// relay holds relay.lock for its life; one that finds it held exits at once, happily.
+// Racing hooks leave exactly one relay: it holds relay.lock, and a second exits at once.
 func TestRelayRunsOnce(t *testing.T) {
 	dir := relaySandbox(t)
 	addr := freeAddr(t)
@@ -108,8 +105,7 @@ func TestRelayRunsOnce(t *testing.T) {
 	}
 }
 
-// Something else on the relay's port receives the agents' telemetry. The relay cannot
-// take the port back, so it says why it did not start, and status names the squatter.
+// A squatter on the relay's port is reported by run, and named by status.
 func TestRelayReportsASquatter(t *testing.T) {
 	dir := relaySandbox(t)
 	squatter, err := net.Listen("tcp", "127.0.0.1:0")
@@ -138,8 +134,7 @@ func TestRelayReportsASquatter(t *testing.T) {
 	}
 }
 
-// doctor's export check on a relayed machine: what stops this repository's sessions
-// from leaving, each named with its fix.
+// doctor's export check on a relayed machine names what stops sessions leaving, with fixes.
 func TestRelayDoctorCheck(t *testing.T) {
 	dir := relaySandbox(t)
 	addr := freeAddr(t)
@@ -175,9 +170,8 @@ func TestRelayDoctorCheck(t *testing.T) {
 	}
 }
 
-// A Codex daemon reads its exporter when it starts: one running from before `relay
-// setup` still exports where it did. setup says so, and doctor warns until it restarts;
-// terma never restarts it (Codex says running work may be interrupted).
+// An agent daemon started before `terma relay setup` still exports where it did: setup
+// says so, and doctor warns until it restarts, which terma never does itself.
 func TestRelayCodexDaemonPredatesSetup(t *testing.T) {
 	dir := relaySandbox(t)
 	codex := os.Getenv("CODEX_HOME")

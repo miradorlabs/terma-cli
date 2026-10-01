@@ -63,8 +63,8 @@ func TestInstallWiresAntigravityHooksWhenAsked(t *testing.T) {
 	}
 }
 
-// Antigravity is coming soon: a repository with one of agy's customization directories
-// gets no Antigravity hooks from a plain install. --adapters antigravity still wires them.
+// A coming-soon agent's directory in a repository gets no hooks from a plain install;
+// --adapters still wires them.
 func TestInstallLeavesAntigravityAloneWhileComingSoon(t *testing.T) {
 	repo := installRepo(t)
 	if err := os.MkdirAll(filepath.Join(repo, ".agents", "rules"), 0o755); err != nil {
@@ -81,8 +81,7 @@ func TestInstallLeavesAntigravityAloneWhileComingSoon(t *testing.T) {
 	}
 }
 
-// agy loads a workspace's hooks only once the developer has trusted the workspace from
-// inside agy, and records that in its own settings. Until then the committed file is
+// Until the developer trusts the workspace from inside the agent, the committed file is
 // inert and only doctor can say so.
 func TestDoctorReportsAntigravityWorkspaceTrust(t *testing.T) {
 	repo := installRepo(t)

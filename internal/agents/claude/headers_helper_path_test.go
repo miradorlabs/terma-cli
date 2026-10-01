@@ -9,8 +9,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-// A project id out of a committed .terma/settings.json must never steer the helper — which
-// holds a live server key and is written executable — out of the helpers directory.
+// A project id from a committed binding must never steer the helper, an executable holding a live
+// key, out of the helpers directory.
 func TestHelperFilePathRejectsTraversal(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", filepath.Join(t.TempDir(), "cfg"))
 	for _, id := range []string{
@@ -47,7 +47,7 @@ func TestHelperFilePathStaysInHelpersDir(t *testing.T) {
 	}
 }
 
-// The regression proper: the write that used to land anywhere now cannot start.
+// The write itself cannot start outside the helpers directory.
 func TestWriteHelperNotReachableOutsideHelpersDir(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("TERMA_CONFIG_DIR", filepath.Join(tmp, "cfg"))

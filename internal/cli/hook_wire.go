@@ -11,18 +11,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
-// wireCloneOnFirstUse does the per-clone half of `terma install` from the first agent
-// hook that claims a session in the clone: git is pointed at the committed commit-hook
-// shims (core.hooksPath, wireRepo), so commits made there carry their session's
-// trailers. A repository the platform connected commits its binding and hooks; nothing
-// in a commit can set a clone's git config, and without this its commits were never
-// stamped unless someone ran `terma install`.
-//
-// It costs one stat on every later hook: a clone wired before (by this or by install)
-// has the hook-restoration record under its git directory, and is left alone — also
-// when its developer pointed core.hooksPath somewhere else since. Only a binding whose
-// commit hooks are terma's own shims is wired: a husky, lefthook or pre-commit line is
-// committed and needs nothing per clone.
+// wireCloneOnFirstUse sets core.hooksPath from the first claiming hook, since nothing in
+// a commit can set a clone's git config. Later hooks pay one stat for the restoration
+// record; a husky, lefthook or pre-commit line needs nothing per clone.
 func wireCloneOnFirstUse(ctx context.Context, cwd string) {
 	root, gitDir, ok := gitx.LocateFS(cwd)
 	if !ok {

@@ -17,17 +17,10 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
-// A refresh brings what earlier versions of terma wrote up to this build, so an update
-// takes effect without re-running `terma install`. Re-running install is not the same
-// thing: several of its choices are flags it never records (--signals, --exclude-prompts,
-// --identity, --no-statusline), so a bare re-run would put them back to their
-// defaults, and it signs in. A refresh works only from what is on disk. It rewrites
-// files terma wrote with this build's templates, never creates one, never signs in, and
-// never touches a choice: an absent status line or hook file stays absent.
+// A refresh rewrites files terma already wrote with this build's templates, from disk alone:
+// it never creates a file, signs in, or changes a choice, which a bare `terma install` would.
 
-// refreshMachine rewrites the home-directory files every repository shares, each agent's
-// (agents.MachineRefresher). It returns the paths it changed, carrying on past a failure
-// so one broken file does not strand the rest.
+// refreshMachine rewrites each agent's home-directory files, carrying on past a failure.
 func (app *App) refreshMachine() ([]string, error) {
 	var changed []string
 	var errs []error
@@ -48,19 +41,14 @@ type repoRefresh struct {
 	notes []string
 }
 
-// planRepoRefresh plans the refresh of the repository around the working directory,
-// from its binding: the commit hooks through the manager it records, and the agent hook
-// files its hooks files already wire (adapter.WiredNames). It returns nil outside a
-// workspace terma installed; a workspace outside Git has agent hooks and no commit hooks.
-// Only files that exist are refreshed; one that is gone was removed by someone, and
-// bringing it back is `terma install`'s decision.
+// planRepoRefresh plans the refresh of the workspace around the working directory from its
+// binding and the hooks files that already exist (agents.Registry.WiredNames); nil outside one.
 func (app *App) planRepoRefresh(ctx context.Context) (*repoRefresh, error) {
 	root, gitDir, err := workspaceHere(ctx)
 	if err != nil {
 		return nil, nil
 	}
-	// A linked worktree refreshes its own hook files from its main checkout's binding
-	// when it has none of its own: the committed files are the same repository's.
+	// A linked worktree without a binding refreshes its own files from its main checkout's.
 	existing, _, err := termaproject.Resolve(root, gitDir)
 	if errors.Is(err, termaproject.ErrNotFound) {
 		return nil, nil
@@ -84,9 +72,7 @@ func (app *App) planRepoRefresh(ctx context.Context) (*repoRefresh, error) {
 	return r, nil
 }
 
-// stampVersion records this build as the terma that last wrote the repository's
-// committed files, in the checkout's own binding (a linked worktree reading its main
-// checkout's has none to stamp). It reports whether the file changed.
+// stampVersion records this build in the checkout's own binding and reports whether it changed.
 func (app *App) stampVersion(root string) (bool, error) {
 	bound, err := termaproject.Load(root)
 	if errors.Is(err, termaproject.ErrNotFound) {
@@ -99,9 +85,8 @@ func (app *App) stampVersion(root string) (bool, error) {
 	return true, termaproject.Save(root, bound)
 }
 
-// runRefresh is `terma update --refresh`: the machine's files, then the repository
-// around the working directory, reported as it goes. Saved state is migrated first,
-// retrying a migration that failed, so the files are rewritten from current state.
+// runRefresh is `terma update --refresh`: pending migrations, the machine's files, then the
+// current repository's.
 func (app *App) runRefresh(ctx context.Context, out io.Writer) error {
 	out = style.Highlight(out)
 	var migrateErr error
@@ -167,12 +152,8 @@ func (app *App) runRefresh(ctx context.Context, out io.Writer) error {
 	return err
 }
 
-// refreshAfterUpgrade runs the first time an interactive command runs under a release
-// newer than the one that last refreshed this machine — however it got here: `terma
-// update`, an automatic update, or Homebrew or npm on their own. It refreshes only the
-// home-directory files; committed files change only when the developer asks, so for the
-// current repository it says what is out of date instead. It stays quiet when nothing
-// changed, and records the release either way so it runs once.
+// refreshAfterUpgrade runs once per newer release, however it was installed: it refreshes
+// home-directory files and only reports out-of-date committed ones.
 func (app *App) refreshAfterUpgrade(ctx context.Context, dir string, out io.Writer) {
 	out = style.Highlight(out)
 	if !selfupdate.NeedsRefresh(dir, app.version) {

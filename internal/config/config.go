@@ -1,10 +1,5 @@
-// Package config resolves CLI settings from flags, environment, and the on-disk
-// profile, and persists the non-secret half of that state.
-//
-// Config and credentials live in two files on purpose: ~/.config/terma/config.json is
-// safe to read, diff, or check into a dotfiles repo, while ~/.config/terma/credentials.json
-// holds live tokens and is written 0600. Keeping them apart means "share my terma
-// config" never means "share my access token".
+// Package config resolves CLI settings from flags, environment and the on-disk
+// profile, and persists the non-secret half; tokens live apart in credentials.json (0600).
 package config
 
 import (
@@ -34,30 +29,22 @@ const (
 
 // Profile is the non-secret half of a profile: where to talk to and what is selected.
 type Profile struct {
-	// Environment pins a built-in environment for this profile (dev, local). Empty
-	// means production. Not shown to users, and no command writes it: it is read from a
-	// profile edited by hand, after --env and TERMA_ENV.
+	// Environment pins a hidden built-in environment; empty means production.
 	Environment string `json:"environment,omitempty"`
-	// Endpoint overrides. Empty means production. A profile that sets these is how
-	// you point the CLI at a different deployment without passing flags every time.
+	// Endpoint overrides; empty means the environment's defaults.
 	APIURL           string `json:"api_url,omitempty"`
 	AuthURL          string `json:"auth_url,omitempty"`
 	AppURL           string `json:"app_url,omitempty"`
 	OTLPURL          string `json:"otlp_url,omitempty"`
 	OrganizationID   string `json:"organization_id,omitempty"`
 	OrganizationName string `json:"organization_name,omitempty"`
-	// Harnesses is the machine-level list of coding agents this developer works with,
-	// recorded by `terma setup` (adapter names plus codex-desktop as a separate
-	// launch surface). `terma install` connects and wires these for a repository without
-	// asking again. It is a preference, not a connection — no endpoint or key.
+	// Harnesses lists the agents and launch surfaces `terma setup` recorded; a preference, not a connection.
 	Harnesses []string `json:"harnesses,omitempty"`
-	// Policy is the organization's collection policy as `terma setup` last fetched it;
-	// nil before then, when DefaultPolicy applies.
+	// Policy is the collection policy `terma setup` last fetched; nil means DefaultPolicy.
 	Policy *Policy `json:"policy,omitempty"`
 }
 
-// SelectOrganization records the account scope. Switching accounts never chooses
-// or changes a repository's project.
+// SelectOrganization records the account scope, never a repository's project.
 func (p *Profile) SelectOrganization(id, name string) {
 	if p.OrganizationID != id {
 		p.OrganizationName = ""
@@ -69,8 +56,7 @@ func (p *Profile) SelectOrganization(id, name string) {
 	}
 }
 
-// File is config.json as it is on disk: every profile, and which one is active. It holds
-// no secrets; those are in credentials.json and the keystore.
+// File is config.json as it is on disk: every profile, and which one is active.
 type File struct {
 	ActiveProfile string              `json:"active_profile"`
 	Profiles      map[string]*Profile `json:"profiles"`
@@ -79,46 +65,36 @@ type File struct {
 // Config is the fully resolved view a command works against.
 type Config struct {
 	ProfileName string
-	// Environment is the built-in environment the defaults came from (prod, dev, local).
+	// Environment is the built-in environment the defaults came from.
 	Environment string
-	// APIURL is the data plane (traces, logs, metrics, dashboards). AuthURL is the
-	// credential surface — separate hosts, so an auth outage cannot take reads down.
+	// APIURL is the data plane; AuthURL is the credential surface, a separate host.
 	APIURL  string
 	AuthURL string
 	AppURL  string
-	// OTLPURL is the telemetry ingest host written into an agent harness's config by
-	// `terma telemetry connect`. The CLI itself never calls it.
+	// OTLPURL is the ingest host written into agents' exporters; the CLI never calls it.
 	OTLPURL string
 
 	OrganizationID   string
 	OrganizationName string
 	ProjectID        string
 	ProjectName      string
-	// ProjectOrganizationID comes from the repository binding, independently of
-	// the currently signed-in organization.
+	// ProjectOrganizationID comes from the repository binding, not the signed-in organization.
 	ProjectOrganizationID string
 
-	// Harnesses is the machine-level list of coding agents recorded by `terma setup`.
-	// It is a preference read by `terma install`, never a connection.
 	Harnesses []string
 
-	// Policy is the organization's collection policy: the profile's, else DefaultPolicy.
+	// Policy is the profile's collection policy, else DefaultPolicy.
 	Policy Policy
 
-	// APIKey is a server key (ter_srv_…) from TERMA_API_KEY. When set it replaces the
-	// OAuth credential entirely — this is the CI and agent path, where a browser
-	// login is impossible and a fixed project is the point.
-	//
-	// json:"-" so this struct can never be rendered by `-o json` with a live
-	// credential in it. Report whether a key is in use, never its value.
+	// APIKey is a server key from TERMA_API_KEY that replaces the login credential;
+	// json:"-" keeps it out of `-o json`.
 	APIKey string `json:"-"`
 }
 
 // Overrides are the flag values that win over everything else.
 type Overrides struct {
 	Profile string
-	// Env selects a built-in environment (prod, dev, local). Hidden from users; see
-	// endpoints.go.
+	// Env selects a built-in environment; hidden from users.
 	Env       string
 	APIURL    string
 	AuthURL   string
@@ -173,9 +149,7 @@ func Load(o Overrides) (*Config, error) {
 		{"api", cfg.APIURL},
 		{"auth", cfg.AuthURL},
 		{"app", cfg.AppURL},
-		// The CLI never calls the OTLP host, but it writes the URL into a harness's
-		// config alongside a server key. A cleartext endpoint there would put that key
-		// on the wire on every export, so it is held to the same standard.
+		// Agents send a server key to the OTLP host, so it is held to the same standard.
 		{"otlp", cfg.OTLPURL},
 	} {
 		if err := validateEndpoint(endpoint.name, endpoint.value); err != nil {
@@ -185,13 +159,8 @@ func Load(o Overrides) (*Config, error) {
 	return cfg, nil
 }
 
-// validateEndpoint refuses to send credentials over cleartext to anywhere but loopback.
-//
-// Every one of these URLs carries a secret at some point: the auth endpoint receives the
-// authorization code, the PKCE verifier, and the refresh token; the api endpoint receives the
-// access token. A mistyped, copied, or hostile `http://` endpoint would put all of them on the
-// wire in the clear, and nothing else in the CLI would notice. http is allowed for loopback
-// only, because a local stack has no certificate and never leaves the machine.
+// validateEndpoint refuses http except to loopback: every one of these hosts receives
+// a secret at some point.
 func validateEndpoint(name, raw string) error {
 	u, err := url.Parse(raw)
 	if err != nil {
@@ -217,19 +186,14 @@ func validateEndpoint(name, raw string) error {
 }
 
 func isLoopbackHost(host string) bool {
-	// Covers 127.0.0.0/8 and ::1, not just the literal 127.0.0.1 a check on the string would.
 	if ip := net.ParseIP(host); ip != nil {
 		return ip.IsLoopback()
 	}
 	if host != "localhost" {
 		return false
 	}
-	// "localhost" is conventionally loopback, but /etc/hosts or DNS can point it
-	// elsewhere — and http is only ever safe to loopback. Resolve it and require every
-	// address to be loopback, so a poisoned mapping to a real host cannot smuggle the
-	// credential onto the wire in cleartext. If it cannot be resolved at all, allow it:
-	// we cannot prove it hostile, and failing closed would break legitimate offline
-	// local development.
+	// /etc/hosts or DNS can point localhost elsewhere, so every address must be loopback;
+	// an unresolvable one is allowed, or offline local development would break.
 	addrs, err := net.LookupHost(host)
 	if err != nil {
 		return true
@@ -243,8 +207,7 @@ func isLoopbackHost(host string) bool {
 	return len(addrs) > 0
 }
 
-// LoadFile reads config.json. A missing file is an empty one, not an error: every
-// command has to work on a machine that has never run terma.
+// LoadFile reads config.json; a missing file is an empty one.
 func LoadFile() (*File, error) {
 	path, err := ConfigPath()
 	if err != nil {
@@ -301,8 +264,7 @@ func UpdateProfile(name string, mutate func(*Profile)) error {
 	})
 }
 
-// UpdateFile serializes a config read/merge/write across foreground commands and
-// the relay's policy refresh. Mutate runs under the sidecar lock.
+// UpdateFile runs mutate on config.json under a sidecar lock shared with the relay's policy refresh.
 func UpdateFile(mutate func(*File)) error {
 	dir, err := Dir()
 	if err != nil {
@@ -326,8 +288,7 @@ func UpdateFile(mutate func(*File)) error {
 	return SaveFile(file)
 }
 
-// Dir is where terma keeps its config, credentials, journals, and spool:
-// TERMA_CONFIG_DIR when set, else $XDG_CONFIG_HOME/terma, else ~/.config/terma.
+// Dir is terma's config directory: TERMA_CONFIG_DIR, else $XDG_CONFIG_HOME/terma, else ~/.config/terma.
 func Dir() (string, error) {
 	if custom := os.Getenv("TERMA_CONFIG_DIR"); custom != "" {
 		return custom, nil
@@ -360,23 +321,14 @@ func CredentialsPath() (string, error) {
 	return filepath.Join(dir, credentialsFileName), nil
 }
 
-// WriteFileAtomic writes via a temp file in the same directory then renames, so a
-// crash mid-write cannot leave a half-written config or a truncated credential file.
-//
-// The temp file is fsync'd before the rename and the directory is fsync'd after it, so
-// the durability the credential-refresh path assumes actually holds: once this returns,
-// the new bytes have reached disk, not just the page cache. Without that, a power loss
-// right after a token rotation could leave the superseded refresh token on disk while
-// the server has already invalidated it — stranding the session.
+// WriteFileAtomic writes a temp file and renames it, syncing file and directory so a
+// rotated refresh token survives a power loss.
 func WriteFileAtomic(path string, data []byte, perm os.FileMode) error {
 	return writeFileAtomic(path, data, perm, true)
 }
 
-// WriteFileAtomicNoSync is WriteFileAtomic without the fsyncs: the rename still means a
-// reader never sees a torn file, but the bytes may not survive a power loss. It is for
-// state a hook rewrites on every tool call and can rebuild — a session manifest, the
-// spool queue — where the wait is the cost that matters: on macOS a file sync is
-// F_FULLFSYNC, tens of milliseconds, inside an agent's turn.
+// WriteFileAtomicNoSync is WriteFileAtomic without the syncs, for state hooks rewrite on
+// every tool call: on macOS a sync is F_FULLFSYNC, ~10 ms against 0.2 ms.
 func WriteFileAtomicNoSync(path string, data []byte, perm os.FileMode) error {
 	return writeFileAtomic(path, data, perm, false)
 }
@@ -390,7 +342,7 @@ func writeFileAtomic(path string, data []byte, perm os.FileMode, durable bool) e
 	tmpName := tmp.Name()
 	defer func() { _ = os.Remove(tmpName) }()
 
-	// Chmod before writing so the secret is never briefly readable at the default mode.
+	// Chmod first, so a secret is never briefly readable at the default mode.
 	if err := tmp.Chmod(perm); err != nil {
 		tmp.Close()
 		return fmt.Errorf("chmod temp file: %w", err)
@@ -414,9 +366,7 @@ func writeFileAtomic(path string, data []byte, perm os.FileMode, durable bool) e
 	if !durable {
 		return nil
 	}
-	// fsync the directory so the rename itself survives a crash, not just the bytes.
-	// Best-effort: not every platform or filesystem supports opening a directory for
-	// sync, and a failure here does not mean the data was lost.
+	// Sync the directory so the rename survives too; best effort, as not every platform can.
 	if d, err := os.Open(dir); err == nil {
 		_ = d.Sync()
 		_ = d.Close()
@@ -424,9 +374,8 @@ func writeFileAtomic(path string, data []byte, perm os.FileMode, durable bool) e
 	return nil
 }
 
-// WriteJSON is how a state file under the config directory is written: its directory
-// created private, the document indented with a trailing newline so it reads and diffs
-// like a file a person might open, and the write atomic and durable.
+// WriteJSON writes a state file under the config dir: private directory, indented
+// with a trailing newline, atomic and durable.
 func WriteJSON(path string, v any, perm os.FileMode) error {
 	data, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {

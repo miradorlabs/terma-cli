@@ -9,9 +9,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
-// The spool check exists because a hook never reports a failed append: the commit
-// path swallows the error by design, so a queue nobody can write to is a machine
-// whose commits go unbilled in silence. Doctor has to be the place that says so.
+// A hook swallows a failed append by design, so doctor is the place an unwritable spool
+// gets said.
 func TestDoctorFailsWhenTheSpoolCannotBeWritten(t *testing.T) {
 	userSandbox(t)
 	dir, err := config.Dir()
@@ -22,8 +21,7 @@ func TestDoctorFailsWhenTheSpoolCannotBeWritten(t *testing.T) {
 	if err := os.MkdirAll(spoolDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	// A directory where the queue file belongs: every read of the spool still
-	// works, every append fails.
+	// A directory where the queue file belongs: reads still work, every append fails.
 	if err := os.Mkdir(filepath.Join(spoolDir, "events.jsonl"), 0o700); err != nil {
 		t.Fatal(err)
 	}

@@ -19,8 +19,7 @@ import (
 
 const spoolTestProject = "770e8400-e29b-41d4-a716-446655440000"
 
-// spoolForTest opens the queue the command under test will use, so events can be
-// seeded into it. TERMA_CONFIG_DIR must already point at a temp dir.
+// spoolForTest opens the queue the command will use; TERMA_CONFIG_DIR must point at a temp dir.
 func spoolForTest(t *testing.T) *spool.Spool {
 	t.Helper()
 	dir, err := config.Dir()
@@ -34,8 +33,7 @@ func spoolForTest(t *testing.T) *spool.Spool {
 	return s
 }
 
-// acceptingOTLP stands in for the ingest host: any request succeeds, so a test
-// about accounting never fails for a delivery reason.
+// acceptingOTLP stands in for an ingest host that accepts every request.
 func acceptingOTLP(t *testing.T) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -56,9 +54,7 @@ func appendEvent(t *testing.T, s *spool.Spool, projectID string, at time.Time) {
 	}
 }
 
-// An event with no project id can never be routed at all, while one that has aged
-// out past the spool's MaxAge is time doing its work. Counting both as "gave up on
-// N" left the developer with no way to tell which case they were looking at.
+// An event with no project id is counted as unroutable, apart from one that aged out.
 func TestFlushSpoolSeparatesUnroutableFromExpired(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	acceptingOTLP(t)
@@ -81,8 +77,7 @@ func TestFlushSpoolSeparatesUnroutableFromExpired(t *testing.T) {
 	}
 }
 
-// A fresh event for a project with no key is held, not lost: it stays queued, and
-// the pass reports itself incomplete so a script knows to look again later.
+// An event for a project with no key is held, and the pass reports itself incomplete.
 func TestFlushSpoolHoldsEventsAndReportsIncomplete(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	acceptingOTLP(t)
@@ -102,13 +97,11 @@ func TestFlushSpoolHoldsEventsAndReportsIncomplete(t *testing.T) {
 	}
 }
 
-// A flush that declines to run has done no work, which is not the same as a flush
-// that ran and failed. It gets its own exit code, and --force overrides it.
+// A flush declined by its retry window has its own exit code, and --force overrides it.
 func TestSpoolFlushReportsBackoffAsExitCode(t *testing.T) {
 	configDir := t.TempDir()
 	t.Setenv("TERMA_CONFIG_DIR", configDir)
 	acceptingOTLP(t)
-	// A failure an earlier flush recorded, still inside its retry window.
 	spoolDir := filepath.Join(configDir, "spool")
 	if err := os.MkdirAll(spoolDir, 0o700); err != nil {
 		t.Fatal(err)
@@ -133,8 +126,7 @@ func TestSpoolFlushReportsBackoffAsExitCode(t *testing.T) {
 	}
 }
 
-// The throttle is the other reason a flush does nothing, and it is not a failure:
-// a hook asks for a flush every turn, and "one just ran" is the answer it wants.
+// The throttle is not a failure: a hook asks for a flush every turn.
 func TestSpoolFlushThrottleIsNotAnError(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	acceptingOTLP(t)
@@ -157,8 +149,7 @@ func TestSpoolFlushThrottleIsNotAnError(t *testing.T) {
 	}
 }
 
-// The happy path: every queued event reaches the backend under the project's key,
-// and the command exits 0.
+// Every queued event reaches the backend under the project's key, and the command exits 0.
 func TestSpoolFlushDeliversUnderTheProjectKey(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	auth := make(chan string, 4)
@@ -190,9 +181,7 @@ func TestSpoolFlushDeliversUnderTheProjectKey(t *testing.T) {
 	}
 }
 
-// `terma spool flush` and doctor word a pass from the same clauses, so a developer
-// who reads "pruned" in one never reads a different word for it in the other. One
-// clause per reason, in a fixed order, and a quiet pass has none.
+// describeFlush gives one clause per reason, in a fixed order, and none for a quiet pass.
 func TestDescribeFlushNamesEveryReasonOnce(t *testing.T) {
 	delivered, undelivered := describeFlush(flushResult{Sent: 1})
 	if delivered != "1 event" || len(undelivered) != 0 {

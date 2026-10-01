@@ -12,22 +12,11 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/service"
 )
 
-// The relay runs as a per-user service by default: `terma install` sets it up wherever
-// a service manager can run it, because only an always-on relay receives what an agent
-// exports before its first hook (Codex's conversation_starts, a Desktop thread's start)
-// and what it exports while no hook has started one. macOS lists the service under
-// Login Items, and says so once when it is added: the cost the developer pays for it.
-// On Windows it is the per-user Run key and `terma relay supervise`.
-// `terma install --relay-service off` (or `terma relay daemon remove`) opts out, and the
-// choice is remembered (relay/no-service) until `--relay-service on` or `terma relay
-// daemon install`; without the service, hooks start the relay on demand, as before.
+// The relay runs as a per-user service by default, since only an always-on relay receives
+// what an agent exports before its first hook; daemon.NoServiceFile records an opt-out.
 
-// daemon.NoServiceFile, in the relay directory, records that the developer opted out.
-
-// relayServiceWanted says whether install should set the service up: --relay-service
-// when given (recording the choice), else the choice recorded, else yes where a service
-// can run. A test binary, and a test's `TERMA_RELAY_SERVICE=0` (the live suite, the
-// install e2e matrix), never register one with the real service manager.
+// relayServiceWanted reports whether install should set the service up: the flag
+// (recorded), else the recorded choice, else where supported; never from a test.
 func relayServiceWanted(flag string) bool {
 	dir, err := daemon.Dir()
 	if err != nil {
@@ -55,10 +44,8 @@ func relayServiceWanted(flag string) bool {
 	return service.Supported()
 }
 
-// ensureRelay leaves a relay running for the agents install just pointed at it: the
-// service when wanted (installed, or reinstalled so it runs this build), else one started
-// on demand. It tells report what it did, warn when the developer should know it fell
-// short; nothing when there was nothing to do.
+// ensureRelay leaves a relay running, as a service when wanted, else started on demand,
+// reporting only what the developer should know.
 func ensureRelay(ctx context.Context, flag string, report func(warn bool, what string)) {
 	if !relayServiceWanted(flag) {
 		if flag == "off" {
@@ -70,9 +57,7 @@ func ensureRelay(ctx context.Context, flag string, report func(warn bool, what s
 		return
 	}
 	if _, ok := daemon.ServiceInstalled(); ok && flag != "on" {
-		// A service definition does not prove its relay is alive. Starting on
-		// demand is harmless while it runs (the relay lock prevents duplicates),
-		// and closes the gap while a stopped service awaits its manager's restart.
+		// A service definition does not prove its relay is alive; the lock prevents duplicates.
 		daemon.Spawn()
 		return
 	}

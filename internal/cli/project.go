@@ -29,8 +29,7 @@ func (app *App) newProjectCommand() *cobra.Command {
 		Use:     "project",
 		Aliases: []string{"projects"},
 		Short:   "List projects and show the repository's binding",
-		// Advanced: install owns project selection and repository binding.
-		Hidden: true,
+		Hidden:  true,
 		Long: `Projects are selected per repository by terma install.
 Read commands use the current repository's binding, or an explicit --project override.`,
 	}
@@ -115,12 +114,9 @@ func fetchProjects(ctx context.Context, client *api.Client) ([]project, error) {
 	return resp.Projects, nil
 }
 
-// errNoProjects is the one thing terma says about an organization with nothing to
-// select, whichever command found out.
 var errNoProjects = errors.New("no projects in this organization yet — create one in the Terma app")
 
-// availableProjects fetches the organization's projects and fails with errNoProjects
-// when there are none, so no caller has to word the empty case itself.
+// availableProjects fetches the organization's projects, failing with errNoProjects when empty.
 func availableProjects(ctx context.Context, client *api.Client) ([]project, error) {
 	projects, err := fetchProjects(ctx, client)
 	if err != nil {
@@ -132,8 +128,7 @@ func availableProjects(ctx context.Context, client *api.Client) ([]project, erro
 	return projects, nil
 }
 
-// soleOrPick takes the only project without asking, and prompts among several, current
-// (the bound project, or "") marked and kept by a bare Enter.
+// soleOrPick takes the only project without asking, else prompts with current marked.
 func soleOrPick(cmd *cobra.Command, projects []project, current string) (*project, error) {
 	if len(projects) == 1 {
 		return &projects[0], nil
@@ -141,15 +136,11 @@ func soleOrPick(cmd *cobra.Command, projects []project, current string) (*projec
 	return pickProject(cmd, projects, current)
 }
 
-// matchProject resolves an argument the way every named thing resolves; see
-// matchKind.index.
 func matchProject(projects []project, query string) (*project, error) {
 	return projectKind.match(projects, query)
 }
 
-// pickProject prompts for a selection on a terminal. current is the project the
-// repository is bound to: marked in the list and kept by a bare Enter. With none, Enter
-// takes the only project when there is just one.
+// pickProject prompts for a project, current marked and kept by a bare Enter.
 func pickProject(cmd *cobra.Command, projects []project, current string) (*project, error) {
 	labels := projectKind.labels(projects)
 	return projectKind.pick(cmd, projects, func(p project) pickRow {

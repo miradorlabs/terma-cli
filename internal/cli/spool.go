@@ -54,7 +54,6 @@ The exit status distinguishes the outcomes a script needs apart:
      disk pressure, or being unreadable`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			res, err := app.flushSpool(cmd.Context(), force, minInterval)
-			// A background flush has no reader and no caller to inform.
 			if quiet {
 				return nil
 			}
@@ -75,8 +74,7 @@ The exit status distinguishes the outcomes a script needs apart:
 			if res.Err != nil {
 				return res.Err
 			}
-			// Held and waiting events are still queued, and every other counter is
-			// a loss: either way this pass did not finish what it was asked to do.
+			// Held and waiting events are unfinished work, and every other counter is a loss.
 			if res.Held > 0 || res.Failed > 0 || res.Lost() {
 				return exitWith(ExitIncomplete)
 			}
@@ -89,12 +87,8 @@ The exit status distinguishes the outcomes a script needs apart:
 	return cmd
 }
 
-// describeFlush words one flush pass: what was delivered, then a clause for every
-// reason an event was not. Loss is not a delivery failure, but it is the difference
-// between "coverage is complete" and "some of this session was never billed", so each
-// reason is named rather than folded into one count. `terma spool flush` and doctor
-// both render these, each with its own lead-in, so the two cannot disagree about what
-// "held" or "pruned" means.
+// describeFlush words a flush pass: what was delivered, then one clause per reason an
+// event was not; `terma spool flush` and doctor share it so they agree on the terms.
 func describeFlush(res flushResult) (delivered string, undelivered []string) {
 	delivered = fmt.Sprintf("%d event%s", res.Sent, plural(res.Sent))
 	if res.Held > 0 {
@@ -171,57 +165,39 @@ func newSpoolStatusCommand() *cobra.Command {
 	}
 }
 
-// flushResult summarizes one delivery pass across projects.
-//
-// The counters are disjoint so a reader never has to guess which kind of loss it
-// is looking at: Held events are still queued waiting for a key, Failed events are
-// still queued after their project's send failed, Expired and Pruned events are
-// gone for reasons of time and disk, Unroutable events can never be delivered,
-// and only Dropped means the queue itself was unreadable.
+// flushResult summarizes one delivery pass; its counters are disjoint, one per reason.
 type flushResult struct {
 	Sent, Held, Failed, Expired, Pruned, Dropped, Unroutable, Withheld int
 	Skipped                                                            bool
 	Reason                                                             spool.SkipReason
 	NextAttempt                                                        time.Time
 	Err                                                                error
-	// Failures names each project whose send failed, once per pass, in the order
-	// they failed. Doctor reads it to tell its own project's failure from another's.
+	// Failures names each failed project once, in order; doctor tells its own from another's.
 	Failures []projectFailure
-	// Waiting names each project that was not asked this pass because an earlier
-	// failure's window was still open (never under --force).
-	Waiting []projectWait
-	// Endpoints are the ingest hosts that accepted events, sorted.
+	// Waiting names each project skipped because its retry window was open.
+	Waiting   []projectWait
 	Endpoints []string
 }
 
-// projectFailure is one project's refused or failed delivery, and when that project
-// will next be tried (zero when the pass ran out of time rather than failing).
+// projectFailure is a project's failed delivery; RetryAt is zero when the pass ran out of time.
 type projectFailure struct {
 	ProjectID, Endpoint string
 	Err                 error
 	RetryAt             time.Time
 }
 
-// projectWait is a project whose events stayed queued, unsent, until RetryAt.
 type projectWait struct {
 	ProjectID string
 	RetryAt   time.Time
 }
 
-// Lost reports whether the pass discarded events rather than delivering or
-// holding them.
+// Lost reports whether the pass discarded events rather than delivering or holding them.
 func (r flushResult) Lost() bool {
 	return r.Expired > 0 || r.Pruned > 0 || r.Dropped > 0 || r.Unroutable > 0
 }
 
-// flushSpool delivers everything queued. Events are routed by the project id the
-// hook stamped on them, each project with its own server key from the keystore, to
-// its own ingest host (projectEndpoint). Events whose project has no key here yet
-// or no validated collection policy are held for a later flush; ones with no project at all can never be routed, and
-// are counted apart from events that simply aged out so the two failures stay
-// distinguishable. A project whose send fails keeps its events queued without
-// holding up any other project's (spool.PartialDelivery), and backs off on its own:
-// until its window closes it is not asked again, unless force says to.
+// flushSpool delivers everything queued, each project with its own key to its own host.
+// A keyless or policy-less project's events are held; a failing one backs off alone.
 func (app *App) flushSpool(ctx context.Context, force bool, minInterval time.Duration) (flushResult, error) {
 	s := openSpool()
 	if s == nil {
@@ -273,21 +249,16 @@ func (app *App) flushSpool(ctx context.Context, force bool, minInterval time.Dur
 			batch := byProject[id]
 			key := keystore.Get(id)
 			if key == "" {
-				// No key on this machine yet. How long the wait may last is the
-				// spool's business, not this router's: an event that outlives
-				// MaxAge was already dropped before it got here.
+				// No key yet; MaxAge already dropped anything too old to wait.
 				held = append(held, batch...)
 				continue
 			}
 			if failed[id] {
-				// Refused earlier in this pass: wait for the next one rather than
-				// ask the same host the same question once per batch.
+				// Refused earlier in this pass: one question per host per pass.
 				undelivered = append(undelivered, batch...)
 				continue
 			}
 			if next := s.RetryAt(id); !force && now.Before(next) {
-				// Its last send failed and its window is still open. It waits
-				// without holding up any other project, and without asking again.
 				if !waiting[id] {
 					waiting[id] = true
 					res.Waiting = append(res.Waiting, projectWait{ProjectID: id, RetryAt: next})
@@ -320,10 +291,7 @@ func (app *App) flushSpool(ctx context.Context, force bool, minInterval time.Dur
 	})
 	r := s.Flush(ctx, router, spool.FlushOptions{Force: force, MinInterval: minInterval, Now: now})
 	res.Endpoints = slices.Sorted(maps.Keys(accepted))
-	// Every kind of loss is the spool's to report, since it is the spool that
-	// decides what leaves the queue. Sent is the router's own count: it is per
-	// project and per send, while the spool only knows the size of the batch it
-	// handed over.
+	// Loss is the spool's to report; Sent is the router's per-project count.
 	res.Held = r.Held
 	res.Failed = r.Failed
 	res.Expired = r.Expired
@@ -336,8 +304,8 @@ func (app *App) flushSpool(ctx context.Context, force bool, minInterval time.Dur
 	return res, nil
 }
 
-// Replies and titles bypass the native relay. Recheck its same policy ceiling on
-// every delivery, including events captured before the organization tightened it.
+// spoolEventAllowed rechecks the policy ceiling on every delivery, since replies and titles
+// bypass the relay and may predate a tightened policy.
 func (app *App) spoolEventAllowed(org config.Policy, projectID string, e spool.Event) bool {
 	org = routing.EffectivePolicy(org, projectID)
 	if !org.AllowsSignal("logs") || e.Global && !org.Global() {
@@ -356,8 +324,7 @@ func (app *App) spoolEventAllowed(org config.Policy, projectID string, e spool.E
 	return !recorded || slices.Contains(rec.Signals, "logs")
 }
 
-// contentConsented asks the agent that spooled e whether what it said may leave: an
-// event no agent owns carries nothing anyone consented to.
+// contentConsented asks the agent that spooled e whether its content may leave.
 func (app *App) contentConsented(e spool.Event, projectID string, global bool) bool {
 	tool, _ := e.Attrs[hookrun.AttrTool].(string)
 	a, ok := app.agents.ForTool(tool)
@@ -368,15 +335,8 @@ func (app *App) contentConsented(e spool.Event, projectID string, global bool) b
 	return ok && c.ContentConsented(projectID, global)
 }
 
-// projectEndpoint is the ingest host a project's events are delivered to: the one its
-// key was stored with, because the key was minted in that project's environment and
-// only that environment's ingest host accepts it. Sending every project to the active
-// profile's host had a developer with one repository bound to a dev-deployment project
-// and another to a production one refused with "invalid OTLP API key" on every flush,
-// while their agents, which read the routing record, exported without trouble. An
-// explicit --otlp-url or TERMA_OTLP_URL still wins. A key stored before its hosts were
-// recorded falls back to the routing record `terma install` writes for a telemetry
-// agent, and a project with neither to the active profile's host.
+// projectEndpoint is a project's ingest host: the one its key was stored with, since only
+// its environment accepts the key, then the routing record, then the profile.
 func (app *App) projectEndpoint(cfg *config.Config, projectID string) string {
 	if app.flags.otlpURL != "" || os.Getenv("TERMA_OTLP_URL") != "" {
 		return cfg.OTLPURL
@@ -390,11 +350,8 @@ func (app *App) projectEndpoint(cfg *config.Config, projectID string) string {
 	return cfg.OTLPURL
 }
 
-// projectAPI is the data API a project's events are read back from: its key's
-// environment, like projectEndpoint. A key stored before its hosts were recorded is
-// placed by its routing record — only when that names another built-in environment's
-// ingest host, since a profile with a custom data API and the stock ingest host would
-// otherwise be sent to the stock API. An explicit --api-url or TERMA_API_URL wins.
+// projectAPI is a project's data API, placed like projectEndpoint; the routing record counts
+// only when it names another built-in environment's ingest host.
 func (app *App) projectAPI(cfg *config.Config, projectID string) string {
 	if app.flags.apiURL != "" || os.Getenv("TERMA_API_URL") != "" {
 		return cfg.APIURL
@@ -410,10 +367,8 @@ func (app *App) projectAPI(cfg *config.Config, projectID string) string {
 	return cfg.APIURL
 }
 
-// queuedByRouting splits the queued events by what delivery can do with them: how
-// many can never be routed (no project id), and how many are waiting per project
-// that has no key on this machine. It reads the whole queue — bounded by the count
-// Pending just reported, so the split adds up to what was printed above it.
+// queuedByRouting counts queued events with no project id, and per project those waiting
+// for a key, reading only the pending count so the split matches it.
 func queuedByRouting(s *spool.Spool, pending int) (int, map[string]int) {
 	events, err := s.Peek(pending)
 	if err != nil {

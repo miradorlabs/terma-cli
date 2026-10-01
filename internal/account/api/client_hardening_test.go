@@ -14,11 +14,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 )
 
-// TestClient_RefusesToFollowRedirects guards the redirect policy. Following a redirect
-// would let a 307/308 replay the request body — an auth code, PKCE verifier, or refresh
-// token — to the new location, and a same-host https→http downgrade would put the
-// bearer token on the wire in cleartext. The API never redirects, so a redirect must be
-// a hard error, not a silently followed hop.
+// TestClient_RefusesToFollowRedirects makes a redirect a hard error, since following it
+// would replay tokens to the new location.
 func TestClient_RefusesToFollowRedirects(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "http://example.com/elsewhere", http.StatusTemporaryRedirect)
@@ -36,11 +33,8 @@ func TestClient_RefusesToFollowRedirects(t *testing.T) {
 	}
 }
 
-// TestClient_ConcurrentExpiredRequestsRefreshOnce is the regression guard for the
-// refresh race: many goroutines sharing one Client, all seeing an expired token, must
-// redeem the single-use refresh token exactly once. A second redemption of the same
-// rotated token is what the server's reuse detection reads as theft, revoking the whole
-// session — so more than one token exchange here would be a real, user-facing bug.
+// TestClient_ConcurrentExpiredRequestsRefreshOnce proves goroutines sharing an expired token
+// redeem the single-use refresh token exactly once.
 func TestClient_ConcurrentExpiredRequestsRefreshOnce(t *testing.T) {
 	var refreshes atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -87,9 +81,7 @@ func TestClient_ConcurrentExpiredRequestsRefreshOnce(t *testing.T) {
 	}
 }
 
-// TestClient_Concurrent401sRefreshOnce covers the other refresh trigger: a token the
-// client believed was live is rejected by every in-flight request at once. The
-// generation guard must still collapse those into a single refresh-and-retry.
+// TestClient_Concurrent401sRefreshOnce collapses simultaneous 401s into one refresh.
 func TestClient_Concurrent401sRefreshOnce(t *testing.T) {
 	var refreshes atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -104,7 +96,6 @@ func TestClient_Concurrent401sRefreshOnce(t *testing.T) {
 			})
 			return
 		}
-		// The originally-live token is now rejected; only the rotated one is accepted.
 		if r.Header.Get("Authorization") != "Bearer mir_cli_rotated" {
 			w.WriteHeader(http.StatusUnauthorized)
 			w.Write([]byte(`{"error":{"code":"UNAUTHENTICATED","message":"stale"}}`))

@@ -16,12 +16,10 @@ import (
 	"time"
 )
 
-// loginTimeout bounds how long the CLI waits at the browser. Long enough to sign in
-// and pick an organization, short enough that an abandoned attempt releases the port.
+// loginTimeout bounds the wait at the browser, so an abandoned attempt releases the port.
 const loginTimeout = 5 * time.Minute
 
-// TokenExchanger performs the code/refresh exchange against the API gateway. It is an
-// interface so the login flow can be exercised without a live gateway.
+// TokenExchanger performs the code exchange against the API gateway.
 type TokenExchanger interface {
 	ExchangeCode(ctx context.Context, code, verifier string, port int) (*Credential, error)
 }
@@ -30,24 +28,18 @@ type TokenExchanger interface {
 type LoginOptions struct {
 	// AppURL is the web app that serves the approval page, <AppURL>/cli/auth.
 	AppURL string
-	// Label names this machine on that page and in the list of sessions.
-	Label string
-	// Organization, when set, is preselected on the approval page — an id or a name.
-	// The page still lets the user pick another, so callers check what came back.
+	Label  string
+	// Organization is only preselected; the user may pick another, so callers check.
 	Organization string
-	// NoBrowser prints the URL instead of opening it — for SSH sessions and any
-	// environment where launching a browser would silently do nothing.
+	// NoBrowser prints the URL instead of opening it.
 	NoBrowser bool
 	Out       io.Writer
-	// Timeout overrides how long to wait at the browser. Zero means loginTimeout.
+	// Timeout overrides loginTimeout when nonzero.
 	Timeout time.Duration
 }
 
-// Login runs the full browser handoff and returns the resulting credential.
-//
-// The listener binds 127.0.0.1 on an OS-assigned port before the browser opens, so the
-// port advertised in the URL is guaranteed to be the one being listened on — binding
-// afterwards would race another process onto it.
+// Login runs the browser handoff, binding the loopback port before the browser opens so
+// no other process can race onto it.
 func Login(ctx context.Context, exchanger TokenExchanger, opts LoginOptions) (*Credential, error) {
 	out := opts.Out
 	if out == nil {
@@ -79,9 +71,7 @@ func Login(ctx context.Context, exchanger TokenExchanger, opts LoginOptions) (*C
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
-		// Reject anything not addressed to the loopback listener by name. A page on a
-		// domain that resolves to 127.0.0.1 (DNS rebinding) reaches this handler with its
-		// own Host, and the same-origin policy would then let it read the response.
+		// A DNS-rebinding page reaches this handler with its own Host; reject it.
 		if !isLoopbackRequest(r, port) {
 			http.Error(w, "invalid host", http.StatusBadRequest)
 			return
@@ -91,11 +81,8 @@ func Login(ctx context.Context, exchanger TokenExchanger, opts LoginOptions) (*C
 		gotState := query.Get("state")
 		code := query.Get("code")
 
-		// A mismatched or empty callback is not fatal to the login. Any local process, and
-		// any web page that guesses the port, can hit this endpoint; letting such a request
-		// abort the pending login would hand an attacker a trivial denial of service on
-		// `terma login`. Ignore it and keep waiting for the real one — the overall
-		// timeout still bounds how long that can take.
+		// Ignore a mismatched callback rather than abort: anything that guesses the port
+		// could otherwise deny the login.
 		if subtle.ConstantTimeCompare([]byte(gotState), []byte(state)) != 1 {
 			writeResultPage(w, http.StatusBadRequest, "Authorization failed", "This request did not match the login your terminal started.")
 			return
@@ -153,11 +140,9 @@ func Login(ctx context.Context, exchanger TokenExchanger, opts LoginOptions) (*C
 }
 
 // isLoopbackRequest reports whether the request is addressed to this listener on loopback.
-// An absent Host is rejected: every real browser sends one.
 func isLoopbackRequest(r *http.Request, port int) bool {
 	host, hostPort, err := net.SplitHostPort(r.Host)
 	if err != nil {
-		// No port in Host — never what a browser sends for an explicit :port URL.
 		return false
 	}
 	if hostPort != strconv.Itoa(port) {
@@ -185,8 +170,7 @@ func buildAuthorizeURL(appURL, challenge, state string, port int, label, organiz
 	return u + "?" + q.Encode()
 }
 
-// DefaultLabel names the machine in the approval prompt and the session list, so a
-// user with several logins can tell which one to revoke.
+// DefaultLabel names the machine in the approval prompt and the session list.
 func DefaultLabel() string {
 	host, err := os.Hostname()
 	if err != nil || host == "" {

@@ -11,20 +11,13 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// CodexSubagentStart announces a Codex subagent, which is a thread the session spawned.
-// Codex sends the root thread's session_id, the child thread's id as agent_id, and the
-// child's own rollout as transcript_path (codex-rs/core/src/hook_runtime.rs, read
-// 2026-09-17; not yet seen live). The rollout's first line is the spawn record — which
-// thread spawned this one, how deep, and Codex's labels for it — and the start carries
-// it, with rollout_status saying whether it could be read rather than dropping a miss.
-//
-// SubagentStop fires at the end of every turn of the child thread, not once: a Codex
-// end is per turn, told apart by turn_id, where Claude Code's is a bracket.
+// CodexSubagentStart announces a thread the session spawned with the spawn record from
+// the child's rollout, rollout_status saying whether it was read.
 func CodexSubagentStart(ctx context.Context, env hookrun.Env) error {
 	return codexSubagent(ctx, env, hookrun.EventSubagentStart)
 }
 
-// CodexSubagentStop is the end of the subagent CodexSubagentStart announced.
+// CodexSubagentStop handles Codex's per-turn subagent end, told apart by turn_id.
 func CodexSubagentStop(ctx context.Context, env hookrun.Env) error {
 	return codexSubagent(ctx, env, hookrun.EventSubagentEnd)
 }
@@ -59,13 +52,9 @@ func codexSubagent(ctx context.Context, env hookrun.Env, name string) error {
 	return nil
 }
 
-// codexRolloutID is the thread whose rollout a Codex hook's transcript_path names. A
-// subagent in Codex is a spawned thread with a rollout of its own: its hooks keep the
-// root thread's session_id, put the child thread's id in agent_id, and point
-// transcript_path at the child's rollout. Reading that file as the session's fails the
-// confined open's own check — the rollout says it is another thread's — so capture
-// inside a subagent recorded nothing but a mismatch. Codex names a rollout file after
-// its thread, which is what settles it; anything else is the session's, as before.
+// codexRolloutID is the thread whose rollout transcript_path names: a subagent's points at
+// the child's own rollout, which the confined open refuses as the session's. Codex names a
+// rollout file after its thread.
 func codexRolloutID(in *codexHookInput) string {
 	if session.ValidID(in.AgentID) && strings.Contains(filepath.Base(in.TranscriptPath), in.AgentID) {
 		return in.AgentID
@@ -73,10 +62,8 @@ func codexRolloutID(in *codexHookInput) string {
 	return in.SessionID
 }
 
-// codexSpawnAttrs copies a rollout's spawn record: the thread that spawned this one,
-// under parentKey, and Codex's own labels for the child (a random nickname, a
-// "/root/<task>" path). The parent is a session when the child is one (a start event
-// of its own) and an agent's parent when the child is a facet of the root's session.
+// codexSpawnAttrs copies the spawning thread (under parentKey) and Codex's labels for the
+// child, a random nickname and a "/root/<task>" path.
 func codexSpawnAttrs(attrs map[string]any, parentKey string, spawn CodexThreadSpawn) {
 	if !session.ValidID(spawn.ParentThreadID) {
 		return

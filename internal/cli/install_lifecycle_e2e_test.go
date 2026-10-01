@@ -14,15 +14,12 @@ import (
 	"time"
 )
 
-// End-to-end through the real terma binary, built once, run as a subprocess.
-
 var (
 	termaOnce sync.Once
 	termaPath string
 	termaErr  error
 )
 
-// termaBinary builds the CLI once for the package and returns its path.
 func termaBinary(t *testing.T) string {
 	t.Helper()
 	termaOnce.Do(func() {
@@ -67,7 +64,6 @@ func envWith(pairs ...string) []string {
 	return append(append(out, "TERMA_RELAY_SERVICE=0"), pairs...)
 }
 
-// withPath returns the current environment with PATH replaced by the given directories.
 func runProc(t *testing.T, bin, dir string, env []string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command(bin, args...)
@@ -80,11 +76,8 @@ func runProc(t *testing.T, bin, dir string, env []string, args ...string) string
 	return string(out)
 }
 
-// A Codex session launched through `terma shim exec` in a bound repo is handed that
-// project's runtime exporter; outside a bound repo it is a transparent pass-through.
-// The full install lifecycle through the real binary, offline (--harness none, a
-// verbatim project id so no sign-in): install writes the committed binding + hooks,
-// a re-run leaves the binding byte-identical, and uninstall removes it.
+// The install lifecycle through the real binary, offline: install writes the binding and
+// hooks, a re-run leaves the binding byte-identical, and uninstall removes it.
 func TestE2E_InstallLifecycle(t *testing.T) {
 	bin := termaBinary(t)
 	cfgDir := t.TempDir()
@@ -94,8 +87,8 @@ func TestE2E_InstallLifecycle(t *testing.T) {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}
 	}
-	// One environment for every run: it is part of the committed binding, so a run under
-	// another one would rewrite the file. dev, so that nothing here can reach production.
+	// One environment for every run, since it is part of the committed binding; dev, so
+	// nothing reaches production.
 	env := envWith("TERMA_CONFIG_DIR="+cfgDir, "TERMA_ENV=dev")
 	binding := filepath.Join(repo, ".terma", "settings.json")
 
@@ -115,10 +108,8 @@ func TestE2E_InstallLifecycle(t *testing.T) {
 		t.Fatalf("re-install churned the binding:\n--- first ---\n%s\n--- second ---\n%s", first, second)
 	}
 
-	// Nor does an already-bound repository need a sign-in to be re-installed without
-	// --project: there is no project to look up and no telemetry agent to mint a key for.
-	// (--no-browser and the deadline are the guard rails: a regression here would reach
-	// auth.Login, which otherwise opens a real browser and waits five minutes.)
+	// An already-bound repository re-installs without --project and without a sign-in;
+	// --no-browser and the deadline guard against reaching auth.Login.
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	rerun := exec.CommandContext(ctx, bin, "install", "--harness", "none", "--yes", "--no-browser", "--no-doctor")

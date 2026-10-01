@@ -10,9 +10,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
-// newHarnessListCommand reports terma's static support for each coding agent: what it
-// can do with it, and where a capability is missing. This is the catalog, not a
-// connection — `terma harness status` reads each harness's own config for that.
 func (app *App) newHarnessListCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:     "list [" + strings.Join(app.agents.SupportNames(), "|") + "]",
@@ -73,8 +70,7 @@ type harnessSupportReport struct {
 	Harnesses []agents.AgentSupport `json:"harnesses"`
 }
 
-// supportNotes joins the per-capability caveats for the NOTES column, telemetry first
-// because a missing telemetry capability is the gap a reader most needs to see.
+// supportNotes puts telemetry first: it is the gap a reader most needs to see.
 func supportNotes(a agents.AgentSupport) string {
 	var notes []string
 	if a.Telemetry.Note != "" {

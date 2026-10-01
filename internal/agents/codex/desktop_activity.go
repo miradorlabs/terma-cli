@@ -11,9 +11,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-// CodexDesktopActivity is a completed response or hosted action from Codex's local
-// rollout. Project hooks supply ordinary tool calls; only categories without a hook
-// are read here, so one action cannot be counted twice.
+// CodexDesktopActivity is a completed response or hosted action from the rollout; only
+// categories no hook reports are read, so no action counts twice.
 type CodexDesktopActivity struct {
 	Kind, ID, TurnID, TraceID, Model, ToolName, Input     string
 	Status, Reason                                        string
@@ -35,8 +34,8 @@ type CodexDesktopCursor struct {
 	Skipping bool   `json:"skipping,omitempty"`
 }
 
-// ReadCodexDesktopActivity reads at most 1 MiB and 128 relevant records per hook.
-// The caller must append each activity before persisting the returned cursor.
+// ReadCodexDesktopActivity reads at most 1 MiB and 128 relevant records per hook; the
+// caller appends each activity before persisting the cursor.
 func ReadCodexDesktopActivity(ctx context.Context, sessionID, transcript string, cursor CodexDesktopCursor, emit func(CodexDesktopActivity) error) (CodexDesktopCursor, string, error) {
 	f, status := openCodexRollout(ctx, sessionID, transcript)
 	if f == nil {

@@ -15,19 +15,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 )
 
-// Global mode's machine-wide agent hooks. In global mode the organization collects
-// every session on the machine, so the hooks that claim a session cannot live only in
-// repositories that opted in: `terma setup` writes terma's entries into each agent's
-// user-level hooks file (Claude Code's settings, Codex's $CODEX_HOME/hooks.json,
-// Cursor's ~/.cursor/hooks.json), calling `terma hook --user <event>` by absolute path.
-//
-// For those agents the machine-wide hooks are the ones that act: a repository's own
-// committed hooks step aside (hookYields), so nothing is recorded twice. It is not the
-// other way round because a repository's hooks do not always run — Codex skips them
-// until each developer trusts them — and global mode must not depend on that. The
-// agents that got machine-wide hooks are recorded (relay/user-hooks.json), which is how
-// a hook knows; leaving global mode removes the entries and the record, and until then
-// a machine-wide hook outside global mode does nothing.
+// In global mode `terma setup` writes machine-wide hooks into each agent's user-level
+// hooks file, and a repository's committed hooks step aside for them (hookYields): a
+// repository's hooks may not run until each developer trusts them.
 
 const userHooksFile = "user-hooks.json"
 
@@ -35,10 +25,7 @@ type userHooksRecord struct {
 	Agents []string `json:"agents"`
 }
 
-// userHookAgents are the agents with a user-level hooks file terma writes, among the
-// developer's: Codex Desktop counts as Codex (it runs the same hooks).
-// userHooksTrustSteps are what the selected agents need of the developer before their
-// machine-wide hooks run, unless an organization deployed them as managed configuration.
+// userHooksTrustSteps are what the developer must do before machine-wide hooks run.
 func (app *App) userHooksTrustSteps(selected []string) []string {
 	var steps []string
 	for _, name := range app.userHookAgents(selected) {
@@ -62,9 +49,6 @@ func (app *App) userHookAgents(selected []string) []string {
 	return out
 }
 
-// applyUserHooks writes terma's machine-wide hooks for the developer's agents (install)
-// or removes every one terma wrote (not install), and records which agents have them.
-// It reports the files it changed.
 func (app *App) applyUserHooks(selected []string, install bool) ([]string, error) {
 	terma, err := app.hookExecutable()
 	if err != nil {
@@ -73,8 +57,7 @@ func (app *App) applyUserHooks(selected []string, install bool) ([]string, error
 	covered := app.userHookAgents(selected)
 	var changed []string
 	for _, a := range app.agents.With[agents.UserHooks]() {
-		// Written for the developer's selected in global mode, unless the organization's
-		// managed hooks run for one — then setup's would run as well, and go.
+		// Not where the organization's managed hooks run: both would fire.
 		want := install && slices.Contains(covered, a.Name()) && !app.managedHooksDeployed(a.Name())
 		path, err := a.UserHooksPath()
 		dir, file := filepath.Dir(path), filepath.Base(path)
@@ -113,8 +96,7 @@ func (app *App) applyUserHooks(selected []string, install bool) ([]string, error
 		}
 		return changed, nil
 	}
-	// Recorded whichever hooks run for it — setup's or the organization's managed ones:
-	// either way a repository's committed hooks step aside for it.
+	// Recorded whichever hooks run, so a repository's committed hooks step aside either way.
 	return changed, config.WriteJSON(rec, userHooksRecord{Agents: covered}, 0o600)
 }
 
@@ -126,8 +108,6 @@ func userHooksRecordPath() (string, error) {
 	return filepath.Join(dir, userHooksFile), nil
 }
 
-// userHooksCover reports whether a machine-wide hook handles tool's events: global mode
-// wrote them for that agent.
 func (app *App) userHooksCover(tool string) bool {
 	path, err := userHooksRecordPath()
 	if err != nil {
@@ -144,15 +124,12 @@ func (app *App) userHooksCover(tool string) bool {
 	return slices.Contains(rec.Agents, app.agentForTool(tool))
 }
 
-// agentForTool maps a hook's tool label to its agent's name.
 func (app *App) agentForTool(tool string) string {
 	return app.agents.NameForTool(tool)
 }
 
-// hookYields reports whether this hook invocation leaves the event to another: a
-// machine-wide one (user) outside global mode — leftover from before the organization
-// left it — or a repository's committed one in global mode, for an agent whose
-// machine-wide hooks handle it.
+// hookYields is true for a leftover machine-wide hook outside global mode, or a committed
+// one in global mode whose agent has machine-wide hooks.
 func (app *App) hookYields(user bool, pol config.Policy, tool string) bool {
 	if user {
 		return !pol.Global()
@@ -160,10 +137,6 @@ func (app *App) hookYields(user bool, pol config.Policy, tool string) bool {
 	return pol.Global() && app.userHooksCover(tool)
 }
 
-// managedHookFiles are where an organization deploys global mode's hooks as managed
-// configuration, per agent: Claude Code's managed settings and Codex's system
-// requirements. An agent whose managed file carries terma's hooks gets none from setup:
-// both would run.
 func (app *App) managedHookFiles(agent string) []string {
 	a, ok := app.agents.Lookup(agent)
 	if !ok {
@@ -176,8 +149,6 @@ func (app *App) managedHookFiles(agent string) []string {
 	return managed.ManagedHookFiles(app.managedRoot)
 }
 
-// managedHooksDeployed reports whether the organization deployed terma's hooks for agent
-// as managed configuration.
 func (app *App) managedHooksDeployed(agent string) bool {
 	for _, f := range app.managedHookFiles(agent) {
 		if data, err := os.ReadFile(f); err == nil && strings.Contains(string(data), " hook --user ") {
@@ -187,10 +158,8 @@ func (app *App) managedHooksDeployed(agent string) bool {
 	return false
 }
 
-// writeManagedConfig writes global mode's hooks as managed configuration into dir, for
-// an organization to deploy to every machine (MDM, configuration management), and a
-// README saying where each file goes. terma is the path the hooks call it by on those
-// machines ($HOME is expanded per user). It needs no sign-in.
+// writeManagedConfig needs no sign-in; terma is the path the hooks call it by on the
+// deployed machines, with $HOME expanded per user.
 func (app *App) writeManagedConfig(dir, terma string) ([]string, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, err

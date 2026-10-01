@@ -24,7 +24,7 @@ func policyPath(team string) (string, error) {
 	return filepath.Join(dir, "policies", team+".json"), nil
 }
 
-// LoadPolicy is local only. Hooks never need a credential or a network request.
+// LoadPolicy reads a team's cached policy from disk; hooks never need a credential.
 func LoadPolicy(team string) (config.Policy, bool, error) {
 	path, err := policyPath(team)
 	if err != nil {
@@ -47,8 +47,7 @@ func LoadPolicy(team string) (config.Policy, bool, error) {
 	return p, true, nil
 }
 
-// SavePolicy atomically publishes a validated team's policy. Delayed responses
-// cannot roll a team's revision back; another team's revision is independent.
+// SavePolicy writes a team's policy, refusing one whose revision moved backwards.
 func SavePolicy(p config.Policy) error {
 	path, err := policyPath(p.TeamID)
 	if err != nil {
@@ -75,8 +74,8 @@ func SavePolicy(p config.Policy) error {
 	return config.WriteFileAtomic(path, b, 0o600)
 }
 
-// EffectivePolicy never borrows another team's capture grant. Unscoped policies
-// support legacy profiles and explicit offline fixtures.
+// EffectivePolicy is team's cached policy, else an unscoped or same-team fallback, else
+// collect nothing; it never borrows another team's grant.
 func EffectivePolicy(fallback config.Policy, team string) config.Policy {
 	p, ok, err := LoadPolicy(team)
 	if err == nil && ok && p.AppliesTo(fallback.OrganizationID, fallback.AuthURL) {

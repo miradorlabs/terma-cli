@@ -20,9 +20,7 @@ import (
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 )
 
-// boundRepo is a git repository bound to project, the test's own home and agent
-// configuration around it, and the fake auth host behind it. signedIn stores an Acme
-// session, which is what makes install check the binding: it signs in to route an agent.
+// boundRepo's signedIn stores a session, which is what makes install check the binding.
 func boundRepo(t *testing.T, bound termaproject.Project, signedIn bool) *fakeAuth {
 	t.Helper()
 	f := newFakeAuth(t)
@@ -60,11 +58,8 @@ func bindingNow(t *testing.T) termaproject.Project {
 	return f.Project
 }
 
-// A repository bound on the dev deployment, installed by a developer signed in to
-// production: the project does not exist there. install used to take the binding as it
-// stood and fail at the first key it minted, with the account service's own words — "no
-// such project in this organization — run `mirador project list`". It says what is wrong
-// now, before minting anything or touching the binding.
+// A binding from another environment is named as the problem before anything is minted
+// or the binding touched.
 func TestInstallRefusesABindingFromAnotherEnvironment(t *testing.T) {
 	devProject := termaproject.Project{
 		ID: "dddddddd-0000-4000-8000-000000000001", Name: "Terma Dev",
@@ -97,8 +92,7 @@ func TestInstallRefusesABindingFromAnotherEnvironment(t *testing.T) {
 	}
 }
 
-// Same environment, another organization: the developer may belong to it, so the error
-// names the switch as well as the rebind.
+// Another organization's binding: the error names the switch as well as the rebind.
 func TestInstallRefusesABindingFromAnotherOrganization(t *testing.T) {
 	beta := projectsIn(orgB().ID)[0]
 	f := boundRepo(t, termaproject.Project{ID: beta.ID, Name: beta.Name, OrganizationID: orgB().ID}, true)
@@ -117,8 +111,7 @@ func TestInstallRefusesABindingFromAnotherOrganization(t *testing.T) {
 	}
 }
 
-// --project is the way out the error names: it binds the repository to one of the
-// developer's projects, recorded with the environment it was chosen in.
+// --project rebinds, recorded with the environment it was chosen in.
 func TestInstallProjectRebindsAnUnreachableBinding(t *testing.T) {
 	boundRepo(t, termaproject.Project{ID: "dddddddd-0000-4000-8000-000000000001", Name: "Terma Dev", Environment: config.EnvDev}, true)
 
@@ -131,8 +124,7 @@ func TestInstallProjectRebindsAnUnreachableBinding(t *testing.T) {
 	}
 }
 
-// A binding the account can see is kept exactly as committed without a terminal to ask
-// on — a colleague's install must not churn the file.
+// Without a terminal a visible binding is kept exactly: a colleague's install must not churn it.
 func TestInstallKeepsAReachableBinding(t *testing.T) {
 	acme := projectsIn(orgA().ID)[1]
 	bound := termaproject.Project{ID: acme.ID, Name: acme.Name, OrganizationID: orgA().ID}
@@ -149,8 +141,7 @@ func TestInstallKeepsAReachableBinding(t *testing.T) {
 	}
 }
 
-// An explicit offline policy fixture permits an install without a credential, so
-// nothing checks the binding. It keeps the environment it was made in.
+// An offline policy fixture without a credential keeps the binding and its environment unchecked.
 func TestInstallWithoutACredentialKeepsTheBindingsEnvironment(t *testing.T) {
 	bound := termaproject.Project{ID: testProjectID, Name: "Terma Dev", Environment: config.EnvDev}
 	boundRepo(t, bound, false)
@@ -164,10 +155,8 @@ func TestInstallWithoutACredentialKeepsTheBindingsEnvironment(t *testing.T) {
 	}
 }
 
-// An organization with one project gives install nothing to choose, so it binds that
-// project without the picker — even with a person there to ask, on a first install and in
-// place of a binding the account cannot see alike. With several it still asks: here, with
-// no terminal to draw the picker on, that is the picker's own error.
+// One project is bound without the picker; several still ask, which without a terminal
+// is the picker's own error.
 func TestResolveBindingTakesTheOnlyProjectWithoutAsking(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
@@ -214,8 +203,7 @@ func TestUnreachableBindingWording(t *testing.T) {
 	}
 }
 
-// terma_version is the terma that last wrote the repository's committed files: an
-// install that writes none leaves an older one alone, and one that rewrites them moves it.
+// terma_version moves only when install writes a committed file.
 func TestInstallStampsTheVersionOnlyWhenItWritesCommittedFiles(t *testing.T) {
 	repo := installRepo(t)
 	install := func() {
@@ -256,9 +244,7 @@ func TestInstallStampsTheVersionOnlyWhenItWritesCommittedFiles(t *testing.T) {
 	}
 }
 
-// --prompts is the one switch for whether the developer's agents send what was said, and
-// the answer sticks: a re-install without it keeps the last one instead of switching
-// prompts back on, which is what re-running install used to do.
+// --prompts sticks: a re-install without it keeps the last choice.
 func TestInstallPromptsSwitchSticks(t *testing.T) {
 	acme := projectsIn(orgA().ID)[0]
 	boundRepo(t, termaproject.Project{ID: acme.ID, Name: acme.Name, OrganizationID: orgA().ID}, true)
@@ -317,8 +303,7 @@ func TestYesAnswer(t *testing.T) {
 	}
 }
 
-// --exclude-tool-content sticks like --prompts: a re-install without it keeps the last
-// choice instead of switching tool content back on (a review reproduced exactly that).
+// --exclude-tool-content sticks like --prompts.
 func TestInstallToolContentChoiceSticks(t *testing.T) {
 	acme := projectsIn(orgA().ID)[0]
 	boundRepo(t, termaproject.Project{ID: acme.ID, Name: acme.Name, OrganizationID: orgA().ID}, true)

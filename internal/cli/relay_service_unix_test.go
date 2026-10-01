@@ -14,8 +14,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 )
 
-// The service's relay (--idle 0) that finds a hook's relay running waits for it to
-// exit and takes over, rather than exiting and leaving the machine without a service.
+// A service relay (--idle 0) that finds a hook's relay running waits and takes over.
 func TestServiceRelayTakesOverFromAHooksRelay(t *testing.T) {
 	bin := termaBinary(t) // built before the sandbox moves HOME, and Go's caches with it
 	dir := relaySandbox(t)
@@ -47,9 +46,7 @@ func TestServiceRelayTakesOverFromAHooksRelay(t *testing.T) {
 	}
 }
 
-// The service's relay tells its manager whether to start it again: stopped (by `terma
-// relay setup`, to reread its setup) it exits ExitRestart; with its setup gone (terma
-// uninstalled) it exits 0 and stays stopped.
+// A stopped service relay exits ExitRestart to be restarted; with its setup gone it exits 0.
 func TestServiceRelayExitCodes(t *testing.T) {
 	bin := termaBinary(t)
 	dir := relaySandbox(t)

@@ -9,11 +9,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 )
 
-// Agent is OpenCode. It has no repository-scope hooks: Terma's plugin is user-scope,
-// written by `terma install` / `terma connect opencode`, and calls the binary directly with
-// the events below. It is an adapter here so `--adapters opencode` is a known name (a
-// repository can record it and carry an export policy for it) and so its events are
-// dispatched from the same table as everyone else's.
+// Agent is OpenCode, whose events come from terma's user-scope plugin; it has no
+// repository-scope hooks.
 type Agent struct{}
 
 func (Agent) Name() string                       { return "opencode" }

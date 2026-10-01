@@ -11,22 +11,19 @@ import (
 
 const metricsQueryPath = "/v1/metrics/query"
 
-// PromSample is one series of an instant-query vector: its labels and the value at
-// the evaluation instant.
+// PromSample is one series of an instant-query vector.
 type PromSample struct {
 	Metric map[string]string `json:"metric"`
 	Value  PromValue         `json:"value"`
 }
 
-// PromValue is Prometheus's [unix_seconds, "value"] pair. The value travels as a
-// string so precision survives; Float parses it on demand.
+// PromValue is Prometheus's [unix_seconds, "value"] pair, the value kept as a string for precision.
 type PromValue struct {
 	Time  float64
 	Value string
 }
 
-// UnmarshalJSON reads the two-element array, refusing any other length: a sample with
-// a missing half would otherwise decode as a zero at time zero.
+// UnmarshalJSON reads the two-element array, refusing any other length.
 func (v *PromValue) UnmarshalJSON(b []byte) error {
 	var raw []json.RawMessage
 	if err := json.Unmarshal(b, &raw); err != nil {
@@ -44,13 +41,12 @@ func (v *PromValue) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// MarshalJSON writes the pair back in Prometheus's shape, so `--output json` prints
-// what the gateway sent.
+// MarshalJSON writes the pair back in Prometheus's shape.
 func (v PromValue) MarshalJSON() ([]byte, error) {
 	return json.Marshal([]any{v.Time, v.Value})
 }
 
-// Float parses the sample's value. NaN and Inf are legal Prometheus values and parse.
+// Float parses the sample's value, NaN and Inf included.
 func (s PromSample) Float() (float64, error) {
 	return strconv.ParseFloat(s.Value.Value, 64)
 }
@@ -66,9 +62,7 @@ type PromResult struct {
 	Error     string `json:"error,omitempty"`
 }
 
-// QueryMetric evaluates a PromQL expression at one instant (zero at means now). The
-// gateway answers a bad expression with a 400, which surfaces as an *APIError; a
-// query that matches nothing is an empty vector, not an error.
+// QueryMetric evaluates a PromQL expression at one instant; a zero at means now.
 func (c *Client) QueryMetric(ctx context.Context, expr string, at time.Time) (PromResult, error) {
 	q := url.Values{"query": {expr}}
 	if !at.IsZero() {

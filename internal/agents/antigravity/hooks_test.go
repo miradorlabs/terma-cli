@@ -11,8 +11,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 )
 
-// agy's hooks.json is keyed by hook name. terma owns one name and leaves every other
-// author's entry byte-for-byte.
+// terma owns one hook name and leaves every other author's entry byte-for-byte.
 func TestAntigravityHooksMergeKeepsOtherNamedHooks(t *testing.T) {
 	root := t.TempDir()
 	hookruntest.WriteFile(t, root, hooksPath, `{

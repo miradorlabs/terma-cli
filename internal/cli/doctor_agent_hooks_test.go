@@ -25,9 +25,8 @@ func TestAgentHooksCheckRejectsMalformedSettings(t *testing.T) {
 	}
 }
 
-// The agent-hooks check reads what is wired from the repository's hooks files, and
-// calls an agent missing only when this developer uses it and the repository does not
-// wire it — never an agent nobody named.
+// An agent is missing only when this developer uses it and the repository does not wire
+// it, never an agent nobody named.
 func TestAgentHooksCheckReadsTheRepository(t *testing.T) {
 	root := t.TempDir()
 	if c := doctor.AgentHooksCheck(testApp.agents, root, nil); c.Status != doctor.Skip {
@@ -40,7 +39,7 @@ func TestAgentHooksCheckReadsTheRepository(t *testing.T) {
 		t.Fatalf("claude wired, no agents named: %v %q", c.Status, c.Detail)
 	}
 
-	// A developer who uses Cursor in a repository wired only for Claude Code.
+	// A developer who uses one agent in a repository wired only for another.
 	c = doctor.AgentHooksCheck(testApp.agents, root, []string{"cursor"})
 	if c.Status != doctor.Warn || !strings.Contains(c.Detail, "Cursor hooks missing") || c.Fix != "terma install" {
 		t.Fatalf("cursor named but not wired: %v %q fix %q", c.Status, c.Detail, c.Fix)
@@ -53,9 +52,7 @@ func TestAgentHooksCheckReadsTheRepository(t *testing.T) {
 	}
 }
 
-// Wired hooks an earlier terma wrote — here, missing an event this build adds — are out
-// of date, and the fix is the refresh that rewrites them, not a re-install that signs in
-// and asks everything again.
+// Hooks an earlier terma wrote are out of date, and the fix is the refresh, not a re-install.
 func TestAgentHooksCheckSendsStaleHooksToRefresh(t *testing.T) {
 	root := t.TempDir()
 	wireAdapters(t, root, "claude")

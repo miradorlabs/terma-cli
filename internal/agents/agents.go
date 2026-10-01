@@ -23,13 +23,12 @@ type Agent interface {
 	// Default reports whether a plain `terma install` wires this agent in root.
 	Default(root string) bool
 	Plan(root string, install bool) (hookmgr.Plan, error)
-	// Events maps each committed `terma hook <event>` name to its handler.
 	Events() map[string]Handler
 	// FlushAfter lists the events that start a detached spool flush.
 	FlushAfter() []string
 }
 
-// Selections is every name a developer may select a under, its own first.
+// Selections is every name a developer may select a by, its own first.
 func Selections(a Agent) []string {
 	var out []string
 	for _, s := range Surfaces(a) {

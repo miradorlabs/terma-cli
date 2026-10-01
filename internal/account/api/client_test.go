@@ -17,16 +17,12 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
-// newTestClient builds a client against a stub server with a CLI credential,
-// pointing the credential store at a temp dir so a refresh cannot touch the
-// developer's real ~/.config/terma.
+// newTestClient builds a client against a stub server, its credential store in a temp dir.
 func newTestClient(t *testing.T, url string, cred *auth.Credential, projectID string) *Client {
 	t.Helper()
 	return newSplitTestClient(t, url, url, cred, projectID)
 }
 
-// newSplitTestClient points the two surfaces at (possibly) different servers, which is
-// how they are deployed: api.mirador.org and auth.mirador.org.
 func newSplitTestClient(t *testing.T, apiURL, authURL string, cred *auth.Credential, projectID string) *Client {
 	t.Helper()
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
@@ -76,8 +72,6 @@ func TestClient_SendsBearerAndProjectHeader(t *testing.T) {
 	if gotAuth != "Bearer mir_cli_live" {
 		t.Errorf("Authorization = %q, want the access token", gotAuth)
 	}
-	// Without this header every project-scoped read is a 400 — it is the whole
-	// mechanism by which a project-less credential picks a project.
 	if gotProject != "project-123" {
 		t.Errorf("%s = %q, want project-123", projectHeader, gotProject)
 	}
@@ -110,8 +104,6 @@ func TestClient_ServerKeyDoesNotSendProjectHeader(t *testing.T) {
 	if gotAuth != "Bearer mir_srv_abc" {
 		t.Errorf("Authorization = %q, want the server key", gotAuth)
 	}
-	// The key's grant already fixes the project; sending a header would imply a
-	// scope the key does not have.
 	if gotProject != "" {
 		t.Errorf("%s = %q, want it omitted under a server key", projectHeader, gotProject)
 	}
@@ -151,8 +143,6 @@ func TestClient_RefreshesExpiredTokenBeforeRequesting(t *testing.T) {
 		t.Fatalf("Get: %v", err)
 	}
 
-	// A known-expired token refreshes up front, so the read costs one request
-	// rather than a guaranteed 401 followed by a retry.
 	if got := refreshes.Load(); got != 1 {
 		t.Errorf("refreshes = %d, want 1", got)
 	}
@@ -160,8 +150,6 @@ func TestClient_RefreshesExpiredTokenBeforeRequesting(t *testing.T) {
 		t.Errorf("reads = %d, want 1 (no wasted 401 round trip)", got)
 	}
 
-	// The rotated pair must be persisted: the server already invalidated the old
-	// refresh token, so losing the new one would strand the session.
 	saved, err := auth.LoadCredential(config.DefaultProfile)
 	if err != nil {
 		t.Fatalf("LoadCredential: %v", err)
@@ -184,8 +172,6 @@ func TestClient_RetriesOnceAfterUnexpected401(t *testing.T) {
 			})
 			return
 		}
-		// First read rejects a token the client believed was live — what a
-		// revocation or an out-of-band rotation looks like.
 		if reads.Add(1) == 1 {
 			w.WriteHeader(http.StatusUnauthorized)
 			w.Write([]byte(`{"error":{"code":"UNAUTHENTICATED","message":"invalid or expired CLI token"}}`))
@@ -226,7 +212,6 @@ func TestClient_SurfacesGatewayErrorEnvelope(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *APIError, got %T", err)
 	}
-	// The gateway's message names the fix, so it has to reach the user intact.
 	if apiErr.Message != "missing X-Mirador-Project header" {
 		t.Errorf("Message = %q", apiErr.Message)
 	}
@@ -260,17 +245,13 @@ func TestClient_DoesNotRefreshUnderAServerKey(t *testing.T) {
 	if err := client.Get(context.Background(), "/v1/identity", nil, &struct{}{}); err == nil {
 		t.Fatal("expected the 401 to surface")
 	}
-	// A server key has nothing to refresh; attempting it would be a pointless
-	// round trip and could mask a genuinely bad key.
 	if got := tokenCalls.Load(); got != 0 {
 		t.Errorf("token endpoint called %d times under a server key, want 0", got)
 	}
 }
 
-// TestClient_RoutesCredentialCallsToTheAuthHost pins the two-host split: a refresh must
-// go to the auth surface even though it was triggered by a data-plane read. Sending it
-// to the data host would leak a refresh token to a service that cannot honour it and
-// would fail every login on a real deployment.
+// TestClient_RoutesCredentialCallsToTheAuthHost pins that a refresh triggered by a
+// data-plane read goes to the auth host.
 func TestClient_RoutesCredentialCallsToTheAuthHost(t *testing.T) {
 	var dataPaths, authPaths []string
 
@@ -331,10 +312,8 @@ func TestClient_RoutesCredentialCallsToTheAuthHost(t *testing.T) {
 	}
 }
 
-// TestClient_RefusesACredentialFromAnotherDeployment covers pointing the CLI at one
-// deployment, logging in, then pointing it at another. Without this the second auth host
-// answers 401 and the message reads like a broken login rather than a wrong endpoint —
-// and the first deployment's token has been handed to the second on the way.
+// TestClient_RefusesACredentialFromAnotherDeployment refuses a token minted by another
+// auth host before sending it, naming both hosts.
 func TestClient_RefusesACredentialFromAnotherDeployment(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 
@@ -356,7 +335,6 @@ func TestClient_RefusesACredentialFromAnotherDeployment(t *testing.T) {
 	if _, ok := errors.AsType[*auth.ErrWrongEnvironment](err); !ok {
 		t.Fatalf("expected ErrWrongEnvironment, got %T: %v", err, err)
 	}
-	// Both hosts must appear, or the message does not tell you what to fix.
 	for _, want := range []string{"auth.other.example", "auth.mirador.org"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error should name %q, got %v", want, err)
@@ -392,7 +370,7 @@ func TestClient_AcceptsACredentialFromTheSameEnvironment(t *testing.T) {
 	}
 }
 
-// TestClient_StampsTheIssuingHostOnLogin is what makes the guard above possible.
+// TestClient_StampsTheIssuingHostOnLogin records the issuing host on a new credential.
 func TestClient_StampsTheIssuingHostOnLogin(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
@@ -415,10 +393,7 @@ func TestClient_StampsTheIssuingHostOnLogin(t *testing.T) {
 	}
 }
 
-// parseError fills Message from a plain body or the status text, and Error() used to
-// discard it unless the gateway had also sent a code or a request id — so a proxy's
-// 502 read "request failed with status 502" and a stream error with no code read
-// "request failed with status 0".
+// An error without the gateway's envelope keeps its message.
 func TestAPIErrorKeepsItsMessage(t *testing.T) {
 	for _, tc := range []struct {
 		name string

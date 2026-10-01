@@ -12,10 +12,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
-// followFrames drains a live feed, handing every frame that carries state to onFrame.
-// Heartbeats are swallowed, an `error` frame ends the command with the gateway's
-// message, and the hourly connection rotation surfaces as an error rather than a
-// silent stop.
+// followFrames drains a live feed: heartbeats are swallowed, and an `error` frame or the
+// hourly connection rotation ends it with an error rather than a silent stop.
 func followFrames(cmd *cobra.Command, format output.Format, stream *api.Stream, onFrame func(*api.Event) error) error {
 	if format != output.FormatTable && format != output.FormatJSON {
 		return fmt.Errorf("--follow renders as table or json (newline-delimited events)")
@@ -45,8 +43,7 @@ func followFrames(cmd *cobra.Command, format output.Format, stream *api.Stream, 
 	}
 }
 
-// writeFrame prints a frame the way --follow's JSON does: one newline-delimited
-// envelope {"event": …, "data": …}, the data exactly as the gateway sent it.
+// writeFrame prints a frame as a {"event": …, "data": …} line, data as the gateway sent it.
 func writeFrame(w io.Writer, f *api.Event) error {
 	return json.NewEncoder(w).Encode(struct {
 		Event string          `json:"event"`
@@ -54,9 +51,7 @@ func writeFrame(w io.Writer, f *api.Event) error {
 	}{f.Name, json.RawMessage(f.Data)})
 }
 
-// followUpserts drains a live upsert feed. A table prints one line per upsert as it
-// arrives; JSON is one envelope per frame so a consumer can key on activity_id and
-// replace.
+// followUpserts drains a live upsert feed: a line per upsert, or a JSON envelope per frame.
 func followUpserts(cmd *cobra.Command, format output.Format, stream *api.Stream, onUpsert func(json.RawMessage) error) error {
 	return followFrames(cmd, format, stream, func(f *api.Event) error {
 		switch {
@@ -72,11 +67,8 @@ func followUpserts(cmd *cobra.Command, format output.Format, stream *api.Stream,
 	})
 }
 
-// followSessionSnapshots drains the live session catalog. The gateway does not send
-// changes: it re-sends the whole first page on a fixed interval, changed or not. A
-// frame identical to the last carries nothing and is dropped. JSON passes every other
-// frame through for the consumer to replace its copy with; a table prints one line per
-// session that is new or differs from the row last printed for it.
+// followSessionSnapshots drains the session catalog, which the gateway re-sends whole on an
+// interval: identical frames are dropped, and a table prints only new or changed sessions.
 func followSessionSnapshots(cmd *cobra.Command, format output.Format, stream *api.Stream, index *principalIndex) error {
 	var last string
 	printed := map[string]string{}

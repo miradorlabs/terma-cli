@@ -10,10 +10,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
-// Agent is Hermes (Nous Research). Its shell hooks are user-level only and do not
-// fire in its TUI, so terma's user-level plugin (internal/harness/hermes) calls the
-// binary with the events below. It is an adapter so `terma hook hermes-*` dispatches
-// from the same table as everyone else's.
+// Agent is Hermes, whose events come from terma's user-level plugin.
 type Agent struct{}
 
 func (Agent) Name() string        { return "hermes" }

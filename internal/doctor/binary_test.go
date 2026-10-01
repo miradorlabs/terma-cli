@@ -92,9 +92,8 @@ func TestDoctorRecognizesOfficialNpmLauncher(t *testing.T) {
 	}
 }
 
-// Two copies are only a problem when they disagree: a second build somewhere an agent
-// started outside this shell would find first is reported; the same build, a link to this
-// file, a non-executable and terma's own shim directory are not.
+// Only a different build is reported, not the same build, a link, a non-executable or the
+// shim directory.
 func TestOtherTermasReportsOnlyADifferentBuild(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	primary := writeTerma(t, t.TempDir(), "build A")
@@ -113,8 +112,7 @@ func TestOtherTermasReportsOnlyADifferentBuild(t *testing.T) {
 		t.Fatalf("nothing here disagrees with the primary: %v", others)
 	}
 
-	// A stale copy where PATH does not look — the system directory an app started from
-	// the Dock searches first — found through the well-known list.
+	// A stale copy where PATH does not look, found through the well-known list.
 	stale := writeTerma(t, t.TempDir(), "build B, from this morning")
 	others := otherTermas(primary, []string{filepath.Dir(stale), filepath.Dir(stale)})
 	if len(others) != 1 || !strings.Contains(others[0], filepath.Base(filepath.Dir(stale))) || !strings.Contains(others[0], "installed ") {
@@ -122,9 +120,7 @@ func TestOtherTermasReportsOnlyADifferentBuild(t *testing.T) {
 	}
 }
 
-// A build run from a directory that is not on PATH — `make build` and then bin/terma —
-// installs hooks that call `terma` by name and find nothing. The fix is the command that
-// puts the directory on PATH, quoted once and whole, so it is drawn as one command to copy.
+// A build off PATH gets, as its fix, the one quoted command that puts its directory on PATH.
 func TestDoctorGivesTheCommandThatPutsTermaOnPath(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	home := t.TempDir()
@@ -144,8 +140,7 @@ func TestDoctorGivesTheCommandThatPutsTermaOnPath(t *testing.T) {
 	if !ok || reload != "source ~/.zshrc" || !strings.HasSuffix(echo, " >> ~/.zshrc") {
 		t.Fatalf("zsh: %q, want the line appended to ~/.zshrc, then sourced", command)
 	}
-	// The quoting holds for a directory with a quote and a space in it: the line lands in
-	// the file exactly as terma writes a PATH line for this shell.
+	// The quoting holds for a directory with a quote and a space in it.
 	if out, err := exec.Command("/bin/sh", "-c", echo).CombinedOutput(); err != nil {
 		t.Fatalf("%s: %v\n%s", echo, err, out)
 	}

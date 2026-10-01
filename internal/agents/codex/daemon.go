@@ -9,11 +9,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-// Codex's app-server daemon (0.157+ runs the interactive TUI's threads in it by
-// default, and Codex Desktop's) reads the [otel] exporter once, when it starts: a
-// config change reaches its threads only after `codex app-server daemon restart`
-// (docs/RELAY.md). Its record is $CODEX_HOME/app-server-daemon/daemon.pid:
-// {"pid":…, "processIdentity":{"startSeconds":…}, …}.
+// Codex's app-server daemon reads [otel] only when it starts, so a config change reaches
+// its threads only after `codex app-server daemon restart`.
 
 // CodexDaemon is a running Codex app-server daemon.
 type CodexDaemon struct {
@@ -21,8 +18,7 @@ type CodexDaemon struct {
 	Started time.Time
 }
 
-// RunningCodexDaemon reports the daemon for $CODEX_HOME, if its record names a live
-// process.
+// RunningCodexDaemon reports the daemon for $CODEX_HOME if its record names a live process.
 func RunningCodexDaemon() (CodexDaemon, bool) {
 	home, err := codexHome()
 	if err != nil {

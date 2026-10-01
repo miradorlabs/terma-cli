@@ -82,9 +82,7 @@ func TestClaudeSettingsCreatedAndRemovedWhole(t *testing.T) {
 	}
 }
 
-// The committed files hold the guard as written. encoding/json would otherwise commit
-// `>` and `&` as \u003e and \u0026 — and rewrite any user hook that carries a redirect
-// the same way.
+// Committed files keep `>` and `&` unescaped, user hooks included.
 func TestHookFilesAreNotHTMLEscaped(t *testing.T) {
 	root := t.TempDir()
 	const userHook = `echo edited >> hooks.log && true`
@@ -111,7 +109,6 @@ func TestHookFilesAreNotHTMLEscaped(t *testing.T) {
 	if !strings.Contains(got, userHook) {
 		t.Fatalf("user's redirecting hook was rewritten:\n%s", got)
 	}
-	// Still valid JSON that parses back to the same commands.
 	var doc struct {
 		Hooks map[string][]struct {
 			Hooks []struct {
@@ -131,7 +128,7 @@ func TestHookFilesAreNotHTMLEscaped(t *testing.T) {
 	_ = os.Remove // keep os imported for readers extending this test with file checks
 }
 
-// Absent is still absent: the contract change must not turn a first install into an error.
+// A first install still creates what is missing.
 func TestPlannersStillCreateWhatIsMissing(t *testing.T) {
 	plan, err := planSettings(t.TempDir(), true)
 	if err != nil {

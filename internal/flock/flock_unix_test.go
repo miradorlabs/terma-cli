@@ -63,8 +63,7 @@ func TestTryLockReportsAHeldLockAsBusy(t *testing.T) {
 	again()
 }
 
-// A lock file lives in a directory other processes can write to; TryLock must not be
-// walked through a link into locking, or creating, a file somewhere else.
+// TryLock never follows a planted link to lock or create a file elsewhere.
 func TestTryLockRefusesASymlink(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "elsewhere")

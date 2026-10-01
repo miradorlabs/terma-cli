@@ -19,8 +19,7 @@ import (
 // RetryAfter is how long hooks leave a failed start before trying again.
 const RetryAfter = time.Minute
 
-// Stop asks a running relay to stop (SIGTERM through its pid file) and waits for
-// its lock, so a setup that changed the address or token takes effect.
+// Stop asks a running relay to stop and waits for its lock, so a changed address or token takes effect.
 func Stop(dir string) {
 	data, err := os.ReadFile(filepath.Join(dir, PIDFile))
 	if err != nil {
@@ -35,8 +34,7 @@ func Stop(dir string) {
 		return
 	}
 	if proc.Signal(syscall.SIGTERM) != nil {
-		// Windows signals nothing but a kill, which would skip the relay's delivery of
-		// what it accepted: ask through the stop file instead.
+		// Windows signals nothing but a kill, which would skip delivery: ask through the stop file.
 		if config.WriteFileAtomicNoSync(filepath.Join(dir, StopFile), []byte(strconv.Itoa(pid)+"\n"), 0o600) != nil {
 			return
 		}
@@ -49,10 +47,8 @@ func Stop(dir string) {
 	}
 }
 
-// Spawn starts `terma relay run` detached, unless one is already running. A hook calls
-// it after claiming a session, so the relay is up before the session's first export in
-// the common case and restarted if it idled out; two hooks racing here both start one
-// and the second exits at its lock.
+// Spawn starts `terma relay run` detached unless one is running; of two racing hooks, the
+// second's relay exits at its lock.
 func Spawn() {
 	dir, err := claim.Dir()
 	if err != nil {
@@ -60,17 +56,15 @@ func Spawn() {
 	}
 	unlock, err := flock.TryLock(filepath.Join(dir, LockFile))
 	if err != nil {
-		return // running (or unlockable: nothing to do from a hook either way)
+		return
 	}
 	unlock()
-	// One that just failed to start (its port taken) is not retried by every hook:
-	// each would start a process that fails the same way.
+	// A relay that just failed to start is not retried by every hook: each would fail the same way.
 	if info, err := os.Stat(filepath.Join(dir, ErrorFile)); err == nil && time.Since(info.ModTime()) < RetryAfter {
 		return
 	}
 	exe, err := os.Executable()
-	// A package's tests run as <package>.test: that binary is no relay, and would only
-	// fail on the flags while the caller waited for it to listen.
+	// A <package>.test binary is no relay, and would only fail on the flags.
 	if err != nil || strings.HasSuffix(filepath.Base(exe), ".test") {
 		return
 	}
@@ -81,10 +75,8 @@ func Spawn() {
 		return
 	}
 	_ = proc.Process.Release()
-	// Wait, briefly, until it listens. The hook runs before its turn does, so an agent
-	// that exports as soon as the hook returns — Claude Code 2.1.280 did, right after
-	// UserPromptSubmit — finds the relay up instead of a refused connection it will not
-	// retry. Only a hook that had to start the relay waits; the others return above.
+	// Wait until it listens: an agent may export as soon as the hook returns, and never
+	// retries a refused connection.
 	addr := Addr(dir)
 	for deadline := time.Now().Add(StartWait); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
 		if conn, err := net.DialTimeout("tcp", addr, 50*time.Millisecond); err == nil {

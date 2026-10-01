@@ -72,9 +72,8 @@ func TestCursorSubagentStopRecordsOutcomeAndFiles(t *testing.T) {
 	}
 }
 
-// cursor-agent can file a subagent's own afterFileEdit under the subagent's conversation
-// id. Left there, the commit is stamped with a session nobody can open — or, once
-// subagentStop adds the same files to the parent, with two.
+// A subagent's afterFileEdit under its own conversation id is folded into the parent's,
+// so the commit carries one trailer.
 func TestCursorSubagentEditsAreFoldedIntoTheParentConversation(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	ctx := context.Background()

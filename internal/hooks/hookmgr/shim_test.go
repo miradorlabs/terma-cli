@@ -10,10 +10,8 @@ import (
 	"time"
 )
 
-// TestShimNeverChainsItself runs the committed shim through git with
-// core.hooksPath pointing at the shim directory (the installed layout) and a
-// terma-less PATH. The shim must exit 0 promptly, chain the repository's own
-// hook of the same name, and never exec itself.
+// TestShimNeverChainsItself proves the installed shim, without terma, exits 0, chains the
+// repository's own hook once, and never execs itself.
 func TestShimNeverChainsItself(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not installed")
@@ -60,10 +58,7 @@ func TestShimNeverChainsItself(t *testing.T) {
 	cmd.Dir = root
 	cmd.Env = append(os.Environ(), "PATH=/usr/bin:/bin", "TERMA_CHAIN_HOOKS_DIR=")
 	out, err := cmd.CombinedOutput()
-	// The context deadline is the recursion guard: a shim that execs itself never
-	// returns, and the deadline is what stops it. There is deliberately no tighter
-	// wall-clock bound here — this test measures correctness, not speed (that is
-	// `make bench-hook`), and a 2s bound flaked under -race on a loaded runner.
+	// The deadline is the recursion guard; a tighter wall-clock bound flaked under -race.
 	if ctx.Err() != nil {
 		t.Fatalf("shim did not finish (recursion?):\n%s", out)
 	}

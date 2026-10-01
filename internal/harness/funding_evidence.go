@@ -11,13 +11,8 @@ import (
 	"time"
 )
 
-// FundingEvidence contains only allowlisted metadata. SourceTime is when the
-// provider wrote a snapshot; observation time is added by the hook. Status is
-// explicit so missing, malformed and inaccessible data never turn into zero.
-//
-// This file holds the harness-agnostic evidence machinery — the reader, the
-// copiers and the value validators. Each provider's own evidence gathering lives
-// in its file: Claude in claude_funding.go, Codex in codex_funding.go.
+// FundingEvidence is allowlisted metadata with an explicit Status, so missing or
+// malformed data never reads as zero; SourceTime is when the provider wrote it.
 type FundingEvidence struct {
 	Source     string
 	Status     string
@@ -92,9 +87,7 @@ func CopyEvidenceNumber(dst map[string]any, doc map[string]json.RawMessage, from
 	}
 }
 
-// ValidEmail is a bounded shape check (not RFC 5322): the address rides verbatim into every quota
-// spool entry, so it must be non-empty, within the spool budget, and free of separators that would
-// corrupt an attribute value.
+// ValidEmail is a bounded shape check, not RFC 5322, free of separators that would corrupt an attribute.
 func ValidEmail(s string) bool {
 	if len(s) < 3 || len(s) > 254 {
 		return false

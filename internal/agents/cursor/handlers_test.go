@@ -15,9 +15,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// Cursor's user-level hooks run from ~/.cursor, so the repository has to come from the
-// workspace roots in the payload — and afterFileEdit carries no session_id, so the
-// conversation id is what ties the edits to the session. Both are exercised here.
+// The repository comes from the payload's workspace roots, and the conversation id ties
+// afterFileEdit (which has no session_id) to the session.
 func TestCursorConversationIsStampedOnItsCommit(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	ctx := context.Background()
@@ -87,7 +86,6 @@ func TestCursorHandlersIgnoreBadInput(t *testing.T) {
 	}
 }
 
-// testEnv is a hook environment in a repository bound to project-a, with a private spool.
 func testEnv(t *testing.T) hookrun.Env {
 	root, sp := hookruntest.Project(t)
 	return hookrun.Env{Now: time.Now(), Cwd: root, Spool: sp, Version: "test", Policy: config.DefaultPolicy()}

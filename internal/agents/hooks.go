@@ -37,10 +37,9 @@ type UserHooksTrust interface {
 // ManagedHooks is an agent whose machine-wide hooks an organization can deploy.
 type ManagedHooks interface {
 	Agent
-	// ManagedHookFiles are where an administrator deploys them, under root.
 	ManagedHookFiles(root string) []string
-	// ManagedConfig is the file an organization deploys, by the name it is written as.
 	ManagedConfig(command func(event string) string) (name string, data []byte, err error)
+
 	// ManagedDeploy says where that file goes, as Markdown.
 	ManagedDeploy() string
 }
@@ -54,15 +53,13 @@ type PayloadReader interface {
 // RenderHandler is a hook that draws something; its result is the process's exit status.
 type RenderHandler = func(context.Context, hookrun.Env) int
 
-// Renderer is an agent with hooks that render another command's output. They run even
-// with hooks switched off, capturing nothing (env.Spool is nil), never claim a session,
-// and end the process with their own exit status.
+// Renderer is an agent with hooks that render another command's output; they run even
+// with hooks switched off (env.Spool is nil) and never claim a session.
 type Renderer interface {
 	Renders() map[string]RenderHandler
 }
 
-// OffSwitched is an agent with events that still owe the developer something when hooks
-// are switched off: what they run instead.
+// OffSwitched is an agent with events that run something else when hooks are switched off.
 type OffSwitched interface {
 	WhenHooksOff() map[string]Handler
 }

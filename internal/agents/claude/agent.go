@@ -12,9 +12,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
-// Agent is Claude Code: project hooks in .claude/settings.json, wired into every
-// repository by default because the file is Claude Code's own project settings and a
-// repository without one loses nothing by gaining it.
+// Agent is Claude Code: hooks in .claude/settings.json, wired by default because a repository
+// loses nothing by gaining that file.
 type Agent struct{}
 
 func (Agent) Name() string                       { return "claude" }
@@ -33,12 +32,10 @@ func (Agent) Events() map[string]agents.Handler {
 		"post-tool-use": postToolUse,
 		"stop":          stop,
 		"stop-failure":  stopFailure,
-		// Turn start: claims the session for the local relay and starts it (internal/cli/hook.go
-		// does both from the payload); the handler itself only reads the payload.
+		// internal/cli/hook.go claims the session and starts the relay from the payload.
 		"user-prompt-submit": hookrun.TurnStart,
-		// A subagent runs inside the session; both are notification-only for terma.
-		"subagent-start": subagentStart,
-		"subagent-stop":  subagentStop,
+		"subagent-start":     subagentStart,
+		"subagent-stop":      subagentStop,
 	}
 }
 
@@ -72,9 +69,7 @@ func (Agent) Harness() harness.Harness { return exporter{} }
 // RefreshMachine rewrites the status-line wrap.
 func (Agent) RefreshMachine() (string, bool, error) { return exporter{}.RefreshStatusLine() }
 
-// Renders is the status line: Claude Code's statusLine command once terma has wrapped
-// it. The renderer has its own deadline even when Claude does not cancel it; capture
-// starts detached delivery before waiting for rendering.
+// Renders is the wrapped statusLine command; the renderer has its own deadline.
 func (Agent) Renders() map[string]agents.RenderHandler {
 	return map[string]agents.RenderHandler{"statusline": func(ctx context.Context, env hookrun.Env) int {
 		renderer, err := statusLineRenderer()

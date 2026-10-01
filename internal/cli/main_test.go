@@ -14,22 +14,15 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/shape"
 )
 
-// TestMain gives the whole package a private home before any test runs. Commands write
-// to the developer's agent configuration — `terma setup` points Codex's and Claude's
-// exporters at the relay — and one test that sandboxed only terma's config directory
-// rewrote the real ~/.codex/config.toml. A test that wants a particular home still sets
-// its own (sandboxMachine); none can reach the real one by forgetting to.
-//
-// Go's caches stay where they are: under a fresh HOME, every `go build` a test runs
-// (termaBinary) would download and compile the world again.
-// testApp is the command line every test runs, with this build's agents. What else is
-// installed on the machine running the tests is none of their business.
+// testApp is the command line every test runs, with this build's agents and no other termas.
 var testApp = func() *App {
 	app := New(builtin.Agents(), "dev")
 	app.binDirs = func() []string { return nil }
 	return app
 }()
 
+// TestMain gives the package a private HOME so no test can rewrite the developer's agent
+// configuration; Go's caches stay put, or every test build would recompile the world.
 func TestMain(m *testing.M) {
 	os.Exit(runIsolated(m))
 }
@@ -57,8 +50,7 @@ func runIsolated(m *testing.M) int {
 		"CODEX_HOME":        home + "/.codex",
 		"TERMA_CONFIG_DIR":  home + "/.config/terma",
 		"GEMINI_CLI_HOME":   home,
-		// Command unit tests are offline; policy integration tests explicitly clear
-		// this override and exercise the real authenticated HTTP path.
+		// Offline; policy integration tests clear this and use the real HTTP path.
 		"TERMA_POLICY_STUB": `{"mode":"repo","include_prompts":true,"include_tool_content":true}`,
 	} {
 		_ = os.Setenv(k, v)
@@ -72,13 +64,11 @@ func newTestRelay(o relay.Options) *relay.Relay {
 	return relay.New(o)
 }
 
-// hooksPathOf is the hooks file the named agent commits.
 func hooksPathOf(name string) string {
 	a, _ := testApp.agents.Lookup(name)
 	return a.HooksPath()
 }
 
-// harnessOf is the named agent's harness.
 func harnessOf(t *testing.T, name string) harness.Harness {
 	t.Helper()
 	h, err := testApp.agents.Harness(name)
@@ -88,7 +78,7 @@ func harnessOf(t *testing.T, name string) harness.Harness {
 	return h
 }
 
-// claudeHarness is Claude Code's harness and status line, as these tests use them.
+// claudeHarness is the status-line agent's harness with the capabilities these tests use.
 func claudeHarness(t *testing.T) struct {
 	harness.Scoped
 	harness.Credentialed
@@ -109,5 +99,4 @@ func claudeHarness(t *testing.T) struct {
 	}{scoped, credentialed, line}
 }
 
-// codexDesktopAgent is Codex Desktop's surface name.
 const codexDesktopAgent = "codex-desktop"

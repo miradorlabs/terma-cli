@@ -1,14 +1,10 @@
 // Package agents is the contract a coding agent implements and the registry of the
-// agents a build of terma knows. Each agent lives in its own package below this one,
-// internal/agents/<name>; package builtin registers them, and code a few agents share
-// is in internal/agents/internal. Nothing else in terma names an agent: what the core
-// needs of one it asks through this package (internal/boundary enforces it).
+// agents a build knows. Each agent is a package below this one, builtin registers them,
+// and nothing else in terma names an agent (internal/boundary enforces it).
 //
-// Every agent implements Agent: its name, its committed hooks file and the plan that
-// writes it, and the `terma hook` events it handles. The rest is optional, and an
-// agent implements only what it has; the registry finds each capability with
-// Registry.With and Registry.Find, and each agent package asserts the ones it
-// implements (var _), so a drifted method fails the build instead of switching off.
+// Every agent implements Agent; the rest is optional capabilities, found with
+// Registry.With and Registry.Find and asserted by each agent package (var _), so a
+// drifted method fails the build instead of switching off.
 //
 // Hooks (hooks.go)
 //
@@ -38,8 +34,6 @@
 //	Notifier         the end-of-turn notifier terma chains in front of the developer's
 //	EmissionChecker  an export that several settings files decide together
 //
-// How the relay places and redacts the agent's records, and which of its keys are safe
-// to pass, is declared through internal/relay/shape (Correlator and Capturer); the
-// relay pins the safe keys everyone declares. How completely terma supports the agent
-// is Covered (support.go).
+// How the relay places and redacts an agent's records is declared through
+// internal/relay/shape (Correlator and Capturer); support levels are Covered (support.go).
 package agents

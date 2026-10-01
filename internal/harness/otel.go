@@ -8,6 +8,5 @@ const (
 	EnvResourceAttributes = "OTEL_RESOURCE_ATTRIBUTES"
 )
 
-// ProtocolHTTPProtobuf is chosen over grpc because it traverses ordinary HTTPS proxies
-// and corporate TLS interception, which the gRPC transport frequently does not.
+// ProtocolHTTPProtobuf is chosen over grpc because it traverses HTTPS proxies and TLS interception.
 const ProtocolHTTPProtobuf = "http/protobuf"

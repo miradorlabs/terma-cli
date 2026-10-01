@@ -12,9 +12,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 )
 
-// An extension's session is announced under its tool, names the files it edits, stamps
-// the commit that follows, and ends; a prompt spools nothing, and a payload with no
-// session or an unsafe one records nothing.
+// An extension's session is announced, names its edits, stamps the next commit and ends;
+// a prompt, or a missing or unsafe session id, records nothing.
 func TestExtensionSessionIsStampedOnItsCommit(t *testing.T) {
 	root, sp := hookruntest.Project(t)
 	ctx := context.Background()

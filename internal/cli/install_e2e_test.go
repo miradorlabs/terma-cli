@@ -18,8 +18,8 @@ import (
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 )
 
-// Run the built CLI, never Cobra in process. Each scenario gets private config,
-// no inherited credentials/exporters/Git overrides, and a bounded subprocess.
+// installSandbox runs the built CLI as a bounded subprocess with private config and no
+// inherited credentials, exporters or Git overrides.
 type installSandbox struct {
 	t         *testing.T
 	bin, base string
@@ -579,8 +579,7 @@ func TestInstallE2EUninstallOwnership(t *testing.T) {
 			if doc.Env["USER_FLAG"] != "keep" || len(doc.Hooks) != 0 {
 				t.Fatalf("uninstall damaged user settings or left hooks: %+v", doc)
 			}
-			// Without this machine's journal the policy terma wrote ("1") is still terma's
-			// to remove — a colleague's committed policy is removable from any clone.
+			// Without the journal, a value terma writes ("1") is still terma's to remove.
 			want := map[string]string{"journal_restores": "0", "journal_missing": "", "user_changed_after_install": "user-choice"}[kind]
 			if doc.Env["OTEL_LOG_USER_PROMPTS"] != want {
 				t.Fatalf("policy %q, want %q", doc.Env["OTEL_LOG_USER_PROMPTS"], want)
@@ -676,8 +675,7 @@ func TestInstallE2EUpgradesLegacyHooksPath(t *testing.T) {
 			s := newInstallSandbox(t)
 			root := s.mkdir("workspace")
 			s.git(root, "init", "-q")
-			// Reproduce the on-disk shape from the released installer, rather
-			// than using the current installer to create the initial state.
+			// Reproduce the released installer's on-disk shape.
 			s.git(root, "config", "--local", "core.hooksPath", hookmgr.ShimDir)
 			record, err := json.Marshal(map[string]string{
 				"previous_hooks_path": previous,

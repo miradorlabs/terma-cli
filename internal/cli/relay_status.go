@@ -44,8 +44,7 @@ func newRelayStatusCommand() *cobra.Command {
 			for _, k := range snap.Keys() {
 				fmt.Fprintf(out, "  %-44s %d\n", k, snap.Counters[k])
 			}
-			// What waits on disk for delivery: accepted for a claimed session, not yet
-			// taken by its project's host. The next relay sends it.
+			// Accepted for a claimed session and not yet taken by its host.
 			for _, q := range relay.Backlog(filepath.Join(dir, relay.OutboxDir)) {
 				who := q.Project
 				if q.Tool != "" {

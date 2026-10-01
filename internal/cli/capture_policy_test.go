@@ -267,8 +267,8 @@ func TestQueuedRelayExportsRespectHarnessDeselection(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("the selected harness never attempted delivery")
 	}
-	// The first delivery is still blocked. Remove Codex while its accepted part
-	// remains on disk, then let the retry re-read the saved harness selection.
+	// Deselect the harness while its accepted part is on disk; the retry must re-read
+	// the selection.
 	rec.Harnesses = []string{"claude"}
 	if err := routing.SaveRecord(rec); err != nil {
 		t.Fatal(err)

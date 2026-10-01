@@ -15,9 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// The payloads below are what agy 1.2.4 wrote to the probe hooks on 2026-09-16, with
-// the workspace substituted; agy 1.2.7 wrote the same keys on 2026-09-18. Hooks run from <workspace>/.agents, so the repository has
-// to come from workspacePaths; every event expects `{}` back on stdout.
+// antigravityPayload is a recorded agy payload with the workspace substituted.
 func antigravityPayload(root, event string, extra string) string {
 	common := `"artifactDirectoryPath":"/home/dev/.gemini/antigravity-cli/brain/6ac5e722-b53c-4798-8cc5-9d1d035b68da","conversationId":"6ac5e722-b53c-4798-8cc5-9d1d035b68da","modelName":"gemini-3.8-flash-high","transcriptPath":"/home/dev/.gemini/antigravity-cli/brain/6ac5e722-b53c-4798-8cc5-9d1d035b68da/.system_generated/logs/transcript_full.jsonl","workspacePaths":["` + root + `"]`
 	_ = event
@@ -70,7 +68,7 @@ func TestAntigravityConversationIsStampedOnItsCommit(t *testing.T) {
 	// A read is not an edit, and a file outside the repository is not ours.
 	run(postToolUse, antigravityPayload(root, "PostToolUse", `"error":"","stepIdx":6,"toolCall":{"args":{"AbsolutePath":"`+filepath.Join(root, "hello.txt")+`"},"name":"view_file"}`))
 	run(postToolUse, antigravityPayload(root, "PostToolUse", `"error":"","stepIdx":7,"toolCall":{"args":{"TargetFile":"/etc/hosts"},"name":"write_to_file"}`))
-	// spooled drains, so the steps' events are read once and examined three ways.
+	// Spooled drains, so the steps' events are read once.
 	stepEvents := hookruntest.Spooled(t, sp)
 	touched := 0
 	for _, e := range stepEvents {
@@ -106,8 +104,7 @@ func TestAntigravityConversationIsStampedOnItsCommit(t *testing.T) {
 			t.Errorf("call %d reports a duration agy never gave: %v", i, c)
 		}
 	}
-	// What a call was given is content, and none of it travels: not the file body, not
-	// the replacement, not a path.
+	// What a call was given is content and never travels.
 	for _, e := range stepEvents {
 		if e.Name != hookrun.EventToolCall {
 			continue
@@ -118,8 +115,7 @@ func TestAntigravityConversationIsStampedOnItsCommit(t *testing.T) {
 			}
 		}
 	}
-	// An edit's files-touched event is the same step, not a second call: it says so by
-	// carrying the call's ids.
+	// An edit's files-touched event carries the call's ids: the same step, not a second call.
 	for _, e := range stepEvents {
 		if e.Name == hookrun.EventFilesTouched && (e.Attrs["turn_id"] != "turn-1" || !strings.HasPrefix(e.Attrs["tool_call_id"].(string), "step-")) {
 			t.Errorf("files touched is not tied to its call: %v", e.Attrs)
@@ -259,10 +255,8 @@ func TestAntigravityConversationFallsBackToTheEnvironment(t *testing.T) {
 	}
 }
 
-// agy names no turn, and nothing in its payloads does either: `invocationNum` restarts
-// every turn, `initialNumSteps` moves with every invocation, and Stop's `executionNum`
-// was 0 on both turns of one resumed conversation (agy 1.2.7, 2026-09-18 — the numbers
-// below are that recording). The turn is where it began.
+// A turn is named by where it began, from a recording of two turns of one resumed
+// conversation.
 func TestAntigravityTurnsAreNamedByWhereTheyBegan(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	ctx := context.Background()

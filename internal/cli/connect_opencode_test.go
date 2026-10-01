@@ -8,8 +8,8 @@ import (
 	"testing"
 )
 
-// OpenCode's harness is a plugin file Terma owns outright: connect writes it with the
-// key in the helper script, status reads it back, disconnect removes both.
+// A plugin harness Terma owns outright: connect writes it with the key in the helper
+// script, status reads it back, disconnect removes both.
 func TestTelemetryConnectOpenCodeInstallsThePlugin(t *testing.T) {
 	xdg := t.TempDir()
 	termaDir := t.TempDir()
@@ -39,7 +39,7 @@ func TestTelemetryConnectOpenCodeInstallsThePlugin(t *testing.T) {
 	if _, err := os.Stat(helper); err != nil {
 		t.Fatalf("helper not written: %v", err)
 	}
-	// Nothing of OpenCode's own configuration was created.
+	// Nothing of the agent's own configuration was created.
 	if _, err := os.Stat(filepath.Join(xdg, "opencode", "opencode.json")); err == nil {
 		t.Fatal("connect wrote opencode.json")
 	}
@@ -66,8 +66,7 @@ func TestTelemetryConnectOpenCodeInstallsThePlugin(t *testing.T) {
 		t.Errorf("project = %q", st.ProjectID)
 	}
 
-	// Reconnecting reuses the installed key rather than needing one: no --api-key, no
-	// login, and it still succeeds.
+	// Reconnecting reuses the installed key: no --api-key, no login.
 	if out, err := runTerma(t, "connect", "opencode", "--project", "770e8400-e29b-41d4-a716-446655440000", "--yes"); err != nil {
 		t.Fatalf("reconnect: %v\n%s", err, out)
 	} else if !strings.Contains(out, "Reusing the key") {
@@ -86,7 +85,7 @@ func TestTelemetryConnectOpenCodeInstallsThePlugin(t *testing.T) {
 	}
 }
 
-// A repository policy for OpenCode is a committed file with no destination in it.
+// A plugin harness's repository policy is a committed file with no destination in it.
 func TestTelemetryConnectOpenCodeLocalWritesPolicy(t *testing.T) {
 	repo, _ := localRepo(t)
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())

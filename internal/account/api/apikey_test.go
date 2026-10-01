@@ -42,7 +42,6 @@ func TestCreateServerKey_PostsToAuthHostAndReturnsPlaintextOnce(t *testing.T) {
 		t.Fatalf("CreateServerKey: %v", err)
 	}
 
-	// Minting is a credential operation and belongs on the auth host, not the data plane.
 	if gotMethod != http.MethodPost || gotPath != "/v1/api-keys/server" {
 		t.Errorf("called %s %s, want POST /v1/api-keys/server", gotMethod, gotPath)
 	}
@@ -55,8 +54,6 @@ func TestCreateServerKey_PostsToAuthHostAndReturnsPlaintextOnce(t *testing.T) {
 	if meta.KeyPrefix != "mir_srv_0123…" {
 		t.Errorf("key prefix = %q", meta.KeyPrefix)
 	}
-	// The plaintext must not also be reachable through the metadata struct, or it will
-	// eventually be rendered by something that only meant to print the prefix.
 	encoded, err := json.Marshal(meta)
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
@@ -66,8 +63,7 @@ func TestCreateServerKey_PostsToAuthHostAndReturnsPlaintextOnce(t *testing.T) {
 	}
 }
 
-// A server key cannot mint another. Catching it locally turns an opaque 403 into a
-// message that names the fix.
+// A server key cannot mint another, and the message names the fix.
 func TestCreateServerKey_RefusesUnderAServerKey(t *testing.T) {
 	var called bool
 	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { called = true }))
@@ -115,8 +111,7 @@ func TestCreateServerKey_RequiresProjectAndName(t *testing.T) {
 	}
 }
 
-// A 201 carrying no key would otherwise be reported as success, and the caller would
-// write an empty credential into a harness config.
+// A 201 carrying no key is an error, not an empty credential.
 func TestCreateServerKey_RejectsEmptyKeyInResponse(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusCreated)

@@ -12,7 +12,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// runDoctor runs doctor here, with this process's configuration and probes.
 func (app *App) runDoctor(ctx context.Context, skipCommit bool, progress doctor.Progress) doctor.Report {
 	return doctor.Run(ctx, app.doctorEnv(ctx, skipCommit), progress)
 }
@@ -58,10 +57,8 @@ func (app *App) doctorProbes(cfg *config.Config) doctor.Probes {
 	}
 }
 
-// commitRecorded reads a commit's terma.commit event back where it was delivered. A
-// project in another environment than the active profile's is read from its own data
-// API, with its own key: the signed-in credential is bound to the active profile's auth
-// host, and asking the profile's API for the project's events found nothing on every run.
+// commitRecorded reads another environment's project from its own data API with its own
+// key: the signed-in credential is bound to the active profile's auth host.
 func (app *App) commitRecorded(cfg *config.Config) func(ctx context.Context, projectID, sha string, from, to time.Time) (bool, error) {
 	return func(ctx context.Context, projectID, sha string, from, to time.Time) (bool, error) {
 		// Query the project the scratch event used, independently of command overrides.
@@ -81,7 +78,6 @@ func (app *App) commitRecorded(cfg *config.Config) func(ctx context.Context, pro
 	}
 }
 
-// binaryCheck is doctor's binary check for the running build.
 func (app *App) binaryCheck() doctor.Check {
 	exe, _ := os.Executable()
 	return doctor.BinaryCheck(exe, app.binDirs())

@@ -12,9 +12,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/shape"
 )
 
-// rules are every registered agent's telemetry shape, composed once: one session-key
-// precedence, and one content classifier, since a key that is content for any agent is
-// content for all.
+// rules compose every agent's telemetry shape once: a key that is content for any agent is content for all.
 type rules struct {
 	sessionKeys          []shape.SessionKey
 	startEvents          []string
@@ -30,11 +28,9 @@ type rules struct {
 	safePrefixes         []string
 }
 
-// defaultMarker replaces a prompt field that no agent's marker keys claim.
 const defaultMarker = "<REDACTED>"
 
-// generic is content no one agent owns: the GenAI semantic conventions' content
-// attributes, free text that may restate what was said, and a process's command line.
+// generic is content no one agent owns.
 var generic = shape.CaptureRules{
 	PromptDropFields: []string{"gen_ai.prompt", "gen_ai.completion", "gen_ai.input.messages", "gen_ai.output.messages",
 		"gen_ai.system_instructions", "gen_ai.tool.definitions", "gen_ai.tool.description", "gen_ai.agent.description",
@@ -93,8 +89,6 @@ func union(set, add []string) []string {
 	return set
 }
 
-// marker is what replaces a prompt field in attrs: the first agent's marker whose keys
-// attrs carries, else the default.
 func (r *rules) marker(attrs []*commonpb.KeyValue) string {
 	for _, m := range r.markers {
 		for _, kv := range attrs {

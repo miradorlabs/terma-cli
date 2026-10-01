@@ -37,8 +37,7 @@ func TestSanitizeTerminal_StripsControlSequences(t *testing.T) {
 }
 
 func TestTruncate_IsRuneAware(t *testing.T) {
-	// A byte-slicing truncation would cut a multi-byte rune in half and emit invalid
-	// UTF-8. The result must always stay valid UTF-8.
+	// The result always stays valid UTF-8.
 	cases := []struct {
 		name string
 		in   string
@@ -81,9 +80,7 @@ func TestRenderTable_SanitizesCells(t *testing.T) {
 }
 
 func TestRenderCSV_KeepsFieldsVerbatim(t *testing.T) {
-	// CSV is a data export, not a terminal view: a field with an embedded newline or
-	// tab must survive verbatim (encoding/csv quotes it), not be stripped the way the
-	// human table path sanitizes control characters.
+	// A CSV field with an embedded newline or tab survives verbatim.
 	var buf bytes.Buffer
 	body := "line1\nline2\twith tab"
 	table := Table{Headers: []string{"NAME", "BODY"}, Rows: [][]string{{"svc", body}}}
@@ -100,9 +97,7 @@ func TestRenderCSV_KeepsFieldsVerbatim(t *testing.T) {
 }
 
 func TestRenderJSON_LeavesEscapingToTheEncoder(t *testing.T) {
-	// JSON is a machine format: the encoder escapes control characters to \uXXXX
-	// itself, so the raw ESC never reaches the terminal and the value still
-	// round-trips. The sanitizer must not touch this path.
+	// JSON escapes control characters itself, so the value round-trips unsanitized.
 	var buf bytes.Buffer
 	data := map[string]string{"body": "a\x1bb"}
 	if err := Render(&buf, FormatJSON, Table{}, data); err != nil {

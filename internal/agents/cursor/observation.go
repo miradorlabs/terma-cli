@@ -7,29 +7,19 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
-// The four handlers below record observations, not additive usage counters. Cursor may
-// repeat the same parent-turn token snapshot at afterAgentResponse and stop, omit it, or
-// exclude subagents. Never derive billing or quota from these numbers.
+// These handlers record observations, never additive counters: Cursor may repeat a token
+// snapshot at afterAgentResponse and stop, omit it, or exclude subagents.
 
-// beforeSubmitPrompt observes a prompt being submitted, and refreshes the active
-// session: an IDE conversation can outlive its TTL, and a CLI client may never have
-// sent sessionStart.
 func beforeSubmitPrompt(ctx context.Context, env hookrun.Env) error {
 	return cursorObserve(ctx, env, "beforeSubmitPrompt")
 }
 
-// afterAgentResponse observes the end of a model response, which is where Cursor
-// reports a token snapshot when it reports one at all.
 func afterAgentResponse(ctx context.Context, env hookrun.Env) error {
 	return cursorObserve(ctx, env, "afterAgentResponse")
 }
 
-// stop observes the end of a turn. The committed entry sets loop_limit to null so
-// it keeps firing past Cursor's five follow-up loops.
 func stop(ctx context.Context, env hookrun.Env) error { return cursorObserve(ctx, env, "stop") }
 
-// preCompact observes a context compaction, the one moment context occupancy is
-// reported — which is not a billing quota.
 func preCompact(ctx context.Context, env hookrun.Env) error {
 	return cursorObserve(ctx, env, "preCompact")
 }
@@ -46,8 +36,7 @@ func cursorObserve(ctx context.Context, env hookrun.Env, hook string) error {
 		return nil
 	}
 	if hook == "beforeSubmitPrompt" {
-		// IDE conversations can outlive the active manifest's TTL; CLI clients may
-		// omit sessionStart. A submitted prompt refreshes attribution in both cases.
+		// A conversation can outlive the active TTL, and the CLI may omit sessionStart.
 		env.SetActive(r, env.NewSession(r, in.id(), cursorTool, in.Model))
 	}
 	captureCursorObservation(env, ctx, r, in, hook)
@@ -102,7 +91,7 @@ func cursorObservationAttrs(in *cursorHookInput, hook string) map[string]any {
 			}
 		}
 	case "preCompact":
-		// Context occupancy is not a subscription allowance or a token usage delta.
+		// Context occupancy is neither an allowance nor a usage delta.
 		for k, v := range map[string]json.RawMessage{"context_tokens": in.ContextTokens, "context_window_size": in.ContextWindowSize, "context_usage_percent": in.ContextUsagePercent} {
 			if value, _, ok := hookrun.JSONNumber(v, k != "context_usage_percent"); ok {
 				a[k] = value
@@ -116,9 +105,7 @@ func cursorObservationAttrs(in *cursorHookInput, hook string) map[string]any {
 	return a
 }
 
-// captureCursorObservation records one Cursor hook as an ordered observation. The
-// checkpoint directory and the observation id seed are Cursor's own, so state written
-// by earlier versions keeps its sequence.
+// captureCursorObservation records one Cursor hook as an ordered observation.
 func captureCursorObservation(e hookrun.Env, ctx context.Context, r *hookrun.Repo, in *cursorHookInput, hook string) {
 	e.CaptureObservation(ctx, r, hookrun.Observation{
 		Tool: cursorTool, Source: sourceCursorHook, StateDir: cursorObservationDir,

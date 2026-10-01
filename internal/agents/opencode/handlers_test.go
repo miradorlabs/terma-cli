@@ -105,9 +105,7 @@ func TestOpenCodeChildSessionNamesItsParent(t *testing.T) {
 	}
 }
 
-// The active session is what claims a commit no manifest accounts for. A session the
-// task tool opened for a subagent must not displace the one a person is driving, or the
-// developer's next hand-written commit is stamped with the subagent.
+// A subagent's session never displaces the active one, which claims hand-written commits.
 func TestOpenCodeChildSessionNeverBecomesTheActiveOne(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	ctx := context.Background()

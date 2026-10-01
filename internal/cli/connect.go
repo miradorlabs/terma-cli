@@ -55,26 +55,16 @@ Supported: ` + strings.Join(app.agents.HarnessNames(), ", ") + `.`,
 }
 
 type connectFlags struct {
-	// scope is global (the harness's user settings) or local (this repository's
-	// project settings); see harness.Scope.
 	scope   string
 	signals string
-	// exports is the Reach of a global connect: everywhere (default) or repos, which
-	// writes the destination and the key but leaves every exporter off so that each
-	// repository's own committed policy decides. Meaningless at local scope, where
-	// deciding what to ship is the whole point of the file.
+	// exports is the Reach of a global connect; meaningless at local scope.
 	exports string
-	// The content switches are spelled as exclusions because capture is the default:
-	// the point of connecting an agent harness is to see what the agent did, and a
-	// trace with the prompt and tool activity redacted answers almost none of the
-	// questions that send someone to it. The flags exist for the environments where
-	// that content must not leave the machine.
+	// The content switches are exclusions because capture is the default: a redacted
+	// trace answers almost none of the questions that send someone to it.
 	excludePrompts     bool
 	excludeToolContent bool
-	// noStatusLine leaves Claude Code's statusLine alone. By default a global
-	// connect puts `terma hook statusline` in front of it: the status line payload
-	// carries the provider's own rate-limit windows, the strongest funding evidence
-	// a machine produces, and the previous command keeps running unchanged behind it.
+	// noStatusLine skips the status-line wrap, whose payload carries the provider's own
+	// rate-limit windows, the strongest funding evidence a machine produces.
 	noStatusLine bool
 	keyName      string
 	apiKey       string
@@ -138,9 +128,8 @@ key or sign-in (` + app.scopedHarnessNames() + `).`,
 	return cmd
 }
 
-// runTelemetryConnectAll connects each named harness in turn, each with its own key.
-// Names are resolved up front so a typo in the last one is refused before the first
-// is touched.
+// runTelemetryConnectAll resolves every name up front so a typo in the last is refused
+// before the first is touched.
 func (app *App) runTelemetryConnectAll(cmd *cobra.Command, names []string, f connectFlags) error {
 	var hs []harness.Harness
 	seen := map[string]bool{}
@@ -157,9 +146,8 @@ func (app *App) runTelemetryConnectAll(cmd *cobra.Command, names []string, f con
 	}
 	out := cmd.OutOrStdout()
 
-	// The checklist runs once for all of them: what to send is one decision, and a
-	// harness without repository settings is refused up front rather than after the
-	// first one has been written.
+	// One checklist for all: what to send is one decision, and an unscoped harness is
+	// refused before the first one is written.
 	if !f.assumeYes && canPrompt() {
 		root, _ := localRoot(cmd.Context())
 		picked, err := askConnectOptions(f, hs, connectForm{root: root})
@@ -213,8 +201,6 @@ func (app *App) runTelemetryConnect(cmd *cobra.Command, name string, f connectFl
 	return err
 }
 
-// connectGlobal writes a harness's user-level telemetry settings and reports what it
-// did about the key.
 func (app *App) connectGlobal(cmd *cobra.Command, name string, f connectFlags) error {
 	h, err := app.agents.Harness(name)
 	if err != nil {
@@ -228,10 +214,8 @@ func (app *App) connectGlobal(cmd *cobra.Command, name string, f connectFlags) e
 	if err != nil {
 		return err
 	}
-	// `--exports repos` hands the decision to each repository, so the global file must
-	// switch nothing on. It still carries the endpoint, the key, the identity and the
-	// master telemetry switch — everything a repository's committed policy cannot hold
-	// and needs underneath it.
+	// `--exports repos` switches nothing on globally, but still writes what a committed
+	// policy cannot hold: endpoint, key, identity and the master switch.
 	if reach == harness.ReachRepos {
 		signals = nil
 	}
@@ -243,15 +227,12 @@ func (app *App) connectGlobal(cmd *cobra.Command, name string, f connectFlags) e
 	if err := requireProject(cfg); err != nil {
 		return err
 	}
-	// A server key is bound to a project id, so the id has to be known locally. Under
-	// TERMA_API_KEY the project is fixed by the key's own grant and never recorded in
-	// the repository or an override, which is different from an implicit server-key scope.
+	// A server key is bound to a project id; under TERMA_API_KEY the key's own grant fixes it.
 	if cfg.ProjectID == "" {
 		return errors.New("telemetry connect needs a project — run `terma install` in this repository or pass --project")
 	}
 
-	// ConfigPath before anything else: if the file cannot even be located, nothing below
-	// is worth doing, and a key minted here would be stranded.
+	// ConfigPath first: if the file cannot be located, a key minted below would be stranded.
 	configPath, err := h.ConfigPath()
 	if err != nil {
 		return err
@@ -261,11 +242,8 @@ func (app *App) connectGlobal(cmd *cobra.Command, name string, f connectFlags) e
 	out := cmd.OutOrStdout()
 	detection := h.Detect(ctx)
 
-	// The exporter this connect intends to install. Built before the key exists so the
-	// conflict check can run first: a per-signal endpoint or a beta-tracing redirect left
-	// in place would keep exporting to whoever owns it while inheriting the Authorization
-	// header Terma is about to write — handing out a live server key. Once the key is
-	// on disk that is invisible, so it has to be caught here.
+	// Built before the key exists so the conflict check runs first: a per-signal endpoint
+	// left in place would inherit the Authorization header and hand out a live server key.
 	intended := harness.Exporter{
 		Endpoint:           cfg.OTLPURL,
 		ProjectID:          cfg.ProjectID,
@@ -274,9 +252,8 @@ func (app *App) connectGlobal(cmd *cobra.Command, name string, f connectFlags) e
 		IncludePrompts:     !f.excludePrompts,
 		IncludeToolContent: !f.excludeToolContent,
 	}
-	// The default delivery, where the harness supports it: a Terma-owned helper script
-	// supplies the Authorization header, so the harness's settings file never holds the
-	// key — only a path. A harness without the mechanism gets the key inline.
+	// Where the harness supports it, a helper script supplies the header, so its settings
+	// file holds only a path, never the key.
 	if !f.inlineKey && h.SupportsHeadersHelper() {
 		helperPath, err := harness.HelperFilePath(h, cfg.ProjectID)
 		if err != nil {
@@ -293,15 +270,11 @@ func (app *App) connectGlobal(cmd *cobra.Command, name string, f connectFlags) e
 	printConnectNotes(out, h, intended)
 	printConflicts(out, conflicts, f.force)
 
-	// Advisory conflicts — a Codex profile's overrides, which apply only when that
-	// profile is selected — are shown above and do not gate the connect.
+	// Advisory conflicts (overrides that apply only under a selected profile) do not gate.
 	conflicts, _ = partitionConflicts(conflicts)
 
-	// A conflict Terma does not change — exported in the shell, set in a managed file
-	// that outranks the user config, or a setting that is the user's own opt-out —
-	// cannot be cleared by writing to the user file, so --force must not pretend
-	// otherwise. Connecting anyway would install the credential while the override
-	// kept deciding where telemetry goes.
+	// A conflict outside the user file (the shell, a managed file, the user's own opt-out)
+	// cannot be cleared by --force: the key would be installed while the override decides.
 	if blocking := unclearable(conflicts); len(blocking) > 0 {
 		return fmt.Errorf(
 			"%s has settings Terma does not change: %s — remove or adjust them, then retry",
@@ -332,8 +305,7 @@ func (app *App) connectGlobal(cmd *cobra.Command, name string, f connectFlags) e
 		fmt.Fprintf(out, "\nReusing the key already configured for this project (%s) — nothing new minted.\n", keyMeta.KeyPrefix)
 	}
 
-	// Back up before the merge. Best-effort: a user who asked to connect should not be
-	// blocked because a backup could not be written, but they should hear about it.
+	// The backup is best-effort: a failure is reported, never blocking.
 	if backup, err := backupHarnessConfig(h, cfg.OTLPURL); err != nil {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not back up %s (%v).\n", configPath, err)
 	} else if backup != "" {
@@ -342,9 +314,7 @@ func (app *App) connectGlobal(cmd *cobra.Command, name string, f connectFlags) e
 
 	intended.APIKey = key
 	if err := h.Connect(intended, f.force); err != nil {
-		// Only when this invocation created it. A key supplied with --api-key already
-		// existed and is still perfectly good, so telling the user to go revoke it would
-		// send them to destroy a working credential over an unrelated write failure.
+		// Only a key this invocation minted; an --api-key key is still good.
 		if minted {
 			fmt.Fprintf(cmd.ErrOrStderr(),
 				"\nA key (%s) was minted before this failed. Revoke it in the web app if you do not retry.\n",
@@ -352,9 +322,7 @@ func (app *App) connectGlobal(cmd *cobra.Command, name string, f connectFlags) e
 		}
 		return err
 	}
-	// Remember the key per harness and per project, so the spool can deliver this
-	// project's events and a later `terma install` for this project reuses the key
-	// without minting again.
+	// Kept per harness and project so the spool can deliver and `terma install` reuses it.
 	if err := keystore.SetFor(h.Name(), cfg.ProjectID, key, keystore.HostsOf(cfg)); err != nil {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not store the project key for the spool (%v); `terma spool flush` will not deliver until it is stored.\n", err)
 	}
@@ -384,9 +352,7 @@ func (app *App) connectGlobal(cmd *cobra.Command, name string, f connectFlags) e
 	return nil
 }
 
-// printConnectPlan shows exactly what a connect would do, before it does any of it.
-// The redaction lines are always printed, including when they are off — "off" is the
-// answer to the question a reader actually has.
+// printConnectPlan always prints the redaction lines: "off" is the answer a reader wants.
 func printConnectPlan(
 	out io.Writer,
 	h harness.Harness,
@@ -402,8 +368,7 @@ func printConnectPlan(
 	fmt.Fprintf(out, "  Endpoint:        %s\n", cfg.OTLPURL)
 
 	if reach == harness.ReachRepos {
-		// Without this the plan shows three empty checkboxes, which reads as a mistake
-		// rather than as the arrangement the user asked for.
+		// Three empty checkboxes would read as a mistake rather than as the arrangement asked for.
 		fmt.Fprintf(out, "  Exports from:    repositories that carry a terma policy — every exporter here is left off\n")
 		fmt.Fprintln(out, "\n  Signals:")
 		fmt.Fprintln(out, "    decided by each repository's committed terma policy")
@@ -421,8 +386,7 @@ func printConnectPlan(
 		fmt.Fprintln(out, "    (the server key is written into this file, which is tightened to 0600)")
 	}
 	if f.apiKey == "" {
-		// Reuse is decided after the plan (it needs the config read that minting also
-		// waits on), so the plan states the rule rather than predicting the branch.
+		// Reuse is decided after the plan, so the plan states the rule.
 		fmt.Fprintln(out, "\n  A server key will be minted for this project — unless one is already installed here, which will be reused.")
 	} else {
 		fmt.Fprintf(out, "\n  Installing the key you supplied (%s).\n", harness.MaskKey(f.apiKey))
@@ -430,9 +394,6 @@ func printConnectPlan(
 	fmt.Fprintln(out)
 }
 
-// printConnectNotes prints what a harness wants said about this particular connect —
-// a side effect of its own, or a limit of what its switches can do — before the user
-// is asked to confirm. Optional: most connects have nothing to add.
 func printConnectNotes(out io.Writer, h harness.Harness, e harness.Exporter) {
 	n, ok := h.(harness.Noter)
 	if !ok {
@@ -449,9 +410,8 @@ func printConnectNotes(out io.Writer, h harness.Harness, e harness.Exporter) {
 	fmt.Fprintln(out)
 }
 
-// resolveKey either installs a key the caller already holds or mints a new one. The
-// bool reports which happened, because only a key this invocation created is the
-// caller's to clean up if a later step fails.
+// resolveKey reports minted because only a key this invocation created is the caller's
+// to clean up if a later step fails.
 func (app *App) resolveKey(ctx context.Context, cfg *config.Config, h harness.Harness, f connectFlags) (key string, meta api.ServerKey, minted, reused bool, err error) {
 	if key := strings.TrimSpace(f.apiKey); key != "" {
 		if !serverkey.Is(key) {
@@ -460,22 +420,14 @@ func (app *App) resolveKey(ctx context.Context, cfg *config.Config, h harness.Ha
 		return key, api.ServerKey{KeyPrefix: harness.MaskKey(key)}, false, false, nil
 	}
 
-	// Reconnects reuse the key already installed for this exact endpoint and project.
-	// Minting on every settings tweak — flipping a capture flag, changing signals —
-	// would leave a trail of live orphaned keys that nobody remembers and nothing
-	// cleans up; the key already here is exactly as scoped as the one a mint would
-	// produce. A different project or endpoint falls through to a fresh mint, because
-	// reusing across either boundary would be wrong, not just untidy. Reuse is per
-	// harness on purpose: each agent holds its own key, so one can be revoked without
-	// cutting the other off.
+	// Reuse the key for this exact endpoint and project, per harness: minting on every
+	// tweak leaves live orphaned keys, and one agent's key can be revoked alone.
 	if cur, ok := h.(harness.Credentialed); ok {
 		if existing, ok := cur.CurrentCredential(cfg.OTLPURL, cfg.ProjectID); ok {
 			return existing, api.ServerKey{KeyPrefix: harness.MaskKey(existing)}, false, true, nil
 		}
 	}
-	// The harness is pointed elsewhere now, but this machine may have connected it to
-	// this project before — moving between repositories does exactly that. The key it
-	// used then is still its own and still scoped to this project.
+	// Pointed elsewhere now, it may have been connected to this project before.
 	if remembered := keystore.GetFor(h.Name(), cfg.ProjectID); remembered != "" {
 		return remembered, api.ServerKey{KeyPrefix: harness.MaskKey(remembered)}, false, true, nil
 	}
@@ -497,13 +449,8 @@ func (app *App) resolveKey(ctx context.Context, cfg *config.Config, h harness.Ha
 	return key, meta, true, false, nil
 }
 
-// resourceAttributes are stamped on everything the harness emits — Codex and OpenCode,
-// that is: the Claude Code adapter renders none of them, because OTEL_RESOURCE_ATTRIBUTES
-// is the user's variable and Claude Code carries its own identity and service name.
-//
-// identity overrides the default enduser.id. The literal "none" omits it — worth having
-// because the default is a real email address written into a global config file, and
-// there is no other way to say "do not label my sessions".
+// resourceAttributes takes identity "none" to omit enduser.id, whose default is a real
+// email written into a global config file.
 func resourceAttributes(ctx context.Context, h harness.Harness, cfg *config.Config, identity string) map[string]string {
 	attrs := map[string]string{
 		harness.AttrServiceName: harness.ServiceName(h),
@@ -513,10 +460,7 @@ func resourceAttributes(ctx context.Context, h harness.Harness, cfg *config.Conf
 	switch identity = strings.TrimSpace(identity); identity {
 	case "none":
 	case "":
-		// git's *global* email: this lands in a global config and labels every future
-		// session, so a repository-local address would follow the user out of the repo
-		// it was set in. Resolved here and written as a literal — config holds strings,
-		// not shell.
+		// git's global email: a repository-local one would follow the user out of its repo.
 		if email := harness.GitEmail(ctx); email != "" {
 			attrs[harness.AttrEnduserID] = email
 		}
@@ -526,10 +470,8 @@ func resourceAttributes(ctx context.Context, h harness.Harness, cfg *config.Conf
 	return attrs
 }
 
-// printConflicts explains what is in the way, naming each variable so the user can go
-// and look at it. A header value is never printed: it is the one that may hold someone
-// else's credential. Every field is sanitized on the way to the terminal — a key can
-// carry a file name, and a file name can carry anything.
+// printConflicts never prints a header value (it may hold someone else's credential) and
+// sanitizes every field, since a key can carry a file name.
 func printConflicts(out io.Writer, conflicts []harness.Conflict, force bool) {
 	blocking, advisory := partitionConflicts(conflicts)
 
@@ -566,8 +508,7 @@ func printConflict(out io.Writer, c harness.Conflict) {
 	}
 	fmt.Fprintf(out, "     %s [%s] %s\n", marker, output.SanitizeTerminal(c.Scope), output.SanitizeTerminal(c.Reason))
 	if !c.Clearable && !c.Advisory {
-		// Say it here as well as in the error: this is the one the user has to go
-		// and fix themselves.
+		// Said here and in the error: the user has to fix this one themselves.
 		if c.Scope == harness.ScopeUserSettings {
 			fmt.Fprintf(out, "       Terma does not change this — it is your setting to remove.\n")
 		} else {
@@ -576,8 +517,6 @@ func printConflict(out io.Writer, c harness.Conflict) {
 	}
 }
 
-// partitionConflicts separates the conflicts that gate a connect from the advisory
-// ones, which are reported and nothing more.
 func partitionConflicts(conflicts []harness.Conflict) (blocking, advisory []harness.Conflict) {
 	for _, c := range conflicts {
 		if c.Advisory {
@@ -589,7 +528,6 @@ func partitionConflicts(conflicts []harness.Conflict) (blocking, advisory []harn
 	return blocking, advisory
 }
 
-// unclearable names the conflicts --force cannot resolve, which are fatal.
 func unclearable(conflicts []harness.Conflict) []string {
 	var out []string
 	for _, c := range conflicts {
@@ -600,9 +538,6 @@ func unclearable(conflicts []harness.Conflict) []string {
 	return out
 }
 
-// backupHarnessConfig snapshots the file before it is merged, when the harness exposes
-// a way to. Not part of the Harness interface: a harness whose config is not a single
-// file it owns has nothing meaningful to snapshot.
 func backupHarnessConfig(h harness.Harness, endpoint string) (string, error) {
 	if b, ok := h.(harness.Backuper); ok {
 		return b.Backup(endpoint)
@@ -610,9 +545,7 @@ func backupHarnessConfig(h harness.Harness, endpoint string) (string, error) {
 	return "", nil
 }
 
-// installStatusLine puts `terma hook statusline` in front of Claude Code's status
-// line and returns the line to say about it, and whether it is in place. A failure is a
-// warning, never a failed connect: the exporters are already written and working.
+// installStatusLine only warns on failure: the exporters are already written and working.
 func (app *App) installStatusLine(errOut io.Writer) (string, bool) {
 	s, ok := doctor.StatusLineAgent(app.agents)
 	if !ok {
@@ -640,18 +573,14 @@ func installHarnessStatusLine(c agents.StatusLiner, errOut io.Writer) (string, b
 	}
 }
 
-// confirm accepts a single key at a terminal or a line from piped input.
 func confirm(cmd *cobra.Command, question string) (bool, error) {
 	return confirmDefault(cmd, question, true)
 }
 
-// confirmDefault is confirm with the answer a bare Enter gives: yes when def, else no.
 func confirmDefault(cmd *cobra.Command, question string, def bool) (bool, error) {
 	return confirmExplained(cmd, question, nil, def)
 }
 
-// confirmExplained is confirmDefault with lines under the question that say what a yes
-// does, so they are read before the answer is typed.
 func confirmExplained(cmd *cobra.Command, question string, detail []string, def bool) (bool, error) {
 	in := cmd.InOrStdin()
 	interactive := false
@@ -692,9 +621,6 @@ func confirmExplained(cmd *cobra.Command, question string, detail []string, def 
 	return answer, err
 }
 
-// confirmPrompt draws a yes/no question. Without detail the answer is typed on the
-// question's own line; with it, the detail sits indented under the question and the
-// answer goes on a line of its own beneath.
 func confirmPrompt(p style.Palette, question string, detail []string, def bool) string {
 	hint := "[Y/n]"
 	if !def {
@@ -712,8 +638,7 @@ func confirmPrompt(p style.Palette, question string, detail []string, def bool) 
 	return b.String()
 }
 
-// yesAnswer reads a typed answer: y or yes is yes, nothing is def, and anything else —
-// a typo included — is no, so a mistyped answer never agrees to something.
+// yesAnswer treats anything but y, yes or nothing as no, so a typo never agrees to something.
 func yesAnswer(line string, def bool) bool {
 	switch strings.ToLower(strings.TrimSpace(line)) {
 	case "y", "yes":
@@ -737,8 +662,6 @@ func joinSignals(signals []harness.Signal) string {
 	return strings.Join(parts, ",")
 }
 
-// signalLabel names a signal the way the docs do, so the plan reads as prose rather
-// than as a list of OTLP nouns.
 func signalLabel(s harness.Signal) string {
 	switch s {
 	case harness.SignalTraces:

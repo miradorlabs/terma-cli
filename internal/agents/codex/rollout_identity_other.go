@@ -4,6 +4,5 @@ package codex
 
 import "os"
 
-// Head and checkpoint hashes detect content changes on other platforms. A
-// byte-identical replacement is intentionally indistinguishable from the original.
+// Off Unix, content hashes detect a change; a byte-identical replacement is not one.
 func rolloutFileIdentity(st os.FileInfo) string { return "" }

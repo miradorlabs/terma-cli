@@ -12,9 +12,7 @@ import (
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
-// withhold applies a project's content policy to one session's part, in place, and
-// returns how many records it changed. The exporters send content, so the relay
-// enforces each project's own.
+// withhold applies a project's content policy to a part in place and returns how many records it changed.
 func (ru *rules) withhold(p *part, prompts, toolContent bool, unclassified map[string]int) int {
 	if prompts && toolContent {
 		return 0
@@ -163,7 +161,6 @@ func (ru *rules) withholdAttrs(attrs []*commonpb.KeyValue, prompts, toolContent 
 			kv.Value = &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: marker}}
 			changed = true
 		case !ru.contentKey(key) && !ru.safeKey(key) && !scalarNonText(kv.GetValue()):
-			// Withheld content passes only what is known to be safe (allow.go).
 			unclassified[key]++
 			changed = true
 			continue
@@ -173,10 +170,8 @@ func (ru *rules) withholdAttrs(attrs []*commonpb.KeyValue, prompts, toolContent 
 	return out, changed
 }
 
-// scalarNonText reports whether v is a number or a boolean — a count, a size, a flag
-// or a numeric id — which cannot carry what was said, whatever its key. Claude Code and
-// Codex send many of theirs as strings ("3", "true"), which count the same when the
-// whole string is one.
+// scalarNonText reports whether v is a number or boolean, which cannot carry what was said
+// whatever its key; agents send many as strings ("3", "true"), which count the same.
 func scalarNonText(v *commonpb.AnyValue) bool {
 	switch x := v.GetValue().(type) {
 	case *commonpb.AnyValue_IntValue, *commonpb.AnyValue_DoubleValue, *commonpb.AnyValue_BoolValue:
@@ -187,7 +182,6 @@ func scalarNonText(v *commonpb.AnyValue) bool {
 	return false
 }
 
-// numericOrBool reports whether s is, whole, a decimal number or true/false.
 func numericOrBool(s string) bool {
 	if s == "true" || s == "false" {
 		return true
@@ -199,8 +193,6 @@ func numericOrBool(s string) bool {
 	return err == nil && !strings.ContainsAny(s, "xXpPiInN_")
 }
 
-// bodyNamesItsEvent reports whether a log body says no more than which event it is: the
-// event's name, or an agent's prefix before it.
 func (ru *rules) bodyNamesItsEvent(body, event string) bool {
 	if body == event {
 		return true

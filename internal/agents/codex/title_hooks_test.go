@@ -13,8 +13,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// titleIndex writes $CODEX_HOME/session_index.jsonl in Codex 0.157.1's shape: one line per
-// naming, a rename appending another for the same id, other threads interleaved.
+// titleIndex writes session_index.jsonl: one line per naming, renames appended, other
+// threads interleaved.
 func titleIndex(t *testing.T, lines ...string) {
 	t.Helper()
 	hookruntest.WriteFile(t, os.Getenv("CODEX_HOME"), "session_index.jsonl", strings.Join(lines, "\n")+"\n")
@@ -41,9 +41,8 @@ func stopCodexTitles(t *testing.T, env hookrun.Env) []spool.Event {
 	return titles
 }
 
-// Codex names a thread in a side conversation that exports neither the name nor the thread
-// it names; the name is only in session_index.jsonl. The end of a turn spools it once, for
-// the session it names, stamped with when Codex wrote it.
+// A turn's end spools the thread's name once, for the session it names, stamped with when
+// Codex wrote it.
 func TestCodexStopSpoolsTheThreadName(t *testing.T) {
 	env := fundingEnv(t)
 	routeCodex(t, true)
@@ -68,14 +67,13 @@ func TestCodexStopSpoolsTheThreadName(t *testing.T) {
 	if got.SessionID != replySession || !got.Time.Equal(time.Date(2026, 9, 27, 12, 53, 23, 735_966_000, time.UTC)) {
 		t.Errorf("session %q at %v: a title is stamped with when Codex wrote it, in the session it names", got.SessionID, got.Time)
 	}
-	// Every later turn ends the same way; an unchanged name is not sent again.
+	// An unchanged name is not sent again.
 	if again := stopCodexTitles(t, env); len(again) != 0 {
 		t.Fatalf("title spooled twice: %+v", again)
 	}
 }
 
-// A rename appends a line; the latest wins and is a new event. An earlier line that sorts
-// after it in the file does not undo it.
+// The latest rename wins and is a new event, even if an earlier line sorts after it.
 func TestCodexRenameSpoolsTheNewName(t *testing.T) {
 	env := fundingEnv(t)
 	routeCodex(t, true)
@@ -94,9 +92,8 @@ func TestCodexRenameSpoolsTheNewName(t *testing.T) {
 	}
 }
 
-// A first turn can end before the side conversation answers, and some Codex sessions are
-// never named (`codex exec`). Nothing is spooled and nothing is remembered, so the next
-// turn's end sends the name once it exists.
+// An unnamed thread spools and remembers nothing, so a later turn sends the name once it
+// exists.
 func TestCodexTitleNotYetWritten(t *testing.T) {
 	env := fundingEnv(t)
 	routeCodex(t, true)
@@ -138,7 +135,7 @@ func TestCodexTitleNeedsTheConsentPromptsTravelUnder(t *testing.T) {
 	}
 }
 
-// A manual rename has no length limit of its own; the title is cut on a rune boundary.
+// A rename has no length limit of its own; the title is cut on a rune boundary.
 func TestCodexTitleIsBounded(t *testing.T) {
 	env := fundingEnv(t)
 	routeCodex(t, true)

@@ -1,9 +1,5 @@
-// Package output renders command results in the format the caller asked for.
-//
-// The default is a human table, but the CLI flips to JSON automatically when it is
-// not attached to a terminal or when an agent harness is detected — a piped or
-// agent-driven invocation almost always wants to parse the result, and silently
-// getting column-aligned text is the most common way that goes wrong.
+// Package output renders command results as a table for a person, and by default as
+// JSON for a pipe or an agent, which almost always wants to parse them.
 package output
 
 import (
@@ -25,8 +21,7 @@ import (
 // Format is how a command renders its result: what --output accepts.
 type Format string
 
-// The output formats. Table is for a person at a terminal; the others are for whatever
-// reads the command's output instead, and carry the same rows and columns.
+// The output formats; Table is for a person at a terminal.
 const (
 	FormatTable Format = "table"
 	FormatJSON  Format = "json"
@@ -45,8 +40,7 @@ func Interactive() bool {
 	return term.IsTerminal(int(os.Stdout.Fd()))
 }
 
-// Resolve turns the --output flag into a concrete format. An explicit flag always
-// wins; otherwise a non-terminal or agent caller gets JSON.
+// Resolve turns the --output flag into a format; unset, a non-terminal or agent caller gets JSON.
 func Resolve(flag string) (Format, error) {
 	switch strings.ToLower(strings.TrimSpace(flag)) {
 	case "":
@@ -67,16 +61,13 @@ func Resolve(flag string) (Format, error) {
 	}
 }
 
-// Table is the shape every list command produces. Rows carry pre-rendered strings so
-// each command decides its own formatting once, rather than the renderer guessing.
+// Table is the shape every list command produces, its cells already rendered.
 type Table struct {
 	Headers []string
 	Rows    [][]string
 }
 
-// Render writes the payload. JSON and YAML serialize `data` — the full object,
-// including fields the table omits — so scripting is never limited to what the
-// human view happens to show.
+// Render writes the payload; JSON and YAML serialize the whole of data, not the table.
 func Render(w io.Writer, format Format, table Table, data any) error {
 	switch format {
 	case FormatJSON:
@@ -110,9 +101,7 @@ func renderTable(w io.Writer, table Table) error {
 }
 
 func renderCSV(w io.Writer, table Table) error {
-	// CSV is a data format, not a terminal view: encoding/csv already quotes embedded
-	// newlines and commas, so cells pass through verbatim to keep the export faithful.
-	// Terminal-escape sanitizing belongs to the human table path, not here.
+	// CSV cells pass through verbatim: encoding/csv quotes them, and sanitizing is the table's.
 	cw := csv.NewWriter(w)
 	if len(table.Headers) > 0 {
 		if err := cw.Write(table.Headers); err != nil {
@@ -126,8 +115,7 @@ func renderCSV(w io.Writer, table Table) error {
 	return cw.Error()
 }
 
-// KeyValues renders a detail view: a fixed set of labelled fields for humans, the
-// whole object for machines.
+// KeyValues renders labelled fields for a person, the whole object for machines.
 func KeyValues(w io.Writer, format Format, pairs [][2]string, data any) error {
 	if format != FormatTable {
 		rows := make([][]string, 0, len(pairs))
@@ -143,9 +131,7 @@ func KeyValues(w io.Writer, format Format, pairs [][2]string, data any) error {
 	return tw.Flush()
 }
 
-// Truncate keeps a table column from wrapping and destroying the alignment that
-// makes it readable in the first place. It counts and slices by rune, so a limit that
-// falls inside a multi-byte character (CJK, emoji) never leaves a mangled half-rune.
+// Truncate shortens s to limit runes with an ellipsis, never splitting a rune.
 func Truncate(s string, limit int) string {
 	if limit <= 1 || utf8.RuneCountInString(s) <= limit {
 		return s
@@ -153,15 +139,8 @@ func Truncate(s string, limit int) string {
 	return string([]rune(s)[:limit-1]) + "…"
 }
 
-// SanitizeTerminal strips control characters from a value bound for a human-facing
-// terminal. Log bodies, trace names, and attribute values come from ingested telemetry
-// — data an attacker can influence — and a raw ANSI/OSC escape sequence rendered to a
-// terminal can rewrite the screen, retitle the window, or drive the clipboard. Tabs,
-// newlines, and other C0/C1 controls are dropped; everything printable, including
-// legitimate Unicode, is kept. Machine formats (JSON/YAML/CSV) are deliberately left
-// untouched — their encoders escape or quote control characters and their output is
-// meant to be parsed, not read off a terminal — so only the table renderer and callers
-// printing directly to a terminal route through here.
+// SanitizeTerminal drops C0/C1 control characters from a value bound for a terminal:
+// ingested telemetry could carry escapes that rewrite the screen or drive the clipboard.
 func SanitizeTerminal(s string) string {
 	if !strings.ContainsFunc(s, isControlRune) {
 		return s

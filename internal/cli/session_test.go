@@ -11,9 +11,8 @@ import (
 	"time"
 )
 
-// These drive `terma session` against a fake gateway (runInsights) and hold it to the
-// query parameters the gateway reads today. It ignores a name it does not know, so a
-// stale one is not an error anyone sees — it is a flag that quietly does nothing.
+// These drive `terma session` against a fake gateway and pin the query parameters it
+// reads, since the gateway silently ignores a name it does not know.
 
 func wantQuery(t *testing.T, r *http.Request, want url.Values) {
 	t.Helper()
@@ -77,7 +76,6 @@ func TestSessionList_SendsSortPageAndPageSize(t *testing.T) {
 		t.Fatalf("stdout still carries the old contract:\n%s", stdout)
 	}
 
-	// A person reading the table is told how to get the next page.
 	stdout, stderr, err := runInsights(t, handler, append(args, "-o", "table")...)
 	if err != nil {
 		t.Fatal(err)
@@ -116,14 +114,13 @@ func TestSessionList_RejectsBadFlagsBeforeAnyRequest(t *testing.T) {
 	}
 }
 
-// The gateway bounds last activity from below only, so --until is the client's: it
-// never travels, it is a half-open bound on the same field, and the walk keeps reading
-// pages until a page of ours is full — then stops, without reading the rest.
+// --until never travels: it filters client-side, half-open, and the walk stops once a
+// page of ours is full.
 func TestSessionList_UntilFiltersClientSideAcrossPages(t *testing.T) {
 	pages := map[string]string{
 		// Ranked by recency, so the rows --until rejects come first.
 		"1": sessionsPage(1, 4, sessionRow("s1", "2026-09-10T00:00:00Z"), sessionRow("s2", "2026-09-09T00:00:00Z")),
-		// A session that reports no last activity cannot be placed before anything.
+		// A session with no last activity cannot be placed before anything.
 		"2": sessionsPage(2, 4, sessionRow("s3", "2026-09-07T23:59:59Z"), sessionRow("s4", "")),
 		// The bound is exclusive.
 		"3": sessionsPage(3, 4, sessionRow("s5", "2026-09-08T00:00:00Z"), sessionRow("s6", "2026-09-06T00:00:00Z")),
@@ -161,15 +158,14 @@ func TestSessionList_UntilFiltersClientSideAcrossPages(t *testing.T) {
 		t.Fatalf("--all: sessions = %v over pages %v", got, asked)
 	}
 
-	// A table says when it stopped short, since nothing else would.
+	// A table says when it stopped short.
 	_, stderr, err := runInsights(t, handler, append(args, "-o", "table")...)
 	if err != nil || !strings.Contains(stderr, "Stopped at 2 sessions") {
 		t.Fatalf("err = %v stderr = %q", err, stderr)
 	}
 }
 
-// A relative --until is an age the gateway never sees; it is resolved to an instant
-// here, against the clock of the machine asking.
+// A relative --until is resolved to an instant against the local clock.
 func TestSessionList_UntilResolvesRelativeAges(t *testing.T) {
 	now := time.Now().UTC()
 	stdout, _, err := runInsights(t, principalsThen(t, func(w http.ResponseWriter, r *http.Request) {
@@ -186,8 +182,7 @@ func TestSessionList_UntilResolvesRelativeAges(t *testing.T) {
 	}
 }
 
-// A walk that the gateway cannot finish honestly is an error, never a short list
-// passed off as the whole one.
+// An unfinished walk is an error, never a short list passed off as whole.
 func TestSessionList_AllReportsAnIncompleteWalk(t *testing.T) {
 	calls := 0
 	_, _, err := runInsights(t, principalsThen(t, func(w http.ResponseWriter, r *http.Request) {
@@ -206,8 +201,7 @@ func TestSessionList_AllReportsAnIncompleteWalk(t *testing.T) {
 
 const summaryFrame = "event: summary\ndata: {\"summary\":{\"session_id\":\"sid1\",\"source_system\":\"claude-code\",\"user_id\":\"u-dana\",\"turns\":7,\"usage\":{\"input_tokens\":10,\"output_tokens\":5,\"provider_cost_usd\":0.25},\"providers\":[\"anthropic\"]}}\n\n"
 
-// The gateway serves one session's roll-up only as a feed. `get` reads its first
-// summary and returns; the feed staying open behind it is not the command's problem.
+// `get` reads the summary feed's first frame and returns.
 func TestSessionGet_ReadsTheSummaryFeed(t *testing.T) {
 	stdout, _, err := runInsights(t, principalsThen(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/ai/sessions/summary/stream" {
@@ -234,9 +228,7 @@ func TestSessionGet_ReadsTheSummaryFeed(t *testing.T) {
 	}
 }
 
-// A feed that opens and never sends a summary has to end as an error a person can
-// read. The wait is shortened here; runInsights' own deadline would fail this test
-// with a context error if the command's did not fire first.
+// A feed that never sends a summary ends in a readable error, not a hang.
 func TestSessionGet_SilentFeedIsAnErrorNotAHang(t *testing.T) {
 	previous := testApp.sessionGetWait
 	testApp.sessionGetWait = 100 * time.Millisecond
@@ -253,8 +245,7 @@ func TestSessionGet_SilentFeedIsAnErrorNotAHang(t *testing.T) {
 	}
 }
 
-// The history is keyset-paged. The command still prints all of it, sends the window
-// to the gateway, and applies the same window itself in case the gateway did not.
+// The keyset-paged history is printed whole, its window sent and also applied locally.
 func TestSessionEvents_WalksCursorsAndSendsTheWindow(t *testing.T) {
 	var cursors []string
 	stdout, _, err := runInsights(t, func(w http.ResponseWriter, r *http.Request) {
@@ -348,9 +339,8 @@ func TestSessionGit_IdentifiesTheSessionByID(t *testing.T) {
 	}
 }
 
-// The live catalog is not a change feed: the gateway re-sends the whole first page on
-// a timer. Repeats are dropped, JSON passes the rest through, and a table prints only
-// the sessions that are new or changed since they were last printed.
+// The catalog feed re-sends whole pages: repeats are dropped, JSON passes the rest, and a
+// table prints only new or changed sessions.
 func TestSessionListFollow_ReadsSnapshotFrames(t *testing.T) {
 	first := `{"sessions":[` + sessionRow("s1", "2026-09-09T10:00:00Z") + `,` + sessionRow("s2", "2026-09-09T09:00:00Z") + `],"pagination":{"page":1,"per_page":5,"total":2,"total_pages":1}}`
 	second := `{"sessions":[` + sessionRow("s3", "2026-09-09T10:02:00Z") + `,` + sessionRow("s1", "2026-09-09T10:01:00Z") + `,` + sessionRow("s2", "2026-09-09T09:00:00Z") + `],"pagination":{"page":1,"per_page":5,"total":3,"total_pages":1}}`

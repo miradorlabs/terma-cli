@@ -10,30 +10,17 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-// WriteRouteSettings writes the two files a per-repository route hands Claude Code: a
-// headers-helper script holding the key, and a settings document that names it beside
-// the export's `env` block. Neither is Claude Code's own settings file — they live in
-// Terma's directory and reach the agent on its command line (`claude --settings <path>`).
-//
-// The command line is the point. A developer who connected Claude Code machine-wide has
-// an `env` block and an otelHeadersHelper in ~/.claude/settings.json, and both outrank
-// the process environment: exporting OTEL_EXPORTER_OTLP_HEADERS around the agent does
-// nothing while a user-level helper exists, so every session keeps reporting to the
-// machine-wide project and nothing says so. `--settings` ranks above the user file on
-// both counts. Verified against local mock API/OTLP receivers on Claude Code 2.1.270–2.1.272:
-// explicit settings also override global detailed beta tracing, whereas native
-// repository-local settings do not reliably override that exporter.
-//
-// It is also the better home for the key: a 0700 script, rather than a variable every
-// tool subprocess the agent starts would inherit.
+// WriteRouteSettings writes a route's headers-helper script and a settings document naming it, both
+// in terma's directory and passed as `claude --settings <path>`: that outranks a machine-wide `env`
+// block and otelHeadersHelper, which beat the process environment, and keeps the key out of every
+// tool subprocess's environment.
 func (exporter) WriteRouteSettings(settingsPath, helperPath string, e harness.Exporter) error {
 	if err := harness.WriteHelper(helperPath, e.APIKey); err != nil {
 		return err
 	}
 	e.HelperPath = helperPath
 	env := exporter{}.render(e)
-	// A route owns its destination, including higher-priority signal overrides.
-	// Empty headers allow the dedicated helper to supply the credential.
+	// A route owns its destination, signal overrides included; empty headers let the helper supply the key.
 	env[harness.EnvOTLPHeaders] = ""
 	for _, override := range perSignalOverrides {
 		env[override.endpoint] = e.SignalEndpoint(override.signal)

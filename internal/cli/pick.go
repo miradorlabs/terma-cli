@@ -14,25 +14,19 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
-// pickRow is one line of a numbered picker: what it is called, and anything worth
-// saying beside it (an id, "signed in", "current").
+// pickRow is one line of a picker: a label and an optional note beside it.
 type pickRow struct {
 	Label string
 	Note  string
-	// Current marks the row that is already selected, so the list says so.
+	// Current marks the row already selected.
 	Current bool
-	// Default is the row a bare Enter selects. Without one, Enter selects nothing.
+	// Default is the row a bare Enter selects; without one, Enter selects nothing.
 	Default bool
 }
 
-// pick prompts for one of rows and returns its index. On a terminal it is a list to move
-// through with the arrow keys, starting on the default (or current) row, Enter to pick
-// and Esc to back out (errCancelled). With a terminal to draw on but none to read keys
-// from, it falls back to a numbered list answered by number or by name — match
-// resolves a typed name the same way the command's argument would, so the picker and
-// the argument agree on what a string means. It refuses to run without a terminal at
-// all: a script that reaches this path wanted an argument, and blocking on stdin would
-// hang a pipeline instead of failing it.
+// pick prompts for one of rows and returns its index: arrow keys on a terminal, else a
+// numbered list answered by number or by name (match). Without a terminal it refuses
+// rather than hang a pipeline on stdin.
 func pick(cmd *cobra.Command, title string, rows []pickRow, match func(string) (int, error)) (int, error) {
 	if canPrompt() {
 		items := make([]prompt.Item, len(rows))

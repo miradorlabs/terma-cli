@@ -9,10 +9,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 )
 
-// Agent is Gemini CLI. Its hooks come from terma's user-level Gemini extension
-// (ConnectGeminiRelay), which fires in every folder; a repository's own
-// .gemini/settings.json hooks need the folder trusted. It is an adapter so `terma hook
-// gemini-*` dispatches from the same table as everyone else's.
+// Agent is Gemini CLI, whose hooks come from terma's user-level extension: it fires in
+// every folder, where a repository's own hooks need the folder trusted.
 type Agent struct{}
 
 func (Agent) Name() string        { return "gemini" }

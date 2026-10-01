@@ -17,22 +17,14 @@ import (
 type ResolverDeps struct {
 	// Mint asks for a claimed project's missing key; nil when none may be minted.
 	Mint func(projectID string)
-	// AgentName is the agent whose hooks carry a tool label, which its key is kept under.
+	// AgentName names the agent behind a tool label, which its key is kept under.
 	AgentName func(tool string) string
 	// Endpoint is the ingest host a project's telemetry goes to.
 	Endpoint func(projectID string) string
 }
 
-// Resolver turns a claim into where its session's telemetry goes: the project's
-// own ingest host (ResolverDeps.Endpoint), the key this machine holds for
-// the claiming agent (else the project's spool key), and what the routing record lets
-// through.
-//
-// No key yet — a repository the platform connected, where no `terma install` ran — asks
-// mint for one in the background (KeyMinter): the session's parts wait in the hold
-// meanwhile, as they do for any keyless claim. Content and signals are
-// relay.CapturePolicy's: the organization's policy (fetched by `terma setup`) is the
-// ceiling, and the developer's routing record for the project can only narrow it.
+// Resolver turns a claim into a Policy: the project's ingest host, the claiming agent's key
+// (else the spool key, else a background mint while the parts wait), and relay.CapturePolicy.
 func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Policy, error) {
 	mint := r.Mint
 	return func(c claim.Claim) (relay.Policy, error) {
@@ -47,8 +39,7 @@ func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Polic
 			return relay.Policy{}, relay.ErrNoKey
 		}
 		org := cfg.Policy
-		// Reread the profile so a refreshed policy also governs queued exports. The
-		// resolver's cache bounds these local reads; hooks never fetch the network.
+		// Reread the profile so a refreshed policy also governs queued exports.
 		if file, err := config.LoadFile(); err != nil {
 			return relay.Policy{}, err
 		} else if p := file.Profiles[cfg.ProfileName]; p != nil {
@@ -64,8 +55,7 @@ func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Polic
 		globalPrimary := org.Global() && (org.TeamID == "" || org.TeamID == c.ProjectID)
 		org = routing.EffectivePolicy(org, c.ProjectID)
 		if cfg.ProfileName != "" && org.FetchedAt.IsZero() && os.Getenv("TERMA_POLICY_STUB") == "" {
-			// A new team's first exports wait for its background fetch, just as they
-			// wait for a missing key. Unknown policy must neither grant nor drop them.
+			// Unknown policy must neither grant nor drop: a new team's exports wait for its fetch.
 			return relay.Policy{}, errors.New("no validated collection policy for this team")
 		}
 		in := relay.Capture{Org: org, Primary: globalPrimary}
@@ -83,9 +73,8 @@ func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Polic
 	}
 }
 
-// CatchAll is where global mode files what nothing placed: the organization's
-// default project. The policy is read again at most every 10 seconds, so a `terma
-// setup` that switches mode takes effect in a running relay (the service outlives it).
+// CatchAll is where global mode files what nothing placed, rereading the policy every 10
+// seconds so a mode switch reaches a running relay.
 func CatchAll(policy func() config.Policy) func() (claim.Claim, bool) {
 	var mu sync.Mutex
 	var at time.Time

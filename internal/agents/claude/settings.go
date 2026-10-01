@@ -14,44 +14,25 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-// envKey is the settings member Claude Code reads its environment from.
 const envKey = "env"
 
-// settingsFile is a harness config file whose telemetry lives in a JSON `env` object —
-// the shape Claude Code uses. Codex keeps its telemetry in a TOML table instead; see
-// tomlFile.
-//
-// Every value is held as json.RawMessage so a merge is non-destructive: settings this
-// CLI has never heard of survive byte-for-byte, including their nested key order. Only
-// top-level ordering is lost, since Go marshals map keys alphabetically. That churns a
-// hand-written file once and is stable forever after.
+// settingsFile is a Claude Code settings document held as json.RawMessage, so settings terma
+// does not know survive byte-for-byte; only top-level key order is lost.
 type settingsFile struct {
 	path string
-	// writePath is path with symlinks resolved. Writing goes here rather than to path,
-	// because the atomic rename replaces whatever name it is given — and for anyone
-	// keeping ~/.claude/settings.json as a link into a dotfiles repo, that would swap
-	// the link for a regular file and quietly detach the file from the repo.
+	// writePath is path with symlinks resolved, so the atomic rename does not replace a dotfiles link.
 	writePath string
-	// root is the whole document; env is the nested object telemetry keys live in.
-	root map[string]json.RawMessage
-	env  map[string]string
-	// existed distinguishes "no telemetry configured" from "no file at all", which
-	// status reports differently.
-	existed bool
-	// symlinked records that path is a link. A disconnect that empties the document
-	// deletes the file — but deleting the *target* of a link leaves the link dangling,
-	// so a linked file is emptied to `{}` instead.
+	root      map[string]json.RawMessage
+	env       map[string]string
+	existed   bool
+	// symlinked files are emptied to `{}`, never deleted: deleting the target leaves the link dangling.
 	symlinked bool
-	// mode is the file's mode as found, so a file that was already tighter than 0600
-	// is not loosened by writing it back.
+	// mode is kept, so a file tighter than 0600 is not loosened.
 	mode fs.FileMode
 }
 
-// marshalJSON encodes without HTML escaping; an empty indent compacts. A settings file
-// holds hook commands and a status line that carry `>` and `&&`, and encoding/json's
-// default rewrites them as `\u003e` and `\u0026` — inside a json.RawMessage too, so a
-// value this CLI never touched did not survive byte-for-byte after all. hookmgr writes
-// the same file unescaped, and the two must not take turns re-encoding it.
+// marshalJSON encodes without HTML escaping (an empty indent compacts): hook commands carry `>` and
+// `&&`, and hookmgr writes the same file unescaped, so the two must not take turns re-encoding it.
 func marshalJSON(v any, indent string) ([]byte, error) {
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
@@ -63,7 +44,6 @@ func marshalJSON(v any, indent string) ([]byte, error) {
 	return bytes.TrimRight(buf.Bytes(), "\n"), nil
 }
 
-// loadSettings reads a settings file, tolerating its absence.
 func loadSettings(path string) (*settingsFile, error) {
 	s := &settingsFile{
 		path:      path,
@@ -92,20 +72,16 @@ func loadSettings(path string) (*settingsFile, error) {
 		s.mode = info.Mode().Perm()
 	}
 
-	// An empty file is a valid starting point; json.Unmarshal would reject it.
 	if len(bytes.TrimSpace(data)) == 0 {
 		return s, nil
 	}
 
 	if err := json.Unmarshal(data, &s.root); err != nil {
-		// Refusing here is the whole point: a merge into a file we cannot parse would
-		// mean overwriting settings we cannot see.
+		// A merge into a file terma cannot parse would overwrite settings it cannot see.
 		return nil, fmt.Errorf("parse %s: %w (fix or move the file, then retry)", path, err)
 	}
 
 	if raw, ok := s.root[envKey]; ok && len(raw) > 0 {
-		// Claude Code requires env values to be strings. A file with a non-string value
-		// is already broken for the harness, so say so rather than silently discarding it.
 		if err := json.Unmarshal(raw, &s.env); err != nil {
 			return nil, fmt.Errorf("parse %q in %s: %w (values must be strings)", envKey, path, err)
 		}
@@ -116,13 +92,11 @@ func loadSettings(path string) (*settingsFile, error) {
 	return s, nil
 }
 
-// merge applies env, overwriting only the keys given.
 func (s *settingsFile) merge(env map[string]string) {
 	maps.Copy(s.env, env)
 }
 
-// remove deletes the named keys and reports how many were actually present, so a
-// disconnect can tell "removed 12 settings" from "there was nothing to remove".
+// remove deletes the named keys and reports how many were present.
 func (s *settingsFile) remove(keys []string) int {
 	removed := 0
 	for _, k := range keys {
@@ -134,13 +108,9 @@ func (s *settingsFile) remove(keys []string) int {
 	return removed
 }
 
-// save writes the document back atomically.
-//
-// tighten is set when the file now carries a credential; it clamps the mode to 0600
-// rather than preserving a permissive one. A file already at 0400 keeps that.
+// save writes the document back atomically; tighten clamps a permissive mode to 0600 when the
+// file now carries a credential.
 func (s *settingsFile) save(tighten bool) error {
-	// An env object emptied by disconnect is dropped entirely rather than left as `{}`,
-	// so a full disconnect restores the file to what it looked like before.
 	if len(s.env) == 0 {
 		delete(s.root, envKey)
 	} else {
@@ -151,10 +121,7 @@ func (s *settingsFile) save(tighten bool) error {
 		s.root[envKey] = encoded
 	}
 
-	// A document with nothing left in it is removed rather than written as `{}` — unless
-	// it is reached through a symlink, where removing the target would leave the link
-	// dangling and break the next read. There, an empty object is written instead: it
-	// says the same thing and keeps the file the link points at.
+	// An empty document is removed, except through a symlink, where it is written as `{}`.
 	if len(s.root) == 0 && !s.symlinked {
 		if !s.existed {
 			return nil
@@ -182,23 +149,8 @@ func (s *settingsFile) save(tighten bool) error {
 	return config.WriteFileAtomic(s.writePath, data, mode)
 }
 
-// backup copies the current file alongside itself before the first modification. This
-// is a user's own configuration, possibly hand-written and possibly in a dotfiles repo;
-// a mangled merge should never be the only copy left.
-//
-// replace decides whether an existing backup may be overwritten, and the caller sets it
-// from whether the current file is Terma's own work.
-//
-// Neither "always" nor "never" is right. Always overwriting means a re-connect replaces
-// the record of the user's original collector with a copy of Terma's settings. Never
-// overwriting means the record goes stale the moment the user reconfigures: connect,
-// disconnect, set up a different collector, re-connect — the backup still holds the
-// first configuration while the second is overwritten and then deleted, unrecoverable.
-// So the rule is to snapshot whatever is not already Terma's, and leave the snapshot
-// alone when re-connecting over a config this CLI wrote.
-//
-// Best-effort by design: a failure to write the backup must not block the connect the
-// user asked for, so the caller reports it as a warning.
+// backup copies the current file alongside itself before the first modification, best effort.
+// replace, set when the current file is not terma's own work, lets it overwrite a stale backup.
 func (s *settingsFile) backup(replace bool) (string, error) {
 	return harness.BackupFile(s.writePath, s.existed, replace)
 }

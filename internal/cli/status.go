@@ -21,12 +21,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
-// statusHooks is status's wording for the commit-hook verdict, and whether commit
-// stamping counts toward coverage. A plan that could not be computed is not "nothing
-// left to write": status used to read it that way and credit commit stamping while
-// doctor failed the same repository — and an unreadable hooks file is exactly what
-// makes a plan fail. Reinstalling cannot fix what it cannot read, so the reason is
-// given rather than the usual advice.
+// statusHooks words the commit-hook verdict and whether stamping counts toward coverage;
+// a plan that could not be computed (an unreadable hooks file) is reported, not credited.
 func statusHooks(w doctor.HookWiring) (string, bool) {
 	switch {
 	case w.Err != nil:
@@ -40,12 +36,8 @@ func statusHooks(w doctor.HookWiring) (string, bool) {
 	}
 }
 
-// statusAgent describes one agent in a line, and reports whether its spend actually
-// reaches this project. Exporting to the right host but the wrong project is the case
-// worth spelling out: everything looks wired, and none of the spend arrives. `terma
-// doctor` fails on it, so status must not call it connected. bound says the CLI
-// stands in an installed repository. Whether it reaches the project is doctor's
-// judgement (HarnessVerdict.Reaches), so the two cannot disagree.
+// statusAgent describes one agent in a line and whether its spend reaches this project,
+// using doctor's own judgement (HarnessVerdict.Reaches) so the two cannot disagree.
 func statusAgent(v doctor.HarnessVerdict, bound bool) (string, bool) {
 	return statusAgentLine(v, bound), v.Reaches(bound)
 }
@@ -62,18 +54,11 @@ func statusAgentLine(v doctor.HarnessVerdict, bound bool) string {
 	case doctor.RouteOtherProject:
 		return "→ reporting to project " + v.OtherProject + ", not this one — run `terma install`"
 	case doctor.RouteRepoDecides:
-		// A machine-wide connect that exports no signal of its own is "connected" in
-		// general and says nothing about *here*. In a bound repository the question
-		// has an answer — this repository routes the agent, asks for it, or neither —
-		// and doctor gives it; status must give the same one, or it reports readiness
-		// for a repository whose sessions send nothing.
+		// In a bound repository status must give doctor's answer for this repository.
 		if bound && !v.RepoAsks {
 			return "→ no telemetry: this repository neither routes it nor asks for it — sessions here send nothing (run `terma install`)"
 		}
-		// Pointed somewhere, holding a key, exporting no signal. Nothing but a
-		// repository's own policy can make this send, which is `--exports repos`
-		// however it was arrived at. Saying "connected" alone would read as working;
-		// saying "not connected" would read as broken. It is neither.
+		// Neither "connected" (working) nor "not connected" (broken): repositories decide.
 		return "→ connected; repositories decide what is sent"
 	}
 	if v.Err != nil {
@@ -82,8 +67,7 @@ func statusAgentLine(v doctor.HarnessVerdict, bound bool) string {
 	return "→ not connected"
 }
 
-// statusLineSummary is one line on whether Claude Code's status line feeds terma the
-// plan's usage windows, and why not when it does not.
+// statusLineSummary says whether the agent's status line feeds terma the plan's usage windows.
 func statusLineSummary(v doctor.StatusLineVerdict) string {
 	switch v.Capture {
 	case doctor.StatusLineUnknown:
@@ -116,7 +100,6 @@ Nothing is written and no scratch commit is made — run
 				return err
 			}
 
-			// Account.
 			authOK := true
 			switch {
 			case cfg.APIKey != "":
@@ -130,11 +113,7 @@ Nothing is written and no scratch commit is made — run
 					fmt.Fprintf(out, "Account:     %s in %s\n", cmp.Or(cred.UserEmail, "signed in"), cmp.Or(cfg.OrganizationName, cred.OrganizationID))
 				}
 			}
-			// Say where this is pointed whenever it is not production, by a named
-			// environment or by endpoint overrides on the profile. Someone reading
-			// their own status should never have to guess which backend it describes,
-			// and the environment name is only the source of the defaults — once a
-			// profile overrides the hosts, naming it "prod" would be a lie.
+			// Name the backend whenever it is not production, by environment or by host overrides.
 			switch {
 			case cfg.Environment != config.EnvProd:
 				fmt.Fprintf(out, "Environment: %s (%s)\n", cfg.Environment, cfg.AuthURL)
@@ -142,7 +121,6 @@ Nothing is written and no scratch commit is made — run
 				fmt.Fprintf(out, "Endpoints:   custom, from profile %s (%s)\n", cfg.ProfileName, cfg.AuthURL)
 			}
 
-			// Repository.
 			root, gitDir, repoErr := workspaceHere(ctx)
 			hooksOK := false
 			var agentHooks doctor.Check
@@ -163,8 +141,7 @@ Nothing is written and no scratch commit is made — run
 					state, hooksOK = statusHooks(wiring)
 					fmt.Fprintf(out, "Hooks:       %s via %s\n", state, wiring.Manager)
 				}
-				// The agents' own hooks, judged the way doctor judges them: an agent that
-				// cannot run its hooks yet costs its share of commit stamping in both.
+				// An agent that cannot run its hooks yet costs its share of commit stamping.
 				if agentHooks = doctor.AgentHooksCheck(app.agents, root, doctor.SelectedForRepo(app.agents, projectID, cfg.Harnesses)); agentHooks.Status == doctor.Warn {
 					fmt.Fprintf(out, "Agent hooks: %d of %d agents can run theirs — %s\n", agentHooks.Ready, agentHooks.Of, agentHooks.Fix)
 				}
@@ -190,8 +167,7 @@ Nothing is written and no scratch commit is made — run
 				}
 			}
 
-			// Harnesses. Through the local relay one line says it all, the same verdict
-			// doctor gives (relayDoctorCheck), so the two never disagree.
+			// Through the relay one line gives doctor's own verdict (doctor.RelayCheck).
 			var export doctor.Check
 			if claim.Enabled() {
 				export = doctor.RelayCheck(app.agents, projectID, cfg.Harnesses)
@@ -218,8 +194,7 @@ Nothing is written and no scratch commit is made — run
 				}
 				export = doctor.HarnessCheck(app.agents, verdicts, cfg.OTLPURL, projectID, repoBound)
 			}
-			// A repository's own policy narrows what its sessions ship. Said next to
-			// the agent it applies to, since the global line cannot show it.
+			// A repository's own policy narrows what its sessions ship; the global line cannot show it.
 			if repoErr == nil {
 				for _, h := range app.agents.Harnesses() {
 					scoped, ok := h.(harness.Scoped)
@@ -235,7 +210,6 @@ Nothing is written and no scratch commit is made — run
 				}
 			}
 
-			// Spool.
 			backendOK := false
 			if s := openSpool(); s != nil {
 				backendOK = true

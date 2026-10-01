@@ -21,8 +21,7 @@ type PayloadSession struct {
 	Cwd string
 }
 
-// ReadPayloadSession reads the fields most agents' payloads share: session_id,
-// agent_id and cwd.
+// ReadPayloadSession reads the session_id, agent_id and cwd most agents' payloads share.
 func ReadPayloadSession(payload []byte) (PayloadSession, bool) {
 	var in struct {
 		SessionID string `json:"session_id"`
@@ -35,12 +34,8 @@ func ReadPayloadSession(payload []byte) (PayloadSession, bool) {
 	return PayloadSession{ID: in.SessionID, AgentID: in.AgentID, Cwd: in.Cwd}, true
 }
 
-// ClaimFromPayload claims a hook's session for the local relay from what its payload
-// said, for the hooks whose handler spooled nothing: a tool call that edited no file, a
-// Stop with nothing new in the rollout. Those are exactly the hooks of a session whose
-// hooks were trusted mid-way, and without a claim none of its telemetry would be
-// forwarded. EmitFor claims everything that is spooled; this is the net under it. tool
-// is the agent's label.
+// ClaimFromPayload claims a hook's session for the relay when its handler spooled nothing,
+// so a session whose hooks were trusted mid-way is still forwarded.
 func ClaimFromPayload(ctx context.Context, env Env, s PayloadSession, tool string) bool {
 	if s.ID == "" || !claim.Enabled() {
 		return false
@@ -52,13 +47,13 @@ func ClaimFromPayload(ctx context.Context, env Env, s PayloadSession, tool strin
 	case err == nil && r.ProjectID != "":
 		c = claim.Claim{ProjectID: r.ProjectID, Tool: tool, Repo: r.Name, Worktree: r.Worktree}
 	case err != nil && env.Policy.Global() && env.Policy.DefaultProjectID != "":
-		// Global mode, outside any repository: a scratch directory, the home directory.
+		// Global mode, outside any repository.
 		c = claim.Claim{ProjectID: env.Policy.DefaultProjectID, Tool: tool, Repo: filepath.Base(env.Cwd)}
 	default:
 		return false
 	}
 	c.PIDs = claimPIDs()
-	// A Codex subagent's telemetry names its own thread (see claimForRelay).
+	// A subagent's telemetry may name its own id (see claimForRelay).
 	if s.AgentID != "" && s.AgentID != id {
 		claim.Write(s.AgentID, c, env.Time())
 	}
@@ -69,6 +64,5 @@ func ClaimFromPayload(ctx context.Context, env Env, s PayloadSession, tool strin
 	return true
 }
 
-// claimPIDs are the processes this hook runs under, one of which is the agent: a claim
-// covers only records those processes export. Walked once per hook.
+// claimPIDs are this hook's ancestors, one of them the agent: a claim covers only their records.
 var claimPIDs = sync.OnceValue(procinfo.Ancestors)

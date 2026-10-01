@@ -8,26 +8,21 @@ import (
 	"strings"
 )
 
-// Manager is the package manager that owns an installation. Those installations are
-// upgraded through it, never replaced behind its back.
+// Manager is the package manager that owns an installation, which is upgraded through it.
 type Manager struct {
-	// Name is how the developer knows it: "Homebrew" or "npm".
+	// Name is "Homebrew" or "npm".
 	Name string
-	// Command is the upgrade as the developer would type it, for messages.
+	// Command is the upgrade as the developer would type it.
 	Command string
-	// Argv runs the upgrade with the package manager that owns this installation,
-	// not whichever one PATH finds first. Empty when that program cannot be found or
-	// the layout is not one terma recognizes; the developer is told Command instead.
+	// Argv runs the owning manager itself, not PATH's; empty when it cannot be found.
 	Argv []string
 	// Terma is where the upgraded binary is found afterwards.
 	Terma string
-	// Project is set when terma is a dependency of a project rather than a global
-	// install: Command then runs in this directory, and terma never runs it itself.
+	// Project is set for a project dependency: Command runs there, never by terma.
 	Project string
 }
 
-// ManagedBy reports the package manager that owns the binary at exe, if any. It reads
-// only the path, so it costs nothing and runs nothing.
+// ManagedBy reports the package manager that owns the binary at exe, from its path alone.
 func ManagedBy(exe string) (Manager, bool) {
 	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
 		exe = resolved
@@ -38,8 +33,7 @@ func ManagedBy(exe string) (Manager, bool) {
 		if !ok {
 			continue
 		}
-		// A new version lands in a new Caskroom or Cellar directory; the prefix's
-		// bin/terma is the link Homebrew moves to it.
+		// The prefix's bin/terma is the link that moves to each new version.
 		m := Manager{Name: "Homebrew", Command: "brew upgrade terma", Terma: filepath.FromSlash(prefix + "/bin/terma")}
 		if brew := filepath.FromSlash(prefix + "/bin/brew"); isExecutable(brew) {
 			m.Argv = []string{brew, "upgrade"}
@@ -52,21 +46,17 @@ func ManagedBy(exe string) (Manager, bool) {
 	}
 	if before, _, ok := strings.Cut(path, "/node_modules/@miradorlabs/terma/"); ok {
 		m := Manager{Name: "npm", Command: "npm install -g @miradorlabs/terma@latest", Terma: exe}
-		// On Windows terma neither runs npm nor tells the layouts apart, and names the
-		// global command as it always has.
+		// On Windows terma neither runs npm nor tells the layouts apart.
 		if runtime.GOOS == "windows" {
 			return m, true
 		}
-		// A global package lives in <prefix>/lib/node_modules. Anything else is a
-		// project's own dependency: a global install would not change the copy that runs,
-		// and only the project should change its lockfile.
+		// Outside <prefix>/lib/node_modules it is a project's dependency, and its lockfile is the project's.
 		prefix, global := strings.CutSuffix(before, "/lib")
 		if !global {
 			m.Command, m.Project = "npm install @miradorlabs/terma@latest", filepath.FromSlash(before)
 			return m, true
 		}
-		// The prefix is passed explicitly, so an npm found on PATH (a custom prefix keeps
-		// no npm of its own) still upgrades this copy and not another.
+		// An explicit prefix makes a PATH npm upgrade this copy, not another.
 		npm := filepath.FromSlash(prefix + "/bin/npm")
 		if !isExecutable(npm) {
 			npm, _ = exec.LookPath("npm")

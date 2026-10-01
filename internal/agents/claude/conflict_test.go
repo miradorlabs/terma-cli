@@ -13,16 +13,11 @@ import (
 
 const termaEndpoint = "https://otel.terma.ai"
 
-// miradorExporter is the export a default connect installs: every signal, Terma's
-// endpoint.
 func termaExporter() harness.Exporter {
 	return harness.Exporter{Endpoint: termaEndpoint, Signals: harness.AllSignals}
 }
 
-// The finding this file exists for: Claude Code resolves each signal's exporter from
-// the per-signal endpoint when one is set, and merges the *generic* headers into it. A
-// connect that writes only the generic endpoint plus an Authorization header therefore
-// hands Terma's server key to whoever owns that per-signal endpoint.
+// A per-signal endpoint receives the merged generic headers, so it would get terma's key.
 func TestConflictsDetectPerSignalEndpointLeak(t *testing.T) {
 	c, _ := claudeIn(t, `{"env":{
 		"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT":"https://other-collector.example.com"
@@ -43,9 +38,7 @@ func TestConflictsDetectPerSignalEndpointLeak(t *testing.T) {
 	}
 }
 
-// The OTLP spec: a generic endpoint gets `v1/<signal>` appended, but a per-signal
-// endpoint "MUST be used as-is without any modification". So only the suffixed URL is
-// equivalent — and the bare base URL, which looks equivalent, posts to the wrong path.
+// A per-signal endpoint is used as-is (OTLP spec), so only the suffixed URL is equivalent.
 func TestConflictsComparePerSignalEndpointAgainstTheSignalPath(t *testing.T) {
 	t.Run("suffixed url is equivalent", func(t *testing.T) {
 		c, _ := claudeIn(t, `{"env":{
@@ -73,16 +66,14 @@ func TestConflictsComparePerSignalEndpointAgainstTheSignalPath(t *testing.T) {
 		if len(conflicts) != 1 {
 			t.Fatalf("got %+v, want the bare base URL reported — no /v1/traces is appended to a per-signal endpoint", conflicts)
 		}
-		// It still goes to Terma's host, so it is a broken export rather than a
-		// credential handed to a stranger.
+		// Terma's own host: a broken export, not a credential handed to a stranger.
 		if conflicts[0].Credential {
 			t.Error("Terma's own base URL is not a credential disclosure")
 		}
 	})
 }
 
-// A signal Terma is not exporting cannot be redirected away from Terma, so an
-// override on it must not block the connect.
+// An override on a signal terma is not exporting must not block the connect.
 func TestConflictsIgnoreOverridesForDisabledSignals(t *testing.T) {
 	c, _ := claudeIn(t, `{"env":{
 		"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT":"https://other-collector.example.com"
@@ -100,10 +91,7 @@ func TestConflictsIgnoreOverridesForDisabledSignals(t *testing.T) {
 	}
 }
 
-// Detailed beta tracing diverts logs and traces to its own endpoint instead of the
-// exporters, so it defeats a connect without touching any OTEL_* variable. Terma
-// writes user settings, which get none of the managed-settings protection that would
-// otherwise strip it.
+// Detailed beta tracing diverts logs and traces without touching any OTEL_* variable.
 func TestConflictsDetectBetaTracingRedirect(t *testing.T) {
 	c, _ := claudeIn(t, `{"env":{
 		"ENABLE_BETA_TRACING_DETAILED":"1",
@@ -152,7 +140,6 @@ func TestConnectClearsBetaTracingPairWhenAsked(t *testing.T) {
 	env := envOf(t, path)
 	for _, key := range []string{"BETA_TRACING_ENDPOINT", "ENABLE_BETA_TRACING_DETAILED"} {
 		if _, ok := env[key]; ok {
-			// The switch alone does nothing, so leaving it is dead config.
 			t.Errorf("%s survived --force", key)
 		}
 	}
@@ -173,15 +160,13 @@ func TestConflictsDetectPerSignalHeadersAndProtocol(t *testing.T) {
 	}
 
 	for _, c := range conflicts {
-		// A header bag may itself be a credential; the key is named, the value never is.
 		if c.Key == "OTEL_EXPORTER_OTLP_LOGS_HEADERS" && c.Value != "" {
 			t.Errorf("a header value was captured for display: %q", c.Value)
 		}
 	}
 }
 
-// A generic endpoint already exporting elsewhere is not a leak — it gets overwritten —
-// but replacing someone's working collector must be a decision, not a side effect.
+// Replacing someone's working collector must be a decision, not a side effect.
 func TestConflictsReportExistingGenericEndpoint(t *testing.T) {
 	c, _ := claudeIn(t, `{"env":{
 		"CLAUDE_CODE_ENABLE_TELEMETRY":"1",
@@ -195,16 +180,12 @@ func TestConflictsReportExistingGenericEndpoint(t *testing.T) {
 	if len(conflicts) != 1 || conflicts[0].Key != "OTEL_EXPORTER_OTLP_ENDPOINT" {
 		t.Fatalf("got %+v, want the existing generic endpoint reported", conflicts)
 	}
-	// It is overwritten, so it is not a disclosure.
 	if conflicts[0].Credential {
 		t.Error("the generic endpoint is replaced by the connect; it is not a credential leak")
 	}
 }
 
-// A destination configured while telemetry is switched off is still a destination
-// someone chose, and connect overwrites it just the same. Ignoring it because nothing
-// is currently exporting is how a disconnect-reconfigure-reconnect cycle silently
-// destroys the replacement configuration.
+// A destination saved while telemetry is off is still someone's choice, and connect overwrites it.
 func TestConflictsReportGenericEndpointEvenWhenTelemetryIsOff(t *testing.T) {
 	c, _ := claudeIn(t, `{"env":{
 		"CLAUDE_CODE_ENABLE_TELEMETRY":"0",
@@ -223,10 +204,8 @@ func TestConflictsReportGenericEndpointEvenWhenTelemetryIsOff(t *testing.T) {
 	}
 }
 
-// The finding this rule exists for: connect (backup A), disconnect, reconfigure to B,
-// reconnect. A backup that is never overwritten still holds A, so the reconnect replaces
-// B and the next disconnect deletes it — B unrecoverable. The backup must track the last
-// non-Terma state, not the first one ever seen.
+// After connect, disconnect, reconfigure and reconnect, the backup holds the latest non-terma
+// state, or the next disconnect deletes the reconfiguration.
 func TestBackupTracksTheLatestNonMiradorConfiguration(t *testing.T) {
 	c, path := claudeIn(t, `{"env":{"OTEL_EXPORTER_OTLP_ENDPOINT":"https://collector-a.example.com"}}`)
 
@@ -240,7 +219,6 @@ func TestBackupTracksTheLatestNonMiradorConfiguration(t *testing.T) {
 		t.Fatalf("Disconnect: %v", err)
 	}
 
-	// The user sets up a different collector while disconnected.
 	s, err := loadSettings(path)
 	if err != nil {
 		t.Fatalf("loadSettings: %v", err)
@@ -263,8 +241,7 @@ func TestBackupTracksTheLatestNonMiradorConfiguration(t *testing.T) {
 	}
 }
 
-// Connect must not silently delete the user's settings. Without clearConflicts the
-// override survives, which is exactly why the command refuses to connect while it does.
+// Without clearConflicts the override survives, which is why the command refuses to connect.
 func TestConnectLeavesConflictsAloneByDefault(t *testing.T) {
 	c, path := claudeIn(t, `{"env":{
 		"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT":"https://other-collector.example.com"
@@ -300,7 +277,6 @@ func TestConnectClearsConflictsWhenAsked(t *testing.T) {
 			t.Errorf("%s survived --force", key)
 		}
 	}
-	// Only the conflicts go. Everything else is still the user's.
 	if env["EDITOR"] != "vim" {
 		t.Error("--force removed an unrelated setting")
 	}
@@ -309,15 +285,13 @@ func TestConnectClearsConflictsWhenAsked(t *testing.T) {
 	}
 }
 
-// Status must not report a Terma endpoint while a per-signal override quietly sends
-// that signal somewhere else.
+// Status reports a per-signal override that sends a signal away from terma.
 func TestStatusReportsConflicts(t *testing.T) {
 	c, _ := claudeIn(t, "")
 	if err := c.Connect(fullExporter(), false); err != nil {
 		t.Fatalf("Connect: %v", err)
 	}
 
-	// Simulate an override added after the fact.
 	s, err := loadSettings(mustConfigPath(t, c))
 	if err != nil {
 		t.Fatalf("loadSettings: %v", err)
@@ -339,9 +313,7 @@ func TestStatusReportsConflicts(t *testing.T) {
 	}
 }
 
-// Connect overwrites the telemetry variables and disconnect deletes them; neither
-// remembers what was there. The backup is the only record of the user's original
-// collector, so a re-connect must not replace it with a copy of Terma's own settings.
+// The backup is the only record of the user's original collector; a reconnect must not replace it.
 func TestBackupIsNotOverwrittenByAReconnect(t *testing.T) {
 	const original = `{"env":{"OTEL_EXPORTER_OTLP_ENDPOINT":"https://their-collector.example.com"}}`
 	c, _ := claudeIn(t, original)
@@ -354,7 +326,6 @@ func TestBackupIsNotOverwrittenByAReconnect(t *testing.T) {
 		t.Fatalf("Connect: %v", err)
 	}
 
-	// The second connect backs up a file that now contains Terma's settings.
 	second, err := c.Backup(termaEndpoint)
 	if err != nil {
 		t.Fatalf("Backup: %v", err)
@@ -375,8 +346,7 @@ func TestBackupIsNotOverwrittenByAReconnect(t *testing.T) {
 	}
 }
 
-// Anyone keeping ~/.claude/settings.json as a link into a dotfiles repo would find the
-// link silently swapped for a regular file, detaching it from the repo.
+// A dotfiles link must stay a link.
 func TestConnectWritesThroughASymlink(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("symlinks")
@@ -408,7 +378,6 @@ func TestConnectWritesThroughASymlink(t *testing.T) {
 	if info.Mode()&os.ModeSymlink == 0 {
 		t.Fatal("the symlink was replaced by a regular file; a dotfiles link would be broken")
 	}
-	// The content must have landed in the real file, not just anywhere.
 	data, err := os.ReadFile(target)
 	if err != nil {
 		t.Fatalf("read target: %v", err)
@@ -417,7 +386,7 @@ func TestConnectWritesThroughASymlink(t *testing.T) {
 		t.Fatalf("the write did not reach the symlink target:\n%s", data)
 	}
 
-	// And the backup belongs next to the real file, not next to the link.
+	// The backup belongs next to the real file, not the link.
 	if _, err := os.Stat(target + ".terma.bak"); err != nil {
 		if _, err2 := c.Backup(termaEndpoint); err2 != nil {
 			t.Fatalf("Backup: %v", err2)
@@ -428,8 +397,7 @@ func TestConnectWritesThroughASymlink(t *testing.T) {
 	}
 }
 
-// Telemetry switched off, or the endpoint deleted, leaves the server key on disk. That
-// config is not "connected", and disconnect keying off Connected would walk away from it.
+// A config with telemetry off or no endpoint still holds the key, and disconnect must clear it.
 func TestStatusCountsManagedKeysWhenNotConnected(t *testing.T) {
 	c, _ := claudeIn(t, "")
 	if err := c.Connect(fullExporter(), false); err != nil {
@@ -459,7 +427,6 @@ func TestStatusCountsManagedKeysWhenNotConnected(t *testing.T) {
 		t.Error("the key is still configured and should still be reported")
 	}
 
-	// And disconnect must actually clear it.
 	result, err := c.Disconnect()
 	if err != nil {
 		t.Fatalf("Disconnect: %v", err)
@@ -472,15 +439,11 @@ func TestStatusCountsManagedKeysWhenNotConnected(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Status: %v", err)
 	}
-	// The credential is the part that must not survive.
 	if after.KeyPrefix != "" {
 		t.Fatalf("the server key survived disconnect: %+v", after)
 	}
 
-	// The one key deliberately left behind is the switch the user themselves set to 0
-	// after connecting. Its value is no longer what Terma installed, so it is their
-	// edit — the same rule that stops disconnect deleting a collector someone
-	// reconfigured. It is reported rather than silently kept.
+	// The switch the user set to 0 after connecting is their edit: kept and reported.
 	if !slices.Contains(result.Skipped, claudeEnableTelemetry) {
 		t.Errorf("skipped = %v, want the user-edited switch reported", result.Skipped)
 	}
@@ -498,9 +461,7 @@ func TestStatusCountsManagedKeysWhenNotConnected(t *testing.T) {
 	}
 }
 
-// A key Terma installed and nobody touched is restored to whatever it held before —
-// including "absent". A key edited since is left alone, which is what stops a disconnect
-// deleting a collector somebody reconfigured after connecting.
+// An untouched key is restored to its prior value, absent included; an edited one is left alone.
 func TestDisconnectRestoresPreviousValuesAndSkipsEdits(t *testing.T) {
 	c, path := claudeIn(t, `{"env":{
 		"OTEL_EXPORTER_OTLP_ENDPOINT":"https://their-collector.example.com",
@@ -511,7 +472,6 @@ func TestDisconnectRestoresPreviousValuesAndSkipsEdits(t *testing.T) {
 		t.Fatalf("Connect: %v", err)
 	}
 
-	// Somebody changes the export after connecting.
 	s, err := loadSettings(path)
 	if err != nil {
 		t.Fatalf("loadSettings: %v", err)
@@ -527,18 +487,15 @@ func TestDisconnectRestoresPreviousValuesAndSkipsEdits(t *testing.T) {
 	}
 
 	env := envOf(t, path)
-	// Present before Terma: restored to the original values, not deleted.
 	if env[harness.EnvOTLPEndpoint] != "https://their-collector.example.com" {
 		t.Errorf("%s = %q, want the pre-Terma collector restored", harness.EnvOTLPEndpoint, env[harness.EnvOTLPEndpoint])
 	}
 	if env[otelLogUserPrompts] != "1" {
 		t.Errorf("%s = %q, want the pre-Terma value restored", otelLogUserPrompts, env[otelLogUserPrompts])
 	}
-	// Absent before Terma: removed.
 	if _, ok := env[harness.EnvOTLPHeaders]; ok {
 		t.Errorf("%s survived; it did not exist before the connect", harness.EnvOTLPHeaders)
 	}
-	// Edited after the connect: left alone and reported.
 	if env[harness.EnvOTLPProtocol] != "grpc" {
 		t.Errorf("%s = %q, want the later edit preserved", harness.EnvOTLPProtocol, env[harness.EnvOTLPProtocol])
 	}
@@ -550,7 +507,7 @@ func TestDisconnectRestoresPreviousValuesAndSkipsEdits(t *testing.T) {
 	}
 }
 
-// --force takes settings that were never Terma's. Disconnect gives them back.
+// --force takes settings that were never terma's; disconnect gives them back.
 func TestDisconnectRestoresClearedConflicts(t *testing.T) {
 	c, path := claudeIn(t, `{
 		"otelHeadersHelper": "/usr/local/bin/headers.sh",
@@ -579,9 +536,7 @@ func TestDisconnectRestoresClearedConflicts(t *testing.T) {
 	}
 }
 
-// A reconnect updates what Terma installed, but it must not turn the preceding
-// Terma installation into the value disconnect restores. The ownership chain starts
-// before the first connect and survives until the final disconnect.
+// A reconnect keeps the ownership chain that started before the first connect.
 func TestReconnectPreservesOriginalJournal(t *testing.T) {
 	c, path := claudeIn(t, `{
 		"otelHeadersHelper":"/usr/local/bin/headers.sh",
@@ -615,9 +570,7 @@ func TestReconnectPreservesOriginalJournal(t *testing.T) {
 	}
 }
 
-// A first disconnect deliberately leaves an edited value alone. Keeping a reduced
-// journal makes that decision stable: status no longer calls the edit Terma-owned,
-// and a repeated disconnect must keep leaving the edit alone.
+// A reduced journal keeps an edited value alone across repeated disconnects.
 func TestRepeatedDisconnectKeepsEditedKeys(t *testing.T) {
 	c, path := claudeIn(t, `{}`)
 	if err := c.Connect(fullExporter(), false); err != nil {
@@ -712,9 +665,7 @@ func mustConfigPath(t *testing.T, c exporter) string {
 	return path
 }
 
-// Writing through a dangling link would replace the link with a regular file, silently
-// detaching a dotfiles setup from its repo. There is no safe way to guess where the
-// missing target belonged, so this is refused rather than papered over.
+// Writing through a dangling link would replace it with a regular file, so it is refused.
 func TestConnectRefusesADanglingSymlink(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("symlinks")
@@ -738,7 +689,6 @@ func TestConnectRefusesADanglingSymlink(t *testing.T) {
 		t.Errorf("error = %q, want it to explain the broken link", err)
 	}
 
-	// The link itself must survive untouched.
 	info, lerr := os.Lstat(link)
 	if lerr != nil {
 		t.Fatalf("lstat: %v", lerr)
@@ -748,9 +698,7 @@ func TestConnectRefusesADanglingSymlink(t *testing.T) {
 	}
 }
 
-// Disconnecting a settings file that holds nothing but Terma's keys empties the
-// document. Deleting the target of a link would leave the link dangling and break the
-// next read, so a linked file is emptied to `{}` instead.
+// A linked file emptied by disconnect becomes `{}`, so the link does not dangle.
 func TestDisconnectKeepsASymlinkTargetAlive(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("symlinks")
@@ -787,7 +735,6 @@ func TestDisconnectKeepsASymlinkTargetAlive(t *testing.T) {
 	if info.Mode()&os.ModeSymlink == 0 {
 		t.Fatal("the link was replaced by a regular file")
 	}
-	// And the file must still be readable as settings.
 	st, err := c.Status()
 	if err != nil {
 		t.Fatalf("Status after disconnect: %v", err)
@@ -797,9 +744,7 @@ func TestDisconnectKeepsASymlinkTargetAlive(t *testing.T) {
 	}
 }
 
-// Claude Code resolves settings from several files, and the user file Terma writes is
-// the lowest-precedence of them. A project file wins — so a conflict there decides where
-// telemetry goes while the user file supplies Terma's Authorization header.
+// A project file outranks the user file, so its redirect is a conflict.
 func TestConflictsDetectProjectSettings(t *testing.T) {
 	c, _ := claudeIn(t, "")
 
@@ -827,8 +772,7 @@ func TestConflictsDetectProjectSettings(t *testing.T) {
 	if conflicts[0].Scope != harness.ScopeProject {
 		t.Errorf("scope = %q, want %q", conflicts[0].Scope, harness.ScopeProject)
 	}
-	// Terma writes the user file; it has no business editing a project's settings, and
-	// --force must not claim to have handled this.
+	// A project's settings are not terma's to edit, and --force must not claim to handle them.
 	if conflicts[0].Clearable {
 		t.Error("a project setting must not be reported as clearable")
 	}
@@ -837,8 +781,7 @@ func TestConflictsDetectProjectSettings(t *testing.T) {
 	}
 }
 
-// A variable exported in the shell takes effect regardless of what is written to any
-// settings file, and Terma cannot unset it for the user.
+// A shell export wins over any settings file, and terma cannot unset it.
 func TestConflictsDetectShellEnvironment(t *testing.T) {
 	c, _ := claudeIn(t, "")
 	t.Chdir(t.TempDir())
@@ -859,8 +802,7 @@ func TestConflictsDetectShellEnvironment(t *testing.T) {
 	}
 }
 
-// An exported value that already agrees with what Terma would install is not a
-// conflict — the check must not fire on its own configuration.
+// An export that agrees with what terma would install is not a conflict.
 func TestConflictsIgnoreMatchingShellEnvironment(t *testing.T) {
 	c, _ := claudeIn(t, "")
 	t.Chdir(t.TempDir())
@@ -875,8 +817,7 @@ func TestConflictsIgnoreMatchingShellEnvironment(t *testing.T) {
 	}
 }
 
-// otelHeadersHelper is a top-level setting, not an env entry, so a scan of the env block
-// never sees it — while it decides what the export authenticates with.
+// otelHeadersHelper is a top-level setting that decides what the export authenticates with.
 func TestConflictsDetectOtelHeadersHelper(t *testing.T) {
 	c, _ := claudeIn(t, `{"otelHeadersHelper":"/usr/local/bin/headers.sh"}`)
 	t.Chdir(t.TempDir())
@@ -891,7 +832,6 @@ func TestConflictsDetectOtelHeadersHelper(t *testing.T) {
 	if !conflicts[0].Credential {
 		t.Error("a helper that supplies the Authorization header is a credential conflict")
 	}
-	// It is in the user file, so --force can take it.
 	if !conflicts[0].Clearable {
 		t.Error("a helper in the user's own settings should be clearable")
 	}
@@ -913,8 +853,7 @@ func TestConnectClearsOtelHeadersHelperWhenAsked(t *testing.T) {
 	}
 }
 
-// A saved beta endpoint with the switch off does nothing, so blocking on it is a false
-// positive that also talks --force into deleting two settings for no reason.
+// A saved beta endpoint with the switch off does nothing, so it must not block.
 func TestConflictsIgnoreDormantBetaTracing(t *testing.T) {
 	c, _ := claudeIn(t, `{"env":{
 		"BETA_TRACING_ENDPOINT":"https://beta-collector.example.com"
@@ -930,10 +869,7 @@ func TestConflictsIgnoreDormantBetaTracing(t *testing.T) {
 	}
 }
 
-// Connecting a sandbox under CLAUDE_CONFIG_DIR must not disturb a different config's
-// record. A single per-harness journal made these collide: the sandbox connect
-// overwrote the record for the real ~/.claude, and every later read of the real config
-// found a journal describing a file it was never asked about.
+// A sandbox under CLAUDE_CONFIG_DIR keeps its own journal, apart from the real config's.
 func TestJournalIsPerConfigNotPerHarness(t *testing.T) {
 	termaHome := t.TempDir()
 	t.Setenv("TERMA_CONFIG_DIR", termaHome)
@@ -942,13 +878,11 @@ func TestJournalIsPerConfigNotPerHarness(t *testing.T) {
 	sandboxDir := t.TempDir()
 	c := exporter{}
 
-	// Connect the "real" config.
 	t.Setenv("CLAUDE_CONFIG_DIR", realDir)
 	if err := c.Connect(fullExporter(), false); err != nil {
 		t.Fatalf("connect real: %v", err)
 	}
 
-	// Connect a sandbox, as anyone testing this would.
 	t.Setenv("CLAUDE_CONFIG_DIR", sandboxDir)
 	sandbox := fullExporter()
 	sandbox.Endpoint = "https://otel-dev.terma.ai"
@@ -956,7 +890,6 @@ func TestJournalIsPerConfigNotPerHarness(t *testing.T) {
 		t.Fatalf("connect sandbox: %v", err)
 	}
 
-	// The real config must still read cleanly, and still be connected.
 	t.Setenv("CLAUDE_CONFIG_DIR", realDir)
 	st, err := c.Status()
 	if err != nil {
@@ -969,7 +902,6 @@ func TestJournalIsPerConfigNotPerHarness(t *testing.T) {
 		t.Errorf("real endpoint = %q, want it untouched by the sandbox connect", st.Endpoint)
 	}
 
-	// And each disconnects independently, restoring its own file.
 	realResult, err := c.Disconnect()
 	if err != nil {
 		t.Fatalf("disconnect real: %v", err)
@@ -995,17 +927,13 @@ func TestJournalIsPerConfigNotPerHarness(t *testing.T) {
 	}
 }
 
-// A connect that switches the credential from inline to a headers helper — which is
-// what happens when a machine connected by an earlier tool, or to another project, is
-// pointed at a new one — must not leave the old inline header behind. The OTel SDK
-// reads OTEL_EXPORTER_OTLP_HEADERS itself and it outranks the helper script, so a
-// stale value keeps sending every export to the project the old key belonged to while
-// `status` and `doctor` both report a healthy connection.
+// Switching to a headers helper clears the old inline header, which outranks the helper and would
+// keep exporting to the old project.
 func TestConnectClearsInlineHeaderWhenSwitchingToHelper(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, ".config"))
-	// A developer's own CLAUDE_CONFIG_DIR would otherwise move the file this test reads.
+	// A developer's own CLAUDE_CONFIG_DIR would move the file this test reads.
 	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(dir, ".claude"))
 	path := filepath.Join(dir, ".claude", "settings.json")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -1053,7 +981,6 @@ func TestConnectClearsInlineHeaderWhenSwitchingToHelper(t *testing.T) {
 		t.Fatal("helper does not carry the new key")
 	}
 
-	// The status the CLI reports must come from the helper, not a leftover.
 	st, err := c.Status()
 	if err != nil {
 		t.Fatalf("status: %v", err)
@@ -1063,13 +990,12 @@ func TestConnectClearsInlineHeaderWhenSwitchingToHelper(t *testing.T) {
 	}
 }
 
-// Traces off must not leave the beta switch from an earlier traces-on connect behind:
-// the same convergence rule, on a key whose staleness opts the user into a beta.
+// Traces off clears a beta switch an earlier traces-on connect left.
 func TestConnectClearsBetaSwitchWhenTracesAreOff(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, ".config"))
-	// A developer's own CLAUDE_CONFIG_DIR would otherwise move the file this test reads.
+	// A developer's own CLAUDE_CONFIG_DIR would move the file this test reads.
 	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(dir, ".claude"))
 	path := filepath.Join(dir, ".claude", "settings.json")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

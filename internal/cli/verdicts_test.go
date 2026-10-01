@@ -12,9 +12,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 )
 
-// Each test below hands ONE verdict to both commands' renderers. status and doctor
-// used to reach these judgements separately, which is how one could say "connected"
-// while the other failed; now a disagreement has to be written down here to exist.
+// Each test hands one verdict to both status's and doctor's renderers, so they cannot disagree.
 
 func TestHookWiringVerdictInBothCommands(t *testing.T) {
 	cases := []struct {
@@ -47,8 +45,7 @@ func TestHookWiringVerdictInBothCommands(t *testing.T) {
 			statusState: "NOT wired (run `terma install`)", statusWired: false,
 		},
 		{
-			// Every file is there, written by an earlier terma: a refresh rewrites them
-			// without the sign-in and questions a re-install brings.
+			// A refresh rewrites files an earlier terma wrote, without sign-in.
 			name:         "an earlier terma wrote the files",
 			w:            doctor.HookWiring{Manager: hookmgr.GitShim, HooksPath: hookmgr.ShimDir, Changes: 2, Stale: 2},
 			doctorStatus: doctor.Fail, doctorDetail: string(hookmgr.GitShim) + " wiring was written by an earlier terma (2 file(s) out of date)",
@@ -62,9 +59,7 @@ func TestHookWiringVerdictInBothCommands(t *testing.T) {
 			statusState: "NOT wired (run `terma install`)", statusWired: false,
 		},
 		{
-			// Where the two commands used to disagree: doctor failed a plan it could not
-			// compute, and status read it as nothing left to write and credited commit
-			// stamping. Neither calls it wired now, and both say why.
+			// A plan that cannot be computed is not wired in either command, and both say why.
 			name:         "the plan cannot be computed",
 			w:            doctor.HookWiring{Manager: hookmgr.Husky, Err: errors.New("read .husky/pre-commit: permission denied")},
 			doctorStatus: doctor.Fail, doctorDetail: "read .husky/pre-commit: permission denied",
@@ -153,8 +148,7 @@ func TestStatusLineVerdictInBothCommands(t *testing.T) {
 			if got := statusLineSummary(v); got != tc.status {
 				t.Errorf("status = %q; want %q", got, tc.status)
 			}
-			// Capturing is the only state doctor passes, and the only one status does
-			// not flag: the two agree on which states work.
+			// Capturing is the only state doctor passes and status does not flag.
 			capturing := v.Capture == doctor.StatusLineBehind || v.Capture == doctor.StatusLineDefault
 			if (check.Status == doctor.Pass) != capturing || strings.HasPrefix(tc.status, "capturing") != capturing {
 				t.Errorf("the commands disagree about whether %v captures", v.Capture)
@@ -164,8 +158,7 @@ func TestStatusLineVerdictInBothCommands(t *testing.T) {
 }
 
 func TestHarnessVerdictInBothCommands(t *testing.T) {
-	// The pending case asks where the shims should go, which reads the shell's
-	// startup file; keep that away from the developer's own.
+	// The pending case reads the shell's startup file; keep it away from the developer's.
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("SHELL", "/bin/zsh")
 
@@ -201,8 +194,7 @@ func TestHarnessVerdictInBothCommands(t *testing.T) {
 			status: "→ reporting to project " + elsewhere + ", not this one — run `terma install`", statusOK: false,
 		},
 		{
-			// Routing that is not live yet changes nothing about a repository that asks:
-			// sessions here do send, through the machine-wide config.
+			// Without live routing, a repository that asks still sends via the machine-wide config.
 			name:  "routing not live, but the repository's policy makes it send",
 			facts: doctor.HarnessFacts{Status: silent, RepoAsks: true, LocalScope: true}, bound: true,
 			route:        doctor.RouteRepoDecides,
@@ -224,10 +216,7 @@ func TestHarnessVerdictInBothCommands(t *testing.T) {
 			status: "→ connected; repositories decide what is sent", statusOK: true,
 		},
 		{
-			// The second place the two used to disagree: an agent that cannot carry a
-			// repository policy at all (Codex) was never asked by doctor whether this
-			// repository has one, so doctor passed what status said sends nothing. Only a
-			// hand-edited config reaches it — connect always writes Codex's signals.
+			// An agent that cannot carry a repository policy fails in doctor as in status.
 			name:  "silent config for an agent with no repository scope",
 			facts: doctor.HarnessFacts{Status: silent}, bound: true,
 			route:        doctor.RouteRepoDecides,

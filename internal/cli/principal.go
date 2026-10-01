@@ -101,7 +101,6 @@ func validatePrincipalKind(kind string) error {
 	return fmt.Errorf("--kind must be %s or %s", api.AIPrincipalUser, api.AIPrincipalAPIKey)
 }
 
-// principalFilter renders the catalog's AIP-160 filter: kind and source, ANDed.
 func principalFilter(kind, source string) string {
 	var terms []string
 	if kind != "" {
@@ -134,8 +133,7 @@ func sortPrincipals(principals []api.AIPrincipal) {
 	})
 }
 
-// principalIndex is the catalog loaded once per command: it labels ids in output and
-// turns the names people type into the ids the filters need.
+// principalIndex is the catalog loaded once per command, labelling ids and resolving names.
 type principalIndex struct {
 	all   []api.AIPrincipal
 	byKey map[string]api.AIPrincipal
@@ -159,7 +157,6 @@ func newPrincipalIndex(principals []api.AIPrincipal) *principalIndex {
 	return index
 }
 
-// name labels an id for display; empty when the catalog has not seen it.
 func (ix *principalIndex) name(source, id string) string {
 	if ix == nil || id == "" {
 		return ""
@@ -170,12 +167,8 @@ func (ix *principalIndex) name(source, id string) string {
 	return ""
 }
 
-// resolve maps what a person typed to principals. An exact id wins; then an exact
-// name or alias, case-insensitively; then a unique substring of any of the three.
-// One person is often several principals — the same email seen by Claude Code and by
-// Codex — so a name match returns all of them. A substring that lands on different
-// people is an error naming them, because silently picking one would attribute
-// someone else's spend.
+// resolve maps what a person typed to principals: an exact id, then an exact name or alias,
+// then a unique substring; a substring matching two people is an error, never a guess.
 func (ix *principalIndex) resolve(kind, query string) ([]api.AIPrincipal, error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
@@ -209,8 +202,7 @@ func (ix *principalIndex) resolve(kind, query string) ([]api.AIPrincipal, error)
 		return exact, nil
 	}
 
-	// Substring: group the hits by who they are, so one person on two agents is one
-	// candidate and two people are an ambiguity.
+	// Group hits by person, so one person on two agents is one candidate.
 	groups := map[string][]api.AIPrincipal{}
 	var order []string
 	for _, p := range pool {
@@ -244,7 +236,6 @@ func (ix *principalIndex) resolve(kind, query string) ([]api.AIPrincipal, error)
 	}
 }
 
-// resolveIDs is resolve for a list of flag values, flattening to the ids a filter takes.
 func (ix *principalIndex) resolveIDs(kind string, queries []string) ([]string, error) {
 	var ids []string
 	for _, q := range queries {

@@ -11,61 +11,35 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
-// State directories under the config dir. Each holds small files named by a hash,
-// with a `.lock` beside mutable checkpoints; pruneState ages them out. The
-// names are on developers' disks already: renaming one orphans its files and restarts
-// every sequence and cursor kept there.
+// State directory names are on developers' disks: renaming one orphans its files.
 const (
-	// fundingStateDir is the hash of the last funding evidence spooled per session.
 	fundingStateDir = "funding"
 )
 
-// SnapshotStateRetention is how long a status line snapshot or a funding evidence hash
-// outlives its last write. Both are rewritten whenever a live session spools one, at
-// least every quotaHeartbeat, so two idle days means the session is over. The cursors
-// and checkpoints in the other directories are kept for spool.MaxAge, not for this.
+// SnapshotStateRetention is how long a snapshot or evidence hash outlives its last write;
+// a live session rewrites one at least every QuotaHeartbeat.
 const SnapshotStateRetention = 48 * time.Hour
 
-// observationLockWait is how long an observation waits for another hook of the same
-// session to release the checkpoint before it reports a capture gap, and
-// observationLockPoll is how often it looks.
+// observationLockWait is how long an observation waits for the checkpoint before reporting a capture gap.
 const (
 	observationLockWait = time.Second
 	observationLockPoll = 10 * time.Millisecond
 )
 
-// WriteState replaces one of the state files above: a cursor, a checkpoint, the hash of
-// the last thing spooled. Atomic, so another hook never reads half of one — and not
-// fsynced, on purpose.
-//
-// Each of these says how far capture has got, and what it has got is in the spool,
-// which Append does not sync either. A cursor more durable than the events behind it
-// fails the wrong way round: after a power cut it would say "already sent" about
-// something that never reached the disk, and that evidence would be gone. One that is
-// merely as durable as the spool falls behind instead and the hook replays, which is
-// what the stable observation ids are for — a duplicate is dropped downstream, a gap
-// is not recoverable. The sync it skips is F_FULLFSYNC on macOS: about ten
-// milliseconds against a fifth of one, on every tool call, inside the agent's turn.
+// WriteState atomically replaces a cursor or checkpoint without fsync: one more durable
+// than the unsynced spool would claim lost events were sent, and F_FULLFSYNC costs ~10 ms per call.
 func WriteState(path string, data []byte) error {
 	return config.WriteFileAtomicNoSync(path, data, 0o600)
 }
 
-// EvidenceID is the stable id for s: a state file's name, an observation's id. The
-// same input is the same id on every run, which is what makes a replay harmless.
+// EvidenceID is the stable id for s, which makes a replay harmless.
 func EvidenceID(s string) string { h := sha256.Sum256([]byte(s)); return hex.EncodeToString(h[:]) }
 
-// QuotaHeartbeat is how often an unchanged snapshot is re-sent, so the backend
-// can tell "no change" from "no status line".
+// QuotaHeartbeat is how often an unchanged snapshot is re-sent, so "no change" differs from "no capture".
 const QuotaHeartbeat = 10 * time.Minute
 
-// PruneState ages out a state directory: every `<id>.json` last written before the
-// cutoff, and then the `<id>.json.lock` beside it. The locks used to be left behind —
-// one per session, for ever — because only the data files were matched.
-//
-// A lock goes only when all three hold: it is past the cutoff itself, its data file is
-// gone, and nothing holds it (the prune takes it before unlinking). A lock's mtime is
-// its creation, so a session that outlives the cutoff keeps its lock through its data
-// file, which every write refreshes.
+// PruneState removes `<id>.json` files older than before, then each lock that is past the
+// cutoff, has no data file and is not held.
 func PruneState(dir string, before time.Time) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {

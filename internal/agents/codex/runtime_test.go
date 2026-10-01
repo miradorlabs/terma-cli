@@ -56,15 +56,13 @@ func TestCodexRuntimeArgs(t *testing.T) {
 	exp.IncludeToolContent = true
 	args = (Codex{}).RuntimeArgs(exp)
 	joined := strings.Join(args, " ")
-	// Unselected signals are turned OFF explicitly, not left absent: otherwise a per-repo
-	// run would fall through to whatever exporters a prior machine-wide connect left in
-	// the user-level config.toml and leak this repo's telemetry to another project.
+	// Unselected signals are turned off explicitly, or Codex would fall through to another
+	// project's user-level exporters.
 	for _, want := range []string{`otel.trace_exporter="none"`, `otel.metrics_exporter="none"`} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("unselected signal not turned off: want %q in\n%s", want, joined)
 		}
 	}
-	// metrics is off, so no analytics opt-in; and no notify override on the per-repo path.
 	for _, unwanted := range []string{"analytics.enabled", "notify"} {
 		if strings.Contains(joined, unwanted) {
 			t.Fatalf("unexpected override %s", unwanted)

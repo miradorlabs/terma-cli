@@ -62,8 +62,7 @@ func (Agent) PlanUserHooks(dir string, command func(string) string, install bool
 	return planUserHooks(dir, command, install)
 }
 
-// PayloadSession reads Cursor's payload, keyed on conversation_id: the one id every
-// Cursor event carries.
+// PayloadSession keys Cursor's payload on conversation_id, the one id every event carries.
 func (Agent) PayloadSession(payload []byte) (hookrun.PayloadSession, bool) {
 	var in struct {
 		ConversationID string `json:"conversation_id"`

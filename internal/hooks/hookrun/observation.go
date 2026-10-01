@@ -14,29 +14,22 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// Observation is one snapshot bound for the spool, with the identity the write-ahead
-// checkpoint needs to order it. An agent that reports only through its hooks records
-// through this; the attributes are the agent's, the ordering and replay identity are
-// shared.
+// Observation is one hooks-only agent snapshot bound for the spool, ordered by a shared write-ahead checkpoint.
 type Observation struct {
 	// Tool is the agent's label; it also seeds the observation id.
 	Tool string
 	// Source is the evidence_source attribute on a capture-gap event.
 	Source string
-	// StateDir is the checkpoint directory under the config dir, per harness so a
-	// harness's stream survives another's being introduced.
+	// StateDir is the checkpoint directory under the config dir, one per agent.
 	StateDir  string
 	SessionID string
 	Hook      string
-	// TurnID is the harness's turn identifier when it has one; it travels on the
-	// capture-gap event so a lost observation can be placed.
+	// TurnID travels on a capture-gap event so a lost observation can be placed.
 	TurnID string
 	Attrs  map[string]any
 }
 
-// ObservationState is a write-ahead checkpoint. A crash between spool append and
-// checkpoint acknowledgement replays Pending with the same observation ID. Ordering is
-// local receipt order, not an invented provider timestamp/order.
+// ObservationState is a write-ahead checkpoint: a crash after the append replays Pending with the same id.
 type ObservationState struct {
 	Stream   string       `json:"stream"`
 	Sequence uint64       `json:"sequence"`
@@ -68,8 +61,7 @@ func (e Env) CaptureObservation(ctx context.Context, r *Repo, o Observation) {
 		return
 	}
 	path := filepath.Join(dir, EvidenceID(o.SessionID+"\x00"+r.Root)+".json")
-	// Unlike a redraw, distinct hooks cannot simply be discarded when another hook
-	// holds the lock. Wait briefly, bounded by the hook's deadline.
+	// Distinct hooks cannot be discarded when another holds the lock, so wait briefly.
 	ctx, cancel := context.WithTimeout(ctx, observationLockWait)
 	defer cancel()
 	var unlock func()
@@ -127,8 +119,7 @@ func (e Env) CaptureObservation(ctx context.Context, r *Repo, o Observation) {
 			return
 		}
 	}
-	// Suppress only adjacent identical snapshots. Changed hook, turn, model, account,
-	// loop count, missingness or values always retains a new position.
+	// Suppress only adjacent identical snapshots.
 	if state.LastHash == hash && !e.Time().Before(state.At) && e.Time().Sub(state.At) < QuotaHeartbeat {
 		return
 	}

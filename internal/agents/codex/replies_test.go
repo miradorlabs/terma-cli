@@ -9,10 +9,8 @@ import (
 	"time"
 )
 
-// The record shapes below are Codex 0.155.1's, from a live rollout (2026-09-19): a turn
-// opens with task_started carrying the rollout's turn_id *and* the turn's OTel trace_id,
-// turn_context repeats the turn_id alone, and an assistant message is a response_item with
-// Codex's own message id, a phase, and output_text parts.
+// Rollout shapes as Codex writes them: task_started carries turn_id and the OTel trace_id,
+// turn_context repeats turn_id alone, and a reply is a response_item with Codex's own id.
 const (
 	replyTurnA  = "01a0bae4-4a41-7910-9022-15897b3021ae"
 	replyTraceA = "ae2a5e6f8e0168ae5ec2efa2c8772b02"
@@ -48,8 +46,7 @@ func readReplies(t *testing.T, path string, c CodexReplyCursor, maxText int) (Co
 	return next, status, out
 }
 
-// What Codex said, in order, each in the turn it was said in — and the turn is named by
-// the trace id, because that is what every natively exported event of the turn carries.
+// Codex's replies come out in order, each in its turn, named by the trace id.
 func TestCodexRepliesCarryTheirTurnAndCodexsOwnIdentity(t *testing.T) {
 	path := sequenceFixture(t,
 		replyTaskStarted(replyTurnA, replyTraceA)+replyTurnContext(replyTurnA)+
@@ -76,25 +73,23 @@ func TestCodexRepliesCarryTheirTurnAndCodexsOwnIdentity(t *testing.T) {
 			t.Errorf("reply %d = %+v, want %+v", i, got, w)
 		}
 	}
-	// When it was said, not when it was read: a turn's replies are all read at its end.
+	// When it was said, not when it was read.
 	if !replies[0].At.Equal(time.Date(2026, 9, 19, 18, 18, 41, 265_000_000, time.UTC)) {
 		t.Errorf("reply time = %v", replies[0].At)
 	}
-	// Nothing but an assistant's message is a reply: not the developer's prompt, not the
-	// instructions Codex was given, not a tool call, not task_complete's summary of it.
+	// Only an assistant message is a reply: not a prompt, instructions, a tool call, or
+	// task_complete's summary.
 	for _, r := range replies {
 		if strings.Contains(r.Text, "remove") || strings.Contains(r.Text, "permissions") || strings.Contains(r.Text, "never read") {
 			t.Errorf("captured something that is not a reply: %q", r.Text)
 		}
 	}
-	// Acknowledged is acknowledged.
 	if _, _, again := readReplies(t, path, cursor, 1<<10); len(again) != 0 {
 		t.Fatalf("replayed acknowledged replies: %+v", again)
 	}
 }
 
-// A turn's records span hook invocations: the turn is opened in one read and the reply
-// arrives in the next, so the cursor carries the turn — both of its ids — across.
+// The cursor carries the turn, both its ids, across hook invocations.
 func TestCodexRepliesKeepTheTurnBetweenReads(t *testing.T) {
 	half := replyMessage("assistant", "msg_a1", "commentary", "2026-09-19T18:18:41.265Z", "Working on it.")
 	path := sequenceFixture(t, replyTaskStarted(replyTurnA, replyTraceA)+replyTurnContext(replyTurnA)+half[:len(half)/2])
@@ -109,8 +104,8 @@ func TestCodexRepliesKeepTheTurnBetweenReads(t *testing.T) {
 	}
 }
 
-// A long reply is cut on a rune boundary and says that it was; an empty one is not a reply;
-// a message with no id of Codex's own still gets an identity that a replay reproduces.
+// A long reply is cut on a rune boundary and says so; an empty one is not a reply; a
+// message without Codex's id gets one a replay reproduces.
 func TestCodexRepliesAreBoundedAndAlwaysIdentified(t *testing.T) {
 	long := strings.Repeat("é", 40) // two bytes each
 	path := sequenceFixture(t, replyTaskStarted(replyTurnA, replyTraceA)+
@@ -133,8 +128,8 @@ func TestCodexRepliesAreBoundedAndAlwaysIdentified(t *testing.T) {
 	}
 }
 
-// A rollout that was replaced is read again from the top, and because the ids are Codex's
-// own, what was already sent is sent as itself. A batch that fills is a backlog, not a loss.
+// A replaced rollout is read again from the top under the same ids; a full batch is
+// backlog, not loss.
 func TestCodexRepliesSurviveARewrittenRolloutAndABacklog(t *testing.T) {
 	var body strings.Builder
 	body.WriteString(replyTaskStarted(replyTurnA, replyTraceA))
@@ -159,8 +154,7 @@ func TestCodexRepliesSurviveARewrittenRolloutAndABacklog(t *testing.T) {
 	}
 }
 
-// The caller spools before it acknowledges: a failed append leaves the cursor before the
-// reply, so the next hook sends it.
+// A failed append leaves the cursor before the reply, so the next hook sends it.
 func TestCodexRepliesAreNotAcknowledgedUntilSpooled(t *testing.T) {
 	path := sequenceFixture(t, replyTaskStarted(replyTurnA, replyTraceA)+
 		replyMessage("assistant", "msg_a1", "commentary", "2026-09-19T18:18:41.000Z", "one")+

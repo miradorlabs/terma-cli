@@ -1,28 +1,20 @@
 package harness
 
-// The optional interfaces: what some harnesses can do and others cannot. A command asks
-// for one with a type assertion and carries on without it, so a method that drifted —
-// a renamed parameter, a changed result — would not fail to compile. It would stop
-// matching, and the capability would switch itself off: key reuse silently minting a
-// new key on every connect, for one. The assertions below turn that into a build
-// error. Scoped is declared with the scope it describes.
+// Optional capabilities are asked for by type assertion, so a drifted method silently
+// switches one off; each implementation asserts them with a `var _` line.
 
-// Noter is a harness with something to say before the user confirms a connect: a side
-// effect of its own, or a limit of what its switches can do.
+// Noter is an agent with something to say before the user confirms a connect.
 type Noter interface {
 	ConnectNotes(e Exporter) []string
 }
 
-// Credentialed is a harness that can read back the key it already exports with, for
-// one endpoint and project, so a reconnect reuses it instead of minting another. Reuse
-// is per harness on purpose: each agent holds its own key, so one can be revoked
-// without cutting the other off.
+// Credentialed is an agent that can read back its key for an endpoint and project, so a
+// reconnect reuses it; keys are per agent so one can be revoked alone.
 type Credentialed interface {
 	CurrentCredential(endpoint, projectID string) (key string, ok bool)
 }
 
-// Backuper is a harness whose configuration is a single file it can snapshot before a
-// connect rewrites it. One whose config is not a file it owns has nothing to back up.
+// Backuper is an agent whose configuration is one file it can snapshot before a connect.
 type Backuper interface {
 	Backup(endpoint string) (path string, err error)
 }

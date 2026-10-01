@@ -15,7 +15,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 )
 
-// relayHeartbeat is the heartbeat's facts about this terma and its agents.
 func (app *App) relayHeartbeat(dir string) daemon.Heartbeat {
 	return daemon.Heartbeat{Dir: dir, Version: app.version, InstallKind: app.installKind(),
 		Agents: func(addr string) (pointed, blocked []string) {
@@ -33,8 +32,7 @@ func (app *App) relayHeartbeat(dir string) daemon.Heartbeat {
 		}}
 }
 
-// installKind is how this terma was installed: the package manager that owns it, a
-// source build, or the install script's.
+// installKind is the package manager that owns this terma, "source", or "script".
 func (app *App) installKind() string {
 	exe, err := os.Executable()
 	if err != nil {
@@ -49,9 +47,8 @@ func (app *App) installKind() string {
 	return "script"
 }
 
-// relayHeartbeatSend delivers a heartbeat to the organization the developer signed in
-// to, with their credential (api.SendHeartbeat). Not signed in, there is no organization
-// to tell, and nothing is sent.
+// relayHeartbeatSend delivers a heartbeat with the developer's credential; signed out,
+// nothing is sent.
 func (app *App) relayHeartbeatSend(ctx context.Context, beat *logspb.LogsData) error {
 	cfg, err := config.Load(config.Overrides{})
 	if err != nil {

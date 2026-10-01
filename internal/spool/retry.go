@@ -9,23 +9,12 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
-// Per-destination retry windows.
-//
-// One spool-wide backoff made every destination wait out the worst one's. A project
-// whose key its ingest host refused failed every pass, the window doubled to an hour,
-// and hook-started flushes, which honour it, delivered every other project's events
-// once an hour for the two weeks the refused ones took to expire. A Sender that
-// routes a batch to several destinations keeps a window for each instead and returns
-// a PartialDelivery, which opens no spool-wide window.
-//
-// Only a Sender calls the writers, from inside Flush: the delivery lock Flush holds is
-// what makes their read, edit and rename safe. Readers take nothing, since every write
-// is an atomic rename.
+// Per-destination retry windows, so one refused project does not hold back the others.
+// Only a Sender inside Flush writes them: the delivery lock makes the read-edit-rename safe.
 
 const retryFile = "retry.json"
 
-// retryWindow is one destination's backoff: when it may next be tried, and the wait
-// that produced it, so the next failure can double it.
+// retryWindow keeps the wait that produced Next, so the next failure can double it.
 type retryWindow struct {
 	Next int64 `json:"next"` // unix seconds
 	Wait int64 `json:"wait"` // seconds
@@ -37,13 +26,11 @@ func (s *Spool) loadRetryWindows() map[string]retryWindow {
 	if err != nil {
 		return windows
 	}
-	// A file that does not decode costs a retry sooner than planned, nothing more.
 	_ = json.Unmarshal(data, &windows)
 	return windows
 }
 
-// saveRetryWindows forgets a window closed for longer than MaxAge: every event that
-// could have been waiting on it has expired.
+// saveRetryWindows forgets windows closed longer than MaxAge: their events have expired.
 func (s *Spool) saveRetryWindows(windows map[string]retryWindow, now time.Time) {
 	for dest, w := range windows {
 		if now.Sub(time.Unix(w.Next, 0)) > MaxAge {
@@ -62,8 +49,7 @@ func (s *Spool) saveRetryWindows(windows map[string]retryWindow, now time.Time) 
 	_ = config.WriteFileAtomicNoSync(path, data, fileMode)
 }
 
-// RetryAt is when dest may next be sent to; zero when its last send, if any, went
-// through.
+// RetryAt is when dest may next be sent to; zero when no window is open.
 func (s *Spool) RetryAt(dest string) time.Time {
 	w, ok := s.loadRetryWindows()[dest]
 	if !ok {
@@ -72,9 +58,7 @@ func (s *Spool) RetryAt(dest string) time.Time {
 	return time.Unix(w.Next, 0)
 }
 
-// DestinationFailed records a failed send to dest and returns when it may be tried
-// again: the spool-wide policy, per destination — 30 seconds after the first failure,
-// doubling to an hour.
+// DestinationFailed records a failed send to dest and returns when it may be retried (30s doubling to 1h).
 func (s *Spool) DestinationFailed(dest string, now time.Time) time.Time {
 	windows := s.loadRetryWindows()
 	wait := minBackoff
@@ -88,8 +72,7 @@ func (s *Spool) DestinationFailed(dest string, now time.Time) time.Time {
 	return time.Unix(next.Unix(), 0)
 }
 
-// DestinationDelivered closes dest's window: its next failure starts again at 30
-// seconds.
+// DestinationDelivered closes dest's window.
 func (s *Spool) DestinationDelivered(dest string, now time.Time) {
 	windows := s.loadRetryWindows()
 	if _, ok := windows[dest]; !ok {
@@ -99,8 +82,7 @@ func (s *Spool) DestinationDelivered(dest string, now time.Time) {
 	s.saveRetryWindows(windows, now)
 }
 
-// RetryWindows lists the destinations whose window is open at now, with when each
-// may next be tried.
+// RetryWindows lists the destinations whose window is open at now, with each one's end.
 func (s *Spool) RetryWindows(now time.Time) map[string]time.Time {
 	open := map[string]time.Time{}
 	for dest, w := range s.loadRetryWindows() {

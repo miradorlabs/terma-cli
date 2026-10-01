@@ -12,8 +12,7 @@ import (
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 )
 
-// gitRepoHere makes the current directory a git repository (authSandbox already moved
-// the test into a scratch one).
+// gitRepoHere makes the current (scratch) directory a git repository.
 func gitRepoHere(t *testing.T) {
 	t.Helper()
 	for _, args := range [][]string{{"init", "-q", "."}, {"config", "user.email", "dev@example.com"}, {"config", "user.name", "Dev"}} {
@@ -23,8 +22,7 @@ func gitRepoHere(t *testing.T) {
 	}
 }
 
-// A signed-in developer wiring only committed hooks still needs a delivery key,
-// even without selecting a telemetry harness. Install must mint it once and reuse it.
+// A signed-in developer wiring only committed hooks gets a delivery key, minted once.
 func TestInstallGivesAHooksOnlyDeveloperAKeyToDeliverWith(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
@@ -45,8 +43,7 @@ func TestInstallGivesAHooksOnlyDeveloperAKeyToDeliverWith(t *testing.T) {
 	if strings.Contains(out, "Project key stored") {
 		t.Fatalf("key storage details should require --verbose:\n%s", out)
 	}
-	// A hooks-only project has no routing record, so the key's own hosts are the only
-	// record of which environment its events belong to.
+	// A hooks-only project has no routing record, so the key's hosts name its environment.
 	cfg, err := testApp.loadConfig()
 	if err != nil {
 		t.Fatal(err)
@@ -64,9 +61,7 @@ func TestInstallGivesAHooksOnlyDeveloperAKeyToDeliverWith(t *testing.T) {
 	}
 }
 
-// Wiring a repository with no agent of one's own must stay possible without signing in —
-// CI does it, and so does whoever onboards a repository. It says what is missing instead
-// of pretending: the hooks are in, and their events wait for a key.
+// Without a credential install still wires hooks, and says their events wait for a key.
 func TestInstallWithoutACredentialSaysItsEventsAreHeld(t *testing.T) {
 	installRepo(t)
 	out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude", "--yes", "--no-doctor")
@@ -81,8 +76,7 @@ func TestInstallWithoutACredentialSaysItsEventsAreHeld(t *testing.T) {
 	}
 }
 
-// A repository with no hooks produces no events, so there is nothing to hold and nothing
-// to say. (One whose hooks are already in is a different matter, even under --no-hooks.)
+// A repository with no hooks has nothing to hold, so install says nothing about a key.
 func TestInstallWithoutHooksSaysNothingAboutAKey(t *testing.T) {
 	installRepo(t)
 	out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--no-hooks", "--yes", "--no-doctor")

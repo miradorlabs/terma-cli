@@ -9,8 +9,7 @@ const (
 	testEndpoint  = "https://otel-dev.example.com"
 )
 
-// sandbox points config.Dir() at a temporary directory so a test never reads or writes
-// real state.
+// sandbox points config.Dir() at a temporary directory.
 func sandbox(t *testing.T) {
 	t.Helper()
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())

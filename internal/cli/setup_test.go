@@ -39,8 +39,7 @@ func TestSetupRecordsCodexDesktopSeparatelyFromCLI(t *testing.T) {
 	}
 }
 
-// setup is the machine half of the relay: it records the organization's collection
-// policy and points the developer's agents at the relay, with no repository involved.
+// setup records the collection policy and points the agents at the relay, no repository involved.
 func TestSetupFetchesThePolicyAndPointsAgentsAtTheRelay(t *testing.T) {
 	gateway := newFakeAuth(t)
 	authSandbox(t, gateway)
@@ -146,7 +145,7 @@ func TestHarnessSelectionFiltersSavedAgents(t *testing.T) {
 		}
 		wantSetup := slices.Clone(wantInstalled)
 		if desktop, _, _ := testApp.agents.Surface(codexDesktopAgent); desktop.Installed(context.Background()) {
-			// Codex Desktop sorts right after the CLI in the picker.
+			// The desktop surface sorts right after the CLI in the picker.
 			if i := slices.Index(wantSetup, "codex"); i >= 0 {
 				wantSetup = slices.Insert(wantSetup, i+1, codexDesktopAgent)
 			} else {

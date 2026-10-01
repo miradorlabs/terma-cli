@@ -15,8 +15,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
-// installUI reports the project, capture choice, warnings, result, and next steps.
-// Successful setup steps and their details are only printed under --verbose.
+// installUI reports install's steps, verdict and next steps; successful steps and details
+// print only under --verbose.
 type installUI struct {
 	out    io.Writer
 	detail io.Writer
@@ -33,7 +33,6 @@ func newInstallUI(out io.Writer, verbose bool) *installUI {
 	return &installUI{out: out, detail: detail, p: style.For(out)}
 }
 
-// stepLabelWidth is the column the step labels are padded to, so the details line up.
 const stepLabelWidth = 13
 
 // OK reports a step that did what it should.
@@ -60,15 +59,13 @@ func (u *installUI) line(out io.Writer, mark, label, what string) {
 	fmt.Fprintf(out, "  %s %-*s %s\n", mark, stepLabelWidth, label, u.p.Commands(what))
 }
 
-// Then adds a step left for the developer. Lines after the first keep their own
-// indentation under the step's number.
+// Then adds a step left for the developer, once.
 func (u *installUI) Then(step string) {
 	if !slices.Contains(u.next, step) {
 		u.next = append(u.next, step)
 	}
 }
 
-// finish prints the verdict and the next steps.
 func (u *installUI) finish() {
 	if u.warned {
 		fmt.Fprintf(u.out, "\n%s %s\n", u.p.Warn("!"), u.p.Bold("terma installed — the steps marked ! need you"))
@@ -92,8 +89,6 @@ func (u *installUI) finish() {
 	}
 }
 
-// verify runs doctor behind a spinner and reports it as one step, its fixes as next
-// steps.
 func (u *installUI) verify(cmd *cobra.Command, runDoctor func(context.Context, bool, doctor.Progress) doctor.Report) {
 	fmt.Fprintf(u.detail, "\n%s\n", u.p.Bold("Verifying the chain (terma doctor):"))
 	sp := spinner.New(cmd.ErrOrStderr())
@@ -119,9 +114,7 @@ func (u *installUI) verify(cmd *cobra.Command, runDoctor func(context.Context, b
 	u.verdict(report)
 }
 
-// verdict reports a doctor run as install's Verified step: every problem's fix becomes a
-// next step (its name and detail when it names no fix), and the full report is one
-// command away.
+// verdict reports a doctor run as the Verified step, each problem's fix a next step.
 func (u *installUI) verdict(report doctor.Report) {
 	var fixes []string
 	skipped := false
@@ -154,9 +147,7 @@ func (u *installUI) verdict(report doctor.Report) {
 	}
 }
 
-// doctorFixStep turns a doctor fix into a next step: one that starts with a terma
-// command is that command to run, with whatever explains it after; anything else is
-// already a sentence.
+// doctorFixStep turns a doctor fix into a next step, quoting a leading terma command.
 func doctorFixStep(fix string) string {
 	if strings.HasPrefix(fix, "terma ") {
 		command, rest := fix, ""
@@ -168,10 +159,7 @@ func doctorFixStep(fix string) string {
 	return strings.ToUpper(fix[:1]) + fix[1:]
 }
 
-// commitList is the next step that names the committed files an install or refresh
-// wrote: the hooks do nothing for a colleague until the files are merged. lead says why.
-// A path is listed once, even when two changes touched it, and the `git add` that
-// commits them is drawn in p as a command.
+// commitList is the next step naming the committed files to merge, each once, led by lead.
 func commitList(p style.Palette, lead string, paths []string) string {
 	var unique []string
 	for _, p := range paths {

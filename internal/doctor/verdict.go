@@ -14,23 +14,18 @@ import (
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 )
 
-// The verdicts `terma status` and `terma doctor` both reach. Each is judged once, here,
-// and each command renders it in its own words (statusHooks / HooksCheck and
-// their siblings). A status that says "connected" while doctor fails is worse than
-// either, and two copies of the same judgement are how that happens.
+// `terma status` and `terma doctor` render these verdicts in their own words; one copy of
+// each judgement keeps the two from disagreeing.
 
 // HookWiring is the verdict on a bound repository's commit-hook wiring.
 type HookWiring struct {
 	Manager hookmgr.Manager
-	// Err is set when the plan could not be computed at all.
-	Err error
-	// Changes is how many files an install would still write, and Stale how many of
-	// those are already there: written by an earlier terma, which `terma update
-	// --refresh` rewrites without asking anything. A missing one is install's to add.
+	Err     error
+	// Changes is how many files an install would still write; Stale is those an earlier
+	// terma wrote, which `terma update --refresh` rewrites.
 	Changes int
 	Stale   int
-	// Unpointed is the shim manager's own failure: the shims are committed, and this
-	// clone's core.hooksPath (HooksPath) is not pointed at them.
+	// Unpointed means the shims are committed but this clone's core.hooksPath is not them.
 	Unpointed bool
 	HooksPath string
 }
@@ -56,8 +51,7 @@ func JudgeHookWiring(ctx context.Context, root string, bound *termaproject.File)
 	return w
 }
 
-// StatusLineCapture is whether Claude Code's status line feeds terma the plan's usage
-// windows, and why not when it does not.
+// StatusLineCapture is whether the wrapped status line feeds terma the plan's usage windows.
 type StatusLineCapture int
 
 // The status line's captures.
@@ -122,37 +116,32 @@ func ClassifyStatusLine(st agents.StatusLineState, err error) StatusLineVerdict 
 	return v
 }
 
-// Route is how one agent's sessions, started here and now, reach this project —
-// or why they do not.
+// Route is how one agent's sessions reach this project, or why they do not.
 type Route int
 
 // The routes an agent's sessions take.
 const (
 	// RouteNone means not connected to this host, and nothing routes it here.
 	RouteNone Route = iota
-	// RouteOtherProject means connected machine-wide to a different project. Everything
-	// looks wired, and none of the spend arrives.
+	// RouteOtherProject means connected machine-wide to a different project.
 	RouteOtherProject
 	// RouteGlobal means the machine-wide config exports signals of its own.
 	RouteGlobal
-	// RouteHooks means the agent reports through the repository's hooks and the spool (Codex
-	// Desktop's route, before the local relay carried its own export).
+	// RouteHooks means the agent reports through the repository's hooks and the spool.
 	RouteHooks
 	// RouteRepoDecides means connected machine-wide and exporting no signal of its own, so
 	// only a repository's committed policy makes it send.
 	RouteRepoDecides
 )
 
-// HarnessFacts is what judging one agent needs to know. GatherHarness reads it off the
-// machine; a test sets it directly.
+// HarnessFacts is what judging one agent needs to know.
 type HarnessFacts struct {
 	Status harness.Status
 	Err    error
-	// RepoAsks: the repository the CLI stands in carries a committed policy that
-	// switches this agent's signals on. LocalScope: the agent can carry one at all.
+	// RepoAsks means a committed repository policy switches this agent's signals on;
+	// LocalScope that the agent can carry one at all.
 	RepoAsks, LocalScope bool
-	// EmissionProblem prevents routing or another healthy agent from hiding a
-	// configuration that cannot emit telemetry. These checks never launch an agent.
+	// EmissionProblem is a configuration that cannot emit, which routing must not hide.
 	EmissionProblem, EmissionFix string
 }
 
@@ -162,13 +151,12 @@ type HarnessVerdict struct {
 	Route             Route
 	HarnessFacts
 	// OtherProject is the project a RouteOtherProject agent reports to instead.
-	OtherProject string
-	// SendsGlobally: the machine-wide config alone would deliver to this project.
+	OtherProject  string
 	SendsGlobally bool
 }
 
-// Reaches reports whether the agent's sessions reach this project. bound says the CLI
-// stands in an installed repository, the only place a repository's silence counts.
+// Reaches reports whether the agent's sessions reach this project; bound means an
+// installed repository, the only place its silence counts.
 func (v HarnessVerdict) Reaches(bound bool) bool {
 	if v.EmissionProblem != "" {
 		return false
@@ -228,8 +216,7 @@ func emissionProblem(reg *agents.Registry, h harness.Harness, root, projectID st
 	if len(st.Signals) != 0 {
 		return "", ""
 	}
-	// Leave the missing-policy case to RouteRepoDecides, which explains the
-	// machine-wide 'repos decide' arrangement and its plain-install fix.
+	// The missing-policy case is RouteRepoDecides's to explain.
 	if len(f.Status.Signals) == 0 && !f.RepoAsks {
 		if scoped, ok := h.(harness.Scoped); ok {
 			local, err := scoped.Local(root).Status()
@@ -244,9 +231,8 @@ func emissionProblem(reg *agents.Registry, h harness.Harness, root, projectID st
 		"review the export switches in the settings file named above (including the traces beta switch); run `terma install --signals traces,logs,metrics` to enable repository telemetry, then restart " + h.DisplayName()
 }
 
-// JudgeHarness classifies one agent's machine-wide connection (one made before the local
-// relay, which judges itself: RelayCheck). The order is the judgement: another
-// project's export fails before anything else.
+// JudgeHarness classifies one agent's machine-wide connection; another project's export
+// fails before anything else.
 func JudgeHarness(f HarnessFacts, otlpURL, projectID string) HarnessVerdict {
 	v := HarnessVerdict{HarnessFacts: f}
 	st := f.Status
@@ -267,8 +253,7 @@ func JudgeHarness(f HarnessFacts, otlpURL, projectID string) HarnessVerdict {
 	return v
 }
 
-// JudgeHarnesses judges every agent found on this machine, in registry order. root is
-// empty outside a repository, where no repository policy can be asking.
+// JudgeHarnesses judges every agent found on this machine, in registry order.
 func JudgeHarnesses(ctx context.Context, reg *agents.Registry, otlpURL, projectID, root string) []HarnessVerdict {
 	var out []HarnessVerdict
 	for _, h := range reg.Harnesses() {
@@ -282,9 +267,8 @@ func JudgeHarnesses(ctx context.Context, reg *agents.Registry, otlpURL, projectI
 	return out
 }
 
-// JudgeSelectedHarnesses keeps an agent's surfaces distinct for a developer who
-// selected one with a check of its own (Codex Desktop): a desktop-only choice must never
-// be reported as a missing CLI.
+// JudgeSelectedHarnesses judges a selected surface by its own check, so a desktop-only
+// choice is never reported as a missing CLI.
 func JudgeSelectedHarnesses(ctx context.Context, reg *agents.Registry, otlpURL, projectID, root string, saved []string) []HarnessVerdict {
 	selected := SelectedForRepo(reg, projectID, saved)
 	verdicts := JudgeHarnesses(ctx, reg, otlpURL, projectID, root)
@@ -301,10 +285,8 @@ func JudgeSelectedHarnesses(ctx context.Context, reg *agents.Registry, otlpURL, 
 	return append(verdicts, checked...)
 }
 
-// SelectedForRepo is the saved selection as this repository's routing record narrows it:
-// for an agent run as more than one surface, the surfaces the record routes here. A
-// record that names no surface (one an earlier build wrote) leaves the selection alone,
-// so a surface's own check still says what is missing.
+// SelectedForRepo is the saved selection narrowed to the surfaces this repository's
+// routing record routes here; a record naming none leaves it alone.
 func SelectedForRepo(reg *agents.Registry, projectID string, saved []string) []string {
 	selected := slices.Clone(saved)
 	if projectID == "" {
@@ -347,9 +329,7 @@ func JudgeSurface(reg *agents.Registry, surface, root, projectID string) (Harnes
 }
 
 // RepoAsks reports whether the repository at root carries a committed policy that switches
-// a harness's signals on. It is the other half of a machine-wide connect made with
-// `--exports repos`: that connect holds the endpoint and the key and exports nothing, so
-// whether a session here sends anything is this file's decision.
+// a harness's signals on, the half of an `--exports repos` connect that decides.
 func RepoAsks(h harness.Harness, root string) bool {
 	scoped, ok := h.(harness.Scoped)
 	if !ok || root == "" {

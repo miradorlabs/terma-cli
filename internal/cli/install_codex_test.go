@@ -61,7 +61,7 @@ func TestInstallWiresCodexHooksWhenAsked(t *testing.T) {
 	}
 }
 
-// A repository nobody opens in Codex should not gain a .codex directory.
+// A repository without the agent's own directory gains no hooks file for it…
 func TestInstallSkipsCodexHooksByDefault(t *testing.T) {
 	repo := installRepo(t)
 	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--yes"); err != nil {
@@ -72,7 +72,7 @@ func TestInstallSkipsCodexHooksByDefault(t *testing.T) {
 	}
 }
 
-// ...but one that already has Codex configuration gets them without being asked.
+// …but one that already has the agent's configuration gets them without being asked.
 func TestInstallWiresCodexHooksWhereCodexIsUsed(t *testing.T) {
 	repo := installRepo(t)
 	if err := os.MkdirAll(filepath.Join(repo, ".codex"), 0o755); err != nil {
@@ -99,8 +99,8 @@ func TestUninstallRemovesCodexHooks(t *testing.T) {
 	}
 }
 
-// codexHookCommand is what .codex/hooks.json runs for event: Codex gives hooks a minimal
-// PATH, so the committed command extends it before the guard.
+// codexHookCommand is the committed command for event, which extends the agent's minimal
+// hook PATH before the guard.
 func codexHookCommand(event string) string {
 	return `PATH="${PATH:-/usr/bin:/bin}:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin"; ` + hookmgr.HookCommand(event)
 }

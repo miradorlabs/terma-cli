@@ -23,8 +23,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 )
 
-// sandboxMachine keeps a refresh away from the developer's real shims, status line and
-// OpenCode plugin.
+// sandboxMachine keeps a refresh away from the developer's real home-directory files.
 func sandboxMachine(t *testing.T) {
 	t.Helper()
 	t.Setenv("HOME", t.TempDir())
@@ -33,16 +32,15 @@ func sandboxMachine(t *testing.T) {
 	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
 }
 
-// A refresh brings the repository's committed hooks up to this build from what its
-// binding records, never brings back a file someone removed, and leaves the binding as
-// it was.
+// A refresh updates committed hooks from the binding, never restores a removed file,
+// and leaves the binding as it was.
 func TestRefreshUpdatesTheRepositoryFromItsBinding(t *testing.T) {
 	repo := installRepo(t)
 	sandboxMachine(t)
 	if out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude", "--yes", "--no-doctor"); err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}
-	// What an earlier build wrote: its own version in the binding…
+	// What an earlier build wrote: its version in the binding…
 	bound, err := termaproject.Load(repo)
 	if err != nil {
 		t.Fatal(err)
@@ -52,7 +50,7 @@ func TestRefreshUpdatesTheRepositoryFromItsBinding(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// …and no SubagentStop hook yet.
+	// …an older hooks file…
 	settings := filepath.Join(repo, ".claude", "settings.json")
 	var doc map[string]map[string]json.RawMessage
 	data, _ := os.ReadFile(settings)
@@ -64,7 +62,7 @@ func TestRefreshUpdatesTheRepositoryFromItsBinding(t *testing.T) {
 	if err := os.WriteFile(settings, stale, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// And a hook file somebody deleted.
+	// …and a hook file somebody deleted.
 	postCommit := filepath.Join(repo, ".terma", "hooks", "post-commit")
 	if err := os.Remove(postCommit); err != nil {
 		t.Fatal(err)
@@ -83,8 +81,7 @@ func TestRefreshUpdatesTheRepositoryFromItsBinding(t *testing.T) {
 	if _, err := os.Stat(postCommit); !os.IsNotExist(err) {
 		t.Fatalf("a removed hook file was brought back (stat err = %v)", err)
 	}
-	// The binding now names the terma that last wrote the committed files, and says
-	// nothing else new: the rest of it is the onboarder's.
+	// The binding gains only the terma version that last wrote the committed files.
 	after, err := termaproject.Load(repo)
 	if err != nil {
 		t.Fatal(err)
@@ -102,8 +99,7 @@ func TestRefreshUpdatesTheRepositoryFromItsBinding(t *testing.T) {
 	}
 }
 
-// Outside a repository a refresh still updates the machine's files, and says where the
-// committed ones get theirs.
+// Outside a repository a refresh still updates the machine's files.
 func TestRefreshOutsideARepositoryRefreshesTheMachine(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	sandboxMachine(t)
@@ -129,8 +125,7 @@ func TestRefreshIsExclusiveWithTheOtherModes(t *testing.T) {
 	}
 }
 
-// recordSteps replaces the programs an update runs, recording each command line and
-// failing the ones fail names.
+// recordSteps replaces the programs an update runs, recording each and failing fail.
 func recordSteps(t *testing.T, fail string) *[][]string {
 	t.Helper()
 	var steps [][]string
@@ -155,8 +150,7 @@ func latestRelease(t *testing.T, tag string) *selfupdate.Client {
 	return &selfupdate.Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0"}
 }
 
-// A Homebrew installation is upgraded by its own brew, then the upgraded binary — found
-// through the link Homebrew moves — finishes the update.
+// A Homebrew installation is upgraded by its brew, then the upgraded binary finishes.
 func TestUpdateUpgradesThroughThePackageManager(t *testing.T) {
 	prefix, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
@@ -201,8 +195,7 @@ func TestUpdateUpgradesThroughThePackageManager(t *testing.T) {
 	}
 }
 
-// A project's own npm dependency is never upgraded from here, and the developer is told
-// to update it in that project — not to make an unrelated global install.
+// A project's own npm dependency is never upgraded from here; the developer is sent there.
 func TestUpdateSendsAProjectDependencyToItsProject(t *testing.T) {
 	root, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
@@ -224,8 +217,7 @@ func TestUpdateSendsAProjectDependencyToItsProject(t *testing.T) {
 	}
 }
 
-// After replacing itself, the old binary hands the refresh to the new one; a refresh
-// that fails leaves the update in place and says how to retry.
+// The old binary hands the refresh to the new one; a failed refresh says how to retry.
 func TestUpdateRefreshesWithTheReplacedBinary(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("no self-update on windows")
@@ -285,8 +277,8 @@ func tarGzWith(t *testing.T, name string, body []byte) []byte {
 	return buf.Bytes()
 }
 
-// The first interactive command under a newer release refreshes the machine's files
-// once, and points at the repository's committed ones instead of rewriting them.
+// The first interactive command under a newer release refreshes the machine once and only
+// points at the committed files.
 func TestRefreshAfterUpgradeRunsOncePerRelease(t *testing.T) {
 	repo := installRepo(t)
 	sandboxMachine(t)
@@ -322,9 +314,8 @@ func TestRefreshAfterUpgradeRunsOncePerRelease(t *testing.T) {
 	}
 }
 
-// The first install under a newer release refreshes what earlier versions wrote on the
-// machine before it verifies anything, says so as a step, and records it — so the
-// refresh that follows an interactive command has nothing left to do.
+// The first install under a newer release refreshes the machine before verifying, says so,
+// and records it.
 func TestInstallRefreshesTheMachineOnANewRelease(t *testing.T) {
 	installRepo(t)
 	sandboxMachine(t)
@@ -356,8 +347,7 @@ func TestInstallRefreshesTheMachineOnANewRelease(t *testing.T) {
 	}
 }
 
-// plantStaleStatusLine wraps Claude Code's status line the way an earlier build did, and
-// returns the settings file a machine refresh rewrites.
+// plantStaleStatusLine writes an earlier build's status-line wrap and returns its file.
 func plantStaleStatusLine(t *testing.T) string {
 	t.Helper()
 	c := claudeHarness(t)
@@ -374,7 +364,6 @@ func plantStaleStatusLine(t *testing.T) string {
 	return path
 }
 
-// requireRefreshed fails unless the stale wrap at path was rewritten.
 func requireRefreshed(t *testing.T, path string) {
 	t.Helper()
 	if data, _ := os.ReadFile(path); strings.Contains(string(data), `"exec terma hook statusline"`) {

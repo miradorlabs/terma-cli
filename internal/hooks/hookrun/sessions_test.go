@@ -7,9 +7,8 @@ import (
 	"io"
 )
 
-// The core's tests drive sessions through Extension, the one handler set the core owns,
-// under Claude Code's label. editFile takes the payload shape these tests were written
-// in, tool_input.file_path, and hands the extension its own.
+// The core's tests drive sessions through Extension, the one handler set the core owns;
+// editFile translates a tool_input.file_path payload into the extension's shape.
 var testAgent = Extension{Tool: "claude-code"}
 
 func startSession(ctx context.Context, env Env) error { return testAgent.sessionStart(ctx, env) }

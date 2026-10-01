@@ -99,13 +99,8 @@ func TestCodexFundingRejectsSymlinksAndReportsUnreadableDiscovery(t *testing.T) 
 	}
 }
 
-// latestCodexQuota reads a rollout the way the hooks do — ReadCodexFunding from an empty
-// cursor, again while it reports a backlog — and returns the newest quota it emitted.
-// When the rollout could not be opened at all it returns the reader's status instead,
-// which is how the confinement refusals (a foreign path, a symlink, another thread's
-// file) show up. These tests used to drive CodexFunding, a second tail reader nothing
-// shipped called; they are the coverage of what a rollout read may touch and of what
-// must never leave it, so they moved to the reader that runs.
+// latestCodexQuota reads a rollout as the hooks do and returns the newest quota, or the
+// reader's status when the open was refused.
 func latestCodexQuota(t *testing.T, ctx context.Context, sessionID, transcript string) harness.FundingEvidence {
 	t.Helper()
 	var last *harness.FundingEvidence

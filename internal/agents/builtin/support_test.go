@@ -6,9 +6,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 )
 
-// The catalog is what `terma harness list` reports, so its shape is a contract: every
-// agent has a token and a display name, its overall level is the fold of its
-// capabilities, and any less-than-full capability carries a note explaining the gap.
+// Every catalog entry has a token and display name, its level folds its capabilities, and
+// any less-than-full capability carries a note.
 func TestSupportCatalogInvariants(t *testing.T) {
 	cat := reg.SupportCatalog()
 	if len(cat) == 0 {
@@ -30,8 +29,7 @@ func TestSupportCatalogInvariants(t *testing.T) {
 	}
 }
 
-// The partial case is the whole reason the command exists: Cursor does attribution but
-// exports partial hook evidence, so it must read as partial, not full and not none.
+// Cursor has full attribution but partial telemetry, so it reads as partial.
 func TestSupportCatalogCursorIsPartial(t *testing.T) {
 	cursor, ok := reg.LookupSupport("cursor")
 	if !ok {

@@ -24,8 +24,7 @@ const (
 	StatsFile = "stats.json"
 	PIDFile   = "pid"
 	ErrorFile = "last-error"
-	// StopFile asks the relay whose pid it holds to stop: how Stop reaches a relay on
-	// Windows, which has no SIGTERM. The relay looks every second.
+	// StopFile asks the relay whose pid it holds to stop, since Windows has no SIGTERM.
 	StopFile          = "stop"
 	MachineIDFile     = "machine-id"
 	NoServiceFile     = "no-service"
@@ -73,8 +72,7 @@ func Running(dir string) bool {
 	return flock.IsBusy(err)
 }
 
-// Squatted reports whether something answers on addr while the relay is not running:
-// the agents' exporters would be sending to it.
+// Squatted reports whether something else answers on addr while the relay is not running.
 func Squatted(addr string) bool {
 	conn, err := net.DialTimeout("tcp", addr, 300*time.Millisecond)
 	if err != nil {
@@ -84,8 +82,7 @@ func Squatted(addr string) bool {
 	return true
 }
 
-// Stats reads the running relay's counters, else those the last run left behind, and
-// says whether one is running.
+// Stats reads the running relay's counters, else the last run's, and says whether one runs.
 func Stats(dir string) (relay.Snapshot, bool, error) {
 	var snap relay.Snapshot
 	if !Running(dir) {

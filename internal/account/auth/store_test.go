@@ -44,8 +44,6 @@ func TestSaveCredential_WritesFile0600(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stat credentials.json: %v", err)
 	}
-	// This file holds live access and refresh tokens; it must never be group- or
-	// world-readable.
 	if perm := info.Mode().Perm(); perm != 0o600 {
 		t.Errorf("credentials.json mode = %o, want 600", perm)
 	}
@@ -57,8 +55,6 @@ func TestMutateCredentialFile_PreservesOtherProfiles(t *testing.T) {
 	if _, err := SaveCredential("work", sampleCredential()); err != nil {
 		t.Fatalf("SaveCredential(work): %v", err)
 	}
-	// A second profile's write is a whole-file read-modify-write; without the lock and
-	// re-read it would clobber the first profile's entry.
 	if _, err := SaveCredential("personal", sampleCredential()); err != nil {
 		t.Fatalf("SaveCredential(personal): %v", err)
 	}
@@ -93,8 +89,7 @@ func TestDeleteCredential_RemovesOnlyTheNamedProfile(t *testing.T) {
 	}
 }
 
-// TestDeleteCredential_MissingProfileIsNoError keeps logout idempotent: clearing a
-// profile that was never logged in must not error.
+// TestDeleteCredential_MissingProfileIsNoError keeps logout idempotent.
 func TestDeleteCredential_MissingProfileIsNoError(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	if err := DeleteCredential("never-existed"); err != nil {
@@ -116,7 +111,6 @@ func TestSaveCredential_KeepsOneCredentialPerOrganization(t *testing.T) {
 		t.Fatalf("signing into a second organization replaced nothing, got %+v", replaced)
 	}
 
-	// The newest login is active; the earlier one is kept for switching back.
 	active, err := LoadCredential("default")
 	if err != nil || active.OrganizationID != "org-b" {
 		t.Fatalf("active = %+v, %v; want org-b", active, err)
@@ -130,8 +124,6 @@ func TestSaveCredential_KeepsOneCredentialPerOrganization(t *testing.T) {
 		t.Fatalf("Credentials should list both, active first: %+v, %v", all, err)
 	}
 
-	// A fresh login into an organization that already has a session reports the one
-	// it displaced, so the caller can revoke it.
 	replaced, err = SaveCredential("default", orgCredential("org-a", "s-a2"))
 	if err != nil {
 		t.Fatal(err)
@@ -162,9 +154,7 @@ func TestUseOrganization_SwitchesTheActiveCredential(t *testing.T) {
 	}
 }
 
-// A refresh persists the rotated token pair for whichever credential was in use —
-// which, mid-switch, may not be the active one. Flipping the active organization as
-// a side effect of a refresh would change what every other command does next.
+// A refresh of a parked credential persists it without changing the active organization.
 func TestUpdateCredential_DoesNotChangeTheActiveOrganization(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	if _, err := SaveCredential("default", orgCredential("org-a", "s-a")); err != nil {

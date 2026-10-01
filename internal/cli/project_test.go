@@ -27,8 +27,7 @@ func TestMatchProject(t *testing.T) {
 	})
 
 	t.Run("prefers an exact name over a prefix", func(t *testing.T) {
-		// "payments" is also a prefix of "payments-staging"; an exact hit must win
-		// rather than being reported as ambiguous.
+		// "payments" is also a prefix of "payments-staging"; the exact hit wins.
 		got, err := matchProject(projects, "payments")
 		if err != nil {
 			t.Fatalf("matchProject: %v", err)
@@ -59,8 +58,7 @@ func TestMatchProject(t *testing.T) {
 	})
 
 	t.Run("rejects an ambiguous prefix rather than guessing", func(t *testing.T) {
-		// Silently picking one would point every later read at a project the user
-		// did not choose — the worst possible failure for this command.
+		// Silently picking one would point every later read at a project nobody chose.
 		_, err := matchProject(projects, "pay")
 		if err == nil {
 			t.Fatal("expected an ambiguity error")

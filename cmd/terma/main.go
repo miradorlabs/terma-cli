@@ -1,7 +1,5 @@
-// Command terma connects coding agents to Terma and stamps the commits they produce.
-// The command line is internal/cli; this is only the process boundary, where it is
-// handed the agents this build registers and its version, and its result becomes an
-// exit status.
+// Command terma connects coding agents to Terma and stamps the commits they produce;
+// the command line itself is internal/cli.
 package main
 
 import (
@@ -11,8 +9,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/cli"
 )
 
-// version is stamped at build time via -ldflags: the release tag by GoReleaser, `git
-// describe` by `make build`. "dev" is the unset sentinel.
+// version is stamped via -ldflags (the release tag, or `git describe`); "dev" when unset.
 var version = "dev"
 
 func main() { os.Exit(cli.New(builtin.Agents(), version).Execute()) }

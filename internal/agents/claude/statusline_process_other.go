@@ -5,9 +5,7 @@ package claude
 import "os/exec"
 
 func configureRendererProcess(cmd *exec.Cmd) {
-	// Keep CommandContext's portable Process.Kill cancellation. There are no Unix
-	// process groups here; bound the wait if a descendant keeps output pipes open.
-	// This closes the pipes but does not terminate descendants.
+	// No process groups: the bounded wait closes the pipes but leaves descendants running.
 	cmd.WaitDelay = rendererPipeDrain
 }
 

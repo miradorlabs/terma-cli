@@ -10,10 +10,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
-// Agent is Google's Antigravity CLI (`agy`), the successor to Gemini CLI. Its
-// hooks live in .agents/hooks.json, the customization root agy shares with its rules
-// and skills, and are wired by default where the repository already carries one of
-// agy's customization directories.
+// Agent is Google's Antigravity CLI (`agy`), with hooks in .agents/hooks.json, wired by
+// default where the repository already carries one of agy's customization directories.
 type Agent struct{}
 
 func (Agent) Name() string        { return "antigravity" }
@@ -38,11 +36,8 @@ func (Agent) Events() map[string]agents.Handler {
 
 func (Agent) FlushAfter() []string { return []string{"antigravity-stop"} }
 
-// Trust answers two questions agy never raises itself. Hooks load only for a workspace
-// the developer has trusted from inside agy (the record is agy's own settings file), and
-// terma's named entry in .agents/hooks.json can be switched off with `"enabled": false`
-// — a switch `terma install` deliberately preserves. Either way the committed file is
-// inert and nothing says so.
+// Trust reports the two ways agy silently skips terma's hooks: an untrusted workspace, or
+// terma's entry switched off with `"enabled": false`, which install preserves.
 func (a Agent) Trust(root string) (agents.TrustState, error) {
 	if !hooksEnabled(root) {
 		return agents.TrustState{
@@ -63,8 +58,8 @@ func (a Agent) Trust(root string) (agents.TrustState, error) {
 	return agents.TrustState{Trusted: true, Detail: " and the workspace is trusted"}, nil
 }
 
-// PayloadSession reads agy's protojson payload: the conversation, and the workspace it
-// runs in (the hook's own directory is <repo>/.agents).
+// PayloadSession reads agy's protojson payload; the workspace comes from it, since the
+// hook runs in <repo>/.agents.
 func (Agent) PayloadSession(payload []byte) (hookrun.PayloadSession, bool) {
 	var in struct {
 		ConversationID string   `json:"conversationId"`

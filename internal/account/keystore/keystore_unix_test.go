@@ -8,9 +8,7 @@ import (
 	"testing"
 )
 
-// Two installs in two repositories each add their own project's key. Unlocked, each
-// read the file, added one key and renamed its copy back, and the later rename forgot
-// the earlier key.
+// Concurrent installs in two repositories each keep their own project's key.
 func TestConcurrentSetsKeepEveryKey(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	const key = "ter_srv_0123456789abcdef"

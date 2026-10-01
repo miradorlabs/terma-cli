@@ -12,8 +12,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// captureCodexDesktopActivity fills the two gaps in repository hooks: model usage
-// and hosted Extension actions. Local tool calls are emitted by PostToolUse.
+// captureCodexDesktopActivity fills the two gaps in repository hooks: model usage and
+// hosted Extension actions.
 func captureCodexDesktopActivity(e hookrun.Env, ctx context.Context, r *hookrun.Repo, in *codexHookInput) {
 	if e.Spool == nil || !session.ValidID(in.SessionID) {
 		return
@@ -99,8 +99,8 @@ func captureCodexDesktopActivity(e hookrun.Env, ctx context.Context, r *hookrun.
 		default:
 			return nil
 		}
-		// Spooled directly rather than through emitFor, so the binding is stamped here:
-		// an event with no project id is dropped as unroutable at the next flush.
+		// Spooled without Env.EmitFor, so the binding is stamped here: with no project id the
+		// flush drops it as unroutable.
 		if r.ProjectID != "" {
 			attrs[hookrun.AttrProjectID] = r.ProjectID
 		}

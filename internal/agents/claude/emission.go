@@ -9,10 +9,8 @@ import (
 // TelemetrySwitch is Claude Code's master switch, which only the user file holds.
 func (exporter) TelemetrySwitch() string { return claudeEnableTelemetry }
 
-// EmissionStatus reads the user and repository settings together, including the
-// developer's settings.local.json. Unlike Status, it describes the combined export
-// switches rather than one file. It does not prove a running agent has reloaded them,
-// and cannot inspect managed settings or an arbitrary --settings argument.
+// EmissionStatus combines the user, repository and settings.local.json switches; it cannot see
+// managed settings or a --settings argument.
 func (c exporter) EmissionStatus(root string) (harness.Status, error) {
 	path, err := (exporter{}).ConfigPath()
 	if err != nil {

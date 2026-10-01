@@ -8,10 +8,7 @@ import (
 	"testing"
 )
 
-// executable writes an empty executable at path, creating its directory.
-// unixLayouts skips a test of the package managers' Unix layouts: on Windows terma
-// names npm's global command without telling the layouts apart (managed.go), and PATH
-// lookups want an .exe.
+// unixLayouts skips on Windows, where terma does not tell npm's layouts apart.
 func unixLayouts(t *testing.T) {
 	t.Helper()
 	if runtime.GOOS == "windows" {
@@ -60,8 +57,7 @@ func TestManagedByUsesThePackageManagerThatOwnsTheBinary(t *testing.T) {
 		// A custom prefix keeps no npm of its own, and PATH has none here either.
 		{"npm prefix without npm", filepath.Join(root, "custom", "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "npm", nil,
 			filepath.Join(root, "custom", "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "", ""},
-		// A project's own dependency is that project's to upgrade, in that project: a
-		// global install would not change the copy that runs.
+		// A project's own dependency is upgraded in that project.
 		{"npm project", filepath.Join(root, "app", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "npm", nil,
 			filepath.Join(root, "app", "node_modules", "@miradorlabs", "terma", "vendor", "terma"),
 			"npm install @miradorlabs/terma@latest", filepath.Join(root, "app")},

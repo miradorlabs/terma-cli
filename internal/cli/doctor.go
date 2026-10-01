@@ -32,14 +32,12 @@ remaining steps to complete setup.`,
 	return cmd
 }
 
-// executeDoctor streams each check as it finishes and prints the remaining setup
-// actions. It is the shared body of `terma doctor` and the verification `terma install`
-// runs at the end; the caller decides what a failure means.
+// executeDoctor is shared by `terma doctor` and install's verification; the caller decides
+// what a failure means.
 func (app *App) executeDoctor(cmd *cobra.Command, skipCommit bool) doctor.Report {
 	out := cmd.OutOrStdout()
-	// Each check prints the moment it finishes, with the mark spinning beside the one
-	// still running: the round-trip wait is long enough that a report printed only at
-	// the end looks like a hang.
+	// Streamed: the round-trip wait is long enough that a report printed at the end looks
+	// like a hang.
 	sp := spinner.New(cmd.ErrOrStderr())
 	report := app.runDoctor(cmd.Context(), skipCommit, doctor.Progress{
 		Start: func(name string) { sp.Start(name + "…") },

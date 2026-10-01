@@ -17,8 +17,8 @@ func newRepo(t *testing.T) string {
 	return hookruntest.InitRepo(t)
 }
 
-// newFundingEnv is a hook environment in a repository bound to project-a, where no
-// credential of the developer's leaks in from the environment.
+// newFundingEnv is a hook environment in a repository bound to project-a, with no developer
+// credential leaking in.
 func newFundingEnv(t *testing.T) hookrun.Env {
 	t.Helper()
 	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
@@ -29,7 +29,6 @@ func newFundingEnv(t *testing.T) hookrun.Env {
 	return hookrun.Env{Now: time.Now(), Cwd: root, Spool: sp, Version: "test", Policy: config.DefaultPolicy()}
 }
 
-// hookPayload is a minimal hook payload for event in env's repository.
 func hookPayload(env hookrun.Env, event string) string {
 	b, _ := json.Marshal(map[string]any{"session_id": "funding-session", "cwd": env.Cwd, "hook_event_name": event})
 	return string(b)

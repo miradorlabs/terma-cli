@@ -11,14 +11,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
-// Gemini CLI exports OTLP natively, configured from its user settings file alone
-// (~/.gemini/settings.json `telemetry`), with session.id on every log record and metric
-// point and gen_ai.conversation.id on its spans (0.62). The file has no headers
-// setting, so the relay's token rides the endpoint's path (http://127.0.0.1:43180/<token>,
-// relay.Handler): through OTEL_EXPORTER_OTLP_HEADERS it would reach everything Gemini
-// runs. Sessions are claimed by a user-level Gemini extension whose hooks fire in every
-// folder, trusted or not, with no enable step, as children of the exporting process.
-
 // geminiHome is where Gemini keeps .gemini: GEMINI_CLI_HOME, else the home directory.
 func geminiHome() (string, error) {
 	if d := os.Getenv("GEMINI_CLI_HOME"); d != "" {
@@ -27,7 +19,6 @@ func geminiHome() (string, error) {
 	return os.UserHomeDir()
 }
 
-// settingsPath is Gemini's user settings file.
 func settingsPath() (string, error) {
 	home, err := geminiHome()
 	if err != nil {
@@ -36,7 +27,6 @@ func settingsPath() (string, error) {
 	return filepath.Join(home, ".gemini", "settings.json"), nil
 }
 
-// extensionDir is where terma's Gemini extension lives.
 func extensionDir() (string, error) {
 	home, err := geminiHome()
 	if err != nil {
@@ -45,8 +35,6 @@ func extensionDir() (string, error) {
 	return filepath.Join(home, ".gemini", "extensions", "terma"), nil
 }
 
-// geminiHookEvents are the Gemini hook events terma's extension handles, and the
-// `terma hook` event each becomes.
 var geminiHookEvents = []struct{ gemini, terma string }{
 	{"SessionStart", "gemini-session-start"},
 	{"BeforeAgent", "gemini-prompt"},
@@ -54,9 +42,9 @@ var geminiHookEvents = []struct{ gemini, terma string }{
 	{"SessionEnd", "gemini-session-end"},
 }
 
-// connectRelay points Gemini's exporter at endpoint (the relay, its token in the
-// path) and writes terma's extension, whose hooks run hookCommand. Only the telemetry
-// block of the settings file changes; a file that does not parse is left alone.
+// connectRelay points Gemini's exporter at endpoint and writes terma's extension. The
+// settings file has no headers setting, so the relay's token rides the endpoint path:
+// OTEL_EXPORTER_OTLP_HEADERS would reach everything Gemini runs.
 func connectRelay(endpoint string, hookCommand []string) (settings, extension string, err error) {
 	if settings, err = settingsPath(); err != nil {
 		return "", "", err
@@ -113,8 +101,7 @@ func connectRelay(endpoint string, hookCommand []string) (settings, extension st
 	return settings, extension, config.WriteFileAtomic(filepath.Join(extension, "hooks", "hooks.json"), append(hooksJSON, '\n'), 0o600)
 }
 
-// shellQuoteArgs renders args as one POSIX shell command line: Gemini runs a hook's
-// command through the shell.
+// shellQuoteArgs renders args as one POSIX shell command line, as Gemini runs hooks.
 func shellQuoteArgs(args []string) string {
 	quoted := make([]string, len(args))
 	for i, a := range args {

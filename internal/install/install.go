@@ -1,7 +1,6 @@
-// Package install puts terma into a repository: the commit hooks, each agent's own
-// hooks, and the committed binding. A Plan is built once, before anything is written; a
-// dry run prints it and Apply carries it out, with what lies outside the repository —
-// the agents' configuration, keys, the export policy — supplied as Steps.
+// Package install puts terma into a repository: the commit hooks, each agent's hooks and
+// the committed binding. A Plan is built before anything is written, and what lies
+// outside the repository is supplied as Steps.
 package install
 
 import (
@@ -23,25 +22,20 @@ import (
 type Plan struct {
 	Agents       *agents.Registry
 	Root, GitDir string
-	// Existing is the repository's binding before the install, nil for a first one.
+	// Existing is nil for a first install.
 	Existing *termaproject.File
-	// Selected are the developer's agents; Adapters the agents whose committed hooks
-	// are wired.
+	// Selected are the developer's agents; Adapters those whose committed hooks are wired.
 	Selected, Adapters []string
 	Detection          hookmgr.Detection
-	// Hooks is what the hooks would write; NoHooks leaves them as they are.
-	Hooks   HookPlan
-	NoHooks bool
-	Binding Binding
+	Hooks              HookPlan
+	NoHooks            bool
+	Binding            Binding
 }
 
-// Build plans an install of the selected agents into the workspace at root. adapters,
-// when given, names the wired agents outright.
+// Build plans an install of the selected agents into the workspace at root.
 func Build(reg *agents.Registry, root, gitDir string, existing *termaproject.File, selected, adapters []string, noHooks bool, b Binding) (Plan, error) {
 	p := Plan{Agents: reg, Root: root, GitDir: gitDir, Existing: existing, Selected: selected, NoHooks: noHooks, Binding: b}
-	// The wired adapters are a team decision, so a re-install keeps every agent the
-	// repository's hooks files already wire: a colleague re-running install must not
-	// rewrite the committed hooks to match their own agent set.
+	// The wired adapters are a team decision: a colleague's re-install keeps them all.
 	p.Adapters = Adapters(reg, root, selected, adapters)
 	if err := CheckHookNeeds(reg, selected, p.Adapters); err != nil {
 		return Plan{}, err
@@ -57,7 +51,7 @@ func Build(reg *agents.Registry, root, gitDir string, existing *termaproject.Fil
 	return p, err
 }
 
-// PrintDryRun says what an install would do. signIn says it would sign in first.
+// PrintDryRun says what an install would do.
 func (p Plan) PrintDryRun(w io.Writer, signIn bool) error {
 	if !p.NoHooks {
 		p.Hooks.Print(w)
@@ -89,41 +83,33 @@ type Reporter interface {
 	// Then is a next step for the developer, and Commit the files they commit.
 	Then(step string)
 	Commit(lead string, paths []string)
-	// Detail takes the long form: the plan's file list, the git wiring.
+	// Detail takes the long form.
 	Detail() io.Writer
 }
 
 // Steps are what an install does outside the repository. A nil step is skipped.
 type Steps struct {
-	// Confirm asks before the hooks are written; an error stops the install.
-	Confirm func(question string, explain []string) (bool, error)
-	// Connect points the developer's agents at the repository's project.
-	Connect func(ctx context.Context) error
-	// StatusLine wraps the agent's status line, saying how.
+	Confirm    func(question string, explain []string) (bool, error)
+	Connect    func(ctx context.Context) error
 	StatusLine func() (note string, ok bool)
-	// SpoolKey makes sure this machine can deliver the repository's hook events: state
-	// says how they go, and fix, when set, what the developer must do first.
+	// SpoolKey makes sure this machine can deliver hook events; fix is what the
+	// developer must do first.
 	SpoolKey func(ctx context.Context) (state, fix string)
-	// RepoPolicy writes the repository's export policy for the agents that read one,
-	// returning the files it wrote.
+	// RepoPolicy writes the repository's export policy, returning the files it wrote.
 	RepoPolicy func(ctx context.Context, hs []harness.Harness) ([]string, error)
 }
 
 // Options are an install's own choices.
 type Options struct {
-	// AssumeYes writes the hooks without asking.
 	AssumeYes bool
-	// Version is this terma's, stamped on the binding when the install writes a file.
-	Version string
-	Now     time.Time
+	Version   string
+	Now       time.Time
 }
 
 // Apply carries out the plan.
 func Apply(ctx context.Context, p Plan, o Options, s Steps, r Reporter) error {
 	reg := p.Agents
-	// Reserve the private store even before the first agent event. A hook already
-	// in flight when git init runs and a hook starting afterwards must choose the
-	// same store, including when neither has written a manifest yet.
+	// Reserve the private store now, so hooks before and after a later git init choose the same one.
 	if p.GitDir == "" {
 		stateDir, err := termaproject.StateDir(p.Root, "")
 		if err != nil {
@@ -149,8 +135,8 @@ func Apply(ctx context.Context, p Plan, o Options, s Steps, r Reporter) error {
 
 	installedHooks := p.GitDir != "" && p.Existing != nil && p.Existing.Install.HookManager != ""
 	adapters := p.Adapters
-	var written []string    // the repository files this run wrote hooks into, to commit
-	var afterMerge []string // what each clone does once they are merged
+	var written []string
+	var afterMerge []string
 	if !p.NoHooks {
 		p.Hooks.Print(r.Detail())
 		write := o.AssumeYes
@@ -162,8 +148,6 @@ func Apply(ctx context.Context, p Plan, o Options, s Steps, r Reporter) error {
 		}
 		switch {
 		case p.Hooks.Empty():
-			// An empty git-hook plan means the commit hooks are already wired, so this
-			// repo is hook-installed; record them in the binding without rewriting.
 			installedHooks = p.GitDir != ""
 			r.OK("Hooks", p.Hooks.Summary(adapters)+" — already in place")
 		case write:
@@ -175,19 +159,18 @@ func Apply(ctx context.Context, p Plan, o Options, s Steps, r Reporter) error {
 			r.OK("Hooks", p.Hooks.Summary(adapters))
 			afterMerge = p.Hooks.hooks.Notes
 		default:
-			adapters = reg.WiredNames(p.Root) // declined: only what is already wired
+			adapters = reg.WiredNames(p.Root)
 			r.Warn("Hooks", "not written — commits are not stamped until they are")
 			r.Then("Run `terma install` again and accept the hooks when you are ready.")
 		}
 	} else {
-		adapters = reg.WiredNames(p.Root) // --no-hooks: only what is already wired
+		adapters = reg.WiredNames(p.Root)
 	}
 	if err := CheckHooksApplied(reg, p.Root, p.Selected, "run `terma install` without --no-hooks and accept the hook plan"); err != nil {
 		return err
 	}
 
-	// The key this machine delivers the repository's hook events with: without one,
-	// every commit, tool call and observation waits in the spool.
+	// Without a spool key every hook event waits in the spool.
 	if s.SpoolKey != nil && (installedHooks || len(reg.WiredNames(p.Root)) > 0) {
 		if state, fix := s.SpoolKey(ctx); fix == "" {
 			r.OK("Hook events", state)
@@ -197,8 +180,6 @@ func Apply(ctx context.Context, p Plan, o Options, s Steps, r Reporter) error {
 		}
 	}
 
-	// Repository telemetry also supports developers using a global repos-only
-	// connection. Hooks alone do not enable that connection's exporters.
 	if s.RepoPolicy != nil {
 		paths, err := s.RepoPolicy(ctx, PolicyHarnesses(reg, adapters))
 		if err != nil {
@@ -233,7 +214,6 @@ func Apply(ctx context.Context, p Plan, o Options, s Steps, r Reporter) error {
 		}
 	}
 	if p.GitDir != "" && len(written) > 0 {
-		// Save always rewrites the binding.
 		r.Commit("Commit these files and open a PR — merging it onboards the repository:", append(written, termaproject.FileName))
 	}
 	for _, n := range afterMerge {
@@ -242,10 +222,8 @@ func Apply(ctx context.Context, p Plan, o Options, s Steps, r Reporter) error {
 	return nil
 }
 
-// File is the committed binding an install writes. installed_at is the onboarder's and
-// never moves; terma_version is the terma that last wrote the committed files, so it
-// moves only when this install wrote one — a colleague's install that changes nothing
-// does not churn the file.
+// File is the committed binding an install writes; terma_version moves only when this
+// install wrote a file, so a no-op re-install does not churn it.
 func (b Binding) File(existing *termaproject.File, det hookmgr.Detection, installedHooks, wrote bool, o Options) *termaproject.File {
 	version, installedAt := o.Version, o.Now.UTC()
 	if existing != nil {

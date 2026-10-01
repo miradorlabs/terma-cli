@@ -10,8 +10,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
-// A policy from another organization or environment, or none validated yet, grants
-// nothing: the claimed session waits rather than leaving under a guess.
+// A policy from another organization or environment, or none validated yet, grants nothing.
 func TestResolverGrantsOnlyAValidatedPolicyOfThisLogin(t *testing.T) {
 	const org, auth = "org_a", "https://auth.example"
 	fetched := time.Now()

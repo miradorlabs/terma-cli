@@ -16,36 +16,31 @@ import (
 // Signal is one of the three OTLP export paths.
 type Signal string
 
-// The OTLP signals, named as their export paths are: /v1/<signal>.
+// The OTLP signals, named as their export paths: /v1/<signal>.
 const (
 	Logs    Signal = "logs"
 	Metrics Signal = "metrics"
 	Traces  Signal = "traces"
 )
 
-// The export requests are decoded as LogsData, MetricsData and TracesData: the same
-// message on the wire and in JSON (field 1, repeated resource entries), without the
-// collector packages' gRPC and gateway dependencies, which every hook would link.
+// Exports decode as LogsData, MetricsData and TracesData, wire-identical to the requests,
+// because the collector packages would link gRPC into every hook.
 
-// part is the slice of one export request that belongs to one session: a request of
-// the same signal holding only that session's records, and how many records it has.
+// part is the slice of one export request that belongs to one session.
 type part struct {
 	signal  Signal
 	session string
 	msg     proto.Message
 	records int
-	// pid is the process that exported it, 0 when unknown (see Options.PeerPID).
+	// pid is the process that exported it, 0 when unknown.
 	pid int
-	// at is when its earliest record happened, zero when none says: which placement of a
-	// resumed session it belongs to, when its process does not decide (claim.At).
+	// at picks the placement of a resumed session when its process does not decide (claim.At).
 	at time.Time
-	// start holds a conversation start an agent declared: unclaimed, it waits as long as
-	// a trace (Options.TraceHold), because the hook that claims it may be a long way off.
+	// start marks a conversation start, which waits as long as a trace: its claiming hook may be far off.
 	start bool
 }
 
-// sessionOf is the session a record names: the first session key, by rank, on its own
-// attributes, then on its resource's.
+// sessionOf is the first session key, by rank, on the record's attributes, then its resource's.
 func (ru *rules) sessionOf(attrs, resource []*commonpb.KeyValue) string {
 	for _, set := range [][]*commonpb.KeyValue{attrs, resource} {
 		for _, key := range ru.sessionKeys {
@@ -70,13 +65,9 @@ func numeric(s string) bool {
 	return s != ""
 }
 
-// splitLogs divides a logs export by session. Records naming no session come back
-// under the empty key.
-//
-// A log record that names its session and carries a trace id also teaches learn which
-// session the trace belongs to. An agent whose only span that names the session is
-// exported when the turn ends needs this: without it, a turn's child spans would wait in
-// the hold for the whole turn, and a turn longer than the hold would lose them.
+// splitLogs divides a logs export by session, records naming none under the empty key.
+// A record naming its session and a trace teaches learn the trace's session, or an agent
+// that names the session only on its turn-end span would lose a long turn's child spans.
 func (ru *rules) splitLogs(req *logspb.LogsData, learn func(traceID, session string)) map[string]*part {
 	out := map[string]*part{}
 	for _, rl := range req.GetResourceLogs() {
@@ -113,15 +104,11 @@ func (ru *rules) splitLogs(req *logspb.LogsData, learn func(traceID, session str
 	return out
 }
 
-// tracePrefix marks a part keyed by a trace, not yet a session: spans that name no
-// session in a trace whose session the relay has not learnt yet.
+// tracePrefix keys spans of a trace whose session is not yet known.
 const tracePrefix = "trace:"
 
-// splitTraces divides a traces export by session, span by span. A span that names no
-// session belongs to the session of its trace: an agent may name the session on one
-// span only, and its children inherit the trace, not the attribute. learn records every
-// trace a keyed span names; known answers for the others. A span of a trace nobody
-// has named yet comes back under tracePrefix+traceID, for the relay to hold.
+// splitTraces divides a traces export by session, span by span; a span naming no session
+// belongs to its trace's, since children inherit the trace, not the attribute.
 func (ru *rules) splitTraces(req *tracepb.TracesData, learn func(traceID, session string), known func(traceID string) string) map[string]*part {
 	for _, rs := range req.GetResourceSpans() {
 		res := rs.GetResource().GetAttributes()
@@ -171,9 +158,7 @@ func (ru *rules) splitTraces(req *tracepb.TracesData, learn func(traceID, sessio
 	return out
 }
 
-// splitMetrics divides a metrics export by session, data point by data point: one
-// metric's points can belong to several sessions (an agent may stamp its session on each
-// point), so each session gets a copy of the metric holding only its own points.
+// splitMetrics divides a metrics export by data point, since one metric's points can name several sessions.
 func (ru *rules) splitMetrics(req *metricspb.MetricsData) map[string]*part {
 	out := map[string]*part{}
 	for _, rm := range req.GetResourceMetrics() {
@@ -215,8 +200,6 @@ type metricPiece struct {
 	points int
 }
 
-// splitMetric groups one metric's data points by session, each group a shallow copy
-// of the metric (name, unit, temporality) holding only those points.
 func (ru *rules) splitMetric(m *metricspb.Metric, res []*commonpb.KeyValue) map[string]metricPiece {
 	out := map[string]metricPiece{}
 	shell := func() *metricspb.Metric {
@@ -282,8 +265,7 @@ func (ru *rules) splitMetric(m *metricspb.Metric, res []*commonpb.KeyValue) map[
 	return out
 }
 
-// cloneResource copies a resource so stamping one project's id on it cannot reach a
-// part bound for another project.
+// cloneResource keeps one project's stamp from reaching a part bound for another.
 func cloneResource(r *resourcepb.Resource) *resourcepb.Resource {
 	if r == nil {
 		return &resourcepb.Resource{}
@@ -291,8 +273,6 @@ func cloneResource(r *resourcepb.Resource) *resourcepb.Resource {
 	return proto.Clone(r).(*resourcepb.Resource)
 }
 
-// conversationStart reports whether p holds an event an agent declared a conversation
-// start (shape.Correlation.StartEvents).
 func (ru *rules) conversationStart(p *part) bool {
 	m, ok := p.msg.(*logspb.LogsData)
 	if !ok {
@@ -312,8 +292,6 @@ func (ru *rules) conversationStart(p *part) bool {
 	return false
 }
 
-// earliest is the time of a part's earliest record: a log record's time (else when it
-// was observed), a span's start, a data point's time. Zero when none carries one.
 func earliest(msg proto.Message) time.Time {
 	var first uint64
 	see := func(t uint64) {

@@ -15,19 +15,17 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// codexTitleMaxText bounds a title. Codex generates at most 36 characters; a manual
-// rename has no limit of its own.
+// codexTitleMaxText bounds a title: Codex generates at most 36 characters, a rename has
+// no limit.
 const codexTitleMaxText = 256
 
-// codexTitleState is the name a session's capture last spooled, so an unchanged name is
-// not sent again at every turn's end.
+// codexTitleState keeps an unchanged name from being sent at every turn's end.
 type codexTitleState struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// captureCodexTitle spools the name Codex gave this thread when it is new or renamed.
-// The name restates the developer's first prompt, so it travels under the consent a
-// reply does (codexRepliesConsented).
+// captureCodexTitle spools the thread's name when new or renamed; it restates the first
+// prompt, so it travels under CodexRepliesConsented.
 func captureCodexTitle(e hookrun.Env, ctx context.Context, r *hookrun.Repo, in *codexHookInput) {
 	pol := routing.EffectivePolicy(e.Policy, r.ProjectID)
 	if e.Spool == nil || !session.ValidID(in.SessionID) || !pol.IncludePrompts || !pol.AllowsSignal("logs") || len(pol.ExcludePaths) > 0 || !CodexRepliesConsented(r.ProjectID, pol.Global()) {
@@ -85,7 +83,6 @@ func captureCodexTitle(e hookrun.Env, ctx context.Context, r *hookrun.Repo, in *
 	}
 }
 
-// truncateRunes cuts s to at most n bytes on a rune boundary.
 func truncateRunes(s string, n int) string {
 	if len(s) <= n {
 		return s

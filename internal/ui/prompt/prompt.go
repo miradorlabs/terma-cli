@@ -1,11 +1,5 @@
-// Package prompt draws the one interactive control the CLI needs beyond a yes/no —
-// a form of checkboxes and radio buttons — on a terminal, without a TUI framework.
-//
-// The form is a pure model (Form, handle, render) driven by decoded keypresses, so
-// every behaviour is testable with a byte buffer. Run is the thin terminal layer: it
-// puts stdin in raw mode, feeds keys to the model, and redraws in place. Anything
-// without a terminal never reaches Run — callers check Interactive and fall back to
-// flags, which is also how agents and CI use the same commands.
+// Package prompt draws a form of checkboxes and radio buttons on a terminal without a
+// TUI framework: a pure model driven by decoded keys, and Run, the raw-mode driver.
 package prompt
 
 import (
@@ -34,19 +28,17 @@ const (
 
 // Item is one line of a form.
 type Item struct {
-	// Label is the short name shown next to the box.
 	Label string
-	// Detail is the explanation printed after the label, dimmed.
+	// Detail is printed after the label, dimmed.
 	Detail string
 	Kind   Kind
 	// Group ties Radio items together; ignored for Check.
 	Group    int
 	Selected bool
-	// Disabled items are drawn but cannot be toggled or landed on. Reason says why,
-	// and is printed in place of Detail so the user is told rather than left guessing.
+	// Disabled items are drawn but cannot be toggled or landed on; Reason replaces Detail.
 	Disabled bool
 	Reason   string
-	// Heading, when set, is printed as a section title above this item.
+	// Heading is a section title printed above this item.
 	Heading string
 }
 
@@ -54,15 +46,11 @@ type Item struct {
 type Form struct {
 	Title string
 	Items []Item
-	// Choice makes the form a list to pick one item from: no boxes, the cursor starts
-	// on the Selected item (the current choice), and Enter picks the item under it.
+	// Choice makes the form a pick-one list: no boxes, the cursor starts on the Selected item.
 	Choice bool
 
 	cursor int
-	// termWidth is the terminal's column count, used so render can count the physical
-	// rows a wrapped line occupies rather than one row per logical line — the count the
-	// redraw backs up over. Zero means "unknown / assume no wrapping" (the model tests
-	// exercise render this way).
+	// termWidth lets render count wrapped physical rows for the redraw; zero assumes no wrapping.
 	termWidth int
 }
 
@@ -85,17 +73,14 @@ const (
 	keyCancel
 )
 
-// Interactive reports whether both ends of a prompt are terminals. stdout being a
-// terminal is not enough: `echo y | terma connect claude` has a terminal to draw on
-// and nothing to read keys from, and must fall through to the line-based confirm.
+// Interactive reports whether both ends of a prompt are terminals: with stdin piped
+// there is a terminal to draw on but no keys to read.
 func Interactive() bool {
 	return term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stderr.Fd()))
 }
 
-// Run shows the form on the terminal, lets the user edit it, and returns the items in
-// their final state. The form stays on screen after Enter so the transcript shows what
-// was chosen. It draws on stderr, like every other prompt in this CLI, so stdout stays
-// clean for the command's own output.
+// Run shows the form on stderr, lets the user edit it, and returns the items in their
+// final state, leaving the form on screen.
 func Run(f *Form) ([]Item, error) {
 	if !Interactive() {
 		return nil, ErrNoTerminal
@@ -107,8 +92,7 @@ func Run(f *Form) ([]Item, error) {
 	if err != nil {
 		return nil, fmt.Errorf("raw terminal: %w", err)
 	}
-	// Restored before anything else is written, including an error: a terminal left in
-	// raw mode swallows the user's next Enter and echoes nothing.
+	// A terminal left in raw mode swallows the next Enter and echoes nothing.
 	defer func() { _ = term.Restore(fd, state) }()
 
 	out := os.Stderr
@@ -121,8 +105,7 @@ func Run(f *Form) ([]Item, error) {
 		if err != nil {
 			return nil, fmt.Errorf("read key: %w", err)
 		}
-		// One read can carry several keys — a paste, or a terminal that batches — so
-		// every token is applied, and the frame is redrawn once at the end.
+		// One read can carry several keys; apply them all, then redraw once.
 		var done, cancelled bool
 		for _, tok := range tokens(buf[:n]) {
 			if done, cancelled = f.handle(decode(tok)); done || cancelled {
@@ -133,10 +116,7 @@ func Run(f *Form) ([]Item, error) {
 			fmt.Fprint(out, "\r\n")
 			return nil, ErrCancelled
 		}
-		// Redraw in place: back up over the physical rows the frame occupied, clear from
-		// there to the end of the screen (so a resize or a shrunk line leaves no residue),
-		// then draw the new frame. `lines` is a physical-row count, so a wrapped line does
-		// not smear copies down the screen on every keypress.
+		// Back up over the frame's physical rows and clear to the end of the screen.
 		fmt.Fprintf(out, "\x1b[%dA\r\x1b[0J", lines)
 		f.termWidth = terminalWidth()
 		lines = f.render(out, style.For(out))
@@ -147,8 +127,7 @@ func Run(f *Form) ([]Item, error) {
 	}
 }
 
-// Choose shows items as a list to pick one from with the arrow keys and returns the
-// index picked. The item marked Selected is where the cursor starts, so Enter keeps it.
+// Choose shows items as a pick-one list and returns the index picked; Enter keeps the Selected one.
 func Choose(title string, items []Item) (int, error) {
 	f := &Form{Title: title, Items: items, Choice: true}
 	chosen, err := Run(f)
@@ -163,8 +142,7 @@ func Choose(title string, items []Item) (int, error) {
 	return -1, ErrCancelled
 }
 
-// tokens splits raw input into keypresses: a CSI sequence (ESC [ x) is one token, any
-// other byte is one on its own. A lone trailing ESC is a token too — Esc means cancel.
+// tokens splits raw input into keypresses: a CSI sequence (ESC [ x) or a single byte.
 func tokens(b []byte) [][]byte {
 	var out [][]byte
 	for i := 0; i < len(b); {
@@ -179,8 +157,7 @@ func tokens(b []byte) [][]byte {
 	return out
 }
 
-// init puts the cursor on the first item that can be acted on — in a Choice form, on
-// the selected one, so Enter keeps the current choice.
+// init puts the cursor on the first enabled item, or a Choice form's selected one.
 func (f *Form) init() {
 	f.cursor = 0
 	if f.Choice {
@@ -199,7 +176,6 @@ func (f *Form) init() {
 	}
 }
 
-// handle applies one keypress and reports whether the form is finished.
 func (f *Form) handle(k key) (done, cancelled bool) {
 	switch k {
 	case keyUp:
@@ -245,7 +221,6 @@ func (f *Form) handle(k key) (done, cancelled bool) {
 	return false, false
 }
 
-// move steps the cursor, skipping disabled items and stopping at the ends.
 func (f *Form) move(delta int) {
 	for i := f.cursor + delta; i >= 0 && i < len(f.Items); i += delta {
 		if !f.Items[i].Disabled {
@@ -264,7 +239,6 @@ func (f *Form) toggle(i int) {
 		it.Selected = !it.Selected
 		return
 	}
-	// A radio button cannot be unselected: one of the group is always chosen.
 	for j := range f.Items {
 		if f.Items[j].Kind == Radio && f.Items[j].Group == it.Group {
 			f.Items[j].Selected = j == i
@@ -272,8 +246,6 @@ func (f *Form) toggle(i int) {
 	}
 }
 
-// decode maps the raw bytes of one keypress onto a key. Arrow keys arrive as CSI
-// sequences; a lone escape is a cancel.
 func decode(b []byte) key {
 	switch {
 	case len(b) == 0:
@@ -307,13 +279,10 @@ func decode(b []byte) key {
 	return keyNone
 }
 
-// clearLine erases the current line before it is redrawn, so a shorter frame never
-// leaves the tail of a longer one behind.
+// clearLine erases a line before it is redrawn, so a shorter frame leaves no tail.
 const clearLine = "\x1b[2K"
 
-// render draws the whole form and returns the number of lines written, which is what
-// the next redraw has to back up over. Lines end in \r\n because the terminal is in
-// raw mode, where \n alone does not return the carriage.
+// render draws the form and returns the physical rows written; raw mode needs \r\n.
 func (f *Form) render(w io.Writer, p style.Palette) int {
 	dim, bold, brand := p.Dim, p.Bold, p.Brand
 	lines := 0
@@ -360,7 +329,6 @@ func (f *Form) render(w io.Writer, p style.Palette) int {
 		}
 		label := it.Label + strings.Repeat(" ", width-len([]rune(it.Label)))
 		if f.Choice {
-			// No box: the cursor is the selection, drawn bright where it rests.
 			if i == f.cursor && !it.Disabled {
 				label = brand(label)
 			}
@@ -392,18 +360,14 @@ func (f *Form) render(w io.Writer, p style.Palette) int {
 	return lines
 }
 
-// ansiSGR matches the colour escape sequences the palette emits, so a line's visible
-// width can be measured without counting them.
+// ansiSGR matches the colour escapes the palette emits.
 var ansiSGR = regexp.MustCompile("\x1b\\[[0-9;]*m")
 
-// visibleWidth is the column count a line occupies, ignoring colour escapes.
 func visibleWidth(s string) int {
 	return utf8.RuneCountInString(ansiSGR.ReplaceAllString(s, ""))
 }
 
-// rows is how many physical terminal rows a rendered line occupies once the terminal
-// wraps it. With an unknown width it is one row per line, which is what the redraw and
-// the model tests assume off a terminal.
+// rows is how many physical rows a rendered line occupies once wrapped.
 func (f *Form) rows(s string) int {
 	if f.termWidth <= 0 {
 		return 1
@@ -414,8 +378,7 @@ func (f *Form) rows(s string) int {
 	return 1
 }
 
-// terminalWidth reports the drawing terminal's column count, or 0 when it cannot be
-// determined (in which case render assumes no wrapping).
+// terminalWidth is stderr's column count, or 0 when unknown.
 func terminalWidth() int {
 	if w, _, err := term.GetSize(int(os.Stderr.Fd())); err == nil && w > 0 {
 		return w

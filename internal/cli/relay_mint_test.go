@@ -16,9 +16,8 @@ import (
 
 const mintedKey = "ter_srv_minted0123456789abcdefghijklmnopqrstuv"
 
-// A claimed project with no key on this machine — a repository the platform connected —
-// asks for one to be minted, and waits; with a key, the organization's policy is the
-// ceiling on content and the developer's record can only narrow it.
+// A claimed project without a key here is minted one; with a key, the organization's
+// policy caps content and the developer's record can only narrow it.
 func TestRelayResolverMintsAndCapsContent(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	cfg := &config.Config{OTLPURL: "https://otel.example", Policy: config.DefaultPolicy()}
@@ -47,9 +46,8 @@ func TestRelayResolverMintsAndCapsContent(t *testing.T) {
 	}
 }
 
-// The first claiming hook in a clone of a repository the platform connected points git
-// at the committed commit-hook shims; a clone wired before is left alone, also when its
-// developer moved core.hooksPath since.
+// The first claiming hook in a platform-connected clone points git at the committed shims;
+// a clone wired before is left alone, even if core.hooksPath moved since.
 func TestFirstHookWiresTheClone(t *testing.T) {
 	repo := installRepo(t)
 	if err := termaproject.Save(repo, &termaproject.File{
@@ -74,8 +72,7 @@ func TestFirstHookWiresTheClone(t *testing.T) {
 	}
 }
 
-// A binding whose commit hooks run through a manager (husky, lefthook) needs nothing
-// per clone: the hook leaves git's config alone.
+// A binding whose commit hooks run through a manager needs nothing per clone.
 func TestFirstHookLeavesAManagedRepositoryAlone(t *testing.T) {
 	repo := installRepo(t)
 	if err := termaproject.Save(repo, &termaproject.File{

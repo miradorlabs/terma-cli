@@ -11,9 +11,8 @@ import (
 	"testing"
 )
 
-// Connect writes through a symlinked config.toml (TestCodexConnectWritesThroughSymlink)
-// and the notify edit follows it in the same command. That second write renamed over the
-// link itself, so the dotfiles repository it pointed into was quietly left behind.
+// The notify edit writes through a symlinked config.toml, as Connect does, instead of
+// renaming over the link.
 func TestCodexNotifyWritesThroughSymlinkAndKeepsTheMode(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("CODEX_HOME", home)
@@ -34,7 +33,7 @@ func TestCodexNotifyWritesThroughSymlinkAndKeepsTheMode(t *testing.T) {
 	for _, step := range []struct {
 		name string
 		run  func() (bool, error)
-		want bool // whether terma's notify is in the file afterwards
+		want bool
 	}{
 		{"install", func() (bool, error) { return Codex{}.InstallCodexNotify() }, true},
 		{"remove", func() (bool, error) { return Codex{}.RemoveCodexNotify() }, false},
@@ -58,10 +57,7 @@ func TestCodexNotifyWritesThroughSymlinkAndKeepsTheMode(t *testing.T) {
 	}
 }
 
-// The record is one file for every Codex config on the machine. Keying it by config
-// path fixed whose chain is whose; this is the other half — two connects under
-// different CODEX_HOMEs each read it, set their own chain and renamed their copy back,
-// and the later rename forgot the other's notifier.
+// Concurrent connects under different CODEX_HOMEs keep both notifiers.
 func TestConcurrentNotifyChainsKeepEveryConfig(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	const configs = 16

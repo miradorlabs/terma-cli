@@ -11,18 +11,14 @@ import (
 
 func configureRendererProcess(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	// CommandContext normally kills only the shell, leaving grandchildren holding
-	// stdout/stderr open. Cancel the renderer's process group instead.
+	// CommandContext kills only the shell; grandchildren would hold stdout open.
 	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
-	// A descendant that starts a separate session may retain output pipes even
-	// after the group is killed. Bound pipe draining as well as process waiting.
+	// A descendant in its own session can outlive the group kill, so pipe draining is bounded too.
 	cmd.WaitDelay = rendererPipeDrain
 }
 
 func forwardRendererSignals(cmd *exec.Cmd, exited <-chan struct{}) {
-	// Claude Code cancels an in-flight status line by terminating it. Pass that
-	// on to the renderer's process group rather than leaving it drawing into a
-	// pipe nobody reads.
+	// Claude Code cancels an in-flight status line by terminating it; pass that to the group.
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP)
 	go func() {
@@ -38,7 +34,6 @@ func forwardRendererSignals(cmd *exec.Cmd, exited <-chan struct{}) {
 }
 
 func rendererSignalExitCode(exit *exec.ExitError) int {
-	// Killed by a signal: report it the way a shell would.
 	if st, ok := exit.Sys().(syscall.WaitStatus); ok && st.Signaled() {
 		return 128 + int(st.Signal())
 	}

@@ -2,18 +2,11 @@ package api
 
 import "time"
 
-// The AI read surface lives under /v1/ai on the data plane. These shapes mirror the
-// gateway's OpenAPI schemas. Two rules from the platform shape everything here:
-//
-//   - A session is identified by session_id + source_system. The id is an opaque
-//     token the gateway hands out on a list row — the routing key behind it is never
-//     exposed — and every session-scoped read takes both halves.
-//   - Principals are ids, never names. user_id / api_key_id are stable and non-PII;
-//     the readable name (an email, a key label) comes from ListAIPrincipals and is
-//     joined at display time.
+// These shapes mirror the gateway's /v1/ai schemas. A session is session_id +
+// source_system, and principals are ids whose names come from ListAIPrincipals.
 
-// AITokenUsage is a settled model call's, or a whole session's, token and cost roll-up.
-// Cost is the provider's price in dollars: an analytics figure, not a ledger value.
+// AITokenUsage is a model call's or a session's token and cost roll-up; cost is an
+// analytics figure, not a ledger value.
 type AITokenUsage struct {
 	InputTokens      uint64  `json:"input_tokens"`
 	OutputTokens     uint64  `json:"output_tokens"`
@@ -30,7 +23,7 @@ func (u *AITokenUsage) TotalTokens() uint64 {
 	return u.InputTokens + u.OutputTokens + u.CacheReadTokens + u.CacheWriteTokens
 }
 
-// CostUSD is the cost in dollars. A nil usage is "no usage recorded" and costs nothing.
+// CostUSD is the cost in dollars; a nil usage costs nothing.
 func (u *AITokenUsage) CostUSD() float64 {
 	if u == nil {
 		return 0
@@ -38,7 +31,7 @@ func (u *AITokenUsage) CostUSD() float64 {
 	return u.ProviderCostUsd
 }
 
-// Add folds another usage into this one. A nil src is "no usage recorded" and adds nothing.
+// Add folds another usage into this one; a nil src adds nothing.
 func (u *AITokenUsage) Add(src *AITokenUsage) {
 	if src == nil {
 		return
@@ -50,8 +43,7 @@ func (u *AITokenUsage) Add(src *AITokenUsage) {
 	u.ProviderCostUsd += src.ProviderCostUsd
 }
 
-// AISession is one coding session's roll-up over its events — the gateway's
-// AISessionSummary. It carries no events; those are ListAISessionEvents.
+// AISession is one coding session's roll-up, the gateway's AISessionSummary.
 type AISession struct {
 	SourceSystem          string        `json:"source_system"`
 	SessionID             string        `json:"session_id"`
@@ -90,8 +82,7 @@ const (
 // AISessionSorts lists every ranking, the gateway's default first.
 var AISessionSorts = []string{AISortRecency, AISortCost, AISortTokens, AISortTurns, AISortTools}
 
-// AIPagination is offset pagination over the filtered session catalog. Page is
-// 1-indexed and Total is exact for the filter as of when the page was read.
+// AIPagination is offset pagination over the filtered session catalog; Page is 1-indexed.
 type AIPagination struct {
 	Page       int   `json:"page"`
 	PerPage    int   `json:"per_page"`
@@ -141,8 +132,7 @@ type AISessionEvent struct {
 	EventTime time.Time       `json:"event_time"`
 	TurnID    string          `json:"turn_id,omitempty"`
 	Content   []AIContentPart `json:"content,omitempty"`
-	// Usage is present only on a settled model call. Its absence means "no usage
-	// recorded", which is different from a zero-cost call.
+	// Usage is nil for "no usage recorded", which is not a zero-cost call.
 	Usage        *AITokenUsage `json:"usage,omitempty"`
 	Model        string        `json:"model,omitempty"`
 	Provider     string        `json:"provider,omitempty"`
@@ -153,16 +143,13 @@ type AISessionEvent struct {
 	TtftMs       *uint64       `json:"ttft_ms,omitempty"`
 	ModelCallID  string        `json:"model_call_id,omitempty"`
 	ToolCallID   string        `json:"tool_call_id,omitempty"`
-	// LogicalEventID is the event's stable identity across pages and corrections; for
-	// one id, the copy with the higher Version supersedes.
+	// LogicalEventID is stable across pages and corrections; the higher Version supersedes.
 	LogicalEventID string `json:"logical_event_id,omitempty"`
 	Version        int64  `json:"version,omitempty"`
-	// Cursor is this event's own keyset position within the session.
-	Cursor string `json:"cursor,omitempty"`
+	Cursor         string `json:"cursor,omitempty"`
 }
 
-// AISessionEventsResponse is one keyset page of a session's events, oldest first.
-// NextCursor is empty on the last page.
+// AISessionEventsResponse is one keyset page of a session's events; NextCursor is empty on the last.
 type AISessionEventsResponse struct {
 	SessionID    string           `json:"session_id"`
 	SourceSystem string           `json:"source_system"`
@@ -176,9 +163,7 @@ const (
 	AIPrincipalAPIKey = "api_key"
 )
 
-// AIPrincipal maps a stable principal id to its provider-observed name and an
-// optional alias set in the web app. Prefer Alias, then Name, then Id when labelling.
-// AccountUserID is the account user (a seat) the web app linked the principal to.
+// AIPrincipal maps a stable principal id to its provider-observed name and optional alias.
 type AIPrincipal struct {
 	Kind          string `json:"kind"`
 	ID            string `json:"id"`
@@ -188,8 +173,7 @@ type AIPrincipal struct {
 	AccountUserID string `json:"account_user_id,omitempty"`
 }
 
-// DisplayName is the label a person would recognise: the alias they chose, else the
-// name the provider reported, else the bare id.
+// DisplayName is the alias, else the provider's name, else the bare id.
 func (p AIPrincipal) DisplayName() string {
 	switch {
 	case p.Alias != "":

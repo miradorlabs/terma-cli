@@ -7,10 +7,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-// OTEL_RESOURCE_ATTRIBUTES is the user's variable for describing their own resources.
-// Terma never writes it for Claude Code: the key names the project, Claude Code stamps
-// user.id and user.email itself, and its resource already carries
-// service.name=claude-code. The exporter's attributes are for Codex and OpenCode.
+// OTEL_RESOURCE_ATTRIBUTES is the user's; Claude Code stamps user.id, user.email and service.name itself.
 func TestRenderNeverWritesResourceAttributes(t *testing.T) {
 	for _, h := range []harness.Harness{exporter{}, exporter{}.Local(t.TempDir())} {
 		if got, ok := h.(exporter).render(fullExporter())[harness.EnvResourceAttributes]; ok {
@@ -19,8 +16,7 @@ func TestRenderNeverWritesResourceAttributes(t *testing.T) {
 	}
 }
 
-// A user's own resource attributes are neither overwritten by a connect nor removed by
-// the disconnect that follows: they were never Terma's.
+// A user's own resource attributes survive a connect and the disconnect after it.
 func TestConnectLeavesUsersResourceAttributesAlone(t *testing.T) {
 	const theirs = "deployment.environment=staging,team=payments"
 	c, path := claudeIn(t, `{"env":{"OTEL_RESOURCE_ATTRIBUTES":"`+theirs+`"}}`)

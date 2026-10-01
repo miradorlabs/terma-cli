@@ -12,9 +12,7 @@ import (
 	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 )
 
-// Every key a harness was seen to send with content withheld is classified: the
-// goldens the live suite records are the evidence, and a key they gain on a new release
-// must be decided here before the relay lets it through.
+// Every key the live goldens record with content withheld is classified here.
 func TestClassificationCoversTheGoldens(t *testing.T) {
 	files, _ := filepath.Glob(filepath.Join("..", "..", "live", "golden", "*", "telemetry-redacted.json"))
 	withheld, _ := filepath.Glob(filepath.Join("..", "..", "live", "golden", "relay", "*-withheld.json"))
@@ -41,8 +39,7 @@ func TestClassificationCoversTheGoldens(t *testing.T) {
 	}
 }
 
-// A key is safe or content, never both: a content key listed as safe would pass whatever
-// the gate did to it.
+// A key is safe or content, never both.
 func TestNoKeyIsBothSafeAndContent(t *testing.T) {
 	for key := range testRules.safeKeys {
 		if testRules.contentKey(key) {
@@ -51,9 +48,8 @@ func TestNoKeyIsBothSafeAndContent(t *testing.T) {
 	}
 }
 
-// With content withheld, what is not known to be safe does not leave: an unknown
-// attribute, an unknown resource attribute, and a body that says more than its event's
-// name are dropped and counted by name. With content allowed, nothing is touched.
+// With content withheld, unknown attributes and free-text bodies are dropped and counted;
+// with content allowed, nothing is touched.
 func TestWithheldContentPassesOnlyWhatIsClassified(t *testing.T) {
 	record := func() *part {
 		return &part{signal: Logs, session: "A", msg: &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{
@@ -98,8 +94,7 @@ func TestWithheldContentPassesOnlyWhatIsClassified(t *testing.T) {
 	}
 }
 
-// A count or a flag cannot carry what was said, whatever its key, sent as a number or
-// as a string that is wholly one; anything more is text and must be classified.
+// A number or flag passes under any key, even as a string that is wholly one; anything more is text.
 func TestNumbersAndFlagsPassUnderAnyKey(t *testing.T) {
 	for v, want := range map[string]bool{"3": true, "-12.5": true, "true": true, "false": true, "0": true,
 		"": false, "3 files": false, "0x1f": false, "NaN": false, "Inf": false, "1_000": false, "yes": false, "1e999999": false} {
@@ -115,9 +110,7 @@ func TestNumbersAndFlagsPassUnderAnyKey(t *testing.T) {
 	}
 }
 
-// classify says how the relay treats key when a project's content is withheld: "safe"
-// (passes), "content" (marked or dropped) or "unclassified" (dropped, and counted so that
-// someone classifies it).
+// classify says how the relay treats key with content withheld: "safe", "content" or "unclassified".
 func (ru *rules) classify(key string) string {
 	switch {
 	case ru.contentKey(key):

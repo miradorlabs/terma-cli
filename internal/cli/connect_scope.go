@@ -19,42 +19,30 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/ui/prompt"
 )
 
-// The interactive half of connect: a checklist of what to send and where, shown on a
-// terminal before anything is planned. Every box has a flag — --signals,
-// --exclude-prompts, --exclude-tool-content, --scope — so agents, CI and anyone who
-// prefers typing get the same result without the form; --yes takes flags and defaults
-// without asking. The form seeds from the flags, so a flag given on a terminal is the
-// starting state rather than a way to skip the question.
+// The connect checklist has a flag for every box and seeds from them, so a flag given on a
+// terminal is the starting state rather than a way to skip the question.
 
-// errCancelled is the user backing out of the checklist. Callers print "Cancelled" and
-// return nil, the way a declined confirm does.
+// errCancelled is printed as "Cancelled" and returned as nil, like a declined confirm.
 var errCancelled = errors.New("cancelled")
 
-// canPrompt reports whether an interactive form can be shown: a human at a terminal,
-// on both ends. output.Interactive covers stdout and agent detection; prompt.Interactive
-// covers stdin, so `echo y | terma connect claude` falls through to the line-based
-// confirm the way it always has.
+// canPrompt needs both halves: output.Interactive covers stdout and agent detection,
+// prompt.Interactive stdin, so piped input falls through to the line-based confirm.
 func canPrompt() bool {
 	return output.Interactive() && prompt.Interactive()
 }
 
-// signalDetails are the one-line explanations shown beside each signal's checkbox.
 var signalDetails = map[harness.Signal]string{
 	harness.SignalTraces:  "spans per turn, model call and tool call",
 	harness.SignalLogs:    "prompts, tool calls and results, as events",
 	harness.SignalMetrics: "what the usage and cost views are built on",
 }
 
-// connectForm is what the checklist needs to know beyond the flags. It asks what to
-// send and where the file goes (global or local); which repositories a global connect
-// exports from stays with --exports, since a connect naming one harness is already the
-// expert path.
+// connectForm leaves --exports out of the checklist: a connect naming one harness is
+// already the expert path.
 type connectForm struct {
-	// root is the repository the CLI runs in, or "" outside one.
 	root string
 }
 
-// askConnectOptions shows the checklist seeded from f and returns f with the answers.
 func askConnectOptions(f connectFlags, hs []harness.Harness, ask connectForm) (connectFlags, error) {
 	signals, err := harness.ParseSignals(f.signals)
 	if err != nil {
@@ -92,8 +80,7 @@ func askConnectOptions(f connectFlags, hs []harness.Harness, ask connectForm) (c
 	const scopeGroup = 1
 	unavailable := localUnavailable(hs, root)
 	if scope == harness.ScopeLocal && unavailable != "" {
-		// Asked for by flag and impossible here: say so rather than quietly flipping
-		// the radio button to global.
+		// Refused rather than quietly flipping the radio button to global.
 		return f, errors.New("--scope local: " + unavailable)
 	}
 	local := prompt.Item{
@@ -136,17 +123,14 @@ func askConnectOptions(f connectFlags, hs []harness.Harness, ask connectForm) (c
 	if items[localAt].Selected {
 		f.scope = string(harness.ScopeLocal)
 	}
-	// Three ways to send nothing, and only one of them is a mistake. A repository that
-	// ships nothing is a policy; a machine that hands the decision to its repositories
-	// is the arrangement above. A machine that simply has every box unticked while
-	// holding a live key is the mistake, and there is a better command for it.
+	// Sending nothing is a policy locally and an arrangement under --exports repos; a
+	// machine with every box unticked while holding a live key is the mistake.
 	if len(chosen) == 0 && f.scope != string(harness.ScopeLocal) && f.exports != string(harness.ReachRepos) {
 		return f, errors.New("nothing selected to send — tick at least one signal, or run `terma disconnect` to stop exporting")
 	}
 	return f, nil
 }
 
-// localUnavailable says why local scope cannot be offered, or "" when it can.
 func localUnavailable(hs []harness.Harness, root string) string {
 	if root == "" {
 		return "not inside a git repository"
@@ -159,18 +143,15 @@ func localUnavailable(hs []harness.Harness, root string) string {
 	return ""
 }
 
-// joinNames names agents in prose, or all of them when the list is empty.
 func joinNames(names []string) string {
 	return cmp.Or(output.And(names), "your coding agents")
 }
 
-// localRoot is the repository the CLI runs in, which is what --scope local writes.
 func localRoot(ctx context.Context) (string, error) {
 	root, _, err := repoHere(ctx, "--scope local applies to a repository — run this inside a git checkout")
 	return root, err
 }
 
-// localHarness binds h to the repository the CLI runs in, or explains why it cannot.
 func (app *App) localHarness(ctx context.Context, h harness.Harness) (harness.Harness, error) {
 	scoped, ok := h.(harness.Scoped)
 	if !ok {
@@ -183,10 +164,8 @@ func (app *App) localHarness(ctx context.Context, h harness.Harness) (harness.Ha
 	return scoped.Local(root), nil
 }
 
-// runLocalConnect writes a repository's policy: which signals and content its sessions
-// ship, in its committed .claude/settings.json. Nothing about where or with which key —
-// that stays in the global connect — so it needs no project, no sign-in and no network,
-// and the file stays safe to commit.
+// runLocalConnect writes only what a repository ships, never where or with which key, so
+// it needs no project, sign-in or network and the file stays safe to commit.
 func (app *App) runLocalConnect(cmd *cobra.Command, name string, f connectFlags) error {
 	global, err := app.agents.Harness(name)
 	if err != nil {
@@ -216,9 +195,7 @@ func (app *App) runLocalConnect(cmd *cobra.Command, name string, f connectFlags)
 	}
 
 	intended := harness.Exporter{
-		// The endpoint is the global connect's and is not written here. It is carried
-		// so a per-signal redirect in an outranking file is judged against where the
-		// export actually goes.
+		// Carried, never written: an outranking per-signal redirect is judged against it.
 		Endpoint:           cfg.OTLPURL,
 		Signals:            signals,
 		IncludePrompts:     !f.excludePrompts,
@@ -262,9 +239,8 @@ func (app *App) runLocalConnect(cmd *cobra.Command, name string, f connectFlags)
 	return nil
 }
 
-// printLocalConnectPlan is printConnectPlan for a repository layer: no project, no
-// key, and the global connect it sits on named — a policy with nothing under it ships
-// nothing, and the reader should learn that here, not from an empty dashboard.
+// printLocalConnectPlan names the global connect under the policy: with nothing under it
+// the policy ships nothing, and the reader should learn that here.
 func printLocalConnectPlan(
 	out io.Writer,
 	global harness.Harness,
@@ -290,7 +266,6 @@ func printLocalConnectPlan(
 	fmt.Fprintln(out)
 }
 
-// printDetection is the first line of every connect plan.
 func printDetection(out io.Writer, h harness.Harness, detection harness.Detection) {
 	if detection.Found {
 		version := detection.Version
@@ -300,12 +275,10 @@ func printDetection(out io.Writer, h harness.Harness, detection harness.Detectio
 		fmt.Fprintf(out, "%s found: %s\n", h.DisplayName(), version)
 		return
 	}
-	// Not an error: the config is read whenever it is eventually started.
+	// Not an error: the config is read whenever the agent is eventually started.
 	fmt.Fprintf(out, "%s not found on PATH — the configuration will still be written.\n", h.DisplayName())
 }
 
-// printDataPlan lists what will be sent. The content lines are always printed,
-// including when they are off — "off" is the answer to the question a reader has.
 func printDataPlan(out io.Writer, signals []harness.Signal, prompts, toolContent bool) {
 	fmt.Fprintln(out, "\n  Signals:")
 	for _, s := range harness.AllSignals {
@@ -320,7 +293,6 @@ func printDataPlan(out io.Writer, signals []harness.Signal, prompts, toolContent
 	fmt.Fprintf(out, "    Tool content: %s\n", onOff(toolContent))
 }
 
-// scopeSuffix qualifies a "nothing to do" for the layer it was about.
 func scopeSuffix(scope harness.Scope) string {
 	if scope == harness.ScopeLocal {
 		return " in this repository"
@@ -328,10 +300,6 @@ func scopeSuffix(scope harness.Scope) string {
 	return ""
 }
 
-// localLayerStatus is the status row for a repository's local layer — present when the
-// repository at root has one for h. The global row says whether anything is exported
-// at all; this row says what this repository narrows it to, and whether that is in
-// effect or waiting on a global connect.
 func localLayerStatus(h harness.Harness, root string, global telemetryStatus) (telemetryStatus, bool) {
 	scoped, ok := h.(harness.Scoped)
 	if !ok || root == "" {
@@ -365,7 +333,6 @@ func statusRow(name string, e telemetryStatus) []string {
 	return []string{name, e.Installed, e.State, e.Signals, e.Prompts, e.ToolContent}
 }
 
-// describeShipment is a local layer in one clause, for `terma status`.
 func describeShipment(st harness.Status) string {
 	signals := "nothing"
 	if len(st.Signals) > 0 {
@@ -374,13 +341,8 @@ func describeShipment(st harness.Status) string {
 	return fmt.Sprintf("%s; prompts %s; tool content %s", signals, onOff(st.IncludePrompts), onOff(st.IncludeToolContent))
 }
 
-// writeRepoPolicy writes each harness's repository-scope export policy: what this
-// repository's sessions ship. No endpoint, no key, no identity — those belong to the
-// developer's own settings, which is what keeps this file safe to commit.
-//
-// A conflict here is reported and skipped rather than fatal: the hooks and the binding
-// are already written by this point, and failing the whole install over one harness's
-// pre-existing OTLP settings would leave the repository half-onboarded for no gain.
+// writeRepoPolicy skips a conflict rather than failing: the hooks and binding are already
+// written, and failing would leave the repository half-onboarded.
 func writeRepoPolicy(
 	ctx context.Context,
 	ui *installUI,
@@ -408,8 +370,7 @@ func writeRepoPolicy(
 			continue
 		}
 		intended := harness.Exporter{
-			// Carried, never written: an outranking per-signal redirect has to be
-			// judged against where the export actually goes.
+			// Carried, never written: an outranking per-signal redirect is judged against it.
 			Endpoint:           cfg.OTLPURL,
 			Signals:            signals,
 			IncludePrompts:     !f.excludePrompts,
@@ -458,7 +419,6 @@ func writeRepoPolicy(
 	return written, nil
 }
 
-// conflictKeys names the settings in the way a reader can go and find them.
 func conflictKeys(conflicts []harness.Conflict) []string {
 	out := make([]string, 0, len(conflicts))
 	for _, c := range conflicts {

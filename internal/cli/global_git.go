@@ -11,29 +11,16 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 )
 
-// Global mode's commit stamping. A commit is stamped by prepare-commit-msg and recorded
-// by post-commit; per repository that is a committed hook line or the shims `terma
-// install` points one clone at. In global mode every repository counts, so `terma
-// setup` points git itself at terma's hooks: `git config --global core.hooksPath` names
-// a directory terma writes (config dir, git-hooks/).
-//
-// A global core.hooksPath replaces each repository's own .git/hooks for every hook name,
-// so that directory holds a script for each one: the two terma uses call terma first,
-// and every one then runs the repository's own hook of that name — or, when the
-// developer had a global hooks directory of their own, that one's, which is what git ran
-// before. A repository that sets core.hooksPath itself (husky, lefthook, `terma
-// install`'s shims) is unaffected: its local setting outranks the global one, and those
-// repositories' committed lines are what stamp them.
+// In global mode `terma setup` points git's global core.hooksPath at terma's hooks. That
+// replaces every repository's .git/hooks for every hook name, so each name gets a script
+// that chains to the hook git ran before; a local core.hooksPath still outranks it.
 
 const (
 	globalGitHooksDir = "git-hooks"
-	// globalGitPrevious records the global core.hooksPath terma replaced ("" for none),
-	// restored when global mode ends.
+	// globalGitPrevious records the global core.hooksPath terma replaced, to restore it.
 	globalGitPrevious = ".previous-hooks-path"
 )
 
-// gitHookNames are the client-side hooks git runs; each gets a script, so none of a
-// repository's own stops running under the global hooks path.
 var gitHookNames = []string{
 	"applypatch-msg", "pre-applypatch", "post-applypatch", "pre-commit", "pre-merge-commit",
 	"prepare-commit-msg", "commit-msg", "post-commit", "pre-rebase", "post-checkout",
@@ -41,7 +28,6 @@ var gitHookNames = []string{
 	"fsmonitor-watchman", "reference-transaction", "post-index-change", "push-to-checkout",
 }
 
-// termaGitHooks are the hooks terma itself runs.
 var termaGitHooks = map[string]bool{"prepare-commit-msg": true, "post-commit": true}
 
 func globalGitHooksPath() (string, error) {
@@ -54,8 +40,7 @@ func globalGitHooksPath() (string, error) {
 
 func shellQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }
 
-// globalGitHookScript is one hook's script: terma (for the two it uses; a terma that is
-// gone, or fails, never blocks git), then the hook git would have run without terma.
+// globalGitHookScript never lets a missing or failing terma block git.
 func globalGitHookScript(hook, terma, previous string) string {
 	var b strings.Builder
 	b.WriteString("#!/bin/sh\n# Written by `terma setup` for global mode (git config --global core.hooksPath).\n")
@@ -64,20 +49,16 @@ func globalGitHookScript(hook, terma, previous string) string {
 		fmt.Fprintf(&b, "[ -x %[1]s ] && %[1]s hook %[2]s \"$@\" || true\n", shellQuote(terma), hook)
 	}
 	if previous != "" {
-		// The developer's own global hooks directory, which git ran before terma's.
 		fmt.Fprintf(&b, "chained=%s/%s\n", shellQuote(previous), hook)
 	} else {
-		// The repository's own hooks directory (git runs hooks from the worktree root;
-		// a linked worktree asks git for the common directory).
+		// Git runs hooks from the worktree root; a linked worktree asks for the common dir.
 		fmt.Fprintf(&b, "if [ -d \"${GIT_DIR:-.git}/hooks\" ]; then chained=\"${GIT_DIR:-.git}/hooks/%[1]s\"; else chained=\"$(git rev-parse --git-common-dir 2>/dev/null)/hooks/%[1]s\"; fi\n", hook)
 	}
 	b.WriteString("if [ -x \"$chained\" ] && ! [ \"$chained\" -ef \"$0\" ]; then exec \"$chained\" \"$@\"; fi\nexit 0\n")
 	return b.String()
 }
 
-// applyGlobalGitHooks points git's global core.hooksPath at terma's hooks (install),
-// remembering what it replaces, or puts back what was there (not install). It reports
-// whether it changed git's configuration.
+// applyGlobalGitHooks reports whether it changed git's configuration.
 func (app *App) applyGlobalGitHooks(ctx context.Context, install bool) (bool, error) {
 	dir, err := globalGitHooksPath()
 	if err != nil {
@@ -132,7 +113,6 @@ func (app *App) applyGlobalGitHooks(ctx context.Context, install bool) (bool, er
 	return true, nil
 }
 
-// sameDir reports whether a and b name the same directory.
 func sameDir(a, b string) bool {
 	a, b = expandHome(a), expandHome(b)
 	if filepath.Clean(a) == filepath.Clean(b) {

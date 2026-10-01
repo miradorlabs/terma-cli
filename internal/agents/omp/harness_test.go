@@ -10,8 +10,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-// ompIn sandboxes omp's agent directory (OMP_DIR) and Terma's own, so a connect here
-// writes a throwaway hooks directory and helper.
+// ompIn sandboxes omp's agent directory (OMP_DIR) and terma's own.
 func ompIn(t *testing.T) (exporter, string) {
 	t.Helper()
 	dir := t.TempDir()
@@ -34,8 +33,8 @@ func ompExporter(t *testing.T, h exporter, helper bool) harness.Exporter {
 	return e
 }
 
-// The embedded extension and the Go side share one line: the config placeholder. If
-// either drifts, every connect would install an inert extension.
+// The embedded extension has exactly one config placeholder, or every connect installs
+// an inert extension.
 func TestOmpTemplateHasOneConfigLineAndOneExport(t *testing.T) {
 	if n := strings.Count(ompExtensionSource, ompConfigPlaceholder); n != 1 {
 		t.Fatalf("placeholder appears %d times, want 1", n)
@@ -99,7 +98,7 @@ func TestOmpConnectWritesExtensionAndHelper(t *testing.T) {
 	if harness.KeyFromHelper(e.HelperPath) != e.APIKey {
 		t.Fatal("helper does not hold the key")
 	}
-	// The user's own config was never touched, or created.
+	// The user's own config was never touched.
 	if _, err := os.Stat(filepath.Join(filepath.Dir(filepath.Dir(path)), "config.yml")); err == nil {
 		t.Fatal("connect wrote config.yml")
 	}
@@ -146,8 +145,8 @@ func TestOmpStatusRoundTrip(t *testing.T) {
 	}
 }
 
-// A foreign hook file — one without a Terma config line — reads as existing but not
-// managed, and disconnect must not touch it.
+// A hook file without terma's config line exists but is not managed, and disconnect
+// leaves it.
 func TestOmpForeignExtensionIsNotOurs(t *testing.T) {
 	h, path := ompIn(t)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -211,18 +210,15 @@ func TestOmpDisconnectRemovesExtensionAndHelper(t *testing.T) {
 	if _, err := os.Stat(e.HelperPath); err == nil {
 		t.Error("helper still present — the credential must go with the extension")
 	}
-	// Disconnecting again is a noop, not an error.
 	result, err = h.Disconnect()
 	if err != nil || result.Removed != 0 {
 		t.Fatalf("second disconnect = %+v, %v", result, err)
 	}
 }
 
-// A helper that is not Terma's own — user-written, outside Terma's helpers
-// directory — is not a credential Terma manages and is left alone.
+// A helper outside terma's helpers directory is the user's and is left alone.
 func TestOmpDisconnectLeavesForeignHelper(t *testing.T) {
 	h, path := ompIn(t)
-	// Hand-write an extension pointing at a helper path Terma would never write.
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -246,8 +242,7 @@ func TestOmpDisconnectLeavesForeignHelper(t *testing.T) {
 	}
 }
 
-// The repository-scope file carries the policy and nothing else: no endpoint, no key,
-// no identity, so it is safe to commit.
+// The repository-scope file carries the policy and no endpoint, key or identity.
 func TestOmpLocalPolicyCarriesNoCredential(t *testing.T) {
 	root := t.TempDir()
 	local := exporter{root: root}
@@ -307,12 +302,10 @@ func TestOmpConnectPerRepo(t *testing.T) {
 	if _, present := cfg.ResourceAttributes[harness.AttrProjectID]; present {
 		t.Error("a per-repo extension must not pin a project id")
 	}
-	// Content capture is off in the shared floor: one repository's choice must not
-	// turn it on for every other repository that has no policy of its own.
+	// One repository's content choice must not ride in the shared extension.
 	if cfg.IncludePrompts || cfg.IncludeToolContent {
 		t.Errorf("per-repo extension must not carry content capture: %+v", cfg)
 	}
-	// The project's helper holds the key.
 	helper, err := harness.HelperFilePath(h, e.ProjectID)
 	if err != nil {
 		t.Fatal(err)
@@ -338,7 +331,6 @@ func TestOmpConflicts(t *testing.T) {
 		t.Errorf("endpoint conflict = %+v", conflicts)
 	}
 
-	// The same value is no conflict.
 	t.Setenv(harness.EnvOTLPEndpoint, e.Endpoint)
 	if conflicts, _ := (exporter{}).ConflictsWith(e); len(conflicts) != 0 {
 		t.Errorf("same endpoint should not conflict: %+v", conflicts)

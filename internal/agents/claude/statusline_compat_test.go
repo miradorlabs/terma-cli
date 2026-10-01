@@ -12,8 +12,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 )
 
-// These are terminal byte streams, not strings to sanitize or reflow. Prefixing
-// must not split ANSI/OSC sequences, normalize newlines, or drop trailing resets.
+// Prefixing must not split ANSI/OSC sequences, normalize newlines or drop trailing resets.
 func TestStatusLineExoticOutputPreserved(t *testing.T) {
 	cases := map[string][]byte{
 		"empty":               {},

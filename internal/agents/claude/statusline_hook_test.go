@@ -22,8 +22,7 @@ func statusEnv(t *testing.T, stdin string) (hookrun.Env, *bytes.Buffer, *spool.S
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	sp, _ := spool.Open(t.TempDir())
 	var out bytes.Buffer
-	// Resolve symlinks so Cwd matches what a renderer's own `pwd` reports: on macOS
-	// t.TempDir() is under /var, a symlink to /private/var, and `pwd` returns the latter.
+	// On macOS t.TempDir() is under the /var symlink, and a renderer's `pwd` reports /private/var.
 	cwd := t.TempDir()
 	if resolved, err := filepath.EvalSymlinks(cwd); err == nil {
 		cwd = resolved
@@ -32,7 +31,6 @@ func statusEnv(t *testing.T, stdin string) (hookrun.Env, *bytes.Buffer, *spool.S
 }
 
 func TestStatusLinePassesBytesThroughUnchanged(t *testing.T) {
-	// ANSI, a multi-line payload and no trailing newline: what goes in comes out.
 	in := "\x1b[32mgreen\x1b[0m\nline two\n{\"not\":\"json\""
 	env, out, _ := statusEnv(t, in)
 	code := statusLine(context.Background(), env, statusLineOptions{Renderer: "cat"})
@@ -55,7 +53,6 @@ func TestStatusLineReturnsRendererExitStatusAndStderr(t *testing.T) {
 }
 
 func TestStatusLineRendererKeepsOptionsOfItsOwn(t *testing.T) {
-	// The renderer sees the same environment and directory the hook got.
 	env, out, _ := statusEnv(t, quotaPayload)
 	t.Setenv("COLUMNS", "123")
 	code := statusLine(context.Background(), env, statusLineOptions{Renderer: `printf "%s %s" "$COLUMNS" "$(pwd)"`})
@@ -74,7 +71,6 @@ func TestStatusLineSurvivesARendererThatIgnoresStdinAndAnOversizedPayload(t *tes
 	if evs := hookruntest.Spooled(t, sp); len(evs) != 0 {
 		t.Fatalf("oversized input must not be captured: %d events", len(evs))
 	}
-	// And every byte still reaches a renderer that does read it.
 	env, out, _ = statusEnv(t, big)
 	statusLine(context.Background(), env, statusLineOptions{Renderer: "wc -c | tr -d ' '"})
 	if strings.TrimSpace(out.String()) != "1052672" {
@@ -113,7 +109,6 @@ func TestStatusLineCapturesQuotaOncePerChange(t *testing.T) {
 		t.Fatalf("a changed window must spool again: %+v", evs)
 	}
 
-	// The heartbeat re-sends an unchanged snapshot after ten minutes.
 	env.Now = env.Now.Add(hookrun.QuotaHeartbeat + time.Second)
 	env.Stdin = strings.NewReader(changed)
 	statusLine(context.Background(), env, statusLineOptions{CaptureOnly: true})
@@ -132,7 +127,6 @@ func TestStatusLineWithoutWindowsCapturesNothingButStillRenders(t *testing.T) {
 	if evs := hookruntest.Spooled(t, sp); len(evs) != 0 {
 		t.Fatalf("no windows and no fast flag must spool nothing: %+v", evs)
 	}
-	// Malformed JSON: rendered, not captured, exit 0.
 	env, out, sp = statusEnv(t, "{oops")
 	if code := statusLine(context.Background(), env, statusLineOptions{Renderer: "cat"}); code != 0 || out.String() != "{oops" {
 		t.Fatalf("code %d out %q", code, out.String())
@@ -150,13 +144,11 @@ func TestStatusLineIndicatorPrefixesTheFirstLineOnly(t *testing.T) {
 	if got := out.String(); got != "t "+in {
 		t.Fatalf("indicator output %q", got)
 	}
-	// A renderer that intentionally hides itself must stay hidden.
 	env, out, _ = statusEnv(t, in)
 	statusLine(context.Background(), env, statusLineOptions{Renderer: "true", Indicator: true})
 	if out.String() != "" {
 		t.Fatalf("empty rendering %q", out.String())
 	}
-	// With colour on, the mark carries the brand escape and a reset.
 	t.Setenv("NO_COLOR", "")
 	t.Setenv("COLORTERM", "truecolor")
 	env, out, _ = statusEnv(t, quotaPayload)
@@ -164,7 +156,6 @@ func TestStatusLineIndicatorPrefixesTheFirstLineOnly(t *testing.T) {
 	if got := out.String(); got != "\x1b[38;2;167;139;250mt\x1b[0m custom" {
 		t.Fatalf("coloured mark %q", got)
 	}
-	// The renderer's exit status still comes through with the indicator on.
 	env, _, _ = statusEnv(t, quotaPayload)
 	if code := statusLine(context.Background(), env, statusLineOptions{Renderer: "exit 4", Indicator: true}); code != 4 {
 		t.Fatalf("exit %d", code)
@@ -271,7 +262,7 @@ func TestClaudeQuotaSequenceAndUnavailableTransition(t *testing.T) {
 	if captureQuota(env, &p) {
 		t.Fatal("duplicate redraw captured")
 	}
-	// Preserve two changes during one prompt, even with identical observation times.
+	// Two changes within one prompt are both kept, even with identical observation times.
 	w := p.RateLimits["five_hour"]
 	pct := 100.0
 	w.UsedPercentage = &pct
@@ -333,9 +324,7 @@ func TestClaudeQuotaCarriesAccountIDAndSchemaV2(t *testing.T) {
 	}
 }
 
-// The quota record names the organization the account is signed in to, read from the
-// real ~/.claude.json oauthAccount shape: a Team seat is funded by the organization,
-// not the account, so the backend keys the funding facility on both.
+// The quota record names the organization: a Team seat is funded by it, not the account.
 func TestClaudeQuotaCarriesOrganizationID(t *testing.T) {
 	env, _, sp := statusEnv(t, quotaPayload)
 	claudeConfigDir(t, "unused")
@@ -353,8 +342,7 @@ func TestClaudeQuotaCarriesOrganizationID(t *testing.T) {
 	}
 }
 
-// An env API key, auth token or cloud provider outranks the cached OAuth login,
-// so neither the OAuth accountUuid nor its organization is stamped as the funding owner.
+// Under an override credential neither the OAuth account nor its organization is stamped.
 func TestClaudeQuotaOmitsAccountIDUnderOverrideCredential(t *testing.T) {
 	for _, override := range []string{"ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY"} {
 		t.Run(override, func(t *testing.T) {
@@ -382,8 +370,7 @@ func TestClaudeQuotaOmitsAccountIDUnderOverrideCredential(t *testing.T) {
 	}
 }
 
-// A mid-session account switch with an otherwise-identical quota payload must
-// emit a fresh observation, so the latest record names the new account.
+// An account switch with an otherwise identical payload emits a fresh observation.
 func TestClaudeQuotaAccountSwitchEmitsNewObservation(t *testing.T) {
 	env, _, sp := statusEnv(t, quotaPayload)
 	claudeConfigDir(t, "account-1")
@@ -409,9 +396,7 @@ func TestClaudeQuotaAccountSwitchEmitsNewObservation(t *testing.T) {
 	}
 }
 
-// Switching organization keeps the account id (Team to personal on one login), so an
-// otherwise-identical quota payload must still emit a fresh observation naming the new
-// organization.
+// An organization switch keeps the account id and still emits a fresh observation.
 func TestClaudeQuotaOrganizationSwitchEmitsNewObservation(t *testing.T) {
 	env, _, sp := statusEnv(t, quotaPayload)
 	claudeConfigDir(t, "unused")

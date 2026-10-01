@@ -15,11 +15,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// relaySetUp writes the token `terma relay setup` leaves, which is what makes hooks
-// claim sessions at all.
-// Any hook of a session in a bound repository claims it for the relay — Claude's and
-// Codex's alike, and not only their session starts — and reports the claim so the
-// caller can start the relay.
+// Any hook of a session in a bound repository, not only its start, claims it for the
+// relay and reports the claim so the caller can start the relay.
 func TestHooksClaimSessionsForTheRelay(t *testing.T) {
 	root := initRepo(t)
 	hookruntest.RelayOn(t)
@@ -35,7 +32,7 @@ func TestHooksClaimSessionsForTheRelay(t *testing.T) {
 	if err := startSession(context.Background(), env(`{"session_id":"`+claude+`","cwd":"`+root+`","model":"m"}`)); err != nil {
 		t.Fatal(err)
 	}
-	// A Codex session whose first hook is a tool call still claims.
+	// A session whose first hook is a tool call still claims.
 	if err := editFile(context.Background(), env(`{"session_id":"`+codex+`","cwd":"`+root+`","tool_name":"shell","tool_input":{"command":"ls"}}`)); err != nil {
 		t.Fatal(err)
 	}

@@ -7,8 +7,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 )
 
-// Each check is reported the moment it finishes, in order, so the command can print
-// it then rather than after the slow round-trip at the end.
+// Each check is reported in order the moment it finishes, not after the slow round-trip.
 func TestDoctorReportsEachCheckAsItFinishes(t *testing.T) {
 	userSandbox(t)
 	var started, finished []string

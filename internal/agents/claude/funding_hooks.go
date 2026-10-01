@@ -13,11 +13,8 @@ func captureClaudeAccount(e hookrun.Env, r *hookrun.Repo, in *claudeHookInput) {
 	e.CaptureFunding(r, in.SessionID, claudeTool, hookrun.EventSessionAccount, readFunding(r.Root))
 }
 
-// stopFailure is notification-only. Capture the documented category, never
-// error_details or last_assistant_message (either can contain private text). What Codex
-// said is captured elsewhere, from the rollout and under the prompt-export consent
-// (captureCodexReplies) — never from a hook payload, and never as funding evidence.
-// https://code.claude.com/docs/en/hooks#stopfailure
+// stopFailure spools the documented error category, never error_details or
+// last_assistant_message: either can hold private text.
 func stopFailure(ctx context.Context, env hookrun.Env) error {
 	in, err := readClaudeInput(env.Stdin)
 	if err != nil || !session.ValidID(in.SessionID) {
@@ -28,9 +25,8 @@ func stopFailure(ctx context.Context, env hookrun.Env) error {
 	if err != nil {
 		return nil
 	}
-	// ~/.claude.json is read once: the same evidence is spooled as the account record and
-	// names the account the limit is reported against. The id is taken first because
-	// captureFunding stamps its own keys onto the evidence's map.
+	// ~/.claude.json is read once for both events; the id is taken first because CaptureFunding
+	// stamps its own keys onto the evidence's map.
 	evidence := readFunding(r.Root)
 	accountID, owned := oauthAccountID(evidence.Attrs)
 	env.CaptureFunding(r, in.SessionID, claudeTool, hookrun.EventSessionAccount, evidence)
@@ -52,25 +48,9 @@ func stopFailure(ctx context.Context, env hookrun.Env) error {
 	return nil
 }
 
-// claudeOAuthAccount returns the cached OAuth account id and the organization it
-// is signed in to, and true, only when OAuth is the proven effective credential.
-// The organization shares the account's gate because it is part of the same
-// login: Pro/Max plans belong to the account, Team/Enterprise seats and Console
-// billing to the organization, and one account can switch organizations without
-// changing id (anthropics/claude-code#89966). Claude Code's env API key, auth
-// token, cloud providers (Bedrock/Vertex/Foundry) and a VISIBLE externally
-// supplied CLAUDE_CODE_OAUTH_TOKEN (which may belong to a different account than
-// the cached profile) all outrank the stored OAuth login; and attribution
-// proceeds only when the apiKeyHelper state is a positive "not_found" (a
-// "configured" helper is a competing credential, and an "unknown" state — e.g.
-// a symlinked settings.json the Lstat evidence reader rejects — cannot rule one
-// out). Under any of those the cached accountUuid is not the proven funding
-// owner and attribution is withheld. When Claude strips CLAUDE_CODE_OAUTH_TOKEN
-// from the hook it is indistinguishable from an ordinary interactive login, so
-// the cached profile stands as best-effort evidence (never asserted as proof —
-// the backend treats account_id as evidence, not a settled payer). Reads
-// ~/.claude.json once via ClaudeFunding; a caller that already holds the evidence
-// uses oauthAccountID and does not read it again.
+// claudeOAuthAccount returns the cached OAuth account and organization only when OAuth is the
+// effective credential (oauthAccountIsEffective); the organization shares the gate because one
+// account can switch organizations without changing id. It is evidence, never a settled payer.
 func claudeOAuthAccount(root string) (accountID, orgID string, ok bool) {
 	attrs := readFunding(root).Attrs
 	if accountID, ok = oauthAccountID(attrs); !ok {
@@ -81,13 +61,7 @@ func claudeOAuthAccount(root string) (accountID, orgID string, ok bool) {
 }
 
 func oauthAccountID(attrs map[string]any) (string, bool) {
-	// One shared gate (OAuthAccountIsEffective) decides whether the cached OAuth
-	// login is the proven credential — an env API key/auth token, a cloud provider, a
-	// visible external OAuth token, or an apiKeyHelper that is not a positive "not_found"
-	// all withhold it ("configured" is a competing credential; "unknown" means we could
-	// not read the settings, e.g. a symlinked settings.json the Lstat-based evidence
-	// reader rejects, and so cannot rule one out). ClaudeFunding applies the same gate to
-	// the account email, so the id and email can never drift apart.
+	// The same gate withholds the email in readFunding, so the id and the email never drift apart.
 	if !oauthAccountIsEffective(attrs) {
 		return "", false
 	}

@@ -7,12 +7,12 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents/internal/relayexport"
 )
 
-// ConfigureRelay points Claude's own exporter at the local relay.
+// ConfigureRelay points Claude Code's own exporter at the local relay.
 func (Agent) ConfigureRelay(_ context.Context, cfg agents.RelayConfig) (agents.RelayResult, error) {
 	return relayexport.Native(exporter{}, cfg)
 }
 
-// RelayPointed reports whether Claude's exporter sends to the relay at addr.
+// RelayPointed reports whether Claude Code's exporter sends to the relay at addr.
 func (Agent) RelayPointed(addr string) (bool, bool) {
 	return relayexport.NativePointed(exporter{}, addr), true
 }

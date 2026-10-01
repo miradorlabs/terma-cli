@@ -101,9 +101,7 @@ release.`,
 	return cmd
 }
 
-// These bound the parts of an update: the release lookup and download, a package
-// manager (Homebrew updates its taps first, which can take minutes), and the new
-// binary's refresh.
+// Update phase bounds; a package manager may update its taps first, which takes minutes.
 const (
 	downloadTimeout = 2 * time.Minute
 	upgradeTimeout  = 15 * time.Minute
@@ -163,9 +161,8 @@ func (app *App) runUpdate(ctx context.Context, client *selfupdate.Client, dir, e
 	return nil
 }
 
-// upgradeManaged upgrades a package-managed installation with the package manager that
-// owns it, then has the upgraded binary finish the update. When that package manager
-// cannot be found, or it fails, the developer is given the command to run.
+// upgradeManaged runs the package manager that owns the installation, then the new
+// binary's refresh; without that manager the developer is given the command.
 func (app *App) upgradeManaged(ctx context.Context, m selfupdate.Manager, current, latest string, out io.Writer) error {
 	if m.Project != "" {
 		return fmt.Errorf("this terma is a dependency of the project in %s; run `%s` there", m.Project, m.Command)
@@ -183,9 +180,7 @@ func (app *App) upgradeManaged(ctx context.Context, m selfupdate.Manager, curren
 	return nil
 }
 
-// finishUpdate has the new binary refresh what earlier versions wrote. This process is
-// still the old version, so the refresh must run in the new one. The update itself has
-// succeeded either way; a refresh that fails says how to retry.
+// finishUpdate has the new binary run the refresh, since this process is still the old one.
 func (app *App) finishUpdate(ctx context.Context, terma string, out io.Writer) {
 	ctx, cancel := context.WithTimeout(ctx, refreshTimeout)
 	defer cancel()
@@ -195,9 +190,7 @@ func (app *App) finishUpdate(ctx context.Context, terma string, out io.Writer) {
 	}
 }
 
-// runUpdateStep runs one program of an update — a package manager, or the new terma
-// finishing it — attached to the terminal, so a password prompt or progress reaches the
-// developer.
+// runUpdateStep runs one update program attached to the terminal, so prompts reach the developer.
 func runUpdateStep(ctx context.Context, out io.Writer, argv ...string) error {
 	c := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	c.Stdin, c.Stdout, c.Stderr = os.Stdin, out, os.Stderr

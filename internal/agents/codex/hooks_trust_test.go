@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// codexHomeWith writes a user config.toml holding body and points CODEX_HOME at it.
 func codexHomeWith(t *testing.T, body string) {
 	t.Helper()
 	dir := t.TempDir()
@@ -19,8 +18,7 @@ func codexHomeWith(t *testing.T, body string) {
 }
 
 func TestCodexHookTrustUnreviewed(t *testing.T) {
-	// A fresh machine: Codex has never been shown this repository's hooks, so it runs
-	// none of them, and nothing in the config says so.
+	// A fresh machine: Codex has never been shown this repository's hooks.
 	codexHomeWith(t, "model = \"gpt-6\"\n")
 	trust, err := (Codex{}).CodexHookTrustFor("/repo/.codex/hooks.json")
 	if err != nil {
@@ -67,8 +65,7 @@ trusted_hash = "sha256:ddd"
 }
 
 func TestCodexHookTrustSeenButNotTrusted(t *testing.T) {
-	// Codex records an entry the moment it discovers a hook; without a hash it is
-	// still waiting for review and will not run.
+	// An entry recorded without a hash is still waiting for review and will not run.
 	codexHomeWith(t, `
 [hooks.state."/repo/.codex/hooks.json:session_start:0:0"]
 enabled = true
@@ -86,8 +83,7 @@ enabled = true
 }
 
 func TestCodexHookTrustWithoutAConfig(t *testing.T) {
-	// No config.toml at all is the ordinary state of a machine that has run Codex
-	// once and never configured it; it must read as "not trusted", not as an error.
+	// No config.toml at all reads as "not trusted", not as an error.
 	codexHomeWith(t, "")
 	trust, err := (Codex{}).CodexHookTrustFor("/repo/.codex/hooks.json")
 	if err != nil {

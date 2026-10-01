@@ -15,12 +15,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
-// Hermes (Nous Research) has no OpenTelemetry export terma can use, and its shell hooks
-// are user-level only and do not fire in its TUI. terma's plugin (hermes/__init__.py,
-// written into $HERMES_HOME/plugins/terma/) is its exporter and calls `terma hook
-// hermes-*` for its session lifecycle, prompts and file edits. For now it is written by
-// `terma relay setup --harness hermes` only, pointed at the local relay, which decides
-// per session and project what leaves the machine.
+// Hermes has no usable OpenTelemetry export and its shell hooks do not fire in its TUI,
+// so terma's plugin is its exporter and calls `terma hook hermes-*`.
 
 //go:embed plugin/__init__.py
 var hermesPluginTemplate string
@@ -28,10 +24,8 @@ var hermesPluginTemplate string
 //go:embed plugin/plugin.yaml
 var hermesPluginManifest string
 
-// hermesConfigMarker is the line of the template the machine's configuration replaces.
 const hermesConfigMarker = "CONFIG_JSON = None  # terma:config"
 
-// pluginConfig is what the plugin is spliced with.
 type pluginConfig struct {
 	Version            int               `json:"version"`
 	Endpoint           string            `json:"endpoint"`
@@ -53,7 +47,6 @@ func home() (string, error) {
 	return filepath.Join(home, ".hermes"), nil
 }
 
-// pluginDir is where terma's plugin lives.
 func pluginDir() (string, error) {
 	home, err := home()
 	if err != nil {
@@ -62,8 +55,7 @@ func pluginDir() (string, error) {
 	return filepath.Join(home, "plugins", "terma"), nil
 }
 
-// renderPlugin splices cfg into the plugin template. The configuration travels as
-// a JSON string literal: Go's quoting of it is a valid Python string literal too.
+// renderPlugin splices cfg in as a JSON string literal: Go's quoting of it is valid Python too.
 func renderPlugin(cfg pluginConfig) (string, error) {
 	cfg.Version = 1
 	if len(cfg.HookCommand) == 0 {
@@ -79,9 +71,8 @@ func renderPlugin(cfg pluginConfig) (string, error) {
 	return strings.Replace(hermesPluginTemplate, hermesConfigMarker, "CONFIG_JSON = "+strconv.Quote(string(data))+"  # terma:config", 1), nil
 }
 
-// writePlugin writes terma's plugin, configured by cfg, into Hermes's plugin
-// directory and returns the directory. The plugin holds the relay's local token, so it
-// is private to this user.
+// writePlugin writes terma's plugin and returns its directory, private to this user
+// since it holds the relay's token.
 func writePlugin(cfg pluginConfig) (string, error) {
 	dir, err := pluginDir()
 	if err != nil {
@@ -100,10 +91,8 @@ func writePlugin(cfg pluginConfig) (string, error) {
 	return dir, config.WriteFileAtomic(filepath.Join(dir, "__init__.py"), []byte(text), 0o600)
 }
 
-// enablePlugin turns the plugin on the way Hermes's own settings do: plugins are
-// opt-in (plugins.enabled in config.yaml), and `hermes plugins enable` is the supported
-// writer of that file. stdin is closed, so the tool-override question it asks is
-// declined: the plugin overrides no tool.
+// enablePlugin runs `hermes plugins enable`, the supported writer of plugins.enabled;
+// stdin is closed, which declines its tool-override question (the plugin overrides none).
 func enablePlugin(ctx context.Context) error {
 	bin, err := exec.LookPath("hermes")
 	if err != nil {

@@ -13,23 +13,14 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-// agy has no configurable OTLP exporter (its one telemetry switch reports to Google), so
-// everything terma learns about an agy session arrives through the repository hooks.
-// What is here is the part that has to know agy's file layout: where it is installed,
-// and where it records which workspaces the developer trusted, since a workspace's
-// hooks.json loads only for a trusted workspace and is silently skipped otherwise.
-
 var agyVersionRE = regexp.MustCompile(`\d+\.\d+(\.\d+)?`)
 
-// detect looks for the agy binary and its version.
 func detect(ctx context.Context) harness.Detection {
 	return harness.DetectBinary(ctx, "agy", agyVersionRE)
 }
 
-// settingsPath is agy's own settings file, ~/.gemini/antigravity-cli/settings.json. It is
-// agy's, never terma's to write: it holds the trust decisions this package only reads.
-// The parent directory is shared with Gemini CLI, whose settings.json one level up is a
-// different file with different keys.
+// settingsPath is agy's own settings file, which terma only reads; the settings.json one
+// level up belongs to another tool.
 func settingsPath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -38,10 +29,8 @@ func settingsPath() (string, error) {
 	return filepath.Join(home, ".gemini", "antigravity-cli", "settings.json"), nil
 }
 
-// trustsWorkspace reports whether the developer has trusted root as an Antigravity
-// workspace. agy records the answer under `trustedWorkspaces` in its settings when the
-// developer accepts the trust prompt on opening a folder; a missing file or list means
-// nothing has been trusted, which is what a fresh machine looks like and not an error.
+// trustsWorkspace reports whether root is in agy's `trustedWorkspaces`; a missing file or
+// list is a fresh machine, not an error.
 func trustsWorkspace(root string) (bool, error) {
 	path, err := settingsPath()
 	if err != nil {
@@ -60,8 +49,7 @@ func trustsWorkspace(root string) (bool, error) {
 	if err := json.Unmarshal(data, &settings); err != nil {
 		return false, err
 	}
-	// agy records the path the developer opened. Compare the cleaned literal and the
-	// resolved one: a repository reached through a symlink must not read as untrusted.
+	// agy records the path opened: a repository reached through a symlink is still trusted.
 	want := []string{filepath.Clean(root)}
 	if resolved, err := filepath.EvalSymlinks(root); err == nil && resolved != want[0] {
 		want = append(want, resolved)

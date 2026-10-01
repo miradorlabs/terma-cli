@@ -11,9 +11,7 @@ import (
 	"time"
 )
 
-// supervisedChild is the relay a supervisor test runs: this test binary, re-run into
-// TestSupervisedChild, which exits at once (0 for "done", 75 asking to be restarted
-// for "fail") or waits to be stopped.
+// supervisedChild re-runs this test binary into TestSupervisedChild as the supervised relay.
 func supervisedChild(mode string) *exec.Cmd {
 	c := exec.Command(os.Args[0], "-test.run=^TestSupervisedChild$")
 	c.Env = append(os.Environ(), "TERMA_SUPERVISED_CHILD="+mode)
@@ -37,8 +35,7 @@ func testSupervisor() Supervisor {
 		Healthy: time.Hour, Poll: 5 * time.Millisecond}
 }
 
-// The stop file (how stopRelay reaches a relay on Windows) stops the relay it names, and
-// a stale one naming another pid is cleared without stopping anyone.
+// The stop file stops the relay it names; a stale one naming another pid is cleared.
 func TestStopFileStopsOnlyTheRelayItNames(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, StopFile)
@@ -55,8 +52,7 @@ func TestStopFileStopsOnlyTheRelayItNames(t *testing.T) {
 	}
 }
 
-// A relay that exits asking to be restarted is started again, for as long as the
-// service is installed.
+// A relay that exits asking to be restarted is started again while the service is installed.
 func TestSuperviseRestartsTheRelayUntilRemoved(t *testing.T) {
 	var starts atomic.Int32
 	sv := testSupervisor()
@@ -74,8 +70,7 @@ func TestSuperviseRestartsTheRelayUntilRemoved(t *testing.T) {
 	}
 }
 
-// A relay that exits 0 is done for good (its token is gone): it is not started again,
-// and the supervisor ends with it.
+// A relay that exits 0 is not started again, and the supervisor ends with it.
 func TestSuperviseEndsWithARelayDoneForGood(t *testing.T) {
 	var starts atomic.Int32
 	sv := testSupervisor()

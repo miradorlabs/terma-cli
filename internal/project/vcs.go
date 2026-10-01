@@ -6,9 +6,8 @@ import (
 	"strings"
 )
 
-// UnsupportedVCS recognizes metadata directories in the nearest non-Git
-// repository enclosing dir. This is only a warning heuristic: it never executes
-// another VCS or changes workspace root selection.
+// UnsupportedVCS names the non-Git version control in the nearest enclosing directory
+// that has one, for a warning only.
 func UnsupportedVCS(dir string) string {
 	dir, err := filepath.Abs(dir)
 	if err != nil {

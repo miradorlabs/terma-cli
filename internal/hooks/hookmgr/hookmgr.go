@@ -1,14 +1,6 @@
-// Package hookmgr installs the git hooks that stamp commits, through whichever hook
-// manager the repository already uses.
-//
-// Hooks are thin shims: each one shells out to `terma hook <event>` and exits.
-// All logic lives in the binary, so the committed wiring never changes when terma
-// updates, and every shim carries the two guardrails — `|| true` so a terma failure
-// never blocks a commit, and a `command -v` guard so a clone without terma on PATH
-// commits normally.
-//
-// The install is repo-scoped and meant to land as one PR: a plan of file changes
-// is produced first (so it can be shown, or dry-run), then applied atomically.
+// Package hookmgr plans and applies the committed hook wiring, through whichever git hook
+// manager the repository already uses. Every hook is a guarded shim that calls
+// `terma hook <event>` and never fails, so all logic stays in the binary.
 package hookmgr
 
 import (
@@ -26,42 +18,27 @@ import (
 // Manager is the hook manager a repository uses.
 type Manager string
 
-// The hook managers terma installs through. A repository that already uses one keeps
-// using it: terma adds its two hooks in that manager's own file, in the form its users
-// keep it in, rather than taking over core.hooksPath from it.
+// The hook managers terma installs through, in the manager's own file rather than taking over core.hooksPath.
 const (
 	Husky     Manager = "husky"
 	Lefthook  Manager = "lefthook"
 	PreCommit Manager = "pre-commit"
-	// GitShim is the fallback: committed shim scripts under .terma/hooks that git
-	// runs via core.hooksPath, chaining any pre-existing hook of the same name.
+	// GitShim is the fallback: shims under .terma/hooks via core.hooksPath, chaining any existing hook.
 	GitShim Manager = "git"
 )
 
-// GitHooks are the git hooks terma installs. prepare-commit-msg stamps trailers;
-// post-commit records the resulting sha and clears consumed manifests.
+// GitHooks are the git hooks terma installs.
 var GitHooks = []string{"prepare-commit-msg", "post-commit"}
 
 // ShimDir is where the fallback shims live, relative to the repo root.
 const ShimDir = ".terma/hooks"
 
-// Marker identifies lines and entries terma wrote, so install is idempotent and
-// uninstall removes only its own.
+// Marker identifies lines terma wrote, so uninstall removes only its own.
 const Marker = "terma hook"
 
-// HookCommand is the command every harness hook entry runs: the binary, behind the
-// guard the git hook lines carry. A committed hooks file runs on every colleague's
-// machine, and a colleague without terma must not be able to tell. Claude Code runs the
-// command with `sh -c`, prints a hook's stderr in the transcript when it exits non-zero
-// and, for SessionStart and PostToolUse, hands that stderr to the model as context — so
-// an unguarded `terma hook` meant "command not found" after every edit, read by the
-// model. Cursor and Codex run the command the same way (a shell string, JSON on stdin)
-// and fail open. The guard writes nothing to either stream: SessionStart's stdout
-// becomes context too.
-//
-// Changing this string changes every committed hooks file on its next `terma install`
-// (terma rewrites its own entries in place) and, for Codex, the hash each developer
-// trusted, so they trust the hooks once more; `terma doctor` says so.
+// HookCommand is the guarded command every committed agent hook entry runs; it prints
+// nothing without terma, since an agent may hand a hook's output to the model. Changing
+// it changes every committed hooks file and any hash-keyed trust a developer granted.
 func HookCommand(event string) string {
 	return "command -v terma >/dev/null 2>&1 && terma hook " + event + " || true"
 }
@@ -76,11 +53,8 @@ func HookEventOf(command string) string {
 	return event
 }
 
-// UserHookCommand is the command a machine-wide (global mode) hook entry runs: terma by
-// its absolute path — an agent a desktop app started has the system PATH, and nothing
-// here is committed for another machine — with --user, which tells the hook that a
-// repository whose own committed hooks run handles the event itself. A terma that is
-// gone does nothing.
+// UserHookCommand is the command a machine-wide hook entry runs: terma by absolute path,
+// since a desktop-started agent has the system PATH, with --user.
 func UserHookCommand(terma string) func(event string) string {
 	q := "'" + strings.ReplaceAll(terma, "'", `'\''`) + "'"
 	return func(event string) string {
@@ -95,9 +69,8 @@ type Detection struct {
 	Detail     string
 }
 
-// Detect picks the hook manager from what is already in the repository.
-// Preference order matters only when several are present, which is rare; the one
-// with a config file committed wins over one merely listed in package.json.
+// Detect picks the hook manager from what is already in the repository; a committed
+// config file wins over one merely listed in package.json.
 func Detect(root string) Detection {
 	if _, err := os.Stat(filepath.Join(root, ".husky")); err == nil {
 		return Detection{Manager: Husky, ConfigPath: ".husky", Detail: ".husky/ directory present"}
@@ -164,8 +137,7 @@ type Plan struct {
 // Empty reports whether the plan changes nothing.
 func (p Plan) Empty() bool { return len(p.Changes) == 0 }
 
-// PlanInstall computes the changes that wire the git hooks through det's manager.
-// Existing user content is preserved: terma's lines are added, never substituted.
+// PlanInstall computes the changes that wire the git hooks through det's manager, preserving user content.
 func PlanInstall(root string, det Detection) (Plan, error) {
 	switch det.Manager {
 	case Husky:
@@ -179,8 +151,7 @@ func PlanInstall(root string, det Detection) (Plan, error) {
 	}
 }
 
-// PlanUninstall computes the reverse of PlanInstall: only terma's own lines and
-// files go.
+// PlanUninstall computes the reverse of PlanInstall: only terma's own lines and files go.
 func PlanUninstall(root string, det Detection) (Plan, error) {
 	switch det.Manager {
 	case Husky:
@@ -235,8 +206,6 @@ func Apply(root string, p Plan) error {
 	return nil
 }
 
-// removeEmptyParents deletes dir and its ancestors while they are empty, stopping
-// at root: an uninstall leaves no empty `.terma/hooks/` shells behind.
 func removeEmptyParents(root, dir string) {
 	root = filepath.Clean(root)
 	for dir = filepath.Clean(dir); dir != root && strings.HasPrefix(dir, root); dir = filepath.Dir(dir) {
@@ -250,9 +219,8 @@ func removeEmptyParents(root, dir string) {
 	}
 }
 
-// ReadFile returns a file's bytes, or nil when it does not exist. Every other failure
-// is returned: a file that is there and cannot be read is not an absent one, and
-// planning it as a create would let Apply rename terma-only content over it.
+// ReadFile returns a file's bytes, or nil when it does not exist; any other failure is an
+// error, since planning an unreadable file as a create would overwrite it.
 func ReadFile(path string) ([]byte, error) {
 	data, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {

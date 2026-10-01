@@ -47,33 +47,28 @@ instead, and leaves your global connect as it is.`,
 			if err != nil {
 				return err
 			}
-			// Terma's Codex notifier lives outside the telemetry key set, so it can
-			// linger after the keys are gone (removed by hand or by an older CLI). That
-			// still needs restoring, so it counts as work to do.
+			// A notifier outside the telemetry key set can linger after the keys are gone
+			// and still needs restoring.
 			notifierLeftover := false
 			if notifier, ok := app.agents.Find[agents.Notifier](h.Name()); ok && scope == harness.ScopeGlobal {
 				if installed, nerr := notifier.NotifierInstalled(); nerr == nil {
 					notifierLeftover = installed
 				}
 			}
-			// Repository install can wrap the user-level status line without a
-			// global telemetry connection. It still belongs to this disconnect.
+			// Install can wrap the status line without a global connect; it is still undone here.
 			statusLineLeftover := false
 			if renderer, ok := app.agents.Find[agents.StatusLiner](h.Name()); ok && scope == harness.ScopeGlobal {
 				if line, lineErr := renderer.StatusLineState(""); lineErr == nil {
 					statusLineLeftover = line.Installed || line.Replaced
 				}
 			}
-			// Keyed off the settings actually present, not off Connected. A config with
-			// telemetry switched off, or with the endpoint deleted, is not "connected" —
-			// but it still has Terma's server key sitting in it, and that is the state
-			// where walking away would be worst.
+			// Keyed off the settings present, not Connected: a switched-off config still
+			// holds Terma's server key.
 			if st.ManagedKeys == 0 && !notifierLeftover && !statusLineLeftover {
 				fmt.Fprintf(out, "%s has no Terma telemetry settings%s. Nothing to do.\n", h.DisplayName(), scopeSuffix(scope))
 				return nil
 			}
-			// A local layer has no endpoint and is never "connected"; the line is for
-			// the global file, where it names a real state.
+			// A local layer has no endpoint and is never "connected".
 			if !st.Connected && scope == harness.ScopeGlobal {
 				fmt.Fprintf(out, "%s is not exporting, but Terma settings are still present.\n\n", h.DisplayName())
 			}
@@ -129,8 +124,7 @@ instead, and leaves your global connect as it is.`,
 				fmt.Fprintf(out, "Restored %d setting(s) to the value held before Terma connected.\n", result.Restored)
 			}
 			if len(result.Skipped) > 0 {
-				// Changed after the connect, so they are somebody's deliberate edit and
-				// not Terma's to throw away.
+				// Changed after the connect: somebody's deliberate edit, not Terma's to discard.
 				fmt.Fprintf(out, "Left alone (changed since connecting): %s\n", strings.Join(result.Skipped, ", "))
 			}
 			if result.Unjournaled {

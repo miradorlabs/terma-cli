@@ -8,9 +8,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
-// TestConfigView_NeverCarriesTheAPIKey guards a leak that shipped once: `config show
-// -o json` serialized the internal Config, which holds TERMA_API_KEY, printing a
-// live server key into whatever consumed the output.
+// TestConfigView_NeverCarriesTheAPIKey proves `config show -o json` never prints TERMA_API_KEY.
 func TestConfigView_NeverCarriesTheAPIKey(t *testing.T) {
 	view := configView{
 		Profile: "default",
@@ -29,9 +27,8 @@ func TestConfigView_NeverCarriesTheAPIKey(t *testing.T) {
 	}
 }
 
-// Profiles live in a map, and a map's order is different on every run: the list
-// reshuffled itself between two invocations with nothing changed. Enough profiles
-// that an unsorted range would have to be lucky to come out in order.
+// Profiles live in a map; enough of them that an unsorted range would have to be lucky
+// to come out in order.
 func TestConfigProfilesAreListedByName(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	names := []string{"staging", "alpha", "work", "default", "beta", "personal", "zeta", "client"}
@@ -58,8 +55,7 @@ func TestConfigProfilesAreListedByName(t *testing.T) {
 	}
 }
 
-// TestConfig_APIKeyIsNotSerializable is the second layer: even if a future command
-// renders config.Config directly, the key must not travel with it.
+// TestConfig_APIKeyIsNotSerializable proves config.Config itself never serializes the key.
 func TestConfig_APIKeyIsNotSerializable(t *testing.T) {
 	encoded, err := json.Marshal(&config.Config{
 		ProfileName: "default",

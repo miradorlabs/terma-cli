@@ -11,7 +11,7 @@ var (
 	testRules       = compose(testCorrelators, testCapturers)
 )
 
-// newRelay is New with every built-in agent's telemetry shape, as terma relay run has.
+// newRelay is New with every built-in agent's telemetry shape.
 func newRelay(o Options) *Relay {
 	o.Correlators, o.Capturers = testCorrelators, testCapturers
 	return New(o)

@@ -9,9 +9,8 @@ import (
 	"testing"
 )
 
-// TestPut_SendsExactlyOnePrecondition covers the gateway's central write rule: a
-// blind overwrite is never allowed, so every PUT must carry either If-None-Match or
-// If-Match — never neither, never both.
+// TestPut_SendsExactlyOnePrecondition proves every PUT carries exactly one of If-None-Match
+// and If-Match.
 func TestPut_SendsExactlyOnePrecondition(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -60,8 +59,6 @@ func TestPut_SendsExactlyOnePrecondition(t *testing.T) {
 			if v := got.Get(tc.wantName); v != tc.wantValue {
 				t.Errorf("%s = %q, want %q", tc.wantName, v, tc.wantValue)
 			}
-			// The other conditional header must be absent, not empty: sending both is a
-			// 400 at the gateway.
 			for _, other := range []string{"If-Match", "If-None-Match"} {
 				if other != tc.wantName {
 					if _, present := got[http.CanonicalHeaderKey(other)]; present {
@@ -76,8 +73,7 @@ func TestPut_SendsExactlyOnePrecondition(t *testing.T) {
 	}
 }
 
-// TestPut_CreatedIsDistinguishedFromReplaced matters because apply reports which one
-// happened, and 201 vs 200 is the only signal.
+// TestPut_CreatedIsDistinguishedFromReplaced tells a 201 from a 200.
 func TestPut_CreatedIsDistinguishedFromReplaced(t *testing.T) {
 	for _, status := range []int{http.StatusOK, http.StatusCreated} {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -98,8 +94,7 @@ func TestPut_CreatedIsDistinguishedFromReplaced(t *testing.T) {
 	}
 }
 
-// TestDelete_RefusesWithoutAnETag stops the CLI from turning a delete into an
-// unconditional one when a prior read failed to yield a token.
+// TestDelete_RefusesWithoutAnETag refuses an unconditional delete.
 func TestDelete_RefusesWithoutAnETag(t *testing.T) {
 	var called bool
 	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { called = true }))

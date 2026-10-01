@@ -27,8 +27,7 @@ func findConflict(conflicts []harness.Conflict, key string) *harness.Conflict {
 	return nil
 }
 
-// A shell export of a capture key as off beats the settings file, so a connect that
-// means to capture must say the content will not arrive.
+// A shell export of a capture key as off is reported when the connect means to capture.
 func TestCaptureConflictsReportsShellOverride(t *testing.T) {
 	t.Setenv(otelLogUserPrompts, "false")
 	got := captureConflictsIn(captureExporter(), exporter{}.layer())
@@ -47,7 +46,6 @@ func TestCaptureConflictsReportsShellOverride(t *testing.T) {
 	}
 }
 
-// The same key exported as on is not a conflict — it agrees with the intent.
 func TestCaptureConflictsIgnoresAgreeingValue(t *testing.T) {
 	t.Setenv(otelLogUserPrompts, "1")
 	if got := captureConflictsIn(captureExporter(), exporter{}.layer()); len(got) != 0 {
@@ -55,8 +53,7 @@ func TestCaptureConflictsIgnoresAgreeingValue(t *testing.T) {
 	}
 }
 
-// Nothing is being overridden if Terma is not asking for the content in the first
-// place, so --exclude-prompts must not produce noise.
+// Without content capture requested there is nothing to override, so no noise.
 func TestCaptureConflictsSilentWhenNotCapturing(t *testing.T) {
 	t.Setenv(otelLogUserPrompts, "0")
 	e := captureExporter()
@@ -68,7 +65,7 @@ func TestCaptureConflictsSilentWhenNotCapturing(t *testing.T) {
 	}
 }
 
-// A project settings file outranks the user file Terma writes.
+// A project settings file that turns capture off outranks the user file terma writes.
 func TestCaptureConflictsReportsProjectOverride(t *testing.T) {
 	repo := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o755); err != nil {
@@ -93,7 +90,7 @@ func TestCaptureConflictsReportsProjectOverride(t *testing.T) {
 	}
 }
 
-// A capture override must never gate a connect: it is reported and nothing more.
+// A capture override is reported, never blocking.
 func TestCaptureConflictsNeverBlock(t *testing.T) {
 	t.Setenv(otelLogUserPrompts, "0")
 	t.Setenv(otelLogToolContent, "0")
@@ -104,8 +101,7 @@ func TestCaptureConflictsNeverBlock(t *testing.T) {
 	}
 }
 
-// A previous connect that excluded content must not leak into the next one: Render
-// writes every capture key explicitly, so the flags alone decide.
+// render writes every capture key, so a previous exclusion never leaks into the next connect.
 func TestRenderAlwaysStatesCapturePosture(t *testing.T) {
 	on := exporter{}.render(captureExporter())
 	e := captureExporter()

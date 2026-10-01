@@ -68,7 +68,7 @@ func TestDoctorChecksClaudeEmissionSettings(t *testing.T) {
 				t.Fatalf("status disagrees with doctor: %s", status)
 			}
 			if tc.wantFailure {
-				// Another installed agent must not conceal a silent Claude setup.
+				// Another installed agent must not conceal a silent setup.
 				healthy := doctor.HarnessVerdict{DisplayName: "Codex", Route: doctor.RouteGlobal}
 				check = doctor.HarnessCheck(testApp.agents, []doctor.HarnessVerdict{healthy, v}, endpoint, testProjectID, true)
 				check.Key = doctor.KeyHarness

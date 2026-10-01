@@ -17,9 +17,8 @@ const (
 	SupportNone SupportLevel = "none"
 )
 
-// CapabilitySupport is terma's support for one capability of one agent. Note carries a
-// short caveat and is expected to be set whenever the level is anything but full, and
-// may also flag a limitation that does not itself lower the level.
+// CapabilitySupport is terma's support for one capability of one agent; Note is a caveat,
+// set whenever the level is not full.
 type CapabilitySupport struct {
 	Level SupportLevel `json:"level"`
 	Note  string       `json:"note,omitempty"`
@@ -27,23 +26,17 @@ type CapabilitySupport struct {
 
 // AgentSupport is terma's support for one coding agent, across every capability.
 type AgentSupport struct {
-	// Name is the agent's command-line token.
-	Name string `json:"name"`
-	// DisplayName is how the agent is written in prose — "Claude Code".
+	Name        string `json:"name"`
 	DisplayName string `json:"display_name"`
-	// Attribution is stamping commits with the session and tool that produced them,
-	// via committed hooks (or, for OpenCode, a plugin).
+	// Attribution is stamping commits with the session and tool that produced them.
 	Attribution CapabilitySupport `json:"attribution"`
-	// Telemetry is exporting OTLP usage to Terma so `usage` and `session` can report
-	// spend and cost.
+	// Telemetry is exporting OTLP usage so `usage` and `session` can report spend.
 	Telemetry CapabilitySupport `json:"telemetry"`
-	// Support is the overall level: full only when every capability is full, none when
-	// none of them is, partial otherwise.
+	// Support is the overall level, folded by Overall.
 	Support SupportLevel `json:"support"`
 }
 
-// Overall folds a set of capabilities into a single level: full when all are full,
-// none when none is anything but none, partial in between.
+// Overall is full when every capability is full, none when all are none, else partial.
 func Overall(caps ...CapabilitySupport) SupportLevel {
 	full, present := 0, 0
 	for _, c := range caps {
@@ -64,15 +57,13 @@ func Overall(caps ...CapabilitySupport) SupportLevel {
 	}
 }
 
-// Covered is an agent that says how completely terma supports it, for `terma harness
-// list`.
+// Covered is an agent that says how completely terma supports it, for `terma harness list`.
 type Covered interface {
 	Agent
 	Coverage() (attribution, telemetry CapabilitySupport)
 }
 
-// SupportCatalog is every agent that declares its coverage, in registry order, with the
-// overall level folded from its capabilities so it can never drift from them.
+// SupportCatalog is every Covered agent, in registry order, its level folded by Overall.
 func (r *Registry) SupportCatalog() []AgentSupport {
 	var out []AgentSupport
 	for _, a := range r.With[Covered]() {

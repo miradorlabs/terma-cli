@@ -21,8 +21,8 @@ var update = flag.Bool("update", false, "rewrite the snapshots from the current 
 // terma is the absolute path a machine-wide hook entry names.
 const terma = "/usr/local/bin/terma"
 
-// TestCommittedHookFiles pins what `terma install` commits into a repository for each
-// agent, rendered into an empty one.
+// TestCommittedHookFiles pins what `terma install` commits into an empty repository for
+// each agent.
 func TestCommittedHookFiles(t *testing.T) {
 	for _, a := range builtin.Agents().All() {
 		if a.HooksPath() == "" {
@@ -43,9 +43,8 @@ func TestCommittedHookFiles(t *testing.T) {
 	}
 }
 
-// TestCodexTrustKeys pins what Codex records a developer's trust under: each entry's
-// key and hash. A different hash is a hook Codex skips until the developer trusts it
-// again.
+// TestCodexTrustKeys pins each entry's key and hash, which Codex records trust under: a
+// new hash is skipped until the developer trusts it again.
 func TestCodexTrustKeys(t *testing.T) {
 	root := t.TempDir()
 	a, _ := builtin.Agents().Lookup("codex")
@@ -125,7 +124,7 @@ func TestManagedConfiguration(t *testing.T) {
 }
 
 // TestRelayExporterFiles pins what pointing each agent at the local relay writes into
-// its user-level configuration, in a home of its own.
+// its user-level configuration.
 func TestRelayExporterFiles(t *testing.T) {
 	for _, e := range builtin.Agents().With[agents.RelayExporter]() {
 		t.Run(e.Name(), func(t *testing.T) {
@@ -176,8 +175,8 @@ func TestRelayExporterFiles(t *testing.T) {
 	}
 }
 
-// check compares files with the snapshot under testdata/dir, after replacing the
-// temporary root they were rendered under with a fixed name.
+// check compares files with the snapshot under testdata/dir, the temporary root
+// replaced by a fixed name.
 func check(t *testing.T, dir string, files map[string][]byte, root string) {
 	t.Helper()
 	if len(files) == 0 {

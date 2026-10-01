@@ -16,8 +16,7 @@ import (
 	"time"
 )
 
-// retiredSessionParams are the names the gateway stopped reading. It ignores a
-// parameter it does not know, so sending one is a filter that silently does nothing.
+// retiredSessionParams are names the gateway ignores, so sending one silently filters nothing.
 var retiredSessionParams = []string{"routing_key", "page_token", "page_size", "started_after", "started_before"}
 
 func assertQuery(t *testing.T, r *http.Request, want url.Values) {
@@ -33,8 +32,7 @@ func assertQuery(t *testing.T, r *http.Request, want url.Values) {
 	}
 }
 
-// One page is one request, and every field of the query travels under the name the
-// gateway reads today.
+// One page is one request, and every query field travels under the gateway's current name.
 func TestListAISessions_SendsTheQueryAndReadsPagination(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/ai/sessions" {
@@ -66,7 +64,7 @@ func TestListAISessions_SendsTheQueryAndReadsPagination(t *testing.T) {
 	}
 }
 
-// An empty query sends nothing: the gateway's defaults are the gateway's to choose.
+// An empty query sends nothing.
 func TestListAISessions_EmptyQuerySendsNothing(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assertQuery(t, r, url.Values{})
@@ -80,9 +78,8 @@ func TestListAISessions_EmptyQuerySendsNothing(t *testing.T) {
 	}
 }
 
-// The session walk has to reach every page exactly once, send the project header the
-// gateway insists on, and hand back the integers it was given — a token count pushed
-// through a float64 would come back wrong.
+// The session walk reaches every page once, sends the project header, and keeps integer
+// precision.
 func TestForEachAISession_WalksPagesOnceAndKeepsPrecision(t *testing.T) {
 	var pages []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -99,9 +96,7 @@ func TestForEachAISession_WalksPagesOnceAndKeepsPrecision(t *testing.T) {
 		case "1":
 			fmt.Fprint(w, `{"project_id":"project-123","sessions":[{"session_id":"a","source_system":"codex","usage":{"input_tokens":9007199254740993,"provider_cost_usd":2.5}}],"pagination":{"page":1,"per_page":1,"total":2,"total_pages":2}}`)
 		case "2":
-			// The first session repeats (the traversal is weakly consistent), and the
-			// list grew by a page while the walk ran. A second source system sharing
-			// the session id is a different session.
+			// A repeat, a list that grew mid-walk, and the same id under another source system.
 			fmt.Fprint(w, `{"sessions":[{"session_id":"a","source_system":"codex"},{"session_id":"a","source_system":"claude-code"}],"pagination":{"page":2,"per_page":1,"total":3,"total_pages":3}}`)
 		case "3":
 			fmt.Fprint(w, `{"sessions":[{"session_id":"b","source_system":"codex"}],"pagination":{"page":3,"per_page":1,"total":3,"total_pages":3}}`)
@@ -168,8 +163,7 @@ func TestForEachAISession_StopsWhenAsked(t *testing.T) {
 	}
 }
 
-// A gateway that misreports must end the walk, not spin it. Each of these claims one
-// more page than it has just served, forever.
+// A gateway that misreports, always claiming one more page, must end the walk, not spin it.
 func TestForEachAISession_EndsOnAGatewayThatMisreports(t *testing.T) {
 	cases := []struct {
 		name      string
@@ -177,7 +171,6 @@ func TestForEachAISession_EndsOnAGatewayThatMisreports(t *testing.T) {
 		wantCalls int
 	}{
 		{
-			// An empty page before the end.
 			name: "empty pages",
 			respond: func(page int) string {
 				return fmt.Sprintf(`{"sessions":[],"pagination":{"page":%d,"per_page":1,"total":9,"total_pages":%d}}`, page, page+1)
@@ -185,7 +178,6 @@ func TestForEachAISession_EndsOnAGatewayThatMisreports(t *testing.T) {
 			wantCalls: 1,
 		},
 		{
-			// total_pages grows with every request while the rows stay the same.
 			name: "the same rows on every page",
 			respond: func(page int) string {
 				return fmt.Sprintf(`{"sessions":[{"session_id":"a","source_system":"codex"}],"pagination":{"page":%d,"per_page":1,"total":9,"total_pages":%d}}`, page, page+1)
@@ -193,7 +185,6 @@ func TestForEachAISession_EndsOnAGatewayThatMisreports(t *testing.T) {
 			wantCalls: 2,
 		},
 		{
-			// The page parameter is ignored: page 1 comes back whatever was asked.
 			name: "the wrong page",
 			respond: func(page int) string {
 				return fmt.Sprintf(`{"sessions":[{"session_id":"s%d","source_system":"codex"}],"pagination":{"page":1,"per_page":1,"total":9,"total_pages":9}}`, page)
@@ -228,9 +219,7 @@ func TestForEachAISession_EndsOnAGatewayThatMisreports(t *testing.T) {
 	}
 }
 
-// Session-scoped reads identify the session with two query parameters. Losing the
-// source system would make the gateway answer 400, and the old name for the id does
-// the same: "session_id is required".
+// Session-scoped reads carry both identity halves, under their current names.
 func TestSessionReadsCarryBothIdentityHalves(t *testing.T) {
 	identity := url.Values{"session_id": {"sid/with slash"}, "source_system": {"claude-code"}}
 	var paths []string
@@ -283,8 +272,7 @@ func TestSessionReadsCarryBothIdentityHalves(t *testing.T) {
 	}
 }
 
-// heldFeed answers 200 with the frames given, then keeps the connection open the way
-// a live feed does. released closes once the client has hung up.
+// heldFeed answers with frames and holds the connection open; released closes on hang-up.
 func heldFeed(t *testing.T, frames string) (srv *httptest.Server, released chan struct{}) {
 	t.Helper()
 	released = make(chan struct{})
@@ -300,8 +288,7 @@ func heldFeed(t *testing.T, frames string) (srv *httptest.Server, released chan 
 	return srv, released
 }
 
-// The roll-up of one session is served as a feed that never ends. The read takes the
-// first summary — past whatever else the feed carries — and hangs up.
+// The roll-up read takes the first summary of a never-ending feed and hangs up.
 func TestGetAISession_TakesTheFirstSummaryAndHangsUp(t *testing.T) {
 	srv, released := heldFeed(t, "retry: 3000\n\n"+
 		"event: heartbeat\ndata: {}\n\n"+
@@ -337,11 +324,9 @@ func TestGetAISession_MissingSessionIsNotFound(t *testing.T) {
 	}
 }
 
-// A feed that connects and then says nothing would hold the command forever: the
-// stream client has no timeout of its own. The wait turns that into an error.
+// A silent feed ends as an error at the wait's deadline, not a hang.
 func TestGetAISession_SilentFeedEndsAtTheDeadline(t *testing.T) {
 	heartbeats, _ := heldFeed(t, "event: heartbeat\ndata: {}\n\n")
-	// The other way to say nothing: accept the request and never answer it.
 	mute := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		<-r.Context().Done()
 	}))
@@ -394,9 +379,8 @@ func TestGetAISession_SurfacesFeedFailures(t *testing.T) {
 	}
 }
 
-// The event history is keyset-paged now. The walk carries the window and the identity
-// onto every page, follows next_cursor to the end, and folds a correction that
-// arrives under a logical id already seen into the place the event first had.
+// The event walk carries window and identity onto every page, follows next_cursor, and
+// folds a correction into the event's first place.
 func TestAllAISessionEvents_FollowsCursorsAndFoldsCorrections(t *testing.T) {
 	var cursors []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -452,8 +436,6 @@ func TestAllAISessionEvents_FollowsCursorsAndFoldsCorrections(t *testing.T) {
 	for _, e := range out.Events {
 		got = append(got, e.Kind+"/"+e.LogicalEventID+"/"+e.Status)
 	}
-	// e2's correction replaced it in place, e1's repeat was dropped, and the two
-	// events with no logical id were both kept.
 	if want := "user_message/e1/,model_call/e2/ok,tool_call//,tool_call//"; strings.Join(got, ",") != want {
 		t.Fatalf("events = %v, want %s", got, want)
 	}
@@ -538,8 +520,7 @@ func TestAllAIPrincipals_FollowsPages(t *testing.T) {
 	}
 }
 
-// The metric value is Prometheus's [time, "string"] pair; the string form is how
-// precision survives the wire, and the parse has to accept what Prometheus emits.
+// The metric value decodes from Prometheus's [time, "string"] pair.
 func TestQueryMetric_DecodesInstantVector(t *testing.T) {
 	var gotQuery, gotTime string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

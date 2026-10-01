@@ -5,14 +5,13 @@ import (
 	"testing"
 )
 
-// A wrap an earlier version installed is brought up to this build's command, falling
-// back to the renderer it recorded, and every other option survives.
+// A wrap from an earlier build is upgraded, keeping its recorded renderer and every option.
 func TestRefreshStatusLineUpgradesAnOlderWrap(t *testing.T) {
 	c, path := claudeIn(t, `{"statusLine": {"type": "command", "command": "my-renderer --fancy", "padding": 2}}`)
 	if _, err := c.InstallStatusLine(); err != nil {
 		t.Fatal(err)
 	}
-	// What an earlier build wrote: the bare invocation, without the fallback guard.
+	// The bare invocation, without the fallback guard.
 	s, err := loadSettings(path)
 	if err != nil {
 		t.Fatal(err)
@@ -36,7 +35,6 @@ func TestRefreshStatusLineUpgradesAnOlderWrap(t *testing.T) {
 	if _, changed, err := c.RefreshStatusLine(); err != nil || changed {
 		t.Fatalf("second refresh: changed=%v err=%v", changed, err)
 	}
-	// The record still restores what the developer had.
 	if _, err := c.RemoveStatusLine(); err != nil {
 		t.Fatal(err)
 	}
@@ -45,8 +43,7 @@ func TestRefreshStatusLineUpgradesAnOlderWrap(t *testing.T) {
 	}
 }
 
-// A refresh never installs: no status line, the developer's own, or a copied terma
-// command with no record of what it replaced all stay exactly as they are.
+// A refresh never installs, and leaves an unrecorded copy of terma's command alone.
 func TestRefreshStatusLineNeverInstalls(t *testing.T) {
 	for name, settings := range map[string]string{
 		"absent":    `{"model": "opus"}`,

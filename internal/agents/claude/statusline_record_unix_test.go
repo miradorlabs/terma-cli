@@ -8,9 +8,7 @@ import (
 	"testing"
 )
 
-// One record file serves every Claude config on the machine, and an install read it,
-// set its own entry and renamed its copy back: two at once and the later rename forgot
-// the status line the other had displaced.
+// Concurrent installs under different config dirs each keep the status line they displaced.
 func TestConcurrentStatusLineRecordsKeepEveryConfig(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	const configs = 16

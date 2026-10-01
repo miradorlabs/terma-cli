@@ -8,9 +8,7 @@ import (
 	"testing"
 )
 
-// The service definitions: valid (plutil lints the plist on macOS), running the relay
-// with no idle exit, carrying the config directory, and named per config directory so
-// a sandbox never touches the real service.
+// The service definitions are valid, run the relay with no idle exit, and are named per config directory.
 func TestDefinitions(t *testing.T) {
 	env := map[string]string{"TERMA_CONFIG_DIR": "/tmp/a & b", "TERMA_ENV": "dev"}
 	plist := Launchd("ai.terma.relay.x", "/opt/terma/bin/terma", "/tmp/log", env)

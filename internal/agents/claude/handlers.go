@@ -11,8 +11,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
-// claudeHookInput is the JSON Claude Code writes to a hook's stdin. Only the fields
-// terma reads are declared; everything else is ignored.
+// claudeHookInput is the subset of a hook's stdin JSON that terma reads.
 type claudeHookInput struct {
 	SessionID string `json:"session_id"`
 	Cwd       string `json:"cwd"`
@@ -32,13 +31,11 @@ type claudeHookInput struct {
 		Edits        []struct {
 			FilePath string `json:"file_path"`
 		} `json:"edits"`
-		// SubagentType is the Agent tool's: which kind of subagent was asked for. The
-		// task's description and prompt sit beside it and are not decoded.
+		// SubagentType is the Agent tool's; the task's description and prompt beside it are not decoded.
 		SubagentType string `json:"subagent_type"`
 	} `json:"tool_input"`
-	// ToolResponse is kept undecoded. Only the Agent tool's is ever opened, and then
-	// into claudeAgentResult, which names the fields it wants and no others: for an
-	// edit this holds the file's content, which is nothing to do with terma.
+	// ToolResponse is opened only for the Agent tool, into claudeAgentResult: for an edit it holds
+	// file content.
 	ToolResponse json.RawMessage `json:"tool_response"`
 }
 
@@ -55,7 +52,6 @@ func readClaudeInput(r io.Reader) (*claudeHookInput, error) {
 
 const claudeTool = "claude-code"
 
-// sessionStart records the announced session as active and spools the start.
 func sessionStart(ctx context.Context, env hookrun.Env) error {
 	in, err := readClaudeInput(env.Stdin)
 	if err != nil {
@@ -78,8 +74,7 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 	return nil
 }
 
-// sessionEnd clears the active session (manifests stay: the work may still be
-// uncommitted) and spools the end.
+// sessionEnd clears the active session and spools the end; manifests stay for uncommitted work.
 func sessionEnd(ctx context.Context, env hookrun.Env) error {
 	in, err := readClaudeInput(env.Stdin)
 	if err != nil {
@@ -115,7 +110,6 @@ func stop(ctx context.Context, env hookrun.Env) error {
 	return nil
 }
 
-// postToolUse adds the edited files to the session's manifest.
 func postToolUse(ctx context.Context, env hookrun.Env) error {
 	in, err := readClaudeInput(env.Stdin)
 	if err != nil {
@@ -135,8 +129,7 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	paths := append([]string{in.ToolInput.FilePath, in.ToolInput.NotebookPath}, editPaths(in)...)
-	// Inside a subagent the payload keeps the parent's session_id and names the agent:
-	// the manifest stays the session's, the event says which agent did the editing.
+	// Inside a subagent the manifest stays the session's; the event names the agent.
 	env.Touch(r, session.Session{ID: in.SessionID, Tool: claudeTool, Model: in.Model}, in.ToolName,
 		hookrun.RelativeFiles(r, env.Cwd, paths), hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType))
 	return nil

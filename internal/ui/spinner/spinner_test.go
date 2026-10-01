@@ -6,8 +6,7 @@ import (
 	"time"
 )
 
-// Captured output — a test buffer, a pipe, an agent — must never see a frame: the
-// spinner is a terminal courtesy, and escape sequences in a transcript are noise.
+// Captured output never sees a frame.
 func TestSpinnerIsInertOffATerminal(t *testing.T) {
 	var buf bytes.Buffer
 	s := New(&buf)
@@ -21,8 +20,7 @@ func TestSpinnerIsInertOffATerminal(t *testing.T) {
 	}
 }
 
-// The mark is four squares lit in turn; on one cell that is the eight quadrant
-// glyphs sweeping around the square.
+// The mark is the eight quadrant glyphs sweeping around one cell.
 func TestFramesSweepTheFourSquares(t *testing.T) {
 	if len(frames) != 8 {
 		t.Fatalf("want 8 frames, got %d", len(frames))

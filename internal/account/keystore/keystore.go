@@ -1,9 +1,5 @@
-// Package keystore holds the project server keys the spool flushes with.
-//
-// A harness's key lives inside that harness's own config; the spool is terma's
-// and needs its own copy, keyed by project, so a flush can deliver events for any
-// repository this machine has set up. One 0600 file under the config dir, never
-// printed: `terma status` shows the masked prefix only.
+// Package keystore holds the project server keys the spool flushes with, one 0600 file
+// keyed by project so a flush can deliver for any repository on this machine.
 package keystore
 
 import (
@@ -24,30 +20,19 @@ import (
 const fileName = "keys.json"
 
 type file struct {
-	// Keys maps project id → Terma server key.
 	Keys map[string]string `json:"keys"`
-	// HarnessKeys maps harness name → project id → the key that harness exported with
-	// when it was last pointed at that project. Each harness holds a key of its own so
-	// one can be revoked without the other; remembering them here means re-pointing a
-	// harness at a project it reported to before reuses its own key instead of minting
-	// another every time the developer moves between repositories.
+	// HarnessKeys maps harness → project → its last key, so re-pointing a harness reuses
+	// its own key instead of minting another.
 	HarnessKeys map[string]map[string]string `json:"harness_keys,omitempty"`
-	// Hosts maps project id → the hosts of the environment its key was stored from.
-	// A key is accepted only by its own environment's hosts, and a profile can change
-	// environment after the key is stored: a flush that sent every project to the
-	// active profile's ingest host presented a dev project's key to production.
-	// Optional: a key stored before hosts were recorded has none, and an older terma
-	// that rewrites this file drops the map, so a reader treats a missing entry as
-	// "not recorded" and falls back.
+	// Hosts maps project → its key's environment, which alone accepts the key; a missing
+	// entry means "not recorded".
 	Hosts map[string]Hosts `json:"hosts,omitempty"`
 }
 
-// Hosts are the environment a project's key belongs to: the ingest host its events
-// are delivered to and the data API they are read back from.
+// Hosts are the ingest and data API hosts of the environment a project's key belongs to.
 type Hosts struct {
-	// Env names a built-in environment when the key was stored with that
-	// environment's own hosts. It is resolved through the current table on read, so a
-	// built-in host renamed in a later release does not strand the keys stored before.
+	// Env names a built-in environment, resolved through the current table on read so a
+	// renamed host does not strand its keys.
 	Env  string `json:"env,omitempty"`
 	OTLP string `json:"otlp,omitempty"`
 	API  string `json:"api,omitempty"`
@@ -66,8 +51,6 @@ func (h Hosts) normalized() Hosts {
 	return Hosts{Env: h.Env, OTLP: strings.TrimRight(h.OTLP, "/"), API: strings.TrimRight(h.API, "/")}
 }
 
-// resolved reads a built-in environment's hosts from the current table, and a custom
-// one's as recorded. An environment this build does not know keeps the recorded hosts.
 func (h Hosts) resolved() Hosts {
 	if h.Env == "" {
 		return h
@@ -79,10 +62,8 @@ func (h Hosts) resolved() Hosts {
 	return Hosts{Env: h.Env, OTLP: e.OTLPURL, API: e.APIURL}
 }
 
-// recordHosts files a project's hosts with the key being stored. They describe the
-// key, not the command storing it: a key already on file keeps the hosts it came
-// with, so re-storing it from a profile pointed at another environment cannot
-// re-label it. Only a new key, or one stored without any, takes the caller's.
+// recordHosts files a project's hosts with its key; a key already on file keeps the hosts
+// it came with, so a profile pointed elsewhere cannot re-label it.
 func (f *file) recordHosts(projectID, key string, hosts Hosts) {
 	hosts = hosts.normalized()
 	if hosts == (Hosts{}) {
@@ -130,20 +111,17 @@ func load() (*file, error) {
 	return &f, nil
 }
 
-// lockWait bounds the wait for another terma's update. Holders rewrite one small file.
+// lockWait bounds the wait for another terma's update.
 const lockWait = 5 * time.Second
 
-// update is the one way the file changes: load, edit, save, under a lock. Two installs
-// in two repositories each used to read the file, add their project's key and rename
-// their copy back, and the second rename forgot the first key — after which that
-// project's hook events were held for want of one.
+// update is the one way the file changes: unlocked, a concurrent install's rename
+// dropped the other's key.
 func update(edit func(*file)) error {
 	p, err := path()
 	if err != nil {
 		return err
 	}
-	// The first key can be the first thing terma ever writes: `terma install` mints one
-	// before any credential or profile has created the config directory.
+	// The first key can be the first thing terma ever writes.
 	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
 		return err
 	}
@@ -255,8 +233,7 @@ func GetFor(harness, projectID string) string {
 	return key
 }
 
-// SetFor records the key a harness exports with for a project, alongside the
-// project's spool key and the hosts of the environment it was minted in.
+// SetFor records a harness's key for a project, which is also the project's spool key.
 func SetFor(harness, projectID, key string, hosts Hosts) error {
 	if harness == "" || projectID == "" || !serverkey.Is(key) {
 		return errors.New("keystore: a harness, a project id and a server key are required")

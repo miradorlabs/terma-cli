@@ -38,13 +38,10 @@ type installFlags struct {
 	noHooks      bool
 	noDoctor     bool
 	noStatusLine bool
-	// relayService is --relay-service: "on", "off", or "" (keep the recorded choice; on
-	// for a first install where a service can run).
-	relayService string
-	identity     string
-	signals      string
-	// prompts is --prompts: "on", "off", or "" (keep what this developer chose for the
-	// project last time, on for a first install).
+	// relayService and prompts are "on", "off", or "" to keep the last choice.
+	relayService       string
+	identity           string
+	signals            string
 	prompts            string
 	excludePrompts     bool
 	excludeToolContent bool
@@ -53,8 +50,7 @@ type installFlags struct {
 	dryRun             bool
 	assumeYes          bool
 	force              bool
-	// verbose prints setup steps and their details.
-	verbose bool
+	verbose            bool
 }
 
 func (app *App) newInstallCommand() *cobra.Command {
@@ -108,7 +104,7 @@ The keys and per-project configuration live in your home directory; the committe
 	cmd.Flags().StringVar(&f.signals, "signals", "", "comma-separated signals to export: traces, logs, metrics (default all)")
 	cmd.Flags().StringVar(&f.prompts, "prompts", "", "send prompt text and model responses: on or off (default: your last choice for this project, on for a first install)")
 	cmd.Flags().BoolVar(&f.excludePrompts, "exclude-prompts", false, "do not export prompt text or model responses")
-	// --exclude-prompts is --prompts off, kept working for the scripts that pass it.
+	// --exclude-prompts is --prompts off, kept for the scripts that pass it.
 	_ = cmd.Flags().MarkHidden("exclude-prompts")
 	cmd.Flags().BoolVar(&f.excludeToolContent, "exclude-tool-content", false, "do not export tool parameters, input, or output")
 	cmd.Flags().BoolVar(&f.noBrowser, "no-browser", false, "print the sign-in URL instead of opening a browser")
@@ -148,15 +144,13 @@ func (app *App) runInstall(cmd *cobra.Command, f installFlags) error {
 			return err
 		}
 	}
-	// A linked worktree installing for the first time keeps its main checkout's project
-	// rather than asking again; the binding it writes is its own.
+	// A linked worktree keeps its main checkout's project; the binding it writes is its own.
 	existing, _, err := termaproject.Resolve(root, gitDir)
 	if err != nil && !errors.Is(err, termaproject.ErrNotFound) {
 		return err
 	}
 
-	// 1. Which agents to configure: --harness, else recorded, else a picker. Resolved
-	// before sign-in so we know whether sign-in is even needed.
+	// Agents are resolved first because they decide whether sign-in is needed.
 	agents, err := app.resolveInstallHarnesses(cmd, cfg, f)
 	if errors.Is(err, errCancelled) {
 		fmt.Fprintln(out, "Cancelled. Nothing was written.")
@@ -169,10 +163,8 @@ func (app *App) runInstall(cmd *cobra.Command, f installFlags) error {
 		return err
 	}
 
-	// 2. Auth. Every real install reads the team's policy, including hooks-only
-	// installs and --harness none. Offline policy fixtures need no policy login;
-	// binding lookup and key minting can still need one. A --dry-run never signs in:
-	// it plans against the credential already present without rewriting it.
+	// Every real install reads the team's policy, even hooks-only; only an offline policy
+	// fixture skips that login. A --dry-run never signs in.
 	needsAuth := cfg.APIKey == "" && (os.Getenv("TERMA_POLICY_STUB") == "" || app.installNeedsAuth(agents, f.projectRef, existing, !f.noHooks))
 	if needsAuth && !f.dryRun {
 		if cfg, err = app.signInAndReload(cmd, cfg, signInOptions{noBrowser: f.noBrowser}); err != nil {
@@ -180,25 +172,19 @@ func (app *App) runInstall(cmd *cobra.Command, f installFlags) error {
 		}
 	}
 
-	// 3. Project binding.
 	b, err := app.resolveBinding(cmd, cfg, existing, f.projectRef, needsAuth, !f.assumeYes && !f.dryRun && canPrompt())
 	if errors.Is(err, errCancelled) {
 		fmt.Fprintln(out, "Cancelled. Nothing was written.")
 		return nil
 	}
 	if err != nil {
-		// A dry run never signs in (step 2), so when no credential is stored the
-		// project picker cannot reach the API to resolve a binding. Rather than fail
-		// before printing anything, plan against an unresolved project: the plan's
-		// files (hooks, adapters) do not depend on the project id, and the dry run
-		// already says a real install would sign in first. Any other error is real.
+		// A signed-out dry run plans against an unresolved project: its files do not
+		// depend on the project id.
 		if !f.dryRun || !errors.Is(err, auth.ErrNotLoggedIn) {
 			return err
 		}
 		b = install.Binding{}
 	}
-	// Point the resolved config at the repo's project so key minting and resource
-	// attributes speak for it.
 	cfg.ProjectID, cfg.ProjectName, cfg.OrganizationID = b.ID, b.Name, b.OrganizationID
 	if !f.dryRun {
 		pol, err := app.fetchPolicy(ctx, cfg)
@@ -233,10 +219,8 @@ func (app *App) runInstall(cmd *cobra.Command, f installFlags) error {
 		return fmt.Errorf("--relay-service %q: want on or off", f.relayService)
 	}
 
-	// Whether the developer's agents send what was said, settled here — once the project
-	// is known, so the last choice for it stands — and carried as excludePrompts to the
-	// routing record and any repository policy written below. Nothing asks, so the line
-	// names the command that changes it.
+	// Settled once the project is known, so the last choice for it stands; nothing asks,
+	// so the line names the command that changes it.
 	include, err := resolvePrompts(cmd, cfg.ProjectID, f)
 	if err != nil {
 		return err
@@ -251,8 +235,7 @@ func (app *App) runInstall(cmd *cobra.Command, f installFlags) error {
 		}
 	}
 
-	// The plan is built once, before anything is written, so a dry run prints exactly
-	// the plan an install goes on to apply.
+	// Built once, so a dry run prints exactly the plan an install applies.
 	plan, err := install.Build(app.agents, root, gitDir, existing, agents, splitCommas(f.adapters), f.noHooks, b)
 	if err != nil {
 		return err
@@ -268,8 +251,7 @@ func (app *App) runInstall(cmd *cobra.Command, f installFlags) error {
 			}
 			return err == nil && yes, nil
 		},
-		// Per-repo routing: the per-developer half, keys and routing state in the home
-		// directory. It touches no committed file.
+		// The per-developer half: home-directory state, no committed file.
 		Connect: func(context.Context) error { return app.connectHarnessesForRepo(cmd, ui, cfg, agents, f) },
 		SpoolKey: func(ctx context.Context) (string, string) {
 			sp := spinner.New(cmd.ErrOrStderr())
@@ -282,20 +264,15 @@ func (app *App) runInstall(cmd *cobra.Command, f installFlags) error {
 			return writeRepoPolicy(ctx, ui, root, cfg, hs, f)
 		},
 	}
-	// The status line carries the plan's rate-limit windows, the strongest funding
-	// evidence a machine produces. It is the user's global setting, so it is wrapped
-	// only for a developer who chose its agent; --no-statusline opts out.
+	// The status line is a global setting, wrapped only for a developer who chose its agent.
 	if a, ok := doctor.StatusLineAgent(app.agents); ok && !f.noStatusLine && slices.Contains(agents, a.Name()) {
 		steps.StatusLine = func() (string, bool) { return app.installStatusLine(cmd.ErrOrStderr()) }
 	}
 	if err := install.Apply(ctx, plan, install.Options{AssumeYes: f.assumeYes, Version: app.version, Now: time.Now()}, steps, ui); err != nil {
 		return err
 	}
-	// The first run of a newer release brings what earlier versions wrote on this machine
-	// up to this build — the shims and wraps this run did not rewrite itself — before
-	// doctor checks them, and records it, so the refresh that would otherwise follow the
-	// command has nothing left to do. The repository's committed hooks went through the
-	// plan above, which rewrites a stale file as it adds a missing one.
+	// A newer release's first install refreshes the machine before doctor checks it, and
+	// records it so the refresh after the command has nothing left to do.
 	if dir, err := config.Dir(); err == nil && selfupdate.NeedsRefresh(dir, app.version) {
 		changed, err := app.refreshMachine()
 		for _, p := range changed {
@@ -312,9 +289,7 @@ func (app *App) runInstall(cmd *cobra.Command, f installFlags) error {
 		}
 	}
 
-	// Verify the chain right away. Skipped without a terminal (a script, CI) or with
-	// --no-doctor, since doctor makes a scratch commit and a network round-trip; those
-	// callers can run `terma doctor` themselves.
+	// Skipped without a terminal: doctor makes a scratch commit and a network round-trip.
 	if f.noDoctor || !canPrompt() {
 		ui.Then("Run `terma doctor` to verify the chain end to end.")
 	} else {
@@ -324,10 +299,7 @@ func (app *App) runInstall(cmd *cobra.Command, f installFlags) error {
 	return nil
 }
 
-// resolveToolContent decides whether the developer's agents send tool input and output,
-// the way resolvePrompts decides prompts: --exclude-tool-content when given, else the
-// choice this developer made for the project last time (its routing record), on for a
-// first install. A bare re-install used to switch tool content back on.
+// resolveToolContent keeps the project's last choice unless the flag is given.
 func resolveToolContent(cmd *cobra.Command, projectID string, f installFlags) bool {
 	if cmd.Flags().Changed("exclude-tool-content") {
 		return !f.excludeToolContent
@@ -338,10 +310,7 @@ func resolveToolContent(cmd *cobra.Command, projectID string, f installFlags) bo
 	return true
 }
 
-// resolvePrompts decides whether the developer's agents send prompt text and model
-// responses, without asking: --prompts (or the older --exclude-prompts) when given, else
-// the choice this developer made for the project last time (its routing record), on for
-// a first install. Re-running install without the flag used to switch prompts back on.
+// resolvePrompts never asks: the flag, else the project's last choice, else on.
 func resolvePrompts(cmd *cobra.Command, projectID string, f installFlags) (bool, error) {
 	explicit := strings.ToLower(strings.TrimSpace(f.prompts))
 	excluded := cmd.Flags().Changed("exclude-prompts") && f.excludePrompts
@@ -366,13 +335,8 @@ func resolvePrompts(cmd *cobra.Command, projectID string, f installFlags) (bool,
 	return true, nil
 }
 
-// installNeedsAuth reports whether install needs a credential beyond the policy
-// fetch: to point a telemetry harness (mint or list a key), to resolve the project
-// by name or in a picker,
-// or to mint the key this machine delivers hook events with — which a developer whose
-// agents are all hooks-only (Cursor, Antigravity) gets from nowhere else. A repository
-// wired with no agent of the developer's own (`--harness none`) needs no key minting
-// login, but still needs a policy login unless using an explicit offline fixture.
+// installNeedsAuth includes minting the spool key, which hooks-only agents get from
+// nowhere else.
 func (app *App) installNeedsAuth(agents []string, projectRef string, existing *termaproject.File, wantsHooks bool) bool {
 	for _, a := range app.telemetryAgentNames(agents) {
 		if _, err := app.agents.Harness(a); err == nil {
@@ -403,8 +367,6 @@ func (app *App) telemetryAgentNames(agents []string) []string {
 	return names
 }
 
-// projectRefNeedsLookup reports whether resolving --project needs the API: an empty ref
-// means a picker, a name means a lookup, and only a bare valid id is taken verbatim.
 func projectRefNeedsLookup(ref string) bool {
 	ref = strings.TrimSpace(ref)
 	if ref == "" {
@@ -413,14 +375,10 @@ func projectRefNeedsLookup(ref string) bool {
 	return !termaproject.ValidID(ref)
 }
 
-// spoolKey is how this machine delivers the repository's hook events: state says it, and
-// fix, when set, is what the developer has to do before they are delivered.
+// spoolKey's fix, when set, is what the developer must do before events are delivered.
 type spoolKey struct{ state, fix string }
 
-// ensureSpoolKey makes sure this machine holds a key for cfg's project, minting one when
-// it has none and a credential to mint with. It never fails the install: the hooks and
-// the binding are what the repository needs, and held events wait up to the spool's
-// MaxAge for a key.
+// ensureSpoolKey never fails the install: held events wait up to the spool's MaxAge for a key.
 func (app *App) ensureSpoolKey(ctx context.Context, cfg *config.Config) spoolKey {
 	if keystore.Get(cfg.ProjectID) != "" {
 		return spoolKey{state: "delivered with this project's key"}
@@ -447,11 +405,7 @@ func (app *App) ensureSpoolKey(ctx context.Context, cfg *config.Config) spoolKey
 	return spoolKey{state: "Project key stored for this machine (" + keystore.Mask(key) + ")"}
 }
 
-// resolveInstallHarnesses picks the agents to configure: the --harness flag ("none" for
-// no agents), else the machine-level list `terma setup` recorded, else a picker
-// (recorded to the profile so the next repo does not ask). Which agents a developer
-// configures is a per-developer choice, so a prior install's committed binding does not
-// decide it.
+// resolveInstallHarnesses never reads the committed binding: agents are a per-developer choice.
 func (app *App) resolveInstallHarnesses(cmd *cobra.Command, cfg *config.Config, f installFlags) ([]string, error) {
 	if h := strings.TrimSpace(f.harnesses); h != "" {
 		if strings.EqualFold(h, "none") {
@@ -481,13 +435,8 @@ func (app *App) resolveInstallHarnesses(cmd *cobra.Command, cfg *config.Config, 
 	return names, nil
 }
 
-// connectHarnessesForRepo points the developer's agents at this repository's project
-// through the local relay (docs/RELAY.md): the project's key for each agent with a
-// native exporter (the keystore — the relay sends the project's sessions with it), the
-// project's routing record (its signals and what content may leave: the relay's policy
-// for it), and each agent's user-level exporter pointed at the relay, which is started.
-// The repository's hooks claim its sessions; nothing unclaimed leaves the machine. It
-// writes no committed file.
+// connectHarnessesForRepo writes no committed file: keys, the routing record and the
+// relay are home-directory state (docs/RELAY.md).
 func (app *App) connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *config.Config, agents []string, f installFlags) error {
 	ctx := cmd.Context()
 	signals, err := harness.ParseSignals(f.signals)
@@ -521,8 +470,7 @@ func (app *App) connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *
 		if err != nil {
 			continue // an exporter terma writes: it sends with the project's spool key
 		}
-		// The relay sends a session with its agent's key for the project, else the
-		// project's own (relayResolver): one already on file needs no mint.
+		// Either key on file serves the relay, so none is minted.
 		if keystore.GetFor(a, cfg.ProjectID) != "" || keystore.Get(cfg.ProjectID) != "" {
 			continue
 		}
@@ -539,8 +487,7 @@ func (app *App) connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *
 	if err := routing.SaveRecord(rec); err != nil {
 		return err
 	}
-	// The machine half is `terma setup`'s; install does it too, so an install without a
-	// setup is complete, and a re-run repairs an agent pointed elsewhere since.
+	// The machine half too, so an install without a setup is complete.
 	err = app.connectMachineRelay(ctx, agents, f.relayService, relayReport{ok: ui.OK, warn: ui.Warn, then: ui.Then, detail: ui.detail})
 	if err != nil {
 		return err
@@ -553,10 +500,7 @@ func (app *App) connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *
 	return nil
 }
 
-// printCommitList tells the developer which files the hook install wrote and that they
-// must be committed: the hooks do nothing for a colleague until the files are merged.
-// lead is the sentence that says why. A path is listed once, even when two changes
-// touched it.
+// printCommitList exists because the hooks do nothing for a colleague until the files are merged.
 func printCommitList(out io.Writer, lead string, paths []string) {
 	fmt.Fprintln(out, commitList(style.For(out), lead, paths))
 }
@@ -569,24 +513,12 @@ func signalStrings(signals []harness.Signal) []string {
 	return out
 }
 
-// boundTo is a newly chosen project, recorded with the environment it was chosen in.
 func boundTo(p *project, cfg *config.Config) install.Binding {
 	return install.Binding{ID: p.ID, Name: p.Name, OrganizationID: p.OrganizationID, Environment: nonProd(cfg.Environment)}
 }
 
-// resolveBinding picks the project: an explicit reference (matched against the
-// organization's projects, falling back to a picker when it does not match), else the
-// organization's projects with the existing binding offered first.
-//
-// verify says install signs in to act for the project, so the binding is checked against
-// the projects that credential can see: one made in another environment or organization
-// names a project the account service refuses, and used as-is it failed at the first key
-// install minted, with the server's words about neither. ask says a person is there to
-// choose: they confirm or change the project on every install, the bound one marked and
-// kept by Enter — unless the organization has one project, which is taken without asking.
-// Without ask, a binding that checks out is kept and one that does not is an error naming
-// the fix. An offline policy fixture with no credential keeps the binding unchecked;
-// there is nothing to check it with.
+// resolveBinding with verify checks the binding against the credential's projects: one
+// from another environment or organization would be refused at the first key mint.
 func (app *App) resolveBinding(cmd *cobra.Command, cfg *config.Config, existing *termaproject.File, ref string, verify, ask bool) (install.Binding, error) {
 	sp := spinner.New(cmd.ErrOrStderr())
 	sp.Start("Loading projects…")
@@ -628,7 +560,6 @@ func (app *App) resolveBinding(cmd *cobra.Command, cfg *config.Config, existing 
 
 	client, err := app.newClient(cfg)
 	if err != nil {
-		// A dry run does not sign in; without a credential the binding stands unchecked.
 		if existing != nil && errors.Is(err, auth.ErrNotLoggedIn) {
 			return install.Kept(existing), nil
 		}
@@ -655,9 +586,6 @@ func (app *App) resolveBinding(cmd *cobra.Command, cfg *config.Config, existing 
 		return install.Kept(existing), nil
 	}
 
-	// One project is no choice, so it is taken without asking — on a first install and in
-	// place of a binding the account cannot see alike. Several are a picker, the bound one
-	// marked and kept by Enter.
 	p, err := soleOrPick(cmd, projects, current)
 	if err != nil {
 		return install.Binding{}, err
@@ -668,9 +596,6 @@ func (app *App) resolveBinding(cmd *cobra.Command, cfg *config.Config, existing 
 	return boundTo(p, cfg), nil
 }
 
-// unreachableBinding says why the repository's project is not among those the current
-// credential can see: the environment it was bound in when that differs, else the
-// organization it belongs to, which the developer may be able to switch to.
 func unreachableBinding(existing *termaproject.File, cfg *config.Config) string {
 	p := existing.Project
 	org := cmp.Or(cfg.OrganizationName, cfg.OrganizationID)
@@ -687,7 +612,6 @@ func unreachableBinding(existing *termaproject.File, cfg *config.Config) string 
 	return msg
 }
 
-// environmentLabel names a built-in environment in a sentence.
 func environmentLabel(env string) string {
 	if env == "" || env == config.EnvProd {
 		return "production"
@@ -695,15 +619,9 @@ func environmentLabel(env string) string {
 	return "the " + env + " environment"
 }
 
-// serverKeyBinding is the project a server key (TERMA_API_KEY) belongs to. A ter_srv_ key
-// is scoped to exactly one project, and the account service that lists projects accepts
-// only a signed-in user, so the API gateway's /v1/identity is what can say which project
-// it is. A --project or an existing binding that names a different project is an error
-// rather than a silent switch: the key could not deliver that project's events. It asks
-// on every install, a reinstall with a binding included, because that is what verifies the
-// key still belongs to the bound project; the key needs the network to deliver anyway.
-// /v1/identity names no project, so a first install records none (Name is omitempty) and
-// output falls back to the id.
+// serverKeyBinding asks the gateway's /v1/identity, since the account service lists
+// projects only for a signed-in user; another project is refused, as the key cannot
+// deliver its events.
 func (app *App) serverKeyBinding(ctx context.Context, cfg *config.Config, existing *termaproject.File, ref string) (install.Binding, error) {
 	client, err := app.newClient(cfg)
 	if err != nil {
@@ -739,8 +657,6 @@ func nonProd(env string) string {
 	return env
 }
 
-// splitCommas splits a comma-joined list — a flag's value, the `sessions` attribute of
-// a commit record — dropping empties and the spaces around each item.
 func splitCommas(s string) []string {
 	var out []string
 	for item := range strings.SplitSeq(s, ",") {
@@ -750,8 +666,6 @@ func splitCommas(s string) []string {
 	}
 	return out
 }
-
-// --- uninstall ---------------------------------------------------------------------
 
 func (app *App) newUninstallCommand() *cobra.Command {
 	var assumeYes bool
@@ -840,9 +754,7 @@ with 'terma nate'.`,
 					return err
 				}
 			}
-			// Every harness that reads a repository policy, not only the ones some
-			// install chose: uninstall removes whatever of terma's is here, and a policy
-			// that is not there is nothing to remove.
+			// Every scoped harness, not only the ones an install chose.
 			for _, h := range app.agents.Harnesses() {
 				scoped, ok := h.(harness.Scoped)
 				if !ok {
@@ -852,12 +764,8 @@ with 'terma nate'.`,
 					fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not remove %s's repository policy: %v\n", h.DisplayName(), err)
 				}
 			}
-			// Per-repo routing state (the routing record) is
-			// keyed by project id, not by clone, and shared across every worktree or
-			// repository bound to that project — so it is left in place, exactly as the
-			// keystore keys are. Removing .terma/settings.json below un-binds this checkout,
-			// which is what stops routing here; other checkouts of the same project keep
-			// working. `terma nate` is the machine-level teardown.
+			// Routing records and keys are per project, shared with other checkouts, so they
+			// stay; removing the binding is what stops routing here.
 			if gitDir != "" {
 				if err := install.Unwire(ctx, root, gitDir); err != nil {
 					return err
@@ -874,8 +782,8 @@ with 'terma nate'.`,
 				return err
 			}
 			if stateDir != gitDir {
-				// A workspace that gained Git retains private session storage, but
-				// its Git hook restoration journal lives in the worktree metadata.
+				// A workspace that gained Git keeps private session storage, but its hook
+				// restoration journal lives in the worktree metadata.
 				if gitDir != "" {
 					if err := session.Open(gitDir).Remove(); err != nil {
 						return err

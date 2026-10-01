@@ -36,9 +36,7 @@ type tokenResponse struct {
 	} `json:"user"`
 }
 
-// LoginResult is a completed sign-in. The organization and user names ride alongside
-// the credential so `terma whoami` and the login summary can print them without
-// another round trip.
+// LoginResult is a completed sign-in, with the organization and user names to print.
 type LoginResult struct {
 	Credential       *auth.Credential
 	OrganizationName string
@@ -67,8 +65,7 @@ func (c *Client) ExchangeCode(ctx context.Context, code, verifier string, port i
 	return cred, nil
 }
 
-// LastLogin returns the organization/user detail from the most recent exchange on
-// this client, so the login command can print who it signed in as.
+// LastLogin returns the most recent exchange's result on this client.
 func (c *Client) LastLogin() *LoginResult {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -136,11 +133,8 @@ func (c *Client) refreshIfNeeded(ctx context.Context) error {
 	return c.refreshIfCurrent(ctx, gen)
 }
 
-// refreshIfCurrent redeems the refresh token only if no other goroutine has already
-// rotated past the given generation. It serializes on refreshMu, so two racing callers
-// produce exactly one token exchange: the first rotates and bumps the generation, and
-// the second — now observing a newer generation — returns without redeeming the same
-// refresh token again (which reuse detection would read as theft and log everyone out).
+// refreshIfCurrent redeems the refresh token only if no other goroutine has rotated past
+// gen, so racing callers make exactly one exchange.
 func (c *Client) refreshIfCurrent(ctx context.Context, gen uint64) error {
 	c.refreshMu.Lock()
 	defer c.refreshMu.Unlock()
@@ -150,11 +144,8 @@ func (c *Client) refreshIfCurrent(ctx context.Context, gen uint64) error {
 	return c.refresh(ctx)
 }
 
-// refresh rotates the token pair and persists it. It must be called with refreshMu
-// held (via refreshIfCurrent) so only one rotation is ever in flight. Persisting
-// immediately matters: the server has already invalidated the old refresh token, so
-// losing the new one to a crash would strand the session even though the user is still
-// authorized.
+// refresh rotates the token pair and persists it at once, since the server has already
+// invalidated the old refresh token; call it with refreshMu held.
 func (c *Client) refresh(ctx context.Context) error {
 	c.mu.Lock()
 	if c.credential == nil || c.credential.RefreshToken == "" {
@@ -186,8 +177,7 @@ func (c *Client) refresh(ctx context.Context) error {
 	return nil
 }
 
-// RevokeSession ends the calling session server-side. Called by `terma logout`
-// before the local credential file is cleared.
+// RevokeSession ends the calling session server-side.
 func (c *Client) RevokeSession(ctx context.Context) error {
 	return c.AuthPost(ctx, "/v1/auth/cli/revoke", nil, nil)
 }

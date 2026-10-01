@@ -100,8 +100,7 @@ would leave live tokens that anyone holding a copy could keep using.`,
 				fmt.Fprintln(cmd.OutOrStdout(), "Already logged out.")
 				return nil
 			}
-			// A failed revoke must not strand the local credential — the user asked to be
-			// logged out, so report it and still clear the file.
+			// A failed revoke still clears the local file: the user asked to be logged out.
 			for _, cred := range creds {
 				if err := app.revokeSession(cmd.Context(), cfg, cred); err != nil {
 					fmt.Fprintf(cmd.ErrOrStderr(), "Warning: could not revoke the session for %s server-side (%v).\n",
@@ -158,14 +157,11 @@ func (app *App) newWhoamiCommand() *cobra.Command {
 				pairs = append(pairs, [2]string{"user", identity.UserID})
 			}
 			pairs = append(pairs, [2]string{"organization", cmp.Or(cfg.OrganizationName, identity.OrganizationID)})
-			// whoami describes the credential, which is org-scoped; the project
-			// comes from the repository binding or a one-command override.
 			if cfg.ProjectID != "" {
 				pairs = append(pairs, [2]string{"project", cmp.Or(cfg.ProjectName, cfg.ProjectID)})
 			} else {
 				pairs = append(pairs, [2]string{"project", "(no repository project)"})
 			}
-			// Other organizations this profile can switch to without a browser.
 			if cfg.APIKey == "" {
 				if creds, err := auth.Credentials(cfg.ProfileName); err == nil && len(creds) > 1 {
 					pairs = append(pairs, [2]string{"also signed in", fmt.Sprintf("%d other organization(s) — see `terma org list`", len(creds)-1)})
@@ -177,8 +173,6 @@ func (app *App) newWhoamiCommand() *cobra.Command {
 	}
 }
 
-// orgRef is how a user names an organization on the command line: an id, or a name to
-// match against the organizations they belong to.
 type orgRef struct {
 	ID   string
 	Name string
@@ -186,7 +180,7 @@ type orgRef struct {
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
-// parseOrgRef reads an argument. Ids are UUIDs; anything else is taken as a name.
+// parseOrgRef takes a UUID as an id and anything else as a name.
 func parseOrgRef(arg string) orgRef {
 	arg = strings.TrimSpace(arg)
 	if arg == "" {
@@ -200,7 +194,6 @@ func parseOrgRef(arg string) orgRef {
 
 func (r orgRef) empty() bool { return r.ID == "" && r.Name == "" }
 
-// matches reports whether an organization is the one referred to.
 func (r orgRef) matches(id, name string) bool {
 	if r.ID != "" {
 		return r.ID == id
@@ -214,34 +207,28 @@ func (r orgRef) hint() string { return cmp.Or(r.ID, r.Name) }
 func (r orgRef) String() string { return cmp.Or(r.Name, r.ID) }
 
 type signInOptions struct {
-	// org is the organization to sign into. Empty means whichever is active, or
-	// whatever the user picks in the browser.
-	org orgRef
-	// force skips reuse: the browser opens and a new session is minted.
-	force     bool
-	noBrowser bool
-	label     string
-	// pauseBeforeBrowser lets setup explain the handoff before opening a browser.
+	// org empty means whichever is active, or whatever the user picks in the browser.
+	org                orgRef
+	force              bool
+	noBrowser          bool
+	label              string
 	pauseBeforeBrowser bool
 }
 
 type signInResult struct {
 	cred    *auth.Credential
 	orgName string
-	// reused is true when a stored session served, and no browser opened.
-	reused bool
+	reused  bool
 }
 
-// signedInAs is the one sentence that says who is signed in and where, without its
-// full stop so a caller can qualify it.
+// signedInAs has no full stop so a caller can qualify it.
 func (r *signInResult) signedInAs() string {
 	return fmt.Sprintf("Signed in as %s in %s", cmp.Or(r.cred.UserEmail, "your account"),
 		cmp.Or(r.orgName, r.cred.OrganizationID))
 }
 
-// signInAndReload signs in and returns the configuration as the sign-in left
-// it: signing in points the profile at the credential's organization, so the
-// configuration loaded before it is stale.
+// signInAndReload reloads because signing in points the profile at the credential's
+// organization, so the configuration loaded before it is stale.
 func (app *App) signInAndReload(cmd *cobra.Command, cfg *config.Config, opts signInOptions) (*config.Config, error) {
 	_, err := app.signIn(cmd, cfg, opts)
 	if err != nil {
@@ -250,11 +237,8 @@ func (app *App) signInAndReload(cmd *cobra.Command, cfg *config.Config, opts sig
 	return app.loadConfig()
 }
 
-// signIn is the one way a command obtains a credential. It prefers a session the
-// profile already holds — verified against the auth host, so a revoked or expired one
-// is not handed back — and opens the browser only when there is none for the
-// organization asked for. Every path ends with the credential active in the store and
-// the profile pointed at its organization.
+// signIn is the one way a command obtains a credential: a stored session verified
+// against the auth host, else the browser.
 func (app *App) signIn(cmd *cobra.Command, cfg *config.Config, opts signInOptions) (*signInResult, error) {
 	if cfg.APIKey != "" {
 		return nil, errors.New("TERMA_API_KEY is set — unset it to sign in as a user, or keep using the server key")
@@ -264,9 +248,8 @@ func (app *App) signIn(cmd *cobra.Command, cfg *config.Config, opts signInOption
 
 	want := opts.org
 	if !opts.force {
-		// A name has to become an id to find a stored credential; that needs any
-		// working credential to list the organizations with. Without one the browser
-		// resolves it — the page preselects by name as well as by id.
+		// A name must become an id to find a stored credential; without a working
+		// credential to list organizations, the browser page resolves the name.
 		if want.ID == "" && want.Name != "" {
 			if org, err := app.resolveOrganization(ctx, cfg, want); err == nil {
 				want = orgRef{ID: org.ID, Name: org.Name}
@@ -311,9 +294,7 @@ func (app *App) signIn(cmd *cobra.Command, cfg *config.Config, opts signInOption
 	if err != nil {
 		return nil, err
 	}
-	// The session this one supersedes is revoked so a re-login does not leave a trail
-	// of live sessions. Best-effort: it may already be dead, which is often why the
-	// user is here.
+	// Best-effort: the superseded session may already be dead, often why the user is here.
 	if replaced != nil {
 		_ = app.revokeSession(ctx, cfg, replaced)
 	}
@@ -323,10 +304,8 @@ func (app *App) signIn(cmd *cobra.Command, cfg *config.Config, opts signInOption
 	return &signInResult{cred: cred, orgName: orgName}, nil
 }
 
-// reuseStoredSession tries the credential the profile holds for the organization asked
-// for (the active one when none was), verifies it still works, and makes it active. A
-// dead credential is dropped so it is not tried again. ok is false when there is
-// nothing usable and the caller should open the browser.
+// reuseStoredSession drops a dead credential so it is not tried again; ok false means
+// open the browser.
 func (app *App) reuseStoredSession(ctx context.Context, cfg *config.Config, want orgRef) (*signInResult, bool, error) {
 	var cred *auth.Credential
 	var err error
@@ -334,7 +313,6 @@ func (app *App) reuseStoredSession(ctx context.Context, cfg *config.Config, want
 	case want.ID != "":
 		cred, err = auth.LoadCredentialFor(cfg.ProfileName, want.ID)
 	case want.Name != "":
-		// Unresolved name: nothing stored can be known to match.
 		return nil, false, nil
 	default:
 		cred, err = auth.LoadCredential(cfg.ProfileName)
@@ -362,8 +340,6 @@ func (app *App) reuseStoredSession(ctx context.Context, cfg *config.Config, want
 		orgName = cfg.OrganizationName
 	}
 	if orgName == "" {
-		// Switching to a parked credential whose name the profile no longer holds:
-		// one listing names it. Not fatal if it cannot.
 		if org, err := app.lookupOrganization(ctx, cfg, verified, verified.OrganizationID); err == nil {
 			orgName = org.Name
 		}
@@ -378,9 +354,8 @@ func (app *App) reuseStoredSession(ctx context.Context, cfg *config.Config, want
 	return &signInResult{cred: verified, orgName: orgName, reused: true}, true, nil
 }
 
-// verifyCredential asks the auth host who the credential is, refreshing it if the
-// access token is spent. It returns the credential as it now stands — possibly a
-// rotated pair, already persisted for its organization.
+// verifyCredential returns the credential as it now stands: possibly a rotated pair,
+// already persisted for its organization.
 func (app *App) verifyCredential(ctx context.Context, cfg *config.Config, cred *auth.Credential) (*auth.Credential, identityResponse, error) {
 	client, err := api.New(cfg, api.Options{Version: app.version, Credential: cred})
 	if err != nil {
@@ -397,13 +372,8 @@ func (app *App) verifyCredential(ctx context.Context, cfg *config.Config, cred *
 	return current, identity, nil
 }
 
-// errNoWorkingCredential means no stored credential could reach the auth host, so
-// nothing that needs one — listing organizations, resolving a name — is possible.
 var errNoWorkingCredential = errors.New("no working credential")
 
-// workingClient returns a client on the first stored credential that still works,
-// the active one first. It is how a command lists organizations before it knows which
-// one it wants.
 func (app *App) workingClient(ctx context.Context, cfg *config.Config) (*api.Client, error) {
 	if cfg.APIKey != "" {
 		return app.newClient(cfg)
@@ -440,8 +410,6 @@ func fetchOrganizations(ctx context.Context, client *api.Client) ([]organization
 	return resp.Organizations, nil
 }
 
-// resolveOrganization turns a reference into one of the organizations the user
-// belongs to, using whichever stored credential still works.
 func (app *App) resolveOrganization(ctx context.Context, cfg *config.Config, ref orgRef) (*organization, error) {
 	client, err := app.workingClient(ctx, cfg)
 	if err != nil {
@@ -454,7 +422,6 @@ func (app *App) resolveOrganization(ctx context.Context, cfg *config.Config, ref
 	return matchOrganization(orgs, ref.String())
 }
 
-// lookupOrganization names an organization by id using a specific credential.
 func (app *App) lookupOrganization(ctx context.Context, cfg *config.Config, cred *auth.Credential, id string) (*organization, error) {
 	client, err := api.New(cfg, api.Options{Version: app.version, Credential: cred})
 	if err != nil {
@@ -472,13 +439,10 @@ func (app *App) lookupOrganization(ctx context.Context, cfg *config.Config, cred
 	return nil, fmt.Errorf("organization %s not found", id)
 }
 
-// matchOrganization resolves an argument the way every named thing resolves; see
-// matchKind.index.
 func matchOrganization(orgs []organization, query string) (*organization, error) {
 	return organizationKind.match(orgs, query)
 }
 
-// revokeSession ends one stored session server-side.
 func (app *App) revokeSession(ctx context.Context, cfg *config.Config, cred *auth.Credential) error {
 	client, err := api.New(cfg, api.Options{Version: app.version, Credential: cred})
 	if err != nil {
@@ -487,12 +451,11 @@ func (app *App) revokeSession(ctx context.Context, cfg *config.Config, cred *aut
 	return client.RevokeSession(ctx)
 }
 
-// applyLogin records the account scope. Project selection belongs to repositories.
+// applyLogin records only the account scope: project selection belongs to repositories.
 func applyLogin(p *config.Profile, cred *auth.Credential, orgName string) {
 	p.SelectOrganization(cred.OrganizationID, orgName)
 }
 
-// waitForBrowserEnter runs before starting login, so the user can take their time.
 func waitForBrowserEnter(cmd *cobra.Command) error {
 	fmt.Fprint(cmd.ErrOrStderr(), "Press Enter to open your browser and sign in to Terma (Ctrl-C to cancel): ")
 	// Do not buffer input: queued answers belong to the prompts that follow.

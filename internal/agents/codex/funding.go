@@ -18,14 +18,9 @@ import (
 
 const codexTailLimit = 1 << 20
 
-// CodexOAuthAccountID returns the ChatGPT account id Codex is signed in with, and true, when the
-// effective auth route is the ChatGPT subscription: auth_mode "chatgpt" with no OPENAI_API_KEY in the
-// auth.json. On the API-key route the cached tokens.account_id is not the paying identity, so this
-// returns "", false — the mirror of claudeOAuthAccountID's api-key/bedrock/vertex gate. The auth.json
-// is the source of truth: an exported OPENAI_API_KEY alone does NOT authenticate Codex's built-in
-// provider (that needs `codex login --with-api-key`, which persists auth_mode/OPENAI_API_KEY to the
-// file), so an unused shell var must not suppress a genuine subscription attribution. The id is
-// evidence of who a subscription session belongs to, never asserted for API metering.
+// CodexOAuthAccountID returns the ChatGPT account id when auth.json's route is the
+// subscription (auth_mode "chatgpt", no OPENAI_API_KEY in the file). A shell
+// OPENAI_API_KEY alone does not authenticate Codex, so it does not suppress this.
 func CodexOAuthAccountID() (string, bool) {
 	home, err := codexHome()
 	if err != nil {
@@ -39,8 +34,7 @@ func CodexOAuthAccountID() (string, bool) {
 	if json.Unmarshal(doc["OPENAI_API_KEY"], &apiKey) == nil && apiKey != "" {
 		return "", false
 	}
-	// Require a positively-decoded chatgpt auth_mode: an absent/null/malformed mode is not proof of
-	// the subscription route, so it withholds rather than falling through to the cached account.
+	// An absent or malformed mode is no proof of the subscription route.
 	var mode string
 	if json.Unmarshal(doc["auth_mode"], &mode) != nil || mode != "chatgpt" {
 		return "", false
@@ -48,23 +42,16 @@ func CodexOAuthAccountID() (string, bool) {
 	var tokens struct {
 		AccountID string `json:"account_id"`
 	}
-	// Bound and shape-check the id before exporting it: readEvidenceJSON permits a 2 MiB file, and an
-	// unvalidated account_id would ride verbatim into every quota spool entry (a malformed/huge value
-	// could blow the 16 MiB spool budget). EvidenceLabel is the same guard other exported ids use.
+	// Shape-checked: an unvalidated id would ride verbatim into every quota spool entry.
 	if json.Unmarshal(doc["tokens"], &tokens) != nil || !harness.EvidenceLabel.MatchString(tokens.AccountID) {
 		return "", false
 	}
 	return tokens.AccountID, true
 }
 
-// CodexOAuthUser returns the ChatGPT per-user identity Codex is signed in with — the stable, opaque
-// user_id and the (mutable) login email — and true, when the effective auth route is the ChatGPT
-// subscription (the same gate as CodexOAuthAccountID). Both matter because Codex's native OTel export
-// exposes NEITHER as a per-user id: it emits only the shared workspace account_id and the mutable
-// user.email. The stable user_id lives solely in the id_token JWT here, so this funding record is the
-// only channel that can give the platform a durable Codex principal. Read from the auth.json id_token,
-// never asserted on the API-key route. Emitted raw (the platform hashes/renames); never the git
-// enduser.id, which is user-set and unreliable.
+// CodexOAuthUser returns the ChatGPT user_id and login email under CodexOAuthAccountID's
+// gate: Codex's export carries only the shared workspace account_id, so the id_token is
+// the one source of a durable principal.
 func CodexOAuthUser() (email, userID string, ok bool) {
 	home, err := codexHome()
 	if err != nil {
@@ -92,10 +79,8 @@ func CodexOAuthUser() (email, userID string, ok bool) {
 	return email, userID, true
 }
 
-// codexIDClaims decodes a JWT id_token payload (signature NOT verified — the token is Codex's own
-// local credential used purely as identity evidence, never a security boundary here). Returns the
-// verified login email and the stable opaque `user_id` (the OpenAI-namespaced claim), each "" when
-// absent or implausible; both are shape-checked before they can ride into a spool entry verbatim.
+// codexIDClaims decodes the id_token without verifying it: identity evidence, not a
+// security boundary. Both values are shape-checked before they reach a spool entry.
 func codexIDClaims(idToken string) (email, userID string) {
 	parts := strings.Split(idToken, ".")
 	if len(parts) != 3 {
@@ -168,13 +153,9 @@ func findCodexRollout(ctx context.Context, root *os.Root, dir, id string, depth 
 	return ""
 }
 
-// openCodexRollout opens one thread's rollout through a confined root, for every reader
-// of it (funding, replies, the spawn record). The hook's transcript_path is a hint, not
-// permission to read an arbitrary file: the path must sit under CODEX_HOME's session
-// directories, must not be reached through a symlink, and the file's own session_meta
-// must name this thread. Only plain JSONL is supported. A nil file comes with the
-// reason as the status — unsupported_path, unsupported, session_mismatch, unreadable,
-// search_limit, missing — which a caller reports rather than treats as an error.
+// openCodexRollout opens a thread's rollout through a confined root: the path must sit
+// under CODEX_HOME's session directories, not through a symlink, and its session_meta must
+// name this thread. A nil file comes with the reason as status.
 func openCodexRollout(ctx context.Context, sessionID, transcript string) (*os.File, string) {
 	status := "missing"
 	if !harness.EvidenceLabel.MatchString(sessionID) || strings.ContainsAny(sessionID, `/\`) {
@@ -211,7 +192,7 @@ func openCodexRollout(ctx context.Context, sessionID, transcript string) (*os.Fi
 			return nil, status
 		}
 	} else {
-		// Older hooks may omit transcript_path. Bound discovery as well as the read.
+		// Older hooks may omit transcript_path; discovery is bounded too.
 		budget := 4096
 		readFailed := false
 		for _, dir := range []string{"sessions", "archived_sessions"} {
@@ -229,7 +210,7 @@ func openCodexRollout(ctx context.Context, sessionID, transcript string) (*os.Fi
 			return nil, status
 		}
 	}
-	// Reject symlinks and non-regular files before opening (no FIFO can block a hook).
+	// Rejected before opening, so no FIFO can block a hook.
 	st, err := root.Lstat(rel)
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {

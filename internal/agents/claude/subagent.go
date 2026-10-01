@@ -13,18 +13,13 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// claudeSubagentDir holds launch evidence per (session, agent), so internal forks'
-// orphan stop hooks cannot create delegated runs.
+// claudeSubagentDir holds launch evidence per (session, agent).
 const claudeSubagentDir = "claude-subagents"
 
-// Claude's internal forks mint agent ids and fire SubagentStop without ever
-// dispatching SubagentStart or being launched by Agent/Task. Their agent_type can
-// inherit the session's --agent, so neither an id nor a type proves delegation.
-// Keep launch evidence across hook processes and spool flushes instead.
-//
-// Each (session, agent) has its own marker, written whole with no read/modify/write
-// cycle or shared index. Concurrent launches cannot overwrite one another. The
-// repository is not part of the key: a subagent can run in another worktree.
+// Claude Code's internal forks mint agent ids and fire SubagentStop without a launch, so only a
+// recorded launch proves delegation. One marker per (session, agent), written whole, so concurrent
+// launches never overwrite one another; the repository is not in the key, since a subagent can run
+// in another worktree.
 func claudeSubagentPath(sessionID, agentID string) (string, error) {
 	dir, err := config.Dir()
 	if err != nil {
@@ -55,8 +50,7 @@ func knownClaudeSubagent(e hookrun.Env, sessionID, agentID string) bool {
 		return false
 	}
 	info, err := os.Lstat(path)
-	// Keep the marker after a stop: hooks can keep an agent running or it can be
-	// resumed. SessionStart prunes old markers; enforce the same age on reads.
+	// Kept after a stop, since an agent can be resumed; aged out like the spool.
 	return err == nil && info.Mode().IsRegular() && !info.ModTime().Before(e.Time().Add(-spool.MaxAge))
 }
 
@@ -66,15 +60,12 @@ func pruneClaudeSubagents(e hookrun.Env) {
 	}
 }
 
-// subagentStart handles the first half of Claude Code's subagent lifecycle. The payload
-// is the parent's (session_id, cwd, prompt_id) plus agent_id and agent_type. The
-// subagent's transcript path and last message are in the payload too and are never read.
+// subagentStart handles SubagentStart; the transcript path and last message are never read.
 func subagentStart(ctx context.Context, env hookrun.Env) error {
 	return claudeSubagent(ctx, env, hookrun.EventSubagentStart)
 }
 
-// subagentStop handles the second half for an agent whose launch terma observed.
-// Claude's internal forks also fire this hook, without a delegated launch.
+// subagentStop handles SubagentStop for an agent whose launch terma observed.
 func subagentStop(ctx context.Context, env hookrun.Env) error {
 	return claudeSubagent(ctx, env, hookrun.EventSubagentEnd)
 }
@@ -96,8 +87,7 @@ func claudeSubagent(ctx context.Context, env hookrun.Env, name string) error {
 	if name == hookrun.EventSubagentStart {
 		rememberClaudeSubagent(env, in.SessionID, in.AgentID)
 	} else if !knownClaudeSubagent(env, in.SessionID, in.AgentID) {
-		// Internal forks (background summaries, prompt suggestions, /btw) also
-		// fire SubagentStop. Only a launch establishes a delegated run.
+		// Internal forks (background summaries, prompt suggestions, /btw) fire it too.
 		return nil
 	}
 	attrs := hookrun.AgentAttrs(map[string]any{hookrun.AttrTool: claudeTool, hookrun.AttrSchemaVersion: 1}, in.AgentID, in.AgentType)
@@ -111,31 +101,13 @@ func claudeSubagent(ctx context.Context, env hookrun.Env, name string) error {
 	return nil
 }
 
-// isClaudeAgentTool reports whether a tool is the one that launches a subagent: "Agent"
-// today, "Task" in the builds before it.
+// isClaudeAgentTool reports whether a tool launches a subagent: "Agent", or "Task" in older builds.
 func isClaudeAgentTool(name string) bool { return name == "Agent" || name == "Task" }
 
-// claudeAgentResult is the Agent tool's response, as far as terma reads it. The
-// response also carries the task's prompt and the subagent's reply (prompt, description,
-// content); they are conversation content, have no field here, and so are never decoded.
-//
-// A subagent launched in the background returns at once with status "async_launched"
-// and nothing but its id and model. One the parent waits for returns "completed" with
-// the subagent's own account of the run: how long it took, how many tools it used and
-// what they did. Every number is optional, and a missing one stays missing rather than
-// zero.
-//
-// WHAT IT DOES NOT HOLD IS WHAT THE RUN SPENT, whatever the field names suggest. `usage`
-// is the usage of the subagent's LAST API request, and `totalTokens` is that one
-// request's four classes added up — the size the subagent's context had reached when it
-// finished. Two live runs, 2026-09-21 (Claude Code 2.1.278), each of two requests
-// (input / cache read / cache write): 10/0/13071 then 8/13071/2357, and the response
-// said usage 8/13071/2357, totalTokens 15572; 10/0/13060 then 8/13060/2192, and it said
-// 8/13060/2192, 15385. The first request is in neither. So `usage` has no field here
-// beyond its two labels: its numbers are one request's, which the native export already
-// carries under that request's own id, and beside a run's duration they read as the
-// run's — the first cut of this event, and the platform adapter written against it, took
-// them for exactly that until a reviewer added the requests up.
+// claudeAgentResult is the Agent tool's response as far as terma reads it; the prompt,
+// description and reply have no field, so they are never decoded. Every number stays missing
+// rather than zero when absent. `usage` and `totalTokens` describe the subagent's last API request
+// (the context's final size), not what the run spent, so only usage's two labels are read.
 type claudeAgentResult struct {
 	Status            string          `json:"status"`
 	IsAsync           *bool           `json:"isAsync"`
@@ -160,13 +132,8 @@ type claudeAgentResult struct {
 	} `json:"toolStats"`
 }
 
-// claudeSubagentCall records the Agent tool call a subagent was launched by. It is the
-// only hook that names the subagent's model (SubagentStart does not), and for a
-// subagent the parent waited on, the only record of how the run went that is keyed to
-// the subagent: how long it took, how many tools it used, what they did, and how large
-// its context had grown (final_context_tokens — see claudeAgentResult for why that is
-// not what it spent). What a subagent spent is the native export's to say, request by
-// request; no hook reports it for a run.
+// claudeSubagentCall records the Agent tool call that launched a subagent: the only hook naming its
+// model and, when the parent waited, how the run went. final_context_tokens is a size, never a spend.
 func claudeSubagentCall(e hookrun.Env, r *hookrun.Repo, in *claudeHookInput) {
 	var res claudeAgentResult
 	if len(in.ToolResponse) == 0 || json.Unmarshal(in.ToolResponse, &res) != nil {
@@ -179,8 +146,7 @@ func claudeSubagentCall(e hookrun.Env, r *hookrun.Repo, in *claudeHookInput) {
 	}
 	rememberClaudeSubagent(e, in.SessionID, res.AgentID)
 	attrs := hookrun.AgentAttrs(map[string]any{hookrun.AttrTool: claudeTool, hookrun.AttrSchemaVersion: 1}, res.AgentID, cmp.Or(res.AgentType, in.ToolInput.SubagentType))
-	// A subagent can launch one of its own: the hook then fires inside the launching
-	// agent and names it, which is the new agent's parent.
+	// A subagent can launch one of its own; the hook then names the launching agent, the new one's parent.
 	if session.ValidID(in.AgentID) && in.AgentID != res.AgentID {
 		attrs[hookrun.AttrAgentParentID] = in.AgentID
 	}

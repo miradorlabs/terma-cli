@@ -22,7 +22,7 @@ import (
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 )
 
-// Exercise real installed hooks, background delivery and API read-back together.
+// Real installed hooks, background delivery and API read-back together.
 func TestDoctorScratchCommitRoundTrip(t *testing.T) {
 	bin := termaBinary(t)
 	repo := installRepo(t)
@@ -37,7 +37,6 @@ func TestDoctorScratchCommitRoundTrip(t *testing.T) {
 		mu.Lock()
 		defer mu.Unlock()
 		if r.URL.Path == "/v1/identity" {
-			// What the API gateway says about a server key: the one project it belongs to.
 			fmt.Fprintf(w, `{"project_id":%q,"organization_id":"org","auth_type":"server_key"}`, testProjectID)
 			return
 		}
@@ -122,8 +121,7 @@ func TestDoctorScratchCommitRoundTrip(t *testing.T) {
 	}
 }
 
-// A first install leaves its hook files uncommitted until the developer adds them.
-// The install's immediate doctor check must run those files in its scratch worktree.
+// Install's doctor check runs the still-uncommitted hook files in its scratch worktree.
 func TestDoctorScratchCommitWithUncommittedHooks(t *testing.T) {
 	s := newInstallSandbox(t)
 	s.env = append(s.env, "HOME="+s.mkdir("home"))

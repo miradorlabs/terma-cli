@@ -8,40 +8,23 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-// Claude Code resolves a setting from several files, and the user-level one Terma
-// writes is the *lowest* precedence of them: managed settings, then `--settings`, then
-// `.claude/settings.local.json`, then `.claude/settings.json`, then
-// `~/.claude/settings.json`. An `env` block is an ordinary key and follows that order.
-//
-// So checking only the file Terma writes is not enough to know where telemetry will
-// actually go. A project file — or a variable exported in the shell — can define
-// OTEL_EXPORTER_OTLP_TRACES_ENDPOINT and win, while the user file supplies the generic
-// Authorization header carrying Terma's key. Neither of those is Terma's to edit, so
-// they are reported as conflicts that --force cannot clear and connect must refuse.
-//
-// This is a best-effort scan of the directory the CLI happens to be run from. Claude Code
-// may later run somewhere else entirely, with different project settings; that is stated
-// in the docs rather than papered over here.
-//
-// A repository-scope connect writes one of those project files itself. What outranks
-// *that* is narrower — the same repository's settings.local.json, and the shell — and
-// the user file below it is not a conflict at all: the project file is meant to win.
+// Claude Code applies managed settings, `--settings`, `.claude/settings.local.json` and
+// `.claude/settings.json` over the user file terma writes, and a shell export may win too, so a
+// redirect there gets terma's key; those are conflicts --force cannot clear. The scan covers only
+// the directory the CLI runs from.
 
-// claudeLayer is the file a Claude value writes, seen from conflict detection: what to
-// call a setting found in the file itself, how to name the file when an outranking
-// setting overrides it, and which project files Claude Code applies over it.
+// claudeLayer is the file a value writes, seen from conflict detection: its scope label, its
+// name in prose, and the project files that outrank it.
 type claudeLayer struct {
 	scope      string
 	over       string
 	outranking []string
 }
 
-// scopeRepositorySettings labels a conflict found in the repository's own
-// .claude/settings.json during a repository-scope connect. Like ScopeUserSettings it is
-// the file Terma is writing, so such a conflict is clearable with --force.
+// scopeRepositorySettings labels a conflict in the repository's own .claude/settings.json,
+// which is clearable because terma is writing that file.
 const scopeRepositorySettings = "repository settings"
 
-// layer describes the file this value writes.
 func (c exporter) layer() claudeLayer {
 	if c.root != "" {
 		return claudeLayer{
@@ -59,10 +42,8 @@ func (c exporter) layer() claudeLayer {
 	}
 }
 
-// projectFilesAbove lists the project settings files Claude Code applies over the user
-// file, for the directory the CLI was run from: both files at each level, local before
-// shared to match Claude Code's own precedence, walking up to the repository root so a
-// subdirectory of a repository still finds the project's settings.
+// projectFilesAbove lists both project settings files at each level up to the repository root,
+// local before shared as Claude Code applies them.
 func projectFilesAbove() []string {
 	dir, err := os.Getwd()
 	if err != nil {
@@ -85,8 +66,6 @@ func projectFilesAbove() []string {
 	return out
 }
 
-// redirectKeys are the settings that decide where telemetry goes, and therefore the ones
-// worth hunting for outside the user file.
 func redirectKeys() []string {
 	keys := []string{harness.EnvOTLPEndpoint, harness.EnvOTLPHeaders, claudeBetaTracingEndpoint}
 	for _, o := range perSignalOverrides {
@@ -95,13 +74,8 @@ func redirectKeys() []string {
 	return keys
 }
 
-// environmentConflicts reports redirect settings exported in the process environment.
-//
-// Whether a settings-file `env` entry beats an already-exported shell variable is not
-// documented for the OTEL_* names, so this refuses to guess: an exported value that
-// disagrees with what Terma is about to install is reported, and the user is told to
-// unset it. Being wrong in the other direction would mean writing a credential into a
-// config whose destination is decided elsewhere.
+// environmentConflicts reports redirect settings exported in the shell. Whether a settings `env`
+// entry beats a shell variable is undocumented, so any disagreeing export is reported.
 func environmentConflicts(e harness.Exporter) []harness.Conflict {
 	var out []harness.Conflict
 	for _, key := range redirectKeys() {
@@ -127,8 +101,6 @@ func environmentConflicts(e harness.Exporter) []harness.Conflict {
 	return out
 }
 
-// projectConflicts reports redirect settings in the project files that outrank the file
-// l describes.
 func projectConflicts(e harness.Exporter, l claudeLayer) []harness.Conflict {
 	var out []harness.Conflict
 	for _, path := range l.outranking {
@@ -147,8 +119,7 @@ func conflictsInProjectFile(path string, e harness.Exporter, l claudeLayer) []ha
 		OtelHeadersHelper string            `json:"otelHeadersHelper"`
 	}
 	if json.Unmarshal(data, &doc) != nil {
-		// A project file this CLI cannot parse is not this CLI's to complain about; the
-		// user file is still checked, and Claude Code will report its own parse error.
+		// Claude Code reports its own parse error.
 		return nil
 	}
 
@@ -183,11 +154,8 @@ func conflictsInProjectFile(path string, e harness.Exporter, l claudeLayer) []ha
 	return out
 }
 
-// captureKeys are the content-capture switches. They do not decide where telemetry
-// goes, so they are not redirectKeys and cannot leak the credential — but a
-// higher-precedence "off" silently empties every view built on prompt and tool
-// content while `telemetry status` still reports the harness connected. That silence
-// is the whole problem, so they are scanned in the outranking scopes too.
+// captureKeys cannot redirect, but an outranking "off" silently empties every content view while
+// status reports connected, so they are scanned there too.
 var captureKeys = []string{
 	otelLogUserPrompts,
 	otelLogAssistantResponse,
@@ -195,7 +163,6 @@ var captureKeys = []string{
 	otelLogToolContent,
 }
 
-// intendsCapture reports whether e turns a given capture key on.
 func intendsCapture(key string, e harness.Exporter) bool {
 	switch key {
 	case otelLogUserPrompts, otelLogAssistantResponse:
@@ -206,17 +173,13 @@ func intendsCapture(key string, e harness.Exporter) bool {
 	return false
 }
 
-// captureConflictsIn reports content capture that an outranking scope turns off while
-// this export means to turn it on.
-//
-// Advisory, always: these disclose nothing and break no export, so they must not block
-// a connect or need --force. They exist to be said out loud, because the alternative is
-// a connect that reports success and a dashboard that stays empty.
+// captureConflictsIn reports content capture an outranking scope turns off. Advisory: it never
+// blocks a connect, it only says why a dashboard stays empty.
 func captureConflictsIn(e harness.Exporter, l claudeLayer) []harness.Conflict {
 	var out []harness.Conflict
 	for _, key := range captureKeys {
 		if !intendsCapture(key, e) {
-			continue // nothing is being overridden if Terma is not asking for it
+			continue
 		}
 		if value := os.Getenv(key); value != "" && !isOn(value) {
 			out = append(out, harness.Conflict{
@@ -233,13 +196,8 @@ func captureConflictsIn(e harness.Exporter, l claudeLayer) []harness.Conflict {
 	return out
 }
 
-// captureConflictsInProjectFiles is captureConflictsIn for the project settings that
-// outrank the file l describes.
-//
-// A value Terma itself put there — a repository's local layer, written by
-// `terma connect claude --scope local` — is still reported, because it still decides
-// what leaves the machine from this repository; but it is named as the repository's
-// policy rather than as a stray override, so the reader knows which command set it.
+// captureConflictsInProjectFiles is captureConflictsIn for project files; a value terma's own
+// local connect wrote is named as the repository's policy.
 func captureConflictsInProjectFiles(e harness.Exporter, l claudeLayer) []harness.Conflict {
 	var out []harness.Conflict
 	for _, path := range l.outranking {
@@ -277,10 +235,8 @@ func captureConflictsInProjectFiles(e harness.Exporter, l claudeLayer) []harness
 	return out
 }
 
-// termaOwnedKeys reports which env keys in a project file still hold what a Terma
-// connect installed there, according to this machine's journal for that file. Best
-// effort: a colleague's committed layer has no journal here and reads as unowned,
-// which only changes the wording of an advisory.
+// termaOwnedKeys reports which env keys still hold what this machine's journal says terma
+// installed; a colleague's committed layer reads as unowned.
 func termaOwnedKeys(path string, env map[string]string) map[string]bool {
 	j, err := harness.LoadJournal(exporter{}.Name(), path)
 	if err != nil || j == nil {
@@ -295,8 +251,7 @@ func termaOwnedKeys(path string, env map[string]string) map[string]bool {
 	return owned
 }
 
-// relevantToExporter drops keys for signals Terma is not exporting: they cannot
-// redirect telemetry that is never sent.
+// relevantToExporter drops keys for signals terma is not exporting.
 func relevantToExporter(key string, e harness.Exporter) bool {
 	for _, o := range perSignalOverrides {
 		if key == o.endpoint || key == o.headers || key == o.protocol {
@@ -309,8 +264,6 @@ func relevantToExporter(key string, e harness.Exporter) bool {
 	return true
 }
 
-// expectedValue is what Terma would itself write for a key, so a value that already
-// agrees is not reported as a conflict.
 func expectedValue(key string, e harness.Exporter) (string, bool) {
 	switch key {
 	case harness.EnvOTLPEndpoint:
@@ -327,8 +280,6 @@ func expectedValue(key string, e harness.Exporter) (string, bool) {
 	return "", false
 }
 
-// isRedirect reports whether a key can move telemetry — and Terma's Authorization
-// header with it — to a host Terma does not control.
 func isRedirect(key string) bool {
 	if key == claudeBetaTracingEndpoint {
 		return true
@@ -341,8 +292,7 @@ func isRedirect(key string) bool {
 	return false
 }
 
-// redactIfHeader keeps a header bag out of terminal output: it may hold somebody else's
-// credential, and naming the variable is enough to act on.
+// redactIfHeader keeps a header bag, which may hold someone's credential, out of output.
 func redactIfHeader(key, value string) string {
 	if key == harness.EnvOTLPHeaders {
 		return ""

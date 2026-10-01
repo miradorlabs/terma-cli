@@ -22,30 +22,16 @@ import (
 	toml "github.com/pelletier/go-toml/v2"
 )
 
-// tomlFile is a harness config file whose telemetry lives in a TOML table — the shape
-// Codex uses, with everything under `[otel]` in config.toml.
-//
-// The document is parsed to read it, but it is never re-serialized as a whole. A
-// config.toml is hand-written: it carries comments, blank lines, a chosen key order, and
-// tables for MCP servers and profiles that a round trip through a parser would flatten
-// and reorder. So a write replaces only the text of the `[otel]` table — the lines from
-// its header to the next header — and leaves every other byte exactly as found. The
-// result is re-parsed before it is written, and refused if anything outside `[otel]`
-// reads differently from the original: a splice that could not be proven safe is not
-// written at all.
-//
-// Inside `[otel]` the whole table is rewritten, so comments placed within it do not
-// survive a connect. Keys in it that Terma does not own do.
+// tomlFile is Codex's config.toml, edited by splicing only the `[otel]` table's text so
+// hand-written comments, order and other tables survive byte for byte. A splice that
+// changes how anything outside `[otel]` reads is refused, not written.
 type tomlFile struct {
 	path string
-	// writePath is path with symlinks resolved, for the same reason settingsFile has one.
+	// writePath is path with symlinks resolved, so a write goes through a symlinked file.
 	writePath string
-	// raw is the file exactly as read; the splice works on this text.
-	raw []byte
-	// doc is the parsed document, for reading settings outside the otel table.
-	doc map[string]any
-	// otel is the parsed `[otel]` table, never nil. save writes this back in place of
-	// whatever the text currently holds for it.
+	raw       []byte
+	doc       map[string]any
+	// otel is the parsed `[otel]` table, never nil; save splices it back.
 	otel map[string]any
 
 	existed   bool
@@ -55,7 +41,6 @@ type tomlFile struct {
 
 const otelTable = "otel"
 
-// loadTOML reads a config file, tolerating its absence.
 func loadTOML(path string) (*tomlFile, error) {
 	f := &tomlFile{
 		path:      path,
@@ -90,8 +75,7 @@ func loadTOML(path string) (*tomlFile, error) {
 	}
 
 	if err := toml.Unmarshal(data, &f.doc); err != nil {
-		// Refusing here is the whole point: a splice into a file we cannot parse would
-		// mean rewriting settings we cannot see.
+		// A splice into a file that cannot be parsed would rewrite settings nobody can see.
 		return nil, fmt.Errorf("parse %s: %w (fix or move the file, then retry)", path, err)
 	}
 	if f.doc == nil {
@@ -100,8 +84,7 @@ func loadTOML(path string) (*tomlFile, error) {
 	if raw, ok := f.doc[otelTable]; ok {
 		table, ok := raw.(map[string]any)
 		if !ok {
-			// Codex would reject this file itself; say so rather than silently replacing
-			// whatever it is with a table.
+			// Codex would reject this file itself.
 			return nil, fmt.Errorf("parse %s: %q is %s, want a table (fix the file, then retry)",
 				path, otelTable, tomlTypeName(raw))
 		}
@@ -110,28 +93,21 @@ func loadTOML(path string) (*tomlFile, error) {
 	return f, nil
 }
 
-// save writes the document back with f.otel spliced in place of the current `[otel]`
-// text. An empty table is removed from the text rather than written as a bare header.
-//
-// tighten is set when the file now carries a credential; it clamps the mode to 0600
-// rather than preserving a permissive one. A file already at 0400 keeps that.
+// save splices f.otel in place of the current `[otel]` text, dropping an empty table.
+// tighten clamps the mode to 0600 once the file carries a credential.
 func (f *tomlFile) save(tighten bool) error {
 	out, err := spliceOtelTable(f.raw, f.otel)
 	if err != nil {
 		return fmt.Errorf("rewrite %s: %w", f.path, err)
 	}
 
-	// Prove the splice before writing it: everything outside the otel table must read
-	// exactly as it did, and the otel table must read as what was asked for. A scanner
-	// that misjudged where a table starts or ends would fail here, and the file is left
-	// untouched rather than written wrong.
+	// Prove the splice before writing it; a scanner that misjudged a table's bounds fails
+	// here and leaves the file untouched.
 	if err := verifySplice(f.doc, f.otel, out); err != nil {
 		return fmt.Errorf("rewrite %s: %w", f.path, err)
 	}
 
-	// A document with nothing left in it is removed rather than written empty — unless
-	// it is reached through a symlink, where removing the target would leave the link
-	// dangling. There, the empty text is written instead.
+	// An emptied document is removed, unless reached through a symlink, which would dangle.
 	if len(bytes.TrimSpace(out)) == 0 && !f.symlinked {
 		if !f.existed {
 			return nil
@@ -152,15 +128,14 @@ func (f *tomlFile) save(tighten bool) error {
 	return config.WriteFileAtomic(f.writePath, out, mode)
 }
 
-// backup copies the file alongside itself before the first modification. See
-// settingsFile.backup for the rule behind replace.
+// backup copies the file alongside itself before the first modification; replace lets
+// it overwrite a stale backup when the file is not Terma's own work.
 func (f *tomlFile) backup(replace bool) (string, error) {
 	return harness.BackupFile(f.writePath, f.existed, replace)
 }
 
-// verifySplice re-parses the spliced text and checks it against what was intended.
-// Comparison is by canonical rendering rather than reflect.DeepEqual: a datetime parsed
-// twice carries two distinct time.Location pointers and would never compare equal.
+// verifySplice compares canonical renderings, not reflect.DeepEqual: a datetime parsed
+// twice carries two distinct time.Location pointers.
 func verifySplice(original map[string]any, otel map[string]any, out []byte) error {
 	reparsed := map[string]any{}
 	if len(bytes.TrimSpace(out)) > 0 {
@@ -208,9 +183,7 @@ func verifySplice(original map[string]any, otel map[string]any, out []byte) erro
 	return nil
 }
 
-// Table headers and root-level dotted keys that belong to the otel table. A quoted
-// `["otel"]` is accepted as well as the bare spelling; `[otel_extra]` and
-// `[mcp_servers.otel]` are not otel's, and must not match.
+// Quoted `["otel"]` matches too; `[otel_extra]` and `[mcp_servers.otel]` must not.
 var (
 	anyHeaderRE      = regexp.MustCompile(`^\s*\[`)
 	otelHeaderRE     = regexp.MustCompile(`^\s*\[\s*(?:otel|"otel"|'otel')\s*(?:\]|\.)`)
@@ -218,13 +191,8 @@ var (
 	commentOrBlankRE = regexp.MustCompile(`^\s*(?:#.*)?$`)
 )
 
-// spliceOtelTable returns raw with every piece of text defining the otel table — the
-// `[otel]` header and its body, any `[otel.x]` sub-tables, and any root-level `otel.x`
-// dotted keys — replaced by a single rendering of otel. When otel is empty the pieces
-// are removed and nothing is added. When there was no otel table, one is appended.
-//
-// Line endings are preserved: existing lines keep theirs, and the inserted block uses
-// whichever the file already uses.
+// spliceOtelTable replaces every piece of text defining the otel table (header, sub-tables,
+// root-level `otel.x` keys) with one rendering of otel, preserving the file's line endings.
 func spliceOtelTable(raw []byte, otel map[string]any) ([]byte, error) {
 	block, err := renderOtelTable(otel)
 	if err != nil {
@@ -236,8 +204,7 @@ func spliceOtelTable(raw []byte, otel map[string]any) ([]byte, error) {
 	if strings.Contains(text, "\r\n") {
 		eol = "\r\n"
 	}
-	// Split keeps a trailing "\r" on each line so that the join below reproduces the
-	// file's own endings; only pattern matching trims it.
+	// Split keeps each trailing "\r" so the join reproduces the file's own endings.
 	var lines []string
 	if text != "" {
 		lines = strings.Split(text, "\n")
@@ -249,9 +216,8 @@ func spliceOtelTable(raw []byte, otel map[string]any) ([]byte, error) {
 	clean := func(line string) string { return strings.TrimRight(line, "\r") }
 	isBlank := func(line string) bool { return strings.TrimSpace(clean(line)) == "" }
 
-	// header marks a `[otel…]` block, which is where the rendered block may go. A
-	// root-level dotted key is only ever removed: a `[otel]` header written in its place,
-	// before the first table header, would swallow every root key after it.
+	// A root-level dotted key is only removed: a `[otel]` header in its place would swallow
+	// every root key after it.
 	type span struct {
 		start, end int
 		header     bool
@@ -267,8 +233,7 @@ func spliceOtelTable(raw []byte, otel map[string]any) ([]byte, error) {
 				for j < len(lines) && !anyHeaderRE.MatchString(clean(lines[j])) {
 					j++
 				}
-				// Blank and comment lines directly before the next header describe that
-				// header, not this table; leave them where they are.
+				// Blank and comment lines directly before the next header belong to that header.
 				end := j
 				for end > i+1 && commentOrBlankRE.MatchString(clean(lines[end-1])) {
 					end--
@@ -303,8 +268,7 @@ func spliceOtelTable(raw []byte, otel map[string]any) ([]byte, error) {
 			inserted = true
 			continue
 		}
-		// Removed. A table taken out from between two others would leave both their
-		// separating blank lines behind; keep one.
+		// A table removed from between two others would leave both separators; keep one.
 		if len(out) > 0 && isBlank(out[len(out)-1]) && sp.end < len(lines) && isBlank(lines[sp.end]) {
 			out = out[:len(out)-1]
 		}
@@ -312,7 +276,6 @@ func spliceOtelTable(raw []byte, otel map[string]any) ([]byte, error) {
 	out = append(out, lines[next:]...)
 
 	if len(otel) > 0 && !inserted {
-		// No otel table header anywhere: append one, separated from what precedes it.
 		if len(out) > 0 && !isBlank(out[len(out)-1]) {
 			out = append(out, strings.TrimSuffix(eol, "\n"))
 		}
@@ -320,13 +283,10 @@ func spliceOtelTable(raw []byte, otel map[string]any) ([]byte, error) {
 		blockEnd = len(out)
 	}
 	if blockEnd == len(out) {
-		// The block is the last thing in the file; end it properly even if the original
-		// text stopped short of a final newline.
 		trailingNewline = true
 	}
 	if len(spans) > 0 {
-		// A table removed from the very top or bottom leaves its separator as a leading
-		// or trailing blank line; drop those, and nothing else.
+		// A table removed from the very top or bottom leaves a leading or trailing blank line.
 		if spans[0].start == 0 {
 			for len(out) > 0 && isBlank(out[0]) {
 				out = out[1:]
@@ -346,9 +306,7 @@ func spliceOtelTable(raw []byte, otel map[string]any) ([]byte, error) {
 	return []byte(joined), nil
 }
 
-// renderOtelTable renders the table as a `[otel]` block, one key per line in sorted
-// order so the text is byte-stable across connects. Values are inline, matching the
-// shape Codex's own documentation uses.
+// renderOtelTable sorts keys so the text is byte-stable across connects.
 func renderOtelTable(otel map[string]any) (string, error) {
 	if len(otel) == 0 {
 		return "", nil
@@ -371,10 +329,8 @@ func renderOtelTable(otel map[string]any) (string, error) {
 	return b.String(), nil
 }
 
-// renderTOMLValue renders a parsed TOML value back as TOML text, deterministically:
-// table keys are sorted, numbers are minimal, strings are basic strings. Two values
-// that parse the same render the same, which is what lets rendered text stand in for
-// the value in the ownership journal.
+// renderTOMLValue renders deterministically, so two values that parse the same render the
+// same and rendered text can stand in for the value in the ownership journal.
 func renderTOMLValue(v any) (string, error) {
 	switch x := v.(type) {
 	case nil:
@@ -399,7 +355,7 @@ func renderTOMLValue(v any) (string, error) {
 			return "-inf", nil
 		}
 		s := strconv.FormatFloat(x, 'g', -1, 64)
-		// A float must stay a float: 2.0 rendered as 2 would read back as an integer.
+		// 2.0 rendered as 2 would read back as an integer.
 		if !strings.ContainsAny(s, ".eE") {
 			s += ".0"
 		}
@@ -445,7 +401,6 @@ func renderTOMLValue(v any) (string, error) {
 	}
 }
 
-// parseTOMLValue is the inverse of renderTOMLValue for a single value.
 func parseTOMLValue(text string) (any, error) {
 	var doc map[string]any
 	if err := toml.Unmarshal([]byte("v = "+text), &doc); err != nil {
@@ -467,8 +422,6 @@ func quoteTOMLKey(k string) string {
 	return quoteTOMLString(k)
 }
 
-// quoteTOMLString renders a basic (double-quoted) string with every character TOML
-// requires escaped.
 func quoteTOMLString(s string) string {
 	var b strings.Builder
 	b.Grow(len(s) + 2)
@@ -520,9 +473,8 @@ func tomlTypeName(v any) string {
 	}
 }
 
-// unmarshalTOMLLenient decodes into a struct, ignoring keys the struct does not name.
-// go-toml's default is already lenient; the name records that this is relied upon for
-// files that hold far more than the otel table.
+// unmarshalTOMLLenient relies on go-toml ignoring keys the struct does not name: the
+// files hold far more than the otel table.
 func unmarshalTOMLLenient(data []byte, v any) error {
 	return toml.Unmarshal(data, v)
 }

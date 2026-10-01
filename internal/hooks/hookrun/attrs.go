@@ -1,20 +1,16 @@
 package hookrun
 
-// maxAttrLen bounds a string a harness supplied before it travels as an attribute. An
-// identifier or a model name is a few dozen bytes; anything past this is not one.
 const maxAttrLen = 1024
 
-// BoundedAttr sets attrs[key] to v when v is present and within maxAttrLen. A value past
-// the bound is left out rather than cut: a truncated identifier joins to nothing, and
-// missing stays missing everywhere else in these events.
+// BoundedAttr sets attrs[key] to v when present and within maxAttrLen; a longer value is
+// left out, not cut, since a truncated identifier joins to nothing.
 func BoundedAttr(attrs map[string]any, key, v string) {
 	if v != "" && len(v) <= maxAttrLen {
 		attrs[key] = v
 	}
 }
 
-// EvidenceAttrs opens a record a hooks-only harness reports: which agent, which of its
-// hooks, and that the only order terma can vouch for is the order it received them in.
+// EvidenceAttrs opens a hooks-only agent's record, ordered only by local receipt.
 func EvidenceAttrs(tool, source, hook string) map[string]any {
 	return map[string]any{
 		AttrTool: tool, AttrSchemaVersion: 1, AttrEvidenceSource: source,

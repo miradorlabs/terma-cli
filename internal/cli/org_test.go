@@ -14,10 +14,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
-// fakeAuth is an auth host that knows two organizations and one user. A bearer token
-// names the session it belongs to: `ter_cli_<org>` is live for that organization,
-// anything else is a stranger. It counts what the CLI does so a test can say "no
-// browser, no new session" with evidence.
+// fakeAuth is an auth host with two organizations and one user; `ter_cli_<org>` is a live
+// token for that organization, and it counts what the CLI does.
 type fakeAuth struct {
 	srv        *httptest.Server
 	revokes    atomic.Int32
@@ -97,8 +95,7 @@ type createServerKeyRequestShape struct {
 	Name      string `json:"name"`
 }
 
-// Each organization has projects of its own; Acme has two so a picker would be
-// needed, Beta Labs one so it is selected outright.
+// Acme has two projects, so a picker would be needed; Beta Labs one.
 func projectsIn(org string) []project {
 	switch org {
 	case orgA().ID:
@@ -112,7 +109,6 @@ func projectsIn(org string) []project {
 	return nil
 }
 
-// authSandbox points the CLI at the fake host with a scratch config dir.
 func authSandbox(t *testing.T, f *fakeAuth) {
 	t.Helper()
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
@@ -172,8 +168,7 @@ func TestMatchOrganization(t *testing.T) {
 	}
 }
 
-// The complaint this fixes: `terma login` minted a fresh session every time, leaving
-// the old ones live. A working stored session is verified and reused; nothing opens.
+// A working stored session is verified and reused; no browser opens.
 func TestLoginReusesAWorkingSession(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
@@ -197,9 +192,7 @@ func TestLoginReusesAWorkingSession(t *testing.T) {
 	}
 }
 
-// --force is the way to get a new session on purpose. Off a terminal and without a
-// browser, that is a wait at the loopback listener — which the deadline ends — but
-// the point here is that the stored session was not reused.
+// --force does not reuse the stored session.
 func TestLoginForceSkipsReuse(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
@@ -223,7 +216,6 @@ func TestOrgUseSwitchesAccountsWithoutSelectingProjects(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	// Working in Acme on Acme API.
 	if _, err := auth.UseOrganization(config.DefaultProfile, orgA().ID); err != nil {
 		t.Fatal(err)
 	}
@@ -273,9 +265,8 @@ func TestOrgUseSwitchesAccountsWithoutSelectingProjects(t *testing.T) {
 	}
 }
 
-// A stored session the server no longer honours is dropped, not retried forever, and
-// the switch falls through to the browser for that organization. The active session
-// for the other organization is untouched.
+// A session the server no longer honours is dropped and the switch falls through to the
+// browser; the other organization's session is untouched.
 func TestOrgUseDropsADeadSession(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)

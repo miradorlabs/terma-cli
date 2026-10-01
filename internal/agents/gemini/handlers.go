@@ -8,11 +8,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
-// --- Gemini CLI --------------------------------------------------------------------------
-
-// geminiHookInput is what Gemini CLI hands a hook on stdin (0.62): the session is
-// Gemini's own session_id — the session.id its telemetry carries — and cwd the
-// session's workspace. AfterTool adds the tool and its input.
+// geminiHookInput is a hook's stdin; session_id is the session.id its telemetry carries.
 type geminiHookInput struct {
 	SessionID string `json:"session_id"`
 	Cwd       string `json:"cwd"`
@@ -26,7 +22,6 @@ type geminiHookInput struct {
 
 const geminiTool = "gemini"
 
-// geminiEditTools are Gemini's tools that change a file.
 var geminiEditTools = map[string]bool{"write_file": true, "replace": true, "edit": true}
 
 func readGeminiInput(env hookrun.Env) (*geminiHookInput, bool) {
@@ -42,7 +37,6 @@ func readGeminiInput(env hookrun.Env) (*geminiHookInput, bool) {
 	return in, true
 }
 
-// sessionStart records a Gemini session as active.
 func sessionStart(ctx context.Context, env hookrun.Env) error {
 	in, ok := readGeminiInput(env)
 	if !ok {
@@ -57,14 +51,12 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 	return nil
 }
 
-// prompt is Gemini's BeforeAgent, at every turn: the caller claims the session
-// from the payload and starts the relay; nothing is recorded.
+// prompt is BeforeAgent: the caller claims the session from the payload; nothing is recorded.
 func prompt(_ context.Context, env hookrun.Env) error {
 	_, _ = readGeminiInput(env)
 	return nil
 }
 
-// afterTool adds the file an editing tool changed to the session's manifest.
 func afterTool(ctx context.Context, env hookrun.Env) error {
 	in, ok := readGeminiInput(env)
 	if !ok || !geminiEditTools[in.ToolName] {

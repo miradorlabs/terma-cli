@@ -12,11 +12,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 )
 
-// testdata/codex_rollout_real.jsonl are REAL rate-limit records (event_msg/token_count) captured from
-// a live Codex rollout — rate_limits only, no conversation content — showing a team plan with the
-// weekly (secondary) window at 91%. The auth.json shape is the real ~/.codex/auth.json (chatgpt route),
-// account id anonymized. Together they pin that CodexStop stamps the ChatGPT account id onto the real
-// funding evidence.
+// testdata/codex_rollout_real.jsonl holds real rate-limit records only (a team plan, weekly
+// window at 91%); with a real auth.json shape they pin that CodexStop stamps the account id.
 const realCodexAccountID = "a5c616f7-0e91-49d4-bcfb-000000000001"
 
 func writeRealCodexAuth(t *testing.T, mode string, apiKey any) {
@@ -80,9 +77,8 @@ func TestCodexStopStampsRealChatGPTAccountID(t *testing.T) {
 	}
 }
 
-// A record with no present ChatGPT rate-limit evidence (rate_limits:null, as an --oss/custom-provider
-// session emits) must not carry the account id even on the chatgpt route: that usage is not this
-// account's. Mirrors the harness present-gate in captureCodexFunding.
+// A record without present ChatGPT rate-limit evidence never carries the account id, even
+// on the chatgpt route.
 func TestCodexStopOmitsAccountIDOnNullRateLimits(t *testing.T) {
 	env := fundingEnv(t)
 	t.Setenv("OPENAI_API_KEY", "")
@@ -115,7 +111,7 @@ func TestCodexStopOmitsAccountIDOnNullRateLimits(t *testing.T) {
 func TestCodexStopOmitsAccountIDOnAPIKeyRoute(t *testing.T) {
 	env := fundingEnv(t)
 	t.Setenv("OPENAI_API_KEY", "")
-	writeRealCodexAuth(t, "apikey", "sk-key") // API-key route: cached OAuth account is not the payer
+	writeRealCodexAuth(t, "apikey", "sk-key")
 	id := "funding-session"
 	path := realRolloutTranscript(t, env, id)
 	b, _ := json.Marshal(map[string]any{"session_id": id, "cwd": env.Cwd, "transcript_path": path})

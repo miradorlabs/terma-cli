@@ -12,11 +12,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
-// CollectionPolicy asks the account service what the signed-in organization collects
-// from this machine — every session (global) or what repositories opted in to (repo) —
-// its content defaults and, for global mode, where sessions no binding places go.
-//
-// TERMA_POLICY_STUB is an explicit offline test override using config.Policy JSON.
+// CollectionPolicy asks the account service what the signed-in organization collects from
+// this machine; TERMA_POLICY_STUB is an offline test override.
 func (c *Client) CollectionPolicy(ctx context.Context) (config.Policy, error) {
 	if err := ctx.Err(); err != nil {
 		return config.Policy{}, err
@@ -45,8 +42,7 @@ func (c *Client) CollectionPolicy(ctx context.Context) (config.Policy, error) {
 	return response.collectionPolicy()
 }
 
-// Pointers distinguish a missing capture switch from false. An incomplete response
-// must never silently authorize capture.
+// policyResponse uses pointers so a missing capture switch never reads as an authorization.
 type policyResponse struct {
 	Policy *struct {
 		Version string `json:"version"`
@@ -70,8 +66,7 @@ type policyResponse struct {
 }
 
 func (r policyResponse) collectionPolicy() (config.Policy, error) {
-	// An organization that has never set a policy returns an absent policy.
-	// Retain repository opt-in and the developer's capture choices there.
+	// An organization that never set a policy keeps repository opt-in.
 	if r.Policy == nil {
 		p := config.DefaultPolicy()
 		p.FetchedAt = time.Now().UTC()

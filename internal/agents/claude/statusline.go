@@ -18,55 +18,27 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-// Claude Code's statusLine is one command that draws one row, and many people
-// have one they care about: a script from a dotfiles repository, ccstatusline
-// through npx or bun, something hand-written with jq. Terma needs to see the
-// payload that command receives, because it carries the provider's own
-// rate-limit windows, and the only way to see it is to be that command. So
-// `terma connect claude` puts `terma hook statusline` in front of whatever was
-// configured and records what it replaced; the hook runs the previous command
-// with the same bytes and everything else untouched (internal/hookrun/
-// statusline.go), and `terma disconnect claude` puts the previous entry back.
-//
-// The rules that keep this invisible:
-//
-//   - Only the `command` changes. padding, refreshInterval, hideVimModeIndicator
-//     and any option added later are copied onto Terma's entry verbatim, so
-//     Claude Code lays the output out exactly as before.
-//   - The installed command falls back to the previous one by itself when terma
-//     is not on the PATH: `command -v terma ... && exec terma hook statusline ||
-//     exec /bin/sh -c '<previous>'`. Uninstalling the binary without
-//     disconnecting leaves the status line working.
-//   - The previous entry is recorded whole, in Terma's own directory, and
-//     restored only while the file still holds what Terma wrote. An entry the
-//     user has since replaced is theirs and is left alone; status and doctor
-//     report that capture has stopped rather than fighting them for it.
-//   - A statusLine in a project or local settings file, or in a managed file,
-//     outranks the user file; Terma neither writes there nor complains, it
-//     reports the override so the missing capture has a name.
+// The status-line payload carries the plan's rate-limit windows, and the only way to see it is to
+// be the statusLine command, so terma puts `terma hook statusline` in front of the configured one
+// (statusline_hook.go), copies every other option, falls back to the previous command when terma
+// is not on the PATH, and restores the entry only while the file still holds what terma wrote.
 
 const (
 	claudeStatusLineKey = "statusLine"
-	// statusLineMarker identifies Terma's command however it is guarded.
-	statusLineMarker = "terma hook statusline"
-	// statusLineRecordFile keeps, per Claude config path, the entry Terma
-	// installed and the one it replaced.
+	statusLineMarker    = "terma hook statusline"
+	// statusLineRecordFile keeps, per config path, the entry terma installed and the one it replaced.
 	statusLineRecordFile = "statusline.json"
 )
 
-// statusLineRecord is one wrapped config.
 type statusLineRecord struct {
-	// Installed is the statusLine object Terma wrote.
 	Installed json.RawMessage `json:"installed"`
-	// Previous is the object it replaced, or null when there was none.
+	// Previous is null when there was none.
 	Previous json.RawMessage `json:"previous"`
 }
 
-// statusLineCommand is the command Terma installs. previous is the command it
-// falls back to when terma is not installed; empty draws nothing in that case.
+// statusLineCommand is the installed command; previous is its fallback when terma is not installed.
 func statusLineCommand(previous string) string {
-	// /bin/sh by absolute path: the fallback runs precisely when the PATH is not
-	// what it was, and every POSIX system has that one.
+	// /bin/sh by absolute path: the fallback runs precisely when the PATH is not what it was.
 	fallback := "exit 0"
 	if strings.TrimSpace(previous) != "" {
 		fallback = "exec /bin/sh -c " + shellSingleQuote(previous)
@@ -74,15 +46,12 @@ func statusLineCommand(previous string) string {
 	return "command -v terma >/dev/null 2>&1 && exec " + statusLineMarker + " || " + fallback
 }
 
-// shellSingleQuote wraps s in single quotes for a POSIX shell; an embedded
-// quote becomes the '\” sequence. Newlines survive inside single quotes.
 func shellSingleQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
-// isStatusLineCommand recognizes our installed guard and direct invocations.
-// A renderer may legitimately print our command name; a substring match would
-// silently discard such a renderer or mistake it for an existing installation.
+// isStatusLineCommand recognizes the installed guard and direct invocations, never a substring:
+// a renderer may print terma's command name.
 func isStatusLineCommand(command string) bool {
 	command = strings.TrimSpace(command)
 	if strings.HasPrefix(command, "command -v terma >/dev/null 2>&1 && exec "+statusLineMarker+" || ") {
@@ -97,7 +66,6 @@ func isStatusLineCommand(command string) bool {
 
 func isStatusLineOurs(command string) bool { return isStatusLineCommand(command) }
 
-// statusLineEntry is the parsed object, keeping unknown options as raw JSON.
 type statusLineEntry struct {
 	Type    string
 	Command string
@@ -128,9 +96,8 @@ func parseStatusLine(raw json.RawMessage) (*statusLineEntry, error) {
 	return e, nil
 }
 
-// InstallStatusLine puts Terma's command in front of the configured one in the
-// user's Claude settings. It is idempotent: a file already holding Terma's
-// command is left as it is. It returns whether the file changed.
+// InstallStatusLine puts terma's command in front of the configured one in the user settings,
+// idempotently, and reports whether the file changed.
 func (c exporter) InstallStatusLine() (bool, error) {
 	if c.root != "" {
 		return false, errors.New("the status line is a user setting; Terma does not write it into a repository")
@@ -169,8 +136,7 @@ func (c exporter) InstallStatusLine() (bool, error) {
 		return false, err
 	}
 
-	// Record first: the moment the settings change, Claude Code runs the new
-	// command, and the hook must already know what to pass through to.
+	// Record first: Claude Code runs the new command the moment the settings change.
 	rec := statusLineRecord{Installed: installed, Previous: raw}
 	if len(raw) == 0 {
 		rec.Previous = json.RawMessage("null")
@@ -185,11 +151,8 @@ func (c exporter) InstallStatusLine() (bool, error) {
 	return true, nil
 }
 
-// RefreshStatusLine rewrites Terma's command in the user's Claude settings when it is
-// an older form of the one this build installs, falling back to the same recorded
-// renderer. It never installs one: a file without Terma's command, or a wrap with no
-// record of what it replaced, is left as it is. It returns the settings path and
-// whether the file changed.
+// RefreshStatusLine rewrites an older form of terma's command and never installs one; it returns
+// the settings path and whether the file changed.
 func (c exporter) RefreshStatusLine() (string, bool, error) {
 	if c.root != "" {
 		return "", false, nil
@@ -229,8 +192,7 @@ func (c exporter) RefreshStatusLine() (string, bool, error) {
 	if err != nil {
 		return path, false, err
 	}
-	// Record first, as InstallStatusLine does: the hook reads it the moment the
-	// settings change.
+	// Record first, as InstallStatusLine does.
 	rec.Installed = installed
 	if err := saveStatusLineRecord(path, rec); err != nil {
 		return path, false, err
@@ -242,8 +204,7 @@ func (c exporter) RefreshStatusLine() (string, bool, error) {
 	return path, true, nil
 }
 
-// RemoveStatusLine restores the entry Terma replaced, if the file still holds
-// Terma's command. It returns whether the file changed.
+// RemoveStatusLine restores the entry terma replaced, if the file still holds terma's command.
 func (c exporter) RemoveStatusLine() (bool, error) {
 	if c.root != "" {
 		return false, nil
@@ -265,13 +226,11 @@ func (c exporter) RemoveStatusLine() (bool, error) {
 		return false, fmt.Errorf("%s: %w", path, err)
 	}
 	if cur == nil || !isStatusLineOurs(cur.Command) {
-		// Nothing of Terma's in the file. A leftover record describes a wrap the
-		// user has since undone or replaced; it has nothing left to restore.
+		// A leftover record describes a wrap the user has since undone.
 		return false, deleteStatusLineRecord(path)
 	}
 	switch {
 	case rec == nil:
-		// A manually copied Terma command has no displaced renderer to restore.
 		delete(s.root, claudeStatusLineKey)
 	case string(rec.Previous) == "null" || len(rec.Previous) == 0:
 		delete(s.root, claudeStatusLineKey)
@@ -284,8 +243,7 @@ func (c exporter) RemoveStatusLine() (bool, error) {
 	return true, deleteStatusLineRecord(path)
 }
 
-// StatusLineState reports the file's status line as Terma sees it. cwd names
-// the repository whose project and local settings are checked for an override.
+// StatusLineState reports the status line as terma sees it; cwd names the repository checked for overrides.
 func (c exporter) StatusLineState(cwd string) (agents.StatusLineState, error) {
 	path, err := c.ConfigPath()
 	if err != nil {
@@ -318,8 +276,7 @@ func (c exporter) StatusLineState(cwd string) (agents.StatusLineState, error) {
 	return st, nil
 }
 
-// statusLineRenderer is what the hook passes through to: the command Terma
-// replaced in the Claude config in effect for this process.
+// statusLineRenderer is the command terma replaced in the config in effect for this process.
 func statusLineRenderer() (string, error) {
 	path, err := exporter{}.ConfigPath()
 	if err != nil {
@@ -336,9 +293,7 @@ func statusLineRenderer() (string, error) {
 	return prev.Command, nil
 }
 
-// statusLineOverrides lists the settings files that outrank the user file and
-// define their own statusLine: the repository's project and local settings, and
-// the platform's managed settings file.
+// statusLineOverrides lists the project, local and managed settings files that define their own statusLine.
 func statusLineOverrides(cwd string) []string {
 	var candidates []string
 	if cwd != "" {
@@ -368,8 +323,6 @@ func statusLineOverrides(cwd string) []string {
 	}
 	return out
 }
-
-// --- record file -------------------------------------------------------------
 
 func statusLineRecordPath() (string, error) {
 	dir, err := config.Dir()
@@ -421,10 +374,8 @@ func loadStatusLineRecord(configPath string) (*statusLineRecord, error) {
 	return recs[configPath], nil
 }
 
-// updateStatusLineRecords is the one way the record file changes: load, edit, save,
-// under a lock. It is one file for every Claude config on the machine, so two installs
-// under different CLAUDE_CONFIG_DIRs each read it, set their own entry and renamed
-// their copy back, and the later rename forgot what the other had displaced.
+// updateStatusLineRecords edits the record file under a lock: it is one file for every config on
+// the machine, and unlocked, a second CLAUDE_CONFIG_DIR's install forgot what the first displaced.
 func updateStatusLineRecords(edit func(map[string]*statusLineRecord)) error {
 	path, err := statusLineRecordPath()
 	if err != nil {

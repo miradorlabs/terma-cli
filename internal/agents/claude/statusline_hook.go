@@ -26,54 +26,29 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
-// statusLineStateDir is the last quota snapshot each session spooled.
+// statusLineStateDir holds the last quota snapshot each session spooled.
 const statusLineStateDir = "statusline"
 
-// The status line is the one hook that draws something. Claude Code runs the
-// configured command with the session's JSON on stdin every time the display
-// changes, debounced at 300 ms, and shows whatever it prints. Terma installs its
-// own command in front of whatever was configured, so `terma hook statusline`
-// has two jobs that must not interfere:
-//
-//   - capture: the payload carries the provider's own view of the seat's
-//     rate-limit windows (`rate_limits`, present on Pro, Max and Team after the
-//     first response), the fast-mode switch and the session's running estimate.
-//     That is the strongest funding evidence a machine can produce, and it is
-//     spooled as terma.session.quota when it changes.
-//   - render: the renderer that was configured before Terma wrapped it runs
-//     exactly as it would have — same bytes on stdin, same shell, same
-//     environment and working directory, stdout and stderr connected straight
-//     through, its exit status returned — so nothing anyone built or installed
-//     for their status line changes. Without a previous renderer, capture is
-//     silent: no default line and no indicator are drawn.
-//
-// The budget is the same as every other hook: no network, no git subprocess,
-// one small state file. Capture never delays or alters rendering: the renderer
-// is started first and the capture runs while it draws.
+// The status line hook both captures the payload (the plan's `rate_limits`, fast mode, the running
+// estimate) as terma.session.quota and runs the renderer it wrapped with the same bytes, shell,
+// environment and directory. Capture never delays rendering: the renderer starts first.
 
-// statusLineOptions is how `terma hook statusline` is configured by the
-// installer's record of what it wrapped.
+// statusLineOptions configures `terma hook statusline`.
 type statusLineOptions struct {
-	// RendererTimeout overrides TERMA_STATUSLINE_TIMEOUT and the 30s default.
-	// Nonpositive values use the environment/default; there is no unlimited mode.
+	// RendererTimeout overrides TERMA_STATUSLINE_TIMEOUT and the 30s default; nonpositive keeps them.
 	RendererTimeout time.Duration
-	// Renderer is the status line command configured before Terma's, run with
-	// `sh -c` as Claude Code runs it. Empty means there was none.
+	// Renderer is the command configured before terma's, run with `sh -c`; empty means none.
 	Renderer string
-	// Shell overrides the shell the renderer runs in (tests). Default: sh.
-	Shell string
-	// CaptureOnly skips rendering entirely (tests and diagnostics).
+	// Shell overrides the renderer's shell, for tests.
+	Shell       string
 	CaptureOnly bool
-	// Indicator prefixes the first rendered line with Terma's mark, so a glance at
-	// the status line says the session is being watched. Off when capture is off:
+	// Indicator prefixes the first rendered line with terma's mark; off when capture is off, since
 	// the mark means "watching", not "installed".
 	Indicator bool
-	// OnCapture starts delivery after a new snapshot is safely queued. Claude
-	// may render the status line after Stop has already flushed the spool.
+	// OnCapture starts delivery after a new snapshot is queued: rendering can happen after Stop flushed.
 	OnCapture func()
 }
 
-// indicatorMark is the mark itself: a lowercase t in the brand colour, then a space.
 func indicatorMark() string {
 	if seq := style.BrandSequence(); seq != "" {
 		return seq + "t" + style.Reset + " "
@@ -81,14 +56,12 @@ func indicatorMark() string {
 	return "t "
 }
 
-// statusLineMaxInput bounds what is parsed. Claude's payload is a few kilobytes;
-// anything larger is passed to the renderer untouched and simply not captured.
+// statusLineMaxInput bounds what is parsed; a larger payload still reaches the renderer whole.
 const statusLineMaxInput = 1 << 20
 
 const defaultRendererTimeout = 30 * time.Second
 
-// rendererPipeDrain bounds the wait for the renderer's output pipes once its shell has
-// exited or been cancelled: a descendant can keep them open long after.
+// rendererPipeDrain bounds the wait for output pipes after the shell exits: a descendant can hold them.
 const rendererPipeDrain = 100 * time.Millisecond
 
 func statusLineRendererTimeout(override time.Duration) time.Duration {
@@ -101,8 +74,7 @@ func statusLineRendererTimeout(override time.Duration) time.Duration {
 	return defaultRendererTimeout
 }
 
-// statusLinePayload is the allowlisted subset of what Claude Code writes. Every
-// other field is ignored; nothing here is content.
+// statusLinePayload is the allowlisted, content-free subset of the payload.
 type statusLinePayload struct {
 	SessionID string `json:"session_id"`
 	PromptID  string `json:"prompt_id"`
@@ -125,11 +97,10 @@ type statusLinePayload struct {
 	} `json:"rate_limits"`
 }
 
-// quotaWindows are the rate_limits keys Claude Code documents.
 var quotaWindows = []string{"five_hour", "seven_day", "spend_limit"}
 
-// quotaState is what the last emitted snapshot looked like, kept per session so
-// the 300 ms cadence of the status line turns into one event per change.
+// quotaState is the last emitted snapshot, per session, so a 300 ms redraw cadence becomes one
+// event per change.
 type quotaState struct {
 	Stream    string             `json:"stream,omitempty"`
 	Sequence  uint64             `json:"sequence,omitempty"`
@@ -145,8 +116,7 @@ type quotaState struct {
 	OrgID     string             `json:"organization_id,omitempty"`
 }
 
-// statusLine runs the status line hook and returns the exit status to end with:
-// the renderer's own, or 0.
+// statusLine runs the hook and returns the renderer's exit status, or 0.
 func statusLine(ctx context.Context, env hookrun.Env, opts statusLineOptions) int {
 	stdout := env.Stdout
 	if stdout == nil {
@@ -158,7 +128,7 @@ func statusLine(ctx context.Context, env hookrun.Env, opts statusLineOptions) in
 	}
 	head, rest := readHead(env.Stdin, statusLineMaxInput)
 
-	// Wrapping Terma's own command a second time would loop; treat it as no renderer.
+	// Wrapping terma's own command again would loop.
 	renderer := opts.Renderer
 	if strings.TrimSpace(renderer) == "" {
 		renderer = ""
@@ -168,9 +138,7 @@ func statusLine(ctx context.Context, env hookrun.Env, opts statusLineOptions) in
 		renderer = ""
 	}
 
-	// With the indicator on, the renderer draws into a buffer so the mark can go
-	// in front of its first line; otherwise its stdout is connected straight
-	// through. Either way its bytes are never altered.
+	// With the indicator on, the renderer draws into a buffer so the mark can lead its first line.
 	var render *exec.Cmd
 	var renderDone chan error
 	var renderCtx context.Context
@@ -220,9 +188,8 @@ func statusLine(ctx context.Context, env hookrun.Env, opts statusLineOptions) in
 	return 0
 }
 
-// withIndicator puts the mark in front of the first line of a rendering. An
-// empty rendering stays empty: conditional renderers must remain able to hide
-// their status line. Everything after the marker is byte-for-byte unchanged.
+// withIndicator puts the mark in front of a rendering; an empty one stays empty so a renderer can
+// hide the status line.
 func withIndicator(out []byte) []byte {
 	mark := indicatorMark()
 	if len(out) == 0 {
@@ -231,8 +198,7 @@ func withIndicator(out []byte) []byte {
 	return append([]byte(mark), out...)
 }
 
-// readHead reads up to limit bytes. When the input is longer, rest is the reader
-// positioned after head, so a renderer still receives every byte.
+// readHead reads up to limit bytes; when the input is longer, rest continues after head.
 func readHead(r io.Reader, limit int) (head []byte, rest io.Reader) {
 	if r == nil {
 		return nil, nil
@@ -247,11 +213,8 @@ func readHead(r io.Reader, limit int) (head []byte, rest io.Reader) {
 	return head, nil
 }
 
-// startRenderer runs the previous status line command the way Claude Code
-// would have: through the shell, in the same directory and environment, with
-// the payload on stdin and its output connected straight through. It runs in
-// its own process group on Unix so that a cancellation from Claude Code (which kills
-// the in-flight command when a newer update arrives) reaches it as well.
+// startRenderer runs the previous command as Claude Code would, in its own process group on Unix
+// so a cancellation (Claude Code kills an in-flight command on a newer update) reaches it.
 func startRenderer(ctx context.Context, command, shell, cwd string, head []byte, rest io.Reader, stdout, stderr io.Writer) (*exec.Cmd, chan error) {
 	if shell == "" {
 		shell = "sh"
@@ -267,13 +230,10 @@ func startRenderer(ctx context.Context, command, shell, cwd string, head []byte,
 		return nil, nil
 	}
 	if err := cmd.Start(); err != nil {
-		// The shell itself could not start. sh prints "command not found" for a
-		// missing renderer on its own; this is rarer and worth a line.
 		fmt.Fprintf(stderr, "terma: status line renderer did not start: %v\n", err)
 		return nil, nil
 	}
 	go func() {
-		// A renderer that never reads stdin closes the pipe on us; that is fine.
 		defer stdin.Close()
 		if _, err := stdin.Write(head); err != nil {
 			return
@@ -282,15 +242,13 @@ func startRenderer(ctx context.Context, command, shell, cwd string, head []byte,
 			_, _ = io.Copy(stdin, rest)
 		}
 	}()
-	// done carries the exit to the one waiter; exited only signals that it
-	// happened, so the signal forwarder below can stop without consuming it.
+	// exited only signals the exit, so the signal forwarder stops without consuming done.
 	done := make(chan error, 1)
 	exited := make(chan struct{})
 	go func() {
 		err := cmd.Wait()
 		if errors.Is(err, exec.ErrWaitDelay) {
-			// The shell exited but descendants kept its output pipes open. Stop
-			// the group too, rather than merely closing our copies of the pipes.
+			// Descendants kept the pipes open: stop the group too.
 			_ = cmd.Cancel()
 		}
 		done <- err
@@ -301,8 +259,6 @@ func startRenderer(ctx context.Context, command, shell, cwd string, head []byte,
 	return cmd, done
 }
 
-// waitRenderer returns the renderer's exit code, or -1 when it did not run to
-// an exit status.
 func waitRenderer(cmd *exec.Cmd, done chan error) int {
 	err := <-done
 	if err == nil {
@@ -317,9 +273,8 @@ func waitRenderer(cmd *exec.Cmd, done chan error) int {
 	return -1
 }
 
-// captureQuota spools one terma.session.quota event when the snapshot changed
-// or the heartbeat is due. Missing windows supersede previous quota evidence.
-// Empty startup redraws before any evidence are suppressed.
+// captureQuota spools terma.session.quota when the snapshot changed or the heartbeat is due;
+// empty startup redraws before any evidence are suppressed.
 func captureQuota(e hookrun.Env, p *statusLinePayload) bool {
 	if e.Spool == nil {
 		return false
@@ -351,15 +306,13 @@ func captureQuota(e hookrun.Env, p *statusLinePayload) bool {
 	}
 	defer unlock()
 	prev := readQuotaState(statePath)
-	// Preserve disappearance of windows after an observed snapshot, but avoid
-	// emitting empty startup redraws before any funding evidence was available.
 	if len(quota) == 0 && p.FastMode == nil && prev == nil {
 		return false
 	}
 	repo, worktree, projectID, repoRoot := "", "", "", ""
 	root, gitDir, located := gitx.LocateFS(cmp.Or(p.Cwd, e.Cwd))
 	if !located {
-		// A workspace outside Git (PR #4) is found by its binding.
+		// A workspace outside Git is found by its binding.
 		root, _ = project.Find(cmp.Or(p.Cwd, e.Cwd))
 	}
 	if root != "" {
@@ -384,8 +337,7 @@ func captureQuota(e hookrun.Env, p *statusLinePayload) bool {
 	if next.Stream == "" {
 		next.Stream = rand.Text()
 	}
-	// Include the snapshot in the ID: if saving the checkpoint fails, a later
-	// different observation must not collide with the previous sequence number.
+	// The snapshot is in the ID, so a later observation never collides after a failed checkpoint save.
 	identity, _ := json.Marshal(next)
 	attrs := map[string]any{
 		hookrun.AttrTool: claudeTool, hookrun.AttrVersion: e.Version,
@@ -459,8 +411,7 @@ func quotaChanged(a, b quotaState) bool {
 	return false
 }
 
-// quotaStatePath is the per-session state file under the config dir. The
-// session id is hashed: it is an identifier a harness chose, not a path.
+// quotaStatePath hashes the session id: it is an identifier an agent chose, not a path.
 func quotaStatePath(sessionID string) (string, error) {
 	dir, err := config.Dir()
 	if err != nil {
@@ -482,8 +433,7 @@ func readQuotaState(path string) *quotaState {
 	return &s
 }
 
-// writeQuotaState persists the snapshot atomically and, when the session is
-// new, drops state files no session has touched in two days.
+// writeQuotaState persists the snapshot and, for a new session, prunes stale state files.
 func writeQuotaState(path string, s quotaState) {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o700); err != nil {

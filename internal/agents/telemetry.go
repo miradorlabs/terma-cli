@@ -19,7 +19,7 @@ type RelayConfig struct {
 type RelayResult struct {
 	Paths []string
 	Notes []string
-	// Pending means the configuration is written but needs a developer's action.
+	// Pending means the configuration is written but needs the developer's action.
 	Pending bool
 }
 
@@ -57,23 +57,21 @@ type Exporting interface {
 	Harness() harness.Harness
 }
 
-// MachineRefresher is an agent with home-directory files terma rewrites to this build's
-// templates on `terma update --refresh`. It rewrites only a file terma wrote, never
-// creates one, and reports the path it changed.
+// MachineRefresher is an agent with home-directory files `terma update --refresh` rewrites
+// to this build's templates; it rewrites only a file terma wrote, never creates one.
 type MachineRefresher interface {
 	Agent
 	RefreshMachine() (path string, changed bool, err error)
 }
 
-// ContentConsent is an agent whose hooks spool what was said (a reply, a thread's name),
-// under a consent of its own beyond the organization's prompt policy, checked again at
-// every delivery.
+// ContentConsent is an agent whose hooks spool what was said (a reply, a thread's name)
+// under a consent of its own beyond the prompt policy, checked again at delivery.
 type ContentConsent interface {
 	ContentConsented(projectID string, global bool) bool
 }
 
-// StatusLiner is an agent whose user-level status line terma wraps to capture the
-// plan's usage windows. It is machine-level capture, never repository policy.
+// StatusLiner is an agent whose user-level status line terma wraps to capture the plan's
+// usage windows; machine-level, never repository policy.
 type StatusLiner interface {
 	Agent
 	InstallStatusLine() (bool, error)
@@ -84,15 +82,12 @@ type StatusLiner interface {
 // StatusLineState is what the agent's status line looks like to terma.
 type StatusLineState struct {
 	ConfigPath string
-	// Installed: the file holds terma's command.
-	Installed bool
+	Installed  bool
 	// Renderer is the previous command terma passes through ("" when none).
 	Renderer string
-	// Replaced: terma wrapped this file once, and the file now holds a status line that
-	// is not terma's. Capture has stopped; the developer's entry stands.
+	// Replaced means terma wrapped this file once and the developer has since replaced it.
 	Replaced bool
-	// Overrides lists settings files that outrank this one and define their own status
-	// line, so terma's never runs there.
+	// Overrides lists settings files that outrank this one with a status line of their own.
 	Overrides []string
 }
 
@@ -109,7 +104,6 @@ type Notifier interface {
 // what a repository exports is none of them alone.
 type EmissionChecker interface {
 	Agent
-	// EmissionStatus is the combined export for the repository at root.
 	EmissionStatus(root string) (harness.Status, error)
 	// TelemetrySwitch is the setting that turns the whole export on.
 	TelemetrySwitch() string

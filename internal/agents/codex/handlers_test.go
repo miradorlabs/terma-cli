@@ -29,9 +29,7 @@ func TestCodexSessionStartAnnouncesSession(t *testing.T) {
 	// A trusted hook can announce a repository session without a global exporter.
 }
 
-// Codex names no edited file of its own: an edit is a tool call carrying an apply_patch
-// envelope, and the paths are inside it. This is the whole reason the project hooks are
-// worth having over `notify`, so it is what the end-to-end test asserts.
+// The project hooks find edited files inside the apply_patch envelope a tool call carries.
 func TestCodexSessionStampsItsCommitFromApplyPatch(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	ctx := context.Background()
@@ -86,8 +84,7 @@ func TestCodexSessionStampsItsCommitFromApplyPatch(t *testing.T) {
 	}
 }
 
-// A shell call that changed nothing must leave no manifest behind: PostToolUse fires on
-// every tool call a session makes, and most of them are not edits.
+// A shell call that changed nothing leaves no manifest behind.
 func TestCodexPostToolUseIgnoresCallsWithoutAPatch(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	ctx := context.Background()
@@ -137,8 +134,7 @@ func TestApplyPatchPaths(t *testing.T) {
 	}
 }
 
-// Every handler must survive input it cannot understand: a hook that fails is a hook
-// the developer removes.
+// Every handler survives input it cannot understand: a failing hook gets removed.
 func TestCodexHooksNeverFailOnBadInput(t *testing.T) {
 	ctx := context.Background()
 	for _, bad := range []string{"", "{", `{"session_id":""}`, `{"session_id":"../../etc/passwd"}`} {

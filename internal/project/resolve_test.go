@@ -18,9 +18,7 @@ func git(t *testing.T, dir string, args ...string) {
 	}
 }
 
-// mainWithWorktree makes a main checkout bound to id and a sibling linked worktree
-// without a binding of its own, as `git worktree add` leaves one when the binding is
-// gitignored.
+// mainWithWorktree makes a main checkout bound to id and a linked worktree without a binding.
 func mainWithWorktree(t *testing.T, id string) (main, wt string) {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {

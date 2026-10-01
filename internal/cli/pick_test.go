@@ -5,8 +5,7 @@ import (
 	"testing"
 )
 
-// A bare Enter takes the default row when there is one — install offers the bound
-// project that way — and is no answer at all when there is not.
+// A bare Enter takes the default row when there is one, and is no answer when there is not.
 func TestPickAnswer(t *testing.T) {
 	byName := func(name string) (int, error) {
 		if name == "Acme API" {

@@ -1,15 +1,12 @@
-// Package shape is what a coding agent declares about its telemetry for the local
-// relay: how its records name their session (Correlator) and where they carry content
-// (Capturer). Agents declare; the relay enforces. The safe keys an agent declares are
-// pinned, composed with everyone's, in the relay's tests, so a declaration alone widens
-// nothing that leaves a machine.
+// Package shape is what a coding agent declares about its telemetry for the local relay:
+// how its records name their session (Correlator) and where they carry content (Capturer).
+// Agents declare; the relay enforces, and pins the composed safe keys in its tests.
 package shape
 
 // SessionKey is an attribute that names the session a record belongs to.
 type SessionKey struct {
 	Attr string
-	// Rank orders keys across agents, lowest first; it is fixed so that registering
-	// agents in another order never routes a record differently.
+	// Rank orders keys across agents, lowest first, so registration order never changes routing.
 	Rank int
 	// RejectNumeric: a numeric value is never a session (an OS thread id).
 	RejectNumeric bool
@@ -24,8 +21,7 @@ var (
 // Correlation is how an agent's telemetry is placed in a session.
 type Correlation struct {
 	SessionKeys []SessionKey
-	// StartEvents are conversation starts that may arrive long before the first hook
-	// claims their session, so they wait as long as a trace does.
+	// StartEvents may arrive long before a hook claims their session, so they wait as long as a trace.
 	StartEvents []string
 }
 
@@ -34,13 +30,11 @@ type Correlator interface {
 	Correlation() Correlation
 }
 
-// CaptureRules are where an agent's telemetry carries what was said or what a tool
-// was called with or returned.
+// CaptureRules are where an agent's telemetry carries what was said or a tool's input and output.
 type CaptureRules struct {
 	// PromptFields are blanked to the marker when prompts are withheld.
 	PromptFields []string
-	// PromptDropFields, PromptBodyEvents and ResourcePromptFields are removed (or, for
-	// a body, emptied) when prompts are withheld.
+	// PromptDropFields, PromptBodyEvents and ResourcePromptFields are removed when prompts are withheld.
 	PromptDropFields     []string
 	PromptBodyEvents     []string
 	ResourcePromptFields []string
@@ -48,13 +42,10 @@ type CaptureRules struct {
 	ToolContentFields []string
 	ToolContentEvents []string
 	// Marker replaces a prompt field in any attribute set carrying one of MarkerKeys.
-	Marker     string
-	MarkerKeys []string
-	// BodyPrefixes are how the agent's log bodies name their event (<prefix><event>).
+	Marker       string
+	MarkerKeys   []string
 	BodyPrefixes []string
-	// SafeKeys and SafePrefixes are keys only this agent emits that never carry what
-	// was said; with content withheld they pass. A key another agent declares as
-	// content stays content.
+	// SafeKeys and SafePrefixes pass with content withheld, unless another agent declares them content.
 	SafeKeys     []string
 	SafePrefixes []string
 }

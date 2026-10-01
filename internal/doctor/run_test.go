@@ -6,8 +6,7 @@ import (
 	"time"
 )
 
-// A binary check that did not pass makes the backend check inconclusive before it
-// flushes or polls anything: hooks may run another build.
+// A failed binary check makes the backend check inconclusive before it flushes anything.
 func TestBackendCheckWaitsForTheBinary(t *testing.T) {
 	binary := Check{Status: Warn, Fix: "replace the stale binary"}
 	check := BackendCheck(context.Background(), Probes{}, "p", "sha", binary, Progress{})
@@ -16,8 +15,7 @@ func TestBackendCheckWaitsForTheBinary(t *testing.T) {
 	}
 }
 
-// The round-trip polls until the event is readable, noting each poll, over a window
-// that brackets the moment it started by commitLogWindow.
+// The round-trip polls, noting each poll, over a commitLogWindow either side of its start.
 func TestWaitForCommitPollsAWindowAroundTheCommit(t *testing.T) {
 	started := time.Now()
 	var polls, notes int

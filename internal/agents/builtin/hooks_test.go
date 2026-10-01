@@ -13,15 +13,12 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 )
 
-// hookCommand finds the event a committed hook entry runs. The files differ — JSON with
-// the command under three different shapes — and the text `terma hook <event>` is what
-// they all share, which is also all that reaches `terma hook` at run time.
+// hookCommand finds the event a committed hook entry runs: `terma hook <event>` is the
+// one text every hooks file shares.
 var hookCommand = regexp.MustCompile(`terma hook ([a-z][a-z-]*)`)
 
-// Event names are written twice: in hookmgr, into the files customers commit, and in
-// each adapter's Events, where `terma hook <event>` looks them up. Nothing tied the two
-// lists together, and the failure is silent on every side — a committed hook naming an
-// event with no handler does nothing, for ever, in every repository that ran install.
+// Every event a committed hooks file names has a handler in its own adapter; a missing
+// one fails silently in every repository that ran install.
 func TestEveryCommittedHookHasAHandler(t *testing.T) {
 	handlers := reg.Handlers()
 	for _, a := range reg.All() {
@@ -51,10 +48,7 @@ func TestEveryCommittedHookHasAHandler(t *testing.T) {
 	}
 }
 
-// harness.SupportCatalog is what `terma harness` prints, and it names the agents again
-// by hand. An adapter added to the registry and not to the catalog would be supported
-// and unlisted; one renamed in a single place would be listed under a name install
-// rejects.
+// The support catalog lists exactly the registry's supported agents, by the same names.
 func TestSupportCatalogMatchesTheRegistry(t *testing.T) {
 	listed := map[string]string{}
 	for _, agent := range reg.SupportCatalog() {
@@ -76,8 +70,6 @@ func TestSupportCatalogMatchesTheRegistry(t *testing.T) {
 	}
 }
 
-// committedCommands plans a's committed hooks into a fresh repository and returns every
-// command terma wrote there.
 func committedCommands(t *testing.T, a agents.Agent) []string {
 	t.Helper()
 	plan, err := a.Plan(t.TempDir(), true)
@@ -110,10 +102,8 @@ func committedCommands(t *testing.T, a agents.Agent) []string {
 	return out
 }
 
-// Every hook entry terma commits must be silent on both streams and exit 0 on a machine
-// without terma. Claude Code prints a hook's stderr in the transcript on a non-zero exit
-// and hands SessionStart and PostToolUse stderr to the model; SessionStart's stdout
-// becomes context as well. The agents run the command with `sh -c` and JSON on stdin.
+// Every committed hook entry is silent on both streams and exits 0 without terma: an
+// agent may hand a hook's output to the model.
 func TestCommittedHookCommandsAreInertWithoutTerma(t *testing.T) {
 	if _, err := exec.LookPath("sh"); err != nil {
 		t.Skip("sh not installed")
@@ -125,8 +115,7 @@ func TestCommittedHookCommandsAreInertWithoutTerma(t *testing.T) {
 		for _, command := range committedCommands(t, a) {
 			t.Run(a.Name()+"/"+command, func(t *testing.T) {
 				dir := t.TempDir()
-				// A command may extend PATH before its guard (Codex's does); where that finds a
-				// real terma, running the command would run it.
+				// A command may extend PATH before its guard; if that finds a real terma, skip.
 				if i := strings.Index(command, "; command -v terma"); i >= 0 {
 					probe := exec.Command("sh", "-c", command[:i+2]+"command -v terma")
 					probe.Env = []string{"PATH=/usr/bin:/bin", "HOME=" + dir}
@@ -151,9 +140,8 @@ func TestCommittedHookCommandsAreInertWithoutTerma(t *testing.T) {
 	}
 }
 
-// A hooks file that exists and cannot be read is not an absent one: planned as a create,
-// Apply would rename terma-only content over whatever the developer had there. A
-// directory at the file's path fails to read on every platform.
+// An unreadable hooks file is an error, never a create that Apply would rename over the
+// developer's file.
 func TestPlannersRefuseAFileTheyCannotRead(t *testing.T) {
 	for _, a := range reg.All() {
 		if a.HooksPath() == "" || strings.HasSuffix(a.HooksPath(), "/") {
@@ -203,9 +191,8 @@ func TestCommittedHooksRoundTrip(t *testing.T) {
 	}
 }
 
-// Global mode's machine-wide hooks: every agent's user-level file gets terma's entries by
-// absolute path with --user, beside the developer's own; a second setup changes nothing,
-// a moved terma is replaced in place, and removal leaves the developer's own.
+// Machine-wide hooks are written by absolute path beside the developer's own, idempotent,
+// replaced in place when terma moves, and removed leaving the developer's own.
 func TestUserHooksInstallIdempotentlyAndRemoveCleanly(t *testing.T) {
 	mine := map[string]string{
 		"claude": `{"env":{"A":"1"},"hooks":{"Stop":[{"hooks":[{"type":"command","command":"say done"}]}]}}`,

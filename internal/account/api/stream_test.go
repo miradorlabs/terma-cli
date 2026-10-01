@@ -21,8 +21,7 @@ func sseServer(t *testing.T, body string, capture *http.Header) *httptest.Server
 	}))
 }
 
-// TestStream_ParsesFrames covers the SSE shapes the gateway actually emits:
-// multi-line data, comment keep-alives, and events with an id to resume from.
+// TestStream_ParsesFrames covers multi-line data, comment keep-alives and resumable ids.
 func TestStream_ParsesFrames(t *testing.T) {
 	body := ":ping\n" +
 		"event: ready\ndata: {\"stream\":\"logs\"}\n\n" +
@@ -55,8 +54,6 @@ func TestStream_ParsesFrames(t *testing.T) {
 	if second.Name != "log" || second.ID != "abc123" {
 		t.Errorf("second frame = %q id=%q, want log/abc123", second.Name, second.ID)
 	}
-	// Multi-line data joins with newlines per the SSE spec; dropping the join would
-	// corrupt any record whose JSON the server split.
 	if want := "{\"log\":\n{\"body\":\"hello\"}}"; second.Data != want {
 		t.Errorf("data = %q, want %q", second.Data, want)
 	}
@@ -74,8 +71,7 @@ func TestStream_ParsesFrames(t *testing.T) {
 	}
 }
 
-// TestStream_SendsLastEventID is the resume contract: without this header the server
-// replays the whole window instead of continuing after the last record seen.
+// TestStream_SendsLastEventID pins the resume contract.
 func TestStream_SendsLastEventID(t *testing.T) {
 	var got http.Header
 	server := sseServer(t, "event: heartbeat\ndata: {}\n\n", &got)
@@ -94,15 +90,12 @@ func TestStream_SendsLastEventID(t *testing.T) {
 	if v := got.Get("Authorization"); !strings.HasPrefix(v, "Bearer ") {
 		t.Errorf("stream request lost its credential: Authorization = %q", v)
 	}
-	// The project header decides which project the tail reads; a stream that omits
-	// it would silently tail the wrong scope or 400.
 	if v := got.Get(projectHeader); v != "proj-1" {
 		t.Errorf("%s = %q, want proj-1", projectHeader, v)
 	}
 }
 
-// TestStream_ErrorStatusIsReportedNotStreamed stops a 403 HTML page from being parsed
-// as frames and surfacing as an empty, silent tail.
+// TestStream_ErrorStatusIsReportedNotStreamed reports a 403 instead of parsing it as frames.
 func TestStream_ErrorStatusIsReportedNotStreamed(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)

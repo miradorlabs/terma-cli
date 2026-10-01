@@ -10,12 +10,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
-// --- omp adapter ----------------------------------------------------------------------
-
-// ompHookInput is the JSON Terma's omp hook extension writes to stdin. The extension
-// composes it from omp's own events, so only what attribution needs is here. The
-// session id is the extension's own: omp fires session_start without one, so the
-// extension mints a UUID per process and reuses it for the session's whole life.
+// ompHookInput is what terma's hook extension writes to stdin, composed from omp's events.
 type ompHookInput struct {
 	SessionID string `json:"session_id"`
 	Cwd       string `json:"cwd"`
@@ -37,7 +32,6 @@ func readOmpInput(r io.Reader) (*ompHookInput, error) {
 	return in, nil
 }
 
-// sessionStart records an omp session as active.
 func sessionStart(ctx context.Context, env hookrun.Env) error {
 	in, err := readOmpInput(env.Stdin)
 	if err != nil {
@@ -75,13 +69,10 @@ func sessionEnd(ctx context.Context, env hookrun.Env) error {
 	if err != nil {
 		return nil
 	}
-	// The extension's id belongs to this session alone, so end it directly rather
-	// than risk clearing an active session another tool started.
 	env.EndSession(r, in.SessionID, ompTool, "")
 	return nil
 }
 
-// fileEdit adds one edited file to the session's manifest.
 func fileEdit(ctx context.Context, env hookrun.Env) error {
 	in, err := readOmpInput(env.Stdin)
 	if err != nil {

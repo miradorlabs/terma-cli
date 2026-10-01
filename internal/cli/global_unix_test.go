@@ -13,8 +13,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
-// globalSandbox signs a developer in on a private machine and makes the hooks that
-// setup writes call a built terma (the test binary is none).
+// globalSandbox makes the hooks setup writes call a built terma (the test binary is none).
 func globalSandbox(t *testing.T) (codexHome string) {
 	t.Helper()
 	bin := termaBinary(t) // before HOME moves, and Go's caches with it
@@ -46,9 +45,8 @@ func gitOut(t *testing.T, dir string, args ...string) string {
 
 const globalStub = `{"mode":"global","include_prompts":true,"include_tool_content":true,"default_project_id":"p-default"}`
 
-// setup in global mode puts hooks for every session and every commit on the machine —
-// the agents' user-level hooks and git's global hooks path, chaining the hooks git ran
-// before — and a setup back in repo mode takes every one of them away again.
+// Global-mode setup wires user-level agent hooks and git's global hooks path, chaining
+// what git ran before; a setup back in repo mode removes all of it.
 func TestSetupGlobalModeInstallsAndRemovesMachineHooks(t *testing.T) {
 	codexHome := globalSandbox(t)
 	// The developer's own global hooks directory, which git ran before terma's.
@@ -93,7 +91,6 @@ func TestSetupGlobalModeInstallsAndRemovesMachineHooks(t *testing.T) {
 		t.Fatal("the developer's own global pre-commit did not run under terma's hooks")
 	}
 
-	// A second setup changes nothing and keeps what terma replaced.
 	if out, err := runTerma(t, "setup", "--harness", "claude,codex"); err != nil {
 		t.Fatalf("second setup: %v\n%s", err, out)
 	}
@@ -116,8 +113,8 @@ func TestSetupGlobalModeInstallsAndRemovesMachineHooks(t *testing.T) {
 	}
 }
 
-// In global mode a repository's committed hooks step aside for the agents the
-// machine-wide hooks cover, and the machine-wide ones do nothing outside global mode.
+// Committed hooks step aside for covered agents in global mode; machine-wide ones do
+// nothing outside it.
 func TestHookYields(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	global := config.Policy{Mode: config.ModeGlobal, DefaultProjectID: "p"}
@@ -147,16 +144,15 @@ func TestHookYields(t *testing.T) {
 	}
 }
 
-// Where the organization deployed terma's hooks as managed configuration, setup writes
-// none of its own for that agent — and takes away any it wrote before the deployment —
-// while a repository's committed hooks still step aside for it.
+// Where managed hooks are deployed, setup writes none of its own and removes earlier ones,
+// while committed hooks still step aside.
 func TestSetupGlobalModeDefersToManagedHooks(t *testing.T) {
 	codexHome := globalSandbox(t)
 	t.Setenv("TERMA_POLICY_STUB", globalStub)
 	if out, err := runTerma(t, "setup", "--harness", "claude,codex"); err != nil {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}
-	// The organization deploys Codex's hooks afterwards.
+	// The organization deploys one agent's managed hooks afterwards.
 	root := t.TempDir()
 	prev := testApp.managedRoot
 	testApp.managedRoot = root
