@@ -14,7 +14,7 @@ func TestSandboxSetupWithoutProviderCredentials(t *testing.T) {
 	binary := filepath.Join(t.TempDir(), "terma")
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	build := exec.CommandContext(ctx, "go", "build", "-o", binary, ".")
+	build := exec.CommandContext(ctx, "go", "build", "-o", binary, "./cmd/terma")
 	build.Dir = ".."
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build CLI: %v\n%s", err, out)

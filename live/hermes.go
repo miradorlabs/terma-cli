@@ -16,7 +16,7 @@ import (
 )
 
 // Hermes (Nous Research) has no usable OTLP export: terma's plugin
-// (internal/harness/hermes), written into $HERMES_HOME/plugins/terma and enabled in its
+// (internal/agents/hermes/plugin), written into $HERMES_HOME/plugins/terma and enabled in its
 // config.yaml, is its exporter and calls `terma hook hermes-*`. `terma relay setup
 // --harness hermes` writes it pointed at the relay; a direct run writes the same plugin
 // pointed at the receiver. Only the installed build is tested (`hermes` on PATH runs
@@ -58,11 +58,11 @@ func (sb *Sandbox) UseHermes(url string) {
 func (sb *Sandbox) UseHermesPluginDirect() {
 	t := sb.T
 	t.Helper()
-	tmpl, err := os.ReadFile(filepath.Join("..", "internal", "harness", "hermes", "__init__.py"))
+	tmpl, err := os.ReadFile(filepath.Join("..", "internal", "agents", "hermes", "plugin", "__init__.py"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	manifest, err := os.ReadFile(filepath.Join("..", "internal", "harness", "hermes", "plugin.yaml"))
+	manifest, err := os.ReadFile(filepath.Join("..", "internal", "agents", "hermes", "plugin", "plugin.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}

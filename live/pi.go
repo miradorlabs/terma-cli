@@ -12,7 +12,7 @@ import (
 )
 
 // Pi (@earendil-works/pi-coding-agent) has no OpenTelemetry of its own: terma's
-// extension (internal/harness/pi/terma.ts), written into Pi's agent directory, is its
+// extension (internal/agents/internal/pifamily/terma.ts), written into Pi's agent directory, is its
 // exporter and calls `terma hook pi-*`. `terma relay setup --harness pi` writes it
 // pointed at the relay; a direct run splices the same template pointed at the receiver,
 // so the two differ only in where the extension sends. Only the installed build is
@@ -59,7 +59,7 @@ func (sb *Sandbox) UsePiExtensionDirect() {
 func (sb *Sandbox) writePiFamilyExtension(path, agent string, lifecycle bool) {
 	t := sb.T
 	t.Helper()
-	tmpl, err := os.ReadFile(filepath.Join("..", "internal", "harness", "pi", "terma.ts"))
+	tmpl, err := os.ReadFile(filepath.Join("..", "internal", "agents", "internal", "pifamily", "terma.ts"))
 	if err != nil {
 		t.Fatal(err)
 	}

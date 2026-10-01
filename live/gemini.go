@@ -16,7 +16,7 @@ import (
 )
 
 // Gemini CLI (@google/gemini-cli) exports OTLP natively from its user settings file,
-// and runs terma's user-level Gemini extension's hooks (internal/harness/gemini.go).
+// and runs terma's user-level Gemini extension's hooks (internal/agents/gemini).
 // Builds come from npm; the fake model speaks the Gemini API
 // (models/{m}:streamGenerateContent?alt=sse) at GOOGLE_GEMINI_BASE_URL.
 

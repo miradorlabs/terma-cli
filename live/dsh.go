@@ -13,7 +13,7 @@ import (
 )
 
 // DeepSeek Harness (dsh, @deepseek-ai/dsh) sends its own OTLP to DeepSeek; terma's Cordis
-// plugin (internal/harness/dsh/terma.mjs) is its exporter and calls `terma hook dsh-*`.
+// plugin (internal/agents/dsh/plugin/terma.mjs) is its exporter and calls `terma hook dsh-*`.
 // Builds come from npm (every release so far is a prerelease, so the dist-tag `latest`
 // is what is tested); its native adapter speaks the Anthropic Messages API at
 // DEEPSEEK_BASE_URL, so the Claude fakes stand in for DeepSeek.
@@ -91,7 +91,7 @@ func (sb *Sandbox) UseDsh(url string) {
 func (sb *Sandbox) UseDshDirect() {
 	t := sb.T
 	t.Helper()
-	tmpl, err := os.ReadFile(filepath.Join("..", "internal", "harness", "dsh", "terma.mjs"))
+	tmpl, err := os.ReadFile(filepath.Join("..", "internal", "agents", "dsh", "plugin", "terma.mjs"))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -10,7 +10,7 @@ import (
 
 // omp (oh-my-pi) has a native exporter, but it reads its OTEL_* variables once at
 // startup, before any extension loads, so only a wrapper could configure it. Through
-// the relay, omp runs terma's Pi-family extension instead (internal/harness/pi/terma.ts,
+// the relay, omp runs terma's Pi-family extension instead (internal/agents/internal/pifamily/terma.ts,
 // agent "omp", in ~/.omp/agent/extensions), which exports from omp's own events; its
 // sessions are claimed by the committed hook file `terma install --adapters omp` writes
 // and the extension's claim-only omp-prompt. The direct half of a comparison runs the
