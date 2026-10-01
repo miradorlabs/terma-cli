@@ -36,7 +36,7 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 			defer stop()
 			deps := app.relayDeps()
 			res, err := daemon.Run(ctx, daemon.Config{
-				Dir: dir, Addr: addr, Idle: idle,
+				Dir: dir, Addr: addr, Idle: idle, Environment: cfg.Environment,
 				Engine:  deps.Engine(ctx, dir, cfg, daemon.SettingsFromEnv(), cmd.ErrOrStderr()),
 				Workers: []func(context.Context){deps.Refresher().Run},
 				Listening: func(at net.Addr, hold time.Duration) {

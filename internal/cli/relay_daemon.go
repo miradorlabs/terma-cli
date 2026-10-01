@@ -15,7 +15,7 @@ func newRelayDaemonCommand() *cobra.Command {
 	}
 	cmd.AddCommand(&cobra.Command{
 		Use:   "install",
-		Short: "Install and start the relay service",
+		Short: "Install the relay service, or rewrite and restart it as this terma",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			relayServiceWanted("on") // an explicit install clears an opt-out

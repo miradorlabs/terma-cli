@@ -211,8 +211,9 @@ func HarnessCheck(reg *agents.Registry, verdicts []HarnessVerdict, otlpURL, proj
 }
 
 // RelayCheck is doctor's "agent exporting to Terma" through the local relay: its address
-// is free, the developer's agents send to it, and this repository is bound and keyed.
-func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID string, selected []string) Check {
+// is free, it delivers to env (this profile's environment), the developer's agents send to
+// it, its service is this terma's, and this repository is bound and keyed.
+func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env string, selected []string) Check {
 	if relay.Err != nil {
 		return Check{Status: Fail, Detail: relay.Err.Error()}
 	}
@@ -220,6 +221,13 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID string, 
 	if !running && relay.Squatted {
 		return Check{Status: Fail, Detail: "another process is listening on " + addr + " and receives the agents' telemetry",
 			Fix: "stop it, or move the relay with `terma relay setup --addr`"}
+	}
+	// A relay started without this profile's environment holds no key for its teams, and
+	// drops everything it receives.
+	if running && relay.Environment != "" && env != "" && relay.Environment != env {
+		return Check{Status: Fail,
+			Detail: "the local relay on " + addr + " delivers to the " + relay.Environment + " environment, not this profile's " + env + ", so it forwards none of this profile's sessions",
+			Fix:    "terma relay daemon install"}
 	}
 	mine := func(e agents.Agent) bool {
 		if len(selected) == 0 {
@@ -235,6 +243,16 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID string, 
 	}
 	if len(wrong) > 0 {
 		return Check{Status: Fail, Detail: strings.Join(wrong, " and ") + " not exporting to the local relay", Fix: "terma relay setup"}
+	}
+	if relay.ServiceInstalled && !relay.ServiceCurrent {
+		return Check{Status: Warn,
+			Detail: "the relay service was written by an earlier terma, or for another binary or environment, so the system may not start this relay",
+			Fix:    "terma relay daemon install"}
+	}
+	if relay.ServiceInstalled && running && relay.HookStarted {
+		return Check{Status: Warn,
+			Detail: "a relay a hook started holds " + addr + ", so the relay service waits behind it and misses what agents export before their first hook",
+			Fix:    "terma relay daemon install"}
 	}
 	for _, e := range reg.With[agents.RelayExporter]() {
 		if c, ok := e.(agents.RelayChecker); ok && mine(e) {

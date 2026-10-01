@@ -12,6 +12,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
+	"github.com/miradorlabs/terma-cli/internal/relay/service"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -99,6 +100,13 @@ func relayFacts() doctor.Relay {
 	}
 	r := doctor.Relay{Dir: dir, Addr: daemon.Addr(dir), Running: daemon.Running(dir)}
 	r.Squatted = !r.Running && daemon.Squatted(r.Addr)
+	if info, ok := daemon.RunningRelay(dir); ok {
+		r.Environment, r.HookStarted = info.Environment, !info.Service
+	}
+	if service.Supported() {
+		state := daemon.CheckService()
+		r.ServiceInstalled, r.ServiceCurrent = state.Installed, state.Current
+	}
 	return r
 }
 

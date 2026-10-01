@@ -130,3 +130,31 @@ func TestHarnessSelectionFiltersSavedAgents(t *testing.T) {
 		}
 	}
 }
+
+// setup is the developer's own command, so it records their environment as the relay's:
+// a relay a hook starts later runs in it even when the hook's shell lacks TERMA_ENV.
+func TestSetupRecordsTheRelayEnvironment(t *testing.T) {
+	gateway := newFakeAuth(t)
+	authSandbox(t, gateway)
+	sandboxMachine(t)
+	t.Setenv("CODEX_HOME", t.TempDir())
+	if _, err := auth.SaveCredential(config.DefaultProfile, storedSession(gateway, orgA())); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := runTerma(t, "setup", "--harness", "codex"); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	dir, err := daemon.Dir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	env, ok := daemon.RecordedEnv(dir)
+	if !ok {
+		t.Fatal("setup recorded no relay environment")
+	}
+	for _, k := range []string{"TERMA_ENV", "TERMA_CONFIG_DIR", "HOME"} {
+		if env[k] != os.Getenv(k) {
+			t.Errorf("recorded %s=%q, setup ran with %q", k, env[k], os.Getenv(k))
+		}
+	}
+}

@@ -28,6 +28,10 @@ const (
 	StopFile          = "stop"
 	NoServiceFile     = "no-service"
 	SupervisorPIDFile = "supervisor.pid"
+	// EnvFile is the environment every relay of this config directory runs in (RecordEnv).
+	EnvFile = "relay-env.json"
+	// RunFile describes the running relay (RunningRelay).
+	RunFile = "relay.json"
 )
 
 // Dir is the relay's state directory, created if missing.

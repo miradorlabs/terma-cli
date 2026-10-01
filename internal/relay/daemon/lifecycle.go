@@ -68,8 +68,7 @@ func Spawn() {
 	if err != nil || strings.HasSuffix(filepath.Base(exe), ".test") {
 		return
 	}
-	proc := exec.Command(exe, "relay", "run", "--quiet")
-	proc.Stdin, proc.Stdout, proc.Stderr = nil, nil, nil
+	proc := spawnCommand(exe, dir)
 	procinfo.Detach(proc)
 	if err := proc.Start(); err != nil {
 		return
@@ -84,6 +83,17 @@ func Spawn() {
 			return
 		}
 	}
+}
+
+// spawnCommand is the hook-started relay. A hook's environment is not the developer's (it
+// may lack TERMA_ENV), so the relay runs in the one install recorded, where there is one.
+func spawnCommand(exe, dir string) *exec.Cmd {
+	proc := exec.Command(exe, "relay", "run", "--quiet")
+	if env, ok := RecordedEnv(dir); ok {
+		proc.Env = withRelayEnv(os.Environ(), env)
+	}
+	proc.Stdin, proc.Stdout, proc.Stderr = nil, nil, nil
+	return proc
 }
 
 // StartWait bounds how long a hook that started the relay waits for it to listen.

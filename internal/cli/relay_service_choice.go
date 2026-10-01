@@ -38,15 +38,19 @@ func relayServiceWanted(flag string) bool {
 	if os.Getenv("TERMA_RELAY_SERVICE") == "0" {
 		return false
 	}
-	if exe, err := os.Executable(); err != nil || strings.HasSuffix(filepath.Base(exe), ".test") {
+	if !realTerma() {
 		return false
 	}
 	return service.Supported()
 }
 
 // ensureRelay leaves a relay running, as a service when wanted, else started on demand,
-// reporting only what the developer should know.
+// reporting only what the developer should know. It is a developer's own command, so it
+// records their environment as the relay's (daemon.RecordEnv).
 func ensureRelay(ctx context.Context, flag string, report func(warn bool, what string)) {
+	if dir, err := daemon.Dir(); err == nil {
+		_ = daemon.RecordEnv(dir)
+	}
 	if !relayServiceWanted(flag) {
 		if flag == "off" {
 			_, _ = daemon.RemoveService(ctx)
@@ -55,7 +59,10 @@ func ensureRelay(ctx context.Context, flag string, report func(warn bool, what s
 		daemon.Spawn()
 		return
 	}
-	if _, ok := daemon.ServiceInstalled(); ok && flag != "on" {
+	// A definition that exists is not one that works: an earlier terma's may run a command
+	// this one lacks, or another binary or environment. Only one this terma would write stays.
+	state := daemon.CheckServiceHere()
+	if keepService(state, flag) {
 		// A service definition does not prove its relay is alive; the lock prevents duplicates.
 		report(false, "running in the background")
 		daemon.Spawn()
@@ -66,6 +73,22 @@ func ensureRelay(ctx context.Context, flag string, report func(warn bool, what s
 		daemon.Spawn()
 		return
 	}
-	report(false, "running in the background")
+	if state.Installed && !state.Current {
+		report(false, "running in the background (its service was out of date and is rewritten for this terma)")
+	} else {
+		report(false, "running in the background")
+	}
 	daemon.Spawn()
+}
+
+// keepService reports whether install leaves the relay service as it is: only one this
+// terma would write now, and only when --relay-service on did not ask for it again.
+func keepService(state daemon.ServiceState, flag string) bool {
+	return state.Installed && state.Current && flag != "on"
+}
+
+// realTerma is false for a test binary, which must not touch the machine's relay service.
+func realTerma() bool {
+	exe, err := os.Executable()
+	return err == nil && !strings.HasSuffix(filepath.Base(exe), ".test")
 }
