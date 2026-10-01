@@ -53,10 +53,12 @@ var global = map[string]string{
 }
 
 type pkg struct {
-	ImportPath string
-	Dir        string
-	GoFiles    []string
-	Imports    []string
+	ImportPath                string
+	Dir                       string
+	GoFiles, TestGoFiles      []string
+	XTestGoFiles              []string
+	Imports                   []string
+	TestImports, XTestImports []string
 }
 
 func listPackages(t *testing.T) []pkg {
@@ -80,7 +82,7 @@ func listPackages(t *testing.T) []pkg {
 		if _, err := os.ReadDir(p.Dir); err != nil {
 			t.Fatal(err)
 		}
-		for _, name := range p.GoFiles {
+		for _, name := range slices.Concat(p.GoFiles, p.TestGoFiles, p.XTestGoFiles) {
 			if _, err := os.ReadFile(filepath.Join(p.Dir, name)); err != nil {
 				t.Fatal(err)
 			}
@@ -138,6 +140,12 @@ func TestAgentPackagesAreImportedOnlyByTheRegistry(t *testing.T) {
 				t.Errorf("%s imports %s: one agent never imports another; share through internal/agents/internal", p.ImportPath, imp)
 			case p.ImportPath != module+"/internal/agents/builtin":
 				t.Errorf("%s imports %s: only internal/agents/builtin imports an agent's package", p.ImportPath, imp)
+			}
+		}
+		// A test may build on the registry, but only the snapshots are about one agent.
+		for _, imp := range append(p.TestImports, p.XTestImports...) {
+			if other, ok := agentPackage(imp); ok && (!isAgent || other != self) && p.ImportPath != module+"/internal/contract" {
+				t.Errorf("%s's tests import %s: a test reaches an agent through internal/agents/builtin", p.ImportPath, imp)
 			}
 		}
 		for _, imp := range p.Imports {

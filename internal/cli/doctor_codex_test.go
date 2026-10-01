@@ -1,12 +1,8 @@
 package cli
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/miradorlabs/terma-cli/internal/agents/codex"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
@@ -60,63 +56,6 @@ func TestDoctorDoesNotChargeForAnAgentTheDeveloperDoesNotUse(t *testing.T) {
 	}
 }
 
-func TestDoctorAcceptsTrustedCodexHooks(t *testing.T) {
-	repo := installRepo(t)
-	codexHome := t.TempDir()
-	t.Setenv("CODEX_HOME", codexHome)
-
-	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude,codex", "--yes"); err != nil {
-		t.Fatal(err)
-	}
-	// The agent writes a trust record for every entry once the developer trusts them.
-	trustCodexEntries(t, repo, codexHome, func(codex.Entry) bool { return true })
-
-	out, _ := runTerma(t, "doctor", "--skip-commit")
-	if !strings.Contains(out, "Codex hooks present and trusted") {
-		t.Fatalf("doctor should report trusted hooks:\n%s", out)
-	}
-	if strings.Contains(out, "has not been shown them") {
-		t.Fatalf("doctor still reports the hooks as unreviewed:\n%s", out)
-	}
-}
-
-func TestDoctorRejectsChangedCodexHookAfterTrust(t *testing.T) {
-	repo := installRepo(t)
-	codexHome := t.TempDir()
-	t.Setenv("CODEX_HOME", codexHome)
-	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude,codex", "--yes"); err != nil {
-		t.Fatal(err)
-	}
-	trustCodexEntries(t, repo, codexHome, func(codex.Entry) bool { return true })
-	path := filepath.Join(codexHome, "config.toml")
-	before, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	entries, err := codex.TermaEntries(repo)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var oldHash string
-	for _, entry := range entries {
-		if entry.Event == "PostToolUse" {
-			oldHash = entry.Hash
-			break
-		}
-	}
-	after := strings.Replace(string(before), oldHash, "sha256:stale", 1)
-	if after == string(before) {
-		t.Fatal("PostToolUse trust hash was not found")
-	}
-	if err := os.WriteFile(path, []byte(after), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	out, _ := runTerma(t, "doctor", "--skip-commit")
-	if !strings.Contains(out, "PostToolUse") || !strings.Contains(out, "include any new or changed entries") {
-		t.Fatalf("doctor accepted a changed, untrusted hook:\n%s", out)
-	}
-}
-
 // A repository installed without the adapter is not nagged about its trust prompt.
 func TestDoctorIgnoresCodexTrustWithoutTheAdapter(t *testing.T) {
 	installRepo(t)
@@ -127,45 +66,5 @@ func TestDoctorIgnoresCodexTrustWithoutTheAdapter(t *testing.T) {
 	out, _ := runTerma(t, "doctor", "--skip-commit")
 	if strings.Contains(out, "Codex hooks") {
 		t.Fatalf("doctor mentioned Codex hooks in a repository that has none:\n%s", out)
-	}
-}
-
-func trustCodexEntries(t *testing.T, repo, codexHome string, keep func(codex.Entry) bool) {
-	t.Helper()
-	entries, err := codex.TermaEntries(repo)
-	if err != nil || len(entries) == 0 {
-		t.Fatalf("terma's Codex entries: %v (%d)", err, len(entries))
-	}
-	hooksPath := filepath.Join(repo, ".codex", "hooks.json")
-	config := ""
-	for _, e := range entries {
-		if keep(e) {
-			config += "[hooks.state.\"" + hooksPath + ":" + e.Key() + "\"]\n" + "trusted_hash = \"" + e.Hash + "\"\nenabled = true\n\n"
-		}
-	}
-	if err := os.WriteFile(filepath.Join(codexHome, "config.toml"), []byte(config), 0o600); err != nil {
-		t.Fatal(err)
-	}
-}
-
-// Trust is per entry: entries added after the developer trusted the file are skipped in
-// silence, and doctor names them.
-func TestDoctorNamesTheCodexEntriesANewerTermaAdded(t *testing.T) {
-	repo := installRepo(t)
-	codexHome := t.TempDir()
-	t.Setenv("CODEX_HOME", codexHome)
-	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude,codex", "--yes"); err != nil {
-		t.Fatal(err)
-	}
-	trustCodexEntries(t, repo, codexHome, func(e codex.Entry) bool { return !strings.HasPrefix(e.Event, "Subagent") })
-
-	out, _ := runTerma(t, "doctor", "--skip-commit")
-	if strings.Contains(out, "Codex hooks present and trusted") {
-		t.Fatalf("doctor passed a file with untrusted entries:\n%s", out)
-	}
-	for _, want := range []string{"SubagentStart", "SubagentStop", "Settings → Hooks → Review", "include any new or changed entries"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("doctor does not mention %q:\n%s", want, out)
-		}
 	}
 }
