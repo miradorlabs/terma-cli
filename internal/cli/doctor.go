@@ -2,11 +2,13 @@ package cli
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/spf13/cobra"
 
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/ui/spinner"
+	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
 func (app *App) newDoctorCommand() *cobra.Command {
@@ -22,6 +24,9 @@ stamp a trailer?), the event spool, and the backend round-trip.
 Every failure names the command that fixes it, and the report ends with the
 remaining steps to complete setup.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if capturePaused() {
+				fmt.Fprintln(style.Highlight(cmd.OutOrStdout()), "Capture is paused on this machine, so the scratch commit is not stamped — run `terma resume` first.")
+			}
 			if app.executeDoctor(cmd, skipCommit).Failed() {
 				return errors.New("some checks failed")
 			}

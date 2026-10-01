@@ -34,7 +34,7 @@ func (app *App) newHookCommand() *cobra.Command {
 			status := dispatch.Run(cmd.Context(), app.hookDeps(), dispatch.Request{
 				Event: args[0], Args: args[1:], User: user,
 				Stdin: cmd.InOrStdin(), Stdout: cmd.OutOrStdout(), Stderr: cmd.ErrOrStderr(),
-				Version: app.version, Debug: os.Getenv("TERMA_DEBUG") != "", HooksOff: HooksDisabled(), Cwd: cwd,
+				Version: app.version, Debug: os.Getenv("TERMA_DEBUG") != "", HooksOff: HooksDisabled() || capturePaused(), Cwd: cwd,
 			})
 			if status != 0 {
 				return exitWith(status)

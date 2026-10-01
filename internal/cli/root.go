@@ -110,6 +110,8 @@ spend will be attributed.`,
 		app.newHookCommand(),
 		app.newAgentCommand(),
 		app.newRelayCommand(),
+		app.newPauseCommand(),
+		app.newResumeCommand(),
 	)
 	return root
 }

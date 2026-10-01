@@ -131,7 +131,9 @@ is up before any agent starts; with `--relay-service off`, hooks start it on dem
 Terma uses fast, local hooks. Each committed hook is a guarded one-liner that calls
 `terma hook <event>`; the binary owns the session files, touched-file manifests,
 commit trailers, and local event spool. On a machine without Terma, hooks are silent
-and inert. Set `TERMA_HOOKS=0` to disable them on a machine where Terma is installed.
+and inert. `terma pause` stops all capture on the machine, hooks and the relay alike,
+until `terma resume`; events already queued are still delivered. `TERMA_HOOKS=0` turns
+the hooks off for one shell or process.
 
 Commit attribution works like this:
 

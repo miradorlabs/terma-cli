@@ -50,6 +50,9 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 			add("Account", "%s in %s", cmp.Or(cred.Email, "signed in"), cmp.Or(cfg.OrganizationName, cred.OrganizationID))
 		}
 	}
+	if config.Paused() && cfg.Policy.PauseAllowed() {
+		add("Capture", "paused on this machine — run `terma resume` to start it again")
+	}
 	// Name the backend whenever it is not production, by environment or by host overrides.
 	switch {
 	case cfg.Environment != config.EnvProd:

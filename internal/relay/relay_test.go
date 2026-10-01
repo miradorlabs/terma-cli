@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -93,6 +94,7 @@ type fixture struct {
 	mu     sync.Mutex
 	claims map[string]claim.Claim
 	now    time.Time
+	paused atomic.Bool
 }
 
 func newFixture() *fixture {
@@ -122,6 +124,7 @@ func (f *fixture) relay(t *testing.T, u *upstream, policies map[string]Policy) (
 		Hold:   time.Minute,
 		Lookup: f.lookup,
 		Now:    f.clock,
+		Paused: f.paused.Load,
 		Resolve: func(c claim.Claim) (Policy, error) {
 			p, ok := policies[c.ProjectID]
 			if !ok {
@@ -261,6 +264,35 @@ func TestRelayRoutesLogsPerClaimedSession(t *testing.T) {
 				t.Fatalf("after the hold: %v", c)
 			}
 		})
+	}
+}
+
+// While paused, every record is received and dropped at once, claimed or not, and nothing
+// waits to leave after a resume.
+func TestRelayDropsEverythingWhilePaused(t *testing.T) {
+	u := newUpstream(t)
+	f := newFixture()
+	f.paused.Store(true)
+	r, srv := f.relay(t, u, allPolicies(u))
+	body, err := proto.Marshal(mixedLogs())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code := post(t, srv, "/v1/logs", body, "application/x-protobuf", token, false); code != http.StatusOK {
+		t.Fatalf("export = %d", code)
+	}
+	c := r.Stats().Snapshot().Counters
+	if c["received.logs"] != 6 || c["dropped.paused.logs"] != 6 || c["held_parts"] != 0 {
+		t.Fatalf("stats while paused = %v", c)
+	}
+
+	f.paused.Store(false)
+	if code := post(t, srv, "/v1/logs", body, "application/x-protobuf", token, false); code != http.StatusOK {
+		t.Fatalf("export = %d", code)
+	}
+	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["forwarded.logs"] == 3 })
+	if got, _ := u.logs(t); len(got["Bearer key-p1"]) != 1 || len(got["Bearer key-p2"]) != 2 {
+		t.Fatalf("after resume, forwarded = %v", got)
 	}
 }
 

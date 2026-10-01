@@ -21,7 +21,7 @@ var primaryCommands = []string{
 // advancedCommands are hidden, not removed: automation and terma's own fix-it hints run them.
 var advancedCommands = []string{
 	"agent", "config", "connect", "disconnect", "harness", "hook", "login", "logout", "nate",
-	"principal", "project", "relay", "spool", "telemetry", "version", "whoami",
+	"pause", "principal", "project", "relay", "resume", "spool", "telemetry", "version", "whoami",
 }
 
 func commandNamed(root *cobra.Command, name string) *cobra.Command {
