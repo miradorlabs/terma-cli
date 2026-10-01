@@ -1,4 +1,4 @@
-package cmd
+package install
 
 import (
 	"context"
@@ -13,9 +13,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
-// wireRepo does the per-clone half of an install: point git at the committed shims
+// Wire does the per-clone half of an install: point git at the committed shims
 // when the repo uses them, remembering the previous hooksPath for uninstall.
-func wireRepo(ctx context.Context, out io.Writer, root string, bound *termaproject.File) error {
+func Wire(ctx context.Context, out io.Writer, root string, bound *termaproject.File) error {
 	if bound.Install.HookManager != string(hookmgr.GitShim) {
 		return nil
 	}
@@ -75,8 +75,8 @@ func wireRepo(ctx context.Context, out io.Writer, root string, bound *termaproje
 	return nil
 }
 
-// unwireRepo restores core.hooksPath to what it was before terma set it.
-func unwireRepo(ctx context.Context, root, gitDir string) error {
+// Unwire restores core.hooksPath to what it was before terma set it.
+func Unwire(ctx context.Context, root, gitDir string) error {
 	if gitx.ConfigGet(ctx, root, "core.hooksPath") != hookmgr.ShimDir {
 		return nil
 	}

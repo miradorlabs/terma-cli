@@ -32,7 +32,7 @@ func newProjectCommand() *cobra.Command {
 		// Advanced: install owns project selection and repository binding.
 		Hidden: true,
 		Long: `Projects are selected per repository by terma install.
-Read commands use the current repository's binding, or an explicit --project override.`,
+Read commands use the current repository's install.Binding, or an explicit --project override.`,
 	}
 	cmd.AddCommand(newProjectListCommand(), newProjectShowCommand())
 	return cmd

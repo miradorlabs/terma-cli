@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/miradorlabs/terma-cli/internal/doctor"
+	"github.com/miradorlabs/terma-cli/internal/install"
 	"github.com/miradorlabs/terma-cli/internal/spinner"
 	"github.com/miradorlabs/terma-cli/internal/style"
 )
@@ -34,25 +35,33 @@ func newInstallUI(out io.Writer, verbose bool) *installUI {
 // stepLabelWidth is the column the step labels are padded to, so the details line up.
 const stepLabelWidth = 13
 
-// ok reports a step that did what it should.
-func (u *installUI) ok(label, what string) { u.line(u.detail, u.p.OK("✓"), label, what) }
+// OK reports a step that did what it should.
+func (u *installUI) OK(label, what string) { u.line(u.detail, u.p.OK("✓"), label, what) }
 
 // summary keeps user-facing choices visible without exposing setup internals.
 func (u *installUI) summary(label, what string) { u.line(u.out, u.p.OK("✓"), label, what) }
 
-// warn reports a step that needs the developer, whose fix is a next step.
-func (u *installUI) warn(label, what string) {
+// Warn reports a step that needs the developer, whose fix is a next step.
+func (u *installUI) Warn(label, what string) {
 	u.warned = true
 	u.line(u.out, u.p.Warn("!"), label, what)
 }
+
+// Commit adds the step that commits paths, led by why.
+func (u *installUI) Commit(lead string, paths []string) { u.Then(commitList(u.p, lead, paths)) }
+
+// Detail takes the long form, shown under --verbose or --dry-run.
+func (u *installUI) Detail() io.Writer { return u.detail }
+
+var _ install.Reporter = (*installUI)(nil)
 
 func (u *installUI) line(out io.Writer, mark, label, what string) {
 	fmt.Fprintf(out, "  %s %-*s %s\n", mark, stepLabelWidth, label, u.p.Commands(what))
 }
 
-// then adds a step left for the developer. Lines after the first keep their own
+// Then adds a step left for the developer. Lines after the first keep their own
 // indentation under the step's number.
-func (u *installUI) then(step string) {
+func (u *installUI) Then(step string) {
 	if !slices.Contains(u.next, step) {
 		u.next = append(u.next, step)
 	}
@@ -132,15 +141,15 @@ func (u *installUI) verdict(report doctor.Report) {
 	}
 	switch {
 	case len(fixes) > 0:
-		u.warn("Verified", fmt.Sprintf("terma doctor found %d thing(s) to fix", len(fixes)))
+		u.Warn("Verified", fmt.Sprintf("terma doctor found %d thing(s) to fix", len(fixes)))
 		for _, f := range fixes {
-			u.then(f)
+			u.Then(f)
 		}
-		u.then("Run `terma doctor` for the full report.")
+		u.Then("Run `terma doctor` for the full report.")
 	case skipped:
-		u.ok("Verified", "terma doctor: the checks that ran passed; some were skipped")
+		u.OK("Verified", "terma doctor: the checks that ran passed; some were skipped")
 	default:
-		u.ok("Verified", "terma doctor: all checks passed")
+		u.OK("Verified", "terma doctor: all checks passed")
 	}
 }
 

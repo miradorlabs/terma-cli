@@ -13,13 +13,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
+	"github.com/miradorlabs/terma-cli/internal/install"
 	"github.com/miradorlabs/terma-cli/internal/keystore"
 	"github.com/miradorlabs/terma-cli/internal/output"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
@@ -69,7 +69,7 @@ not run ` + "`terma setup`" + `, asks which agents you use if you have not chose
      committed, no secrets. An organization with one project is bound to it without
      asking. With several, on a terminal you choose the project every time, the one
      already bound offered first (Enter keeps it); --project names it instead, and
-     without a terminal, or with --yes, an existing binding is kept. A binding to a
+     without a terminal, or with --yes, an existing install.Binding is kept. A install.Binding to a
      project your account cannot see is not used: install says why and chooses again.
   2. Points each of your agents at that project, through the local relay: their own
      exporters (or terma's plugin, for an agent without a usable one) send to a relay
@@ -165,7 +165,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	if err != nil {
 		return err
 	}
-	if err := checkSignalNeeds(agents, f.signals); err != nil {
+	if err := install.CheckSignalNeeds(registered, agents, f.signals); err != nil {
 		return err
 	}
 
@@ -195,7 +195,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 		if !f.dryRun || !errors.Is(err, auth.ErrNotLoggedIn) {
 			return err
 		}
-		b = binding{}
+		b = install.Binding{}
 	}
 	// Point the resolved config at the repo's project so key minting and resource
 	// attributes speak for it.
@@ -215,14 +215,14 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	}
 
 	if gitDir == "" {
-		ui.warn("Git hooks", "skipped — not a Git repository, so commits are not stamped")
+		ui.Warn("Git hooks", "skipped — not a Git repository, so commits are not stamped")
 	}
 	env := ""
 	if cfg.Environment != config.EnvProd {
 		env = " (" + cfg.Environment + ")"
 	}
 	if b.ID == "" && b.Name == "" {
-		ui.warn("Project", "unresolved — a real install signs in and selects one"+env)
+		ui.Warn("Project", "unresolved — a real install signs in and selects one"+env)
 	} else {
 		ui.summary("Project", cmp.Or(b.Name, b.ID)+env)
 	}
@@ -251,215 +251,45 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 		}
 	}
 
-	// The hook plan — the commit hooks and the agents' own hooks, into committed files —
-	// is built once, before anything is written, so a dry run prints exactly the plan an
-	// install goes on to apply. The wired adapters are a team decision, so a re-install
-	// keeps every agent the repository's hooks files already wire unless --adapters
-	// overrides it — a colleague re-running install must not rewrite the committed hooks
-	// to match their own agent set.
-	adapters := installAdapters(root, agents, f.adapters)
-	if err := checkHookNeeds(agents, adapters); err != nil {
-		return err
-	}
-	det := hookmgr.Detect(root)
-	if gitDir == "" {
-		det = hookmgr.Detection{}
-	}
-	var plan hookPlan
-	if !f.noHooks {
-		if plan, err = planHooks(root, det, adapters); err != nil {
-			return err
-		}
-	} else if err := checkHooksApplied(root, agents, "run `terma install` without --no-hooks"); err != nil {
-		return err
-	}
-
-	if f.dryRun {
-		if !f.noHooks {
-			plan.print(out)
-		}
-		if needsAuth {
-			fmt.Fprintln(out, "\nA real install would sign in first (not done for a dry run).")
-		}
-		for _, h := range repoPolicyHarnesses(adapters) {
-			path, err := h.(harness.Scoped).Local(root).ConfigPath()
-			if err != nil {
-				return err
-			}
-			fmt.Fprintf(out, "\nRepository telemetry: %s (preserve existing policy unless export flags are supplied).\n", path)
-		}
-		for _, s := range selectedSurfaces(agents) {
-			for _, step := range s.SetupSteps {
-				fmt.Fprintf(out, "\nAfter a real install — %s\n", step)
-			}
-		}
-		fmt.Fprintln(out, "\nDry run: nothing written.")
-		return nil
-	}
-
-	// Reserve the private store even before the first agent event. A hook already
-	// in flight when git init runs and a hook starting afterwards must choose the
-	// same store, including when neither has written a manifest yet.
-	if gitDir == "" {
-		stateDir, err := termaproject.StateDir(root, "")
-		if err != nil {
-			return err
-		}
-		if err := os.MkdirAll(stateDir, 0o700); err != nil {
-			return err
-		}
-	}
-
-	// 4. Configure each agent for this repository (per-repo routing). This is the
-	// per-developer half — keys and routing state in the home directory — and touches
-	// no committed file.
-	if err := connectHarnessesForRepo(cmd, ui, cfg, agents, f); err != nil {
-		return err
-	}
-
-	// Wrap Claude Code's status line to capture the plan's rate-limit windows — the
-	// strongest funding evidence a machine produces. It is machine-level (the user's
-	// global Claude settings) and idempotent. Gated on Claude being a configured agent
-	// (not merely installed) so it only touches the global config for a developer who
-	// has chosen Claude — which also keeps `--harness none` installs from touching it.
-	// --no-statusline opts out.
-	if a, ok := doctor.StatusLineAgent(registered); ok && !f.noStatusLine && slices.Contains(agents, a.Name()) {
-		if note, ok := installStatusLine(cmd.ErrOrStderr()); ok {
-			fmt.Fprintf(ui.detail, "\n%s\n", note)
-			ui.ok("Status line", "reads your plan's usage windows")
-		} else {
-			ui.warn("Status line", "not wrapped — your plan's usage windows are not captured")
-		}
-	}
-
-	// 5. Hooks: apply the plan built above.
-	installedHooks := gitDir != "" && existing != nil && existing.Install.HookManager != ""
-	var written []string    // the repository files this run wrote hooks into, to commit
-	var afterMerge []string // what each clone does once they are merged
-	if !f.noHooks {
-		plan.print(ui.detail)
-		writeHooks := f.assumeYes
-		if !plan.empty() && !writeHooks {
-			var err error
-			writeHooks, err = confirmExplained(cmd, "Write terma's hooks to "+joinNames(plan.files())+"?", plan.explain(), true)
-			if errors.Is(err, errCancelled) {
-				return err
-			}
-			writeHooks = err == nil && writeHooks
-		}
-		switch {
-		case plan.empty():
-			// An empty git-hook plan means the commit hooks are already wired, so this
-			// repo is hook-installed; record them in the binding without rewriting.
-			installedHooks = gitDir != ""
-			ui.ok("Hooks", plan.summary(adapters)+" — already in place")
-		case writeHooks:
-			if err := plan.apply(root); err != nil {
-				return err
-			}
-			installedHooks = gitDir != ""
-			written = plan.paths()
-			ui.ok("Hooks", plan.summary(adapters))
-			afterMerge = plan.hooks.Notes
-		default:
-			adapters = registered.WiredNames(root) // declined: only what is already wired
-			ui.warn("Hooks", "not written — commits are not stamped until they are")
-			ui.then("Run `terma install` again and accept the hooks when you are ready.")
-		}
-	} else {
-		adapters = registered.WiredNames(root) // --no-hooks: only what is already wired
-	}
-	if err := checkHooksApplied(root, agents, "run `terma install` without --no-hooks and accept the hook plan"); err != nil {
-		return err
-	}
-
-	// The key this machine delivers the repository's hook events with. Pointing a
-	// telemetry agent stores one as a side effect; nothing else does, and `terma setup`
-	// no longer connects anything — so without this step a developer whose agents are
-	// all hooks-only would see "Installed." while every commit, tool call and observation
-	// sat in the spool, held for a key that no command would ever mint.
-	if installedHooks || len(registered.WiredNames(root)) > 0 {
-		sp := spinner.New(cmd.ErrOrStderr())
-		sp.Start("Preparing hook event delivery…")
-		k := ensureSpoolKey(ctx, cfg)
-		sp.Stop()
-		if k.fix == "" {
-			ui.ok("Hook events", k.state)
-		} else {
-			ui.warn("Hook events", k.state)
-			ui.then(k.fix)
-		}
-	}
-
-	// 6. Repository telemetry also supports developers using a global repos-only
-	// connection. Hooks alone do not enable that connection's exporters.
-	paths, err := writeRepoPolicy(ctx, ui, root, cfg, repoPolicyHarnesses(adapters), f)
+	// The plan is built once, before anything is written, so a dry run prints exactly
+	// the plan an install goes on to apply.
+	plan, err := install.Build(registered, root, gitDir, existing, agents, splitCommas(f.adapters), f.noHooks, b)
 	if err != nil {
 		return err
 	}
-	for _, path := range paths {
-		if !slices.Contains(written, path) {
-			written = append(written, path)
-		}
+	if f.dryRun {
+		return plan.PrintDryRun(out, needsAuth)
 	}
-
-	// 7. The committed binding. installed_at is the onboarder's and never moves;
-	// terma_version is the terma that last wrote the committed files, so it moves only
-	// when this run wrote one — a colleague's install that changes nothing does not
-	// churn the file.
-	version, installedAt := Version, time.Now().UTC()
-	if existing != nil {
-		if existing.Install.Version != "" && len(written) == 0 {
-			version = existing.Install.Version
-		}
-		if !existing.Install.InstalledAt.IsZero() {
-			installedAt = existing.Install.InstalledAt
-		}
-	}
-	file := &termaproject.File{
-		Project: termaproject.Project{
-			ID:             b.ID,
-			Name:           b.Name,
-			OrganizationID: b.OrganizationID,
-			Environment:    b.Environment,
+	steps := install.Steps{
+		Confirm: func(question string, explain []string) (bool, error) {
+			yes, err := confirmExplained(cmd, question, explain, true)
+			if errors.Is(err, errCancelled) {
+				return false, err
+			}
+			return err == nil && yes, nil
 		},
-		Install: termaproject.Install{
-			HookManager: managerOrEmpty(det, installedHooks),
-			Hooks:       hooksOrNil(installedHooks),
-			Version:     version,
-			InstalledAt: installedAt,
+		// Per-repo routing: the per-developer half, keys and routing state in the home
+		// directory. It touches no committed file.
+		Connect: func(context.Context) error { return connectHarnessesForRepo(cmd, ui, cfg, agents, f) },
+		SpoolKey: func(ctx context.Context) (string, string) {
+			sp := spinner.New(cmd.ErrOrStderr())
+			sp.Start("Preparing hook event delivery…")
+			defer sp.Stop()
+			k := ensureSpoolKey(ctx, cfg)
+			return k.state, k.fix
+		},
+		RepoPolicy: func(ctx context.Context, hs []harness.Harness) ([]string, error) {
+			return writeRepoPolicy(ctx, ui, root, cfg, hs, f)
 		},
 	}
-	if err := termaproject.Save(root, file); err != nil {
+	// The status line carries the plan's rate-limit windows, the strongest funding
+	// evidence a machine produces. It is the user's global setting, so it is wrapped
+	// only for a developer who chose its agent; --no-statusline opts out.
+	if a, ok := doctor.StatusLineAgent(registered); ok && !f.noStatusLine && slices.Contains(agents, a.Name()) {
+		steps.StatusLine = func() (string, bool) { return installStatusLine(cmd.ErrOrStderr()) }
+	}
+	if err := install.Apply(ctx, plan, install.Options{AssumeYes: f.assumeYes, Version: Version, Now: time.Now()}, steps, ui); err != nil {
 		return err
-	}
-
-	// 8. Per-clone git wiring for the shim manager.
-	if installedHooks {
-		if err := wireRepo(ctx, ui.detail, root, file); err != nil {
-			return err
-		}
-	}
-	for _, s := range selectedSurfaces(agents) {
-		for _, step := range s.InstallSteps {
-			ui.then(step)
-		}
-		if s.Warn == nil {
-			continue
-		}
-		if warning := s.Warn(); warning != "" {
-			_, a, _ := registered.Surface(s.Name)
-			ui.warn(a.DisplayName(), warning)
-		}
-	}
-
-	if gitDir != "" && len(written) > 0 {
-		// Save always rewrites the binding.
-		written = append(written, termaproject.FileName)
-		ui.then(commitList(ui.p, "Commit these files and open a PR — merging it onboards the repository:", written))
-	}
-	for _, n := range afterMerge {
-		ui.then("After merging: " + n)
 	}
 	// The first run of a newer release brings what earlier versions wrote on this machine
 	// up to this build — the shims and wraps this run did not rewrite itself — before
@@ -472,11 +302,11 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 			fmt.Fprintf(ui.detail, "  updated %s\n", p)
 		}
 		if err != nil {
-			ui.warn("Refreshed", "some files an earlier terma installed could not be updated ("+err.Error()+")")
-			ui.then("Run `terma update --refresh` to retry.")
+			ui.Warn("Refreshed", "some files an earlier terma installed could not be updated ("+err.Error()+")")
+			ui.Then("Run `terma update --refresh` to retry.")
 		} else {
 			if len(changed) > 0 {
-				ui.ok("Refreshed", fmt.Sprintf("%d file(s) an earlier terma installed", len(changed)))
+				ui.OK("Refreshed", fmt.Sprintf("%d file(s) an earlier terma installed", len(changed)))
 			}
 			_ = selfupdate.SaveRefreshed(dir, Version)
 		}
@@ -486,7 +316,7 @@ func runInstall(cmd *cobra.Command, f installFlags) error {
 	// --no-doctor, since doctor makes a scratch commit and a network round-trip; those
 	// callers can run `terma doctor` themselves.
 	if f.noDoctor || !canPrompt() {
-		ui.then("Run `terma doctor` to verify the chain end to end.")
+		ui.Then("Run `terma doctor` to verify the chain end to end.")
 	} else {
 		ui.verify(cmd)
 	}
@@ -675,7 +505,7 @@ func connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *config.Conf
 		IncludePrompts:     !f.excludePrompts,
 		IncludeToolContent: !f.excludeToolContent,
 		Harnesses:          targets,
-		Surfaces:           routedSurfaces(agents, targets),
+		Surfaces:           install.RoutedSurfaces(registered, agents, targets),
 	}
 	if !cmd.Flags().Changed("signals") {
 		if prev, ok, err := routing.LoadRecord(cfg.ProjectID); err != nil {
@@ -711,275 +541,16 @@ func connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *config.Conf
 	}
 	// The machine half is `terma setup`'s; install does it too, so an install without a
 	// setup is complete, and a re-run repairs an agent pointed elsewhere since.
-	err = connectMachineRelay(ctx, agents, f.relayService, relayReport{ok: ui.ok, warn: ui.warn, then: ui.then, detail: ui.detail})
+	err = connectMachineRelay(ctx, agents, f.relayService, relayReport{ok: ui.OK, warn: ui.Warn, then: ui.Then, detail: ui.detail})
 	if err != nil {
 		return err
 	}
-	for _, s := range selectedSurfaces(agents) {
+	for _, s := range install.SelectedSurfaces(registered, agents) {
 		if s.Reports != "" {
-			ui.ok(s.DisplayName, s.Reports)
+			ui.OK(s.DisplayName, s.Reports)
 		}
 	}
 	return nil
-}
-
-// routedSurfaces are the selected surfaces of the agents routed to the project.
-func routedSurfaces(selected, targets []string) []string {
-	var out []string
-	for _, name := range selected {
-		if _, a, ok := registered.Surface(name); ok && slices.Contains(targets, a.Name()) {
-			out = append(out, name)
-		}
-	}
-	return out
-}
-
-// selectedSurfaces are the surfaces the selection names.
-func selectedSurfaces(selected []string) []agents.Surface {
-	var out []agents.Surface
-	for _, name := range selected {
-		if s, _, ok := registered.Surface(name); ok {
-			out = append(out, s)
-		}
-	}
-	return out
-}
-
-// checkSignalNeeds refuses signals a selected surface cannot report without.
-func checkSignalNeeds(selected []string, rawSignals string) error {
-	for _, s := range selectedSurfaces(selected) {
-		if len(s.Needs.Signals) == 0 {
-			continue
-		}
-		signals, err := harness.ParseSignals(rawSignals)
-		if err != nil {
-			return err
-		}
-		for _, want := range s.Needs.Signals {
-			if !slices.Contains(signals, harness.Signal(want)) {
-				return fmt.Errorf("%s needs the %s signal to route sessions by repository", s.DisplayName, want)
-			}
-		}
-	}
-	return nil
-}
-
-// checkHookNeeds refuses adapters without the committed hooks a selected surface needs.
-func checkHookNeeds(selected, adapters []string) error {
-	for _, s := range selectedSurfaces(selected) {
-		if _, a, _ := registered.Surface(s.Name); s.Needs.Hooks && !slices.Contains(adapters, a.Name()) {
-			return fmt.Errorf("%s needs the %s repository hooks; include %s in --adapters", s.DisplayName, a.DisplayName(), a.Name())
-		}
-	}
-	return nil
-}
-
-// checkHooksApplied refuses an install that leaves out committed hooks a selected surface
-// needs: its agent's plan must have nothing left to write.
-func checkHooksApplied(root string, selected []string, hint string) error {
-	for _, s := range selectedSurfaces(selected) {
-		if !s.Needs.Hooks {
-			continue
-		}
-		_, a, _ := registered.Surface(s.Name)
-		plan, err := a.Plan(root, true)
-		if err != nil {
-			return err
-		}
-		if !plan.Empty() {
-			return fmt.Errorf("%s needs its %s repository hooks; %s", s.DisplayName, a.DisplayName(), hint)
-		}
-	}
-	return nil
-}
-
-// installAdapters lists the agents whose committed hooks to wire. --adapters overrides
-// it outright; otherwise it is the union of the agents the repository's hooks files
-// already wire, the agents this install configures, and any adapter whose directory the
-// repository already carries (a .codex directory is a clear sign the repo is opened in
-// Codex) — restricted to adapters that actually write a hooks file, and to agents that
-// are available: one still coming soon (not supported by this build) is wired
-// only when --adapters names it, whatever directory the repository carries. Hooks a
-// colleague committed for one are left as they are, not rewritten or removed.
-//
-// A union (rather than replacing with the current selection) means selecting more agents
-// grows the committed set, while a colleague re-running install with a narrower selection
-// never removes hooks someone else committed — so the files grow on purpose and never
-// churn down.
-func installAdapters(root string, selected []string, override string) []string {
-	if list := splitCommas(override); len(list) > 0 {
-		return list
-	}
-	var out []string
-	for _, a := range registered.All() {
-		if a.HooksPath() == "" || !registered.IsSupported(a.Name()) {
-			continue
-		}
-		chosen := slices.ContainsFunc(agents.Selections(a), func(s string) bool { return slices.Contains(selected, s) })
-		if chosen || a.Default(root) || agents.Wired(root, a) {
-			out = append(out, a.Name())
-		}
-	}
-	return out
-}
-
-// hookPlan is everything install would write into the repository for hooks: the
-// commit hooks through the detected manager, and each wired agent's own hooks file.
-type hookPlan struct {
-	det    hookmgr.Detection
-	hooks  hookmgr.Plan
-	agents []hookmgr.Plan
-}
-
-func planHooks(root string, det hookmgr.Detection, adapters []string) (hookPlan, error) {
-	var hooks hookmgr.Plan
-	var err error
-	if det.Manager != "" {
-		hooks, err = hookmgr.PlanInstall(root, det)
-		if err != nil {
-			return hookPlan{}, err
-		}
-	}
-	agents, err := planAdapters(root, adapters, true)
-	if err != nil {
-		return hookPlan{}, err
-	}
-	if err := hookmgr.Validate(root, hooks); err != nil {
-		return hookPlan{}, err
-	}
-	return hookPlan{det: det, hooks: hooks, agents: agents}, nil
-}
-
-// empty reports whether the commit hooks and every agent's hooks are already in place.
-func (p hookPlan) empty() bool {
-	if !p.hooks.Empty() {
-		return false
-	}
-	for _, a := range p.agents {
-		if !a.Empty() {
-			return false
-		}
-	}
-	return true
-}
-
-// print lists the files the hook install would write, or says there are none.
-func (p hookPlan) print(out io.Writer) {
-	if p.empty() {
-		fmt.Fprintln(out, "\nHooks already present — nothing to write.")
-		return
-	}
-	if p.det.Manager == "" {
-		fmt.Fprintln(out, "\nAgent hooks:")
-	} else {
-		fmt.Fprintf(out, "\nHooks — commit stamping via %s (%s):\n", p.det.Manager, p.det.Detail)
-	}
-	for _, c := range p.hooks.Changes {
-		fmt.Fprintf(out, "  %-7s %s\n", c.Action(), c.Path)
-	}
-	for _, a := range p.agents {
-		for _, c := range a.Changes {
-			fmt.Fprintf(out, "  %-7s %s\n", c.Action(), c.Path)
-		}
-	}
-	// What the hook manager needs from each clone (`lefthook install`, `pre-commit
-	// install …`, husky's prepare script). Without these lines the hooks are committed
-	// and never run, and nothing says why.
-	if len(p.hooks.Notes) > 0 {
-		fmt.Fprintln(out, "\nAfter merging:")
-		for _, n := range p.hooks.Notes {
-			fmt.Fprintf(out, "  - %s\n", n)
-		}
-	}
-}
-
-// files names what the plan writes for a question that fits on a line: terma's own hook
-// shims as their directory, every other file by its path.
-func (p hookPlan) files() []string {
-	var files []string
-	for _, path := range p.paths() {
-		if path = shownPath(path); !slices.Contains(files, path) {
-			files = append(files, path)
-		}
-	}
-	return files
-}
-
-// shownPath is how a question names a file the plan writes: terma's hook shims by their
-// directory, every other file by its path.
-func shownPath(path string) string {
-	if strings.HasPrefix(path, hookmgr.ShimDir+"/") {
-		return hookmgr.ShimDir + "/"
-	}
-	return path
-}
-
-// explain says what each file in files() is for, a line apiece, and what committing them
-// means — the lines under the question that asks to write them, so a developer knows what
-// a yes does before giving it.
-func (p hookPlan) explain() []string {
-	what := map[string]string{}
-	for _, c := range p.hooks.Changes {
-		what[shownPath(c.Path)] = "stamps each commit with the agent session that wrote it"
-	}
-	for _, a := range registered.All() {
-		if path := a.HooksPath(); path != "" {
-			what[path] = "reports each " + a.DisplayName() + " session and the files it edits"
-		}
-	}
-	files := p.files()
-	width := 0
-	for _, f := range files {
-		width = max(width, len(f))
-	}
-	lines := make([]string, 0, len(files)+2)
-	for _, f := range files {
-		desc, ok := what[f]
-		if !ok {
-			desc = "terma's hook wiring"
-		}
-		lines = append(lines, fmt.Sprintf("%-*s  %s", width, f, desc))
-	}
-	return append(lines,
-		"These are committed: merging them sets up everyone who clones the repository,",
-		"and on a machine without terma they do nothing.")
-}
-
-// summary says what the hooks do once installed: commit stamping through the hook
-// manager, and the agents whose own hooks report their sessions.
-func (p hookPlan) summary(adapters []string) string {
-	var parts []string
-	if p.det.Manager != "" {
-		parts = append(parts, "commit stamping via "+string(p.det.Manager))
-	}
-	var agents []string
-	for _, name := range adapters {
-		if a, ok := registered.Lookup(name); ok {
-			agents = append(agents, a.DisplayName())
-		}
-	}
-	if len(agents) > 0 {
-		parts = append(parts, "session hooks for "+joinNames(agents))
-	}
-	if len(parts) == 0 {
-		return "none to write"
-	}
-	return strings.Join(parts, "; ")
-}
-
-// paths lists the files the plan writes or deletes, relative to the root, in the order
-// print shows them.
-func (p hookPlan) paths() []string {
-	var paths []string
-	for _, c := range p.hooks.Changes {
-		paths = append(paths, c.Path)
-	}
-	for _, a := range p.agents {
-		for _, c := range a.Changes {
-			paths = append(paths, c.Path)
-		}
-	}
-	return paths
 }
 
 // printCommitList tells the developer which files the hook install wrote and that they
@@ -990,32 +561,6 @@ func printCommitList(out io.Writer, lead string, paths []string) {
 	fmt.Fprintln(out, commitList(style.For(out), lead, paths))
 }
 
-func (p hookPlan) apply(root string) error {
-	if err := hookmgr.Apply(root, p.hooks); err != nil {
-		return err
-	}
-	for _, a := range p.agents {
-		if err := hookmgr.Apply(root, a); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func managerOrEmpty(det hookmgr.Detection, installed bool) string {
-	if !installed {
-		return ""
-	}
-	return string(det.Manager)
-}
-
-func hooksOrNil(installed bool) []string {
-	if !installed {
-		return nil
-	}
-	return hookmgr.GitHooks
-}
-
 func signalStrings(signals []harness.Signal) []string {
 	out := make([]string, 0, len(signals))
 	for _, s := range signals {
@@ -1024,22 +569,9 @@ func signalStrings(signals []harness.Signal) []string {
 	return out
 }
 
-// binding is the project a repository is tied to, and the environment it was chosen in.
-type binding struct {
-	ID, Name, OrganizationID, Environment string
-}
-
-// keptBinding is the repository's binding as it stands, environment included: a
-// colleague confirming the project must not rewrite the committed file to match their
-// own setup.
-func keptBinding(existing *termaproject.File) binding {
-	p := existing.Project
-	return binding{ID: p.ID, Name: p.Name, OrganizationID: p.OrganizationID, Environment: p.Environment}
-}
-
 // boundTo is a newly chosen project, recorded with the environment it was chosen in.
-func boundTo(p *project, cfg *config.Config) binding {
-	return binding{ID: p.ID, Name: p.Name, OrganizationID: p.OrganizationID, Environment: nonProd(cfg.Environment)}
+func boundTo(p *project, cfg *config.Config) install.Binding {
+	return install.Binding{ID: p.ID, Name: p.Name, OrganizationID: p.OrganizationID, Environment: nonProd(cfg.Environment)}
 }
 
 // resolveBinding picks the project: an explicit reference (matched against the
@@ -1055,7 +587,7 @@ func boundTo(p *project, cfg *config.Config) binding {
 // Without ask, a binding that checks out is kept and one that does not is an error naming
 // the fix. An offline policy fixture with no credential keeps the binding unchecked;
 // there is nothing to check it with.
-func resolveBinding(cmd *cobra.Command, cfg *config.Config, existing *termaproject.File, ref string, verify, ask bool) (binding, error) {
+func resolveBinding(cmd *cobra.Command, cfg *config.Config, existing *termaproject.File, ref string, verify, ask bool) (install.Binding, error) {
 	sp := spinner.New(cmd.ErrOrStderr())
 	sp.Start("Loading projects…")
 	defer sp.Stop()
@@ -1071,14 +603,14 @@ func resolveBinding(cmd *cobra.Command, cfg *config.Config, existing *termaproje
 		client, err := newClient(cfg)
 		if err != nil {
 			if errors.Is(err, auth.ErrNotLoggedIn) {
-				return binding{ID: ref, Environment: nonProd(cfg.Environment)}, nil
+				return install.Binding{ID: ref, Environment: nonProd(cfg.Environment)}, nil
 			}
-			return binding{}, err
+			return install.Binding{}, err
 		}
 		projects, err := fetchProjects(cmd.Context(), client)
 		sp.Stop()
 		if err != nil {
-			return binding{}, err
+			return install.Binding{}, err
 		}
 		if p, err := matchProject(projects, ref); err == nil {
 			return boundTo(p, cfg), nil
@@ -1086,41 +618,41 @@ func resolveBinding(cmd *cobra.Command, cfg *config.Config, existing *termaproje
 		fmt.Fprintf(cmd.ErrOrStderr(), "No project matches %q in this organization — pick one:\n", ref)
 		p, err := pickProject(cmd, projects, current)
 		if err != nil {
-			return binding{}, err
+			return install.Binding{}, err
 		}
 		return boundTo(p, cfg), nil
 	}
 	if existing != nil && !verify {
-		return keptBinding(existing), nil
+		return install.Kept(existing), nil
 	}
 
 	client, err := newClient(cfg)
 	if err != nil {
 		// A dry run does not sign in; without a credential the binding stands unchecked.
 		if existing != nil && errors.Is(err, auth.ErrNotLoggedIn) {
-			return keptBinding(existing), nil
+			return install.Kept(existing), nil
 		}
-		return binding{}, err
+		return install.Binding{}, err
 	}
 	projects, err := availableProjects(cmd.Context(), client)
 	sp.Stop()
 	if errors.Is(err, errNoProjects) {
-		return binding{}, fmt.Errorf("%w, then run `terma install` again", err)
+		return install.Binding{}, fmt.Errorf("%w, then run `terma install` again", err)
 	}
 	if err != nil {
-		return binding{}, err
+		return install.Binding{}, err
 	}
 	bound := existing != nil && slices.ContainsFunc(projects, func(p project) bool { return p.ID == current })
 
 	switch {
 	case existing != nil && !bound && !ask:
-		return binding{}, fmt.Errorf("%s — run `terma install --project <name or id>` with one of yours (`terma project list` lists them)", unreachableBinding(existing, cfg))
+		return install.Binding{}, fmt.Errorf("%s — run `terma install --project <name or id>` with one of yours (`terma project list` lists them)", unreachableBinding(existing, cfg))
 	case existing != nil && !bound:
 		reason := unreachableBinding(existing, cfg)
 		fmt.Fprintf(cmd.ErrOrStderr(), "%s%s.\n", strings.ToUpper(reason[:1]), reason[1:])
 		current = ""
 	case bound && !ask:
-		return keptBinding(existing), nil
+		return install.Kept(existing), nil
 	}
 
 	// One project is no choice, so it is taken without asking — on a first install and in
@@ -1128,10 +660,10 @@ func resolveBinding(cmd *cobra.Command, cfg *config.Config, existing *termaproje
 	// marked and kept by Enter.
 	p, err := soleOrPick(cmd, projects, current)
 	if err != nil {
-		return binding{}, err
+		return install.Binding{}, err
 	}
 	if bound && p.ID == current {
-		return keptBinding(existing), nil
+		return install.Kept(existing), nil
 	}
 	return boundTo(p, cfg), nil
 }
@@ -1172,59 +704,32 @@ func environmentLabel(env string) string {
 // key still belongs to the bound project; the key needs the network to deliver anyway.
 // /v1/identity names no project, so a first install records none (Name is omitempty) and
 // output falls back to the id.
-func serverKeyBinding(ctx context.Context, cfg *config.Config, existing *termaproject.File, ref string) (binding, error) {
+func serverKeyBinding(ctx context.Context, cfg *config.Config, existing *termaproject.File, ref string) (install.Binding, error) {
 	client, err := newClient(cfg)
 	if err != nil {
-		return binding{}, err
+		return install.Binding{}, err
 	}
 	var identity struct {
 		ProjectID      string `json:"project_id"`
 		OrganizationID string `json:"organization_id"`
 	}
 	if err := client.Get(ctx, "/v1/identity", nil, &identity); err != nil {
-		return binding{}, fmt.Errorf("look up the project TERMA_API_KEY belongs to: %w", err)
+		return install.Binding{}, fmt.Errorf("look up the project TERMA_API_KEY belongs to: %w", err)
 	}
 	if identity.ProjectID == "" {
-		return binding{}, errors.New("TERMA_API_KEY names no project")
+		return install.Binding{}, errors.New("TERMA_API_KEY names no project")
 	}
 	if ref != "" && ref != identity.ProjectID {
-		return binding{}, fmt.Errorf("TERMA_API_KEY belongs to project %s, not %q — a server key binds only its own project, named by id", identity.ProjectID, ref)
+		return install.Binding{}, fmt.Errorf("TERMA_API_KEY belongs to project %s, not %q — a server key binds only its own project, named by id", identity.ProjectID, ref)
 	}
-	b := binding{ID: identity.ProjectID, OrganizationID: identity.OrganizationID, Environment: nonProd(cfg.Environment)}
+	b := install.Binding{ID: identity.ProjectID, OrganizationID: identity.OrganizationID, Environment: nonProd(cfg.Environment)}
 	if existing != nil {
 		if existing.Project.ID != identity.ProjectID {
-			return binding{}, fmt.Errorf("this repository is bound to project %s, and TERMA_API_KEY belongs to %s", existing.Project.ID, identity.ProjectID)
+			return install.Binding{}, fmt.Errorf("this repository is bound to project %s, and TERMA_API_KEY belongs to %s", existing.Project.ID, identity.ProjectID)
 		}
 		b.Name = existing.Project.Name
 	}
 	return b, nil
-}
-
-// planAdapters computes each named adapter's repository changes, in registry order so
-// the plan reads the same way every time whatever order --adapters listed them in.
-func planAdapters(root string, names []string, install bool) ([]hookmgr.Plan, error) {
-	want := map[string]bool{}
-	for _, name := range names {
-		if _, ok := registered.Lookup(name); !ok {
-			return nil, fmt.Errorf("unknown agent %q (want %s)", name, joinNames(registered.RepoNames()))
-		}
-		want[name] = true
-	}
-	var plans []hookmgr.Plan
-	for _, a := range registered.All() {
-		if !want[a.Name()] {
-			continue
-		}
-		p, err := a.Plan(root, install)
-		if err != nil {
-			return nil, err
-		}
-		if err := hookmgr.Validate(root, p); err != nil {
-			return nil, err
-		}
-		plans = append(plans, p)
-	}
-	return plans, nil
 }
 
 func nonProd(env string) string {
@@ -1255,7 +760,7 @@ func newUninstallCommand() *cobra.Command {
 		Short: "Remove everything terma install wrote to this repository",
 		Long: `Symmetric with install: removes terma's hook wiring (only terma's lines from
 shared hook files), each agent's committed hooks, .terma/settings.json, the per-clone
-git configuration, and the local session state. Removing the binding un-routes this
+git configuration, and the local session state. Removing the install.Binding un-routes this
 checkout; the home-dir routing state (keys, routing records) is kept, since it is shared
 with any other worktree or clone bound to the same project — remove it machine-wide
 with 'terma nate'.`,
@@ -1292,7 +797,7 @@ with 'terma nate'.`,
 			if err := hookmgr.Validate(root, hooks); err != nil {
 				return err
 			}
-			plans, err := planAdapters(root, registered.Names(), false)
+			plans, err := install.PlanAdapters(registered, root, registered.Names(), false)
 			if err != nil {
 				return err
 			}
@@ -1354,7 +859,7 @@ with 'terma nate'.`,
 			// which is what stops routing here; other checkouts of the same project keep
 			// working. `terma nate` is the machine-level teardown.
 			if gitDir != "" {
-				if err := unwireRepo(ctx, root, gitDir); err != nil {
+				if err := install.Unwire(ctx, root, gitDir); err != nil {
 					return err
 				}
 			}

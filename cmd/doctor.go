@@ -15,7 +15,7 @@ func newDoctorCommand() *cobra.Command {
 		Use:   "doctor",
 		Short: "Verify the whole chain end to end and report setup readiness",
 		Long: `Checks every link between a coding agent and the Terma backend: the binary,
-your sign-in, the repository binding, the installed hooks and adapters, the
+your sign-in, the repository install.Binding, the installed hooks and adapters, the
 harness export, a scratch commit in a temporary worktree (does the hook actually
 stamp a trailer?), the event spool, and the backend round-trip.
 

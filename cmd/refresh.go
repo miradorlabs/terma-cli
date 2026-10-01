@@ -10,6 +10,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
+	"github.com/miradorlabs/terma-cli/internal/install"
 	"github.com/miradorlabs/terma-cli/internal/migrate"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
@@ -43,7 +44,7 @@ func refreshMachine() ([]string, error) {
 // repoRefresh is what a refresh would change in one repository's committed files.
 type repoRefresh struct {
 	root  string
-	plan  hookPlan
+	plan  install.HookPlan
 	notes []string
 }
 
@@ -68,25 +69,18 @@ func planRepoRefresh(ctx context.Context) (*repoRefresh, error) {
 		return nil, err
 	}
 	r := &repoRefresh{root: root}
+	var det hookmgr.Detection
 	if recorded := existing.Install.HookManager; recorded != "" && gitDir != "" {
-		det := hookmgr.Detect(root)
-		if string(det.Manager) != recorded {
+		if det = hookmgr.Detect(root); string(det.Manager) != recorded {
 			r.notes = append(r.notes, fmt.Sprintf("The commit hooks were installed through %s, but the repository now uses %s. Run `terma install` to move them.", recorded, det.Manager))
-		} else {
-			hooks, err := hookmgr.PlanInstall(root, det)
-			if err != nil {
-				return nil, err
-			}
-			r.plan.det, r.plan.hooks = det, existingFilesOnly(hooks)
+			det = hookmgr.Detection{}
 		}
 	}
-	plans, err := planAdapters(root, registered.WiredNames(root), true)
+	plan, err := install.PlanHooks(registered, root, det, registered.WiredNames(root))
 	if err != nil {
 		return nil, err
 	}
-	for _, p := range plans {
-		r.plan.agents = append(r.plan.agents, existingFilesOnly(p))
-	}
+	r.plan = plan.ExistingOnly()
 	return r, nil
 }
 
@@ -103,14 +97,6 @@ func stampVersion(root string) (bool, error) {
 	}
 	bound.Install.Version = Version
 	return true, termaproject.Save(root, bound)
-}
-
-// existingFilesOnly keeps a plan's changes to files that are already there. The notes
-// are for a first install (what each clone must run) and are dropped.
-func existingFilesOnly(p hookmgr.Plan) hookmgr.Plan {
-	p.Changes = slices.DeleteFunc(slices.Clone(p.Changes), func(c hookmgr.Change) bool { return c.Before == nil })
-	p.Notes = nil
-	return p
 }
 
 // runRefresh is `terma update --refresh`: the machine's files, then the repository
@@ -132,9 +118,9 @@ func runRefresh(ctx context.Context, out io.Writer) error {
 	machine, machineErr := refreshMachine()
 	repo, repoErr := planRepoRefresh(ctx)
 	var repoChanged []string
-	if repo != nil && !repo.plan.empty() {
-		if repoErr = repo.plan.apply(repo.root); repoErr == nil {
-			repoChanged = repo.plan.paths()
+	if repo != nil && !repo.plan.Empty() {
+		if repoErr = repo.plan.Apply(repo.root); repoErr == nil {
+			repoChanged = repo.plan.Paths()
 			if stamped, err := stampVersion(repo.root); err != nil {
 				repoErr = err
 			} else if stamped {
@@ -199,7 +185,7 @@ func refreshAfterUpgrade(ctx context.Context, dir string, out io.Writer) {
 	if err != nil {
 		fmt.Fprintf(out, "terma %s could not refresh what an earlier version installed (%v). Run `terma update --refresh` to retry.\n", Version, err)
 	}
-	if repo, _ := planRepoRefresh(ctx); repo != nil && !repo.plan.empty() {
+	if repo, _ := planRepoRefresh(ctx); repo != nil && !repo.plan.Empty() {
 		fmt.Fprintln(out, "This repository's hooks were written by an earlier terma. Run `terma update --refresh` here to update them.")
 	}
 	if err == nil {

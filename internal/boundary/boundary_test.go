@@ -103,6 +103,7 @@ var bans = []struct {
 }{
 	{"internal/relay", []string{"internal/harness", "internal/agents"}, "the relay learns about agents only through its options"},
 	{"internal/doctor", []string{"internal/api", "internal/spool"}, "doctor reaches the network and the spool only through its probes"},
+	{"internal/install", []string{"internal/api", "internal/auth", "internal/spool"}, "install signs in and reaches the network only through its steps"},
 }
 
 // within reports whether path is pkg or below it.

@@ -6,6 +6,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
+	"github.com/miradorlabs/terma-cli/internal/install"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
@@ -34,5 +35,5 @@ func wireCloneOnFirstUse(ctx context.Context, cwd string) {
 	if err != nil || bound == nil || bound.Install.HookManager != string(hookmgr.GitShim) {
 		return
 	}
-	_ = wireRepo(ctx, io.Discard, root, bound)
+	_ = install.Wire(ctx, io.Discard, root, bound)
 }

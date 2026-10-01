@@ -47,13 +47,13 @@ func TestInstallUIFinish(t *testing.T) {
 	var buf bytes.Buffer
 	ui := newInstallUI(&buf, false)
 	ui.summary("Project", "Acme Web")
-	ui.ok("Status line", "reads your plan's usage windows")
-	ui.ok("Claude Code", "shim at ~/.config/terma/shim/bin/claude")
-	ui.ok("Hook events", "delivered with this project's key")
+	ui.OK("Status line", "reads your plan's usage windows")
+	ui.OK("Claude Code", "shim at ~/.config/terma/shim/bin/claude")
+	ui.OK("Hook events", "delivered with this project's key")
 	fmt.Fprintln(ui.detail, "only with --verbose")
-	ui.then("Run `source ~/.zshrc`.")
-	ui.then("Commit these files:\n  a\n\n  git add a")
-	ui.then("Run `source ~/.zshrc`.") // said once
+	ui.Then("Run `source ~/.zshrc`.")
+	ui.Then("Commit these files:\n  a\n\n  git add a")
+	ui.Then("Run `source ~/.zshrc`.") // said once
 	ui.finish()
 	want := "  ✓ Project       Acme Web\n\n✓ terma installed\n\nNext steps:\n" +
 		"  1. Run `source ~/.zshrc`.\n" +
@@ -67,7 +67,7 @@ func TestInstallUIFinish(t *testing.T) {
 	if ui.detail == io.Discard {
 		t.Fatal("--verbose discards the detail")
 	}
-	ui.warn("PATH", "the shims are not on PATH yet")
+	ui.Warn("PATH", "the shims are not on PATH yet")
 	ui.finish()
 	if !strings.Contains(buf.String(), "! PATH") || !strings.Contains(buf.String(), "! terma installed — the steps marked ! need you") || strings.Contains(buf.String(), "Next steps") {
 		t.Fatalf("a warning is the verdict, and no steps means no list:\n%s", buf.String())

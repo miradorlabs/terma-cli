@@ -200,3 +200,11 @@ func TildePath(path string) string {
 	}
 	return path
 }
+
+// And joins names as prose: "a", "a and b", "a, b and c".
+func And(names []string) string {
+	if len(names) < 2 {
+		return strings.Join(names, "")
+	}
+	return strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
+}

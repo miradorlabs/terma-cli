@@ -37,7 +37,7 @@ func newNateCommand() *cobra.Command {
 Terma state, then delete installed Terma executables. This is intended for testing
 onboarding from a clean machine.
 
-Repositories are left alone: their hooks and binding are committed files shared with
+Repositories are left alone: their hooks and install.Binding are committed files shared with
 everyone who works in them. Remove a repository's install with 'terma uninstall'.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if !assumeYes {

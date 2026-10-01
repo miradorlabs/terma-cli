@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
+	"github.com/miradorlabs/terma-cli/internal/install"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/style"
 )
@@ -158,13 +159,13 @@ func TestInstallListsTheFilesToCommit(t *testing.T) {
 // Every file the question names gets its own line.
 func TestInstallHookQuestionExplainsEachFile(t *testing.T) {
 	repo := installRepo(t)
-	plan, err := planHooks(repo, hookmgr.Detect(repo), []string{"claude", "codex"})
+	plan, err := install.PlanHooks(registered, repo, hookmgr.Detect(repo), []string{"claude", "codex"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	lines := plan.explain()
-	if len(lines) != len(plan.files())+2 {
-		t.Fatalf("want a line per file %v and the closing sentence, got:\n%s", plan.files(), strings.Join(lines, "\n"))
+	lines := plan.Explain()
+	if len(lines) != len(plan.Files())+2 {
+		t.Fatalf("want a line per file %v and the closing sentence, got:\n%s", plan.Files(), strings.Join(lines, "\n"))
 	}
 	for i, want := range [][2]string{
 		{".terma/hooks/", "stamps each commit with the agent session that wrote it"},

@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/miradorlabs/terma-cli/internal/hookmgr"
+	"github.com/miradorlabs/terma-cli/internal/install"
 )
 
 // installAdapters unions what the repository's hooks files wire, the configured agents,
@@ -21,17 +22,17 @@ func TestInstallAdaptersUnionGrowsNeverShrinks(t *testing.T) {
 
 	// Selecting more agents wires their committed hooks too (opencode has no hooks file,
 	// and cursor is coming soon).
-	got := installAdapters(root, []string{"claude", "cursor", "codex", "opencode"}, "")
+	got := install.Adapters(registered, root, []string{"claude", "cursor", "codex", "opencode"}, nil)
 	if strings.Join(got, ",") != "claude,codex" {
 		t.Fatalf("selecting agents should grow adapters, got %v", got)
 	}
 	// A narrower re-run keeps what a colleague's install committed (no churn-down).
 	wireAdapters(t, root, "codex")
-	if got := installAdapters(root, []string{"claude"}, ""); strings.Join(got, ",") != "claude,codex" {
+	if got := install.Adapters(registered, root, []string{"claude"}, nil); strings.Join(got, ",") != "claude,codex" {
 		t.Fatalf("a narrower re-run must not drop committed adapters, got %v", got)
 	}
 	// --adapters overrides outright.
-	if got := installAdapters(root, []string{"claude", "cursor"}, "codex"); strings.Join(got, ",") != "codex" {
+	if got := install.Adapters(registered, root, []string{"claude", "cursor"}, splitCommas("codex")); strings.Join(got, ",") != "codex" {
 		t.Fatalf("--adapters should override, got %v", got)
 	}
 }
@@ -47,10 +48,10 @@ func TestInstallAdaptersLeavesComingSoonAgentsOut(t *testing.T) {
 		}
 	}
 	wireAdapters(t, root, "cursor", "antigravity")
-	if got := installAdapters(root, []string{"claude"}, ""); strings.Join(got, ",") != "claude" {
+	if got := install.Adapters(registered, root, []string{"claude"}, nil); strings.Join(got, ",") != "claude" {
 		t.Fatalf("a coming-soon agent was wired by default: %v", got)
 	}
-	if got := installAdapters(root, []string{"claude"}, "claude,cursor"); strings.Join(got, ",") != "claude,cursor" {
+	if got := install.Adapters(registered, root, []string{"claude"}, splitCommas("claude,cursor")); strings.Join(got, ",") != "claude,cursor" {
 		t.Fatalf("--adapters cursor should still wire Cursor, got %v", got)
 	}
 }

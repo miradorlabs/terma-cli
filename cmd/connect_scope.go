@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -158,15 +159,9 @@ func localUnavailable(hs []harness.Harness, root string) string {
 	return ""
 }
 
+// joinNames names agents in prose, or all of them when the list is empty.
 func joinNames(names []string) string {
-	switch len(names) {
-	case 0:
-		return "your coding agents"
-	case 1:
-		return names[0]
-	default:
-		return strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
-	}
+	return cmp.Or(output.And(names), "your coding agents")
 }
 
 // localRoot is the repository the CLI runs in, which is what --scope local writes.
@@ -379,24 +374,6 @@ func describeShipment(st harness.Status) string {
 	return fmt.Sprintf("%s; prompts %s; tool content %s", signals, onOff(st.IncludePrompts), onOff(st.IncludeToolContent))
 }
 
-// repoPolicyHarnesses is the subset of an install's adapters whose harness reads a
-// repository's own export policy. Cursor and Codex are wired for hooks and nothing
-// else: Cursor has no local OTLP exporter policy, and Codex ignores an otel table
-// in a project's config.
-func repoPolicyHarnesses(adapters []string) []harness.Harness {
-	var out []harness.Harness
-	for _, a := range adapters {
-		h, err := registered.Harness(a)
-		if err != nil {
-			continue
-		}
-		if _, ok := h.(harness.Scoped); ok {
-			out = append(out, h)
-		}
-	}
-	return out
-}
-
 // writeRepoPolicy writes each harness's repository-scope export policy: what this
 // repository's sessions ship. No endpoint, no key, no identity — those belong to the
 // developer's own settings, which is what keeps this file safe to commit.
@@ -444,9 +421,9 @@ func writeRepoPolicy(
 		}
 		conflicts, _ = partitionConflicts(conflicts)
 		if len(conflicts) > 0 {
-			ui.warn("Repo policy", fmt.Sprintf("%s skipped — this repository already has OTLP settings for it (%s)",
+			ui.Warn("Repo policy", fmt.Sprintf("%s skipped — this repository already has OTLP settings for it (%s)",
 				h.DisplayName(), output.SanitizeTerminal(strings.Join(conflictKeys(conflicts), ", "))))
-			ui.then(fmt.Sprintf("Resolve %s's OTLP settings in this repository, then run `terma connect %s --scope local` here.", h.DisplayName(), h.Name()))
+			ui.Then(fmt.Sprintf("Resolve %s's OTLP settings in this repository, then run `terma connect %s --scope local` here.", h.DisplayName(), h.Name()))
 			continue
 		}
 		path, err := local.ConfigPath()
@@ -476,7 +453,7 @@ func writeRepoPolicy(
 		if err != nil {
 			rel = path
 		}
-		ui.ok("Repo policy", h.DisplayName()+" telemetry settings in "+rel)
+		ui.OK("Repo policy", h.DisplayName()+" telemetry settings in "+rel)
 	}
 	return written, nil
 }

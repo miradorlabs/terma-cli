@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/install"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 
 	"github.com/spf13/cobra"
@@ -170,7 +171,7 @@ func TestInstallWithoutACredentialKeepsTheBindingsEnvironment(t *testing.T) {
 func TestResolveBindingTakesTheOnlyProjectWithoutAsking(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
-	resolve := func(org organization, existing *termaproject.File) (binding, string, error) {
+	resolve := func(org organization, existing *termaproject.File) (install.Binding, string, error) {
 		t.Helper()
 		if _, err := auth.SaveCredential(config.DefaultProfile, storedSession(f, org)); err != nil {
 			t.Fatal(err)
