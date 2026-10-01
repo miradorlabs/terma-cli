@@ -154,24 +154,25 @@ which macOS announces as a background item), and exporter settings that are mach
 
 ### Relay package boundaries
 
-`internal/relay` owns OTLP admission, attribution, filtering and delivery, and the
-capture decision for a claim (`CapturePolicy`: team policy as the ceiling, the routing
-record narrowing it). Its focused subpackages keep the other responsibilities out of
-command handlers:
+`internal/relay` is the engine: OTLP admission, attribution, filtering and delivery, and
+the capture decision for a claim (`CapturePolicy`: team policy as the ceiling, the
+routing record narrowing it). It names no agent. Each agent declares how its records
+name their session and where they carry content (`internal/relay/shape`), and the
+command line hands those declarations in through `relay.Options`. Its subpackages keep
+the other responsibilities apart:
 
 - `claim`: the small, local session-claim store that hooks can import without OTLP.
-- `exporter`: the `Exporter` interface and registry for machine-level exporter setup.
-  Native exporters and extension exporters implement the same configuration operation.
-  The registry also owns hook-label normalization and surface selection, so adding an
-  exporter does not require another agent-name switch in `cmd`.
-- `service`: the per-user service — launchd, systemd and Windows definitions, and the
-  `Manager` that installs, removes and finds them. The CLI decides when, starts the
-  relay itself, and reports.
+- `daemon`: the relay as a running process. It covers the state directory, the run loop
+  and its typed result, `Spawn` and `Stop` for hooks, the Windows supervisor and the
+  per-user service, and the resolver that loads the profile, keys and routing record
+  for `CapturePolicy`. It also mints keys for projects connected in Terma, sends the
+  heartbeat, and keeps each team's collection policy fresh (`PolicyRefresher`).
+- `service`: the launchd, systemd and Windows definitions, and the `Manager` that
+  installs, removes and finds them.
+- `shape`: what an agent declares about its telemetry (`Correlator`, `Capturer`).
 
-`cmd` keeps what reads this machine's state and talks to the developer: the resolver
-that loads the profile, keys and routing record for `CapturePolicy` (`relay_policy.go`),
-`relay run` (`relay_run.go`), starting and stopping it (`relay_lifecycle.go`), setup
-(`relay_setup.go`), and status and doctor (`relay_status.go`).
+`internal/cli` keeps what talks to the developer: `relay setup`, `relay status` and the
+cobra commands that start the daemon with the agents' declarations.
 
 Repository routing records narrow team capture with their saved harness list as well
 as signals and content. A claimed session from an unselected harness is withheld on
@@ -188,24 +189,32 @@ hooks from the worktree root), asks `git rev-parse --git-common-dir` only for li
 worktrees, and refuses to exec anything that is the same file as `$0`.
 `TERMA_CHAIN_HOOKS_DIR` overrides the location for repositories that kept hooks elsewhere.
 
-## Harness-agnostic
+## Agents as plugins
 
-`internal/harness` is the only package that knows a harness's file layout. `hookrun`
-speaks in events (session start/end, files touched, commit) and the tool label travels as
-data. The dashboard shows which harness produced spend, but nothing in the pipeline is
-special-cased on it: a new harness is a new adapter, not a new hook type. The
-adapters are registered once, in `internal/adapter`, and install, uninstall, doctor and
-hook dispatch all read that registry.
+Each coding agent is a package of its own, `internal/agents/<name>`. It holds the
+agent's hook handlers, the planner for its committed hooks file, its exporter
+configuration and its relay shapes. `internal/agents/builtin` is the one place that
+lists them. `hookrun` speaks in events (session start/end, files touched, commit), and
+the tool label travels as data. The dashboard shows which agent produced spend, but
+nothing in the pipeline is special-cased on it: a new agent is a new package, not a new
+hook type, and install, uninstall, doctor and hook dispatch all read the registry.
 
-Commands ask for capabilities rather than checking an agent's name: `adapter.UserHooks`
-and `adapter.ManagedHooks` handle machine-wide hook planning and locations;
-`harness.StatusLiner` and `harness.TurnNotifier` handle optional usage capture on connect
-and cleanup on disconnect. Every implementation has a compile-time interface assertion.
-Keep vendor file layouts and behavior in the implementation, and keep command handlers
-responsible for selection, confirmation and reporting.
+Commands ask for capabilities rather than checking an agent's name. Some examples:
+
+- `agents.UserHooks` and `agents.ManagedHooks` plan machine-wide hooks and say where
+  they go.
+- `agents.StatusLiner` and `agents.Notifier` handle optional usage capture on connect
+  and cleanup on disconnect.
+- `agents.Surfaced` separates a CLI from a desktop app.
+
+`internal/agents/doc.go` lists them all. Every implementation has a compile-time
+interface assertion in the agent's package, and `internal/boundary` fails when anything
+outside `internal/agents` names an agent. Keep vendor file layouts and behavior in the
+agent's package, and keep command handlers responsible for selection, confirmation and
+reporting.
 
 Not every harness offers a file to write environment variables into. OpenCode reads its
-OTEL_* variables from the process environment only, so its adapter is a plugin: one
+OTEL_* variables from the process environment only, so its exporter is a plugin: one
 dependency-free JavaScript file Terma writes into OpenCode's plugins directory, which
 turns OpenCode's own events into OTLP/JSON and calls `terma hook opencode-*` for
 attribution. The harness interface is the same; only what Connect writes differs.

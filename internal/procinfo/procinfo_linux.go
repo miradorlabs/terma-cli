@@ -14,8 +14,7 @@ func parentOf(pid int) (int, bool) {
 	if err != nil {
 		return 0, false
 	}
-	// pid (comm) state ppid ... — comm may hold spaces and parentheses, so read after
-	// the last ')'.
+	// comm may hold spaces and parentheses, so read after the last ')'.
 	s := string(data)
 	i := strings.LastIndexByte(s, ')')
 	if i < 0 {
@@ -32,8 +31,7 @@ func parentOf(pid int) (int, bool) {
 // Supported is true: /proc answers both questions.
 const Supported = true
 
-// ownsPort reports whether pid holds a TCP socket bound locally to port: its inode in
-// /proc/net/tcp{,6}, then among pid's own descriptors.
+// ownsPort reports whether pid holds a TCP socket bound locally to port.
 func ownsPort(pid, port int) bool {
 	inodes := map[string]bool{}
 	suffix := fmt.Sprintf(":%04X", port)

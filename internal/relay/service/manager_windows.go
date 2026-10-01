@@ -15,16 +15,12 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/flock"
 )
 
-// On Windows the relay's service is a value under the per-user Run key — no
-// administrator, nothing to register — naming wscript and the launcher script
-// (Windows), which starts `terma relay supervise` hidden at every logon. The
-// registry is written through its API, never `reg.exe`.
+// On Windows the service is a per-user Run key value, needing no administrator, that starts
+// the launcher script at every logon.
 
 const runKeyPath = `Software\Microsoft\Windows\CurrentVersion\Run`
 
-// supervisorWait bounds how long install and remove wait for a supervisor to hand
-// over: it notices its launcher changed within a second, then stops the relay, which
-// delivers what it accepted within its grace.
+// supervisorWait covers a supervisor noticing its launcher changed (a second) and the relay's grace.
 const supervisorWait = 20 * time.Second
 
 func (m Manager) installWindows(path string) error {
@@ -50,8 +46,7 @@ func (m Manager) installWindows(path string) error {
 	if err := key.SetStringValue(m.Name, `"`+wscript+`" //B //Nologo "`+path+`"`); err != nil {
 		return fmt.Errorf("write the Run key: %w", err)
 	}
-	// A supervisor started from the launcher this replaced retires on its own; start
-	// this one's now rather than at the next logon.
+	// The replaced launcher's supervisor retires on its own; start this one now, not at next logon.
 	if !waitSupervisorGone(m.StateDir) {
 		return errors.New("the previous relay supervisor did not stop; the new one starts at the next logon")
 	}

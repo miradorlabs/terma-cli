@@ -3,7 +3,7 @@ package relay
 import (
 	"context"
 	"errors"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -14,33 +14,21 @@ import (
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
-// The relay's heartbeat: meta-telemetry about the machine's terma, sent every period
-// for as long as the relay runs, so the platform can see which versions run where,
-// whether a machine's relay is healthy, and what it drops and why. It describes the
-// machine, not any project's work, so it belongs to the organization the developer
-// signed in to: no project is stamped on it, and it does not travel with a project's
-// key or through the outbox — Options.HeartbeatSend delivers it with the developer's
-// own credential. A beat that cannot be sent is not kept: the next one carries the same
-// cumulative counters. It carries no content: counts, versions and settings, from
-// Options.HeartbeatInfo and the relay's own account.
-//
-// One log record per beat, `event.name` = HeartbeatEvent, under resource
-// `service.name` = HeartbeatService.
+// The heartbeat describes the machine, not a project, so it carries no project and goes
+// with the developer's credential, never a project key or the outbox. A failed beat is not
+// kept: its counters are cumulative.
 
 const (
 	// HeartbeatEvent names the heartbeat's log record.
 	HeartbeatEvent = "terma.relay.heartbeat"
 	// HeartbeatService is the heartbeat's service.name.
 	HeartbeatService = "terma-relay"
-	// DefaultHeartbeatEvery is how often the relay beats when Options.HeartbeatEvery is 0.
+	// DefaultHeartbeatEvery is the heartbeat period when Options.HeartbeatEvery is 0.
 	DefaultHeartbeatEvery = 15 * time.Minute
 )
 
-// maxAgentVersions bounds the agent builds the relay remembers.
 const maxAgentVersions = 32
 
-// noteDelivery records, for the heartbeat, that the relay delivered something and which
-// agent build sent it (the part's resource service.name / service.version).
 func (r *Relay) noteDelivery(p *part) {
 	name, version := resourceService(p)
 	r.mu.Lock()
@@ -78,9 +66,7 @@ func resourceService(p *part) (name, version string) {
 	return name, version
 }
 
-// Why a beat was sent (HeartbeatReasonAttr): the relay started, its period came round,
-// or `terma setup` asked for one as it finished (HeartbeatSetup), which is the
-// platform's "installed and working" for the machine.
+// HeartbeatReasonAttr says why a beat was sent; HeartbeatSetup is the platform's "installed and working".
 const (
 	HeartbeatReasonAttr = "terma.heartbeat.reason"
 	HeartbeatStart      = "start"
@@ -88,11 +74,8 @@ const (
 	HeartbeatSetup      = "setup"
 )
 
-// errNoHeartbeat is heartbeat's answer on a relay whose heartbeat is off.
 var errNoHeartbeat = errors.New("this relay sends no heartbeat")
 
-// heartbeat sends one beat, bounded by the send timeout; its outcome is counted and
-// returned.
 func (r *Relay) heartbeat(ctx context.Context, reason string) error {
 	if r.opts.HeartbeatInfo == nil || r.opts.HeartbeatSend == nil {
 		return errNoHeartbeat
@@ -110,8 +93,6 @@ func (r *Relay) heartbeat(ctx context.Context, reason string) error {
 	return nil
 }
 
-// heartbeatData is one beat: HeartbeatInfo's facts, the agent builds seen, when the
-// relay last delivered, its counters since it started and what waits in its outbox.
 func (r *Relay) heartbeatData(reason string) *logspb.LogsData {
 	var attrs []*commonpb.KeyValue
 	add := func(k string, v *commonpb.AnyValue) { attrs = append(attrs, &commonpb.KeyValue{Key: k, Value: v}) }
@@ -175,7 +156,7 @@ func sortedKeys(m map[string]any) []string {
 	for k := range m {
 		keys = append(keys, k)
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 	return keys
 }
 

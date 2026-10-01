@@ -1,13 +1,8 @@
-// Package relay is the local OTLP relay. The agents' global exporters send to it on
-// loopback; it forwards a record only when a hook in an opted-in repository claimed
-// the record's session (package claim) and the record came from a process that claim
-// names, to that repository's project, with that project's key and under its content
-// policy. Everything else waits briefly in memory — a first export can race the hook
-// that claims it — and is then dropped, without leaving the machine or touching disk.
-//
-// The files: relay.go takes requests and decodes them, split.go divides an export by
-// session, route.go decides and holds, forward.go sends upstream, content.go applies
-// the content policy, conn.go names senders, stats.go counts every record's fate.
+// Package relay is the local OTLP relay: agents' exporters send to it on loopback, and it
+// forwards a record only when a hook in an opted-in repository claimed its session and the
+// record came from a process that claim names, to that project with its key and content
+// policy. Everything else waits briefly in memory, since a first export can race the
+// claiming hook, and is then dropped without touching disk.
 package relay
 
 import (
@@ -30,43 +25,43 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/relay/shape"
 )
 
-// ProjectAttr is the resource attribute the relay stamps on everything it forwards:
-// the project the claim named. The shared gateway already reads it on Codex's and
-// OpenCode's exports.
+// ProjectAttr is the resource attribute the relay stamps on everything it forwards: the claimed project.
 const ProjectAttr = "mirador.project.id"
 
-// DefaultHold is how long a part that cannot leave yet — unclaimed, uncovered, keyless
-// — waits for its reason to go away. It covers a first export racing the hook.
+// DefaultHold is how long a part that cannot leave yet waits, covering a first export that races its hook.
 const DefaultHold = 2 * time.Minute
 
-// DefaultTraceHold is how long a span waits for its trace to be named: as long as a
-// turn can last, since a turn's child spans can precede the span naming the session.
+// DefaultTraceHold is how long a span waits for its trace to be named: as long as a turn can last.
 const DefaultTraceHold = 30 * time.Minute
 
 // maxBody bounds one export request, decompressed.
 const maxBody = 16 << 20
 
-// Policy is how a claimed session's telemetry leaves the machine: where, with which
-// key, and what content the project's routing record lets through.
+// Policy is how a claimed session's telemetry leaves the machine: where, with which key, and what content.
 type Policy struct {
 	Endpoint           string
 	Key                string
 	IncludePrompts     bool
 	IncludeToolContent bool
-	// Nil preserves older callers' all-signals policy; empty disables all signals.
-	Signals      []string
-	ExcludePaths []string
+	// Signals nil allows every signal; empty allows none.
+	Signals []string
+	// Excludes reports whether an attribute, in protojson's shape, names an excluded
+	// file; nil when nothing is excluded.
+	Excludes     func(value any) bool
 	RequireClaim bool
 }
 
-// ErrNoKey is Resolve's answer for a project this machine holds no key for: the
-// developer has not opted in here, so the session's parts wait, then are dropped.
+// ErrNoKey is Resolve's answer for a project this machine holds no key for; its parts wait, then drop.
 var ErrNoKey = errors.New("no key for this project on this machine")
 
 // Options configure a relay.
 type Options struct {
+	// Correlators and Capturers say how each agent's records name their session and carry content.
+	Correlators []shape.Correlator
+	Capturers   []shape.Capturer
 	// Token is what the agents' exporters present as `Authorization: Bearer <token>`.
 	Token string
 	// Hold and TraceHold: DefaultHold and DefaultTraceHold (at least Hold) when zero.
@@ -76,68 +71,51 @@ type Options struct {
 	Lookup func(sessionID string, now time.Time) (claim.Claim, bool)
 	// Resolve turns a claim into a Policy, or ErrNoKey.
 	Resolve func(c claim.Claim) (Policy, error)
-	// CatchAll, in global mode, is where a part goes whose hold ran out with nothing
-	// placing it — unclaimed, no session, an ambiguous process — instead of being
-	// dropped: the organization's default project (resolved like any claim), marked
-	// terma.relay.attribution=catch-all. False (or nil) outside global mode.
+	// CatchAll, in global mode, is where a part whose hold ran out unplaced goes instead of being dropped.
 	CatchAll func() (claim.Claim, bool)
-	// HeartbeatInfo and HeartbeatSend, both set, turn the heartbeat on (heartbeat.go):
-	// the facts about this machine's terma it reports — version, platform, mode — as
-	// attribute values (string, bool, int, []string), and how a beat reaches the
-	// organization. HeartbeatEvery is its period, DefaultHeartbeatEvery when zero.
+	// HeartbeatInfo and HeartbeatSend, both set, turn the heartbeat on; HeartbeatEvery is its period.
 	HeartbeatInfo  func() map[string]any
 	HeartbeatSend  func(ctx context.Context, beat *logspb.LogsData) error
 	HeartbeatEvery time.Duration
-	// ClaimCacheTTL and PolicyCacheTTL keep Lookup's and Resolve's answers that long
-	// (0: ask every time). Production uses about a second and a few seconds.
+	// ClaimCacheTTL and PolicyCacheTTL keep Lookup's and Resolve's answers that long (0: ask every time).
 	ClaimCacheTTL  time.Duration
 	PolicyCacheTTL time.Duration
-	// PeerPID names the process behind a connection from its remote port
-	// (procinfo.FindSender). Without it the session alone decides.
+	// PeerPID names the process behind a connection from its remote port; without it the session alone decides.
 	PeerPID func(port int) (int, bool)
-	// ProcessAlive reports whether a sender still runs: what names no session is
-	// attributed to its process only once the process exits (decideExited). Without it
-	// nothing is attributed by process.
+	// ProcessAlive reports whether a sender still runs; sessionless parts go by process once it exits.
 	ProcessAlive func(pid int) bool
 	// HTTP sends upstream; a no-redirect client with a 15-second timeout when nil.
 	HTTP *http.Client
-	// Dir is the outbox: where parts that may leave wait for delivery, on disk, so a
-	// crash or restart loses none (outbox.go). Required for anything to leave.
+	// Dir is the on-disk outbox, so a restart loses nothing; required for anything to leave.
 	Dir string
-	// Grace is how long a stopping relay keeps delivering what it accepted (5 s); what
-	// it could not send stays in the outbox for the next relay.
+	// Grace is how long a stopping relay keeps delivering (5 s); the rest waits in the outbox.
 	Grace time.Duration
 	// Now is the clock; time.Now when nil.
 	Now func() time.Time
 	// Version is terma's, sent as the User-Agent.
 	Version string
-	// Logf, when set, is told why each part that could not leave was dropped: its key,
-	// its sender and the claim's processes. `terma relay run` sets it with
-	// TERMA_RELAY_DEBUG=1.
+	// Logf, when set, is told why each part that could not leave was dropped (TERMA_RELAY_DEBUG=1).
 	Logf func(format string, args ...any)
 }
 
-// Relay is the local OTLP relay. Handler serves the agents; Run delivers what was
-// accepted and ages out what never may be.
+// Relay is the local OTLP relay: Handler accepts exports and Run delivers or ages them out.
 type Relay struct {
 	opts  Options
+	rules *rules
 	stats *Stats
 	cache lookupCache
 
-	// deliverMu orders every hand-off to a destination and every hold, so a session's
-	// parts leave in arrival order. Taken before mu, never after.
+	// deliverMu keeps a session's parts in arrival order; taken before mu, never after.
 	deliverMu sync.Mutex
 
-	mu        sync.Mutex
-	held      map[string][]heldPart
-	heldN     int
-	heldBytes int
-	traces    map[string]traceSession
-	procs     map[int]*procState // sender pid → the sessions it named, and whether it exited
-	outbox    outbox
-	senders   map[route]*sender
-	// lastDelivery and agentVersions are what heartbeats report: when the relay last
-	// delivered anything, and the agent builds seen (service.name → version).
+	mu            sync.Mutex
+	held          map[string][]heldPart
+	heldN         int
+	heldBytes     int
+	traces        map[string]traceSession
+	procs         map[int]*procState // sender pid → the sessions it named, and whether it exited
+	outbox        outbox
+	senders       map[route]*sender
 	lastDelivery  time.Time
 	agentVersions map[string]string
 	lastSeen      time.Time
@@ -178,7 +156,7 @@ func New(opts Options) *Relay {
 	}
 	sendCtx, cancel := context.WithCancel(context.Background())
 	return &Relay{
-		opts: opts, stats: newStats(),
+		opts: opts, rules: compose(opts.Correlators, opts.Capturers), stats: newStats(),
 		cache:  lookupCache{claims: map[string]cachedClaim{}, policies: map[string]cachedPolicy{}},
 		held:   map[string][]heldPart{},
 		traces: map[string]traceSession{}, procs: map[int]*procState{}, senders: map[route]*sender{}, outbox: outbox{dir: opts.Dir},
@@ -190,14 +168,10 @@ func New(opts Options) *Relay {
 // Stats is the relay's running account.
 func (r *Relay) Stats() *Stats { return r.stats }
 
-// Handler serves OTLP over HTTP (protobuf or JSON, optionally gzipped) on
-// /v1/{logs,metrics,traces}, and the stats on GET /stats.
+// Handler serves OTLP over HTTP on /v1/{logs,metrics,traces} and the stats on GET /stats.
 //
-// The token may also lead the path — /<token>/v1/logs — for an exporter configured by
-// a file that has no headers setting (Gemini CLI's otlpEndpoint): headers could then
-// only come from OTEL_EXPORTER_OTLP_HEADERS in the environment, which everything the
-// agent runs would inherit, token and all. An exporter appends /v1/<signal> to its
-// endpoint's path, so an endpoint of http://127.0.0.1:43180/<token> carries it.
+// The token may also lead the path (/<token>/v1/logs) for an exporter whose config file has
+// no headers setting: an environment header would hand the token to every tool the agent runs.
 func (r *Relay) Handler() http.Handler {
 	mux := r.routes()
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -211,7 +185,6 @@ func (r *Relay) Handler() http.Handler {
 	})
 }
 
-// pathToken reports whether path leads with the relay's token, and what follows it.
 func (r *Relay) pathToken(path string) (string, bool) {
 	if r.opts.Token == "" {
 		return "", false
@@ -236,9 +209,7 @@ func (r *Relay) routes() *http.ServeMux {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(r.stats.Snapshot())
 	})
-	// A heartbeat now, with the reason given (?reason=setup): `terma setup` asks for one
-	// as it finishes, so the developer learns the whole path works — this relay, their
-	// credential, the organization's endpoint — or which part does not.
+	// `terma setup` asks for a beat as it finishes, proving the relay, credential and endpoint work.
 	mux.HandleFunc("/heartbeat", func(w http.ResponseWriter, req *http.Request) {
 		if req.Method != http.MethodPost {
 			http.Error(w, "POST only", http.StatusMethodNotAllowed)
@@ -301,13 +272,12 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 		r.stats.received(s, p.records)
 		if p.session != "" && !strings.HasPrefix(p.session, tracePrefix) {
 			r.learnProcess(pid, p.session)
-			p.start = conversationStart(p)
+			p.start = r.rules.conversationStart(p)
 		}
 	}
 	for _, p := range parts {
 		if p.session == "" {
-			// Nothing in the record names a session — Codex's metrics. Its process
-			// might, once it exits: see decideExited.
+			// A part naming no session may still go by its process once it exits (decideExited).
 			if pid == 0 {
 				if _, global := r.catchAll(); !global {
 					r.stats.dropped(s, "no_session_id", p.records)
@@ -361,18 +331,18 @@ func (r *Relay) decode(s Signal, body []byte, isJSON bool) (map[string]*part, er
 		if err := unmarshal(body, &m); err != nil {
 			return nil, err
 		}
-		return splitLogs(&m, r.learnTrace), nil
+		return r.rules.splitLogs(&m, r.learnTrace), nil
 	case Traces:
 		var m tracepb.TracesData
 		if err := unmarshal(body, &m); err != nil {
 			return nil, err
 		}
-		return splitTraces(&m, r.learnTrace, r.traceOf), nil
+		return r.rules.splitTraces(&m, r.learnTrace, r.traceOf), nil
 	default:
 		var m metricspb.MetricsData
 		if err := unmarshal(body, &m); err != nil {
 			return nil, err
 		}
-		return splitMetrics(&m), nil
+		return r.rules.splitMetrics(&m), nil
 	}
 }

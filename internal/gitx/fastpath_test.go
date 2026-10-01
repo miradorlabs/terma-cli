@@ -128,8 +128,7 @@ func TestLastCommit(t *testing.T) {
 	}
 }
 
-// TestParseNumstat covers the record framing directly: the shapes below are what
-// `git log -1 -z --format=...%x1e --numstat` writes after the format block.
+// TestParseNumstat covers the `--numstat -z` record framing directly.
 func TestParseNumstat(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
@@ -159,8 +158,7 @@ func TestParseNumstat(t *testing.T) {
 		},
 		{
 			name: "rename keeps the following records aligned",
-			// The rename spends three records; a parser that splits on NUL alone
-			// reads "old.txt" as a stat line and every record after it shifts.
+			// A rename spends three records.
 			block: "\x004\t2\t\x00old.txt\x00new.txt\x009\t9\tafter.txt\x00",
 			want: []FileStat{
 				{Path: "new.txt", Added: 4, Deleted: 2},
@@ -196,8 +194,7 @@ func TestParseNumstat(t *testing.T) {
 	}
 }
 
-// TestLastCommitFileStats runs the same cases through real repositories, so the
-// parser is held to what this machine's git actually prints.
+// TestLastCommitFileStats holds the parser to what this machine's git prints.
 func TestLastCommitFileStats(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not installed")
@@ -298,9 +295,7 @@ func TestLastCommitFileStats(t *testing.T) {
 	}
 }
 
-// post-commit is not told a commit's source the way prepare-commit-msg is, so the
-// merge and squash it must skip have to be read off the commit itself: the parent
-// count that comes with the log call, and git's default squash subject.
+// Merges and squashes are read off the commit: its parent count and git's squash subject.
 func TestLastCommitTellsMergesAndSquashes(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not installed")
@@ -362,9 +357,7 @@ func TestLastCommitTellsMergesAndSquashes(t *testing.T) {
 	}
 }
 
-// RemoteURLFS has to agree with `git config --get remote.origin.url` after the
-// same normalisation, including from a linked worktree, whose own git dir holds a
-// `commondir` pointer rather than a config.
+// RemoteURLFS agrees with git's normalised remote.origin.url, including from a linked worktree.
 func TestRemoteURLFSMatchesGit(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not installed")
@@ -414,8 +407,7 @@ func TestRemoteURLFSMatchesGit(t *testing.T) {
 	}
 }
 
-// A linked worktree names git's name for it and its main checkout; a main checkout is
-// not one, and a worktree of a bare repository has no main checkout to name.
+// A linked worktree reports its name and main checkout; a bare repository's has no main checkout.
 func TestLinkedWorktreeFS(t *testing.T) {
 	base, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {

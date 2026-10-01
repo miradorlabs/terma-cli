@@ -21,7 +21,7 @@ jobs:
           - name: govulncheck
             module: .
           - name: govulncheck (live)
-            module: live
+            module: test/live
     runs-on: ubuntu-latest
     defaults:
       run:

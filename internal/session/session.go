@@ -1,20 +1,6 @@
-// Package session keeps the per-repository record of which agent sessions touched
-// which files, so a commit can be attributed to the sessions that actually produced
-// its staged content.
-//
-// State lives under <gitdir>/terma/ for a workspace installed with Git, or under
-// its private configuration directory if it started without Git. That choice is
-// retained after git init, so active hooks keep sharing a store. State is never
-// committed with the worktree, and each worktree has its own. Two things are recorded:
-//
-//   - the active session (session.json): what the harness most recently announced,
-//     used only as a fallback when no manifest matches;
-//   - one manifest per session (manifests/<id>.json): the repo-relative files the
-//     session edited, maintained as the agent works.
-//
-// Attribution is decided by the manifests, not by "whatever is active now": a human
-// committing agent work hours later is still stamped correctly, and pure human work
-// in a repo with an idle session is not.
+// Package session records which agent sessions touched which files in a repository,
+// so a commit is attributed by per-session manifests, with the active session only as
+// a fallback for a session that has none.
 package session
 
 import (
@@ -26,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -45,8 +32,7 @@ type Session struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
-// Manifest is the set of files one session edited, with the last time each was
-// touched.
+// Manifest is the set of files one session edited, with when each was last touched.
 type Manifest struct {
 	SessionID   string               `json:"session_id"`
 	Tool        string               `json:"tool"`
@@ -75,9 +61,7 @@ func toolLabel(tool, version string) string {
 // Store is the on-disk state for one repository.
 type Store struct {
 	dir string
-	// lockWait bounds how long a writer waits for the store lock before it goes ahead
-	// without it; see lock. Open sets the hook's bound, and the tests of mutual
-	// exclusion raise it, because how long a loaded machine takes is not what they test.
+	// lockWait bounds a writer's wait for the store lock; exclusion tests raise it.
 	lockWait time.Duration
 }
 
@@ -105,9 +89,7 @@ func ValidID(id string) bool {
 	return id != "" && len(id) <= maxIDLen && safeID.MatchString(id) && !strings.HasPrefix(id, ".")
 }
 
-// isMultiline reports whether a value would break out of the single line a trailer
-// occupies. Checked on the values that are not identifiers and so cannot be held to
-// ValidID's charset.
+// isMultiline reports whether a non-identifier value would break out of its trailer line.
 func isMultiline(v string) bool {
 	return strings.ContainsAny(v, "\r\n")
 }
@@ -123,9 +105,7 @@ func (s *Store) SetActive(sess Session) error {
 	if sess.UpdatedAt.IsZero() {
 		sess.UpdatedAt = sess.StartedAt
 	}
-	// Under the store lock, like every other writer of this file: Touch refreshes the
-	// active session by reading it and writing it back, and an announcement landing
-	// between the two was overwritten by the session it had just replaced.
+	// Locked because Touch reads and rewrites the active session.
 	if err := os.MkdirAll(s.dir, dirMode); err != nil {
 		return err
 	}
@@ -154,9 +134,7 @@ func (s *Store) ClearActive(id string) error {
 	return s.clearActive(id)
 }
 
-// clearActive is ClearActive for a caller that already holds the store lock. Its check
-// and its remove are one step only under that lock: unlocked, a Touch could rewrite the
-// record in between and have it deleted from under it.
+// clearActive is ClearActive for a caller that already holds the store lock.
 func (s *Store) clearActive(id string) error {
 	path := filepath.Join(s.dir, activeFile)
 	if id != "" {
@@ -172,26 +150,13 @@ func (s *Store) clearActive(id string) error {
 	return err
 }
 
-// hookLockWait bounds how long a hook waits for the store. Holders rewrite a few
-// kilobytes, so a wait that long means something is wrong, and a hook must not hang on it.
+// hookLockWait bounds a hook's wait: holders rewrite a few kilobytes.
 const hookLockWait = 250 * time.Millisecond
 
-// lock serializes the store's read-modify-write paths. Hooks run concurrently — Codex's
-// PostToolUse is asynchronous, and a subagent's edits arrive under its parent's session
-// id — and each of them reads a manifest, adds to it and renames it back: unlocked, the
-// second rename dropped the first one's files, and the commit that carried them went
-// out unattributed.
-//
-// It covers every writer of the store's two kinds of file — the manifests (Touch,
-// Consume, Prune) and the active session (SetActive, ClearActive, and Touch's refresh).
-// Readers take nothing: every write is an atomic rename.
-//
-// One lock for the store rather than one per manifest, so there is nothing to prune. It
-// is never taken twice in one call path: a second flock on another descriptor waits on
-// the first, even in the same process — which is why Prune calls clearActive, not
-// ClearActive. A lock that cannot be had — no state directory
-// yet, or a holder that outlasts the store's lockWait — returns a no-op: the write goes ahead as it
-// always did, which can lose a race but never loses the write.
+// lock serializes every writer of the store, since concurrent hooks read, edit and
+// rename the same manifest (unlocked, 24 concurrent touches kept 1 file). Never nest it:
+// a second flock waits on the first even in one process. A lock that cannot be had
+// returns a no-op, so the write still happens.
 func (s *Store) lock() (unlock func()) {
 	ctx, cancel := context.WithTimeout(context.Background(), s.lockWait)
 	defer cancel()
@@ -202,14 +167,13 @@ func (s *Store) lock() (unlock func()) {
 	return unlock
 }
 
-// Touch records that session sessionID edited files (repo-relative, slash-separated)
-// at time at. Unknown sessions get a manifest; the active session's UpdatedAt is
-// refreshed so the TTL fallback tracks real activity, not just the start.
+// Touch records that sess edited files (repo-relative) at at, and refreshes the
+// active session's UpdatedAt so the TTL fallback tracks activity.
 func (s *Store) Touch(sess Session, files []string, at time.Time) error {
 	if !ValidID(sess.ID) {
 		return fmt.Errorf("invalid session id %q", sess.ID)
 	}
-	// Touch is what creates the state, so the directory has to exist to be locked.
+	// Touch creates the state, so the directory must exist to be locked.
 	if err := os.MkdirAll(s.dir, dirMode); err != nil {
 		return err
 	}
@@ -241,7 +205,6 @@ func (s *Store) Touch(sess Session, files []string, at time.Time) error {
 	if err := writeJSON(s.manifestPath(sess.ID), m); err != nil {
 		return err
 	}
-	// Keep the active session's freshness in step with real activity.
 	if active, _ := s.Active(at, 0); active != nil && active.ID == sess.ID {
 		active.UpdatedAt = at
 		_ = writeJSON(filepath.Join(s.dir, activeFile), active)
@@ -267,19 +230,12 @@ func (s *Store) Manifests() ([]Manifest, error) {
 		if err := readJSON(filepath.Join(s.dir, manifestsDir, e.Name()), &m); err != nil {
 			continue // a torn write is skipped, never fatal to a commit
 		}
-		// Every write path checks ValidID, but the check has to be repeated on read:
-		// these are files, and what is on disk is not necessarily what this code put
-		// there. The id read back flows into a commit message (a newline in it would
-		// forge trailer lines git and the GitHub App then parse as real) and into
-		// manifestPath, where Prune removes it — an id of "../../x" would delete
-		// outside this directory. Requiring the id to be exactly the file name it was
-		// read from enforces the invariant writeJSON establishes, so manifestPath is
-		// guaranteed to address the file this manifest actually came from.
+		// Revalidate on read: the id reaches a commit message (a newline forges trailers)
+		// and Prune's manifestPath ("../../x" deletes elsewhere), so it must equal its file name.
 		if !ValidID(m.SessionID) || e.Name() != m.SessionID+manifestExt {
 			continue
 		}
-		// Tool and ToolVersion are rendered into the same commit message and are not
-		// identifiers, so they get the weaker rule: no line breaks, ever.
+		// Tool and ToolVersion reach the commit message too: no line breaks.
 		if isMultiline(m.Tool) || isMultiline(m.ToolVersion) {
 			m.Tool, m.ToolVersion = "", ""
 		}
@@ -292,11 +248,8 @@ func (s *Store) Manifests() ([]Manifest, error) {
 	return out, nil
 }
 
-// Consume removes files from a session's manifest once a commit has carried them,
-// so the next commit is not attributed to work that already shipped. An emptied
-// manifest is kept (with no files): it is still the evidence that this session
-// reports its edits, which keeps the active-session fallback from claiming a
-// later human commit. Prune retires it with the rest.
+// Consume removes files a commit carried from a session's manifest; an emptied manifest
+// is kept as evidence the session reports edits, so the fallback never claims for it.
 func (s *Store) Consume(sessionID string, files []string) error {
 	defer s.lock()()
 	m, err := s.manifest(sessionID)
@@ -309,17 +262,8 @@ func (s *Store) Consume(sessionID string, files []string) error {
 	return writeJSON(s.manifestPath(sessionID), m)
 }
 
-// Merge folds one session's manifest into another's and retires the first. It is how a
-// subagent that edited under an id of its own is attributed to the conversation that
-// spawned it: Cursor can file a subagent's afterFileEdit under the subagent's
-// conversation id, and left alone the commit would be stamped with a session nobody can
-// find, or with two.
-//
-// Each file keeps its own touch time, the later one where both sessions touched it. The
-// target keeps its tool, or takes the source's when it is new. An active record for the
-// source is cleared: a session folded away must not go on claiming commits through the
-// fallback. A source with no manifest merges nothing. Returns the files that moved,
-// sorted.
+// Merge folds fromID's manifest into into's (later touch wins), retires it and its
+// active record, and returns the files that moved, sorted.
 func (s *Store) Merge(fromID string, into Session, at time.Time) ([]string, error) {
 	if !ValidID(into.ID) {
 		return nil, fmt.Errorf("invalid session id %q", into.ID)
@@ -352,23 +296,21 @@ func (s *Store) Merge(fromID string, into Session, at time.Time) ([]string, erro
 	if at.After(dst.UpdatedAt) {
 		dst.UpdatedAt = at
 	}
-	// The target is written before the source goes: a hook killed between the two leaves
-	// the files in both manifests, which a commit survives, rather than in neither.
+	// Target first: a hook killed in between leaves the files in both manifests, not neither.
 	if err := writeJSON(s.manifestPath(into.ID), dst); err != nil {
 		return nil, err
 	}
 	if err := os.Remove(s.manifestPath(fromID)); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return nil, err
 	}
-	_ = s.clearActive(fromID) // the lock is already held
-	sort.Strings(files)
+	_ = s.clearActive(fromID)
+	slices.Sort(files)
 	return files, nil
 }
 
 // Prune drops manifests not updated since before, and a stale active session.
 func (s *Store) Prune(before time.Time) (int, error) {
-	// Under the lock: a manifest read as stale must not be removed after a Touch has
-	// just brought it back to life.
+	// Locked, so a manifest a Touch just revived is not removed as stale.
 	defer s.lock()()
 	manifests, err := s.Manifests()
 	if err != nil {
@@ -382,16 +324,14 @@ func (s *Store) Prune(before time.Time) (int, error) {
 			}
 		}
 	}
-	// Active with no ttl always reports fresh, so asking it for staleness meant this never
-	// ran and a finished session's record stayed for ever; the cutoff is the only test.
+	// Active with no ttl reports fresh, so the cutoff is the test.
 	if active, _ := s.Active(before, 0); active != nil && active.UpdatedAt.Before(before) {
-		_ = s.clearActive(active.ID) // the lock is already held
+		_ = s.clearActive(active.ID)
 	}
 	return n, nil
 }
 
-// installRecord is the per-clone memory of what `terma install` changed in git's
-// configuration, so uninstall can put it back exactly.
+// installRecord is what `terma install` changed in git's configuration, for uninstall.
 type installRecord struct {
 	PreviousHooksPath string    `json:"previous_hooks_path"`
 	HooksConfigScope  string    `json:"hooks_config_scope,omitempty"`
@@ -401,8 +341,8 @@ type installRecord struct {
 
 const installFile = "install.json"
 
-// RecordPreviousHooksPathAtScope also records Git's scope and whether the previous
-// setting was explicit there. Inherited values must be restored by unsetting ours.
+// RecordPreviousHooksPathAtScope records the previous hooks path, its git config scope,
+// and whether it was set explicitly there.
 func RecordPreviousHooksPathAtScope(gitDir, previous, scope string, local bool, chainPath string) error {
 	path := filepath.Join(gitDir, stateDirName, installFile)
 	if err := writeJSON(path, installRecord{PreviousHooksPath: previous, HooksConfigScope: scope, HooksPathLocal: &local, RecordedAt: time.Now()}); err != nil {
@@ -411,7 +351,7 @@ func RecordPreviousHooksPathAtScope(gitDir, previous, scope string, local bool, 
 	return os.WriteFile(filepath.Join(gitDir, stateDirName, "previous-hooks-path"), []byte(chainPath+"\n"), fileMode)
 }
 
-// PreviousHooksScope returns the scope Terma changed. Older installs used --local.
+// PreviousHooksScope returns the git config scope install changed.
 func PreviousHooksScope(gitDir string) string {
 	var rec installRecord
 	if readJSON(filepath.Join(gitDir, stateDirName, installFile), &rec) == nil && rec.HooksConfigScope == "--worktree" {
@@ -447,14 +387,8 @@ type Attribution struct {
 	Files []string
 }
 
-// Attribute decides which sessions a commit belongs to: every session whose
-// manifest intersects the staged files, oldest session first.
-//
-// The fresh active session claims a commit only when it has no manifest at all —
-// the fallback for harnesses that announce sessions but cannot report file edits.
-// A session that does report edits is judged by them alone: if none of its files
-// are staged, the commit is human work and stays unstamped, however recently the
-// session was active.
+// Attribute returns every session whose manifest intersects the staged files, oldest
+// first; the fresh active session claims a commit only when it has no manifest at all.
 func Attribute(staged []string, manifests []Manifest, active *Session, activeFresh bool) []Attribution {
 	stagedSet := make(map[string]bool, len(staged))
 	for _, f := range staged {
@@ -477,7 +411,7 @@ func Attribute(staged []string, manifests []Manifest, active *Session, activeFre
 		if len(hit) == 0 {
 			continue
 		}
-		sort.Strings(hit)
+		slices.Sort(hit)
 		out = append(out, Attribution{SessionID: m.SessionID, Tool: m.ToolLabel(), Files: hit})
 	}
 	if len(out) == 0 && active != nil && activeFresh && !activeHasManifest && len(stagedSet) > 0 {
@@ -486,16 +420,13 @@ func Attribute(staged []string, manifests []Manifest, active *Session, activeFre
 	return out
 }
 
-// Normalize makes a path comparable across the sources that produce them: slashes,
-// no leading "./", trimmed. Absolute paths are the caller's job to relativize.
+// Normalize makes a relative path comparable: slashes, no leading "./", trimmed.
 func Normalize(p string) string {
 	p = strings.TrimSpace(p)
 	p = filepath.ToSlash(p)
 	p = strings.TrimPrefix(p, "./")
 	return strings.TrimSuffix(p, "/")
 }
-
-// --- files ------------------------------------------------------------------
 
 func (s *Store) manifestPath(id string) string {
 	return filepath.Join(s.dir, manifestsDir, id+manifestExt)
@@ -527,9 +458,7 @@ func readJSON(path string, out any) error {
 	return json.Unmarshal(data, out)
 }
 
-// writeJSON is atomic: a hook interrupted mid-write must never leave a torn file for
-// the next commit to choke on. Not fsynced — this runs on every tool call, and a
-// manifest lost to a power cut costs one commit its trailer, not a session its state.
+// writeJSON is atomic but not synced: it runs on every tool call.
 func writeJSON(path string, v any) error {
 	if err := os.MkdirAll(filepath.Dir(path), dirMode); err != nil {
 		return err
@@ -541,8 +470,8 @@ func writeJSON(path string, v any) error {
 	return config.WriteFileAtomicNoSync(path, data, fileMode)
 }
 
-// HooksPathWasLocal distinguishes an explicit hooksPath (including an empty value)
-// from an inherited value, so uninstall restores inheritance rather than pinning it.
+// HooksPathWasLocal reports whether the previous hooksPath was set explicitly rather
+// than inherited, so uninstall restores inheritance rather than pinning it.
 func HooksPathWasLocal(gitDir string) bool {
 	var rec installRecord
 	if err := readJSON(filepath.Join(gitDir, stateDirName, installFile), &rec); err != nil {

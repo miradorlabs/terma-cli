@@ -2,15 +2,13 @@ package relay
 
 import (
 	"maps"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 )
 
-// Stats counts what the relay did with every record, by reason, so a run (and
-// the live canary) can say exactly what was forwarded and why the rest was not. A
-// record is a log record, a span or a metric data point.
+// Stats counts what the relay did with every record (log record, span or data point), by reason.
 type Stats struct {
 	mu       sync.Mutex
 	started  time.Time
@@ -25,12 +23,9 @@ func (s *Stats) add(key string, n int) {
 	s.mu.Unlock()
 }
 
-// maxUnclassified bounds how many distinct unclassified keys are counted by name: a
-// hostile or broken exporter must not grow the stats without limit.
+// maxUnclassified keeps a hostile or broken exporter from growing the stats without limit.
 const maxUnclassified = 256
 
-// unclassified counts a key the content gate dropped for not being classified, by name
-// while fewer than maxUnclassified are, then as unclassified_overflow.
 func (s *Stats) unclassified(key string, n int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -55,7 +50,7 @@ func (s *Stats) dropped(sig Signal, reason string, n int) {
 	s.add("dropped."+reason+"."+string(sig), n)
 }
 
-// Snapshot is the stats as they stand, for GET /stats and stats.json.
+// Snapshot is the stats as they stand.
 type Snapshot struct {
 	Since    time.Time      `json:"since"`
 	Counters map[string]int `json:"counters"`
@@ -76,6 +71,6 @@ func (s Snapshot) Keys() []string {
 	for k := range s.Counters {
 		keys = append(keys, k)
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 	return keys
 }

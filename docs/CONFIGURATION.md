@@ -122,9 +122,6 @@ catches what an agent exports before its first hook. Codex's background server r
 exporter settings only when it starts: `terma install` and `terma doctor` say when it
 needs `codex app-server daemon restart`.
 
-Earlier versions routed agents through PATH shims; `terma update --refresh` removes
-them, and `terma shim uninstall` does the same on request.
-
 ## Export scope and consent
 
 The advanced `terma connect` command presents a checklist before writing telemetry
@@ -235,7 +232,7 @@ something rewrites it. So once the new version is in place, `terma update` runs 
 It works only from what is on disk. It never signs in, never creates a file (one that is
 gone was removed on purpose and stays gone; `terma install` brings it back), and never
 changes a choice — unlike re-running `terma install`, which puts every flag it does not
-record (`--signals`, `--identity`, `--no-statusline`, `--activation`) back to its
+record (`--signals`, `--identity`, `--no-statusline`) back to its
 default. The repository files it changes are listed to
 commit.
 

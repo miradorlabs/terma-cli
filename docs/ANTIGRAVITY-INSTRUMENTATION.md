@@ -108,7 +108,7 @@ replace_file_content), three `PostInvocation` and one `Stop` observation, a mani
 with the file, a stamped commit and its `terma.commit` record. `view_file` produced no
 attribution. The colleague-without-terma hook produced no agy warning. `terma doctor`
 reported the untrusted workspace once the trust entry was removed. The recorded
-payloads are the fixtures in `internal/hookrun/antigravity_test.go`.
+payloads are the fixtures in `internal/agents/antigravity/handlers_test.go`.
 
 Interactive agy and the Antigravity IDE were not exercised. The IDE shares the
 customization layout but its hooks support and directory names (`antigravity-ide/`)

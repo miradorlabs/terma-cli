@@ -14,11 +14,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/flock"
 )
 
-// Hooks are separate processes that share one manifest: Codex's PostToolUse is
-// asynchronous, and a subagent edits under its parent's session id. Each Touch reads
-// the manifest, adds its files and renames it back, so without the store lock the
-// later rename dropped the earlier one's files. flock excludes per open file, so
-// goroutines contend here exactly as processes do.
+// Concurrent touches of one manifest keep every file; flock excludes per open file, so
+// goroutines contend exactly as processes do.
 func TestConcurrentTouchesKeepEveryFile(t *testing.T) {
 	store := patient(Open(t.TempDir()))
 	sess := Session{ID: "sess-1", Tool: "codex"}
@@ -46,8 +43,7 @@ func TestConcurrentTouchesKeepEveryFile(t *testing.T) {
 	}
 }
 
-// Reading a repository's state must not create it: a post-commit in a repository no
-// agent has worked in leaves nothing behind, lock file included.
+// Reading a repository's state does not create it, lock file included.
 func TestConsumeAndPruneCreateNothing(t *testing.T) {
 	gitDir := t.TempDir()
 	store := Open(gitDir)
@@ -62,9 +58,7 @@ func TestConsumeAndPruneCreateNothing(t *testing.T) {
 	}
 }
 
-// Touch refreshes the active session by reading it and writing it back. SetActive wrote
-// the same file outside the store lock, so a new session announced between Touch's read
-// and its write was overwritten by the one it had just replaced.
+// A SetActive racing Touch's refresh of the active session is never overwritten.
 func TestANewSessionSurvivesTouchesOfTheOldOne(t *testing.T) {
 	for round := range 40 {
 		store := patient(Open(t.TempDir()))
@@ -84,16 +78,14 @@ func TestANewSessionSurvivesTouchesOfTheOldOne(t *testing.T) {
 			}
 		})
 		wg.Wait()
-		// Whatever the order, a Touch of the old session must never bring it back: it
-		// only refreshes the record when the record is still its own.
+		// A Touch of the old session never brings it back.
 		if active, _ := store.Active(time.Now(), 0); active == nil || active.ID != "sess-new" {
 			t.Fatalf("round %d: the active session is %+v, want the newly announced one", round, active)
 		}
 	}
 }
 
-// Prune holds the store lock when it retires a stale active session. Clearing it through
-// the locking entry point would wait on its own lock for the whole lockWait.
+// Prune retires a stale active session without waiting on its own lock.
 func TestPruneDoesNotWaitOnItsOwnLock(t *testing.T) {
 	store := Open(t.TempDir())
 	long := time.Now().Add(-30 * 24 * time.Hour)
@@ -112,18 +104,14 @@ func TestPruneDoesNotWaitOnItsOwnLock(t *testing.T) {
 	}
 }
 
-// patient gives a store a wait no test will outlast. A hook's store stops waiting after
-// hookLockWait and writes without the lock — deliberately, and tested below — so a test
-// that queues two dozen writers behind one another on a loaded machine was measuring
-// the machine: it kept 15 of 24 files on a CI runner, having passed four times before.
+// patient gives a store a wait no test will outlast, so exclusion tests do not measure
+// the machine (hookLockWait kept 15 of 24 files on a loaded CI runner).
 func patient(s *Store) *Store {
 	s.lockWait = time.Minute
 	return s
 }
 
-// The other half of the policy: a lock that cannot be had in time must cost the hook its
-// exclusivity, never its write. A holder that never lets go stands in for a wedged
-// process; the touch has to land anyway, and soon.
+// A lock that cannot be had in time costs the hook its exclusivity, never its write.
 func TestTouchGoesAheadWhenTheLockCannotBeHad(t *testing.T) {
 	store := Open(t.TempDir())
 	store.lockWait = 40 * time.Millisecond
@@ -152,16 +140,14 @@ func TestTouchGoesAheadWhenTheLockCannotBeHad(t *testing.T) {
 	}
 }
 
-// Merge is a read-modify-rename of two manifests, run while the parent conversation's
-// own hooks are touching the target. Every file must end up in the parent's manifest —
-// its own and each folded child's — and no child's manifest may survive.
+// Merges racing the parent's own touches keep every file in the parent's manifest and
+// leave no child's.
 func TestConcurrentMergesAndTouchesLoseNothing(t *testing.T) {
 	store := patient(Open(t.TempDir()))
 	parent := Session{ID: "conv-parent", Tool: "cursor"}
 	const own, children = 12, 8
 	now := time.Now()
 
-	// Each child has edited before it is folded, as a subagent has by subagentStop.
 	for j := range children {
 		if err := store.Touch(Session{ID: fmt.Sprintf("conv-child-%d", j), Tool: "cursor"}, []string{fmt.Sprintf("child-%d.go", j)}, now); err != nil {
 			t.Fatal(err)

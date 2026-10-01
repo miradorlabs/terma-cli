@@ -70,23 +70,21 @@ jobs:
       - run: go vet ./...
       - name: Relay, locking, process lookups and updater on Windows
         run: go test ./internal/relay/... ./internal/flock/... ./internal/procinfo/... ./internal/selfupdate/... -count=1 -timeout=5m
-      - name: The relay's Windows service and supervisor
-        run: go test ./cmd/ -count=1 -timeout=5m -run "TestSupervise|TestStopFile|TestRelayServiceDefinitions"
 
   # The live suite is a separate module; its offline contracts must run in CI too.
   live-contracts:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: live
+        working-directory: test/live
     env:
       TERMA_LIVE: "0"
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
         with:
-          go-version-file: live/go.mod
-          cache-dependency-path: live/go.sum
+          go-version-file: test/live/go.mod
+          cache-dependency-path: test/live/go.sum
       - run: go vet ./...
       - run: go test -race ./...
 
@@ -103,7 +101,7 @@ jobs:
       TERMA_LIVE_OPENCODE_VERSIONS: "1.18.33"
       TERMA_LIVE_GEMINI_VERSIONS: "0.62.0"
       TERMA_LIVE_DSH_VERSIONS: "0.2.0-rc.2"
-      TERMA_LIVE_BINARY: ${{ github.workspace }}/live/bin/terma
+      TERMA_LIVE_BINARY: ${{ github.workspace }}/test/live/bin/terma
       # Codex 0.158.0 sometimes exits without running its SessionEnd hook, with or
       # without Terma (docs/CODEX-SESSION-END.md). Pull requests report it instead of
       # failing on it; the nightly live workflow stays strict.
@@ -112,24 +110,24 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
         with:
-          go-version-file: live/go.mod
+          go-version-file: test/live/go.mod
           cache-dependency-path: |
             go.sum
-            live/go.sum
+            test/live/go.sum
       - name: Build Terma
-        run: go build -o live/bin/terma .
+        run: go build -o test/live/bin/terma ./cmd/terma
       # Pi has no exporter; terma's extension is one, tested only on the installed
-      # build (live/pi.go).
+      # build (test/live/pi.go).
       - uses: actions/setup-node@v5
         with:
           node-version: 22
       - name: Install Pi and T3 Code
         # Pi has no exporter (terma's extension is one); T3 Code runs Codex and Claude
-        # Code itself. Gemini CLI and DeepSeek Harness install on demand (live/gemini.go,
-        # live/dsh.go). Hermes, omp and Cursor run only where installed or credentialed.
+        # Code itself. Gemini CLI and DeepSeek Harness install on demand (test/live/gemini.go,
+        # test/live/dsh.go). Hermes, omp and Cursor run only where installed or credentialed.
         run: npm install -g @earendil-works/pi-coding-agent@0.99.1 t3@0.0.42
       - name: Assert harness telemetry (no provider credentials)
-        working-directory: live
+        working-directory: test/live
         # TestRelay* is the local relay (docs/RELAY.md): the same
         # harnesses exporting globally through `terma relay run`, and nothing but the
         # claimed session reaching the receiver.
@@ -137,42 +135,9 @@ jobs:
       - name: Publish coverage summary
         if: always()
         run: |
-          if [ -f live/report/latest.md ]; then
-            cat live/report/latest.md >> "$GITHUB_STEP_SUMMARY"
+          if [ -f test/live/report/latest.md ]; then
+            cat test/live/report/latest.md >> "$GITHUB_STEP_SUMMARY"
           fi
-
-  cursor-billing:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: pocs/cursor-billing
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: pocs/cursor-billing/go.mod
-          cache: false
-      - run: test -z "$(gofmt -l .)"
-      - run: go vet ./...
-      - run: go test -race ./...
-
-  # The funding model is a proof of concept, but it is the estimator the backend
-  # will be reconciled against, so a change that breaks its tests should not pass
-  # review only because the module lives under pocs/.
-  funding-model:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: pocs/funding-model
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: pocs/funding-model/go.mod
-          cache: false
-      - run: test -z "$(gofmt -l .)"
-      - run: go vet ./...
-      - run: go test -race ./...
 
   # The OpenCode plugin is ~450 lines of JavaScript that writes into a user's
   # plugin directory and ships in the release archives. `make test-plugin` skips it
@@ -181,7 +146,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: internal/harness/opencode
+        working-directory: internal/agents/opencode/plugin
     steps:
       - uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2
@@ -199,7 +164,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - run: go build -o bin/terma .
+      - run: go build -o bin/terma ./cmd/terma
       - name: Shim runs under dash and busybox sh
         env:
           TERMA_POLICY_STUB: '{"mode":"repo","include_prompts":true,"include_tool_content":true}'

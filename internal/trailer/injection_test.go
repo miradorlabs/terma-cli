@@ -5,8 +5,7 @@ import (
 	"testing"
 )
 
-// A trailer is one line. A value carrying a newline must not become a second line
-// that git, `git interpret-trailers`, and the GitHub App would read as a real trailer.
+// A value carrying a newline never becomes a second trailer line.
 func TestStampSkipsMultilineSessionID(t *testing.T) {
 	evil := "abc\nCo-authored-by: Attacker <a@evil.test>"
 	out, changed := Stamp("fix: a thing\n", []Trailer{{SessionID: evil, Tool: "claude-code"}}, "#")
@@ -18,8 +17,7 @@ func TestStampSkipsMultilineSessionID(t *testing.T) {
 	}
 }
 
-// A tool label is not an identifier, so it is collapsed rather than dropping the
-// whole attribution: the session id is still worth recording.
+// A multi-line tool label is collapsed, keeping the attribution.
 func TestFormatCollapsesMultilineTool(t *testing.T) {
 	lines := Format(Trailer{SessionID: "s1", Tool: "claude-code\nAgent-Session-Id: forged"})
 	for _, l := range lines {

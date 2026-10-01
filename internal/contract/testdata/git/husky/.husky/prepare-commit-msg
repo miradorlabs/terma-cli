@@ -1,0 +1,1 @@
+command -v terma >/dev/null 2>&1 && terma hook prepare-commit-msg "$@" || true # terma hook

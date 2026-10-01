@@ -19,10 +19,8 @@ func parentOf(pid int) (int, bool) {
 	return int(kp.Eproc.Ppid), true
 }
 
-// The kernel's proc_info call (sys/proc_info.h), which libproc and lsof are built on.
-// Go reaches it through libc's syscall(2), as it does every raw darwin syscall; the
-// layout below is the SDK's, checked by TestOwnsPortSeesItsOwnSocket against a real
-// socket so a kernel that moved it fails a test, not a guess.
+// The kernel's proc_info call (sys/proc_info.h), its SDK layout pinned against a real
+// socket by TestFindSenderNamesTheConnectingProcess.
 const (
 	sysProcInfo          = 336 // SYS_proc_info
 	procInfoCallListPIDs = 1   // PROC_INFO_CALL_LISTPIDS
@@ -51,8 +49,7 @@ func procInfo(callnum, pid, flavor int, arg uint64, buf []byte) (int, bool) {
 	return int(n), true
 }
 
-// ownsPort reports whether pid holds a TCP socket bound locally to port: the client
-// end of a loopback connection the relay sees arriving from that port.
+// ownsPort reports whether pid holds a TCP socket bound locally to port.
 func ownsPort(pid, port int) bool {
 	fds := make([]byte, procFDInfoSize*maxFDsPerProcess)
 	n, ok := procInfo(procInfoCallPIDInfo, pid, procPIDListFDs, 0, fds)

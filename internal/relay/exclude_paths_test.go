@@ -16,8 +16,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
-// pathExcludedJSON is the filter as it was: the part through protojson and back, every
-// map with a "key" handed to HasExcludedPath. pathExcluded must decide as it did.
+// pathExcludedJSON is a reference filter through protojson that pathExcluded must agree with.
 func pathExcludedJSON(msg proto.Message, patterns []string) bool {
 	b, err := protojson.Marshal(msg)
 	if err != nil {
@@ -96,7 +95,7 @@ func TestPathExcludedMatchesTheJSONWalk(t *testing.T) {
 		"JSON-encoded arguments": true, "nested kvlist": true, "body kvlist": true, "span event": true, "span link": true, "metric exemplar": true}
 	for name, msg := range cases {
 		for _, patterns := range [][]string{{"secrets"}, {"7"}, nil} {
-			got, want := pathExcluded(msg, patterns), pathExcludedJSON(msg, patterns)
+			got, want := pathExcluded(msg, excluding(patterns...)), pathExcludedJSON(msg, patterns)
 			if len(patterns) == 0 {
 				want = false
 			}
@@ -108,4 +107,13 @@ func TestPathExcludedMatchesTheJSONWalk(t *testing.T) {
 			}
 		}
 	}
+}
+
+// excluding is the matcher the daemon builds for patterns.
+func excluding(patterns ...string) func(any) bool {
+	if len(patterns) == 0 {
+		return nil
+	}
+	p := config.Policy{ExcludePaths: patterns}
+	return func(v any) bool { return p.HasExcludedPath(v, "") }
 }

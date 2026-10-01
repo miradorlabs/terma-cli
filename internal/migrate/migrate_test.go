@@ -13,10 +13,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/flock"
 )
 
-// The registry is append-only and ordered: an ID a machine has recorded must always
-// mean the same migration, and Run relies on the order.
+// The registry is ordered and starts past the retired IDs.
 func TestRegistryIsOrderedAndNamed(t *testing.T) {
-	last := 0
+	last := retiredThrough
 	for _, m := range migrations {
 		if m.ID <= last || m.Name == "" || m.Run == nil {
 			t.Fatalf("migration %d (%q) out of order, unnamed or empty after %d", m.ID, m.Name, last)
@@ -25,7 +24,22 @@ func TestRegistryIsOrderedAndNamed(t *testing.T) {
 	}
 }
 
-// with replaces the registry for one test.
+// A retired migration's failure, recorded by the build that had it, holds nothing back.
+func TestARetiredFailureIsCleared(t *testing.T) {
+	dir := t.TempDir()
+	ran := false
+	with(t, Migration{ID: retiredThrough + 1, Name: "next", Run: func(context.Context) error { ran = true; return nil }})
+	if err := save(dir, State{Failed: &Failure{ID: retiredThrough, Name: "retired", At: time.Now(), Error: "boom"}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Run(context.Background(), dir, false); err != nil || !ran {
+		t.Fatalf("run = %v, ran %v", err, ran)
+	}
+	if s, _ := Load(dir); s.Failed != nil || s.Applied != retiredThrough+1 {
+		t.Fatalf("state %+v", s)
+	}
+}
+
 func with(t *testing.T, ms ...Migration) {
 	t.Helper()
 	original := migrations
@@ -78,9 +92,7 @@ func TestRunAppliesInOrderAndRecordsEach(t *testing.T) {
 	}
 }
 
-// A failure stops the run and is recorded. A start that is not asked to retry leaves it
-// alone for a while — a hook fires on every tool call — and one that is asked runs it
-// again from there, clearing the record when it gets through.
+// A failure stops the run and is recorded; only retry or RetryAfter runs it again.
 func TestAFailedMigrationStopsTheRunAndIsRetried(t *testing.T) {
 	dir := t.TempDir()
 	broken, ran := true, 0
@@ -126,8 +138,7 @@ func TestAFailedMigrationStopsTheRunAndIsRetried(t *testing.T) {
 	}
 }
 
-// An unreadable record is not trusted as "all applied": every migration is idempotent,
-// so running them again is safe, and the rewrite repairs it.
+// An unreadable record reruns every migration and is rewritten.
 func TestAnUnreadableRecordIsRepaired(t *testing.T) {
 	dir := t.TempDir()
 	ran := 0
@@ -143,8 +154,7 @@ func TestAnUnreadableRecordIsRepaired(t *testing.T) {
 	}
 }
 
-// The bound covers the migrations themselves, not only the lock: a run cut short records
-// no failure, and the next start carries on.
+// A run ctx cuts short records no failure, and the next start carries on.
 func TestTheBoundCoversRunningMigrations(t *testing.T) {
 	dir := t.TempDir()
 	finished := false
@@ -175,8 +185,7 @@ func TestTheBoundCoversRunningMigrations(t *testing.T) {
 	}
 }
 
-// Concurrent starts share one lock; one that cannot get it within its bound changes
-// nothing and says so.
+// A start that cannot get the lock within its bound changes nothing and says so.
 func TestRunWaitsForAnotherMigratingProcess(t *testing.T) {
 	dir := t.TempDir()
 	ran := 0

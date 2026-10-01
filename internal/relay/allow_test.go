@@ -12,12 +12,10 @@ import (
 	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 )
 
-// Every key a harness was seen to send with content withheld is classified: the
-// goldens the live suite records are the evidence, and a key they gain on a new release
-// must be decided here before the relay lets it through.
+// Every key the live goldens record with content withheld is classified here.
 func TestClassificationCoversTheGoldens(t *testing.T) {
-	files, _ := filepath.Glob(filepath.Join("..", "..", "live", "golden", "*", "telemetry-redacted.json"))
-	withheld, _ := filepath.Glob(filepath.Join("..", "..", "live", "golden", "relay", "*-withheld.json"))
+	files, _ := filepath.Glob(filepath.Join("..", "..", "test", "live", "golden", "*", "telemetry-redacted.json"))
+	withheld, _ := filepath.Glob(filepath.Join("..", "..", "test", "live", "golden", "relay", "*-withheld.json"))
 	files = append(files, withheld...)
 	if len(files) == 0 {
 		t.Fatal("no goldens found")
@@ -33,7 +31,7 @@ func TestClassificationCoversTheGoldens(t *testing.T) {
 		}
 		for surface, keys := range surfaces {
 			for _, k := range keys {
-				if c := Classify(strings.TrimPrefix(k, "resource/")); c == "unclassified" {
+				if c := testRules.classify(strings.TrimPrefix(k, "resource/")); c == "unclassified" {
 					t.Errorf("%s %s: %q is unclassified", filepath.Base(f), surface, k)
 				}
 			}
@@ -41,19 +39,17 @@ func TestClassificationCoversTheGoldens(t *testing.T) {
 	}
 }
 
-// A key is safe or content, never both: a content key listed as safe would pass whatever
-// the gate did to it.
+// A key is safe or content, never both.
 func TestNoKeyIsBothSafeAndContent(t *testing.T) {
-	for key := range safeKeys {
-		if contentKey(key) {
+	for key := range testRules.safeKeys {
+		if testRules.contentKey(key) {
 			t.Errorf("%q is listed as safe and as content", key)
 		}
 	}
 }
 
-// With content withheld, what is not known to be safe does not leave: an unknown
-// attribute, an unknown resource attribute, and a body that says more than its event's
-// name are dropped and counted by name. With content allowed, nothing is touched.
+// With content withheld, unknown attributes and free-text bodies are dropped and counted;
+// with content allowed, nothing is touched.
 func TestWithheldContentPassesOnlyWhatIsClassified(t *testing.T) {
 	record := func() *part {
 		return &part{signal: Logs, session: "A", msg: &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{
@@ -70,7 +66,7 @@ func TestWithheldContentPassesOnlyWhatIsClassified(t *testing.T) {
 	}
 	unclassified := map[string]int{}
 	p := record()
-	withhold(p, false, false, unclassified)
+	testRules.withhold(p, false, false, unclassified)
 	rl := p.msg.(*logspb.LogsData).ResourceLogs[0]
 	recs := rl.ScopeLogs[0].LogRecords
 	for _, want := range []string{"x.new_text", "resource/host.fancy"} {
@@ -93,13 +89,12 @@ func TestWithheldContentPassesOnlyWhatIsClassified(t *testing.T) {
 
 	unclassified = map[string]int{}
 	p = record()
-	if n := withhold(p, true, true, unclassified); n != 0 || len(unclassified) != 0 {
+	if n := testRules.withhold(p, true, true, unclassified); n != 0 || len(unclassified) != 0 {
 		t.Fatalf("content allowed, yet the gate changed %d records: %v", n, unclassified)
 	}
 }
 
-// A count or a flag cannot carry what was said, whatever its key, sent as a number or
-// as a string that is wholly one; anything more is text and must be classified.
+// A number or flag passes under any key, even as a string that is wholly one; anything more is text.
 func TestNumbersAndFlagsPassUnderAnyKey(t *testing.T) {
 	for v, want := range map[string]bool{"3": true, "-12.5": true, "true": true, "false": true, "0": true,
 		"": false, "3 files": false, "0x1f": false, "NaN": false, "Inf": false, "1_000": false, "yes": false, "1e999999": false} {
@@ -108,9 +103,20 @@ func TestNumbersAndFlagsPassUnderAnyKey(t *testing.T) {
 		}
 	}
 	unclassified := map[string]int{}
-	attrs, _ := withholdAttrs([]*commonpb.KeyValue{kv("num_hooks", "3"), kv("x.new_note", "3 files"),
+	attrs, _ := testRules.withholdAttrs([]*commonpb.KeyValue{kv("num_hooks", "3"), kv("x.new_note", "3 files"),
 		{Key: "x.count", Value: &commonpb.AnyValue{Value: &commonpb.AnyValue_IntValue{IntValue: 4}}}}, false, false, unclassified)
 	if attr(attrs, "num_hooks") != "3" || len(attrs) != 2 || unclassified["x.new_note"] != 1 {
 		t.Fatalf("attrs %v, unclassified %v", attrs, unclassified)
 	}
+}
+
+// classify says how the relay treats key with content withheld: "safe", "content" or "unclassified".
+func (ru *rules) classify(key string) string {
+	switch {
+	case ru.contentKey(key):
+		return "content"
+	case testRules.safeKey(key):
+		return "safe"
+	}
+	return "unclassified"
 }

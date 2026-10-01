@@ -136,7 +136,7 @@ larger than 1 MiB are skipped incrementally to the next newline. Unix file ident
 survives an archive rename; other platforms use metadata/checkpoint hashes and
 cannot distinguish a byte-identical replacement. These checks do not detect every
 possible historical in-place edit. No transcript text is stored in cursor state.
-(The rollout has one other reader, `harness.ReadCodexReplies`, which does read text — the
+(The rollout has one other reader, `readRolloutReplies` (internal/agents/codex), which does read text — the
 assistant's replies, for a developer whose prompts already travel — with a cursor of its
 own under `reply-cursors/` that holds none either. Funding capture itself reads none.)
 
@@ -215,8 +215,8 @@ Authentic API routes passed on 2026-09-15 for Claude 2.1.270–2.1.272 and Codex
 0.153.3–0.154.0. Claude delivers headless per-request usage and credential-presence
 account evidence; Codex delivers completed-response usage with `auth_mode=ApiKey`
 and its hook's quota-availability status. Missing API quota is not zero quota.
-The corresponding field-name baselines are `live/golden/claude/*-apikey.json` and
-`live/golden/codex/response_completed-apikey.json`. This verifies collection;
+The corresponding field-name baselines are `test/live/golden/claude/*-apikey.json` and
+`test/live/golden/codex/response_completed-apikey.json`. This verifies collection;
 provider billing reconciliation and mixed-auth live coverage remain separate.
 
 ## Cursor IDE and CLI

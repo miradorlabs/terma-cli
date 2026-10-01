@@ -49,20 +49,20 @@ func TestFailedCheckRetriesAfter15Minutes(t *testing.T) {
 			dir := t.TempDir()
 			// A failed refresh must retry even when an earlier successful result exists.
 			SaveCache(dir, Cache{CheckedAt: time.Now().Add(-25 * time.Hour), Latest: "1.0.0"})
-			_ = c.Notice(context.Background(), dir, c.Version)
+			_ = noticeOf(c, context.Background(), dir, c.Version)
 			cache := LoadCache(dir)
 			if calls != 1 || !cache.Failed {
 				t.Fatalf("failure not recorded: %+v, calls %d", cache, calls)
 			}
 			cache.CheckedAt = time.Now().Add(-14 * time.Minute)
 			SaveCache(dir, cache)
-			_ = c.Notice(context.Background(), dir, c.Version)
+			_ = noticeOf(c, context.Background(), dir, c.Version)
 			if calls != 1 {
 				t.Fatal("retried before 15 minutes")
 			}
 			cache.CheckedAt = time.Now().Add(-16 * time.Minute)
 			SaveCache(dir, cache)
-			if msg := c.Notice(context.Background(), dir, c.Version); calls != 2 || !strings.Contains(msg, "2.0.0") {
+			if msg := noticeOf(c, context.Background(), dir, c.Version); calls != 2 || !strings.Contains(msg, "2.0.0") {
 				t.Fatalf("did not recover after 15 minutes: calls %d, %q", calls, msg)
 			}
 			cache = LoadCache(dir)
@@ -71,7 +71,7 @@ func TestFailedCheckRetriesAfter15Minutes(t *testing.T) {
 			}
 			cache.CheckedAt = time.Now().Add(-16 * time.Minute)
 			SaveCache(dir, cache)
-			_ = c.Notice(context.Background(), dir, c.Version)
+			_ = noticeOf(c, context.Background(), dir, c.Version)
 			if calls != 2 {
 				t.Fatal("successful check did not retain daily interval")
 			}
@@ -154,8 +154,7 @@ func TestMaintainRequiresOptInAndVerifiesUpdates(t *testing.T) {
 			if mode == "locked" && lookups != 0 {
 				t.Fatal("contended updater still made requests")
 			}
-			// `terma update` upgrades a managed installation through its package manager,
-			// so the notice names it for every installation; nothing is downloaded here.
+			// The notice names `terma update` for a managed installation too; nothing is downloaded.
 			if mode == "managed" && (downloads != 0 || !strings.Contains(out.String(), "Run `terma update`")) {
 				t.Fatalf("managed installation: %s", &out)
 			}
@@ -170,7 +169,16 @@ func TestManualCacheTimestampIsReusable(t *testing.T) {
 	dir := t.TempDir()
 	SaveCache(dir, Cache{CheckedAt: time.Now(), Current: "1.0.0", Latest: "2.0.0"})
 	c := &Client{BaseURL: "http://invalid.invalid", Version: "1.0.0"}
-	if msg := c.Notice(context.Background(), dir, c.Version); !strings.Contains(msg, "2.0.0") {
+	if msg := noticeOf(c, context.Background(), dir, c.Version); !strings.Contains(msg, "2.0.0") {
 		t.Fatal(msg)
 	}
+}
+
+// noticeOf is the update notice c's cached check gives for current.
+func noticeOf(c *Client, ctx context.Context, dir, current string) string {
+	if !IsRelease(current) {
+		return ""
+	}
+	cache, _ := c.cachedCheck(ctx, dir, current)
+	return notice(cache, current)
 }

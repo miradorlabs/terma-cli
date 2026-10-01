@@ -21,10 +21,10 @@ npm/vendor/
 .terma.toml
 
 # live tests: local credentials, built binaries, the last report
-live/.env.local
-live/bin/
-live/report/
-live/versions/
+test/live/.env.local
+test/live/bin/
+test/live/report/
+test/live/versions/
 
 # Local provisioning credential
 /openai-key.txt

@@ -1,0 +1,104 @@
+package cli
+
+import (
+	"context"
+	"os"
+	"os/exec"
+	"path/filepath"
+
+	"github.com/spf13/cobra"
+
+	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/hooks/dispatch"
+	"github.com/miradorlabs/terma-cli/internal/procinfo"
+	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
+	"github.com/miradorlabs/terma-cli/internal/spool"
+)
+
+// HooksDisabled reports the kill switch `TERMA_HOOKS=0`, which makes every hook exit 0 at once.
+func HooksDisabled() bool {
+	return os.Getenv("TERMA_HOOKS") == "0"
+}
+
+func (app *App) newHookCommand() *cobra.Command {
+	var user bool
+	cmd := &cobra.Command{
+		Use:    "hook <event> [args...]",
+		Short:  "Internal: the runtime behind every installed hook shim",
+		Hidden: true,
+		Args:   cobra.MinimumNArgs(1),
+		// Hooks exit 0 whatever happens, on top of the shims' `|| true`.
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cwd, _ := os.Getwd()
+			status := dispatch.Run(cmd.Context(), app.hookDeps(), dispatch.Request{
+				Event: args[0], Args: args[1:], User: user,
+				Stdin: cmd.InOrStdin(), Stdout: cmd.OutOrStdout(), Stderr: cmd.ErrOrStderr(),
+				Version: app.version, Debug: os.Getenv("TERMA_DEBUG") != "", HooksOff: HooksDisabled(), Cwd: cwd,
+			})
+			if status != 0 {
+				return exitWith(status)
+			}
+			return nil
+		},
+	}
+	// --user only before the event: what follows it is the event's own arguments.
+	cmd.Flags().BoolVar(&user, "user", false, "internal: a machine-wide hook entry")
+	cmd.Flags().SetInterspersed(false)
+	return cmd
+}
+
+// hookDeps are what `terma hook` reaches beyond the hook runtime.
+func (app *App) hookDeps() dispatch.Deps {
+	return dispatch.Deps{
+		Agents: app.agents,
+		Policy: hookPolicy,
+		Yields: app.globalMode().Yields,
+		Spool:  openSpool,
+		Claimed: func(ctx context.Context, cwd string) {
+			daemon.Spawn()
+			wireCloneOnFirstUse(ctx, cwd)
+		},
+		Flush: spawnFlush,
+	}
+}
+
+// hookPolicy is one small local read; without a validated scope content capture stays off.
+func hookPolicy() config.Policy {
+	cfg, err := config.Load(config.Overrides{})
+	if err != nil {
+		return config.NoPolicy("", "")
+	}
+	if !cfg.Policy.Validated() {
+		return config.NoPolicy(cfg.OrganizationID, cfg.AuthURL)
+	}
+	return cfg.Policy
+}
+
+// openSpool returns nil when the config dir cannot be used: a nil spool drops events,
+// never failing a hook.
+func openSpool() *spool.Spool {
+	dir, err := config.Dir()
+	if err != nil {
+		return nil
+	}
+	s, err := spool.Open(filepath.Join(dir, "spool"))
+	if err != nil {
+		return nil
+	}
+	return s
+}
+
+// spawnFlush is silent on failure: the next flush picks up whatever this one leaves.
+func spawnFlush() {
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+	proc := exec.Command(exe, "spool", "flush", "--quiet")
+	proc.Stdin, proc.Stdout, proc.Stderr = nil, nil, nil
+	procinfo.Detach(proc)
+	if err := proc.Start(); err != nil {
+		return
+	}
+	_ = proc.Process.Release()
+}

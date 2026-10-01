@@ -21,43 +21,31 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 )
 
-// Upstream. A part that may leave is written to its route's outbox on disk (outbox.go)
-// before the export that carried it is answered, so what the relay accepted for a
-// claimed session survives the relay's crash, a restart and a gateway outage. Only
-// claimed parts, with the project's content policy already applied, ever reach disk:
-// what waits for a claim stays in memory (route.go). Each route — a project and the
-// tool whose key it uses — has its own sender: its parts leave oldest first, a
-// transient failure is retried with backoff, and one refusing host never holds up
-// another project.
-
 const (
 	sendTimeout   = 15 * time.Second
 	maxMergeBytes = 4 << 20
 	maxMergeFiles = 64
 	minBackoff    = time.Second
 	maxBackoff    = 2 * time.Minute
-	// maxRetryAfter bounds how long a gateway's Retry-After can park a route.
 	maxRetryAfter = 10 * time.Minute
 	// A refused key is not fixed by asking again soon: `terma install` stores a new one.
 	refusedBackoff    = 5 * time.Minute
 	maxRefusedBackoff = time.Hour
-	// keylessRetry is how often a route whose key is gone looks for one again.
-	keylessRetry = time.Minute
-	idleWait     = 30 * time.Second
+	keylessRetry      = time.Minute
+	idleWait          = 30 * time.Second
 )
 
-// sender delivers one route's outbox.
+// sender delivers one route's outbox, so one refusing host never holds up another project.
 type sender struct {
 	r     *Relay
 	route route
 	wake  chan struct{}
 
 	mu      sync.Mutex
-	pending int  // files queued and not yet delivered or set aside
-	keyless bool // the route's key is gone: it waits, and keeps no relay awake
+	pending int
+	keyless bool // a keyless route waits and keeps no relay awake
 }
 
-// sender returns rt's sender, starting it on first use.
 func (r *Relay) sender(rt route) *sender {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -71,8 +59,8 @@ func (r *Relay) sender(rt route) *sender {
 	return s
 }
 
-// enqueue writes a part that may leave to its route's outbox and wakes the sender. It
-// runs under deliverMu, so a route's files are named in the order its parts arrived.
+// enqueue writes a part to its route's outbox before the export is answered, so a crash
+// loses none. It runs under deliverMu, so files are named in arrival order.
 func (r *Relay) enqueue(c claim.Claim, p *part) {
 	rt := routeOf(c)
 	body, err := proto.Marshal(p.msg)
@@ -102,8 +90,7 @@ func (s *sender) poke() {
 	}
 }
 
-// busy reports whether the sender has something to deliver: a keyless route does not
-// count, since only a new key — the next claim's relay — can move it.
+// busy ignores a keyless route, since only a new key can move it.
 func (s *sender) busy() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -122,15 +109,12 @@ func (s *sender) delivered(n int) {
 	s.mu.Unlock()
 }
 
-// loop delivers the outbox oldest first until the relay stops; a stopping relay keeps
-// delivering, within its grace, until the outbox is empty. What is left stays on disk
-// for the next relay.
+// loop delivers the outbox oldest first; a stopping relay keeps going within its grace.
 func (s *sender) loop() {
 	defer s.r.wg.Done()
 	ctx := s.r.sendCtx
 	backoff := time.Duration(0)
-	// single sends one file per request after a merged request was refused, so one bad
-	// file is set aside without the ones merged with it.
+	// single sends one file per request after a merged request was refused, so one bad file is set aside alone.
 	single := false
 	stopping := func() bool {
 		select {
@@ -140,7 +124,6 @@ func (s *sender) loop() {
 			return false
 		}
 	}
-	// sleep waits d, or for new work when nothing failed; false once the relay is done.
 	sleep := func(d time.Duration) bool {
 		t := time.NewTimer(d)
 		defer t.Stop()
@@ -194,9 +177,7 @@ func (s *sender) loop() {
 			}
 			continue
 		}
-		// The project's content policy as it stands now, not as it stood when the part
-		// was queued: a project that turned prompts off since sends none of the prompts
-		// still waiting (they stay on disk until delivered, filtered).
+		// The content policy as it stands now: a project that turned prompts off since sends none still queued.
 		body = s.r.withholdQueued(batch[0].signal, body, pol)
 		if pol.Signals != nil && !contains(pol.Signals, string(batch[0].signal)) || body == nil {
 			for _, e := range batch {
@@ -215,8 +196,7 @@ func (s *sender) loop() {
 			}
 			s.r.stats.forwarded(batch[0].signal, records)
 			if rejected > 0 {
-				// Accepted, but the gateway dropped some of it: sending again would only
-				// duplicate what it kept, so it is counted, never retried.
+				// Resending a partial success would only duplicate what was kept.
 				s.r.stats.add("upstream_rejected."+string(batch[0].signal), int(rejected))
 			}
 			s.r.outbox.remove(s.route, batch)
@@ -247,7 +227,6 @@ func (s *sender) loop() {
 	}
 }
 
-// take reads the oldest files of one signal that fit one request and merges them.
 func (s *sender) take(entries []entry) ([]entry, []byte, error) {
 	first := entries[0]
 	body, err := s.r.outbox.read(s.route, first)
@@ -291,10 +270,8 @@ const (
 	refused
 )
 
-// send delivers one request and classifies the answer. A refused key (401, 403) and a
-// missing endpoint (404) are retried, slowly: they are configuration, fixed on this
-// machine, not a fault in the records. Only a body the host judges bad is refused for
-// good. A 2xx can still carry OTLP's partial success, returned as rejected.
+// send delivers one request and classifies the answer: 401, 403 and 404 are configuration fixed
+// on this machine and retried slowly; only a body the host judges bad is refused for good.
 func (s *sender) send(ctx context.Context, pol Policy, sig Signal, body []byte) (outcome, time.Duration, string, int64) {
 	ctx, cancel := context.WithTimeout(ctx, sendTimeout)
 	defer cancel()
@@ -323,10 +300,8 @@ func (s *sender) send(ctx context.Context, pol Policy, sig Signal, body []byte) 
 	}
 }
 
-// partialSuccess reads the records a host rejected out of an accepted export from its
-// protobuf response: field 1 of every Export*ServiceResponse is partial_success, whose
-// field 1 is the rejected count. Decoded by hand, since the collector packages that
-// define those messages pull gRPC into every hook.
+// partialSuccess reads the rejected count (field 1 of field 1) by hand, since the collector
+// packages that define the response pull gRPC into every hook.
 func partialSuccess(body []byte) int64 {
 	ps := protoField(body, 1, protowire.BytesType)
 	if ps == nil {
@@ -354,7 +329,6 @@ func partialSuccess(body []byte) int64 {
 	return 0
 }
 
-// protoField returns the bytes of the first length-delimited field num in b.
 func protoField(b []byte, num protowire.Number, typ protowire.Type) []byte {
 	for len(b) > 0 {
 		n, t, l := protowire.ConsumeTag(b)
@@ -386,8 +360,6 @@ func retryAfter(v string) time.Duration {
 	return min(time.Duration(secs)*time.Second, maxRetryAfter)
 }
 
-// nextBackoff doubles the previous wait within its bounds, starting from floor when the
-// answer asked for one.
 func nextBackoff(prev, floor time.Duration) time.Duration {
 	next := max(minBackoff, prev*2, floor)
 	limit := maxBackoff
@@ -397,9 +369,7 @@ func nextBackoff(prev, floor time.Duration) time.Duration {
 	return min(next, max(limit, floor))
 }
 
-// jitter spreads a wait over ±20%, never below floor (a host's Retry-After). Without
-// it, every relay that lost the gateway in one outage retries on the same beat and
-// meets the recovering gateway all at once.
+// jitter spreads a wait over ±20% so relays that lost the gateway together do not return together.
 func jitter(d, floor time.Duration) time.Duration {
 	if d <= 0 {
 		return d
@@ -408,8 +378,6 @@ func jitter(d, floor time.Duration) time.Duration {
 	return max(floor, d-time.Duration(spread/2)+time.Duration(rand.Int64N(spread+1)))
 }
 
-// recoverOutbox starts a sender for every route that has files from an earlier relay, so
-// what it accepted and could not deliver leaves now.
 func (r *Relay) recoverOutbox() {
 	routes, _ := r.outbox.routes()
 	for _, rt := range routes {
@@ -430,13 +398,12 @@ func (r *Relay) recoverOutbox() {
 	}
 }
 
-// withholdQueued applies pol's content policy to a queued body before it is sent. A
-// body that no longer decodes cannot be checked against a stricter policy and is dropped.
+// withholdQueued drops a queued body that no longer decodes: it cannot be checked against a stricter policy.
 func (r *Relay) withholdQueued(sig Signal, body []byte, pol Policy) []byte {
-	if len(pol.ExcludePaths) > 0 {
+	if pol.Excludes != nil {
 		pol.IncludePrompts, pol.IncludeToolContent = false, false
 	}
-	if pol.IncludePrompts && pol.IncludeToolContent && len(pol.ExcludePaths) == 0 && !pol.RequireClaim {
+	if pol.IncludePrompts && pol.IncludeToolContent && pol.Excludes == nil && !pol.RequireClaim {
 		return body
 	}
 	var msg proto.Message
@@ -454,11 +421,11 @@ func (r *Relay) withholdQueued(sig Signal, body []byte, pol Policy) []byte {
 	if pol.RequireClaim && hasCatchAll(&part{signal: sig, msg: msg}) {
 		return nil
 	}
-	if pathExcluded(msg, pol.ExcludePaths) {
+	if pathExcluded(msg, pol.Excludes) {
 		return nil
 	}
 	unclassified := map[string]int{}
-	n := withhold(&part{signal: sig, msg: msg}, pol.IncludePrompts, pol.IncludeToolContent, unclassified)
+	n := r.rules.withhold(&part{signal: sig, msg: msg}, pol.IncludePrompts, pol.IncludeToolContent, unclassified)
 	if n == 0 && len(unclassified) == 0 {
 		return body
 	}

@@ -24,8 +24,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 )
 
-// Attempts to break the relay: each test is a way it could leak, lose, reorder or
-// misattribute a record.
+// Each test here is a way the relay could leak, lose, reorder or misattribute a record.
 
 func logsOf(session string, n int, extra ...*commonpb.KeyValue) *logspb.LogsData {
 	var recs []*logspb.LogRecord
@@ -57,8 +56,7 @@ func (u *upstream) seqs(t *testing.T) []string {
 	return out
 }
 
-// OTLP/JSON encodes trace and span ids as hex. Decoded as protobuf JSON's base64 they
-// would reach upstream as noise, and every trace join would break.
+// OTLP/JSON's hex trace and span ids reach upstream intact, not decoded as base64 noise.
 func TestRelayKeepsOTLPJSONHexIDs(t *testing.T) {
 	u := newUpstream(t)
 	f := newFixture()
@@ -85,8 +83,7 @@ func TestRelayKeepsOTLPJSONHexIDs(t *testing.T) {
 	}
 }
 
-// A record that arrives after its session was claimed must not overtake the same
-// session's records still waiting in the hold.
+// A record arriving after its session's claim does not overtake that session's held records.
 func TestRelayKeepsASessionsOrderAcrossTheHold(t *testing.T) {
 	u := newUpstream(t)
 	f := newFixture()
@@ -96,7 +93,6 @@ func TestRelayKeepsASessionsOrderAcrossTheHold(t *testing.T) {
 	f.mu.Lock()
 	f.claims["late"] = claim.Claim{ProjectID: "p1"}
 	f.mu.Unlock()
-	// Claimed now, but its first three are still held: this one must queue behind them.
 	next := logsOf("late", 1)
 	next.ResourceLogs[0].ScopeLogs[0].LogRecords[0].Attributes[1] = kv("seq", "3")
 	body, _ := proto.Marshal(next)
@@ -129,10 +125,9 @@ func TestRelayBoundsTheHoldByBytes(t *testing.T) {
 	}
 }
 
-// When the hold is full, spans of traces nothing has named go before a session's
-// records: they are mostly process-level work that never will be named.
+// A full hold evicts spans of unnamed traces before a session's records.
 func TestRelayEvictsUnnamedTracesFirst(t *testing.T) {
-	r := New(Options{Dir: t.TempDir(), Token: token, Lookup: func(string, time.Time) (claim.Claim, bool) { return claim.Claim{}, false }})
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Lookup: func(string, time.Time) (claim.Claim, bool) { return claim.Claim{}, false }})
 	big := strings.Repeat("x", 30<<20)
 	r.route(&part{signal: Traces, session: tracePrefix + "t1", msg: logsOf("x", 1, kv("blob", big)), records: 1})
 	r.route(&part{signal: Logs, session: "S", msg: logsOf("S", 1, kv("blob", big)), records: 1})
@@ -145,8 +140,7 @@ func TestRelayEvictsUnnamedTracesFirst(t *testing.T) {
 	}
 }
 
-// An agent that already names a project on its resource cannot choose where its
-// records go: the claim decides.
+// A project an agent names on its resource does not choose where its records go: the claim does.
 func TestRelayOverridesAProjectTheAgentNamed(t *testing.T) {
 	u := newUpstream(t)
 	f := newFixture()
@@ -178,7 +172,7 @@ func TestRelayReadsTheSessionFromTheResource(t *testing.T) {
 
 // A span flood with a fresh trace id each cannot grow the trace index without bound.
 func TestRelayBoundsTheTraceIndex(t *testing.T) {
-	r := New(Options{Dir: t.TempDir(), Token: token, Lookup: func(string, time.Time) (claim.Claim, bool) { return claim.Claim{}, false }, Resolve: func(claim.Claim) (Policy, error) { return Policy{}, ErrNoKey }})
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Lookup: func(string, time.Time) (claim.Claim, bool) { return claim.Claim{}, false }, Resolve: func(claim.Claim) (Policy, error) { return Policy{}, ErrNoKey }})
 	for i := range maxTraces + 10 {
 		r.learnTrace(fmt.Sprintf("%032x", i), "s")
 	}
@@ -187,13 +181,11 @@ func TestRelayBoundsTheTraceIndex(t *testing.T) {
 	}
 }
 
-// Under concurrent exports, claims landing mid-way and a stop at the end, every record
-// the relay received is accounted for exactly once: forwarded, or dropped for a
-// reason. Nothing is double counted and nothing vanishes.
+// Under concurrent exports, mid-way claims and a stop, every record is accounted for exactly once.
 func TestRelayAccountsForEveryRecordUnderLoad(t *testing.T) {
 	u := newUpstream(t)
 	f := newFixture()
-	r := New(Options{Dir: t.TempDir(),
+	r := newRelay(Options{Dir: t.TempDir(),
 		Token: token, Hold: 50 * time.Millisecond, Lookup: f.lookup,
 		Resolve: func(c claim.Claim) (Policy, error) {
 			if p, ok := allPolicies(u)[c.ProjectID]; ok {
@@ -224,7 +216,6 @@ func TestRelayAccountsForEveryRecordUnderLoad(t *testing.T) {
 			}
 		})
 	}
-	// E is claimed half-way through.
 	time.Sleep(20 * time.Millisecond)
 	f.mu.Lock()
 	f.claims["E"] = claim.Claim{ProjectID: "p2"}
@@ -250,8 +241,7 @@ func sum(c map[string]int, prefix string) int {
 	return n
 }
 
-// A stopping relay still delivers what it accepted for claimed sessions, even to a
-// slow host, within its grace.
+// A stopping relay still delivers what it accepted, even to a slow host, within its grace.
 func TestRelayDrainsOnStop(t *testing.T) {
 	var got atomic.Int64
 	slow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -267,7 +257,7 @@ func TestRelayDrainsOnStop(t *testing.T) {
 	}))
 	defer slow.Close()
 	f := newFixture()
-	r := New(Options{Dir: t.TempDir(), Token: token, Lookup: f.lookup, Grace: 5 * time.Second,
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Lookup: f.lookup, Grace: 5 * time.Second,
 		Resolve: func(claim.Claim) (Policy, error) {
 			return Policy{Endpoint: slow.URL, Key: "k", IncludePrompts: true, IncludeToolContent: true}, nil
 		}})
@@ -288,8 +278,7 @@ func TestRelayDrainsOnStop(t *testing.T) {
 	}
 }
 
-// A host that fails transiently gets each part once it recovers: retried, not lost,
-// not duplicated.
+// A host that fails transiently gets each part exactly once after it recovers.
 func TestRelayRetriesATransientFailure(t *testing.T) {
 	var calls atomic.Int64
 	var bodies sync.Map
@@ -304,7 +293,7 @@ func TestRelayRetriesATransientFailure(t *testing.T) {
 	}))
 	defer flaky.Close()
 	f := newFixture()
-	r := New(Options{Dir: t.TempDir(), Token: token, Lookup: f.lookup,
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Lookup: f.lookup,
 		Resolve: func(claim.Claim) (Policy, error) {
 			return Policy{Endpoint: flaky.URL, Key: "k", IncludePrompts: true, IncludeToolContent: true}, nil
 		}})
@@ -343,14 +332,13 @@ func TestRelayRefusesMalformedExports(t *testing.T) {
 	}
 }
 
-// FuzzDecode: whatever bytes arrive, the decoder and splitter never panic, and every
-// record lands in exactly one part.
+// FuzzDecode checks that the decoder and splitter never panic and every record lands in one part.
 func FuzzDecode(f *testing.F) {
 	seed, _ := proto.Marshal(mixedLogs())
 	f.Add(seed, false)
 	f.Add([]byte(`{"resourceLogs":[{"scopeLogs":[{"logRecords":[{"attributes":[{"key":"session.id","value":{"stringValue":"A"}}]}]}]}]}`), true)
 	f.Add([]byte(`{"resourceSpans":[{"scopeSpans":[{"spans":[{"traceId":"00","name":"x"}]}]}]}`), true)
-	r := New(Options{Dir: f.TempDir(), Token: token})
+	r := newRelay(Options{Dir: f.TempDir(), Token: token})
 	f.Fuzz(func(t *testing.T, body []byte, isJSON bool) {
 		for _, s := range []Signal{Logs, Metrics, Traces} {
 			parts, err := r.decode(s, body, isJSON)
@@ -367,16 +355,14 @@ func FuzzDecode(f *testing.F) {
 	})
 }
 
-// A session claimed by one process and resumed by another, somewhere no hook of the
-// repository runs, is not covered by the first process's claim: its records wait for
-// a claim of their own and are dropped when none comes. The claiming process's
-// records still go; a sender that cannot be resolved falls back to the session.
+// A session resumed by another process where no hook runs is not covered by the first
+// process's claim; the claiming process's records still go.
 func TestRelayClaimCoversOnlyItsProcesses(t *testing.T) {
 	u := newUpstream(t)
 	f := newFixture()
 	f.claims["A"] = claim.Claim{ProjectID: "p1", PIDs: []int{100, 101}}
 	var sender atomic.Int64
-	r := New(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
 		PeerPID: func(int) (int, bool) { pid := int(sender.Load()); return pid, pid != 0 },
 		Resolve: func(c claim.Claim) (Policy, error) { return allPolicies(u)[c.ProjectID], nil }})
 	ctx := t.Context()
@@ -391,7 +377,6 @@ func TestRelayClaimCoversOnlyItsProcesses(t *testing.T) {
 		req, _ := http.NewRequest(http.MethodPost, srv.URL+"/v1/logs", bytes.NewReader(body))
 		req.Header.Set("Authorization", "Bearer "+token)
 		req.Header.Set("Content-Type", "application/x-protobuf")
-		// A fresh connection each time, so each send is looked up anew.
 		resp, err := (&http.Client{Transport: &http.Transport{DisableKeepAlives: true}}).Do(req)
 		if err != nil {
 			t.Fatal(err)
@@ -412,14 +397,12 @@ func TestRelayClaimCoversOnlyItsProcesses(t *testing.T) {
 	}
 }
 
-// A long Codex turn exports its child spans long before the turn span that names the
-// session. A log record naming the session with the same trace id — which Codex emits
-// mid-turn — must release them, with no keyed span at all; and a trace-keyed span
-// outlives the ordinary hold while it waits.
+// A mid-turn log record naming the session and trace releases the turn's held child spans,
+// which outlive the ordinary hold while they wait.
 func TestRelayLearnsTracesFromLogs(t *testing.T) {
 	u := newUpstream(t)
 	f := newFixture()
-	r := New(Options{Dir: t.TempDir(), Token: token, Hold: time.Second, Lookup: f.lookup, Now: f.clock,
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Second, Lookup: f.lookup, Now: f.clock,
 		Resolve: func(c claim.Claim) (Policy, error) { return allPolicies(u)[c.ProjectID], nil }})
 	ctx := t.Context()
 	go r.Run(ctx)
@@ -449,8 +432,7 @@ func TestRelayLearnsTracesFromLogs(t *testing.T) {
 	})
 }
 
-// BenchmarkRelayExport measures one export of 50 log records across 5 claimed
-// sessions, through the handler, with claims read from disk as in production.
+// BenchmarkRelayExport measures one 50-record export across 5 claimed sessions, claims read from disk.
 func BenchmarkRelayExport(b *testing.B) {
 	dir := b.TempDir()
 	b.Setenv("TERMA_CONFIG_DIR", dir)
@@ -460,7 +442,7 @@ func BenchmarkRelayExport(b *testing.B) {
 	}
 	sink := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	defer sink.Close()
-	r := New(Options{Dir: b.TempDir(), Token: token, Resolve: func(claim.Claim) (Policy, error) {
+	r := newRelay(Options{Dir: b.TempDir(), Token: token, Resolve: func(claim.Claim) (Policy, error) {
 		return Policy{Endpoint: sink.URL, Key: "k", IncludePrompts: false, IncludeToolContent: false}, nil
 	}})
 	ctx := b.Context()
@@ -481,8 +463,7 @@ func BenchmarkRelayExport(b *testing.B) {
 	b.ReportMetric(float64(b.N*50)/b.Elapsed().Seconds(), "records/s")
 }
 
-// procRelay is a relay whose senders are told by the test: send(pid, ...) posts on a
-// fresh connection that PeerPID names pid.
+// procRelay is a relay whose senders the test names: send(pid, ...) posts as pid.
 type procRelay struct {
 	t      *testing.T
 	r      *Relay
@@ -495,7 +476,7 @@ type procRelay struct {
 
 func newProcRelay(t *testing.T) *procRelay {
 	pr := &procRelay{t: t, u: newUpstream(t), f: newFixture()}
-	pr.r = New(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: pr.f.lookup, Now: pr.f.clock,
+	pr.r = newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: pr.f.lookup, Now: pr.f.clock,
 		PeerPID:      func(int) (int, bool) { pid := int(pr.sender.Load()); return pid, pid != 0 },
 		ProcessAlive: func(pid int) bool { _, gone := pr.dead.Load(pid); return !gone },
 		Resolve: func(c claim.Claim) (Policy, error) {
@@ -514,7 +495,6 @@ func newProcRelay(t *testing.T) *procRelay {
 	return pr
 }
 
-// advance moves the relay's clock on and sweeps.
 func (pr *procRelay) advance(d time.Duration) {
 	pr.f.mu.Lock()
 	pr.f.now = pr.f.now.Add(d)
@@ -522,7 +502,6 @@ func (pr *procRelay) advance(d time.Duration) {
 	pr.r.sweep()
 }
 
-// exit has pid's process exit, and the relay see it past its grace.
 func (pr *procRelay) exit(pid int) {
 	pr.dead.Store(pid, true)
 	pr.r.sweep() // seen gone
@@ -542,7 +521,7 @@ func (pr *procRelay) send(pid int, path string, m proto.Message) {
 	_ = resp.Body.Close()
 }
 
-// codexMetric is a Codex-shaped metric: no session anywhere.
+// codexMetric is a metric that names no session anywhere.
 func codexMetric() *metricspb.MetricsData {
 	return &metricspb.MetricsData{ResourceMetrics: []*metricspb.ResourceMetrics{{Resource: &resourcepb.Resource{}, ScopeMetrics: []*metricspb.ScopeMetrics{{Metrics: []*metricspb.Metric{
 		{Name: "codex.turn.token_usage", Data: &metricspb.Metric_Histogram{Histogram: &metricspb.Histogram{DataPoints: []*metricspb.HistogramDataPoint{{Count: 1}}}}},
@@ -572,9 +551,8 @@ func (pr *procRelay) metricsBy(auth string) []map[string]string {
 	return out
 }
 
-// Codex's metrics name no session. While their process runs they wait; once it has
-// exited, having named exactly one session in its life — an opted-in one — they go to
-// that session's project, marked as inferred.
+// Sessionless metrics wait while their process runs, then go, marked inferred, to the one
+// claimed session it named.
 func TestRelayAttributesSessionlessMetricsOnceTheProcessExits(t *testing.T) {
 	pr := newProcRelay(t)
 	pr.send(100, "/v1/logs", logsOf("B", 1)) // B: p2, the process's one session
@@ -592,9 +570,8 @@ func TestRelayAttributesSessionlessMetricsOnceTheProcessExits(t *testing.T) {
 	}
 }
 
-// A process that named an opted-in session and an unclaimed one, or two projects' —
-// or one that never exits within the hold, like Codex's shared daemon — could have
-// made the metric for any of them: it is dropped, never guessed.
+// A process that named several sessions, or never exits within the hold, has its metrics
+// dropped, never guessed.
 func TestRelayRefusesAmbiguousProcesses(t *testing.T) {
 	pr := newProcRelay(t)
 	pr.send(200, "/v1/logs", logsOf("A", 1)) // p1
@@ -620,8 +597,7 @@ func TestRelayRefusesAmbiguousProcesses(t *testing.T) {
 	}
 }
 
-// A process whose metrics arrive before it names any session: they wait, and leave once
-// it has named its one opted-in session and exited.
+// Metrics that arrive before their process names a session wait until it names one and exits.
 func TestRelayHoldsMetricsUntilTheProcessNamesItsSession(t *testing.T) {
 	pr := newProcRelay(t)
 	pr.send(400, "/v1/metrics", codexMetric())
@@ -633,8 +609,7 @@ func TestRelayHoldsMetricsUntilTheProcessNamesItsSession(t *testing.T) {
 	waitFor(t, func() bool { return len(pr.metricsBy("Bearer key-p1")) == 1 })
 }
 
-// A span of a trace nothing ever names — Codex's process-level work — goes with its
-// process's one session once the process has exited.
+// A span of a trace nothing names goes with its process's one session once the process exits.
 func TestRelayAttributesUnnamedTracesOnceTheProcessExits(t *testing.T) {
 	pr := newProcRelay(t)
 	pr.send(500, "/v1/logs", logsOf("A", 1))
@@ -651,10 +626,8 @@ func TestRelayAttributesUnnamedTracesOnceTheProcessExits(t *testing.T) {
 	}
 }
 
-// The review's first case: a shared process (Codex Desktop's app-server) has shown one
-// claimed session, then exports spans of a trace it has not named yet — a personal
-// thread's, whose identifying record comes later. They must not leave for the claimed
-// session's project: they wait for the trace, and go where it turns out to belong.
+// A shared process that has shown one claimed session does not send an unnamed trace's
+// spans to that project: they wait for the trace and follow it.
 func TestRelayNeverAttributesAnUnnamedTraceOfARunningSharedProcess(t *testing.T) {
 	pr := newProcRelay(t)
 	pr.send(600, "/v1/logs", codexLogs("A", "Codex Desktop", 1)) // claimed, p1
@@ -668,7 +641,6 @@ func TestRelayNeverAttributesAnUnnamedTraceOfARunningSharedProcess(t *testing.T)
 	if c := pr.r.Stats().Snapshot().Counters; c["forwarded.traces"] != 0 {
 		t.Fatalf("an unnamed span of a shared process left for the claimed session's project: %v", c)
 	}
-	// The personal thread names itself on the same trace: its spans follow it, unclaimed.
 	named := &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{Resource: &resourcepb.Resource{}, ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{
 		{Name: "session_task.turn", TraceId: trace, SpanId: []byte("span0002"), Attributes: []*commonpb.KeyValue{kv("thread.id", "personal-0000-4000-8000-000000000001")}},
 	}}}}}}
@@ -679,14 +651,12 @@ func TestRelayNeverAttributesAnUnnamedTraceOfARunningSharedProcess(t *testing.T)
 	}
 }
 
-// A developer runs `terma install` moments after starting a session: its claim exists
-// before its key does. The session's parts wait, and leave once the key is there,
-// instead of being dropped on arrival.
+// A claim that lands before its key holds the session's parts until the key is there.
 func TestRelayWaitsForAKey(t *testing.T) {
 	u := newUpstream(t)
 	f := newFixture()
 	var keyed atomic.Bool
-	r := New(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
 		Resolve: func(c claim.Claim) (Policy, error) {
 			if c.ProjectID == "p3" && keyed.Load() {
 				return Policy{Endpoint: u.srv.URL, Key: "key-p3"}, nil
@@ -708,9 +678,8 @@ func TestRelayWaitsForAKey(t *testing.T) {
 	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["forwarded.logs"] == 2 })
 }
 
-// A Codex Desktop thread exports its start at thread/start, and its first hook fires
-// at its first turn, however long after: the start waits past the ordinary hold for
-// that claim, and still leaves; an unclaimed one is dropped when the trace hold ends.
+// A conversation start waits past the ordinary hold for its first turn's claim; an
+// unclaimed one is dropped when the trace hold ends.
 func TestRelayConversationStartWaitsForTheFirstTurn(t *testing.T) {
 	pr := newProcRelay(t)
 	pr.f.mu.Lock()
@@ -741,22 +710,16 @@ func TestRelayConversationStartWaitsForTheFirstTurn(t *testing.T) {
 	}
 }
 
-// codexStart is a Codex conversation start for session, with its policies.
 func codexStart(session, originator, approval, sandbox string) *logspb.LogsData {
 	return logsOf(session, 1, kv("originator", originator), kv("event.name", "codex.conversation_starts"), kv("approval_policy", approval), kv("sandbox_policy", sandbox))
 }
 
-// codexLogs is a Codex-shaped log export for session, from client originator.
 func codexLogs(session, originator string, n int) *logspb.LogsData {
 	return logsOf(session, n, kv("originator", originator))
 }
 
-// The review's second case: nothing about a conversation start proves it is Codex's own
-// work — approval "never" in a read-only sandbox is a developer's `codex -a never -s
-// read-only` as much as the TUI's title generator — and no client name proves a process
-// serves one repository. An unclaimed conversation is never adopted, whatever its
-// policies, client or neighbours; and its process, having named two sessions, has its
-// metrics dropped.
+// An unclaimed conversation is never adopted, whatever its policies, client or neighbours,
+// and its process, having named two sessions, has its metrics dropped.
 func TestRelayAdoptsNothing(t *testing.T) {
 	pr := newProcRelay(t)
 	pr.send(700, "/v1/logs", codexLogs("A", "codex-tui", 1))                            // claimed, p1
@@ -797,8 +760,7 @@ func TestRelayRoutesEachRunOfAResumedSession(t *testing.T) {
 	if len(byAuth["Bearer key-p1"]) != 1 || len(byAuth["Bearer key-p2"]) != 2 {
 		t.Fatalf("p1 got %d, p2 got %d", len(byAuth["Bearer key-p1"]), len(byAuth["Bearer key-p2"]))
 	}
-	// A process neither run named — the session resumed where no bound repository's
-	// hook ran — is held and dropped, as ever.
+	// A process neither run named is held and dropped.
 	pr.send(300, "/v1/logs", logsOf("R", 1))
 	pr.f.mu.Lock()
 	pr.f.now = pr.f.now.Add(2 * time.Minute)
@@ -806,15 +768,13 @@ func TestRelayRoutesEachRunOfAResumedSession(t *testing.T) {
 	waitFor(t, func() bool { return pr.r.Stats().Snapshot().Counters["dropped.uncovered_process.logs"] == 1 })
 }
 
-// Global mode: a session no hook claimed, and a record naming no session at all, go to
-// the selected team's project immediately, under its capture policy. Claims and
-// process attribution do not narrow global coverage.
+// In global mode unclaimed and sessionless records go to the team's project at once.
 func TestRelayCatchAllInGlobalMode(t *testing.T) {
 	u := newUpstream(t)
 	f := newFixture()
 	policies := allPolicies(u)
 	policies["p-default"] = Policy{Endpoint: u.srv.URL, Key: "key-default", IncludePrompts: true, IncludeToolContent: true}
-	r := New(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
 		CatchAll: func() (claim.Claim, bool) { return claim.Claim{ProjectID: "p-default"}, true },
 		Resolve: func(c claim.Claim) (Policy, error) {
 			if p, ok := policies[c.ProjectID]; ok {
@@ -848,16 +808,14 @@ func TestRelayCatchAllInGlobalMode(t *testing.T) {
 	}
 }
 
-// The heartbeat is the organization's: it goes every period, whatever the relay
-// delivered, through HeartbeatSend and never to a project's host, with no project on it.
-// It says the machine's facts, the agent builds seen and the relay's counters, and
-// nothing any session said.
+// The heartbeat goes every period through HeartbeatSend, never to a project's host, and
+// carries the machine's facts and counters but nothing any session said.
 func TestRelayHeartbeat(t *testing.T) {
 	u := newUpstream(t)
 	f := newFixture()
 	var mu sync.Mutex
 	var beats []*logspb.LogsData
-	r := New(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock, Version: "v9.9.9",
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock, Version: "v9.9.9",
 		HeartbeatEvery: time.Minute,
 		HeartbeatInfo: func() map[string]any {
 			return map[string]any{"terma.version": "v9.9.9", "terma.mode": "repo", "terma.agents": []string{"claude", "codex"}}
@@ -894,7 +852,6 @@ func TestRelayHeartbeat(t *testing.T) {
 	f.now = f.now.Add(time.Minute)
 	f.mu.Unlock()
 	waitFor(t, func() bool { return count() == 2 })
-	// And on, with nothing delivered.
 	f.mu.Lock()
 	f.now = f.now.Add(time.Minute)
 	f.mu.Unlock()
@@ -939,7 +896,6 @@ func TestRelayHeartbeat(t *testing.T) {
 			t.Errorf("heartbeat has no %s", k)
 		}
 	}
-	// Nothing of it went to a project's host.
 	byAuth, _ := u.logs(t)
 	for auth, recs := range byAuth {
 		for _, l := range recs {
@@ -950,14 +906,13 @@ func TestRelayHeartbeat(t *testing.T) {
 	}
 }
 
-// A failed sender lookup is tried again at the connection's next export, not kept for
-// the connection's life: the socket may not have been in the kernel's table yet.
+// A failed sender lookup is retried at the connection's next export, not kept for its life.
 func TestRelayRetriesAFailedSenderLookup(t *testing.T) {
 	u := newUpstream(t)
 	f := newFixture()
 	f.claims["A"] = claim.Claim{ProjectID: "p1", PIDs: []int{101}}
 	var lookups atomic.Int32
-	r := New(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
 		PeerPID: func(int) (int, bool) {
 			if lookups.Add(1) == 1 {
 				return 0, false
@@ -983,9 +938,7 @@ func TestRelayRetriesAFailedSenderLookup(t *testing.T) {
 		_, _ = io.Copy(io.Discard, resp.Body)
 		_ = resp.Body.Close()
 	}
-	// The first export's sender was unknown: it waits, and is dropped when its hold runs
-	// out (loss, never a widened claim). The second found the sender, which the claim
-	// covers.
+	// The first export's unknown sender is dropped, never a widened claim; the second is covered.
 	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["forwarded.logs"] >= 1 })
 	if n := lookups.Load(); n != 2 {
 		t.Fatalf("looked up %d times, want a retry after the failure", n)

@@ -24,10 +24,8 @@ func TestAncestorsStartAtTheParent(t *testing.T) {
 	}
 }
 
-// A child process connects to a listener here; FindSender names the child — not this
-// process, which holds the server end of the same connection. This is also what pins
-// the proc_info layout on macOS, and the TCP table's on Windows, against a real socket.
-// The child is this test binary (TestMain), so no platform needs a netcat.
+// FindSender names a child connecting here, not this process; it pins the platform
+// layouts against a real socket.
 func TestFindSenderNamesTheConnectingProcess(t *testing.T) {
 	if !Supported {
 		t.Skip("unsupported")

@@ -37,7 +37,7 @@ coverage.
 | Per-repository route (Claude) | `install-content` / `install-redacted`: `terma install` points Claude's user-level exporter at the local relay, which forwards the repository's claimed session to the receiver under the project's policy — install's default (prompts and responses sent), and `--prompts off --exclude-tool-content`, which the relay withholds. |
 | Failures | Claude HTTP 400: native API-error fields, ERROR request span and StopFailure delivery |
 
-`live/golden/{claude,codex}/telemetry-{content,redacted}.json` lists the required
+`test/live/golden/{claude,codex}/telemetry-{content,redacted}.json` lists the required
 field names per controlled log/span/metric surface. Every matching record is
 checked, so a healthy first record cannot mask a later record missing fields.
 Missing surfaces, missing baseline files and disappeared fields fail on every

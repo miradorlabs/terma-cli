@@ -71,9 +71,8 @@ type refreshed struct {
 	Version string `json:"version"`
 }
 
-// NeedsRefresh reports whether version is a release newer than the one that last
-// refreshed the files terma installed on this machine. Only upward: two builds side by
-// side on PATH must not take turns rewriting each other's files.
+// NeedsRefresh reports whether version is a release newer than the last refresh's; only
+// upward, so two builds on PATH never take turns rewriting files.
 func NeedsRefresh(dir, version string) bool {
 	if !IsRelease(version) {
 		return false
@@ -85,8 +84,7 @@ func NeedsRefresh(dir, version string) bool {
 	return !IsRelease(last.Version) || Newer(last.Version, version)
 }
 
-// SaveRefreshed records version as the one that last refreshed this machine. A build
-// that is not a release records nothing.
+// SaveRefreshed records version, when it is a release, as the last to refresh this machine.
 func SaveRefreshed(dir, version string) error {
 	if !IsRelease(version) {
 		return nil
@@ -94,8 +92,7 @@ func SaveRefreshed(dir, version string) error {
 	return config.WriteJSON(filepath.Join(dir, refreshedFile), refreshed{Version: version}, 0600)
 }
 
-// Lock serializes checks and replacements across simultaneous CLI processes.
-// It returns immediately when another update is already running.
+// Lock serializes update checks and replacements, failing at once when another holds it.
 func Lock(dir string) (func(), error) {
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return nil, err
@@ -127,18 +124,6 @@ func (c *Client) cachedCheck(ctx context.Context, dir, current string) (Cache, *
 	return cache, release
 }
 
-// Notice returns an available-update message. Successful lookups are cached for
-// a day; failed lookups retry after 15 minutes.
-func (c *Client) Notice(ctx context.Context, dir, current string) string {
-	if !IsRelease(current) {
-		return ""
-	}
-	cache, _ := c.cachedCheck(ctx, dir, current)
-	return notice(cache, current)
-}
-
-// notice names `terma update` for every installation: it upgrades a package-managed one
-// through its package manager.
 func notice(cache Cache, current string) string {
 	if !Newer(current, cache.Latest) {
 		return ""
@@ -146,8 +131,8 @@ func notice(cache Cache, current string) string {
 	return fmt.Sprintf("A newer terma is available (%s → %s). Run `terma update`.", current, cache.Latest)
 }
 
-// Maintain checks for updates after a human-facing command. Errors never change the
-// command's result. Automatic replacement requires a saved opt-in and a release build.
+// Maintain checks for updates after a human-facing command, replacing the binary only
+// for a release build with a saved opt-in; errors never change the command's result.
 func (c *Client) Maintain(ctx context.Context, dir, exe string, out io.Writer) {
 	if !IsRelease(c.Version) {
 		return

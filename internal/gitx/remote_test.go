@@ -5,8 +5,7 @@ import (
 	"testing"
 )
 
-// A remote is emitted as telemetry, so anything that could carry a secret has to
-// be stripped before it leaves the machine.
+// A remote leaves the machine as telemetry, so anything that could carry a secret is stripped.
 func TestNormalizeRemoteStripsCredentials(t *testing.T) {
 	for _, tc := range []struct{ name, in, want string }{
 		{

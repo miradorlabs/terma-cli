@@ -52,9 +52,9 @@ The ordinary Go suite covers:
 Run the focused suite with:
 
 ```sh
-TMPDIR=/private/tmp go test ./internal/harness ./internal/hookrun
-TMPDIR=/private/tmp go test -race ./internal/harness ./internal/hookrun
-TMPDIR=/private/tmp go test ./internal/hookrun -run '^$' \
+TMPDIR=/private/tmp go test ./internal/agents/claude
+TMPDIR=/private/tmp go test -race ./internal/agents/claude
+TMPDIR=/private/tmp go test ./internal/agents/claude -run '^$' \
   -fuzz FuzzStatusLineIndicatorPreservesRendererBytes -fuzztime 5s -parallel 2
 ```
 

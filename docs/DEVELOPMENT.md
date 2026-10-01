@@ -15,7 +15,7 @@ make release-dry-run  # goreleaser snapshot, nothing published
 make test-install     # what CI runs: a tagged goreleaser render, then install.sh (and the cask on macOS) over loopback
 ```
 
-One test: `TERMA_ENV=dev go test ./internal/hookrun/ -run TestName`. The Makefile sets
+One test: `TERMA_ENV=dev go test ./internal/hooks/hookrun/ -run TestName`. The Makefile sets
 `TERMA_ENV=dev` for everything it runs; outside it, set it yourself — `terma install` and
 `terma setup` sign in, and a bare run that reaches them opens a browser login on
 production (see [Working against the dev backend](#working-against-the-dev-backend)).
@@ -24,7 +24,7 @@ The linter's version lives in `.golangci-lint-version`, which CI reads too. `mak
 builds it from source rather than using one from your PATH, because a released
 golangci-lint refuses a module whose `go` directive is newer than the Go it was built with.
 Test files are linted, and exported identifiers need a doc comment. The OpenCode plugin is driven the
-way OpenCode would with `bun test internal/harness/opencode`; `make check` runs it when
+way OpenCode would with `bun test internal/agents/opencode/plugin`; `make check` runs it when
 bun is present.
 
 Go 1.27, no CGO. Packages under `internal/`: `hookmgr` (what install writes),

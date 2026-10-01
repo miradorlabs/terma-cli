@@ -5,8 +5,7 @@ import (
 	"strings"
 )
 
-// HasExcludedPath checks structured file/path fields, including JSON tool input.
-// Free text without source paths cannot establish that file content is permitted.
+// HasExcludedPath reports whether any path-like field, including JSON in a string, is excluded.
 func (p Policy) HasExcludedPath(value any, root string) bool {
 	var walk func(any, bool) bool
 	walk = func(v any, isPath bool) bool {

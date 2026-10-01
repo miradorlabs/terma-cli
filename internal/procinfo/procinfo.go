@@ -1,8 +1,6 @@
-// Package procinfo answers the two questions the local relay needs about processes:
-// which processes a hook runs under (its ancestors — the agent is one of them), and
-// which process owns the other end of a loopback connection (the agent exporting).
-// Together they tie a session's claim to the agent process that made it, so the same
-// session resumed later by another process somewhere else is not covered by it.
+// Package procinfo tells the local relay which processes a hook runs under, which
+// process owns the other end of a loopback connection, and whether a process still
+// runs, so a claim covers only the agent process that made it.
 package procinfo
 
 import "os"
@@ -11,8 +9,7 @@ import "os"
 const maxDepth = 32
 
 // Ancestors returns the calling process's ancestors, nearest first, stopping before
-// pid 1 (launchd or init, the ancestor of everything, which would match any sender).
-// It returns what it could walk; an error part-way ends the list, never the caller.
+// pid 1, which would match any sender.
 func Ancestors() []int {
 	var out []int
 	pid := os.Getppid()
@@ -30,13 +27,8 @@ func Ancestors() []int {
 	return out
 }
 
-// FindSender returns the process holding the client end of a loopback connection
-// that arrived from port, from the kernel, never a subprocess: on macOS and Linux by
-// looking at every process this user may inspect (others refuse, and are skipped),
-// about 3 ms over 900 processes on macOS; on Windows from the TCP table, which names
-// each connection's owner. The relay runs it once per connection, when the
-// connection's first export arrives — while the socket still exists, so a record held
-// for a claim that comes later keeps its sender.
+// FindSender returns the process holding the client end of a loopback connection from
+// port, asking the kernel (about 3 ms over 900 processes on macOS), never a subprocess.
 func FindSender(port int) (pid int, ok bool) {
 	if !Supported {
 		return 0, false

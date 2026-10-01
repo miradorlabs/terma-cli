@@ -169,8 +169,7 @@ func TestExtractBinaryReadsWindowsZip(t *testing.T) {
 	}
 }
 
-// Windows cannot replace a running executable, but can rename it: the old one steps
-// aside to .old (a previous .old is removed first) and the new one takes its name.
+// On Windows the old executable steps aside to .old (replacing a previous one) first.
 func TestSwapExecutableMovesTheRunningOneAsideOnWindows(t *testing.T) {
 	dir := t.TempDir()
 	exe, next := filepath.Join(dir, "terma.exe"), filepath.Join(dir, ".terma-update-1")
@@ -199,20 +198,18 @@ func TestNoticeUsesCache(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 	c := &Client{HTTP: srv.Client(), BaseURL: srv.URL, Version: "1.0.0"}
-	if msg := c.Notice(context.Background(), dir, "1.0.0"); !strings.Contains(msg, "2.0.0") {
+	if msg := noticeOf(c, context.Background(), dir, "1.0.0"); !strings.Contains(msg, "2.0.0") {
 		t.Fatalf("expected a notice, got %q", msg)
 	}
-	if msg := c.Notice(context.Background(), dir, "1.0.0"); !strings.Contains(msg, "2.0.0") || calls != 1 {
+	if msg := noticeOf(c, context.Background(), dir, "1.0.0"); !strings.Contains(msg, "2.0.0") || calls != 1 {
 		t.Fatalf("second notice should come from the cache (calls=%d): %q", calls, msg)
 	}
-	if msg := c.Notice(context.Background(), dir, "2.0.0"); msg != "" {
+	if msg := noticeOf(c, context.Background(), dir, "2.0.0"); msg != "" {
 		t.Fatalf("up to date should be silent, got %q", msg)
 	}
 }
 
-// A local build can never be told it is out of date, so it must not ask. It used to:
-// the lookup ran first and Newer discarded the answer, which put a live request — three
-// seconds of timeout when offline — behind every command of every dev build and test.
+// A local build never looks up the latest release: it can never be out of date.
 func TestNoticeAsksNothingForABuildThatIsNotARelease(t *testing.T) {
 	calls := 0
 	mux := http.NewServeMux()
@@ -224,7 +221,7 @@ func TestNoticeAsksNothingForABuildThatIsNotARelease(t *testing.T) {
 	defer srv.Close()
 	c := &Client{HTTP: srv.Client(), BaseURL: srv.URL}
 	for _, version := range []string{"dev", "", "1.2.3-next", "v1.2.3-next"} {
-		if msg := c.Notice(context.Background(), t.TempDir(), version); msg != "" {
+		if msg := noticeOf(c, context.Background(), t.TempDir(), version); msg != "" {
 			t.Errorf("%q: got a notice: %q", version, msg)
 		}
 	}

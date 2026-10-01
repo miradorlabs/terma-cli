@@ -33,7 +33,7 @@ Restart running agents after installation so they load the new configuration.
 Codex desktop uses a separate backend from the `codex` shell command. Select
 **Codex Desktop** in `terma setup` (or use `--harness codex-desktop` with
 `terma install`). Install then configures repository hooks and a local project
-route. Trust the hooks in the app and check `terma desktop status` from that repository.
+route. Trust the hooks in the app and check `terma agent status codex-desktop` from that repository.
 See [Codex desktop telemetry](docs/CODEX-DESKTOP-TELEMETRY.md).
 
 Then verify the installation:
@@ -228,8 +228,24 @@ shell completion, configuration, hook execution, the local relay, and spool main
 available as hidden commands for automation and troubleshooting. Run
 `terma <command> --help` for details.
 
+## Architecture
+
+terma is one binary with three roles:
+
+- the **command line** (`internal/cli`), which `cmd/terma` starts;
+- the **hooks** that coding agents and git run (`terma hook <event>`, `internal/hooks`);
+- a **local relay daemon** (`terma relay run`, `internal/relay`). It forwards an
+  agent's own telemetry only for sessions an opted-in repository claimed.
+
+Each coding agent is a plugin: one package under `internal/agents/<name>`, behind the
+interfaces in `internal/agents`, and registered in `internal/agents/builtin`. Nothing
+else names an agent, and `internal/boundary` tests that this holds.
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) has the diagram, the package map and every
+rule the tests enforce.
+
 ## Documentation
 
+- [Architecture](docs/ARCHITECTURE.md) — the command line, the hooks, the relay daemon, agents as plugins, and the boundaries the tests hold
 - [Configuration and authentication](docs/CONFIGURATION.md) — profiles, credentials, project routing, export scope, and environment variables
 - [Instrumentation guide](docs/INSTRUMENTATION.md) — hooks, commit stamping, queues, status lines, and hook managers
 - [Insights](docs/INSIGHTS.md) — usage, sessions, principals, filters, and machine-readable output

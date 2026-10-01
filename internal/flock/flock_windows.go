@@ -11,8 +11,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// Windows locks with LockFileEx on the first byte, polled without blocking for the
-// same reason flock is on Unix: a blocked lock cannot be cancelled.
+// Windows locks the first byte with LockFileEx, polled because a blocked lock cannot be cancelled.
 
 func lockFile(f *os.File) error {
 	var ol windows.Overlapped

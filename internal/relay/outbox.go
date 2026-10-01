@@ -22,16 +22,13 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 )
 
-// The outbox is plain files, one part each, so a crash at any point leaves a whole file
-// or none (config.WriteFileAtomicNoSync: a temporary ".tmp-" file renamed into place):
+// The outbox is plain files, one part each, renamed into place so a crash leaves a whole file or none:
 //
 //	<dir>/<project>/<tool>/<received>-<seq>-<signal>-<records>.pb   accepted, not yet delivered
 //	<dir>/.dead/<project>-<tool>-<name>                             refused by the host
 //
-// <received> is Unix nanoseconds, zero-padded, so a name sort is arrival order. The
-// bodies are protobuf OTLP with the project's content policy already applied: nothing
-// is written for a session no hook claimed. Unsynced writes: a process crash loses
-// nothing, a power cut can lose the last few seconds.
+// <received> is zero-padded Unix nanoseconds, so a name sort is arrival order. Only claimed
+// parts, already filtered, are written; unsynced, so a power cut can lose the last seconds.
 
 const (
 	deadDir  = ".dead"
@@ -39,8 +36,7 @@ const (
 	pbSuffix = ".pb"
 )
 
-// Bounds on the outbox. A machine offline for weeks, or a project whose key is refused
-// for good, fills it; these keep it from filling the disk.
+// A machine offline for weeks, or a key refused for good, would otherwise fill the disk.
 const (
 	maxOutboxBytes = 256 << 20
 	maxDeadBytes   = 32 << 20
@@ -70,7 +66,6 @@ func (rt route) toolLabel() string {
 
 func (rt route) String() string { return rt.project + "/" + rt.tool }
 
-// entry is one queued part, named by its file.
 type entry struct {
 	name    string
 	signal  Signal
@@ -84,7 +79,6 @@ func newEntry(now time.Time, sig Signal, records int) entry {
 	return entry{name: fmt.Sprintf("%020d-%06d-%s-%d%s", now.UnixNano(), n, sig, records, pbSuffix), signal: sig, records: records}
 }
 
-// parseEntry reads an entry back from its file name; false for anything else there.
 func parseEntry(name string) (entry, bool) {
 	stem, ok := strings.CutSuffix(name, pbSuffix)
 	if !ok || strings.HasPrefix(name, ".") {
@@ -131,7 +125,6 @@ func (o outbox) put(rt route, e entry, body []byte) error {
 	return config.WriteFileAtomicNoSync(filepath.Join(dir, e.name), body, 0o600)
 }
 
-// list is rt's queued parts, oldest first; an absent directory is empty.
 func (o outbox) list(rt route) ([]entry, error) {
 	des, err := os.ReadDir(o.routeDir(rt))
 	if errors.Is(err, fs.ErrNotExist) {
@@ -163,7 +156,6 @@ func (o outbox) remove(rt route, batch []entry) {
 	}
 }
 
-// bury moves a refused part to .dead/, where the janitor bounds it.
 func (o outbox) bury(rt route, e entry) {
 	dead := filepath.Join(o.dir, deadDir)
 	src := filepath.Join(o.routeDir(rt), e.name)
@@ -172,7 +164,6 @@ func (o outbox) bury(rt route, e entry) {
 	}
 }
 
-// routes lists every route with a directory in the outbox.
 func (o outbox) routes() ([]route, error) {
 	projects, err := os.ReadDir(o.dir)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -200,7 +191,6 @@ func (o outbox) routes() ([]route, error) {
 	return out, nil
 }
 
-// queued is one file the janitor weighs.
 type queued struct {
 	rt    route
 	e     entry
@@ -209,10 +199,8 @@ type queued struct {
 	mtime time.Time
 }
 
-// sweepOutbox enforces the bounds: parts older than maxOutboxAge go, then the oldest
-// until the outbox fits maxOutboxBytes, each counted as dropped under its reason; then
-// the oldest refused parts until .dead/ fits maxDeadBytes. It returns the routes whose
-// parts it removed, whose senders' counts must be told.
+// sweepOutbox enforces the bounds, oldest first, and returns how many parts it removed per
+// route so their senders' counts stay right.
 func (r *Relay) sweepOutbox(now time.Time) map[route]int {
 	o := r.outbox
 	routes, _ := o.routes()
@@ -276,7 +264,6 @@ func (r *Relay) sweepOutbox(now time.Time) map[route]int {
 	return removed
 }
 
-// mergeBodies joins parts of one signal into one export: their resources side by side.
 func mergeBodies(sig Signal, bodies [][]byte) ([]byte, error) {
 	switch sig {
 	case Logs:
@@ -312,10 +299,10 @@ func mergeBodies(sig Signal, bodies [][]byte) ([]byte, error) {
 	}
 }
 
-// OutboxDir is the outbox's directory under the relay directory.
+// OutboxDir is the outbox's directory name under the relay directory.
 const OutboxDir = "outbox"
 
-// Queued is what waits in the outbox for one project, as `terma relay status` shows it.
+// Queued is what waits in the outbox for one route.
 type Queued struct {
 	Project string
 	Tool    string
@@ -323,7 +310,7 @@ type Queued struct {
 	Records int
 }
 
-// Backlog lists what waits in the outbox at dir for delivery, by route.
+// Backlog lists what waits in the outbox at dir, by route.
 func Backlog(dir string) []Queued {
 	o := outbox{dir}
 	routes, _ := o.routes()

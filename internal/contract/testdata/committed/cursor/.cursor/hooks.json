@@ -1,0 +1,67 @@
+{
+  "hooks": {
+    "afterAgentResponse": [
+      {
+        "command": "command -v terma >/dev/null 2>&1 && terma hook cursor-after-agent-response || true",
+        "timeout": 10
+      }
+    ],
+    "afterFileEdit": [
+      {
+        "command": "command -v terma >/dev/null 2>&1 && terma hook cursor-file-edit || true",
+        "timeout": 10
+      }
+    ],
+    "beforeSubmitPrompt": [
+      {
+        "command": "command -v terma >/dev/null 2>&1 && terma hook cursor-before-submit-prompt || true",
+        "timeout": 10
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": "command -v terma >/dev/null 2>&1 && terma hook cursor-post-tool-use || true",
+        "timeout": 10
+      }
+    ],
+    "postToolUseFailure": [
+      {
+        "command": "command -v terma >/dev/null 2>&1 && terma hook cursor-post-tool-use-failure || true",
+        "timeout": 10
+      }
+    ],
+    "preCompact": [
+      {
+        "command": "command -v terma >/dev/null 2>&1 && terma hook cursor-pre-compact || true",
+        "timeout": 10
+      }
+    ],
+    "sessionEnd": [
+      {
+        "command": "command -v terma >/dev/null 2>&1 && terma hook cursor-session-end || true",
+        "timeout": 10
+      }
+    ],
+    "sessionStart": [
+      {
+        "command": "command -v terma >/dev/null 2>&1 && terma hook cursor-session-start || true",
+        "timeout": 10
+      }
+    ],
+    "stop": [
+      {
+        "command": "command -v terma >/dev/null 2>&1 && terma hook cursor-stop || true",
+        "timeout": 10,
+        "loop_limit": null
+      }
+    ],
+    "subagentStop": [
+      {
+        "command": "command -v terma >/dev/null 2>&1 && terma hook cursor-subagent-stop || true",
+        "timeout": 10,
+        "loop_limit": null
+      }
+    ]
+  },
+  "version": 1
+}

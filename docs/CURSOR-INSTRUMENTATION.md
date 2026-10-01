@@ -161,7 +161,7 @@ associate costs with a session; without a generation/request join they cannot
 prove the cost of each user turn. Timestamp allocation is an estimate. Neither
 account email, OAuth/API authentication, context occupancy, nor a zero/missing
 charge proves that subscription allowance rather than credits paid. Keep model
-reference value, credits consumed and invoiced charges separate. The standalone [billing importer](../pocs/cursor-billing/README.md) reads these
+reference value, credits consumed and invoiced charges separate. A standalone billing importer, kept outside this repository, reads these
 records for a future platform worker; it is independent of the Terma CLI and hooks.
 
 ## Verification and sources
@@ -185,10 +185,10 @@ records for a future platform worker; it is independent of the Terma CLI and hoo
 Unit tests exercise two generations with identical usage, changes within a turn,
 missing/zero/invalid values, private-content exclusion, concurrent capture,
 crash replay, failed append recovery, corrupt state and install/uninstall merging.
-The synthetic `live/TestCursorHookDelivery` passed on 2026-09-16 through the
+The synthetic ``TestCursorHookDelivery` (test/live/cursor_test.go)` passed on 2026-09-16 through the
 installed shims, rebuilt Terma binary and loopback OTLP receiver, including the
 kill switch and explicit zero preservation. The opt-in
-`live/TestCursorCLITurnObservations` covers two authenticated headless CLI turns,
+``TestCursorCLITurnObservations` (test/live/cursor_test.go)` covers two authenticated headless CLI turns,
 raw-hook-to-OTLP preservation and commit attribution. It skips without a CLI key;
 an offline pass is not an authenticated provider compatibility result.
 
@@ -231,7 +231,7 @@ above. The reusable importer described below has since been implemented.
 
 ## Reusable platform importer (2026-09-16)
 
-`pocs/cursor-billing` is a standalone Go module with injected credentials and
+The importer is a standalone Go module, kept outside this repository, with injected credentials and
 explicit tenant/connection scope. It reads members, paginated spending and
 paginated usage, retaining decimal precision, provider timestamps, raw records
 and unknown values. The platform owns key entry/storage, scheduling and atomic
@@ -245,7 +245,6 @@ CLI responses. Both events were `Included in Business`, yet had nonzero
 There is no authoritative generation join here; matching token tuples in this
 controlled case must not become a production per-turn matching heuristic.
 
-See the [integration/persistence contract](../pocs/cursor-billing/README.md).
 Dashboard comparison of tier/seat/percentage/limit semantics is still pending;
 no allowance denominator, reset date, seat price or credit balance is invented.
 

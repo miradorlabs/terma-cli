@@ -9,8 +9,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
-// A writer may resolve its store before git init and write after a newer hook.
-// Both handles must address the same lock and files, even with no prior events.
+// A store resolved before git init and one resolved after address the same files.
 func TestStateDirKeepsInFlightWritersTogether(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	root := t.TempDir()

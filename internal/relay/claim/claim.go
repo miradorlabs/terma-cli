@@ -1,9 +1,6 @@
 // Package claim is how hooks tell the local relay which sessions belong to an opted-in
-// repository. A hook in a repository with a project binding writes one small file per
-// session; the relay forwards an agent's telemetry only for sessions it finds here.
-//
-// It is its own package, with no OTLP dependency, because every hook imports it and
-// the hook path has a latency budget; the relay is the only reader.
+// repository: one small file per session. It has no OTLP dependency because every hook
+// imports it and the hook path has a latency budget.
 package claim
 
 import (
@@ -12,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -20,9 +16,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
-// DirName is the relay's directory under the config dir. It holds the claims, the
-// local token the agents' exporters present, the address the relay listens on, its
-// single-instance lock and the stats it leaves behind.
+// DirName is the relay's directory under the config dir.
 const DirName = "relay"
 
 const (
@@ -30,36 +24,25 @@ const (
 	tokenFile = "token"
 )
 
-// TTL is how long a claim stays valid after its last write. A hook refreshes it on
-// every event of a live session (see Refresh), so a session idle this long has ended;
-// it matches the hooks' ActiveTTL.
+// TTL is how long a claim stays valid after its last write; it matches the hooks' ActiveTTL.
 const TTL = 4 * time.Hour
 
-// Refresh is how old a claim may be before a hook rewrites it. Below it a hook only
-// stats the file, so a session's hundreds of tool calls cost one write every few
-// minutes, not one each.
+// Refresh is how old a claim may be before a hook rewrites it, so hundreds of tool calls cost
+// one write every few minutes.
 const Refresh = 5 * time.Minute
 
-// Claim says which project a session's telemetry belongs to. Its top-level fields are
-// the session's latest placement; Placements keeps the earlier ones too.
+// Claim says which project a session's telemetry belongs to; its top-level fields are the latest placement.
 type Claim struct {
 	ProjectID string    `json:"project_id"`
 	Tool      string    `json:"tool,omitempty"`
 	Repo      string    `json:"repo,omitempty"`
 	Worktree  string    `json:"worktree,omitempty"`
 	ClaimedAt time.Time `json:"claimed_at"`
-	// PIDs are the processes the claiming hooks ran under: the agent is one of them.
-	// The relay forwards a record only from a process named here, so the same session
-	// resumed by another process elsewhere — where no hook of this repository runs —
-	// is not covered. Every hook of the session adds its own; the most recent maxPIDs
-	// are kept. Empty (a platform where they cannot be read) matches any sender.
+	// PIDs are the processes the claiming hooks ran under, so a session resumed by another
+	// process where no hook runs is not covered. Empty matches any sender.
 	PIDs []int `json:"pids,omitempty"`
-	// Placements are where the session has run, oldest first, the last being the
-	// top-level fields. A session keeps its id across `claude --resume` and `codex
-	// resume` in any directory: resumed in another bound repository, it gets a second
-	// placement, and the first run's records — from its own processes, or stamped before
-	// the move — still go to the first run's project, however late they arrive. Empty in
-	// a claim an earlier build wrote: the top-level fields are then its one placement.
+	// Placements are where the session has run, oldest first: an agent can keep a session id
+	// across resumes in another repository, and the first run's late records stay its own.
 	Placements []Placement `json:"placements,omitempty"`
 }
 
@@ -73,11 +56,9 @@ type Placement struct {
 	Since     time.Time `json:"since"`
 }
 
-// maxPIDs bounds a claim's process list: a few runs of one session, each with its
-// chain of ancestors.
+// maxPIDs allows a few runs of one session, each with its chain of ancestors.
 const maxPIDs = 64
 
-// maxPlacements bounds a session's placement history.
 const maxPlacements = 8
 
 // Covers reports whether pid may send under this claim's latest placement.
@@ -85,10 +66,8 @@ func (c Claim) Covers(pid int) bool {
 	return covers(c.PIDs, pid)
 }
 
-// covers reports whether a placement naming pids covers a record pid sent. A placement
-// that names none (a platform where a hook cannot read its processes) covers any
-// sender; one that names some covers only those — never a sender the relay could not
-// identify (pid 0), which would otherwise let a session resumed elsewhere through.
+// covers never admits an unidentified sender (pid 0) to a placement that names
+// processes, which would let a session resumed elsewhere through.
 func covers(pids []int, pid int) bool {
 	if len(pids) == 0 {
 		return true
@@ -103,11 +82,8 @@ func (c Claim) placements() []Placement {
 	return []Placement{{ProjectID: c.ProjectID, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree, PIDs: c.PIDs}}
 }
 
-// At is the claim as it applies to a record pid sent, stamped at (zero: unknown): the
-// placement whose processes include pid — the latest to start by at, when several do
-// (one process serving more than one run, such as Codex's app-server) — as a claim of
-// its own. False when no placement covers pid: the session was resumed by a process
-// no hook of a bound repository ran under.
+// At is the claim as it applies to a record pid sent at time at: the covering placement
+// latest to start by at. False when no placement covers pid.
 func (c Claim) At(pid int, at time.Time) (Claim, bool) {
 	var best *Placement
 	all := c.placements()
@@ -116,8 +92,6 @@ func (c Claim) At(pid int, at time.Time) (Claim, bool) {
 		if !covers(p.PIDs, pid) {
 			continue
 		}
-		// A later placement that had started by the record's time wins; with no time,
-		// the latest does.
 		if best == nil || at.IsZero() || !p.Since.After(at) {
 			best = p
 		}
@@ -138,8 +112,7 @@ func Dir() (string, error) {
 	return filepath.Join(base, DirName), nil
 }
 
-// Enabled reports whether this machine exports through the relay: `terma relay setup`
-// wrote its token. Without it hooks write no claims — nothing would read them.
+// Enabled reports whether `terma relay setup` wrote the relay's token; without it hooks write no claims.
 func Enabled() bool {
 	dir, err := Dir()
 	if err != nil {
@@ -149,36 +122,8 @@ func Enabled() bool {
 	return err == nil
 }
 
-// DefaultAddr is where the relay listens unless `terma relay setup --addr` said
-// otherwise. It is fixed, because the agents' exporter configuration is static.
+// DefaultAddr is where the relay listens; it is fixed because exporter configuration is static.
 const DefaultAddr = "127.0.0.1:43180"
-
-// Addr is the address the relay listens on: what setup recorded, else DefaultAddr.
-func Addr() string {
-	dir, err := Dir()
-	if err != nil {
-		return DefaultAddr
-	}
-	if data, err := os.ReadFile(filepath.Join(dir, "addr")); err == nil {
-		if a := strings.TrimSpace(string(data)); a != "" {
-			return a
-		}
-	}
-	return DefaultAddr
-}
-
-// Token is the relay's local token, "" when the relay is not set up.
-func Token() string {
-	path, err := TokenPath()
-	if err != nil {
-		return ""
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(data))
-}
 
 // TokenPath is where the relay's local token lives.
 func TokenPath() (string, error) {
@@ -200,24 +145,13 @@ func path(sessionID string) (string, bool) {
 	return filepath.Join(dir, claimsDir, sessionID+".json"), true
 }
 
-// lockWait is how long a hook waits for another hook of the same session to finish
-// its read-merge-write of the claim: the session store's policy (internal/session). A
-// lock that cannot be had costs the write its exclusivity, never the write itself — a
-// hook must not lose its claim to a wedged process. A variable so a test of the
-// exclusion is not decided by a loaded machine.
+// lockWait caps the wait for the claim's lock; a lock that cannot be had costs the write its
+// exclusivity, never the write itself. A variable so a loaded machine cannot decide a test.
 var lockWait = 250 * time.Millisecond
 
-// Write records that sessionID belongs to c.ProjectID, merging c.PIDs into the
-// processes already named, unless a claim for the same project naming them was
-// written less than Refresh ago. It reports whether it wrote. Errors are swallowed: a
-// hook never fails for want of a claim, the session is only not exported.
-//
-// A claim for another project than the latest placement's — the session resumed in
-// another bound repository — starts a new placement, keeping the earlier ones.
-//
-// The read-merge-write runs under a sidecar lock: two runs of one session (a resume
-// in the repository while the first still exports) each add their processes, and
-// without it one run's would be lost and its records dropped as another process's.
+// Write merges c into sessionID's claim, unless a fresh one already names its processes,
+// and reports whether it wrote; a hook never fails for want of a claim. The merge runs
+// under a sidecar lock: unlocked, 14 of 16 concurrent writers' processes were lost.
 func Write(sessionID string, c Claim, now time.Time) bool {
 	if c.ProjectID == "" {
 		return false
@@ -276,7 +210,6 @@ func Write(sessionID string, c Claim, now time.Time) bool {
 	return config.WriteFileAtomicNoSync(p, data, 0o600) == nil
 }
 
-// samePlace reports whether c continues prev's latest placement: the same project.
 func samePlace(prev, c Claim) bool {
 	return prev.ProjectID == c.ProjectID
 }
@@ -290,7 +223,6 @@ func subset(a, b []int) bool {
 	return true
 }
 
-// merge appends the new pids to the old ones, without repeats, keeping the newest.
 func merge(old, add []int) []int {
 	out := slices.Clone(old)
 	for _, v := range add {
@@ -305,7 +237,7 @@ func merge(old, add []int) []int {
 	return out
 }
 
-// Read returns the live claim for sessionID: one written less than TTL ago.
+// Read returns sessionID's claim if written less than TTL ago.
 func Read(sessionID string, now time.Time) (Claim, bool) {
 	p, ok := path(sessionID)
 	if !ok {
@@ -343,7 +275,6 @@ func Prune(now time.Time) {
 	for _, e := range entries {
 		info, err := e.Info()
 		if err == nil && now.Sub(info.ModTime()) >= TTL {
-			// A claim's lock goes with it; a lock alone ages out the same way.
 			_ = os.Remove(filepath.Join(dir, claimsDir, e.Name()))
 		}
 	}

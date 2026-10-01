@@ -79,7 +79,7 @@ assert that SessionEnd still runs or shutdown reports failure.
 
 ## Reproduce
 
-Build `live/bin/terma` from the repository root, then run:
+Build `test/live/bin/terma` from the repository root, then run:
 
 ```sh
 cd live

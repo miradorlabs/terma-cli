@@ -14,8 +14,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 )
 
-// Locate uses Git's worktree root when available. Outside Git it uses the nearest
-// binding, or dir for a first install. Git errors other than absence remain errors.
+// Locate returns Git's worktree root, else outside Git the nearest binding's directory or dir.
 func Locate(ctx context.Context, dir string) (root, gitDir string, err error) {
 	dir, err = filepath.Abs(dir)
 	if err != nil {
@@ -56,10 +55,8 @@ func Locate(ctx context.Context, dir string) (root, gitDir string, err error) {
 	return dir, "", nil
 }
 
-// StateDir addresses local session storage. A workspace that started outside Git
-// keeps its private store after git init, including before the next install. Its
-// existing writers and new Git hooks must never split attribution across stores.
-// Workspaces installed with Git from the start use their own Git metadata.
+// StateDir addresses local session storage: Git metadata, or a private store that a
+// workspace begun outside Git keeps after git init so hooks never split across stores.
 func StateDir(root, gitDir string) (string, error) {
 	dir, err := config.Dir()
 	if err != nil {
@@ -89,8 +86,7 @@ func StateDir(root, gitDir string) (string, error) {
 	return private, nil
 }
 
-// CheckPath refuses mutations through symlinked configuration files/directories.
-// A symlink used to enter the workspace itself is already canonicalized by Locate.
+// CheckPath refuses a path that escapes root or passes through a symlink.
 func CheckPath(root, relative string) error {
 	if filepath.IsAbs(relative) || relative == ".." || strings.HasPrefix(filepath.Clean(relative), ".."+string(filepath.Separator)) {
 		return fmt.Errorf("path escapes workspace: %s", relative)

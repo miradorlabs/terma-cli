@@ -20,7 +20,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 )
 
-// countFiles counts the regular files under dir, temporary ones aside.
 func countFiles(t *testing.T, dir string) int {
 	t.Helper()
 	n := 0
@@ -33,9 +32,7 @@ func countFiles(t *testing.T, dir string) int {
 	return n
 }
 
-// What a relay accepted for a claimed session and could not deliver — the gateway
-// down, then the relay stopped — is delivered by the next relay on the same outbox:
-// nothing acknowledged is lost to a restart, and every record is accounted for.
+// What a stopped relay could not deliver is delivered by the next relay on the same outbox.
 func TestRelayOutboxSurvivesARestart(t *testing.T) {
 	var up atomic.Bool
 	var got atomic.Int64
@@ -53,7 +50,7 @@ func TestRelayOutboxSurvivesARestart(t *testing.T) {
 		return Policy{Endpoint: host.URL, Key: "k", IncludePrompts: true, IncludeToolContent: true}, nil
 	}
 
-	first := New(Options{Dir: dir, Token: token, Lookup: f.lookup, Resolve: resolve, Grace: 50 * time.Millisecond})
+	first := newRelay(Options{Dir: dir, Token: token, Lookup: f.lookup, Resolve: resolve, Grace: 50 * time.Millisecond})
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() { first.Run(ctx); close(done) }()
@@ -77,7 +74,7 @@ func TestRelayOutboxSurvivesARestart(t *testing.T) {
 	}
 
 	up.Store(true)
-	second := New(Options{Dir: dir, Token: token, Lookup: f.lookup, Resolve: resolve})
+	second := newRelay(Options{Dir: dir, Token: token, Lookup: f.lookup, Resolve: resolve})
 	go second.Run(t.Context())
 	waitFor(t, func() bool { return second.Stats().Snapshot().Counters["forwarded.logs"] == 6 })
 	if c := second.Stats().Snapshot().Counters; c["recovered_from_outbox"] != 6 {
@@ -89,8 +86,7 @@ func TestRelayOutboxSurvivesARestart(t *testing.T) {
 	waitFor(t, func() bool { return countFiles(t, dir) == 0 })
 }
 
-// Only claimed parts reach the disk: a session no hook claimed, a project with no key
-// and a record naming no session are held in memory and dropped there.
+// Only claimed, keyed parts reach the disk; everything else is held and dropped in memory.
 func TestRelayWritesNothingUnclaimed(t *testing.T) {
 	u := newUpstream(t)
 	u.status = http.StatusServiceUnavailable // so claimed parts stay on disk to be seen
@@ -128,7 +124,7 @@ func TestRelayKeylessOutboxDoesNotKeepTheRelayBusy(t *testing.T) {
 		t.Fatal(err)
 	}
 	f := newFixture()
-	r := New(Options{Dir: dir, Token: token, Lookup: f.lookup, Now: f.clock})
+	r := newRelay(Options{Dir: dir, Token: token, Lookup: f.lookup, Now: f.clock})
 	go r.Run(t.Context())
 	waitFor(t, func() bool { _, idle := r.Idle(); return idle })
 	if n := countFiles(t, dir); n != 1 {
@@ -136,8 +132,7 @@ func TestRelayKeylessOutboxDoesNotKeepTheRelayBusy(t *testing.T) {
 	}
 }
 
-// The janitor drops what is past its age, then the oldest past the size bound, and
-// counts each as dropped.
+// The janitor drops what is past its age, then the oldest past the size bound, counting each.
 func TestOutboxJanitorBounds(t *testing.T) {
 	dir := t.TempDir()
 	o := outbox{dir}
@@ -153,7 +148,7 @@ func TestOutboxJanitorBounds(t *testing.T) {
 	if err := o.put(rt, fresh, body); err != nil {
 		t.Fatal(err)
 	}
-	r := New(Options{Dir: dir, Token: token})
+	r := newRelay(Options{Dir: dir, Token: token})
 	removed := r.sweepOutbox(time.Now())
 	if removed[rt] != 1 || r.Stats().Snapshot().Counters["dropped.outbox_expired.logs"] != 4 {
 		t.Fatalf("removed %v: %v", removed, r.Stats().Snapshot().Counters)
@@ -221,9 +216,7 @@ func TestBackoffAndJitter(t *testing.T) {
 	}
 }
 
-// A part queued while the project allowed prompts, delivered after it stopped: it leaves
-// under the policy that stands at delivery, so the prompt never reaches upstream (the
-// review's reproduction: queue a prompt, restart with prompts off).
+// A part queued while prompts were allowed leaves under the policy at delivery, without them.
 func TestRelayQueuedPartsFollowTheCurrentContentPolicy(t *testing.T) {
 	var up atomic.Bool
 	var got [][]byte
@@ -246,7 +239,7 @@ func TestRelayQueuedPartsFollowTheCurrentContentPolicy(t *testing.T) {
 			return Policy{Endpoint: host.URL, Key: "k", IncludePrompts: prompts, IncludeToolContent: true}, nil
 		}
 	}
-	first := New(Options{Dir: dir, Token: token, Lookup: f.lookup, Resolve: policy(true), Grace: 50 * time.Millisecond})
+	first := newRelay(Options{Dir: dir, Token: token, Lookup: f.lookup, Resolve: policy(true), Grace: 50 * time.Millisecond})
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() { first.Run(ctx); close(done) }()
@@ -259,7 +252,7 @@ func TestRelayQueuedPartsFollowTheCurrentContentPolicy(t *testing.T) {
 	<-done
 
 	up.Store(true)
-	second := New(Options{Dir: dir, Token: token, Lookup: f.lookup, Resolve: policy(false)})
+	second := newRelay(Options{Dir: dir, Token: token, Lookup: f.lookup, Resolve: policy(false)})
 	go second.Run(t.Context())
 	waitFor(t, func() bool { return second.Stats().Snapshot().Counters["forwarded.logs"] == 1 })
 	mu.Lock()

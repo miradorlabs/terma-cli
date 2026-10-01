@@ -15,8 +15,7 @@ import (
 // connection's owner.
 const Supported = true
 
-// A process's parent is read from one Toolhelp snapshot of every process, kept briefly:
-// an ancestry walk asks once per step.
+// A Toolhelp snapshot is kept briefly: an ancestry walk asks once per step.
 var snap struct {
 	mu      sync.Mutex
 	at      time.Time
@@ -25,9 +24,7 @@ var snap struct {
 
 const snapTTL = time.Second
 
-// parentOf reads pid's parent from the process snapshot. Windows keeps a parent's pid
-// after the parent exits, and may give it to a new process, so a parent that started
-// after its child is not its parent: the walk stops there rather than name a stranger.
+// parentOf stops at a parent that started after its child: Windows reuses an exited parent's pid.
 func parentOf(pid int) (int, bool) {
 	parents := processParents()
 	ppid, ok := parents[pid]
@@ -85,16 +82,12 @@ const (
 	afInet                      = 2
 	afInet6                     = 23
 	tcpTableOwnerPIDConnections = 4
-	// Row sizes of MIB_TCPROW_OWNER_PID and MIB_TCP6ROW_OWNER_PID, and where in each row
-	// the local port and the owning pid are.
+	// Row sizes of MIB_TCPROW_OWNER_PID and MIB_TCP6ROW_OWNER_PID, and offsets in each.
 	row4Size, row4LocalPort, row4PID = 24, 8, 20
 	row6Size, row6LocalPort, row6PID = 56, 20, 52
 )
 
-// findSender looks the connection up in the kernel's TCP tables, IPv4 then IPv6: the
-// row whose local port is port is the client's end, and names its owner. The relay's
-// own end of the same connection has port as its *remote* port, so it never matches;
-// self is skipped regardless.
+// findSender finds the TCP table row whose local port is port, IPv4 then IPv6.
 func findSender(port, self int) (int, bool) {
 	for _, t := range []struct{ af, size, localPort, pid int }{
 		{afInet, row4Size, row4LocalPort, row4PID},

@@ -96,9 +96,7 @@ func TestRelativize(t *testing.T) {
 	}
 }
 
-// A git killed at its deadline used to report "signal: killed", which doctor printed
-// as "could not create a temporary worktree: git worktree: signal: killed" — read as
-// git crashing, when a large checkout had simply outlasted a hook's 2-second budget.
+// A git killed at its deadline says it did not finish in time, not "signal: killed".
 func TestGitWithinNamesTheDeadlineItMissed(t *testing.T) {
 	dir := initRepo(t)
 	hooks := filepath.Join(dir, "slow-hooks")

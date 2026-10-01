@@ -9,9 +9,7 @@ import (
 	"testing"
 )
 
-// The archive and checksums URLs come from the release payload, which this code does
-// not choose. The checksum cannot police them — it comes from the same payload — so
-// the origin is pinned instead.
+// Asset URLs from the release payload must come from GitHub: the checksum shares their payload.
 func TestGetRefusesNonGitHubOrigin(t *testing.T) {
 	c := &Client{Version: "1.0.0"}
 	for _, target := range []string{
@@ -45,8 +43,7 @@ func TestDownloadOriginAllowsGitHub(t *testing.T) {
 	}
 }
 
-// An explicitly configured base (tests, GitHub Enterprise) is a trusted origin too,
-// because it was set by whoever built the client rather than named by a release.
+// An explicitly configured base is a trusted origin too.
 func TestDownloadOriginAllowsConfiguredBase(t *testing.T) {
 	c := &Client{Version: "1.0.0", BaseURL: "http://127.0.0.1:8080"}
 	if err := c.checkDownloadOrigin("http://127.0.0.1:8080/archive"); err != nil {

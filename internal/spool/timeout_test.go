@@ -16,7 +16,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/flock"
 )
 
-// size reports the queue's on-disk size, which is what the disk bound measures.
 func (s *Spool) size(t *testing.T) int64 {
 	t.Helper()
 	info, err := os.Stat(s.path())
@@ -26,9 +25,7 @@ func (s *Spool) size(t *testing.T) int64 {
 	return info.Size()
 }
 
-// Nothing but the lock wait is charged the append budget. Encoding is not, because
-// the budget has to survive an event that is large to write and a machine that is
-// busy doing it — an event refused there is lost while the lock it wanted was free.
+// Only the lock wait is charged the append budget, never the encode.
 func TestAppendBudgetsOnlyTheLockWait(t *testing.T) {
 	s, _ := Open(t.TempDir())
 	oversized := Event{Name: "large", Attrs: map[string]any{"data": strings.Repeat("x", 8<<20)}}
@@ -186,10 +183,7 @@ func TestFlushHeldRewriteFailurePreservesOriginalBatch(t *testing.T) {
 func TestPeekCannotPruneAnInflightBatch(t *testing.T) {
 	s, _ := Open(t.TempDir())
 	_ = s.Append(Event{Name: "in-flight"})
-	// An event big enough to exceed MaxBytes but small enough to encode inside the
-	// append lock budget — the real bound, which AppendContext now charges only the
-	// lock wait against. A larger one would be refused here for encoder time, which
-	// is a different test (TestAppendBudgetsOnlyTheLockWait).
+	// Big enough to exceed MaxBytes, small enough to encode quickly.
 	oversized := Event{Name: "large", Attrs: map[string]any{"data": strings.Repeat("x", 2<<20)}}
 	var encoded int64
 	res := s.Flush(context.Background(), SenderFunc(func(_ context.Context, events []Event) ([]Event, error) {
@@ -232,9 +226,8 @@ func TestPeekCannotPruneAnInflightBatch(t *testing.T) {
 		}
 		return nil, nil
 	}), FlushOptions{})
-	// Pruning cuts to MaxBytes/2, so it removes a prefix of what the in-flight send
-	// appended rather than all of it. What it must never remove is the newest event,
-	// and it must never re-read the prefix the first flush acknowledged.
+	// Pruning cuts to MaxBytes/2: it may remove some of what was appended, never the
+	// newest event, and never re-reads the acknowledged prefix.
 	if res.Err != nil || res.Pruned == 0 || res.Dropped != 0 {
 		t.Fatalf("the oversized tail must prune, not fail: %+v", res)
 	}
@@ -248,9 +241,7 @@ func TestPeekCannotPruneAnInflightBatch(t *testing.T) {
 	}
 }
 
-// A line that will not decode is a torn write; an event past MaxAge is time. The
-// two leave the queue together but must not be reported as the same thing: only
-// one of them means the file was unreadable.
+// A torn line and an expired event leave together but are counted apart.
 func TestFlushSeparatesExpiryFromUnreadableLines(t *testing.T) {
 	s, _ := Open(t.TempDir())
 	_ = s.Append(Event{Name: "expired", Time: time.Now().Add(-2 * MaxAge)})
@@ -277,8 +268,7 @@ func TestFlushDoesNotAcknowledgeAChangedPrefix(t *testing.T) {
 	now := time.Now()
 	_ = s.Append(Event{Name: "first", Time: now})
 	res := s.Flush(context.Background(), SenderFunc(func(context.Context, []Event) ([]Event, error) {
-		// An older flusher uses only flush.lock. Model it acknowledging the
-		// original event while our network request is in flight, then an append.
+		// A flusher that takes only flush.lock acknowledges the event mid-send, then an append lands.
 		if err := os.WriteFile(s.path(), nil, fileMode); err != nil {
 			t.Fatal(err)
 		}

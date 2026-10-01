@@ -118,9 +118,7 @@ func TestFlushSkipsTornLinesAndKeepsConcurrentAppends(t *testing.T) {
 	}
 }
 
-// TestHeldEventsRequeueWithoutLooping: a sender that cannot deliver some events
-// yet hands them back; they survive at the tail, are not re-sent in the same pass,
-// and are offered again on the next flush.
+// Held events requeue at the tail, are not re-sent in the same pass, and return next flush.
 func TestHeldEventsRequeueWithoutLooping(t *testing.T) {
 	s, err := Open(t.TempDir())
 	if err != nil {
@@ -172,12 +170,8 @@ func TestHeldEventsRequeueWithoutLooping(t *testing.T) {
 	}
 }
 
-// One destination refusing its events must not keep another's queued. Before
-// PartialDelivery a batch was all-or-nothing: a project whose key the ingest host
-// refused held every other project's events for two days, and the ones that had
-// gone through were re-sent on every retry. The pass acknowledges what went out,
-// walks on to the end of its snapshot, and still ends as a failure — without the
-// spool-wide backoff, which would make every destination wait out the failed one's.
+// One refused destination does not keep another's events queued: the pass acknowledges
+// what went out and ends as a failure without opening the spool-wide backoff.
 func TestPartialDeliveryAcknowledgesWhatWentOutAndCarriesOn(t *testing.T) {
 	s, err := Open(t.TempDir())
 	if err != nil {
@@ -248,9 +242,7 @@ func TestPartialDeliveryAcknowledgesWhatWentOutAndCarriesOn(t *testing.T) {
 	}
 }
 
-// A sender that only defers — its destination is waiting out an earlier failure —
-// leaves the events queued and counted, but nothing failed this pass: no error, and
-// no window, since a deferral that opened one would double it every pass.
+// A deferral leaves events queued and counted, with no error and no window.
 func TestPartialDeliveryThatOnlyDefersIsNotAFailure(t *testing.T) {
 	s, err := Open(t.TempDir())
 	if err != nil {
@@ -272,9 +264,7 @@ func TestPartialDeliveryThatOnlyDefersIsNotAFailure(t *testing.T) {
 	}
 }
 
-// A pass that reaches every destination clears a spool-wide window left by an older
-// terma: under per-destination windows it has nothing left to protect, and it would
-// otherwise keep hook-started flushes skipping for up to an hour.
+// A pass that reaches every destination clears a spool-wide window.
 func TestPartialDeliveryClearsAStaleSpoolWideWindow(t *testing.T) {
 	s, err := Open(t.TempDir())
 	if err != nil {
@@ -293,9 +283,7 @@ func TestPartialDeliveryClearsAStaleSpoolWideWindow(t *testing.T) {
 	}
 }
 
-// Each destination backs off on its own schedule: 30 seconds, doubling to an hour,
-// reset by a delivery. The windows are what a sender consults before it asks a host
-// that failed again.
+// Each destination backs off on its own: 30 seconds doubling to an hour, reset by a delivery.
 func TestDestinationRetryWindows(t *testing.T) {
 	s, err := Open(t.TempDir())
 	if err != nil {
@@ -391,9 +379,7 @@ func TestFlushMinIntervalSkipsARecentFlush(t *testing.T) {
 	}
 }
 
-// TestWritableLeavesTheQueueExactlyAsItWas: the probe doctor writes must not reach
-// a sender, change the count, or reorder what is already queued — a check that
-// costs an event is worse than the failure it looks for.
+// Writable's probe never reaches a sender, changes the count, or reorders the queue.
 func TestWritableLeavesTheQueueExactlyAsItWas(t *testing.T) {
 	dir := t.TempDir()
 	s, _ := Open(dir)
@@ -444,8 +430,7 @@ func TestWritableLeavesTheQueueExactlyAsItWas(t *testing.T) {
 	}
 }
 
-// A spool that exists but cannot be appended to — a fresh install whose config dir
-// is owned by another user, a read-only home — is the failure this check exists for.
+// A spool that exists but cannot be appended to fails Writable.
 func TestWritableReportsAnUnwritableSpool(t *testing.T) {
 	dir := t.TempDir()
 	s, _ := Open(dir)
