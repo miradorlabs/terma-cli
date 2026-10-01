@@ -171,7 +171,7 @@ jobs:
         run: |
           sudo apt-get install -y -q dash busybox >/dev/null
           tmp=$(mktemp -d); cd "$tmp"; git init -q; git config user.email t@example.com; git config user.name t
-          "$GITHUB_WORKSPACE/bin/terma" install --project proj_ci --harness none --yes >/dev/null
+          "$GITHUB_WORKSPACE/bin/terma" install --team proj_ci --harness none --yes >/dev/null
           for sh in dash "busybox sh"; do
             echo "subject" > msg.txt
             $sh .terma/hooks/prepare-commit-msg msg.txt message

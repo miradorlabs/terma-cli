@@ -62,13 +62,13 @@ func TestInstallDryRunDoesNotSignIn(t *testing.T) {
 	}
 }
 
-// A dry run with no credential and no --project still prints the plan.
+// A dry run with no credential and no --team still prints the plan.
 func TestInstallDryRunUnauthenticatedNoProject(t *testing.T) {
 	installRepo(t)
 	out, err := runTerma(t, "install", "--harness", "claude",
 		"--adapters", "claude", "--dry-run", "--no-browser", "--no-statusline")
 	if err != nil {
-		t.Fatalf("dry run without a credential or --project should still plan: %v\n%s", err, out)
+		t.Fatalf("dry run without a credential or --team should still plan: %v\n%s", err, out)
 	}
 	for _, want := range []string{"unresolved", "would sign in first", "Dry run: nothing written."} {
 		if !strings.Contains(out, want) {

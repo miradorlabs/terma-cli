@@ -108,7 +108,7 @@ func TestE2E_InstallLifecycle(t *testing.T) {
 		t.Fatalf("re-install churned the binding:\n--- first ---\n%s\n--- second ---\n%s", first, second)
 	}
 
-	// An already-bound repository re-installs without --project and without a sign-in;
+	// An already-bound repository re-installs without --team and without a sign-in;
 	// --no-browser and the deadline guard against reaching auth.Login.
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
@@ -118,7 +118,7 @@ func TestE2E_InstallLifecycle(t *testing.T) {
 		t.Fatalf("re-install of a bound repo must not need a sign-in: %v\n%s", err, out)
 	}
 	if third, _ := os.ReadFile(binding); string(first) != string(third) {
-		t.Fatalf("re-install without --project churned the binding:\n%s", third)
+		t.Fatalf("re-install without --team churned the binding:\n%s", third)
 	}
 
 	runProc(t, bin, repo, env, "uninstall", "--yes")

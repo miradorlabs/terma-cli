@@ -46,7 +46,7 @@ func TestInstallWithAServerKeyBindsTheKeysProject(t *testing.T) {
 		}
 	}
 
-	// Re-running without --project keeps the key's project.
+	// Re-running without --team keeps the key's project.
 	if out, err := run.combined(t, "install", "--harness", "none", "--adapters", "claude", "--yes", "--no-browser"); err != nil {
 		t.Fatalf("reinstall: %v\n%s", err, out)
 	}
@@ -54,7 +54,7 @@ func TestInstallWithAServerKeyBindsTheKeysProject(t *testing.T) {
 	// Another project is refused, by name, and the binding is left alone.
 	out, err = run.combined(t, "install", "--harness", "none", "--team", "22222222-2222-4333-8444-555555555555", "--adapters", "claude", "--yes", "--no-browser")
 	if err == nil || !strings.Contains(err.Error(), keyProject) {
-		t.Fatalf("a --project the key does not belong to was accepted: %v\n%s", err, out)
+		t.Fatalf("a --team the key does not belong to was accepted: %v\n%s", err, out)
 	}
 	if bound, _ := termaproject.Load(repo); bound.Project.ID != keyProject {
 		t.Fatalf("the refused install rebound the repository: %+v", bound)

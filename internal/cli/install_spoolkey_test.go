@@ -104,7 +104,7 @@ func TestInstallNeedsAuth(t *testing.T) {
 	}{
 		{"a telemetry agent mints a key", []string{"claude"}, id, nil, true, true},
 		{"a project name needs a lookup", nil, "Acme Web", nil, true, true},
-		{"no binding and no --project is a picker", nil, "", nil, true, true},
+		{"no binding and no --team is a picker", nil, "", nil, true, true},
 		{"wiring a repository with no agent of one's own", nil, id, nil, true, false},
 		{"…and re-wiring a bound one", nil, "", bound, true, false},
 		{"a hooks-only agent needs a key to deliver with", []string{"cursor"}, "", bound, true, true},

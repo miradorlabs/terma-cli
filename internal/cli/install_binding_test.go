@@ -111,12 +111,12 @@ func TestInstallRefusesABindingFromAnotherOrganization(t *testing.T) {
 	}
 }
 
-// --project rebinds, recorded with the environment it was chosen in.
+// --team rebinds, recorded with the environment it was chosen in.
 func TestInstallProjectRebindsAnUnreachableBinding(t *testing.T) {
 	boundRepo(t, termaproject.Project{ID: "dddddddd-0000-4000-8000-000000000001", Name: "Terma Dev", Environment: config.EnvDev}, true)
 
 	if out, err := routeCodex(t, "--team", "Acme Web", "--yes"); err != nil {
-		t.Fatalf("install --project: %v\n%s", err, out)
+		t.Fatalf("install --team: %v\n%s", err, out)
 	}
 	want := projectsIn(orgA().ID)[0]
 	if got := bindingNow(t); got.ID != want.ID || got.Name != want.Name || got.OrganizationID != orgA().ID || got.Environment != "" {
