@@ -91,7 +91,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           CLAUDE_CODE_OAUTH_TOKEN: ${{ inputs.include_subscriptions && secrets.CLAUDE_CODE_OAUTH_TOKEN || '' }}
           TERMA_LIVE: "1"
-          TERMA_LIVE_BINARY: ${{ github.workspace }}/live/bin/terma
+          TERMA_LIVE_BINARY: ${{ github.workspace }}/test/live/bin/terma
         run: ./bin/live.test -test.v -test.timeout 75m
       - name: Publish coverage summary
         if: always()

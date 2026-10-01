@@ -15,9 +15,9 @@ in the normal `make check` suite on Unix (macOS/Linux).
 Run a smaller group while developing:
 
 ```sh
-TERMA_ENV=dev go test ./cmd -run '^TestInstallE2ELocations$' -count=1 -v
-TERMA_ENV=dev go test ./cmd -run '^TestInstallE2EUninstallOwnership$' -count=1 -v
-TERMA_ENV=dev go test ./cmd -run '^TestInstallE2E(NonGitToGit|TransitionKeepsOtherWorkspaces)$' -count=1 -v
+TERMA_ENV=dev go test ./internal/cli -run '^TestInstallE2ELocations$' -count=1 -v
+TERMA_ENV=dev go test ./internal/cli -run '^TestInstallE2EUninstallOwnership$' -count=1 -v
+TERMA_ENV=dev go test ./internal/cli -run '^TestInstallE2E(NonGitToGit|TransitionKeepsOtherWorkspaces)$' -count=1 -v
 ```
 
 ## Root selection and non-Git behavior

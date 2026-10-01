@@ -107,6 +107,7 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 	}
 
 	var steps []string
+	recorded := false
 	res, err := setup.Run(cmd.Context(), app.agents, cfg, setup.Steps{
 		SignIn: func(_ context.Context, cfg *config.Config) (*config.Config, error) {
 			return app.signInAndReload(cmd, cfg, signInOptions{noBrowser: f.noBrowser, pauseBeforeBrowser: !f.assumeYes})
@@ -117,6 +118,7 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 			return app.chooseHarnesses(cmd, cfg, f)
 		},
 		Recorded: func(names []string) {
+			recorded = true
 			if len(names) == 0 {
 				fmt.Fprintln(out, "\nNo agents recorded. `terma install` will ask you to pick some in each repository.")
 			} else {
@@ -151,8 +153,14 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 			}
 		},
 	})
+	// A team picker left after the agents were recorded is still a cancellation, but not
+	// one that recorded nothing.
 	if errors.Is(err, errCancelled) {
-		fmt.Fprintln(out, "Cancelled. Nothing was recorded.")
+		if recorded {
+			fmt.Fprintln(out, "Cancelled before a team was selected; the agents above stay recorded.")
+		} else {
+			fmt.Fprintln(out, "Cancelled. Nothing was recorded.")
+		}
 		return nil
 	}
 	if err != nil {

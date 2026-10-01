@@ -15,7 +15,7 @@ make release-dry-run  # goreleaser snapshot, nothing published
 make test-install     # what CI runs: a tagged goreleaser render, then install.sh (and the cask on macOS) over loopback
 ```
 
-One test: `TERMA_ENV=dev go test ./internal/hookrun/ -run TestName`. The Makefile sets
+One test: `TERMA_ENV=dev go test ./internal/hooks/hookrun/ -run TestName`. The Makefile sets
 `TERMA_ENV=dev` for everything it runs; outside it, set it yourself — `terma install` and
 `terma setup` sign in, and a bare run that reaches them opens a browser login on
 production (see [Working against the dev backend](#working-against-the-dev-backend)).
