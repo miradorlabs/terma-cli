@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # PostToolUse: `go fix` modernizers on each edited Go package (make format runs it repo-wide).
-# Run from the package's own directory: test/live/ and prototypes/* are modules of their own, with no
+# Run from the package's own directory: test/live/ is a module of its own, with no
 # go.work. Best-effort: a package that does not compile, or no `go`, is a silent no-op.
 
 set -u

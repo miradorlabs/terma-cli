@@ -139,39 +139,6 @@ jobs:
             cat test/live/report/latest.md >> "$GITHUB_STEP_SUMMARY"
           fi
 
-  cursor-billing:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: prototypes/cursor-billing
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: prototypes/cursor-billing/go.mod
-          cache: false
-      - run: test -z "$(gofmt -l .)"
-      - run: go vet ./...
-      - run: go test -race ./...
-
-  # The funding model is a proof of concept, but it is the estimator the backend
-  # will be reconciled against, so a change that breaks its tests should not pass
-  # review only because the module lives under prototypes/.
-  funding-model:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: prototypes/funding-model
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: prototypes/funding-model/go.mod
-          cache: false
-      - run: test -z "$(gofmt -l .)"
-      - run: go vet ./...
-      - run: go test -race ./...
-
   # The OpenCode plugin is ~450 lines of JavaScript that writes into a user's
   # plugin directory and ships in the release archives. `make test-plugin` skips it
   # wherever bun is absent, so CI is where it is actually run.

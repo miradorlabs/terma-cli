@@ -161,7 +161,7 @@ associate costs with a session; without a generation/request join they cannot
 prove the cost of each user turn. Timestamp allocation is an estimate. Neither
 account email, OAuth/API authentication, context occupancy, nor a zero/missing
 charge proves that subscription allowance rather than credits paid. Keep model
-reference value, credits consumed and invoiced charges separate. The standalone [billing importer](../prototypes/cursor-billing/README.md) reads these
+reference value, credits consumed and invoiced charges separate. A standalone billing importer, kept outside this repository, reads these
 records for a future platform worker; it is independent of the Terma CLI and hooks.
 
 ## Verification and sources
@@ -231,7 +231,7 @@ above. The reusable importer described below has since been implemented.
 
 ## Reusable platform importer (2026-09-16)
 
-`prototypes/cursor-billing` is a standalone Go module with injected credentials and
+The importer is a standalone Go module, kept outside this repository, with injected credentials and
 explicit tenant/connection scope. It reads members, paginated spending and
 paginated usage, retaining decimal precision, provider timestamps, raw records
 and unknown values. The platform owns key entry/storage, scheduling and atomic
@@ -245,7 +245,6 @@ CLI responses. Both events were `Included in Business`, yet had nonzero
 There is no authoritative generation join here; matching token tuples in this
 controlled case must not become a production per-turn matching heuristic.
 
-See the [integration/persistence contract](../prototypes/cursor-billing/README.md).
 Dashboard comparison of tier/seat/percentage/limit semantics is still pending;
 no allowance denominator, reset date, seat price or credit balance is invented.
 

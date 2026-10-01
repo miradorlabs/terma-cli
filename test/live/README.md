@@ -240,7 +240,7 @@ emitted only lifecycle hooks. This is recorded as a provider coverage gap.
 
 Set `TERMA_LIVE_CURSOR_CAPTURE=report/cursor-billing-validation/session.json` when
 running that test to save a private capture and the synthetic CLI responses.
-The [standalone importer](../../prototypes/cursor-billing/README.md) accepts this capture
+The standalone billing importer (outside this repository) accepts this capture
 and joins it to team billing using a separate `CURSOR_ADMIN_API_KEY`. A successful
 capture can contain fewer lifecycle snapshots than CLI invocations; neither
 lifecycle generations nor observation counts are a reliable turn counter.

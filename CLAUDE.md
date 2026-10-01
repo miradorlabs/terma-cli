@@ -624,22 +624,6 @@ developer login to check the team's repository permission.
   exist there; `golden/` holds each surface's attribute names so drift fails a test. A
   scenario without its credential is reported as not run, never as a pass.
 
-`prototypes/funding-model` is the estimator for *who paid* for a model call (seat allowance,
-usage credits, API metering) and an evaluation harness that runs it over simulated
-organisations with known truth and the providers' exports rendered from that truth. It
-is a separate Go module with no dependencies and runs only through Docker (`make eval`
-there); `model/` is written to move to the backend unchanged. The estimator never
-determines a route: it scores evidence (account snapshot from `~/.claude.json`,
-credential hints, per-request `speed`, Codex `auth_mode`) and is corrected by
-reconciliation against simulated user × model × day USD reports. The local
-`prototypes/funding-model/cmd/funding-reconcile` pilot preserves the actual exports' grain and units (Claude
-account/model/period USD; OpenAI workspace/product/interval credits); see
-`prototypes/funding-model/replay/README.md`. Do not feed real exports to the simulation
-reconciler or price real calls with its illustrative tables. The earlier Codex
-exploration it superseded (`pocs/funding-observer` and two handover files in the root) was
-removed on 2026-09-21; it is in the history before that. The one piece of it still cited, the
-provider report schema evidence, lives in `prototypes/funding-model/replay/evidence/`.
-
 ## Local relay
 
 - `docs/RELAY.md`. `terma relay setup|run|status` (hidden): the agents' global
