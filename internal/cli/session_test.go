@@ -199,7 +199,7 @@ func TestSessionList_AllReportsAnIncompleteWalk(t *testing.T) {
 	}
 }
 
-const summaryFrame = "event: summary\ndata: {\"summary\":{\"session_id\":\"sid1\",\"source_system\":\"claude-code\",\"user_id\":\"u-dana\",\"turns\":7,\"usage\":{\"input_tokens\":10,\"output_tokens\":5,\"provider_cost_usd\":0.25},\"providers\":[\"anthropic\"]}}\n\n"
+const summaryFrame = "event: summary\ndata: {\"summary\":{\"session_id\":\"sid1\",\"source_system\":\"claude-code\",\"user_id\":\"u-sam\",\"turns\":7,\"usage\":{\"input_tokens\":10,\"output_tokens\":5,\"provider_cost_usd\":0.25},\"providers\":[\"anthropic\"]}}\n\n"
 
 // `get` reads the summary feed's first frame and returns.
 func TestSessionGet_ReadsTheSummaryFeed(t *testing.T) {
@@ -220,7 +220,7 @@ func TestSessionGet_ReadsTheSummaryFeed(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &view); err != nil {
 		t.Fatalf("stdout is not JSON: %v\n%s", err, stdout)
 	}
-	if view.SessionID != "sid1" || view.Turns != 7 || view.UserName != "Dana" || view.Usage.CostUSD() != 0.25 {
+	if view.SessionID != "sid1" || view.Turns != 7 || view.UserName != "Sam" || view.Usage.CostUSD() != 0.25 {
 		t.Fatalf("view = %+v", view)
 	}
 	if strings.Contains(stdout, "routing_key") {

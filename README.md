@@ -156,8 +156,8 @@ relay.
 
 ```bash
 terma status
-terma usage --user dawson --since today
-terma session list --user dawson --since yesterday
+terma usage --user alex --since today
+terma session list --user alex --since yesterday
 ```
 
 `status` is the quick local view of sign-in, project binding, hooks, connected

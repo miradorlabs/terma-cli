@@ -374,7 +374,7 @@ func TestRemoteURLFSMatchesGit(t *testing.T) {
 	if got := RemoteURLFS(gitDir); got != "" {
 		t.Fatalf("no origin yet, got %q", got)
 	}
-	mustGit(t, root, "remote", "add", "origin", "https://dawson:ghp_secret@github.com/miradorlabs/terma-cli.git")
+	mustGit(t, root, "remote", "add", "origin", "https://alex:ghp_secret@github.com/miradorlabs/terma-cli.git")
 	want := NormalizeRemote(mustGit(t, root, "config", "--get", "remote.origin.url"))
 	if want != "https://github.com/miradorlabs/terma-cli" {
 		t.Fatalf("git-backed value = %q", want)

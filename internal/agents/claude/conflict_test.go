@@ -942,7 +942,7 @@ func TestConnectClearsInlineHeaderWhenSwitchingToHelper(t *testing.T) {
 
 	c := exporter{}
 	old := harness.Exporter{
-		Endpoint:  "https://otel-dev.mirador.org",
+		Endpoint:  "https://otel-dev.terma.ai",
 		APIKey:    "ter_srv_oldprojectkey0001",
 		ProjectID: "project-old",
 		Signals:   harness.AllSignals,
@@ -956,7 +956,7 @@ func TestConnectClearsInlineHeaderWhenSwitchingToHelper(t *testing.T) {
 
 	helper := filepath.Join(dir, ".config", "terma", "helpers", "claude-otel-project-new")
 	fresh := harness.Exporter{
-		Endpoint:   "https://otel-dev.mirador.org",
+		Endpoint:   "https://otel-dev.terma.ai",
 		APIKey:     "ter_srv_newprojectkey0002",
 		ProjectID:  "project-new",
 		Signals:    harness.AllSignals,

@@ -91,7 +91,7 @@ homebrew_casks:
     license: MIT
     commit_author:
       name: mirador-bot
-      email: engineering@mirador.org
+      email: engineering@terma.ai
     generate_completions_from_executable:
       executable: terma
       args: [completion]

@@ -162,7 +162,7 @@ func TestHarnessVerdictInBothCommands(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("SHELL", "/bin/zsh")
 
-	const otlp = "https://otel-dev.mirador.org"
+	const otlp = "https://otel-dev.terma.ai"
 	const project = "6796a71f-7949-40f1-bde8-b87a74071686"
 	const elsewhere = "c970664b-ba35-4cdd-b7a9-d5acadb327f6"
 	sending := harness.Status{Connected: true, Endpoint: otlp, ProjectID: project, Signals: harness.AllSignals}

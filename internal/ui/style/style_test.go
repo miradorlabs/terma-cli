@@ -52,7 +52,7 @@ func TestBrandSequenceFollowsTheTerminalsDepth(t *testing.T) {
 }
 
 func TestHeaderLaysInfoBesideTheLogo(t *testing.T) {
-	info := []string{"Terma CLI", "dawson@mirador.org  (Terma Dev · Org: Mirador Dev)", "~/Projects/Mirador/terma-cli"}
+	info := []string{"Terma CLI", "alex@terma.ai  (Terma Dev · Org: Mirador Dev)", "~/Projects/Mirador/terma-cli"}
 	h := Header(Plain(), info)
 	if strings.Contains(h, "\x1b[") {
 		t.Fatal("a plain header must carry no escape sequences")

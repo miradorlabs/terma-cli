@@ -20,9 +20,9 @@ func runInsights(t *testing.T, handler http.HandlerFunc, args ...string) (stdout
 }
 
 const principalsJSON = `{"principals":[
-	{"kind":"user","id":"u-dawson-cc","name":"dawson@mirador.org","source_system":"claude-code"},
-	{"kind":"user","id":"u-dawson-cx","name":"dawson@mirador.org","source_system":"codex"},
-	{"kind":"user","id":"u-dana","name":"dana@mirador.org","source_system":"claude-code","alias":"Dana"},
+	{"kind":"user","id":"u-alex-cc","name":"alex@terma.ai","source_system":"claude-code"},
+	{"kind":"user","id":"u-alex-cx","name":"alex@terma.ai","source_system":"codex"},
+	{"kind":"user","id":"u-sam","name":"sam@terma.ai","source_system":"claude-code","alias":"Sam"},
 	{"kind":"api_key","id":"k1","name":"ci-bot","source_system":"openrouter"}
 ]}`
 
@@ -63,12 +63,12 @@ func TestSessionList_ResolvesNameAndWindow(t *testing.T) {
 			t.Fatalf("path = %s", r.URL.Path)
 		}
 		got = r.URL.Query()
-		fmt.Fprint(w, `{"project_id":"p","sessions":[{"session_id":"sid1","source_system":"claude-code","user_id":"u-dawson-cc","turns":4,"usage":{"input_tokens":100,"output_tokens":50,"provider_cost_usd":2.5},"models":["claude-opus-4-8"]}],"pagination":{"page":1,"per_page":100,"total":140,"total_pages":2}}`)
-	}), "session", "list", "--user", "dawson", "--source", "claude-code", "--since", "2026-09-01")
+		fmt.Fprint(w, `{"project_id":"p","sessions":[{"session_id":"sid1","source_system":"claude-code","user_id":"u-alex-cc","turns":4,"usage":{"input_tokens":100,"output_tokens":50,"provider_cost_usd":2.5},"models":["claude-opus-4-8"]}],"pagination":{"page":1,"per_page":100,"total":140,"total_pages":2}}`)
+	}), "session", "list", "--user", "alex", "--source", "claude-code", "--since", "2026-09-01")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if f := got.Get("filter"); f != `source_system="claude-code" AND (user_id="u-dawson-cc" OR user_id="u-dawson-cx")` {
+	if f := got.Get("filter"); f != `source_system="claude-code" AND (user_id="u-alex-cc" OR user_id="u-alex-cx")` {
 		t.Errorf("filter = %q", f)
 	}
 	// A date is the caller's local midnight; what travels is the instant.
@@ -83,7 +83,7 @@ func TestSessionList_ResolvesNameAndWindow(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &view); err != nil {
 		t.Fatalf("stdout is not JSON: %v\n%s", err, stdout)
 	}
-	if len(view.Sessions) != 1 || view.Sessions[0].UserName != "dawson@mirador.org" || view.Sessions[0].SessionID != "sid1" {
+	if len(view.Sessions) != 1 || view.Sessions[0].UserName != "alex@terma.ai" || view.Sessions[0].SessionID != "sid1" {
 		t.Fatalf("view = %+v", view)
 	}
 	if view.Pagination == nil || view.Pagination.TotalPages != 2 || view.Pagination.Total != 140 || view.ProjectID != "p" {
@@ -97,8 +97,8 @@ func TestSessionList_ResolvesNameAndWindow(t *testing.T) {
 func TestSessionList_AmbiguousNameIsAnError(t *testing.T) {
 	_, _, err := runInsights(t, principalsThen(t, func(w http.ResponseWriter, r *http.Request) {
 		t.Fatalf("no session read should happen; got %s", r.URL.Path)
-	}), "session", "list", "--user", "da")
-	if err == nil || !strings.Contains(err.Error(), "Dana") || !strings.Contains(err.Error(), "dawson@mirador.org") {
+	}), "session", "list", "--user", "a")
+	if err == nil || !strings.Contains(err.Error(), "Sam") || !strings.Contains(err.Error(), "alex@terma.ai") {
 		t.Fatalf("err = %v, want both candidates named", err)
 	}
 }
@@ -117,18 +117,18 @@ func TestPrincipalIndexResolve(t *testing.T) {
 		return got
 	}
 	// An exact id is one principal, even when its name is shared.
-	if got := ids("user", "u-dawson-cx"); len(got) != 1 || got[0] != "u-dawson-cx" {
+	if got := ids("user", "u-alex-cx"); len(got) != 1 || got[0] != "u-alex-cx" {
 		t.Errorf("by id = %v", got)
 	}
 	// An exact email is that person on every agent, whatever the case.
-	if got := ids("user", "DAWSON@mirador.org"); len(got) != 2 {
+	if got := ids("user", "ALEX@terma.ai"); len(got) != 2 {
 		t.Errorf("by email = %v", got)
 	}
 	// An alias resolves, and a unique substring resolves.
-	if got := ids("user", "dana"); len(got) != 1 || got[0] != "u-dana" {
+	if got := ids("user", "sam"); len(got) != 1 || got[0] != "u-sam" {
 		t.Errorf("by alias = %v", got)
 	}
-	if got := ids("user", "wson"); len(got) != 2 {
+	if got := ids("user", "lex"); len(got) != 2 {
 		t.Errorf("by substring = %v", got)
 	}
 	// The kind is a hard boundary: a key label never resolves as a user.
@@ -139,7 +139,7 @@ func TestPrincipalIndexResolve(t *testing.T) {
 		t.Errorf("by key label = %v", got)
 	}
 	// Labels come back for known ids only; unknown ids are left for the caller to print raw.
-	if index.name("claude-code", "u-dana") != "Dana" || index.name("codex", "ghost") != "" {
+	if index.name("claude-code", "u-sam") != "Sam" || index.name("codex", "ghost") != "" {
 		t.Error("name lookups")
 	}
 }
@@ -273,16 +273,16 @@ func TestUsage_BuildsPromQLAndJoinsNames(t *testing.T) {
 			value = "7"
 		}
 		fmt.Fprintf(w, `{"status":"success","data":{"resultType":"vector","result":[
-			{"metric":{"source_system":"claude-code","user_id":"u-dawson-cc"},"value":[1757376000,"%s"]},
-			{"metric":{"source_system":"codex","user_id":"u-dawson-cx"},"value":[1757376000,"0"]}]}}`, value)
-	}), "usage", "--user", "Dawson", "--since", "2026-09-08T00:00:00Z", "--until", "2026-09-09T00:00:00Z")
+			{"metric":{"source_system":"claude-code","user_id":"u-alex-cc"},"value":[1757376000,"%s"]},
+			{"metric":{"source_system":"codex","user_id":"u-alex-cx"},"value":[1757376000,"0"]}]}}`, value)
+	}), "usage", "--user", "Alex", "--since", "2026-09-08T00:00:00Z", "--until", "2026-09-09T00:00:00Z")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(queries) != 6 {
 		t.Fatalf("queries = %d:\n%s", len(queries), strings.Join(queries, "\n"))
 	}
-	want := `sum by (source_system, user_id) (increase({__name__="terma.ai.cost.usd.total", user_id=~"u-dawson-cc|u-dawson-cx"}[86400s]))`
+	want := `sum by (source_system, user_id) (increase({__name__="terma.ai.cost.usd.total", user_id=~"u-alex-cc|u-alex-cx"}[86400s]))`
 	if queries[0] != want {
 		t.Fatalf("query[0] =\n%s\nwant\n%s", queries[0], want)
 	}
@@ -296,7 +296,7 @@ func TestUsage_BuildsPromQLAndJoinsNames(t *testing.T) {
 		t.Fatalf("report = %+v", report)
 	}
 	top := report.Rows[0]
-	if top.Name != "dawson@mirador.org" || top.Group["source_system"] != "claude-code" {
+	if top.Name != "alex@terma.ai" || top.Group["source_system"] != "claude-code" {
 		t.Fatalf("top row = %+v", top)
 	}
 	if top.CostUSD != 1.25 || top.InputTokens != 1000 || top.OutputTokens != 200 || top.TotalTokens != 1200 || top.ModelCalls != 7 {
@@ -340,11 +340,11 @@ func TestUsage_GroupByNoneAndRejectsUnknownGroup(t *testing.T) {
 func TestPrincipalFind(t *testing.T) {
 	stdout, _, err := runInsights(t, principalsThen(t, func(w http.ResponseWriter, r *http.Request) {
 		t.Fatalf("unexpected %s", r.URL.Path)
-	}), "principal", "find", "dana")
+	}), "principal", "find", "sam")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(stdout, `"u-dana"`) || strings.Contains(stdout, "u-dawson") {
+	if !strings.Contains(stdout, `"u-sam"`) || strings.Contains(stdout, "u-alex") {
 		t.Fatalf("stdout = %s", stdout)
 	}
 	_, _, err = runInsights(t, principalsThen(t, nil), "principal", "find", "nobody")

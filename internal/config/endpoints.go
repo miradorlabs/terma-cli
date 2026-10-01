@@ -32,17 +32,17 @@ var environments = map[string]Endpoints{
 		OTLPURL: "https://otel.terma.ai",
 	},
 	EnvDev: {
-		APIURL:  "https://api-dev.mirador.org",
-		AuthURL: "https://auth-dev.mirador.org",
+		APIURL:  "https://api-dev.terma.ai",
+		AuthURL: "https://auth-dev.terma.ai",
 		AppURL:  "https://dev.terma.ai",
-		OTLPURL: "https://otel-dev.mirador.org",
+		OTLPURL: "https://otel-dev.terma.ai",
 	},
 	EnvLocal: {
 		// A local app in front of the dev backend: there is no local account service.
-		APIURL:  "https://api-dev.mirador.org",
-		AuthURL: "https://auth-dev.mirador.org",
+		APIURL:  "https://api-dev.terma.ai",
+		AuthURL: "https://auth-dev.terma.ai",
 		AppURL:  "http://localhost:3000",
-		OTLPURL: "https://otel-dev.mirador.org",
+		OTLPURL: "https://otel-dev.terma.ai",
 	},
 }
 

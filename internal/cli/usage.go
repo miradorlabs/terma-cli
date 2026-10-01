@@ -116,7 +116,7 @@ func (app *App) newUsageCommand() *cobra.Command {
 tokens and provider cost of every model call that settled inside the window,
 whichever session it belonged to. Defaults to the last 24 hours grouped by user.
 
-  terma usage --user dawson --since today
+  terma usage --user alex --since today
   terma usage --group-by model --since 7d
   terma usage --source <source system> --since yesterday --until today
 

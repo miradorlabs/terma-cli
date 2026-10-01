@@ -14,7 +14,7 @@ const commitLogsBody = `{
   "logs": [
     {
       "attributes": {
-        "author_email": "dawsonwalker91@gmail.com",
+        "author_email": "dev@example.com",
         "branch": "feat/org-switching-and-use",
         "file_count": "32",
         "file_stats_reported": "32",

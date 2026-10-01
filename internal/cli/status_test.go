@@ -10,7 +10,7 @@ import (
 
 // A harness wired to the right host but another project is not connected, in status as in doctor.
 func TestHarnessState(t *testing.T) {
-	const otlp = "https://otel-dev.mirador.org"
+	const otlp = "https://otel-dev.terma.ai"
 	const project = "6796a71f-7949-40f1-bde8-b87a74071686"
 
 	cases := []struct {

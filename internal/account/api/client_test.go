@@ -325,8 +325,8 @@ func TestClient_RefusesACredentialFromAnotherDeployment(t *testing.T) {
 
 	_, err := New(&config.Config{
 		ProfileName: config.DefaultProfile,
-		APIURL:      "https://api.mirador.org",
-		AuthURL:     "https://auth.mirador.org",
+		APIURL:      "https://api.terma.ai",
+		AuthURL:     "https://auth.terma.ai",
 	}, Options{Version: "test"})
 	if err == nil {
 		t.Fatal("expected a credential from another deployment to be refused")
@@ -335,7 +335,7 @@ func TestClient_RefusesACredentialFromAnotherDeployment(t *testing.T) {
 	if _, ok := errors.AsType[*auth.ErrWrongEnvironment](err); !ok {
 		t.Fatalf("expected ErrWrongEnvironment, got %T: %v", err, err)
 	}
-	for _, want := range []string{"auth.other.example", "auth.mirador.org"} {
+	for _, want := range []string{"auth.other.example", "auth.terma.ai"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error should name %q, got %v", want, err)
 		}
@@ -349,7 +349,7 @@ func TestClient_AcceptsACredentialFromTheSameEnvironment(t *testing.T) {
 		authURL string
 		wantErr bool
 	}{
-		{"same host", "https://auth.mirador.org", false},
+		{"same host", "https://auth.terma.ai", false},
 		{"missing issuing host", "", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -361,8 +361,8 @@ func TestClient_AcceptsACredentialFromTheSameEnvironment(t *testing.T) {
 			}
 			if _, err := New(&config.Config{
 				ProfileName: config.DefaultProfile,
-				APIURL:      "https://api.mirador.org",
-				AuthURL:     "https://auth.mirador.org",
+				APIURL:      "https://api.terma.ai",
+				AuthURL:     "https://auth.terma.ai",
 			}, Options{Version: "test"}); (err != nil) != tc.wantErr {
 				t.Fatalf("New error = %v, want error %v", err, tc.wantErr)
 			}
