@@ -90,6 +90,8 @@ type Repo struct {
 	Name string
 	// Worktree is git's name for a linked worktree, "" in a main checkout.
 	Worktree string
+
+	route func() routeRead
 }
 
 // Open is every session hook's first step: it refuses an unsafe session id, runs from

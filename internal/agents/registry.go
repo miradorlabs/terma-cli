@@ -127,10 +127,10 @@ func (r *Registry) CheckedSurfaces() []string {
 }
 
 // CheckSurface runs the named surface's own check; ok is false when it has none.
-func (r *Registry) CheckSurface(surface, root, projectID string) (st SurfaceStatus, ok bool, err error) {
+func (r *Registry) CheckSurface(surface string, in SurfaceInput) (st SurfaceStatus, ok bool, err error) {
 	for _, c := range r.With[SurfaceChecker]() {
 		if slices.Contains(c.CheckedSurfaces(), surface) {
-			st, err = c.CheckSurface(surface, root, projectID)
+			st, err = c.CheckSurface(surface, in)
 			return st, true, err
 		}
 	}

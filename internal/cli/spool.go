@@ -331,7 +331,7 @@ func (app *App) contentConsented(e spool.Event, projectID string, global bool) b
 		return false
 	}
 	c, ok := a.(agents.ContentConsent)
-	return ok && c.ContentConsented(projectID, global)
+	return ok && c.ContentConsented(hookrun.ConsentFor(projectID, global))
 }
 
 // projectEndpoint is a project's ingest host: the one its key was stored with, since only

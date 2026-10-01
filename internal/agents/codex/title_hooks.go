@@ -10,7 +10,6 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -27,8 +26,8 @@ type codexTitleState struct {
 // captureCodexTitle spools the thread's name when new or renamed; it restates the first
 // prompt, so it travels under repliesConsented.
 func captureCodexTitle(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in *codexHookInput) {
-	pol := routing.EffectivePolicy(e.Policy, r.ProjectID)
-	if e.Spool == nil || !session.ValidID(in.SessionID) || !pol.IncludePrompts || !pol.AllowsSignal("logs") || len(pol.ExcludePaths) > 0 || !repliesConsented(r.ProjectID, pol.Global()) {
+	pol := e.ProjectPolicy(r)
+	if e.Spool == nil || !session.ValidID(in.SessionID) || !pol.IncludePrompts || !pol.AllowsSignal("logs") || len(pol.ExcludePaths) > 0 || !repliesConsented(r.Consent(pol.Global())) {
 		return
 	}
 	dir, err := config.Dir()

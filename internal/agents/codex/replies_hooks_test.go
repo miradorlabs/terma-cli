@@ -3,6 +3,7 @@ package codex
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -276,5 +277,20 @@ func TestCodexNotifyAndStopDoNotDoubleReplies(t *testing.T) {
 	}
 	if total += len(stopCodex(t, env, path)); total != 2 {
 		t.Fatalf("notify then Stop spooled %d replies, want the turn's 2 once", total)
+	}
+}
+
+// A routing record that exists and cannot be read consents to nothing, whatever else
+// would have: it may be the one that withholds prompts.
+func TestAnUnreadableRouteConsentsToNothing(t *testing.T) {
+	unreadable := errors.New("unexpected end of JSON input")
+	for _, c := range []hookrun.Consent{
+		{RouteErr: unreadable, Relay: true, Global: true},
+		{RouteErr: unreadable, Relay: true},
+		{RouteErr: unreadable, Global: true},
+	} {
+		if repliesConsented(c) {
+			t.Errorf("repliesConsented(%+v) = true", c)
+		}
 	}
 }

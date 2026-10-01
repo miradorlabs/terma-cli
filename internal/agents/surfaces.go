@@ -1,6 +1,10 @@
 package agents
 
-import "context"
+import (
+	"context"
+
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
+)
 
 // Surface is one way a developer runs an agent, chosen on its own at setup (a CLI, a
 // desktop app).
@@ -53,5 +57,16 @@ type StatusLine struct{ Label, Value string }
 type SurfaceChecker interface {
 	Agent
 	CheckedSurfaces() []string
-	CheckSurface(surface, root, projectID string) (SurfaceStatus, error)
+	CheckSurface(surface string, in SurfaceInput) (SurfaceStatus, error)
+}
+
+// SurfaceInput is what a surface's check reads, gathered by the caller.
+type SurfaceInput struct {
+	Root, ProjectID string
+	Route           hookrun.Route
+	Recorded        bool
+	// RouteErr is a routing record that exists and cannot be read.
+	RouteErr error
+	// Keyed reports whether the agent, or else the project, has a delivery key.
+	Keyed func(agent string) bool
 }

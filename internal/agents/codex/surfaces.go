@@ -8,9 +8,7 @@ import (
 	"runtime"
 	"slices"
 
-	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/agents"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
 // desktop's threads run in codex app-server and reach Terma through the relay and the
@@ -47,17 +45,17 @@ func (Agent) CheckedSurfaces() []string { return []string{desktop} }
 
 // CheckSurface is Codex Desktop's readiness at root: a desktop route with logs, a delivery
 // key, and trusted hooks.
-func (a Agent) CheckSurface(_, root, projectID string) (agents.SurfaceStatus, error) {
-	route, recorded, err := routing.LoadRecord(projectID)
-	if err != nil {
-		return agents.SurfaceStatus{}, fmt.Errorf("read this repository's Codex Desktop route: %w", err)
+func (a Agent) CheckSurface(_ string, in agents.SurfaceInput) (agents.SurfaceStatus, error) {
+	route, recorded, projectID := in.Route, in.Recorded, in.ProjectID
+	if in.RouteErr != nil {
+		return agents.SurfaceStatus{}, fmt.Errorf("read this repository's Codex Desktop route: %w", in.RouteErr)
 	}
 	var st agents.SurfaceStatus
 	routed := recorded && slices.Contains(route.Surfaces, desktop) && slices.Contains(route.Harnesses, name) && slices.Contains(route.Signals, "logs")
 	switch {
 	case !routed:
 		st.Problem, st.Fix = "this repository has no Codex Desktop hook route", "terma install --signals logs"
-	case keystore.GetFor(name, projectID) == "" && keystore.Get(projectID) == "":
+	case in.Keyed == nil || !in.Keyed(name):
 		st.Problem, st.Fix = "this repository has no delivery key", "terma install"
 	default:
 		st.Ready = true
@@ -73,7 +71,7 @@ func (a Agent) CheckSurface(_, root, projectID string) (agents.SurfaceStatus, er
 		st.Lines = append(st.Lines, agents.StatusLine{Label: "Prompt text", Value: onOff(route.IncludePrompts)},
 			agents.StatusLine{Label: "Tool content", Value: onOff(route.IncludeToolContent)})
 	}
-	trust, err := a.Trust(root)
+	trust, err := a.Trust(in.Root)
 	if err != nil {
 		return st, err
 	}

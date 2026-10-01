@@ -118,6 +118,7 @@ var bans = []struct {
 	{"internal/hooks/hookruntest", []string{"internal/agents", "internal/cli", "internal/account", "internal/harness"}, "the hook runtime's test kit knows no agent"},
 	{"internal/hooks/dispatch", []string{"internal/cli", "internal/account", "internal/harness", "internal/relay/daemon"}, "a hook reaches the relay and the network only through what the command line injects"},
 	{"internal/agents", []string{"internal/hooks/dispatch"}, "the registry is what dispatch reads, never the other way round"},
+	{"internal/agents", []string{"internal/routing", "internal/relay/claim", "internal/account/keystore", "internal/account/auth", "internal/account/api"}, "an agent is handed the project's route, consent and keys; it never reads them itself"},
 	{"internal/account", []string{"internal/agents", "internal/hooks", "internal/relay", "internal/cli", "internal/ui"}, "the account packages talk to the platform and nothing else"},
 	{"internal/ui", []string{"internal/account", "internal/agents", "internal/hooks", "internal/relay", "internal/cli", "internal/config"}, "terminal output depends on nothing of terma's"},
 }

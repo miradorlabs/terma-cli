@@ -134,6 +134,10 @@ wired, but `install` does not wire them by default.
     account or exporter-kit package. `dispatch` reads the registry, and imports neither the
     command line, the account packages, the exporter kit nor the daemon. The registry never
     imports `dispatch`.
+  - An agent never reads core state: the routing record, the relay's claims, keys and
+    credentials reach it as facts (`hookrun.Repo.Route`, `hookrun.Consent`,
+    `agents.SurfaceInput`), so `internal/agents` imports no `routing`, `relay/claim`,
+    `account/keystore`, `account/auth` or `account/api`.
   - The account packages import nothing but the platform's own.
   - The terminal packages import nothing of terma's.
   - Only `cmd/terma` imports `internal/cli` and `builtin`.

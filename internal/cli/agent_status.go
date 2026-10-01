@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/miradorlabs/terma-cli/internal/doctor"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 )
 
@@ -34,7 +35,7 @@ func (app *App) statusAgentSurface(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	st, ok, err := app.agents.CheckSurface(args[0], root, binding.Project.ID)
+	st, ok, err := app.agents.CheckSurface(args[0], doctor.SurfaceInput(root, binding.Project.ID))
 	if err != nil {
 		return err
 	}

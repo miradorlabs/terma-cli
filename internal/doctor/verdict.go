@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 
@@ -309,9 +310,19 @@ func SelectedForRepo(reg *agents.Registry, projectID string, saved []string) []s
 	return selected
 }
 
+// SurfaceInput is what a surface's own check reads: the project's routing record and
+// whether a delivery key is stored, the agent's own or the project's.
+func SurfaceInput(root, projectID string) agents.SurfaceInput {
+	in := agents.SurfaceInput{Root: root, ProjectID: projectID, Keyed: func(agent string) bool {
+		return keystore.GetFor(agent, projectID) != "" || keystore.Get(projectID) != ""
+	}}
+	in.Route, in.Recorded, in.RouteErr = routing.LoadRecord(projectID)
+	return in
+}
+
 // JudgeSurface is the verdict of a surface with a check of its own.
 func JudgeSurface(reg *agents.Registry, surface, root, projectID string) (HarnessVerdict, bool) {
-	st, ok, err := reg.CheckSurface(surface, root, projectID)
+	st, ok, err := reg.CheckSurface(surface, SurfaceInput(root, projectID))
 	if !ok {
 		return HarnessVerdict{}, false
 	}

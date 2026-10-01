@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/miradorlabs/terma-cli/internal/harness"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
 // RelayConfig is where an agent's telemetry reaches the local relay. Token is never
@@ -67,7 +68,7 @@ type MachineRefresher interface {
 // ContentConsent is an agent whose hooks spool what was said (a reply, a thread's name)
 // under a consent of its own beyond the prompt policy, checked again at delivery.
 type ContentConsent interface {
-	ContentConsented(projectID string, global bool) bool
+	ContentConsented(hookrun.Consent) bool
 }
 
 // StatusLiner is an agent whose user-level status line terma wraps to capture the plan's

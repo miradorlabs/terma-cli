@@ -8,10 +8,8 @@ import (
 	"slices"
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -22,8 +20,8 @@ const codexReplyMaxText = 16 << 10
 // captureCodexReplies spools the messages recorded since the last capture, under a
 // per-session cursor, and only where prompts are consented.
 func captureCodexReplies(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in *codexHookInput) {
-	pol := routing.EffectivePolicy(e.Policy, r.ProjectID)
-	if e.Spool == nil || !session.ValidID(in.SessionID) || !pol.IncludePrompts || !pol.AllowsSignal("logs") || len(pol.ExcludePaths) > 0 || !repliesConsented(r.ProjectID, pol.Global()) {
+	pol := e.ProjectPolicy(r)
+	if e.Spool == nil || !session.ValidID(in.SessionID) || !pol.IncludePrompts || !pol.AllowsSignal("logs") || len(pol.ExcludePaths) > 0 || !repliesConsented(r.Consent(pol.Global())) {
 		return
 	}
 	dir, err := config.Dir()
@@ -91,15 +89,15 @@ func captureCodexReplies(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in
 // repliesConsented reports whether prompts, and so replies, may leave for this
 // repository. It fails closed: a source that exists and cannot be read might be the one
 // that withholds prompts; a missing file is simply not a source.
-func repliesConsented(projectID string, global bool) bool {
-	rec, recorded, err := routing.LoadRecord(projectID)
-	if err != nil {
+func repliesConsented(c hookrun.Consent) bool {
+	rec, recorded := c.Route, c.Recorded
+	if c.RouteErr != nil {
 		return false
 	}
 	// Under the relay the machine-wide config allows prompts on purpose, so only the project's
 	// routing record can consent.
-	if claim.Enabled() {
-		if global && !recorded {
+	if c.Relay {
+		if c.Global && !recorded {
 			return true
 		}
 		return recorded && rec.IncludePrompts && slices.Contains(rec.Harnesses, name) && slices.Contains(rec.Signals, "logs")

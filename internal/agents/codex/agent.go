@@ -136,9 +136,7 @@ func (Agent) WhenHooksOff() map[string]agents.Handler {
 }
 
 // ContentConsented is the consent replies and thread names travel under.
-func (Agent) ContentConsented(projectID string, global bool) bool {
-	return repliesConsented(projectID, global)
-}
+func (Agent) ContentConsented(c hookrun.Consent) bool { return repliesConsented(c) }
 
 // RetrustNote is what a refresh that rewrote .codex/hooks.json says.
 func (Agent) RetrustNote() string {

@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/session"
@@ -115,11 +114,11 @@ type codexHookInput struct {
 
 const codexDesktopSurface = "desktop"
 
-func codexDesktopRoute(r *hookrun.Repo) (routing.Record, bool) {
+func codexDesktopRoute(r *hookrun.Repo) (hookrun.Route, bool) {
 	if r.ProjectID == "" {
-		return routing.Record{}, false
+		return hookrun.Route{}, false
 	}
-	rec, ok, err := routing.LoadRecord(r.ProjectID)
+	rec, ok, err := r.Route()
 	return rec, err == nil && ok && slices.Contains(rec.Surfaces, desktop) &&
 		slices.Contains(rec.Harnesses, name) && slices.Contains(rec.Signals, "logs")
 }
