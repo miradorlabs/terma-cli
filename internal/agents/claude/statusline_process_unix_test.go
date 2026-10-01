@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 )
 
 func TestStatusLineCancellationStopsRendererGroup(t *testing.T) {

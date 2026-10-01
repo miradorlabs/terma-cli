@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/miradorlabs/terma-cli/internal/hookmgr"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 )
 
 // --- Codex project hooks --------------------------------------------------------------

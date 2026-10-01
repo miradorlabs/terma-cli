@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/output"
+	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
 // configView is the machine-readable shape of `config show`. It deliberately has no

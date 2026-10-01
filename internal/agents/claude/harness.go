@@ -10,8 +10,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/miradorlabs/terma-cli/internal/account/serverkey"
 	"github.com/miradorlabs/terma-cli/internal/harness"
-	"github.com/miradorlabs/terma-cli/internal/serverkey"
 )
 
 // exporter configures exporter Code's OpenTelemetry export.

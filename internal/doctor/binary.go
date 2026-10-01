@@ -11,8 +11,8 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/miradorlabs/terma-cli/internal/output"
 	"github.com/miradorlabs/terma-cli/internal/shellrc"
+	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
 // WellKnownBinDirs are where a terma binary gets installed besides wherever PATH points

@@ -5,7 +5,7 @@ import (
 	"io"
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
-	"github.com/miradorlabs/terma-cli/internal/hookmgr"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/install"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/session"

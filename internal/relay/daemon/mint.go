@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/keystore"
 )
 
 // A repository the platform connected has its binding and hooks committed, and no

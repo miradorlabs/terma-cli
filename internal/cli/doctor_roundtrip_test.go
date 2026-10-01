@@ -13,10 +13,10 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/routing"
 
-	"github.com/miradorlabs/terma-cli/internal/auth"
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
+	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
-	"github.com/miradorlabs/terma-cli/internal/keystore"
 )
 
 // Doctor's round-trip reads the scratch commit's terma.commit record back, so it has to

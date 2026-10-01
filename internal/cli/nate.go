@@ -16,7 +16,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
-	"github.com/miradorlabs/terma-cli/internal/output"
+	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
 const termaModulePath = "github.com/miradorlabs/terma-cli"

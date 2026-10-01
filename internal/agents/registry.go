@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/harness"
-	"github.com/miradorlabs/terma-cli/internal/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
 // Registry is the agents a build knows, in the order install plans them, and which of

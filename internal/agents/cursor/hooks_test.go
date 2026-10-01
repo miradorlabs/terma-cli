@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/miradorlabs/terma-cli/internal/hookmgr"
-	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 )
 
 func TestCursorHooksMergeKeepsUnknownKeysAndUserHooks(t *testing.T) {

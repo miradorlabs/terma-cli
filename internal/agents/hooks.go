@@ -3,8 +3,8 @@ package agents
 import (
 	"context"
 
-	"github.com/miradorlabs/terma-cli/internal/hookmgr"
-	"github.com/miradorlabs/terma-cli/internal/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
 // TrustState is whether an agent will run the hooks a repository commits. Detail

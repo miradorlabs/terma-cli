@@ -55,8 +55,8 @@ var mayNameAgents = map[string]string{
 // global are the files that name agents by rule rather than by leak, each with the
 // rule. Nothing else belongs here.
 var global = map[string]string{
-	"internal/style/style.go": "the environment variables coding agents set, terma's or not, to tell a model from a person",
-	"internal/api/ai.go":      "the gateway's pagination cursor",
+	"internal/ui/style/style.go": "the environment variables coding agents set, terma's or not, to tell a model from a person",
+	"internal/account/api/ai.go": "the gateway's pagination cursor",
 }
 
 type pkg struct {
@@ -82,6 +82,17 @@ func listPackages(t *testing.T) []pkg {
 			t.Fatal(err)
 		}
 		pkgs = append(pkgs, p)
+		// go test caches a result by what the test process itself reads, and go list
+		// reads in a process of its own: read each package's directory and files here,
+		// or a change to the import graph is answered from the cache.
+		if _, err := os.ReadDir(p.Dir); err != nil {
+			t.Fatal(err)
+		}
+		for _, name := range p.GoFiles {
+			if _, err := os.ReadFile(filepath.Join(p.Dir, name)); err != nil {
+				t.Fatal(err)
+			}
+		}
 	}
 	return pkgs
 }
@@ -102,8 +113,19 @@ var bans = []struct {
 	why    string
 }{
 	{"internal/relay", []string{"internal/harness", "internal/agents"}, "the relay learns about agents only through its options"},
-	{"internal/doctor", []string{"internal/api", "internal/spool"}, "doctor reaches the network and the spool only through its probes"},
-	{"internal/install", []string{"internal/api", "internal/auth", "internal/spool"}, "install signs in and reaches the network only through its steps"},
+	{"internal/doctor", []string{"internal/account/api", "internal/spool"}, "doctor reaches the network and the spool only through its probes"},
+	{"internal/install", []string{"internal/account", "internal/spool"}, "install signs in and reaches the network only through its steps"},
+	{"internal/hooks/hookrun", []string{"internal/hooks/hookmgr"}, "running a hook and planning hook files are separate halves"},
+	{"internal/hooks/hookmgr", []string{"internal/hooks/hookrun"}, "running a hook and planning hook files are separate halves"},
+	{"internal/hooks", []string{"internal/agents", "internal/cli", "internal/account"}, "the hook runtime knows no agent, command or account; agents build on it"},
+	{"internal/account", []string{"internal/agents", "internal/hooks", "internal/relay", "internal/cli", "internal/ui"}, "the account packages talk to the platform and nothing else"},
+	{"internal/ui", []string{"internal/account", "internal/agents", "internal/hooks", "internal/relay", "internal/cli", "internal/config"}, "terminal output depends on nothing of terma's"},
+}
+
+// onlyImportedBy are packages one entry point imports, and nothing else outside tests.
+var onlyImportedBy = map[string]string{
+	"internal/cli":            "cmd/terma",
+	"internal/agents/builtin": "cmd/terma",
 }
 
 // within reports whether path is pkg or below it.
@@ -126,6 +148,13 @@ func TestAgentPackagesAreImportedOnlyByTheRegistry(t *testing.T) {
 				t.Errorf("%s imports %s: one agent never imports another; share through internal/agents/internal", p.ImportPath, imp)
 			case p.ImportPath != module+"/internal/agents/builtin":
 				t.Errorf("%s imports %s: only internal/agents/builtin imports an agent's package", p.ImportPath, imp)
+			}
+		}
+		for _, imp := range p.Imports {
+			for pkg, by := range onlyImportedBy {
+				if imp == module+"/"+pkg && p.ImportPath != module+"/"+by {
+					t.Errorf("%s imports %s: only %s does", p.ImportPath, imp, by)
+				}
 			}
 		}
 		for _, ban := range bans {

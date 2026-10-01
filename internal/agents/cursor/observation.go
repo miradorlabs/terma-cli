@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/miradorlabs/terma-cli/internal/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
 // The four handlers below record observations, not additive usage counters. Cursor may

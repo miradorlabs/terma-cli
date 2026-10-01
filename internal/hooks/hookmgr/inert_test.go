@@ -9,7 +9,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 )
 
 // Every line terma commits into a repository's hook manager must be a no-op on a

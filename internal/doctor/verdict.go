@@ -10,7 +10,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/harness"
-	"github.com/miradorlabs/terma-cli/internal/hookmgr"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 )
 

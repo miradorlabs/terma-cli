@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/style"
+	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
 // Status is a check's outcome.

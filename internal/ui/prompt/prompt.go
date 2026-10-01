@@ -19,7 +19,7 @@ import (
 
 	"golang.org/x/term"
 
-	"github.com/miradorlabs/terma-cli/internal/style"
+	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
 // Kind is how an Item toggles.

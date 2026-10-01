@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/hookrun"
-	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 )
 
 // A session id becomes a file name and a query value, so every handler refuses one that

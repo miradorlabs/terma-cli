@@ -11,8 +11,8 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/install"
-	"github.com/miradorlabs/terma-cli/internal/spinner"
-	"github.com/miradorlabs/terma-cli/internal/style"
+	"github.com/miradorlabs/terma-cli/internal/ui/spinner"
+	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
 // installUI reports the project, capture choice, warnings, result, and next steps.

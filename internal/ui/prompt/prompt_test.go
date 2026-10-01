@@ -2,9 +2,10 @@ package prompt
 
 import (
 	"bytes"
-	"github.com/miradorlabs/terma-cli/internal/style"
 	"strings"
 	"testing"
+
+	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
 func form() *Form {

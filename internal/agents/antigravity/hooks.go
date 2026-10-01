@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/miradorlabs/terma-cli/internal/hookmgr"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 )
 
 // --- Antigravity project hooks ----------------------------------------------------------

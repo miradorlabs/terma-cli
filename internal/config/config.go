@@ -12,7 +12,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/miradorlabs/terma-cli/internal/flock"
 	"io/fs"
 	"net"
 	"net/url"
@@ -20,6 +19,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/miradorlabs/terma-cli/internal/flock"
 )
 
 const (

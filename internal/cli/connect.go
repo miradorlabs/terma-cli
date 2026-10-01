@@ -14,15 +14,15 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
+	"github.com/miradorlabs/terma-cli/internal/account/api"
+	"github.com/miradorlabs/terma-cli/internal/account/keystore"
+	"github.com/miradorlabs/terma-cli/internal/account/serverkey"
 	"github.com/miradorlabs/terma-cli/internal/agents"
-	"github.com/miradorlabs/terma-cli/internal/api"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/harness"
-	"github.com/miradorlabs/terma-cli/internal/keystore"
-	"github.com/miradorlabs/terma-cli/internal/output"
-	"github.com/miradorlabs/terma-cli/internal/serverkey"
-	"github.com/miradorlabs/terma-cli/internal/style"
+	"github.com/miradorlabs/terma-cli/internal/ui/output"
+	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
 func (app *App) newTelemetryCommand() *cobra.Command {

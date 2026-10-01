@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/miradorlabs/terma-cli/internal/hookmgr"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/install"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
-	"github.com/miradorlabs/terma-cli/internal/style"
+	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
 // A hook manager that needs something run in each clone says so in the plan. Without

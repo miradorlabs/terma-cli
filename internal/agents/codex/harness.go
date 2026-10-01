@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/account/serverkey"
 	"github.com/miradorlabs/terma-cli/internal/harness"
-	"github.com/miradorlabs/terma-cli/internal/serverkey"
 )
 
 // Codex configures the Codex CLI's OpenTelemetry export.

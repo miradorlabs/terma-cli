@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/miradorlabs/terma-cli/internal/hookrun"
-	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 )
 
 func cursorToolRun(t *testing.T, env hookrun.Env, hook, turn string, fields map[string]any) {

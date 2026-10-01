@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 
 	"github.com/miradorlabs/terma-cli/internal/config"

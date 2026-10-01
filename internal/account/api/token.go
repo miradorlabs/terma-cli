@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/auth"
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
 )
 
 const tokenPath = "/v1/auth/cli/token"

@@ -6,7 +6,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/harness"
-	"github.com/miradorlabs/terma-cli/internal/hookmgr"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 )
 
 // Agent is OpenCode. It has no repository-scope hooks: Terma's plugin is user-scope,

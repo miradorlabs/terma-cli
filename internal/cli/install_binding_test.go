@@ -15,7 +15,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/miradorlabs/terma-cli/internal/auth"
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 )

@@ -8,8 +8,8 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/harness"
-	"github.com/miradorlabs/terma-cli/internal/hookmgr"
-	"github.com/miradorlabs/terma-cli/internal/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
 // Agent is Claude Code: project hooks in .claude/settings.json, wired into every

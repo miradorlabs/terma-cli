@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
-	"github.com/miradorlabs/terma-cli/internal/hookmgr"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 )
 
 // hookCommand finds the event a committed hook entry runs. The files differ — JSON with

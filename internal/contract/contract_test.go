@@ -13,7 +13,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
 	"github.com/miradorlabs/terma-cli/internal/agents/codex"
-	"github.com/miradorlabs/terma-cli/internal/hookmgr"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 )
 
 var update = flag.Bool("update", false, "rewrite the snapshots from the current build")

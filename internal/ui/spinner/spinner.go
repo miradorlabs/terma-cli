@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/style"
+	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
 // frames is the web app's loading mark on one terminal cell: the four quadrants of

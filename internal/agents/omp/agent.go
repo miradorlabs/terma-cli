@@ -6,8 +6,8 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/harness"
-	"github.com/miradorlabs/terma-cli/internal/hookmgr"
-	"github.com/miradorlabs/terma-cli/internal/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
 // Agent is Omp. Its attribution wiring is a committed hook file at .omp/hooks/pre/terma.ts

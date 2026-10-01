@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
-	"github.com/miradorlabs/terma-cli/internal/output"
+	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
 // newHarnessListCommand reports terma's static support for each coding agent: what it

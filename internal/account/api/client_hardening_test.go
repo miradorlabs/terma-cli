@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/auth"
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
 )
 
 // TestClient_RefusesToFollowRedirects guards the redirect policy. Following a redirect

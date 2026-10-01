@@ -9,9 +9,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/miradorlabs/terma-cli/internal/output"
-	"github.com/miradorlabs/terma-cli/internal/prompt"
-	"github.com/miradorlabs/terma-cli/internal/style"
+	"github.com/miradorlabs/terma-cli/internal/ui/output"
+	"github.com/miradorlabs/terma-cli/internal/ui/prompt"
+	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
 // pickRow is one line of a numbered picker: what it is called, and anything worth

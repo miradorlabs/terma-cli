@@ -11,14 +11,14 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/miradorlabs/terma-cli/internal/account/api"
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/agents"
-	"github.com/miradorlabs/terma-cli/internal/api"
-	"github.com/miradorlabs/terma-cli/internal/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/output"
-	"github.com/miradorlabs/terma-cli/internal/prompt"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
-	"github.com/miradorlabs/terma-cli/internal/style"
+	"github.com/miradorlabs/terma-cli/internal/ui/output"
+	"github.com/miradorlabs/terma-cli/internal/ui/prompt"
+	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
 type setupFlags struct {

@@ -6,8 +6,8 @@ import (
 	"os/exec"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
-	"github.com/miradorlabs/terma-cli/internal/hookmgr"
-	"github.com/miradorlabs/terma-cli/internal/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
 // Agent is Pi (@earendil-works/pi-coding-agent). Like OpenCode it has no repository-scope

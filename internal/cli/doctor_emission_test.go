@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/harness"
-	"github.com/miradorlabs/terma-cli/internal/keystore"
 )
 
 func TestDoctorChecksClaudeEmissionSettings(t *testing.T) {

@@ -6,7 +6,7 @@ import (
 	"os/exec"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
-	"github.com/miradorlabs/terma-cli/internal/hookmgr"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 )
 
 // Agent is Gemini CLI. Its hooks come from terma's user-level Gemini extension

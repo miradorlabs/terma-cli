@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/api"
+	"github.com/miradorlabs/terma-cli/internal/account/api"
 )
 
 // runInsights executes the command tree against a fake gateway, authenticated with a

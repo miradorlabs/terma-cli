@@ -9,9 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/miradorlabs/terma-cli/internal/auth"
-	"github.com/miradorlabs/terma-cli/internal/config"
 	"time"
+
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
+	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
 const testCapture = `"capture":{"exclude_paths":[],"exclude_prompts":true,"exclude_tool_content":false,"signals":["traces","logs"]}`

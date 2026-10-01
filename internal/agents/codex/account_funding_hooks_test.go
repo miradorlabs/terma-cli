@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/miradorlabs/terma-cli/internal/hookrun"
-	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 )
 
 // testdata/codex_rollout_real.jsonl are REAL rate-limit records (event_msg/token_count) captured from

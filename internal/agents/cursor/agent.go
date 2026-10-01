@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
-	"github.com/miradorlabs/terma-cli/internal/hookmgr"
-	"github.com/miradorlabs/terma-cli/internal/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
 // Agent is Cursor's IDE and CLI: project hooks in .cursor/hooks.json, wired by default

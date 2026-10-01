@@ -13,9 +13,9 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/miradorlabs/terma-cli/internal/account/serverkey"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/harness"
-	"github.com/miradorlabs/terma-cli/internal/serverkey"
 )
 
 // exporter configures the exporter CLI's export to Terma by installing a plugin.

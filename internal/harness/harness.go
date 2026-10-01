@@ -18,7 +18,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/miradorlabs/terma-cli/internal/serverkey"
+	"github.com/miradorlabs/terma-cli/internal/account/serverkey"
 )
 
 // Signal is one OTLP telemetry stream.

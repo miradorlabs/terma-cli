@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/keystore"
 )
 
 const mintedKey = "ter_srv_minted0123456789abcdefghijklmnopqrstuv"

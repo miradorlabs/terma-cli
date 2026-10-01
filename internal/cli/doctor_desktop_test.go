@@ -10,8 +10,8 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/routing"
 
+	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
-	"github.com/miradorlabs/terma-cli/internal/keystore"
 )
 
 func TestDesktopOnlySelectionDoesNotRequireCodexCLIShim(t *testing.T) {

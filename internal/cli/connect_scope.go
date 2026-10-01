@@ -15,8 +15,8 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/harness"
-	"github.com/miradorlabs/terma-cli/internal/output"
-	"github.com/miradorlabs/terma-cli/internal/prompt"
+	"github.com/miradorlabs/terma-cli/internal/ui/output"
+	"github.com/miradorlabs/terma-cli/internal/ui/prompt"
 )
 
 // The interactive half of connect: a checklist of what to send and where, shown on a

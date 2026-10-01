@@ -6,7 +6,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/miradorlabs/terma-cli/internal/doctor"
-	"github.com/miradorlabs/terma-cli/internal/spinner"
+	"github.com/miradorlabs/terma-cli/internal/ui/spinner"
 )
 
 func (app *App) newDoctorCommand() *cobra.Command {

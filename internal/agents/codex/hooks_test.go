@@ -11,8 +11,8 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 
-	"github.com/miradorlabs/terma-cli/internal/hookmgr"
-	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 )
 
 // codexFile is the shape terma writes and Codex parses: matcher groups, each holding

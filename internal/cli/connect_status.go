@@ -10,7 +10,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/harness"
-	"github.com/miradorlabs/terma-cli/internal/output"
+	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
 func (app *App) newTelemetryStatusCommand() *cobra.Command {

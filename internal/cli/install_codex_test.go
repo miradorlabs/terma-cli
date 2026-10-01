@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/miradorlabs/terma-cli/internal/hookmgr"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 )
 
 func codexHooksIn(t *testing.T, repo string) map[string][]struct {

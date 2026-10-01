@@ -16,7 +16,7 @@ import (
 	"text/tabwriter"
 	"unicode/utf8"
 
-	"github.com/miradorlabs/terma-cli/internal/style"
+	"github.com/miradorlabs/terma-cli/internal/ui/style"
 
 	"golang.org/x/term"
 	"gopkg.in/yaml.v3"

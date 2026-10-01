@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 )
 
 // These are terminal byte streams, not strings to sanitize or reflow. Prefixing

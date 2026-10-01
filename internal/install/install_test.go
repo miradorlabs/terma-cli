@@ -10,8 +10,8 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
-	"github.com/miradorlabs/terma-cli/internal/hookmgr"
-	"github.com/miradorlabs/terma-cli/internal/hookrun/hookruntest"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 )
 

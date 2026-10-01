@@ -4,7 +4,7 @@ import (
 	"cmp"
 	"context"
 
-	"github.com/miradorlabs/terma-cli/internal/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
