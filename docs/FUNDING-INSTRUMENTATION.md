@@ -136,7 +136,7 @@ larger than 1 MiB are skipped incrementally to the next newline. Unix file ident
 survives an archive rename; other platforms use metadata/checkpoint hashes and
 cannot distinguish a byte-identical replacement. These checks do not detect every
 possible historical in-place edit. No transcript text is stored in cursor state.
-(The rollout has one other reader, `harness.ReadCodexReplies`, which does read text — the
+(The rollout has one other reader, `readRolloutReplies` (internal/agents/codex), which does read text — the
 assistant's replies, for a developer whose prompts already travel — with a cursor of its
 own under `reply-cursors/` that holds none either. Funding capture itself reads none.)
 

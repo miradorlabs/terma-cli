@@ -48,8 +48,11 @@ developer login to check the team's repository permission.
   are never wired by default (`install.Adapters`), whatever directory the repository
   carries or a colleague committed — only `--adapters` names one — and uninstall, doctor
   and `terma hook` still cover them.
-- Hooks are thin shims; **all logic is in the binary** (`terma hook <event>`,
-  `internal/hooks/hookrun`). Never put logic in `hookmgr.ShimScript` or the husky/lefthook/
+- Hooks are thin shims; **all logic is in the binary** (`terma hook <event>`, run by
+  `internal/hooks/dispatch` over the runtime in `internal/hooks/hookrun`). dispatch takes git
+  hooks first without touching the registry, then the owning agent's render hook (it still
+  renders under `TERMA_HOOKS=0`, returning its status as the exit code), its hooks-off
+  handler or its handler; the relay start, clone wiring and flush are injected by the CLI. Never put logic in `hookmgr.ShimScript` or the husky/lefthook/
   pre-commit lines beyond "call terma, never fail, chain". Every committed entry is
   guarded (`command -v terma … || true`) so a colleague without terma sees nothing, in
   git or in their agent; the harness entries share one string, `hookmgr.HookCommand`,
@@ -148,6 +151,9 @@ developer login to check the team's repository permission.
   sidecar, never the file the rename replaces. **Any file that is read, edited and
   renamed back needs the lock** — the session store, `keys.json`, `codex-notify.json` and
   `statusline.json` each lost updates without it (16 concurrent writers kept 1 entry).
+  `flock.Locked(path, wait, fn)` is that read-modify-write's lock: it creates the
+  directory and holds `path+".lock"` around `fn` (the claim store keeps its own, since it
+  writes even without the lock).
 - `internal/hooks/hookmgr` by file: `hookmgr.go` is the vocabulary (`Manager`, `Detect`,
   `Change`, `Plan`, `Apply`); `git.go` the four git hook managers; `user.go` the
   machine-wide hooks; `json.go` the unescaped, key-ordered JSON. Each agent's planner is
@@ -160,7 +166,9 @@ developer login to check the team's repository permission.
   never rename one); `input.go` is the one bounded payload reader (`ReadInput[T]`,
   4 MiB, an oversized payload is refused by name); `lifecycle.go` the session
   start / end / files-touched steps every agent shares (`announce`, `endSession`,
-  `touch`); `attrs.go` the evidence header and the bounded-string guard; `state.go` the
+  `touch`, and `Env.Open`, every session hook's first step: refuse an unsafe session id, run
+  from the payload's cwd, resolve the repository); `attrs.go` the evidence header and the
+  bounded-string guard; `evidence.go` the bounded funding-evidence reader agents capture with; `state.go` the
   state directory names and timing constants. A handler resolves the repository once
   and passes the `*repo` down. Only Codex patches and Cursor's `subagentStop` dedupe and
   sort their `files` list (`hookrun.UniqueSorted`, at the call site); every other agent keeps
@@ -180,7 +188,7 @@ developer login to check the team's repository permission.
   names agents awaiting trust instead of assigning speculative spend percentages.
   Doctor also compares PATH's executable with the running build; a mismatch can leave
   scratch events without a project binding. Only the developer's own agents
-  (`config.Harnesses`; empty = all) count — a colleague's committed Codex hooks are not
+  (`config.Profile.Harnesses`; empty = all) count — a colleague's committed Codex hooks are not
   theirs to trust. The scratch commit's checkout, commit and removal run under
   `scratchGitTimeout` (2 min) through `gitx.GitWithin`, never a hook's 2-second
   `gitx.Timeout`: a 2.7 GB checkout takes 11 s and was killed on every run, each
@@ -294,16 +302,16 @@ developer login to check the team's repository permission.
   `.codex/hooks.json`, which Codex loads only for a trusted project *and* only after the
   developer trusts each entry from inside Codex. Until then the file is inert and
   nothing says so, which is why `doctor` reads the `[hooks.state]` record in the user's
-  config (`harness.CodexHookTrustFor`) and reports untrusted hooks as a warning. Terma
+  config (`hookTrustFor` in internal/agents/codex) and reports untrusted hooks as a warning. Terma
   never writes that table.
 - Codex never exports what it **said**: its OTel events carry `prompt` and tool
   `arguments`/`output`, `response.completed` is token counts, and no switch adds the reply
   (every record of a live 0.155.1 session, 2026-09-19). So `codex-stop` (and `codex-notify`,
   `codex-session-end`; one locked cursor per session under `reply-cursors/`) reads the
-  turn's assistant messages from the rollout (`harness.ReadCodexReplies`, the same confined
+  turn's assistant messages from the rollout (`readRolloutReplies` (internal/agents/codex), the same confined
   open as funding, 32 messages / 1 MiB per invocation, 16 KiB per message) and spools
   `terma.assistant.message`. It is the **one** place terma reads conversation content, and
-  it is gated on the consent prompts travel under (`codexRepliesConsented`): the repo's
+  it is gated on the consent prompts travel under (`repliesConsented`): the repo's
   routing record and the machine-wide Codex config must each allow prompts where they
   exist — a hook cannot tell which started the session — and with neither, nothing is read.
   It fails closed: a source that exists and cannot be read (a half-written routing record, a
@@ -319,10 +327,10 @@ developer login to check the team's repository permission.
   `conversation.id`, a fixed "Generate a concise, single-line task title…" prompt, no link
   back) generates it, and it lands only in `$CODEX_HOME/session_index.jsonl`, keyed by the
   thread it names (0.157.1, 2026-09-27). The same three hooks read the latest line for their
-  session (`harness.ReadCodexThreadTitle`) and spool `terma.session.title` (`title`, stamped
+  session (`readThreadTitle` (internal/agents/codex)) and spool `terma.session.title` (`title`, stamped
   with the index's `updated_at`) when it is new or renamed; `codex-titles/` keeps the last
   `updated_at` sent. The name restates the first prompt, so it is the one other read of
-  conversation content and travels under the same `codexRepliesConsented` gate.
+  conversation content and travels under the same `repliesConsented` gate.
 - Codex names no edited file: `PostToolUse` carries the tool call, and the paths live in
   the apply_patch envelope inside `tool_input.command` (`hookrun.applyPatchPaths`). That
   hook is `async` in the committed file because it fires on every tool call and nothing
@@ -370,7 +378,11 @@ developer login to check the team's repository permission.
   export flags explicitly change it. Per-repo routing is configured independently.
   A pre-existing OTLP conflict there is reported and
   skipped, not fatal — the hooks and the binding are already written by that point.
-- Connect scope (`internal/harness/scope.go`): `Claude{}` is global; `Claude{}.Local(root)`
+- The connect workflows are `internal/connect`: `Global` (machine-wide) and `Local` (a
+  repository's committed policy) share one gate — report conflicts, refuse what terma
+  cannot clear, refuse what needs `--force`, ask — and resolving, storing and asking for a
+  key come in as `connect.Steps`, so the package imports no account or spool code.
+- Connect scope (`internal/harness/scope.go`): Claude Code's exporter is global; its `.Local(root)`
   writes `<root>/.claude/settings.json` and renders only `claudeLocalKeys` — the three
   exporters, the four capture switches, the traces beta flag — never the endpoint, key
   or master switch. A local file is a policy, not a connection: its
@@ -519,7 +531,7 @@ developer login to check the team's repository permission.
   come from `toolCall.args.TargetFile` (agy's own tools) or the vendor-style keys. Every
   handler prints `{}` to stdout — agy's documented reply — so `hookrun.Env.Stdout` is now
   set for all hooks. agy loads hooks only in a **trusted** workspace (`trustedWorkspaces`
-  in `~/.gemini/antigravity-cli/settings.json`, read by `harness.Antigravity`) and only
+  in `~/.gemini/antigravity-cli/settings.json`, read by `trustsWorkspace` in internal/agents/antigravity) and only
   when the repository is the conversation's workspace: `agy -p` from an unregistered
   directory uses its default CLI project's scratch folder and loads no repository hooks
   (`--add-dir <repo>` binds it). Payloads and transcripts carry no token counts; the
@@ -579,7 +591,7 @@ developer login to check the team's repository permission.
   **Codex**: a subagent is a thread the session spawned. Its hooks carry the root's
   `session_id`, the child thread's id as `agent_id`, and the child's own rollout as
   `transcript_path` (`hook_runtime.rs`, read 2026-09-17; not seen live). `SubagentStart`
-  reads that rollout's first line for the spawn record (`harness.CodexRolloutSpawn` →
+  reads that rollout's first line for the spawn record (`rolloutSpawn` (internal/agents/codex) →
   `agent_parent_id`, `agent_depth`, `agent_nickname`, `agent_path`, `rollout_status`);
   `SubagentStop` is per child *turn*, not a bracket. Capture inside the thread must read
   the child's rollout — `codexRolloutID` takes the thread from the rollout file's own
@@ -601,7 +613,7 @@ developer login to check the team's repository permission.
   Codex trusts hooks entry by entry: a developer who trusted terma's before the two
   subagent entries existed has a file that counts as trusted and two hooks Codex skips in
   silence, so the adapter compares entries (`codex.TermaEntries`,
-  `CodexHookTrust.TrustedKeys`) and doctor names what is skipped.
+  `hookTrust.TrustedKeys`) and doctor names what is skipped.
 - `docs/collection-matrix.html` is the harness × information × mechanism matrix (open it
   in a browser). Update a cell when a mechanism ships or a live check changes it.
 - `live/` runs the real harness binaries with real credentials through the real `terma`
@@ -650,7 +662,7 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   `conversation_starts` before any hook and never retries it.
 - A claim is scoped to processes, not just a session: it carries the hook's ancestors
   (`internal/procinfo`), and the relay forwards a record only from a process the claim
-  names (`procinfo.PeerPID` per connection, retried at the connection's next exports if
+  names (`procinfo.FindSender` per connection, retried at the connection's next exports if
   it failed; an unresolved sender is covered only by a claim that names no processes —
   a platform where hooks cannot read them — and never widens one that does: counted
   `sender_unresolved`, held and dropped). Claude keeps a session id across `--resume` in any directory,
@@ -757,7 +769,7 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   (underscore) is a session key; an unclaimed `codex.conversation_starts` waits
   `TraceHold` (app-server exports it at `thread/start`, the first hook fires at the first
   turn). The daemon reads `[otel]` only at start: `relay setup` and doctor name
-  `codex app-server daemon restart` (`harness.RunningCodexDaemon`), never run it.
+  `codex app-server daemon restart` (`runningDaemon` in internal/agents/codex), never run it.
   `live/codex_appserver.go` drives app-server over stdio JSON-RPC and a sandbox daemon
   (short `CODEX_HOME`: SUN_LEN); `live/claude_desktop.go` reproduces Desktop's launch.
 - Pi, Hermes and DeepSeek Harness have no usable exporter: terma writes one into each —
@@ -777,7 +789,7 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
   strips them (`TestRelayClaudeToolsGetNoExporter`); omp gets none
   (`TestRelayOmpToolsGetNoExporter`). cursor-agent's own tracer is fixed to Cursor's backend, so Cursor never
   reaches the relay (`TestRelayCursorHooks`).
-- Gemini CLI exports natively from `~/.gemini/settings.json` (`harness.ConnectGeminiRelay`
+- Gemini CLI exports natively from `~/.gemini/settings.json` (`connectRelay` in internal/agents/gemini
   changes only its `telemetry` block); the file has no headers, so the relay also takes
   its token as the endpoint path's first segment (`relay.Handler`, exact, constant-time).
   Its claims come from terma's user-level Gemini extension (`~/.gemini/extensions/terma`,
@@ -800,7 +812,7 @@ provider report schema evidence, lives in `pocs/funding-model/replay/evidence/`.
 - OTLP types come from `go.opentelemetry.io/proto/otlp/{logs,metrics,trace}` as
   `*Data` messages (wire-identical to the export requests); never import the collector
   packages, which pull gRPC into every hook. Under the relay the machine-wide Codex config
-  always allows prompts, so `codexRepliesConsented` takes consent from the routing record
+  always allows prompts, so `repliesConsented` takes consent from the routing record
   alone. `live/relay_test.go` is the e2e proof and nightly canary (`golden/relay/`).
 
 ## Contracts other repos depend on

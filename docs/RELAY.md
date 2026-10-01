@@ -342,12 +342,12 @@ The relay's own attribution reads no harness files: everything it knows comes fr
 
 | Reader | File | What it captures | Why no OTLP substitute |
 |---|---|---|---|
-| `harness.ReadCodexReplies` | the Codex rollout | the assistant's reply text (`terma.assistant.message`) | Codex exports what was asked, never what it said |
-| `harness.ReadCodexThreadTitle` | `$CODEX_HOME/session_index.jsonl` | the thread's name (`terma.session.title`) | the title conversation exports its spans, not the name it chose |
+| `readRolloutReplies` (internal/agents/codex) | the Codex rollout | the assistant's reply text (`terma.assistant.message`) | Codex exports what was asked, never what it said |
+| `readThreadTitle` (internal/agents/codex) | `$CODEX_HOME/session_index.jsonl` | the thread's name (`terma.session.title`) | the title conversation exports its spans, not the name it chose |
 | Codex funding capture | the Codex rollout | rate-limit and quota snapshots (`terma.session.quota`) | not in Codex's OTLP |
-| `harness.ReadCodexDesktopActivity` | the Codex rollout | Desktop turn summaries, compactions, approvals | not in Codex's OTLP |
-| `harness.CodexRolloutSpawn` | a subagent's rollout, first line | the subagent's parent link | not in Codex's OTLP |
-| `harness.ClaudeFunding` | `~/.claude.json` | account state and credential-presence hints (`terma.session.account`) | not in Claude's OTLP |
+| `readDesktopActivity` (internal/agents/codex) | the Codex rollout | Desktop turn summaries, compactions, approvals | not in Codex's OTLP |
+| `rolloutSpawn` (internal/agents/codex) | a subagent's rollout, first line | the subagent's parent link | not in Codex's OTLP |
+| `readFunding` (internal/agents/claude) | `~/.claude.json` | account state and credential-presence hints (`terma.session.account`) | not in Claude's OTLP |
 
 Each read is bounded and confined as `CLAUDE.md` describes, and replies and titles travel under the prompt-consent gate. These should be replaced the day a harness exports the same facts. Nothing new may add such a read.
 
