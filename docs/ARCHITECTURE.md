@@ -12,7 +12,7 @@ place.
                   │   ├─ internal/install   one plan: dry run prints it, Apply carries it out │
                   │   └─ internal/doctor    the checks, in order; probes reach network/spool  │
                   │                                                                           │
- agent hooks ────▶│ terma hook <event>  →  internal/hooks/hookrun  →  internal/spool ─────────┼──▶ Terma ingest
+ agent hooks ────▶│ terma hook <event> → hooks/dispatch → hooks/hookrun → internal/spool ─────┼──▶ Terma ingest
  git hooks   ────▶│   (prepare-commit-msg stamps trailers: internal/trailer, internal/session)│
                   │        │ claims sessions (internal/relay/claim)                           │
                   │        ▼                                                                  │
@@ -35,8 +35,10 @@ other state. Commands stay thin: `install` builds an `install.Plan` and applies 
 such as sign-in, key minting and the network, as `install.Steps` or `doctor.Probes`.
 
 **The hooks** (`internal/hooks`). A committed hooks file calls `terma hook <event>`,
-guarded so that a machine without terma does nothing. `hookrun` is the runtime every
-event shares: a bounded payload reader, the session lifecycle (start, files touched,
+guarded so that a machine without terma does nothing. `dispatch` runs it: the git hooks
+first, then the owning agent's render hook, its hooks-off handler or its event handler
+(from the registry's event index), then the claim, the relay start and the flush, which
+the command line injects. `hookrun` is the runtime every event shares: a bounded payload reader, the session lifecycle (start, files touched,
 end), the evidence attributes, and the spool append. An agent's handlers build on it
 from the agent's own package. `hookmgr` plans the files that wire hooks: the commit
 hooks through whichever manager the repository uses (husky, lefthook, pre-commit or
@@ -95,7 +97,7 @@ wired, but `install` does not wire them by default.
 | Command line | `internal/cli` |
 | Workflows | `internal/install`, `internal/doctor` |
 | Agents | `internal/agents` (contract, registry), `internal/agents/builtin`, `internal/agents/<name>`, `internal/agents/internal/*` (shared by a few agents) |
-| Hook runtime | `internal/hooks/hookrun`, `internal/hooks/hookmgr`, `internal/hooks/hookruntest` |
+| Hook runtime | `internal/hooks/dispatch`, `internal/hooks/hookrun`, `internal/hooks/hookmgr`, `internal/hooks/hookruntest` |
 | Relay | `internal/relay` (engine), `internal/relay/daemon`, `internal/relay/claim`, `internal/relay/shape`, `internal/relay/service` |
 | Events and attribution | `internal/spool`, `internal/session`, `internal/trailer` |
 | Exporter kit | `internal/harness` (exporter configuration, journal, settings writes) |
@@ -119,7 +121,10 @@ wired, but `install` does not wire them by default.
   - `doctor` imports neither `account/api` nor `spool`.
   - `install` imports nothing under `account` and not `spool`.
   - `hookrun` and `hookmgr` never import each other.
-  - The hook runtime imports no agent, command, account or exporter-kit package.
+  - The hook runtime (`hookrun`, `hookmgr`, `hookruntest`) imports no agent, command,
+    account or exporter-kit package. `dispatch` reads the registry, and imports neither the
+    command line, the account packages, the exporter kit nor the daemon. The registry never
+    imports `dispatch`.
   - The account packages import nothing but the platform's own.
   - The terminal packages import nothing of terma's.
   - Only `cmd/terma` imports `internal/cli` and `builtin`.

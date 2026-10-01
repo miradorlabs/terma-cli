@@ -112,7 +112,11 @@ var bans = []struct {
 	{"internal/install", []string{"internal/account", "internal/spool"}, "install signs in and reaches the network only through its steps"},
 	{"internal/hooks/hookrun", []string{"internal/hooks/hookmgr"}, "running a hook and planning hook files are separate halves"},
 	{"internal/hooks/hookmgr", []string{"internal/hooks/hookrun"}, "running a hook and planning hook files are separate halves"},
-	{"internal/hooks", []string{"internal/agents", "internal/cli", "internal/account", "internal/harness"}, "the hook runtime knows no agent, command, account or exporter; agents build on it"},
+	{"internal/hooks/hookrun", []string{"internal/agents", "internal/cli", "internal/account", "internal/harness"}, "the hook runtime knows no agent, command, account or exporter; agents build on it"},
+	{"internal/hooks/hookmgr", []string{"internal/agents", "internal/cli", "internal/account", "internal/harness"}, "hook files are planned for agents, never by naming them"},
+	{"internal/hooks/hookruntest", []string{"internal/agents", "internal/cli", "internal/account", "internal/harness"}, "the hook runtime's test kit knows no agent"},
+	{"internal/hooks/dispatch", []string{"internal/cli", "internal/account", "internal/harness", "internal/relay/daemon"}, "a hook reaches the relay and the network only through what the command line injects"},
+	{"internal/agents", []string{"internal/hooks/dispatch"}, "the registry is what dispatch reads, never the other way round"},
 	{"internal/account", []string{"internal/agents", "internal/hooks", "internal/relay", "internal/cli", "internal/ui"}, "the account packages talk to the platform and nothing else"},
 	{"internal/ui", []string{"internal/account", "internal/agents", "internal/hooks", "internal/relay", "internal/cli", "internal/config"}, "terminal output depends on nothing of terma's"},
 }

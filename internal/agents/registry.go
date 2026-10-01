@@ -5,6 +5,7 @@ import (
 	"maps"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
@@ -16,6 +17,48 @@ type Registry struct {
 	all       []Agent
 	supported map[string]bool
 	upcoming  []string
+
+	indexOnce sync.Once
+	events    map[string]Event
+	renders   map[string]RenderHandler
+	offs      map[string]Handler
+}
+
+// Event is one `terma hook <event>` name: the handler, the agent that owns it, and
+// whether a spool flush follows it.
+type Event struct {
+	Handler Handler
+	Agent   Agent
+	Flush   bool
+}
+
+// index maps every event to its owner once, on first use, so a git hook never pays for
+// it. Two agents claiming one event is a build error, never a merge of the two.
+func (r *Registry) index() {
+	r.indexOnce.Do(func() {
+		r.events, r.renders, r.offs = map[string]Event{}, map[string]RenderHandler{}, map[string]Handler{}
+		for _, a := range r.all {
+			for name, h := range a.Events() {
+				if other, dup := r.events[name]; dup {
+					panic(fmt.Sprintf("agents: %s and %s both handle %q", other.Agent.Name(), a.Name(), name))
+				}
+				r.events[name] = Event{Handler: h, Agent: a, Flush: slices.Contains(a.FlushAfter(), name)}
+			}
+			if rd, ok := a.(Renderer); ok {
+				maps.Copy(r.renders, rd.Renders())
+			}
+			if o, ok := a.(OffSwitched); ok {
+				maps.Copy(r.offs, o.WhenHooksOff())
+			}
+		}
+	})
+}
+
+// Event resolves a hook event to its handler and owner.
+func (r *Registry) Event(name string) (Event, bool) {
+	r.index()
+	e, ok := r.events[name]
+	return e, ok
 }
 
 // New registers every agent the build knows.
@@ -143,16 +186,18 @@ func (r *Registry) WiredNames(root string) []string {
 
 // Handlers is every known agent's events. Names are unique across agents.
 func (r *Registry) Handlers() map[string]Handler {
-	out := map[string]Handler{}
-	for _, a := range r.all {
-		maps.Copy(out, a.Events())
+	r.index()
+	out := make(map[string]Handler, len(r.events))
+	for name, e := range r.events {
+		out[name] = e.Handler
 	}
 	return out
 }
 
 // FlushesAfter reports whether a spool flush follows the event.
 func (r *Registry) FlushesAfter(event string) bool {
-	return slices.ContainsFunc(r.all, func(a Agent) bool { return slices.Contains(a.FlushAfter(), event) })
+	e, ok := r.Event(event)
+	return ok && e.Flush
 }
 
 // ForTool resolves the agent whose hooks carry label.
@@ -167,41 +212,31 @@ func (r *Registry) ForTool(label string) (Agent, bool) {
 
 // Render is the render hook for event, when an agent has one.
 func (r *Registry) Render(event string) (RenderHandler, bool) {
-	for _, a := range r.With[Renderer]() {
-		if h, ok := a.Renders()[event]; ok {
-			return h, true
-		}
-	}
-	return nil, false
+	r.index()
+	h, ok := r.renders[event]
+	return h, ok
 }
 
 // WhenHooksOff is what event runs while hooks are switched off, when anything does.
 func (r *Registry) WhenHooksOff(event string) (Handler, bool) {
-	for _, a := range r.With[OffSwitched]() {
-		if h, ok := a.WhenHooksOff()[event]; ok {
-			return h, true
-		}
-	}
-	return nil, false
+	r.index()
+	h, ok := r.offs[event]
+	return h, ok
 }
 
 // ToolForEvent is the label of the agent whose hooks run event, or "" for a git hook.
 func (r *Registry) ToolForEvent(event string) string {
-	for _, a := range r.all {
-		if _, ok := a.Events()[event]; ok {
-			return Tool(a)
-		}
+	if e, ok := r.Event(event); ok {
+		return Tool(e.Agent)
 	}
 	return ""
 }
 
 // PayloadSession reads a hook payload's session the way the agent that owns event writes it.
 func (r *Registry) PayloadSession(event string, payload []byte) (hookrun.PayloadSession, bool) {
-	for _, a := range r.all {
-		if _, ok := a.Events()[event]; ok {
-			if pr, ok := a.(PayloadReader); ok {
-				return pr.PayloadSession(payload)
-			}
+	if e, ok := r.Event(event); ok {
+		if pr, ok := e.Agent.(PayloadReader); ok {
+			return pr.PayloadSession(payload)
 		}
 	}
 	return hookrun.ReadPayloadSession(payload)
