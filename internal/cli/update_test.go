@@ -99,7 +99,7 @@ func TestUpdateCheckAndSourceBuildGuard(t *testing.T) {
 				t.Fatal(err)
 			}
 			var out bytes.Buffer
-			if err := testApp.runUpdate(context.Background(), c, dir, exe, &out, true, false); err != nil {
+			if _, err := testApp.runUpdate(context.Background(), c, dir, exe, &out, true, false); err != nil {
 				t.Fatal(err)
 			}
 			if calls != 1 {
@@ -114,9 +114,14 @@ func TestUpdateCheckAndSourceBuildGuard(t *testing.T) {
 			}
 
 			if version != "1.0.0" {
-				err := testApp.runUpdate(context.Background(), c, dir, exe, &out, false, false)
-				if err == nil || !strings.Contains(err.Error(), "--force") {
-					t.Fatalf("source build not guarded: %v", err)
+				// A source build is left in place (update then only refreshes) and told about --force.
+				out.Reset()
+				installed, err := testApp.runUpdate(context.Background(), c, dir, exe, &out, false, false)
+				if err != nil || installed || !strings.Contains(out.String(), "--force") {
+					t.Fatalf("source build not guarded: installed %v, err %v, output %q", installed, err, &out)
+				}
+				if data, _ := os.ReadFile(exe); string(data) != "keep me" {
+					t.Fatal("update replaced a source build without --force")
 				}
 			}
 		})
@@ -129,7 +134,7 @@ func TestUpdateCheckExplainsMissingRelease(t *testing.T) {
 	c := &selfupdate.Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0"}
 	var out bytes.Buffer
 	dir := t.TempDir()
-	if err := testApp.runUpdate(context.Background(), c, dir, "unused", &out, true, false); err != nil {
+	if _, err := testApp.runUpdate(context.Background(), c, dir, "unused", &out, true, false); err != nil {
 		t.Fatal(err)
 	}
 	if !selfupdate.LoadCache(dir).Failed {
@@ -137,5 +142,33 @@ func TestUpdateCheckExplainsMissingRelease(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "No binary update is available") {
 		t.Fatal(out.String())
+	}
+}
+
+// Already on the latest release, `terma update` is the refresh, so it is safe to run again.
+func TestUpdateOnTheLatestReleaseRefreshes(t *testing.T) {
+	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprint(w, `{"tag_name":"v1.0.0","assets":[]}`)
+	}))
+	defer srv.Close()
+	c := &selfupdate.Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0"}
+	var out bytes.Buffer
+	if err := testApp.updateOrRefresh(context.Background(), c, t.TempDir(), "unused", &out, false, false); err != nil {
+		t.Fatalf("update: %v\n%s", err, &out)
+	}
+	for _, want := range []string{"is up to date", "refresh"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("output should say %q:\n%s", want, &out)
+		}
+	}
+
+	// --check only reports.
+	out.Reset()
+	if err := testApp.updateOrRefresh(context.Background(), c, t.TempDir(), "unused", &out, true, false); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "efresh") {
+		t.Errorf("--check refreshed:\n%s", &out)
 	}
 }

@@ -82,7 +82,7 @@ func (app *App) resolveBinding(cmd *cobra.Command, cfg *config.Config, existing 
 
 	switch {
 	case existing != nil && !bound && !ask:
-		return install.Binding{}, fmt.Errorf("%s — run `terma install --team <name or id>` with one of yours (`terma team list` lists them)", unreachableBinding(existing, cfg))
+		return install.Binding{}, fmt.Errorf("%s — run `terma install --team <name or id>` with one of yours, or `terma install` alone to pick from your teams", unreachableBinding(existing, cfg))
 	case existing != nil && !bound:
 		reason := unreachableBinding(existing, cfg)
 		fmt.Fprintf(cmd.ErrOrStderr(), "%s%s.\n", strings.ToUpper(reason[:1]), reason[1:])
@@ -114,7 +114,7 @@ func unreachableBinding(existing *termaproject.File, cfg *config.Config) string 
 	case !config.SameAccounts(p.Environment, cfg.Environment):
 		return fmt.Sprintf("%s: it was bound in %s, and terma is using %s", msg, environmentLabel(p.Environment), environmentLabel(cfg.Environment))
 	case p.OrganizationID != "" && p.OrganizationID != cfg.OrganizationID:
-		return fmt.Sprintf("%s: it belongs to organization %s (`terma org use %s` switches to it, if you are a member)", msg, p.OrganizationID, p.OrganizationID)
+		return fmt.Sprintf("%s: it belongs to organization %s (`terma setup --org %s` switches to it, if you are a member)", msg, p.OrganizationID, p.OrganizationID)
 	}
 	return msg
 }

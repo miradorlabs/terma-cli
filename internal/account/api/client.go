@@ -66,8 +66,8 @@ func (e *Error) Error() string {
 
 // gatewayRemedies renames the commands the shared gateway's messages recommend.
 var gatewayRemedies = strings.NewReplacer(
-	"`mirador login`", "`terma login`",
-	"`mirador project list`", "`terma team list`",
+	"`mirador login`", "`terma setup`",
+	"`mirador project list`", "`terma install`",
 )
 
 // Unauthenticated reports whether the credential itself was rejected.

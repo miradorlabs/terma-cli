@@ -82,7 +82,7 @@ func TestRelaySetupPointsAgentsAtTheRelay(t *testing.T) {
 func TestRelayRunNeedsSetup(t *testing.T) {
 	relaySandbox(t)
 	out, err := within(5*time.Second).combined(t, "relay", "run", "--addr", freeAddr(t))
-	if err == nil || !strings.Contains(err.Error(), "`terma relay setup`") {
+	if err == nil || !strings.Contains(err.Error(), "`terma setup`") {
 		t.Fatalf("relay ran without setup: %v\n%s", err, out)
 	}
 }
@@ -165,7 +165,7 @@ func TestRelayDoctorCheck(t *testing.T) {
 	if out, err := runTerma(t, "telemetry", "disconnect", "codex", "--yes"); err != nil {
 		t.Fatalf("disconnect: %v\n%s", err, out)
 	}
-	if c := doctor.RelayCheck(testApp.agents, relayFacts(), storedKeys, "proj_x", "", nil); c.Status != doctor.Fail || !strings.Contains(c.Detail, "Codex") || c.Fix != "terma relay setup" {
+	if c := doctor.RelayCheck(testApp.agents, relayFacts(), storedKeys, "proj_x", "", nil); c.Status != doctor.Fail || !strings.Contains(c.Detail, "Codex") || c.Fix != "terma setup" {
 		t.Fatalf("codex pointed elsewhere: %+v", c)
 	}
 }

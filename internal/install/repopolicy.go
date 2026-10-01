@@ -62,7 +62,7 @@ func WriteRepoPolicy(r Reporter, root string, hs []harness.Harness, want harness
 			}
 			r.Warn("Repo policy", fmt.Sprintf("%s skipped — this repository already has OTLP settings for it (%s)",
 				h.DisplayName(), output.SanitizeTerminal(strings.Join(keys, ", "))))
-			r.Then(fmt.Sprintf("Resolve %s's OTLP settings in this repository, then run `terma connect %s --scope local` here.", h.DisplayName(), h.Name()))
+			r.Then(fmt.Sprintf("Resolve %s's OTLP settings in this repository, then run `terma install` here again.", h.DisplayName()))
 			continue
 		}
 		path, err := h.ConfigPath()

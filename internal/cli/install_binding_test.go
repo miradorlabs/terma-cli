@@ -101,7 +101,7 @@ func TestInstallRefusesABindingFromAnotherOrganization(t *testing.T) {
 	if err == nil {
 		t.Fatalf("install used another organization's project:\n%s", out)
 	}
-	for _, want := range []string{"Beta Core", "not a team in Acme", "terma org use " + orgB().ID, "terma install --team"} {
+	for _, want := range []string{"Beta Core", "not a team in Acme", "terma setup --org " + orgB().ID, "terma install --team"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("the error should say %q: %v", want, err)
 		}

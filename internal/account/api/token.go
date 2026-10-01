@@ -158,7 +158,7 @@ func (c *Client) refresh(ctx context.Context) error {
 	resp, err := c.postToken(ctx, tokenRequest{GrantType: "refresh_token", RefreshToken: refreshToken})
 	if err != nil {
 		if errors.Is(err, auth.ErrNotLoggedIn) {
-			return fmt.Errorf("%w: session expired, run `terma login`", auth.ErrNotLoggedIn)
+			return fmt.Errorf("%w: session expired, run `terma setup`", auth.ErrNotLoggedIn)
 		}
 		return err
 	}

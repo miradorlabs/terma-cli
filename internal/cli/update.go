@@ -33,9 +33,10 @@ Every command a new version runs first migrates anything it keeps in the config
 directory whose format changed. After the new version is in place, update also refreshes
 what earlier versions wrote — the agents' status line wrap and plugins, and the hooks
 of the repository you run it in — keeping every choice you made at install time. It works from
-what is on disk: it signs in to nothing and never adds a file. --refresh runs just that
-step; inside each other repository terma is installed in, run it to update the hooks
-there (they are committed files, so they change only when you ask).
+what is on disk: it signs in to nothing and never adds a file. Already on the latest
+release, update runs just that refresh, so it is safe to run again; inside each other
+repository terma is installed in, run it to update the hooks there (they are committed
+files, so they change only when you ask).
 
 Normal interactive commands check daily and notify you when a newer version exists.
 Use --auto on to install those updates automatically, or --auto off for notices only.
@@ -90,13 +91,15 @@ release.`,
 				return fmt.Errorf("cannot start update (another check or update may be running): %w", err)
 			}
 			defer unlock()
-			return app.runUpdate(cmd.Context(), &selfupdate.Client{Version: app.version}, dir, exe, out, check, force)
+			return app.updateOrRefresh(cmd.Context(), &selfupdate.Client{Version: app.version}, dir, exe, out, check, force)
 		},
 	}
 	cmd.Flags().BoolVar(&check, "check", false, "check for a newer published release without installing")
 	cmd.Flags().BoolVar(&force, "force", false, "replace a source/development build with the latest published release")
 	cmd.Flags().StringVar(&automatic, "auto", "", "automatic updates: on, off, or status (default: off)")
 	cmd.Flags().BoolVar(&refresh, "refresh", false, "only migrate saved state and refresh what terma installed (agents' status lines and plugins, this repository's hooks) to this version; runs by itself after an update")
+	// The new binary runs `update --refresh` after an upgrade; people run plain `update`.
+	_ = cmd.Flags().MarkHidden("refresh")
 	cmd.MarkFlagsMutuallyExclusive("auto", "check", "force", "refresh")
 	return cmd
 }
@@ -108,7 +111,21 @@ const (
 	refreshTimeout  = time.Minute
 )
 
-func (app *App) runUpdate(ctx context.Context, client *selfupdate.Client, dir, exe string, out io.Writer, check, force bool) error {
+// updateOrRefresh is `terma update`: when no newer version is installed, this version's
+// refresh is the update, so running it again always brings what terma installed up to date.
+func (app *App) updateOrRefresh(ctx context.Context, client *selfupdate.Client, dir, exe string, out io.Writer, check, force bool) error {
+	installed, err := app.runUpdate(ctx, client, dir, exe, out, check, force)
+	if installed || check {
+		return err
+	}
+	if refreshErr := app.runRefresh(ctx, out); err == nil {
+		err = refreshErr
+	}
+	return err
+}
+
+// runUpdate reports whether it installed a new version (whose own refresh then ran).
+func (app *App) runUpdate(ctx context.Context, client *selfupdate.Client, dir, exe string, out io.Writer, check, force bool) (bool, error) {
 	current := client.Version
 	download, cancel := context.WithTimeout(ctx, downloadTimeout)
 	defer cancel()
@@ -118,47 +135,48 @@ func (app *App) runUpdate(ctx context.Context, client *selfupdate.Client, dir, e
 		selfupdate.SaveCache(dir, selfupdate.Cache{CheckedAt: time.Now(), Current: current, Failed: true})
 		if check {
 			fmt.Fprintln(out, err.Error()+". No binary update is available.")
-			return nil
+			return false, nil
 		}
-		return err
+		return false, err
 	}
 	if err != nil {
 		cache := selfupdate.LoadCache(dir)
 		cache.CheckedAt, cache.Current, cache.Failed = time.Now(), current, true
 		selfupdate.SaveCache(dir, cache)
-		return err
+		return false, err
 	}
 	selfupdate.SaveCache(dir, selfupdate.Cache{CheckedAt: time.Now(), Current: current, Latest: rel.Version()})
 	if !selfupdate.IsRelease(current) {
 		if check {
 			fmt.Fprintf(out, "terma %s is a development build; latest release is %s. Use `terma update --force` to switch to it.\n", current, rel.Version())
-			return nil
+			return false, nil
 		}
 		if !force {
-			return errors.New("this is a source/development build; use `terma update --force` to replace it with a published release")
+			fmt.Fprintf(out, "terma %s is a development build, so it is not replaced (`terma update --force` installs %s).\n", current, rel.Version())
+			return false, nil
 		}
 	} else if !selfupdate.Newer(current, rel.TagName) {
 		fmt.Fprintf(out, "terma %s is up to date (latest %s).\n", current, rel.Version())
-		return nil
+		return false, nil
 	}
 	if check {
 		fmt.Fprintf(out, "terma %s → %s available.\n", current, rel.Version())
-		return nil
+		return false, nil
 	}
 	if m, ok := selfupdate.ManagedBy(exe); ok {
-		return app.upgradeManaged(ctx, m, current, rel.Version(), out)
+		return true, app.upgradeManaged(ctx, m, current, rel.Version(), out)
 	}
 	if runtime.GOOS == "windows" {
-		return errors.New("download the latest release from https://github.com/" + selfupdate.Repo + "/releases; in-place updates on Windows are not supported yet")
+		return false, errors.New("download the latest release from https://github.com/" + selfupdate.Repo + "/releases; in-place updates on Windows are not supported yet")
 	}
 	installed, err := client.Apply(download, rel, exe, out)
 	if err != nil {
-		return err
+		return false, err
 	}
 	selfupdate.SaveCache(dir, selfupdate.Cache{CheckedAt: time.Now(), Current: installed, Latest: installed})
 	fmt.Fprintf(out, "Updated terma %s → %s (%s).\n", current, installed, exe)
 	app.finishUpdate(ctx, exe, out)
-	return nil
+	return true, nil
 }
 
 // upgradeManaged runs the package manager that owns the installation, then the new
@@ -186,7 +204,7 @@ func (app *App) finishUpdate(ctx context.Context, terma string, out io.Writer) {
 	defer cancel()
 	fmt.Fprintln(out)
 	if err := app.runUpdateStep(ctx, out, terma, "update", "--refresh"); err != nil {
-		fmt.Fprintf(out, "The new version is installed, but refreshing what terma installed failed (%v). Run `terma update --refresh` to retry.\n", err)
+		fmt.Fprintf(out, "The new version is installed, but refreshing what terma installed failed (%v). Run `terma update` to retry.\n", err)
 	}
 }
 

@@ -190,7 +190,7 @@ func migrateState(ctx context.Context, args []string) {
 	ctx, cancel := context.WithTimeout(ctx, wait)
 	defer cancel()
 	if _, err := migrate.Run(ctx, dir, false); err != nil && !quiet && canPrompt() {
-		fmt.Fprintf(os.Stderr, "terma could not update its saved state for this version (%v). Run `terma update --refresh` to retry.\n", err)
+		fmt.Fprintf(os.Stderr, "terma could not update its saved state for this version (%v). Run `terma update` to retry.\n", err)
 	}
 }
 
@@ -257,7 +257,7 @@ func (app *App) Execute() int {
 		errOut := style.Highlight(os.Stderr)
 		label := style.For(os.Stderr).Fail("Error:")
 		if errors.Is(err, auth.ErrNotLoggedIn) {
-			fmt.Fprintf(errOut, "%s not signed in. Run `terma setup` (or `terma login`).\n", label)
+			fmt.Fprintf(errOut, "%s not signed in. Run `terma setup`.\n", label)
 			return 1
 		}
 		if wrongEnv, ok := errors.AsType[*auth.ErrWrongEnvironment](err); ok {

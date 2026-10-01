@@ -169,7 +169,7 @@ func TestUpdateUpgradesThroughThePackageManager(t *testing.T) {
 
 	steps := recordSteps(t, "")
 	var out bytes.Buffer
-	if err := testApp.runUpdate(context.Background(), latestRelease(t, "v2.0.0"), t.TempDir(), exe, &out, false, false); err != nil {
+	if _, err := testApp.runUpdate(context.Background(), latestRelease(t, "v2.0.0"), t.TempDir(), exe, &out, false, false); err != nil {
 		t.Fatalf("update: %v\n%s", err, &out)
 	}
 	want := [][]string{{brew, "upgrade", "--cask", "terma"}, {filepath.Join(prefix, "bin", "terma"), "update", "--refresh"}}
@@ -179,7 +179,7 @@ func TestUpdateUpgradesThroughThePackageManager(t *testing.T) {
 
 	// A failed upgrade names the command, and nothing refreshes.
 	steps = recordSteps(t, "brew")
-	err = testApp.runUpdate(context.Background(), latestRelease(t, "v2.0.0"), t.TempDir(), exe, &out, false, false)
+	_, err = testApp.runUpdate(context.Background(), latestRelease(t, "v2.0.0"), t.TempDir(), exe, &out, false, false)
 	if err == nil || !strings.Contains(err.Error(), "brew upgrade terma") || len(*steps) != 1 {
 		t.Fatalf("failed upgrade: %v, ran %q", err, *steps)
 	}
@@ -189,7 +189,7 @@ func TestUpdateUpgradesThroughThePackageManager(t *testing.T) {
 		t.Fatal(err)
 	}
 	steps = recordSteps(t, "")
-	err = testApp.runUpdate(context.Background(), latestRelease(t, "v2.0.0"), t.TempDir(), exe, &out, false, false)
+	_, err = testApp.runUpdate(context.Background(), latestRelease(t, "v2.0.0"), t.TempDir(), exe, &out, false, false)
 	if err == nil || !strings.Contains(err.Error(), "brew upgrade terma") || len(*steps) != 0 {
 		t.Fatalf("no brew: %v, ran %q", err, *steps)
 	}
@@ -211,7 +211,7 @@ func TestUpdateSendsAProjectDependencyToItsProject(t *testing.T) {
 	}
 	steps := recordSteps(t, "")
 	var out bytes.Buffer
-	err = testApp.runUpdate(context.Background(), latestRelease(t, "v2.0.0"), t.TempDir(), exe, &out, false, false)
+	_, err = testApp.runUpdate(context.Background(), latestRelease(t, "v2.0.0"), t.TempDir(), exe, &out, false, false)
 	if err == nil || !strings.Contains(err.Error(), project) || !strings.Contains(err.Error(), "`npm install @miradorlabs/terma@latest`") || strings.Contains(err.Error(), " -g ") || len(*steps) != 0 {
 		t.Fatalf("project dependency: %v, ran %q", err, *steps)
 	}
@@ -245,13 +245,13 @@ func TestUpdateRefreshesWithTheReplacedBinary(t *testing.T) {
 		steps := recordSteps(t, fail)
 		var out bytes.Buffer
 		client := &selfupdate.Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0"}
-		if err := testApp.runUpdate(context.Background(), client, t.TempDir(), exe, &out, false, false); err != nil {
+		if _, err := testApp.runUpdate(context.Background(), client, t.TempDir(), exe, &out, false, false); err != nil {
 			t.Fatalf("update: %v\n%s", err, &out)
 		}
 		if want := [][]string{{exe, "update", "--refresh"}}; !slices.EqualFunc(*steps, want, slices.Equal) {
 			t.Fatalf("ran %q, want %q", *steps, want)
 		}
-		if retry := strings.Contains(out.String(), "`terma update --refresh` to retry"); retry != (fail != "") {
+		if retry := strings.Contains(out.String(), "`terma update` to retry"); retry != (fail != "") {
 			t.Fatalf("refresh failing=%v, output:\n%s", fail != "", &out)
 		}
 	}
@@ -299,7 +299,7 @@ func TestRefreshAfterUpgradeRunsOncePerRelease(t *testing.T) {
 	dir := os.Getenv("TERMA_CONFIG_DIR")
 	var out bytes.Buffer
 	testApp.refreshAfterUpgrade(context.Background(), dir, &out)
-	if !strings.Contains(out.String(), "refreshed 1 file(s)") || !strings.Contains(out.String(), "`terma update --refresh` here") {
+	if !strings.Contains(out.String(), "refreshed 1 file(s)") || !strings.Contains(out.String(), "`terma update` here") {
 		t.Fatalf("output:\n%s", &out)
 	}
 	requireRefreshed(t, statusLine)

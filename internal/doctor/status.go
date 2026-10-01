@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/harness"
@@ -50,21 +51,7 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 			add("Account", "%s in %s", cmp.Or(cred.Email, "signed in"), cmp.Or(cfg.OrganizationName, cred.OrganizationID))
 		}
 	}
-	switch {
-	case config.Paused() && cfg.Policy.PauseAllowed():
-		add("Capture", "paused on this machine — run `terma resume` to start it again")
-	case cfg.Policy.Validated() && cfg.Policy.Expired(time.Now()):
-		add("Capture", "off: the collection policy has not been refreshed for over a week — run `terma setup`")
-	case cfg.Policy.Validated():
-		add("Collecting", "%s", PolicySummary(cfg.Policy))
-	}
-	// Name the backend whenever it is not production, by environment or by host overrides.
-	switch {
-	case cfg.Environment != config.EnvProd:
-		add("Environment", "%s (%s)", cfg.Environment, cfg.AuthURL)
-	case cfg.AuthURL != config.DefaultAuthURL:
-		add("Endpoints", "custom, from profile %s (%s)", cfg.ProfileName, cfg.AuthURL)
-	}
+	rep.Rows = append(rep.Rows, machineRows(cfg)...)
 
 	root, gitDir, reg := env.Root, env.GitDir, env.Agents
 	hooksOK, repoBound, projectID := false, false, cfg.ProjectID
@@ -88,26 +75,11 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 		if agentHooks = AgentHooksCheck(reg, root, SelectedForRepo(reg, projectID, cfg.Harnesses)); agentHooks.Status == Warn {
 			add("Agent hooks", "%d of %d agents can run theirs — %s", agentHooks.Ready, agentHooks.Of, agentHooks.Fix)
 		}
-		stateDir, err := termaproject.StateDir(root, gitDir)
+		work, err := workRows(root, gitDir)
 		if err != nil {
 			return LocalReport{}, err
 		}
-		store := session.Open(stateDir)
-		if active, fresh := store.Active(time.Now(), 4*time.Hour); active != nil && fresh {
-			add("Session", "%s (%s), active", active.ID, active.ToolLabel())
-		}
-		if manifests, _ := store.Manifests(); len(manifests) > 0 {
-			pending, sessions := 0, 0
-			for _, m := range manifests {
-				if len(m.Files) > 0 {
-					pending += len(m.Files)
-					sessions++
-				}
-			}
-			if pending > 0 {
-				add("Uncommitted", "%d agent-edited file(s) across %d session(s)", pending, sessions)
-			}
-		}
+		rep.Rows = append(rep.Rows, work...)
 	}
 
 	// Through the relay one line gives doctor's own verdict (RelayCheck).
@@ -137,19 +109,8 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 		}
 		export = HarnessCheck(reg, verdicts, cfg.OTLPURL, projectID, repoBound)
 	}
-	// A repository's own policy narrows what its sessions ship; the global line cannot show it.
 	if env.RepoErr == nil {
-		for _, h := range reg.Harnesses() {
-			local, ok := h.Local(root)
-			if !ok {
-				continue
-			}
-			st, err := local.Status()
-			if err != nil || st.ManagedKeys == 0 {
-				continue
-			}
-			add("Local", "%s ships %s from this repository (%s)", h.DisplayName(), shipment(st), gitx.Relativize(root, st.ConfigPath))
-		}
+		rep.Rows = append(rep.Rows, repoPolicyRows(reg, root)...)
 	}
 
 	backendOK := false
@@ -189,6 +150,89 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 	return rep, nil
 }
 
+// Context is what `terma doctor` prints above its checks, which do not cover it: what this
+// machine collects, which backend it reports to, and the repository's work in progress.
+func Context(env Env) []Row {
+	if env.Config == nil {
+		return nil
+	}
+	rows := machineRows(env.Config)
+	if env.RepoErr != nil {
+		return rows
+	}
+	if _, _, err := termaproject.Resolve(env.Root, env.GitDir); err == nil {
+		if work, err := workRows(env.Root, env.GitDir); err == nil {
+			rows = append(rows, work...)
+		}
+	}
+	return append(rows, repoPolicyRows(env.Agents, env.Root)...)
+}
+
+// machineRows are what this machine collects and where it reports.
+func machineRows(cfg *config.Config) []Row {
+	var rows []Row
+	switch {
+	case config.Paused() && cfg.Policy.PauseAllowed():
+		rows = append(rows, Row{"Capture", "paused on this machine — run `terma resume` to start it again"})
+	case cfg.Policy.Validated() && cfg.Policy.Expired(time.Now()):
+		rows = append(rows, Row{"Capture", "off: the collection policy has not been refreshed for over a week — run `terma setup`"})
+	case cfg.Policy.Validated():
+		rows = append(rows, Row{"Collecting", PolicySummary(cfg.Policy)})
+	}
+	// Name the backend whenever it is not production, by environment or by host overrides.
+	switch {
+	case cfg.Environment != config.EnvProd:
+		rows = append(rows, Row{"Environment", fmt.Sprintf("%s (%s)", cfg.Environment, cfg.AuthURL)})
+	case cfg.AuthURL != config.DefaultAuthURL:
+		rows = append(rows, Row{"Endpoints", fmt.Sprintf("custom, from profile %s (%s)", cfg.ProfileName, cfg.AuthURL)})
+	}
+	return rows
+}
+
+// workRows are a bound repository's active session and the agent edits not yet committed.
+func workRows(root, gitDir string) ([]Row, error) {
+	stateDir, err := termaproject.StateDir(root, gitDir)
+	if err != nil {
+		return nil, err
+	}
+	var rows []Row
+	store := session.Open(stateDir)
+	if active, fresh := store.Active(time.Now(), 4*time.Hour); active != nil && fresh {
+		rows = append(rows, Row{"Session", fmt.Sprintf("%s (%s), active", active.ID, active.ToolLabel())})
+	}
+	if manifests, _ := store.Manifests(); len(manifests) > 0 {
+		pending, sessions := 0, 0
+		for _, m := range manifests {
+			if len(m.Files) > 0 {
+				pending += len(m.Files)
+				sessions++
+			}
+		}
+		if pending > 0 {
+			rows = append(rows, Row{"Uncommitted", fmt.Sprintf("%d agent-edited file(s) across %d session(s)", pending, sessions)})
+		}
+	}
+	return rows, nil
+}
+
+// repoPolicyRows are the repository's own policies, which narrow what its sessions ship;
+// the machine's line cannot show them.
+func repoPolicyRows(reg *agents.Registry, root string) []Row {
+	var rows []Row
+	for _, h := range reg.Harnesses() {
+		local, ok := h.Local(root)
+		if !ok {
+			continue
+		}
+		st, err := local.Status()
+		if err != nil || st.ManagedKeys == 0 {
+			continue
+		}
+		rows = append(rows, Row{"Local", fmt.Sprintf("%s ships %s from this repository (%s)", h.DisplayName(), shipment(st), gitx.Relativize(root, st.ConfigPath))})
+	}
+	return rows
+}
+
 func keyOf(keys Keys, projectID string) string {
 	if keys == nil {
 		return ""
@@ -206,7 +250,7 @@ func HooksSummary(w HookWiring) (string, bool) {
 	case w.Changes == 0 && !w.Unpointed:
 		return "wired", true
 	case w.Changes > 0 && w.Stale == w.Changes && !w.Unpointed:
-		return "out of date (run `terma update --refresh`)", false
+		return "out of date (run `terma update`)", false
 	default:
 		return "NOT wired (run `terma install`)", false
 	}

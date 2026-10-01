@@ -2,9 +2,11 @@ package doctor
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
 
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
@@ -58,5 +60,18 @@ func TestFixTextIsPlainOffATerminal(t *testing.T) {
 		if got := fixText(style.Plain(), fix); got != fix {
 			t.Errorf("fixText(%q) = %q", fix, got)
 		}
+	}
+}
+
+// Context is doctor's header: it names a non-production backend, and outside a repository
+// it has no work to report and needs no agents.
+func TestContextNamesTheBackendOutsideARepository(t *testing.T) {
+	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	if rows := Context(Env{}); rows != nil {
+		t.Fatalf("no configuration: %v", rows)
+	}
+	rows := Context(Env{Config: &config.Config{Environment: config.EnvDev, AuthURL: "https://auth.example"}, RepoErr: errors.New("not a repository")})
+	if len(rows) != 1 || rows[0].Label != "Environment" || !strings.Contains(rows[0].Value, "https://auth.example") {
+		t.Fatalf("rows = %v", rows)
 	}
 }

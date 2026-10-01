@@ -49,8 +49,8 @@ func TestHookWiringVerdictInBothCommands(t *testing.T) {
 			name:         "an earlier terma wrote the files",
 			w:            doctor.HookWiring{Manager: hookmgr.GitShim, HooksPath: hookmgr.ShimDir, Changes: 2, Stale: 2},
 			doctorStatus: doctor.Fail, doctorDetail: string(hookmgr.GitShim) + " wiring was written by an earlier terma (2 file(s) out of date)",
-			doctorFix:   "terma update --refresh",
-			statusState: "out of date (run `terma update --refresh`)", statusWired: false,
+			doctorFix:   "terma update",
+			statusState: "out of date (run `terma update`)", statusWired: false,
 		},
 		{
 			name:         "shims committed, this clone not pointed at them",
