@@ -28,6 +28,8 @@ type Config struct {
 	Addr string
 	// Idle is how long a quiet relay runs before it exits; zero is the service's relay, which never idles.
 	Idle time.Duration
+	// Environment is the backend environment the relay delivers to, recorded for doctor.
+	Environment string
 	// Engine is the engine's options; Run sets its Token.
 	Engine relay.Options
 	// Workers run beside the engine until it stops, and are waited for.
@@ -91,6 +93,11 @@ func Run(ctx context.Context, c Config) (Result, error) {
 	pidPath := filepath.Join(c.Dir, PIDFile)
 	_ = config.WriteFileAtomicNoSync(pidPath, []byte(strconv.Itoa(os.Getpid())+"\n"), 0o600)
 	defer func() { _ = os.Remove(pidPath) }()
+	runPath := filepath.Join(c.Dir, RunFile)
+	if data, err := json.Marshal(RunInfo{PID: os.Getpid(), Environment: c.Environment, Service: res.Service}); err == nil {
+		_ = config.WriteFileAtomicNoSync(runPath, append(data, '\n'), 0o600)
+	}
+	defer func() { _ = os.Remove(runPath) }()
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -118,6 +125,32 @@ func Run(ctx context.Context, c Config) (Result, error) {
 		_ = config.WriteFileAtomicNoSync(filepath.Join(c.Dir, StatsFile), append(data, '\n'), 0o600)
 	}
 	return res, serveErr
+}
+
+// RunInfo is what the running relay records about itself.
+type RunInfo struct {
+	PID int `json:"pid"`
+	// Environment is the backend environment it delivers to.
+	Environment string `json:"environment"`
+	// Service is true for the service's relay, false for one a hook or a developer started.
+	Service bool `json:"service"`
+}
+
+// RunningRelay is what the relay holding dir's lock recorded about itself; false when none
+// runs, or it is a terma from before the record.
+func RunningRelay(dir string) (RunInfo, bool) {
+	if !Running(dir) {
+		return RunInfo{}, false
+	}
+	data, err := os.ReadFile(filepath.Join(dir, RunFile))
+	if err != nil {
+		return RunInfo{}, false
+	}
+	var info RunInfo
+	if json.Unmarshal(data, &info) != nil || info.PID <= 0 {
+		return RunInfo{}, false
+	}
+	return info, true
 }
 
 // lock takes the single-instance lock, with wait waiting out a hook-started relay; a nil

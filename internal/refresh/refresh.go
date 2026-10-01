@@ -22,6 +22,25 @@ import (
 type Refresher struct {
 	Agents  *agents.Registry
 	Version string
+	// RelayService rewrites the relay's service when it is not what this build would
+	// install, returning its path and whether it did; nil leaves the service alone.
+	RelayService func(ctx context.Context) (path string, changed bool, err error)
+}
+
+// machine refreshes the agents' home-directory files, then the relay's service, which an
+// earlier build may have written to run a command this one lacks.
+func (r Refresher) machine(ctx context.Context) ([]string, error) {
+	changed, err := r.Machine()
+	if r.RelayService == nil {
+		return changed, err
+	}
+	path, ok, serviceErr := r.RelayService(ctx)
+	if serviceErr != nil {
+		serviceErr = fmt.Errorf("relay service: %w", serviceErr)
+	} else if ok {
+		changed = append(changed, path)
+	}
+	return changed, errors.Join(err, serviceErr)
 }
 
 // Machine rewrites each agent's home-directory files, carrying on past a failure.
@@ -111,7 +130,7 @@ func (r Refresher) Run(ctx context.Context, root, gitDir string) (Result, error)
 			migrateErr = fmt.Errorf("migrate saved state: %w", migrateErr)
 		}
 	}
-	machine, machineErr := r.Machine()
+	machine, machineErr := r.machine(ctx)
 	res.Machine = machine
 	repo, repoErr := r.PlanRepo(root, gitDir)
 	res.Repo = repo
@@ -151,12 +170,12 @@ type Upgrade struct {
 
 // AfterUpgrade runs once per newer release, however it was installed: it refreshes the
 // home-directory files under dir and only reports out-of-date committed ones at root.
-func (r Refresher) AfterUpgrade(dir, root, gitDir string) (Upgrade, error) {
+func (r Refresher) AfterUpgrade(ctx context.Context, dir, root, gitDir string) (Upgrade, error) {
 	if !selfupdate.NeedsRefresh(dir, r.Version) {
 		return Upgrade{}, nil
 	}
 	up := Upgrade{Due: true}
-	changed, err := r.Machine()
+	changed, err := r.machine(ctx)
 	up.Changed = changed
 	if repo, _ := r.PlanRepo(root, gitDir); repo != nil && !repo.Plan.Empty() {
 		up.RepoStale = true

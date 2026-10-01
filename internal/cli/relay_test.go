@@ -141,31 +141,31 @@ func TestRelayDoctorCheck(t *testing.T) {
 	if out, err := runTerma(t, "relay", "setup", "--no-start", "--addr", addr); err != nil {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}
-	if c := doctor.RelayCheck(testApp.agents, relayFacts(), storedKeys, "", nil); c.Status != doctor.Warn || !strings.Contains(c.Detail, "not bound") {
+	if c := doctor.RelayCheck(testApp.agents, relayFacts(), storedKeys, "", "", nil); c.Status != doctor.Warn || !strings.Contains(c.Detail, "not bound") {
 		t.Fatalf("unbound: %+v", c)
 	}
-	if c := doctor.RelayCheck(testApp.agents, relayFacts(), storedKeys, "proj_x", nil); c.Status != doctor.Warn || !strings.Contains(c.Detail, "no key") {
+	if c := doctor.RelayCheck(testApp.agents, relayFacts(), storedKeys, "proj_x", "", nil); c.Status != doctor.Warn || !strings.Contains(c.Detail, "no key") {
 		t.Fatalf("no key: %+v", c)
 	}
 	keys := `{"keys":{"proj_x":"ter_srv_1"}}`
 	if err := os.WriteFile(filepath.Join(filepath.Dir(dir), "keys.json"), []byte(keys), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if c := doctor.RelayCheck(testApp.agents, relayFacts(), storedKeys, "proj_x", nil); c.Status != doctor.Pass {
+	if c := doctor.RelayCheck(testApp.agents, relayFacts(), storedKeys, "proj_x", "", nil); c.Status != doctor.Pass {
 		t.Fatalf("ready: %+v", c)
 	}
 	squatter, err := net.Listen("tcp", addr)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c := doctor.RelayCheck(testApp.agents, relayFacts(), storedKeys, "proj_x", nil); c.Status != doctor.Fail || !strings.Contains(c.Detail, "another process") {
+	if c := doctor.RelayCheck(testApp.agents, relayFacts(), storedKeys, "proj_x", "", nil); c.Status != doctor.Fail || !strings.Contains(c.Detail, "another process") {
 		t.Fatalf("squatted: %+v", c)
 	}
 	_ = squatter.Close()
 	if out, err := runTerma(t, "telemetry", "disconnect", "codex", "--yes"); err != nil {
 		t.Fatalf("disconnect: %v\n%s", err, out)
 	}
-	if c := doctor.RelayCheck(testApp.agents, relayFacts(), storedKeys, "proj_x", nil); c.Status != doctor.Fail || !strings.Contains(c.Detail, "Codex") || c.Fix != "terma relay setup" {
+	if c := doctor.RelayCheck(testApp.agents, relayFacts(), storedKeys, "proj_x", "", nil); c.Status != doctor.Fail || !strings.Contains(c.Detail, "Codex") || c.Fix != "terma relay setup" {
 		t.Fatalf("codex pointed elsewhere: %+v", c)
 	}
 }
@@ -196,11 +196,11 @@ func TestRelayCodexDaemonPredatesSetup(t *testing.T) {
 	if !strings.Contains(out, "`codex app-server daemon restart`") {
 		t.Errorf("setup did not name the daemon restart:\n%s", out)
 	}
-	if c := doctor.RelayCheck(testApp.agents, relayFacts(), storedKeys, "proj_x", nil); c.Status != doctor.Warn || !strings.Contains(c.Fix, "codex app-server daemon restart") {
+	if c := doctor.RelayCheck(testApp.agents, relayFacts(), storedKeys, "proj_x", "", nil); c.Status != doctor.Warn || !strings.Contains(c.Fix, "codex app-server daemon restart") {
 		t.Fatalf("a daemon from before the setup: %+v", c)
 	}
 	record(time.Now().Add(time.Minute)) // restarted since
-	if c := doctor.RelayCheck(testApp.agents, relayFacts(), storedKeys, "proj_x", nil); c.Status != doctor.Pass {
+	if c := doctor.RelayCheck(testApp.agents, relayFacts(), storedKeys, "proj_x", "", nil); c.Status != doctor.Pass {
 		t.Fatalf("a daemon started after the setup: %+v", c)
 	}
 }
@@ -220,5 +220,73 @@ func TestRelayStatusAgreesWithDoctor(t *testing.T) {
 	}
 	if strings.Contains(out, "none connected") {
 		t.Fatalf("status reads a relayed machine as unconnected:\n%s", out)
+	}
+}
+
+// `terma relay run` records the environment it delivers to, which doctor compares with
+// the profile's: the relay a hook starts without TERMA_ENV must be told apart.
+func TestRelayRunRecordsItsEnvironment(t *testing.T) {
+	dir := relaySandbox(t)
+	addr := freeAddr(t)
+	if out, err := runTerma(t, "relay", "setup", "--no-start", "--addr", addr, "--harness", "codex"); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	t.Setenv("TERMA_ENV", "dev")
+	done := make(chan error, 1)
+	go func() {
+		_, err := within(3*time.Second).combined(t, "relay", "run", "--idle", "1h", "--quiet")
+		done <- err
+	}()
+	var info daemon.RunInfo
+	for ok, deadline := false, time.Now().Add(3*time.Second); !ok; info, ok = daemon.RunningRelay(dir) {
+		if time.Now().After(deadline) {
+			t.Fatal("the relay never recorded itself")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if info.Environment != "dev" || info.Service {
+		t.Fatalf("recorded %+v, want a hook-style relay delivering to dev", info)
+	}
+	facts := relayFacts()
+	if facts.Environment != "dev" || !facts.HookStarted {
+		t.Fatalf("doctor's facts = %+v", facts)
+	}
+	if c := doctor.RelayCheck(testApp.agents, facts, storedKeys, "proj_x", "prod", nil); c.Status != doctor.Fail || !strings.Contains(c.Detail, "dev environment") {
+		t.Fatalf("a relay in another environment passed doctor: %+v", c)
+	}
+	if err := <-done; err != nil {
+		t.Fatalf("relay run: %v", err)
+	}
+}
+
+// doctor reads the relay's record through the lock: a relay holding it that recorded
+// another environment fails the export check, with the fix that replaces it.
+func TestRelayDoctorFailsARelayInAnotherEnvironment(t *testing.T) {
+	dir := relaySandbox(t)
+	if out, err := runTerma(t, "relay", "setup", "--no-start", "--addr", freeAddr(t)); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	if err := os.WriteFile(filepath.Join(filepath.Dir(dir), "keys.json"), []byte(`{"keys":{"proj_x":"ter_srv_1"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	unlock, err := flock.TryLock(filepath.Join(dir, daemon.LockFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unlock()
+	record := func(env string) {
+		data := fmt.Sprintf(`{"pid":%d,"environment":%q,"service":false}`, os.Getpid(), env)
+		if err := os.WriteFile(filepath.Join(dir, daemon.RunFile), []byte(data), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	record("prod")
+	c := doctor.RelayCheck(testApp.agents, relayFacts(), storedKeys, "proj_x", "dev", nil)
+	if c.Status != doctor.Fail || !strings.Contains(c.Detail, "delivers to the prod environment, not this profile's dev") || c.Fix != "terma install" {
+		t.Fatalf("a production relay on a dev profile: %+v", c)
+	}
+	record("dev")
+	if c := doctor.RelayCheck(testApp.agents, relayFacts(), storedKeys, "proj_x", "dev", nil); c.Status != doctor.Pass {
+		t.Fatalf("a relay in this profile's environment: %+v", c)
 	}
 }

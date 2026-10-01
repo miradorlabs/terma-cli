@@ -6,11 +6,22 @@ import (
 	"io"
 
 	"github.com/miradorlabs/terma-cli/internal/refresh"
+	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
+	"github.com/miradorlabs/terma-cli/internal/relay/service"
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
 func (app *App) refresher() refresh.Refresher {
-	return refresh.Refresher{Agents: app.agents, Version: app.version}
+	return refresh.Refresher{Agents: app.agents, Version: app.version, RelayService: refreshRelayService}
+}
+
+// refreshRelayService rewrites a relay service an earlier terma (or another binary) wrote,
+// in the environment install recorded, never the caller's: an update can run from any shell.
+func refreshRelayService(ctx context.Context) (string, bool, error) {
+	if !realTerma() || !service.Supported() {
+		return "", false, nil
+	}
+	return daemon.RefreshService(ctx)
 }
 
 // workspaceRoot is the workspace around the working directory, "" outside one.
@@ -61,7 +72,7 @@ func (app *App) runRefresh(ctx context.Context, out io.Writer) error {
 func (app *App) refreshAfterUpgrade(ctx context.Context, dir string, out io.Writer) {
 	out = style.Highlight(out)
 	root, gitDir := workspaceRoot(ctx)
-	up, err := app.refresher().AfterUpgrade(dir, root, gitDir)
+	up, err := app.refresher().AfterUpgrade(ctx, dir, root, gitDir)
 	if !up.Due {
 		return
 	}

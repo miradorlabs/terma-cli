@@ -88,6 +88,35 @@ func (m Manager) Installed() (string, bool) {
 	return path, err == nil
 }
 
+// Definition is the service definition Install writes for m, byte for byte.
+func (m Manager) Definition() (string, error) {
+	switch runtime.GOOS {
+	case "darwin":
+		return Launchd(m.Name, m.Exe, filepath.Join(m.StateDir, "daemon.log"), m.Env), nil
+	case "linux":
+		return Systemd(m.Exe, m.Env), nil
+	case "windows":
+		return Windows(m.Exe, m.Env), nil
+	}
+	return "", errUnsupported()
+}
+
+// Current reports whether the installed definition is the one Install would write now. One
+// an earlier terma wrote, or for another binary or environment, is not: the system may run
+// a command this terma no longer has, or a relay that talks to another backend.
+func (m Manager) Current() bool {
+	path, err := m.Path()
+	if err != nil {
+		return false
+	}
+	have, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	want, err := m.Definition()
+	return err == nil && string(have) == want
+}
+
 // Install writes the service definition and starts it, and returns where the definition is.
 func (m Manager) Install(ctx context.Context) (string, error) {
 	if !Supported() {
@@ -104,10 +133,13 @@ func (m Manager) Install(ctx context.Context) (string, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return "", err
 	}
+	def, err := m.Definition()
+	if err != nil {
+		return "", err
+	}
 	switch runtime.GOOS {
 	case "darwin":
-		plist := Launchd(m.Name, m.Exe, filepath.Join(m.StateDir, "daemon.log"), m.Env)
-		if err := config.WriteFileAtomic(path, []byte(plist), 0o644); err != nil {
+		if err := config.WriteFileAtomic(path, []byte(def), 0o644); err != nil {
 			return "", err
 		}
 		var lastErr error
@@ -121,7 +153,7 @@ func (m Manager) Install(ctx context.Context) (string, error) {
 		}
 		return "", lastErr
 	case "linux":
-		if err := config.WriteFileAtomic(path, []byte(Systemd(m.Exe, m.Env)), 0o644); err != nil {
+		if err := config.WriteFileAtomic(path, []byte(def), 0o644); err != nil {
 			return "", err
 		}
 		if out, err := run(ctx, "systemctl", "--user", "daemon-reload"); err != nil {

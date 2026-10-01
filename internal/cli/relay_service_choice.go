@@ -38,34 +38,83 @@ func relayServiceWanted(flag string) bool {
 	if os.Getenv("TERMA_RELAY_SERVICE") == "0" {
 		return false
 	}
-	if exe, err := os.Executable(); err != nil || strings.HasSuffix(filepath.Base(exe), ".test") {
+	if !realTerma() {
 		return false
 	}
 	return service.Supported()
 }
 
-// ensureRelay leaves a relay running, as a service when wanted, else started on demand,
-// reporting only what the developer should know.
-func ensureRelay(ctx context.Context, flag string, report func(warn bool, what string)) {
+// ensureRelay leaves a relay running in env, as a service when wanted, else started on
+// demand, reporting only what the developer should know. It is a developer's own command,
+// so it records their environment as the relay's (daemon.RecordEnv), and it replaces a
+// relay that cannot deliver for them: install is the one fix doctor names.
+func ensureRelay(ctx context.Context, flag, env string, report func(warn bool, what string)) {
+	dir, err := daemon.Dir()
+	if err == nil {
+		_ = daemon.RecordEnv(dir)
+	}
+	running, isRunning := daemon.RunningRelay(dir)
 	if !relayServiceWanted(flag) {
 		if flag == "off" {
 			_, _ = daemon.RemoveService(ctx)
+		}
+		// A relay in another environment holds the lock, so the next one would wait behind it.
+		if strayRelay(running, isRunning, env, false) && realTerma() {
+			daemon.Stop(dir)
 		}
 		report(false, "starts when an agent needs it")
 		daemon.Spawn()
 		return
 	}
-	if _, ok := daemon.ServiceInstalled(); ok && flag != "on" {
+	// A definition that exists is not one that works: an earlier terma's may run a command
+	// this one lacks, or another binary or environment. Only one this terma would write stays.
+	state := daemon.CheckServiceHere()
+	stray := strayRelay(running, isRunning, env, state.Installed)
+	if keepService(state, stray, flag) {
 		// A service definition does not prove its relay is alive; the lock prevents duplicates.
 		report(false, "running in the background")
 		daemon.Spawn()
 		return
 	}
+	// Installing stops whatever relay holds the port, so the service takes over.
 	if _, err := daemon.InstallService(ctx); err != nil {
 		report(true, "could not run in the background ("+err.Error()+"); it starts when an agent needs it")
 		daemon.Spawn()
 		return
 	}
-	report(false, "running in the background")
+	switch {
+	case state.Installed && !state.Current:
+		report(false, "running in the background (its service was out of date and is rewritten for this terma)")
+	case stray:
+		report(false, "running in the background (replaced a relay that could not deliver for this profile)")
+	default:
+		report(false, "running in the background")
+	}
 	daemon.Spawn()
+}
+
+// strayRelay reports whether the running relay cannot be left as it is: it delivers to
+// another environment than env, or a hook started it while the service waits behind it.
+// A relay from before relays recorded themselves (ok false) cannot be judged, and stays.
+func strayRelay(running daemon.RunInfo, ok bool, env string, serviceInstalled bool) bool {
+	if !ok {
+		return false
+	}
+	if running.Environment != "" && env != "" && running.Environment != env {
+		return true
+	}
+	return serviceInstalled && !running.Service
+}
+
+// keepService reports whether install leaves the relay service as it is: only one this
+// terma would write now, with no stray relay holding its port, and only when
+// --relay-service on did not ask for it again.
+func keepService(state daemon.ServiceState, stray bool, flag string) bool {
+	return state.Installed && state.Current && !stray && flag != "on"
+}
+
+// realTerma is false for a test binary, which must not touch the machine's relay service.
+func realTerma() bool {
+	exe, err := os.Executable()
+	return err == nil && !strings.HasSuffix(filepath.Base(exe), ".test")
 }

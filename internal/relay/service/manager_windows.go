@@ -27,7 +27,11 @@ func (m Manager) installWindows(path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
-	launcher := []byte(Windows(m.Exe, m.Env))
+	def, err := m.Definition()
+	if err != nil {
+		return err
+	}
+	launcher := []byte(def)
 	if have, err := os.ReadFile(path); err == nil && string(have) == string(launcher) && supervisorRunning(m.StateDir) {
 		return nil // installed as it is, and running
 	}

@@ -69,6 +69,14 @@ type Relay struct {
 	Dir, Addr         string
 	Running, Squatted bool
 	Err               error
+	// Environment is the backend environment the running relay delivers to; "" when unknown
+	// (none runs, or a terma from before relays recorded it).
+	Environment string
+	// HookStarted means the running relay is not the service's: a hook, or a developer, started it.
+	HookStarted bool
+	// ServiceInstalled says a relay service is installed; ServiceCurrent that it is the one
+	// this terma would install, in the environment install recorded.
+	ServiceInstalled, ServiceCurrent bool
 }
 
 // SpoolState is the event queue as a run finds it.
@@ -275,7 +283,7 @@ func (d *run) agentHooks() Check {
 
 func (d *run) agentsExporting() Check {
 	if claim.Enabled() {
-		return RelayCheck(d.env.Agents, d.env.Probes.Relay(), d.env.Probes.Keys, d.projectID, d.cfg.Harnesses)
+		return RelayCheck(d.env.Agents, d.env.Probes.Relay(), d.env.Probes.Keys, d.projectID, d.cfg.Environment, d.cfg.Harnesses)
 	}
 	verdicts := JudgeHarnesses(d.ctx, d.env.Agents, d.cfg.OTLPURL, d.projectID, d.env.Root)
 	return HarnessCheck(d.env.Agents, verdicts, d.cfg.OTLPURL, d.projectID, d.installed())
