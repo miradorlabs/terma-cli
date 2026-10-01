@@ -3,7 +3,6 @@
 package keystore
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"io/fs"
@@ -121,23 +120,14 @@ func update(edit func(*file)) error {
 	if err != nil {
 		return err
 	}
-	// The first key can be the first thing terma ever writes.
-	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
-		return err
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), lockWait)
-	defer cancel()
-	unlock, err := flock.Lock(ctx, p+".lock")
-	if err != nil {
-		return err
-	}
-	defer unlock()
-	f, err := load()
-	if err != nil {
-		return err
-	}
-	edit(f)
-	return save(f)
+	return flock.Locked(p, lockWait, func() error {
+		f, err := load()
+		if err != nil {
+			return err
+		}
+		edit(f)
+		return save(f)
+	})
 }
 
 func save(f *file) error {

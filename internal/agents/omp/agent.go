@@ -5,6 +5,7 @@ import (
 	"context"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
+	"github.com/miradorlabs/terma-cli/internal/agents/internal/relayexport"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
@@ -12,7 +13,7 @@ import (
 
 // Agent is Omp: attribution through a committed hook file, telemetry through a
 // user-scope extension.
-type Agent struct{}
+type Agent struct{ relayexport.Own }
 
 func (Agent) Name() string                       { return "omp" }
 func (Agent) DisplayName() string                { return "Omp" }

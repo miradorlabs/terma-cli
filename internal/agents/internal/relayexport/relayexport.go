@@ -31,3 +31,10 @@ func NativePointed(h harness.Harness, addr string) bool {
 func Headers(cfg agents.RelayConfig) map[string]string {
 	return map[string]string{"Authorization": "Bearer " + cfg.Token}
 }
+
+// Own is embedded by an agent whose relay exporter is terma's own extension, which no
+// settings file can say is pointed at the relay.
+type Own struct{}
+
+// RelayPointed is unknown: the exporter is terma's own.
+func (Own) RelayPointed(string) (bool, bool) { return false, false }

@@ -6,12 +6,13 @@ import (
 	"os/exec"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
+	"github.com/miradorlabs/terma-cli/internal/agents/internal/relayexport"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
 // Agent is DeepSeek Harness, whose events come from terma's user-level Cordis plugin.
-type Agent struct{}
+type Agent struct{ relayexport.Own }
 
 func (Agent) Name() string        { return "dsh" }
 func (Agent) DisplayName() string { return "DeepSeek Harness" }

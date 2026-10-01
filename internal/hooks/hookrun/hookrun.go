@@ -5,6 +5,7 @@
 package hookrun
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -89,6 +90,23 @@ type Repo struct {
 	Name string
 	// Worktree is git's name for a linked worktree, "" in a main checkout.
 	Worktree string
+}
+
+// Open is every session hook's first step: it refuses an unsafe session id, runs from
+// the payload's cwd when it names one, and resolves the repository, logging why when it
+// cannot.
+func (e *Env) Open(ctx context.Context, sessionID, cwd string) (*Repo, bool) {
+	if !session.ValidID(sessionID) {
+		e.Logf("ignoring unsafe session id")
+		return nil, false
+	}
+	e.Cwd = cmp.Or(cwd, e.Cwd)
+	r, err := e.Repo(ctx)
+	if err != nil {
+		e.Logf("not in a git repository: %v", err)
+		return nil, false
+	}
+	return r, true
 }
 
 // Repo resolves the repository, or outside Git the bound workspace, and its project.

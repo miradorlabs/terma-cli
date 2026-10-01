@@ -147,22 +147,14 @@ func updateCodexNotifyRecord(edit func(*codexNotifyRecord)) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return err
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), harness.RecordLockWait)
-	defer cancel()
-	unlock, err := flock.Lock(ctx, path+".lock")
-	if err != nil {
-		return err
-	}
-	defer unlock()
-	rec, _, err := loadCodexNotifyRecord()
-	if err != nil {
-		return err
-	}
-	edit(rec)
-	return rec.save(path)
+	return flock.Locked(path, harness.RecordLockWait, func() error {
+		rec, _, err := loadCodexNotifyRecord()
+		if err != nil {
+			return err
+		}
+		edit(rec)
+		return rec.save(path)
+	})
 }
 
 func saveCodexNotifyChain(configPath string, previous []string) error {

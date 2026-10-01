@@ -28,7 +28,4 @@ func agentDir() (string, error) {
 	return filepath.Join(home, ".pi", "agent"), err
 }
 
-// RelayPointed is unknown: the exporter is terma's own.
-func (Agent) RelayPointed(string) (bool, bool) { return false, false }
-
 var _ agents.RelayExporter = Agent{}

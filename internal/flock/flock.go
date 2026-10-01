@@ -5,6 +5,8 @@ package flock
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -34,4 +36,20 @@ func TryLock(path string) (unlock func(), err error) {
 // IsBusy reports whether err is TryLock finding the lock held, as opposed to failing.
 func IsBusy(err error) bool {
 	return isBusy(err)
+}
+
+// Locked runs fn holding path's sidecar lock, waiting at most wait. path's directory is
+// created first: the lock may be the first thing written there.
+func Locked(path string, wait time.Duration, fn func() error) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), wait)
+	defer cancel()
+	unlock, err := Lock(ctx, path+".lock")
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	return fn()
 }

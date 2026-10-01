@@ -1,7 +1,6 @@
 package routing
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"os"
@@ -53,25 +52,17 @@ func SavePolicy(p config.Policy) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return err
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	unlock, err := flock.Lock(ctx, path+".lock")
-	if err != nil {
-		return err
-	}
-	defer unlock()
-	prev, ok, _ := LoadPolicy(p.TeamID)
-	if ok && prev.OrganizationID == p.OrganizationID && prev.AuthURL == p.AuthURL && prev.Revision > p.Revision {
-		return errors.New("collection policy revision moved backwards")
-	}
-	b, err := json.Marshal(p)
-	if err != nil {
-		return err
-	}
-	return config.WriteFileAtomic(path, b, 0o600)
+	return flock.Locked(path, 5*time.Second, func() error {
+		prev, ok, _ := LoadPolicy(p.TeamID)
+		if ok && prev.OrganizationID == p.OrganizationID && prev.AuthURL == p.AuthURL && prev.Revision > p.Revision {
+			return errors.New("collection policy revision moved backwards")
+		}
+		b, err := json.Marshal(p)
+		if err != nil {
+			return err
+		}
+		return config.WriteFileAtomic(path, b, 0o600)
+	})
 }
 
 // EffectivePolicy is team's cached policy, else an unscoped or same-team fallback, else

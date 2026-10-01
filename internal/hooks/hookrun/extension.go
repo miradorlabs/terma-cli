@@ -50,14 +50,8 @@ func (x Extension) sessionStart(ctx context.Context, env Env) error {
 		env.Logf("%v", err)
 		return nil
 	}
-	if !session.ValidID(in.SessionID) {
-		env.Logf("ignoring unsafe session id")
-		return nil
-	}
-	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	r, err := env.Repo(ctx)
-	if err != nil {
-		env.Logf("not in a git repository: %v", err)
+	r, ok := env.Open(ctx, in.SessionID, in.Cwd)
+	if !ok {
 		return nil
 	}
 	env.Announce(r, env.NewSession(r, in.SessionID, x.Tool, in.Model), map[string]any{AttrSource: "session_start"})
@@ -70,13 +64,8 @@ func (x Extension) sessionEnd(ctx context.Context, env Env) error {
 		env.Logf("%v", err)
 		return nil
 	}
-	if !session.ValidID(in.SessionID) {
-		env.Logf("ignoring unsafe session id")
-		return nil
-	}
-	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	r, err := env.Repo(ctx)
-	if err != nil {
+	r, ok := env.Open(ctx, in.SessionID, in.Cwd)
+	if !ok {
 		return nil
 	}
 	env.EndSession(r, in.SessionID, x.Tool, "")

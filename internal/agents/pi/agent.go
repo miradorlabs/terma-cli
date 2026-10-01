@@ -6,13 +6,14 @@ import (
 	"os/exec"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
+	"github.com/miradorlabs/terma-cli/internal/agents/internal/relayexport"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
 // Agent is Pi (@earendil-works/pi-coding-agent), whose events come from terma's
 // user-scope extension; it has no repository-scope hooks.
-type Agent struct{}
+type Agent struct{ relayexport.Own }
 
 func (Agent) Name() string        { return "pi" }
 func (Agent) DisplayName() string { return "Pi" }

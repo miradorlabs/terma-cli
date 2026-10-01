@@ -38,14 +38,8 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 		env.Logf("%v", err)
 		return nil
 	}
-	if !session.ValidID(in.SessionID) {
-		env.Logf("ignoring unsafe session id")
-		return nil
-	}
-	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	r, err := env.Repo(ctx)
-	if err != nil {
-		env.Logf("not in a git repository: %v", err)
+	r, ok := env.Open(ctx, in.SessionID, in.Cwd)
+	if !ok {
 		return nil
 	}
 	attrs := map[string]any{hookrun.AttrSource: "session_start"}
@@ -60,13 +54,8 @@ func sessionEnd(ctx context.Context, env hookrun.Env) error {
 		env.Logf("%v", err)
 		return nil
 	}
-	if !session.ValidID(in.SessionID) {
-		env.Logf("ignoring unsafe session id")
-		return nil
-	}
-	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	r, err := env.Repo(ctx)
-	if err != nil {
+	r, ok := env.Open(ctx, in.SessionID, in.Cwd)
+	if !ok {
 		return nil
 	}
 	env.EndSession(r, in.SessionID, ompTool, "")

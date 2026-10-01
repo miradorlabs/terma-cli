@@ -1,7 +1,6 @@
 package claude
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -381,22 +380,14 @@ func updateStatusLineRecords(edit func(map[string]*statusLineRecord)) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return err
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), harness.RecordLockWait)
-	defer cancel()
-	unlock, err := flock.Lock(ctx, path+".lock")
-	if err != nil {
-		return err
-	}
-	defer unlock()
-	recs, err := loadStatusLineRecords()
-	if err != nil {
-		return err
-	}
-	edit(recs)
-	return saveStatusLineRecords(recs)
+	return flock.Locked(path, harness.RecordLockWait, func() error {
+		recs, err := loadStatusLineRecords()
+		if err != nil {
+			return err
+		}
+		edit(recs)
+		return saveStatusLineRecords(recs)
+	})
 }
 
 func saveStatusLineRecord(configPath string, rec *statusLineRecord) error {

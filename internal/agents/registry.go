@@ -102,12 +102,7 @@ func (r *Registry) Lookup(name string) (Agent, bool) { return r.Find[Agent](name
 
 // Selected resolves any of the names an agent may be selected under.
 func (r *Registry) Selected(selection string) (Agent, bool) {
-	for _, a := range r.all {
-		if slices.Contains(Selections(a), selection) {
-			return a, true
-		}
-	}
-	return nil, false
+	return first(r.all, func(a Agent) bool { return slices.Contains(Selections(a), selection) })
 }
 
 // Surface resolves a surface by name, with its agent.
@@ -143,45 +138,21 @@ func (r *Registry) CheckSurface(surface, root, projectID string) (st SurfaceStat
 }
 
 // Names lists every known agent's name.
-func (r *Registry) Names() []string {
-	out := make([]string, 0, len(r.all))
-	for _, a := range r.all {
-		out = append(out, a.Name())
-	}
-	return out
-}
+func (r *Registry) Names() []string { return names(r.all) }
 
 // RepoNames lists the agents that commit a hooks file into a repository.
 func (r *Registry) RepoNames() []string {
-	var out []string
-	for _, a := range r.all {
-		if a.HooksPath() != "" {
-			out = append(out, a.Name())
-		}
-	}
-	return out
+	return collect(r.all, func(a Agent) (string, bool) { return a.Name(), a.HooksPath() != "" })
 }
 
 // HooksPaths lists the files agents commit their hooks to, relative to a repository.
 func (r *Registry) HooksPaths() []string {
-	var out []string
-	for _, a := range r.all {
-		if p := a.HooksPath(); p != "" {
-			out = append(out, p)
-		}
-	}
-	return out
+	return collect(r.all, func(a Agent) (string, bool) { return a.HooksPath(), a.HooksPath() != "" })
 }
 
 // WiredNames lists the agents whose committed hooks root carries.
 func (r *Registry) WiredNames(root string) []string {
-	var out []string
-	for _, a := range r.all {
-		if Wired(root, a) {
-			out = append(out, a.Name())
-		}
-	}
-	return out
+	return collect(r.all, func(a Agent) (string, bool) { return a.Name(), Wired(root, a) })
 }
 
 // Handlers is every known agent's events. Names are unique across agents.
@@ -202,12 +173,7 @@ func (r *Registry) FlushesAfter(event string) bool {
 
 // ForTool resolves the agent whose hooks carry label.
 func (r *Registry) ForTool(label string) (Agent, bool) {
-	for _, a := range r.all {
-		if Tool(a) == label {
-			return a, true
-		}
-	}
-	return nil, false
+	return first(r.all, func(a Agent) bool { return Tool(a) == label })
 }
 
 // Render is the render hook for event, when an agent has one.
@@ -252,32 +218,18 @@ func (r *Registry) NameForTool(label string) string {
 
 // RelayTargets names the relay exporters among selected, in registry order.
 func (r *Registry) RelayTargets(selected []string) []string {
-	var out []string
-	for _, e := range r.With[RelayExporter]() {
-		if slices.ContainsFunc(Selections(e), func(s string) bool { return slices.Contains(selected, s) }) {
-			out = append(out, e.Name())
-		}
-	}
-	return out
+	return collect(r.With[RelayExporter](), func(e RelayExporter) (string, bool) {
+		return e.Name(), slices.ContainsFunc(Selections(e), func(s string) bool { return slices.Contains(selected, s) })
+	})
 }
 
 // Harnesses is every exporting agent's harness, in registry order.
 func (r *Registry) Harnesses() []harness.Harness {
-	var out []harness.Harness
-	for _, e := range r.With[Exporting]() {
-		out = append(out, e.Harness())
-	}
-	return out
+	return collect(r.With[Exporting](), func(e Exporting) (harness.Harness, bool) { return e.Harness(), true })
 }
 
 // HarnessNames lists the exporting agents' names.
-func (r *Registry) HarnessNames() []string {
-	var out []string
-	for _, e := range r.With[Exporting]() {
-		out = append(out, e.Name())
-	}
-	return out
-}
+func (r *Registry) HarnessNames() []string { return names(r.With[Exporting]()) }
 
 // Harness resolves an exporting agent's harness by name.
 func (r *Registry) Harness(name string) (harness.Harness, error) {
@@ -289,22 +241,40 @@ func (r *Registry) Harness(name string) (harness.Harness, error) {
 
 // With returns the known agents that have capability C.
 func (r *Registry) With[C any]() []C {
-	var out []C
-	for _, a := range r.all {
-		if c, ok := a.(C); ok {
-			out = append(out, c)
+	return collect(r.all, func(a Agent) (C, bool) { c, ok := a.(C); return c, ok })
+}
+
+// Find resolves an agent by name when it has capability C.
+func (r *Registry) Find[C any](name string) (C, bool) {
+	a, ok := first(r.all, func(a Agent) bool { _, ok := a.(C); return ok && a.Name() == name })
+	if !ok {
+		var zero C
+		return zero, false
+	}
+	return a.(C), true
+}
+
+// collect keeps f's result for each x it reports.
+func collect[T, R any](xs []T, f func(T) (R, bool)) []R {
+	var out []R
+	for _, x := range xs {
+		if r, ok := f(x); ok {
+			out = append(out, r)
 		}
 	}
 	return out
 }
 
-// Find resolves an agent by name when it has capability C.
-func (r *Registry) Find[C any](name string) (C, bool) {
-	for _, a := range r.all {
-		if c, ok := a.(C); ok && a.Name() == name {
-			return c, true
-		}
+// first is the first x that match reports.
+func first[T any](xs []T, match func(T) bool) (T, bool) {
+	if i := slices.IndexFunc(xs, match); i >= 0 {
+		return xs[i], true
 	}
-	var zero C
+	var zero T
 	return zero, false
+}
+
+// names lists the agents' names.
+func names[A interface{ Name() string }](as []A) []string {
+	return collect(as, func(a A) (string, bool) { return a.Name(), true })
 }

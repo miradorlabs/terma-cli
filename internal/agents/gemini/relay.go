@@ -12,7 +12,4 @@ func (Agent) ConfigureRelay(ctx context.Context, cfg agents.RelayConfig) (agents
 	return agents.RelayResult{Paths: []string{settings, extension}}, err
 }
 
-// RelayPointed is unknown: the exporter is terma's own.
-func (Agent) RelayPointed(string) (bool, bool) { return false, false }
-
 var _ agents.RelayExporter = Agent{}

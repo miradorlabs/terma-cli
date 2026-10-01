@@ -6,12 +6,13 @@ import (
 	"os/exec"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
+	"github.com/miradorlabs/terma-cli/internal/agents/internal/relayexport"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 )
 
 // Agent is Gemini CLI, whose hooks come from terma's user-level extension: it fires in
 // every folder, where a repository's own hooks need the folder trusted.
-type Agent struct{}
+type Agent struct{ relayexport.Own }
 
 func (Agent) Name() string        { return "gemini" }
 func (Agent) DisplayName() string { return "Gemini CLI" }
