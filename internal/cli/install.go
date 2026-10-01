@@ -182,7 +182,6 @@ func (app *App) runInstall(cmd *cobra.Command, f installFlags) error {
 		HasKey:         func(projectID string) bool { return keystore.Get(projectID) != "" },
 		RefreshMachine: app.refresher().Machine,
 		ApplySteps: func(cfg *config.Config, plan install.Plan) install.Steps {
-			f.excludePrompts, f.excludeToolContent = !plan.Prompts, !plan.ToolContent
 			return app.installSteps(cmd, ui, cfg, agents, f, plan)
 		},
 	}
@@ -213,7 +212,7 @@ func (app *App) installSteps(cmd *cobra.Command, ui *installUI, cfg *config.Conf
 			return err == nil && yes, nil
 		},
 		// The per-developer half: home-directory state, no committed file.
-		Connect: func(context.Context) error { return app.connectHarnessesForRepo(cmd, ui, cfg, agents, f, plan.Record) },
+		Connect: func(context.Context) error { return app.connectHarnessesForRepo(cmd, ui, cfg, agents, f, plan) },
 		SpoolKey: func(ctx context.Context) (string, string) {
 			sp := spinner.New(cmd.ErrOrStderr())
 			sp.Start("Preparing hook event delivery…")
@@ -221,8 +220,12 @@ func (app *App) installSteps(cmd *cobra.Command, ui *installUI, cfg *config.Conf
 			k := app.ensureSpoolKey(ctx, cfg)
 			return k.state, k.fix
 		},
-		RepoPolicy: func(ctx context.Context, hs []harness.Harness) ([]string, error) {
-			return writeRepoPolicy(ctx, ui, plan.Root, cfg, hs, f)
+		RepoPolicy: func(_ context.Context, hs []harness.Harness) ([]string, error) {
+			signals, err := harness.ParseSignals(f.signals)
+			if err != nil {
+				return nil, err
+			}
+			return install.WriteRepoPolicy(ui, plan.Root, hs, plan.Exporter(cfg.OTLPURL, signals), f.updatePolicy)
 		},
 	}
 	// The status line is a global setting, wrapped only for a developer who chose its agent.
@@ -312,31 +315,22 @@ func (app *App) resolveInstallHarnesses(cmd *cobra.Command, cfg *config.Config, 
 
 // connectHarnessesForRepo writes no committed file: keys, the routing record and the
 // relay are home-directory state (docs/RELAY.md).
-func (app *App) connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *config.Config, agents []string, f installFlags, prev *routing.Record) error {
+func (app *App) connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *config.Config, agents []string, f installFlags, plan install.Plan) error {
 	ctx := cmd.Context()
 	signals, err := harness.ParseSignals(f.signals)
 	if err != nil {
 		return err
 	}
-	targets := app.agents.RelayTargets(agents)
-	if len(targets) == 0 {
+	rec, ok := install.RouteRecord(app.agents, cfg.ProjectID, agents, plan.Exporter(cfg.OTLPURL, signals))
+	if !ok {
 		return nil
 	}
-	rec := routing.Record{
-		ProjectID:          cfg.ProjectID,
-		Endpoint:           cfg.OTLPURL,
-		Signals:            signalStrings(signals),
-		IncludePrompts:     !f.excludePrompts,
-		IncludeToolContent: !f.excludeToolContent,
-		Harnesses:          targets,
-		Surfaces:           install.RoutedSurfaces(app.agents, agents, targets),
-	}
-	if !cmd.Flags().Changed("signals") && prev != nil {
-		rec.Signals = prev.Signals
+	if !cmd.Flags().Changed("signals") && plan.Record != nil {
+		rec.Signals = plan.Record.Signals
 	}
 	sp := spinner.New(cmd.ErrOrStderr())
 	defer sp.Stop()
-	for _, a := range targets {
+	for _, a := range rec.Harnesses {
 		h, err := app.agents.Harness(a)
 		if err != nil {
 			continue // an exporter terma writes: it sends with the project's spool key
@@ -374,14 +368,6 @@ func (app *App) connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *
 // printCommitList exists because the hooks do nothing for a colleague until the files are merged.
 func printCommitList(out io.Writer, lead string, paths []string) {
 	fmt.Fprintln(out, commitList(style.For(out), lead, paths))
-}
-
-func signalStrings(signals []harness.Signal) []string {
-	out := make([]string, 0, len(signals))
-	for _, s := range signals {
-		out = append(out, string(s))
-	}
-	return out
 }
 
 func splitCommas(s string) []string {

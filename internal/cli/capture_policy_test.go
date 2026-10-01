@@ -17,6 +17,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/install"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/routing"
@@ -317,7 +318,7 @@ func TestReinstallKeepsSignalChoiceUnlessExplicit(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := testApp.connectHarnessesForRepo(cmd, ui, cfg, []string{"codex"}, f, &prev); err != nil {
+		if err := testApp.connectHarnessesForRepo(cmd, ui, cfg, []string{"codex"}, f, install.Plan{Record: &prev}); err != nil {
 			t.Fatal(err)
 		}
 		r, _, err := routing.LoadRecord("team")

@@ -1,19 +1,15 @@
 package cli
 
 import (
-	"bytes"
 	"cmp"
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
 
-	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/connect"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
@@ -235,85 +231,4 @@ func localLayerStatus(h harness.Harness, root string, global telemetryStatus) (t
 
 func statusRow(name string, e telemetryStatus) []string {
 	return []string{name, e.Installed, e.State, e.Signals, e.Prompts, e.ToolContent}
-}
-
-// writeRepoPolicy skips a conflict rather than failing: the hooks and binding are already
-// written, and failing would leave the repository half-onboarded.
-func writeRepoPolicy(
-	ctx context.Context,
-	ui *installUI,
-	root string,
-	cfg *config.Config,
-	hs []harness.Harness,
-	f installFlags,
-) ([]string, error) {
-	signals, err := harness.ParseSignals(f.signals)
-	if err != nil {
-		return nil, err
-	}
-	var written []string
-	for _, h := range hs {
-		status, err := h.Status()
-		if err != nil {
-			return nil, err
-		}
-		if status.HasPolicy && !f.updatePolicy {
-			continue
-		}
-		intended := harness.Exporter{
-			// Carried, never written: an outranking per-signal redirect is judged against it.
-			Endpoint:           cfg.OTLPURL,
-			Signals:            signals,
-			IncludePrompts:     !f.excludePrompts,
-			IncludeToolContent: !f.excludeToolContent,
-		}
-		conflicts, err := h.ConflictsWith(intended)
-		if err != nil {
-			return nil, err
-		}
-		conflicts, _ = connect.Partition(conflicts)
-		if len(conflicts) > 0 {
-			ui.Warn("Repo policy", fmt.Sprintf("%s skipped — this repository already has OTLP settings for it (%s)",
-				h.DisplayName(), output.SanitizeTerminal(strings.Join(conflictKeys(conflicts), ", "))))
-			ui.Then(fmt.Sprintf("Resolve %s's OTLP settings in this repository, then run `terma connect %s --scope local` here.", h.DisplayName(), h.Name()))
-			continue
-		}
-		path, err := h.ConfigPath()
-		if err != nil {
-			return nil, err
-		}
-		before, err := os.ReadFile(path)
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
-			return nil, err
-		}
-		if err := h.Connect(intended, false); err != nil {
-			return nil, fmt.Errorf("write %s repository policy: %w", h.Name(), err)
-		}
-		after, err := os.ReadFile(path)
-		if err != nil {
-			return nil, err
-		}
-		if !bytes.Equal(before, after) {
-			rel, err := filepath.Rel(root, path)
-			if err != nil {
-				return nil, err
-			}
-			written = append(written, rel)
-		}
-		fmt.Fprintf(ui.detail, "\nWrote %s's repository policy to %s.\n", h.DisplayName(), path)
-		rel, err := filepath.Rel(root, path)
-		if err != nil {
-			rel = path
-		}
-		ui.OK("Repo policy", h.DisplayName()+" telemetry settings in "+rel)
-	}
-	return written, nil
-}
-
-func conflictKeys(conflicts []harness.Conflict) []string {
-	out := make([]string, 0, len(conflicts))
-	for _, c := range conflicts {
-		out = append(out, c.Key)
-	}
-	return out
 }

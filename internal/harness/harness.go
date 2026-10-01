@@ -291,3 +291,15 @@ func MaskKey(key string) string {
 	}
 	return serverkey.Mask(key)
 }
+
+// Partition splits conflicts into those that gate a connect and the advisory rest.
+func Partition(conflicts []Conflict) (blocking, advisory []Conflict) {
+	for _, c := range conflicts {
+		if c.Advisory {
+			advisory = append(advisory, c)
+		} else {
+			blocking = append(blocking, c)
+		}
+	}
+	return blocking, advisory
+}

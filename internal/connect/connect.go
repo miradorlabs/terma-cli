@@ -183,7 +183,7 @@ func Local(ctx context.Context, global, local harness.Harness, cfg *config.Confi
 // gate.
 func gate(out io.Writer, agent string, conflicts []harness.Conflict, o Options, s Steps, where, question string) error {
 	PrintConflicts(out, conflicts, o.Force)
-	conflicts, _ = Partition(conflicts)
+	conflicts, _ = harness.Partition(conflicts)
 	if blocking := unclearable(conflicts); len(blocking) > 0 {
 		return fmt.Errorf("%s has settings Terma does not change: %s — remove or adjust them, then retry",
 			agent, output.SanitizeTerminal(strings.Join(blocking, ", ")))

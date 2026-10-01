@@ -92,7 +92,7 @@ func resourceAttributes(ctx context.Context, h harness.Harness, cfg *config.Conf
 // PrintConflicts never prints a header value (it may hold someone else's credential) and
 // sanitizes every field, since a key can carry a file name.
 func PrintConflicts(out io.Writer, conflicts []harness.Conflict, force bool) {
-	blocking, advisory := Partition(conflicts)
+	blocking, advisory := harness.Partition(conflicts)
 
 	if len(blocking) > 0 {
 		if force {
@@ -134,18 +134,6 @@ func printConflict(out io.Writer, c harness.Conflict) {
 			fmt.Fprintf(out, "       Terma cannot change this — it is outside the file Terma writes.\n")
 		}
 	}
-}
-
-// Partition splits conflicts into those that gate a connect and the advisory rest.
-func Partition(conflicts []harness.Conflict) (blocking, advisory []harness.Conflict) {
-	for _, c := range conflicts {
-		if c.Advisory {
-			advisory = append(advisory, c)
-		} else {
-			blocking = append(blocking, c)
-		}
-	}
-	return blocking, advisory
 }
 
 func unclearable(conflicts []harness.Conflict) []string {

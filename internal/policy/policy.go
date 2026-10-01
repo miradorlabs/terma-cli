@@ -31,7 +31,6 @@ type Source struct {
 // default team.
 func (s Source) Fetch(ctx context.Context, cfg *config.Config) (config.Policy, error) {
 	var client *api.Client
-	var err error
 	// Only an explicit offline fixture skips the developer's login.
 	if config.PolicyStub() != "" {
 		client = api.NewAnonymous(cfg.AuthURL, s.Version)

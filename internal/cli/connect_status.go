@@ -120,7 +120,7 @@ func describeStatus(ctx context.Context, h harness.Harness, cfg *config.Config) 
 	entry.Endpoint = st.Endpoint
 	entry.ProjectID = st.ProjectID
 	entry.KeyPrefix = st.KeyPrefix
-	blocking, advisory := connect.Partition(st.Conflicts)
+	blocking, advisory := harness.Partition(st.Conflicts)
 	for _, c := range blocking {
 		entry.Conflicts = append(entry.Conflicts, c.Key)
 	}

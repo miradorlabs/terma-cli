@@ -147,10 +147,6 @@ func (app *App) newVersionCommand() *cobra.Command {
 // printUpdateNotice runs update maintenance after interactive commands, never from a
 // hook or a spool flush, which must stay silent and fast.
 func (app *App) printUpdateNotice(cmd *cobra.Command) {
-	// nate removes the updater's state and the executable; its post-run must not recreate them.
-	if cmd.Name() == "nate" {
-		return
-	}
 	if !app.automaticUpdatesAllowed(cmd, canPrompt()) {
 		return
 	}
@@ -173,7 +169,8 @@ func (app *App) automaticUpdatesAllowed(cmd *cobra.Command, interactive bool) bo
 	}
 	for c := cmd; c != nil; c = c.Parent() {
 		switch c.Name() {
-		case "hook", "spool", "update", "version", "completion", "__complete", "__completeNoDesc":
+		// nate removes the updater's state and the executable; its post-run must not recreate them.
+		case "hook", "spool", "update", "version", "completion", "__complete", "__completeNoDesc", "nate":
 			return false
 		}
 	}
