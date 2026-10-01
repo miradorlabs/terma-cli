@@ -75,7 +75,7 @@ func TestInstallRefusesABindingFromAnotherEnvironment(t *testing.T) {
 	if err == nil {
 		t.Fatalf("install used a project the signed-in account cannot see:\n%s", out)
 	}
-	for _, want := range []string{"Terma Dev", "not a project in Acme", "bound in the dev environment", "terma is using production", "terma install --project"} {
+	for _, want := range []string{"Terma Dev", "not a team in Acme", "bound in the dev environment", "terma is using production", "terma install --team"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("the error should say %q: %v", want, err)
 		}
@@ -101,7 +101,7 @@ func TestInstallRefusesABindingFromAnotherOrganization(t *testing.T) {
 	if err == nil {
 		t.Fatalf("install used another organization's project:\n%s", out)
 	}
-	for _, want := range []string{"Beta Core", "not a project in Acme", "terma org use " + orgB().ID, "terma install --project"} {
+	for _, want := range []string{"Beta Core", "not a team in Acme", "terma org use " + orgB().ID, "terma install --team"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("the error should say %q: %v", want, err)
 		}
@@ -115,7 +115,7 @@ func TestInstallRefusesABindingFromAnotherOrganization(t *testing.T) {
 func TestInstallProjectRebindsAnUnreachableBinding(t *testing.T) {
 	boundRepo(t, termaproject.Project{ID: "dddddddd-0000-4000-8000-000000000001", Name: "Terma Dev", Environment: config.EnvDev}, true)
 
-	if out, err := routeCodex(t, "--project", "Acme Web", "--yes"); err != nil {
+	if out, err := routeCodex(t, "--team", "Acme Web", "--yes"); err != nil {
 		t.Fatalf("install --project: %v\n%s", err, out)
 	}
 	want := projectsIn(orgA().ID)[0]
@@ -186,7 +186,7 @@ func TestResolveBindingTakesTheOnlyProjectWithoutAsking(t *testing.T) {
 	if err != nil || b.ID != beta.ID {
 		t.Fatalf("unreachable binding: %+v, err %v; want it replaced by %s", b, err, beta.Name)
 	}
-	if !strings.Contains(stderr, "not a project in") {
+	if !strings.Contains(stderr, "not a team in") {
 		t.Errorf("install should still say why it replaced the binding: %q", stderr)
 	}
 	if _, _, err := resolve(orgA(), nil); err == nil || !strings.Contains(err.Error(), "no terminal") {
@@ -198,7 +198,7 @@ func TestUnreachableBindingWording(t *testing.T) {
 	cfg := &config.Config{Environment: config.EnvLocal, OrganizationID: orgA().ID, OrganizationName: "Acme"}
 	// local and dev share an account service, so the environment is not the reason.
 	got := unreachableBinding(&termaproject.File{Project: termaproject.Project{ID: testProjectID, Name: "Web", Environment: config.EnvDev}}, cfg)
-	if want := "this repository is bound to Web, which is not a project in Acme"; got != want {
+	if want := "this repository is bound to Web, which is not a team in Acme"; got != want {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 }
@@ -208,7 +208,7 @@ func TestInstallStampsTheVersionOnlyWhenItWritesCommittedFiles(t *testing.T) {
 	repo := installRepo(t)
 	install := func() {
 		t.Helper()
-		if out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude", "--yes", "--no-doctor"); err != nil {
+		if out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude", "--yes", "--no-doctor"); err != nil {
 			t.Fatalf("install: %v\n%s", err, out)
 		}
 	}

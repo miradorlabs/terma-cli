@@ -19,9 +19,9 @@ type matchKind[T any] struct {
 }
 
 var projectKind = matchKind[project]{
-	noun:  "project",
-	list:  "`terma project list`",
-	title: "Select a project:",
+	noun:  "team",
+	list:  "`terma team list`",
+	title: "Select a team:",
 	id:    func(p project) string { return p.ID },
 	name:  func(p project) string { return p.Name },
 }

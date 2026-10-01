@@ -17,7 +17,7 @@ func TestTelemetryConnectOpenCodeInstallsThePlugin(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", termaDir)
 
 	out, err := runTerma(t, "connect", "opencode",
-		"--api-key", "ter_srv_0123456789abcdef", "--project", "770e8400-e29b-41d4-a716-446655440000",
+		"--api-key", "ter_srv_0123456789abcdef", "--team", "770e8400-e29b-41d4-a716-446655440000",
 		"--yes", "--exclude-tool-content")
 	if err != nil {
 		t.Fatalf("connect: %v\n%s", err, out)
@@ -67,7 +67,7 @@ func TestTelemetryConnectOpenCodeInstallsThePlugin(t *testing.T) {
 	}
 
 	// Reconnecting reuses the installed key: no --api-key, no login.
-	if out, err := runTerma(t, "connect", "opencode", "--project", "770e8400-e29b-41d4-a716-446655440000", "--yes"); err != nil {
+	if out, err := runTerma(t, "connect", "opencode", "--team", "770e8400-e29b-41d4-a716-446655440000", "--yes"); err != nil {
 		t.Fatalf("reconnect: %v\n%s", err, out)
 	} else if !strings.Contains(out, "Reusing the key") {
 		t.Errorf("reconnect minted instead of reusing:\n%s", out)

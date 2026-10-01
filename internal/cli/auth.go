@@ -26,8 +26,8 @@ for the organization, nothing is minted and no browser opens. Otherwise your bro
 opens, you approve the CLI against an organization, and the resulting credential is
 stored in ~/.config/terma/credentials.json.
 
-The credential is scoped to the organization, not a project, so you can switch
-projects afterwards without signing in again. Each organization you sign into keeps
+The credential is scoped to the organization, not a team, so you can switch
+teams afterwards without signing in again. Each organization you sign into keeps
 its own credential in the profile; ` + "`terma org use`" + ` switches between them.
 
   --org <name-or-id>   sign into (or switch to) a particular organization
@@ -153,9 +153,9 @@ func (app *App) newWhoamiCommand() *cobra.Command {
 			}
 			pairs = append(pairs, [2]string{"organization", cmp.Or(cfg.OrganizationName, identity.OrganizationID)})
 			if cfg.ProjectID != "" {
-				pairs = append(pairs, [2]string{"project", cmp.Or(cfg.ProjectName, cfg.ProjectID)})
+				pairs = append(pairs, [2]string{"team", cmp.Or(cfg.ProjectName, cfg.ProjectID)})
 			} else {
-				pairs = append(pairs, [2]string{"project", "(no repository project)"})
+				pairs = append(pairs, [2]string{"team", "(no repository team)"})
 			}
 			if cfg.APIKey == "" {
 				if creds, err := auth.Credentials(cfg.ProfileName); err == nil && len(creds) > 1 {

@@ -29,7 +29,7 @@ func HelpersDir() (string, error) {
 // becomes a path, since a "../" in it would put a live key wherever it pointed.
 func HelperFilePath(h Harness, projectID string) (string, error) {
 	if !project.ValidID(projectID) {
-		return "", fmt.Errorf("invalid project id %q: expected letters, digits, dot, dash or underscore", projectID)
+		return "", fmt.Errorf("invalid team id %q: expected letters, digits, dot, dash or underscore", projectID)
 	}
 	dir, err := HelpersDir()
 	if err != nil {

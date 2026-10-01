@@ -92,7 +92,7 @@ func (s *installSandbox) write(root, path, body string) {
 	}
 }
 func (s *installSandbox) install(dir string, extra ...string) string {
-	return s.cli(dir, append([]string{"install", "--harness", "none", "--project", testProjectID, "--adapters", "claude,cursor,codex,antigravity", "--yes", "--no-doctor"}, extra...)...)
+	return s.cli(dir, append([]string{"install", "--harness", "none", "--team", testProjectID, "--adapters", "claude,cursor,codex,antigravity", "--yes", "--no-doctor"}, extra...)...)
 }
 func readInstallFile(t *testing.T, root, path string) []byte {
 	t.Helper()
@@ -313,7 +313,7 @@ func TestInstallE2ERejectsBrokenInputsWithoutWrites(t *testing.T) {
 			if path != "" {
 				s.write(root, path, body)
 			}
-			out, err := s.run(root, "", s.bin, "install", "--harness", "none", "--project", testProjectID, "--yes", "--no-doctor")
+			out, err := s.run(root, "", s.bin, "install", "--harness", "none", "--team", testProjectID, "--yes", "--no-doctor")
 			if err == nil {
 				t.Fatalf("expected rejection: %s", out)
 			}
@@ -531,7 +531,7 @@ func TestInstallE2ESymlinkedConfigIsNotModified(t *testing.T) {
 			for _, command := range []string{"install", "uninstall"} {
 				args := []string{command, "--yes"}
 				if command == "install" {
-					args = append(args, "--harness", "none", "--project", testProjectID, "--no-doctor")
+					args = append(args, "--harness", "none", "--team", testProjectID, "--no-doctor")
 				}
 				out, err := s.run(root, "", s.bin, args...)
 				if err == nil {
@@ -636,7 +636,7 @@ func TestInstallE2EHookManagerNameCollisions(t *testing.T) {
 				body = "repos:\n  - repo: local\n    hooks:\n      - id: terma-post-commit\n        name: user\n        entry: ./user-command.sh\n        language: system\n"
 			}
 			s.write(root, path, body)
-			out, err := s.run(root, "", s.bin, "install", "--harness", "none", "--project", testProjectID, "--yes", "--no-doctor")
+			out, err := s.run(root, "", s.bin, "install", "--harness", "none", "--team", testProjectID, "--yes", "--no-doctor")
 			if err == nil {
 				t.Fatalf("overwrote conflicting name: %s", out)
 			}
@@ -731,7 +731,7 @@ func TestInstallE2ELegacyLinkedMigrationDoesNotChangeSharedHooks(t *testing.T) {
 				journalDir = filepath.Join(main, ".git")
 			}
 			s.write(journalDir, "terma/install.json", record)
-			out, err := s.run(linked, "", s.bin, "install", "--harness", "none", "--project", testProjectID, "--yes", "--no-doctor")
+			out, err := s.run(linked, "", s.bin, "install", "--harness", "none", "--team", testProjectID, "--yes", "--no-doctor")
 			if err == nil || !strings.Contains(out, "main worktree") {
 				t.Fatalf("expected migration guidance, got %v: %s", err, out)
 			}

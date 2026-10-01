@@ -26,12 +26,12 @@ type listProjectsResponse struct {
 
 func (app *App) newProjectCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "project",
-		Aliases: []string{"projects"},
-		Short:   "List projects and show the repository's binding",
+		Use:     "team",
+		Aliases: []string{"teams"},
+		Short:   "List teams and show the repository's binding",
 		Hidden:  true,
-		Long: `Projects are selected per repository by terma install.
-Read commands use the current repository's binding, or an explicit --project override.`,
+		Long: `Teams are selected per repository by terma install.
+Read commands use the current repository's binding, or an explicit --team override.`,
 	}
 	cmd.AddCommand(app.newProjectListCommand(), app.newProjectShowCommand())
 	return cmd
@@ -41,7 +41,7 @@ func (app *App) newProjectListCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
-		Short:   "List projects in the current organization",
+		Short:   "List teams in the current organization",
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfg, client, format, err := app.setupCommand(resolveRepoProject)
@@ -75,7 +75,7 @@ func (app *App) newProjectListCommand() *cobra.Command {
 func (app *App) newProjectShowCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:    "show",
-		Short:  "Show this repository's project",
+		Short:  "Show this repository's team",
 		Hidden: true,
 		Args:   cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -88,7 +88,7 @@ func (app *App) newProjectShowCommand() *cobra.Command {
 				return err
 			}
 			if cfg.ProjectID == "" {
-				return fmt.Errorf("no project bound to this repository — run `terma install` or pass --project")
+				return fmt.Errorf("no team bound to this repository — run `terma install` or pass --team")
 			}
 
 			organizationID := cmp.Or(cfg.ProjectOrganizationID, cfg.OrganizationID)
@@ -114,7 +114,7 @@ func fetchProjects(ctx context.Context, client *api.Client) ([]project, error) {
 	return resp.Projects, nil
 }
 
-var errNoProjects = errors.New("no projects in this organization yet — create one in the Terma app")
+var errNoProjects = errors.New("no teams in this organization yet — create one in the Terma app")
 
 // availableProjects fetches the organization's projects, failing with errNoProjects when empty.
 func availableProjects(ctx context.Context, client *api.Client) ([]project, error) {

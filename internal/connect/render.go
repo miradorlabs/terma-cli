@@ -26,7 +26,7 @@ func printConnectPlan(
 	o Options,
 ) {
 	printDetection(out, h, detection)
-	fmt.Fprintf(out, "  Terma project: %s\n", cmp.Or(cfg.ProjectName, cfg.ProjectID))
+	fmt.Fprintf(out, "  Terma team: %s\n", cmp.Or(cfg.ProjectName, cfg.ProjectID))
 	fmt.Fprintf(out, "  Endpoint:        %s\n", cfg.OTLPURL)
 
 	if reach == harness.ReachRepos {
@@ -49,7 +49,7 @@ func printConnectPlan(
 	}
 	if o.SuppliedKey == "" {
 		// Reuse is decided after the plan, so the plan states the rule.
-		fmt.Fprintln(out, "\n  A server key will be minted for this project — unless one is already installed here, which will be reused.")
+		fmt.Fprintln(out, "\n  A server key will be minted for this team — unless one is already installed here, which will be reused.")
 	} else {
 		fmt.Fprintf(out, "\n  Installing the key you supplied (%s).\n", harness.MaskKey(o.SuppliedKey))
 	}

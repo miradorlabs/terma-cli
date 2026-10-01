@@ -33,7 +33,7 @@ func (c *Client) CollectionPolicy(ctx context.Context) (config.Policy, error) {
 		return config.Policy{}, fmt.Errorf("collection policy requires a developer login; server keys only deliver telemetry")
 	}
 	if c.projectID == "" {
-		return config.Policy{}, fmt.Errorf("collection policy requires a team project ID")
+		return config.Policy{}, fmt.Errorf("collection policy requires a team ID")
 	}
 	if err := c.AuthGet(ctx, "/v1/policy", url.Values{"project_id": {c.projectID}}, &response); err != nil {
 		return config.Policy{}, err

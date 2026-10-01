@@ -37,7 +37,7 @@ func sandboxMachine(t *testing.T) {
 func TestRefreshUpdatesTheRepositoryFromItsBinding(t *testing.T) {
 	repo := installRepo(t)
 	sandboxMachine(t)
-	if out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude", "--yes", "--no-doctor"); err != nil {
+	if out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude", "--yes", "--no-doctor"); err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}
 	// What an earlier build wrote: its version in the binding…
@@ -282,7 +282,7 @@ func tarGzWith(t *testing.T, name string, body []byte) []byte {
 func TestRefreshAfterUpgradeRunsOncePerRelease(t *testing.T) {
 	repo := installRepo(t)
 	sandboxMachine(t)
-	if out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude", "--yes", "--no-doctor"); err != nil {
+	if out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude", "--yes", "--no-doctor"); err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}
 	settings := filepath.Join(repo, ".claude", "settings.json")
@@ -321,7 +321,7 @@ func TestInstallRefreshesTheMachineOnANewRelease(t *testing.T) {
 	sandboxMachine(t)
 	install := func() string {
 		t.Helper()
-		out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude", "--yes", "--no-doctor", "--verbose")
+		out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude", "--yes", "--no-doctor", "--verbose")
 		if err != nil {
 			t.Fatalf("install: %v\n%s", err, out)
 		}

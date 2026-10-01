@@ -33,7 +33,7 @@ func (app *App) newConfigCommand() *cobra.Command {
 		Short:  "Inspect and switch configuration profiles",
 		Hidden: true,
 		Long: `Profiles keep separate selections side by side — two organizations you move
-between, or two projects you compare.
+between, or two teams you compare.
 
 Credentials are stored per profile too, so switching profiles switches identity.`,
 	}
@@ -87,7 +87,7 @@ func (app *App) newConfigShowCommand() *cobra.Command {
 				{"app url", cfg.AppURL},
 				{"otlp url", cfg.OTLPURL},
 				{"organization", cmp.Or(cfg.OrganizationName, cfg.OrganizationID)},
-				{"project", cmp.Or(cfg.ProjectName, cfg.ProjectID)},
+				{"team", cmp.Or(cfg.ProjectName, cfg.ProjectID)},
 				{"auth", authMode},
 			}, view)
 		},

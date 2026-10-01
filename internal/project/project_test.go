@@ -51,7 +51,7 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 func TestLoadRejectsMissingID(t *testing.T) {
 	root := t.TempDir()
 	writeRaw(t, root, []byte(`{"project":{"name":"x"}}`))
-	if _, err := Load(root); err == nil || !strings.Contains(err.Error(), "no project id") {
+	if _, err := Load(root); err == nil || !strings.Contains(err.Error(), "no team id") {
 		t.Fatalf("expected a missing-id error, got %v", err)
 	}
 }

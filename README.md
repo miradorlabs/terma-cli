@@ -15,7 +15,7 @@ Terma has two onboarding commands with different owners:
 | Command | Run it | What it does |
 |---|---|---|
 | `terma setup` | Once per developer (optional) | Signs you in, records which coding agents you use, fetches your organization's collection policy, and points those agents at the local relay. It writes no repository files. |
-| `terma install` | Once per repository | Binds the repository to a Terma project, configures per-repository agent routing, and offers to install commit and agent hooks. |
+| `terma install` | Once per repository | Binds the repository to a Terma team, configures per-repository agent routing, and offers to install commit and agent hooks. |
 
 Repository telemetry is enabled by `terma install`; no extra telemetry flag is needed.
 Run it from any subdirectory: Git worktrees and submodules use their own root.
@@ -30,7 +30,7 @@ Restart running agents after installation so they load the new configuration.
 
 Codex desktop uses a separate backend from the `codex` shell command. Select
 **Codex Desktop** in `terma setup` (or use `--harness codex-desktop` with
-`terma install`). Install then configures repository hooks and a local project
+`terma install`). Install then configures repository hooks and a local team
 route. Trust the hooks in the app and check `terma agent status codex-desktop` from that repository.
 
 Then verify the installation:
@@ -41,14 +41,14 @@ terma install     # run inside each repository
 terma doctor      # verify the chain end to end
 ```
 
-`terma install` binds the repository to a project: the only one, when your
+`terma install` binds the repository to a team: the only one, when your
 organization has one; otherwise it asks, offering the one in an existing
-`.terma/settings.json` first (Enter keeps it), or takes `--project <name-or-id>`. A bound project your account cannot see is never used:
+`.terma/settings.json` first (Enter keeps it), or takes `--team <name-or-id>`. A bound team your account cannot see is never used:
 install says why and lets you choose another. Use `--yes` for non-interactive setup
 (it keeps an existing binding), or `--harness none` when you only want commit hooks.
-It shows the project, prompt-capture setting, warnings, and what is left for you
+It shows the team, prompt-capture setting, warnings, and what is left for you
 to do; `-v` / `--verbose` also shows setup steps and every file and setting it wrote. The committed settings
-file contains a project reference, never a secret.
+file contains a team reference, never a secret.
 
 ## Install
 
@@ -117,9 +117,9 @@ Your agents export to a relay terma runs on your machine (on `127.0.0.1`), from 
 user-level settings — which is also what Claude Desktop, Codex Desktop and IDE extensions
 read, so they are covered too. The relay forwards a session only when a hook in a
 repository you ran `terma install` in claimed it, and sends it to that repository's
-project with that project's key. Everything else — personal work, other repositories —
+team with that team's key. Everything else — personal work, other repositories —
 waits briefly in memory and is dropped: it never leaves your machine. Prompts and model
-responses are sent by default; `terma install --prompts off` stops them for a project,
+responses are sent by default; `terma install --prompts off` stops them for a team,
 and the relay removes them before anything leaves.
 
 `terma setup` and `terma install` run the relay as a per-user background service, so it
@@ -159,23 +159,23 @@ terma status
 terma doctor
 ```
 
-`status` is the quick local view of sign-in, project binding, hooks, connected
+`status` is the quick local view of sign-in, team binding, hooks, connected
 agents, queue state, and remaining setup steps. `doctor` performs the end-to-end check,
 including a scratch commit in a temporary worktree. Output automatically becomes JSON
 when stdout is not a terminal.
 
-Organization and project names are shown without UUIDs in normal output. IDs remain
-available with `terma org list -o json` and `terma project list -o json`; lists and
+Organization and team names are shown without UUIDs in normal output. IDs remain
+available with `terma org list -o json` and `terma team list -o json`; lists and
 pickers show them when a name is missing or duplicated.
 
-Choose the project for each repository with `terma install`. Reads use that repository's
-binding; use `--project <id>` for a one-command override or when outside a repository.
-Switching organizations never changes a repository's project.
+Choose the team for each repository with `terma install`. Reads use that repository's
+binding; use `--team <id>` for a one-command override or when outside a repository.
+Switching organizations never changes a repository's team.
 
 ## Privacy and security
 
 Authentication uses a browser handoff with PKCE and a loopback callback. Credentials
-and project keys stay in the user's configuration directory with restrictive file
+and team keys stay in the user's configuration directory with restrictive file
 permissions; repository settings contain no secrets. Export choices support signal,
 prompt, tool-content, and global-versus-local scope controls.
 
@@ -193,7 +193,7 @@ uninstall   Remove repository installation files
 update      Update terma
 ```
 
-Authentication, direct telemetry management, project lookup,
+Authentication, direct telemetry management, team lookup,
 shell completion, configuration, hook execution, the local relay, and spool maintenance remain
 available as hidden commands for automation and troubleshooting. Run
 `terma <command> --help` for details.

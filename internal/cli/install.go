@@ -51,22 +51,22 @@ func (app *App) newInstallCommand() *cobra.Command {
 	var f installFlags
 	cmd := &cobra.Command{
 		Use:   "install",
-		Short: "Configure this workspace: point your agents at its project and wire the hooks",
+		Short: "Configure this workspace: point your agents at its team and wire the hooks",
 		Long: `Run once per repository. install is self-contained — it signs you in if you have
 not run ` + "`terma setup`" + `, asks which agents you use if you have not chosen, then:
 
-  1. Binds the repository to a Terma project and records it in .terma/settings.json —
-     committed, no secrets. An organization with one project is bound to it without
-     asking. With several, on a terminal you choose the project every time, the one
-     already bound offered first (Enter keeps it); --project names it instead, and
+  1. Binds the repository to a Terma team and records it in .terma/settings.json —
+     committed, no secrets. An organization with one team is bound to it without
+     asking. With several, on a terminal you choose the team every time, the one
+     already bound offered first (Enter keeps it); --team names it instead, and
      without a terminal, or with --yes, an existing binding is kept. A binding to a
-     project your account cannot see is not used: install says why and chooses again.
-  2. Points each of your agents at that project, through the local relay: their own
+     team your account cannot see is not used: install says why and chooses again.
+  2. Points each of your agents at that team, through the local relay: their own
      exporters (or terma's plugin, for an agent without a usable one) send to a relay
      on this machine, and the relay forwards only the sessions this repository's hooks
-     claim, with the project's key. Nothing else leaves the machine. Keys stay in your home
-     directory, namespaced by project — never in the repository. Prompt text and model
-     responses are sent (your last choice for the project, on for a first install);
+     claim, with the team's key. Nothing else leaves the machine. Keys stay in your home
+     directory, namespaced by team — never in the repository. Prompt text and model
+     responses are sent (your last choice for the team, on for a first install);
      --prompts off stops them. A desktop app also reports through repository hooks.
   3. Enables repository telemetry, including for machines configured to export only
      from installed repositories. Existing repository policies are preserved unless
@@ -80,14 +80,14 @@ the first install uses the current directory and later installs find the nearest
 commit stamping are skipped. Recognizable non-Git repositories produce a warning:
 only Git has version-control integration. Bare repositories are not workspaces.
 
-The keys and per-project configuration live in your home directory; the committed
+The keys and per-team configuration live in your home directory; the committed
 .terma/settings.json only names the project.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			f.updatePolicy = cmd.Flags().Changed("signals") || cmd.Flags().Changed("prompts") || cmd.Flags().Changed("exclude-prompts") || cmd.Flags().Changed("exclude-tool-content")
 			return app.runInstall(cmd, f)
 		},
 	}
-	cmd.Flags().StringVar(&f.projectRef, "project", "", "Terma project (name or id) to bind the repository to")
+	cmd.Flags().StringVar(&f.projectRef, "team", "", "Terma team (name or id) to bind the repository to")
 	cmd.Flags().StringVar(&f.harnesses, "harness", "", "comma-separated agents to configure ("+strings.Join(app.availableAgentNames(), ", ")+"); default: what `terma setup` recorded, else a picker")
 	cmd.Flags().StringVar(&f.adapters, "adapters", "", "comma-separated agents whose committed hooks to wire (default: the configured agents that have one)")
 	cmd.Flags().BoolVar(&f.noHooks, "no-hooks", false, "do not install commit hooks or agent hooks")
@@ -96,7 +96,7 @@ The keys and per-project configuration live in your home directory; the committe
 	cmd.Flags().BoolVar(&f.noStatusLine, "no-statusline", false, "do not wrap "+app.statusLineOwner()+"'s status line (which captures the plan's rate-limit windows)")
 	cmd.Flags().StringVar(&f.identity, "identity", "", "identity stamped on the sessions of agents that take one (default: git user.email; \"none\" to omit)")
 	cmd.Flags().StringVar(&f.signals, "signals", "", "comma-separated signals to export: traces, logs, metrics (default all)")
-	cmd.Flags().StringVar(&f.prompts, "prompts", "", "send prompt text and model responses: on or off (default: your last choice for this project, on for a first install)")
+	cmd.Flags().StringVar(&f.prompts, "prompts", "", "send prompt text and model responses: on or off (default: your last choice for this team, on for a first install)")
 	cmd.Flags().BoolVar(&f.excludePrompts, "exclude-prompts", false, "do not export prompt text or model responses")
 	// --exclude-prompts is --prompts off, kept for the scripts that pass it.
 	_ = cmd.Flags().MarkHidden("exclude-prompts")
@@ -266,9 +266,9 @@ type spoolKey struct{ state, fix string }
 // ensureSpoolKey never fails the install: held events wait up to the spool's MaxAge for a key.
 func (app *App) ensureSpoolKey(ctx context.Context, cfg *config.Config) spoolKey {
 	if keystore.Get(cfg.ProjectID) != "" {
-		return spoolKey{state: "delivered with this project's key"}
+		return spoolKey{state: "delivered with this team's key"}
 	}
-	const held = "held until this machine has a key for the project"
+	const held = "held until this machine has a key for the team"
 	if cfg.APIKey != "" {
 		return spoolKey{held, "TERMA_API_KEY cannot mint a key for hook events: unset it and run `terma install` again."}
 	}
@@ -287,7 +287,7 @@ func (app *App) ensureSpoolKey(ctx context.Context, cfg *config.Config) spoolKey
 	if err := keystore.Set(cfg.ProjectID, key, keystore.HostsOf(cfg)); err != nil {
 		return spoolKey{held, "Storing the key for hook events failed (" + err.Error() + "); run `terma install` again."}
 	}
-	return spoolKey{state: "Project key stored for this machine (" + keystore.Mask(key) + ")"}
+	return spoolKey{state: "Team key stored for this machine (" + keystore.Mask(key) + ")"}
 }
 
 // resolveInstallHarnesses never reads the committed binding: agents are a per-developer
@@ -339,7 +339,7 @@ func (app *App) connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *
 		if keystore.GetFor(a, cfg.ProjectID) != "" || keystore.Get(cfg.ProjectID) != "" {
 			continue
 		}
-		sp.Start("Preparing " + h.DisplayName() + "'s key for this project…")
+		sp.Start("Preparing " + h.DisplayName() + "'s key for this team…")
 		key, _, _, _, err := app.resolveKey(ctx, cfg, h, connectFlags{})
 		sp.Stop()
 		if err != nil {

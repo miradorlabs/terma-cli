@@ -34,7 +34,7 @@ func TestInstallGivesAHooksOnlyDeveloperAKeyToDeliverWith(t *testing.T) {
 	}
 	const project = "aaaaaaaa-0000-4000-8000-000000000001"
 
-	out, err := within(20*time.Second).combined(t, "install", "--harness", "none", "--adapters", "cursor", "--project", project, "--yes", "--no-doctor", "--no-browser")
+	out, err := within(20*time.Second).combined(t, "install", "--harness", "none", "--adapters", "cursor", "--team", project, "--yes", "--no-doctor", "--no-browser")
 	if err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}
@@ -65,7 +65,7 @@ func TestInstallGivesAHooksOnlyDeveloperAKeyToDeliverWith(t *testing.T) {
 // Without a credential install still wires hooks, and says their events wait for a key.
 func TestInstallWithoutACredentialSaysItsEventsAreHeld(t *testing.T) {
 	installRepo(t)
-	out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude", "--yes", "--no-doctor")
+	out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude", "--yes", "--no-doctor")
 	if err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}
@@ -80,7 +80,7 @@ func TestInstallWithoutACredentialSaysItsEventsAreHeld(t *testing.T) {
 // A repository with no hooks has nothing to hold, so install says nothing about a key.
 func TestInstallWithoutHooksSaysNothingAboutAKey(t *testing.T) {
 	installRepo(t)
-	out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--no-hooks", "--yes", "--no-doctor")
+	out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--no-hooks", "--yes", "--no-doctor")
 	if err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}

@@ -177,7 +177,7 @@ func New(t *testing.T, mode Mode, opts ...Option) *Sandbox {
 	sb.StartAccount()
 	// Each scenario connects its own exporter. --no-browser bounds a fixture-login
 	// regression instead of opening a browser; --no-doctor avoids unrelated checks.
-	sb.terma(sb.Repo, "install", "--project", sb.ProjectID, "--harness", "none", "--adapters", "claude,codex", "--yes", "--no-browser", "--no-doctor")
+	sb.terma(sb.Repo, "install", "--team", sb.ProjectID, "--harness", "none", "--adapters", "claude,codex", "--yes", "--no-browser", "--no-doctor")
 	return sb
 }
 
@@ -210,7 +210,7 @@ func (sb *Sandbox) connectCodex() {
 }
 
 func (sb *Sandbox) connectHarness(name string) {
-	args := []string{"connect", name, "--project", sb.ProjectID, "--api-key", liveKey, "--yes", "--otlp-url", sb.Receiver.URL()}
+	args := []string{"connect", name, "--team", sb.ProjectID, "--api-key", liveKey, "--yes", "--otlp-url", sb.Receiver.URL()}
 	if sb.ExcludeContent {
 		args = append(args, "--exclude-prompts", "--exclude-tool-content")
 	}
@@ -229,11 +229,11 @@ func (sb *Sandbox) RouteClaude() {
 	if sb.Mode != Isolated {
 		sb.T.Fatal("RouteClaude needs an isolated sandbox")
 	}
-	sb.terma(sb.Repo, "connect", "claude", "--project", sb.ProjectID, "--api-key", liveKey, "--yes", "--otlp-url", sb.Receiver.URL())
+	sb.terma(sb.Repo, "connect", "claude", "--team", sb.ProjectID, "--api-key", liveKey, "--yes", "--otlp-url", sb.Receiver.URL())
 	sb.terma(sb.Repo, "disconnect", "claude", "--yes")
 	// The relay on a port of its own, forwarding to the receiver; install finds it there.
 	sb.UseRelay(RelayOptions{Start: true, Content: !sb.ExcludeContent})
-	args := []string{"install", "--project", sb.ProjectID, "--harness", "claude", "--yes", "--no-browser", "--no-doctor"}
+	args := []string{"install", "--team", sb.ProjectID, "--harness", "claude", "--yes", "--no-browser", "--no-doctor"}
 	if sb.ExcludeContent {
 		args = append(args, "--prompts", "off", "--exclude-tool-content")
 	}

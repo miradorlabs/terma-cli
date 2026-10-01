@@ -63,7 +63,7 @@ func TestDisconnectClaudeCleansTelemetryWithCorruptStatusLineRecord(t *testing.T
 			t.Setenv(key, "")
 		}
 	}
-	if out, err := runTerma(t, "connect", "claude", "--api-key", "ter_srv_leftover", "--project", testProjectID, "--yes"); err != nil {
+	if out, err := runTerma(t, "connect", "claude", "--api-key", "ter_srv_leftover", "--team", testProjectID, "--yes"); err != nil {
 		t.Fatalf("connect: %v\n%s", err, out)
 	}
 	settings := filepath.Join(claudeDir, "settings.json")

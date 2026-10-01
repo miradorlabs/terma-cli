@@ -15,7 +15,7 @@ func hermesSandbox(tool string, args map[string]any) func(t *testing.T) *Sandbox
 	return func(t *testing.T) *Sandbox {
 		sb := New(t, Isolated)
 		sb.RelayAgents = []string{"hermes"}
-		sb.terma(sb.Repo, "install", "--project", sb.ProjectID, "--harness", "none", "--yes", "--no-browser", "--no-doctor")
+		sb.terma(sb.Repo, "install", "--team", sb.ProjectID, "--harness", "none", "--yes", "--no-browser", "--no-doctor")
 		var calls atomic.Int32
 		provider := httptest.NewServer(hermesProvider(&calls, tool, args))
 		t.Cleanup(provider.Close)

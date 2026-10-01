@@ -39,7 +39,7 @@ func (e *Error) Error() string {
 	msg := e.Message
 	// The shared gateway's remedies name its original CLI; give terma's commands instead.
 	if e.Code == "INVALID_ARGUMENT" && strings.Contains(msg, "missing X-Mirador-Project header") {
-		msg = "no project selected — run `terma install` in this repository or pass --project"
+		msg = "no team selected — run `terma install` in this repository or pass --team"
 	}
 	msg = gatewayRemedies.Replace(msg)
 	switch {
@@ -67,7 +67,7 @@ func (e *Error) Error() string {
 // gatewayRemedies renames the commands the shared gateway's messages recommend.
 var gatewayRemedies = strings.NewReplacer(
 	"`mirador login`", "`terma login`",
-	"`mirador project list`", "`terma project list`",
+	"`mirador project list`", "`terma team list`",
 )
 
 // Unauthenticated reports whether the credential itself was rejected.

@@ -29,7 +29,7 @@ func (app *App) newTelemetryCommand() *cobra.Command {
 		Short:   "Connect agent harnesses to Terma telemetry",
 		Long: `Configures an agent CLI to export OpenTelemetry to Terma.
 
-Connecting mints a server key scoped to one project and writes it, along with the
+Connecting mints a server key scoped to one team and writes it, along with the
 OTLP endpoint, into the harness's own configuration. Nothing is added to your shell
 profile, and no other setting in that file is touched.
 
@@ -77,7 +77,7 @@ func (app *App) newTelemetryConnectCommand() *cobra.Command {
 		Use:    "connect <" + strings.Join(app.agents.HarnessNames(), "|") + "> [<harness>...]",
 		Short:  "Point one or more agent harnesses at Terma",
 		Hidden: true,
-		Long: `Mints a server key for the selected project and writes the harness's telemetry
+		Long: `Mints a server key for the selected team and writes the harness's telemetry
 configuration.
 
 The key is created server-side and returned exactly once. Where the harness can fetch
@@ -89,7 +89,7 @@ such mechanism always gets the key in its config. Either way, a file that holds 
 key is tightened to 0600.
 
 Your existing settings are preserved — only Terma's own keys are written, and
-` + "`terma disconnect`" + ` removes exactly those. Reconnecting to the same project
+` + "`terma disconnect`" + ` removes exactly those. Reconnecting to the same team
 reuses the key already installed rather than minting another; --api-key installs a
 key you already hold.
 
@@ -100,7 +100,7 @@ On a terminal, a checklist first asks what to send and where; every box has a fl
 and --yes takes the flags and defaults without asking. --scope local writes the
 repository you are in rather than your user settings: its committed settings get the
 signal and content switches — nothing else, so it is safe to commit — and the agent
-applies them over your global connect inside that repository. It needs no project,
+applies them over your global connect inside that repository. It needs no team,
 key or sign-in (` + app.scopedHarnessNames() + `).`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -219,7 +219,7 @@ func (app *App) connectGlobal(cmd *cobra.Command, name string, f connectFlags) e
 	}
 	// A server key is bound to a project id; under TERMA_API_KEY the key's own grant fixes it.
 	if cfg.ProjectID == "" {
-		return errors.New("telemetry connect needs a project — run `terma install` in this repository or pass --project")
+		return errors.New("telemetry connect needs a team — run `terma install` in this repository or pass --team")
 	}
 	ctx := cmd.Context()
 	return connect.Global(ctx, app.agents, h, cfg, f.options(signals, reach), connect.Steps{

@@ -292,7 +292,7 @@ func (s *sender) send(ctx context.Context, pol Policy, sig Signal, body []byte) 
 	case code/100 == 2:
 		return sent, 0, "", partialSuccess(answer)
 	case code == http.StatusUnauthorized || code == http.StatusForbidden:
-		return retry, refusedBackoff, fmt.Sprintf("HTTP %d: the project's key was refused", code), 0
+		return retry, refusedBackoff, fmt.Sprintf("HTTP %d: the team's key was refused", code), 0
 	case code == http.StatusRequestTimeout || code == http.StatusTooManyRequests || code == http.StatusNotFound || code >= 500:
 		return retry, retryAfter(resp.Header.Get("Retry-After")), fmt.Sprintf("HTTP %d", code), 0
 	default:

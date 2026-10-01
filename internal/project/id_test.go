@@ -23,7 +23,7 @@ func TestLoadRejectsUnsafeProjectID(t *testing.T) {
 			writeID(t, root, tc.id)
 			if _, err := Load(root); err == nil {
 				t.Fatalf("expected %q to be rejected", tc.id)
-			} else if !strings.Contains(err.Error(), "invalid project id") {
+			} else if !strings.Contains(err.Error(), "invalid team id") {
 				t.Fatalf("expected an invalid-id error, got %v", err)
 			}
 		})

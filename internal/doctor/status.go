@@ -159,14 +159,14 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 				line += fmt.Sprintf(", delivery failing (retry at %s)", s.NextAttempt.Local().Format(time.Kitchen))
 				backendOK = false
 			} else if next, open := s.Windows[projectID]; open && projectID != "" {
-				line += fmt.Sprintf(", delivery failing for this project (retry at %s)", next.Local().Format(time.Kitchen))
+				line += fmt.Sprintf(", delivery failing for this team (retry at %s)", next.Local().Format(time.Kitchen))
 				backendOK = false
 			}
 			if projectID != "" {
 				if key := keyOf(p.Keys, projectID); key != "" {
 					line += ", key " + key
 				} else {
-					line += ", no project key (run `terma install`)"
+					line += ", no team key (run `terma install`)"
 					backendOK = false
 				}
 			}
@@ -226,7 +226,7 @@ func agentLine(v HarnessVerdict, bound bool) string {
 	case RouteHooks:
 		return "→ connected (repository hooks)"
 	case RouteOtherProject:
-		return "→ reporting to project " + v.OtherProject + ", not this one — run `terma install`"
+		return "→ reporting to team " + v.OtherProject + ", not this one — run `terma install`"
 	case RouteRepoDecides:
 		// In a bound repository status must give doctor's answer for this repository.
 		if bound && !v.RepoAsks {

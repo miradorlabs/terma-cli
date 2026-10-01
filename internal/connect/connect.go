@@ -99,7 +99,7 @@ func Global(ctx context.Context, reg *agents.Registry, h harness.Harness, cfg *c
 		return err
 	}
 	if key.Reused {
-		fmt.Fprintf(w.Out, "\nReusing the key already configured for this project (%s) — nothing new minted.\n", key.Prefix)
+		fmt.Fprintf(w.Out, "\nReusing the key already configured for this team (%s) — nothing new minted.\n", key.Prefix)
 	}
 	// The backup is best-effort: a failure is reported, never blocking.
 	if backup, err := h.Backup(cfg.OTLPURL); err != nil {
@@ -115,7 +115,7 @@ func Global(ctx context.Context, reg *agents.Registry, h harness.Harness, cfg *c
 		return err
 	}
 	if err := s.Store(key.Value); err != nil {
-		fmt.Fprintf(w.Err, "Warning: could not store the project key for the spool (%v); `terma spool flush` will not deliver until it is stored.\n", err)
+		fmt.Fprintf(w.Err, "Warning: could not store the team key for the spool (%v); `terma spool flush` will not deliver until it is stored.\n", err)
 	}
 	var notes []string
 	if line, ok := reg.Find[agents.StatusLiner](h.Name()); ok && !o.NoStatusLine {

@@ -190,8 +190,8 @@ func TestHarnessVerdictInBothCommands(t *testing.T) {
 			name:  "reports to another project",
 			facts: doctor.HarnessFacts{Status: other}, bound: true,
 			route:        doctor.RouteOtherProject,
-			doctorStatus: doctor.Fail, doctorDetail: "Claude Code reports to project " + elsewhere + ", not " + project,
-			status: "→ reporting to project " + elsewhere + ", not this one — run `terma install`", statusOK: false,
+			doctorStatus: doctor.Fail, doctorDetail: "Claude Code reports to team " + elsewhere + ", not " + project,
+			status: "→ reporting to team " + elsewhere + ", not this one — run `terma install`", statusOK: false,
 		},
 		{
 			// Without live routing, a repository that asks still sends via the machine-wide config.
@@ -205,7 +205,7 @@ func TestHarnessVerdictInBothCommands(t *testing.T) {
 			name:  "silent machine-wide config, and this repository neither routes nor asks",
 			facts: doctor.HarnessFacts{Status: silent, LocalScope: true}, bound: true,
 			route:        doctor.RouteRepoDecides,
-			doctorStatus: doctor.Fail, doctorDetail: "Claude Code → " + otlp + " (only where a repository asks); this repository does not route Claude Code to its project, so its sessions send nothing",
+			doctorStatus: doctor.Fail, doctorDetail: "Claude Code → " + otlp + " (only where a repository asks); this repository does not route Claude Code to its team, so its sessions send nothing",
 			status: "→ no telemetry: this repository neither routes it nor asks for it — sessions here send nothing (run `terma install`)", statusOK: false,
 		},
 		{
@@ -220,7 +220,7 @@ func TestHarnessVerdictInBothCommands(t *testing.T) {
 			name:  "silent config for an agent with no repository scope",
 			facts: doctor.HarnessFacts{Status: silent}, bound: true,
 			route:        doctor.RouteRepoDecides,
-			doctorStatus: doctor.Fail, doctorDetail: "Claude Code → " + otlp + " (only where a repository asks); this repository does not route Claude Code to its project, so its sessions send nothing",
+			doctorStatus: doctor.Fail, doctorDetail: "Claude Code → " + otlp + " (only where a repository asks); this repository does not route Claude Code to its team, so its sessions send nothing",
 			status: "→ no telemetry: this repository neither routes it nor asks for it — sessions here send nothing (run `terma install`)", statusOK: false,
 		},
 		{

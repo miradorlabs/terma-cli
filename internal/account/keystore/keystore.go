@@ -154,7 +154,7 @@ func Get(projectID string) string {
 // Set records a project's key and the hosts of the environment it was minted in.
 func Set(projectID, key string, hosts Hosts) error {
 	if projectID == "" || !serverkey.Is(key) {
-		return errors.New("keystore: a project id and a server key are required")
+		return errors.New("keystore: a team id and a server key are required")
 	}
 	return update(func(f *file) {
 		f.recordHosts(projectID, key, hosts)
@@ -226,7 +226,7 @@ func GetFor(harness, projectID string) string {
 // SetFor records a harness's key for a project, which is also the project's spool key.
 func SetFor(harness, projectID, key string, hosts Hosts) error {
 	if harness == "" || projectID == "" || !serverkey.Is(key) {
-		return errors.New("keystore: a harness, a project id and a server key are required")
+		return errors.New("keystore: a harness, a team id and a server key are required")
 	}
 	return update(func(f *file) {
 		if f.HarnessKeys[harness] == nil {

@@ -55,7 +55,7 @@ func appendEvent(t *testing.T, s *spool.Spool, projectID string, at time.Time) {
 	}
 }
 
-// An event with no project id is counted as unroutable, apart from one that aged out.
+// An event with no team id is counted as unroutable, apart from one that aged out.
 func TestFlushSpoolSeparatesUnroutableFromExpired(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	acceptingOTLP(t)
@@ -90,7 +90,7 @@ func TestFlushSpoolHoldsEventsAndReportsIncomplete(t *testing.T) {
 	if !ok || code != ExitIncomplete {
 		t.Fatalf("held events should report incomplete: err=%v code=%d ok=%v\n%s", err, code, ok, out)
 	}
-	if !strings.Contains(out, "holding 1 for a project key") {
+	if !strings.Contains(out, "holding 1 for a team key") {
 		t.Fatalf("the report should name what is held:\n%s", out)
 	}
 	if n, _, _ := s.Pending(); n != 1 {
@@ -194,10 +194,10 @@ func TestDescribeFlushNamesEveryReasonOnce(t *testing.T) {
 		t.Errorf("delivered = %q", delivered)
 	}
 	want := []string{
-		"holding 3 for a project key (run `terma install` in their repositories)",
+		"holding 3 for a team key (run `terma install` in their repositories)",
 		"expired 4 past the spool's age limit",
 		"pruned 5 to stay under the size limit",
-		"dropped 6 with no project id",
+		"dropped 6 with no team id",
 		"dropped 7 unreadable",
 	}
 	if strings.Join(undelivered, "|") != strings.Join(want, "|") {

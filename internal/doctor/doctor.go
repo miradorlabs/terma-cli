@@ -70,7 +70,7 @@ const (
 	KeyBinary        = "binary"
 	KeyState         = "state"
 	KeyAuth          = "auth"
-	KeyProject       = "project"
+	KeyProject       = "team"
 	KeyHooks         = "hooks"
 	KeyAgentHooks    = "agent-hooks"
 	KeyHarness       = "harness"

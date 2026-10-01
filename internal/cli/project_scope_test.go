@@ -13,7 +13,7 @@ import (
 )
 
 func TestProjectShowFollowsRepositoryBinding(t *testing.T) {
-	t.Setenv("TERMA_PROJECT_ID", "")
+	t.Setenv("TERMA_TEAM_ID", "")
 	for _, id := range []string{"repo-a", "repo-b"} {
 		t.Run(id, func(t *testing.T) {
 			repo := installRepo(t)
@@ -31,7 +31,7 @@ func TestProjectShowFollowsRepositoryBinding(t *testing.T) {
 			}); err != nil {
 				t.Fatal(err)
 			}
-			out, err := runTerma(t, "project", "show", "-o", "json")
+			out, err := runTerma(t, "team", "show", "-o", "json")
 			var got project
 			if err != nil || json.Unmarshal([]byte(out), &got) != nil || got.ID != id || got.Name != "Project "+id || got.OrganizationID != "repo-org" {
 				t.Fatalf("project show disagrees with the binding: %v\n%s", err, out)
@@ -46,7 +46,7 @@ func TestProjectShowFollowsRepositoryBinding(t *testing.T) {
 
 func TestUnboundRepositoryRequiresProject(t *testing.T) {
 	repo := installRepo(t)
-	t.Setenv("TERMA_PROJECT_ID", "")
+	t.Setenv("TERMA_TEAM_ID", "")
 	t.Setenv("TERMA_API_KEY", "")
 	// An unbound checkout and a directory outside git both need an explicit choice.
 	for _, dir := range []string{repo, t.TempDir()} {
@@ -76,7 +76,7 @@ func TestUnboundRepositoryRequiresProject(t *testing.T) {
 
 func TestProjectScopeExplicitOverrideAndBinding(t *testing.T) {
 	repo := installRepo(t)
-	t.Setenv("TERMA_PROJECT_ID", "")
+	t.Setenv("TERMA_TEAM_ID", "")
 	if err := termaproject.Save(repo, &termaproject.File{Project: termaproject.Project{ID: "bound-repo", Name: "Repository"}}); err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +87,7 @@ func TestProjectScopeExplicitOverrideAndBinding(t *testing.T) {
 		{"flag-project", "env-project", "flag-project"},
 	} {
 		testApp.flags = globalFlags{projectID: tc.flag}
-		t.Setenv("TERMA_PROJECT_ID", tc.env)
+		t.Setenv("TERMA_TEAM_ID", tc.env)
 		cfg, err := testApp.loadProjectConfig()
 		if err != nil || cfg.ProjectID != tc.want {
 			t.Fatalf("scope: %+v, %v; want %s", cfg, err, tc.want)
@@ -97,7 +97,7 @@ func TestProjectScopeExplicitOverrideAndBinding(t *testing.T) {
 		}
 	}
 	testApp.flags = globalFlags{}
-	t.Setenv("TERMA_PROJECT_ID", "")
+	t.Setenv("TERMA_TEAM_ID", "")
 	if err := os.MkdirAll(filepath.Dir(termaproject.Path(repo)), 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -112,11 +112,11 @@ func TestProjectScopeExplicitOverrideAndBinding(t *testing.T) {
 func TestInstallKeepsProjectChoiceInEachRepo(t *testing.T) {
 	repos := []string{installRepo(t), installRepo(t)}
 	ids := []string{testProjectID, "770e8400-e29b-41d4-a716-446655440001"}
-	t.Setenv("TERMA_PROJECT_ID", "")
+	t.Setenv("TERMA_TEAM_ID", "")
 	t.Setenv("TERMA_API_KEY", "")
 	for i, repo := range repos {
 		t.Chdir(repo)
-		if out, err := runTerma(t, "install", "--harness", "none", "--project", ids[i], "--yes", "--no-doctor"); err != nil {
+		if out, err := runTerma(t, "install", "--harness", "none", "--team", ids[i], "--yes", "--no-doctor"); err != nil {
 			t.Fatalf("install repository %d: %v\n%s", i, err, out)
 		}
 	}

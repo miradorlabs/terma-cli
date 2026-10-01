@@ -527,7 +527,7 @@ func TestRelayConcurrentProjects(t *testing.T) {
 		for _, args := range [][]string{{"init", "-q", "-b", "main"}, {"config", "user.email", "live@terma.test"}, {"config", "user.name", "Terma Live"}, {"commit", "-q", "--allow-empty", "-m", "init"}} {
 			sb.gitIn(other, args...)
 		}
-		sb.terma(other, "install", "--project", otherProject, "--harness", "none", "--adapters", "claude", "--yes", "--no-browser", "--no-doctor")
+		sb.terma(other, "install", "--team", otherProject, "--harness", "none", "--adapters", "claude", "--yes", "--no-browser", "--no-doctor")
 		keys, _ := json.Marshal(map[string]any{"keys": map[string]string{sb.ProjectID: liveKey, otherProject: otherKey}})
 		sb.writeAbs(filepath.Join(sb.TermaConfig, "keys.json"), string(keys))
 

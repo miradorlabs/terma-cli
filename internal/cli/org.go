@@ -32,7 +32,7 @@ each organization you have signed into, so ` + "`terma org use`" + ` switches be
 without a browser; an organization you have not signed into yet opens one, with
 that organization preselected.
 
-Projects are selected per repository with ` + "`terma install`" + `. Switching
+Teams are selected per repository with ` + "`terma install`" + `. Switching
 organizations does not change repository bindings.`,
 	}
 	cmd.AddCommand(app.newOrgListCommand(), app.newOrgUseCommand())
@@ -88,7 +88,7 @@ func (app *App) newOrgUseCommand() *cobra.Command {
 it is reused and verified; otherwise your browser opens with the organization
 preselected. With no argument on a terminal it presents a picker.
 
-Choose a project for each repository with ` + "`terma install`" + `.`,
+Choose a team for each repository with ` + "`terma install`" + `.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := app.loadConfig()
@@ -96,7 +96,7 @@ Choose a project for each repository with ` + "`terma install`" + `.`,
 				return err
 			}
 			if cfg.APIKey != "" {
-				return errors.New("TERMA_API_KEY is set — a server key is bound to one project; unset it to switch organizations")
+				return errors.New("TERMA_API_KEY is set — a server key is bound to one team; unset it to switch organizations")
 			}
 			ctx := cmd.Context()
 			out := cmd.OutOrStdout()
@@ -145,7 +145,7 @@ Choose a project for each repository with ` + "`terma install`" + `.`,
 				fmt.Fprintf(out, "\nNow using %s.\n", where)
 			}
 
-			fmt.Fprintln(out, "Projects are selected per repository with `terma install`.")
+			fmt.Fprintln(out, "Teams are selected per repository with `terma install`.")
 			return nil
 		},
 	}

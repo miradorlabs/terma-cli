@@ -92,7 +92,7 @@ const testProjectID = "770e8400-e29b-41d4-a716-446655440000"
 
 func TestInstallWiresCursorHooksWhenAsked(t *testing.T) {
 	repo := installRepo(t)
-	out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude,cursor", "--yes")
+	out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude,cursor", "--yes")
 	if err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}
@@ -150,7 +150,7 @@ func TestInstallLeavesCursorAloneWhileComingSoon(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(repo, ".cursor", "rules"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--yes", "--verbose")
+	out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--yes", "--verbose")
 	if err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}
@@ -164,7 +164,7 @@ func TestInstallLeavesCursorAloneWhileComingSoon(t *testing.T) {
 
 func TestInstallRejectsUnknownAdapter(t *testing.T) {
 	installRepo(t)
-	_, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "zed", "--yes")
+	_, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "zed", "--yes")
 	if err == nil || !strings.Contains(err.Error(), "zed") || !strings.Contains(err.Error(), "unknown agent") {
 		t.Fatalf("err = %v", err)
 	}
@@ -179,7 +179,7 @@ func TestInstallRejectsUnknownAdapter(t *testing.T) {
 // Re-running install in an onboarded repository leaves the committed binding unchanged.
 func TestInstallReRunDoesNotChurnBinding(t *testing.T) {
 	repo := installRepo(t)
-	if out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude", "--yes"); err != nil {
+	if out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude", "--yes"); err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}
 	path := filepath.Join(repo, ".terma", "settings.json")
@@ -187,7 +187,7 @@ func TestInstallReRunDoesNotChurnBinding(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--yes"); err != nil {
+	if out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--yes"); err != nil {
 		t.Fatalf("re-install: %v\n%s", err, out)
 	}
 	second, err := os.ReadFile(path)
@@ -201,7 +201,7 @@ func TestInstallReRunDoesNotChurnBinding(t *testing.T) {
 		t.Fatalf("committed adapter was lost on re-install: %v", testApp.agents.WiredNames(repo))
 	}
 	// A developer's extra agent gets its own hooks file; the binding stays the team's.
-	if out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude,cursor", "--yes"); err != nil {
+	if out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude,cursor", "--yes"); err != nil {
 		t.Fatalf("re-install with cursor: %v\n%s", err, out)
 	}
 	third, err := os.ReadFile(path)

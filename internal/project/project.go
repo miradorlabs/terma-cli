@@ -125,10 +125,10 @@ func ResolveDir(dir string) (f *File, root string, err error) {
 func validate(f *File, source string) (*File, error) {
 	f.Project.ID = strings.TrimSpace(f.Project.ID)
 	if f.Project.ID == "" {
-		return nil, fmt.Errorf("%s has no project id", source)
+		return nil, fmt.Errorf("%s has no team id", source)
 	}
 	if !ValidID(f.Project.ID) {
-		return nil, fmt.Errorf("%s has an invalid project id %q: expected letters, digits, dot, dash or underscore", source, f.Project.ID)
+		return nil, fmt.Errorf("%s has an invalid team id %q: expected letters, digits, dot, dash or underscore", source, f.Project.ID)
 	}
 	return f, nil
 }

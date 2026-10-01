@@ -13,12 +13,12 @@ import (
 // Default output keeps the project, warnings, and actions; -v includes setup details.
 func TestInstallIsConciseUnlessVerbose(t *testing.T) {
 	installRepo(t)
-	out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude", "--yes", "--no-doctor")
+	out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude", "--yes", "--no-doctor")
 	if err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}
 	for _, want := range []string{
-		"✓ Project", "! Hook events   held until this machine has a key",
+		"✓ Team", "! Hook events   held until this machine has a key",
 		"terma installed", "Next steps:\n  1. Sign in with `terma setup`", "Commit these files", "git add ",
 	} {
 		if !strings.Contains(out, want) {
@@ -32,11 +32,11 @@ func TestInstallIsConciseUnlessVerbose(t *testing.T) {
 	}
 
 	installRepo(t)
-	out, err = runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude", "--yes", "--no-doctor", "-v")
+	out, err = runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude", "--yes", "--no-doctor", "-v")
 	if err != nil {
 		t.Fatalf("install --verbose: %v\n%s", err, out)
 	}
-	for _, want := range []string{"✓ Project", "✓ Hooks", "✓ Repo policy", "create  ", "Wrote Claude Code's repository policy", "Pointed git at"} {
+	for _, want := range []string{"✓ Team", "✓ Hooks", "✓ Repo policy", "create  ", "Wrote Claude Code's repository policy", "Pointed git at"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("--verbose should say %q:\n%s", want, out)
 		}
@@ -46,7 +46,7 @@ func TestInstallIsConciseUnlessVerbose(t *testing.T) {
 func TestInstallUIFinish(t *testing.T) {
 	var buf bytes.Buffer
 	ui := newInstallUI(&buf, false)
-	ui.Summary("Project", "Acme Web")
+	ui.Summary("Team", "Acme Web")
 	ui.OK("Status line", "reads your plan's usage windows")
 	ui.OK("Claude Code", "exports to the local relay")
 	ui.OK("Hook events", "delivered with this project's key")
@@ -55,7 +55,7 @@ func TestInstallUIFinish(t *testing.T) {
 	ui.Then("Commit these files:\n  a\n\n  git add a")
 	ui.Then("Run `source ~/.zshrc`.") // said once
 	ui.finish()
-	want := "  ✓ Project       Acme Web\n\n✓ terma installed\n\nNext steps:\n" +
+	want := "  ✓ Team          Acme Web\n\n✓ terma installed\n\nNext steps:\n" +
 		"  1. Run `source ~/.zshrc`.\n" +
 		"  2. Commit these files:\n       a\n\n       git add a\n"
 	if got := buf.String(); got != want {

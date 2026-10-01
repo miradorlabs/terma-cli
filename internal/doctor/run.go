@@ -319,7 +319,7 @@ func (d *run) eventSpool() Check {
 		if d.bound != nil {
 			name = d.bound.Project.Name
 		}
-		return Check{Status: Fail, Detail: fmt.Sprintf("%d queued; no project key stored for %s", n, cmp.Or(name, d.projectID)), Fix: "terma install"}
+		return Check{Status: Fail, Detail: fmt.Sprintf("%d queued; no team key stored for %s", n, cmp.Or(name, d.projectID)), Fix: "terma install"}
 	}
 	return Check{Status: Pass, Detail: fmt.Sprintf("%d queued, spool writable", n)}
 }
@@ -333,7 +333,7 @@ func BackendCheck(ctx context.Context, p Probes, projectID, scratchSHA string, b
 			Fix:    binary.Fix}
 	}
 	if projectID != "" && !p.Keys.has("", projectID) {
-		return Check{Status: Skip, Detail: "no project key on this machine; nothing can be delivered", Fix: "terma install"}
+		return Check{Status: Skip, Detail: "no team key on this machine; nothing can be delivered", Fix: "terma install"}
 	}
 	res, err := p.Deliver(ctx)
 	if err != nil {
@@ -346,13 +346,13 @@ func BackendCheck(ctx context.Context, p Probes, projectID, scratchSHA string, b
 	if res.Err != nil {
 		if i := slices.IndexFunc(res.Failures, func(f Failure) bool { return f.ProjectID == projectID }); i >= 0 {
 			f := res.Failures[i]
-			return Check{Status: Fail, Detail: "this project's events were not delivered: " + describeFailure(f), Fix: failureFix(f)}
+			return Check{Status: Fail, Detail: "this team's events were not delivered: " + describeFailure(f), Fix: failureFix(f)}
 		}
 		if len(res.Failures) == 0 {
 			return Check{Status: Fail, Detail: "flush failed: " + res.Err.Error(), Fix: "check the network, then run `terma spool flush --force`"}
 		}
 		for _, f := range res.Failures {
-			others = append(others, "another project's events were not delivered: "+f.ProjectID+" "+describeFailure(f))
+			others = append(others, "another team's events were not delivered: "+f.ProjectID+" "+describeFailure(f))
 		}
 		othersFix = failureFix(res.Failures[0])
 	}
@@ -375,7 +375,7 @@ func BackendCheck(ctx context.Context, p Probes, projectID, scratchSHA string, b
 		return Check{Status: Warn, Inconclusive: true, Detail: detail + "; the scratch commit event was not visible via the API within " + roundTripWait.String(), Fix: "terma doctor"}
 	}
 	if len(others) > 0 {
-		return Check{Status: Warn, Detail: detail + "; round-trip confirmed for this project", Fix: othersFix}
+		return Check{Status: Warn, Detail: detail + "; round-trip confirmed for this team", Fix: othersFix}
 	}
 	return Check{Status: Pass, Detail: detail + "; round-trip confirmed"}
 }
@@ -391,7 +391,7 @@ func describeFailure(f Failure) string {
 // failureFix is the next step for a failed delivery; a refused key is not a network problem.
 func failureFix(f Failure) string {
 	if f.KeyRefused {
-		return "the key this machine holds for project " + f.ProjectID + " was refused by " + f.Endpoint + " — it may have been revoked, or belong to another environment"
+		return "the key this machine holds for team " + f.ProjectID + " was refused by " + f.Endpoint + " — it may have been revoked, or belong to another environment"
 	}
 	return "check the network and " + f.Endpoint + ", then run `terma spool flush --force`"
 }

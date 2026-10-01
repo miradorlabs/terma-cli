@@ -82,7 +82,7 @@ func askConnectOptions(f connectFlags, hs []harness.Harness, ask connectForm) (c
 	}
 	local := prompt.Item{
 		Kind: prompt.Radio, Group: scopeGroup, Label: "Local",
-		Detail:   "this repository only — a committed project file; only what to ship",
+		Detail:   "this repository only — a committed team file; only what to ship",
 		Selected: scope == harness.ScopeLocal,
 		Disabled: unavailable != "", Reason: unavailable,
 	}

@@ -92,7 +92,7 @@ func TestE2E_InstallLifecycle(t *testing.T) {
 	env := envWith("TERMA_CONFIG_DIR="+cfgDir, "TERMA_ENV=dev")
 	binding := filepath.Join(repo, ".terma", "settings.json")
 
-	runProc(t, bin, repo, env, "install", "--harness", "none", "--project", "proj-e2e-repo", "--adapters", "claude", "--yes")
+	runProc(t, bin, repo, env, "install", "--harness", "none", "--team", "proj-e2e-repo", "--adapters", "claude", "--yes")
 	first, err := os.ReadFile(binding)
 	if err != nil {
 		t.Fatalf(".terma/settings.json not written: %v", err)
@@ -102,7 +102,7 @@ func TestE2E_InstallLifecycle(t *testing.T) {
 	}
 
 	// A colleague's re-run must not churn the committed binding.
-	runProc(t, bin, repo, env, "install", "--harness", "none", "--project", "proj-e2e-repo", "--yes")
+	runProc(t, bin, repo, env, "install", "--harness", "none", "--team", "proj-e2e-repo", "--yes")
 	second, _ := os.ReadFile(binding)
 	if string(first) != string(second) {
 		t.Fatalf("re-install churned the binding:\n--- first ---\n%s\n--- second ---\n%s", first, second)

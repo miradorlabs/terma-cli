@@ -20,7 +20,7 @@ func (app *App) newTelemetryDisconnectCommand() *cobra.Command {
 		Hidden: true,
 		Long: `Removes the telemetry settings Terma wrote, and nothing else.
 
-The server key stays live — it is bound to the project, not to this machine, and may
+The server key stays live — it is bound to the team, not to this machine, and may
 be in use elsewhere. Revoke it in the web app when you are done with it; the key's
 masked prefix is printed so you can find it in the list.
 

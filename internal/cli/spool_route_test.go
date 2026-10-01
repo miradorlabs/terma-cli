@@ -148,7 +148,7 @@ func TestSpoolFlushOneRefusedProjectDoesNotHoldUpAnother(t *testing.T) {
 	}
 	// The report is printed; the error is what `terma` prints after "Error:".
 	said := out + err.Error()
-	for _, want := range []string{"Flushed 1 event", "keeping 2 queued after a failed delivery", "retrying project " + routeDevProject + " after", dev.URL, "403"} {
+	for _, want := range []string{"Flushed 1 event", "keeping 2 queued after a failed delivery", "retrying team " + routeDevProject + " after", dev.URL, "403"} {
 		if !strings.Contains(said, want) {
 			t.Fatalf("flush does not say %q:\n%s", want, said)
 		}
@@ -186,7 +186,7 @@ func TestSpoolFlushARefusedProjectWaitsAlone(t *testing.T) {
 	if code, ok := exitCodeOf(err); !ok || code != ExitIncomplete {
 		t.Fatalf("a pass that only waited on a project must exit %d (left work), got %v:\n%s", ExitIncomplete, err, out)
 	}
-	for _, want := range []string{"Flushed 1 event", "keeping 1 queued after a failed delivery", "retrying project " + routeDevProject + " after"} {
+	for _, want := range []string{"Flushed 1 event", "keeping 1 queued after a failed delivery", "retrying team " + routeDevProject + " after"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("flush does not say %q:\n%s", want, out)
 		}
@@ -201,7 +201,7 @@ func TestSpoolFlushARefusedProjectWaitsAlone(t *testing.T) {
 		t.Fatalf("queue = %v, want the refused project's event only", queued)
 	}
 	status, err := runTerma(t, "spool", "status")
-	if err != nil || !strings.Contains(status, "Retrying:        project "+routeDevProject+" after") {
+	if err != nil || !strings.Contains(status, "Retrying:        team "+routeDevProject+" after") {
 		t.Fatalf("spool status does not name the waiting project (%v):\n%s", err, status)
 	}
 
@@ -277,7 +277,7 @@ func TestDoctorBackendWarnsForAnotherProjectsRefusal(t *testing.T) {
 	if check.Status == doctor.Fail {
 		t.Fatalf("another project's refusal must not fail this repository's check: %+v", check)
 	}
-	for _, want := range []string{"flushed 1 event to " + prod.URL, "another project's events were not delivered", routeDevProject, dev.URL} {
+	for _, want := range []string{"flushed 1 event to " + prod.URL, "another team's events were not delivered", routeDevProject, dev.URL} {
 		if !strings.Contains(check.Detail, want) {
 			t.Fatalf("detail does not say %q: %s", want, check.Detail)
 		}
@@ -298,10 +298,10 @@ func TestDoctorBackendFailsOnThisProjectsRefusal(t *testing.T) {
 	}
 
 	check := doctor.BackendCheck(context.Background(), testApp.doctorProbes(cfg), routeDevProject, "", doctor.Check{}, doctor.Progress{})
-	if check.Status != doctor.Fail || !strings.Contains(check.Detail, "this project's events were not delivered: refused by "+dev.URL) {
+	if check.Status != doctor.Fail || !strings.Contains(check.Detail, "this team's events were not delivered: refused by "+dev.URL) {
 		t.Fatalf("this project's refusal must fail, naming the host: %+v", check)
 	}
-	if !strings.Contains(check.Fix, "project "+routeDevProject+" was refused by "+dev.URL) {
+	if !strings.Contains(check.Fix, "team "+routeDevProject+" was refused by "+dev.URL) {
 		t.Fatalf("fix = %q", check.Fix)
 	}
 }

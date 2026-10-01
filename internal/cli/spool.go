@@ -44,11 +44,11 @@ func (app *App) newSpoolFlushCommand() *cobra.Command {
 The exit status distinguishes the outcomes a script needs apart:
 
   0  everything queued was delivered (including "nothing was queued")
-  1  delivery failed for at least one project; its events stay queued and that
-     project backs off on its own, while every other project's are delivered
+  1  delivery failed for at least one team; its events stay queued and that
+     team backs off on its own, while every other team's are delivered
   2  nothing was attempted: an earlier failure's retry window is open (--force overrides)
-  3  the pass ran but left work: events held for a project key or waiting out
-     their project's retry window (--force overrides), or given up on for age,
+  3  the pass ran but left work: events held for a team key or waiting out
+     their team's retry window (--force overrides), or given up on for age,
      disk pressure, or being unreadable`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			res, err := app.flushSpool(cmd.Context(), force, minInterval)
@@ -90,18 +90,18 @@ The exit status distinguishes the outcomes a script needs apart:
 func describeFlush(res delivery.Result) (delivered string, undelivered []string) {
 	delivered = fmt.Sprintf("%d event%s", res.Sent, plural(res.Sent))
 	if res.Held > 0 {
-		undelivered = append(undelivered, fmt.Sprintf("holding %d for a project key (run `terma install` in their repositories)", res.Held))
+		undelivered = append(undelivered, fmt.Sprintf("holding %d for a team key (run `terma install` in their repositories)", res.Held))
 	}
 	if res.Failed > 0 {
 		undelivered = append(undelivered, fmt.Sprintf("keeping %d queued after a failed delivery", res.Failed))
 	}
 	for _, f := range res.Failures {
 		if !f.RetryAt.IsZero() {
-			undelivered = append(undelivered, fmt.Sprintf("retrying project %s after %s", f.ProjectID, f.RetryAt.Local().Format(time.Kitchen)))
+			undelivered = append(undelivered, fmt.Sprintf("retrying team %s after %s", f.ProjectID, f.RetryAt.Local().Format(time.Kitchen)))
 		}
 	}
 	for _, w := range res.Waiting {
-		undelivered = append(undelivered, fmt.Sprintf("retrying project %s after %s", w.ProjectID, w.RetryAt.Local().Format(time.Kitchen)))
+		undelivered = append(undelivered, fmt.Sprintf("retrying team %s after %s", w.ProjectID, w.RetryAt.Local().Format(time.Kitchen)))
 	}
 	if res.Expired > 0 {
 		undelivered = append(undelivered, fmt.Sprintf("expired %d past the spool's age limit", res.Expired))
@@ -110,7 +110,7 @@ func describeFlush(res delivery.Result) (delivered string, undelivered []string)
 		undelivered = append(undelivered, fmt.Sprintf("pruned %d to stay under the size limit", res.Pruned))
 	}
 	if res.Unroutable > 0 {
-		undelivered = append(undelivered, fmt.Sprintf("dropped %d with no project id", res.Unroutable))
+		undelivered = append(undelivered, fmt.Sprintf("dropped %d with no team id", res.Unroutable))
 	}
 	if res.Dropped > 0 {
 		undelivered = append(undelivered, fmt.Sprintf("dropped %d unreadable", res.Dropped))
@@ -141,14 +141,14 @@ func newSpoolStatusCommand() *cobra.Command {
 			}
 			windows := s.RetryWindows(time.Now())
 			for _, id := range slices.Sorted(maps.Keys(windows)) {
-				fmt.Fprintf(out, "Retrying:        project %s after %s — its last delivery failed (`terma spool flush --force` retries now)\n", id, windows[id].Local().Format(time.Kitchen))
+				fmt.Fprintf(out, "Retrying:        team %s after %s — its last delivery failed (`terma spool flush --force` retries now)\n", id, windows[id].Local().Format(time.Kitchen))
 			}
 			keys := keystore.Projects()
 			slices.Sort(keys)
-			fmt.Fprintf(out, "Project keys:    %d\n", len(keys))
+			fmt.Fprintf(out, "Team keys:       %d\n", len(keys))
 			unroutable, held := delivery.Queued(s, n)
 			if unroutable > 0 {
-				fmt.Fprintf(out, "Unroutable:      %d event%s with no project id — they cannot be delivered (they leave the queue at the next flush)\n", unroutable, plural(unroutable))
+				fmt.Fprintf(out, "Unroutable:      %d event%s with no team id — they cannot be delivered (they leave the queue at the next flush)\n", unroutable, plural(unroutable))
 			}
 			ids := make([]string, 0, len(held))
 			for id := range held {
@@ -156,7 +156,7 @@ func newSpoolStatusCommand() *cobra.Command {
 			}
 			slices.Sort(ids)
 			for _, id := range ids {
-				fmt.Fprintf(out, "Held:            %d event%s for project %s — no key here yet (run `terma install` in that repository)\n", held[id], plural(held[id]), id)
+				fmt.Fprintf(out, "Held:            %d event%s for team %s — no key here yet (run `terma install` in that repository)\n", held[id], plural(held[id]), id)
 			}
 			return nil
 		},

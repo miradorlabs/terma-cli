@@ -14,7 +14,7 @@ func TestDoctorReportsCodexHooksAwaitingTrust(t *testing.T) {
 	codexHome := t.TempDir()
 	t.Setenv("CODEX_HOME", codexHome)
 
-	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude,codex", "--yes"); err != nil {
+	if _, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude,codex", "--yes"); err != nil {
 		t.Fatal(err)
 	}
 	out, _ := runTerma(t, "doctor", "--skip-commit")
@@ -44,7 +44,7 @@ func TestDoctorReportsCodexHooksAwaitingTrust(t *testing.T) {
 func TestDoctorDoesNotChargeForAnAgentTheDeveloperDoesNotUse(t *testing.T) {
 	installRepo(t)
 	t.Setenv("CODEX_HOME", t.TempDir())
-	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude,codex", "--yes"); err != nil {
+	if _, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude,codex", "--yes"); err != nil {
 		t.Fatal(err)
 	}
 	if err := config.UpdateProfile(config.DefaultProfile, func(p *config.Profile) { p.Harnesses = []string{"claude"} }); err != nil {
@@ -60,7 +60,7 @@ func TestDoctorDoesNotChargeForAnAgentTheDeveloperDoesNotUse(t *testing.T) {
 func TestDoctorIgnoresCodexTrustWithoutTheAdapter(t *testing.T) {
 	installRepo(t)
 	t.Setenv("CODEX_HOME", t.TempDir())
-	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude", "--yes"); err != nil {
+	if _, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude", "--yes"); err != nil {
 		t.Fatal(err)
 	}
 	out, _ := runTerma(t, "doctor", "--skip-commit")

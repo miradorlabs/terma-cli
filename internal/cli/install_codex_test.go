@@ -39,7 +39,7 @@ func codexHooksIn(t *testing.T, repo string) map[string][]struct {
 
 func TestInstallWiresCodexHooksWhenAsked(t *testing.T) {
 	repo := installRepo(t)
-	out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude,codex", "--yes")
+	out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude,codex", "--yes")
 	if err != nil {
 		t.Fatalf("%v\n%s", err, out)
 	}
@@ -64,7 +64,7 @@ func TestInstallWiresCodexHooksWhenAsked(t *testing.T) {
 // A repository without the agent's own directory gains no hooks file for it…
 func TestInstallSkipsCodexHooksByDefault(t *testing.T) {
 	repo := installRepo(t)
-	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--yes"); err != nil {
+	if _, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--yes"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(repo, filepath.FromSlash(hooksPathOf("codex")))); !os.IsNotExist(err) {
@@ -78,7 +78,7 @@ func TestInstallWiresCodexHooksWhereCodexIsUsed(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(repo, ".codex"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--yes"); err != nil {
+	if _, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--yes"); err != nil {
 		t.Fatal(err)
 	}
 	if len(codexHooksIn(t, repo)["PostToolUse"]) != 1 {
@@ -88,7 +88,7 @@ func TestInstallWiresCodexHooksWhereCodexIsUsed(t *testing.T) {
 
 func TestUninstallRemovesCodexHooks(t *testing.T) {
 	repo := installRepo(t)
-	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude,codex", "--yes"); err != nil {
+	if _, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude,codex", "--yes"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := runTerma(t, "uninstall", "--yes"); err != nil {

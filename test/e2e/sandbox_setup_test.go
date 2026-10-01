@@ -22,7 +22,7 @@ func TestSandboxSetupWithoutProviderCredentials(t *testing.T) {
 	t.Setenv("TERMA_E2E", "1")
 	t.Setenv("TERMA_E2E_BINARY", binary)
 	sb := New(t, Isolated)
-	sb.terma(sb.Repo, "install", "--harness", "none", "--no-browser", "--no-doctor", "--project", sb.ProjectID, "--adapters", "cursor", "--yes")
+	sb.terma(sb.Repo, "install", "--harness", "none", "--no-browser", "--no-doctor", "--team", sb.ProjectID, "--adapters", "cursor", "--yes")
 	sb.connectClaude()
 	sb.connectCodex()
 }

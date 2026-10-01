@@ -13,7 +13,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/flock"
 )
 
-// setup's check-in reports the beat as sent, no project key here yet, another failure,
+// setup's check-in reports the beat as sent, no team key here yet, another failure,
 // or no relay at all.
 func TestRelayCheckIn(t *testing.T) {
 	dir, _ := setUpRelay(t)
@@ -37,7 +37,7 @@ func TestRelayCheckIn(t *testing.T) {
 		says   string
 	}{
 		{200, `{}`, true, "reported to your organization"},
-		{502, `{"error":"no key for this project on this machine"}`, true, "once a repository is connected"},
+		{502, `{"error":"no key for this team on this machine"}`, true, "once a repository is connected"},
 		{502, `{"error":"invalid token"}`, false, "invalid token"},
 	} {
 		ln, err := net.Listen("tcp", addr)

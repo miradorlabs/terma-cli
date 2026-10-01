@@ -40,7 +40,7 @@ func TestInstallUsesSavedCodexDesktopChoice(t *testing.T) {
 		t.Fatal(err)
 	}
 	const projectID = "aaaaaaaa-0000-4000-8000-000000000001"
-	out, err := within(20*time.Second).combined(t, "install", "--project", projectID, "--yes", "--no-doctor")
+	out, err := within(20*time.Second).combined(t, "install", "--team", projectID, "--yes", "--no-doctor")
 	if err != nil {
 		t.Fatalf("install desktop: %v\n%s", err, out)
 	}
@@ -69,7 +69,7 @@ func TestInstallUsesSavedCodexDesktopChoice(t *testing.T) {
 func TestInstallCodexCLIAndDesktopShareOneProjectKey(t *testing.T) {
 	_, gateway := desktopInstallSandbox(t)
 	const projectID = "aaaaaaaa-0000-4000-8000-000000000001"
-	out, err := within(20*time.Second).combined(t, "install", "--harness", "codex,codex-desktop", "--project", projectID,
+	out, err := within(20*time.Second).combined(t, "install", "--harness", "codex,codex-desktop", "--team", projectID,
 		"--yes", "--no-doctor")
 	if err != nil {
 		t.Fatalf("install both Codex surfaces: %v\n%s", err, out)
@@ -87,8 +87,8 @@ func TestDesktopInstallDryRunAndMissingLogsLeaveSettingsUntouched(t *testing.T) 
 	home, _ := desktopInstallSandbox(t)
 	const projectID = "aaaaaaaa-0000-4000-8000-000000000001"
 	for _, args := range [][]string{
-		{"install", "--harness", "codex-desktop", "--project", projectID, "--dry-run"},
-		{"install", "--harness", "codex-desktop", "--project", projectID, "--signals", "traces"},
+		{"install", "--harness", "codex-desktop", "--team", projectID, "--dry-run"},
+		{"install", "--harness", "codex-desktop", "--team", projectID, "--signals", "traces"},
 	} {
 		out, err := runTerma(t, args...)
 		if slices.Contains(args, "--dry-run") {
@@ -108,7 +108,7 @@ func TestDesktopInstallRequiresCodexRepositoryHooks(t *testing.T) {
 	home, _ := desktopInstallSandbox(t)
 	const projectID = "aaaaaaaa-0000-4000-8000-000000000001"
 	for _, extra := range [][]string{{"--no-hooks"}, {"--adapters", "claude"}} {
-		args := append([]string{"install", "--harness", "codex-desktop", "--project", projectID, "--yes", "--no-doctor"}, extra...)
+		args := append([]string{"install", "--harness", "codex-desktop", "--team", projectID, "--yes", "--no-doctor"}, extra...)
 		out, err := runTerma(t, args...)
 		if err == nil || !strings.Contains(err.Error(), "Codex repository hooks") && !strings.Contains(err.Error(), "SessionStart repository hook") {
 			t.Fatalf("missing Codex hooks accepted: %v\n%s", err, out)

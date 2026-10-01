@@ -18,7 +18,7 @@ func (app *App) newUninstallCommand() *cobra.Command {
 shared hook files), each agent's committed hooks, .terma/settings.json, the per-clone
 git configuration, and the local session state. Removing the binding un-routes this
 checkout; the home-dir routing state (keys, routing records) is kept, since it is shared
-with any other worktree or clone bound to the same project — remove it machine-wide
+with any other worktree or clone bound to the same team — remove it machine-wide
 with 'terma nate'.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()

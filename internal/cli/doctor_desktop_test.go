@@ -38,7 +38,7 @@ func TestDesktopOnlySelectionJudgesOnlyCodexDesktop(t *testing.T) {
 func TestDesktopChoiceCountsCodexHookTrust(t *testing.T) {
 	repo := installRepo(t)
 	t.Setenv("CODEX_HOME", t.TempDir())
-	if out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "codex", "--yes", "--no-doctor"); err != nil {
+	if out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "codex", "--yes", "--no-doctor"); err != nil {
 		t.Fatalf("wire Codex hooks: %v\n%s", err, out)
 	}
 	check := doctor.AgentHooksCheck(testApp.agents, repo, []string{codexDesktopAgent})

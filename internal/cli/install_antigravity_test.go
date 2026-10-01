@@ -13,7 +13,7 @@ import (
 
 func TestInstallWiresAntigravityHooksWhenAsked(t *testing.T) {
 	repo := installRepo(t)
-	out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude,antigravity", "--yes")
+	out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude,antigravity", "--yes")
 	if err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}
@@ -70,7 +70,7 @@ func TestInstallLeavesAntigravityAloneWhileComingSoon(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(repo, ".agents", "rules"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--yes"); err != nil {
+	if out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--yes"); err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}
 	if _, err := os.Stat(filepath.Join(repo, ".agents", "hooks.json")); err == nil {
@@ -87,7 +87,7 @@ func TestDoctorReportsAntigravityWorkspaceTrust(t *testing.T) {
 	repo := installRepo(t)
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude,antigravity", "--yes"); err != nil {
+	if _, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude,antigravity", "--yes"); err != nil {
 		t.Fatal(err)
 	}
 	out, _ := runTerma(t, "doctor", "--skip-commit")
@@ -118,7 +118,7 @@ func TestDoctorReportsAntigravityWorkspaceTrust(t *testing.T) {
 	if !strings.Contains(out, "switched off") {
 		t.Fatalf("doctor should report the disabled entry:\n%s", out)
 	}
-	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude,antigravity", "--yes"); err != nil {
+	if _, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude,antigravity", "--yes"); err != nil {
 		t.Fatal(err)
 	}
 	if data, _ = os.ReadFile(hooks); !strings.Contains(string(data), `"enabled": false`) {
@@ -129,7 +129,7 @@ func TestDoctorReportsAntigravityWorkspaceTrust(t *testing.T) {
 func TestDoctorIgnoresAntigravityWithoutTheAdapter(t *testing.T) {
 	installRepo(t)
 	t.Setenv("HOME", t.TempDir())
-	if _, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude", "--yes"); err != nil {
+	if _, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude", "--yes"); err != nil {
 		t.Fatal(err)
 	}
 	out, _ := runTerma(t, "doctor", "--skip-commit")

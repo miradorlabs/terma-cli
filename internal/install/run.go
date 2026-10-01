@@ -172,9 +172,9 @@ func summarize(r Reporter, plan Plan, b Binding, env, gitDir string) {
 		env = ""
 	}
 	if b.ID == "" && b.Name == "" {
-		r.Warn("Project", "unresolved — a real install signs in and selects one"+env)
+		r.Warn("Team", "unresolved — a real install signs in and selects one"+env)
 	} else {
-		r.Summary("Project", cmp.Or(b.Name, b.ID)+env)
+		r.Summary("Team", cmp.Or(b.Name, b.ID)+env)
 	}
 	// Nothing asks, so the line names the command that changes it.
 	if len(plan.Agents.RelayTargets(plan.Selected)) > 0 {

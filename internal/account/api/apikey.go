@@ -34,7 +34,7 @@ func (c *Client) CreateServerKey(ctx context.Context, projectID, name, descripti
 			"minting a server key needs a user credential, and TERMA_API_KEY is set — unset it and run `terma login`")
 	}
 	if projectID == "" {
-		return "", ServerKey{}, errors.New("a server key must name the project it is bound to")
+		return "", ServerKey{}, errors.New("a server key must name the team it is bound to")
 	}
 	if name == "" {
 		return "", ServerKey{}, errors.New("a server key needs a name — it is the only handle for revoking it later")

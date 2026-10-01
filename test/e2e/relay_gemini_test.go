@@ -15,7 +15,7 @@ func geminiSandbox(tool string, args func(sb *Sandbox) map[string]any) func(t *t
 	return func(t *testing.T) *Sandbox {
 		sb := New(t, Isolated)
 		sb.RelayAgents = []string{"gemini"}
-		sb.terma(sb.Repo, "install", "--project", sb.ProjectID, "--harness", "none", "--yes", "--no-browser", "--no-doctor")
+		sb.terma(sb.Repo, "install", "--team", sb.ProjectID, "--harness", "none", "--yes", "--no-browser", "--no-doctor")
 		var a map[string]any
 		if args != nil {
 			a = args(sb)

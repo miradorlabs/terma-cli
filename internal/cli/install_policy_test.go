@@ -30,7 +30,7 @@ func TestInstallChecksRepositoryPermissionWithoutNativeExporters(t *testing.T) {
 				t.Fatal(err)
 			}
 			id := projectsIn(orgA().ID)[0].ID
-			out, err := within(5*time.Second).combined(t, "install", "--harness", "none", "--adapters", agent, "--project", id, "--yes", "--no-doctor", "--no-browser")
+			out, err := within(5*time.Second).combined(t, "install", "--harness", "none", "--adapters", agent, "--team", id, "--yes", "--no-doctor", "--no-browser")
 			if err == nil || !strings.Contains(err.Error(), "does not allow members to add repositories") {
 				t.Fatalf("install bypassed repository permission: %v\n%s", err, out)
 			}
@@ -98,7 +98,7 @@ func TestInstallWithServerKeyUsesDeveloperLoginForPolicy(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			out, err := within(5*time.Second).combined(t, "install", "--harness", "none", "--adapters", "cursor", "--project", id, "--yes", "--no-doctor", "--no-browser")
+			out, err := within(5*time.Second).combined(t, "install", "--harness", "none", "--adapters", "cursor", "--team", id, "--yes", "--no-doctor", "--no-browser")
 			switch {
 			case tc.loginOrg == "":
 				if !errors.Is(err, auth.ErrNotLoggedIn) {

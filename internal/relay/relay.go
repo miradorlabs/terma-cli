@@ -55,7 +55,7 @@ type Policy struct {
 }
 
 // ErrNoKey is Resolve's answer for a project this machine holds no key for; its parts wait, then drop.
-var ErrNoKey = errors.New("no key for this project on this machine")
+var ErrNoKey = errors.New("no key for this team on this machine")
 
 // Options configure a relay.
 type Options struct {

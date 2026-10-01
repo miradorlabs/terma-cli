@@ -75,7 +75,7 @@ func TestMatchProject(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected an error")
 		}
-		if !strings.Contains(err.Error(), "terma project list") {
+		if !strings.Contains(err.Error(), "terma team list") {
 			t.Errorf("error should point at the discovery command, got %v", err)
 		}
 	})

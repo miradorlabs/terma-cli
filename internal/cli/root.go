@@ -50,9 +50,9 @@ func (app *App) NewRootCommand() *cobra.Command {
 
   terma setup     optional, once per developer — signs you in and records which
                   coding agents you use (an agent's CLI and desktop app are
-                  separate choices). No project or telemetry connection.
+                  separate choices). No team or telemetry connection.
   terma install   run in each repository — signs you in if setup has not, binds the
-                  repo to a Terma project, points your agents at that project per
+                  repo to a Terma team, points your agents at that team per
                   repository, and (offer to) wire the commit and agent hooks. A
                   colleague who clones an already-onboarded repo runs it too: it sets
                   up their own routing without rewriting the committed files.
@@ -81,7 +81,7 @@ spend will be attributed.`,
 	for _, name := range []string{"env", "api-url", "auth-url", "app-url", "otlp-url"} {
 		_ = pf.MarkHidden(name)
 	}
-	pf.StringVarP(&app.flags.projectID, "project", "p", "", "project override for this command (default: current repository's binding)")
+	pf.StringVarP(&app.flags.projectID, "team", "t", "", "team override for this command (default: current repository's binding)")
 	pf.StringVarP(&app.flags.output, "output", "o", "", "output format: table, json, yaml, csv")
 
 	root.AddCommand(
@@ -331,7 +331,7 @@ func requireProject(cfg *config.Config) error {
 	if cfg.APIKey != "" || cfg.ProjectID != "" {
 		return nil
 	}
-	return errors.New("no project bound to this repository — run `terma install` inside a repository, or pass --project for this command")
+	return errors.New("no team bound to this repository — run `terma install` inside a repository, or pass --team for this command")
 }
 
 // repoHere locates the worktree root and git directory; outside, when non-empty, replaces

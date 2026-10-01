@@ -133,7 +133,7 @@ func Load(o Overrides) (*Config, error) {
 		OTLPURL:          strings.TrimRight(firstNonEmpty(o.OTLPURL, os.Getenv("TERMA_OTLP_URL"), profile.OTLPURL, defaults.OTLPURL), "/"),
 		OrganizationID:   firstNonEmpty(os.Getenv("TERMA_ORGANIZATION_ID"), profile.OrganizationID),
 		OrganizationName: profile.OrganizationName,
-		ProjectID:        firstNonEmpty(o.ProjectID, os.Getenv("TERMA_PROJECT_ID")),
+		ProjectID:        firstNonEmpty(o.ProjectID, os.Getenv("TERMA_TEAM_ID")),
 		Harnesses:        profile.Harnesses,
 		Policy:           DefaultPolicy(),
 		APIKey:           strings.TrimSpace(os.Getenv("TERMA_API_KEY")),

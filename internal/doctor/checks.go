@@ -168,7 +168,7 @@ func HarnessCheck(reg *agents.Registry, verdicts []HarnessVerdict, otlpURL, proj
 		installed = append(installed, v.DisplayName)
 		switch v.Route {
 		case RouteOtherProject:
-			return Check{Status: Fail, Detail: v.DisplayName + " reports to project " + v.OtherProject + ", not " + projectID, Fix: "terma install"}
+			return Check{Status: Fail, Detail: v.DisplayName + " reports to team " + v.OtherProject + ", not " + projectID, Fix: "terma install"}
 		case RouteHooks:
 			connected = append(connected, v.DisplayName+" (repository hooks)")
 		case RouteGlobal:
@@ -205,7 +205,7 @@ func HarnessCheck(reg *agents.Registry, verdicts []HarnessVerdict, otlpURL, proj
 	}
 	return Check{
 		Status: Fail,
-		Detail: detail + "; this repository does not route " + strings.Join(silent, ", ") + " to its project, so its sessions send nothing",
+		Detail: detail + "; this repository does not route " + strings.Join(silent, ", ") + " to its team, so its sessions send nothing",
 		Fix:    "terma install",
 	}
 }
@@ -251,7 +251,7 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID string, 
 	case projectID == "":
 		return Check{Status: Warn, Detail: "local relay on " + addr + " (" + state + "); this repository is not bound, so its sessions are never forwarded", Fix: "terma install"}
 	case !keys.has("", projectID) && !slices.ContainsFunc(reg.With[agents.RelayExporter](), func(e agents.RelayExporter) bool { return keys.has(e.Name(), projectID) }):
-		return Check{Status: Warn, Detail: "local relay on " + addr + " (" + state + "); no key for this project on this machine, so its sessions are dropped", Fix: "terma install"}
+		return Check{Status: Warn, Detail: "local relay on " + addr + " (" + state + "); no key for this team on this machine, so its sessions are dropped", Fix: "terma install"}
 	}
 	return Check{Status: Pass, Detail: "through the local relay on " + addr + " (" + state + "); only this repository's sessions are forwarded"}
 }

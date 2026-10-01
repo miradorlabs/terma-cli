@@ -41,7 +41,7 @@ func Dir() (string, error) { return dir("routing") }
 
 func recordPath(projectID string) (string, error) {
 	if !termaproject.ValidID(projectID) {
-		return "", fmt.Errorf("unsafe project id %q", projectID)
+		return "", fmt.Errorf("unsafe team id %q", projectID)
 	}
 	d, err := Dir()
 	if err != nil {

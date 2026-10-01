@@ -18,7 +18,7 @@ func TestInstallPrintsWhatTheHookManagerNeedsFromEachClone(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(repo, "lefthook.yml"), []byte("pre-commit:\n  commands: {}\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude", "--yes", "--no-doctor")
+	out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude", "--yes", "--no-doctor")
 	if err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}
@@ -30,7 +30,7 @@ func TestInstallPrintsWhatTheHookManagerNeedsFromEachClone(t *testing.T) {
 // --dry-run shows the files an install would write, and writes none of them.
 func TestInstallDryRunListsTheFilesAndWritesNothing(t *testing.T) {
 	repo := installRepo(t)
-	out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude", "--dry-run")
+	out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude", "--dry-run")
 	if err != nil {
 		t.Fatalf("install --dry-run: %v\n%s", err, out)
 	}
@@ -49,7 +49,7 @@ func TestInstallDryRunListsTheFilesAndWritesNothing(t *testing.T) {
 // A --dry-run never signs in, even with a telemetry agent and no credential.
 func TestInstallDryRunDoesNotSignIn(t *testing.T) {
 	installRepo(t)
-	out, err := runTerma(t, "install", "--harness", "claude", "--project", testProjectID,
+	out, err := runTerma(t, "install", "--harness", "claude", "--team", testProjectID,
 		"--adapters", "claude", "--dry-run", "--no-browser", "--no-statusline")
 	if err != nil {
 		t.Fatalf("dry run with a telemetry harness should not require sign-in: %v\n%s", err, out)
@@ -84,7 +84,7 @@ func TestInstallDryRunUnauthenticatedNoProject(t *testing.T) {
 // --no-hooks writes no hooks file whatever --adapters asks.
 func TestInstallRecordsNoAdapters(t *testing.T) {
 	repo := installRepo(t)
-	if out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude", "--yes", "--no-doctor"); err != nil {
+	if out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude", "--yes", "--no-doctor"); err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}
 	path := termaproject.Path(repo)
@@ -121,7 +121,7 @@ func TestInstallRecordsNoAdapters(t *testing.T) {
 // asks for no commit.
 func TestInstallListsTheFilesToCommit(t *testing.T) {
 	installRepo(t)
-	out, err := runTerma(t, "install", "--harness", "none", "--project", testProjectID, "--adapters", "claude,cursor", "--yes", "--no-doctor")
+	out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude,cursor", "--yes", "--no-doctor")
 	if err != nil {
 		t.Fatalf("install: %v\n%s", err, out)
 	}

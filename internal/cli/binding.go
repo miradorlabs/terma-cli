@@ -26,7 +26,7 @@ func boundTo(p *project, cfg *config.Config) install.Binding {
 // from another environment or organization would be refused at the first key mint.
 func (app *App) resolveBinding(cmd *cobra.Command, cfg *config.Config, existing *termaproject.File, ref string, verify, ask bool) (install.Binding, error) {
 	sp := spinner.New(cmd.ErrOrStderr())
-	sp.Start("Loading projects…")
+	sp.Start("Loading teams…")
 	defer sp.Stop()
 	ref = strings.TrimSpace(ref)
 	if serverkey.Is(cfg.APIKey) {
@@ -52,7 +52,7 @@ func (app *App) resolveBinding(cmd *cobra.Command, cfg *config.Config, existing 
 		if p, err := matchProject(projects, ref); err == nil {
 			return boundTo(p, cfg), nil
 		}
-		fmt.Fprintf(cmd.ErrOrStderr(), "No project matches %q in this organization — pick one:\n", ref)
+		fmt.Fprintf(cmd.ErrOrStderr(), "No team matches %q in this organization — pick one:\n", ref)
 		p, err := pickProject(cmd, projects, current)
 		if err != nil {
 			return install.Binding{}, err
@@ -82,7 +82,7 @@ func (app *App) resolveBinding(cmd *cobra.Command, cfg *config.Config, existing 
 
 	switch {
 	case existing != nil && !bound && !ask:
-		return install.Binding{}, fmt.Errorf("%s — run `terma install --project <name or id>` with one of yours (`terma project list` lists them)", unreachableBinding(existing, cfg))
+		return install.Binding{}, fmt.Errorf("%s — run `terma install --team <name or id>` with one of yours (`terma team list` lists them)", unreachableBinding(existing, cfg))
 	case existing != nil && !bound:
 		reason := unreachableBinding(existing, cfg)
 		fmt.Fprintf(cmd.ErrOrStderr(), "%s%s.\n", strings.ToUpper(reason[:1]), reason[1:])
@@ -107,7 +107,7 @@ func unreachableBinding(existing *termaproject.File, cfg *config.Config) string 
 	if org == "" {
 		org = "your organization"
 	}
-	msg := fmt.Sprintf("this repository is bound to %s, which is not a project in %s", cmp.Or(p.Name, p.ID), org)
+	msg := fmt.Sprintf("this repository is bound to %s, which is not a team in %s", cmp.Or(p.Name, p.ID), org)
 	switch {
 	case !config.SameAccounts(p.Environment, cfg.Environment):
 		return fmt.Sprintf("%s: it was bound in %s, and terma is using %s", msg, environmentLabel(p.Environment), environmentLabel(cfg.Environment))
@@ -137,18 +137,18 @@ func (app *App) serverKeyBinding(ctx context.Context, cfg *config.Config, existi
 		OrganizationID string `json:"organization_id"`
 	}
 	if err := client.Get(ctx, "/v1/identity", nil, &identity); err != nil {
-		return install.Binding{}, fmt.Errorf("look up the project TERMA_API_KEY belongs to: %w", err)
+		return install.Binding{}, fmt.Errorf("look up the team TERMA_API_KEY belongs to: %w", err)
 	}
 	if identity.ProjectID == "" {
-		return install.Binding{}, errors.New("TERMA_API_KEY names no project")
+		return install.Binding{}, errors.New("TERMA_API_KEY names no team")
 	}
 	if ref != "" && ref != identity.ProjectID {
-		return install.Binding{}, fmt.Errorf("TERMA_API_KEY belongs to project %s, not %q — a server key binds only its own project, named by id", identity.ProjectID, ref)
+		return install.Binding{}, fmt.Errorf("TERMA_API_KEY belongs to team %s, not %q — a server key binds only its own team, named by id", identity.ProjectID, ref)
 	}
 	b := install.Binding{ID: identity.ProjectID, OrganizationID: identity.OrganizationID, Environment: nonProd(cfg.Environment)}
 	if existing != nil {
 		if existing.Project.ID != identity.ProjectID {
-			return install.Binding{}, fmt.Errorf("this repository is bound to project %s, and TERMA_API_KEY belongs to %s", existing.Project.ID, identity.ProjectID)
+			return install.Binding{}, fmt.Errorf("this repository is bound to team %s, and TERMA_API_KEY belongs to %s", existing.Project.ID, identity.ProjectID)
 		}
 		b.Name = existing.Project.Name
 	}

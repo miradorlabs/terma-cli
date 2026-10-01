@@ -91,7 +91,7 @@ func TestDoctorJudgesTheSpoolFromItsProbes(t *testing.T) {
 		detail string
 	}{
 		"unwritable": {SpoolState{Open: true, WriteErr: errors.New("read-only file system")}, keyed, Fail, "cannot be written"},
-		"keyless":    {SpoolState{Open: true, Queued: 3}, nil, Fail, "no project key"},
+		"keyless":    {SpoolState{Open: true, Queued: 3}, nil, Fail, "no team key"},
 		"closed":     {SpoolState{}, keyed, Fail, "cannot open"},
 		"healthy":    {SpoolState{Open: true, Queued: 3}, keyed, Pass, "3 queued"},
 	} {
@@ -135,7 +135,7 @@ func TestStatusSaysWhatDoctorWould(t *testing.T) {
 		rows[r.Label] = r.Value
 	}
 	if !strings.Contains(rows["Account"], "not signed in") || !strings.Contains(rows["Repository"], "One") ||
-		!strings.Contains(rows["Spool"], "2 event(s) queued, no project key") {
+		!strings.Contains(rows["Spool"], "2 event(s) queued, no team key") {
 		t.Fatalf("rows = %v", rows)
 	}
 	fixes := map[string]bool{}
