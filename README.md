@@ -181,9 +181,6 @@ and project keys stay in the user's configuration directory with restrictive fil
 permissions; repository settings contain no secrets. Export choices support signal,
 prompt, tool-content, and global-versus-local scope controls.
 
-Read [SECURITY.md](SECURITY.md) for the threat model, consent behavior, credential
-storage, hook guarantees, and reporting instructions.
-
 ## Commands
 
 The normal command surface is intentionally small:
@@ -220,7 +217,6 @@ else names an agent, and `internal/boundary` tests that this holds.
 
 ## Documentation
 
-- [Security](SECURITY.md) — login flow, privacy boundaries, and threat model
 - [Agent-facing CLI guide](https://terma.ai/cli/llms.txt)
 
 ## License
