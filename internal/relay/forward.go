@@ -178,8 +178,12 @@ func (s *sender) loop() {
 		// The content policy as it stands now: a project that turned prompts off since sends none still queued.
 		body, excluded := s.r.withholdQueued(batch[0].signal, body, pol)
 		if pol.Signals != nil && !contains(pol.Signals, string(batch[0].signal)) || body == nil {
+			reason := "policy_signal_or_content"
+			if body == nil && excluded > 0 {
+				reason = "policy_path"
+			}
 			for _, e := range batch {
-				s.r.stats.dropped(e.signal, "policy_signal_or_content", e.records)
+				s.r.stats.dropped(e.signal, reason, e.records)
 			}
 			s.r.outbox.remove(s.route, batch)
 			s.delivered(len(batch))
@@ -396,8 +400,9 @@ func (r *Relay) recoverOutbox() {
 }
 
 // withholdQueued applies the policy as it stands now to a queued body, reporting the records
-// an excluded path took from what it returns; nil drops all of it, as does a body that no
-// longer decodes, since it cannot be checked against a stricter policy.
+// an excluded path took from it; nil drops all of it (an excluded path took everything when
+// it reports any), as does a body that no longer decodes, since it cannot be checked
+// against a stricter policy.
 func (r *Relay) withholdQueued(sig Signal, body []byte, pol Policy) ([]byte, int) {
 	if pol.Excludes != nil {
 		pol.IncludePrompts, pol.IncludeToolContent = false, false
@@ -424,7 +429,7 @@ func (r *Relay) withholdQueued(sig Signal, body []byte, pol Policy) ([]byte, int
 	excluded := dropExcluded(p, pol.Excludes)
 	if excluded > 0 {
 		if emptied(msg) {
-			return nil, 0
+			return nil, excluded
 		}
 		r.stats.dropped(sig, "policy_path", excluded)
 	}

@@ -147,7 +147,8 @@ func (m Manager) installedExe(have string) (string, bool) {
 		return "", false
 	}
 	// The renderers escape the path (XML, a Go-quoted string, VBScript quotes); the one
-	// candidate that renders the installed bytes again is the path.
+	// candidate that renders the installed bytes again is the path. Re-rendering also keeps
+	// this right should a renderer ever write the path twice: every occurrence must match.
 	raw := match[1]
 	unquoted, _ := strconv.Unquote(`"` + raw + `"`)
 	for _, exe := range []string{raw, html.UnescapeString(raw), unquoted, strings.ReplaceAll(raw, `""`, `"`)} {

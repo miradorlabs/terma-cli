@@ -82,8 +82,8 @@ func TestQueuedCapturePolicyFiltersPathsAndCorruptBodies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := r.withholdQueued(Traces, b, Policy{Excludes: excluding("**/secrets/**")}); got != nil {
-		t.Fatal("queued excluded path survived")
+	if got, excluded := r.withholdQueued(Traces, b, Policy{Excludes: excluding("**/secrets/**")}); got != nil || excluded != 1 {
+		t.Fatalf("queued excluded path survived, or was not counted as one (%d)", excluded)
 	}
 	if got, _ := r.withholdQueued(Traces, []byte{0xff}, Policy{}); got != nil {
 		t.Fatal("uncheckable body was forwarded")

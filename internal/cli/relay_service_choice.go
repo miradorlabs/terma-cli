@@ -73,9 +73,16 @@ func ensureRelay(ctx context.Context, flag, env string, report func(warn bool, w
 	// this one lacks, or another binary or environment. Only one this terma would write stays.
 	state := daemon.CheckServiceHere()
 	if keepService(state, foreign, flag) {
-		report(false, "running in the background")
 		// The service's relay may have stopped, or wait behind a relay a hook started.
-		_ = daemon.StartService(ctx)
+		if err := daemon.StartService(ctx); err != nil {
+			// A working relay is not stopped for a service that may never take its port.
+			report(true, "could not start in the background ("+err.Error()+"); it starts when an agent needs it")
+			if !isRunning {
+				daemon.Spawn()
+			}
+			return
+		}
+		report(false, "running in the background")
 		if isRunning && !running.Service {
 			daemon.Stop(dir)
 		}
