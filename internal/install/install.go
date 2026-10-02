@@ -96,30 +96,6 @@ func Build(reg *agents.Registry, in Input) (Plan, error) {
 	return p, err
 }
 
-// PrintDryRun says what an install would do.
-func (p Plan) PrintDryRun(w io.Writer, signIn bool) error {
-	if !p.NoHooks {
-		p.Hooks.Print(w)
-	}
-	if signIn {
-		fmt.Fprintln(w, "\nA real install would sign in first (not done for a dry run).")
-	}
-	for _, h := range PolicyHarnesses(p.Agents, p.Adapters, p.Root) {
-		path, err := h.ConfigPath()
-		if err != nil {
-			return err
-		}
-		fmt.Fprintf(w, "\nRepository telemetry: %s (preserve existing policy unless export flags are supplied).\n", path)
-	}
-	for _, s := range SelectedSurfaces(p.Agents, p.Selected) {
-		for _, step := range s.SetupSteps {
-			fmt.Fprintf(w, "\nAfter a real install — %s\n", step)
-		}
-	}
-	fmt.Fprintln(w, "\nDry run: nothing written.")
-	return nil
-}
-
 // Reporter is how an install reports, a line per step.
 type Reporter interface {
 	// OK reports a step done; Warn one that needs the developer; Summary a choice the
@@ -220,7 +196,7 @@ func Apply(ctx context.Context, p Plan, o Options, s Steps, r Reporter) error {
 		adapters = reg.WiredNames(p.Root)
 	}
 	if hooksInPlace {
-		approveOwnHooks(reg, p.Root, r)
+		approveOwnHooks(ownTrust(reg, func(a agents.Agent) bool { return agents.Wired(p.Root, a) }), p.Root, r)
 	}
 	// Without a spool key every hook event waits in the spool.
 	if s.SpoolKey != nil && (installedHooks || len(reg.WiredNames(p.Root)) > 0) {
@@ -272,15 +248,24 @@ func Apply(ctx context.Context, p Plan, o Options, s Steps, r Reporter) error {
 	return nil
 }
 
-// approveOwnHooks approves, in each agent that runs hooks only once trusted, terma's own
-// entries of the repository's hooks file, so the agent runs them without a review step;
-// a failure leaves the agent's own step to say what to do.
-func approveOwnHooks(reg *agents.Registry, root string, r Reporter) {
+// ownTrust are the agents, among those wired reports, whose approvals of terma's own
+// hook entries an install keeps in step: each runs repository hooks only once trusted.
+func ownTrust(reg *agents.Registry, wired func(agents.Agent) bool) []agents.Agent {
+	var out []agents.Agent
 	for _, a := range reg.All() {
-		t, ok := a.(agents.HookTrusting)
-		if !ok || a.HooksPath() == "" || !agents.Wired(root, a) {
-			continue
+		if _, ok := a.(agents.HookTrusting); ok && a.HooksPath() != "" && wired(a) {
+			out = append(out, a)
 		}
+	}
+	return out
+}
+
+// approveOwnHooks approves, in each of the agents, terma's own entries of the repository's
+// hooks file, so the agent runs them without a review step; a failure leaves the agent's
+// own step to say what to do.
+func approveOwnHooks(trusting []agents.Agent, root string, r Reporter) {
+	for _, a := range trusting {
+		t := a.(agents.HookTrusting)
 		done, err := t.SyncHookTrust(filepath.Join(root, filepath.FromSlash(a.HooksPath())), nil)
 		switch {
 		case err != nil:

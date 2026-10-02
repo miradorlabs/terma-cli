@@ -87,7 +87,8 @@ func TestARefusedInstallWritesNothing(t *testing.T) {
 	}
 }
 
-// A dry run signs in to nothing and fetches nothing, and a signed-out one still plans.
+// A dry run signs in to nothing, fetches nothing and runs no step it reports, and a
+// signed-out one still plans.
 func TestADryRunCallsNoStep(t *testing.T) {
 	cfg, req := request(t)
 	req.DryRun = true
@@ -96,6 +97,15 @@ func TestADryRunCallsNoStep(t *testing.T) {
 	w.Bind = func(context.Context, *config.Config, *termaproject.File, string, bool, bool) (Binding, error) {
 		log = append(log, "bind")
 		return Binding{}, ErrNotSignedIn
+	}
+	// The dry run reads the steps Apply would be handed, so building them is allowed.
+	w.ApplySteps = func(*config.Config, Plan) Steps {
+		run := func(s string) { log = append(log, s) }
+		return Steps{
+			Connect:    func(context.Context) error { run("connect"); return nil },
+			StatusLine: func() (string, bool) { run("status line"); return "", true },
+			SpoolKey:   func(context.Context) (string, string) { run("spool key"); return "", "" },
+		}
 	}
 	if _, err := Run(t.Context(), registry(), cfg, req, w, &report{}); err != nil {
 		t.Fatal(err)

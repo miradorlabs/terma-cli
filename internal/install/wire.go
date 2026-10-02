@@ -23,6 +23,9 @@ func Wire(ctx context.Context, out io.Writer, root string, bound *termaproject.F
 	if err != nil {
 		return err
 	}
+	if shimsWired(ctx, root, gitDir) {
+		return nil
+	}
 	// Restore a shared --local setting first, or the new override would record our own
 	// shim as the previous path; only the main checkout may migrate it.
 	if session.PreviousHooksScope(gitDir) == "--local" {
@@ -71,6 +74,16 @@ func Wire(ctx context.Context, out io.Writer, root string, bound *termaproject.F
 		fmt.Fprintf(out, "The shims chain your previous hooks (%s) when they exist; `terma uninstall` restores the setting.\n", current)
 	}
 	return nil
+}
+
+// shimsWired reports whether git in this checkout already runs the committed shims, so
+// Wire has nothing to change; a dry run asks the same question.
+func shimsWired(ctx context.Context, root, gitDir string) bool {
+	if session.PreviousHooksScope(gitDir) == "--local" || gitx.ConfigGet(ctx, root, "extensions.worktreeConfig") != "true" {
+		return false
+	}
+	v, err := gitx.Git(ctx, root, "config", "--worktree", "--get", "core.hooksPath")
+	return err == nil && v == hookmgr.ShimDir
 }
 
 // Unwire restores core.hooksPath to what it was before terma set it.

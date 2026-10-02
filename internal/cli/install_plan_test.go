@@ -2,6 +2,7 @@ package cli
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -180,5 +181,60 @@ func TestConfirmPromptPutsTheDetailBeforeTheAnswer(t *testing.T) {
 	got := confirmPrompt(p, "Write them?", []string{"a.json  does a", "b.json  does b"}, false)
 	if want := "? Write them?\n  a.json  does a\n  b.json  does b\n  [y/N] "; got != want {
 		t.Errorf("with detail: %q, want %q", got, want)
+	}
+}
+
+// On a fresh clone the hook files are all committed, yet the install still points git at
+// the shims and approves the Codex hooks: the dry run lists both, and once the install has
+// done them, neither.
+func TestInstallDryRunListsWhatAFreshCloneStillNeeds(t *testing.T) {
+	repo := installRepo(t)
+	t.Setenv("CODEX_HOME", t.TempDir())
+	if out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude,codex", "--yes"); err != nil {
+		t.Fatalf("install: %v\n%s", err, out)
+	}
+	// Another clone of the merged repository, on another machine.
+	if out, err := exec.Command("git", "-C", repo, "config", "--worktree", "--unset", "core.hooksPath").CombinedOutput(); err != nil {
+		t.Fatalf("unset core.hooksPath: %v\n%s", err, out)
+	}
+	t.Setenv("CODEX_HOME", t.TempDir())
+
+	wiring := "point git at the committed hook shims (core.hooksPath = .terma/hooks)"
+	approval := "approve Terma's hooks in Codex"
+	dry, err := runTerma(t, "install", "--harness", "none", "--dry-run")
+	if err != nil {
+		t.Fatalf("install --dry-run: %v\n%s", err, dry)
+	}
+	for _, want := range []string{"Hooks already present", "A real install would also:", wiring, approval, "Dry run: nothing written."} {
+		if !strings.Contains(dry, want) {
+			t.Fatalf("dry run does not mention %q:\n%s", want, dry)
+		}
+	}
+	if strings.Contains(dry, "write "+termaproject.FileName) {
+		t.Fatalf("dry run would rewrite an unchanged binding:\n%s", dry)
+	}
+	if got, _ := exec.Command("git", "-C", repo, "config", "--get", "core.hooksPath").Output(); len(got) != 0 {
+		t.Fatalf("dry run set core.hooksPath = %s", got)
+	}
+
+	out, err := runTerma(t, "install", "--harness", "none", "--yes", "--verbose")
+	if err != nil || !strings.Contains(out, "core.hooksPath = .terma/hooks") || !strings.Contains(out, "approved Terma's") {
+		t.Fatalf("install did not do what its dry run listed: %v\n%s", err, out)
+	}
+	if again, _ := runTerma(t, "install", "--harness", "none", "--dry-run"); strings.Contains(again, wiring) || strings.Contains(again, approval) {
+		t.Fatalf("dry run lists changes the install already made:\n%s", again)
+	}
+}
+
+// Install approves the Codex hooks itself, so its dry run asks for no /hooks review.
+func TestInstallDryRunAsksForNoCodexReview(t *testing.T) {
+	installRepo(t)
+	t.Setenv("CODEX_HOME", t.TempDir())
+	out, err := runTerma(t, "install", "--harness", "codex", "--team", testProjectID, "--dry-run", "--no-browser")
+	if err != nil {
+		t.Fatalf("install --dry-run: %v\n%s", err, out)
+	}
+	if strings.Contains(out, "`/hooks`") || !strings.Contains(out, "approve Terma's hooks in Codex") {
+		t.Fatalf("dry run should list the approval, not a /hooks step:\n%s", out)
 	}
 }

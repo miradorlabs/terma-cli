@@ -50,7 +50,8 @@ type Workflow struct {
 	FetchPolicy func(ctx context.Context, cfg *config.Config) (config.Policy, error)
 	// HasKey reports whether this machine holds projectID's key.
 	HasKey func(projectID string) bool
-	// ApplySteps are the plan's steps outside the repository, under the final cfg.
+	// ApplySteps are the plan's steps outside the repository, under the final cfg. A dry
+	// run builds them too, to report them, and runs none.
 	ApplySteps func(cfg *config.Config, p Plan) Steps
 	// RefreshMachine refreshes the home-directory files an earlier terma wrote.
 	RefreshMachine func() ([]string, error)
@@ -125,15 +126,20 @@ func Run(ctx context.Context, reg *agents.Registry, cfg *config.Config, req Requ
 		return Plan{}, err
 	}
 	summarize(r, plan, b, cfg.Environment, req.GitDir)
-	if req.DryRun {
-		return plan, plan.PrintDryRun(r.Detail(), needsAuth)
-	}
-	if err := Apply(ctx, plan, Options{AssumeYes: req.AssumeYes, Version: req.Version, Now: req.Now}, w.ApplySteps(cfg, plan), r); err != nil {
-		return plan, err
-	}
+	opts := Options{AssumeYes: req.AssumeYes, Version: req.Version, Now: req.Now}
 	// A newer release's first install refreshes the machine before doctor checks it, and
 	// records it so the refresh after the command has nothing left to do.
-	if dir, err := config.Dir(); err == nil && w.RefreshMachine != nil && selfupdate.NeedsRefresh(dir, req.Version) {
+	dir, dirErr := config.Dir()
+	refresh := dirErr == nil && w.RefreshMachine != nil && selfupdate.NeedsRefresh(dir, req.Version)
+	// The dry run is handed the steps Apply would run, so the two cannot drift apart.
+	steps := w.ApplySteps(cfg, plan)
+	if req.DryRun {
+		return plan, plan.PrintDryRun(ctx, r.Detail(), DryRun{SignIn: needsAuth, HasKey: w.HasKey, Steps: steps, Options: opts, RefreshMachine: refresh})
+	}
+	if err := Apply(ctx, plan, opts, steps, r); err != nil {
+		return plan, err
+	}
+	if refresh {
 		changed, err := w.RefreshMachine()
 		for _, p := range changed {
 			fmt.Fprintf(r.Detail(), "  updated %s\n", p)
