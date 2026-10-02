@@ -20,8 +20,10 @@ var committedHooks = []struct {
 	{"SessionStart", "", hookmgr.PathHookCommand("session-start")},
 	{"SessionEnd", "", hookmgr.PathHookCommand("session-end")},
 	// Edits build the manifest; the Agent tool's response (Task in older builds) is the only place a
-	// subagent's model is named.
-	{"PostToolUse", "Edit|Write|MultiEdit|NotebookEdit|Agent|Task", hookmgr.PathHookCommand("post-tool-use")},
+	// subagent's model is named. A Bash call names no files, so its edits are the working tree's
+	// changes between its PreToolUse and its PostToolUse.
+	{"PreToolUse", "Bash", hookmgr.PathHookCommand("pre-tool-use")},
+	{"PostToolUse", "Edit|Write|MultiEdit|NotebookEdit|Agent|Task|Bash", hookmgr.PathHookCommand("post-tool-use")},
 	{"Stop", "", hookmgr.PathHookCommand("stop")},
 	{"StopFailure", "", hookmgr.PathHookCommand("stop-failure")},
 	// The one hook before a turn exports anything, so the relay is up and the session claimed first.

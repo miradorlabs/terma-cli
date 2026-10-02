@@ -73,7 +73,7 @@ func TestEventNamesAreStable(t *testing.T) {
 		"omp-file-edit", "omp-prompt", "omp-session-end", "omp-session-start",
 		"opencode-file-edit", "opencode-session-end", "opencode-session-start",
 		"pi-file-edit", "pi-prompt", "pi-session-end", "pi-session-start",
-		"post-tool-use", "session-end", "session-start", "stop", "stop-failure", "subagent-start", "subagent-stop",
+		"post-tool-use", "pre-tool-use", "session-end", "session-start", "stop", "stop-failure", "subagent-start", "subagent-stop",
 		"user-prompt-submit",
 	}
 	got := slices.Sorted(maps.Keys(reg.Handlers()))

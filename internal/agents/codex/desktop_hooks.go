@@ -16,16 +16,23 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// preToolUse records a local start time for PostToolUse's elapsed wall time, which
-// includes approval waits and is not Codex's execution duration.
+// preToolUse snapshots the working tree before a shell call, and records a local start
+// time for PostToolUse's elapsed wall time, which includes approval waits and is not
+// Codex's execution duration.
 func preToolUse(ctx context.Context, env hookrun.Env) error {
 	in, err := readCodexHookInput(env.Stdin)
-	if err != nil || !session.ValidID(in.SessionID) || in.ToolUseID == "" {
+	if err != nil || !session.ValidID(in.SessionID) {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
 	r, err := env.Repo(ctx)
 	if err != nil {
+		return nil
+	}
+	if isCodexShellCall(in) {
+		env.ShellBefore(ctx, r, in.SessionID, in.ToolUseID)
+	}
+	if in.ToolUseID == "" {
 		return nil
 	}
 	if _, desktop := codexDesktopRoute(r); !desktop {

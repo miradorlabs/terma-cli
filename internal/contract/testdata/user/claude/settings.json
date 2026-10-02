@@ -2,11 +2,23 @@
   "hooks": {
     "PostToolUse": [
       {
-        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Agent|Task",
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Agent|Task|Bash",
         "hooks": [
           {
             "type": "command",
             "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user post-tool-use || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user pre-tool-use || true",
             "timeout": 10
           }
         ]

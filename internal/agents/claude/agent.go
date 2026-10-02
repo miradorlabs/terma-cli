@@ -40,6 +40,7 @@ func (Agent) Events() map[string]agents.Handler {
 	return map[string]agents.Handler{
 		"session-start": sessionStart,
 		"session-end":   sessionEnd,
+		"pre-tool-use":  preToolUse,
 		"post-tool-use": postToolUse,
 		"stop":          stop,
 		"stop-failure":  stopFailure,

@@ -275,19 +275,41 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 		env.EmitFor(r, spool.Event{Name: hookrun.EventToolCall, SessionID: in.SessionID, Repo: r.Name, Attrs: attrs})
 	}
 	captureCodexDesktopActivity(ctx, env, r, in)
-	candidates := codexEditedPaths(in)
-	if len(candidates) == 0 {
-		return nil
-	}
-	// The call's path fields and its patch can name the same file.
+	sess := session.Session{ID: in.SessionID, Tool: codexTool, Model: in.Model}
 	attrs := hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType)
 	hookrun.BoundedAttr(attrs, hookrun.AttrToolCallID, in.ToolUseID)
 	if _, desktop := codexDesktopRoute(r); desktop {
 		attrs["capture_surface"] = codexDesktopSurface
 	}
-	env.Touch(r, session.Session{ID: in.SessionID, Tool: codexTool, Model: in.Model}, in.ToolName,
-		hookrun.UniqueSorted(hookrun.RelativeFiles(r, env.Cwd, candidates)), attrs)
+	if isCodexShellCall(in) {
+		env.ShellAfter(ctx, r, sess, in.ToolName, in.ToolUseID, attrs)
+		return nil
+	}
+	candidates := codexEditedPaths(in)
+	if len(candidates) == 0 {
+		return nil
+	}
+	// The call's path fields and its patch can name the same file.
+	env.Touch(r, sess, in.ToolName, hookrun.UniqueSorted(hookrun.RelativeFiles(r, env.Cwd, candidates)), attrs)
 	return nil
+}
+
+// isCodexShellCall is a call that runs a command (shell, exec_command and their kin take
+// `command` or `cmd`), whose edits only the working tree shows. A patch heredoc'd into one
+// still names its files, so those calls stay with codexEditedPaths.
+func isCodexShellCall(in *codexHookInput) bool {
+	var input struct {
+		Command json.RawMessage `json:"command"`
+		Cmd     json.RawMessage `json:"cmd"`
+	}
+	if in.ToolName == "apply_patch" || json.Unmarshal(in.ToolInput, &input) != nil {
+		return false
+	}
+	command := cmp.Or(string(input.Command), string(input.Cmd))
+	if command == "" || command == "null" || command == `""` {
+		return false
+	}
+	return len(codexEditedPaths(in)) == 0
 }
 
 func codexEditedPaths(in *codexHookInput) []string {

@@ -99,6 +99,25 @@ func stop(ctx context.Context, env hookrun.Env) error {
 	return nil
 }
 
+// claudeShellTool is the tool whose edits only the working tree shows.
+const claudeShellTool = "Bash"
+
+// preToolUse snapshots the working tree before a Bash call, for postToolUse to diff. It
+// prints nothing: a PreToolUse reply can deny the call.
+func preToolUse(ctx context.Context, env hookrun.Env) error {
+	in, err := readClaudeInput(env.Stdin)
+	if err != nil || in.ToolName != claudeShellTool || !session.ValidID(in.SessionID) {
+		return nil
+	}
+	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+	r, err := env.Repo(ctx)
+	if err != nil {
+		return nil
+	}
+	env.ShellBefore(ctx, r, in.SessionID, in.ToolUseID)
+	return nil
+}
+
 func postToolUse(ctx context.Context, env hookrun.Env) error {
 	in, err := readClaudeInput(env.Stdin)
 	if err != nil {
@@ -117,9 +136,14 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 		claudeSubagentCall(env, r, in)
 		return nil
 	}
+	sess := session.Session{ID: in.SessionID, Tool: claudeTool, Model: in.Model}
+	if in.ToolName == claudeShellTool {
+		env.ShellAfter(ctx, r, sess, in.ToolName, in.ToolUseID, hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType))
+		return nil
+	}
 	paths := append([]string{in.ToolInput.FilePath, in.ToolInput.NotebookPath}, editPaths(in)...)
 	// Inside a subagent the manifest stays the session's; the event names the agent.
-	env.Touch(r, session.Session{ID: in.SessionID, Tool: claudeTool, Model: in.Model}, in.ToolName,
+	env.Touch(r, sess, in.ToolName,
 		hookrun.RelativeFiles(r, env.Cwd, paths), hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType))
 	return nil
 }
