@@ -262,10 +262,15 @@ func (a *AppServer) close() {
 
 // TrustHooks records the developer's approval of every hook Codex finds for cwd, as
 // Desktop's Settings → Hooks → Review (or the TUI's /hooks) does: the hooks/list key and
-// current hash of each, as [hooks.state."<key>"] trusted_hash in config.toml.
+// current hash of each, as [hooks.state."<key>"] trusted_hash in config.toml. It returns
+// how many hooks Codex listed; one terma already approved is not written twice, which
+// Codex refuses to load.
 func (a *AppServer) TrustHooks(sb *Sandbox, cwd string) int {
 	a.t.Helper()
 	res := a.call("hooks/list", map[string]any{"cwds": []string{cwd}})
+	cfg := filepath.Join(sb.CodexHome, "config.toml")
+	existing, _ := os.ReadFile(cfg)
+	listed := 0
 	var entries []string
 	var walk func(v any)
 	walk = func(v any) {
@@ -274,7 +279,10 @@ func (a *AppServer) TrustHooks(sb *Sandbox, cwd string) int {
 			key, _ := x["key"].(string)
 			hash, _ := x["currentHash"].(string)
 			if key != "" && hash != "" {
-				entries = append(entries, "[hooks.state."+tomlQuote(key)+"]\ntrusted_hash = "+tomlQuote(hash)+"\n")
+				listed++
+				if header := "[hooks.state." + tomlQuote(key) + "]"; !strings.Contains(string(existing), header) {
+					entries = append(entries, header+"\ntrusted_hash = "+tomlQuote(hash)+"\n")
+				}
 			}
 			for _, e := range x {
 				walk(e)
@@ -286,12 +294,10 @@ func (a *AppServer) TrustHooks(sb *Sandbox, cwd string) int {
 		}
 	}
 	walk(res)
-	cfg := filepath.Join(sb.CodexHome, "config.toml")
-	existing, _ := os.ReadFile(cfg)
 	if err := os.WriteFile(cfg, append(existing, []byte("\n"+strings.Join(entries, "\n"))...), 0o600); err != nil {
 		a.t.Fatal(err)
 	}
-	return len(entries)
+	return listed
 }
 
 // CodexDaemon is a sandbox's own app-server daemon, listening where Codex's clients

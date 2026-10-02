@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -127,9 +129,11 @@ func (sb *Sandbox) CodexExec(route Route, prompt string, extra ...string) *Codex
 	t.Helper()
 	sb.prepareCodex(route)
 	args := []string{"exec", "--json", "--skip-git-repo-check"}
-	if !sb.CodexHooksUntrusted {
-		// Otherwise the first run of a real developer's Codex: the project's hooks exist
-		// but nobody has trusted them, so Codex runs none.
+	if sb.CodexHooksUntrusted {
+		// A developer whose Codex was never shown the hooks as they stand, such as after a
+		// teammate changed them: install approved its own, so take those back.
+		sb.withdrawCodexHookTrust()
+	} else {
 		args = append(args, "--dangerously-bypass-hook-trust")
 	}
 	args = append(append(args,
@@ -209,4 +213,31 @@ func (sb *Sandbox) CodexLogs(threadID string, timeout time.Duration) (starts, co
 
 func fixtureCodexArgs(url string) []string {
 	return []string{"-c", `model_provider="telemetry_fixture"`, "-c", `model_providers.telemetry_fixture.name="Telemetry fixture"`, "-c", "model_providers.telemetry_fixture.base_url=" + tomlQuote(url), "-c", `model_providers.telemetry_fixture.wire_api="responses"`, "-c", `model_providers.telemetry_fixture.requires_openai_auth=false`, "-s", "workspace-write"}
+}
+
+// withdrawCodexHookTrust removes every [hooks.state."…"] table from the sandbox's Codex
+// config, so Codex runs none of the hooks it finds.
+func (sb *Sandbox) withdrawCodexHookTrust() {
+	sb.T.Helper()
+	cfg := filepath.Join(sb.CodexHome, "config.toml")
+	data, err := os.ReadFile(cfg)
+	if errors.Is(err, fs.ErrNotExist) {
+		return
+	}
+	if err != nil {
+		sb.T.Fatal(err)
+	}
+	var kept []string
+	inTrust := false
+	for line := range strings.SplitSeq(string(data), "\n") {
+		if trimmed := strings.TrimSpace(line); strings.HasPrefix(trimmed, "[") {
+			inTrust = strings.HasPrefix(trimmed, "[hooks.state.")
+		}
+		if !inTrust {
+			kept = append(kept, line)
+		}
+	}
+	if err := os.WriteFile(cfg, []byte(strings.Join(kept, "\n")), 0o600); err != nil {
+		sb.T.Fatal(err)
+	}
 }
