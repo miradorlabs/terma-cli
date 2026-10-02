@@ -118,3 +118,59 @@ func earlierCommand(t *testing.T, def string) string {
 	t.Fatalf("the definition starts no relay command this test knows:\n%s", def)
 	return ""
 }
+
+// A definition for another path to this same binary is current: setup run as ./bin/terma and
+// install run through a symlink on PATH must not rewrite the service and restart the relay.
+// A path to another binary, with identical bytes, is not.
+func TestADefinitionForAnotherPathToThisBinaryIsCurrent(t *testing.T) {
+	if !Supported() {
+		t.Skip("no relay service on this platform")
+	}
+	sandboxHome(t)
+	dir := t.TempDir()
+	target := filepath.Join(dir, "bin", "terma")
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(target, []byte("terma"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(dir, "it's & <linked>", "terma")
+	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, link); err != nil {
+		t.Skipf("no symlinks here: %v", err)
+	}
+	copied := filepath.Join(dir, "copy", "terma")
+	if err := os.MkdirAll(filepath.Dir(copied), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(copied, []byte("terma"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	installed := testManager(t)
+	installed.Exe = link
+	def, err := installed.Definition()
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeDefinition(t, installed, def)
+
+	viaReal := installed
+	viaReal.Exe = target
+	if !viaReal.Current() {
+		t.Fatal("the service for a symlink to this binary reads as stale, so install would restart the relay")
+	}
+	other := installed
+	other.Exe = copied
+	if other.Current() {
+		t.Fatal("the service for another binary reads as current")
+	}
+	otherEnv := viaReal
+	otherEnv.Env = map[string]string{"HOME": "/home/dev"}
+	if otherEnv.Current() {
+		t.Fatal("the same binary in another environment reads as current")
+	}
+}
