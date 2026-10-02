@@ -135,6 +135,9 @@ func (s *Store) Active(now time.Time, ttl time.Duration) (*Session, bool) {
 
 // ClearActive forgets the active session if it is id (or any, when id is empty).
 func (s *Store) ClearActive(id string) error {
+	if s.missing() {
+		return nil
+	}
 	defer s.lock()()
 	return s.clearActive(id)
 }
@@ -164,6 +167,14 @@ const hookLockWait = 250 * time.Millisecond
 func (s *Store) lock() (unlock func()) {
 	unlock, _ = s.acquire()
 	return unlock
+}
+
+// missing reports a store nothing has created yet. Its lock file cannot be opened, so a
+// writer that went on would do so unlocked, racing the Touch that creates the store; with
+// no store there is nothing to change. Only uninstall's Remove deletes a store, unlocked.
+func (s *Store) missing() bool {
+	_, err := os.Stat(s.dir)
+	return errors.Is(err, fs.ErrNotExist)
 }
 
 // acquire is lock, reporting whether the lock is held.
@@ -347,6 +358,9 @@ func (s *Store) manifests() ([]Manifest, map[string][]string, error) {
 // Consume removes files a commit carried from a session's manifest; an emptied manifest
 // is kept as evidence the session reports edits, so the fallback never claims for it.
 func (s *Store) Consume(sessionID string, files []string) error {
+	if s.missing() {
+		return nil
+	}
 	defer s.lock()()
 	m, deltas, err := s.load(sessionID)
 	if err != nil || m == nil {
@@ -368,7 +382,7 @@ func (s *Store) Merge(fromID string, into Session, at time.Time) ([]string, erro
 	if !ValidID(into.ID) {
 		return nil, fmt.Errorf("invalid session id %q", into.ID)
 	}
-	if !ValidID(fromID) || fromID == into.ID {
+	if !ValidID(fromID) || fromID == into.ID || s.missing() {
 		return nil, nil
 	}
 	defer s.lock()()
@@ -409,6 +423,9 @@ func (s *Store) Merge(fromID string, into Session, at time.Time) ([]string, erro
 
 // Prune drops manifests not updated since before, and a stale active session.
 func (s *Store) Prune(before time.Time) (int, error) {
+	if s.missing() {
+		return 0, nil
+	}
 	// Locked, so a manifest a Touch just revived is not removed as stale.
 	defer s.lock()()
 	manifests, deltas, err := s.manifests()
