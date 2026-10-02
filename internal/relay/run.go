@@ -2,7 +2,6 @@ package relay
 
 import (
 	"context"
-	"strings"
 	"time"
 )
 
@@ -20,21 +19,11 @@ func (r *Relay) Run(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			// Claims that landed since the last sweep still count.
+			// Claims that landed since the last sweep still count; the rest waits on disk for the next relay.
 			r.sweep()
 			r.deliverMu.Lock()
 			r.mu.Lock()
-			for key, parts := range r.held {
-				for _, h := range parts {
-					reason := "unclaimed_at_exit"
-					if strings.HasPrefix(key, tracePrefix) {
-						reason = "no_session_trace_at_exit"
-					}
-					r.stats.dropped(h.p.signal, reason, h.p.records)
-				}
-				delete(r.held, key)
-			}
-			r.heldN, r.heldBytes = 0, 0
+			r.saveHeldLocked()
 			r.mu.Unlock()
 			r.deliverMu.Unlock()
 			close(r.stopping)

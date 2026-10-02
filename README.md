@@ -124,7 +124,8 @@ user-level settings — which is also what Claude Desktop, Codex Desktop and IDE
 read, so they are covered too. The relay forwards a session only when a hook in a
 repository you ran `terma install` in claimed it, and sends it to that repository's
 team with that team's key. Everything else — personal work, other repositories —
-waits briefly in memory and is dropped: it never leaves your machine. Prompts and model
+waits briefly in memory and is dropped: it never leaves your machine. A relay restart
+keeps what is waiting on your disk until the next relay takes it back. Prompts and model
 responses are sent by default; `terma install --prompts off` stops them for a team,
 and the relay removes them before anything leaves.
 

@@ -75,7 +75,7 @@ func TestRelayOutboxSurvivesARestart(t *testing.T) {
 
 	up.Store(true)
 	second := newRelay(Options{Dir: dir, Token: token, Lookup: f.lookup, Resolve: resolve})
-	go second.Run(t.Context())
+	runRelay(t, second)
 	waitFor(t, func() bool { return second.Stats().Snapshot().Counters["forwarded.logs"] == 6 })
 	if c := second.Stats().Snapshot().Counters; c["recovered_from_outbox"] != 6 {
 		t.Fatalf("second relay: %v", c)
@@ -86,7 +86,7 @@ func TestRelayOutboxSurvivesARestart(t *testing.T) {
 	waitFor(t, func() bool { return countFiles(t, dir) == 0 })
 }
 
-// Only claimed, keyed parts reach the disk; everything else is held and dropped in memory.
+// While a relay runs only claimed, keyed parts reach the disk; everything else is held in memory.
 func TestRelayWritesNothingUnclaimed(t *testing.T) {
 	u := newUpstream(t)
 	u.status = http.StatusServiceUnavailable // so claimed parts stay on disk to be seen
@@ -125,7 +125,7 @@ func TestRelayKeylessOutboxDoesNotKeepTheRelayBusy(t *testing.T) {
 	}
 	f := newFixture()
 	r := newRelay(Options{Dir: dir, Token: token, Lookup: f.lookup, Now: f.clock})
-	go r.Run(t.Context())
+	runRelay(t, r)
 	waitFor(t, func() bool { _, idle := r.Idle(); return idle })
 	if n := countFiles(t, dir); n != 1 {
 		t.Fatalf("a keyless part was removed: %d files", n)
@@ -253,7 +253,7 @@ func TestRelayQueuedPartsFollowTheCurrentContentPolicy(t *testing.T) {
 
 	up.Store(true)
 	second := newRelay(Options{Dir: dir, Token: token, Lookup: f.lookup, Resolve: policy(false)})
-	go second.Run(t.Context())
+	runRelay(t, second)
 	waitFor(t, func() bool { return second.Stats().Snapshot().Counters["forwarded.logs"] == 1 })
 	mu.Lock()
 	defer mu.Unlock()

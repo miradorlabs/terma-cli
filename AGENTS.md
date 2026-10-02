@@ -58,7 +58,9 @@ agent's user-level exporter points at a relay that terma runs on `127.0.0.1`. Ho
 installed repository claim each session they see. The relay forwards only claimed
 sessions, and only from the processes the claim names. It sends them to that repository's
 project with the project's key and applies the project's content policy. Everything else
-is held briefly in memory and dropped: nothing unclaimed leaves the machine.
+is held briefly in memory and dropped: nothing unclaimed leaves the machine. A relay that
+stops leaves what it still holds on disk, and the next one takes it back for the rest of
+its hold, judged by the collection mode it arrived under.
 
 ## Rules
 

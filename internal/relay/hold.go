@@ -31,24 +31,30 @@ type traceSession struct {
 }
 
 func (r *Relay) hold(p *part) {
-	size := proto.Size(p.msg)
+	r.holdSince(p.session, heldPart{p, r.opts.Now(), proto.Size(p.msg)})
+}
+
+// holdSince adds h under key within the hold's bounds, reporting whether it is held.
+func (r *Relay) holdSince(key string, h heldPart) bool {
+	p, size := h.p, h.size
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if p.records > maxHeld || size > maxHeldBytes {
 		r.stats.dropped(p.signal, "unclaimed_overflow", p.records)
-		return
+		return false
 	}
 	// Evict the oldest rather than refuse the newcomer, the likeliest to be claimed soon.
 	for r.heldN+p.records > maxHeld || r.heldBytes+size > maxHeldBytes {
 		if !r.evictOldestLocked() {
 			r.stats.dropped(p.signal, "unclaimed_overflow", p.records)
-			return
+			return false
 		}
 	}
-	r.held[p.session] = append(r.held[p.session], heldPart{p, r.opts.Now(), size})
+	r.held[key] = append(r.held[key], h)
 	r.heldN += p.records
 	r.heldBytes += size
 	r.stats.add("held_parts", 1)
+	return true
 }
 
 // evictOldestLocked drops the oldest held part, of an unnamed key first since those are
