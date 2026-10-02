@@ -1,11 +1,17 @@
 package delivery
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -145,4 +151,68 @@ func writeFile(path, data string) error {
 		return err
 	}
 	return os.WriteFile(path, []byte(data), 0o600)
+}
+
+// An event spooled while the team's policy collected content leaves under the policy in
+// force when it is sent: once tightened, without its content, the rest of it still sent.
+func TestContentSpooledUnderAnOlderPolicyLeavesWithoutIt(t *testing.T) {
+	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	var bodies [][]byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		bodies = append(bodies, b)
+	}))
+	defer srv.Close()
+	if err := keystore.Set("p1", testKey, keystore.Hosts{}); err != nil {
+		t.Fatal(err)
+	}
+	s, err := spool.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range []spool.Event{
+		{Name: hookrun.EventUserPrompt, SessionID: "s1", Attrs: map[string]any{hookrun.AttrProjectID: "p1", hookrun.AttrTurnID: "turn-1", "prompt": "private prompt"}},
+		{Name: hookrun.EventToolCall, SessionID: "s1", Attrs: map[string]any{hookrun.AttrProjectID: "p1", hookrun.AttrToolCallID: "call-1", "arguments": "private arguments", "output": "private output"}},
+		{Name: hookrun.EventApprovalAsked, SessionID: "s1", Attrs: map[string]any{hookrun.AttrProjectID: "p1", hookrun.AttrReason: "private reason"}},
+	} {
+		if err := s.Append(e); err != nil {
+			t.Fatal(err)
+		}
+	}
+	tightened := config.Policy{Mode: config.ModeRepo, TeamID: "p1", FetchedAt: time.Now()}
+	r := Router{OTLPPinned: true, Policy: func(context.Context, *config.Config, string) (config.Policy, error) { return tightened, nil }}
+	res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL}, true, 0)
+	if res.Sent != 3 || res.Err != nil {
+		t.Fatalf("Flush = %+v", res)
+	}
+	sent := string(bytes.Join(bodies, nil))
+	if strings.Contains(sent, "private") {
+		t.Fatalf("content the policy withholds left:\n%q", sent)
+	}
+	for _, kept := range []string{"turn-1", "call-1", hookrun.EventApprovalAsked} {
+		if !strings.Contains(sent, kept) {
+			t.Errorf("%s did not leave with its content withheld", kept)
+		}
+	}
+}
+
+// Outgoing withholds by kind and by switch, and leaves the spooled event as it was.
+func TestOutgoingWithholdsOnlyWhatThePolicyDoes(t *testing.T) {
+	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	call := spool.Event{Name: hookrun.EventToolCall, Attrs: map[string]any{"arguments": "a", "output": "o", hookrun.AttrToolName: "exec"}}
+	prompt := spool.Event{Name: hookrun.EventUserPrompt, Attrs: map[string]any{"prompt": "p"}}
+	promptsOnly := config.Policy{Mode: config.ModeRepo, IncludePrompts: true}
+	if out, ok := (Router{}).Outgoing(promptsOnly, "p1", call); !ok || out.Attrs["arguments"] != nil || out.Attrs["output"] != nil || out.Attrs[hookrun.AttrToolName] != "exec" {
+		t.Fatalf("tool call = %+v, %v", out, ok)
+	}
+	if call.Attrs["arguments"] != "a" {
+		t.Fatal("Outgoing changed the spooled event")
+	}
+	if out, ok := (Router{}).Outgoing(promptsOnly, "p1", prompt); !ok || out.Attrs["prompt"] != "p" {
+		t.Fatalf("prompt = %+v, %v", out, ok)
+	}
+	// Not validated: nothing leaves at all.
+	if _, ok := (Router{}).Outgoing(config.NoPolicy("", ""), "p1", prompt); ok {
+		t.Fatal("an event left under no policy")
+	}
 }

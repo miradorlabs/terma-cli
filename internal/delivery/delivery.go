@@ -94,11 +94,12 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 				held = append(held, e)
 				continue
 			}
-			if !r.Allowed(pol, id, e) {
+			out, ok := r.Outgoing(pol, id, e)
+			if !ok {
 				res.Withheld++
 				continue
 			}
-			byProject[id] = append(byProject[id], e)
+			byProject[id] = append(byProject[id], out)
 		}
 		var undelivered []spool.Event
 		var errs []error
@@ -161,8 +162,10 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 	return res
 }
 
-// Allowed rechecks the policy ceiling on every delivery, since replies and titles bypass
-// the relay and may predate a tightened policy.
+// Allowed rechecks the policy ceiling on every delivery, since hook events bypass the
+// relay and may predate a tightened policy: an event naming an excluded path, a reply or
+// a thread's name the policy's prompts-off withholds, sends nothing. Outgoing removes the
+// rest of what the policy withholds.
 func (r Router) Allowed(org config.Policy, projectID string, e spool.Event) bool {
 	org = routing.EffectivePolicy(org, projectID)
 	if org.CollectsNothing || e.Global && !org.Global() {
@@ -172,7 +175,8 @@ func (r Router) Allowed(org config.Policy, projectID string, e spool.Event) bool
 		return false
 	}
 	if e.Name == hookrun.EventAssistantMessage || e.Name == hookrun.EventSessionTitle {
-		return org.IncludePrompts && len(org.ExcludePaths) == 0 && r.consented(e, projectID, org.Global())
+		prompts, _ := org.Content()
+		return prompts && r.consented(e, projectID, org.Global())
 	}
 	rec, recorded, err := routing.LoadRecord(projectID)
 	if err != nil {

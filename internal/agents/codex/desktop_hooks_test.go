@@ -39,7 +39,8 @@ func TestCodexDesktopHooksCaptureLocalToolsUnderTheTeamPolicy(t *testing.T) {
 				"tool_name": "functions.exec", "tool_use_id": "call_1",
 				"tool_input":    map[string]any{"command": "private command"},
 				"tool_response": map[string]any{"exit_code": 0, "output": "private output"}}, postToolUse)
-			all := hookruntest.Spooled(t, env.Spool)
+			// The hooks record everything; delivery sends what the team's policy collects.
+			all := delivered(env.Policy, hookruntest.Spooled(t, env.Spool))
 			prompts, calls, approvals := hookruntest.Named(all, hookrun.EventUserPrompt), hookruntest.Named(all, hookrun.EventToolCall), hookruntest.Named(all, hookrun.EventApprovalAsked)
 			if len(prompts) != 1 || len(calls) != 1 || len(approvals) != 1 {
 				t.Fatalf("prompt/call missing: %+v", all)
@@ -52,7 +53,7 @@ func TestCodexDesktopHooksCaptureLocalToolsUnderTheTeamPolicy(t *testing.T) {
 			}
 			_, hasReason := approvals[0].Attrs["reason"]
 			if hasReason != allow {
-				t.Fatalf("approval reason consent: %+v", approvals[0])
+				t.Fatalf("approval reason under the team's policy: %+v", approvals[0])
 			}
 			if prompts[0].Attrs["capture_surface"] != "desktop" || calls[0].Attrs["tool_call_id"] != "call_1" {
 				t.Fatalf("route/identity: %+v %+v", prompts[0], calls[0])
@@ -61,7 +62,7 @@ func TestCodexDesktopHooksCaptureLocalToolsUnderTheTeamPolicy(t *testing.T) {
 			_, hasArgs := calls[0].Attrs["arguments"]
 			_, hasOutput := calls[0].Attrs["output"]
 			if hasPrompt != allow || hasArgs != allow || hasOutput != allow {
-				t.Fatalf("consent failed: %+v %+v", prompts[0], calls[0])
+				t.Fatalf("content under the team's policy: %+v %+v", prompts[0], calls[0])
 			}
 		})
 	}

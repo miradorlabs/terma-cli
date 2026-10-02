@@ -130,7 +130,9 @@ What content leaves is your team's collection policy, set in Terma, and nothing 
 install has no content switch and never reads the policy. The relay and the hook queue's
 delivery fetch it with your login; until they have, nothing they would send leaves. Agents send prompts, model responses and tool input and
 output to the relay, and the relay removes what the policy does not collect before
-anything leaves. Paths the policy excludes withhold every record that names one, in a
+anything leaves. Hook events, which queue on this machine and never pass the relay, are
+held to the same policy when they are sent: a prompt or tool call queued before the
+policy tightened leaves without its content. Paths the policy excludes withhold every record that names one, in a
 path field or as a word of a shell command (`cat secrets/app.env`), with the command's
 output. Exclusion reads what an agent reports, so a file read indirectly, by a script or
 a program the command runs, is not caught.

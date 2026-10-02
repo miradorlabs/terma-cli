@@ -8,9 +8,11 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/delivery"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/routing"
+	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
 func TestPolicyBlocksCodexReplyCapture(t *testing.T) {
@@ -35,16 +37,30 @@ func TestPolicyBlocksCodexReplyCapture(t *testing.T) {
 						t.Fatal(err)
 					}
 				}
-				if replies := stopCodex(t, env, replyRollout(t)); len(replies) != 0 {
-					t.Fatalf("%d private replies spooled", len(replies))
+				if replies := delivered(env.Policy, stopCodex(t, env, replyRollout(t))); len(replies) != 0 {
+					t.Fatalf("%d private replies delivered", len(replies))
 				}
 			})
 		}
 	}
 }
 
-// The team's policy alone decides what Codex's hook events carry: they reach the spool,
-// not the relay, so nothing else would withhold it.
+// delivered is what the spool's delivery sends of events under org, the team's policy
+// when they leave, asking Codex's own consent as the command line does.
+func delivered(org config.Policy, events []spool.Event) []spool.Event {
+	r := delivery.Router{Consent: func(_ string, c hookrun.Consent) bool { return repliesConsented(c) }}
+	var out []spool.Event
+	for _, e := range events {
+		if sent, ok := r.Outgoing(org, "project-a", e); ok {
+			out = append(out, sent)
+		}
+	}
+	return out
+}
+
+// The team's policy alone decides what Codex's hook events carry when they leave. They
+// reach the spool, not the relay, so the hooks record them whole and delivery withholds
+// what the policy does not collect.
 func TestTeamPolicyWithholdsCodexHookContent(t *testing.T) {
 	for label, team := range map[string]config.Policy{
 		"prompts and tool content off": {Mode: config.ModeRepo},
@@ -75,19 +91,23 @@ func TestTeamPolicyWithholdsCodexHookContent(t *testing.T) {
 				"tool_input":    map[string]any{"command": "private command"},
 				"tool_response": map[string]any{"exit_code": 0, "output": "private output"}}, postToolUse)
 			run(map[string]any{}, stop)
-			all := hookruntest.Spooled(t, env.Spool)
-			prompts, calls := hookruntest.Named(all, hookrun.EventUserPrompt), hookruntest.Named(all, hookrun.EventToolCall)
-			if len(prompts) != 1 || len(calls) != 2 || len(hookruntest.Named(all, hookrun.EventApprovalAsked)) != 1 {
-				t.Fatalf("events missing: %+v", all)
+			spooled := hookruntest.Spooled(t, env.Spool)
+			if b, _ := json.Marshal(spooled); !strings.Contains(string(b), "private prompt") {
+				t.Fatalf("the hooks did not record the prompt whole: %s", b)
 			}
-			for _, ev := range all {
+			sent := delivered(env.Policy, spooled)
+			prompts, calls := hookruntest.Named(sent, hookrun.EventUserPrompt), hookruntest.Named(sent, hookrun.EventToolCall)
+			if len(prompts) != 1 || len(calls) != 2 || len(hookruntest.Named(sent, hookrun.EventApprovalAsked)) != 1 {
+				t.Fatalf("events not delivered: %+v", sent)
+			}
+			for _, ev := range sent {
 				for _, key := range []string{"prompt", "arguments", "output", "reason"} {
 					if _, ok := ev.Attrs[key]; ok && (ev.Name != hookrun.EventSessionEnd || key != "reason") {
-						t.Fatalf("%s carries %s against the team's policy: %+v", ev.Name, key, ev.Attrs)
+						t.Fatalf("%s left with %s against the team's policy: %+v", ev.Name, key, ev.Attrs)
 					}
 				}
 				if b, _ := json.Marshal(ev.Attrs); strings.Contains(string(b), "private") {
-					t.Fatalf("%s carries private content: %s", ev.Name, b)
+					t.Fatalf("%s left with private content: %s", ev.Name, b)
 				}
 			}
 		})

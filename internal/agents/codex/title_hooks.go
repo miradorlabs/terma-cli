@@ -26,8 +26,7 @@ type codexTitleState struct {
 // captureCodexTitle spools the thread's name when new or renamed; it restates the first
 // prompt, so it travels under repliesConsented.
 func captureCodexTitle(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in *codexHookInput) {
-	pol := e.ProjectPolicy(r)
-	if prompts, _ := pol.Content(); e.Spool == nil || !session.ValidID(in.SessionID) || !prompts || !repliesConsented(r.Consent(pol.Global())) {
+	if e.Spool == nil || !session.ValidID(in.SessionID) || !repliesConsented(r.Consent(e.Policy.Global())) {
 		return
 	}
 	dir, err := config.Dir()
@@ -68,7 +67,7 @@ func captureCodexTitle(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in *
 	if !title.UpdatedAt.IsZero() && !title.UpdatedAt.After(at) {
 		at = title.UpdatedAt
 	}
-	if err := e.Spool.Append(spool.Event{Time: at, Name: hookrun.EventSessionTitle, SessionID: in.SessionID, Repo: r.Name, Workspace: r.Root, Global: pol.Global(), Attrs: attrs}); err != nil {
+	if err := e.Spool.Append(spool.Event{Time: at, Name: hookrun.EventSessionTitle, SessionID: in.SessionID, Repo: r.Name, Workspace: r.Root, Global: e.Policy.Global(), Attrs: attrs}); err != nil {
 		e.Logf("codex title: %v", err)
 		return
 	}

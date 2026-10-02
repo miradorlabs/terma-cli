@@ -166,8 +166,8 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 	return nil
 }
 
-// userPromptSubmit records a desktop turn; the prompt travels only where both the team's
-// policy and the repository's routing allow prompt content.
+// userPromptSubmit records a desktop turn, prompt and all: delivery withholds what the
+// team's policy does not collect.
 func userPromptSubmit(ctx context.Context, env hookrun.Env) error {
 	in, err := readCodexHookInput(env.Stdin)
 	if err != nil || !session.ValidID(in.SessionID) {
@@ -186,9 +186,7 @@ func userPromptSubmit(ctx context.Context, env hookrun.Env) error {
 	attrs["prompt_bytes"] = len(in.Prompt)
 	hookrun.BoundedAttr(attrs, hookrun.AttrTurnID, in.TurnID)
 	hookrun.BoundedAttr(attrs, hookrun.AttrModel, in.Model)
-	if prompts, _ := env.Content(r); prompts {
-		attrs["prompt"] = boundedCodexContent(in.Prompt)
-	}
+	attrs["prompt"] = boundedCodexContent(in.Prompt)
 	env.EmitFor(r, spool.Event{Name: hookrun.EventUserPrompt, SessionID: in.SessionID, Repo: r.Name, Attrs: attrs})
 	return nil
 }
@@ -262,10 +260,8 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 			attrs["duration_ms"] = elapsed
 			attrs["duration_source"] = "hook_elapsed"
 		}
-		if _, toolContent := env.Content(r); toolContent {
-			attrs["arguments"] = boundedCodexContent(string(in.ToolInput))
-			attrs["output"] = boundedCodexContent(string(in.ToolResponse))
-		}
+		attrs["arguments"] = boundedCodexContent(string(in.ToolInput))
+		attrs["output"] = boundedCodexContent(string(in.ToolResponse))
 		if success, known := codexToolSuccess(in.ToolResponse); known {
 			if success {
 				attrs[hookrun.AttrStatus] = "completed"

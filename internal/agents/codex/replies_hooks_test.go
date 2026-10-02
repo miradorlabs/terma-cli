@@ -176,12 +176,13 @@ func TestCodexRepliesNeedTheConsentPromptsTravelUnder(t *testing.T) {
 			env := fundingEnv(t)
 			env.Policy.IncludePrompts = !c.withheld
 			c.setup(t)
-			if got := len(stopCodex(t, env, replyRollout(t))); got != c.want {
-				t.Fatalf("spooled %d replies, want %d", got, c.want)
+			// The hook knows no policy; delivery withholds replies the team's prompts-off does.
+			if got := len(delivered(env.Policy, stopCodex(t, env, replyRollout(t)))); got != c.want {
+				t.Fatalf("delivered %d replies, want %d", got, c.want)
 			}
-			// Without consent the rollout is not opened for replies: no cursor.
+			// Where nothing routes Codex the rollout is not opened for replies: no cursor.
 			dir, _ := os.ReadDir(filepath.Join(os.Getenv("TERMA_CONFIG_DIR"), "reply-cursors"))
-			if c.want == 0 && len(dir) != 0 {
+			if c.want == 0 && !c.withheld && len(dir) != 0 {
 				t.Fatalf("a reply cursor was written without consent: %v", dir)
 			}
 		})

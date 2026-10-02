@@ -18,10 +18,10 @@ import (
 const codexReplyMaxText = 16 << 10
 
 // captureCodexReplies spools the messages recorded since the last capture, under a
-// per-session cursor, and only where prompts are consented.
+// per-session cursor, where this repository routes Codex; delivery sends them only while
+// the team's policy collects prompts.
 func captureCodexReplies(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in *codexHookInput) {
-	pol := e.ProjectPolicy(r)
-	if prompts, _ := pol.Content(); e.Spool == nil || !session.ValidID(in.SessionID) || !prompts || !repliesConsented(r.Consent(pol.Global())) {
+	if e.Spool == nil || !session.ValidID(in.SessionID) || !repliesConsented(r.Consent(e.Policy.Global())) {
 		return
 	}
 	dir, err := config.Dir()
@@ -69,7 +69,7 @@ func captureCodexReplies(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in
 		if !reply.At.IsZero() && !reply.At.After(at) {
 			at = reply.At
 		}
-		return e.Spool.Append(spool.Event{Time: at, Name: hookrun.EventAssistantMessage, SessionID: in.SessionID, Repo: r.Name, Workspace: r.Root, Global: pol.Global(), Attrs: attrs})
+		return e.Spool.Append(spool.Event{Time: at, Name: hookrun.EventAssistantMessage, SessionID: in.SessionID, Repo: r.Name, Workspace: r.Root, Global: e.Policy.Global(), Attrs: attrs})
 	})
 	if err != nil {
 		e.Logf("codex replies (%s): %v", status, err)

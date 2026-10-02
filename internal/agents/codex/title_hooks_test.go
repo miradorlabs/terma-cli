@@ -130,8 +130,9 @@ func TestCodexTitleNeedsTheConsentPromptsTravelUnder(t *testing.T) {
 			env.Policy.IncludePrompts = !c.withheld
 			c.setup(t)
 			titleIndex(t, titleLine(replySession, "Rate this project", "2026-09-27T12:53:23Z"))
-			if got := stopCodexTitles(t, env); len(got) != c.want {
-				t.Fatalf("spooled %d titles, want %d", len(got), c.want)
+			// The hook knows no policy; delivery withholds a title the team's prompts-off does.
+			if got := delivered(env.Policy, stopCodexTitles(t, env)); len(got) != c.want {
+				t.Fatalf("delivered %d titles, want %d", len(got), c.want)
 			}
 		})
 	}
