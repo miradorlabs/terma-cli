@@ -45,7 +45,7 @@ func CheckIn(ctx context.Context) (ok bool, what string) {
 		}
 	}
 	if err != nil {
-		return false, "the relay did not answer on " + addr + "; `terma relay status` says why"
+		return false, "the relay did not answer on " + addr + "; `terma doctor` says why"
 	}
 	defer resp.Body.Close()
 	var body struct {

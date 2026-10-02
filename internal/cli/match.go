@@ -10,9 +10,7 @@ import (
 
 // matchKind says how to resolve one kind of named thing and how to word a failed match.
 type matchKind[T any] struct {
-	noun string
-	// list is the quoted command that prints the candidates, for the "no match" error.
-	list  string
+	noun  string
 	title string
 	id    func(T) string
 	name  func(T) string
@@ -20,7 +18,6 @@ type matchKind[T any] struct {
 
 var projectKind = matchKind[project]{
 	noun:  "team",
-	list:  "`terma team list`",
 	title: "Select a team:",
 	id:    func(p project) string { return p.ID },
 	name:  func(p project) string { return p.Name },
@@ -28,7 +25,6 @@ var projectKind = matchKind[project]{
 
 var organizationKind = matchKind[organization]{
 	noun:  "organization",
-	list:  "`terma org list`",
 	title: "Select an organization:",
 	id:    func(o organization) string { return o.ID },
 	name:  func(o organization) string { return o.Name },
@@ -51,6 +47,9 @@ func (k matchKind[T]) labels(items []T) map[string]string {
 	}
 	return labels
 }
+
+// maxListedChoices bounds the candidates a "no match" error names.
+const maxListedChoices = 10
 
 // index resolves query by id, then exact name, then unique case-insensitive prefix; an
 // ambiguous prefix is an error rather than a guess.
@@ -78,7 +77,19 @@ func (k matchKind[T]) index(items []T, query string) (int, error) {
 	case 1:
 		return matches[0], nil
 	case 0:
-		return -1, fmt.Errorf("no %s matches %q — run %s", k.noun, query, k.list)
+		// The candidates themselves, so no listing command is needed to find the right one.
+		labels := k.labels(items)
+		names := make([]string, 0, len(items))
+		for _, item := range items {
+			names = append(names, labels[k.id(item)])
+		}
+		if len(names) > maxListedChoices {
+			names = append(names[:maxListedChoices], fmt.Sprintf("and %d more", len(items)-maxListedChoices))
+		}
+		if len(names) == 0 {
+			return -1, fmt.Errorf("no %s matches %q, and you have none", k.noun, query)
+		}
+		return -1, fmt.Errorf("no %s matches %q — yours: %s", k.noun, query, strings.Join(names, ", "))
 	default:
 		names := make([]string, len(matches))
 		for i, m := range matches {

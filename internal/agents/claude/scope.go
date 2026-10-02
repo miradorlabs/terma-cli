@@ -220,7 +220,7 @@ func captureConflictsInProjectFiles(e harness.Exporter, l claudeLayer) []harness
 			reason := "set off in " + path + ", which Claude Code applies over " + l.over
 			if owned[key] {
 				reason = "turned off by this repository's Terma policy in " + path +
-					" (change it with `terma connect claude --scope local`)"
+					" (change it by running `terma install` here with --prompts or --exclude-tool-content)"
 			}
 			out = append(out, harness.Conflict{
 				Key:       key,

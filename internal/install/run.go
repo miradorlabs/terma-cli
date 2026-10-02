@@ -143,7 +143,7 @@ func Run(ctx context.Context, reg *agents.Registry, cfg *config.Config, req Requ
 		}
 		if err != nil {
 			r.Warn("Refreshed", "some files an earlier terma installed could not be updated ("+err.Error()+")")
-			r.Then("Run `terma update --refresh` to retry.")
+			r.Then("Run `terma update` to retry.")
 		} else {
 			if len(changed) > 0 {
 				r.OK("Refreshed", fmt.Sprintf("%d file(s) an earlier terma installed", len(changed)))

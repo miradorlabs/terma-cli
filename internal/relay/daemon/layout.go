@@ -61,7 +61,7 @@ func Token() (string, error) {
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return "", errors.New("the relay is not set up on this machine — run `terma relay setup`")
+		return "", errors.New("the relay is not set up on this machine — run `terma setup`")
 	}
 	return strings.TrimSpace(string(data)), nil
 }

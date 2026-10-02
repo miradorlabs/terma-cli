@@ -40,7 +40,7 @@ type ErrWrongEnvironment struct {
 
 func (e *ErrWrongEnvironment) Error() string {
 	return fmt.Sprintf(
-		"this profile is logged in against %s but is now pointed at %s — run `terma login` for this environment, or switch profiles with `terma config use <profile>`",
+		"this profile is logged in against %s but is now pointed at %s — run `terma setup` to sign in for this environment",
 		e.IssuedBy, e.ConfiguredAs)
 }
 

@@ -357,7 +357,7 @@ func BackendCheck(ctx context.Context, p Probes, projectID, scratchSHA string, b
 			return Check{Status: Fail, Detail: "this team's events were not delivered: " + describeFailure(f), Fix: failureFix(f)}
 		}
 		if len(res.Failures) == 0 {
-			return Check{Status: Fail, Detail: "flush failed: " + res.Err.Error(), Fix: "check the network, then run `terma spool flush --force`"}
+			return Check{Status: Fail, Detail: "flush failed: " + res.Err.Error(), Fix: "check the network, then run `terma doctor` again (it retries delivery)"}
 		}
 		for _, f := range res.Failures {
 			others = append(others, "another team's events were not delivered: "+f.ProjectID+" "+describeFailure(f))
@@ -401,7 +401,7 @@ func failureFix(f Failure) string {
 	if f.KeyRefused {
 		return "the key this machine holds for team " + f.ProjectID + " was refused by " + f.Endpoint + " — it may have been revoked, or belong to another environment"
 	}
-	return "check the network and " + f.Endpoint + ", then run `terma spool flush --force`"
+	return "check the network and " + f.Endpoint + ", then run `terma doctor` again (it retries delivery)"
 }
 
 // roundTripWait bounds the wait for the scratch commit to be readable back.

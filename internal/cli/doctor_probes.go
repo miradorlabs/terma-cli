@@ -16,10 +16,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-func (app *App) runDoctor(ctx context.Context, skipCommit bool, progress doctor.Progress) doctor.Report {
-	return doctor.Run(ctx, app.doctorEnv(ctx, skipCommit), progress)
-}
-
 func (app *App) doctorEnv(ctx context.Context, skipCommit bool) doctor.Env {
 	exe, _ := os.Executable()
 	env := doctor.Env{Agents: app.agents, Exe: exe, BinDirs: app.binDirs(), SkipCommit: skipCommit}

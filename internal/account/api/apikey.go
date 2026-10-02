@@ -31,7 +31,7 @@ type createServerKeyResponse struct {
 func (c *Client) CreateServerKey(ctx context.Context, projectID, name, description string) (key string, meta ServerKey, err error) {
 	if c.apiKey != "" {
 		return "", ServerKey{}, errors.New(
-			"minting a server key needs a user credential, and TERMA_API_KEY is set — unset it and run `terma login`")
+			"minting a server key needs a user credential, and TERMA_API_KEY is set — unset it and run `terma setup`")
 	}
 	if projectID == "" {
 		return "", ServerKey{}, errors.New("a server key must name the team it is bound to")

@@ -352,7 +352,7 @@ func TestGlobalConflictsNameTermaOwnedLocalLayer(t *testing.T) {
 	if c == nil || !c.Advisory {
 		t.Fatalf("expected an advisory for the repository policy, got %+v", conflicts)
 	}
-	if !strings.Contains(c.Reason, "Terma policy") || !strings.Contains(c.Reason, "--scope local") {
+	if !strings.Contains(c.Reason, "Terma policy") || !strings.Contains(c.Reason, "`terma install` here") {
 		t.Errorf("reason = %q, want it to name the policy and the command", c.Reason)
 	}
 	if blocking := unclearableKeys(conflicts); len(blocking) != 0 {

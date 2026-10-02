@@ -97,11 +97,11 @@ func stateCheck() (Check, bool) {
 	s, err := migrate.Load(dir)
 	switch {
 	case err != nil:
-		return Check{Status: Warn, Detail: "the migration record cannot be read: " + err.Error(), Fix: "terma update --refresh"}, true
+		return Check{Status: Warn, Detail: "the migration record cannot be read: " + err.Error(), Fix: "terma update"}, true
 	case s.Failed != nil:
-		return Check{Status: Fail, Detail: fmt.Sprintf("%s failed: %s", s.Failed.Name, s.Failed.Error), Fix: "terma update --refresh"}, true
+		return Check{Status: Fail, Detail: fmt.Sprintf("%s failed: %s", s.Failed.Name, s.Failed.Error), Fix: "terma update"}, true
 	}
-	return Check{Status: Warn, Detail: fmt.Sprintf("%d migration(s) from this update not applied yet", migrate.Remaining(s)), Fix: "terma update --refresh"}, true
+	return Check{Status: Warn, Detail: fmt.Sprintf("%d migration(s) from this update not applied yet", migrate.Remaining(s)), Fix: "terma update"}, true
 }
 
 // HooksCheck is doctor's wording for the commit-hook verdict.
@@ -110,7 +110,7 @@ func HooksCheck(w HookWiring) Check {
 	case w.Err != nil:
 		return Check{Status: Fail, Detail: w.Err.Error(), Fix: "terma install"}
 	case w.Changes > 0 && w.Stale == w.Changes:
-		return Check{Status: Fail, Detail: fmt.Sprintf("%s wiring was written by an earlier terma (%d file(s) out of date)", w.Manager, w.Stale), Fix: "terma update --refresh"}
+		return Check{Status: Fail, Detail: fmt.Sprintf("%s wiring was written by an earlier terma (%d file(s) out of date)", w.Manager, w.Stale), Fix: "terma update"}
 	case w.Changes > 0:
 		return Check{Status: Fail, Detail: fmt.Sprintf("%s wiring is missing (%d file change(s))", w.Manager, w.Changes), Fix: "terma install"}
 	case w.Unpointed:
@@ -220,7 +220,7 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 	dir, addr, running := relay.Dir, relay.Addr, relay.Running
 	if !running && relay.Squatted {
 		return Check{Status: Fail, Detail: "another process is listening on " + addr + " and receives the agents' telemetry",
-			Fix: "stop it, or move the relay with `terma relay setup --addr`"}
+			Fix: "stop it, or move the relay with `terma setup --relay-addr <host:port>`"}
 	}
 	// A relay started without this profile's environment holds no key for its teams, and
 	// drops everything it receives.
@@ -242,7 +242,7 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 		}
 	}
 	if len(wrong) > 0 {
-		return Check{Status: Fail, Detail: strings.Join(wrong, " and ") + " not exporting to the local relay", Fix: "terma relay setup"}
+		return Check{Status: Fail, Detail: strings.Join(wrong, " and ") + " not exporting to the local relay", Fix: "terma setup"}
 	}
 	if relay.ServiceInstalled && !relay.ServiceCurrent {
 		return Check{Status: Warn,

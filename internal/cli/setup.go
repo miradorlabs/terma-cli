@@ -15,6 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/globalmode"
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/setup"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
@@ -24,10 +25,14 @@ import (
 
 type setupFlags struct {
 	harnesses string
+	// org is --org: the organization to sign into, by name or id; "" keeps the current one.
+	org       string
 	noBrowser bool
 	assumeYes bool
 	// relayService is --relay-service: "on", "off", or "" to keep the recorded choice.
 	relayService string
+	// relayAddr is --relay-addr: a loopback address to move the relay to, "" to keep it.
+	relayAddr string
 	// managedConfig is --managed-config's directory for global mode's managed hooks, which
 	// call terma at managedTerma.
 	managedConfig string
@@ -65,14 +70,19 @@ func (app *App) newSetupCommand() *cobra.Command {
      allowed by the selected team's collection policy leave this machine.
 
 A repository your organization connected in Terma needs nothing more: its committed
-hooks claim its sessions. ` + "`terma install`" + ` connects a repository from here instead.`,
+hooks claim its sessions. ` + "`terma install`" + ` connects a repository from here instead.
+
+Run it again any time: it reuses a working sign-in, --org switches organization, and
+--relay-addr moves the relay off a port another program holds.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error { return app.runSetup(cmd, f) },
 	}
 	cmd.Flags().StringVar(&f.harnesses, "harness", "", "comma-separated agents to record ("+strings.Join(app.availableAgentNames(), ", ")+"); default: a picker")
+	cmd.Flags().StringVar(&f.org, "org", "", "organization to sign into, by name or id (default: the current one)")
 	cmd.Flags().BoolVar(&f.noBrowser, "no-browser", false, "print the sign-in URL instead of opening a browser")
 	cmd.Flags().BoolVarP(&f.assumeYes, "yes", "y", false, "skip the browser prompt and picker; record every available installed agent")
 	cmd.Flags().StringVar(&f.relayService, "relay-service", "", "run the local relay as a background service: on or off (default: on, or your last choice)")
+	cmd.Flags().StringVar(&f.relayAddr, "relay-addr", "", "move the local relay to this loopback address (default "+claim.DefaultAddr+", or the one recorded)")
 	cmd.Flags().BoolVarP(&f.verbose, "verbose", "v", false, "show each step and what it wrote")
 	cmd.Flags().StringVar(&f.managedConfig, "managed-config", "", "write global mode's hooks as managed configuration into this directory, for your organization to deploy, and exit")
 	cmd.Flags().StringVar(&f.managedTerma, "managed-terma", "$HOME/.local/bin/terma", "with --managed-config: where terma is installed on the machines")
@@ -107,6 +117,11 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 	default:
 		return fmt.Errorf("--relay-service %q: want on or off", f.relayService)
 	}
+	if f.relayAddr != "" {
+		if err := checkRelayAddr(f.relayAddr); err != nil {
+			return err
+		}
+	}
 
 	ui := newInstallUI(out, f.verbose)
 	ui.title, ui.warnTitle = "Setup complete", "Almost done — finish the steps marked ! below"
@@ -114,7 +129,7 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 	team := ""
 	res, err := setup.Run(cmd.Context(), app.agents, cfg, setup.Steps{
 		SignIn: func(_ context.Context, cfg *config.Config) (*config.Config, error) {
-			cfg, err := app.signInAndReload(cmd, cfg, signInOptions{noBrowser: f.noBrowser, pauseBeforeBrowser: !f.assumeYes})
+			cfg, err := app.signInAndReload(cmd, cfg, signInOptions{org: parseOrgRef(f.org), noBrowser: f.noBrowser, pauseBeforeBrowser: !f.assumeYes})
 			if err == nil {
 				fmt.Fprintln(out)
 				ui.Summary("Signed in", signedInAs(cfg))
@@ -152,6 +167,11 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 			ui.Summary("Collects", doctor.PolicySummary(pol))
 		},
 		ConnectRelay: func(ctx context.Context, names []string) error {
+			if f.relayAddr != "" {
+				if err := moveRelay(f.relayAddr); err != nil {
+					return err
+				}
+			}
 			return app.connectMachineRelay(ctx, names, f.relayService, relayReport{
 				ok: func(label, what string) {
 					if label == "Relay" {
@@ -207,7 +227,7 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 	if res.Policy.Global() {
 		ui.title = "Setup complete — every session and commit on this machine reports to " + cmp.Or(team, "your organization")
 	}
-	ui.Then("Run `terma status` any time to see what terma is collecting.")
+	ui.Then("Run `terma doctor` any time to see what terma is collecting and check it end to end.")
 	ui.finish()
 	return nil
 }

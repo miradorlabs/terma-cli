@@ -63,7 +63,7 @@ func (app *App) runRefresh(ctx context.Context, out io.Writer) error {
 		}
 	}
 	if res.Repo == nil {
-		fmt.Fprintln(out, "\nRun `terma update --refresh` inside each repository terma is installed in to update its committed hooks too.")
+		fmt.Fprintln(out, "\nRun `terma update` inside each repository terma is installed in to update its committed hooks too.")
 	}
 	return err
 }
@@ -80,9 +80,9 @@ func (app *App) refreshAfterUpgrade(ctx context.Context, dir string, out io.Writ
 		fmt.Fprintf(out, "terma %s refreshed %d file(s) an earlier version installed.\n", app.version, len(up.Changed))
 	}
 	if err != nil {
-		fmt.Fprintf(out, "terma %s could not refresh what an earlier version installed (%v). Run `terma update --refresh` to retry.\n", app.version, err)
+		fmt.Fprintf(out, "terma %s could not refresh what an earlier version installed (%v). Run `terma update` to retry.\n", app.version, err)
 	}
 	if up.RepoStale {
-		fmt.Fprintln(out, "This repository's hooks were written by an earlier terma. Run `terma update --refresh` here to update them.")
+		fmt.Fprintln(out, "This repository's hooks were written by an earlier terma. Run `terma update` here to update them.")
 	}
 }
