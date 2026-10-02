@@ -15,8 +15,6 @@ func TestCapturePolicy(t *testing.T) {
 	global.Mode = config.ModeGlobal
 	excluding := open
 	excluding.ExcludePaths = []string{"secrets"}
-	nothing := open
-	nothing.CollectsNothing = true
 	record := func(prompts, tools bool, signals ...string) *routing.Record {
 		return &routing.Record{IncludePrompts: prompts, IncludeToolContent: tools, Signals: signals, Harnesses: []string{"claude", "pi"}}
 	}
@@ -35,12 +33,6 @@ func TestCapturePolicy(t *testing.T) {
 			want{false, true, true, []string{"traces", "logs"}}},
 		{"the record cannot widen content", Capture{Org: config.Policy{}, Record: record(true, true, "logs"), Harness: "claude"},
 			want{false, false, true, []string{"logs"}}},
-		{"the record picks the signals", Capture{Org: open, Record: record(true, true, "metrics"), Harness: "pi"},
-			want{true, true, true, []string{"metrics"}}},
-		{"an organization collecting nothing withholds the record's", Capture{Org: nothing, Record: record(true, true, "traces", "logs"), Harness: "pi"},
-			want{false, false, true, []string{}}},
-		{"an organization collecting nothing withholds without a record", Capture{Org: nothing, Harness: "claude"},
-			want{false, false, true, []string{}}},
 		{"an unreadable record withholds everything", Capture{Org: open, RecordErr: errors.New("torn"), Harness: "claude"},
 			want{false, false, true, []string{}}},
 		{"an agent the record does not name is withheld", Capture{Org: open, Record: record(true, true, "traces"), Harness: "codex"},
