@@ -162,20 +162,22 @@ func TestCompletionIsHiddenNotRemoved(t *testing.T) {
 	}
 }
 
-// hiddenCommandSources implement or drive a hidden command; their own help may name it.
-// Every other shipped line a person reads names only a primary command.
+// hiddenCommandSources implement a hidden command whose own help names it. Every other
+// shipped line a person reads names only a primary command.
 var hiddenCommandSources = []string{
 	"internal/cli/config.go", "internal/cli/connect.go", "internal/cli/connect_scope.go",
-	"internal/cli/connect_status.go", "internal/cli/disconnect.go", "internal/cli/hook.go",
-	"internal/cli/nate.go", "internal/cli/relay_daemon.go", "internal/cli/relay_run.go",
-	"internal/cli/relay_setup.go", "internal/cli/relay_supervise.go", "internal/cli/spool.go",
-	"internal/cli/status.go", "internal/connect/", "internal/relay/service/windows.go",
+	"internal/connect/render.go", "internal/relay/service/windows.go",
 }
 
 // The fix-it hints, errors and help a developer reads name one of the six commands, so
 // nobody is sent to a command they were never meant to learn.
 func TestMessagesNameOnlyPrimaryCommands(t *testing.T) {
 	root := filepath.Join("..", "..")
+	for _, src := range hiddenCommandSources {
+		if _, err := os.Stat(filepath.Join(root, src)); err != nil {
+			t.Errorf("hiddenCommandSources names %s: %v", src, err)
+		}
+	}
 	err := filepath.WalkDir(filepath.Join(root, "internal"), func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -185,10 +187,8 @@ func TestMessagesNameOnlyPrimaryCommands(t *testing.T) {
 		}
 		rel, _ := filepath.Rel(root, path)
 		rel = filepath.ToSlash(rel)
-		for _, src := range hiddenCommandSources {
-			if rel == src || strings.HasSuffix(src, "/") && strings.HasPrefix(rel, src) {
-				return nil
-			}
+		if slices.Contains(hiddenCommandSources, rel) {
+			return nil
 		}
 		data, err := os.ReadFile(path)
 		if err != nil {

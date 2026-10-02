@@ -172,19 +172,6 @@ func HostsFor(projectID string) (Hosts, bool) {
 	return h.resolved(), ok
 }
 
-// Projects lists the project ids with a stored key.
-func Projects() []string {
-	f, err := load()
-	if err != nil {
-		return nil
-	}
-	out := make([]string, 0, len(f.Keys))
-	for id := range f.Keys {
-		out = append(out, id)
-	}
-	return out
-}
-
 // CollectionProjects includes teams whose only saved key belongs to an agent.
 func CollectionProjects() []string {
 	f, err := load()

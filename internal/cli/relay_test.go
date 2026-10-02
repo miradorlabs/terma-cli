@@ -129,7 +129,7 @@ func TestRelayReportsASquatter(t *testing.T) {
 		t.Errorf("squatted relay: %+v", c)
 	}
 	facts.Squatted = false
-	if c := doctor.RelayCheck(testApp.agents, facts, storedKeys, "proj_x", "", nil); c.Status != doctor.Warn || !strings.Contains(c.Detail, "last failed to start") {
+	if c := doctor.RelayCheck(testApp.agents, facts, storedKeys, "proj_x", "", []string{"codex"}); c.Status != doctor.Warn || !strings.Contains(c.Detail, "last failed to start") {
 		t.Errorf("failed relay: %+v", c)
 	}
 }

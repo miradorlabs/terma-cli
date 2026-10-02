@@ -91,3 +91,20 @@ func TestTeardownStopsWhenAnAgentCannotBeRestored(t *testing.T) {
 		t.Fatalf("the relay's state went although restoration failed: %v", err)
 	}
 }
+
+// --sign-out with an API key has no session to revoke, so teardown refuses before it changes anything.
+func TestTeardownSignOutWithAnAPIKeyChangesNothing(t *testing.T) {
+	_, configDir, _ := nateTestEnvironment(t)
+	relayDir := filepath.Join(configDir, claim.DirName)
+	if err := os.MkdirAll(relayDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TERMA_API_KEY", "ter_srv_0123456789abcdef")
+	out, err := runTerma(t, "teardown", "--sign-out", "--yes")
+	if err == nil || !strings.Contains(err.Error(), "TERMA_API_KEY") {
+		t.Fatalf("teardown --sign-out with an API key = %v, output %q", err, out)
+	}
+	if _, err := os.Stat(relayDir); err != nil {
+		t.Fatalf("teardown changed state before refusing: %v", err)
+	}
+}

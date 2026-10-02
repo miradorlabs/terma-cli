@@ -222,9 +222,6 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 		return Check{Status: Fail, Detail: "another process is listening on " + addr + " and receives the agents' telemetry",
 			Fix: "stop it, or move the relay with `terma setup --relay-addr <host:port>`"}
 	}
-	if !running && relay.LastFailure != "" {
-		return Check{Status: Warn, Detail: "the local relay last failed to start: " + relay.LastFailure, Fix: "terma setup"}
-	}
 	// A relay started without this profile's environment holds no key for its teams, and
 	// drops everything it receives.
 	if running && relay.Environment != "" && env != "" && relay.Environment != env {
@@ -246,6 +243,9 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 	}
 	if len(wrong) > 0 {
 		return Check{Status: Fail, Detail: strings.Join(wrong, " and ") + " not exporting to the local relay", Fix: "terma setup"}
+	}
+	if !running && relay.LastFailure != "" {
+		return Check{Status: Warn, Detail: "the local relay last failed to start: " + relay.LastFailure, Fix: "terma setup"}
 	}
 	if relay.ServiceInstalled && !relay.ServiceCurrent {
 		return Check{Status: Warn,

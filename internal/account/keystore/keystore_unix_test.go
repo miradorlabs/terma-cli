@@ -23,7 +23,9 @@ func TestConcurrentSetsKeepEveryKey(t *testing.T) {
 		})
 	}
 	wg.Wait()
-	if got := len(Projects()); got != writers {
-		t.Fatalf("the keystore kept %d of %d keys", got, writers)
+	for i := range writers {
+		if Get(fmt.Sprintf("proj-%02d", i)) != key {
+			t.Errorf("the keystore lost proj-%02d's key", i)
+		}
 	}
 }

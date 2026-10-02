@@ -52,7 +52,7 @@ type policyResponse struct {
 				ExcludePaths       *[]string `json:"exclude_paths"`
 				Signals            *[]string `json:"signals"`
 			} `json:"capture"`
-			// Global's presence is the mode; its members_can_pause is unused since pause was removed.
+			// Global's presence alone selects the mode.
 			Global        *struct{} `json:"global"`
 			PerRepository *struct {
 				MembersCanAddRepositories bool `json:"members_can_add_repositories"`

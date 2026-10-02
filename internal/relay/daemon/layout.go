@@ -1,19 +1,14 @@
 package daemon
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
 	"net"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/flock"
-	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 )
 
@@ -83,32 +78,4 @@ func Squatted(addr string) bool {
 	}
 	_ = conn.Close()
 	return true
-}
-
-// Stats reads the running relay's counters, else the last run's, and says whether one runs.
-func Stats(dir string) (relay.Snapshot, bool, error) {
-	var snap relay.Snapshot
-	if !Running(dir) {
-		data, err := os.ReadFile(filepath.Join(dir, StatsFile))
-		if err != nil {
-			return snap, false, nil
-		}
-		return snap, false, json.Unmarshal(data, &snap)
-	}
-	token, err := Token()
-	if err != nil {
-		return snap, true, err
-	}
-	req, _ := http.NewRequest(http.MethodGet, "http://"+Addr(dir)+"/stats", nil)
-	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := (&http.Client{Timeout: 2 * time.Second}).Do(req)
-	if err != nil {
-		return snap, true, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return snap, true, fmt.Errorf("relay stats: HTTP %s", resp.Status)
-	}
-	body, _ := io.ReadAll(resp.Body)
-	return snap, true, json.Unmarshal(body, &snap)
 }

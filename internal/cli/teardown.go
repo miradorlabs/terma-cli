@@ -26,14 +26,25 @@ func (app *App) newTeardownCommand() *cobra.Command {
 
   1. Restores the settings terma changed in your coding agents (their telemetry
      exporters, status line and notifier) and removes machine-wide hooks.
-  2. Stops the local relay, removes its background service, and forgets its
-     address and token, so no hook starts it again.
+  2. Stops the local relay, removes its background service, and deletes its state
+     (its token, its address and any telemetry not yet delivered), so no hook
+     starts it again.
 
 Your sign-in is kept, so ` + "`terma setup`" + ` sets this machine up again in seconds;
 --sign-out also revokes it. Repositories keep their committed hooks and binding,
 which everyone who works in them shares: ` + "`terma uninstall`" + ` inside one removes them.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			// Refused before anything changes, so teardown never stops halfway.
+			if signOut {
+				cfg, err := app.loadConfig()
+				if err != nil {
+					return err
+				}
+				if cfg.APIKey != "" {
+					return errNoSessionWithAPIKey
+				}
+			}
 			if !assumeYes {
 				question := "Restore your agents' settings and stop terma's relay on this machine?"
 				if signOut {
@@ -115,10 +126,12 @@ func (app *App) undoSetup(ctx context.Context, out io.Writer) error {
 		if err := os.RemoveAll(dir); err != nil {
 			return fmt.Errorf("remove the relay's state: %w", err)
 		}
-		fmt.Fprintln(out, "Stopped the relay.")
+		fmt.Fprintln(out, "Stopped the relay and removed its state.")
 	}
 	return nil
 }
+
+var errNoSessionWithAPIKey = errors.New("TERMA_API_KEY is set — there is no session to sign out of; unset it to use the stored credential")
 
 // signOut revokes every session this profile holds server-side and deletes the local
 // credentials, one per organization signed into. A failed revoke still clears the local
@@ -130,7 +143,7 @@ func (app *App) signOut(cmd *cobra.Command) error {
 		return err
 	}
 	if cfg.APIKey != "" {
-		return errors.New("TERMA_API_KEY is set — there is no session to sign out of; unset it to use the stored credential")
+		return errNoSessionWithAPIKey
 	}
 	creds, err := auth.Credentials(cfg.ProfileName)
 	if err != nil {
