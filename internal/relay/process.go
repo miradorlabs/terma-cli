@@ -29,7 +29,7 @@ type procState struct {
 }
 
 // decideExited attributes a sessionless part to the one session its exited sender named, if claimed.
-func (r *Relay) decideExited(pid int) (claim.Claim, Policy, string, bool, attribution) {
+func (r *Relay) decideExited(pid int, narrow bool) (claim.Claim, Policy, string, bool, attribution) {
 	r.mu.Lock()
 	st := r.procs[pid]
 	var sessions []string
@@ -50,7 +50,7 @@ func (r *Relay) decideExited(pid int) (claim.Claim, Policy, string, bool, attrib
 	case overflow || len(sessions) != 1:
 		return claim.Claim{}, Policy{}, whyAmbiguous, false, attribution{}
 	}
-	c, pol, why, ok := r.decideClaimed(sessions[0], pid, time.Time{})
+	c, pol, why, ok := r.decideClaimed(sessions[0], pid, time.Time{}, narrow)
 	if !ok {
 		return claim.Claim{}, Policy{}, why, false, attribution{}
 	}

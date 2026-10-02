@@ -275,8 +275,10 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 		return
 	}
 	pid := r.senderPID(req)
+	_, global := r.catchAll()
+	narrow := r.opts.CatchAll != nil && !global
 	for _, p := range parts {
-		p.pid = pid
+		p.pid, p.narrow = pid, narrow
 		p.at = earliest(p.msg)
 		r.stats.received(s, p.records)
 		if p.session != "" && !strings.HasPrefix(p.session, tracePrefix) {
