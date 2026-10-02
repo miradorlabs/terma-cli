@@ -135,7 +135,8 @@ func TestADefinitionForAnotherPathToThisBinaryIsCurrent(t *testing.T) {
 	if err := os.WriteFile(target, []byte("terma"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	link := filepath.Join(dir, "it's & <linked>", "terma")
+	// Characters each renderer escapes (XML, Go quoting) that Windows still allows in a name.
+	link := filepath.Join(dir, "it's & linked", "terma")
 	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
 		t.Fatal(err)
 	}
