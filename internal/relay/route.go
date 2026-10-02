@@ -107,9 +107,11 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 	if pol.Excludes != nil {
 		pol.IncludePrompts, pol.IncludeToolContent = false, false
 	}
-	if pathExcluded(p.msg, pol.Excludes) {
-		r.stats.dropped(p.signal, "policy_path", p.records)
-		return
+	if n := dropExcluded(p, pol.Excludes); n > 0 {
+		r.stats.dropped(p.signal, "policy_path", n)
+		if p.records <= 0 {
+			return
+		}
 	}
 	if pol.Signals != nil && !contains(pol.Signals, string(p.signal)) {
 		r.stats.dropped(p.signal, "policy_signal", p.records)

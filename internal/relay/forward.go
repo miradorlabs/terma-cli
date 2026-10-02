@@ -178,7 +178,7 @@ func (s *sender) loop() {
 			continue
 		}
 		// The content policy as it stands now: a project that turned prompts off since sends none still queued.
-		body = s.r.withholdQueued(batch[0].signal, body, pol)
+		body, excluded := s.r.withholdQueued(batch[0].signal, body, pol)
 		if pol.Signals != nil && !contains(pol.Signals, string(batch[0].signal)) || body == nil {
 			for _, e := range batch {
 				s.r.stats.dropped(e.signal, "policy_signal_or_content", e.records)
@@ -190,7 +190,7 @@ func (s *sender) loop() {
 		out, wait, detail, rejected := s.send(ctx, pol, batch[0].signal, body)
 		switch out {
 		case sent:
-			records := 0
+			records := -excluded
 			for _, e := range batch {
 				records += e.records
 			}
@@ -398,13 +398,15 @@ func (r *Relay) recoverOutbox() {
 	}
 }
 
-// withholdQueued drops a queued body that no longer decodes: it cannot be checked against a stricter policy.
-func (r *Relay) withholdQueued(sig Signal, body []byte, pol Policy) []byte {
+// withholdQueued applies the policy as it stands now to a queued body, reporting the records
+// an excluded path took from what it returns; nil drops all of it, as does a body that no
+// longer decodes, since it cannot be checked against a stricter policy.
+func (r *Relay) withholdQueued(sig Signal, body []byte, pol Policy) ([]byte, int) {
 	if pol.Excludes != nil {
 		pol.IncludePrompts, pol.IncludeToolContent = false, false
 	}
 	if pol.IncludePrompts && pol.IncludeToolContent && pol.Excludes == nil && !pol.RequireClaim {
-		return body
+		return body, 0
 	}
 	var msg proto.Message
 	switch sig {
@@ -416,18 +418,23 @@ func (r *Relay) withholdQueued(sig Signal, body []byte, pol Policy) []byte {
 		msg = &metricspb.MetricsData{}
 	}
 	if proto.Unmarshal(body, msg) != nil {
-		return nil
+		return nil, 0
 	}
-	if pol.RequireClaim && hasCatchAll(&part{signal: sig, msg: msg}) {
-		return nil
+	p := &part{signal: sig, msg: msg}
+	if pol.RequireClaim && hasCatchAll(p) {
+		return nil, 0
 	}
-	if pathExcluded(msg, pol.Excludes) {
-		return nil
+	excluded := dropExcluded(p, pol.Excludes)
+	if excluded > 0 {
+		if emptied(msg) {
+			return nil, 0
+		}
+		r.stats.dropped(sig, "policy_path", excluded)
 	}
 	unclassified := map[string]int{}
-	n := r.rules.withhold(&part{signal: sig, msg: msg}, pol.IncludePrompts, pol.IncludeToolContent, unclassified)
-	if n == 0 && len(unclassified) == 0 {
-		return body
+	n := r.rules.withhold(p, pol.IncludePrompts, pol.IncludeToolContent, unclassified)
+	if n == 0 && len(unclassified) == 0 && excluded == 0 {
+		return body, 0
 	}
 	r.stats.add("withheld_at_send_records", n)
 	for key, c := range unclassified {
@@ -435,7 +442,7 @@ func (r *Relay) withholdQueued(sig Signal, body []byte, pol Policy) []byte {
 	}
 	out, err := proto.Marshal(msg)
 	if err != nil {
-		return nil
+		return nil, 0
 	}
-	return out
+	return out, excluded
 }

@@ -82,10 +82,25 @@ func TestQueuedCapturePolicyFiltersPathsAndCorruptBodies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := r.withholdQueued(Traces, b, Policy{Excludes: excluding("**/secrets/**")}); got != nil {
+	if got, _ := r.withholdQueued(Traces, b, Policy{Excludes: excluding("**/secrets/**")}); got != nil {
 		t.Fatal("queued excluded path survived")
 	}
-	if got := r.withholdQueued(Traces, []byte{0xff}, Policy{}); got != nil {
+	if got, _ := r.withholdQueued(Traces, []byte{0xff}, Policy{}); got != nil {
 		t.Fatal("uncheckable body was forwarded")
+	}
+
+	// A queued batch keeps the spans that name no excluded file.
+	spans := m.ResourceSpans[0].ScopeSpans[0]
+	spans.Spans = append(spans.Spans, &tracepb.Span{Name: "Read README.md", Attributes: []*commonpb.KeyValue{kv("file_path", "README.md")}})
+	if b, err = proto.Marshal(m); err != nil {
+		t.Fatal(err)
+	}
+	got, excluded := r.withholdQueued(Traces, b, Policy{Excludes: excluding("**/secrets/**")})
+	var kept tracepb.TracesData
+	if err := proto.Unmarshal(got, &kept); err != nil || excluded != 1 {
+		t.Fatalf("excluded %d, err %v; want 1 excluded and the rest sent", excluded, err)
+	}
+	if left := kept.ResourceSpans[0].ScopeSpans[0].Spans; len(left) != 1 || left[0].Name != "Read README.md" {
+		t.Fatalf("kept %v, want only the README span", left)
 	}
 }
