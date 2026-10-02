@@ -79,6 +79,14 @@ func (m Manager) removeWindows(path string) error {
 	return nil
 }
 
+// startWindows starts the supervisor the Run key would start at logon, unless one runs.
+func (m Manager) startWindows() error {
+	if supervisorRunning(m.StateDir) || m.StartSupervisor == nil {
+		return nil
+	}
+	return m.StartSupervisor()
+}
+
 func supervisorRunning(dir string) bool {
 	unlock, err := flock.TryLock(filepath.Join(dir, SuperviseLock))
 	if err == nil {

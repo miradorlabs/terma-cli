@@ -2,7 +2,9 @@ package relay
 
 import (
 	"encoding/json"
+	"net/http"
 	"slices"
+	"strings"
 	"testing"
 
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
@@ -16,7 +18,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
-// pathExcludedJSON is a reference filter through protojson that pathExcluded must agree with.
+// pathExcludedJSON is a reference filter through protojson that dropExcluded must agree with.
 func pathExcludedJSON(msg proto.Message, patterns []string) bool {
 	b, err := protojson.Marshal(msg)
 	if err != nil {
@@ -95,12 +97,12 @@ func TestPathExcludedMatchesTheJSONWalk(t *testing.T) {
 		"JSON-encoded arguments": true, "nested kvlist": true, "body kvlist": true, "span event": true, "span link": true, "metric exemplar": true}
 	for name, msg := range cases {
 		for _, patterns := range [][]string{{"secrets"}, {"7"}, nil} {
-			got, want := pathExcluded(msg, excluding(patterns...)), pathExcludedJSON(msg, patterns)
+			got, want := dropExcluded(&part{msg: proto.Clone(msg)}, excluding(patterns...)) > 0, pathExcludedJSON(msg, patterns)
 			if len(patterns) == 0 {
 				want = false
 			}
 			if got != want {
-				t.Errorf("%s, %v: pathExcluded = %v, the JSON walk %v", name, patterns, got, want)
+				t.Errorf("%s, %v: dropExcluded = %v, the JSON walk %v", name, patterns, got, want)
 			}
 			if len(patterns) == 1 && patterns[0] == "secrets" && got != withheld[name] {
 				t.Errorf("%s: withheld = %v, want %v", name, got, withheld[name])
@@ -116,4 +118,53 @@ func excluding(patterns ...string) func(any) bool {
 	}
 	p := config.Policy{ExcludePaths: patterns}
 	return func(v any) bool { return p.HasExcludedPath(v, "") }
+}
+
+// An excluded path takes only the records that name it: the session's other tool calls,
+// model calls and spans in the same export still reach the project.
+func TestPathExclusionDropsOnlyTheRecordsNamingIt(t *testing.T) {
+	u := newUpstream(t)
+	f := newFixture()
+	pol := Policy{Endpoint: u.srv.URL, Key: "key-p1", IncludePrompts: true, IncludeToolContent: true, Excludes: excluding("secrets/**")}
+	r, srv := f.relay(t, u, map[string]Policy{"p1": pol})
+
+	rec := func(event string, extra ...*commonpb.KeyValue) *logspb.LogRecord {
+		return &logspb.LogRecord{Attributes: append([]*commonpb.KeyValue{kv("session.id", "A"), kv("event.name", event)}, extra...)}
+	}
+	logs := &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{
+		rec("tool_result", kv("tool_parameters", `{"file_path":"secrets/app.env"}`)),
+		rec("tool_result", kv("tool_parameters", `{"file_path":"README.md"}`)),
+		rec("api_request", kv("model", "sonnet")),
+	}}}}}}
+	span := func(name string, extra ...*commonpb.KeyValue) *tracepb.Span {
+		return &tracepb.Span{TraceId: make([]byte, 16), SpanId: []byte(name[:8]), Name: name,
+			Attributes: append([]*commonpb.KeyValue{kv("session.id", "A")}, extra...)}
+	}
+	traces := &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{
+		span("tool.read.secret", kv("file_path", "secrets/app.env")),
+		span("tool.write.e2e", kv("file_path", "e2e/p6.txt")),
+	}}}}}}
+	for path, msg := range map[string]proto.Message{"/v1/logs": logs, "/v1/traces": traces} {
+		body, err := proto.Marshal(msg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if code := post(t, srv, path, body, "application/x-protobuf", token, false); code != http.StatusOK {
+			t.Fatalf("%s = %d", path, code)
+		}
+	}
+	waitFor(t, func() bool {
+		c := r.Stats().Snapshot().Counters
+		return c["forwarded.logs"] == 2 && c["forwarded.traces"] == 1
+	})
+	c := r.Stats().Snapshot().Counters
+	if c["dropped.policy_path.logs"] != 1 || c["dropped.policy_path.traces"] != 1 {
+		t.Fatalf("stats = %v, want one log and one span dropped for the path", c)
+	}
+	got, _ := u.logs(t)
+	for _, lr := range got["Bearer key-p1"] {
+		if strings.Contains(attr(lr.Attributes, "tool_parameters"), "secrets") {
+			t.Fatalf("the excluded file's record left: %v", lr.Attributes)
+		}
+	}
 }

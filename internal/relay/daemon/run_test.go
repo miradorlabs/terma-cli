@@ -111,3 +111,60 @@ func TestRestart(t *testing.T) {
 		}
 	}
 }
+
+// The service's relay waiting behind a hook-started one listens within a moment of that
+// one's exit: nothing listens in between, and agents never resend what they exported into
+// the gap. AwaitRelay sees a relay only while one holds the lock and listens.
+func TestTheWaitingServiceRelayTakesOverAtOnce(t *testing.T) {
+	dir, _ := setUpRelay(t)
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := ln.Addr().String()
+	_ = ln.Close()
+	if err := os.WriteFile(filepath.Join(dir, AddrFile), []byte(addr+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := func(idle time.Duration, listening func(net.Addr, time.Duration)) Config {
+		c := runConfig(dir, idle, listening)
+		c.Addr = ""
+		return c
+	}
+
+	hookCtx, stopHook := context.WithCancel(t.Context())
+	hookUp := make(chan struct{})
+	hookDone := make(chan time.Time, 1)
+	go func() {
+		_, _ = Run(hookCtx, cfg(time.Hour, func(net.Addr, time.Duration) { close(hookUp) }))
+		hookDone <- time.Now()
+	}()
+	<-hookUp
+	if !AwaitRelay(dir, time.Second) {
+		t.Fatal("AwaitRelay misses a relay that holds the lock and listens")
+	}
+
+	serviceCtx, stopService := context.WithCancel(t.Context())
+	serviceUp := make(chan time.Time, 1)
+	serviceDone := make(chan struct{})
+	go func() {
+		defer close(serviceDone)
+		_, _ = Run(serviceCtx, cfg(0, func(net.Addr, time.Duration) { serviceUp <- time.Now() }))
+	}()
+	time.Sleep(300 * time.Millisecond) // waiting on the lock
+	stopHook()
+	exited := <-hookDone
+	select {
+	case up := <-serviceUp:
+		if gap := up.Sub(exited); gap > time.Second {
+			t.Fatalf("the service's relay listened %v after the hook-started one exited", gap)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the service's relay never took over")
+	}
+	stopService()
+	<-serviceDone
+	if AwaitRelay(dir, 50*time.Millisecond) {
+		t.Fatal("AwaitRelay reports a relay after both stopped")
+	}
+}

@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -90,9 +93,16 @@ func kv(k, v string) *commonpb.KeyValue {
 
 // fixture: A (p1) and B (p2) are claimed with keys, C is unclaimed, D is claimed but keyless.
 type fixture struct {
-	mu     sync.Mutex
-	claims map[string]claim.Claim
-	now    time.Time
+	mu       sync.Mutex
+	claims   map[string]claim.Claim
+	now      time.Time
+	warnings []string
+}
+
+func (f *fixture) warned() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.warnings)
 }
 
 func newFixture() *fixture {
@@ -122,6 +132,11 @@ func (f *fixture) relay(t *testing.T, u *upstream, policies map[string]Policy) (
 		Hold:   time.Minute,
 		Lookup: f.lookup,
 		Now:    f.clock,
+		Warnf: func(format string, args ...any) {
+			f.mu.Lock()
+			f.warnings = append(f.warnings, fmt.Sprintf(format, args...))
+			f.mu.Unlock()
+		},
 		Resolve: func(c claim.Claim) (Policy, error) {
 			p, ok := policies[c.ProjectID]
 			if !ok {
@@ -458,6 +473,10 @@ func TestRelayUpstreamRefusalIsFinal(t *testing.T) {
 	}
 	if n := countFiles(t, filepath.Join(r.opts.Dir, deadDir)); n == 0 {
 		t.Fatal("a refused part was not set aside in .dead/")
+	}
+	// Refused records are lost for good, so the relay log says so without debug on.
+	if w := f.warned(); !slices.ContainsFunc(w, func(s string) bool { return strings.Contains(s, "refused") }) {
+		t.Fatalf("no warning for the refusal: %q", w)
 	}
 }
 

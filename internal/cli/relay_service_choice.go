@@ -47,19 +47,22 @@ func relayServiceWanted(flag string) bool {
 // ensureRelay leaves a relay running in env, as a service when wanted, else started on
 // demand, reporting only what the developer should know. It is a developer's own command,
 // so it records their environment as the relay's (daemon.RecordEnv), and it replaces a
-// relay that cannot deliver for them: install is the one fix doctor names.
+// relay that cannot deliver for them: install is the one fix doctor names. It restarts
+// nothing that already works, since an agent never resends what it exported while no relay
+// listened.
 func ensureRelay(ctx context.Context, flag, env string, report func(warn bool, what string)) {
 	dir, err := daemon.Dir()
 	if err == nil {
 		_ = daemon.RecordEnv(dir)
 	}
 	running, isRunning := daemon.RunningRelay(dir)
+	foreign := foreignRelay(running, isRunning, env)
 	if !relayServiceWanted(flag) {
 		if flag == "off" {
 			_, _ = daemon.RemoveService(ctx)
 		}
 		// A relay in another environment holds the lock, so the next one would wait behind it.
-		if strayRelay(running, isRunning, env, false) && realTerma() {
+		if foreign && realTerma() {
 			daemon.Stop(dir)
 		}
 		report(false, "starts when an agent needs it")
@@ -69,11 +72,21 @@ func ensureRelay(ctx context.Context, flag, env string, report func(warn bool, w
 	// A definition that exists is not one that works: an earlier terma's may run a command
 	// this one lacks, or another binary or environment. Only one this terma would write stays.
 	state := daemon.CheckServiceHere()
-	stray := strayRelay(running, isRunning, env, state.Installed)
-	if keepService(state, stray, flag) {
-		// A service definition does not prove its relay is alive; the lock prevents duplicates.
+	if keepService(state, foreign, flag) {
+		// The service's relay may have stopped, or wait behind a relay a hook started.
+		if err := daemon.StartService(ctx); err != nil {
+			// A working relay is not stopped for a service that may never take its port.
+			report(true, "could not start in the background ("+err.Error()+"); it starts when an agent needs it")
+			if !isRunning {
+				daemon.Spawn()
+			}
+			return
+		}
 		report(false, "running in the background")
-		daemon.Spawn()
+		if isRunning && !running.Service {
+			daemon.Stop(dir)
+		}
+		awaitServiceRelay(dir)
 		return
 	}
 	// Installing stops whatever relay holds the port, so the service takes over.
@@ -85,32 +98,35 @@ func ensureRelay(ctx context.Context, flag, env string, report func(warn bool, w
 	switch {
 	case state.Installed && !state.Current:
 		report(false, "running in the background (its service was out of date and is rewritten for this terma)")
-	case stray:
+	case foreign:
 		report(false, "running in the background (replaced a relay that could not deliver for this profile)")
 	default:
 		report(false, "running in the background")
 	}
-	daemon.Spawn()
+	awaitServiceRelay(dir)
 }
 
-// strayRelay reports whether the running relay cannot be left as it is: it delivers to
-// another environment than env, or a hook started it while the service waits behind it.
-// A relay from before relays recorded themselves (ok false) cannot be judged, and stays.
-func strayRelay(running daemon.RunInfo, ok bool, env string, serviceInstalled bool) bool {
-	if !ok {
-		return false
+// awaitServiceRelay gives the service's relay time to take the lock and listen, and starts
+// one on demand only if it does not: started at once, that one would take the port and
+// leave the service's waiting behind it.
+func awaitServiceRelay(dir string) {
+	if !daemon.AwaitRelay(dir, daemon.ServiceStartWait) {
+		daemon.Spawn()
 	}
-	if running.Environment != "" && env != "" && running.Environment != env {
-		return true
-	}
-	return serviceInstalled && !running.Service
+}
+
+// foreignRelay reports whether the running relay delivers to another environment than
+// env, so it cannot be left as it is. A relay from before relays recorded themselves (ok
+// false) cannot be judged, and stays.
+func foreignRelay(running daemon.RunInfo, ok bool, env string) bool {
+	return ok && running.Environment != "" && env != "" && running.Environment != env
 }
 
 // keepService reports whether install leaves the relay service as it is: only one this
-// terma would write now, with no stray relay holding its port, and only when
-// --relay-service on did not ask for it again.
-func keepService(state daemon.ServiceState, stray bool, flag string) bool {
-	return state.Installed && state.Current && !stray && flag != "on"
+// terma would write now, with no relay for another environment holding its port, and only
+// when --relay-service on did not ask for it again.
+func keepService(state daemon.ServiceState, foreign bool, flag string) bool {
+	return state.Installed && state.Current && !foreign && flag != "on"
 }
 
 // realTerma is false for a test binary, which must not touch the machine's relay service.
