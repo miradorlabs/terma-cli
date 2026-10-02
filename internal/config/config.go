@@ -372,7 +372,7 @@ func writeFileAtomic(path string, data []byte, perm os.FileMode, durable bool) e
 	if err := tmp.Close(); err != nil {
 		return fmt.Errorf("close temp file: %w", err)
 	}
-	if err := os.Rename(tmpName, path); err != nil {
+	if err := replaceFile(tmpName, path); err != nil {
 		return fmt.Errorf("replace %s: %w", path, err)
 	}
 	if !durable {
