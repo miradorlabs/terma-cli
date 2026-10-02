@@ -237,7 +237,14 @@ func (d *run) signedIn() Check {
 	if cfg.Environment != config.EnvProd {
 		env = " [" + cfg.Environment + "]"
 	}
-	return Check{Status: Pass, Detail: who + " in " + cmp.Or(cfg.OrganizationName, cred.OrganizationID) + env}
+	detail := who + " in " + cmp.Or(cfg.OrganizationName, cred.OrganizationID) + env
+	// Doctor's own run sees TERMA_ENV; the hooks and the flushes they start do not.
+	if cfg.ProfileEnvironment != "" && cfg.ProfileEnvironment != cfg.Environment {
+		return Check{Status: Warn, Detail: detail + ", but the profile records " + cfg.ProfileEnvironment +
+			", so hooks, which run without TERMA_ENV, hold this environment's events",
+			Fix: "TERMA_ENV=" + cfg.Environment + " terma setup"}
+	}
+	return Check{Status: Pass, Detail: detail}
 }
 
 // RepositoryCheck finds the binding of the workspace at root, or, in a linked worktree

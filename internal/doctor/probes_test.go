@@ -75,6 +75,21 @@ func TestDoctorJudgesTheSignInFromItsProbe(t *testing.T) {
 	}
 }
 
+// A run under TERMA_ENV that the profile does not record warns: the hooks resolve to the
+// profile's environment, so their events wait for a key that never comes.
+func TestDoctorWarnsWhenTheProfileRecordsAnotherEnvironment(t *testing.T) {
+	e := env(t, Probes{Credential: signedIn, Spool: func() SpoolState { return SpoolState{} }})
+	e.Config = &config.Config{Environment: config.EnvDev, ProfileEnvironment: config.EnvProd}
+	c := check(Run(t.Context(), e, Progress{}), KeyAuth)
+	if c.Status != Warn || c.Fix != "TERMA_ENV=dev terma setup" || !strings.Contains(c.Detail, "records prod") {
+		t.Fatalf("signed in = %+v", c)
+	}
+	e.Config = &config.Config{Environment: config.EnvDev, ProfileEnvironment: config.EnvDev}
+	if c := check(Run(t.Context(), e, Progress{}), KeyAuth); c.Status != Pass {
+		t.Fatalf("pinned profile = %+v", c)
+	}
+}
+
 // The spool check fails on a queue that cannot be written, and on a project with no key
 // here; only then is it a pass.
 func TestDoctorJudgesTheSpoolFromItsProbes(t *testing.T) {

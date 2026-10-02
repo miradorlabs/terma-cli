@@ -56,6 +56,14 @@ func (p *Profile) SelectOrganization(id, name string) {
 	}
 }
 
+// PinEnvironment records env as the profile's, production as none.
+func (p *Profile) PinEnvironment(env string) {
+	if env == EnvProd {
+		env = ""
+	}
+	p.Environment = env
+}
+
 // File is config.json as it is on disk: every profile, and which one is active.
 type File struct {
 	ActiveProfile string              `json:"active_profile"`
@@ -67,6 +75,9 @@ type Config struct {
 	ProfileName string
 	// Environment is the built-in environment the defaults came from.
 	Environment string
+	// ProfileEnvironment is the one the profile records, which a process without TERMA_ENV,
+	// such as a hook, resolves to.
+	ProfileEnvironment string
 	// APIURL is the data plane; AuthURL is the credential surface, a separate host.
 	APIURL  string
 	AuthURL string
@@ -125,18 +136,19 @@ func Load(o Overrides) (*Config, error) {
 	}
 
 	cfg := &Config{
-		ProfileName:      name,
-		Environment:      envName,
-		APIURL:           strings.TrimRight(firstNonEmpty(o.APIURL, os.Getenv("TERMA_API_URL"), profile.APIURL, defaults.APIURL), "/"),
-		AuthURL:          strings.TrimRight(firstNonEmpty(o.AuthURL, os.Getenv("TERMA_AUTH_URL"), profile.AuthURL, defaults.AuthURL), "/"),
-		AppURL:           strings.TrimRight(firstNonEmpty(o.AppURL, os.Getenv("TERMA_APP_URL"), profile.AppURL, defaults.AppURL), "/"),
-		OTLPURL:          strings.TrimRight(firstNonEmpty(o.OTLPURL, os.Getenv("TERMA_OTLP_URL"), profile.OTLPURL, defaults.OTLPURL), "/"),
-		OrganizationID:   firstNonEmpty(os.Getenv("TERMA_ORGANIZATION_ID"), profile.OrganizationID),
-		OrganizationName: profile.OrganizationName,
-		ProjectID:        firstNonEmpty(o.ProjectID, os.Getenv("TERMA_TEAM_ID")),
-		Harnesses:        profile.Harnesses,
-		Policy:           DefaultPolicy(),
-		APIKey:           strings.TrimSpace(os.Getenv("TERMA_API_KEY")),
+		ProfileName:        name,
+		Environment:        envName,
+		ProfileEnvironment: firstNonEmpty(profile.Environment, EnvProd),
+		APIURL:             strings.TrimRight(firstNonEmpty(o.APIURL, os.Getenv("TERMA_API_URL"), profile.APIURL, defaults.APIURL), "/"),
+		AuthURL:            strings.TrimRight(firstNonEmpty(o.AuthURL, os.Getenv("TERMA_AUTH_URL"), profile.AuthURL, defaults.AuthURL), "/"),
+		AppURL:             strings.TrimRight(firstNonEmpty(o.AppURL, os.Getenv("TERMA_APP_URL"), profile.AppURL, defaults.AppURL), "/"),
+		OTLPURL:            strings.TrimRight(firstNonEmpty(o.OTLPURL, os.Getenv("TERMA_OTLP_URL"), profile.OTLPURL, defaults.OTLPURL), "/"),
+		OrganizationID:     firstNonEmpty(os.Getenv("TERMA_ORGANIZATION_ID"), profile.OrganizationID),
+		OrganizationName:   profile.OrganizationName,
+		ProjectID:          firstNonEmpty(o.ProjectID, os.Getenv("TERMA_TEAM_ID")),
+		Harnesses:          profile.Harnesses,
+		Policy:             DefaultPolicy(),
+		APIKey:             strings.TrimSpace(os.Getenv("TERMA_API_KEY")),
 	}
 	if profile.Policy != nil {
 		cfg.Policy = *profile.Policy
