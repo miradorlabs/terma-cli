@@ -153,6 +153,11 @@ func RunningRelay(dir string) (RunInfo, bool) {
 	return info, true
 }
 
+// lockPoll is how often the service's relay retries a lock another relay holds. Nothing
+// listens between that relay's exit and the retry, and an agent never resends what it
+// exported into the gap, so the wait is short.
+const lockPoll = 250 * time.Millisecond
+
 // lock takes the single-instance lock, with wait waiting out a hook-started relay; a nil
 // unlock means this relay must not run.
 func lock(ctx context.Context, dir string, wait bool) (unlock func(), busy bool, err error) {
@@ -162,7 +167,7 @@ func lock(ctx context.Context, dir string, wait bool) (unlock func(), busy bool,
 		select {
 		case <-ctx.Done():
 			return nil, false, nil
-		case <-time.After(5 * time.Second):
+		case <-time.After(lockPoll):
 		}
 		unlock, err = flock.TryLock(path)
 	}

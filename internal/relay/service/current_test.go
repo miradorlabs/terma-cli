@@ -174,3 +174,18 @@ func TestADefinitionForAnotherPathToThisBinaryIsCurrent(t *testing.T) {
 		t.Fatal("the same binary in another environment reads as current")
 	}
 }
+
+// Start starts only a service that is installed; it never writes a definition.
+func TestStartNeedsAnInstalledService(t *testing.T) {
+	if !Supported() {
+		t.Skip("no relay service on this platform")
+	}
+	sandboxHome(t)
+	m := testManager(t)
+	if err := m.Start(t.Context()); err == nil {
+		t.Fatal("Start of a service that is not installed succeeded")
+	}
+	if _, ok := m.Installed(); ok {
+		t.Fatal("Start wrote a definition")
+	}
+}

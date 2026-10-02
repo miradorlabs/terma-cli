@@ -19,14 +19,12 @@ import (
 // RetryAfter is how long hooks leave a failed start before trying again.
 const RetryAfter = time.Minute
 
-// Stop asks a running relay to stop and waits for its lock, so a changed address or token takes effect.
+// Stop asks a running relay to stop and waits for its lock, so a changed address or token
+// takes effect; it also returns once another relay, such as the service's waiting behind
+// it, has taken over.
 func Stop(dir string) {
-	data, err := os.ReadFile(filepath.Join(dir, PIDFile))
-	if err != nil {
-		return
-	}
-	pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
-	if err != nil || pid <= 1 {
+	pid := recordedPID(dir)
+	if pid <= 1 {
 		return
 	}
 	proc, err := os.FindProcess(pid)
@@ -40,11 +38,29 @@ func Stop(dir string) {
 		}
 	}
 	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
-		if unlock, err := flock.TryLock(filepath.Join(dir, LockFile)); err == nil {
+		unlock, err := flock.TryLock(filepath.Join(dir, LockFile))
+		if err == nil {
 			unlock()
 			return
 		}
+		// A relay writes its pid only once it holds the lock and listens.
+		if now := recordedPID(dir); flock.IsBusy(err) && now > 1 && now != pid {
+			return
+		}
 	}
+}
+
+// recordedPID is the pid the running relay recorded, 0 when none.
+func recordedPID(dir string) int {
+	data, err := os.ReadFile(filepath.Join(dir, PIDFile))
+	if err != nil {
+		return 0
+	}
+	pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
+	if err != nil {
+		return 0
+	}
+	return pid
 }
 
 // Spawn starts `terma relay run` detached unless one is running; of two racing hooks, the
@@ -98,3 +114,25 @@ func spawnCommand(exe, dir string) *exec.Cmd {
 
 // StartWait bounds how long a hook that started the relay waits for it to listen.
 const StartWait = time.Second
+
+// ServiceStartWait bounds how long a developer's command waits for the service's relay to
+// listen before starting one itself: launchd and systemd start it in well under a second.
+const ServiceStartWait = 5 * time.Second
+
+// AwaitRelay waits up to wait for a relay to hold dir's lock and answer on its address,
+// reporting whether one does. Starting another relay before the service's has taken the
+// lock would leave the service waiting behind it.
+func AwaitRelay(dir string, wait time.Duration) bool {
+	addr := Addr(dir)
+	for deadline := time.Now().Add(wait); ; time.Sleep(20 * time.Millisecond) {
+		if Running(dir) {
+			if conn, err := net.DialTimeout("tcp", addr, 50*time.Millisecond); err == nil {
+				_ = conn.Close()
+				return true
+			}
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
+	}
+}

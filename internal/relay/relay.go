@@ -87,7 +87,9 @@ type Options struct {
 	HTTP *http.Client
 	// Dir is the on-disk outbox, so a restart loses nothing; required for anything to leave.
 	Dir string
-	// Grace is how long a stopping relay keeps delivering (5 s); the rest waits in the outbox.
+	// Grace is how long a stopping relay keeps delivering (2 s); the rest waits in the outbox
+	// for the next relay. Its port is already closed, and the next relay cannot take it
+	// until this one exits, so a long grace is a long gap for the agents.
 	Grace time.Duration
 	// Now is the clock; time.Now when nil.
 	Now func() time.Time
@@ -149,7 +151,7 @@ func New(opts Options) *Relay {
 		opts.HeartbeatEvery = DefaultHeartbeatEvery
 	}
 	if opts.Grace == 0 {
-		opts.Grace = 5 * time.Second
+		opts.Grace = 2 * time.Second
 	}
 	sendCtx, cancel := context.WithCancel(context.Background())
 	return &Relay{

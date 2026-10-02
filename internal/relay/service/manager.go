@@ -226,6 +226,41 @@ func (m Manager) Install(ctx context.Context) (string, error) {
 	return "", errors.New("unsupported")
 }
 
+// Start starts the installed service's relay as it is defined, without rewriting it: one
+// already running is left alone, and one that exited 0 or was unloaded runs again.
+func (m Manager) Start(ctx context.Context) error {
+	path, ok := m.Installed()
+	if !ok {
+		return errors.New("the relay service is not installed")
+	}
+	switch runtime.GOOS {
+	case "darwin":
+		var lastErr error
+		for _, domain := range launchdDomains() {
+			if _, err := run(ctx, "launchctl", "kickstart", domain+"/"+m.Name); err == nil {
+				return nil
+			}
+		}
+		// Not loaded: kickstart knows only loaded jobs.
+		for _, domain := range launchdDomains() {
+			out, err := run(ctx, "launchctl", "bootstrap", domain, path)
+			if err == nil {
+				return nil
+			}
+			lastErr = fmt.Errorf("launchctl bootstrap %s: %w: %s", domain, err, out)
+		}
+		return lastErr
+	case "linux":
+		if out, err := run(ctx, "systemctl", "--user", "start", m.Name+".service"); err != nil {
+			return fmt.Errorf("systemctl --user start: %w: %s", err, out)
+		}
+		return nil
+	case "windows":
+		return m.startWindows()
+	}
+	return errUnsupported()
+}
+
 // Remove stops the service and removes its definition, reporting whether there was one.
 func (m Manager) Remove(ctx context.Context) (bool, error) {
 	path, err := m.Path()
