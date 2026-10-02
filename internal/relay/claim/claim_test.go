@@ -181,3 +181,25 @@ func TestClaimWithoutPlacements(t *testing.T) {
 		t.Fatal("covered another process")
 	}
 }
+
+// A hook reading the claim while another writes it costs that write nothing: Windows
+// refuses to replace a file someone holds open, and the writer's process was lost.
+func TestWriteSurvivesAReaderHoldingTheClaim(t *testing.T) {
+	enable(t)
+	now := time.Now()
+	if !Write("s", Claim{ProjectID: "p", PIDs: []int{1}}, now) {
+		t.Fatal("first write")
+	}
+	p, _ := path("s")
+	f, err := os.Open(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() { time.Sleep(20 * time.Millisecond); f.Close() }()
+	if !Write("s", Claim{ProjectID: "p", PIDs: []int{2}}, now) {
+		t.Fatal("a write while a reader held the claim was lost")
+	}
+	if c, _ := Read("s", now); !c.Covers(1) || !c.Covers(2) {
+		t.Fatalf("claim %v", c.PIDs)
+	}
+}
