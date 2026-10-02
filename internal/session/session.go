@@ -171,7 +171,7 @@ func (s *Store) lock() (unlock func()) {
 
 // missing reports a store nothing has created yet. Its lock file cannot be opened, so a
 // writer that went on would do so unlocked, racing the Touch that creates the store; with
-// no store there is nothing to change, and a store once created is not removed under it.
+// no store there is nothing to change. Only uninstall's Remove deletes a store, unlocked.
 func (s *Store) missing() bool {
 	_, err := os.Stat(s.dir)
 	return errors.Is(err, fs.ErrNotExist)
