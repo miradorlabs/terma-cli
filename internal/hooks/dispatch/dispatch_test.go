@@ -57,7 +57,7 @@ func newHarness(t *testing.T) *harness {
 	h.deps = Deps{
 		Agents:  agents.New(fake{ran: &h.ran}),
 		Policy:  func() config.Policy { return config.Policy{Mode: config.ModeRepo} },
-		Yields:  func(bool, config.Policy, string, string) bool { return h.yields },
+		Yields:  func(bool, config.Policy, string) bool { return h.yields },
 		Spool:   func() *spool.Spool { return s },
 		Claimed: func(context.Context, string) { h.claims++ },
 		Flush:   func() { h.flushes++ },

@@ -35,7 +35,7 @@ func sandbox(t *testing.T) (Machine, string) {
 func TestMachineWideHooksComeAndGoWithGlobalMode(t *testing.T) {
 	m, hooks := sandbox(t)
 	global := config.Policy{Mode: config.ModeGlobal, DefaultProjectID: "p"}
-	if m.Yields(false, global, "fake-cli", "") {
+	if m.Yields(false, global, "fake-cli") {
 		t.Fatal("a committed hook yielded before any machine-wide hook was written")
 	}
 	changed, err := m.ApplyUserHooks([]string{"fake"}, true)
@@ -46,10 +46,10 @@ func TestMachineWideHooksComeAndGoWithGlobalMode(t *testing.T) {
 	if !strings.Contains(string(data), "hook --user fake-stop") {
 		t.Fatalf("hooks file:\n%s", data)
 	}
-	if !m.Yields(false, global, "fake-cli", "") || m.Yields(false, config.DefaultPolicy(), "fake-cli", "") {
+	if !m.Yields(false, global, "fake-cli") || m.Yields(false, config.DefaultPolicy(), "fake-cli") {
 		t.Fatal("a committed hook did not step aside for the machine-wide one, or did outside global mode")
 	}
-	if !m.Yields(true, config.DefaultPolicy(), "fake-cli", "") || m.Yields(true, global, "fake-cli", "") {
+	if !m.Yields(true, config.DefaultPolicy(), "fake-cli") || m.Yields(true, global, "fake-cli") {
 		t.Fatal("a machine-wide hook acted outside global mode, or stood down inside it")
 	}
 	if _, err := m.ApplyUserHooks([]string{"fake"}, false); err != nil {
@@ -58,7 +58,7 @@ func TestMachineWideHooksComeAndGoWithGlobalMode(t *testing.T) {
 	if data, _ := os.ReadFile(hooks); strings.Contains(string(data), "hook --user") {
 		t.Fatalf("machine-wide hooks left:\n%s", data)
 	}
-	if m.Yields(false, global, "fake-cli", "") {
+	if m.Yields(false, global, "fake-cli") {
 		t.Fatal("the coverage record outlived global mode")
 	}
 }

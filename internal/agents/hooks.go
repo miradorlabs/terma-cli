@@ -28,15 +28,6 @@ type UserHooks interface {
 	PlanUserHooks(dir string, command func(string) string, install bool) (hookmgr.Plan, error)
 }
 
-// LaunchScoped is an agent that reads a repository's committed hooks only from the
-// directory it started in, never from the repository root above it; LaunchDir is that
-// directory for a hook that runs in cwd. Outside global mode its machine-wide hooks stand
-// in for the committed ones a session started in a subdirectory cannot see.
-type LaunchScoped interface {
-	Agent
-	LaunchDir(cwd string) string
-}
-
 // UserHooksTrust is an agent that runs its machine-wide hooks only once the developer
 // trusts them; UserHooksTrustStep says how, and UserHooksTrusted whether terma's entries are
 // there (present) and run as written (trusted).

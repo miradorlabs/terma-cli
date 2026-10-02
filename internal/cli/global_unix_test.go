@@ -134,7 +134,7 @@ func TestHookYields(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	global := config.Policy{Mode: config.ModeGlobal, DefaultProjectID: "p"}
 	repo := config.DefaultPolicy()
-	if testApp.globalMode().Yields(false, global, "claude-code", "") {
+	if testApp.globalMode().Yields(false, global, "claude-code") {
 		t.Fatal("a repository hook yielded with no machine-wide hooks recorded")
 	}
 	dir, err := daemon.Dir()
@@ -156,7 +156,7 @@ func TestHookYields(t *testing.T) {
 		{true, repo, "claude-code", true}, // leftover from global mode
 		{false, repo, "claude-code", false},
 	} {
-		if got := testApp.globalMode().Yields(tc.user, tc.pol, tc.tool, ""); got != tc.yield {
+		if got := testApp.globalMode().Yields(tc.user, tc.pol, tc.tool); got != tc.yield {
 			t.Errorf("hookYields(user=%v, %s, %s) = %v", tc.user, tc.pol.Mode, tc.tool, got)
 		}
 	}
@@ -202,7 +202,7 @@ func TestSetupGlobalModeDefersToManagedHooks(t *testing.T) {
 		t.Fatalf("setup asked to trust hooks the organization manages:\n%s", setupOut)
 	}
 	gm, global := testApp.globalMode(), config.Policy{Mode: config.ModeGlobal}
-	if !gm.Yields(false, global, "codex", "") || !gm.Yields(false, global, "claude-code", "") {
+	if !gm.Yields(false, global, "codex") || !gm.Yields(false, global, "claude-code") {
 		t.Fatal("the agents' repository hooks would not step aside")
 	}
 }
