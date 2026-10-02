@@ -3,6 +3,8 @@ package install
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -18,13 +20,8 @@ const (
 	auth = "https://auth.example"
 )
 
-func admitting() config.Policy {
-	return config.Policy{Mode: config.ModeRepo,
-		OrganizationID: org, AuthURL: auth, TeamID: "p1", FetchedAt: time.Now()}
-}
-
 // workflow records each step it was asked for.
-func workflow(log *[]string, pol config.Policy) Workflow {
+func workflow(log *[]string) Workflow {
 	note := func(s string) { *log = append(*log, s) }
 	return Workflow{
 		SignIn: func(_ context.Context, cfg *config.Config) (*config.Config, error) { note("sign-in"); return cfg, nil },
@@ -32,8 +29,7 @@ func workflow(log *[]string, pol config.Policy) Workflow {
 			note("bind")
 			return Binding{ID: "p1", Name: "One", OrganizationID: org}, nil
 		},
-		FetchPolicy: func(context.Context, *config.Config) (config.Policy, error) { note("fetch"); return pol, nil },
-		ApplySteps:  func(*config.Config, Plan) Steps { note("apply"); return Steps{} },
+		ApplySteps: func(*config.Config, Plan) Steps { note("apply"); return Steps{} },
 	}
 }
 
@@ -47,33 +43,43 @@ func request(t *testing.T) (*config.Config, Request) {
 
 func registry() *agents.Registry { return agents.New(agentstest.Agent{ID: "fake"}) }
 
-// An install signs in, binds, fetches and admits before anything writes, and records the
-// developer's choice of agents only once admitted.
-func TestAnInstallWritesOnlyOnceAdmitted(t *testing.T) {
+// An install signs in, binds, then writes, and records the developer's choice of agents.
+// It knows nothing of the team's collection policy: nothing fetches or stores one, and
+// none need be reachable.
+func TestAnInstallKnowsNothingOfThePolicy(t *testing.T) {
 	cfg, req := request(t)
 	var log []string
-	if _, err := Run(t.Context(), registry(), cfg, req, workflow(&log, admitting()), &report{}); err != nil {
+	if _, err := Run(t.Context(), registry(), cfg, req, workflow(&log), &report{}); err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"sign-in", "bind", "fetch", "apply"}; !slices.Equal(log, want) {
+	if want := []string{"sign-in", "bind", "apply"}; !slices.Equal(log, want) {
 		t.Fatalf("steps = %v, want %v", log, want)
 	}
 	if f, err := termaproject.Load(req.Root); err != nil || f.Project.ID != "p1" {
 		t.Fatalf("binding = %+v, %v", f, err)
 	}
-	if file, _ := config.LoadFile(); file == nil || !slices.Equal(file.Profiles[config.DefaultProfile].Harnesses, []string{"fake"}) {
+	file, _ := config.LoadFile()
+	if file == nil || !slices.Equal(file.Profiles[config.DefaultProfile].Harnesses, []string{"fake"}) {
 		t.Fatal("the agents chosen were not recorded")
+	}
+	if p := file.Profiles[config.DefaultProfile].Policy; p != nil {
+		t.Fatalf("install stored a collection policy: %+v", p)
+	}
+	if dir, _ := config.Dir(); fileExists(filepath.Join(dir, "policies")) {
+		t.Fatal("install cached a team's collection policy")
 	}
 }
 
-// A policy from another organization writes nothing at all: no step outside the
-// repository, no binding, no recorded choice.
+// A binding the developer cannot see refuses the install before anything writes.
 func TestARefusedInstallWritesNothing(t *testing.T) {
-	foreign := admitting()
-	foreign.OrganizationID = "org_b"
 	cfg, req := request(t)
 	var log []string
-	if _, err := Run(t.Context(), registry(), cfg, req, workflow(&log, foreign), &report{}); err == nil {
+	w := workflow(&log)
+	w.Bind = func(context.Context, *config.Config, *termaproject.File, string, bool, bool) (Binding, error) {
+		log = append(log, "bind")
+		return Binding{}, errors.New("no such team")
+	}
+	if _, err := Run(t.Context(), registry(), cfg, req, w, &report{}); err == nil {
 		t.Fatal("installed")
 	}
 	if slices.Contains(log, "apply") {
@@ -87,12 +93,17 @@ func TestARefusedInstallWritesNothing(t *testing.T) {
 	}
 }
 
-// A dry run signs in to nothing and fetches nothing, and a signed-out one still plans.
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+// A dry run signs in to nothing, and a signed-out one still plans.
 func TestADryRunCallsNoStep(t *testing.T) {
 	cfg, req := request(t)
 	req.DryRun = true
 	var log []string
-	w := workflow(&log, admitting())
+	w := workflow(&log)
 	w.Bind = func(context.Context, *config.Config, *termaproject.File, string, bool, bool) (Binding, error) {
 		log = append(log, "bind")
 		return Binding{}, ErrNotSignedIn
@@ -108,14 +119,14 @@ func TestADryRunCallsNoStep(t *testing.T) {
 	}
 }
 
-// The steps that decide what is safe are never optional.
-func TestAnInstallNeedsItsSafetySteps(t *testing.T) {
+// The steps that decide where an install writes are never optional.
+func TestAnInstallNeedsItsSteps(t *testing.T) {
 	cfg, req := request(t)
 	var log []string
-	w := workflow(&log, admitting())
-	w.FetchPolicy = nil
+	w := workflow(&log)
+	w.Bind = nil
 	if _, err := Run(t.Context(), registry(), cfg, req, w, &report{}); err == nil || len(log) != 0 {
-		t.Fatalf("ran without a policy fetch: %v, %v", err, log)
+		t.Fatalf("ran without a binding step: %v, %v", err, log)
 	}
 }
 
@@ -123,7 +134,7 @@ func TestAnInstallNeedsItsSafetySteps(t *testing.T) {
 func TestAnUninstallRemovesWhatTheInstallWrote(t *testing.T) {
 	cfg, req := request(t)
 	var log []string
-	if _, err := Run(t.Context(), registry(), cfg, req, workflow(&log, admitting()), &report{}); err != nil {
+	if _, err := Run(t.Context(), registry(), cfg, req, workflow(&log), &report{}); err != nil {
 		t.Fatal(err)
 	}
 	rm, err := PlanRemoval(t.Context(), registry(), req.Root, "")

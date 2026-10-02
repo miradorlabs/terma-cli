@@ -12,7 +12,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 )
 
@@ -28,7 +27,7 @@ type Request struct {
 	Existing   *termaproject.File
 	ProjectRef string
 	Selected   []string
-	// RecordSelected saves Selected as the developer's agents, once the install is admitted.
+	// RecordSelected saves Selected as the developer's agents, for a real install.
 	RecordSelected    bool
 	Adapters          []string
 	NoHooks, DryRun   bool
@@ -37,16 +36,15 @@ type Request struct {
 	Now               time.Time
 }
 
-// Workflow is what an install reaches through the command line. SignIn, Bind,
-// FetchPolicy and ApplySteps are required; the rest do nothing when nil.
+// Workflow is what an install reaches through the command line. SignIn, Bind and
+// ApplySteps are required; the rest do nothing when nil. Nothing here reads the team's
+// collection policy: the relay and the spool's delivery fetch it and apply it.
 type Workflow struct {
 	// SignIn signs the developer in and returns the configuration reloaded under it.
 	SignIn func(ctx context.Context, cfg *config.Config) (*config.Config, error)
 	// Bind resolves the project to bind to, checking an existing binding against the
 	// credential's projects when verify. ErrNotSignedIn means it needs a sign-in.
 	Bind func(ctx context.Context, cfg *config.Config, existing *termaproject.File, ref string, verify, ask bool) (Binding, error)
-	// FetchPolicy is the organization's collection policy for cfg's project.
-	FetchPolicy func(ctx context.Context, cfg *config.Config) (config.Policy, error)
 	// HasKey reports whether this machine holds projectID's key.
 	HasKey func(projectID string) bool
 	// ApplySteps are the plan's steps outside the repository, under the final cfg.
@@ -71,16 +69,16 @@ func Open(reg *agents.Registry, root, gitDir string) (*termaproject.File, error)
 }
 
 // Run installs terma into the workspace. In order: sign-in when the install needs it,
-// the binding, the organization's policy and its admission, the plan, then — only once
-// admitted — everything that writes. A dry run signs in to nothing, writes nothing, and
-// prints the plan a real install would apply.
+// the binding, the plan, then everything that writes. A dry run signs in to nothing,
+// writes nothing, and prints the plan a real install would apply. The team's collection
+// policy is none of install's business: until the relay or the spool's delivery has
+// fetched it, nothing this install routes leaves the machine.
 func Run(ctx context.Context, reg *agents.Registry, cfg *config.Config, req Request, w Workflow, r Reporter) (Plan, error) {
-	if w.SignIn == nil || w.Bind == nil || w.FetchPolicy == nil || w.ApplySteps == nil {
-		return Plan{}, errors.New("install: sign-in, binding, the policy fetch and the apply steps are required")
+	if w.SignIn == nil || w.Bind == nil || w.ApplySteps == nil {
+		return Plan{}, errors.New("install: sign-in, binding and the apply steps are required")
 	}
-	// Every real install reads the team's policy, even hooks-only; only an offline policy
-	// fixture skips that login. A dry run never signs in.
-	needsAuth := cfg.APIKey == "" && (config.PolicyStub() == "" || NeedsAuth(reg, req, w.HasKey))
+	// A dry run never signs in.
+	needsAuth := cfg.APIKey == "" && NeedsAuth(reg, req, w.HasKey)
 	if needsAuth && !req.DryRun {
 		var err error
 		if cfg, err = w.SignIn(ctx, cfg); err != nil {
@@ -97,29 +95,14 @@ func Run(ctx context.Context, reg *agents.Registry, cfg *config.Config, req Requ
 		b = Binding{}
 	}
 	cfg.ProjectID, cfg.ProjectName, cfg.OrganizationID = b.ID, b.Name, b.OrganizationID
-	var admitting *config.Policy
-	if !req.DryRun {
-		pol, err := w.FetchPolicy(ctx, cfg)
-		if err != nil {
+	if !req.DryRun && req.RecordSelected {
+		if err := config.UpdateProfile(cfg.ProfileName, func(p *config.Profile) { p.Harnesses = req.Selected }); err != nil {
 			return Plan{}, err
-		}
-		// The fetch is the command line's; what it returns must still be this login's.
-		if !pol.AppliesTo(cfg.OrganizationID, cfg.AuthURL) {
-			return Plan{}, errors.New("install: the collection policy fetched belongs to another organization or environment")
-		}
-		if err := routing.StorePolicy(cfg, &pol); err != nil {
-			return Plan{}, err
-		}
-		cfg.Policy, admitting = pol, &pol
-		if req.RecordSelected {
-			if err := config.UpdateProfile(cfg.ProfileName, func(p *config.Profile) { p.Harnesses = req.Selected }); err != nil {
-				return Plan{}, err
-			}
 		}
 	}
 	// Built once, so a dry run prints exactly the plan an install applies.
 	plan, err := Build(reg, Input{Root: req.Root, GitDir: req.GitDir, Existing: req.Existing, Selected: req.Selected,
-		Adapters: req.Adapters, NoHooks: req.NoHooks, Binding: b, Policy: admitting})
+		Adapters: req.Adapters, NoHooks: req.NoHooks, Binding: b})
 	if err != nil {
 		return Plan{}, err
 	}

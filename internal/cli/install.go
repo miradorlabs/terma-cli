@@ -165,7 +165,6 @@ func (app *App) runInstall(cmd *cobra.Command, f installFlags) error {
 			}
 			return b, err
 		},
-		FetchPolicy:    app.policies().Fetch,
 		HasKey:         func(projectID string) bool { return keystore.Get(projectID) != "" },
 		RefreshMachine: app.refresher().Machine,
 		ApplySteps: func(cfg *config.Config, plan install.Plan) install.Steps {

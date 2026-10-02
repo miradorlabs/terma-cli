@@ -34,7 +34,7 @@ func (r *report) Summary(label, _ string)         { r.ok = append(r.ok, label) }
 func plan(t *testing.T, root string, existing *termaproject.File) Plan {
 	t.Helper()
 	p, err := Build(builtin.Agents(), Input{Root: root, GitDir: root + "/.git", Existing: existing, Adapters: []string{"claude"},
-		Binding: Binding{ID: "proj_1", Name: "One"}, Policy: &config.Policy{Mode: config.ModeRepo}})
+		Binding: Binding{ID: "proj_1", Name: "One"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,21 +107,6 @@ func TestApplyThatWritesNothingKeepsTheBinding(t *testing.T) {
 	}
 	if again.Install.Version != "v1" || !again.Install.InstalledAt.Equal(first) || r.commit != nil {
 		t.Fatalf("an install that wrote nothing churned the binding: %+v, commit %v", again.Install, r.commit)
-	}
-}
-
-// A plan built without a policy, as a dry run is, cannot be applied.
-func TestApplyNeedsAnAdmittedPlan(t *testing.T) {
-	root := hookruntest.InitRepo(t)
-	p, err := Build(builtin.Agents(), Input{Root: root, GitDir: root + "/.git", Adapters: []string{"claude"}, Binding: Binding{ID: "proj_1"}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := Apply(context.Background(), p, Options{AssumeYes: true}, Steps{}, &report{}); err == nil {
-		t.Fatal("an unadmitted plan was applied")
-	}
-	if _, err := termaproject.Load(root); err == nil {
-		t.Fatal("the refused plan wrote a binding")
 	}
 }
 

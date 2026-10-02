@@ -25,7 +25,7 @@ type Account struct {
 	// withholdContent is the team's collection policy: no prompts, no tool content.
 	withholdContent atomic.Bool
 	mu              sync.Mutex
-	keys      map[string]string // project → minted key
+	keys            map[string]string // project → minted key
 }
 
 // accountOrg is the organization the fake account signs the developer in to.

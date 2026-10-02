@@ -5,7 +5,6 @@ package install
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -14,7 +13,6 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
-	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
@@ -36,8 +34,6 @@ type Plan struct {
 	Binding            Binding
 	// Record is the project's routing record as it stands, nil when there is none.
 	Record *routing.Record
-	// admitted is the organization's policy the plan was admitted under; Apply needs one.
-	admitted *config.Policy
 }
 
 // Input is what an install plans from.
@@ -49,15 +45,11 @@ type Input struct {
 	Selected, Adapters []string
 	NoHooks            bool
 	Binding            Binding
-	// Policy is the organization's validated policy, which admits the install; nil plans
-	// a dry run that cannot be applied.
-	Policy *config.Policy
 }
 
 // Build plans an install into the workspace at in.Root.
 func Build(reg *agents.Registry, in Input) (Plan, error) {
 	p := Plan{Agents: reg, Root: in.Root, GitDir: in.GitDir, Existing: in.Existing, Selected: in.Selected, NoHooks: in.NoHooks, Binding: in.Binding}
-	p.admitted = in.Policy
 	// A record that exists and cannot be read is not "no choice": rewriting it from
 	// defaults would switch signals its developer turned off back on.
 	if in.Binding.ID != "" {
@@ -141,9 +133,6 @@ type Options struct {
 
 // Apply carries out the plan.
 func Apply(ctx context.Context, p Plan, o Options, s Steps, r Reporter) error {
-	if p.admitted == nil {
-		return errors.New("install: a plan is applied only once the organization's policy admits it")
-	}
 	reg := p.Agents
 	// Reserve the private store now, so hooks before and after a later git init choose the same one.
 	if p.GitDir == "" {

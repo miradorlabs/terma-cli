@@ -127,7 +127,8 @@ team with that team's key. Everything else — personal work, other repositories
 waits briefly in memory and is dropped: it never leaves your machine.
 
 What content leaves is your team's collection policy, set in Terma, and nothing else:
-install has no content switch. Agents send prompts, model responses and tool input and
+install has no content switch and never reads the policy. The relay and the hook queue's
+delivery fetch it with your login; until they have, nothing they would send leaves. Agents send prompts, model responses and tool input and
 output to the relay, and the relay removes what the policy does not collect before
 anything leaves. Paths the policy excludes withhold every record that names one, in a
 path field or as a word of a shell command (`cat secrets/app.env`), with the command's

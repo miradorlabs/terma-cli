@@ -72,4 +72,8 @@ is held briefly in memory and dropped: nothing unclaimed leaves the machine.
 - Wire names are contracts with other repositories, so never rename them: the commit
   trailers, hook event names, and spool event names (`internal/hooks/hookrun/events.go`).
 - `.terma/settings.json` is committed: no secrets, nothing per-developer.
+- Install is a plain installation of hooks and routing: it never fetches, stores or reads
+  the team's collection policy, and writes no content setting. The relay and the spool's
+  delivery fetch the policy (`internal/policy`) and apply it; setup fetches it for global
+  mode.
 - Help text never mentions the hidden `dev` and `local` environments.

@@ -172,8 +172,9 @@ func New(t *testing.T, mode Mode, opts ...Option) *Sandbox {
 
 	// The real terma paths: the profile's ingest URL is the receiver, so the
 	// background flushes the hooks start deliver there; the repository is installed
-	// with both adapters' hooks. The account fixture provides the developer login
-	// and collection policy every install requires. Providers remain local fixtures.
+	// with both adapters' hooks. The account fixture provides the developer login,
+	// and the collection policy the relay and the spool's delivery fetch with it.
+	// Providers remain local fixtures.
 	sb.terma(sb.Repo, "config", "set", "--otlp-url", sb.Receiver.URL())
 	sb.StartAccount()
 	// Each scenario connects its own exporter. --no-browser bounds a fixture-login
