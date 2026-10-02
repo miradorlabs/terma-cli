@@ -15,7 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
-const testCapture = `"capture":{"exclude_paths":[],"exclude_prompts":true,"exclude_tool_content":false,"signals":["traces","logs"]}`
+const testCapture = `"capture":{"exclude_paths":[],"exclude_prompts":true,"exclude_tool_content":false}`
 
 func TestCollectionPolicyWireContract(t *testing.T) {
 	t.Setenv("TERMA_POLICY_STUB", "")
@@ -25,7 +25,7 @@ func TestCollectionPolicyWireContract(t *testing.T) {
 				if r.URL.Path != "/v1/policy" || r.URL.Query().Get("project_id") != "team" || r.Header.Get("Authorization") != "Bearer mir_cli_live" || r.Header.Get(projectHeader) != "" {
 					t.Errorf("wrong policy authentication/URL")
 				}
-				fmt.Fprintf(w, `{"policy":{"version":"1.0","terma":{%s,"%s":{"members_can_pause":true,"members_can_add_repositories":true}}},"revision":4,"updated_at":"2026-09-30T12:27:05.490205Z"}`, testCapture, mode)
+				fmt.Fprintf(w, `{"policy":{"version":"1.0","terma":{%s,"%s":{}}},"revision":4,"updated_at":"2026-09-30T12:27:05.490205Z"}`, testCapture, mode)
 			}))
 			defer srv.Close()
 			c := newSplitTestClient(t, "http://127.0.0.1:1", srv.URL, liveCredential(), "team")
@@ -33,11 +33,8 @@ func TestCollectionPolicyWireContract(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if p.Global() != (mode == "global") || p.IncludePrompts || !p.IncludeToolContent || p.AllowsSignal("metrics") || !p.AllowsSignal("logs") || p.Revision != 4 || p.FetchedAt.IsZero() {
+			if p.Global() != (mode == "global") || p.IncludePrompts || !p.IncludeToolContent || p.CollectsNothing || p.Revision != 4 || p.FetchedAt.IsZero() {
 				t.Fatalf("wrong translated policy: %+v", p)
-			}
-			if mode == "per_repository" && !p.MembersCanAddRepositories {
-				t.Fatal("permissions lost")
 			}
 		})
 	}
@@ -95,7 +92,7 @@ func TestCollectionPolicyDev(t *testing.T) {
 	if p.Mode != config.ModeRepo && p.Mode != config.ModeGlobal {
 		t.Fatal("unsupported deployed policy")
 	}
-	t.Logf("dev policy parsed: mode=%s revision=%d include_prompts=%t include_tool_content=%t signals=%v", p.Mode, p.Revision, p.IncludePrompts, p.IncludeToolContent, p.Signals)
+	t.Logf("dev policy parsed: mode=%s revision=%d include_prompts=%t include_tool_content=%t", p.Mode, p.Revision, p.IncludePrompts, p.IncludeToolContent)
 }
 
 func TestCollectionPolicyMissingInvalidAndUnavailable(t *testing.T) {
@@ -111,7 +108,6 @@ func TestCollectionPolicyMissingInvalidAndUnavailable(t *testing.T) {
 		{"empty document", `{"policy":{}}`, 200, true},
 		{"unknown version", strings.Replace(valid, `"1.0"`, `"2.0"`, 1), 200, true},
 		{"missing capture switch", strings.Replace(valid, `"exclude_prompts":true,`, "", 1), 200, true},
-		{"unknown signal", strings.Replace(valid, `"logs"`, `"unknown"`, 1), 200, true},
 		{"both modes", strings.Replace(valid, `"global":{}`, `"global":{},"per_repository":{}`, 1), 200, true},
 		{"no modes", strings.Replace(valid, `,"global":{}`, "", 1), 200, true},
 		{"unavailable", `{}`, 503, true},
@@ -126,7 +122,7 @@ func TestCollectionPolicyMissingInvalidAndUnavailable(t *testing.T) {
 			if (err != nil) != tt.wantError {
 				t.Fatalf("policy=%+v error=%v", p, err)
 			}
-			if !tt.wantError && (p.Global() || !p.MembersCanAddRepositories) {
+			if !tt.wantError && (p.Global() || p.CollectsNothing) {
 				t.Fatal("unset policy granted global coverage")
 			}
 		})

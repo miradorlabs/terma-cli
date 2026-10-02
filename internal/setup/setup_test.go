@@ -36,7 +36,7 @@ func steps(log *[]string, pol config.Policy) Steps {
 }
 
 func policy() config.Policy {
-	return config.Policy{Mode: config.ModeRepo, Signals: []string{"logs"}, OrganizationID: "org_a", AuthURL: "https://auth.example", TeamID: "t1", FetchedAt: time.Now()}
+	return config.Policy{Mode: config.ModeRepo, OrganizationID: "org_a", AuthURL: "https://auth.example", TeamID: "t1", FetchedAt: time.Now()}
 }
 
 // The agents are recorded before the policy is fetched, the policy is stored before the

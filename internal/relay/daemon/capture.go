@@ -28,13 +28,13 @@ type Capture struct {
 // that agent's exporter at the relay machine-wide.
 func CapturePolicy(in Capture) relay.Policy {
 	org := in.Org
-	pol := relay.Policy{IncludePrompts: org.IncludePrompts, IncludeToolContent: org.IncludeToolContent, Signals: org.Signals,
+	pol := relay.Policy{IncludePrompts: org.IncludePrompts, IncludeToolContent: org.IncludeToolContent,
 		Excludes: excludes(org.ExcludePaths), RequireClaim: !in.Primary || !org.Global()}
 	if len(org.ExcludePaths) > 0 {
 		pol.IncludePrompts, pol.IncludeToolContent = false, false
 	}
 	switch rec := in.Record; {
-	case in.RecordErr != nil:
+	case org.CollectsNothing, in.RecordErr != nil:
 		pol.IncludePrompts, pol.IncludeToolContent = false, false
 		pol.Signals = []string{}
 	case rec == nil:
@@ -44,12 +44,7 @@ func CapturePolicy(in Capture) relay.Policy {
 	default:
 		pol.IncludePrompts = pol.IncludePrompts && rec.IncludePrompts
 		pol.IncludeToolContent = pol.IncludeToolContent && rec.IncludeToolContent
-		pol.Signals = []string{}
-		for _, s := range rec.Signals {
-			if org.AllowsSignal(s) {
-				pol.Signals = append(pol.Signals, s)
-			}
-		}
+		pol.Signals = append([]string{}, rec.Signals...)
 	}
 	return pol
 }

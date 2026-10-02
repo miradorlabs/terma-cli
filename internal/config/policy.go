@@ -2,7 +2,6 @@ package config
 
 import (
 	"os"
-	"slices"
 	"time"
 )
 
@@ -20,15 +19,14 @@ type Policy struct {
 	Mode               string `json:"mode"`
 	IncludePrompts     bool   `json:"include_prompts"`
 	IncludeToolContent bool   `json:"include_tool_content"`
-	// Signals nil means all; an empty list means collect nothing.
-	Signals                   []string  `json:"signals"`
-	ExcludePaths              []string  `json:"exclude_paths,omitempty"`
-	MembersCanAddRepositories bool      `json:"members_can_add_repositories"`
-	Revision                  int64     `json:"revision"`
-	UpdatedAt                 time.Time `json:"updated_at,omitempty"`
-	OrganizationID            string    `json:"organization_id,omitempty"`
-	TeamID                    string    `json:"team_id,omitempty"`
-	AuthURL                   string    `json:"auth_url,omitempty"`
+	// CollectsNothing is set while no validated policy applies: nothing leaves the machine.
+	CollectsNothing bool      `json:"collects_nothing,omitempty"`
+	ExcludePaths    []string  `json:"exclude_paths,omitempty"`
+	Revision        int64     `json:"revision"`
+	UpdatedAt       time.Time `json:"updated_at"`
+	OrganizationID  string    `json:"organization_id,omitempty"`
+	TeamID          string    `json:"team_id,omitempty"`
+	AuthURL         string    `json:"auth_url,omitempty"`
 	// DefaultProjectID receives everything in global mode.
 	DefaultProjectID string    `json:"default_project_id,omitempty"`
 	FetchedAt        time.Time `json:"fetched_at"`
@@ -45,12 +43,7 @@ func (p Policy) Expired(now time.Time) bool {
 
 // DefaultPolicy applies before `terma setup` has fetched one: repository mode, content on.
 func DefaultPolicy() Policy {
-	return Policy{Mode: ModeRepo, IncludePrompts: true, IncludeToolContent: true, MembersCanAddRepositories: true}
-}
-
-// AllowsSignal applies the organization's signal ceiling.
-func (p Policy) AllowsSignal(signal string) bool {
-	return p.Signals == nil || slices.Contains(p.Signals, signal)
+	return Policy{Mode: ModeRepo, IncludePrompts: true, IncludeToolContent: true}
 }
 
 // Global reports whether the organization collects every session on the machine.
@@ -65,7 +58,7 @@ func (p Policy) AppliesTo(organizationID, authURL string) bool {
 // NoPolicy is what applies to a login until its team's policy is validated: repositories
 // opt in and nothing is collected.
 func NoPolicy(organizationID, authURL string) Policy {
-	return Policy{Mode: ModeRepo, Signals: []string{}, OrganizationID: organizationID, AuthURL: authURL}
+	return Policy{Mode: ModeRepo, CollectsNothing: true, OrganizationID: organizationID, AuthURL: authURL}
 }
 
 // PolicyStub is the offline test override, TERMA_POLICY_STUB, read here and nowhere else.

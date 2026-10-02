@@ -108,9 +108,6 @@ func Run(ctx context.Context, reg *agents.Registry, cfg *config.Config, req Requ
 		if !pol.AppliesTo(cfg.OrganizationID, cfg.AuthURL) {
 			return Plan{}, errors.New("install: the collection policy fetched belongs to another organization or environment")
 		}
-		if err := Admit(pol, req.Existing, b); err != nil {
-			return Plan{}, err
-		}
 		if err := routing.StorePolicy(cfg, &pol); err != nil {
 			return Plan{}, err
 		}

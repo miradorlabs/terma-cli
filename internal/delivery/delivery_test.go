@@ -63,7 +63,7 @@ func TestEachProjectGoesToItsKeysOwnEnvironment(t *testing.T) {
 // an agent that refuses, it is withheld.
 func TestConversationContentNeedsItsAgentsConsent(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
-	pol := config.Policy{Mode: config.ModeRepo, IncludePrompts: true, Signals: []string{"logs"}}
+	pol := config.Policy{Mode: config.ModeRepo, IncludePrompts: true}
 	reply := spool.Event{Name: hookrun.EventAssistantMessage, Attrs: map[string]any{hookrun.AttrTool: "fake"}}
 	var asked []string
 	for _, tc := range []struct {
@@ -94,7 +94,7 @@ func TestConversationContentNeedsItsAgentsConsent(t *testing.T) {
 func TestQueuedEventsMeetTodaysPolicy(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	start := spool.Event{Name: hookrun.EventSessionStart}
-	logs := config.Policy{Mode: config.ModeRepo, Signals: []string{"logs"}}
+	logs := config.Policy{Mode: config.ModeRepo}
 	r := Router{}
 	if !r.Allowed(logs, "p1", start) {
 		t.Fatal("an unrecorded project's event was withheld")
@@ -132,7 +132,7 @@ func TestAProjectWithoutAPolicyOrAKeyKeepsItsEvents(t *testing.T) {
 		if team == "unfetched" {
 			return config.Policy{}, errors.New("not fetched yet")
 		}
-		return config.Policy{Mode: config.ModeRepo, Signals: []string{"logs"}}, nil
+		return config.Policy{Mode: config.ModeRepo}, nil
 	}}
 	res := r.Flush(t.Context(), s, &config.Config{}, true, 0)
 	if res.Sent != 0 || res.Held != 2 || res.Unroutable != 1 || res.Err != nil {

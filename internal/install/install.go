@@ -60,12 +60,7 @@ type Input struct {
 // Build plans an install into the workspace at in.Root.
 func Build(reg *agents.Registry, in Input) (Plan, error) {
 	p := Plan{Agents: reg, Root: in.Root, GitDir: in.GitDir, Existing: in.Existing, Selected: in.Selected, NoHooks: in.NoHooks, Binding: in.Binding}
-	if in.Policy != nil {
-		if err := Admit(*in.Policy, in.Existing, in.Binding); err != nil {
-			return Plan{}, err
-		}
-		p.admitted = in.Policy
-	}
+	p.admitted = in.Policy
 	// A record that exists and cannot be read is not "no choice": rewriting it from
 	// defaults would switch content its developer turned off back on.
 	if in.Binding.ID != "" {
@@ -98,14 +93,6 @@ func Build(reg *agents.Registry, in Input) (Plan, error) {
 	var err error
 	p.Hooks, err = PlanHooks(reg, in.Root, p.Detection, p.Adapters)
 	return p, err
-}
-
-// Admit refuses a new binding the organization's policy keeps for its admins.
-func Admit(pol config.Policy, existing *termaproject.File, b Binding) error {
-	if !pol.Global() && !pol.MembersCanAddRepositories && (existing == nil || existing.Project.ID != b.ID) {
-		return errors.New("your organization's policy does not allow members to add repositories; connect this repository in Terma first")
-	}
-	return nil
 }
 
 // PrintDryRun says what an install would do.

@@ -9,7 +9,7 @@ import (
 
 func TestPolicyBlocksCodexReplyCapture(t *testing.T) {
 	for _, mode := range []string{config.ModeRepo, config.ModeGlobal} {
-		for _, rule := range []string{"prompts", "signals", "paths", "agent"} {
+		for _, rule := range []string{"prompts", "nothing", "paths", "agent"} {
 			t.Run(mode+"/"+rule, func(t *testing.T) {
 				env := fundingEnv(t)
 				env.Policy.Mode = mode
@@ -17,8 +17,8 @@ func TestPolicyBlocksCodexReplyCapture(t *testing.T) {
 				switch rule {
 				case "prompts":
 					env.Policy.IncludePrompts = false
-				case "signals":
-					env.Policy.Signals = []string{"metrics"}
+				case "nothing":
+					env.Policy.CollectsNothing = true
 				case "paths":
 					env.Policy.ExcludePaths = []string{".env"}
 				case "agent":

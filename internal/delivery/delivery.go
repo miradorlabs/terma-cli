@@ -165,7 +165,7 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 // the relay and may predate a tightened policy.
 func (r Router) Allowed(org config.Policy, projectID string, e spool.Event) bool {
 	org = routing.EffectivePolicy(org, projectID)
-	if !org.AllowsSignal("logs") || e.Global && !org.Global() {
+	if org.CollectsNothing || e.Global && !org.Global() {
 		return false
 	}
 	if org.ExcludesPath(e.Workspace, "") || org.HasExcludedPath(e.Attrs, e.Workspace) {

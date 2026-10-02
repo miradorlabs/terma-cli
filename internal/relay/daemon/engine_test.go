@@ -17,17 +17,17 @@ func TestARelayCapturesNothingBeforeTheFirstFetch(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	for _, pol := range []config.Policy{
 		{},
-		{Mode: config.ModeRepo, IncludePrompts: true, Signals: []string{"logs"}, TeamID: "t1"},
+		{Mode: config.ModeRepo, IncludePrompts: true, TeamID: "t1"},
 	} {
 		cfg := &config.Config{OrganizationID: "org_a", AuthURL: "https://auth.example", Policy: pol}
 		Prepare(cfg)
-		if cfg.Policy.IncludePrompts || cfg.Policy.IncludeToolContent || len(cfg.Policy.Signals) != 0 || cfg.Policy.Global() {
+		if cfg.Policy.IncludePrompts || cfg.Policy.IncludeToolContent || !cfg.Policy.CollectsNothing || cfg.Policy.Global() {
 			t.Errorf("Prepare(%+v) = %+v", pol, cfg.Policy)
 		}
 	}
-	fetched := config.Policy{Mode: config.ModeRepo, Signals: []string{"logs"}, TeamID: "t1", FetchedAt: time.Now()}
+	fetched := config.Policy{Mode: config.ModeRepo, IncludePrompts: true, TeamID: "t1", FetchedAt: time.Now()}
 	cfg := &config.Config{Policy: fetched}
-	if Prepare(cfg); !slices.Equal(cfg.Policy.Signals, fetched.Signals) {
+	if Prepare(cfg); cfg.Policy.CollectsNothing || !cfg.Policy.IncludePrompts {
 		t.Fatalf("a validated policy was replaced: %+v", cfg.Policy)
 	}
 }

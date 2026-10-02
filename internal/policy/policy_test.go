@@ -27,7 +27,7 @@ func setUp(t *testing.T, stub string) *config.Config {
 
 func cache(t *testing.T, fetched time.Time) config.Policy {
 	t.Helper()
-	p := config.Policy{Mode: config.ModeRepo, Signals: []string{"logs"}, TeamID: team, OrganizationID: org, AuthURL: authURL, FetchedAt: fetched}
+	p := config.Policy{Mode: config.ModeRepo, TeamID: team, OrganizationID: org, AuthURL: authURL, FetchedAt: fetched}
 	if err := routing.SavePolicy(p); err != nil {
 		t.Fatal(err)
 	}
@@ -36,12 +36,12 @@ func cache(t *testing.T, fetched time.Time) config.Policy {
 
 // A fetched policy is stamped with the login and team it was fetched for, and stored.
 func TestRefreshStoresThePolicyForItsTeam(t *testing.T) {
-	cfg := setUp(t, `{"mode":"repo","signals":["metrics"]}`)
+	cfg := setUp(t, `{"mode":"repo","include_prompts":true}`)
 	if err := (Source{}).Refresh(t.Context(), cfg); err != nil {
 		t.Fatal(err)
 	}
 	stored, ok := routing.ValidatedPolicy(cfg, team)
-	if !ok || stored.TeamID != team || stored.OrganizationID != org || stored.AuthURL != authURL || stored.Signals[0] != "metrics" {
+	if !ok || stored.TeamID != team || stored.OrganizationID != org || stored.AuthURL != authURL || !stored.IncludePrompts {
 		t.Fatalf("stored %+v, %v", stored, ok)
 	}
 }

@@ -19,7 +19,7 @@ const (
 )
 
 func admitting() config.Policy {
-	return config.Policy{Mode: config.ModeRepo, MembersCanAddRepositories: true, Signals: []string{"logs"},
+	return config.Policy{Mode: config.ModeRepo,
 		OrganizationID: org, AuthURL: auth, TeamID: "p1", FetchedAt: time.Now()}
 }
 
@@ -66,30 +66,24 @@ func TestAnInstallWritesOnlyOnceAdmitted(t *testing.T) {
 	}
 }
 
-// A policy that refuses the repository, or one from another organization, writes nothing
-// at all: no step outside the repository, no binding, no recorded choice.
+// A policy from another organization writes nothing at all: no step outside the
+// repository, no binding, no recorded choice.
 func TestARefusedInstallWritesNothing(t *testing.T) {
-	refusing := admitting()
-	refusing.MembersCanAddRepositories = false
 	foreign := admitting()
 	foreign.OrganizationID = "org_b"
-	for name, pol := range map[string]config.Policy{"refused": refusing, "another organization": foreign} {
-		t.Run(name, func(t *testing.T) {
-			cfg, req := request(t)
-			var log []string
-			if _, err := Run(t.Context(), registry(), cfg, req, workflow(&log, pol), &report{}); err == nil {
-				t.Fatal("installed")
-			}
-			if slices.Contains(log, "apply") {
-				t.Fatalf("steps = %v", log)
-			}
-			if _, err := termaproject.Load(req.Root); !errors.Is(err, termaproject.ErrNotFound) {
-				t.Fatalf("a binding was written: %v", err)
-			}
-			if file, _ := config.LoadFile(); file != nil && file.Profiles[config.DefaultProfile] != nil {
-				t.Fatal("the agents chosen were recorded")
-			}
-		})
+	cfg, req := request(t)
+	var log []string
+	if _, err := Run(t.Context(), registry(), cfg, req, workflow(&log, foreign), &report{}); err == nil {
+		t.Fatal("installed")
+	}
+	if slices.Contains(log, "apply") {
+		t.Fatalf("steps = %v", log)
+	}
+	if _, err := termaproject.Load(req.Root); !errors.Is(err, termaproject.ErrNotFound) {
+		t.Fatalf("a binding was written: %v", err)
+	}
+	if file, _ := config.LoadFile(); file != nil && file.Profiles[config.DefaultProfile] != nil {
+		t.Fatal("the agents chosen were recorded")
 	}
 }
 

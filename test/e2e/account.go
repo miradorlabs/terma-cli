@@ -56,7 +56,7 @@ func (sb *Sandbox) StartAccount() *Account {
 				http.Error(w, "missing policy project_id", http.StatusBadRequest)
 				return
 			}
-			fmt.Fprint(w, `{"policy":{"version":"1.0","terma":{"per_repository":{"members_can_add_repositories":true},"capture":{"exclude_paths":[],"exclude_prompts":false,"exclude_tool_content":false,"signals":["traces","logs","metrics"]}}},"revision":1,"updated_at":"2026-09-30T12:27:05Z"}`)
+			fmt.Fprint(w, `{"policy":{"version":"1.0","terma":{"per_repository":{},"capture":{"exclude_paths":[],"exclude_prompts":false,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-09-30T12:27:05Z"}`)
 		case "/v1/api-keys/server":
 			if a.denyMints.Load() {
 				w.WriteHeader(http.StatusForbidden)
