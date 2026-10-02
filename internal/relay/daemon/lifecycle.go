@@ -86,7 +86,15 @@ func Spawn() {
 	}
 	proc := spawnCommand(exe, dir)
 	procinfo.Detach(proc)
-	if err := proc.Start(); err != nil {
+	out := openDaemonLog(dir)
+	if out != nil {
+		proc.Stdout, proc.Stderr = out, out
+	}
+	err = proc.Start()
+	if out != nil {
+		_ = out.Close()
+	}
+	if err != nil {
 		return
 	}
 	_ = proc.Process.Release()

@@ -71,9 +71,7 @@ func (r *Relay) enqueue(c claim.Claim, p *part) {
 	e := newEntry(r.opts.Now(), p.signal, p.records)
 	if err := r.outbox.put(rt, e, body); err != nil {
 		r.stats.dropped(p.signal, "outbox_write_failed", p.records)
-		if r.opts.Logf != nil {
-			r.opts.Logf("outbox %s: %v", rt, err)
-		}
+		r.warnf("outbox %s: %v; dropped %d %s", rt, err, p.records, p.signal)
 		return
 	}
 	s := r.sender(rt)
@@ -209,6 +207,7 @@ func (s *sender) loop() {
 			}
 			single = false
 			s.r.stats.dropped(batch[0].signal, "upstream_"+detail, batch[0].records)
+			s.r.warnf("upstream %s refused %d %s: %s", s.route, batch[0].records, batch[0].signal, detail)
 			s.r.outbox.bury(s.route, batch[0])
 			s.delivered(1)
 		case retry:
@@ -216,9 +215,7 @@ func (s *sender) loop() {
 				return
 			}
 			s.r.stats.add("upstream_retries", 1)
-			if s.r.opts.Logf != nil {
-				s.r.opts.Logf("upstream %s: %s", s.route, detail)
-			}
+			s.r.warnf("upstream %s: %s; retrying", s.route, detail)
 			backoff = nextBackoff(backoff, wait)
 			if !sleep(jitter(backoff, wait)) {
 				return

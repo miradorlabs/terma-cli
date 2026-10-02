@@ -35,9 +35,13 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 			ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 			defer stop()
 			deps := app.relayDeps()
+			log := daemon.NewLog(dir)
+			defer log.Close()
+			engine := deps.Engine(ctx, dir, cfg, daemon.SettingsFromEnv(), cmd.ErrOrStderr())
+			engine.Warnf = log.Printf
 			res, err := daemon.Run(ctx, daemon.Config{
-				Dir: dir, Addr: addr, Idle: idle, Environment: cfg.Environment,
-				Engine:  deps.Engine(ctx, dir, cfg, daemon.SettingsFromEnv(), cmd.ErrOrStderr()),
+				Dir: dir, Addr: addr, Idle: idle, Environment: cfg.Environment, Log: log,
+				Engine:  engine,
 				Workers: []func(context.Context){deps.Refresher().Run},
 				Listening: func(at net.Addr, hold time.Duration) {
 					if !quiet {

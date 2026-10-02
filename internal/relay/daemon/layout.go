@@ -17,8 +17,10 @@ const (
 	AddrFile  = "addr"
 	LockFile  = "relay.lock"
 	StatsFile = "stats.json"
-	PIDFile   = "pid"
-	ErrorFile = "last-error"
+	// PrevStatsFile is the exit counters of the relay before the last one.
+	PrevStatsFile = "stats.prev.json"
+	PIDFile       = "pid"
+	ErrorFile     = "last-error"
 	// StopFile asks the relay whose pid it holds to stop, since Windows has no SIGTERM.
 	StopFile          = "stop"
 	NoServiceFile     = "no-service"
