@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -15,6 +16,9 @@ func initRepo(t *testing.T) string {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not installed")
 	}
+	// No global hooks path: a commit here must not run the developer's installed terma.
+	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(t.TempDir(), "gitconfig"))
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	dir := t.TempDir()
 	ctx := context.Background()
 	for _, args := range [][]string{
@@ -110,5 +114,51 @@ func TestGitWithinNamesTheDeadlineItMissed(t *testing.T) {
 	_, err := GitWithin(context.Background(), 300*time.Millisecond, dir, "-c", "core.hooksPath="+hooks, "commit", "--allow-empty", "-qm", "slow")
 	if err == nil || !strings.Contains(err.Error(), "git commit: did not finish within 300ms") {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+// ChangedFiles is what a commit could take: modified, deleted, staged and untracked files,
+// never an ignored one.
+func TestChangedFiles(t *testing.T) {
+	dir := initRepo(t)
+	ctx := context.Background()
+	write := func(rel, body string) {
+		t.Helper()
+		path := filepath.Join(dir, rel)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("kept.txt", "a\n")
+	write("gone.txt", "a\n")
+	write("staged.txt", "a\n")
+	write(".gitignore", "build/\n")
+	if _, err := run(ctx, dir, "add", "-A"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := run(ctx, dir, "commit", "-qm", "base"); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := ChangedFiles(ctx, dir); err != nil || len(got) != 0 {
+		t.Fatalf("clean tree: %v, %v", got, err)
+	}
+	write("kept.txt", "b\n")
+	_ = os.Remove(filepath.Join(dir, "gone.txt"))
+	write("staged.txt", "b\n")
+	if _, err := run(ctx, dir, "add", "staged.txt"); err != nil {
+		t.Fatal(err)
+	}
+	write("new dir/with space.txt", "x\n")
+	write("build/out.bin", "x\n")
+	got, err := ChangedFiles(ctx, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	slices.Sort(got)
+	if want := []string{"gone.txt", "kept.txt", "new dir/with space.txt", "staged.txt"}; !slices.Equal(got, want) {
+		t.Fatalf("ChangedFiles = %q, want %q", got, want)
 	}
 }
