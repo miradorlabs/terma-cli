@@ -217,14 +217,8 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 		ui.printLines()
 		return err
 	}
+	// Install approves each agent's hooks itself, so connecting a repository is the only step.
 	if !res.Policy.Global() {
-		for _, n := range res.Agents {
-			if s, _, ok := app.agents.Surface(n); ok {
-				for _, step := range s.SetupSteps {
-					ui.Then(step)
-				}
-			}
-		}
 		ui.Then("Run `terma install` in each repository you want to connect.")
 	}
 	if res.Policy.Global() {

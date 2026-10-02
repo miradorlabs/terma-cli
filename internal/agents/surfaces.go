@@ -9,8 +9,8 @@ import (
 type Surface struct {
 	Name, DisplayName string
 	Installed         func(context.Context) bool
-	// InstallSteps and SetupSteps are what the developer does next for it to report.
-	InstallSteps, SetupSteps []string
+	// InstallSteps are what the developer does next, after an install, for it to report.
+	InstallSteps []string
 	// Reports says, after an install, how the surface's sessions reach Terma.
 	Reports string
 }

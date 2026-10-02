@@ -40,6 +40,10 @@ func TestSetupFetchesThePolicyAndPointsAgentsAtTheRelay(t *testing.T) {
 	if !strings.Contains(out, "Collects      sessions in connected repositories") {
 		t.Fatalf("setup did not say the policy:\n%s", out)
 	}
+	// Install approves Codex's hooks itself, so setup asks for no review in Codex.
+	if strings.Contains(out, "`/hooks`") {
+		t.Fatalf("setup still asks for a /hooks review that install does itself:\n%s", out)
+	}
 	token, err := daemon.Token()
 	if err != nil {
 		t.Fatalf("no relay token after setup: %v", err)

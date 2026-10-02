@@ -16,7 +16,6 @@ func (a Agent) Surfaces() []agents.Surface {
 		Name: name, DisplayName: "Codex TUI & Desktop",
 		Installed:    func(ctx context.Context) bool { return a.Installed(ctx) || desktopInstalled(ctx) },
 		InstallSteps: []string{"Approve Terma's hooks in Codex: run `/hooks` in this repository (in the desktop app: Settings → Hooks → Review). Until then Codex runs none of them, so none of its sessions here are recorded."},
-		SetupSteps:   []string{"Approve Terma's hooks in Codex: in a connected repository, run `/hooks` (in the desktop app: Settings → Hooks → Review). Until then Codex runs none of them, so none of its sessions there are recorded."},
 		Reports:      "reports through the relay and this repository's hooks",
 	}}
 }
