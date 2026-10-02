@@ -24,17 +24,17 @@ func TestPolicyCacheIsolatesTeamsAndScopes(t *testing.T) {
 	if EffectivePolicy(b, "team-a").IncludePrompts || !EffectivePolicy(a, "team-b").IncludePrompts {
 		t.Fatal("borrowed another team's capture policy")
 	}
-	if EffectivePolicy(b, "unknown").AllowsSignal("logs") {
+	if !EffectivePolicy(b, "unknown").CollectsNothing {
 		t.Fatal("unknown team borrowed selected team's grant")
 	}
 	other := b
 	other.OrganizationID = "other"
-	if EffectivePolicy(other, "team-b").AllowsSignal("logs") {
+	if !EffectivePolicy(other, "team-b").CollectsNothing {
 		t.Fatal("policy crossed organizations")
 	}
 	other = b
 	other.AuthURL = "https://prod.example"
-	if EffectivePolicy(other, "team-b").AllowsSignal("logs") {
+	if !EffectivePolicy(other, "team-b").CollectsNothing {
 		t.Fatal("policy crossed environments")
 	}
 	a.Revision = 8
@@ -48,7 +48,7 @@ func TestPolicyCacheIsolatesTeamsAndScopes(t *testing.T) {
 	if err := os.WriteFile(path, []byte("corrupt"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if EffectivePolicy(b, "team-a").AllowsSignal("logs") {
+	if !EffectivePolicy(b, "team-a").CollectsNothing {
 		t.Fatal("corrupt cache defaulted to capture")
 	}
 }
@@ -62,12 +62,12 @@ func TestExpiredPolicyGrantsNothing(t *testing.T) {
 	if err := SavePolicy(old); err != nil {
 		t.Fatal(err)
 	}
-	if got := EffectivePolicy(old, "team-a"); got.AllowsSignal("logs") || got.IncludePrompts {
+	if got := EffectivePolicy(old, "team-a"); !got.CollectsNothing || got.IncludePrompts {
 		t.Fatalf("an expired cache granted %+v", got)
 	}
 	fallback := old
 	fallback.TeamID = "team-b"
-	if got := EffectivePolicy(fallback, "team-b"); got.AllowsSignal("logs") || got.IncludePrompts {
+	if got := EffectivePolicy(fallback, "team-b"); !got.CollectsNothing || got.IncludePrompts {
 		t.Fatalf("an expired fallback granted %+v", got)
 	}
 	fresh := old
@@ -75,7 +75,7 @@ func TestExpiredPolicyGrantsNothing(t *testing.T) {
 	if err := SavePolicy(fresh); err != nil {
 		t.Fatal(err)
 	}
-	if !EffectivePolicy(fresh, "team-a").AllowsSignal("logs") {
+	if EffectivePolicy(fresh, "team-a").CollectsNothing {
 		t.Fatal("a refreshed policy still grants nothing")
 	}
 }

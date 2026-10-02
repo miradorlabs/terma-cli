@@ -21,7 +21,7 @@ const codexReplyMaxText = 16 << 10
 // per-session cursor, and only where prompts are consented.
 func captureCodexReplies(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in *codexHookInput) {
 	pol := e.ProjectPolicy(r)
-	if e.Spool == nil || !session.ValidID(in.SessionID) || !pol.IncludePrompts || !pol.AllowsSignal("logs") || len(pol.ExcludePaths) > 0 || !repliesConsented(r.Consent(pol.Global())) {
+	if e.Spool == nil || !session.ValidID(in.SessionID) || !pol.IncludePrompts || pol.CollectsNothing || len(pol.ExcludePaths) > 0 || !repliesConsented(r.Consent(pol.Global())) {
 		return
 	}
 	dir, err := config.Dir()

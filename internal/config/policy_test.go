@@ -25,7 +25,7 @@ func TestPolicyValidated(t *testing.T) {
 // Before validation nothing is collected, and the default names its login.
 func TestNoPolicyCollectsNothing(t *testing.T) {
 	p := NoPolicy("org", "https://auth")
-	if p.Global() || p.AllowsSignal("logs") || p.IncludePrompts || p.IncludeToolContent || !p.AppliesTo("org", "https://auth") || p.AppliesTo("other", "https://auth") {
+	if p.Global() || !p.CollectsNothing || p.IncludePrompts || p.IncludeToolContent || !p.AppliesTo("org", "https://auth") || p.AppliesTo("other", "https://auth") {
 		t.Fatalf("NoPolicy = %+v", p)
 	}
 }

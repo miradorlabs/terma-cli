@@ -34,7 +34,7 @@ func (r *report) Summary(label, _ string)         { r.ok = append(r.ok, label) }
 func plan(t *testing.T, root string, existing *termaproject.File) Plan {
 	t.Helper()
 	p, err := Build(builtin.Agents(), Input{Root: root, GitDir: root + "/.git", Existing: existing, Adapters: []string{"claude"},
-		Binding: Binding{ID: "proj_1", Name: "One"}, Policy: &config.Policy{Mode: config.ModeRepo, MembersCanAddRepositories: true}})
+		Binding: Binding{ID: "proj_1", Name: "One"}, Policy: &config.Policy{Mode: config.ModeRepo}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,22 +122,6 @@ func TestApplyNeedsAnAdmittedPlan(t *testing.T) {
 	}
 	if _, err := termaproject.Load(root); err == nil {
 		t.Fatal("the refused plan wrote a binding")
-	}
-}
-
-// A new binding is refused where the organization keeps adding repositories for its
-// admins; a repository already bound to the project is not new.
-func TestAdmitKeepsNewRepositoriesForAdmins(t *testing.T) {
-	closed := config.Policy{Mode: config.ModeRepo}
-	b := Binding{ID: "proj_1"}
-	if err := Admit(closed, nil, b); err == nil {
-		t.Fatal("a new repository was admitted")
-	}
-	if err := Admit(closed, &termaproject.File{Project: termaproject.Project{ID: "proj_1"}}, b); err != nil {
-		t.Fatalf("a bound repository was refused: %v", err)
-	}
-	if err := Admit(config.Policy{Mode: config.ModeGlobal}, nil, b); err != nil {
-		t.Fatalf("global mode refused: %v", err)
 	}
 }
 

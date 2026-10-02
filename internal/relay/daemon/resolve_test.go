@@ -14,7 +14,7 @@ import (
 func TestResolverGrantsOnlyAValidatedPolicyOfThisLogin(t *testing.T) {
 	const org, auth = "org_a", "https://auth.example"
 	fetched := time.Now()
-	valid := config.Policy{Mode: config.ModeRepo, IncludePrompts: true, IncludeToolContent: true, Signals: []string{"logs"},
+	valid := config.Policy{Mode: config.ModeRepo, IncludePrompts: true, IncludeToolContent: true,
 		OrganizationID: org, AuthURL: auth, TeamID: "p1", FetchedAt: fetched}
 	for _, tc := range []struct {
 		name    string

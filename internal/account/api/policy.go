@@ -50,13 +50,10 @@ type policyResponse struct {
 				ExcludePrompts     *bool     `json:"exclude_prompts"`
 				ExcludeToolContent *bool     `json:"exclude_tool_content"`
 				ExcludePaths       *[]string `json:"exclude_paths"`
-				Signals            *[]string `json:"signals"`
 			} `json:"capture"`
-			// Global's presence alone selects the mode.
+			// Which of the two is present selects the mode.
 			Global        *struct{} `json:"global"`
-			PerRepository *struct {
-				MembersCanAddRepositories bool `json:"members_can_add_repositories"`
-			} `json:"per_repository"`
+			PerRepository *struct{} `json:"per_repository"`
 		} `json:"terma"`
 	} `json:"policy"`
 	Revision  int64     `json:"revision"`
@@ -73,14 +70,9 @@ func (r policyResponse) collectionPolicy() (config.Policy, error) {
 	t := r.Policy.Terma
 	c := t.Capture
 	if r.Policy.Version != "1.0" || (t.Global == nil) == (t.PerRepository == nil) ||
-		c == nil || c.ExcludePrompts == nil || c.ExcludeToolContent == nil || c.ExcludePaths == nil || c.Signals == nil ||
+		c == nil || c.ExcludePrompts == nil || c.ExcludeToolContent == nil || c.ExcludePaths == nil ||
 		r.Revision < 1 || r.UpdatedAt.IsZero() {
 		return config.Policy{}, fmt.Errorf("invalid collection policy: require version 1.0, one collection mode and complete capture rules")
-	}
-	for _, signal := range *c.Signals {
-		if signal != "traces" && signal != "logs" && signal != "metrics" {
-			return config.Policy{}, fmt.Errorf("invalid collection policy signal %q", signal)
-		}
 	}
 	for _, path := range *c.ExcludePaths {
 		if strings.TrimSpace(path) == "" {
@@ -88,13 +80,10 @@ func (r policyResponse) collectionPolicy() (config.Policy, error) {
 		}
 	}
 	p := config.Policy{Mode: config.ModeRepo, IncludePrompts: !*c.ExcludePrompts,
-		IncludeToolContent: !*c.ExcludeToolContent, Signals: append([]string{}, (*c.Signals)...),
-		ExcludePaths: *c.ExcludePaths, Revision: r.Revision, UpdatedAt: r.UpdatedAt,
+		IncludeToolContent: !*c.ExcludeToolContent, ExcludePaths: *c.ExcludePaths, Revision: r.Revision, UpdatedAt: r.UpdatedAt,
 		FetchedAt: time.Now().UTC()}
 	if t.Global != nil {
 		p.Mode = config.ModeGlobal
-	} else {
-		p.MembersCanAddRepositories = t.PerRepository.MembersCanAddRepositories
 	}
 	return p, nil
 }
