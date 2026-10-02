@@ -169,8 +169,8 @@ terma doctor
 
 `doctor` opens with what this machine collects and what the repository has in progress
 (the active session, uncommitted agent edits), then checks every link end to end —
-sign-in, team binding, hooks, the agents' export, a scratch commit in a temporary
-worktree, the queue, and the backend round-trip. Every failure names its fix.
+sign-in, team binding, hooks, the agents' export, the queue, and delivery to the
+backend. Every failure names its fix.
 
 Organization and team names are shown without UUIDs in normal output; pickers show the
 ID when a name is missing or duplicated, and a name that matches nothing lists yours.

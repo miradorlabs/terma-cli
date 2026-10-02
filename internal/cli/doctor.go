@@ -13,20 +13,18 @@ import (
 )
 
 func (app *App) newDoctorCommand() *cobra.Command {
-	var skipCommit bool
 	cmd := &cobra.Command{
 		Use:   "doctor",
 		Short: "Verify the whole chain end to end and report setup readiness",
 		Long: `Says what this machine collects and what the repository has in progress, then
 checks every link between a coding agent and the Terma backend: the binary,
 your sign-in, the repository binding, the installed hooks and adapters, the
-harness export, a scratch commit in a temporary worktree (does the hook actually
-stamp a trailer?), the event spool, and the backend round-trip.
+harness export, the event spool, and delivery of what it holds to the backend.
 
 Every failure names the command that fixes it, and the report ends with the
 remaining steps to complete setup.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			env := app.doctorEnv(cmd.Context(), skipCommit)
+			env := app.doctorEnv(cmd.Context())
 			printContext(cmd.OutOrStdout(), doctor.Context(env))
 			if app.executeDoctor(cmd, env).Failed() {
 				return errors.New("some checks failed")
@@ -34,7 +32,9 @@ remaining steps to complete setup.`,
 			return nil
 		},
 	}
-	cmd.Flags().BoolVar(&skipCommit, "skip-commit", false, "do not make a scratch commit in a temporary worktree")
+	// --skip-commit predates the end of doctor's scratch commit; scripts may still pass it.
+	cmd.Flags().Bool("skip-commit", false, "")
+	_ = cmd.Flags().MarkHidden("skip-commit")
 	return cmd
 }
 
@@ -57,12 +57,10 @@ func printContext(w io.Writer, rows []doctor.Row) {
 // executeDoctor runs doctor's checks, printing each as it finishes.
 func (app *App) executeDoctor(cmd *cobra.Command, env doctor.Env) doctor.Report {
 	out := cmd.OutOrStdout()
-	// Streamed: the round-trip wait is long enough that a report printed at the end looks
-	// like a hang.
+	// Streamed: delivery can take long enough that a report printed at the end looks like a hang.
 	sp := spinner.New(cmd.ErrOrStderr())
 	report := doctor.Run(cmd.Context(), env, doctor.Progress{
 		Start: func(name string) { sp.Start(name + "…") },
-		Note:  sp.Update,
 		Done: func(c doctor.Check) {
 			sp.Stop()
 			doctor.RenderCheck(out, c, doctor.NameWidth)

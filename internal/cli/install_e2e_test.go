@@ -469,7 +469,7 @@ func TestInstallE2ENonGitHooksActuallyRun(t *testing.T) {
 		t.Fatalf("non-Git hooks inactive: %s", status)
 	}
 	// No credential means doctor cannot contact a backend. Git checks must still skip.
-	out, _ := s.run(nested, "", s.bin, "doctor", "--skip-commit")
+	out, _ := s.run(nested, "", s.bin, "doctor")
 	if !strings.Contains(out, "not a Git repository") || strings.Contains(out, "needs an installed repository") {
 		t.Fatalf("non-Git diagnostic: %s", out)
 	}

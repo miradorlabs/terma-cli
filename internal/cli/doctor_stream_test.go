@@ -7,11 +7,11 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 )
 
-// Each check is reported in order the moment it finishes, not after the slow round-trip.
+// Each check is reported in order the moment it finishes, not after the slowest.
 func TestDoctorReportsEachCheckAsItFinishes(t *testing.T) {
 	userSandbox(t)
 	var started, finished []string
-	report := doctor.Run(context.Background(), testApp.doctorEnv(context.Background(), true), doctor.Progress{
+	report := doctor.Run(context.Background(), testApp.doctorEnv(context.Background()), doctor.Progress{
 		Start: func(name string) { started = append(started, name) },
 		Done: func(c doctor.Check) {
 			if len(finished) != len(started)-1 && len(finished) != len(started) {

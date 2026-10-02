@@ -77,7 +77,6 @@ const (
 	KeyCompatibility = "compatibility"
 	KeyRouting       = "routing"
 	KeyStatusLine    = "statusline"
-	KeyScratch       = "scratch-commit"
 	KeySpool         = "spool"
 	KeyBackend       = "backend"
 	KeyGitHubApp     = "github-app"
@@ -130,7 +129,7 @@ func RenderSummary(w io.Writer, r Report) {
 	skipped := false
 	for _, c := range r.Checks {
 		if c.Status == Skip {
-			if c.Key == KeyScratch || c.Key == KeyBackend || c.Key == KeyProject {
+			if c.Key == KeyBackend || c.Key == KeyProject {
 				skipped = true
 			}
 			continue

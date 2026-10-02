@@ -23,7 +23,7 @@ import (
 type Row struct{ Label, Value string }
 
 // LocalReport is `terma status`: this machine and repository from local state alone, in
-// doctor's own verdicts, so the two cannot disagree. No scratch commit, no network.
+// doctor's own verdicts, so the two cannot disagree. No network.
 type LocalReport struct {
 	Rows   []Row
 	Checks []Check

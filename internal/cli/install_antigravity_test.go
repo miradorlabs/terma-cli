@@ -90,7 +90,7 @@ func TestDoctorReportsAntigravityWorkspaceTrust(t *testing.T) {
 	if _, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude,antigravity", "--yes"); err != nil {
 		t.Fatal(err)
 	}
-	out, _ := runTerma(t, "doctor", "--skip-commit")
+	out, _ := runTerma(t, "doctor")
 	if !strings.Contains(out, "Antigravity hooks present") || !strings.Contains(out, "not a trusted Antigravity workspace") {
 		t.Fatalf("doctor should see the hooks and the missing trust:\n%s", out)
 	}
@@ -102,7 +102,7 @@ func TestDoctorReportsAntigravityWorkspaceTrust(t *testing.T) {
 	if err := os.WriteFile(settings, []byte(`{"trustedWorkspaces": ["`+repo+`"]}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	out, _ = runTerma(t, "doctor", "--skip-commit")
+	out, _ = runTerma(t, "doctor")
 	if !strings.Contains(out, "Antigravity hooks present and the workspace is trusted") {
 		t.Fatalf("doctor should report the trusted workspace:\n%s", out)
 	}
@@ -114,7 +114,7 @@ func TestDoctorReportsAntigravityWorkspaceTrust(t *testing.T) {
 	if err := os.WriteFile(hooks, data, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	out, _ = runTerma(t, "doctor", "--skip-commit")
+	out, _ = runTerma(t, "doctor")
 	if !strings.Contains(out, "switched off") {
 		t.Fatalf("doctor should report the disabled entry:\n%s", out)
 	}
@@ -132,7 +132,7 @@ func TestDoctorIgnoresAntigravityWithoutTheAdapter(t *testing.T) {
 	if _, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude", "--yes"); err != nil {
 		t.Fatal(err)
 	}
-	out, _ := runTerma(t, "doctor", "--skip-commit")
+	out, _ := runTerma(t, "doctor")
 	if strings.Contains(out, "Antigravity") {
 		t.Fatalf("doctor mentioned Antigravity in a repository that has none of its hooks:\n%s", out)
 	}

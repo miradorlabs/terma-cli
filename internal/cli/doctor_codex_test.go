@@ -17,7 +17,7 @@ func TestDoctorReportsCodexHooksAwaitingTrust(t *testing.T) {
 	if _, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude,codex", "--yes"); err != nil {
 		t.Fatal(err)
 	}
-	out, _ := runTerma(t, "doctor", "--skip-commit")
+	out, _ := runTerma(t, "doctor")
 	if !strings.Contains(out, "Codex hooks present") {
 		t.Fatalf("doctor should see the hooks:\n%s", out)
 	}
@@ -50,7 +50,7 @@ func TestDoctorDoesNotChargeForAnAgentTheDeveloperDoesNotUse(t *testing.T) {
 	if err := config.UpdateProfile(config.DefaultProfile, func(p *config.Profile) { p.Harnesses = []string{"claude"} }); err != nil {
 		t.Fatal(err)
 	}
-	out, _ := runTerma(t, "doctor", "--skip-commit")
+	out, _ := runTerma(t, "doctor")
 	if !strings.Contains(out, "ok    agent hooks run") || strings.Contains(out, "let every agent run its hooks") {
 		t.Fatalf("an agent the developer does not use should cost nothing:\n%s", out)
 	}
@@ -63,7 +63,7 @@ func TestDoctorIgnoresCodexTrustWithoutTheAdapter(t *testing.T) {
 	if _, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude", "--yes"); err != nil {
 		t.Fatal(err)
 	}
-	out, _ := runTerma(t, "doctor", "--skip-commit")
+	out, _ := runTerma(t, "doctor")
 	if strings.Contains(out, "Codex hooks") {
 		t.Fatalf("doctor mentioned Codex hooks in a repository that has none:\n%s", out)
 	}
