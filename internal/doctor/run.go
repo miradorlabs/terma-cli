@@ -11,7 +11,6 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/gitx"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 )
@@ -254,32 +253,6 @@ func (d *run) signedIn() Check {
 			Fix: "TERMA_ENV=" + cfg.Environment + " terma setup"}
 	}
 	return Check{Status: Pass, Detail: detail}
-}
-
-// RepositoryCheck finds the binding of the workspace at root, or, in a linked worktree
-// without one, its main checkout's.
-func RepositoryCheck(root, gitDir string, repoErr error) (Check, *termaproject.File) {
-	if repoErr != nil {
-		return Check{Status: Fail, Detail: repoErr.Error()}, nil
-	}
-	f, from, err := termaproject.Resolve(root, gitDir)
-	if err != nil {
-		where := root
-		if _, main, ok := gitx.LinkedWorktreeFS(gitDir); ok && main != "" {
-			where += " or its main checkout " + main
-		}
-		return Check{Status: Fail, Detail: "no " + termaproject.FileName + " in " + where, Fix: "terma install"}, nil
-	}
-	return Check{Status: Pass, Detail: cmp.Or(f.Project.Name, f.Project.ID) + ThroughMain(root, from)}, f
-}
-
-// ThroughMain says, for a linked worktree bound through its main checkout, where the
-// binding came from; it is empty when the checkout has its own.
-func ThroughMain(root, from string) string {
-	if from == "" || from == root {
-		return ""
-	}
-	return " (through the main checkout " + from + ")"
 }
 
 func (d *run) commitHooks() Check {
