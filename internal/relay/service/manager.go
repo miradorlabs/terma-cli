@@ -6,9 +6,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"html"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -103,7 +105,9 @@ func (m Manager) Definition() (string, error) {
 
 // Current reports whether the installed definition is the one Install would write now. One
 // an earlier terma wrote, or for another binary or environment, is not: the system may run
-// a command this terma no longer has, or a relay that talks to another backend.
+// a command this terma no longer has, or a relay that talks to another backend. One that
+// reaches this same binary by another path (a symlink, ./bin/terma) is: rewriting it would
+// restart the relay for nothing, and an agent never resends what a restarting relay refused.
 func (m Manager) Current() bool {
 	path, err := m.Path()
 	if err != nil {
@@ -114,7 +118,58 @@ func (m Manager) Current() bool {
 		return false
 	}
 	want, err := m.Definition()
-	return err == nil && string(have) == want
+	if err != nil {
+		return false
+	}
+	if string(have) == want {
+		return true
+	}
+	exe, ok := m.installedExe(string(have))
+	return ok && sameFile(exe, m.Exe)
+}
+
+// installedExe is the binary an installed definition runs, when it is the definition Install
+// would write for that binary: everything but the path must match.
+func (m Manager) installedExe(have string) (string, bool) {
+	const mark = "TERMAEXEPLACEHOLDER"
+	o := m
+	o.Exe = mark
+	tmpl, err := o.Definition()
+	if err != nil || !strings.Contains(tmpl, mark) {
+		return "", false
+	}
+	pieces := strings.Split(tmpl, mark)
+	for i, p := range pieces {
+		pieces[i] = regexp.QuoteMeta(p)
+	}
+	match := regexp.MustCompile("^" + strings.Join(pieces, "(.+?)") + "$").FindStringSubmatch(have)
+	if match == nil {
+		return "", false
+	}
+	// The renderers escape the path (XML, a Go-quoted string, VBScript quotes); the one
+	// candidate that renders the installed bytes again is the path. Re-rendering also keeps
+	// this right should a renderer ever write the path twice: every occurrence must match.
+	raw := match[1]
+	unquoted, _ := strconv.Unquote(`"` + raw + `"`)
+	for _, exe := range []string{raw, html.UnescapeString(raw), unquoted, strings.ReplaceAll(raw, `""`, `"`)} {
+		if exe == "" {
+			continue
+		}
+		o.Exe = exe
+		if def, err := o.Definition(); err == nil && def == have {
+			return exe, true
+		}
+	}
+	return "", false
+}
+
+func sameFile(a, b string) bool {
+	ia, err := os.Stat(a)
+	if err != nil {
+		return false
+	}
+	ib, err := os.Stat(b)
+	return err == nil && os.SameFile(ia, ib)
 }
 
 // Install writes the service definition and starts it, and returns where the definition is.
@@ -170,6 +225,41 @@ func (m Manager) Install(ctx context.Context) (string, error) {
 		return path, nil
 	}
 	return "", errors.New("unsupported")
+}
+
+// Start starts the installed service's relay as it is defined, without rewriting it: one
+// already running is left alone, and one that exited 0 or was unloaded runs again.
+func (m Manager) Start(ctx context.Context) error {
+	path, ok := m.Installed()
+	if !ok {
+		return errors.New("the relay service is not installed")
+	}
+	switch runtime.GOOS {
+	case "darwin":
+		var lastErr error
+		for _, domain := range launchdDomains() {
+			if _, err := run(ctx, "launchctl", "kickstart", domain+"/"+m.Name); err == nil {
+				return nil
+			}
+		}
+		// Not loaded: kickstart knows only loaded jobs.
+		for _, domain := range launchdDomains() {
+			out, err := run(ctx, "launchctl", "bootstrap", domain, path)
+			if err == nil {
+				return nil
+			}
+			lastErr = fmt.Errorf("launchctl bootstrap %s: %w: %s", domain, err, out)
+		}
+		return lastErr
+	case "linux":
+		if out, err := run(ctx, "systemctl", "--user", "start", m.Name+".service"); err != nil {
+			return fmt.Errorf("systemctl --user start: %w: %s", err, out)
+		}
+		return nil
+	case "windows":
+		return m.startWindows()
+	}
+	return errUnsupported()
 }
 
 // Remove stops the service and removes its definition, reporting whether there was one.

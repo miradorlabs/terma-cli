@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -82,10 +83,60 @@ func TestQueuedCapturePolicyFiltersPathsAndCorruptBodies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := r.withholdQueued(Traces, b, Policy{Excludes: excluding("**/secrets/**")}); got != nil {
-		t.Fatal("queued excluded path survived")
+	if got, tl := r.withholdQueued(Traces, b, Policy{Excludes: excluding("**/secrets/**")}); got != nil || tl.excluded != 1 {
+		t.Fatalf("queued excluded path survived, or was not counted as one (%d)", tl.excluded)
 	}
-	if got := r.withholdQueued(Traces, []byte{0xff}, Policy{}); got != nil {
+	if got, _ := r.withholdQueued(Traces, []byte{0xff}, Policy{}); got != nil {
 		t.Fatal("uncheckable body was forwarded")
+	}
+
+	// A queued batch keeps the spans that name no excluded file.
+	spans := m.ResourceSpans[0].ScopeSpans[0]
+	spans.Spans = append(spans.Spans, &tracepb.Span{Name: "Read README.md", Attributes: []*commonpb.KeyValue{kv("file_path", "README.md")}})
+	if b, err = proto.Marshal(m); err != nil {
+		t.Fatal(err)
+	}
+	got, tl := r.withholdQueued(Traces, b, Policy{Excludes: excluding("**/secrets/**")})
+	var kept tracepb.TracesData
+	if err := proto.Unmarshal(got, &kept); err != nil || tl.excluded != 1 {
+		t.Fatalf("excluded %d, err %v; want 1 excluded and the rest sent", tl.excluded, err)
+	}
+	if left := kept.ResourceSpans[0].ScopeSpans[0].Spans; len(left) != 1 || left[0].Name != "Read README.md" {
+		t.Fatalf("kept %v, want only the README span", left)
+	}
+}
+
+// A queued batch the upstream asks to retry is counted once, when it finally leaves.
+func TestQueuedExclusionCountsOnceAcrossRetries(t *testing.T) {
+	var calls atomic.Int32
+	host := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if calls.Add(1) <= 2 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer host.Close()
+	policy := Policy{Endpoint: host.URL, Key: "key", Excludes: excluding("**/secrets/**")}
+	r := newRelay(Options{Dir: t.TempDir(), Resolve: func(claim.Claim) (Policy, error) { return policy, nil }})
+	m := &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{
+		{Attributes: []*commonpb.KeyValue{kv("file_path", "src/secrets/app.env")}},
+		{Attributes: []*commonpb.KeyValue{kv("file_path", "README.md")}},
+	}}}}}}
+	body, err := proto.Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.outbox.put(route{project: "team", tool: "claude"}, newEntry(time.Now(), Traces, 2), body); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { r.Run(ctx); close(done) }()
+	defer func() { cancel(); <-done }()
+	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["forwarded.traces"] > 0 })
+	c := r.Stats().Snapshot().Counters
+	if c["upstream_retries"] != 2 || c["forwarded.traces"] != 1 || c["dropped.policy_path.traces"] != 1 || c["withheld_at_send_records"] != 1 {
+		t.Fatalf("2 retries, then 1 forwarded, 1 excluded and 1 withheld wanted: %v", c)
 	}
 }

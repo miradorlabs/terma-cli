@@ -41,9 +41,7 @@ func (r *Relay) heartbeat(ctx context.Context, reason string) error {
 	defer cancel()
 	if err := r.opts.HeartbeatSend(ctx, r.heartbeatData(reason)); err != nil {
 		r.stats.add("heartbeats_failed", 1)
-		if r.opts.Logf != nil {
-			r.opts.Logf("heartbeat: %v", err)
-		}
+		r.warnf("heartbeat: %v", err)
 		return err
 	}
 	r.stats.add("heartbeats_sent", 1)

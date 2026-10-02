@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -35,6 +36,8 @@ type Config struct {
 	// Workers run beside the engine until it stops, and are waited for.
 	Workers   []func(ctx context.Context)
 	Listening func(addr net.Addr, hold time.Duration)
+	// Log, when set, is told of the relay's start and exit, with its counters.
+	Log *Log
 }
 
 // Result is how a relay's run ended.
@@ -84,8 +87,14 @@ func Run(ctx context.Context, c Config) (Result, error) {
 	r := relay.New(opts)
 	ln, err := listen(c.Dir, addr)
 	if err != nil {
+		c.Log.Printf("relay pid %d: %v", os.Getpid(), err)
 		return res, err
 	}
+	kind := "on demand"
+	if res.Service {
+		kind = "service"
+	}
+	c.Log.Printf("relay pid %d (%s, %s) listening on %s", os.Getpid(), kind, cmp.Or(c.Environment, "prod"), ln.Addr())
 	if c.Listening != nil {
 		c.Listening(ln.Addr(), opts.Hold)
 	}
@@ -121,10 +130,30 @@ func Run(ctx context.Context, c Config) (Result, error) {
 	cancel()
 	<-engine
 	workers.Wait()
-	if data, err := json.MarshalIndent(r.Stats().Snapshot(), "", "  "); err == nil {
-		_ = config.WriteFileAtomicNoSync(filepath.Join(c.Dir, StatsFile), append(data, '\n'), 0o600)
+	snap := r.Stats().Snapshot()
+	if data, err := json.MarshalIndent(snap, "", "  "); err == nil {
+		// The previous relay's exit counters stay beside this one's.
+		statsPath := filepath.Join(c.Dir, StatsFile)
+		_ = os.Rename(statsPath, filepath.Join(c.Dir, PrevStatsFile))
+		_ = config.WriteFileAtomicNoSync(statsPath, append(data, '\n'), 0o600)
+	}
+	if line, err := json.Marshal(snap.Counters); err == nil {
+		c.Log.Printf("relay pid %d stopped (%s): %s", os.Getpid(), res.why(serveErr), line)
 	}
 	return res, serveErr
+}
+
+// why names how a run ended, for the relay log.
+func (r Result) why(err error) string {
+	switch {
+	case err != nil:
+		return err.Error()
+	case r.Replaced:
+		return "its binary was replaced"
+	case r.SetupGone:
+		return "its setup was removed"
+	}
+	return "stopped or idle"
 }
 
 // RunInfo is what the running relay records about itself.
@@ -153,6 +182,11 @@ func RunningRelay(dir string) (RunInfo, bool) {
 	return info, true
 }
 
+// lockPoll is how often the service's relay retries a lock another relay holds. Nothing
+// listens between that relay's exit and the retry, and an agent never resends what it
+// exported into the gap, so the wait is short.
+const lockPoll = 250 * time.Millisecond
+
 // lock takes the single-instance lock, with wait waiting out a hook-started relay; a nil
 // unlock means this relay must not run.
 func lock(ctx context.Context, dir string, wait bool) (unlock func(), busy bool, err error) {
@@ -162,7 +196,7 @@ func lock(ctx context.Context, dir string, wait bool) (unlock func(), busy bool,
 		select {
 		case <-ctx.Done():
 			return nil, false, nil
-		case <-time.After(5 * time.Second):
+		case <-time.After(lockPoll):
 		}
 		unlock, err = flock.TryLock(path)
 	}
