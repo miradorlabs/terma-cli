@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"errors"
 	"net"
 	"os"
 	"os/exec"
@@ -21,7 +22,8 @@ const RetryAfter = time.Minute
 
 // Stop asks a running relay to stop and waits for its lock, so a changed address or token
 // takes effect; it also returns once another relay, such as the service's waiting behind
-// it, has taken over.
+// it, has taken over. While its setup remains, the relay hands its socket to the next
+// relay (handoff.go), so the port stays bound throughout.
 func Stop(dir string) {
 	pid := recordedPID(dir)
 	if pid <= 1 {
@@ -79,25 +81,9 @@ func Spawn() {
 	if info, err := os.Stat(filepath.Join(dir, ErrorFile)); err == nil && time.Since(info.ModTime()) < RetryAfter {
 		return
 	}
-	exe, err := os.Executable()
-	// A <package>.test binary is no relay, and would only fail on the flags.
-	if err != nil || strings.HasSuffix(filepath.Base(exe), ".test") {
+	if start(dir) != nil {
 		return
 	}
-	proc := spawnCommand(exe, dir)
-	procinfo.Detach(proc)
-	out := openDaemonLog(dir)
-	if out != nil {
-		proc.Stdout, proc.Stderr = out, out
-	}
-	err = proc.Start()
-	if out != nil {
-		_ = out.Close()
-	}
-	if err != nil {
-		return
-	}
-	_ = proc.Process.Release()
 	// Wait until it listens: an agent may export as soon as the hook returns, and never
 	// retries a refused connection.
 	addr := Addr(dir)
@@ -109,10 +95,39 @@ func Spawn() {
 	}
 }
 
+// SpawnSuccessor starts the relay that takes a stopping relay's socket once it releases the
+// lock: an on-demand relay, which steps aside for the service's should that start.
+func SpawnSuccessor(dir string) error {
+	return start(dir, "--successor")
+}
+
+// start starts `terma relay run --quiet` detached, logging to the relay's log.
+func start(dir string, args ...string) error {
+	exe, err := os.Executable()
+	// A <package>.test binary is no relay, and would only fail on the flags.
+	if err != nil || strings.HasSuffix(filepath.Base(exe), ".test") {
+		return errors.New("relay: no terma binary to start")
+	}
+	proc := spawnCommand(exe, dir, args...)
+	procinfo.Detach(proc)
+	out := openDaemonLog(dir)
+	if out != nil {
+		proc.Stdout, proc.Stderr = out, out
+	}
+	err = proc.Start()
+	if out != nil {
+		_ = out.Close()
+	}
+	if err != nil {
+		return err
+	}
+	return proc.Process.Release()
+}
+
 // spawnCommand is the hook-started relay. A hook's environment is not the developer's (it
 // may lack TERMA_ENV), so the relay runs in the one install recorded, where there is one.
-func spawnCommand(exe, dir string) *exec.Cmd {
-	proc := exec.Command(exe, "relay", "run", "--quiet")
+func spawnCommand(exe, dir string, args ...string) *exec.Cmd {
+	proc := exec.Command(exe, append([]string{"relay", "run", "--quiet"}, args...)...)
 	if env, ok := RecordedEnv(dir); ok {
 		proc.Env = withRelayEnv(os.Environ(), env)
 	}
