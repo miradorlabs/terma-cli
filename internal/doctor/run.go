@@ -293,8 +293,11 @@ func (d *run) commitHooks() Check {
 	if d.nonGit {
 		return Check{Status: Skip, Detail: "not a Git repository"}
 	}
-	if !d.installed() {
+	if d.env.RepoErr != nil {
 		return Check{Status: Skip, Detail: "needs an installed repository"}
+	}
+	if !d.installed() {
+		return UnboundHooksCheck(JudgeHooksPath(d.ctx, d.env.Root), d.cfg.Policy.Global())
 	}
 	return HooksCheck(JudgeHookWiring(d.ctx, d.env.Root, d.bound))
 }

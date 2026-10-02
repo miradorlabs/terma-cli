@@ -121,6 +121,25 @@ func HooksCheck(w HookWiring) Check {
 	return Check{Status: Pass, Detail: string(w.Manager)}
 }
 
+// UnboundHooksCheck is doctor's wording for where git looks for an unbound repository's
+// hooks: a local setting outranks terma's global hooks, and one naming no hooks runs none.
+func UnboundHooksCheck(h HooksPath, global bool) Check {
+	where := "core.hooksPath=" + h.Value + " (" + h.Scope + ")"
+	switch {
+	case h.Local() && h.Hookless && h.Value == hookmgr.ShimDir:
+		return Check{Status: Warn, Detail: where + " is left from a terma install and holds no hooks, so git runs none here", Fix: "terma uninstall"}
+	case h.Local() && h.Hookless:
+		return Check{Status: Warn, Detail: where + " holds no hooks, so git runs none here", Fix: "git config --" + h.Scope + " --unset core.hooksPath, or restore the hooks it names"}
+	case !global:
+		return Check{Status: Skip, Detail: "needs an installed repository"}
+	case h.Local():
+		return Check{Status: Warn, Detail: where + " outranks terma's global git hooks, so commits here are not stamped", Fix: "terma install"}
+	case h.TermaGlobal && !h.Hookless:
+		return Check{Status: Pass, Detail: "terma's global git hooks (global mode)"}
+	}
+	return Check{Status: Warn, Detail: "terma's global git hooks are not in effect (" + cmp.Or(h.Value, "core.hooksPath unset") + "), so commits here are not stamped", Fix: "terma setup"}
+}
+
 // StatusLineCheck is doctor's wording for the status-line verdict.
 func StatusLineCheck(v StatusLineVerdict) Check {
 	switch v.Capture {
