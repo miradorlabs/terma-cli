@@ -273,7 +273,7 @@ func TestDoctorBackendWarnsForAnotherProjectsRefusal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	check := doctor.BackendCheck(context.Background(), testApp.doctorProbes(cfg), routeProdProject, "", doctor.Check{}, doctor.Progress{})
+	check := doctor.BackendCheck(context.Background(), testApp.doctorProbes(cfg), routeProdProject)
 	if check.Status == doctor.Fail {
 		t.Fatalf("another project's refusal must not fail this repository's check: %+v", check)
 	}
@@ -297,7 +297,7 @@ func TestDoctorBackendFailsOnThisProjectsRefusal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	check := doctor.BackendCheck(context.Background(), testApp.doctorProbes(cfg), routeDevProject, "", doctor.Check{}, doctor.Progress{})
+	check := doctor.BackendCheck(context.Background(), testApp.doctorProbes(cfg), routeDevProject)
 	if check.Status != doctor.Fail || !strings.Contains(check.Detail, "this team's events were not delivered: refused by "+dev.URL) {
 		t.Fatalf("this project's refusal must fail, naming the host: %+v", check)
 	}
