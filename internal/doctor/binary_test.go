@@ -25,19 +25,28 @@ func writeTerma(t *testing.T, dir, body string) string {
 	return path
 }
 
+// agentHookPath stands dirs in for where an agent started from the Dock looks for terma.
+func agentHookPath(t *testing.T, dirs ...string) {
+	t.Helper()
+	prev := agentHookDirs
+	agentHookDirs = func() []string { return dirs }
+	t.Cleanup(func() { agentHookDirs = prev })
+}
+
 func TestDoctorComparesPATHBinaryWithRunningBuild(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	current := writeTerma(t, t.TempDir(), "new build")
 	installed := writeTerma(t, t.TempDir(), "old build")
 	t.Setenv("PATH", filepath.Dir(installed))
-	check := BinaryCheck(current, nil)
+	agentHookPath(t, filepath.Dir(installed))
+	check := BinaryCheck(current, nil, ByName)
 	if check.Status != Warn || !strings.Contains(check.Detail, "hooks run a different build") || !strings.Contains(check.Fix, filepath.Dir(current)) {
 		t.Fatalf("stale hook binary must be reported: %+v", check)
 	}
 	if err := os.WriteFile(installed, []byte("new build"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	if check := BinaryCheck(current, nil); check.Status != Pass {
+	if check := BinaryCheck(current, nil, ByName); check.Status != Pass {
 		t.Fatalf("identical copy should pass: %+v", check)
 	}
 }
@@ -69,7 +78,8 @@ func TestDoctorRecognizesOfficialNpmLauncher(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", bin)
-	if check := BinaryCheck(current, nil); check.Status != Pass {
+	agentHookPath(t, bin)
+	if check := BinaryCheck(current, nil, ByName); check.Status != Pass {
 		t.Fatalf("official npm launcher should delegate to this build: %+v", check)
 	}
 	if others := otherTermas(filepath.Join(bin, "terma"), nil); len(others) != 0 {
@@ -78,7 +88,7 @@ func TestDoctorRecognizesOfficialNpmLauncher(t *testing.T) {
 	if err := os.WriteFile(vendor, []byte("old Go build"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if check := BinaryCheck(current, nil); check.Status != Warn {
+	if check := BinaryCheck(current, nil, ByName); check.Status != Warn {
 		t.Fatalf("stale vendor binary must still be reported: %+v", check)
 	}
 	if err := os.WriteFile(vendor, []byte("same Go build"), 0o755); err != nil {
@@ -87,7 +97,7 @@ func TestDoctorRecognizesOfficialNpmLauncher(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(pkg, "bin", "terma.js"), append(launcher, []byte("\n// changed\n")...), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if check := BinaryCheck(current, nil); check.Status != Warn {
+	if check := BinaryCheck(current, nil, ByName); check.Status != Warn {
 		t.Fatalf("edited npm launcher must not be trusted: %+v", check)
 	}
 }
@@ -130,10 +140,14 @@ func TestDoctorGivesTheCommandThatPutsTermaOnPath(t *testing.T) {
 	current := writeTerma(t, filepath.Join(t.TempDir(), "it's a build"), "this build")
 	dir := filepath.Dir(current)
 
-	check := BinaryCheck(current, nil)
+	check := BinaryCheck(current, nil, ByName)
 	command := AddToPathCommand(dir)
 	if check.Status != Fail || !strings.Contains(check.Fix, "run `"+command+"` to put "+dir+" on PATH") || strings.Count(check.Fix, "`") != 2 {
 		t.Fatalf("the fix should be the one quoted command: %+v", check)
+	}
+	// Machine-wide hooks run terma by its full path, so they need nothing from PATH.
+	if check := BinaryCheck(current, nil, ByFullPath); check.Status != Pass || !strings.Contains(check.Detail, current) {
+		t.Fatalf("machine-wide hooks alone must not need PATH: %+v", check)
 	}
 	echo, reload, ok := strings.Cut(command, " && ")
 	if !ok || reload != "source ~/.zshrc" || !strings.HasSuffix(echo, " >> ~/.zshrc") {
@@ -155,5 +169,28 @@ func TestDoctorGivesTheCommandThatPutsTermaOnPath(t *testing.T) {
 	t.Setenv("SHELL", "/bin/dash")
 	if got, want := AddToPathCommand("/opt/terma"), `export PATH="/opt/terma:$PATH"`; got != want {
 		t.Errorf("an unknown shell: %q, want %q", got, want)
+	}
+}
+
+// Committed hooks started by an agent from the Dock look only in a few directories, so a
+// terma on this shell's PATH alone is not enough for them.
+func TestDoctorWarnsWhenAgentHooksCannotFindTerma(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("committed hooks extend PATH in sh only")
+	}
+	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	current := writeTerma(t, t.TempDir(), "this build")
+	t.Setenv("PATH", filepath.Dir(current))
+	agentHookPath(t, t.TempDir())
+	check := BinaryCheck(current, nil, ByName)
+	if check.Status != Warn || !strings.Contains(check.Detail, "Dock or an IDE") || !strings.Contains(check.Fix, "ln -sf") {
+		t.Fatalf("a terma only this shell finds must be reported: %+v", check)
+	}
+	if check := BinaryCheck(current, nil, ByFullPath); check.Status != Pass {
+		t.Fatalf("machine-wide hooks run terma by its full path: %+v", check)
+	}
+	agentHookPath(t, filepath.Dir(current))
+	if check := BinaryCheck(current, nil, ByName); check.Status != Pass {
+		t.Fatalf("a terma where agents look passes: %+v", check)
 	}
 }

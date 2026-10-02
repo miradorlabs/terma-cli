@@ -137,7 +137,7 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 		}
 	}
 
-	rep.Checks = []Check{BinaryCheck(env.Exe, env.BinDirs), export, agentHooks, {Key: KeyBackend, Status: Skip}}
+	rep.Checks = []Check{BinaryCheck(env.Exe, env.BinDirs, HookCallerFor(env.Root, env.GitDir, env.RepoErr)), export, agentHooks, {Key: KeyBackend, Status: Skip}}
 	if !authOK {
 		rep.Checks = append(rep.Checks, Check{Status: Fail, Fix: "terma setup"})
 	}

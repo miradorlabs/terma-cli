@@ -152,7 +152,7 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 
 	var binaryCheck Check
 	timed(KeyBinary, "terma on PATH", func() Check {
-		binaryCheck = BinaryCheck(env.Exe, env.BinDirs)
+		binaryCheck = BinaryCheck(env.Exe, env.BinDirs, HookCallerFor(env.Root, env.GitDir, env.RepoErr))
 		return binaryCheck
 	})
 
@@ -238,6 +238,17 @@ func (d *run) signedIn() Check {
 		env = " [" + cfg.Environment + "]"
 	}
 	return Check{Status: Pass, Detail: who + " in " + cmp.Or(cfg.OrganizationName, cred.OrganizationID) + env}
+}
+
+// HookCallerFor is how hooks reach terma in the workspace at root: a bound repository's
+// committed hooks call it by name, and elsewhere only machine-wide hooks run.
+func HookCallerFor(root, gitDir string, repoErr error) HookCaller {
+	if repoErr == nil {
+		if _, _, err := termaproject.Resolve(root, gitDir); err == nil {
+			return ByName
+		}
+	}
+	return ByFullPath
 }
 
 // RepositoryCheck finds the binding of the workspace at root, or, in a linked worktree
