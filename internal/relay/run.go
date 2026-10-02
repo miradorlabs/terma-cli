@@ -2,6 +2,7 @@ package relay
 
 import (
 	"context"
+	"strings"
 	"time"
 )
 
@@ -21,11 +22,8 @@ func (r *Relay) Run(ctx context.Context) {
 		case <-ctx.Done():
 			// Claims that landed since the last sweep still count; the rest waits on disk for the next relay.
 			r.sweep()
-			r.deliverMu.Lock()
-			r.mu.Lock()
-			r.saveHeldLocked()
-			r.mu.Unlock()
-			r.deliverMu.Unlock()
+			r.flushHeld()
+			r.countHeldAtExit()
 			close(r.stopping)
 			done := make(chan struct{})
 			go func() { r.wg.Wait(); close(done) }()
@@ -40,6 +38,7 @@ func (r *Relay) Run(ctx context.Context) {
 			return
 		case <-tick.C:
 			r.sweep()
+			r.flushHeld()
 			if now := time.Now(); now.Sub(lastJanitor) >= time.Minute {
 				r.janitor(now)
 				lastJanitor = now
@@ -66,6 +65,32 @@ func (r *Relay) janitor(now time.Time) {
 			s.delivered(n)
 		}
 	}
+}
+
+// countHeldAtExit counts what the store keeps for the next relay, or drops what it could
+// not keep, and lets go of the hold without touching the store.
+func (r *Relay) countHeldAtExit() {
+	r.deliverMu.Lock()
+	defer r.deliverMu.Unlock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.store.mu.Lock()
+	defer r.store.mu.Unlock()
+	for key, parts := range r.held {
+		for _, h := range parts {
+			if _, kept := r.store.on[h.p]; kept {
+				r.stats.add("held_at_exit."+string(h.p.signal), h.p.records)
+				continue
+			}
+			reason := "unclaimed_at_exit"
+			if strings.HasPrefix(key, tracePrefix) {
+				reason = "no_session_trace_at_exit"
+			}
+			r.stats.dropped(h.p.signal, reason, h.p.records)
+		}
+	}
+	clear(r.held)
+	r.heldN, r.heldBytes = 0, 0
 }
 
 // countQueuedAtExit counts the outbox as queued, not lost: the next relay delivers it.

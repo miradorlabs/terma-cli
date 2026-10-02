@@ -31,7 +31,23 @@ type traceSession struct {
 }
 
 func (r *Relay) hold(p *part) {
-	r.holdSince(p.session, heldPart{p, r.opts.Now(), proto.Size(p.msg)})
+	// Encoded now, while nothing else can change it, for the store's next flush.
+	var body []byte
+	size := 0
+	if r.store.dir != "" {
+		var err error
+		if body, err = proto.Marshal(p.msg); err != nil {
+			body = nil
+		}
+		size = len(body)
+	}
+	if body == nil {
+		size = proto.Size(p.msg)
+	}
+	h := heldPart{p, r.opts.Now(), size}
+	if r.holdSince(p.session, h) {
+		r.store.add(p.session, h, body)
+	}
 }
 
 // holdSince adds h under key within the hold's bounds, reporting whether it is held.
@@ -86,6 +102,7 @@ func (r *Relay) evictOldestLocked() bool {
 	}
 	r.heldN -= h.p.records
 	r.heldBytes -= h.size
+	r.store.gone(h.p)
 	r.stats.dropped(h.p.signal, "unclaimed_evicted", h.p.records)
 	return true
 }
@@ -155,9 +172,16 @@ func (r *Relay) sweep() {
 		}
 		// hold runs only under deliverMu, which the sweep has.
 		r.mu.Lock()
+		kept := map[*part]bool{}
+		for _, h := range keep {
+			kept[h.p] = true
+		}
 		for _, h := range parts {
 			r.heldN -= h.p.records
 			r.heldBytes -= h.size
+			if !kept[h.p] {
+				r.store.gone(h.p)
+			}
 		}
 		for _, h := range keep {
 			r.heldN += h.p.records

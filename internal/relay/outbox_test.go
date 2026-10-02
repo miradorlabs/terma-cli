@@ -86,7 +86,8 @@ func TestRelayOutboxSurvivesARestart(t *testing.T) {
 	waitFor(t, func() bool { return countFiles(t, dir) == 0 })
 }
 
-// While a relay runs only claimed, keyed parts reach the disk; everything else is held in memory.
+// Only claimed, keyed parts reach the outbox; everything else waits in the hold, whose
+// store is the hold's own (holdstore.go).
 func TestRelayWritesNothingUnclaimed(t *testing.T) {
 	u := newUpstream(t)
 	u.status = http.StatusServiceUnavailable // so claimed parts stay on disk to be seen
@@ -96,6 +97,9 @@ func TestRelayWritesNothingUnclaimed(t *testing.T) {
 	post(t, srv, "/v1/logs", body, "application/x-protobuf", token, false)
 	waitFor(t, func() bool { return countFiles(t, r.opts.Dir) == 2 })
 	_ = filepath.WalkDir(r.opts.Dir, func(p string, d fs.DirEntry, err error) error {
+		if d != nil && d.IsDir() && d.Name() == heldDir {
+			return filepath.SkipDir
+		}
 		if err != nil || !d.Type().IsRegular() {
 			return nil
 		}

@@ -2,8 +2,8 @@
 // forwards a record only when a hook in an opted-in repository claimed its session and the
 // record came from a process that claim names, to that project with its key and content
 // policy. Everything else waits briefly in memory, since a first export can race the
-// claiming hook, and is then dropped. Only a stopping relay writes what it still holds to
-// disk, where the next relay takes it back into memory (holdstore.go).
+// claiming hook, and is then dropped. What waits is mirrored on disk until it leaves, so a
+// restarted relay takes it back (holdstore.go).
 package relay
 
 import (
@@ -119,6 +119,7 @@ type Relay struct {
 	traces     map[string]traceSession
 	procs      map[int]*procState // sender pid → the sessions it named, and whether it exited
 	outbox     outbox
+	store      heldStore
 	senders    map[route]*sender
 	lastSeen   time.Time
 	wg         sync.WaitGroup
@@ -163,6 +164,7 @@ func New(opts Options) *Relay {
 		held:   map[string][]heldPart{},
 		traces: map[string]traceSession{}, procs: map[int]*procState{}, senders: map[route]*sender{}, outbox: outbox{dir: opts.Dir},
 		lastSeen: opts.Now(), sendCtx: sendCtx, cancelSend: cancel, stopping: make(chan struct{}),
+		store: newHeldStore(opts.Dir),
 	}
 	// Before the first export, so a session's reloaded parts still go ahead of its new ones.
 	r.loadHeld()
