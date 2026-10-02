@@ -32,7 +32,7 @@ func (m Machine) Apply(ctx context.Context, selected []string, global bool, said
 	for _, f := range files {
 		said("Machine-wide hooks updated: " + output.TildePath(f))
 	}
-	if global && len(files) > 0 {
+	if global {
 		for _, step := range m.TrustSteps(selected) {
 			then(step)
 		}

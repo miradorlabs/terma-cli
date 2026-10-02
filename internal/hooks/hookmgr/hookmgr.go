@@ -43,6 +43,29 @@ func HookCommand(event string) string {
 	return "command -v terma >/dev/null 2>&1 && terma hook " + event + " || true"
 }
 
+// PathHookCommand is HookCommand behind the small GUI PATH a desktop- or IDE-launched agent
+// gets, extended with the directories terma installs to, portable across developers since
+// the entry is committed. A hooks file switching to it changes its bytes, and so any trust
+// granted to it.
+func PathHookCommand(event string) string {
+	return `PATH="${PATH:-/usr/bin:/bin}:` + strings.Join(hookPathDirs, ":") + `"; ` + HookCommand(event)
+}
+
+// hookPathDirs are the directories PathHookCommand adds, in its order.
+var hookPathDirs = []string{"$HOME/.local/bin", "/opt/homebrew/bin", "/usr/local/bin"}
+
+// HookPathDirs are the directories PathHookCommand adds to PATH, with $HOME as home.
+func HookPathDirs(home string) []string {
+	dirs := make([]string, len(hookPathDirs))
+	for i, d := range hookPathDirs {
+		dirs[i] = d
+		if rest, ok := strings.CutPrefix(d, "$HOME/"); ok {
+			dirs[i] = filepath.Join(home, rest)
+		}
+	}
+	return dirs
+}
+
 // HookEventOf is the `terma hook <event>` name a committed command runs.
 func HookEventOf(command string) string {
 	_, rest, ok := strings.Cut(command, "terma hook ")

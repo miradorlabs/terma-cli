@@ -130,7 +130,7 @@ func (app *App) signIn(cmd *cobra.Command, cfg *config.Config, opts signInOption
 	if replaced != nil {
 		_ = app.revokeSession(ctx, cfg, replaced)
 	}
-	if err := config.UpdateProfile(cfg.ProfileName, func(p *config.Profile) { applyLogin(p, cred, orgName) }); err != nil {
+	if err := config.UpdateProfile(cfg.ProfileName, func(p *config.Profile) { applyLogin(p, cfg, cred, orgName) }); err != nil {
 		return nil, err
 	}
 	return &signInResult{cred: cred, orgName: orgName}, nil
@@ -180,7 +180,7 @@ func (app *App) reuseStoredSession(ctx context.Context, cfg *config.Config, want
 		verified.UserEmail = identity.Email
 		_ = auth.UpdateCredential(cfg.ProfileName, verified)
 	}
-	if err := config.UpdateProfile(cfg.ProfileName, func(p *config.Profile) { applyLogin(p, verified, orgName) }); err != nil {
+	if err := config.UpdateProfile(cfg.ProfileName, func(p *config.Profile) { applyLogin(p, cfg, verified, orgName) }); err != nil {
 		return nil, false, err
 	}
 	return &signInResult{cred: verified, orgName: orgName, reused: true}, true, nil
@@ -283,9 +283,12 @@ func (app *App) revokeSession(ctx context.Context, cfg *config.Config, cred *aut
 	return client.RevokeSession(ctx)
 }
 
-// applyLogin records only the account scope: project selection belongs to repositories.
-func applyLogin(p *config.Profile, cred *auth.Credential, orgName string) {
+// applyLogin records only the account scope, and the environment the credential belongs
+// to: hooks and the flushes they start run without TERMA_ENV, and would otherwise resolve
+// to production and hold every event. Project selection belongs to repositories.
+func applyLogin(p *config.Profile, cfg *config.Config, cred *auth.Credential, orgName string) {
 	p.SelectOrganization(cred.OrganizationID, orgName)
+	p.PinEnvironment(cfg.Environment)
 }
 
 func waitForBrowserEnter(cmd *cobra.Command) error {

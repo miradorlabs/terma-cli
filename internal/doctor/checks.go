@@ -8,8 +8,10 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/migrate"
+	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
@@ -86,6 +88,41 @@ func AgentHooksCheck(reg *agents.Registry, root string, mine []string) Check {
 		return Check{Status: Skip, Detail: "no agent hooks are wired in this repository"}
 	}
 	return Check{Status: status, Detail: strings.Join(parts, "; "), Fix: fix, Ready: ready, Of: of}
+}
+
+// UserHooksCheck reports, in global mode, whether each of the developer's agents (mine;
+// empty means all) runs terma's machine-wide hooks: one that gates them behind trust skips
+// a changed entry in silence, and records nothing for it. A warning, like a repository's
+// untrusted hooks; false when no agent has any.
+func UserHooksCheck(reg *agents.Registry, mine []string) (Check, bool) {
+	var parts []string
+	c := Check{Status: Pass}
+	for _, a := range reg.All() {
+		gated, ok := a.(agents.UserHooksTrust)
+		if !ok || len(mine) > 0 && !slices.ContainsFunc(agents.Selections(a), func(s string) bool { return slices.Contains(mine, s) }) {
+			continue
+		}
+		present, trusted, err := gated.UserHooksTrusted()
+		switch {
+		case !present && err == nil:
+			continue
+		case err != nil:
+			// Unreadable is not untrusted.
+			parts = append(parts, a.DisplayName()+": could not read its trust record: "+err.Error())
+		case !trusted:
+			parts = append(parts, a.DisplayName()+" skips some or all of them until you approve them")
+			if c.Status != Warn {
+				c.Status, c.Fix = Warn, gated.UserHooksTrustStep()
+			}
+		default:
+			parts = append(parts, a.DisplayName()+" trusts them")
+		}
+	}
+	if len(parts) == 0 {
+		return Check{}, false
+	}
+	c.Detail = strings.Join(parts, "; ")
+	return c, true
 }
 
 // stateCheck reports saved state this build has not finished migrating.
@@ -307,4 +344,30 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 		return Check{Status: Warn, Detail: "local relay on " + addr + " (" + state + "); no key for this team on this machine, so its sessions are dropped", Fix: "terma install"}
 	}
 	return Check{Status: Pass, Detail: "through the local relay on " + addr + " (" + state + "); only this repository's sessions are forwarded"}
+}
+
+// RepositoryCheck finds the binding of the workspace at root, or, in a linked worktree
+// without one, its main checkout's.
+func RepositoryCheck(root, gitDir string, repoErr error) (Check, *termaproject.File) {
+	if repoErr != nil {
+		return Check{Status: Fail, Detail: repoErr.Error()}, nil
+	}
+	f, from, err := termaproject.Resolve(root, gitDir)
+	if err != nil {
+		where := root
+		if _, main, ok := gitx.LinkedWorktreeFS(gitDir); ok && main != "" {
+			where += " or its main checkout " + main
+		}
+		return Check{Status: Fail, Detail: "no " + termaproject.FileName + " in " + where, Fix: "terma install"}, nil
+	}
+	return Check{Status: Pass, Detail: cmp.Or(f.Project.Name, f.Project.ID) + ThroughMain(root, from)}, f
+}
+
+// ThroughMain says, for a linked worktree bound through its main checkout, where the
+// binding came from; it is empty when the checkout has its own.
+func ThroughMain(root, from string) string {
+	if from == "" || from == root {
+		return ""
+	}
+	return " (through the main checkout " + from + ")"
 }

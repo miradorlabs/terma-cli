@@ -24,11 +24,18 @@ type userHooksRecord struct {
 	Agents []string `json:"agents"`
 }
 
-// TrustSteps are what the developer must do before machine-wide hooks run.
+// TrustSteps are what the developer must do before machine-wide hooks run: one per agent
+// that does not yet run all of terma's entries as written. A file setup left unchanged can
+// still be one, trusted before an earlier setup rewrote it.
 func (m Machine) TrustSteps(selected []string) []string {
 	var steps []string
 	for _, name := range m.userHookAgents(selected) {
-		if a, ok := m.Agents.Find[agents.UserHooksTrust](name); ok && !m.ManagedDeployed(name) {
+		a, ok := m.Agents.Find[agents.UserHooksTrust](name)
+		if !ok || m.ManagedDeployed(name) {
+			continue
+		}
+		// Unreadable trust is not trusted: the step is the way to find out.
+		if present, trusted, err := a.UserHooksTrusted(); err != nil || present && !trusted {
 			steps = append(steps, a.UserHooksTrustStep())
 		}
 	}
