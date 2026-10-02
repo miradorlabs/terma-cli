@@ -49,6 +49,10 @@ func TestMachineWideHooksStandInForASubdirectorySession(t *testing.T) {
 	if yields(sub, "") {
 		t.Fatal("without CLAUDE_PROJECT_DIR the hook's own directory is where the session started")
 	}
+	// A launch directory gone from disk has no settings of its own, so it reads as unwired.
+	if yields(sub, filepath.Join(root, "removed", "dir")) {
+		t.Fatal("a launch directory missing from disk stopped the stand-in")
+	}
 	// Started at the root, the committed hooks run: the machine-wide one must not fire too.
 	if !yields(root, root) || !yields(sub, root) {
 		t.Fatal("a machine-wide hook fired beside the repository's own")

@@ -101,17 +101,32 @@ func TestBashEditsJoinTheSessionsManifest(t *testing.T) {
 }
 
 // A PostToolUse whose PreToolUse never ran claims nothing: the tree's changes predate it.
+// Nor does a call with no id, which could not be told from another one in its session.
 func TestBashWithoutASnapshotRecordsNothing(t *testing.T) {
-	root := newRepo(t)
-	ctx := context.Background()
-	sp, _ := spool.Open(t.TempDir())
-	env := hookrun.Env{Now: time.Now(), Cwd: root, Spool: sp, Version: "test"}
-	hookruntest.WriteFile(t, root, "dirty.txt", "x\n")
-	env.Stdin = strings.NewReader(`{"session_id":"sess-late","cwd":"` + root + `","tool_name":"Bash","tool_use_id":"toolu_2","tool_input":{"command":"ls"}}`)
-	if err := postToolUse(ctx, env); err != nil {
-		t.Fatal(err)
-	}
-	if manifests, _ := session.Open(filepath.Join(root, ".git")).Manifests(); len(manifests) != 0 {
-		t.Fatalf("an unseen call's tree was attributed: %+v", manifests)
+	for name, tc := range map[string]struct{ pre, post string }{
+		"start unseen": {"", `"tool_use_id":"toolu_2",`},
+		"no call id":   {`"tool_use_id":"",`, `"tool_use_id":"",`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			root := newRepo(t)
+			ctx := context.Background()
+			sp, _ := spool.Open(t.TempDir())
+			payload := func(id string) hookrun.Env {
+				return hookrun.Env{Now: time.Now(), Cwd: root, Spool: sp, Version: "test", Stdin: strings.NewReader(
+					`{"session_id":"sess-late","cwd":"` + root + `","tool_name":"Bash",` + id + `"tool_input":{"command":"touch dirty.txt"}}`)}
+			}
+			if tc.pre != "" {
+				if err := preToolUse(ctx, payload(tc.pre)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			hookruntest.WriteFile(t, root, "dirty.txt", "x\n")
+			if err := postToolUse(ctx, payload(tc.post)); err != nil {
+				t.Fatal(err)
+			}
+			if manifests, _ := session.Open(filepath.Join(root, ".git")).Manifests(); len(manifests) != 0 {
+				t.Fatalf("an unmatched call's tree was attributed: %+v", manifests)
+			}
+		})
 	}
 }
