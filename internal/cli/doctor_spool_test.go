@@ -34,15 +34,3 @@ func TestDoctorFailsWhenTheSpoolCannotBeWritten(t *testing.T) {
 		t.Fatalf("doctor should name the write failure, not the queue depth:\n%s", out)
 	}
 }
-
-// Scripts written before doctor stopped making a scratch commit still pass --skip-commit.
-func TestDoctorStillAcceptsSkipCommit(t *testing.T) {
-	userSandbox(t)
-	out, _ := runTerma(t, "doctor", "--skip-commit")
-	if strings.Contains(out, "unknown flag") {
-		t.Fatalf("--skip-commit must still parse:\n%s", out)
-	}
-	if help, _ := runTerma(t, "doctor", "--help"); strings.Contains(help, "skip-commit") {
-		t.Fatalf("--skip-commit should stay hidden:\n%s", help)
-	}
-}

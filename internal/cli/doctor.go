@@ -32,9 +32,6 @@ remaining steps to complete setup.`,
 			return nil
 		},
 	}
-	// --skip-commit predates the end of doctor's scratch commit; scripts may still pass it.
-	cmd.Flags().Bool("skip-commit", false, "")
-	_ = cmd.Flags().MarkHidden("skip-commit")
 	return cmd
 }
 
