@@ -168,3 +168,40 @@ func TestPathExclusionDropsOnlyTheRecordsNamingIt(t *testing.T) {
 		}
 	}
 }
+
+// A shell call whose command names an excluded file goes whole, its output with it, and
+// counts as a path drop.
+func TestPathExclusionDropsShellCommandsNamingIt(t *testing.T) {
+	u := newUpstream(t)
+	f := newFixture()
+	pol := Policy{Endpoint: u.srv.URL, Key: "key-p1", IncludePrompts: true, IncludeToolContent: true, Excludes: excluding("secrets/**")}
+	r, srv := f.relay(t, u, map[string]Policy{"p1": pol})
+
+	rec := func(extra ...*commonpb.KeyValue) *logspb.LogRecord {
+		return &logspb.LogRecord{Attributes: append([]*commonpb.KeyValue{kv("session.id", "A"), kv("event.name", "codex.tool_result")}, extra...)}
+	}
+	logs := &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{
+		rec(kv("arguments", `{"command":["bash","-lc","cat secrets/app.env"],"workdir":"/repo"}`), kv("output", "API_KEY=hunter2")),
+		rec(kv("tool_parameters", `{"bash_command":"cat","full_command":"cat secrets/app.env"}`), kv("output", "API_KEY=hunter2")),
+		rec(kv("arguments", `{"command":["bash","-lc","cat README.md"]}`), kv("output", "readme")),
+	}}}}}}
+	body, err := proto.Marshal(logs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code := post(t, srv, "/v1/logs", body, "application/x-protobuf", token, false); code != http.StatusOK {
+		t.Fatalf("/v1/logs = %d", code)
+	}
+	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["forwarded.logs"] == 1 })
+	if c := r.Stats().Snapshot().Counters; c["dropped.policy_path.logs"] != 2 {
+		t.Fatalf("stats = %v, want both shell reads of the excluded file dropped for the path", c)
+	}
+	got, _ := u.logs(t)
+	for _, lr := range got["Bearer key-p1"] {
+		for _, a := range lr.Attributes {
+			if strings.Contains(a.GetValue().GetStringValue(), "secrets") || strings.Contains(a.GetValue().GetStringValue(), "hunter2") {
+				t.Fatalf("the excluded file's command or output left: %v", lr.Attributes)
+			}
+		}
+	}
+}

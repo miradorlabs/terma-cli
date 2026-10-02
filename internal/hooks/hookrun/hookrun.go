@@ -148,7 +148,7 @@ func (e Env) EmitFor(r *Repo, ev spool.Event) {
 	if r != nil {
 		ev.Workspace = r.Root
 		pol := routing.EffectivePolicy(e.Policy, r.ProjectID)
-		if pol.ExcludesPath(r.Root, "") || pol.HasExcludedPath(ev.Attrs, r.Root) {
+		if pol.ExcludesPath(r.Root, "") || pol.HasExcludedPathFrom(ev.Attrs, r.Root, e.Cwd) {
 			return
 		}
 	}
