@@ -114,6 +114,13 @@ func (m Machine) ApplyGitHooks(ctx context.Context, install bool) (bool, error) 
 	return true, nil
 }
 
+// IsGitHooksDir reports whether path, a core.hooksPath as git reads it, is global mode's
+// hooks directory.
+func IsGitHooksDir(path string) bool {
+	dir, err := globalGitHooksPath()
+	return err == nil && path != "" && sameDir(path, dir)
+}
+
 func sameDir(a, b string) bool {
 	a, b = expandHome(a), expandHome(b)
 	if filepath.Clean(a) == filepath.Clean(b) {

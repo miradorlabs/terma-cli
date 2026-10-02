@@ -193,7 +193,7 @@ func (app *App) runInstall(cmd *cobra.Command, f installFlags) error {
 	}
 	// The hooks call terma by name: an install they cannot run is not done.
 	if exe, err := os.Executable(); err == nil {
-		if c := doctor.BinaryCheck(exe, app.binDirs()); c.Status == doctor.Fail {
+		if c := doctor.BinaryCheck(exe, app.binDirs(), doctor.ByName); c.Status == doctor.Fail {
 			ui.Warn("terma", "not on your PATH, so the hooks cannot run it")
 			ui.next = append([]string{"Put terma on your PATH: `" + doctor.AddToPathCommand(filepath.Dir(exe)) + "`"}, ui.next...)
 		}
