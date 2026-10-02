@@ -250,9 +250,60 @@ func TestPostCommitBoundsFileStats(t *testing.T) {
 	if attrs["file_stats_truncated"] != true || attrs["file_stats_reported"] != float64(MaxCommitFileStats) {
 		t.Fatalf("truncation must be visible: %v / %v", attrs["file_stats_truncated"], attrs["file_stats_reported"])
 	}
-	// One session: the file entries carry no session id, `sessions` says it all.
-	if _, ok := stats[0]["session_id"]; ok {
-		t.Fatalf("single-session commit should not repeat the session per file: %v", stats[0])
+	// One session still names each file it touched, so the commit's files join the session.
+	for _, s := range stats {
+		if s["session_id"] != "sess-wide" {
+			t.Fatalf("single-session commit lost its per-file session: %v", s)
+		}
+	}
+}
+
+// A commit the agent makes in its own session names the session on the files it edited,
+// and on nothing a hand edit added beside them.
+func TestPostCommitNamesTheSessionOnItsFilesInASingleSessionCommit(t *testing.T) {
+	root := initRepo(t)
+	ctx := context.Background()
+	sp, _ := spool.Open(t.TempDir())
+	now := time.Now()
+	env := func(stdin string, args ...string) Env {
+		return Env{Now: now, Cwd: root, Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
+	}
+	if err := startSession(ctx, env(`{"session_id":"sess-solo","cwd":"`+root+`","hook_event_name":"SessionStart"}`)); err != nil {
+		t.Fatal(err)
+	}
+	hookruntest.WriteFile(t, root, "src/agent.go", "package src\n")
+	hookruntest.WriteFile(t, root, "notes.txt", "by hand\n")
+	if err := editFile(ctx, env(`{"session_id":"sess-solo","cwd":"`+root+`","tool_name":"Write","tool_input":{"file_path":"`+filepath.Join(root, "src/agent.go")+`"}}`)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := gitx.Git(ctx, root, "add", "-A"); err != nil {
+		t.Fatal(err)
+	}
+	// `git commit -m` from inside the session: prepare-commit-msg sees source "message".
+	msgPath := filepath.Join(t.TempDir(), "MSG")
+	_ = os.WriteFile(msgPath, []byte("feat: agent work\n"), 0o644)
+	if err := PrepareCommitMsg(ctx, env("", msgPath, "message")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := gitx.Git(ctx, root, "commit", "-q", "-F", msgPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := PostCommit(ctx, env("")); err != nil {
+		t.Fatal(err)
+	}
+	attrs := commitEvent(t, sp)
+	if attrs["sessions"] != "sess-solo" {
+		t.Fatalf("sessions = %v", attrs["sessions"])
+	}
+	byPath := map[string]map[string]any{}
+	for _, s := range fileStats(t, attrs) {
+		byPath[s["path"].(string)] = s
+	}
+	if got := byPath["src/agent.go"]["session_id"]; got != "sess-solo" {
+		t.Fatalf("the session's own file lost its session: %v", byPath["src/agent.go"])
+	}
+	if _, ok := byPath["notes.txt"]["session_id"]; ok {
+		t.Fatalf("a hand edit was attributed to the session: %v", byPath["notes.txt"])
 	}
 }
 
