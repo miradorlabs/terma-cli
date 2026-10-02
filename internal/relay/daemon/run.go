@@ -119,10 +119,12 @@ func Run(ctx context.Context, c Config) (Result, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	// A client that trickles its request cannot hold a connection open.
-	srv := &http.Server{Handler: r.Handler(), ConnContext: r.ConnContext, ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout: 30 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 2 * time.Minute}
+	var accepted fresh
+	srv := &http.Server{Handler: r.Handler(), ConnContext: r.ConnContext, ConnState: accepted.track,
+		ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 2 * time.Minute}
+	g := &gate{Listener: ln}
 	served := make(chan error, 1)
-	go func() { served <- srv.Serve(ln) }()
+	go func() { served <- srv.Serve(g) }()
 	engine := make(chan struct{})
 	go func() { r.Run(ctx); close(engine) }()
 	var workers sync.WaitGroup
@@ -131,10 +133,17 @@ func Run(ctx context.Context, c Config) (Result, error) {
 	}
 
 	why, serveErr := watch(ctx, r, c.Dir, c.Idle, res.Service, served)
-	res.Replaced, res.SetupGone = why == stopReplaced, why == stopSetupGone
+	res.Replaced = why == stopReplaced
+	// A relay stopped once its token went (teardown) is done for good, however it was stopped.
+	res.SetupGone = why == stopSetupGone || !setUp()
 	var h *handoff
-	if why.handsOff() && setUp() {
+	if why.handsOff() && !res.SetupGone {
 		h = startHandoff(c.Dir, addr, ln, c.SpawnSuccessor)
+	}
+	if why != stopServeFailed {
+		g.stop()
+		<-served
+		accepted.await(newRequestWait)
 	}
 	shutdown, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelShutdown()

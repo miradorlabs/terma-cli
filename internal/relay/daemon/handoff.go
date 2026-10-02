@@ -18,8 +18,10 @@ import (
 const WaitingFile = "service-waiting"
 
 const (
-	// handoffWait bounds how long a stopping relay keeps its socket for a successor.
-	handoffWait = 10 * time.Second
+	// handoffWait bounds how long a stopping relay keeps its socket for a successor, which
+	// takes it within a lock poll: with the drain, a stop stays under launchd's 20 s
+	// ExitTimeOut before it kills the relay.
+	handoffWait = 5 * time.Second
 	// successorWait bounds how long a successor waits for the stopping relay to drain.
 	successorWait = 30 * time.Second
 	successorPoll = 20 * time.Millisecond
