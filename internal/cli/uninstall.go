@@ -58,10 +58,11 @@ setup on the machine.`,
 					return nil
 				}
 			}
+			removesFiles := len(rm.Changes()) > 0 || rm.Existing != nil
 			if err := rm.Apply(ctx, app.agents, func(warning string) { fmt.Fprintf(cmd.ErrOrStderr(), "Warning: %s\n", warning) }); err != nil {
 				return err
 			}
-			if gitDir != "" {
+			if gitDir != "" && removesFiles {
 				fmt.Fprintln(out, "Uninstalled. Commit the removals if the install was committed.")
 			} else {
 				fmt.Fprintln(out, "Uninstalled.")

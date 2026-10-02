@@ -205,10 +205,8 @@ func Apply(ctx context.Context, p Plan, o Options, s Steps, r Reporter) error {
 			}
 			installedHooks = p.GitDir != ""
 			written = p.Hooks.Paths()
+			// The plan printed above already lists its after-merging notes.
 			r.Summary("Hooks", output.And(p.Hooks.Files()))
-			for _, n := range p.Hooks.hooks.Notes {
-				fmt.Fprintln(r.Detail(), "  After merging: "+n)
-			}
 		default:
 			adapters = reg.WiredNames(p.Root)
 			r.Warn("Hooks", "not written — commits are not stamped until they are")
