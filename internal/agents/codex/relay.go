@@ -1,6 +1,7 @@
 package codex
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -23,11 +24,16 @@ const (
 // exporting where it did until restarted.
 func (a Agent) ConfigureRelay(_ context.Context, cfg agents.RelayConfig) (agents.RelayResult, error) {
 	already := relayexport.NativePointed(exporter{}, strings.TrimPrefix(cfg.Endpoint, "http://"))
+	before := configBytes()
 	result, err := relayexport.Native(exporter{}, cfg)
 	if err != nil {
 		return result, err
 	}
-	_ = config.WriteFileAtomic(filepath.Join(cfg.StateDir, setupFile), []byte(time.Now().UTC().Format(time.RFC3339Nano)+"\n"), 0o600)
+	// Only a changed config makes a running daemon stale; an idempotent re-run keeps the
+	// time the config last changed.
+	if !bytes.Equal(before, configBytes()) {
+		_ = config.WriteFileAtomic(filepath.Join(cfg.StateDir, setupFile), []byte(time.Now().UTC().Format(time.RFC3339Nano)+"\n"), 0o600)
+	}
 	// The background server and the desktop app's own server read the exporter only at start.
 	_, daemon := daemonPredates(cfg.StateDir)
 	app := !already && desktopInstalled(context.Background())
@@ -40,6 +46,16 @@ func (a Agent) ConfigureRelay(_ context.Context, cfg agents.RelayConfig) (agents
 		result.Notes = append(result.Notes, "Quit and reopen the Codex desktop app so it starts sending to Terma.")
 	}
 	return result, nil
+}
+
+// configBytes is config.toml as it stands, nil when it cannot be read.
+func configBytes() []byte {
+	path, err := exporter{}.ConfigPath()
+	if err != nil {
+		return nil
+	}
+	data, _ := os.ReadFile(path)
+	return data
 }
 
 // RelayPointed reports whether Codex's exporter sends to the relay at addr.
