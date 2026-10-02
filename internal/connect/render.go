@@ -189,14 +189,6 @@ func SignalLabel(s harness.Signal) string {
 	}
 }
 
-// OnOff is a switch as a plan shows it.
-func OnOff(v bool) string {
-	if v {
-		return "on"
-	}
-	return "off"
-}
-
 // printLocalConnectPlan names the global connect under the policy: with nothing under it
 // the policy ships nothing, and the reader should learn that here.
 func printLocalConnectPlan(
