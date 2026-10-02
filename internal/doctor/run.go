@@ -152,7 +152,7 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 
 	var binaryCheck Check
 	timed(KeyBinary, "terma on PATH", func() Check {
-		binaryCheck = BinaryCheck(env.Exe, env.BinDirs)
+		binaryCheck = BinaryCheck(env.Exe, env.BinDirs, HookCallerFor(env.Root, env.GitDir, env.RepoErr))
 		return binaryCheck
 	})
 
@@ -172,6 +172,9 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 	timed(KeyProject, "repository bound", func() Check {
 		c, bound := RepositoryCheck(env.Root, env.GitDir, env.RepoErr)
 		d.bound = bound
+		if bound == nil && env.RepoErr == nil && cfg.Policy.Global() {
+			return Check{Status: Pass, Detail: "not bound, which global mode does not need: " + GlobalDestination(cfg)}
+		}
 		return c
 	})
 	d.projectID = cfg.ProjectID
@@ -283,8 +286,11 @@ func (d *run) commitHooks() Check {
 	if d.nonGit {
 		return Check{Status: Skip, Detail: "not a Git repository"}
 	}
-	if !d.installed() {
+	if d.env.RepoErr != nil {
 		return Check{Status: Skip, Detail: "needs an installed repository"}
+	}
+	if !d.installed() {
+		return UnboundHooksCheck(JudgeHooksPath(d.ctx, d.env.Root), d.cfg.Policy.Global())
 	}
 	return HooksCheck(JudgeHookWiring(d.ctx, d.env.Root, d.bound))
 }

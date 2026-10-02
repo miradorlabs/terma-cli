@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -746,6 +747,40 @@ func TestInstallE2ELegacyLinkedMigrationDoesNotChangeSharedHooks(t *testing.T) {
 				if _, err := os.Stat(filepath.Join(gitDir, "terma", "install.json")); !os.IsNotExist(err) {
 					t.Fatalf("refused install created a linked journal: %v", err)
 				}
+			}
+		})
+	}
+}
+
+// A merged uninstall from another clone removes the binding and shims but not this clone's
+// core.hooksPath, which then points git at an empty directory; uninstall still undoes it.
+func TestInstallE2EUninstallRestoresAnOrphanedHooksPath(t *testing.T) {
+	for _, journal := range []bool{true, false} {
+		t.Run("journal="+strconv.FormatBool(journal), func(t *testing.T) {
+			s := newInstallSandbox(t)
+			root := s.mkdir("workspace")
+			s.git(root, "init", "-q")
+			s.install(root)
+			for _, path := range []string{".terma/settings.json", ".terma/hooks/prepare-commit-msg", ".terma/hooks/post-commit",
+				hooksPathOf("claude"), hooksPathOf("cursor"), hooksPathOf("codex"), hooksPathOf("antigravity")} {
+				if err := os.Remove(filepath.Join(root, filepath.FromSlash(path))); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if !journal {
+				if err := os.RemoveAll(filepath.Join(root, ".git", "terma")); err != nil {
+					t.Fatal(err)
+				}
+			}
+			out := s.cli(root, "uninstall", "--yes")
+			if !strings.Contains(out, "restore git config core.hooksPath") {
+				t.Fatalf("uninstall did not offer to restore core.hooksPath:\n%s", out)
+			}
+			if strings.Contains(out, "Commit the removals") {
+				t.Fatalf("uninstall asked to commit a removal that is only git config:\n%s", out)
+			}
+			if got, err := s.run(root, "", "git", "config", "--get", "core.hooksPath"); err == nil {
+				t.Fatalf("core.hooksPath still set to %q", strings.TrimSpace(got))
 			}
 		})
 	}

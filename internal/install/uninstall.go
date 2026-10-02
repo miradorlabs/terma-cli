@@ -70,8 +70,11 @@ func (r Removal) Changes() []hookmgr.Change {
 	return changes
 }
 
-// Empty means nothing of terma's is installed.
-func (r Removal) Empty() bool { return len(r.Changes()) == 0 && r.Existing == nil }
+// Empty means nothing of terma's is installed. A clone whose binding and shims were
+// removed by a merged uninstall still points git at them, and that is terma's to undo.
+func (r Removal) Empty() bool {
+	return len(r.Changes()) == 0 && r.Existing == nil && !r.RestoresHooksPath
+}
 
 // Apply removes it all; warn hears of a repository policy that could not be removed,
 // which never stops the rest.
