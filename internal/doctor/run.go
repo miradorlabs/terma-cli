@@ -260,7 +260,8 @@ func (d *run) agentHooks() Check {
 
 func (d *run) agentsExporting() Check {
 	if claim.Enabled() {
-		return RelayCheck(d.env.Agents, d.env.Probes.Relay(), d.env.Probes.Keys, d.projectID, d.cfg.Environment, d.cfg.Harnesses)
+		id, team := relayTarget(d.cfg, d.projectID)
+		return RelayCheck(d.env.Agents, d.env.Probes.Relay(), d.env.Probes.Keys, id, team, d.cfg.Environment, d.cfg.Harnesses)
 	}
 	verdicts := JudgeHarnesses(d.ctx, d.env.Agents, d.cfg.OTLPURL, d.projectID, d.env.Root)
 	return HarnessCheck(d.env.Agents, verdicts, d.cfg.OTLPURL, d.projectID, d.installed())

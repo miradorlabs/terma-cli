@@ -91,7 +91,8 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 	// Through the relay one line gives doctor's own verdict (RelayCheck).
 	var export Check
 	if claim.Enabled() && p.Relay != nil {
-		export = RelayCheck(reg, p.Relay(), p.Keys, projectID, cfg.Environment, cfg.Harnesses)
+		id, team := relayTarget(cfg, projectID)
+		export = RelayCheck(reg, p.Relay(), p.Keys, id, team, cfg.Environment, cfg.Harnesses)
 		export.Key = KeyHarness
 		add("Agents", "%s", export.Detail)
 		if export.Fix != "" {

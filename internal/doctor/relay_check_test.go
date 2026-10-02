@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
+	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
 // keyed is a keystore holding a key for every team.
@@ -44,12 +45,54 @@ func TestRelayCheckJudgesTheRelayItself(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r := healthy()
 			tc.relay(&r)
-			c := RelayCheck(reg, r, keyed, "proj_x", tc.env, nil)
+			c := RelayCheck(reg, r, keyed, "proj_x", "", tc.env, nil)
 			if c.Status != tc.status || !strings.Contains(c.Detail, tc.want) {
 				t.Fatalf("RelayCheck = %+v, want %v containing %q", c, tc.status, tc.want)
 			}
 			if c.Status != Pass && c.Fix != "terma install" {
 				t.Fatalf("fix = %q, want terma install, which replaces the relay and rewrites its service", c.Fix)
+			}
+		})
+	}
+}
+
+// Global mode sends every session to the team's project, so whether this repository is
+// bound changes nothing in what doctor says is forwarded; per-repo mode is unchanged.
+func TestRelayCheckSaysWhatGlobalModeForwards(t *testing.T) {
+	reg := agents.New()
+	global := config.Policy{Mode: config.ModeGlobal, DefaultProjectID: "p9"}
+	for _, tc := range []struct {
+		name      string
+		cfg       config.Config
+		projectID string
+		keys      Keys
+		status    Status
+		want, fix string
+	}{
+		{name: "global, unbound", cfg: config.Config{ProjectID: "p9", ProjectName: "Engineering", Policy: global},
+			status: Pass, want: "every session on this machine is forwarded to Engineering"},
+		{name: "global, bound elsewhere", cfg: config.Config{ProjectID: "p9", ProjectName: "Engineering", Policy: global}, projectID: "proj_x",
+			status: Pass, want: "every session on this machine is forwarded to Engineering"},
+		{name: "global, team known by id only", cfg: config.Config{Policy: global},
+			status: Pass, want: "forwarded to the team chosen at setup (p9)"},
+		{name: "global, no key", cfg: config.Config{Policy: global}, keys: func(string, string) string { return "" },
+			status: Warn, want: "no key for the team chosen at setup (p9) on this machine, so every session is dropped", fix: "terma setup"},
+		{name: "global, no team", cfg: config.Config{Policy: config.Policy{Mode: config.ModeGlobal}},
+			status: Warn, want: "global mode has no team to send to", fix: "terma setup"},
+		{name: "per-repo, bound", cfg: config.Config{ProjectID: "p9", Policy: config.Policy{Mode: config.ModeRepo}}, projectID: "proj_x",
+			status: Pass, want: "only this repository's sessions are forwarded"},
+		{name: "per-repo, unbound", cfg: config.Config{Policy: config.Policy{Mode: config.ModeRepo}},
+			status: Warn, want: "this repository is not bound, so its sessions are never forwarded", fix: "terma install"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			keys := tc.keys
+			if keys == nil {
+				keys = keyed
+			}
+			id, team := relayTarget(&tc.cfg, tc.projectID)
+			c := RelayCheck(reg, healthy(), keys, id, team, "dev", nil)
+			if c.Status != tc.status || !strings.Contains(c.Detail, tc.want) || c.Fix != tc.fix {
+				t.Fatalf("RelayCheck = %+v, want %v containing %q, fix %q", c, tc.status, tc.want, tc.fix)
 			}
 		})
 	}

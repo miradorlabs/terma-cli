@@ -158,17 +158,23 @@ func HooksCheck(w HookWiring) Check {
 	return Check{Status: Pass, Detail: string(w.Manager)}
 }
 
-// GlobalDestination says where global mode sends an unbound repository's sessions. Only a
-// project this command resolved has a name here; the policy carries the team's id alone.
+// GlobalDestination says where global mode sends an unbound repository's sessions.
 func GlobalDestination(cfg *config.Config) string {
-	id := cmp.Or(cfg.Policy.DefaultProjectID, cfg.ProjectID)
+	_, team := GlobalTeam(cfg)
+	return "its sessions report to " + team
+}
+
+// GlobalTeam is the project global mode sends every session to, by id and as prose. Only
+// a project this command resolved has a name here; the policy carries the team's id alone.
+func GlobalTeam(cfg *config.Config) (id, team string) {
+	id = cmp.Or(cfg.Policy.DefaultProjectID, cfg.ProjectID)
 	switch {
 	case id != "" && id == cfg.ProjectID && cfg.ProjectName != "":
-		return "its sessions report to " + cfg.ProjectName
+		return id, cfg.ProjectName
 	case id != "":
-		return "its sessions report to the team chosen at setup (" + id + ")"
+		return id, "the team chosen at setup (" + id + ")"
 	}
-	return "its sessions report to the team chosen at setup"
+	return "", "the team chosen at setup"
 }
 
 // UnboundHooksCheck is doctor's wording for where git looks for an unbound repository's
@@ -281,8 +287,9 @@ func HarnessCheck(reg *agents.Registry, verdicts []HarnessVerdict, otlpURL, proj
 
 // RelayCheck is doctor's "agent exporting to Terma" through the local relay: its address
 // is free, it delivers to env (this profile's environment), the developer's agents send to
-// it, its service is this terma's, and this repository is bound and keyed.
-func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env string, selected []string) Check {
+// it, its service is this terma's, and this repository is bound and keyed. In global mode
+// team names the project every session goes to and projectID is its id, bound or not.
+func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, team, env string, selected []string) Check {
 	if relay.Err != nil {
 		return Check{Status: Fail, Detail: relay.Err.Error()}
 	}
@@ -337,13 +344,32 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 	if running {
 		state = "running"
 	}
+	keyed := keys.has("", projectID) || slices.ContainsFunc(reg.With[agents.RelayExporter](), func(e agents.RelayExporter) bool { return keys.has(e.Name(), projectID) })
+	if team != "" {
+		switch {
+		case projectID == "":
+			return Check{Status: Warn, Detail: "local relay on " + addr + " (" + state + "); global mode has no team to send to, so every session is dropped", Fix: "terma setup"}
+		case !keyed:
+			return Check{Status: Warn, Detail: "local relay on " + addr + " (" + state + "); no key for " + team + " on this machine, so every session is dropped", Fix: "terma setup"}
+		}
+		return Check{Status: Pass, Detail: "through the local relay on " + addr + " (" + state + "); every session on this machine is forwarded to " + team}
+	}
 	switch {
 	case projectID == "":
 		return Check{Status: Warn, Detail: "local relay on " + addr + " (" + state + "); this repository is not bound, so its sessions are never forwarded", Fix: "terma install"}
-	case !keys.has("", projectID) && !slices.ContainsFunc(reg.With[agents.RelayExporter](), func(e agents.RelayExporter) bool { return keys.has(e.Name(), projectID) }):
+	case !keyed:
 		return Check{Status: Warn, Detail: "local relay on " + addr + " (" + state + "); no key for this team on this machine, so its sessions are dropped", Fix: "terma install"}
 	}
 	return Check{Status: Pass, Detail: "through the local relay on " + addr + " (" + state + "); only this repository's sessions are forwarded"}
+}
+
+// relayTarget is the project the relay sends this repository's sessions to, and in global
+// mode the team that names it.
+func relayTarget(cfg *config.Config, projectID string) (id, team string) {
+	if cfg.Policy.Global() {
+		return GlobalTeam(cfg)
+	}
+	return projectID, ""
 }
 
 // RepositoryCheck finds the binding of the workspace at root, or, in a linked worktree
