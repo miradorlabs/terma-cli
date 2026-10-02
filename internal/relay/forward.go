@@ -12,9 +12,6 @@ import (
 	"sync"
 	"time"
 
-	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
-	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
-	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 
@@ -176,15 +173,20 @@ func (s *sender) loop() {
 			continue
 		}
 		// The content policy as it stands now: a project that turned prompts off since sends none still queued.
-		body, excluded := s.r.withholdQueued(batch[0].signal, body, pol)
+		// Counted only once the batch leaves the outbox: a retry filters it again.
+		body, tl := s.r.withholdQueued(batch[0].signal, body, pol)
 		if pol.Signals != nil && !contains(pol.Signals, string(batch[0].signal)) || body == nil {
-			reason := "policy_signal_or_content"
-			if body == nil && excluded > 0 {
-				reason = "policy_path"
-			}
+			reason, records := "policy_signal_or_content", 0
 			for _, e := range batch {
-				s.r.stats.dropped(e.signal, reason, e.records)
+				records += e.records
 			}
+			if body == nil && tl.excluded > 0 {
+				reason = "policy_path" // the excluded path took every record
+			} else if tl.excluded > 0 {
+				s.r.stats.dropped(batch[0].signal, "policy_path", tl.excluded)
+				records -= tl.excluded
+			}
+			s.r.stats.dropped(batch[0].signal, reason, records)
 			s.r.outbox.remove(s.route, batch)
 			s.delivered(len(batch))
 			continue
@@ -192,7 +194,8 @@ func (s *sender) loop() {
 		out, wait, detail, rejected := s.send(ctx, pol, batch[0].signal, body)
 		switch out {
 		case sent:
-			records := -excluded
+			s.r.count(batch[0].signal, tl)
+			records := -tl.excluded
 			for _, e := range batch {
 				records += e.records
 			}
@@ -210,7 +213,10 @@ func (s *sender) loop() {
 				continue
 			}
 			single = false
-			s.r.stats.dropped(batch[0].signal, "upstream_"+detail, batch[0].records)
+			if tl.excluded > 0 {
+				s.r.stats.dropped(batch[0].signal, "policy_path", tl.excluded)
+			}
+			s.r.stats.dropped(batch[0].signal, "upstream_"+detail, batch[0].records-tl.excluded)
 			s.r.warnf("upstream %s refused %d %s: %s", s.route, batch[0].records, batch[0].signal, detail)
 			s.r.outbox.bury(s.route, batch[0])
 			s.delivered(1)
@@ -397,54 +403,4 @@ func (r *Relay) recoverOutbox() {
 		s.mu.Unlock()
 		s.poke()
 	}
-}
-
-// withholdQueued applies the policy as it stands now to a queued body, reporting the records
-// an excluded path took from it; nil drops all of it (an excluded path took everything when
-// it reports any), as does a body that no longer decodes, since it cannot be checked
-// against a stricter policy.
-func (r *Relay) withholdQueued(sig Signal, body []byte, pol Policy) ([]byte, int) {
-	if pol.Excludes != nil {
-		pol.IncludePrompts, pol.IncludeToolContent = false, false
-	}
-	if pol.IncludePrompts && pol.IncludeToolContent && pol.Excludes == nil && !pol.RequireClaim {
-		return body, 0
-	}
-	var msg proto.Message
-	switch sig {
-	case Logs:
-		msg = &logspb.LogsData{}
-	case Traces:
-		msg = &tracepb.TracesData{}
-	default:
-		msg = &metricspb.MetricsData{}
-	}
-	if proto.Unmarshal(body, msg) != nil {
-		return nil, 0
-	}
-	p := &part{signal: sig, msg: msg}
-	if pol.RequireClaim && hasCatchAll(p) {
-		return nil, 0
-	}
-	excluded := dropExcluded(p, pol.Excludes)
-	if excluded > 0 {
-		if emptied(msg) {
-			return nil, excluded
-		}
-		r.stats.dropped(sig, "policy_path", excluded)
-	}
-	unclassified := map[string]int{}
-	n := r.rules.withhold(p, pol.IncludePrompts, pol.IncludeToolContent, unclassified)
-	if n == 0 && len(unclassified) == 0 && excluded == 0 {
-		return body, 0
-	}
-	r.stats.add("withheld_at_send_records", n)
-	for key, c := range unclassified {
-		r.stats.unclassified(key, c)
-	}
-	out, err := proto.Marshal(msg)
-	if err != nil {
-		return nil, 0
-	}
-	return out, excluded
 }
