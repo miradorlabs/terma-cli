@@ -9,12 +9,12 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 )
 
-// --relay-addr records a loopback address for the relay and refuses anything else.
+// --relay-addr records a loopback host:port for the relay and refuses anything else.
 func TestMoveRelayTakesOnlyALoopbackAddress(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
-	for _, bad := range []string{"0.0.0.0:4319", "192.168.1.5:4319", "4319", "example.com:4319"} {
+	for _, bad := range []string{"0.0.0.0:4319", "192.168.1.5:4319", "4319", "example.com:4319", "127.0.0.1:", "127.0.0.1:0", "127.0.0.1:abc", "127.0.0.1:70000"} {
 		if err := moveRelay(bad); err == nil {
-			t.Errorf("moveRelay(%q) accepted a non-loopback address", bad)
+			t.Errorf("moveRelay(%q) accepted an address the relay cannot listen on", bad)
 		}
 	}
 	for _, good := range []string{"127.0.0.1:4320", "localhost:4321", "[::1]:4322"} {
