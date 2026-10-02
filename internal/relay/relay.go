@@ -95,6 +95,10 @@ type Options struct {
 	Version string
 	// Logf, when set, is told why each part that could not leave was dropped (TERMA_RELAY_DEBUG=1).
 	Logf func(format string, args ...any)
+	// Warnf, when set, is told what an operator should see whatever the debug setting: a
+	// delivery the backend refused, a retry, an outbox that cannot be written, a failed
+	// heartbeat. Logf is told too.
+	Warnf func(format string, args ...any)
 }
 
 // Relay is the local OTLP relay: Handler accepts exports and Run delivers or ages them out.
@@ -163,6 +167,15 @@ func New(opts Options) *Relay {
 
 // Stats is the relay's running account.
 func (r *Relay) Stats() *Stats { return r.stats }
+
+func (r *Relay) warnf(format string, args ...any) {
+	if r.opts.Warnf != nil {
+		r.opts.Warnf(format, args...)
+	}
+	if r.opts.Logf != nil {
+		r.opts.Logf(format, args...)
+	}
+}
 
 // Handler serves OTLP over HTTP on /v1/{logs,metrics,traces} and the stats on GET /stats.
 //

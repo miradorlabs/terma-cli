@@ -142,12 +142,21 @@ func install(ctx context.Context, m service.Manager) (string, error) {
 	if !service.Supported() {
 		return "", fmt.Errorf("a relay service is not supported on %s; hooks start the relay on demand", runtime.GOOS)
 	}
-	var err error
-	if m.Exe, err = procinfo.AbsExecutable(); err != nil {
+	m, err := asThisTerma(m)
+	if err != nil {
 		return "", err
 	}
 	if _, err := Token(); err != nil {
 		return "", err
+	}
+	return m.Install(ctx)
+}
+
+// asThisTerma is m running this terma, with its Windows supervisor.
+func asThisTerma(m service.Manager) (service.Manager, error) {
+	var err error
+	if m.Exe, err = procinfo.AbsExecutable(); err != nil {
+		return m, err
 	}
 	m.StartSupervisor = func() error {
 		sup := exec.Command(m.Exe, "relay", "supervise")
@@ -157,7 +166,20 @@ func install(ctx context.Context, m service.Manager) (string, error) {
 		}
 		return sup.Process.Release()
 	}
-	return m.Install(ctx)
+	return m, nil
+}
+
+// StartService starts the installed service's relay as it is defined, without rewriting the
+// definition: a definition that is current needs its relay running, not a restart.
+func StartService(ctx context.Context) error {
+	m, err := Service()
+	if err != nil {
+		return err
+	}
+	if m, err = asThisTerma(m); err != nil {
+		return err
+	}
+	return m.Start(ctx)
 }
 
 // ServiceState is the relay service as installed: where its definition is, and whether it

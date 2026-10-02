@@ -12,9 +12,6 @@ import (
 	"sync"
 	"time"
 
-	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
-	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
-	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 
@@ -71,9 +68,7 @@ func (r *Relay) enqueue(c claim.Claim, p *part) {
 	e := newEntry(r.opts.Now(), p.signal, p.records)
 	if err := r.outbox.put(rt, e, body); err != nil {
 		r.stats.dropped(p.signal, "outbox_write_failed", p.records)
-		if r.opts.Logf != nil {
-			r.opts.Logf("outbox %s: %v", rt, err)
-		}
+		r.warnf("outbox %s: %v; dropped %d %s", rt, err, p.records, p.signal)
 		return
 	}
 	s := r.sender(rt)
@@ -178,11 +173,20 @@ func (s *sender) loop() {
 			continue
 		}
 		// The content policy as it stands now: a project that turned prompts off since sends none still queued.
-		body = s.r.withholdQueued(batch[0].signal, body, pol)
+		// Counted only once the batch leaves the outbox: a retry filters it again.
+		body, tl := s.r.withholdQueued(batch[0].signal, body, pol)
 		if pol.Signals != nil && !contains(pol.Signals, string(batch[0].signal)) || body == nil {
+			reason, records := "policy_signal_or_content", 0
 			for _, e := range batch {
-				s.r.stats.dropped(e.signal, "policy_signal_or_content", e.records)
+				records += e.records
 			}
+			if body == nil && tl.excluded > 0 {
+				reason = "policy_path" // the excluded path took every record
+			} else if tl.excluded > 0 {
+				s.r.stats.dropped(batch[0].signal, "policy_path", tl.excluded)
+				records -= tl.excluded
+			}
+			s.r.stats.dropped(batch[0].signal, reason, records)
 			s.r.outbox.remove(s.route, batch)
 			s.delivered(len(batch))
 			continue
@@ -190,7 +194,8 @@ func (s *sender) loop() {
 		out, wait, detail, rejected := s.send(ctx, pol, batch[0].signal, body)
 		switch out {
 		case sent:
-			records := 0
+			s.r.count(batch[0].signal, tl)
+			records := -tl.excluded
 			for _, e := range batch {
 				records += e.records
 			}
@@ -208,7 +213,11 @@ func (s *sender) loop() {
 				continue
 			}
 			single = false
-			s.r.stats.dropped(batch[0].signal, "upstream_"+detail, batch[0].records)
+			if tl.excluded > 0 {
+				s.r.stats.dropped(batch[0].signal, "policy_path", tl.excluded)
+			}
+			s.r.stats.dropped(batch[0].signal, "upstream_"+detail, batch[0].records-tl.excluded)
+			s.r.warnf("upstream %s refused %d %s: %s", s.route, batch[0].records, batch[0].signal, detail)
 			s.r.outbox.bury(s.route, batch[0])
 			s.delivered(1)
 		case retry:
@@ -216,9 +225,7 @@ func (s *sender) loop() {
 				return
 			}
 			s.r.stats.add("upstream_retries", 1)
-			if s.r.opts.Logf != nil {
-				s.r.opts.Logf("upstream %s: %s", s.route, detail)
-			}
+			s.r.warnf("upstream %s: %s; retrying", s.route, detail)
 			backoff = nextBackoff(backoff, wait)
 			if !sleep(jitter(backoff, wait)) {
 				return
@@ -396,46 +403,4 @@ func (r *Relay) recoverOutbox() {
 		s.mu.Unlock()
 		s.poke()
 	}
-}
-
-// withholdQueued drops a queued body that no longer decodes: it cannot be checked against a stricter policy.
-func (r *Relay) withholdQueued(sig Signal, body []byte, pol Policy) []byte {
-	if pol.Excludes != nil {
-		pol.IncludePrompts, pol.IncludeToolContent = false, false
-	}
-	if pol.IncludePrompts && pol.IncludeToolContent && pol.Excludes == nil && !pol.RequireClaim {
-		return body
-	}
-	var msg proto.Message
-	switch sig {
-	case Logs:
-		msg = &logspb.LogsData{}
-	case Traces:
-		msg = &tracepb.TracesData{}
-	default:
-		msg = &metricspb.MetricsData{}
-	}
-	if proto.Unmarshal(body, msg) != nil {
-		return nil
-	}
-	if pol.RequireClaim && hasCatchAll(&part{signal: sig, msg: msg}) {
-		return nil
-	}
-	if pathExcluded(msg, pol.Excludes) {
-		return nil
-	}
-	unclassified := map[string]int{}
-	n := r.rules.withhold(&part{signal: sig, msg: msg}, pol.IncludePrompts, pol.IncludeToolContent, unclassified)
-	if n == 0 && len(unclassified) == 0 {
-		return body
-	}
-	r.stats.add("withheld_at_send_records", n)
-	for key, c := range unclassified {
-		r.stats.unclassified(key, c)
-	}
-	out, err := proto.Marshal(msg)
-	if err != nil {
-		return nil
-	}
-	return out
 }

@@ -9,3 +9,5 @@ import "errors"
 func (Manager) installWindows(string) error { return errors.New("not Windows") }
 
 func (Manager) removeWindows(string) error { return errors.New("not Windows") }
+
+func (Manager) startWindows() error { return errors.New("not Windows") }
