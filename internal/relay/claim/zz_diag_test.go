@@ -47,5 +47,5 @@ func TestDiagLostWriters(t *testing.T) {
 	f, _ := os.Open(p)
 	err := config.WriteFileAtomicNoSync(p, []byte("b"), 0o600)
 	f.Close()
-	t.Logf("DIAG rounds-with-loss=%d/50 write-false=%d/800 replace-while-open err=%v", lostRounds.Load(), falseWrites.Load(), err)
+	t.Errorf("DIAG rounds-with-loss=%d/50 write-false=%d/800 replace-while-open err=%v", lostRounds.Load(), falseWrites.Load(), err)
 }
