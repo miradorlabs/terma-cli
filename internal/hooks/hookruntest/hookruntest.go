@@ -20,6 +20,10 @@ import (
 func InitRepo(t *testing.T) string {
 	t.Helper()
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	// The developer's own git config stays out: a global core.hooksPath would run the
+	// installed terma's post-commit inside the test and consume its manifests.
+	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(t.TempDir(), "gitconfig"))
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not installed")
 	}
