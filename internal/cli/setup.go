@@ -78,7 +78,7 @@ Run it again any time: it reuses a working sign-in, --org switches organization,
 		RunE: func(cmd *cobra.Command, _ []string) error { return app.runSetup(cmd, f) },
 	}
 	cmd.Flags().StringVar(&f.harnesses, "harness", "", "comma-separated agents to record ("+strings.Join(app.availableAgentNames(), ", ")+"); default: a picker")
-	cmd.Flags().StringVar(&f.org, "org", "", "organization to sign into, by name or id (default: the current one); run setup again to switch")
+	cmd.Flags().StringVar(&f.org, "org", "", "organization to sign into, by name or id (default: the current one)")
 	cmd.Flags().BoolVar(&f.noBrowser, "no-browser", false, "print the sign-in URL instead of opening a browser")
 	cmd.Flags().BoolVarP(&f.assumeYes, "yes", "y", false, "skip the browser prompt and picker; record every available installed agent")
 	cmd.Flags().StringVar(&f.relayService, "relay-service", "", "run the local relay as a background service: on or off (default: on, or your last choice)")
@@ -116,6 +116,11 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 	case "", "on", "off":
 	default:
 		return fmt.Errorf("--relay-service %q: want on or off", f.relayService)
+	}
+	if f.relayAddr != "" {
+		if err := checkRelayAddr(f.relayAddr); err != nil {
+			return err
+		}
 	}
 
 	ui := newInstallUI(out, f.verbose)

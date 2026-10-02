@@ -148,6 +148,8 @@ func TestUpdateCheckExplainsMissingRelease(t *testing.T) {
 // Already on the latest release, `terma update` is the refresh, so it is safe to run again.
 func TestUpdateOnTheLatestReleaseRefreshes(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	sandboxMachine(t)
+	t.Chdir(t.TempDir())
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprint(w, `{"tag_name":"v1.0.0","assets":[]}`)
 	}))
@@ -176,6 +178,8 @@ func TestUpdateOnTheLatestReleaseRefreshes(t *testing.T) {
 // A failed check refreshes nothing: the error is the whole answer.
 func TestUpdateThatCannotCheckRefreshesNothing(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	sandboxMachine(t)
+	t.Chdir(t.TempDir())
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
 	c := &selfupdate.Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0"}

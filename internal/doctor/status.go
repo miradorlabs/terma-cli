@@ -18,8 +18,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
-// Row is one labelled line of `terma status`; a row with no label continues the one
-// before it.
+// Row is one labelled line of context above doctor's checks; a row with no label continues
+// the one before it.
 type Row struct{ Label, Value string }
 
 // LocalReport is `terma status`: this machine and repository from local state alone, in

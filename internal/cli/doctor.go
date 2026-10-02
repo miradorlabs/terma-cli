@@ -54,13 +54,9 @@ func printContext(w io.Writer, rows []doctor.Row) {
 	fmt.Fprintln(out)
 }
 
-// executeDoctor is shared by `terma doctor` and install's verification; the caller decides
-// what a failure means.
+// executeDoctor runs doctor's checks, printing each as it finishes.
 func (app *App) executeDoctor(cmd *cobra.Command, env doctor.Env) doctor.Report {
 	out := cmd.OutOrStdout()
-	if notice := captureNotice(); notice != "" {
-		fmt.Fprintln(style.Highlight(out), notice)
-	}
 	// Streamed: the round-trip wait is long enough that a report printed at the end looks
 	// like a hang.
 	sp := spinner.New(cmd.ErrOrStderr())

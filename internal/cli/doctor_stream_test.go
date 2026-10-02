@@ -11,7 +11,7 @@ import (
 func TestDoctorReportsEachCheckAsItFinishes(t *testing.T) {
 	userSandbox(t)
 	var started, finished []string
-	report := testApp.runDoctor(context.Background(), true, doctor.Progress{
+	report := doctor.Run(context.Background(), testApp.doctorEnv(context.Background(), true), doctor.Progress{
 		Start: func(name string) { started = append(started, name) },
 		Done: func(c doctor.Check) {
 			if len(finished) != len(started)-1 && len(finished) != len(started) {
