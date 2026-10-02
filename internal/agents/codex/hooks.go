@@ -39,11 +39,8 @@ var committedHooks = []struct {
 	{"SubagentStop", hookCommand("codex-subagent-stop"), false, 3},
 }
 
-// hookCommand extends the small GUI PATH a desktop-launched Codex gets, with directories
-// portable across developers since the entry is committed.
-func hookCommand(event string) string {
-	return `PATH="${PATH:-/usr/bin:/bin}:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin"; ` + hookmgr.HookCommand(event)
-}
+// hookCommand finds terma with the small GUI PATH a desktop-launched Codex gets.
+func hookCommand(event string) string { return hookmgr.PathHookCommand(event) }
 
 // hasConfig is when wiring hooks by default helps rather than leaves a stray directory.
 func hasConfig(root string) bool {

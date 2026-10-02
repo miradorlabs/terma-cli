@@ -10,29 +10,30 @@ import (
 // settingsPath is the committed project settings file, which carries hooks.
 const settingsPath = ".claude/settings.json"
 
-// committedHooks are the one-line shims that forward each hook's JSON to the binary.
+// committedHooks are the one-line shims that forward each hook's JSON to the binary, behind
+// a PATH that finds terma when Claude starts from the Dock or an IDE.
 var committedHooks = []struct {
 	Event   string
 	Matcher string
 	Command string
 }{
-	{"SessionStart", "", hookmgr.HookCommand("session-start")},
-	{"SessionEnd", "", hookmgr.HookCommand("session-end")},
+	{"SessionStart", "", hookmgr.PathHookCommand("session-start")},
+	{"SessionEnd", "", hookmgr.PathHookCommand("session-end")},
 	// Edits build the manifest; the Agent tool's response (Task in older builds) is the only place a
 	// subagent's model is named.
-	{"PostToolUse", "Edit|Write|MultiEdit|NotebookEdit|Agent|Task", hookmgr.HookCommand("post-tool-use")},
-	{"Stop", "", hookmgr.HookCommand("stop")},
-	{"StopFailure", "", hookmgr.HookCommand("stop-failure")},
+	{"PostToolUse", "Edit|Write|MultiEdit|NotebookEdit|Agent|Task", hookmgr.PathHookCommand("post-tool-use")},
+	{"Stop", "", hookmgr.PathHookCommand("stop")},
+	{"StopFailure", "", hookmgr.PathHookCommand("stop-failure")},
 	// The one hook before a turn exports anything, so the relay is up and the session claimed first.
 	// It must print nothing: its stdout goes to the model.
-	{"UserPromptSubmit", "", hookmgr.HookCommand("user-prompt-submit")},
-	{"SubagentStart", "", hookmgr.HookCommand("subagent-start")},
-	{"SubagentStop", "", hookmgr.HookCommand("subagent-stop")},
+	{"UserPromptSubmit", "", hookmgr.PathHookCommand("user-prompt-submit")},
+	{"SubagentStart", "", hookmgr.PathHookCommand("subagent-start")},
+	{"SubagentStop", "", hookmgr.PathHookCommand("subagent-stop")},
 }
 
 // planSettings merges terma's hooks into .claude/settings.json; unknown keys survive byte-for-byte.
 func planSettings(root string, install bool) (hookmgr.Plan, error) {
-	return planClaude(root, settingsPath, hookmgr.HookCommand, install)
+	return planClaude(root, settingsPath, hookmgr.PathHookCommand, install)
 }
 
 // planUserHooks merges global mode's machine-wide hooks into <configDir>/settings.json.
