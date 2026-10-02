@@ -18,7 +18,7 @@ import (
 
 // WellKnownBinDirs are where a terma binary gets installed besides wherever PATH points.
 func WellKnownBinDirs() []string {
-	dirs := []string{"/usr/local/bin", "/opt/homebrew/bin", "/usr/bin"}
+	dirs := []string{"/usr/local/bin", "/opt/homebrew/bin", "/usr/bin", "/bin"}
 	if home, err := os.UserHomeDir(); err == nil {
 		dirs = append(dirs, filepath.Join(home, ".local", "bin"), filepath.Join(home, "bin"), filepath.Join(home, "go", "bin"))
 	}

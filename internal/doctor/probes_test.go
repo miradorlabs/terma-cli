@@ -156,10 +156,11 @@ func TestDoctorNeedsABindingOnlyInPerRepositoryMode(t *testing.T) {
 			if err := termaproject.Remove(e.Root); err != nil {
 				t.Fatal(err)
 			}
-			e.Config.ProjectID, e.Config.ProjectName = "p9", "Engineering"
+			// An unbound repository resolves no project, so only the policy's id names the team.
+			e.Config.ProjectID, e.Config.ProjectName = "", ""
 			e.Config.Policy = config.Policy{Mode: mode, DefaultProjectID: "p9"}
 			c := check(Run(t.Context(), e, Progress{}), KeyProject)
-			if c.Status != want || want == Pass && !strings.Contains(c.Detail, "Engineering") || want == Fail && c.Fix != "terma install" {
+			if c.Status != want || want == Pass && !strings.Contains(c.Detail, "the team chosen at setup (p9)") || want == Fail && c.Fix != "terma install" {
 				t.Fatalf("repository bound in %s mode = %+v", mode, c)
 			}
 		})
@@ -187,5 +188,21 @@ func TestLocalReportNeedsABindingOnlyInPerRepositoryMode(t *testing.T) {
 				t.Fatalf("%s mode: asks for terma install = %v, rows %v", mode, asks, rep.Rows)
 			}
 		})
+	}
+}
+
+// A name is shown only for the project the command resolved, never put on another id.
+func TestGlobalDestinationNamesOnlyTheResolvedProject(t *testing.T) {
+	for _, tc := range []struct {
+		cfg  config.Config
+		want string
+	}{
+		{config.Config{ProjectID: "p9", ProjectName: "Engineering", Policy: config.Policy{DefaultProjectID: "p9"}}, "report to Engineering"},
+		{config.Config{ProjectID: "p1", ProjectName: "Other", Policy: config.Policy{DefaultProjectID: "p9"}}, "setup (p9)"},
+		{config.Config{}, "the team chosen at setup"},
+	} {
+		if got := GlobalDestination(&tc.cfg); !strings.HasSuffix(got, tc.want) {
+			t.Errorf("GlobalDestination(%+v) = %q, want suffix %q", tc.cfg, got, tc.want)
+		}
 	}
 }
