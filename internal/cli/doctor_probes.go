@@ -18,9 +18,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-func (app *App) doctorEnv(ctx context.Context, skipCommit bool) doctor.Env {
+func (app *App) doctorEnv(ctx context.Context) doctor.Env {
 	exe, _ := os.Executable()
-	env := doctor.Env{Agents: app.agents, Exe: exe, BinDirs: app.binDirs(), SkipCommit: skipCommit}
+	env := doctor.Env{Agents: app.agents, Exe: exe, BinDirs: app.binDirs()}
 	env.Config, env.ConfigErr = app.loadConfig()
 	env.Root, env.GitDir, env.RepoErr = workspaceHere(ctx)
 	if env.Config != nil {
@@ -54,9 +54,8 @@ func (app *App) doctorProbes(cfg *config.Config) doctor.Probes {
 			}
 			return d, nil
 		},
-		Relay:          relayFacts,
-		Endpoint:       func(projectID string) string { return app.delivery().Endpoint(cfg, projectID) },
-		CommitRecorded: app.commitRecorded(cfg),
+		Relay:    relayFacts,
+		Endpoint: func(projectID string) string { return app.delivery().Endpoint(cfg, projectID) },
 		Credential: func() (doctor.Credential, error) {
 			cred, err := auth.LoadCredential(cfg.ProfileName)
 			if err != nil {
@@ -66,27 +65,6 @@ func (app *App) doctorProbes(cfg *config.Config) doctor.Probes {
 				OtherEnvironment: cred.CheckEnvironment(cfg.AuthURL) != nil}, nil
 		},
 		Keys: storedKeys,
-	}
-}
-
-// commitRecorded reads another environment's project from its own data API with its own
-// key: the signed-in credential is bound to the active profile's auth host.
-func (app *App) commitRecorded(cfg *config.Config) func(ctx context.Context, projectID, sha string, from, to time.Time) (bool, error) {
-	return func(ctx context.Context, projectID, sha string, from, to time.Time) (bool, error) {
-		// Query the project the scratch event used, independently of command overrides.
-		queryConfig := *cfg
-		queryConfig.ProjectID = projectID
-		if api := app.delivery().API(cfg, projectID); api != cfg.APIURL {
-			if key := keystore.Get(projectID); key != "" {
-				queryConfig.APIURL, queryConfig.APIKey = api, key
-			}
-		}
-		client, err := app.newClient(&queryConfig)
-		if err != nil {
-			return false, err
-		}
-		rec, err := client.CommitLog(ctx, sha, from, to)
-		return rec != nil, err
 	}
 }
 

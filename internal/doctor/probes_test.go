@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/agents/agentstest"
@@ -38,7 +37,7 @@ func env(t *testing.T, p Probes) Env {
 	}
 	p.Endpoint = func(string) string { return "https://otlp.example" }
 	return Env{Agents: agents.New(agentstest.Agent{ID: "fake"}), Config: &config.Config{Environment: config.EnvProd},
-		Root: root, GitDir: gitDir, SkipCommit: true, Probes: p}
+		Root: root, GitDir: gitDir, Probes: p}
 }
 
 func signedIn() (Credential, error) {
@@ -128,10 +127,10 @@ func TestTheBackendCheckTellsThisProjectFromAnother(t *testing.T) {
 			return Delivery{Err: errors.New("refused"), Failures: []Failure{{ProjectID: project, Err: errors.New("401"), Refused: true, KeyRefused: true}}}, nil
 		}
 	}
-	if c := BackendCheck(t.Context(), Probes{Keys: keys, Deliver: deliver("p1")}, "p1", "", Check{}, Progress{}); c.Status != Fail {
+	if c := BackendCheck(t.Context(), Probes{Keys: keys, Deliver: deliver("p1")}, "p1"); c.Status != Fail {
 		t.Fatalf("this project's refusal = %+v", c)
 	}
-	other := BackendCheck(t.Context(), Probes{Keys: keys, Deliver: deliver("p2"), Endpoint: func(string) string { return "https://otlp.example" }, CommitRecorded: func(context.Context, string, string, time.Time, time.Time) (bool, error) { return false, nil }}, "p1", "", Check{}, Progress{})
+	other := BackendCheck(t.Context(), Probes{Keys: keys, Deliver: deliver("p2"), Endpoint: func(string) string { return "https://otlp.example" }}, "p1")
 	if other.Status == Fail {
 		t.Fatalf("another project's refusal failed this one: %+v", other)
 	}
@@ -219,5 +218,20 @@ func TestGlobalDestinationNamesOnlyTheResolvedProject(t *testing.T) {
 		if got := GlobalDestination(&tc.cfg); !strings.HasSuffix(got, tc.want) {
 			t.Errorf("GlobalDestination(%+v) = %q, want suffix %q", tc.cfg, got, tc.want)
 		}
+	}
+}
+
+// An accepted flush is the proof of delivery; an empty queue proves nothing.
+func TestTheBackendCheckPassesOnAnAcceptedFlush(t *testing.T) {
+	keys := Keys(func(string, string) string { return "ter_srv_…" })
+	probes := func(sent int) Probes {
+		return Probes{Keys: keys, Endpoint: func(string) string { return "https://otlp.example" },
+			Deliver: func(context.Context) (Delivery, error) { return Delivery{Sent: sent, Delivered: "1 event"}, nil }}
+	}
+	if c := BackendCheck(t.Context(), probes(1), "p1"); c.Status != Pass {
+		t.Fatalf("accepted flush = %+v", c)
+	}
+	if c := BackendCheck(t.Context(), probes(0), "p1"); c.Status != Skip || !c.Inconclusive {
+		t.Fatalf("empty queue = %+v", c)
 	}
 }

@@ -16,11 +16,11 @@ func (app *App) newStatusCommand() *cobra.Command {
 		Short:  "Show connections, queued events, and setup readiness",
 		Long: `A quick, local view of this machine and repository: sign-in, team binding,
 hook wiring, connected agents, the event spool, and remaining setup steps.
-Nothing is written and no scratch commit is made — run
+Nothing is written and nothing is sent — run
 ` + "`terma doctor`" + ` for the end-to-end verification.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			out := style.Highlight(cmd.OutOrStdout())
-			env := app.doctorEnv(cmd.Context(), true)
+			env := app.doctorEnv(cmd.Context())
 			if env.ConfigErr != nil {
 				return env.ConfigErr
 			}

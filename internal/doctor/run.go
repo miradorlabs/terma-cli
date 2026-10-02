@@ -26,7 +26,6 @@ type Env struct {
 	BinDirs      []string
 	Root, GitDir string
 	RepoErr      error
-	SkipCommit   bool
 	Probes       Probes
 }
 
@@ -38,8 +37,6 @@ type Probes struct {
 	Endpoint func(projectID string) string
 	// Relay is the local relay as the machine finds it.
 	Relay func() Relay
-	// CommitRecorded reports whether projectID's data API holds sha's terma.commit event.
-	CommitRecorded func(ctx context.Context, projectID, sha string, from, to time.Time) (bool, error)
 	// Credential is the signed-in developer, or why there is none.
 	Credential func() (Credential, error)
 	// Keys are the delivery keys stored on this machine.
@@ -112,19 +109,12 @@ type Failure struct {
 // Progress is how a run reports as it goes; every field is optional.
 type Progress struct {
 	Start func(name string)
-	Note  func(text string)
 	Done  func(c Check)
 }
 
 func (p Progress) starting(name string) {
 	if p.Start != nil {
 		p.Start(name)
-	}
-}
-
-func (p Progress) noting(text string) {
-	if p.Note != nil {
-		p.Note(text)
 	}
 }
 
@@ -149,10 +139,8 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 		add(c)
 	}
 
-	var binaryCheck Check
 	timed(KeyBinary, "terma on PATH", func() Check {
-		binaryCheck = BinaryCheck(env.Exe, env.BinDirs, HookCallerFor(env.Root, env.GitDir, env.RepoErr))
-		return binaryCheck
+		return BinaryCheck(env.Exe, env.BinDirs, HookCallerFor(env.Root, env.GitDir, env.RepoErr))
 	})
 
 	if c, ok := stateCheck(); ok {
@@ -164,7 +152,7 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 		return Build(checks)
 	}
 	cfg := env.Config
-	d := &run{ctx: ctx, env: env, cfg: cfg, progress: progress, binaryCheck: binaryCheck}
+	d := &run{ctx: ctx, env: env, cfg: cfg}
 	timed(KeyAuth, "signed in", d.signedIn)
 
 	d.nonGit = env.RepoErr == nil && env.GitDir == ""
@@ -198,11 +186,9 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 		timed(KeyStatusLine, a.DisplayName()+" status line", d.statusLine)
 	}
 
-	timed(KeyScratch, "scratch commit stamped", d.scratchCommit)
-
 	timed(KeySpool, "event spool", d.eventSpool)
 	timed(KeyBackend, "backend receives events", func() Check {
-		return BackendCheck(ctx, env.Probes, d.projectID, d.scratchSHA, binaryCheck, progress)
+		return BackendCheck(ctx, env.Probes, d.projectID)
 	})
 
 	return Build(checks)
@@ -210,15 +196,12 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 
 // run carries what one check establishes for the ones after it.
 type run struct {
-	ctx         context.Context
-	env         Env
-	cfg         *config.Config
-	progress    Progress
-	nonGit      bool
-	bound       *termaproject.File
-	projectID   string
-	scratchSHA  string
-	binaryCheck Check
+	ctx       context.Context
+	env       Env
+	cfg       *config.Config
+	nonGit    bool
+	bound     *termaproject.File
+	projectID string
 }
 
 // installed reports whether the CLI stands in a repository `terma install` has bound.
@@ -291,21 +274,6 @@ func (d *run) statusLine() Check {
 	return StatusLineCheck(JudgeStatusLine(d.env.Agents, repoRoot))
 }
 
-func (d *run) scratchCommit() Check {
-	if d.nonGit {
-		return Check{Status: Skip, Detail: "not a Git repository"}
-	}
-	if !d.installed() {
-		return Check{Status: Skip, Detail: "needs an installed repository"}
-	}
-	if d.env.SkipCommit {
-		return Check{Status: Skip, Detail: "--skip-commit"}
-	}
-	sha, c := ScratchCommit(d.ctx, d.env.Root, d.bound)
-	d.scratchSHA = sha
-	return c
-}
-
 func (d *run) eventSpool() Check {
 	s := d.env.Probes.Spool()
 	if !s.Open {
@@ -326,14 +294,8 @@ func (d *run) eventSpool() Check {
 	return Check{Status: Pass, Detail: fmt.Sprintf("%d queued, spool writable", n)}
 }
 
-// BackendCheck flushes every project's queued events and reads the scratch commit's
-// event back; a failed binary check makes it inconclusive, as hooks may run another build.
-func BackendCheck(ctx context.Context, p Probes, projectID, scratchSHA string, binary Check, progress Progress) Check {
-	if binary.Status == Warn || binary.Status == Fail {
-		return Check{Status: Warn, Inconclusive: true,
-			Detail: "resolve the missing or conflicting Terma executables before verifying hook delivery",
-			Fix:    binary.Fix}
-	}
+// BackendCheck flushes every project's queued events; a flush the backend accepts is the proof.
+func BackendCheck(ctx context.Context, p Probes, projectID string) Check {
 	if projectID != "" && !p.Keys.has("", projectID) {
 		return Check{Status: Skip, Detail: "no team key on this machine; nothing can be delivered", Fix: "terma install"}
 	}
@@ -368,18 +330,13 @@ func BackendCheck(ctx context.Context, p Probes, projectID, scratchSHA string, b
 		flushDetail = "nothing queued at verification time (hooks may already have flushed)"
 	}
 	detail := strings.Join(append(append([]string{flushDetail}, undelivered...), others...), "; ")
-	if scratchSHA == "" {
-		return Check{Status: Skip, Inconclusive: true, Detail: detail + "; no scratch commit event to verify", Fix: othersFix}
-	}
-	if ok, err := waitForCommit(ctx, p, projectID, scratchSHA, progress); err != nil {
-		return Check{Status: Warn, Inconclusive: true, Detail: detail + "; could not confirm the round-trip via the API (" + err.Error() + ")", Fix: "terma doctor"}
-	} else if !ok {
-		return Check{Status: Warn, Inconclusive: true, Detail: detail + "; the scratch commit event was not visible via the API within " + roundTripWait.String(), Fix: "terma doctor"}
-	}
 	if len(others) > 0 {
-		return Check{Status: Warn, Detail: detail + "; round-trip confirmed for this team", Fix: othersFix}
+		return Check{Status: Warn, Detail: detail, Fix: othersFix}
 	}
-	return Check{Status: Pass, Detail: detail + "; round-trip confirmed"}
+	if res.Sent == 0 {
+		return Check{Status: Skip, Inconclusive: true, Detail: detail}
+	}
+	return Check{Status: Pass, Detail: detail}
 }
 
 // describeFailure names the host, which a developer with projects in two environments cannot guess.
@@ -396,34 +353,4 @@ func failureFix(f Failure) string {
 		return "the key this machine holds for team " + f.ProjectID + " was refused by " + f.Endpoint + " — it may have been revoked, or belong to another environment"
 	}
 	return "check the network and " + f.Endpoint + ", then run `terma doctor` again (it retries delivery)"
-}
-
-// roundTripWait bounds the wait for the scratch commit to be readable back.
-const (
-	roundTripWait = 20 * time.Second
-	roundTripPoll = time.Second
-)
-
-// commitLogWindow is the lookup's reach either side of its start: the log store caps a query's span.
-const commitLogWindow = time.Hour
-
-func waitForCommit(ctx context.Context, p Probes, projectID, sha string, progress Progress) (bool, error) {
-	started := time.Now()
-	deadline := started.Add(roundTripWait)
-	for {
-		progress.noting(fmt.Sprintf("backend receives events… waiting for the round-trip (%ds of %ds)",
-			int(time.Since(started).Seconds()), int(roundTripWait.Seconds())))
-		found, err := p.CommitRecorded(ctx, projectID, sha, started.Add(-commitLogWindow), started.Add(commitLogWindow))
-		if err != nil || found {
-			return found, err
-		}
-		if time.Now().After(deadline) {
-			return false, nil
-		}
-		select {
-		case <-ctx.Done():
-			return false, ctx.Err()
-		case <-time.After(roundTripPoll):
-		}
-	}
 }

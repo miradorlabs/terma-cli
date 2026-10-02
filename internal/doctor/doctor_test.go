@@ -21,7 +21,7 @@ func TestReadinessSummary(t *testing.T) {
 		{"partial export", []Check{{Status: Warn, Ready: 1, Of: 2, Fix: "open a new terminal"}}, "open a new terminal", false},
 		{"unverified backend", []Check{{Key: KeyBackend, Status: Warn, Inconclusive: true, Fix: "terma doctor"}}, "terma doctor", false},
 		{"broken backend", []Check{{Key: KeyBackend, Status: Fail, Fix: "check network"}}, "check network", true},
-		{"skipped probe", []Check{{Key: KeyScratch, Status: Skip}}, "Verification incomplete", false},
+		{"skipped probe", []Check{{Key: KeyBackend, Status: Skip}}, "Verification incomplete", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r := Build(tc.checks)
