@@ -52,9 +52,8 @@ type policyResponse struct {
 				ExcludePaths       *[]string `json:"exclude_paths"`
 				Signals            *[]string `json:"signals"`
 			} `json:"capture"`
-			Global *struct {
-				MembersCanPause bool `json:"members_can_pause"`
-			} `json:"global"`
+			// Global's presence alone selects the mode.
+			Global        *struct{} `json:"global"`
 			PerRepository *struct {
 				MembersCanAddRepositories bool `json:"members_can_add_repositories"`
 			} `json:"per_repository"`
@@ -93,7 +92,7 @@ func (r policyResponse) collectionPolicy() (config.Policy, error) {
 		ExcludePaths: *c.ExcludePaths, Revision: r.Revision, UpdatedAt: r.UpdatedAt,
 		FetchedAt: time.Now().UTC()}
 	if t.Global != nil {
-		p.Mode, p.MembersCanPause = config.ModeGlobal, t.Global.MembersCanPause
+		p.Mode = config.ModeGlobal
 	} else {
 		p.MembersCanAddRepositories = t.PerRepository.MembersCanAddRepositories
 	}

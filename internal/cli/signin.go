@@ -51,9 +51,7 @@ func (r orgRef) String() string { return cmp.Or(r.Name, r.ID) }
 type signInOptions struct {
 	// org empty means whichever is active, or whatever the user picks in the browser.
 	org                orgRef
-	force              bool
 	noBrowser          bool
-	label              string
 	pauseBeforeBrowser bool
 }
 
@@ -61,12 +59,6 @@ type signInResult struct {
 	cred    *auth.Credential
 	orgName string
 	reused  bool
-}
-
-// signedInAs has no full stop so a caller can qualify it.
-func (r *signInResult) signedInAs() string {
-	return fmt.Sprintf("Signed in as %s in %s", cmp.Or(r.cred.UserEmail, "your account"),
-		cmp.Or(r.orgName, r.cred.OrganizationID))
 }
 
 // signInAndReload reloads because signing in points the profile at the credential's
@@ -89,21 +81,19 @@ func (app *App) signIn(cmd *cobra.Command, cfg *config.Config, opts signInOption
 	errOut := cmd.ErrOrStderr()
 
 	want := opts.org
-	if !opts.force {
-		// A name must become an id to find a stored credential; without a working
-		// credential to list organizations, the browser page resolves the name.
-		if want.ID == "" && want.Name != "" {
-			if org, err := app.resolveOrganization(ctx, cfg, want); err == nil {
-				want = orgRef{ID: org.ID, Name: org.Name}
-			} else if !errors.Is(err, errNoWorkingCredential) {
-				return nil, err
-			}
-		}
-		if res, ok, err := app.reuseStoredSession(ctx, cfg, want); err != nil {
+	// A name must become an id to find a stored credential; without a working
+	// credential to list organizations, the browser page resolves the name.
+	if want.ID == "" && want.Name != "" {
+		if org, err := app.resolveOrganization(ctx, cfg, want); err == nil {
+			want = orgRef{ID: org.ID, Name: org.Name}
+		} else if !errors.Is(err, errNoWorkingCredential) {
 			return nil, err
-		} else if ok {
-			return res, nil
 		}
+	}
+	if res, ok, err := app.reuseStoredSession(ctx, cfg, want); err != nil {
+		return nil, err
+	} else if ok {
+		return res, nil
 	}
 
 	if opts.pauseBeforeBrowser && !opts.noBrowser && canPrompt() {
@@ -115,7 +105,7 @@ func (app *App) signIn(cmd *cobra.Command, cfg *config.Config, opts signInOption
 	client := api.NewAnonymous(cfg.AuthURL, app.version)
 	cred, err := auth.Login(ctx, client, auth.LoginOptions{
 		AppURL:       cfg.AppURL,
-		Label:        cmp.Or(opts.label, auth.DefaultLabel()),
+		Label:        auth.DefaultLabel(),
 		Organization: want.hint(),
 		NoBrowser:    opts.noBrowser,
 		Out:          errOut,
@@ -311,4 +301,12 @@ func waitForBrowserEnter(cmd *cobra.Command) error {
 			return fmt.Errorf("read browser confirmation: %w", err)
 		}
 	}
+}
+
+type identityResponse struct {
+	OrganizationID string `json:"organization_id"`
+	ProjectID      string `json:"project_id"`
+	AuthType       string `json:"auth_type"`
+	UserID         string `json:"user_id"`
+	Email          string `json:"email"`
 }

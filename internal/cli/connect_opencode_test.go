@@ -44,7 +44,7 @@ func TestTelemetryConnectOpenCodeInstallsThePlugin(t *testing.T) {
 		t.Fatal("connect wrote opencode.json")
 	}
 
-	out, err = runTerma(t, "harness", "status", "opencode", "-o", "json")
+	out, err = runTerma(t, "telemetry", "status", "opencode", "-o", "json")
 	if err != nil {
 		t.Fatalf("status: %v\n%s", err, out)
 	}
@@ -112,7 +112,7 @@ func TestTelemetryConnectOpenCodeLocalWritesPolicy(t *testing.T) {
 	if strings.Contains(string(data), "endpoint") || strings.Contains(string(data), "headers") {
 		t.Errorf("policy carries a destination:\n%s", data)
 	}
-	out, err = runTerma(t, "harness", "status", "opencode", "-o", "json")
+	out, err = runTerma(t, "telemetry", "status", "opencode", "-o", "json")
 	if err != nil {
 		t.Fatal(err)
 	}

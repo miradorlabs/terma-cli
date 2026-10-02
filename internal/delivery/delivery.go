@@ -219,24 +219,3 @@ func (r Router) API(cfg *config.Config, projectID string) string {
 	}
 	return cfg.APIURL
 }
-
-// Queued counts queued events with no project id, and per project those waiting for a
-// key, reading only the pending count so the split matches it.
-func Queued(s *spool.Spool, pending int) (int, map[string]int) {
-	events, err := s.Peek(pending)
-	if err != nil {
-		return 0, nil
-	}
-	unroutable := 0
-	counts := map[string]int{}
-	for _, e := range events {
-		id, _ := e.Attrs[hookrun.AttrProjectID].(string)
-		switch {
-		case id == "":
-			unroutable++
-		case keystore.Get(id) == "":
-			counts[id]++
-		}
-	}
-	return unroutable, counts
-}

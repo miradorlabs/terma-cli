@@ -4,9 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"maps"
 	"os"
-	"slices"
 	"strings"
 	"time"
 
@@ -15,7 +13,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -29,7 +26,7 @@ func (app *App) newSpoolCommand() *cobra.Command {
 The spool is delivered later — in the background after a commit or session end,
 or on demand here. A backend outage costs nothing at commit time.`,
 	}
-	cmd.AddCommand(app.newSpoolFlushCommand(), newSpoolStatusCommand())
+	cmd.AddCommand(app.newSpoolFlushCommand())
 	return cmd
 }
 
@@ -119,48 +116,6 @@ func describeFlush(res delivery.Result) (delivered string, undelivered []string)
 		undelivered = append(undelivered, fmt.Sprintf("withheld %d by capture policy", res.Withheld))
 	}
 	return delivered, undelivered
-}
-
-func newSpoolStatusCommand() *cobra.Command {
-	return &cobra.Command{
-		Use:   "status",
-		Short: "Show what is queued",
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			s := openSpool()
-			if s == nil {
-				return errors.New("cannot open the spool directory")
-			}
-			n, size, err := s.Pending()
-			if err != nil {
-				return err
-			}
-			out := cmd.OutOrStdout()
-			fmt.Fprintf(out, "Queued events:   %d (%d KB)\n", n, size/1024)
-			if next := s.NextAttempt(); !next.IsZero() && time.Now().Before(next) {
-				fmt.Fprintf(out, "Backing off:     until %s (last delivery failed)\n", next.Local().Format(time.Kitchen))
-			}
-			windows := s.RetryWindows(time.Now())
-			for _, id := range slices.Sorted(maps.Keys(windows)) {
-				fmt.Fprintf(out, "Retrying:        team %s after %s — its last delivery failed (`terma spool flush --force` retries now)\n", id, windows[id].Local().Format(time.Kitchen))
-			}
-			keys := keystore.Projects()
-			slices.Sort(keys)
-			fmt.Fprintf(out, "Team keys:       %d\n", len(keys))
-			unroutable, held := delivery.Queued(s, n)
-			if unroutable > 0 {
-				fmt.Fprintf(out, "Unroutable:      %d event%s with no team id — they cannot be delivered (they leave the queue at the next flush)\n", unroutable, plural(unroutable))
-			}
-			ids := make([]string, 0, len(held))
-			for id := range held {
-				ids = append(ids, id)
-			}
-			slices.Sort(ids)
-			for _, id := range ids {
-				fmt.Fprintf(out, "Held:            %d event%s for team %s — no key here yet (run `terma install` in that repository)\n", held[id], plural(held[id]), id)
-			}
-			return nil
-		},
-	}
 }
 
 func plural(n int) string {

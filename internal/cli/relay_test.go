@@ -121,16 +121,16 @@ func TestRelayReportsASquatter(t *testing.T) {
 		t.Fatalf("relay started on a taken port:\n%s", out)
 	}
 	if _, err := os.Stat(filepath.Join(dir, daemon.ErrorFile)); err != nil {
-		t.Fatal("the failure was not recorded for status")
+		t.Fatal("the failure was not recorded for doctor")
 	}
-	out, err := runTerma(t, "relay", "status")
-	if err != nil {
-		t.Fatalf("status: %v\n%s", err, out)
+	// Doctor names the squatter first; the recorded failure is there once the port is free.
+	facts := relayFacts()
+	if c := doctor.RelayCheck(testApp.agents, facts, storedKeys, "proj_x", "", nil); c.Status != doctor.Fail || !strings.Contains(c.Detail, "another process is listening on "+addr) {
+		t.Errorf("squatted relay: %+v", c)
 	}
-	for _, want := range []string{"another process is listening on " + addr, "last failed to start"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("status should say %q:\n%s", want, out)
-		}
+	facts.Squatted = false
+	if c := doctor.RelayCheck(testApp.agents, facts, storedKeys, "proj_x", "", []string{"codex"}); c.Status != doctor.Warn || !strings.Contains(c.Detail, "last failed to start") {
+		t.Errorf("failed relay: %+v", c)
 	}
 }
 

@@ -95,8 +95,6 @@ type Options struct {
 	Version string
 	// Logf, when set, is told why each part that could not leave was dropped (TERMA_RELAY_DEBUG=1).
 	Logf func(format string, args ...any)
-	// Paused, when it reports true, drops every export as it arrives (`terma pause`).
-	Paused func() bool
 }
 
 // Relay is the local OTLP relay: Handler accepts exports and Run delivers or ages them out.
@@ -273,12 +271,7 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 			p.start = r.rules.conversationStart(p)
 		}
 	}
-	paused := r.opts.Paused != nil && r.opts.Paused()
 	for _, p := range parts {
-		if paused {
-			r.stats.dropped(s, "paused", p.records)
-			continue
-		}
 		if p.session == "" {
 			// A part naming no session may still go by its process once it exits (decideExited).
 			if pid == 0 {

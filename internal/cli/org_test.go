@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -12,6 +14,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/spf13/cobra"
 )
 
 // fakeAuth is an auth host with two organizations and one user; `ter_cli_<org>` is a live
@@ -168,20 +171,40 @@ func TestMatchOrganization(t *testing.T) {
 	}
 }
 
+// signInHere runs the sign-in `terma setup` starts with, under a deadline that cuts a
+// browser handoff short; it returns what it printed.
+func signInHere(t *testing.T, opts signInOptions, wait time.Duration) (*signInResult, string, error) {
+	t.Helper()
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), wait)
+	defer cancel()
+	var out bytes.Buffer
+	cmd := &cobra.Command{}
+	cmd.SetContext(ctx)
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetIn(strings.NewReader(""))
+	res, err := testApp.signIn(cmd, cfg, opts)
+	return res, out.String(), err
+}
+
 // A working stored session is verified and reused; no browser opens.
-func TestLoginReusesAWorkingSession(t *testing.T) {
+func TestSignInReusesAWorkingSession(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
 	if _, err := auth.SaveCredential(config.DefaultProfile, storedSession(f, orgA())); err != nil {
 		t.Fatal(err)
 	}
 
-	out, err := within(10*time.Second).combined(t, "login", "--no-browser")
+	res, out, err := signInHere(t, signInOptions{noBrowser: true}, 10*time.Second)
 	if err != nil {
-		t.Fatalf("login: %v\n%s", err, out)
+		t.Fatalf("sign-in: %v\n%s", err, out)
 	}
-	if !strings.Contains(out, "existing session reused") || strings.Contains(out, "Open this URL") {
-		t.Fatalf("login should reuse the stored session without a browser:\n%s", out)
+	if !res.reused || strings.Contains(out, "Open this URL") {
+		t.Fatalf("sign-in should reuse the stored session without a browser:\n%s", out)
 	}
 	if f.whoamis.Load() != 1 {
 		t.Fatalf("the session should be verified exactly once, got %d whoami calls", f.whoamis.Load())
@@ -192,23 +215,9 @@ func TestLoginReusesAWorkingSession(t *testing.T) {
 	}
 }
 
-// --force does not reuse the stored session.
-func TestLoginForceSkipsReuse(t *testing.T) {
-	f := newFakeAuth(t)
-	authSandbox(t, f)
-	if _, err := auth.SaveCredential(config.DefaultProfile, storedSession(f, orgA())); err != nil {
-		t.Fatal(err)
-	}
-	out, err := within(2*time.Second).combined(t, "login", "--no-browser", "--force")
-	if err == nil {
-		t.Fatalf("expected the browser handoff to be cut short:\n%s", out)
-	}
-	if !strings.Contains(out, "Open this URL") || f.whoamis.Load() != 0 {
-		t.Fatalf("--force should go straight to the browser:\n%s", out)
-	}
-}
-
-func TestOrgUseSwitchesAccountsWithoutSelectingProjects(t *testing.T) {
+// `terma setup --org` switches between stored sessions by name or id without a browser,
+// and selects no team.
+func TestSignInWithOrgSwitchesBetweenStoredSessions(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
 	for _, o := range fakeOrgs {
@@ -225,49 +234,31 @@ func TestOrgUseSwitchesAccountsWithoutSelectingProjects(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err := within(10*time.Second).combined(t, "org", "use", "beta")
-	if err != nil {
-		t.Fatalf("org use: %v\n%s", err, out)
-	}
-	if !strings.Contains(out, "Now using Beta Labs") || !strings.Contains(out, "existing session reused") {
-		t.Fatalf("switch should reuse the stored Beta Labs session:\n%s", out)
-	}
-	// Even an organization with one project must not select it globally.
-	if strings.Contains(out, "Project:") {
-		t.Fatalf("org use should not select a project:\n%s", out)
-	}
-	if strings.Contains(out, "Open this URL") {
-		t.Fatalf("no browser should open for a stored session:\n%s", out)
-	}
-	active, err := auth.LoadCredential(config.DefaultProfile)
-	if err != nil || active.OrganizationID != orgB().ID {
-		t.Fatalf("active credential should be Beta Labs: %+v, %v", active, err)
-	}
-
-	// Back to Acme: no old project is restored.
-	out, err = within(10*time.Second).combined(t, "org", "use", orgA().ID)
-	if err != nil {
-		t.Fatalf("org use back: %v\n%s", err, out)
-	}
-	if strings.Contains(out, "Project:") || strings.Contains(out, "restored") {
-		t.Fatalf("switching back should not restore a project:\n%s", out)
-	}
-	file, _ := config.LoadFile()
-	p := file.Profiles[config.DefaultProfile]
-	if p.OrganizationID != orgA().ID {
-		t.Fatalf("profile after switching back: %+v", p)
-	}
-
-	// Already there: says so, changes nothing.
-	out, err = within(10*time.Second).combined(t, "org", "use", "Acme")
-	if err != nil || !strings.Contains(out, "Already using Acme") {
-		t.Fatalf("re-selecting the current organization: %v\n%s", err, out)
+	for _, step := range []struct {
+		ref  string
+		want organization
+	}{{"beta labs", orgB()}, {"beta", orgB()}, {orgA().ID, orgA()}} {
+		res, out, err := signInHere(t, signInOptions{org: parseOrgRef(step.ref), noBrowser: true}, 10*time.Second)
+		if err != nil {
+			t.Fatalf("--org %s: %v\n%s", step.ref, err, out)
+		}
+		if !res.reused || strings.Contains(out, "Open this URL") {
+			t.Fatalf("--org %s should reuse the stored session:\n%s", step.ref, out)
+		}
+		active, err := auth.LoadCredential(config.DefaultProfile)
+		if err != nil || active.OrganizationID != step.want.ID {
+			t.Fatalf("--org %s: active credential %+v, %v; want %s", step.ref, active, err, step.want.Name)
+		}
+		file, _ := config.LoadFile()
+		if p := file.Profiles[config.DefaultProfile]; p.OrganizationID != step.want.ID {
+			t.Fatalf("--org %s: profile %+v", step.ref, p)
+		}
 	}
 }
 
 // A session the server no longer honours is dropped and the switch falls through to the
 // browser; the other organization's session is untouched.
-func TestOrgUseDropsADeadSession(t *testing.T) {
+func TestSignInDropsADeadSession(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
 	for _, o := range fakeOrgs {
@@ -280,7 +271,7 @@ func TestOrgUseDropsADeadSession(t *testing.T) {
 	}
 	f.deadToken = "ter_cli_" + orgB().ID
 
-	out, err := within(2*time.Second).combined(t, "org", "use", "Beta Labs", "--no-browser")
+	_, out, err := signInHere(t, signInOptions{org: parseOrgRef("Beta Labs"), noBrowser: true}, 2*time.Second)
 	if err == nil {
 		t.Fatalf("a dead session should fall through to the browser, which the deadline cuts short:\n%s", out)
 	}
@@ -295,7 +286,8 @@ func TestOrgUseDropsADeadSession(t *testing.T) {
 	}
 }
 
-func TestLoginWithOrgResolvesTheNameThroughAStoredSession(t *testing.T) {
+// `terma teardown --sign-out` revokes every stored session server-side.
+func TestSignOutRevokesEveryStoredSession(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
 	for _, o := range fakeOrgs {
@@ -303,64 +295,21 @@ func TestLoginWithOrgResolvesTheNameThroughAStoredSession(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if _, err := auth.UseOrganization(config.DefaultProfile, orgA().ID); err != nil {
-		t.Fatal(err)
+	var out bytes.Buffer
+	cmd := &cobra.Command{}
+	cmd.SetContext(context.Background())
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	if err := testApp.signOut(cmd); err != nil {
+		t.Fatalf("sign out: %v\n%s", err, &out)
 	}
-	out, err := within(10*time.Second).combined(t, "login", "--org", "beta labs")
-	if err != nil {
-		t.Fatalf("login --org: %v\n%s", err, out)
-	}
-	if !strings.Contains(out, "in Beta Labs") || !strings.Contains(out, "existing session reused") {
-		t.Fatalf("login --org should switch to the stored Beta Labs session:\n%s", out)
-	}
-}
-
-func TestLogoutRevokesEveryStoredSession(t *testing.T) {
-	f := newFakeAuth(t)
-	authSandbox(t, f)
-	for _, o := range fakeOrgs {
-		if _, err := auth.SaveCredential(config.DefaultProfile, storedSession(f, o)); err != nil {
-			t.Fatal(err)
-		}
-	}
-	out, err := within(10*time.Second).combined(t, "logout")
-	if err != nil {
-		t.Fatalf("logout: %v\n%s", err, out)
-	}
-	if !strings.Contains(out, "Logged out of 2 organizations") {
-		t.Fatalf("logout should say how many sessions it ended:\n%s", out)
+	if !strings.Contains(out.String(), "Signed out of 2 organizations") {
+		t.Fatalf("sign-out should say how many sessions it ended:\n%s", &out)
 	}
 	if got := f.revokes.Load(); got != 2 {
 		t.Fatalf("every stored session must be revoked server-side, got %d revokes", got)
 	}
 	if creds, _ := auth.Credentials(config.DefaultProfile); len(creds) != 0 {
 		t.Fatalf("credentials should be gone: %+v", creds)
-	}
-}
-
-func TestOrgListMarksSignedInOrganizations(t *testing.T) {
-	f := newFakeAuth(t)
-	authSandbox(t, f)
-	if _, err := auth.SaveCredential(config.DefaultProfile, storedSession(f, orgA())); err != nil {
-		t.Fatal(err)
-	}
-	out, err := within(10*time.Second).combined(t, "org", "list", "-o", "table")
-	if err != nil {
-		t.Fatalf("org list: %v\n%s", err, out)
-	}
-	if !strings.Contains(out, "SIGNED IN") {
-		t.Fatalf("the table should have a signed-in column:\n%s", out)
-	}
-	var acme, beta string
-	for line := range strings.SplitSeq(out, "\n") {
-		switch {
-		case strings.Contains(line, "Acme"):
-			acme = line
-		case strings.Contains(line, "Beta Labs"):
-			beta = line
-		}
-	}
-	if !strings.Contains(acme, "yes") || strings.Contains(beta, "yes") {
-		t.Fatalf("only Acme has a session:\n%s", out)
 	}
 }

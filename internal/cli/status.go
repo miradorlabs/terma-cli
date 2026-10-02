@@ -11,8 +11,9 @@ import (
 
 func (app *App) newStatusCommand() *cobra.Command {
 	return &cobra.Command{
-		Use:   "status",
-		Short: "Show connections, queued events, and setup readiness",
+		Use:    "status",
+		Hidden: true,
+		Short:  "Show connections, queued events, and setup readiness",
 		Long: `A quick, local view of this machine and repository: sign-in, team binding,
 hook wiring, connected agents, the event spool, and remaining setup steps.
 Nothing is written and no scratch commit is made — run

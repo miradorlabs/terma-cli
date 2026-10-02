@@ -138,7 +138,7 @@ func TestTelemetryStatusListsTheLocalLayer(t *testing.T) {
 		t.Fatalf("connect: %v\n%s", err, out)
 	}
 
-	out, err := runTerma(t, "harness", "status", "claude", "-o", "json")
+	out, err := runTerma(t, "telemetry", "status", "claude", "-o", "json")
 	if err != nil {
 		t.Fatalf("status: %v\n%s", err, out)
 	}
@@ -163,7 +163,7 @@ func TestTelemetryStatusListsTheLocalLayer(t *testing.T) {
 		t.Errorf("local config path = %q", local.ConfigPath)
 	}
 
-	table, err := runTerma(t, "harness", "status", "claude", "-o", "table")
+	table, err := runTerma(t, "telemetry", "status", "claude", "-o", "table")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,7 +183,7 @@ func TestTelemetryStatusListsTheLocalLayer(t *testing.T) {
 // Outside a repository, or in one without a layer, nothing extra is reported.
 func TestTelemetryStatusWithoutALocalLayerIsOneRow(t *testing.T) {
 	localRepo(t)
-	out, err := runTerma(t, "harness", "status", "claude", "-o", "json")
+	out, err := runTerma(t, "telemetry", "status", "claude", "-o", "json")
 	if err != nil {
 		t.Fatal(err)
 	}

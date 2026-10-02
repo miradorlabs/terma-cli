@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
@@ -96,6 +98,9 @@ func relayFacts() doctor.Relay {
 	}
 	r := doctor.Relay{Dir: dir, Addr: daemon.Addr(dir), Running: daemon.Running(dir)}
 	r.Squatted = !r.Running && daemon.Squatted(r.Addr)
+	if data, err := os.ReadFile(filepath.Join(dir, daemon.ErrorFile)); err == nil && !r.Running {
+		r.LastFailure = strings.TrimSpace(string(data))
+	}
 	if info, ok := daemon.RunningRelay(dir); ok {
 		r.Environment, r.HookStarted = info.Environment, !info.Service
 	}

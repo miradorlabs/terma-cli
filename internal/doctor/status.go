@@ -172,8 +172,6 @@ func Context(env Env) []Row {
 func machineRows(cfg *config.Config) []Row {
 	var rows []Row
 	switch {
-	case config.Paused() && cfg.Policy.PauseAllowed():
-		rows = append(rows, Row{"Capture", "paused on this machine — run `terma resume` to start it again"})
 	case cfg.Policy.Validated() && cfg.Policy.Expired(time.Now()):
 		rows = append(rows, Row{"Capture", "off: the collection policy has not been refreshed for over a week — run `terma setup`"})
 	case cfg.Policy.Validated():

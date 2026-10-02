@@ -36,7 +36,7 @@ func TestCollectionPolicyWireContract(t *testing.T) {
 			if p.Global() != (mode == "global") || p.IncludePrompts || !p.IncludeToolContent || p.AllowsSignal("metrics") || !p.AllowsSignal("logs") || p.Revision != 4 || p.FetchedAt.IsZero() {
 				t.Fatalf("wrong translated policy: %+v", p)
 			}
-			if mode == "global" && !p.MembersCanPause || mode == "per_repository" && !p.MembersCanAddRepositories {
+			if mode == "per_repository" && !p.MembersCanAddRepositories {
 				t.Fatal("permissions lost")
 			}
 		})

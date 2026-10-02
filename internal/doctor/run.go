@@ -69,6 +69,8 @@ type Relay struct {
 	Dir, Addr         string
 	Running, Squatted bool
 	Err               error
+	// LastFailure is why the relay last failed to start, when none runs; "" if it did not fail.
+	LastFailure string
 	// Environment is the backend environment the running relay delivers to; "" when unknown
 	// (none runs, or a terma from before relays recorded it).
 	Environment string

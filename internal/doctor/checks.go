@@ -244,6 +244,9 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 	if len(wrong) > 0 {
 		return Check{Status: Fail, Detail: strings.Join(wrong, " and ") + " not exporting to the local relay", Fix: "terma setup"}
 	}
+	if !running && relay.LastFailure != "" {
+		return Check{Status: Warn, Detail: "the local relay last failed to start: " + relay.LastFailure, Fix: "terma setup"}
+	}
 	if relay.ServiceInstalled && !relay.ServiceCurrent {
 		return Check{Status: Warn,
 			Detail: "the relay service was written by an earlier terma, or for another binary or environment, so the system may not start this relay",

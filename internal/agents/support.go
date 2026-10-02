@@ -57,7 +57,7 @@ func Overall(caps ...CapabilitySupport) SupportLevel {
 	}
 }
 
-// Covered is an agent that says how completely terma supports it, for `terma harness list`.
+// Covered is an agent that says how completely terma supports it, for the support listing.
 type Covered interface {
 	Agent
 	Coverage() (attribution, telemetry CapabilitySupport)

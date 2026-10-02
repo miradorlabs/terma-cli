@@ -106,7 +106,7 @@ func describeStatus(ctx context.Context, h harness.Harness, cfg *config.Config) 
 
 	st, err := h.Status()
 	if err != nil {
-		// A state, not a failure: `terma harness status` must not exit non-zero for listing it.
+		// A state, not a failure: the status listing must not exit non-zero for listing it.
 		if _, ok := errors.AsType[*harness.ErrUnsupported](err); ok {
 			entry.State = "unsupported"
 			return entry

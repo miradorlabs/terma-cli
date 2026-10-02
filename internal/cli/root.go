@@ -48,17 +48,18 @@ func (app *App) NewRootCommand() *cobra.Command {
 		Short: "Attribute AI coding spend to the sessions, files, and commits that produced it",
 		Long: `terma connects your coding agents to Terma and stamps the commits they produce.
 
-  terma setup     optional, once per developer — signs you in and records which
-                  coding agents you use (an agent's CLI and desktop app are
-                  separate choices). No team or telemetry connection.
-  terma install   run in each repository — signs you in if setup has not, binds the
-                  repo to a Terma team, points your agents at that team per
-                  repository, and (offer to) wire the commit and agent hooks. A
-                  colleague who clones an already-onboarded repo runs it too: it sets
-                  up their own routing without rewriting the committed files.
+  terma setup      once per developer: signs you in, records your coding agents and
+                   points them at terma's local relay. Run it again to switch
+                   organization (--org) or repair the machine.
+  terma install    in each repository: binds it to a Terma team and wires the commit
+                   and agent hooks. A colleague who clones an onboarded repository
+                   runs it too.
+  terma doctor     verifies the whole chain end to end; every failure names its fix.
+  terma update     installs the latest release and refreshes what terma installed.
+  terma uninstall  removes terma from the current repository.
+  terma teardown   undoes setup on this machine (--sign-out also signs out).
 
-Then ` + "`terma doctor`" + ` verifies the whole chain end to end and predicts how much
-spend will be attributed.`,
+Every command is safe to run again.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Version:       app.version,
@@ -88,41 +89,26 @@ spend will be attributed.`,
 		app.newSetupCommand(),
 		app.newInstallCommand(),
 		app.newUninstallCommand(),
-		app.newNateCommand(),
 		app.newDoctorCommand(),
-		app.newStatusCommand(),
-		app.newTelemetryConnectCommand(), // advanced: install configures telemetry normally
-		app.newTelemetryDisconnectCommand(),
-		app.newHarnessCommand(),
-		app.newTelemetryCommand(),
-		app.newLoginCommand(),
-		app.newLogoutCommand(),
-		app.newWhoamiCommand(),
-		app.newProjectCommand(),
-		app.newOrgCommand(),
-		app.newConfigCommand(),
 		app.newUpdateCommand(),
-		app.newSpoolCommand(),
-		app.newVersionCommand(),
+		app.newTeardownCommand(),
+		// Hidden. Other programs run these: agents and git run hook, the relay service runs
+		// relay, hooks run spool, the Homebrew cask runs completion and install.sh version.
 		app.newHookCommand(),
 		app.newRelayCommand(),
-		app.newPauseCommand(),
-		app.newResumeCommand(),
+		app.newSpoolCommand(),
+		app.newVersionCommand(),
+		// Hidden, for Terma's engineers: config switches deployments, nate wipes a machine.
+		app.newConfigCommand(),
+		app.newNateCommand(),
+		// Hidden until the e2e suites stop calling them (MIR-80); install, setup and doctor
+		// do their jobs.
+		app.newStatusCommand(),
+		app.newTelemetryConnectCommand(),
+		app.newTelemetryDisconnectCommand(),
+		app.newTelemetryCommand(),
 	)
 	return root
-}
-
-func (app *App) newHarnessCommand() *cobra.Command {
-	list := app.newHarnessListCommand()
-	cmd := &cobra.Command{
-		Use:    "harness",
-		Short:  "Show supported coding agents and their connection status",
-		Hidden: true,
-		Args:   cobra.MaximumNArgs(1),
-		RunE:   app.runHarnessList,
-	}
-	cmd.AddCommand(list, app.newTelemetryStatusCommand())
-	return cmd
 }
 
 func (app *App) newVersionCommand() *cobra.Command {
@@ -353,27 +339,4 @@ func workspaceHere(ctx context.Context) (root, gitDir string, err error) {
 		return "", "", err
 	}
 	return termaproject.Locate(ctx, cwd)
-}
-
-// setupCommand loads configuration, format and client, running preconditions first so a
-// missing project is reported ahead of a sign-in error.
-func (app *App) setupCommand(preconditions ...func(*config.Config) error) (*config.Config, *api.Client, output.Format, error) {
-	cfg, err := app.loadConfig()
-	if err != nil {
-		return nil, nil, "", err
-	}
-	for _, check := range preconditions {
-		if err := check(cfg); err != nil {
-			return nil, nil, "", err
-		}
-	}
-	format, err := app.resolveFormat()
-	if err != nil {
-		return nil, nil, "", err
-	}
-	client, err := app.newClient(cfg)
-	if err != nil {
-		return nil, nil, "", err
-	}
-	return cfg, client, format, nil
 }
