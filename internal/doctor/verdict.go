@@ -3,12 +3,16 @@ package doctor
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
+	"github.com/miradorlabs/terma-cli/internal/globalmode"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
@@ -49,6 +53,44 @@ func JudgeHookWiring(ctx context.Context, root string, bound *termaproject.File)
 		w.Unpointed = w.HooksPath != hookmgr.ShimDir
 	}
 	return w
+}
+
+// HooksPath is where git looks for an unbound repository's hooks.
+type HooksPath struct {
+	// Scope is git's for the setting (local, worktree, global, system); "" when unset.
+	Scope, Value string
+	// Hookless is a directory that is missing or holds no executable hook.
+	Hookless bool
+	// TermaGlobal is global mode's hooks directory.
+	TermaGlobal bool
+}
+
+// Local reports whether the repository's own config sets it, outranking the global one.
+func (h HooksPath) Local() bool { return h.Scope == "local" || h.Scope == "worktree" }
+
+// JudgeHooksPath reads the core.hooksPath git uses in the repository at root.
+func JudgeHooksPath(ctx context.Context, root string) HooksPath {
+	out, err := gitx.Git(ctx, root, "config", "--show-scope", "--get", "core.hooksPath")
+	if err != nil {
+		return HooksPath{}
+	}
+	scope, value, _ := strings.Cut(out, "\t")
+	h := HooksPath{Scope: scope, Value: value}
+	dir, err := gitx.Git(ctx, root, "config", "--path", "--get", "core.hooksPath")
+	if err != nil {
+		return h
+	}
+	if !filepath.IsAbs(dir) {
+		dir = filepath.Join(root, dir)
+	}
+	h.TermaGlobal = globalmode.IsGitHooksDir(dir)
+	entries, err := os.ReadDir(dir)
+	h.Hookless = err != nil || !slices.ContainsFunc(entries, func(e os.DirEntry) bool {
+		info, err := os.Stat(filepath.Join(dir, e.Name()))
+		// Git never runs its *.sample files, executable or not.
+		return !strings.HasSuffix(e.Name(), ".sample") && err == nil && info.Mode().IsRegular() && info.Mode().Perm()&0o111 != 0
+	})
+	return h
 }
 
 // StatusLineCapture is whether the wrapped status line feeds terma the plan's usage windows.

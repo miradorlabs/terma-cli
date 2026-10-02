@@ -12,7 +12,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
-// A hook manager that needs something run in each clone says so in the plan.
+// A hook manager that needs something run in each clone says so in the plan, once.
 func TestInstallPrintsWhatTheHookManagerNeedsFromEachClone(t *testing.T) {
 	repo := installRepo(t)
 	if err := os.WriteFile(filepath.Join(repo, "lefthook.yml"), []byte("pre-commit:\n  commands: {}\n"), 0o644); err != nil {
@@ -24,6 +24,9 @@ func TestInstallPrintsWhatTheHookManagerNeedsFromEachClone(t *testing.T) {
 	}
 	if !strings.Contains(out, "After merging:") || !strings.Contains(out, "lefthook install") {
 		t.Fatalf("the plan does not say what lefthook needs from each clone:\n%s", out)
+	}
+	if n := strings.Count(out, "lefthook install"); n != 1 {
+		t.Fatalf("the per-clone step is printed %d times, want once:\n%s", n, out)
 	}
 }
 

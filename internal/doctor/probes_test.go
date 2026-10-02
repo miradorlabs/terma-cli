@@ -146,3 +146,63 @@ func TestStatusSaysWhatDoctorWould(t *testing.T) {
 		t.Fatalf("checks = %+v", rep.Checks)
 	}
 }
+
+// Global mode needs no install, so an unbound repository passes there and fails only in
+// per-repository mode.
+func TestDoctorNeedsABindingOnlyInPerRepositoryMode(t *testing.T) {
+	for mode, want := range map[string]Status{config.ModeGlobal: Pass, config.ModeRepo: Fail} {
+		t.Run(mode, func(t *testing.T) {
+			e := env(t, Probes{Credential: signedIn, Spool: func() SpoolState { return SpoolState{Open: true} }})
+			if err := termaproject.Remove(e.Root); err != nil {
+				t.Fatal(err)
+			}
+			// An unbound repository resolves no project, so only the policy's id names the team.
+			e.Config.ProjectID, e.Config.ProjectName = "", ""
+			e.Config.Policy = config.Policy{Mode: mode, DefaultProjectID: "p9"}
+			c := check(Run(t.Context(), e, Progress{}), KeyProject)
+			if c.Status != want || want == Pass && !strings.Contains(c.Detail, "the team chosen at setup (p9)") || want == Fail && c.Fix != "terma install" {
+				t.Fatalf("repository bound in %s mode = %+v", mode, c)
+			}
+		})
+	}
+}
+
+// The local report agrees: in global mode an unbound repository asks for no install.
+func TestLocalReportNeedsABindingOnlyInPerRepositoryMode(t *testing.T) {
+	for mode, wantInstall := range map[string]bool{config.ModeGlobal: false, config.ModeRepo: true} {
+		t.Run(mode, func(t *testing.T) {
+			e := env(t, Probes{Credential: signedIn})
+			if err := termaproject.Remove(e.Root); err != nil {
+				t.Fatal(err)
+			}
+			e.Config.Policy = config.Policy{Mode: mode}
+			rep, err := Local(t.Context(), e)
+			if err != nil {
+				t.Fatal(err)
+			}
+			asks := false
+			for _, c := range rep.Checks {
+				asks = asks || c.Fix == "terma install"
+			}
+			if asks != wantInstall {
+				t.Fatalf("%s mode: asks for terma install = %v, rows %v", mode, asks, rep.Rows)
+			}
+		})
+	}
+}
+
+// A name is shown only for the project the command resolved, never put on another id.
+func TestGlobalDestinationNamesOnlyTheResolvedProject(t *testing.T) {
+	for _, tc := range []struct {
+		cfg  config.Config
+		want string
+	}{
+		{config.Config{ProjectID: "p9", ProjectName: "Engineering", Policy: config.Policy{DefaultProjectID: "p9"}}, "report to Engineering"},
+		{config.Config{ProjectID: "p1", ProjectName: "Other", Policy: config.Policy{DefaultProjectID: "p9"}}, "setup (p9)"},
+		{config.Config{}, "the team chosen at setup"},
+	} {
+		if got := GlobalDestination(&tc.cfg); !strings.HasSuffix(got, tc.want) {
+			t.Errorf("GlobalDestination(%+v) = %q, want suffix %q", tc.cfg, got, tc.want)
+		}
+	}
+}
