@@ -26,7 +26,7 @@ func TestDoctorFailsWhenTheSpoolCannotBeWritten(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err := runTerma(t, "doctor", "--skip-commit")
+	out, err := runTerma(t, "doctor")
 	if err == nil {
 		t.Fatalf("doctor must fail on a spool it cannot write:\n%s", out)
 	}
