@@ -121,6 +121,15 @@ func HooksCheck(w HookWiring) Check {
 	return Check{Status: Pass, Detail: string(w.Manager)}
 }
 
+// GlobalDestination says where global mode sends an unbound repository's sessions.
+func GlobalDestination(cfg *config.Config) string {
+	name := cfg.Policy.DefaultProjectID
+	if name == "" || name == cfg.ProjectID {
+		name = cmp.Or(cfg.ProjectName, cfg.ProjectID)
+	}
+	return "its sessions report to " + cmp.Or(name, "your team's project")
+}
+
 // UnboundHooksCheck is doctor's wording for where git looks for an unbound repository's
 // hooks: a local setting outranks terma's global hooks, and one naming no hooks runs none.
 func UnboundHooksCheck(h HooksPath, global bool) Check {

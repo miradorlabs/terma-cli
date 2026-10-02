@@ -243,26 +243,6 @@ func (d *run) signedIn() Check {
 	return Check{Status: Pass, Detail: who + " in " + cmp.Or(cfg.OrganizationName, cred.OrganizationID) + env}
 }
 
-// HookCallerFor is how hooks reach terma in the workspace at root: a bound repository's
-// committed hooks call it by name, and elsewhere only machine-wide hooks run.
-func HookCallerFor(root, gitDir string, repoErr error) HookCaller {
-	if repoErr == nil {
-		if _, _, err := termaproject.Resolve(root, gitDir); err == nil {
-			return ByName
-		}
-	}
-	return ByFullPath
-}
-
-// GlobalDestination says where global mode sends an unbound repository's sessions.
-func GlobalDestination(cfg *config.Config) string {
-	name := cfg.Policy.DefaultProjectID
-	if name == "" || name == cfg.ProjectID {
-		name = cmp.Or(cfg.ProjectName, cfg.ProjectID)
-	}
-	return "its sessions report to " + cmp.Or(name, "your team's project")
-}
-
 // RepositoryCheck finds the binding of the workspace at root, or, in a linked worktree
 // without one, its main checkout's.
 func RepositoryCheck(root, gitDir string, repoErr error) (Check, *termaproject.File) {

@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strings"
 
+	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/shellrc"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
@@ -140,13 +141,24 @@ const (
 )
 
 // agentHookDirs are the directories a committed agent hook adds to the system PATH an agent
-// started from the Dock or an IDE gets (codex's hookCommand); a var so tests can stand in.
+// started from the Dock or an IDE gets; a var so tests can stand in.
 var agentHookDirs = func() []string {
 	dirs := []string{"/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"}
 	if home, err := os.UserHomeDir(); err == nil {
 		dirs = append([]string{filepath.Join(home, ".local", "bin")}, dirs...)
 	}
 	return dirs
+}
+
+// HookCallerFor is how hooks reach terma in the workspace at root: a bound repository's
+// committed hooks call it by name, and elsewhere only machine-wide hooks run.
+func HookCallerFor(root, gitDir string, repoErr error) HookCaller {
+	if repoErr == nil {
+		if _, _, err := termaproject.Resolve(root, gitDir); err == nil {
+			return ByName
+		}
+	}
+	return ByFullPath
 }
 
 // BinaryCheck checks that the hooks in play run exe's build, looking for other builds along
