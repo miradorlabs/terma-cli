@@ -87,7 +87,8 @@ func JudgeHooksPath(ctx context.Context, root string) HooksPath {
 	entries, err := os.ReadDir(dir)
 	h.Hookless = err != nil || !slices.ContainsFunc(entries, func(e os.DirEntry) bool {
 		info, err := os.Stat(filepath.Join(dir, e.Name()))
-		return err == nil && info.Mode().IsRegular() && info.Mode().Perm()&0o111 != 0
+		// Git never runs its *.sample files, executable or not.
+		return !strings.HasSuffix(e.Name(), ".sample") && err == nil && info.Mode().IsRegular() && info.Mode().Perm()&0o111 != 0
 	})
 	return h
 }

@@ -63,6 +63,9 @@ func TestDoctorJudgesAnUnboundRepositorysHooksPath(t *testing.T) {
 		"missing directory": {func(t *testing.T, root string) {
 			git(t, root, "config", "core.hooksPath", "gone")
 		}, false, Warn, "git config --local --unset core.hooksPath"},
+		"only git's samples": {func(t *testing.T, root string) {
+			git(t, root, "config", "core.hooksPath", hookDir(t, filepath.Join(root, "hooks"), "pre-commit.sample"))
+		}, true, Warn, "git config --local --unset core.hooksPath"},
 		"per-repository mode, nothing set": {func(*testing.T, string) {}, false, Skip, ""},
 		"per-repository mode, working local hooks": {func(t *testing.T, root string) {
 			git(t, root, "config", "core.hooksPath", hookDir(t, filepath.Join(root, "hooks"), "pre-commit"))

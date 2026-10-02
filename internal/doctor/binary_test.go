@@ -146,7 +146,7 @@ func TestDoctorGivesTheCommandThatPutsTermaOnPath(t *testing.T) {
 		t.Fatalf("the fix should be the one quoted command: %+v", check)
 	}
 	// Machine-wide hooks run terma by its full path, so they need nothing from PATH.
-	if check := BinaryCheck(current, nil, ByFullPath); check.Status != Pass || !strings.Contains(check.Detail, current) {
+	if check := BinaryCheck(current, nil, ByFullPath); check.Status != Pass || !strings.Contains(check.Detail, "full path setup wrote") {
 		t.Fatalf("machine-wide hooks alone must not need PATH: %+v", check)
 	}
 	echo, reload, ok := strings.Cut(command, " && ")

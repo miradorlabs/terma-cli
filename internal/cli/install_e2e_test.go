@@ -776,6 +776,9 @@ func TestInstallE2EUninstallRestoresAnOrphanedHooksPath(t *testing.T) {
 			if !strings.Contains(out, "restore git config core.hooksPath") {
 				t.Fatalf("uninstall did not offer to restore core.hooksPath:\n%s", out)
 			}
+			if strings.Contains(out, "Commit the removals") {
+				t.Fatalf("uninstall asked to commit a removal that is only git config:\n%s", out)
+			}
 			if got, err := s.run(root, "", "git", "config", "--get", "core.hooksPath"); err == nil {
 				t.Fatalf("core.hooksPath still set to %q", strings.TrimSpace(got))
 			}

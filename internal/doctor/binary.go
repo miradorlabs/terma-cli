@@ -167,7 +167,7 @@ func BinaryCheck(exe string, binDirs []string, caller HookCaller) Check {
 	path, err := exec.LookPath("terma")
 	if err != nil {
 		if caller == ByFullPath {
-			return Check{Status: Pass, Detail: "not on PATH; machine-wide hooks run " + exe + " by its full path (a repository's committed hooks need it on PATH)"}
+			return Check{Status: Pass, Detail: "not on PATH; machine-wide hooks run terma by the full path setup wrote into them (a repository's committed hooks need it on PATH)"}
 		}
 		return Check{Status: Fail, Detail: "this repository's hooks call `terma` by name and will not find it",
 			Fix: "run `" + AddToPathCommand(filepath.Dir(exe)) + "` to put " + filepath.Dir(exe) + " on PATH (or reinstall with the install script)"}
