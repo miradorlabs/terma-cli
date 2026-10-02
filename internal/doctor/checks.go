@@ -23,15 +23,12 @@ func AgentHooksCheck(reg *agents.Registry, root string, mine []string) Check {
 	var fix string
 	ready, of := 0, 0
 	status := Pass
-	// The first fix goes, unless a later problem is worse.
-	report := func(s Status, f string) {
-		if s > status {
-			status, fix = s, f
-		} else if fix == "" {
+	problem := func(f string) {
+		status = Warn
+		if fix == "" {
 			fix = f
 		}
 	}
-	problem := func(f string) { report(Warn, f) }
 	for _, a := range reg.All() {
 		if a.HooksPath() == "" {
 			continue
@@ -77,10 +74,8 @@ func AgentHooksCheck(reg *agents.Registry, root string, mine []string) Check {
 			part += " (could not read " + a.DisplayName() + "'s trust record: " + err.Error() + ")"
 			ready++
 		case !trust.Trusted:
-			// The agent runs none or only some of them, so its sessions arrive incomplete or
-			// not at all.
 			part += trust.Detail
-			report(Fail, trust.Fix)
+			problem(trust.Fix)
 		default:
 			part += trust.Detail
 			ready++
@@ -95,7 +90,8 @@ func AgentHooksCheck(reg *agents.Registry, root string, mine []string) Check {
 
 // UserHooksCheck reports, in global mode, whether each of the developer's agents (mine;
 // empty means all) runs terma's machine-wide hooks: one that gates them behind trust skips
-// a changed entry in silence, and records nothing for it. false when no agent has any.
+// a changed entry in silence, and records nothing for it. A warning, like a repository's
+// untrusted hooks; false when no agent has any.
 func UserHooksCheck(reg *agents.Registry, mine []string) (Check, bool) {
 	var parts []string
 	c := Check{Status: Pass}
@@ -113,8 +109,8 @@ func UserHooksCheck(reg *agents.Registry, mine []string) (Check, bool) {
 			parts = append(parts, a.DisplayName()+": could not read its trust record: "+err.Error())
 		case !trusted:
 			parts = append(parts, a.DisplayName()+" skips some or all of them until you approve them")
-			if c.Status != Fail {
-				c.Status, c.Fix = Fail, gated.UserHooksTrustStep()
+			if c.Status != Warn {
+				c.Status, c.Fix = Warn, gated.UserHooksTrustStep()
 			}
 		default:
 			parts = append(parts, a.DisplayName()+" trusts them")

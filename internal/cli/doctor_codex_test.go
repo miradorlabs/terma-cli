@@ -27,10 +27,9 @@ func TestDoctorReportsCodexHooksAwaitingTrust(t *testing.T) {
 	if !strings.Contains(out, "Settings → Hooks → Review") || !strings.Contains(out, "run /hooks in this repository") {
 		t.Fatalf("doctor should explain trust for both Desktop-only and CLI users:\n%s", out)
 	}
-	// Codex claims none of its sessions until then, so the agent hooks fail; the commit hooks
-	// still pass.
-	if !strings.Contains(out, "ok    commit hooks installed") || !strings.Contains(out, "FAIL  agent hooks run") {
-		t.Fatalf("the commit hooks pass; only the agent hooks fail:\n%s", out)
+	// A warning about one agent, not a verdict on the repository: the other agent's hooks run.
+	if !strings.Contains(out, "ok    commit hooks installed") || !strings.Contains(out, "warn  agent hooks run") {
+		t.Fatalf("the commit hooks pass; only the agent hooks warn:\n%s", out)
 	}
 	if !strings.Contains(out, "Setup needs attention:") || strings.Contains(out, "Predicted coverage") {
 		t.Fatalf("doctor should report readiness without an invented percentage:\n%s", out)

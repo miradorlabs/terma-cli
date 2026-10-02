@@ -181,7 +181,7 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 
 	timed(KeyHooks, "commit hooks installed", d.commitHooks)
 
-	// Stale hooks cost a little and warn; an agent that runs none of them records nothing, and fails.
+	// A fraction, not a verdict: one agent that cannot run its hooks costs only its own commits.
 	timed(KeyAgentHooks, "agent hooks run", d.agentHooks)
 
 	if cfg.Policy.Global() {

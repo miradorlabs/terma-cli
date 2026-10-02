@@ -72,7 +72,7 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 			add("Hooks", "%s via %s", state, wiring.Manager)
 		}
 		// An agent that cannot run its hooks yet costs its share of commit stamping.
-		if agentHooks = AgentHooksCheck(reg, root, SelectedForRepo(reg, projectID, cfg.Harnesses)); agentHooks.Status == Warn || agentHooks.Status == Fail {
+		if agentHooks = AgentHooksCheck(reg, root, SelectedForRepo(reg, projectID, cfg.Harnesses)); agentHooks.Status == Warn {
 			add("Agent hooks", "%d of %d agents can run theirs — %s", agentHooks.Ready, agentHooks.Of, agentHooks.Fix)
 		}
 		work, err := workRows(root, gitDir)
