@@ -33,7 +33,7 @@ func (app *App) connectMachineRelay(ctx context.Context, agents []string, relayS
 	if err != nil {
 		return err
 	}
-	token, err := ensureRelayToken()
+	token, err := app.ensureRelayToken()
 	if err != nil {
 		return err
 	}

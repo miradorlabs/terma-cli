@@ -30,8 +30,9 @@ func (app *App) newTeardownCommand() *cobra.Command {
      (its token, its address and any telemetry not yet delivered), so no hook
      starts it again.
 
-Your sign-in is kept, so ` + "`terma setup`" + ` sets this machine up again in seconds;
---sign-out also revokes it. Repositories keep their committed hooks and binding,
+Your sign-in is kept, so ` + "`terma setup`" + ` sets this machine up again in seconds,
+with the relay's token as it was: agents still running keep reporting without a
+restart. --sign-out also revokes the sign-in, and the next setup mints a new token. Repositories keep their committed hooks and binding,
 which everyone who works in them shares: ` + "`terma uninstall`" + ` inside one removes them.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -60,7 +61,7 @@ which everyone who works in them shares: ` + "`terma uninstall`" + ` inside one 
 				}
 			}
 			out := cmd.OutOrStdout()
-			if err := app.undoSetup(cmd.Context(), out); err != nil {
+			if err := app.undoSetup(cmd.Context(), out, !signOut); err != nil {
 				return err
 			}
 			if signOut {
@@ -79,8 +80,9 @@ which everyone who works in them shares: ` + "`terma uninstall`" + ` inside one 
 }
 
 // undoSetup restores everything setup changed outside terma's own state and stops the
-// relay for good; it leaves the sign-in, keys and repositories alone.
-func (app *App) undoSetup(ctx context.Context, out io.Writer) error {
+// relay for good; it leaves the sign-in, keys and repositories alone. keepToken keeps the
+// relay's token aside for a setup under the same sign-in (daemon.RetireToken).
+func (app *App) undoSetup(ctx context.Context, out io.Writer, keepToken bool) error {
 	// Restore what Terma displaced before anything that holds the journals goes.
 	for _, h := range app.agents.Harnesses() {
 		result, err := h.Disconnect()
@@ -111,13 +113,17 @@ func (app *App) undoSetup(ctx context.Context, out io.Writer) error {
 	if err := app.globalMode().Apply(ctx, nil, false, say, say, func(string) {}); err != nil {
 		return fmt.Errorf("restore machine-wide hooks: %w", err)
 	}
+	// Without its token the relay refuses to run and hooks write no claims, so a hook in a
+	// bound repository cannot start it again. It goes first, so the relay stopping below
+	// hands its socket to no successor.
+	if err := app.retireRelayToken(keepToken); err != nil {
+		return fmt.Errorf("remove the relay's token: %w", err)
+	}
 	if removed, err := daemon.RemoveService(ctx); err != nil {
 		return fmt.Errorf("remove the relay service: %w", err)
 	} else if removed {
 		fmt.Fprintln(out, "Removed the relay service.")
 	}
-	// Without its token the relay refuses to run and hooks write no claims, so a hook in a
-	// bound repository cannot start it again; setup writes a new one.
 	dir, err := claim.Dir()
 	if err != nil {
 		return err
@@ -130,6 +136,19 @@ func (app *App) undoSetup(ctx context.Context, out io.Writer) error {
 		fmt.Fprintln(out, "Stopped the relay and removed its state.")
 	}
 	return nil
+}
+
+// retireRelayToken removes the relay's token, keeping it for this sign-in when keep.
+func (app *App) retireRelayToken(keep bool) error {
+	org, authURL := "", ""
+	if !keep {
+		if err := daemon.DiscardRetiredToken(); err != nil {
+			return err
+		}
+	} else if cfg, err := app.loadConfig(); err == nil {
+		org, authURL = daemon.Identity(cfg)
+	}
+	return daemon.RetireToken(org, authURL)
 }
 
 var errNoSessionWithAPIKey = errors.New("TERMA_API_KEY is set — there is no session to sign out of; unset it to use the stored credential")

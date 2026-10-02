@@ -56,7 +56,7 @@ func (app *App) runNate(cmd *cobra.Command) error {
 
 	// Only home-directory state: a repository's committed wiring is `terma uninstall`'s.
 
-	if err := app.undoSetup(cmd.Context(), out); err != nil {
+	if err := app.undoSetup(cmd.Context(), out, false); err != nil {
 		return err
 	}
 
