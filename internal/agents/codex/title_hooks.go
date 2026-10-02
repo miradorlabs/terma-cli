@@ -27,7 +27,7 @@ type codexTitleState struct {
 // prompt, so it travels under repliesConsented.
 func captureCodexTitle(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in *codexHookInput) {
 	pol := e.ProjectPolicy(r)
-	if e.Spool == nil || !session.ValidID(in.SessionID) || !pol.IncludePrompts || pol.CollectsNothing || len(pol.ExcludePaths) > 0 || !repliesConsented(r.Consent(pol.Global())) {
+	if prompts, _ := pol.Content(); e.Spool == nil || !session.ValidID(in.SessionID) || !prompts || !repliesConsented(r.Consent(pol.Global())) {
 		return
 	}
 	dir, err := config.Dir()

@@ -16,12 +16,13 @@ import (
 )
 
 // Record is a project's routing configuration on this machine; its key stays in the keystore.
+// It holds no content switch: what content leaves is the team's collection policy alone,
+// so an earlier terma's include_prompts and include_tool_content are ignored when read and
+// dropped when the record is next written.
 type Record struct {
 	ProjectID          string            `json:"project_id"`
 	Endpoint           string            `json:"endpoint"`
 	Signals            []string          `json:"signals"`
-	IncludePrompts     bool              `json:"include_prompts"`
-	IncludeToolContent bool              `json:"include_tool_content"`
 	ResourceAttributes map[string]string `json:"resource_attributes,omitempty"`
 	Harnesses          []string          `json:"harnesses"`
 	// Surfaces names the agents.Surface values routed here; an agent with one surface is named by it.

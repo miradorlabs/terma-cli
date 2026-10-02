@@ -34,10 +34,8 @@ func printConnectPlan(
 		fmt.Fprintf(out, "  Exports from:    repositories that carry a terma policy — every exporter here is left off\n")
 		fmt.Fprintln(out, "\n  Signals:")
 		fmt.Fprintln(out, "    decided by each repository's committed terma policy")
-		fmt.Fprintf(out, "\n    Prompts:      %s (a repository may narrow this, never widen the machine's reach)\n", OnOff(!o.ExcludePrompts))
-		fmt.Fprintf(out, "    Tool content: %s\n", OnOff(!o.ExcludeToolContent))
 	} else {
-		printDataPlan(out, signals, !o.ExcludePrompts, !o.ExcludeToolContent)
+		printDataPlan(out, signals)
 	}
 
 	fmt.Fprintln(out, "\n  This will update:")
@@ -219,7 +217,7 @@ func printLocalConnectPlan(
 		fmt.Fprintf(out, "               This file decides what to ship; `terma connect %s` says where.\n", global.Name())
 	}
 
-	printDataPlan(out, e.Signals, e.IncludePrompts, e.IncludeToolContent)
+	printDataPlan(out, e.Signals)
 
 	fmt.Fprintln(out, "\n  This will update:")
 	fmt.Fprintf(out, "    %s  (what to ship — the endpoint and key stay in your user settings)\n", configPath)
@@ -239,7 +237,8 @@ func printDetection(out io.Writer, h harness.Harness, detection harness.Detectio
 	fmt.Fprintf(out, "%s not found on PATH — the configuration will still be written.\n", h.DisplayName())
 }
 
-func printDataPlan(out io.Writer, signals []harness.Signal, prompts, toolContent bool) {
+// printDataPlan names no content switch: what content leaves is the team policy's call.
+func printDataPlan(out io.Writer, signals []harness.Signal) {
 	fmt.Fprintln(out, "\n  Signals:")
 	for _, s := range harness.AllSignals {
 		mark := " "
@@ -248,7 +247,4 @@ func printDataPlan(out io.Writer, signals []harness.Signal, prompts, toolContent
 		}
 		fmt.Fprintf(out, "    %s %s\n", mark, SignalLabel(s))
 	}
-	fmt.Fprintln(out)
-	fmt.Fprintf(out, "    Prompts:      %s\n", OnOff(prompts))
-	fmt.Fprintf(out, "    Tool content: %s\n", OnOff(toolContent))
 }

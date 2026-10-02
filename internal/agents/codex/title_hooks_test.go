@@ -45,7 +45,7 @@ func stopCodexTitles(t *testing.T, env hookrun.Env) []spool.Event {
 // Codex wrote it.
 func TestCodexStopSpoolsTheThreadName(t *testing.T) {
 	env := fundingEnv(t)
-	routeCodex(t, true)
+	routeCodex(t)
 	titleIndex(t,
 		titleLine("01a0e2e8-724f-7ea3-8088-5da1bb9504ec", "Another thread", "2026-09-27T12:48:06.533494Z"),
 		titleLine(replySession, "Rate this project", "2026-09-27T12:53:23.735966Z"),
@@ -76,7 +76,7 @@ func TestCodexStopSpoolsTheThreadName(t *testing.T) {
 // The latest rename wins and is a new event, even if an earlier line sorts after it.
 func TestCodexRenameSpoolsTheNewName(t *testing.T) {
 	env := fundingEnv(t)
-	routeCodex(t, true)
+	routeCodex(t)
 	titleIndex(t, titleLine(replySession, "Generated title", "2026-09-27T07:09:44.114286Z"))
 	if first := stopCodexTitles(t, env); len(first) != 1 {
 		t.Fatalf("first title: %+v", first)
@@ -96,7 +96,7 @@ func TestCodexRenameSpoolsTheNewName(t *testing.T) {
 // exists.
 func TestCodexTitleNotYetWritten(t *testing.T) {
 	env := fundingEnv(t)
-	routeCodex(t, true)
+	routeCodex(t)
 	if titles := stopCodexTitles(t, env); len(titles) != 0 {
 		t.Fatalf("no index file, yet spooled %+v", titles)
 	}
@@ -114,18 +114,20 @@ func TestCodexTitleNotYetWritten(t *testing.T) {
 // The name restates the first prompt: it travels under the consent a reply does.
 func TestCodexTitleNeedsTheConsentPromptsTravelUnder(t *testing.T) {
 	for _, c := range []struct {
-		name  string
-		setup func(t *testing.T)
-		want  int
+		name     string
+		setup    func(t *testing.T)
+		withheld bool
+		want     int
 	}{
-		{"nothing exports Codex here at all", func(*testing.T) {}, 0},
-		{"this repository routes Codex without prompts", func(t *testing.T) { routeCodex(t, false) }, 0},
-		{"this repository routes Codex with prompts", func(t *testing.T) { routeCodex(t, true) }, 1},
-		{"a machine-wide connect with prompts, no routing", func(t *testing.T) { connectCodexMachineWide(t, true) }, 1},
-		{"a machine-wide connect without prompts", func(t *testing.T) { connectCodexMachineWide(t, false) }, 0},
+		{"nothing exports Codex here at all", func(*testing.T) {}, false, 0},
+		{"this repository routes Codex, the team withholds prompts", routeCodex, true, 0},
+		{"this repository routes Codex", routeCodex, false, 1},
+		{"a machine-wide connect, no routing", connectCodexMachineWide, false, 1},
+		{"a machine-wide connect, the team withholds prompts", connectCodexMachineWide, true, 0},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			env := fundingEnv(t)
+			env.Policy.IncludePrompts = !c.withheld
 			c.setup(t)
 			titleIndex(t, titleLine(replySession, "Rate this project", "2026-09-27T12:53:23Z"))
 			if got := stopCodexTitles(t, env); len(got) != c.want {
@@ -138,7 +140,7 @@ func TestCodexTitleNeedsTheConsentPromptsTravelUnder(t *testing.T) {
 // A rename has no length limit of its own; the title is cut on a rune boundary.
 func TestCodexTitleIsBounded(t *testing.T) {
 	env := fundingEnv(t)
-	routeCodex(t, true)
+	routeCodex(t)
 	long := strings.Repeat("é", codexTitleMaxText)
 	titleIndex(t, titleLine(replySession, long, "2026-09-27T12:53:23Z"))
 	titles := stopCodexTitles(t, env)

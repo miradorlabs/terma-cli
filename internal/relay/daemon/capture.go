@@ -21,29 +21,20 @@ type Capture struct {
 	Harness string
 }
 
-// CapturePolicy is the content and signal half of a claim's Policy, with the
-// organization's policy as the ceiling that the routing record can only narrow.
-// Path exclusions withhold all free text, since exporters do not name its source files,
-// and a record withholds an agent it does not name: another repository may have pointed
-// that agent's exporter at the relay machine-wide.
+// CapturePolicy is the content and signal half of a claim's Policy. Content is the team
+// policy's alone (config.Policy.Content, the rule hook events follow too); the routing
+// record decides only signals, and withholds every one from an agent it does not name,
+// since another repository may have pointed that agent's exporter at the relay.
 func CapturePolicy(in Capture) relay.Policy {
 	org := in.Org
-	pol := relay.Policy{IncludePrompts: org.IncludePrompts, IncludeToolContent: org.IncludeToolContent,
-		Excludes: excludes(org.ExcludePaths), RequireClaim: !in.Primary || !org.Global()}
-	if len(org.ExcludePaths) > 0 {
-		pol.IncludePrompts, pol.IncludeToolContent = false, false
-	}
+	pol := relay.Policy{Excludes: excludes(org.ExcludePaths), RequireClaim: !in.Primary || !org.Global()}
+	pol.IncludePrompts, pol.IncludeToolContent = org.Content()
 	switch rec := in.Record; {
-	case org.CollectsNothing, in.RecordErr != nil:
+	case org.CollectsNothing, in.RecordErr != nil,
+		rec != nil && in.Harness != "" && !slices.Contains(rec.Harnesses, in.Harness):
 		pol.IncludePrompts, pol.IncludeToolContent = false, false
 		pol.Signals = []string{}
-	case rec == nil:
-	case in.Harness != "" && !slices.Contains(rec.Harnesses, in.Harness):
-		pol.IncludePrompts, pol.IncludeToolContent = false, false
-		pol.Signals = []string{}
-	default:
-		pol.IncludePrompts = pol.IncludePrompts && rec.IncludePrompts
-		pol.IncludeToolContent = pol.IncludeToolContent && rec.IncludeToolContent
+	case rec != nil:
 		pol.Signals = append([]string{}, rec.Signals...)
 	}
 	return pol

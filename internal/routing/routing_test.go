@@ -1,6 +1,10 @@
 package routing
 
 import (
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 )
 
@@ -35,5 +39,37 @@ func TestRecordRejectsUnsafeProjectID(t *testing.T) {
 	sandbox(t)
 	if err := SaveRecord(Record{ProjectID: "../escape"}); err == nil {
 		t.Fatal("expected an unsafe project id to be rejected")
+	}
+}
+
+// An earlier terma's content switches are read as nothing and gone from the next write:
+// content is the team's policy alone.
+func TestARecordsOldContentSwitchesAreDroppedOnRewrite(t *testing.T) {
+	sandbox(t)
+	d, err := Dir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(d, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	old := `{"project_id":"` + testProjectID + `","endpoint":"` + testEndpoint + `","signals":["logs"],"include_prompts":false,"include_tool_content":false,"harnesses":["codex"]}`
+	path := filepath.Join(d, testProjectID+".json")
+	if err := os.WriteFile(path, []byte(old), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	rec, ok, err := LoadRecord(testProjectID)
+	if err != nil || !ok || !slices.Equal(rec.Signals, []string{"logs"}) || !slices.Equal(rec.Harnesses, []string{"codex"}) {
+		t.Fatalf("an old record did not load: %+v, %v, %v", rec, ok, err)
+	}
+	if err := SaveRecord(rec); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "include_") {
+		t.Fatalf("the rewrite kept a content switch:\n%s", data)
 	}
 }

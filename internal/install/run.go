@@ -32,7 +32,6 @@ type Request struct {
 	RecordSelected    bool
 	Adapters          []string
 	NoHooks, DryRun   bool
-	Prompts, Content  *bool
 	AssumeYes, CanAsk bool
 	Version           string
 	Now               time.Time
@@ -120,11 +119,11 @@ func Run(ctx context.Context, reg *agents.Registry, cfg *config.Config, req Requ
 	}
 	// Built once, so a dry run prints exactly the plan an install applies.
 	plan, err := Build(reg, Input{Root: req.Root, GitDir: req.GitDir, Existing: req.Existing, Selected: req.Selected,
-		Adapters: req.Adapters, NoHooks: req.NoHooks, Binding: b, Prompts: req.Prompts, ToolContent: req.Content, Policy: admitting})
+		Adapters: req.Adapters, NoHooks: req.NoHooks, Binding: b, Policy: admitting})
 	if err != nil {
 		return Plan{}, err
 	}
-	summarize(r, plan, b, cfg.Environment, req.GitDir)
+	summarize(r, b, cfg.Environment, req.GitDir)
 	if req.DryRun {
 		return plan, plan.PrintDryRun(r.Detail(), needsAuth)
 	}
@@ -152,7 +151,7 @@ func Run(ctx context.Context, reg *agents.Registry, cfg *config.Config, req Requ
 	return plan, nil
 }
 
-func summarize(r Reporter, plan Plan, b Binding, env, gitDir string) {
+func summarize(r Reporter, b Binding, env, gitDir string) {
 	if gitDir == "" {
 		r.Warn("Git hooks", "skipped — not a Git repository, so commits are not stamped")
 		r.Then("Run `terma install` inside a Git repository to stamp its commits.")
@@ -166,14 +165,6 @@ func summarize(r Reporter, plan Plan, b Binding, env, gitDir string) {
 		r.Warn("Team", "unresolved — a real install signs in and selects one"+env)
 	} else {
 		r.Summary("Team", cmp.Or(b.Name, b.ID)+env)
-	}
-	// Nothing asks, so the line names the command that changes it.
-	if len(plan.Agents.RelayTargets(plan.Selected)) > 0 {
-		if plan.Prompts {
-			r.Summary("Prompts", "sent — `terma install --prompts off` stops them")
-		} else {
-			r.Summary("Prompts", "not sent — `terma install --prompts on` sends them")
-		}
 	}
 }
 

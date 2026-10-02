@@ -12,13 +12,13 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
-func TestCodexDesktopHooksCaptureLocalToolsWithRepositoryConsent(t *testing.T) {
+func TestCodexDesktopHooksCaptureLocalToolsUnderTheTeamPolicy(t *testing.T) {
 	for _, allow := range []bool{false, true} {
 		t.Run(map[bool]string{false: "redacted", true: "content"}[allow], func(t *testing.T) {
 			env := fundingEnv(t)
+			env.Policy.IncludePrompts, env.Policy.IncludeToolContent = allow, allow
 			if err := routing.SaveRecord(routing.Record{ProjectID: "project-a", Endpoint: "https://otel.terma.ai",
-				Signals: []string{"logs"}, Harnesses: []string{name}, Surfaces: []string{name},
-				IncludePrompts: allow, IncludeToolContent: allow}); err != nil {
+				Signals: []string{"logs"}, Harnesses: []string{name}, Surfaces: []string{name}}); err != nil {
 				t.Fatal(err)
 			}
 			run := func(input map[string]any, fn func(context.Context, hookrun.Env) error) {

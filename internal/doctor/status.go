@@ -309,7 +309,8 @@ func StatusLineSummary(v StatusLineVerdict) string {
 	return "not wrapped — plan usage is NOT captured (run `terma install`)"
 }
 
-// shipment is what a repository's own policy lets its sessions ship.
+// shipment is the signals a repository's own policy lets its sessions ship; content is the
+// team policy's, shown on its own row.
 func shipment(st harness.Status) string {
 	signals := "nothing"
 	if len(st.Signals) > 0 {
@@ -320,14 +321,7 @@ func shipment(st harness.Status) string {
 		slices.Sort(parts)
 		signals = strings.Join(parts, ",")
 	}
-	return fmt.Sprintf("%s; prompts %s; tool content %s", signals, onOff(st.IncludePrompts), onOff(st.IncludeToolContent))
-}
-
-func onOff(v bool) string {
-	if v {
-		return "on"
-	}
-	return "off"
+	return signals
 }
 
 // PolicySummary is what a collection policy collects, in one line.

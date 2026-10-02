@@ -69,7 +69,8 @@ type Sandbox struct {
 	Codex  Binary
 	// ClaudeBaseURL is set only by scenarios using a synthetic loopback provider.
 	ClaudeBaseURL string
-	// ExcludeContent exercises Terma's actual exporter redaction switches.
+	// ExcludeContent is a team policy that withholds prompts and tool content, applied by
+	// the relay: no exporter has a switch for it.
 	ExcludeContent bool
 
 	claudeConnected, codexConnected bool
@@ -210,19 +211,15 @@ func (sb *Sandbox) connectCodex() {
 }
 
 func (sb *Sandbox) connectHarness(name string) {
-	args := []string{"connect", name, "--team", sb.ProjectID, "--api-key", liveKey, "--yes", "--otlp-url", sb.Receiver.URL()}
-	if sb.ExcludeContent {
-		args = append(args, "--exclude-prompts", "--exclude-tool-content")
-	}
-	sb.terma(sb.Repo, args...)
+	sb.terma(sb.Repo, "connect", name, "--team", sb.ProjectID, "--api-key", liveKey, "--yes", "--otlp-url", sb.Receiver.URL())
 }
 
 // RouteClaude points Claude Code at this repository's project the way `terma install`
 // does for a developer: its user-level exporter at the local relay, which forwards the
 // sessions this repository's hooks claim to the receiver, standing in for Terma. With
-// ExcludeContent it passes the switches install offers (`--prompts off`,
-// `--exclude-tool-content`); without, none, so the project's policy is install's own
-// default. The account fixture supplies the developer login used to check policy.
+// ExcludeContent the team's policy, which the account fixture serves, withholds prompts
+// and tool content; install has no switch for them. The account fixture supplies the
+// developer login the relay fetches that policy with.
 // A connect that is then undone supplies the receiver's key for install to reuse.
 func (sb *Sandbox) RouteClaude() {
 	sb.T.Helper()
@@ -233,11 +230,7 @@ func (sb *Sandbox) RouteClaude() {
 	sb.terma(sb.Repo, "disconnect", "claude", "--yes")
 	// The relay on a port of its own, forwarding to the receiver; install finds it there.
 	sb.UseRelay(RelayOptions{Start: true, Content: !sb.ExcludeContent})
-	args := []string{"install", "--team", sb.ProjectID, "--harness", "claude", "--yes", "--no-browser"}
-	if sb.ExcludeContent {
-		args = append(args, "--prompts", "off", "--exclude-tool-content")
-	}
-	sb.terma(sb.Repo, args...)
+	sb.terma(sb.Repo, "install", "--team", sb.ProjectID, "--harness", "claude", "--yes", "--no-browser")
 	// What install wrote is the only exporter: the relay's, in the user's settings.
 	if user, err := os.ReadFile(filepath.Join(sb.ClaudeConfig, "settings.json")); err != nil || !bytes.Contains(user, []byte(sb.relayAddr)) {
 		sb.T.Fatalf("install did not point Claude Code at the relay (%s): %v\n%s", sb.relayAddr, err, user)

@@ -124,9 +124,15 @@ user-level settings — which is also what Claude Desktop, Codex Desktop and IDE
 read, so they are covered too. The relay forwards a session only when a hook in a
 repository you ran `terma install` in claimed it, and sends it to that repository's
 team with that team's key. Everything else — personal work, other repositories —
-waits briefly in memory and is dropped: it never leaves your machine. Prompts and model
-responses are sent by default; `terma install --prompts off` stops them for a team,
-and the relay removes them before anything leaves.
+waits briefly in memory and is dropped: it never leaves your machine.
+
+What content leaves is your team's collection policy, set in Terma, and nothing else:
+install has no content switch. Agents send prompts, model responses and tool input and
+output to the relay, and the relay removes what the policy does not collect before
+anything leaves. Paths the policy excludes withhold every record that names one, in a
+path field or as a word of a shell command (`cat secrets/app.env`), with the command's
+output. Exclusion reads what an agent reports, so a file read indirectly, by a script or
+a program the command runs, is not caught.
 
 `terma setup` and `terma install` run the relay as a per-user background service, so it
 is up before any agent starts; with `--relay-service off`, hooks start it on demand.
@@ -183,8 +189,9 @@ Switching organizations never changes a repository's team.
 
 Authentication uses a browser handoff with PKCE and a loopback callback. Credentials
 and team keys stay in the user's configuration directory with restrictive file
-permissions; repository settings contain no secrets. Export choices support signal,
-prompt, tool-content, and global-versus-local scope controls.
+permissions; repository settings contain no secrets. A repository chooses its signals;
+what content leaves is the team's collection policy alone, applied on this machine
+before anything is sent.
 
 ## Commands
 

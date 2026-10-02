@@ -23,8 +23,7 @@ type Options struct {
 	// Identity is the enduser.id to stamp: "" for git's global email, "none" for none.
 	Identity string
 	// SuppliedKey is the key the developer passed, empty when one is minted or reused.
-	SuppliedKey                        string
-	ExcludePrompts, ExcludeToolContent bool
+	SuppliedKey string
 	// InlineKey writes the key into the settings file even where a helper could hold it.
 	InlineKey, Force, AssumeYes, NoStatusLine bool
 }
@@ -72,8 +71,6 @@ func Global(ctx context.Context, reg *agents.Registry, h harness.Harness, cfg *c
 		ProjectID:          cfg.ProjectID,
 		Signals:            signals,
 		ResourceAttributes: resourceAttributes(ctx, h, cfg, o.Identity),
-		IncludePrompts:     !o.ExcludePrompts,
-		IncludeToolContent: !o.ExcludeToolContent,
 	}
 	// A helper script supplies the header where it can, so the settings file holds a path.
 	if !o.InlineKey && h.SupportsHeadersHelper() {
@@ -153,10 +150,8 @@ func Local(ctx context.Context, global, local harness.Harness, cfg *config.Confi
 	}
 	intended := harness.Exporter{
 		// Carried, never written: an outranking per-signal redirect is judged against it.
-		Endpoint:           cfg.OTLPURL,
-		Signals:            o.Signals,
-		IncludePrompts:     !o.ExcludePrompts,
-		IncludeToolContent: !o.ExcludeToolContent,
+		Endpoint: cfg.OTLPURL,
+		Signals:  o.Signals,
 	}
 	conflicts, err := local.ConflictsWith(intended)
 	if err != nil {

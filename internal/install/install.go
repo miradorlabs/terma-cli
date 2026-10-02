@@ -34,10 +34,8 @@ type Plan struct {
 	Hooks              HookPlan
 	NoHooks            bool
 	Binding            Binding
-	// Prompts and ToolContent are what the developer's agents send for the project, and
-	// Record the routing record they were resolved from, nil when there is none.
-	Prompts, ToolContent bool
-	Record               *routing.Record
+	// Record is the project's routing record as it stands, nil when there is none.
+	Record *routing.Record
 	// admitted is the organization's policy the plan was admitted under; Apply needs one.
 	admitted *config.Policy
 }
@@ -51,8 +49,6 @@ type Input struct {
 	Selected, Adapters []string
 	NoHooks            bool
 	Binding            Binding
-	// Prompts and ToolContent are explicit choices, nil to keep the project's last.
-	Prompts, ToolContent *bool
 	// Policy is the organization's validated policy, which admits the install; nil plans
 	// a dry run that cannot be applied.
 	Policy *config.Policy
@@ -63,7 +59,7 @@ func Build(reg *agents.Registry, in Input) (Plan, error) {
 	p := Plan{Agents: reg, Root: in.Root, GitDir: in.GitDir, Existing: in.Existing, Selected: in.Selected, NoHooks: in.NoHooks, Binding: in.Binding}
 	p.admitted = in.Policy
 	// A record that exists and cannot be read is not "no choice": rewriting it from
-	// defaults would switch content its developer turned off back on.
+	// defaults would switch signals its developer turned off back on.
 	if in.Binding.ID != "" {
 		rec, ok, err := routing.LoadRecord(in.Binding.ID)
 		if err != nil {
@@ -72,16 +68,6 @@ func Build(reg *agents.Registry, in Input) (Plan, error) {
 		if ok {
 			p.Record = &rec
 		}
-	}
-	p.Prompts, p.ToolContent = true, true
-	if p.Record != nil {
-		p.Prompts, p.ToolContent = p.Record.IncludePrompts, p.Record.IncludeToolContent
-	}
-	if in.Prompts != nil {
-		p.Prompts = *in.Prompts
-	}
-	if in.ToolContent != nil {
-		p.ToolContent = *in.ToolContent
 	}
 	// The wired adapters are a team decision: a colleague's re-install keeps them all.
 	p.Adapters = Adapters(reg, in.Root, in.Selected, in.Adapters)

@@ -28,7 +28,7 @@ func preToolUse(ctx context.Context, env hookrun.Env) error {
 	if err != nil {
 		return nil
 	}
-	if _, desktop := codexDesktopRoute(r); !desktop {
+	if !codexDesktopRoute(r) {
 		return nil
 	}
 	path, err := codexToolStartPath(in)
@@ -85,8 +85,7 @@ func permissionRequest(ctx context.Context, env hookrun.Env) error {
 	if err != nil {
 		return nil
 	}
-	route, desktop := codexDesktopRoute(r)
-	if !desktop {
+	if !codexDesktopRoute(r) {
 		return nil
 	}
 	at := env.Time()
@@ -96,7 +95,7 @@ func permissionRequest(ctx context.Context, env hookrun.Env) error {
 	hookrun.BoundedAttr(attrs, hookrun.AttrTurnID, in.TurnID)
 	hookrun.BoundedAttr(attrs, hookrun.AttrToolName, in.ToolName)
 	hookrun.BoundedAttr(attrs, "permission_mode", in.PermissionMode)
-	if route.IncludeToolContent {
+	if _, toolContent := env.Content(r); toolContent {
 		var input struct {
 			Description string `json:"description"`
 		}

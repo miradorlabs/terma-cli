@@ -40,16 +40,16 @@ func TestTelemetryConnectFlags(t *testing.T) {
 		t.Fatalf("find: %v", err)
 	}
 
-	for _, name := range []string{"signals", "exclude-prompts", "exclude-tool-content", "key-name", "api-key", "yes", "scope"} {
+	for _, name := range []string{"signals", "key-name", "api-key", "yes", "scope"} {
 		if cmd.Flags().Lookup(name) == nil {
 			t.Errorf("`telemetry connect` has no --%s flag", name)
 		}
 	}
 
-	// Capture is the default; redaction is the explicit choice.
-	for _, name := range []string{"exclude-prompts", "exclude-tool-content"} {
-		if got := cmd.Flags().Lookup(name).DefValue; got != "false" {
-			t.Errorf("--%s defaults to %q, want false — a bare connect captures content", name, got)
+	// Content is the team's collection policy's to decide, never a connect's.
+	for _, name := range []string{"exclude-prompts", "exclude-tool-content", "prompts", "tool-content"} {
+		if cmd.Flags().Lookup(name) != nil {
+			t.Errorf("`telemetry connect` still has --%s", name)
 		}
 	}
 }
@@ -266,7 +266,7 @@ func TestTelemetryCodexProfileOverridesAreReportedNotBlocking(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("CODEX_HOME", dir)
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
-	profile := "[analytics]\nenabled = false\n\n[otel]\nexporter = \"none\"\nlog_user_prompt = true\ntool_result = { max_bytes = 2048 }\n"
+	profile := "[analytics]\nenabled = false\n\n[otel]\nexporter = \"none\"\nlog_user_prompt = false\ntool_result = { max_bytes = 0 }\n"
 	if err := os.WriteFile(filepath.Join(dir, "work.config.toml"), []byte(profile), 0o644); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
@@ -275,7 +275,6 @@ func TestTelemetryCodexProfileOverridesAreReportedNotBlocking(t *testing.T) {
 		"telemetry", "connect", "codex",
 		"--api-key", "ter_srv_profiles",
 		"--team", "770e8400-e29b-41d4-a716-446655440000",
-		"--exclude-prompts", "--exclude-tool-content",
 		"--yes",
 	)
 	if err != nil {
@@ -287,8 +286,8 @@ func TestTelemetryCodexProfileOverridesAreReportedNotBlocking(t *testing.T) {
 	}
 	for _, key := range []string{
 		"work.config.toml:otel.exporter=none",
-		"work.config.toml:otel.log_user_prompt=true",
-		"work.config.toml:otel.tool_result.max_bytes=2048",
+		"work.config.toml:otel.log_user_prompt=false",
+		"work.config.toml:otel.tool_result.max_bytes=0",
 		"work.config.toml:analytics.enabled=false",
 	} {
 		if !strings.Contains(got, key) {
@@ -506,7 +505,7 @@ func TestTelemetryDisconnectCleansPartiallyDisabledConfig(t *testing.T) {
 	}
 }
 
-// A bare connect captures everything; each exclusion flag turns off only its own capture.
+// A connect captures everything: what content leaves is the team policy's call.
 func TestTelemetryConnectCapturesContentByDefault(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -523,26 +522,6 @@ func TestTelemetryConnectCapturesContentByDefault(t *testing.T) {
 				"OTEL_TRACES_EXPORTER":         "otlp",
 				"OTEL_LOGS_EXPORTER":           "otlp",
 				"OTEL_METRICS_EXPORTER":        "otlp",
-			},
-		},
-		{
-			name: "exclude prompts",
-			args: []string{"--exclude-prompts"},
-			want: map[string]string{
-				"OTEL_LOG_USER_PROMPTS":        "0",
-				"OTEL_LOG_ASSISTANT_RESPONSES": "0",
-				"OTEL_LOG_TOOL_DETAILS":        "1",
-				"OTEL_LOG_TOOL_CONTENT":        "1",
-			},
-		},
-		{
-			name: "exclude tool content",
-			args: []string{"--exclude-tool-content"},
-			want: map[string]string{
-				"OTEL_LOG_USER_PROMPTS":        "1",
-				"OTEL_LOG_ASSISTANT_RESPONSES": "1",
-				"OTEL_LOG_TOOL_DETAILS":        "0",
-				"OTEL_LOG_TOOL_CONTENT":        "0",
 			},
 		},
 	} {
@@ -601,8 +580,8 @@ func TestTelemetryReconnectReusesInstalledKey(t *testing.T) {
 		t.Fatalf("first connect: %v", err)
 	}
 
-	// Different capture flags: tweaking settings is when re-minting would happen.
-	out, err := connect("--exclude-prompts")
+	// Different signals: tweaking settings is when re-minting would happen.
+	out, err := connect("--signals", "traces,logs")
 	if err != nil {
 		t.Fatalf("reconnect tried to mint instead of reusing: %v", err)
 	}

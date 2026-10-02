@@ -33,19 +33,16 @@ type installFlags struct {
 	adapters     string
 	noHooks      bool
 	noStatusLine bool
-	// relayService and prompts are "on", "off", or "" to keep the last choice.
-	relayService       string
-	identity           string
-	signals            string
-	prompts            string
-	excludePrompts     bool
-	excludeToolContent bool
-	updatePolicy       bool
-	noBrowser          bool
-	dryRun             bool
-	assumeYes          bool
-	force              bool
-	verbose            bool
+	// relayService is "on", "off", or "" to keep the last choice.
+	relayService string
+	identity     string
+	signals      string
+	updatePolicy bool
+	noBrowser    bool
+	dryRun       bool
+	assumeYes    bool
+	force        bool
+	verbose      bool
 }
 
 func (app *App) newInstallCommand() *cobra.Command {
@@ -65,12 +62,15 @@ not run ` + "`terma setup`" + `, asks which agents you use if you have not chose
      exporters (or terma's plugin, for an agent without a usable one) send to a relay
      on this machine, and the relay forwards only the sessions this repository's hooks
      claim, with the team's key. Nothing else leaves the machine. Keys stay in your home
-     directory, namespaced by team — never in the repository. Prompt text and model
-     responses are sent (your last choice for the team, on for a first install);
-     --prompts off stops them. A desktop app also reports through repository hooks.
+     directory, namespaced by team — never in the repository. Agents send prompt text,
+     model responses and tool content to the relay; what of it leaves is your team's
+     collection policy's call, set in Terma, never the install's. Excluded paths
+     withhold a tool call that names one, in a path field or as a word of a shell
+     command; a file read indirectly, by a script the command runs, is not caught. A
+     desktop app also reports through repository hooks.
   3. Enables repository telemetry, including for machines configured to export only
      from installed repositories. Existing repository policies are preserved unless
-     --signals or a content flag changes them.
+     --signals changes them; a content switch an earlier terma wrote there is removed.
   4. Offers to install the commit hooks and the agents' own hooks (session start/end,
      tool use, stop) into the files you commit, so one merged PR onboards everyone.
 
@@ -83,7 +83,7 @@ only Git has version-control integration. Bare repositories are not workspaces.
 The keys and per-team configuration live in your home directory; the committed
 .terma/settings.json only names the project.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			f.updatePolicy = cmd.Flags().Changed("signals") || cmd.Flags().Changed("prompts") || cmd.Flags().Changed("exclude-prompts") || cmd.Flags().Changed("exclude-tool-content")
+			f.updatePolicy = cmd.Flags().Changed("signals")
 			return app.runInstall(cmd, f)
 		},
 	}
@@ -95,11 +95,6 @@ The keys and per-team configuration live in your home directory; the committed
 	cmd.Flags().BoolVar(&f.noStatusLine, "no-statusline", false, "do not wrap "+app.statusLineOwner()+"'s status line (which captures the plan's rate-limit windows)")
 	cmd.Flags().StringVar(&f.identity, "identity", "", "identity stamped on the sessions of agents that take one (default: git user.email; \"none\" to omit)")
 	cmd.Flags().StringVar(&f.signals, "signals", "", "comma-separated signals to export: traces, logs, metrics (default all)")
-	cmd.Flags().StringVar(&f.prompts, "prompts", "", "send prompt text and model responses: on or off (default: your last choice for this team, on for a first install)")
-	cmd.Flags().BoolVar(&f.excludePrompts, "exclude-prompts", false, "do not export prompt text or model responses")
-	// --exclude-prompts is --prompts off, kept for the scripts that pass it.
-	_ = cmd.Flags().MarkHidden("exclude-prompts")
-	cmd.Flags().BoolVar(&f.excludeToolContent, "exclude-tool-content", false, "do not export tool parameters, input, or output")
 	cmd.Flags().BoolVar(&f.noBrowser, "no-browser", false, "print the sign-in URL instead of opening a browser")
 	cmd.Flags().BoolVar(&f.dryRun, "dry-run", false, "show what would change without writing anything")
 	cmd.Flags().BoolVarP(&f.verbose, "verbose", "v", false, "show setup steps and what each step wrote")
@@ -146,11 +141,7 @@ func (app *App) runInstall(cmd *cobra.Command, f installFlags) error {
 	if err != nil {
 		return err
 	}
-	// Flags that disagree are refused before anything signs in or prints.
-	prompts, toolContent, err := contentChoices(cmd, f)
-	if err != nil {
-		return err
-	}
+	// A flag value that is refused is refused before anything signs in or prints.
 	switch f.relayService {
 	case "", "on", "off":
 	default:
@@ -159,7 +150,7 @@ func (app *App) runInstall(cmd *cobra.Command, f installFlags) error {
 
 	req := install.Request{Root: root, GitDir: gitDir, Existing: existing, ProjectRef: f.projectRef, Selected: agents,
 		RecordSelected: chosen && !f.dryRun, Adapters: splitCommas(f.adapters), NoHooks: f.noHooks, DryRun: f.dryRun,
-		Prompts: prompts, Content: toolContent, AssumeYes: f.assumeYes, CanAsk: canPrompt(), Version: app.version, Now: time.Now()}
+		AssumeYes: f.assumeYes, CanAsk: canPrompt(), Version: app.version, Now: time.Now()}
 	// A picker left before anything is written; a confirm declined later is the plan's own.
 	unbound := false
 	flow := install.Workflow{
@@ -239,31 +230,6 @@ func (app *App) installSteps(cmd *cobra.Command, ui *installUI, cfg *config.Conf
 		steps.StatusLine = func() (string, bool) { return app.installStatusLine(cmd.ErrOrStderr()) }
 	}
 	return steps
-}
-
-// contentChoices are the explicit --prompts / --exclude-prompts and
-// --exclude-tool-content choices, nil where the developer made none.
-func contentChoices(cmd *cobra.Command, f installFlags) (prompts, toolContent *bool, err error) {
-	excluded := cmd.Flags().Changed("exclude-prompts") && f.excludePrompts
-	switch strings.ToLower(strings.TrimSpace(f.prompts)) {
-	case "on":
-		if excluded {
-			return nil, nil, errors.New("--prompts on and --exclude-prompts disagree; pass one")
-		}
-		prompts = new(true)
-	case "off":
-		prompts = new(false)
-	case "":
-		if excluded {
-			prompts = new(false)
-		}
-	default:
-		return nil, nil, fmt.Errorf("--prompts %q: want on or off", f.prompts)
-	}
-	if cmd.Flags().Changed("exclude-tool-content") {
-		toolContent = new(!f.excludeToolContent)
-	}
-	return prompts, toolContent, nil
 }
 
 // spoolKey's fix, when set, is what the developer must do before events are delivered.

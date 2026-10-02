@@ -62,11 +62,13 @@ type opencodeConfig struct {
 	ProjectAttribute string `json:"projectAttribute,omitempty"`
 }
 
-// opencodePolicy is the repository-scope file: what a repository may decide.
+// opencodePolicy is the repository-scope file: what a repository may decide. Content is not
+// among it; an earlier terma's includePrompts and includeToolContent are read only to be
+// found stale, and a rewrite drops them.
 type opencodePolicy struct {
 	Signals            []string `json:"signals"`
-	IncludePrompts     bool     `json:"includePrompts"`
-	IncludeToolContent bool     `json:"includeToolContent"`
+	IncludePrompts     *bool    `json:"includePrompts,omitempty"`
+	IncludeToolContent *bool    `json:"includeToolContent,omitempty"`
 }
 
 // Name is the token `terma connect` and `--harness` accept.
@@ -115,8 +117,8 @@ func (c exporter) config(e harness.Exporter) opencodeConfig {
 	cfg := opencodeConfig{
 		Version:            1,
 		Signals:            harness.SignalNames(e.Signals),
-		IncludePrompts:     e.IncludePrompts,
-		IncludeToolContent: e.IncludeToolContent,
+		IncludePrompts:     true,
+		IncludeToolContent: true,
 	}
 	if c.root != "" {
 		return cfg
@@ -197,8 +199,8 @@ func (c exporter) Status() (harness.Status, error) {
 		}
 		status.HasPolicy = true
 		status.Signals = harness.SignalsFromNames(policy.Signals)
-		status.IncludePrompts = policy.IncludePrompts
-		status.IncludeToolContent = policy.IncludeToolContent
+		status.StaleContent = policy.IncludePrompts != nil && !*policy.IncludePrompts ||
+			policy.IncludeToolContent != nil && !*policy.IncludeToolContent
 		status.ManagedKeys = 1
 		return status, nil
 	}
@@ -210,8 +212,6 @@ func (c exporter) Status() (harness.Status, error) {
 	status.ManagedKeys = 1
 	status.Endpoint = cfg.Endpoint
 	status.Signals = harness.SignalsFromNames(cfg.Signals)
-	status.IncludePrompts = cfg.IncludePrompts
-	status.IncludeToolContent = cfg.IncludeToolContent
 	status.ProjectID = cfg.ResourceAttributes[harness.AttrProjectID]
 	status.Connected = cfg.Endpoint != "" && (cfg.HeadersHelper != "" || cfg.Headers[opencodeAuthorizationHeader] != "")
 	status.KeyPrefix = harness.MaskKey(opencodeKey(cfg))
@@ -265,9 +265,7 @@ func (c exporter) Connect(e harness.Exporter, _ bool) error {
 	cfg := c.config(e)
 
 	if c.root != "" {
-		data, err := json.MarshalIndent(opencodePolicy{
-			Signals: cfg.Signals, IncludePrompts: cfg.IncludePrompts, IncludeToolContent: cfg.IncludeToolContent,
-		}, "", "  ")
+		data, err := json.MarshalIndent(opencodePolicy{Signals: cfg.Signals}, "", "  ")
 		if err != nil {
 			return err
 		}
@@ -310,8 +308,8 @@ func (exporter) ConnectPerRepo(e harness.Exporter) error {
 		Version:  1,
 		Endpoint: e.Endpoint,
 		Signals:  harness.SignalNames(e.Signals),
-		// The file is shared by every bound repository, so content capture stays off
-		// here and is opted into per repository by its committed policy.
+		// A direct export, past the relay that applies the team's policy, so content
+		// capture stays off.
 		IncludePrompts:     false,
 		IncludeToolContent: false,
 		ResourceAttributes: opencodeBaseAttributes(e),

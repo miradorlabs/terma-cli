@@ -22,7 +22,6 @@ func opencodeIn(t *testing.T) (exporter, string) {
 func opencodeExporter(t *testing.T, h exporter, helper bool) harness.Exporter {
 	t.Helper()
 	e := baseExporter()
-	e.IncludePrompts, e.IncludeToolContent = true, false
 	if helper {
 		path, err := harness.HelperFilePath(h, "proj_123")
 		if err != nil {
@@ -79,8 +78,8 @@ func TestOpenCodeConnectWritesPluginAndHelper(t *testing.T) {
 	if cfg.Endpoint != e.Endpoint || cfg.HeadersHelper != e.HelperPath || len(cfg.Headers) != 0 {
 		t.Errorf("config = %+v", cfg)
 	}
-	if !reflect.DeepEqual(cfg.Signals, []string{"traces", "logs", "metrics"}) || !cfg.IncludePrompts || cfg.IncludeToolContent {
-		t.Errorf("policy = %v / %v / %v", cfg.Signals, cfg.IncludePrompts, cfg.IncludeToolContent)
+	if !reflect.DeepEqual(cfg.Signals, []string{"traces", "logs", "metrics"}) || !cfg.IncludePrompts || !cfg.IncludeToolContent {
+		t.Errorf("policy = %v / %v / %v, want every signal and all content", cfg.Signals, cfg.IncludePrompts, cfg.IncludeToolContent)
 	}
 	if cfg.ResourceAttributes[harness.AttrProjectID] != "proj_123" || cfg.ResourceAttributes[harness.AttrEnduserID] != "dev@example.com" {
 		t.Errorf("resource attributes = %v", cfg.ResourceAttributes)
@@ -123,8 +122,8 @@ func TestOpenCodeStatusRoundTrip(t *testing.T) {
 	if !st.Exists || !st.Connected || st.Endpoint != e.Endpoint || st.ManagedKeys != 1 {
 		t.Errorf("status = %+v", st)
 	}
-	if !reflect.DeepEqual(st.Signals, []harness.Signal{harness.SignalTraces, harness.SignalLogs}) || !st.IncludePrompts || st.IncludeToolContent {
-		t.Errorf("policy = %v / %v / %v", st.Signals, st.IncludePrompts, st.IncludeToolContent)
+	if !reflect.DeepEqual(st.Signals, []harness.Signal{harness.SignalTraces, harness.SignalLogs}) {
+		t.Errorf("signals = %v", st.Signals)
 	}
 	if st.KeyPrefix != harness.MaskKey(e.APIKey) || strings.Contains(st.KeyPrefix, e.APIKey[len(e.APIKey)-6:]) {
 		t.Errorf("key prefix = %q", st.KeyPrefix)
@@ -211,7 +210,7 @@ func TestOpenCodeLocalPolicyCarriesNoDestination(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if st.Connected || st.ManagedKeys != 1 || !reflect.DeepEqual(st.Signals, []harness.Signal{harness.SignalTraces}) || !st.IncludePrompts {
+	if st.Connected || st.ManagedKeys != 1 || !reflect.DeepEqual(st.Signals, []harness.Signal{harness.SignalTraces}) || st.StaleContent {
 		t.Errorf("local status = %+v", st)
 	}
 	if _, ok := h.(interface {
@@ -276,8 +275,6 @@ func TestOpenCodeConnectPerRepo(t *testing.T) {
 		ProjectID:          "proj_123",
 		Signals:            harness.AllSignals,
 		ResourceAttributes: map[string]string{harness.AttrServiceName: "opencode", harness.AttrProjectID: "proj_123", harness.AttrEnduserID: "dev@example.com"},
-		IncludePrompts:     true,
-		IncludeToolContent: true,
 	}
 	if err := h.ConnectPerRepo(e); err != nil {
 		t.Fatal(err)

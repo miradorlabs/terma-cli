@@ -40,6 +40,14 @@ func (e Env) ProjectPolicy(r *Repo) config.Policy {
 	return routing.EffectivePolicy(e.Policy, r.ProjectID)
 }
 
+// Content is what content this repository's hook events may carry, decided as they are
+// emitted: the team's policy alone (config.Policy.Content), the rule the relay holds
+// exports to. These events reach the spool, not the relay, so this is their only gate. A
+// team whose policy this machine has not validated gets none.
+func (e Env) Content(r *Repo) (prompts, toolContent bool) {
+	return e.ProjectPolicy(r).Content()
+}
+
 // RelayEnabled reports whether the local relay is set up on this machine.
 func (Env) RelayEnabled() bool { return claim.Enabled() }
 

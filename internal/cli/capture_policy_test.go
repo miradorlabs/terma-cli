@@ -58,7 +58,7 @@ func TestPolicyRefreshFiltersAlreadyQueuedReplies(t *testing.T) {
 	if err := keystore.Set("team", policyTestKey, keystore.Hosts{OTLP: srv.URL}); err != nil {
 		t.Fatal(err)
 	}
-	if err := routing.SaveRecord(routing.Record{ProjectID: "team", Signals: []string{"logs"}, IncludePrompts: true, IncludeToolContent: true, Harnesses: []string{"codex"}}); err != nil {
+	if err := routing.SaveRecord(routing.Record{ProjectID: "team", Signals: []string{"logs"}, Harnesses: []string{"codex"}}); err != nil {
 		t.Fatal(err)
 	}
 	seedPolicyLogin(t, srv.URL)
@@ -108,7 +108,7 @@ func TestRelayRespectsSignalSelection(t *testing.T) {
 			if err := keystore.Set("team", policyTestKey, keystore.Hosts{}); err != nil {
 				t.Fatal(err)
 			}
-			if err := routing.SaveRecord(routing.Record{ProjectID: "team", Signals: signals, IncludePrompts: true, IncludeToolContent: true, Harnesses: []string{"codex"}}); err != nil {
+			if err := routing.SaveRecord(routing.Record{ProjectID: "team", Signals: signals, Harnesses: []string{"codex"}}); err != nil {
 				t.Fatal(err)
 			}
 			cfg := &config.Config{Policy: config.DefaultPolicy(), OTLPURL: "http://127.0.0.1:1"}
@@ -157,7 +157,7 @@ func TestRelayRespectsHarnessSelection(t *testing.T) {
 			if err := keystore.Set("team", policyTestKey, keystore.Hosts{OTLP: host.URL}); err != nil {
 				t.Fatal(err)
 			}
-			rec := routing.Record{ProjectID: "team", Signals: []string{"traces"}, IncludePrompts: true, IncludeToolContent: true, Harnesses: []string{test.harness}}
+			rec := routing.Record{ProjectID: "team", Signals: []string{"traces"}, Harnesses: []string{test.harness}}
 			if err := routing.SaveRecord(rec); err != nil {
 				t.Fatal(err)
 			}
@@ -231,7 +231,7 @@ func TestQueuedRelayExportsRespectHarnessDeselection(t *testing.T) {
 	if err := keystore.Set("team", policyTestKey, keystore.Hosts{OTLP: host.URL}); err != nil {
 		t.Fatal(err)
 	}
-	rec := routing.Record{ProjectID: "team", Signals: []string{"traces"}, IncludePrompts: true, IncludeToolContent: true, Harnesses: []string{"codex"}}
+	rec := routing.Record{ProjectID: "team", Signals: []string{"traces"}, Harnesses: []string{"codex"}}
 	if err := routing.SaveRecord(rec); err != nil {
 		t.Fatal(err)
 	}

@@ -24,7 +24,7 @@ import (
 func TestSpoolRepliesUseCurrentNativeCodexConsent(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	t.Setenv("CODEX_HOME", t.TempDir())
-	exporter := harness.Exporter{Endpoint: "https://example.invalid", APIKey: policyTestKey, ProjectID: "team", Signals: []harness.Signal{harness.SignalLogs}, IncludePrompts: true}
+	exporter := harness.Exporter{Endpoint: "https://example.invalid", APIKey: policyTestKey, ProjectID: "team", Signals: []harness.Signal{harness.SignalLogs}}
 	if err := harnessOf(t, "codex").Connect(exporter, false); err != nil {
 		t.Fatal(err)
 	}
@@ -36,13 +36,12 @@ func TestSpoolRepliesUseCurrentNativeCodexConsent(t *testing.T) {
 	if testApp.delivery().Allowed(config.DefaultPolicy(), "team", spool.Event{Name: hookrun.EventAssistantMessage}) {
 		t.Fatal("a reply no agent's label vouches for was delivered")
 	}
-	exporter.IncludePrompts = false
-	if err := harnessOf(t, "codex").Connect(exporter, false); err != nil {
-		t.Fatal(err)
-	}
+	// The team's policy, not the agent's config, decides whether prompts may leave.
+	withheld := config.DefaultPolicy()
+	withheld.IncludePrompts = false
 	for _, name := range []string{hookrun.EventAssistantMessage, hookrun.EventSessionTitle} {
-		if testApp.delivery().Allowed(config.DefaultPolicy(), "team", spool.Event{Name: name, Attrs: map[string]any{hookrun.AttrTool: "codex"}}) {
-			t.Fatalf("queued %s ignored native prompt opt-out", name)
+		if testApp.delivery().Allowed(withheld, "team", spool.Event{Name: name, Attrs: map[string]any{hookrun.AttrTool: "codex"}}) {
+			t.Fatalf("queued %s ignored the team's prompts-off", name)
 		}
 	}
 }

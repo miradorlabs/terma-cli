@@ -17,11 +17,10 @@ const telemetryCommand = "printf TERMA_TELEMETRY_TOOL"
 // These scenarios use real harnesses and exporters with deterministic provider
 // responses. No provider credentials, model compliance or paid calls are needed.
 //
-// Claude runs two ways. content/redacted connect it machine-wide (`terma connect`
-// and its content switches). install-content/install-redacted set it up the way `terma
-// install` does for a developer: its exporter at the local relay, which forwards this
-// repository's sessions under the project's policy — install's own default, which sends
-// prompts and responses, and the `--prompts off` its checklist names to stop them.
+// Claude runs two ways. content connects it machine-wide (`terma connect`, which sends
+// everything straight to Terma). install-content/install-redacted set it up the way
+// `terma install` does for a developer: its exporter at the local relay, which forwards
+// this repository's sessions under the team's policy, collecting content or not.
 func TestClaudeTelemetry(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, newest bool) {
 		for _, tc := range []struct {
@@ -29,7 +28,6 @@ func TestClaudeTelemetry(t *testing.T) {
 			exclude, routed bool
 		}{
 			{"content", false, false},
-			{"redacted", true, false},
 			{"install-content", false, true},
 			{"install-redacted", true, true},
 		} {
@@ -67,6 +65,10 @@ func TestCodexTelemetry(t *testing.T) {
 				t.Setenv("OPENAI_API_KEY", "synthetic-telemetry-key")
 				sb := New(t, Isolated, WithCodex(b))
 				sb.ExcludeContent = exclude
+				// Only the relay withholds content, under the team's policy.
+				if exclude {
+					sb.UseRelay(RelayOptions{Start: true})
+				}
 				var calls atomic.Int32
 				provider := httptest.NewServer(codexTelemetryProvider(t, &calls))
 				defer provider.Close()

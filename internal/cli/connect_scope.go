@@ -70,10 +70,6 @@ func askConnectOptions(f connectFlags, hs []harness.Harness, ask connectForm) (c
 		}
 		form.Items = append(form.Items, item)
 	}
-	form.Items = append(form.Items,
-		prompt.Item{Label: "Prompt text and model responses", Detail: "what you and the model said", Selected: !f.excludePrompts},
-		prompt.Item{Label: "Tool input and output", Detail: "commands run, files read, and what came back", Selected: !f.excludeToolContent},
-	)
 	const scopeGroup = 1
 	unavailable := localUnavailable(hs, root)
 	if scope == harness.ScopeLocal && unavailable != "" {
@@ -114,8 +110,6 @@ func askConnectOptions(f connectFlags, hs []harness.Harness, ask connectForm) (c
 	if len(chosen) > 0 {
 		f.signals = strings.Join(chosen, ",")
 	}
-	f.excludePrompts = !items[len(harness.AllSignals)].Selected
-	f.excludeToolContent = !items[len(harness.AllSignals)+1].Selected
 	f.scope = string(harness.ScopeGlobal)
 	if items[localAt].Selected {
 		f.scope = string(harness.ScopeLocal)
@@ -224,11 +218,9 @@ func localLayerStatus(h harness.Harness, root string, global telemetryStatus) (t
 	if entry.Signals == "" {
 		entry.Signals = "none"
 	}
-	entry.Prompts = connect.OnOff(st.IncludePrompts)
-	entry.ToolContent = connect.OnOff(st.IncludeToolContent)
 	return entry, true
 }
 
 func statusRow(name string, e telemetryStatus) []string {
-	return []string{name, e.Installed, e.State, e.Signals, e.Prompts, e.ToolContent}
+	return []string{name, e.Installed, e.State, e.Signals}
 }

@@ -22,7 +22,9 @@ type Account struct {
 	token     string
 	mints     atomic.Int32
 	denyMints atomic.Bool
-	mu        sync.Mutex
+	// withholdContent is the team's collection policy: no prompts, no tool content.
+	withholdContent atomic.Bool
+	mu              sync.Mutex
 	keys      map[string]string // project → minted key
 }
 
@@ -56,7 +58,8 @@ func (sb *Sandbox) StartAccount() *Account {
 				http.Error(w, "missing policy project_id", http.StatusBadRequest)
 				return
 			}
-			fmt.Fprint(w, `{"policy":{"version":"1.0","terma":{"per_repository":{},"capture":{"exclude_paths":[],"exclude_prompts":false,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-09-30T12:27:05Z"}`)
+			withhold := a.withholdContent.Load()
+			fmt.Fprintf(w, `{"policy":{"version":"1.0","terma":{"per_repository":{},"capture":{"exclude_paths":[],"exclude_prompts":%t,"exclude_tool_content":%t}}},"revision":1,"updated_at":"2026-09-30T12:27:05Z"}`, withhold, withhold)
 		case "/v1/api-keys/server":
 			if a.denyMints.Load() {
 				w.WriteHeader(http.StatusForbidden)

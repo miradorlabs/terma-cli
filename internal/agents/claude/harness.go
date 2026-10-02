@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/harness"
@@ -153,10 +154,6 @@ func (c exporter) Status() (harness.Status, error) {
 		ConfigPath: path,
 		Exists:     s.existed,
 		Endpoint:   s.env[harness.EnvOTLPEndpoint],
-
-		// Absent is off, as in Claude Code.
-		IncludePrompts:     isOn(s.env[otelLogUserPrompts]),
-		IncludeToolContent: isOn(s.env[otelLogToolContent]),
 	}
 
 	// The caller compares Endpoint against its own to decide whether this is terma.
@@ -165,8 +162,6 @@ func (c exporter) Status() (harness.Status, error) {
 	status.Signals = claudeSignals(s.env)
 	// A repository can only switch things off, so what it leaves unsaid is the user level's.
 	if c.root != "" {
-		status.IncludePrompts = s.env[otelLogUserPrompts] != boolValue(false)
-		status.IncludeToolContent = s.env[otelLogToolContent] != boolValue(false)
 		status.Signals = nil
 		keys := map[harness.Signal]string{harness.SignalTraces: otelTracesExporter, harness.SignalLogs: otelLogsExporter, harness.SignalMetrics: otelMetricsExporter}
 		for _, sig := range harness.AllSignals {
@@ -175,8 +170,12 @@ func (c exporter) Status() (harness.Status, error) {
 			}
 		}
 		// Only an off value is a policy; an earlier terma's on values are left to the next connect to clear.
+		// A content key off is no policy any more, only an earlier terma's leftover to clear.
 		for _, key := range claudeLocalKeys {
-			if v := s.env[key]; v == exporterNone || v == boolValue(false) {
+			switch v := s.env[key]; {
+			case slices.Contains(captureKeys, key) && v == boolValue(false):
+				status.StaleContent = true
+			case v == exporterNone || v == boolValue(false):
 				status.HasPolicy = true
 			}
 		}

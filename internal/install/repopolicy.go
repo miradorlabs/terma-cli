@@ -14,10 +14,10 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
-// Exporter is the export the plan asks for: endpoint and signals as given, prompts and
-// tool content as the plan resolved them.
-func (p Plan) Exporter(endpoint string, signals []harness.Signal) harness.Exporter {
-	return harness.Exporter{Endpoint: endpoint, Signals: signals, IncludePrompts: p.Prompts, IncludeToolContent: p.ToolContent}
+// Exporter is the export the plan asks for: endpoint and signals as given. It names no
+// content: agents send all of it to the relay, and the team's policy decides what leaves.
+func (Plan) Exporter(endpoint string, signals []harness.Signal) harness.Exporter {
+	return harness.Exporter{Endpoint: endpoint, Signals: signals}
 }
 
 // RouteRecord is the routing record for the selected agents' relay targets; ok is false
@@ -32,14 +32,15 @@ func RouteRecord(reg *agents.Registry, projectID string, selected []string, want
 		signals = append(signals, string(s))
 	}
 	return routing.Record{ProjectID: projectID, Endpoint: want.Endpoint, Signals: signals,
-		IncludePrompts: want.IncludePrompts, IncludeToolContent: want.IncludeToolContent,
 		Harnesses: targets, Surfaces: RoutedSurfaces(reg, selected, targets)}, true
 }
 
 // WriteRepoPolicy writes want as each exporter's repository policy, keeping an existing
-// one unless update, and returns the files it changed relative to root. A conflict is
-// skipped rather than failing: the hooks and binding are already written, and failing
-// would leave the repository half-onboarded.
+// one unless update, and returns the files it changed relative to root. A policy that
+// still withholds content, as an earlier terma's could, is rewritten with its own
+// signals: content is the team policy's alone. A conflict is skipped rather than
+// failing: the hooks and binding are already written, and failing would leave the
+// repository half-onboarded.
 func WriteRepoPolicy(r Reporter, root string, hs []harness.Harness, want harness.Exporter, update bool) ([]string, error) {
 	var written []string
 	for _, h := range hs {
@@ -47,8 +48,12 @@ func WriteRepoPolicy(r Reporter, root string, hs []harness.Harness, want harness
 		if err != nil {
 			return nil, err
 		}
+		want := want
 		if status.HasPolicy && !update {
-			continue
+			if !status.StaleContent {
+				continue
+			}
+			want.Signals = status.Signals
 		}
 		// want.Endpoint is carried, never written: an outranking per-signal redirect is judged against it.
 		conflicts, err := h.ConflictsWith(want)

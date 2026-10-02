@@ -21,7 +21,7 @@ const codexReplyMaxText = 16 << 10
 // per-session cursor, and only where prompts are consented.
 func captureCodexReplies(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in *codexHookInput) {
 	pol := e.ProjectPolicy(r)
-	if e.Spool == nil || !session.ValidID(in.SessionID) || !pol.IncludePrompts || pol.CollectsNothing || len(pol.ExcludePaths) > 0 || !repliesConsented(r.Consent(pol.Global())) {
+	if prompts, _ := pol.Content(); e.Spool == nil || !session.ValidID(in.SessionID) || !prompts || !repliesConsented(r.Consent(pol.Global())) {
 		return
 	}
 	dir, err := config.Dir()
@@ -57,7 +57,7 @@ func captureCodexReplies(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in
 			hookrun.AttrVersion: e.Version, hookrun.AttrProjectID: r.ProjectID,
 		}, in.AgentID, in.AgentType)
 		r.StampWorktree(attrs)
-		if _, desktop := codexDesktopRoute(r); desktop {
+		if codexDesktopRoute(r) {
 			attrs["capture_surface"] = codexDesktopSurface
 		}
 		for k, v := range map[string]string{hookrun.AttrTurnID: reply.TurnID, "trace_id": reply.TraceID, "phase": reply.Phase, hookrun.AttrModel: in.Model} {
@@ -86,30 +86,26 @@ func captureCodexReplies(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in
 	}
 }
 
-// repliesConsented reports whether prompts, and so replies, may leave for this
-// repository. It fails closed: a source that exists and cannot be read might be the one
-// that withholds prompts; a missing file is simply not a source.
+// repliesConsented reports whether replies may be sent for this repository at all: the
+// team's policy, which its callers check, decides whether prompts may. It fails closed: a
+// source that exists and cannot be read might be the one that withholds them; a missing
+// file is simply not a source.
 func repliesConsented(c hookrun.Consent) bool {
 	rec, recorded := c.Route, c.Recorded
 	if c.RouteErr != nil {
 		return false
 	}
-	// Under the relay the machine-wide config allows prompts on purpose, so only the project's
-	// routing record can consent.
+	// Under the relay the machine-wide config sends everything on purpose, so only the
+	// project's routing record can route the replies here.
 	if c.Relay {
 		if c.Global && !recorded {
 			return true
 		}
-		return recorded && rec.IncludePrompts && slices.Contains(rec.Harnesses, name) && slices.Contains(rec.Signals, "logs")
+		return recorded && slices.Contains(rec.Harnesses, name) && slices.Contains(rec.Signals, "logs")
 	}
 	if slices.Contains(rec.Surfaces, name) {
-		return recorded && slices.Contains(rec.Harnesses, name) &&
-			slices.Contains(rec.Signals, "logs") && rec.IncludePrompts
+		return recorded && slices.Contains(rec.Harnesses, name) && slices.Contains(rec.Signals, "logs")
 	}
 	st, err := (exporter{}).Status()
-	if err != nil {
-		return false
-	}
-	return st.Connected && st.IncludePrompts &&
-		(!recorded || !slices.Contains(rec.Harnesses, name) || rec.IncludePrompts)
+	return err == nil && st.Connected
 }

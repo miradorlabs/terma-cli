@@ -27,9 +27,9 @@ type RelayOptions struct {
 	// NoKey leaves the machine without a key for the project: installed, but never
 	// opted in here.
 	NoKey bool
-	// Content is the project's routing record: prompts and tool content through, or
-	// both withheld. Always written: with no record the organization's policy decides,
-	// which collects both by default.
+	// Content is the team's collection policy, which the account fixture serves:
+	// prompts and tool content through, or both withheld. Only the policy decides
+	// content; the routing record names agents and signals.
 	Content bool
 }
 
@@ -39,6 +39,7 @@ func (sb *Sandbox) UseRelay(o RelayOptions) {
 	t.Helper()
 	acct := sb.StartAccount()
 	acct.denyMints.Store(o.NoKey)
+	acct.withholdContent.Store(!o.Content)
 	sb.relayed = true
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -62,7 +63,7 @@ func (sb *Sandbox) UseRelay(o RelayOptions) {
 	// The record names every agent pointed at the relay, as install's does: the relay
 	// withholds a claimed session of an agent the record does not name.
 	agents := append([]string{"claude", "codex", "opencode"}, sb.RelayAgents...)
-	rec, _ := json.Marshal(map[string]any{"project_id": sb.ProjectID, "include_prompts": o.Content, "include_tool_content": o.Content, "signals": []string{"traces", "logs", "metrics"}, "harnesses": agents})
+	rec, _ := json.Marshal(map[string]any{"project_id": sb.ProjectID, "signals": []string{"traces", "logs", "metrics"}, "harnesses": agents})
 	sb.writeAbs(filepath.Join(sb.TermaConfig, "routing", sb.ProjectID+".json"), string(rec)+"\n")
 	// --no-start: the scenario decides whether the relay runs before the agent.
 	// One setup for every agent: a second would stop the relay StartRelay runs.

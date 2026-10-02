@@ -56,7 +56,7 @@ func envIn(t *testing.T, path string) (map[string]string, map[string]json.RawMes
 func TestTelemetryConnectLocalWritesOnlyWhatToShip(t *testing.T) {
 	_, settings := localRepo(t)
 
-	out, err := runTerma(t, "connect", "claude", "--scope", "local", "--yes", "--exclude-prompts", "--signals", "traces,logs")
+	out, err := runTerma(t, "connect", "claude", "--scope", "local", "--yes", "--signals", "traces,logs")
 	if err != nil {
 		t.Fatalf("connect: %v\n%s", err, out)
 	}
@@ -72,11 +72,7 @@ func TestTelemetryConnectLocalWritesOnlyWhatToShip(t *testing.T) {
 		t.Fatal("the hooks block was lost")
 	}
 	// Only what the repository switches off: Claude Code ignores a project that turns anything on.
-	want := map[string]string{
-		"OTEL_METRICS_EXPORTER":        "none",
-		"OTEL_LOG_USER_PROMPTS":        "0",
-		"OTEL_LOG_ASSISTANT_RESPONSES": "0",
-	}
+	want := map[string]string{"OTEL_METRICS_EXPORTER": "none"}
 	if !reflect.DeepEqual(env, want) {
 		t.Errorf("env = %v, want %v", env, want)
 	}
@@ -134,7 +130,7 @@ func TestTelemetryConnectLocalRejectsGlobalOnlyFlags(t *testing.T) {
 // The local layer is its own row in both renderings, never "connected" on its own.
 func TestTelemetryStatusListsTheLocalLayer(t *testing.T) {
 	localRepo(t)
-	if out, err := runTerma(t, "connect", "claude", "--scope", "local", "--yes", "--exclude-tool-content"); err != nil {
+	if out, err := runTerma(t, "connect", "claude", "--scope", "local", "--yes", "--signals", "traces,logs"); err != nil {
 		t.Fatalf("connect: %v\n%s", err, out)
 	}
 
@@ -156,8 +152,8 @@ func TestTelemetryStatusListsTheLocalLayer(t *testing.T) {
 	if local.Scope != "local" || local.State != "local settings, not exporting" {
 		t.Errorf("local row = %+v", local)
 	}
-	if local.Signals != "logs,metrics,traces" || local.Prompts != "on" || local.ToolContent != "off" {
-		t.Errorf("local row data = %s / %s / %s", local.Signals, local.Prompts, local.ToolContent)
+	if local.Signals != "logs,traces" {
+		t.Errorf("local row signals = %s", local.Signals)
 	}
 	if !strings.HasSuffix(local.ConfigPath, filepath.FromSlash(".claude/settings.json")) {
 		t.Errorf("local config path = %q", local.ConfigPath)
@@ -175,7 +171,7 @@ func TestTelemetryStatusListsTheLocalLayer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("status: %v\n%s", err, status)
 	}
-	if !strings.Contains(status, "Local:       Claude Code ships logs,metrics,traces; prompts on; tool content off from this repository (.claude/settings.json)") {
+	if !strings.Contains(status, "Local:       Claude Code ships logs,traces from this repository (.claude/settings.json)") {
 		t.Errorf("terma status lacks the local line:\n%s", status)
 	}
 }

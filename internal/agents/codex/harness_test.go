@@ -73,8 +73,7 @@ func TestCodexRenderWritesOneExporterPerSignal(t *testing.T) {
 		"trace_exporter":   `{ otlp-http = { endpoint = "https://otel.terma.ai/v1/traces", headers = { Authorization = "Bearer ter_srv_0123456789abcdef" }, protocol = "binary" } }`,
 		"exporter":         `{ otlp-http = { endpoint = "https://otel.terma.ai/v1/logs", headers = { Authorization = "Bearer ter_srv_0123456789abcdef" }, protocol = "binary" } }`,
 		"metrics_exporter": `{ otlp-http = { endpoint = "https://otel.terma.ai/v1/metrics", headers = { Authorization = "Bearer ter_srv_0123456789abcdef" }, protocol = "binary" } }`,
-		"log_user_prompt":  "false",
-		"tool_result":      "{ max_bytes = 0 }",
+		"log_user_prompt":  "true",
 		// Each attribution key is its own span_attributes entry; service.name is Codex's own.
 		"span_attributes/enduser.id":         `"dev@example.com"`,
 		"span_attributes/mirador.project.id": `"proj_123"`,
@@ -98,19 +97,15 @@ func TestCodexRenderLeavesUnselectedSignalsAlone(t *testing.T) {
 	}
 }
 
-func TestCodexRenderContentSwitches(t *testing.T) {
-	on := exporter{}.render(harness.Exporter{Signals: harness.AllSignals, IncludePrompts: true, IncludeToolContent: true})
+// Content always goes to the relay, which withholds it per the team's policy: prompts are
+// logged and Codex's or the user's own tool-output cap stays in force.
+func TestCodexRenderAlwaysCapturesContent(t *testing.T) {
+	on := exporter{}.render(harness.Exporter{Signals: harness.AllSignals})
 	if on["log_user_prompt"] != "true" {
 		t.Errorf("log_user_prompt = %q, want true", on["log_user_prompt"])
 	}
-	// With content on, Codex's or the user's own cap stays in force.
 	if v, ok := on["tool_result"]; ok {
-		t.Errorf("tool_result = %q, want it unwritten when tool content is on", v)
-	}
-
-	off := exporter{}.render(harness.Exporter{Signals: harness.AllSignals})
-	if off["log_user_prompt"] != "false" || off["tool_result"] != "{ max_bytes = 0 }" {
-		t.Errorf("exclusions rendered as %v", off)
+		t.Errorf("tool_result = %q, want it unwritten", v)
 	}
 }
 
@@ -341,7 +336,7 @@ func TestCodexDisconnectLeavesEditedKeysAlone(t *testing.T) {
 	if err := c.Connect(codexExporter(), false); err != nil {
 		t.Fatalf("Connect: %v", err)
 	}
-	edited := strings.Replace(readText(t, path), "log_user_prompt = false", "log_user_prompt = true", 1)
+	edited := strings.Replace(readText(t, path), "log_user_prompt = true", "log_user_prompt = false", 1)
 	if err := os.WriteFile(path, []byte(edited), 0o600); err != nil {
 		t.Fatalf("edit: %v", err)
 	}
@@ -353,7 +348,7 @@ func TestCodexDisconnectLeavesEditedKeysAlone(t *testing.T) {
 	if !reflect.DeepEqual(result.Skipped, []string{"log_user_prompt"}) {
 		t.Errorf("skipped = %v, want the edited key", result.Skipped)
 	}
-	if otelOf(t, path)["log_user_prompt"] != true {
+	if otelOf(t, path)["log_user_prompt"] != false {
 		t.Error("the user's edit was thrown away")
 	}
 	if _, ok := otelOf(t, path)["exporter"]; ok {
@@ -372,10 +367,7 @@ func TestCodexStatusRoundTrip(t *testing.T) {
 		t.Errorf("a missing config reported connected=%v exists=%v", before.Connected, before.Exists)
 	}
 
-	e := codexExporter()
-	e.IncludePrompts = true
-	e.IncludeToolContent = true
-	if err := c.Connect(e, false); err != nil {
+	if err := c.Connect(codexExporter(), false); err != nil {
 		t.Fatalf("Connect: %v", err)
 	}
 
@@ -391,9 +383,6 @@ func TestCodexStatusRoundTrip(t *testing.T) {
 	}
 	if !reflect.DeepEqual(after.Signals, harness.AllSignals) {
 		t.Errorf("signals = %v, want %v", after.Signals, harness.AllSignals)
-	}
-	if !after.IncludePrompts || !after.IncludeToolContent {
-		t.Errorf("prompts=%v tool content=%v, want both on", after.IncludePrompts, after.IncludeToolContent)
 	}
 	if after.ProjectID != "proj_123" {
 		t.Errorf("project = %q, want it read back from span_attributes", after.ProjectID)
@@ -603,15 +592,15 @@ func TestCodexConflictsInManagedLayer(t *testing.T) {
 }
 
 // A higher layer's content switches, attribution and analytics opt-out are reported only
-// when they contradict what Terma is about to write.
+// when they contradict what Terma is about to write; content it always asks for.
 func TestCodexConflictsInLayerCoverPrivacySettings(t *testing.T) {
 	layer := codexLayer{source: "work.config.toml", scope: harness.ScopeProfile, where: "profile", advisory: true}
 	data := []byte(`[analytics]
 enabled = false
 
 [otel]
-log_user_prompt = true
-tool_result = { max_bytes = 2048 }
+log_user_prompt = false
+tool_result = { max_bytes = 0 }
 span_attributes = { "mirador.project.id" = "proj_other", team = "payments" }
 `)
 
@@ -639,9 +628,13 @@ span_attributes = { "mirador.project.id" = "proj_other", team = "payments" }
 
 	agreeing := harness.Exporter{
 		Endpoint: termaEndpoint, Signals: []harness.Signal{harness.SignalTraces, harness.SignalLogs},
-		IncludePrompts: true, IncludeToolContent: true,
 		ResourceAttributes: map[string]string{harness.AttrProjectID: "proj_other"},
 	}
+	data = []byte(`[otel]
+log_user_prompt = true
+tool_result = { max_bytes = 2048 }
+span_attributes = { "mirador.project.id" = "proj_other", team = "payments" }
+`)
 	if conflicts := codexConflictsInLayer(data, layer, agreeing); len(conflicts) != 0 {
 		t.Fatalf("got %+v, want none when the layer agrees with the connect", conflicts)
 	}
@@ -730,22 +723,29 @@ func fileExists(path string) bool {
 	return err == nil
 }
 
-// Turning content back on removes the zero cap or restores the user's own.
-func TestCodexReconnectWithToolContentOnLiftsTheCap(t *testing.T) {
+// An earlier terma's zero tool-output cap goes at the next connect, which restores the
+// user's own: content always goes to the relay now.
+func TestCodexReconnectLiftsAnEarlierTermasZeroCap(t *testing.T) {
 	c, path := codexIn(t, "[otel]\ntool_result = { max_bytes = 8192 }\n")
-
-	excluded := codexExporter()
-	if err := c.Connect(excluded, false); err != nil {
-		t.Fatalf("connect excluding tool content: %v", err)
+	if err := c.Connect(codexExporter(), false); err != nil {
+		t.Fatalf("connect: %v", err)
 	}
-	if codexToolContentOn(otelOf(t, path)) {
-		t.Fatal("tool output was not excluded")
+	// What an earlier terma's connect with tool content off left: the cap, and a journal
+	// that owns it.
+	j, err := harness.LoadJournal(c.Name(), path)
+	if err != nil || j == nil {
+		t.Fatalf("journal: %v, %v", j, err)
 	}
-
-	included := codexExporter()
-	included.IncludeToolContent = true
-	if err := c.Connect(included, false); err != nil {
-		t.Fatalf("reconnect including tool content: %v", err)
+	zero, user := mustRenderTOML(map[string]any{"max_bytes": int64(0)}), mustRenderTOML(map[string]any{"max_bytes": int64(8192)})
+	j.Installed["tool_result"], j.Previous["tool_result"] = zero, &user
+	if err := j.Save(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(strings.Replace(readText(t, path), "max_bytes = 8192", "max_bytes = 0", 1)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Connect(codexExporter(), false); err != nil {
+		t.Fatalf("reconnect: %v", err)
 	}
 	table, _ := otelOf(t, path)["tool_result"].(map[string]any)
 	if table["max_bytes"] != int64(8192) {
@@ -847,12 +847,11 @@ func TestCodexDetectDoesNotFailWhenAbsent(t *testing.T) {
 
 func TestCodexConnectNotes(t *testing.T) {
 	notes := exporter{}.ConnectNotes(codexExporter())
-	if len(notes) != 2 {
-		t.Fatalf("notes = %v, want the metrics route and the tool-arguments limit", notes)
+	if len(notes) != 1 {
+		t.Fatalf("notes = %v, want the metrics route", notes)
 	}
 	quiet := codexExporter()
 	quiet.Signals = []harness.Signal{harness.SignalTraces}
-	quiet.IncludeToolContent = true
 	if notes := (exporter{}).ConnectNotes(quiet); len(notes) != 0 {
 		t.Fatalf("notes = %v, want none", notes)
 	}

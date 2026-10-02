@@ -59,7 +59,7 @@ send, not whether anything has arrived. With no argument it reports every harnes
 			}
 
 			return output.Render(cmd.OutOrStdout(), format, output.Table{
-				Headers: []string{"HARNESS", "INSTALLED", "TELEMETRY", "SIGNALS", "PROMPTS", "TOOL CONTENT"},
+				Headers: []string{"HARNESS", "INSTALLED", "TELEMETRY", "SIGNALS"},
 				Rows:    rows,
 			}, telemetryStatusReport{Harnesses: report})
 		},
@@ -74,17 +74,15 @@ type telemetryStatusReport struct {
 type telemetryStatus struct {
 	Harness string `json:"harness"`
 	// Scope is a harness.Scope; a local entry follows its global one.
-	Scope       string `json:"scope"`
-	Installed   string `json:"installed"`
-	Version     string `json:"version,omitempty"`
-	State       string `json:"state"`
-	ConfigPath  string `json:"config_path,omitempty"`
-	Endpoint    string `json:"endpoint,omitempty"`
-	ProjectID   string `json:"project_id,omitempty"`
-	KeyPrefix   string `json:"key_prefix,omitempty"`
-	Signals     string `json:"signals,omitempty"`
-	Prompts     string `json:"prompts,omitempty"`
-	ToolContent string `json:"tool_content,omitempty"`
+	Scope      string `json:"scope"`
+	Installed  string `json:"installed"`
+	Version    string `json:"version,omitempty"`
+	State      string `json:"state"`
+	ConfigPath string `json:"config_path,omitempty"`
+	Endpoint   string `json:"endpoint,omitempty"`
+	ProjectID  string `json:"project_id,omitempty"`
+	KeyPrefix  string `json:"key_prefix,omitempty"`
+	Signals    string `json:"signals,omitempty"`
 	// Conflicts names per-signal overrides that send a signal, and the credential, elsewhere.
 	Conflicts []string `json:"conflicts,omitempty"`
 	// Warnings names overrides that apply only under an explicitly selected profile.
@@ -155,7 +153,5 @@ func describeStatus(ctx context.Context, h harness.Harness, cfg *config.Config) 
 	if entry.Signals == "" {
 		entry.Signals = "none"
 	}
-	entry.Prompts = connect.OnOff(st.IncludePrompts)
-	entry.ToolContent = connect.OnOff(st.IncludeToolContent)
 	return entry
 }

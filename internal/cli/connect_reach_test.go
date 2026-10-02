@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -72,10 +73,10 @@ func TestInstallWritesNoTelemetryIntoTheRepository(t *testing.T) {
 
 func TestUninstallRemovesRepoPolicy(t *testing.T) {
 	repo := installRepo(t)
-	if _, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--yes", "--prompts", "off"); err != nil {
+	if _, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--yes", "--signals", "logs"); err != nil {
 		t.Fatal(err)
 	}
-	if settings := readClaudeSettings(t, filepath.Join(repo, ".claude", "settings.json")); settings["OTEL_LOG_USER_PROMPTS"] != "0" {
+	if settings := readClaudeSettings(t, filepath.Join(repo, ".claude", "settings.json")); settings["OTEL_TRACES_EXPORTER"] != "none" {
 		t.Fatalf("policy not written: %+v", settings)
 	}
 	if _, err := runTerma(t, "uninstall", "--yes"); err != nil {
@@ -83,7 +84,7 @@ func TestUninstallRemovesRepoPolicy(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(repo, ".claude", "settings.json")); err == nil {
 		settings := readClaudeSettings(t, filepath.Join(repo, ".claude", "settings.json"))
-		if _, ok := settings["OTEL_LOG_USER_PROMPTS"]; ok {
+		if _, ok := settings["OTEL_TRACES_EXPORTER"]; ok {
 			t.Fatalf("uninstall left the repository policy behind: %+v", settings)
 		}
 	}
@@ -178,7 +179,7 @@ func TestInstallPreservesExistingRepositoryPolicy(t *testing.T) {
 		t.Run(signals, func(t *testing.T) {
 			repo := installRepo(t)
 			args := []string{"install", "--harness", "none", "--team", testProjectID, "--yes"}
-			if out, err := runTerma(t, append(args, "--signals", signals, "--exclude-prompts", "--exclude-tool-content")...); err != nil {
+			if out, err := runTerma(t, append(args, "--signals", signals)...); err != nil {
 				t.Fatalf("%v\n%s", err, out)
 			}
 			path := filepath.Join(repo, ".claude", "settings.json")
@@ -208,7 +209,7 @@ func TestInstallPreservesExistingRepositoryPolicy(t *testing.T) {
 
 func TestInstallUpgradesHooksOnlyRepository(t *testing.T) {
 	repo := installRepo(t)
-	args := []string{"install", "--harness", "none", "--team", testProjectID, "--yes", "--prompts", "off"}
+	args := []string{"install", "--harness", "none", "--team", testProjectID, "--yes", "--signals", "logs"}
 	if _, err := runTerma(t, args...); err != nil {
 		t.Fatal(err)
 	}
@@ -219,7 +220,7 @@ func TestInstallUpgradesHooksOnlyRepository(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n%s", err, out)
 	}
-	if got := readClaudeSettings(t, filepath.Join(repo, ".claude", "settings.json"))["OTEL_LOG_USER_PROMPTS"]; got != "0" {
+	if got := readClaudeSettings(t, filepath.Join(repo, ".claude", "settings.json"))["OTEL_TRACES_EXPORTER"]; got != "none" {
 		t.Fatalf("reinstall did not write the policy back: %q", got)
 	}
 	_, files, ok := strings.Cut(out, "Commit the new files")
@@ -231,7 +232,7 @@ func TestInstallUpgradesHooksOnlyRepository(t *testing.T) {
 func TestInstallPreservesManuallyChangedRepositoryPolicy(t *testing.T) {
 	repo := installRepo(t)
 	args := []string{"install", "--harness", "none", "--team", testProjectID, "--yes"}
-	if _, err := runTerma(t, append(args, "--signals", "logs", "--prompts", "off")...); err != nil {
+	if _, err := runTerma(t, append(args, "--signals", "logs")...); err != nil {
 		t.Fatal(err)
 	}
 	path := filepath.Join(repo, ".claude", "settings.json")
@@ -268,6 +269,26 @@ func TestInstallPreservesManuallyChangedRepositoryPolicy(t *testing.T) {
 	}
 	if string(before) != string(after) {
 		t.Fatal("reinstall replaced a manually disabled policy")
+	}
+}
+
+// A colleague's committed content switch, from an earlier terma, goes at the next install:
+// content is the team policy's alone. The repository's signals stay.
+func TestInstallRemovesACommittedContentSwitch(t *testing.T) {
+	repo := installRepo(t)
+	path := filepath.Join(repo, ".claude", "settings.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	old := `{"env":{"OTEL_METRICS_EXPORTER":"none","OTEL_LOG_USER_PROMPTS":"0","OTEL_LOG_ASSISTANT_RESPONSES":"0","OTEL_LOG_TOOL_DETAILS":"0","OTEL_LOG_TOOL_CONTENT":"0"}}`
+	if err := os.WriteFile(path, []byte(old), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--yes"); err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	if got := readClaudeSettings(t, path); !reflect.DeepEqual(got, map[string]string{"OTEL_METRICS_EXPORTER": "none"}) {
+		t.Fatalf("settings = %v, want the content switches gone and the signals kept", got)
 	}
 }
 

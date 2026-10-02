@@ -33,11 +33,11 @@ Connecting mints a server key scoped to one team and writes it, along with the
 OTLP endpoint, into the harness's own configuration. Nothing is added to your shell
 profile, and no other setting in that file is touched.
 
-Everything is captured by default — traces, events, metrics, prompt text, model
-responses, and tool input/output. That content is what makes an agent trace worth
-reading, but it does mean what you and the model said leaves this machine. On a
-terminal, connect shows a checklist to untick what should stay; --exclude-prompts,
---exclude-tool-content and --signals decide the same thing without one.
+Every signal is captured by default — traces, events and metrics, with prompt text,
+model responses, and tool input/output. Connect has no content switch: what content
+a team collects is its collection policy's, which the local relay applies. A connect
+exports straight to Terma, past the relay, so it sends all of it. On a terminal,
+connect shows a checklist of signals; --signals decides the same thing without one.
 
 A connect is global by default — this machine, every repository. --scope local
 writes a repository's own policy into its committed settings instead: only what to
@@ -55,10 +55,6 @@ type connectFlags struct {
 	signals string
 	// exports is the Reach of a global connect; meaningless at local scope.
 	exports string
-	// The content switches are exclusions because capture is the default: a redacted
-	// trace answers almost none of the questions that send someone to it.
-	excludePrompts     bool
-	excludeToolContent bool
 	// noStatusLine skips the status-line wrap, whose payload carries the provider's own
 	// rate-limit windows, the strongest funding evidence a machine produces.
 	noStatusLine bool
@@ -99,7 +95,7 @@ key of its own, so one agent's key can be revoked without touching the other's.
 On a terminal, a checklist first asks what to send and where; every box has a flag,
 and --yes takes the flags and defaults without asking. --scope local writes the
 repository you are in rather than your user settings: its committed settings get the
-signal and content switches — nothing else, so it is safe to commit — and the agent
+signal switches — nothing else, so it is safe to commit — and the agent
 applies them over your global connect inside that repository. It needs no team,
 key or sign-in (` + app.scopedHarnessNames() + `).`,
 		Args: cobra.MinimumNArgs(1),
@@ -112,8 +108,6 @@ key or sign-in (` + app.scopedHarnessNames() + `).`,
 	fl.StringVar(&f.scope, "scope", "", "where to write: global (this machine, default) or local (this repository's own settings; "+app.scopedHarnessNames()+")")
 	fl.StringVar(&f.signals, "signals", "", "comma-separated signals to export: traces, logs, metrics (default all; none to ship nothing)")
 	fl.StringVar(&f.exports, "exports", "", "which repositories export: everywhere (this machine, default) or repos (only those whose committed terma policy turns it on; refused for an agent that ignores repository telemetry settings)")
-	fl.BoolVar(&f.excludePrompts, "exclude-prompts", false, "do not export prompt text or model responses")
-	fl.BoolVar(&f.excludeToolContent, "exclude-tool-content", false, "do not export tool parameters, input, or output")
 	fl.BoolVar(&f.noStatusLine, "no-statusline", false, "leave "+app.statusLineOwner()+"'s status line alone (by default terma wraps it to read the plan's rate-limit windows; the configured command keeps running unchanged)")
 	fl.StringVar(&f.keyName, "key-name", "", "name for the minted key (defaults to <harness>@<hostname>)")
 	fl.StringVar(&f.apiKey, "api-key", "", "install this existing server key (ter_srv_…) instead of minting a new one")
@@ -235,7 +229,6 @@ func (app *App) connectGlobal(cmd *cobra.Command, name string, f connectFlags) e
 // options are the connect choices the flags make.
 func (f connectFlags) options(signals []harness.Signal, reach harness.Reach) connect.Options {
 	return connect.Options{Signals: signals, Reach: reach, Identity: f.identity, SuppliedKey: strings.TrimSpace(f.apiKey),
-		ExcludePrompts: f.excludePrompts, ExcludeToolContent: f.excludeToolContent,
 		InlineKey: f.inlineKey, Force: f.force, AssumeYes: f.assumeYes, NoStatusLine: f.noStatusLine}
 }
 

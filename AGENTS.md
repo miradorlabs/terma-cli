@@ -57,7 +57,9 @@ sends everything, personal work and other repositories included, under one key. 
 agent's user-level exporter points at a relay that terma runs on `127.0.0.1`. Hooks in an
 installed repository claim each session they see. The relay forwards only claimed
 sessions, and only from the processes the claim names. It sends them to that repository's
-project with the project's key and applies the project's content policy. Everything else
+project with the project's key and applies the team's collection policy: agents export
+all content to it, and the policy alone decides what leaves (`config.Policy.Content`).
+Hook events never pass the relay, so delivery applies the same rule when it sends them. Everything else
 is held briefly in memory and dropped: nothing unclaimed leaves the machine.
 
 ## Rules

@@ -46,6 +46,16 @@ func DefaultPolicy() Policy {
 	return Policy{Mode: ModeRepo, IncludePrompts: true, IncludeToolContent: true}
 }
 
+// Content is what content the team's policy lets a session carry, the one rule the relay
+// and the hook events both apply: path exclusions withhold all free text, since an
+// exporter does not name its source files, and a policy not validated withholds all.
+func (p Policy) Content() (prompts, toolContent bool) {
+	if p.CollectsNothing || len(p.ExcludePaths) > 0 {
+		return false, false
+	}
+	return p.IncludePrompts, p.IncludeToolContent
+}
+
 // Global reports whether the organization collects every session on the machine.
 func (p Policy) Global() bool { return p.Mode == ModeGlobal }
 

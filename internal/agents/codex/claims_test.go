@@ -19,7 +19,7 @@ import (
 // Codex Desktop's activity, spooled without Env.EmitFor, carries the repository's binding.
 func TestCodexDesktopActivityCarriesTheProject(t *testing.T) {
 	env := fundingEnv(t)
-	connectCodexDesktop(t, false)
+	connectCodexDesktop(t)
 	path := filepath.Join(os.Getenv("CODEX_HOME"), "sessions", "2026", "09", "19", "rollout-2026-09-19T12-18-12-"+replySession+".jsonl")
 	hookruntest.WriteFile(t, filepath.Dir(path), filepath.Base(path), strings.Join([]string{
 		`{"type":"session_meta","payload":{"id":"` + replySession + `"}}`,

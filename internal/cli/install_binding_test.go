@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/install"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 
 	"github.com/spf13/cobra"
 
@@ -244,46 +243,20 @@ func TestInstallStampsTheVersionOnlyWhenItWritesCommittedFiles(t *testing.T) {
 	}
 }
 
-// --prompts sticks: a re-install without it keeps the last choice.
-func TestInstallPromptsSwitchSticks(t *testing.T) {
-	acme := projectsIn(orgA().ID)[0]
-	boundRepo(t, termaproject.Project{ID: acme.ID, Name: acme.Name, OrganizationID: orgA().ID}, true)
-	prompts := func() bool {
-		t.Helper()
-		rec, ok, err := routing.LoadRecord(acme.ID)
-		if err != nil || !ok {
-			t.Fatalf("no routing record: ok=%v err=%v", ok, err)
-		}
-		return rec.IncludePrompts
+// Install has no content switch: what content leaves is the team's collection policy's.
+func TestInstallHasNoContentSwitches(t *testing.T) {
+	root := testApp.NewRootCommand()
+	cmd, _, err := root.Find([]string{"install"})
+	if err != nil {
+		t.Fatal(err)
 	}
-	for _, step := range []struct {
-		args []string
-		want bool
-		line string
-	}{
-		// a first install sends them, unasked, and says how to stop it
-		{nil, true, "sent — `terma install --prompts off` stops them"},
-		{[]string{"--prompts", "off"}, false, "not sent — `terma install --prompts on` sends them"},
-		{nil, false, ""}, // kept, not re-defaulted
-		{[]string{"--prompts", "on"}, true, ""},
-		{[]string{"--exclude-prompts"}, false, ""}, // the older spelling still works
-	} {
-		out, err := routeCodex(t, step.args...)
-		if err != nil {
-			t.Fatalf("install %v: %v\n%s", step.args, err, out)
-		}
-		if got := prompts(); got != step.want {
-			t.Fatalf("after install %v: prompts included = %v, want %v", step.args, got, step.want)
-		}
-		if !strings.Contains(out, step.line) {
-			t.Fatalf("install %v should say %q:\n%s", step.args, step.line, out)
+	for _, name := range []string{"prompts", "exclude-prompts", "tool-content", "exclude-tool-content"} {
+		if cmd.Flags().Lookup(name) != nil {
+			t.Errorf("install still has --%s", name)
 		}
 	}
-	if _, err := routeCodex(t, "--yes", "--prompts", "maybe"); err == nil || !strings.Contains(err.Error(), "want on or off") {
-		t.Fatalf("--prompts maybe: %v", err)
-	}
-	if _, err := routeCodex(t, "--yes", "--prompts", "on", "--exclude-prompts"); err == nil || !strings.Contains(err.Error(), "disagree") {
-		t.Fatalf("--prompts on --exclude-prompts: %v", err)
+	if _, err := runTerma(t, "install", "--prompts", "off"); err == nil || !strings.Contains(err.Error(), "unknown flag") {
+		t.Errorf("install --prompts off: %v, want an unknown flag", err)
 	}
 }
 
@@ -299,36 +272,6 @@ func TestYesAnswer(t *testing.T) {
 	} {
 		if got := yesAnswer(c.line, c.def); got != c.want {
 			t.Errorf("yesAnswer(%q, %v) = %v, want %v", c.line, c.def, got, c.want)
-		}
-	}
-}
-
-// --exclude-tool-content sticks like --prompts.
-func TestInstallToolContentChoiceSticks(t *testing.T) {
-	acme := projectsIn(orgA().ID)[0]
-	boundRepo(t, termaproject.Project{ID: acme.ID, Name: acme.Name, OrganizationID: orgA().ID}, true)
-	toolContent := func() bool {
-		t.Helper()
-		rec, ok, err := routing.LoadRecord(acme.ID)
-		if err != nil || !ok {
-			t.Fatalf("no routing record: ok=%v err=%v", ok, err)
-		}
-		return rec.IncludeToolContent
-	}
-	for _, step := range []struct {
-		args []string
-		want bool
-	}{
-		{nil, true}, // a first install sends it
-		{[]string{"--exclude-tool-content"}, false},
-		{nil, false}, // kept, not re-defaulted
-		{[]string{"--exclude-tool-content=false"}, true},
-	} {
-		if out, err := routeCodex(t, step.args...); err != nil {
-			t.Fatalf("install %v: %v\n%s", step.args, err, out)
-		}
-		if got := toolContent(); got != step.want {
-			t.Fatalf("after install %v: tool content included = %v, want %v", step.args, got, step.want)
 		}
 	}
 }

@@ -34,15 +34,15 @@ func TestRelayResolverMintsAndCapsContent(t *testing.T) {
 	if err != nil || !pol.IncludePrompts || !pol.IncludeToolContent || pol.Key != mintedKey {
 		t.Fatalf("no record: %+v, %v (the policy's defaults apply)", pol, err)
 	}
-	if err := routing.SaveRecord(routing.Record{ProjectID: "p1", IncludePrompts: false, IncludeToolContent: true, Harnesses: []string{"codex"}}); err != nil {
+	if err := routing.SaveRecord(routing.Record{ProjectID: "p1", Harnesses: []string{"codex"}}); err != nil {
 		t.Fatal(err)
 	}
-	if pol, _ := resolve(c); pol.IncludePrompts || !pol.IncludeToolContent {
-		t.Fatalf("the developer's prompts-off did not narrow: %+v", pol)
+	if pol, _ := resolve(c); !pol.IncludePrompts || !pol.IncludeToolContent {
+		t.Fatalf("a routing record narrowed content: %+v", pol)
 	}
 	cfg.Policy.IncludeToolContent = false
 	if pol, _ := resolve(c); pol.IncludeToolContent {
-		t.Fatalf("the organization's tool-content-off was widened by the record: %+v", pol)
+		t.Fatalf("the organization's tool-content-off was not applied: %+v", pol)
 	}
 }
 

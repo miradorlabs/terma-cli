@@ -16,6 +16,9 @@ import (
 type policyFile struct {
 	path      string
 	hasPolicy bool
+	// stale is a content switch an earlier terma wrote beside signals.
+	stale     bool
+	signals   []harness.Signal
 	conflicts []harness.Conflict
 }
 
@@ -25,7 +28,7 @@ func (policyFile) Detect(context.Context) harness.Detection { return harness.Det
 func (p policyFile) ConfigPath() (string, error)            { return p.path, nil }
 func (policyFile) SupportsHeadersHelper() bool              { return false }
 func (p policyFile) Status() (harness.Status, error) {
-	return harness.Status{HasPolicy: p.hasPolicy}, nil
+	return harness.Status{HasPolicy: p.hasPolicy, StaleContent: p.stale, Signals: p.signals}, nil
 }
 func (p policyFile) ConflictsWith(harness.Exporter) ([]harness.Conflict, error) {
 	return p.conflicts, nil
@@ -53,7 +56,7 @@ var _ harness.Harness = policyFile{}
 func TestWriteRepoPolicy(t *testing.T) {
 	root := t.TempDir()
 	path := filepath.Join(root, "policy.json")
-	want := Plan{Prompts: true}.Exporter("http://ingest", []harness.Signal{harness.SignalLogs})
+	want := Plan{}.Exporter("http://ingest", []harness.Signal{harness.SignalLogs})
 	advisory := []harness.Conflict{{Key: "OTEL_ADVISORY", Advisory: true}}
 
 	var r report
@@ -78,17 +81,38 @@ func TestWriteRepoPolicy(t *testing.T) {
 	}
 }
 
-// The routing record carries the plan's choices for the agents that route through the
-// relay, and there is none when no selected agent does.
+// The routing record names the agents that route through the relay, and there is none
+// when no selected agent does.
 func TestRouteRecord(t *testing.T) {
 	reg := builtin.Agents()
-	want := Plan{Prompts: true}.Exporter("http://ingest", []harness.Signal{harness.SignalLogs})
+	want := Plan{}.Exporter("http://ingest", []harness.Signal{harness.SignalLogs})
 	rec, ok := RouteRecord(reg, "proj_1", []string{"claude"}, want)
 	if !ok || rec.ProjectID != "proj_1" || rec.Endpoint != "http://ingest" || !slices.Equal(rec.Signals, []string{"logs"}) ||
-		!rec.IncludePrompts || rec.IncludeToolContent || !slices.Equal(rec.Harnesses, []string{"claude"}) {
+		!slices.Equal(rec.Harnesses, []string{"claude"}) {
 		t.Fatalf("RouteRecord = %+v, %v", rec, ok)
 	}
 	if _, ok := RouteRecord(reg, "proj_1", nil, want); ok {
 		t.Fatal("a record with no agent to route")
+	}
+}
+
+// A repository policy holding an earlier terma's content switch is rewritten even unasked,
+// with its own signals: content is the team policy's alone.
+func TestWriteRepoPolicyRemovesAStaleContentSwitch(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "policy.json")
+	if err := os.WriteFile(path, []byte(`{"stale":true}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	stale := policyFile{path: path, hasPolicy: true, stale: true, signals: []harness.Signal{harness.SignalTraces}}
+	var r report
+	written, err := WriteRepoPolicy(&r, root, []harness.Harness{stale}, Plan{}.Exporter("http://ingest", harness.AllSignals), false)
+	if err != nil || !slices.Equal(written, []string{"policy.json"}) {
+		t.Fatalf("a stale content switch was kept: %v, %v", written, err)
+	}
+	var got harness.Exporter
+	data, _ := os.ReadFile(path)
+	if err := json.Unmarshal(data, &got); err != nil || !slices.Equal(got.Signals, []harness.Signal{harness.SignalTraces}) {
+		t.Fatalf("rewrote %s, want the repository's own signals kept", data)
 	}
 }

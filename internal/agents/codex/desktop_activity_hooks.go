@@ -18,10 +18,10 @@ func captureCodexDesktopActivity(ctx context.Context, e hookrun.Env, r *hookrun.
 	if e.Spool == nil || !session.ValidID(in.SessionID) {
 		return
 	}
-	route, enabled := codexDesktopRoute(r)
-	if !enabled {
+	if !codexDesktopRoute(r) {
 		return
 	}
+	_, toolContent := e.Content(r)
 	dir, err := config.Dir()
 	if err != nil {
 		return
@@ -71,7 +71,7 @@ func captureCodexDesktopActivity(ctx context.Context, e hookrun.Env, r *hookrun.
 				attrs["duration_ms"] = a.DurationMs
 				attrs["duration_source"] = "rollout_item"
 			}
-			if route.IncludeToolContent {
+			if toolContent {
 				attrs["arguments"] = boundedCodexContent(a.Input)
 			}
 		case "compaction":

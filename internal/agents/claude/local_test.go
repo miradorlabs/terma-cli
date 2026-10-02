@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -41,14 +42,10 @@ const hooksOnly = `{
 }
 `
 
-func localExporter() harness.Exporter {
-	e := fullExporter()
-	e.IncludePrompts, e.IncludeToolContent = true, true
-	return e
-}
+func localExporter() harness.Exporter { return fullExporter() }
 
 // A committed project file can only switch telemetry off: Claude Code ignores one that
-// enables or redirects it, so all-on writes nothing.
+// enables or redirects it, so all-on writes nothing, and content is always on.
 func TestLocalRenderCarriesOnlyOffValues(t *testing.T) {
 	local, _ := localClaudeIn(t, "")
 	h := local.(exporter)
@@ -58,11 +55,7 @@ func TestLocalRenderCarriesOnlyOffValues(t *testing.T) {
 
 	e := localExporter()
 	e.Signals = []harness.Signal{harness.SignalLogs}
-	e.IncludePrompts = false
-	want := map[string]string{
-		otelTracesExporter: exporterNone, otelMetricsExporter: exporterNone,
-		otelLogUserPrompts: "0", otelLogAssistantResponse: "0",
-	}
+	want := map[string]string{otelTracesExporter: exporterNone, otelMetricsExporter: exporterNone}
 	if env := h.render(e); !reflect.DeepEqual(env, want) {
 		t.Fatalf("local render = %v, want %v", env, want)
 	}
@@ -111,7 +104,7 @@ func TestLocalConnectAndDisconnectRoundTrip(t *testing.T) {
 	h, path := localClaudeIn(t, hooksOnly)
 
 	e := localExporter()
-	e.IncludePrompts = false
+	e.Signals = []harness.Signal{harness.SignalLogs, harness.SignalMetrics}
 	if err := h.Connect(e, false); err != nil {
 		t.Fatalf("connect: %v", err)
 	}
@@ -119,7 +112,7 @@ func TestLocalConnectAndDisconnectRoundTrip(t *testing.T) {
 	if _, ok := doc["hooks"]; !ok {
 		t.Fatal("connect dropped the hooks block")
 	}
-	if env := envOf(t, path); !reflect.DeepEqual(env, map[string]string{otelLogUserPrompts: "0", otelLogAssistantResponse: "0"}) {
+	if env := envOf(t, path); !reflect.DeepEqual(env, map[string]string{otelTracesExporter: exporterNone}) {
 		t.Fatalf("env = %v", env)
 	}
 	if _, ok := doc[claudeOtelHeadersHelper]; ok {
@@ -139,8 +132,8 @@ func TestLocalConnectAndDisconnectRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("disconnect: %v", err)
 	}
-	if result.Removed != 2 || result.Unjournaled {
-		t.Fatalf("disconnect = %+v, want 2 removals from the journal", result)
+	if result.Removed != 1 || result.Unjournaled {
+		t.Fatalf("disconnect = %+v, want 1 removal from the journal", result)
 	}
 	after, _ := os.ReadFile(path)
 	if envOf(t, path) != nil {
@@ -198,7 +191,6 @@ func TestLocalStatusReportsPresenceNotConnection(t *testing.T) {
 	h, _ := localClaudeIn(t, hooksOnly)
 	e := localExporter()
 	e.Signals = []harness.Signal{harness.SignalTraces, harness.SignalLogs}
-	e.IncludeToolContent = false
 	if err := h.Connect(e, false); err != nil {
 		t.Fatal(err)
 	}
@@ -213,11 +205,8 @@ func TestLocalStatusReportsPresenceNotConnection(t *testing.T) {
 	if !reflect.DeepEqual(st.Signals, []harness.Signal{harness.SignalTraces, harness.SignalLogs}) {
 		t.Errorf("signals = %v", st.Signals)
 	}
-	if !st.IncludePrompts || st.IncludeToolContent {
-		t.Errorf("prompts=%v tool=%v, want on/off", st.IncludePrompts, st.IncludeToolContent)
-	}
-	if !st.HasPolicy || st.ManagedKeys != 3 {
-		t.Errorf("policy=%v managed keys = %d, want a policy of 3", st.HasPolicy, st.ManagedKeys)
+	if !st.HasPolicy || st.StaleContent || st.ManagedKeys != 1 {
+		t.Errorf("policy=%v stale content=%v managed keys = %d, want a policy of 1", st.HasPolicy, st.StaleContent, st.ManagedKeys)
 	}
 	if len(st.Conflicts) != 0 {
 		t.Errorf("unexpected conflicts: %+v", st.Conflicts)
@@ -334,14 +323,14 @@ func TestLocalConflictsComeFromWhatOutranksTheProjectFile(t *testing.T) {
 	}
 }
 
-// From the global connect, a repository's terma policy is named as one, with the command to change it.
+// From the global connect, a content switch an earlier terma left in a repository is named
+// as such, with the install that removes it.
 func TestGlobalConflictsNameTermaOwnedLocalLayer(t *testing.T) {
 	h, path := localClaudeIn(t, hooksOnly)
-	e := localExporter()
-	e.IncludePrompts = false
-	if err := h.Connect(e, false); err != nil {
+	if err := h.Connect(localExporter(), false); err != nil {
 		t.Fatal(err)
 	}
+	earlierTermaWrote(t, path, map[string]string{otelLogUserPrompts: "0", otelLogAssistantResponse: "0"})
 	t.Chdir(filepath.Dir(filepath.Dir(path)))
 
 	conflicts, err := exporter{}.ConflictsWith(localExporter())
@@ -352,8 +341,8 @@ func TestGlobalConflictsNameTermaOwnedLocalLayer(t *testing.T) {
 	if c == nil || !c.Advisory {
 		t.Fatalf("expected an advisory for the repository policy, got %+v", conflicts)
 	}
-	if !strings.Contains(c.Reason, "Terma policy") || !strings.Contains(c.Reason, "`terma install` here") {
-		t.Errorf("reason = %q, want it to name the policy and the command", c.Reason)
+	if !strings.Contains(c.Reason, "earlier terma") || !strings.Contains(c.Reason, "`terma install` here") {
+		t.Errorf("reason = %q, want it to name the earlier terma and the command", c.Reason)
 	}
 	if blocking := unclearableKeys(conflicts); len(blocking) != 0 {
 		t.Errorf("a Terma-written local layer must never block the global connect: %v", blocking)
@@ -368,4 +357,57 @@ func unclearableKeys(conflicts []harness.Conflict) []string {
 		}
 	}
 	return out
+}
+
+// earlierTermaWrote puts values into a repository's settings as an earlier terma's local
+// connect did, journal included, since this one writes no content switch.
+func earlierTermaWrote(t *testing.T, path string, values map[string]string) {
+	t.Helper()
+	doc := readJSON(t, path)
+	env, _ := doc["env"].(map[string]any)
+	if env == nil {
+		env = map[string]any{}
+	}
+	j, err := harness.LoadJournal(exporter{}.Name(), path)
+	if err != nil || j == nil {
+		t.Fatalf("journal: %v, %v", j, err)
+	}
+	for k, v := range values {
+		env[k] = v
+		j.Installed[k], j.Previous[k] = v, nil
+	}
+	doc["env"] = env
+	if err := j.Save(); err != nil {
+		t.Fatal(err)
+	}
+	b, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, b, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A content switch an earlier terma left in a repository reads as stale, never as the
+// repository's policy, and the next connect removes it, signals kept.
+func TestLocalConnectRemovesAnEarlierTermasContentSwitch(t *testing.T) {
+	h, path := localClaudeIn(t, hooksOnly)
+	e := localExporter()
+	e.Signals = []harness.Signal{harness.SignalLogs}
+	if err := h.Connect(e, false); err != nil {
+		t.Fatal(err)
+	}
+	earlierTermaWrote(t, path, map[string]string{otelLogToolContent: "0", otelLogToolDetails: "0"})
+	st, err := h.Status()
+	if err != nil || !st.StaleContent || !st.HasPolicy || !reflect.DeepEqual(st.Signals, []harness.Signal{harness.SignalLogs}) {
+		t.Fatalf("status = %+v, %v; want a stale content switch beside the signals policy", st, err)
+	}
+	if err := h.Connect(e, false); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{otelTracesExporter: exporterNone, otelMetricsExporter: exporterNone}
+	if env := envOf(t, path); !reflect.DeepEqual(env, want) {
+		t.Fatalf("env = %v, want %v", env, want)
+	}
 }

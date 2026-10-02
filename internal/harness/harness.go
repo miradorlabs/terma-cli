@@ -78,12 +78,10 @@ type Exporter struct {
 	// HelperPath, when set, is a 0700 script that prints the Authorization header, so the
 	// settings file holds a path instead of the key. Empty means inline delivery.
 	HelperPath string
-
-	// IncludePrompts and IncludeToolContent are separate switches because they disclose
-	// different things; the zero value captures nothing.
-	IncludePrompts     bool
-	IncludeToolContent bool
 }
+
+// An Exporter carries no content switch: every agent sends prompts and tool content to
+// the local relay, which withholds what the team's collection policy does not collect.
 
 // HasSignal reports whether a stream is enabled.
 func (e Exporter) HasSignal(s Signal) bool {
@@ -180,9 +178,9 @@ type Status struct {
 	Connected bool
 	Endpoint  string
 	Signals   []Signal
-
-	IncludePrompts     bool
-	IncludeToolContent bool
+	// StaleContent reports a repository setting an earlier terma wrote to withhold content;
+	// install removes it, since only the team's policy decides content.
+	StaleContent bool
 
 	// ManagedKeys counts Terma-written keys present; disconnect keys off it, not Connected,
 	// because telemetry switched off with the key still on disk most needs cleaning.

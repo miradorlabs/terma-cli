@@ -133,11 +133,9 @@ func (c exporter) Status() (harness.Status, error) {
 	}
 
 	status := harness.Status{
-		ConfigPath:         path,
-		Exists:             f.existed,
-		IncludePrompts:     f.otel[codexLogUserPrompt] == true,
-		IncludeToolContent: codexToolContentOn(f.otel),
-		ProjectID:          codexSpanAttribute(f.otel, harness.AttrProjectID),
+		ConfigPath: path,
+		Exists:     f.existed,
+		ProjectID:  codexSpanAttribute(f.otel, harness.AttrProjectID),
 	}
 
 	// Codex has no switch beyond the exporters, so an OTLP exporter present is telemetry on.
@@ -162,10 +160,8 @@ func (c exporter) Status() (harness.Status, error) {
 
 	// Computed before the analytics check below drops metrics.
 	status.Conflicts = codexConflicts(f, harness.Exporter{
-		Endpoint:           status.Endpoint,
-		Signals:            status.Signals,
-		IncludePrompts:     status.IncludePrompts,
-		IncludeToolContent: status.IncludeToolContent,
+		Endpoint: status.Endpoint,
+		Signals:  status.Signals,
 		ResourceAttributes: map[string]string{
 			harness.AttrEnduserID: codexSpanAttribute(f.otel, harness.AttrEnduserID),
 			harness.AttrProjectID: status.ProjectID,
@@ -358,15 +354,11 @@ func (c exporter) Backup(endpoint string) (string, error) {
 	return f.backup(!pointsAtTerma)
 }
 
-// ConnectNotes says that connecting metrics takes them from OpenAI's own route and that
-// excluding tool content cannot exclude tool arguments.
+// ConnectNotes says that connecting metrics takes them from OpenAI's own route.
 func (exporter) ConnectNotes(e harness.Exporter) []string {
 	var notes []string
 	if e.HasSignal(harness.SignalMetrics) {
 		notes = append(notes, "Codex sends metrics to OpenAI (statsig) unless configured otherwise; after this connect they go to Terma instead.")
-	}
-	if !e.IncludeToolContent {
-		notes = append(notes, "Codex has no switch for tool arguments: tool output is dropped, but the command or parameters of each tool call are still exported.")
 	}
 	return notes
 }

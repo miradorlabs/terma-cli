@@ -18,7 +18,7 @@ func TestTelemetryConnectOpenCodeInstallsThePlugin(t *testing.T) {
 
 	out, err := runTerma(t, "connect", "opencode",
 		"--api-key", "ter_srv_0123456789abcdef", "--team", "770e8400-e29b-41d4-a716-446655440000",
-		"--yes", "--exclude-tool-content")
+		"--yes")
 	if err != nil {
 		t.Fatalf("connect: %v\n%s", err, out)
 	}
@@ -56,7 +56,7 @@ func TestTelemetryConnectOpenCodeInstallsThePlugin(t *testing.T) {
 		t.Fatalf("got %d entries:\n%s", len(report.Harnesses), out)
 	}
 	st := report.Harnesses[0]
-	if st.State != "connected" || st.Signals != "logs,metrics,traces" || st.Prompts != "on" || st.ToolContent != "off" {
+	if st.State != "connected" || st.Signals != "logs,metrics,traces" {
 		t.Errorf("status = %+v", st)
 	}
 	if st.KeyPrefix == "" || strings.Contains(out, "ter_srv_0123456789abcdef") {
@@ -90,7 +90,7 @@ func TestTelemetryConnectOpenCodeLocalWritesPolicy(t *testing.T) {
 	repo, _ := localRepo(t)
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
-	out, err := runTerma(t, "connect", "opencode", "--scope", "local", "--yes", "--signals", "traces", "--exclude-prompts")
+	out, err := runTerma(t, "connect", "opencode", "--scope", "local", "--yes", "--signals", "traces")
 	if err != nil {
 		t.Fatalf("connect: %v\n%s", err, out)
 	}
@@ -99,17 +99,16 @@ func TestTelemetryConnectOpenCodeLocalWritesPolicy(t *testing.T) {
 		t.Fatalf("policy not written: %v", err)
 	}
 	var policy struct {
-		Signals            []string `json:"signals"`
-		IncludePrompts     bool     `json:"includePrompts"`
-		IncludeToolContent bool     `json:"includeToolContent"`
+		Signals []string `json:"signals"`
 	}
 	if err := json.Unmarshal(data, &policy); err != nil {
 		t.Fatal(err)
 	}
-	if len(policy.Signals) != 1 || policy.Signals[0] != "traces" || policy.IncludePrompts || !policy.IncludeToolContent {
+	if len(policy.Signals) != 1 || policy.Signals[0] != "traces" {
 		t.Errorf("policy = %+v", policy)
 	}
-	if strings.Contains(string(data), "endpoint") || strings.Contains(string(data), "headers") {
+	// Content is the team policy's, never the repository's.
+	if strings.Contains(string(data), "endpoint") || strings.Contains(string(data), "headers") || strings.Contains(string(data), "include") {
 		t.Errorf("policy carries a destination:\n%s", data)
 	}
 	out, err = runTerma(t, "telemetry", "status", "opencode", "-o", "json")

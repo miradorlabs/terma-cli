@@ -125,23 +125,19 @@ func TestApplyNeedsAnAdmittedPlan(t *testing.T) {
 	}
 }
 
-// The project's last choice stands unless the developer makes one, and a record that
-// cannot be read stops the plan rather than being rewritten from defaults.
-func TestBuildResolvesContentFromTheRoutingRecord(t *testing.T) {
+// The project's routing record is read into the plan, and a record that cannot be read
+// stops the plan rather than being rewritten from defaults.
+func TestBuildReadsTheRoutingRecord(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	in := Input{Root: root, GitDir: root + "/.git", Adapters: []string{"claude"}, Binding: Binding{ID: "proj_1"}}
-	if p, err := Build(builtin.Agents(), in); err != nil || !p.Prompts || !p.ToolContent || p.Record != nil {
+	if p, err := Build(builtin.Agents(), in); err != nil || p.Record != nil {
 		t.Fatalf("no record: %+v, %v", p, err)
 	}
-	if err := routing.SaveRecord(routing.Record{ProjectID: "proj_1", IncludePrompts: false, IncludeToolContent: true, Harnesses: []string{"claude"}}); err != nil {
+	if err := routing.SaveRecord(routing.Record{ProjectID: "proj_1", Signals: []string{"logs"}, Harnesses: []string{"claude"}}); err != nil {
 		t.Fatal(err)
 	}
-	if p, err := Build(builtin.Agents(), in); err != nil || p.Prompts || !p.ToolContent || p.Record == nil {
-		t.Fatalf("the record's prompts-off did not stand: %+v, %v", p, err)
-	}
-	in.Prompts = new(true)
-	if p, err := Build(builtin.Agents(), in); err != nil || !p.Prompts {
-		t.Fatalf("an explicit choice did not win: %+v, %v", p, err)
+	if p, err := Build(builtin.Agents(), in); err != nil || p.Record == nil || len(p.Record.Signals) != 1 {
+		t.Fatalf("the record was not read: %+v, %v", p, err)
 	}
 	dir, err := config.Dir()
 	if err != nil {
