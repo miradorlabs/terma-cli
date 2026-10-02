@@ -80,6 +80,13 @@ func Unwire(ctx context.Context, root, gitDir string) error {
 	}
 	previous, ok := session.PreviousHooksPath(gitDir)
 	if !ok {
+		// Without the journal there is nothing to restore, but the value is still terma's.
+		for _, scope := range []string{"--worktree", "--local"} {
+			if v, err := gitx.Git(ctx, root, "config", scope, "--get", "core.hooksPath"); err == nil && v == hookmgr.ShimDir {
+				_, err = gitx.Git(ctx, root, "config", scope, "--unset", "core.hooksPath")
+				return err
+			}
+		}
 		return nil
 	}
 	scope := session.PreviousHooksScope(gitDir)
