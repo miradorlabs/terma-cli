@@ -111,7 +111,12 @@ func (e Entry) Key() string {
 // TermaEntries lists terma's entries in committedHooks order, so doctor can name the ones
 // Codex skips in silence because they were added after the file was trusted.
 func TermaEntries(root string) ([]Entry, error) {
-	before, err := hookmgr.ReadFile(filepath.Join(root, filepath.FromSlash(hooksPath)))
+	return termaEntriesIn(filepath.Join(root, filepath.FromSlash(hooksPath)))
+}
+
+// termaEntriesIn lists terma's entries in the hooks file at path.
+func termaEntriesIn(path string) ([]Entry, error) {
+	before, err := hookmgr.ReadFile(path)
 	if err != nil || before == nil {
 		return nil, err
 	}
@@ -122,7 +127,7 @@ func TermaEntries(root string) ([]Entry, error) {
 		} `json:"hooks"`
 	}
 	if err := json.Unmarshal(before, &doc); err != nil {
-		return nil, fmt.Errorf("parse %s: %w", hooksPath, err)
+		return nil, fmt.Errorf("parse %s: %w", path, err)
 	}
 	var out []Entry
 	for _, h := range committedHooks {

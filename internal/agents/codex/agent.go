@@ -160,7 +160,33 @@ func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
 
 // UserHooksTrustStep is how the developer trusts the machine-wide hooks.
 func (Agent) UserHooksTrustStep() string {
-	return "Approve Terma's hooks in Codex: run `/hooks` (in the desktop app: Settings → Hooks → Review)."
+	return "Approve Terma's hooks in Codex: run `/hooks` (in the desktop app: Settings → Hooks → Review). Until then Codex runs none of the new or changed ones, and records nothing for them."
+}
+
+// UserHooksTrusted reports whether Codex runs every one of terma's machine-wide entries as
+// written: one changed since it was trusted, or switched off, is skipped in silence.
+func (Agent) UserHooksTrusted() (present, trusted bool, err error) {
+	path, err := userHooksPath()
+	if err != nil {
+		return false, false, err
+	}
+	entries, err := termaEntriesIn(path)
+	if err != nil || len(entries) == 0 {
+		return false, false, err
+	}
+	trust, err := (exporter{}).hookTrustFor(path)
+	if err != nil {
+		return true, false, err
+	}
+	if trust.Disabled > 0 {
+		return true, false, nil
+	}
+	for _, e := range entries {
+		if trust.TrustedHashes[e.Key()] != e.Hash {
+			return true, false, nil
+		}
+	}
+	return true, true, nil
 }
 
 // NotifierInstalled reports whether terma's notifier is in Codex's config.

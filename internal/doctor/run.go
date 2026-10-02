@@ -181,8 +181,14 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 
 	timed(KeyHooks, "commit hooks installed", d.commitHooks)
 
-	// A fraction, not a verdict: one agent that cannot run its hooks costs only its own commits.
+	// Stale hooks cost a little and warn; an agent that runs none of them records nothing, and fails.
 	timed(KeyAgentHooks, "agent hooks run", d.agentHooks)
+
+	if cfg.Policy.Global() {
+		if c, ok := UserHooksCheck(env.Agents, cfg.Harnesses); ok {
+			timed(KeyUserHooks, "machine-wide hooks run", func() Check { return c })
+		}
+	}
 
 	timed(KeyHarness, "agent exporting to Terma", d.agentsExporting)
 

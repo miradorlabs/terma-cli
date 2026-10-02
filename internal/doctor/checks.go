@@ -23,12 +23,15 @@ func AgentHooksCheck(reg *agents.Registry, root string, mine []string) Check {
 	var fix string
 	ready, of := 0, 0
 	status := Pass
-	problem := func(f string) {
-		status = Warn
-		if fix == "" {
+	// The first fix goes, unless a later problem is worse.
+	report := func(s Status, f string) {
+		if s > status {
+			status, fix = s, f
+		} else if fix == "" {
 			fix = f
 		}
 	}
+	problem := func(f string) { report(Warn, f) }
 	for _, a := range reg.All() {
 		if a.HooksPath() == "" {
 			continue
@@ -74,8 +77,10 @@ func AgentHooksCheck(reg *agents.Registry, root string, mine []string) Check {
 			part += " (could not read " + a.DisplayName() + "'s trust record: " + err.Error() + ")"
 			ready++
 		case !trust.Trusted:
+			// The agent runs none or only some of them, so its sessions arrive incomplete or
+			// not at all.
 			part += trust.Detail
-			problem(trust.Fix)
+			report(Fail, trust.Fix)
 		default:
 			part += trust.Detail
 			ready++
@@ -86,6 +91,40 @@ func AgentHooksCheck(reg *agents.Registry, root string, mine []string) Check {
 		return Check{Status: Skip, Detail: "no agent hooks are wired in this repository"}
 	}
 	return Check{Status: status, Detail: strings.Join(parts, "; "), Fix: fix, Ready: ready, Of: of}
+}
+
+// UserHooksCheck reports, in global mode, whether each of the developer's agents (mine;
+// empty means all) runs terma's machine-wide hooks: one that gates them behind trust skips
+// a changed entry in silence, and records nothing for it. false when no agent has any.
+func UserHooksCheck(reg *agents.Registry, mine []string) (Check, bool) {
+	var parts []string
+	c := Check{Status: Pass}
+	for _, a := range reg.All() {
+		gated, ok := a.(agents.UserHooksTrust)
+		if !ok || len(mine) > 0 && !slices.ContainsFunc(agents.Selections(a), func(s string) bool { return slices.Contains(mine, s) }) {
+			continue
+		}
+		present, trusted, err := gated.UserHooksTrusted()
+		switch {
+		case !present && err == nil:
+			continue
+		case err != nil:
+			// Unreadable is not untrusted.
+			parts = append(parts, a.DisplayName()+": could not read its trust record: "+err.Error())
+		case !trusted:
+			parts = append(parts, a.DisplayName()+" skips some or all of them until you approve them")
+			if c.Status != Fail {
+				c.Status, c.Fix = Fail, gated.UserHooksTrustStep()
+			}
+		default:
+			parts = append(parts, a.DisplayName()+" trusts them")
+		}
+	}
+	if len(parts) == 0 {
+		return Check{}, false
+	}
+	c.Detail = strings.Join(parts, "; ")
+	return c, true
 }
 
 // stateCheck reports saved state this build has not finished migrating.

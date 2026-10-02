@@ -29,9 +29,11 @@ type UserHooks interface {
 }
 
 // UserHooksTrust is an agent that runs its machine-wide hooks only once the developer
-// trusts them; UserHooksTrustStep says how.
+// trusts them; UserHooksTrustStep says how, and UserHooksTrusted whether terma's entries are
+// there (present) and run as written (trusted).
 type UserHooksTrust interface {
 	UserHooksTrustStep() string
+	UserHooksTrusted() (present, trusted bool, err error)
 }
 
 // ManagedHooks is an agent whose machine-wide hooks an organization can deploy.
