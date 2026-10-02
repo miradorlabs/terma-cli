@@ -11,7 +11,6 @@ import (
 	"runtime"
 	"slices"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -147,12 +146,6 @@ type loadResult struct {
 	heldLeft, heldLeftBytes  int
 	outboxFiles, outboxBytes int
 	forwarded, dropped       int
-}
-
-func cpuTime() time.Duration {
-	var ru syscall.Rusage
-	_ = syscall.Getrusage(syscall.RUSAGE_SELF, &ru)
-	return time.Duration(ru.Utime.Nano() + ru.Stime.Nano())
 }
 
 func dirFiles(dir string, keep func(string) bool) (n, size int) {

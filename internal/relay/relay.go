@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -165,6 +166,11 @@ func New(opts Options) *Relay {
 		traces: map[string]traceSession{}, procs: map[int]*procState{}, senders: map[route]*sender{}, outbox: outbox{dir: opts.Dir},
 		lastSeen: opts.Now(), sendCtx: sendCtx, cancelSend: cancel, stopping: make(chan struct{}),
 		store: newHeldStore(opts.Dir),
+	}
+	// The held store's parent, created once here: a flush never creates it, so a relay torn
+	// down mid-flush leaves nothing behind.
+	if opts.Dir != "" {
+		_ = os.MkdirAll(opts.Dir, 0o700)
 	}
 	// Before the first export, so a session's reloaded parts still go ahead of its new ones.
 	r.loadHeld()

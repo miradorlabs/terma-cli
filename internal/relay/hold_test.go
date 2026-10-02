@@ -305,3 +305,23 @@ func TestRelayHeldStoreHoldsACopiedPartOnce(t *testing.T) {
 		t.Fatalf("%d batch files, want the one copy", n)
 	}
 }
+
+// A relay on a fresh machine, its outbox directory not made yet, still keeps what it
+// holds before its first delivery: the first claim is what the store exists for.
+func TestRelayHeldStoreWorksBeforeTheOutboxExists(t *testing.T) {
+	f := newFixture()
+	dir := filepath.Join(t.TempDir(), "relay", OutboxDir)
+	opts := Options{Dir: dir, Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock}
+	first := newRelay(opts)
+	srv := httptest.NewServer(first.Handler())
+	postProto(t, srv, "/v1/logs", logsOf("C", 2))
+	srv.Close()
+	first.flushHeld()
+	first.cancelSend()
+	if c := first.Stats().Snapshot().Counters; c["held_store_write_failed"] != 0 || c["held_store_files_written"] != 1 {
+		t.Fatalf("first relay: %v", c)
+	}
+	if c := newRelay(opts).Stats().Snapshot().Counters; c["recovered_held.logs"] != 2 {
+		t.Fatalf("second relay: %v", c)
+	}
+}

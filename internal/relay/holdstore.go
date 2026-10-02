@@ -333,7 +333,7 @@ func (r *Relay) flushHeld() {
 
 func (r *Relay) writeBatch(buf []byte) (string, error) {
 	s := &r.store
-	// Never the outbox above it: a relay torn down mid-flush leaves nothing behind.
+	// Never the outbox above it, which New creates: a relay torn down mid-flush leaves nothing behind.
 	if err := os.Mkdir(s.dir, 0o700); err != nil && !errors.Is(err, fs.ErrExist) {
 		return "", err
 	}
