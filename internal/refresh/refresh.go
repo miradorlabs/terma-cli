@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"slices"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
@@ -145,9 +146,16 @@ func (r Refresher) Run(ctx context.Context, root, gitDir string) (Result, error)
 		}
 	}
 	for _, a := range r.Agents.With[agents.Retrusting]() {
-		if slices.Contains(res.RepoChanged, a.HooksPath()) {
-			res.Retrust = append(res.Retrust, a.RetrustNote())
+		if !slices.Contains(res.RepoChanged, a.HooksPath()) {
+			continue
 		}
+		// Rewritten entries terma approves again itself; only a failure needs the developer.
+		if t, ok := a.(agents.HookTrusting); ok {
+			if _, err := t.SyncHookTrust(filepath.Join(repo.Root, filepath.FromSlash(a.HooksPath())), nil); err == nil {
+				continue
+			}
+		}
+		res.Retrust = append(res.Retrust, a.RetrustNote())
 	}
 	err := errors.Join(migrateErr, machineErr, repoErr)
 	if err == nil {

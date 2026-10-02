@@ -3,6 +3,7 @@ package globalmode
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -53,6 +54,33 @@ func (m Machine) userHookAgents(selected []string) []string {
 		}
 	}
 	return out
+}
+
+// syncUserHookTrust keeps each agent's approvals of terma's machine-wide entries in step
+// with the hooks file as ApplyUserHooks left it: approved while there, withdrawn once gone.
+// A failure leaves TrustSteps to say what the developer does instead.
+func (m Machine) syncUserHookTrust(approved, then func(string)) {
+	terma, err := m.Terma()
+	if err != nil {
+		return
+	}
+	for _, a := range m.Agents.With[agents.UserHooks]() {
+		t, ok := a.(agents.HookTrusting)
+		if !ok {
+			continue
+		}
+		path, err := a.UserHooksPath()
+		if err != nil {
+			continue
+		}
+		done, err := t.SyncHookTrust(path, hookmgr.UserHookCommand(terma))
+		switch {
+		case err != nil:
+			then("Terma could not approve its " + a.DisplayName() + " hooks itself (" + err.Error() + ").")
+		case done.Approved > 0:
+			approved(fmt.Sprintf("%s: approved Terma's %d machine-wide hooks (review them with /hooks)", a.DisplayName(), done.Approved))
+		}
+	}
 }
 
 // ApplyUserHooks writes terma's entries into each covered agent's machine-wide hooks file,

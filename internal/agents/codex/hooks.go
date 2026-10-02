@@ -69,6 +69,15 @@ func planUserHooks(codexHome string, command func(event string) string, install 
 func planCodex(root, path string, command func(event string) string, install bool) (hookmgr.Plan, error) {
 	// A group is terma's when a handler calls the binary. Codex trusts by entry hash, so an
 	// updated group must be trusted again; doctor reports it until then.
+	own, err := ownGroups(command)
+	if err != nil {
+		return hookmgr.Plan{}, err
+	}
+	return hookmgr.MergeEventHooks(root, hookmgr.HooksFile{Path: path}, own, install)
+}
+
+// ownGroups are the groups terma writes, one per committed hook, running command.
+func ownGroups(command func(event string) string) ([]hookmgr.EventHook, error) {
 	own := make([]hookmgr.EventHook, 0, len(committedHooks))
 	for _, h := range committedHooks {
 		// No matcher from terma: which calls edit files is the binary's to decide.
@@ -76,11 +85,11 @@ func planCodex(root, path string, command func(event string) string, install boo
 			Type: "command", Command: command(hookmgr.HookEventOf(h.Command)), Timeout: h.Timeout, Async: h.Async,
 		})
 		if err != nil {
-			return hookmgr.Plan{}, err
+			return nil, err
 		}
 		own = append(own, entry)
 	}
-	return hookmgr.MergeEventHooks(root, hookmgr.HooksFile{Path: path}, own, install)
+	return own, nil
 }
 
 // Entry is one of terma's hook entries in .codex/hooks.json, located by event, group and
@@ -147,8 +156,48 @@ func termaEntriesIn(path string) ([]Entry, error) {
 	return out, nil
 }
 
+// ownEntries finds, in the hooks file at path, the groups that are exactly ones terma
+// writes with command: a group someone else wrote or edited is not terma's to approve,
+// even when it calls terma. A missing file has none.
+func ownEntries(path string, command func(event string) string) ([]Entry, error) {
+	data, err := hookmgr.ReadFile(path)
+	if err != nil || data == nil {
+		return nil, err
+	}
+	var doc struct {
+		Hooks map[string][]json.RawMessage `json:"hooks"`
+	}
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return nil, fmt.Errorf("parse %s: %w", path, err)
+	}
+	own, err := ownGroups(command)
+	if err != nil {
+		return nil, err
+	}
+	var out []Entry
+	for _, h := range own {
+		for g, raw := range doc.Hooks[h.Event] {
+			if !hookmgr.SameJSON(raw, h.Entry) {
+				continue
+			}
+			var group struct {
+				Hooks []json.RawMessage `json:"hooks"`
+			}
+			if err := json.Unmarshal(raw, &group); err != nil || len(group.Hooks) != 1 {
+				continue
+			}
+			entry := Entry{Event: h.Event, Group: g}
+			if entry.Hash, err = codexEntryHash(entry, nil, group.Hooks[0]); err != nil {
+				return nil, err
+			}
+			out = append(out, entry)
+		}
+	}
+	return out, nil
+}
+
 // codexEntryHash matches Codex's command-hook identity: event, group and handler as
-// canonical JSON, SHA-256. Only Codex can grant trust for it.
+// canonical JSON, SHA-256, as Codex records it once the entry is approved.
 func codexEntryHash(entry Entry, matcher *string, raw json.RawMessage) (string, error) {
 	var handler map[string]any
 	if err := json.Unmarshal(raw, &handler); err != nil {

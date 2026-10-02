@@ -41,7 +41,7 @@ func (app *App) relayDeps() daemon.Deps {
 // profile's own team's changes.
 func (app *App) policies() policy.Source {
 	return policy.Source{Version: app.version, ModeChanged: func(ctx context.Context, cfg *config.Config, pol config.Policy) error {
-		return app.globalMode().Apply(ctx, cfg.Harnesses, pol.Global(), func(string) {}, func(string) {})
+		return app.globalMode().Apply(ctx, cfg.Harnesses, pol.Global(), func(string) {}, func(string) {}, func(string) {})
 	}}
 }
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
@@ -85,6 +86,14 @@ func (r Removal) Apply(ctx context.Context, reg *agents.Registry, warn func(stri
 	for _, p := range r.Agents {
 		if err := hookmgr.Apply(r.Root, p); err != nil {
 			return err
+		}
+	}
+	// With terma's entries gone, so go the approvals terma wrote for them.
+	for _, a := range reg.All() {
+		if t, ok := a.(agents.HookTrusting); ok && a.HooksPath() != "" {
+			if _, err := t.SyncHookTrust(filepath.Join(r.Root, filepath.FromSlash(a.HooksPath())), nil); err != nil {
+				warn(fmt.Sprintf("could not withdraw Terma's approval of its %s hooks: %v", a.DisplayName(), err))
+			}
 		}
 	}
 	// Every scoped harness, not only the ones an install chose.

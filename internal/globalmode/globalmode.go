@@ -23,8 +23,9 @@ type Machine struct {
 }
 
 // Apply installs global mode's machine-wide agent hooks and git's global hooks path, or
-// removes them; said reports each change, then each step left to the developer.
-func (m Machine) Apply(ctx context.Context, selected []string, global bool, said, then func(string)) error {
+// removes them; said reports each change, approved each approval written into an agent's
+// own config (one the developer should always see), then each step left to the developer.
+func (m Machine) Apply(ctx context.Context, selected []string, global bool, said, approved, then func(string)) error {
 	files, err := m.ApplyUserHooks(selected, global)
 	if err != nil {
 		return err
@@ -32,6 +33,7 @@ func (m Machine) Apply(ctx context.Context, selected []string, global bool, said
 	for _, f := range files {
 		said("Machine-wide hooks updated: " + output.TildePath(f))
 	}
+	m.syncUserHookTrust(approved, then)
 	if global {
 		for _, step := range m.TrustSteps(selected) {
 			then(step)

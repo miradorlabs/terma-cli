@@ -36,6 +36,16 @@ type UserHooksTrust interface {
 	UserHooksTrusted() (present, trusted bool, err error)
 }
 
+// HookTrusting is an agent whose approvals terma keeps in step with the hooks it writes:
+// approved for each entry of hooksFile byte for byte terma's (written with command; nil is
+// the committed command), withdrawn once terma removes it. Other entries stay untouched.
+type HookTrusting interface {
+	SyncHookTrust(hooksFile string, command func(event string) string) (TrustSync, error)
+}
+
+// TrustSync is what a SyncHookTrust changed.
+type TrustSync struct{ Approved, Withdrawn int }
+
 // ManagedHooks is an agent whose machine-wide hooks an organization can deploy.
 type ManagedHooks interface {
 	Agent

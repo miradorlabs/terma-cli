@@ -107,7 +107,8 @@ func (app *App) undoSetup(ctx context.Context, out io.Writer) error {
 	}
 
 	// Global mode's hooks and the relay service point into the config directory and at this binary.
-	if err := app.globalMode().Apply(ctx, nil, false, func(what string) { fmt.Fprintln(out, strings.TrimSpace(what)) }, func(string) {}); err != nil {
+	say := func(what string) { fmt.Fprintln(out, strings.TrimSpace(what)) }
+	if err := app.globalMode().Apply(ctx, nil, false, say, say, func(string) {}); err != nil {
 		return fmt.Errorf("restore machine-wide hooks: %w", err)
 	}
 	if removed, err := daemon.RemoveService(ctx); err != nil {
