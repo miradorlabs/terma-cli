@@ -146,3 +146,46 @@ func TestStatusSaysWhatDoctorWould(t *testing.T) {
 		t.Fatalf("checks = %+v", rep.Checks)
 	}
 }
+
+// Global mode needs no install, so an unbound repository passes there and fails only in
+// per-repository mode.
+func TestDoctorNeedsABindingOnlyInPerRepositoryMode(t *testing.T) {
+	for mode, want := range map[string]Status{config.ModeGlobal: Pass, config.ModeRepo: Fail} {
+		t.Run(mode, func(t *testing.T) {
+			e := env(t, Probes{Credential: signedIn, Spool: func() SpoolState { return SpoolState{Open: true} }})
+			if err := termaproject.Remove(e.Root); err != nil {
+				t.Fatal(err)
+			}
+			e.Config.ProjectID, e.Config.ProjectName = "p9", "Engineering"
+			e.Config.Policy = config.Policy{Mode: mode, DefaultProjectID: "p9"}
+			c := check(Run(t.Context(), e, Progress{}), KeyProject)
+			if c.Status != want || want == Pass && !strings.Contains(c.Detail, "Engineering") || want == Fail && c.Fix != "terma install" {
+				t.Fatalf("repository bound in %s mode = %+v", mode, c)
+			}
+		})
+	}
+}
+
+// The local report agrees: in global mode an unbound repository asks for no install.
+func TestLocalReportNeedsABindingOnlyInPerRepositoryMode(t *testing.T) {
+	for mode, wantInstall := range map[string]bool{config.ModeGlobal: false, config.ModeRepo: true} {
+		t.Run(mode, func(t *testing.T) {
+			e := env(t, Probes{Credential: signedIn})
+			if err := termaproject.Remove(e.Root); err != nil {
+				t.Fatal(err)
+			}
+			e.Config.Policy = config.Policy{Mode: mode}
+			rep, err := Local(t.Context(), e)
+			if err != nil {
+				t.Fatal(err)
+			}
+			asks := false
+			for _, c := range rep.Checks {
+				asks = asks || c.Fix == "terma install"
+			}
+			if asks != wantInstall {
+				t.Fatalf("%s mode: asks for terma install = %v, rows %v", mode, asks, rep.Rows)
+			}
+		})
+	}
+}

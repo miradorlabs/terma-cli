@@ -55,11 +55,17 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 
 	root, gitDir, reg := env.Root, env.GitDir, env.Agents
 	hooksOK, repoBound, projectID := false, false, cfg.ProjectID
+	// Global mode needs no install: an unbound repository's sessions go to the team's project.
+	globalUnbound := false
 	var agentHooks Check
 	if env.RepoErr != nil {
 		add("Repository", "not inside a git repository")
 	} else if bound, from, err := termaproject.Resolve(root, gitDir); err != nil {
-		add("Repository", "%s — not installed (run `terma install`)", root)
+		if globalUnbound = cfg.Policy.Global(); globalUnbound {
+			add("Repository", "%s — not installed; in global mode %s", root, GlobalDestination(cfg))
+		} else {
+			add("Repository", "%s — not installed (run `terma install`)", root)
+		}
 	} else {
 		projectID, repoBound = bound.Project.ID, true
 		add("Repository", "%s → %s%s", root, cmp.Or(bound.Project.Name, bound.Project.ID), ThroughMain(root, from))
@@ -141,7 +147,7 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 	if !authOK {
 		rep.Checks = append(rep.Checks, Check{Status: Fail, Fix: "terma setup"})
 	}
-	if !repoBound || (gitDir != "" && !hooksOK) {
+	if !globalUnbound && (!repoBound || (gitDir != "" && !hooksOK)) {
 		rep.Checks = append(rep.Checks, Check{Status: Fail, Fix: "terma install"})
 	}
 	if !backendOK {

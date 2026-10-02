@@ -172,6 +172,9 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 	timed(KeyProject, "repository bound", func() Check {
 		c, bound := RepositoryCheck(env.Root, env.GitDir, env.RepoErr)
 		d.bound = bound
+		if bound == nil && env.RepoErr == nil && cfg.Policy.Global() {
+			return Check{Status: Pass, Detail: "not bound, which global mode does not need: " + GlobalDestination(cfg)}
+		}
 		return c
 	})
 	d.projectID = cfg.ProjectID
@@ -249,6 +252,15 @@ func HookCallerFor(root, gitDir string, repoErr error) HookCaller {
 		}
 	}
 	return ByFullPath
+}
+
+// GlobalDestination says where global mode sends an unbound repository's sessions.
+func GlobalDestination(cfg *config.Config) string {
+	name := cfg.Policy.DefaultProjectID
+	if name == "" || name == cfg.ProjectID {
+		name = cmp.Or(cfg.ProjectName, cfg.ProjectID)
+	}
+	return "its sessions report to " + cmp.Or(name, "your team's project")
 }
 
 // RepositoryCheck finds the binding of the workspace at root, or, in a linked worktree
