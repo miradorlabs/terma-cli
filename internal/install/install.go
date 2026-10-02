@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"slices"
 	"time"
 
@@ -186,6 +187,7 @@ func Apply(ctx context.Context, p Plan, o Options, s Steps, r Reporter) error {
 	installedHooks := p.GitDir != "" && p.Existing != nil && p.Existing.Install.HookManager != ""
 	adapters := p.Adapters
 	var written []string
+	hooksInPlace := false
 	if !p.NoHooks {
 		p.Hooks.Print(r.Detail())
 		write := o.AssumeYes
@@ -198,12 +200,14 @@ func Apply(ctx context.Context, p Plan, o Options, s Steps, r Reporter) error {
 		switch {
 		case p.Hooks.Empty():
 			installedHooks = p.GitDir != ""
+			hooksInPlace = true
 			r.Summary("Hooks", "already in place")
 		case write:
 			if err := p.Hooks.Apply(p.Root); err != nil {
 				return err
 			}
 			installedHooks = p.GitDir != ""
+			hooksInPlace = true
 			written = p.Hooks.Paths()
 			// The plan printed above already lists its after-merging notes.
 			r.Summary("Hooks", output.And(p.Hooks.Files()))
@@ -214,6 +218,9 @@ func Apply(ctx context.Context, p Plan, o Options, s Steps, r Reporter) error {
 		}
 	} else {
 		adapters = reg.WiredNames(p.Root)
+	}
+	if hooksInPlace {
+		approveOwnHooks(reg, p.Root, r)
 	}
 	// Without a spool key every hook event waits in the spool.
 	if s.SpoolKey != nil && (installedHooks || len(reg.WiredNames(p.Root)) > 0) {
@@ -263,6 +270,26 @@ func Apply(ctx context.Context, p Plan, o Options, s Steps, r Reporter) error {
 		r.Commit("Commit the new files; once merged, everyone who clones this repository is set up:", append(written, termaproject.FileName))
 	}
 	return nil
+}
+
+// approveOwnHooks approves, in each agent that runs hooks only once trusted, terma's own
+// entries of the repository's hooks file, so the agent runs them without a review step;
+// a failure leaves the agent's own step to say what to do.
+func approveOwnHooks(reg *agents.Registry, root string, r Reporter) {
+	for _, a := range reg.All() {
+		t, ok := a.(agents.HookTrusting)
+		if !ok || a.HooksPath() == "" || !agents.Wired(root, a) {
+			continue
+		}
+		done, err := t.SyncHookTrust(filepath.Join(root, filepath.FromSlash(a.HooksPath())), nil)
+		switch {
+		case err != nil:
+			r.Warn(a.DisplayName()+" hooks", "not approved in "+a.DisplayName()+": "+err.Error())
+		case done.Approved > 0:
+			// Written into the agent's own config: shown even when steps are quiet.
+			r.Summary(a.DisplayName()+" hooks", fmt.Sprintf("approved Terma's %d hooks in %s (review them with /hooks)", done.Approved, a.DisplayName()))
+		}
+	}
 }
 
 // File is the committed binding an install writes; terma_version moves only when this

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
+	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/globalmode"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
@@ -65,8 +66,16 @@ func TestSetupGlobalModeInstallsAndRemovesMachineHooks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}
-	if !strings.Contains(out, "every session on this machine") || !strings.Contains(out, "`/hooks`") {
-		t.Fatalf("setup did not say global mode, or Codex's trust step:\n%s", out)
+	// Setup approves its own machine-wide Codex hooks, so there is no trust step to take.
+	if !strings.Contains(out, "every session on this machine") || !strings.Contains(out, "approved Terma's") || strings.Contains(out, "`/hooks`") {
+		t.Fatalf("setup did not say global mode, or approve Codex's hooks itself:\n%s", out)
+	}
+	codexAgent, ok := testApp.agents.Find[agents.UserHooksTrust]("codex")
+	if !ok {
+		t.Fatal("no Codex agent in the registry")
+	}
+	if present, trusted, err := codexAgent.UserHooksTrusted(); err != nil || !present || !trusted {
+		t.Fatalf("Codex would not run the machine-wide hooks: present %v trusted %v, %v", present, trusted, err)
 	}
 	claude, _ := os.ReadFile(filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), "settings.json"))
 	codex, _ := os.ReadFile(filepath.Join(codexHome, "hooks.json"))
@@ -110,6 +119,9 @@ func TestSetupGlobalModeInstallsAndRemovesMachineHooks(t *testing.T) {
 	codex, _ = os.ReadFile(filepath.Join(codexHome, "hooks.json"))
 	if strings.Contains(string(claude)+string(codex), "hook --user") {
 		t.Fatalf("machine-wide hooks left after global mode ended:\n%s\n%s", claude, codex)
+	}
+	if cfg, _ := os.ReadFile(filepath.Join(codexHome, "config.toml")); strings.Contains(string(cfg), "hooks.json:") {
+		t.Fatalf("approvals of the removed hooks left in Codex's config:\n%s", cfg)
 	}
 	if got := gitOut(t, t.TempDir(), "config", "--global", "--get", "core.hooksPath"); filepath.Clean(strings.TrimSpace(got)) != filepath.Clean(mine) {
 		t.Fatalf("git's global hooks path = %q, want the developer's %q back", got, mine)

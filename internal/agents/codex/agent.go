@@ -128,6 +128,20 @@ func pronoun(n int) string {
 	return "them"
 }
 
+// SyncHookTrust approves, in Codex's config, the entries of hooksFile that are byte for
+// byte terma's, and withdraws the approvals terma wrote for entries no longer there.
+func (Agent) SyncHookTrust(hooksFile string, command func(event string) string) (agents.TrustSync, error) {
+	configPath, err := (exporter{}).ConfigPath()
+	if err != nil {
+		return agents.TrustSync{}, err
+	}
+	if command == nil {
+		command = hookCommand
+	}
+	done, err := syncHookTrust(configPath, hooksFile, command)
+	return agents.TrustSync{Approved: done.Approved, Withdrawn: done.Withdrawn}, err
+}
+
 // Harness is how terma configures the agent's exporter.
 func (Agent) Harness() harness.Harness { return exporter{} }
 
@@ -208,6 +222,7 @@ var (
 	_ agents.Exporting      = Agent{}
 	_ agents.Agent          = Agent{}
 	_ agents.Trusting       = Agent{}
+	_ agents.HookTrusting   = Agent{}
 	_ agents.UserHooks      = Agent{}
 	_ agents.ManagedHooks   = Agent{}
 	_ agents.Surfaced       = Agent{}

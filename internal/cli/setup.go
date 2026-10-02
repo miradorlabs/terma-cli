@@ -191,7 +191,8 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 			})
 		},
 		ApplyMode: func(ctx context.Context, names []string, global bool) error {
-			return app.globalMode().Apply(ctx, names, global, func(what string) { ui.OK("Machine", what) }, ui.Then)
+			return app.globalMode().Apply(ctx, names, global, func(what string) { ui.OK("Machine", what) },
+				func(what string) { ui.Summary("Machine", what) }, ui.Then)
 		},
 		CheckIn: func(ctx context.Context) {
 			if ok, what := daemon.CheckIn(ctx); ok {
