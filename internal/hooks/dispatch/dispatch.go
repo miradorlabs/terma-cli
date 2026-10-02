@@ -42,8 +42,9 @@ type Deps struct {
 	Agents *agents.Registry
 	// Policy is the collection policy hooks read locally.
 	Policy func() config.Policy
-	// Yields reports whether a repository's hook steps aside for a machine-wide one.
-	Yields func(user bool, policy config.Policy, tool string) bool
+	// Yields reports whether a repository's hook steps aside for a machine-wide one, or a
+	// machine-wide one for the repository's hooks at cwd.
+	Yields func(user bool, policy config.Policy, tool, cwd string) bool
 	Spool  func() *spool.Spool
 	// Claimed runs once a hook has claimed its session: the relay, the clone's wiring.
 	Claimed func(ctx context.Context, cwd string)
@@ -90,7 +91,7 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 		return
 	}
 	policy := d.Policy()
-	if tool != "" && d.Yields(r.User, policy, tool) {
+	if tool != "" && d.Yields(r.User, policy, tool, r.Cwd) {
 		return
 	}
 	if r.Cwd == "" {

@@ -160,11 +160,12 @@ func (m Machine) userHooksCover(tool string) bool {
 	return slices.Contains(rec.Agents, m.Agents.NameForTool(tool))
 }
 
-// Yields is true for a leftover machine-wide hook outside global mode, or a committed one
-// in global mode whose agent has machine-wide hooks.
-func (m Machine) Yields(user bool, pol config.Policy, tool string) bool {
+// Yields is true for a leftover machine-wide hook outside global mode, unless it stands in
+// for committed hooks its agent cannot see from cwd, or a committed one in global mode
+// whose agent has machine-wide hooks.
+func (m Machine) Yields(user bool, pol config.Policy, tool, cwd string) bool {
 	if user {
-		return !pol.Global()
+		return !pol.Global() && !m.standsIn(tool, cwd)
 	}
 	return pol.Global() && m.userHooksCover(tool)
 }

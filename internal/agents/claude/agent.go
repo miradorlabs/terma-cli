@@ -2,7 +2,9 @@
 package claude
 
 import (
+	"cmp"
 	"context"
+	"os"
 	"path/filepath"
 	"runtime"
 
@@ -49,6 +51,10 @@ func (Agent) Events() map[string]agents.Handler {
 }
 
 func (Agent) FlushAfter() []string { return []string{"session-end", "stop", "stop-failure"} }
+
+// LaunchDir is where the session started: Claude Code reads .claude/settings.json there
+// only, and names it to every hook as CLAUDE_PROJECT_DIR.
+func (Agent) LaunchDir(cwd string) string { return cmp.Or(os.Getenv("CLAUDE_PROJECT_DIR"), cwd) }
 
 func (Agent) UserHooksPath() (string, error) { return (exporter{}).ConfigPath() }
 func (Agent) PlanUserHooks(dir string, command func(string) string, install bool) (hookmgr.Plan, error) {
@@ -124,4 +130,5 @@ var (
 	_ agents.Agent            = Agent{}
 	_ agents.UserHooks        = Agent{}
 	_ agents.ManagedHooks     = Agent{}
+	_ agents.LaunchScoped     = Agent{}
 )
