@@ -8,8 +8,8 @@ import (
 )
 
 // TestClaudeEditInLinkedWorktree is a Claude Code session in a linked git worktree — the
-// shape `git worktree add` and Claude Code's own isolated worktrees leave. The worktree's
-// folder is not one the team lists; origin's repository name is, so it is admitted. Its
+// shape `git worktree add` and Claude Code's own isolated worktrees leave. The worktree
+// reads origin from its main repository, which the team lists, so it is admitted. Its
 // events must reach the team's project, report the main repository as terma.repo, and
 // name the worktree; a commit made there runs terma's global git hooks and must be
 // stamped and delivered.
@@ -19,7 +19,6 @@ func TestClaudeEditInLinkedWorktree(t *testing.T) {
 		mode, route := claudeMode(t)
 		sb := New(t, mode, WithClaude(b))
 		repoName := filepath.Base(sb.Repo)
-		sb.git("remote", "add", "origin", "https://github.com/acme/"+repoName+".git")
 		wt := filepath.Join(sb.Dir, "feature-wt")
 		sb.git("worktree", "add", "-q", "-b", "feature", wt)
 

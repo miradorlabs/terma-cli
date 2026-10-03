@@ -107,7 +107,7 @@ func TestRelayGemini(t *testing.T) {
 	})
 }
 
-// Gemini outside any admitted folder: it exports to the relay, the relay holds the
+// Gemini outside any admitted repository: it exports to the relay, the relay holds the
 // unclaimed session and drops it, and nothing reaches upstream.
 func TestRelayGeminiOutsideARepository(t *testing.T) {
 	forEachGemini(t, func(t *testing.T, b Binary) {

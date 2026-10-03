@@ -59,8 +59,8 @@ func (sb *Sandbox) StartAccount() *Account {
 				return
 			}
 			withhold := a.withholdContent.Load()
-			folders, _ := json.Marshal(append([]string{}, sb.Folders...))
-			fmt.Fprintf(w, `{"policy":{"version":"1.0","terma":{"per_repository":{"folders":%s},"capture":{"exclude_prompts":%t,"exclude_tool_content":%t}}},"revision":1,"updated_at":"2026-09-30T12:27:05Z"}`, folders, withhold, withhold)
+			repos, _ := json.Marshal(append([]string{}, sb.Repositories...))
+			fmt.Fprintf(w, `{"policy":{"version":"1.0","terma":{"per_repository":{"repositories":%s},"capture":{"exclude_prompts":%t,"exclude_tool_content":%t}}},"revision":1,"updated_at":"2026-09-30T12:27:05Z"}`, repos, withhold, withhold)
 		case "/v1/api-keys/server":
 			if a.denyMints.Load() {
 				w.WriteHeader(http.StatusForbidden)

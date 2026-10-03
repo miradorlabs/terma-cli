@@ -28,8 +28,7 @@ func TestRelayClaudeDesktop(t *testing.T) {
 		defer provider.Close()
 		sb.ClaudeBaseURL = provider.URL
 
-		// A linked worktree is admitted by its main checkout's folder or origin's name.
-		sb.git("remote", "add", "origin", "https://github.com/acme/repo.git")
+		// A linked worktree is admitted by its main repository's origin.
 		wt := filepath.Join(sb.Repo, ".claude", "worktrees", "desk")
 		sb.git("worktree", "add", "-q", "-b", "claude/desk", wt)
 		personal := filepath.Join(sb.Dir, "personal")

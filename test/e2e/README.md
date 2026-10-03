@@ -18,8 +18,9 @@ scratch git global config and a scratch git repository, with the machine-wide ho
 `terma setup` writes for a developer (the agents' user-level hooks and git's global
 `core.hooksPath`), and the export pointed at an OTLP receiver inside the test:
 through the local relay, or straight there by an exporter the sandbox writes into the
-agent's own config. The team policy's folder list (`WithFolders`, default the
-repository's folder) decides where the hooks record anything. Contracts then read
+agent's own config. The team policy's repository list (`WithRepositories`, default the
+scratch repository's origin, `github.com/acme/repo`) decides where the hooks record
+anything. Contracts then read
 three planes together:
 
 - the hook events (`terma.session.start`, `terma.session.quota`, `terma.files.touched`, `terma.commit.stamped`, …), read from the spool file or, more often, from what the end-of-turn flush has already delivered to the receiver,
@@ -211,9 +212,10 @@ copied into the scratch `CODEX_HOME` for the ChatGPT route, and terma's machine-
 `CODEX_HOME/hooks.json`, which setup approves in the scratch config's `[hooks.state]`.
 
 `TestMachineHooks*` covers where those hooks record: beside a repository's own Claude
-Code, Codex and git hooks, from a subdirectory, by origin's repository name, by a
-parent folder outside git, nothing in an unlisted folder, and a Codex thread resumed
-into one.
+Code, Codex and git hooks; the listed origin from a subdirectory, a differently named
+checkout, its ssh and https forms and linked worktrees; nothing in a same-named folder
+with another origin, a fork, a repository with no origin or a folder outside git; and a
+Codex thread resumed into an unlisted repository.
 
 ## Cursor
 

@@ -61,9 +61,10 @@ type Sandbox struct {
 	Receiver     *Receiver
 	// ProjectID is the team `terma setup` selects.
 	ProjectID string
-	// Folders is the team policy's folder list, which the account fixture serves; the
-	// scratch repository's folder name unless an option sets it.
-	Folders []string
+	// Repositories is the team policy's repository list, which the account fixture
+	// serves; the scratch repository's origin, github.com/acme/repo, unless an option
+	// sets it.
+	Repositories []string
 	// RendererMarker is what the pre-existing status line prints; the wrapped
 	// status line must still show it.
 	RendererMarker string
@@ -107,8 +108,10 @@ func WithClaude(b Binary) Option { return func(sb *Sandbox) { sb.Claude = b } }
 // WithCodex runs the scenario against this Codex build.
 func WithCodex(b Binary) Option { return func(sb *Sandbox) { sb.Codex = b } }
 
-// WithFolders is the team policy's folder list.
-func WithFolders(folders ...string) Option { return func(sb *Sandbox) { sb.Folders = folders } }
+// WithRepositories is the team policy's repository list.
+func WithRepositories(repos ...string) Option {
+	return func(sb *Sandbox) { sb.Repositories = repos }
+}
 
 // setupHarnesses are the agents every sandbox's setup records: all setup offers.
 const setupHarnesses = "claude,codex"
@@ -148,7 +151,7 @@ func New(t *testing.T, mode Mode, opts ...Option) *Sandbox {
 		ClaudeConfig: filepath.Join(dir, "claude"), CodexHome: filepath.Join(dir, "codex"),
 		Repo: filepath.Join(dir, "repo"), RendererMarker: "LIVE-RENDERER",
 		Claude: Binary{Harness: "claude", Path: "claude"}, Codex: Binary{Harness: "codex", Path: "codex"},
-		Folders: []string{"repo"}}
+		Repositories: []string{"github.com/acme/repo"}}
 	for _, o := range opts {
 		o(sb)
 	}
@@ -163,6 +166,7 @@ func New(t *testing.T, mode Mode, opts ...Option) *Sandbox {
 	sb.git("config", "user.email", "live@terma.test")
 	sb.git("config", "user.name", "Terma Live")
 	sb.git("config", "commit.gpgsign", "false")
+	sb.git("remote", "add", "origin", "https://github.com/acme/repo.git")
 	sb.write("README.md", "live sandbox\n")
 	sb.git("add", "README.md")
 	sb.git("commit", "-q", "-m", "init")
@@ -269,7 +273,7 @@ func (sb *Sandbox) useLiveKey() {
 
 // RouteClaude points Claude Code at the team's project the way `terma setup` does for a
 // developer: its user-level exporter at the local relay, which forwards the sessions the
-// hooks claim in an admitted folder to the receiver, standing in for Terma. With
+// hooks claim in an admitted repository to the receiver, standing in for Terma. With
 // ExcludeContent the team's policy, which the account fixture serves, withholds prompts
 // and tool content. The account fixture supplies the developer login the relay fetches
 // that policy with. UseRelay files the receiver's key.

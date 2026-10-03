@@ -145,7 +145,7 @@ func TestRelayDsh(t *testing.T) {
 	})
 }
 
-// dsh outside any admitted folder reaches nothing upstream.
+// dsh outside any admitted repository reaches nothing upstream.
 func TestRelayDshOutsideARepository(t *testing.T) {
 	forEachDsh(t, func(t *testing.T, b Binary) {
 		ProvesAll(t, b, "relay.only_opted_in")

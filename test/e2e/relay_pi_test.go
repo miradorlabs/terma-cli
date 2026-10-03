@@ -55,7 +55,7 @@ func TestRelayWorkloadsPi(t *testing.T) {
 	})
 }
 
-// Pi outside any admitted folder: its extension exports to the relay, the relay
+// Pi outside any admitted repository: its extension exports to the relay, the relay
 // holds the unclaimed session and drops it, and nothing reaches upstream.
 func TestRelayPiOutsideARepository(t *testing.T) {
 	forEachPi(t, func(t *testing.T, b Binary) {

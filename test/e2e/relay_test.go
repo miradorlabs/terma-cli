@@ -22,14 +22,14 @@ import (
 
 // The local relay, end to end: real Claude Code and Codex
 // builds export through their global configuration to `terma relay run` on loopback,
-// terma's hooks claim the sessions in a folder the team admits, and the receiver stands in
+// terma's hooks claim the sessions in a repository the team admits, and the receiver stands in
 // for Terma upstream. What these prove:
 //
 //   - an opted-in session arrives whole: every contract the direct export meets, the
 //     project stamped on it, the project's key on every request;
 //   - content leaves only as the team's policy allows;
 //   - nothing else reaches upstream — a session outside any repository, in a
-//     repository the team's folders do not list, or in one this machine holds no key for;
+//     repository the team does not list, or in one this machine holds no key for;
 //   - how a cold start (relay not running when the agent starts) goes.
 
 // checkOnlyClaimed fails if anything the agent exported reached upstream without
@@ -304,8 +304,8 @@ func TestRelayCodex(t *testing.T) {
 	})
 }
 
-// Nothing leaves for a session no admitted folder claimed: one outside any repository,
-// one in a repository the team's folders do not list, one in the admitted repository on
+// Nothing leaves for a session no admitted repository claimed: one outside any repository,
+// one in a repository the team does not list, one in the admitted repository on
 // a machine that holds no key for its project.
 func TestRelayNegativeControls(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
@@ -439,7 +439,7 @@ func TestRelayLateClaim(t *testing.T) {
 		if n := agentRecords(sb.Receiver.evidence()); n != 0 {
 			t.Fatalf("%d records reached upstream before any claim", n)
 		}
-		claim := fmt.Sprintf(`{"project_id":%q,"tool":"claude-code","repository":{"names":[%q]},"claimed_at":%q}`, sb.ProjectID, filepath.Base(sb.Repo), time.Now().UTC().Format(time.RFC3339Nano))
+		claim := fmt.Sprintf(`{"project_id":%q,"tool":"claude-code","repository":{"origin":"github.com/acme/repo"},"claimed_at":%q}`, sb.ProjectID, time.Now().UTC().Format(time.RFC3339Nano))
 		sb.writeAbs(filepath.Join(sb.TermaConfig, "relay", "claims", sid+".json"), claim+"\n")
 		deadline := time.Now().Add(30 * time.Second)
 		for agentRecords(sb.Receiver.evidence()) == 0 && time.Now().Before(deadline) {
@@ -514,9 +514,9 @@ func TestRelayConcurrentProjects(t *testing.T) {
 		ProvesAll(t, b, "relay.concurrent_projects")
 		track(t)
 		t.Setenv("ANTHROPIC_API_KEY", "synthetic-telemetry-key")
-		// Both teams list both folders; which team a session's hooks claim it for is the
-		// profile they run under.
-		sb := New(t, Isolated, WithClaude(b), WithFolders("repo", "other"))
+		// Both teams list both repositories; which team a session's hooks claim it for is
+		// the profile they run under.
+		sb := New(t, Isolated, WithClaude(b), WithRepositories("github.com/acme/repo", "github.com/acme/other"))
 		const otherProject, otherKey = "proj_other", "ter_srv_111111111111111111111111"
 		other := filepath.Join(sb.Dir, "other")
 		personal := filepath.Join(sb.Dir, "personal")
@@ -525,7 +525,7 @@ func TestRelayConcurrentProjects(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		for _, args := range [][]string{{"init", "-q", "-b", "main"}, {"config", "user.email", "live@terma.test"}, {"config", "user.name", "Terma Live"}, {"commit", "-q", "--allow-empty", "-m", "init"}} {
+		for _, args := range [][]string{{"init", "-q", "-b", "main"}, {"config", "user.email", "live@terma.test"}, {"config", "user.name", "Terma Live"}, {"remote", "add", "origin", "git@github.com:acme/other.git"}, {"commit", "-q", "--allow-empty", "-m", "init"}} {
 			sb.gitIn(other, args...)
 		}
 		// The second team is a second profile, set up before the relay starts: setup stops it.

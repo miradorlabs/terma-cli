@@ -13,7 +13,7 @@ import (
 )
 
 // terma's hooks are the agents' user-level ones and git's global hooks path, so they run
-// beside a repository's own, from any folder; the team policy's folder list decides
+// beside a repository's own, from any folder; the team policy's repository list decides
 // where they record anything. Real agent builds with loopback providers: no credentials.
 
 // claimFile is the relay claim terma's hooks write for a session.
@@ -24,8 +24,7 @@ type claimFile struct {
 }
 
 type claimRepository struct {
-	Names []string `json:"names"`
-	Path  string   `json:"path"`
+	Origin string `json:"origin"`
 }
 
 type claimPlacement struct {
@@ -131,59 +130,73 @@ func TestMachineHooksBesideRepositoryHooksCodex(t *testing.T) {
 	})
 }
 
-// Which folders the team admits, wherever the agent starts: the repository from a
-// subdirectory, a checkout by origin's repository name, a folder outside git by a
-// parent's name, and nothing at all in a repository the list does not name.
+// Which working copies the team admits, wherever the agent starts: the listed repository
+// by its origin from any folder, subdirectory or linked worktree and in any URL form, and
+// nothing at all in a same-named folder with another origin, a fork, a repository with no
+// origin, or a folder outside git.
 func TestMachineHooksAdmission(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
 		t.Setenv("ANTHROPIC_API_KEY", "synthetic-telemetry-key")
-		sb := New(t, Isolated, WithClaude(b), WithFolders("repo", "widget", "notes-parent"))
-		renamed := sb.newRepo("checkout-2", "https://github.com/acme/widget.git")
-		unlisted := sb.newRepo("unlisted", "")
-		outside := filepath.Join(sb.Dir, "notes-parent", "today")
+		sb := New(t, Isolated, WithClaude(b), WithRepositories("github.com/acme/repo"))
+		renamed := sb.newRepo("checkout-2", "git@github.com:acme/repo.git")
+		https := sb.newRepo("https-clone", "https://GitHub.com/acme/repo/")
+		worktree := filepath.Join(sb.Dir, "feature-wt")
+		sb.git("worktree", "add", "-q", "-b", "feature", worktree)
+		claudeWorktree := filepath.Join(sb.Repo, ".claude", "worktrees", "fix-1")
+		sb.git("worktree", "add", "-q", "-b", "claude/fix-1", claudeWorktree)
+		sameName := sb.newRepo(filepath.Join("elsewhere", "repo"), "git@github.com:acme/widget.git")
+		fork := sb.newRepo("fork", "git@github.com:someone/repo.git")
+		noOrigin := sb.newRepo("no-origin", "")
+		outside := filepath.Join(sb.Dir, "notes")
 		for _, d := range []string{filepath.Join(sb.Repo, "sub"), outside} {
 			if err := os.MkdirAll(d, 0o700); err != nil {
 				t.Fatal(err)
 			}
 		}
 		for _, place := range []struct {
-			name, dir, root, file, admittedAs string
+			name, dir, root, file string
+			admitted              bool
 		}{
-			{"listed", sb.Repo, sb.Repo, "listed.txt", "repo"},
-			{"subdirectory", filepath.Join(sb.Repo, "sub"), sb.Repo, "sub/sub.txt", "repo"},
-			{"origin-name", renamed, renamed, "renamed.txt", "widget"},
-			{"parent-folder", outside, "", "today.txt", "notes-parent"},
-			{"unlisted", unlisted, unlisted, "unlisted.txt", ""},
+			{"listed", sb.Repo, sb.Repo, "listed.txt", true},
+			{"subdirectory", filepath.Join(sb.Repo, "sub"), sb.Repo, "sub/sub.txt", true},
+			{"renamed-ssh-checkout", renamed, renamed, "renamed.txt", true},
+			{"https-form", https, https, "https.txt", true},
+			{"linked-worktree", worktree, worktree, "worktree.txt", true},
+			{"claude-worktree", claudeWorktree, claudeWorktree, "claude-wt.txt", true},
+			{"same-name-other-origin", sameName, sameName, "same-name.txt", false},
+			{"fork", fork, fork, "fork.txt", false},
+			{"no-origin", noOrigin, noOrigin, "no-origin.txt", false},
+			{"outside-git", outside, "", "outside.txt", false},
 		} {
 			t.Run(place.name, func(t *testing.T) {
 				track(t)
 				sid := sb.claudeWrites(place.dir, filepath.Base(place.file))
-				if place.admittedAs == "" {
+				if !place.admitted {
 					ran := slices.ContainsFunc(sb.HookPayloads("session-start"), func(p map[string]any) bool { return p["session_id"] == sid })
 					if !ran {
 						t.Fatal("terma's SessionStart hook never ran, so the control proves nothing")
 					}
 					time.Sleep(2 * time.Second) // any flush the hooks started
 					if c := sb.claimOf(sid); c != nil {
-						t.Errorf("an unlisted folder's session was claimed: %+v", *c)
+						t.Errorf("an unlisted working copy's session was claimed: %+v", *c)
 					}
 					if n := sb.hookEventsOf(sid); n != 0 {
-						t.Errorf("hooks recorded %d events for an unlisted folder's session", n)
+						t.Errorf("hooks recorded %d events for an unlisted working copy's session", n)
+					}
+					if place.root == "" {
+						return
 					}
 					if msg := sb.commitWithGlobalHooks(place.root, place.file); strings.Contains(msg, "Agent-Session-Id") {
-						t.Errorf("an unlisted folder's commit was stamped:\n%s", msg)
+						t.Errorf("an unlisted repository's commit was stamped:\n%s", msg)
 					}
 					return
 				}
 				c := sb.claimOf(sid)
-				if c == nil || c.ProjectID != sb.ProjectID || !slices.Contains(c.Repository.Names, place.admittedAs) {
-					t.Errorf("claim = %+v, want project %s with the name %q", c, sb.ProjectID, place.admittedAs)
+				if c == nil || c.ProjectID != sb.ProjectID || !strings.EqualFold(c.Repository.Origin, "github.com/acme/repo") {
+					t.Errorf("claim = %+v, want project %s with origin github.com/acme/repo", c, sb.ProjectID)
 				}
 				if len(sb.Delivered("terma.session.start", sid, 30*time.Second)) == 0 || len(sb.Delivered("terma.files.touched", sid, 30*time.Second)) == 0 {
 					t.Errorf("the session's hook events were not delivered; spool: %+v", sb.Spool())
-				}
-				if place.root == "" {
-					return
 				}
 				if msg := sb.commitWithGlobalHooks(place.root, place.file); !strings.Contains(msg, "Agent-Session-Id: "+sid) {
 					t.Errorf("commit not stamped with %s:\n%s", sid, msg)
@@ -212,17 +225,17 @@ func TestMachineHooksCodexResumedUnlisted(t *testing.T) {
 		if resumed.ThreadID != first.ThreadID {
 			Note(t.Name(), "Codex gave the resumed run a new thread id, so no claim follows it")
 			if sb.claimOf(resumed.ThreadID) != nil {
-				t.Error("the resumed thread in an unlisted folder was claimed")
+				t.Error("the resumed thread in an unlisted repository was claimed")
 			}
 			return
 		}
 		c := sb.claimOf(first.ThreadID)
 		if c == nil || len(c.Placements) < 2 {
-			t.Fatalf("claim = %+v, want a placement for the unlisted folder", c)
+			t.Fatalf("claim = %+v, want a placement for the unlisted repository", c)
 		}
 		last := c.Placements[len(c.Placements)-1]
-		if !slices.Equal(last.Repository.Names, []string{"unlisted"}) || !slices.Contains(c.Placements[0].Repository.Names, "repo") {
-			t.Errorf("placements = %+v, want the repository's, then the unlisted folder's", c.Placements)
+		if last.Repository.Origin != "" || c.Placements[0].Repository.Origin != "github.com/acme/repo" {
+			t.Errorf("placements = %+v, want the repository's, then the unlisted one's with no origin", c.Placements)
 		}
 		time.Sleep(6 * time.Second) // past the hold
 		sb.StopRelay()

@@ -117,7 +117,7 @@ func TestRelayHermes(t *testing.T) {
 	})
 }
 
-// Hermes outside any admitted folder: its plugin exports to the relay, the relay holds
+// Hermes outside any admitted repository: its plugin exports to the relay, the relay holds
 // the unclaimed session and drops it, and nothing reaches upstream.
 func TestRelayHermesOutsideARepository(t *testing.T) {
 	forEachHermes(t, func(t *testing.T, b Binary) {

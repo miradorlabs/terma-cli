@@ -55,15 +55,13 @@ func TestRelayCodexResumedElsewhere(t *testing.T) {
 }
 
 // A session in a linked worktree (git worktree add) of an admitted repository is admitted
-// through origin's repository name or its main checkout's folder, so its telemetry must
-// reach the team's project.
+// through its main repository's origin, so its telemetry must reach the team's project.
 func TestRelayLinkedWorktree(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
 		track(t)
 		t.Setenv("ANTHROPIC_API_KEY", "synthetic-telemetry-key")
 		sb := New(t, Isolated, WithClaude(b))
 		sb.UseRelay(RelayOptions{Start: true})
-		sb.git("remote", "add", "origin", "https://github.com/acme/repo.git")
 		wt := filepath.Join(sb.Dir, "wt")
 		sb.git("worktree", "add", "-q", wt)
 		var calls atomic.Int32

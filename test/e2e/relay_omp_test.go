@@ -40,7 +40,7 @@ func TestRelayWorkloadsOmp(t *testing.T) {
 	})
 }
 
-// omp outside any admitted folder: its extension exports to the relay, the relay holds
+// omp outside any admitted repository: its extension exports to the relay, the relay holds
 // the unclaimed session and drops it, and nothing reaches upstream.
 func TestRelayOmpOutsideARepository(t *testing.T) {
 	forEachOmp(t, func(t *testing.T, b Binary) {
