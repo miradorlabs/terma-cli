@@ -33,7 +33,7 @@ type setupFlags struct {
 	relayService string
 	// relayAddr is --relay-addr: a loopback address to move the relay to, "" to keep it.
 	relayAddr string
-	// managedConfig is --managed-config's directory for global mode's managed hooks, which
+	// managedConfig is --managed-config's directory for the managed hooks, which
 	// call terma at managedTerma.
 	managedConfig string
 	managedTerma  string
@@ -86,7 +86,7 @@ holds.`,
 	cmd.Flags().StringVar(&f.relayService, "relay-service", "", "run the local relay as a background service: on or off (default: on, or your last choice)")
 	cmd.Flags().StringVar(&f.relayAddr, "relay-addr", "", "move the local relay to this loopback address (default "+claim.DefaultAddr+", or the one recorded)")
 	cmd.Flags().BoolVarP(&f.verbose, "verbose", "v", false, "show each step and what it wrote")
-	cmd.Flags().StringVar(&f.managedConfig, "managed-config", "", "write global mode's hooks as managed configuration into this directory, for your organization to deploy, and exit")
+	cmd.Flags().StringVar(&f.managedConfig, "managed-config", "", "write the machine-wide hooks as managed configuration into this directory, for your organization to deploy, and exit")
 	cmd.Flags().StringVar(&f.managedTerma, "managed-terma", "$HOME/.local/bin/terma", "with --managed-config: where terma is installed on the machines")
 	return cmd
 }

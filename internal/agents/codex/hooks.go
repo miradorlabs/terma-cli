@@ -199,7 +199,7 @@ func codexEntryHash(entry Entry, matcher *string, raw json.RawMessage) (string, 
 // hooks with no trust step.
 func managedRequirements(command func(event string) string) string {
 	var b strings.Builder
-	b.WriteString("# terma: global mode's hooks for every Codex session on this machine.\n[hooks]\n")
+	b.WriteString("# terma: hooks for every Codex session on this machine.\n[hooks]\n")
 	for _, h := range codexHooks {
 		fmt.Fprintf(&b, "\n[[hooks.%s]]\n\n[[hooks.%s.hooks]]\ntype = \"command\"\ncommand = %s\ntimeout = %d\n", h.Event, h.Event, tomlString(command(h.Hook)), h.Timeout)
 		if h.Async {

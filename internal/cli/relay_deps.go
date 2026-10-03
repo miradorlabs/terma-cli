@@ -38,13 +38,12 @@ func (app *App) relayDeps() daemon.Deps {
 	}
 }
 
-// policies fetch collection policies as this build, and switch global mode when the
-// profile's own team's changes.
+// policies fetch collection policies as this build.
 func (app *App) policies() policy.Source {
 	return policy.Source{Version: app.version}
 }
 
-// globalMode is this machine as global mode writes it.
+// globalMode is this machine as setup writes it.
 func (app *App) globalMode() globalmode.Machine {
 	return globalmode.Machine{Agents: app.agents, Terma: app.hookExecutable, ManagedRoot: app.managedRoot}
 }

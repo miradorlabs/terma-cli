@@ -11,7 +11,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
-// Machine is this machine as global mode writes it.
+// Machine is this machine as setup writes it.
 type Machine struct {
 	Agents *agents.Registry
 	// Terma is the executable the hooks call, by absolute path.

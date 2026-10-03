@@ -31,11 +31,12 @@ func WriteManaged(reg *agents.Registry, dir, terma string) ([]string, error) {
 		names = append(names, a.DisplayName())
 		deploy = append(deploy, "- `"+name+"` → "+a.ManagedDeploy())
 	}
-	files["README.md"] = []byte(`# terma global mode: managed hooks
+	files["README.md"] = []byte(`# terma: managed hooks
 
-Deploy these so every ` + strings.Join(names, " and ") + ` session on a machine is claimed, with no
-trust step for anyone. Each developer still runs ` + "`terma setup`" + ` once: it points the
-agents' exporters at the machine's relay, whose token is the machine's own.
+Deploy these so every ` + strings.Join(names, " and ") + ` session on a machine runs terma's hooks,
+with no trust step for anyone; the team's folder list still decides what is recorded.
+Each developer still runs ` + "`terma setup`" + ` once: it points the agents' exporters at the
+machine's relay, whose token is the machine's own.
 
 ` + strings.Join(deploy, "\n") + `
 
