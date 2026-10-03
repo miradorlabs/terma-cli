@@ -4,13 +4,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// The local relay forwards only what hooks in opted-in repositories
-// claimed; its commands are hidden because install and setup run them.
+// The local relay forwards only what hooks claimed in the folders the team collects; its
+// commands are hidden because setup runs them.
 
 func (app *App) newRelayCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:    "relay",
-		Short:  "The local OTLP relay that forwards only opted-in repositories' telemetry",
+		Short:  "The local OTLP relay that forwards only the team's folders' telemetry",
 		Hidden: true,
 	}
 	cmd.AddCommand(app.newRelayRunCommand(), app.newRelaySetupCommand(), newRelayDaemonCommand(), newRelaySuperviseCommand())

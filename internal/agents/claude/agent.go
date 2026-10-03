@@ -28,11 +28,6 @@ func (Agent) Name() string { return name }
 func (Agent) DisplayName() string { return displayName }
 
 func (Agent) Installed(ctx context.Context) bool { return exporter{}.Detect(ctx).Found }
-func (Agent) HooksPath() string                  { return settingsPath }
-func (Agent) Default(string) bool                { return true }
-func (Agent) Plan(root string, install bool) (hookmgr.Plan, error) {
-	return planSettings(root, install)
-}
 
 func (Agent) Events() map[string]agents.Handler {
 	return map[string]agents.Handler{

@@ -96,7 +96,7 @@ func captureCodexDesktopActivity(ctx context.Context, e hookrun.Env, r *hookrun.
 		default:
 			return nil
 		}
-		// Spooled without Env.EmitFor, so the binding is stamped here: with no project id the
+		// Spooled without Env.EmitFor, so the team is stamped here: with no project id the
 		// flush drops it as unroutable.
 		if r.ProjectID != "" {
 			attrs[hookrun.AttrProjectID] = r.ProjectID

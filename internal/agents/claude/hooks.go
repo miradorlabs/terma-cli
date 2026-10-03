@@ -7,36 +7,28 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 )
 
-// settingsPath is the committed project settings file, which carries hooks.
-const settingsPath = ".claude/settings.json"
-
-// committedHooks are the one-line shims that forward each hook's JSON to the binary, behind
-// a PATH that finds terma when Claude starts from the Dock or an IDE.
-var committedHooks = []struct {
+// claudeHooks are the hooks that forward each event's JSON to the binary.
+var claudeHooks = []struct {
 	Event   string
 	Matcher string
-	Command string
+	Hook    string
 }{
-	{"SessionStart", "", hookmgr.PathHookCommand("session-start")},
-	{"SessionEnd", "", hookmgr.PathHookCommand("session-end")},
+	{"SessionStart", "", "session-start"},
+	{"SessionEnd", "", "session-end"},
 	// Edits build the manifest; the Agent tool's response (Task in older builds) is the only place a
 	// subagent's model is named.
-	{"PostToolUse", "Edit|Write|MultiEdit|NotebookEdit|Agent|Task", hookmgr.PathHookCommand("post-tool-use")},
-	{"Stop", "", hookmgr.PathHookCommand("stop")},
-	{"StopFailure", "", hookmgr.PathHookCommand("stop-failure")},
+	{"PostToolUse", "Edit|Write|MultiEdit|NotebookEdit|Agent|Task", "post-tool-use"},
+	{"Stop", "", "stop"},
+	{"StopFailure", "", "stop-failure"},
 	// The one hook before a turn exports anything, so the relay is up and the session claimed first.
 	// It must print nothing: its stdout goes to the model.
-	{"UserPromptSubmit", "", hookmgr.PathHookCommand("user-prompt-submit")},
-	{"SubagentStart", "", hookmgr.PathHookCommand("subagent-start")},
-	{"SubagentStop", "", hookmgr.PathHookCommand("subagent-stop")},
+	{"UserPromptSubmit", "", "user-prompt-submit"},
+	{"SubagentStart", "", "subagent-start"},
+	{"SubagentStop", "", "subagent-stop"},
 }
 
-// planSettings merges terma's hooks into .claude/settings.json; unknown keys survive byte-for-byte.
-func planSettings(root string, install bool) (hookmgr.Plan, error) {
-	return planClaude(root, settingsPath, hookmgr.PathHookCommand, install)
-}
-
-// planUserHooks merges global mode's machine-wide hooks into <configDir>/settings.json.
+// planUserHooks merges terma's machine-wide hooks into <configDir>/settings.json; unknown
+// keys survive byte-for-byte.
 func planUserHooks(configDir string, command func(event string) string, install bool) (hookmgr.Plan, error) {
 	return planClaude(configDir, "settings.json", command, install)
 }
@@ -47,9 +39,9 @@ func planClaude(root, path string, command func(event string) string, install bo
 		Command string `json:"command"`
 		Timeout int    `json:"timeout,omitempty"`
 	}
-	own := make([]hookmgr.EventHook, 0, len(committedHooks))
-	for _, h := range committedHooks {
-		entry, err := hookmgr.Group(h.Event, h.Matcher, hookCmd{Type: "command", Command: command(hookmgr.HookEventOf(h.Command)), Timeout: 10})
+	own := make([]hookmgr.EventHook, 0, len(claudeHooks))
+	for _, h := range claudeHooks {
+		entry, err := hookmgr.Group(h.Event, h.Matcher, hookCmd{Type: "command", Command: command(h.Hook), Timeout: 10})
 		if err != nil {
 			return hookmgr.Plan{}, err
 		}

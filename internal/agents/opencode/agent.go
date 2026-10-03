@@ -6,7 +6,6 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/harness"
-	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
@@ -26,11 +25,6 @@ func (Agent) Name() string { return name }
 func (Agent) DisplayName() string { return displayName }
 
 func (Agent) Installed(ctx context.Context) bool { return exporter{}.Detect(ctx).Found }
-func (Agent) HooksPath() string                  { return "" }
-func (Agent) Default(string) bool                { return false }
-func (Agent) Plan(string, bool) (hookmgr.Plan, error) {
-	return hookmgr.Plan{}, nil
-}
 
 func (Agent) Events() map[string]agents.Handler {
 	events := hookrun.Extension{Tool: "opencode", Source: "session.created"}.Events("opencode")

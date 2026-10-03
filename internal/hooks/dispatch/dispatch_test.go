@@ -8,7 +8,6 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -17,13 +16,10 @@ import (
 // what ran.
 type fake struct{ ran *[]string }
 
-func (fake) Name() string                            { return "fake" }
-func (fake) DisplayName() string                     { return "Fake" }
-func (fake) Installed(context.Context) bool          { return true }
-func (fake) HooksPath() string                       { return "" }
-func (fake) Default(string) bool                     { return false }
-func (fake) Plan(string, bool) (hookmgr.Plan, error) { return hookmgr.Plan{}, nil }
-func (fake) FlushAfter() []string                    { return []string{"fake-stop"} }
+func (fake) Name() string                   { return "fake" }
+func (fake) DisplayName() string            { return "Fake" }
+func (fake) Installed(context.Context) bool { return true }
+func (fake) FlushAfter() []string           { return []string{"fake-stop"} }
 func (f fake) record(name string) agents.Handler {
 	return func(context.Context, hookrun.Env) error { *f.ran = append(*f.ran, name); return nil }
 }

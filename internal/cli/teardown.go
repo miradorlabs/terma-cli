@@ -115,8 +115,8 @@ func (app *App) undoSetup(ctx context.Context, out io.Writer) error {
 	} else if removed {
 		fmt.Fprintln(out, "Removed the relay service.")
 	}
-	// Without its token the relay refuses to run and hooks write no claims, so a hook in a
-	// bound repository cannot start it again; setup writes a new one.
+	// Without its token the relay refuses to run and hooks write no claims, so no hook can
+	// start it again; setup writes a new one.
 	dir, err := claim.Dir()
 	if err != nil {
 		return err

@@ -252,7 +252,7 @@ func agentLine(v HarnessVerdict, bound bool) string {
 	case RouteOtherProject:
 		return "→ reporting to team " + v.OtherProject + ", not this one — run `terma setup`"
 	case RouteRepoDecides:
-		// In a bound repository status must give doctor's answer for this repository.
+		// In a collected folder status must give doctor's answer for it.
 		if bound && !v.RepoAsks {
 			return "→ no telemetry: sessions here send nothing (run `terma setup`)"
 		}

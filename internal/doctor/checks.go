@@ -63,7 +63,7 @@ func stateCheck() (Check, bool) {
 	return Check{Status: Warn, Detail: fmt.Sprintf("%d migration(s) from this update not applied yet", migrate.Remaining(s)), Fix: "terma update"}, true
 }
 
-// GlobalDestination says where global mode sends an unbound repository's sessions. Only a
+// GlobalDestination says where global mode sends a folder's sessions. Only a
 // project this command resolved has a name here; the policy carries the team's id alone.
 func GlobalDestination(cfg *config.Config) string {
 	id := cmp.Or(cfg.Policy.DefaultProjectID, cfg.ProjectID)

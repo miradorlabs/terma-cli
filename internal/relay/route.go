@@ -17,7 +17,7 @@ import (
 // Why a part cannot leave now; the same reason names the drop when its hold runs out.
 const (
 	whyNoTrace        = "no_session_trace"   // a span of a trace no record has named yet
-	whyUnclaimed      = "unclaimed_expired"  // no hook of an opted-in repository claimed the session
+	whyUnclaimed      = "unclaimed_expired"  // no hook in a collected folder claimed the session
 	whyProcess        = "uncovered_process"  // claimed, but by other processes: resumed elsewhere
 	whyNoKey          = "no_key"             // claimed, but this machine holds no key for the project
 	whyAmbiguous      = "ambiguous_process"  // no session named; its process named more than one session

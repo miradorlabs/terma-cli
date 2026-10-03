@@ -2,8 +2,6 @@ package cursor
 
 import (
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -11,9 +9,12 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 )
 
+// testCommand is a machine-wide hook entry's command, as setup writes it.
+var testCommand = hookmgr.UserHookCommand("/opt/terma/bin/terma")
+
 func TestCursorHooksMergeKeepsUnknownKeysAndUserHooks(t *testing.T) {
 	root := t.TempDir()
-	hookruntest.WriteFile(t, root, hooksPath, `{
+	hookruntest.WriteFile(t, root, "hooks.json", `{
   "version": 1,
   "hooks": {
     "afterFileEdit": [{"command": "./format.sh"}],
@@ -21,14 +22,14 @@ func TestCursorHooksMergeKeepsUnknownKeysAndUserHooks(t *testing.T) {
   }
 }
 `)
-	plan, err := planHooks(root, true)
+	plan, err := planUserHooks(root, testCommand, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := hookmgr.Apply(root, plan); err != nil {
 		t.Fatal(err)
 	}
-	got := hookruntest.ReadFile(t, root, hooksPath)
+	got := hookruntest.ReadFile(t, root, "hooks.json")
 	var doc struct {
 		Version int `json:"version"`
 		Hooks   map[string][]struct {
@@ -45,7 +46,7 @@ func TestCursorHooksMergeKeepsUnknownKeysAndUserHooks(t *testing.T) {
 	if len(doc.Hooks["afterFileEdit"]) != 2 || doc.Hooks["afterFileEdit"][0].Command != "./format.sh" {
 		t.Fatalf("user's afterFileEdit hook lost: %+v", doc.Hooks["afterFileEdit"])
 	}
-	if doc.Hooks["afterFileEdit"][1].Command != hookmgr.HookCommand("cursor-file-edit") || doc.Hooks["afterFileEdit"][1].Timeout != 10 {
+	if doc.Hooks["afterFileEdit"][1].Command != testCommand("cursor-file-edit") || doc.Hooks["afterFileEdit"][1].Timeout != 10 {
 		t.Fatalf("terma hook wrong: %+v", doc.Hooks["afterFileEdit"][1])
 	}
 	if len(doc.Hooks["beforeShellExecution"]) != 1 {
@@ -54,14 +55,14 @@ func TestCursorHooksMergeKeepsUnknownKeysAndUserHooks(t *testing.T) {
 	if len(doc.Hooks["sessionStart"]) != 1 || len(doc.Hooks["sessionEnd"]) != 1 {
 		t.Fatalf("session hooks missing: %v", doc.Hooks)
 	}
-	if again, _ := planHooks(root, true); !again.Empty() {
+	if again, _ := planUserHooks(root, testCommand, true); !again.Empty() {
 		t.Fatal("install should be idempotent")
 	}
-	un, _ := planHooks(root, false)
+	un, _ := planUserHooks(root, testCommand, false)
 	if err := hookmgr.Apply(root, un); err != nil {
 		t.Fatal(err)
 	}
-	got = hookruntest.ReadFile(t, root, hooksPath)
+	got = hookruntest.ReadFile(t, root, "hooks.json")
 	if strings.Contains(got, "terma") || !strings.Contains(got, "./format.sh") || !strings.Contains(got, "./audit.sh") || !strings.Contains(got, `"version": 1`) {
 		t.Fatalf("uninstall wrong:\n%s", got)
 	}
@@ -74,23 +75,23 @@ func TestCursorUninstallPreservesSchemaVersion(t *testing.T) {
 		t.Run(before, func(t *testing.T) {
 			root := t.TempDir()
 			if before != "" {
-				hookruntest.WriteFile(t, root, hooksPath, before)
+				hookruntest.WriteFile(t, root, "hooks.json", before)
 			}
-			plan, err := planHooks(root, true)
+			plan, err := planUserHooks(root, testCommand, true)
 			if err != nil {
 				t.Fatal(err)
 			}
 			if err := hookmgr.Apply(root, plan); err != nil {
 				t.Fatal(err)
 			}
-			un, err := planHooks(root, false)
+			un, err := planUserHooks(root, testCommand, false)
 			if err != nil {
 				t.Fatal(err)
 			}
 			if err := hookmgr.Apply(root, un); err != nil {
 				t.Fatal(err)
 			}
-			got := hookruntest.ReadFile(t, root, hooksPath)
+			got := hookruntest.ReadFile(t, root, "hooks.json")
 			want := before
 			if want == "" {
 				want = `{"version":1}`
@@ -104,30 +105,17 @@ func TestCursorUninstallPreservesSchemaVersion(t *testing.T) {
 
 func TestCursorHooksRefusesMalformedFile(t *testing.T) {
 	root := t.TempDir()
-	hookruntest.WriteFile(t, root, hooksPath, `{"version": 1, "hooks": [`)
-	if _, err := planHooks(root, true); err == nil {
+	hookruntest.WriteFile(t, root, "hooks.json", `{"version": 1, "hooks": [`)
+	if _, err := planUserHooks(root, testCommand, true); err == nil {
 		t.Fatal("a file terma cannot parse must not be rewritten")
-	}
-}
-
-func TestHasCursor(t *testing.T) {
-	root := t.TempDir()
-	if hasConfig(root) {
-		t.Fatal("no .cursor yet")
-	}
-	if err := os.MkdirAll(filepath.Join(root, ".cursor", "rules"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if !hasConfig(root) {
-		t.Fatal("a .cursor directory means the repository is used with Cursor")
 	}
 }
 
 // Capture continues through follow-up loops without changing anyone else's limit.
 func TestCursorObservationHooksPreserveUserPolicy(t *testing.T) {
 	root := t.TempDir()
-	hookruntest.WriteFile(t, root, hooksPath, `{"version":1,"hooks":{"stop":[{"command":"./continue.sh","loop_limit":2,"timeout":42,"future_option":true}],"beforeSubmitPrompt":[{"command":"./policy.sh","failClosed":true}]}}`)
-	p, err := planHooks(root, true)
+	hookruntest.WriteFile(t, root, "hooks.json", `{"version":1,"hooks":{"stop":[{"command":"./continue.sh","loop_limit":2,"timeout":42,"future_option":true}],"beforeSubmitPrompt":[{"command":"./policy.sh","failClosed":true}]}}`)
+	p, err := planUserHooks(root, testCommand, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +125,7 @@ func TestCursorObservationHooksPreserveUserPolicy(t *testing.T) {
 	var doc struct {
 		Hooks map[string][]map[string]json.RawMessage `json:"hooks"`
 	}
-	if err = json.Unmarshal([]byte(hookruntest.ReadFile(t, root, hooksPath)), &doc); err != nil {
+	if err = json.Unmarshal([]byte(hookruntest.ReadFile(t, root, "hooks.json")), &doc); err != nil {
 		t.Fatal(err)
 	}
 	if string(doc.Hooks["stop"][0]["loop_limit"]) != "2" || string(doc.Hooks["stop"][1]["loop_limit"]) != "null" {
@@ -168,14 +156,14 @@ func TestCursorObservationHooksPreserveUserPolicy(t *testing.T) {
 			t.Fatalf("missing %s", name)
 		}
 	}
-	p, err = planHooks(root, false)
+	p, err = planUserHooks(root, testCommand, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err = hookmgr.Apply(root, p); err != nil {
 		t.Fatal(err)
 	}
-	got := hookruntest.ReadFile(t, root, hooksPath)
+	got := hookruntest.ReadFile(t, root, "hooks.json")
 	if strings.Contains(got, "terma") || !strings.Contains(got, "future_option") || !strings.Contains(got, "failClosed") {
 		t.Fatal(got)
 	}

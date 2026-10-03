@@ -8,14 +8,12 @@
 //
 // Hooks (hooks.go)
 //
-//	Trusting        whether the agent will run the hooks a repository commits
-//	UserHooks       machine-wide hooks, for global mode
+//	UserHooks       the machine-wide hooks setup writes
 //	UserHooksTrust  the step the developer takes before those run
 //	ManagedHooks    the same hooks as configuration an organization deploys
 //	PayloadReader   a hook payload that names its session in keys of its own
 //	Renderer        a hook that draws something (a status line)
 //	OffSwitched     what an event still runs with hooks switched off
-//	Retrusting      the note a refresh prints when the agent must trust hooks again
 //
 // Surfaces (surfaces.go)
 //

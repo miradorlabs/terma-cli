@@ -26,13 +26,10 @@ func (a Agent) DisplayName() string { return a.ID }
 func (Agent) Installed(context.Context) bool { return true }
 
 // HooksPath is "": the agent commits no hooks file.
-func (Agent) HooksPath() string { return "" }
 
 // Default is false: install never wires it unasked.
-func (Agent) Default(string) bool { return false }
 
 // Plan plans nothing.
-func (Agent) Plan(string, bool) (hookmgr.Plan, error) { return hookmgr.Plan{}, nil }
 
 // Events handles no event.
 func (Agent) Events() map[string]agents.Handler { return nil }

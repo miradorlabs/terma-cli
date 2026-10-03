@@ -29,11 +29,6 @@ func (Agent) Installed(context.Context) bool {
 	}
 	return false
 }
-func (Agent) HooksPath() string        { return hooksPath }
-func (Agent) Default(root string) bool { return hasConfig(root) }
-func (Agent) Plan(root string, install bool) (hookmgr.Plan, error) {
-	return planHooks(root, install)
-}
 
 func (Agent) Events() map[string]agents.Handler {
 	return map[string]agents.Handler{

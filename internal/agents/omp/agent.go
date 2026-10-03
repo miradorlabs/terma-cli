@@ -7,7 +7,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/agents/internal/relayexport"
 	"github.com/miradorlabs/terma-cli/internal/harness"
-	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
@@ -16,8 +15,7 @@ const (
 	displayName = "Omp"
 )
 
-// Agent is Omp: attribution through a committed hook file, telemetry through a
-// user-scope extension.
+// Agent is Omp: telemetry through a user-scope extension.
 type Agent struct {
 	relayexport.Own
 }
@@ -29,12 +27,6 @@ func (Agent) Name() string { return name }
 func (Agent) DisplayName() string { return displayName }
 
 func (Agent) Installed(ctx context.Context) bool { return exporter{}.Detect(ctx).Found }
-func (Agent) HooksPath() string                  { return hooksPath }
-func (Agent) Default(root string) bool           { return hasConfig(root) }
-
-func (Agent) Plan(root string, install bool) (hookmgr.Plan, error) {
-	return planHooks(root, install)
-}
 
 func (Agent) Events() map[string]agents.Handler {
 	return hookrun.Extension{Tool: "omp"}.Events("omp")
