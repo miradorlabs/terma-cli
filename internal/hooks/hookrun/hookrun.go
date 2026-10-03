@@ -144,9 +144,6 @@ func (e Env) Repo(ctx context.Context) (*Repo, error) {
 // linked worktree, which one.
 func (e Env) EmitFor(r *Repo, ev spool.Event) {
 	ev.Global = e.Policy.Global()
-	if r != nil {
-		ev.Workspace = r.Root
-	}
 	if r != nil && (r.ProjectID != "" || r.Worktree != "") {
 		if ev.Attrs == nil {
 			ev.Attrs = map[string]any{}

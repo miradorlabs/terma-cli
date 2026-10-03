@@ -30,7 +30,7 @@
 //	MachineRefresher home-directory files `terma update --refresh` rewrites
 //	ContentConsent   the consent a spooled reply or title travels under
 //	StatusLiner      the status line terma wraps to read plan usage
-//	Notifier         the end-of-turn notifier terma chains in front of the developer's
+//	Notifier         an end-of-turn notifier an earlier terma chained, which teardown restores
 //	EmissionChecker  an export that several settings files decide together
 //
 // How the relay places and redacts an agent's records is declared through

@@ -19,6 +19,19 @@ var hookContent = map[string]struct{ prompts, toolContent []string }{
 	hookrun.EventApprovalAsked: {toolContent: []string{hookrun.AttrReason}},
 }
 
+// contentFree are the event kinds that carry no content, or (a reply, a thread's name)
+// that Allowed sends or withholds whole. A kind in neither list is withheld whenever the
+// policy withholds any content, so a new kind leaks nothing until it is classified.
+var contentFree = map[string]bool{
+	hookrun.EventSessionStart: true, hookrun.EventSessionEnd: true, hookrun.EventModelCall: true,
+	hookrun.EventTurnSummary: true, hookrun.EventCompaction: true, hookrun.EventFilesTouched: true,
+	hookrun.EventCommitStamped: true, hookrun.EventCommit: true, hookrun.EventCommitUnattributed: true,
+	hookrun.EventSessionQuota: true, hookrun.EventSessionAccount: true, hookrun.EventSessionLimit: true,
+	hookrun.EventSessionCapture: true, hookrun.EventSubagentStart: true, hookrun.EventSubagentEnd: true,
+	hookrun.EventSubagentCall: true, hookrun.EventSessionObservation: true,
+	hookrun.EventAssistantMessage: true, hookrun.EventSessionTitle: true,
+}
+
 // Outgoing is e as it may leave for projectID under org, the team's policy now, without
 // the content that policy withholds (config.Policy.Content, the relay's rule); false when
 // none of it may leave.
@@ -29,7 +42,7 @@ func (r Router) Outgoing(org config.Policy, projectID string, e spool.Event) (sp
 	prompts, toolContent := routing.EffectivePolicy(org, projectID).Content()
 	c, ok := hookContent[e.Name]
 	if !ok {
-		return e, true
+		return e, contentFree[e.Name] || prompts && toolContent
 	}
 	var drop []string
 	if !prompts {

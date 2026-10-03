@@ -203,12 +203,6 @@ func (Agent) UserHooksTrusted() (present, trusted bool, err error) {
 	return true, true, nil
 }
 
-// NotifierInstalled reports whether terma's notifier is in Codex's config.
-func (Agent) NotifierInstalled() (bool, error) { return exporter{}.NotifierInstalled() }
-
-// InstallNotifier puts terma's notifier in front of the user's own.
-func (Agent) InstallNotifier() (bool, error) { return exporter{}.InstallNotifier() }
-
 // RemoveNotifier restores the user's own notifier.
 func (Agent) RemoveNotifier() (bool, error) { return exporter{}.RemoveNotifier() }
 

@@ -23,8 +23,6 @@ type Event struct {
 	Name      string    `json:"name"`
 	SessionID string    `json:"session_id,omitempty"`
 	Repo      string    `json:"repo,omitempty"`
-	// Workspace is local policy context; the OTLP encoder never exports it.
-	Workspace string `json:"workspace,omitempty"`
 	// Global records machine-wide capture, so queued events can be withheld after a
 	// switch back to repository coverage. Local only.
 	Global bool           `json:"global,omitempty"`

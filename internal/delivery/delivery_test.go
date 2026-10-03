@@ -4,11 +4,15 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -214,5 +218,48 @@ func TestOutgoingWithholdsOnlyWhatThePolicyDoes(t *testing.T) {
 	// Not validated: nothing leaves at all.
 	if _, ok := (Router{}).Outgoing(config.NoPolicy("", ""), "p1", prompt); ok {
 		t.Fatal("an event left under no policy")
+	}
+}
+
+// Every event kind the hooks spool is classified, as content-bearing or content-free, so
+// delivery never sends an unknown kind's content past a policy that withholds it.
+func TestEveryHookEventKindIsClassified(t *testing.T) {
+	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	file, err := parser.ParseFile(token.NewFileSet(), "../hooks/hookrun/events.go", nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kinds := 0
+	ast.Inspect(file, func(n ast.Node) bool {
+		spec, ok := n.(*ast.ValueSpec)
+		if !ok {
+			return true
+		}
+		for i, name := range spec.Names {
+			if !strings.HasPrefix(name.Name, "Event") || i >= len(spec.Values) {
+				continue
+			}
+			lit, ok := spec.Values[i].(*ast.BasicLit)
+			if !ok {
+				continue
+			}
+			kind, _ := strconv.Unquote(lit.Value)
+			kinds++
+			if _, content := hookContent[kind]; content == contentFree[kind] {
+				t.Errorf("%s (%s): classify it in exactly one of hookContent or contentFree", name.Name, kind)
+			}
+		}
+		return true
+	})
+	if kinds < 20 {
+		t.Fatalf("found %d event kinds in events.go; the parse missed them", kinds)
+	}
+	// An unclassified kind leaves only under a policy that withholds nothing.
+	unknown := spool.Event{Name: "terma.something.new", Attrs: map[string]any{"text": "private"}}
+	if _, ok := (Router{}).Outgoing(config.Policy{Mode: config.ModeRepo, IncludeToolContent: true}, "p1", unknown); ok {
+		t.Error("an unclassified kind left under a policy withholding prompts")
+	}
+	if _, ok := (Router{}).Outgoing(config.Policy{Mode: config.ModeRepo, IncludePrompts: true, IncludeToolContent: true}, "p1", unknown); !ok {
+		t.Error("an unclassified kind was withheld under a policy withholding nothing")
 	}
 }
