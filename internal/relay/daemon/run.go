@@ -38,6 +38,11 @@ type Config struct {
 	Listening func(addr net.Addr, hold time.Duration)
 	// Log, when set, is told of the relay's start and exit, with its counters.
 	Log *Log
+	// Successor is a relay a stopping one started to take its socket: it waits for that
+	// one's lock as long as a drain takes.
+	Successor bool
+	// SpawnSuccessor starts such a relay, detached; nil starts none.
+	SpawnSuccessor func() error
 }
 
 // Result is how a relay's run ended.
@@ -65,7 +70,7 @@ func Run(ctx context.Context, c Config) (Result, error) {
 			return res, nil
 		}
 	}
-	unlock, busy, err := lock(ctx, c.Dir, res.Service)
+	unlock, busy, err := lock(ctx, c.Dir, res.Service, c.Successor)
 	if err != nil {
 		return res, err
 	}
@@ -73,7 +78,9 @@ func Run(ctx context.Context, c Config) (Result, error) {
 		res.AlreadyRunning = busy
 		return res, nil
 	}
-	defer unlock()
+	var unlockOnce sync.Once
+	release := func() { unlockOnce.Do(unlock) }
+	defer release()
 	token, err := Token()
 	if err != nil {
 		return res, err
@@ -101,20 +108,23 @@ func Run(ctx context.Context, c Config) (Result, error) {
 	claim.Prune(time.Now())
 	pidPath := filepath.Join(c.Dir, PIDFile)
 	_ = config.WriteFileAtomicNoSync(pidPath, []byte(strconv.Itoa(os.Getpid())+"\n"), 0o600)
-	defer func() { _ = os.Remove(pidPath) }()
 	runPath := filepath.Join(c.Dir, RunFile)
 	if data, err := json.Marshal(RunInfo{PID: os.Getpid(), Environment: c.Environment, Service: res.Service}); err == nil {
 		_ = config.WriteFileAtomicNoSync(runPath, append(data, '\n'), 0o600)
 	}
-	defer func() { _ = os.Remove(runPath) }()
+	// Gone before the lock is, so the next relay's records are never removed.
+	forget := func() { _ = os.Remove(pidPath); _ = os.Remove(runPath) }
+	defer forget()
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	// A client that trickles its request cannot hold a connection open.
-	srv := &http.Server{Handler: r.Handler(), ConnContext: r.ConnContext, ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout: 30 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 2 * time.Minute}
+	var accepted fresh
+	srv := &http.Server{Handler: r.Handler(), ConnContext: r.ConnContext, ConnState: accepted.track,
+		ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 2 * time.Minute}
+	g := &gate{Listener: ln}
 	served := make(chan error, 1)
-	go func() { served <- srv.Serve(ln) }()
+	go func() { served <- srv.Serve(g) }()
 	engine := make(chan struct{})
 	go func() { r.Run(ctx); close(engine) }()
 	var workers sync.WaitGroup
@@ -122,8 +132,19 @@ func Run(ctx context.Context, c Config) (Result, error) {
 		workers.Go(func() { w(ctx) })
 	}
 
-	var serveErr error
-	res.Replaced, res.SetupGone, serveErr = watch(ctx, r, c.Dir, c.Idle, served)
+	why, serveErr := watch(ctx, r, c.Dir, c.Idle, res.Service, served)
+	res.Replaced = why == stopReplaced
+	// A relay stopped once its token went (teardown) is done for good, however it was stopped.
+	res.SetupGone = why == stopSetupGone || !setUp()
+	var h *handoff
+	if why.handsOff() && !res.SetupGone {
+		h = startHandoff(c.Dir, addr, ln, c.SpawnSuccessor)
+	}
+	if why != stopServeFailed {
+		g.stop()
+		<-served
+		accepted.await(newRequestWait)
+	}
 	shutdown, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelShutdown()
 	_ = srv.Shutdown(shutdown)
@@ -138,22 +159,67 @@ func Run(ctx context.Context, c Config) (Result, error) {
 		_ = config.WriteFileAtomicNoSync(statsPath, append(data, '\n'), 0o600)
 	}
 	if line, err := json.Marshal(snap.Counters); err == nil {
-		c.Log.Printf("relay pid %d stopped (%s): %s", os.Getpid(), res.why(serveErr), line)
+		c.Log.Printf("relay pid %d stopped (%s): %s", os.Getpid(), why.describe(serveErr), line)
+	}
+	await := h.offer()
+	forget()
+	release()
+	if await != nil {
+		if await() {
+			c.Log.Printf("relay pid %d handed its socket to the next relay", os.Getpid())
+		} else {
+			c.Log.Printf("relay pid %d: no relay took its socket", os.Getpid())
+		}
 	}
 	return res, serveErr
 }
 
-// why names how a run ended, for the relay log.
-func (r Result) why(err error) string {
+// stopReason is why a relay stops.
+type stopReason int
+
+const (
+	// stopAsked is terma's stop request (Stop), which the signal after it, if any, carries out.
+	stopAsked stopReason = iota
+	// stopSignalled is a signal terma did not ask for: Ctrl-C, kill, a service manager's stop.
+	stopSignalled
+	stopIdle
+	stopReplaced
+	stopSetupGone
+	stopServeFailed
+	// stopForService is an on-demand relay stepping aside for the service's.
+	stopForService
+)
+
+// handsOff reports whether a relay stopping for r passes its socket on: only for terma's
+// own restarts. One that idled, failed or lost its setup has nothing to keep listening
+// for, and a signal from anyone else stops it for good.
+func (r stopReason) handsOff() bool {
+	return r == stopAsked || r == stopReplaced || r == stopForService
+}
+
+// describe names how a run ended, for the relay log.
+func (r stopReason) describe(err error) string {
 	switch {
 	case err != nil:
 		return err.Error()
-	case r.Replaced:
+	case r == stopReplaced:
 		return "its binary was replaced"
-	case r.SetupGone:
+	case r == stopSetupGone:
 		return "its setup was removed"
+	case r == stopIdle:
+		return "idle"
+	case r == stopForService:
+		return "the service's relay takes over"
+	case r == stopSignalled:
+		return "signalled"
 	}
-	return "stopped or idle"
+	return "asked to stop"
+}
+
+// setUp reports whether the relay's token is still there.
+func setUp() bool {
+	_, err := Token()
+	return err == nil
 }
 
 // RunInfo is what the running relay records about itself.
@@ -182,21 +248,33 @@ func RunningRelay(dir string) (RunInfo, bool) {
 	return info, true
 }
 
-// lockPoll is how often the service's relay retries a lock another relay holds. Nothing
-// listens between that relay's exit and the retry, and an agent never resends what it
-// exported into the gap, so the wait is short.
+// lockPoll is how often the service's relay retries a lock another relay holds. Where no
+// socket is handed over (Windows), nothing listens between that relay's exit and the
+// retry, so the wait is short.
 const lockPoll = 250 * time.Millisecond
 
-// lock takes the single-instance lock, with wait waiting out a hook-started relay; a nil
-// unlock means this relay must not run.
-func lock(ctx context.Context, dir string, wait bool) (unlock func(), busy bool, err error) {
+// lock takes the single-instance lock; a nil unlock means this relay must not run. The
+// service's relay waits out another relay, saying so in WaitingFile, and a successor
+// waits out the relay that started it.
+func lock(ctx context.Context, dir string, service, successor bool) (unlock func(), busy bool, err error) {
 	path := filepath.Join(dir, LockFile)
+	waiting := filepath.Join(dir, WaitingFile)
+	if service {
+		defer func() { _ = os.Remove(waiting) }()
+	}
+	poll, deadline := lockPoll, time.Time{}
+	if successor {
+		poll, deadline = successorPoll, time.Now().Add(successorWait)
+	}
 	unlock, err = flock.TryLock(path)
-	for wait && flock.IsBusy(err) {
+	for (service || successor && time.Now().Before(deadline)) && flock.IsBusy(err) {
+		if service {
+			touchWaiting(dir)
+		}
 		select {
 		case <-ctx.Done():
 			return nil, false, nil
-		case <-time.After(lockPoll):
+		case <-time.After(poll):
 		}
 		unlock, err = flock.TryLock(path)
 	}
@@ -206,8 +284,13 @@ func lock(ctx context.Context, dir string, wait bool) (unlock func(), busy bool,
 	return unlock, false, err
 }
 
-// listen writes a failure where status reads it, since a hook-started relay has nowhere to print.
+// listen takes the socket a stopping relay offers for addr, or listens afresh, writing a
+// failure where status reads it, since a hook-started relay has nowhere to print.
 func listen(dir, addr string) (net.Listener, error) {
+	if ln := take(dir, addr); ln != nil {
+		_ = os.Remove(filepath.Join(dir, ErrorFile))
+		return ln, nil
+	}
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		err = fmt.Errorf("relay: listen on %s: %w", addr, err)
@@ -218,7 +301,7 @@ func listen(dir, addr string) (net.Listener, error) {
 	return ln, nil
 }
 
-func watch(ctx context.Context, r *relay.Relay, dir string, idle time.Duration, served <-chan error) (replaced, setupGone bool, err error) {
+func watch(ctx context.Context, r *relay.Relay, dir string, idle time.Duration, service bool, served <-chan error) (stopReason, error) {
 	self := executableStamp()
 	lastPrune := time.Now()
 	tick := time.NewTicker(time.Second)
@@ -226,31 +309,37 @@ func watch(ctx context.Context, r *relay.Relay, dir string, idle time.Duration, 
 	for {
 		select {
 		case <-ctx.Done():
-			return false, false, nil
+			if stopRequested(dir) {
+				return stopAsked, nil
+			}
+			return stopSignalled, nil
 		case err := <-served:
 			if errors.Is(err, http.ErrServerClosed) {
 				err = nil
 			}
-			return false, false, err
+			return stopServeFailed, err
 		case <-tick.C:
 		}
 		d, quiet := r.Idle()
-		if _, err := Token(); err != nil {
-			return false, true, nil
+		if !setUp() {
+			return stopSetupGone, nil
 		}
 		if stopRequested(dir) {
-			return false, false, nil
+			return stopAsked, nil
 		}
 		if time.Since(lastPrune) > time.Hour {
 			claim.Prune(time.Now())
 			lastPrune = time.Now()
 		}
-		// A replaced binary steps aside only once quiet: agents do not retry a refused connection.
+		// Stepping aside only once quiet, so nothing waiting in memory for a claim is lost.
 		if quiet && d >= time.Minute && self != "" && executableStamp() != self {
-			return true, false, nil
+			return stopReplaced, nil
+		}
+		if quiet && !service && handoffSupported && serviceWaiting(dir) {
+			return stopForService, nil
 		}
 		if quiet && idle > 0 && d >= idle {
-			return false, false, nil
+			return stopIdle, nil
 		}
 	}
 }

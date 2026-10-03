@@ -51,7 +51,7 @@ onboarding from a clean machine.`,
 func (app *App) runNate(cmd *cobra.Command) error {
 	out := cmd.OutOrStdout()
 
-	if err := app.undoSetup(cmd.Context(), out); err != nil {
+	if err := app.undoSetup(cmd.Context(), out, false); err != nil {
 		return err
 	}
 

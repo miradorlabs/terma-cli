@@ -24,7 +24,7 @@ func TestARelayLogsItsRunAndKeepsThePreviousCounters(t *testing.T) {
 		t.Fatal(err)
 	}
 	log := string(data)
-	if strings.Count(log, "listening on") != 2 || strings.Count(log, "stopped (stopped or idle)") != 2 {
+	if strings.Count(log, "listening on") != 2 || strings.Count(log, "stopped (idle)") != 2 {
 		t.Fatalf("relay log:\n%s", log)
 	}
 	for _, name := range []string{StatsFile, PrevStatsFile} {
