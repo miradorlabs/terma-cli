@@ -132,11 +132,7 @@ delivery fetch it with your login; until they have, nothing they would send leav
 output to the relay, and the relay removes what the policy does not collect before
 anything leaves. Hook events, which queue on this machine and never pass the relay, are
 held to the same policy when they are sent: a prompt or tool call queued before the
-policy tightened leaves without its content. Paths the policy excludes withhold every record that names one, in a
-path field or as a word of a shell command (`cat secrets/app.env`), with the command's
-output, and a session run in an excluded directory sends nothing at all. Exclusion reads
-what an agent reports, so a file read indirectly, by a script or a program the command
-runs, is not caught.
+policy tightened leaves without its content.
 
 `terma setup` and `terma install` run the relay as a per-user background service, so it
 is up before any agent starts; with `--relay-service off`, hooks start it on demand.

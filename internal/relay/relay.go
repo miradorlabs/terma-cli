@@ -47,13 +47,8 @@ type Policy struct {
 	IncludePrompts     bool
 	IncludeToolContent bool
 	// Signals nil allows every signal; empty allows none.
-	Signals []string
-	// Excludes reports whether an attribute, in protojson's shape, names an excluded
-	// file; nil when nothing is excluded.
-	Excludes func(value any) bool
-	// ExcludedWorkspace drops everything: the claimed workspace is an excluded path.
-	ExcludedWorkspace bool
-	RequireClaim      bool
+	Signals      []string
+	RequireClaim bool
 }
 
 // ErrNoKey is Resolve's answer for a project this machine holds no key for; its parts wait, then drop.

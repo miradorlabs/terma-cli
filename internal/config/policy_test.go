@@ -44,8 +44,7 @@ func TestPolicyExpires(t *testing.T) {
 	}
 }
 
-// Content is the team's policy alone: path exclusions and a policy not validated
-// withhold all of it.
+// Content is the team's policy alone: a policy not validated withholds all of it.
 func TestContentIsTheTeamPolicys(t *testing.T) {
 	for _, c := range []struct {
 		name          string
@@ -56,7 +55,6 @@ func TestContentIsTheTeamPolicys(t *testing.T) {
 		{"both off", Policy{Mode: ModeRepo}, false, false},
 		{"prompts only", Policy{Mode: ModeRepo, IncludePrompts: true}, true, false},
 		{"tool content only", Policy{Mode: ModeRepo, IncludeToolContent: true}, false, true},
-		{"paths excluded", Policy{Mode: ModeRepo, IncludePrompts: true, IncludeToolContent: true, ExcludePaths: []string{".env"}}, false, false},
 		{"not validated", NoPolicy("", ""), false, false},
 	} {
 		if prompts, tool := c.pol.Content(); prompts != c.prompts || tool != c.tool {

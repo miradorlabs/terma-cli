@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -47,9 +46,8 @@ type policyResponse struct {
 		Version string `json:"version"`
 		Terma   struct {
 			Capture *struct {
-				ExcludePrompts     *bool     `json:"exclude_prompts"`
-				ExcludeToolContent *bool     `json:"exclude_tool_content"`
-				ExcludePaths       *[]string `json:"exclude_paths"`
+				ExcludePrompts     *bool `json:"exclude_prompts"`
+				ExcludeToolContent *bool `json:"exclude_tool_content"`
 			} `json:"capture"`
 			// Which of the two is present selects the mode.
 			Global        *struct{} `json:"global"`
@@ -70,17 +68,12 @@ func (r policyResponse) collectionPolicy() (config.Policy, error) {
 	t := r.Policy.Terma
 	c := t.Capture
 	if r.Policy.Version != "1.0" || (t.Global == nil) == (t.PerRepository == nil) ||
-		c == nil || c.ExcludePrompts == nil || c.ExcludeToolContent == nil || c.ExcludePaths == nil ||
+		c == nil || c.ExcludePrompts == nil || c.ExcludeToolContent == nil ||
 		r.Revision < 1 || r.UpdatedAt.IsZero() {
 		return config.Policy{}, fmt.Errorf("invalid collection policy: require version 1.0, one collection mode and complete capture rules")
 	}
-	for _, path := range *c.ExcludePaths {
-		if strings.TrimSpace(path) == "" {
-			return config.Policy{}, fmt.Errorf("invalid empty excluded path")
-		}
-	}
 	p := config.Policy{Mode: config.ModeRepo, IncludePrompts: !*c.ExcludePrompts,
-		IncludeToolContent: !*c.ExcludeToolContent, ExcludePaths: *c.ExcludePaths, Revision: r.Revision, UpdatedAt: r.UpdatedAt,
+		IncludeToolContent: !*c.ExcludeToolContent, Revision: r.Revision, UpdatedAt: r.UpdatedAt,
 		FetchedAt: time.Now().UTC()}
 	if t.Global != nil {
 		p.Mode = config.ModeGlobal

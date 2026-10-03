@@ -21,7 +21,6 @@ type Policy struct {
 	IncludeToolContent bool   `json:"include_tool_content"`
 	// CollectsNothing is set while no validated policy applies: nothing leaves the machine.
 	CollectsNothing bool      `json:"collects_nothing,omitempty"`
-	ExcludePaths    []string  `json:"exclude_paths,omitempty"`
 	Revision        int64     `json:"revision"`
 	UpdatedAt       time.Time `json:"updated_at"`
 	OrganizationID  string    `json:"organization_id,omitempty"`
@@ -47,10 +46,9 @@ func DefaultPolicy() Policy {
 }
 
 // Content is what content the team's policy lets a session carry, the one rule the relay
-// and the hook events both apply: path exclusions withhold all free text, since an
-// exporter does not name its source files, and a policy not validated withholds all.
+// and the hook events both apply: a policy not validated withholds all.
 func (p Policy) Content() (prompts, toolContent bool) {
-	if p.CollectsNothing || len(p.ExcludePaths) > 0 {
+	if p.CollectsNothing {
 		return false, false
 	}
 	return p.IncludePrompts, p.IncludeToolContent

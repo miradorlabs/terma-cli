@@ -45,10 +45,10 @@ func ClaimFromPayload(ctx context.Context, env Env, s PayloadSession, tool strin
 	var c claim.Claim
 	switch r, err := env.Repo(ctx); {
 	case err == nil && r.ProjectID != "":
-		c = claim.Claim{ProjectID: r.ProjectID, Tool: tool, Repo: r.Name, Root: r.Root, Worktree: r.Worktree}
+		c = claim.Claim{ProjectID: r.ProjectID, Tool: tool, Repo: r.Name, Worktree: r.Worktree}
 	case err != nil && env.Policy.Global() && env.Policy.DefaultProjectID != "":
 		// Global mode, outside any repository.
-		c = claim.Claim{ProjectID: env.Policy.DefaultProjectID, Tool: tool, Repo: filepath.Base(env.Cwd), Root: env.Cwd}
+		c = claim.Claim{ProjectID: env.Policy.DefaultProjectID, Tool: tool, Repo: filepath.Base(env.Cwd)}
 	default:
 		return false
 	}

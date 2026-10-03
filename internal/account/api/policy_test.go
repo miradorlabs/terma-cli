@@ -15,7 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
-const testCapture = `"capture":{"exclude_paths":[],"exclude_prompts":true,"exclude_tool_content":false}`
+const testCapture = `"capture":{"exclude_prompts":true,"exclude_tool_content":false}`
 
 func TestCollectionPolicyWireContract(t *testing.T) {
 	t.Setenv("TERMA_POLICY_STUB", "")

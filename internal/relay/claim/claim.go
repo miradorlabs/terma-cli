@@ -33,12 +33,9 @@ const Refresh = 5 * time.Minute
 
 // Claim says which project a session's telemetry belongs to; its top-level fields are the latest placement.
 type Claim struct {
-	ProjectID string `json:"project_id"`
-	Tool      string `json:"tool,omitempty"`
-	Repo      string `json:"repo,omitempty"`
-	// Root is the workspace the session runs in, which the relay checks against the
-	// team's excluded paths.
-	Root      string    `json:"root,omitempty"`
+	ProjectID string    `json:"project_id"`
+	Tool      string    `json:"tool,omitempty"`
+	Repo      string    `json:"repo,omitempty"`
 	Worktree  string    `json:"worktree,omitempty"`
 	ClaimedAt time.Time `json:"claimed_at"`
 	// PIDs are the processes the claiming hooks ran under, so a session resumed by another
@@ -54,7 +51,6 @@ type Placement struct {
 	ProjectID string    `json:"project_id"`
 	Tool      string    `json:"tool,omitempty"`
 	Repo      string    `json:"repo,omitempty"`
-	Root      string    `json:"root,omitempty"`
 	Worktree  string    `json:"worktree,omitempty"`
 	PIDs      []int     `json:"pids,omitempty"`
 	Since     time.Time `json:"since"`
@@ -83,7 +79,7 @@ func (c Claim) placements() []Placement {
 	if len(c.Placements) > 0 {
 		return c.Placements
 	}
-	return []Placement{{ProjectID: c.ProjectID, Tool: c.Tool, Repo: c.Repo, Root: c.Root, Worktree: c.Worktree, PIDs: c.PIDs}}
+	return []Placement{{ProjectID: c.ProjectID, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree, PIDs: c.PIDs}}
 }
 
 // At is the claim as it applies to a record pid sent at time at: the covering placement
@@ -103,7 +99,7 @@ func (c Claim) At(pid int, at time.Time) (Claim, bool) {
 	if best == nil {
 		return Claim{}, false
 	}
-	return Claim{ProjectID: best.ProjectID, Tool: best.Tool, Repo: best.Repo, Root: best.Root, Worktree: best.Worktree,
+	return Claim{ProjectID: best.ProjectID, Tool: best.Tool, Repo: best.Repo, Worktree: best.Worktree,
 		PIDs: best.PIDs, ClaimedAt: c.ClaimedAt, Placements: c.Placements}, true
 }
 
@@ -201,7 +197,7 @@ func Write(sessionID string, c Claim, now time.Time) bool {
 	if havePrev && samePlace(prev, c) {
 		since = prev.placements()[len(prev.placements())-1].Since
 	}
-	placements = append(placements, Placement{ProjectID: c.ProjectID, Tool: c.Tool, Repo: c.Repo, Root: c.Root, Worktree: c.Worktree, PIDs: c.PIDs, Since: since})
+	placements = append(placements, Placement{ProjectID: c.ProjectID, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree, PIDs: c.PIDs, Since: since})
 	if len(placements) > maxPlacements {
 		placements = placements[len(placements)-maxPlacements:]
 	}
@@ -215,7 +211,7 @@ func Write(sessionID string, c Claim, now time.Time) bool {
 }
 
 func samePlace(prev, c Claim) bool {
-	return prev.ProjectID == c.ProjectID && prev.Root == c.Root
+	return prev.ProjectID == c.ProjectID
 }
 
 func subset(a, b []int) bool {

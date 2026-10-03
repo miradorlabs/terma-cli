@@ -59,7 +59,7 @@ func (sb *Sandbox) StartAccount() *Account {
 				return
 			}
 			withhold := a.withholdContent.Load()
-			fmt.Fprintf(w, `{"policy":{"version":"1.0","terma":{"per_repository":{},"capture":{"exclude_paths":[],"exclude_prompts":%t,"exclude_tool_content":%t}}},"revision":1,"updated_at":"2026-09-30T12:27:05Z"}`, withhold, withhold)
+			fmt.Fprintf(w, `{"policy":{"version":"1.0","terma":{"per_repository":{},"capture":{"exclude_prompts":%t,"exclude_tool_content":%t}}},"revision":1,"updated_at":"2026-09-30T12:27:05Z"}`, withhold, withhold)
 		case "/v1/api-keys/server":
 			if a.denyMints.Load() {
 				w.WriteHeader(http.StatusForbidden)

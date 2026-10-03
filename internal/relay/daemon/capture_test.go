@@ -15,8 +15,6 @@ func TestCapturePolicy(t *testing.T) {
 	open := config.Policy{Mode: config.ModeRepo, IncludePrompts: true, IncludeToolContent: true}
 	global := open
 	global.Mode = config.ModeGlobal
-	excluding := open
-	excluding.ExcludePaths = []string{"secrets"}
 	record := func(signals ...string) *routing.Record {
 		return &routing.Record{Signals: signals, Harnesses: []string{"claude", "pi"}}
 	}
@@ -42,8 +40,6 @@ func TestCapturePolicy(t *testing.T) {
 			want{false, false, true, []string{}}},
 		{"catch-all has no agent to check", Capture{Org: global, Primary: true, Record: record("traces")},
 			want{true, true, false, []string{"traces"}}},
-		{"path exclusions withhold content", Capture{Org: excluding, Harness: "claude"},
-			want{false, false, true, nil}},
 		{"global mode's own project needs no claim", Capture{Org: global, Primary: true, Harness: "claude"},
 			want{true, true, false, nil}},
 		{"another project in global mode needs one", Capture{Org: global, Harness: "claude"},
@@ -56,10 +52,6 @@ func TestCapturePolicy(t *testing.T) {
 			if got.IncludePrompts != test.want.prompts || got.IncludeToolContent != test.want.tools || got.RequireClaim != test.want.requireClaim ||
 				!slices.Equal(got.Signals, test.want.signals) || (got.Signals == nil) != (test.want.signals == nil) {
 				t.Fatalf("got prompts=%v tools=%v requireClaim=%v signals=%#v, want %+v", got.IncludePrompts, got.IncludeToolContent, got.RequireClaim, got.Signals, test.want)
-			}
-			named := map[string]any{"file_path": map[string]any{"stringValue": "secrets/prod.env"}}
-			if excluded := got.Excludes != nil && got.Excludes(named); excluded != (len(test.in.Org.ExcludePaths) > 0) {
-				t.Fatalf("a value naming secrets/prod.env excluded=%v, want the organization's %v", excluded, test.in.Org.ExcludePaths)
 			}
 		})
 	}
@@ -87,15 +79,5 @@ func TestAnOldRecordsContentSwitchesNarrowNothing(t *testing.T) {
 	got := CapturePolicy(Capture{Org: config.Policy{Mode: config.ModeRepo, IncludePrompts: true, IncludeToolContent: true}, Record: &rec, Harness: "claude"})
 	if !got.IncludePrompts || !got.IncludeToolContent || !slices.Equal(got.Signals, []string{"logs"}) {
 		t.Fatalf("an old record narrowed content: %+v", got)
-	}
-}
-
-// A session claimed in an excluded workspace sends nothing; hooks no longer check.
-func TestCapturePolicyDropsAnExcludedWorkspace(t *testing.T) {
-	org := config.Policy{Mode: config.ModeRepo, IncludePrompts: true, IncludeToolContent: true, ExcludePaths: []string{"/w/secret/**"}}
-	for root, want := range map[string]bool{"/w/secret/repo": true, "/w/open": false, "": false} {
-		if got := CapturePolicy(Capture{Org: org, Harness: "claude", Root: root}).ExcludedWorkspace; got != want {
-			t.Errorf("root %q: ExcludedWorkspace = %v, want %v", root, got, want)
-		}
 	}
 }

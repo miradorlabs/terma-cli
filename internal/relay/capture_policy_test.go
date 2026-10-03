@@ -76,38 +76,15 @@ func TestQueuedExportsRespectSignalAndCoverageChanges(t *testing.T) {
 	}
 }
 
-func TestQueuedCapturePolicyFiltersPathsAndCorruptBodies(t *testing.T) {
+func TestQueuedCapturePolicyDropsCorruptBodies(t *testing.T) {
 	r := newRelay(Options{})
-	m := &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{{Attributes: []*commonpb.KeyValue{kv("tool_input", `{"file_path":"src/secrets/passwords.txt"}`)}}}}}}}}
-	b, err := proto.Marshal(m)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got, tl := r.withholdQueued(Traces, b, Policy{Excludes: excluding("**/secrets/**")}); got != nil || tl.excluded != 1 {
-		t.Fatalf("queued excluded path survived, or was not counted as one (%d)", tl.excluded)
-	}
 	if got, _ := r.withholdQueued(Traces, []byte{0xff}, Policy{}); got != nil {
 		t.Fatal("uncheckable body was forwarded")
-	}
-
-	// A queued batch keeps the spans that name no excluded file.
-	spans := m.ResourceSpans[0].ScopeSpans[0]
-	spans.Spans = append(spans.Spans, &tracepb.Span{Name: "Read README.md", Attributes: []*commonpb.KeyValue{kv("file_path", "README.md")}})
-	if b, err = proto.Marshal(m); err != nil {
-		t.Fatal(err)
-	}
-	got, tl := r.withholdQueued(Traces, b, Policy{Excludes: excluding("**/secrets/**")})
-	var kept tracepb.TracesData
-	if err := proto.Unmarshal(got, &kept); err != nil || tl.excluded != 1 {
-		t.Fatalf("excluded %d, err %v; want 1 excluded and the rest sent", tl.excluded, err)
-	}
-	if left := kept.ResourceSpans[0].ScopeSpans[0].Spans; len(left) != 1 || left[0].Name != "Read README.md" {
-		t.Fatalf("kept %v, want only the README span", left)
 	}
 }
 
 // A queued batch the upstream asks to retry is counted once, when it finally leaves.
-func TestQueuedExclusionCountsOnceAcrossRetries(t *testing.T) {
+func TestQueuedWithholdingCountsOnceAcrossRetries(t *testing.T) {
 	var calls atomic.Int32
 	host := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		if calls.Add(1) <= 2 {
@@ -117,7 +94,7 @@ func TestQueuedExclusionCountsOnceAcrossRetries(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer host.Close()
-	policy := Policy{Endpoint: host.URL, Key: "key", Excludes: excluding("**/secrets/**")}
+	policy := Policy{Endpoint: host.URL, Key: "key"}
 	r := newRelay(Options{Dir: t.TempDir(), Resolve: func(claim.Claim) (Policy, error) { return policy, nil }})
 	m := &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{
 		{Attributes: []*commonpb.KeyValue{kv("file_path", "src/secrets/app.env")}},
@@ -136,7 +113,7 @@ func TestQueuedExclusionCountsOnceAcrossRetries(t *testing.T) {
 	defer func() { cancel(); <-done }()
 	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["forwarded.traces"] > 0 })
 	c := r.Stats().Snapshot().Counters
-	if c["upstream_retries"] != 2 || c["forwarded.traces"] != 1 || c["dropped.policy_path.traces"] != 1 || c["withheld_at_send_records"] != 1 {
-		t.Fatalf("2 retries, then 1 forwarded, 1 excluded and 1 withheld wanted: %v", c)
+	if c["upstream_retries"] != 2 || c["forwarded.traces"] != 2 || c["withheld_at_send_records"] != 2 {
+		t.Fatalf("2 retries, then 2 forwarded and 2 withheld wanted: %v", c)
 	}
 }

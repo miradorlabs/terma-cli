@@ -64,10 +64,8 @@ not run ` + "`terma setup`" + `, asks which agents you use if you have not chose
      claim, with the team's key. Nothing else leaves the machine. Keys stay in your home
      directory, namespaced by team — never in the repository. Agents send prompt text,
      model responses and tool content to the relay; what of it leaves is your team's
-     collection policy's call, set in Terma, never the install's. Excluded paths
-     withhold a tool call that names one, in a path field or as a word of a shell
-     command; a file read indirectly, by a script the command runs, is not caught. A
-     desktop app also reports through repository hooks.
+     collection policy's call, set in Terma, never the install's. A desktop app also
+     reports through repository hooks.
   3. Enables repository telemetry, including for machines configured to export only
      from installed repositories. Existing repository policies are preserved unless
      --signals changes them; a content switch an earlier terma wrote there is removed.

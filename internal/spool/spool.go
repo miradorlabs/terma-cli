@@ -25,9 +25,6 @@ type Event struct {
 	Repo      string    `json:"repo,omitempty"`
 	// Workspace is local policy context; the OTLP encoder never exports it.
 	Workspace string `json:"workspace,omitempty"`
-	// Cwd is where the hook ran, which a relative name in a shell command resolves
-	// against; local policy context like Workspace.
-	Cwd string `json:"cwd,omitempty"`
 	// Global records machine-wide capture, so queued events can be withheld after a
 	// switch back to repository coverage. Local only.
 	Global bool           `json:"global,omitempty"`

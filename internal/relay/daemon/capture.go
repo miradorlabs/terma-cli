@@ -19,8 +19,6 @@ type Capture struct {
 	RecordErr error
 	// Harness is the claiming agent's harness name, empty for global mode's catch-all.
 	Harness string
-	// Root is the claimed workspace, empty when the claim names none.
-	Root string
 }
 
 // CapturePolicy is the content and signal half of a claim's Policy. Content is the team
@@ -29,8 +27,7 @@ type Capture struct {
 // since another repository may have pointed that agent's exporter at the relay.
 func CapturePolicy(in Capture) relay.Policy {
 	org := in.Org
-	pol := relay.Policy{Excludes: excludes(org.ExcludePaths), RequireClaim: !in.Primary || !org.Global(),
-		ExcludedWorkspace: in.Root != "" && org.ExcludesPath(in.Root, "")}
+	pol := relay.Policy{RequireClaim: !in.Primary || !org.Global()}
 	pol.IncludePrompts, pol.IncludeToolContent = org.Content()
 	switch rec := in.Record; {
 	case org.CollectsNothing, in.RecordErr != nil,
@@ -41,14 +38,4 @@ func CapturePolicy(in Capture) relay.Policy {
 		pol.Signals = append([]string{}, rec.Signals...)
 	}
 	return pol
-}
-
-// excludes matches values naming one of patterns, nil when there are none. It keeps its
-// own copy, so a policy refreshed later never changes a decision already made.
-func excludes(patterns []string) func(any) bool {
-	if len(patterns) == 0 {
-		return nil
-	}
-	p := config.Policy{ExcludePaths: slices.Clone(patterns)}
-	return func(v any) bool { return p.HasExcludedPath(v, "") }
 }

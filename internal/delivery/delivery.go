@@ -171,9 +171,6 @@ func (r Router) Allowed(org config.Policy, projectID string, e spool.Event) bool
 	if org.CollectsNothing || e.Global && !org.Global() {
 		return false
 	}
-	if org.ExcludesPath(e.Workspace, "") || org.HasExcludedPathFrom(e.Attrs, e.Workspace, e.Cwd) {
-		return false
-	}
 	if e.Name == hookrun.EventAssistantMessage || e.Name == hookrun.EventSessionTitle {
 		prompts, _ := org.Content()
 		return prompts && r.consented(e, projectID, org.Global())

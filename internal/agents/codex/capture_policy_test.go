@@ -17,7 +17,7 @@ import (
 
 func TestPolicyBlocksCodexReplyCapture(t *testing.T) {
 	for _, mode := range []string{config.ModeRepo, config.ModeGlobal} {
-		for _, rule := range []string{"prompts", "paths", "agent"} {
+		for _, rule := range []string{"prompts", "agent"} {
 			t.Run(mode+"/"+rule, func(t *testing.T) {
 				env := fundingEnv(t)
 				env.Policy.Mode = mode
@@ -25,8 +25,6 @@ func TestPolicyBlocksCodexReplyCapture(t *testing.T) {
 				switch rule {
 				case "prompts":
 					env.Policy.IncludePrompts = false
-				case "paths":
-					env.Policy.ExcludePaths = []string{".env"}
 				case "agent":
 					rec, _, err := routing.LoadRecord("project-a")
 					if err != nil {
@@ -64,7 +62,6 @@ func delivered(org config.Policy, events []spool.Event) []spool.Event {
 func TestTeamPolicyWithholdsCodexHookContent(t *testing.T) {
 	for label, team := range map[string]config.Policy{
 		"prompts and tool content off": {Mode: config.ModeRepo},
-		"paths excluded":               {Mode: config.ModeRepo, IncludePrompts: true, IncludeToolContent: true, ExcludePaths: []string{"secrets/**"}},
 	} {
 		t.Run(label, func(t *testing.T) {
 			env := fundingEnv(t)
