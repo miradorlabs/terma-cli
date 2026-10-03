@@ -17,14 +17,15 @@ repo="$tmp/repo"; mkdir -p "$repo" "$TERMA_CONFIG_DIR"
 git -C "$repo" init -q
 git -C "$repo" config user.email bench@example.com
 git -C "$repo" config user.name bench
+git -C "$repo" remote add origin git@github.com:acme/repo.git
 git -C "$repo" commit -q --allow-empty -m init
 git -C "$repo" worktree add -q "$tmp/wt"
 
 # What `terma setup` leaves, offline: a validated policy listing the repository (which
 # admits its worktree too), and the hooks it writes, from the same code.
-export TERMA_POLICY_STUB='{"mode":"repo","folders":["repo"]}'
+export TERMA_POLICY_STUB='{"mode":"repo","repositories":["github.com/acme/repo"]}'
 now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-printf '{"active_profile":"default","profiles":{"default":{"policy":{"mode":"repo","folders":["repo"],"include_prompts":true,"include_tool_content":true,"revision":1,"updated_at":"%s","team_id":"proj_bench","fetched_at":"%s"}}}}' "$now" "$now" > "$TERMA_CONFIG_DIR/config.json"
+printf '{"active_profile":"default","profiles":{"default":{"policy":{"mode":"repo","repositories":["github.com/acme/repo"],"include_prompts":true,"include_tool_content":true,"revision":1,"updated_at":"%s","team_id":"proj_bench","fetched_at":"%s"}}}}' "$now" "$now" > "$TERMA_CONFIG_DIR/config.json"
 (cd "$ROOT" && go run ./scripts/benchhooks "$BIN")
 hook="$TERMA_CONFIG_DIR/git-hooks/prepare-commit-msg"
 
