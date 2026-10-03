@@ -66,7 +66,7 @@ func (r *Relay) enqueue(c claim.Claim, p *part) {
 		return
 	}
 	e := newEntry(r.opts.Now(), p.signal, p.records)
-	if err := r.outbox.put(rt, e, body); err != nil {
+	if err := r.outbox.put(rt, c.Repository, e, body); err != nil {
 		r.stats.dropped(p.signal, "outbox_write_failed", p.records)
 		r.warnf("outbox %s: %v; dropped %d %s", rt, err, p.records, p.signal)
 		return
@@ -111,6 +111,7 @@ func (s *sender) loop() {
 	backoff := time.Duration(0)
 	// single sends one file per request after a merged request was refused, so one bad file is set aside alone.
 	single := false
+	c := claim.Claim{ProjectID: s.route.project, Tool: s.route.toolLabel(), Repository: s.r.outbox.identity(s.route)}
 	stopping := func() bool {
 		select {
 		case <-s.r.stopping:
@@ -153,7 +154,7 @@ func (s *sender) loop() {
 			}
 			continue
 		}
-		pol, ok := s.r.resolve(claim.Claim{ProjectID: s.route.project, Tool: s.route.toolLabel()})
+		pol, ok := s.r.resolve(c)
 		if !ok {
 			s.setKeyless(true)
 			if stopping() || !sleep(keylessRetry) {
@@ -162,6 +163,15 @@ func (s *sender) loop() {
 			continue
 		}
 		s.setKeyless(false)
+		// The folder list as it stands now: a repository removed since sends none still queued.
+		if pol.Unadmitted {
+			for _, e := range entries {
+				s.r.stats.dropped(e.signal, "policy_repository", e.records)
+			}
+			s.r.outbox.remove(s.route, entries)
+			s.delivered(len(entries))
+			continue
+		}
 		if single {
 			entries = entries[:1]
 		}

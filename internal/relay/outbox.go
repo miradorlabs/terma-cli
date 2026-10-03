@@ -1,6 +1,9 @@
 package relay
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -24,16 +27,21 @@ import (
 
 // The outbox is plain files, one part each, renamed into place so a crash leaves a whole file or none:
 //
-//	<dir>/<project>/<tool>/<received>-<seq>-<signal>-<records>.pb   accepted, not yet delivered
-//	<dir>/.dead/<project>-<tool>-<name>                             refused by the host
+//	<dir>/<project>/<tool>/<repo>/<received>-<seq>-<signal>-<records>.pb   accepted, not yet delivered
+//	<dir>/<project>/<tool>/<repo>/identity.json                            the repository <repo> hashes
+//	<dir>/.dead/<project>-<tool>-<repo>-<name>                             refused by the host
 //
 // <received> is zero-padded Unix nanoseconds, so a name sort is arrival order. Only claimed
 // parts, already filtered, are written; unsynced, so a power cut can lose the last seconds.
+// <repo> keeps the claim's repository so the sender rechecks it against the policy then.
 
 const (
 	deadDir  = ".dead"
 	noTool   = "_"
+	noRepo   = "_"
 	pbSuffix = ".pb"
+	identity = "identity.json"
+	repoKeyN = 16
 )
 
 // A machine offline for weeks, or a key refused for good, would otherwise fill the disk.
@@ -43,10 +51,12 @@ const (
 	maxOutboxAge   = 14 * 24 * time.Hour
 )
 
-// route is where a part goes: a project, with the key of the tool that claimed it.
+// route is where a part goes: a project, with the key of the tool that claimed it and a
+// hash of the repository its session ran in.
 type route struct {
 	project string
 	tool    string
+	repo    string
 }
 
 func routeOf(c claim.Claim) route {
@@ -54,7 +64,16 @@ func routeOf(c claim.Claim) route {
 	if t == "" {
 		t = noTool
 	}
-	return route{project: c.ProjectID, tool: t}
+	return route{project: c.ProjectID, tool: t, repo: repoKey(c.Repository)}
+}
+
+func repoKey(r config.Repository) string {
+	if r.Equal(config.Repository{}) {
+		return noRepo
+	}
+	b, _ := json.Marshal(r)
+	sum := sha256.Sum256(b)
+	return hex.EncodeToString(sum[:])[:repoKeyN]
 }
 
 func (rt route) toolLabel() string {
@@ -64,7 +83,7 @@ func (rt route) toolLabel() string {
 	return rt.tool
 }
 
-func (rt route) String() string { return rt.project + "/" + rt.tool }
+func (rt route) String() string { return rt.project + "/" + rt.tool + "/" + rt.repo }
 
 type entry struct {
 	name    string
@@ -104,14 +123,22 @@ func parseEntry(name string) (entry, bool) {
 
 type outbox struct{ dir string }
 
-func (o outbox) routeDir(rt route) string { return filepath.Join(o.dir, rt.project, rt.tool) }
+func (o outbox) routeDir(rt route) string { return filepath.Join(o.dir, rt.project, rt.tool, rt.repo) }
 
-// validRoute admits a route's two directory names: a project id and a tool label.
+// validRoute admits a route's three directory names: a project id, a tool label and a repository key.
 func validRoute(rt route) bool {
-	return project.ValidID(rt.project) && (rt.tool == noTool || project.ValidID(rt.tool))
+	return project.ValidID(rt.project) && (rt.tool == noTool || project.ValidID(rt.tool)) && validRepoKey(rt.repo)
 }
 
-func (o outbox) put(rt route, e entry, body []byte) error {
+func validRepoKey(k string) bool {
+	if k == noRepo {
+		return true
+	}
+	return len(k) == repoKeyN && strings.Trim(k, "0123456789abcdef") == ""
+}
+
+// put writes a part, and first, for a new route, the repository it was claimed in.
+func (o outbox) put(rt route, repo config.Repository, e entry, body []byte) error {
 	if o.dir == "" {
 		return errors.New("the relay has no outbox directory")
 	}
@@ -121,6 +148,17 @@ func (o outbox) put(rt route, e entry, body []byte) error {
 	dir := o.routeDir(rt)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
+	}
+	if rt.repo != noRepo {
+		if _, err := os.Stat(filepath.Join(dir, identity)); errors.Is(err, fs.ErrNotExist) {
+			b, err := json.Marshal(repo)
+			if err != nil {
+				return err
+			}
+			if err := config.WriteFileAtomicNoSync(filepath.Join(dir, identity), b, 0o600); err != nil {
+				return err
+			}
+		}
 	}
 	return config.WriteFileAtomicNoSync(filepath.Join(dir, e.name), body, 0o600)
 }
@@ -146,6 +184,20 @@ func (o outbox) list(rt route) ([]entry, error) {
 	return out, nil
 }
 
+// identity is the repository a route's parts were claimed in; the zero one for noRepo, or
+// when unreadable, which a folder list never admits.
+func (o outbox) identity(rt route) config.Repository {
+	var repo config.Repository
+	if rt.repo == noRepo {
+		return repo
+	}
+	b, err := os.ReadFile(filepath.Join(o.routeDir(rt), identity))
+	if err != nil || json.Unmarshal(b, &repo) != nil {
+		return config.Repository{}
+	}
+	return repo
+}
+
 func (o outbox) read(rt route, e entry) ([]byte, error) {
 	return os.ReadFile(filepath.Join(o.routeDir(rt), e.name))
 }
@@ -159,7 +211,7 @@ func (o outbox) remove(rt route, batch []entry) {
 func (o outbox) bury(rt route, e entry) {
 	dead := filepath.Join(o.dir, deadDir)
 	src := filepath.Join(o.routeDir(rt), e.name)
-	if os.MkdirAll(dead, 0o700) != nil || os.Rename(src, filepath.Join(dead, rt.project+"-"+rt.tool+"-"+e.name)) != nil {
+	if os.MkdirAll(dead, 0o700) != nil || os.Rename(src, filepath.Join(dead, rt.project+"-"+rt.tool+"-"+rt.repo+"-"+e.name)) != nil {
 		_ = os.Remove(src)
 	}
 }
@@ -182,9 +234,18 @@ func (o outbox) routes() ([]route, error) {
 			continue
 		}
 		for _, t := range tools {
-			rt := route{project: p.Name(), tool: t.Name()}
-			if t.IsDir() && validRoute(rt) {
-				out = append(out, rt)
+			if !t.IsDir() {
+				continue
+			}
+			repos, err := os.ReadDir(filepath.Join(o.dir, p.Name(), t.Name()))
+			if err != nil {
+				continue
+			}
+			for _, k := range repos {
+				rt := route{project: p.Name(), tool: t.Name(), repo: k.Name()}
+				if k.IsDir() && validRoute(rt) {
+					out = append(out, rt)
+				}
 			}
 		}
 	}
@@ -203,6 +264,11 @@ type queued struct {
 // route so their senders' counts stay right.
 func (r *Relay) sweepOutbox(now time.Time) map[route]int {
 	o := r.outbox
+	// Parts from before routes named a repository cannot be rechecked; they go.
+	stale, _ := filepath.Glob(filepath.Join(o.dir, "*", "*", "*"+pbSuffix))
+	for _, p := range stale {
+		_ = os.Remove(p)
+	}
 	routes, _ := o.routes()
 	var all []queued
 	for _, rt := range routes {

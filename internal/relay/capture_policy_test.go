@@ -2,14 +2,17 @@ package relay
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
@@ -58,9 +61,9 @@ func TestQueuedExportsRespectSignalAndCoverageChanges(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			rt := route{project: "team", tool: "codex"}
+			rt := route{project: "team", tool: "codex", repo: noRepo}
 			e := newEntry(time.Now(), Logs, 1)
-			if err := r.outbox.put(rt, e, body); err != nil {
+			if err := r.outbox.put(rt, config.Repository{}, e, body); err != nil {
 				t.Fatal(err)
 			}
 			ctx, cancel := context.WithCancel(context.Background())
@@ -73,6 +76,48 @@ func TestQueuedExportsRespectSignalAndCoverageChanges(t *testing.T) {
 				t.Fatalf("disallowed export remained queued: %v %v", entries, err)
 			}
 		})
+	}
+}
+
+// A part queued in a folder the team policy has since dropped is dropped; one still listed is sent.
+func TestQueuedExportsRecheckTheRepository(t *testing.T) {
+	removed := config.Repository{Names: []string{"removed"}, Path: "acme/removed"}
+	kept := config.Repository{Names: []string{"kept"}, Path: "acme/kept"}
+	var got atomic.Value
+	host := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
+		b, _ := io.ReadAll(req.Body)
+		got.Store(string(b))
+	}))
+	defer host.Close()
+	r := newRelay(Options{Dir: t.TempDir(), Resolve: func(c claim.Claim) (Policy, error) {
+		if c.Repository.Equal(config.Repository{}) {
+			t.Error("the sender resolved a queued part without its repository")
+		}
+		return Policy{Endpoint: host.URL, Key: "key", Unadmitted: !c.Repository.Equal(kept)}, nil
+	}})
+	for _, repo := range []config.Repository{removed, kept} {
+		body, err := proto.Marshal(logsOf("session-"+repo.Names[0], 1))
+		if err != nil {
+			t.Fatal(err)
+		}
+		c := claim.Claim{ProjectID: "team", Tool: "codex", Repository: repo}
+		if err := r.outbox.put(routeOf(c), repo, newEntry(time.Now(), Logs, 1), body); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { r.Run(ctx); close(done) }()
+	defer func() { cancel(); <-done }()
+	waitFor(t, func() bool {
+		c := r.Stats().Snapshot().Counters
+		return c["dropped.policy_repository.logs"] == 1 && c["forwarded.logs"] == 1
+	})
+	if body, _ := got.Load().(string); !strings.Contains(body, "session-kept") || strings.Contains(body, "session-removed") {
+		t.Fatalf("upstream got %q, want only the kept folder's part", body)
+	}
+	if entries, _ := r.outbox.list(routeOf(claim.Claim{ProjectID: "team", Tool: "codex", Repository: removed})); len(entries) != 0 {
+		t.Fatalf("the removed folder's part stayed queued: %v", entries)
 	}
 }
 
@@ -104,7 +149,7 @@ func TestQueuedWithholdingCountsOnceAcrossRetries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := r.outbox.put(route{project: "team", tool: "claude"}, newEntry(time.Now(), Traces, 2), body); err != nil {
+	if err := r.outbox.put(route{project: "team", tool: "claude", repo: noRepo}, config.Repository{}, newEntry(time.Now(), Traces, 2), body); err != nil {
 		t.Fatal(err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
