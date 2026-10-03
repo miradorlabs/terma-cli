@@ -71,6 +71,7 @@ func TestAdmissionOutsideGitWalksUpTheFolders(t *testing.T) {
 	initRepo(t)
 	home, _ := filepath.EvalSymlinks(t.TempDir())
 	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 	dir := filepath.Join(home, "clients", "acme", "notes")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
@@ -143,6 +144,10 @@ func TestASubdirectorySessionIsItsCheckouts(t *testing.T) {
 		t.Fatal(err)
 	}
 	hookruntest.RelayOn(t)
+	// The worktree's root folder is its own: the main checkout's name does not admit it.
+	if _, err := (Env{Cwd: wt, Policy: listing("checkout-a"), Team: "t1"}).Repo(ctx); err == nil {
+		t.Fatal("the main checkout's folder name admitted a linked worktree")
+	}
 	for i, cwd := range []string{filepath.Join(main, "src", "pkg"), filepath.Join(wt, "docs")} {
 		if err := os.MkdirAll(cwd, 0o755); err != nil {
 			t.Fatal(err)

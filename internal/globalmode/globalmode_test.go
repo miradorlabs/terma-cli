@@ -5,11 +5,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/agents/agentstest"
+	"github.com/miradorlabs/terma-cli/internal/gitx"
 )
 
 func sandbox(t *testing.T) (Machine, string) {
@@ -97,4 +99,77 @@ func git(t *testing.T, args ...string) string {
 		t.Fatalf("git %v: %v\n%s", args, err, out)
 	}
 	return strings.TrimSpace(string(out))
+}
+
+// A clone whose own hooks path outranks git's global one (husky's) is routed through
+// terma's hooks at worktree scope, chaining to its own: a commit runs both, a hook manager
+// writing its path again changes nothing, and Remove leaves the clone's own setting.
+func TestAHuskyCloneIsRoutedThroughTermasHooks(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	m, _ := sandbox(t)
+	ctx := context.Background()
+	marks := t.TempDir()
+	terma := filepath.Join(t.TempDir(), "terma")
+	if err := os.WriteFile(terma, []byte("#!/bin/sh\ntouch '"+filepath.Join(marks, "terma")+"'\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	m.Terma = func() (string, error) { return terma, nil }
+	root := t.TempDir()
+	git(t, "init", "-q", root)
+	git(t, "-C", root, "config", "user.email", "dev@example.com")
+	git(t, "-C", root, "config", "user.name", "Dev")
+	husky := filepath.Join(root, ".husky", "_")
+	if err := os.MkdirAll(husky, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(husky, "prepare-commit-msg"), []byte("#!/bin/sh\ntouch '"+filepath.Join(marks, "husky")+"'\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	git(t, "-C", root, "config", "core.hooksPath", ".husky/_")
+	gitDir := filepath.Join(root, ".git")
+
+	if changed, err := m.WireClone(ctx, root, gitDir); err != nil || !changed {
+		t.Fatalf("WireClone = %v, %v", changed, err)
+	}
+	if changed, err := m.WireClone(ctx, root, gitDir); err != nil || changed {
+		t.Fatalf("a second WireClone = %v, %v", changed, err)
+	}
+	git(t, "-C", root, "config", "core.hooksPath", ".husky/_") // npm install runs husky again
+	// The scripts are sh, which Git for Windows runs too; the fake terma here is not an .exe.
+	if runtime.GOOS != "windows" {
+		git(t, "-C", root, "commit", "-q", "--allow-empty", "-m", "x")
+		for _, who := range []string{"terma", "husky"} {
+			if _, err := os.Stat(filepath.Join(marks, who)); err != nil {
+				t.Errorf("the commit did not run %s's prepare-commit-msg", who)
+			}
+		}
+	}
+	if !IsCloneHooksDir(git(t, "-C", root, "config", "--get", "core.hooksPath")) {
+		t.Fatal("git does not see terma's clone hooks")
+	}
+
+	if err := m.Remove(ctx, func(string) {}); err != nil {
+		t.Fatal(err)
+	}
+	if got := git(t, "-C", root, "config", "--get", "core.hooksPath"); got != ".husky/_" {
+		t.Fatalf("core.hooksPath after Remove = %q, want the clone's own", got)
+	}
+}
+
+// A clone with no hooks path of its own is git's global hooks' to run.
+func TestAPlainCloneIsLeftAlone(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	m, _ := sandbox(t)
+	root := t.TempDir()
+	git(t, "init", "-q", root)
+	if changed, err := m.WireClone(context.Background(), root, filepath.Join(root, ".git")); err != nil || changed {
+		t.Fatalf("WireClone = %v, %v", changed, err)
+	}
+	if _, worktree := gitx.HooksPathFS(filepath.Join(root, ".git")); worktree != "" {
+		t.Fatalf("worktree hooks path = %q", worktree)
+	}
 }

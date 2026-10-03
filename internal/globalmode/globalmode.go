@@ -44,6 +44,11 @@ func (m Machine) apply(ctx context.Context, selected []string, install bool, sai
 	for _, step := range m.TrustSteps(selected) {
 		then(step)
 	}
+	if !install {
+		if err := unwireClones(ctx); err != nil {
+			return fmt.Errorf("clones' hooks: %w", err)
+		}
+	}
 	changed, err := m.ApplyGitHooks(ctx, install)
 	if err != nil {
 		return fmt.Errorf("git's global hooks: %w", err)

@@ -135,10 +135,22 @@ func RemoteURLFS(gitDir string) string {
 	return NormalizeRemote(raw)
 }
 
+// HooksPathFS reads core.hooksPath as the checkout's own config sets it, without running
+// git: the shared local value, and the worktree-scoped one, which outranks it.
+func HooksPathFS(gitDir string) (local, worktree string) {
+	common := CommonDirFS(gitDir)
+	local, _ = configValue(filepath.Join(common, "config"), "core", "hookspath")
+	if v, _ := configValue(filepath.Join(common, "config"), "extensions", "worktreeconfig"); strings.EqualFold(v, "true") {
+		worktree, _ = configValue(filepath.Join(gitDir, "config.worktree"), "core", "hookspath")
+	}
+	return local, worktree
+}
+
 // RepositoryFS names the working copy at root for admission without running git: in a
-// checkout, its folder, a linked worktree's main checkout's folder too, and origin's
-// repository name, with a hosted origin's owner/name as path; outside Git, root's folder
-// and every parent's, stopping before the home directory or the volume root.
+// checkout, its root's folder (a linked worktree's own) and origin's repository name, read
+// from the main repository's config, with a hosted origin's owner/name as path; outside
+// Git, root's folder and every parent's, stopping before the home directory, which never
+// counts, or the volume root.
 func RepositoryFS(root, gitDir string) (names []string, path string) {
 	if gitDir == "" {
 		home, _ := os.UserHomeDir()
@@ -148,9 +160,6 @@ func RepositoryFS(root, gitDir string) (names []string, path string) {
 		return names, ""
 	}
 	names = append(names, filepath.Base(root))
-	if _, main, ok := LinkedWorktreeFS(gitDir); ok && main != "" {
-		names = append(names, filepath.Base(main))
-	}
 	raw, _ := configValue(filepath.Join(CommonDirFS(gitDir), "config"), `remote "origin"`, "url")
 	name := ""
 	if remote := NormalizeRemote(raw); remote != "" {

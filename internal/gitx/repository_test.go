@@ -42,6 +42,7 @@ func TestRepositoryFS(t *testing.T) {
 func TestRepositoryFSOutsideGit(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 	dir := filepath.Join(home, "work", "notes", "today")
 	if names, path := RepositoryFS(dir, ""); !slices.Equal(names, []string{"today", "notes", "work"}) || path != "" {
 		t.Fatalf("RepositoryFS = %q, %q", names, path)
@@ -79,5 +80,18 @@ func TestRepositoryFSWindowsShapes(t *testing.T) {
 	}
 	if got := NormalizeRemote(`C:\repos\billing`); got != "" {
 		t.Fatalf("a drive path normalized to %q", got)
+	}
+}
+
+// The home folder itself never names a folder outside Git, nor does anything above it.
+func TestRepositoryFSStopsBeforeHome(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	if names, _ := RepositoryFS(home, ""); len(names) != 0 {
+		t.Fatalf("the home folder named %q", names)
+	}
+	if names, _ := RepositoryFS(filepath.Join(home, "notes"), ""); !slices.Equal(names, []string{"notes"}) {
+		t.Fatalf("RepositoryFS = %q", names)
 	}
 }

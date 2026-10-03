@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/dispatch"
 	"github.com/miradorlabs/terma-cli/internal/procinfo"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
@@ -54,8 +55,14 @@ func (app *App) hookDeps() dispatch.Deps {
 		Agents:  app.agents,
 		Profile: hookProfile,
 		Spool:   openSpool,
-		Claimed: func(context.Context, string) { daemon.Spawn() },
-		Flush:   spawnFlush,
+		Claimed: func(ctx context.Context, cwd string) {
+			daemon.Spawn()
+			// A clone whose own hooks path outranks terma's global one is routed through it.
+			if root, gitDir, ok := gitx.LocateFS(cwd); ok {
+				_, _ = app.globalMode().WireClone(ctx, root, gitDir)
+			}
+		},
+		Flush: spawnFlush,
 	}
 }
 

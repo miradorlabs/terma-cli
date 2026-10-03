@@ -81,11 +81,13 @@ func GlobalDestination(cfg *config.Config) string {
 func HooksPathCheck(h HooksPath) Check {
 	where := "core.hooksPath=" + h.Value + " (" + h.Scope + ")"
 	switch {
+	case h.TermaClone && !h.Hookless:
+		return Check{Status: Pass, Detail: "terma's git hooks for this clone, which chain to its own"}
 	case h.Local() && h.Hookless:
 		return Check{Status: Warn, Detail: where + " holds no hooks, so git runs none here", Fix: "git config --" + h.Scope + " --unset core.hooksPath, or restore the hooks it names"}
 	case h.Local():
-		return Check{Status: Warn, Detail: where + " outranks terma's global git hooks, so commits here are not stamped",
-			Fix: "git config --" + h.Scope + " --unset core.hooksPath, if nothing else in this repository needs it"}
+		return Check{Status: Warn, Detail: where + " outranks terma's global git hooks, so commits here are not stamped until an agent session here routes them through terma's",
+			Fix: "start an agent session in this folder, or git config --" + h.Scope + " --unset core.hooksPath if nothing else needs it"}
 	case h.TermaGlobal && !h.Hookless:
 		return Check{Status: Pass, Detail: "terma's global git hooks"}
 	}

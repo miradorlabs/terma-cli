@@ -24,8 +24,8 @@ type HooksPath struct {
 	Scope, Value string
 	// Hookless is a directory that is missing or holds no executable hook.
 	Hookless bool
-	// TermaGlobal is global mode's hooks directory.
-	TermaGlobal bool
+	// TermaGlobal is terma's global hooks directory, TermaClone the one terma set for this clone.
+	TermaGlobal, TermaClone bool
 }
 
 // Local reports whether the repository's own config sets it, outranking the global one.
@@ -46,7 +46,7 @@ func JudgeHooksPath(ctx context.Context, root string) HooksPath {
 	if !filepath.IsAbs(dir) {
 		dir = filepath.Join(root, dir)
 	}
-	h.TermaGlobal = globalmode.IsGitHooksDir(dir)
+	h.TermaGlobal, h.TermaClone = globalmode.IsGitHooksDir(dir), globalmode.IsCloneHooksDir(dir)
 	entries, err := os.ReadDir(dir)
 	h.Hookless = err != nil || !slices.ContainsFunc(entries, func(e os.DirEntry) bool {
 		info, err := os.Stat(filepath.Join(dir, e.Name()))
