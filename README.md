@@ -142,7 +142,9 @@ user-level settings — which is also what Claude Desktop, Codex Desktop and IDE
 read, so they are covered too. A machine-wide hook claims each session that runs in a
 repository your team collects, for your team; the relay forwards only claimed sessions,
 with your team's key. Everything else — personal work, other repositories, folders
-outside git — waits briefly in memory and is dropped: it never leaves your machine. A
+outside git — waits briefly and is dropped: it never leaves your machine. While it
+waits it is also kept on your disk, readable only by you, so a relay restart does not
+lose it; it is deleted as soon as it is sent or dropped. A
 session that moves to a repository the list does not name, or whose repository leaves
 the list, stops being forwarded.
 

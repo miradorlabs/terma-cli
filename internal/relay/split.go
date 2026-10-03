@@ -38,6 +38,9 @@ type part struct {
 	at time.Time
 	// start marks a conversation start, which waits as long as a trace: its claiming hook may be far off.
 	start bool
+	// narrow marks a part that arrived outside global mode, while the relay has one to
+	// enter: only a placement that needs a claim may send it, never one global mode grants.
+	narrow bool
 }
 
 // sessionOf is the first session key, by rank, on the record's attributes, then its resource's.

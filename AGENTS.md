@@ -68,8 +68,10 @@ only claimed sessions, only from the processes the claim names, and only while t
 still lists the claim's repository. It sends them with the team's key and applies the team's
 collection policy: agents export all content to it, and the policy alone decides what
 leaves (`config.Policy.Content`). Hook events never pass the relay, so delivery applies
-the same rules when it sends them. Everything else is held briefly in memory and
-dropped: nothing unclaimed leaves the machine.
+the same rules when it sends them. Everything else is held briefly and dropped: nothing
+unclaimed leaves the machine. What is held is mirrored on disk, written behind and
+removed as it leaves the hold, so a restarted relay takes it back for the rest of its
+hold, judged by the collection mode it arrived under.
 
 ## Rules
 

@@ -77,7 +77,7 @@ func TestRelayOutboxSurvivesARestart(t *testing.T) {
 
 	up.Store(true)
 	second := newRelay(Options{Dir: dir, Token: token, Lookup: f.lookup, Resolve: resolve})
-	go second.Run(t.Context())
+	runRelay(t, second)
 	waitFor(t, func() bool { return second.Stats().Snapshot().Counters["forwarded.logs"] == 6 })
 	if c := second.Stats().Snapshot().Counters; c["recovered_from_outbox"] != 6 {
 		t.Fatalf("second relay: %v", c)
@@ -88,7 +88,8 @@ func TestRelayOutboxSurvivesARestart(t *testing.T) {
 	waitFor(t, func() bool { return countFiles(t, dir) == 0 })
 }
 
-// Only claimed, keyed parts reach the disk; everything else is held and dropped in memory.
+// Only claimed, keyed parts reach the outbox; everything else waits in the hold, whose
+// store is the hold's own (holdstore.go).
 func TestRelayWritesNothingUnclaimed(t *testing.T) {
 	u := newUpstream(t)
 	u.status = http.StatusServiceUnavailable // so claimed parts stay on disk to be seen
@@ -98,6 +99,9 @@ func TestRelayWritesNothingUnclaimed(t *testing.T) {
 	post(t, srv, "/v1/logs", body, "application/x-protobuf", token, false)
 	waitFor(t, func() bool { return countFiles(t, r.opts.Dir) == 2 })
 	_ = filepath.WalkDir(r.opts.Dir, func(p string, d fs.DirEntry, err error) error {
+		if d != nil && d.IsDir() && d.Name() == heldDir {
+			return filepath.SkipDir
+		}
 		if err != nil || !d.Type().IsRegular() {
 			return nil
 		}
@@ -127,7 +131,7 @@ func TestRelayKeylessOutboxDoesNotKeepTheRelayBusy(t *testing.T) {
 	}
 	f := newFixture()
 	r := newRelay(Options{Dir: dir, Token: token, Lookup: f.lookup, Now: f.clock})
-	go r.Run(t.Context())
+	runRelay(t, r)
 	waitFor(t, func() bool { _, idle := r.Idle(); return idle })
 	if n := countFiles(t, dir); n != 1 {
 		t.Fatalf("a keyless part was removed: %d files", n)
@@ -290,7 +294,7 @@ func TestRelayQueuedPartsFollowTheCurrentContentPolicy(t *testing.T) {
 
 	up.Store(true)
 	second := newRelay(Options{Dir: dir, Token: token, Lookup: f.lookup, Resolve: policy(false)})
-	go second.Run(t.Context())
+	runRelay(t, second)
 	waitFor(t, func() bool { return second.Stats().Snapshot().Counters["forwarded.logs"] == 1 })
 	mu.Lock()
 	defer mu.Unlock()

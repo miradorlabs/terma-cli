@@ -157,7 +157,7 @@ func deliverThroughRelay(t *testing.T, global bool, pol Policy, sessionKey strin
 		pol.RequireClaim = true
 	}
 	r := newRelay(opts)
-	go r.Run(t.Context())
+	runRelay(t, r)
 	srv := httptest.NewServer(r.Handler())
 	t.Cleanup(srv.Close)
 
