@@ -12,7 +12,6 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
-	"github.com/miradorlabs/terma-cli/internal/agents/codex"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 )
 
@@ -21,76 +20,7 @@ var update = flag.Bool("update", false, "rewrite the snapshots from the current 
 // terma is the absolute path a machine-wide hook entry names.
 const terma = "/usr/local/bin/terma"
 
-// TestCommittedHookFiles pins what `terma install` commits into an empty repository for
-// each agent.
-func TestCommittedHookFiles(t *testing.T) {
-	for _, a := range builtin.Agents().All() {
-		if a.HooksPath() == "" {
-			continue // an agent whose hooks are user-scope commits nothing
-		}
-		t.Run(a.Name(), func(t *testing.T) {
-			root := t.TempDir()
-			plan, err := a.Plan(root, true)
-			if err != nil {
-				t.Fatal(err)
-			}
-			files := map[string][]byte{}
-			for _, c := range plan.Changes {
-				files[c.Path] = c.After
-			}
-			check(t, filepath.Join("committed", a.Name()), files, root)
-		})
-	}
-}
-
-// TestCodexTrustKeys pins each entry's key and hash, which Codex records trust under: a
-// new hash is skipped until the developer trusts it again.
-func TestCodexTrustKeys(t *testing.T) {
-	root := t.TempDir()
-	a, _ := builtin.Agents().Lookup("codex")
-	plan, err := a.Plan(root, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := hookmgr.Apply(root, plan); err != nil {
-		t.Fatal(err)
-	}
-	entries, err := codex.TermaEntries(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var b strings.Builder
-	for _, e := range entries {
-		b.WriteString(e.Key() + " " + e.Hash + "\n")
-	}
-	check(t, "trust", map[string][]byte{"codex-entries.txt": []byte(b.String())}, root)
-}
-
-// TestGitHookFiles pins what each git hook manager commits: the hooks that stamp every
-// commit, whichever agent wrote it.
-func TestGitHookFiles(t *testing.T) {
-	for _, det := range []hookmgr.Detection{
-		{Manager: hookmgr.GitShim, ConfigPath: hookmgr.ShimDir},
-		{Manager: hookmgr.Husky, ConfigPath: ".husky"},
-		{Manager: hookmgr.Lefthook, ConfigPath: "lefthook.yml"},
-		{Manager: hookmgr.PreCommit, ConfigPath: ".pre-commit-config.yaml"},
-	} {
-		t.Run(string(det.Manager), func(t *testing.T) {
-			root := t.TempDir()
-			plan, err := hookmgr.PlanInstall(root, det)
-			if err != nil {
-				t.Fatal(err)
-			}
-			files := map[string][]byte{}
-			for _, c := range plan.Changes {
-				files[c.Path] = c.After
-			}
-			check(t, filepath.Join("git", string(det.Manager)), files, root)
-		})
-	}
-}
-
-// TestUserHookFiles pins the machine-wide hooks files global mode writes.
+// TestUserHookFiles pins the machine-wide hooks files setup writes.
 func TestUserHookFiles(t *testing.T) {
 	for _, a := range builtin.Agents().With[agents.UserHooks]() {
 		t.Run(a.Name(), func(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -125,7 +126,7 @@ func TestSaveFile_WritesConfigWorldReadableButNotTheCredentialFile(t *testing.T)
 		t.Fatalf("stat config: %v", err)
 	}
 	// The config holds no secrets; the credential file (0600) is the one that does.
-	if perm := info.Mode().Perm(); perm != 0o644 {
+	if perm := info.Mode().Perm(); runtime.GOOS != "windows" && perm != 0o644 {
 		t.Errorf("config mode = %o, want 644", perm)
 	}
 }

@@ -2,6 +2,7 @@ package relay
 
 import (
 	"context"
+	"errors"
 	"io"
 	"io/fs"
 	"net/http"
@@ -17,6 +18,7 @@ import (
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 )
 
@@ -24,7 +26,7 @@ func countFiles(t *testing.T, dir string) int {
 	t.Helper()
 	n := 0
 	_ = filepath.WalkDir(dir, func(_ string, d fs.DirEntry, err error) error {
-		if err == nil && d.Type().IsRegular() && !strings.HasPrefix(d.Name(), ".tmp-") {
+		if err == nil && d.Type().IsRegular() && strings.HasSuffix(d.Name(), pbSuffix) && !strings.HasPrefix(d.Name(), ".tmp-") {
 			n++
 		}
 		return nil
@@ -75,7 +77,7 @@ func TestRelayOutboxSurvivesARestart(t *testing.T) {
 
 	up.Store(true)
 	second := newRelay(Options{Dir: dir, Token: token, Lookup: f.lookup, Resolve: resolve})
-	go second.Run(t.Context())
+	runRelay(t, second)
 	waitFor(t, func() bool { return second.Stats().Snapshot().Counters["forwarded.logs"] == 6 })
 	if c := second.Stats().Snapshot().Counters; c["recovered_from_outbox"] != 6 {
 		t.Fatalf("second relay: %v", c)
@@ -86,7 +88,8 @@ func TestRelayOutboxSurvivesARestart(t *testing.T) {
 	waitFor(t, func() bool { return countFiles(t, dir) == 0 })
 }
 
-// Only claimed, keyed parts reach the disk; everything else is held and dropped in memory.
+// Only claimed, keyed parts reach the outbox; everything else waits in the hold, whose
+// store is the hold's own (holdstore.go).
 func TestRelayWritesNothingUnclaimed(t *testing.T) {
 	u := newUpstream(t)
 	u.status = http.StatusServiceUnavailable // so claimed parts stay on disk to be seen
@@ -96,6 +99,9 @@ func TestRelayWritesNothingUnclaimed(t *testing.T) {
 	post(t, srv, "/v1/logs", body, "application/x-protobuf", token, false)
 	waitFor(t, func() bool { return countFiles(t, r.opts.Dir) == 2 })
 	_ = filepath.WalkDir(r.opts.Dir, func(p string, d fs.DirEntry, err error) error {
+		if d != nil && d.IsDir() && d.Name() == heldDir {
+			return filepath.SkipDir
+		}
 		if err != nil || !d.Type().IsRegular() {
 			return nil
 		}
@@ -117,15 +123,15 @@ func TestRelayWritesNothingUnclaimed(t *testing.T) {
 // A route whose key is gone waits, and keeps no relay awake: only a new key can move it.
 func TestRelayKeylessOutboxDoesNotKeepTheRelayBusy(t *testing.T) {
 	dir := t.TempDir()
-	rt := route{project: "p1", tool: "claude-code"}
+	rt := route{project: "p1", tool: "claude-code", repo: noRepo}
 	e := newEntry(time.Now(), Logs, 2)
 	body, _ := proto.Marshal(logsOf("A", 2))
-	if err := (outbox{dir}).put(rt, e, body); err != nil {
+	if err := (outbox{dir}).put(rt, config.Repository{}, e, body); err != nil {
 		t.Fatal(err)
 	}
 	f := newFixture()
 	r := newRelay(Options{Dir: dir, Token: token, Lookup: f.lookup, Now: f.clock})
-	go r.Run(t.Context())
+	runRelay(t, r)
 	waitFor(t, func() bool { _, idle := r.Idle(); return idle })
 	if n := countFiles(t, dir); n != 1 {
 		t.Fatalf("a keyless part was removed: %d files", n)
@@ -136,16 +142,20 @@ func TestRelayKeylessOutboxDoesNotKeepTheRelayBusy(t *testing.T) {
 func TestOutboxJanitorBounds(t *testing.T) {
 	dir := t.TempDir()
 	o := outbox{dir}
-	rt := route{project: "p1", tool: noTool}
+	rt := route{project: "p1", tool: noTool, repo: noRepo}
 	old := newEntry(time.Now(), Logs, 4)
 	body := []byte("x")
-	if err := o.put(rt, old, body); err != nil {
+	if err := o.put(rt, config.Repository{}, old, body); err != nil {
 		t.Fatal(err)
 	}
 	past := time.Now().Add(-maxOutboxAge - time.Hour)
 	_ = os.Chtimes(filepath.Join(o.routeDir(rt), old.name), past, past)
 	fresh := newEntry(time.Now(), Logs, 1)
-	if err := o.put(rt, fresh, body); err != nil {
+	if err := o.put(rt, config.Repository{}, fresh, body); err != nil {
+		t.Fatal(err)
+	}
+	stale := filepath.Join(dir, "p1", noTool, newEntry(time.Now(), Logs, 1).name)
+	if err := os.WriteFile(stale, body, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	r := newRelay(Options{Dir: dir, Token: token})
@@ -155,6 +165,36 @@ func TestOutboxJanitorBounds(t *testing.T) {
 	}
 	if entries, _ := o.list(rt); len(entries) != 1 || entries[0].name != fresh.name {
 		t.Fatalf("left %v", entries)
+	}
+	if _, err := os.Stat(stale); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("a part outside any repository's route survived the sweep: %v", err)
+	}
+}
+
+// A route's directory names its repository, and the outbox finds both again.
+func TestOutboxRouteKeepsItsRepository(t *testing.T) {
+	o := outbox{t.TempDir()}
+	repo := config.Repository{Origin: "github.com/acme/web"}
+	rt := routeOf(claim.Claim{ProjectID: "p1", Tool: "codex", Repository: repo})
+	if rt.repo == noRepo || !validRoute(rt) {
+		t.Fatalf("routeOf gave %v", rt)
+	}
+	if routeOf(claim.Claim{ProjectID: "p1"}).repo != noRepo {
+		t.Fatal("no repository did not route to noRepo")
+	}
+	e := newEntry(time.Now(), Logs, 1)
+	if err := o.put(rt, repo, e, []byte("x")); err != nil {
+		t.Fatal(err)
+	}
+	routes, err := o.routes()
+	if err != nil || len(routes) != 1 || routes[0] != rt {
+		t.Fatalf("routes() = %v, %v; want [%v]", routes, err, rt)
+	}
+	if entries, _ := o.list(rt); len(entries) != 1 || entries[0] != e {
+		t.Fatalf("list = %v", entries)
+	}
+	if got := o.identity(rt); got != repo {
+		t.Fatalf("identity = %+v, want %+v", got, repo)
 	}
 }
 
@@ -169,7 +209,8 @@ func TestOutboxEntryNames(t *testing.T) {
 			t.Errorf("parseEntry accepted %q", bad)
 		}
 	}
-	if validRoute(route{project: "../x", tool: noTool}) || validRoute(route{project: "p", tool: "a/b"}) {
+	if validRoute(route{project: "../x", tool: noTool, repo: noRepo}) || validRoute(route{project: "p", tool: "a/b", repo: noRepo}) ||
+		validRoute(route{project: "p", tool: noTool, repo: ".."}) || validRoute(route{project: "p", tool: noTool}) {
 		t.Fatal("validRoute admitted a path")
 	}
 }
@@ -253,7 +294,7 @@ func TestRelayQueuedPartsFollowTheCurrentContentPolicy(t *testing.T) {
 
 	up.Store(true)
 	second := newRelay(Options{Dir: dir, Token: token, Lookup: f.lookup, Resolve: policy(false)})
-	go second.Run(t.Context())
+	runRelay(t, second)
 	waitFor(t, func() bool { return second.Stats().Snapshot().Counters["forwarded.logs"] == 1 })
 	mu.Lock()
 	defer mu.Unlock()

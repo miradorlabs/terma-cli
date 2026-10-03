@@ -133,6 +133,32 @@ func (sb *Sandbox) UseOpenCodeProvider(url string) {
 	sb.writeAbs(filepath.Join(sb.Home, ".config", "opencode", "opencode.json"), string(data)+"\n")
 }
 
+// directOpenCode installs terma's OpenCode plugin with the receiver as its endpoint,
+// unless the scenario uses the relay: the plugin a developer's machine held
+// before the relay was the only route.
+func (sb *Sandbox) directOpenCode() {
+	t := sb.T
+	t.Helper()
+	if sb.relayed {
+		return
+	}
+	src, err := os.ReadFile("../../internal/agents/opencode/plugin/terma.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, _ := json.Marshal(map[string]any{"version": 1, "endpoint": sb.Receiver.URL(),
+		"headers": map[string]string{"Authorization": "Bearer " + liveKey}, "signals": []string{"traces", "logs", "metrics"},
+		"includePrompts": true, "includeToolContent": true,
+		"resourceAttributes": map[string]string{"mirador.project.id": sb.ProjectID, "service.name": "opencode"},
+		"hookCommand":        []string{"terma", "hook"}})
+	const placeholder = "const CONFIG = null /* terma:config */"
+	if !bytes.Contains(src, []byte(placeholder)) {
+		t.Fatal("the OpenCode plugin has no config placeholder")
+	}
+	sb.writeAbs(filepath.Join(sb.Home, ".config", "opencode", "plugins", "terma.js"), strings.Replace(string(src), placeholder, "const CONFIG = "+string(cfg), 1))
+	sb.useLiveKey()
+}
+
 // OpenCodeRun runs one headless `opencode run` in dir (continuing session when it is
 // set) and returns the session id OpenCode reports.
 func (sb *Sandbox) OpenCodeRun(b Binary, dir, session, prompt string) string {

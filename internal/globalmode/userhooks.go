@@ -1,7 +1,6 @@
 package globalmode
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -11,19 +10,10 @@ import (
 	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
-	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 )
 
-// In global mode `terma setup` writes machine-wide hooks into each agent's user-level
-// hooks file, and a repository's committed hooks step aside for them (hookYields): a
-// repository's hooks may not run until each developer trusts them.
-
-const userHooksFile = "user-hooks.json"
-
-type userHooksRecord struct {
-	Agents []string `json:"agents"`
-}
+// `terma setup` writes machine-wide hooks into each agent's user-level hooks file.
 
 // TrustSteps are what the developer must do before machine-wide hooks run: one per agent
 // that does not yet run all of terma's entries as written. A file setup left unchanged can
@@ -84,7 +74,7 @@ func (m Machine) syncUserHookTrust(approved, then func(string)) {
 }
 
 // ApplyUserHooks writes terma's entries into each covered agent's machine-wide hooks file,
-// or removes them, and records which agents they cover.
+// or removes them.
 func (m Machine) ApplyUserHooks(selected []string, install bool) ([]string, error) {
 	terma, err := m.Terma()
 	if err != nil {
@@ -122,51 +112,7 @@ func (m Machine) ApplyUserHooks(selected []string, install bool) ([]string, erro
 		}
 		changed = append(changed, filepath.Join(dir, file))
 	}
-	rec, err := m.userHooksRecordPath()
-	if err != nil {
-		return changed, err
-	}
-	if !install {
-		if err := os.Remove(rec); err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return changed, err
-		}
-		return changed, nil
-	}
-	// Recorded whichever hooks run, so a repository's committed hooks step aside either way.
-	return changed, config.WriteJSON(rec, userHooksRecord{Agents: covered}, 0o600)
-}
-
-func (m Machine) userHooksRecordPath() (string, error) {
-	dir, err := m.RelayDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(dir, userHooksFile), nil
-}
-
-func (m Machine) userHooksCover(tool string) bool {
-	path, err := m.userHooksRecordPath()
-	if err != nil {
-		return false
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return false
-	}
-	var rec userHooksRecord
-	if json.Unmarshal(data, &rec) != nil {
-		return false
-	}
-	return slices.Contains(rec.Agents, m.Agents.NameForTool(tool))
-}
-
-// Yields is true for a leftover machine-wide hook outside global mode, or a committed one
-// in global mode whose agent has machine-wide hooks.
-func (m Machine) Yields(user bool, pol config.Policy, tool string) bool {
-	if user {
-		return !pol.Global()
-	}
-	return pol.Global() && m.userHooksCover(tool)
+	return changed, nil
 }
 
 func (m Machine) managedHookFiles(agent string) []string {

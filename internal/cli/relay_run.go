@@ -17,7 +17,7 @@ import (
 func (app *App) newRelayRunCommand() *cobra.Command {
 	var idle time.Duration
 	var addr string
-	var quiet bool
+	var quiet, successor bool
 	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "Run the relay in the foreground until it has been idle for --idle",
@@ -41,6 +41,7 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 			engine.Warnf = log.Printf
 			res, err := daemon.Run(ctx, daemon.Config{
 				Dir: dir, Addr: addr, Idle: idle, Environment: cfg.Environment, Log: log,
+				Successor: successor, SpawnSuccessor: func() error { return daemon.SpawnSuccessor(dir) },
 				Engine:  engine,
 				Workers: []func(context.Context){deps.Refresher().Run},
 				Listening: func(at net.Addr, hold time.Duration) {
@@ -67,5 +68,8 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 	cmd.Flags().DurationVar(&idle, "idle", 8*time.Hour, "exit after this long with no export and nothing held or queued (0: never)")
 	cmd.Flags().StringVar(&addr, "addr", "", "listen here instead of the address `terma setup` recorded")
 	cmd.Flags().BoolVar(&quiet, "quiet", false, "print nothing")
+	// A stopping relay starts its successor with this, to take its socket once it has drained.
+	cmd.Flags().BoolVar(&successor, "successor", false, "wait for the running relay to stop, and take over its socket")
+	_ = cmd.Flags().MarkHidden("successor")
 	return cmd
 }

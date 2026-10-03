@@ -47,7 +47,7 @@ const EventAssistantMessage = "terma.assistant.message"
 // is a new event, under the consent a reply needs.
 const EventSessionTitle = "terma.session.title"
 
-// AttrProjectID is the event attribute carrying the project binding.
+// AttrProjectID is the event attribute carrying the developer's team.
 const AttrProjectID = "project_id"
 
 // AttrWorktree is git's name for the linked worktree an event came from; absent in a main checkout.

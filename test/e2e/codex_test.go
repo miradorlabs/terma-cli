@@ -114,7 +114,7 @@ func TestCodexSubscriptionSession(t *testing.T) {
 		CheckKeys(t, "codex/response_completed", first.Attrs, newest)
 		CheckKeys(t, "codex/resource", first.Resource, newest)
 		if auths := sb.Receiver.Authorizations(); len(auths) == 0 || auths[0] != "Bearer "+liveKey {
-			t.Errorf("exports not authorised with the connected key: %v", auths)
+			t.Errorf("exports not authorised with the live key: %v", auths)
 		}
 
 		// Production collection: the hook must deliver plan evidence itself.

@@ -68,9 +68,7 @@ func TestRelaySetupPointsAgentsAtTheRelay(t *testing.T) {
 		t.Fatal("a second setup minted a new token")
 	}
 	for _, h := range []string{"claude", "codex"} {
-		if out, err := runTerma(t, "telemetry", "disconnect", h, "--yes"); err != nil {
-			t.Fatalf("disconnect %s: %v\n%s", h, err, out)
-		}
+		disconnect(t, h)
 	}
 	claude, _ = os.ReadFile(filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), "settings.json"))
 	if strings.Contains(string(claude), addr) {
@@ -141,8 +139,8 @@ func TestRelayDoctorCheck(t *testing.T) {
 	if out, err := runTerma(t, "relay", "setup", "--no-start", "--addr", addr); err != nil {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}
-	if c := doctor.RelayCheck(testApp.agents, relayFacts(), storedKeys, "", "", nil); c.Status != doctor.Warn || !strings.Contains(c.Detail, "not bound") {
-		t.Fatalf("unbound: %+v", c)
+	if c := doctor.RelayCheck(testApp.agents, relayFacts(), storedKeys, "", "", nil); c.Status != doctor.Warn || !strings.Contains(c.Detail, "no team is chosen") {
+		t.Fatalf("no team: %+v", c)
 	}
 	if c := doctor.RelayCheck(testApp.agents, relayFacts(), storedKeys, "proj_x", "", nil); c.Status != doctor.Warn || !strings.Contains(c.Detail, "no key") {
 		t.Fatalf("no key: %+v", c)
@@ -162,9 +160,7 @@ func TestRelayDoctorCheck(t *testing.T) {
 		t.Fatalf("squatted: %+v", c)
 	}
 	_ = squatter.Close()
-	if out, err := runTerma(t, "telemetry", "disconnect", "codex", "--yes"); err != nil {
-		t.Fatalf("disconnect: %v\n%s", err, out)
-	}
+	disconnect(t, "codex")
 	if c := doctor.RelayCheck(testApp.agents, relayFacts(), storedKeys, "proj_x", "", nil); c.Status != doctor.Fail || !strings.Contains(c.Detail, "Codex") || c.Fix != "terma setup" {
 		t.Fatalf("codex pointed elsewhere: %+v", c)
 	}
@@ -208,14 +204,13 @@ func TestRelayCodexDaemonPredatesSetup(t *testing.T) {
 // status says what doctor says about a relayed machine, in one line.
 func TestRelayStatusAgreesWithDoctor(t *testing.T) {
 	relaySandbox(t)
-	repo := installRepo(t)
-	_ = repo
+	gitRepo(t)
 	addr := freeAddr(t)
 	if out, err := runTerma(t, "relay", "setup", "--no-start", "--addr", addr); err != nil {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}
 	out, _ := runTerma(t, "status")
-	if !strings.Contains(out, "Agents:      local relay on "+addr) || !strings.Contains(out, "this repository is not bound") {
+	if !strings.Contains(out, "Agents:      local relay on "+addr) || !strings.Contains(out, "no team is chosen") {
 		t.Fatalf("status does not report the relay:\n%s", out)
 	}
 	if strings.Contains(out, "none connected") {
@@ -282,11 +277,23 @@ func TestRelayDoctorFailsARelayInAnotherEnvironment(t *testing.T) {
 	}
 	record("prod")
 	c := doctor.RelayCheck(testApp.agents, relayFacts(), storedKeys, "proj_x", "dev", nil)
-	if c.Status != doctor.Fail || !strings.Contains(c.Detail, "delivers to the prod environment, not this profile's dev") || c.Fix != "terma install" {
+	if c.Status != doctor.Fail || !strings.Contains(c.Detail, "delivers to the prod environment, not this profile's dev") || c.Fix != "terma setup" {
 		t.Fatalf("a production relay on a dev profile: %+v", c)
 	}
 	record("dev")
 	if c := doctor.RelayCheck(testApp.agents, relayFacts(), storedKeys, "proj_x", "dev", nil); c.Status != doctor.Pass {
 		t.Fatalf("a relay in this profile's environment: %+v", c)
+	}
+}
+
+// disconnect undoes what terma wrote into an agent's own configuration, as teardown does.
+func disconnect(t *testing.T, agent string) {
+	t.Helper()
+	h, err := testApp.agents.Harness(agent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.Disconnect(); err != nil {
+		t.Fatalf("disconnect %s: %v", agent, err)
 	}
 }

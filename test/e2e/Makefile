@@ -25,7 +25,7 @@ test: build
 telemetry: build
 	TERMA_E2E=1 TERMA_E2E_BINARY="$(CURDIR)/bin/terma" \
 	 ./bin/e2e.test -test.v -test.timeout 30m \
-	 -test.run '^(TestClaudeTelemetry|TestCodexTelemetry|TestClaudeStopFailureDelivery|TestRelay.*|TestPi.*|TestGemini.*|TestDsh.*|TestHermes.*)$$'
+	 -test.run '^(TestClaudeTelemetry|TestCodexTelemetry|TestClaudeStopFailureDelivery|TestRelay.*|TestMachineHooks.*|TestPi.*|TestGemini.*|TestDsh.*|TestHermes.*)$$'
 # Loads test/e2e/.env.local (credentials, never committed) and runs every scenario.
 # RUN=TestClaude... narrows it; ARGS adds test flags.
 run: build

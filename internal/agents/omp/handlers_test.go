@@ -28,7 +28,7 @@ func TestOmpSessionIsStampedOnItsCommit(t *testing.T) {
 	ctx := context.Background()
 	sp, _ := spool.Open(t.TempDir())
 	env := func(stdin string, args ...string) hookrun.Env {
-		return hookrun.Env{Now: time.Now(), Cwd: root, Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
+		return hookrun.Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
 	}
 
 	if err := sessionStart(ctx, env(`{"session_id":"5b8c2f1e-9a1b-4c2d-8e3f-0a1b2c3d4e5f","cwd":"`+root+`"}`)); err != nil {

@@ -11,6 +11,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
+	"github.com/miradorlabs/terma-cli/internal/globalmode"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
@@ -54,38 +55,31 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 	rep.Rows = append(rep.Rows, machineRows(cfg)...)
 
 	root, gitDir, reg := env.Root, env.GitDir, env.Agents
-	hooksOK, repoBound, projectID := false, false, cfg.ProjectID
-	// Global mode needs no install: an unbound repository's sessions go to the team's project.
-	globalUnbound := false
-	var agentHooks Check
+	projectID := cmp.Or(cfg.ProjectID, cfg.Policy.TeamID)
+	admission := Check{Status: Pass}
+	hooksOK := true
 	if env.RepoErr != nil {
 		add("Repository", "not inside a git repository")
-	} else if bound, from, err := termaproject.Resolve(root, gitDir); err != nil {
-		if globalUnbound = cfg.Policy.Global(); globalUnbound {
-			add("Repository", "%s — not installed; in global mode %s", root, GlobalDestination(cfg))
-		} else {
-			add("Repository", "%s — not installed (run `terma install`)", root)
-		}
 	} else {
-		projectID, repoBound = bound.Project.ID, true
-		add("Repository", "%s → %s%s", root, cmp.Or(bound.Project.Name, bound.Project.ID), ThroughMain(root, from))
+		admission.Detail = "every folder, in global mode: " + GlobalDestination(cfg)
+		if pol := cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL); !pol.Global() {
+			admission = RepositoryCheck(pol, gitDir, nil)
+		}
+		add("Repository", "%s", admission.Detail)
 		if gitDir == "" {
 			add("Hooks", "Git hooks skipped (not a Git repository)")
 		} else {
-			wiring := JudgeHookWiring(ctx, root, bound)
-			var state string
-			state, hooksOK = HooksSummary(wiring)
-			add("Hooks", "%s via %s", state, wiring.Manager)
+			hooks := HooksPathCheck(JudgeHooksPath(ctx, root))
+			hooksOK = hooks.Status == Pass
+			add("Hooks", "%s", hooks.Detail)
 		}
-		// An agent that cannot run its hooks yet costs its share of commit stamping.
-		if agentHooks = AgentHooksCheck(reg, root, SelectedForRepo(reg, projectID, cfg.Harnesses)); agentHooks.Status == Warn {
-			add("Agent hooks", "%d of %d agents can run theirs — %s", agentHooks.Ready, agentHooks.Of, agentHooks.Fix)
+		if admission.Status == Pass {
+			work, err := workRows(root, gitDir)
+			if err != nil {
+				return LocalReport{}, err
+			}
+			rep.Rows = append(rep.Rows, work...)
 		}
-		work, err := workRows(root, gitDir)
-		if err != nil {
-			return LocalReport{}, err
-		}
-		rep.Rows = append(rep.Rows, work...)
 	}
 
 	// Through the relay one line gives doctor's own verdict (RelayCheck).
@@ -101,7 +95,7 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 		var connected []string
 		verdicts := JudgeHarnesses(ctx, reg, cfg.OTLPURL, projectID, root)
 		for _, v := range verdicts {
-			suffix, ok := AgentSummary(v, repoBound)
+			suffix, ok := AgentSummary(v, admission.Status == Pass)
 			if ok {
 				connected = append(connected, v.DisplayName)
 			}
@@ -111,9 +105,9 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 			}
 		}
 		if len(connected) == 0 {
-			add("Agent", "none connected — run `terma install`")
+			add("Agent", "none connected — run `terma setup`")
 		}
-		export = HarnessCheck(reg, verdicts, cfg.OTLPURL, projectID, repoBound)
+		export = HarnessCheck(reg, verdicts, cfg.OTLPURL, projectID, admission.Status == Pass)
 	}
 	if env.RepoErr == nil {
 		rep.Rows = append(rep.Rows, repoPolicyRows(reg, root)...)
@@ -135,7 +129,7 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 				if key := keyOf(p.Keys, projectID); key != "" {
 					line += ", key " + key
 				} else {
-					line += ", no team key (run `terma install`)"
+					line += ", no team key (run `terma setup`)"
 					backendOK = false
 				}
 			}
@@ -143,12 +137,12 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 		}
 	}
 
-	rep.Checks = []Check{BinaryCheck(env.Exe, env.BinDirs, HookCallerFor(env.Root, env.GitDir, env.RepoErr)), export, agentHooks, {Key: KeyBackend, Status: Skip}}
-	if !authOK {
+	rep.Checks = []Check{BinaryCheck(env.Exe, env.BinDirs), export, {Key: KeyBackend, Status: Skip}}
+	if !authOK || !hooksOK {
 		rep.Checks = append(rep.Checks, Check{Status: Fail, Fix: "terma setup"})
 	}
-	if !globalUnbound && (!repoBound || (gitDir != "" && !hooksOK)) {
-		rep.Checks = append(rep.Checks, Check{Status: Fail, Fix: "terma install"})
+	if admission.Status != Pass {
+		rep.Checks = append(rep.Checks, admission)
 	}
 	if !backendOK {
 		rep.Checks = append(rep.Checks, Check{Status: Warn, Fix: "terma doctor"})
@@ -166,10 +160,8 @@ func Context(env Env) []Row {
 	if env.RepoErr != nil {
 		return rows
 	}
-	if _, _, err := termaproject.Resolve(env.Root, env.GitDir); err == nil {
-		if work, err := workRows(env.Root, env.GitDir); err == nil {
-			rows = append(rows, work...)
-		}
+	if work, err := workRows(env.Root, env.GitDir); err == nil {
+		rows = append(rows, work...)
 	}
 	return append(rows, repoPolicyRows(env.Agents, env.Root)...)
 }
@@ -183,6 +175,12 @@ func machineRows(cfg *config.Config) []Row {
 	case cfg.Policy.Validated():
 		rows = append(rows, Row{"Collecting", PolicySummary(cfg.Policy)})
 	}
+	if clones := globalmode.RoutedClones(); len(clones) > 0 {
+		rows = append(rows, Row{"Clones", "a clone with its own hooks path gets a git config entry routing it through terma's hooks; its own hooks (husky's, say) still run, and `terma teardown` removes the entry. Routed:"})
+		for _, c := range clones {
+			rows = append(rows, Row{"", "  " + output.TildePath(c)})
+		}
+	}
 	// Name the backend whenever it is not production, by environment or by host overrides.
 	switch {
 	case cfg.Environment != config.EnvProd:
@@ -193,7 +191,7 @@ func machineRows(cfg *config.Config) []Row {
 	return rows
 }
 
-// workRows are a bound repository's active session and the agent edits not yet committed.
+// workRows are a collected repository's active session and the agent edits not yet committed.
 func workRows(root, gitDir string) ([]Row, error) {
 	stateDir, err := termaproject.StateDir(root, gitDir)
 	if err != nil {
@@ -244,22 +242,6 @@ func keyOf(keys Keys, projectID string) string {
 	return keys("", projectID)
 }
 
-// HooksSummary words the commit-hook verdict and whether stamping counts toward
-// coverage; a plan that could not be computed (an unreadable hooks file) is reported,
-// not credited.
-func HooksSummary(w HookWiring) (string, bool) {
-	switch {
-	case w.Err != nil:
-		return "could not be checked — " + w.Err.Error(), false
-	case w.Changes == 0 && !w.Unpointed:
-		return "wired", true
-	case w.Changes > 0 && w.Stale == w.Changes && !w.Unpointed:
-		return "out of date (run `terma update`)", false
-	default:
-		return "NOT wired (run `terma install`)", false
-	}
-}
-
 // AgentSummary describes one agent in a line and whether its spend reaches this project,
 // by the same judgement as the harness check (HarnessVerdict.Reaches).
 func AgentSummary(v HarnessVerdict, bound bool) (string, bool) {
@@ -273,14 +255,12 @@ func agentLine(v HarnessVerdict, bound bool) string {
 	switch v.Route {
 	case RouteGlobal:
 		return "→ connected"
-	case RouteHooks:
-		return "→ connected (repository hooks)"
 	case RouteOtherProject:
-		return "→ reporting to team " + v.OtherProject + ", not this one — run `terma install`"
+		return "→ reporting to team " + v.OtherProject + ", not this one — run `terma setup`"
 	case RouteRepoDecides:
-		// In a bound repository status must give doctor's answer for this repository.
+		// In a collected repository status must give doctor's answer for it.
 		if bound && !v.RepoAsks {
-			return "→ no telemetry: this repository neither routes it nor asks for it — sessions here send nothing (run `terma install`)"
+			return "→ no telemetry: sessions here send nothing (run `terma setup`)"
 		}
 		// Neither "connected" (working) nor "not connected" (broken): repositories decide.
 		return "→ connected; repositories decide what is sent"
@@ -304,12 +284,13 @@ func StatusLineSummary(v StatusLineVerdict) string {
 	case StatusLineDefault:
 		return "capturing plan usage (terma's default line)"
 	case StatusLineReplaced:
-		return "replaced by your own since terma wrapped it — plan usage is NOT captured (run `terma install`)"
+		return "replaced by your own since terma wrapped it — plan usage is NOT captured (run `terma setup`)"
 	}
-	return "not wrapped — plan usage is NOT captured (run `terma install`)"
+	return "not wrapped — plan usage is NOT captured (run `terma setup`)"
 }
 
-// shipment is what a repository's own policy lets its sessions ship.
+// shipment is the signals a repository's own policy lets its sessions ship; content is the
+// team policy's, shown on its own row.
 func shipment(st harness.Status) string {
 	signals := "nothing"
 	if len(st.Signals) > 0 {
@@ -320,21 +301,17 @@ func shipment(st harness.Status) string {
 		slices.Sort(parts)
 		signals = strings.Join(parts, ",")
 	}
-	return fmt.Sprintf("%s; prompts %s; tool content %s", signals, onOff(st.IncludePrompts), onOff(st.IncludeToolContent))
-}
-
-func onOff(v bool) string {
-	if v {
-		return "on"
-	}
-	return "off"
+	return signals
 }
 
 // PolicySummary is what a collection policy collects, in one line.
 func PolicySummary(p config.Policy) string {
-	scope := "sessions in connected repositories"
-	if p.Global() {
+	scope := "sessions in the team's repositories (" + strings.Join(p.Repositories, ", ") + ")"
+	switch {
+	case p.Global():
 		scope = "every session on this machine"
+	case p.AdmitsNone():
+		return "nothing yet: your team lists no repositories"
 	}
 	switch {
 	case p.IncludePrompts && p.IncludeToolContent:

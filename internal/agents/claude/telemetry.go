@@ -10,7 +10,7 @@ func (Agent) Correlation() shape.Correlation {
 // CaptureRules are where Claude Code's telemetry carries content, the tool.output span event included.
 func (Agent) CaptureRules() shape.CaptureRules {
 	return shape.CaptureRules{
-		PromptFields:      []string{"prompt", "response", "user_prompt"},
+		PromptFields:      []string{"prompt", "prompt_text", "response", "user_prompt"},
 		ToolContentFields: []string{"tool_parameters", "tool_input", "full_command", "bash_command"},
 		ToolContentEvents: []string{"tool.output", "tool.input"},
 		BodyPrefixes:      []string{"claude_code."},

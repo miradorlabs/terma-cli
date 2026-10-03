@@ -91,7 +91,7 @@ func (o *OTLPSender) Send(ctx context.Context, events []Event) ([]Event, error) 
 
 func (o *OTLPSender) send(ctx context.Context, events []Event) error {
 	if o.Endpoint == "" || o.APIKey == "" {
-		return fmt.Errorf("spool flush needs an OTLP endpoint and a team key — run `terma install` in the repository")
+		return fmt.Errorf("spool flush needs an OTLP endpoint and a team key — run `terma setup`")
 	}
 	records := make([]map[string]any, 0, len(events))
 	for _, e := range events {

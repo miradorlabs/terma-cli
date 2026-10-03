@@ -31,24 +31,46 @@ type traceSession struct {
 }
 
 func (r *Relay) hold(p *part) {
-	size := proto.Size(p.msg)
+	// Encoded now, while nothing else can change it, for the store's next flush.
+	var body []byte
+	size := 0
+	if r.store.dir != "" {
+		var err error
+		if body, err = proto.Marshal(p.msg); err != nil {
+			body = nil
+		}
+		size = len(body)
+	}
+	if body == nil {
+		size = proto.Size(p.msg)
+	}
+	h := heldPart{p, r.opts.Now(), size}
+	if r.holdSince(p.session, h) {
+		r.store.add(p.session, h, body)
+	}
+}
+
+// holdSince adds h under key within the hold's bounds, reporting whether it is held.
+func (r *Relay) holdSince(key string, h heldPart) bool {
+	p, size := h.p, h.size
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if p.records > maxHeld || size > maxHeldBytes {
 		r.stats.dropped(p.signal, "unclaimed_overflow", p.records)
-		return
+		return false
 	}
 	// Evict the oldest rather than refuse the newcomer, the likeliest to be claimed soon.
 	for r.heldN+p.records > maxHeld || r.heldBytes+size > maxHeldBytes {
 		if !r.evictOldestLocked() {
 			r.stats.dropped(p.signal, "unclaimed_overflow", p.records)
-			return
+			return false
 		}
 	}
-	r.held[p.session] = append(r.held[p.session], heldPart{p, r.opts.Now(), size})
+	r.held[key] = append(r.held[key], h)
 	r.heldN += p.records
 	r.heldBytes += size
 	r.stats.add("held_parts", 1)
+	return true
 }
 
 // evictOldestLocked drops the oldest held part, of an unnamed key first since those are
@@ -80,6 +102,7 @@ func (r *Relay) evictOldestLocked() bool {
 	}
 	r.heldN -= h.p.records
 	r.heldBytes -= h.size
+	r.store.gone(h.p)
 	r.stats.dropped(h.p.signal, "unclaimed_evicted", h.p.records)
 	return true
 }
@@ -120,13 +143,13 @@ func (r *Relay) sweep() {
 		var out []release
 		// A part that must wait holds up nothing: order matters only among parts that leave.
 		for _, h := range parts {
-			c, pol, why, ok, how := r.decide(key, h.p.pid, h.p.at)
+			c, pol, why, ok, how := r.decide(key, h.p.pid, h.p.at, h.p.narrow)
 			limit := hold
 			if h.p.start && why == whyUnclaimed {
 				// A conversation start waits for the thread's first turn.
 				limit = max(hold, r.opts.TraceHold)
 			}
-			if !ok && why != whyNoKey && now.Sub(h.at) >= limit {
+			if !ok && !h.p.narrow && why != whyNoKey && now.Sub(h.at) >= limit {
 				if cc, cok := r.catchAll(); cok {
 					if cpol, pok := r.resolve(cc); pok && !cpol.RequireClaim {
 						c, pol, ok, how = cc, cpol, true, attribution{how: "catch-all"}
@@ -137,7 +160,7 @@ func (r *Relay) sweep() {
 			switch {
 			case ok:
 				out = append(out, release{c, pol, h.p, how})
-			case now.Sub(h.at) >= limit:
+			case why == whyWidened || now.Sub(h.at) >= limit:
 				r.stats.dropped(h.p.signal, why, h.p.records)
 				if r.opts.Logf != nil {
 					c, _ := r.lookup(r.sessionFor(key))
@@ -149,9 +172,16 @@ func (r *Relay) sweep() {
 		}
 		// hold runs only under deliverMu, which the sweep has.
 		r.mu.Lock()
+		kept := map[*part]bool{}
+		for _, h := range keep {
+			kept[h.p] = true
+		}
 		for _, h := range parts {
 			r.heldN -= h.p.records
 			r.heldBytes -= h.size
+			if !kept[h.p] {
+				r.store.gone(h.p)
+			}
 		}
 		for _, h := range keep {
 			r.heldN += h.p.records

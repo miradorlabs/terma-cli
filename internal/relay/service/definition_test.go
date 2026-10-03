@@ -25,7 +25,7 @@ func TestDefinitions(t *testing.T) {
 		}
 	}
 	unit := Systemd("/opt/terma/bin/terma", env)
-	for _, want := range []string{`ExecStart="/opt/terma/bin/terma" relay run --idle 0 --quiet`, `Environment="TERMA_CONFIG_DIR=/tmp/a & b"`, "Restart=on-failure"} {
+	for _, want := range []string{`ExecStart="/opt/terma/bin/terma" relay run --idle 0 --quiet`, `Environment="TERMA_CONFIG_DIR=/tmp/a & b"`, "Restart=on-failure", "KillMode=process"} {
 		if !strings.Contains(unit, want) {
 			t.Errorf("unit lacks %q:\n%s", want, unit)
 		}

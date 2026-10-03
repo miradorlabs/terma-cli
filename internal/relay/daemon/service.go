@@ -200,7 +200,7 @@ func CheckService() ServiceState {
 }
 
 // CheckServiceHere compares it with what this process would install, in its own
-// environment: what `terma install` repairs.
+// environment: what `terma setup` repairs.
 func CheckServiceHere() ServiceState {
 	return checkService(callerEnv())
 }
@@ -241,11 +241,15 @@ func RefreshService(ctx context.Context) (string, bool, error) {
 	return path, true, nil
 }
 
-// RemoveService stops and removes the relay service.
+// RemoveService stops and removes the relay service. Its relay is asked to stop first, so
+// it hands its socket on (while setup remains) instead of being signalled to a halt.
 func RemoveService(ctx context.Context) (bool, error) {
 	m, err := Service()
 	if err != nil {
 		return false, err
+	}
+	if running, ok := RunningRelay(m.StateDir); ok && running.Service {
+		Stop(m.StateDir)
 	}
 	return m.Remove(ctx)
 }

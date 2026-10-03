@@ -13,37 +13,43 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 )
 
-// hookCommand finds the event a committed hook entry runs: `terma hook <event>` is the
-// one text every hooks file shares.
-var hookCommand = regexp.MustCompile(`terma hook ([a-z][a-z-]*)`)
+// userCommand is a machine-wide hook entry's command, run by the full path setup wrote.
+var userCommand = hookmgr.UserHookCommand("/nonexistent/terma")
 
-// Every event a committed hooks file names has a handler in its own adapter; a missing
-// one fails silently in every repository that ran install.
-func TestEveryCommittedHookHasAHandler(t *testing.T) {
+// hookCommand finds the event a hook entry runs: `hook --user <event>` is the one text
+// every machine-wide hooks file shares.
+var hookCommand = regexp.MustCompile(`hook --user ([a-z][a-z-]*)`)
+
+// userPlan is what setup writes into an empty machine-wide hooks directory for a.
+func userPlan(t *testing.T, a agents.UserHooks) hookmgr.Plan {
+	t.Helper()
+	plan, err := a.PlanUserHooks(t.TempDir(), userCommand, true)
+	if err != nil {
+		t.Fatalf("%s: %v", a.Name(), err)
+	}
+	return plan
+}
+
+// Every event a machine-wide hooks file names has a handler in its own adapter; a missing
+// one fails silently on every machine that ran setup.
+func TestEveryMachineWideHookHasAHandler(t *testing.T) {
 	handlers := reg.Handlers()
-	for _, a := range reg.All() {
-		if a.HooksPath() == "" {
-			continue
-		}
-		plan, err := a.Plan(t.TempDir(), true)
-		if err != nil {
-			t.Fatalf("%s: %v", a.Name(), err)
-		}
+	for _, a := range reg.With[agents.UserHooks]() {
 		own := a.Events()
 		found := 0
-		for _, change := range plan.Changes {
+		for _, change := range userPlan(t, a).Changes {
 			for _, m := range hookCommand.FindAllStringSubmatch(string(change.After), -1) {
 				found++
 				event := m[1]
 				if _, ok := handlers[event]; !ok {
-					t.Errorf("%s commits `terma hook %s`, which no adapter handles", a.Name(), event)
+					t.Errorf("%s writes `terma hook %s`, which no adapter handles", a.Name(), event)
 				} else if _, ok := own[event]; !ok {
-					t.Errorf("%s commits `terma hook %s`, which belongs to another adapter", a.Name(), event)
+					t.Errorf("%s writes `terma hook %s`, which belongs to another adapter", a.Name(), event)
 				}
 			}
 		}
 		if found == 0 {
-			t.Errorf("%s writes %s with no `terma hook` command in it", a.Name(), a.HooksPath())
+			t.Errorf("%s writes no `terma hook` command", a.Name())
 		}
 	}
 }
@@ -70,19 +76,15 @@ func TestSupportCatalogMatchesTheRegistry(t *testing.T) {
 	}
 }
 
-func committedCommands(t *testing.T, a agents.Agent) []string {
+func userCommands(t *testing.T, a agents.UserHooks) []string {
 	t.Helper()
-	plan, err := a.Plan(t.TempDir(), true)
-	if err != nil {
-		t.Fatalf("%s: %v", a.Name(), err)
-	}
 	var out []string
 	var walk func(v any)
 	walk = func(v any) {
 		switch v := v.(type) {
 		case map[string]any:
 			for k, x := range v {
-				if s, ok := x.(string); ok && k == "command" && strings.Contains(s, "terma hook") {
+				if s, ok := x.(string); ok && k == "command" && strings.Contains(s, "hook --user") {
 					out = append(out, s)
 				}
 				walk(x)
@@ -93,7 +95,7 @@ func committedCommands(t *testing.T, a agents.Agent) []string {
 			}
 		}
 	}
-	for _, change := range plan.Changes {
+	for _, change := range userPlan(t, a).Changes {
 		var doc any
 		if json.Unmarshal(change.After, &doc) == nil {
 			walk(doc)
@@ -102,29 +104,17 @@ func committedCommands(t *testing.T, a agents.Agent) []string {
 	return out
 }
 
-// Every committed hook entry is silent on both streams and exits 0 without terma: an
-// agent may hand a hook's output to the model.
-func TestCommittedHookCommandsAreInertWithoutTerma(t *testing.T) {
+// Every machine-wide hook entry is silent on both streams and exits 0 once terma is gone:
+// an agent may hand a hook's output to the model.
+func TestMachineWideHookCommandsAreInertWithoutTerma(t *testing.T) {
 	if _, err := exec.LookPath("sh"); err != nil {
 		t.Skip("sh not installed")
 	}
-	for _, a := range reg.All() {
-		if a.HooksPath() == "" {
-			continue
-		}
-		for _, command := range committedCommands(t, a) {
+	for _, a := range reg.With[agents.UserHooks]() {
+		for _, command := range userCommands(t, a) {
 			t.Run(a.Name()+"/"+command, func(t *testing.T) {
-				dir := t.TempDir()
-				// A command may extend PATH before its guard; if that finds a real terma, skip.
-				if i := strings.Index(command, "; command -v terma"); i >= 0 {
-					probe := exec.Command("sh", "-c", command[:i+2]+"command -v terma")
-					probe.Env = []string{"PATH=/usr/bin:/bin", "HOME=" + dir}
-					if probe.Run() == nil {
-						t.Skip("a terma is installed where this command looks for one")
-					}
-				}
 				cmd := exec.Command("sh", "-c", command)
-				cmd.Dir = dir
+				cmd.Dir = t.TempDir()
 				cmd.Env = []string{"PATH=/usr/bin:/bin", "HOME=" + cmd.Dir}
 				cmd.Stdin = strings.NewReader(`{"session_id":"s1","hook_event_name":"SessionStart","cwd":"` + cmd.Dir + `"}`)
 				var stdout, stderr strings.Builder
@@ -143,50 +133,17 @@ func TestCommittedHookCommandsAreInertWithoutTerma(t *testing.T) {
 // An unreadable hooks file is an error, never a create that Apply would rename over the
 // developer's file.
 func TestPlannersRefuseAFileTheyCannotRead(t *testing.T) {
-	for _, a := range reg.All() {
-		if a.HooksPath() == "" || strings.HasSuffix(a.HooksPath(), "/") {
-			continue
-		}
-		root := t.TempDir()
-		if err := os.MkdirAll(filepath.Join(root, filepath.FromSlash(a.HooksPath())), 0o755); err != nil {
+	for _, a := range reg.With[agents.UserHooks]() {
+		path, err := a.UserHooksPath()
+		if err != nil {
 			t.Fatal(err)
 		}
-		if plan, err := a.Plan(root, true); err == nil {
+		dir := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(dir, filepath.Base(path)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if plan, err := a.PlanUserHooks(dir, userCommand, true); err == nil {
 			t.Errorf("%s planned %d change(s) over a file that could not be read", a.Name(), len(plan.Changes))
-		}
-	}
-}
-
-// What install commits, uninstall recognizes as terma's and removes, and a second install
-// changes nothing.
-func TestCommittedHooksRoundTrip(t *testing.T) {
-	for _, a := range reg.All() {
-		if a.HooksPath() == "" {
-			continue
-		}
-		root := t.TempDir()
-		plan, err := a.Plan(root, true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := hookmgr.Apply(root, plan); err != nil {
-			t.Fatalf("%s: %v", a.Name(), err)
-		}
-		if again, err := a.Plan(root, true); err != nil || !again.Empty() {
-			t.Errorf("%s: a second install plans %+v (%v)", a.Name(), again.Changes, err)
-		}
-		if !agents.Wired(root, a) {
-			t.Errorf("%s: installed hooks do not read as wired", a.Name())
-		}
-		remove, err := a.Plan(root, false)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := hookmgr.Apply(root, remove); err != nil {
-			t.Fatalf("%s: %v", a.Name(), err)
-		}
-		if agents.Wired(root, a) {
-			t.Errorf("%s: uninstall left terma's hooks in place", a.Name())
 		}
 	}
 }

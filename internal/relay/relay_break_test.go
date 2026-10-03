@@ -298,8 +298,7 @@ func TestRelayRetriesATransientFailure(t *testing.T) {
 		Resolve: func(claim.Claim) (Policy, error) {
 			return Policy{Endpoint: flaky.URL, Key: "k", IncludePrompts: true, IncludeToolContent: true}, nil
 		}})
-	ctx := t.Context()
-	go r.Run(ctx)
+	runRelay(t, r)
 	srv := httptest.NewServer(r.Handler())
 	defer srv.Close()
 	body, _ := proto.Marshal(logsOf("A", 2))
@@ -366,8 +365,7 @@ func TestRelayClaimCoversOnlyItsProcesses(t *testing.T) {
 	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
 		PeerPID: func(int) (int, bool) { pid := int(sender.Load()); return pid, pid != 0 },
 		Resolve: func(c claim.Claim) (Policy, error) { return allPolicies(u)[c.ProjectID], nil }})
-	ctx := t.Context()
-	go r.Run(ctx)
+	runRelay(t, r)
 	srv := httptest.NewUnstartedServer(r.Handler())
 	srv.Config.ConnContext = r.ConnContext
 	srv.Start()
@@ -405,8 +403,7 @@ func TestRelayLearnsTracesFromLogs(t *testing.T) {
 	f := newFixture()
 	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Second, Lookup: f.lookup, Now: f.clock,
 		Resolve: func(c claim.Claim) (Policy, error) { return allPolicies(u)[c.ProjectID], nil }})
-	ctx := t.Context()
-	go r.Run(ctx)
+	runRelay(t, r)
 	srv := httptest.NewServer(r.Handler())
 	defer srv.Close()
 	trace := []byte("0123456789abcdef")
@@ -446,8 +443,7 @@ func BenchmarkRelayExport(b *testing.B) {
 	r := newRelay(Options{Dir: b.TempDir(), Token: token, Resolve: func(claim.Claim) (Policy, error) {
 		return Policy{Endpoint: sink.URL, Key: "k", IncludePrompts: false, IncludeToolContent: false}, nil
 	}})
-	ctx := b.Context()
-	go r.Run(ctx)
+	runRelay(b, r)
 	var recs []*logspb.LogRecord
 	for i := range 50 {
 		recs = append(recs, &logspb.LogRecord{Attributes: []*commonpb.KeyValue{kv("session.id", fmt.Sprintf("s%d", i%5)), kv("prompt", strings.Repeat("p", 200)), kv("event.name", "user_prompt")}})
@@ -486,9 +482,7 @@ func newProcRelay(t *testing.T) *procRelay {
 			}
 			return Policy{}, ErrNoKey
 		}})
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
-	go pr.r.Run(ctx)
+	runRelay(t, pr.r)
 	pr.srv = httptest.NewUnstartedServer(pr.r.Handler())
 	pr.srv.Config.ConnContext = pr.r.ConnContext
 	pr.srv.Start()
@@ -664,8 +658,7 @@ func TestRelayWaitsForAKey(t *testing.T) {
 			}
 			return Policy{}, ErrNoKey
 		}})
-	ctx := t.Context()
-	go r.Run(ctx)
+	runRelay(t, r)
 	srv := httptest.NewServer(r.Handler())
 	defer srv.Close()
 	body, _ := proto.Marshal(logsOf("D", 2)) // D is claimed for p3
@@ -783,7 +776,7 @@ func TestRelayCatchAllInGlobalMode(t *testing.T) {
 			}
 			return Policy{}, ErrNoKey
 		}})
-	go r.Run(t.Context())
+	runRelay(t, r)
 	srv := httptest.NewServer(r.Handler())
 	defer srv.Close()
 	body, _ := proto.Marshal(mixedLogs())
@@ -830,7 +823,7 @@ func TestRelayHeartbeat(t *testing.T) {
 			}
 			return Policy{}, ErrNoKey
 		}})
-	go r.Run(t.Context())
+	runRelay(t, r)
 	srv := httptest.NewServer(r.Handler())
 	defer srv.Close()
 	count := func() int { mu.Lock(); defer mu.Unlock(); return len(beats) }
@@ -897,7 +890,7 @@ func TestRelayRetriesAFailedSenderLookup(t *testing.T) {
 			return 101, true
 		},
 		Resolve: func(c claim.Claim) (Policy, error) { return allPolicies(u)[c.ProjectID], nil }})
-	go r.Run(t.Context())
+	runRelay(t, r)
 	srv := httptest.NewUnstartedServer(r.Handler())
 	srv.Config.ConnContext = r.ConnContext
 	srv.Start()

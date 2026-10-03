@@ -13,10 +13,15 @@ make run RUN=TestClaudeSubscriptionSession
 E2E_UPDATE_GOLDEN=1 make run # re-record the attribute key sets after a harness upgrade
 ```
 
-Every scenario runs in a sandbox: scratch Terma config, scratch harness
-config, and a scratch git repository that `terma install` and `terma connect`
-configured exactly as they would for a developer, with the export pointed at an
-OTLP receiver inside the test. Contracts then read three planes together:
+Every scenario runs in a sandbox: scratch Terma config, scratch harness config, a
+scratch git global config and a scratch git repository, with the machine-wide hooks
+`terma setup` writes for a developer (the agents' user-level hooks and git's global
+`core.hooksPath`), and the export pointed at an OTLP receiver inside the test:
+through the local relay, or straight there by an exporter the sandbox writes into the
+agent's own config. The team policy's repository list (`WithRepositories`, default the
+scratch repository's origin, `github.com/acme/repo`) decides where the hooks record
+anything. Contracts then read
+three planes together:
 
 - the hook events (`terma.session.start`, `terma.session.quota`, `terma.files.touched`, `terma.commit.stamped`, …), read from the spool file or, more often, from what the end-of-turn flush has already delivered to the receiver,
 - the receiver (the harness's own OTLP records: `api_request` with `speed`, `cost_usd`, `session.id`, resource identity; and Terma's own delivered events, as `service.name=terma-cli` logs stamped with the project, which is the shape the backend parses),
@@ -63,7 +68,7 @@ passes by absence.
 
 `TERMA_ENV` is the one terma setting the sandboxes inherit (`TERMA_ENV=dev make run …`),
 so anything that is not the in-test receiver stays off production. How the sandbox
-installs without an account is under "Sandbox installation" at the end.
+is set up without an account is under "Sandbox setup" at the end.
 
 For Codex API tests, the suite pipes the key to `codex login --with-api-key` in
 its scratch `CODEX_HOME`, using `cli_auth_credentials_store="file"` for login and
@@ -203,10 +208,19 @@ they must not count as a pass for an assumed unsupported version.
 One driver file (start it, get past its dialogs, send a prompt, exit), one
 test file with the contracts the matrix row promises, and golden files. Codex
 uses `codex exec` for the API route, the developer's `~/.codex/auth.json`
-copied into the scratch `CODEX_HOME` for the ChatGPT route, `.codex/hooks.json`
-trusted in the scratch config's `[hooks.state]`.
+copied into the scratch `CODEX_HOME` for the ChatGPT route, and terma's machine-wide
+`CODEX_HOME/hooks.json`, which setup approves in the scratch config's `[hooks.state]`.
+
+`TestMachineHooks*` covers where those hooks record: beside a repository's own Claude
+Code, Codex and git hooks; the listed origin from a subdirectory, a differently named
+checkout, its ssh and https forms and linked worktrees; nothing in a same-named folder
+with another origin, a fork, a repository with no origin or a folder outside git; and a
+Codex thread resumed into an unlisted repository.
 
 ## Cursor
+
+`terma setup` offers Cursor as Coming Soon and writes no Cursor hooks, so every Cursor
+scenario below is recorded as not run until it does.
 
 `TestCursorHookDelivery` needs no provider credentials: it sends synthetic payloads
 through installed hooks and the real Terma binary to the loopback OTLP receiver,
@@ -228,7 +242,7 @@ TERMA_E2E=1 TERMA_E2E_BINARY=../bin/terma \
 
 Supply the key through the environment, never a command argument. This verifies
 CLI collection only, not plan classification, billing reconciliation, full token
-coverage or IDE behavior. The same project hooks are installed for the IDE;
+coverage or IDE behavior. The same hooks serve the IDE;
 its authenticated check remains manual.
 
 
@@ -255,11 +269,15 @@ binary/capture variables above). The inspected `--print` runner lacks the local
 turn-hook invocations present in the interactive UI; the headless test remains a
 separate regression check.
 
-## Sandbox installation
+## Sandbox setup
 
-Sandbox installation uses `--harness none --no-browser` with a local
-account fixture that supplies the developer login, project list, and collection
-policy. Each scenario connects its exporter separately with a dummy key for the
+Each sandbox runs `terma setup --team … --harness claude,codex --yes --no-browser
+--relay-service off` with a local account fixture that supplies the developer login,
+project list, and collection policy. Setup runs from the recording shim's path, since
+the hooks it writes call terma by absolute path; the relay it starts and its check-in
+are cleared before the scenario. The relay forwards only agents the profile records,
+and setup records only Claude Code and Codex, so relay scenarios for other agents
+record them in the profile themselves. Each scenario points its exporter separately, with a dummy key for the
 loopback receiver. Account hosts are persisted in the private profile so relay
 services load the same scoped policy after a restart. No real provider credentials
 are needed for the deterministic telemetry scenarios.

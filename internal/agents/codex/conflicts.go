@@ -225,11 +225,12 @@ func codexConflictsInLayer(data []byte, layer codexLayer, e harness.Exporter) []
 		report(otelTable+"."+sk.key, value, "decides where "+string(sk.signal)+" go")
 	}
 
-	if v, ok := doc.Otel[codexLogUserPrompt].(bool); ok && v != e.IncludePrompts {
+	// Content is always asked for: the team's policy, at the relay, withholds it.
+	if v, ok := doc.Otel[codexLogUserPrompt].(bool); ok && !v {
 		report(otelTable+"."+codexLogUserPrompt, strconv.FormatBool(v), "turns prompt capture "+switchWord(v))
 	}
 	if table, ok := doc.Otel[codexToolResult].(map[string]any); ok {
-		if n, ok := tomlInt(table[codexToolResultMaxBytes]); ok && (n > 0) != e.IncludeToolContent {
+		if n, ok := tomlInt(table[codexToolResultMaxBytes]); ok && n <= 0 {
 			report(otelTable+"."+codexToolResult+"."+codexToolResultMaxBytes, strconv.FormatInt(n, 10),
 				"turns tool output capture "+switchWord(n > 0))
 		}

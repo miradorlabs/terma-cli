@@ -28,7 +28,7 @@ func preToolUse(ctx context.Context, env hookrun.Env) error {
 	if err != nil {
 		return nil
 	}
-	if _, desktop := codexDesktopRoute(r); !desktop {
+	if !codexDesktopRoute(env, r) {
 		return nil
 	}
 	path, err := codexToolStartPath(in)
@@ -85,8 +85,7 @@ func permissionRequest(ctx context.Context, env hookrun.Env) error {
 	if err != nil {
 		return nil
 	}
-	route, desktop := codexDesktopRoute(r)
-	if !desktop {
+	if !codexDesktopRoute(env, r) {
 		return nil
 	}
 	at := env.Time()
@@ -96,13 +95,11 @@ func permissionRequest(ctx context.Context, env hookrun.Env) error {
 	hookrun.BoundedAttr(attrs, hookrun.AttrTurnID, in.TurnID)
 	hookrun.BoundedAttr(attrs, hookrun.AttrToolName, in.ToolName)
 	hookrun.BoundedAttr(attrs, "permission_mode", in.PermissionMode)
-	if route.IncludeToolContent {
-		var input struct {
-			Description string `json:"description"`
-		}
-		if json.Unmarshal(in.ToolInput, &input) == nil {
-			hookrun.BoundedAttr(attrs, "reason", input.Description)
-		}
+	var input struct {
+		Description string `json:"description"`
+	}
+	if json.Unmarshal(in.ToolInput, &input) == nil {
+		hookrun.BoundedAttr(attrs, hookrun.AttrReason, input.Description)
 	}
 	env.EmitFor(r, spool.Event{Time: at, Name: hookrun.EventApprovalAsked, SessionID: in.SessionID, Repo: r.Name, Attrs: attrs})
 	return nil

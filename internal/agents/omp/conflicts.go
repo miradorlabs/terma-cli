@@ -40,11 +40,11 @@ func ompConflicts(e harness.Exporter) []harness.Conflict {
 		})
 	}
 
-	if value := os.Getenv(ompCaptureContentEnv); value != "" && !matchesCapture(value, e) {
+	if value := os.Getenv(ompCaptureContentEnv); value != "" && !capturesContent(value) {
 		out = append(out, harness.Conflict{
 			Key:       ompCaptureContentEnv,
 			Value:     value,
-			Reason:    "exported in your shell, where it decides content capture instead of the repository's policy",
+			Reason:    "exported in your shell, where it turns content capture off; the team's policy decides what leaves, so terma asks for all of it",
 			Scope:     harness.ScopeEnvironment,
 			Clearable: false,
 			Advisory:  true,
@@ -53,14 +53,12 @@ func ompConflicts(e harness.Exporter) []harness.Conflict {
 	return out
 }
 
-// matchesCapture reports whether an exported capture value agrees with e's content posture.
-func matchesCapture(value string, e harness.Exporter) bool {
-	want := e.IncludePrompts || e.IncludeToolContent
+// capturesContent reports whether an exported capture value keeps content on, as terma
+// always asks.
+func capturesContent(value string) bool {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "true", "1", "summary":
-		return want
-	case "false", "0", "":
-		return !want
+		return true
 	}
 	return false
 }

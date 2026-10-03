@@ -1,39 +1,26 @@
 package e2e
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 )
 
-// TestClaudeEditInLinkedWorktree is a Claude Code session in a linked git worktree of a
-// repository that keeps its binding out of git — the shape `git worktree add` and Claude
-// Code's own isolated worktrees leave, since neither copies an ignored file. The
-// worktree has no .terma/settings.json. Its events must still reach the repository's
-// project (an event without one is dropped at the flush), report the main repository as
-// terma.repo, and name the worktree; a commit made there must be stamped and delivered.
+// TestClaudeEditInLinkedWorktree is a Claude Code session in a linked git worktree — the
+// shape `git worktree add` and Claude Code's own isolated worktrees leave. The worktree
+// reads origin from its main repository, which the team lists, so it is admitted. Its
+// events must reach the team's project, report the main repository as terma.repo, and
+// name the worktree; a commit made there runs terma's global git hooks and must be
+// stamped and delivered.
 func TestClaudeEditInLinkedWorktree(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
 		track(t)
 		mode, route := claudeMode(t)
 		sb := New(t, mode, WithClaude(b))
 		repoName := filepath.Base(sb.Repo)
-
-		// Everything install wrote is committed except the binding, which is ignored.
-		sb.write(".gitignore", ".terma/settings.json\n")
-		sb.Commit("wire terma hooks; keep the binding local")
 		wt := filepath.Join(sb.Dir, "feature-wt")
 		sb.git("worktree", "add", "-q", "-b", "feature", wt)
-		if _, err := os.Stat(filepath.Join(wt, ".terma", "settings.json")); !os.IsNotExist(err) {
-			t.Fatalf("precondition: the worktree must have no binding of its own (stat: %v)", err)
-		}
-		for _, hook := range []string{".claude/settings.json", ".terma/hooks/post-commit"} {
-			if _, err := os.Stat(filepath.Join(wt, hook)); err != nil {
-				t.Fatalf("precondition: the worktree must have the committed %s: %v", hook, err)
-			}
-		}
 
 		// The session and the commit happen in the worktree.
 		sb.Repo = wt
@@ -43,7 +30,7 @@ func TestClaudeEditInLinkedWorktree(t *testing.T) {
 		sid := run.SessionID
 
 		// Delivered, not merely spooled: the flush drops an event with no project, so
-		// arriving at the receiver is the evidence the binding was found.
+		// arriving at the receiver is the evidence the worktree was admitted.
 		check := func(name string, recs []LogRecord) {
 			t.Helper()
 			if len(recs) == 0 {

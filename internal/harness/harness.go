@@ -78,12 +78,10 @@ type Exporter struct {
 	// HelperPath, when set, is a 0700 script that prints the Authorization header, so the
 	// settings file holds a path instead of the key. Empty means inline delivery.
 	HelperPath string
-
-	// IncludePrompts and IncludeToolContent are separate switches because they disclose
-	// different things; the zero value captures nothing.
-	IncludePrompts     bool
-	IncludeToolContent bool
 }
+
+// An Exporter carries no content switch: every agent sends prompts and tool content to
+// the local relay, which withholds what the team's collection policy does not collect.
 
 // HasSignal reports whether a stream is enabled.
 func (e Exporter) HasSignal(s Signal) bool {
@@ -180,9 +178,9 @@ type Status struct {
 	Connected bool
 	Endpoint  string
 	Signals   []Signal
-
-	IncludePrompts     bool
-	IncludeToolContent bool
+	// StaleContent reports a repository setting an earlier terma wrote to withhold content;
+	// install removes it, since only the team's policy decides content.
+	StaleContent bool
 
 	// ManagedKeys counts Terma-written keys present; disconnect keys off it, not Connected,
 	// because telemetry switched off with the key still on disk most needs cleaning.
@@ -198,7 +196,7 @@ type Status struct {
 
 // Harness is one configurable agent CLI.
 type Harness interface {
-	// Name is the command-line token: `terma telemetry connect <name>`.
+	// Name is the command-line token: `terma setup --harness <name>`.
 	Name() string
 	// DisplayName is how it is written in prose.
 	DisplayName() string
@@ -207,10 +205,6 @@ type Harness interface {
 
 	// ConfigPath is the file Connect and Disconnect write.
 	ConfigPath() (string, error)
-
-	// SupportsHeadersHelper reports whether the agent can read OTLP headers from a
-	// script; without it the key is written inline and HelperPath is ignored.
-	SupportsHeadersHelper() bool
 
 	Status() (Status, error)
 
@@ -233,8 +227,6 @@ type Harness interface {
 	CurrentCredential(endpoint, projectID string) (key string, ok bool)
 	// Backup snapshots the configuration before a connect; "" for none taken.
 	Backup(endpoint string) (path string, err error)
-	// ConnectNotes are said before the developer confirms a connect.
-	ConnectNotes(e Exporter) []string
 }
 
 // ErrUnsupported is returned by an agent that is registered but not yet implemented.

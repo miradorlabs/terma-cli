@@ -3,8 +3,6 @@ package cli
 import (
 	"bytes"
 	"context"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 )
@@ -56,20 +54,4 @@ func (r termaRun) combined(t *testing.T, args ...string) (string, error) {
 func runTerma(t *testing.T, args ...string) (string, error) {
 	t.Helper()
 	return termaRun{}.combined(t, args...)
-}
-
-// fakeGateway serves handler as the API and auth host and returns the environment for it,
-// with a server key so no sign-in can be reached.
-func fakeGateway(t *testing.T, handler http.HandlerFunc) map[string]string {
-	t.Helper()
-	srv := httptest.NewServer(handler)
-	t.Cleanup(srv.Close)
-	return map[string]string{
-		"TERMA_CONFIG_DIR": t.TempDir(),
-		"TERMA_API_URL":    srv.URL,
-		"TERMA_AUTH_URL":   srv.URL,
-		"TERMA_API_KEY":    "ter_srv_0123456789abcdef",
-		"TERMA_ENV":        "",
-		"TERMA_PROFILE":    "",
-	}
 }

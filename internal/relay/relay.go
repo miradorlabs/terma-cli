@@ -1,8 +1,9 @@
 // Package relay is the local OTLP relay: agents' exporters send to it on loopback, and it
-// forwards a record only when a hook in an opted-in repository claimed its session and the
+// forwards a record only when a hook in a collected repository claimed its session and the
 // record came from a process that claim names, to that project with its key and content
-// policy. Everything else waits briefly in memory, since a first export can race the
-// claiming hook, and is then dropped without touching disk.
+// policy. Everything else waits briefly, since a first export can race the
+// claiming hook, and is then dropped. What waits is mirrored on disk until it leaves, so a
+// restarted relay takes it back (holdstore.go).
 package relay
 
 import (
@@ -14,6 +15,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -47,11 +49,10 @@ type Policy struct {
 	IncludePrompts     bool
 	IncludeToolContent bool
 	// Signals nil allows every signal; empty allows none.
-	Signals []string
-	// Excludes reports whether an attribute, in protojson's shape, names an excluded
-	// file; nil when nothing is excluded.
-	Excludes     func(value any) bool
+	Signals      []string
 	RequireClaim bool
+	// Unadmitted is a claim whose repository the team policy no longer lists: its records drop.
+	Unadmitted bool
 }
 
 // ErrNoKey is Resolve's answer for a project this machine holds no key for; its parts wait, then drop.
@@ -118,6 +119,7 @@ type Relay struct {
 	traces     map[string]traceSession
 	procs      map[int]*procState // sender pid → the sessions it named, and whether it exited
 	outbox     outbox
+	store      heldStore
 	senders    map[route]*sender
 	lastSeen   time.Time
 	wg         sync.WaitGroup
@@ -156,13 +158,22 @@ func New(opts Options) *Relay {
 		opts.Grace = 5 * time.Second
 	}
 	sendCtx, cancel := context.WithCancel(context.Background())
-	return &Relay{
+	r := &Relay{
 		opts: opts, rules: compose(opts.Correlators, opts.Capturers), stats: newStats(),
 		cache:  lookupCache{claims: map[string]cachedClaim{}, policies: map[string]cachedPolicy{}},
 		held:   map[string][]heldPart{},
 		traces: map[string]traceSession{}, procs: map[int]*procState{}, senders: map[route]*sender{}, outbox: outbox{dir: opts.Dir},
 		lastSeen: opts.Now(), sendCtx: sendCtx, cancelSend: cancel, stopping: make(chan struct{}),
+		store: newHeldStore(opts.Dir),
 	}
+	// The held store's parent, created once here: a flush never creates it, so a relay torn
+	// down mid-flush leaves nothing behind.
+	if opts.Dir != "" {
+		_ = os.MkdirAll(opts.Dir, 0o700)
+	}
+	// Before the first export, so a session's reloaded parts still go ahead of its new ones.
+	r.loadHeld()
+	return r
 }
 
 // Stats is the relay's running account.
@@ -275,8 +286,10 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 		return
 	}
 	pid := r.senderPID(req)
+	_, global := r.catchAll()
+	narrow := r.opts.CatchAll != nil && !global
 	for _, p := range parts {
-		p.pid = pid
+		p.pid, p.narrow = pid, narrow
 		p.at = earliest(p.msg)
 		r.stats.received(s, p.records)
 		if p.session != "" && !strings.HasPrefix(p.session, tracePrefix) {

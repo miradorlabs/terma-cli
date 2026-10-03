@@ -110,7 +110,7 @@ func claudeConflicts(env map[string]string, root map[string]json.RawMessage, e h
 	// Outranking layers terma does not own.
 	out = append(out, environmentConflicts(e)...)
 	out = append(out, projectConflicts(e, l)...)
-	out = append(out, captureConflictsIn(e, l)...)
+	out = append(out, captureConflictsIn(l)...)
 	return out
 }
 

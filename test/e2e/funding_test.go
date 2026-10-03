@@ -157,7 +157,7 @@ func TestClaudeStopFailureDelivery(t *testing.T) {
 		track(t)
 		t.Setenv("ANTHROPIC_API_KEY", "synthetic-live-error-key")
 		sb := New(t, Isolated, WithClaude(b))
-		sb.connectClaude()
+		sb.directClaude()
 		var calls atomic.Int32
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			calls.Add(1)

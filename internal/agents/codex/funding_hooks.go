@@ -71,7 +71,7 @@ func captureCodexFunding(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in
 		if !ev.SourceTime.IsZero() {
 			attrs["source_time"] = ev.SourceTime.UTC().Format(time.RFC3339Nano)
 		}
-		return e.Spool.Append(spool.Event{Time: e.Time(), Name: hookrun.EventSessionQuota, SessionID: in.SessionID, Repo: r.Name, Attrs: attrs})
+		return e.Spool.Append(spool.Event{Time: e.Time(), Name: hookrun.EventSessionQuota, SessionID: in.SessionID, Repo: r.Name, Repository: r.Repository, Attrs: attrs})
 	})
 	if next != cursor {
 		b, _ := json.Marshal(next)

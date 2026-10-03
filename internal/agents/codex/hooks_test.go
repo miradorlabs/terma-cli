@@ -3,9 +3,7 @@ package codex
 import (
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -38,28 +36,8 @@ func parseCodex(t *testing.T, raw string) codexFile {
 	return doc
 }
 
-func TestCodexHookCommandFindsHomeInstallWithGUIPath(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("Codex hook command uses a POSIX shell")
-	}
-	home := t.TempDir()
-	bin := filepath.Join(home, ".local", "bin")
-	if err := os.MkdirAll(bin, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(bin, "terma"), []byte("#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$HOME/invoked\"\n"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	cmd := exec.Command("/bin/sh", "-c", hookCommand("codex-user-prompt-submit"))
-	cmd.Env = []string{"HOME=" + home, "PATH=" + t.TempDir()}
-	if out, err := cmd.CombinedOutput(); err != nil || len(out) != 0 {
-		t.Fatalf("Codex hook command failed: %v, output %q", err, out)
-	}
-	got, err := os.ReadFile(filepath.Join(home, "invoked"))
-	if err != nil || string(got) != "hook\ncodex-user-prompt-submit\n" {
-		t.Fatalf("home install not invoked: %q, %v", got, err)
-	}
-}
+// testCommand is a machine-wide hook entry's command, as setup writes it.
+var testCommand = hookmgr.UserHookCommand("/opt/terma/bin/terma")
 
 func TestCodexEntryHashMatchesCodexCommandHook(t *testing.T) {
 	entry := Entry{Event: "PostToolUse", Group: 0, Handler: 0}
@@ -77,7 +55,7 @@ func TestCodexEntryHashMatchesCodexCommandHook(t *testing.T) {
 
 func TestCodexHooksMergeKeepsDescriptionAndUserGroups(t *testing.T) {
 	root := t.TempDir()
-	hookruntest.WriteFile(t, root, hooksPath, `{
+	hookruntest.WriteFile(t, root, "hooks.json", `{
   "description": "team hooks",
   "hooks": {
     "PostToolUse": [{"matcher": "^shell$", "hooks": [{"type": "command", "command": "./audit.sh"}]}],
@@ -85,14 +63,14 @@ func TestCodexHooksMergeKeepsDescriptionAndUserGroups(t *testing.T) {
   }
 }
 `)
-	plan, err := planHooks(root, true)
+	plan, err := planUserHooks(root, testCommand, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := hookmgr.Apply(root, plan); err != nil {
 		t.Fatal(err)
 	}
-	doc := parseCodex(t, hookruntest.ReadFile(t, root, hooksPath))
+	doc := parseCodex(t, hookruntest.ReadFile(t, root, "hooks.json"))
 
 	if doc.Description != "team hooks" {
 		t.Fatalf("description lost: %q", doc.Description)
@@ -109,61 +87,61 @@ func TestCodexHooksMergeKeepsDescriptionAndUserGroups(t *testing.T) {
 		t.Fatalf("terma's group should carry no matcher, got %q", *post[1].Matcher)
 	}
 	ours := post[1].Hooks[0]
-	if ours.Command != hookCommand("codex-post-tool-use") || ours.Type != "command" {
+	if ours.Command != testCommand("codex-post-tool-use") || ours.Type != "command" {
 		t.Fatalf("terma's PostToolUse handler wrong: %+v", ours)
 	}
 	// PostToolUse fires on every tool call, so it must not make the agent wait.
 	if !ours.Async {
 		t.Fatal("PostToolUse must be async")
 	}
-	if pre := doc.Hooks["PreToolUse"]; len(pre) != 1 || pre[0].Hooks[0].Command != hookCommand("codex-pre-tool-use") || pre[0].Hooks[0].Async {
+	if pre := doc.Hooks["PreToolUse"]; len(pre) != 1 || pre[0].Hooks[0].Command != testCommand("codex-pre-tool-use") || pre[0].Hooks[0].Async {
 		t.Fatalf("PreToolUse must record before the call: %+v", pre)
 	}
-	if approval := doc.Hooks["PermissionRequest"]; len(approval) != 1 || approval[0].Hooks[0].Command != hookCommand("codex-permission-request") {
+	if approval := doc.Hooks["PermissionRequest"]; len(approval) != 1 || approval[0].Hooks[0].Command != testCommand("codex-permission-request") {
 		t.Fatalf("PermissionRequest missing: %+v", approval)
 	}
-	if prompt := doc.Hooks["UserPromptSubmit"]; len(prompt) != 2 || prompt[0].Hooks[0].Command != "./log.sh" || prompt[1].Hooks[0].Command != hookCommand("codex-user-prompt-submit") {
+	if prompt := doc.Hooks["UserPromptSubmit"]; len(prompt) != 2 || prompt[0].Hooks[0].Command != "./log.sh" || prompt[1].Hooks[0].Command != testCommand("codex-user-prompt-submit") {
 		t.Fatalf("user prompt hook merge wrong: %+v", prompt)
 	}
 	start := doc.Hooks["SessionStart"]
-	if len(start) != 1 || start[0].Hooks[0].Command != hookCommand("codex-session-start") {
+	if len(start) != 1 || start[0].Hooks[0].Command != testCommand("codex-session-start") {
 		t.Fatalf("SessionStart missing: %+v", start)
 	}
 	if start[0].Hooks[0].Async {
 		t.Fatal("SessionStart should be synchronous: the session must exist before the first edit")
 	}
 	stop := doc.Hooks["Stop"]
-	if len(stop) != 1 || stop[0].Hooks[0].Command != hookCommand("codex-stop") {
+	if len(stop) != 1 || stop[0].Hooks[0].Command != testCommand("codex-stop") {
 		t.Fatalf("Stop missing: %+v", stop)
 	}
 	if stop[0].Hooks[0].Async || stop[0].Hooks[0].Timeout != 3 {
 		t.Fatal("Stop must finish bounded local capture before codex exec exits")
 	}
 	end := doc.Hooks["SessionEnd"]
-	if len(end) != 1 || end[0].Hooks[0].Command != hookCommand("codex-session-end") {
+	if len(end) != 1 || end[0].Hooks[0].Command != testCommand("codex-session-end") {
 		t.Fatalf("SessionEnd missing: %+v", end)
 	}
 	if end[0].Hooks[0].Timeout != 3 {
 		t.Fatalf("SessionEnd timeout = %d, want Codex's maximum of 3", end[0].Hooks[0].Timeout)
 	}
 	sub := doc.Hooks["SubagentStart"]
-	if len(sub) != 1 || sub[0].Hooks[0].Command != hookCommand("codex-subagent-start") || !sub[0].Hooks[0].Async {
+	if len(sub) != 1 || sub[0].Hooks[0].Command != testCommand("codex-subagent-start") || !sub[0].Hooks[0].Async {
 		t.Fatalf("SubagentStart should be wired and async: %+v", sub)
 	}
 	sub = doc.Hooks["SubagentStop"]
-	if len(sub) != 1 || sub[0].Hooks[0].Command != hookCommand("codex-subagent-stop") || sub[0].Hooks[0].Async || sub[0].Hooks[0].Timeout != 3 {
+	if len(sub) != 1 || sub[0].Hooks[0].Command != testCommand("codex-subagent-stop") || sub[0].Hooks[0].Async || sub[0].Hooks[0].Timeout != 3 {
 		t.Fatalf("SubagentStop should be synchronous and short: %+v", sub)
 	}
 
-	if again, _ := planHooks(root, true); !again.Empty() {
+	if again, _ := planUserHooks(root, testCommand, true); !again.Empty() {
 		t.Fatal("install should be idempotent")
 	}
 
-	un, _ := planHooks(root, false)
+	un, _ := planUserHooks(root, testCommand, false)
 	if err := hookmgr.Apply(root, un); err != nil {
 		t.Fatal(err)
 	}
-	after := parseCodex(t, hookruntest.ReadFile(t, root, hooksPath))
+	after := parseCodex(t, hookruntest.ReadFile(t, root, "hooks.json"))
 	if after.Description != "team hooks" {
 		t.Fatalf("uninstall lost the description: %q", after.Description)
 	}
@@ -177,20 +155,20 @@ func TestCodexHooksMergeKeepsDescriptionAndUserGroups(t *testing.T) {
 
 func TestCodexHooksCreateAndRemoveWholeFile(t *testing.T) {
 	root := t.TempDir()
-	plan, err := planHooks(root, true)
+	plan, err := planUserHooks(root, testCommand, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := hookmgr.Apply(root, plan); err != nil {
 		t.Fatal(err)
 	}
-	doc := parseCodex(t, hookruntest.ReadFile(t, root, hooksPath))
-	if len(doc.Hooks) != len(committedHooks) {
-		t.Fatalf("want %d events, got %d", len(committedHooks), len(doc.Hooks))
+	doc := parseCodex(t, hookruntest.ReadFile(t, root, "hooks.json"))
+	if len(doc.Hooks) != len(codexHooks) {
+		t.Fatalf("want %d events, got %d", len(codexHooks), len(doc.Hooks))
 	}
 	// Codex denies unknown fields, so an unknown key would reject the whole file.
 	var top map[string]json.RawMessage
-	if err := json.Unmarshal([]byte(hookruntest.ReadFile(t, root, hooksPath)), &top); err != nil {
+	if err := json.Unmarshal([]byte(hookruntest.ReadFile(t, root, "hooks.json")), &top); err != nil {
 		t.Fatal(err)
 	}
 	for key := range top {
@@ -199,35 +177,22 @@ func TestCodexHooksCreateAndRemoveWholeFile(t *testing.T) {
 		}
 	}
 
-	un, _ := planHooks(root, false)
+	un, _ := planUserHooks(root, testCommand, false)
 	if err := hookmgr.Apply(root, un); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(hooksPath))); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(root, "hooks.json")); !os.IsNotExist(err) {
 		t.Fatal("a file that held nothing but terma's hooks should be removed")
 	}
 }
 
 func TestCodexHooksRefuseMalformedFile(t *testing.T) {
 	root := t.TempDir()
-	hookruntest.WriteFile(t, root, hooksPath, "{not json")
-	if _, err := planHooks(root, true); err == nil {
+	hookruntest.WriteFile(t, root, "hooks.json", "{not json")
+	if _, err := planUserHooks(root, testCommand, true); err == nil {
 		t.Fatal("want an error for a file this CLI cannot parse")
-	} else if !strings.Contains(err.Error(), hooksPath) {
+	} else if !strings.Contains(err.Error(), "hooks.json") {
 		t.Fatalf("error should name the file: %v", err)
-	}
-}
-
-func TestHasCodex(t *testing.T) {
-	root := t.TempDir()
-	if hasConfig(root) {
-		t.Fatal("no .codex directory")
-	}
-	if err := os.MkdirAll(filepath.Join(root, ".codex"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if !hasConfig(root) {
-		t.Fatal("want true once .codex exists")
 	}
 }
 
@@ -248,23 +213,23 @@ func TestCodexEntryKeyIsCodexsOwn(t *testing.T) {
 // Only terma's entries are listed, wherever a developer's own sit beside them.
 func TestCodexTermaEntriesFindsTermasAmongOthers(t *testing.T) {
 	root := t.TempDir()
-	if entries, err := TermaEntries(root); err != nil || entries != nil {
+	if entries, err := termaEntriesIn(filepath.Join(root, "hooks.json")); err != nil || entries != nil {
 		t.Fatalf("a missing file: %v, %v", entries, err)
 	}
-	hookruntest.WriteFile(t, root, hooksPath, `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"my-notifier"}]}]}}`)
-	plan, err := planHooks(root, true)
+	hookruntest.WriteFile(t, root, "hooks.json", `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"my-notifier"}]}]}}`)
+	plan, err := planUserHooks(root, testCommand, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := hookmgr.Apply(root, plan); err != nil {
 		t.Fatal(err)
 	}
-	entries, err := TermaEntries(root)
+	entries, err := termaEntriesIn(filepath.Join(root, "hooks.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(entries) != len(committedHooks) {
-		t.Fatalf("entries = %d, want one per hook terma installs (%d): %+v", len(entries), len(committedHooks), entries)
+	if len(entries) != len(codexHooks) {
+		t.Fatalf("entries = %d, want one per hook terma installs (%d): %+v", len(entries), len(codexHooks), entries)
 	}
 	for _, e := range entries {
 		if want := map[bool]int{true: 1, false: 0}[e.Event == "Stop"]; e.Group != want || e.Handler != 0 {
@@ -290,13 +255,13 @@ func TestManagedRequirements(t *testing.T) {
 	if err := toml.Unmarshal([]byte(text), &req); err != nil {
 		t.Fatalf("requirements.toml does not parse: %v\n%s", err, text)
 	}
-	for _, h := range committedHooks {
+	for _, h := range codexHooks {
 		groups := req.Hooks[h.Event]
 		if len(groups) != 1 || len(groups[0].Hooks) != 1 {
 			t.Fatalf("%s: %+v", h.Event, groups)
 		}
 		got := groups[0].Hooks[0]
-		if got.Type != "command" || got.Command != cmd(hookmgr.HookEventOf(h.Command)) || got.Timeout != h.Timeout || got.Async != h.Async {
+		if got.Type != "command" || got.Command != cmd(h.Hook) || got.Timeout != h.Timeout || got.Async != h.Async {
 			t.Errorf("%s: %+v", h.Event, got)
 		}
 	}

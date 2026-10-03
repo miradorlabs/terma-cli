@@ -18,6 +18,8 @@ type ResolverDeps struct {
 	Mint func(projectID string)
 	// AgentName names the agent behind a tool label, which its key is kept under.
 	AgentName func(tool string) string
+	// RelayTargets names the agents among the developer's choices that send through the relay.
+	RelayTargets func(selected []string) []string
 	// Endpoint is the ingest host a project's telemetry goes to.
 	Endpoint func(projectID string) string
 }
@@ -37,7 +39,7 @@ func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Polic
 			}
 			return relay.Policy{}, relay.ErrNoKey
 		}
-		org := cfg.Policy
+		org, chosen := cfg.Policy, cfg.Harnesses
 		// Reread the profile so a refreshed policy also governs queued exports.
 		if file, err := config.LoadFile(); err != nil {
 			return relay.Policy{}, err
@@ -45,6 +47,7 @@ func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Polic
 			// The startup policy would outlive a sign-out or a removed profile.
 			return relay.Policy{}, errors.New("profile removed; restart the relay")
 		} else if p != nil {
+			chosen = p.Harnesses
 			if p.OrganizationID != cfg.OrganizationID {
 				return relay.Policy{}, errors.New("organization changed; restart the relay")
 			}
@@ -60,14 +63,9 @@ func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Polic
 			// Unknown policy must neither grant nor drop: a new team's exports wait for its fetch.
 			return relay.Policy{}, errors.New("no validated collection policy for this team")
 		}
-		in := Capture{Org: org, Primary: globalPrimary}
+		in := Capture{Org: org, Primary: globalPrimary, Agents: r.RelayTargets(chosen), Repository: c.Repository}
 		if c.Tool != "" {
 			in.Harness = r.AgentName(c.Tool)
-		}
-		if rec, ok, err := routing.LoadRecord(c.ProjectID); err != nil {
-			in.RecordErr = err
-		} else if ok {
-			in.Record = &rec
 		}
 		pol := CapturePolicy(in)
 		pol.Endpoint, pol.Key = r.Endpoint(c.ProjectID), key
