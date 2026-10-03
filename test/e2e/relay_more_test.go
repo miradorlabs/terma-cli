@@ -55,7 +55,8 @@ func TestRelayCodexResumedElsewhere(t *testing.T) {
 }
 
 // A session in a linked worktree (git worktree add) of an admitted repository is admitted
-// through origin's repository name, so its telemetry must reach the team's project.
+// through origin's repository name or its main checkout's folder, so its telemetry must
+// reach the team's project.
 func TestRelayLinkedWorktree(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
 		track(t)

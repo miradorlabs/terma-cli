@@ -14,7 +14,9 @@ type Repository struct {
 
 // Admits reports whether p collects the sessions and commits of r: every one in global
 // mode, else those its folder list names. An entry with a slash matches origin's
-// owner/name, one without any of r's names, ignoring case.
+// owner/name; one without equals any of r's names, ignoring case: the git root's folder
+// name (for a linked worktree, also its main checkout's folder name) or the origin
+// remote's repository name.
 func (p Policy) Admits(r Repository) bool {
 	if p.Global() {
 		return true

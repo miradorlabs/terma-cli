@@ -39,13 +39,15 @@ Your team's collection policy, set in Terma, lists the folders it collects. A se
 commit is recorded only in a folder the list names; everywhere else the hooks write
 nothing. Matching ignores case:
 
-- an entry `name` matches the git checkout's folder name, origin's repository name
+- an entry `name` equals the git root's folder name (for a linked worktree, also its
+  main checkout's folder name) or the origin remote's repository name
   (`git@github.com:acme/name.git`, `https://…/acme/name`, `ssh://…/acme/name.git`), or,
   outside Git, the working folder or any folder above it, up to the home directory;
 - an entry `owner/name` matches only origin's `owner/name`.
 
 So a checkout in `checkout-a` with origin `acme/mirador-platform` is collected by
-`mirador-platform`, `checkout-a` or `acme/mirador-platform`. In global mode the policy
+`mirador-platform`, `checkout-a` or `acme/mirador-platform`, and so is a worktree of it at
+`checkout-a/.claude/worktrees/fix-1`. In global mode the policy
 collects every folder. Each session reports to the team of the developer who ran it,
 so two developers on different teams in one repository each report to their own.
 

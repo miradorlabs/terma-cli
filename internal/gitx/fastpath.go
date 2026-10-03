@@ -148,8 +148,9 @@ func HooksPathFS(gitDir string) (local, worktree string) {
 }
 
 // RepositoryFS names the working copy at root for admission without running git: in a
-// checkout, its root's folder (a linked worktree's own) and origin's repository name, read
-// from the main repository's config, with a hosted origin's owner/name as path; outside
+// checkout, its root's folder (for a linked worktree, also its main checkout's) and
+// origin's repository name, read from the main repository's config, with a hosted origin's
+// owner/name as path; outside
 // Git, root's folder and every parent's, stopping before the home directory, which never
 // counts, or the volume root. A name already listed, ignoring case, is not repeated.
 func RepositoryFS(root, gitDir string) (names []string, path string) {
@@ -161,7 +162,13 @@ func RepositoryFS(root, gitDir string) (names []string, path string) {
 		return names, ""
 	}
 	names = append(names, filepath.Base(root))
-	raw, _ := configValue(filepath.Join(CommonDirFS(gitDir), "config"), `remote "origin"`, "url")
+	common := CommonDirFS(gitDir)
+	if common != filepath.Clean(gitDir) {
+		if name := mainCheckoutName(common); name != "" {
+			names = appendName(names, name)
+		}
+	}
+	raw, _ := configValue(filepath.Join(common, "config"), `remote "origin"`, "url")
 	name := ""
 	if remote := NormalizeRemote(raw); remote != "" {
 		if u, err := url.Parse(remote); err == nil {
@@ -177,6 +184,24 @@ func RepositoryFS(root, gitDir string) (names []string, path string) {
 		names = appendName(names, name)
 	}
 	return names, path
+}
+
+// mainCheckoutName is the folder of the checkout whose git directory is common, or a bare
+// repository's own name without .git; either separator, since git may write either.
+func mainCheckoutName(common string) string {
+	base := func(p string) (dir, name string) {
+		p = strings.TrimRight(p, `/\`)
+		i := strings.LastIndexAny(p, `/\`)
+		return p[:max(i, 0)], p[i+1:]
+	}
+	dir, name := base(common)
+	if strings.EqualFold(name, ".git") {
+		if _, name = base(dir); strings.HasSuffix(name, ":") {
+			return "" // a drive root names nothing
+		}
+		return name
+	}
+	return strings.TrimSuffix(name, ".git")
 }
 
 func appendName(names []string, name string) []string {

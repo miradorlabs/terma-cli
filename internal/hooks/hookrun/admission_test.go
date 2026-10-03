@@ -131,7 +131,7 @@ func TestAHookOutsideTheListWritesNothing(t *testing.T) {
 }
 
 // A session started in a subdirectory, or in a linked worktree whose .git is a file, is
-// its checkout's, admitted by origin's repository name.
+// its checkout's, admitted by origin's repository name or the main checkout's folder.
 func TestASubdirectorySessionIsItsCheckouts(t *testing.T) {
 	initRepo(t)
 	main := namedRepo(t, "checkout-a", "git@github.com:miradorlabs/mirador-platform.git")
@@ -144,9 +144,9 @@ func TestASubdirectorySessionIsItsCheckouts(t *testing.T) {
 		t.Fatal(err)
 	}
 	hookruntest.RelayOn(t)
-	// The worktree's root folder is its own: the main checkout's name does not admit it.
-	if _, err := (Env{Cwd: wt, Policy: listing("checkout-a"), Team: "t1"}).Repo(ctx); err == nil {
-		t.Fatal("the main checkout's folder name admitted a linked worktree")
+	// A linked worktree is also named by its main checkout's folder.
+	if _, err := (Env{Cwd: wt, Policy: listing("checkout-a"), Team: "t1"}).Repo(ctx); err != nil {
+		t.Fatalf("the main checkout's folder name did not admit its linked worktree: %v", err)
 	}
 	for i, cwd := range []string{filepath.Join(main, "src", "pkg"), filepath.Join(wt, "docs")} {
 		if err := os.MkdirAll(cwd, 0o755); err != nil {

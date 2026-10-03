@@ -96,3 +96,35 @@ func TestRepositoryFSStopsBeforeHome(t *testing.T) {
 		t.Fatalf("RepositoryFS = %q", names)
 	}
 }
+
+// A linked worktree is also named by its main checkout's folder, read from its commondir in
+// either separator; a bare repository's worktree by the repository's name.
+func TestRepositoryFSLinkedWorktree(t *testing.T) {
+	for _, tc := range []struct{ name, commondir, main string }{
+		{"relative, as git writes it", "../..", "billing"},
+		{"windows drive path", `C:\Users\dev\billing\.git`, "billing"},
+		{"windows forward slashes", "C:/Users/dev/billing/.git/", "billing"},
+		{"bare repository", `D:\repos\billing.git`, "billing"},
+		{"bare, unix", "/srv/git/billing.git", "billing"},
+		{"drive root", `C:\.git`, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mainRoot := filepath.Join(t.TempDir(), "billing")
+			gitDir := filepath.Join(mainRoot, ".git", "worktrees", "fix-1")
+			if err := os.MkdirAll(gitDir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(gitDir, "commondir"), []byte(tc.commondir+"\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			want := []string{"fix-1"}
+			if tc.main != "" {
+				want = append(want, tc.main)
+			}
+			root := filepath.Join(mainRoot, ".claude", "worktrees", "fix-1")
+			if names, _ := RepositoryFS(root, gitDir); !slices.Equal(names, want) {
+				t.Fatalf("RepositoryFS = %q, want %q", names, want)
+			}
+		})
+	}
+}
