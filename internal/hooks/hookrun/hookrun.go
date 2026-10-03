@@ -285,7 +285,8 @@ type commitFileStat struct {
 	Added   *int   `json:"added,omitempty"`
 	Deleted *int   `json:"deleted,omitempty"`
 	Binary  bool   `json:"binary,omitempty"`
-	// SessionID is set only when the commit carries more than one session.
+	// SessionID is the stamped session whose manifest names the file; a file no session
+	// touched (a hand edit beside an agent's) has none.
 	SessionID string `json:"session_id,omitempty"`
 }
 
@@ -310,11 +311,9 @@ func PostCommit(ctx context.Context, env Env) error {
 	for _, t := range stamped {
 		ids = append(ids, t.SessionID)
 	}
-	// Read before Consume empties the manifests.
-	var owners map[string]string
-	if len(ids) > 1 {
-		owners = fileOwners(env, r.Store, ids)
-	}
+	// Read before Consume empties the manifests. A single stamped session still names its
+	// files, since its commit can carry a hand edit too.
+	owners := fileOwners(env, r.Store, ids)
 	for _, id := range ids {
 		if err := r.Store.Consume(id, files); err != nil {
 			env.Logf("consume manifest: %v", err)
