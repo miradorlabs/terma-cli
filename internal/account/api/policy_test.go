@@ -25,7 +25,11 @@ func TestCollectionPolicyWireContract(t *testing.T) {
 				if r.URL.Path != "/v1/policy" || r.URL.Query().Get("project_id") != "team" || r.Header.Get("Authorization") != "Bearer mir_cli_live" || r.Header.Get(projectHeader) != "" {
 					t.Errorf("wrong policy authentication/URL")
 				}
-				fmt.Fprintf(w, `{"policy":{"version":"1.0","terma":{%s,"%s":{}}},"revision":4,"updated_at":"2026-09-30T12:27:05.490205Z"}`, testCapture, mode)
+				body := "{}"
+				if mode == "per_repository" {
+					body = `{"repositories":["mirador-platform","acme/sales"]}`
+				}
+				fmt.Fprintf(w, `{"policy":{"version":"1.0","terma":{%s,"%s":%s}},"revision":4,"updated_at":"2026-09-30T12:27:05.490205Z"}`, testCapture, mode, body)
 			}))
 			defer srv.Close()
 			c := newSplitTestClient(t, "http://127.0.0.1:1", srv.URL, liveCredential(), "team")
@@ -35,6 +39,9 @@ func TestCollectionPolicyWireContract(t *testing.T) {
 			}
 			if p.Global() != (mode == "global") || p.IncludePrompts || !p.IncludeToolContent || p.CollectsNothing || p.Revision != 4 || p.FetchedAt.IsZero() {
 				t.Fatalf("wrong translated policy: %+v", p)
+			}
+			if !p.Admits(config.Repository{Name: "sales", Path: "acme/sales"}) || p.Global() != p.Admits(config.Repository{Name: "web"}) {
+				t.Fatalf("wrong repository list: %+v", p.Repositories)
 			}
 		})
 	}
@@ -110,6 +117,9 @@ func TestCollectionPolicyMissingInvalidAndUnavailable(t *testing.T) {
 		{"missing capture switch", strings.Replace(valid, `"exclude_prompts":true,`, "", 1), 200, true},
 		{"both modes", strings.Replace(valid, `"global":{}`, `"global":{},"per_repository":{}`, 1), 200, true},
 		{"no modes", strings.Replace(valid, `,"global":{}`, "", 1), 200, true},
+		{"per repository without a list", strings.Replace(valid, `"global":{}`, `"per_repository":{}`, 1), 200, true},
+		{"per repository with a null list", strings.Replace(valid, `"global":{}`, `"per_repository":{"repositories":null}`, 1), 200, true},
+		{"per repository with an empty list", strings.Replace(valid, `"global":{}`, `"per_repository":{"repositories":[]}`, 1), 200, false},
 		{"unavailable", `{}`, 503, true},
 		{"forbidden", `{}`, 403, true},
 		{"missing endpoint", `{}`, 404, true},
@@ -122,8 +132,8 @@ func TestCollectionPolicyMissingInvalidAndUnavailable(t *testing.T) {
 			if (err != nil) != tt.wantError {
 				t.Fatalf("policy=%+v error=%v", p, err)
 			}
-			if !tt.wantError && (p.Global() || p.CollectsNothing) {
-				t.Fatal("unset policy granted global coverage")
+			if !tt.wantError && (p.Global() || p.CollectsNothing || p.Admits(config.Repository{Name: "web"})) {
+				t.Fatal("an unset policy or an empty list admitted a repository")
 			}
 		})
 	}

@@ -7,18 +7,19 @@ import (
 
 // Collection modes: what the signed-in organization collects from this machine.
 const (
-	// ModeRepo, the default, collects only sessions a bound repository's hook claimed.
+	// ModeRepo, the default, collects only the repositories the policy lists.
 	ModeRepo = "repo"
 	// ModeGlobal collects every session on the machine.
 	ModeGlobal = "global"
 )
 
-// Policy is the organization's collection policy, fetched by `terma setup`; routing
-// records can only narrow it.
+// Policy is the organization's collection policy, fetched by `terma setup`.
 type Policy struct {
-	Mode               string `json:"mode"`
-	IncludePrompts     bool   `json:"include_prompts"`
-	IncludeToolContent bool   `json:"include_tool_content"`
+	Mode string `json:"mode"`
+	// Repositories are what repository mode admits (Admits).
+	Repositories       []string `json:"repositories,omitempty"`
+	IncludePrompts     bool     `json:"include_prompts"`
+	IncludeToolContent bool     `json:"include_tool_content"`
 	// CollectsNothing is set while no validated policy applies: nothing leaves the machine.
 	CollectsNothing bool      `json:"collects_nothing,omitempty"`
 	Revision        int64     `json:"revision"`
@@ -63,8 +64,8 @@ func (p Policy) AppliesTo(organizationID, authURL string) bool {
 		(p.AuthURL == "" || p.AuthURL == authURL)
 }
 
-// NoPolicy is what applies to a login until its team's policy is validated: repositories
-// opt in and nothing is collected.
+// NoPolicy is what applies to a login until its team's policy is validated: no repository
+// is admitted and nothing is collected.
 func NoPolicy(organizationID, authURL string) Policy {
 	return Policy{Mode: ModeRepo, CollectsNothing: true, OrganizationID: organizationID, AuthURL: authURL}
 }

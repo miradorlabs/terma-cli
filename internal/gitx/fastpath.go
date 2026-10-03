@@ -2,7 +2,9 @@ package gitx
 
 import (
 	"bufio"
+	"cmp"
 	"context"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -127,11 +129,56 @@ func CommentCharFS(gitDir string) string {
 	return value
 }
 
-// RemoteURLFS reads remote.origin.url from the common dir's config through
-// NormalizeRemote; includes are not followed.
+// RemoteURLFS reads the url of remote origin, else of the first remote, from the common
+// dir's config through NormalizeRemote; includes are not followed.
 func RemoteURLFS(gitDir string) string {
-	raw, _ := configValue(filepath.Join(CommonDirFS(gitDir), "config"), `remote "origin"`, "url")
-	return NormalizeRemote(raw)
+	f, err := os.Open(filepath.Join(CommonDirFS(gitDir), "config"))
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+	var section, origin, first string
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" || line[0] == '#' || line[0] == ';' {
+			continue
+		}
+		if line[0] == '[' {
+			section = strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(line, "["), "]"))
+			continue
+		}
+		if len(section) < 8 || !strings.EqualFold(section[:7], "remote ") {
+			continue
+		}
+		k, v, ok := strings.Cut(line, "=")
+		if !ok || !strings.EqualFold(strings.TrimSpace(k), "url") {
+			continue
+		}
+		if strings.Trim(section[7:], `" `) == "origin" {
+			origin = unquoteConfigValue(v)
+		} else if first == "" {
+			first = unquoteConfigValue(v)
+		}
+	}
+	return NormalizeRemote(cmp.Or(origin, first))
+}
+
+// RepositoryFS names the working copy at root for admission without running git: its
+// remote's path (owner/name) and that path's last segment, else, with no remote, the
+// folder of the checkout, a linked worktree's main one.
+func RepositoryFS(root, gitDir string) (name, path string) {
+	if remote := RemoteURLFS(gitDir); remote != "" {
+		if u, err := url.Parse(remote); err == nil {
+			if path = strings.Trim(u.Path, "/"); path != "" {
+				return path[strings.LastIndex(path, "/")+1:], path
+			}
+		}
+	}
+	if _, main, ok := LinkedWorktreeFS(gitDir); ok && main != "" {
+		root = main
+	}
+	return filepath.Base(root), ""
 }
 
 func globalConfigPaths() []string {

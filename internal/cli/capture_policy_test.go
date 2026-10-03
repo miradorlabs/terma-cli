@@ -40,7 +40,7 @@ func TestPolicyRefreshFiltersAlreadyQueuedReplies(t *testing.T) {
 			if r.Header.Get("Authorization") != "Bearer developer-policy-token" {
 				t.Error("policy did not use developer login")
 			}
-			fmt.Fprintf(w, `{"policy":{"version":"1.0","terma":{"per_repository":{},"capture":{"exclude_prompts":%t,"exclude_tool_content":false}}},"revision":%d,"updated_at":"2026-09-30T12:27:05Z"}`, revision.Load() > 1, revision.Load())
+			fmt.Fprintf(w, `{"policy":{"version":"1.0","terma":{"per_repository":{"repositories":[]},"capture":{"exclude_prompts":%t,"exclude_tool_content":false}}},"revision":%d,"updated_at":"2026-09-30T12:27:05Z"}`, revision.Load() > 1, revision.Load())
 			return
 		}
 		if r.Header.Get("Authorization") != "Bearer "+policyTestKey {
@@ -364,7 +364,7 @@ func TestPolicyRefreshOtherTeamKeepsSelectedCoverage(t *testing.T) {
 		if r.URL.Query().Get("project_id") != "other" || r.Header.Get("Authorization") != "Bearer developer-policy-token" {
 			t.Error("wrong team policy request")
 		}
-		fmt.Fprint(w, `{"policy":{"version":"1.0","terma":{"per_repository":{},"capture":{"exclude_prompts":true,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-09-30T12:27:05Z"}`)
+		fmt.Fprint(w, `{"policy":{"version":"1.0","terma":{"per_repository":{"repositories":[]},"capture":{"exclude_prompts":true,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-09-30T12:27:05Z"}`)
 	}))
 	defer srv.Close()
 	seedPolicyLogin(t, srv.URL)
