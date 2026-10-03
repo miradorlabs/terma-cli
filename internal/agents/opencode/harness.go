@@ -71,14 +71,11 @@ type opencodePolicy struct {
 	IncludeToolContent *bool    `json:"includeToolContent,omitempty"`
 }
 
-// Name is the token `terma connect` and `--harness` accept.
+// Name is the token `--harness` accepts.
 func (exporter) Name() string { return name }
 
 // DisplayName is how the agent is written in prose.
 func (exporter) DisplayName() string { return displayName }
-
-// SupportsHeadersHelper is true: the plugin runs the helper script itself.
-func (exporter) SupportsHeadersHelper() bool { return true }
 
 // Local is the exporter bound to the repository at root.
 func (exporter) Local(root string) (harness.Harness, bool) { return exporter{root: root}, true }
@@ -422,20 +419,6 @@ func (c exporter) CurrentCredential(endpoint, projectID string) (string, bool) {
 		return key, true
 	}
 	return "", false
-}
-
-// ConnectNotes says what is particular about OpenCode before the user confirms.
-func (c exporter) ConnectNotes(e harness.Exporter) []string {
-	var notes []string
-	if e.HasSignal(harness.SignalMetrics) {
-		notes = append(notes, "OpenCode's plugin sends traces and events only; token counts and cost ride on each model-call span, so there is no separate metrics stream.")
-	}
-	if c.root == "" {
-		notes = append(notes,
-			"OpenCode loads plugins at startup — restart it after connecting.",
-			"Commit attribution runs `terma hook` from inside OpenCode, so terma must be on the PATH OpenCode starts with.")
-	}
-	return notes
 }
 
 // Backup takes none.

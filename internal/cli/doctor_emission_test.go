@@ -2,13 +2,13 @@ package cli
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
-	"github.com/miradorlabs/terma-cli/internal/connect"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
@@ -101,7 +101,7 @@ func writeDoctorEnv(t *testing.T, path string, env map[string]string) {
 func TestDoctorChecksOpenCodeRepositoryPolicy(t *testing.T) {
 	const endpoint = "https://otel.example.test"
 	for _, signals := range [][]harness.Signal{nil, {harness.SignalLogs}} {
-		t.Run(connect.JoinSignals(signals), func(t *testing.T) {
+		t.Run(fmt.Sprint(signals), func(t *testing.T) {
 			repo := installRepo(t)
 			t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 			h := harnessOf(t, "opencode")

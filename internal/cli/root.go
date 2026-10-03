@@ -101,12 +101,9 @@ Every command is safe to run again.`,
 		// Hidden, for Terma's engineers: config switches deployments, nate wipes a machine.
 		app.newConfigCommand(),
 		app.newNateCommand(),
-		// Hidden until the e2e suites stop calling them (MIR-80); install, setup and doctor
-		// do their jobs.
+		// Hidden until the e2e suites stop calling it (MIR-80); install, setup and doctor
+		// do its job.
 		app.newStatusCommand(),
-		app.newTelemetryConnectCommand(),
-		app.newTelemetryDisconnectCommand(),
-		app.newTelemetryCommand(),
 	)
 	return root
 }
@@ -307,16 +304,6 @@ func resolveRepoProject(cfg *config.Config) error {
 
 func (app *App) newClient(cfg *config.Config) (*api.Client, error) {
 	return api.New(cfg, api.Options{Version: app.version, ProjectID: cfg.ProjectID})
-}
-
-func requireProject(cfg *config.Config) error {
-	if err := resolveRepoProject(cfg); err != nil {
-		return err
-	}
-	if cfg.APIKey != "" || cfg.ProjectID != "" {
-		return nil
-	}
-	return errors.New("no team bound to this repository — run `terma install` inside a repository, or pass --team for this command")
 }
 
 // repoHere locates the worktree root and git directory; outside, when non-empty, replaces

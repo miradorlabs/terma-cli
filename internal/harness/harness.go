@@ -196,7 +196,7 @@ type Status struct {
 
 // Harness is one configurable agent CLI.
 type Harness interface {
-	// Name is the command-line token: `terma telemetry connect <name>`.
+	// Name is the command-line token: `terma install --harness <name>`.
 	Name() string
 	// DisplayName is how it is written in prose.
 	DisplayName() string
@@ -205,10 +205,6 @@ type Harness interface {
 
 	// ConfigPath is the file Connect and Disconnect write.
 	ConfigPath() (string, error)
-
-	// SupportsHeadersHelper reports whether the agent can read OTLP headers from a
-	// script; without it the key is written inline and HelperPath is ignored.
-	SupportsHeadersHelper() bool
 
 	Status() (Status, error)
 
@@ -231,8 +227,6 @@ type Harness interface {
 	CurrentCredential(endpoint, projectID string) (key string, ok bool)
 	// Backup snapshots the configuration before a connect; "" for none taken.
 	Backup(endpoint string) (path string, err error)
-	// ConnectNotes are said before the developer confirms a connect.
-	ConnectNotes(e Exporter) []string
 }
 
 // ErrUnsupported is returned by an agent that is registered but not yet implemented.

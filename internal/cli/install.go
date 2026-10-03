@@ -309,7 +309,7 @@ func (app *App) connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *
 			continue
 		}
 		sp.Start("Preparing " + h.DisplayName() + "'s key for this team…")
-		key, _, _, _, err := app.resolveKey(ctx, cfg, h, connectFlags{})
+		key, err := app.agentKey(ctx, cfg, h)
 		sp.Stop()
 		if err != nil {
 			return fmt.Errorf("%s: %w", a, err)

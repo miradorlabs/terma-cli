@@ -356,17 +356,6 @@ func TestOmpConflicts(t *testing.T) {
 	}
 }
 
-func TestOmpConnectNotesWarnAboutRestart(t *testing.T) {
-	notes := (exporter{}).ConnectNotes(harness.Exporter{})
-	joined := strings.Join(notes, " ")
-	if !strings.Contains(joined, "restart") {
-		t.Errorf("notes must say omp loads hooks at startup: %v", notes)
-	}
-	if len((exporter{root: t.TempDir()}).ConnectNotes(harness.Exporter{})) != 0 {
-		t.Error("repository scope has no user-facing caveats")
-	}
-}
-
 func baseExporter() harness.Exporter {
 	return harness.Exporter{Endpoint: "https://otel.terma.ai", APIKey: "ter_srv_0123456789abcdef", ProjectID: "proj_123", Signals: harness.AllSignals,
 		ResourceAttributes: map[string]string{harness.AttrServiceName: "omp", harness.AttrEnduserID: "dev@example.com", harness.AttrProjectID: "proj_123"}}

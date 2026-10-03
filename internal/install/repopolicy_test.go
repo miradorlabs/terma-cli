@@ -26,7 +26,7 @@ func (policyFile) Name() string                             { return "fake" }
 func (policyFile) DisplayName() string                      { return "Fake" }
 func (policyFile) Detect(context.Context) harness.Detection { return harness.Detection{Found: true} }
 func (p policyFile) ConfigPath() (string, error)            { return p.path, nil }
-func (policyFile) SupportsHeadersHelper() bool              { return false }
+
 func (p policyFile) Status() (harness.Status, error) {
 	return harness.Status{HasPolicy: p.hasPolicy, StaleContent: p.stale, Signals: p.signals}, nil
 }
@@ -46,7 +46,6 @@ func (policyFile) Disconnect() (harness.DisconnectResult, error) {
 func (policyFile) Local(string) (harness.Harness, bool)            { return nil, false }
 func (policyFile) CurrentCredential(string, string) (string, bool) { return "", false }
 func (policyFile) Backup(string) (string, error)                   { return "", nil }
-func (policyFile) ConnectNotes(harness.Exporter) []string          { return nil }
 
 var _ harness.Harness = policyFile{}
 

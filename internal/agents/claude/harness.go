@@ -106,7 +106,7 @@ func (c exporter) managedKeys() []string {
 	return claudeManagedKeys
 }
 
-// Name is the token `terma connect` and `--harness` accept.
+// Name is the token `--harness` accepts.
 func (exporter) Name() string { return name }
 
 // ServiceName is Claude Code's own default; terma writes no OTEL_RESOURCE_ATTRIBUTES.
@@ -114,9 +114,6 @@ func (exporter) ServiceName() string { return "claude-code" }
 
 // DisplayName is how the agent is written in prose.
 func (exporter) DisplayName() string { return displayName }
-
-// SupportsHeadersHelper is true: Claude Code has the otelHeadersHelper setting.
-func (exporter) SupportsHeadersHelper() bool { return true }
 
 // Detect runs `claude --version`; a missing binary is not-found, not an error.
 func (exporter) Detect(ctx context.Context) harness.Detection {
@@ -246,10 +243,6 @@ func (c exporter) Backup(endpoint string) (string, error) {
 
 // ManagedKeys is what Disconnect would remove, for a preview.
 func (c exporter) ManagedKeys() []string { return c.managedKeys() }
-
-// A capability asked for by type assertion switches off in silence when its method drifts.
-// ConnectNotes has nothing to say.
-func (exporter) ConnectNotes(harness.Exporter) []string { return nil }
 
 // LocalOffOnly marks Claude Code's repository scope: project settings may only switch off.
 func (exporter) LocalOffOnly() {}

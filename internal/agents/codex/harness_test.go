@@ -845,18 +845,6 @@ func TestCodexDetectDoesNotFailWhenAbsent(t *testing.T) {
 	}
 }
 
-func TestCodexConnectNotes(t *testing.T) {
-	notes := exporter{}.ConnectNotes(codexExporter())
-	if len(notes) != 1 {
-		t.Fatalf("notes = %v, want the metrics route", notes)
-	}
-	quiet := codexExporter()
-	quiet.Signals = []harness.Signal{harness.SignalTraces}
-	if notes := (exporter{}).ConnectNotes(quiet); len(notes) != 0 {
-		t.Fatalf("notes = %v, want none", notes)
-	}
-}
-
 func TestCodexCurrentCredentialAcceptsTermaPrefix(t *testing.T) {
 	c, _ := codexIn(t, "")
 	e := codexExporter()

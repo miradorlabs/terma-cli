@@ -81,7 +81,7 @@ var codexSignalKeys = []struct {
 	{harness.SignalMetrics, codexMetricsExporter},
 }
 
-// Name is the token `terma connect` and `--harness` accept.
+// Name is the token `--harness` accepts.
 func (exporter) Name() string { return name }
 
 // ServiceName is codex_cli_rs, the originator Codex stamps for its CLI; Desktop and the
@@ -90,9 +90,6 @@ func (exporter) ServiceName() string { return codexServiceName }
 
 // DisplayName is how the agent is written in prose.
 func (exporter) DisplayName() string { return displayName }
-
-// SupportsHeadersHelper is false: Codex's headers are literal strings in config.toml.
-func (exporter) SupportsHeadersHelper() bool { return false }
 
 // Detect runs `codex --version`. A missing binary is not-found rather than an error.
 func (exporter) Detect(ctx context.Context) harness.Detection {
@@ -352,15 +349,6 @@ func (c exporter) Backup(endpoint string) (string, error) {
 		}
 	}
 	return f.backup(!pointsAtTerma)
-}
-
-// ConnectNotes says that connecting metrics takes them from OpenAI's own route.
-func (exporter) ConnectNotes(e harness.Exporter) []string {
-	var notes []string
-	if e.HasSignal(harness.SignalMetrics) {
-		notes = append(notes, "Codex sends metrics to OpenAI (statsig) unless configured otherwise; after this connect they go to Terma instead.")
-	}
-	return notes
 }
 
 // CurrentCredential returns the key installed for both endpoint and projectID, so a
