@@ -205,3 +205,26 @@ func TestPathExclusionDropsShellCommandsNamingIt(t *testing.T) {
 		}
 	}
 }
+
+// A session claimed in an excluded workspace sends none of its records, whatever they name.
+func TestAnExcludedWorkspaceSendsNothing(t *testing.T) {
+	u := newUpstream(t)
+	f := newFixture()
+	pol := Policy{Endpoint: u.srv.URL, Key: "key-p1", IncludePrompts: true, IncludeToolContent: true, ExcludedWorkspace: true}
+	r, srv := f.relay(t, u, map[string]Policy{"p1": pol})
+	logs := &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{
+		{Attributes: []*commonpb.KeyValue{kv("session.id", "A"), kv("event.name", "api_request")}},
+		{Attributes: []*commonpb.KeyValue{kv("session.id", "A"), kv("event.name", "user_prompt")}},
+	}}}}}}
+	body, err := proto.Marshal(logs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code := post(t, srv, "/v1/logs", body, "application/x-protobuf", token, false); code != http.StatusOK {
+		t.Fatalf("/v1/logs = %d", code)
+	}
+	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["dropped.policy_path.logs"] == 2 })
+	if c := r.Stats().Snapshot().Counters; c["forwarded.logs"] != 0 {
+		t.Fatalf("stats = %v, want nothing forwarded", c)
+	}
+}

@@ -89,3 +89,13 @@ func TestAnOldRecordsContentSwitchesNarrowNothing(t *testing.T) {
 		t.Fatalf("an old record narrowed content: %+v", got)
 	}
 }
+
+// A session claimed in an excluded workspace sends nothing; hooks no longer check.
+func TestCapturePolicyDropsAnExcludedWorkspace(t *testing.T) {
+	org := config.Policy{Mode: config.ModeRepo, IncludePrompts: true, IncludeToolContent: true, ExcludePaths: []string{"/w/secret/**"}}
+	for root, want := range map[string]bool{"/w/secret/repo": true, "/w/open": false, "": false} {
+		if got := CapturePolicy(Capture{Org: org, Harness: "claude", Root: root}).ExcludedWorkspace; got != want {
+			t.Errorf("root %q: ExcludedWorkspace = %v, want %v", root, got, want)
+		}
+	}
+}

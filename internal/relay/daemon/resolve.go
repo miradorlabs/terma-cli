@@ -60,7 +60,7 @@ func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Polic
 			// Unknown policy must neither grant nor drop: a new team's exports wait for its fetch.
 			return relay.Policy{}, errors.New("no validated collection policy for this team")
 		}
-		in := Capture{Org: org, Primary: globalPrimary}
+		in := Capture{Org: org, Primary: globalPrimary, Root: c.Root}
 		if c.Tool != "" {
 			in.Harness = r.AgentName(c.Tool)
 		}

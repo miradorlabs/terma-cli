@@ -20,7 +20,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 	"github.com/miradorlabs/terma-cli/internal/trailer"
@@ -146,11 +145,7 @@ func (e Env) Repo(ctx context.Context) (*Repo, error) {
 func (e Env) EmitFor(r *Repo, ev spool.Event) {
 	ev.Global = e.Policy.Global()
 	if r != nil {
-		ev.Workspace = r.Root
-		pol := routing.EffectivePolicy(e.Policy, r.ProjectID)
-		if pol.ExcludesPath(r.Root, "") || pol.HasExcludedPathFrom(ev.Attrs, r.Root, e.Cwd) {
-			return
-		}
+		ev.Workspace, ev.Cwd = r.Root, e.Cwd
 	}
 	if r != nil && (r.ProjectID != "" || r.Worktree != "") {
 		if ev.Attrs == nil {
@@ -172,7 +167,7 @@ func (e Env) claimForRelay(r *Repo, ev spool.Event) {
 		return
 	}
 	tool, _ := ev.Attrs[AttrTool].(string)
-	c := claim.Claim{ProjectID: r.ProjectID, Tool: tool, Repo: r.Name, Worktree: r.Worktree, PIDs: claimPIDs()}
+	c := claim.Claim{ProjectID: r.ProjectID, Tool: tool, Repo: r.Name, Root: r.Root, Worktree: r.Worktree, PIDs: claimPIDs()}
 	claim.Write(ev.SessionID, c, e.Time())
 	// A subagent whose telemetry uses its agent_id as session id would otherwise be dropped.
 	if agent, _ := ev.Attrs[AttrAgentID].(string); agent != "" && agent != ev.SessionID {

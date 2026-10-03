@@ -50,8 +50,10 @@ type Policy struct {
 	Signals []string
 	// Excludes reports whether an attribute, in protojson's shape, names an excluded
 	// file; nil when nothing is excluded.
-	Excludes     func(value any) bool
-	RequireClaim bool
+	Excludes func(value any) bool
+	// ExcludedWorkspace drops everything: the claimed workspace is an excluded path.
+	ExcludedWorkspace bool
+	RequireClaim      bool
 }
 
 // ErrNoKey is Resolve's answer for a project this machine holds no key for; its parts wait, then drop.

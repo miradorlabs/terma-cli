@@ -77,9 +77,9 @@ func TestAnUnreadableRouteIsNeverAbsent(t *testing.T) {
 	}
 }
 
-// A hook event whose shell command names an excluded file is not spooled, the command
-// resolved against the directory the hook ran in.
-func TestEmitForDropsShellCommandsNamingAnExcludedFile(t *testing.T) {
+// Hooks know no policy: an event whose shell command names an excluded file is spooled
+// whole, with the directory the hook ran in, which delivery resolves the command against.
+func TestEmitForSpoolsWholeWithWhereTheHookRan(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	root := t.TempDir()
 	sp, err := spool.Open(t.TempDir())
@@ -91,10 +91,10 @@ func TestEmitForDropsShellCommandsNamingAnExcludedFile(t *testing.T) {
 	for _, dir := range []string{"secrets", "src"} {
 		env.Cwd = filepath.Join(root, dir)
 		env.EmitFor(r, spool.Event{Name: EventToolCall, SessionID: "s1",
-			Attrs: map[string]any{"cwd_dir": dir, "arguments": `{"command":["bash","-lc","cat app.env"]}`}})
+			Attrs: map[string]any{"arguments": `{"command":["bash","-lc","cat app.env"]}`}})
 	}
 	got := hookruntest.Spooled(t, sp)
-	if len(got) != 1 || got[0].Attrs["cwd_dir"] != "src" {
-		t.Fatalf("spooled %+v, want only the call run outside the excluded directory", got)
+	if len(got) != 2 || got[0].Cwd != filepath.Join(root, "secrets") || got[1].Cwd != filepath.Join(root, "src") || got[0].Workspace != root {
+		t.Fatalf("spooled %+v, want both calls whole, each with its cwd", got)
 	}
 }

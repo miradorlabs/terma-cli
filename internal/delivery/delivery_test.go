@@ -216,3 +216,25 @@ func TestOutgoingWithholdsOnlyWhatThePolicyDoes(t *testing.T) {
 		t.Fatal("an event left under no policy")
 	}
 }
+
+// Delivery applies path exclusion the hooks no longer do: a relative name in a shell
+// command resolves against where the hook ran, and an excluded workspace sends nothing.
+func TestDeliveryResolvesCommandsWhereTheHookRan(t *testing.T) {
+	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	pol := config.Policy{Mode: config.ModeRepo, IncludePrompts: true, IncludeToolContent: true, ExcludePaths: []string{"secrets/**"}}
+	call := func(cwd string) spool.Event {
+		return spool.Event{Name: hookrun.EventToolCall, Workspace: "/w", Cwd: cwd,
+			Attrs: map[string]any{"arguments": `{"command":["bash","-lc","cat app.env"]}`}}
+	}
+	r := Router{}
+	if r.Allowed(pol, "p1", call("/w/secrets")) {
+		t.Error("a command run in an excluded directory was sent")
+	}
+	if !r.Allowed(pol, "p1", call("/w/src")) {
+		t.Error("a command run outside the excluded directory was withheld")
+	}
+	excludedWorkspace := config.Policy{Mode: config.ModeRepo, ExcludePaths: []string{"/w"}}
+	if r.Allowed(excludedWorkspace, "p1", spool.Event{Name: hookrun.EventSessionStart, Workspace: "/w"}) {
+		t.Error("an excluded workspace's session start was sent")
+	}
+}

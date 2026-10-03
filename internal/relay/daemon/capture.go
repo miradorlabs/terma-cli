@@ -19,6 +19,8 @@ type Capture struct {
 	RecordErr error
 	// Harness is the claiming agent's harness name, empty for global mode's catch-all.
 	Harness string
+	// Root is the claimed workspace, empty when the claim names none.
+	Root string
 }
 
 // CapturePolicy is the content and signal half of a claim's Policy. Content is the team
@@ -27,7 +29,8 @@ type Capture struct {
 // since another repository may have pointed that agent's exporter at the relay.
 func CapturePolicy(in Capture) relay.Policy {
 	org := in.Org
-	pol := relay.Policy{Excludes: excludes(org.ExcludePaths), RequireClaim: !in.Primary || !org.Global()}
+	pol := relay.Policy{Excludes: excludes(org.ExcludePaths), RequireClaim: !in.Primary || !org.Global(),
+		ExcludedWorkspace: in.Root != "" && org.ExcludesPath(in.Root, "")}
 	pol.IncludePrompts, pol.IncludeToolContent = org.Content()
 	switch rec := in.Record; {
 	case org.CollectsNothing, in.RecordErr != nil,

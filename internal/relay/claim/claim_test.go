@@ -203,3 +203,21 @@ func TestWriteSurvivesAReaderHoldingTheClaim(t *testing.T) {
 		t.Fatalf("claim %v", c.PIDs)
 	}
 }
+
+// Each workspace a session runs in is its own placement, so the relay checks the one
+// a record came from against the team's excluded paths.
+func TestClaimKeepsEachWorkspace(t *testing.T) {
+	enable(t)
+	t0 := time.Now()
+	Write("s", Claim{ProjectID: "p", Root: "/w/open", PIDs: []int{10}}, t0)
+	Write("s", Claim{ProjectID: "p", Root: "/w/secret", PIDs: []int{20}}, t0.Add(time.Second))
+	c, ok := Read("s", t0.Add(time.Second))
+	if !ok || len(c.Placements) != 2 {
+		t.Fatalf("claim %+v", c)
+	}
+	for pid, want := range map[int]string{10: "/w/open", 20: "/w/secret"} {
+		if got, ok := c.At(pid, time.Time{}); !ok || got.Root != want {
+			t.Errorf("At(%d) root = %q, %v; want %q", pid, got.Root, ok, want)
+		}
+	}
+}
