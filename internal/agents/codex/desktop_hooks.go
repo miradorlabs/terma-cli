@@ -28,7 +28,7 @@ func preToolUse(ctx context.Context, env hookrun.Env) error {
 	if err != nil {
 		return nil
 	}
-	if !codexDesktopRoute(r) {
+	if !codexDesktopRoute(env, r) {
 		return nil
 	}
 	path, err := codexToolStartPath(in)
@@ -85,7 +85,7 @@ func permissionRequest(ctx context.Context, env hookrun.Env) error {
 	if err != nil {
 		return nil
 	}
-	if !codexDesktopRoute(r) {
+	if !codexDesktopRoute(env, r) {
 		return nil
 	}
 	at := env.Time()

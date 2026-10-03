@@ -51,10 +51,10 @@ func (app *App) newHookCommand() *cobra.Command {
 // hookDeps are what `terma hook` reaches beyond the hook runtime.
 func (app *App) hookDeps() dispatch.Deps {
 	return dispatch.Deps{
-		Agents: app.agents,
-		Policy: hookPolicy,
-		Yields: app.globalMode().Yields,
-		Spool:  openSpool,
+		Agents:  app.agents,
+		Profile: hookProfile,
+		Yields:  app.globalMode().Yields,
+		Spool:   openSpool,
 		Claimed: func(ctx context.Context, cwd string) {
 			daemon.Spawn()
 			wireCloneOnFirstUse(ctx, cwd)
@@ -63,17 +63,22 @@ func (app *App) hookDeps() dispatch.Deps {
 	}
 }
 
-// hookPolicy is one small local read; without a validated scope content capture stays off.
-func hookPolicy() config.Policy {
+// hookProfile is one small local read; without a validated scope content capture stays
+// off, but the team still claims, so a stale policy loses no session.
+func hookProfile() dispatch.Profile {
 	cfg, err := config.Load(config.Overrides{})
 	if err != nil {
-		return config.NoPolicy("", "")
+		return dispatch.Profile{Policy: config.NoPolicy("", "")}
 	}
+	p := dispatch.Profile{Team: cfg.Policy.TeamID, Agents: cfg.Harnesses, Policy: cfg.Policy}
 	if !cfg.Policy.Validated() || cfg.Policy.Expired(time.Now()) {
-		return config.NoPolicy(cfg.OrganizationID, cfg.AuthURL)
+		p.Policy = config.NoPolicy(cfg.OrganizationID, cfg.AuthURL)
 	}
-	return cfg.Policy
+	return p
 }
+
+// hookPolicy is the collection policy as a hook reads it.
+func hookPolicy() config.Policy { return hookProfile().Policy }
 
 // openSpool returns nil when the config dir cannot be used: a nil spool drops events,
 // never failing a hook.

@@ -3,20 +3,16 @@ package install
 import (
 	"context"
 	"io"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
-	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
 type report struct {
@@ -107,31 +103,5 @@ func TestApplyThatWritesNothingKeepsTheBinding(t *testing.T) {
 	}
 	if again.Install.Version != "v1" || !again.Install.InstalledAt.Equal(first) || r.commit != nil {
 		t.Fatalf("an install that wrote nothing churned the binding: %+v, commit %v", again.Install, r.commit)
-	}
-}
-
-// The project's routing record is read into the plan, and a record that cannot be read
-// stops the plan rather than being rewritten from defaults.
-func TestBuildReadsTheRoutingRecord(t *testing.T) {
-	root := hookruntest.InitRepo(t)
-	in := Input{Root: root, GitDir: root + "/.git", Adapters: []string{"claude"}, Binding: Binding{ID: "proj_1"}}
-	if p, err := Build(builtin.Agents(), in); err != nil || p.Record != nil {
-		t.Fatalf("no record: %+v, %v", p, err)
-	}
-	if err := routing.SaveRecord(routing.Record{ProjectID: "proj_1", Signals: []string{"logs"}, Harnesses: []string{"claude"}}); err != nil {
-		t.Fatal(err)
-	}
-	if p, err := Build(builtin.Agents(), in); err != nil || p.Record == nil || len(p.Record.Signals) != 1 {
-		t.Fatalf("the record was not read: %+v, %v", p, err)
-	}
-	dir, err := config.Dir()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "routing", "proj_1.json"), []byte("{torn"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := Build(builtin.Agents(), in); err == nil {
-		t.Fatal("an unreadable routing record was planned over")
 	}
 }

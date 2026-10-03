@@ -255,7 +255,7 @@ func (d *run) agentHooks() Check {
 	if !d.installed() {
 		return Check{Status: Skip, Detail: "needs an installed repository"}
 	}
-	return AgentHooksCheck(d.env.Agents, d.env.Root, SelectedForRepo(d.env.Agents, d.projectID, d.cfg.Harnesses))
+	return AgentHooksCheck(d.env.Agents, d.env.Root, d.cfg.Harnesses)
 }
 
 func (d *run) agentsExporting() Check {

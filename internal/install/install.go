@@ -16,7 +16,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
@@ -32,8 +31,6 @@ type Plan struct {
 	Hooks              HookPlan
 	NoHooks            bool
 	Binding            Binding
-	// Record is the project's routing record as it stands, nil when there is none.
-	Record *routing.Record
 }
 
 // Input is what an install plans from.
@@ -50,17 +47,6 @@ type Input struct {
 // Build plans an install into the workspace at in.Root.
 func Build(reg *agents.Registry, in Input) (Plan, error) {
 	p := Plan{Agents: reg, Root: in.Root, GitDir: in.GitDir, Existing: in.Existing, Selected: in.Selected, NoHooks: in.NoHooks, Binding: in.Binding}
-	// A record that exists and cannot be read is not "no choice": rewriting it from
-	// defaults would switch signals its developer turned off back on.
-	if in.Binding.ID != "" {
-		rec, ok, err := routing.LoadRecord(in.Binding.ID)
-		if err != nil {
-			return Plan{}, fmt.Errorf("read the routing record for %s: %w", in.Binding.ID, err)
-		}
-		if ok {
-			p.Record = &rec
-		}
-	}
 	// The wired adapters are a team decision: a colleague's re-install keeps them all.
 	p.Adapters = Adapters(reg, in.Root, in.Selected, in.Adapters)
 	if in.GitDir != "" {

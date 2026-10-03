@@ -1,3 +1,5 @@
+// Package routing keeps each team's collection policy under the config directory, which
+// hooks, the relay and delivery read without a credential.
 package routing
 
 import (

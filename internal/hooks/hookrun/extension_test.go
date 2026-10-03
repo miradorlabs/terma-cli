@@ -18,7 +18,7 @@ func TestExtensionSessionIsStampedOnItsCommit(t *testing.T) {
 	root, sp := hookruntest.Project(t)
 	ctx := context.Background()
 	env := func(stdin string, args ...string) Env {
-		return Env{Now: time.Now(), Cwd: root, Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
+		return Env{Now: time.Now(), Cwd: root, Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test", Team: hookruntest.Team}
 	}
 	events := Extension{Tool: "ext"}.Events("ext")
 	for _, name := range []string{"ext-session-start", "ext-prompt", "ext-session-end", "ext-file-edit"} {

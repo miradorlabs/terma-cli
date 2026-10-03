@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/globalmode"
@@ -311,30 +310,6 @@ func JudgeHarnesses(ctx context.Context, reg *agents.Registry, otlpURL, projectI
 		out = append(out, v)
 	}
 	return out
-}
-
-// SelectedForRepo is the saved selection narrowed to the surfaces this repository's
-// routing record routes here; a record naming none leaves it alone.
-func SelectedForRepo(reg *agents.Registry, projectID string, saved []string) []string {
-	selected := slices.Clone(saved)
-	if projectID == "" {
-		return selected
-	}
-	rec, ok, err := routing.LoadRecord(projectID)
-	if err != nil || !ok || len(rec.Surfaces) == 0 {
-		return selected
-	}
-	for _, a := range reg.With[agents.Surfaced]() {
-		for _, s := range a.Surfaces() {
-			routed := slices.Contains(rec.Surfaces, s.Name)
-			if routed && !slices.Contains(selected, s.Name) {
-				selected = append(selected, s.Name)
-			} else if !routed {
-				selected = slices.DeleteFunc(selected, func(name string) bool { return name == s.Name })
-			}
-		}
-	}
-	return selected
 }
 
 // RepoAsks reports whether the repository at root carries a committed policy that switches

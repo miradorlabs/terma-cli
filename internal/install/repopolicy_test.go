@@ -8,7 +8,6 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
@@ -77,21 +76,6 @@ func TestWriteRepoPolicy(t *testing.T) {
 	}
 	if _, err := os.Stat(blocked.path); !os.IsNotExist(err) {
 		t.Fatalf("wrote over a conflict: %v", err)
-	}
-}
-
-// The routing record names the agents that route through the relay, and there is none
-// when no selected agent does.
-func TestRouteRecord(t *testing.T) {
-	reg := builtin.Agents()
-	want := Plan{}.Exporter("http://ingest", []harness.Signal{harness.SignalLogs})
-	rec, ok := RouteRecord(reg, "proj_1", []string{"claude"}, want)
-	if !ok || rec.ProjectID != "proj_1" || rec.Endpoint != "http://ingest" || !slices.Equal(rec.Signals, []string{"logs"}) ||
-		!slices.Equal(rec.Harnesses, []string{"claude"}) {
-		t.Fatalf("RouteRecord = %+v, %v", rec, ok)
-	}
-	if _, ok := RouteRecord(reg, "proj_1", nil, want); ok {
-		t.Fatal("a record with no agent to route")
 	}
 }
 

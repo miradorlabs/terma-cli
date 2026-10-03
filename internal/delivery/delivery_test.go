@@ -10,8 +10,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -20,22 +18,16 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
 const testKey = "ter_srv_minted0123456789abcdefghijklmnopqrstuv"
 
 // A project's events go where its key works: a pinned host, else the key's own, else the
-// routing record's, else the profile's. The data API follows the record only when the
-// record names another built-in environment.
+// profile's.
 func TestEachProjectGoesToItsKeysOwnEnvironment(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	prod, err := config.EndpointsFor(config.EnvProd)
-	if err != nil {
-		t.Fatal(err)
-	}
-	dev, err := config.EndpointsFor(config.EnvDev)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,17 +35,9 @@ func TestEachProjectGoesToItsKeysOwnEnvironment(t *testing.T) {
 	if err := keystore.Set("keyed", testKey, keystore.Hosts{OTLP: "https://otlp.keyed", API: "https://api.keyed"}); err != nil {
 		t.Fatal(err)
 	}
-	// A record naming one host while the key names another: the key wins.
-	if err := routing.SaveRecord(routing.Record{ProjectID: "keyed", Endpoint: dev.OTLPURL}); err != nil {
-		t.Fatal(err)
-	}
-	if err := routing.SaveRecord(routing.Record{ProjectID: "routed", Endpoint: dev.OTLPURL + "/"}); err != nil {
-		t.Fatal(err)
-	}
 	r := Router{}
 	for _, tc := range []struct{ project, otlp, api string }{
 		{"keyed", "https://otlp.keyed", "https://api.keyed"},
-		{"routed", dev.OTLPURL, dev.APIURL},
 		{"unknown", prod.OTLPURL, prod.APIURL},
 	} {
 		if got := r.Endpoint(cfg, tc.project); got != tc.otlp {
@@ -99,25 +83,15 @@ func TestConversationContentNeedsItsAgentsConsent(t *testing.T) {
 	}
 }
 
-// A queued event is held to the policy in force when it leaves: a project whose record
-// cannot be read, or whose coverage moved out of global mode, sends nothing.
+// A queued event is held to the policy in force when it leaves: one whose coverage moved
+// out of global mode sends nothing.
 func TestQueuedEventsMeetTodaysPolicy(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	start := spool.Event{Name: hookrun.EventSessionStart}
 	logs := config.Policy{Mode: config.ModeRepo}
 	r := Router{}
 	if !r.Allowed(logs, "p1", start) {
-		t.Fatal("an unrecorded project's event was withheld")
-	}
-	dir, err := routing.Dir()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := writeFile(filepath.Join(dir, "p2.json"), "{"); err != nil {
-		t.Fatal(err)
-	}
-	if r.Allowed(logs, "p2", start) {
-		t.Fatal("an unreadable routing record let an event through")
+		t.Fatal("a project's event was withheld")
 	}
 	global := spool.Event{Name: hookrun.EventSessionStart, Global: true}
 	if r.Allowed(logs, "p1", global) {
@@ -148,13 +122,6 @@ func TestAProjectWithoutAPolicyOrAKeyKeepsItsEvents(t *testing.T) {
 	if res.Sent != 0 || res.Held != 2 || res.Unroutable != 1 || res.Err != nil {
 		t.Fatalf("Flush = %+v", res)
 	}
-}
-
-func writeFile(path, data string) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return err
-	}
-	return os.WriteFile(path, []byte(data), 0o600)
 }
 
 // An event spooled while the team's policy collected content leaves under the policy in

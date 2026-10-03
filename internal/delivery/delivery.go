@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"maps"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
@@ -173,24 +172,20 @@ func (r Router) Allowed(org config.Policy, projectID string, e spool.Event) bool
 	}
 	if e.Name == hookrun.EventAssistantMessage || e.Name == hookrun.EventSessionTitle {
 		prompts, _ := org.Content()
-		return prompts && r.consented(e, projectID, org.Global())
+		return prompts && r.consented(e, org.Global())
 	}
-	rec, recorded, err := routing.LoadRecord(projectID)
-	if err != nil {
-		return false
-	}
-	return !recorded || slices.Contains(rec.Signals, "logs")
+	return true
 }
 
 // consented asks the agent that spooled e whether its content may leave; with no one to
 // ask, it may not.
-func (r Router) consented(e spool.Event, projectID string, global bool) bool {
+func (r Router) consented(e spool.Event, global bool) bool {
 	tool, _ := e.Attrs[hookrun.AttrTool].(string)
-	return r.Consent != nil && r.Consent(tool, hookrun.ConsentFor(projectID, global))
+	return r.Consent != nil && r.Consent(tool, hookrun.ConsentFor(global))
 }
 
 // Endpoint is a project's ingest host: a pinned one, else the one its key was stored with,
-// since only its environment accepts the key, then the routing record, then the profile.
+// since only its environment accepts the key, then the profile's.
 func (r Router) Endpoint(cfg *config.Config, projectID string) string {
 	if r.OTLPPinned {
 		return cfg.OTLPURL
@@ -198,25 +193,16 @@ func (r Router) Endpoint(cfg *config.Config, projectID string) string {
 	if h, ok := keystore.HostsFor(projectID); ok && h.OTLP != "" {
 		return h.OTLP
 	}
-	if rec, ok, err := routing.LoadRecord(projectID); err == nil && ok && rec.Endpoint != "" {
-		return strings.TrimRight(rec.Endpoint, "/")
-	}
 	return cfg.OTLPURL
 }
 
-// API is a project's data API, placed like Endpoint; the routing record counts only when
-// it names another built-in environment's ingest host.
+// API is a project's data API, placed like Endpoint.
 func (r Router) API(cfg *config.Config, projectID string) string {
 	if r.APIPinned {
 		return cfg.APIURL
 	}
 	if h, ok := keystore.HostsFor(projectID); ok && h.API != "" {
 		return h.API
-	}
-	if rec, ok, err := routing.LoadRecord(projectID); err == nil && ok && strings.TrimRight(rec.Endpoint, "/") != cfg.OTLPURL {
-		if e, ok := config.EndpointsByOTLP(rec.Endpoint); ok {
-			return e.APIURL
-		}
 	}
 	return cfg.APIURL
 }

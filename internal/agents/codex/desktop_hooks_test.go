@@ -9,7 +9,6 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
 func TestCodexDesktopHooksCaptureLocalToolsUnderTheTeamPolicy(t *testing.T) {
@@ -17,10 +16,7 @@ func TestCodexDesktopHooksCaptureLocalToolsUnderTheTeamPolicy(t *testing.T) {
 		t.Run(map[bool]string{false: "redacted", true: "content"}[allow], func(t *testing.T) {
 			env := fundingEnv(t)
 			env.Policy.IncludePrompts, env.Policy.IncludeToolContent = allow, allow
-			if err := routing.SaveRecord(routing.Record{ProjectID: "project-a", Endpoint: "https://otel.terma.ai",
-				Signals: []string{"logs"}, Harnesses: []string{name}, Surfaces: []string{name}}); err != nil {
-				t.Fatal(err)
-			}
+			routeCodex(t, &env)
 			run := func(input map[string]any, fn func(context.Context, hookrun.Env) error) {
 				b, _ := json.Marshal(input)
 				env.Stdin = strings.NewReader(string(b))

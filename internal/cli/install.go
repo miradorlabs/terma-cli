@@ -21,7 +21,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/install"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 	"github.com/miradorlabs/terma-cli/internal/ui/spinner"
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
@@ -286,20 +285,13 @@ func (app *App) resolveInstallHarnesses(cmd *cobra.Command, cfg *config.Config, 
 // relay are home-directory state.
 func (app *App) connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *config.Config, agents []string, f installFlags, plan install.Plan) error {
 	ctx := cmd.Context()
-	signals, err := harness.ParseSignals(f.signals)
-	if err != nil {
-		return err
-	}
-	rec, ok := install.RouteRecord(app.agents, cfg.ProjectID, agents, plan.Exporter(cfg.OTLPURL, signals))
-	if !ok {
+	targets := app.agents.RelayTargets(agents)
+	if len(targets) == 0 {
 		return nil
-	}
-	if !cmd.Flags().Changed("signals") && plan.Record != nil {
-		rec.Signals = plan.Record.Signals
 	}
 	sp := spinner.New(cmd.ErrOrStderr())
 	defer sp.Stop()
-	for _, a := range rec.Harnesses {
+	for _, a := range targets {
 		h, err := app.agents.Harness(a)
 		if err != nil {
 			continue // an exporter terma writes: it sends with the project's spool key
@@ -318,11 +310,8 @@ func (app *App) connectHarnessesForRepo(cmd *cobra.Command, ui *installUI, cfg *
 			return err
 		}
 	}
-	if err := routing.SaveRecord(rec); err != nil {
-		return err
-	}
 	// The machine half too, so an install without a setup is complete.
-	err = app.connectMachineRelay(ctx, agents, f.relayService, relayReport{ok: ui.OK, warn: ui.Warn, then: ui.Then, detail: ui.detail})
+	err := app.connectMachineRelay(ctx, agents, f.relayService, relayReport{ok: ui.OK, warn: ui.Warn, then: ui.Then, detail: ui.detail})
 	if err != nil {
 		return err
 	}

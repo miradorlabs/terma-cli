@@ -97,8 +97,7 @@ func TestTheRefresherKeepsTheSelectedTeamFresh(t *testing.T) {
 	}
 }
 
-// A team install just bound, with its key on file and no policy fetched, is held, never
-// granted; the relay's refresher finds it at once by its key, and once that fetch is
+// A team with its key on file and no policy fetched is held, never granted; the relay's refresher finds it at once by its key, and once that fetch is
 // stored the team's records follow its policy.
 func TestAFreshBindingIsHeldUntilTheRelayFetchesItsPolicy(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
@@ -106,17 +105,14 @@ func TestAFreshBindingIsHeldUntilTheRelayFetchesItsPolicy(t *testing.T) {
 	const org, auth = "org_a", "https://auth.example"
 	t.Setenv("TERMA_AUTH_URL", auth)
 	cfg := &config.Config{ProfileName: "default", OrganizationID: org, AuthURL: auth}
-	if err := config.UpdateProfile(cfg.ProfileName, func(p *config.Profile) { p.OrganizationID = org }); err != nil {
+	if err := config.UpdateProfile(cfg.ProfileName, func(p *config.Profile) { p.OrganizationID, p.Harnesses = org, []string{"claude"} }); err != nil {
 		t.Fatal(err)
 	}
-	// What install leaves: the team's key and a routing record, no policy.
 	if err := keystore.Set("p1", mintedKey, keystore.HostsOf(cfg)); err != nil {
 		t.Fatal(err)
 	}
-	if err := routing.SaveRecord(routing.Record{ProjectID: "p1", Signals: []string{"logs"}, Harnesses: []string{"claude"}}); err != nil {
-		t.Fatal(err)
-	}
-	resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "claude" }, Endpoint: func(string) string { return "https://otel.example" }})
+	resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "claude" }, Endpoint: func(string) string { return "https://otel.example" },
+		RelayTargets: func(s []string) []string { return s }})
 	c := claim.Claim{ProjectID: "p1", Tool: "claude"}
 	if pol, err := resolve(c); err == nil {
 		t.Fatalf("a team with no policy fetched was granted %+v", pol)
@@ -140,7 +136,7 @@ func TestAFreshBindingIsHeldUntilTheRelayFetchesItsPolicy(t *testing.T) {
 		t.Fatalf("Refresh = %v, fetched %v", err, fetched)
 	}
 	pol, err := resolve(c)
-	if err != nil || !pol.IncludePrompts || pol.IncludeToolContent || !slices.Equal(pol.Signals, []string{"logs"}) {
+	if err != nil || !pol.IncludePrompts || pol.IncludeToolContent || pol.Signals != nil {
 		t.Fatalf("after the fetch: %+v, %v; want the team's prompts-only policy", pol, err)
 	}
 }

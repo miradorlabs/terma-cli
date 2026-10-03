@@ -114,15 +114,11 @@ type codexHookInput struct {
 
 const codexDesktopSurface = "desktop"
 
-// codexDesktopRoute reports whether the routing record sends this repository's Codex
-// Desktop logs; what content they carry is Env.Content's call.
-func codexDesktopRoute(r *hookrun.Repo) bool {
-	if r.ProjectID == "" {
-		return false
-	}
-	rec, ok, err := r.Route()
-	return err == nil && ok && slices.Contains(rec.Surfaces, name) &&
-		slices.Contains(rec.Harnesses, name) && slices.Contains(rec.Signals, "logs")
+// codexDesktopRoute reports whether this repository's Codex Desktop logs are sent: Codex
+// is among the developer's agents and the session has a project. What content they carry
+// is the team policy's call.
+func codexDesktopRoute(e hookrun.Env, r *hookrun.Repo) bool {
+	return r.ProjectID != "" && slices.Contains(e.Agents, name)
 }
 
 func readCodexHookInput(r io.Reader) (*codexHookInput, error) {
@@ -151,7 +147,7 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 	env.SetActive(r, sess)
 	env.PruneManifests(r, sess.UpdatedAt)
 	attrs := map[string]any{hookrun.AttrSource: in.Source}
-	if codexDesktopRoute(r) {
+	if codexDesktopRoute(env, r) {
 		attrs["capture_surface"] = codexDesktopSurface
 		if dir, err := config.Dir(); err == nil {
 			hookrun.PruneState(filepath.Join(dir, codexToolStartDir), env.Time().Add(-spool.MaxAge))
@@ -178,7 +174,7 @@ func userPromptSubmit(ctx context.Context, env hookrun.Env) error {
 	if err != nil {
 		return nil
 	}
-	if !codexDesktopRoute(r) || in.TurnID == "" {
+	if !codexDesktopRoute(env, r) || in.TurnID == "" {
 		return nil
 	}
 	attrs := hookrun.EvidenceAttrs(codexTool, sourceCodexHook, "UserPromptSubmit")
@@ -249,7 +245,7 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	captureCodexFunding(ctx, env, r, in)
-	if codexDesktopRoute(r) && in.ToolName != "" {
+	if codexDesktopRoute(env, r) && in.ToolName != "" {
 		attrs := hookrun.EvidenceAttrs(codexTool, sourceCodexHook, "PostToolUse")
 		attrs["capture_surface"] = codexDesktopSurface
 		hookrun.BoundedAttr(attrs, hookrun.AttrToolName, in.ToolName)
@@ -279,7 +275,7 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	// The call's path fields and its patch can name the same file.
 	attrs := hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType)
 	hookrun.BoundedAttr(attrs, hookrun.AttrToolCallID, in.ToolUseID)
-	if codexDesktopRoute(r) {
+	if codexDesktopRoute(env, r) {
 		attrs["capture_surface"] = codexDesktopSurface
 	}
 	env.Touch(r, session.Session{ID: in.SessionID, Tool: codexTool, Model: in.Model}, in.ToolName,

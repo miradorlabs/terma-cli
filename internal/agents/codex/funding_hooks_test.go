@@ -25,12 +25,11 @@ func fundingEnv(t *testing.T) hookrun.Env {
 	t.Setenv("ANTHROPIC_API_KEY", "")
 	t.Setenv("ANTHROPIC_AUTH_TOKEN", "")
 	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "")
-	hookruntest.WriteFile(t, root, ".terma/settings.json", `{"project":{"id":"project-a"}}`)
 	sp, err := spool.Open(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
-	return hookrun.Env{Now: time.Now(), Cwd: root, Spool: sp, Version: "test", Policy: config.DefaultPolicy()}
+	return hookrun.Env{Now: time.Now(), Cwd: root, Spool: sp, Version: "test", Policy: config.DefaultPolicy(), Team: "project-a"}
 }
 
 func TestCodexStopCapturesRolloutAndDeduplicates(t *testing.T) {

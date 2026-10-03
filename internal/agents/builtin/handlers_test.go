@@ -30,7 +30,7 @@ func TestNoHandlerSpoolsAnUnsafeSessionID(t *testing.T) {
 				"cwd": root, "workspacePaths": []string{root}, "reason": "exit",
 				"file_path": root + "/a.go", "file": root + "/a.go", "tool_name": "Write",
 			})
-			env := hookrun.Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(string(payload)), Spool: sp, Version: "test"}
+			env := hookrun.Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(string(payload)), Spool: sp, Version: "test", Team: hookruntest.Team}
 			if err := handle(context.Background(), env); err != nil {
 				t.Errorf("%s: a hook must never fail: %v", event, err)
 			}

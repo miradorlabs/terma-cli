@@ -8,17 +8,6 @@ import (
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 )
 
-// RoutedSurfaces are the selected surfaces of the agents routed to the project.
-func RoutedSurfaces(reg *agents.Registry, selected, targets []string) []string {
-	var out []string
-	for _, name := range selected {
-		if _, a, ok := reg.Surface(name); ok && slices.Contains(targets, a.Name()) {
-			out = append(out, name)
-		}
-	}
-	return out
-}
-
 // SelectedSurfaces are the surfaces the selection names.
 func SelectedSurfaces(reg *agents.Registry, selected []string) []agents.Surface {
 	var out []agents.Surface

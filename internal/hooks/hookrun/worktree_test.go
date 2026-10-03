@@ -2,7 +2,6 @@ package hookrun
 
 import (
 	"context"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -13,23 +12,19 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// A linked worktree without its own binding reports the main checkout's project and
-// repository name, and which worktree it is.
+// A linked worktree reports the main checkout's repository name, the developer's team,
+// and which worktree it is.
 func TestWorktreeEventsReportTheMainRepositoryAndProject(t *testing.T) {
 	main := initRepo(t)
 	ctx := context.Background()
 	if _, err := gitx.Git(ctx, main, "commit", "-q", "--allow-empty", "-m", "init"); err != nil {
 		t.Fatal(err)
 	}
-	hookruntest.WriteFile(t, main, ".terma/settings.json", `{"project":{"id":"proj-main"}}`)
 	wt := filepath.Join(t.TempDir(), "feature-x")
 	if _, err := gitx.Git(ctx, main, "worktree", "add", "-q", wt); err != nil {
 		t.Fatal(err)
 	}
 	wt, _ = filepath.EvalSymlinks(wt)
-	if _, err := os.Stat(filepath.Join(wt, ".terma", "settings.json")); !os.IsNotExist(err) {
-		t.Fatalf("precondition: the worktree has no binding (%v)", err)
-	}
 
 	sp, err := spool.Open(t.TempDir())
 	if err != nil {
@@ -37,7 +32,7 @@ func TestWorktreeEventsReportTheMainRepositoryAndProject(t *testing.T) {
 	}
 	run := func(cwd, payload string, hook func(context.Context, Env) error) {
 		t.Helper()
-		if err := hook(ctx, Env{Now: time.Now(), Cwd: cwd, Stdin: strings.NewReader(payload), Spool: sp, Version: "test"}); err != nil {
+		if err := hook(ctx, Env{Now: time.Now(), Cwd: cwd, Stdin: strings.NewReader(payload), Spool: sp, Version: "test", Team: "proj-main"}); err != nil {
 			t.Fatal(err)
 		}
 	}

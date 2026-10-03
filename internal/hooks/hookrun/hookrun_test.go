@@ -14,7 +14,6 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
-	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 	"github.com/miradorlabs/terma-cli/internal/trailer"
 )
@@ -265,12 +264,9 @@ func TestPostCommitOnAnUnstampedCommitEmitsOnlyACount(t *testing.T) {
 	root := initRepo(t)
 	ctx := context.Background()
 	sp, _ := spool.Open(t.TempDir())
-	env := Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(""), Spool: sp, Version: "test"}
-	// A credentialed remote and a binding, so the event carries every field it may.
+	env := Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(""), Spool: sp, Version: "test", Team: "proj_test"}
+	// A credentialed remote and a team, so the event carries every field it may.
 	if _, err := gitx.Git(ctx, root, "remote", "add", "origin", "https://dev:ghp_secret@github.com/o/r.git"); err != nil {
-		t.Fatal(err)
-	}
-	if err := project.Save(root, &project.File{Project: project.Project{ID: "proj_test"}}); err != nil {
 		t.Fatal(err)
 	}
 	hookruntest.WriteFile(t, root, "notes/human.md", "mine\nall mine\n")
@@ -324,12 +320,9 @@ func TestCommitEventsAreOneFilterApart(t *testing.T) {
 	sp, _ := spool.Open(t.TempDir())
 	now := time.Now()
 	env := func(stdin string, args ...string) Env {
-		return Env{Now: now, Cwd: root, Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
+		return Env{Now: now, Cwd: root, Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test", Team: "proj_test"}
 	}
 	if _, err := gitx.Git(ctx, root, "remote", "add", "origin", "git@github.com:o/r.git"); err != nil {
-		t.Fatal(err)
-	}
-	if err := project.Save(root, &project.File{Project: project.Project{ID: "proj_test"}}); err != nil {
 		t.Fatal(err)
 	}
 	msgPath := filepath.Join(t.TempDir(), "MSG")

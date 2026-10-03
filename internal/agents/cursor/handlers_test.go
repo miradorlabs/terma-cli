@@ -88,7 +88,7 @@ func TestCursorHandlersIgnoreBadInput(t *testing.T) {
 
 func testEnv(t *testing.T) hookrun.Env {
 	root, sp := hookruntest.Project(t)
-	return hookrun.Env{Now: time.Now(), Cwd: root, Spool: sp, Version: "test", Policy: config.DefaultPolicy()}
+	return hookrun.Env{Now: time.Now(), Cwd: root, Spool: sp, Version: "test", Policy: config.DefaultPolicy(), Team: hookruntest.Team}
 }
 
 // The reader refuses a payload past the bound by name.

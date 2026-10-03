@@ -28,6 +28,7 @@ func (app *App) relayDeps() daemon.Deps {
 		Correlators:   app.agents.With[shape.Correlator](),
 		Capturers:     app.agents.With[shape.Capturer](),
 		AgentName:     app.agents.NameForTool,
+		RelayTargets:  app.agents.RelayTargets,
 		Endpoint:      app.delivery().Endpoint,
 		CreateKey:     app.createProjectKey,
 		SendHeartbeat: app.relayHeartbeatSend,

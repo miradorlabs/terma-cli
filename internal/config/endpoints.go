@@ -1,9 +1,6 @@
 package config
 
-import (
-	"fmt"
-	"strings"
-)
+import "fmt"
 
 // Environment names. Only production is public; help text never mentions the others.
 const (
@@ -82,16 +79,4 @@ func SameAccounts(a, b string) bool {
 	ea, errA := EndpointsFor(a)
 	eb, errB := EndpointsFor(b)
 	return errA == nil && errB == nil && ea.AuthURL == eb.AuthURL
-}
-
-// EndpointsByOTLP finds the built-in environment whose ingest host is otlpURL; dev
-// and local share hosts, so the first match answers for both.
-func EndpointsByOTLP(otlpURL string) (Endpoints, bool) {
-	otlpURL = strings.TrimRight(otlpURL, "/")
-	for _, name := range []string{EnvProd, EnvDev, EnvLocal} {
-		if e := environments[name]; e.OTLPURL == otlpURL {
-			return e, true
-		}
-	}
-	return Endpoints{}, false
 }

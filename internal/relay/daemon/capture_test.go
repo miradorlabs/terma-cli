@@ -1,23 +1,17 @@
 package daemon
 
 import (
-	"errors"
-	"os"
-	"path/filepath"
 	"slices"
 	"testing"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
 func TestCapturePolicy(t *testing.T) {
 	open := config.Policy{Mode: config.ModeRepo, IncludePrompts: true, IncludeToolContent: true}
 	global := open
 	global.Mode = config.ModeGlobal
-	record := func(signals ...string) *routing.Record {
-		return &routing.Record{Signals: signals, Harnesses: []string{"claude", "pi"}}
-	}
+	chosen := []string{"claude", "pi"}
 	teamOff := config.Policy{Mode: config.ModeRepo, IncludeToolContent: true}
 	type want struct {
 		prompts, tools, requireClaim bool
@@ -28,23 +22,21 @@ func TestCapturePolicy(t *testing.T) {
 		in   Capture
 		want want
 	}{
-		{"no record keeps the organization's policy", Capture{Org: open, Harness: "claude"},
+		{"a chosen agent sends every signal under the team's policy", Capture{Org: open, Agents: chosen, Harness: "claude"},
 			want{true, true, true, nil}},
-		{"the record decides signals, never content", Capture{Org: open, Record: record("traces", "logs"), Harness: "claude"},
-			want{true, true, true, []string{"traces", "logs"}}},
-		{"the team's policy withholds content whatever the record", Capture{Org: teamOff, Record: record("logs"), Harness: "claude"},
-			want{false, true, true, []string{"logs"}}},
-		{"an unreadable record withholds everything", Capture{Org: open, RecordErr: errors.New("torn"), Harness: "claude"},
+		{"the team's policy withholds content", Capture{Org: teamOff, Agents: chosen, Harness: "claude"},
+			want{false, true, true, nil}},
+		{"an agent the developer did not choose is withheld", Capture{Org: open, Agents: chosen, Harness: "codex"},
 			want{false, false, true, []string{}}},
-		{"an agent the record does not name is withheld", Capture{Org: open, Record: record("traces"), Harness: "codex"},
+		{"a policy that collects nothing withholds everything", Capture{Org: config.NoPolicy("", ""), Agents: chosen, Harness: "claude"},
 			want{false, false, true, []string{}}},
-		{"catch-all has no agent to check", Capture{Org: global, Primary: true, Record: record("traces")},
-			want{true, true, false, []string{"traces"}}},
-		{"global mode's own project needs no claim", Capture{Org: global, Primary: true, Harness: "claude"},
+		{"catch-all has no agent to check", Capture{Org: global, Primary: true},
 			want{true, true, false, nil}},
-		{"another project in global mode needs one", Capture{Org: global, Harness: "claude"},
+		{"global mode sends every agent's sessions", Capture{Org: global, Primary: true, Harness: "codex"},
+			want{true, true, false, nil}},
+		{"another project in global mode needs a claim", Capture{Org: global, Agents: chosen, Harness: "claude"},
 			want{true, true, true, nil}},
-		{"a primary project out of global mode needs one", Capture{Org: open, Primary: true, Harness: "claude"},
+		{"a primary project out of global mode needs one", Capture{Org: open, Agents: chosen, Primary: true, Harness: "claude"},
 			want{true, true, true, nil}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -54,30 +46,5 @@ func TestCapturePolicy(t *testing.T) {
 				t.Fatalf("got prompts=%v tools=%v requireClaim=%v signals=%#v, want %+v", got.IncludePrompts, got.IncludeToolContent, got.RequireClaim, got.Signals, test.want)
 			}
 		})
-	}
-}
-
-// A record an earlier terma wrote with content off narrows nothing: content is the team
-// policy's alone.
-func TestAnOldRecordsContentSwitchesNarrowNothing(t *testing.T) {
-	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
-	dir, err := routing.Dir()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	old := `{"project_id":"p1","signals":["logs"],"include_prompts":false,"include_tool_content":false,"harnesses":["claude"]}`
-	if err := os.WriteFile(filepath.Join(dir, "p1.json"), []byte(old), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	rec, ok, err := routing.LoadRecord("p1")
-	if err != nil || !ok {
-		t.Fatalf("LoadRecord = %v, %v", ok, err)
-	}
-	got := CapturePolicy(Capture{Org: config.Policy{Mode: config.ModeRepo, IncludePrompts: true, IncludeToolContent: true}, Record: &rec, Harness: "claude"})
-	if !got.IncludePrompts || !got.IncludeToolContent || !slices.Equal(got.Signals, []string{"logs"}) {
-		t.Fatalf("an old record narrowed content: %+v", got)
 	}
 }

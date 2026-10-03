@@ -11,15 +11,14 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
-	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// Codex Desktop's activity, spooled without Env.EmitFor, carries the repository's binding.
+// Codex Desktop's activity, spooled without Env.EmitFor, carries the developer's team.
 func TestCodexDesktopActivityCarriesTheProject(t *testing.T) {
 	env := fundingEnv(t)
-	connectCodexDesktop(t)
+	routeCodex(t, &env)
 	path := filepath.Join(os.Getenv("CODEX_HOME"), "sessions", "2026", "09", "19", "rollout-2026-09-19T12-18-12-"+replySession+".jsonl")
 	hookruntest.WriteFile(t, filepath.Dir(path), filepath.Base(path), strings.Join([]string{
 		`{"type":"session_meta","payload":{"id":"` + replySession + `"}}`,
@@ -53,17 +52,14 @@ func TestCodexDesktopActivityCarriesTheProject(t *testing.T) {
 func TestCodexSubagentThreadIsClaimed(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	hookruntest.RelayOn(t)
-	if err := project.Save(root, &project.File{Project: project.Project{ID: "project-a"}}); err != nil {
-		t.Fatal(err)
-	}
 	sp, _ := spool.Open(t.TempDir())
-	env := hookrun.Env{Now: time.Now(), Cwd: root, Spool: sp,
+	env := hookrun.Env{Now: time.Now(), Cwd: root, Spool: sp, Team: "project-a",
 		Stdin: strings.NewReader(`{"session_id":"root-thread","agent_id":"child-thread","agent_type":"worker","cwd":"` + root + `"}`)}
 	if err := subagentStart(context.Background(), env); err != nil {
 		t.Fatal(err)
 	}
 	payload := `{"session_id":"root-thread","agent_id":"child-thread-2","cwd":"` + root + `"}`
-	hookrun.ClaimFromPayload(context.Background(), hookrun.Env{Now: time.Now(), Cwd: root}, payloadSession(t, payload), "codex")
+	hookrun.ClaimFromPayload(context.Background(), hookrun.Env{Now: time.Now(), Cwd: root, Team: "project-a"}, payloadSession(t, payload), "codex")
 	for _, id := range []string{"root-thread", "child-thread", "child-thread-2"} {
 		if c, ok := claim.Read(id, time.Now()); !ok || c.ProjectID != "project-a" {
 			t.Errorf("%s not claimed: %+v %v", id, c, ok)

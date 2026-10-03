@@ -8,7 +8,6 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -49,6 +48,11 @@ type Env struct {
 	Flush func()
 	// Policy is the organization's collection policy; global mode places every session in its DefaultProjectID.
 	Policy config.Policy
+	// Team is the developer's team from setup, which claims every session they run in an
+	// installed repository, whatever the policy's state.
+	Team string
+	// Agents are the agents the developer chose at setup.
+	Agents []string
 }
 
 // Time is when the hook runs: Now when the caller set it, the clock otherwise.
@@ -83,14 +87,12 @@ type Repo struct {
 	Root   string
 	GitDir string
 	Store  *session.Store
-	// ProjectID is the binding, a linked worktree's falling back to its main checkout's.
+	// ProjectID is the developer's team, or global mode's default project.
 	ProjectID string
 	// Name is the checkout's directory name, a linked worktree's main checkout's.
 	Name string
 	// Worktree is git's name for a linked worktree, "" in a main checkout.
 	Worktree string
-
-	route func() routeRead
 }
 
 // Open is every session hook's first step: it refuses an unsafe session id, runs from
@@ -110,7 +112,8 @@ func (e *Env) Open(ctx context.Context, sessionID, cwd string) (*Repo, bool) {
 	return r, true
 }
 
-// Repo resolves the repository, or outside Git the bound workspace, and its project.
+// Repo resolves the repository, or outside Git the current directory, and its project:
+// a hook ran, so the workspace is installed.
 func (e Env) Repo(ctx context.Context) (*Repo, error) {
 	// Filesystem first: a git subprocess is a third of the hook budget on macOS.
 	root, gitDir, ok := gitx.LocateFS(e.Cwd)
@@ -120,28 +123,21 @@ func (e Env) Repo(ctx context.Context) (*Repo, error) {
 			return nil, err
 		}
 	}
-	if gitDir == "" {
-		// Outside Git only a bound workspace counts, except in global mode.
-		if _, err := project.Load(root); err != nil && (!e.Policy.Global() || !errors.Is(err, project.ErrNotFound)) {
-			return nil, err
-		}
-	}
 	stateDir, err := project.StateDir(root, gitDir)
 	if err != nil {
 		return nil, err
 	}
 	r := &Repo{Root: root, GitDir: gitDir, Store: session.Open(stateDir)}
 	r.Name, r.Worktree = CheckoutNames(root, gitDir)
+	r.ProjectID = e.Team
 	if e.Policy.Global() {
 		r.ProjectID = e.Policy.DefaultProjectID
-	} else if f, _, err := project.Resolve(root, gitDir); err == nil {
-		r.ProjectID = f.Project.ID
 	}
 	return r, nil
 }
 
-// EmitFor spools an event stamped with the repository's project binding and, from a
-// linked worktree, which one.
+// EmitFor spools an event stamped with the repository's project and, from a linked
+// worktree, which one.
 func (e Env) EmitFor(r *Repo, ev spool.Event) {
 	ev.Global = e.Policy.Global()
 	if r != nil && (r.ProjectID != "" || r.Worktree != "") {

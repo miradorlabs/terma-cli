@@ -8,9 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/harness"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
@@ -18,21 +16,6 @@ import (
 // content: agents send all of it to the relay, and the team's policy decides what leaves.
 func (Plan) Exporter(endpoint string, signals []harness.Signal) harness.Exporter {
 	return harness.Exporter{Endpoint: endpoint, Signals: signals}
-}
-
-// RouteRecord is the routing record for the selected agents' relay targets; ok is false
-// when none of them routes through the relay.
-func RouteRecord(reg *agents.Registry, projectID string, selected []string, want harness.Exporter) (rec routing.Record, ok bool) {
-	targets := reg.RelayTargets(selected)
-	if len(targets) == 0 {
-		return routing.Record{}, false
-	}
-	signals := make([]string, 0, len(want.Signals))
-	for _, s := range want.Signals {
-		signals = append(signals, string(s))
-	}
-	return routing.Record{ProjectID: projectID, Endpoint: want.Endpoint, Signals: signals,
-		Harnesses: targets, Surfaces: RoutedSurfaces(reg, selected, targets)}, true
 }
 
 // WriteRepoPolicy writes want as each exporter's repository policy, keeping an existing

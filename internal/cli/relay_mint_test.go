@@ -11,16 +11,15 @@ import (
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
 const mintedKey = "ter_srv_minted0123456789abcdefghijklmnopqrstuv"
 
 // A claimed project without a key here is minted one; with a key, the organization's
-// policy caps content and the developer's record can only narrow it.
+// policy decides content.
 func TestRelayResolverMintsAndCapsContent(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
-	cfg := &config.Config{OTLPURL: "https://otel.example", Policy: config.DefaultPolicy()}
+	cfg := &config.Config{OTLPURL: "https://otel.example", Policy: config.DefaultPolicy(), Harnesses: []string{"codex"}}
 	var asked []string
 	resolve := testApp.relayDeps().Resolver(cfg, func(p string) { asked = append(asked, p) })
 	c := claim.Claim{ProjectID: "p1", Tool: "codex"}
@@ -32,13 +31,7 @@ func TestRelayResolverMintsAndCapsContent(t *testing.T) {
 	}
 	pol, err := resolve(c)
 	if err != nil || !pol.IncludePrompts || !pol.IncludeToolContent || pol.Key != mintedKey {
-		t.Fatalf("no record: %+v, %v (the policy's defaults apply)", pol, err)
-	}
-	if err := routing.SaveRecord(routing.Record{ProjectID: "p1", Harnesses: []string{"codex"}}); err != nil {
-		t.Fatal(err)
-	}
-	if pol, _ := resolve(c); !pol.IncludePrompts || !pol.IncludeToolContent {
-		t.Fatalf("a routing record narrowed content: %+v", pol)
+		t.Fatalf("keyed: %+v, %v (the policy's defaults apply)", pol, err)
 	}
 	cfg.Policy.IncludeToolContent = false
 	if pol, _ := resolve(c); pol.IncludeToolContent {

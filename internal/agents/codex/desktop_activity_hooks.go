@@ -18,7 +18,7 @@ func captureCodexDesktopActivity(ctx context.Context, e hookrun.Env, r *hookrun.
 	if e.Spool == nil || !session.ValidID(in.SessionID) {
 		return
 	}
-	if !codexDesktopRoute(r) {
+	if !codexDesktopRoute(e, r) {
 		return
 	}
 	dir, err := config.Dir()

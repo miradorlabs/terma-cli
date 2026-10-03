@@ -14,23 +14,28 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-func TestSpoolRepliesUseCurrentNativeCodexConsent(t *testing.T) {
+// A queued reply or title leaves under the consent setup gives now: Codex among the
+// developer's agents, through the relay.
+func TestSpoolRepliesUseCurrentCodexConsent(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
-	t.Setenv("CODEX_HOME", t.TempDir())
-	exporter := harness.Exporter{Endpoint: "https://example.invalid", APIKey: policyTestKey, ProjectID: "team", Signals: []harness.Signal{harness.SignalLogs}}
-	if err := harnessOf(t, "codex").Connect(exporter, false); err != nil {
+	reply := spool.Event{Name: hookrun.EventAssistantMessage, Attrs: map[string]any{hookrun.AttrTool: "codex"}}
+	if testApp.delivery().Allowed(config.DefaultPolicy(), "team", reply) {
+		t.Fatal("a reply left for a developer who did not choose Codex")
+	}
+	hookruntest.RelayOn(t)
+	if err := config.UpdateProfile(config.DefaultProfile, func(p *config.Profile) { p.Harnesses = []string{"codex"} }); err != nil {
 		t.Fatal(err)
 	}
 	for _, name := range []string{hookrun.EventAssistantMessage, hookrun.EventSessionTitle} {
 		if !testApp.delivery().Allowed(config.DefaultPolicy(), "team", spool.Event{Name: name, Attrs: map[string]any{hookrun.AttrTool: "codex"}}) {
-			t.Fatalf("queued %s ignored native consent without a routing record", name)
+			t.Fatalf("queued %s ignored the developer's consent", name)
 		}
 	}
 	if testApp.delivery().Allowed(config.DefaultPolicy(), "team", spool.Event{Name: hookrun.EventAssistantMessage}) {

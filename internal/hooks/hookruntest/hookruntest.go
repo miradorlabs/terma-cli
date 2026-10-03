@@ -74,11 +74,13 @@ func Spooled(t *testing.T, sp *spool.Spool) []spool.Event {
 	return out
 }
 
-// Project is a repository bound to project-a and a private spool for its hooks.
+// Team is the team the developer chose at setup in these tests.
+const Team = "project-a"
+
+// Project is a repository and a private spool for its hooks, which run for Team.
 func Project(t *testing.T) (root string, sp *spool.Spool) {
 	t.Helper()
 	root = InitRepo(t)
-	WriteFile(t, root, ".terma/settings.json", `{"project":{"id":"project-a"}}`)
 	sp, err := spool.Open(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
