@@ -28,8 +28,10 @@ type procState struct {
 	exitedAt time.Time
 }
 
-// decideExited attributes a sessionless part to the one session its exited sender named, if claimed.
-func (r *Relay) decideExited(pid int, narrow bool) (claim.Claim, Policy, string, bool, attribution) {
+// decideExited attributes a sessionless part sent at at to the one session its exited
+// sender named, if claimed, under the placement in force at at: a process that moved
+// repositories sent its earlier parts from the earlier one.
+func (r *Relay) decideExited(pid int, at time.Time, narrow bool) (claim.Claim, Policy, string, bool, attribution) {
 	r.mu.Lock()
 	st := r.procs[pid]
 	var sessions []string
@@ -50,7 +52,7 @@ func (r *Relay) decideExited(pid int, narrow bool) (claim.Claim, Policy, string,
 	case overflow || len(sessions) != 1:
 		return claim.Claim{}, Policy{}, whyAmbiguous, false, attribution{}
 	}
-	c, pol, why, ok := r.decideClaimed(sessions[0], pid, time.Time{}, narrow)
+	c, pol, why, ok := r.decideClaimed(sessions[0], pid, at, narrow)
 	if !ok {
 		return claim.Claim{}, Policy{}, why, false, attribution{}
 	}

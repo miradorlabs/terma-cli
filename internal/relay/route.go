@@ -50,12 +50,12 @@ func (r *Relay) decide(key string, pid int, at time.Time, narrow bool) (claim.Cl
 	}
 	if p, ok := strings.CutPrefix(key, procPrefix); ok {
 		n, _ := strconv.Atoi(p)
-		return r.decideExited(n, narrow)
+		return r.decideExited(n, at, narrow)
 	}
 	session := r.sessionFor(key)
 	if session == "" {
 		if pid != 0 {
-			if c, pol, _, ok, how := r.decideExited(pid, narrow); ok {
+			if c, pol, _, ok, how := r.decideExited(pid, at, narrow); ok {
 				return c, pol, "", true, how
 			}
 		}

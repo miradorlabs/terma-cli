@@ -6,6 +6,7 @@ import (
 	"time"
 
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
+	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
 
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 )
@@ -171,5 +172,42 @@ func TestNotCollectedAcrossAHandOver(t *testing.T) {
 	}
 	if n, _ := heldOnDisk(t, dir); n != 0 {
 		t.Fatalf("%d batch files after the successor's first sweep", n)
+	}
+}
+
+// metricAt is codexMetric stamped at.
+func metricAt(at time.Time) *metricspb.MetricsData {
+	m := codexMetric()
+	m.ResourceMetrics[0].ScopeMetrics[0].Metrics[0].GetHistogram().DataPoints[0].TimeUnixNano = uint64(at.UnixNano())
+	return m
+}
+
+// A sessionless part of an exited process goes under the placement in force when it was
+// sent, not the latest: what a process sent before it moved stays where it was sent from,
+// a repository its team does not collect included.
+func TestRelayAttributesAnExitedProcessByWhenItSent(t *testing.T) {
+	pr := newProcRelay(t)
+	t0 := pr.f.clock()
+	t1 := t0.Add(time.Minute)
+	pr.f.claim("U", claim.Claim{ProjectID: "p1", PIDs: []int{100}, Placements: []claim.Placement{
+		{PIDs: []int{100}, Since: t0.Add(-time.Hour)}, // marked: an unlisted repository first
+		{ProjectID: "p1", PIDs: []int{100}, Since: t1},
+	}})
+	pr.f.claim("L", claim.Claim{ProjectID: "p2", PIDs: []int{200}, Placements: []claim.Placement{
+		{ProjectID: "p1", PIDs: []int{200}, Since: t0.Add(-time.Hour)},
+		{ProjectID: "p2", PIDs: []int{200}, Since: t1},
+	}})
+	pr.send(100, "/v1/logs", logsAt("U", 1, t1.Add(time.Second)))
+	pr.send(100, "/v1/metrics", metricAt(t0)) // before the move: the unlisted repository's
+	pr.send(200, "/v1/logs", logsAt("L", 1, t1.Add(time.Second)))
+	pr.send(200, "/v1/metrics", metricAt(t0)) // before the move: p1's
+	pr.exit(100)
+	pr.exit(200)
+	waitFor(t, func() bool {
+		c := pr.r.Stats().Snapshot().Counters
+		return c["dropped.not_collected.metrics"] == 1 && c["forwarded.metrics"] == 1
+	})
+	if got := pr.metricsBy("Bearer key-p1"); len(got) != 1 {
+		t.Fatalf("p1 got %d metrics, want the one sent before the move: %v", len(got), pr.r.Stats().Snapshot().Counters)
 	}
 }
