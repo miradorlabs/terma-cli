@@ -267,12 +267,12 @@ func TestPostCommitNamesTheSessionOnItsFilesInASingleSessionCommit(t *testing.T)
 	env := func(stdin string, args ...string) Env {
 		return Env{Now: now, Cwd: root, Policy: hookruntest.Admitting(root), Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
 	}
-	if err := startSession(ctx, env(`{"session_id":"sess-solo","cwd":"`+root+`","hook_event_name":"SessionStart"}`)); err != nil {
+	if err := startSession(ctx, env(`{"session_id":"sess-solo","cwd":"`+hookruntest.InJSON(root)+`","hook_event_name":"SessionStart"}`)); err != nil {
 		t.Fatal(err)
 	}
 	hookruntest.WriteFile(t, root, "src/agent.go", "package src\n")
 	hookruntest.WriteFile(t, root, "notes.txt", "by hand\n")
-	if err := editFile(ctx, env(`{"session_id":"sess-solo","cwd":"`+root+`","tool_name":"Write","tool_input":{"file_path":"`+filepath.Join(root, "src/agent.go")+`"}}`)); err != nil {
+	if err := editFile(ctx, env(`{"session_id":"sess-solo","cwd":"`+hookruntest.InJSON(root)+`","tool_name":"Write","tool_input":{"file_path":"`+hookruntest.InJSON(filepath.Join(root, "src/agent.go"))+`"}}`)); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := gitx.Git(ctx, root, "add", "-A"); err != nil {
