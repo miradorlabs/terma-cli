@@ -26,7 +26,7 @@ func TestRelayCheckJudgesTheRelayItself(t *testing.T) {
 		status Status
 		want   string
 	}{
-		{name: "healthy", relay: func(*Relay) {}, env: "dev", status: Pass, want: "only the team's folders' sessions are forwarded"},
+		{name: "healthy", relay: func(*Relay) {}, env: "dev", status: Pass, want: "only the team's repositories' sessions are forwarded"},
 		{name: "another environment: everything is dropped", relay: func(r *Relay) { r.Environment = "prod" }, env: "dev",
 			status: Fail, want: "delivers to the prod environment, not this profile's dev"},
 		{name: "environment unknown (an earlier terma's relay)", relay: func(r *Relay) { r.Environment = "" }, env: "dev", status: Pass},

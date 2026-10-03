@@ -21,14 +21,14 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// listingApp is a repository-mode policy, content on, listing appFolder.
-var listingApp = config.Policy{Mode: config.ModeRepo, Folders: appFolder.Names, IncludePrompts: true, IncludeToolContent: true}
+// listingApp is a repository-mode policy, content on, listing appRepo.
+var listingApp = config.Policy{Mode: config.ModeRepo, Repositories: []string{appRepo.Origin}, IncludePrompts: true, IncludeToolContent: true}
 
 // A queued reply or title leaves under the consent setup gives now: Codex among the
 // developer's agents, through the relay.
 func TestSpoolRepliesUseCurrentCodexConsent(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
-	reply := spool.Event{Repository: appFolder, Name: hookrun.EventAssistantMessage, Attrs: map[string]any{hookrun.AttrTool: "codex"}}
+	reply := spool.Event{Repository: appRepo, Name: hookrun.EventAssistantMessage, Attrs: map[string]any{hookrun.AttrTool: "codex"}}
 	if testApp.delivery().Allowed(listingApp, "team", reply) {
 		t.Fatal("a reply left for a developer who did not choose Codex")
 	}
@@ -37,18 +37,18 @@ func TestSpoolRepliesUseCurrentCodexConsent(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, name := range []string{hookrun.EventAssistantMessage, hookrun.EventSessionTitle} {
-		if !testApp.delivery().Allowed(listingApp, "team", spool.Event{Repository: appFolder, Name: name, Attrs: map[string]any{hookrun.AttrTool: "codex"}}) {
+		if !testApp.delivery().Allowed(listingApp, "team", spool.Event{Repository: appRepo, Name: name, Attrs: map[string]any{hookrun.AttrTool: "codex"}}) {
 			t.Fatalf("queued %s ignored the developer's consent", name)
 		}
 	}
-	if testApp.delivery().Allowed(listingApp, "team", spool.Event{Repository: appFolder, Name: hookrun.EventAssistantMessage}) {
+	if testApp.delivery().Allowed(listingApp, "team", spool.Event{Repository: appRepo, Name: hookrun.EventAssistantMessage}) {
 		t.Fatal("a reply no agent's label vouches for was delivered")
 	}
 	// The team's policy, not the agent's config, decides whether prompts may leave.
 	withheld := listingApp
 	withheld.IncludePrompts = false
 	for _, name := range []string{hookrun.EventAssistantMessage, hookrun.EventSessionTitle} {
-		if testApp.delivery().Allowed(withheld, "team", spool.Event{Repository: appFolder, Name: name, Attrs: map[string]any{hookrun.AttrTool: "codex"}}) {
+		if testApp.delivery().Allowed(withheld, "team", spool.Event{Repository: appRepo, Name: name, Attrs: map[string]any{hookrun.AttrTool: "codex"}}) {
 			t.Fatalf("queued %s ignored the team's prompts-off", name)
 		}
 	}

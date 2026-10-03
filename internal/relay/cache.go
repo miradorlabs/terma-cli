@@ -49,7 +49,7 @@ func (r *Relay) lookup(session string) (claim.Claim, bool) {
 
 func (r *Relay) resolve(c claim.Claim) (Policy, bool) {
 	now := r.opts.Now()
-	key := strings.Join(append([]string{c.ProjectID, c.Tool, c.Repository.Path}, c.Repository.Names...), "\x00")
+	key := strings.Join([]string{c.ProjectID, c.Tool, c.Repository.Origin}, "\x00")
 	if ttl := r.opts.PolicyCacheTTL; ttl > 0 {
 		r.cache.mu.Lock()
 		e, hit := r.cache.policies[key]

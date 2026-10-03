@@ -30,6 +30,7 @@ func TestHookKillSwitch(t *testing.T) {
 	git("init", "-q")
 	git("config", "user.email", "dev@example.com")
 	git("config", "user.name", "Dev")
+	git("remote", "add", "origin", "git@github.com:acme/"+filepath.Base(root)+".git")
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	t.Setenv("TERMA_HOOKS", "")
 	admitHere(t, root, "team")

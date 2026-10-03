@@ -27,7 +27,7 @@ func TestCollectionPolicyWireContract(t *testing.T) {
 				}
 				body := "{}"
 				if mode == "per_repository" {
-					body = `{"folders":["mirador-platform","acme/sales"]}`
+					body = `{"repositories":["github.com/miradorlabs/mirador-platform","github.com/acme/sales"]}`
 				}
 				fmt.Fprintf(w, `{"policy":{"version":"1.0","terma":{%s,"%s":%s}},"revision":4,"updated_at":"2026-09-30T12:27:05.490205Z"}`, testCapture, mode, body)
 			}))
@@ -40,8 +40,8 @@ func TestCollectionPolicyWireContract(t *testing.T) {
 			if p.Global() != (mode == "global") || p.IncludePrompts || !p.IncludeToolContent || p.CollectsNothing || p.Revision != 4 || p.FetchedAt.IsZero() {
 				t.Fatalf("wrong translated policy: %+v", p)
 			}
-			if !p.Admits(config.Repository{Names: []string{"sales"}, Path: "acme/sales"}) || p.Global() != p.Admits(config.Repository{Names: []string{"web"}}) {
-				t.Fatalf("wrong folder list: %+v", p.Folders)
+			if !p.Admits(config.Repository{Origin: "github.com/acme/sales"}) || p.Global() != p.Admits(config.Repository{Origin: "github.com/acme/web"}) {
+				t.Fatalf("wrong repository list: %+v", p.Repositories)
 			}
 		})
 	}
@@ -118,8 +118,9 @@ func TestCollectionPolicyMissingInvalidAndUnavailable(t *testing.T) {
 		{"both modes", strings.Replace(valid, `"global":{}`, `"global":{},"per_repository":{}`, 1), 200, true},
 		{"no modes", strings.Replace(valid, `,"global":{}`, "", 1), 200, true},
 		{"per repository without a list", strings.Replace(valid, `"global":{}`, `"per_repository":{}`, 1), 200, true},
-		{"per repository with a null list", strings.Replace(valid, `"global":{}`, `"per_repository":{"folders":null}`, 1), 200, true},
-		{"per repository with an empty list", strings.Replace(valid, `"global":{}`, `"per_repository":{"folders":[]}`, 1), 200, false},
+		{"per repository with a null list", strings.Replace(valid, `"global":{}`, `"per_repository":{"repositories":null}`, 1), 200, true},
+		{"per repository with only the old folder list", strings.Replace(valid, `"global":{}`, `"per_repository":{"folders":["repo"]}`, 1), 200, true},
+		{"per repository with an empty list", strings.Replace(valid, `"global":{}`, `"per_repository":{"repositories":[]}`, 1), 200, false},
 		{"unavailable", `{}`, 503, true},
 		{"forbidden", `{}`, 403, true},
 		{"missing endpoint", `{}`, 404, true},
@@ -132,7 +133,7 @@ func TestCollectionPolicyMissingInvalidAndUnavailable(t *testing.T) {
 			if (err != nil) != tt.wantError {
 				t.Fatalf("policy=%+v error=%v", p, err)
 			}
-			if !tt.wantError && (p.Global() || p.CollectsNothing || p.Admits(config.Repository{Names: []string{"web"}})) {
+			if !tt.wantError && (p.Global() || p.CollectsNothing || p.Admits(config.Repository{Origin: "github.com/acme/web"})) {
 				t.Fatal("an unset policy or an empty list admitted a repository")
 			}
 		})

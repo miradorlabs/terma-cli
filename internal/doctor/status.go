@@ -56,16 +56,16 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 
 	root, gitDir, reg := env.Root, env.GitDir, env.Agents
 	projectID := cmp.Or(cfg.ProjectID, cfg.Policy.TeamID)
-	folder := Check{Status: Pass}
+	admission := Check{Status: Pass}
 	hooksOK := true
 	if env.RepoErr != nil {
 		add("Repository", "not inside a git repository")
 	} else {
-		folder.Detail = "every folder, in global mode: " + GlobalDestination(cfg)
+		admission.Detail = "every folder, in global mode: " + GlobalDestination(cfg)
 		if pol := cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL); !pol.Global() {
-			folder = FolderCheck(pol, root, gitDir, nil)
+			admission = RepositoryCheck(pol, gitDir, nil)
 		}
-		add("Folder", "%s", folder.Detail)
+		add("Repository", "%s", admission.Detail)
 		if gitDir == "" {
 			add("Hooks", "Git hooks skipped (not a Git repository)")
 		} else {
@@ -73,7 +73,7 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 			hooksOK = hooks.Status == Pass
 			add("Hooks", "%s", hooks.Detail)
 		}
-		if folder.Status == Pass {
+		if admission.Status == Pass {
 			work, err := workRows(root, gitDir)
 			if err != nil {
 				return LocalReport{}, err
@@ -95,7 +95,7 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 		var connected []string
 		verdicts := JudgeHarnesses(ctx, reg, cfg.OTLPURL, projectID, root)
 		for _, v := range verdicts {
-			suffix, ok := AgentSummary(v, folder.Status == Pass)
+			suffix, ok := AgentSummary(v, admission.Status == Pass)
 			if ok {
 				connected = append(connected, v.DisplayName)
 			}
@@ -107,7 +107,7 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 		if len(connected) == 0 {
 			add("Agent", "none connected — run `terma setup`")
 		}
-		export = HarnessCheck(reg, verdicts, cfg.OTLPURL, projectID, folder.Status == Pass)
+		export = HarnessCheck(reg, verdicts, cfg.OTLPURL, projectID, admission.Status == Pass)
 	}
 	if env.RepoErr == nil {
 		rep.Rows = append(rep.Rows, repoPolicyRows(reg, root)...)
@@ -141,8 +141,8 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 	if !authOK || !hooksOK {
 		rep.Checks = append(rep.Checks, Check{Status: Fail, Fix: "terma setup"})
 	}
-	if folder.Status != Pass {
-		rep.Checks = append(rep.Checks, folder)
+	if admission.Status != Pass {
+		rep.Checks = append(rep.Checks, admission)
 	}
 	if !backendOK {
 		rep.Checks = append(rep.Checks, Check{Status: Warn, Fix: "terma doctor"})
@@ -258,7 +258,7 @@ func agentLine(v HarnessVerdict, bound bool) string {
 	case RouteOtherProject:
 		return "→ reporting to team " + v.OtherProject + ", not this one — run `terma setup`"
 	case RouteRepoDecides:
-		// In a collected folder status must give doctor's answer for it.
+		// In a collected repository status must give doctor's answer for it.
 		if bound && !v.RepoAsks {
 			return "→ no telemetry: sessions here send nothing (run `terma setup`)"
 		}
@@ -306,12 +306,12 @@ func shipment(st harness.Status) string {
 
 // PolicySummary is what a collection policy collects, in one line.
 func PolicySummary(p config.Policy) string {
-	scope := "sessions in the team's folders (" + strings.Join(p.Folders, ", ") + ")"
+	scope := "sessions in the team's repositories (" + strings.Join(p.Repositories, ", ") + ")"
 	switch {
 	case p.Global():
 		scope = "every session on this machine"
 	case p.AdmitsNone():
-		return "nothing yet: your team lists no folders"
+		return "nothing yet: your team lists no repositories"
 	}
 	switch {
 	case p.IncludePrompts && p.IncludeToolContent:

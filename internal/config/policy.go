@@ -7,7 +7,7 @@ import (
 
 // Collection modes: what the signed-in organization collects from this machine.
 const (
-	// ModeRepo, the default, collects only the folders the policy lists.
+	// ModeRepo, the default, collects only the repositories the policy lists.
 	ModeRepo = "repo"
 	// ModeGlobal collects every session on the machine.
 	ModeGlobal = "global"
@@ -16,8 +16,8 @@ const (
 // Policy is the organization's collection policy, fetched by `terma setup`.
 type Policy struct {
 	Mode string `json:"mode"`
-	// Folders are what repository mode admits (Admits).
-	Folders            []string `json:"folders,omitempty"`
+	// Repositories are what repository mode admits (Admits).
+	Repositories       []string `json:"repositories,omitempty"`
 	IncludePrompts     bool     `json:"include_prompts"`
 	IncludeToolContent bool     `json:"include_tool_content"`
 	// CollectsNothing is set while no validated policy applies: nothing leaves the machine.

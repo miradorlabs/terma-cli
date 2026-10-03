@@ -170,7 +170,7 @@ func TestOutboxJanitorBounds(t *testing.T) {
 // A route's directory names its repository, and the outbox finds both again.
 func TestOutboxRouteKeepsItsRepository(t *testing.T) {
 	o := outbox{t.TempDir()}
-	repo := config.Repository{Names: []string{"web", "acme-web"}, Path: "acme/web"}
+	repo := config.Repository{Origin: "github.com/acme/web"}
 	rt := routeOf(claim.Claim{ProjectID: "p1", Tool: "codex", Repository: repo})
 	if rt.repo == noRepo || !validRoute(rt) {
 		t.Fatalf("routeOf gave %v", rt)
@@ -189,7 +189,7 @@ func TestOutboxRouteKeepsItsRepository(t *testing.T) {
 	if entries, _ := o.list(rt); len(entries) != 1 || entries[0] != e {
 		t.Fatalf("list = %v", entries)
 	}
-	if got := o.identity(rt); !got.Equal(repo) {
+	if got := o.identity(rt); got != repo {
 		t.Fatalf("identity = %+v, want %+v", got, repo)
 	}
 }

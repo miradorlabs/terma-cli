@@ -151,7 +151,7 @@ func (e Env) locate(ctx context.Context) (root, gitDir string, id config.Reposit
 			return "", "", id, err
 		}
 	}
-	id.Names, id.Path = gitx.RepositoryFS(root, gitDir)
+	id.Origin = gitx.RepositoryFS(gitDir)
 	return root, gitDir, id, nil
 }
 

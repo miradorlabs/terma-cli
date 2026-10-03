@@ -68,7 +68,7 @@ func routeOf(c claim.Claim) route {
 }
 
 func repoKey(r config.Repository) string {
-	if r.Equal(config.Repository{}) {
+	if r == (config.Repository{}) {
 		return noRepo
 	}
 	b, _ := json.Marshal(r)
@@ -185,7 +185,7 @@ func (o outbox) list(rt route) ([]entry, error) {
 }
 
 // identity is the repository a route's parts were claimed in; the zero one for noRepo, or
-// when unreadable, which a folder list never admits.
+// when unreadable, which a repository list never admits.
 func (o outbox) identity(rt route) config.Repository {
 	var repo config.Repository
 	if rt.repo == noRepo {

@@ -264,9 +264,9 @@ func TestPostCommitOnAnUnstampedCommitEmitsOnlyACount(t *testing.T) {
 	root := initRepo(t)
 	ctx := context.Background()
 	sp, _ := spool.Open(t.TempDir())
-	env := Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting("o/r"), Stdin: strings.NewReader(""), Spool: sp, Version: "test", Team: "proj_test"}
+	env := Env{Now: time.Now(), Cwd: root, Policy: listing("github.com/o/r"), Stdin: strings.NewReader(""), Spool: sp, Version: "test", Team: "proj_test"}
 	// A credentialed remote and a team, so the event carries every field it may.
-	if _, err := gitx.Git(ctx, root, "remote", "add", "origin", "https://dev:ghp_secret@github.com/o/r.git"); err != nil {
+	if _, err := gitx.Git(ctx, root, "remote", "set-url", "origin", "https://dev:ghp_secret@github.com/o/r.git"); err != nil {
 		t.Fatal(err)
 	}
 	hookruntest.WriteFile(t, root, "notes/human.md", "mine\nall mine\n")
@@ -320,9 +320,9 @@ func TestCommitEventsAreOneFilterApart(t *testing.T) {
 	sp, _ := spool.Open(t.TempDir())
 	now := time.Now()
 	env := func(stdin string, args ...string) Env {
-		return Env{Now: now, Cwd: root, Policy: hookruntest.Admitting("o/r"), Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test", Team: "proj_test"}
+		return Env{Now: now, Cwd: root, Policy: listing("github.com/o/r"), Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test", Team: "proj_test"}
 	}
-	if _, err := gitx.Git(ctx, root, "remote", "add", "origin", "git@github.com:o/r.git"); err != nil {
+	if _, err := gitx.Git(ctx, root, "remote", "set-url", "origin", "git@github.com:o/r.git"); err != nil {
 		t.Fatal(err)
 	}
 	msgPath := filepath.Join(t.TempDir(), "MSG")

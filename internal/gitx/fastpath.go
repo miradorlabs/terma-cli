@@ -3,10 +3,8 @@ package gitx
 import (
 	"bufio"
 	"context"
-	"net/url"
 	"os"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 )
@@ -147,68 +145,14 @@ func HooksPathFS(gitDir string) (local, worktree string) {
 	return local, worktree
 }
 
-// RepositoryFS names the working copy at root for admission without running git: in a
-// checkout, its root's folder (for a linked worktree, also its main checkout's) and
-// origin's repository name, read from the main repository's config, with a hosted origin's
-// owner/name as path; outside
-// Git, root's folder and every parent's, stopping before the home directory, which never
-// counts, or the volume root. A name already listed, ignoring case, is not repeated.
-func RepositoryFS(root, gitDir string) (names []string, path string) {
+// RepositoryFS is origin's RepositoryID, read from the main repository's config so a
+// linked worktree shares it; "" outside git.
+func RepositoryFS(gitDir string) string {
 	if gitDir == "" {
-		home, _ := os.UserHomeDir()
-		for dir := filepath.Clean(root); !strings.EqualFold(dir, filepath.Clean(home)) && dir != filepath.Dir(dir); dir = filepath.Dir(dir) {
-			names = appendName(names, filepath.Base(dir))
-		}
-		return names, ""
+		return ""
 	}
-	names = append(names, filepath.Base(root))
-	common := CommonDirFS(gitDir)
-	if common != filepath.Clean(gitDir) {
-		if name := mainCheckoutName(common); name != "" {
-			names = appendName(names, name)
-		}
-	}
-	raw, _ := configValue(filepath.Join(common, "config"), `remote "origin"`, "url")
-	name := ""
-	if remote := NormalizeRemote(raw); remote != "" {
-		if u, err := url.Parse(remote); err == nil {
-			path = strings.Trim(u.Path, "/")
-			name = path[strings.LastIndex(path, "/")+1:]
-		}
-	} else {
-		// A local remote: a path or file:// URL, with either separator.
-		local := strings.TrimRight(strings.TrimPrefix(raw, "file://"), `/\`)
-		name = strings.TrimSuffix(local[strings.LastIndexAny(local, `/\`)+1:], ".git")
-	}
-	if name != "" {
-		names = appendName(names, name)
-	}
-	return names, path
-}
-
-// mainCheckoutName is the folder of the checkout whose git directory is common, or a bare
-// repository's own name without .git; either separator, since git may write either.
-func mainCheckoutName(common string) string {
-	base := func(p string) (dir, name string) {
-		p = strings.TrimRight(p, `/\`)
-		i := strings.LastIndexAny(p, `/\`)
-		return p[:max(i, 0)], p[i+1:]
-	}
-	dir, name := base(common)
-	if strings.EqualFold(name, ".git") {
-		if _, name = base(dir); strings.HasSuffix(name, ":") {
-			return "" // a drive root names nothing
-		}
-		return name
-	}
-	return strings.TrimSuffix(name, ".git")
-}
-
-func appendName(names []string, name string) []string {
-	if slices.ContainsFunc(names, func(n string) bool { return strings.EqualFold(n, name) }) {
-		return names
-	}
-	return append(names, name)
+	raw, _ := configValue(filepath.Join(CommonDirFS(gitDir), "config"), `remote "origin"`, "url")
+	return RepositoryID(raw)
 }
 
 func globalConfigPaths() []string {

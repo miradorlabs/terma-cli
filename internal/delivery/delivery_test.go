@@ -23,10 +23,10 @@ import (
 
 const testKey = "ter_srv_minted0123456789abcdefghijklmnopqrstuv"
 
-// app is the working copy the tests' events come from, and listed the policies' folders.
+// app is the working copy the tests' events come from, and listed the policies' repositories.
 var (
-	listed = []string{"app"}
-	app    = config.Repository{Names: listed}
+	listed = []string{"github.com/acme/app"}
+	app    = config.Repository{Origin: "github.com/acme/app"}
 )
 
 // A project's events go where its key works: a pinned host, else the key's own, else the
@@ -63,7 +63,7 @@ func TestEachProjectGoesToItsKeysOwnEnvironment(t *testing.T) {
 // an agent that refuses, it is withheld.
 func TestConversationContentNeedsItsAgentsConsent(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
-	pol := config.Policy{Mode: config.ModeRepo, Folders: listed, IncludePrompts: true}
+	pol := config.Policy{Mode: config.ModeRepo, Repositories: listed, IncludePrompts: true}
 	reply := spool.Event{Repository: app, Name: hookrun.EventAssistantMessage, Attrs: map[string]any{hookrun.AttrTool: "fake"}}
 	var asked []string
 	for _, tc := range []struct {
@@ -90,11 +90,11 @@ func TestConversationContentNeedsItsAgentsConsent(t *testing.T) {
 }
 
 // A queued event is held to the policy in force when it leaves: one whose coverage moved
-// out of global mode, or whose folder left the list, sends nothing.
+// out of global mode, or whose repository left the list, sends nothing.
 func TestQueuedEventsMeetTodaysPolicy(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	start := spool.Event{Repository: app, Name: hookrun.EventSessionStart}
-	logs := config.Policy{Mode: config.ModeRepo, Folders: listed}
+	logs := config.Policy{Mode: config.ModeRepo, Repositories: listed}
 	r := Router{}
 	if !r.Allowed(logs, "p1", start) {
 		t.Fatal("a project's event was withheld")
@@ -103,9 +103,9 @@ func TestQueuedEventsMeetTodaysPolicy(t *testing.T) {
 	if r.Allowed(logs, "p1", global) {
 		t.Fatal("a global-mode event left after coverage moved back to repositories")
 	}
-	logs.Folders = []string{"other"}
+	logs.Repositories = []string{"github.com/acme/other"}
 	if r.Allowed(logs, "p1", start) {
-		t.Fatal("an event left after its folder left the list")
+		t.Fatal("an event left after its repository left the list")
 	}
 }
 
@@ -126,7 +126,7 @@ func TestAProjectWithoutAPolicyOrAKeyKeepsItsEvents(t *testing.T) {
 		if team == "unfetched" {
 			return config.Policy{}, errors.New("not fetched yet")
 		}
-		return config.Policy{Mode: config.ModeRepo, Folders: listed}, nil
+		return config.Policy{Mode: config.ModeRepo, Repositories: listed}, nil
 	}}
 	res := r.Flush(t.Context(), s, &config.Config{}, true, 0)
 	if res.Sent != 0 || res.Held != 2 || res.Unroutable != 1 || res.Err != nil {
@@ -160,7 +160,7 @@ func TestContentSpooledUnderAnOlderPolicyLeavesWithoutIt(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	tightened := config.Policy{Mode: config.ModeRepo, Folders: listed, TeamID: "p1", FetchedAt: time.Now()}
+	tightened := config.Policy{Mode: config.ModeRepo, Repositories: listed, TeamID: "p1", FetchedAt: time.Now()}
 	r := Router{OTLPPinned: true, Policy: func(context.Context, *config.Config, string) (config.Policy, error) { return tightened, nil }}
 	res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL}, true, 0)
 	if res.Sent != 3 || res.Err != nil {
@@ -182,7 +182,7 @@ func TestOutgoingWithholdsOnlyWhatThePolicyDoes(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	call := spool.Event{Repository: app, Name: hookrun.EventToolCall, Attrs: map[string]any{"arguments": "a", "output": "o", hookrun.AttrToolName: "exec"}}
 	prompt := spool.Event{Repository: app, Name: hookrun.EventUserPrompt, Attrs: map[string]any{"prompt": "p"}}
-	promptsOnly := config.Policy{Mode: config.ModeRepo, Folders: listed, IncludePrompts: true}
+	promptsOnly := config.Policy{Mode: config.ModeRepo, Repositories: listed, IncludePrompts: true}
 	if out, ok := (Router{}).Outgoing(promptsOnly, "p1", call); !ok || out.Attrs["arguments"] != nil || out.Attrs["output"] != nil || out.Attrs[hookrun.AttrToolName] != "exec" {
 		t.Fatalf("tool call = %+v, %v", out, ok)
 	}
@@ -233,10 +233,10 @@ func TestEveryHookEventKindIsClassified(t *testing.T) {
 	}
 	// An unclassified kind leaves only under a policy that withholds nothing.
 	unknown := spool.Event{Repository: app, Name: "terma.something.new", Attrs: map[string]any{"text": "private"}}
-	if _, ok := (Router{}).Outgoing(config.Policy{Mode: config.ModeRepo, Folders: listed, IncludeToolContent: true}, "p1", unknown); ok {
+	if _, ok := (Router{}).Outgoing(config.Policy{Mode: config.ModeRepo, Repositories: listed, IncludeToolContent: true}, "p1", unknown); ok {
 		t.Error("an unclassified kind left under a policy withholding prompts")
 	}
-	if _, ok := (Router{}).Outgoing(config.Policy{Mode: config.ModeRepo, Folders: listed, IncludePrompts: true, IncludeToolContent: true}, "p1", unknown); !ok {
+	if _, ok := (Router{}).Outgoing(config.Policy{Mode: config.ModeRepo, Repositories: listed, IncludePrompts: true, IncludeToolContent: true}, "p1", unknown); !ok {
 		t.Error("an unclassified kind was withheld under a policy withholding nothing")
 	}
 }

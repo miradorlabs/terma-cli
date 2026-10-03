@@ -63,10 +63,10 @@ func TestContentIsTheTeamPolicys(t *testing.T) {
 	}
 }
 
-// Hooks apply a policy once validated, NoPolicy before; an empty or blank list admits none.
+// Hooks apply a policy once validated, NoPolicy before; a list of no usable entry admits none.
 func TestPolicyInForceAndAdmitsNone(t *testing.T) {
 	t.Setenv("TERMA_POLICY_STUB", "")
-	fetched := Policy{Mode: ModeRepo, Folders: []string{"app"}, TeamID: "t", FetchedAt: time.Now()}
+	fetched := Policy{Mode: ModeRepo, Repositories: []string{"github.com/acme/app"}, TeamID: "t", FetchedAt: time.Now()}
 	if got := fetched.InForce("org", "a"); got.CollectsNothing || got.AdmitsNone() {
 		t.Fatalf("a validated policy was not in force: %+v", got)
 	}
@@ -74,7 +74,7 @@ func TestPolicyInForceAndAdmitsNone(t *testing.T) {
 		t.Fatalf("an unvalidated policy was in force: %+v", got)
 	}
 	blank := fetched
-	blank.Folders = []string{" ", "/"}
+	blank.Repositories = []string{" ", "/", "app", "github.com/acme"}
 	global := Policy{Mode: ModeGlobal, TeamID: "t", FetchedAt: time.Now()}
 	if !blank.AdmitsNone() || global.AdmitsNone() {
 		t.Fatal("AdmitsNone misjudged a blank list or global mode")

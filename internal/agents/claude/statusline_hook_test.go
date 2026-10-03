@@ -2,7 +2,6 @@ package claude
 
 import (
 	"bytes"
-	"cmp"
 	"context"
 	"encoding/json"
 	"os"
@@ -16,22 +15,15 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-const quotaPayload = `{"session_id":"sess-q","prompt_id":"p1","version":"2.1.272","cwd":"/tmp","model":{"id":"claude-haiku-4-5","display_name":"Haiku 4.5"},"fast_mode":false,"cost":{"total_cost_usd":0.0123},"context_window":{"used_percentage":12.5},"rate_limits":{"five_hour":{"used_percentage":3,"resets_at":1789483200},"seven_day":{"used_percentage":38,"resets_at":1789585200}}}`
+// quotaPayload's empty cwd leaves the hook in statusEnv's repository.
+const quotaPayload = `{"session_id":"sess-q","prompt_id":"p1","version":"2.1.272","cwd":"","model":{"id":"claude-haiku-4-5","display_name":"Haiku 4.5"},"fast_mode":false,"cost":{"total_cost_usd":0.0123},"context_window":{"used_percentage":12.5},"rate_limits":{"five_hour":{"used_percentage":3,"resets_at":1789483200},"seven_day":{"used_percentage":38,"resets_at":1789585200}}}`
 
 func statusEnv(t *testing.T, stdin string) (hookrun.Env, *bytes.Buffer, *spool.Spool) {
 	t.Helper()
-	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	cwd := newRepo(t)
 	sp, _ := spool.Open(t.TempDir())
 	var out bytes.Buffer
-	// On macOS t.TempDir() is under the /var symlink, and a renderer's `pwd` reports /private/var.
-	cwd := t.TempDir()
-	if resolved, err := filepath.EvalSymlinks(cwd); err == nil {
-		cwd = resolved
-	}
-	// quotaPayload's cwd is /tmp.
-	pol := hookruntest.Admitting(cwd)
-	pol.Folders = append(pol.Folders, "tmp")
-	return hookrun.Env{Now: time.Now(), Cwd: cwd, Policy: pol, Team: hookruntest.Team, Stdin: strings.NewReader(stdin), Stdout: &out, Stderr: os.Stderr, Spool: sp, Version: "test"}, &out, sp
+	return hookrun.Env{Now: time.Now(), Cwd: cwd, Policy: hookruntest.Admitting(cwd), Team: hookruntest.Team, Stdin: strings.NewReader(stdin), Stdout: &out, Stderr: os.Stderr, Spool: sp, Version: "test"}, &out, sp
 }
 
 func TestStatusLinePassesBytesThroughUnchanged(t *testing.T) {
@@ -122,7 +114,7 @@ func TestStatusLineCapturesQuotaOncePerChange(t *testing.T) {
 }
 
 func TestStatusLineWithoutWindowsCapturesNothingButStillRenders(t *testing.T) {
-	early := `{"session_id":"sess-e","cwd":"/tmp","model":{"id":"m"},"cost":{"total_cost_usd":0}}`
+	early := `{"session_id":"sess-e","cwd":"","model":{"id":"m"},"cost":{"total_cost_usd":0}}`
 	env, out, sp := statusEnv(t, early)
 	statusLine(context.Background(), env, statusLineOptions{Renderer: "cat"})
 	if out.String() != early {
@@ -182,34 +174,32 @@ func TestStatusLineWithoutRendererIsSilentButCaptures(t *testing.T) {
 	}
 }
 
-// A status line in an admitted repository, from a subdirectory of a Git checkout too,
-// stamps the developer's team; one in a repository the list does not name records nothing.
+// A status line in an admitted repository, from a subdirectory too, stamps the developer's
+// team; one in a repository the list does not name, or outside git, records nothing.
 func TestStatusLineStampsProjectFromRepository(t *testing.T) {
-	for _, nonGit := range []bool{false, true} {
-		t.Run(map[bool]string{false: "git", true: "non_git"}[nonGit], func(t *testing.T) {
-			root, cwd := t.TempDir(), ""
-			if root, _ = filepath.EvalSymlinks(root); !nonGit {
-				root = newRepo(t)
-				cwd = filepath.Join(root, "nested")
-				if err := os.MkdirAll(cwd, 0o755); err != nil {
-					t.Fatal(err)
-				}
-			}
-			payload := strings.Replace(quotaPayload, `"cwd":"/tmp"`, `"cwd":`+string(mustJSON(cmp.Or(cwd, root))), 1)
-			env, _, sp := statusEnv(t, payload)
-			env.Team, env.Policy = "proj_sl", hookruntest.Admitting(root)
-			statusLine(context.Background(), env, statusLineOptions{CaptureOnly: true})
-			evs := hookruntest.Spooled(t, sp)
-			if len(evs) != 1 || evs[0].Attrs[hookrun.AttrProjectID] != "proj_sl" || evs[0].Repo != filepath.Base(root) {
-				t.Fatalf("project: %+v", evs)
-			}
-			env.Stdin, env.Policy.Folders = strings.NewReader(payload), []string{"elsewhere"}
-			env.Now = env.Now.Add(time.Hour)
-			statusLine(context.Background(), env, statusLineOptions{CaptureOnly: true})
-			if evs := hookruntest.Spooled(t, sp); len(evs) != 0 {
-				t.Fatalf("an unlisted repository recorded %+v", evs)
-			}
-		})
+	root := newRepo(t)
+	cwd := filepath.Join(root, "nested")
+	if err := os.MkdirAll(cwd, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	in := func(dir string) string {
+		return strings.Replace(quotaPayload, `"cwd":""`, `"cwd":`+string(mustJSON(dir)), 1)
+	}
+	env, _, sp := statusEnv(t, in(cwd))
+	env.Team, env.Policy = "proj_sl", hookruntest.Admitting(root)
+	statusLine(context.Background(), env, statusLineOptions{CaptureOnly: true})
+	evs := hookruntest.Spooled(t, sp)
+	if len(evs) != 1 || evs[0].Attrs[hookrun.AttrProjectID] != "proj_sl" || evs[0].Repo != filepath.Base(root) {
+		t.Fatalf("project: %+v", evs)
+	}
+	outside, _ := filepath.EvalSymlinks(t.TempDir())
+	for _, tc := range []struct{ dir, entry string }{{cwd, "github.com/acme/elsewhere"}, {outside, "github.com/acme/" + filepath.Base(outside)}} {
+		env.Stdin, env.Policy.Repositories = strings.NewReader(in(tc.dir)), []string{tc.entry}
+		env.Now = env.Now.Add(time.Hour)
+		statusLine(context.Background(), env, statusLineOptions{CaptureOnly: true})
+		if evs := hookruntest.Spooled(t, sp); len(evs) != 0 {
+			t.Fatalf("%s under %s recorded %+v", tc.dir, tc.entry, evs)
+		}
 	}
 }
 

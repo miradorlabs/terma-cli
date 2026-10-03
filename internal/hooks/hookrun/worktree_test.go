@@ -30,9 +30,7 @@ func TestWorktreeEventsReportTheMainRepositoryAndProject(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// A linked worktree is admitted by its own folder's name.
 	pol := hookruntest.Admitting(main)
-	pol.Folders = append(pol.Folders, "feature-x")
 	run := func(cwd, payload string, hook func(context.Context, Env) error) {
 		t.Helper()
 		if err := hook(ctx, Env{Now: time.Now(), Cwd: cwd, Policy: pol, Stdin: strings.NewReader(payload), Spool: sp, Version: "test", Team: "proj-main"}); err != nil {

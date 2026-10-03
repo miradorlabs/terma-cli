@@ -245,34 +245,32 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 	case !keys.has("", projectID) && !slices.ContainsFunc(reg.With[agents.RelayExporter](), func(e agents.RelayExporter) bool { return keys.has(e.Name(), projectID) }):
 		return Check{Status: Warn, Detail: "local relay on " + addr + " (" + state + "); no key for this team on this machine, so its sessions are dropped", Fix: "terma setup"}
 	}
-	return Check{Status: Pass, Detail: "through the local relay on " + addr + " (" + state + "); only the team's folders' sessions are forwarded"}
+	return Check{Status: Pass, Detail: "through the local relay on " + addr + " (" + state + "); only the team's repositories' sessions are forwarded"}
 }
 
-// NoFoldersStep is what a developer whose team lists no folders is told.
-const NoFoldersStep = "Nothing is collected until a team admin lists folders in Terma (Team settings → Data collection), or chooses Every folder."
+// NoRepositoriesStep is what a developer whose team lists no repositories is told.
+const NoRepositoriesStep = "Nothing is collected until a team admin lists repositories in Terma (Team settings → Data collection), or chooses Every folder."
 
-// FolderCheck says whether policy, the one hooks apply, collects the working copy at root.
-func FolderCheck(policy config.Policy, root, gitDir string, repoErr error) Check {
+// RepositoryCheck says whether policy, the one hooks apply, collects the working copy whose
+// git directory is gitDir, naming the origin terma sees.
+func RepositoryCheck(policy config.Policy, gitDir string, repoErr error) Check {
 	switch {
 	case repoErr != nil:
 		return Check{Status: Fail, Detail: repoErr.Error()}
 	case !policy.Validated():
 		return Check{Status: Warn, Detail: "no team collection policy on this machine, so nothing is recorded", Fix: "terma setup"}
 	case policy.AdmitsNone():
-		return Check{Status: Warn, Detail: "your team lists no folders, so nothing is recorded anywhere", Fix: NoFoldersStep}
+		return Check{Status: Warn, Detail: "your team lists no repositories, so nothing is recorded anywhere", Fix: NoRepositoriesStep}
+	case gitDir == "":
+		return Check{Status: Warn, Detail: "not a git repository, so nothing here is recorded"}
 	}
-	var id config.Repository
-	id.Names, id.Path = gitx.RepositoryFS(root, gitDir)
-	if len(id.Names) == 0 {
-		return Check{Status: Warn, Detail: output.TildePath(root) + " has no folder name the team's list could match (the home folder never counts), so nothing here is recorded"}
+	id := config.Repository{Origin: gitx.RepositoryFS(gitDir)}
+	switch {
+	case id.Origin == "":
+		return Check{Status: Warn, Detail: "no origin a team could list (none, or a local path), so nothing here is recorded"}
+	case policy.Admits(id):
+		return Check{Status: Pass, Detail: id.Origin + " is in the team's repositories"}
 	}
-	names := strings.Join(id.Names, ", ")
-	if id.Path != "" {
-		names += ", " + id.Path
-	}
-	if policy.Admits(id) {
-		return Check{Status: Pass, Detail: output.TildePath(root) + " is in the team's folders (" + names + ")"}
-	}
-	return Check{Status: Warn, Detail: "none of " + names + " is in the team's folders, so nothing here is recorded",
-		Fix: "ask your team to add " + cmp.Or(id.Path, id.Names[0]) + " to its folders in Terma"}
+	return Check{Status: Warn, Detail: id.Origin + " is not in the team's repositories, so nothing here is recorded",
+		Fix: "ask your team to add " + id.Origin + " in Terma (Team settings → Data collection)"}
 }

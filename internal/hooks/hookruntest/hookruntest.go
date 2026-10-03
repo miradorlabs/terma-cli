@@ -18,8 +18,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// InitRepo creates a git repository with a private terma config directory and returns its
-// resolved path. Git's global and system config are ignored, since a developer's global
+// InitRepo creates a git repository, origin github.com/acme/<its folder>, with a private
+// terma config directory and returns its resolved path. Git's global and system config are ignored, since a developer's global
 // core.hooksPath would run the installed terma's hooks inside the test.
 func InitRepo(t *testing.T) string {
 	t.Helper()
@@ -35,6 +35,7 @@ func InitRepo(t *testing.T) string {
 		{"config", "user.email", "dev@example.com"},
 		{"config", "user.name", "Dev"},
 		{"config", "commit.gpgsign", "false"},
+		{"remote", "add", "origin", "https://github.com/acme/" + filepath.Base(dir) + ".git"},
 	} {
 		if _, err := gitx.Git(context.Background(), dir, args...); err != nil {
 			t.Fatalf("git %v: %v", args, err)
@@ -83,10 +84,11 @@ func Spooled(t *testing.T, sp *spool.Spool) []spool.Event {
 // Team is the team the developer chose at setup in these tests.
 const Team = "project-a"
 
-// Admitting is a repository-mode policy, content on, that lists the folder root.
+// Admitting is a repository-mode policy, content on, that lists the repository InitRepo
+// made at root.
 func Admitting(root string) config.Policy {
 	p := config.DefaultPolicy()
-	p.Folders = []string{filepath.Base(root)}
+	p.Repositories = []string{"github.com/acme/" + filepath.Base(root)}
 	return p
 }
 

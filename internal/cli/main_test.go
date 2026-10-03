@@ -55,7 +55,7 @@ func runIsolated(m *testing.M) int {
 		"GEMINI_CLI_HOME":     home,
 		"GIT_CONFIG_NOSYSTEM": "1",
 		// Offline; policy integration tests clear this and use the real HTTP path.
-		"TERMA_POLICY_STUB": `{"mode":"repo","folders":["app"],"include_prompts":true,"include_tool_content":true}`,
+		"TERMA_POLICY_STUB": `{"mode":"repo","repositories":["github.com/acme/app"],"include_prompts":true,"include_tool_content":true}`,
 	} {
 		_ = os.Setenv(k, v)
 	}
@@ -63,14 +63,14 @@ func runIsolated(m *testing.M) int {
 }
 
 // newTestRelay is relay.New with the registered agents' telemetry shapes, as relay run has.
-// appFolder is the working copy the package's stub policy lists.
-var appFolder = config.Repository{Names: []string{"app"}}
+// appRepo is the working copy the package's stub policy lists.
+var appRepo = config.Repository{Origin: "github.com/acme/app"}
 
 // admitHere signs the profile into a validated repository-mode policy for team, listing
-// the folder root, as `terma setup` would leave it.
+// root's origin, github.com/acme/<root's folder>, as `terma setup` would leave it.
 func admitHere(t *testing.T, root, team string) {
 	t.Helper()
-	pol := config.Policy{Mode: config.ModeRepo, Folders: []string{filepath.Base(root)}, IncludePrompts: true, IncludeToolContent: true,
+	pol := config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/acme/" + filepath.Base(root)}, IncludePrompts: true, IncludeToolContent: true,
 		TeamID: team, Revision: 1, FetchedAt: time.Now()}
 	if err := config.UpdateProfile(config.DefaultProfile, func(p *config.Profile) { p.Policy = &pol }); err != nil {
 		t.Fatal(err)

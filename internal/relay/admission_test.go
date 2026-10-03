@@ -11,7 +11,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 )
 
-// A claimed session whose folder the team policy no longer lists sends nothing more.
+// A claimed session whose repository the team policy no longer lists sends nothing more.
 func TestAnUnadmittedClaimDropsItsRecords(t *testing.T) {
 	u := newUpstream(t)
 	r := newRelay(Options{Dir: t.TempDir(), Token: token,

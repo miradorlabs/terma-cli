@@ -55,7 +55,7 @@ func TestHooksClaimSessionsForTheRelay(t *testing.T) {
 func TestAnExpiredPolicyStillClaims(t *testing.T) {
 	root := initRepo(t)
 	hookruntest.RelayOn(t)
-	expired := config.Policy{Mode: config.ModeRepo, Folders: []string{filepath.Base(root)}, TeamID: "project-a", Revision: 1, FetchedAt: time.Now().Add(-config.MaxPolicyAge - time.Hour)}
+	expired := config.Policy{Mode: config.ModeRepo, Repositories: hookruntest.Admitting(root).Repositories, TeamID: "project-a", Revision: 1, FetchedAt: time.Now().Add(-config.MaxPolicyAge - time.Hour)}
 	if err := routing.SavePolicy(expired); err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +123,7 @@ func TestNoClaimWithoutATeamOrRelay(t *testing.T) {
 func TestGlobalModeClaimsEverySession(t *testing.T) {
 	global := config.Policy{Mode: config.ModeGlobal, DefaultProjectID: "p-default"}
 	known := initRepo(t)
-	if _, err := gitx.Git(context.Background(), known, "remote", "add", "origin", "git@github.com:org/app.git"); err != nil {
+	if _, err := gitx.Git(context.Background(), known, "remote", "set-url", "origin", "git@github.com:org/app.git"); err != nil {
 		t.Fatal(err)
 	}
 	unknown := initRepo(t)

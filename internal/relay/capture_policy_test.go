@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"path"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -79,10 +80,10 @@ func TestQueuedExportsRespectSignalAndCoverageChanges(t *testing.T) {
 	}
 }
 
-// A part queued in a folder the team policy has since dropped is dropped; one still listed is sent.
+// A part queued in a repository the team policy has since dropped is dropped; one still listed is sent.
 func TestQueuedExportsRecheckTheRepository(t *testing.T) {
-	removed := config.Repository{Names: []string{"removed"}, Path: "acme/removed"}
-	kept := config.Repository{Names: []string{"kept"}, Path: "acme/kept"}
+	removed := config.Repository{Origin: "github.com/acme/removed"}
+	kept := config.Repository{Origin: "github.com/acme/kept"}
 	var got atomic.Value
 	host := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
 		b, _ := io.ReadAll(req.Body)
@@ -90,13 +91,13 @@ func TestQueuedExportsRecheckTheRepository(t *testing.T) {
 	}))
 	defer host.Close()
 	r := newRelay(Options{Dir: t.TempDir(), Resolve: func(c claim.Claim) (Policy, error) {
-		if c.Repository.Equal(config.Repository{}) {
+		if c.Repository == (config.Repository{}) {
 			t.Error("the sender resolved a queued part without its repository")
 		}
-		return Policy{Endpoint: host.URL, Key: "key", Unadmitted: !c.Repository.Equal(kept)}, nil
+		return Policy{Endpoint: host.URL, Key: "key", Unadmitted: c.Repository != kept}, nil
 	}})
 	for _, repo := range []config.Repository{removed, kept} {
-		body, err := proto.Marshal(logsOf("session-"+repo.Names[0], 1))
+		body, err := proto.Marshal(logsOf("session-"+path.Base(repo.Origin), 1))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -114,10 +115,10 @@ func TestQueuedExportsRecheckTheRepository(t *testing.T) {
 		return c["dropped.policy_repository.logs"] == 1 && c["forwarded.logs"] == 1
 	})
 	if body, _ := got.Load().(string); !strings.Contains(body, "session-kept") || strings.Contains(body, "session-removed") {
-		t.Fatalf("upstream got %q, want only the kept folder's part", body)
+		t.Fatalf("upstream got %q, want only the kept repository's part", body)
 	}
 	if entries, _ := r.outbox.list(routeOf(claim.Claim{ProjectID: "team", Tool: "codex", Repository: removed})); len(entries) != 0 {
-		t.Fatalf("the removed folder's part stayed queued: %v", entries)
+		t.Fatalf("the removed repository's part stayed queued: %v", entries)
 	}
 }
 

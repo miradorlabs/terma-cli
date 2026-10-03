@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -35,51 +34,45 @@ func namedRepo(t *testing.T, name, remote string) string {
 }
 
 func listing(entries ...string) config.Policy {
-	return config.Policy{Mode: config.ModeRepo, Folders: entries}
+	p := config.DefaultPolicy()
+	p.Repositories = entries
+	return p
 }
 
-// A git checkout is admitted by its folder or origin's repository name, an owner/name
-// entry only by origin's.
-
-func TestAdmissionByFolderOrOrigin(t *testing.T) {
+// A checkout is admitted by origin alone, in any of git's URL forms, whatever its folder.
+func TestAdmissionByOrigin(t *testing.T) {
 	initRepo(t)
+	pol := listing("github.com/miradorlabs/mirador-platform")
 	for _, tc := range []struct {
 		folder, remote string
-		pol            config.Policy
 		want           bool
 	}{
-		{"checkout-a", "git@github.com:miradorlabs/mirador-platform.git", listing("mirador-platform"), true},
-		{"checkout-a", "https://github.com/miradorlabs/mirador-platform", listing("MiradorLabs/Mirador-Platform"), true},
-		{"checkout-a", "ssh://git@github.com/miradorlabs/mirador-platform.git", listing("checkout-a"), true},
-		{"mirador-platform", "git@github.com:acme/other.git", listing("mirador-platform"), true},
-		{"mirador-platform", "git@github.com:acme/other.git", listing("acme/other"), true},
-		{"mirador-platform", "git@github.com:acme/other.git", listing("acme/mirador-platform"), false},
-		{"sales", "", listing("sales"), true},
-		{"sales", "", listing("acme/sales"), false},
-		{"sales", "", listing("web"), false},
+		{"mirador-platform", "git@github.com:miradorlabs/mirador-platform.git", true},
+		{"checkout-a", "https://github.com/MiradorLabs/Mirador-Platform", true},
+		{"checkout-b", "ssh://git@GitHub.com:22/miradorlabs/mirador-platform.git/", true},
+		{"mirador-platform", "git@github.com:someone/mirador-platform.git", false},
+		{"mirador-platform", "git@gitlab.com:miradorlabs/mirador-platform.git", false},
+		{"mirador-platform", "", false},
+		{"mirador-platform", "/srv/git/miradorlabs/mirador-platform.git", false},
 	} {
 		root := namedRepo(t, tc.folder, tc.remote)
-		_, err := Env{Cwd: root, Policy: tc.pol, Team: "t1"}.Repo(t.Context())
+		_, err := Env{Cwd: root, Policy: pol, Team: "t1"}.Repo(t.Context())
 		if got := err == nil; got != tc.want {
-			t.Errorf("%s (%s) under %v: admitted %v, err %v", tc.folder, tc.remote, tc.pol.Folders, got, err)
+			t.Errorf("%s (%s): admitted %v, err %v", tc.folder, tc.remote, got, err)
 		}
 	}
 }
 
-// Outside Git a folder is admitted by its name or any parent's below the home directory.
-func TestAdmissionOutsideGitWalksUpTheFolders(t *testing.T) {
+// Outside git nothing is admitted, whatever the folder is called.
+func TestAdmissionOutsideGit(t *testing.T) {
 	initRepo(t)
-	home, _ := filepath.EvalSymlinks(t.TempDir())
-	t.Setenv("HOME", home)
-	t.Setenv("USERPROFILE", home)
-	dir := filepath.Join(home, "clients", "acme", "notes")
+	parent, _ := filepath.EvalSymlinks(t.TempDir())
+	dir := filepath.Join(parent, "mirador-platform")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	for entry, want := range map[string]bool{"notes": true, "acme": true, "clients": true, filepath.Base(home): false, "other": false} {
-		if _, err := (Env{Cwd: dir, Policy: listing(entry), Team: "t1"}).Repo(t.Context()); (err == nil) != want {
-			t.Errorf("entry %q: err %v, want admitted %v", entry, err, want)
-		}
+	if _, err := (Env{Cwd: dir, Policy: listing("github.com/miradorlabs/mirador-platform"), Team: "t1"}).Repo(t.Context()); err == nil {
+		t.Fatal("a folder outside git was admitted")
 	}
 }
 
@@ -91,7 +84,7 @@ func TestAHookOutsideTheListWritesNothing(t *testing.T) {
 	hookruntest.RelayOn(t)
 	sp, _ := spool.Open(t.TempDir())
 	env := func(stdin string, args ...string) Env {
-		return Env{Now: time.Now(), Cwd: root, Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Team: "t1", Policy: listing("work")}
+		return Env{Now: time.Now(), Cwd: root, Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Team: "t1", Policy: listing("github.com/acme/work")}
 	}
 	ctx := t.Context()
 	if err := startSession(ctx, env(`{"session_id":"s1","cwd":"`+hookruntest.InJSON(root)+`"}`)); err != nil {
@@ -131,7 +124,7 @@ func TestAHookOutsideTheListWritesNothing(t *testing.T) {
 }
 
 // A session started in a subdirectory, or in a linked worktree whose .git is a file, is
-// its checkout's, admitted by origin's repository name or the main checkout's folder.
+// its checkout's, admitted by the origin the worktree reads from its main repository.
 func TestASubdirectorySessionIsItsCheckouts(t *testing.T) {
 	initRepo(t)
 	main := namedRepo(t, "checkout-a", "git@github.com:miradorlabs/mirador-platform.git")
@@ -144,22 +137,18 @@ func TestASubdirectorySessionIsItsCheckouts(t *testing.T) {
 		t.Fatal(err)
 	}
 	hookruntest.RelayOn(t)
-	// A linked worktree is also named by its main checkout's folder.
-	if _, err := (Env{Cwd: wt, Policy: listing("checkout-a"), Team: "t1"}).Repo(ctx); err != nil {
-		t.Fatalf("the main checkout's folder name did not admit its linked worktree: %v", err)
-	}
 	for i, cwd := range []string{filepath.Join(main, "src", "pkg"), filepath.Join(wt, "docs")} {
 		if err := os.MkdirAll(cwd, 0o755); err != nil {
 			t.Fatal(err)
 		}
 		sid := []string{"from-subdir", "from-worktree"}[i]
-		env := Env{Now: time.Now(), Cwd: cwd, Team: "t1", Policy: listing("mirador-platform"),
+		env := Env{Now: time.Now(), Cwd: cwd, Team: "t1", Policy: listing("github.com/miradorlabs/mirador-platform"),
 			Stdin: strings.NewReader(`{"session_id":"` + sid + `","cwd":"` + hookruntest.InJSON(cwd) + `"}`)}
 		if err := startSession(ctx, env); err != nil {
 			t.Fatal(err)
 		}
 		c, ok := claim.Read(sid, time.Now())
-		if !ok || !slices.Contains(c.Repository.Names, "mirador-platform") || c.Repository.Path != "miradorlabs/mirador-platform" || c.Repo != "checkout-a" {
+		if !ok || c.Repository.Origin != "github.com/miradorlabs/mirador-platform" || c.Repo != "checkout-a" {
 			t.Errorf("%s: claim %+v, %v", sid, c, ok)
 		}
 	}
@@ -173,7 +162,7 @@ func TestATurnInAnUnlistedRepositoryWithdrawsTheClaim(t *testing.T) {
 	work := namedRepo(t, "work", "git@github.com:acme/work.git")
 	personal := namedRepo(t, "personal", "git@github.com:me/personal.git")
 	hookruntest.RelayOn(t)
-	pol := listing("work")
+	pol := listing("github.com/acme/work")
 	ctx := t.Context()
 	at := time.Now()
 	if !ClaimFromPayload(ctx, Env{Now: at, Cwd: work, Team: "t1", Policy: pol}, PayloadSession{ID: "thread", Cwd: work}, "codex") {

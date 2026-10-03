@@ -215,7 +215,7 @@ func Write(sessionID string, c Claim, now time.Time) bool {
 }
 
 func samePlace(prev, c Claim) bool {
-	return prev.ProjectID == c.ProjectID && prev.Repository.Equal(c.Repository)
+	return prev.ProjectID == c.ProjectID && prev.Repository == c.Repository
 }
 
 func subset(a, b []int) bool {

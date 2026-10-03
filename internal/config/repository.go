@@ -5,48 +5,44 @@ import (
 	"strings"
 )
 
-// Repository is how a working copy is named for admission: the folder names and origin's
-// repository name a folder entry may equal, and origin's owner/name.
+// Repository is how admission names a working copy: its origin remote as `host/path`
+// (gitx.RepositoryID), "" outside git or without a hosted origin.
 type Repository struct {
-	Names []string `json:"names,omitempty"`
-	Path  string   `json:"path,omitempty"`
+	Origin string `json:"origin,omitempty"`
 }
 
 // Admits reports whether p collects the sessions and commits of r: every one in global
-// mode, else those its folder list names. An entry with a slash matches origin's
-// owner/name; one without equals any of r's names, ignoring case: the git root's folder
-// name (for a linked worktree, also its main checkout's folder name) or the origin
-// remote's repository name.
+// mode, else those in a repository its list names.
+//
+// Each entry is a repository as `host/owner/name`, e.g. `github.com/miradorlabs/mirador-platform`.
+// The CLI admits a session only inside a git working copy whose `origin` remote, normalised,
+// equals an entry ignoring case: host lowercased without port or credentials, path with
+// `.git` and any trailing slash stripped, from scp (`git@host:path`), `https://`, `ssh://`
+// and `git://` forms. A linked worktree reads `origin` from its main repository. A folder
+// outside git, a repository with no `origin`, or an `origin` that is a local path or
+// `file://` URL is never admitted. An entry has a host and at least two path segments, none
+// empty; a longer path matches a longer `origin` path exactly (GitLab subgroups). An empty
+// list admits nothing.
 func (p Policy) Admits(r Repository) bool {
 	if p.Global() {
 		return true
 	}
-	for _, entry := range p.Folders {
-		entry = strings.Trim(strings.TrimSpace(entry), "/")
-		if entry == "" {
-			continue
-		}
-		if strings.Contains(entry, "/") {
-			if strings.EqualFold(entry, r.Path) {
-				return true
-			}
-		} else if slices.ContainsFunc(r.Names, func(n string) bool { return strings.EqualFold(entry, n) }) {
-			return true
-		}
-	}
-	return false
+	return r.Origin != "" && slices.ContainsFunc(p.Repositories, func(e string) bool {
+		return validEntry(e) && strings.EqualFold(strings.TrimSpace(e), r.Origin)
+	})
 }
 
-// AdmitsNone reports whether p admits no folder at all: not validated, or repository mode
-// with an empty list.
+// AdmitsNone reports whether p admits no repository at all: not validated, or repository
+// mode with no usable entry.
 func (p Policy) AdmitsNone() bool {
 	if !p.Validated() {
 		return true
 	}
-	return !p.Global() && !slices.ContainsFunc(p.Folders, func(f string) bool { return strings.Trim(strings.TrimSpace(f), "/") != "" })
+	return !p.Global() && !slices.ContainsFunc(p.Repositories, validEntry)
 }
 
-// Equal reports whether r and o name the same working copy.
-func (r Repository) Equal(o Repository) bool {
-	return r.Path == o.Path && slices.Equal(r.Names, o.Names)
+// validEntry is a host and at least two path segments, none empty.
+func validEntry(e string) bool {
+	parts := strings.Split(strings.TrimSpace(e), "/")
+	return len(parts) >= 3 && !slices.Contains(parts, "")
 }
