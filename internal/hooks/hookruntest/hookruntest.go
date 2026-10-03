@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
@@ -67,6 +68,10 @@ func ReadFile(t *testing.T, root, rel string) string {
 	return string(data)
 }
 
+// spooledAsOf is when Spooled flushes: before every fixture's date, so none has expired
+// (spool.MaxAge) however long ago its transcript was recorded.
+var spooledAsOf = time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+
 // Spooled flushes the spool and returns every event in it, in order.
 func Spooled(t *testing.T, sp *spool.Spool) []spool.Event {
 	t.Helper()
@@ -74,7 +79,7 @@ func Spooled(t *testing.T, sp *spool.Spool) []spool.Event {
 	res := sp.Flush(context.Background(), spool.SenderFunc(func(_ context.Context, events []spool.Event) ([]spool.Event, error) {
 		out = append(out, events...)
 		return nil, nil
-	}), spool.FlushOptions{Force: true})
+	}), spool.FlushOptions{Force: true, Now: spooledAsOf})
 	if res.Err != nil {
 		t.Fatalf("flush: %v", res.Err)
 	}
