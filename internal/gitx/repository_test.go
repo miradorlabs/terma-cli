@@ -20,6 +20,7 @@ func TestRepositoryFS(t *testing.T) {
 		{"ssh scheme", "[remote \"origin\"]\n\turl = ssh://git@gitlab.example.com:2222/group/sub/app.git\n", []string{"checkout", "app"}, "group/sub/app"},
 		{"only origin counts", "[remote \"fork\"]\n\turl = git@github.com:me/fork.git\n", []string{"checkout"}, ""},
 		{"no remote", "[core]\n\tbare = false\n", []string{"checkout"}, ""},
+		{"origin named like the folder", "[remote \"origin\"]\n\turl = git@github.com:o/Checkout.git\n", []string{"checkout"}, "o/Checkout"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root := filepath.Join(t.TempDir(), "checkout")

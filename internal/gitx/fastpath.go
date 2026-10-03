@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -150,12 +151,12 @@ func HooksPathFS(gitDir string) (local, worktree string) {
 // checkout, its root's folder (a linked worktree's own) and origin's repository name, read
 // from the main repository's config, with a hosted origin's owner/name as path; outside
 // Git, root's folder and every parent's, stopping before the home directory, which never
-// counts, or the volume root.
+// counts, or the volume root. A name already listed, ignoring case, is not repeated.
 func RepositoryFS(root, gitDir string) (names []string, path string) {
 	if gitDir == "" {
 		home, _ := os.UserHomeDir()
 		for dir := filepath.Clean(root); !strings.EqualFold(dir, filepath.Clean(home)) && dir != filepath.Dir(dir); dir = filepath.Dir(dir) {
-			names = append(names, filepath.Base(dir))
+			names = appendName(names, filepath.Base(dir))
 		}
 		return names, ""
 	}
@@ -173,9 +174,16 @@ func RepositoryFS(root, gitDir string) (names []string, path string) {
 		name = strings.TrimSuffix(local[strings.LastIndexAny(local, `/\`)+1:], ".git")
 	}
 	if name != "" {
-		names = append(names, name)
+		names = appendName(names, name)
 	}
 	return names, path
+}
+
+func appendName(names []string, name string) []string {
+	if slices.ContainsFunc(names, func(n string) bool { return strings.EqualFold(n, name) }) {
+		return names
+	}
+	return append(names, name)
 }
 
 func globalConfigPaths() []string {
