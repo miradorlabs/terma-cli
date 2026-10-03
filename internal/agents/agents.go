@@ -20,7 +20,7 @@ type Agent interface {
 	// HooksPath is the committed hooks file, relative to the repository root, or ""
 	// for an agent whose hooks are user-scope.
 	HooksPath() string
-	// Default reports whether a plain `terma install` wires this agent in root.
+	// Default reports whether this agent's hooks belong in root unasked.
 	Default(root string) bool
 	Plan(root string, install bool) (hookmgr.Plan, error)
 	Events() map[string]Handler

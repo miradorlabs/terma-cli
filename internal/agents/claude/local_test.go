@@ -341,8 +341,8 @@ func TestGlobalConflictsNameTermaOwnedLocalLayer(t *testing.T) {
 	if c == nil || !c.Advisory {
 		t.Fatalf("expected an advisory for the repository policy, got %+v", conflicts)
 	}
-	if !strings.Contains(c.Reason, "earlier terma") || !strings.Contains(c.Reason, "`terma install` here") {
-		t.Errorf("reason = %q, want it to name the earlier terma and the command", c.Reason)
+	if !strings.Contains(c.Reason, "earlier terma") || !strings.Contains(c.Reason, "remove it from that file") {
+		t.Errorf("reason = %q, want it to name the earlier terma and the remedy", c.Reason)
 	}
 	if blocking := unclearableKeys(conflicts); len(blocking) != 0 {
 		t.Errorf("a Terma-written local layer must never block the global connect: %v", blocking)

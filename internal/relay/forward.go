@@ -25,7 +25,7 @@ const (
 	minBackoff    = time.Second
 	maxBackoff    = 2 * time.Minute
 	maxRetryAfter = 10 * time.Minute
-	// A refused key is not fixed by asking again soon: `terma install` stores a new one.
+	// A refused key is not fixed by asking again soon: `terma setup` stores a new one.
 	refusedBackoff    = 5 * time.Minute
 	maxRefusedBackoff = time.Hour
 	keylessRetry      = time.Minute

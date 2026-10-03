@@ -15,7 +15,7 @@ import (
 // primaryCommands is terma's whole surface (MIR-80): what `terma --help` lists, and the
 // only commands a message may tell someone to run. Each is safe to run again.
 var primaryCommands = []string{
-	"doctor", "install", "setup", "teardown", "uninstall", "update",
+	"doctor", "setup", "teardown", "update",
 }
 
 // advancedCommands are hidden: other programs run them (hook, relay, spool, version),

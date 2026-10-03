@@ -26,7 +26,7 @@ func TestRelayCheckJudgesTheRelayItself(t *testing.T) {
 		status Status
 		want   string
 	}{
-		{name: "healthy", relay: func(*Relay) {}, env: "dev", status: Pass, want: "only this repository's sessions are forwarded"},
+		{name: "healthy", relay: func(*Relay) {}, env: "dev", status: Pass, want: "only the team's folders' sessions are forwarded"},
 		{name: "another environment: everything is dropped", relay: func(r *Relay) { r.Environment = "prod" }, env: "dev",
 			status: Fail, want: "delivers to the prod environment, not this profile's dev"},
 		{name: "environment unknown (an earlier terma's relay)", relay: func(r *Relay) { r.Environment = "" }, env: "dev", status: Pass},
@@ -48,8 +48,8 @@ func TestRelayCheckJudgesTheRelayItself(t *testing.T) {
 			if c.Status != tc.status || !strings.Contains(c.Detail, tc.want) {
 				t.Fatalf("RelayCheck = %+v, want %v containing %q", c, tc.status, tc.want)
 			}
-			if c.Status != Pass && c.Fix != "terma install" {
-				t.Fatalf("fix = %q, want terma install, which replaces the relay and rewrites its service", c.Fix)
+			if c.Status != Pass && c.Fix != "terma setup" {
+				t.Fatalf("fix = %q, want terma setup, which replaces the relay and rewrites its service", c.Fix)
 			}
 		})
 	}

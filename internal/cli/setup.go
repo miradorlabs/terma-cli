@@ -60,22 +60,22 @@ func (app *App) newSetupCommand() *cobra.Command {
 		Use: "setup",
 		// login was its own command; onboarding emails already sent say `terma login`.
 		Aliases: []string{"login"},
-		Short:   "Sign in and choose your coding agents (once per developer)",
+		Short:   "Sign in, choose your team and coding agents, and write machine-wide hooks",
 		Long: `Gets this machine ready to use terma, once per developer:
 
   1. Signs you in (a browser handoff; --no-browser prints the URL instead).
-  2. Records which coding agents you work with (an agent's CLI and desktop app
-     separately).
-  3. Fetches your organization's collection policy.
+  2. Records which coding agents you work with.
+  3. Chooses your team (--team names it) and fetches its collection policy, which
+     lists the folders it collects.
   4. Points those agents' telemetry at terma's local relay, and runs the relay in
-     the background (--relay-service off: started on demand instead). Only sessions
-     allowed by the selected team's collection policy leave this machine.
+     the background (--relay-service off: started on demand instead).
+  5. Writes the agents' machine-wide hooks and git's global core.hooksPath, so a
+     session or commit in a folder the policy lists is recorded for your team,
+     and nothing anywhere else. Nothing is written into a repository.
 
-A repository your organization connected in Terma needs nothing more: its committed
-hooks claim its sessions. ` + "`terma install`" + ` connects a repository from here instead.
-
-Run it again any time: it reuses a working sign-in, --org switches organization, and
---relay-addr moves the relay off a port another program holds.`,
+Run it again any time: it reuses a working sign-in, --team switches team, --org
+switches organization, and --relay-addr moves the relay off a port another program
+holds.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error { return app.runSetup(cmd, f) },
 	}
@@ -125,7 +125,7 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 		}
 	}
 
-	ui := newInstallUI(out, f.verbose)
+	ui := newSetupUI(out, f.verbose)
 	ui.title, ui.warnTitle = "Setup complete", "Almost done — finish the steps marked ! below"
 	recorded := false
 	team := ""
@@ -199,8 +199,12 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 			}
 		},
 		MachineHooks: func(ctx context.Context, names []string) error {
-			return app.globalMode().Apply(ctx, names, func(what string) { ui.OK("Machine", what) },
+			err := app.globalMode().Apply(ctx, names, func(what string) { ui.OK("Machine", what) },
 				func(what string) { ui.Summary("Machine", what) }, ui.Then)
+			if err == nil {
+				app.setupStatusLine(cmd.ErrOrStderr(), ui, names)
+			}
+			return err
 		},
 		CheckIn: func(ctx context.Context) {
 			if ok, what := daemon.CheckIn(ctx); ok {

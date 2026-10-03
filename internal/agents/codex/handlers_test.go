@@ -11,7 +11,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
-	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -19,9 +18,6 @@ func TestCodexSessionStartAnnouncesSession(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	const id = "01a0d0ff-0000-7000-8000-000000000003"
-	if err := project.Save(root, &project.File{Project: project.Project{ID: "project-a"}}); err != nil {
-		t.Fatal(err)
-	}
 	env := hookrun.Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Stdin: strings.NewReader(`{"session_id":"` + id + `","cwd":"` + root + `"}`)}
 	if err := sessionStart(context.Background(), env); err != nil {
 		t.Fatal(err)

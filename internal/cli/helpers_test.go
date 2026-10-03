@@ -43,3 +43,22 @@ func fakeClaudeOnPath(t *testing.T) {
 	}
 	t.Setenv("PATH", dir)
 }
+
+const testProjectID = "770e8400-e29b-41d4-a716-446655440000"
+
+// gitRepo is a fresh git repository, the working directory, with Terma's directory and
+// Claude's sandboxed.
+func gitRepo(t *testing.T) string {
+	t.Helper()
+	repo := t.TempDir()
+	for _, args := range [][]string{{"init", "-q", repo}, {"-C", repo, "config", "user.email", "dev@example.com"}, {"-C", repo, "config", "user.name", "Dev"}} {
+		if out, err := exec.Command("git", args...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
+	t.Chdir(repo)
+	realDir, _ := filepath.EvalSymlinks(repo)
+	return realDir
+}

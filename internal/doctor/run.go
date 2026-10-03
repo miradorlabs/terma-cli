@@ -11,7 +11,6 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
-	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 )
 
@@ -140,7 +139,7 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 	}
 
 	timed(KeyBinary, "terma on PATH", func() Check {
-		return BinaryCheck(env.Exe, env.BinDirs, HookCallerFor(env.Root, env.GitDir, env.RepoErr))
+		return BinaryCheck(env.Exe, env.BinDirs)
 	})
 
 	if c, ok := stateCheck(); ok {
@@ -156,28 +155,20 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 	timed(KeyAuth, "signed in", d.signedIn)
 
 	d.nonGit = env.RepoErr == nil && env.GitDir == ""
-	timed(KeyProject, "repository bound", func() Check {
-		c, bound := RepositoryCheck(env.Root, env.GitDir, env.RepoErr)
-		d.bound = bound
-		if bound == nil && env.RepoErr == nil && cfg.Policy.Global() {
-			return Check{Status: Pass, Detail: "not bound, which global mode does not need: " + GlobalDestination(cfg)}
+	timed(KeyProject, "folder collected", func() Check {
+		if env.RepoErr == nil && cfg.Policy.Global() {
+			return Check{Status: Pass, Detail: "every folder, in global mode: " + GlobalDestination(cfg)}
 		}
+		c := FolderCheck(cfg.Policy, env.Root, env.GitDir, env.RepoErr)
+		d.admitted = c.Status == Pass
 		return c
 	})
-	d.projectID = cfg.ProjectID
-	if d.bound != nil {
-		d.projectID = d.bound.Project.ID
-	}
+	d.projectID = cmp.Or(cfg.ProjectID, cfg.Policy.TeamID)
 
-	timed(KeyHooks, "commit hooks installed", d.commitHooks)
+	timed(KeyHooks, "commit hooks in effect", d.commitHooks)
 
-	// A fraction, not a verdict: one agent that cannot run its hooks costs only its own commits.
-	timed(KeyAgentHooks, "agent hooks run", d.agentHooks)
-
-	if cfg.Policy.Global() {
-		if c, ok := UserHooksCheck(env.Agents, cfg.Harnesses); ok {
-			timed(KeyUserHooks, "machine-wide hooks run", func() Check { return c })
-		}
+	if c, ok := UserHooksCheck(env.Agents, cfg.Harnesses); ok {
+		timed(KeyUserHooks, "machine-wide hooks run", func() Check { return c })
 	}
 
 	timed(KeyHarness, "agent exporting to Terma", d.agentsExporting)
@@ -200,12 +191,9 @@ type run struct {
 	env       Env
 	cfg       *config.Config
 	nonGit    bool
-	bound     *termaproject.File
+	admitted  bool
 	projectID string
 }
-
-// installed reports whether the CLI stands in a repository `terma install` has bound.
-func (d *run) installed() bool { return d.env.RepoErr == nil && d.bound != nil }
 
 func (d *run) signedIn() Check {
 	cfg := d.cfg
@@ -243,19 +231,9 @@ func (d *run) commitHooks() Check {
 		return Check{Status: Skip, Detail: "not a Git repository"}
 	}
 	if d.env.RepoErr != nil {
-		return Check{Status: Skip, Detail: "needs an installed repository"}
+		return Check{Status: Skip, Detail: "not inside a repository"}
 	}
-	if !d.installed() {
-		return UnboundHooksCheck(JudgeHooksPath(d.ctx, d.env.Root), d.cfg.Policy.Global())
-	}
-	return HooksCheck(JudgeHookWiring(d.ctx, d.env.Root, d.bound))
-}
-
-func (d *run) agentHooks() Check {
-	if !d.installed() {
-		return Check{Status: Skip, Detail: "needs an installed repository"}
-	}
-	return AgentHooksCheck(d.env.Agents, d.env.Root, d.cfg.Harnesses)
+	return HooksPathCheck(JudgeHooksPath(d.ctx, d.env.Root))
 }
 
 func (d *run) agentsExporting() Check {
@@ -263,7 +241,7 @@ func (d *run) agentsExporting() Check {
 		return RelayCheck(d.env.Agents, d.env.Probes.Relay(), d.env.Probes.Keys, d.projectID, d.cfg.Environment, d.cfg.Harnesses)
 	}
 	verdicts := JudgeHarnesses(d.ctx, d.env.Agents, d.cfg.OTLPURL, d.projectID, d.env.Root)
-	return HarnessCheck(d.env.Agents, verdicts, d.cfg.OTLPURL, d.projectID, d.installed())
+	return HarnessCheck(d.env.Agents, verdicts, d.cfg.OTLPURL, d.projectID, d.admitted)
 }
 
 func (d *run) statusLine() Check {
@@ -285,11 +263,7 @@ func (d *run) eventSpool() Check {
 		return Check{Status: Fail, Detail: "events cannot be written to the spool: " + s.WriteErr.Error(), Fix: "check permissions and free space on the config directory"}
 	}
 	if d.projectID != "" && !d.env.Probes.Keys.has("", d.projectID) {
-		name := d.cfg.ProjectName
-		if d.bound != nil {
-			name = d.bound.Project.Name
-		}
-		return Check{Status: Fail, Detail: fmt.Sprintf("%d queued; no team key stored for %s", n, cmp.Or(name, d.projectID)), Fix: "terma install"}
+		return Check{Status: Fail, Detail: fmt.Sprintf("%d queued; no team key stored for %s", n, cmp.Or(d.cfg.ProjectName, d.projectID)), Fix: "terma setup"}
 	}
 	return Check{Status: Pass, Detail: fmt.Sprintf("%d queued, spool writable", n)}
 }
@@ -297,11 +271,11 @@ func (d *run) eventSpool() Check {
 // BackendCheck flushes every project's queued events; a flush the backend accepts is the proof.
 func BackendCheck(ctx context.Context, p Probes, projectID string) Check {
 	if projectID != "" && !p.Keys.has("", projectID) {
-		return Check{Status: Skip, Detail: "no team key on this machine; nothing can be delivered", Fix: "terma install"}
+		return Check{Status: Skip, Detail: "no team key on this machine; nothing can be delivered", Fix: "terma setup"}
 	}
 	res, err := p.Deliver(ctx)
 	if err != nil {
-		return Check{Status: Fail, Detail: err.Error(), Fix: "terma install"}
+		return Check{Status: Fail, Detail: err.Error(), Fix: "terma setup"}
 	}
 	// Another project's refusal says nothing about this repository, so it only warns; this
 	// project's, or a failure no project owns (a lock, the deadline), fails.

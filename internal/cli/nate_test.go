@@ -83,15 +83,12 @@ func TestNateRemovesMachineStateAndBinaryButNotTheRepository(t *testing.T) {
 			t.Errorf("%s survived nate: %v", path, err)
 		}
 	}
-	// The binding is a committed file; nate must not touch the repository it ran in.
+	// nate must not touch the repository it ran in.
 	if _, err := os.Stat(filepath.Join(workspace, ".terma", "settings.json")); err != nil {
-		t.Errorf("nate removed the repository's binding: %v", err)
+		t.Errorf("nate removed a file in the repository: %v", err)
 	}
 	if !strings.Contains(out, "Terma has been removed") {
 		t.Fatalf("missing completion message:\n%s", out)
-	}
-	if !strings.Contains(out, "`terma uninstall`") {
-		t.Fatalf("completion message does not point at `terma uninstall`:\n%s", out)
 	}
 }
 

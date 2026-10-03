@@ -54,11 +54,8 @@ func (app *App) hookDeps() dispatch.Deps {
 		Agents:  app.agents,
 		Profile: hookProfile,
 		Spool:   openSpool,
-		Claimed: func(ctx context.Context, cwd string) {
-			daemon.Spawn()
-			wireCloneOnFirstUse(ctx, cwd)
-		},
-		Flush: spawnFlush,
+		Claimed: func(context.Context, string) { daemon.Spawn() },
+		Flush:   spawnFlush,
 	}
 }
 

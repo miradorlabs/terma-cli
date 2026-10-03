@@ -82,11 +82,6 @@ func newTestRelay(o relay.Options) *relay.Relay {
 	return relay.New(o)
 }
 
-func hooksPathOf(name string) string {
-	a, _ := testApp.agents.Lookup(name)
-	return a.HooksPath()
-}
-
 func harnessOf(t *testing.T, name string) harness.Harness {
 	t.Helper()
 	h, err := testApp.agents.Harness(name)

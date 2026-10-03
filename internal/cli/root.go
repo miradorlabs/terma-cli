@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -22,7 +23,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/api"
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/migrate"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
@@ -48,15 +48,12 @@ func (app *App) NewRootCommand() *cobra.Command {
 		Short: "Attribute AI coding spend to the sessions, files, and commits that produced it",
 		Long: `terma connects your coding agents to Terma and stamps the commits they produce.
 
-  terma setup      once per developer: signs you in, records your coding agents and
-                   points them at terma's local relay. Run it again to switch
-                   organization (--org) or repair the machine.
-  terma install    in each repository: binds it to a Terma team and wires the commit
-                   and agent hooks. A colleague who clones an onboarded repository
-                   runs it too.
+  terma setup      once per developer: signs you in, chooses your team and coding
+                   agents, and writes machine-wide hooks. Your team's policy lists
+                   the folders it collects; nothing is written into a repository.
+                   Run it again to switch team or organization, or repair the machine.
   terma doctor     verifies the whole chain end to end; every failure names its fix.
   terma update     installs the latest release and refreshes what terma installed.
-  terma uninstall  removes terma from the current repository.
   terma teardown   undoes setup on this machine (--sign-out also signs out).
 
 Every command is safe to run again.`,
@@ -82,13 +79,11 @@ Every command is safe to run again.`,
 	for _, name := range []string{"env", "api-url", "auth-url", "app-url", "otlp-url"} {
 		_ = pf.MarkHidden(name)
 	}
-	pf.StringVarP(&app.flags.projectID, "team", "t", "", "team override for this command (default: current repository's binding)")
+	pf.StringVarP(&app.flags.projectID, "team", "t", "", "team override for this command (default: the team chosen at setup)")
 	pf.StringVarP(&app.flags.output, "output", "o", "", "output format: table, json, yaml, csv")
 
 	root.AddCommand(
 		app.newSetupCommand(),
-		app.newInstallCommand(),
-		app.newUninstallCommand(),
 		app.newDoctorCommand(),
 		app.newUpdateCommand(),
 		app.newTeardownCommand(),
@@ -274,50 +269,12 @@ func (app *App) loadProjectConfig() (*config.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := resolveRepoProject(cfg); err != nil {
-		return nil, err
-	}
+	cfg.ProjectID = cmp.Or(cfg.ProjectID, cfg.Policy.TeamID)
 	return cfg, nil
-}
-
-// resolveRepoProject supplies the repository's binding unless a flag or env var gave a
-// project; a nested checkout never inherits its parent's.
-func resolveRepoProject(cfg *config.Config) error {
-	if cfg.ProjectID != "" {
-		return nil
-	}
-	root, gitDir, err := workspaceHere(context.Background())
-	if err != nil {
-		return nil // Outside a repository: requireProject explains the next step.
-	}
-	bound, _, err := termaproject.Resolve(root, gitDir)
-	if errors.Is(err, termaproject.ErrNotFound) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	cfg.ProjectID, cfg.ProjectName = bound.Project.ID, bound.Project.Name
-	cfg.ProjectOrganizationID = bound.Project.OrganizationID
-	return nil
 }
 
 func (app *App) newClient(cfg *config.Config) (*api.Client, error) {
 	return api.New(cfg, api.Options{Version: app.version, ProjectID: cfg.ProjectID})
-}
-
-// repoHere locates the worktree root and git directory; outside, when non-empty, replaces
-// git's error for a directory in no repository.
-func repoHere(ctx context.Context, outside string) (root, gitDir string, err error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", "", err
-	}
-	root, gitDir, err = gitx.Locate(ctx, cwd)
-	if err != nil && outside != "" {
-		return "", "", errors.New(outside)
-	}
-	return root, gitDir, err
 }
 
 func workspaceHere(ctx context.Context) (root, gitDir string, err error) {

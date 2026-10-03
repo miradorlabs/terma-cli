@@ -9,91 +9,13 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
-	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/migrate"
-	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
-// AgentHooksCheck reports, for the agents wired in this repository, whether their hooks
-// are in place and whether the agent will run them; doctor and status share it.
-//
-// A wired agent is checked whoever uses it, an unwired one is missing only when named in
-// mine, and trust is judged only for the developer's own agents (mine; empty means all).
-func AgentHooksCheck(reg *agents.Registry, root string, mine []string) Check {
-	var parts []string
-	var fix string
-	ready, of := 0, 0
-	status := Pass
-	problem := func(f string) {
-		status = Warn
-		if fix == "" {
-			fix = f
-		}
-	}
-	for _, a := range reg.All() {
-		if a.HooksPath() == "" {
-			continue
-		}
-		// A surface is wired through its agent's hooks file.
-		named := slices.ContainsFunc(agents.Selections(a), func(s string) bool { return slices.Contains(mine, s) })
-		if !agents.Wired(root, a) {
-			if named {
-				of++
-				parts = append(parts, a.DisplayName()+" hooks missing")
-				problem("terma install")
-			}
-			continue
-		}
-		used := len(mine) == 0 || named
-		if used {
-			of++
-		}
-		plan, err := a.Plan(root, true)
-		if err != nil {
-			parts = append(parts, a.DisplayName()+" hooks could not be read: "+err.Error())
-			problem("repair " + a.HooksPath() + "; then run terma install")
-			continue
-		}
-		if !plan.Empty() {
-			parts = append(parts, a.DisplayName()+" hooks out of date")
-			problem("terma update --refresh")
-			continue
-		}
-		part := a.DisplayName() + " hooks present"
-		trusting, gated := a.(agents.Trusting)
-		if !gated || !used {
-			if used {
-				ready++
-			}
-			parts = append(parts, part)
-			continue
-		}
-		trust, err := trusting.Trust(root)
-		switch {
-		case err != nil:
-			// Unreadable is not untrusted.
-			part += " (could not read " + a.DisplayName() + "'s trust record: " + err.Error() + ")"
-			ready++
-		case !trust.Trusted:
-			part += trust.Detail
-			problem(trust.Fix)
-		default:
-			part += trust.Detail
-			ready++
-		}
-		parts = append(parts, part)
-	}
-	if len(parts) == 0 {
-		return Check{Status: Skip, Detail: "no agent hooks are wired in this repository"}
-	}
-	return Check{Status: status, Detail: strings.Join(parts, "; "), Fix: fix, Ready: ready, Of: of}
-}
-
-// UserHooksCheck reports, in global mode, whether each of the developer's agents (mine;
-// empty means all) runs terma's machine-wide hooks: one that gates them behind trust skips
-// a changed entry in silence, and records nothing for it. A warning, like a repository's
-// untrusted hooks; false when no agent has any.
+// UserHooksCheck reports whether each of the developer's agents (mine; empty means all)
+// runs terma's machine-wide hooks: one that gates them behind trust skips a changed entry
+// in silence, and records nothing for it. A warning; false when no agent has any.
 func UserHooksCheck(reg *agents.Registry, mine []string) (Check, bool) {
 	var parts []string
 	c := Check{Status: Pass}
@@ -141,23 +63,6 @@ func stateCheck() (Check, bool) {
 	return Check{Status: Warn, Detail: fmt.Sprintf("%d migration(s) from this update not applied yet", migrate.Remaining(s)), Fix: "terma update"}, true
 }
 
-// HooksCheck is doctor's wording for the commit-hook verdict.
-func HooksCheck(w HookWiring) Check {
-	switch {
-	case w.Err != nil:
-		return Check{Status: Fail, Detail: w.Err.Error(), Fix: "terma install"}
-	case w.Changes > 0 && w.Stale == w.Changes:
-		return Check{Status: Fail, Detail: fmt.Sprintf("%s wiring was written by an earlier terma (%d file(s) out of date)", w.Manager, w.Stale), Fix: "terma update"}
-	case w.Changes > 0:
-		return Check{Status: Fail, Detail: fmt.Sprintf("%s wiring is missing (%d file change(s))", w.Manager, w.Changes), Fix: "terma install"}
-	case w.Unpointed:
-		return Check{Status: Fail, Detail: "shims are committed but git is not pointed at them in this clone (core.hooksPath=" + cmp.Or(w.HooksPath, "unset") + ")", Fix: "terma install"}
-	case w.Manager == hookmgr.GitShim:
-		return Check{Status: Pass, Detail: string(w.Manager) + " shims, core.hooksPath set"}
-	}
-	return Check{Status: Pass, Detail: string(w.Manager)}
-}
-
 // GlobalDestination says where global mode sends an unbound repository's sessions. Only a
 // project this command resolved has a name here; the policy carries the team's id alone.
 func GlobalDestination(cfg *config.Config) string {
@@ -171,21 +76,18 @@ func GlobalDestination(cfg *config.Config) string {
 	return "its sessions report to the team chosen at setup"
 }
 
-// UnboundHooksCheck is doctor's wording for where git looks for an unbound repository's
-// hooks: a local setting outranks terma's global hooks, and one naming no hooks runs none.
-func UnboundHooksCheck(h HooksPath, global bool) Check {
+// HooksPathCheck is doctor's wording for where git looks for a repository's hooks: a
+// local setting outranks terma's global hooks, and one naming no hooks runs none.
+func HooksPathCheck(h HooksPath) Check {
 	where := "core.hooksPath=" + h.Value + " (" + h.Scope + ")"
 	switch {
-	case h.Local() && h.Hookless && h.Value == hookmgr.ShimDir:
-		return Check{Status: Warn, Detail: where + " is left from a terma install and holds no hooks, so git runs none here", Fix: "terma uninstall"}
 	case h.Local() && h.Hookless:
 		return Check{Status: Warn, Detail: where + " holds no hooks, so git runs none here", Fix: "git config --" + h.Scope + " --unset core.hooksPath, or restore the hooks it names"}
-	case !global:
-		return Check{Status: Skip, Detail: "needs an installed repository"}
 	case h.Local():
-		return Check{Status: Warn, Detail: where + " outranks terma's global git hooks, so commits here are not stamped", Fix: "terma install"}
+		return Check{Status: Warn, Detail: where + " outranks terma's global git hooks, so commits here are not stamped",
+			Fix: "git config --" + h.Scope + " --unset core.hooksPath, if nothing else in this repository needs it"}
 	case h.TermaGlobal && !h.Hookless:
-		return Check{Status: Pass, Detail: "terma's global git hooks (global mode)"}
+		return Check{Status: Pass, Detail: "terma's global git hooks"}
 	}
 	return Check{Status: Warn, Detail: "terma's global git hooks are not in effect (" + cmp.Or(h.Value, "core.hooksPath unset") + "), so commits here are not stamped", Fix: "terma setup"}
 }
@@ -204,9 +106,9 @@ func StatusLineCheck(v StatusLineVerdict) Check {
 	case StatusLineDefault:
 		return Check{Status: Pass, Detail: "capturing plan usage (terma's default line)"}
 	case StatusLineReplaced:
-		return Check{Status: Warn, Detail: "replaced by your own status line since terma wrapped it; plan usage is not captured", Fix: "terma install"}
+		return Check{Status: Warn, Detail: "replaced by your own status line since terma wrapped it; plan usage is not captured", Fix: "terma setup"}
 	}
-	return Check{Status: Warn, Detail: "not wrapped; plan usage is not captured", Fix: "terma install"}
+	return Check{Status: Warn, Detail: "not wrapped; plan usage is not captured", Fix: "terma setup"}
 }
 
 // HarnessCheck folds every agent's verdict into doctor's one export check.
@@ -237,7 +139,7 @@ func HarnessCheck(reg *agents.Registry, verdicts []HarnessVerdict, otlpURL, proj
 		installed = append(installed, v.DisplayName)
 		switch v.Route {
 		case RouteOtherProject:
-			return Check{Status: Fail, Detail: v.DisplayName + " reports to team " + v.OtherProject + ", not " + projectID, Fix: "terma install"}
+			return Check{Status: Fail, Detail: v.DisplayName + " reports to team " + v.OtherProject + ", not " + projectID, Fix: "terma setup"}
 		case RouteHooks:
 			connected = append(connected, v.DisplayName+" (repository hooks)")
 		case RouteGlobal:
@@ -252,10 +154,10 @@ func HarnessCheck(reg *agents.Registry, verdicts []HarnessVerdict, otlpURL, proj
 		}
 	}
 	if len(installed) == 0 {
-		return Check{Status: Fail, Detail: "no coding agent found (" + agents.DisplayNames(reg.Supported()) + ")", Fix: "install one, then terma install"}
+		return Check{Status: Fail, Detail: "no coding agent found (" + agents.DisplayNames(reg.Supported()) + ")", Fix: "install one, then terma setup"}
 	}
 	if len(connected) == 0 {
-		return Check{Status: Fail, Detail: strings.Join(installed, ", ") + " installed but not exporting to " + otlpURL, Fix: "terma install"}
+		return Check{Status: Fail, Detail: strings.Join(installed, ", ") + " installed but not exporting to " + otlpURL, Fix: "terma setup"}
 	}
 	detail := strings.Join(connected, ", ") + " → " + otlpURL
 	if len(repoDecides) == 0 {
@@ -275,13 +177,13 @@ func HarnessCheck(reg *agents.Registry, verdicts []HarnessVerdict, otlpURL, proj
 	return Check{
 		Status: Fail,
 		Detail: detail + "; this repository does not route " + strings.Join(silent, ", ") + " to its team, so its sessions send nothing",
-		Fix:    "terma install",
+		Fix:    "terma setup",
 	}
 }
 
 // RelayCheck is doctor's "agent exporting to Terma" through the local relay: its address
 // is free, it delivers to env (this profile's environment), the developer's agents send to
-// it, its service is this terma's, and this repository is bound and keyed.
+// it, its service is this terma's, and the team is chosen and keyed.
 func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env string, selected []string) Check {
 	if relay.Err != nil {
 		return Check{Status: Fail, Detail: relay.Err.Error()}
@@ -296,7 +198,7 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 	if running && relay.Environment != "" && env != "" && relay.Environment != env {
 		return Check{Status: Fail,
 			Detail: "the local relay on " + addr + " delivers to the " + relay.Environment + " environment, not this profile's " + env + ", so it forwards none of this profile's sessions",
-			Fix:    "terma install"}
+			Fix:    "terma setup"}
 	}
 	mine := func(e agents.Agent) bool {
 		if len(selected) == 0 {
@@ -319,12 +221,12 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 	if relay.ServiceInstalled && !relay.ServiceCurrent {
 		return Check{Status: Warn,
 			Detail: "the relay service was written by an earlier terma, or for another binary or environment, so the system may not start this relay",
-			Fix:    "terma install"}
+			Fix:    "terma setup"}
 	}
 	if relay.ServiceInstalled && running && relay.HookStarted {
 		return Check{Status: Warn,
 			Detail: "a relay a hook started holds " + addr + ", so the relay service waits behind it and misses what agents export before their first hook",
-			Fix:    "terma install"}
+			Fix:    "terma setup"}
 	}
 	for _, e := range reg.With[agents.RelayExporter]() {
 		if c, ok := e.(agents.RelayChecker); ok && mine(e) {
@@ -339,35 +241,27 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 	}
 	switch {
 	case projectID == "":
-		return Check{Status: Warn, Detail: "local relay on " + addr + " (" + state + "); this repository is not bound, so its sessions are never forwarded", Fix: "terma install"}
+		return Check{Status: Warn, Detail: "local relay on " + addr + " (" + state + "); no team is chosen, so no session is forwarded", Fix: "terma setup"}
 	case !keys.has("", projectID) && !slices.ContainsFunc(reg.With[agents.RelayExporter](), func(e agents.RelayExporter) bool { return keys.has(e.Name(), projectID) }):
-		return Check{Status: Warn, Detail: "local relay on " + addr + " (" + state + "); no key for this team on this machine, so its sessions are dropped", Fix: "terma install"}
+		return Check{Status: Warn, Detail: "local relay on " + addr + " (" + state + "); no key for this team on this machine, so its sessions are dropped", Fix: "terma setup"}
 	}
-	return Check{Status: Pass, Detail: "through the local relay on " + addr + " (" + state + "); only this repository's sessions are forwarded"}
+	return Check{Status: Pass, Detail: "through the local relay on " + addr + " (" + state + "); only the team's folders' sessions are forwarded"}
 }
 
-// RepositoryCheck finds the binding of the workspace at root, or, in a linked worktree
-// without one, its main checkout's.
-func RepositoryCheck(root, gitDir string, repoErr error) (Check, *termaproject.File) {
+// FolderCheck says whether the team policy collects the working copy at root.
+func FolderCheck(policy config.Policy, root, gitDir string, repoErr error) Check {
 	if repoErr != nil {
-		return Check{Status: Fail, Detail: repoErr.Error()}, nil
+		return Check{Status: Fail, Detail: repoErr.Error()}
 	}
-	f, from, err := termaproject.Resolve(root, gitDir)
-	if err != nil {
-		where := root
-		if _, main, ok := gitx.LinkedWorktreeFS(gitDir); ok && main != "" {
-			where += " or its main checkout " + main
-		}
-		return Check{Status: Fail, Detail: "no " + termaproject.FileName + " in " + where, Fix: "terma install"}, nil
+	var id config.Repository
+	id.Names, id.Path = gitx.RepositoryFS(root, gitDir)
+	names := strings.Join(id.Names, ", ")
+	if id.Path != "" {
+		names += ", " + id.Path
 	}
-	return Check{Status: Pass, Detail: cmp.Or(f.Project.Name, f.Project.ID) + ThroughMain(root, from)}, f
-}
-
-// ThroughMain says, for a linked worktree bound through its main checkout, where the
-// binding came from; it is empty when the checkout has its own.
-func ThroughMain(root, from string) string {
-	if from == "" || from == root {
-		return ""
+	if policy.Admits(id) {
+		return Check{Status: Pass, Detail: output.TildePath(root) + " is in the team's folders (" + names + ")"}
 	}
-	return " (through the main checkout " + from + ")"
+	return Check{Status: Warn, Detail: "none of " + names + " is in the team's folders, so nothing here is recorded",
+		Fix: "ask your team to add " + cmp.Or(id.Path, id.Names[0]) + " to its folders in Terma"}
 }

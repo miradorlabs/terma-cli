@@ -196,7 +196,7 @@ type Status struct {
 
 // Harness is one configurable agent CLI.
 type Harness interface {
-	// Name is the command-line token: `terma install --harness <name>`.
+	// Name is the command-line token: `terma setup --harness <name>`.
 	Name() string
 	// DisplayName is how it is written in prose.
 	DisplayName() string

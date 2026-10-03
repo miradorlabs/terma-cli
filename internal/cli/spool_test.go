@@ -194,7 +194,7 @@ func TestDescribeFlushNamesEveryReasonOnce(t *testing.T) {
 		t.Errorf("delivered = %q", delivered)
 	}
 	want := []string{
-		"holding 3 for a team key (run `terma install` in their repositories)",
+		"holding 3 for a team key (run `terma setup`)",
 		"expired 4 past the spool's age limit",
 		"pruned 5 to stay under the size limit",
 		"dropped 6 with no team id",

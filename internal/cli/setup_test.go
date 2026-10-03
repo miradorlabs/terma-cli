@@ -91,9 +91,6 @@ func TestHarnessSelectionFlags(t *testing.T) {
 			if _, err := testApp.chooseHarnesses(cmd, cfg, setupFlags{harnesses: "claude," + name}); err == nil || !strings.Contains(err.Error(), "Coming Soon") {
 				t.Fatalf("setup error = %v", err)
 			}
-			if _, _, err := testApp.resolveInstallHarnesses(cmd, cfg, installFlags{harnesses: name}); err == nil || !strings.Contains(err.Error(), "Coming Soon") {
-				t.Fatalf("install error = %v", err)
-			}
 		})
 	}
 	got, err := testApp.parseAgentList("codex,claude,codex")
@@ -123,10 +120,6 @@ func TestHarnessSelectionFiltersSavedAgents(t *testing.T) {
 		got, err := testApp.chooseHarnesses(cmd, cfg, setupFlags{assumeYes: true})
 		if err != nil || !slices.Equal(got, wantSetup) {
 			t.Fatalf("setup selection = %v, %v; want %v", got, err, wantSetup)
-		}
-		got, _, err = testApp.resolveInstallHarnesses(cmd, cfg, installFlags{assumeYes: true, dryRun: true})
-		if err != nil || !slices.Equal(got, wantInstalled) {
-			t.Fatalf("install selection = %v, %v; want %v", got, err, wantInstalled)
 		}
 	}
 }

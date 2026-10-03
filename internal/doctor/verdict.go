@@ -13,48 +13,12 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/globalmode"
 	"github.com/miradorlabs/terma-cli/internal/harness"
-	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
-	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 )
 
 // `terma status` and `terma doctor` render these verdicts in their own words; one copy of
 // each judgement keeps the two from disagreeing.
 
-// HookWiring is the verdict on a bound repository's commit-hook wiring.
-type HookWiring struct {
-	Manager hookmgr.Manager
-	Err     error
-	// Changes is how many files an install would still write; Stale is those an earlier
-	// terma wrote, which `terma update --refresh` rewrites.
-	Changes int
-	Stale   int
-	// Unpointed means the shims are committed but this clone's core.hooksPath is not them.
-	Unpointed bool
-	HooksPath string
-}
-
-// JudgeHookWiring judges the commit-hook wiring of the repository at root.
-func JudgeHookWiring(ctx context.Context, root string, bound *termaproject.File) HookWiring {
-	det := hookmgr.Detect(root)
-	if bound.Install.HookManager != "" {
-		det.Manager = hookmgr.Manager(bound.Install.HookManager)
-	}
-	w := HookWiring{Manager: det.Manager}
-	plan, err := hookmgr.PlanInstall(root, det)
-	w.Err, w.Changes = err, len(plan.Changes)
-	for _, c := range plan.Changes {
-		if c.Before != nil {
-			w.Stale++
-		}
-	}
-	if det.Manager == hookmgr.GitShim {
-		w.HooksPath = gitx.ConfigGet(ctx, root, "core.hooksPath")
-		w.Unpointed = w.HooksPath != hookmgr.ShimDir
-	}
-	return w
-}
-
-// HooksPath is where git looks for an unbound repository's hooks.
+// HooksPath is where git looks for a repository's hooks.
 type HooksPath struct {
 	// Scope is git's for the setting (local, worktree, global, system); "" when unset.
 	Scope, Value string
@@ -273,7 +237,7 @@ func emissionProblem(reg *agents.Registry, h harness.Harness, root, projectID st
 			"run `terma setup` to point " + h.DisplayName() + " at the relay machine-wide (a repository cannot turn its telemetry on), then restart it"
 	}
 	return fmt.Sprintf("no OTLP telemetry signals enabled by %s; sessions here send nothing", st.ConfigPath),
-		"review the export switches in the settings file named above (including the traces beta switch); run `terma install --signals traces,logs,metrics` to enable repository telemetry, then restart " + h.DisplayName()
+		"review the export switches in the settings file named above (including the traces beta switch); run `terma setup` to point " + h.DisplayName() + " at the relay machine-wide, then restart it"
 }
 
 // JudgeHarness classifies one agent's machine-wide connection; another project's export

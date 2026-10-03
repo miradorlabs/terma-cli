@@ -401,8 +401,8 @@ func TestAPIErrorKeepsItsMessage(t *testing.T) {
 		want string
 	}{
 		{"envelope", Error{StatusCode: 403, Code: "forbidden", Message: "no access", RequestID: "req_1"}, "no access (forbidden, request_id=req_1)"},
-		{"shared gateway project hint", Error{StatusCode: 400, Code: "INVALID_ARGUMENT", Message: "missing X-Mirador-Project header — run `mirador project use <project>` or pass --project", RequestID: "req_1"}, "no team selected — run `terma install` in this repository or pass --team (INVALID_ARGUMENT, request_id=req_1)"},
-		{"shared gateway project remedy", Error{StatusCode: 400, Code: "INVALID_ARGUMENT", Message: "no such project in this organization — run `mirador project list`"}, "no such project in this organization — run `terma install` (INVALID_ARGUMENT)"},
+		{"shared gateway project hint", Error{StatusCode: 400, Code: "INVALID_ARGUMENT", Message: "missing X-Mirador-Project header — run `mirador project use <project>` or pass --project", RequestID: "req_1"}, "no team selected — run `terma setup` or pass --team (INVALID_ARGUMENT, request_id=req_1)"},
+		{"shared gateway project remedy", Error{StatusCode: 400, Code: "INVALID_ARGUMENT", Message: "no such project in this organization — run `mirador project list`"}, "no such project in this organization — run `terma setup` (INVALID_ARGUMENT)"},
 		{"shared gateway sign-in remedy", Error{StatusCode: 403, Code: "PERMISSION_DENIED", Message: "listing organizations requires a user credential — run `mirador login`"}, "listing organizations requires a user credential — run `terma setup` (PERMISSION_DENIED)"},
 		{"code only", Error{StatusCode: 404, Code: "not_found", Message: "no such session"}, "no such session (not_found)"},
 		{"request id without a code", Error{StatusCode: 500, Message: "boom", RequestID: "req_2"}, "boom (status 500) (request_id=req_2)"},

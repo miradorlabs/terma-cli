@@ -1,10 +1,9 @@
-// Package hookmgr plans and applies the committed hook wiring, through whichever git hook
-// manager the repository already uses. Every hook is a guarded shim that calls
-// `terma hook <event>` and never fails, so all logic stays in the binary.
+// Package hookmgr plans and applies terma's entries in agents' hooks files. Every entry is
+// a guarded command that calls `terma hook <event>` and never fails, so all logic stays in
+// the binary.
 package hookmgr
 
 import (
-	"encoding/json"
 	"errors"
 	"io/fs"
 	"os"
@@ -15,25 +14,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/project"
 )
 
-// Manager is the hook manager a repository uses.
-type Manager string
-
-// The hook managers terma installs through, in the manager's own file rather than taking over core.hooksPath.
-const (
-	Husky     Manager = "husky"
-	Lefthook  Manager = "lefthook"
-	PreCommit Manager = "pre-commit"
-	// GitShim is the fallback: shims under .terma/hooks via core.hooksPath, chaining any existing hook.
-	GitShim Manager = "git"
-)
-
-// GitHooks are the git hooks terma installs.
-var GitHooks = []string{"prepare-commit-msg", "post-commit"}
-
-// ShimDir is where the fallback shims live, relative to the repo root.
-const ShimDir = ".terma/hooks"
-
-// Marker identifies lines terma wrote, so uninstall removes only its own.
+// Marker identifies lines terma wrote, so their removal takes only its own.
 const Marker = "terma hook"
 
 // HookCommand is the guarded command every committed agent hook entry runs; it prints
@@ -89,50 +70,6 @@ func userHookCommand(q string) func(event string) string {
 	}
 }
 
-// Detection is what Detect found.
-type Detection struct {
-	Manager    Manager
-	ConfigPath string // the file the plan will edit (relative to root), if any
-	Detail     string
-}
-
-// Detect picks the hook manager from what is already in the repository; a committed
-// config file wins over one merely listed in package.json.
-func Detect(root string) Detection {
-	if _, err := os.Stat(filepath.Join(root, ".husky")); err == nil {
-		return Detection{Manager: Husky, ConfigPath: ".husky", Detail: ".husky/ directory present"}
-	}
-	for _, name := range []string{"lefthook.yml", "lefthook.yaml", ".lefthook.yml", ".lefthook.yaml"} {
-		if _, err := os.Stat(filepath.Join(root, name)); err == nil {
-			return Detection{Manager: Lefthook, ConfigPath: name, Detail: name + " present"}
-		}
-	}
-	if _, err := os.Stat(filepath.Join(root, ".pre-commit-config.yaml")); err == nil {
-		return Detection{Manager: PreCommit, ConfigPath: ".pre-commit-config.yaml", Detail: ".pre-commit-config.yaml present"}
-	}
-	if hasDevDependency(root, "husky") {
-		return Detection{Manager: Husky, ConfigPath: ".husky", Detail: "husky in package.json"}
-	}
-	return Detection{Manager: GitShim, ConfigPath: ShimDir, Detail: "no hook manager found; using a core.hooksPath shim"}
-}
-
-func hasDevDependency(root, name string) bool {
-	data, err := os.ReadFile(filepath.Join(root, "package.json"))
-	if err != nil {
-		return false
-	}
-	var pkg struct {
-		Dev  map[string]json.RawMessage `json:"devDependencies"`
-		Deps map[string]json.RawMessage `json:"dependencies"`
-	}
-	if json.Unmarshal(data, &pkg) != nil {
-		return false
-	}
-	_, a := pkg.Dev[name]
-	_, b := pkg.Deps[name]
-	return a || b
-}
-
 // Change is one file the plan touches. Before is nil for a new file; After is nil
 // for a deletion.
 type Change struct {
@@ -156,41 +93,12 @@ func (c Change) Action() string {
 
 // Plan is the set of file changes plus what the user still has to do by hand.
 type Plan struct {
-	Manager Manager
 	Changes []Change
 	Notes   []string
 }
 
 // Empty reports whether the plan changes nothing.
 func (p Plan) Empty() bool { return len(p.Changes) == 0 }
-
-// PlanInstall computes the changes that wire the git hooks through det's manager, preserving user content.
-func PlanInstall(root string, det Detection) (Plan, error) {
-	switch det.Manager {
-	case Husky:
-		return planHusky(root, true)
-	case Lefthook:
-		return planLefthook(root, det.ConfigPath, true)
-	case PreCommit:
-		return planPreCommit(root, true)
-	default:
-		return planShim(root, true)
-	}
-}
-
-// PlanUninstall computes the reverse of PlanInstall: only terma's own lines and files go.
-func PlanUninstall(root string, det Detection) (Plan, error) {
-	switch det.Manager {
-	case Husky:
-		return planHusky(root, false)
-	case Lefthook:
-		return planLefthook(root, det.ConfigPath, false)
-	case PreCommit:
-		return planPreCommit(root, false)
-	default:
-		return planShim(root, false)
-	}
-}
 
 // Validate checks all destinations before applying any part of a plan.
 func Validate(root string, p Plan) error {

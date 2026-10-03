@@ -207,7 +207,7 @@ func captureConflictsInProjectFiles(l claudeLayer) []harness.Conflict {
 			}
 			reason := "set off in " + path + ", which Claude Code applies over " + l.over
 			if owned[key] {
-				reason = "turned off in " + path + " by an earlier terma (run `terma install` here to remove it)"
+				reason = "turned off in " + path + " by an earlier terma (remove it from that file)"
 			}
 			out = append(out, harness.Conflict{
 				Key:       key,

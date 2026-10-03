@@ -39,7 +39,7 @@ func TestDoctorChecksClaudeEmissionSettings(t *testing.T) {
 		{name: "malformed private settings cannot pass", globalSignals: harness.AllSignals, brokenLocal: true, wantFailure: true, wantDetail: "could not read effective telemetry settings"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			repo := installRepo(t)
+			repo := gitRepo(t)
 			h := harnessOf(t, "claude")
 			if err := h.Connect(harness.Exporter{Endpoint: endpoint, APIKey: testServerKey, Signals: tc.globalSignals}, false); err != nil {
 				t.Fatal(err)
@@ -102,7 +102,7 @@ func TestDoctorChecksOpenCodeRepositoryPolicy(t *testing.T) {
 	const endpoint = "https://otel.example.test"
 	for _, signals := range [][]harness.Signal{nil, {harness.SignalLogs}} {
 		t.Run(fmt.Sprint(signals), func(t *testing.T) {
-			repo := installRepo(t)
+			repo := gitRepo(t)
 			t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 			h := harnessOf(t, "opencode")
 			if err := h.Connect(harness.Exporter{Endpoint: endpoint, APIKey: testServerKey, Signals: harness.AllSignals}, false); err != nil {

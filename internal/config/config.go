@@ -89,8 +89,6 @@ type Config struct {
 	OrganizationName string
 	ProjectID        string
 	ProjectName      string
-	// ProjectOrganizationID comes from the repository binding, not the signed-in organization.
-	ProjectOrganizationID string
 
 	Harnesses []string
 

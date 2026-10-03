@@ -4,40 +4,38 @@ import (
 	"context"
 	"errors"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/agents/agentstest"
 	"github.com/miradorlabs/terma-cli/internal/config"
-	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 )
 
-// bound is a git repository bound to project p1, with nothing else installed.
-func bound(t *testing.T) (root, gitDir string) {
+// listed is a git repository in a folder called one, which the team's policy lists.
+func listed(t *testing.T) (root, gitDir string) {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not installed")
 	}
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
-	root = t.TempDir()
-	if out, err := exec.Command("git", "-C", root, "init", "-q").CombinedOutput(); err != nil {
+	root = filepath.Join(t.TempDir(), "one")
+	if out, err := exec.Command("git", "init", "-q", root).CombinedOutput(); err != nil {
 		t.Fatalf("git init: %v\n%s", err, out)
 	}
-	if err := termaproject.Save(root, &termaproject.File{Project: termaproject.Project{ID: "p1", Name: "One"}}); err != nil {
-		t.Fatal(err)
-	}
-	return root, root + "/.git"
+	return root, filepath.Join(root, ".git")
 }
 
 func env(t *testing.T, p Probes) Env {
-	root, gitDir := bound(t)
+	root, gitDir := listed(t)
 	if p.Deliver == nil {
 		p.Deliver = func(context.Context) (Delivery, error) { return Delivery{}, nil }
 	}
 	p.Endpoint = func(string) string { return "https://otlp.example" }
-	return Env{Agents: agents.New(agentstest.Agent{ID: "fake"}), Config: &config.Config{Environment: config.EnvProd},
-		Root: root, GitDir: gitDir, Probes: p}
+	cfg := &config.Config{Environment: config.EnvProd, ProjectID: "p1", ProjectName: "One",
+		Policy: config.Policy{Mode: config.ModeRepo, Folders: []string{"one"}}}
+	return Env{Agents: agents.New(agentstest.Agent{ID: "fake"}), Config: cfg, Root: root, GitDir: gitDir, Probes: p}
 }
 
 func signedIn() (Credential, error) {
@@ -148,7 +146,7 @@ func TestStatusSaysWhatDoctorWould(t *testing.T) {
 	for _, r := range rep.Rows {
 		rows[r.Label] = r.Value
 	}
-	if !strings.Contains(rows["Account"], "not signed in") || !strings.Contains(rows["Repository"], "One") ||
+	if !strings.Contains(rows["Account"], "not signed in") || !strings.Contains(rows["Folder"], "in the team's folders (one)") ||
 		!strings.Contains(rows["Spool"], "2 event(s) queued, no team key") {
 		t.Fatalf("rows = %v", rows)
 	}
@@ -161,45 +159,46 @@ func TestStatusSaysWhatDoctorWould(t *testing.T) {
 	}
 }
 
-// Global mode needs no install, so an unbound repository passes there and fails only in
-// per-repository mode.
-func TestDoctorNeedsABindingOnlyInPerRepositoryMode(t *testing.T) {
-	for mode, want := range map[string]Status{config.ModeGlobal: Pass, config.ModeRepo: Fail} {
-		t.Run(mode, func(t *testing.T) {
+// A folder the team lists, or any in global mode, passes; another warns, naming what to
+// add to the list.
+func TestDoctorChecksTheFolderList(t *testing.T) {
+	for name, tc := range map[string]struct {
+		pol  config.Policy
+		want Status
+		text string
+	}{
+		"listed":   {config.Policy{Mode: config.ModeRepo, Folders: []string{"ONE"}}, Pass, "in the team's folders"},
+		"unlisted": {config.Policy{Mode: config.ModeRepo, Folders: []string{"two"}}, Warn, "ask your team to add one to its folders in Terma"},
+		"global":   {config.Policy{Mode: config.ModeGlobal, DefaultProjectID: "p9"}, Pass, "the team chosen at setup (p9)"},
+	} {
+		t.Run(name, func(t *testing.T) {
 			e := env(t, Probes{Credential: signedIn, Spool: func() SpoolState { return SpoolState{Open: true} }})
-			if err := termaproject.Remove(e.Root); err != nil {
-				t.Fatal(err)
-			}
-			// An unbound repository resolves no project, so only the policy's id names the team.
 			e.Config.ProjectID, e.Config.ProjectName = "", ""
-			e.Config.Policy = config.Policy{Mode: mode, DefaultProjectID: "p9"}
+			e.Config.Policy = tc.pol
 			c := check(Run(t.Context(), e, Progress{}), KeyProject)
-			if c.Status != want || want == Pass && !strings.Contains(c.Detail, "the team chosen at setup (p9)") || want == Fail && c.Fix != "terma install" {
-				t.Fatalf("repository bound in %s mode = %+v", mode, c)
+			if c.Status != tc.want || !strings.Contains(c.Detail+c.Fix, tc.text) {
+				t.Fatalf("folder = %+v, want %s with %q", c, tc.want, tc.text)
 			}
 		})
 	}
 }
 
-// The local report agrees: in global mode an unbound repository asks for no install.
-func TestLocalReportNeedsABindingOnlyInPerRepositoryMode(t *testing.T) {
-	for mode, wantInstall := range map[string]bool{config.ModeGlobal: false, config.ModeRepo: true} {
+// The local report agrees: an unlisted folder asks the team for the list.
+func TestLocalReportChecksTheFolderList(t *testing.T) {
+	for mode, wantAsk := range map[string]bool{config.ModeGlobal: false, config.ModeRepo: true} {
 		t.Run(mode, func(t *testing.T) {
 			e := env(t, Probes{Credential: signedIn})
-			if err := termaproject.Remove(e.Root); err != nil {
-				t.Fatal(err)
-			}
-			e.Config.Policy = config.Policy{Mode: mode}
+			e.Config.Policy = config.Policy{Mode: mode, Folders: []string{"two"}}
 			rep, err := Local(t.Context(), e)
 			if err != nil {
 				t.Fatal(err)
 			}
 			asks := false
 			for _, c := range rep.Checks {
-				asks = asks || c.Fix == "terma install"
+				asks = asks || strings.Contains(c.Fix, "ask your team")
 			}
-			if asks != wantInstall {
-				t.Fatalf("%s mode: asks for terma install = %v, rows %v", mode, asks, rep.Rows)
+			if asks != wantAsk {
+				t.Fatalf("%s mode: asks for the list = %v, rows %v", mode, asks, rep.Rows)
 			}
 		})
 	}
