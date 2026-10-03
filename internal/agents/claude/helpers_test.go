@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 )
@@ -26,7 +25,7 @@ func newFundingEnv(t *testing.T) hookrun.Env {
 	t.Setenv("ANTHROPIC_AUTH_TOKEN", "")
 	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "")
 	root, sp := hookruntest.Project(t)
-	return hookrun.Env{Now: time.Now(), Cwd: root, Spool: sp, Version: "test", Policy: config.DefaultPolicy()}
+	return hookrun.Env{Now: time.Now(), Cwd: root, Spool: sp, Version: "test", Policy: hookruntest.Admitting(root), Team: hookruntest.Team}
 }
 
 func hookPayload(env hookrun.Env, event string) string {

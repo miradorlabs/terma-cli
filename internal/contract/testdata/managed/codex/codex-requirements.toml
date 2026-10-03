@@ -1,4 +1,4 @@
-# terma: global mode's hooks for every Codex session on this machine.
+# terma: hooks for every Codex session on this machine.
 [hooks]
 
 [[hooks.SessionStart]]

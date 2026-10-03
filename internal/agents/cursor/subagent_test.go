@@ -23,7 +23,7 @@ func TestCursorSubagentStopRecordsOutcomeAndFiles(t *testing.T) {
 	sp, _ := spool.Open(t.TempDir())
 	elsewhere := t.TempDir()
 	env := func(stdin string) hookrun.Env {
-		return hookrun.Env{Now: time.Now(), Cwd: elsewhere, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
+		return hookrun.Env{Now: time.Now(), Cwd: elsewhere, Policy: hookruntest.Admitting(root), Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
 	}
 	common := `"conversation_id":"conv_9a1","model":"claude-opus-5","workspace_roots":["` + root + `"]`
 	if err := sessionStart(ctx, env(`{`+common+`,"hook_event_name":"sessionStart"}`)); err != nil {
@@ -64,7 +64,7 @@ func TestCursorSubagentStopRecordsOutcomeAndFiles(t *testing.T) {
 	}
 	msgPath := filepath.Join(t.TempDir(), "COMMIT_EDITMSG")
 	_ = os.WriteFile(msgPath, []byte("subagent work\n"), 0o644)
-	if err := hookrun.PrepareCommitMsg(ctx, hookrun.Env{Now: time.Now(), Cwd: root, Args: []string{msgPath, "message"}, Stdin: strings.NewReader(""), Spool: sp}); err != nil {
+	if err := hookrun.PrepareCommitMsg(ctx, hookrun.Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Args: []string{msgPath, "message"}, Stdin: strings.NewReader(""), Spool: sp}); err != nil {
 		t.Fatal(err)
 	}
 	if data, _ := os.ReadFile(msgPath); !strings.Contains(string(data), "Agent-Session-Id: conv_9a1") {
@@ -79,7 +79,7 @@ func TestCursorSubagentEditsAreFoldedIntoTheParentConversation(t *testing.T) {
 	ctx := context.Background()
 	sp, _ := spool.Open(t.TempDir())
 	env := func(stdin string, args ...string) hookrun.Env {
-		return hookrun.Env{Now: time.Now(), Cwd: root, Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
+		return hookrun.Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
 	}
 	const parent, child = "conv_parent_1", "conv_child_7"
 	roots := `"workspace_roots":["` + root + `"],"model":"claude-opus-5"`

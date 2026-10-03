@@ -31,12 +31,21 @@ func TestCursorBillingSession(t *testing.T) {
 	cursorSession(t, true, false)
 }
 
+// cursorHooksUnavailable skips a Cursor scenario: `terma setup` offers Cursor as Coming
+// Soon and writes no Cursor hooks, so there are none to drive.
+func cursorHooksUnavailable(t *testing.T) {
+	t.Helper()
+	Record(t.Name(), "not run", "terma setup writes no Cursor hooks (Coming Soon)")
+	t.Skip("terma setup writes no Cursor hooks (Coming Soon)")
+}
+
 func cursorSession(t *testing.T, billingOnly, interactive bool) {
 	t.Helper()
 	track(t)
 	if !Enabled() {
 		t.Skip("live tests run only with TERMA_E2E=1")
 	}
+	cursorHooksUnavailable(t)
 	key := os.Getenv("CURSOR_API_KEY")
 	if key == "" {
 		t.Skip("needs CURSOR_API_KEY (CLI key, not a team admin key)")
@@ -89,7 +98,6 @@ func cursorSession(t *testing.T, billingOnly, interactive bool) {
 			t.Errorf("write Cursor validation capture: %v", err)
 		}
 	})
-	sb.terma(sb.Repo, "install", "--harness", "none", "--no-browser", "--team", sb.ProjectID, "--adapters", "cursor", "--yes")
 	// No local Cursor exporter exists to connect. Give only the sandbox spool
 	// the loopback receiver's dummy project key.
 	keys, _ := json.Marshal(map[string]any{"keys": map[string]string{sb.ProjectID: liveKey}})
@@ -317,13 +325,13 @@ func cursorSession(t *testing.T, billingOnly, interactive bool) {
 // delivery without provider credentials; it does not verify Cursor itself.
 func TestCursorHookDelivery(t *testing.T) {
 	track(t)
+	cursorHooksUnavailable(t)
 	sb := New(t, Isolated)
-	sb.terma(sb.Repo, "install", "--harness", "none", "--no-browser", "--team", sb.ProjectID, "--adapters", "cursor", "--yes")
 	keys, _ := json.Marshal(map[string]any{"keys": map[string]string{sb.ProjectID: liveKey}})
 	if err := os.WriteFile(filepath.Join(sb.TermaConfig, "keys.json"), keys, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	raw, err := os.ReadFile(filepath.Join(sb.Repo, ".cursor", "hooks.json"))
+	raw, err := os.ReadFile(filepath.Join(sb.Home, ".cursor", "hooks.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

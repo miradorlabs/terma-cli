@@ -39,7 +39,7 @@ func (app *App) newRelaySetupCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			token, err := ensureRelayToken()
+			token, err := app.ensureRelayToken()
 			if err != nil {
 				return err
 			}
@@ -56,7 +56,7 @@ func (app *App) newRelaySetupCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Fprintln(out, "Hooks in repositories with a binding claim their sessions; nothing else is forwarded.")
+			fmt.Fprintln(out, "Hooks in the repositories your team collects claim their sessions; nothing else is forwarded.")
 			// A running relay has the old address and token: replace it.
 			daemon.Stop(dir)
 			if _, ok := daemon.ServiceInstalled(); ok {
@@ -106,9 +106,16 @@ func (app *App) pointAgentsAtRelay(ctx context.Context, selected []string, addr,
 	return nil
 }
 
-func ensureRelayToken() (string, error) {
+// ensureRelayToken is the relay's token: the one there is, else the one teardown kept for
+// this sign-in, which agents still running present, else a new one.
+func (app *App) ensureRelayToken() (string, error) {
 	if token, err := daemon.Token(); err == nil && token != "" {
 		return token, nil
+	}
+	if cfg, err := app.loadConfig(); err == nil {
+		if token, ok := daemon.ReviveToken(daemon.Identity(cfg)); ok {
+			return token, nil
+		}
 	}
 	path, err := claim.TokenPath()
 	if err != nil {

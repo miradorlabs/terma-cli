@@ -94,7 +94,7 @@ func TestClaudeSubscriptionSession(t *testing.T) {
 		}
 
 		// The exporter: the call, joined to the hook session by session.id, carrying
-		// what the funding estimator reads, authorised with the connected key.
+		// what the funding estimator reads, authorised with the live key.
 		reqs := sb.APIRequests(sid, 30*time.Second)
 		if len(reqs) == 0 {
 			t.Fatalf("no api_request reached the receiver for %s; %d logs total", sid, len(sb.Receiver.Logs()))
@@ -120,14 +120,14 @@ func TestClaudeSubscriptionSession(t *testing.T) {
 		CheckKeys(t, "claude/api_request", first.Attrs, newest)
 		CheckKeys(t, "claude/resource", first.Resource, newest)
 		if auths := sb.Receiver.Authorizations(); len(auths) == 0 || auths[0] != "Bearer "+liveKey {
-			t.Errorf("exports not authorised with the connected key: %v", auths)
+			t.Errorf("exports not authorised with the live key: %v", auths)
 		}
 		AddSpend(SpendOf(reqs))
 		checkClaudeAccount(t, sb, sid, mode == RealLogin)
 
 		// Delivery: the Stop and SessionEnd hooks start background flushes, so the
 		// spooled events must reach the receiver on their own, as OTLP logs from
-		// terma-cli, stamped with the project, under the connected key. This is
+		// terma-cli, stamped with the project, under the live key. This is
 		// the shape the backend parses.
 		delivered := sb.Delivered("terma.session.quota", sid, 45*time.Second)
 		if len(delivered) == 0 {

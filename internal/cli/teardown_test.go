@@ -1,12 +1,14 @@
 package cli
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 )
 
 func TestTeardownRequiresConfirmationWithoutATerminal(t *testing.T) {
@@ -52,8 +54,8 @@ func TestTeardownStopsTheRelayAndKeepsTheSignIn(t *testing.T) {
 		if err != nil {
 			t.Fatalf("teardown: %v\n%s", err, out)
 		}
-		if !strings.Contains(out, "`terma setup` sets it up again") || !strings.Contains(out, "`terma uninstall`") {
-			t.Fatalf("teardown should say how to undo it and what it left:\n%s", out)
+		if !strings.Contains(out, "`terma setup` sets it up again") {
+			t.Fatalf("teardown should say how to undo it:\n%s", out)
 		}
 	}
 	if _, err := os.Stat(relayDir); !os.IsNotExist(err) {
@@ -106,5 +108,45 @@ func TestTeardownSignOutWithAnAPIKeyChangesNothing(t *testing.T) {
 	}
 	if _, err := os.Stat(relayDir); err != nil {
 		t.Fatalf("teardown changed state before refusing: %v", err)
+	}
+}
+
+// A teardown and setup under the same sign-in keep the relay's token, so an agent still
+// running with it is not refused; a sign-out discards it, and the next setup mints anew.
+func TestTeardownThenSetupKeepsTheTokenForTheSameSignIn(t *testing.T) {
+	relaySandbox(t)
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	seedPolicyLogin(t, cfg.AuthURL)
+	addr := freeAddr(t)
+	setUp := func() string {
+		t.Helper()
+		if out, err := runTerma(t, "relay", "setup", "--no-start", "--addr", addr, "--harness", "claude"); err != nil {
+			t.Fatalf("relay setup: %v\n%s", err, out)
+		}
+		token, err := daemon.Token()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return token
+	}
+	before := setUp()
+	if out, err := runTerma(t, "teardown", "--yes"); err != nil {
+		t.Fatalf("teardown: %v\n%s", err, out)
+	}
+	if claim.Enabled() {
+		t.Fatal("teardown left the relay enabled")
+	}
+	if after := setUp(); after != before {
+		t.Fatalf("setup after teardown minted a new token: agents still running present %q", before)
+	}
+
+	if err := testApp.undoSetup(t.Context(), io.Discard, false); err != nil { // teardown --sign-out
+		t.Fatal(err)
+	}
+	if after := setUp(); after == before {
+		t.Fatal("the token survived a sign-out")
 	}
 }

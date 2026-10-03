@@ -193,6 +193,6 @@ deployment and switch between them.`,
 	cmd.Flags().StringVar(&apiURL, "api-url", "", "Terma data API base URL")
 	cmd.Flags().StringVar(&authURL, "auth-url", "", "Terma auth API base URL")
 	cmd.Flags().StringVar(&appURL, "app-url", "", "Terma app base URL")
-	cmd.Flags().StringVar(&otlpURL, "otlp-url", "", "Terma OTLP ingest URL (written into harness configs by `telemetry connect`)")
+	cmd.Flags().StringVar(&otlpURL, "otlp-url", "", "Terma OTLP ingest URL (the relay sends there)")
 	return cmd
 }

@@ -264,7 +264,7 @@ func (a *AppServer) close() {
 // TrustHooks records the developer's approval of every hook Codex finds for cwd, as
 // Desktop's Settings → Hooks → Review (or the TUI's /hooks) does: the hooks/list key and
 // current hash of each, as [hooks.state."<key>"] trusted_hash in config.toml. An entry
-// `terma install` already approved is left as it is, and must carry Codex's own hash. It
+// `terma setup` already approved is left as it is, and must carry Codex's own hash. It
 // returns how many hooks Codex listed.
 func (a *AppServer) TrustHooks(sb *Sandbox, cwd string) int {
 	a.t.Helper()

@@ -21,8 +21,8 @@ import (
 //   - started through Contents/Helpers/disclaimer, which stays alive as the parent
 //     (Claude → disclaimer → claude);
 //   - `--input-format stream-json --output-format stream-json` on pipes, no terminal,
-//     `--setting-sources=user,project,local` — so the user's settings.json env, where
-//     `terma relay setup` puts the exporter, and the repository's hooks both apply;
+//     `--setting-sources=user,project,local` — so the user's settings.json, where
+//     `terma setup` puts the exporter and terma's hooks, applies;
 //   - CLAUDE_CODE_ENTRYPOINT=claude-desktop, and OTEL_SERVICE_NAME /
 //     OTEL_RESOURCE_ATTRIBUTES naming the service claude-code-desktop.
 //
@@ -90,7 +90,7 @@ func desktopParent() []string {
 func (sb *Sandbox) ClaudeDesktopRun(dir, prompt string, extra ...string) string {
 	t := sb.T
 	t.Helper()
-	sb.ensureClaudeExport()
+	sb.directClaude()
 	args := append(desktopParent(), sb.Claude.Path,
 		"--output-format", "stream-json", "--verbose", "--input-format", "stream-json",
 		"--model", "claude-haiku-4-5", "--permission-prompt-tool", "stdio",

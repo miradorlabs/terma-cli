@@ -79,3 +79,21 @@ func TestExpiredPolicyGrantsNothing(t *testing.T) {
 		t.Fatal("a refreshed policy still grants nothing")
 	}
 }
+
+// Every fetcher stores through StorePolicy, which refuses another login's organization or
+// environment: no caller has to remember to check.
+func TestStorePolicyRefusesAnotherLoginsPolicy(t *testing.T) {
+	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	cfg := &config.Config{ProfileName: "default", OrganizationID: "org_a", AuthURL: "https://auth.example"}
+	for _, pol := range []config.Policy{
+		{Mode: config.ModeRepo, TeamID: "t1", OrganizationID: "org_b", AuthURL: "https://auth.example", FetchedAt: time.Now()},
+		{Mode: config.ModeRepo, TeamID: "t1", OrganizationID: "org_a", AuthURL: "https://auth.other", FetchedAt: time.Now()},
+	} {
+		if err := StorePolicy(cfg, &pol); err == nil {
+			t.Errorf("stored %+v under %s/%s", pol, cfg.OrganizationID, cfg.AuthURL)
+		}
+		if _, ok, _ := LoadPolicy("t1"); ok {
+			t.Fatal("a refused policy was cached")
+		}
+	}
+}

@@ -134,18 +134,42 @@ func RemoteURLFS(gitDir string) string {
 	return NormalizeRemote(raw)
 }
 
+// HooksPathFS reads core.hooksPath as the checkout's own config sets it, without running
+// git: the shared local value, and the worktree-scoped one, which outranks it.
+func HooksPathFS(gitDir string) (local, worktree string) {
+	common := CommonDirFS(gitDir)
+	local, _ = configValue(filepath.Join(common, "config"), "core", "hookspath")
+	if v, _ := configValue(filepath.Join(common, "config"), "extensions", "worktreeconfig"); strings.EqualFold(v, "true") {
+		worktree, _ = configValue(filepath.Join(gitDir, "config.worktree"), "core", "hookspath")
+	}
+	return local, worktree
+}
+
+// RepositoryFS is origin's RepositoryID, read from the main repository's config so a
+// linked worktree shares it; "" outside git.
+func RepositoryFS(gitDir string) string {
+	if gitDir == "" {
+		return ""
+	}
+	raw, _ := configValue(filepath.Join(CommonDirFS(gitDir), "config"), `remote "origin"`, "url")
+	return RepositoryID(raw)
+}
+
 func globalConfigPaths() []string {
+	// Git reads $HOME, Git for Windows included; os.UserHomeDir is %USERPROFILE% there.
+	home := os.Getenv("HOME")
+	if home == "" {
+		home, _ = os.UserHomeDir()
+	}
 	var paths []string
 	xdg := os.Getenv("XDG_CONFIG_HOME")
-	if xdg == "" {
-		if home, err := os.UserHomeDir(); err == nil {
-			xdg = filepath.Join(home, ".config")
-		}
+	if xdg == "" && home != "" {
+		xdg = filepath.Join(home, ".config")
 	}
 	if xdg != "" {
 		paths = append(paths, filepath.Join(xdg, "git", "config"))
 	}
-	if home, err := os.UserHomeDir(); err == nil {
+	if home != "" {
 		paths = append(paths, filepath.Join(home, ".gitconfig"))
 	}
 	return paths

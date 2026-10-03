@@ -40,14 +40,11 @@ const (
 	ompCaptureContentEnv = "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"
 )
 
-// Name is the token `terma connect` and `--harness` accept.
+// Name is the token `--harness` accepts.
 func (exporter) Name() string { return name }
 
 // DisplayName is how the agent is written in prose.
 func (exporter) DisplayName() string { return displayName }
-
-// SupportsHeadersHelper is true: the extension runs the helper script itself.
-func (exporter) SupportsHeadersHelper() bool { return true }
 
 // Local is the exporter bound to the repository at root.
 func (exporter) Local(root string) (harness.Harness, bool) { return exporter{root: root}, true }
@@ -102,11 +99,13 @@ type ompConfig struct {
 	ProjectAttribute string `json:"projectAttribute,omitempty"`
 }
 
-// ompPolicy is the repository-scope file: what a repository may decide.
+// ompPolicy is the repository-scope file: what a repository may decide. Content is not
+// among it; an earlier terma's includePrompts and includeToolContent are read only to be
+// found stale, and a rewrite drops them.
 type ompPolicy struct {
 	Signals            []string `json:"signals"`
-	IncludePrompts     bool     `json:"includePrompts"`
-	IncludeToolContent bool     `json:"includeToolContent"`
+	IncludePrompts     *bool    `json:"includePrompts,omitempty"`
+	IncludeToolContent *bool    `json:"includeToolContent,omitempty"`
 }
 
 // config builds what the extension reads; at repository scope only the policy fields.
@@ -114,8 +113,8 @@ func (c exporter) config(e harness.Exporter) ompConfig {
 	cfg := ompConfig{
 		Version:            1,
 		Signals:            harness.SignalNames(e.Signals),
-		IncludePrompts:     e.IncludePrompts,
-		IncludeToolContent: e.IncludeToolContent,
+		IncludePrompts:     true,
+		IncludeToolContent: true,
 	}
 	if c.root != "" {
 		return cfg
@@ -189,8 +188,8 @@ func (c exporter) Status() (harness.Status, error) {
 		}
 		status.HasPolicy = true
 		status.Signals = harness.SignalsFromNames(policy.Signals)
-		status.IncludePrompts = policy.IncludePrompts
-		status.IncludeToolContent = policy.IncludeToolContent
+		status.StaleContent = policy.IncludePrompts != nil && !*policy.IncludePrompts ||
+			policy.IncludeToolContent != nil && !*policy.IncludeToolContent
 		status.ManagedKeys = 1
 		return status, nil
 	}
@@ -202,8 +201,6 @@ func (c exporter) Status() (harness.Status, error) {
 	status.ManagedKeys = 1
 	status.Endpoint = cfg.Endpoint
 	status.Signals = harness.SignalsFromNames(cfg.Signals)
-	status.IncludePrompts = cfg.IncludePrompts
-	status.IncludeToolContent = cfg.IncludeToolContent
 	status.ProjectID = cfg.ResourceAttributes[harness.AttrProjectID]
 	status.Connected = cfg.Endpoint != "" && (cfg.HeadersHelper != "" || cfg.Headers["Authorization"] != "")
 	status.KeyPrefix = harness.MaskKey(ompKey(cfg))
@@ -236,9 +233,7 @@ func (c exporter) Connect(e harness.Exporter, _ bool) error {
 	cfg := c.config(e)
 
 	if c.root != "" {
-		data, err := json.MarshalIndent(ompPolicy{
-			Signals: cfg.Signals, IncludePrompts: cfg.IncludePrompts, IncludeToolContent: cfg.IncludeToolContent,
-		}, "", "  ")
+		data, err := json.MarshalIndent(ompPolicy{Signals: cfg.Signals}, "", "  ")
 		if err != nil {
 			return err
 		}
@@ -261,61 +256,6 @@ func (c exporter) Connect(e harness.Exporter, _ bool) error {
 		mode = harness.SettingsMode
 	}
 	return config.WriteFileAtomic(path, src, mode)
-}
-
-// ConnectPerRepo writes this project's headers helper and the shared extension in
-// per-repo mode, which resolves each session's project and helper at runtime.
-func (exporter) ConnectPerRepo(e harness.Exporter) error {
-	helper, err := harness.HelperFilePath(exporter{}, e.ProjectID)
-	if err != nil {
-		return err
-	}
-	if err := harness.WriteHelper(helper, e.APIKey); err != nil {
-		return err
-	}
-	helpersDir, err := harness.HelpersDir()
-	if err != nil {
-		return err
-	}
-	cfg := ompConfig{
-		Version:  1,
-		Endpoint: e.Endpoint,
-		Signals:  harness.SignalNames(e.Signals),
-		// The file is shared by every bound repository, so content capture stays off
-		// here and is opted into per repository by its committed policy.
-		IncludePrompts:     false,
-		IncludeToolContent: false,
-		ResourceAttributes: ompBaseAttributes(e),
-		HookCommand:        []string{"terma", "hook"},
-		PerRepo:            true,
-		HelpersDir:         helpersDir,
-		HelperPrefix:       exporter{}.Name() + "-otel-",
-		ProjectAttribute:   harness.AttrProjectID,
-	}
-	path, err := (exporter{}).ConfigPath()
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return fmt.Errorf("create %s: %w", filepath.Dir(path), err)
-	}
-	src, err := renderOmpExtension(cfg)
-	if err != nil {
-		return err
-	}
-	return config.WriteFileAtomic(path, src, 0o644)
-}
-
-// ompBaseAttributes are e's resource attributes but the project id, stamped per repository.
-func ompBaseAttributes(e harness.Exporter) map[string]string {
-	out := map[string]string{}
-	for k, v := range e.ResourceAttributes {
-		if k == "" || v == "" || k == harness.AttrProjectID {
-			continue
-		}
-		out[k] = v
-	}
-	return out
 }
 
 // Disconnect removes the extension and terma's helper, or the repository's policy file.
@@ -371,19 +311,6 @@ func (c exporter) CurrentCredential(endpoint, projectID string) (string, bool) {
 		return key, true
 	}
 	return "", false
-}
-
-// ConnectNotes says what is particular about omp before the user confirms.
-func (c exporter) ConnectNotes(e harness.Exporter) []string {
-	var notes []string
-	if c.root == "" {
-		notes = append(notes,
-			"omp loads hooks at startup — restart it after connecting.",
-			"Commit attribution runs `terma hook` from inside omp, so terma must be on the PATH omp starts with.",
-			"Tokens, effort, service tier and latency ride omp's native OTLP spans; estimated cost is posted as a companion record the server joins by session.",
-		)
-	}
-	return notes
 }
 
 // Backup takes none.

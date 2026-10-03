@@ -14,7 +14,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 )
 
-// Locate returns Git's worktree root, else outside Git the nearest binding's directory or dir.
+// Locate returns Git's worktree root, else outside Git dir itself.
 func Locate(ctx context.Context, dir string) (root, gitDir string, err error) {
 	dir, err = filepath.Abs(dir)
 	if err != nil {
@@ -46,11 +46,6 @@ func Locate(ctx context.Context, dir string) (root, gitDir string, err error) {
 		if filepath.Dir(cur) == cur {
 			break
 		}
-	}
-	if root, err = Find(dir); err == nil {
-		return root, "", nil
-	} else if !errors.Is(err, ErrNotFound) {
-		return "", "", err
 	}
 	return dir, "", nil
 }

@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
@@ -15,12 +14,9 @@ type plain struct {
 	events []string
 }
 
-func (p plain) Name() string                          { return p.name }
-func (p plain) DisplayName() string                   { return p.name }
-func (plain) Installed(context.Context) bool          { return true }
-func (plain) HooksPath() string                       { return "" }
-func (plain) Default(string) bool                     { return false }
-func (plain) Plan(string, bool) (hookmgr.Plan, error) { return hookmgr.Plan{}, nil }
+func (p plain) Name() string                 { return p.name }
+func (p plain) DisplayName() string          { return p.name }
+func (plain) Installed(context.Context) bool { return true }
 func (p plain) FlushAfter() []string {
 	return slices.DeleteFunc(slices.Clone(p.events), func(e string) bool { return !strings.HasSuffix(e, "-stop") })
 }

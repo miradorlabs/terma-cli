@@ -7,7 +7,6 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/agents/internal/relayexport"
-	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 )
 
 // Agent is Gemini CLI, whose hooks come from terma's user-level extension: it fires in
@@ -19,11 +18,6 @@ func (Agent) DisplayName() string { return "Gemini CLI" }
 func (Agent) Installed(context.Context) bool {
 	_, err := exec.LookPath("gemini")
 	return err == nil
-}
-func (Agent) HooksPath() string   { return "" }
-func (Agent) Default(string) bool { return false }
-func (Agent) Plan(string, bool) (hookmgr.Plan, error) {
-	return hookmgr.Plan{}, nil
 }
 
 func (Agent) Events() map[string]agents.Handler {

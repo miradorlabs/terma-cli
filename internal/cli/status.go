@@ -14,7 +14,7 @@ func (app *App) newStatusCommand() *cobra.Command {
 		Use:    "status",
 		Hidden: true,
 		Short:  "Show connections, queued events, and setup readiness",
-		Long: `A quick, local view of this machine and repository: sign-in, team binding,
+		Long: `A quick, local view of this machine and repository: sign-in, the repository's admission,
 hook wiring, connected agents, the event spool, and remaining setup steps.
 Nothing is written and nothing is sent — run
 ` + "`terma doctor`" + ` for the end-to-end verification.`,

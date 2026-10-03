@@ -17,7 +17,7 @@ import (
 // Why a part cannot leave now; the same reason names the drop when its hold runs out.
 const (
 	whyNoTrace        = "no_session_trace"   // a span of a trace no record has named yet
-	whyUnclaimed      = "unclaimed_expired"  // no hook of an opted-in repository claimed the session
+	whyUnclaimed      = "unclaimed_expired"  // no hook in a collected repository claimed the session
 	whyProcess        = "uncovered_process"  // claimed, but by other processes: resumed elsewhere
 	whyNoKey          = "no_key"             // claimed, but this machine holds no key for the project
 	whyAmbiguous      = "ambiguous_process"  // no session named; its process named more than one session
@@ -111,14 +111,9 @@ const (
 
 // deliverAttributed applies the content policy, stamps the project and enqueues. deliverMu is held.
 func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attribution) {
-	if pol.Excludes != nil {
-		pol.IncludePrompts, pol.IncludeToolContent = false, false
-	}
-	if n := dropExcluded(p, pol.Excludes); n > 0 {
-		r.stats.dropped(p.signal, "policy_path", n)
-		if p.records <= 0 {
-			return
-		}
+	if pol.Unadmitted {
+		r.stats.dropped(p.signal, "policy_repository", p.records)
+		return
 	}
 	if pol.Signals != nil && !contains(pol.Signals, string(p.signal)) {
 		r.stats.dropped(p.signal, "policy_signal", p.records)

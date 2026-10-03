@@ -17,8 +17,7 @@ const (
 	displayName = "Claude Code"
 )
 
-// Agent is Claude Code: hooks in .claude/settings.json, wired by default because a repository
-// loses nothing by gaining that file.
+// Agent is Claude Code: machine-wide hooks in the user's settings.json.
 type Agent struct{}
 
 // Name is the agent's token.
@@ -28,11 +27,6 @@ func (Agent) Name() string { return name }
 func (Agent) DisplayName() string { return displayName }
 
 func (Agent) Installed(ctx context.Context) bool { return exporter{}.Detect(ctx).Found }
-func (Agent) HooksPath() string                  { return settingsPath }
-func (Agent) Default(string) bool                { return true }
-func (Agent) Plan(root string, install bool) (hookmgr.Plan, error) {
-	return planSettings(root, install)
-}
 
 func (Agent) Events() map[string]agents.Handler {
 	return map[string]agents.Handler{

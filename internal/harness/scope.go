@@ -26,26 +26,3 @@ func ParseScope(raw string) (Scope, error) {
 		return "", fmt.Errorf("unknown scope %q (want global or local)", raw)
 	}
 }
-
-// Reach is which repositories a global connect exports from. Nothing stores it: connected
-// and exporting no signal is ReachRepos, since only a repository policy can make it send.
-type Reach string
-
-// The two reaches of a global connect; repos writes every exporter off for repositories to
-// switch on, so it is refused for a LocalOffOnly harness.
-const (
-	ReachEverywhere Reach = "everywhere"
-	ReachRepos      Reach = "repos"
-)
-
-// ParseReach reads an --exports value; empty is everywhere.
-func ParseReach(raw string) (Reach, error) {
-	switch r := Reach(strings.ToLower(strings.TrimSpace(raw))); r {
-	case "":
-		return ReachEverywhere, nil
-	case ReachEverywhere, ReachRepos:
-		return r, nil
-	default:
-		return "", fmt.Errorf("unknown --exports value %q (want everywhere or repos)", raw)
-	}
-}

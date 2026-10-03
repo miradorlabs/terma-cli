@@ -14,7 +14,6 @@ func ompSandbox(t *testing.T, cmd string) func(t *testing.T) *Sandbox {
 	return func(t *testing.T) *Sandbox {
 		sb := New(t, Isolated)
 		sb.RelayAgents = []string{"omp"}
-		sb.terma(sb.Repo, "install", "--team", sb.ProjectID, "--harness", "none", "--adapters", "omp", "--yes", "--no-browser")
 		var calls atomic.Int32
 		provider := httptest.NewServer(openAIToolProvider(&calls, cmd))
 		t.Cleanup(provider.Close)
@@ -41,7 +40,7 @@ func TestRelayWorkloadsOmp(t *testing.T) {
 	})
 }
 
-// omp outside any bound repository: its extension exports to the relay, the relay holds
+// omp outside any admitted repository: its extension exports to the relay, the relay holds
 // the unclaimed session and drops it, and nothing reaches upstream.
 func TestRelayOmpOutsideARepository(t *testing.T) {
 	forEachOmp(t, func(t *testing.T, b Binary) {

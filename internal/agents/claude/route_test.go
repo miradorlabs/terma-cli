@@ -39,7 +39,7 @@ func TestClaudeRouteNativeExport(t *testing.T) {
 	if out, err := exec.Command("git", "init", "-q", root).CombinedOutput(); err != nil {
 		t.Fatalf("git init: %v %s", err, out)
 	}
-	exp := harness.Exporter{ProjectID: "route-test", APIKey: "ter_srv_0123456789abcdef", Signals: harness.AllSignals, IncludePrompts: true, IncludeToolContent: true}
+	exp := harness.Exporter{ProjectID: "route-test", APIKey: "ter_srv_0123456789abcdef", Signals: harness.AllSignals}
 	var mu sync.Mutex
 	seen := map[string][]string{}
 	receiver := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

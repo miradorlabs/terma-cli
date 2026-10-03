@@ -22,7 +22,7 @@ import (
 
 // What the agents declare between them, pinned: a change here changes what leaves a machine.
 var (
-	pinnedPromptFields     = []string{"prompt", "response", "user_prompt"}
+	pinnedPromptFields     = []string{"prompt", "prompt_text", "response", "user_prompt"}
 	pinnedPromptDropFields = []string{"gen_ai.prompt", "gen_ai.completion", "gen_ai.input.messages", "gen_ai.output.messages", "gen_ai.system_instructions",
 		"gen_ai.tool.definitions",
 		"omp.gen_ai.request.messages", "omp.gen_ai.response.text",
@@ -84,7 +84,7 @@ func TestNoDeclaredContentKeyIsSafe(t *testing.T) {
 	}
 }
 
-// Every known agent's shape is composed, supported or not: its committed hooks still claim sessions.
+// Every known agent's shape is composed, supported or not: its hooks still claim sessions.
 func TestEveryExportingAgentDeclaresItsShape(t *testing.T) {
 	reg := builtin.Agents()
 	for _, a := range reg.All() {

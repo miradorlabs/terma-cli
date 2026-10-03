@@ -399,9 +399,7 @@ func TestRelayWorkloadsOpenCode(t *testing.T) {
 					sb.UseOpenCodeProvider(provider.URL)
 					return sb
 				}, func(t *testing.T, sb *Sandbox) {
-					if !sb.relayed {
-						sb.connectHarness("opencode")
-					}
+					sb.directOpenCode()
 					sb.OpenCodeRun(b, sb.Repo, "", "Do the task. TERMA_WORKLOAD")
 				})
 			})

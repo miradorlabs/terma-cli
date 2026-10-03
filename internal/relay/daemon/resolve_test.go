@@ -49,7 +49,7 @@ func TestResolverGrantsOnlyAValidatedPolicyOfThisLogin(t *testing.T) {
 			if err := keystore.Set("p1", mintedKey, keystore.HostsOf(cfg)); err != nil {
 				t.Fatal(err)
 			}
-			resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "" }, Endpoint: func(string) string { return "https://otel.example" }})
+			resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "" }, Endpoint: func(string) string { return "https://otel.example" }, RelayTargets: func(s []string) []string { return s }})
 			pol, err := resolve(claim.Claim{ProjectID: "p1"})
 			if tc.ok {
 				if err != nil || !pol.IncludePrompts || pol.Key != mintedKey {
@@ -74,7 +74,7 @@ func TestResolverGrantsNothingOnceTheProfileIsGone(t *testing.T) {
 	if err := keystore.Set("p1", mintedKey, keystore.HostsOf(cfg)); err != nil {
 		t.Fatal(err)
 	}
-	resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "" }, Endpoint: func(string) string { return "https://otel.example" }})
+	resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "" }, Endpoint: func(string) string { return "https://otel.example" }, RelayTargets: func(s []string) []string { return s }})
 	if pol, err := resolve(claim.Claim{ProjectID: "p1"}); err == nil {
 		t.Fatalf("granted %+v with no profile on file", pol)
 	}
