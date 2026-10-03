@@ -44,8 +44,10 @@ npm/, install.sh        distribution
 ## How it fits together
 
 **Hooks.** `terma setup` writes each agent's user-level hooks and points git's global
-`core.hooksPath` at terma's hooks, which chain to whatever git ran before; nothing is
-written into a repository. Every hook runs `terma hook <event>`, which first resolves
+`core.hooksPath` at terma's hooks, which chain to whatever git ran before. Nothing is
+written into a repository's working tree or committed files; a clone with its own hooks
+path gets a git config entry routing it through terma's hooks (teardown removes it).
+Every hook runs `terma hook <event>`, which first resolves
 the working copy (a git checkout's root, else the folder) and asks the team policy's
 folder list (`config.Policy.Admits`); in a folder the list does not name it writes
 nothing. Each session is claimed for the developer's own team from setup.
@@ -78,6 +80,6 @@ dropped: nothing unclaimed leaves the machine.
   in `internal/agents/builtin`.
 - Wire names are contracts with other repositories, so never rename them: the commit
   trailers, hook event names, and spool event names (`internal/hooks/hookrun/events.go`).
-- Nothing terma does writes into a repository's tree. What a developer collects is the
+- Nothing terma does writes into a repository's working tree or committed files. What a developer collects is the
   team policy's folder list, read through `config.Policy.Admits` alone.
 - Help text never mentions the hidden `dev` and `local` environments.

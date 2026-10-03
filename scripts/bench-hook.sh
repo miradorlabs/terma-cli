@@ -1,9 +1,9 @@
 #!/bin/sh
-# Measures the prepare-commit-msg shim git's global hooks path runs, end to end (sh +
-# terma), in a scratch repository the team policy lists, and fails when it exceeds the
-# budget. Runs the shim a
-# few times and takes the median: the first execution of a freshly written script
-# pays a one-time OS cost (macOS's exec policy check) that no commit after it sees.
+# Times the prepare-commit-msg script `terma setup` writes into git's global hooks path, end
+# to end (sh + terma), in a scratch repository the team policy lists and in a linked
+# worktree of it (where the script asks git for the common dir), and fails when either
+# median exceeds the budget. The first execution of a freshly written script pays a
+# one-time OS cost (macOS's exec policy check) that no commit after it sees.
 set -eu
 BUDGET_MS="${TERMA_HOOK_BUDGET_MS:-50}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -12,38 +12,50 @@ BIN="$ROOT/bin/terma"
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
-export TERMA_CONFIG_DIR="$tmp/home" PATH="$ROOT/bin:$PATH"
-repo="$tmp/repo"; mkdir -p "$repo"; cd "$repo"
-git init -q; git config user.email bench@example.com; git config user.name bench
-# What `terma setup` leaves, offline: a validated policy listing this folder, and the
-# shim it writes into git's global hooks directory.
+export TERMA_CONFIG_DIR="$tmp/home" GIT_CONFIG_GLOBAL="$tmp/gitconfig" GIT_CONFIG_NOSYSTEM=1 PATH="$ROOT/bin:$PATH"
+repo="$tmp/repo"; mkdir -p "$repo" "$TERMA_CONFIG_DIR"
+git -C "$repo" init -q
+git -C "$repo" config user.email bench@example.com
+git -C "$repo" config user.name bench
+git -C "$repo" commit -q --allow-empty -m init
+git -C "$repo" worktree add -q "$tmp/wt"
+
+# What `terma setup` leaves, offline: a validated policy listing the repository (which
+# admits its worktree too), and the hooks it writes, from the same code.
 export TERMA_POLICY_STUB='{"mode":"repo","folders":["repo"]}'
-mkdir -p "$TERMA_CONFIG_DIR" hooks
 now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 printf '{"active_profile":"default","profiles":{"default":{"policy":{"mode":"repo","folders":["repo"],"include_prompts":true,"include_tool_content":true,"revision":1,"updated_at":"%s","team_id":"proj_bench","fetched_at":"%s"}}}}' "$now" "$now" > "$TERMA_CONFIG_DIR/config.json"
-printf '#!/bin/sh\n[ -x %s ] && %s hook prepare-commit-msg "$@" || true\nexit 0\n' "$BIN" "$BIN" > hooks/prepare-commit-msg
+(cd "$ROOT" && go run ./scripts/benchhooks "$BIN")
+hook="$TERMA_CONFIG_DIR/git-hooks/prepare-commit-msg"
 
-# An agent session with a manifest, so the timed path includes the staged-files
-# intersection (the expensive branch), not the early exit.
-printf '{"session_id":"018f3a2c-bench-session","hook_event_name":"SessionStart","cwd":"%s"}' "$repo" | terma hook session-start
-mkdir -p src; echo "x" > src/a.go
-printf '{"session_id":"018f3a2c-bench-session","hook_event_name":"PostToolUse","tool_name":"Edit","tool_input":{"file_path":"%s/src/a.go"},"cwd":"%s"}' "$repo" "$repo" | terma hook post-tool-use
-git add src/a.go
-echo "feat: bench" > msg.txt
-sh hooks/prepare-commit-msg msg.txt message
-grep -q 'Agent-Session-Id' msg.txt || { echo "the shim did not stamp: the timed path is not the real one" >&2; exit 1; }
-echo "feat: bench" > msg.txt
+ms() { perl -MTime::HiRes=time -e 'printf "%d", time*1000'; }
 
-times=""
-i=0
-while [ $i -lt 7 ]; do
-  start=$(perl -MTime::HiRes=time -e 'printf "%d", time*1000')
-  sh hooks/prepare-commit-msg msg.txt message
-  end=$(perl -MTime::HiRes=time -e 'printf "%d", time*1000')
-  times="$times $((end - start))"
-  echo "feat: bench" > msg.txt
-  i=$((i + 1))
-done
-median=$(echo "$times" | tr ' ' '\n' | grep -v '^$' | sort -n | sed -n 4p)
-echo "prepare-commit-msg shim: median ${median}ms over 7 runs (${times# }) — budget ${BUDGET_MS}ms"
-[ "$median" -le "$BUDGET_MS" ] || { echo "over budget" >&2; exit 1; }
+# bench <checkout> <label>: an agent session with a manifest, so the timed path includes
+# the staged-files intersection (the expensive branch), not the early exit.
+bench() {
+  cd "$1"
+  sid="018f3a2c-bench-$2"
+  printf '{"session_id":"%s","hook_event_name":"SessionStart","cwd":"%s"}' "$sid" "$1" | terma hook --user session-start
+  mkdir -p src; echo "$2" > src/a.go
+  printf '{"session_id":"%s","hook_event_name":"PostToolUse","tool_name":"Edit","tool_input":{"file_path":"%s/src/a.go"},"cwd":"%s"}' "$sid" "$1" "$1" | terma hook --user post-tool-use
+  git add src/a.go
+  echo "feat: bench" > "$tmp/msg.txt"
+  sh "$hook" "$tmp/msg.txt" message
+  grep -q "Agent-Session-Id: $sid" "$tmp/msg.txt" || { echo "$2: the hook did not stamp: the timed path is not the real one" >&2; exit 1; }
+  times=""
+  i=0
+  while [ $i -lt 7 ]; do
+    echo "feat: bench" > "$tmp/msg.txt"
+    start=$(ms)
+    sh "$hook" "$tmp/msg.txt" message
+    end=$(ms)
+    times="$times $((end - start))"
+    i=$((i + 1))
+  done
+  median=$(echo "$times" | tr ' ' '\n' | grep -v '^$' | sort -n | sed -n 4p)
+  echo "prepare-commit-msg, $2: median ${median}ms over 7 runs (${times# }) — budget ${BUDGET_MS}ms"
+  [ "$median" -le "$BUDGET_MS" ] || { echo "$2: over budget" >&2; exit 1; }
+}
+
+bench "$repo" checkout
+bench "$tmp/wt" worktree

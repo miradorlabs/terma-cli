@@ -22,7 +22,9 @@ terma doctor      # verify the chain end to end
 organization's only team, else a picker), records which coding agents you use, fetches
 the team's collection policy, points those agents at the local relay, and writes the
 agents' machine-wide hooks and git's global `core.hooksPath`. It writes nothing into a
-repository. Run it again to repair the machine, to switch team, or, with `--org`, to
+repository's working tree or committed files; a clone with its own hooks path (husky's,
+say) gets a git config entry routing it through terma's hooks, which `terma teardown`
+removes. Run it again to repair the machine, to switch team, or, with `--org`, to
 switch organization.
 
 `terma doctor` checks the result, `terma update` keeps terma current, and `terma
@@ -180,7 +182,7 @@ Reads use the team you chose at setup; `--team <id>` overrides it for one comman
 
 Authentication uses a browser handoff with PKCE and a loopback callback. Credentials
 and team keys stay in the user's configuration directory with restrictive file
-permissions; nothing is written into a repository. What content leaves is the team's
+permissions; none is written into a repository. What content leaves is the team's
 collection policy alone, applied on this machine before anything is sent.
 
 ## Commands

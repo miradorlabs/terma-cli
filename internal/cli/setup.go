@@ -71,7 +71,9 @@ func (app *App) newSetupCommand() *cobra.Command {
      the background (--relay-service off: started on demand instead).
   5. Writes the agents' machine-wide hooks and git's global core.hooksPath, so a
      session or commit in a folder the policy lists is recorded for your team,
-     and nothing anywhere else. Nothing is written into a repository.
+     and nothing anywhere else. Nothing is written into a repository's working
+     tree or committed files; a clone with its own hooks path gets a git config
+     entry routing it through terma's hooks (terma teardown removes it).
 
 Run it again any time: it reuses a working sign-in, --team switches team, --org
 switches organization, and --relay-addr moves the relay off a port another program
