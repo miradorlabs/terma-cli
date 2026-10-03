@@ -1,7 +1,7 @@
 // Terma telemetry plugin for OpenCode.
 //
-// Installed by `terma install` into OpenCode's plugins directory, where it is loaded at
-// startup; `terma teardown` removes it. Do not edit — the next install rewrites it.
+// Installed by `terma relay setup` into OpenCode's plugins directory, where it is loaded at
+// startup; `terma teardown` removes it. Do not edit — the next setup or update rewrites it.
 // CONFIG below is the only part that differs per machine.
 //
 // What it does: turns OpenCode's own events into OpenTelemetry — one span per model

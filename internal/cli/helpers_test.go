@@ -9,7 +9,7 @@ import (
 )
 
 // userSandbox also leaves the repository the test binary was built in, so status reads
-// no real .terma/settings.json.
+// nothing of it.
 func userSandbox(t *testing.T) string {
 	t.Helper()
 	claudeDir := t.TempDir()
