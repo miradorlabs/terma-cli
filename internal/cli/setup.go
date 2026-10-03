@@ -66,11 +66,11 @@ func (app *App) newSetupCommand() *cobra.Command {
   1. Signs you in (a browser handoff; --no-browser prints the URL instead).
   2. Records which coding agents you work with.
   3. Chooses your team (--team names it) and fetches its collection policy, which
-     lists the folders it collects.
+     lists the repositories it collects.
   4. Points those agents' telemetry at terma's local relay, and runs the relay in
      the background (--relay-service off: started on demand instead).
   5. Writes the agents' machine-wide hooks and git's global core.hooksPath, so a
-     session or commit in a folder the policy lists is recorded for your team,
+     session or commit in a repository the policy lists is recorded for your team,
      and nothing anywhere else. Nothing is written into a repository's working
      tree or committed files; a clone with its own hooks path gets a git config
      entry routing it through terma's hooks (terma teardown removes it).

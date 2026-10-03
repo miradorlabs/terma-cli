@@ -50,8 +50,8 @@ func (app *App) NewRootCommand() *cobra.Command {
 
   terma setup      once per developer: signs you in, chooses your team and coding
                    agents, and writes machine-wide hooks. Your team's policy lists
-                   the folders it collects; nothing is written into a repository's
-                   files.
+                   the repositories it collects; nothing is written into a
+                   repository's files.
                    Run it again to switch team or organization, or repair the machine.
   terma doctor     verifies the whole chain end to end; every failure names its fix.
   terma update     installs the latest release and refreshes what terma installed.

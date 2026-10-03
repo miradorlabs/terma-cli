@@ -163,7 +163,7 @@ func (s *sender) loop() {
 			continue
 		}
 		s.setKeyless(false)
-		// The folder list as it stands now: a repository removed since sends none still queued.
+		// The repository list as it stands now: a repository removed since sends none still queued.
 		if pol.Unadmitted {
 			for _, e := range entries {
 				s.r.stats.dropped(e.signal, "policy_repository", e.records)

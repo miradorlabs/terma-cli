@@ -34,7 +34,7 @@ func WriteManaged(reg *agents.Registry, dir, terma string) ([]string, error) {
 	files["README.md"] = []byte(`# terma: managed hooks
 
 Deploy these so every ` + strings.Join(names, " and ") + ` session on a machine runs terma's hooks,
-with no trust step for anyone; the team's folder list still decides what is recorded.
+with no trust step for anyone; the team's repository list still decides what is recorded.
 Each developer still runs ` + "`terma setup`" + ` once: it points the agents' exporters at the
 machine's relay, whose token is the machine's own.
 

@@ -50,7 +50,7 @@ type Env struct {
 	// Policy is the organization's collection policy; global mode places every session in its DefaultProjectID.
 	Policy config.Policy
 	// Team is the developer's team from setup, which claims every session they run in a
-	// collected folder, whatever the policy's state.
+	// collected repository, whatever the policy's state.
 	Team string
 	// Agents are the agents the developer chose at setup.
 	Agents []string

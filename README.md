@@ -35,23 +35,31 @@ Each agent is one choice for its CLI and its desktop app, which share the agent'
 user-level settings: **Claude Code & Desktop** and **Codex TUI & Desktop**. Setup
 approves terma's own Codex hooks itself.
 
-### Which folders are collected
+### Which repositories are collected
 
-Your team's collection policy, set in Terma, lists the folders it collects. A session or
-commit is recorded only in a folder the list names; everywhere else the hooks write
-nothing. Matching ignores case:
+Your team's collection policy, set in Terma, lists the repositories it collects. A
+session or commit is recorded only in a repository the list names; everywhere else the
+hooks write nothing.
 
-- an entry `name` equals the git root's folder name (for a linked worktree, also its
-  main checkout's folder name) or the origin remote's repository name
-  (`git@github.com:acme/name.git`, `https://…/acme/name`, `ssh://…/acme/name.git`), or,
-  outside Git, the working folder or any folder above it, up to the home directory;
-- an entry `owner/name` matches only origin's `owner/name`.
+Each entry is a repository as `host/owner/name`, e.g. `github.com/miradorlabs/mirador-platform`.
+The CLI admits a session only inside a git working copy whose `origin` remote, normalised,
+equals an entry ignoring case: host lowercased without port or credentials, path with
+`.git` and any trailing slash stripped, from scp (`git@host:path`), `https://`, `ssh://`
+and `git://` forms. A linked worktree reads `origin` from its main repository. A folder
+outside git, a repository with no `origin`, or an `origin` that is a local path or
+`file://` URL is never admitted. An entry has a host and at least two path segments, none
+empty; a longer path matches a longer `origin` path exactly (GitLab subgroups). An empty
+list admits nothing.
 
-So a checkout in `checkout-a` with origin `acme/mirador-platform` is collected by
-`mirador-platform`, `checkout-a` or `acme/mirador-platform`, and so is a worktree of it at
-`checkout-a/.claude/worktrees/fix-1`. In global mode the policy
-collects every folder. Each session reports to the team of the developer who ran it,
-so two developers on different teams in one repository each report to their own.
+So a clone in any folder, a subdirectory of it, and a worktree of it at
+`.claude/worktrees/fix-1` are all collected by `github.com/acme/api` when origin is
+`git@github.com:acme/api.git` or `https://github.com/acme/api`; a fork whose origin is
+`github.com/you/api` is not. An SSH host alias (`git@github-work:acme/api` through
+`~/.ssh/config`) normalises to host `github-work` and does not match
+`github.com/acme/api`; `terma doctor` shows the origin terma sees. In global mode the
+policy collects every folder, inside git or not. Each session reports to the team of the
+developer who ran it, so two developers on different teams in one repository each report
+to their own.
 
 ### Hook managers
 
@@ -132,10 +140,11 @@ On the latest release, `terma update` does just that refresh.
 Your agents export to a relay terma runs on your machine (on `127.0.0.1`), from their own
 user-level settings — which is also what Claude Desktop, Codex Desktop and IDE extensions
 read, so they are covered too. A machine-wide hook claims each session that runs in a
-folder your team collects, for your team; the relay forwards only claimed sessions, with
-your team's key. Everything else — personal work, other folders — waits briefly in
-memory and is dropped: it never leaves your machine. A session that moves to a folder
-the list does not name, or whose folder leaves the list, stops being forwarded.
+repository your team collects, for your team; the relay forwards only claimed sessions,
+with your team's key. Everything else — personal work, other repositories, folders
+outside git — waits briefly in memory and is dropped: it never leaves your machine. A
+session that moves to a repository the list does not name, or whose repository leaves
+the list, stops being forwarded.
 
 What content leaves is your team's collection policy, set in Terma, and nothing else.
 The relay and the hook queue's delivery fetch it with your login; until they have,
@@ -143,8 +152,8 @@ nothing they would send leaves. Agents send prompts, model responses and tool in
 output to the relay, and the relay removes what the policy does not collect before
 anything leaves. Hook events, which queue on this machine and never pass the relay, are
 held to the same policy when they are sent: an event queued before the policy tightened
-leaves without the content it no longer collects, and one from a folder no longer listed
-does not leave.
+leaves without the content it no longer collects, and one from a repository no longer
+listed does not leave.
 
 `terma setup` runs the relay as a per-user background service, so it is up before any
 agent starts; with `--relay-service off`, hooks start it on demand. `terma update`
@@ -186,7 +195,7 @@ terma doctor
 
 `doctor` opens with what this machine collects and what the repository has in progress
 (the active session, uncommitted agent edits), then checks every link end to end —
-sign-in, whether the team collects this folder, hooks, the agents' export, the queue,
+sign-in, whether the team collects this repository (and the origin terma sees), hooks, the agents' export, the queue,
 and delivery to the backend. Every failure names its fix.
 
 Organization and team names are shown without UUIDs in normal output; pickers show the
@@ -223,7 +232,8 @@ terma is one binary with three roles:
 - the **hooks** that coding agents and git run machine-wide (`terma hook <event>`,
   `internal/hooks`);
 - a **local relay daemon** (`terma relay run`, `internal/relay`). It forwards an
-  agent's own telemetry only for sessions a hook claimed in a folder the team collects.
+  agent's own telemetry only for sessions a hook claimed in a repository the team
+  collects.
 
 Each coding agent is a plugin: one package under `internal/agents/<name>`, behind the
 interfaces in `internal/agents`, and registered in `internal/agents/builtin`. Nothing

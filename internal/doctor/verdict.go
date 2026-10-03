@@ -182,7 +182,7 @@ type HarnessVerdict struct {
 	SendsGlobally bool
 }
 
-// Reaches reports whether the agent's sessions reach this project; bound means a folder
+// Reaches reports whether the agent's sessions reach this project; bound means a repository
 // the team collects, the only place its silence counts.
 func (v HarnessVerdict) Reaches(bound bool) bool {
 	if v.EmissionProblem != "" {

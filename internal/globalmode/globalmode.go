@@ -1,6 +1,6 @@
 // Package globalmode is what `terma setup` writes on a machine in every mode: each agent's
 // machine-wide hooks, git's global core.hooksPath, and the managed configuration an
-// administrator deploys instead. The team policy's folder list decides what they record.
+// administrator deploys instead. The team policy's repository list decides what they record.
 package globalmode
 
 import (
@@ -54,7 +54,7 @@ func (m Machine) apply(ctx context.Context, selected []string, install bool, sai
 		return fmt.Errorf("git's global hooks: %w", err)
 	}
 	if changed && install {
-		said("Git: commits in the team's folders are stamped (git config --global core.hooksPath); each repository's own hooks still run")
+		said("Git: commits in the team's repositories are stamped (git config --global core.hooksPath); each repository's own hooks still run")
 	} else if changed {
 		said("Git: global hooks path restored")
 	}

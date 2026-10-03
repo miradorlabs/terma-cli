@@ -48,9 +48,9 @@ npm/, install.sh        distribution
 written into a repository's working tree or committed files; a clone with its own hooks
 path gets a git config entry routing it through terma's hooks (teardown removes it).
 Every hook runs `terma hook <event>`, which first resolves
-the working copy (a git checkout's root, else the folder) and asks the team policy's
-folder list (`config.Policy.Admits`); in a folder the list does not name it writes
-nothing. Each session is claimed for the developer's own team from setup.
+the working copy's `origin` as `host/path` (`gitx.RepositoryFS`) and asks the team
+policy's repository list (`config.Policy.Admits`); in a repository the list does not
+name, or outside git, it writes nothing. Each session is claimed for the developer's own team from setup.
 
 **Commits.** The agent hooks announce the session and record the files it edits in a
 session manifest. At commit time, `prepare-commit-msg` matches the staged files against
@@ -62,10 +62,10 @@ delivers them to each project.
 **Telemetry.** Claude Code and Codex ignore exporter settings in repository config, and
 desktop apps and IDE extensions read only user-level settings. But a user-level exporter
 sends everything, personal work included, under one key. So every agent's user-level
-exporter points at a relay that terma runs on `127.0.0.1`. A hook in a collected folder
-claims its session for the developer's team, naming the folder. The relay forwards only
-claimed sessions, only from the processes the claim names, and only while the policy
-still lists the claim's folder. It sends them with the team's key and applies the team's
+exporter points at a relay that terma runs on `127.0.0.1`. A hook in a collected repository
+claims its session for the developer's team, naming the repository. The relay forwards
+only claimed sessions, only from the processes the claim names, and only while the policy
+still lists the claim's repository. It sends them with the team's key and applies the team's
 collection policy: agents export all content to it, and the policy alone decides what
 leaves (`config.Policy.Content`). Hook events never pass the relay, so delivery applies
 the same rules when it sends them. Everything else is held briefly in memory and
@@ -81,5 +81,5 @@ dropped: nothing unclaimed leaves the machine.
 - Wire names are contracts with other repositories, so never rename them: the commit
   trailers, hook event names, and spool event names (`internal/hooks/hookrun/events.go`).
 - Nothing terma does writes into a repository's working tree or committed files. What a developer collects is the
-  team policy's folder list, read through `config.Policy.Admits` alone.
+  team policy's repository list, read through `config.Policy.Admits` alone.
 - Help text never mentions the hidden `dev` and `local` environments.

@@ -18,7 +18,7 @@ func (app *App) newDoctorCommand() *cobra.Command {
 		Short: "Verify the whole chain end to end and report setup readiness",
 		Long: `Says what this machine collects and what the repository has in progress, then
 checks every link between a coding agent and the Terma backend: the binary,
-your sign-in, whether your team collects this folder, the machine-wide hooks, the
+your sign-in, whether your team collects this repository, the machine-wide hooks, the
 harness export, the event spool, and delivery of what it holds to the backend.
 
 Every failure names the command that fixes it, and the report ends with the

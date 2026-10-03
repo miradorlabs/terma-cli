@@ -1,5 +1,5 @@
 // Package relay is the local OTLP relay: agents' exporters send to it on loopback, and it
-// forwards a record only when a hook in a collected folder claimed its session and the
+// forwards a record only when a hook in a collected repository claimed its session and the
 // record came from a process that claim names, to that project with its key and content
 // policy. Everything else waits briefly in memory, since a first export can race the
 // claiming hook, and is then dropped without touching disk.
