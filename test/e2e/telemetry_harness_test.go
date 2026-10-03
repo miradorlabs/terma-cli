@@ -17,11 +17,10 @@ const telemetryCommand = "printf TERMA_TELEMETRY_TOOL"
 // These scenarios use real harnesses and exporters with deterministic provider
 // responses. No provider credentials, model compliance or paid calls are needed.
 //
-// Claude runs two ways. content/redacted connect it machine-wide (`terma connect`
-// and its content switches). install-content/install-redacted set it up the way `terma
-// install` does for a developer: its exporter at the local relay, which forwards this
-// repository's sessions under the project's policy — install's own default, which sends
-// prompts and responses, and the `--prompts off` its checklist names to stop them.
+// Claude runs two ways. content exports machine-wide straight to the receiver, an exporter
+// the sandbox writes itself. relay-content/relay-redacted set it up the way
+// `terma setup` does for a developer: its exporter at the local relay, which forwards
+// the admitted repository's sessions under the team's policy, collecting content or not.
 func TestClaudeTelemetry(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, newest bool) {
 		for _, tc := range []struct {
@@ -29,9 +28,8 @@ func TestClaudeTelemetry(t *testing.T) {
 			exclude, routed bool
 		}{
 			{"content", false, false},
-			{"redacted", true, false},
-			{"install-content", false, true},
-			{"install-redacted", true, true},
+			{"relay-content", false, true},
+			{"relay-redacted", true, true},
 		} {
 			exclude := tc.exclude
 			t.Run(tc.name, func(t *testing.T) {
@@ -67,6 +65,10 @@ func TestCodexTelemetry(t *testing.T) {
 				t.Setenv("OPENAI_API_KEY", "synthetic-telemetry-key")
 				sb := New(t, Isolated, WithCodex(b))
 				sb.ExcludeContent = exclude
+				// Only the relay withholds content, under the team's policy.
+				if exclude {
+					sb.UseRelay(RelayOptions{Start: true})
+				}
 				var calls atomic.Int32
 				provider := httptest.NewServer(codexTelemetryProvider(t, &calls))
 				defer provider.Close()
@@ -80,12 +82,16 @@ func TestCodexTelemetry(t *testing.T) {
 					t.Errorf("provider calls = %d, want tool request and final reply", calls.Load())
 				}
 				awaitTelemetry(t, sb, func(reporter contractReporter, e telemetryEvidence) {
-					checkCodexTelemetry(reporter, e, run.ThreadID, sb.ProjectID, exclude, false)
+					checkCodexTelemetry(reporter, e, run.ThreadID, sb.ProjectID, exclude, exclude)
 				})
 				if knownUpstream(upstreamCodexSessionEnd) && len(sb.Delivered("terma.session.end", run.ThreadID, 10*time.Second)) == 0 {
 					t.Logf("KNOWN UPSTREAM: Codex exited without running SessionEnd; tolerated by TERMA_E2E_KNOWN_UPSTREAM (TestCodexSessionEndProbe)")
 				}
-				checkTelemetrySchema(t, sb.Receiver.evidence(), "codex", exclude, newest)
+				if exclude {
+					checkTelemetrySchemaAt(t, sb.Receiver.evidence(), "codex", "relay/codex-withheld", newest)
+				} else {
+					checkTelemetrySchema(t, sb.Receiver.evidence(), "codex", false, newest)
+				}
 			})
 		}
 	})

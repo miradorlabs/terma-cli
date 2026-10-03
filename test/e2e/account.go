@@ -22,8 +22,10 @@ type Account struct {
 	token     string
 	mints     atomic.Int32
 	denyMints atomic.Bool
-	mu        sync.Mutex
-	keys      map[string]string // project → minted key
+	// withholdContent is the team's collection policy: no prompts, no tool content.
+	withholdContent atomic.Bool
+	mu              sync.Mutex
+	keys            map[string]string // project → minted key
 }
 
 // accountOrg is the organization the fake account signs the developer in to.
@@ -56,7 +58,9 @@ func (sb *Sandbox) StartAccount() *Account {
 				http.Error(w, "missing policy project_id", http.StatusBadRequest)
 				return
 			}
-			fmt.Fprint(w, `{"policy":{"version":"1.0","terma":{"per_repository":{},"capture":{"exclude_paths":[],"exclude_prompts":false,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-09-30T12:27:05Z"}`)
+			withhold := a.withholdContent.Load()
+			repos, _ := json.Marshal(append([]string{}, sb.Repositories...))
+			fmt.Fprintf(w, `{"policy":{"version":"1.0","terma":{"per_repository":{"repositories":%s},"capture":{"exclude_prompts":%t,"exclude_tool_content":%t}}},"revision":1,"updated_at":"2026-09-30T12:27:05Z"}`, repos, withhold, withhold)
 		case "/v1/api-keys/server":
 			if a.denyMints.Load() {
 				w.WriteHeader(http.StatusForbidden)
@@ -78,16 +82,29 @@ func (sb *Sandbox) StartAccount() *Account {
 		}
 	}))
 	sb.T.Cleanup(a.srv.Close)
-	// The developer is signed in: the credential `terma setup` would have stored.
-	creds := map[string]any{"default": map[string]any{"active": accountOrg, "organizations": map[string]any{accountOrg: map[string]any{
+	sb.ExtraEnv = append(sb.ExtraEnv, "TERMA_AUTH_URL="+a.srv.URL, "TERMA_API_URL="+a.srv.URL, "TERMA_APP_URL="+a.srv.URL)
+	sb.account = a
+	sb.SignIn("default")
+	return a
+}
+
+// SignIn signs the developer in to the fake account under profile: the credential
+// `terma setup` would have stored and the organization selection login persists, with
+// the account's hosts, so launchd/systemd relays (which do not inherit ExtraEnv) load
+// the same scoped policy and login.
+func (sb *Sandbox) SignIn(profile string) {
+	a := sb.account
+	credsPath := filepath.Join(sb.TermaConfig, "credentials.json")
+	creds := map[string]any{}
+	if data, err := os.ReadFile(credsPath); err == nil {
+		_ = json.Unmarshal(data, &creds)
+	}
+	creds[profile] = map[string]any{"active": accountOrg, "organizations": map[string]any{accountOrg: map[string]any{
 		"access_token": a.token, "refresh_token": "ter_clr_live", "expires_at": time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339),
 		"auth_url": a.srv.URL, "organization_id": accountOrg, "user_email": "live@terma.test",
-	}}}}
+	}}}
 	data, _ := json.MarshalIndent(creds, "", "  ")
-	sb.writeAbs(filepath.Join(sb.TermaConfig, "credentials.json"), string(data)+"\n")
-	sb.ExtraEnv = append(sb.ExtraEnv, "TERMA_AUTH_URL="+a.srv.URL, "TERMA_API_URL="+a.srv.URL, "TERMA_APP_URL="+a.srv.URL)
-	// Mirror the organization selection that login persists, keeping the existing
-	// private sandbox's endpoint settings.
+	sb.writeAbs(credsPath, string(data)+"\n")
 	path := filepath.Join(sb.TermaConfig, "config.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -98,15 +115,15 @@ func (sb *Sandbox) StartAccount() *Account {
 		sb.T.Fatal(err)
 	}
 	profiles := file["profiles"].(map[string]any)
-	profile := profiles["default"].(map[string]any)
-	profile["organization_id"] = accountOrg
-	// Services do not inherit ExtraEnv. Persist the selected deployment as setup
-	// does for a custom host, so launchd/systemd use the same scoped policy/login.
-	profile["auth_url"], profile["api_url"], profile["app_url"] = a.srv.URL, a.srv.URL, a.srv.URL
+	p, _ := profiles[profile].(map[string]any)
+	if p == nil {
+		p = map[string]any{"otlp_url": profiles["default"].(map[string]any)["otlp_url"]}
+		profiles[profile] = p
+	}
+	p["organization_id"] = accountOrg
+	p["auth_url"], p["api_url"], p["app_url"] = a.srv.URL, a.srv.URL, a.srv.URL
 	data, _ = json.Marshal(file)
 	sb.writeAbs(path, string(data))
-	sb.account = a
-	return a
 }
 
 // KeyFor is the key the account minted for a project, "" if none.

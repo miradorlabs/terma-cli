@@ -1,3 +1,5 @@
+// Package routing keeps each team's collection policy under the config directory, which
+// hooks, the relay and delivery read without a credential.
 package routing
 
 import (
@@ -85,8 +87,12 @@ func EffectivePolicy(fallback config.Policy, team string) config.Policy {
 
 // StorePolicy records a freshly fetched policy: the team's cache, and the profile's
 // machine-wide coverage when it is the profile's team. It serializes with login changes
-// and refuses a policy fetched under an organization the profile has since left.
+// and refuses a policy fetched under another login's organization or environment, or
+// one the profile has since left; every fetcher stores through it.
 func StorePolicy(cfg *config.Config, pol *config.Policy) error {
+	if !pol.AppliesTo(cfg.OrganizationID, cfg.AuthURL) {
+		return errors.New("the collection policy fetched belongs to another organization or environment")
+	}
 	var rejected error
 	err := config.UpdateProfile(cfg.ProfileName, func(p *config.Profile) {
 		if p.OrganizationID == "" && cfg.OrganizationID != "" {

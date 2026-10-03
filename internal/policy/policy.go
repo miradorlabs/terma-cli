@@ -22,9 +22,6 @@ const RefreshInterval = time.Minute
 // Source fetches policies as one terma build.
 type Source struct {
 	Version string
-	// ModeChanged applies a refreshed policy of the profile's own team machine-wide
-	// (global mode on or off).
-	ModeChanged func(ctx context.Context, cfg *config.Config, pol config.Policy) error
 }
 
 // Fetch asks cfg's organization for the collection policy of cfg's project, else its
@@ -78,13 +75,6 @@ func (s Source) Refresh(ctx context.Context, cfg *config.Config) error {
 		return err
 	}
 	cfg.Policy = pol
-	file, err := config.LoadFile()
-	if err != nil {
-		return err
-	}
-	if p := file.Profiles[cfg.ProfileName]; p != nil && p.Policy != nil && p.Policy.TeamID == pol.TeamID && s.ModeChanged != nil {
-		return s.ModeChanged(ctx, cfg, pol)
-	}
 	return nil
 }
 

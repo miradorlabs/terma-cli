@@ -28,6 +28,7 @@ func (app *App) relayDeps() daemon.Deps {
 		Correlators:   app.agents.With[shape.Correlator](),
 		Capturers:     app.agents.With[shape.Capturer](),
 		AgentName:     app.agents.NameForTool,
+		RelayTargets:  app.agents.RelayTargets,
 		Endpoint:      app.delivery().Endpoint,
 		CreateKey:     app.createProjectKey,
 		SendHeartbeat: app.relayHeartbeatSend,
@@ -37,17 +38,14 @@ func (app *App) relayDeps() daemon.Deps {
 	}
 }
 
-// policies fetch collection policies as this build, and switch global mode when the
-// profile's own team's changes.
+// policies fetch collection policies as this build.
 func (app *App) policies() policy.Source {
-	return policy.Source{Version: app.version, ModeChanged: func(ctx context.Context, cfg *config.Config, pol config.Policy) error {
-		return app.globalMode().Apply(ctx, cfg.Harnesses, pol.Global(), func(string) {}, func(string) {}, func(string) {})
-	}}
+	return policy.Source{Version: app.version}
 }
 
-// globalMode is this machine as global mode writes it.
+// globalMode is this machine as setup writes it.
 func (app *App) globalMode() globalmode.Machine {
-	return globalmode.Machine{Agents: app.agents, Terma: app.hookExecutable, ManagedRoot: app.managedRoot, RelayDir: daemon.Dir}
+	return globalmode.Machine{Agents: app.agents, Terma: app.hookExecutable, ManagedRoot: app.managedRoot}
 }
 
 func (app *App) createProjectKey(ctx context.Context, cfg *config.Config, projectID string) (string, error) {

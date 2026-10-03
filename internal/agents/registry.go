@@ -120,21 +120,6 @@ func (r *Registry) Surface(name string) (Surface, Agent, bool) {
 // Names lists every known agent's name.
 func (r *Registry) Names() []string { return names(r.all) }
 
-// RepoNames lists the agents that commit a hooks file into a repository.
-func (r *Registry) RepoNames() []string {
-	return collect(r.all, func(a Agent) (string, bool) { return a.Name(), a.HooksPath() != "" })
-}
-
-// HooksPaths lists the files agents commit their hooks to, relative to a repository.
-func (r *Registry) HooksPaths() []string {
-	return collect(r.all, func(a Agent) (string, bool) { return a.HooksPath(), a.HooksPath() != "" })
-}
-
-// WiredNames lists the agents whose committed hooks root carries.
-func (r *Registry) WiredNames(root string) []string {
-	return collect(r.all, func(a Agent) (string, bool) { return a.Name(), Wired(root, a) })
-}
-
 // Handlers is every known agent's events. Names are unique across agents.
 func (r *Registry) Handlers() map[string]Handler {
 	r.index()

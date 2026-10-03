@@ -72,7 +72,6 @@ const (
 	KeyAuth          = "auth"
 	KeyProject       = "team"
 	KeyHooks         = "hooks"
-	KeyAgentHooks    = "agent-hooks"
 	KeyUserHooks     = "user-hooks"
 	KeyHarness       = "harness"
 	KeyCompatibility = "compatibility"

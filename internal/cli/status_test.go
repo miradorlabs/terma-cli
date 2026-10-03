@@ -40,7 +40,7 @@ func TestHarnessState(t *testing.T) {
 		{
 			name: "exporting to another project is not connected",
 			st:   harness.Status{Connected: true, Endpoint: otlp, ProjectID: "c970664b-ba35-4cdd-b7a9-d5acadb327f6"},
-			want: "→ reporting to team c970664b-ba35-4cdd-b7a9-d5acadb327f6, not this one — run `terma install`",
+			want: "→ reporting to team c970664b-ba35-4cdd-b7a9-d5acadb327f6, not this one — run `terma setup`",
 			ok:   false, project: project,
 		},
 		{

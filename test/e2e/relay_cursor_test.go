@@ -23,10 +23,10 @@ import (
 // (cursor_test.go).
 func TestRelayCursorHooks(t *testing.T) {
 	track(t)
+	cursorHooksUnavailable(t)
 	sb := New(t, Isolated)
-	sb.terma(sb.Repo, "install", "--harness", "none", "--no-browser", "--team", sb.ProjectID, "--adapters", "cursor", "--yes")
 	sb.UseRelay(RelayOptions{Start: true})
-	raw, err := os.ReadFile(filepath.Join(sb.Repo, ".cursor", "hooks.json"))
+	raw, err := os.ReadFile(filepath.Join(sb.Home, ".cursor", "hooks.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

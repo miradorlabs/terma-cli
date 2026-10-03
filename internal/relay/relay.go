@@ -1,5 +1,5 @@
 // Package relay is the local OTLP relay: agents' exporters send to it on loopback, and it
-// forwards a record only when a hook in an opted-in repository claimed its session and the
+// forwards a record only when a hook in a collected repository claimed its session and the
 // record came from a process that claim names, to that project with its key and content
 // policy. Everything else waits briefly in memory, since a first export can race the
 // claiming hook, and is then dropped without touching disk.
@@ -47,11 +47,10 @@ type Policy struct {
 	IncludePrompts     bool
 	IncludeToolContent bool
 	// Signals nil allows every signal; empty allows none.
-	Signals []string
-	// Excludes reports whether an attribute, in protojson's shape, names an excluded
-	// file; nil when nothing is excluded.
-	Excludes     func(value any) bool
+	Signals      []string
 	RequireClaim bool
+	// Unadmitted is a claim whose repository the team policy no longer lists: its records drop.
+	Unadmitted bool
 }
 
 // ErrNoKey is Resolve's answer for a project this machine holds no key for; its parts wait, then drop.

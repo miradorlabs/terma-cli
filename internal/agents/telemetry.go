@@ -92,12 +92,10 @@ type StatusLineState struct {
 	Overrides []string
 }
 
-// Notifier is an agent with an end-of-turn notifier terma chains in front of the
-// developer's own, to capture funding evidence.
+// Notifier is an agent whose end-of-turn notifier an earlier terma chained in front of
+// the developer's own; teardown restores theirs. Funding evidence now comes from hooks.
 type Notifier interface {
 	Agent
-	NotifierInstalled() (bool, error)
-	InstallNotifier() (bool, error)
 	RemoveNotifier() (bool, error)
 }
 

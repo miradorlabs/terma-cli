@@ -25,7 +25,7 @@ const (
 	minBackoff    = time.Second
 	maxBackoff    = 2 * time.Minute
 	maxRetryAfter = 10 * time.Minute
-	// A refused key is not fixed by asking again soon: `terma install` stores a new one.
+	// A refused key is not fixed by asking again soon: `terma setup` stores a new one.
 	refusedBackoff    = 5 * time.Minute
 	maxRefusedBackoff = time.Hour
 	keylessRetry      = time.Minute
@@ -66,7 +66,7 @@ func (r *Relay) enqueue(c claim.Claim, p *part) {
 		return
 	}
 	e := newEntry(r.opts.Now(), p.signal, p.records)
-	if err := r.outbox.put(rt, e, body); err != nil {
+	if err := r.outbox.put(rt, c.Repository, e, body); err != nil {
 		r.stats.dropped(p.signal, "outbox_write_failed", p.records)
 		r.warnf("outbox %s: %v; dropped %d %s", rt, err, p.records, p.signal)
 		return
@@ -111,6 +111,7 @@ func (s *sender) loop() {
 	backoff := time.Duration(0)
 	// single sends one file per request after a merged request was refused, so one bad file is set aside alone.
 	single := false
+	c := claim.Claim{ProjectID: s.route.project, Tool: s.route.toolLabel(), Repository: s.r.outbox.identity(s.route)}
 	stopping := func() bool {
 		select {
 		case <-s.r.stopping:
@@ -153,7 +154,7 @@ func (s *sender) loop() {
 			}
 			continue
 		}
-		pol, ok := s.r.resolve(claim.Claim{ProjectID: s.route.project, Tool: s.route.toolLabel()})
+		pol, ok := s.r.resolve(c)
 		if !ok {
 			s.setKeyless(true)
 			if stopping() || !sleep(keylessRetry) {
@@ -162,6 +163,15 @@ func (s *sender) loop() {
 			continue
 		}
 		s.setKeyless(false)
+		// The repository list as it stands now: a repository removed since sends none still queued.
+		if pol.Unadmitted {
+			for _, e := range entries {
+				s.r.stats.dropped(e.signal, "policy_repository", e.records)
+			}
+			s.r.outbox.remove(s.route, entries)
+			s.delivered(len(entries))
+			continue
+		}
 		if single {
 			entries = entries[:1]
 		}
@@ -180,12 +190,6 @@ func (s *sender) loop() {
 			for _, e := range batch {
 				records += e.records
 			}
-			if body == nil && tl.excluded > 0 {
-				reason = "policy_path" // the excluded path took every record
-			} else if tl.excluded > 0 {
-				s.r.stats.dropped(batch[0].signal, "policy_path", tl.excluded)
-				records -= tl.excluded
-			}
 			s.r.stats.dropped(batch[0].signal, reason, records)
 			s.r.outbox.remove(s.route, batch)
 			s.delivered(len(batch))
@@ -195,7 +199,7 @@ func (s *sender) loop() {
 		switch out {
 		case sent:
 			s.r.count(batch[0].signal, tl)
-			records := -tl.excluded
+			records := 0
 			for _, e := range batch {
 				records += e.records
 			}
@@ -213,10 +217,7 @@ func (s *sender) loop() {
 				continue
 			}
 			single = false
-			if tl.excluded > 0 {
-				s.r.stats.dropped(batch[0].signal, "policy_path", tl.excluded)
-			}
-			s.r.stats.dropped(batch[0].signal, "upstream_"+detail, batch[0].records-tl.excluded)
+			s.r.stats.dropped(batch[0].signal, "upstream_"+detail, batch[0].records)
 			s.r.warnf("upstream %s refused %d %s: %s", s.route, batch[0].records, batch[0].signal, detail)
 			s.r.outbox.bury(s.route, batch[0])
 			s.delivered(1)

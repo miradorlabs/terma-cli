@@ -69,15 +69,6 @@ func (c exporter) notifySetting() (notifyStatus, error) {
 	return st, nil
 }
 
-// NotifierInstalled reports whether Terma's turn notifier is still present.
-func (c exporter) NotifierInstalled() (bool, error) {
-	state, err := c.notifySetting()
-	return state.Terma, err
-}
-
-// InstallNotifier installs turn capture while chaining the developer's notifier.
-func (c exporter) InstallNotifier() (bool, error) { return c.installNotify() }
-
 // RemoveNotifier restores the notifier that preceded Terma's turn capture.
 func (c exporter) RemoveNotifier() (bool, error) { return c.removeNotify() }
 

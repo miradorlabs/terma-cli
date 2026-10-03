@@ -10,7 +10,7 @@ import (
 )
 
 // T3 Code through the relay. One T3 server runs a Codex thread and a Claude thread in
-// the bound repository, and one of each in a personal project beside it: the
+// the admitted repository, and one of each in a personal project beside it: the
 // repository's reach its project — prompts included, content being allowed — and the
 // personal ones reach nothing. T3 spawns one app-server per thread and Claude through
 // the Agent SDK, each exporting from the process that runs its hooks, so nothing about

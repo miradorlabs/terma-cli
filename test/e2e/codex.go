@@ -74,7 +74,7 @@ func (sb *Sandbox) codexEnv(route Route) []string {
 	return env
 }
 
-// prepareCodex trusts the sandbox repository, connects Codex to the receiver
+// prepareCodex trusts the sandbox repository, points Codex at the receiver
 // and installs the route's login. Trust first: an untrusted project skips its
 // .codex/ layer, hooks included, and the record is what a developer's own
 // approval writes into config.toml.
@@ -93,7 +93,7 @@ func (sb *Sandbox) prepareCodex(route Route) {
 			t.Fatal(err)
 		}
 	}
-	sb.connectCodex()
+	sb.directCodex()
 	if route == RouteAPIKey {
 		// Use Codex's login flow, scoped to the scratch CODEX_HOME. Keep the
 		// key off command arguments and force file storage to avoid Keychain.
@@ -122,11 +122,50 @@ func (sb *Sandbox) prepareCodex(route Route) {
 	}
 }
 
-// withdrawCodexRepoTrust removes every approval of the repository's Codex hooks from
-// config.toml, counting them in codexTrustWithdrawn: `terma install` approves its own, so
+// directCodex points Codex's user-level exporter straight at the receiver, once, unless
+// the scenario uses the relay: the [otel] table a developer's config.toml held before
+// the relay was the only route, in place of the relay's that setup wrote.
+func (sb *Sandbox) directCodex() {
+	t := sb.T
+	t.Helper()
+	if sb.codexDirect || sb.relayed {
+		return
+	}
+	sb.codexDirect = true
+	exporter := func(signal string) string {
+		return "{ otlp-http = { endpoint = " + tomlQuote(sb.Receiver.URL()+"/v1/"+signal) +
+			", headers = { Authorization = " + tomlQuote("Bearer "+liveKey) + " }, protocol = \"binary\" } }"
+	}
+	otel := "[otel]\nexporter = " + exporter("logs") + "\nlog_user_prompt = true\nmetrics_exporter = " + exporter("metrics") +
+		"\nspan_attributes = { \"mirador.project.id\" = " + tomlQuote(sb.ProjectID) + " }\ntrace_exporter = " + exporter("traces") + "\n"
+	cfg := filepath.Join(sb.CodexHome, "config.toml")
+	existing, _ := os.ReadFile(cfg)
+	if err := os.WriteFile(cfg, []byte(withoutTable(string(existing), "[otel]")+"\n"+otel), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	sb.useLiveKey()
+}
+
+// withoutTable is TOML text with one table, header to the next header, removed.
+func withoutTable(config, header string) string {
+	var out []string
+	dropping := false
+	for line := range strings.Lines(config) {
+		if trimmed := strings.TrimSpace(line); strings.HasPrefix(trimmed, "[") {
+			dropping = trimmed == header
+		}
+		if !dropping {
+			out = append(out, line)
+		}
+	}
+	return strings.Join(out, "")
+}
+
+// withdrawCodexHookTrust removes every approval of terma's machine-wide Codex hooks from
+// config.toml, counting them in codexTrustWithdrawn: `terma setup` approves its own, so
 // a developer whose Codex does not trust them is one whose approvals are gone (reset, or
 // never written).
-func (sb *Sandbox) withdrawCodexRepoTrust() {
+func (sb *Sandbox) withdrawCodexHookTrust() {
 	t := sb.T
 	t.Helper()
 	cfg := filepath.Join(sb.CodexHome, "config.toml")
@@ -134,10 +173,7 @@ func (sb *Sandbox) withdrawCodexRepoTrust() {
 	if err != nil {
 		return
 	}
-	hooks := []string{filepath.Join(sb.Repo, ".codex", "hooks.json") + ":"}
-	if resolved, err := filepath.EvalSymlinks(sb.Repo); err == nil {
-		hooks = append(hooks, filepath.Join(resolved, ".codex", "hooks.json")+":")
-	}
+	hooks := []string{filepath.Join(sb.CodexHome, "hooks.json") + ":"}
 	var out []string
 	dropping, dropped := false, 0
 	for line := range strings.Lines(string(data)) {
@@ -169,7 +205,7 @@ func (sb *Sandbox) CodexExec(route Route, prompt string, extra ...string) *Codex
 	t.Helper()
 	sb.prepareCodex(route)
 	if sb.CodexHooksUntrusted {
-		sb.withdrawCodexRepoTrust()
+		sb.withdrawCodexHookTrust()
 	}
 	args := []string{"exec", "--json", "--skip-git-repo-check"}
 	if !sb.CodexHooksUntrusted {

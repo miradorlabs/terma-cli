@@ -84,11 +84,11 @@ func TestConfigRoundTrip(t *testing.T) {
 }
 
 func TestRelativize(t *testing.T) {
-	root := filepath.Join(string(filepath.Separator), "repo")
+	root := filepath.Join(t.TempDir(), "repo") // absolute on every OS, a drive included
 	if got := Relativize(root, filepath.Join(root, "src", "a.go")); got != "src/a.go" {
 		t.Fatalf("got %q", got)
 	}
-	if got := Relativize(root, filepath.Join(string(filepath.Separator), "elsewhere", "x")); got != "" {
+	if got := Relativize(root, filepath.Join(t.TempDir(), "elsewhere", "x")); got != "" {
 		t.Fatalf("outside the root should be empty, got %q", got)
 	}
 	if got := Relativize(root, "already/relative.go"); got != "already/relative.go" {

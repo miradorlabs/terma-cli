@@ -12,9 +12,6 @@ import (
 	"strings"
 )
 
-// committedHookShape is HookCommand's output for any event, with or without a PATH prefix.
-var committedHookShape = regexp.MustCompile(`^(PATH="[^"]*"; )?command -v terma >/dev/null 2>&1 && terma hook [a-z0-9-]+ \|\| true$`)
-
 // userHookShape is UserHookCommand's and ManagedHookCommand's output for any path and event.
 var userHookShape = regexp.MustCompile(`^\[ -x ('(?:[^']|'\\'')+'|"(?:[^"\\]|\\.)+") \] && ('(?:[^']|'\\'')+'|"(?:[^"\\]|\\.)+") hook --user [a-z0-9-]+ \|\| true$`)
 
@@ -102,7 +99,7 @@ func MarshalOrdered(m map[string]json.RawMessage) ([]byte, error) {
 // that merely mentions "terma hook" is not terma's.
 func ownedHookCommand(command string) bool {
 	command = strings.TrimSpace(command)
-	return committedHookShape.MatchString(command) || userHookShape.MatchString(command)
+	return userHookShape.MatchString(command)
 }
 
 // WithoutTerma removes only owned command leaves, retaining unrelated handlers in

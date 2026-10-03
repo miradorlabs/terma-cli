@@ -9,8 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/routing"
-
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
@@ -55,7 +53,7 @@ func (h *ingestHost) keysSeen() []string {
 }
 
 // routingSandbox gives a test its own config dir and a profile host no one listens on, so
-// ignoring the routing record fails fast.
+// ignoring a key's own host fails fast.
 func routingSandbox(t *testing.T) {
 	t.Helper()
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
@@ -65,16 +63,10 @@ func routingSandbox(t *testing.T) {
 	}
 }
 
-// routeProject stores a project's key and the routing record naming its host.
+// routeProject stores a project's key with the host it belongs to.
 func routeProject(t *testing.T, projectID, key, endpoint string) {
 	t.Helper()
-	if err := keystore.Set(projectID, key, keystore.Hosts{}); err != nil {
-		t.Fatal(err)
-	}
-	if endpoint == "" {
-		return
-	}
-	if err := routing.SaveRecord(routing.Record{ProjectID: projectID, Endpoint: endpoint, Signals: []string{"logs"}, Harnesses: []string{"claude"}}); err != nil {
+	if err := keystore.Set(projectID, key, keystore.Hosts{OTLP: endpoint}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -93,7 +85,7 @@ func queuedProjects(t *testing.T) []string {
 	return ids
 }
 
-// Each project's events go to the host its routing record names, and no key is shown to
+// Each project's events go to the host its key was stored with, and no key is shown to
 // another host.
 func TestSpoolFlushSendsEachProjectToItsOwnHost(t *testing.T) {
 	routingSandbox(t)
@@ -213,37 +205,8 @@ func TestSpoolFlushARefusedProjectWaitsAlone(t *testing.T) {
 	}
 }
 
-// A project with no routing record reaches the hosts stored with its key.
-func TestSpoolFlushUsesTheHostsStoredWithTheKey(t *testing.T) {
-	routingSandbox(t)
-	dev := newIngestHost(t, "ter_srv_dev")
-	stale := newIngestHost(t, "ter_srv_dev")
-	// No routing record at all: the key's own hosts are all there is.
-	if err := keystore.Set(routeDevProject, "ter_srv_dev", keystore.Hosts{OTLP: dev.URL, API: "http://127.0.0.1:1"}); err != nil {
-		t.Fatal(err)
-	}
-	// And they outrank a routing record, which only restates them.
-	routeProject(t, routeProdProject, "ter_srv_dev", stale.URL)
-	if err := keystore.Set(routeProdProject, "ter_srv_dev", keystore.Hosts{OTLP: dev.URL}); err != nil {
-		t.Fatal(err)
-	}
-	s := spoolForTest(t)
-	appendEvent(t, s, routeDevProject, time.Now())
-	appendEvent(t, s, routeProdProject, time.Now())
-
-	if out, err := runTerma(t, "spool", "flush"); err != nil {
-		t.Fatalf("flush: %v\n%s", err, out)
-	}
-	if n := len(dev.keysSeen()); n != 2 {
-		t.Fatalf("the key's own host received %d sends, want 2", n)
-	}
-	if n := len(stale.keysSeen()); n != 0 {
-		t.Fatalf("the routing record's host was used over the key's own: %d sends", n)
-	}
-}
-
-// --otlp-url and TERMA_OTLP_URL still decide over the routing record.
-func TestSpoolFlushOverrideWinsOverTheRoutingRecord(t *testing.T) {
+// --otlp-url and TERMA_OTLP_URL still decide over the key's own host.
+func TestSpoolFlushOverrideWinsOverTheKeysHost(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	override := newIngestHost(t, "ter_srv_prod")
 	t.Setenv("TERMA_OTLP_URL", override.URL)

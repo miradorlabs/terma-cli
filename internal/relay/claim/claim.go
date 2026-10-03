@@ -33,11 +33,13 @@ const Refresh = 5 * time.Minute
 
 // Claim says which project a session's telemetry belongs to; its top-level fields are the latest placement.
 type Claim struct {
-	ProjectID string    `json:"project_id"`
-	Tool      string    `json:"tool,omitempty"`
-	Repo      string    `json:"repo,omitempty"`
-	Worktree  string    `json:"worktree,omitempty"`
-	ClaimedAt time.Time `json:"claimed_at"`
+	ProjectID string `json:"project_id"`
+	Tool      string `json:"tool,omitempty"`
+	Repo      string `json:"repo,omitempty"`
+	Worktree  string `json:"worktree,omitempty"`
+	// Repository is the working copy as admission names it; the relay rechecks it.
+	Repository config.Repository `json:"repository,omitzero"`
+	ClaimedAt  time.Time         `json:"claimed_at"`
 	// PIDs are the processes the claiming hooks ran under, so a session resumed by another
 	// process where no hook runs is not covered. Empty matches any sender.
 	PIDs []int `json:"pids,omitempty"`
@@ -48,12 +50,14 @@ type Claim struct {
 
 // Placement is one run of a session in one repository.
 type Placement struct {
-	ProjectID string    `json:"project_id"`
-	Tool      string    `json:"tool,omitempty"`
-	Repo      string    `json:"repo,omitempty"`
-	Worktree  string    `json:"worktree,omitempty"`
-	PIDs      []int     `json:"pids,omitempty"`
-	Since     time.Time `json:"since"`
+	ProjectID string `json:"project_id"`
+	Tool      string `json:"tool,omitempty"`
+	Repo      string `json:"repo,omitempty"`
+	Worktree  string `json:"worktree,omitempty"`
+	// Repository is Claim.Repository for this run.
+	Repository config.Repository `json:"repository,omitzero"`
+	PIDs       []int             `json:"pids,omitempty"`
+	Since      time.Time         `json:"since"`
 }
 
 // maxPIDs allows a few runs of one session, each with its chain of ancestors.
@@ -79,7 +83,7 @@ func (c Claim) placements() []Placement {
 	if len(c.Placements) > 0 {
 		return c.Placements
 	}
-	return []Placement{{ProjectID: c.ProjectID, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree, PIDs: c.PIDs}}
+	return []Placement{{ProjectID: c.ProjectID, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree, Repository: c.Repository, PIDs: c.PIDs}}
 }
 
 // At is the claim as it applies to a record pid sent at time at: the covering placement
@@ -100,7 +104,7 @@ func (c Claim) At(pid int, at time.Time) (Claim, bool) {
 		return Claim{}, false
 	}
 	return Claim{ProjectID: best.ProjectID, Tool: best.Tool, Repo: best.Repo, Worktree: best.Worktree,
-		PIDs: best.PIDs, ClaimedAt: c.ClaimedAt, Placements: c.Placements}, true
+		Repository: best.Repository, PIDs: best.PIDs, ClaimedAt: c.ClaimedAt, Placements: c.Placements}, true
 }
 
 // Dir is the relay directory, under the config dir.
@@ -197,7 +201,7 @@ func Write(sessionID string, c Claim, now time.Time) bool {
 	if havePrev && samePlace(prev, c) {
 		since = prev.placements()[len(prev.placements())-1].Since
 	}
-	placements = append(placements, Placement{ProjectID: c.ProjectID, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree, PIDs: c.PIDs, Since: since})
+	placements = append(placements, Placement{ProjectID: c.ProjectID, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree, Repository: c.Repository, PIDs: c.PIDs, Since: since})
 	if len(placements) > maxPlacements {
 		placements = placements[len(placements)-maxPlacements:]
 	}
@@ -211,7 +215,7 @@ func Write(sessionID string, c Claim, now time.Time) bool {
 }
 
 func samePlace(prev, c Claim) bool {
-	return prev.ProjectID == c.ProjectID
+	return prev.ProjectID == c.ProjectID && prev.Repository == c.Repository
 }
 
 func subset(a, b []int) bool {

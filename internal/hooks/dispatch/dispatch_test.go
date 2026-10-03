@@ -8,7 +8,6 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -17,13 +16,10 @@ import (
 // what ran.
 type fake struct{ ran *[]string }
 
-func (fake) Name() string                            { return "fake" }
-func (fake) DisplayName() string                     { return "Fake" }
-func (fake) Installed(context.Context) bool          { return true }
-func (fake) HooksPath() string                       { return "" }
-func (fake) Default(string) bool                     { return false }
-func (fake) Plan(string, bool) (hookmgr.Plan, error) { return hookmgr.Plan{}, nil }
-func (fake) FlushAfter() []string                    { return []string{"fake-stop"} }
+func (fake) Name() string                   { return "fake" }
+func (fake) DisplayName() string            { return "Fake" }
+func (fake) Installed(context.Context) bool { return true }
+func (fake) FlushAfter() []string           { return []string{"fake-stop"} }
 func (f fake) record(name string) agents.Handler {
 	return func(context.Context, hookrun.Env) error { *f.ran = append(*f.ran, name); return nil }
 }
@@ -43,7 +39,6 @@ func (f fake) WhenHooksOff() map[string]agents.Handler {
 type harness struct {
 	ran             []string
 	flushes, claims int
-	yields          bool
 	deps            Deps
 }
 
@@ -56,8 +51,7 @@ func newHarness(t *testing.T) *harness {
 	}
 	h.deps = Deps{
 		Agents:  agents.New(fake{ran: &h.ran}),
-		Policy:  func() config.Policy { return config.Policy{Mode: config.ModeRepo} },
-		Yields:  func(bool, config.Policy, string) bool { return h.yields },
+		Profile: func() Profile { return Profile{Policy: config.Policy{Mode: config.ModeRepo}} },
 		Spool:   func() *spool.Spool { return s },
 		Claimed: func(context.Context, string) { h.claims++ },
 		Flush:   func() { h.flushes++ },
@@ -107,16 +101,6 @@ func TestRunFlushesAfterTheEventsThatAsk(t *testing.T) {
 	Run(context.Background(), h.deps, request("fake-stop"))
 	if strings.Join(h.ran, ",") != "edit,stop" || h.flushes != 1 {
 		t.Fatalf("ran %v, %d flushes", h.ran, h.flushes)
-	}
-}
-
-// A repository hook that yields to a machine-wide one runs nothing.
-func TestRunYields(t *testing.T) {
-	h := newHarness(t)
-	h.yields = true
-	Run(context.Background(), h.deps, request("fake-stop"))
-	if len(h.ran) != 0 || h.flushes != 0 {
-		t.Fatalf("a yielding hook ran %v and flushed %d", h.ran, h.flushes)
 	}
 }
 

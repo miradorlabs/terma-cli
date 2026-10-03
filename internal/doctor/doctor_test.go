@@ -39,24 +39,24 @@ func TestReadinessDeduplicatesActions(t *testing.T) {
 	RenderSummary(&out, Build([]Check{
 		{Status: Warn, Fix: "open a new terminal"},
 		{Status: Warn, Fix: "open a new terminal"},
-		{Status: Fail, Fix: "terma install"},
+		{Status: Fail, Fix: "terma setup"},
 	}))
-	if strings.Count(out.String(), "open a new terminal") != 1 || !strings.Contains(out.String(), "terma install") {
+	if strings.Count(out.String(), "open a new terminal") != 1 || !strings.Contains(out.String(), "terma setup") {
 		t.Fatal(out.String())
 	}
 }
 
 func TestRenderCheck(t *testing.T) {
 	var out bytes.Buffer
-	RenderCheck(&out, Check{Status: Fail, Name: "commit hooks installed", Detail: "hooks missing", Fix: "terma install"}, NameWidth)
-	if !strings.Contains(out.String(), "FAIL  commit hooks installed") || !strings.Contains(out.String(), "→ terma install") {
+	RenderCheck(&out, Check{Status: Fail, Name: "commit hooks in effect", Detail: "hooks missing", Fix: "terma setup"}, NameWidth)
+	if !strings.Contains(out.String(), "FAIL  commit hooks in effect") || !strings.Contains(out.String(), "→ terma setup") {
 		t.Fatal(out.String())
 	}
 }
 
 // A fix's command is drawn only on a terminal; plain output is the fix as written.
 func TestFixTextIsPlainOffATerminal(t *testing.T) {
-	for _, fix := range []string{"terma install", "terma install (a later line puts the real binaries back in front)", "run `source ~/.zshrc` or open a new terminal"} {
+	for _, fix := range []string{"terma setup", "terma setup (a later line puts the real binaries back in front)", "run `source ~/.zshrc` or open a new terminal"} {
 		if got := fixText(style.Plain(), fix); got != fix {
 			t.Errorf("fixText(%q) = %q", fix, got)
 		}

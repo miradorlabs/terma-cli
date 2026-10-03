@@ -29,10 +29,7 @@ func (app *App) newNateCommand() *cobra.Command {
 		Args:   cobra.NoArgs,
 		Long: `Restore user settings that Terma changed, remove machine routing and local
 Terma state, then delete installed Terma executables. This is intended for testing
-onboarding from a clean machine.
-
-Repositories are left alone: their hooks and binding are committed files shared with
-everyone who works in them. Remove a repository's install with 'terma uninstall'.`,
+onboarding from a clean machine.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if !assumeYes {
 				ok, err := confirm(cmd, "Are you sure you want to do this? It will remove everything related to Terma on this machine.")
@@ -53,8 +50,6 @@ everyone who works in them. Remove a repository's install with 'terma uninstall'
 
 func (app *App) runNate(cmd *cobra.Command) error {
 	out := cmd.OutOrStdout()
-
-	// Only home-directory state: a repository's committed wiring is `terma uninstall`'s.
 
 	if err := app.undoSetup(cmd.Context(), out); err != nil {
 		return err
@@ -80,7 +75,6 @@ func (app *App) runNate(cmd *cobra.Command) error {
 		fmt.Fprintln(out, "No installed Terma executable was found.")
 	}
 	fmt.Fprintln(out, "Terma has been removed. A new install will start with a fresh configuration.")
-	fmt.Fprintln(out, "Repositories keep their committed hooks and binding; remove one with `terma uninstall` inside it.")
 	return nil
 }
 

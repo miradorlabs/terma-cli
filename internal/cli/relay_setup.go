@@ -56,7 +56,7 @@ func (app *App) newRelaySetupCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Fprintln(out, "Hooks in repositories with a binding claim their sessions; nothing else is forwarded.")
+			fmt.Fprintln(out, "Hooks in the repositories your team collects claim their sessions; nothing else is forwarded.")
 			// A running relay has the old address and token: replace it.
 			daemon.Stop(dir)
 			if _, ok := daemon.ServiceInstalled(); ok {

@@ -18,10 +18,10 @@ import (
 const codexReplyMaxText = 16 << 10
 
 // captureCodexReplies spools the messages recorded since the last capture, under a
-// per-session cursor, and only where prompts are consented.
+// per-session cursor, where this repository routes Codex; delivery sends them only while
+// the team's policy collects prompts.
 func captureCodexReplies(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in *codexHookInput) {
-	pol := e.ProjectPolicy(r)
-	if e.Spool == nil || !session.ValidID(in.SessionID) || !pol.IncludePrompts || pol.CollectsNothing || len(pol.ExcludePaths) > 0 || !repliesConsented(r.Consent(pol.Global())) {
+	if e.Spool == nil || !session.ValidID(in.SessionID) || !repliesConsented(e.Consent()) {
 		return
 	}
 	dir, err := config.Dir()
@@ -57,7 +57,7 @@ func captureCodexReplies(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in
 			hookrun.AttrVersion: e.Version, hookrun.AttrProjectID: r.ProjectID,
 		}, in.AgentID, in.AgentType)
 		r.StampWorktree(attrs)
-		if _, desktop := codexDesktopRoute(r); desktop {
+		if codexDesktopRoute(e, r) {
 			attrs["capture_surface"] = codexDesktopSurface
 		}
 		for k, v := range map[string]string{hookrun.AttrTurnID: reply.TurnID, "trace_id": reply.TraceID, "phase": reply.Phase, hookrun.AttrModel: in.Model} {
@@ -69,7 +69,7 @@ func captureCodexReplies(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in
 		if !reply.At.IsZero() && !reply.At.After(at) {
 			at = reply.At
 		}
-		return e.Spool.Append(spool.Event{Time: at, Name: hookrun.EventAssistantMessage, SessionID: in.SessionID, Repo: r.Name, Workspace: r.Root, Global: pol.Global(), Attrs: attrs})
+		return e.Spool.Append(spool.Event{Time: at, Name: hookrun.EventAssistantMessage, SessionID: in.SessionID, Repo: r.Name, Repository: r.Repository, Global: e.Policy.Global(), Attrs: attrs})
 	})
 	if err != nil {
 		e.Logf("codex replies (%s): %v", status, err)
@@ -86,30 +86,9 @@ func captureCodexReplies(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in
 	}
 }
 
-// repliesConsented reports whether prompts, and so replies, may leave for this
-// repository. It fails closed: a source that exists and cannot be read might be the one
-// that withholds prompts; a missing file is simply not a source.
+// repliesConsented reports whether replies may be sent at all: Codex is among the
+// developer's agents, which setup points at the relay, or global mode collects every
+// session. The team's policy, which its callers check, decides whether prompts may.
 func repliesConsented(c hookrun.Consent) bool {
-	rec, recorded := c.Route, c.Recorded
-	if c.RouteErr != nil {
-		return false
-	}
-	// Under the relay the machine-wide config allows prompts on purpose, so only the project's
-	// routing record can consent.
-	if c.Relay {
-		if c.Global && !recorded {
-			return true
-		}
-		return recorded && rec.IncludePrompts && slices.Contains(rec.Harnesses, name) && slices.Contains(rec.Signals, "logs")
-	}
-	if slices.Contains(rec.Surfaces, name) {
-		return recorded && slices.Contains(rec.Harnesses, name) &&
-			slices.Contains(rec.Signals, "logs") && rec.IncludePrompts
-	}
-	st, err := (exporter{}).Status()
-	if err != nil {
-		return false
-	}
-	return st.Connected && st.IncludePrompts &&
-		(!recorded || !slices.Contains(rec.Harnesses, name) || rec.IncludePrompts)
+	return c.Relay && (c.Global || slices.Contains(c.Agents, name))
 }

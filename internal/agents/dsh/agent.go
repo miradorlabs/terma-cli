@@ -7,7 +7,6 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/agents/internal/relayexport"
-	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
@@ -19,11 +18,6 @@ func (Agent) DisplayName() string { return "DeepSeek Harness" }
 func (Agent) Installed(context.Context) bool {
 	_, err := exec.LookPath("dsh")
 	return err == nil
-}
-func (Agent) HooksPath() string   { return "" }
-func (Agent) Default(string) bool { return false }
-func (Agent) Plan(string, bool) (hookmgr.Plan, error) {
-	return hookmgr.Plan{}, nil
 }
 
 func (Agent) Events() map[string]agents.Handler { return hookrun.Extension{Tool: "dsh"}.Events("dsh") }

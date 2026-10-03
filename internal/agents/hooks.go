@@ -7,21 +7,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
-// TrustState is whether an agent will run the hooks a repository commits. Detail
-// continues a sentence ending in "<agent> hooks present"; Fix applies when not Trusted.
-type TrustState struct {
-	Trusted bool
-	Detail  string
-	Fix     string
-}
-
-// Trusting is an agent that runs committed hooks only once the developer trusts them.
-type Trusting interface {
-	Agent
-	Trust(root string) (TrustState, error)
-}
-
-// UserHooks is an agent whose machine-wide hooks global mode writes.
+// UserHooks is an agent whose machine-wide hooks setup writes.
 type UserHooks interface {
 	Agent
 	UserHooksPath() (string, error)
@@ -37,8 +23,8 @@ type UserHooksTrust interface {
 }
 
 // HookTrusting is an agent whose approvals terma keeps in step with the hooks it writes:
-// approved for each entry of hooksFile byte for byte terma's (written with command; nil is
-// the committed command), withdrawn once terma removes it. Other entries stay untouched.
+// approved for each entry of hooksFile byte for byte terma's (written with command),
+// withdrawn once terma removes it. Other entries stay untouched.
 type HookTrusting interface {
 	SyncHookTrust(hooksFile string, command func(event string) string) (TrustSync, error)
 }
@@ -74,11 +60,4 @@ type Renderer interface {
 // OffSwitched is an agent with events that run something else when hooks are switched off.
 type OffSwitched interface {
 	WhenHooksOff() map[string]Handler
-}
-
-// Retrusting is an agent that runs a changed committed hook only after the developer
-// trusts it again; RetrustNote says so when a refresh rewrote the file.
-type Retrusting interface {
-	Agent
-	RetrustNote() string
 }

@@ -32,6 +32,8 @@ type Deps struct {
 	Capturers   []shape.Capturer
 	// AgentName is the agent behind a tool label.
 	AgentName func(tool string) string
+	// RelayTargets names the agents among the developer's choices that send through the relay.
+	RelayTargets func(selected []string) []string
 	// Endpoint is a project's ingest host.
 	Endpoint func(cfg *config.Config, projectID string) string
 	// CreateKey mints a project's key under cfg's sign-in.
@@ -94,7 +96,7 @@ func (d Deps) Engine(ctx context.Context, dir string, cfg *config.Config, s Sett
 
 // Resolver turns a claim into its session's policy, minting a missing key with mint.
 func (d Deps) Resolver(cfg *config.Config, mint func(projectID string)) func(claim.Claim) (relay.Policy, error) {
-	return Resolver(cfg, ResolverDeps{Mint: mint, AgentName: d.AgentName,
+	return Resolver(cfg, ResolverDeps{Mint: mint, AgentName: d.AgentName, RelayTargets: d.RelayTargets,
 		Endpoint: func(projectID string) string { return d.Endpoint(cfg, projectID) }})
 }
 

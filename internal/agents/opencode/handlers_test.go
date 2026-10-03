@@ -28,7 +28,7 @@ func TestOpenCodeSessionIsStampedOnItsCommit(t *testing.T) {
 	ctx := context.Background()
 	sp, _ := spool.Open(t.TempDir())
 	env := func(stdin string, args ...string) hookrun.Env {
-		return hookrun.Env{Now: time.Now(), Cwd: root, Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
+		return hookrun.Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
 	}
 
 	if err := sessionStart(ctx, env(`{"session_id":"ses_abc123","cwd":"`+root+`"}`)); err != nil {
@@ -90,7 +90,7 @@ func TestOpenCodeChildSessionNamesItsParent(t *testing.T) {
 	ctx := context.Background()
 	sp, _ := spool.Open(t.TempDir())
 	env := func(stdin string) hookrun.Env {
-		return hookrun.Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
+		return hookrun.Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
 	}
 	if err := sessionStart(ctx, env(`{"session_id":"ses_child","cwd":"`+root+`","parent_session_id":"ses_parent"}`)); err != nil {
 		t.Fatal(err)
@@ -118,7 +118,7 @@ func TestOpenCodeChildSessionNeverBecomesTheActiveOne(t *testing.T) {
 	ctx := context.Background()
 	sp, _ := spool.Open(t.TempDir())
 	env := func(stdin string, args ...string) hookrun.Env {
-		return hookrun.Env{Now: time.Now(), Cwd: root, Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
+		return hookrun.Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
 	}
 	if err := sessionStart(ctx, env(`{"session_id":"ses_person","cwd":"`+root+`"}`)); err != nil {
 		t.Fatal(err)

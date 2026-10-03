@@ -10,51 +10,72 @@ they produce so agent spend can be traced to shipped code.
 
 ## The workflow
 
-Terma has six commands, and every one is safe to run again. Two of them onboard, with
-different owners:
-
-| Command | Run it | What it does |
-|---|---|---|
-| `terma setup` | Once per developer (optional) | Signs you in, records which coding agents you use, fetches your organization's collection policy, and points those agents at the local relay. It writes no repository files. |
-| `terma install` | Once per repository | Binds the repository to a Terma team, configures per-repository agent routing, and offers to install commit and agent hooks. |
-
-`terma doctor` checks the result, `terma update` keeps terma current, and two commands undo
-the onboarding: `terma uninstall` in a repository, `terma teardown` on the machine. Run
-`terma setup` again to repair the machine or, with `--org`, switch organization.
-
-Repository telemetry is enabled by `terma install`; no extra telemetry flag is needed.
-Run it from any subdirectory: Git worktrees and submodules use their own root.
-Outside Git, the first install uses the current directory; later install/uninstall
-calls from subdirectories find the nearest `.terma/settings.json`. Agent hooks and
-telemetry work in these folders, while Git hooks and commit stamping are skipped.
-If you later run `git init` in that same folder, rerun `terma install` to add Git
-hooks; existing sessions and tracked edits carry on without losing attribution.
-Bare repositories are rejected because they have no working directory.
-
-Restart running agents after installation so they load the new configuration.
-
-Each agent is one choice for its CLI and its desktop app, which share the agent's
-user-level settings: **Claude Code & Desktop** and **Codex TUI & Desktop**. Codex runs
-Terma's hooks once you approve them with `/hooks` (in the desktop app: Settings → Hooks →
-Review).
-
-Then verify the installation:
+Terma has four commands, and every one is safe to run again. One of them onboards, once
+per developer:
 
 ```bash
-terma setup       # optional: sign in and choose agents
-terma install     # run inside each repository
+terma setup       # sign in, choose your team and agents, write machine-wide hooks
 terma doctor      # verify the chain end to end
 ```
 
-`terma install` binds the repository to a team without asking: the one in an existing
-`.terma/settings.json`, else the team you chose at `terma setup`, else your
-organization's only team. It asks only when none of these decides; `--team <name-or-id>`
-names another. A bound team your account cannot see is never used: install says why and
-lets you choose another. Use `--yes` for non-interactive setup, or `--harness none` when
-you only want commit hooks.
-It shows the team, prompt-capture setting, warnings, and what is left for you
-to do; `-v` / `--verbose` also shows setup steps and every file and setting it wrote. The committed settings
-file contains a team reference, never a secret.
+`terma setup` signs you in, chooses your team (`--team <name-or-id>`, else your
+organization's only team, else a picker), records which coding agents you use, fetches
+the team's collection policy, points those agents at the local relay, and writes the
+agents' machine-wide hooks and git's global `core.hooksPath`. It writes nothing into a
+repository's working tree or committed files; a clone with its own hooks path (husky's,
+say) gets a git config entry routing it through terma's hooks, which `terma teardown`
+removes. Run it again to repair the machine, to switch team, or, with `--org`, to
+switch organization.
+
+`terma doctor` checks the result, `terma update` keeps terma current, and `terma
+teardown` undoes setup on the machine. Restart running agents after setup so they load
+the new configuration.
+
+Each agent is one choice for its CLI and its desktop app, which share the agent's
+user-level settings: **Claude Code & Desktop** and **Codex TUI & Desktop**. Setup
+approves terma's own Codex hooks itself.
+
+### Which repositories are collected
+
+Your team's collection policy, set in Terma, lists the repositories it collects. A
+session or commit is recorded only in a repository the list names; everywhere else the
+hooks write nothing.
+
+Each entry is a repository as `host/owner/name`, e.g. `github.com/miradorlabs/mirador-platform`.
+The CLI admits a session only inside a git working copy whose `origin` remote, normalised,
+equals an entry ignoring case: host lowercased without port or credentials, path with
+`.git` and any trailing slash stripped, from scp (`git@host:path`), `https://`, `ssh://`
+and `git://` forms. A linked worktree reads `origin` from its main repository. A folder
+outside git, a repository with no `origin`, or an `origin` that is a local path or
+`file://` URL is never admitted. An entry has a host and at least two path segments, none
+empty; a longer path matches a longer `origin` path exactly (GitLab subgroups). An empty
+list admits nothing.
+
+So a clone in any folder, a subdirectory of it, and a worktree of it at
+`.claude/worktrees/fix-1` are all collected by `github.com/acme/api` when origin is
+`git@github.com:acme/api.git` or `https://github.com/acme/api`; a fork whose origin is
+`github.com/you/api` is not. An SSH host alias (`git@github-work:acme/api` through
+`~/.ssh/config`) normalises to host `github-work` and does not match
+`github.com/acme/api`; `terma doctor` shows the origin terma sees. In global mode the
+policy collects every folder, inside git or not. Each session reports to the team of the
+developer who ran it, so two developers on different teams in one repository each report
+to their own.
+
+### Hook managers
+
+terma's global git hooks run each repository's own hooks after terma's, so hooks a hook
+manager already installed keep running.
+
+- **husky** sets the clone's own `core.hooksPath`, which outranks git's global one. The
+  first agent session in that clone adds a git config entry routing it through terma's
+  hooks, which then run husky's; `terma teardown` removes the entry.
+- **pre-commit** refuses to install while a global `core.hooksPath` is set, and
+  **lefthook** prints a notice and installs nothing. Install them, or add a hook type,
+  with git's global config out of the way: `GIT_CONFIG_GLOBAL=/dev/null pre-commit
+  install`, or `GIT_CONFIG_GLOBAL=/dev/null lefthook install`. They install into
+  `.git/hooks`, which terma's hooks run. `terma doctor` points this out for pre-commit.
+  Avoid `lefthook install --force` and `--reset-hooks-path`: they overwrite or unset
+  terma's global hooks.
 
 ## Install
 
@@ -109,40 +130,45 @@ build is never updated without `terma update --force`.
 
 The first time a new version runs, it migrates anything it keeps in `~/.config/terma`
 whose format changed, before doing anything else, with no command from you. After an
-update, the new version also refreshes what earlier versions wrote — the wrapped Claude
-Code status line, the OpenCode plugin, and the hooks of the repository you ran `terma
-update` in — keeping every choice you made when you installed. It works
-from what is on disk, never signs in, and never adds a file. The repository hooks are
-committed files, so they change only when you ask: run `terma update` in each other
-repository to bring its hooks up to date, then commit them. On the latest release,
-`terma update` does just that refresh.
+update, the new version also refreshes what earlier versions wrote in your home
+directory — the wrapped Claude Code status line, the OpenCode plugin — keeping every
+choice you made. It works from what is on disk, never signs in, and never adds a file.
+On the latest release, `terma update` does just that refresh.
 
-## Per-repository routing
+## Routing
 
 Your agents export to a relay terma runs on your machine (on `127.0.0.1`), from their own
 user-level settings — which is also what Claude Desktop, Codex Desktop and IDE extensions
-read, so they are covered too. The relay forwards a session only when a hook in a
-repository you ran `terma install` in claimed it, and sends it to that repository's
-team with that team's key. Everything else — personal work, other repositories —
-waits briefly in memory and is dropped: it never leaves your machine. Prompts and model
-responses are sent by default; `terma install --prompts off` stops them for a team,
-and the relay removes them before anything leaves.
+read, so they are covered too. A machine-wide hook claims each session that runs in a
+repository your team collects, for your team; the relay forwards only claimed sessions,
+with your team's key. Everything else — personal work, other repositories, folders
+outside git — waits briefly in memory and is dropped: it never leaves your machine. A
+session that moves to a repository the list does not name, or whose repository leaves
+the list, stops being forwarded.
 
-`terma setup` and `terma install` run the relay as a per-user background service, so it
-is up before any agent starts; with `--relay-service off`, hooks start it on demand.
-Either way the relay runs as the setup or install that configured it, whoever starts it
-later. `terma update` rewrites a service an earlier terma wrote; `terma install` does the
-same, and also replaces a relay that cannot deliver for you (another environment, or one
-a hook started while the service waits).
-`terma doctor` shows whether it runs and delivers; `terma teardown` stops it and removes
-its service.
+What content leaves is your team's collection policy, set in Terma, and nothing else.
+The relay and the hook queue's delivery fetch it with your login; until they have,
+nothing they would send leaves. Agents send prompts, model responses and tool input and
+output to the relay, and the relay removes what the policy does not collect before
+anything leaves. Hook events, which queue on this machine and never pass the relay, are
+held to the same policy when they are sent: an event queued before the policy tightened
+leaves without the content it no longer collects, and one from a repository no longer
+listed does not leave.
+
+`terma setup` runs the relay as a per-user background service, so it is up before any
+agent starts; with `--relay-service off`, hooks start it on demand. `terma update`
+rewrites a service an earlier terma wrote. `terma doctor` shows whether it runs and
+delivers; `terma teardown` stops it and removes its service.
 
 ## What gets collected
 
-Terma uses fast, local hooks. Each committed hook is a guarded one-liner that calls
-`terma hook <event>`; the binary owns the session files, touched-file manifests,
-commit trailers, and local event spool. On a machine without Terma, hooks are silent
-and inert. `TERMA_HOOKS=0` turns the hooks off for one shell or process.
+Terma uses fast, local hooks. Each machine-wide hook is a guarded one-liner that calls
+terma by the full path setup wrote; the binary owns the session files, touched-file
+manifests, commit trailers, and local event spool. If terma is gone, the hooks are
+silent and inert. `TERMA_HOOKS=0` turns the hooks off for one shell or process. Git's
+global hooks chain to the hooks git ran before, so a repository's own hooks still run;
+a repository that sets its own `core.hooksPath` outranks them, which `terma doctor`
+reports.
 
 Commit attribution works like this:
 
@@ -158,8 +184,8 @@ tested against a sub-50 ms budget.
 ## Supported agents
 
 Terma supports Claude Code (CLI and Desktop) and Codex (CLI and Desktop): commit
-attribution through repository hooks, and each agent's native telemetry through the local
-relay.
+attribution through machine-wide hooks, and each agent's native telemetry through the
+local relay.
 
 ## Check the setup
 
@@ -169,33 +195,29 @@ terma doctor
 
 `doctor` opens with what this machine collects and what the repository has in progress
 (the active session, uncommitted agent edits), then checks every link end to end —
-sign-in, team binding, hooks, the agents' export, the queue, and delivery to the
-backend. Every failure names its fix.
+sign-in, whether the team collects this repository (and the origin terma sees), hooks, the agents' export, the queue,
+and delivery to the backend. Every failure names its fix.
 
 Organization and team names are shown without UUIDs in normal output; pickers show the
 ID when a name is missing or duplicated, and a name that matches nothing lists yours.
 
-Choose the team for each repository with `terma install`. Reads use that repository's
-binding; use `--team <id>` for a one-command override or when outside a repository.
-Switching organizations never changes a repository's team.
+Reads use the team you chose at setup; `--team <id>` overrides it for one command.
 
 ## Privacy and security
 
 Authentication uses a browser handoff with PKCE and a loopback callback. Credentials
 and team keys stay in the user's configuration directory with restrictive file
-permissions; repository settings contain no secrets. Export choices support signal,
-prompt, tool-content, and global-versus-local scope controls.
+permissions; none is written into a repository. What content leaves is the team's
+collection policy alone, applied on this machine before anything is sent.
 
 ## Commands
 
 The command surface is intentionally small, and every command is safe to run again:
 
 ```text
-setup       Sign in, choose agents, point them at the local relay (--org switches)
-install     Configure this repository
+setup       Sign in, choose team and agents, write machine-wide hooks (--org switches)
 doctor      Verify the full chain
 update      Update terma, or refresh what it installed
-uninstall   Remove terma from this repository
 teardown    Undo setup on this machine (--sign-out also signs out)
 ```
 
@@ -207,9 +229,11 @@ relay, spool delivery, shell completion — and for Terma's own engineers.
 terma is one binary with three roles:
 
 - the **command line** (`internal/cli`), which `cmd/terma` starts;
-- the **hooks** that coding agents and git run (`terma hook <event>`, `internal/hooks`);
+- the **hooks** that coding agents and git run machine-wide (`terma hook <event>`,
+  `internal/hooks`);
 - a **local relay daemon** (`terma relay run`, `internal/relay`). It forwards an
-  agent's own telemetry only for sessions an opted-in repository claimed.
+  agent's own telemetry only for sessions a hook claimed in a repository the team
+  collects.
 
 Each coding agent is a plugin: one package under `internal/agents/<name>`, behind the
 interfaces in `internal/agents`, and registered in `internal/agents/builtin`. Nothing

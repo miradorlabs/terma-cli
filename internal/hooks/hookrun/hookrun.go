@@ -20,7 +20,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 	"github.com/miradorlabs/terma-cli/internal/trailer"
@@ -50,6 +49,11 @@ type Env struct {
 	Flush func()
 	// Policy is the organization's collection policy; global mode places every session in its DefaultProjectID.
 	Policy config.Policy
+	// Team is the developer's team from setup, which claims every session they run in a
+	// collected repository, whatever the policy's state.
+	Team string
+	// Agents are the agents the developer chose at setup.
+	Agents []string
 }
 
 // Time is when the hook runs: Now when the caller set it, the clock otherwise.
@@ -84,15 +88,18 @@ type Repo struct {
 	Root   string
 	GitDir string
 	Store  *session.Store
-	// ProjectID is the binding, a linked worktree's falling back to its main checkout's.
+	// ProjectID is the developer's team, or global mode's default project.
 	ProjectID string
 	// Name is the checkout's directory name, a linked worktree's main checkout's.
 	Name string
 	// Worktree is git's name for a linked worktree, "" in a main checkout.
 	Worktree string
-
-	route func() routeRead
+	// Repository is the working copy as the team policy's repository list names it.
+	Repository config.Repository
 }
+
+// ErrNotAdmitted is a working copy the team policy does not collect: its hooks write nothing.
+var ErrNotAdmitted = errors.New("not among the team's repositories")
 
 // Open is every session hook's first step: it refuses an unsafe session id, runs from
 // the payload's cwd when it names one, and resolves the repository, logging why when it
@@ -105,52 +112,55 @@ func (e *Env) Open(ctx context.Context, sessionID, cwd string) (*Repo, bool) {
 	e.Cwd = cmp.Or(cwd, e.Cwd)
 	r, err := e.Repo(ctx)
 	if err != nil {
-		e.Logf("not in a git repository: %v", err)
+		e.Logf("no repository to record: %v", err)
 		return nil, false
 	}
 	return r, true
 }
 
-// Repo resolves the repository, or outside Git the bound workspace, and its project.
+// Repo resolves the repository, or outside Git the current directory, and its project,
+// or ErrNotAdmitted, before anything is written, for one the team policy does not collect.
 func (e Env) Repo(ctx context.Context) (*Repo, error) {
-	// Filesystem first: a git subprocess is a third of the hook budget on macOS.
-	root, gitDir, ok := gitx.LocateFS(e.Cwd)
-	if !ok {
-		var err error
-		if root, gitDir, err = project.Locate(ctx, e.Cwd); err != nil {
-			return nil, err
-		}
+	root, gitDir, id, err := e.locate(ctx)
+	if err != nil {
+		return nil, err
 	}
-	if gitDir == "" {
-		// Outside Git only a bound workspace counts, except in global mode.
-		if _, err := project.Load(root); err != nil && (!e.Policy.Global() || !errors.Is(err, project.ErrNotFound)) {
-			return nil, err
-		}
+	if !e.Policy.Admits(id) {
+		return nil, ErrNotAdmitted
 	}
 	stateDir, err := project.StateDir(root, gitDir)
 	if err != nil {
 		return nil, err
 	}
-	r := &Repo{Root: root, GitDir: gitDir, Store: session.Open(stateDir)}
+	r := &Repo{Root: root, GitDir: gitDir, Store: session.Open(stateDir), Repository: id}
 	r.Name, r.Worktree = CheckoutNames(root, gitDir)
+	r.ProjectID = e.Team
 	if e.Policy.Global() {
 		r.ProjectID = e.Policy.DefaultProjectID
-	} else if f, _, err := project.Resolve(root, gitDir); err == nil {
-		r.ProjectID = f.Project.ID
 	}
 	return r, nil
 }
 
-// EmitFor spools an event stamped with the repository's project binding and, from a
-// linked worktree, which one.
+// locate finds the working copy at Cwd, a Git checkout's root from any directory in it,
+// and how admission names it.
+func (e Env) locate(ctx context.Context) (root, gitDir string, id config.Repository, err error) {
+	// Filesystem first: a git subprocess is a third of the hook budget on macOS.
+	root, gitDir, ok := gitx.LocateFS(e.Cwd)
+	if !ok {
+		if root, gitDir, err = project.Locate(ctx, e.Cwd); err != nil {
+			return "", "", id, err
+		}
+	}
+	id.Origin = gitx.RepositoryFS(gitDir)
+	return root, gitDir, id, nil
+}
+
+// EmitFor spools an event stamped with the repository's project and, from a linked
+// worktree, which one.
 func (e Env) EmitFor(r *Repo, ev spool.Event) {
 	ev.Global = e.Policy.Global()
 	if r != nil {
-		ev.Workspace = r.Root
-		pol := routing.EffectivePolicy(e.Policy, r.ProjectID)
-		if pol.ExcludesPath(r.Root, "") || pol.HasExcludedPath(ev.Attrs, r.Root) {
-			return
-		}
+		ev.Repository = r.Repository
 	}
 	if r != nil && (r.ProjectID != "" || r.Worktree != "") {
 		if ev.Attrs == nil {
@@ -172,7 +182,7 @@ func (e Env) claimForRelay(r *Repo, ev spool.Event) {
 		return
 	}
 	tool, _ := ev.Attrs[AttrTool].(string)
-	c := claim.Claim{ProjectID: r.ProjectID, Tool: tool, Repo: r.Name, Worktree: r.Worktree, PIDs: claimPIDs()}
+	c := claim.Claim{ProjectID: r.ProjectID, Tool: tool, Repo: r.Name, Worktree: r.Worktree, Repository: r.Repository, PIDs: claimPIDs()}
 	claim.Write(ev.SessionID, c, e.Time())
 	// A subagent whose telemetry uses its agent_id as session id would otherwise be dropped.
 	if agent, _ := ev.Attrs[AttrAgentID].(string); agent != "" && agent != ev.SessionID {

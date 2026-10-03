@@ -23,10 +23,8 @@ var gitHookEvents = map[string]agents.Event{
 
 // Request is one hook invocation.
 type Request struct {
-	Event string
-	Args  []string
-	// User marks a machine-wide hook entry.
-	User           bool
+	Event          string
+	Args           []string
 	Stdin          io.Reader
 	Stdout, Stderr io.Writer
 	Version        string
@@ -40,14 +38,20 @@ type Request struct {
 // Deps are what a hook reaches beyond the hook runtime.
 type Deps struct {
 	Agents *agents.Registry
-	// Policy is the collection policy hooks read locally.
-	Policy func() config.Policy
-	// Yields reports whether a repository's hook steps aside for a machine-wide one.
-	Yields func(user bool, policy config.Policy, tool string) bool
-	Spool  func() *spool.Spool
+	// Profile is the developer's setup as hooks read it locally.
+	Profile func() Profile
+	Spool   func() *spool.Spool
 	// Claimed runs once a hook has claimed its session: the relay, the clone's wiring.
 	Claimed func(ctx context.Context, cwd string)
 	Flush   func()
+}
+
+// Profile is what a hook reads of the developer's setup.
+type Profile struct {
+	Team   string
+	Agents []string
+	// Policy is the collection policy, NoPolicy until one is validated.
+	Policy config.Policy
 }
 
 // maxPayload bounds the copy of a payload kept to claim a session from.
@@ -63,8 +67,9 @@ func Run(ctx context.Context, d Deps, r Request) int {
 		return 0
 	}
 	if render, ok := d.Agents.Render(r.Event); ok {
+		p := d.Profile()
 		env := hookrun.Env{Now: time.Now(), Cwd: r.Cwd, Args: r.Args, Stdin: r.Stdin, Stdout: r.Stdout, Stderr: r.Stderr,
-			Version: r.Version, Debug: r.Debug, Flush: d.Flush}
+			Version: r.Version, Debug: r.Debug, Flush: d.Flush, Policy: p.Policy, Team: p.Team}
 		if !r.HooksOff {
 			env.Spool = d.Spool()
 		}
@@ -89,10 +94,7 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 	if r.HooksOff {
 		return
 	}
-	policy := d.Policy()
-	if tool != "" && d.Yields(r.User, policy, tool) {
-		return
-	}
+	p := d.Profile()
 	if r.Cwd == "" {
 		return
 	}
@@ -111,7 +113,9 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 		Version: r.Version,
 		Debug:   r.Debug,
 		Spool:   d.Spool(),
-		Policy:  policy,
+		Policy:  p.Policy,
+		Team:    p.Team,
+		Agents:  p.Agents,
 	}
 	ctx, cancel := context.WithTimeout(ctx, handlerTimeout)
 	defer cancel()

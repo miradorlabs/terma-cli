@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
+	"errors"
 	"path/filepath"
 	"sync"
 
@@ -45,7 +46,14 @@ func ClaimFromPayload(ctx context.Context, env Env, s PayloadSession, tool strin
 	var c claim.Claim
 	switch r, err := env.Repo(ctx); {
 	case err == nil && r.ProjectID != "":
-		c = claim.Claim{ProjectID: r.ProjectID, Tool: tool, Repo: r.Name, Worktree: r.Worktree}
+		c = claim.Claim{ProjectID: r.ProjectID, Tool: tool, Repo: r.Name, Worktree: r.Worktree, Repository: r.Repository}
+	case errors.Is(err, ErrNotAdmitted):
+		for _, sid := range []string{id, s.AgentID} {
+			if sid != "" {
+				withdraw(ctx, env, sid)
+			}
+		}
+		return false
 	case err != nil && env.Policy.Global() && env.Policy.DefaultProjectID != "":
 		// Global mode, outside any repository.
 		c = claim.Claim{ProjectID: env.Policy.DefaultProjectID, Tool: tool, Repo: filepath.Base(env.Cwd)}
@@ -62,6 +70,21 @@ func ClaimFromPayload(ctx context.Context, env Env, s PayloadSession, tool strin
 		return live
 	}
 	return true
+}
+
+// withdraw moves a claimed session, now running in a working copy the team policy does
+// not admit (an agent's cwd can change per turn), to a placement there, so the relay drops
+// what its processes send from now on; earlier records keep their own placement.
+func withdraw(ctx context.Context, env Env, sessionID string) {
+	prev, ok := claim.Read(sessionID, env.Time())
+	if !ok {
+		return
+	}
+	_, _, id, err := env.locate(ctx)
+	if err != nil {
+		return
+	}
+	claim.Write(sessionID, claim.Claim{ProjectID: prev.ProjectID, Repository: id, PIDs: claimPIDs()}, env.Time())
 }
 
 // claimPIDs are this hook's ancestors, one of them the agent: a claim covers only their records.

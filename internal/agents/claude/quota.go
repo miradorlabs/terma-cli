@@ -2,6 +2,7 @@ package claude
 
 import (
 	"cmp"
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -12,9 +13,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
-	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -41,6 +40,12 @@ type quotaState struct {
 // empty startup redraws before any evidence are suppressed.
 func captureQuota(e hookrun.Env, p *statusLinePayload) bool {
 	if e.Spool == nil {
+		return false
+	}
+	e.Cwd = cmp.Or(p.Cwd, e.Cwd)
+	r, err := e.Repo(context.Background())
+	if err != nil {
+		e.Logf("quota: %v", err)
 		return false
 	}
 	quota := map[string]float64{}
@@ -73,20 +78,8 @@ func captureQuota(e hookrun.Env, p *statusLinePayload) bool {
 	if len(quota) == 0 && p.FastMode == nil && prev == nil {
 		return false
 	}
-	repo, worktree, projectID, repoRoot := "", "", "", ""
-	root, gitDir, located := gitx.LocateFS(cmp.Or(p.Cwd, e.Cwd))
-	if !located {
-		// A workspace outside Git is found by its binding.
-		root, _ = project.Find(cmp.Or(p.Cwd, e.Cwd))
-	}
-	if root != "" {
-		repoRoot = root
-		repo, worktree = hookrun.CheckoutNames(root, gitDir)
-		if f, _, err := project.Resolve(root, gitDir); err == nil {
-			projectID = f.Project.ID
-		}
-	}
-	accountID, orgID, _ := claudeOAuthAccount(repoRoot)
+	repo, worktree, projectID := r.Name, r.Worktree, r.ProjectID
+	accountID, orgID, _ := claudeOAuthAccount(r.Root)
 	next := quotaState{EmittedAt: now, Quota: quota, FastMode: p.FastMode, Model: p.Model.ID,
 		PromptID: p.PromptID, Resets: resets, Cost: p.Cost.TotalCostUSD, ProjectID: projectID, AccountID: accountID, OrgID: orgID}
 	if prev != nil && !quotaChanged(*prev, next) && now.Sub(prev.EmittedAt) < hookrun.QuotaHeartbeat {
@@ -140,7 +133,7 @@ func captureQuota(e hookrun.Env, p *statusLinePayload) bool {
 			attrs[w+"_resets_at"] = at
 		}
 	}
-	ev := spool.Event{Name: hookrun.EventSessionQuota, SessionID: p.SessionID, Repo: repo, Attrs: attrs}
+	ev := spool.Event{Name: hookrun.EventSessionQuota, SessionID: p.SessionID, Repo: repo, Repository: r.Repository, Attrs: attrs}
 	if worktree != "" {
 		attrs[hookrun.AttrWorktree] = worktree
 	}
