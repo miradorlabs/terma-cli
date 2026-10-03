@@ -53,6 +53,22 @@ So a checkout in `checkout-a` with origin `acme/mirador-platform` is collected b
 collects every folder. Each session reports to the team of the developer who ran it,
 so two developers on different teams in one repository each report to their own.
 
+### Hook managers
+
+terma's global git hooks run each repository's own hooks after terma's, so hooks a hook
+manager already installed keep running.
+
+- **husky** sets the clone's own `core.hooksPath`, which outranks git's global one. The
+  first agent session in that clone adds a git config entry routing it through terma's
+  hooks, which then run husky's; `terma teardown` removes the entry.
+- **pre-commit** refuses to install while a global `core.hooksPath` is set, and
+  **lefthook** prints a notice and installs nothing. Install them, or add a hook type,
+  with git's global config out of the way: `GIT_CONFIG_GLOBAL=/dev/null pre-commit
+  install`, or `GIT_CONFIG_GLOBAL=/dev/null lefthook install`. They install into
+  `.git/hooks`, which terma's hooks run. `terma doctor` points this out for pre-commit.
+  Avoid `lefthook install --force` and `--reset-hooks-path`: they overwrite or unset
+  terma's global hooks.
+
 ## Install
 
 ### Homebrew (macOS and Linux)

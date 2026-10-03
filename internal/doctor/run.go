@@ -5,12 +5,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 )
 
@@ -235,7 +238,24 @@ func (d *run) commitHooks() Check {
 	if d.env.RepoErr != nil {
 		return Check{Status: Skip, Detail: "not inside a repository"}
 	}
-	return HooksPathCheck(JudgeHooksPath(d.ctx, d.env.Root))
+	h := JudgeHooksPath(d.ctx, d.env.Root)
+	c := HooksPathCheck(h)
+	if c.Status == Pass && h.TermaGlobal && preCommitNotInstalled(d.env.Root, d.env.GitDir) {
+		return Check{Status: Warn,
+			Detail: c.Detail + "; this repository's .pre-commit-config.yaml is not installed: pre-commit refuses while git's global core.hooksPath is set",
+			Fix:    "GIT_CONFIG_GLOBAL=/dev/null pre-commit install (terma's hooks then run it from .git/hooks)"}
+	}
+	return c
+}
+
+// preCommitNotInstalled reports a pre-commit config with no pre-commit hook in the
+// repository's own hooks directory, which terma's global hooks chain to.
+func preCommitNotInstalled(root, gitDir string) bool {
+	if _, err := os.Stat(filepath.Join(root, ".pre-commit-config.yaml")); err != nil {
+		return false
+	}
+	_, err := os.Stat(filepath.Join(gitx.CommonDirFS(gitDir), "hooks", "pre-commit"))
+	return err != nil
 }
 
 func (d *run) agentsExporting() Check {

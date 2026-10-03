@@ -77,3 +77,24 @@ func TestDoctorJudgesARepositorysHooksPath(t *testing.T) {
 		})
 	}
 }
+
+// pre-commit refuses to install under a global hooks path: a repository that configures it
+// with no pre-commit hook of its own is told how to install one terma's hooks will run.
+func TestDoctorHintsAtInstallingPreCommit(t *testing.T) {
+	root := unboundRepo(t)
+	git(t, root, "config", "--global", "core.hooksPath", hookDir(t, filepath.Join(os.Getenv("TERMA_CONFIG_DIR"), "git-hooks"), "prepare-commit-msg"))
+	d := &run{ctx: t.Context(), env: Env{Root: root, GitDir: filepath.Join(root, ".git")}}
+	if c := d.commitHooks(); c.Status != Pass {
+		t.Fatalf("without pre-commit: %+v", c)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".pre-commit-config.yaml"), []byte("repos: []\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if c := d.commitHooks(); c.Status != Warn || !strings.HasPrefix(c.Fix, "GIT_CONFIG_GLOBAL=/dev/null pre-commit install") {
+		t.Fatalf("pre-commit not installed: %+v", c)
+	}
+	hookDir(t, filepath.Join(root, ".git", "hooks"), "pre-commit")
+	if c := d.commitHooks(); c.Status != Pass {
+		t.Fatalf("pre-commit installed: %+v", c)
+	}
+}
