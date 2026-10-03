@@ -41,7 +41,14 @@ func TestDoctorListsRoutedClones(t *testing.T) {
 		}
 	}
 	resolved := func(p string) string {
-		if r, err := filepath.EvalSymlinks(strings.TrimSpace(p)); err == nil {
+		p = strings.TrimSpace(p)
+		// Doctor shows a path under the home folder as ~ (Windows keeps temp dirs there).
+		if rest, ok := strings.CutPrefix(p, "~"); ok {
+			if home, err := os.UserHomeDir(); err == nil {
+				p = home + rest
+			}
+		}
+		if r, err := filepath.EvalSymlinks(p); err == nil {
 			return r
 		}
 		return p
