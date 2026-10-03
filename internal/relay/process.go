@@ -59,6 +59,32 @@ func (r *Relay) decideExited(pid int, at time.Time, narrow bool) (claim.Claim, P
 	return c, pol, "", true, attribution{how: "process", session: sessions[0]}
 }
 
+// collectsNone reports whether every session pid has named is, at at, marked not
+// collected for it: a part naming nothing from it can then never leave, since naming
+// another session would make it ambiguous. An unnamed span may yet be named, so only
+// parts naming no trace either go by this.
+func (r *Relay) collectsNone(pid int, at time.Time) bool {
+	r.mu.Lock()
+	st := r.procs[pid]
+	var sessions []string
+	if st != nil && !st.overflow {
+		for s := range st.sessions {
+			sessions = append(sessions, s)
+		}
+	}
+	r.mu.Unlock()
+	for _, s := range sessions {
+		c, ok := r.lookup(s)
+		if !ok {
+			return false
+		}
+		if c, ok = c.At(pid, at); !ok || c.ProjectID != "" {
+			return false
+		}
+	}
+	return len(sessions) > 0
+}
+
 func (r *Relay) learnProcess(pid int, session string) {
 	if pid == 0 || session == "" {
 		return

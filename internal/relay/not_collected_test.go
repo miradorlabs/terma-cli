@@ -211,3 +211,30 @@ func TestRelayAttributesAnExitedProcessByWhenItSent(t *testing.T) {
 		t.Fatalf("p1 got %d metrics, want the one sent before the move: %v", len(got), pr.r.Stats().Snapshot().Counters)
 	}
 }
+
+// A part naming neither session nor trace, from a running process whose every session is
+// marked not collected, is dropped on arrival: it could never leave. An unnamed span of
+// that process waits to be named, as a shared process's next thread may name it, and goes
+// once the process exits; a process that also named a claimed session waits as before.
+func TestNotCollectedSessionlessParts(t *testing.T) {
+	pr := newProcRelay(t)
+	t0 := pr.f.clock()
+	pr.f.claim("U", marked(t0.Add(-time.Hour), 100, 300))
+	pr.send(100, "/v1/logs", logsAt("U", 1, t0))
+	pr.send(100, "/v1/metrics", metricAt(t0))
+	waitFor(t, func() bool { return pr.r.Stats().Snapshot().Counters["dropped.not_collected.metrics"] == 1 })
+
+	pr.send(100, "/v1/traces", sessionlessSpans([]byte("0123456789abcdef"), 2))
+	pr.send(300, "/v1/logs", logsAt("U", 1, t0))
+	pr.send(300, "/v1/logs", logsAt("A", 1, t0)) // A is claimed: the process serves both
+	pr.send(300, "/v1/metrics", metricAt(t0))
+	pr.advance(time.Second)
+	if c := pr.r.Stats().Snapshot().Counters; c["dropped.not_collected.traces"] != 0 || c["dropped.not_collected.metrics"] != 1 {
+		t.Fatalf("a part that may yet leave was dropped: %v", c)
+	}
+	pr.exit(100)
+	waitFor(t, func() bool { return pr.r.Stats().Snapshot().Counters["dropped.not_collected.traces"] == 2 })
+	if c := pr.r.Stats().Snapshot().Counters; c["dropped.not_collected.metrics"] != 1 || pr.r.heldN != 1 {
+		t.Fatalf("stats = %v, held %d", c, pr.r.heldN)
+	}
+}

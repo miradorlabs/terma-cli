@@ -50,13 +50,20 @@ func (r *Relay) decide(key string, pid int, at time.Time, narrow bool) (claim.Cl
 	}
 	if p, ok := strings.CutPrefix(key, procPrefix); ok {
 		n, _ := strconv.Atoi(p)
+		if r.collectsNone(n, at) {
+			return claim.Claim{}, Policy{}, whyNotCollected, false, attribution{}
+		}
 		return r.decideExited(n, at, narrow)
 	}
 	session := r.sessionFor(key)
 	if session == "" {
 		if pid != 0 {
-			if c, pol, _, ok, how := r.decideExited(pid, at, narrow); ok {
+			c, pol, why, ok, how := r.decideExited(pid, at, narrow)
+			if ok {
 				return c, pol, "", true, how
+			}
+			if why == whyNotCollected {
+				return claim.Claim{}, Policy{}, why, false, attribution{}
 			}
 		}
 		return claim.Claim{}, Policy{}, whyNoTrace, false, attribution{}
