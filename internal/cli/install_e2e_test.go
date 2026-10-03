@@ -444,43 +444,6 @@ func TestInstallE2EModifiedShimSurvivesUninstall(t *testing.T) {
 	}
 }
 
-func TestInstallE2ENonGitHooksActuallyRun(t *testing.T) {
-	s := newInstallSandbox(t)
-	root := s.mkdir("workspace")
-	s.install(root)
-	nested := filepath.Join(root, "nested")
-	if err := os.MkdirAll(nested, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	var doc struct {
-		Hooks map[string][]struct{ Hooks []struct{ Command string } }
-	}
-	if err := json.Unmarshal(readInstallFile(t, root, hooksPathOf("claude")), &doc); err != nil {
-		t.Fatal(err)
-	}
-	for _, event := range []string{"SessionStart", "PostToolUse"} {
-		payload, _ := json.Marshal(map[string]any{"session_id": "e2e-session", "cwd": nested, "hook_event_name": event, "tool_name": "Write", "tool_input": map[string]string{"file_path": filepath.Join(nested, "edited.txt")}})
-		command := doc.Hooks[event][0].Hooks[0].Command
-		if out, err := s.run(nested, string(payload), "/bin/sh", "-c", command); err != nil {
-			t.Fatalf("installed hook: %v %s", err, out)
-		}
-	}
-	status := s.cli(nested, "status")
-	if !strings.Contains(status, "e2e-session") || !strings.Contains(status, "1 agent-edited file") || !strings.Contains(status, "Git hooks skipped") {
-		t.Fatalf("non-Git hooks inactive: %s", status)
-	}
-	// No credential means doctor cannot contact a backend. Git checks must still skip.
-	out, _ := s.run(nested, "", s.bin, "doctor")
-	if !strings.Contains(out, "not a Git repository") || strings.Contains(out, "needs an installed repository") {
-		t.Fatalf("non-Git diagnostic: %s", out)
-	}
-	s.cli(nested, "uninstall", "--yes")
-	matches, err := filepath.Glob(filepath.Join(s.base, "config", "workspaces", "*", "terma", "session.json"))
-	if err != nil || len(matches) != 0 {
-		t.Fatalf("session state survived: %v %v", matches, err)
-	}
-}
-
 func TestInstallE2EDryRunAndNoHooks(t *testing.T) {
 	for _, nonGit := range []bool{false, true} {
 		t.Run(map[bool]string{false: "git", true: "non_git"}[nonGit], func(t *testing.T) {

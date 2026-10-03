@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/session"
@@ -80,6 +81,13 @@ func Spooled(t *testing.T, sp *spool.Spool) []spool.Event {
 
 // Team is the team the developer chose at setup in these tests.
 const Team = "project-a"
+
+// Admitting is a repository-mode policy, content on, that lists the folder root.
+func Admitting(root string) config.Policy {
+	p := config.DefaultPolicy()
+	p.Folders = []string{filepath.Base(root)}
+	return p
+}
 
 // Project is a repository and a private spool for its hooks, which run for Team.
 func Project(t *testing.T) (root string, sp *spool.Spool) {

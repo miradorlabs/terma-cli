@@ -14,6 +14,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/config"
+
 	"github.com/miradorlabs/terma-cli/internal/flock"
 )
 
@@ -25,8 +27,11 @@ type Event struct {
 	Repo      string    `json:"repo,omitempty"`
 	// Global records machine-wide capture, so queued events can be withheld after a
 	// switch back to repository coverage. Local only.
-	Global bool           `json:"global,omitempty"`
-	Attrs  map[string]any `json:"attrs,omitempty"`
+	Global bool `json:"global,omitempty"`
+	// Repository is the working copy as admission names it, so delivery holds a queued
+	// event to the repository list in force when it leaves. Local only.
+	Repository config.Repository `json:"repository,omitzero"`
+	Attrs      map[string]any    `json:"attrs,omitempty"`
 }
 
 // Sender delivers a batch. Send must respect context cancellation.

@@ -48,3 +48,22 @@ func TestCapturePolicy(t *testing.T) {
 		})
 	}
 }
+
+// A claim whose folder the current policy no longer lists is marked, so its records drop;
+// global mode lists none and drops none.
+func TestCapturePolicyRechecksTheFolder(t *testing.T) {
+	work := config.Repository{Names: []string{"work"}, Path: "acme/work"}
+	for _, tc := range []struct {
+		org  config.Policy
+		want bool
+	}{
+		{config.Policy{Mode: config.ModeRepo, Folders: []string{"work"}}, false},
+		{config.Policy{Mode: config.ModeRepo, Folders: []string{"acme/work"}}, false},
+		{config.Policy{Mode: config.ModeRepo, Folders: []string{"other"}}, true},
+		{config.Policy{Mode: config.ModeGlobal}, false},
+	} {
+		if got := CapturePolicy(Capture{Org: tc.org, Repository: work}).Unadmitted; got != tc.want {
+			t.Errorf("folders %v: Unadmitted = %v", tc.org.Folders, got)
+		}
+	}
+}

@@ -46,7 +46,7 @@ func acceptingOTLP(t *testing.T) {
 
 func appendEvent(t *testing.T, s *spool.Spool, projectID string, at time.Time) {
 	t.Helper()
-	e := spool.Event{Name: "terma.commit", Time: at}
+	e := spool.Event{Name: "terma.commit", Time: at, Repository: appFolder}
 	if projectID != "" {
 		e.Attrs = map[string]any{hookrun.AttrProjectID: projectID}
 	}

@@ -33,7 +33,7 @@ func TestAntigravityConversationIsStampedOnItsCommit(t *testing.T) {
 	}
 	var stdout bytes.Buffer
 	env := func(stdin string) hookrun.Env {
-		return hookrun.Env{Now: time.Now(), Cwd: hookDir, Stdin: strings.NewReader(stdin), Stdout: &stdout, Spool: sp, Version: "test"}
+		return hookrun.Env{Now: time.Now(), Cwd: hookDir, Policy: hookruntest.Admitting(root), Stdin: strings.NewReader(stdin), Stdout: &stdout, Spool: sp, Version: "test"}
 	}
 	run := func(h func(context.Context, hookrun.Env) error, stdin string) {
 		t.Helper()
@@ -161,7 +161,7 @@ func TestAntigravityConversationIsStampedOnItsCommit(t *testing.T) {
 	}
 	msgPath := filepath.Join(t.TempDir(), "COMMIT_EDITMSG")
 	_ = os.WriteFile(msgPath, []byte("agent work\n"), 0o644)
-	if err := hookrun.PrepareCommitMsg(ctx, hookrun.Env{Now: time.Now(), Cwd: root, Args: []string{msgPath, "message"}, Stdin: strings.NewReader(""), Spool: sp, Version: "test"}); err != nil {
+	if err := hookrun.PrepareCommitMsg(ctx, hookrun.Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Args: []string{msgPath, "message"}, Stdin: strings.NewReader(""), Spool: sp, Version: "test"}); err != nil {
 		t.Fatal(err)
 	}
 	data, _ := os.ReadFile(msgPath)
@@ -179,7 +179,7 @@ func TestAntigravityLaterTurnsRefreshWithoutRestarting(t *testing.T) {
 	sp, _ := spool.Open(t.TempDir())
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	env := func(stdin string) hookrun.Env {
-		return hookrun.Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
+		return hookrun.Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
 	}
 	if err := preInvocation(ctx, env(antigravityPayload(root, "PreInvocation", `"initialNumSteps":9,"invocationNum":0`))); err != nil {
 		t.Fatal(err)
@@ -207,7 +207,7 @@ func TestAntigravityLaterTurnsRefreshWithoutRestarting(t *testing.T) {
 	}
 	msgPath := filepath.Join(t.TempDir(), "COMMIT_EDITMSG")
 	_ = os.WriteFile(msgPath, []byte("work\n"), 0o644)
-	if err := hookrun.PrepareCommitMsg(ctx, hookrun.Env{Now: time.Now(), Cwd: root, Args: []string{msgPath, "message"}, Stdin: strings.NewReader(""), Spool: sp}); err != nil {
+	if err := hookrun.PrepareCommitMsg(ctx, hookrun.Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Args: []string{msgPath, "message"}, Stdin: strings.NewReader(""), Spool: sp}); err != nil {
 		t.Fatal(err)
 	}
 	if data, _ := os.ReadFile(msgPath); !strings.Contains(string(data), "Agent-Tool: antigravity") {
@@ -241,7 +241,7 @@ func TestAntigravityConversationFallsBackToTheEnvironment(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	t.Setenv(antigravityConversationEnv, "env-conv-1")
 	stdin := `{"workspacePaths":["` + root + `"],"modelName":"gemini-3.8-pro","initialNumSteps":1,"invocationNum":0}`
-	if err := preInvocation(context.Background(), hookrun.Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(stdin), Spool: sp}); err != nil {
+	if err := preInvocation(context.Background(), hookrun.Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Stdin: strings.NewReader(stdin), Spool: sp}); err != nil {
 		t.Fatal(err)
 	}
 	events := hookruntest.Spooled(t, sp)
@@ -264,7 +264,7 @@ func TestAntigravityTurnsAreNamedByWhereTheyBegan(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	run := func(h func(context.Context, hookrun.Env) error, extra string) {
 		t.Helper()
-		if err := h(ctx, hookrun.Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(antigravityPayload(root, "", extra)), Spool: sp, Version: "test"}); err != nil {
+		if err := h(ctx, hookrun.Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Stdin: strings.NewReader(antigravityPayload(root, "", extra)), Spool: sp, Version: "test"}); err != nil {
 			t.Fatal(err)
 		}
 	}

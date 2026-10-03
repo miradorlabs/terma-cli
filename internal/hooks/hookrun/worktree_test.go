@@ -32,7 +32,7 @@ func TestWorktreeEventsReportTheMainRepositoryAndProject(t *testing.T) {
 	}
 	run := func(cwd, payload string, hook func(context.Context, Env) error) {
 		t.Helper()
-		if err := hook(ctx, Env{Now: time.Now(), Cwd: cwd, Stdin: strings.NewReader(payload), Spool: sp, Version: "test", Team: "proj-main"}); err != nil {
+		if err := hook(ctx, Env{Now: time.Now(), Cwd: cwd, Policy: hookruntest.Admitting(main), Stdin: strings.NewReader(payload), Spool: sp, Version: "test", Team: "proj-main"}); err != nil {
 			t.Fatal(err)
 		}
 	}

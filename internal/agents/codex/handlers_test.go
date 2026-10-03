@@ -22,7 +22,7 @@ func TestCodexSessionStartAnnouncesSession(t *testing.T) {
 	if err := project.Save(root, &project.File{Project: project.Project{ID: "project-a"}}); err != nil {
 		t.Fatal(err)
 	}
-	env := hookrun.Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(`{"session_id":"` + id + `","cwd":"` + root + `"}`)}
+	env := hookrun.Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Stdin: strings.NewReader(`{"session_id":"` + id + `","cwd":"` + root + `"}`)}
 	if err := sessionStart(context.Background(), env); err != nil {
 		t.Fatal(err)
 	}
@@ -35,7 +35,7 @@ func TestCodexSessionStampsItsCommitFromApplyPatch(t *testing.T) {
 	ctx := context.Background()
 	sp, _ := spool.Open(t.TempDir())
 	env := func(stdin string) hookrun.Env {
-		return hookrun.Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
+		return hookrun.Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
 	}
 	const id = "01a08bd5-0487-74b1-9d82-45e619c574fa"
 
@@ -70,7 +70,7 @@ func TestCodexSessionStampsItsCommitFromApplyPatch(t *testing.T) {
 	}
 	msgPath := filepath.Join(t.TempDir(), "COMMIT_EDITMSG")
 	_ = os.WriteFile(msgPath, []byte("agent work\n"), 0o644)
-	commitEnv := hookrun.Env{Now: time.Now(), Cwd: root, Args: []string{msgPath, "message"}, Stdin: strings.NewReader(""), Spool: sp, Version: "test"}
+	commitEnv := hookrun.Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Args: []string{msgPath, "message"}, Stdin: strings.NewReader(""), Spool: sp, Version: "test"}
 	if err := hookrun.PrepareCommitMsg(ctx, commitEnv); err != nil {
 		t.Fatal(err)
 	}
@@ -89,14 +89,14 @@ func TestCodexPostToolUseIgnoresCallsWithoutAPatch(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	ctx := context.Background()
 	sp, _ := spool.Open(t.TempDir())
-	env := hookrun.Env{Now: time.Now(), Cwd: root, Spool: sp, Version: "test",
+	env := hookrun.Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Spool: sp, Version: "test",
 		Stdin: strings.NewReader(`{"session_id":"01a08bd5-0487-74b1-9d82-45e619c574fa","hook_event_name":"PostToolUse","cwd":"` + root + `","model":"gpt-6","permission_mode":"default","tool_name":"shell","tool_use_id":"c1","turn_id":"t1","transcript_path":null,"tool_response":"","tool_input":{"command":"go test ./..."}}`)}
 	if err := postToolUse(ctx, env); err != nil {
 		t.Fatal(err)
 	}
 	msgPath := filepath.Join(t.TempDir(), "COMMIT_EDITMSG")
 	_ = os.WriteFile(msgPath, []byte("manual work\n"), 0o644)
-	commitEnv := hookrun.Env{Now: time.Now(), Cwd: root, Args: []string{msgPath, "message"}, Stdin: strings.NewReader(""), Spool: sp, Version: "test"}
+	commitEnv := hookrun.Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Args: []string{msgPath, "message"}, Stdin: strings.NewReader(""), Spool: sp, Version: "test"}
 	if err := hookrun.PrepareCommitMsg(ctx, commitEnv); err != nil {
 		t.Fatal(err)
 	}

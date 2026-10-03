@@ -21,7 +21,7 @@ func TestClaudeSessionStampsOnlyItsOwnFiles(t *testing.T) {
 	sp, _ := spool.Open(t.TempDir())
 	now := time.Now()
 	env := func(stdin string, args ...string) hookrun.Env {
-		return hookrun.Env{Now: now, Cwd: root, Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
+		return hookrun.Env{Now: now, Cwd: root, Policy: hookruntest.Admitting(root), Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
 	}
 
 	if err := sessionStart(ctx, env(`{"session_id":"sess-claude-1","cwd":"`+root+`","hook_event_name":"SessionStart","source":"startup","model":"claude-opus-5"}`)); err != nil {

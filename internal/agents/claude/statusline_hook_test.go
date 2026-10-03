@@ -2,6 +2,7 @@ package claude
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"os"
@@ -27,7 +28,10 @@ func statusEnv(t *testing.T, stdin string) (hookrun.Env, *bytes.Buffer, *spool.S
 	if resolved, err := filepath.EvalSymlinks(cwd); err == nil {
 		cwd = resolved
 	}
-	return hookrun.Env{Now: time.Now(), Cwd: cwd, Stdin: strings.NewReader(stdin), Stdout: &out, Stderr: os.Stderr, Spool: sp, Version: "test"}, &out, sp
+	// quotaPayload's cwd is /tmp.
+	pol := hookruntest.Admitting(cwd)
+	pol.Folders = append(pol.Folders, "tmp")
+	return hookrun.Env{Now: time.Now(), Cwd: cwd, Policy: pol, Team: hookruntest.Team, Stdin: strings.NewReader(stdin), Stdout: &out, Stderr: os.Stderr, Spool: sp, Version: "test"}, &out, sp
 }
 
 func TestStatusLinePassesBytesThroughUnchanged(t *testing.T) {
@@ -178,24 +182,32 @@ func TestStatusLineWithoutRendererIsSilentButCaptures(t *testing.T) {
 	}
 }
 
+// A status line in an admitted repository, from a subdirectory of a Git checkout too,
+// stamps the developer's team; one in a repository the list does not name records nothing.
 func TestStatusLineStampsProjectFromRepository(t *testing.T) {
 	for _, nonGit := range []bool{false, true} {
 		t.Run(map[bool]string{false: "git", true: "non_git"}[nonGit], func(t *testing.T) {
-			root := t.TempDir()
-			if !nonGit {
+			root, cwd := t.TempDir(), ""
+			if root, _ = filepath.EvalSymlinks(root); !nonGit {
 				root = newRepo(t)
+				cwd = filepath.Join(root, "nested")
+				if err := os.MkdirAll(cwd, 0o755); err != nil {
+					t.Fatal(err)
+				}
 			}
-			hookruntest.WriteFile(t, root, ".terma/settings.json", `{"project":{"id":"proj_sl"}}`)
-			nested := filepath.Join(root, "nested")
-			if err := os.MkdirAll(nested, 0o755); err != nil {
-				t.Fatal(err)
-			}
-			payload := strings.Replace(quotaPayload, `"cwd":"/tmp"`, `"cwd":`+string(mustJSON(nested)), 1)
+			payload := strings.Replace(quotaPayload, `"cwd":"/tmp"`, `"cwd":`+string(mustJSON(cmp.Or(cwd, root))), 1)
 			env, _, sp := statusEnv(t, payload)
+			env.Team, env.Policy = "proj_sl", hookruntest.Admitting(root)
 			statusLine(context.Background(), env, statusLineOptions{CaptureOnly: true})
 			evs := hookruntest.Spooled(t, sp)
 			if len(evs) != 1 || evs[0].Attrs[hookrun.AttrProjectID] != "proj_sl" || evs[0].Repo != filepath.Base(root) {
-				t.Fatalf("project binding: %+v", evs)
+				t.Fatalf("project: %+v", evs)
+			}
+			env.Stdin, env.Policy.Folders = strings.NewReader(payload), []string{"elsewhere"}
+			env.Now = env.Now.Add(time.Hour)
+			statusLine(context.Background(), env, statusLineOptions{CaptureOnly: true})
+			if evs := hookruntest.Spooled(t, sp); len(evs) != 0 {
+				t.Fatalf("an unlisted repository recorded %+v", evs)
 			}
 		})
 	}

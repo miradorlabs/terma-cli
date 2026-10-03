@@ -162,12 +162,12 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 }
 
 // Allowed rechecks the policy ceiling on every delivery, since hook events bypass the
-// relay and may predate a tightened policy: an event naming an excluded path, a reply or
-// a thread's name the policy's prompts-off withholds, sends nothing. Outgoing removes the
+// relay and may predate a tightened policy: an event from a repository the list no longer
+// names, a reply or a thread's name the policy's prompts-off withholds, sends nothing. Outgoing removes the
 // rest of what the policy withholds.
 func (r Router) Allowed(org config.Policy, projectID string, e spool.Event) bool {
 	org = routing.EffectivePolicy(org, projectID)
-	if org.CollectsNothing || e.Global && !org.Global() {
+	if org.CollectsNothing || e.Global && !org.Global() || !org.Admits(e.Repository) {
 		return false
 	}
 	if e.Name == hookrun.EventAssistantMessage || e.Name == hookrun.EventSessionTitle {

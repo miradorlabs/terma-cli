@@ -71,8 +71,9 @@ func Run(ctx context.Context, d Deps, r Request) int {
 		return 0
 	}
 	if render, ok := d.Agents.Render(r.Event); ok {
+		p := d.Profile()
 		env := hookrun.Env{Now: time.Now(), Cwd: r.Cwd, Args: r.Args, Stdin: r.Stdin, Stdout: r.Stdout, Stderr: r.Stderr,
-			Version: r.Version, Debug: r.Debug, Flush: d.Flush, Team: d.Profile().Team}
+			Version: r.Version, Debug: r.Debug, Flush: d.Flush, Policy: p.Policy, Team: p.Team}
 		if !r.HooksOff {
 			env.Spool = d.Spool()
 		}

@@ -32,6 +32,7 @@ func TestHookKillSwitch(t *testing.T) {
 	git("config", "user.name", "Dev")
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	t.Setenv("TERMA_HOOKS", "")
+	admitHere(t, root, "team")
 
 	wd, err := os.Getwd()
 	if err != nil {

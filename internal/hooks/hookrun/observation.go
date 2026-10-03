@@ -127,7 +127,7 @@ func (e Env) CaptureObservation(ctx context.Context, r *Repo, o Observation) {
 	state.LastHash, state.At = hash, e.Time()
 	attrs["source_stream"], attrs["observation_sequence"] = state.Stream, state.Sequence
 	attrs["observation_id"] = EvidenceID(fmt.Sprintf("%s\x00%s\x00%d", o.Tool, state.Stream, state.Sequence))
-	state.Pending = &spool.Event{Time: e.Time(), Name: EventSessionObservation, SessionID: o.SessionID, Repo: r.Name, Attrs: attrs}
+	state.Pending = &spool.Event{Time: e.Time(), Name: EventSessionObservation, SessionID: o.SessionID, Repo: r.Name, Repository: r.Repository, Attrs: attrs}
 	if err = write(); err != nil {
 		e.Logf("%s checkpoint: %v", o.Tool, err)
 		return

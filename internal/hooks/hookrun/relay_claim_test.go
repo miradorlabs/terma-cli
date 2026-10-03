@@ -23,7 +23,7 @@ func TestHooksClaimSessionsForTheRelay(t *testing.T) {
 	sp, _ := spool.Open(t.TempDir())
 	claimed := 0
 	env := func(stdin string) Env {
-		return Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(stdin), Spool: sp, Team: "project-a", OnClaim: func() { claimed++ }}
+		return Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(stdin), Spool: sp, Policy: hookruntest.Admitting(root), Team: "project-a", OnClaim: func() { claimed++ }}
 	}
 	const claude, codex = "claude-session-1", "codex-thread-1"
 	if err := startSession(context.Background(), env(`{"session_id":"`+claude+`","cwd":"`+root+`","model":"m"}`)); err != nil {
@@ -55,13 +55,13 @@ func TestHooksClaimSessionsForTheRelay(t *testing.T) {
 func TestAnExpiredPolicyStillClaims(t *testing.T) {
 	root := initRepo(t)
 	hookruntest.RelayOn(t)
-	expired := config.Policy{Mode: config.ModeRepo, TeamID: "project-a", Revision: 1, FetchedAt: time.Now().Add(-config.MaxPolicyAge - time.Hour)}
+	expired := config.Policy{Mode: config.ModeRepo, Folders: []string{filepath.Base(root)}, TeamID: "project-a", Revision: 1, FetchedAt: time.Now().Add(-config.MaxPolicyAge - time.Hour)}
 	if err := routing.SavePolicy(expired); err != nil {
 		t.Fatal(err)
 	}
 	sp, _ := spool.Open(t.TempDir())
 	claimed := false
-	env := Env{Now: time.Now(), Cwd: root, Spool: sp, Policy: config.NoPolicy("", ""), Team: "project-a", OnClaim: func() { claimed = true },
+	env := Env{Now: time.Now(), Cwd: root, Spool: sp, Policy: expired, Team: "project-a", OnClaim: func() { claimed = true },
 		Stdin: strings.NewReader(`{"session_id":"expired-session","cwd":"` + root + `","model":"m"}`)}
 	if err := startSession(context.Background(), env); err != nil {
 		t.Fatal(err)
@@ -83,7 +83,7 @@ func TestEachDeveloperClaimsForTheirOwnTeam(t *testing.T) {
 	hookruntest.RelayOn(t)
 	sp, _ := spool.Open(t.TempDir())
 	for sid, team := range map[string]string{"backend-session": "team-backend", "billing-session": "team-billing"} {
-		env := Env{Now: time.Now(), Cwd: root, Spool: sp, Team: team,
+		env := Env{Now: time.Now(), Cwd: root, Spool: sp, Team: team, Policy: hookruntest.Admitting(root),
 			Stdin: strings.NewReader(`{"session_id":"` + sid + `","cwd":"` + root + `","model":"m"}`)}
 		if err := startSession(context.Background(), env); err != nil {
 			t.Fatal(err)
@@ -103,7 +103,7 @@ func TestEachDeveloperClaimsForTheirOwnTeam(t *testing.T) {
 // No team from setup, or no relay on this machine: nothing is claimed.
 func TestNoClaimWithoutATeamOrRelay(t *testing.T) {
 	root := initRepo(t)
-	env := Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(`{"session_id":"s1","cwd":"` + root + `"}`)}
+	env := Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Stdin: strings.NewReader(`{"session_id":"s1","cwd":"` + root + `"}`)}
 	hookruntest.RelayOn(t)
 	_ = startSession(context.Background(), env)
 	if _, ok := claim.Read("s1", time.Now()); ok {
@@ -111,7 +111,7 @@ func TestNoClaimWithoutATeamOrRelay(t *testing.T) {
 	}
 
 	root = initRepo(t) // a fresh config dir: no relay token
-	env = Env{Now: time.Now(), Cwd: root, Team: "project-a", Stdin: strings.NewReader(`{"session_id":"s2","cwd":"` + root + `"}`)}
+	env = Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Team: "project-a", Stdin: strings.NewReader(`{"session_id":"s2","cwd":"` + root + `"}`)}
 	_ = startSession(context.Background(), env)
 	if _, ok := claim.Read("s2", time.Now()); ok {
 		t.Fatal("a machine without `terma relay setup` claimed a session")

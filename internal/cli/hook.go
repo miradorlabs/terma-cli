@@ -63,22 +63,32 @@ func (app *App) hookDeps() dispatch.Deps {
 	}
 }
 
-// hookProfile is one small local read; without a validated scope content capture stays
-// off, but the team still claims, so a stale policy loses no session.
+// hookProfile is one small local read. Hooks run on the last validated policy even once
+// it has expired, so a refresh outage stops no claim: what leaves is decided downstream,
+// under the policy in force then.
 func hookProfile() dispatch.Profile {
 	cfg, err := config.Load(config.Overrides{})
 	if err != nil {
 		return dispatch.Profile{Policy: config.NoPolicy("", "")}
 	}
 	p := dispatch.Profile{Team: cfg.Policy.TeamID, Agents: cfg.Harnesses, Policy: cfg.Policy}
-	if !cfg.Policy.Validated() || cfg.Policy.Expired(time.Now()) {
+	if !cfg.Policy.Validated() {
 		p.Policy = config.NoPolicy(cfg.OrganizationID, cfg.AuthURL)
 	}
 	return p
 }
 
-// hookPolicy is the collection policy as a hook reads it.
-func hookPolicy() config.Policy { return hookProfile().Policy }
+// hookPolicy is the collection policy while it is validated and fresh, else NoPolicy.
+func hookPolicy() config.Policy {
+	cfg, err := config.Load(config.Overrides{})
+	if err != nil {
+		return config.NoPolicy("", "")
+	}
+	if !cfg.Policy.Validated() || cfg.Policy.Expired(time.Now()) {
+		return config.NoPolicy(cfg.OrganizationID, cfg.AuthURL)
+	}
+	return cfg.Policy
+}
 
 // openSpool returns nil when the config dir cannot be used: a nil spool drops events,
 // never failing a hook.

@@ -162,11 +162,11 @@ func NormalizeRemote(raw string) string {
 	if raw == "" {
 		return ""
 	}
-	// scp-like syntax: git@host:owner/repo(.git)
+	// scp-like syntax: git@host:owner/repo(.git); a local path, C:\repo included, is none.
 	if !strings.Contains(raw, "://") {
 		at := strings.LastIndex(raw, "@")
 		colon := strings.Index(raw[at+1:], ":")
-		if at >= 0 && colon >= 0 {
+		if at >= 0 && colon >= 0 && !strings.ContainsAny(raw[:at+1+colon], `/\`) {
 			host := raw[at+1 : at+1+colon]
 			path := raw[at+1+colon+1:]
 			return "https://" + host + "/" + strings.TrimSuffix(strings.TrimPrefix(path, "/"), ".git")

@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/shape"
@@ -52,7 +55,7 @@ func runIsolated(m *testing.M) int {
 		"GEMINI_CLI_HOME":     home,
 		"GIT_CONFIG_NOSYSTEM": "1",
 		// Offline; policy integration tests clear this and use the real HTTP path.
-		"TERMA_POLICY_STUB": `{"mode":"repo","include_prompts":true,"include_tool_content":true}`,
+		"TERMA_POLICY_STUB": `{"mode":"repo","folders":["app"],"include_prompts":true,"include_tool_content":true}`,
 	} {
 		_ = os.Setenv(k, v)
 	}
@@ -60,6 +63,20 @@ func runIsolated(m *testing.M) int {
 }
 
 // newTestRelay is relay.New with the registered agents' telemetry shapes, as relay run has.
+// appFolder is the working copy the package's stub policy lists.
+var appFolder = config.Repository{Names: []string{"app"}}
+
+// admitHere signs the profile into a validated repository-mode policy for team, listing
+// the folder root, as `terma setup` would leave it.
+func admitHere(t *testing.T, root, team string) {
+	t.Helper()
+	pol := config.Policy{Mode: config.ModeRepo, Folders: []string{filepath.Base(root)}, IncludePrompts: true, IncludeToolContent: true,
+		TeamID: team, Revision: 1, FetchedAt: time.Now()}
+	if err := config.UpdateProfile(config.DefaultProfile, func(p *config.Profile) { p.Policy = &pol }); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func newTestRelay(o relay.Options) *relay.Relay {
 	o.Correlators, o.Capturers = testApp.agents.With[shape.Correlator](), testApp.agents.With[shape.Capturer]()
 	return relay.New(o)

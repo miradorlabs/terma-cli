@@ -51,7 +51,7 @@ func captureCodexDesktopActivity(ctx context.Context, e hookrun.Env, r *hookrun.
 		if at.IsZero() || at.After(e.Time()) {
 			at = e.Time()
 		}
-		ev := spool.Event{Time: at, SessionID: in.SessionID, Repo: r.Name, Attrs: attrs}
+		ev := spool.Event{Time: at, SessionID: in.SessionID, Repo: r.Name, Repository: r.Repository, Attrs: attrs}
 		switch a.Kind {
 		case "model":
 			ev.Name = hookrun.EventModelCall

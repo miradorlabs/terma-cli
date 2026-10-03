@@ -104,6 +104,10 @@ const (
 
 // deliverAttributed applies the content policy, stamps the project and enqueues. deliverMu is held.
 func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attribution) {
+	if pol.Unadmitted {
+		r.stats.dropped(p.signal, "policy_repository", p.records)
+		return
+	}
 	if pol.Signals != nil && !contains(pol.Signals, string(p.signal)) {
 		r.stats.dropped(p.signal, "policy_signal", p.records)
 		return

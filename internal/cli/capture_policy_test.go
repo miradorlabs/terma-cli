@@ -40,7 +40,7 @@ func TestPolicyRefreshFiltersAlreadyQueuedReplies(t *testing.T) {
 			if r.Header.Get("Authorization") != "Bearer developer-policy-token" {
 				t.Error("policy did not use developer login")
 			}
-			fmt.Fprintf(w, `{"policy":{"version":"1.0","terma":{"per_repository":{"repositories":[]},"capture":{"exclude_prompts":%t,"exclude_tool_content":false}}},"revision":%d,"updated_at":"2026-09-30T12:27:05Z"}`, revision.Load() > 1, revision.Load())
+			fmt.Fprintf(w, `{"policy":{"version":"1.0","terma":{"per_repository":{"folders":["app"]},"capture":{"exclude_prompts":%t,"exclude_tool_content":false}}},"revision":%d,"updated_at":"2026-09-30T12:27:05Z"}`, revision.Load() > 1, revision.Load())
 			return
 		}
 		if r.Header.Get("Authorization") != "Bearer "+policyTestKey {
@@ -72,7 +72,7 @@ func TestPolicyRefreshFiltersAlreadyQueuedReplies(t *testing.T) {
 		if name != "terma.commit" {
 			attrs["text"] = "PRIVATE_CONTENT"
 		}
-		if err := s.Append(spool.Event{Time: time.Now(), Name: name, Attrs: attrs}); err != nil {
+		if err := s.Append(spool.Event{Time: time.Now(), Name: name, Repository: appFolder, Attrs: attrs}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -123,8 +123,9 @@ func TestRelayRespectsHarnessSelection(t *testing.T) {
 				t.Fatal(err)
 			}
 			cfg := &config.Config{Policy: config.DefaultPolicy(), OTLPURL: host.URL, Harnesses: []string{test.harness}}
+			cfg.Policy.Folders = appFolder.Names
 			r := newTestRelay(relay.Options{Token: "test-token", Dir: t.TempDir(), Resolve: testApp.relayDeps().Resolver(cfg, nil), Lookup: func(string, time.Time) (claim.Claim, bool) {
-				return claim.Claim{ProjectID: "team", Tool: test.tool}, true
+				return claim.Claim{ProjectID: "team", Tool: test.tool, Repository: appFolder}, true
 			}})
 			ctx, cancel := context.WithCancel(t.Context())
 			done := make(chan struct{})
@@ -195,7 +196,7 @@ func TestQueuedRelayExportsRespectHarnessDeselection(t *testing.T) {
 	choose := func(agents ...string) {
 		t.Helper()
 		pol := config.DefaultPolicy()
-		pol.FetchedAt = time.Now()
+		pol.FetchedAt, pol.Folders = time.Now(), appFolder.Names
 		if err := config.UpdateProfile(config.DefaultProfile, func(p *config.Profile) { p.Harnesses, p.Policy = agents, &pol }); err != nil {
 			t.Fatal(err)
 		}
@@ -204,7 +205,7 @@ func TestQueuedRelayExportsRespectHarnessDeselection(t *testing.T) {
 	dir := t.TempDir()
 	cfg := &config.Config{ProfileName: config.DefaultProfile, Policy: config.DefaultPolicy(), OTLPURL: host.URL}
 	r := newTestRelay(relay.Options{Token: "test-token", Dir: dir, Resolve: testApp.relayDeps().Resolver(cfg, nil), Lookup: func(string, time.Time) (claim.Claim, bool) {
-		return claim.Claim{ProjectID: "team", Tool: "codex"}, true
+		return claim.Claim{ProjectID: "team", Tool: "codex", Repository: appFolder}, true
 	}})
 	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan struct{})
@@ -364,7 +365,7 @@ func TestPolicyRefreshOtherTeamKeepsSelectedCoverage(t *testing.T) {
 		if r.URL.Query().Get("project_id") != "other" || r.Header.Get("Authorization") != "Bearer developer-policy-token" {
 			t.Error("wrong team policy request")
 		}
-		fmt.Fprint(w, `{"policy":{"version":"1.0","terma":{"per_repository":{"repositories":[]},"capture":{"exclude_prompts":true,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-09-30T12:27:05Z"}`)
+		fmt.Fprint(w, `{"policy":{"version":"1.0","terma":{"per_repository":{"folders":[]},"capture":{"exclude_prompts":true,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-09-30T12:27:05Z"}`)
 	}))
 	defer srv.Close()
 	seedPolicyLogin(t, srv.URL)

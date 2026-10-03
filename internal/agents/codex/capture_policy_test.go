@@ -64,7 +64,7 @@ func TestTeamPolicyWithholdsCodexHookContent(t *testing.T) {
 	} {
 		t.Run(label, func(t *testing.T) {
 			env := fundingEnv(t)
-			team.TeamID, team.FetchedAt = "project-a", time.Now()
+			team.TeamID, team.FetchedAt, team.Folders = "project-a", time.Now(), env.Policy.Folders
 			if err := routing.SavePolicy(team); err != nil {
 				t.Fatal(err)
 			}

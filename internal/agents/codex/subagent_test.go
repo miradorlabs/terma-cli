@@ -19,7 +19,7 @@ func TestCodexSubagentHooksAndSpawnedThreadParent(t *testing.T) {
 	ctx := context.Background()
 	sp, _ := spool.Open(t.TempDir())
 	env := func(stdin string) hookrun.Env {
-		return hookrun.Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
+		return hookrun.Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
 	}
 	const child = "01a04490-7a2c-7b1e-8000-000000000002"
 	const parent = "01a04490-7a2c-7b1e-8000-000000000001"
@@ -83,7 +83,7 @@ func TestCodexSpawnedThreadArrivesThroughSubagentStart(t *testing.T) {
 	sp, _ := spool.Open(t.TempDir())
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	env := func(stdin string) hookrun.Env {
-		return hookrun.Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
+		return hookrun.Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
 	}
 	const rootThread = "01a04490-7a2c-7b1e-8000-00000000000a"
 	const child = "01a04490-7a2c-7b1e-8000-00000000000b"

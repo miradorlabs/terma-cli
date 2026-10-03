@@ -17,15 +17,17 @@ type Capture struct {
 	Agents []string
 	// Harness is the claiming agent's harness name, empty for global mode's catch-all.
 	Harness string
+	// Repository is where the claim's session runs.
+	Repository config.Repository
 }
 
-// CapturePolicy is the content and signal half of a claim's Policy. Content is the team
-// policy's alone (config.Policy.Content, the rule hook events follow too), and every
+// CapturePolicy is the content and signal half of a claim's Policy, and whether the team
+// policy still admits the claim's repository. Content is the team policy's alone (config.Policy.Content, the rule hook events follow too), and every
 // signal is sent, except from an agent the developer did not choose, whose exporter an
 // earlier setup may have left pointing at the relay.
 func CapturePolicy(in Capture) relay.Policy {
 	org := in.Org
-	pol := relay.Policy{RequireClaim: !in.Primary || !org.Global()}
+	pol := relay.Policy{RequireClaim: !in.Primary || !org.Global(), Unadmitted: !org.Admits(in.Repository)}
 	pol.IncludePrompts, pol.IncludeToolContent = org.Content()
 	if org.CollectsNothing || !org.Global() && in.Harness != "" && !slices.Contains(in.Agents, in.Harness) {
 		pol.IncludePrompts, pol.IncludeToolContent = false, false

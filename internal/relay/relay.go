@@ -49,6 +49,8 @@ type Policy struct {
 	// Signals nil allows every signal; empty allows none.
 	Signals      []string
 	RequireClaim bool
+	// Unadmitted is a claim whose repository the team policy no longer lists: its records drop.
+	Unadmitted bool
 }
 
 // ErrNoKey is Resolve's answer for a project this machine holds no key for; its parts wait, then drop.

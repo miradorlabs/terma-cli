@@ -1,30 +1,41 @@
 package config
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
-// Repository is how a working copy is named for admission: the last segment of its
-// remote's path and the whole path (owner/name), else only its folder's name.
+// Repository is how a working copy is named for admission: the folder names and origin's
+// repository name a folder entry may equal, and origin's owner/name.
 type Repository struct {
-	Name string `json:"name,omitempty"`
-	Path string `json:"path,omitempty"`
+	Names []string `json:"names,omitempty"`
+	Path  string   `json:"path,omitempty"`
 }
 
 // Admits reports whether p collects the sessions and commits of r: every one in global
-// mode, else those its repository list names. An entry with a slash matches the remote's
-// owner/name, one without the repository's name, ignoring case.
+// mode, else those its folder list names. An entry with a slash matches origin's
+// owner/name, one without any of r's names, ignoring case.
 func (p Policy) Admits(r Repository) bool {
 	if p.Global() {
 		return true
 	}
-	for _, entry := range p.Repositories {
+	for _, entry := range p.Folders {
 		entry = strings.Trim(strings.TrimSpace(entry), "/")
-		target := r.Name
-		if strings.Contains(entry, "/") {
-			target = r.Path
+		if entry == "" {
+			continue
 		}
-		if target != "" && strings.EqualFold(entry, target) {
+		if strings.Contains(entry, "/") {
+			if strings.EqualFold(entry, r.Path) {
+				return true
+			}
+		} else if slices.ContainsFunc(r.Names, func(n string) bool { return strings.EqualFold(entry, n) }) {
 			return true
 		}
 	}
 	return false
+}
+
+// Equal reports whether r and o name the same working copy.
+func (r Repository) Equal(o Repository) bool {
+	return r.Path == o.Path && slices.Equal(r.Names, o.Names)
 }

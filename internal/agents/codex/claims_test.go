@@ -53,13 +53,13 @@ func TestCodexSubagentThreadIsClaimed(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	hookruntest.RelayOn(t)
 	sp, _ := spool.Open(t.TempDir())
-	env := hookrun.Env{Now: time.Now(), Cwd: root, Spool: sp, Team: "project-a",
+	env := hookrun.Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Spool: sp, Team: "project-a",
 		Stdin: strings.NewReader(`{"session_id":"root-thread","agent_id":"child-thread","agent_type":"worker","cwd":"` + root + `"}`)}
 	if err := subagentStart(context.Background(), env); err != nil {
 		t.Fatal(err)
 	}
 	payload := `{"session_id":"root-thread","agent_id":"child-thread-2","cwd":"` + root + `"}`
-	hookrun.ClaimFromPayload(context.Background(), hookrun.Env{Now: time.Now(), Cwd: root, Team: "project-a"}, payloadSession(t, payload), "codex")
+	hookrun.ClaimFromPayload(context.Background(), hookrun.Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Team: "project-a"}, payloadSession(t, payload), "codex")
 	for _, id := range []string{"root-thread", "child-thread", "child-thread-2"} {
 		if c, ok := claim.Read(id, time.Now()); !ok || c.ProjectID != "project-a" {
 			t.Errorf("%s not claimed: %+v %v", id, c, ok)

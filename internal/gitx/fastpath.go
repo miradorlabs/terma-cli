@@ -2,7 +2,6 @@ package gitx
 
 import (
 	"bufio"
-	"cmp"
 	"context"
 	"net/url"
 	"os"
@@ -129,56 +128,45 @@ func CommentCharFS(gitDir string) string {
 	return value
 }
 
-// RemoteURLFS reads the url of remote origin, else of the first remote, from the common
-// dir's config through NormalizeRemote; includes are not followed.
+// RemoteURLFS reads remote.origin.url from the common dir's config through
+// NormalizeRemote; includes are not followed.
 func RemoteURLFS(gitDir string) string {
-	f, err := os.Open(filepath.Join(CommonDirFS(gitDir), "config"))
-	if err != nil {
-		return ""
-	}
-	defer f.Close()
-	var section, origin, first string
-	sc := bufio.NewScanner(f)
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if line == "" || line[0] == '#' || line[0] == ';' {
-			continue
-		}
-		if line[0] == '[' {
-			section = strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(line, "["), "]"))
-			continue
-		}
-		if len(section) < 8 || !strings.EqualFold(section[:7], "remote ") {
-			continue
-		}
-		k, v, ok := strings.Cut(line, "=")
-		if !ok || !strings.EqualFold(strings.TrimSpace(k), "url") {
-			continue
-		}
-		if strings.Trim(section[7:], `" `) == "origin" {
-			origin = unquoteConfigValue(v)
-		} else if first == "" {
-			first = unquoteConfigValue(v)
-		}
-	}
-	return NormalizeRemote(cmp.Or(origin, first))
+	raw, _ := configValue(filepath.Join(CommonDirFS(gitDir), "config"), `remote "origin"`, "url")
+	return NormalizeRemote(raw)
 }
 
-// RepositoryFS names the working copy at root for admission without running git: its
-// remote's path (owner/name) and that path's last segment, else, with no remote, the
-// folder of the checkout, a linked worktree's main one.
-func RepositoryFS(root, gitDir string) (name, path string) {
-	if remote := RemoteURLFS(gitDir); remote != "" {
-		if u, err := url.Parse(remote); err == nil {
-			if path = strings.Trim(u.Path, "/"); path != "" {
-				return path[strings.LastIndex(path, "/")+1:], path
-			}
+// RepositoryFS names the working copy at root for admission without running git: in a
+// checkout, its folder, a linked worktree's main checkout's folder too, and origin's
+// repository name, with a hosted origin's owner/name as path; outside Git, root's folder
+// and every parent's, stopping before the home directory or the volume root.
+func RepositoryFS(root, gitDir string) (names []string, path string) {
+	if gitDir == "" {
+		home, _ := os.UserHomeDir()
+		for dir := filepath.Clean(root); !strings.EqualFold(dir, filepath.Clean(home)) && dir != filepath.Dir(dir); dir = filepath.Dir(dir) {
+			names = append(names, filepath.Base(dir))
 		}
+		return names, ""
 	}
+	names = append(names, filepath.Base(root))
 	if _, main, ok := LinkedWorktreeFS(gitDir); ok && main != "" {
-		root = main
+		names = append(names, filepath.Base(main))
 	}
-	return filepath.Base(root), ""
+	raw, _ := configValue(filepath.Join(CommonDirFS(gitDir), "config"), `remote "origin"`, "url")
+	name := ""
+	if remote := NormalizeRemote(raw); remote != "" {
+		if u, err := url.Parse(remote); err == nil {
+			path = strings.Trim(u.Path, "/")
+			name = path[strings.LastIndex(path, "/")+1:]
+		}
+	} else {
+		// A local remote: a path or file:// URL, with either separator.
+		local := strings.TrimRight(strings.TrimPrefix(raw, "file://"), `/\`)
+		name = strings.TrimSuffix(local[strings.LastIndexAny(local, `/\`)+1:], ".git")
+	}
+	if name != "" {
+		names = append(names, name)
+	}
+	return names, path
 }
 
 func globalConfigPaths() []string {

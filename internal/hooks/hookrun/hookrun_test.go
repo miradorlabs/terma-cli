@@ -23,7 +23,7 @@ func TestActiveSessionFallbackAndMergeSkip(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now()
 	env := func(stdin string, args ...string) Env {
-		return Env{Now: now, Cwd: root, Args: args, Stdin: strings.NewReader(stdin), Version: "test"}
+		return Env{Now: now, Cwd: root, Policy: hookruntest.Admitting(root), Args: args, Stdin: strings.NewReader(stdin), Version: "test"}
 	}
 	// A session announced with no files falls back to active-session attribution.
 	if err := (Extension{Tool: "codex"}).sessionStart(ctx, env(`{"session_id":"thread-9","cwd":"`+root+`","model":"gpt-5.4"}`)); err != nil {
@@ -113,7 +113,7 @@ func TestPostCommitReportsPerFileLineStats(t *testing.T) {
 	sp, _ := spool.Open(t.TempDir())
 	now := time.Now()
 	env := func(at time.Time, stdin string, args ...string) Env {
-		return Env{Now: at, Cwd: root, Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
+		return Env{Now: at, Cwd: root, Policy: hookruntest.Admitting(root), Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
 	}
 	touch := func(at time.Time, sessionID, rel string) {
 		t.Helper()
@@ -210,7 +210,7 @@ func TestPostCommitBoundsFileStats(t *testing.T) {
 	sp, _ := spool.Open(t.TempDir())
 	now := time.Now()
 	env := func(stdin string, args ...string) Env {
-		return Env{Now: now, Cwd: root, Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
+		return Env{Now: now, Cwd: root, Policy: hookruntest.Admitting(root), Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
 	}
 	if err := startSession(ctx, env(`{"session_id":"sess-wide","cwd":"`+root+`","hook_event_name":"SessionStart"}`)); err != nil {
 		t.Fatal(err)
@@ -264,7 +264,7 @@ func TestPostCommitOnAnUnstampedCommitEmitsOnlyACount(t *testing.T) {
 	root := initRepo(t)
 	ctx := context.Background()
 	sp, _ := spool.Open(t.TempDir())
-	env := Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(""), Spool: sp, Version: "test", Team: "proj_test"}
+	env := Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting("o/r"), Stdin: strings.NewReader(""), Spool: sp, Version: "test", Team: "proj_test"}
 	// A credentialed remote and a team, so the event carries every field it may.
 	if _, err := gitx.Git(ctx, root, "remote", "add", "origin", "https://dev:ghp_secret@github.com/o/r.git"); err != nil {
 		t.Fatal(err)
@@ -320,7 +320,7 @@ func TestCommitEventsAreOneFilterApart(t *testing.T) {
 	sp, _ := spool.Open(t.TempDir())
 	now := time.Now()
 	env := func(stdin string, args ...string) Env {
-		return Env{Now: now, Cwd: root, Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test", Team: "proj_test"}
+		return Env{Now: now, Cwd: root, Policy: hookruntest.Admitting("o/r"), Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test", Team: "proj_test"}
 	}
 	if _, err := gitx.Git(ctx, root, "remote", "add", "origin", "git@github.com:o/r.git"); err != nil {
 		t.Fatal(err)
@@ -400,7 +400,7 @@ func TestPostCommitSkipsMergeAndSquashCommits(t *testing.T) {
 	root := initRepo(t)
 	ctx := context.Background()
 	sp, _ := spool.Open(t.TempDir())
-	env := Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(""), Spool: sp, Version: "test"}
+	env := Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Stdin: strings.NewReader(""), Spool: sp, Version: "test"}
 	git := func(args ...string) {
 		t.Helper()
 		if _, err := gitx.Git(ctx, root, args...); err != nil {

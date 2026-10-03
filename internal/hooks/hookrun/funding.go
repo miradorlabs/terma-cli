@@ -68,7 +68,7 @@ func (e Env) CaptureFunding(r *Repo, id, tool, name string, evidence FundingEvid
 	if prev.Hash == next.Hash && !next.At.Before(prev.At) && next.At.Sub(prev.At) < QuotaHeartbeat {
 		return
 	}
-	ev := spool.Event{Time: e.Time(), Name: name, SessionID: id, Repo: r.Name, Attrs: attrs}
+	ev := spool.Event{Time: e.Time(), Name: name, SessionID: id, Repo: r.Name, Repository: r.Repository, Attrs: attrs}
 	if e.Spool.Append(ev) != nil {
 		return
 	} // Retry a failed append at the next hook.

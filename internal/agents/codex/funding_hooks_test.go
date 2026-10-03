@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/spool"
@@ -29,7 +28,7 @@ func fundingEnv(t *testing.T) hookrun.Env {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return hookrun.Env{Now: time.Now(), Cwd: root, Spool: sp, Version: "test", Policy: config.DefaultPolicy(), Team: "project-a"}
+	return hookrun.Env{Now: time.Now(), Cwd: root, Spool: sp, Version: "test", Policy: hookruntest.Admitting(root), Team: "project-a"}
 }
 
 func TestCodexStopCapturesRolloutAndDeduplicates(t *testing.T) {
