@@ -129,9 +129,10 @@ func TestRelayClaudeSubagent(t *testing.T) {
 	})
 }
 
-// A developer who has not trusted the project's Codex hooks yet: Codex runs no hook,
-// so nothing claims the session and nothing is forwarded — fail closed, and the
-// reason is what doctor's "agent hooks run" check names.
+// A developer whose Codex does not trust the project's hooks (install approves them, so
+// here the approvals are gone): Codex runs no hook, so nothing claims the session and
+// nothing is forwarded — fail closed, and the reason is what doctor's "agent hooks run"
+// check names.
 func TestRelayCodexUntrustedHooks(t *testing.T) {
 	forEachCodex(t, func(t *testing.T, b Binary, _ bool) {
 		track(t)
@@ -143,6 +144,9 @@ func TestRelayCodexUntrustedHooks(t *testing.T) {
 		provider := httptest.NewServer(codexTelemetryProvider(t, &calls))
 		defer provider.Close()
 		sb.CodexExec(RouteAPIKey, telemetryPrompt, fixtureCodexArgs(provider.URL)...)
+		if sb.codexTrustWithdrawn == 0 {
+			t.Fatal("install approved none of the repository's Codex hooks, so there was nothing to withdraw")
+		}
 		time.Sleep(8 * time.Second)
 		if n := agentRecords(sb.Receiver.evidence()); n != 0 {
 			t.Errorf("%d records forwarded for a session no hook claimed", n)
