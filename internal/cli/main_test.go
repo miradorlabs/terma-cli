@@ -43,13 +43,14 @@ func runIsolated(m *testing.M) int {
 	}
 	defer func() { _ = os.RemoveAll(home) }()
 	for k, v := range map[string]string{
-		"HOME":              home,
-		"SHELL":             "/bin/zsh",
-		"XDG_CONFIG_HOME":   home + "/.config",
-		"CLAUDE_CONFIG_DIR": home + "/.claude",
-		"CODEX_HOME":        home + "/.codex",
-		"TERMA_CONFIG_DIR":  home + "/.config/terma",
-		"GEMINI_CLI_HOME":   home,
+		"HOME":                home,
+		"SHELL":               "/bin/zsh",
+		"XDG_CONFIG_HOME":     home + "/.config",
+		"CLAUDE_CONFIG_DIR":   home + "/.claude",
+		"CODEX_HOME":          home + "/.codex",
+		"TERMA_CONFIG_DIR":    home + "/.config/terma",
+		"GEMINI_CLI_HOME":     home,
+		"GIT_CONFIG_NOSYSTEM": "1",
 		// Offline; policy integration tests clear this and use the real HTTP path.
 		"TERMA_POLICY_STUB": `{"mode":"repo","include_prompts":true,"include_tool_content":true}`,
 	} {
