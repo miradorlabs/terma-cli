@@ -3,6 +3,7 @@ package claim
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -201,5 +202,89 @@ func TestWriteSurvivesAReaderHoldingTheClaim(t *testing.T) {
 	}
 	if c, _ := Read("s", now); !c.Covers(1) || !c.Covers(2) {
 		t.Fatalf("claim %v", c.PIDs)
+	}
+}
+
+// A mark names the agent and its processes, and nothing that says whose or where.
+func TestMarkNamesNoTeamNoRepository(t *testing.T) {
+	enable(t)
+	now := time.Now()
+	if !Mark("s", "codex", []int{10, 11}, now) {
+		t.Fatal("mark not written")
+	}
+	p, _ := path("s")
+	data, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range []string{`"repository"`, `"repo"`, `"worktree"`} {
+		if strings.Contains(string(data), field) {
+			t.Errorf("the mark holds %s: %s", field, data)
+		}
+	}
+	c, ok := Read("s", now)
+	if !ok || c.ProjectID != "" || len(c.Placements) != 1 || c.Placements[0].ProjectID != "" || c.Tool != "codex" || !c.Covers(11) {
+		t.Fatalf("read = %+v, %v", c, ok)
+	}
+	if got, ok := c.At(10, now); !ok || got.ProjectID != "" {
+		t.Fatalf("At = %+v, %v", got, ok)
+	}
+}
+
+// A session's hooks mark it once; only a new process or the TTL's half writes again.
+func TestMarkWritesOncePerSession(t *testing.T) {
+	enable(t)
+	now := time.Now()
+	Mark("s", "claude-code", []int{10}, now)
+	if Mark("s", "claude-code", []int{10}, now.Add(30*time.Minute)) {
+		t.Fatal("a fresh mark naming these processes was rewritten")
+	}
+	if !Mark("s", "claude-code", []int{20}, now.Add(30*time.Minute)) {
+		t.Fatal("a new process was not added")
+	}
+	if !Mark("s", "claude-code", []int{20}, now.Add(TTL/2+time.Minute)) {
+		t.Fatal("a mark half its TTL old was not refreshed")
+	}
+	if c, _ := Read("s", now); len(c.Placements) != 1 || !c.Covers(10) || !c.Covers(20) {
+		t.Fatalf("claim %+v", c)
+	}
+}
+
+// At carries the selected placement's project, never the top level's: a mark then a
+// claim, and a claim then a mark, each place a record by its process and time.
+func TestAtAcrossMarkAndClaim(t *testing.T) {
+	enable(t)
+	t0 := time.Now().Add(-time.Hour).Truncate(time.Second)
+	t1 := t0.Add(30 * time.Minute)
+	Mark("unlisted-first", "codex", []int{10}, t0)
+	Write("unlisted-first", Claim{ProjectID: "p1", PIDs: []int{10}}, t1)
+	Write("listed-first", Claim{ProjectID: "p1", PIDs: []int{10}}, t0)
+	Mark("listed-first", "codex", []int{10}, t1)
+	for _, tc := range []struct {
+		session string
+		pid     int
+		at      time.Time
+		top     string
+		want    string
+	}{
+		{"unlisted-first", 10, t0.Add(time.Minute), "p1", ""}, // top level listed, the mark selected
+		{"unlisted-first", 10, t1.Add(time.Minute), "p1", "p1"},
+		{"listed-first", 10, t0.Add(time.Minute), "", "p1"}, // top level a mark, the claim selected
+		{"listed-first", 10, t1.Add(time.Minute), "", ""},
+	} {
+		c, ok := Read(tc.session, t1)
+		if !ok || c.ProjectID != tc.top {
+			t.Fatalf("%s: read %+v, %v", tc.session, c, ok)
+		}
+		if got, ok := c.At(tc.pid, tc.at); !ok || got.ProjectID != tc.want {
+			t.Errorf("%s At(%d, %v) = %q, %v; want %q", tc.session, tc.pid, tc.at, got.ProjectID, ok, tc.want)
+		}
+	}
+	// A listed run in another process: its first records, before its placement, are its own.
+	Mark("resumed", "codex", []int{10}, t0)
+	Write("resumed", Claim{ProjectID: "p1", PIDs: []int{20}}, t1)
+	c, _ := Read("resumed", t1)
+	if got, ok := c.At(20, t0.Add(time.Minute)); !ok || got.ProjectID != "p1" {
+		t.Fatalf("the resumed run's early record = %+v, %v", got, ok)
 	}
 }
