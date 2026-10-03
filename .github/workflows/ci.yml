@@ -155,7 +155,7 @@ jobs:
           bun-version: latest
       - run: bun test
 
-  # The shim scripts are committed into customers' repositories: they must be
+  # terma setup's git hook scripts run on every developer's machine: they must be
   # POSIX sh, and they must keep working on the sh that Debian/Alpine ship.
   shim-portability:
     runs-on: ubuntu-latest
@@ -165,20 +165,10 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - run: go build -o bin/terma ./cmd/terma
-      - name: Shim runs under dash and busybox sh
-        env:
-          TERMA_POLICY_STUB: '{"mode":"repo","include_prompts":true,"include_tool_content":true}'
+      - name: Git hook scripts run under dash and busybox sh
         run: |
           sudo apt-get install -y -q dash busybox >/dev/null
-          tmp=$(mktemp -d); cd "$tmp"; git init -q; git config user.email t@example.com; git config user.name t
-          "$GITHUB_WORKSPACE/bin/terma" install --team proj_ci --harness none --yes >/dev/null
-          for sh in dash "busybox sh"; do
-            echo "subject" > msg.txt
-            $sh .terma/hooks/prepare-commit-msg msg.txt message
-            $sh .terma/hooks/post-commit
-          done
-          echo "ok"
+          TERMA_SHIM_SHELLS="dash,busybox sh" go test ./internal/globalmode/ -run TestGitHookScriptsRunUnderPOSIXShells -count=1 -v
 
   # Everything a release publishes, rendered with the committed GoReleaser config
   # from a throwaway tag that never leaves the runner: every platform
