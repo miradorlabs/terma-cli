@@ -3,8 +3,10 @@ package doctor
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 
@@ -49,11 +51,33 @@ func JudgeHooksPath(ctx context.Context, root string) HooksPath {
 	h.TermaGlobal, h.TermaClone = globalmode.IsGitHooksDir(dir), globalmode.IsCloneHooksDir(dir)
 	entries, err := os.ReadDir(dir)
 	h.Hookless = err != nil || !slices.ContainsFunc(entries, func(e os.DirEntry) bool {
-		info, err := os.Stat(filepath.Join(dir, e.Name()))
 		// Git never runs its *.sample files, executable or not.
-		return !strings.HasSuffix(e.Name(), ".sample") && err == nil && info.Mode().IsRegular() && info.Mode().Perm()&0o111 != 0
+		return !strings.HasSuffix(e.Name(), ".sample") && runnable(filepath.Join(dir, e.Name()))
 	})
 	return h
+}
+
+// runnable is whether git runs the file at path as a hook: an executable file, or on
+// Windows, which has no executable bit, an .exe or a script starting with #!.
+func runnable(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil || !info.Mode().IsRegular() {
+		return false
+	}
+	if runtime.GOOS != "windows" {
+		return info.Mode().Perm()&0o111 != 0
+	}
+	if strings.EqualFold(filepath.Ext(path), ".exe") {
+		return true
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = f.Close() }()
+	head := make([]byte, 2)
+	n, _ := io.ReadFull(f, head)
+	return n == 2 && string(head) == "#!"
 }
 
 // StatusLineCapture is whether the wrapped status line feeds terma the plan's usage windows.

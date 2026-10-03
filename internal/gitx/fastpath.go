@@ -212,17 +212,20 @@ func appendName(names []string, name string) []string {
 }
 
 func globalConfigPaths() []string {
+	// Git reads $HOME, Git for Windows included; os.UserHomeDir is %USERPROFILE% there.
+	home := os.Getenv("HOME")
+	if home == "" {
+		home, _ = os.UserHomeDir()
+	}
 	var paths []string
 	xdg := os.Getenv("XDG_CONFIG_HOME")
-	if xdg == "" {
-		if home, err := os.UserHomeDir(); err == nil {
-			xdg = filepath.Join(home, ".config")
-		}
+	if xdg == "" && home != "" {
+		xdg = filepath.Join(home, ".config")
 	}
 	if xdg != "" {
 		paths = append(paths, filepath.Join(xdg, "git", "config"))
 	}
-	if home, err := os.UserHomeDir(); err == nil {
+	if home != "" {
 		paths = append(paths, filepath.Join(home, ".gitconfig"))
 	}
 	return paths

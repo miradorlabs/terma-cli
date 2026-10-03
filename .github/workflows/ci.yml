@@ -56,11 +56,11 @@ jobs:
 
   # What has a Windows implementation of its own — LockFileEx, the relay's sender from the
   # TCP table and parents from a process snapshot, the Run-key service and its
-  # supervisor, the stop file, the zip archive and the rename-aside swap — and no other
-  # job runs. Also vets the whole module for Windows, so nothing Unix-only creeps back in.
+  # supervisor, the stop file, the zip archive and the rename-aside swap — and what setup
+  # writes and hooks read, on Windows paths. Also vets the whole module for Windows, so nothing Unix-only creeps back in.
   windows:
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
@@ -70,6 +70,10 @@ jobs:
       - run: go vet ./...
       - name: Relay, locking, process lookups and updater on Windows
         run: go test ./internal/relay/... ./internal/flock/... ./internal/procinfo/... ./internal/selfupdate/... -count=1 -timeout=5m
+      # Setup's machine-wide hooks and what they run: git's layout and config read from
+      # disk, the folder list, the hook runtime, doctor's checks and setup's order.
+      - name: Git, policy, hooks, doctor and setup on Windows
+        run: go test ./internal/gitx/... ./internal/config/... ./internal/globalmode/... ./internal/hooks/... ./internal/doctor/... ./internal/setup/... -count=1 -timeout=10m
 
   # The e2e suite is a separate module; its offline contracts must run in CI too.
   live-contracts:

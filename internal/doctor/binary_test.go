@@ -18,7 +18,11 @@ func writeTerma(t *testing.T, dir, body string) string {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(dir, "terma")
+	name := "terma"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	path := filepath.Join(dir, name)
 	if err := os.WriteFile(path, []byte(body), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -94,6 +98,9 @@ func TestDoctorRecognizesOfficialNpmLauncher(t *testing.T) {
 
 // Only a different build is reported, not the same build, a link or a non-executable.
 func TestOtherTermasReportsOnlyADifferentBuild(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("links and executable bits are Unix's")
+	}
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	primary := writeTerma(t, t.TempDir(), "build A")
 
@@ -121,6 +128,9 @@ func TestOtherTermasReportsOnlyADifferentBuild(t *testing.T) {
 
 // A build off PATH needs nothing, and the command that puts a directory on PATH is one quoted line.
 func TestDoctorGivesTheCommandThatPutsTermaOnPath(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the command is for a Unix shell rc file")
+	}
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	home := t.TempDir()
 	t.Setenv("HOME", home)

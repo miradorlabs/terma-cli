@@ -47,7 +47,8 @@ func otherTermas(primary string, binDirs []string) []string {
 		}
 		candidate := filepath.Join(dir, name)
 		info, err := os.Stat(candidate)
-		if err != nil || info.IsDir() || info.Mode()&0o111 == 0 || os.SameFile(info, primaryInfo) {
+		// Windows has no executable bit; the .exe name is what makes it one.
+		if err != nil || info.IsDir() || runtime.GOOS != "windows" && info.Mode()&0o111 == 0 || os.SameFile(info, primaryInfo) {
 			continue
 		}
 		resolved, err := filepath.EvalSymlinks(candidate)

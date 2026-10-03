@@ -17,7 +17,9 @@ import (
 func sandbox(t *testing.T) (Machine, string) {
 	t.Helper()
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
-	t.Setenv("HOME", t.TempDir())
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(t.TempDir(), "gitconfig"))
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	hooks := filepath.Join(t.TempDir(), "hooks.json")
