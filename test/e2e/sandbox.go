@@ -90,6 +90,8 @@ type Sandbox struct {
 	relayed      bool
 	relayAddr    string
 	codexTrusted map[string]bool
+	// codexTrustWithdrawn counts the approvals CodexHooksUntrusted took back.
+	codexTrustWithdrawn int
 }
 
 // Option adjusts a sandbox before it is configured.
