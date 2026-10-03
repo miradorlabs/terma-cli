@@ -183,6 +183,17 @@ func TestDoctorChecksTheFolderList(t *testing.T) {
 	}
 }
 
+// The home folder names nothing the list could match, and says so rather than failing.
+func TestDoctorFolderCheckAtHome(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	c := FolderCheck(config.Policy{Mode: config.ModeRepo, Folders: []string{filepath.Base(home)}}, home, "", nil)
+	if c.Status != Warn || !strings.Contains(c.Detail, "home folder never counts") {
+		t.Fatalf("folder at home = %+v", c)
+	}
+}
+
 // The local report agrees: an unlisted folder asks the team for the list.
 func TestLocalReportChecksTheFolderList(t *testing.T) {
 	for mode, wantAsk := range map[string]bool{config.ModeGlobal: false, config.ModeRepo: true} {

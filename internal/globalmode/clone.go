@@ -143,5 +143,5 @@ func unwireClones(ctx context.Context) error {
 // for a clone.
 func IsCloneHooksDir(path string) bool {
 	dir, err := config.Dir()
-	return err == nil && path != "" && filepath.Dir(filepath.Clean(expandHome(path))) == filepath.Join(dir, cloneHooksDir)
+	return err == nil && path != "" && strings.EqualFold(filepath.Dir(filepath.Clean(expandHome(path))), filepath.Join(dir, cloneHooksDir))
 }

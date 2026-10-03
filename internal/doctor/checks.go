@@ -257,6 +257,9 @@ func FolderCheck(policy config.Policy, root, gitDir string, repoErr error) Check
 	}
 	var id config.Repository
 	id.Names, id.Path = gitx.RepositoryFS(root, gitDir)
+	if len(id.Names) == 0 {
+		return Check{Status: Warn, Detail: output.TildePath(root) + " has no folder name the team's list could match (the home folder never counts), so nothing here is recorded"}
+	}
 	names := strings.Join(id.Names, ", ")
 	if id.Path != "" {
 		names += ", " + id.Path

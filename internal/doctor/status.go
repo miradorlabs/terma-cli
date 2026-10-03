@@ -60,6 +60,7 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 	if env.RepoErr != nil {
 		add("Repository", "not inside a git repository")
 	} else {
+		folder.Detail = "every folder, in global mode: " + GlobalDestination(cfg)
 		if !cfg.Policy.Global() {
 			folder = FolderCheck(cfg.Policy, root, gitDir, nil)
 		}
