@@ -25,10 +25,9 @@ const maxShellFiles = 2000
 const AttrEditSource = "edit_source"
 
 // ShellBefore snapshots the checkout's changed files before a shell call runs; callID is
-// the call's id, which its ShellAfter repeats. A call with no id is skipped: two of them
-// in one session would share a snapshot, and one would be diffed against the other's start.
+// the call's id, which its ShellAfter repeats.
 func (e Env) ShellBefore(ctx context.Context, r *Repo, sessionID, callID string) {
-	if r.GitDir == "" || callID == "" || !session.ValidID(sessionID) {
+	if r.GitDir == "" || !session.ValidID(sessionID) {
 		return
 	}
 	changed, err := gitx.ChangedFiles(ctx, r.Root)
@@ -48,7 +47,7 @@ func (e Env) ShellBefore(ctx context.Context, r *Repo, sessionID, callID string)
 // ShellAfter adds to sess's manifest the files its shell call changed, if ShellBefore
 // saw the call start.
 func (e Env) ShellAfter(ctx context.Context, r *Repo, sess session.Session, toolName, callID string, extra map[string]any) {
-	if r.GitDir == "" || callID == "" || !session.ValidID(sess.ID) {
+	if r.GitDir == "" || !session.ValidID(sess.ID) {
 		return
 	}
 	snap, ok := r.Store.TakeShell(shellKey(sess.ID, callID))
