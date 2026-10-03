@@ -258,61 +258,6 @@ func (c exporter) Connect(e harness.Exporter, _ bool) error {
 	return config.WriteFileAtomic(path, src, mode)
 }
 
-// ConnectPerRepo writes this project's headers helper and the shared extension in
-// per-repo mode, which resolves each session's project and helper at runtime.
-func (exporter) ConnectPerRepo(e harness.Exporter) error {
-	helper, err := harness.HelperFilePath(exporter{}, e.ProjectID)
-	if err != nil {
-		return err
-	}
-	if err := harness.WriteHelper(helper, e.APIKey); err != nil {
-		return err
-	}
-	helpersDir, err := harness.HelpersDir()
-	if err != nil {
-		return err
-	}
-	cfg := ompConfig{
-		Version:  1,
-		Endpoint: e.Endpoint,
-		Signals:  harness.SignalNames(e.Signals),
-		// A direct export, past the relay that applies the team's policy, so content
-		// capture stays off.
-		IncludePrompts:     false,
-		IncludeToolContent: false,
-		ResourceAttributes: ompBaseAttributes(e),
-		HookCommand:        []string{"terma", "hook"},
-		PerRepo:            true,
-		HelpersDir:         helpersDir,
-		HelperPrefix:       exporter{}.Name() + "-otel-",
-		ProjectAttribute:   harness.AttrProjectID,
-	}
-	path, err := (exporter{}).ConfigPath()
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return fmt.Errorf("create %s: %w", filepath.Dir(path), err)
-	}
-	src, err := renderOmpExtension(cfg)
-	if err != nil {
-		return err
-	}
-	return config.WriteFileAtomic(path, src, 0o644)
-}
-
-// ompBaseAttributes are e's resource attributes but the project id, stamped per repository.
-func ompBaseAttributes(e harness.Exporter) map[string]string {
-	out := map[string]string{}
-	for k, v := range e.ResourceAttributes {
-		if k == "" || v == "" || k == harness.AttrProjectID {
-			continue
-		}
-		out[k] = v
-	}
-	return out
-}
-
 // Disconnect removes the extension and terma's helper, or the repository's policy file.
 func (c exporter) Disconnect() (harness.DisconnectResult, error) {
 	path, err := c.ConfigPath()

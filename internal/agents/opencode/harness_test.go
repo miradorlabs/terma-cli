@@ -265,61 +265,6 @@ func TestOpenCodeDetectDoesNotFailWhenAbsent(t *testing.T) {
 	}
 }
 
-// ConnectPerRepo installs one keyless, projectless plugin in per-repo mode plus this
-// project's helper.
-func TestOpenCodeConnectPerRepo(t *testing.T) {
-	h, pluginPath := opencodeIn(t)
-	e := harness.Exporter{
-		Endpoint:           "https://otel.example.com",
-		APIKey:             "ter_srv_perrepo0123456789",
-		ProjectID:          "proj_123",
-		Signals:            harness.AllSignals,
-		ResourceAttributes: map[string]string{harness.AttrServiceName: "opencode", harness.AttrProjectID: "proj_123", harness.AttrEnduserID: "dev@example.com"},
-	}
-	if err := h.ConnectPerRepo(e); err != nil {
-		t.Fatal(err)
-	}
-
-	data, err := os.ReadFile(pluginPath)
-	if err != nil {
-		t.Fatalf("plugin not written: %v", err)
-	}
-	cfg, ok := readPluginConfig(data)
-	if !ok {
-		t.Fatalf("plugin config not readable:\n%s", data)
-	}
-	if !cfg.PerRepo {
-		t.Fatal("plugin is not in per-repo mode")
-	}
-	if cfg.Endpoint != e.Endpoint {
-		t.Fatalf("endpoint = %q, want %q", cfg.Endpoint, e.Endpoint)
-	}
-	if cfg.HelperPrefix != "opencode-otel-" || cfg.ProjectAttribute != harness.AttrProjectID {
-		t.Fatalf("per-repo fields wrong: %+v", cfg)
-	}
-	// One repository's content choice must not ride in the shared plugin.
-	if cfg.IncludePrompts || cfg.IncludeToolContent {
-		t.Fatalf("shared per-repo plugin leaked content capture: prompts=%v toolContent=%v", cfg.IncludePrompts, cfg.IncludeToolContent)
-	}
-	if _, ok := cfg.ResourceAttributes[harness.AttrProjectID]; ok {
-		t.Fatalf("project id must not be in the shared plugin: %+v", cfg.ResourceAttributes)
-	}
-	if strings.Contains(string(data), e.APIKey) {
-		t.Fatal("the key reached the plugin file")
-	}
-	helper, err := harness.HelperFilePath(h, "proj_123")
-	if err != nil {
-		t.Fatal(err)
-	}
-	hdata, err := os.ReadFile(helper)
-	if err != nil {
-		t.Fatalf("per-project helper not written: %v", err)
-	}
-	if !strings.Contains(string(hdata), e.APIKey) {
-		t.Fatalf("helper does not carry the key:\n%s", hdata)
-	}
-}
-
 // An installed plugin gets this build's source around its own configuration, and keeps
 // its file mode; an absent or inert one is left alone.
 func TestRefreshPluginKeepsItsConfiguration(t *testing.T) {

@@ -277,46 +277,6 @@ func TestOmpLocalPolicyCarriesNoCredential(t *testing.T) {
 	}
 }
 
-// Per-repo connect writes a keyless, projectless extension plus a per-project helper.
-func TestOmpConnectPerRepo(t *testing.T) {
-	h, path := ompIn(t)
-	e := ompExporter(t, h, false)
-	if err := h.ConnectPerRepo(e); err != nil {
-		t.Fatal(err)
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	cfg, ok := readOmpExtensionConfig(data)
-	if !ok {
-		t.Fatal("config line not readable back")
-	}
-	if !cfg.PerRepo || cfg.HeadersHelper != "" || len(cfg.Headers) != 0 {
-		t.Errorf("per-repo config = %+v", cfg)
-	}
-	if cfg.Endpoint != e.Endpoint || cfg.HelpersDir == "" || cfg.HelperPrefix != "omp-otel-" || cfg.ProjectAttribute != harness.AttrProjectID {
-		t.Errorf("routing fields = %+v", cfg)
-	}
-	if _, present := cfg.ResourceAttributes[harness.AttrProjectID]; present {
-		t.Error("a per-repo extension must not pin a project id")
-	}
-	// A direct export, past the relay, so no content.
-	if cfg.IncludePrompts || cfg.IncludeToolContent {
-		t.Errorf("per-repo extension must not carry content capture: %+v", cfg)
-	}
-	helper, err := harness.HelperFilePath(h, e.ProjectID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if harness.KeyFromHelper(helper) != e.APIKey {
-		t.Error("project helper does not hold the key")
-	}
-	if info, _ := os.Stat(path); info.Mode().Perm() != 0o644 {
-		t.Errorf("per-repo extension mode = %o, want 0644 (no secret in it)", info.Mode().Perm())
-	}
-}
-
 func TestOmpConflicts(t *testing.T) {
 	e := harness.Exporter{Endpoint: "https://otel.terma.ai"}
 

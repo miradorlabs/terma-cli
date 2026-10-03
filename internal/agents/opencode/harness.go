@@ -287,49 +287,6 @@ func (c exporter) Connect(e harness.Exporter, _ bool) error {
 	return config.WriteFileAtomic(path, src, mode)
 }
 
-// ConnectPerRepo writes this project's headers helper and the shared plugin in per-repo
-// mode, which resolves each session's project and helper at runtime.
-func (exporter) ConnectPerRepo(e harness.Exporter) error {
-	helper, err := harness.HelperFilePath(exporter{}, e.ProjectID)
-	if err != nil {
-		return err
-	}
-	if err := harness.WriteHelper(helper, e.APIKey); err != nil {
-		return err
-	}
-	helpersDir, err := harness.HelpersDir()
-	if err != nil {
-		return err
-	}
-	cfg := opencodeConfig{
-		Version:  1,
-		Endpoint: e.Endpoint,
-		Signals:  harness.SignalNames(e.Signals),
-		// A direct export, past the relay that applies the team's policy, so content
-		// capture stays off.
-		IncludePrompts:     false,
-		IncludeToolContent: false,
-		ResourceAttributes: opencodeBaseAttributes(e),
-		HookCommand:        []string{"terma", "hook"},
-		PerRepo:            true,
-		HelpersDir:         helpersDir,
-		HelperPrefix:       exporter{}.Name() + "-otel-",
-		ProjectAttribute:   harness.AttrProjectID,
-	}
-	path, err := (exporter{}).ConfigPath()
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return fmt.Errorf("create %s: %w", filepath.Dir(path), err)
-	}
-	src, err := renderPlugin(cfg)
-	if err != nil {
-		return err
-	}
-	return config.WriteFileAtomic(path, src, 0o644)
-}
-
 // RefreshPlugin re-splices an installed plugin's configuration into this build's source,
 // leaving an absent or inert plugin, and the file mode, alone.
 func (exporter) RefreshPlugin() (string, bool, error) {
@@ -357,18 +314,6 @@ func (exporter) RefreshPlugin() (string, bool, error) {
 		return path, false, err
 	}
 	return path, true, config.WriteFileAtomic(path, src, info.Mode().Perm())
-}
-
-// opencodeBaseAttributes are e's resource attributes but the project id, stamped per repository.
-func opencodeBaseAttributes(e harness.Exporter) map[string]string {
-	out := map[string]string{}
-	for k, v := range e.ResourceAttributes {
-		if k == "" || v == "" || k == harness.AttrProjectID {
-			continue
-		}
-		out[k] = v
-	}
-	return out
 }
 
 // Disconnect removes the plugin and terma's helper, or the repository's policy file.
