@@ -96,24 +96,6 @@ func StagedFiles(ctx context.Context, dir string) ([]string, error) {
 	return files, nil
 }
 
-// ChangedFiles lists the repo-relative paths that differ from HEAD in the index or the
-// working tree, untracked files included and ignored ones not: what a commit could take.
-// Renames are reported as a deletion and an addition, and submodules not at all.
-func ChangedFiles(ctx context.Context, dir string) ([]string, error) {
-	out, err := run(ctx, dir, "status", "--porcelain=v1", "-z", "--no-renames", "--untracked-files=all", "--ignore-submodules=all")
-	if err != nil {
-		return nil, err
-	}
-	var files []string
-	for entry := range strings.SplitSeq(out, "\x00") {
-		// "XY path": two status letters and a space; -z leaves the path unquoted.
-		if len(entry) > 3 {
-			files = append(files, entry[3:])
-		}
-	}
-	return files, nil
-}
-
 // HeadSHA is the current commit, or "" in an unborn repository.
 func HeadSHA(ctx context.Context, dir string) string {
 	out, err := run(ctx, dir, "rev-parse", "--verify", "-q", "HEAD")

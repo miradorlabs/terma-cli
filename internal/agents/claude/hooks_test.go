@@ -48,11 +48,8 @@ func TestClaudeSettingsMergeKeepsUnknownKeys(t *testing.T) {
 	if len(doc.Hooks["PostToolUse"]) != 2 || doc.Hooks["PostToolUse"][0].Hooks[0].Command != "./lint.sh" {
 		t.Fatalf("existing PostToolUse hook lost: %+v", doc.Hooks["PostToolUse"])
 	}
-	if doc.Hooks["PostToolUse"][1].Matcher != "Edit|Write|MultiEdit|NotebookEdit|Agent|Task|Bash" || doc.Hooks["PostToolUse"][1].Hooks[0].Command != hookmgr.PathHookCommand("post-tool-use") {
+	if doc.Hooks["PostToolUse"][1].Matcher != "Edit|Write|MultiEdit|NotebookEdit|Agent|Task" || doc.Hooks["PostToolUse"][1].Hooks[0].Command != hookmgr.PathHookCommand("post-tool-use") {
 		t.Fatalf("terma hook wrong: %+v", doc.Hooks["PostToolUse"][1])
-	}
-	if pre := doc.Hooks["PreToolUse"]; len(pre) != 1 || pre[0].Matcher != "Bash" || pre[0].Hooks[0].Command != hookmgr.PathHookCommand("pre-tool-use") {
-		t.Fatalf("Bash snapshot hook wrong: %+v", pre)
 	}
 	if len(doc.Hooks["SessionStart"]) != 1 || len(doc.Hooks["SessionEnd"]) != 1 {
 		t.Fatalf("session hooks missing: %v", doc.Hooks)
