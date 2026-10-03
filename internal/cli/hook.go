@@ -42,8 +42,8 @@ func (app *App) newHookCommand() *cobra.Command {
 			return nil
 		},
 	}
-	// --user marks a machine-wide entry, written before the event: what follows it is the
-	// event's own arguments.
+	// --user is ignored here: it marks the entries setup writes, so terma recognizes its own
+	// in an agent's hooks file (hookmgr's userHookShape, ManagedDeployed).
 	cmd.Flags().Bool("user", false, "internal: a machine-wide hook entry")
 	cmd.Flags().SetInterspersed(false)
 	return cmd
