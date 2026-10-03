@@ -39,7 +39,9 @@ approves terma's own Codex hooks itself.
 
 Your team's collection policy, set in Terma, lists the repositories it collects. A
 session or commit is recorded only in a repository the list names; everywhere else the
-hooks write nothing.
+hooks record nothing. They leave only a local note that the session is not collected (its
+id, the agent and its process ids; no team, project or repository), so the relay drops its
+telemetry at once instead of holding it.
 
 Each entry is a repository as `host/owner/name`, e.g. `github.com/miradorlabs/mirador-platform`.
 The CLI admits a session only inside a git working copy whose `origin` remote, normalised,
@@ -142,11 +144,13 @@ user-level settings — which is also what Claude Desktop, Codex Desktop and IDE
 read, so they are covered too. A machine-wide hook claims each session that runs in a
 repository your team collects, for your team; the relay forwards only claimed sessions,
 with your team's key. Everything else — personal work, other repositories, folders
-outside git — waits briefly and is dropped: it never leaves your machine. While it
-waits it is also kept on your disk, readable only by you, so a relay restart does not
-lose it; it is deleted as soon as it is sent or dropped. A
-session that moves to a repository the list does not name, or whose repository leaves
-the list, stops being forwarded.
+outside git — never leaves your machine. A session in a repository the list does not
+name, or outside git, is dropped as soon as its first hook runs; anything else unclaimed
+waits briefly, then is dropped. While it waits it is also kept on your disk, readable only
+by you, so a relay restart does not lose it; it is deleted as soon as it is sent or
+dropped. A session that moves to a repository the list does not name, or whose repository
+leaves the list, stops being forwarded; one that moves into a listed repository is
+forwarded from the move on, and what it sent before stays dropped.
 
 What content leaves is your team's collection policy, set in Terma, and nothing else.
 The relay and the hook queue's delivery fetch it with your login; until they have,

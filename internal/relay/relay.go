@@ -1,9 +1,10 @@
 // Package relay is the local OTLP relay: agents' exporters send to it on loopback, and it
 // forwards a record only when a hook in a collected repository claimed its session and the
 // record came from a process that claim names, to that project with its key and content
-// policy. Everything else waits briefly, since a first export can race the
-// claiming hook, and is then dropped. What waits is mirrored on disk until it leaves, so a
-// restarted relay takes it back (holdstore.go).
+// policy. A session a hook marked not collected is dropped as it arrives. Everything else
+// waits briefly, since a first export can race the claiming hook, and is then dropped.
+// What waits is mirrored on disk until it leaves, so a restarted relay takes it back
+// (holdstore.go).
 package relay
 
 import (

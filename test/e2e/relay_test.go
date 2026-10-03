@@ -304,9 +304,10 @@ func TestRelayCodex(t *testing.T) {
 	})
 }
 
-// Nothing leaves for a session no admitted repository claimed: one outside any repository,
-// one in a repository the team does not list, one in the admitted repository on
-// a machine that holds no key for its project.
+// Nothing leaves for a session no admitted repository claimed: one outside any repository
+// and one in a repository the team does not list, which their hooks mark not collected,
+// one whose hooks are off, and one in the admitted repository on a machine that holds no
+// key for its project.
 func TestRelayNegativeControls(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
 		ProvesAll(t, b, "relay.only_opted_in")
@@ -351,7 +352,10 @@ func TestRelayNegativeControls(t *testing.T) {
 				}
 				sb.WorkDir = dir
 				run(t, sb)
-				expectNothing(t, sb, "unclaimed_expired")
+				expectNothing(t, sb, "not_collected")
+				if c := sb.RelayStats(); sum(c, "dropped.unclaimed_expired") != 0 {
+					t.Errorf("a marked session's records were held to expiry: %v", c)
+				}
 			})
 		}
 		t.Run("hooks-off", func(t *testing.T) {

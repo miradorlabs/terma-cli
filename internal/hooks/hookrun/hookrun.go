@@ -98,7 +98,7 @@ type Repo struct {
 	Repository config.Repository
 }
 
-// ErrNotAdmitted is a working copy the team policy does not collect: its hooks write nothing.
+// ErrNotAdmitted is a working copy the team policy does not collect: its hooks record nothing.
 var ErrNotAdmitted = errors.New("not among the team's repositories")
 
 // Open is every session hook's first step: it refuses an unsafe session id, runs from
