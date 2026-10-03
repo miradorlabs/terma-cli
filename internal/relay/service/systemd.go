@@ -7,8 +7,10 @@ import (
 	"strings"
 )
 
-// Systemd renders a user service with the supplied configuration environment. A stopping
-// relay hands its socket to a successor it starts, which KillMode=process lets outlive it.
+// Systemd renders a user service with the supplied configuration environment. A relay
+// terma stops hands its socket to a successor it starts, which KillMode=process lets
+// outlive it. That successor is the only process the relay starts, and a stop terma did
+// not ask for starts none, so nothing else escapes the unit.
 func Systemd(exe string, env map[string]string) string {
 	var b strings.Builder
 	b.WriteString("[Unit]\nDescription=terma local OTLP relay\n\n[Service]\n")
