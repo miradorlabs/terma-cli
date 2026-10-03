@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -262,10 +263,16 @@ func (a *AppServer) close() {
 
 // TrustHooks records the developer's approval of every hook Codex finds for cwd, as
 // Desktop's Settings → Hooks → Review (or the TUI's /hooks) does: the hooks/list key and
-// current hash of each, as [hooks.state."<key>"] trusted_hash in config.toml.
+// current hash of each, as [hooks.state."<key>"] trusted_hash in config.toml. An entry
+// `terma install` already approved is left as it is, and must carry Codex's own hash. It
+// returns how many hooks Codex listed.
 func (a *AppServer) TrustHooks(sb *Sandbox, cwd string) int {
 	a.t.Helper()
 	res := a.call("hooks/list", map[string]any{"cwds": []string{cwd}})
+	cfg := filepath.Join(sb.CodexHome, "config.toml")
+	existing, _ := os.ReadFile(cfg)
+	approved := trustedHashes(string(existing))
+	listed := 0
 	var entries []string
 	var walk func(v any)
 	walk = func(v any) {
@@ -274,7 +281,13 @@ func (a *AppServer) TrustHooks(sb *Sandbox, cwd string) int {
 			key, _ := x["key"].(string)
 			hash, _ := x["currentHash"].(string)
 			if key != "" && hash != "" {
-				entries = append(entries, "[hooks.state."+tomlQuote(key)+"]\ntrusted_hash = "+tomlQuote(hash)+"\n")
+				listed++
+				switch have, ok := approved[key]; {
+				case !ok:
+					entries = append(entries, "[hooks.state."+tomlQuote(key)+"]\ntrusted_hash = "+tomlQuote(hash)+"\n")
+				case have != hash:
+					a.t.Fatalf("terma approved %s as %s, but Codex hashes it %s", key, have, hash)
+				}
 			}
 			for _, e := range x {
 				walk(e)
@@ -286,12 +299,32 @@ func (a *AppServer) TrustHooks(sb *Sandbox, cwd string) int {
 		}
 	}
 	walk(res)
-	cfg := filepath.Join(sb.CodexHome, "config.toml")
-	existing, _ := os.ReadFile(cfg)
 	if err := os.WriteFile(cfg, append(existing, []byte("\n"+strings.Join(entries, "\n"))...), 0o600); err != nil {
 		a.t.Fatal(err)
 	}
-	return len(entries)
+	return listed
+}
+
+// trustedHashes reads each [hooks.state."<key>"] table's trusted_hash from config text.
+func trustedHashes(config string) map[string]string {
+	out := map[string]string{}
+	key := ""
+	for line := range strings.Lines(config) {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "[") {
+			key = ""
+			if q, ok := strings.CutPrefix(line, "[hooks.state."); ok {
+				key, _ = strconv.Unquote(strings.TrimSuffix(q, "]"))
+			}
+			continue
+		}
+		if v, ok := strings.CutPrefix(line, "trusted_hash"); ok && key != "" {
+			if v, ok = strings.CutPrefix(strings.TrimSpace(v), "="); ok {
+				out[key], _ = strconv.Unquote(strings.TrimSpace(v))
+			}
+		}
+	}
+	return out
 }
 
 // CodexDaemon is a sandbox's own app-server daemon, listening where Codex's clients

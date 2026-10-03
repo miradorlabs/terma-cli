@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -121,11 +122,55 @@ func (sb *Sandbox) prepareCodex(route Route) {
 	}
 }
 
+// withdrawCodexRepoTrust removes every approval of the repository's Codex hooks from
+// config.toml, counting them in codexTrustWithdrawn: `terma install` approves its own, so
+// a developer whose Codex does not trust them is one whose approvals are gone (reset, or
+// never written).
+func (sb *Sandbox) withdrawCodexRepoTrust() {
+	t := sb.T
+	t.Helper()
+	cfg := filepath.Join(sb.CodexHome, "config.toml")
+	data, err := os.ReadFile(cfg)
+	if err != nil {
+		return
+	}
+	hooks := []string{filepath.Join(sb.Repo, ".codex", "hooks.json") + ":"}
+	if resolved, err := filepath.EvalSymlinks(sb.Repo); err == nil {
+		hooks = append(hooks, filepath.Join(resolved, ".codex", "hooks.json")+":")
+	}
+	var out []string
+	dropping, dropped := false, 0
+	for line := range strings.Lines(string(data)) {
+		if trimmed := strings.TrimSpace(line); strings.HasPrefix(trimmed, "[") {
+			dropping = false
+			if q, ok := strings.CutPrefix(trimmed, "[hooks.state."); ok {
+				key, _ := strconv.Unquote(strings.TrimSuffix(q, "]"))
+				for _, h := range hooks {
+					dropping = dropping || strings.HasPrefix(key, h)
+				}
+				if dropping {
+					dropped++
+				}
+			}
+		}
+		if !dropping {
+			out = append(out, line)
+		}
+	}
+	sb.codexTrustWithdrawn += dropped
+	if err := os.WriteFile(cfg, []byte(strings.Join(out, "")), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // CodexExec runs one non-interactive turn in the sandbox repository.
 func (sb *Sandbox) CodexExec(route Route, prompt string, extra ...string) *CodexRun {
 	t := sb.T
 	t.Helper()
 	sb.prepareCodex(route)
+	if sb.CodexHooksUntrusted {
+		sb.withdrawCodexRepoTrust()
+	}
 	args := []string{"exec", "--json", "--skip-git-repo-check"}
 	if !sb.CodexHooksUntrusted {
 		// Otherwise the first run of a real developer's Codex: the project's hooks exist
