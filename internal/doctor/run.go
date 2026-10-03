@@ -162,7 +162,7 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 	pol := cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL)
 	timed(KeyProject, "repository collected", func() Check {
 		if env.RepoErr == nil && pol.Global() {
-			return Check{Status: Pass, Detail: "every folder, in global mode: " + GlobalDestination(cfg)}
+			return Check{Status: Pass, Detail: "every session, in global mode: " + GlobalDestination(cfg)}
 		}
 		c := RepositoryCheck(pol, env.GitDir, env.RepoErr)
 		d.admitted = c.Status == Pass

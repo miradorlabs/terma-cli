@@ -61,7 +61,7 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 	if env.RepoErr != nil {
 		add("Repository", "not inside a git repository")
 	} else {
-		admission.Detail = "every folder, in global mode: " + GlobalDestination(cfg)
+		admission.Detail = "every session, in global mode: " + GlobalDestination(cfg)
 		if pol := cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL); !pol.Global() {
 			admission = RepositoryCheck(pol, gitDir, nil)
 		}
