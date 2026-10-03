@@ -50,7 +50,9 @@ path gets a git config entry routing it through terma's hooks (teardown removes 
 Every hook runs `terma hook <event>`, which first resolves
 the working copy's `origin` as `host/path` (`gitx.RepositoryFS`) and asks the team
 policy's repository list (`config.Policy.Admits`); in a repository the list does not
-name, or outside git, it writes nothing. Each session is claimed for the developer's own team from setup.
+name, or outside git, it writes no manifest, spool line, trailer or claim for a project,
+only a placement with no project that marks the session not collected (`claim.Mark`). Each
+session is claimed for the developer's own team from setup.
 
 **Commits.** The agent hooks announce the session and record the files it edits in a
 session manifest. At commit time, `prepare-commit-msg` matches the staged files against
@@ -68,8 +70,9 @@ only claimed sessions, only from the processes the claim names, and only while t
 still lists the claim's repository. It sends them with the team's key and applies the team's
 collection policy: agents export all content to it, and the policy alone decides what
 leaves (`config.Policy.Content`). Hook events never pass the relay, so delivery applies
-the same rules when it sends them. Everything else is held briefly and dropped: nothing
-unclaimed leaves the machine. What is held is mirrored on disk, written behind and
+the same rules when it sends them. A session marked not collected is dropped on arrival;
+everything else unclaimed is held briefly and dropped: nothing unclaimed leaves the
+machine. What is held is mirrored on disk, written behind and
 removed as it leaves the hold, so a restarted relay takes it back for the rest of its
 hold, judged by the collection mode it arrived under.
 

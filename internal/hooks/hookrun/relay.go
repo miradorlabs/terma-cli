@@ -50,7 +50,7 @@ func ClaimFromPayload(ctx context.Context, env Env, s PayloadSession, tool strin
 	case errors.Is(err, ErrNotAdmitted):
 		for _, sid := range []string{id, s.AgentID} {
 			if sid != "" {
-				withdraw(ctx, env, sid)
+				notCollected(env, sid, tool)
 			}
 		}
 		return false
@@ -66,25 +66,23 @@ func ClaimFromPayload(ctx context.Context, env Env, s PayloadSession, tool strin
 		claim.Write(s.AgentID, c, env.Time())
 	}
 	if !claim.Write(id, c, env.Time()) {
-		_, live := claim.Read(id, env.Time())
-		return live
+		prev, live := claim.Read(id, env.Time())
+		return live && prev.ProjectID != ""
 	}
 	return true
 }
 
-// withdraw moves a claimed session, now running in a working copy the team policy does
-// not admit (an agent's cwd can change per turn), to a placement there, so the relay drops
-// what its processes send from now on; earlier records keep their own placement.
-func withdraw(ctx context.Context, env Env, sessionID string) {
-	prev, ok := claim.Read(sessionID, env.Time())
-	if !ok {
-		return
+// notCollected marks a session running in a working copy the team policy does not admit
+// (an agent's cwd can change per turn), so the relay drops what its processes send from now
+// on instead of holding it; earlier records keep their own placement. A policy not yet
+// validated is no answer, so it marks only a session already claimed or marked.
+func notCollected(env Env, sessionID, tool string) {
+	if !env.Policy.Validated() {
+		if _, ok := claim.Read(sessionID, env.Time()); !ok {
+			return
+		}
 	}
-	_, _, id, err := env.locate(ctx)
-	if err != nil {
-		return
-	}
-	claim.Write(sessionID, claim.Claim{ProjectID: prev.ProjectID, Repository: id, PIDs: claimPIDs()}, env.Time())
+	claim.Mark(sessionID, tool, claimPIDs(), env.Time())
 }
 
 // claimPIDs are this hook's ancestors, one of them the agent: a claim covers only their records.

@@ -28,8 +28,10 @@ type procState struct {
 	exitedAt time.Time
 }
 
-// decideExited attributes a sessionless part to the one session its exited sender named, if claimed.
-func (r *Relay) decideExited(pid int, narrow bool) (claim.Claim, Policy, string, bool, attribution) {
+// decideExited attributes a sessionless part sent at at to the one session its exited
+// sender named, if claimed, under the placement in force at at: a process that moved
+// repositories sent its earlier parts from the earlier one.
+func (r *Relay) decideExited(pid int, at time.Time, narrow bool) (claim.Claim, Policy, string, bool, attribution) {
 	r.mu.Lock()
 	st := r.procs[pid]
 	var sessions []string
@@ -50,11 +52,37 @@ func (r *Relay) decideExited(pid int, narrow bool) (claim.Claim, Policy, string,
 	case overflow || len(sessions) != 1:
 		return claim.Claim{}, Policy{}, whyAmbiguous, false, attribution{}
 	}
-	c, pol, why, ok := r.decideClaimed(sessions[0], pid, time.Time{}, narrow)
+	c, pol, why, ok := r.decideClaimed(sessions[0], pid, at, narrow)
 	if !ok {
 		return claim.Claim{}, Policy{}, why, false, attribution{}
 	}
 	return c, pol, "", true, attribution{how: "process", session: sessions[0]}
+}
+
+// collectsNone reports whether every session pid has named is, at at, marked not
+// collected for it: a part naming nothing from it can then never leave, since naming
+// another session would make it ambiguous. An unnamed span may yet be named, so only
+// parts naming no trace either go by this.
+func (r *Relay) collectsNone(pid int, at time.Time) bool {
+	r.mu.Lock()
+	st := r.procs[pid]
+	var sessions []string
+	if st != nil && !st.overflow {
+		for s := range st.sessions {
+			sessions = append(sessions, s)
+		}
+	}
+	r.mu.Unlock()
+	for _, s := range sessions {
+		c, ok := r.lookup(s)
+		if !ok {
+			return false
+		}
+		if c, ok = c.At(pid, at); !ok || c.ProjectID != "" {
+			return false
+		}
+	}
+	return len(sessions) > 0
 }
 
 func (r *Relay) learnProcess(pid int, session string) {

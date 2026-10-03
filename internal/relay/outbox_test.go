@@ -89,11 +89,12 @@ func TestRelayOutboxSurvivesARestart(t *testing.T) {
 }
 
 // Only claimed, keyed parts reach the outbox; everything else waits in the hold, whose
-// store is the hold's own (holdstore.go).
+// store is the hold's own (holdstore.go), except a marked session's, which is dropped.
 func TestRelayWritesNothingUnclaimed(t *testing.T) {
 	u := newUpstream(t)
 	u.status = http.StatusServiceUnavailable // so claimed parts stay on disk to be seen
 	f := newFixture()
+	f.claim("C", marked(f.now))
 	r, srv := f.relay(t, u, allPolicies(u))
 	body, _ := proto.Marshal(mixedLogs())
 	post(t, srv, "/v1/logs", body, "application/x-protobuf", token, false)
@@ -117,6 +118,9 @@ func TestRelayWritesNothingUnclaimed(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(r.opts.Dir, want)); err != nil {
 			t.Errorf("no outbox for %s: %v", want, err)
 		}
+	}
+	if c := r.Stats().Snapshot().Counters; c["dropped.not_collected.logs"] != 1 {
+		t.Errorf("the marked session's record was not dropped: %v", c)
 	}
 }
 

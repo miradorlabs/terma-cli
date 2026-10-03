@@ -75,7 +75,7 @@ func TestRelayClaudeDesktop(t *testing.T) {
 		c := sb.RelayStats()
 		noteRelayStats(t.Name(), c)
 		failUnclassified(t, c)
-		if sum(c, "dropped.unclaimed") == 0 {
+		if sum(c, "dropped.unclaimed")+sum(c, "dropped.not_collected") == 0 {
 			t.Errorf("the personal session was never received and dropped, so the control proves nothing: %v", c)
 		}
 	})

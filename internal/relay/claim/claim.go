@@ -31,7 +31,12 @@ const TTL = 4 * time.Hour
 // one write every few minutes.
 const Refresh = 5 * time.Minute
 
+// markRefresh is Refresh for a session marked not collected, which only needs to outlive
+// its TTL: one write per session.
+const markRefresh = TTL / 2
+
 // Claim says which project a session's telemetry belongs to; its top-level fields are the latest placement.
+// An empty ProjectID is a run in a working copy the team does not collect (Mark).
 type Claim struct {
 	ProjectID string `json:"project_id"`
 	Tool      string `json:"tool,omitempty"`
@@ -87,7 +92,8 @@ func (c Claim) placements() []Placement {
 }
 
 // At is the claim as it applies to a record pid sent at time at: the covering placement
-// latest to start by at. False when no placement covers pid.
+// latest to start by at, whose ProjectID it carries, empty for one Mark wrote. False when
+// no placement covers pid.
 func (c Claim) At(pid int, at time.Time) (Claim, bool) {
 	var best *Placement
 	all := c.placements()
@@ -160,13 +166,28 @@ func Write(sessionID string, c Claim, now time.Time) bool {
 	if c.ProjectID == "" {
 		return false
 	}
+	return write(sessionID, c, now)
+}
+
+// Mark records that sessionID runs, under processes pids, where its team does not collect,
+// so the relay drops what those processes send from now on instead of holding it. The
+// placement names no project and no repository; earlier placements keep their records.
+func Mark(sessionID, tool string, pids []int, now time.Time) bool {
+	return write(sessionID, Claim{Tool: tool, PIDs: pids}, now)
+}
+
+func write(sessionID string, c Claim, now time.Time) bool {
+	refresh := Refresh
+	if c.ProjectID == "" {
+		refresh = markRefresh
+	}
 	p, ok := path(sessionID)
 	if !ok {
 		return false
 	}
 	// The fast path needs no lock: a fresh claim already naming these processes.
 	if prev, ok := read(p); ok && samePlace(prev, c) && subset(c.PIDs, prev.PIDs) {
-		if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < Refresh {
+		if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < refresh {
 			return false
 		}
 	}
@@ -185,7 +206,7 @@ func Write(sessionID string, c Claim, now time.Time) bool {
 	switch {
 	case !havePrev:
 	case samePlace(prev, c):
-		if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < Refresh && subset(c.PIDs, prev.PIDs) {
+		if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < refresh && subset(c.PIDs, prev.PIDs) {
 			return false
 		}
 		c.PIDs = merge(prev.PIDs, c.PIDs)
@@ -260,7 +281,7 @@ func read(p string) (Claim, bool) {
 		return Claim{}, false
 	}
 	var c Claim
-	if json.Unmarshal(data, &c) != nil || c.ProjectID == "" {
+	if json.Unmarshal(data, &c) != nil || c.ProjectID == "" && len(c.Placements) == 0 {
 		return Claim{}, false
 	}
 	return c, true

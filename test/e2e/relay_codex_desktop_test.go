@@ -92,7 +92,7 @@ func TestRelayCodexDesktop(t *testing.T) {
 			// clean stop), so the metrics check above had nothing of the daemon's to judge.
 			Note(t.Name(), "the app-server exported no metrics")
 		}
-		if sum(c, "dropped.unclaimed") == 0 {
+		if sum(c, "dropped.unclaimed")+sum(c, "dropped.not_collected") == 0 {
 			t.Errorf("the personal thread was never received and dropped: %v", c)
 		}
 	})
@@ -258,7 +258,7 @@ func TestRelayCodexDaemonTUI(t *testing.T) {
 		c := sb.RelayStats()
 		noteRelayStats(t.Name(), c)
 		failUnclassified(t, c)
-		if sum(c, "dropped.unclaimed") == 0 {
+		if sum(c, "dropped.unclaimed")+sum(c, "dropped.not_collected") == 0 {
 			t.Errorf("the personal thread was never received and dropped: %v", c)
 		}
 	})

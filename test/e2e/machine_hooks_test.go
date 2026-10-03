@@ -34,15 +34,34 @@ type claimPlacement struct {
 
 // claimOf is the claim for session, nil when no hook wrote one.
 func (sb *Sandbox) claimOf(session string) *claimFile {
+	c, _ := sb.claimFileOf(session)
+	return c
+}
+
+// claimFileOf is claimOf and the file's bytes.
+func (sb *Sandbox) claimFileOf(session string) (*claimFile, string) {
 	data, err := os.ReadFile(filepath.Join(sb.TermaConfig, "relay", "claims", session+".json"))
 	if err != nil {
-		return nil
+		return nil, ""
 	}
 	var c claimFile
 	if err := json.Unmarshal(data, &c); err != nil {
 		sb.T.Fatalf("claim %s: %v\n%s", session, err, data)
 	}
-	return &c
+	return &c, string(data)
+}
+
+// marked reports whether c is a mark alone: every placement names no project and no repository.
+func (c *claimFile) marked() bool {
+	if c == nil || c.ProjectID != "" || len(c.Placements) == 0 {
+		return false
+	}
+	for _, p := range c.Placements {
+		if p.ProjectID != "" || p.Repository.Origin != "" {
+			return false
+		}
+	}
+	return true
 }
 
 // hookEventsOf counts what terma's hooks recorded for session: spooled, or delivered.
@@ -132,8 +151,9 @@ func TestMachineHooksBesideRepositoryHooksCodex(t *testing.T) {
 
 // Which working copies the team admits, wherever the agent starts: the listed repository
 // by its origin from any folder, subdirectory or linked worktree and in any URL form, and
-// nothing at all in a same-named folder with another origin, a fork, a repository with no
-// origin, or a folder outside git.
+// nothing in a same-named folder with another origin, a fork, a repository with no origin,
+// or a folder outside git, beyond a mark that the session is not collected, which names
+// neither the team nor the place.
 func TestMachineHooksAdmission(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
 		t.Setenv("ANTHROPIC_API_KEY", "synthetic-telemetry-key")
@@ -177,8 +197,14 @@ func TestMachineHooksAdmission(t *testing.T) {
 						t.Fatal("terma's SessionStart hook never ran, so the control proves nothing")
 					}
 					time.Sleep(2 * time.Second) // any flush the hooks started
-					if c := sb.claimOf(sid); c != nil {
-						t.Errorf("an unlisted working copy's session was claimed: %+v", *c)
+					c, raw := sb.claimFileOf(sid)
+					if !c.marked() {
+						t.Errorf("an unlisted working copy's session was not marked, or was claimed: %+v\n%s", c, raw)
+					}
+					for _, leak := range []string{sb.ProjectID, filepath.Base(place.dir), filepath.ToSlash(place.dir), "github.com"} {
+						if strings.Contains(raw, leak) {
+							t.Errorf("the mark holds %q: %s", leak, raw)
+						}
 					}
 					if n := sb.hookEventsOf(sid); n != 0 {
 						t.Errorf("hooks recorded %d events for an unlisted working copy's session", n)
@@ -206,43 +232,67 @@ func TestMachineHooksAdmission(t *testing.T) {
 	})
 }
 
-// A Codex thread from an admitted repository resumed in an unlisted one: the claim gains
-// a placement there, and the relay drops what the resumed run exports.
+// A Codex thread resumed between an admitted repository and an unlisted one, either way:
+// the unlisted run is marked, a placement with no project and no origin, and the relay
+// drops what it exports; the admitted run is collected, from the move on.
 func TestMachineHooksCodexResumedUnlisted(t *testing.T) {
 	forEachCodex(t, func(t *testing.T, b Binary, _ bool) {
-		track(t)
-		t.Setenv("OPENAI_API_KEY", "synthetic-telemetry-key")
-		sb := New(t, Isolated, WithCodex(b))
-		sb.UseRelay(RelayOptions{Start: true, Hold: 3 * time.Second, Content: true})
-		var calls atomic.Int32
-		provider := httptest.NewServer(codexTelemetryProvider(t, &calls))
-		defer provider.Close()
-		first := sb.CodexExec(RouteAPIKey, telemetryPrompt, fixtureCodexArgs(provider.URL)...)
-		unlisted := sb.newRepo("unlisted", "")
-		calls.Store(1) // the resumed turn gets a plain reply, no tool call
-		sb.WorkDir = unlisted
-		resumed := sb.CodexExec(RouteAPIKey, "TERMA_UNLISTED_WORK please", append(fixtureCodexArgs(provider.URL), "resume", first.ThreadID)...)
-		if resumed.ThreadID != first.ThreadID {
-			Note(t.Name(), "Codex gave the resumed run a new thread id, so no claim follows it")
-			if sb.claimOf(resumed.ThreadID) != nil {
-				t.Error("the resumed thread in an unlisted repository was claimed")
-			}
-			return
-		}
-		c := sb.claimOf(first.ThreadID)
-		if c == nil || len(c.Placements) < 2 {
-			t.Fatalf("claim = %+v, want a placement for the unlisted repository", c)
-		}
-		last := c.Placements[len(c.Placements)-1]
-		if last.Repository.Origin != "" || c.Placements[0].Repository.Origin != "github.com/acme/repo" {
-			t.Errorf("placements = %+v, want the repository's, then the unlisted one's with no origin", c.Placements)
-		}
-		time.Sleep(6 * time.Second) // past the hold
-		sb.StopRelay()
-		stats := sb.RelayStats()
-		noteRelayStats(t.Name(), stats)
-		if sum(stats, "dropped.policy_repository.") == 0 || len(leakedFieldsOf(sb.Receiver.evidence(), "TERMA_UNLISTED_WORK")) > 0 {
-			t.Errorf("want the resumed run's records dropped as policy_repository, none leaked: %v", stats)
+		for _, listedFirst := range []bool{true, false} {
+			t.Run(map[bool]string{true: "listed-then-unlisted", false: "unlisted-then-listed"}[listedFirst], func(t *testing.T) {
+				codexResumedAcross(t, b, listedFirst)
+			})
 		}
 	})
+}
+
+func codexResumedAcross(t *testing.T, b Binary, listedFirst bool) {
+	track(t)
+	t.Setenv("OPENAI_API_KEY", "synthetic-telemetry-key")
+	sb := New(t, Isolated, WithCodex(b))
+	sb.UseRelay(RelayOptions{Start: true, Hold: 3 * time.Second, Content: true})
+	var calls atomic.Int32
+	provider := httptest.NewServer(codexTelemetryProvider(t, &calls))
+	defer provider.Close()
+	unlisted := sb.newRepo("unlisted", "")
+	listed := sb.Repo
+	firstDir, firstWork, thenDir, thenWork := listed, "TERMA_LISTED_WORK", unlisted, "TERMA_UNLISTED_WORK"
+	if !listedFirst {
+		firstDir, firstWork, thenDir, thenWork = unlisted, "TERMA_UNLISTED_WORK", listed, "TERMA_LISTED_WORK"
+	}
+	calls.Store(1) // plain replies, no tool call
+	sb.WorkDir = firstDir
+	first := sb.CodexExec(RouteAPIKey, firstWork+" please", fixtureCodexArgs(provider.URL)...)
+	calls.Store(1)
+	sb.WorkDir = thenDir
+	resumed := sb.CodexExec(RouteAPIKey, thenWork+" please", append(fixtureCodexArgs(provider.URL), "resume", first.ThreadID)...)
+	if resumed.ThreadID != first.ThreadID {
+		Note(t.Name(), "Codex gave the resumed run a new thread id, so no placement follows it")
+		return
+	}
+	c := sb.claimOf(first.ThreadID)
+	if c == nil || len(c.Placements) != 2 {
+		t.Fatalf("claim = %+v, want a placement for each run", c)
+	}
+	mark, claimed := c.Placements[1], c.Placements[0]
+	if !listedFirst {
+		mark, claimed = claimed, mark
+	}
+	if mark.ProjectID != "" || mark.Repository.Origin != "" || claimed.ProjectID != sb.ProjectID || claimed.Repository.Origin != "github.com/acme/repo" {
+		t.Errorf("placements = %+v, want the repository's and a mark with no project or origin", c.Placements)
+	}
+	deadline := time.Now().Add(30 * time.Second)
+	for len(leakedFieldsOf(sb.Receiver.evidence(), "TERMA_LISTED_WORK")) == 0 && time.Now().Before(deadline) {
+		time.Sleep(time.Second)
+	}
+	time.Sleep(6 * time.Second) // past the hold
+	sb.StopRelay()
+	stats := sb.RelayStats()
+	noteRelayStats(t.Name(), stats)
+	e := sb.Receiver.evidence()
+	if len(leakedFieldsOf(e, "TERMA_LISTED_WORK")) == 0 {
+		t.Errorf("the listed run's prompt never reached the project: %v", stats)
+	}
+	if leaked := leakedFieldsOf(e, "TERMA_UNLISTED_WORK"); len(leaked) > 0 || sum(stats, "dropped.not_collected.") == 0 {
+		t.Errorf("want the unlisted run's records dropped as not_collected, none leaked (%v): %v", leaked, stats)
+	}
 }

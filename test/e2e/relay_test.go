@@ -304,9 +304,10 @@ func TestRelayCodex(t *testing.T) {
 	})
 }
 
-// Nothing leaves for a session no admitted repository claimed: one outside any repository,
-// one in a repository the team does not list, one in the admitted repository on
-// a machine that holds no key for its project.
+// Nothing leaves for a session no admitted repository claimed: one outside any repository
+// and one in a repository the team does not list, which their hooks mark not collected,
+// one whose hooks are off, and one in the admitted repository on a machine that holds no
+// key for its project.
 func TestRelayNegativeControls(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
 		ProvesAll(t, b, "relay.only_opted_in")
@@ -351,7 +352,10 @@ func TestRelayNegativeControls(t *testing.T) {
 				}
 				sb.WorkDir = dir
 				run(t, sb)
-				expectNothing(t, sb, "unclaimed_expired")
+				expectNothing(t, sb, "not_collected")
+				if c := sb.RelayStats(); sum(c, "dropped.unclaimed_expired") != 0 {
+					t.Errorf("a marked session's records were held to expiry: %v", c)
+				}
 			})
 		}
 		t.Run("hooks-off", func(t *testing.T) {
@@ -416,14 +420,16 @@ func TestRelayColdStart(t *testing.T) {
 
 // A claim that arrives after the session's first exports — a Codex session whose
 // hooks were trusted mid-way, a hook that timed out — releases what the relay held,
-// as long as it lands inside the hold. The session runs where no hook can claim it,
-// and the claim is written the way a hook writes it, seconds later.
+// as long as it lands inside the hold. The session runs with no hook at all (a hook
+// where the team does not collect would mark it, and the relay drop it at once), and
+// the claim is written the way a hook writes it, seconds later.
 func TestRelayLateClaim(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
 		ProvesAll(t, b, "relay.late_claim")
 		track(t)
 		t.Setenv("ANTHROPIC_API_KEY", "synthetic-telemetry-key")
 		sb := New(t, Isolated, WithClaude(b))
+		sb.ExtraEnv = append(sb.ExtraEnv, "TERMA_HOOKS=0")
 		sb.UseRelay(RelayOptions{Start: true, Hold: time.Minute})
 		dir := filepath.Join(sb.Dir, "elsewhere")
 		if err := os.MkdirAll(dir, 0o700); err != nil {

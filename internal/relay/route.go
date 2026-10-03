@@ -24,6 +24,7 @@ const (
 	whyProcessIdle    = "no_session_process" // no session named; its process has named none
 	whyProcessRunning = "process_running"    // no session named; attributed only once its process exits
 	whyWidened        = "policy_widened"     // arrived outside global mode, now placed only by it: dropped at once
+	whyNotCollected   = "not_collected"      // a hook marked the session where its team does not collect: dropped at once
 )
 
 // attribution says how a part's session was found, when not by the part itself.
@@ -49,13 +50,20 @@ func (r *Relay) decide(key string, pid int, at time.Time, narrow bool) (claim.Cl
 	}
 	if p, ok := strings.CutPrefix(key, procPrefix); ok {
 		n, _ := strconv.Atoi(p)
-		return r.decideExited(n, narrow)
+		if r.collectsNone(n, at) {
+			return claim.Claim{}, Policy{}, whyNotCollected, false, attribution{}
+		}
+		return r.decideExited(n, at, narrow)
 	}
 	session := r.sessionFor(key)
 	if session == "" {
 		if pid != 0 {
-			if c, pol, _, ok, how := r.decideExited(pid, narrow); ok {
+			c, pol, why, ok, how := r.decideExited(pid, at, narrow)
+			if ok {
 				return c, pol, "", true, how
+			}
+			if why == whyNotCollected {
+				return claim.Claim{}, Policy{}, why, false, attribution{}
 			}
 		}
 		return claim.Claim{}, Policy{}, whyNoTrace, false, attribution{}
@@ -76,6 +84,10 @@ func (r *Relay) decideClaimed(session string, pid int, at time.Time, narrow bool
 	if !ok {
 		return claim.Claim{}, Policy{}, whyProcess, false
 	}
+	// The placement's own project: a mark has none, and never reaches a key or a route.
+	if c.ProjectID == "" {
+		return claim.Claim{}, Policy{}, whyNotCollected, false
+	}
 	pol, ok := r.resolve(c)
 	if !ok {
 		return claim.Claim{}, Policy{}, whyNoKey, false
@@ -86,11 +98,17 @@ func (r *Relay) decideClaimed(session string, pid int, at time.Time, narrow bool
 	return c, pol, "", true
 }
 
-// route sends a part on only if nothing is held for its key, so arrival order holds.
+// route sends a part on only if nothing is held for its key, so arrival order holds, and
+// drops a part of a session marked not collected without holding it.
 func (r *Relay) route(p *part) {
 	r.deliverMu.Lock()
 	defer r.deliverMu.Unlock()
-	if c, pol, _, ok, how := r.decide(p.session, p.pid, p.at, p.narrow); ok {
+	c, pol, why, ok, how := r.decide(p.session, p.pid, p.at, p.narrow)
+	if why == whyNotCollected {
+		r.stats.dropped(p.signal, why, p.records)
+		return
+	}
+	if ok {
 		r.mu.Lock()
 		waiting := len(r.held[p.session]) > 0
 		r.mu.Unlock()

@@ -134,6 +134,40 @@ var loadScenarios = []loadScenario{
 			}
 		}
 	}},
+	// (d) the same personal session, marked not collected by its first hook a second in.
+	{"personal-not-collected", 60 + 150, func(l *loadRun, sec int) {
+		if sec == 1 {
+			l.f.claim("P", marked(l.f.now))
+		}
+		if sec < 60 {
+			for i := range 3 {
+				l.post("/v1/logs", agentLogs("session.id", "P", 3, i == 0 && sec%10 == 0))
+			}
+		}
+	}},
+	// (e) a Codex startup burst in an unlisted repository, never claimed, then the same
+	// burst marked at its first prompt (20 s in, as Codex's first hook fires) and at 1 s.
+	{"codex-personal-unclaimed", 60, codexPersonal(-1)},
+	{"codex-personal-not-collected-20s", 60, codexPersonal(20)},
+	{"codex-personal-not-collected-1s", 60, codexPersonal(1)},
+}
+
+// codexPersonal is codex-startup-burst's load for a session marked at second markAt (never when negative).
+func codexPersonal(markAt int) func(l *loadRun, sec int) {
+	return func(l *loadRun, sec int) {
+		if sec == markAt {
+			l.f.claim("N", marked(l.f.now))
+		}
+		if sec < 20 {
+			a, b := []byte(fmt.Sprintf("trace-%010d-a", sec)), []byte(fmt.Sprintf("trace-%010d-b", sec))
+			l.post("/v1/traces", codexSpans(sec, 100, a, b))
+			for _, tr := range [][]byte{a, b} {
+				lg := agentLogs("conversation.id", "N", 1, false)
+				lg.ResourceLogs[0].ScopeLogs[0].LogRecords[0].TraceId = tr
+				l.post("/v1/logs", lg)
+			}
+		}
+	}
 }
 
 type loadResult struct {
@@ -234,4 +268,24 @@ func BenchmarkRelayHeldExport(b *testing.B) {
 	c := r.Stats().Snapshot().Counters
 	b.ReportMetric(float64(c["held_store_bytes_written"])/float64(b.N), "store-B/op")
 	b.ReportMetric(float64(len(body)), "export-B")
+}
+
+// BenchmarkRelayNotCollectedExport is BenchmarkRelayHeldExport's export from a session a
+// hook marked not collected, which the relay drops on arrival.
+func BenchmarkRelayNotCollectedExport(b *testing.B) {
+	f := newFixture()
+	f.claim("P", marked(f.now))
+	r := newRelay(Options{Dir: b.TempDir(), Token: token, Lookup: f.lookup})
+	runRelay(b, r)
+	body, _ := proto.Marshal(agentLogs("session.id", "P", 3, false))
+	h := r.Handler()
+	for b.Loop() {
+		req := httptest.NewRequest(http.MethodPost, "/v1/logs", bytes.NewReader(body))
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/x-protobuf")
+		h.ServeHTTP(httptest.NewRecorder(), req)
+	}
+	if c := r.Stats().Snapshot().Counters; c["held_parts"] != 0 {
+		b.Fatalf("a marked session's export was held: %v", c)
+	}
 }

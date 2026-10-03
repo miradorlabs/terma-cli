@@ -160,7 +160,7 @@ func (r *Relay) sweep() {
 			switch {
 			case ok:
 				out = append(out, release{c, pol, h.p, how})
-			case why == whyWidened || now.Sub(h.at) >= limit:
+			case why == whyWidened || why == whyNotCollected || now.Sub(h.at) >= limit:
 				r.stats.dropped(h.p.signal, why, h.p.records)
 				if r.opts.Logf != nil {
 					c, _ := r.lookup(r.sessionFor(key))

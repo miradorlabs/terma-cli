@@ -3,12 +3,17 @@ package dispatch
 import (
 	"bytes"
 	"context"
+	"io"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -122,4 +127,36 @@ func TestRunGitHooksNeedNoRegistry(t *testing.T) {
 	if got := Run(context.Background(), h.deps, r); got != 0 {
 		t.Fatalf("status %d", got)
 	}
+}
+
+// A hook where the team does not collect marks its session but claims nothing, so it
+// starts no relay.
+func TestRunMarksWithoutClaiming(t *testing.T) {
+	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	hookruntest.RelayOn(t)
+	h := newHarness(t)
+	h.deps.Agents = agents.New(reading{fake{ran: &h.ran}})
+	h.deps.Profile = func() Profile {
+		return Profile{Team: "t1", Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/acme/work"}, TeamID: "t1", FetchedAt: time.Now()}}
+	}
+	r := request("fake-edit")
+	r.Cwd, _ = filepath.EvalSymlinks(t.TempDir())
+	r.Stdin = strings.NewReader(`{"session_id":"s1","cwd":"` + hookruntest.InJSON(r.Cwd) + `"}`)
+	Run(context.Background(), h.deps, r)
+	if c, ok := claim.Read("s1", time.Now()); !ok || c.ProjectID != "" {
+		t.Fatalf("mark = %+v, %v", c, ok)
+	}
+	if h.claims != 0 {
+		t.Fatal("a mark started the relay")
+	}
+}
+
+// reading is fake whose edit handler reads its payload, as every real handler does.
+type reading struct{ fake }
+
+func (reading) Events() map[string]agents.Handler {
+	return map[string]agents.Handler{"fake-edit": func(_ context.Context, env hookrun.Env) error {
+		_, err := io.ReadAll(env.Stdin)
+		return err
+	}}
 }
