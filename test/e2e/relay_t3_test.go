@@ -96,7 +96,7 @@ func TestRelayT3(t *testing.T) {
 		c := sb.RelayStats()
 		noteRelayStats(t.Name(), c)
 		failUnclassified(t, c)
-		if sum(c, "dropped.unclaimed") == 0 {
+		if sum(c, "dropped.unclaimed")+sum(c, "dropped.not_collected") == 0 {
 			t.Errorf("the personal threads were never received and dropped: %v", c)
 		}
 	})

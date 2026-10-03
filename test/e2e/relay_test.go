@@ -420,14 +420,16 @@ func TestRelayColdStart(t *testing.T) {
 
 // A claim that arrives after the session's first exports — a Codex session whose
 // hooks were trusted mid-way, a hook that timed out — releases what the relay held,
-// as long as it lands inside the hold. The session runs where no hook can claim it,
-// and the claim is written the way a hook writes it, seconds later.
+// as long as it lands inside the hold. The session runs with no hook at all (a hook
+// where the team does not collect would mark it, and the relay drop it at once), and
+// the claim is written the way a hook writes it, seconds later.
 func TestRelayLateClaim(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
 		ProvesAll(t, b, "relay.late_claim")
 		track(t)
 		t.Setenv("ANTHROPIC_API_KEY", "synthetic-telemetry-key")
 		sb := New(t, Isolated, WithClaude(b))
+		sb.ExtraEnv = append(sb.ExtraEnv, "TERMA_HOOKS=0")
 		sb.UseRelay(RelayOptions{Start: true, Hold: time.Minute})
 		dir := filepath.Join(sb.Dir, "elsewhere")
 		if err := os.MkdirAll(dir, 0o700); err != nil {
