@@ -82,12 +82,16 @@ func TestCodexTelemetry(t *testing.T) {
 					t.Errorf("provider calls = %d, want tool request and final reply", calls.Load())
 				}
 				awaitTelemetry(t, sb, func(reporter contractReporter, e telemetryEvidence) {
-					checkCodexTelemetry(reporter, e, run.ThreadID, sb.ProjectID, exclude, false)
+					checkCodexTelemetry(reporter, e, run.ThreadID, sb.ProjectID, exclude, exclude)
 				})
 				if knownUpstream(upstreamCodexSessionEnd) && len(sb.Delivered("terma.session.end", run.ThreadID, 10*time.Second)) == 0 {
 					t.Logf("KNOWN UPSTREAM: Codex exited without running SessionEnd; tolerated by TERMA_E2E_KNOWN_UPSTREAM (TestCodexSessionEndProbe)")
 				}
-				checkTelemetrySchema(t, sb.Receiver.evidence(), "codex", exclude, newest)
+				if exclude {
+					checkTelemetrySchemaAt(t, sb.Receiver.evidence(), "codex", "relay/codex-withheld", newest)
+				} else {
+					checkTelemetrySchema(t, sb.Receiver.evidence(), "codex", false, newest)
+				}
 			})
 		}
 	})
