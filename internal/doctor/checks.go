@@ -249,7 +249,7 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 }
 
 // NoRepositoriesStep is what a developer whose team lists no repositories is told.
-const NoRepositoriesStep = "Nothing is collected until a team admin lists repositories in Terma (Team settings → Data collection), or chooses Every folder."
+const NoRepositoriesStep = "Nothing is collected until a team admin lists repositories in Terma (Team settings → Data collection), or chooses Every session."
 
 // RepositoryCheck says whether policy, the one hooks apply, collects the working copy whose
 // git directory is gitDir, naming the origin terma sees.
