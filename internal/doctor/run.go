@@ -155,11 +155,13 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 	timed(KeyAuth, "signed in", d.signedIn)
 
 	d.nonGit = env.RepoErr == nil && env.GitDir == ""
+	// The policy the hooks apply, so doctor never admits a folder they would not.
+	pol := cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL)
 	timed(KeyProject, "folder collected", func() Check {
-		if env.RepoErr == nil && cfg.Policy.Global() {
+		if env.RepoErr == nil && pol.Global() {
 			return Check{Status: Pass, Detail: "every folder, in global mode: " + GlobalDestination(cfg)}
 		}
-		c := FolderCheck(cfg.Policy, env.Root, env.GitDir, env.RepoErr)
+		c := FolderCheck(pol, env.Root, env.GitDir, env.RepoErr)
 		d.admitted = c.Status == Pass
 		return c
 	})

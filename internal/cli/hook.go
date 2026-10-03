@@ -74,11 +74,7 @@ func hookProfile() dispatch.Profile {
 	if err != nil {
 		return dispatch.Profile{Policy: config.NoPolicy("", "")}
 	}
-	p := dispatch.Profile{Team: cfg.Policy.TeamID, Agents: cfg.Harnesses, Policy: cfg.Policy}
-	if !cfg.Policy.Validated() {
-		p.Policy = config.NoPolicy(cfg.OrganizationID, cfg.AuthURL)
-	}
-	return p
+	return dispatch.Profile{Team: cfg.Policy.TeamID, Agents: cfg.Harnesses, Policy: cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL)}
 }
 
 // hookPolicy is the collection policy while it is validated and fresh, else NoPolicy.

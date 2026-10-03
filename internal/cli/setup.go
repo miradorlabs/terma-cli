@@ -166,7 +166,12 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 			if team != "" {
 				ui.Summary("Team", team)
 			}
-			ui.Summary("Collects", doctor.PolicySummary(pol))
+			if pol.AdmitsNone() {
+				ui.Warn("Collects", doctor.PolicySummary(pol))
+				ui.Then(doctor.NoFoldersStep)
+			} else {
+				ui.Summary("Collects", doctor.PolicySummary(pol))
+			}
 		},
 		ConnectRelay: func(ctx context.Context, names []string) error {
 			if f.relayAddr != "" {

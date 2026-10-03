@@ -35,6 +35,15 @@ func (p Policy) Admits(r Repository) bool {
 	return false
 }
 
+// AdmitsNone reports whether p admits no folder at all: not validated, or repository mode
+// with an empty list.
+func (p Policy) AdmitsNone() bool {
+	if !p.Validated() {
+		return true
+	}
+	return !p.Global() && !slices.ContainsFunc(p.Folders, func(f string) bool { return strings.Trim(strings.TrimSpace(f), "/") != "" })
+}
+
 // Equal reports whether r and o name the same working copy.
 func (r Repository) Equal(o Repository) bool {
 	return r.Path == o.Path && slices.Equal(r.Names, o.Names)

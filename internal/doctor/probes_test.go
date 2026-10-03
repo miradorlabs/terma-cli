@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/agents/agentstest"
@@ -34,8 +35,14 @@ func env(t *testing.T, p Probes) Env {
 	}
 	p.Endpoint = func(string) string { return "https://otlp.example" }
 	cfg := &config.Config{Environment: config.EnvProd, ProjectID: "p1", ProjectName: "One",
-		Policy: config.Policy{Mode: config.ModeRepo, Folders: []string{"one"}}}
+		Policy: fetched(config.Policy{Mode: config.ModeRepo, Folders: []string{"one"}})}
 	return Env{Agents: agents.New(agentstest.Agent{ID: "fake"}), Config: cfg, Root: root, GitDir: gitDir, Probes: p}
+}
+
+// fetched is p as setup stores it: validated for a team.
+func fetched(p config.Policy) config.Policy {
+	p.TeamID, p.FetchedAt = "p1", time.Now()
+	return p
 }
 
 func signedIn() (Credential, error) {
@@ -167,9 +174,9 @@ func TestDoctorChecksTheFolderList(t *testing.T) {
 		want Status
 		text string
 	}{
-		"listed":   {config.Policy{Mode: config.ModeRepo, Folders: []string{"ONE"}}, Pass, "in the team's folders"},
-		"unlisted": {config.Policy{Mode: config.ModeRepo, Folders: []string{"two"}}, Warn, "ask your team to add one to its folders in Terma"},
-		"global":   {config.Policy{Mode: config.ModeGlobal, DefaultProjectID: "p9"}, Pass, "the team chosen at setup (p9)"},
+		"listed":   {fetched(config.Policy{Mode: config.ModeRepo, Folders: []string{"ONE"}}), Pass, "in the team's folders"},
+		"unlisted": {fetched(config.Policy{Mode: config.ModeRepo, Folders: []string{"two"}}), Warn, "ask your team to add one to its folders in Terma"},
+		"global":   {fetched(config.Policy{Mode: config.ModeGlobal, DefaultProjectID: "p9"}), Pass, "the team chosen at setup (p9)"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			e := env(t, Probes{Credential: signedIn, Spool: func() SpoolState { return SpoolState{Open: true} }})
@@ -188,7 +195,7 @@ func TestDoctorFolderCheckAtHome(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
-	c := FolderCheck(config.Policy{Mode: config.ModeRepo, Folders: []string{filepath.Base(home)}}, home, "", nil)
+	c := FolderCheck(fetched(config.Policy{Mode: config.ModeRepo, Folders: []string{filepath.Base(home)}}), home, "", nil)
 	if c.Status != Warn || !strings.Contains(c.Detail, "home folder never counts") {
 		t.Fatalf("folder at home = %+v", c)
 	}
@@ -199,7 +206,7 @@ func TestLocalReportChecksTheFolderList(t *testing.T) {
 	for mode, wantAsk := range map[string]bool{config.ModeGlobal: false, config.ModeRepo: true} {
 		t.Run(mode, func(t *testing.T) {
 			e := env(t, Probes{Credential: signedIn})
-			e.Config.Policy = config.Policy{Mode: mode, Folders: []string{"two"}}
+			e.Config.Policy = fetched(config.Policy{Mode: mode, Folders: []string{"two"}})
 			rep, err := Local(t.Context(), e)
 			if err != nil {
 				t.Fatal(err)
@@ -243,5 +250,31 @@ func TestTheBackendCheckPassesOnAnAcceptedFlush(t *testing.T) {
 	}
 	if c := BackendCheck(t.Context(), probes(0), "p1"); c.Status != Skip || !c.Inconclusive {
 		t.Fatalf("empty queue = %+v", c)
+	}
+}
+
+// Doctor admits a folder only under the policy hooks apply: a list not validated for a
+// team admits nothing, and a validated empty list says who can change that.
+func TestDoctorFolderCheckUsesThePolicyHooksApply(t *testing.T) {
+	t.Setenv("TERMA_POLICY_STUB", "")
+	for _, tc := range []struct {
+		name    string
+		policy  config.Policy
+		fix     string
+		passing bool
+	}{
+		{"validated, listed", config.Policy{Mode: config.ModeRepo, Folders: []string{"one"}, TeamID: "p1", FetchedAt: time.Now()}, "", true},
+		{"listed but never fetched", config.Policy{Mode: config.ModeRepo, Folders: []string{"one"}}, "terma setup", false},
+		{"global but never fetched", config.Policy{Mode: config.ModeGlobal}, "terma setup", false},
+		{"validated, no folders", config.Policy{Mode: config.ModeRepo, Folders: []string{" "}, TeamID: "p1", FetchedAt: time.Now()}, NoFoldersStep, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := env(t, Probes{Credential: signedIn, Spool: func() SpoolState { return SpoolState{} }})
+			e.Config.Policy = tc.policy
+			c := check(Run(t.Context(), e, Progress{}), KeyProject)
+			if (c.Status == Pass) != tc.passing || c.Fix != tc.fix {
+				t.Fatalf("folder check = %+v", c)
+			}
+		})
 	}
 }

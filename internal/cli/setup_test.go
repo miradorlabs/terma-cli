@@ -12,6 +12,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 )
 
@@ -50,6 +51,30 @@ func TestSetupFetchesThePolicyAndPointsAgentsAtTheRelay(t *testing.T) {
 	}
 	if out, err := runTerma(t, "setup", "--harness", "codex", "--relay-service", "sometimes"); err == nil {
 		t.Fatalf("--relay-service sometimes was accepted:\n%s", out)
+	}
+}
+
+// A team that lists no folders collects nothing, and setup says so as a step left to do.
+func TestSetupWarnsWhenTheTeamListsNoFolders(t *testing.T) {
+	gateway := newFakeAuth(t)
+	authSandbox(t, gateway)
+	sandboxMachine(t)
+	t.Setenv("CODEX_HOME", t.TempDir())
+	t.Setenv("TERMA_POLICY_STUB", `{"mode":"repo","folders":[],"include_prompts":true,"include_tool_content":true}`)
+	if _, err := auth.SaveCredential(config.DefaultProfile, storedSession(gateway, orgA())); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runTerma(t, "setup", "--harness", "codex")
+	if err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	for _, want := range []string{"! Collects      nothing yet: your team lists no folders", "Next steps:", doctor.NoFoldersStep} {
+		if !strings.Contains(out, want) {
+			t.Errorf("setup output lacks %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "✓ Setup complete") {
+		t.Errorf("setup called itself complete while collecting nothing:\n%s", out)
 	}
 }
 

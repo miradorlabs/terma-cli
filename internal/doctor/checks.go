@@ -248,10 +248,18 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 	return Check{Status: Pass, Detail: "through the local relay on " + addr + " (" + state + "); only the team's folders' sessions are forwarded"}
 }
 
-// FolderCheck says whether the team policy collects the working copy at root.
+// NoFoldersStep is what a developer whose team lists no folders is told.
+const NoFoldersStep = "Nothing is collected until a team admin lists folders in Terma (Team settings → Data collection), or chooses Every folder."
+
+// FolderCheck says whether policy, the one hooks apply, collects the working copy at root.
 func FolderCheck(policy config.Policy, root, gitDir string, repoErr error) Check {
-	if repoErr != nil {
+	switch {
+	case repoErr != nil:
 		return Check{Status: Fail, Detail: repoErr.Error()}
+	case !policy.Validated():
+		return Check{Status: Warn, Detail: "no team collection policy on this machine, so nothing is recorded", Fix: "terma setup"}
+	case policy.AdmitsNone():
+		return Check{Status: Warn, Detail: "your team lists no folders, so nothing is recorded anywhere", Fix: NoFoldersStep}
 	}
 	var id config.Repository
 	id.Names, id.Path = gitx.RepositoryFS(root, gitDir)

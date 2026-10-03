@@ -61,8 +61,8 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 		add("Repository", "not inside a git repository")
 	} else {
 		folder.Detail = "every folder, in global mode: " + GlobalDestination(cfg)
-		if !cfg.Policy.Global() {
-			folder = FolderCheck(cfg.Policy, root, gitDir, nil)
+		if pol := cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL); !pol.Global() {
+			folder = FolderCheck(pol, root, gitDir, nil)
 		}
 		add("Folder", "%s", folder.Detail)
 		if gitDir == "" {
@@ -300,11 +300,11 @@ func shipment(st harness.Status) string {
 // PolicySummary is what a collection policy collects, in one line.
 func PolicySummary(p config.Policy) string {
 	scope := "sessions in the team's folders (" + strings.Join(p.Folders, ", ") + ")"
-	if len(p.Folders) == 0 {
-		scope = "sessions in no folder yet (your team lists folders in Terma)"
-	}
-	if p.Global() {
+	switch {
+	case p.Global():
 		scope = "every session on this machine"
+	case p.AdmitsNone():
+		return "nothing yet: your team lists no folders"
 	}
 	switch {
 	case p.IncludePrompts && p.IncludeToolContent:
