@@ -146,7 +146,7 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 			recorded = true
 			if len(names) == 0 {
 				ui.Warn("Agents", "none chosen")
-				ui.Then("Run `terma install` in a repository; it asks which agents to connect.")
+				ui.Then("Run `terma setup` again to choose your coding agents.")
 			} else {
 				ui.Summary("Agents", strings.Join(app.adapterDisplayNames(names), ", "))
 			}
@@ -190,8 +190,16 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 				detail: ui.Detail(),
 			})
 		},
-		ApplyMode: func(ctx context.Context, names []string, global bool) error {
-			return app.globalMode().Apply(ctx, names, global, func(what string) { ui.OK("Machine", what) },
+		SpoolKey: func(ctx context.Context, cfg *config.Config) {
+			if k := app.ensureSpoolKey(ctx, cfg); k.fix == "" {
+				ui.OK("Hook events", k.state)
+			} else {
+				ui.Warn("Hook events", k.state)
+				ui.Then(k.fix)
+			}
+		},
+		MachineHooks: func(ctx context.Context, names []string) error {
+			return app.globalMode().Apply(ctx, names, func(what string) { ui.OK("Machine", what) },
 				func(what string) { ui.Summary("Machine", what) }, ui.Then)
 		},
 		CheckIn: func(ctx context.Context) {
@@ -216,16 +224,6 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 	if err != nil {
 		ui.printLines()
 		return err
-	}
-	if !res.Policy.Global() {
-		for _, n := range res.Agents {
-			if s, _, ok := app.agents.Surface(n); ok {
-				for _, step := range s.SetupSteps {
-					ui.Then(step)
-				}
-			}
-		}
-		ui.Then("Run `terma install` in each repository you want to connect.")
 	}
 	if res.Policy.Global() {
 		ui.title = "Setup complete — every session and commit on this machine reports to " + cmp.Or(team, "your organization")

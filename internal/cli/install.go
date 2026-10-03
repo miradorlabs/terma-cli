@@ -228,36 +228,6 @@ func (app *App) installSteps(cmd *cobra.Command, ui *installUI, cfg *config.Conf
 	return steps
 }
 
-// spoolKey's fix, when set, is what the developer must do before events are delivered.
-type spoolKey struct{ state, fix string }
-
-// ensureSpoolKey never fails the install: held events wait up to the spool's MaxAge for a key.
-func (app *App) ensureSpoolKey(ctx context.Context, cfg *config.Config) spoolKey {
-	if keystore.Get(cfg.ProjectID) != "" {
-		return spoolKey{state: "delivered with this team's key"}
-	}
-	const held = "held until this machine has a key for the team"
-	if cfg.APIKey != "" {
-		return spoolKey{held, "TERMA_API_KEY cannot mint a key for hook events: unset it and run `terma install` again."}
-	}
-	client, err := app.newClient(cfg)
-	var key string
-	if err == nil {
-		key, _, err = client.CreateServerKey(ctx, cfg.ProjectID, "terma-cli@"+hostname(),
-			"Created by terma install, for hook events")
-	}
-	switch {
-	case errors.Is(err, auth.ErrNotLoggedIn):
-		return spoolKey{held, "Sign in with `terma setup`, then run `terma install` again, so hook events from this machine are delivered."}
-	case err != nil:
-		return spoolKey{held, "Minting a key for hook events failed (" + err.Error() + "); run `terma install` again."}
-	}
-	if err := keystore.Set(cfg.ProjectID, key, keystore.HostsOf(cfg)); err != nil {
-		return spoolKey{held, "Storing the key for hook events failed (" + err.Error() + "); run `terma install` again."}
-	}
-	return spoolKey{state: "Team key stored for this machine (" + keystore.Mask(key) + ")"}
-}
-
 // resolveInstallHarnesses never reads the committed binding: agents are a per-developer
 // choice. chosen is a choice made just now, which the install records once admitted.
 func (app *App) resolveInstallHarnesses(cmd *cobra.Command, cfg *config.Config, f installFlags) (names []string, chosen bool, err error) {

@@ -43,7 +43,6 @@ func (f fake) WhenHooksOff() map[string]agents.Handler {
 type harness struct {
 	ran             []string
 	flushes, claims int
-	yields          bool
 	deps            Deps
 }
 
@@ -57,7 +56,6 @@ func newHarness(t *testing.T) *harness {
 	h.deps = Deps{
 		Agents:  agents.New(fake{ran: &h.ran}),
 		Profile: func() Profile { return Profile{Policy: config.Policy{Mode: config.ModeRepo}} },
-		Yields:  func(bool, config.Policy, string) bool { return h.yields },
 		Spool:   func() *spool.Spool { return s },
 		Claimed: func(context.Context, string) { h.claims++ },
 		Flush:   func() { h.flushes++ },
@@ -107,16 +105,6 @@ func TestRunFlushesAfterTheEventsThatAsk(t *testing.T) {
 	Run(context.Background(), h.deps, request("fake-stop"))
 	if strings.Join(h.ran, ",") != "edit,stop" || h.flushes != 1 {
 		t.Fatalf("ran %v, %d flushes", h.ran, h.flushes)
-	}
-}
-
-// A repository hook that yields to a machine-wide one runs nothing.
-func TestRunYields(t *testing.T) {
-	h := newHarness(t)
-	h.yields = true
-	Run(context.Background(), h.deps, request("fake-stop"))
-	if len(h.ran) != 0 || h.flushes != 0 {
-		t.Fatalf("a yielding hook ran %v and flushed %d", h.ran, h.flushes)
 	}
 }
 

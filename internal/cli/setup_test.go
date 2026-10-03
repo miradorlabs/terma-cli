@@ -37,7 +37,7 @@ func TestSetupFetchesThePolicyAndPointsAgentsAtTheRelay(t *testing.T) {
 	if p == nil || p.Policy == nil || p.Policy.Mode != config.ModeRepo || !p.Policy.IncludePrompts || p.Policy.FetchedAt.IsZero() {
 		t.Fatalf("policy not recorded: %+v", p)
 	}
-	if !strings.Contains(out, "Collects      sessions in connected repositories") {
+	if !strings.Contains(out, "Collects      sessions in the team's folders (app)") {
 		t.Fatalf("setup did not say the policy:\n%s", out)
 	}
 	token, err := daemon.Token()

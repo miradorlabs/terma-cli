@@ -22,7 +22,6 @@ func HooksDisabled() bool {
 }
 
 func (app *App) newHookCommand() *cobra.Command {
-	var user bool
 	cmd := &cobra.Command{
 		Use:    "hook <event> [args...]",
 		Short:  "Internal: the runtime behind every installed hook shim",
@@ -32,7 +31,7 @@ func (app *App) newHookCommand() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cwd, _ := os.Getwd()
 			status := dispatch.Run(cmd.Context(), app.hookDeps(), dispatch.Request{
-				Event: args[0], Args: args[1:], User: user,
+				Event: args[0], Args: args[1:],
 				Stdin: cmd.InOrStdin(), Stdout: cmd.OutOrStdout(), Stderr: cmd.ErrOrStderr(),
 				Version: app.version, Debug: os.Getenv("TERMA_DEBUG") != "", HooksOff: HooksDisabled(), Cwd: cwd,
 			})
@@ -42,8 +41,9 @@ func (app *App) newHookCommand() *cobra.Command {
 			return nil
 		},
 	}
-	// --user only before the event: what follows it is the event's own arguments.
-	cmd.Flags().BoolVar(&user, "user", false, "internal: a machine-wide hook entry")
+	// --user marks a machine-wide entry, written before the event: what follows it is the
+	// event's own arguments.
+	cmd.Flags().Bool("user", false, "internal: a machine-wide hook entry")
 	cmd.Flags().SetInterspersed(false)
 	return cmd
 }
@@ -53,7 +53,6 @@ func (app *App) hookDeps() dispatch.Deps {
 	return dispatch.Deps{
 		Agents:  app.agents,
 		Profile: hookProfile,
-		Yields:  app.globalMode().Yields,
 		Spool:   openSpool,
 		Claimed: func(ctx context.Context, cwd string) {
 			daemon.Spawn()

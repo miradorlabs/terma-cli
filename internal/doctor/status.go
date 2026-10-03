@@ -326,7 +326,10 @@ func shipment(st harness.Status) string {
 
 // PolicySummary is what a collection policy collects, in one line.
 func PolicySummary(p config.Policy) string {
-	scope := "sessions in connected repositories"
+	scope := "sessions in the team's folders (" + strings.Join(p.Folders, ", ") + ")"
+	if len(p.Folders) == 0 {
+		scope = "sessions in no folder yet (your team lists folders in Terma)"
+	}
 	if p.Global() {
 		scope = "every session on this machine"
 	}

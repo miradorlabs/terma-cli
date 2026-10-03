@@ -30,6 +30,7 @@ func sandboxMachine(t *testing.T) {
 	t.Setenv("SHELL", "/bin/zsh")
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
+	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(t.TempDir(), "gitconfig")) // setup writes core.hooksPath
 }
 
 // A refresh updates committed hooks from the binding, never restores a removed file,

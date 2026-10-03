@@ -1,6 +1,6 @@
-// Package setup is `terma setup`, the machine half: sign in, record the developer's
-// agents, fetch the selected team's collection policy, point the agents at the relay,
-// and write what the organization's mode asks for.
+// Package setup is `terma setup`: sign in, record the developer's agents, fetch the
+// selected team's collection policy, point the agents at the relay, and write the
+// machine-wide hooks.
 package setup
 
 import (
@@ -29,9 +29,12 @@ type Steps struct {
 	// relay fixes both at startup.
 	StopRelay func()
 	// Fetched says which policy is now in force.
-	Fetched      func(config.Policy)
+	Fetched func(config.Policy)
+	// SpoolKey makes sure the team's key for hook events is on this machine.
+	SpoolKey     func(ctx context.Context, cfg *config.Config)
 	ConnectRelay func(ctx context.Context, names []string) error
-	ApplyMode    func(ctx context.Context, names []string, global bool) error
+	// MachineHooks writes the agents' machine-wide hooks and git's global hooks path.
+	MachineHooks func(ctx context.Context, names []string) error
 	// CheckIn asks the relay for a heartbeat, once an agent reports through it.
 	CheckIn func(ctx context.Context)
 }
@@ -83,14 +86,17 @@ func Run(ctx context.Context, reg *agents.Registry, cfg *config.Config, s Steps)
 		}
 	}
 	call(s.Fetched, pol)
+	if s.SpoolKey != nil {
+		s.SpoolKey(ctx, cfg)
+	}
 
 	if s.ConnectRelay != nil {
 		if err := s.ConnectRelay(ctx, names); err != nil {
 			return Result{}, err
 		}
 	}
-	if s.ApplyMode != nil {
-		if err := s.ApplyMode(ctx, names, pol.Global()); err != nil {
+	if s.MachineHooks != nil {
+		if err := s.MachineHooks(ctx, names); err != nil {
 			return Result{}, err
 		}
 	}

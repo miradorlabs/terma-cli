@@ -23,10 +23,8 @@ var gitHookEvents = map[string]agents.Event{
 
 // Request is one hook invocation.
 type Request struct {
-	Event string
-	Args  []string
-	// User marks a machine-wide hook entry.
-	User           bool
+	Event          string
+	Args           []string
 	Stdin          io.Reader
 	Stdout, Stderr io.Writer
 	Version        string
@@ -42,9 +40,7 @@ type Deps struct {
 	Agents *agents.Registry
 	// Profile is the developer's setup as hooks read it locally.
 	Profile func() Profile
-	// Yields reports whether a repository's hook steps aside for a machine-wide one.
-	Yields func(user bool, policy config.Policy, tool string) bool
-	Spool  func() *spool.Spool
+	Spool   func() *spool.Spool
 	// Claimed runs once a hook has claimed its session: the relay, the clone's wiring.
 	Claimed func(ctx context.Context, cwd string)
 	Flush   func()
@@ -99,9 +95,6 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 		return
 	}
 	p := d.Profile()
-	if tool != "" && d.Yields(r.User, p.Policy, tool) {
-		return
-	}
 	if r.Cwd == "" {
 		return
 	}

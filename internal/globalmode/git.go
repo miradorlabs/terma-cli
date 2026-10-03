@@ -11,7 +11,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 )
 
-// In global mode `terma setup` points git's global core.hooksPath at terma's hooks. That
+// `terma setup` points git's global core.hooksPath at terma's hooks. That
 // replaces every repository's .git/hooks for every hook name, so each name gets a script
 // that chains to the hook git ran before; a local core.hooksPath still outranks it.
 
@@ -43,8 +43,8 @@ func shellQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''
 // globalGitHookScript never lets a missing or failing terma block git.
 func globalGitHookScript(hook, terma, previous string) string {
 	var b strings.Builder
-	b.WriteString("#!/bin/sh\n# Written by `terma setup` for global mode (git config --global core.hooksPath).\n")
-	b.WriteString("# Removed when the organization leaves global mode. Never blocks git.\n")
+	b.WriteString("#!/bin/sh\n# Written by `terma setup` (git config --global core.hooksPath).\n")
+	b.WriteString("# Removed by `terma teardown`. Never blocks git.\n")
 	if termaGitHooks[hook] {
 		fmt.Fprintf(&b, "[ -x %[1]s ] && %[1]s hook %[2]s \"$@\" || true\n", shellQuote(terma), hook)
 	}
@@ -114,8 +114,8 @@ func (m Machine) ApplyGitHooks(ctx context.Context, install bool) (bool, error) 
 	return true, nil
 }
 
-// IsGitHooksDir reports whether path, a core.hooksPath as git reads it, is global mode's
-// hooks directory.
+// IsGitHooksDir reports whether path, a core.hooksPath as git reads it, is terma's hooks
+// directory.
 func IsGitHooksDir(path string) bool {
 	dir, err := globalGitHooksPath()
 	return err == nil && path != "" && sameDir(path, dir)

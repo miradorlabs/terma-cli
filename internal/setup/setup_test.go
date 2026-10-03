@@ -30,8 +30,9 @@ func steps(log *[]string, pol config.Policy) Steps {
 			note("relay")
 			return nil
 		},
-		ApplyMode: func(_ context.Context, _ []string, global bool) error { note("mode"); return nil },
-		CheckIn:   func(context.Context) { note("check-in") },
+		SpoolKey:     func(context.Context, *config.Config) { note("spool-key") },
+		MachineHooks: func(context.Context, []string) error { note("machine-hooks"); return nil },
+		CheckIn:      func(context.Context) { note("check-in") },
 	}
 }
 
@@ -49,7 +50,7 @@ func TestSetupRecordsThenFetchesThenConnects(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"sign-in", "choose", "recorded", "team", "fetch", "stop-relay", "fetched", "relay", "mode"}
+	want := []string{"sign-in", "choose", "recorded", "team", "fetch", "stop-relay", "fetched", "spool-key", "relay", "machine-hooks"}
 	if !slices.Equal(log, want) {
 		t.Fatalf("steps = %v, want %v", log, want)
 	}
