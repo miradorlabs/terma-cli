@@ -18,9 +18,9 @@ const telemetryCommand = "printf TERMA_TELEMETRY_TOOL"
 // responses. No provider credentials, model compliance or paid calls are needed.
 //
 // Claude runs two ways. content exports machine-wide straight to the receiver, an exporter
-// the sandbox writes itself. install-content/install-redacted set it up the way
-// `terma install` does for a developer: its exporter at the local relay, which forwards
-// this repository's sessions under the team's policy, collecting content or not.
+// the sandbox writes itself. relay-content/relay-redacted set it up the way
+// `terma setup` does for a developer: its exporter at the local relay, which forwards
+// the admitted repository's sessions under the team's policy, collecting content or not.
 func TestClaudeTelemetry(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, newest bool) {
 		for _, tc := range []struct {
@@ -28,8 +28,8 @@ func TestClaudeTelemetry(t *testing.T) {
 			exclude, routed bool
 		}{
 			{"content", false, false},
-			{"install-content", false, true},
-			{"install-redacted", true, true},
+			{"relay-content", false, true},
+			{"relay-redacted", true, true},
 		} {
 			exclude := tc.exclude
 			t.Run(tc.name, func(t *testing.T) {

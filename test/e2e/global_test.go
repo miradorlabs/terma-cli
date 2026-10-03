@@ -17,7 +17,7 @@ import (
 // set up the way a developer's machine gets it: the real `terma setup`, signed in to an
 // account whose policy is global, which writes the agents' machine-wide hooks and git's
 // global hooks path. Then real agents in four places, each of which must reach its
-// configured global destination: a bound repository, an unbound repository with a
+// configured global destination: the sandbox repository, another repository with a
 // known remote, an unknown one, and a directory outside any repository. Commits in the repositories carry
 // their session. Nothing is installed per repository.
 //
@@ -50,9 +50,8 @@ func (sb *Sandbox) UseGlobalSetup(agents string) *Account {
 	sb.relayAddr = ln.Addr().String()
 	_ = ln.Close()
 	sb.relayed = true
-	sb.writeAbs(filepath.Join(sb.TermaConfig, "relay", "addr"), sb.relayAddr+"\n")
 	sb.ExtraEnv = append(sb.ExtraEnv, "TERMA_POLICY_STUB="+globalPolicy())
-	out := sb.terma(sb.Home, "setup", "--harness", agents, "--relay-service", "off", "--yes", "--no-browser")
+	out := sb.Setup(nil, "--harness", agents)
 	if !strings.Contains(out, "every session on this machine") {
 		t.Fatalf("setup did not enter global mode:\n%s", out)
 	}
@@ -64,16 +63,16 @@ func (sb *Sandbox) UseGlobalSetup(agents string) *Account {
 	if !checkedIn {
 		t.Error("the ingest received no setup check-in")
 	}
-	// setup started a relay of its own; this one logs what it drops.
+	// A relay that logs what it drops, in place of the one setup started.
 	sb.StopRelay()
 	sb.StartRelay()
 	t.Cleanup(sb.StopRelay)
 	return acct
 }
 
-// newUnboundRepo makes a repository with no binding and the given origin remote, trusted
+// newRepo makes another repository with the given origin remote, trusted
 // by the sandbox's Claude.
-func (sb *Sandbox) newUnboundRepo(name, remote string) string {
+func (sb *Sandbox) newRepo(name, remote string) string {
 	dir := filepath.Join(sb.Dir, name)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		sb.T.Fatal(err)
@@ -136,8 +135,8 @@ func TestGlobalModeClaude(t *testing.T) {
 		sb := New(t, Isolated, WithClaude(b))
 		acct := sb.UseGlobalSetup("claude")
 
-		known := sb.newUnboundRepo("known", "git@github.com:org/known.git")
-		unknown := sb.newUnboundRepo("unknown", "https://gitlab.example/me/side.git")
+		known := sb.newRepo("known", "git@github.com:org/known.git")
+		unknown := sb.newRepo("unknown", "https://gitlab.example/me/side.git")
 		scratch := filepath.Join(sb.Dir, "scratch")
 		_ = os.MkdirAll(scratch, 0o700)
 
@@ -171,8 +170,7 @@ func TestGlobalModeClaude(t *testing.T) {
 						t.Errorf("the commit in %s is not stamped with its session %s:\n%s", place.name, sid, msg)
 					}
 				}
-				// Recorded once: in the bound repository its committed hooks stepped aside
-				// for the machine-wide ones, which ran everywhere.
+				// Recorded once: only the machine-wide hooks ran.
 				if starts := sb.Delivered("terma.session.start", sid, 30*time.Second); len(starts) != 1 {
 					t.Errorf("session %s in %s was announced %d times, want once", sid, place.name, len(starts))
 				} else if got := starts[0].Resource["mirador.project.id"] + starts[0].Attrs["mirador.project.id"]; !strings.Contains(got, place.want) {
@@ -206,7 +204,7 @@ func TestGlobalModeCodex(t *testing.T) {
 		t.Setenv("OPENAI_API_KEY", "synthetic-telemetry-key")
 		sb := New(t, Isolated, WithCodex(b))
 		sb.UseGlobalSetup("codex")
-		unknown := sb.newUnboundRepo("unknown", "https://gitlab.example/me/side.git")
+		unknown := sb.newRepo("unknown", "https://gitlab.example/me/side.git")
 		scratch := filepath.Join(sb.Dir, "scratch")
 		_ = os.MkdirAll(scratch, 0o700)
 		for _, place := range []struct{ name, dir string }{{"unknown-remote", unknown}, {"outside-any-repository", scratch}} {

@@ -11,12 +11,11 @@ import (
 	"time"
 )
 
-// dshSandbox is a bound repository whose dsh is asked for the given tool calls.
+// dshSandbox is an admitted repository whose dsh is asked for the given tool calls.
 func dshSandbox(steps func(sb *Sandbox) []claudeStep) func(t *testing.T) *Sandbox {
 	return func(t *testing.T) *Sandbox {
 		sb := New(t, Isolated)
 		sb.RelayAgents = []string{"dsh"}
-		sb.terma(sb.Repo, "install", "--team", sb.ProjectID, "--harness", "none", "--yes", "--no-browser")
 		var s []claudeStep
 		if steps != nil {
 			s = steps(sb)
@@ -146,7 +145,7 @@ func TestRelayDsh(t *testing.T) {
 	})
 }
 
-// dsh outside any bound repository reaches nothing upstream.
+// dsh outside any admitted folder reaches nothing upstream.
 func TestRelayDshOutsideARepository(t *testing.T) {
 	forEachDsh(t, func(t *testing.T, b Binary) {
 		ProvesAll(t, b, "relay.only_opted_in")

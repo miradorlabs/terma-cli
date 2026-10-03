@@ -24,12 +24,12 @@ type RelayOptions struct {
 	Start bool
 	// Hold overrides how long unclaimed records wait (TERMA_RELAY_HOLD).
 	Hold time.Duration
-	// NoKey leaves the machine without a key for the project: installed, but never
+	// NoKey leaves the machine without a key for the project: set up, but never
 	// opted in here.
 	NoKey bool
 	// Content is the team's collection policy, which the account fixture serves:
 	// prompts and tool content through, or both withheld. Only the policy decides
-	// content; the routing record names agents and signals.
+	// content.
 	Content bool
 }
 
@@ -39,7 +39,11 @@ func (sb *Sandbox) UseRelay(o RelayOptions) {
 	t.Helper()
 	acct := sb.StartAccount()
 	acct.denyMints.Store(o.NoKey)
-	acct.withholdContent.Store(!o.Content)
+	if acct.withholdContent.Swap(!o.Content) != !o.Content {
+		// The team's policy changed since setup fetched it: set up again, as a developer would.
+		sb.Setup(nil, "--team", sb.ProjectID, "--harness", setupHarnesses)
+		sb.Receiver.Reset()
+	}
 	sb.relayed = true
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -50,7 +54,7 @@ func (sb *Sandbox) UseRelay(o RelayOptions) {
 	if o.Hold > 0 {
 		sb.ExtraEnv = append(sb.ExtraEnv, "TERMA_RELAY_HOLD="+o.Hold.String())
 	}
-	// Install obtained a hook-delivery key from the account fixture. A no-key
+	// Setup obtained a hook-delivery key from the account fixture. A no-key
 	// negative control must remove it as well as refuse any subsequent key mint.
 	projectKeys := map[string]string{}
 	if !o.NoKey {
@@ -60,11 +64,11 @@ func (sb *Sandbox) UseRelay(o RelayOptions) {
 	if err := os.WriteFile(filepath.Join(sb.TermaConfig, "keys.json"), keys, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	// The record names every agent pointed at the relay, as install's does: the relay
-	// withholds a claimed session of an agent the record does not name.
+	// The relay withholds a claimed session of an agent the developer did not choose, and
+	// setup records only Claude Code and Codex (the rest are Coming Soon): the profile
+	// names every agent pointed at the relay, as setup would once it offers them.
 	agents := append([]string{"claude", "codex", "opencode"}, sb.RelayAgents...)
-	rec, _ := json.Marshal(map[string]any{"project_id": sb.ProjectID, "signals": []string{"traces", "logs", "metrics"}, "harnesses": agents})
-	sb.writeAbs(filepath.Join(sb.TermaConfig, "routing", sb.ProjectID+".json"), string(rec)+"\n")
+	sb.recordHarnesses(agents)
 	// --no-start: the scenario decides whether the relay runs before the agent.
 	// One setup for every agent: a second would stop the relay StartRelay runs.
 	sb.terma(sb.Repo, "relay", "setup", "--no-start", "--addr", sb.relayAddr, "--harness", strings.Join(agents, ","))
@@ -72,6 +76,22 @@ func (sb *Sandbox) UseRelay(o RelayOptions) {
 	if o.Start {
 		sb.StartRelay()
 	}
+}
+
+// recordHarnesses sets the default profile's chosen agents.
+func (sb *Sandbox) recordHarnesses(agents []string) {
+	path := filepath.Join(sb.TermaConfig, "config.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		sb.T.Fatal(err)
+	}
+	var file map[string]any
+	if err := json.Unmarshal(data, &file); err != nil {
+		sb.T.Fatal(err)
+	}
+	file["profiles"].(map[string]any)["default"].(map[string]any)["harnesses"] = agents
+	data, _ = json.Marshal(file)
+	sb.writeAbs(path, string(data))
 }
 
 // StartRelay runs `terma relay run` in the background, never idling out.

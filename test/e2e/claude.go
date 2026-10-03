@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -184,6 +183,12 @@ func (sb *Sandbox) ClaudeHeadless(route Route, prompt string, extra ...string) (
 // ClaudeHeadlessIn is ClaudeHeadless started in dir, so several sessions can run at
 // once in different places.
 func (sb *Sandbox) ClaudeHeadlessIn(dir string, route Route, prompt string, extra ...string) (map[string]any, string) {
+	sb.T.Helper()
+	return sb.ClaudeHeadlessEnv(dir, nil, route, prompt, extra...)
+}
+
+// ClaudeHeadlessEnv is ClaudeHeadlessIn with env added for this one session and its hooks.
+func (sb *Sandbox) ClaudeHeadlessEnv(dir string, env []string, route Route, prompt string, extra ...string) (map[string]any, string) {
 	t := sb.T
 	t.Helper()
 	sb.directClaude()
@@ -194,7 +199,7 @@ func (sb *Sandbox) ClaudeHeadlessIn(dir string, route Route, prompt string, extr
 	defer cancel()
 	cmd := exec.CommandContext(ctx, sb.claudeLauncher(), args...)
 	cmd.Dir = dir
-	cmd.Env = sb.claudeEnv(route)
+	cmd.Env = append(sb.claudeEnv(route), env...)
 	cmd.Stdin = nil
 	out, err := cmd.Output()
 	if err != nil {
@@ -256,9 +261,9 @@ func containsAll(s string, subs ...string) []string {
 	return missing
 }
 
-// directClaude points Claude Code's user-level exporter straight at the receiver and
-// wraps its status line in terma's, once, unless the scenario uses the relay: what a
-// developer's settings held before the relay was the only route.
+// directClaude points Claude Code's user-level exporter straight at the receiver, once,
+// unless the scenario uses the relay: what a developer's settings held before the relay
+// was the only route.
 func (sb *Sandbox) directClaude() {
 	t := sb.T
 	t.Helper()
@@ -285,22 +290,6 @@ func (sb *Sandbox) directClaude() {
 		env[k] = v
 	}
 	doc["env"] = env
-	// The status line `terma install` wraps, and the record its hook finds the
-	// developer's own renderer in.
-	previous, _ := doc["statusLine"].(map[string]any)
-	installed := maps.Clone(previous)
-	if installed == nil {
-		installed = map[string]any{}
-	}
-	fallback := "exit 0"
-	if renderer, _ := previous["command"].(string); renderer != "" {
-		fallback = "exec /bin/sh -c '" + strings.ReplaceAll(renderer, "'", `'\''`) + "'"
-	}
-	installed["type"] = "command"
-	installed["command"] = "command -v terma >/dev/null 2>&1 && exec terma hook statusline || " + fallback
-	doc["statusLine"] = installed
-	record, _ := json.MarshalIndent(map[string]any{path: map[string]any{"installed": installed, "previous": previous}}, "", "  ")
-	sb.writeAbs(filepath.Join(sb.TermaConfig, "statusline.json"), string(record)+"\n")
 	data, _ := json.MarshalIndent(doc, "", "  ")
 	sb.writeAbs(path, string(data)+"\n")
 	sb.useLiveKey()

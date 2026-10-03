@@ -54,18 +54,15 @@ func TestRelayCodexResumedElsewhere(t *testing.T) {
 	})
 }
 
-// A session in a linked worktree (git worktree add) belongs to the main checkout's
-// project: its binding is inherited, so its telemetry must reach that project.
+// A session in a linked worktree (git worktree add) of an admitted repository is admitted
+// through origin's repository name, so its telemetry must reach the team's project.
 func TestRelayLinkedWorktree(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
 		track(t)
 		t.Setenv("ANTHROPIC_API_KEY", "synthetic-telemetry-key")
 		sb := New(t, Isolated, WithClaude(b))
 		sb.UseRelay(RelayOptions{Start: true})
-		// The hooks are committed, as they are once the install is merged; a worktree
-		// checks out what is committed.
-		sb.git("add", "-A")
-		sb.git("commit", "-q", "-m", "install terma")
+		sb.git("remote", "add", "origin", "https://github.com/acme/repo.git")
 		wt := filepath.Join(sb.Dir, "wt")
 		sb.git("worktree", "add", "-q", wt)
 		var calls atomic.Int32
@@ -129,8 +126,8 @@ func TestRelayClaudeSubagent(t *testing.T) {
 	})
 }
 
-// A developer whose Codex does not trust the project's hooks (install approves them, so
-// here the approvals are gone): Codex runs no hook, so nothing claims the session and
+// A developer whose Codex does not trust terma's machine-wide hooks (setup approves them,
+// so here the approvals are gone): Codex runs no hook, so nothing claims the session and
 // nothing is forwarded — fail closed, and the reason is what doctor's "agent hooks run"
 // check names.
 func TestRelayCodexUntrustedHooks(t *testing.T) {
@@ -145,7 +142,7 @@ func TestRelayCodexUntrustedHooks(t *testing.T) {
 		defer provider.Close()
 		sb.CodexExec(RouteAPIKey, telemetryPrompt, fixtureCodexArgs(provider.URL)...)
 		if sb.codexTrustWithdrawn == 0 {
-			t.Fatal("install approved none of the repository's Codex hooks, so there was nothing to withdraw")
+			t.Fatal("setup approved none of terma's Codex hooks, so there was nothing to withdraw")
 		}
 		time.Sleep(8 * time.Second)
 		if n := agentRecords(sb.Receiver.evidence()); n != 0 {

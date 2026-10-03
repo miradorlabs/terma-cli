@@ -22,14 +22,14 @@ import (
 
 // The local relay, end to end: real Claude Code and Codex
 // builds export through their global configuration to `terma relay run` on loopback,
-// hooks in the installed repository claim their sessions, and the receiver stands in
+// terma's hooks claim the sessions in a folder the team admits, and the receiver stands in
 // for Terma upstream. What these prove:
 //
 //   - an opted-in session arrives whole: every contract the direct export meets, the
 //     project stamped on it, the project's key on every request;
-//   - content leaves only as the project's routing record allows;
+//   - content leaves only as the team's policy allows;
 //   - nothing else reaches upstream — a session outside any repository, in a
-//     repository with no binding, or in one this machine holds no key for;
+//     repository the team's folders do not list, or in one this machine holds no key for;
 //   - how a cold start (relay not running when the agent starts) goes.
 
 // checkOnlyClaimed fails if anything the agent exported reached upstream without
@@ -304,9 +304,9 @@ func TestRelayCodex(t *testing.T) {
 	})
 }
 
-// Nothing leaves for a session no opted-in repository claimed: one outside any
-// repository, one in a repository without a binding, one in the installed repository
-// on a machine that holds no key for its project.
+// Nothing leaves for a session no admitted folder claimed: one outside any repository,
+// one in a repository the team's folders do not list, one in the admitted repository on
+// a machine that holds no key for its project.
 func TestRelayNegativeControls(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
 		ProvesAll(t, b, "relay.only_opted_in")
@@ -336,7 +336,7 @@ func TestRelayNegativeControls(t *testing.T) {
 				t.Errorf("want everything dropped as %s: %v", reason, c)
 			}
 		}
-		for _, where := range []string{"outside-repo", "unbound-repo"} {
+		for _, where := range []string{"outside-repo", "unlisted-repo"} {
 			t.Run(where, func(t *testing.T) {
 				track(t)
 				t.Setenv("ANTHROPIC_API_KEY", "synthetic-telemetry-key")
@@ -346,7 +346,7 @@ func TestRelayNegativeControls(t *testing.T) {
 				if err := os.MkdirAll(dir, 0o700); err != nil {
 					t.Fatal(err)
 				}
-				if where == "unbound-repo" {
+				if where == "unlisted-repo" {
 					sb.gitIn(dir, "init", "-q", "-b", "main")
 				}
 				sb.WorkDir = dir
@@ -439,7 +439,7 @@ func TestRelayLateClaim(t *testing.T) {
 		if n := agentRecords(sb.Receiver.evidence()); n != 0 {
 			t.Fatalf("%d records reached upstream before any claim", n)
 		}
-		claim := fmt.Sprintf(`{"project_id":%q,"tool":"claude-code","claimed_at":%q}`, sb.ProjectID, time.Now().UTC().Format(time.RFC3339Nano))
+		claim := fmt.Sprintf(`{"project_id":%q,"tool":"claude-code","repository":{"names":[%q]},"claimed_at":%q}`, sb.ProjectID, filepath.Base(sb.Repo), time.Now().UTC().Format(time.RFC3339Nano))
 		sb.writeAbs(filepath.Join(sb.TermaConfig, "relay", "claims", sid+".json"), claim+"\n")
 		deadline := time.Now().Add(30 * time.Second)
 		for agentRecords(sb.Receiver.evidence()) == 0 && time.Now().Before(deadline) {
@@ -514,8 +514,9 @@ func TestRelayConcurrentProjects(t *testing.T) {
 		ProvesAll(t, b, "relay.concurrent_projects")
 		track(t)
 		t.Setenv("ANTHROPIC_API_KEY", "synthetic-telemetry-key")
-		sb := New(t, Isolated, WithClaude(b))
-		sb.UseRelay(RelayOptions{Start: true, Hold: 5 * time.Second})
+		// Both teams list both folders; which team a session's hooks claim it for is the
+		// profile they run under.
+		sb := New(t, Isolated, WithClaude(b), WithFolders("repo", "other"))
 		const otherProject, otherKey = "proj_other", "ter_srv_111111111111111111111111"
 		other := filepath.Join(sb.Dir, "other")
 		personal := filepath.Join(sb.Dir, "personal")
@@ -527,7 +528,11 @@ func TestRelayConcurrentProjects(t *testing.T) {
 		for _, args := range [][]string{{"init", "-q", "-b", "main"}, {"config", "user.email", "live@terma.test"}, {"config", "user.name", "Terma Live"}, {"commit", "-q", "--allow-empty", "-m", "init"}} {
 			sb.gitIn(other, args...)
 		}
-		sb.terma(other, "install", "--team", otherProject, "--harness", "none", "--adapters", "claude", "--yes", "--no-browser")
+		// The second team is a second profile, set up before the relay starts: setup stops it.
+		sb.SignIn("other")
+		otherEnv := []string{"TERMA_PROFILE=other"}
+		sb.Setup(otherEnv, "--team", otherProject, "--harness", setupHarnesses)
+		sb.UseRelay(RelayOptions{Start: true, Hold: 5 * time.Second})
 		keys, _ := json.Marshal(map[string]any{"keys": map[string]string{sb.ProjectID: liveKey, otherProject: otherKey}})
 		sb.writeAbs(filepath.Join(sb.TermaConfig, "keys.json"), string(keys))
 
@@ -542,7 +547,11 @@ func TestRelayConcurrentProjects(t *testing.T) {
 			wg.Go(func() {
 				// One provider serves all three, and whichever call comes first is asked
 				// to run the tool: every session gets the turns and the tool to do it.
-				_, sid := sb.ClaudeHeadlessIn(dir, RouteAPIKey, telemetryPrompt, "--max-turns", "3", "--tools", "Bash", "--allowedTools", "Bash")
+				var env []string
+				if name == "other" {
+					env = otherEnv
+				}
+				_, sid := sb.ClaudeHeadlessEnv(dir, env, RouteAPIKey, telemetryPrompt, "--max-turns", "3", "--tools", "Bash", "--allowedTools", "Bash")
 				mu.Lock()
 				sids[name] = sid
 				mu.Unlock()

@@ -17,12 +17,11 @@ func piSandbox(cmd string) func(t *testing.T) *Sandbox {
 	return piToolSandbox("bash", map[string]any{"command": cmd})
 }
 
-// piToolSandbox is a bound repository whose Pi is asked for one call of tool.
+// piToolSandbox is an admitted repository whose Pi is asked for one call of tool.
 func piToolSandbox(tool string, args map[string]any) func(t *testing.T) *Sandbox {
 	return func(t *testing.T) *Sandbox {
 		sb := New(t, Isolated)
 		sb.RelayAgents = []string{"pi"}
-		sb.terma(sb.Repo, "install", "--team", sb.ProjectID, "--harness", "none", "--yes", "--no-browser")
 		var calls atomic.Int32
 		provider := httptest.NewServer(openAIToolCallProvider(&calls, tool, args))
 		t.Cleanup(provider.Close)
@@ -56,7 +55,7 @@ func TestRelayWorkloadsPi(t *testing.T) {
 	})
 }
 
-// Pi outside any bound repository: its extension exports to the relay, the relay
+// Pi outside any admitted folder: its extension exports to the relay, the relay
 // holds the unclaimed session and drops it, and nothing reaches upstream.
 func TestRelayPiOutsideARepository(t *testing.T) {
 	forEachPi(t, func(t *testing.T, b Binary) {

@@ -10,12 +10,11 @@ import (
 	"time"
 )
 
-// geminiSandbox is a bound repository whose Gemini is asked for one call of tool.
+// geminiSandbox is an admitted repository whose Gemini is asked for one call of tool.
 func geminiSandbox(tool string, args func(sb *Sandbox) map[string]any) func(t *testing.T) *Sandbox {
 	return func(t *testing.T) *Sandbox {
 		sb := New(t, Isolated)
 		sb.RelayAgents = []string{"gemini"}
-		sb.terma(sb.Repo, "install", "--team", sb.ProjectID, "--harness", "none", "--yes", "--no-browser")
 		var a map[string]any
 		if args != nil {
 			a = args(sb)
@@ -108,7 +107,7 @@ func TestRelayGemini(t *testing.T) {
 	})
 }
 
-// Gemini outside any bound repository: it exports to the relay, the relay holds the
+// Gemini outside any admitted folder: it exports to the relay, the relay holds the
 // unclaimed session and drops it, and nothing reaches upstream.
 func TestRelayGeminiOutsideARepository(t *testing.T) {
 	forEachGemini(t, func(t *testing.T, b Binary) {

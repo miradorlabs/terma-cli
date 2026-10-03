@@ -5,9 +5,9 @@
 // matrix is either a passing test here or a claim.
 //
 // Every test runs in a sandbox: a scratch Terma config directory, a scratch
-// harness config directory, and a scratch git repository that `terma install`
-// has configured exactly as it would for a developer, with the harness's export
-// pointed at an OTLP receiver inside the test. The contracts then read three planes
+// harness config directory, a scratch git global config, and a scratch git repository,
+// with the machine-wide hooks `terma setup` writes for a developer, and the harness's
+// export pointed at an OTLP receiver inside the test. The contracts then read three planes
 // together: the hook spool, the receiver, and the terminal.
 package e2e
 
@@ -16,6 +16,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -58,8 +59,11 @@ type Sandbox struct {
 	Repo         string
 	Terma        string
 	Receiver     *Receiver
-	// ProjectID is the Terma project the scratch repository is bound to.
+	// ProjectID is the team `terma setup` selects.
 	ProjectID string
+	// Folders is the team policy's folder list, which the account fixture serves; the
+	// scratch repository's folder name unless an option sets it.
+	Folders []string
 	// RendererMarker is what the pre-existing status line prints; the wrapped
 	// status line must still show it.
 	RendererMarker string
@@ -74,7 +78,7 @@ type Sandbox struct {
 
 	claudeDirect, codexDirect bool
 	// WorkDir is where an agent run starts; the sandbox repository when empty. The
-	// relay's negative controls run agents outside the installed repository.
+	// relay's negative controls run agents outside the admitted repository.
 	WorkDir string
 	// CodexHooksUntrusted runs Codex without bypassing its hook trust, as a developer
 	// who has not yet trusted the project's hooks does.
@@ -102,6 +106,12 @@ func WithClaude(b Binary) Option { return func(sb *Sandbox) { sb.Claude = b } }
 
 // WithCodex runs the scenario against this Codex build.
 func WithCodex(b Binary) Option { return func(sb *Sandbox) { sb.Codex = b } }
+
+// WithFolders is the team policy's folder list.
+func WithFolders(folders ...string) Option { return func(sb *Sandbox) { sb.Folders = folders } }
+
+// setupHarnesses are the agents every sandbox's setup records: all setup offers.
+const setupHarnesses = "claude,codex"
 
 const (
 	// liveKey is the server key the agents and the spool export with: a syntactically
@@ -137,7 +147,8 @@ func New(t *testing.T, mode Mode, opts ...Option) *Sandbox {
 		Home: filepath.Join(dir, "home"), TermaConfig: filepath.Join(dir, "terma"),
 		ClaudeConfig: filepath.Join(dir, "claude"), CodexHome: filepath.Join(dir, "codex"),
 		Repo: filepath.Join(dir, "repo"), RendererMarker: "LIVE-RENDERER",
-		Claude: Binary{Harness: "claude", Path: "claude"}, Codex: Binary{Harness: "codex", Path: "codex"}}
+		Claude: Binary{Harness: "claude", Path: "claude"}, Codex: Binary{Harness: "codex", Path: "codex"},
+		Folders: []string{"repo"}}
 	for _, o := range opts {
 		o(sb)
 	}
@@ -172,16 +183,57 @@ func New(t *testing.T, mode Mode, opts ...Option) *Sandbox {
 	sb.writeAbs(filepath.Join(sb.ClaudeConfig, ".claude.json"), string(raw)+"\n")
 
 	// The real terma paths: the profile's ingest URL is the receiver, so the
-	// background flushes the hooks start deliver there; the repository is installed
-	// with both adapters' hooks. The account fixture provides the developer login,
-	// and the collection policy the relay and the spool's delivery fetch with it.
-	// Providers remain local fixtures.
+	// background flushes the hooks start deliver there. The account fixture provides
+	// the developer login, and the collection policy setup, the relay and the spool's
+	// delivery fetch with it. Providers remain local fixtures.
 	sb.terma(sb.Repo, "config", "set", "--otlp-url", sb.Receiver.URL())
 	sb.StartAccount()
-	// Each scenario points its own exporter. --no-browser bounds a fixture-login
-	// regression instead of opening a browser.
-	sb.terma(sb.Repo, "install", "--team", sb.ProjectID, "--harness", "none", "--adapters", "claude,codex", "--yes", "--no-browser")
+	// A relay port of the sandbox's own: setup points the agents at it.
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sb.relayAddr = ln.Addr().String()
+	_ = ln.Close()
+	t.Cleanup(sb.StopRelay)
+	sb.Setup(nil, "--team", sb.ProjectID, "--harness", setupHarnesses)
+	// Setup's check-in reached the receiver with the key it minted; scenarios start clean.
+	sb.Receiver.Reset()
 	return sb
+}
+
+// Setup runs `terma setup` with env added, from the recording shim's path: the hooks it
+// writes call terma by the absolute path it ran from, so they must name the shim. Each
+// scenario decides whether a relay runs, so the one setup starts is stopped.
+func (sb *Sandbox) Setup(env []string, args ...string) string {
+	t := sb.T
+	t.Helper()
+	shim := filepath.Join(strings.TrimSuffix(sb.binDir(), ":"), "terma")
+	data, err := os.ReadFile(sb.Terma)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(shim+".tmp", data, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(shim+".tmp", shim); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, shim, append([]string{"setup", "--yes", "--no-browser", "--relay-service", "off", "--relay-addr", sb.relayAddr}, args...)...)
+	cmd.WaitDelay = 2 * time.Second
+	cmd.Dir = sb.Repo
+	cmd.Env = append(sb.termaEnv(), env...)
+	out, err := cmd.CombinedOutput()
+	sb.writeShim()
+	if err != nil {
+		t.Fatalf("terma setup %s: %v\n%s", strings.Join(args, " "), err, out)
+	}
+	if sb.waitRelay(5 * time.Second) {
+		sb.StopRelay()
+	}
+	return string(out)
 }
 
 // Delivered waits for Terma's own flush to have delivered a spooled event of
@@ -195,7 +247,7 @@ func (sb *Sandbox) Delivered(name, session string, timeout time.Duration) []LogR
 }
 
 // useLiveKey files liveKey as the project's key, which the spool's flushes deliver with,
-// in place of the one install had the account fixture mint.
+// in place of the one setup had the account fixture mint.
 func (sb *Sandbox) useLiveKey() {
 	sb.T.Helper()
 	path := filepath.Join(sb.TermaConfig, "keys.json")
@@ -215,24 +267,21 @@ func (sb *Sandbox) useLiveKey() {
 	}
 }
 
-// RouteClaude points Claude Code at this repository's project the way `terma install`
-// does for a developer: its user-level exporter at the local relay, which forwards the
-// sessions this repository's hooks claim to the receiver, standing in for Terma. With
+// RouteClaude points Claude Code at the team's project the way `terma setup` does for a
+// developer: its user-level exporter at the local relay, which forwards the sessions the
+// hooks claim in an admitted folder to the receiver, standing in for Terma. With
 // ExcludeContent the team's policy, which the account fixture serves, withholds prompts
-// and tool content; install has no switch for them. The account fixture supplies the
-// developer login the relay fetches that policy with. UseRelay files the receiver's key,
-// so install mints none.
+// and tool content. The account fixture supplies the developer login the relay fetches
+// that policy with. UseRelay files the receiver's key.
 func (sb *Sandbox) RouteClaude() {
 	sb.T.Helper()
 	if sb.Mode != Isolated {
 		sb.T.Fatal("RouteClaude needs an isolated sandbox")
 	}
-	// The relay on a port of its own, forwarding to the receiver; install finds it there.
 	sb.UseRelay(RelayOptions{Start: true, Content: !sb.ExcludeContent})
-	sb.terma(sb.Repo, "install", "--team", sb.ProjectID, "--harness", "claude", "--yes", "--no-browser")
-	// What install wrote is the only exporter: the relay's, in the user's settings.
+	// The relay's is the only exporter, in the user's settings.
 	if user, err := os.ReadFile(filepath.Join(sb.ClaudeConfig, "settings.json")); err != nil || !bytes.Contains(user, []byte(sb.relayAddr)) {
-		sb.T.Fatalf("install did not point Claude Code at the relay (%s): %v\n%s", sb.relayAddr, err, user)
+		sb.T.Fatalf("Claude Code does not export to the relay (%s): %v\n%s", sb.relayAddr, err, user)
 	}
 }
 
@@ -254,6 +303,9 @@ func (sb *Sandbox) claudeLauncher() string {
 func (sb *Sandbox) termaEnv() []string {
 	return append(sb.baseEnv(), "TERMA_CONFIG_DIR="+sb.TermaConfig, "CLAUDE_CONFIG_DIR="+sb.ClaudeConfig, "CODEX_HOME="+sb.CodexHome)
 }
+
+// gitConfigGlobal is the sandbox's git global config, where setup sets core.hooksPath.
+func (sb *Sandbox) gitConfigGlobal() string { return filepath.Join(sb.Dir, "gitconfig") }
 
 // baseEnv is the environment harnesses and terma run with.
 //
@@ -291,9 +343,11 @@ func (sb *Sandbox) baseEnv() []string {
 			env = append(env, "SHELL=/bin/zsh")
 		}
 	}
-	// TERMA_RELAY_SERVICE=0: `terma install` in a sandbox must not register the
-	// sandbox's relay with the developer's service manager; each test runs its own.
-	env = append(env, "PATH="+path, "TERM=xterm-256color", "COLORTERM=truecolor", "TERMA_RELAY_SERVICE=0")
+	// TERMA_RELAY_SERVICE=0: setup in a sandbox must not register the sandbox's relay
+	// with the developer's service manager; each test runs its own. Git, terma and the
+	// agents all read the sandbox's git global config, never the developer's.
+	env = append(env, "PATH="+path, "TERM=xterm-256color", "COLORTERM=truecolor", "TERMA_RELAY_SERVICE=0",
+		"GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL="+sb.gitConfigGlobal())
 	// The one terma setting carried across: which environment's auth and API hosts a
 	// run may reach (TERMA_ENV=dev keeps anything that is not the receiver off
 	// production). Everything else of the developer's terma stays out.
@@ -317,17 +371,25 @@ func (sb *Sandbox) binDir() string {
 				_ = os.Symlink(b.Path, filepath.Join(dir, b.Harness))
 			}
 		}
-		shim := "#!/bin/sh\n" +
-			"# Records a hook's stdin, then runs terma with it. Written by the live suite.\n" +
-			"if [ \"$1\" = hook ]; then\n" +
-			"  f=\"" + sb.payloadDir() + "/$(date +%s%N)-$2.json\"\n" +
-			"  cat > \"$f\"\n" +
-			"  exec \"" + sb.Terma + "\" \"$@\" < \"$f\"\n" +
-			"fi\n" +
-			"exec \"" + sb.Terma + "\" \"$@\"\n"
-		_ = os.WriteFile(filepath.Join(dir, "terma"), []byte(shim), 0o755)
+		sb.writeShim()
 	}
 	return dir + ":"
+}
+
+// writeShim puts the recording terma in the PATH directory.
+func (sb *Sandbox) writeShim() {
+	shim := "#!/bin/sh\n" +
+		"# Records a hook's stdin, then runs terma with it. Written by the live suite.\n" +
+		"if [ \"$1\" = hook ]; then\n" +
+		"  e=\"$2\"; [ \"$e\" = --user ] && e=\"$3\"\n" +
+		"  f=\"" + sb.payloadDir() + "/$(date +%s%N)-$e.json\"\n" +
+		"  cat > \"$f\"\n" +
+		"  exec \"" + sb.Terma + "\" \"$@\" < \"$f\"\n" +
+		"fi\n" +
+		"exec \"" + sb.Terma + "\" \"$@\"\n"
+	path := filepath.Join(sb.Dir, "path", "terma")
+	_ = os.WriteFile(path+".tmp", []byte(shim), 0o755)
+	_ = os.Rename(path+".tmp", path)
 }
 
 func (sb *Sandbox) payloadDir() string { return filepath.Join(sb.Dir, "hook-payloads") }
@@ -381,7 +443,7 @@ func (sb *Sandbox) gitIn(dir string, args ...string) string {
 	sb.T.Helper()
 	cmd := exec.Command("git", args...)
 	cmd.Dir = dir
-	cmd.Env = append(sb.baseEnv(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null")
+	cmd.Env = append(sb.baseEnv(), "TERMA_CONFIG_DIR="+sb.TermaConfig)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		sb.T.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, out)
@@ -406,7 +468,7 @@ func (sb *Sandbox) Commit(message string) string {
 	sb.git("add", "-A")
 	cmd := exec.Command("git", "commit", "-q", "-m", message)
 	cmd.Dir = sb.Repo
-	cmd.Env = append(sb.baseEnv(), "TERMA_CONFIG_DIR="+sb.TermaConfig, "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null")
+	cmd.Env = append(sb.baseEnv(), "TERMA_CONFIG_DIR="+sb.TermaConfig)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		sb.T.Fatalf("git commit: %v\n%s", err, out)
 	}

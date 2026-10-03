@@ -10,12 +10,11 @@ import (
 	"time"
 )
 
-// hermesSandbox is a bound repository whose Hermes is asked for one call of tool.
+// hermesSandbox is an admitted repository whose Hermes is asked for one call of tool.
 func hermesSandbox(tool string, args map[string]any) func(t *testing.T) *Sandbox {
 	return func(t *testing.T) *Sandbox {
 		sb := New(t, Isolated)
 		sb.RelayAgents = []string{"hermes"}
-		sb.terma(sb.Repo, "install", "--team", sb.ProjectID, "--harness", "none", "--yes", "--no-browser")
 		var calls atomic.Int32
 		provider := httptest.NewServer(hermesProvider(&calls, tool, args))
 		t.Cleanup(provider.Close)
@@ -118,7 +117,7 @@ func TestRelayHermes(t *testing.T) {
 	})
 }
 
-// Hermes outside any bound repository: its plugin exports to the relay, the relay holds
+// Hermes outside any admitted folder: its plugin exports to the relay, the relay holds
 // the unclaimed session and drops it, and nothing reaches upstream.
 func TestRelayHermesOutsideARepository(t *testing.T) {
 	forEachHermes(t, func(t *testing.T, b Binary) {

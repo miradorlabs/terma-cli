@@ -12,8 +12,8 @@ import (
 // startup, before any extension loads, so only the process that launches omp could set them. Through
 // the relay, omp runs terma's Pi-family extension instead (internal/agents/internal/pifamily/terma.ts,
 // agent "omp", in ~/.omp/agent/extensions), which exports from omp's own events; its
-// sessions are claimed by the committed hook file `terma install --adapters omp` writes
-// and the extension's claim-only omp-prompt. The direct half of a comparison runs the
+// sessions are claimed by the extension's claim-only omp-prompt, and terma writes no omp
+// hooks, so its commits carry no attribution. The direct half of a comparison runs the
 // same extension pointed at the receiver. Only the installed build is tested: the npm
 // package is over a gigabyte.
 
