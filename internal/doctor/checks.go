@@ -245,7 +245,7 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 	case !keys.has("", projectID) && !slices.ContainsFunc(reg.With[agents.RelayExporter](), func(e agents.RelayExporter) bool { return keys.has(e.Name(), projectID) }):
 		return Check{Status: Warn, Detail: "local relay on " + addr + " (" + state + "); no key for this team on this machine, so its sessions are dropped", Fix: "terma setup"}
 	}
-	return Check{Status: Pass, Detail: "through the local relay on " + addr + " (" + state + "); only the team's repositories' sessions are forwarded"}
+	return Check{Status: Pass, Detail: "through the local relay on " + addr + " (" + state + "); it forwards the sessions your team's policy collects"}
 }
 
 // NoRepositoriesStep is what a developer whose team lists no repositories is told.

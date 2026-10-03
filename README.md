@@ -57,7 +57,7 @@ So a clone in any folder, a subdirectory of it, and a worktree of it at
 `github.com/you/api` is not. An SSH host alias (`git@github-work:acme/api` through
 `~/.ssh/config`) normalises to host `github-work` and does not match
 `github.com/acme/api`; `terma doctor` shows the origin terma sees. In global mode the
-policy collects every folder, inside git or not. Each session reports to the team of the
+policy collects every session, inside git or not. Each session reports to the team of the
 developer who ran it, so two developers on different teams in one repository each report
 to their own.
 
