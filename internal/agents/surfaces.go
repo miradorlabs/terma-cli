@@ -9,10 +9,6 @@ import (
 type Surface struct {
 	Name, DisplayName string
 	Installed         func(context.Context) bool
-	// InstallSteps and SetupSteps are what the developer does next for it to report.
-	InstallSteps, SetupSteps []string
-	// Reports says, after an install, how the surface's sessions reach Terma.
-	Reports string
 }
 
 // Surfaced is an agent run as more than one surface.

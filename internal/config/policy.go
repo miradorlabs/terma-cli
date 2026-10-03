@@ -7,21 +7,21 @@ import (
 
 // Collection modes: what the signed-in organization collects from this machine.
 const (
-	// ModeRepo, the default, collects only sessions a bound repository's hook claimed.
+	// ModeRepo, the default, collects only the repositories the policy lists.
 	ModeRepo = "repo"
 	// ModeGlobal collects every session on the machine.
 	ModeGlobal = "global"
 )
 
-// Policy is the organization's collection policy, fetched by `terma setup`; routing
-// records can only narrow it.
+// Policy is the organization's collection policy, fetched by `terma setup`.
 type Policy struct {
-	Mode               string `json:"mode"`
-	IncludePrompts     bool   `json:"include_prompts"`
-	IncludeToolContent bool   `json:"include_tool_content"`
+	Mode string `json:"mode"`
+	// Repositories are what repository mode admits (Admits).
+	Repositories       []string `json:"repositories,omitempty"`
+	IncludePrompts     bool     `json:"include_prompts"`
+	IncludeToolContent bool     `json:"include_tool_content"`
 	// CollectsNothing is set while no validated policy applies: nothing leaves the machine.
 	CollectsNothing bool      `json:"collects_nothing,omitempty"`
-	ExcludePaths    []string  `json:"exclude_paths,omitempty"`
 	Revision        int64     `json:"revision"`
 	UpdatedAt       time.Time `json:"updated_at"`
 	OrganizationID  string    `json:"organization_id,omitempty"`
@@ -46,6 +46,15 @@ func DefaultPolicy() Policy {
 	return Policy{Mode: ModeRepo, IncludePrompts: true, IncludeToolContent: true}
 }
 
+// Content is what content the team's policy lets a session carry, the one rule the relay
+// and the hook events both apply: a policy not validated withholds all.
+func (p Policy) Content() (prompts, toolContent bool) {
+	if p.CollectsNothing {
+		return false, false
+	}
+	return p.IncludePrompts, p.IncludeToolContent
+}
+
 // Global reports whether the organization collects every session on the machine.
 func (p Policy) Global() bool { return p.Mode == ModeGlobal }
 
@@ -55,14 +64,22 @@ func (p Policy) AppliesTo(organizationID, authURL string) bool {
 		(p.AuthURL == "" || p.AuthURL == authURL)
 }
 
-// NoPolicy is what applies to a login until its team's policy is validated: repositories
-// opt in and nothing is collected.
+// NoPolicy is what applies to a login until its team's policy is validated: no repository
+// is admitted and nothing is collected.
 func NoPolicy(organizationID, authURL string) Policy {
 	return Policy{Mode: ModeRepo, CollectsNothing: true, OrganizationID: organizationID, AuthURL: authURL}
 }
 
 // PolicyStub is the offline test override, TERMA_POLICY_STUB, read here and nowhere else.
 func PolicyStub() string { return os.Getenv("TERMA_POLICY_STUB") }
+
+// InForce is the policy hooks apply: p once validated, else NoPolicy.
+func (p Policy) InForce(organizationID, authURL string) Policy {
+	if p.Validated() {
+		return p
+	}
+	return NoPolicy(organizationID, authURL)
+}
 
 // Validated reports whether p is a team's fetched policy; an offline stub stands in for
 // the team.

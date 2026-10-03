@@ -12,6 +12,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 )
 
@@ -37,7 +38,7 @@ func TestSetupFetchesThePolicyAndPointsAgentsAtTheRelay(t *testing.T) {
 	if p == nil || p.Policy == nil || p.Policy.Mode != config.ModeRepo || !p.Policy.IncludePrompts || p.Policy.FetchedAt.IsZero() {
 		t.Fatalf("policy not recorded: %+v", p)
 	}
-	if !strings.Contains(out, "Collects      sessions in connected repositories") {
+	if !strings.Contains(out, "Collects      sessions in the team's repositories (github.com/acme/app)") {
 		t.Fatalf("setup did not say the policy:\n%s", out)
 	}
 	token, err := daemon.Token()
@@ -50,6 +51,30 @@ func TestSetupFetchesThePolicyAndPointsAgentsAtTheRelay(t *testing.T) {
 	}
 	if out, err := runTerma(t, "setup", "--harness", "codex", "--relay-service", "sometimes"); err == nil {
 		t.Fatalf("--relay-service sometimes was accepted:\n%s", out)
+	}
+}
+
+// A team that lists no repositories collects nothing, and setup says so as a step left to do.
+func TestSetupWarnsWhenTheTeamListsNoRepositories(t *testing.T) {
+	gateway := newFakeAuth(t)
+	authSandbox(t, gateway)
+	sandboxMachine(t)
+	t.Setenv("CODEX_HOME", t.TempDir())
+	t.Setenv("TERMA_POLICY_STUB", `{"mode":"repo","repositories":[],"include_prompts":true,"include_tool_content":true}`)
+	if _, err := auth.SaveCredential(config.DefaultProfile, storedSession(gateway, orgA())); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runTerma(t, "setup", "--harness", "codex")
+	if err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	for _, want := range []string{"! Collects      nothing yet: your team lists no repositories", "Next steps:", doctor.NoRepositoriesStep} {
+		if !strings.Contains(out, want) {
+			t.Errorf("setup output lacks %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "✓ Setup complete") {
+		t.Errorf("setup called itself complete while collecting nothing:\n%s", out)
 	}
 }
 
@@ -91,9 +116,6 @@ func TestHarnessSelectionFlags(t *testing.T) {
 			if _, err := testApp.chooseHarnesses(cmd, cfg, setupFlags{harnesses: "claude," + name}); err == nil || !strings.Contains(err.Error(), "Coming Soon") {
 				t.Fatalf("setup error = %v", err)
 			}
-			if _, _, err := testApp.resolveInstallHarnesses(cmd, cfg, installFlags{harnesses: name}); err == nil || !strings.Contains(err.Error(), "Coming Soon") {
-				t.Fatalf("install error = %v", err)
-			}
 		})
 	}
 	got, err := testApp.parseAgentList("codex,claude,codex")
@@ -123,10 +145,6 @@ func TestHarnessSelectionFiltersSavedAgents(t *testing.T) {
 		got, err := testApp.chooseHarnesses(cmd, cfg, setupFlags{assumeYes: true})
 		if err != nil || !slices.Equal(got, wantSetup) {
 			t.Fatalf("setup selection = %v, %v; want %v", got, err, wantSetup)
-		}
-		got, _, err = testApp.resolveInstallHarnesses(cmd, cfg, installFlags{assumeYes: true, dryRun: true})
-		if err != nil || !slices.Equal(got, wantInstalled) {
-			t.Fatalf("install selection = %v, %v; want %v", got, err, wantInstalled)
 		}
 	}
 }

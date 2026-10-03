@@ -33,7 +33,7 @@ type setupFlags struct {
 	relayService string
 	// relayAddr is --relay-addr: a loopback address to move the relay to, "" to keep it.
 	relayAddr string
-	// managedConfig is --managed-config's directory for global mode's managed hooks, which
+	// managedConfig is --managed-config's directory for the managed hooks, which
 	// call terma at managedTerma.
 	managedConfig string
 	managedTerma  string
@@ -60,22 +60,24 @@ func (app *App) newSetupCommand() *cobra.Command {
 		Use: "setup",
 		// login was its own command; onboarding emails already sent say `terma login`.
 		Aliases: []string{"login"},
-		Short:   "Sign in and choose your coding agents (once per developer)",
+		Short:   "Sign in, choose your team and coding agents, and write machine-wide hooks",
 		Long: `Gets this machine ready to use terma, once per developer:
 
   1. Signs you in (a browser handoff; --no-browser prints the URL instead).
-  2. Records which coding agents you work with (an agent's CLI and desktop app
-     separately).
-  3. Fetches your organization's collection policy.
+  2. Records which coding agents you work with.
+  3. Chooses your team (--team names it) and fetches its collection policy, which
+     lists the repositories it collects.
   4. Points those agents' telemetry at terma's local relay, and runs the relay in
-     the background (--relay-service off: started on demand instead). Only sessions
-     allowed by the selected team's collection policy leave this machine.
+     the background (--relay-service off: started on demand instead).
+  5. Writes the agents' machine-wide hooks and git's global core.hooksPath, so a
+     session or commit in a repository the policy lists is recorded for your team,
+     and nothing anywhere else. Nothing is written into a repository's working
+     tree or committed files; a clone with its own hooks path gets a git config
+     entry routing it through terma's hooks (terma teardown removes it).
 
-A repository your organization connected in Terma needs nothing more: its committed
-hooks claim its sessions. ` + "`terma install`" + ` connects a repository from here instead.
-
-Run it again any time: it reuses a working sign-in, --org switches organization, and
---relay-addr moves the relay off a port another program holds.`,
+Run it again any time: it reuses a working sign-in, --team switches team, --org
+switches organization, and --relay-addr moves the relay off a port another program
+holds.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error { return app.runSetup(cmd, f) },
 	}
@@ -86,7 +88,7 @@ Run it again any time: it reuses a working sign-in, --org switches organization,
 	cmd.Flags().StringVar(&f.relayService, "relay-service", "", "run the local relay as a background service: on or off (default: on, or your last choice)")
 	cmd.Flags().StringVar(&f.relayAddr, "relay-addr", "", "move the local relay to this loopback address (default "+claim.DefaultAddr+", or the one recorded)")
 	cmd.Flags().BoolVarP(&f.verbose, "verbose", "v", false, "show each step and what it wrote")
-	cmd.Flags().StringVar(&f.managedConfig, "managed-config", "", "write global mode's hooks as managed configuration into this directory, for your organization to deploy, and exit")
+	cmd.Flags().StringVar(&f.managedConfig, "managed-config", "", "write the machine-wide hooks as managed configuration into this directory, for your organization to deploy, and exit")
 	cmd.Flags().StringVar(&f.managedTerma, "managed-terma", "$HOME/.local/bin/terma", "with --managed-config: where terma is installed on the machines")
 	return cmd
 }
@@ -125,7 +127,7 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 		}
 	}
 
-	ui := newInstallUI(out, f.verbose)
+	ui := newSetupUI(out, f.verbose)
 	ui.title, ui.warnTitle = "Setup complete", "Almost done — finish the steps marked ! below"
 	recorded := false
 	team := ""
@@ -146,7 +148,7 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 			recorded = true
 			if len(names) == 0 {
 				ui.Warn("Agents", "none chosen")
-				ui.Then("Run `terma install` in a repository; it asks which agents to connect.")
+				ui.Then("Run `terma setup` again to choose your coding agents.")
 			} else {
 				ui.Summary("Agents", strings.Join(app.adapterDisplayNames(names), ", "))
 			}
@@ -166,7 +168,12 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 			if team != "" {
 				ui.Summary("Team", team)
 			}
-			ui.Summary("Collects", doctor.PolicySummary(pol))
+			if pol.AdmitsNone() {
+				ui.Warn("Collects", doctor.PolicySummary(pol))
+				ui.Then(doctor.NoRepositoriesStep)
+			} else {
+				ui.Summary("Collects", doctor.PolicySummary(pol))
+			}
 		},
 		ConnectRelay: func(ctx context.Context, names []string) error {
 			if f.relayAddr != "" {
@@ -190,9 +197,21 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 				detail: ui.Detail(),
 			})
 		},
-		ApplyMode: func(ctx context.Context, names []string, global bool) error {
-			return app.globalMode().Apply(ctx, names, global, func(what string) { ui.OK("Machine", what) },
+		SpoolKey: func(ctx context.Context, cfg *config.Config) {
+			if k := app.ensureSpoolKey(ctx, cfg); k.fix == "" {
+				ui.OK("Hook events", k.state)
+			} else {
+				ui.Warn("Hook events", k.state)
+				ui.Then(k.fix)
+			}
+		},
+		MachineHooks: func(ctx context.Context, names []string) error {
+			err := app.globalMode().Apply(ctx, names, func(what string) { ui.OK("Machine", what) },
 				func(what string) { ui.Summary("Machine", what) }, ui.Then)
+			if err == nil {
+				app.setupStatusLine(cmd.ErrOrStderr(), ui, names)
+			}
+			return err
 		},
 		CheckIn: func(ctx context.Context) {
 			if ok, what := daemon.CheckIn(ctx); ok {
@@ -216,16 +235,6 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 	if err != nil {
 		ui.printLines()
 		return err
-	}
-	if !res.Policy.Global() {
-		for _, n := range res.Agents {
-			if s, _, ok := app.agents.Surface(n); ok {
-				for _, step := range s.SetupSteps {
-					ui.Then(step)
-				}
-			}
-		}
-		ui.Then("Run `terma install` in each repository you want to connect.")
 	}
 	if res.Policy.Global() {
 		ui.title = "Setup complete — every session and commit on this machine reports to " + cmp.Or(team, "your organization")

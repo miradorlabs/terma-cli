@@ -13,7 +13,7 @@ import (
 )
 
 // codexDesktopSandbox is a sandbox with a Desktop-shaped app-server on a relay, and a
-// personal directory beside the bound repository.
+// personal directory beside the admitted repository.
 func codexDesktopSandbox(t *testing.T, b Binary) (*Sandbox, *AppServer, string) {
 	t.Setenv("OPENAI_API_KEY", "synthetic-telemetry-key")
 	sb := New(t, Isolated, WithCodex(b))
@@ -114,7 +114,7 @@ func metricNewest(m *metricspb.Metric) uint64 {
 	return newest
 }
 
-// A Desktop thread started in the bound repository, then — after Desktop (or the
+// A Desktop thread started in the admitted repository, then — after Desktop (or the
 // daemon) restarted, which unloads every thread — resumed from a personal directory
 // (thread/resume takes a cwd; a thread still loaded keeps its own). What the resumed
 // turn does must reach nothing.
@@ -171,7 +171,7 @@ func titleOf(e telemetryEvidence) (title, thread, attribution string) {
 
 // The interactive TUI attached to Codex's daemon — what a bare `codex` does since
 // 0.157 when a daemon runs. The daemon, not the TUI, runs the thread, its hooks and
-// its export. A thread in the bound repository reaches its project, and nothing else
+// its export. A thread in the admitted repository reaches its project, and nothing else
 // does: not its title conversation (unclaimed, and nothing proves it is Codex's own),
 // and not a thread in a personal directory in the same daemon — neither its prompt
 // nor its own title.

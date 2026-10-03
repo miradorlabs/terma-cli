@@ -15,14 +15,14 @@ import (
 // primaryCommands is terma's whole surface (MIR-80): what `terma --help` lists, and the
 // only commands a message may tell someone to run. Each is safe to run again.
 var primaryCommands = []string{
-	"doctor", "install", "setup", "teardown", "uninstall", "update",
+	"doctor", "setup", "teardown", "update",
 }
 
 // advancedCommands are hidden: other programs run them (hook, relay, spool, version),
-// Terma's engineers do (config, nate), or the e2e suites still do (status, connect,
-// disconnect, telemetry; MIR-80 removes them once those move to the primary commands).
+// Terma's engineers do (config, nate), or the e2e suites still do (status; MIR-80 removes
+// it once those move to the primary commands).
 var advancedCommands = []string{
-	"config", "connect", "disconnect", "hook", "nate", "relay", "spool", "status", "telemetry", "version",
+	"config", "hook", "nate", "relay", "spool", "status", "version",
 }
 
 func commandNamed(root *cobra.Command, name string) *cobra.Command {
@@ -165,8 +165,7 @@ func TestCompletionIsHiddenNotRemoved(t *testing.T) {
 // hiddenCommandSources implement a hidden command whose own help names it. Every other
 // shipped line a person reads names only a primary command.
 var hiddenCommandSources = []string{
-	"internal/cli/config.go", "internal/cli/connect.go", "internal/cli/connect_scope.go",
-	"internal/connect/render.go", "internal/relay/service/windows.go",
+	"internal/cli/config.go", "internal/relay/service/windows.go",
 }
 
 // The fix-it hints, errors and help a developer reads name one of the six commands, so

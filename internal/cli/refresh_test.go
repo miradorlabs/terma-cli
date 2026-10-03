@@ -7,7 +7,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -19,7 +18,6 @@ import (
 	"strings"
 	"testing"
 
-	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 )
 
@@ -30,73 +28,7 @@ func sandboxMachine(t *testing.T) {
 	t.Setenv("SHELL", "/bin/zsh")
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
-}
-
-// A refresh updates committed hooks from the binding, never restores a removed file,
-// and leaves the binding as it was.
-func TestRefreshUpdatesTheRepositoryFromItsBinding(t *testing.T) {
-	repo := installRepo(t)
-	sandboxMachine(t)
-	if out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude", "--yes"); err != nil {
-		t.Fatalf("install: %v\n%s", err, out)
-	}
-	// What an earlier build wrote: its version in the binding…
-	bound, err := termaproject.Load(repo)
-	if err != nil {
-		t.Fatal(err)
-	}
-	bound.Install.Version = "v0.0.1"
-	if err := termaproject.Save(repo, bound); err != nil {
-		t.Fatal(err)
-	}
-
-	// …an older hooks file…
-	settings := filepath.Join(repo, ".claude", "settings.json")
-	var doc map[string]map[string]json.RawMessage
-	data, _ := os.ReadFile(settings)
-	if err := json.Unmarshal(data, &doc); err != nil {
-		t.Fatal(err)
-	}
-	delete(doc["hooks"], "SubagentStop")
-	stale, _ := json.MarshalIndent(doc, "", "  ")
-	if err := os.WriteFile(settings, stale, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	// …and a hook file somebody deleted.
-	postCommit := filepath.Join(repo, ".terma", "hooks", "post-commit")
-	if err := os.Remove(postCommit); err != nil {
-		t.Fatal(err)
-	}
-
-	out, err := runTerma(t, "update", "--refresh")
-	if err != nil {
-		t.Fatalf("refresh: %v\n%s", err, out)
-	}
-	if !strings.Contains(out, "updated .claude/settings.json") || !strings.Contains(out, "git add .claude/settings.json") {
-		t.Fatalf("refresh does not report the committed file:\n%s", out)
-	}
-	if data, _ := os.ReadFile(settings); !strings.Contains(string(data), `"SubagentStop"`) {
-		t.Fatalf("the Claude hooks were not refreshed:\n%s", data)
-	}
-	if _, err := os.Stat(postCommit); !os.IsNotExist(err) {
-		t.Fatalf("a removed hook file was brought back (stat err = %v)", err)
-	}
-	// The binding gains only the terma version that last wrote the committed files.
-	after, err := termaproject.Load(repo)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if after.Install.Version != testApp.version || !strings.Contains(out, "git add .claude/settings.json .terma") {
-		t.Fatalf("refresh should stamp terma_version %q and list the binding: %q\n%s", testApp.version, after.Install.Version, out)
-	}
-	after.Install.Version = bound.Install.Version
-	if after.Project != bound.Project || !after.Install.InstalledAt.Equal(bound.Install.InstalledAt) || after.Install.HookManager != bound.Install.HookManager {
-		t.Fatalf("the binding changed beyond terma_version:\n%+v\nwas\n%+v", after, bound)
-	}
-
-	if out, err := runTerma(t, "update", "--refresh"); err != nil || !strings.Contains(out, "Nothing to refresh") {
-		t.Fatalf("second refresh: %v\n%s", err, out)
-	}
+	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(t.TempDir(), "gitconfig")) // setup writes core.hooksPath
 }
 
 // Outside a repository a refresh still updates the machine's files.
@@ -110,7 +42,7 @@ func TestRefreshOutsideARepositoryRefreshesTheMachine(t *testing.T) {
 	if err != nil {
 		t.Fatalf("refresh: %v\n%s", err, out)
 	}
-	if !strings.Contains(out, statusLine) || !strings.Contains(out, "inside each repository") {
+	if !strings.Contains(out, statusLine) {
 		t.Fatalf("output:\n%s", out)
 	}
 	requireRefreshed(t, statusLine)
@@ -277,20 +209,10 @@ func tarGzWith(t *testing.T, name string, body []byte) []byte {
 	return buf.Bytes()
 }
 
-// The first interactive command under a newer release refreshes the machine once and only
-// points at the committed files.
+// The first interactive command under a newer release refreshes the machine once.
 func TestRefreshAfterUpgradeRunsOncePerRelease(t *testing.T) {
-	repo := installRepo(t)
+	gitRepo(t)
 	sandboxMachine(t)
-	if out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude", "--yes"); err != nil {
-		t.Fatalf("install: %v\n%s", err, out)
-	}
-	settings := filepath.Join(repo, ".claude", "settings.json")
-	data, _ := os.ReadFile(settings)
-	stale := bytes.Replace(data, []byte(`"SubagentStop"`), []byte(`"SubagentStopOld"`), 1)
-	if err := os.WriteFile(settings, stale, 0o644); err != nil {
-		t.Fatal(err)
-	}
 	statusLine := plantStaleStatusLine(t)
 
 	original := testApp.version
@@ -299,51 +221,15 @@ func TestRefreshAfterUpgradeRunsOncePerRelease(t *testing.T) {
 	dir := os.Getenv("TERMA_CONFIG_DIR")
 	var out bytes.Buffer
 	testApp.refreshAfterUpgrade(context.Background(), dir, &out)
-	if !strings.Contains(out.String(), "refreshed 1 file(s)") || !strings.Contains(out.String(), "`terma update` here") {
+	if !strings.Contains(out.String(), "refreshed 1 file(s)") {
 		t.Fatalf("output:\n%s", &out)
 	}
 	requireRefreshed(t, statusLine)
-	if got, _ := os.ReadFile(settings); !bytes.Equal(got, stale) {
-		t.Fatal("an automatic refresh rewrote a committed file")
-	}
 
 	out.Reset()
 	testApp.refreshAfterUpgrade(context.Background(), dir, &out)
 	if out.Len() != 0 {
 		t.Fatalf("second run under the same release was not silent:\n%s", &out)
-	}
-}
-
-// The first install under a newer release refreshes the machine before verifying, says so,
-// and records it.
-func TestInstallRefreshesTheMachineOnANewRelease(t *testing.T) {
-	installRepo(t)
-	sandboxMachine(t)
-	install := func() string {
-		t.Helper()
-		out, err := runTerma(t, "install", "--harness", "none", "--team", testProjectID, "--adapters", "claude", "--yes", "--verbose")
-		if err != nil {
-			t.Fatalf("install: %v\n%s", err, out)
-		}
-		return out
-	}
-	install()
-	statusLine := plantStaleStatusLine(t)
-
-	original := testApp.version
-	testApp.version = "9.9.9"
-	t.Cleanup(func() { testApp.version = original })
-	if out := install(); !strings.Contains(out, "✓ Refreshed     1 file(s) an earlier terma installed") {
-		t.Fatalf("install should refresh the machine as a step:\n%s", out)
-	}
-	requireRefreshed(t, statusLine)
-	var after bytes.Buffer
-	testApp.refreshAfterUpgrade(context.Background(), os.Getenv("TERMA_CONFIG_DIR"), &after)
-	if after.Len() != 0 {
-		t.Fatalf("the refresh after the command ran again:\n%s", &after)
-	}
-	if out := install(); strings.Contains(out, "Refreshed") {
-		t.Fatalf("a second install under the same release refreshed again:\n%s", out)
 	}
 }
 

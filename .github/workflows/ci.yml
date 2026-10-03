@@ -56,11 +56,11 @@ jobs:
 
   # What has a Windows implementation of its own — LockFileEx, the relay's sender from the
   # TCP table and parents from a process snapshot, the Run-key service and its
-  # supervisor, the stop file, the zip archive and the rename-aside swap — and no other
-  # job runs. Also vets the whole module for Windows, so nothing Unix-only creeps back in.
+  # supervisor, the stop file, the zip archive and the rename-aside swap — and what setup
+  # writes and hooks read, on Windows paths. Also vets the whole module for Windows, so nothing Unix-only creeps back in.
   windows:
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
@@ -70,6 +70,10 @@ jobs:
       - run: go vet ./...
       - name: Relay, locking, process lookups and updater on Windows
         run: go test ./internal/relay/... ./internal/flock/... ./internal/procinfo/... ./internal/selfupdate/... -count=1 -timeout=5m
+      # Setup's machine-wide hooks and what they run: git's layout and config read from
+      # disk, the repository list, the hook runtime, doctor's checks and setup's order.
+      - name: Git, policy, hooks, doctor and setup on Windows
+        run: go test ./internal/gitx/... ./internal/config/... ./internal/globalmode/... ./internal/hooks/... ./internal/doctor/... ./internal/setup/... -count=1 -timeout=10m
 
   # The e2e suite is a separate module; its offline contracts must run in CI too.
   live-contracts:
@@ -130,8 +134,9 @@ jobs:
         working-directory: test/e2e
         # TestRelay* is the local relay: the same
         # harnesses exporting globally through `terma relay run`, and nothing but the
-        # claimed session reaching the receiver.
-        run: go test -v -count=1 -timeout=65m -run '^(TestClaudeTelemetry|TestCodexTelemetry|TestClaudeStopFailureDelivery|TestRelay.*|TestPi.*|TestGemini.*|TestDsh.*|TestHermes.*)$' .
+        # claimed session reaching the receiver. TestMachineHooks* is where setup's
+        # machine-wide hooks record: beside a repository's own, in the repositories the team admits.
+        run: go test -v -count=1 -timeout=65m -run '^(TestClaudeTelemetry|TestCodexTelemetry|TestClaudeStopFailureDelivery|TestRelay.*|TestMachineHooks.*|TestPi.*|TestGemini.*|TestDsh.*|TestHermes.*)$' .
       - name: Publish coverage summary
         if: always()
         run: |
@@ -154,7 +159,7 @@ jobs:
           bun-version: latest
       - run: bun test
 
-  # The shim scripts are committed into customers' repositories: they must be
+  # terma setup's git hook scripts run on every developer's machine: they must be
   # POSIX sh, and they must keep working on the sh that Debian/Alpine ship.
   shim-portability:
     runs-on: ubuntu-latest
@@ -164,20 +169,10 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - run: go build -o bin/terma ./cmd/terma
-      - name: Shim runs under dash and busybox sh
-        env:
-          TERMA_POLICY_STUB: '{"mode":"repo","include_prompts":true,"include_tool_content":true}'
+      - name: Git hook scripts run under dash and busybox sh
         run: |
           sudo apt-get install -y -q dash busybox >/dev/null
-          tmp=$(mktemp -d); cd "$tmp"; git init -q; git config user.email t@example.com; git config user.name t
-          "$GITHUB_WORKSPACE/bin/terma" install --team proj_ci --harness none --yes >/dev/null
-          for sh in dash "busybox sh"; do
-            echo "subject" > msg.txt
-            $sh .terma/hooks/prepare-commit-msg msg.txt message
-            $sh .terma/hooks/post-commit
-          done
-          echo "ok"
+          TERMA_SHIM_SHELLS="dash,busybox sh" go test ./internal/globalmode/ -run TestGitHookScriptsRunUnderPOSIXShells -count=1 -v
 
   # Everything a release publishes, rendered with the committed GoReleaser config
   # from a throwaway tag that never leaves the runner: every platform

@@ -9,19 +9,17 @@ import (
 )
 
 // Render maps an Exporter onto the otel table as TOML text, span attributes one entry at
-// a time; an unselected signal is left as it was (for metrics, OpenAI's own route).
+// a time; an unselected signal is left as it was (for metrics, OpenAI's own route). Prompts
+// are always logged and tool output left at Codex's own cap: the relay withholds content
+// per the team's policy.
 func (exporter) render(e harness.Exporter) map[string]string {
 	out := map[string]string{
-		codexLogUserPrompt: mustRenderTOML(e.IncludePrompts),
+		codexLogUserPrompt: mustRenderTOML(true),
 	}
 	for _, sk := range codexSignalKeys {
 		if e.HasSignal(sk.signal) {
 			out[sk.key] = mustRenderTOML(codexOTLPExporter(e, sk.signal))
 		}
-	}
-	// Written only when excluding, so Codex's or the user's own cap otherwise stays.
-	if !e.IncludeToolContent {
-		out[codexToolResult] = mustRenderTOML(map[string]any{codexToolResultMaxBytes: int64(0)})
 	}
 	for key, value := range codexSpanAttributeValues(e.ResourceAttributes) {
 		out[codexSpanAttributePrefix+key] = mustRenderTOML(value)
@@ -161,22 +159,6 @@ func codexSpanAttribute(otel map[string]any, key string) string {
 	attrs, _ := otel[codexSpanAttributes].(map[string]any)
 	s, _ := attrs[key].(string)
 	return s
-}
-
-// codexToolContentOn: absent means Codex's default, which sends output.
-func codexToolContentOn(otel map[string]any) bool {
-	table, ok := otel[codexToolResult].(map[string]any)
-	if !ok {
-		return true
-	}
-	switch n := table[codexToolResultMaxBytes].(type) {
-	case int64:
-		return n > 0
-	case float64:
-		return n > 0
-	default:
-		return true
-	}
 }
 
 func codexAnalyticsDisabled(doc map[string]any) bool {

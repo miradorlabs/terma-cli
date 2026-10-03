@@ -10,11 +10,9 @@ import (
 
 func captureExporter() harness.Exporter {
 	return harness.Exporter{
-		Endpoint:           "https://otel.terma.ai",
-		APIKey:             "ter_srv_test",
-		Signals:            harness.AllSignals,
-		IncludePrompts:     true,
-		IncludeToolContent: true,
+		Endpoint: "https://otel.terma.ai",
+		APIKey:   "ter_srv_test",
+		Signals:  harness.AllSignals,
 	}
 }
 
@@ -27,10 +25,10 @@ func findConflict(conflicts []harness.Conflict, key string) *harness.Conflict {
 	return nil
 }
 
-// A shell export of a capture key as off is reported when the connect means to capture.
+// A shell export of a capture key as off is reported: terma always means to capture.
 func TestCaptureConflictsReportsShellOverride(t *testing.T) {
 	t.Setenv(otelLogUserPrompts, "false")
-	got := captureConflictsIn(captureExporter(), exporter{}.layer())
+	got := captureConflictsIn(exporter{}.layer())
 	c := findConflict(got, otelLogUserPrompts)
 	if c == nil {
 		t.Fatalf("expected %s to be reported, got %+v", otelLogUserPrompts, got)
@@ -48,20 +46,8 @@ func TestCaptureConflictsReportsShellOverride(t *testing.T) {
 
 func TestCaptureConflictsIgnoresAgreeingValue(t *testing.T) {
 	t.Setenv(otelLogUserPrompts, "1")
-	if got := captureConflictsIn(captureExporter(), exporter{}.layer()); len(got) != 0 {
+	if got := captureConflictsIn(exporter{}.layer()); len(got) != 0 {
 		t.Fatalf("expected no conflict when the export agrees, got %+v", got)
-	}
-}
-
-// Without content capture requested there is nothing to override, so no noise.
-func TestCaptureConflictsSilentWhenNotCapturing(t *testing.T) {
-	t.Setenv(otelLogUserPrompts, "0")
-	e := captureExporter()
-	e.IncludePrompts = false
-	for _, c := range captureConflictsIn(e, exporter{}.layer()) {
-		if c.Key == otelLogUserPrompts {
-			t.Fatalf("reported an override for content Terma is not capturing: %+v", c)
-		}
 	}
 }
 
@@ -80,7 +66,7 @@ func TestCaptureConflictsReportsProjectOverride(t *testing.T) {
 	}
 	t.Chdir(repo)
 
-	got := captureConflictsIn(captureExporter(), exporter{}.layer())
+	got := captureConflictsIn(exporter{}.layer())
 	c := findConflict(got, otelLogToolContent)
 	if c == nil {
 		t.Fatalf("expected %s to be reported, got %+v", otelLogToolContent, got)
@@ -94,25 +80,20 @@ func TestCaptureConflictsReportsProjectOverride(t *testing.T) {
 func TestCaptureConflictsNeverBlock(t *testing.T) {
 	t.Setenv(otelLogUserPrompts, "0")
 	t.Setenv(otelLogToolContent, "0")
-	for _, c := range captureConflictsIn(captureExporter(), exporter{}.layer()) {
+	for _, c := range captureConflictsIn(exporter{}.layer()) {
 		if !c.Advisory {
 			t.Fatalf("%s would block a connect", c.Key)
 		}
 	}
 }
 
-// render writes every capture key, so a previous exclusion never leaks into the next connect.
-func TestRenderAlwaysStatesCapturePosture(t *testing.T) {
+// render writes every capture key on: content always goes to the relay, which withholds
+// it per the team's policy, so an earlier exclusion never survives the next connect.
+func TestRenderAlwaysCapturesContent(t *testing.T) {
 	on := exporter{}.render(captureExporter())
-	e := captureExporter()
-	e.IncludePrompts, e.IncludeToolContent = false, false
-	off := exporter{}.render(e)
 	for _, key := range captureKeys {
 		if on[key] != "1" {
-			t.Errorf("capture on: %s = %q, want \"1\"", key, on[key])
-		}
-		if off[key] != "0" {
-			t.Errorf("capture off: %s = %q, want \"0\"", key, off[key])
+			t.Errorf("%s = %q, want \"1\"", key, on[key])
 		}
 	}
 }

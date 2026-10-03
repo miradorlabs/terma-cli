@@ -3,66 +3,31 @@ package doctor
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/globalmode"
 	"github.com/miradorlabs/terma-cli/internal/harness"
-	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
-	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 )
 
 // `terma status` and `terma doctor` render these verdicts in their own words; one copy of
 // each judgement keeps the two from disagreeing.
 
-// HookWiring is the verdict on a bound repository's commit-hook wiring.
-type HookWiring struct {
-	Manager hookmgr.Manager
-	Err     error
-	// Changes is how many files an install would still write; Stale is those an earlier
-	// terma wrote, which `terma update --refresh` rewrites.
-	Changes int
-	Stale   int
-	// Unpointed means the shims are committed but this clone's core.hooksPath is not them.
-	Unpointed bool
-	HooksPath string
-}
-
-// JudgeHookWiring judges the commit-hook wiring of the repository at root.
-func JudgeHookWiring(ctx context.Context, root string, bound *termaproject.File) HookWiring {
-	det := hookmgr.Detect(root)
-	if bound.Install.HookManager != "" {
-		det.Manager = hookmgr.Manager(bound.Install.HookManager)
-	}
-	w := HookWiring{Manager: det.Manager}
-	plan, err := hookmgr.PlanInstall(root, det)
-	w.Err, w.Changes = err, len(plan.Changes)
-	for _, c := range plan.Changes {
-		if c.Before != nil {
-			w.Stale++
-		}
-	}
-	if det.Manager == hookmgr.GitShim {
-		w.HooksPath = gitx.ConfigGet(ctx, root, "core.hooksPath")
-		w.Unpointed = w.HooksPath != hookmgr.ShimDir
-	}
-	return w
-}
-
-// HooksPath is where git looks for an unbound repository's hooks.
+// HooksPath is where git looks for a repository's hooks.
 type HooksPath struct {
 	// Scope is git's for the setting (local, worktree, global, system); "" when unset.
 	Scope, Value string
 	// Hookless is a directory that is missing or holds no executable hook.
 	Hookless bool
-	// TermaGlobal is global mode's hooks directory.
-	TermaGlobal bool
+	// TermaGlobal is terma's global hooks directory, TermaClone the one terma set for this clone.
+	TermaGlobal, TermaClone bool
 }
 
 // Local reports whether the repository's own config sets it, outranking the global one.
@@ -83,14 +48,36 @@ func JudgeHooksPath(ctx context.Context, root string) HooksPath {
 	if !filepath.IsAbs(dir) {
 		dir = filepath.Join(root, dir)
 	}
-	h.TermaGlobal = globalmode.IsGitHooksDir(dir)
+	h.TermaGlobal, h.TermaClone = globalmode.IsGitHooksDir(dir), globalmode.IsCloneHooksDir(dir)
 	entries, err := os.ReadDir(dir)
 	h.Hookless = err != nil || !slices.ContainsFunc(entries, func(e os.DirEntry) bool {
-		info, err := os.Stat(filepath.Join(dir, e.Name()))
 		// Git never runs its *.sample files, executable or not.
-		return !strings.HasSuffix(e.Name(), ".sample") && err == nil && info.Mode().IsRegular() && info.Mode().Perm()&0o111 != 0
+		return !strings.HasSuffix(e.Name(), ".sample") && runnable(filepath.Join(dir, e.Name()))
 	})
 	return h
+}
+
+// runnable is whether git runs the file at path as a hook: an executable file, or on
+// Windows, which has no executable bit, an .exe or a script starting with #!.
+func runnable(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil || !info.Mode().IsRegular() {
+		return false
+	}
+	if runtime.GOOS != "windows" {
+		return info.Mode().Perm()&0o111 != 0
+	}
+	if strings.EqualFold(filepath.Ext(path), ".exe") {
+		return true
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = f.Close() }()
+	head := make([]byte, 2)
+	n, _ := io.ReadFull(f, head)
+	return n == 2 && string(head) == "#!"
 }
 
 // StatusLineCapture is whether the wrapped status line feeds terma the plan's usage windows.
@@ -169,8 +156,6 @@ const (
 	RouteOtherProject
 	// RouteGlobal means the machine-wide config exports signals of its own.
 	RouteGlobal
-	// RouteHooks means the agent reports through the repository's hooks and the spool.
-	RouteHooks
 	// RouteRepoDecides means connected machine-wide and exporting no signal of its own, so
 	// only a repository's committed policy makes it send.
 	RouteRepoDecides
@@ -197,14 +182,14 @@ type HarnessVerdict struct {
 	SendsGlobally bool
 }
 
-// Reaches reports whether the agent's sessions reach this project; bound means an
-// installed repository, the only place its silence counts.
+// Reaches reports whether the agent's sessions reach this project; bound means a repository
+// the team collects, the only place its silence counts.
 func (v HarnessVerdict) Reaches(bound bool) bool {
 	if v.EmissionProblem != "" {
 		return false
 	}
 	switch v.Route {
-	case RouteGlobal, RouteHooks:
+	case RouteGlobal:
 		return true
 	case RouteRepoDecides:
 		return !bound || v.RepoAsks
@@ -274,7 +259,7 @@ func emissionProblem(reg *agents.Registry, h harness.Harness, root, projectID st
 			"run `terma setup` to point " + h.DisplayName() + " at the relay machine-wide (a repository cannot turn its telemetry on), then restart it"
 	}
 	return fmt.Sprintf("no OTLP telemetry signals enabled by %s; sessions here send nothing", st.ConfigPath),
-		"review the export switches in the settings file named above (including the traces beta switch); run `terma install --signals traces,logs,metrics` to enable repository telemetry, then restart " + h.DisplayName()
+		"review the export switches in the settings file named above (including the traces beta switch); run `terma setup` to point " + h.DisplayName() + " at the relay machine-wide, then restart it"
 }
 
 // JudgeHarness classifies one agent's machine-wide connection; another project's export
@@ -313,32 +298,8 @@ func JudgeHarnesses(ctx context.Context, reg *agents.Registry, otlpURL, projectI
 	return out
 }
 
-// SelectedForRepo is the saved selection narrowed to the surfaces this repository's
-// routing record routes here; a record naming none leaves it alone.
-func SelectedForRepo(reg *agents.Registry, projectID string, saved []string) []string {
-	selected := slices.Clone(saved)
-	if projectID == "" {
-		return selected
-	}
-	rec, ok, err := routing.LoadRecord(projectID)
-	if err != nil || !ok || len(rec.Surfaces) == 0 {
-		return selected
-	}
-	for _, a := range reg.With[agents.Surfaced]() {
-		for _, s := range a.Surfaces() {
-			routed := slices.Contains(rec.Surfaces, s.Name)
-			if routed && !slices.Contains(selected, s.Name) {
-				selected = append(selected, s.Name)
-			} else if !routed {
-				selected = slices.DeleteFunc(selected, func(name string) bool { return name == s.Name })
-			}
-		}
-	}
-	return selected
-}
-
 // RepoAsks reports whether the repository at root carries a committed policy that switches
-// a harness's signals on, the half of an `--exports repos` connect that decides.
+// a harness's signals on.
 func RepoAsks(h harness.Harness, root string) bool {
 	if root == "" {
 		return false

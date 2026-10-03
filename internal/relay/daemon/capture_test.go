@@ -1,23 +1,18 @@
 package daemon
 
 import (
-	"errors"
 	"slices"
 	"testing"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
 func TestCapturePolicy(t *testing.T) {
 	open := config.Policy{Mode: config.ModeRepo, IncludePrompts: true, IncludeToolContent: true}
 	global := open
 	global.Mode = config.ModeGlobal
-	excluding := open
-	excluding.ExcludePaths = []string{"secrets"}
-	record := func(prompts, tools bool, signals ...string) *routing.Record {
-		return &routing.Record{IncludePrompts: prompts, IncludeToolContent: tools, Signals: signals, Harnesses: []string{"claude", "pi"}}
-	}
+	chosen := []string{"claude", "pi"}
+	teamOff := config.Policy{Mode: config.ModeRepo, IncludeToolContent: true}
 	type want struct {
 		prompts, tools, requireClaim bool
 		signals                      []string
@@ -27,25 +22,21 @@ func TestCapturePolicy(t *testing.T) {
 		in   Capture
 		want want
 	}{
-		{"no record keeps the organization's policy", Capture{Org: open, Harness: "claude"},
+		{"a chosen agent sends every signal under the team's policy", Capture{Org: open, Agents: chosen, Harness: "claude"},
 			want{true, true, true, nil}},
-		{"the record narrows content", Capture{Org: open, Record: record(false, true, "traces", "logs"), Harness: "claude"},
-			want{false, true, true, []string{"traces", "logs"}}},
-		{"the record cannot widen content", Capture{Org: config.Policy{}, Record: record(true, true, "logs"), Harness: "claude"},
-			want{false, false, true, []string{"logs"}}},
-		{"an unreadable record withholds everything", Capture{Org: open, RecordErr: errors.New("torn"), Harness: "claude"},
+		{"the team's policy withholds content", Capture{Org: teamOff, Agents: chosen, Harness: "claude"},
+			want{false, true, true, nil}},
+		{"an agent the developer did not choose is withheld", Capture{Org: open, Agents: chosen, Harness: "codex"},
 			want{false, false, true, []string{}}},
-		{"an agent the record does not name is withheld", Capture{Org: open, Record: record(true, true, "traces"), Harness: "codex"},
+		{"a policy that collects nothing withholds everything", Capture{Org: config.NoPolicy("", ""), Agents: chosen, Harness: "claude"},
 			want{false, false, true, []string{}}},
-		{"catch-all has no agent to check", Capture{Org: global, Primary: true, Record: record(true, true, "traces")},
-			want{true, true, false, []string{"traces"}}},
-		{"path exclusions withhold content", Capture{Org: excluding, Harness: "claude"},
-			want{false, false, true, nil}},
-		{"global mode's own project needs no claim", Capture{Org: global, Primary: true, Harness: "claude"},
+		{"catch-all has no agent to check", Capture{Org: global, Primary: true},
 			want{true, true, false, nil}},
-		{"another project in global mode needs one", Capture{Org: global, Harness: "claude"},
+		{"global mode sends every agent's sessions", Capture{Org: global, Primary: true, Harness: "codex"},
+			want{true, true, false, nil}},
+		{"another project in global mode needs a claim", Capture{Org: global, Agents: chosen, Harness: "claude"},
 			want{true, true, true, nil}},
-		{"a primary project out of global mode needs one", Capture{Org: open, Primary: true, Harness: "claude"},
+		{"a primary project out of global mode needs one", Capture{Org: open, Agents: chosen, Primary: true, Harness: "claude"},
 			want{true, true, true, nil}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -54,10 +45,25 @@ func TestCapturePolicy(t *testing.T) {
 				!slices.Equal(got.Signals, test.want.signals) || (got.Signals == nil) != (test.want.signals == nil) {
 				t.Fatalf("got prompts=%v tools=%v requireClaim=%v signals=%#v, want %+v", got.IncludePrompts, got.IncludeToolContent, got.RequireClaim, got.Signals, test.want)
 			}
-			named := map[string]any{"file_path": map[string]any{"stringValue": "secrets/prod.env"}}
-			if excluded := got.Excludes != nil && got.Excludes(named); excluded != (len(test.in.Org.ExcludePaths) > 0) {
-				t.Fatalf("a value naming secrets/prod.env excluded=%v, want the organization's %v", excluded, test.in.Org.ExcludePaths)
-			}
 		})
+	}
+}
+
+// A claim whose repository the current policy no longer lists is marked, so its records
+// drop; global mode lists none and drops none.
+func TestCapturePolicyRechecksTheRepository(t *testing.T) {
+	work := config.Repository{Origin: "github.com/acme/work"}
+	for _, tc := range []struct {
+		org  config.Policy
+		want bool
+	}{
+		{config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/acme/work"}}, false},
+		{config.Policy{Mode: config.ModeRepo, Repositories: []string{"GitHub.com/Acme/Work"}}, false},
+		{config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/acme/other"}}, true},
+		{config.Policy{Mode: config.ModeGlobal}, false},
+	} {
+		if got := CapturePolicy(Capture{Org: tc.org, Repository: work}).Unadmitted; got != tc.want {
+			t.Errorf("repositories %v: Unadmitted = %v", tc.org.Repositories, got)
+		}
 	}
 }

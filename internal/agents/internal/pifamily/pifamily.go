@@ -21,7 +21,7 @@ var template string
 const configMarker = "const CONFIG: TermaConfig | null = null /* terma:config */"
 
 // Config is what the extension is spliced with; without Lifecycle it only claims the
-// session at each prompt and leaves start, end and edits to a committed hook file.
+// session at each prompt and leaves start, end and edits to hooks.
 type Config struct {
 	Version            int               `json:"version"`
 	Agent              string            `json:"agent"`

@@ -200,7 +200,7 @@ func CheckService() ServiceState {
 }
 
 // CheckServiceHere compares it with what this process would install, in its own
-// environment: what `terma install` repairs.
+// environment: what `terma setup` repairs.
 func CheckServiceHere() ServiceState {
 	return checkService(callerEnv())
 }

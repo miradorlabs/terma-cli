@@ -17,7 +17,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
-	"github.com/miradorlabs/terma-cli/internal/install"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/routing"
@@ -41,7 +40,7 @@ func TestPolicyRefreshFiltersAlreadyQueuedReplies(t *testing.T) {
 			if r.Header.Get("Authorization") != "Bearer developer-policy-token" {
 				t.Error("policy did not use developer login")
 			}
-			fmt.Fprintf(w, `{"policy":{"version":"1.0","terma":{"per_repository":{},"capture":{"exclude_paths":[],"exclude_prompts":%t,"exclude_tool_content":false}}},"revision":%d,"updated_at":"2026-09-30T12:27:05Z"}`, revision.Load() > 1, revision.Load())
+			fmt.Fprintf(w, `{"policy":{"version":"1.0","terma":{"per_repository":{"repositories":["github.com/acme/app"]},"capture":{"exclude_prompts":%t,"exclude_tool_content":false}}},"revision":%d,"updated_at":"2026-09-30T12:27:05Z"}`, revision.Load() > 1, revision.Load())
 			return
 		}
 		if r.Header.Get("Authorization") != "Bearer "+policyTestKey {
@@ -56,9 +55,6 @@ func TestPolicyRefreshFiltersAlreadyQueuedReplies(t *testing.T) {
 	t.Setenv("TERMA_API_URL", srv.URL)
 	t.Setenv("TERMA_OTLP_URL", srv.URL)
 	if err := keystore.Set("team", policyTestKey, keystore.Hosts{OTLP: srv.URL}); err != nil {
-		t.Fatal(err)
-	}
-	if err := routing.SaveRecord(routing.Record{ProjectID: "team", Signals: []string{"logs"}, IncludePrompts: true, IncludeToolContent: true, Harnesses: []string{"codex"}}); err != nil {
 		t.Fatal(err)
 	}
 	seedPolicyLogin(t, srv.URL)
@@ -76,7 +72,7 @@ func TestPolicyRefreshFiltersAlreadyQueuedReplies(t *testing.T) {
 		if name != "terma.commit" {
 			attrs["text"] = "PRIVATE_CONTENT"
 		}
-		if err := s.Append(spool.Event{Time: time.Now(), Name: name, Attrs: attrs}); err != nil {
+		if err := s.Append(spool.Event{Time: time.Now(), Name: name, Repository: appRepo, Attrs: attrs}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -101,39 +97,8 @@ func TestPolicyRefreshFiltersAlreadyQueuedReplies(t *testing.T) {
 	}
 }
 
-func TestRelayRespectsSignalSelection(t *testing.T) {
-	for _, signals := range [][]string{{"metrics"}, {"logs"}, {}} {
-		t.Run(fmt.Sprint(signals), func(t *testing.T) {
-			t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
-			if err := keystore.Set("team", policyTestKey, keystore.Hosts{}); err != nil {
-				t.Fatal(err)
-			}
-			if err := routing.SaveRecord(routing.Record{ProjectID: "team", Signals: signals, IncludePrompts: true, IncludeToolContent: true, Harnesses: []string{"codex"}}); err != nil {
-				t.Fatal(err)
-			}
-			cfg := &config.Config{Policy: config.DefaultPolicy(), OTLPURL: "http://127.0.0.1:1"}
-			r := newTestRelay(relay.Options{Token: "token", Dir: t.TempDir(), Resolve: testApp.relayDeps().Resolver(cfg, nil), Lookup: func(string, time.Time) (claim.Claim, bool) {
-				return claim.Claim{ProjectID: "team", Tool: "codex"}, true
-			}})
-			m := &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{{Name: "chat", Attributes: []*commonpb.KeyValue{{Key: "session.id", Value: &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: "session"}}}}}}}}}}}
-			body, err := proto.Marshal(m)
-			if err != nil {
-				t.Fatal(err)
-			}
-			req := httptest.NewRequest(http.MethodPost, "/v1/traces", bytes.NewReader(body))
-			req.Header.Set("Authorization", "Bearer token")
-			req.Header.Set("Content-Type", "application/x-protobuf")
-			w := httptest.NewRecorder()
-			r.Handler().ServeHTTP(w, req)
-			if w.Code != 200 || r.Stats().Snapshot().Counters["dropped.policy_signal.traces"] != 1 {
-				t.Fatalf("trace bypassed signal selection: %d %+v", w.Code, r.Stats().Snapshot())
-			}
-		})
-	}
-}
-
-// An exporter configured by another repository must not bypass this repository's
-// saved harness selection, even when its committed hooks claim a session here.
+// An exporter an earlier setup left pointing at the relay must not bypass the developer's
+// agents, even when a hook claims a session.
 func TestRelayRespectsHarnessSelection(t *testing.T) {
 	for _, test := range []struct {
 		name     string
@@ -157,13 +122,10 @@ func TestRelayRespectsHarnessSelection(t *testing.T) {
 			if err := keystore.Set("team", policyTestKey, keystore.Hosts{OTLP: host.URL}); err != nil {
 				t.Fatal(err)
 			}
-			rec := routing.Record{ProjectID: "team", Signals: []string{"traces"}, IncludePrompts: true, IncludeToolContent: true, Harnesses: []string{test.harness}}
-			if err := routing.SaveRecord(rec); err != nil {
-				t.Fatal(err)
-			}
-			cfg := &config.Config{Policy: config.DefaultPolicy(), OTLPURL: host.URL}
+			cfg := &config.Config{Policy: config.DefaultPolicy(), OTLPURL: host.URL, Harnesses: []string{test.harness}}
+			cfg.Policy.Repositories = []string{appRepo.Origin}
 			r := newTestRelay(relay.Options{Token: "test-token", Dir: t.TempDir(), Resolve: testApp.relayDeps().Resolver(cfg, nil), Lookup: func(string, time.Time) (claim.Claim, bool) {
-				return claim.Claim{ProjectID: "team", Tool: test.tool}, true
+				return claim.Claim{ProjectID: "team", Tool: test.tool, Repository: appRepo}, true
 			}})
 			ctx, cancel := context.WithCancel(t.Context())
 			done := make(chan struct{})
@@ -231,14 +193,19 @@ func TestQueuedRelayExportsRespectHarnessDeselection(t *testing.T) {
 	if err := keystore.Set("team", policyTestKey, keystore.Hosts{OTLP: host.URL}); err != nil {
 		t.Fatal(err)
 	}
-	rec := routing.Record{ProjectID: "team", Signals: []string{"traces"}, IncludePrompts: true, IncludeToolContent: true, Harnesses: []string{"codex"}}
-	if err := routing.SaveRecord(rec); err != nil {
-		t.Fatal(err)
+	choose := func(agents ...string) {
+		t.Helper()
+		pol := config.DefaultPolicy()
+		pol.FetchedAt, pol.Repositories = time.Now(), []string{appRepo.Origin}
+		if err := config.UpdateProfile(config.DefaultProfile, func(p *config.Profile) { p.Harnesses, p.Policy = agents, &pol }); err != nil {
+			t.Fatal(err)
+		}
 	}
+	choose("codex")
 	dir := t.TempDir()
-	cfg := &config.Config{Policy: config.DefaultPolicy(), OTLPURL: host.URL}
+	cfg := &config.Config{ProfileName: config.DefaultProfile, Policy: config.DefaultPolicy(), OTLPURL: host.URL}
 	r := newTestRelay(relay.Options{Token: "test-token", Dir: dir, Resolve: testApp.relayDeps().Resolver(cfg, nil), Lookup: func(string, time.Time) (claim.Claim, bool) {
-		return claim.Claim{ProjectID: "team", Tool: "codex"}, true
+		return claim.Claim{ProjectID: "team", Tool: "codex", Repository: appRepo}, true
 	}})
 	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan struct{})
@@ -270,10 +237,7 @@ func TestQueuedRelayExportsRespectHarnessDeselection(t *testing.T) {
 	}
 	// Deselect the harness while its accepted part is on disk; the retry must re-read
 	// the selection.
-	rec.Harnesses = []string{"claude"}
-	if err := routing.SaveRecord(rec); err != nil {
-		t.Fatal(err)
-	}
+	choose("claude")
 	unblock()
 	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(10 * time.Millisecond) {
 		entries, err := filepath.Glob(filepath.Join(dir, "team", "codex", "*.pb"))
@@ -289,45 +253,6 @@ func TestQueuedRelayExportsRespectHarnessDeselection(t *testing.T) {
 	}
 	if n := requests.Load(); n != 1 {
 		t.Fatalf("deselected harness retried delivery: %d requests", n)
-	}
-}
-
-func TestReinstallKeepsSignalChoiceUnlessExplicit(t *testing.T) {
-	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
-	sandboxMachine(t)
-	t.Setenv("CODEX_HOME", t.TempDir())
-	t.Setenv("TERMA_RELAY_SERVICE", "0")
-	if err := keystore.Set("team", policyTestKey, keystore.Hosts{}); err != nil {
-		t.Fatal(err)
-	}
-	if err := routing.SaveRecord(routing.Record{ProjectID: "team", Signals: []string{"metrics"}, Harnesses: []string{"codex"}}); err != nil {
-		t.Fatal(err)
-	}
-	cfg := &config.Config{ProjectID: "team", OTLPURL: "http://127.0.0.1:1"}
-	cmd := testApp.newInstallCommand()
-	ui := newInstallUI(io.Discard, false)
-	for _, explicit := range []bool{false, true} {
-		f := installFlags{}
-		if explicit {
-			if err := cmd.Flags().Set("signals", "none"); err != nil {
-				t.Fatal(err)
-			}
-			f.signals = "none"
-		}
-		prev, _, err := routing.LoadRecord("team")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := testApp.connectHarnessesForRepo(cmd, ui, cfg, []string{"codex"}, f, install.Plan{Record: &prev}); err != nil {
-			t.Fatal(err)
-		}
-		r, _, err := routing.LoadRecord("team")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !explicit && (len(r.Signals) != 1 || r.Signals[0] != "metrics") || explicit && len(r.Signals) != 0 {
-			t.Fatalf("wrong reinstalled signals: %v", r.Signals)
-		}
 	}
 }
 
@@ -419,7 +344,7 @@ func TestPolicyGlobalDestinationIsTheRequestedTeam(t *testing.T) {
 		if r.Header.Get("Authorization") != "Bearer developer-policy-token" || r.URL.Path != "/v1/policy" || r.URL.Query().Get("project_id") != "chosen" {
 			t.Error("wrong developer policy request")
 		}
-		fmt.Fprint(w, `{"policy":{"version":"1.0","terma":{"global":{},"capture":{"exclude_paths":[],"exclude_prompts":true,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-09-30T12:27:05Z"}`)
+		fmt.Fprint(w, `{"policy":{"version":"1.0","terma":{"global":{},"capture":{"exclude_prompts":true,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-09-30T12:27:05Z"}`)
 	}))
 	defer srv.Close()
 	seedPolicyLogin(t, srv.URL)
@@ -440,7 +365,7 @@ func TestPolicyRefreshOtherTeamKeepsSelectedCoverage(t *testing.T) {
 		if r.URL.Query().Get("project_id") != "other" || r.Header.Get("Authorization") != "Bearer developer-policy-token" {
 			t.Error("wrong team policy request")
 		}
-		fmt.Fprint(w, `{"policy":{"version":"1.0","terma":{"per_repository":{},"capture":{"exclude_paths":[],"exclude_prompts":true,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-09-30T12:27:05Z"}`)
+		fmt.Fprint(w, `{"policy":{"version":"1.0","terma":{"per_repository":{"repositories":[]},"capture":{"exclude_prompts":true,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-09-30T12:27:05Z"}`)
 	}))
 	defer srv.Close()
 	seedPolicyLogin(t, srv.URL)

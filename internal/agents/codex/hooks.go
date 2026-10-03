@@ -4,48 +4,33 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 )
 
-// hooksPath loads only in a trusted project, after each developer trusts its entries
-// from inside Codex. Export cannot live here: Codex strips `otel` from project config.
-const hooksPath = ".codex/hooks.json"
-
-// committedHooks forward each event's JSON to the binary. PostToolUse is async because it
+// codexHooks forward each event's JSON to the binary. PostToolUse is async because it
 // fires on every tool call and nothing terma returns changes what Codex does; SessionEnd
 // asks for Codex's 3-second maximum (default 1).
-var committedHooks = []struct {
+var codexHooks = []struct {
 	Event   string
-	Command string
+	Hook    string
 	Async   bool
 	Timeout int
 }{
-	{"SessionStart", hookCommand("codex-session-start"), false, 10},
-	{"UserPromptSubmit", hookCommand("codex-user-prompt-submit"), true, 10},
+	{"SessionStart", "codex-session-start", false, 10},
+	{"UserPromptSubmit", "codex-user-prompt-submit", true, 10},
 	// Recorded before the tool runs, so PostToolUse can report the elapsed time.
-	{"PreToolUse", hookCommand("codex-pre-tool-use"), false, 10},
+	{"PreToolUse", "codex-pre-tool-use", false, 10},
 	// Codex sends repository hooks no approval decision, only the request.
-	{"PermissionRequest", hookCommand("codex-permission-request"), false, 10},
-	{"PostToolUse", hookCommand("codex-post-tool-use"), true, 10},
+	{"PermissionRequest", "codex-permission-request", false, 10},
+	{"PostToolUse", "codex-post-tool-use", true, 10},
 	// Synchronous so the local snapshot finishes before codex exec exits.
-	{"Stop", hookCommand("codex-stop"), false, 3},
-	{"SessionEnd", hookCommand("codex-session-end"), false, 3},
+	{"Stop", "codex-stop", false, 3},
+	{"SessionEnd", "codex-session-end", false, 3},
 	// SubagentStop stays synchronous so its event is spooled before the parent's Stop.
-	{"SubagentStart", hookCommand("codex-subagent-start"), true, 10},
-	{"SubagentStop", hookCommand("codex-subagent-stop"), false, 3},
-}
-
-// hookCommand finds terma with the small GUI PATH a desktop-launched Codex gets.
-func hookCommand(event string) string { return hookmgr.PathHookCommand(event) }
-
-// hasConfig is when wiring hooks by default helps rather than leaves a stray directory.
-func hasConfig(root string) bool {
-	info, err := os.Stat(filepath.Join(root, ".codex"))
-	return err == nil && info.IsDir()
+	{"SubagentStart", "codex-subagent-start", true, 10},
+	{"SubagentStop", "codex-subagent-stop", false, 3},
 }
 
 type codexHookHandler struct {
@@ -55,34 +40,25 @@ type codexHookHandler struct {
 	Async   bool   `json:"async,omitempty"`
 }
 
-// planHooks merges terma's hooks into .codex/hooks.json; Codex denies unknown fields, so
-// only `description` and `hooks` are written at the top level.
-func planHooks(root string, install bool) (hookmgr.Plan, error) {
-	return planCodex(root, hooksPath, hookCommand, install)
-}
-
-// planUserHooks writes global mode's machine-wide hooks to $CODEX_HOME/hooks.json.
+// planUserHooks merges terma's machine-wide hooks into $CODEX_HOME/hooks.json; Codex
+// denies unknown fields, so only `description` and `hooks` are written at the top level.
 func planUserHooks(codexHome string, command func(event string) string, install bool) (hookmgr.Plan, error) {
-	return planCodex(codexHome, "hooks.json", command, install)
-}
-
-func planCodex(root, path string, command func(event string) string, install bool) (hookmgr.Plan, error) {
 	// A group is terma's when a handler calls the binary. Codex trusts by entry hash, so an
 	// updated group must be trusted again; doctor reports it until then.
 	own, err := ownGroups(command)
 	if err != nil {
 		return hookmgr.Plan{}, err
 	}
-	return hookmgr.MergeEventHooks(root, hookmgr.HooksFile{Path: path}, own, install)
+	return hookmgr.MergeEventHooks(codexHome, hookmgr.HooksFile{Path: "hooks.json"}, own, install)
 }
 
-// ownGroups are the groups terma writes, one per committed hook, running command.
+// ownGroups are the groups terma writes, one per hook, running command.
 func ownGroups(command func(event string) string) ([]hookmgr.EventHook, error) {
-	own := make([]hookmgr.EventHook, 0, len(committedHooks))
-	for _, h := range committedHooks {
+	own := make([]hookmgr.EventHook, 0, len(codexHooks))
+	for _, h := range codexHooks {
 		// No matcher from terma: which calls edit files is the binary's to decide.
 		entry, err := hookmgr.Group(h.Event, "", codexHookHandler{
-			Type: "command", Command: command(hookmgr.HookEventOf(h.Command)), Timeout: h.Timeout, Async: h.Async,
+			Type: "command", Command: command(h.Hook), Timeout: h.Timeout, Async: h.Async,
 		})
 		if err != nil {
 			return nil, err
@@ -92,7 +68,7 @@ func ownGroups(command func(event string) string) ([]hookmgr.EventHook, error) {
 	return own, nil
 }
 
-// Entry is one of terma's hook entries in .codex/hooks.json, located by event, group and
+// Entry is one of terma's hook entries in a hooks file, located by event, group and
 // handler position.
 type Entry struct {
 	Event   string
@@ -117,12 +93,6 @@ func (e Entry) Key() string {
 	return fmt.Sprintf("%s:%d:%d", b.String(), e.Group, e.Handler)
 }
 
-// TermaEntries lists terma's entries in committedHooks order, so doctor can name the ones
-// Codex skips in silence because they were added after the file was trusted.
-func TermaEntries(root string) ([]Entry, error) {
-	return termaEntriesIn(filepath.Join(root, filepath.FromSlash(hooksPath)))
-}
-
 // termaEntriesIn lists terma's entries in the hooks file at path.
 func termaEntriesIn(path string) ([]Entry, error) {
 	before, err := hookmgr.ReadFile(path)
@@ -139,7 +109,7 @@ func termaEntriesIn(path string) ([]Entry, error) {
 		return nil, fmt.Errorf("parse %s: %w", path, err)
 	}
 	var out []Entry
-	for _, h := range committedHooks {
+	for _, h := range codexHooks {
 		for g, group := range doc.Hooks[h.Event] {
 			for i, handler := range group.Hooks {
 				if hookmgr.CallsTerma(handler) {
@@ -229,9 +199,9 @@ func codexEntryHash(entry Entry, matcher *string, raw json.RawMessage) (string, 
 // hooks with no trust step.
 func managedRequirements(command func(event string) string) string {
 	var b strings.Builder
-	b.WriteString("# terma: global mode's hooks for every Codex session on this machine.\n[hooks]\n")
-	for _, h := range committedHooks {
-		fmt.Fprintf(&b, "\n[[hooks.%s]]\n\n[[hooks.%s.hooks]]\ntype = \"command\"\ncommand = %s\ntimeout = %d\n", h.Event, h.Event, tomlString(command(hookmgr.HookEventOf(h.Command))), h.Timeout)
+	b.WriteString("# terma: hooks for every Codex session on this machine.\n[hooks]\n")
+	for _, h := range codexHooks {
+		fmt.Fprintf(&b, "\n[[hooks.%s]]\n\n[[hooks.%s.hooks]]\ntype = \"command\"\ncommand = %s\ntimeout = %d\n", h.Event, h.Event, tomlString(command(h.Hook)), h.Timeout)
 		if h.Async {
 			b.WriteString("async = true\n")
 		}

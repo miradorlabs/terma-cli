@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
@@ -23,7 +22,7 @@ func TestCursorConversationIsStampedOnItsCommit(t *testing.T) {
 	sp, _ := spool.Open(t.TempDir())
 	elsewhere := t.TempDir()
 	env := func(stdin string, args ...string) hookrun.Env {
-		return hookrun.Env{Now: time.Now(), Cwd: elsewhere, Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
+		return hookrun.Env{Now: time.Now(), Cwd: elsewhere, Policy: hookruntest.Admitting(root), Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
 	}
 	common := `"conversation_id":"conv_7f3","hook_event_name":"%s","model":"claude-opus-5","workspace_roots":["` + root + `"],"user_email":"dev@example.com"`
 
@@ -44,7 +43,7 @@ func TestCursorConversationIsStampedOnItsCommit(t *testing.T) {
 	}
 	msgPath := filepath.Join(t.TempDir(), "COMMIT_EDITMSG")
 	_ = os.WriteFile(msgPath, []byte("agent work\n"), 0o644)
-	commitEnv := hookrun.Env{Now: time.Now(), Cwd: root, Args: []string{msgPath, "message"}, Stdin: strings.NewReader(""), Spool: sp, Version: "test"}
+	commitEnv := hookrun.Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Args: []string{msgPath, "message"}, Stdin: strings.NewReader(""), Spool: sp, Version: "test"}
 	if err := hookrun.PrepareCommitMsg(ctx, commitEnv); err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +87,7 @@ func TestCursorHandlersIgnoreBadInput(t *testing.T) {
 
 func testEnv(t *testing.T) hookrun.Env {
 	root, sp := hookruntest.Project(t)
-	return hookrun.Env{Now: time.Now(), Cwd: root, Spool: sp, Version: "test", Policy: config.DefaultPolicy()}
+	return hookrun.Env{Now: time.Now(), Cwd: root, Spool: sp, Version: "test", Policy: hookruntest.Admitting(root), Team: hookruntest.Team}
 }
 
 // The reader refuses a payload past the bound by name.

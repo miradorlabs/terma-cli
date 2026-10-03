@@ -2,7 +2,6 @@ package builtin
 
 import (
 	"maps"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -87,49 +86,6 @@ func TestEventNamesAreStable(t *testing.T) {
 	}
 	if reg.FlushesAfter("post-tool-use") || reg.FlushesAfter("antigravity-post-tool-use") {
 		t.Error("a per-tool-call hook must not start a flush")
-	}
-}
-
-// Only Claude Code is wired unconditionally; every other adapter waits for its directory.
-func TestDefaultsFollowTheRepositoryLayout(t *testing.T) {
-	root := t.TempDir()
-	defaults := func() []string {
-		var out []string
-		for _, a := range reg.All() {
-			if a.Default(root) {
-				out = append(out, a.Name())
-			}
-		}
-		return out
-	}
-	if got := defaults(); strings.Join(got, ",") != "claude" {
-		t.Fatalf("empty repository defaults = %v, want claude only", got)
-	}
-	for _, dir := range []string{".cursor", ".codex", ".agents", ".omp"} {
-		if err := os.MkdirAll(filepath.Join(root, dir), 0o755); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if got := defaults(); strings.Join(got, ",") != "claude,cursor,codex,omp,antigravity" {
-		t.Fatalf("defaults = %v", got)
-	}
-	// Every repo-scope adapter plans a file on an empty repository; OpenCode plans none.
-	for _, a := range reg.All() {
-		p, err := a.Plan(t.TempDir(), true)
-		if err != nil {
-			t.Fatalf("%s: %v", a.Name(), err)
-		}
-		if (a.HooksPath() == "") != p.Empty() {
-			t.Errorf("%s: HooksPath %q but plan empty=%v", a.Name(), a.HooksPath(), p.Empty())
-		}
-		for _, c := range p.Changes {
-			if c.Path != a.HooksPath() {
-				t.Errorf("%s plans %s, declares %s", a.Name(), c.Path, a.HooksPath())
-			}
-		}
-	}
-	if strings.Join(reg.RepoNames(), ",") != "claude,cursor,codex,omp,antigravity" {
-		t.Fatalf("RepoNames = %v", reg.RepoNames())
 	}
 }
 

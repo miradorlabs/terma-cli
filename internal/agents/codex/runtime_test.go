@@ -49,11 +49,11 @@ func TestCodexRuntimeArgs(t *testing.T) {
 	if doc.Otel.Attributes[harness.AttrProjectID] != "project-a" || doc.Otel.Attributes["user.email"] != "person@example.com" {
 		t.Fatal("dotted attribute keys were not preserved")
 	}
-	if doc.Otel.LogPrompt || doc.Otel.ToolResult.MaxBytes != 0 {
-		t.Fatal("content exclusion was lost")
+	// Content goes to the relay, which withholds it per the team's policy.
+	if !doc.Otel.LogPrompt || doc.Otel.ToolResult.MaxBytes != 0 {
+		t.Fatal("prompts were not logged, or a tool-output cap was written")
 	}
 	exp.Signals = []harness.Signal{harness.SignalLogs}
-	exp.IncludeToolContent = true
 	args = (exporter{}).RuntimeArgs(exp)
 	joined := strings.Join(args, " ")
 	// Unselected signals are turned off explicitly, or Codex would fall through to another

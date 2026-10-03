@@ -3,9 +3,7 @@ package codex
 
 import (
 	"context"
-	"fmt"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
@@ -14,13 +12,13 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
-// name keys the keystore and routing records too.
+// name keys the keystore too.
 const (
 	name        = "codex"
 	displayName = "Codex"
 )
 
-// Agent covers Codex's repository hooks in .codex/hooks.json and its user-level notifier.
+// Agent covers Codex's machine-wide hooks and its user-level notifier.
 type Agent struct{}
 
 // Name is the agent's token.
@@ -29,14 +27,7 @@ func (Agent) Name() string { return name }
 // DisplayName is how prose names the agent.
 func (Agent) DisplayName() string { return displayName }
 
-const codexHookReview = "approve Terma's hooks in Codex: run /hooks in this repository (in the desktop app: Settings → Hooks → Review)"
-
 func (Agent) Installed(ctx context.Context) bool { return exporter{}.Detect(ctx).Found }
-func (Agent) HooksPath() string                  { return hooksPath }
-func (Agent) Default(root string) bool           { return hasConfig(root) }
-func (Agent) Plan(root string, install bool) (hookmgr.Plan, error) {
-	return planHooks(root, install)
-}
 
 func (Agent) Events() map[string]agents.Handler {
 	return map[string]agents.Handler{
@@ -75,68 +66,12 @@ func (Agent) ManagedDeploy() string {
 	return "`/etc/codex/requirements.toml` (append to one you already deploy), or\n  the same table in your MDM profile for `com.openai.codex`."
 }
 
-// Trust reads Codex's trust records: a committed hooks file is inert until the developer
-// trusts it from inside Codex, and nothing says so.
-func (c Agent) Trust(root string) (agents.TrustState, error) {
-	hooksPath := filepath.Join(root, filepath.FromSlash(c.HooksPath()))
-	trust, err := (exporter{}).hookTrustFor(hooksPath)
-	if err != nil {
-		return agents.TrustState{}, err
-	}
-	switch {
-	case !trust.Reviewed():
-		return agents.TrustState{
-			Detail: ", but Codex has not been shown them yet, so it runs none of them",
-			Fix:    codexHookReview,
-		}, nil
-	case trust.Trusted == 0:
-		return agents.TrustState{
-			Detail: ", but none are trusted, so Codex runs none of them",
-			Fix:    codexHookReview,
-		}, nil
-	case trust.Disabled > 0:
-		return agents.TrustState{
-			Detail: fmt.Sprintf(", but %d is switched off in Codex", trust.Disabled),
-			Fix:    "re-enable Terma's hooks in Codex: run /hooks in this repository (in the desktop app: Settings → Hooks)",
-		}, nil
-	}
-	// A file trusted before terma added an entry still counts as trusted while Codex skips the
-	// new entry in silence.
-	entries, err := TermaEntries(root)
-	if err != nil {
-		return agents.TrustState{}, err
-	}
-	var skipped []string
-	for _, e := range entries {
-		if trust.TrustedHashes[e.Key()] != e.Hash {
-			skipped = append(skipped, e.Event)
-		}
-	}
-	if len(skipped) > 0 {
-		return agents.TrustState{
-			Detail: fmt.Sprintf(", but Codex needs to review %s, so it skips %s", strings.Join(skipped, ", "), pronoun(len(skipped))),
-			Fix:    codexHookReview + "; include any new or changed entries",
-		}, nil
-	}
-	return agents.TrustState{Trusted: true, Detail: " and trusted"}, nil
-}
-
-func pronoun(n int) string {
-	if n == 1 {
-		return "it"
-	}
-	return "them"
-}
-
 // SyncHookTrust approves, in Codex's config, the entries of hooksFile that are byte for
 // byte terma's, and withdraws the approvals terma wrote for entries no longer there.
 func (Agent) SyncHookTrust(hooksFile string, command func(event string) string) (agents.TrustSync, error) {
 	configPath, err := (exporter{}).ConfigPath()
 	if err != nil {
 		return agents.TrustSync{}, err
-	}
-	if command == nil {
-		command = hookCommand
 	}
 	done, err := syncHookTrust(configPath, hooksFile, command)
 	return agents.TrustSync{Approved: done.Approved, Withdrawn: done.Withdrawn}, err
@@ -160,11 +95,6 @@ func (Agent) WhenHooksOff() map[string]agents.Handler {
 
 // ContentConsented is the consent replies and thread names travel under.
 func (Agent) ContentConsented(c hookrun.Consent) bool { return repliesConsented(c) }
-
-// RetrustNote is what a refresh that rewrote .codex/hooks.json says.
-func (Agent) RetrustNote() string {
-	return "Codex runs changed hooks only after you trust them again in Codex; `terma doctor` names any it is skipping."
-}
 
 // Coverage is how completely terma supports the agent.
 func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
@@ -203,12 +133,6 @@ func (Agent) UserHooksTrusted() (present, trusted bool, err error) {
 	return true, true, nil
 }
 
-// NotifierInstalled reports whether terma's notifier is in Codex's config.
-func (Agent) NotifierInstalled() (bool, error) { return exporter{}.NotifierInstalled() }
-
-// InstallNotifier puts terma's notifier in front of the user's own.
-func (Agent) InstallNotifier() (bool, error) { return exporter{}.InstallNotifier() }
-
 // RemoveNotifier restores the user's own notifier.
 func (Agent) RemoveNotifier() (bool, error) { return exporter{}.RemoveNotifier() }
 
@@ -216,12 +140,10 @@ var (
 	_ agents.Notifier       = Agent{}
 	_ agents.UserHooksTrust = Agent{}
 	_ agents.Covered        = Agent{}
-	_ agents.Retrusting     = Agent{}
 	_ agents.ContentConsent = Agent{}
 	_ agents.OffSwitched    = Agent{}
 	_ agents.Exporting      = Agent{}
 	_ agents.Agent          = Agent{}
-	_ agents.Trusting       = Agent{}
 	_ agents.HookTrusting   = Agent{}
 	_ agents.UserHooks      = Agent{}
 	_ agents.ManagedHooks   = Agent{}

@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"cmp"
 	"errors"
 	"strings"
 	"testing"
@@ -9,79 +8,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/harness"
-	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 )
 
 // Each test hands one verdict to both status's and doctor's renderers, so they cannot disagree.
-
-func TestHookWiringVerdictInBothCommands(t *testing.T) {
-	cases := []struct {
-		name         string
-		w            doctor.HookWiring
-		doctorStatus doctor.Status
-		doctorDetail string
-		// doctorFix is the fix a failed check names; empty means `terma install`.
-		doctorFix   string
-		statusState string
-		statusWired bool
-	}{
-		{
-			name:         "wired through a hook manager",
-			w:            doctor.HookWiring{Manager: hookmgr.Husky},
-			doctorStatus: doctor.Pass, doctorDetail: string(hookmgr.Husky),
-			statusState: "wired", statusWired: true,
-		},
-		{
-			name:         "wired through terma's shims",
-			w:            doctor.HookWiring{Manager: hookmgr.GitShim, HooksPath: hookmgr.ShimDir},
-			doctorStatus: doctor.Pass, doctorDetail: string(hookmgr.GitShim) + " shims, core.hooksPath set",
-			statusState: "wired", statusWired: true,
-		},
-		{
-			name:         "an install would still write files",
-			w:            doctor.HookWiring{Manager: hookmgr.Lefthook, Changes: 2, Stale: 1},
-			doctorStatus: doctor.Fail, doctorDetail: string(hookmgr.Lefthook) + " wiring is missing (2 file change(s))",
-			doctorFix:   "terma install",
-			statusState: "NOT wired (run `terma install`)", statusWired: false,
-		},
-		{
-			// A refresh rewrites files an earlier terma wrote, without sign-in.
-			name:         "an earlier terma wrote the files",
-			w:            doctor.HookWiring{Manager: hookmgr.GitShim, HooksPath: hookmgr.ShimDir, Changes: 2, Stale: 2},
-			doctorStatus: doctor.Fail, doctorDetail: string(hookmgr.GitShim) + " wiring was written by an earlier terma (2 file(s) out of date)",
-			doctorFix:   "terma update",
-			statusState: "out of date (run `terma update`)", statusWired: false,
-		},
-		{
-			name:         "shims committed, this clone not pointed at them",
-			w:            doctor.HookWiring{Manager: hookmgr.GitShim, Unpointed: true},
-			doctorStatus: doctor.Fail, doctorDetail: "shims are committed but git is not pointed at them in this clone (core.hooksPath=unset)",
-			statusState: "NOT wired (run `terma install`)", statusWired: false,
-		},
-		{
-			// A plan that cannot be computed is not wired in either command, and both say why.
-			name:         "the plan cannot be computed",
-			w:            doctor.HookWiring{Manager: hookmgr.Husky, Err: errors.New("read .husky/pre-commit: permission denied")},
-			doctorStatus: doctor.Fail, doctorDetail: "read .husky/pre-commit: permission denied",
-			statusState: "could not be checked — read .husky/pre-commit: permission denied", statusWired: false,
-		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			check := doctor.HooksCheck(tc.w)
-			if check.Status != tc.doctorStatus || check.Detail != tc.doctorDetail {
-				t.Errorf("doctor = %v %q; want %v %q", check.Status, check.Detail, tc.doctorStatus, tc.doctorDetail)
-			}
-			if want := cmp.Or(tc.doctorFix, "terma install"); check.Status == doctor.Fail && check.Fix != want {
-				t.Errorf("a failed wiring check should name the fix %q, got %q", want, check.Fix)
-			}
-			state, wired := doctor.HooksSummary(tc.w)
-			if state != tc.statusState || wired != tc.statusWired {
-				t.Errorf("status = %q, %v; want %q, %v", state, wired, tc.statusState, tc.statusWired)
-			}
-		})
-	}
-}
 
 func TestStatusLineVerdictInBothCommands(t *testing.T) {
 	cases := []struct {
@@ -126,13 +55,13 @@ func TestStatusLineVerdictInBothCommands(t *testing.T) {
 			st:           agents.StatusLineState{Replaced: true},
 			capture:      doctor.StatusLineReplaced,
 			doctorStatus: doctor.Warn, doctorDetail: "replaced by your own status line since terma wrapped it; plan usage is not captured",
-			status: "replaced by your own since terma wrapped it — plan usage is NOT captured (run `terma install`)",
+			status: "replaced by your own since terma wrapped it — plan usage is NOT captured (run `terma setup`)",
 		},
 		{
 			name:         "never wrapped",
 			capture:      doctor.StatusLineNotWrapped,
 			doctorStatus: doctor.Warn, doctorDetail: "not wrapped; plan usage is not captured",
-			status: "not wrapped — plan usage is NOT captured (run `terma install`)",
+			status: "not wrapped — plan usage is NOT captured (run `terma setup`)",
 		},
 	}
 	for _, tc := range cases {
@@ -191,7 +120,7 @@ func TestHarnessVerdictInBothCommands(t *testing.T) {
 			facts: doctor.HarnessFacts{Status: other}, bound: true,
 			route:        doctor.RouteOtherProject,
 			doctorStatus: doctor.Fail, doctorDetail: "Claude Code reports to team " + elsewhere + ", not " + project,
-			status: "→ reporting to team " + elsewhere + ", not this one — run `terma install`", statusOK: false,
+			status: "→ reporting to team " + elsewhere + ", not this one — run `terma setup`", statusOK: false,
 		},
 		{
 			// Without live routing, a repository that asks still sends via the machine-wide config.
@@ -206,7 +135,7 @@ func TestHarnessVerdictInBothCommands(t *testing.T) {
 			facts: doctor.HarnessFacts{Status: silent, LocalScope: true}, bound: true,
 			route:        doctor.RouteRepoDecides,
 			doctorStatus: doctor.Fail, doctorDetail: "Claude Code → " + otlp + " (only where a repository asks); this repository does not route Claude Code to its team, so its sessions send nothing",
-			status: "→ no telemetry: this repository neither routes it nor asks for it — sessions here send nothing (run `terma install`)", statusOK: false,
+			status: "→ no telemetry: sessions here send nothing (run `terma setup`)", statusOK: false,
 		},
 		{
 			name:  "silent machine-wide config, outside any installed repository",
@@ -221,7 +150,7 @@ func TestHarnessVerdictInBothCommands(t *testing.T) {
 			facts: doctor.HarnessFacts{Status: silent}, bound: true,
 			route:        doctor.RouteRepoDecides,
 			doctorStatus: doctor.Fail, doctorDetail: "Claude Code → " + otlp + " (only where a repository asks); this repository does not route Claude Code to its team, so its sessions send nothing",
-			status: "→ no telemetry: this repository neither routes it nor asks for it — sessions here send nothing (run `terma install`)", statusOK: false,
+			status: "→ no telemetry: sessions here send nothing (run `terma setup`)", statusOK: false,
 		},
 		{
 			name:  "not connected",

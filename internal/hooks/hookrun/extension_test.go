@@ -18,7 +18,7 @@ func TestExtensionSessionIsStampedOnItsCommit(t *testing.T) {
 	root, sp := hookruntest.Project(t)
 	ctx := context.Background()
 	env := func(stdin string, args ...string) Env {
-		return Env{Now: time.Now(), Cwd: root, Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
+		return Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test", Team: hookruntest.Team}
 	}
 	events := Extension{Tool: "ext"}.Events("ext")
 	for _, name := range []string{"ext-session-start", "ext-prompt", "ext-session-end", "ext-file-edit"} {
@@ -27,20 +27,20 @@ func TestExtensionSessionIsStampedOnItsCommit(t *testing.T) {
 		}
 	}
 	const sid = `"session_id":"7c9e6679-7425-40de-944b-e07fc1f90ae7"`
-	for _, stdin := range []string{`{"cwd":"` + root + `"}`, `{"session_id":"../escape","cwd":"` + root + `"}`} {
+	for _, stdin := range []string{`{"cwd":"` + hookruntest.InJSON(root) + `"}`, `{"session_id":"../escape","cwd":"` + hookruntest.InJSON(root) + `"}`} {
 		_ = events["ext-session-start"](ctx, env(stdin))
 	}
 	if n := len(hookruntest.Spooled(t, sp)); n != 0 {
 		t.Fatalf("a payload without a safe session spooled %d events", n)
 	}
-	if err := events["ext-session-start"](ctx, env(`{`+sid+`,"cwd":"`+root+`","model":"m1"}`)); err != nil {
+	if err := events["ext-session-start"](ctx, env(`{`+sid+`,"cwd":"`+hookruntest.InJSON(root)+`","model":"m1"}`)); err != nil {
 		t.Fatal(err)
 	}
 	if err := events["ext-prompt"](ctx, env(`{`+sid+`}`)); err != nil {
 		t.Fatal(err)
 	}
 	hookruntest.WriteFile(t, root, "src/a.go", "package src\n")
-	if err := events["ext-file-edit"](ctx, env(`{`+sid+`,"cwd":"`+root+`","file":"`+filepath.Join(root, "src", "a.go")+`","tool":"write"}`)); err != nil {
+	if err := events["ext-file-edit"](ctx, env(`{`+sid+`,"cwd":"`+hookruntest.InJSON(root)+`","file":"`+hookruntest.InJSON(filepath.Join(root, "src", "a.go"))+`","tool":"write"}`)); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := gitx.Git(ctx, root, "add", "src"); err != nil {
@@ -54,7 +54,7 @@ func TestExtensionSessionIsStampedOnItsCommit(t *testing.T) {
 	if data, _ := os.ReadFile(msgPath); !strings.Contains(string(data), "Agent-Session-Id: 7c9e6679-7425-40de-944b-e07fc1f90ae7") || !strings.Contains(string(data), "Agent-Tool: ext") {
 		t.Fatalf("commit not stamped for the extension's session:\n%s", data)
 	}
-	if err := events["ext-session-end"](ctx, env(`{`+sid+`,"cwd":"`+root+`"}`)); err != nil {
+	if err := events["ext-session-end"](ctx, env(`{`+sid+`,"cwd":"`+hookruntest.InJSON(root)+`"}`)); err != nil {
 		t.Fatal(err)
 	}
 	got := hookruntest.Names(hookruntest.Lifecycle(hookruntest.Spooled(t, sp)))

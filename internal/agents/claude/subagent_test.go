@@ -27,7 +27,7 @@ func TestClaudeSubagentStopIgnoresInternalForks(t *testing.T) {
 			kind = "custom-reviewer"
 		}
 		payload := fmt.Sprintf(`{"session_id":"parent","agent_id":"summary-%d","agent_type":%q,"hook_event_name":"SubagentStop","last_assistant_message":"NEVER-READ-REPLY"}`, i, kind)
-		env := hookrun.Env{Cwd: root, Spool: sp, Now: time.Now().Add(time.Duration(i) * 30 * time.Second), Stdin: strings.NewReader(payload)}
+		env := hookrun.Env{Cwd: root, Policy: hookruntest.Admitting(root), Spool: sp, Now: time.Now().Add(time.Duration(i) * 30 * time.Second), Stdin: strings.NewReader(payload)}
 		if err := subagentStop(context.Background(), env); err != nil {
 			t.Fatal(err)
 		}
@@ -48,7 +48,7 @@ func TestClaudeSubagentStopRequiresEvidenceForItsSessionAndAgent(t *testing.T) {
 			hook := func(handler func(context.Context, hookrun.Env) error, sessionID, agentID string) {
 				t.Helper()
 				payload := fmt.Sprintf(`{"session_id":%q,"agent_id":%q,"agent_type":"custom-reviewer"}`, sessionID, agentID)
-				if err := handler(ctx, hookrun.Env{Cwd: root, Spool: sp, Stdin: strings.NewReader(payload)}); err != nil {
+				if err := handler(ctx, hookrun.Env{Cwd: root, Policy: hookruntest.Admitting(root), Spool: sp, Stdin: strings.NewReader(payload)}); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -86,7 +86,7 @@ func TestClaudeSubagentConcurrentLaunchesSurvive(t *testing.T) {
 	for i := range 16 {
 		wg.Go(func() {
 			payload := fmt.Sprintf(`{"session_id":"parent","agent_id":"worker-%d"}`, i)
-			if err := subagentStart(ctx, hookrun.Env{Cwd: root, Spool: sp, Stdin: strings.NewReader(payload)}); err != nil {
+			if err := subagentStart(ctx, hookrun.Env{Cwd: root, Policy: hookruntest.Admitting(root), Spool: sp, Stdin: strings.NewReader(payload)}); err != nil {
 				t.Error(err)
 			}
 		})
@@ -95,7 +95,7 @@ func TestClaudeSubagentConcurrentLaunchesSurvive(t *testing.T) {
 	hookruntest.Spooled(t, sp)
 	for i := range 16 {
 		payload := fmt.Sprintf(`{"session_id":"parent","agent_id":"worker-%d"}`, i)
-		if err := subagentStop(ctx, hookrun.Env{Cwd: root, Spool: sp, Stdin: strings.NewReader(payload)}); err != nil {
+		if err := subagentStop(ctx, hookrun.Env{Cwd: root, Policy: hookruntest.Admitting(root), Spool: sp, Stdin: strings.NewReader(payload)}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -111,7 +111,7 @@ func TestClaudeSubagentLaunchEvidenceExpires(t *testing.T) {
 	now := time.Now()
 	for _, id := range []string{"old", "fresh"} {
 		payload := fmt.Sprintf(`{"session_id":"parent","agent_id":%q}`, id)
-		if err := subagentStart(ctx, hookrun.Env{Cwd: root, Spool: sp, Now: now, Stdin: strings.NewReader(payload)}); err != nil {
+		if err := subagentStart(ctx, hookrun.Env{Cwd: root, Policy: hookruntest.Admitting(root), Spool: sp, Now: now, Stdin: strings.NewReader(payload)}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -126,14 +126,14 @@ func TestClaudeSubagentLaunchEvidenceExpires(t *testing.T) {
 	}
 	for _, id := range []string{"old", "fresh"} {
 		payload := fmt.Sprintf(`{"session_id":"parent","agent_id":%q}`, id)
-		if err := subagentStop(ctx, hookrun.Env{Cwd: root, Spool: sp, Now: now, Stdin: strings.NewReader(payload)}); err != nil {
+		if err := subagentStop(ctx, hookrun.Env{Cwd: root, Policy: hookruntest.Admitting(root), Spool: sp, Now: now, Stdin: strings.NewReader(payload)}); err != nil {
 			t.Fatal(err)
 		}
 	}
 	if events := hookruntest.Spooled(t, sp); len(events) != 1 || events[0].Attrs[hookrun.AttrAgentID] != "fresh" {
 		t.Fatalf("expired evidence admitted a stop: %+v", events)
 	}
-	if err := sessionStart(ctx, hookrun.Env{Cwd: root, Spool: sp, Now: now, Stdin: strings.NewReader(`{"session_id":"next-session"}`)}); err != nil {
+	if err := sessionStart(ctx, hookrun.Env{Cwd: root, Policy: hookruntest.Admitting(root), Spool: sp, Now: now, Stdin: strings.NewReader(`{"session_id":"next-session"}`)}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
@@ -157,7 +157,7 @@ func TestClaudeSubagentUnavailableLaunchStateDoesNotFailHooks(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, handler := range []func(context.Context, hookrun.Env) error{subagentStart, subagentStop} {
-		env := hookrun.Env{Cwd: root, Spool: sp, Stdin: strings.NewReader(`{"session_id":"parent","agent_id":"worker"}`)}
+		env := hookrun.Env{Cwd: root, Policy: hookruntest.Admitting(root), Spool: sp, Stdin: strings.NewReader(`{"session_id":"parent","agent_id":"worker"}`)}
 		if err := handler(context.Background(), env); err != nil {
 			t.Fatal(err)
 		}
@@ -173,7 +173,7 @@ func TestClaudeSubagentIsAFacetOfTheParentSession(t *testing.T) {
 	ctx := context.Background()
 	sp, _ := spool.Open(t.TempDir())
 	env := func(stdin string) hookrun.Env {
-		return hookrun.Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
+		return hookrun.Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
 	}
 	parent := `"session_id":"sess-claude-9","cwd":"` + root + `","prompt_id":"prompt-1"`
 	const agent = `"agent_id":"a44816aa66a297cdd","agent_type":"Explore"`
@@ -222,7 +222,7 @@ func TestClaudeSubagentIsAFacetOfTheParentSession(t *testing.T) {
 	}
 	msgPath := filepath.Join(t.TempDir(), "COMMIT_EDITMSG")
 	_ = os.WriteFile(msgPath, []byte("subagent work\n"), 0o644)
-	if err := hookrun.PrepareCommitMsg(ctx, hookrun.Env{Now: time.Now(), Cwd: root, Args: []string{msgPath, "message"}, Stdin: strings.NewReader(""), Spool: sp}); err != nil {
+	if err := hookrun.PrepareCommitMsg(ctx, hookrun.Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Args: []string{msgPath, "message"}, Stdin: strings.NewReader(""), Spool: sp}); err != nil {
 		t.Fatal(err)
 	}
 	data, _ := os.ReadFile(msgPath)

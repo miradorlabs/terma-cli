@@ -252,7 +252,7 @@ func TestHelperSurvivesReconnectThenDisconnect(t *testing.T) {
 	if err := c.Connect(e, false); err != nil {
 		t.Fatalf("connect: %v", err)
 	}
-	e.IncludePrompts = !e.IncludePrompts
+	e.Signals = []harness.Signal{harness.SignalTraces, harness.SignalLogs}
 	if err := c.Connect(e, false); err != nil {
 		t.Fatalf("reconnect: %v", err)
 	}

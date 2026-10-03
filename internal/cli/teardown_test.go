@@ -54,8 +54,8 @@ func TestTeardownStopsTheRelayAndKeepsTheSignIn(t *testing.T) {
 		if err != nil {
 			t.Fatalf("teardown: %v\n%s", err, out)
 		}
-		if !strings.Contains(out, "`terma setup` sets it up again") || !strings.Contains(out, "`terma uninstall`") {
-			t.Fatalf("teardown should say how to undo it and what it left:\n%s", out)
+		if !strings.Contains(out, "`terma setup` sets it up again") {
+			t.Fatalf("teardown should say how to undo it:\n%s", out)
 		}
 	}
 	if _, err := os.Stat(relayDir); !os.IsNotExist(err) {

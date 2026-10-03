@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/dispatch"
 	"github.com/miradorlabs/terma-cli/internal/procinfo"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
@@ -22,7 +23,6 @@ func HooksDisabled() bool {
 }
 
 func (app *App) newHookCommand() *cobra.Command {
-	var user bool
 	cmd := &cobra.Command{
 		Use:    "hook <event> [args...]",
 		Short:  "Internal: the runtime behind every installed hook shim",
@@ -32,7 +32,7 @@ func (app *App) newHookCommand() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cwd, _ := os.Getwd()
 			status := dispatch.Run(cmd.Context(), app.hookDeps(), dispatch.Request{
-				Event: args[0], Args: args[1:], User: user,
+				Event: args[0], Args: args[1:],
 				Stdin: cmd.InOrStdin(), Stdout: cmd.OutOrStdout(), Stderr: cmd.ErrOrStderr(),
 				Version: app.version, Debug: os.Getenv("TERMA_DEBUG") != "", HooksOff: HooksDisabled(), Cwd: cwd,
 			})
@@ -42,8 +42,9 @@ func (app *App) newHookCommand() *cobra.Command {
 			return nil
 		},
 	}
-	// --user only before the event: what follows it is the event's own arguments.
-	cmd.Flags().BoolVar(&user, "user", false, "internal: a machine-wide hook entry")
+	// --user is ignored here: it marks the entries setup writes, so terma recognizes its own
+	// in an agent's hooks file (hookmgr's userHookShape, ManagedDeployed).
+	cmd.Flags().Bool("user", false, "internal: a machine-wide hook entry")
 	cmd.Flags().SetInterspersed(false)
 	return cmd
 }
@@ -51,19 +52,32 @@ func (app *App) newHookCommand() *cobra.Command {
 // hookDeps are what `terma hook` reaches beyond the hook runtime.
 func (app *App) hookDeps() dispatch.Deps {
 	return dispatch.Deps{
-		Agents: app.agents,
-		Policy: hookPolicy,
-		Yields: app.globalMode().Yields,
-		Spool:  openSpool,
+		Agents:  app.agents,
+		Profile: hookProfile,
+		Spool:   openSpool,
 		Claimed: func(ctx context.Context, cwd string) {
 			daemon.Spawn()
-			wireCloneOnFirstUse(ctx, cwd)
+			// A clone whose own hooks path outranks terma's global one is routed through it.
+			if root, gitDir, ok := gitx.LocateFS(cwd); ok {
+				_, _ = app.globalMode().WireClone(ctx, root, gitDir)
+			}
 		},
 		Flush: spawnFlush,
 	}
 }
 
-// hookPolicy is one small local read; without a validated scope content capture stays off.
+// hookProfile is one small local read. Hooks run on the last validated policy even once
+// it has expired, so a refresh outage stops no claim: what leaves is decided downstream,
+// under the policy in force then.
+func hookProfile() dispatch.Profile {
+	cfg, err := config.Load(config.Overrides{})
+	if err != nil {
+		return dispatch.Profile{Policy: config.NoPolicy("", "")}
+	}
+	return dispatch.Profile{Team: cfg.Policy.TeamID, Agents: cfg.Harnesses, Policy: cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL)}
+}
+
+// hookPolicy is the collection policy while it is validated and fresh, else NoPolicy.
 func hookPolicy() config.Policy {
 	cfg, err := config.Load(config.Overrides{})
 	if err != nil {

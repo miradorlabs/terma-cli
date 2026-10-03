@@ -176,6 +176,13 @@ func (r *Receiver) handleMetrics(w http.ResponseWriter, req *http.Request) {
 	_, _ = w.Write(out)
 }
 
+// Reset forgets everything received so far.
+func (r *Receiver) Reset() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.logs, r.span, r.metr, r.auth, r.requests = nil, nil, nil, nil, nil
+}
+
 // Logs returns a copy of every log record so far.
 func (r *Receiver) Logs() []LogRecord {
 	r.mu.Lock()

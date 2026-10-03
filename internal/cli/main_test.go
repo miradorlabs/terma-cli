@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/shape"
@@ -43,15 +46,16 @@ func runIsolated(m *testing.M) int {
 	}
 	defer func() { _ = os.RemoveAll(home) }()
 	for k, v := range map[string]string{
-		"HOME":              home,
-		"SHELL":             "/bin/zsh",
-		"XDG_CONFIG_HOME":   home + "/.config",
-		"CLAUDE_CONFIG_DIR": home + "/.claude",
-		"CODEX_HOME":        home + "/.codex",
-		"TERMA_CONFIG_DIR":  home + "/.config/terma",
-		"GEMINI_CLI_HOME":   home,
+		"HOME":                home,
+		"SHELL":               "/bin/zsh",
+		"XDG_CONFIG_HOME":     home + "/.config",
+		"CLAUDE_CONFIG_DIR":   home + "/.claude",
+		"CODEX_HOME":          home + "/.codex",
+		"TERMA_CONFIG_DIR":    home + "/.config/terma",
+		"GEMINI_CLI_HOME":     home,
+		"GIT_CONFIG_NOSYSTEM": "1",
 		// Offline; policy integration tests clear this and use the real HTTP path.
-		"TERMA_POLICY_STUB": `{"mode":"repo","include_prompts":true,"include_tool_content":true}`,
+		"TERMA_POLICY_STUB": `{"mode":"repo","repositories":["github.com/acme/app"],"include_prompts":true,"include_tool_content":true}`,
 	} {
 		_ = os.Setenv(k, v)
 	}
@@ -59,14 +63,23 @@ func runIsolated(m *testing.M) int {
 }
 
 // newTestRelay is relay.New with the registered agents' telemetry shapes, as relay run has.
+// appRepo is the working copy the package's stub policy lists.
+var appRepo = config.Repository{Origin: "github.com/acme/app"}
+
+// admitHere signs the profile into a validated repository-mode policy for team, listing
+// root's origin, github.com/acme/<root's folder>, as `terma setup` would leave it.
+func admitHere(t *testing.T, root, team string) {
+	t.Helper()
+	pol := config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/acme/" + filepath.Base(root)}, IncludePrompts: true, IncludeToolContent: true,
+		TeamID: team, Revision: 1, FetchedAt: time.Now()}
+	if err := config.UpdateProfile(config.DefaultProfile, func(p *config.Profile) { p.Policy = &pol }); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func newTestRelay(o relay.Options) *relay.Relay {
 	o.Correlators, o.Capturers = testApp.agents.With[shape.Correlator](), testApp.agents.With[shape.Capturer]()
 	return relay.New(o)
-}
-
-func hooksPathOf(name string) string {
-	a, _ := testApp.agents.Lookup(name)
-	return a.HooksPath()
 }
 
 func harnessOf(t *testing.T, name string) harness.Harness {

@@ -25,15 +25,15 @@ func (app *App) newTeardownCommand() *cobra.Command {
 		Long: `The machine-wide undo of ` + "`terma setup`" + `, safe to run again:
 
   1. Restores the settings terma changed in your coding agents (their telemetry
-     exporters, status line and notifier) and removes machine-wide hooks.
+     exporters, status line and notifier), removes their machine-wide hooks, and
+     points git's global core.hooksPath back where it was.
   2. Stops the local relay, removes its background service, and deletes its state
      (its token, its address and any telemetry not yet delivered), so no hook
      starts it again.
 
 Your sign-in is kept, so ` + "`terma setup`" + ` sets this machine up again in seconds,
-with the relay's token as it was: agents still running keep reporting without a
-restart. --sign-out also revokes the sign-in, and the next setup mints a new token. Repositories keep their committed hooks and binding,
-which everyone who works in them shares: ` + "`terma uninstall`" + ` inside one removes them.`,
+with the relay's token as it was: agents still running keep reporting without a restart.
+--sign-out also revokes the sign-in, and the next setup mints a new token.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Refused before anything changes, so teardown never stops halfway.
@@ -70,7 +70,6 @@ which everyone who works in them shares: ` + "`terma uninstall`" + ` inside one 
 				}
 			}
 			fmt.Fprintln(out, "terma is torn down on this machine; `terma setup` sets it up again.")
-			fmt.Fprintln(out, "Repositories keep their committed hooks and binding; remove one with `terma uninstall` inside it.")
 			return nil
 		},
 	}
@@ -108,13 +107,13 @@ func (app *App) undoSetup(ctx context.Context, out io.Writer, keepToken bool) er
 		}
 	}
 
-	// Global mode's hooks and the relay service point into the config directory and at this binary.
+	// The machine-wide hooks and the relay service point into the config directory and at this binary.
 	say := func(what string) { fmt.Fprintln(out, strings.TrimSpace(what)) }
-	if err := app.globalMode().Apply(ctx, nil, false, say, say, func(string) {}); err != nil {
+	if err := app.globalMode().Remove(ctx, say); err != nil {
 		return fmt.Errorf("restore machine-wide hooks: %w", err)
 	}
-	// Without its token the relay refuses to run and hooks write no claims, so a hook in a
-	// bound repository cannot start it again. It goes first, so the relay stopping below
+	// Without its token the relay refuses to run and hooks write no claims, so no hook can
+	// start it again. It goes first, so the relay stopping below
 	// hands its socket to no successor.
 	if err := app.retireRelayToken(keepToken); err != nil {
 		return fmt.Errorf("remove the relay's token: %w", err)

@@ -3,19 +3,16 @@ package codex
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
-	"github.com/miradorlabs/terma-cli/internal/routing"
-
-	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -55,36 +52,14 @@ func enableRelay(t *testing.T) {
 	}
 }
 
-func routeCodex(t *testing.T, includePrompts bool) {
+// routeCodex makes Codex one of the developer's agents, which setup points at the relay.
+func routeCodex(t *testing.T, env *hookrun.Env) {
 	t.Helper()
-	enableRelay(t) // consent comes from the project's routing record alone
-	if err := routing.SaveRecord(routing.Record{ProjectID: "project-a", Endpoint: "https://otel.terma.ai", Signals: []string{"logs"},
-		IncludePrompts: includePrompts, Harnesses: []string{name}}); err != nil {
+	enableRelay(t)
+	if err := config.UpdateProfile(config.DefaultProfile, func(p *config.Profile) { p.Harnesses = []string{name} }); err != nil {
 		t.Fatal(err)
 	}
-}
-
-func connectCodexMachineWide(t *testing.T, includePrompts bool) {
-	t.Helper()
-	err := (exporter{}).Connect(harness.Exporter{
-		Endpoint: "https://otel.terma.ai", APIKey: "ter_srv_0123456789abcdef01234567", ProjectID: "project-a",
-		Signals: []harness.Signal{harness.SignalLogs}, IncludePrompts: includePrompts,
-	}, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if st, err := (exporter{}).Status(); err != nil || !st.Connected || st.IncludePrompts != includePrompts {
-		t.Fatalf("machine-wide connect did not take: %+v %v", st, err)
-	}
-}
-
-func connectCodexDesktop(t *testing.T, includePrompts bool) {
-	t.Helper()
-	if err := routing.SaveRecord(routing.Record{ProjectID: "project-a", Endpoint: "https://otel.terma.ai",
-		Signals: []string{"logs"}, Harnesses: []string{name},
-		IncludePrompts: includePrompts, Surfaces: []string{name}}); err != nil {
-		t.Fatal(err)
-	}
+	env.Agents = []string{name}
 }
 
 func stopCodex(t *testing.T, env hookrun.Env, path string) []spool.Event {
@@ -107,7 +82,7 @@ func stopCodex(t *testing.T, env hookrun.Env, path string) []spool.Event {
 // trace id, stamped with when they were said.
 func TestCodexStopSpoolsWhatCodexSaid(t *testing.T) {
 	env := fundingEnv(t)
-	routeCodex(t, true)
+	routeCodex(t, &env)
 	path := replyRollout(t)
 
 	replies := stopCodex(t, env, path)
@@ -143,89 +118,43 @@ func TestCodexStopSpoolsWhatCodexSaid(t *testing.T) {
 	}
 }
 
-// A reply travels under the consent its prompt does, and no other.
+// A reply travels where its prompt would: only for a developer who chose Codex, and only
+// while the team's policy collects prompts.
 func TestCodexRepliesNeedTheConsentPromptsTravelUnder(t *testing.T) {
 	for _, c := range []struct {
 		name  string
-		setup func(t *testing.T)
-		want  int
+		setup func(t *testing.T, env *hookrun.Env)
+		// withheld is a team policy that does not collect prompts.
+		withheld bool
+		want     int
 	}{
-		{"nothing exports Codex here at all", func(*testing.T) {}, 0},
-		{"this repository routes Codex without prompts", func(t *testing.T) { routeCodex(t, false) }, 0},
-		{"this repository routes Codex with prompts", func(t *testing.T) { routeCodex(t, true) }, 2},
-		{"a machine-wide connect with prompts, no routing", func(t *testing.T) { connectCodexMachineWide(t, true) }, 2},
-		{"a machine-wide connect without prompts, no routing", func(t *testing.T) { connectCodexMachineWide(t, false) }, 0},
-		{"routed with prompts overrides machine-wide exclusion", func(t *testing.T) { routeCodex(t, true); connectCodexMachineWide(t, false) }, 2},
-		{"routed exclusion overrides machine-wide prompts", func(t *testing.T) { routeCodex(t, false); connectCodexMachineWide(t, true) }, 0},
-		{"both export prompts", func(t *testing.T) { routeCodex(t, true); connectCodexMachineWide(t, true) }, 2},
-		{"desktop with no repository route", func(*testing.T) {}, 0},
-		{"desktop route excludes prompts", func(t *testing.T) {
-			connectCodexDesktop(t, false)
-		}, 0},
-		{"desktop route allows prompts without a global exporter", func(t *testing.T) {
-			connectCodexDesktop(t, true)
-		}, 2},
-		{"desktop route does not depend on global exporter syntax", func(t *testing.T) {
-			connectCodexDesktop(t, true)
+		{"the developer did not choose Codex", func(*testing.T, *hookrun.Env) {}, false, 0},
+		{"Codex chosen at setup", routeCodex, false, 2},
+		{"Codex chosen, the team withholds prompts", routeCodex, true, 0},
+		{"Codex chosen, whatever its own exporter's syntax", func(t *testing.T, env *hookrun.Env) {
+			routeCodex(t, env)
 			hookruntest.WriteFile(t, os.Getenv("CODEX_HOME"), "config.toml", "[otel\ninvalid\n")
-		}, 2},
-		{"desktop choice is explicitly off", func(t *testing.T) {
-			if err := routing.SaveRecord(routing.Record{ProjectID: "project-a", Endpoint: "https://otel.terma.ai",
-				Signals: []string{"logs"}, IncludePrompts: true, Harnesses: []string{name}}); err != nil {
+		}, false, 2},
+		{"Codex chosen, but no relay on this machine", func(t *testing.T, env *hookrun.Env) {
+			routeCodex(t, env)
+			path, _ := claim.TokenPath()
+			if err := os.Remove(path); err != nil {
 				t.Fatal(err)
 			}
-		}, 0},
-		{"unrouted CLI still honors the repository prompt exclusion", func(t *testing.T) {
-			routeCodex(t, false)
-			connectCodexMachineWide(t, true)
-		}, 0},
+		}, false, 0},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			env := fundingEnv(t)
-			c.setup(t)
-			if got := len(stopCodex(t, env, replyRollout(t))); got != c.want {
-				t.Fatalf("spooled %d replies, want %d", got, c.want)
+			env.Policy.IncludePrompts = !c.withheld
+			c.setup(t, &env)
+			// The hook knows no policy; delivery withholds replies the team's prompts-off does.
+			if got := len(delivered(env.Policy, stopCodex(t, env, replyRollout(t)))); got != c.want {
+				t.Fatalf("delivered %d replies, want %d", got, c.want)
 			}
-			// Without consent the rollout is not opened for replies: no cursor.
+			// Where nothing routes Codex the rollout is not opened for replies: no cursor.
 			dir, _ := os.ReadDir(filepath.Join(os.Getenv("TERMA_CONFIG_DIR"), "reply-cursors"))
-			if c.want == 0 && len(dir) != 0 {
+			if c.want == 0 && !c.withheld && len(dir) != 0 {
 				t.Fatalf("a reply cursor was written without consent: %v", dir)
-			}
-		})
-	}
-}
-
-// A consent source that exists and cannot be read fails closed, even when the other says yes.
-func TestCodexRepliesFailClosedWhenAConsentSourceCannotBeRead(t *testing.T) {
-	for _, c := range []struct {
-		name  string
-		setup func(t *testing.T)
-	}{
-		{"a routing record that does not parse, beside a machine-wide connect that allows prompts", func(t *testing.T) {
-			connectCodexMachineWide(t, true)
-			dir, err := routing.Dir()
-			if err != nil {
-				t.Fatal(err)
-			}
-			hookruntest.WriteFile(t, dir, "project-a.json", `{"project_id": "project-a", "include_prompts": tr`)
-		}},
-		// Without the relay the machine-wide config is a consent source too; with it, it is not.
-		{"a machine-wide config that does not parse, beside a routing record that allows prompts", func(t *testing.T) {
-			if err := routing.SaveRecord(routing.Record{ProjectID: "project-a", Endpoint: "https://otel.terma.ai", Signals: []string{"logs"},
-				IncludePrompts: true, Harnesses: []string{name}}); err != nil {
-				t.Fatal(err)
-			}
-			hookruntest.WriteFile(t, os.Getenv("CODEX_HOME"), "config.toml", "[otel\nlog_user_prompt = = true\n")
-		}},
-	} {
-		t.Run(c.name, func(t *testing.T) {
-			env := fundingEnv(t)
-			c.setup(t)
-			if got := len(stopCodex(t, env, replyRollout(t))); got != 0 {
-				t.Fatalf("spooled %d replies on a consent source that could not be read", got)
-			}
-			if dir, _ := os.ReadDir(filepath.Join(os.Getenv("TERMA_CONFIG_DIR"), "reply-cursors")); len(dir) != 0 {
-				t.Fatalf("the rollout was opened for replies anyway: %v", dir)
 			}
 		})
 	}
@@ -234,7 +163,7 @@ func TestCodexRepliesFailClosedWhenAConsentSourceCannotBeRead(t *testing.T) {
 // A cursor that does not parse is replaced and reported; the replay repeats Codex's own ids.
 func TestCodexRepliesReplayFromACorruptCursor(t *testing.T) {
 	env := fundingEnv(t)
-	routeCodex(t, true)
+	routeCodex(t, &env)
 	path := replyRollout(t)
 	first := stopCodex(t, env, path)
 	cursors, _ := os.ReadDir(filepath.Join(os.Getenv("TERMA_CONFIG_DIR"), "reply-cursors"))
@@ -257,7 +186,7 @@ func TestCodexRepliesReplayFromACorruptCursor(t *testing.T) {
 // notify shares Stop's locked cursor, so a turn's replies are spooled once.
 func TestCodexNotifyAndStopDoNotDoubleReplies(t *testing.T) {
 	env := fundingEnv(t)
-	routeCodex(t, true)
+	routeCodex(t, &env)
 	path := replyRollout(t)
 	payload, _ := json.Marshal(map[string]any{"type": "agent-turn-complete", "thread-id": replySession, "turn-id": replyTurn, "cwd": env.Cwd,
 		"last-assistant-message": "NOT READ FROM HERE"})
@@ -280,17 +209,17 @@ func TestCodexNotifyAndStopDoNotDoubleReplies(t *testing.T) {
 	}
 }
 
-// A routing record that exists and cannot be read consents to nothing, whatever else
-// would have: it may be the one that withholds prompts.
-func TestAnUnreadableRouteConsentsToNothing(t *testing.T) {
-	unreadable := errors.New("unexpected end of JSON input")
-	for _, c := range []hookrun.Consent{
-		{RouteErr: unreadable, Relay: true, Global: true},
-		{RouteErr: unreadable, Relay: true},
-		{RouteErr: unreadable, Global: true},
+// Replies need the relay and Codex among the developer's agents, or global mode.
+func TestRepliesConsented(t *testing.T) {
+	for c, want := range map[*hookrun.Consent]bool{
+		{Agents: []string{name}, Relay: true}:     true,
+		{Relay: true, Global: true}:               true,
+		{Agents: []string{"claude"}, Relay: true}: false,
+		{Agents: []string{name}}:                  false,
+		{Global: true}:                            false,
 	} {
-		if repliesConsented(c) {
-			t.Errorf("repliesConsented(%+v) = true", c)
+		if got := repliesConsented(*c); got != want {
+			t.Errorf("repliesConsented(%+v) = %v, want %v", *c, got, want)
 		}
 	}
 }

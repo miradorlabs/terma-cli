@@ -107,4 +107,4 @@ case ":$PATH:" in
   *":$dest:"*) ;;
   *) say "Note: ${dest} is not on your PATH. Add it, e.g.:  export PATH=\"${dest}:\$PATH\"" ;;
 esac
-say "Next: run \`terma setup\` in a terminal, then \`terma install\` inside a repository."
+say "Next: run \`terma setup\` in a terminal."

@@ -171,7 +171,7 @@ func (s *Store) lock() (unlock func()) {
 
 // missing reports a store nothing has created yet. Its lock file cannot be opened, so a
 // writer that went on would do so unlocked, racing the Touch that creates the store; with
-// no store there is nothing to change. Only uninstall's Remove deletes a store, unlocked.
+// no store there is nothing to change.
 func (s *Store) missing() bool {
 	_, err := os.Stat(s.dir)
 	return errors.Is(err, fs.ErrNotExist)
@@ -449,54 +449,6 @@ func (s *Store) Prune(before time.Time) (int, error) {
 	return n, nil
 }
 
-// installRecord is what `terma install` changed in git's configuration, for uninstall.
-type installRecord struct {
-	PreviousHooksPath string    `json:"previous_hooks_path"`
-	HooksConfigScope  string    `json:"hooks_config_scope,omitempty"`
-	HooksPathLocal    *bool     `json:"hooks_path_local,omitempty"`
-	RecordedAt        time.Time `json:"recorded_at"`
-}
-
-const installFile = "install.json"
-
-// RecordPreviousHooksPathAtScope records the previous hooks path, its git config scope,
-// and whether it was set explicitly there.
-func RecordPreviousHooksPathAtScope(gitDir, previous, scope string, local bool, chainPath string) error {
-	path := filepath.Join(gitDir, stateDirName, installFile)
-	if err := writeJSON(path, installRecord{PreviousHooksPath: previous, HooksConfigScope: scope, HooksPathLocal: &local, RecordedAt: time.Now()}); err != nil {
-		return err
-	}
-	return os.WriteFile(filepath.Join(gitDir, stateDirName, "previous-hooks-path"), []byte(chainPath+"\n"), fileMode)
-}
-
-// PreviousHooksScope returns the git config scope install changed.
-func PreviousHooksScope(gitDir string) string {
-	var rec installRecord
-	if readJSON(filepath.Join(gitDir, stateDirName, installFile), &rec) == nil && rec.HooksConfigScope == "--worktree" {
-		return "--worktree"
-	}
-	return "--local"
-}
-
-// PreviousHooksPath returns the saved original hook path; ok is false when
-// nothing was recorded.
-func PreviousHooksPath(gitDir string) (previous string, ok bool) {
-	var rec installRecord
-	if err := readJSON(filepath.Join(gitDir, stateDirName, installFile), &rec); err != nil {
-		return "", false
-	}
-	return rec.PreviousHooksPath, true
-}
-
-// Remove deletes all state (uninstall).
-func (s *Store) Remove() error {
-	err := os.RemoveAll(s.dir)
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil
-	}
-	return err
-}
-
 // Attribution is one session's claim on a commit.
 type Attribution struct {
 	SessionID string
@@ -586,17 +538,4 @@ func writeJSON(path string, v any) error {
 		return err
 	}
 	return config.WriteFileAtomicNoSync(path, data, fileMode)
-}
-
-// HooksPathWasLocal reports whether the previous hooksPath was set explicitly rather
-// than inherited, so uninstall restores inheritance rather than pinning it.
-func HooksPathWasLocal(gitDir string) bool {
-	var rec installRecord
-	if err := readJSON(filepath.Join(gitDir, stateDirName, installFile), &rec); err != nil {
-		return false
-	}
-	if rec.HooksPathLocal != nil {
-		return *rec.HooksPathLocal
-	}
-	return rec.PreviousHooksPath != ""
 }

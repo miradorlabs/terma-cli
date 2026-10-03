@@ -7,8 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/relay"
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
 // A relay started before any policy was fetched captures nothing until one is.
@@ -91,5 +94,49 @@ func TestTheRefresherKeepsTheSelectedTeamFresh(t *testing.T) {
 	}
 	if err := r.Refresh(t.Context(), "t1"); err != nil || !slices.Equal(refreshed, []string{"t1"}) {
 		t.Fatalf("Refresh = %v, refreshed %v", err, refreshed)
+	}
+}
+
+// A team with its key on file and no policy fetched is held, never granted; the relay's refresher finds it at once by its key, and once that fetch is
+// stored the team's records follow its policy.
+func TestAFreshBindingIsHeldUntilTheRelayFetchesItsPolicy(t *testing.T) {
+	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	t.Setenv("TERMA_POLICY_STUB", "")
+	const org, auth = "org_a", "https://auth.example"
+	t.Setenv("TERMA_AUTH_URL", auth)
+	cfg := &config.Config{ProfileName: "default", OrganizationID: org, AuthURL: auth}
+	if err := config.UpdateProfile(cfg.ProfileName, func(p *config.Profile) { p.OrganizationID, p.Harnesses = org, []string{"claude"} }); err != nil {
+		t.Fatal(err)
+	}
+	if err := keystore.Set("p1", mintedKey, keystore.HostsOf(cfg)); err != nil {
+		t.Fatal(err)
+	}
+	resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "claude" }, Endpoint: func(string) string { return "https://otel.example" },
+		RelayTargets: func(s []string) []string { return s }})
+	c := claim.Claim{ProjectID: "p1", Tool: "claude"}
+	if pol, err := resolve(c); err == nil {
+		t.Fatalf("a team with no policy fetched was granted %+v", pol)
+	}
+
+	var fetched []string
+	d := Deps{
+		LoadConfig: func() (*config.Config, error) { return config.Load(config.Overrides{}) },
+		RefreshPolicy: func(_ context.Context, scoped *config.Config) error {
+			fetched = append(fetched, scoped.ProjectID)
+			pol := config.Policy{Mode: config.ModeRepo, IncludePrompts: true, OrganizationID: org, AuthURL: auth,
+				TeamID: scoped.ProjectID, Revision: 1, FetchedAt: time.Now()}
+			return routing.StorePolicy(scoped, &pol)
+		},
+	}
+	r := d.Refresher()
+	if !slices.Contains(r.Teams(), "p1") || !r.Fetched("p1").IsZero() {
+		t.Fatalf("the fresh team was not due at once: teams %v", r.Teams())
+	}
+	if err := r.Refresh(t.Context(), "p1"); err != nil || !slices.Equal(fetched, []string{"p1"}) {
+		t.Fatalf("Refresh = %v, fetched %v", err, fetched)
+	}
+	pol, err := resolve(c)
+	if err != nil || !pol.IncludePrompts || pol.IncludeToolContent || pol.Signals != nil {
+		t.Fatalf("after the fetch: %+v, %v; want the team's prompts-only policy", pol, err)
 	}
 }

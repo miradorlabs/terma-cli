@@ -12,7 +12,7 @@ import (
 // Claude Desktop's Code tab through the relay (claude_desktop.go for the launch): the
 // build Desktop pins, started the way Desktop starts it, with the exporter only in
 // the user's settings — where `terma relay setup` put it. On one relay, a session in
-// the bound repository, one in a worktree Desktop's "use worktree" mode would create
+// the admitted repository, one in a worktree Desktop's "use worktree" mode would create
 // (<repo>/.claude/worktrees/<name>, a linked worktree), and a personal one: the first
 // two reach their project with its key, under Desktop's own service name, and the
 // personal one reaches nothing.
@@ -28,10 +28,7 @@ func TestRelayClaudeDesktop(t *testing.T) {
 		defer provider.Close()
 		sb.ClaudeBaseURL = provider.URL
 
-		// The hooks are committed, as once the install is merged: a worktree checks out
-		// what is committed.
-		sb.git("add", "-A")
-		sb.git("commit", "-q", "-m", "install terma")
+		// A linked worktree is admitted by its main repository's origin.
 		wt := filepath.Join(sb.Repo, ".claude", "worktrees", "desk")
 		sb.git("worktree", "add", "-q", "-b", "claude/desk", wt)
 		personal := filepath.Join(sb.Dir, "personal")

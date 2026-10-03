@@ -3,8 +3,8 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
 # Everything here that runs terma's code runs it against the dev environment. `terma
-# install` and `terma setup` sign in, so a test or a script that reaches them would
-# otherwise open a browser login on production. Override with `TERMA_ENV=… make test`.
+# setup` signs in, so a test or a script that reaches it would otherwise open a browser
+# login on production. Override with `TERMA_ENV=… make test`.
 export TERMA_ENV ?= dev
 # Tests run git; a developer's own global git config (global mode's hooks path among it)
 # must not reach them.
@@ -35,10 +35,6 @@ test:
 	go test ./...
 
 # Builds and exercises the real CLI in isolated workspaces; no login or live backend.
-.PHONY: test-install-e2e
-test-install-e2e:
-	go test ./internal/cli -run '^TestInstallE2E' -count=1 -v
-
 .PHONY: cover
 cover:
 	go test -cover ./...
@@ -92,8 +88,8 @@ test-plugin:
 .PHONY: check
 check: fmt-check vet lint test test-plugin
 
-# Hook budget: prepare-commit-msg must stay well under 50 ms end to end. Runs the
-# installed shim against a scratch repository and prints the wall time.
+# Hook budget: prepare-commit-msg must stay well under 50 ms end to end. Runs the global
+# git hook shim against a scratch repository and prints the wall time.
 .PHONY: bench-hook
 bench-hook: build
 	@./scripts/bench-hook.sh

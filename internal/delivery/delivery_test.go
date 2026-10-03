@@ -1,31 +1,39 @@
 package delivery
 
 import (
+	"bytes"
 	"context"
 	"errors"
-	"os"
-	"path/filepath"
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
 const testKey = "ter_srv_minted0123456789abcdefghijklmnopqrstuv"
 
+// app is the working copy the tests' events come from, and listed the policies' repositories.
+var (
+	listed = []string{"github.com/acme/app"}
+	app    = config.Repository{Origin: "github.com/acme/app"}
+)
+
 // A project's events go where its key works: a pinned host, else the key's own, else the
-// routing record's, else the profile's. The data API follows the record only when the
-// record names another built-in environment.
+// profile's.
 func TestEachProjectGoesToItsKeysOwnEnvironment(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
 	prod, err := config.EndpointsFor(config.EnvProd)
-	if err != nil {
-		t.Fatal(err)
-	}
-	dev, err := config.EndpointsFor(config.EnvDev)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,17 +41,9 @@ func TestEachProjectGoesToItsKeysOwnEnvironment(t *testing.T) {
 	if err := keystore.Set("keyed", testKey, keystore.Hosts{OTLP: "https://otlp.keyed", API: "https://api.keyed"}); err != nil {
 		t.Fatal(err)
 	}
-	// A record naming one host while the key names another: the key wins.
-	if err := routing.SaveRecord(routing.Record{ProjectID: "keyed", Endpoint: dev.OTLPURL}); err != nil {
-		t.Fatal(err)
-	}
-	if err := routing.SaveRecord(routing.Record{ProjectID: "routed", Endpoint: dev.OTLPURL + "/"}); err != nil {
-		t.Fatal(err)
-	}
 	r := Router{}
 	for _, tc := range []struct{ project, otlp, api string }{
 		{"keyed", "https://otlp.keyed", "https://api.keyed"},
-		{"routed", dev.OTLPURL, dev.APIURL},
 		{"unknown", prod.OTLPURL, prod.APIURL},
 	} {
 		if got := r.Endpoint(cfg, tc.project); got != tc.otlp {
@@ -63,8 +63,8 @@ func TestEachProjectGoesToItsKeysOwnEnvironment(t *testing.T) {
 // an agent that refuses, it is withheld.
 func TestConversationContentNeedsItsAgentsConsent(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
-	pol := config.Policy{Mode: config.ModeRepo, IncludePrompts: true}
-	reply := spool.Event{Name: hookrun.EventAssistantMessage, Attrs: map[string]any{hookrun.AttrTool: "fake"}}
+	pol := config.Policy{Mode: config.ModeRepo, Repositories: listed, IncludePrompts: true}
+	reply := spool.Event{Repository: app, Name: hookrun.EventAssistantMessage, Attrs: map[string]any{hookrun.AttrTool: "fake"}}
 	var asked []string
 	for _, tc := range []struct {
 		name    string
@@ -89,29 +89,23 @@ func TestConversationContentNeedsItsAgentsConsent(t *testing.T) {
 	}
 }
 
-// A queued event is held to the policy in force when it leaves: a project whose record
-// cannot be read, or whose coverage moved out of global mode, sends nothing.
+// A queued event is held to the policy in force when it leaves: one whose coverage moved
+// out of global mode, or whose repository left the list, sends nothing.
 func TestQueuedEventsMeetTodaysPolicy(t *testing.T) {
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
-	start := spool.Event{Name: hookrun.EventSessionStart}
-	logs := config.Policy{Mode: config.ModeRepo}
+	start := spool.Event{Repository: app, Name: hookrun.EventSessionStart}
+	logs := config.Policy{Mode: config.ModeRepo, Repositories: listed}
 	r := Router{}
 	if !r.Allowed(logs, "p1", start) {
-		t.Fatal("an unrecorded project's event was withheld")
+		t.Fatal("a project's event was withheld")
 	}
-	dir, err := routing.Dir()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := writeFile(filepath.Join(dir, "p2.json"), "{"); err != nil {
-		t.Fatal(err)
-	}
-	if r.Allowed(logs, "p2", start) {
-		t.Fatal("an unreadable routing record let an event through")
-	}
-	global := spool.Event{Name: hookrun.EventSessionStart, Global: true}
+	global := spool.Event{Repository: app, Name: hookrun.EventSessionStart, Global: true}
 	if r.Allowed(logs, "p1", global) {
 		t.Fatal("a global-mode event left after coverage moved back to repositories")
+	}
+	logs.Repositories = []string{"github.com/acme/other"}
+	if r.Allowed(logs, "p1", start) {
+		t.Fatal("an event left after its repository left the list")
 	}
 }
 
@@ -124,7 +118,7 @@ func TestAProjectWithoutAPolicyOrAKeyKeepsItsEvents(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, id := range []string{"unfetched", "keyless", ""} {
-		if err := s.Append(spool.Event{Name: hookrun.EventSessionStart, Attrs: map[string]any{hookrun.AttrProjectID: id}}); err != nil {
+		if err := s.Append(spool.Event{Repository: app, Name: hookrun.EventSessionStart, Attrs: map[string]any{hookrun.AttrProjectID: id}}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -132,7 +126,7 @@ func TestAProjectWithoutAPolicyOrAKeyKeepsItsEvents(t *testing.T) {
 		if team == "unfetched" {
 			return config.Policy{}, errors.New("not fetched yet")
 		}
-		return config.Policy{Mode: config.ModeRepo}, nil
+		return config.Policy{Mode: config.ModeRepo, Repositories: listed}, nil
 	}}
 	res := r.Flush(t.Context(), s, &config.Config{}, true, 0)
 	if res.Sent != 0 || res.Held != 2 || res.Unroutable != 1 || res.Err != nil {
@@ -140,9 +134,109 @@ func TestAProjectWithoutAPolicyOrAKeyKeepsItsEvents(t *testing.T) {
 	}
 }
 
-func writeFile(path, data string) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return err
+// An event spooled while the team's policy collected content leaves under the policy in
+// force when it is sent: once tightened, without its content, the rest of it still sent.
+func TestContentSpooledUnderAnOlderPolicyLeavesWithoutIt(t *testing.T) {
+	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	var bodies [][]byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		bodies = append(bodies, b)
+	}))
+	defer srv.Close()
+	if err := keystore.Set("p1", testKey, keystore.Hosts{}); err != nil {
+		t.Fatal(err)
 	}
-	return os.WriteFile(path, []byte(data), 0o600)
+	s, err := spool.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range []spool.Event{
+		{Repository: app, Name: hookrun.EventUserPrompt, SessionID: "s1", Attrs: map[string]any{hookrun.AttrProjectID: "p1", hookrun.AttrTurnID: "turn-1", "prompt": "private prompt"}},
+		{Repository: app, Name: hookrun.EventToolCall, SessionID: "s1", Attrs: map[string]any{hookrun.AttrProjectID: "p1", hookrun.AttrToolCallID: "call-1", "arguments": "private arguments", "output": "private output"}},
+		{Repository: app, Name: hookrun.EventApprovalAsked, SessionID: "s1", Attrs: map[string]any{hookrun.AttrProjectID: "p1", hookrun.AttrReason: "private reason"}},
+	} {
+		if err := s.Append(e); err != nil {
+			t.Fatal(err)
+		}
+	}
+	tightened := config.Policy{Mode: config.ModeRepo, Repositories: listed, TeamID: "p1", FetchedAt: time.Now()}
+	r := Router{OTLPPinned: true, Policy: func(context.Context, *config.Config, string) (config.Policy, error) { return tightened, nil }}
+	res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL}, true, 0)
+	if res.Sent != 3 || res.Err != nil {
+		t.Fatalf("Flush = %+v", res)
+	}
+	sent := string(bytes.Join(bodies, nil))
+	if strings.Contains(sent, "private") {
+		t.Fatalf("content the policy withholds left:\n%q", sent)
+	}
+	for _, kept := range []string{"turn-1", "call-1", hookrun.EventApprovalAsked} {
+		if !strings.Contains(sent, kept) {
+			t.Errorf("%s did not leave with its content withheld", kept)
+		}
+	}
+}
+
+// Outgoing withholds by kind and by switch, and leaves the spooled event as it was.
+func TestOutgoingWithholdsOnlyWhatThePolicyDoes(t *testing.T) {
+	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	call := spool.Event{Repository: app, Name: hookrun.EventToolCall, Attrs: map[string]any{"arguments": "a", "output": "o", hookrun.AttrToolName: "exec"}}
+	prompt := spool.Event{Repository: app, Name: hookrun.EventUserPrompt, Attrs: map[string]any{"prompt": "p"}}
+	promptsOnly := config.Policy{Mode: config.ModeRepo, Repositories: listed, IncludePrompts: true}
+	if out, ok := (Router{}).Outgoing(promptsOnly, "p1", call); !ok || out.Attrs["arguments"] != nil || out.Attrs["output"] != nil || out.Attrs[hookrun.AttrToolName] != "exec" {
+		t.Fatalf("tool call = %+v, %v", out, ok)
+	}
+	if call.Attrs["arguments"] != "a" {
+		t.Fatal("Outgoing changed the spooled event")
+	}
+	if out, ok := (Router{}).Outgoing(promptsOnly, "p1", prompt); !ok || out.Attrs["prompt"] != "p" {
+		t.Fatalf("prompt = %+v, %v", out, ok)
+	}
+	// Not validated: nothing leaves at all.
+	if _, ok := (Router{}).Outgoing(config.NoPolicy("", ""), "p1", prompt); ok {
+		t.Fatal("an event left under no policy")
+	}
+}
+
+// Every event kind the hooks spool is classified, as content-bearing or content-free, so
+// delivery never sends an unknown kind's content past a policy that withholds it.
+func TestEveryHookEventKindIsClassified(t *testing.T) {
+	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	file, err := parser.ParseFile(token.NewFileSet(), "../hooks/hookrun/events.go", nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kinds := 0
+	ast.Inspect(file, func(n ast.Node) bool {
+		spec, ok := n.(*ast.ValueSpec)
+		if !ok {
+			return true
+		}
+		for i, name := range spec.Names {
+			if !strings.HasPrefix(name.Name, "Event") || i >= len(spec.Values) {
+				continue
+			}
+			lit, ok := spec.Values[i].(*ast.BasicLit)
+			if !ok {
+				continue
+			}
+			kind, _ := strconv.Unquote(lit.Value)
+			kinds++
+			if _, content := hookContent[kind]; content == contentFree[kind] {
+				t.Errorf("%s (%s): classify it in exactly one of hookContent or contentFree", name.Name, kind)
+			}
+		}
+		return true
+	})
+	if kinds < 20 {
+		t.Fatalf("found %d event kinds in events.go; the parse missed them", kinds)
+	}
+	// An unclassified kind leaves only under a policy that withholds nothing.
+	unknown := spool.Event{Repository: app, Name: "terma.something.new", Attrs: map[string]any{"text": "private"}}
+	if _, ok := (Router{}).Outgoing(config.Policy{Mode: config.ModeRepo, Repositories: listed, IncludeToolContent: true}, "p1", unknown); ok {
+		t.Error("an unclassified kind left under a policy withholding prompts")
+	}
+	if _, ok := (Router{}).Outgoing(config.Policy{Mode: config.ModeRepo, Repositories: listed, IncludePrompts: true, IncludeToolContent: true}, "p1", unknown); !ok {
+		t.Error("an unclassified kind was withheld under a policy withholding nothing")
+	}
 }

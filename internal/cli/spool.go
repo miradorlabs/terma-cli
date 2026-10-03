@@ -87,7 +87,7 @@ The exit status distinguishes the outcomes a script needs apart:
 func describeFlush(res delivery.Result) (delivered string, undelivered []string) {
 	delivered = fmt.Sprintf("%d event%s", res.Sent, plural(res.Sent))
 	if res.Held > 0 {
-		undelivered = append(undelivered, fmt.Sprintf("holding %d for a team key (run `terma install` in their repositories)", res.Held))
+		undelivered = append(undelivered, fmt.Sprintf("holding %d for a team key (run `terma setup`)", res.Held))
 	}
 	if res.Failed > 0 {
 		undelivered = append(undelivered, fmt.Sprintf("keeping %d queued after a failed delivery", res.Failed))

@@ -14,7 +14,6 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
-	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 	"github.com/miradorlabs/terma-cli/internal/trailer"
 )
@@ -24,10 +23,10 @@ func TestActiveSessionFallbackAndMergeSkip(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now()
 	env := func(stdin string, args ...string) Env {
-		return Env{Now: now, Cwd: root, Args: args, Stdin: strings.NewReader(stdin), Version: "test"}
+		return Env{Now: now, Cwd: root, Policy: hookruntest.Admitting(root), Args: args, Stdin: strings.NewReader(stdin), Version: "test"}
 	}
 	// A session announced with no files falls back to active-session attribution.
-	if err := (Extension{Tool: "codex"}).sessionStart(ctx, env(`{"session_id":"thread-9","cwd":"`+root+`","model":"gpt-5.4"}`)); err != nil {
+	if err := (Extension{Tool: "codex"}).sessionStart(ctx, env(`{"session_id":"thread-9","cwd":"`+hookruntest.InJSON(root)+`","model":"gpt-5.4"}`)); err != nil {
 		t.Fatal(err)
 	}
 	hookruntest.WriteFile(t, root, "a.txt", "a\n")
@@ -114,18 +113,18 @@ func TestPostCommitReportsPerFileLineStats(t *testing.T) {
 	sp, _ := spool.Open(t.TempDir())
 	now := time.Now()
 	env := func(at time.Time, stdin string, args ...string) Env {
-		return Env{Now: at, Cwd: root, Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
+		return Env{Now: at, Cwd: root, Policy: hookruntest.Admitting(root), Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
 	}
 	touch := func(at time.Time, sessionID, rel string) {
 		t.Helper()
-		in := `{"session_id":"` + sessionID + `","cwd":"` + root + `","tool_name":"Edit","tool_input":{"file_path":"` + filepath.Join(root, rel) + `"}}`
+		in := `{"session_id":"` + sessionID + `","cwd":"` + hookruntest.InJSON(root) + `","tool_name":"Edit","tool_input":{"file_path":"` + hookruntest.InJSON(filepath.Join(root, rel)) + `"}}`
 		if err := editFile(ctx, env(at, in)); err != nil {
 			t.Fatal(err)
 		}
 	}
 
 	for _, id := range []string{"sess-a", "sess-b"} {
-		if err := startSession(ctx, env(now, `{"session_id":"`+id+`","cwd":"`+root+`","hook_event_name":"SessionStart","source":"startup"}`)); err != nil {
+		if err := startSession(ctx, env(now, `{"session_id":"`+id+`","cwd":"`+hookruntest.InJSON(root)+`","hook_event_name":"SessionStart","source":"startup"}`)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -211,16 +210,16 @@ func TestPostCommitBoundsFileStats(t *testing.T) {
 	sp, _ := spool.Open(t.TempDir())
 	now := time.Now()
 	env := func(stdin string, args ...string) Env {
-		return Env{Now: now, Cwd: root, Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
+		return Env{Now: now, Cwd: root, Policy: hookruntest.Admitting(root), Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
 	}
-	if err := startSession(ctx, env(`{"session_id":"sess-wide","cwd":"`+root+`","hook_event_name":"SessionStart"}`)); err != nil {
+	if err := startSession(ctx, env(`{"session_id":"sess-wide","cwd":"`+hookruntest.InJSON(root)+`","hook_event_name":"SessionStart"}`)); err != nil {
 		t.Fatal(err)
 	}
 	total := MaxCommitFileStats + 5
 	for i := range total {
 		rel := fmt.Sprintf("src/f%03d.go", i)
 		hookruntest.WriteFile(t, root, rel, "package p\n")
-		if err := editFile(ctx, env(`{"session_id":"sess-wide","cwd":"`+root+`","tool_name":"Write","tool_input":{"file_path":"`+filepath.Join(root, rel)+`"}}`)); err != nil {
+		if err := editFile(ctx, env(`{"session_id":"sess-wide","cwd":"`+hookruntest.InJSON(root)+`","tool_name":"Write","tool_input":{"file_path":"`+hookruntest.InJSON(filepath.Join(root, rel))+`"}}`)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -265,12 +264,9 @@ func TestPostCommitOnAnUnstampedCommitEmitsOnlyACount(t *testing.T) {
 	root := initRepo(t)
 	ctx := context.Background()
 	sp, _ := spool.Open(t.TempDir())
-	env := Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(""), Spool: sp, Version: "test"}
-	// A credentialed remote and a binding, so the event carries every field it may.
-	if _, err := gitx.Git(ctx, root, "remote", "add", "origin", "https://dev:ghp_secret@github.com/o/r.git"); err != nil {
-		t.Fatal(err)
-	}
-	if err := project.Save(root, &project.File{Project: project.Project{ID: "proj_test"}}); err != nil {
+	env := Env{Now: time.Now(), Cwd: root, Policy: listing("github.com/o/r"), Stdin: strings.NewReader(""), Spool: sp, Version: "test", Team: "proj_test"}
+	// A credentialed remote and a team, so the event carries every field it may.
+	if _, err := gitx.Git(ctx, root, "remote", "set-url", "origin", "https://dev:ghp_secret@github.com/o/r.git"); err != nil {
 		t.Fatal(err)
 	}
 	hookruntest.WriteFile(t, root, "notes/human.md", "mine\nall mine\n")
@@ -324,12 +320,9 @@ func TestCommitEventsAreOneFilterApart(t *testing.T) {
 	sp, _ := spool.Open(t.TempDir())
 	now := time.Now()
 	env := func(stdin string, args ...string) Env {
-		return Env{Now: now, Cwd: root, Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
+		return Env{Now: now, Cwd: root, Policy: listing("github.com/o/r"), Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test", Team: "proj_test"}
 	}
-	if _, err := gitx.Git(ctx, root, "remote", "add", "origin", "git@github.com:o/r.git"); err != nil {
-		t.Fatal(err)
-	}
-	if err := project.Save(root, &project.File{Project: project.Project{ID: "proj_test"}}); err != nil {
+	if _, err := gitx.Git(ctx, root, "remote", "set-url", "origin", "git@github.com:o/r.git"); err != nil {
 		t.Fatal(err)
 	}
 	msgPath := filepath.Join(t.TempDir(), "MSG")
@@ -355,11 +348,11 @@ func TestCommitEventsAreOneFilterApart(t *testing.T) {
 	// A human commit, then an agent commit.
 	hookruntest.WriteFile(t, root, "notes/human.md", "mine\n")
 	humanSHA := commit("notes/human.md", "human note")
-	if err := startSession(ctx, env(`{"session_id":"sess-1","cwd":"`+root+`","hook_event_name":"SessionStart"}`)); err != nil {
+	if err := startSession(ctx, env(`{"session_id":"sess-1","cwd":"`+hookruntest.InJSON(root)+`","hook_event_name":"SessionStart"}`)); err != nil {
 		t.Fatal(err)
 	}
 	hookruntest.WriteFile(t, root, "src/agent.go", "package src\n")
-	if err := editFile(ctx, env(`{"session_id":"sess-1","cwd":"`+root+`","tool_name":"Write","tool_input":{"file_path":"`+filepath.Join(root, "src", "agent.go")+`"}}`)); err != nil {
+	if err := editFile(ctx, env(`{"session_id":"sess-1","cwd":"`+hookruntest.InJSON(root)+`","tool_name":"Write","tool_input":{"file_path":"`+hookruntest.InJSON(filepath.Join(root, "src", "agent.go"))+`"}}`)); err != nil {
 		t.Fatal(err)
 	}
 	agentSHA := commit("src/agent.go", "Add agent code")
@@ -407,7 +400,7 @@ func TestPostCommitSkipsMergeAndSquashCommits(t *testing.T) {
 	root := initRepo(t)
 	ctx := context.Background()
 	sp, _ := spool.Open(t.TempDir())
-	env := Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(""), Spool: sp, Version: "test"}
+	env := Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Stdin: strings.NewReader(""), Spool: sp, Version: "test"}
 	git := func(args ...string) {
 		t.Helper()
 		if _, err := gitx.Git(ctx, root, args...); err != nil {

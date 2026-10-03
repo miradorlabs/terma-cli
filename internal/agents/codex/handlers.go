@@ -114,13 +114,11 @@ type codexHookInput struct {
 
 const codexDesktopSurface = "desktop"
 
-func codexDesktopRoute(r *hookrun.Repo) (hookrun.Route, bool) {
-	if r.ProjectID == "" {
-		return hookrun.Route{}, false
-	}
-	rec, ok, err := r.Route()
-	return rec, err == nil && ok && slices.Contains(rec.Surfaces, name) &&
-		slices.Contains(rec.Harnesses, name) && slices.Contains(rec.Signals, "logs")
+// codexDesktopRoute reports whether this repository's Codex Desktop logs are sent: Codex
+// is among the developer's agents and the session has a project. What content they carry
+// is the team policy's call.
+func codexDesktopRoute(e hookrun.Env, r *hookrun.Repo) bool {
+	return r.ProjectID != "" && slices.Contains(e.Agents, name)
 }
 
 func readCodexHookInput(r io.Reader) (*codexHookInput, error) {
@@ -149,7 +147,7 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 	env.SetActive(r, sess)
 	env.PruneManifests(r, sess.UpdatedAt)
 	attrs := map[string]any{hookrun.AttrSource: in.Source}
-	if _, desktop := codexDesktopRoute(r); desktop {
+	if codexDesktopRoute(env, r) {
 		attrs["capture_surface"] = codexDesktopSurface
 		if dir, err := config.Dir(); err == nil {
 			hookrun.PruneState(filepath.Join(dir, codexToolStartDir), env.Time().Add(-spool.MaxAge))
@@ -164,8 +162,8 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 	return nil
 }
 
-// userPromptSubmit records a desktop turn; the prompt travels only where the
-// repository opted into prompt content.
+// userPromptSubmit records a desktop turn, prompt and all: delivery withholds what the
+// team's policy does not collect.
 func userPromptSubmit(ctx context.Context, env hookrun.Env) error {
 	in, err := readCodexHookInput(env.Stdin)
 	if err != nil || !session.ValidID(in.SessionID) {
@@ -176,8 +174,7 @@ func userPromptSubmit(ctx context.Context, env hookrun.Env) error {
 	if err != nil {
 		return nil
 	}
-	route, desktop := codexDesktopRoute(r)
-	if !desktop || in.TurnID == "" {
+	if !codexDesktopRoute(env, r) || in.TurnID == "" {
 		return nil
 	}
 	attrs := hookrun.EvidenceAttrs(codexTool, sourceCodexHook, "UserPromptSubmit")
@@ -185,9 +182,7 @@ func userPromptSubmit(ctx context.Context, env hookrun.Env) error {
 	attrs["prompt_bytes"] = len(in.Prompt)
 	hookrun.BoundedAttr(attrs, hookrun.AttrTurnID, in.TurnID)
 	hookrun.BoundedAttr(attrs, hookrun.AttrModel, in.Model)
-	if route.IncludePrompts {
-		attrs["prompt"] = boundedCodexContent(in.Prompt)
-	}
+	attrs["prompt"] = boundedCodexContent(in.Prompt)
 	env.EmitFor(r, spool.Event{Name: hookrun.EventUserPrompt, SessionID: in.SessionID, Repo: r.Name, Attrs: attrs})
 	return nil
 }
@@ -250,7 +245,7 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	captureCodexFunding(ctx, env, r, in)
-	if route, desktop := codexDesktopRoute(r); desktop && in.ToolName != "" {
+	if codexDesktopRoute(env, r) && in.ToolName != "" {
 		attrs := hookrun.EvidenceAttrs(codexTool, sourceCodexHook, "PostToolUse")
 		attrs["capture_surface"] = codexDesktopSurface
 		hookrun.BoundedAttr(attrs, hookrun.AttrToolName, in.ToolName)
@@ -261,10 +256,8 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 			attrs["duration_ms"] = elapsed
 			attrs["duration_source"] = "hook_elapsed"
 		}
-		if route.IncludeToolContent {
-			attrs["arguments"] = boundedCodexContent(string(in.ToolInput))
-			attrs["output"] = boundedCodexContent(string(in.ToolResponse))
-		}
+		attrs["arguments"] = boundedCodexContent(string(in.ToolInput))
+		attrs["output"] = boundedCodexContent(string(in.ToolResponse))
 		if success, known := codexToolSuccess(in.ToolResponse); known {
 			if success {
 				attrs[hookrun.AttrStatus] = "completed"
@@ -282,7 +275,7 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	// The call's path fields and its patch can name the same file.
 	attrs := hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType)
 	hookrun.BoundedAttr(attrs, hookrun.AttrToolCallID, in.ToolUseID)
-	if _, desktop := codexDesktopRoute(r); desktop {
+	if codexDesktopRoute(env, r) {
 		attrs["capture_surface"] = codexDesktopSurface
 	}
 	env.Touch(r, session.Session{ID: in.SessionID, Tool: codexTool, Model: in.Model}, in.ToolName,

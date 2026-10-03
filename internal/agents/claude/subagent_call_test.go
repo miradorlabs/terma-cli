@@ -38,7 +38,7 @@ const launchedAgentResponse = `{"isAsync":true,"status":"async_launched","agentI
 
 func runPostToolUse(t *testing.T, root string, sp *spool.Spool, payload string) {
 	t.Helper()
-	env := hookrun.Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(payload), Spool: sp, Version: "test"}
+	env := hookrun.Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Stdin: strings.NewReader(payload), Spool: sp, Version: "test"}
 	if err := postToolUse(context.Background(), env); err != nil {
 		t.Fatalf("a hook must never fail: %v", err)
 	}

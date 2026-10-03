@@ -11,8 +11,6 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
-	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/shellrc"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
@@ -49,7 +47,8 @@ func otherTermas(primary string, binDirs []string) []string {
 		}
 		candidate := filepath.Join(dir, name)
 		info, err := os.Stat(candidate)
-		if err != nil || info.IsDir() || info.Mode()&0o111 == 0 || os.SameFile(info, primaryInfo) {
+		// Windows has no executable bit; the .exe name is what makes it one.
+		if err != nil || info.IsDir() || runtime.GOOS != "windows" && info.Mode()&0o111 == 0 || os.SameFile(info, primaryInfo) {
 			continue
 		}
 		resolved, err := filepath.EvalSymlinks(candidate)
@@ -131,47 +130,12 @@ func shellPath(path string) string {
 	return "'" + strings.ReplaceAll(path, "'", `'\''`) + "'"
 }
 
-// HookCaller is how the hooks in play reach terma.
-type HookCaller int
-
-const (
-	// ByFullPath is machine-wide hooks only: setup writes terma's absolute path into them.
-	ByFullPath HookCaller = iota
-	// ByName is a repository's committed hooks, which run `terma` from PATH.
-	ByName
-)
-
-// agentHookDirs are the directories a committed agent hook adds to the system PATH an agent
-// started from the Dock or an IDE gets; a var so tests can stand in.
-var agentHookDirs = func() []string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return []string{"/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"}
-	}
-	return append(hookmgr.HookPathDirs(home), "/usr/bin", "/bin")
-}
-
-// HookCallerFor is how hooks reach terma in the workspace at root: a bound repository's
-// committed hooks call it by name, and elsewhere only machine-wide hooks run.
-func HookCallerFor(root, gitDir string, repoErr error) HookCaller {
-	if repoErr == nil {
-		if _, _, err := termaproject.Resolve(root, gitDir); err == nil {
-			return ByName
-		}
-	}
-	return ByFullPath
-}
-
-// BinaryCheck checks that the hooks in play run exe's build, looking for other builds along
-// PATH and in binDirs. Only committed hooks look terma up by name.
-func BinaryCheck(exe string, binDirs []string, caller HookCaller) Check {
+// BinaryCheck checks the terma on PATH is exe's build, looking for other builds along PATH
+// and in binDirs; the hooks themselves run terma by the full path setup wrote into them.
+func BinaryCheck(exe string, binDirs []string) Check {
 	path, err := exec.LookPath("terma")
 	if err != nil {
-		if caller == ByFullPath {
-			return Check{Status: Pass, Detail: "not on PATH; machine-wide hooks run terma by the full path setup wrote into them (a repository's committed hooks need it on PATH)"}
-		}
-		return Check{Status: Fail, Detail: "this repository's hooks call `terma` by name and will not find it",
-			Fix: "run `" + AddToPathCommand(filepath.Dir(exe)) + "` to put " + filepath.Dir(exe) + " on PATH (or reinstall with the install script)"}
+		return Check{Status: Pass, Detail: "not on PATH; the machine-wide hooks run terma by the full path setup wrote into them"}
 	}
 	if current, err := fileDigest(exe); err == nil {
 		if installed, err := installedBinaryDigest(path); err == nil && current != installed {
@@ -187,30 +151,7 @@ func BinaryCheck(exe string, binDirs []string, caller HookCaller) Check {
 			Detail: path + binaryBuildLabel(path) + "; a different build is also installed: " + strings.Join(others, ", "),
 			Fix:    "replace or remove the other copy — an agent started outside this shell (from the Dock, an IDE) can resolve `terma` to it"}
 	}
-	if caller == ByName && runtime.GOOS != "windows" && !onAgentHookPath() {
-		return Check{Status: Warn,
-			Detail: path + binaryBuildLabel(path) + "; an agent started from the Dock or an IDE looks only in " + tildeList(agentHookDirs()) + ", so its hooks will not find it",
-			Fix:    "run `mkdir -p ~/.local/bin && ln -sf " + shellPath(path) + " ~/.local/bin/terma`"}
-	}
 	return Check{Status: Pass, Detail: path + binaryBuildLabel(path)}
-}
-
-func tildeList(paths []string) string {
-	short := make([]string, len(paths))
-	for i, p := range paths {
-		short[i] = output.TildePath(p)
-	}
-	return strings.Join(short, ", ")
-}
-
-// onAgentHookPath reports whether a committed hook run with an agent's system PATH finds terma.
-func onAgentHookPath() bool {
-	for _, dir := range agentHookDirs() {
-		if info, err := os.Stat(filepath.Join(dir, "terma")); err == nil && !info.IsDir() && info.Mode()&0o111 != 0 {
-			return true
-		}
-	}
-	return false
 }
 
 // binaryBuildLabel reads build metadata without running an executable found on PATH.

@@ -18,8 +18,7 @@ func captureCodexDesktopActivity(ctx context.Context, e hookrun.Env, r *hookrun.
 	if e.Spool == nil || !session.ValidID(in.SessionID) {
 		return
 	}
-	route, enabled := codexDesktopRoute(r)
-	if !enabled {
+	if !codexDesktopRoute(e, r) {
 		return
 	}
 	dir, err := config.Dir()
@@ -52,7 +51,7 @@ func captureCodexDesktopActivity(ctx context.Context, e hookrun.Env, r *hookrun.
 		if at.IsZero() || at.After(e.Time()) {
 			at = e.Time()
 		}
-		ev := spool.Event{Time: at, SessionID: in.SessionID, Repo: r.Name, Attrs: attrs}
+		ev := spool.Event{Time: at, SessionID: in.SessionID, Repo: r.Name, Repository: r.Repository, Attrs: attrs}
 		switch a.Kind {
 		case "model":
 			ev.Name = hookrun.EventModelCall
@@ -71,9 +70,7 @@ func captureCodexDesktopActivity(ctx context.Context, e hookrun.Env, r *hookrun.
 				attrs["duration_ms"] = a.DurationMs
 				attrs["duration_source"] = "rollout_item"
 			}
-			if route.IncludeToolContent {
-				attrs["arguments"] = boundedCodexContent(a.Input)
-			}
+			attrs["arguments"] = boundedCodexContent(a.Input)
 		case "compaction":
 			ev.Name = hookrun.EventCompaction
 			attrs["item_id"] = a.ID
@@ -99,7 +96,7 @@ func captureCodexDesktopActivity(ctx context.Context, e hookrun.Env, r *hookrun.
 		default:
 			return nil
 		}
-		// Spooled without Env.EmitFor, so the binding is stamped here: with no project id the
+		// Spooled without Env.EmitFor, so the team is stamped here: with no project id the
 		// flush drops it as unroutable.
 		if r.ProjectID != "" {
 			attrs[hookrun.AttrProjectID] = r.ProjectID

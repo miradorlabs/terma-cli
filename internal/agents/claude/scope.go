@@ -163,24 +163,12 @@ var captureKeys = []string{
 	otelLogToolContent,
 }
 
-func intendsCapture(key string, e harness.Exporter) bool {
-	switch key {
-	case otelLogUserPrompts, otelLogAssistantResponse:
-		return e.IncludePrompts
-	case otelLogToolDetails, otelLogToolContent:
-		return e.IncludeToolContent
-	}
-	return false
-}
-
-// captureConflictsIn reports content capture an outranking scope turns off. Advisory: it never
-// blocks a connect, it only says why a dashboard stays empty.
-func captureConflictsIn(e harness.Exporter, l claudeLayer) []harness.Conflict {
+// captureConflictsIn reports content capture an outranking scope turns off: terma always
+// asks for it, since the team's policy decides what leaves. Advisory: it never blocks a
+// connect, it only says why a dashboard stays empty.
+func captureConflictsIn(l claudeLayer) []harness.Conflict {
 	var out []harness.Conflict
 	for _, key := range captureKeys {
-		if !intendsCapture(key, e) {
-			continue
-		}
 		if value := os.Getenv(key); value != "" && !isOn(value) {
 			out = append(out, harness.Conflict{
 				Key:       key,
@@ -192,13 +180,13 @@ func captureConflictsIn(e harness.Exporter, l claudeLayer) []harness.Conflict {
 			})
 		}
 	}
-	out = append(out, captureConflictsInProjectFiles(e, l)...)
+	out = append(out, captureConflictsInProjectFiles(l)...)
 	return out
 }
 
-// captureConflictsInProjectFiles is captureConflictsIn for project files; a value terma's own
-// local connect wrote is named as the repository's policy.
-func captureConflictsInProjectFiles(e harness.Exporter, l claudeLayer) []harness.Conflict {
+// captureConflictsInProjectFiles is captureConflictsIn for project files; a value an
+// earlier terma's local connect wrote is named as such, with the install that removes it.
+func captureConflictsInProjectFiles(l claudeLayer) []harness.Conflict {
 	var out []harness.Conflict
 	for _, path := range l.outranking {
 		data, err := os.ReadFile(path)
@@ -214,13 +202,12 @@ func captureConflictsInProjectFiles(e harness.Exporter, l claudeLayer) []harness
 		owned := termaOwnedKeys(path, doc.Env)
 		for _, key := range captureKeys {
 			value, ok := doc.Env[key]
-			if !ok || value == "" || isOn(value) || !intendsCapture(key, e) {
+			if !ok || value == "" || isOn(value) {
 				continue
 			}
 			reason := "set off in " + path + ", which Claude Code applies over " + l.over
 			if owned[key] {
-				reason = "turned off by this repository's Terma policy in " + path +
-					" (change it by running `terma install` here with --prompts or --exclude-tool-content)"
+				reason = "turned off in " + path + " by an earlier terma (remove it from that file)"
 			}
 			out = append(out, harness.Conflict{
 				Key:       key,

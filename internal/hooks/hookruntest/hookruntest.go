@@ -4,22 +4,28 @@ package hookruntest
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// InitRepo creates a git repository with a private terma config directory and returns its resolved path.
+// InitRepo creates a git repository, origin github.com/acme/<its folder>, with a private
+// terma config directory and returns its resolved path. Git's global and system config are ignored, since a developer's global
+// core.hooksPath would run the installed terma's hooks inside the test.
 func InitRepo(t *testing.T) string {
 	t.Helper()
 	t.Setenv("TERMA_CONFIG_DIR", t.TempDir())
+	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(t.TempDir(), "gitconfig"))
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not installed")
 	}
@@ -29,6 +35,7 @@ func InitRepo(t *testing.T) string {
 		{"config", "user.email", "dev@example.com"},
 		{"config", "user.name", "Dev"},
 		{"config", "commit.gpgsign", "false"},
+		{"remote", "add", "origin", "https://github.com/acme/" + filepath.Base(dir) + ".git"},
 	} {
 		if _, err := gitx.Git(context.Background(), dir, args...); err != nil {
 			t.Fatalf("git %v: %v", args, err)
@@ -74,11 +81,21 @@ func Spooled(t *testing.T, sp *spool.Spool) []spool.Event {
 	return out
 }
 
-// Project is a repository bound to project-a and a private spool for its hooks.
+// Team is the team the developer chose at setup in these tests.
+const Team = "project-a"
+
+// Admitting is a repository-mode policy, content on, that lists the repository InitRepo
+// made at root.
+func Admitting(root string) config.Policy {
+	p := config.DefaultPolicy()
+	p.Repositories = []string{"github.com/acme/" + filepath.Base(root)}
+	return p
+}
+
+// Project is a repository and a private spool for its hooks, which run for Team.
 func Project(t *testing.T) (root string, sp *spool.Spool) {
 	t.Helper()
 	root = InitRepo(t)
-	WriteFile(t, root, ".terma/settings.json", `{"project":{"id":"project-a"}}`)
 	sp, err := spool.Open(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -144,4 +161,11 @@ func RelayOn(t *testing.T) {
 	if err := os.WriteFile(path, []byte("local"), 0o600); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// InJSON is s as it reads inside a JSON string, the way an agent writes a path into a
+// payload: a Windows path's backslashes escaped.
+func InJSON(s string) string {
+	b, _ := json.Marshal(s)
+	return string(b[1 : len(b)-1])
 }

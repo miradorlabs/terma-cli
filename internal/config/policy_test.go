@@ -43,3 +43,40 @@ func TestPolicyExpires(t *testing.T) {
 		t.Fatal("a policy never fetched reports an age")
 	}
 }
+
+// Content is the team's policy alone: a policy not validated withholds all of it.
+func TestContentIsTheTeamPolicys(t *testing.T) {
+	for _, c := range []struct {
+		name          string
+		pol           Policy
+		prompts, tool bool
+	}{
+		{"both on", Policy{Mode: ModeRepo, IncludePrompts: true, IncludeToolContent: true}, true, true},
+		{"both off", Policy{Mode: ModeRepo}, false, false},
+		{"prompts only", Policy{Mode: ModeRepo, IncludePrompts: true}, true, false},
+		{"tool content only", Policy{Mode: ModeRepo, IncludeToolContent: true}, false, true},
+		{"not validated", NoPolicy("", ""), false, false},
+	} {
+		if prompts, tool := c.pol.Content(); prompts != c.prompts || tool != c.tool {
+			t.Errorf("%s: prompts=%v tool content=%v, want %v %v", c.name, prompts, tool, c.prompts, c.tool)
+		}
+	}
+}
+
+// Hooks apply a policy once validated, NoPolicy before; a list of no usable entry admits none.
+func TestPolicyInForceAndAdmitsNone(t *testing.T) {
+	t.Setenv("TERMA_POLICY_STUB", "")
+	fetched := Policy{Mode: ModeRepo, Repositories: []string{"github.com/acme/app"}, TeamID: "t", FetchedAt: time.Now()}
+	if got := fetched.InForce("org", "a"); got.CollectsNothing || got.AdmitsNone() {
+		t.Fatalf("a validated policy was not in force: %+v", got)
+	}
+	if got := (Policy{Mode: ModeGlobal}).InForce("org", "a"); got.Global() || !got.CollectsNothing || !got.AdmitsNone() {
+		t.Fatalf("an unvalidated policy was in force: %+v", got)
+	}
+	blank := fetched
+	blank.Repositories = []string{" ", "/", "app", "github.com/acme"}
+	global := Policy{Mode: ModeGlobal, TeamID: "t", FetchedAt: time.Now()}
+	if !blank.AdmitsNone() || global.AdmitsNone() {
+		t.Fatal("AdmitsNone misjudged a blank list or global mode")
+	}
+}

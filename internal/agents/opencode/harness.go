@@ -62,21 +62,20 @@ type opencodeConfig struct {
 	ProjectAttribute string `json:"projectAttribute,omitempty"`
 }
 
-// opencodePolicy is the repository-scope file: what a repository may decide.
+// opencodePolicy is the repository-scope file: what a repository may decide. Content is not
+// among it; an earlier terma's includePrompts and includeToolContent are read only to be
+// found stale, and a rewrite drops them.
 type opencodePolicy struct {
 	Signals            []string `json:"signals"`
-	IncludePrompts     bool     `json:"includePrompts"`
-	IncludeToolContent bool     `json:"includeToolContent"`
+	IncludePrompts     *bool    `json:"includePrompts,omitempty"`
+	IncludeToolContent *bool    `json:"includeToolContent,omitempty"`
 }
 
-// Name is the token `terma connect` and `--harness` accept.
+// Name is the token `--harness` accepts.
 func (exporter) Name() string { return name }
 
 // DisplayName is how the agent is written in prose.
 func (exporter) DisplayName() string { return displayName }
-
-// SupportsHeadersHelper is true: the plugin runs the helper script itself.
-func (exporter) SupportsHeadersHelper() bool { return true }
 
 // Local is the exporter bound to the repository at root.
 func (exporter) Local(root string) (harness.Harness, bool) { return exporter{root: root}, true }
@@ -115,8 +114,8 @@ func (c exporter) config(e harness.Exporter) opencodeConfig {
 	cfg := opencodeConfig{
 		Version:            1,
 		Signals:            harness.SignalNames(e.Signals),
-		IncludePrompts:     e.IncludePrompts,
-		IncludeToolContent: e.IncludeToolContent,
+		IncludePrompts:     true,
+		IncludeToolContent: true,
 	}
 	if c.root != "" {
 		return cfg
@@ -197,8 +196,8 @@ func (c exporter) Status() (harness.Status, error) {
 		}
 		status.HasPolicy = true
 		status.Signals = harness.SignalsFromNames(policy.Signals)
-		status.IncludePrompts = policy.IncludePrompts
-		status.IncludeToolContent = policy.IncludeToolContent
+		status.StaleContent = policy.IncludePrompts != nil && !*policy.IncludePrompts ||
+			policy.IncludeToolContent != nil && !*policy.IncludeToolContent
 		status.ManagedKeys = 1
 		return status, nil
 	}
@@ -210,8 +209,6 @@ func (c exporter) Status() (harness.Status, error) {
 	status.ManagedKeys = 1
 	status.Endpoint = cfg.Endpoint
 	status.Signals = harness.SignalsFromNames(cfg.Signals)
-	status.IncludePrompts = cfg.IncludePrompts
-	status.IncludeToolContent = cfg.IncludeToolContent
 	status.ProjectID = cfg.ResourceAttributes[harness.AttrProjectID]
 	status.Connected = cfg.Endpoint != "" && (cfg.HeadersHelper != "" || cfg.Headers[opencodeAuthorizationHeader] != "")
 	status.KeyPrefix = harness.MaskKey(opencodeKey(cfg))
@@ -265,9 +262,7 @@ func (c exporter) Connect(e harness.Exporter, _ bool) error {
 	cfg := c.config(e)
 
 	if c.root != "" {
-		data, err := json.MarshalIndent(opencodePolicy{
-			Signals: cfg.Signals, IncludePrompts: cfg.IncludePrompts, IncludeToolContent: cfg.IncludeToolContent,
-		}, "", "  ")
+		data, err := json.MarshalIndent(opencodePolicy{Signals: cfg.Signals}, "", "  ")
 		if err != nil {
 			return err
 		}
@@ -290,49 +285,6 @@ func (c exporter) Connect(e harness.Exporter, _ bool) error {
 		mode = harness.SettingsMode
 	}
 	return config.WriteFileAtomic(path, src, mode)
-}
-
-// ConnectPerRepo writes this project's headers helper and the shared plugin in per-repo
-// mode, which resolves each session's project and helper at runtime.
-func (exporter) ConnectPerRepo(e harness.Exporter) error {
-	helper, err := harness.HelperFilePath(exporter{}, e.ProjectID)
-	if err != nil {
-		return err
-	}
-	if err := harness.WriteHelper(helper, e.APIKey); err != nil {
-		return err
-	}
-	helpersDir, err := harness.HelpersDir()
-	if err != nil {
-		return err
-	}
-	cfg := opencodeConfig{
-		Version:  1,
-		Endpoint: e.Endpoint,
-		Signals:  harness.SignalNames(e.Signals),
-		// The file is shared by every bound repository, so content capture stays off
-		// here and is opted into per repository by its committed policy.
-		IncludePrompts:     false,
-		IncludeToolContent: false,
-		ResourceAttributes: opencodeBaseAttributes(e),
-		HookCommand:        []string{"terma", "hook"},
-		PerRepo:            true,
-		HelpersDir:         helpersDir,
-		HelperPrefix:       exporter{}.Name() + "-otel-",
-		ProjectAttribute:   harness.AttrProjectID,
-	}
-	path, err := (exporter{}).ConfigPath()
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return fmt.Errorf("create %s: %w", filepath.Dir(path), err)
-	}
-	src, err := renderPlugin(cfg)
-	if err != nil {
-		return err
-	}
-	return config.WriteFileAtomic(path, src, 0o644)
 }
 
 // RefreshPlugin re-splices an installed plugin's configuration into this build's source,
@@ -362,18 +314,6 @@ func (exporter) RefreshPlugin() (string, bool, error) {
 		return path, false, err
 	}
 	return path, true, config.WriteFileAtomic(path, src, info.Mode().Perm())
-}
-
-// opencodeBaseAttributes are e's resource attributes but the project id, stamped per repository.
-func opencodeBaseAttributes(e harness.Exporter) map[string]string {
-	out := map[string]string{}
-	for k, v := range e.ResourceAttributes {
-		if k == "" || v == "" || k == harness.AttrProjectID {
-			continue
-		}
-		out[k] = v
-	}
-	return out
 }
 
 // Disconnect removes the plugin and terma's helper, or the repository's policy file.
@@ -424,20 +364,6 @@ func (c exporter) CurrentCredential(endpoint, projectID string) (string, bool) {
 		return key, true
 	}
 	return "", false
-}
-
-// ConnectNotes says what is particular about OpenCode before the user confirms.
-func (c exporter) ConnectNotes(e harness.Exporter) []string {
-	var notes []string
-	if e.HasSignal(harness.SignalMetrics) {
-		notes = append(notes, "OpenCode's plugin sends traces and events only; token counts and cost ride on each model-call span, so there is no separate metrics stream.")
-	}
-	if c.root == "" {
-		notes = append(notes,
-			"OpenCode loads plugins at startup — restart it after connecting.",
-			"Commit attribution runs `terma hook` from inside OpenCode, so terma must be on the PATH OpenCode starts with.")
-	}
-	return notes
 }
 
 // Backup takes none.
