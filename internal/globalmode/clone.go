@@ -139,6 +139,34 @@ func unwireClones(ctx context.Context) error {
 	return os.RemoveAll(base)
 }
 
+// RoutedClones are the roots of the clones WireClone routed through terma's hooks that
+// still exist.
+func RoutedClones() []string {
+	base, err := config.Dir()
+	if err != nil {
+		return nil
+	}
+	entries, _ := os.ReadDir(filepath.Join(base, cloneHooksDir))
+	var roots []string
+	for _, e := range entries {
+		data, _ := os.ReadFile(filepath.Join(base, cloneHooksDir, e.Name(), cloneGitDir))
+		gitDir := strings.TrimSpace(string(data))
+		if gitDir == "" {
+			continue
+		}
+		if _, err := os.Stat(gitDir); err != nil {
+			continue
+		}
+		root := filepath.Dir(gitDir)
+		// A linked worktree's git directory names its checkout in gitdir.
+		if wt, err := os.ReadFile(filepath.Join(gitDir, "gitdir")); err == nil {
+			root = filepath.Dir(strings.TrimSpace(string(wt)))
+		}
+		roots = append(roots, root)
+	}
+	return roots
+}
+
 // IsCloneHooksDir reports whether path, a core.hooksPath as git reads it, is one terma set
 // for a clone.
 func IsCloneHooksDir(path string) bool {

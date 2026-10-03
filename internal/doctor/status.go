@@ -11,6 +11,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
+	"github.com/miradorlabs/terma-cli/internal/globalmode"
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
@@ -173,6 +174,12 @@ func machineRows(cfg *config.Config) []Row {
 		rows = append(rows, Row{"Capture", "off: the collection policy has not been refreshed for over a week — run `terma setup`"})
 	case cfg.Policy.Validated():
 		rows = append(rows, Row{"Collecting", PolicySummary(cfg.Policy)})
+	}
+	if clones := globalmode.RoutedClones(); len(clones) > 0 {
+		rows = append(rows, Row{"Clones", "a clone with its own hooks path gets a git config entry routing it through terma's hooks; its own hooks (husky's, say) still run, and `terma teardown` removes the entry. Routed:"})
+		for _, c := range clones {
+			rows = append(rows, Row{"", "  " + output.TildePath(c)})
+		}
 	}
 	// Name the backend whenever it is not production, by environment or by host overrides.
 	switch {
