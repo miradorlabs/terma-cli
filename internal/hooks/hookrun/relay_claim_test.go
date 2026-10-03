@@ -26,15 +26,15 @@ func TestHooksClaimSessionsForTheRelay(t *testing.T) {
 		return Env{Now: time.Now(), Cwd: root, Stdin: strings.NewReader(stdin), Spool: sp, Policy: hookruntest.Admitting(root), Team: "project-a", OnClaim: func() { claimed++ }}
 	}
 	const claude, codex = "claude-session-1", "codex-thread-1"
-	if err := startSession(context.Background(), env(`{"session_id":"`+claude+`","cwd":"`+root+`","model":"m"}`)); err != nil {
+	if err := startSession(context.Background(), env(`{"session_id":"`+claude+`","cwd":"`+hookruntest.InJSON(root)+`","model":"m"}`)); err != nil {
 		t.Fatal(err)
 	}
 	// A session whose first hook is a tool call still claims.
-	if err := editFile(context.Background(), env(`{"session_id":"`+codex+`","cwd":"`+root+`","tool_name":"shell","tool_input":{"command":"ls"}}`)); err != nil {
+	if err := editFile(context.Background(), env(`{"session_id":"`+codex+`","cwd":"`+hookruntest.InJSON(root)+`","tool_name":"shell","tool_input":{"command":"ls"}}`)); err != nil {
 		t.Fatal(err)
 	}
 	// Nothing was spooled for that call, so the hook's payload claims it.
-	payload := `{"session_id":"` + codex + `","cwd":"` + root + `","tool_name":"shell"}`
+	payload := `{"session_id":"` + codex + `","cwd":"` + hookruntest.InJSON(root) + `","tool_name":"shell"}`
 	if !ClaimFromPayload(context.Background(), env(""), mustPayloadSession(t, payload), "codex") {
 		t.Fatal("a Codex hook that spooled nothing did not claim from its payload")
 	}
@@ -62,7 +62,7 @@ func TestAnExpiredPolicyStillClaims(t *testing.T) {
 	sp, _ := spool.Open(t.TempDir())
 	claimed := false
 	env := Env{Now: time.Now(), Cwd: root, Spool: sp, Policy: expired, Team: "project-a", OnClaim: func() { claimed = true },
-		Stdin: strings.NewReader(`{"session_id":"expired-session","cwd":"` + root + `","model":"m"}`)}
+		Stdin: strings.NewReader(`{"session_id":"expired-session","cwd":"` + hookruntest.InJSON(root) + `","model":"m"}`)}
 	if err := startSession(context.Background(), env); err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +84,7 @@ func TestEachDeveloperClaimsForTheirOwnTeam(t *testing.T) {
 	sp, _ := spool.Open(t.TempDir())
 	for sid, team := range map[string]string{"backend-session": "team-backend", "billing-session": "team-billing"} {
 		env := Env{Now: time.Now(), Cwd: root, Spool: sp, Team: team, Policy: hookruntest.Admitting(root),
-			Stdin: strings.NewReader(`{"session_id":"` + sid + `","cwd":"` + root + `","model":"m"}`)}
+			Stdin: strings.NewReader(`{"session_id":"` + sid + `","cwd":"` + hookruntest.InJSON(root) + `","model":"m"}`)}
 		if err := startSession(context.Background(), env); err != nil {
 			t.Fatal(err)
 		}
@@ -103,7 +103,7 @@ func TestEachDeveloperClaimsForTheirOwnTeam(t *testing.T) {
 // No team from setup, or no relay on this machine: nothing is claimed.
 func TestNoClaimWithoutATeamOrRelay(t *testing.T) {
 	root := initRepo(t)
-	env := Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Stdin: strings.NewReader(`{"session_id":"s1","cwd":"` + root + `"}`)}
+	env := Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Stdin: strings.NewReader(`{"session_id":"s1","cwd":"` + hookruntest.InJSON(root) + `"}`)}
 	hookruntest.RelayOn(t)
 	_ = startSession(context.Background(), env)
 	if _, ok := claim.Read("s1", time.Now()); ok {
@@ -111,7 +111,7 @@ func TestNoClaimWithoutATeamOrRelay(t *testing.T) {
 	}
 
 	root = initRepo(t) // a fresh config dir: no relay token
-	env = Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Team: "project-a", Stdin: strings.NewReader(`{"session_id":"s2","cwd":"` + root + `"}`)}
+	env = Env{Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Team: "project-a", Stdin: strings.NewReader(`{"session_id":"s2","cwd":"` + hookruntest.InJSON(root) + `"}`)}
 	_ = startSession(context.Background(), env)
 	if _, ok := claim.Read("s2", time.Now()); ok {
 		t.Fatal("a machine without `terma relay setup` claimed a session")

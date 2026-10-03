@@ -94,11 +94,11 @@ func TestAHookOutsideTheListWritesNothing(t *testing.T) {
 		return Env{Now: time.Now(), Cwd: root, Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Team: "t1", Policy: listing("work")}
 	}
 	ctx := t.Context()
-	if err := startSession(ctx, env(`{"session_id":"s1","cwd":"`+root+`"}`)); err != nil {
+	if err := startSession(ctx, env(`{"session_id":"s1","cwd":"`+hookruntest.InJSON(root)+`"}`)); err != nil {
 		t.Fatal(err)
 	}
 	hookruntest.WriteFile(t, root, "a.txt", "a\n")
-	if err := editFile(ctx, env(`{"session_id":"s1","cwd":"`+root+`","tool_name":"Edit","tool_input":{"file_path":"`+filepath.Join(root, "a.txt")+`"}}`)); err != nil {
+	if err := editFile(ctx, env(`{"session_id":"s1","cwd":"`+hookruntest.InJSON(root)+`","tool_name":"Edit","tool_input":{"file_path":"`+hookruntest.InJSON(filepath.Join(root, "a.txt"))+`"}}`)); err != nil {
 		t.Fatal(err)
 	}
 	ClaimFromPayload(ctx, env(""), PayloadSession{ID: "s1", Cwd: root}, "claude-code")
@@ -154,7 +154,7 @@ func TestASubdirectorySessionIsItsCheckouts(t *testing.T) {
 		}
 		sid := []string{"from-subdir", "from-worktree"}[i]
 		env := Env{Now: time.Now(), Cwd: cwd, Team: "t1", Policy: listing("mirador-platform"),
-			Stdin: strings.NewReader(`{"session_id":"` + sid + `","cwd":"` + cwd + `"}`)}
+			Stdin: strings.NewReader(`{"session_id":"` + sid + `","cwd":"` + hookruntest.InJSON(cwd) + `"}`)}
 		if err := startSession(ctx, env); err != nil {
 			t.Fatal(err)
 		}

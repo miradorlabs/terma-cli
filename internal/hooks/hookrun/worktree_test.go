@@ -40,9 +40,9 @@ func TestWorktreeEventsReportTheMainRepositoryAndProject(t *testing.T) {
 		}
 	}
 	hookruntest.WriteFile(t, wt, "src/agent.go", "package src\n")
-	run(wt, `{"session_id":"sess-wt","cwd":"`+wt+`","hook_event_name":"SessionStart","source":"startup"}`, startSession)
-	run(wt, `{"session_id":"sess-wt","cwd":"`+wt+`","tool_name":"Write","tool_input":{"file_path":"`+filepath.Join(wt, "src", "agent.go")+`"}}`, editFile)
-	run(main, `{"session_id":"sess-main","cwd":"`+main+`","hook_event_name":"SessionStart","source":"startup"}`, startSession)
+	run(wt, `{"session_id":"sess-wt","cwd":"`+hookruntest.InJSON(wt)+`","hook_event_name":"SessionStart","source":"startup"}`, startSession)
+	run(wt, `{"session_id":"sess-wt","cwd":"`+hookruntest.InJSON(wt)+`","tool_name":"Write","tool_input":{"file_path":"`+hookruntest.InJSON(filepath.Join(wt, "src", "agent.go"))+`"}}`, editFile)
+	run(main, `{"session_id":"sess-main","cwd":"`+hookruntest.InJSON(main)+`","hook_event_name":"SessionStart","source":"startup"}`, startSession)
 
 	events := hookruntest.Spooled(t, sp)
 	if len(events) < 3 {

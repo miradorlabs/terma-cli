@@ -4,6 +4,7 @@ package hookruntest
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -158,4 +159,11 @@ func RelayOn(t *testing.T) {
 	if err := os.WriteFile(path, []byte("local"), 0o600); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// InJSON is s as it reads inside a JSON string, the way an agent writes a path into a
+// payload: a Windows path's backslashes escaped.
+func InJSON(s string) string {
+	b, _ := json.Marshal(s)
+	return string(b[1 : len(b)-1])
 }

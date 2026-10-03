@@ -26,7 +26,7 @@ func TestActiveSessionFallbackAndMergeSkip(t *testing.T) {
 		return Env{Now: now, Cwd: root, Policy: hookruntest.Admitting(root), Args: args, Stdin: strings.NewReader(stdin), Version: "test"}
 	}
 	// A session announced with no files falls back to active-session attribution.
-	if err := (Extension{Tool: "codex"}).sessionStart(ctx, env(`{"session_id":"thread-9","cwd":"`+root+`","model":"gpt-5.4"}`)); err != nil {
+	if err := (Extension{Tool: "codex"}).sessionStart(ctx, env(`{"session_id":"thread-9","cwd":"`+hookruntest.InJSON(root)+`","model":"gpt-5.4"}`)); err != nil {
 		t.Fatal(err)
 	}
 	hookruntest.WriteFile(t, root, "a.txt", "a\n")
@@ -117,14 +117,14 @@ func TestPostCommitReportsPerFileLineStats(t *testing.T) {
 	}
 	touch := func(at time.Time, sessionID, rel string) {
 		t.Helper()
-		in := `{"session_id":"` + sessionID + `","cwd":"` + root + `","tool_name":"Edit","tool_input":{"file_path":"` + filepath.Join(root, rel) + `"}}`
+		in := `{"session_id":"` + sessionID + `","cwd":"` + hookruntest.InJSON(root) + `","tool_name":"Edit","tool_input":{"file_path":"` + hookruntest.InJSON(filepath.Join(root, rel)) + `"}}`
 		if err := editFile(ctx, env(at, in)); err != nil {
 			t.Fatal(err)
 		}
 	}
 
 	for _, id := range []string{"sess-a", "sess-b"} {
-		if err := startSession(ctx, env(now, `{"session_id":"`+id+`","cwd":"`+root+`","hook_event_name":"SessionStart","source":"startup"}`)); err != nil {
+		if err := startSession(ctx, env(now, `{"session_id":"`+id+`","cwd":"`+hookruntest.InJSON(root)+`","hook_event_name":"SessionStart","source":"startup"}`)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -212,14 +212,14 @@ func TestPostCommitBoundsFileStats(t *testing.T) {
 	env := func(stdin string, args ...string) Env {
 		return Env{Now: now, Cwd: root, Policy: hookruntest.Admitting(root), Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
 	}
-	if err := startSession(ctx, env(`{"session_id":"sess-wide","cwd":"`+root+`","hook_event_name":"SessionStart"}`)); err != nil {
+	if err := startSession(ctx, env(`{"session_id":"sess-wide","cwd":"`+hookruntest.InJSON(root)+`","hook_event_name":"SessionStart"}`)); err != nil {
 		t.Fatal(err)
 	}
 	total := MaxCommitFileStats + 5
 	for i := range total {
 		rel := fmt.Sprintf("src/f%03d.go", i)
 		hookruntest.WriteFile(t, root, rel, "package p\n")
-		if err := editFile(ctx, env(`{"session_id":"sess-wide","cwd":"`+root+`","tool_name":"Write","tool_input":{"file_path":"`+filepath.Join(root, rel)+`"}}`)); err != nil {
+		if err := editFile(ctx, env(`{"session_id":"sess-wide","cwd":"`+hookruntest.InJSON(root)+`","tool_name":"Write","tool_input":{"file_path":"`+hookruntest.InJSON(filepath.Join(root, rel))+`"}}`)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -348,11 +348,11 @@ func TestCommitEventsAreOneFilterApart(t *testing.T) {
 	// A human commit, then an agent commit.
 	hookruntest.WriteFile(t, root, "notes/human.md", "mine\n")
 	humanSHA := commit("notes/human.md", "human note")
-	if err := startSession(ctx, env(`{"session_id":"sess-1","cwd":"`+root+`","hook_event_name":"SessionStart"}`)); err != nil {
+	if err := startSession(ctx, env(`{"session_id":"sess-1","cwd":"`+hookruntest.InJSON(root)+`","hook_event_name":"SessionStart"}`)); err != nil {
 		t.Fatal(err)
 	}
 	hookruntest.WriteFile(t, root, "src/agent.go", "package src\n")
-	if err := editFile(ctx, env(`{"session_id":"sess-1","cwd":"`+root+`","tool_name":"Write","tool_input":{"file_path":"`+filepath.Join(root, "src", "agent.go")+`"}}`)); err != nil {
+	if err := editFile(ctx, env(`{"session_id":"sess-1","cwd":"`+hookruntest.InJSON(root)+`","tool_name":"Write","tool_input":{"file_path":"`+hookruntest.InJSON(filepath.Join(root, "src", "agent.go"))+`"}}`)); err != nil {
 		t.Fatal(err)
 	}
 	agentSHA := commit("src/agent.go", "Add agent code")
