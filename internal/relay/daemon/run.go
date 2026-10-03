@@ -178,8 +178,10 @@ func Run(ctx context.Context, c Config) (Result, error) {
 type stopReason int
 
 const (
-	// stopAsked is a signal or a stop request.
+	// stopAsked is terma's stop request (Stop), which the signal after it, if any, carries out.
 	stopAsked stopReason = iota
+	// stopSignalled is a signal terma did not ask for: Ctrl-C, kill, a service manager's stop.
+	stopSignalled
 	stopIdle
 	stopReplaced
 	stopSetupGone
@@ -188,8 +190,9 @@ const (
 	stopForService
 )
 
-// handsOff reports whether a relay stopping for r passes its socket on: one that idled,
-// failed or lost its setup has nothing to keep listening for.
+// handsOff reports whether a relay stopping for r passes its socket on: only for terma's
+// own restarts. One that idled, failed or lost its setup has nothing to keep listening
+// for, and a signal from anyone else stops it for good.
 func (r stopReason) handsOff() bool {
 	return r == stopAsked || r == stopReplaced || r == stopForService
 }
@@ -207,6 +210,8 @@ func (r stopReason) describe(err error) string {
 		return "idle"
 	case r == stopForService:
 		return "the service's relay takes over"
+	case r == stopSignalled:
+		return "signalled"
 	}
 	return "asked to stop"
 }
@@ -304,7 +309,10 @@ func watch(ctx context.Context, r *relay.Relay, dir string, idle time.Duration, 
 	for {
 		select {
 		case <-ctx.Done():
-			return stopAsked, nil
+			if stopRequested(dir) {
+				return stopAsked, nil
+			}
+			return stopSignalled, nil
 		case err := <-served:
 			if errors.Is(err, http.ErrServerClosed) {
 				err = nil

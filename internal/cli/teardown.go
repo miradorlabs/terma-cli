@@ -28,8 +28,8 @@ func (app *App) newTeardownCommand() *cobra.Command {
      exporters, status line and notifier), removes their machine-wide hooks, and
      points git's global core.hooksPath back where it was.
   2. Stops the local relay, removes its background service, and deletes its state
-     (its token, its address and any telemetry not yet delivered), so no hook
-     starts it again.
+     (its address and any telemetry not yet delivered). Its token is set aside, so
+     no hook starts it again.
 
 Your sign-in is kept, so ` + "`terma setup`" + ` sets this machine up again in seconds,
 with the relay's token as it was: agents still running keep reporting without a restart.

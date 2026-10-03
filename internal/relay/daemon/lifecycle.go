@@ -33,11 +33,11 @@ func Stop(dir string) {
 	if err != nil {
 		return
 	}
-	if proc.Signal(syscall.SIGTERM) != nil {
-		// Windows signals nothing but a kill, which would skip delivery: ask through the stop file.
-		if config.WriteFileAtomicNoSync(filepath.Join(dir, StopFile), []byte(strconv.Itoa(pid)+"\n"), 0o600) != nil {
-			return
-		}
+	// The request comes first, so the relay knows terma stopped it and hands its socket on;
+	// Windows signals nothing but a kill, which would skip delivery, so there it is all the relay sees.
+	asked := config.WriteFileAtomicNoSync(filepath.Join(dir, StopFile), []byte(strconv.Itoa(pid)+"\n"), 0o600) == nil
+	if proc.Signal(syscall.SIGTERM) != nil && !asked {
+		return
 	}
 	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
 		unlock, err := flock.TryLock(filepath.Join(dir, LockFile))

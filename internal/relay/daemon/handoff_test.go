@@ -5,6 +5,9 @@ import (
 	"context"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -107,6 +110,16 @@ func startRun(t *testing.T, c Config) *relayRun {
 	return r
 }
 
+// stopAsTerma stops r as Stop does from another process: the request names this process,
+// and the signal (here, ctx) follows it.
+func (r *relayRun) stopAsTerma(t *testing.T, dir string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, StopFile), []byte(strconv.Itoa(os.Getpid())+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	r.cancel()
+}
+
 func (r *relayRun) await(t *testing.T, what string) {
 	t.Helper()
 	select {
@@ -116,8 +129,8 @@ func (r *relayRun) await(t *testing.T, what string) {
 	}
 }
 
-// The service's relay, stopped while an agent exports (launchctl bootout, an update's
-// restart), hands its socket to the relay it starts: no export in between is refused.
+// The service's relay, stopped by terma while an agent exports (an update's restart, setup),
+// hands its socket to the relay it starts: no export in between is refused.
 func TestAStoppedRelayHandsItsSocketToItsSuccessor(t *testing.T) {
 	if !handoffSupported {
 		t.Skip("no socket handoff on this platform")
@@ -137,7 +150,7 @@ func TestAStoppedRelayHandsItsSocketToItsSuccessor(t *testing.T) {
 	old.await(t, "the service's relay")
 	e := export(t, addr)
 	time.Sleep(200 * time.Millisecond)
-	old.cancel()
+	old.stopAsTerma(t, dir)
 	<-old.done
 	if successor == nil {
 		t.Fatal("the stopping relay started no successor")
@@ -199,7 +212,7 @@ func TestASuccessorOnAnotherAddressListensAfresh(t *testing.T) {
 	}
 	old := startRun(t, c)
 	old.await(t, "the relay")
-	old.cancel()
+	old.stopAsTerma(t, dir)
 	<-old.done
 	successor.await(t, "the successor")
 	if conn, err := net.DialTimeout("tcp", to, time.Second); err != nil {
@@ -210,5 +223,32 @@ func TestASuccessorOnAnotherAddressListensAfresh(t *testing.T) {
 	if conn, err := net.DialTimeout("tcp", from, 200*time.Millisecond); err == nil {
 		_ = conn.Close()
 		t.Fatal("the old address still accepts connections")
+	}
+}
+
+// A signal terma did not send (Ctrl-C, kill, a service manager's stop) stops the relay for
+// good: it starts no successor, and its address stops accepting.
+func TestASignalledRelayStopsForGood(t *testing.T) {
+	if !handoffSupported {
+		t.Skip("no socket handoff on this platform")
+	}
+	for _, idle := range []time.Duration{0, time.Hour} {
+		dir, _ := setUpRelay(t)
+		addr := freeAddr(t)
+		c := runConfig(dir, idle, nil)
+		c.Addr = addr
+		spawned := false
+		c.SpawnSuccessor = func() error { spawned = true; return nil }
+		r := startRun(t, c)
+		r.await(t, "the relay")
+		r.cancel()
+		<-r.done
+		if spawned {
+			t.Errorf("idle %v: a signalled relay started a successor", idle)
+		}
+		if conn, err := net.DialTimeout("tcp", addr, 200*time.Millisecond); err == nil {
+			_ = conn.Close()
+			t.Errorf("idle %v: the address still accepts connections", idle)
+		}
 	}
 }
