@@ -190,6 +190,21 @@ func NormalizeRemote(raw string) string {
 	return u.String()
 }
 
+// RepositoryID is a remote as a team policy names a repository, `host/path`: host
+// lowercased without port or credentials, path without `.git` or a trailing slash; "" for
+// a local path, a file:// URL, or a remote with no path.
+func RepositoryID(raw string) string {
+	u, err := url.Parse(NormalizeRemote(raw))
+	if err != nil || u.Hostname() == "" {
+		return ""
+	}
+	path := strings.Trim(strings.TrimSuffix(strings.Trim(u.Path, "/"), ".git"), "/")
+	if path == "" {
+		return ""
+	}
+	return strings.ToLower(u.Hostname()) + "/" + path
+}
+
 // Git runs an arbitrary git command in dir, bounded by Timeout.
 func Git(ctx context.Context, dir string, args ...string) (string, error) {
 	return run(ctx, dir, args...)
