@@ -17,8 +17,8 @@ const telemetryCommand = "printf TERMA_TELEMETRY_TOOL"
 // These scenarios use real harnesses and exporters with deterministic provider
 // responses. No provider credentials, model compliance or paid calls are needed.
 //
-// Claude runs two ways. content connects it machine-wide (`terma connect`, which sends
-// everything straight to Terma). install-content/install-redacted set it up the way
+// Claude runs two ways. content exports machine-wide straight to the receiver, an exporter
+// the sandbox writes itself. install-content/install-redacted set it up the way
 // `terma install` does for a developer: its exporter at the local relay, which forwards
 // this repository's sessions under the team's policy, collecting content or not.
 func TestClaudeTelemetry(t *testing.T) {

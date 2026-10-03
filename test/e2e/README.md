@@ -14,9 +14,10 @@ E2E_UPDATE_GOLDEN=1 make run # re-record the attribute key sets after a harness 
 ```
 
 Every scenario runs in a sandbox: scratch Terma config, scratch harness
-config, and a scratch git repository that `terma install` and `terma connect`
-configured exactly as they would for a developer, with the export pointed at an
-OTLP receiver inside the test. Contracts then read three planes together:
+config, and a scratch git repository that `terma install` configured exactly as it
+would for a developer, with the export pointed at an OTLP receiver inside the test:
+through the local relay, or straight there by an exporter the sandbox writes into the
+agent's own config. Contracts then read three planes together:
 
 - the hook events (`terma.session.start`, `terma.session.quota`, `terma.files.touched`, `terma.commit.stamped`, …), read from the spool file or, more often, from what the end-of-turn flush has already delivered to the receiver,
 - the receiver (the harness's own OTLP records: `api_request` with `speed`, `cost_usd`, `session.id`, resource identity; and Terma's own delivered events, as `service.name=terma-cli` logs stamped with the project, which is the shape the backend parses),
@@ -259,7 +260,7 @@ separate regression check.
 
 Sandbox installation uses `--harness none --no-browser` with a local
 account fixture that supplies the developer login, project list, and collection
-policy. Each scenario connects its exporter separately with a dummy key for the
+policy. Each scenario points its exporter separately, with a dummy key for the
 loopback receiver. Account hosts are persisted in the private profile so relay
 services load the same scoped policy after a restart. No real provider credentials
 are needed for the deterministic telemetry scenarios.

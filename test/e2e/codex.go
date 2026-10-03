@@ -74,7 +74,7 @@ func (sb *Sandbox) codexEnv(route Route) []string {
 	return env
 }
 
-// prepareCodex trusts the sandbox repository, connects Codex to the receiver
+// prepareCodex trusts the sandbox repository, points Codex at the receiver
 // and installs the route's login. Trust first: an untrusted project skips its
 // .codex/ layer, hooks included, and the record is what a developer's own
 // approval writes into config.toml.
@@ -93,7 +93,7 @@ func (sb *Sandbox) prepareCodex(route Route) {
 			t.Fatal(err)
 		}
 	}
-	sb.connectCodex()
+	sb.directCodex()
 	if route == RouteAPIKey {
 		// Use Codex's login flow, scoped to the scratch CODEX_HOME. Keep the
 		// key off command arguments and force file storage to avoid Keychain.
@@ -120,6 +120,30 @@ func (sb *Sandbox) prepareCodex(route Route) {
 			t.Fatal(err)
 		}
 	}
+}
+
+// directCodex points Codex's user-level exporter straight at the receiver, once, unless
+// the scenario uses the relay: the [otel] tables a developer's config.toml held before
+// the relay was the only route.
+func (sb *Sandbox) directCodex() {
+	t := sb.T
+	t.Helper()
+	if sb.codexDirect || sb.relayed {
+		return
+	}
+	sb.codexDirect = true
+	exporter := func(signal string) string {
+		return "{ otlp-http = { endpoint = " + tomlQuote(sb.Receiver.URL()+"/v1/"+signal) +
+			", headers = { Authorization = " + tomlQuote("Bearer "+liveKey) + " }, protocol = \"binary\" } }"
+	}
+	otel := "[otel]\nexporter = " + exporter("logs") + "\nlog_user_prompt = true\nmetrics_exporter = " + exporter("metrics") +
+		"\nspan_attributes = { \"mirador.project.id\" = " + tomlQuote(sb.ProjectID) + " }\ntrace_exporter = " + exporter("traces") + "\n"
+	cfg := filepath.Join(sb.CodexHome, "config.toml")
+	existing, _ := os.ReadFile(cfg)
+	if err := os.WriteFile(cfg, append(existing, []byte("\n"+otel)...), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	sb.useLiveKey()
 }
 
 // withdrawCodexRepoTrust removes every approval of the repository's Codex hooks from

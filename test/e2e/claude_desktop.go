@@ -90,7 +90,7 @@ func desktopParent() []string {
 func (sb *Sandbox) ClaudeDesktopRun(dir, prompt string, extra ...string) string {
 	t := sb.T
 	t.Helper()
-	sb.ensureClaudeExport()
+	sb.directClaude()
 	args := append(desktopParent(), sb.Claude.Path,
 		"--output-format", "stream-json", "--verbose", "--input-format", "stream-json",
 		"--model", "claude-haiku-4-5", "--permission-prompt-tool", "stdio",

@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -105,7 +107,7 @@ func (sb *Sandbox) ClaudeInteractive(route Route, prompt string, reply *regexp.R
 func (sb *Sandbox) ClaudeInteractiveTurns(route Route, prompts []string, replies []*regexp.Regexp, afterTurn func(int, string), extra ...string) *ClaudeRun {
 	t := sb.T
 	t.Helper()
-	sb.ensureClaudeExport()
+	sb.directClaude()
 	sessionID := uuid.NewString()
 	term, err := Start(sb.Repo, sb.claudeEnv(route), 40, 120, sb.claudeLauncher(), sb.claudeArgs(sessionID, extra...)...)
 	if err != nil {
@@ -184,7 +186,7 @@ func (sb *Sandbox) ClaudeHeadless(route Route, prompt string, extra ...string) (
 func (sb *Sandbox) ClaudeHeadlessIn(dir string, route Route, prompt string, extra ...string) (map[string]any, string) {
 	t := sb.T
 	t.Helper()
-	sb.ensureClaudeExport()
+	sb.directClaude()
 	sessionID := uuid.NewString()
 	args := append([]string{"-p", prompt, "--output-format", "json", "--max-turns", "1", "--max-budget-usd", "0.05"},
 		sb.claudeArgs(sessionID, extra...)...)
@@ -252,4 +254,54 @@ func containsAll(s string, subs ...string) []string {
 		}
 	}
 	return missing
+}
+
+// directClaude points Claude Code's user-level exporter straight at the receiver and
+// wraps its status line in terma's, once, unless the scenario uses the relay: what a
+// developer's settings held before the relay was the only route.
+func (sb *Sandbox) directClaude() {
+	t := sb.T
+	t.Helper()
+	if sb.claudeDirect || sb.relayed {
+		return
+	}
+	sb.claudeDirect = true
+	path := filepath.Join(sb.ClaudeConfig, "settings.json")
+	doc := map[string]any{}
+	if data, err := os.ReadFile(path); err == nil {
+		_ = json.Unmarshal(data, &doc)
+	}
+	env, _ := doc["env"].(map[string]any)
+	if env == nil {
+		env = map[string]any{}
+	}
+	for k, v := range map[string]string{
+		"CLAUDE_CODE_ENABLE_TELEMETRY": "1", "CLAUDE_CODE_ENHANCED_TELEMETRY_BETA": "1",
+		"OTEL_EXPORTER_OTLP_ENDPOINT": sb.Receiver.URL(), "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
+		"OTEL_EXPORTER_OTLP_HEADERS": "Authorization=Bearer " + liveKey,
+		"OTEL_LOGS_EXPORTER":         "otlp", "OTEL_METRICS_EXPORTER": "otlp", "OTEL_TRACES_EXPORTER": "otlp",
+		"OTEL_LOG_USER_PROMPTS": "1", "OTEL_LOG_ASSISTANT_RESPONSES": "1", "OTEL_LOG_TOOL_DETAILS": "1", "OTEL_LOG_TOOL_CONTENT": "1",
+	} {
+		env[k] = v
+	}
+	doc["env"] = env
+	// The status line `terma install` wraps, and the record its hook finds the
+	// developer's own renderer in.
+	previous, _ := doc["statusLine"].(map[string]any)
+	installed := maps.Clone(previous)
+	if installed == nil {
+		installed = map[string]any{}
+	}
+	fallback := "exit 0"
+	if renderer, _ := previous["command"].(string); renderer != "" {
+		fallback = "exec /bin/sh -c '" + strings.ReplaceAll(renderer, "'", `'\''`) + "'"
+	}
+	installed["type"] = "command"
+	installed["command"] = "command -v terma >/dev/null 2>&1 && exec terma hook statusline || " + fallback
+	doc["statusLine"] = installed
+	record, _ := json.MarshalIndent(map[string]any{path: map[string]any{"installed": installed, "previous": previous}}, "", "  ")
+	sb.writeAbs(filepath.Join(sb.TermaConfig, "statusline.json"), string(record)+"\n")
+	data, _ := json.MarshalIndent(doc, "", "  ")
+	sb.writeAbs(path, string(data)+"\n")
+	sb.useLiveKey()
 }

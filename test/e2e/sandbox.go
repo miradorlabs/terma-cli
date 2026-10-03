@@ -6,10 +6,9 @@
 //
 // Every test runs in a sandbox: a scratch Terma config directory, a scratch
 // harness config directory, and a scratch git repository that `terma install`
-// and `terma connect` have configured exactly as they would for a developer,
-// with the harness's export pointed at an OTLP receiver inside the test. The
-// contracts then read three planes together: the hook spool, the receiver, and
-// the terminal.
+// has configured exactly as it would for a developer, with the harness's export
+// pointed at an OTLP receiver inside the test. The contracts then read three planes
+// together: the hook spool, the receiver, and the terminal.
 package e2e
 
 import (
@@ -73,7 +72,7 @@ type Sandbox struct {
 	// the relay: no exporter has a switch for it.
 	ExcludeContent bool
 
-	claudeConnected, codexConnected bool
+	claudeDirect, codexDirect bool
 	// WorkDir is where an agent run starts; the sandbox repository when empty. The
 	// relay's negative controls run agents outside the installed repository.
 	WorkDir string
@@ -105,7 +104,7 @@ func WithClaude(b Binary) Option { return func(sb *Sandbox) { sb.Claude = b } }
 func WithCodex(b Binary) Option { return func(sb *Sandbox) { sb.Codex = b } }
 
 const (
-	// liveKey is the server key handed to `terma connect --api-key`: a syntactically
+	// liveKey is the server key the agents and the spool export with: a syntactically
 	// valid key the receiver accepts without checking. Nothing mints anything.
 	liveKey = "ter_srv_00000000000000000000000000000000"
 )
@@ -179,7 +178,7 @@ func New(t *testing.T, mode Mode, opts ...Option) *Sandbox {
 	// Providers remain local fixtures.
 	sb.terma(sb.Repo, "config", "set", "--otlp-url", sb.Receiver.URL())
 	sb.StartAccount()
-	// Each scenario connects its own exporter. --no-browser bounds a fixture-login
+	// Each scenario points its own exporter. --no-browser bounds a fixture-login
 	// regression instead of opening a browser.
 	sb.terma(sb.Repo, "install", "--team", sb.ProjectID, "--harness", "none", "--adapters", "claude,codex", "--yes", "--no-browser")
 	return sb
@@ -195,26 +194,25 @@ func (sb *Sandbox) Delivered(name, session string, timeout time.Duration) []LogR
 	})
 }
 
-// connectClaude points Claude Code's export at the receiver, once.
-func (sb *Sandbox) connectClaude() {
-	if sb.claudeConnected {
-		return
+// useLiveKey files liveKey as the project's key, which the spool's flushes deliver with,
+// in place of the one install had the account fixture mint.
+func (sb *Sandbox) useLiveKey() {
+	sb.T.Helper()
+	path := filepath.Join(sb.TermaConfig, "keys.json")
+	doc := map[string]any{}
+	if data, err := os.ReadFile(path); err == nil {
+		_ = json.Unmarshal(data, &doc)
 	}
-	sb.claudeConnected = true
-	sb.connectHarness("claude")
-}
-
-// connectCodex points Codex's export at the receiver, once.
-func (sb *Sandbox) connectCodex() {
-	if sb.codexConnected || sb.relayed {
-		return
+	keys, _ := doc["keys"].(map[string]any)
+	if keys == nil {
+		keys = map[string]any{}
 	}
-	sb.codexConnected = true
-	sb.connectHarness("codex")
-}
-
-func (sb *Sandbox) connectHarness(name string) {
-	sb.terma(sb.Repo, "connect", name, "--team", sb.ProjectID, "--api-key", liveKey, "--yes", "--otlp-url", sb.Receiver.URL())
+	keys[sb.ProjectID] = liveKey
+	doc["keys"] = keys
+	data, _ := json.MarshalIndent(doc, "", "  ")
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		sb.T.Fatal(err)
+	}
 }
 
 // RouteClaude points Claude Code at this repository's project the way `terma install`
@@ -222,15 +220,13 @@ func (sb *Sandbox) connectHarness(name string) {
 // sessions this repository's hooks claim to the receiver, standing in for Terma. With
 // ExcludeContent the team's policy, which the account fixture serves, withholds prompts
 // and tool content; install has no switch for them. The account fixture supplies the
-// developer login the relay fetches that policy with.
-// A connect that is then undone supplies the receiver's key for install to reuse.
+// developer login the relay fetches that policy with. UseRelay files the receiver's key,
+// so install mints none.
 func (sb *Sandbox) RouteClaude() {
 	sb.T.Helper()
 	if sb.Mode != Isolated {
 		sb.T.Fatal("RouteClaude needs an isolated sandbox")
 	}
-	sb.terma(sb.Repo, "connect", "claude", "--team", sb.ProjectID, "--api-key", liveKey, "--yes", "--otlp-url", sb.Receiver.URL())
-	sb.terma(sb.Repo, "disconnect", "claude", "--yes")
 	// The relay on a port of its own, forwarding to the receiver; install finds it there.
 	sb.UseRelay(RelayOptions{Start: true, Content: !sb.ExcludeContent})
 	sb.terma(sb.Repo, "install", "--team", sb.ProjectID, "--harness", "claude", "--yes", "--no-browser")
@@ -246,14 +242,6 @@ func (sb *Sandbox) workDir() string {
 		return sb.WorkDir
 	}
 	return sb.Repo
-}
-
-// ensureClaudeExport connects Claude machine-wide unless the scenario routed it, or
-// sends everything through the relay.
-func (sb *Sandbox) ensureClaudeExport() {
-	if !sb.relayed {
-		sb.connectClaude()
-	}
 }
 
 // claudeLauncher is what a run starts: the build under test.
