@@ -75,7 +75,7 @@ Every command is safe to run again.`,
 	pf.StringVar(&app.flags.apiURL, "api-url", "", "Terma data API base URL")
 	pf.StringVar(&app.flags.authURL, "auth-url", "", "Terma auth API base URL")
 	pf.StringVar(&app.flags.appURL, "app-url", "", "Terma app base URL (used by login)")
-	pf.StringVar(&app.flags.otlpURL, "otlp-url", "", "Terma OTLP ingest URL (used by connect)")
+	pf.StringVar(&app.flags.otlpURL, "otlp-url", "", "Terma OTLP ingest URL")
 	for _, name := range []string{"env", "api-url", "auth-url", "app-url", "otlp-url"} {
 		_ = pf.MarkHidden(name)
 	}
@@ -96,8 +96,7 @@ Every command is safe to run again.`,
 		// Hidden, for Terma's engineers: config switches deployments, nate wipes a machine.
 		app.newConfigCommand(),
 		app.newNateCommand(),
-		// Hidden until the e2e suites stop calling it (MIR-80); install, setup and doctor
-		// do its job.
+		// Hidden until the e2e suites stop calling it (MIR-80); setup and doctor do its job.
 		app.newStatusCommand(),
 	)
 	return root

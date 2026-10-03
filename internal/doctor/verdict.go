@@ -132,8 +132,6 @@ const (
 	RouteOtherProject
 	// RouteGlobal means the machine-wide config exports signals of its own.
 	RouteGlobal
-	// RouteHooks means the agent reports through the repository's hooks and the spool.
-	RouteHooks
 	// RouteRepoDecides means connected machine-wide and exporting no signal of its own, so
 	// only a repository's committed policy makes it send.
 	RouteRepoDecides
@@ -167,7 +165,7 @@ func (v HarnessVerdict) Reaches(bound bool) bool {
 		return false
 	}
 	switch v.Route {
-	case RouteGlobal, RouteHooks:
+	case RouteGlobal:
 		return true
 	case RouteRepoDecides:
 		return !bound || v.RepoAsks
@@ -277,7 +275,7 @@ func JudgeHarnesses(ctx context.Context, reg *agents.Registry, otlpURL, projectI
 }
 
 // RepoAsks reports whether the repository at root carries a committed policy that switches
-// a harness's signals on, the half of an `--exports repos` connect that decides.
+// a harness's signals on.
 func RepoAsks(h harness.Harness, root string) bool {
 	if root == "" {
 		return false

@@ -98,7 +98,7 @@ func TestPolicyRefreshFiltersAlreadyQueuedReplies(t *testing.T) {
 }
 
 // An exporter an earlier setup left pointing at the relay must not bypass the developer's
-// agents, even when a repository's committed hooks claim a session.
+// agents, even when a hook claims a session.
 func TestRelayRespectsHarnessSelection(t *testing.T) {
 	for _, test := range []struct {
 		name     string

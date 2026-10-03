@@ -84,7 +84,7 @@ func TestNoDeclaredContentKeyIsSafe(t *testing.T) {
 	}
 }
 
-// Every known agent's shape is composed, supported or not: its committed hooks still claim sessions.
+// Every known agent's shape is composed, supported or not: its hooks still claim sessions.
 func TestEveryExportingAgentDeclaresItsShape(t *testing.T) {
 	reg := builtin.Agents()
 	for _, a := range reg.All() {

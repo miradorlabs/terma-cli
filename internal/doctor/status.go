@@ -248,8 +248,6 @@ func agentLine(v HarnessVerdict, bound bool) string {
 	switch v.Route {
 	case RouteGlobal:
 		return "→ connected"
-	case RouteHooks:
-		return "→ connected (repository hooks)"
 	case RouteOtherProject:
 		return "→ reporting to team " + v.OtherProject + ", not this one — run `terma setup`"
 	case RouteRepoDecides:

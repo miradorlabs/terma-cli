@@ -142,8 +142,6 @@ func HarnessCheck(reg *agents.Registry, verdicts []HarnessVerdict, otlpURL, proj
 		switch v.Route {
 		case RouteOtherProject:
 			return Check{Status: Fail, Detail: v.DisplayName + " reports to team " + v.OtherProject + ", not " + projectID, Fix: "terma setup"}
-		case RouteHooks:
-			connected = append(connected, v.DisplayName+" (repository hooks)")
 		case RouteGlobal:
 			connected = append(connected, v.DisplayName)
 		case RouteRepoDecides:

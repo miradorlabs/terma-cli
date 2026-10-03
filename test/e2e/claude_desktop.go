@@ -21,8 +21,8 @@ import (
 //   - started through Contents/Helpers/disclaimer, which stays alive as the parent
 //     (Claude → disclaimer → claude);
 //   - `--input-format stream-json --output-format stream-json` on pipes, no terminal,
-//     `--setting-sources=user,project,local` — so the user's settings.json env, where
-//     `terma relay setup` puts the exporter, and the repository's hooks both apply;
+//     `--setting-sources=user,project,local` — so the user's settings.json, where
+//     `terma setup` puts the exporter and terma's hooks, applies;
 //   - CLAUDE_CODE_ENTRYPOINT=claude-desktop, and OTEL_SERVICE_NAME /
 //     OTEL_RESOURCE_ATTRIBUTES naming the service claude-code-desktop.
 //
