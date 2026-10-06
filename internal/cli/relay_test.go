@@ -229,12 +229,10 @@ func TestRelayRunRecordsItsEnvironment(t *testing.T) {
 		_, err := within(3*time.Second).combined(t, "relay", "run", "--idle", "0", "--quiet")
 		done <- err
 	}()
-	var info daemon.RunInfo
-	for ok, deadline := false, time.Now().Add(3*time.Second); !ok; info, ok = daemon.RunningRelay(dir) {
-		if time.Now().After(deadline) {
-			t.Fatal("the relay never recorded itself")
-		}
-		time.Sleep(20 * time.Millisecond)
+	awaitRelayRecord(t, dir, 3*time.Second, done)
+	info, ok := daemon.RunningRelay(dir)
+	if !ok {
+		t.Fatal("a relay that recorded itself does not read as running")
 	}
 	if info.Environment != "dev" || info.Service {
 		t.Fatalf("recorded %+v, want a hook-style relay delivering to dev", info)
