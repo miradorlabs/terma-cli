@@ -6,12 +6,12 @@
 # The script is POSIX sh, so `| sh` works too. What it does, so you can read it
 # before you run it: pick the archive for this platform from GitHub Releases, verify
 # it against the release's checksums.txt, extract the single `terma` binary, and
-# place it on your PATH. Nothing else is written; nothing downloaded is executed
-# before it has been verified. Windows users: download terma_Windows_x86_64.zip
-# from https://github.com/miradorlabs/terma-cli/releases.
+# place it in ~/.local/bin; it never asks for sudo. Nothing else is written; nothing
+# downloaded is executed before it has been verified. Windows users: download
+# terma_Windows_x86_64.zip from https://github.com/miradorlabs/terma-cli/releases.
 #
 #   TERMA_VERSION      install this release instead of the latest (v1.2.3 or 1.2.3)
-#   TERMA_INSTALL_DIR  put the binary here instead of /usr/local/bin or ~/.local/bin
+#   TERMA_INSTALL_DIR  put the binary here instead of ~/.local/bin
 set -eu
 
 REPO="miradorlabs/terma-cli"
@@ -80,29 +80,16 @@ actual="$(sha256 "$tmp/$asset")"
 tar -xzf "$tmp/$asset" -C "$tmp" terma || die "${asset} does not contain a terma binary"
 chmod +x "$tmp/terma"
 
-# Where to put it: an explicit TERMA_INSTALL_DIR, else /usr/local/bin when writable
-# (with sudo when it is not and a terminal is attached), else ~/.local/bin. Under
-# `curl | sh` stdin is the pipe, so the terminal check is on stderr; sudo prompts
-# on /dev/tty, not stdin.
-dest="${TERMA_INSTALL_DIR:-}"
-sudo_cmd=""
-if [ -z "$dest" ]; then
-  if [ -w /usr/local/bin ]; then
-    dest=/usr/local/bin
-  elif [ -t 2 ] && command -v sudo >/dev/null 2>&1; then
-    dest=/usr/local/bin; sudo_cmd="sudo"
-    say "Installing to ${dest} needs sudo (set TERMA_INSTALL_DIR to install elsewhere)."
-  else
-    dest="$HOME/.local/bin"
-  fi
-fi
-$sudo_cmd mkdir -p "$dest"
+# Where to put it: an explicit TERMA_INSTALL_DIR, else ~/.local/bin. Never sudo, so
+# the binary is the user's own and `terma update` can replace it.
+dest="${TERMA_INSTALL_DIR:-$HOME/.local/bin}"
+mkdir -p "$dest" || die "cannot create ${dest} (set TERMA_INSTALL_DIR to install elsewhere)"
 # Staged beside the binary and renamed over it, so nothing ever runs a half-written terma:
 # a relay or hook running the old one keeps it until it starts the new one.
 staged="$dest/.terma.$$"
-trap 'rm -rf "$tmp"; $sudo_cmd rm -f "$staged"' EXIT
-$sudo_cmd install -m 0755 "$tmp/terma" "$staged" || die "could not write ${staged}"
-$sudo_cmd mv -f "$staged" "$dest/terma" || { $sudo_cmd rm -f "$staged"; die "could not install ${dest}/terma"; }
+trap 'rm -rf "$tmp"; rm -f "$staged"' EXIT
+install -m 0755 "$tmp/terma" "$staged" || die "could not write ${staged}"
+mv -f "$staged" "$dest/terma" || { rm -f "$staged"; die "could not install ${dest}/terma"; }
 
 # No quarantine handling is needed here: curl does not set com.apple.quarantine,
 # only browser downloads do. The Homebrew cask strips it because Homebrew sets it.
