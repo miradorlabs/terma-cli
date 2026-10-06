@@ -6,7 +6,8 @@
 #   scripts/test-install.sh <dist-dir> <tag>
 #
 # Covers the paths a user takes: pinned version piped through bash (the documented
-# `curl | bash`), latest under plain sh, a version without the v prefix, and the two
+# `curl | bash`), latest under plain sh, a version without the v prefix, the default
+# destination (~/.local/bin, never sudo), and the two
 # refusals — a checksum that does not match, and cleartext to a host that is not this
 # machine. Nothing here touches the real PATH: every install goes to a temp dir.
 set -euo pipefail
@@ -52,6 +53,12 @@ TERMA_RELEASE_BASE="$BASE" TERMA_VERSION="$TAG" TERMA_INSTALL_DIR="$work/bin1" s
 echo "== version without the v prefix"
 TERMA_RELEASE_BASE="$BASE" TERMA_VERSION="${TAG#v}" TERMA_INSTALL_DIR="$work/bin3" sh "$INSTALLER" 2>/dev/null
 [ -x "$work/bin3/terma" ] || fail "unprefixed version did not install"
+
+echo "== default: ~/.local/bin, never sudo"
+home="$work/home"; mkdir -p "$home"
+out="$(HOME="$home" PATH="/usr/bin:/bin" TERMA_RELEASE_BASE="$BASE" TERMA_VERSION="$TAG" sh "$INSTALLER" 2>&1 </dev/null)"
+[ "$("$home/.local/bin/terma" version)" = "$want" ] || fail "default install did not land in ~/.local/bin: $out"
+! grep -qi sudo <<<"$out" || fail "installer mentioned sudo: $out"
 
 echo "== refuses a checksum that does not match"
 sums="$mirror/download/$TAG/checksums.txt"
