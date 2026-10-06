@@ -284,11 +284,20 @@ func TestARefreshTakesOverARelayOfAnEarlierRelease(t *testing.T) {
 		}
 		done <- res
 	}()
-	for _, ok := daemon.RunningRelay(dir); !ok; _, ok = daemon.RunningRelay(dir) {
-		if ctx.Err() != nil {
-			t.Fatal("the relay never started")
+	// Waits for the run file, which the relay writes once it holds its lock and listens.
+	// Not daemon.Running: that probes by taking the lock, and a probe that wins the race
+	// makes the starting relay see it held and exit as already running.
+	for {
+		if _, err := os.Stat(filepath.Join(dir, daemon.RunFile)); err == nil {
+			break
 		}
-		time.Sleep(10 * time.Millisecond)
+		select {
+		case res := <-done:
+			t.Fatalf("the relay exited before it started: %+v", res)
+		case <-ctx.Done():
+			t.Fatal("the relay never started")
+		case <-time.After(10 * time.Millisecond):
+		}
 	}
 
 	original := testApp.version
