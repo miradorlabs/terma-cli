@@ -1,0 +1,10 @@
+file_format: definition/2
+attributes:
+  - key: terma.thing
+    type: string
+    stability: development
+    brief: A thing.
+  - key: terma.thing.id
+    type: string
+    stability: development
+    brief: A thing's id.

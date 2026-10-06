@@ -1,0 +1,11 @@
+[
+  "credits",
+  "individual_limit",
+  "limit_id",
+  "limit_name",
+  "plan_type",
+  "primary",
+  "rate_limit_reached_type",
+  "secondary",
+  "spend_control_reached"
+]

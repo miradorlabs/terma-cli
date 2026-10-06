@@ -1,0 +1,9 @@
+[
+  "env",
+  "host.name",
+  "service.name",
+  "service.version",
+  "telemetry.sdk.language",
+  "telemetry.sdk.name",
+  "telemetry.sdk.version"
+]

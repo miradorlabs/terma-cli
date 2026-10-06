@@ -1,0 +1,11 @@
+{
+  "OPENAI_API_KEY": null,
+  "tokens": {
+    "id_token": "PLACEHOLDER_ID_TOKEN",
+    "access_token": "PLACEHOLDER_ACCESS_TOKEN",
+    "refresh_token": "PLACEHOLDER_REFRESH_TOKEN",
+    "account_id": "a5c616f7-0e91-49d4-bcfb-000000000001"
+  },
+  "last_refresh": "2026-09-16T09:47:00.000000000Z",
+  "auth_mode": "chatgpt"
+}

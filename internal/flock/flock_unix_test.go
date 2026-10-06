@@ -1,0 +1,141 @@
+//go:build unix
+
+package flock
+
+import (
+	"context"
+	"errors"
+	"os"
+	"path/filepath"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+)
+
+func TestLockExcludesASecondHolderUntilReleased(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "state.lock")
+	unlock, err := Lock(context.Background(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+	defer cancel()
+	if _, err := Lock(ctx, path); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("a held lock was taken again: err = %v", err)
+	}
+
+	unlock()
+	again, err := Lock(context.Background(), path)
+	if err != nil {
+		t.Fatalf("a released lock could not be taken: %v", err)
+	}
+	again()
+}
+
+func TestLockGivesUpWhenTheContextIsAlreadyDone(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := Lock(ctx, filepath.Join(t.TempDir(), "state.lock")); !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestTryLockReportsAHeldLockAsBusy(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "state.lock")
+	unlock, err := TryLock(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := TryLock(path); !IsBusy(err) {
+		t.Fatalf("a held lock should be busy, got %v", err)
+	}
+	// The two entry points exclude each other: they are one lock.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+	defer cancel()
+	if _, err := Lock(ctx, path); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("Lock took what TryLock holds: %v", err)
+	}
+	unlock()
+	again, err := TryLock(path)
+	if err != nil {
+		t.Fatalf("a released lock could not be taken: %v", err)
+	}
+	again()
+}
+
+// TryLock never follows a planted link to lock or create a file elsewhere.
+func TestTryLockRefusesASymlink(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	target := filepath.Join(dir, "elsewhere")
+	link := filepath.Join(dir, "state.lock")
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := TryLock(link); err == nil || IsBusy(err) {
+		t.Fatalf("a symlinked lock path must be an error that is not \"busy\": %v", err)
+	}
+	if _, err := os.Stat(target); !os.IsNotExist(err) {
+		t.Fatal("the link's target was created")
+	}
+}
+
+// Locked creates the file's directory and runs one caller at a time.
+func TestLockedSerializesItsCallers(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "new", "state.json")
+	var inside, overlapped atomic.Int32
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Go(func() {
+			if err := Locked(path, 5*time.Second, func() error {
+				if inside.Add(1) > 1 {
+					overlapped.Add(1)
+				}
+				time.Sleep(2 * time.Millisecond)
+				inside.Add(-1)
+				return nil
+			}); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+	wg.Wait()
+	if overlapped.Load() != 0 {
+		t.Fatalf("%d callers ran inside the lock together", overlapped.Load())
+	}
+}
+
+// A waiter whose lock file is removed while it waits locks the file the path names
+// afterwards, so it still excludes whoever opens the path next.
+func TestLockFollowsARemovedLockFile(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "x.lock")
+	first, err := TryLock(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := make(chan func())
+	go func() {
+		unlock, err := Lock(context.Background(), path)
+		if err != nil {
+			t.Error(err)
+		}
+		got <- unlock
+	}()
+	time.Sleep(20 * time.Millisecond) // the waiter has opened the file
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	first()
+	unlock := <-got
+	defer unlock()
+	if _, err := TryLock(path); !IsBusy(err) {
+		t.Fatalf("the path's lock is free while the waiter holds one: %v", err)
+	}
+}

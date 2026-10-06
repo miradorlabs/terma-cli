@@ -1,0 +1,36 @@
+package cli
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
+)
+
+// --relay-addr records a loopback host:port for the relay and refuses anything else.
+func TestMoveRelayTakesOnlyALoopbackAddress(t *testing.T) {
+	useConfigDir(t, t.TempDir())
+	for _, bad := range []string{"0.0.0.0:4319", "192.168.1.5:4319", "4319", "example.com:4319", "127.0.0.1:", "127.0.0.1:0", "127.0.0.1:abc", "127.0.0.1:70000"} {
+		if err := testApp.moveRelay(bad); err == nil {
+			t.Errorf("testApp.moveRelay(%q) accepted an address the relay cannot listen on", bad)
+		}
+	}
+	for _, good := range []string{"127.0.0.1:4320", "localhost:4321", "[::1]:4322"} {
+		if err := testApp.moveRelay(good); err != nil {
+			t.Fatalf("testApp.moveRelay(%q): %v", good, err)
+		}
+		dir, err := daemon.Dir(testApp.stateDir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, err := os.ReadFile(filepath.Join(dir, daemon.AddrFile))
+		if err != nil || strings.TrimSpace(string(data)) != good {
+			t.Fatalf("recorded %q, %v; want %q", data, err, good)
+		}
+		if got := daemon.Addr(dir); got != good {
+			t.Fatalf("daemon.Addr = %q, want %q", got, good)
+		}
+	}
+}

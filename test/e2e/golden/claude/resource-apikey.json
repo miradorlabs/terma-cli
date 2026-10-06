@@ -1,0 +1,7 @@
+[
+  "host.arch",
+  "os.type",
+  "os.version",
+  "service.name",
+  "service.version"
+]

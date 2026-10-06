@@ -1,0 +1,6 @@
+file_format: definition/2
+attributes:
+  - key: terma.thing.duration
+    type: int
+    stability: development
+    brief: How long the thing took.

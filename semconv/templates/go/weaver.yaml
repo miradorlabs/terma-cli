@@ -1,0 +1,16 @@
+# Renders internal/semconv: `make semconv`.
+whitespace_control:
+  trim_blocks: true
+  lstrip_blocks: true
+templates:
+  - template: semconv.go.j2
+    application_mode: single
+    # Every key terma's events carry, its own and the dependencies' it references, once.
+    filter: >
+      {
+        schema_version: (.schema_url | split("/") | last | split(".") | first),
+        attributes: ([.registry.attributes[], .registry.events[].attributes[], .registry.attribute_groups[].attributes[]]
+          | unique_by(.key) | sort_by(.key)),
+        events: (.registry.events | sort_by(.name))
+      }
+    file_name: semconv.go

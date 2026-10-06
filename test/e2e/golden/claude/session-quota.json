@@ -1,0 +1,10 @@
+[
+  "gen_ai.main_agent.name",
+  "gen_ai.request.model",
+  "project_id",
+  "terma.evidence.source",
+  "terma.rate_limit.five_hour.resets_at",
+  "terma.rate_limit.five_hour.used_percent",
+  "terma.rate_limit.seven_day.resets_at",
+  "terma.rate_limit.seven_day.used_percent"
+]

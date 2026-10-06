@@ -1,0 +1,36 @@
+{
+  "name": "@miradorlabs/terma",
+  "version": "0.0.0",
+  "description": "npm shim for the terma CLI: downloads the matching release binary at install time",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/miradorlabs/terma-cli.git",
+    "directory": "npm"
+  },
+  "homepage": "https://terma.ai",
+  "bin": {
+    "terma": "bin/terma.js"
+  },
+  "files": [
+    "bin/terma.js",
+    "install.js",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node --test install.test.js",
+    "postinstall": "node install.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ]
+}

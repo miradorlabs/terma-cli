@@ -1,0 +1,497 @@
+file_format: definition/2
+# Every hook event is an OTLP log record named by its EventName field, with scope and
+# service.name terma-cli, session.id on the record and, for Codex's records of a turn, the
+# turn's trace id in its TraceId field. Each one's resource carries service.name,
+# service.version, mirador.project.id and terma.schema.version.
+attribute_groups:
+  - id: terma.resource
+    visibility: public
+    stability: development
+    brief: The resource of every record terma sends.
+    attributes:
+      - ref: service.name
+        requirement_level: required
+      - ref: service.version
+        requirement_level: required
+      - ref: mirador.project.id
+        requirement_level: required
+      - ref: terma.schema.version
+        requirement_level: required
+  - id: terma.relay.stamp
+    visibility: public
+    stability: development
+    brief: What the relay adds to the resource of the agent telemetry it forwards.
+    attributes:
+      - ref: mirador.project.id
+        requirement_level: required
+      - ref: terma.relay.attribution
+      - ref: terma.relay.session.id
+  - id: terma.relay.withheld
+    visibility: public
+    stability: development
+    brief: What the relay adds to an agent's record whose user.email the team's policy withholds.
+    attributes:
+      - ref: terma.account.seat.id
+
+events:
+  - name: terma.session.start
+    stability: development
+    requirement_level: recommended
+    brief: A session started, or an agent that reports no start named its session at a turn's end.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: gen_ai.request.model
+      - ref: terma.session.parent.id
+      - ref: terma.agent.nickname
+      - ref: terma.agent.path
+      - ref: terma.capture.surface
+
+  - name: terma.session.end
+    stability: development
+    requirement_level: recommended
+    brief: A session ended.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+
+  - name: terma.files.touched
+    stability: development
+    requirement_level: recommended
+    brief: A session wrote files in the repository.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: gen_ai.tool.name
+        note: The tool that wrote, or the hook that reported the files where the agent names no tool.
+      - ref: terma.files.paths
+        requirement_level: required
+      - ref: gen_ai.tool.call.id
+      - ref: terma.agent.id
+      - ref: gen_ai.agent.name
+      - ref: terma.turn.id
+      - ref: terma.step.index
+      - ref: terma.capture.surface
+      - ref: vcs.repository.url.full
+        note: The origin of the repository the files are in, without credentials; one event per repository.
+      - ref: vcs.repository.name
+      - ref: vcs.owner.name
+      - ref: vcs.provider.name
+
+  - name: terma.commit.stamped
+    stability: development
+    requirement_level: recommended
+    brief: prepare-commit-msg stamped sessions into a commit message.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: terma.commit.session.ids
+        requirement_level: required
+      - ref: terma.commit.session.count
+        requirement_level: required
+      - ref: terma.commit.staged.count
+      - ref: terma.commit.message_source
+      - ref: vcs.repository.name
+      - ref: vcs.owner.name
+      - ref: vcs.provider.name
+
+  - name: terma.commit
+    stability: development
+    requirement_level: recommended
+    brief: A commit stamped with sessions was made.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: terma.commit.session.ids
+        requirement_level: required
+      - ref: terma.commit.session.count
+        requirement_level: required
+      - ref: vcs.ref.head.revision
+        requirement_level: required
+        note: The full 40-hex commit id.
+      - ref: vcs.ref.head.name
+        note: Omitted on a detached HEAD.
+      - ref: vcs.ref.head.type
+        note: branch, omitted on a detached HEAD.
+      - ref: vcs.repository.url.full
+        note: origin, without credentials.
+      - ref: vcs.repository.name
+      - ref: vcs.owner.name
+      - ref: vcs.provider.name
+      - ref: terma.commit.file.count
+      - ref: terma.commit.lines.added
+      - ref: terma.commit.lines.deleted
+      - ref: terma.commit.file.stats
+      - ref: terma.commit.file.stats_reported
+      - ref: terma.commit.file.stats_truncated
+
+  - name: terma.commit.unattributed
+    stability: development
+    requirement_level: recommended
+    brief: A commit no session was stamped into, counted but never its files.
+    attributes:
+      - ref: vcs.ref.head.revision
+        requirement_level: required
+      - ref: vcs.ref.head.name
+      - ref: vcs.ref.head.type
+      - ref: vcs.repository.url.full
+      - ref: vcs.repository.name
+      - ref: vcs.owner.name
+      - ref: vcs.provider.name
+      - ref: terma.commit.file.count
+      - ref: terma.commit.lines.added
+      - ref: terma.commit.lines.deleted
+
+  - name: terma.session.quota
+    stability: development
+    requirement_level: recommended
+    brief: The provider's rate-limit windows for the session, as last observed.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: terma.evidence.source
+        requirement_level: required
+      - ref: terma.evidence.status
+        requirement_level: required
+      - ref: terma.observation.id
+      - ref: terma.observation.sequence
+      - ref: terma.observation.stream
+      - ref: terma.observation.time
+      - ref: terma.turn.id
+      - ref: terma.agent.id
+      - ref: gen_ai.agent.name
+      - ref: gen_ai.request.model
+      - ref: terma.account.id
+      - ref: terma.account.organization.id
+      - ref: terma.account.plan_type
+      - ref: user.email
+        note: Withheld whenever the team's policy withholds prompts or tool content.
+      - ref: terma.account.seat.id
+      - ref: terma.rate_limit.five_hour.used_percent
+      - ref: terma.rate_limit.five_hour.resets_at
+      - ref: terma.rate_limit.seven_day.used_percent
+      - ref: terma.rate_limit.seven_day.resets_at
+      - ref: terma.rate_limit.spend_limit.used_percent
+      - ref: terma.rate_limit.spend_limit.resets_at
+      - ref: terma.rate_limit.primary.used_percent
+      - ref: terma.rate_limit.primary.window_minutes
+      - ref: terma.rate_limit.primary.resets_at
+      - ref: terma.rate_limit.secondary.used_percent
+      - ref: terma.rate_limit.secondary.window_minutes
+      - ref: terma.rate_limit.secondary.resets_at
+      - ref: terma.rate_limit.reached_type
+      - ref: terma.spend_control.reached
+      - ref: terma.credits.present
+      - ref: terma.credits.unlimited
+      - ref: terma.credits.balance
+
+  - name: terma.session.account
+    stability: development
+    requirement_level: recommended
+    brief: The account state the session's agent holds.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: terma.evidence.source
+        requirement_level: required
+      - ref: terma.evidence.status
+        requirement_level: required
+      - ref: terma.account.id
+      - ref: terma.account.organization.id
+      - ref: terma.account.organization.type
+      - ref: terma.account.seat_tier
+      - ref: terma.account.billing_type
+      - ref: terma.account.extra_usage.enabled
+      - ref: user.email
+        note: Only when the cached login is the session's credential; withheld whenever the team's policy withholds prompts or tool content.
+
+  - name: terma.session.limit
+    stability: development
+    requirement_level: recommended
+    brief: A turn failed on a typed provider limit.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: terma.evidence.source
+        requirement_level: required
+      - ref: error.type
+        requirement_level: required
+        note: >
+          A closed set: rate_limit, overloaded, authentication_failed,
+          oauth_org_not_allowed, account_on_hold, billing_error, invalid_request,
+          model_not_found, server_error, max_output_tokens, cloud_credential_error, and
+          _OTHER for anything else.
+      - ref: terma.account.id
+
+  - name: terma.session.capture
+    stability: development
+    requirement_level: recommended
+    brief: How a capture is going, kept apart from what it captured.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: terma.evidence.source
+        requirement_level: required
+      - ref: terma.evidence.status
+        requirement_level: required
+      - ref: terma.observation.time
+      - ref: terma.hook.event
+      - ref: terma.turn.id
+      - ref: terma.agent.id
+      - ref: gen_ai.agent.name
+
+  - name: terma.subagent.start
+    stability: development
+    requirement_level: recommended
+    brief: A subagent started inside its parent's session.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: terma.agent.id
+        requirement_level: required
+      - ref: gen_ai.agent.name
+      - ref: terma.agent.parent.id
+      - ref: terma.agent.nickname
+      - ref: terma.agent.path
+      - ref: terma.turn.id
+      - ref: gen_ai.request.model
+
+  - name: terma.subagent.end
+    stability: development
+    requirement_level: recommended
+    brief: A subagent's run, or one of its turns, ended.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: terma.agent.id
+      - ref: gen_ai.agent.name
+      - ref: terma.turn.id
+      - ref: gen_ai.request.model
+      - ref: terma.evidence.source
+      - ref: terma.operation.status
+        note: completed, aborted, error or unknown.
+      - ref: terma.operation.duration_ms
+      - ref: terma.message.count
+      - ref: terma.tool_call.count
+      - ref: terma.loop.count
+
+  - name: terma.subagent.call
+    stability: development
+    requirement_level: recommended
+    brief: The parent's view of the tool call that launched a subagent; it says nothing of spend.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: terma.agent.id
+        requirement_level: required
+      - ref: gen_ai.agent.name
+      - ref: terma.agent.parent.id
+      - ref: gen_ai.request.model
+        note: The model the subagent resolved to.
+      - ref: gen_ai.tool.call.id
+      - ref: terma.turn.id
+      - ref: terma.operation.status
+        requirement_level: required
+        note: async_launched, completed or unknown.
+      - ref: terma.operation.duration_ms
+
+  - name: terma.session.observation
+    stability: development
+    requirement_level: recommended
+    brief: One hook-derived snapshot of a session's state, never an additive counter.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: terma.evidence.source
+        requirement_level: required
+      - ref: terma.hook.event
+        requirement_level: required
+      - ref: terma.observation.id
+        requirement_level: required
+      - ref: terma.observation.sequence
+        requirement_level: required
+      - ref: terma.observation.stream
+        requirement_level: required
+      - ref: terma.capture.gap
+      - ref: terma.turn.id
+      - ref: gen_ai.request.model
+      - ref: gen_ai.response.model
+        note: The model the agent resolved and billed.
+      - ref: gen_ai.request.reasoning.level
+      - ref: terma.model_param.thinking
+      - ref: terma.model_param.context
+      - ref: terma.main_agent.version
+      - ref: terma.provider.session.id
+      - ref: user.email
+        note: Withheld whenever the team's policy withholds prompts or tool content.
+      - ref: terma.funding.status
+      - ref: terma.quota.status
+      - ref: terma.account.status
+      - ref: terma.usage.status
+      - ref: terma.usage.semantics
+      - ref: terma.usage.scope
+      - ref: terma.usage.input_tokens
+      - ref: terma.usage.output_tokens
+      - ref: terma.usage.cache_read_tokens
+      - ref: terma.usage.cache_write_tokens
+      - ref: terma.operation.status
+        note: The agent's word for how the turn ended, such as completed, aborted, error, ok or unknown.
+      - ref: terma.loop.count
+      - ref: terma.context.tokens
+      - ref: terma.context.window_size
+      - ref: terma.context.used_percent
+      - ref: terma.compaction.trigger
+      - ref: terma.invocation.number
+      - ref: terma.invocation.initial_steps
+      - ref: terma.execution.number
+      - ref: terma.termination.reason
+      - ref: terma.agent.fully_idle
+
+  - name: terma.tool.call
+    stability: development
+    requirement_level: recommended
+    brief: One tool call, keyed on its call id, which is its replay identity.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: terma.evidence.source
+        requirement_level: required
+      - ref: terma.hook.event
+      - ref: gen_ai.tool.name
+      - ref: gen_ai.tool.call.id
+      - ref: gen_ai.tool.type
+        note: extension for a tool the agent ran itself, as a hosted tool.
+      - ref: gen_ai.tool.call.arguments
+        note: >
+          A JSON object or array as a structured value; other text as a string. Tool
+          content, withheld unless the team's policy collects it.
+        annotations:
+          content: tool
+      - ref: terma.capture.surface
+      - ref: terma.turn.id
+      - ref: terma.step.index
+      - ref: gen_ai.request.model
+      - ref: gen_ai.response.model
+      - ref: gen_ai.request.reasoning.level
+      - ref: terma.model_param.thinking
+      - ref: terma.model_param.context
+      - ref: terma.main_agent.version
+      - ref: terma.operation.status
+        note: completed or error.
+      - ref: terma.operation.duration_ms
+      - ref: terma.operation.duration_status
+      - ref: terma.operation.interrupted
+      - ref: error.type
+        note: error, timeout, permission_denied or _OTHER.
+
+  - name: terma.compaction
+    stability: development
+    requirement_level: recommended
+    brief: The agent compacted the conversation.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: gen_ai.conversation.compacted
+        requirement_level: required
+        note: Always true.
+      - ref: terma.evidence.source
+        requirement_level: required
+      - ref: terma.hook.event
+      - ref: terma.capture.surface
+      - ref: terma.compaction.item.id
+      - ref: terma.turn.id
+      - ref: gen_ai.request.model
+      - ref: terma.operation.duration_ms
+
+  - name: terma.approval.requested
+    stability: development
+    requirement_level: recommended
+    brief: The agent asked the developer for approval; whether it was given is not reported.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: terma.evidence.source
+        requirement_level: required
+      - ref: terma.hook.event
+      - ref: terma.capture.surface
+      - ref: terma.observation.id
+      - ref: terma.turn.id
+      - ref: gen_ai.tool.name
+      - ref: terma.approval.permission_mode
+      - ref: terma.approval.reason
+
+  - name: terma.assistant.message
+    stability: development
+    requirement_level: recommended
+    brief: One reply from an agent whose export leaves its replies out; content as a whole.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: terma.evidence.source
+        requirement_level: required
+      - ref: terma.message.id
+        requirement_level: required
+      - ref: terma.message.text
+        requirement_level: required
+      - ref: terma.message.truncated
+        requirement_level: required
+      - ref: terma.message.phase
+      - ref: terma.turn.id
+      - ref: gen_ai.request.model
+      - ref: terma.agent.id
+      - ref: gen_ai.agent.name
+
+  - name: terma.session.title
+    stability: development
+    requirement_level: recommended
+    brief: The name an agent gave a session; a rename is a new event. Content as a whole.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: terma.evidence.source
+        requirement_level: required
+      - ref: terma.session.title
+        requirement_level: required
+
+  - name: terma.relay.heartbeat
+    stability: development
+    requirement_level: recommended
+    brief: The relay is running; sent with service.name terma-relay.
+    attributes:
+      - ref: terma.relay.heartbeat.reason
+        requirement_level: required
+      - ref: host.name

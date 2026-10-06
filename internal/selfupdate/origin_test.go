@@ -1,0 +1,74 @@
+package selfupdate
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+)
+
+// Asset URLs from the release payload must come from GitHub: the checksum shares their payload.
+func TestGetRefusesNonGitHubOrigin(t *testing.T) {
+	t.Parallel()
+	c := &Client{Version: "1.0.0"}
+	for _, target := range []string{
+		"https://evil.test/terma_Darwin_arm64.tar.gz",
+		"http://github.com/terma.tar.gz",            // cleartext
+		"https://github.com.evil.test/terma.tar.gz", // suffix trick
+		"https://notgithub.com/terma.tar.gz",
+		"file:///etc/passwd",
+	} {
+		t.Run(target, func(t *testing.T) {
+			if _, err := c.get(context.Background(), target); err == nil {
+				t.Fatalf("expected %q to be refused", target)
+			} else if !strings.Contains(err.Error(), "must come from GitHub") &&
+				!strings.Contains(err.Error(), "missing host") {
+				t.Fatalf("expected an origin refusal, got %v", err)
+			}
+		})
+	}
+}
+
+func TestDownloadOriginAllowsGitHub(t *testing.T) {
+	t.Parallel()
+	c := &Client{Version: "1.0.0"}
+	for _, target := range []string{
+		"https://github.com/miradorlabs/terma-cli/releases/download/v1/terma.tar.gz",
+		"https://objects.githubusercontent.com/foo",
+		"https://release-assets.githubusercontent.com/bar",
+	} {
+		if err := c.checkDownloadOrigin(target); err != nil {
+			t.Fatalf("%q should be allowed: %v", target, err)
+		}
+	}
+}
+
+// An explicitly configured base is a trusted origin too.
+func TestDownloadOriginAllowsConfiguredBase(t *testing.T) {
+	t.Parallel()
+	c := &Client{Version: "1.0.0", BaseURL: "http://127.0.0.1:8080"}
+	if err := c.checkDownloadOrigin("http://127.0.0.1:8080/archive"); err != nil {
+		t.Fatalf("configured base should be allowed: %v", err)
+	}
+	if err := c.checkDownloadOrigin("http://127.0.0.1:9999/archive"); err == nil {
+		t.Fatal("a different port is a different origin and must be refused")
+	}
+}
+
+func TestRedirectCannotFetchFromAnotherOrigin(t *testing.T) {
+	t.Parallel()
+	calls := 0
+	destination := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls++; fmt.Fprint(w, "unexpected") }))
+	defer destination.Close()
+	source := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, destination.URL, http.StatusFound) }))
+	defer source.Close()
+	c := &Client{BaseURL: source.URL, HTTP: source.Client()}
+	if _, err := c.get(context.Background(), source.URL+"/asset"); err == nil {
+		t.Fatal("untrusted redirect followed")
+	}
+	if calls != 0 {
+		t.Fatal("untrusted destination contacted")
+	}
+}

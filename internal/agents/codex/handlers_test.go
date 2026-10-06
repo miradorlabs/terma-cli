@@ -1,0 +1,193 @@
+package codex
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/miradorlabs/terma-cli/internal/gitx"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
+	"github.com/miradorlabs/terma-cli/internal/semconv"
+	"github.com/miradorlabs/terma-cli/internal/spool"
+)
+
+func TestCodexSessionStartAnnouncesSession(t *testing.T) {
+	t.Parallel()
+	root := hookruntest.InitRepo(t)
+	stateDir := t.TempDir()
+	const id = "01a0d0ff-0000-7000-8000-000000000003"
+	env := hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Stdin: strings.NewReader(`{"session_id":"` + id + `","cwd":` + strconv.Quote(root) + `}`)}
+	if err := sessionStart(context.Background(), env); err != nil {
+		t.Fatal(err)
+	}
+	// A trusted hook can announce a repository session without a global exporter.
+}
+
+// The project hooks find edited files inside the apply_patch envelope a tool call carries.
+func TestCodexSessionStampsItsCommitFromApplyPatch(t *testing.T) {
+	root := hookruntest.InitRepo(t)
+	stateDir := t.TempDir()
+	ctx := context.Background()
+	sp, _ := spool.Open(t.TempDir())
+	env := func(stdin string) hookrun.Env {
+		return hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
+	}
+	const id = "01a08bd5-0487-74b1-9d82-45e619c574fa"
+
+	if err := sessionStart(ctx, env(`{"session_id":"`+id+`","hook_event_name":"SessionStart","cwd":`+strconv.Quote(root)+`,"model":"gpt-6","source":"startup","permission_mode":"default","transcript_path":null}`)); err != nil {
+		t.Fatal(err)
+	}
+	hookruntest.WriteFile(t, root, "src/a.go", "package src\n")
+	hookruntest.WriteFile(t, root, "src/b.go", "package src\n")
+
+	patch := strings.Join([]string{
+		"apply_patch <<'PATCH'",
+		"*** Begin Patch",
+		"*** Update File: src/a.go",
+		"@@",
+		"-old",
+		"+new",
+		"*** Add File: src/b.go",
+		"+package src",
+		"*** End Patch",
+		"PATCH",
+	}, "\\n")
+	if err := postToolUse(ctx, env(`{"session_id":"`+id+`","hook_event_name":"PostToolUse","cwd":`+strconv.Quote(root)+`,"model":"gpt-6","permission_mode":"default","tool_name":"apply_patch","tool_use_id":"call_1","turn_id":"turn_1","transcript_path":null,"tool_response":"ok","tool_input":{"command":"`+patch+`"}}`)); err != nil {
+		t.Fatal(err)
+	}
+	touched := hookruntest.Named(hookruntest.Spooled(t, sp), semconv.TermaFilesTouchedEvent)
+	if len(touched) != 1 || touched[0].Attrs[semconv.GenAIToolCallIDKey] != "call_1" {
+		t.Fatalf("file touch must carry Codex's tool call id: %+v", touched)
+	}
+
+	if _, err := gitx.Git(ctx, root, "add", "src"); err != nil {
+		t.Fatal(err)
+	}
+	msgPath := filepath.Join(t.TempDir(), "COMMIT_EDITMSG")
+	_ = os.WriteFile(msgPath, []byte("agent work\n"), 0o644)
+	commitEnv := hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Args: []string{msgPath, "message"}, Stdin: strings.NewReader(""), Spool: sp, Version: "test"}
+	if err := hookrun.PrepareCommitMsg(ctx, commitEnv); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(msgPath)
+	if !strings.Contains(string(data), "Agent-Session-Id: "+id) || !strings.Contains(string(data), "Agent-Tool: codex") {
+		t.Fatalf("commit not stamped for Codex:\n%s", data)
+	}
+
+	if err := sessionEnd(ctx, env(`{"session_id":"`+id+`","hook_event_name":"SessionEnd","cwd":`+strconv.Quote(root)+`,"reason":"closed","transcript_path":null}`)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A commit of only files the agent wrote through the shell is the session's (#55).
+func TestCodexSessionStampsItsCommitFromShellWrite(t *testing.T) {
+	root := hookruntest.InitRepo(t)
+	stateDir := t.TempDir()
+	ctx := context.Background()
+	sp, _ := spool.Open(t.TempDir())
+	const id = "01a08bd5-0487-74b1-9d82-45e619c574fb"
+	hookruntest.WriteFile(t, root, "src/a.go", "package src\n")
+	command := strconv.Quote("cd src && cat > a.go <<'EOF'\npackage src\nEOF")
+	env := hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Spool: sp, Version: "test",
+		Stdin: strings.NewReader(`{"session_id":"` + id + `","hook_event_name":"PostToolUse","cwd":` + strconv.Quote(root) + `,"model":"gpt-6","permission_mode":"default","tool_name":"Bash","tool_use_id":"c1","turn_id":"t1","transcript_path":null,"tool_response":"","tool_input":{"command":` + command + `}}`)}
+	if err := postToolUse(ctx, env); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := gitx.Git(ctx, root, "add", "src"); err != nil {
+		t.Fatal(err)
+	}
+	msgPath := filepath.Join(t.TempDir(), "COMMIT_EDITMSG")
+	_ = os.WriteFile(msgPath, []byte("agent work\n"), 0o644)
+	commitEnv := hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Args: []string{msgPath, "message"}, Stdin: strings.NewReader(""), Spool: sp, Version: "test"}
+	if err := hookrun.PrepareCommitMsg(ctx, commitEnv); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(msgPath); !strings.Contains(string(data), "Agent-Session-Id: "+id) {
+		t.Fatalf("commit of a shell-written file not stamped:\n%s", data)
+	}
+}
+
+// A patch is not a shell script: a redirect inside its body names no file.
+func TestCodexEditedPathsParsesShellOnlyForShellCalls(t *testing.T) {
+	t.Parallel()
+	in := &codexHookInput{ToolName: "apply_patch", ToolInput: []byte(`{"command":"*** Begin Patch\n*** Add File: x.sh\n+echo a > out.txt\n*** End Patch"}`)}
+	if got := codexEditedPaths(in, t.TempDir()); len(got) != 1 || got[0] != "x.sh" {
+		t.Fatalf("got %v, want [x.sh]", got)
+	}
+}
+
+// A shell call that changed nothing leaves no manifest behind.
+func TestCodexPostToolUseIgnoresCallsWithoutAPatch(t *testing.T) {
+	root := hookruntest.InitRepo(t)
+	stateDir := t.TempDir()
+	ctx := context.Background()
+	sp, _ := spool.Open(t.TempDir())
+	env := hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Spool: sp, Version: "test",
+		Stdin: strings.NewReader(`{"session_id":"01a08bd5-0487-74b1-9d82-45e619c574fa","hook_event_name":"PostToolUse","cwd":` + strconv.Quote(root) + `,"model":"gpt-6","permission_mode":"default","tool_name":"shell","tool_use_id":"c1","turn_id":"t1","transcript_path":null,"tool_response":"","tool_input":{"command":"go test ./..."}}`)}
+	if err := postToolUse(ctx, env); err != nil {
+		t.Fatal(err)
+	}
+	msgPath := filepath.Join(t.TempDir(), "COMMIT_EDITMSG")
+	_ = os.WriteFile(msgPath, []byte("manual work\n"), 0o644)
+	commitEnv := hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Args: []string{msgPath, "message"}, Stdin: strings.NewReader(""), Spool: sp, Version: "test"}
+	if err := hookrun.PrepareCommitMsg(ctx, commitEnv); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(msgPath); strings.Contains(string(data), "Agent-Session-Id") {
+		t.Fatalf("a shell command that edited nothing claimed the commit:\n%s", data)
+	}
+}
+
+func TestApplyPatchPaths(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name    string
+		command string
+		want    []string
+	}{
+		{"none", "go build ./...", nil},
+		{"add", "*** Begin Patch\n*** Add File: a/b.go\n*** End Patch", []string{"a/b.go"}},
+		{"update and delete", "*** Update File: x.go\n*** Delete File: y.go", []string{"x.go", "y.go"}},
+		// A rename touches both paths, and the commit will carry both.
+		{"rename", "*** Update File: old.go\n*** Move to: new.go", []string{"old.go", "new.go"}},
+		{"indented heredoc", "  *** Add File: spaced.go  ", []string{"spaced.go"}},
+		{"header with no path", "*** Add File:", nil},
+		{"paths with spaces", "*** Add File: dir with space/f.go", []string{"dir with space/f.go"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := applyPatchPaths(tc.command)
+			if len(got) != len(tc.want) {
+				t.Fatalf("got %v, want %v", got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Fatalf("got %v, want %v", got, tc.want)
+				}
+			}
+		})
+	}
+}
+
+// Every handler survives input it cannot understand: a failing hook gets removed.
+func TestCodexHooksNeverFailOnBadInput(t *testing.T) {
+	t.Parallel()
+	stateDir := t.TempDir()
+	ctx := context.Background()
+	for _, bad := range []string{"", "{", `{"session_id":""}`, `{"session_id":"../../etc/passwd"}`} {
+		for name, fn := range map[string]func(context.Context, hookrun.Env) error{
+			"session-start": sessionStart,
+			"session-end":   sessionEnd,
+			"post-tool-use": postToolUse,
+		} {
+			env := hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: t.TempDir(), Stdin: strings.NewReader(bad), Version: "test"}
+			if err := fn(ctx, env); err != nil {
+				t.Fatalf("%s(%q) = %v, want nil", name, bad, err)
+			}
+		}
+	}
+}

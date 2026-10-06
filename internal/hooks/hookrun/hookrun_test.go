@@ -1,0 +1,564 @@
+package hookrun
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"maps"
+	"os"
+	"path/filepath"
+	"reflect"
+	"slices"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/miradorlabs/terma-cli/internal/gitx"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
+	"github.com/miradorlabs/terma-cli/internal/semconv"
+	"github.com/miradorlabs/terma-cli/internal/spool"
+	"github.com/miradorlabs/terma-cli/internal/trailer"
+)
+
+// Only files a session recorded are stamped, and only for the message sources git lets
+// terma write: a developer's own commit beside an open session is theirs.
+func TestOnlyRecordedFilesAreStamped(t *testing.T) {
+	t.Parallel()
+	stateDir := t.TempDir()
+	root := hookruntest.InitRepo(t)
+	ctx := context.Background()
+	now := time.Now()
+	env := func(stdin string, args ...string) Env {
+		return Env{StateDir: stateDir, Now: now, Cwd: root, Policy: hookruntest.Admitting(root), Args: args, Stdin: strings.NewReader(stdin), Version: "test"}
+	}
+	msgPath := filepath.Join(t.TempDir(), "MSG")
+	stamp := func(message string, args ...string) []trailer.Trailer {
+		t.Helper()
+		if err := os.WriteFile(msgPath, []byte(message), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := PrepareCommitMsg(ctx, env("", append([]string{msgPath}, args...)...)); err != nil {
+			t.Fatal(err)
+		}
+		data, _ := os.ReadFile(msgPath)
+		return trailer.Parse(string(data), "#")
+	}
+
+	// A session is announced and open, but has recorded no file: the developer's own
+	// commit is not the agent's.
+	if err := (Extension{Tool: "codex"}).sessionStart(ctx, env(`{"session_id":"thread-9","cwd":"`+hookruntest.InJSON(root)+`","model":"gpt-5.4"}`)); err != nil {
+		t.Fatal(err)
+	}
+	hookruntest.WriteFile(t, root, "by-hand.txt", "mine\n")
+	if _, err := gitx.Git(ctx, root, "add", "by-hand.txt"); err != nil {
+		t.Fatal(err)
+	}
+	if got := stamp("work\n", ""); len(got) != 0 {
+		t.Fatalf("a hand-written commit was stamped for an open session: %+v", got)
+	}
+
+	// The same session records a file, and a commit of it carries the trailer.
+	hookruntest.WriteFile(t, root, "a.txt", "a\n")
+	if err := editFile(ctx, env(`{"session_id":"thread-9","cwd":"`+hookruntest.InJSON(root)+`","tool_name":"Edit","tool_input":{"file_path":"`+hookruntest.InJSON(filepath.Join(root, "a.txt"))+`"}}`)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := gitx.Git(ctx, root, "add", "a.txt"); err != nil {
+		t.Fatal(err)
+	}
+	if got := stamp("work\n", ""); len(got) != 1 || got[0].SessionID != "thread-9" {
+		t.Fatalf("a commit of the session's own file was not stamped: %+v", got)
+	}
+
+	// git's own messages are left alone: a merge and a squash.
+	for _, source := range []string{"merge", "squash"} {
+		if got := stamp("Merge branch 'x'\n", source); len(got) != 0 {
+			t.Errorf("a %s message was stamped: %+v", source, got)
+		}
+	}
+	// A message reused with -c, -C or --amend is stamped like any other, and never twice.
+	if got := stamp("reused\n", "commit", "HEAD"); len(got) != 1 || got[0].SessionID != "thread-9" {
+		t.Errorf("a reused message for the session's file was not stamped: %+v", got)
+	}
+	stamp("reused\n\nAgent-Session-Id: thread-9\nAgent-Tool: codex\n", "commit", "HEAD")
+	if data, _ := os.ReadFile(msgPath); strings.Count(string(data), "Agent-Session-Id") != 1 {
+		t.Errorf("a reused message already carrying the session's trailer was stamped again:\n%s", data)
+	}
+}
+
+func TestHandlersNeverFailOutsideARepo(t *testing.T) {
+	t.Parallel()
+	stateDir := t.TempDir()
+	ctx := context.Background()
+	env := Env{StateDir: stateDir, Cwd: t.TempDir(), Stdin: strings.NewReader(`{"session_id":"s"}`), Args: []string{"/nonexistent"}}
+	for name, fn := range map[string]func(context.Context, Env) error{
+		"start": startSession, "end": endSession, "tool": editFile,
+		"prepare": PrepareCommitMsg, "post": PostCommit,
+	} {
+		if err := fn(ctx, env); err != nil {
+			t.Errorf("%s returned %v outside a repo", name, err)
+		}
+	}
+	bad := Env{StateDir: stateDir, Cwd: t.TempDir(), Stdin: strings.NewReader("not json")}
+	if err := startSession(ctx, bad); err != nil {
+		t.Errorf("garbage input must be ignored, got %v", err)
+	}
+}
+
+func commitEvent(t *testing.T, sp *spool.Spool) map[string]any {
+	t.Helper()
+	var commits []spool.Event
+	res := sp.Flush(context.Background(), spool.SenderFunc(func(_ context.Context, events []spool.Event) ([]spool.Event, error) {
+		for _, e := range events {
+			if e.Name == semconv.TermaCommitEvent {
+				commits = append(commits, e)
+			}
+		}
+		return nil, nil
+	}), spool.FlushOptions{})
+	if res.Err != nil {
+		t.Fatalf("flush: %v", res.Err)
+	}
+	if len(commits) != 1 {
+		t.Fatalf("expected exactly one %s event, got %d", semconv.TermaCommitEvent, len(commits))
+	}
+	return commits[0].Attrs
+}
+
+// fileStats decodes file_stats as generic maps, so the test sees the wire's JSON keys.
+func fileStats(t *testing.T, attrs map[string]any) []map[string]any {
+	t.Helper()
+	// Spooled and read back, the list of maps is a list of any.
+	raw, ok := attrs[semconv.TermaCommitFileStatsKey].([]any)
+	if !ok {
+		t.Fatalf("%s is %T, want a list: %v", semconv.TermaCommitFileStatsKey, attrs[semconv.TermaCommitFileStatsKey], attrs)
+	}
+	out := make([]map[string]any, 0, len(raw))
+	for _, e := range raw {
+		out = append(out, e.(map[string]any))
+	}
+	return out
+}
+
+func TestPostCommitReportsPerFileLineStats(t *testing.T) {
+	t.Parallel()
+	stateDir := t.TempDir()
+	root := hookruntest.InitRepo(t)
+	ctx := context.Background()
+	sp, _ := spool.Open(t.TempDir())
+	now := time.Now()
+	env := func(at time.Time, stdin string, args ...string) Env {
+		return Env{StateDir: stateDir, Now: at, Cwd: root, Policy: hookruntest.Admitting(root), Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
+	}
+	touch := func(at time.Time, sessionID, rel string) {
+		t.Helper()
+		in := `{"session_id":"` + sessionID + `","cwd":"` + hookruntest.InJSON(root) + `","tool_name":"Edit","tool_input":{"file_path":"` + hookruntest.InJSON(filepath.Join(root, rel)) + `"}}`
+		if err := editFile(ctx, env(at, in)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for _, id := range []string{"sess-a", "sess-b"} {
+		if err := startSession(ctx, env(now, `{"session_id":"`+id+`","cwd":"`+hookruntest.InJSON(root)+`","hook_event_name":"SessionStart","source":"startup"}`)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	hookruntest.WriteFile(t, root, "src/a.go", "package a\nfunc A() {}\n")
+	hookruntest.WriteFile(t, root, "src/b.go", "package b\n")
+	hookruntest.WriteFile(t, root, "assets/logo.bin", "\x00\x01\x02logo\x00")
+	hookruntest.WriteFile(t, root, "src/shared.go", "package shared\n")
+	touch(now, "sess-a", "src/a.go")
+	touch(now, "sess-a", "src/shared.go")
+	touch(now.Add(time.Minute), "sess-b", "src/b.go")
+	touch(now.Add(time.Minute), "sess-b", "assets/logo.bin")
+	// Both sessions touched shared.go; the later touch decides who owns it.
+	touch(now.Add(2*time.Minute), "sess-b", "src/shared.go")
+
+	if _, err := gitx.Git(ctx, root, "add", "-A"); err != nil {
+		t.Fatal(err)
+	}
+	msgPath := filepath.Join(t.TempDir(), "MSG")
+	_ = os.WriteFile(msgPath, []byte("feat: both sessions\n"), 0o644)
+	if err := PrepareCommitMsg(ctx, env(now, "", msgPath, "")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := gitx.Git(ctx, root, "commit", "-q", "-F", msgPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := PostCommit(ctx, env(now, "")); err != nil {
+		t.Fatal(err)
+	}
+
+	attrs := commitEvent(t, sp)
+	for _, key := range []string{semconv.VCSRefHeadRevisionKey, semconv.TermaCommitSessionIDsKey, semconv.TermaCommitSessionCountKey, semconv.GenAIMainAgentNameKey, semconv.TermaCommitFileCountKey} {
+		if _, ok := attrs[key]; !ok {
+			t.Fatalf("existing attribute %q was dropped: %v", key, attrs)
+		}
+	}
+	if got := attrs[semconv.TermaCommitFileCountKey]; got != float64(4) {
+		t.Fatalf("file_count = %v, want 4", got)
+	}
+	// 2 + 1 + 1 lines; the binary file contributes no counts.
+	if got, want := attrs[semconv.TermaCommitLinesAddedKey], float64(4); got != want {
+		t.Fatalf("lines_added = %v, want %v", got, want)
+	}
+	if got, want := attrs[semconv.TermaCommitLinesDeletedKey], float64(0); got != want {
+		t.Fatalf("lines_deleted = %v, want %v", got, want)
+	}
+	if attrs[semconv.TermaCommitFileStatsTruncatedKey] != false || attrs[semconv.TermaCommitFileStatsReportedKey] != float64(4) {
+		t.Fatalf("truncation attrs = %v / %v", attrs[semconv.TermaCommitFileStatsTruncatedKey], attrs[semconv.TermaCommitFileStatsReportedKey])
+	}
+
+	stats := fileStats(t, attrs)
+	byPath := map[string]map[string]any{}
+	for _, s := range stats {
+		byPath[s["path"].(string)] = s
+	}
+	if len(byPath) != 4 {
+		t.Fatalf("file_stats = %v", stats)
+	}
+	if got := byPath["src/a.go"]; got["lines_added"] != float64(2) || got["lines_deleted"] != float64(0) || got["session_id"] != "sess-a" {
+		t.Fatalf("src/a.go = %v", got)
+	}
+	if got := byPath["src/b.go"]; got["lines_added"] != float64(1) || got["session_id"] != "sess-b" {
+		t.Fatalf("src/b.go = %v", got)
+	}
+	if got := byPath["src/shared.go"]; got["session_id"] != "sess-b" {
+		t.Fatalf("the later touch should own shared.go: %v", got)
+	}
+	// A binary file has no line counts, rather than zeros.
+	bin := byPath["assets/logo.bin"]
+	if _, ok := bin["lines_added"]; ok {
+		t.Fatalf("a binary file must not carry a line count: %v", bin)
+	}
+	if _, ok := bin["lines_deleted"]; ok {
+		t.Fatalf("a binary file must not carry a line count: %v", bin)
+	}
+}
+
+func TestPostCommitBoundsFileStats(t *testing.T) {
+	t.Parallel()
+	stateDir := t.TempDir()
+	root := hookruntest.InitRepo(t)
+	ctx := context.Background()
+	sp, _ := spool.Open(t.TempDir())
+	now := time.Now()
+	env := func(stdin string, args ...string) Env {
+		return Env{StateDir: stateDir, Now: now, Cwd: root, Policy: hookruntest.Admitting(root), Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
+	}
+	if err := startSession(ctx, env(`{"session_id":"sess-wide","cwd":"`+hookruntest.InJSON(root)+`","hook_event_name":"SessionStart"}`)); err != nil {
+		t.Fatal(err)
+	}
+	total := MaxCommitFileStats + 5
+	for i := range total {
+		rel := fmt.Sprintf("src/f%03d.go", i)
+		hookruntest.WriteFile(t, root, rel, "package p\n")
+		if err := editFile(ctx, env(`{"session_id":"sess-wide","cwd":"`+hookruntest.InJSON(root)+`","tool_name":"Write","tool_input":{"file_path":"`+hookruntest.InJSON(filepath.Join(root, rel))+`"}}`)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := gitx.Git(ctx, root, "add", "-A"); err != nil {
+		t.Fatal(err)
+	}
+	msgPath := filepath.Join(t.TempDir(), "MSG")
+	_ = os.WriteFile(msgPath, []byte("chore: sweep\n"), 0o644)
+	if err := PrepareCommitMsg(ctx, env("", msgPath, "")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := gitx.Git(ctx, root, "commit", "-q", "-F", msgPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := PostCommit(ctx, env("")); err != nil {
+		t.Fatal(err)
+	}
+
+	attrs := commitEvent(t, sp)
+	if got := attrs[semconv.TermaCommitFileCountKey]; got != float64(total) {
+		t.Fatalf("file_count = %v, want the true total %d", got, total)
+	}
+	stats := fileStats(t, attrs)
+	if len(stats) != MaxCommitFileStats {
+		t.Fatalf("file_stats holds %d entries, want the cap of %d", len(stats), MaxCommitFileStats)
+	}
+	if attrs[semconv.TermaCommitFileStatsTruncatedKey] != true || attrs[semconv.TermaCommitFileStatsReportedKey] != float64(MaxCommitFileStats) {
+		t.Fatalf("truncation must be visible: %v / %v", attrs[semconv.TermaCommitFileStatsTruncatedKey], attrs[semconv.TermaCommitFileStatsReportedKey])
+	}
+	// One session still names each file it touched, so the commit's files join the session.
+	for _, s := range stats {
+		if s["session_id"] != "sess-wide" {
+			t.Fatalf("single-session commit lost its per-file session: %v", s)
+		}
+	}
+}
+
+// A commit the agent makes in its own session names the session on the files it edited,
+// and on nothing a hand edit added beside them.
+func TestPostCommitNamesTheSessionOnItsFilesInASingleSessionCommit(t *testing.T) {
+	t.Parallel()
+	stateDir := t.TempDir()
+	root := hookruntest.InitRepo(t)
+	ctx := context.Background()
+	sp, _ := spool.Open(t.TempDir())
+	now := time.Now()
+	env := func(stdin string, args ...string) Env {
+		return Env{StateDir: stateDir, Now: now, Cwd: root, Policy: hookruntest.Admitting(root), Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test"}
+	}
+	if err := startSession(ctx, env(`{"session_id":"sess-solo","cwd":"`+hookruntest.InJSON(root)+`","hook_event_name":"SessionStart"}`)); err != nil {
+		t.Fatal(err)
+	}
+	hookruntest.WriteFile(t, root, "src/agent.go", "package src\n")
+	hookruntest.WriteFile(t, root, "notes.txt", "by hand\n")
+	if err := editFile(ctx, env(`{"session_id":"sess-solo","cwd":"`+hookruntest.InJSON(root)+`","tool_name":"Write","tool_input":{"file_path":"`+hookruntest.InJSON(filepath.Join(root, "src/agent.go"))+`"}}`)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := gitx.Git(ctx, root, "add", "-A"); err != nil {
+		t.Fatal(err)
+	}
+	// `git commit -m` from inside the session: prepare-commit-msg sees source "message".
+	msgPath := filepath.Join(t.TempDir(), "MSG")
+	_ = os.WriteFile(msgPath, []byte("feat: agent work\n"), 0o644)
+	if err := PrepareCommitMsg(ctx, env("", msgPath, "message")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := gitx.Git(ctx, root, "commit", "-q", "-F", msgPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := PostCommit(ctx, env("")); err != nil {
+		t.Fatal(err)
+	}
+	attrs := commitEvent(t, sp)
+	if ids := attrs[semconv.TermaCommitSessionIDsKey]; !reflect.DeepEqual(ids, []any{"sess-solo"}) {
+		t.Fatalf("session ids = %v", ids)
+	}
+	byPath := map[string]map[string]any{}
+	for _, s := range fileStats(t, attrs) {
+		byPath[s["path"].(string)] = s
+	}
+	if got := byPath["src/agent.go"]["session_id"]; got != "sess-solo" {
+		t.Fatalf("the session's own file lost its session: %v", byPath["src/agent.go"])
+	}
+	if _, ok := byPath["notes.txt"]["session_id"]; ok {
+		t.Fatalf("a hand edit was attributed to the session: %v", byPath["notes.txt"])
+	}
+}
+
+func keysOf(attrs map[string]any) []string { return slices.Sorted(maps.Keys(attrs)) }
+
+// commitIdentity is what both commit events carry, and all the unattributed one does.
+var commitIdentity = []string{
+	AttrProjectID, semconv.TermaCommitFileCountKey, semconv.TermaCommitLinesAddedKey, semconv.TermaCommitLinesDeletedKey,
+	semconv.VCSOwnerNameKey, semconv.VCSProviderNameKey, semconv.VCSRefHeadNameKey, semconv.VCSRefHeadRevisionKey,
+	semconv.VCSRefHeadTypeKey, semconv.VCSRepositoryNameKey, semconv.VCSRepositoryURLFullKey,
+}
+
+func TestPostCommitOnAnUnstampedCommitEmitsOnlyACount(t *testing.T) {
+	t.Parallel()
+	stateDir := t.TempDir()
+	root := hookruntest.InitRepo(t)
+	ctx := context.Background()
+	sp, _ := spool.Open(t.TempDir())
+	env := Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Policy: listing("github.com/o/r"), Stdin: strings.NewReader(""), Spool: sp, Version: "test", Team: "proj_test"}
+	// A credentialed remote and a team, so the event carries every field it may.
+	if _, err := gitx.Git(ctx, root, "remote", "set-url", "origin", "https://dev:ghp_secret@github.com/o/r.git"); err != nil {
+		t.Fatal(err)
+	}
+	hookruntest.WriteFile(t, root, "notes/human.md", "mine\nall mine\n")
+	if _, err := gitx.Git(ctx, root, "add", "notes/human.md"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := gitx.Git(ctx, root, "commit", "-q", "-m", "no trailer here"); err != nil {
+		t.Fatal(err)
+	}
+	sha, _ := gitx.Git(ctx, root, "rev-parse", "HEAD")
+	if err := PostCommit(ctx, env); err != nil {
+		t.Fatal(err)
+	}
+
+	events := hookruntest.Spooled(t, sp)
+	if len(events) != 1 || events[0].Name != semconv.TermaCommitUnattributedEvent {
+		t.Fatalf("an unstamped commit must spool exactly one %s, got %+v", semconv.TermaCommitUnattributedEvent, events)
+	}
+	ev := events[0]
+	if ev.SessionID != "" {
+		t.Fatalf("no session was part of this commit, got session %q", ev.SessionID)
+	}
+	if got := keysOf(ev.Attrs); !slices.Equal(got, commitIdentity) {
+		t.Fatalf("the unattributed event must carry exactly the commit's identity and size\n got %v\nwant %v", got, commitIdentity)
+	}
+	want := map[string]any{
+		semconv.VCSRefHeadRevisionKey: sha, semconv.VCSRefHeadNameKey: "main", semconv.VCSRefHeadTypeKey: "branch",
+		semconv.VCSRepositoryURLFullKey: "https://github.com/o/r", semconv.VCSOwnerNameKey: "o", semconv.VCSRepositoryNameKey: "r",
+		semconv.VCSProviderNameKey: "github", semconv.TermaCommitFileCountKey: 1, semconv.TermaCommitLinesAddedKey: 2,
+		semconv.TermaCommitLinesDeletedKey: 0, AttrProjectID: "proj_test",
+	}
+	for k, v := range want {
+		if fmt.Sprint(ev.Attrs[k]) != fmt.Sprint(v) {
+			t.Errorf("%s = %v, want %v", k, ev.Attrs[k], v)
+		}
+	}
+	// No value may name the file, and the remote's credential must not survive.
+	blob, _ := json.Marshal(ev.Attrs)
+	for _, leak := range []string{"human.md", "notes", "ghp_secret", semconv.TermaCommitFileStatsKey, "dev@example.com"} {
+		if strings.Contains(string(blob), leak) {
+			t.Fatalf("unattributed event leaks %q: %s", leak, blob)
+		}
+	}
+}
+
+// The two commit events differ by name alone, share the identity attributes, and leave terma.commit unchanged.
+func TestCommitEventsAreOneFilterApart(t *testing.T) {
+	t.Parallel()
+	stateDir := t.TempDir()
+	root := hookruntest.InitRepo(t)
+	ctx := context.Background()
+	sp, _ := spool.Open(t.TempDir())
+	now := time.Now()
+	env := func(stdin string, args ...string) Env {
+		return Env{StateDir: stateDir, Now: now, Cwd: root, Policy: listing("github.com/o/r"), Args: args, Stdin: strings.NewReader(stdin), Spool: sp, Version: "test", Team: "proj_test"}
+	}
+	if _, err := gitx.Git(ctx, root, "remote", "set-url", "origin", "git@github.com:o/r.git"); err != nil {
+		t.Fatal(err)
+	}
+	msgPath := filepath.Join(t.TempDir(), "MSG")
+	commit := func(rel, msg string) string {
+		t.Helper()
+		if _, err := gitx.Git(ctx, root, "add", rel); err != nil {
+			t.Fatal(err)
+		}
+		_ = os.WriteFile(msgPath, []byte(msg+"\n"), 0o644)
+		if err := PrepareCommitMsg(ctx, env("", msgPath, "message")); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := gitx.Git(ctx, root, "commit", "-q", "-F", msgPath); err != nil {
+			t.Fatal(err)
+		}
+		if err := PostCommit(ctx, env("")); err != nil {
+			t.Fatal(err)
+		}
+		sha, _ := gitx.Git(ctx, root, "rev-parse", "HEAD")
+		return sha
+	}
+
+	// A human commit, then an agent commit.
+	hookruntest.WriteFile(t, root, "notes/human.md", "mine\n")
+	humanSHA := commit("notes/human.md", "human note")
+	if err := startSession(ctx, env(`{"session_id":"sess-1","cwd":"`+hookruntest.InJSON(root)+`","hook_event_name":"SessionStart"}`)); err != nil {
+		t.Fatal(err)
+	}
+	hookruntest.WriteFile(t, root, "src/agent.go", "package src\n")
+	if err := editFile(ctx, env(`{"session_id":"sess-1","cwd":"`+hookruntest.InJSON(root)+`","tool_name":"Write","tool_input":{"file_path":"`+hookruntest.InJSON(filepath.Join(root, "src", "agent.go"))+`"}}`)); err != nil {
+		t.Fatal(err)
+	}
+	agentSHA := commit("src/agent.go", "Add agent code")
+
+	// terma.commit.stamped is also spooled, so a prefix match would double count.
+	byName := map[string][]spool.Event{}
+	var all []string
+	for _, ev := range hookruntest.Spooled(t, sp) {
+		all = append(all, ev.Name)
+		if ev.Name == semconv.TermaCommitEvent || ev.Name == semconv.TermaCommitUnattributedEvent {
+			byName[ev.Name] = append(byName[ev.Name], ev)
+		}
+	}
+	if !slices.Contains(all, semconv.TermaCommitStampedEvent) {
+		t.Fatalf("expected prepare-commit-msg's record in the spool as well: %v", all)
+	}
+	for _, ev := range hookruntest.Named(hookruntest.Spooled(t, sp), semconv.TermaCommitStampedEvent) {
+		want := map[string]any{
+			semconv.TermaCommitMessageSourceKey: semconv.TermaCommitMessageSourceMessage, semconv.VCSOwnerNameKey: "o",
+			semconv.VCSRepositoryNameKey: "r", semconv.VCSProviderNameKey: "github", semconv.TermaCommitSessionCountKey: float64(1),
+		}
+		for k, v := range want {
+			if ev.Attrs[k] != v {
+				t.Errorf("terma.commit.stamped %s = %v, want %v", k, ev.Attrs[k], v)
+			}
+		}
+		if !reflect.DeepEqual(ev.Attrs[semconv.TermaCommitSessionIDsKey], []any{"sess-1"}) {
+			t.Errorf("terma.commit.stamped session ids = %v", ev.Attrs[semconv.TermaCommitSessionIDsKey])
+		}
+	}
+	if len(byName[semconv.TermaCommitEvent]) != 1 || len(byName[semconv.TermaCommitUnattributedEvent]) != 1 {
+		t.Fatalf("want one stamped and one unstamped commit event, got %v", all)
+	}
+	stamped, unstamped := byName[semconv.TermaCommitEvent][0], byName[semconv.TermaCommitUnattributedEvent][0]
+	if stamped.Attrs[semconv.VCSRefHeadRevisionKey] != agentSHA || unstamped.Attrs[semconv.VCSRefHeadRevisionKey] != humanSHA {
+		t.Fatalf("shas: stamped=%v (want %s) unstamped=%v (want %s)", stamped.Attrs[semconv.VCSRefHeadRevisionKey], agentSHA, unstamped.Attrs[semconv.VCSRefHeadRevisionKey], humanSHA)
+	}
+
+	wantStamped := slices.Sorted(slices.Values(append(slices.Clone(commitIdentity),
+		semconv.TermaCommitFileStatsKey, semconv.TermaCommitFileStatsReportedKey, semconv.TermaCommitFileStatsTruncatedKey,
+		semconv.TermaCommitSessionCountKey, semconv.TermaCommitSessionIDsKey, semconv.GenAIMainAgentNameKey)))
+	if got := keysOf(stamped.Attrs); !slices.Equal(got, wantStamped) {
+		t.Fatalf("terma.commit changed shape\n got %v\nwant %v", got, wantStamped)
+	}
+	if stamped.SessionID != "sess-1" || !reflect.DeepEqual(stamped.Attrs[semconv.TermaCommitSessionIDsKey], []any{"sess-1"}) || stamped.Attrs[semconv.GenAIMainAgentNameKey] != "claude-code" {
+		t.Fatalf("terma.commit lost its session: %+v", stamped)
+	}
+	if got := keysOf(unstamped.Attrs); !slices.Equal(got, commitIdentity) {
+		t.Fatalf("unattributed event shape\n got %v\nwant %v", got, commitIdentity)
+	}
+	for _, k := range []string{semconv.VCSRefHeadNameKey, semconv.VCSRepositoryURLFullKey, semconv.VCSRepositoryNameKey, AttrProjectID} {
+		if stamped.Attrs[k] != unstamped.Attrs[k] {
+			t.Errorf("%s differs between the two commit events: %v vs %v", k, stamped.Attrs[k], unstamped.Attrs[k])
+		}
+	}
+}
+
+// Merge and squash commits, never stamped, are left out of the unattributed count.
+func TestPostCommitSkipsMergeAndSquashCommits(t *testing.T) {
+	t.Parallel()
+	stateDir := t.TempDir()
+	root := hookruntest.InitRepo(t)
+	ctx := context.Background()
+	sp, _ := spool.Open(t.TempDir())
+	env := Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Stdin: strings.NewReader(""), Spool: sp, Version: "test"}
+	git := func(args ...string) {
+		t.Helper()
+		if _, err := gitx.Git(ctx, root, args...); err != nil {
+			t.Fatalf("git %v: %v", args, err)
+		}
+	}
+	commit := func(rel, msg string) {
+		t.Helper()
+		hookruntest.WriteFile(t, root, rel, msg+"\n")
+		git("add", rel)
+		git("commit", "-q", "-m", msg)
+	}
+	pending := func() int { n, _, _ := sp.Pending(); return n }
+
+	commit("base.txt", "base")
+	git("checkout", "-q", "-b", "feature")
+	commit("feature.txt", "feature work")
+	git("checkout", "-q", "main")
+	commit("main.txt", "mainline work")
+
+	// A merge commit: two parents.
+	git("merge", "-q", "--no-ff", "--no-edit", "feature")
+	if err := PostCommit(ctx, env); err != nil {
+		t.Fatal(err)
+	}
+	if n := pending(); n != 0 {
+		t.Fatalf("a merge commit must spool nothing, got %d event(s)", n)
+	}
+
+	// A squash: one parent, git's default subject.
+	git("checkout", "-q", "-b", "feature2")
+	commit("feature2.txt", "more feature work")
+	git("checkout", "-q", "main")
+	git("merge", "-q", "--squash", "feature2")
+	git("commit", "-q", "--no-edit")
+	if err := PostCommit(ctx, env); err != nil {
+		t.Fatal(err)
+	}
+	if n := pending(); n != 0 {
+		t.Fatalf("a squash commit must spool nothing, got %d event(s)", n)
+	}
+
+	// The skip is specific: the next ordinary commit is counted.
+	commit("after.txt", "ordinary work")
+	if err := PostCommit(ctx, env); err != nil {
+		t.Fatal(err)
+	}
+	if n := pending(); n != 1 {
+		t.Fatalf("an ordinary unstamped commit must spool one event, got %d", n)
+	}
+}

@@ -1,0 +1,180 @@
+package codex
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"io"
+	"os"
+	"time"
+
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/semconv"
+)
+
+// quotaCursor holds no transcript text: an offset past acknowledged records, an anchor
+// that detects a rewritten file, and the turn carried across bounded reads.
+type quotaCursor struct {
+	SeenQuota bool   `json:"seen_quota,omitempty"`
+	Identity  string `json:"identity"`
+	Stream    string `json:"stream"`
+	Offset    int64  `json:"offset"`
+	Anchor    string `json:"anchor"`
+	TurnID    string `json:"turn_id,omitempty"`
+	Skipping  bool   `json:"skipping,omitempty"`
+	turnState
+}
+
+func fundingHash(s string) string { h := sha256.Sum256([]byte(s)); return hex.EncodeToString(h[:]) }
+
+func cursorAnchor(f *os.File, offset int64) string {
+	if offset <= 0 {
+		return ""
+	}
+	b := make([]byte, min(offset, 64))
+	n, err := f.ReadAt(b, offset-int64(len(b)))
+	if err != nil || n != len(b) {
+		return ""
+	}
+	return fundingHash(string(b))
+}
+
+// readFunding emits each newly observed quota, unchanged and null ones included, at
+// most 1 MiB and 256 records per call; the caller spools before persisting the cursor.
+func readFunding(ctx context.Context, sessionID, transcript string, cursor quotaCursor, admits func(cwd string) bool, emit func(hookrun.FundingEvidence) error) (quotaCursor, string, error) {
+	f, status := openCodexRollout(ctx, sessionID, transcript)
+	if f == nil {
+		return cursor, status, nil
+	}
+	defer f.Close()
+	st, err := f.Stat()
+	if err != nil {
+		return cursor, "unreadable", err
+	}
+	head := make([]byte, min(st.Size(), 64<<10))
+	n, err := f.ReadAt(head, 0)
+	if err != nil && err != io.EOF {
+		return cursor, "unreadable", err
+	}
+	first, _, _ := bytes.Cut(head[:n], []byte{'\n'})
+	identity := fundingHash(rolloutFileIdentity(st) + string(first))
+	reset := cursor.Identity != "" && (cursor.Identity != identity || cursor.Offset < 0 || cursor.Offset > st.Size() || (cursor.Offset > 0 && cursor.Anchor != cursorAnchor(f, cursor.Offset)))
+	cursor.recheck(admits)
+	old := cursor
+	if cursor.Identity == "" || reset {
+		cursor = quotaCursor{Identity: identity, Stream: fundingHash(identity + old.Stream + fmt.Sprint(old.Offset))}
+	}
+	send := func(e hookrun.FundingEvidence, offset int64) error {
+		if e.Attrs == nil {
+			e.Attrs = map[string]any{}
+		}
+		e.Attrs[semconv.TermaObservationStreamKey] = cursor.Stream
+		e.Attrs[semconv.TermaObservationIDKey] = fundingHash(sessionID + cursor.Stream + fmt.Sprint(offset) + e.Status)
+		// A gap in a withheld turn leaves, but not which turn it was.
+		if cursor.TurnID != "" && cursor.Admitted {
+			e.Attrs[semconv.TermaTurnIDKey] = cursor.TurnID
+		}
+		return emit(e)
+	}
+	gap := func(offset int64) error {
+		return send(hookrun.FundingEvidence{Source: sourceCodexRollout, Status: "gap"}, offset)
+	}
+	if reset {
+		if err := gap(0); err != nil {
+			return old, "append_failed", err
+		}
+	}
+	checkpoint := func(status string, err error) (quotaCursor, string, error) {
+		cursor.Anchor = cursorAnchor(f, cursor.Offset)
+		return cursor, status, err
+	}
+	data := make([]byte, min(int64(codexTailLimit), st.Size()-cursor.Offset))
+	n, err = f.ReadAt(data, cursor.Offset)
+	if err != nil && err != io.EOF {
+		return old, "unreadable", err
+	}
+	data = data[:n]
+	emitted := 0
+	for len(data) > 0 {
+		if ctx.Err() != nil {
+			return checkpoint("backlog", ctx.Err())
+		}
+		if emitted >= 256 {
+			return checkpoint("backlog", nil)
+		}
+		line, rest, complete := bytes.Cut(data, []byte{'\n'})
+		if !complete {
+			if cursor.Skipping {
+				cursor.Offset += int64(len(data))
+				return checkpoint("backlog", nil)
+			}
+			// The end of a read chunk is not an oversized line: retry from its start next time.
+			if len(data) < codexTailLimit {
+				if cursor.Offset+int64(len(data)) < st.Size() {
+					return checkpoint("backlog", nil)
+				}
+				return checkpoint("incomplete", nil)
+			}
+			if err := gap(cursor.Offset); err != nil {
+				return checkpoint("append_failed", err)
+			}
+			cursor.Offset += int64(len(data))
+			cursor.Skipping = true
+			cursor.TurnID = ""
+			return checkpoint("backlog", nil)
+		}
+		if cursor.Skipping {
+			cursor.Skipping = false
+		} else {
+			var rec struct {
+				Timestamp time.Time `json:"timestamp"`
+				Type      string    `json:"type"`
+				Payload   struct {
+					Type       string          `json:"type"`
+					TurnID     string          `json:"turn_id"`
+					RateLimits json.RawMessage `json:"rate_limits"`
+					turnFields
+				} `json:"payload"`
+			}
+			if json.Unmarshal(line, &rec) != nil {
+				if err := gap(cursor.Offset); err != nil {
+					return checkpoint("append_failed", err)
+				}
+				emitted++
+				cursor.TurnID = ""
+			} else {
+				cursor.track(admits, rec.Type, rec.Payload.Type, rec.Payload.turnFields)
+				switch {
+				case rec.Type == "turn_context" || (rec.Type == "event_msg" && (rec.Payload.Type == "task_started" || rec.Payload.Type == "turn_started")):
+					cursor.TurnID = ""
+					if hookrun.EvidenceLabel.MatchString(rec.Payload.TurnID) {
+						cursor.TurnID = rec.Payload.TurnID
+					}
+				case rec.Type == "event_msg" && (rec.Payload.Type == "task_complete" || rec.Payload.Type == "turn_complete" || rec.Payload.Type == "turn_aborted"):
+					cursor.TurnID = ""
+				case rec.Type == "event_msg" && rec.Payload.Type == "token_count" && len(rec.Payload.RateLimits) > 0 && cursor.Admitted:
+					if err := send(codexQuota(rec.Payload.RateLimits, rec.Timestamp), cursor.Offset); err != nil {
+						return checkpoint("append_failed", err)
+					}
+					cursor.SeenQuota = true
+					emitted++
+				}
+			}
+		}
+		cursor.Offset += int64(len(line) + 1)
+		data = rest
+	}
+	if cursor.Offset < st.Size() {
+		return checkpoint("backlog", nil)
+	}
+	if cursor.Skipping {
+		return checkpoint("incomplete", nil)
+	}
+	if !cursor.SeenQuota {
+		return checkpoint("not_ready", nil)
+	}
+	return checkpoint("caught_up", nil)
+}

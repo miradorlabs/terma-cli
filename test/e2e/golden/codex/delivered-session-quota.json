@@ -1,0 +1,16 @@
+[
+  "gen_ai.main_agent.name",
+  "session.id",
+  "terma.account.plan_type",
+  "terma.credits.present",
+  "terma.credits.unlimited",
+  "terma.evidence.source",
+  "terma.evidence.status",
+  "terma.observation.time",
+  "terma.rate_limit.primary.resets_at",
+  "terma.rate_limit.primary.used_percent",
+  "terma.rate_limit.primary.window_minutes",
+  "terma.rate_limit.secondary.resets_at",
+  "terma.rate_limit.secondary.used_percent",
+  "terma.rate_limit.secondary.window_minutes"
+]

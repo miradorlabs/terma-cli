@@ -1,0 +1,13 @@
+file_format: definition_manifest/2.0
+schema_url: https://github.com/miradorlabs/terma-cli/schemas/2.0.0
+description: >
+  The attributes and events terma adds to the telemetry it sends: its hook events, the
+  relay's stamp on forwarded agent telemetry, and the relay heartbeat. Every name here is
+  a contract with mirador-platform.
+stability: development
+dependencies:
+  - schema_url: https://opentelemetry.io/schemas/1.44.0
+    registry_path: https://github.com/open-telemetry/semantic-conventions.git@v1.44.0[model]
+  # gen_ai.* is in a registry of its own since semconv v1.42.0; pinned to a commit of main.
+  - schema_url: https://opentelemetry.io/schemas/gen-ai-dev/1.42.0-dev
+    registry_path: https://github.com/open-telemetry/semantic-conventions-genai.git@e07f4ebacb08f56db8c4c882d117720333fbca04[model]

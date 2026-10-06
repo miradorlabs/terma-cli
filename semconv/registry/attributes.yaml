@@ -1,0 +1,526 @@
+file_format: definition/2
+attributes:
+  # The envelope.
+  - key: mirador.project.id
+    type: string
+    stability: development
+    brief: The Mirador project the record is delivered to, the platform's routing key.
+    note: A resource attribute, on hook events and on every part the relay forwards.
+  - key: terma.schema.version
+    type: string
+    stability: development
+    brief: The version of this registry the record follows.
+    note: A resource attribute; "2" for this registry.
+    examples: ["2"]
+
+  # Agents and sessions.
+  - key: terma.main_agent.version
+    type: string
+    stability: development
+    brief: The version of the agent named by gen_ai.main_agent.name.
+    note: Sent by hooks-only agents. Claude Code and Codex carry their version in their own telemetry's service.version.
+  - key: terma.agent.id
+    type: string
+    stability: development
+    brief: The id of a subagent run, scoped to its session.
+    note: Transient, so not gen_ai.agent.id; a subagent whose telemetry uses it as its session id is claimed under it too.
+  - key: terma.agent.parent.id
+    type: string
+    stability: development
+    brief: The terma.agent.id, or the thread, that launched the subagent.
+  - key: terma.agent.path
+    type: string
+    stability: development
+    brief: The agent's label for a subagent's place in its tree.
+    examples: ["/root/<task>"]
+  - key: terma.agent.nickname
+    type: string
+    stability: development
+    brief: The name the agent gave a subagent.
+  - key: terma.session.parent.id
+    type: string
+    stability: development
+    brief: The session that opened this one for a subagent.
+  - key: terma.session.title
+    type: string
+    stability: development
+    brief: The name the agent gave the session.
+    note: Content; sent only while the team's policy collects prompts.
+    annotations:
+      content: prompts
+  - key: terma.turn.id
+    type: string
+    stability: development
+    brief: The turn the event belongs to, in the agent's own id.
+
+  # Operations.
+  - key: terma.operation.status
+    type: string
+    stability: development
+    brief: How the operation the event records ended.
+    note: Each event documents its own vocabulary on its reference to this attribute.
+  - key: terma.operation.duration_ms
+    type: int
+    stability: development
+    brief: How long the operation took, in milliseconds.
+  - key: terma.operation.duration_status
+    type:
+      members:
+        - id: invalid
+          value: invalid
+          brief: The agent reported a duration that is not a non-negative integer.
+          stability: development
+    stability: development
+    brief: Why terma.operation.duration_ms is absent when the agent sent one.
+  - key: terma.operation.interrupted
+    type: boolean
+    stability: development
+    brief: Whether the failed operation was interrupted by the developer.
+  - key: terma.approval.reason
+    type: string
+    stability: development
+    brief: The agent's description of what an approval request asks to do.
+    note: Tool content; withheld unless the team's policy collects it.
+    annotations:
+      content: tool
+  - key: terma.approval.permission_mode
+    type: string
+    stability: development
+    brief: The agent's permission mode when it asked for approval.
+  - key: terma.capture.surface
+    type:
+      members:
+        - id: desktop
+          value: desktop
+          brief: Records only terma reports for the agent, sent from every surface.
+          stability: development
+    stability: development
+    brief: The capture path the record came from.
+  - key: terma.capture.gap
+    type:
+      members:
+        - id: invalid_checkpoint
+          value: invalid_checkpoint
+          brief: The ordering checkpoint was unreadable, so a new stream began.
+          stability: development
+    stability: development
+    brief: Why an observation stream lost its ordering boundary.
+  - key: terma.hook.event
+    type: string
+    stability: development
+    brief: The agent hook that produced the record.
+    examples: ["PermissionRequest", "afterAgentResponse"]
+
+  # Observations and evidence.
+  - key: terma.observation.id
+    type: string
+    stability: development
+    brief: The replay-stable id of one observation.
+  - key: terma.observation.sequence
+    type: int
+    stability: development
+    brief: The observation's position in its stream.
+  - key: terma.observation.stream
+    type: string
+    stability: development
+    brief: The ordered stream the observation belongs to; a new stream marks a lost ordering boundary.
+  - key: terma.observation.time
+    type: string
+    stability: development
+    brief: When the provider wrote what was observed, RFC 3339 in UTC.
+  - key: terma.evidence.source
+    type: string
+    stability: development
+    brief: Where the evidence the record carries was read, named by the agent's package.
+    note: >
+      Each agent has its own: claude_account, claude_statusline, claude_stop_failure,
+      claude_transcript, codex_rollout, codex_hook, codex_session_index, cursor_hook and antigravity_hook.
+    examples: ["codex_rollout", "cursor_hook"]
+  - key: terma.evidence.status
+    type: string
+    stability: development
+    brief: Whether the evidence could be read, so missing data never reads as zero.
+    note: >
+      present, unavailable, missing, unreadable, unsupported, oversized or malformed; a
+      capture's progress adds backlog, incomplete, not_ready, gap, search_limit,
+      session_mismatch, unsupported_path, invalid_session and lock_timeout.
+
+  # Files and compaction.
+  - key: terma.files.paths
+    type: string[]
+    stability: development
+    brief: Repository-relative paths the session wrote.
+  - key: terma.compaction.item.id
+    type: string
+    stability: development
+    brief: The agent's id for the compaction item.
+  - key: terma.compaction.trigger
+    type:
+      members:
+        - id: auto
+          value: auto
+          brief: The agent compacted on its own.
+          stability: development
+        - id: manual
+          value: manual
+          brief: The developer asked for it.
+          stability: development
+    stability: development
+    brief: What started a compaction.
+
+  # Messages.
+  - key: terma.message.id
+    type: string
+    stability: development
+    brief: The agent's id for the message.
+  - key: terma.message.text
+    type: string
+    stability: development
+    brief: What the message said.
+    note: Content; sent only while the team's policy collects prompts.
+    annotations:
+      content: prompts
+  - key: terma.message.phase
+    type: string
+    stability: development
+    brief: The agent's label for where in the turn the message was said.
+  - key: terma.message.truncated
+    type: boolean
+    stability: development
+    brief: Whether terma.message.text was cut at terma's bound.
+  - key: terma.message.count
+    type: int
+    stability: development
+    brief: How many messages the run exchanged.
+
+  # Usage, as an agent without an export reports it.
+  - key: terma.usage.status
+    type:
+      members:
+        - id: available
+          value: available
+          brief: Every count was reported.
+          stability: development
+        - id: partial
+          value: partial
+          brief: Some counts were reported.
+          stability: development
+        - id: unavailable
+          value: unavailable
+          brief: No count was reported.
+          stability: development
+        - id: invalid
+          value: invalid
+          brief: A count was not a non-negative integer.
+          stability: development
+    stability: development
+    brief: Whether the record's usage counts were reported.
+  - key: terma.usage.semantics
+    type:
+      members:
+        - id: snapshot
+          value: snapshot
+          brief: A repeated snapshot, never an additive delta.
+          stability: development
+    stability: development
+    brief: How the record's usage counts add up.
+  - key: terma.usage.scope
+    type:
+      members:
+        - id: parent_turn
+          value: parent_turn
+          brief: The parent conversation's turn, subagents excluded.
+          stability: development
+    stability: development
+    brief: What the record's usage counts cover.
+  - key: terma.usage.input_tokens
+    type: int
+    stability: development
+    brief: Input tokens as the agent reported them.
+    note: Not gen_ai.usage.input_tokens; the agent does not say whether cached tokens are included.
+  - key: terma.usage.output_tokens
+    type: int
+    stability: development
+    brief: Output tokens as the agent reported them, in a snapshot rather than per call.
+  - key: terma.usage.cache_read_tokens
+    type: int
+    stability: development
+    brief: Cache-read input tokens as the agent reported them, in a snapshot rather than per call.
+  - key: terma.usage.cache_write_tokens
+    type: int
+    stability: development
+    brief: Cache-write input tokens as the agent reported them, in a snapshot rather than per call.
+  - key: terma.context.tokens
+    type: int
+    stability: development
+    brief: The tokens the context held.
+  - key: terma.context.window_size
+    type: int
+    stability: development
+    brief: The context window's size, in tokens.
+  - key: terma.context.used_percent
+    type: double
+    stability: development
+    brief: How full the context was, from 0 to 100.
+  - key: terma.model_param.thinking
+    type: string
+    stability: development
+    brief: The thinking setting the developer selected for the model.
+  - key: terma.model_param.context
+    type: string
+    stability: development
+    brief: The context setting the developer selected for the model.
+  - key: terma.loop.count
+    type: int
+    stability: development
+    brief: How many agent loops the run took.
+  - key: terma.tool_call.count
+    type: int
+    stability: development
+    brief: How many tool calls the run made.
+  - key: terma.step.index
+    type: int
+    stability: development
+    brief: The step's index in its conversation, which only grows.
+  - key: terma.invocation.number
+    type: int
+    stability: development
+    brief: The agent's invocation counter.
+  - key: terma.invocation.initial_steps
+    type: int
+    stability: development
+    brief: How many steps the conversation held when the invocation began.
+  - key: terma.execution.number
+    type: int
+    stability: development
+    brief: The agent's execution counter.
+  - key: terma.termination.reason
+    type: string
+    stability: development
+    brief: The agent's word for why the turn ended.
+  - key: terma.agent.fully_idle
+    type: boolean
+    stability: development
+    brief: Whether the agent had nothing left running when the turn ended.
+  - key: terma.provider.session.id
+    type: string
+    stability: development
+    brief: The agent's own session id, where it differs from the session.id terma files the record under.
+  - key: terma.funding.status
+    type: string
+    stability: development
+    brief: Whether the record carries who paid for the session.
+    examples: ["unavailable"]
+  - key: terma.quota.status
+    type: string
+    stability: development
+    brief: Whether the record carries the session's quota.
+    examples: ["unavailable"]
+
+  # Funding, quota and account.
+  - key: terma.account.id
+    type: string
+    stability: development
+    brief: The provider's id for the account the session ran under.
+  - key: terma.account.seat.id
+    type: string
+    stability: development
+    brief: An opaque id for one person's seat in a shared account.
+    note: >
+      The hex SHA-256 of the account scope, a NUL byte and user.email; it stands in for an
+      email the team's policy withholds.
+  - key: terma.account.status
+    type: string
+    stability: development
+    brief: Whether the record names the account.
+    examples: ["available", "unavailable"]
+  - key: terma.account.organization.id
+    type: string
+    stability: development
+    brief: The provider's id for the account's organization.
+  - key: terma.account.organization.type
+    type: string
+    stability: development
+    brief: The provider's word for the organization's kind.
+  - key: terma.account.plan_type
+    type: string
+    stability: development
+    brief: The provider's word for the account's plan.
+  - key: terma.account.seat_tier
+    type: string
+    stability: development
+    brief: The provider's word for the seat's tier.
+  - key: terma.account.billing_type
+    type: string
+    stability: development
+    brief: The provider's word for how the account is billed.
+  - key: terma.account.extra_usage.enabled
+    type: boolean
+    stability: development
+    brief: Whether the account may spend past its plan.
+  - key: terma.rate_limit.five_hour.used_percent
+    type: double
+    stability: development
+    brief: How much of the five-hour window is used, from 0 to 100.
+  - key: terma.rate_limit.five_hour.resets_at
+    type: int
+    stability: development
+    brief: When the five-hour window resets, in Unix seconds.
+  - key: terma.rate_limit.seven_day.used_percent
+    type: double
+    stability: development
+    brief: How much of the seven-day window is used, from 0 to 100.
+  - key: terma.rate_limit.seven_day.resets_at
+    type: int
+    stability: development
+    brief: When the seven-day window resets, in Unix seconds.
+  - key: terma.rate_limit.spend_limit.used_percent
+    type: double
+    stability: development
+    brief: How much of the spend limit is used, from 0 to 100.
+  - key: terma.rate_limit.spend_limit.resets_at
+    type: int
+    stability: development
+    brief: When the spend limit resets, in Unix seconds.
+  - key: terma.rate_limit.primary.used_percent
+    type: double
+    stability: development
+    brief: How much of the provider's primary window is used, from 0 to 100.
+  - key: terma.rate_limit.primary.window_minutes
+    type: int
+    stability: development
+    brief: The primary window's length, in minutes.
+  - key: terma.rate_limit.primary.resets_at
+    type: int
+    stability: development
+    brief: When the primary window resets, in Unix seconds.
+  - key: terma.rate_limit.secondary.used_percent
+    type: double
+    stability: development
+    brief: How much of the provider's secondary window is used, from 0 to 100.
+  - key: terma.rate_limit.secondary.window_minutes
+    type: int
+    stability: development
+    brief: The secondary window's length, in minutes.
+  - key: terma.rate_limit.secondary.resets_at
+    type: int
+    stability: development
+    brief: When the secondary window resets, in Unix seconds.
+  - key: terma.rate_limit.reached_type
+    type: string
+    stability: development
+    brief: The provider's word for the limit the account reached.
+  - key: terma.spend_control.reached
+    type: boolean
+    stability: development
+    brief: Whether the account reached its spend control.
+  - key: terma.credits.present
+    type: boolean
+    stability: development
+    brief: Whether the account has credits.
+  - key: terma.credits.unlimited
+    type: boolean
+    stability: development
+    brief: Whether the account's credits are unlimited.
+  - key: terma.credits.balance
+    type: string
+    stability: development
+    brief: The account's credit balance, a decimal in the provider's own unit.
+    note: Kept as text to preserve its precision; it is not USD.
+
+  # Commits.
+  - key: terma.commit.lines.added
+    type: int
+    stability: development
+    brief: Lines the commit added across its text files.
+  - key: terma.commit.lines.deleted
+    type: int
+    stability: development
+    brief: Lines the commit deleted across its text files.
+  - key: terma.commit.file.count
+    type: int
+    stability: development
+    brief: How many files the commit changed.
+  - key: terma.commit.file.stats
+    type: any
+    stability: development
+    brief: The commit's changes per file, at most 50 of them.
+    note: >
+      An array of maps of path, lines_added, lines_deleted and session_id, the stamped
+      session whose manifest names the file. A binary file has no line counts; a file no
+      session touched has no session_id.
+  - key: terma.commit.file.stats_reported
+    type: int
+    stability: development
+    brief: How many files terma.commit.file.stats lists.
+  - key: terma.commit.file.stats_truncated
+    type: boolean
+    stability: development
+    brief: Whether terma.commit.file.stats left files out.
+  - key: terma.commit.session.ids
+    type: string[]
+    stability: development
+    brief: The sessions stamped into the commit.
+  - key: terma.commit.session.count
+    type: int
+    stability: development
+    brief: How many sessions are stamped into the commit.
+  - key: terma.commit.staged.count
+    type: int
+    stability: development
+    brief: How many files were staged when the message was stamped.
+  - key: terma.commit.message_source
+    type:
+      members:
+        - id: message
+          value: message
+          brief: The message came from -m or -F.
+          stability: development
+        - id: template
+          value: template
+          brief: The message came from a template.
+          stability: development
+        - id: commit
+          value: commit
+          brief: The message came from an existing commit (-c, -C or --amend).
+          stability: development
+    stability: development
+    brief: Where git took the commit message from, as prepare-commit-msg reports it.
+
+  # The relay.
+  - key: terma.relay.attribution
+    type:
+      members:
+        - id: catch_all
+          value: catch-all
+          brief: Global mode placed the part in its default project.
+          stability: development
+        - id: process
+          value: process
+          brief: The part named no session; its process named one.
+          stability: development
+    stability: development
+    brief: How the relay found the part's session when the part did not name it.
+    note: A resource attribute the relay stamps.
+  - key: terma.relay.session.id
+    type: string
+    stability: development
+    brief: The session the relay inferred for a part that named none.
+    note: A resource attribute the relay stamps.
+  - key: terma.relay.heartbeat.reason
+    type:
+      members:
+        - id: start
+          value: start
+          brief: The relay started.
+          stability: development
+        - id: interval
+          value: interval
+          brief: The heartbeat period passed.
+          stability: development
+        - id: setup
+          value: setup
+          brief: Setup finished; the platform reads it as installed and working.
+          stability: development
+    stability: development
+    brief: Why the relay sent a heartbeat.

@@ -1,0 +1,312 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# macOS runners are few and harness-telemetry holds four for ~5 minutes: a pull request's
+# superseded runs are cancelled rather than queued ahead of its latest. Each push to main
+# runs in a group of its own.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  npm-installer:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 18
+      - run: npm test --prefix npm
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Verify formatting
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "::error::gofmt needed on:"; echo "$unformatted"; exit 1
+          fi
+
+      - run: go vet ./...
+
+      # The version lives in .golangci-lint-version, which `make lint` reads too.
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version-file: .golangci-lint-version
+
+      - run: go test -race ./...
+
+      # The attribute registry is a contract with the platform: Weaver's rules and terma's
+      # policies hold, and internal/semconv is what the registry renders. A development
+      # tool only, pinned and checksummed here; no user machine runs it.
+      - name: Semconv registry
+        env:
+          WEAVER_VERSION: v0.27.0
+          WEAVER_SHA256: 7e497eb48215a5240a0bf77747cf431596c468f1039d481807b1f1e096cb5ac2
+        run: |
+          asset=weaver-x86_64-unknown-linux-gnu
+          curl -fsSLo "$RUNNER_TEMP/$asset.tar.xz" "https://github.com/open-telemetry/weaver/releases/download/$WEAVER_VERSION/$asset.tar.xz"
+          echo "$WEAVER_SHA256  $RUNNER_TEMP/$asset.tar.xz" | sha256sum -c -
+          tar -xJf "$RUNNER_TEMP/$asset.tar.xz" -C "$RUNNER_TEMP"
+          WEAVER="$RUNNER_TEMP/$asset/weaver" make semconv-check
+
+      # The hook budget is a product guarantee, not a nice-to-have: a
+      # prepare-commit-msg that gets slow gets uninstalled.
+      - name: Hook latency budget
+        run: make bench-hook
+
+  # What has a Windows implementation of its own — LockFileEx, the relay's sender from the
+  # TCP table and parents from a process snapshot, the Run-key service and its
+  # supervisor, the stop file, the zip archive and the rename-aside swap — and what setup
+  # writes and hooks read, on Windows paths. Also vets the whole module for Windows, so nothing Unix-only creeps back in.
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go vet ./...
+      - name: Relay, locking, session stores, process lookups and updater on Windows
+        run: go test ./internal/relay/... ./internal/flock/... ./internal/session/... ./internal/procinfo/... ./internal/selfupdate/... -count=1 -timeout=5m
+      # Setup's machine-wide hooks, the commit hooks a session installs in a repository,
+      # and what they run: git's layout and config read from disk, the repository list, the
+      # hook runtime, doctor's checks and setup's order.
+      - name: Git, policy, hooks, doctor and setup on Windows
+        run: go test ./internal/gitx/... ./internal/config/... ./internal/globalmode/... ./internal/repohooks/... ./internal/hooks/... ./internal/doctor/... ./internal/setup/... -count=1 -timeout=10m -skip TestWindowsHookCommandRunsUnderCodexShells
+      # The line setup writes as Codex's commandWindows, run through each shell Codex uses
+      # on Windows; verbose, so the log shows which shells ran and how long each took.
+      - name: Codex's Windows hook line under PowerShell and cmd
+        run: go test ./internal/hooks/hookmgr/ -run TestWindowsHookCommandRunsUnderCodexShells -count=1 -v
+      # The Codex adapter on Windows paths: its hooks file, approval hashes, rollouts and relay.
+      - name: Codex on Windows
+        run: go test ./internal/agents/codex/... -count=1 -timeout=5m
+      # Sign-in tokens and server keys in the Credential Manager, through the real store.
+      - name: Credentials in the Windows Credential Manager
+        env:
+          TERMA_KEYCHAIN_TEST: "1"
+        run: go test ./internal/account/... -count=1 -timeout=5m
+
+  # The same through the Secret Service a Linux desktop runs (GNOME Keyring), unlocked
+  # in a D-Bus session of its own; macOS's Keychain is exercised by hand.
+  keychain-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: sudo apt-get install -y -q gnome-keyring dbus-x11 >/dev/null
+      - name: Credentials in the Secret Service
+        env:
+          TERMA_KEYCHAIN_TEST: "1"
+        run: |
+          # A desktop login creates and unlocks the "login" keyring; do the same here.
+          mkdir -p ~/.local/share/keyrings && printf login > ~/.local/share/keyrings/default
+          dbus-run-session -- sh -c 'printf ci | gnome-keyring-daemon --unlock --components=secrets >/dev/null && go test ./internal/account/secret/ -run TestTheSystemKeychain -count=1 -v'
+
+  # The e2e suite is a separate module; its offline contracts must run in CI too.
+  live-contracts:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: test/e2e
+    env:
+      TERMA_E2E: "0"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: test/e2e/go.mod
+          cache-dependency-path: test/e2e/go.sum
+      - run: go vet ./...
+      - run: go test -race ./...
+
+  # Real harness exporters, deterministic loopback model responses and OTLP.
+  # Pin PR builds; live.yml also checks the latest releases nightly. The tests run one
+  # after another, ~18 minutes in all, so they are split into shards that run at once;
+  # scripts/e2e-shard.sh says which test runs where, and any new test runs in `others`.
+  harness-telemetry:
+    name: harness-telemetry (${{ matrix.shard }})
+    runs-on: macos-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [claude, codex-a, codex-b, others]
+    env:
+      # TestRelay* is the local relay: the same harnesses exporting globally through
+      # `terma relay run`, and nothing but the claimed session reaching the receiver.
+      # TestMachineHooks* is where setup's machine-wide hooks record: beside a
+      # repository's own, in the repositories the team admits.
+      E2E_TESTS: '^(TestClaudeTelemetry|TestCodexTelemetry|TestClaudeStopFailureDelivery|TestRelay.*|TestMachineHooks.*|TestPi.*|TestGemini.*|TestDsh.*|TestHermes.*)$'
+      TERMA_ENV: dev
+      TERMA_E2E: "1"
+      TERMA_E2E_CLAUDE_VERSIONS: "2.1.283"
+      TERMA_E2E_CODEX_VERSIONS: "0.158.0"
+      TERMA_E2E_OPENCODE_VERSIONS: "1.18.33"
+      TERMA_E2E_GEMINI_VERSIONS: "0.62.0"
+      TERMA_E2E_DSH_VERSIONS: "0.2.0-rc.2"
+      TERMA_E2E_BINARY: ${{ github.workspace }}/test/e2e/bin/terma
+      # Codex 0.158.0 sometimes exits without running its SessionEnd hook, with or
+      # without Terma (TestCodexSessionEndProbe). Pull requests report it instead of
+      # failing on it; the nightly e2e workflow stays strict.
+      TERMA_E2E_KNOWN_UPSTREAM: codex-session-end
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: test/e2e/go.mod
+          cache-dependency-path: |
+            go.sum
+            test/e2e/go.sum
+      - name: Build Terma
+        run: go build -o test/e2e/bin/terma ./cmd/terma
+      # Pi has no exporter; terma's extension is one, tested only on the installed
+      # build (test/e2e/pi.go).
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Install Pi and T3 Code
+        # Pi has no exporter (terma's extension is one); T3 Code runs Codex and Claude
+        # Code itself. Gemini CLI and DeepSeek Harness install on demand (test/e2e/gemini.go,
+        # test/e2e/dsh.go). Hermes, omp and Cursor run only where installed or credentialed.
+        run: npm install -g @earendil-works/pi-coding-agent@0.99.1 t3@0.0.42
+      - name: Assert harness telemetry (no provider credentials)
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          run=$(./scripts/e2e-shard.sh "$SHARD" "$E2E_TESTS")
+          echo "shard $SHARD: $run"
+          cd test/e2e && go test -v -count=1 -timeout=25m -run "$run" .
+      - name: Publish coverage summary
+        if: always()
+        run: |
+          if [ -f test/e2e/report/latest.md ]; then
+            cat test/e2e/report/latest.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  # The OpenCode plugin is ~450 lines of JavaScript that writes into a user's
+  # plugin directory and ships in the release archives. `make test-plugin` skips it
+  # wherever bun is absent, so CI is where it is actually run.
+  opencode-plugin:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: internal/agents/opencode/plugin
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun test
+
+  # terma setup's git hook scripts run on every developer's machine: they must be
+  # POSIX sh, and they must keep working on the sh that Debian/Alpine ship.
+  shim-portability:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Git hook scripts run under dash and busybox sh
+        run: |
+          sudo apt-get install -y -q dash busybox >/dev/null
+          TERMA_SHIM_SHELLS="dash,busybox sh" go test ./internal/repohooks/ -run TestGitHookScriptsRunUnderPOSIXShells -count=1 -v
+
+  # Everything a release publishes, rendered with the committed GoReleaser config
+  # from a throwaway tag that never leaves the runner: every platform
+  # cross-compiles, and the cask's download URL carries v#{version} exactly as a
+  # real release's does (a --snapshot build's would not, and `brew audit` rejects
+  # it). Nothing is published. The two jobs after this one install what it built.
+  release-dry-run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: git tag v0.0.0-ci
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          # `before` is `go test`, which the test job already runs.
+          args: release --clean --skip=publish,validate,announce,before
+        env:
+          # Read only by the cask template; the dry run pushes nothing.
+          HOMEBREW_TAP_TOKEN: dry-run
+      - uses: actions/upload-artifact@v5
+        with:
+          name: release-dry-run
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/checksums.txt
+            dist/homebrew/
+          retention-days: 1
+          if-no-files-found: error
+
+  # `curl -fsSL https://terma.ai/install.sh | bash`, against those archives served
+  # over loopback: pinned and latest, piped through bash and under sh, plus the two
+  # refusals (checksum mismatch, cleartext). scripts/test-install.sh.
+  install-script:
+    needs: release-dry-run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          name: release-dry-run
+          path: dist
+      - name: shellcheck
+        run: |
+          shellcheck -s sh install.sh
+          shellcheck scripts/test-install.sh scripts/test-cask.sh
+      - run: ./scripts/test-install.sh dist v0.0.0-ci
+
+  # `brew install miradorlabs/tap/terma`, with the cask the release would push:
+  # `brew audit --strict`, then a real install from a throwaway local tap whose
+  # URLs point at the loopback mirror — download, sha256, the preflight that strips
+  # the quarantine flag, completions generated by running the binary, the link.
+  # scripts/test-cask.sh.
+  homebrew-cask:
+    needs: release-dry-run
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          name: release-dry-run
+          path: dist
+      # The runner image's Homebrew can be weeks behind what users get from the
+      # auto-update `brew install` runs; the cask relies on a stanza from 2026-08.
+      - run: brew update --quiet
+      - run: ./scripts/test-cask.sh dist v0.0.0-ci

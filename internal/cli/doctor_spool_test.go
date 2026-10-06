@@ -1,0 +1,32 @@
+package cli
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/miradorlabs/terma-cli/internal/spool"
+)
+
+// A hook swallows a failed append by design, so doctor is the place an unwritable spool
+// gets said.
+func TestDoctorFailsWhenTheSpoolCannotBeWritten(t *testing.T) {
+	userSandbox(t)
+	spoolDir := filepath.Join(testApp.stateDir, spool.Dir)
+	if err := os.MkdirAll(spoolDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	// A directory where the queue file belongs: reads still work, every append fails.
+	if err := os.Mkdir(filepath.Join(spoolDir, "events.jsonl"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runTerma(t, "doctor")
+	if err == nil {
+		t.Fatalf("doctor must fail on a spool it cannot write:\n%s", out)
+	}
+	if !strings.Contains(out, "events cannot be written to the spool") {
+		t.Fatalf("doctor should name the write failure, not the queue depth:\n%s", out)
+	}
+}

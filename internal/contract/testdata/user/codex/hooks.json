@@ -1,0 +1,95 @@
+{
+  "hooks": {
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user codex-permission-request || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user codex-post-tool-use || true",
+            "timeout": 10,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user codex-session-end || true",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user codex-session-start || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user codex-stop || true",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user codex-subagent-start || true",
+            "timeout": 10,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user codex-subagent-stop || true",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user codex-user-prompt-submit || true",
+            "timeout": 10,
+            "async": true
+          }
+        ]
+      }
+    ]
+  }
+}

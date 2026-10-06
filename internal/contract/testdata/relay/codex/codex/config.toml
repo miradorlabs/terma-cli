@@ -1,0 +1,6 @@
+[otel]
+exporter = { otlp-http = { endpoint = "http://127.0.0.1:43180/v1/logs", headers = { Authorization = "Bearer relay-token" }, protocol = "binary" } }
+log_user_prompt = true
+metrics_exporter = { otlp-http = { endpoint = "http://127.0.0.1:43180/v1/metrics", headers = { Authorization = "Bearer relay-token" }, protocol = "binary" } }
+tool_result = { max_bytes = 16384 }
+trace_exporter = { otlp-http = { endpoint = "http://127.0.0.1:43180/v1/traces", headers = { Authorization = "Bearer relay-token" }, protocol = "binary" } }
