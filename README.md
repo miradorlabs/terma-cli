@@ -145,13 +145,17 @@ hand, as Get started says. A build between release tags is never updated and get
 notice.
 
 **Signed releases.** Every release's `checksums.txt`, which names each archive's digest, is
-signed with the release key, and terma installs only a release whose signature a key
-built into it made: a release asset that was tampered with or swapped is refused, by
-`terma update` and by the background update alike. The public key is
+signed together with the release's tag, and terma installs only a release whose signature
+a key built into it made for that tag: a release asset that was tampered with, swapped, or
+taken from an earlier release is refused, by `terma update` and by the background update
+alike. The public key is
 `cb6646bf0ec98128bcab6bd5a4b92d0ca4ade2d9e3f17e12e06e33725240667b` (the list, with any
-being rotated in, is in `internal/selfupdate/sign.go`); to check a release by hand, download its `checksums.txt`
-and `checksums.txt.sig` and run `go run ./scripts/releasesign verify checksums.txt
-checksums.txt.sig` from a clone. The installer script and the npm package do not check
+being rotated in, is in `internal/selfupdate/sign.go`); to check a release by hand, download
+its `checksums.txt` and `checksums.txt.sig` and run `go run ./scripts/releasesign verify
+<tag> checksums.txt checksums.txt.sig` from a clone. A key is rotated by releases signed
+with both the old key and the new for as long as builds without the new key are still
+updating; a build that only knows a retired key cannot update, and is reinstalled with the
+installer script. The installer script and the npm package do not check
 the signature: on a first install, the script, the key it would check against and the
 archives would all come from the same place, so the check would add nothing; what covers
 them is the build provenance GitHub attaches to every release asset (`gh attestation

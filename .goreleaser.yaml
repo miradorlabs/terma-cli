@@ -48,13 +48,13 @@ archives:
 checksum:
   name_template: "checksums.txt"
 
-# checksums.txt names every archive's digest, so its signature signs the release: terma
-# installs only a release whose checksums.txt a key pinned in the binary signed
-# (internal/selfupdate). The private key is the release workflow's TERMA_SIGNING_KEY;
-# dry runs skip this (--skip=sign).
+# checksums.txt names every archive's digest, so its signature, with the tag, signs the
+# release: terma installs only a release whose checksums.txt a key pinned in the binary
+# signed for that tag (internal/selfupdate). The private key is the release workflow's
+# TERMA_SIGNING_KEY; dry runs skip this (--skip=sign).
 signs:
   - cmd: go
-    args: ["run", "./scripts/releasesign", "sign", "${artifact}", "${signature}"]
+    args: ["run", "./scripts/releasesign", "sign", "{{ .Tag }}", "${artifact}", "${signature}"]
     artifacts: checksum
     signature: "${artifact}.sig"
 

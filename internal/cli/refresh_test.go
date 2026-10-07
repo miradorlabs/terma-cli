@@ -174,7 +174,7 @@ func TestUpdateRefreshesWithTheReplacedBinary(t *testing.T) {
 		_, _ = w.Write([]byte(`{"tag_name":"v2.0.0","assets":[{"name":"checksums.txt","browser_download_url":"` + host + `/sums"},{"name":"` + selfupdate.SignatureName + `","browser_download_url":"` + host + `/sig"},{"name":"` + asset + `","browser_download_url":"` + host + `/archive"}]}`))
 	})
 	mux.HandleFunc("/sums", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(sums) })
-	mux.HandleFunc("/sig", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(selfupdate.Sign(priv, sums)) })
+	mux.HandleFunc("/sig", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(selfupdate.Sign(priv, "v2.0.0", sums)) })
 	mux.HandleFunc("/archive", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(archive) })
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)

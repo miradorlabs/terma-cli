@@ -112,7 +112,7 @@ func TestMaintainUpdatesByDefaultAndVerifiesUpdates(t *testing.T) {
 				case "/sums":
 					_, _ = w.Write(sums)
 				case "/sig":
-					_, _ = w.Write(testSign(sums))
+					_, _ = w.Write(testSign(tag, sums))
 				case "/archive":
 					downloads++
 					if mode == "tampered" {
@@ -282,7 +282,7 @@ func fakeReleases(t *testing.T, tag string, binary []byte, downloads *int, failL
 		case "/sums":
 			_, _ = w.Write(sums)
 		case "/sig":
-			_, _ = w.Write(testSign(sums))
+			_, _ = w.Write(testSign(tag, sums))
 		case "/archive":
 			*downloads++
 			_, _ = w.Write(archive)
@@ -465,7 +465,7 @@ func TestAnInstallRefusesABinaryReplacedDuringTheDownload(t *testing.T) {
 		case "/sums":
 			_, _ = w.Write(sums)
 		case "/sig":
-			_, _ = w.Write(testSign(sums))
+			_, _ = w.Write(testSign("v1.0.2", sums))
 		case "/archive":
 			// install.sh puts 1.0.3 in place while the archive is on its way.
 			next := exe + ".next"

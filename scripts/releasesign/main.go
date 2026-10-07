@@ -2,11 +2,13 @@
 // checksums.txt with it (GoReleaser's signs step), and terma installs only a release
 // whose checksums.txt a pinned public key signed (internal/selfupdate).
 //
-//	go run ./scripts/releasesign keygen <keyfile>          writes the private key, prints the public key
-//	go run ./scripts/releasesign sign <file> <sigfile>     signs file with $TERMA_SIGNING_KEY
-//	go run ./scripts/releasesign verify <file> <sigfile> [<public key hex>]
+//	go run ./scripts/releasesign keygen <keyfile>                 writes the private key, prints the public key
+//	go run ./scripts/releasesign sign <tag> <file> <sigfile>      signs file under tag with $TERMA_SIGNING_KEY
+//	go run ./scripts/releasesign verify <tag> <file> <sigfile> [<public key hex>]
 //
-// The private key file holds the 32-byte seed as hex, which TERMA_SIGNING_KEY holds too.
+// The private key file holds the 32-byte seed as hex, which TERMA_SIGNING_KEY holds too;
+// while a key is rotated, TERMA_SIGNING_KEY holds both seeds, separated by whitespace, and
+// the signature file gets a line from each.
 package main
 
 import (
@@ -30,7 +32,7 @@ func main() {
 
 func run(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: releasesign keygen <keyfile> | sign <file> <sigfile> | verify <file> <sigfile> [<public key hex>]")
+		return errors.New("usage: releasesign keygen <keyfile> | sign <tag> <file> <sigfile> | verify <tag> <file> <sigfile> [<public key hex>]")
 	}
 	switch args[0] {
 	case "keygen":
@@ -39,13 +41,13 @@ func run(args []string) error {
 		}
 		return keygen(args[1])
 	case "sign":
-		if len(args) != 3 {
-			return errors.New("usage: releasesign sign <file> <sigfile>")
+		if len(args) != 4 {
+			return errors.New("usage: releasesign sign <tag> <file> <sigfile>")
 		}
-		return sign(args[1], args[2])
+		return sign(args[1], args[2], args[3])
 	case "verify":
-		if len(args) != 3 && len(args) != 4 {
-			return errors.New("usage: releasesign verify <file> <sigfile> [<public key hex>]")
+		if len(args) != 4 && len(args) != 5 {
+			return errors.New("usage: releasesign verify <tag> <file> <sigfile> [<public key hex>]")
 		}
 		return verify(args[1:])
 	}
@@ -74,17 +76,24 @@ func keygen(path string) error {
 	return nil
 }
 
-// privateKey is TERMA_SIGNING_KEY: the seed, hex.
-func privateKey() (ed25519.PrivateKey, error) {
-	seed, err := hex.DecodeString(strings.TrimSpace(os.Getenv("TERMA_SIGNING_KEY")))
-	if err != nil || len(seed) != ed25519.SeedSize {
-		return nil, errors.New("TERMA_SIGNING_KEY must hold the private key's 32-byte seed as hex (releasesign keygen)")
+// privateKeys are TERMA_SIGNING_KEY's seeds, hex, one or more.
+func privateKeys() ([]ed25519.PrivateKey, error) {
+	var keys []ed25519.PrivateKey
+	for _, h := range strings.Fields(os.Getenv("TERMA_SIGNING_KEY")) {
+		seed, err := hex.DecodeString(h)
+		if err != nil || len(seed) != ed25519.SeedSize {
+			return nil, errors.New("TERMA_SIGNING_KEY must hold the private key's 32-byte seed as hex (releasesign keygen), or several separated by whitespace")
+		}
+		keys = append(keys, ed25519.NewKeyFromSeed(seed))
 	}
-	return ed25519.NewKeyFromSeed(seed), nil
+	if len(keys) == 0 {
+		return nil, errors.New("TERMA_SIGNING_KEY is not set: the release cannot be signed, and terma would refuse to install it")
+	}
+	return keys, nil
 }
 
-func sign(path, sigPath string) error {
-	priv, err := privateKey()
+func sign(tag, path, sigPath string) error {
+	privs, err := privateKeys()
 	if err != nil {
 		return err
 	}
@@ -92,30 +101,35 @@ func sign(path, sigPath string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(sigPath, selfupdate.Sign(priv, data), 0o644)
+	var sig []byte
+	for _, priv := range privs {
+		sig = append(sig, selfupdate.Sign(priv, tag, data)...)
+	}
+	return os.WriteFile(sigPath, sig, 0o644)
 }
 
 // verify checks a signature against the given public key, else the keys built into terma.
 func verify(args []string) error {
-	data, err := os.ReadFile(args[0])
+	tag := args[0]
+	data, err := os.ReadFile(args[1])
 	if err != nil {
 		return err
 	}
-	sig, err := os.ReadFile(args[1])
+	sig, err := os.ReadFile(args[2])
 	if err != nil {
 		return err
 	}
 	keys := selfupdate.BuiltinKeys()
-	if len(args) == 3 {
-		k, err := selfupdate.ParseKey(args[2])
+	if len(args) == 4 {
+		k, err := selfupdate.ParseKey(args[3])
 		if err != nil {
 			return err
 		}
 		keys = []ed25519.PublicKey{k}
 	}
-	if err := selfupdate.Verify(keys, data, sig); err != nil {
+	if err := selfupdate.Verify(keys, tag, data, sig); err != nil {
 		return err
 	}
-	fmt.Printf("%s: signature valid\n", args[0])
+	fmt.Printf("%s: signed for %s\n", args[1], tag)
 	return nil
 }

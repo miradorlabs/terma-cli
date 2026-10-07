@@ -215,7 +215,7 @@ func (c *Client) Apply(ctx context.Context, rel *Release, exePath string, out io
 	if err != nil {
 		return "", err
 	}
-	if err := Verify(c.keys(), sumsBody, sig); err != nil {
+	if err := Verify(c.keys(), rel.TagName, sumsBody, sig); err != nil {
 		return "", fmt.Errorf("release %s: %w", rel.TagName, err)
 	}
 	want := ParseChecksums(bytes.NewReader(sumsBody))[archive.Name]

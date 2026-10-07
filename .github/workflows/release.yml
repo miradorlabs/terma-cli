@@ -43,7 +43,9 @@ jobs:
           # release still publishes; only the cask update fails.
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           # The release signing key (scripts/releasesign keygen); without it the release
-          # fails, since terma would refuse to install it.
+          # fails, since terma would refuse to install it. Every command GoReleaser runs
+          # sees it, so the environment's approval is what stands between a change to this
+          # repository and the key.
           TERMA_SIGNING_KEY: ${{ secrets.TERMA_SIGNING_KEY }}
 
       # Signed build provenance for every published artifact, verifiable with

@@ -9,14 +9,19 @@ import (
 	"fmt"
 )
 
-// SignatureName is the release asset holding the signature of checksums.txt, which names
-// every archive's digest: signing it signs the release.
+// SignatureName is the release asset holding the signatures of checksums.txt, which names
+// every archive's digest: signing it, with the release's tag, signs the release. One
+// signature per line, so a release made while a key is being rotated carries both keys'.
 const SignatureName = "checksums.txt.sig"
 
+// maxSignature bounds the signature file: a few lines of base64.
+const maxSignature = 4096
+
 // releaseKeys are the ed25519 public keys a release may be signed with, hex, newest first.
-// A new key ships in a release signed with the old one, and the old key goes a release
-// later, once every machine has taken the new one; a key to retire at once goes with the
-// release that replaces it. The private key is the release workflow's TERMA_SIGNING_KEY.
+// To rotate: a release lists the new key beside the old and is signed by both (both seeds
+// in TERMA_SIGNING_KEY), and so is every release until no build that lacks the new key is
+// still updating; then the old key and its signature go. A key to retire at once goes with
+// the release that replaces it, and a build that lacks the new key is reinstalled.
 var releaseKeys = []string{
 	"cb6646bf0ec98128bcab6bd5a4b92d0ca4ade2d9e3f17e12e06e33725240667b", // 2026-10-07
 }
@@ -44,20 +49,33 @@ func ParseKey(h string) (ed25519.PublicKey, error) {
 	return ed25519.PublicKey(k), nil
 }
 
-// Sign returns the signature file for data: the ed25519 signature, base64, one line.
-func Sign(priv ed25519.PrivateKey, data []byte) []byte {
-	return []byte(base64.StdEncoding.EncodeToString(ed25519.Sign(priv, data)) + "\n")
+// message is what is signed: the release's tag before the file, so a signed file cannot be
+// published again under another tag as a later release.
+func message(tag string, data []byte) []byte {
+	return append([]byte("terma release "+tag+"\n"), data...)
 }
 
-// Verify checks sig, a signature file, against data with any of keys.
-func Verify(keys []ed25519.PublicKey, data, sig []byte) error {
-	raw, err := base64.StdEncoding.DecodeString(string(bytes.TrimSpace(sig)))
-	if err != nil || len(raw) != ed25519.SignatureSize {
+// Sign returns one line of the signature file for data under tag: its ed25519 signature,
+// base64. Lines from several keys concatenate into one file.
+func Sign(priv ed25519.PrivateKey, tag string, data []byte) []byte {
+	return []byte(base64.StdEncoding.EncodeToString(ed25519.Sign(priv, message(tag, data))) + "\n")
+}
+
+// Verify checks sig, a signature file, against data under tag: any line by any of keys.
+func Verify(keys []ed25519.PublicKey, tag string, data, sig []byte) error {
+	if len(sig) > maxSignature {
 		return ErrUnsigned
 	}
-	for _, k := range keys {
-		if ed25519.Verify(k, data, raw) {
-			return nil
+	msg := message(tag, data)
+	for line := range bytes.Lines(sig) {
+		raw, err := base64.StdEncoding.DecodeString(string(bytes.TrimSpace(line)))
+		if err != nil || len(raw) != ed25519.SignatureSize {
+			continue
+		}
+		for _, k := range keys {
+			if ed25519.Verify(k, msg, raw) {
+				return nil
+			}
 		}
 	}
 	return ErrUnsigned

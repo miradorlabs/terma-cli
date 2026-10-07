@@ -128,13 +128,15 @@ func TestApplyVerifiesChecksumAndSwapsBinary(t *testing.T) {
 		_, _ = w.Write([]byte(`{"tag_name":"v9.0.0","assets":[{"name":"checksums.txt","browser_download_url":"` + host + `/sums"},{"name":"` + SignatureName + `","browser_download_url":"` + host + `/sig"},{"name":"` + assetName + `","browser_download_url":"` + host + `/archive","size":` + "123" + `}]}`))
 	})
 	mux.HandleFunc("/sums", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(sums) })
-	mux.HandleFunc("/sig", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(testSign(sums)) })
+	mux.HandleFunc("/sig", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(testSign("v9.0.0", sums)) })
 	// Signed by someone else: the checksums are right, and the release is still refused.
 	other, otherPriv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
-	mux.HandleFunc("/forged", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(Sign(otherPriv, sums)) })
+	mux.HandleFunc("/forged", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(Sign(otherPriv, "v9.0.0", sums)) })
+	// An earlier release's signed files, published again under this tag.
+	mux.HandleFunc("/republished", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(testSign("v8.0.0", sums)) })
 	mux.HandleFunc("/archive", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(archive) })
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
@@ -157,6 +159,10 @@ func TestApplyVerifiesChecksumAndSwapsBinary(t *testing.T) {
 	rel.Assets[1].URL = srv.URL + "/forged"
 	if _, err := c.Apply(context.Background(), rel, exe, nil); !errors.Is(err, ErrUnsigned) {
 		t.Fatalf("a release signed by another key: %v, want ErrUnsigned", err)
+	}
+	rel.Assets[1].URL = srv.URL + "/republished"
+	if _, err := c.Apply(context.Background(), rel, exe, nil); !errors.Is(err, ErrUnsigned) {
+		t.Fatalf("an earlier release's files under this tag: %v, want ErrUnsigned", err)
 	}
 	rel.Assets[1].URL = signed
 	untrusting := &Client{HTTP: srv.Client(), BaseURL: srv.URL, Version: "1.0.0", ReleaseKeys: []ed25519.PublicKey{other}}

@@ -37,23 +37,43 @@ func TestKeygenSignAndVerify(t *testing.T) {
 	}
 	sig := data + ".sig"
 	t.Setenv("TERMA_SIGNING_KEY", "")
-	if err := run([]string{"sign", data, sig}); err == nil {
+	if err := run([]string{"sign", "v1.0.0", data, sig}); err == nil {
 		t.Fatal("signed without a key")
 	}
 	t.Setenv("TERMA_SIGNING_KEY", string(seed))
-	if err := run([]string{"sign", data, sig}); err != nil {
+	if err := run([]string{"sign", "v1.0.0", data, sig}); err != nil {
 		t.Fatal(err)
 	}
-	if err := run([]string{"verify", data, sig, pub}); err != nil {
+	if err := run([]string{"verify", "v1.0.0", data, sig, pub}); err != nil {
 		t.Fatal(err)
 	}
-	if err := run([]string{"verify", data, sig, strings.Repeat("00", 32)}); err == nil {
+	if err := run([]string{"verify", "v1.0.1", data, sig, pub}); err == nil {
+		t.Fatal("verified under another tag")
+	}
+	if err := run([]string{"verify", "v1.0.0", data, sig, strings.Repeat("00", 32)}); err == nil {
 		t.Fatal("verified with another key")
+	}
+	// Two keys, while one is rotated in: a signature from each, either enough.
+	second := filepath.Join(dir, "second.key")
+	out = capture(t, func() error { return run([]string{"keygen", second}) })
+	_, pub2, _ := strings.Cut(strings.TrimSpace(out), "public key: ")
+	seed2, err := os.ReadFile(second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TERMA_SIGNING_KEY", string(seed)+"\n"+string(seed2))
+	if err := run([]string{"sign", "v1.0.0", data, sig}); err != nil {
+		t.Fatal(err)
+	}
+	for _, k := range []string{pub, pub2} {
+		if err := run([]string{"verify", "v1.0.0", data, sig, k}); err != nil {
+			t.Fatalf("key %s: %v", k[:8], err)
+		}
 	}
 	if err := os.WriteFile(data, []byte("abd  terma_Linux_x86_64.tar.gz\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := run([]string{"verify", data, sig, pub}); err == nil {
+	if err := run([]string{"verify", "v1.0.0", data, sig, pub}); err == nil {
 		t.Fatal("verified changed data")
 	}
 }
