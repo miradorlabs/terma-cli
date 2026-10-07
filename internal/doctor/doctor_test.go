@@ -3,8 +3,10 @@ package doctor
 import (
 	"bytes"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
@@ -79,6 +81,34 @@ func TestContextNamesTheDirectoriesAndTheBackendOutsideARepository(t *testing.T)
 	rows := Context(Env{ConfigDir: configDir, StateDir: stateDir, Config: &config.Config{Environment: config.EnvDev, AuthURL: "https://auth.example"}, RepoErr: errors.New("not a repository")})
 	if len(rows) != 3 || rows[0] != (Row{"Config", output.TildePath(configDir)}) || rows[1] != (Row{"State", output.TildePath(stateDir)}) ||
 		rows[2].Label != "Environment" || !strings.Contains(rows[2].Value, "https://auth.example") {
+		t.Fatalf("rows = %v", rows)
+	}
+}
+
+// Doctor says when the team's policy was last fetched and how soon a change reaches the
+// machine; a stale policy makes no such promise.
+func TestContextSaysWhenThePolicyWasChecked(t *testing.T) {
+	t.Parallel()
+	now := time.Now()
+	for _, tc := range []struct {
+		name string
+		age  time.Duration
+		want string
+	}{
+		{"just fetched", 20 * time.Second, "checked 20s ago; " + PolicyPropagation},
+		{"no relay for an hour", 3 * time.Hour, "checked 3h ago"},
+		{"no relay for days", 72 * time.Hour, "checked 3d ago"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pol := config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/acme/app"}, TeamID: "t", FetchedAt: now.Add(-tc.age)}
+			if got := policyAge(pol, now); got != tc.want {
+				t.Fatalf("policyAge = %q, want %q", got, tc.want)
+			}
+		})
+	}
+	rows := Context(Env{Config: &config.Config{Environment: config.EnvProd, AuthURL: config.DefaultAuthURL,
+		Policy: config.Policy{Mode: config.ModeGlobal, TeamID: "t", FetchedAt: now}}, RepoErr: errors.New("not a repository")})
+	if !slices.ContainsFunc(rows, func(r Row) bool { return r.Label == "Policy" && strings.HasSuffix(r.Value, PolicyPropagation) }) {
 		t.Fatalf("rows = %v", rows)
 	}
 }

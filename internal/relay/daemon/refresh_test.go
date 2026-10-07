@@ -165,3 +165,67 @@ func TestRefresherDiscoversATeamWhileAFetchHangs(t *testing.T) {
 	r.fetched(t, "b")
 	close(release)
 }
+
+// A running relay fetches each team's policy at least every 35 seconds, a fetch's own
+// latency included, so a change made in the Terma web app reaches the machine within about
+// half a minute. A fetch ends just after the discovery that started it, so the next one
+// waits for the first discovery after Interval: Interval plus up to one Discover.
+func TestARunningRelayFetchesThePolicyEveryHalfMinute(t *testing.T) {
+	t.Parallel()
+	const latency = 300 * time.Millisecond
+	c := newClock()
+	var mu sync.Mutex
+	var fetches []time.Time
+	var late time.Duration // how far fetches moved the clock past the last discovery
+	p := Deps{}.Refresher()
+	p.Teams = func() []string { return []string{"a"} }
+	p.Fetched = none
+	p.Now, p.After = c.Now, c.After
+	p.Refresh = func(context.Context, string) error {
+		c.mu.Lock()
+		c.now = c.now.Add(latency)
+		at := c.now
+		c.mu.Unlock()
+		mu.Lock()
+		fetches, late = append(fetches, at), late+latency
+		mu.Unlock()
+		return nil
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { p.Run(ctx); close(done) }()
+	t.Cleanup(func() { cancel(); <-done })
+	<-c.waiting
+	// Each fetch runs in its own goroutine; the next discovery must see it finished.
+	settle := func() {
+		for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(time.Millisecond) {
+			p.mu.Lock()
+			busy := p.inFlight["a"]
+			p.mu.Unlock()
+			if !busy {
+				return
+			}
+		}
+		t.Fatal("a fetch never finished")
+	}
+	settle()
+	for range 3 * time.Minute / p.Discover {
+		// Discoveries keep their own beat, whatever the fetches took.
+		mu.Lock()
+		d := p.Discover - late
+		late = 0
+		mu.Unlock()
+		c.step(t, d)
+		settle()
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(fetches) < 2 {
+		t.Fatalf("fetched %d times in three minutes", len(fetches))
+	}
+	for i := 1; i < len(fetches); i++ {
+		if gap := fetches[i].Sub(fetches[i-1]); gap > 35*time.Second {
+			t.Fatalf("fetch %d came %v after the one before; want at most 35s", i, gap)
+		}
+	}
+}

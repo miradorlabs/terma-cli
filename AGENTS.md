@@ -62,7 +62,7 @@ the working copy's `origin` as `host/path` (`gitx.RepositoryFS`) and asks the te
 policy's repository list (`config.Policy.Admits`); in repository mode, in a repository the list does not
 name, or outside git, it writes no manifest, spool line, trailer or claim for a project,
 only a placement with no project that marks the session not collected (`claim.Mark`), and
-under a policy no relay has refreshed for minutes it also starts a refresh. Each
+under a policy no relay has refreshed for 45 seconds it also starts a refresh. Each
 session is claimed for the developer's own team from setup.
 
 **Commits.** The agent hooks announce the session and record the files it edits in a

@@ -16,9 +16,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
-// RefreshInterval is how long a validated policy is used before it is fetched again.
-const RefreshInterval = time.Minute
-
 // Source fetches policies as one terma build.
 type Source struct {
 	Version string
@@ -78,11 +75,12 @@ func (s Source) Refresh(ctx context.Context, cfg *config.Config) error {
 	return nil
 }
 
-// Current is team's policy: the validated one while it is fresh, else a refreshed one,
-// else the stale validated one until it expires; a team never validated has none.
+// Current is team's policy: the validated one until it is stale (config.PolicyStaleAfter),
+// else a refreshed one, else the stale validated one until it expires; a team never
+// validated has none.
 func (s Source) Current(ctx context.Context, cfg *config.Config, team string) (config.Policy, error) {
 	cached, ok := routing.ValidatedPolicy(cfg, team)
-	if ok && time.Since(cached.FetchedAt) < RefreshInterval {
+	if ok && !cached.Stale(time.Now()) {
 		return cached, nil
 	}
 	scoped := *cfg
