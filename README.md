@@ -18,15 +18,16 @@ terma setup       # sign in, choose your team and agents, write machine-wide hoo
 terma doctor      # verify the chain end to end
 ```
 
-`terma setup` signs you in, chooses your team (`--team <name-or-id>`, else your
+`terma setup` signs you in (asking which organization when you belong to several;
+`--org <name-or-id>` names it), chooses your team (`--team <name-or-id>`, else your
 organization's only team, else a picker), records which coding agents you use, fetches
 the team's collection policy, points those agents at the local relay, and writes the
 agents' machine-wide hooks. It changes nothing in git's configuration: when the team's
 policy asks for commit stamping, the first agent session in a repository the policy
 collects installs two hooks in that repository's own `.git/hooks`, chaining to any hook
 already there. Nothing is written into a
-repository's working tree or committed files. Run it again to repair the machine, to
-switch team, or, with `--org`, to switch organization.
+repository's working tree or committed files. Run it again to repair the machine, or
+to switch team or organization.
 
 `terma doctor` checks the result, `terma update` keeps terma current, and `terma
 teardown` undoes setup on the machine. Restart running agents after setup so they load
