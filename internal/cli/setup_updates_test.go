@@ -50,7 +50,7 @@ func TestSetupUpdates(t *testing.T) {
 		{name: "development build", version: "dev", ask: answer(true),
 			wantLine: "none for a development build: `terma update --force` installs the latest release"},
 		{name: "Windows", goos: "windows", ask: answer(true),
-			wantLine: "on request: terma says when one is out; download it from GitHub Releases"},
+			wantLine: "on request: terma says when one is out, and you download it from GitHub Releases"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()

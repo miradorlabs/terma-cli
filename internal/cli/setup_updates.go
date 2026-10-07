@@ -58,7 +58,7 @@ func setupUpdates(ui *setupUI, dir, version, exe, goos string, ask updateAsker) 
 		return nil
 	}
 	if goos == "windows" {
-		ui.Summary("Updates", "on request: terma says when one is out; download it from GitHub Releases")
+		ui.Summary("Updates", "on request: terma says when one is out, and you download it from GitHub Releases")
 		return nil
 	}
 	prefs, err := selfupdate.LoadPreferences(dir)
