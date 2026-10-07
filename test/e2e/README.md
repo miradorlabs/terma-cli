@@ -96,7 +96,9 @@ and the credential-free telemetry scenarios against pinned real harness builds,
 tolerating only Codex's documented SessionEnd race there
 (`TERMA_E2E_KNOWN_UPSTREAM=codex-session-end`; see `TestCodexSessionEndProbe`).
 Scenarios that need provider credentials run locally with `make run`, and
-`make compat` renders the compatibility matrix from those runs.
+`make compat` renders the compatibility matrix from those runs. The Linux machine
+scenarios (`make machines`) also run in `Machine scenarios` (`machines.yml`), on
+manual dispatch only.
 
 ## Cost
 

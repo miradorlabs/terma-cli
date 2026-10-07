@@ -1,0 +1,30 @@
+name: Machine scenarios
+
+# Manual only: the nightly schedule is off until the relay content contract passes on
+# Codex 0.160.1 (TestRelayCodex/installed-0.160.1/content fails on it).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # A fresh Linux machine (test/e2e/machine/Dockerfile): global mode, the managed
+  # configuration and the core relay contracts with real Claude Code and Codex.
+  machines:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - name: Run the machine scenarios
+        working-directory: test/e2e
+        # The agents' newest releases; the rows record the versions they turn out to be.
+        run: make machines HOST_ARCH=amd64 CLAUDE_VERSION=latest CODEX_VERSION=latest
+      - name: Upload this platform's compatibility rows
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: compat-linux
+          path: test/e2e/report/linux/compat.json
+          if-no-files-found: ignore
+          retention-days: 30
