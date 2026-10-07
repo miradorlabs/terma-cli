@@ -305,18 +305,15 @@ type PushedCommit struct {
 }
 
 // PushedCommits lists, newest first and at most limit of them, the commits reachable from
-// tips and from none of have nor, when remote names one, that remote's tracking refs: what
-// a push sends that the remote does not have, as far as this repository knows. A sha the
-// repository lacks (the remote moved on) is ignored. One git call.
-func PushedCommits(ctx context.Context, dir, remote string, tips, have []string, limit int) ([]PushedCommit, error) {
+// tips and from none of have nor any remote-tracking ref: what a push sends that no remote
+// this repository knows of has already. A sha the repository lacks (the remote moved on) is
+// ignored. One git call.
+func PushedCommits(ctx context.Context, dir string, tips, have []string, limit int) ([]PushedCommit, error) {
 	if len(tips) == 0 || limit <= 0 {
 		return nil, nil
 	}
 	args := []string{"log", "-z", "--ignore-missing", "--format=%H%x1f%B", "-n", strconv.Itoa(limit)}
-	args = append(append(append(args, tips...), "--not"), have...)
-	if remote != "" {
-		args = append(args, "--remotes="+remote)
-	}
+	args = append(append(append(append(args, tips...), "--not"), have...), "--remotes")
 	out, err := run(ctx, dir, args...)
 	if err != nil {
 		return nil, err

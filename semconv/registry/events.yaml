@@ -141,7 +141,8 @@ events:
     brief: git is about to push commits stamped with sessions (pre-push).
     note: >
       An attempt: pre-push runs before git talks to the remote, and a push the remote then
-      refuses is not reported again. Sent only when a commit the push sends is stamped.
+      refuses is not reported again. Sent only when a commit the push sends is stamped, and
+      not for a push made while git is replaying commits (a stopped rebase or cherry-pick).
     attributes:
       - ref: session.id
         requirement_level: required
@@ -156,6 +157,7 @@ events:
       - ref: terma.push.commit.shas_truncated
       - ref: terma.push.refs
         requirement_level: required
+      - ref: terma.push.refs_truncated
       - ref: terma.push.remote.name
       - ref: vcs.repository.url.full
         note: The URL pushed to, without credentials.

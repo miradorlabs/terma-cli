@@ -83,14 +83,28 @@ func TestPrePushRecordsTheStampedCommitsAPushSends(t *testing.T) {
 		t.Errorf("remote, root = %v, %v", ev.Attrs[semconv.TermaPushRemoteNameKey], ev.Attrs[semconv.TermaRepositoryRootKey])
 	}
 
-	// Pushed to a URL, to the remote that lacks everything: the new branch sends all four,
-	// and the event names the repository pushed to, not origin.
+	// Pushed to a URL never fetched, as a new branch: the remote names nothing it has, yet
+	// base, which another remote has, is not claimed as sent; the event names the repository
+	// pushed to, not origin.
 	url := "https://github.com/acme/fork.git"
 	events = push(fmt.Sprintf("refs/heads/main %s refs/heads/new %s\n", b, zero), url, url)
-	if len(events) != 1 || len(events[0].Attrs[semconv.TermaPushCommitShasKey].([]any)) != 4 ||
+	if len(events) != 1 || !reflect.DeepEqual(events[0].Attrs[semconv.TermaPushCommitShasKey], []any{b, a, human}) ||
 		events[0].Attrs[semconv.TermaPushRemoteNameKey] != nil || events[0].Attrs[semconv.VCSRepositoryNameKey] != "fork" ||
 		events[0].Attrs[semconv.VCSRepositoryURLFullKey] != "https://github.com/acme/fork" {
 		t.Errorf("a push to a URL = %+v", events)
+	}
+
+	// More refs than the event lists: every ref's commits are still found, the list is cut
+	// and says so.
+	var many strings.Builder
+	for i := range MaxPushCommits + 5 {
+		fmt.Fprintf(&many, "refs/tags/t%d %s refs/tags/t%d %s\n", i, human, i, zero)
+	}
+	fmt.Fprintf(&many, "refs/heads/main %s refs/heads/main %s\n", b, base)
+	events = push(many.String(), "up", remote)
+	if len(events) != 1 || len(events[0].Attrs[semconv.TermaPushRefsKey].([]any)) != MaxPushCommits ||
+		events[0].Attrs[semconv.TermaPushRefsTruncatedKey] != true || events[0].SessionID != "sess-b" {
+		t.Errorf("a push of %d refs = %+v", MaxPushCommits+6, events)
 	}
 
 	// Nothing stamped in what is sent, nothing to push, or a deletion alone: no event.

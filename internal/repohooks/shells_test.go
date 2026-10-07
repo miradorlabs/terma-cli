@@ -2,6 +2,7 @@ package repohooks
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 )
@@ -335,8 +337,10 @@ func TestHookManagersInstallingOverTermas(t *testing.T) {
 	}
 }
 
-// git hands pre-push the refs it pushes on stdin: the displaced hook and terma each read
-// every line of it, byte for byte, under every shell, and an empty push hands both nothing.
+// git hands pre-push the refs it pushes on stdin: terma reads every line of it byte for byte
+// under every shell, after the displaced hook has read the same when there is one; an empty
+// push hands both nothing; and 5,000 refs (a first push of every tag) cost about as little
+// as one, so no push pays a shell loop per ref.
 func TestPrePushHandsItsStdinToBothHooks(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("the fake terma and displaced hooks are sh scripts")
@@ -347,26 +351,46 @@ func TestPrePushHandsItsStdinToBothHooks(t *testing.T) {
 	}
 	const lines = "refs/heads/main 1111111111111111111111111111111111111111 refs/heads/main 0000000000000000000000000000000000000000\n" +
 		"refs/heads/a\\b  2222222222222222222222222222222222222222 refs/heads/$HOME 3333333333333333333333333333333333333333\n"
+	var tags strings.Builder
+	for i := range 5000 {
+		fmt.Fprintf(&tags, "refs/tags/v%d 1111111111111111111111111111111111111111 refs/tags/v%d 0000000000000000000000000000000000000000\n", i, i)
+	}
 	for _, sh := range shells {
-		for _, stdin := range []string{lines, ""} {
-			dir, out := t.TempDir(), t.TempDir()
-			record := func(who string) string {
-				return "#!/bin/sh\ncat > '" + filepath.Join(out, who) + "'\n"
-			}
-			terma := filepath.Join(t.TempDir(), "terma")
-			writeExec(t, terma, record("terma"))
-			writeExec(t, filepath.Join(dir, "pre-push"), script("pre-push", terma))
-			writeExec(t, filepath.Join(dir, "pre-push"+preTermaSuffix), record("prev"))
-			args := append(strings.Fields(sh), filepath.Join(dir, "pre-push"), "origin", "git@example.com:o/r.git")
-			cmd := exec.Command(args[0], args[1:]...)
-			cmd.Dir, cmd.Stdin = t.TempDir(), strings.NewReader(stdin)
-			cmd.Env = append(os.Environ(), "GIT_DIR="+t.TempDir())
-			if b, err := cmd.CombinedOutput(); err != nil || len(b) > 0 {
-				t.Fatalf("%s: pre-push = %v\n%s", sh, err, b)
-			}
-			for _, who := range []string{"prev", "terma"} {
-				if got := readFile(t, filepath.Join(out, who)); got != stdin {
-					t.Errorf("%s: %s read %q, want %q", sh, who, got, stdin)
+		for _, stdin := range []string{lines, "", tags.String()} {
+			for _, displaced := range []bool{true, false} {
+				dir, out := t.TempDir(), t.TempDir()
+				record := func(who string) string {
+					return "#!/bin/sh\ncat > '" + filepath.Join(out, who) + "'\n"
+				}
+				terma := filepath.Join(t.TempDir(), "terma")
+				writeExec(t, terma, record("terma"))
+				writeExec(t, filepath.Join(dir, "pre-push"), script("pre-push", terma))
+				if displaced {
+					writeExec(t, filepath.Join(dir, "pre-push"+preTermaSuffix), record("prev"))
+				}
+				args := append(strings.Fields(sh), filepath.Join(dir, "pre-push"), "origin", "git@example.com:o/r.git")
+				cmd := exec.Command(args[0], args[1:]...)
+				tmp := t.TempDir()
+				cmd.Dir, cmd.Stdin = t.TempDir(), strings.NewReader(stdin)
+				cmd.Env = append(os.Environ(), "GIT_DIR="+t.TempDir(), "TMPDIR="+tmp)
+				start := time.Now()
+				if b, err := cmd.CombinedOutput(); err != nil || len(b) > 0 {
+					t.Fatalf("%s: pre-push = %v\n%s", sh, err, b)
+				}
+				if took := time.Since(start); took > 2*time.Second {
+					t.Errorf("%s, displaced %v: %d bytes of refs took %v", sh, displaced, len(stdin), took)
+				}
+				readers := []string{"terma"}
+				if displaced {
+					readers = append(readers, "prev")
+				}
+				for _, who := range readers {
+					if got := readFile(t, filepath.Join(out, who)); got != stdin {
+						t.Errorf("%s, displaced %v: %s read %d bytes, want %d", sh, displaced, who, len(got), len(stdin))
+					}
+				}
+				if left, _ := os.ReadDir(tmp); len(left) > 0 {
+					t.Errorf("%s: the shared copy was left behind: %v", sh, left)
 				}
 			}
 		}
@@ -407,5 +431,47 @@ func TestAPushRunsTheDisplacedHookThenTerma(t *testing.T) {
 	git(t, root, "commit", "-q", "--allow-empty", "-m", "second")
 	if b, err := exec.Command("git", "-C", root, "push", "-q", "up", "HEAD:refs/heads/main").CombinedOutput(); err == nil {
 		t.Fatalf("the displaced hook's veto did not stop the push:\n%s", b)
+	}
+}
+
+// A hook manager that installs its own pre-push over terma's, moving terma's aside as
+// lefthook does: the next install chains to the manager's, drops the stale copy of its own,
+// and a push then runs the manager's hook and terma, both with git's refs.
+func TestAManagerInstallingPrePushOverTermas(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the fake terma and hook manager are sh scripts")
+	}
+	root, gitDir := scratch(t)
+	remote := t.TempDir()
+	git(t, remote, "init", "-q", "--bare")
+	git(t, root, "remote", "add", "up", remote)
+	git(t, root, "commit", "-q", "--allow-empty", "-m", "first")
+	out, stateDir := t.TempDir(), t.TempDir()
+	terma := filepath.Join(t.TempDir(), "terma")
+	writeExec(t, terma, "#!/bin/sh\ncat > '"+filepath.Join(out, "terma")+"'\n")
+	if _, err := Install(stateDir, terma, gitDir); err != nil {
+		t.Fatal(err)
+	}
+	path := hookPath(gitDir, "pre-push")
+	if err := os.Rename(path, path+".old"); err != nil {
+		t.Fatal(err)
+	}
+	manager := "#!/bin/sh\ncat > '" + filepath.Join(out, "manager") + "'\n"
+	writeExec(t, path, manager)
+	if changed, err := Install(stateDir, terma, gitDir); err != nil || !changed {
+		t.Fatalf("Install over the manager's pre-push = %v, %v", changed, err)
+	}
+	if got := readFile(t, path+preTermaSuffix); got != manager {
+		t.Fatalf("the manager's hook was not chained: %q", got)
+	}
+	if _, err := os.Lstat(path + ".old"); err == nil {
+		t.Error("the copy of terma's script the manager set aside is still there")
+	}
+	git(t, root, "push", "-q", "up", "HEAD:refs/heads/main")
+	want := "HEAD " + git(t, root, "rev-parse", "HEAD") + " refs/heads/main 0000000000000000000000000000000000000000\n"
+	for _, who := range []string{"manager", "terma"} {
+		if got := readFile(t, filepath.Join(out, who)); got != want {
+			t.Errorf("%s read %q, want %q", who, got, want)
+		}
 	}
 }

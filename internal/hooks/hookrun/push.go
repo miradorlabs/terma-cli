@@ -17,17 +17,21 @@ import (
 // bounds a commit's files.
 const MaxPushCommits = 50
 
+// maxPushRefs bounds the ref lines read, so a mirror push of a huge repository cannot make a
+// git call too long for its argument list; a push past it is recorded from its first refs.
+const maxPushRefs = 1000
+
 // pushRef is one line git's pre-push hook reads on stdin.
 type pushRef struct {
 	localRef, localSHA, remoteRef, remoteSHA string
 }
 
-// readPushRefs reads at most MaxPushCommits ref updates, leaving out deletions: a deleted
-// ref sends no commit.
+// readPushRefs reads at most maxPushRefs ref updates, leaving out deletions: a deleted ref
+// sends no commit.
 func readPushRefs(r io.Reader) []pushRef {
 	var refs []pushRef
 	sc := bufio.NewScanner(r)
-	for sc.Scan() && len(refs) < MaxPushCommits {
+	for sc.Scan() && len(refs) < maxPushRefs {
 		f := strings.Fields(sc.Text())
 		if len(f) != 4 || zeroSHA(f[1]) {
 			continue
@@ -58,7 +62,7 @@ func PrePush(ctx context.Context, env Env) error {
 	}
 	remote, url := env.Args[0], env.Args[1]
 	if remote == url {
-		remote = "" // pushed to a URL: no remote-tracking refs say what it has
+		remote = "" // pushed to a URL, which names no remote
 	}
 	var tips, have []string
 	for _, ref := range refs {
@@ -68,7 +72,7 @@ func PrePush(ctx context.Context, env Env) error {
 		}
 	}
 	// One past the bound tells a full list from a cut one.
-	commits, err := gitx.PushedCommits(ctx, r.Root, remote, tips, have, MaxPushCommits+1)
+	commits, err := gitx.PushedCommits(ctx, r.Root, tips, have, MaxPushCommits+1)
 	if err != nil {
 		env.Logf("pushed commits: %v", err)
 		return nil
@@ -96,7 +100,8 @@ func PrePush(ctx context.Context, env Env) error {
 	attrs := map[string]any{
 		semconv.TermaPushSessionIDsKey: sessions, semconv.GenAIMainAgentNameKey: tool,
 		semconv.TermaPushCommitShasKey: shas, semconv.TermaPushCommitCountKey: len(shas),
-		semconv.TermaPushCommitShasTruncatedKey: truncated, semconv.TermaPushRefsKey: refMaps(refs),
+		semconv.TermaPushCommitShasTruncatedKey: truncated, semconv.TermaPushRefsKey: refMaps(refs[:min(len(refs), MaxPushCommits)]),
+		semconv.TermaPushRefsTruncatedKey: len(refs) > MaxPushCommits,
 	}
 	if remote != "" {
 		attrs[semconv.TermaPushRemoteNameKey] = remote

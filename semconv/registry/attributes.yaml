@@ -500,13 +500,19 @@ attributes:
       An array of maps of local_ref, local_sha, remote_ref and remote_sha, as git's pre-push
       hook lists them; remote_sha is all zeros for a ref the remote does not have yet. A
       deletion is left out.
+  - key: terma.push.refs_truncated
+    type: boolean
+    stability: development
+    brief: Whether the push updates more refs than terma.push.refs lists.
   - key: terma.push.commit.shas
     type: string[]
     stability: development
     brief: The full ids of the commits the push sends that the remote lacks, newest first, at most 50.
     note: >
-      Commits reachable from the pushed shas and from none of the remote's shas or its
-      remote-tracking refs, as the repository knew them when the push began.
+      Commits reachable from the pushed shas and from none of the remote's shas or any
+      remote-tracking ref, as the repository knew them when the push began: a commit another
+      remote already has is not listed, so a push to a remote never fetched does not claim
+      history that landed long ago.
   - key: terma.push.commit.count
     type: int
     stability: development

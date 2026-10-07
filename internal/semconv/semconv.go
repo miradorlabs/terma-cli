@@ -173,6 +173,8 @@ const (
 	TermaPushCommitShasTruncatedKey = "terma.push.commit.shas_truncated"
 	// TermaPushRefsKey is terma.push.refs: The refs the push updates, at most 50 of them.
 	TermaPushRefsKey = "terma.push.refs"
+	// TermaPushRefsTruncatedKey is terma.push.refs_truncated: Whether the push updates more refs than terma.push.refs lists.
+	TermaPushRefsTruncatedKey = "terma.push.refs_truncated"
 	// TermaPushRemoteNameKey is terma.push.remote.name: The remote git pushes to, as the push named it; omitted when the push named a URL.
 	TermaPushRemoteNameKey = "terma.push.remote.name"
 	// TermaPushSessionIDsKey is terma.push.session.ids: The sessions stamped into the commits the push sends.

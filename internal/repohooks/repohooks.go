@@ -26,6 +26,10 @@ import (
 // message, one records the commit, and one records what a push sends.
 var names = []string{"prepare-commit-msg", "post-commit", "pre-push"}
 
+// commitHooks are the two that stamp and record commits, which decide whether a repository's
+// commits are attributed; pre-push, added later, only adds what pushes send.
+var commitHooks = []string{"prepare-commit-msg", "post-commit"}
+
 // stdinHooks are the hooks git hands input on stdin, which both the displaced hook and terma
 // must read.
 var stdinHooks = map[string]bool{"pre-push": true}
@@ -56,26 +60,27 @@ var replayState = []string{"CHERRY_PICK_HEAD", "rebase-merge", "rebase-apply", "
 // more than a rebase without terma, so the hook has to decide without starting a process.
 // $0 is the hook's path, which is how the displaced hook is found beside it, and git names
 // the git directory in GIT_DIR wherever it is not the checkout's own `.git`. A hook git
-// feeds on stdin reads it once into a variable with the shell's own read, and hands each
-// reader a here-document of it, so neither forks a process to share it.
+// feeds on stdin (pre-push, which no replay runs) leaves it to terma alone, unless there is a
+// displaced hook to share it with: then it is copied once to a temporary file both read, in
+// linear time however many refs a push names.
 func script(hook, terma string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "#!/bin/sh\n%s%d: chains to %s%s. Written by terma.\n",
 		marker, templateVersion, hook, preTermaSuffix)
 	b.WriteString("d=\"${0%/*}\"\n[ \"$d\" = \"$0\" ] && d=.\n")
 	fmt.Fprintf(&b, "prev=\"$d/%s%s\"\n", hook, preTermaSuffix)
-	run := ""
 	if stdinHooks[hook] {
-		b.WriteString("in=\nwhile IFS= read -r l || [ -n \"$l\" ]; do in=\"${in:+$in\n}$l\"; done\n")
-		b.WriteString("feed() {\n  if [ -n \"$in\" ]; then \"$@\" <<EOF\n$in\nEOF\n  else \"$@\" </dev/null; fi\n}\n")
-		run = "feed "
+		b.WriteString("if [ -x \"$prev\" ]; then\n")
+		b.WriteString("  t=\n  if t=$(mktemp 2>/dev/null); then trap 'rm -f \"$t\"' EXIT; cat >\"$t\" && exec <\"$t\"; fi\n")
+		b.WriteString("  \"$prev\" \"$@\" || exit $?\n  [ -n \"$t\" ] && exec <\"$t\"\nfi\n")
+	} else {
+		b.WriteString("if [ -x \"$prev\" ]; then \"$prev\" \"$@\" || exit $?; fi\n")
 	}
-	fmt.Fprintf(&b, "if [ -x \"$prev\" ]; then %s\"$prev\" \"$@\" || exit $?; fi\n", run)
 	b.WriteString("g=\"${GIT_DIR:-.git}\"\n")
 	b.WriteString("if [ ! -d \"$g\" ]; then IFS= read -r line < \"$g\" 2>/dev/null && g=\"${line#gitdir: }\"; fi\n")
 	// Never stamp or record a commit git is replaying.
 	fmt.Fprintf(&b, "for s in %s; do\n  [ -e \"$g/$s\" ] && exit 0\ndone\n", strings.Join(replayState, " "))
-	fmt.Fprintf(&b, "[ -x %[1]s ] && %[3]s%[1]s hook %[2]s \"$@\" || true\nexit 0\n", shellQuote(terma), hook, run)
+	fmt.Fprintf(&b, "[ -x %[1]s ] && %[1]s hook %[2]s \"$@\" || true\nexit 0\n", shellQuote(terma), hook)
 	return b.String()
 }
 
@@ -291,15 +296,17 @@ func removeOurCopies(dir, name string) error {
 	return nil
 }
 
-// Installed reports whether all of terma's hooks are in place in the repository at
-// gitDir, and whether a hook runs before them: one that was there first, or a tool that
-// installed over terma's and runs its script (pre-commit's migration mode).
+// Installed reports whether terma's commit hooks are in place in the repository at gitDir,
+// and whether a hook runs before them: one that was there first, or a tool that installed
+// over terma's and runs its script (pre-commit's migration mode). pre-push is not judged: an
+// install from before it still stamps every commit, and the next session the policy asks for
+// hooks in adds it.
 func Installed(gitDir string) (installed, chained bool) {
 	dir, hooks, ok := states(gitDir)
 	if !ok {
 		return false, false
 	}
-	for _, name := range names {
+	for _, name := range commitHooks {
 		switch hooks[name].state {
 		case hookViaTool:
 			chained = true

@@ -272,3 +272,34 @@ func TestConcurrentInstallsSetTheHookAsideOnce(t *testing.T) {
 		}
 	}
 }
+
+// A repository with the two commit hooks an earlier terma wrote still reads as installed,
+// so doctor keeps reporting hooks that stamp even where the policy no longer asks for them;
+// the next install adds pre-push and rewrites neither of the others.
+func TestAnInstallFromBeforePrePushIsStillInstalled(t *testing.T) {
+	_, gitDir := scratch(t)
+	for _, name := range commitHooks {
+		writeExec(t, hookPath(gitDir, name), script(name, terma))
+	}
+	if installed, chained := Installed(gitDir); !installed || chained {
+		t.Fatalf("Installed = %v, %v; want the commit hooks installed, unchained", installed, chained)
+	}
+	if current(gitDir, terma) {
+		t.Fatal("an install without pre-push reads as current, so no session would add it")
+	}
+	before := map[string]os.FileInfo{}
+	for _, name := range commitHooks {
+		before[name], _ = os.Stat(hookPath(gitDir, name))
+	}
+	if changed, err := Install(t.TempDir(), terma, gitDir); err != nil || !changed {
+		t.Fatalf("Install = %v, %v", changed, err)
+	}
+	if body := readFile(t, hookPath(gitDir, "pre-push")); !isOurs([]byte(body)) {
+		t.Fatalf("pre-push not added:\n%s", body)
+	}
+	for _, name := range commitHooks {
+		if after, _ := os.Stat(hookPath(gitDir, name)); !os.SameFile(before[name], after) || !after.ModTime().Equal(before[name].ModTime()) {
+			t.Errorf("%s was rewritten", name)
+		}
+	}
+}
