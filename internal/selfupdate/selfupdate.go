@@ -108,6 +108,10 @@ func (c *Client) base() string {
 // ErrNoRelease means GitHub has no accessible stable release.
 var ErrNoRelease = errors.New("no published release is available")
 
+// ErrReplaced means another install put a release in place while this process ran, so what
+// it would have installed over it may be the earlier release: it installs nothing.
+var ErrReplaced = errors.New("another install replaced terma meanwhile; run `terma update` again")
+
 // Latest fetches the newest stable release.
 func (c *Client) Latest(ctx context.Context) (*Release, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base()+"/repos/"+Repo+"/releases/latest", nil)
@@ -217,6 +221,11 @@ func (c *Client) Apply(ctx context.Context, rel *Release, exePath string, out io
 	binary, err := extractBinaryFor(runtime.GOOS, data)
 	if err != nil {
 		return "", err
+	}
+	// Once more after the download, which takes a while: an installer that takes no lock
+	// (install.sh, a copy by hand) may have put a later release in place since.
+	if c.Replaced(exePath) {
+		return "", ErrReplaced
 	}
 	if err := replaceExecutable(exePath, binary); err != nil {
 		return "", err

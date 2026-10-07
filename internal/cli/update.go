@@ -137,7 +137,7 @@ func (app *App) runUpdate(ctx context.Context, client *selfupdate.Client, dir, e
 	// Under the caller's lock: the relay may have installed a release since this process
 	// started, in which case its version says nothing about what is installed now.
 	if client.Replaced(exe) {
-		return false, errors.New("another install replaced terma while this command ran; run `terma update` again")
+		return false, selfupdate.ErrReplaced
 	}
 	current := client.Version
 	download, cancel := context.WithTimeout(ctx, downloadTimeout)

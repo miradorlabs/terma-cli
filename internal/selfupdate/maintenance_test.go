@@ -434,3 +434,38 @@ func TestAStaleProcessNeverReplacesTheInstalledBinary(t *testing.T) {
 		})
 	}
 }
+
+// A release that another install, one taking no lock, put in place while the download ran
+// is left there: the executable is checked again just before it would be replaced.
+func TestAnInstallRefusesABinaryReplacedDuringTheDownload(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("in-place updates are Unix-only")
+	}
+	exe, started := oldBinary(t)
+	archive := archiveWith(t, "terma", []byte("1.0.2"))
+	sum := sha256.Sum256(archive)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		base := "http://" + r.Host
+		switch r.URL.Path {
+		case "/repos/" + Repo + "/releases/latest":
+			_ = json.NewEncoder(w).Encode(Release{TagName: "v1.0.2", PublishedAt: time.Now().Add(-2 * SoakTime),
+				Assets: []Asset{{Name: AssetName(runtime.GOOS, runtime.GOARCH), URL: base + "/archive"}, {Name: "checksums.txt", URL: base + "/sums"}}})
+		case "/sums":
+			fmt.Fprintf(w, "%x  %s\n", sum, AssetName(runtime.GOOS, runtime.GOARCH))
+		case "/archive":
+			// install.sh puts 1.0.3 in place while the archive is on its way.
+			next := exe + ".next"
+			if err := os.WriteFile(next, []byte("1.0.3"), 0o755); err == nil {
+				_ = os.Rename(next, exe)
+			}
+			_, _ = w.Write(archive)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	c := &Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.1", Binary: started}
+	o := c.Auto(context.Background(), t.TempDir(), t.TempDir(), exe, nil)
+	if got, _ := os.ReadFile(exe); !o.Replaced || o.Installed != "" || o.Err != nil || string(got) != "1.0.3" {
+		t.Fatalf("Auto = %+v, binary now %q; want Replaced and 1.0.3 left in place", o, got)
+	}
+}

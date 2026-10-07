@@ -265,7 +265,7 @@ func TestUpdateRefusesOnceAnotherInstallReplacedTerma(t *testing.T) {
 	c := &selfupdate.Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0", Binary: started}
 	var out bytes.Buffer
 	installed, err := testApp.runUpdate(context.Background(), c, t.TempDir(), exe, &out, false, false)
-	if err == nil || !strings.Contains(err.Error(), "replaced terma") || installed || calls != 0 {
+	if err == nil || !strings.Contains(err.Error(), "replaced terma meanwhile") || installed || calls != 0 {
 		t.Fatalf("runUpdate = %v, %v after %d lookups; want a refusal and no lookup", installed, err, calls)
 	}
 	if got, _ := os.ReadFile(exe); string(got) != "1.0.1" {

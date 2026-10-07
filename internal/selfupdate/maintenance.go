@@ -3,6 +3,7 @@ package selfupdate
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -243,7 +244,9 @@ func (c *Client) Auto(ctx context.Context, configDir, stateDir, exe string, prog
 	if progress != nil {
 		fmt.Fprintf(progress, "Updating terma %s → %s…\n", c.Version, rel.Version())
 	}
-	if _, err := c.Apply(updateCtx, rel, exe, progress); err != nil {
+	if _, err := c.Apply(updateCtx, rel, exe, progress); errors.Is(err, ErrReplaced) {
+		return Outcome{Replaced: true}
+	} else if err != nil {
 		return Outcome{Err: err}
 	}
 	// Recorded as the new version's check, so its first pass does not look again.
