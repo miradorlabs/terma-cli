@@ -181,7 +181,7 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 		if env.RepoErr == nil && d.pol.Global() {
 			return unlessCaptureOff(d.pol, Check{Status: Pass, Detail: "every session, in global mode: " + GlobalDestination(cfg)})
 		}
-		c := ForTeam(RepositoryCheck(d.pol, env.GitDir, env.RepoErr), d.pol, selected)
+		c := ForTeam(RepositoryCheck(d.pol, env.GitDir, env.RepoErr), cfg, env.GitDir, d.pol, selected)
 		d.admitted = c.Status == Pass
 		return unlessCaptureOff(d.pol, c)
 	})

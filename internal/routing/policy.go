@@ -8,7 +8,9 @@ package routing
 import (
 	"cmp"
 	"errors"
+	"io/fs"
 	"maps"
+	"os"
 	"slices"
 	"time"
 
@@ -79,15 +81,31 @@ func StorePolicy(cfg *config.Config, pol *config.Policy) error {
 	if profile.OrganizationID != "" && (profile.OrganizationID != cfg.OrganizationID || !selects) {
 		return nil
 	}
-	return config.UpdateProfile(cfg.Dir, cfg.ProfileName, func(p *config.Profile) {
+	left := ""
+	err = config.UpdateProfile(cfg.Dir, cfg.ProfileName, func(p *config.Profile) {
 		if p.OrganizationID == "" && cfg.OrganizationID != "" {
 			p.SelectOrganization(cfg.OrganizationID, "")
 		}
 		// Signed into another organization while this fetch ran: its selection stands.
 		if p.OrganizationID == cfg.OrganizationID && (p.Team == "" || cfg.Policy.TeamID == pol.TeamID) {
+			prev := p.Team
 			p.SelectTeam(pol.TeamID)
+			if prev != "" && prev != pol.TeamID && !slices.Contains(slices.Collect(maps.Values(p.CollectedTeams())), prev) {
+				left = prev
+			}
 		}
 	})
+	if err != nil || left == "" {
+		return err
+	}
+	// The team selected before, now selected in no organization, collects nothing: its
+	// policy file would only be refreshed for nothing.
+	if prevPath, err := config.PolicyPath(cfg.StateDir, left); err == nil {
+		if err := os.Remove(prevPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
+	}
+	return nil
 }
 
 // ValidatedPolicy is team's last validated policy for cfg's environment; an unreadable
@@ -106,28 +124,33 @@ func ValidatedPolicy(cfg *config.Config, team string) (config.Policy, bool) {
 	return cached, ok
 }
 
-// Collection is every policy this machine collects under, as hooks ask them: the
-// repository-mode policies of the teams the profile selected (config.Config.Teams, one
-// per organization set up), the selected team's first and the rest in team order, then
-// the one global policy honoured. Only validated policies of cfg's environment count; an
-// expired one is kept, since hooks run on the last validated policy and what leaves is
-// decided downstream. A policy file of a team no longer selected anywhere does not count.
+// Collected is what one pass over the profile's teams found: the policies this machine
+// collects under, the global policies it does not honour, and the teams with no validated
+// policy.
+type Collected struct {
+	// Policies are the collection, as hooks ask them: the repository-mode policies, the
+	// selected team's first and the rest in team order, then the one global policy honoured.
+	Policies config.Policies
+	// Conflicts are the global policies not honoured: another team's while the selected
+	// team collects everything, or every one when two unselected teams do.
+	Conflicts config.Policies
+	// Unvalidated are the teams selected whose policy is not stored, unreadable, or of
+	// another environment or organization than recorded: each collects nothing until
+	// `terma setup` fetches it again. Only their ids are known.
+	Unvalidated []config.Policy
+}
+
+// Collect reads the policies of the teams the profile selected (config.Config.Teams, one
+// per organization set up). Only validated policies of cfg's environment count; an expired
+// one is kept, since hooks run on the last validated policy and what leaves is decided
+// downstream. A policy file of a team selected nowhere does not count.
 //
 // One global policy is honoured: the selected team's, else the only one among the rest.
 // Two teams that each collect everything would both claim every session, so when neither
-// is selected neither is honoured (Conflicts), until one is narrowed in the Terma web app.
-func Collection(cfg *config.Config) config.Policies {
-	return collection(cfg, false)
-}
-
-// Conflicts are the global policies Collection does not honour: another team's while the
-// selected team collects everything, or every one when two unselected teams do.
-func Conflicts(cfg *config.Config) config.Policies {
-	return collection(cfg, true)
-}
-
-func collection(cfg *config.Config, conflicts bool) config.Policies {
+// is selected neither is honoured, until one is narrowed in the Terma web app.
+func Collect(cfg *config.Config) Collected {
 	selected := cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL)
+	var c Collected
 	var repos, globals config.Policies
 	if selected.Validated() && !selected.Global() {
 		repos = append(repos, selected)
@@ -135,60 +158,66 @@ func collection(cfg *config.Config, conflicts bool) config.Policies {
 	for _, org := range slices.Sorted(maps.Keys(cfg.Teams)) {
 		team := cfg.Teams[org]
 		if team == selected.TeamID {
-			continue // already read: config.Load loaded the selected team's policy
+			if !selected.Validated() {
+				c.Unvalidated = append(c.Unvalidated, config.Policy{TeamID: team, OrganizationID: org})
+			}
+			continue // config.Load read the selected team's policy already
 		}
 		p, ok, err := config.ReadPolicy(cfg.StateDir, team)
-		if err != nil || !ok || !p.Validated() || !p.SameEnvironment(cfg.AuthURL) || p.OrganizationID != org {
-			continue
-		}
-		if p.Global() {
+		switch {
+		case err != nil || !ok || !p.Validated() || !p.SameEnvironment(cfg.AuthURL) || p.OrganizationID != org:
+			c.Unvalidated = append(c.Unvalidated, config.Policy{TeamID: team, OrganizationID: org})
+		case p.Global():
 			globals = append(globals, p)
-		} else {
+		default:
 			repos = append(repos, p)
 		}
 	}
 	slices.SortStableFunc(repos[min(len(repos), 1):], func(a, b config.Policy) int { return cmp.Compare(a.TeamID, b.TeamID) })
 	slices.SortStableFunc(globals, func(a, b config.Policy) int { return cmp.Compare(a.TeamID, b.TeamID) })
-	var honoured config.Policies
 	switch {
 	case selected.Validated() && selected.Global():
-		honoured = config.Policies{selected}
+		repos = append(repos, selected)
 	case len(globals) == 1:
-		honoured, globals = globals, nil
+		repos, globals = append(repos, globals[0]), nil
 	}
-	if conflicts {
-		return globals
-	}
-	return append(repos, honoured...)
+	c.Policies, c.Conflicts = repos, globals
+	return c
 }
 
-// Unvalidated are the teams the profile selected whose policy is not in the collection
-// nor a conflict: never fetched, unreadable, or of another environment or organization
-// than recorded. Each is a team collecting nothing until `terma setup` fetches it again.
-func Unvalidated(cfg *config.Config) []config.Policy {
-	have := map[string]bool{}
-	for _, p := range append(Collection(cfg), Conflicts(cfg)...) {
-		have[p.TeamID] = true
-	}
-	var out []config.Policy
-	for _, org := range slices.Sorted(maps.Keys(cfg.Teams)) {
-		if team := cfg.Teams[org]; !have[team] {
-			out = append(out, config.Policy{TeamID: team, OrganizationID: org})
-		}
-	}
-	return out
-}
+// Collection is the policies this machine collects under (Collected.Policies).
+func Collection(cfg *config.Config) config.Policies { return Collect(cfg).Policies }
+
+// Conflicts are the global policies this machine does not honour (Collected.Conflicts).
+func Conflicts(cfg *config.Config) config.Policies { return Collect(cfg).Conflicts }
 
 // ScopeToTeam is cfg as a fetch, mint or refresh for team runs it: that team as the
-// project, under the organization whose policy for it is stored, so a team of another
-// organization than the profile's is served with that organization's credential.
+// project, under the organization the profile selected it in (config.Config.Teams), else
+// the one whose policy for it is stored, else the profile's own. A team of another
+// organization than the profile's is so served with that organization's credential.
 func ScopeToTeam(cfg *config.Config, team string) *config.Config {
 	scoped := *cfg
-	scoped.ProjectID = team
-	if stored, ok, err := config.ReadPolicy(cfg.StateDir, team); err == nil && ok && stored.SameEnvironment(cfg.AuthURL) && stored.OrganizationID != "" {
-		scoped.OrganizationID = stored.OrganizationID
-		scoped.OrganizationName = stored.OrganizationName
-		scoped.ProjectName = stored.TeamName
+	scoped.ProjectID, scoped.ProjectName = team, ""
+	known := false
+	for _, org := range slices.Sorted(maps.Keys(cfg.Teams)) {
+		if cfg.Teams[org] == team {
+			scoped.OrganizationID, known = org, true
+			break
+		}
 	}
+	stored, ok, err := config.ReadPolicy(cfg.StateDir, team)
+	if err != nil || !ok || !stored.SameEnvironment(cfg.AuthURL) || known && stored.OrganizationID != scoped.OrganizationID {
+		if known && scoped.OrganizationID != cfg.OrganizationID {
+			scoped.OrganizationName = ""
+		}
+		return &scoped
+	}
+	if !known && stored.OrganizationID != "" {
+		scoped.OrganizationID = stored.OrganizationID
+	}
+	if scoped.OrganizationID != cfg.OrganizationID || stored.OrganizationName != "" {
+		scoped.OrganizationName = stored.OrganizationName
+	}
+	scoped.ProjectName = stored.TeamName
 	return &scoped
 }

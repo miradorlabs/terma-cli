@@ -78,7 +78,7 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 	} else {
 		admission.Detail = "every session, in global mode: " + GlobalDestination(cfg)
 		if !pol.Global() {
-			admission = ForTeam(RepositoryCheck(pol, gitDir, nil), pol, selected)
+			admission = ForTeam(RepositoryCheck(pol, gitDir, nil), cfg, gitDir, pol, selected)
 		}
 		add("Repository", "%s", admission.Detail)
 		if gitDir == "" {
@@ -199,7 +199,8 @@ func machineRows(cfg *config.Config) []Row {
 	case cfg.Policy.Validated():
 		rows = append(rows, Row{"Collecting", PolicySummary(cfg.Policy)})
 	}
-	for _, p := range routing.Collection(cfg) {
+	collected := routing.Collect(cfg)
+	for _, p := range collected.Policies {
 		if p.TeamID == cfg.Policy.TeamID {
 			continue
 		}
@@ -209,10 +210,10 @@ func machineRows(cfg *config.Config) []Row {
 		}
 		rows = append(rows, Row{"Also", line})
 	}
-	for _, p := range routing.Conflicts(cfg) {
+	for _, p := range collected.Conflicts {
 		rows = append(rows, Row{"Conflict", ConflictText(p)})
 	}
-	for _, p := range routing.Unvalidated(cfg) {
+	for _, p := range collected.Unvalidated {
 		if p.TeamID != cfg.Policy.TeamID {
 			rows = append(rows, Row{"Also", p.Label() + ": no validated collection policy on this machine, so nothing is collected for it — run `terma setup --org " + p.OrganizationID + "`"})
 		}

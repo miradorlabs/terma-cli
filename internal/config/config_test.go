@@ -313,6 +313,14 @@ func TestProfileKeepsOneTeamPerOrganization(t *testing.T) {
 	if none.Team != "t" || len(none.Teams) != 0 {
 		t.Fatalf("a team selected with no organization was recorded under one: %+v", none)
 	}
+	// A profile written before Teams were recorded keeps its team when it adds an
+	// organization: that is what every existing install does on `terma setup --org`.
+	older := &Profile{OrganizationID: "org-a", Team: "ta"}
+	older.SelectOrganization("org-b", "Beta")
+	older.SelectTeam("tb")
+	if got := older.CollectedTeams(); len(got) != 2 || got["org-a"] != "ta" || got["org-b"] != "tb" {
+		t.Fatalf("adding an organization dropped the first one's team: %v", got)
+	}
 }
 
 // Concurrent UpdateFile calls keep every independent change.

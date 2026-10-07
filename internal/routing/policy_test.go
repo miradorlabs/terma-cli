@@ -158,7 +158,7 @@ func TestCollectionSpansOrganizationsAndHonoursOneGlobalPolicy(t *testing.T) {
 	if got := Conflicts(cfg); len(got) != 0 {
 		t.Fatalf("a lone global policy is a conflict: %v", teams(got))
 	}
-	if got := Unvalidated(cfg); len(got) != 1 || got[0].TeamID != "tz" {
+	if got := Collect(cfg).Unvalidated; len(got) != 1 || got[0].TeamID != "tz" {
 		t.Fatalf("Unvalidated = %+v; want the other environment's team", got)
 	}
 	if p, ok := Collection(cfg).Admitting(config.Repository{Origin: "github.com/beta/site"}); !ok || p.TeamID != "tb" || p.OrganizationID != "org_b" {
@@ -225,8 +225,52 @@ func TestScopeToTeamTakesTheTeamsOrganization(t *testing.T) {
 	if cfg.ProjectID != "ta" || cfg.OrganizationID != "org_a" {
 		t.Fatal("ScopeToTeam changed the config it was given")
 	}
-	if got := ScopeToTeam(cfg, "unknown"); got.ProjectID != "unknown" || got.OrganizationID != "org_a" {
+	if got := ScopeToTeam(cfg, "unknown"); got.ProjectID != "unknown" || got.OrganizationID != "org_a" || got.OrganizationName != "Acme" {
 		t.Fatalf("an unknown team left the profile's organization: %+v", got)
+	}
+	// The profile's selection says which organization a team is in, before any stored
+	// policy: a team just added, with no policy yet, is fetched under its own organization.
+	cfg.Teams = map[string]string{"org_a": "ta", "org_c": "tc", "org_b": "tb"}
+	if got := ScopeToTeam(cfg, "tc"); got.OrganizationID != "org_c" || got.OrganizationName != "" || got.ProjectName != "" {
+		t.Fatalf("a team with no stored policy was not scoped to its organization: %+v", got)
+	}
+	cfg.Teams["org_x"] = "tb" // the profile moved tb to org_x; the stale file does not override it
+	delete(cfg.Teams, "org_b")
+	if got := ScopeToTeam(cfg, "tb"); got.OrganizationID != "org_x" || got.OrganizationName != "" {
+		t.Fatalf("a stored policy overrode the profile's organization: %+v", got)
+	}
+}
+
+// Selecting another team in the same organization leaves the previous one selected
+// nowhere: its policy file is removed, so nothing refreshes it for nothing; a team still
+// selected in another organization keeps its file.
+func TestStorePolicyPrunesTheTeamLeftBehind(t *testing.T) {
+	t.Setenv("TERMA_POLICY_STUB", "")
+	dir := t.TempDir()
+	policy := func(team, org string) *config.Policy {
+		return &config.Policy{Mode: config.ModeRepo, TeamID: team, OrganizationID: org, AuthURL: "https://auth.example", Revision: 1, FetchedAt: time.Now()}
+	}
+	cfg := &config.Config{Dir: dir, StateDir: dir, ProfileName: "default", OrganizationID: "org_a", AuthURL: "https://auth.example"}
+	if err := config.UpdateProfile(dir, "default", func(p *config.Profile) { p.SelectOrganization("org_a", "Acme") }); err != nil {
+		t.Fatal(err)
+	}
+	if err := StorePolicy(cfg, policy("t1", "org_a")); err != nil {
+		t.Fatal(err)
+	}
+	// Setup reselects t2: as setup.Run does, cfg.Policy is the fetched policy when it is stored.
+	cfg.Policy = *policy("t2", "org_a")
+	if err := StorePolicy(cfg, policy("t2", "org_a")); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, _ := config.ReadPolicy(dir, "t1"); ok {
+		t.Fatal("the team left behind kept its policy file")
+	}
+	if _, ok, _ := config.ReadPolicy(dir, "t2"); !ok {
+		t.Fatal("the new team's policy was not stored")
+	}
+	file, err := config.LoadFile(dir)
+	if err != nil || file.Profiles["default"].Team != "t2" || file.Profiles["default"].Teams["org_a"] != "t2" {
+		t.Fatalf("profile %+v, %v", file.Profiles["default"], err)
 	}
 }
 

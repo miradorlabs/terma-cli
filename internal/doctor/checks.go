@@ -268,9 +268,26 @@ func Admitting(cfg *config.Config, gitDir string) config.Policy {
 
 // ForTeam names, on a passing repository check, the team that collects the repository
 // when it is not the selected one: another team's listing, of this or another organization.
-func ForTeam(c Check, pol, selected config.Policy) Check {
-	if c.Status == Pass && pol.Validated() && pol.TeamID != selected.TeamID {
+// A repository other teams list too is named as such: the first listing wins.
+func ForTeam(c Check, cfg *config.Config, gitDir string, pol, selected config.Policy) Check {
+	if c.Status != Pass || !pol.Validated() {
+		return c
+	}
+	if pol.TeamID != selected.TeamID {
 		c.Detail += ", collected for " + pol.Label()
+	}
+	if gitDir == "" || pol.Global() {
+		return c
+	}
+	id := config.Repository{Origin: gitx.RepositoryFS(gitDir)}
+	var also []string
+	for _, p := range routing.Collection(cfg) {
+		if p.TeamID != pol.TeamID && !p.Global() && p.Admits(id) {
+			also = append(also, p.Label())
+		}
+	}
+	if len(also) > 0 {
+		c.Detail += "; also listed by " + strings.Join(also, " and ") + ", whose listing comes second"
 	}
 	return c
 }

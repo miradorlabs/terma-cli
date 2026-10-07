@@ -160,12 +160,13 @@ func (app *App) reportCollection(ui *setupUI, pol config.Policy) {
 		return
 	}
 	cfg.Policy = pol
-	for _, p := range routing.Collection(cfg) {
+	collected := routing.Collect(cfg)
+	for _, p := range collected.Policies {
 		if p.TeamID != pol.TeamID {
 			ui.Summary("Also", doctor.PolicySummary(p)+" for "+p.Label())
 		}
 	}
-	for _, p := range routing.Conflicts(cfg) {
+	for _, p := range collected.Conflicts {
 		ui.Caution("Conflict", doctor.ConflictText(p))
 	}
 }

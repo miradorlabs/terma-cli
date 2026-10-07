@@ -54,9 +54,11 @@ type Profile struct {
 }
 
 // SelectOrganization records the account scope, never a repository's project. Switching
-// organization brings back the team selected there before, if any.
+// organization keeps the team selected in the one left, so the machine goes on collecting
+// for it, and brings back the team selected in the new one before, if any.
 func (p *Profile) SelectOrganization(id, name string) {
 	if p.OrganizationID != id {
+		p.SelectTeam(p.Team) // a profile from before Teams were recorded has its team here alone
 		p.OrganizationName = ""
 		p.Team = p.Teams[id]
 	}

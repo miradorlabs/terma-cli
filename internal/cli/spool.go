@@ -164,7 +164,8 @@ func (app *App) flushSpool(ctx context.Context, force bool, minInterval time.Dur
 	r := app.delivery()
 	// A hook that found a policy stale started this flush to refresh it (hookrun refreshPolicy).
 	var stale []string
-	for _, p := range routing.Collection(cfg) {
+	collected := routing.Collect(cfg)
+	for _, p := range append(collected.Policies, collected.Conflicts...) {
 		if p.Stale(time.Now()) {
 			stale = append(stale, p.Team())
 		}
