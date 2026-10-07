@@ -63,14 +63,16 @@ func lock(ctx context.Context, path string) (func(), error) {
 const pendingDeleteWait = time.Second
 
 // openLockFile opens the lock file at path, waiting out one that Remove is deleting:
-// Windows refuses to open a file pending deletion, with ERROR_ACCESS_DENIED, until its last
-// handle closes. A denial that outlasts ctx or pendingDeleteWait is returned as it is.
+// Windows refuses to open a file pending deletion, with ERROR_ACCESS_DENIED until its last
+// handle closes, or ERROR_SHARING_VIOLATION while the deletion itself holds it open. A
+// refusal that outlasts ctx or pendingDeleteWait is returned as it is.
 func openLockFile(ctx context.Context, path string) (*os.File, error) {
 	deadline := time.Now().Add(pendingDeleteWait)
 	wait := pollMin
 	for {
 		f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, fileMode)
-		if err == nil || !errors.Is(err, windows.ERROR_ACCESS_DENIED) || time.Now().After(deadline) {
+		deleting := errors.Is(err, windows.ERROR_ACCESS_DENIED) || errors.Is(err, windows.ERROR_SHARING_VIOLATION)
+		if err == nil || !deleting || time.Now().After(deadline) {
 			return f, err
 		}
 		timer := time.NewTimer(wait)

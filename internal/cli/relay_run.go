@@ -76,10 +76,10 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 // afterRelay ends a relay's run. One that should run again exits for the service manager to
 // start the newer terma, whoever installed it. A hook-started relay has none: one that
 // updated itself starts its successor, the release it installed, now that its lock is free,
-// since an agent may export before the next hook; one replaced by a newer hook's terma is
-// started again by that hook's next run.
+// since an agent may export before the next hook, unless teardown removed its setup
+// meanwhile; one replaced by a newer hook's terma is started again by that hook's next run.
 func (app *App) afterRelay(res daemon.Result) error {
-	if res.Updated && !res.Service {
+	if res.Updated && !res.Service && !res.SetupGone {
 		app.spawnRelay(app.stateDir, app.version)
 	}
 	if res.Restart() {

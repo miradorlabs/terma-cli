@@ -268,6 +268,7 @@ func TestOnlyAnUpdatedHookStartedRelayStartsItsSuccessor(t *testing.T) {
 	}{
 		{"updated, hook-started", daemon.Result{Updated: true}, true, true},
 		{"updated, service", daemon.Result{Updated: true, Service: true}, false, true},
+		{"updated, then torn down", daemon.Result{Updated: true, SetupGone: true}, false, true},
 		{"replaced, hook-started", daemon.Result{Replaced: true}, false, true},
 		{"idle, hook-started", daemon.Result{}, false, false},
 	} {
