@@ -133,11 +133,9 @@ func TestConcurrentWritersKeepEveryProcess(t *testing.T) {
 	now := time.Now()
 	var wg sync.WaitGroup
 	for i := range 16 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			Write(dir, "s", Claim{ProjectID: "p", PIDs: []int{1000 + i}}, now)
-		}()
+		})
 	}
 	wg.Wait()
 	c, ok := Read(dir, "s", now)
@@ -365,5 +363,35 @@ func TestClaimFollowsTheWorkingTreeInPlace(t *testing.T) {
 	c, _ := Read(dir, "s", at)
 	if marked, ok := c.At(10, t0.Add(time.Second)); !ok || marked.ProjectID != "" {
 		t.Fatalf("the Mark was pushed out: At = %+v, %v", marked, ok)
+	}
+}
+
+// A session that changes directory within its working tree rewrites its latest placement's
+// directory at once, however fresh the claim, and adds no placement.
+func TestClaimFollowsTheDirectoryInPlace(t *testing.T) {
+	t.Parallel()
+	dir := enable(t)
+	at := time.Now().Add(-time.Hour).Truncate(time.Second)
+	top := Claim{ProjectID: "p1", Tool: "claude-code", Root: "/src/api", Cwd: "/src/api", PIDs: []int{10}}
+	if !Write(dir, "s", top, at) {
+		t.Fatal("the first claim did not write")
+	}
+	if Write(dir, "s", top, at.Add(time.Second)) {
+		t.Fatal("the same directory within Refresh rewrote the claim")
+	}
+	sub := top
+	sub.Cwd = "/src/api/web"
+	for i, c := range []Claim{sub, top, sub} {
+		at = at.Add(time.Second)
+		if !Write(dir, "s", c, at) {
+			t.Fatalf("move %d to %s within Refresh did not write", i, c.Cwd)
+		}
+		got, ok := Read(dir, "s", at)
+		if !ok || got.Cwd != c.Cwd || len(got.Placements) != 1 {
+			t.Fatalf("move %d: cwd %q, placements %+v", i, got.Cwd, got.Placements)
+		}
+		if latest, _ := got.At(10, at); latest.Cwd != c.Cwd || latest.Root != "/src/api" {
+			t.Fatalf("move %d: At = %+v", i, latest)
+		}
 	}
 }

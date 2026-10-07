@@ -15,6 +15,7 @@ declared_exceptions := {"mirador.project.id"}
 content_keys := {
 	"terma.message.text", "terma.approval.reason", "terma.session.title",
 	"gen_ai.tool.call.arguments", "gen_ai.tool.call.result", "terma.repository.root",
+	"terma.working_directory",
 }
 
 unit_suffixes := [".count", "_ms", "_percent", "_minutes", "_tokens"]

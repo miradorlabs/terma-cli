@@ -96,9 +96,9 @@ claims its session for the developer's team, naming the repository. The relay fo
 only claimed sessions, only from the processes the claim names, and only while the policy
 still lists the claim's repository. It sends them with the team's key and applies the team's
 collection policy: agents export all content to it, and the policy alone decides what
-leaves (`config.Policy.Content`). The claim also names the working tree the hook ran in,
-which the relay stamps on the session's records as `terma.repository.root`, with tool
-content only. Hook events never pass the relay, so delivery applies
+leaves (`config.Policy.Content`). The claim also names the working tree the hook ran in
+and the directory in it, which the relay stamps on the session's records as
+`terma.repository.root` and `terma.working_directory`, with tool content only. Hook events never pass the relay, so delivery applies
 the same rules when it sends them. A session marked not collected is dropped on arrival;
 everything else unclaimed is held briefly and dropped: nothing unclaimed leaves the
 machine. The exception is a policy in global mode, which collects every session on the

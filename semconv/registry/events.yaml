@@ -27,6 +27,7 @@ attribute_groups:
       - ref: terma.relay.attribution
       - ref: terma.relay.session.id
       - ref: terma.repository.root
+      - ref: terma.working_directory
   - id: terma.relay.withheld
     visibility: public
     stability: development

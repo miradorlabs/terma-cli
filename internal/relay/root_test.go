@@ -14,9 +14,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
-// rootsByKey is the terma.repository.root each key's resources carried; a resource without
-// one counts as "".
-func (u *upstream) rootsByKey(t *testing.T) map[string][]string {
+// stampsByKey is the resource attribute stamp each key's resources carried; a resource
+// without one counts as "".
+func (u *upstream) stampsByKey(t *testing.T, stamp string) map[string][]string {
 	t.Helper()
 	u.mu.Lock()
 	defer u.mu.Unlock()
@@ -30,22 +30,40 @@ func (u *upstream) rootsByKey(t *testing.T) map[string][]string {
 			t.Fatal(err)
 		}
 		for _, rl := range m.ResourceLogs {
-			out[req.auth] = append(out[req.auth], attr(rl.Resource.Attributes, semconv.TermaRepositoryRootKey))
+			out[req.auth] = append(out[req.auth], attr(rl.Resource.Attributes, stamp))
 		}
 	}
 	return out
 }
 
-// A claimed session's records carry the working tree its hooks ran in, Claude Code's (A) and
-// Codex's (B) alike, unless the team's policy withholds tool content: a local path leaves
-// only with the paths tool input names.
+// checkStamps asserts that every resource each key received carries want[stamp][key].
+func (u *upstream) checkStamps(t *testing.T, want map[string]map[string]string) {
+	t.Helper()
+	for stamp, byKey := range want {
+		got := u.stampsByKey(t, stamp)
+		for key, w := range byKey {
+			if len(got[key]) == 0 {
+				t.Fatalf("nothing reached %s: %v", key, got)
+			}
+			for _, g := range got[key] {
+				if g != w {
+					t.Errorf("%s %s = %q, want %q", key, stamp, g, w)
+				}
+			}
+		}
+	}
+}
+
+// A claimed session's records carry the working tree its hooks ran in and the directory they
+// ran in, Claude Code's (A) and Codex's (B) alike, unless the team's policy withholds tool
+// content: a local path leaves only with the paths tool input names.
 func TestRelayStampsTheClaimsWorkingTree(t *testing.T) {
 	t.Parallel()
 	for _, codexContent := range []bool{true, false} {
 		u := newUpstream(t)
 		f := newFixture()
-		f.claim("A", claim.Claim{ProjectID: "p1", Tool: "claude-code", Root: "/work/a"})
-		f.claim("B", claim.Claim{ProjectID: "p2", Tool: "codex", Root: "/work/b"})
+		f.claim("A", claim.Claim{ProjectID: "p1", Tool: "claude-code", Root: "/work/a", Cwd: "/work/a/web"})
+		f.claim("B", claim.Claim{ProjectID: "p2", Tool: "codex", Root: "/work/b", Cwd: "/work/b"})
 		policies := allPolicies(u)
 		policies["p2"] = Policy{Endpoint: u.srv.URL, Key: "key-p2", IncludePrompts: codexContent, IncludeToolContent: codexContent}
 		r, srv := f.relay(t, u, policies)
@@ -56,33 +74,26 @@ func TestRelayStampsTheClaimsWorkingTree(t *testing.T) {
 		if codexContent {
 			wantB = "/work/b"
 		}
-		roots := u.rootsByKey(t)
-		for key, want := range map[string]string{"Bearer key-p1": "/work/a", "Bearer key-p2": wantB} {
-			if len(roots[key]) == 0 {
-				t.Fatalf("codex content %v: nothing reached %s: %v", codexContent, key, roots)
-			}
-			for _, got := range roots[key] {
-				if got != want {
-					t.Errorf("codex content %v: %s root = %q, want %q", codexContent, key, got, want)
-				}
-			}
-		}
+		u.checkStamps(t, map[string]map[string]string{
+			semconv.TermaRepositoryRootKey:   {"Bearer key-p1": "/work/a", "Bearer key-p2": wantB},
+			semconv.TermaWorkingDirectoryKey: {"Bearer key-p1": "/work/a/web", "Bearer key-p2": wantB},
+		})
 	}
 }
 
-// Global mode places every part by its catch-all, which names no checkout: the root comes
-// from the session's own claim for that project, at the part's time, and a session no hook
-// claimed has none.
+// Global mode places every part by its catch-all, which names no checkout: the root and the
+// directory come from the session's own claim for that project, at the part's time, and a
+// session no hook claimed has neither.
 func TestRelayStampsTheWorkingTreeUnderTheCatchAll(t *testing.T) {
 	t.Parallel()
 	u := newUpstream(t)
 	f := newFixture()
 	t0 := f.clock()
-	f.claim("A", claim.Claim{ProjectID: "p-default", Tool: "claude-code", Root: "/work/now", Placements: []claim.Placement{
-		{ProjectID: "p-default", Root: "/work/before", Since: t0.Add(-time.Hour)},
-		{ProjectID: "p-default", Root: "/work/now", Since: t0.Add(-time.Minute)},
+	f.claim("A", claim.Claim{ProjectID: "p-default", Tool: "claude-code", Root: "/work/now", Cwd: "/work/now/web", Placements: []claim.Placement{
+		{ProjectID: "p-default", Root: "/work/before", Cwd: "/work/before", Since: t0.Add(-time.Hour)},
+		{ProjectID: "p-default", Root: "/work/now", Cwd: "/work/now/web", Since: t0.Add(-time.Minute)},
 	}})
-	f.claim("B", claim.Claim{ProjectID: "p2", Root: "/elsewhere"}) // another project's claim names no root here
+	f.claim("B", claim.Claim{ProjectID: "p2", Root: "/elsewhere", Cwd: "/elsewhere"}) // another project's claim names neither here
 	policies := map[string]Policy{"p-default": {Endpoint: u.srv.URL, Key: "key-default", IncludePrompts: true, IncludeToolContent: true}}
 	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
 		CatchAll: func() (claim.Claim, bool) { return claim.Claim{ProjectID: "p-default"}, true },
@@ -105,34 +116,36 @@ func TestRelayStampsTheWorkingTreeUnderTheCatchAll(t *testing.T) {
 		var m logspb.LogsData
 		_ = proto.Unmarshal(req.body, &m)
 		for _, rl := range m.ResourceLogs {
-			root := attr(rl.Resource.Attributes, semconv.TermaRepositoryRootKey)
+			stamps := attr(rl.Resource.Attributes, semconv.TermaRepositoryRootKey) + "|" + attr(rl.Resource.Attributes, semconv.TermaWorkingDirectoryKey)
 			session := ""
 			for _, sl := range rl.ScopeLogs {
 				for _, lr := range sl.LogRecords {
 					session = attr(lr.Attributes, "session.id") + attr(lr.Attributes, "conversation.id")
 				}
 			}
-			seen[session+"="+root]++
+			seen[session+"="+stamps]++
 		}
 	}
-	if seen["A=/work/now"] == 0 {
-		t.Fatalf("A's records do not carry its current root: %v", seen)
+	if seen["A=/work/now|/work/now/web"] == 0 {
+		t.Fatalf("A's records do not carry its current root and directory: %v", seen)
 	}
 	for k := range seen {
 		switch k {
-		case "A=/work/now", "B=", "C=", "D=", "=":
+		case "A=/work/now|/work/now/web", "B=|", "C=|", "D=|", "=|":
 		default:
-			t.Fatalf("unexpected session=root %q in %v", k, seen)
+			t.Fatalf("unexpected session=root|directory %q in %v", k, seen)
 		}
 	}
 }
 
 // A part stamped while the policy collected tool content and sent after it stopped loses the
-// root as content when it is withheld again at send time, never as an unclassified key.
+// root and the directory as content when it is withheld again at send time, never as
+// unclassified keys.
 func TestWithholdDropsTheRootWithToolContent(t *testing.T) {
 	for _, flags := range [][2]bool{{true, true}, {true, false}, {false, true}, {false, false}} {
 		prompts, toolContent := flags[0], flags[1]
-		res := &resourcepb.Resource{Attributes: []*commonpb.KeyValue{kv("service.name", "claude-code"), kv(semconv.TermaRepositoryRootKey, "/work/a")}}
+		res := &resourcepb.Resource{Attributes: []*commonpb.KeyValue{kv("service.name", "claude-code"),
+			kv(semconv.TermaRepositoryRootKey, "/work/a"), kv(semconv.TermaWorkingDirectoryKey, "/work/a/web")}}
 		p := &part{signal: Logs, msg: &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{Resource: res,
 			ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{{Attributes: []*commonpb.KeyValue{kv("event.name", "api_request")}}}}}}}}}
 		unclassified := map[string]int{}
@@ -140,37 +153,33 @@ func TestWithholdDropsTheRootWithToolContent(t *testing.T) {
 		if got := attr(res.Attributes, semconv.TermaRepositoryRootKey); (got == "/work/a") != toolContent {
 			t.Errorf("prompts=%v toolContent=%v: root is %q", prompts, toolContent, got)
 		}
+		if got := attr(res.Attributes, semconv.TermaWorkingDirectoryKey); (got == "/work/a/web") != toolContent {
+			t.Errorf("prompts=%v toolContent=%v: directory is %q", prompts, toolContent, got)
+		}
 		if len(unclassified) != 0 {
 			t.Errorf("prompts=%v toolContent=%v: unclassified %v", prompts, toolContent, unclassified)
 		}
 	}
 }
 
-// The working tree is the relay's to name: one the agent put on its own resource is dropped
-// when no hook named one, and replaced when one did.
+// The working tree and the directory are the relay's to name: what the agent put on its own
+// resource is dropped when no hook named them, and replaced when one did.
 func TestRelayNamesTheWorkingTreeNotTheAgent(t *testing.T) {
 	t.Parallel()
 	u := newUpstream(t)
-	f := newFixture() // A claims no root
-	f.claim("B", claim.Claim{ProjectID: "p2", Tool: "codex", Root: "/work/b"})
+	f := newFixture() // A claims neither
+	f.claim("B", claim.Claim{ProjectID: "p2", Tool: "codex", Root: "/work/b", Cwd: "/work/b/cli"})
 	policies := allPolicies(u)
 	policies["p2"] = Policy{Endpoint: u.srv.URL, Key: "key-p2", IncludePrompts: true, IncludeToolContent: true}
 	r, srv := f.relay(t, u, policies)
 	logs := mixedLogs()
 	res := logs.ResourceLogs[0].Resource
-	res.Attributes = append(res.Attributes, kv(semconv.TermaRepositoryRootKey, "/agent/says"))
+	res.Attributes = append(res.Attributes, kv(semconv.TermaRepositoryRootKey, "/agent/says"), kv(semconv.TermaWorkingDirectoryKey, "/agent/says"))
 	body, _ := proto.Marshal(logs)
 	post(t, srv, "/v1/logs", body, "application/x-protobuf", token, false)
 	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["forwarded.logs"] == 3 })
-	roots := u.rootsByKey(t)
-	for key, want := range map[string]string{"Bearer key-p1": "", "Bearer key-p2": "/work/b"} {
-		if len(roots[key]) == 0 {
-			t.Fatalf("nothing reached %s: %v", key, roots)
-		}
-		for _, got := range roots[key] {
-			if got != want {
-				t.Errorf("%s root = %q, want %q", key, got, want)
-			}
-		}
-	}
+	u.checkStamps(t, map[string]map[string]string{
+		semconv.TermaRepositoryRootKey:   {"Bearer key-p1": "", "Bearer key-p2": "/work/b"},
+		semconv.TermaWorkingDirectoryKey: {"Bearer key-p1": "", "Bearer key-p2": "/work/b/cli"},
+	})
 }

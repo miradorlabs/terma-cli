@@ -209,7 +209,7 @@ func (e Env) claimForRelay(r *Repo, ev spool.Event) {
 		return
 	}
 	tool, _ := ev.Attrs[semconv.GenAIMainAgentNameKey].(string)
-	c := claim.Claim{ProjectID: r.ProjectID, Tool: tool, Repo: r.Name, Worktree: r.Worktree, Repository: r.Repository, Root: r.workTree(), PIDs: claimPIDs()}
+	c := claim.Claim{ProjectID: r.ProjectID, Tool: tool, Repo: r.Name, Worktree: r.Worktree, Repository: r.Repository, Root: r.workTree(), Cwd: e.workingDir(), PIDs: claimPIDs()}
 	claim.Write(e.StateDir, ev.SessionID, c, e.Time())
 	// A subagent whose telemetry uses its agent id as session id would otherwise be dropped.
 	if agent, _ := ev.Attrs[semconv.TermaAgentIDKey].(string); agent != "" && agent != ev.SessionID {

@@ -67,7 +67,7 @@ func ClaimFromPayload(ctx context.Context, env Env, s PayloadSession, tool strin
 	default:
 		return false
 	}
-	c.PIDs = claimPIDs()
+	c.PIDs, c.Cwd = claimPIDs(), env.workingDir()
 	// A subagent's telemetry may name its own id (see claimForRelay).
 	if s.AgentID != "" && s.AgentID != id {
 		claim.Write(env.StateDir, s.AgentID, c, env.Time())
@@ -77,6 +77,18 @@ func ClaimFromPayload(ctx context.Context, env Env, s PayloadSession, tool strin
 		return live && prev.ProjectID != ""
 	}
 	return true
+}
+
+// workingDir is the directory the hook ran in, symlink-resolved as Repo.workTree is: where
+// in the checkout the agent works, which a tool call's relative paths resolve against.
+func (e Env) workingDir() string {
+	if e.Cwd == "" {
+		return ""
+	}
+	if resolved, err := filepath.EvalSymlinks(e.Cwd); err == nil {
+		return resolved
+	}
+	return e.Cwd
 }
 
 // notCollected marks a session running in a working copy the team policy does not admit

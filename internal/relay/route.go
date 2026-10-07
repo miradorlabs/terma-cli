@@ -142,12 +142,17 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 	// terma.relay.attribution and terma.relay.session.id mark a part the relay placed by
 	// inference, so the backend can tell the relay's join from its own.
 	stamp(p, semconv.MiradorProjectIDKey, c.ProjectID)
-	// The checkout is the relay's to name, never the agent's, and a local path: it leaves only
-	// with the tool content that names paths.
+	// The checkout and the directory in it are the relay's to name, never the agent's, and local
+	// paths: they leave only with the tool content that names paths.
 	unstamp(p, semconv.TermaRepositoryRootKey)
+	unstamp(p, semconv.TermaWorkingDirectoryKey)
 	if pol.IncludeToolContent {
-		if root := r.rootOf(c, p, how); root != "" {
-			stamp(p, semconv.TermaRepositoryRootKey, root)
+		ran := r.ranIn(c, p, how)
+		if ran.Root != "" {
+			stamp(p, semconv.TermaRepositoryRootKey, ran.Root)
+		}
+		if ran.Cwd != "" {
+			stamp(p, semconv.TermaWorkingDirectoryKey, ran.Cwd)
 		}
 	}
 	if how.how != "" {
@@ -161,25 +166,26 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 	r.enqueue(c, p)
 }
 
-// rootOf is the working tree the part's session ran in: the placing claim's, or, where global
-// mode's catch-all placed the part without one, its session's own claim's for the same
-// project. "" when no hook has named one.
-func (r *Relay) rootOf(c claim.Claim, p *part, how attribution) string {
-	if c.Root != "" || how.how != semconv.TermaRelayAttributionCatchAll {
-		return c.Root
+// ranIn is the claim naming where the part's session ran, its Root the working tree and its
+// Cwd the directory: the placing claim, or, where global mode's catch-all placed the part
+// without either, its session's own claim for the same project. Both are "" when no hook has
+// named them.
+func (r *Relay) ranIn(c claim.Claim, p *part, how attribution) claim.Claim {
+	if c.Root != "" || c.Cwd != "" || how.how != semconv.TermaRelayAttributionCatchAll {
+		return c
 	}
 	session := r.sessionFor(p.session)
 	if session == "" || strings.HasPrefix(session, procPrefix) {
-		return ""
+		return claim.Claim{}
 	}
 	own, ok := r.lookup(session)
 	if !ok {
-		return ""
+		return claim.Claim{}
 	}
 	if own, ok = own.At(p.pid, p.at); !ok || own.ProjectID != c.ProjectID {
-		return ""
+		return claim.Claim{}
 	}
-	return own.Root
+	return own
 }
 
 func (r *Relay) catchAll() (claim.Claim, bool) {

@@ -2,6 +2,7 @@ package hookrun
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -149,6 +150,39 @@ func TestGlobalModeClaimsEverySession(t *testing.T) {
 	for _, dir := range []string{known, unknown, scratch} {
 		if _, ok := claimIn(dir, "r-"+filepath.Base(dir), config.DefaultPolicy()); ok {
 			t.Errorf("repo mode claimed a session in %s", dir)
+		}
+	}
+	// Outside git the claim names no working tree, but still the directory the hook ran in.
+	want, _ := filepath.EvalSymlinks(scratch)
+	if c, _ := claim.Read(stateDir, "g-scratch", time.Now()); c.Root != "" || c.Cwd != want {
+		t.Errorf("scratch claim root %q, cwd %q; want no root and %q", c.Root, c.Cwd, want)
+	}
+}
+
+// A claim names the directory its hook ran in next to the working tree: a session in a
+// subdirectory resolves a tool call's relative paths and bare git commands there, not at the
+// checkout's root. A spooled event and a bare payload claim alike.
+func TestTheClaimNamesTheDirectoryTheHookRanIn(t *testing.T) {
+	t.Parallel()
+	stateDir := t.TempDir()
+	repo := hookruntest.InitRepo(t)
+	sub := filepath.Join(repo, "frontend")
+	if err := os.Mkdir(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	root, _ := filepath.EvalSymlinks(repo)
+	dir, _ := filepath.EvalSymlinks(sub)
+	sp, _ := spool.Open(t.TempDir())
+	env := Env{StateDir: stateDir, Now: time.Now(), Cwd: sub, Policy: hookruntest.Admitting(repo), Spool: sp, Version: "test", Team: "proj",
+		Stdin: strings.NewReader(`{"session_id":"sess-sub","cwd":"` + hookruntest.InJSON(sub) + `","hook_event_name":"SessionStart"}`)}
+	if err := startSession(context.Background(), env); err != nil {
+		t.Fatal(err)
+	}
+	payloadEnv := Env{StateDir: stateDir, Now: time.Now(), Cwd: sub, Policy: hookruntest.Admitting(repo), Team: "proj"}
+	ClaimFromPayload(context.Background(), payloadEnv, PayloadSession{ID: "sess-payload", Cwd: sub}, "codex")
+	for _, sid := range []string{"sess-sub", "sess-payload"} {
+		if c, ok := claim.Read(stateDir, sid, time.Now()); !ok || c.Root != root || c.Cwd != dir {
+			t.Errorf("%s: claim root %q, cwd %q, %v; want %q, %q", sid, c.Root, c.Cwd, ok, root, dir)
 		}
 	}
 }
