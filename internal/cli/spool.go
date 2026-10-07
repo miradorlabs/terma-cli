@@ -16,6 +16,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -161,9 +162,15 @@ func (app *App) flushSpool(ctx context.Context, force bool, minInterval time.Dur
 		return delivery.Result{}, err
 	}
 	r := app.delivery()
-	// A hook that found the policy stale started this flush to refresh it (hookrun refreshPolicy).
-	if cfg.Policy.Stale(time.Now()) {
-		r.Policy = refreshOnce(ctx, cfg, cfg.Policy.Team(), r.Policy)
+	// A hook that found a policy stale started this flush to refresh it (hookrun refreshPolicy).
+	var stale []string
+	for _, p := range routing.Collection(cfg) {
+		if p.Stale(time.Now()) {
+			stale = append(stale, p.Team())
+		}
+	}
+	if len(stale) > 0 {
+		r.Policy = refreshOnce(ctx, cfg, stale, r.Policy)
 	}
 	return r.Flush(ctx, s, cfg, force, minInterval), nil
 }
@@ -172,13 +179,22 @@ var errTornDown = errors.New("terma is not set up on this machine; run `terma se
 
 type policyFunc = func(context.Context, *config.Config, string) (config.Policy, error)
 
-// refreshOnce refreshes team's policy now, even with nothing queued for it (a hook outside
-// the list queues nothing), and answers delivery's lookups for team with that result.
-func refreshOnce(ctx context.Context, cfg *config.Config, team string, current policyFunc) policyFunc {
-	pol, err := current(ctx, cfg, team)
+// refreshOnce refreshes each of teams' policies now, even with nothing queued for them (a
+// hook outside every list queues nothing), and answers delivery's lookups for them with
+// those results.
+func refreshOnce(ctx context.Context, cfg *config.Config, teams []string, current policyFunc) policyFunc {
+	type result struct {
+		pol config.Policy
+		err error
+	}
+	results := make(map[string]result, len(teams))
+	for _, team := range teams {
+		pol, err := current(ctx, cfg, team)
+		results[team] = result{pol, err}
+	}
 	return func(ctx context.Context, cfg *config.Config, t string) (config.Policy, error) {
-		if t == team {
-			return pol, err
+		if r, ok := results[t]; ok {
+			return r.pol, r.err
 		}
 		return current(ctx, cfg, t)
 	}

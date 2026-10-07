@@ -389,6 +389,7 @@ func TestDoctorAdmitsARepositoryByAnotherOrganizationsTeam(t *testing.T) {
 	t.Parallel()
 	e := env(t, Probes{Credential: signedIn, Spool: func() SpoolState { return SpoolState{} }})
 	e.Config.StateDir, e.Config.OrganizationID, e.Config.AuthURL = e.StateDir, "org_a", config.DefaultAuthURL
+	e.Config.Teams = map[string]string{"org_a": "p1", "org_b": "p2"}
 	e.Config.Policy = fetched(config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/acme/two"}, OrganizationID: "org_a", AuthURL: config.DefaultAuthURL})
 	other := config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/acme/one"}, TeamID: "p2", OrganizationID: "org_b", OrganizationName: "Beta",
 		AuthURL: config.DefaultAuthURL, IncludePrompts: true, IncludeToolContent: true, FetchedAt: time.Now()}

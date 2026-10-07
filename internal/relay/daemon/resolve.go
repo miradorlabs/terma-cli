@@ -68,9 +68,11 @@ func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Polic
 		// Reread the profile's team and its policy so a refreshed policy also governs queued
 		// exports; a profile signed into another organization since keeps the policies it
 		// stored, as this machine collects for every organization it is signed into.
-		if file, err := config.LoadFile(cfg.Dir); err != nil {
+		file, err := config.LoadFile(cfg.Dir)
+		if err != nil {
 			return relay.Policy{}, err
-		} else if p := file.Profiles[cfg.ProfileName]; p == nil && cfg.ProfileName != "" {
+		}
+		if p := file.Profiles[cfg.ProfileName]; p == nil && cfg.ProfileName != "" {
 			// The startup policy would outlive a sign-out or a removed profile.
 			return relay.Policy{}, errors.New("profile removed; restart the relay")
 		} else if p != nil {
@@ -83,6 +85,9 @@ func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Polic
 		}
 		now := *cfg
 		now.Policy = selected
+		if p := file.Profiles[cfg.ProfileName]; p != nil {
+			now.Teams = p.CollectedTeams()
+		}
 		// One global policy is honoured (routing.Collection); a claim for another team's
 		// global policy is a session nothing placed, and is granted nothing.
 		global, hasGlobal := routing.Collection(&now).Global()

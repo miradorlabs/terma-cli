@@ -61,9 +61,7 @@ func ClaimFromPayload(ctx context.Context, env Env, s PayloadSession, tool strin
 				notCollected(env, sid, tool)
 			}
 		}
-		if env.Policy.Stale(env.Time()) {
-			refreshPolicy(env)
-		}
+		refreshPolicy(env)
 		return config.Policy{}, false
 	case err != nil && isGlobal && global.DefaultProjectID != "":
 		// Global mode, outside any repository.
@@ -116,31 +114,44 @@ const (
 	refreshEvery = time.Minute
 )
 
-// refreshPolicy starts the detached flush, which refreshes a stale policy first: with no
-// relay running, nothing else learns of a repository the team has since listed, and the
-// next hook would mark its sessions too. Of hooks racing past the stamp, the one holding
-// its lock starts the flush.
+// refreshPolicy starts the detached flush when a policy the machine collects under is
+// stale; the flush refreshes every stale one first. With no relay running, nothing else
+// learns of a repository a team has since listed, and the next hook would mark its
+// sessions too. Of hooks racing past a team's stamp, the one holding its lock starts the flush.
 func refreshPolicy(env Env) {
-	team := env.Policy.Team()
-	if env.Flush == nil || team == "" || team != filepath.Base(team) {
+	if env.Flush == nil {
 		return
+	}
+	due := false
+	for _, p := range env.policies() {
+		if p.Stale(env.Time()) && stampRefresh(env, p.Team()) {
+			due = true
+		}
+	}
+	if due {
+		env.Flush()
+	}
+}
+
+// stampRefresh records that team's refresh is being started now, false when one was
+// within refreshEvery or another hook holds the stamp.
+func stampRefresh(env Env, team string) bool {
+	if team == "" || team != filepath.Base(team) {
+		return false
 	}
 	stamp, now := filepath.Join(env.StateDir, config.PoliciesDir, refreshedDir, team), env.Time()
 	if os.MkdirAll(filepath.Dir(stamp), 0o700) != nil {
-		return
+		return false
 	}
 	unlock, err := flock.TryLock(stamp + ".lock")
 	if err != nil {
-		return
+		return false
 	}
 	defer unlock()
 	if info, err := os.Stat(stamp); err == nil && now.Sub(info.ModTime()) < refreshEvery {
-		return
+		return false
 	}
-	if err := os.WriteFile(stamp, nil, 0o600); err != nil || os.Chtimes(stamp, now, now) != nil {
-		return
-	}
-	env.Flush()
+	return os.WriteFile(stamp, nil, 0o600) == nil && os.Chtimes(stamp, now, now) == nil
 }
 
 // claimPIDs are this hook's ancestors, one of them the agent: a claim covers only their records.

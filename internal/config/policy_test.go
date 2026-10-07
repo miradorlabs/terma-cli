@@ -1,8 +1,6 @@
 package config
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 )
@@ -165,30 +163,5 @@ func TestPolicyLabel(t *testing.T) {
 		if got := tc.pol.Label(); got != tc.want {
 			t.Errorf("%+v: Label = %q, want %q", tc.pol, got, tc.want)
 		}
-	}
-}
-
-// ListPolicies reads every team's stored policy and skips what is not one.
-func TestListPoliciesReadsEveryTeam(t *testing.T) {
-	t.Setenv("TERMA_POLICY_STUB", "")
-	dir := t.TempDir()
-	if got, err := ListPolicies(dir); err != nil || len(got) != 0 {
-		t.Fatalf("empty state dir: %v, %v", got, err)
-	}
-	now := time.Now()
-	for _, team := range []string{"tb", "ta"} {
-		if err := WritePolicy(dir, Policy{Mode: ModeRepo, TeamID: team, FetchedAt: now}); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := os.WriteFile(filepath.Join(dir, PoliciesDir, "junk.json"), []byte("{"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(filepath.Join(dir, PoliciesDir, "refreshed"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	got, err := ListPolicies(dir)
-	if err != nil || len(got) != 2 || got[0].TeamID != "ta" || got[1].TeamID != "tb" {
-		t.Fatalf("ListPolicies = %+v, %v", got, err)
 	}
 }

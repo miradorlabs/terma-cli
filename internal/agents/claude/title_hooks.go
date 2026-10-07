@@ -26,7 +26,7 @@ type claudeTitleState struct {
 // captureClaudeTitle spools the session's name when new or renamed. It restates the first
 // prompt, so it travels under titleConsented and, at delivery, the policy's prompt switch.
 func captureClaudeTitle(e hookrun.Env, r *hookrun.Repo, in *claudeHookInput) {
-	if e.Spool == nil || in.TranscriptPath == "" || !session.ValidID(in.SessionID) || !titleConsented(e.Consent()) {
+	if e.Spool == nil || in.TranscriptPath == "" || !session.ValidID(in.SessionID) || !titleConsented(e.ConsentUnder(r)) {
 		return
 	}
 	dir := filepath.Join(e.StateDir, claudeTitleStateDir)

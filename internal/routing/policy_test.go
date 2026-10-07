@@ -121,8 +121,9 @@ func TestEachTeamKeepsItsPolicyAndEachProfileItsTeam(t *testing.T) {
 }
 
 // One machine collects for every organization it is signed into: the collection is the
-// selected team's policy first, then every other team's of the environment, with one
-// global policy honoured — the selected team's, else the only one — and the rest conflicts.
+// selected team's policy first, then the team selected in each other organization, with
+// one global policy honoured — the selected team's, else the only one — and the rest
+// conflicts. A policy file of a team no longer selected anywhere does not count.
 func TestCollectionSpansOrganizationsAndHonoursOneGlobalPolicy(t *testing.T) {
 	t.Setenv("TERMA_POLICY_STUB", "")
 	dir := t.TempDir()
@@ -135,12 +136,14 @@ func TestCollectionSpansOrganizationsAndHonoursOneGlobalPolicy(t *testing.T) {
 	}
 	elsewhere := repo("tz", "org_z", "github.com/zeta/app")
 	elsewhere.AuthURL = "https://prod.example"
-	for _, p := range []config.Policy{repo("ta", "org_a", "github.com/acme/app"), repo("tb", "org_b", "github.com/beta/site"), global("tg", "org_b"), elsewhere} {
+	for _, p := range []config.Policy{repo("ta", "org_a", "github.com/acme/app"), repo("tb", "org_b", "github.com/beta/site"), global("tg", "org_g"), elsewhere,
+		repo("old", "org_a", "github.com/acme/old")} {
 		if err := config.WritePolicy(dir, p); err != nil {
 			t.Fatal(err)
 		}
 	}
-	cfg := &config.Config{Dir: dir, StateDir: dir, OrganizationID: "org_a", AuthURL: "https://auth.example"}
+	cfg := &config.Config{Dir: dir, StateDir: dir, OrganizationID: "org_a", AuthURL: "https://auth.example",
+		Teams: map[string]string{"org_a": "ta", "org_b": "tb", "org_g": "tg", "org_z": "tz"}}
 	cfg.Policy = repo("ta", "org_a", "github.com/acme/app")
 	teams := func(ps config.Policies) []string {
 		var out []string
@@ -155,14 +158,22 @@ func TestCollectionSpansOrganizationsAndHonoursOneGlobalPolicy(t *testing.T) {
 	if got := Conflicts(cfg); len(got) != 0 {
 		t.Fatalf("a lone global policy is a conflict: %v", teams(got))
 	}
+	if got := Unvalidated(cfg); len(got) != 1 || got[0].TeamID != "tz" {
+		t.Fatalf("Unvalidated = %+v; want the other environment's team", got)
+	}
 	if p, ok := Collection(cfg).Admitting(config.Repository{Origin: "github.com/beta/site"}); !ok || p.TeamID != "tb" || p.OrganizationID != "org_b" {
 		t.Fatalf("another organization's repository went to %+v, %v", p, ok)
 	}
+	// "old", org_a's team before ta, keeps its file but is selected nowhere: it does not collect.
+	if p, ok := Collection(cfg).Admitting(config.Repository{Origin: "github.com/acme/old"}); !ok || p.TeamID != "tg" {
+		t.Fatalf("a team switched away from was revived from its policy file: %+v, %v (want the honoured global policy)", p, ok)
+	}
 
 	// A second unselected global policy: neither is honoured, both are conflicts.
-	if err := config.WritePolicy(dir, global("th", "org_a")); err != nil {
+	if err := config.WritePolicy(dir, global("th", "org_h")); err != nil {
 		t.Fatal(err)
 	}
+	cfg.Teams["org_h"] = "th"
 	if got := teams(Collection(cfg)); !slices.Equal(got, []string{"ta", "tb"}) {
 		t.Fatalf("Collection with two global policies = %v", got)
 	}
@@ -181,13 +192,18 @@ func TestCollectionSpansOrganizationsAndHonoursOneGlobalPolicy(t *testing.T) {
 	if got := teams(Conflicts(cfg)); !slices.Equal(got, []string{"tg", "th"}) {
 		t.Fatalf("Conflicts under a selected global policy = %v", got)
 	}
-	// Nothing selected: the stored listings still collect, and no global policy is honoured.
+	// Nothing selected: the other listings still collect, and no global policy is honoured.
 	cfg.Policy = config.NoPolicy("org_a", "https://auth.example")
 	if got := teams(Collection(cfg)); !slices.Equal(got, []string{"tb"}) {
 		t.Fatalf("Collection with no selected team = %v", got)
 	}
 	if got := teams(Conflicts(cfg)); !slices.Equal(got, []string{"ta", "tg", "th"}) {
 		t.Fatalf("Conflicts with no selected team = %v", got)
+	}
+	// A single-organization machine from before Teams were recorded collects as it did.
+	single := &config.Config{Dir: dir, StateDir: dir, OrganizationID: "org_a", AuthURL: "https://auth.example", Policy: repo("ta", "org_a", "github.com/acme/app")}
+	if got := teams(Collection(single)); !slices.Equal(got, []string{"ta"}) {
+		t.Fatalf("Collection with no Teams = %v", got)
 	}
 }
 

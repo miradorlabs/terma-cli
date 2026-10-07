@@ -1,13 +1,14 @@
 // Package routing keeps each team's collection policy in the state directory
 // (config.PoliciesDir), the one copy hooks, doctor, the relay and delivery read; a
-// profile records only which team it selected. One machine collects for several
-// organizations at once: every stored policy of the environment counts (Collection), and
-// each names the organization that fetched it, whose credential refreshes it.
+// profile records only which team it selected in each organization. One machine collects
+// for several organizations at once: the selected team of each (Collection), whose policy
+// names the organization that fetched it, whose credential refreshes it.
 package routing
 
 import (
 	"cmp"
 	"errors"
+	"maps"
 	"slices"
 	"time"
 
@@ -84,7 +85,7 @@ func StorePolicy(cfg *config.Config, pol *config.Policy) error {
 		}
 		// Signed into another organization while this fetch ran: its selection stands.
 		if p.OrganizationID == cfg.OrganizationID && (p.Team == "" || cfg.Policy.TeamID == pol.TeamID) {
-			p.Team = pol.TeamID
+			p.SelectTeam(pol.TeamID)
 		}
 	})
 }
@@ -106,10 +107,11 @@ func ValidatedPolicy(cfg *config.Config, team string) (config.Policy, bool) {
 }
 
 // Collection is every policy this machine collects under, as hooks ask them: the
-// repository-mode policies, the selected team's first and the rest in team order, then
+// repository-mode policies of the teams the profile selected (config.Config.Teams, one
+// per organization set up), the selected team's first and the rest in team order, then
 // the one global policy honoured. Only validated policies of cfg's environment count; an
 // expired one is kept, since hooks run on the last validated policy and what leaves is
-// decided downstream.
+// decided downstream. A policy file of a team no longer selected anywhere does not count.
 //
 // One global policy is honoured: the selected team's, else the only one among the rest.
 // Two teams that each collect everything would both claim every session, so when neither
@@ -126,13 +128,17 @@ func Conflicts(cfg *config.Config) config.Policies {
 
 func collection(cfg *config.Config, conflicts bool) config.Policies {
 	selected := cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL)
-	stored, _ := config.ListPolicies(cfg.StateDir)
 	var repos, globals config.Policies
 	if selected.Validated() && !selected.Global() {
 		repos = append(repos, selected)
 	}
-	for _, p := range stored {
-		if !p.Validated() || !p.SameEnvironment(cfg.AuthURL) || p.TeamID == selected.TeamID {
+	for _, org := range slices.Sorted(maps.Keys(cfg.Teams)) {
+		team := cfg.Teams[org]
+		if team == selected.TeamID {
+			continue // already read: config.Load loaded the selected team's policy
+		}
+		p, ok, err := config.ReadPolicy(cfg.StateDir, team)
+		if err != nil || !ok || !p.Validated() || !p.SameEnvironment(cfg.AuthURL) || p.OrganizationID != org {
 			continue
 		}
 		if p.Global() {
@@ -141,6 +147,7 @@ func collection(cfg *config.Config, conflicts bool) config.Policies {
 			repos = append(repos, p)
 		}
 	}
+	slices.SortStableFunc(repos[min(len(repos), 1):], func(a, b config.Policy) int { return cmp.Compare(a.TeamID, b.TeamID) })
 	slices.SortStableFunc(globals, func(a, b config.Policy) int { return cmp.Compare(a.TeamID, b.TeamID) })
 	var honoured config.Policies
 	switch {
@@ -153,6 +160,23 @@ func collection(cfg *config.Config, conflicts bool) config.Policies {
 		return globals
 	}
 	return append(repos, honoured...)
+}
+
+// Unvalidated are the teams the profile selected whose policy is not in the collection
+// nor a conflict: never fetched, unreadable, or of another environment or organization
+// than recorded. Each is a team collecting nothing until `terma setup` fetches it again.
+func Unvalidated(cfg *config.Config) []config.Policy {
+	have := map[string]bool{}
+	for _, p := range append(Collection(cfg), Conflicts(cfg)...) {
+		have[p.TeamID] = true
+	}
+	var out []config.Policy
+	for _, org := range slices.Sorted(maps.Keys(cfg.Teams)) {
+		if team := cfg.Teams[org]; !have[team] {
+			out = append(out, config.Policy{TeamID: team, OrganizationID: org})
+		}
+	}
+	return out
 }
 
 // ScopeToTeam is cfg as a fetch, mint or refresh for team runs it: that team as the

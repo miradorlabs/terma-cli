@@ -47,18 +47,51 @@ type Profile struct {
 	Harnesses []string `json:"harnesses,omitempty"`
 	// Team is the team `terma setup` selected, whose policy (PoliciesDir) the hooks apply.
 	Team string `json:"team,omitempty"`
+	// Teams is the team selected in each organization this profile set up, by
+	// organization id: what this machine collects for (routing.Collection). Team is the
+	// current organization's entry.
+	Teams map[string]string `json:"teams,omitempty"`
 }
 
-// SelectOrganization records the account scope, never a repository's project.
+// SelectOrganization records the account scope, never a repository's project. Switching
+// organization brings back the team selected there before, if any.
 func (p *Profile) SelectOrganization(id, name string) {
 	if p.OrganizationID != id {
 		p.OrganizationName = ""
-		p.Team = ""
+		p.Team = p.Teams[id]
 	}
 	p.OrganizationID = id
 	if name != "" {
 		p.OrganizationName = name
 	}
+}
+
+// SelectTeam records team as the current organization's, replacing the one selected
+// there before: one team per organization is collected for.
+func (p *Profile) SelectTeam(team string) {
+	p.Team = team
+	if p.OrganizationID == "" || team == "" {
+		return
+	}
+	if p.Teams == nil {
+		p.Teams = map[string]string{}
+	}
+	p.Teams[p.OrganizationID] = team
+}
+
+// CollectedTeams is the team selected in each organization, the current one's included:
+// a profile from before Teams were recorded has its one.
+func (p *Profile) CollectedTeams() map[string]string {
+	teams := make(map[string]string, len(p.Teams)+1)
+	for org, team := range p.Teams {
+		if org != "" && team != "" {
+			teams[org] = team
+		}
+	}
+	if p.OrganizationID != "" && p.Team != "" {
+		teams[p.OrganizationID] = p.Team
+	}
+	return teams
 }
 
 // PinEnvironment records env as the profile's, production as none.
@@ -110,11 +143,14 @@ type Config struct {
 	Harnesses []string
 	// Team is the team the profile selected, kept even while its policy is not stored.
 	Team string
+	// Teams is the team selected in each organization the profile set up, by organization
+	// id: the teams this machine collects for (routing.Collection), Team among them.
+	Teams map[string]string
 
 	// Policy is the profile's team's policy stored in the state directory, else
-	// DefaultPolicy; one for another environment, or unreadable, is NoPolicy. Other
-	// teams' policies, of this organization or another, are the collection's
-	// (routing.Collection): hooks admit a repository by any of them.
+	// DefaultPolicy; one for another environment, or unreadable, is NoPolicy. The other
+	// Teams' policies complete the collection (routing.Collection): hooks admit a
+	// repository by any of them.
 	Policy Policy
 
 	// APIKey is a server key from TERMA_API_KEY that replaces the login credential;
@@ -171,6 +207,7 @@ func Load(dir, stateDir string, o Overrides) (*Config, error) {
 		ProjectID:          firstNonEmpty(o.ProjectID, os.Getenv("TERMA_TEAM_ID")),
 		Harnesses:          profile.Harnesses,
 		Team:               profile.Team,
+		Teams:              profile.CollectedTeams(),
 		Policy:             DefaultPolicy(),
 		APIKey:             strings.TrimSpace(os.Getenv("TERMA_API_KEY")),
 	}

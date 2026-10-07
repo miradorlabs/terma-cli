@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -449,5 +450,24 @@ func TestClaimFromPayloadNamesTheAdmittingTeamsPolicy(t *testing.T) {
 	}
 	if c, ok := claim.Read(stateDir, "thread", time.Now()); !ok || c.ProjectID != "t2" || c.Repository.Origin != "github.com/beta/site" {
 		t.Fatalf("claim = %+v, %v", c, ok)
+	}
+}
+
+// Content consent follows the policy that admits the working copy, not the selected
+// team's: a repository another team lists is in global mode only if that team's policy is.
+func TestConsentFollowsTheAdmittingPolicy(t *testing.T) {
+	t.Parallel()
+	selected := fetched(config.Policy{Mode: config.ModeGlobal, DefaultProjectID: "t1"})
+	other := fetched(listing("github.com/beta/site"))
+	other.TeamID = "t2"
+	e := Env{Policy: selected, Policies: config.Policies{other, selected}, Agents: []string{"codex"}}
+	if c := e.ConsentUnder(&Repo{Policy: other}); c.Global || !slices.Equal(c.Agents, []string{"codex"}) {
+		t.Fatalf("consent in another team's repository = %+v; want its repository mode", c)
+	}
+	if c := e.ConsentUnder(&Repo{Policy: selected}); !c.Global {
+		t.Fatalf("consent under the global policy = %+v", c)
+	}
+	if c := e.ConsentUnder(nil); !c.Global {
+		t.Fatalf("consent outside any repository = %+v; want the selected policy's", c)
 	}
 }

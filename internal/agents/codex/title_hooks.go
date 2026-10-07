@@ -27,7 +27,7 @@ type codexTitleState struct {
 // prompt, so it travels under repliesConsented, and only once captureCodexReplies reports
 // every turn collected: any turn may have named it.
 func captureCodexTitle(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in *codexHookInput, collected bool) {
-	if !collected || e.Spool == nil || !session.ValidID(in.SessionID) || !repliesConsented(e.Consent()) {
+	if !collected || e.Spool == nil || !session.ValidID(in.SessionID) || !repliesConsented(e.ConsentUnder(r)) {
 		return
 	}
 	dir := filepath.Join(e.StateDir, codexTitleStateDir)

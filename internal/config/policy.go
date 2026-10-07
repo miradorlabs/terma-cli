@@ -51,34 +51,6 @@ func ReadPolicy(stateDir, team string) (Policy, bool, error) {
 	return p, true, nil
 }
 
-// ListPolicies is every validated policy stored under stateDir, one per team, in team
-// order; a file that is not one is skipped, as ReadPolicy would refuse it.
-func ListPolicies(stateDir string) ([]Policy, error) {
-	if stateDir == "" {
-		return nil, nil
-	}
-	entries, err := os.ReadDir(filepath.Join(stateDir, PoliciesDir))
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	var out []Policy
-	for _, e := range entries {
-		team, ok := strings.CutSuffix(e.Name(), ".json")
-		if e.IsDir() || !ok {
-			continue
-		}
-		p, ok, err := ReadPolicy(stateDir, team)
-		if err != nil || !ok {
-			continue
-		}
-		out = append(out, p)
-	}
-	return out, nil
-}
-
 // WritePolicy stores p as its team's under stateDir; callers serialize writes
 // (routing.StorePolicy).
 func WritePolicy(stateDir string, p Policy) error {
@@ -192,13 +164,14 @@ func (p Policy) Label() string {
 	if team == "" {
 		team = p.Team()
 	}
-	switch org := firstNonEmpty(p.OrganizationName, p.OrganizationID); {
+	org := firstNonEmpty(p.OrganizationName, p.OrganizationID)
+	switch {
 	case team == "":
 		return org
 	case org == "":
 		return "team " + team
 	}
-	return "team " + team + " of " + firstNonEmpty(p.OrganizationName, p.OrganizationID)
+	return "team " + team + " of " + org
 }
 
 // NoPolicy is what applies to a login until its team's policy is validated: no repository

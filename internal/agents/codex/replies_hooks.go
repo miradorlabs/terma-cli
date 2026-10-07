@@ -22,7 +22,7 @@ const codexReplyMaxText = 16 << 10
 // team's policy collects prompts. It reports whether the whole rollout is read and every
 // turn was collected, which the thread's name waits for.
 func captureCodexReplies(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in *codexHookInput) (collected bool) {
-	if e.Spool == nil || !session.ValidID(in.SessionID) || !repliesConsented(e.Consent()) {
+	if e.Spool == nil || !session.ValidID(in.SessionID) || !repliesConsented(e.ConsentUnder(r)) {
 		return false
 	}
 	dir := filepath.Join(e.StateDir, codexReplyCursorDir)

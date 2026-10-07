@@ -212,6 +212,11 @@ func machineRows(cfg *config.Config) []Row {
 	for _, p := range routing.Conflicts(cfg) {
 		rows = append(rows, Row{"Conflict", ConflictText(p)})
 	}
+	for _, p := range routing.Unvalidated(cfg) {
+		if p.TeamID != cfg.Policy.TeamID {
+			rows = append(rows, Row{"Also", p.Label() + ": no validated collection policy on this machine, so nothing is collected for it — run `terma setup --org " + p.OrganizationID + "`"})
+		}
+	}
 	// Name the backend whenever it is not production, by environment or by host overrides.
 	switch {
 	case cfg.Environment != config.EnvProd:
