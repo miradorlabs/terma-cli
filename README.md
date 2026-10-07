@@ -152,8 +152,9 @@ adds a file. On the latest release, `terma update` does just that refresh.
 
 ## Scripted and headless setup
 
-Every question `terma setup` asks has a flag, and with `--yes`, or with no terminal to ask
-on, it asks nothing:
+Every question `terma setup` asks has a flag. With `--yes`, or with no terminal to ask on,
+it asks nothing about the organization, agents or updates; name the team with `--team` the
+first time, when your organization has several:
 
 ```bash
 terma setup --org acme --team platform --harness claude,codex --yes
@@ -166,7 +167,8 @@ terma setup --org acme --team platform --harness claude,codex --yes
 - `--harness <agents>` records those agents (`claude`, `codex`); with `--yes` and no
   `--harness`, setup records the agents recorded before and every supported agent
   installed on this machine.
-- `--yes` skips the prompts and keeps the current organization and update choice.
+- `--yes` skips the browser prompt and the organization, agents and updates questions,
+  keeping the current organization and update choice.
 - `--no-browser` prints the sign-in URL instead of opening a browser.
 - `--relay-service off` starts the relay on demand from hooks instead of as a background
   service; `--relay-addr <host:port>` moves it off a loopback port another program holds.

@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"errors"
 	"io"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -24,6 +25,7 @@ func TestSetupUpdates(t *testing.T) {
 		version   string
 		exe       string
 		goos      string
+		skipOn    string
 		saved     bool
 		ask       updateAsker
 		wantAsked bool
@@ -47,12 +49,20 @@ func TestSetupUpdates(t *testing.T) {
 			wantLine: "through Homebrew: terma says when one is out, and `brew upgrade terma` installs it"},
 		{name: "npm", exe: "/usr/local/lib/node_modules/@miradorlabs/terma/vendor/terma", ask: answer(true),
 			wantLine: "through npm: terma says when one is out, and `npm install -g @miradorlabs/terma@latest` installs it"},
+		// On Windows terma does not tell a project's dependency from a global install.
+		{name: "npm, a project's dependency", exe: "/srv/app/node_modules/@miradorlabs/terma/vendor/terma", ask: answer(true), skipOn: "windows",
+			wantLine: "through npm: terma says when one is out, and `npm install @miradorlabs/terma@latest` in /srv/app installs it"},
 		{name: "development build", version: "dev", ask: answer(true),
 			wantLine: "none for a development build: `terma update --force` installs the latest release"},
+		{name: "development build on Windows", version: "dev", goos: "windows", ask: answer(true),
+			wantLine: "none for a development build: download a release from GitHub Releases"},
 		{name: "Windows", goos: "windows", ask: answer(true),
 			wantLine: "on request: terma says when one is out, and you download it from GitHub Releases"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			if runtime.GOOS == tc.skipOn {
+				t.Skip("not on " + tc.skipOn)
+			}
 			dir := t.TempDir()
 			if tc.saved {
 				if err := selfupdate.SavePreferences(dir, selfupdate.Preferences{Auto: true}); err != nil {

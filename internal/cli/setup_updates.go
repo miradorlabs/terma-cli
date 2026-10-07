@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
+	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
 // updateAsker asks whether terma installs new releases itself, auto marked as the current
@@ -50,14 +51,21 @@ func pickUpdates(cmd *cobra.Command, auto bool) (bool, error) {
 // can replace in place has the choice; ask makes it, and nil keeps the saved one.
 func setupUpdates(ui *setupUI, dir, version, exe, goos string, ask updateAsker) error {
 	if m, ok := selfupdate.ManagedBy(exe); ok {
-		ui.Summary("Updates", fmt.Sprintf("through %s: terma says when one is out, and `%s` installs it", m.Name, m.Command))
+		where := ""
+		if m.Project != "" {
+			where = " in " + output.TildePath(m.Project)
+		}
+		ui.Summary("Updates", fmt.Sprintf("through %s: terma says when one is out, and `%s`%s installs it", m.Name, m.Command, where))
 		return nil
 	}
-	if !selfupdate.IsRelease(version) {
+	switch {
+	case !selfupdate.IsRelease(version) && goos == "windows":
+		ui.Summary("Updates", "none for a development build: download a release from GitHub Releases")
+		return nil
+	case !selfupdate.IsRelease(version):
 		ui.Summary("Updates", "none for a development build: `terma update --force` installs the latest release")
 		return nil
-	}
-	if goos == "windows" {
+	case goos == "windows":
 		ui.Summary("Updates", "on request: terma says when one is out, and you download it from GitHub Releases")
 		return nil
 	}
