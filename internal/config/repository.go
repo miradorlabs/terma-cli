@@ -46,3 +46,36 @@ func validEntry(e string) bool {
 	parts := strings.Split(strings.TrimSpace(e), "/")
 	return len(parts) >= 3 && !slices.Contains(parts, "")
 }
+
+// Policies are the policies one machine collects under, in the order they are asked
+// (routing.Collection builds them): Admitting takes the first that admits a repository.
+type Policies []Policy
+
+// Admitting is the policy that collects r: the first whose repository list names it, else
+// the first global one, which collects every session. Repository mode is asked first across
+// every policy, so a repository a team lists goes to that team even while another team
+// collects everything on the machine.
+func (ps Policies) Admitting(r Repository) (Policy, bool) {
+	for _, p := range ps {
+		if !p.Global() && p.Admits(r) {
+			return p, true
+		}
+	}
+	return ps.Global()
+}
+
+// Global is the global policy among ps, which collects every session the repository-mode
+// ones do not place; false when none is.
+func (ps Policies) Global() (Policy, bool) {
+	for _, p := range ps {
+		if p.Global() {
+			return p, true
+		}
+	}
+	return Policy{}, false
+}
+
+// Validated reports whether any of ps is a fetched policy.
+func (ps Policies) Validated() bool {
+	return slices.ContainsFunc(ps, Policy.Validated)
+}

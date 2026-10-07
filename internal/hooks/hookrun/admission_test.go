@@ -2,8 +2,10 @@ package hookrun
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -125,7 +127,7 @@ func TestAHookOutsideTheListOnlyMarksTheSession(t *testing.T) {
 	if err := editFile(ctx, env(`{"session_id":"s1","cwd":"`+hookruntest.InJSON(root)+`","tool_name":"Edit","tool_input":{"file_path":"`+hookruntest.InJSON(filepath.Join(root, "a.txt"))+`"}}`)); err != nil {
 		t.Fatal(err)
 	}
-	ClaimFromPayload(ctx, env(""), PayloadSession{ID: "s1", Cwd: root}, "claude-code")
+	claimFromPayload(ctx, env(""), PayloadSession{ID: "s1", Cwd: root}, "claude-code")
 	if _, err := gitx.Git(ctx, root, "add", "a.txt"); err != nil {
 		t.Fatal(err)
 	}
@@ -202,10 +204,10 @@ func TestATurnInAnUnlistedRepositoryMarksTheClaim(t *testing.T) {
 	pol := listing("github.com/acme/work")
 	ctx := t.Context()
 	at := time.Now()
-	if !ClaimFromPayload(ctx, Env{StateDir: stateDir, Now: at, Cwd: work, Team: "t1", Policy: pol}, PayloadSession{ID: "thread", Cwd: work}, "codex") {
+	if !claimFromPayload(ctx, Env{StateDir: stateDir, Now: at, Cwd: work, Team: "t1", Policy: pol}, PayloadSession{ID: "thread", Cwd: work}, "codex") {
 		t.Fatal("the admitted turn was not claimed")
 	}
-	if ClaimFromPayload(ctx, Env{StateDir: stateDir, Now: at.Add(time.Minute), Cwd: personal, Team: "t1", Policy: pol}, PayloadSession{ID: "thread", Cwd: personal}, "codex") {
+	if claimFromPayload(ctx, Env{StateDir: stateDir, Now: at.Add(time.Minute), Cwd: personal, Team: "t1", Policy: pol}, PayloadSession{ID: "thread", Cwd: personal}, "codex") {
 		t.Fatal("the unlisted turn claimed")
 	}
 	c, ok := claim.Read(stateDir, "thread", at.Add(time.Minute))
@@ -227,11 +229,11 @@ func TestAMarkedSessionIsClaimedInAListedRepository(t *testing.T) {
 	pol := fetched(listing("github.com/acme/work"))
 	ctx := t.Context()
 	at := time.Now()
-	if ClaimFromPayload(ctx, Env{StateDir: stateDir, Now: at, Cwd: personal, Team: "t1", Policy: pol}, PayloadSession{ID: "thread", Cwd: personal}, "codex") {
+	if claimFromPayload(ctx, Env{StateDir: stateDir, Now: at, Cwd: personal, Team: "t1", Policy: pol}, PayloadSession{ID: "thread", Cwd: personal}, "codex") {
 		t.Fatal("the unlisted turn reported a claim")
 	}
 	markOf(t, stateDir, "thread")
-	if !ClaimFromPayload(ctx, Env{StateDir: stateDir, Now: at.Add(time.Minute), Cwd: work, Team: "t1", Policy: pol}, PayloadSession{ID: "thread", Cwd: work}, "codex") {
+	if !claimFromPayload(ctx, Env{StateDir: stateDir, Now: at.Add(time.Minute), Cwd: work, Team: "t1", Policy: pol}, PayloadSession{ID: "thread", Cwd: work}, "codex") {
 		t.Fatal("the listed turn was not claimed")
 	}
 	c, ok := claim.Read(stateDir, "thread", at.Add(time.Minute))
@@ -250,7 +252,7 @@ func TestWhereAHookMarks(t *testing.T) {
 	ctx := t.Context()
 	listed := fetched(listing("github.com/acme/work"))
 	mark := func(dir, sid, agent string, pol config.Policy) {
-		ClaimFromPayload(ctx, Env{StateDir: stateDir, Now: time.Now(), Cwd: dir, Team: "t1", Policy: pol}, PayloadSession{ID: sid, AgentID: agent, Cwd: dir}, "claude-code")
+		claimFromPayload(ctx, Env{StateDir: stateDir, Now: time.Now(), Cwd: dir, Team: "t1", Policy: pol}, PayloadSession{ID: sid, AgentID: agent, Cwd: dir}, "claude-code")
 	}
 	mark(outside, "outside", "", listed)
 	markOf(t, stateDir, "outside")
@@ -283,7 +285,7 @@ func TestAStalePolicyStartsARefresh(t *testing.T) {
 	otherTeam.TeamID = "t2"
 	flushes := 0
 	hook := func(sid string, pol config.Policy, now time.Time) bool {
-		return ClaimFromPayload(ctx, Env{StateDir: stateDir, Now: now, Cwd: personal, Team: "t1", Policy: pol, Flush: func() { flushes++ }}, PayloadSession{ID: sid, Cwd: personal}, "claude-code")
+		return claimFromPayload(ctx, Env{StateDir: stateDir, Now: now, Cwd: personal, Team: "t1", Policy: pol, Flush: func() { flushes++ }}, PayloadSession{ID: sid, Cwd: personal}, "claude-code")
 	}
 	hook("s1", stale, at)
 	markOf(t, stateDir, "s1")
@@ -341,9 +343,9 @@ func BenchmarkClaimFromPayloadUnlisted(b *testing.B) {
 	}
 	env := Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Team: "t1", Policy: fetched(listing("github.com/acme/work"))}
 	s := PayloadSession{ID: "bench", Cwd: root}
-	ClaimFromPayload(b.Context(), env, s, "claude-code")
+	claimFromPayload(b.Context(), env, s, "claude-code")
 	for b.Loop() {
-		ClaimFromPayload(b.Context(), env, s, "claude-code")
+		claimFromPayload(b.Context(), env, s, "claude-code")
 	}
 }
 
@@ -360,8 +362,135 @@ func TestAdmitsJudgesTheDirectoryItIsGiven(t *testing.T) {
 	for dir, want := range map[string]bool{
 		listed: true, filepath.Join(listed, "sub"): true, other: false, filepath.Join(t.TempDir(), "gone"): false,
 	} {
-		if got := e.Admits(context.Background(), dir); got != want {
-			t.Errorf("Admits(%s) = %v, want %v", dir, got, want)
+		if got := e.AdmitsUnder(context.Background(), nil, dir); got != want {
+			t.Errorf("AdmitsUnder(%s) = %v, want %v", dir, got, want)
 		}
 	}
+}
+
+// claimFromPayload is ClaimFromPayload's answer alone: whether the session was claimed.
+func claimFromPayload(ctx context.Context, env Env, s PayloadSession, tool string) bool {
+	_, ok := ClaimFromPayload(ctx, env, s, tool)
+	return ok
+}
+
+// A repository another organization's team lists is admitted by that team's policy: its
+// sessions report to that team, under that policy, while the selected team's repositories
+// keep reporting to the selected team. A repository no list names goes to the one global
+// policy, and to nothing without one.
+func TestARepositoryIsAdmittedByWhicheverTeamListsIt(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	work := namedRepo(t, "work", "git@github.com:acme/work.git")
+	site := namedRepo(t, "site", "git@github.com:beta/site.git")
+	personal := namedRepo(t, "personal", "git@github.com:me/personal.git")
+	selected := fetched(listing("github.com/acme/work"))
+	selected.OrganizationID = "org_a"
+	other := fetched(listing("github.com/beta/site"))
+	other.TeamID, other.OrganizationID = "t2", "org_b"
+	global := fetched(config.Policy{Mode: config.ModeGlobal, DefaultProjectID: "t3"})
+	global.TeamID, global.OrganizationID = "t3", "org_b"
+	env := func(cwd string, policies ...config.Policy) Env {
+		return Env{StateDir: t.TempDir(), Now: time.Now(), Cwd: cwd, Team: "t1", Policy: selected, Policies: policies}
+	}
+	for _, tc := range []struct {
+		name, cwd string
+		policies  []config.Policy
+		team      string
+		global    bool
+	}{
+		{"selected team's repository", work, []config.Policy{selected, other}, "t1", false},
+		{"another organization's repository", site, []config.Policy{selected, other}, "t2", false},
+		{"unlisted, no global policy", personal, []config.Policy{selected, other}, "", false},
+		{"unlisted, global policy", personal, []config.Policy{selected, other, global}, "t3", true},
+		{"listed, global policy present", site, []config.Policy{selected, other, global}, "t2", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := env(tc.cwd, tc.policies...)
+			r, err := e.Repo(ctx)
+			if tc.team == "" {
+				if !errors.Is(err, ErrNotAdmitted) {
+					t.Fatalf("admitted %+v, %v", r, err)
+				}
+				return
+			}
+			if err != nil || r.ProjectID != tc.team || r.Policy.TeamID != tc.team || r.Policy.Global() != tc.global {
+				t.Fatalf("Repo = %+v, %v; want team %s", r, err, tc.team)
+			}
+			if ev := e.stamp(r, spool.Event{SessionID: "s"}); ev.Global != tc.global || ev.Attrs[AttrProjectID] != tc.team {
+				t.Fatalf("stamped %+v", ev)
+			}
+			if !e.AdmitsUnder(ctx, r, tc.cwd) || !e.AdmitsUnder(ctx, nil, tc.cwd) {
+				t.Fatal("AdmitsUnder disagrees with Repo")
+			}
+		})
+	}
+	// What a session reports from another checkout is admitted only when the collection
+	// gives that checkout to the session's own team: another team's repository is never
+	// stamped with this team, not even by a global policy, which takes what no listing names.
+	scratch := namedRepo(t, "scratch", "git@github.com:me/scratch.git")
+	if r, err := env(site, selected, other).Repo(ctx); err != nil || e2eAdmits(ctx, env(site, selected, other), r, work) {
+		t.Fatalf("a session in team t2's repository had the selected team's repository admitted: %+v, %v", r, err)
+	}
+	underGlobal := env(personal, selected, other, global)
+	r, err := underGlobal.Repo(ctx)
+	if err != nil || r.ProjectID != "t3" {
+		t.Fatalf("the global policy did not take the unlisted repository: %+v, %v", r, err)
+	}
+	if e2eAdmits(ctx, underGlobal, r, site) || e2eAdmits(ctx, underGlobal, r, work) {
+		t.Fatal("a session under the global policy was given another team's listed repository")
+	}
+	if !e2eAdmits(ctx, underGlobal, r, scratch) {
+		t.Fatal("a session under the global policy was refused an unlisted repository")
+	}
+	// With no Policies, Policy alone admits, as before.
+	if r, err := env(work).Repo(ctx); err != nil || r.ProjectID != "t1" {
+		t.Fatalf("Policy alone: %+v, %v", r, err)
+	}
+	if _, err := env(site).Repo(ctx); !errors.Is(err, ErrNotAdmitted) {
+		t.Fatalf("Policy alone admitted another team's repository: %v", err)
+	}
+}
+
+// A session claimed from its payload in another organization's repository is claimed for
+// that team, and the policy it was claimed under is that team's.
+func TestClaimFromPayloadNamesTheAdmittingTeamsPolicy(t *testing.T) {
+	t.Parallel()
+	stateDir := t.TempDir()
+	site := namedRepo(t, "site", "git@github.com:beta/site.git")
+	selected := fetched(listing("github.com/acme/work"))
+	other := fetched(listing("github.com/beta/site"))
+	other.TeamID, other.OrganizationID = "t2", "org_b"
+	env := Env{StateDir: stateDir, Now: time.Now(), Cwd: site, Team: "t1", Policy: selected, Policies: config.Policies{selected, other}}
+	under, ok := ClaimFromPayload(t.Context(), env, PayloadSession{ID: "thread", Cwd: site}, "codex")
+	if !ok || under.TeamID != "t2" {
+		t.Fatalf("claimed = %v under %+v", ok, under)
+	}
+	if c, ok := claim.Read(stateDir, "thread", time.Now()); !ok || c.ProjectID != "t2" || c.Repository.Origin != "github.com/beta/site" {
+		t.Fatalf("claim = %+v, %v", c, ok)
+	}
+}
+
+// Content consent follows the policy that admits the working copy, not the selected
+// team's: a repository another team lists is in global mode only if that team's policy is.
+func TestConsentFollowsTheAdmittingPolicy(t *testing.T) {
+	t.Parallel()
+	selected := fetched(config.Policy{Mode: config.ModeGlobal, DefaultProjectID: "t1"})
+	other := fetched(listing("github.com/beta/site"))
+	other.TeamID = "t2"
+	e := Env{Policy: selected, Policies: config.Policies{other, selected}, Agents: []string{"codex"}}
+	if c := e.ConsentUnder(&Repo{Policy: other}); c.Global || !slices.Equal(c.Agents, []string{"codex"}) {
+		t.Fatalf("consent in another team's repository = %+v; want its repository mode", c)
+	}
+	if c := e.ConsentUnder(&Repo{Policy: selected}); !c.Global {
+		t.Fatalf("consent under the global policy = %+v", c)
+	}
+	if c := e.ConsentUnder(nil); !c.Global {
+		t.Fatalf("consent outside any repository = %+v; want the selected policy's", c)
+	}
+}
+
+// e2eAdmits is AdmitsUnder for a session in r asked about the checkout at dir.
+func e2eAdmits(ctx context.Context, e Env, r *Repo, dir string) bool {
+	return e.AdmitsUnder(ctx, r, dir)
 }

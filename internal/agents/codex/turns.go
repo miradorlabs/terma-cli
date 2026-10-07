@@ -6,15 +6,17 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
-// turnAdmission judges a rollout turn by its own working directory, once per directory: a
-// thread resumed in a listed repository still holds its earlier turns, which a hook there
-// reads, and those must stay on the machine when the team does not collect where they ran.
-func turnAdmission(ctx context.Context, e hookrun.Env) func(cwd string) bool {
+// turnAdmission judges a rollout turn by its own working directory, once per directory,
+// under the policy of r, the checkout the thread runs in now: a thread resumed in a listed
+// repository still holds its earlier turns, which a hook there reads and stamps with r's
+// team, and those must stay on the machine when that team does not collect where they ran,
+// whether another team does or none.
+func turnAdmission(ctx context.Context, e hookrun.Env, r *hookrun.Repo) func(cwd string) bool {
 	judged := map[string]bool{}
 	return func(cwd string) bool {
 		ok, seen := judged[cwd]
 		if !seen {
-			ok = cwd != "" && e.Admits(ctx, cwd)
+			ok = cwd != "" && e.AdmitsUnder(ctx, r, cwd)
 			judged[cwd] = ok
 		}
 		return ok

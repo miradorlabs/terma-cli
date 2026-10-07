@@ -14,6 +14,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/procinfo"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/repohooks"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -76,27 +77,31 @@ func (app *App) hookDeps() dispatch.Deps {
 	}
 }
 
-// hookProfile is one small local read. Hooks run on the last validated policy even once
-// it has expired, so a refresh outage stops no claim: what leaves is decided downstream,
-// under the policy in force then.
+// hookProfile is one small local read: the selected team's policy and every other stored
+// for this environment, of this organization or another, by which a repository is admitted.
+// Hooks run on the last validated policy even once it has expired, so a refresh outage
+// stops no claim: what leaves is decided downstream, under the policy in force then.
 func (app *App) hookProfile() dispatch.Profile {
 	cfg, err := config.Load(app.dir, app.stateDir, config.Overrides{})
 	if err != nil {
 		return dispatch.Profile{Policy: config.NoPolicy("", "")}
 	}
-	return dispatch.Profile{Team: cfg.Policy.TeamID, Agents: cfg.Harnesses, Policy: cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL)}
+	return dispatch.Profile{Team: cfg.Policy.TeamID, Agents: cfg.Harnesses,
+		Policy: cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL), Policies: routing.Collection(cfg)}
 }
 
-// hookPolicy is the collection policy while it is validated and fresh, else NoPolicy.
+// hookPolicy is the policy that collects every session on this machine, the relay's
+// catch-all, while it is validated and fresh, else NoPolicy.
 func (app *App) hookPolicy() config.Policy {
 	cfg, err := config.Load(app.dir, app.stateDir, config.Overrides{})
 	if err != nil {
 		return config.NoPolicy("", "")
 	}
-	if !cfg.Policy.Validated() || cfg.Policy.Expired(time.Now()) {
+	global, ok := routing.Collection(cfg).Global()
+	if !ok || global.Expired(time.Now()) {
 		return config.NoPolicy(cfg.OrganizationID, cfg.AuthURL)
 	}
-	return cfg.Policy
+	return global
 }
 
 // openSpool returns nil when the state directory cannot be used: a nil spool drops events,

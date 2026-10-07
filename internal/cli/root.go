@@ -270,8 +270,14 @@ func (app *App) Execute() int {
 }
 
 func (app *App) loadConfig() (*config.Config, error) {
+	return app.loadProfile(app.flags.profile)
+}
+
+// loadProfile is the named profile's configuration under this command's flags; "" is the
+// active profile.
+func (app *App) loadProfile(name string) (*config.Config, error) {
 	return config.Load(app.dir, app.stateDir, config.Overrides{
-		Profile:   app.flags.profile,
+		Profile:   name,
 		Env:       app.flags.env,
 		APIURL:    app.flags.apiURL,
 		AuthURL:   app.flags.authURL,

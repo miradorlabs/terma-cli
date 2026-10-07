@@ -26,7 +26,7 @@ type claudeTitleState struct {
 // captureClaudeTitle spools the session's name when new or renamed. It restates the first
 // prompt, so it travels under titleConsented and, at delivery, the policy's prompt switch.
 func captureClaudeTitle(e hookrun.Env, r *hookrun.Repo, in *claudeHookInput) {
-	if e.Spool == nil || in.TranscriptPath == "" || !session.ValidID(in.SessionID) || !titleConsented(e.Consent()) {
+	if e.Spool == nil || in.TranscriptPath == "" || !session.ValidID(in.SessionID) || !titleConsented(e.ConsentUnder(r)) {
 		return
 	}
 	dir := filepath.Join(e.StateDir, claudeTitleStateDir)
@@ -57,7 +57,7 @@ func captureClaudeTitle(e hookrun.Env, r *hookrun.Repo, in *claudeHookInput) {
 		semconv.GenAIMainAgentNameKey: claudeTool, semconv.TermaEvidenceSourceKey: sourceClaudeTranscript,
 		semconv.TermaSessionTitleKey: title, hookrun.AttrProjectID: r.ProjectID,
 	}
-	if err := e.Spool.Append(spool.Event{Time: e.Time(), Name: semconv.TermaSessionTitleEvent, SessionID: in.SessionID, Repository: r.Repository, Global: e.Policy.Global(), Attrs: attrs}); err != nil {
+	if err := e.Spool.Append(spool.Event{Time: e.Time(), Name: semconv.TermaSessionTitleEvent, SessionID: in.SessionID, Repository: r.Repository, Global: r.Policy.Global(), Attrs: attrs}); err != nil {
 		e.Logf("claude title: %v", err)
 		return
 	}

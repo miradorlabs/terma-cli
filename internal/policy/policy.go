@@ -25,7 +25,8 @@ type Source struct {
 }
 
 // Fetch asks cfg's organization for the collection policy of cfg's project, else its
-// default team.
+// default team. A team of another organization than the profile's active one is fetched
+// with that organization's stored credential (routing.ScopeToTeam sets cfg up so).
 func (s Source) Fetch(ctx context.Context, cfg *config.Config) (config.Policy, error) {
 	var client *api.Client
 	// Only an explicit offline fixture skips the developer's login.
@@ -40,7 +41,15 @@ func (s Source) Fetch(ctx context.Context, cfg *config.Config) (config.Policy, e
 			cfg.OrganizationID = cred.OrganizationID
 		}
 		if cfg.OrganizationID != cred.OrganizationID {
-			return config.Policy{}, errors.New("collection policy login belongs to another organization — run `terma setup`")
+			// A team of another organization in this machine's collection: that
+			// organization's own credential, never the active one's.
+			cred, err = auth.LoadCredentialFor(cfg.Dir, cfg.ProfileName, cfg.OrganizationID)
+			if errors.Is(err, auth.ErrNotLoggedIn) {
+				return config.Policy{}, errors.New("collection policy login belongs to another organization — run `terma setup --org`")
+			}
+			if err != nil {
+				return config.Policy{}, err
+			}
 		}
 		// Policy always uses the developer login, even while TERMA_API_KEY is set.
 		policyConfig := *cfg
@@ -55,6 +64,7 @@ func (s Source) Fetch(ctx context.Context, cfg *config.Config) (config.Policy, e
 		return config.Policy{}, fmt.Errorf("fetch the organization's collection policy: %w", err)
 	}
 	pol.OrganizationID, pol.AuthURL = cfg.OrganizationID, cfg.AuthURL
+	pol.OrganizationName, pol.TeamName = cfg.OrganizationName, cfg.ProjectName
 	pol.TeamID = cmp.Or(cfg.ProjectID, pol.DefaultProjectID)
 	if pol.Global() && config.PolicyStub() == "" {
 		pol.DefaultProjectID = cfg.ProjectID
@@ -85,9 +95,8 @@ func (s Source) Current(ctx context.Context, cfg *config.Config, team string) (c
 	if ok && time.Since(cached.FetchedAt) < RefreshInterval {
 		return cached, nil
 	}
-	scoped := *cfg
-	scoped.ProjectID = team
-	if err := s.Refresh(ctx, &scoped); err != nil {
+	scoped := routing.ScopeToTeam(cfg, team)
+	if err := s.Refresh(ctx, scoped); err != nil {
 		if ok && !cached.Expired(time.Now()) {
 			return cached, nil
 		}

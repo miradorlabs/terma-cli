@@ -18,6 +18,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/relay/shape"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
 // relayDeps are what the relay reaches through the command line.
@@ -34,6 +35,7 @@ func (app *App) relayDeps() daemon.Deps {
 		SendHeartbeat: app.relayHeartbeatSend,
 		HookPolicy:    app.hookPolicy,
 		LoadConfig:    app.loadConfig,
+		LoadProfile:   app.loadProfile,
 		RefreshPolicy: pols.Refresh,
 	}
 }
@@ -48,10 +50,11 @@ func (app *App) globalMode() globalmode.Machine {
 	return globalmode.Machine{ConfigDir: app.dir, Agents: app.agents, Terma: app.hookExecutable, ManagedRoot: app.managedRoot}
 }
 
+// createProjectKey mints projectID's key under the organization whose team it is, which
+// may not be the profile's (routing.ScopeToTeam).
 func (app *App) createProjectKey(ctx context.Context, cfg *config.Config, projectID string) (string, error) {
-	scoped := *cfg
-	scoped.ProjectID = projectID
-	client, err := app.newClient(&scoped)
+	scoped := routing.ScopeToTeam(cfg, projectID)
+	client, err := app.newClient(scoped)
 	if err != nil {
 		return "", err
 	}

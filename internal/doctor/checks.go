@@ -250,6 +250,47 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 	return Check{Status: Pass, Detail: "through the local relay on " + addr + " (" + state + "); it forwards the sessions your team's policy collects"}
 }
 
+// Admitting is the policy hooks apply to the working copy whose git directory is gitDir:
+// the one of collected, this machine's collection, that admits it (config.Policies.Admitting),
+// which may be another team's than the selected one, of this organization or another; the
+// selected team's policy where none does, or outside git.
+func Admitting(cfg *config.Config, collected config.Policies, gitDir string) config.Policy {
+	selected := cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL)
+	if gitDir == "" {
+		return selected
+	}
+	if p, ok := collected.Admitting(config.Repository{Origin: gitx.RepositoryFS(gitDir)}); ok {
+		return p
+	}
+	return selected
+}
+
+// ForTeam names, on a passing repository check, the team that collects the repository
+// when it is not the selected one: another team's listing, of this or another organization.
+// A repository other teams of the collection list too is named as such: the first listing wins.
+func ForTeam(c Check, collected config.Policies, gitDir string, pol, selected config.Policy) Check {
+	if c.Status != Pass || !pol.Validated() {
+		return c
+	}
+	if pol.TeamID != selected.TeamID {
+		c.Detail += ", collected for " + pol.Label()
+	}
+	if gitDir == "" || pol.Global() {
+		return c
+	}
+	id := config.Repository{Origin: gitx.RepositoryFS(gitDir)}
+	var also []string
+	for _, p := range collected {
+		if p.TeamID != pol.TeamID && !p.Global() && p.Admits(id) {
+			also = append(also, p.Label())
+		}
+	}
+	if len(also) > 0 {
+		c.Detail += "; also listed by " + strings.Join(also, " and ") + ", whose listing comes second"
+	}
+	return c
+}
+
 // NoRepositoriesStep is what a developer whose team lists no repositories is told.
 const NoRepositoriesStep = "Ask a team admin to list repositories, or to collect every session, in the Terma web app; until then, nothing is collected."
 

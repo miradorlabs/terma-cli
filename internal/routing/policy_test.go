@@ -3,6 +3,7 @@ package routing
 import (
 	"bytes"
 	"os"
+	"slices"
 	"testing"
 	"time"
 
@@ -10,7 +11,8 @@ import (
 )
 
 // Each team's sessions follow that team's stored policy: never another team's, another
-// login's, or an expired one.
+// environment's, or an expired one. Another organization's is that team's own: one
+// machine collects for several organizations.
 func TestEffectivePolicyIsolatesTeamsAndExpires(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -31,8 +33,13 @@ func TestEffectivePolicyIsolatesTeamsAndExpires(t *testing.T) {
 	}
 	other := b
 	other.OrganizationID = "other"
-	if !EffectivePolicy(dir, other, "team-b").CollectsNothing {
-		t.Fatal("a policy crossed organizations")
+	if got := EffectivePolicy(dir, other, "team-b"); got.CollectsNothing || got.OrganizationID != "org" {
+		t.Fatalf("another organization's team lost its own policy: %+v", got)
+	}
+	elsewhere := b
+	elsewhere.AuthURL = "https://prod.example"
+	if !EffectivePolicy(dir, elsewhere, "team-b").CollectsNothing {
+		t.Fatal("a policy crossed environments")
 	}
 	a.FetchedAt = time.Now().Add(-config.MaxPolicyAge - time.Hour)
 	if err := config.WritePolicy(dir, a); err != nil {
@@ -110,5 +117,199 @@ func TestEachTeamKeepsItsPolicyAndEachProfileItsTeam(t *testing.T) {
 	}
 	if after, err := os.ReadFile(config.Path(dir)); err != nil || !bytes.Equal(after, settings) {
 		t.Fatalf("a refresh rewrote config.json:\n%s", after)
+	}
+}
+
+// One machine collects for every organization it is signed into: the collection is the
+// selected team's policy first, then the team selected in each other organization, with
+// one global policy honoured — the selected team's, else the only one — and the rest
+// conflicts. A policy file of a team no longer selected anywhere does not count.
+func TestCollectionSpansOrganizationsAndHonoursOneGlobalPolicy(t *testing.T) {
+	t.Setenv("TERMA_POLICY_STUB", "")
+	dir := t.TempDir()
+	now := time.Now()
+	repo := func(team, org string, repos ...string) config.Policy {
+		return config.Policy{Mode: config.ModeRepo, TeamID: team, OrganizationID: org, AuthURL: "https://auth.example", Repositories: repos, FetchedAt: now}
+	}
+	global := func(team, org string) config.Policy {
+		return config.Policy{Mode: config.ModeGlobal, TeamID: team, DefaultProjectID: team, OrganizationID: org, AuthURL: "https://auth.example", FetchedAt: now}
+	}
+	elsewhere := repo("tz", "org_z", "github.com/zeta/app")
+	elsewhere.AuthURL = "https://prod.example"
+	for _, p := range []config.Policy{repo("ta", "org_a", "github.com/acme/app"), repo("tb", "org_b", "github.com/beta/site"), global("tg", "org_g"), elsewhere,
+		repo("old", "org_a", "github.com/acme/old")} {
+		if err := config.WritePolicy(dir, p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cfg := &config.Config{Dir: dir, StateDir: dir, OrganizationID: "org_a", AuthURL: "https://auth.example",
+		Teams: map[string]string{"org_a": "ta", "org_b": "tb", "org_g": "tg", "org_z": "tz"}}
+	cfg.Policy = repo("ta", "org_a", "github.com/acme/app")
+	teams := func(ps config.Policies) []string {
+		var out []string
+		for _, p := range ps {
+			out = append(out, p.TeamID)
+		}
+		return out
+	}
+	if got := teams(Collection(cfg)); !slices.Equal(got, []string{"ta", "tb", "tg"}) {
+		t.Fatalf("Collection = %v; want the selected team, the other listing, then the one global policy", got)
+	}
+	if got := Collect(cfg).Conflicts; len(got) != 0 {
+		t.Fatalf("a lone global policy is a conflict: %v", teams(got))
+	}
+	if got := Collect(cfg).Unvalidated; len(got) != 1 || got[0].TeamID != "tz" {
+		t.Fatalf("Unvalidated = %+v; want the other environment's team", got)
+	}
+	if p, ok := Collection(cfg).Admitting(config.Repository{Origin: "github.com/beta/site"}); !ok || p.TeamID != "tb" || p.OrganizationID != "org_b" {
+		t.Fatalf("another organization's repository went to %+v, %v", p, ok)
+	}
+	// "old", org_a's team before ta, keeps its file but is selected nowhere: it does not collect.
+	if p, ok := Collection(cfg).Admitting(config.Repository{Origin: "github.com/acme/old"}); !ok || p.TeamID != "tg" {
+		t.Fatalf("a team switched away from was revived from its policy file: %+v, %v (want the honoured global policy)", p, ok)
+	}
+
+	// A second unselected global policy: neither is honoured, both are conflicts.
+	if err := config.WritePolicy(dir, global("th", "org_h")); err != nil {
+		t.Fatal(err)
+	}
+	cfg.Teams["org_h"] = "th"
+	if got := teams(Collection(cfg)); !slices.Equal(got, []string{"ta", "tb"}) {
+		t.Fatalf("Collection with two global policies = %v", got)
+	}
+	if got := teams(Collect(cfg).Conflicts); !slices.Equal(got, []string{"tg", "th"}) {
+		t.Fatalf("Conflicts = %v", got)
+	}
+
+	// The selected team's global policy is the one honoured; every other global one conflicts.
+	cfg.Policy = global("ta", "org_a")
+	if err := config.WritePolicy(dir, cfg.Policy); err != nil {
+		t.Fatal(err)
+	}
+	if got := teams(Collection(cfg)); !slices.Equal(got, []string{"tb", "ta"}) {
+		t.Fatalf("Collection under a selected global policy = %v", got)
+	}
+	if got := teams(Collect(cfg).Conflicts); !slices.Equal(got, []string{"tg", "th"}) {
+		t.Fatalf("Conflicts under a selected global policy = %v", got)
+	}
+	// Nothing selected: the other listings still collect, and no global policy is honoured.
+	cfg.Policy = config.NoPolicy("org_a", "https://auth.example")
+	if got := teams(Collection(cfg)); !slices.Equal(got, []string{"tb"}) {
+		t.Fatalf("Collection with no selected team = %v", got)
+	}
+	if got := teams(Collect(cfg).Conflicts); !slices.Equal(got, []string{"ta", "tg", "th"}) {
+		t.Fatalf("Conflicts with no selected team = %v", got)
+	}
+	// A single-organization machine from before Teams were recorded collects as it did.
+	single := &config.Config{Dir: dir, StateDir: dir, OrganizationID: "org_a", AuthURL: "https://auth.example", Policy: repo("ta", "org_a", "github.com/acme/app")}
+	if got := teams(Collection(single)); !slices.Equal(got, []string{"ta"}) {
+		t.Fatalf("Collection with no Teams = %v", got)
+	}
+}
+
+// A fetch, mint or refresh for a team runs under the organization whose team it is, with
+// the names setup stored, so another organization's credential and labels are used.
+func TestScopeToTeamTakesTheTeamsOrganization(t *testing.T) {
+	t.Setenv("TERMA_POLICY_STUB", "")
+	dir := t.TempDir()
+	stored := config.Policy{Mode: config.ModeRepo, TeamID: "tb", OrganizationID: "org_b", OrganizationName: "Beta", TeamName: "Web",
+		AuthURL: "https://auth.example", FetchedAt: time.Now()}
+	if err := config.WritePolicy(dir, stored); err != nil {
+		t.Fatal(err)
+	}
+	cfg := &config.Config{Dir: dir, StateDir: dir, OrganizationID: "org_a", OrganizationName: "Acme", AuthURL: "https://auth.example", ProjectID: "ta"}
+	got := ScopeToTeam(cfg, "tb")
+	if got.ProjectID != "tb" || got.OrganizationID != "org_b" || got.OrganizationName != "Beta" || got.ProjectName != "Web" {
+		t.Fatalf("ScopeToTeam = %+v", got)
+	}
+	if cfg.ProjectID != "ta" || cfg.OrganizationID != "org_a" {
+		t.Fatal("ScopeToTeam changed the config it was given")
+	}
+	if got := ScopeToTeam(cfg, "unknown"); got.ProjectID != "unknown" || got.OrganizationID != "org_a" || got.OrganizationName != "Acme" {
+		t.Fatalf("an unknown team left the profile's organization: %+v", got)
+	}
+	// The profile's selection says which organization a team is in, before any stored
+	// policy: a team just added, with no policy yet, is fetched under its own organization.
+	cfg.Teams = map[string]string{"org_a": "ta", "org_c": "tc", "org_b": "tb"}
+	if got := ScopeToTeam(cfg, "tc"); got.OrganizationID != "org_c" || got.OrganizationName != "" || got.ProjectName != "" {
+		t.Fatalf("a team with no stored policy was not scoped to its organization: %+v", got)
+	}
+	cfg.Teams["org_x"] = "tb" // the profile moved tb to org_x; the stale file does not override it
+	delete(cfg.Teams, "org_b")
+	if got := ScopeToTeam(cfg, "tb"); got.OrganizationID != "org_x" || got.OrganizationName != "" {
+		t.Fatalf("a stored policy overrode the profile's organization: %+v", got)
+	}
+}
+
+// Selecting another team in the same organization leaves the previous one selected
+// nowhere: its policy file is removed, so nothing refreshes it for nothing; a team still
+// selected in another organization keeps its file.
+func TestStorePolicyPrunesTheTeamLeftBehind(t *testing.T) {
+	t.Setenv("TERMA_POLICY_STUB", "")
+	dir := t.TempDir()
+	policy := func(team, org string) *config.Policy {
+		return &config.Policy{Mode: config.ModeRepo, TeamID: team, OrganizationID: org, AuthURL: "https://auth.example", Revision: 1, FetchedAt: time.Now()}
+	}
+	cfg := &config.Config{Dir: dir, StateDir: dir, ProfileName: "default", OrganizationID: "org_a", AuthURL: "https://auth.example"}
+	if err := config.UpdateProfile(dir, "default", func(p *config.Profile) { p.SelectOrganization("org_a", "Acme") }); err != nil {
+		t.Fatal(err)
+	}
+	if err := StorePolicy(cfg, policy("t1", "org_a")); err != nil {
+		t.Fatal(err)
+	}
+	// Setup reselects t2: as setup.Run does, cfg.Policy is the fetched policy when it is stored.
+	cfg.Policy = *policy("t2", "org_a")
+	if err := StorePolicy(cfg, policy("t2", "org_a")); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, _ := config.ReadPolicy(dir, "t1"); ok {
+		t.Fatal("the team left behind kept its policy file")
+	}
+	if _, ok, _ := config.ReadPolicy(dir, "t2"); !ok {
+		t.Fatal("the new team's policy was not stored")
+	}
+	file, err := config.LoadFile(dir)
+	if err != nil || file.Profiles["default"].Team != "t2" || file.Profiles["default"].Teams["org_a"] != "t2" {
+		t.Fatalf("profile %+v, %v", file.Profiles["default"], err)
+	}
+	// Another profile still selects t2: reselecting t3 here keeps t2's file for it.
+	if err := config.UpdateProfile(dir, "other", func(p *config.Profile) { p.SelectOrganization("org_a", ""); p.SelectTeam("t2") }); err != nil {
+		t.Fatal(err)
+	}
+	cfg.Policy = *policy("t3", "org_a")
+	if err := StorePolicy(cfg, policy("t3", "org_a")); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, _ := config.ReadPolicy(dir, "t2"); !ok {
+		t.Fatal("a team another profile selects lost its policy file")
+	}
+}
+
+// A refresh of another organization's team stores its policy and keeps the names setup
+// recorded, without touching the profile's own selection.
+func TestStorePolicyKeepsAnotherOrganizationsTeamApart(t *testing.T) {
+	t.Setenv("TERMA_POLICY_STUB", "")
+	dir := t.TempDir()
+	if err := config.UpdateProfile(dir, "default", func(p *config.Profile) { p.SelectOrganization("org_a", "Acme"); p.Team = "ta" }); err != nil {
+		t.Fatal(err)
+	}
+	first := &config.Policy{Mode: config.ModeRepo, TeamID: "tb", OrganizationID: "org_b", OrganizationName: "Beta", TeamName: "Web", AuthURL: "https://auth.example", Revision: 1, FetchedAt: time.Now()}
+	scoped := &config.Config{Dir: dir, StateDir: dir, ProfileName: "default", OrganizationID: "org_b", AuthURL: "https://auth.example", ProjectID: "tb",
+		Policy: config.Policy{TeamID: "ta", OrganizationID: "org_a"}}
+	if err := StorePolicy(scoped, first); err != nil {
+		t.Fatal(err)
+	}
+	refreshed := *first
+	refreshed.OrganizationName, refreshed.TeamName, refreshed.Revision = "", "", 2
+	if err := StorePolicy(scoped, &refreshed); err != nil {
+		t.Fatal(err)
+	}
+	stored, ok, err := config.ReadPolicy(dir, "tb")
+	if err != nil || !ok || stored.Revision != 2 || stored.OrganizationName != "Beta" || stored.TeamName != "Web" {
+		t.Fatalf("stored %+v, %v, %v", stored, ok, err)
+	}
+	file, err := config.LoadFile(dir)
+	if err != nil || file.Profiles["default"].Team != "ta" || file.Profiles["default"].OrganizationID != "org_a" {
+		t.Fatalf("the profile's selection moved: %+v, %v", file.Profiles["default"], err)
 	}
 }

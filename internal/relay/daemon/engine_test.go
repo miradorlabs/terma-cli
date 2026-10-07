@@ -99,7 +99,8 @@ func TestTheRefresherKeepsTheSelectedTeamFresh(t *testing.T) {
 	}
 }
 
-// A team with its key on file and no policy fetched is held, never granted; the relay's refresher finds it at once by its key, and once that fetch is
+// A selected team with its key on file and no policy fetched is held, never granted; the
+// relay's refresher finds it at once among the profile's teams, and once that fetch is
 // stored the team's records follow its policy.
 func TestAFreshBindingIsHeldUntilTheRelayFetchesItsPolicy(t *testing.T) {
 	configDir := t.TempDir()
@@ -107,7 +108,7 @@ func TestAFreshBindingIsHeldUntilTheRelayFetchesItsPolicy(t *testing.T) {
 	const org, auth = "org_a", "https://auth.example"
 	t.Setenv("TERMA_AUTH_URL", auth)
 	cfg := &config.Config{Dir: configDir, StateDir: configDir, ProfileName: "default", OrganizationID: org, AuthURL: auth}
-	if err := config.UpdateProfile(configDir, cfg.ProfileName, func(p *config.Profile) { p.OrganizationID, p.Harnesses = org, []string{"claude"} }); err != nil {
+	if err := config.UpdateProfile(configDir, cfg.ProfileName, func(p *config.Profile) { p.OrganizationID, p.Team, p.Harnesses = org, "p1", []string{"claude"} }); err != nil {
 		t.Fatal(err)
 	}
 	if err := keystore.Set(configDir, "p1", mintedKey, keystore.HostsOf(cfg)); err != nil {
@@ -150,5 +151,49 @@ func TestARunningRelayKeepsThePolicyFresh(t *testing.T) {
 	r := Deps{}.Refresher()
 	if r.Interval+r.Discover >= config.PolicyStaleAfter {
 		t.Fatalf("refresh every %v, discover every %v: a running relay's policy looks stale after %v", r.Interval, r.Discover, config.PolicyStaleAfter)
+	}
+}
+
+// The refresher finds the teams every profile of its environment selected and refreshes
+// each under that profile, whose credential the fetch then uses; a profile pinned to
+// another environment is left alone.
+func TestTheRefresherServesEveryProfileOfItsEnvironment(t *testing.T) {
+	configDir := t.TempDir()
+	t.Setenv("TERMA_POLICY_STUB", "")
+	const org, auth = "org_a", "https://auth.example"
+	for name, team := range map[string]string{"default": "p1", "other": "p2", "dev": "p3"} {
+		if err := config.UpdateProfile(configDir, name, func(p *config.Profile) {
+			p.OrganizationID = org
+			if name == "dev" {
+				p.Environment = "dev"
+			}
+			p.SelectTeam(team)
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	load := func(name string) (*config.Config, error) {
+		return config.Load(configDir, configDir, config.Overrides{Profile: name, AuthURL: auth})
+	}
+	var refreshed []string
+	d := Deps{
+		LoadConfig:  func() (*config.Config, error) { return load("default") },
+		LoadProfile: load,
+		RefreshPolicy: func(_ context.Context, scoped *config.Config) error {
+			refreshed = append(refreshed, scoped.ProfileName+"/"+scoped.ProjectID)
+			return nil
+		},
+	}
+	r := d.Refresher()
+	if teams := r.Teams(); !slices.Equal(teams, []string{"p1", "p2"}) {
+		t.Fatalf("Teams = %v; want the relay profile's and the other same-environment profile's", teams)
+	}
+	for _, team := range []string{"p1", "p2"} {
+		if err := r.Refresh(t.Context(), team); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if !slices.Equal(refreshed, []string{"default/p1", "other/p2"}) {
+		t.Fatalf("refreshed %v; want each team under the profile that selected it", refreshed)
 	}
 }

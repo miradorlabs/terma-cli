@@ -94,6 +94,10 @@ type Policy struct {
 	OrganizationID  string    `json:"organization_id,omitempty"`
 	TeamID          string    `json:"team_id,omitempty"`
 	AuthURL         string    `json:"auth_url,omitempty"`
+	// OrganizationName and TeamName are what setup knew the organization and team as, for
+	// doctor to name them; a refresh keeps the stored ones.
+	OrganizationName string `json:"organization_name,omitempty"`
+	TeamName         string `json:"team_name,omitempty"`
 	// DefaultProjectID receives everything in global mode.
 	DefaultProjectID string    `json:"default_project_id,omitempty"`
 	FetchedAt        time.Time `json:"fetched_at"`
@@ -144,8 +148,30 @@ func (p Policy) Global() bool { return p.Mode == ModeGlobal }
 
 // AppliesTo keeps a cached policy within the login and environment that fetched it.
 func (p Policy) AppliesTo(organizationID, authURL string) bool {
-	return (p.OrganizationID == "" || p.OrganizationID == organizationID) &&
-		(p.AuthURL == "" || p.AuthURL == authURL)
+	return (p.OrganizationID == "" || p.OrganizationID == organizationID) && p.SameEnvironment(authURL)
+}
+
+// SameEnvironment keeps a cached policy within the environment that fetched it: a key
+// minted at one auth host is nothing to another. Which organization fetched it is the
+// policy's own to say (OrganizationID): one machine collects for several at once.
+func (p Policy) SameEnvironment(authURL string) bool {
+	return p.AuthURL == "" || p.AuthURL == authURL
+}
+
+// Label names p's team for a person: its name, else its id, with its organization.
+func (p Policy) Label() string {
+	team := p.TeamName
+	if team == "" {
+		team = p.Team()
+	}
+	org := firstNonEmpty(p.OrganizationName, p.OrganizationID)
+	switch {
+	case team == "":
+		return org
+	case org == "":
+		return "team " + team
+	}
+	return "team " + team + " of " + org
 }
 
 // NoPolicy is what applies to a login until its team's policy is validated: no repository

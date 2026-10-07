@@ -286,6 +286,49 @@ func TestProfileSelectOrganization(t *testing.T) {
 	}
 }
 
+// Each organization set up keeps the team selected there: switching organization brings
+// that team back, selecting a team replaces the organization's, and the collection is one
+// team per organization; a profile from before Teams were recorded has its one team.
+func TestProfileKeepsOneTeamPerOrganization(t *testing.T) {
+	t.Parallel()
+	p := &Profile{OrganizationID: "org-a", Team: "ta"}
+	if got := p.CollectedTeams(); len(got) != 1 || got["org-a"] != "ta" {
+		t.Fatalf("CollectedTeams of an older profile = %v", got)
+	}
+	p.SelectTeam("ta2")
+	p.SelectOrganization("org-b", "Beta")
+	if p.Team != "" {
+		t.Fatalf("a new organization inherited a team: %+v", p)
+	}
+	p.SelectTeam("tb")
+	p.SelectOrganization("org-a", "")
+	if p.Team != "ta2" {
+		t.Fatalf("switching back lost the team selected there: %+v", p)
+	}
+	if got := p.CollectedTeams(); len(got) != 2 || got["org-a"] != "ta2" || got["org-b"] != "tb" {
+		t.Fatalf("CollectedTeams = %v", got)
+	}
+	none := &Profile{}
+	none.SelectTeam("t")
+	if none.Team != "t" || len(none.Teams) != 0 {
+		t.Fatalf("a team selected with no organization was recorded under one: %+v", none)
+	}
+	if !p.Collects("ta2") || !p.Collects("tb") || p.Collects("ta") || p.Collects("") {
+		t.Fatalf("Collects misjudged %+v", p)
+	}
+	// A profile written before Teams were recorded keeps its team when it adds an
+	// organization: that is what every existing install does on `terma setup --org`.
+	older := &Profile{OrganizationID: "org-a", Team: "ta"}
+	if !older.Collects("ta") {
+		t.Fatal("an older profile does not collect its one team")
+	}
+	older.SelectOrganization("org-b", "Beta")
+	older.SelectTeam("tb")
+	if got := older.CollectedTeams(); len(got) != 2 || got["org-a"] != "ta" || got["org-b"] != "tb" {
+		t.Fatalf("adding an organization dropped the first one's team: %v", got)
+	}
+}
+
 // Concurrent UpdateFile calls keep every independent change.
 func TestUpdateProfileConcurrentChoices(t *testing.T) {
 	t.Parallel()

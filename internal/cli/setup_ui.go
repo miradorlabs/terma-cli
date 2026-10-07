@@ -12,6 +12,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
@@ -148,4 +149,24 @@ func (app *App) setupHeaderInfo(cfg *config.Config, p style.Palette) []string {
 		info = append(info, p.Dim(output.TildePath(cwd)))
 	}
 	return info
+}
+
+// reportCollection says which other teams this machine also collects for, of this
+// organization or another, now that pol is the selected team's, and which global
+// policies it does not honour.
+func (app *App) reportCollection(ui *setupUI, pol config.Policy) {
+	cfg, err := app.loadConfig()
+	if err != nil {
+		return
+	}
+	cfg.Policy = pol
+	collected := routing.Collect(cfg)
+	for _, p := range collected.Policies {
+		if p.TeamID != pol.TeamID {
+			ui.Summary("Also", doctor.PolicySummary(p)+" for "+p.Label())
+		}
+	}
+	for _, p := range collected.Conflicts {
+		ui.Caution("Conflict", doctor.ConflictText(p))
+	}
 }

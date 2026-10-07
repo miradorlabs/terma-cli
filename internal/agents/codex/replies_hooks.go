@@ -22,7 +22,7 @@ const codexReplyMaxText = 16 << 10
 // team's policy collects prompts. It reports whether the whole rollout is read and every
 // turn was collected, which the thread's name waits for.
 func captureCodexReplies(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in *codexHookInput) (collected bool) {
-	if e.Spool == nil || !session.ValidID(in.SessionID) || !repliesConsented(e.Consent()) {
+	if e.Spool == nil || !session.ValidID(in.SessionID) || !repliesConsented(e.ConsentUnder(r)) {
 		return false
 	}
 	dir := filepath.Join(e.StateDir, codexReplyCursorDir)
@@ -46,7 +46,7 @@ func captureCodexReplies(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in
 	// Inside Stop's three seconds, beside the funding capture's one.
 	ctx, cancel := context.WithTimeout(ctx, codexCaptureTimeout)
 	defer cancel()
-	next, status, err := readRolloutReplies(ctx, rollout, in.TranscriptPath, cursor, codexReplyMaxText, turnAdmission(ctx, e), func(reply reply) error {
+	next, status, err := readRolloutReplies(ctx, rollout, in.TranscriptPath, cursor, codexReplyMaxText, turnAdmission(ctx, e, r), func(reply reply) error {
 		attrs := hookrun.AgentAttrs(map[string]any{
 			semconv.GenAIMainAgentNameKey: codexTool, semconv.TermaEvidenceSourceKey: sourceCodexRollout,
 			semconv.TermaMessageIDKey: reply.ID, semconv.TermaMessageTextKey: reply.Text, semconv.TermaMessageTruncatedKey: reply.Truncated,
@@ -63,7 +63,7 @@ func captureCodexReplies(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in
 		if !reply.At.IsZero() && !reply.At.After(at) {
 			at = reply.At
 		}
-		return e.Spool.Append(spool.Event{Time: at, Name: semconv.TermaAssistantMessageEvent, SessionID: in.SessionID, TraceID: reply.TraceID, Repository: r.Repository, Global: e.Policy.Global(), Attrs: attrs})
+		return e.Spool.Append(spool.Event{Time: at, Name: semconv.TermaAssistantMessageEvent, SessionID: in.SessionID, TraceID: reply.TraceID, Repository: r.Repository, Global: r.Policy.Global(), Attrs: attrs})
 	})
 	if err != nil {
 		e.Logf("codex replies (%s): %v", status, err)

@@ -2,6 +2,8 @@ package policy
 
 import (
 	"bytes"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -90,5 +92,48 @@ func TestFetchRefusesAnotherOrganizationsLogin(t *testing.T) {
 	}
 	if _, err := (Source{}).Fetch(t.Context(), cfg); err == nil || !strings.Contains(err.Error(), "another organization") {
 		t.Fatalf("Fetch = %v", err)
+	}
+}
+
+// A team of another organization in the collection is fetched with that organization's
+// stored credential, never the active one's.
+func TestFetchUsesTheTeamsOrganizationsCredential(t *testing.T) {
+	t.Setenv("TERMA_POLICY_STUB", "")
+	var tokens []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tokens = append(tokens, r.Header.Get("Authorization"))
+		if r.URL.Path != "/v1/policy" || r.URL.Query().Get("project_id") != "tb" || r.Header.Get("Authorization") != "Bearer token_b" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		_, _ = w.Write([]byte(`{"policy":{"version":"1.0","terma":{"capture":{"exclude_prompts":false,"exclude_tool_content":true},` +
+			`"per_repository":{"repositories":["github.com/beta/site"]}}},"revision":3,"updated_at":"2026-01-01T00:00:00Z"}`))
+	}))
+	defer srv.Close()
+	dir := t.TempDir()
+	if err := config.UpdateFile(dir, func(f *config.File) { f.InsecureStorage = true }); err != nil {
+		t.Fatal(err)
+	}
+	// org_a signed in last, so it is the active credential.
+	for _, c := range []*auth.Credential{
+		{AccessToken: "token_b", AuthURL: srv.URL, OrganizationID: "org_b", ExpiresAt: time.Now().Add(time.Hour)},
+		{AccessToken: "token_a", AuthURL: srv.URL, OrganizationID: "org_a", ExpiresAt: time.Now().Add(time.Hour)},
+	} {
+		if _, err := auth.SaveCredential(dir, config.DefaultProfile, c); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cfg := &config.Config{Dir: dir, StateDir: t.TempDir(), ProfileName: config.DefaultProfile, APIURL: srv.URL, AuthURL: srv.URL,
+		OrganizationID: "org_b", OrganizationName: "Beta", ProjectID: "tb", ProjectName: "Web"}
+	pol, err := (Source{}).Fetch(t.Context(), cfg)
+	if err != nil {
+		t.Fatalf("Fetch: %v (tokens sent: %v)", err, tokens)
+	}
+	if pol.OrganizationID != "org_b" || pol.OrganizationName != "Beta" || pol.TeamID != "tb" || pol.TeamName != "Web" ||
+		!pol.IncludePrompts || pol.IncludeToolContent || len(pol.Repositories) != 1 {
+		t.Fatalf("fetched %+v", pol)
+	}
+	if len(tokens) != 1 || tokens[0] != "Bearer token_b" {
+		t.Fatalf("tokens sent: %v", tokens)
 	}
 }

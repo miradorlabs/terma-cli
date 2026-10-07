@@ -47,7 +47,7 @@ type Deps struct {
 	Profile func() Profile
 	Spool   func() *spool.Spool
 	// Claimed runs once a hook has claimed its session, with the checkout it claimed and
-	// the policy in force: the relay, and that repository's commit hooks.
+	// the policy that admitted it: the relay, and that repository's commit hooks.
 	Claimed func(cwd string, policy config.Policy)
 	Flush   func()
 }
@@ -56,8 +56,11 @@ type Deps struct {
 type Profile struct {
 	Team   string
 	Agents []string
-	// Policy is the collection policy, NoPolicy until one is validated.
+	// Policy is the selected team's collection policy, NoPolicy until one is validated.
 	Policy config.Policy
+	// Policies are every policy this machine collects under, the selected team's among
+	// them, by which a hook admits a repository (hookrun.Env.Policies).
+	Policies config.Policies
 }
 
 // maxPayload bounds the copy of a payload kept to claim a session from.
@@ -78,7 +81,7 @@ func Run(ctx context.Context, d Deps, r Request) int {
 	if render, ok := d.Agents.Render(r.Event); ok {
 		p := d.Profile()
 		env := hookrun.Env{Now: time.Now(), Cwd: r.Cwd, Args: r.Args, Stdin: r.Stdin, Stdout: r.Stdout, Stderr: r.Stderr,
-			ConfigDir: d.ConfigDir, StateDir: d.StateDir, Version: r.Version, Debug: r.Debug, Flush: d.Flush, Policy: p.Policy, Team: p.Team}
+			ConfigDir: d.ConfigDir, StateDir: d.StateDir, Version: r.Version, Debug: r.Debug, Flush: d.Flush, Policy: p.Policy, Policies: p.Policies, Team: p.Team}
 		if !r.HooksOff {
 			env.Spool = d.Spool()
 		}
@@ -113,12 +116,13 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 	// The checkout to act on is the one the claim names, which the hook's own working
 	// directory may not be: cmd starts a hook in a UNC checkout from the Windows directory.
 	claimed, claimedIn, flushed := false, r.Cwd, false
+	under := p.Policy
 	env := hookrun.Env{
 		Now:       time.Now(),
 		Cwd:       r.Cwd,
 		Args:      r.Args,
 		Stdin:     io.TeeReader(r.Stdin, payload),
-		OnClaim:   func(root string) { claimed, claimedIn = true, root },
+		OnClaim:   func(root string, pol config.Policy) { claimed, claimedIn, under = true, root, pol },
 		Flush:     func() { flushed = true; d.Flush() },
 		Stdout:    r.Stdout,
 		Stderr:    r.Stderr,
@@ -128,6 +132,7 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 		Debug:     r.Debug,
 		Spool:     d.Spool(),
 		Policy:    p.Policy,
+		Policies:  p.Policies,
 		Team:      p.Team,
 		Agents:    p.Agents,
 	}
@@ -136,11 +141,12 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 	_ = handler(ctx, env)
 	if !claimed && tool != "" {
 		if s, ok := d.Agents.PayloadSession(r.Event, payload.Bytes()); ok {
-			claimed, claimedIn = hookrun.ClaimFromPayload(ctx, env, s, tool), cmp.Or(s.Cwd, r.Cwd)
+			under, claimed = hookrun.ClaimFromPayload(ctx, env, s, tool)
+			claimedIn = cmp.Or(s.Cwd, r.Cwd)
 		}
 	}
 	if claimed {
-		d.Claimed(claimedIn, p.Policy)
+		d.Claimed(claimedIn, under)
 	}
 	if flush && env.Spool != nil && !flushed {
 		d.Flush()

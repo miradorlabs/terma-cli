@@ -5,11 +5,13 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
 // With no terminal to ask on, setup keeps the stored sign-in's organization, but never
@@ -28,7 +30,7 @@ func TestSetupWithoutATerminalSaysItKeptOneOfSeveralOrganizations(t *testing.T) 
 	if err != nil {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}
-	want := "! Organization  kept Acme, one of your 2: `terma setup --org <name>` sets up another"
+	want := "! Organization  kept Acme, one of your 2: `terma setup --org <name>` adds another"
 	if !strings.Contains(out, want) {
 		t.Fatalf("setup did not say it kept one of several organizations (%d listings):\n%s", gateway.orgLists.Load(), out)
 	}
@@ -136,5 +138,58 @@ func TestSetupStoppedAtTheOrganizationStepKeepsTheCredentialWhereItWas(t *testin
 	}
 	if config.InsecureStorage(testApp.dir) || auth.StoredInFile(testApp.dir, config.DefaultProfile) {
 		t.Fatal("the credential stayed in plain text after setup stopped")
+	}
+}
+
+// An install from before organizations were added, its one team recorded in Team alone,
+// keeps collecting for that team when `terma setup --org` adds another organization: the
+// machine then collects for both, each team's repositories reporting to that team.
+func TestSetupAddsAnOrganizationToAnOlderInstall(t *testing.T) {
+	gateway := newFakeAuth(t)
+	gateway.policyBody = `{"policy":{"version":"1.0","terma":{"capture":{"exclude_prompts":false,"exclude_tool_content":false},` +
+		`"per_repository":{"repositories":["github.com/beta/site"]}}},"revision":1,"updated_at":"2026-01-01T00:00:00Z"}`
+	authSandbox(t, gateway)
+	sandboxMachine(t)
+	t.Setenv("CODEX_HOME", t.TempDir())
+	t.Setenv("TERMA_POLICY_STUB", "")
+	for _, o := range []organization{orgB(), orgA()} {
+		if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway, o)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	acmeWeb, betaCore := projectsIn(orgA().ID)[0], projectsIn(orgB().ID)[0]
+	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) {
+		p.OrganizationID, p.OrganizationName, p.Team = orgA().ID, orgA().Name, acmeWeb.ID
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := config.WritePolicy(testApp.stateDir, config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/acme/app"},
+		IncludePrompts: true, IncludeToolContent: true, TeamID: acmeWeb.ID, TeamName: acmeWeb.Name, OrganizationID: orgA().ID, OrganizationName: orgA().Name,
+		AuthURL: gateway.srv.URL, Revision: 1, FetchedAt: time.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runTerma(t, "setup", "--org", orgB().Name, "--harness", "codex")
+	if err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "✓ Also") || !strings.Contains(out, "(github.com/acme/app), with prompts and tool content for team Acme Web of Acme") {
+		t.Fatalf("setup did not say it also collects for the first organization:\n%s", out)
+	}
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.OrganizationID != orgB().ID || cfg.Policy.TeamID != betaCore.ID || cfg.Teams[orgA().ID] != acmeWeb.ID || cfg.Teams[orgB().ID] != betaCore.ID {
+		t.Fatalf("after adding an organization: org %s, team %s, teams %v", cfg.OrganizationID, cfg.Policy.TeamID, cfg.Teams)
+	}
+	coll := routing.Collection(cfg)
+	if p, ok := coll.Admitting(config.Repository{Origin: "github.com/acme/app"}); !ok || p.TeamID != acmeWeb.ID {
+		t.Fatalf("the first organization's repository is collected by %+v, %v", p, ok)
+	}
+	if p, ok := coll.Admitting(config.Repository{Origin: "github.com/beta/site"}); !ok || p.TeamID != betaCore.ID {
+		t.Fatalf("the added organization's repository is collected by %+v, %v", p, ok)
+	}
+	if _, ok := coll.Admitting(config.Repository{Origin: "github.com/me/personal"}); ok {
+		t.Fatal("a repository neither team lists is collected")
 	}
 }

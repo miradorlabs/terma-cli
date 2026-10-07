@@ -8,11 +8,13 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"net"
 	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -31,35 +33,6 @@ const (
 	credentialsFileName = "credentials.json"
 	dirName             = "terma"
 )
-
-// Profile is the non-secret half of a profile: where to talk to and what is selected.
-type Profile struct {
-	// Environment pins a hidden built-in environment; empty means production.
-	Environment string `json:"environment,omitempty"`
-	// Endpoint overrides; empty means the environment's defaults.
-	APIURL           string `json:"api_url,omitempty"`
-	AuthURL          string `json:"auth_url,omitempty"`
-	AppURL           string `json:"app_url,omitempty"`
-	OTLPURL          string `json:"otlp_url,omitempty"`
-	OrganizationID   string `json:"organization_id,omitempty"`
-	OrganizationName string `json:"organization_name,omitempty"`
-	// Harnesses lists the agents and launch surfaces `terma setup` recorded; a preference, not a connection.
-	Harnesses []string `json:"harnesses,omitempty"`
-	// Team is the team `terma setup` selected, whose policy (PoliciesDir) the hooks apply.
-	Team string `json:"team,omitempty"`
-}
-
-// SelectOrganization records the account scope, never a repository's project.
-func (p *Profile) SelectOrganization(id, name string) {
-	if p.OrganizationID != id {
-		p.OrganizationName = ""
-		p.Team = ""
-	}
-	p.OrganizationID = id
-	if name != "" {
-		p.OrganizationName = name
-	}
-}
 
 // PinEnvironment records env as the profile's, production as none.
 func (p *Profile) PinEnvironment(env string) {
@@ -81,6 +54,26 @@ type File struct {
 	// system keychain: `terma setup --insecure-storage`, or a setup that found no keychain
 	// to use. Each setup decides it afresh.
 	InsecureStorage bool `json:"insecure_storage,omitempty"`
+}
+
+// Selects reports whether any profile of file selects team in some organization.
+func (f *File) Selects(team string) bool { return f.Owner(team, "") != "" }
+
+// Owner is the name of the profile that selects team, preferring the profile named first,
+// then the active one, then the rest by name; "" when none does.
+func (f *File) Owner(team, first string) string {
+	names := []string{first, f.ActiveProfile}
+	for _, name := range slices.Sorted(maps.Keys(f.Profiles)) {
+		if name != first && name != f.ActiveProfile {
+			names = append(names, name)
+		}
+	}
+	for _, name := range names {
+		if p := f.Profiles[name]; p != nil && p.Collects(team) {
+			return name
+		}
+	}
+	return ""
 }
 
 // Config is the fully resolved view a command works against.
@@ -110,14 +103,26 @@ type Config struct {
 	Harnesses []string
 	// Team is the team the profile selected, kept even while its policy is not stored.
 	Team string
+	// Teams is the team selected in each organization the profile set up, by organization
+	// id: the teams this machine collects for (routing.Collection), Team among them.
+	Teams map[string]string
 
 	// Policy is the profile's team's policy stored in the state directory, else
-	// DefaultPolicy; one for another login, or unreadable, is NoPolicy.
+	// DefaultPolicy; one for another environment, or unreadable, is NoPolicy. The other
+	// Teams' policies complete the collection (routing.Collection): hooks admit a
+	// repository by any of them.
 	Policy Policy
 
 	// APIKey is a server key from TERMA_API_KEY that replaces the login credential;
 	// json:"-" keeps it out of `-o json`.
 	APIKey string `json:"-"`
+}
+
+// SameEnvironment reports whether c and o resolve to one environment: the one their
+// profiles record (a process-wide TERMA_ENV pins both to the same, so it tells nothing)
+// and the same credential host.
+func (c *Config) SameEnvironment(o *Config) bool {
+	return o != nil && c.ProfileEnvironment == o.ProfileEnvironment && c.AuthURL == o.AuthURL
 }
 
 // Overrides are the flag values that win over everything else.
@@ -169,11 +174,12 @@ func Load(dir, stateDir string, o Overrides) (*Config, error) {
 		ProjectID:          firstNonEmpty(o.ProjectID, os.Getenv("TERMA_TEAM_ID")),
 		Harnesses:          profile.Harnesses,
 		Team:               profile.Team,
+		Teams:              profile.CollectedTeams(),
 		Policy:             DefaultPolicy(),
 		APIKey:             strings.TrimSpace(os.Getenv("TERMA_API_KEY")),
 	}
 	switch stored, ok, err := ReadPolicy(stateDir, profile.Team); {
-	case err != nil || ok && !stored.AppliesTo(cfg.OrganizationID, cfg.AuthURL):
+	case err != nil || ok && !stored.SameEnvironment(cfg.AuthURL):
 		cfg.Policy = NoPolicy("", "")
 	case ok:
 		cfg.Policy = stored

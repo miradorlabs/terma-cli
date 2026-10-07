@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"errors"
+	"slices"
 	"sync"
 	"time"
 
@@ -26,6 +27,9 @@ type ResolverDeps struct {
 	RelayTargets func(selected []string) []string
 	// Endpoint is the ingest host a project's telemetry goes to.
 	Endpoint func(projectID string) string
+	// LoadProfile is another profile's configuration, for a claim of a team only that
+	// profile selected; nil judges every claim under the relay's own profile.
+	LoadProfile func(name string) (*config.Config, error)
 }
 
 // Resolver turns a claim into a Policy: the project's ingest host, the claiming agent's key
@@ -64,26 +68,32 @@ func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Polic
 			}
 			return relay.Policy{}, relay.ErrNoKey
 		}
-		org, chosen := cfg.Policy, cfg.Harnesses
-		// Reread the profile's team and its policy so a refreshed policy also governs queued exports.
-		if file, err := config.LoadFile(cfg.Dir); err != nil {
+		// Reread the profile's team and its policy so a refreshed policy also governs queued
+		// exports; a profile signed into another organization since keeps the policies it
+		// stored, as this machine collects for every organization it is signed into. A claim
+		// for a team only another profile selected (`terma config`, one relay for every
+		// profile) is judged under that profile: its policies, its global rule, its agents.
+		file, err := config.LoadFile(cfg.Dir)
+		if err != nil {
 			return relay.Policy{}, err
-		} else if p := file.Profiles[cfg.ProfileName]; p == nil && cfg.ProfileName != "" {
+		}
+		if p := file.Profiles[cfg.ProfileName]; p == nil && cfg.ProfileName != "" {
 			// The startup policy would outlive a sign-out or a removed profile.
 			return relay.Policy{}, errors.New("profile removed; restart the relay")
-		} else if p != nil {
-			chosen = p.Harnesses
-			if p.OrganizationID != cfg.OrganizationID {
-				return relay.Policy{}, errors.New("organization changed; restart the relay")
-			}
-			if stored, ok, err := config.ReadPolicy(cfg.StateDir, p.Team); err != nil || !ok || !stored.AppliesTo(cfg.OrganizationID, cfg.AuthURL) {
-				org = config.NoPolicy(cfg.OrganizationID, cfg.AuthURL)
-			} else {
-				org = stored
-			}
 		}
-		globalPrimary := org.Global() && (org.TeamID == "" || org.TeamID == c.ProjectID)
-		org = routing.EffectivePolicy(cfg.StateDir, org, c.ProjectID)
+		now := owner(cfg, file, c.ProjectID, r.LoadProfile)
+		selected, chosen := now.Policy, now.Harnesses
+		// Only a team this machine collects for is granted: a claim for a team selected
+		// nowhere since, or for another team's global policy, is a session nothing placed.
+		collected := routing.Collection(now)
+		global, hasGlobal := collected.Global()
+		globalPrimary := hasGlobal && (global.TeamID == "" || global.TeamID == c.ProjectID)
+		org := routing.EffectivePolicy(cfg.StateDir, selected, c.ProjectID)
+		switch {
+		case org.Global() && !globalPrimary,
+			org.Validated() && !slices.ContainsFunc(collected, func(p config.Policy) bool { return p.Team() == c.ProjectID }):
+			org = config.NoPolicy(org.OrganizationID, org.AuthURL)
+		}
 		if cfg.ProfileName != "" && org.FetchedAt.IsZero() && config.PolicyStub() == "" {
 			// Unknown policy must neither grant nor drop: a new team's exports wait for its fetch.
 			return relay.Policy{}, errors.New("no validated collection policy for this team")
@@ -96,6 +106,34 @@ func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Polic
 		pol.Endpoint, pol.Key = r.Endpoint(c.ProjectID), key
 		return pol, nil
 	}
+}
+
+// owner is the configuration a claim for team is judged under: the relay's own profile,
+// reread, when it collects for team or no other profile does; else the profile that
+// selected team, loaded as the relay's was, if it is of the same environment.
+func owner(cfg *config.Config, file *config.File, team string, load func(string) (*config.Config, error)) *config.Config {
+	own := *cfg
+	if p := file.Profiles[cfg.ProfileName]; p != nil {
+		own.Harnesses, own.Teams = p.Harnesses, p.CollectedTeams()
+		if stored, ok, err := config.ReadPolicy(cfg.StateDir, p.Team); err != nil || !ok || !stored.SameEnvironment(cfg.AuthURL) {
+			own.Policy = config.NoPolicy(p.OrganizationID, cfg.AuthURL)
+		} else {
+			own.Policy = stored
+		}
+		if p.Collects(team) {
+			return &own
+		}
+	}
+	name := file.Owner(team, cfg.ProfileName)
+	if name == "" || name == cfg.ProfileName || load == nil {
+		return &own
+	}
+	other, err := load(name)
+	if err != nil || !cfg.SameEnvironment(other) {
+		return &own
+	}
+	other.Policy = other.Policy.InForce(other.OrganizationID, other.AuthURL)
+	return other
 }
 
 // CatchAll is where global mode files what nothing placed, rereading the policy every

@@ -15,6 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents/agentstest"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
 // listed is a git repository in a folder called one, origin github.com/acme/one, which the
@@ -380,5 +381,76 @@ func TestCaptureOffWarnsTheCollectionChecks(t *testing.T) {
 				t.Fatalf("status reports capture off = %v, checks %+v", off, local.Checks)
 			}
 		})
+	}
+}
+
+// A repository another organization's team lists is collected, for that team, and doctor
+// says so; the machine's rows name every team it also collects for.
+func TestDoctorAdmitsARepositoryByAnotherOrganizationsTeam(t *testing.T) {
+	t.Parallel()
+	e := env(t, Probes{Credential: signedIn, Spool: func() SpoolState { return SpoolState{} }})
+	e.Config.StateDir, e.Config.OrganizationID, e.Config.AuthURL = e.StateDir, "org_a", config.DefaultAuthURL
+	e.Config.Teams = map[string]string{"org_a": "p1", "org_b": "p2"}
+	e.Config.Policy = fetched(config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/acme/two"}, OrganizationID: "org_a", AuthURL: config.DefaultAuthURL})
+	other := config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/acme/one"}, TeamID: "p2", OrganizationID: "org_b", OrganizationName: "Beta",
+		AuthURL: config.DefaultAuthURL, IncludePrompts: true, IncludeToolContent: true, FetchedAt: time.Now()}
+	for _, p := range []config.Policy{e.Config.Policy, other} {
+		if err := config.WritePolicy(e.StateDir, p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	c := check(Run(t.Context(), e, Progress{}), KeyProject)
+	if c.Status != Pass || !strings.Contains(c.Detail, "collected for team p2 of Beta") {
+		t.Fatalf("repository = %+v", c)
+	}
+	rep, err := Local(t.Context(), e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var also, repo string
+	for _, r := range rep.Rows {
+		switch r.Label {
+		case "Also":
+			also = r.Value
+		case "Repository":
+			repo = r.Value
+		}
+	}
+	if !strings.Contains(also, "github.com/acme/one") || !strings.Contains(also, "team p2 of Beta") || !strings.Contains(repo, "team p2 of Beta") {
+		t.Fatalf("rows %v", rep.Rows)
+	}
+	for _, c := range rep.Checks {
+		if strings.Contains(c.Fix, "ask a team admin") {
+			t.Fatalf("asked for the list though another team collects here: %+v", c)
+		}
+	}
+}
+
+// The machine's rows name a selected team whose policy is not validated, except the
+// current organization's own, which the repository check reports.
+func TestMachineRowsNameOtherTeamsWithoutAPolicy(t *testing.T) {
+	t.Parallel()
+	cfg := &config.Config{OrganizationID: "org_a", AuthURL: config.DefaultAuthURL, Policy: config.NoPolicy("org_a", config.DefaultAuthURL),
+		Teams: map[string]string{"org_a": "pa", "org_b": "pb"}}
+	var also []string
+	for _, r := range machineRows(cfg, routing.Collect(cfg)) {
+		if r.Label == "Also" {
+			also = append(also, r.Value)
+		}
+	}
+	if len(also) != 1 || !strings.Contains(also[0], "team pb of org_b") || !strings.Contains(also[0], "terma setup --org org_b") {
+		t.Fatalf("Also rows = %q; want org_b's team alone", also)
+	}
+	// The selected policy names another team than the organization's recorded one (a
+	// --team override): neither is listed as another team's.
+	cfg.Policy = config.Policy{Mode: config.ModeRepo, TeamID: "px", OrganizationID: "org_a", AuthURL: config.DefaultAuthURL, FetchedAt: time.Now()}
+	also = nil
+	for _, r := range machineRows(cfg, routing.Collect(cfg)) {
+		if r.Label == "Also" {
+			also = append(also, r.Value)
+		}
+	}
+	if len(also) != 1 || !strings.Contains(also[0], "team pb of org_b") {
+		t.Fatalf("Also rows with a team override = %q", also)
 	}
 }

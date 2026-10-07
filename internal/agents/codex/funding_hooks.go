@@ -47,7 +47,7 @@ func captureCodexFunding(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in
 	userEmail := oauthEmail()
 	ctx, cancel := context.WithTimeout(ctx, codexCaptureTimeout)
 	defer cancel()
-	next, status, readErr := readFunding(ctx, rollout, in.TranscriptPath, cursor, turnAdmission(ctx, e), func(ev hookrun.FundingEvidence) error {
+	next, status, readErr := readFunding(ctx, rollout, in.TranscriptPath, cursor, turnAdmission(ctx, e, r), func(ev hookrun.FundingEvidence) error {
 		attrs := hookrun.AgentAttrs(ev.Attrs, in.AgentID, in.AgentType)
 		attrs[semconv.GenAIMainAgentNameKey] = codexTool
 		attrs[semconv.TermaEvidenceSourceKey], attrs[semconv.TermaEvidenceStatusKey] = ev.Source, ev.Status
