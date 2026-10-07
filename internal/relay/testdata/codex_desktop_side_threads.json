@@ -1,0 +1,136 @@
+[
+ {
+  "time": "2026-10-07T14:25:59.766350Z",
+  "resource": {
+   "service.name": "codex-app-server",
+   "service.version": "0.155.0-alpha.16.3",
+   "telemetry.sdk.language": "rust",
+   "telemetry.sdk.name": "opentelemetry",
+   "telemetry.sdk.version": "0.31.0"
+  },
+  "attributes": {
+   "app.version": "0.155.0-alpha.16.3",
+   "approval_policy": "never",
+   "auth.env_codex_api_key_enabled": "false",
+   "auth.env_codex_api_key_present": "false",
+   "auth.env_openai_api_key_present": "false",
+   "auth.env_refresh_token_url_override_present": "false",
+   "auth_mode": "Chatgpt",
+   "conversation.id": "01a116c1-c3b9-7e01-b3aa-7a3111ff2050",
+   "env": "dev",
+   "event.name": "codex.conversation_starts",
+   "mcp_servers": "node_repl, codex_apps, codex_app, cua_repl",
+   "originator": "Codex_Desktop",
+   "provider_name": "OpenAI",
+   "reasoning_effort": "high",
+   "reasoning_summary": "auto",
+   "sandbox_policy": "danger-full-access",
+   "slug": "gpt-6-astra",
+   "terminal.type": "unknown"
+  }
+ },
+ {
+  "time": "2026-10-07T14:27:02.187572Z",
+  "resource": {
+   "service.name": "codex-app-server",
+   "service.version": "0.155.0-alpha.16.3",
+   "telemetry.sdk.language": "rust",
+   "telemetry.sdk.name": "opentelemetry",
+   "telemetry.sdk.version": "0.31.0"
+  },
+  "attributes": {
+   "app.version": "0.155.0-alpha.16.3",
+   "approval_policy": "never",
+   "auth.env_codex_api_key_enabled": "false",
+   "auth.env_codex_api_key_present": "false",
+   "auth.env_openai_api_key_present": "false",
+   "auth.env_refresh_token_url_override_present": "false",
+   "auth_mode": "Chatgpt",
+   "conversation.id": "01a116c2-b7aa-7ad1-ac9f-12e190854a6e",
+   "env": "dev",
+   "event.name": "codex.conversation_starts",
+   "mcp_servers": "node_repl",
+   "originator": "Codex_Desktop",
+   "provider_name": "OpenAI",
+   "reasoning_effort": "low",
+   "reasoning_summary": "auto",
+   "sandbox_policy": "read-only",
+   "slug": "gpt-6-luna",
+   "terminal.type": "unknown"
+  }
+ },
+ {
+  "time": "2026-10-07T14:27:02.230281Z",
+  "resource": {
+   "service.name": "codex-app-server",
+   "service.version": "0.155.0-alpha.16.3",
+   "telemetry.sdk.language": "rust",
+   "telemetry.sdk.name": "opentelemetry",
+   "telemetry.sdk.version": "0.31.0"
+  },
+  "attributes": {
+   "app.version": "0.155.0-alpha.16.3",
+   "auth_mode": "Chatgpt",
+   "conversation.id": "01a116c2-b7aa-7ad1-ac9f-12e190854a6e",
+   "env": "dev",
+   "event.name": "codex.user_prompt",
+   "originator": "Codex_Desktop",
+   "prompt": "You are in a fork of an existing Codex thread.\nFill the structured description field with a compact, search-oriented summary (up to 100 characters) of the thread's current purpose.\nThis is a keyword retrieval index, not a broad prose summary.\nPrioritize the most recent active purpose over older topics if the thread has shifted.\nRepeat 3 to 6 distinctive nouns or short phrases from the most recent relevant user messages verbatim. Do not generalize technical terms into broader categories.\nWrite in the user's locale.\nCurrent title: Review five shell and Codex adapter…\nDo not include quotes, markdown, formatting characters, or trailing punctuation.\nDo not respond to the user or do any other work; only fill the description field.",
+   "prompt_length": "734",
+   "slug": "gpt-6-luna",
+   "terminal.type": "unknown"
+  }
+ },
+ {
+  "time": "2026-10-07T16:26:07.748188Z",
+  "resource": {
+   "service.name": "codex-app-server",
+   "service.version": "0.155.0-alpha.16.3",
+   "telemetry.sdk.language": "rust",
+   "telemetry.sdk.name": "opentelemetry",
+   "telemetry.sdk.version": "0.31.0"
+  },
+  "attributes": {
+   "app.version": "0.155.0-alpha.16.3",
+   "approval_policy": "never",
+   "auth.env_codex_api_key_enabled": "false",
+   "auth.env_codex_api_key_present": "false",
+   "auth.env_openai_api_key_present": "false",
+   "auth.env_refresh_token_url_override_present": "false",
+   "auth_mode": "Chatgpt",
+   "conversation.id": "01a1172f-c001-7683-8608-5c8547edaba8",
+   "env": "dev",
+   "event.name": "codex.conversation_starts",
+   "mcp_servers": "node_repl",
+   "originator": "Codex_Desktop",
+   "provider_name": "OpenAI",
+   "reasoning_effort": "low",
+   "reasoning_summary": "auto",
+   "sandbox_policy": "read-only",
+   "slug": "gpt-6-luna",
+   "terminal.type": "unknown"
+  }
+ },
+ {
+  "time": "2026-10-07T16:26:07.857724Z",
+  "resource": {
+   "service.name": "codex-app-server",
+   "service.version": "0.155.0-alpha.16.3",
+   "telemetry.sdk.language": "rust",
+   "telemetry.sdk.name": "opentelemetry",
+   "telemetry.sdk.version": "0.31.0"
+  },
+  "attributes": {
+   "app.version": "0.155.0-alpha.16.3",
+   "auth_mode": "Chatgpt",
+   "conversation.id": "01a1172f-c001-7683-8608-5c8547edaba8",
+   "env": "dev",
+   "event.name": "codex.user_prompt",
+   "originator": "Codex_Desktop",
+   "prompt": "You are in a fork of a voice chat.\nGenerate a concise UI title (up to 36 characters) for the most recent voice chat in the thread context above.\nFocus only on the most recent conversation. Ignore older unrelated context and delegated work.\nUse under 5 words where possible and write in the user's locale.\nFill the structured title field with plain text.\nFill the structured description field with a compact, search-oriented summary (up to 100 characters) of the recent topic.\nDo not use a generic title such as Voice chat.\nDo not include quotes, markdown, formatting characters, or trailing punctuation.\nDo not respond to the user or do any other work; only fill the title and description fields.",
+   "prompt_length": "696",
+   "slug": "gpt-6-luna",
+   "terminal.type": "unknown"
+  }
+ }
+]

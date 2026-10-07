@@ -103,8 +103,10 @@ the same rules when it sends them. A session marked not collected is dropped on 
 everything else unclaimed is held briefly and dropped: nothing unclaimed leaves the
 machine. The exception is a policy in global mode, which collects every session on the
 machine: it admits every repository, a hook outside git claims its session for the
-policy's default project, and the relay sends what no claim places there too. What is
-held stays in memory, never on disk, and a stopping relay drops it.
+policy's default project, and the relay sends what no claim places there too, except a
+session an agent's hooks claim every one of (`shape.SessionKey.Claimed`): it waits for its
+claim, so a hidden side thread no hook claims stays here. What is held stays in memory,
+never on disk, and a stopping relay drops it.
 
 ## Rules
 

@@ -43,43 +43,54 @@ func captureCodexReplies(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in
 		e.Logf("invalid reply cursor; replaying rollout")
 		cursor = replyCursor{}
 	}
-	// Inside Stop's three seconds, beside the funding capture's one.
+	// Inside Stop's three seconds, beside the funding capture's one: batch after batch, so a
+	// long voice turn's backlog is read at once rather than one batch per turn's end.
 	ctx, cancel := context.WithTimeout(ctx, codexCaptureTimeout)
 	defer cancel()
-	next, status, err := readRolloutReplies(ctx, rollout, in.TranscriptPath, cursor, codexReplyMaxText, turnAdmission(ctx, e), func(reply reply) error {
-		attrs := hookrun.AgentAttrs(map[string]any{
-			semconv.GenAIMainAgentNameKey: codexTool, semconv.TermaEvidenceSourceKey: sourceCodexRollout,
-			semconv.TermaMessageIDKey: reply.ID, semconv.TermaMessageTextKey: reply.Text, semconv.TermaMessageTruncatedKey: reply.Truncated,
-			hookrun.AttrProjectID: r.ProjectID,
-		}, in.AgentID, in.AgentType)
-		// Untagged, so the backend files it under the turn's trace id, the one Codex's own
-		// turn record carries; tagged desktop, it took the rollout's turn id as a second turn.
-		for k, v := range map[string]string{semconv.TermaTurnIDKey: reply.TurnID, semconv.TermaMessagePhaseKey: reply.Phase, semconv.GenAIRequestModelKey: in.Model} {
-			hookrun.BoundedAttr(attrs, k, v)
+	admits := turnAdmission(ctx, e)
+	status := ""
+	for {
+		next, s, err := readRolloutReplies(ctx, rollout, in.TranscriptPath, cursor, codexReplyMaxText, admits, func(reply reply) error {
+			attrs := hookrun.AgentAttrs(map[string]any{
+				semconv.GenAIMainAgentNameKey: codexTool, semconv.TermaEvidenceSourceKey: sourceCodexRollout,
+				semconv.TermaMessageIDKey: reply.ID, semconv.TermaMessageTextKey: reply.Text, semconv.TermaMessageTruncatedKey: reply.Truncated,
+				hookrun.AttrProjectID: r.ProjectID,
+			}, in.AgentID, in.AgentType)
+			// Untagged, so the backend files it under the turn's trace id, the one Codex's own
+			// turn record carries; tagged desktop, it took the rollout's turn id as a second turn.
+			for k, v := range map[string]string{semconv.TermaTurnIDKey: reply.TurnID, semconv.TermaMessagePhaseKey: reply.Phase, semconv.GenAIRequestModelKey: in.Model} {
+				hookrun.BoundedAttr(attrs, k, v)
+			}
+			// Stamped with when the message was said: read at the turn's end, every reply would
+			// otherwise sort after the tool calls it introduced.
+			at := e.Time()
+			if !reply.At.IsZero() && !reply.At.After(at) {
+				at = reply.At
+			}
+			return e.Spool.Append(spool.Event{Time: at, Name: semconv.TermaAssistantMessageEvent, SessionID: in.SessionID, TraceID: reply.TraceID, Repository: r.Repository, Global: e.Policy.Global(), Attrs: attrs})
+		})
+		status = s
+		if err != nil {
+			e.Logf("codex replies (%s): %v", status, err)
 		}
-		// Stamped with when the message was said: read at the turn's end, every reply would
-		// otherwise sort after the tool calls it introduced.
-		at := e.Time()
-		if !reply.At.IsZero() && !reply.At.After(at) {
-			at = reply.At
+		if next == cursor {
+			break
 		}
-		return e.Spool.Append(spool.Event{Time: at, Name: semconv.TermaAssistantMessageEvent, SessionID: in.SessionID, TraceID: reply.TraceID, Repository: r.Repository, Global: e.Policy.Global(), Attrs: attrs})
-	})
-	if err != nil {
-		e.Logf("codex replies (%s): %v", status, err)
-	}
-	if next != cursor {
 		if b, err := json.Marshal(next); err == nil {
 			if err := hookrun.WriteState(path, b); err != nil {
 				e.Logf("reply cursor: %v", err)
 			}
+		}
+		cursor = next
+		if status != "backlog" || err != nil {
+			break
 		}
 	}
 	if os.IsNotExist(readErr) {
 		hookrun.PruneState(dir, e.Time().Add(-spool.MaxAge))
 	}
 	// A half-written record may be the turn_context that withholds the newest turn.
-	return status == "caught_up" && !next.Withheld
+	return status == "caught_up" && !cursor.Withheld
 }
 
 // repliesConsented reports whether replies may be sent at all: Codex is among the

@@ -6,10 +6,12 @@ import "github.com/miradorlabs/terma-cli/internal/relay/shape"
 // thread id is an OS thread, never a session.
 func (Agent) Correlation() shape.Correlation {
 	return shape.Correlation{
+		// Claimed: SessionStart claims every thread; Desktop's title and description forks
+		// fire no hook, write no rollout, and would each list as a one-turn session.
 		SessionKeys: []shape.SessionKey{
-			{Attr: "conversation.id", Rank: 20},
-			{Attr: "thread.id", Rank: 40, RejectNumeric: true},
-			{Attr: "thread_id", Rank: 50, RejectNumeric: true},
+			{Attr: "conversation.id", Rank: 20, Claimed: true},
+			{Attr: "thread.id", Rank: 40, RejectNumeric: true, Claimed: true},
+			{Attr: "thread_id", Rank: 50, RejectNumeric: true, Claimed: true},
 		},
 		StartEvents: []string{"codex.conversation_starts"},
 	}

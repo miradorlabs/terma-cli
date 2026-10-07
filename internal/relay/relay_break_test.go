@@ -812,7 +812,8 @@ func TestRelayRoutesEachRunOfAResumedSession(t *testing.T) {
 	waitFor(t, func() bool { return pr.r.Stats().Snapshot().Counters["dropped.uncovered_process.logs"] == 1 })
 }
 
-// In global mode unclaimed and sessionless records go to the team's project at once.
+// In global mode unclaimed and sessionless records go to the team's project at once; a
+// session whose hook claims every one (B, Codex's) goes by that claim instead.
 func TestRelayCatchAllInGlobalMode(t *testing.T) {
 	t.Parallel()
 	u := newUpstream(t)
@@ -833,12 +834,12 @@ func TestRelayCatchAllInGlobalMode(t *testing.T) {
 	body, _ := proto.Marshal(mixedLogs())
 	post(t, srv, "/v1/logs", body, "application/x-protobuf", token, false)
 	waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 6 })
-	if c := r.Stats().Snapshot().Counters; c["attributed_by_catch_all.logs"] != 6 || sum(c, "attributed_by_process.") != 0 {
+	if c := r.Stats().Snapshot().Counters; c["attributed_by_catch_all.logs"] != 4 || sum(c, "attributed_by_process.") != 0 {
 		t.Fatalf("catch-all deliveries counted as %v", c)
 	}
 	byAuth, _ := u.logs(t)
-	if n := len(byAuth["Bearer key-default"]); n != 6 {
-		t.Fatalf("default project got %d records, want 6", n)
+	if n, b := len(byAuth["Bearer key-default"]), len(byAuth["Bearer key-p2"]); n != 4 || b != 2 {
+		t.Fatalf("default project got %d records, B's claim %d, want 4 and 2", n, b)
 	}
 	u.mu.Lock()
 	defer u.mu.Unlock()

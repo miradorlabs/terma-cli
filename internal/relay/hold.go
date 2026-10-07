@@ -121,13 +121,13 @@ func (r *Relay) sweep() {
 		var out []release
 		// A part that must wait holds up nothing: order matters only among parts that leave.
 		for _, h := range parts {
-			c, pol, why, ok, how := r.decide(key, h.p.pid, h.p.at, h.p.narrow)
+			c, pol, why, ok, how := r.decide(key, h.p.pid, h.p.at, h.p.narrow, h.p.claimed)
 			limit := hold
 			if h.p.start && why == whyUnclaimed {
 				// A conversation start waits for the thread's first turn.
 				limit = max(hold, r.opts.TraceHold)
 			}
-			if !ok && !h.p.narrow && why != whyNoKey && now.Sub(h.at) >= limit {
+			if !ok && !h.p.narrow && !h.p.claimed && why != whyNoKey && now.Sub(h.at) >= limit {
 				if cc, cok := r.catchAll(); cok {
 					if cpol, pok := r.resolve(cc); pok && !cpol.RequireClaim {
 						c, pol, ok, how = cc, cpol, true, attribution{how: semconv.TermaRelayAttributionCatchAll}

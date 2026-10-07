@@ -50,8 +50,8 @@ type replyCursor struct {
 	Withheld bool `json:"withheld,omitempty"`
 }
 
-// codexReplyBatch bounds one invocation inside Stop's three seconds; the rest is
-// "backlog" for the next turn's hook.
+// codexReplyBatch bounds one read; a hook reads batch after batch inside its budget, and
+// what is left is "backlog" for the next hook.
 const codexReplyBatch = 32
 
 // readRolloutReplies emits the messages since cursor, oldest first, and the cursor to persist

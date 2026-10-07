@@ -83,7 +83,8 @@ func TestRelayStampsTheClaimsWorkingTree(t *testing.T) {
 
 // Global mode places every part by its catch-all, which names no checkout: the root and the
 // directory come from the session's own claim for that project, at the part's time (a late record
-// from an earlier placement takes that one's), and a session no hook claimed has neither.
+// from an earlier placement takes that one's), and a session no hook claimed has neither. B,
+// Codex's, waits on its own claim, to a project with no key here.
 func TestRelayStampsTheWorkingTreeUnderTheCatchAll(t *testing.T) {
 	t.Parallel()
 	u := newUpstream(t)
@@ -108,7 +109,9 @@ func TestRelayStampsTheWorkingTreeUnderTheCatchAll(t *testing.T) {
 	defer srv.Close()
 	body, _ := proto.Marshal(mixedLogs())
 	post(t, srv, "/v1/logs", body, "application/x-protobuf", token, false)
-	waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 6 })
+	waitForCounters(t, r, func(c map[string]int) bool {
+		return c["forwarded.logs"] == 4 && c["held_parts"] == 1
+	})
 	// A record from between the two placements, sent late, takes the earlier placement's root and directory.
 	late := &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{
 		Resource: &resourcepb.Resource{Attributes: []*commonpb.KeyValue{kv("service.name", "agent")}},
@@ -119,7 +122,7 @@ func TestRelayStampsTheWorkingTreeUnderTheCatchAll(t *testing.T) {
 	}}}
 	body, _ = proto.Marshal(late)
 	post(t, srv, "/v1/logs", body, "application/x-protobuf", token, false)
-	waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 7 })
+	waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 5 })
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	seen := map[string]int{}
@@ -145,7 +148,7 @@ func TestRelayStampsTheWorkingTreeUnderTheCatchAll(t *testing.T) {
 	}
 	for k := range seen {
 		switch k {
-		case "A=/work/now|/work/now/web", "A=/work/before|/work/before", "B=|", "C=|", "D=|", "=|":
+		case "A=/work/now|/work/now/web", "A=/work/before|/work/before", "C=|", "D=|", "=|":
 		default:
 			t.Fatalf("unexpected session=root|directory %q in %v", k, seen)
 		}
