@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"os"
 	"regexp"
 	"slices"
 	"strings"
@@ -193,13 +192,13 @@ func TestClaudeEditStampsCommit(t *testing.T) {
 
 // TestClaudeAPIKeyHeadless is the Console route: the call is exported and the
 // session announced, and the status line, which does not run headless, sends
-// nothing. Needs ANTHROPIC_API_KEY or GitHub workload identity federation.
+// nothing. Needs ANTHROPIC_API_KEY.
 func TestClaudeAPIKeyHeadless(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, newest bool) {
 		track(t)
-		if ClaudeCredentials().APIKey == "" && os.Getenv("ANTHROPIC_FEDERATION_RULE_ID") == "" {
-			Record(t.Name(), "not run", "needs ANTHROPIC_API_KEY or GitHub federation")
-			t.Skip("no ANTHROPIC_API_KEY or GitHub federation")
+		if ClaudeCredentials().APIKey == "" {
+			Record(t.Name(), "not run", "needs ANTHROPIC_API_KEY")
+			t.Skip("no ANTHROPIC_API_KEY")
 		}
 		sb := New(t, Isolated, WithClaude(b))
 		result, sid := sb.ClaudeHeadless(RouteAPIKey, "Reply with exactly TERMA_OK and nothing else.", "--tools", "")

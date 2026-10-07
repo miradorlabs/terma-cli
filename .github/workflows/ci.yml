@@ -146,8 +146,8 @@ jobs:
       - run: go test -race ./...
 
   # Real harness exporters, deterministic loopback model responses and OTLP.
-  # Pin PR builds; live.yml also checks the latest releases nightly. The tests run one
-  # after another, ~18 minutes in all, so they are split into shards that run at once;
+  # Pinned harness builds. The tests run one after another, ~18 minutes in all, so they
+  # are split into shards that run at once;
   # scripts/e2e-shard.sh says which test runs where, and any new test runs in `others`.
   harness-telemetry:
     name: harness-telemetry (${{ matrix.shard }})
@@ -172,8 +172,7 @@ jobs:
       TERMA_E2E_DSH_VERSIONS: "0.2.0-rc.2"
       TERMA_E2E_BINARY: ${{ github.workspace }}/test/e2e/bin/terma
       # Codex 0.158.0 sometimes exits without running its SessionEnd hook, with or
-      # without Terma (TestCodexSessionEndProbe). Pull requests report it instead of
-      # failing on it; the nightly e2e workflow stays strict.
+      # without Terma (TestCodexSessionEndProbe), so it is reported instead of failing.
       TERMA_E2E_KNOWN_UPSTREAM: codex-session-end
     steps:
       - uses: actions/checkout@v5

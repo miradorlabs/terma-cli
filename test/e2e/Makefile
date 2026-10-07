@@ -64,7 +64,7 @@ machines: machine-image
 
 # The compatibility matrix (docs/COMPATIBILITY.md, docs/compat/): merge the latest runs'
 # report/compat.json — this machine's, and the Linux machine's from `make machines` —
-# into the history and render it. RUNS names other runs' files (CI's artefacts).
+# into the history and render it. RUNS names other runs' files.
 RUNS ?= $(wildcard report/compat.json report/linux/compat.json)
 .PHONY: compat
 compat:
