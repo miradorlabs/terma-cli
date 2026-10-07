@@ -26,7 +26,7 @@ func unlockFile(f *os.File) {
 }
 
 func lock(ctx context.Context, path string) (func(), error) {
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, fileMode)
+	f, err := openLockFile(ctx, path)
 	if err != nil {
 		return nil, err
 	}
@@ -55,6 +55,27 @@ func lock(ctx context.Context, path string) (func(), error) {
 		wait = min(wait*2, pollMax)
 	}
 	return func() { unlockFile(f) }, nil
+}
+
+// openLockFile opens the lock file at path, waiting out one that Remove is deleting:
+// Windows refuses to open a file pending deletion, with ERROR_ACCESS_DENIED, until its last
+// handle closes. A denial that outlasts ctx is returned as it is.
+func openLockFile(ctx context.Context, path string) (*os.File, error) {
+	wait := pollMin
+	for {
+		f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, fileMode)
+		if err == nil || !errors.Is(err, windows.ERROR_ACCESS_DENIED) {
+			return f, err
+		}
+		timer := time.NewTimer(wait)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return nil, err
+		case <-timer.C:
+		}
+		wait = min(wait*2, pollMax)
+	}
 }
 
 func tryLock(path string) (func(), error) {

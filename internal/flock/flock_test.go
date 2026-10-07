@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 )
@@ -71,4 +72,23 @@ func TestRemoveDeletesAHeldLockAndFreesIt(t *testing.T) {
 		t.Fatalf("the lock was not released: %v", err)
 	}
 	again()
+}
+
+// Holders of a lock that Locked removes after each use never fail to open it: on Windows a
+// waiter that opens it while it is being deleted is told access is denied, and waits.
+func TestLockedSurvivesItsLockBeingRemovedUnderIt(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "never-written")
+	var wg sync.WaitGroup
+	for range 16 {
+		wg.Go(func() {
+			for range 50 {
+				if err := Locked(path, 5*time.Second, func() error { return nil }); err != nil {
+					t.Error(err)
+					return
+				}
+			}
+		})
+	}
+	wg.Wait()
 }
