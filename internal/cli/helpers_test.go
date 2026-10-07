@@ -6,7 +6,31 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
+
+	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 )
+
+// awaitRelayRecord waits for the relay directory dir's run file, which a relay writes once
+// it holds its lock and listens, failing at once if done delivers (the relay exited). Not
+// daemon.Running: that probes by taking the lock, and a probe that wins the race makes a
+// starting relay that does not wait for its lock see it held and exit as already running.
+func awaitRelayRecord[T any](t *testing.T, dir string, timeout time.Duration, done <-chan T) {
+	t.Helper()
+	deadline := time.After(timeout)
+	for {
+		if _, err := os.Stat(filepath.Join(dir, daemon.RunFile)); err == nil {
+			return
+		}
+		select {
+		case res := <-done:
+			t.Fatalf("the relay exited before it recorded itself: %+v", res)
+		case <-deadline:
+			t.Fatal("the relay never recorded itself")
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+}
 
 // userSandbox also leaves the repository the test binary was built in, so status reads
 // nothing of it.

@@ -63,14 +63,56 @@ type signInResult struct {
 	reused  bool
 }
 
-// signInAndReload reloads because signing in points the profile at the credential's
-// organization, so the configuration loaded before it is stale.
-func (app *App) signInAndReload(cmd *cobra.Command, cfg *config.Config, opts signInOptions) (*config.Config, error) {
-	_, err := app.signIn(cmd, cfg, opts)
+// orgAsker picks one of orgs, current marked; nil keeps the current one without asking.
+type orgAsker func(orgs []organization, current string) (*organization, error)
+
+// setupSignIn signs in to opts.org, else to the stored sign-in's organization, asking
+// first when its user belongs to several; a browser sign-in chose one on the page. The
+// count is how many organizations the current one was kept among without asking.
+func (app *App) setupSignIn(cmd *cobra.Command, cfg *config.Config, opts signInOptions, ask orgAsker) (*config.Config, int, error) {
+	res, err := app.signIn(cmd, cfg, opts)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return app.loadConfig()
+	kept := 0
+	if res.reused && opts.org.empty() {
+		client, err := api.New(cfg, api.Options{Version: app.version, Credential: res.cred})
+		if err != nil {
+			return nil, 0, err
+		}
+		orgs, err := fetchOrganizations(cmd.Context(), client)
+		if err != nil {
+			return nil, 0, fmt.Errorf("list your organizations: %w", err)
+		}
+		switch {
+		case len(orgs) < 2:
+		case ask == nil:
+			kept = len(orgs)
+		default:
+			org, err := ask(orgs, res.cred.OrganizationID)
+			if err != nil {
+				return nil, 0, err
+			}
+			if org.ID != res.cred.OrganizationID {
+				opts.org = orgRef{ID: org.ID, Name: org.Name}
+				if _, err := app.signIn(cmd, cfg, opts); err != nil {
+					return nil, 0, err
+				}
+			}
+		}
+	}
+	cfg, err = app.loadConfig()
+	return cfg, kept, err
+}
+
+// askOrganization is setup's orgAsker: a picker on a terminal a person watches, else nil.
+func askOrganization(cmd *cobra.Command, assumeYes bool) orgAsker {
+	if assumeYes || !canPrompt() {
+		return nil
+	}
+	return func(orgs []organization, current string) (*organization, error) {
+		return pickOrganization(cmd, orgs, current)
+	}
 }
 
 // signIn is the one way a command obtains a credential: a stored session verified

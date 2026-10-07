@@ -207,7 +207,7 @@ func TestDoctorChecksTheRepositoryList(t *testing.T) {
 		text string
 	}{
 		"listed":   {fetched(config.Policy{Mode: config.ModeRepo, Repositories: []string{"GitHub.com/Acme/One"}}), Pass, "github.com/acme/one is in the team's repositories"},
-		"unlisted": {fetched(config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/acme/two"}}), Warn, "ask your team to add github.com/acme/one"},
+		"unlisted": {fetched(config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/acme/two"}}), Warn, "ask a team admin to add github.com/acme/one"},
 		"global":   {fetched(config.Policy{Mode: config.ModeGlobal, DefaultProjectID: "p9"}), Pass, "the team chosen at setup (p9)"},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -257,13 +257,13 @@ func TestRepositoryCheckAdvisesOnAnSSHAlias(t *testing.T) {
 		}
 		c := RepositoryCheck(pol, gitDir, nil)
 		advised := strings.Contains(c.Fix, "git remote set-url origin 'git@<real host>:acme/one.git'") && strings.Contains(c.Fix, "core.sshCommand")
-		if c.Status != Warn || advised != alias || alias && strings.Contains(c.Fix, "ask your team") {
+		if c.Status != Warn || advised != alias || alias && strings.Contains(c.Fix, "ask a team admin") {
 			t.Errorf("%s: %+v", origin, c)
 		}
 	}
 }
 
-// The local report agrees: an unlisted repository asks the team for the list.
+// The local report agrees: an unlisted repository asks a team admin for the list.
 func TestLocalReportChecksTheRepositoryList(t *testing.T) {
 	t.Parallel()
 	for mode, wantAsk := range map[string]bool{config.ModeGlobal: false, config.ModeRepo: true} {
@@ -276,7 +276,7 @@ func TestLocalReportChecksTheRepositoryList(t *testing.T) {
 			}
 			asks := false
 			for _, c := range rep.Checks {
-				asks = asks || strings.Contains(c.Fix, "ask your team")
+				asks = asks || strings.Contains(c.Fix, "ask a team admin")
 			}
 			if asks != wantAsk {
 				t.Fatalf("%s mode: asks for the list = %v, rows %v", mode, asks, rep.Rows)
@@ -332,6 +332,7 @@ func TestDoctorRepositoryCheckUsesThePolicyHooksApply(t *testing.T) {
 		{"listed but never fetched", config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/acme/one"}}, "terma setup", false},
 		{"global but never fetched", config.Policy{Mode: config.ModeGlobal}, "terma setup", false},
 		{"validated, no repositories", config.Policy{Mode: config.ModeRepo, Repositories: []string{" "}, TeamID: "p1", FetchedAt: time.Now()}, NoRepositoriesStep, false},
+		{"validated, no policy set", config.Policy{Mode: config.ModeRepo, Unset: true, TeamID: "p1", FetchedAt: time.Now()}, NoPolicyStep, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			e := env(t, Probes{Credential: signedIn, Spool: func() SpoolState { return SpoolState{} }})

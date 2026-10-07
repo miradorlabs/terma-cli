@@ -18,15 +18,16 @@ terma setup       # sign in, choose your team and agents, write machine-wide hoo
 terma doctor      # verify the chain end to end
 ```
 
-`terma setup` signs you in, chooses your team (`--team <name-or-id>`, else your
+`terma setup` signs you in (asking which organization when you belong to several;
+`--org <name-or-id>` names it), chooses your team (`--team <name-or-id>`, else your
 organization's only team, else a picker), records which coding agents you use, fetches
 the team's collection policy, points those agents at the local relay, and writes the
 agents' machine-wide hooks. It changes nothing in git's configuration: when the team's
 policy asks for commit stamping, the first agent session in a repository the policy
 collects installs three git hooks in that repository's own `.git/hooks`, chaining to any hook
 already there. Nothing is written into a
-repository's working tree or committed files. Run it again to repair the machine, to
-switch team, or, with `--org`, to switch organization.
+repository's working tree or committed files. Run it again to repair the machine, or
+to switch team or organization.
 
 `terma doctor` checks the result, `terma update` keeps terma current, and `terma
 teardown` undoes setup on the machine. Restart running agents after setup so they load
@@ -66,8 +67,13 @@ so two developers on different teams in one repository each report to their own.
 
 ### Which commits are stamped
 
-Commit stamping is the team policy's choice. With it on, the first agent session claimed
-in a repository the policy collects installs `prepare-commit-msg`, `post-commit` and `pre-push` into
+Commit stamping is the team policy's choice, off unless a team admin turns it on in the
+Terma web app. Off, which work landed is inferred from the git commands
+agents run; on, `post-commit` records every commit as it lands, including ones made
+outside an agent, and `pre-push` what each push sends, for commit-level accuracy. `terma
+setup` and `terma doctor` say so when your team has it off. With it on, the first agent
+session claimed in a repository the policy collects installs `prepare-commit-msg`,
+`post-commit` and `pre-push` into
 that repository's own `.git/hooks` (the common one, so linked worktrees share them). A
 repository no agent has worked in, and a folder outside git, get nothing. If they are
 already there, terma does nothing. It never takes them out: switching the policy off only

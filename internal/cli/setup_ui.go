@@ -4,9 +4,15 @@ import (
 	"cmp"
 	"fmt"
 	"io"
+	"os"
 	"slices"
 	"strings"
+	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
+	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/doctor"
+	"github.com/miradorlabs/terma-cli/internal/ui/output"
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
@@ -68,6 +74,23 @@ func (u *setupUI) Then(step string) {
 	}
 }
 
+// policyFetched says which team and policy are now in force, and what is left to do about
+// them: a policy to set up, a list to fill in, or commit hooks to turn on.
+func (u *setupUI) policyFetched(team string, pol config.Policy) {
+	if team != "" {
+		u.Summary("Team", team)
+	}
+	if pol.AdmitsNone() {
+		u.Warn("Collects", doctor.PolicySummary(pol))
+		u.Then(doctor.NothingCollectedStep(pol))
+		return
+	}
+	u.Summary("Collects", doctor.PolicySummary(pol))
+	if doctor.GitHooksOff(pol, time.Now()) {
+		u.Then(doctor.GitHooksOffStep)
+	}
+}
+
 // printLines prints the checklist so far.
 func (u *setupUI) printLines() {
 	if len(u.lines) > 0 {
@@ -97,4 +120,32 @@ func (u *setupUI) finish() {
 			fmt.Fprintf(u.out, "    %s\n", l)
 		}
 	}
+}
+
+// setupHeaderInfo is the column beside the logo; it reads only local state, so it is safe
+// to show before signing in.
+func (app *App) setupHeaderInfo(cfg *config.Config, p style.Palette) []string {
+	info := []string{p.Bold("Terma CLI") + " " + p.Dim("("+app.version+")")}
+
+	switch {
+	case cfg.APIKey != "":
+		info = append(info, p.Dim("using TERMA_API_KEY"))
+	default:
+		cred, err := auth.LoadIdentity(app.dir, cfg.ProfileName)
+		if err != nil {
+			info = append(info, p.Dim("not signed in — setup will sign you in"))
+			break
+		}
+		who := cmp.Or(cred.UserEmail, "signed in")
+		org := cmp.Or(cfg.OrganizationName, cfg.OrganizationID)
+		if org != "" {
+			who += "  " + p.Dim("("+org+")")
+		}
+		info = append(info, who)
+	}
+
+	if cwd, err := os.Getwd(); err == nil {
+		info = append(info, p.Dim(output.TildePath(cwd)))
+	}
+	return info
 }
