@@ -3,6 +3,7 @@ package selfupdate
 import (
 	"regexp"
 	"strings"
+	"time"
 )
 
 var releaseVersion = regexp.MustCompile(`^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$`)
@@ -60,6 +61,22 @@ func Newer(current, candidate string) bool {
 		return aa[i] > bb[i]
 	}
 	return len(aa) > len(bb)
+}
+
+// SoakTime is how long a minor or major release has been published before terma installs
+// it by itself, so one that breaks can be pulled before it reaches every machine. A patch
+// release installs at once, and `terma update` never waits.
+const SoakTime = 24 * time.Hour
+
+// Soaking reports whether candidate, published at published, still waits before replacing
+// current automatically: a new minor or major version published less than SoakTime ago, or
+// at a time unknown.
+func Soaking(current, candidate string, published, now time.Time) bool {
+	a, b := releaseVersion.FindStringSubmatch(current), releaseVersion.FindStringSubmatch(candidate)
+	if a == nil || b == nil || a[1] == b[1] && a[2] == b[2] {
+		return false
+	}
+	return published.IsZero() || now.Sub(published) < SoakTime
 }
 
 func compareNumber(a, b string) int {

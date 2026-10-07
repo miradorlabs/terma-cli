@@ -71,6 +71,7 @@ async function main() {
 
   installArchive(archive, asset);
   console.log(`terma: installed ${version}`);
+  console.log('terma: next, run `terma setup` in a terminal.');
 }
 
 // Keep verified bytes in a private, unpredictable directory until extraction

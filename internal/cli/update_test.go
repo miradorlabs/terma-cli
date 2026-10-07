@@ -21,10 +21,11 @@ func TestAutomaticUpdatePreference(t *testing.T) {
 		args []string
 		want string
 	}{
+		{[]string{"update", "--auto", "status"}, "Automatic updates: on."},
+		{[]string{"update", "--auto", "off"}, "disabled"},
 		{[]string{"update", "--auto", "status"}, "off (notify only)"},
 		{[]string{"update", "--auto", "on"}, "enabled"},
-		{[]string{"update", "--auto", "status"}, "on"},
-		{[]string{"update", "--auto", "off"}, "disabled"},
+		{[]string{"update", "--auto", "status"}, "Automatic updates: on."},
 	} {
 		out, err := runTerma(t, step.args...)
 		if err != nil || !strings.Contains(out, step.want) {
@@ -37,7 +38,7 @@ func TestAutomaticUpdatePreference(t *testing.T) {
 		}
 	}
 	p, err := selfupdate.LoadPreferences(dir)
-	if err != nil || p.Auto {
+	if err != nil || !p.Auto {
 		t.Fatalf("invalid invocation changed preference: %+v %v", p, err)
 	}
 }
@@ -189,5 +190,29 @@ func TestUpdateThatCannotCheckRefreshesNothing(t *testing.T) {
 	}
 	if strings.Contains(out.String(), "efresh") {
 		t.Errorf("a failed update refreshed:\n%s", &out)
+	}
+}
+
+// Setup says how this installation gets new releases: through the package manager that
+// owns it, by itself, or not at all.
+func TestUpdatesSummary(t *testing.T) {
+	home := t.TempDir()
+	for _, tc := range []struct {
+		name, exe, version, goos string
+		auto                     bool
+		want                     string
+	}{
+		{"installer script", filepath.Join(home, ".local", "bin", "terma"), "1.2.0", "darwin", true, "automatically"},
+		{"turned off", filepath.Join(home, ".local", "bin", "terma"), "1.2.0", "linux", false, "`terma update --auto on`"},
+		{"homebrew", filepath.Join(home, "Caskroom", "terma", "1.2.0", "terma"), "1.2.0", "darwin", true, "through Homebrew: `brew upgrade terma`"},
+		{"npm", filepath.Join(home, "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "1.2.0", "linux", true, "through npm: `npm install -g @miradorlabs/terma@latest`"},
+		{"source build", filepath.Join(home, "go", "bin", "terma"), "v1.2.0-3-g401af35", "darwin", true, "never for a development build"},
+		{"windows", filepath.Join(home, "terma.exe"), "1.2.0", "windows", true, "download each new release"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := updatesSummary(tc.exe, tc.version, tc.goos, tc.auto); !strings.Contains(got, tc.want) {
+				t.Fatalf("updatesSummary = %q, want it to say %q", got, tc.want)
+			}
+		})
 	}
 }

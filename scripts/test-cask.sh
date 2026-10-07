@@ -50,6 +50,7 @@ mkdir -p "$tap/Casks"
 # cask's own.
 sed "s#https://github.com#http://127.0.0.1:$PORT#" "$DIST/homebrew/Casks/terma.rb" >"$tap/Casks/terma.rb"
 grep -q 'download/v#{version}/' "$tap/Casks/terma.rb" || fail "cask URL is not versioned (was dist rendered from a tag?)"
+grep -q 'terma setup' "$tap/Casks/terma.rb" || fail "cask caveats do not say to run terma setup"
 # GoReleaser's hooks.* render as the block stanzas Homebrew deprecated on 2026-08-04
 # ("Calling `preflight` is deprecated! Use `preflight_steps` instead." on every
 # install). The quarantine strip is a preflight_steps custom_block instead; keep it so.

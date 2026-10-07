@@ -50,6 +50,8 @@ type Release struct {
 	Draft      bool    `json:"draft"`
 	Prerelease bool    `json:"prerelease"`
 	Assets     []Asset `json:"assets"`
+	// PublishedAt starts a minor or major release's soak (Soaking).
+	PublishedAt time.Time `json:"published_at"`
 }
 
 // Asset is one downloadable file of a release.

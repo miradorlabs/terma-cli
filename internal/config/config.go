@@ -74,8 +74,9 @@ func (p *Profile) PinEnvironment(env string) {
 type File struct {
 	ActiveProfile string              `json:"active_profile"`
 	Profiles      map[string]*Profile `json:"profiles"`
-	// AutoUpdate replaces terma with each new release; off, terma only says one is out.
-	AutoUpdate bool `json:"auto_update,omitempty"`
+	// AutoUpdate replaces terma with each new release, unless set false: then terma only
+	// says one is out. Unset is on.
+	AutoUpdate *bool `json:"auto_update,omitempty"`
 	// InsecureStorage keeps new secrets in the config directory's files rather than the
 	// system keychain: `terma setup --insecure-storage`, or a setup that found no keychain
 	// to use. Each setup decides it afresh.

@@ -14,7 +14,7 @@ they produce so agent spend can be traced to shipped code. It supports **Claude 
 Install terma one of these ways, then run `terma setup` once.
 
 **Installer script** (macOS and Linux). Installs to `~/.local/bin`, without sudo, and
-verifies `checksums.txt`. `terma update` updates it in place.
+verifies `checksums.txt`. terma keeps it up to date by itself (see [Updates](#updates)).
 
 ```bash
 curl -fsSL https://terma.ai/install.sh | bash
@@ -42,7 +42,7 @@ terma setup
 
 **Direct download or source**. Binaries are on
 [Releases](https://github.com/miradorlabs/terma-cli/releases), with checksums; on macOS and
-Linux, `terma update` updates a downloaded release in place. From a clone of this
+Linux, terma keeps a downloaded release up to date by itself. From a clone of this
 repository, `make install` builds terma; a build between release tags is never updated
 until `terma update --force` replaces it with the latest release. On Windows, download each
 new release from Releases: terma does not update in place there yet.
@@ -112,30 +112,45 @@ relay, spool delivery, shell completion — and for Terma's own engineers.
 
 ## Updates
 
-terma looks for a new release once a day (every 15 minutes while the lookup is failing),
-and only after a terma command you run in a terminal. Hooks, the relay, scripts, CI and `--output` other than a table never look.
-When one is out, terma says so; `terma update` installs it.
+terma keeps itself up to date. Once a day it looks for a new release (every 15 minutes
+while the lookup is failing) and installs it in place, verified against the release
+checksum. The local relay does this in the background, so a machine nobody runs a terma
+command on still updates, and so does each terma command you run in a terminal. Hooks,
+scripts, CI and `--output` other than a table never look. A relay that installed a
+release keeps running until nothing it holds is waiting and no agent has exported for
+half a minute, then restarts on the new binary, so the restart loses nothing.
+
+A patch release (1.4.2 → 1.4.3) installs as soon as it is found. A new minor or major
+version (1.4 → 1.5, 1 → 2) installs once it has been out for 24 hours, so one that breaks
+can be pulled before it reaches every machine. `terma update` never waits.
 
 ```bash
 terma update --check        # check without installing
 terma update                # install the latest release, or refresh what terma installed
-terma update --auto on      # install a new release when that daily check finds one
-terma update --auto off     # only say when one is out (the default)
+terma update --auto off     # only say when one is out
+terma update --auto on      # install new releases automatically again (the default)
 terma update --auto status  # show the current choice
 ```
 
-`--auto on` installs only from that check, so an install nobody runs a terma command on
-never updates, whatever the setting. It never replaces a Homebrew or npm installation or a
-Windows binary either; those only get the notice. `terma update` upgrades Homebrew and npm
-through the package manager that owns them, and when it cannot find that package manager
-it names the command to run; a Windows binary is replaced by hand, as Get started says. A
-build between release tags gets no notice at all. Updates verify the release checksum before
-replacing the binary.
+terma never replaces a Homebrew or npm installation or a Windows binary by itself; those
+only get the notice, and `terma setup` says which applies to yours. `terma update`
+upgrades Homebrew and npm through the package manager that owns them, and when it cannot
+find that package manager it names the command to run; a Windows binary is replaced by
+hand, as Get started says. A build between release tags is never updated and gets no
+notice.
+
+**A bad release.** terma never installs an older version over a newer one, so a release
+is rolled back by rolling forward: delete the bad release, or mark it a pre-release, so
+GitHub's latest release is the previous one again and machines that have not taken it
+never will, then publish a fixed patch release, which every machine installs at its next
+daily check. Pull a bad minor or major release within its 24 hours and no machine
+installs it automatically.
 
 After an update, the new version also refreshes what earlier versions wrote in your home
 directory — the wrapped Claude Code status line, the OpenCode plugin, the relay's service —
 keeping every choice you made. It works from what is on disk, never signs in, and never
-adds a file. On the latest release, `terma update` does just that refresh.
+adds a file. After an update the relay installed, it runs at your next terma command. On
+the latest release, `terma update` does just that refresh.
 
 ## Scripted and headless setup
 

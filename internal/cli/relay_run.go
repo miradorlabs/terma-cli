@@ -15,6 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
+	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 )
 
 func (app *App) newRelayRunCommand() *cobra.Command {
@@ -46,6 +47,7 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 				StateDir: app.stateDir, Addr: addr, Idle: idle, Service: asService, Environment: cfg.Environment, Version: app.version, Log: log,
 				Engine:  engine,
 				Workers: []func(context.Context){deps.Refresher().Run, app.sweepHookState},
+				Updater: app.relayUpdater(),
 				Listening: func(at net.Addr, hold time.Duration) {
 					if !quiet {
 						fmt.Fprintf(cmd.OutOrStdout(), "Relay listening on %s (hold %s, idle exit %s).\n", at, hold, idle)
@@ -58,8 +60,8 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 			if res.AlreadyRunning && !quiet {
 				fmt.Fprintln(cmd.OutOrStdout(), "The relay is already running.")
 			}
-			// Exit for the service manager to start the newer terma; a
-			// hook-started relay is restarted by the next hook.
+			// Exit for the service manager to start the newer terma, whoever installed it;
+			// a hook-started relay is restarted by the next hook.
 			if res.Restart() {
 				return exitWith(ExitRestart)
 			}
@@ -74,6 +76,21 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&asService, "service", false, "run as the relay service")
 	_ = cmd.Flags().MarkHidden("service")
 	return cmd
+}
+
+// relayUpdater has the relay install each new release in place of its own binary, as
+// interactive commands do, so a machine nobody runs terma on still updates; nil where
+// updates are turned off for the process, as in CI.
+func (app *App) relayUpdater() *daemon.Updater {
+	exe, err := os.Executable()
+	if err != nil || os.Getenv("CI") != "" || os.Getenv("TERMA_NO_UPDATE_CHECK") == "1" {
+		return nil
+	}
+	client := &selfupdate.Client{Version: app.version}
+	return &daemon.Updater{Every: daemon.UpdateEvery, Update: func(ctx context.Context) (string, error) {
+		o := client.Auto(ctx, app.dir, app.stateDir, exe, nil)
+		return o.Installed, o.Err
+	}}
 }
 
 // sweepHookState ages out the hooks' state now and hourly while the relay runs, so state

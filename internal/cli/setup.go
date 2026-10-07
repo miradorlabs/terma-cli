@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"runtime"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -15,6 +17,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/globalmode"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
+	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 	"github.com/miradorlabs/terma-cli/internal/setup"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 	"github.com/miradorlabs/terma-cli/internal/ui/prompt"
@@ -248,9 +251,23 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 	if res.Policy.Global() {
 		ui.title = "Setup complete — every session and commit on this machine reports to " + cmp.Or(team, "your organization")
 	}
+	app.reportUpdates(ui)
 	ui.Then("Run `terma doctor` any time to see what terma is collecting and check it end to end.")
 	ui.finish()
 	return nil
+}
+
+// reportUpdates says how this installation gets new releases.
+func (app *App) reportUpdates(ui *setupUI) {
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+	p, err := selfupdate.LoadPreferences(app.dir)
+	if err != nil {
+		return
+	}
+	ui.Summary("Updates", updatesSummary(exe, app.version, runtime.GOOS, p.Auto))
 }
 
 // selectPolicyTeam picks the team whose policy is set up, and returns its name; it never

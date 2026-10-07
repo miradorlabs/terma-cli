@@ -81,13 +81,23 @@ func TestFailedCheckRetriesAfter15Minutes(t *testing.T) {
 	}
 }
 
-func TestMaintainRequiresOptInAndVerifiesUpdates(t *testing.T) {
+// Automatic updates are on unless turned off: "auto" saves no preference at all.
+func TestMaintainUpdatesByDefaultAndVerifiesUpdates(t *testing.T) {
 	t.Parallel()
 	if runtime.GOOS == "windows" {
 		t.Skip("in-place updates are Unix-only")
 	}
-	for _, mode := range []string{"notify", "auto", "tampered", "locked", "managed"} {
+	// "soaking" is a major release published just now, which waits; "patch" is a patch
+	// release published just now, which does not.
+	for _, mode := range []string{"notify", "auto", "tampered", "locked", "managed", "soaking", "patch"} {
 		t.Run(mode, func(t *testing.T) {
+			tag, published := "v2.0.0", time.Now().Add(-SoakTime-time.Hour)
+			switch mode {
+			case "soaking":
+				published = time.Now().Add(-time.Hour)
+			case "patch":
+				tag, published = "v1.0.1", time.Now()
+			}
 			binary := []byte("new binary")
 			archive := archiveWith(t, "terma", binary)
 			sum := sha256.Sum256(archive)
@@ -97,7 +107,7 @@ func TestMaintainRequiresOptInAndVerifiesUpdates(t *testing.T) {
 				case "/repos/" + Repo + "/releases/latest":
 					lookups++
 					base := "http://" + r.Host
-					_ = json.NewEncoder(w).Encode(Release{TagName: "v2.0.0", Assets: []Asset{{Name: AssetName(runtime.GOOS, runtime.GOARCH), URL: base + "/archive"}, {Name: "checksums.txt", URL: base + "/sums"}}})
+					_ = json.NewEncoder(w).Encode(Release{TagName: tag, PublishedAt: published, Assets: []Asset{{Name: AssetName(runtime.GOOS, runtime.GOARCH), URL: base + "/archive"}, {Name: "checksums.txt", URL: base + "/sums"}}})
 				case "/sums":
 					fmt.Fprintf(w, "%x  %s\n", sum, AssetName(runtime.GOOS, runtime.GOARCH))
 				case "/archive":
@@ -123,8 +133,8 @@ func TestMaintainRequiresOptInAndVerifiesUpdates(t *testing.T) {
 			if err := os.WriteFile(exe, []byte("old binary"), 0755); err != nil {
 				t.Fatal(err)
 			}
-			if mode != "notify" {
-				if err := SavePreferences(configDir, Preferences{Auto: true}); err != nil {
+			if mode == "notify" {
+				if err := SavePreferences(configDir, Preferences{Auto: false}); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -144,7 +154,7 @@ func TestMaintainRequiresOptInAndVerifiesUpdates(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if mode == "auto" {
+			if mode == "auto" || mode == "patch" {
 				if !bytes.Equal(got, binary) || downloads != 1 {
 					t.Fatalf("update missing/repeated: %q, downloads %d, %s", got, downloads, &out)
 				}
@@ -165,7 +175,7 @@ func TestMaintainRequiresOptInAndVerifiesUpdates(t *testing.T) {
 			if mode == "managed" && (downloads != 0 || !strings.Contains(out.String(), "Run `terma update`")) {
 				t.Fatalf("managed installation: %s", &out)
 			}
-			if mode == "notify" && (downloads != 0 || !strings.Contains(out.String(), "terma update")) {
+			if (mode == "notify" || mode == "soaking") && (downloads != 0 || !strings.Contains(out.String(), "terma update")) {
 				t.Fatalf("notification: %s", &out)
 			}
 		})
@@ -189,4 +199,56 @@ func noticeOf(c *Client, ctx context.Context, dir, current string) string {
 	}
 	cache, _ := c.cachedCheck(ctx, dir, current)
 	return notice(cache, current)
+}
+
+func TestPreferencesDefaultOnAndRecordOnlyTheOptOut(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if p, err := LoadPreferences(dir); err != nil || !p.Auto {
+		t.Fatalf("no choice recorded: %+v %v, want automatic updates", p, err)
+	}
+	if err := SavePreferences(dir, Preferences{Auto: false}); err != nil {
+		t.Fatal(err)
+	}
+	if p, _ := LoadPreferences(dir); p.Auto {
+		t.Fatal("the opt-out did not stick")
+	}
+	if err := SavePreferences(dir, Preferences{Auto: true}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "config.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "auto_update") {
+		t.Fatalf("turning updates back on left a choice behind: %s", data)
+	}
+	if p, _ := LoadPreferences(dir); !p.Auto {
+		t.Fatal("turned back on, but off")
+	}
+}
+
+func TestOnlyMinorAndMajorReleasesSoak(t *testing.T) {
+	t.Parallel()
+	now := time.Now()
+	fresh, soaked := now.Add(-time.Hour), now.Add(-SoakTime)
+	for _, c := range []struct {
+		current, candidate string
+		published          time.Time
+		want               bool
+	}{
+		{"1.2.3", "1.2.4", fresh, false},
+		{"1.2.3", "1.2.4", time.Time{}, false},
+		{"1.2.3", "1.3.0", fresh, true},
+		{"1.2.3", "2.0.0", fresh, true},
+		{"1.2.3", "1.3.0", soaked, false},
+		{"1.2.3", "2.0.0", soaked, false},
+		// A check recorded before releases' dates were waits for the next one.
+		{"1.2.3", "1.3.0", time.Time{}, true},
+		{"v1.2.3", "v1.3.0-rc.1", fresh, true},
+	} {
+		if got := Soaking(c.current, c.candidate, c.published, now); got != c.want {
+			t.Errorf("Soaking(%s → %s, published %s ago) = %v, want %v", c.current, c.candidate, now.Sub(c.published), got, c.want)
+		}
+	}
 }
