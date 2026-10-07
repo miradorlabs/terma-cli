@@ -37,12 +37,14 @@ func (p *PolicyRefresher) Run(ctx context.Context) {
 	var fetches sync.WaitGroup
 	defer fetches.Wait()
 	for {
+		started := p.Now()
 		for _, team := range p.due() {
 			fetches.Go(func() {
 				_ = p.Refresh(ctx, team)
 				p.mu.Lock()
 				p.inFlight[team] = false
-				p.next[team] = p.Now().Add(p.Interval)
+				// From the start, so a slow fetch does not stretch the cadence.
+				p.next[team] = started.Add(p.Interval)
 				p.mu.Unlock()
 			})
 		}

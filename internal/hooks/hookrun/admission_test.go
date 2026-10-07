@@ -296,9 +296,9 @@ func TestAStalePolicyStartsARefresh(t *testing.T) {
 	if flushes != 2 {
 		t.Fatalf("another team's refresh waited on this one's: %d refreshes", flushes)
 	}
-	hook("s1", stale, at.Add(50*time.Second))
+	hook("s1", stale, at.Add(55*time.Second))
 	if flushes != 3 {
-		t.Fatalf("%d refreshes after 50 seconds, want 3", flushes)
+		t.Fatalf("%d refreshes after 55 seconds, want 3", flushes)
 	}
 	unlock, err := flock.TryLock(filepath.Join(stateDir, config.PoliciesDir, refreshedDir, "t1.lock"))
 	if err != nil {

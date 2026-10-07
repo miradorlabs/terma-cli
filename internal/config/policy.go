@@ -107,8 +107,9 @@ func (p Policy) Expired(now time.Time) bool {
 }
 
 // PolicyStaleAfter is how old a policy grows only when no relay is refreshing it: a running
-// relay fetches it at most 35 seconds apart (its 30-second interval plus one discovery).
-const PolicyStaleAfter = 45 * time.Second
+// relay starts a fetch at most 35 seconds after the last one started (its 30-second
+// interval plus one discovery), and a fetch takes at most 10 seconds (policy.FetchTimeout).
+const PolicyStaleAfter = 50 * time.Second
 
 // Stale reports whether p is validated but more than PolicyStaleAfter old.
 func (p Policy) Stale(now time.Time) bool {

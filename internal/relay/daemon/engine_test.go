@@ -9,6 +9,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/policy"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/routing"
@@ -143,12 +144,12 @@ func TestAFreshBindingIsHeldUntilTheRelayFetchesItsPolicy(t *testing.T) {
 	}
 }
 
-// A running relay refreshes well inside config.PolicyStaleAfter, so hooks never take its
-// policy for one nothing refreshes.
+// A running relay refreshes inside config.PolicyStaleAfter, even when a fetch takes all of
+// its time, so hooks never take its policy for one nothing refreshes.
 func TestARunningRelayKeepsThePolicyFresh(t *testing.T) {
 	t.Parallel()
 	r := Deps{}.Refresher()
-	if r.Interval+r.Discover >= config.PolicyStaleAfter {
-		t.Fatalf("refresh every %v, discover every %v: a running relay's policy looks stale after %v", r.Interval, r.Discover, config.PolicyStaleAfter)
+	if r.Interval+r.Discover+policy.FetchTimeout >= config.PolicyStaleAfter {
+		t.Fatalf("refresh every %v, discover every %v, fetch for up to %v: a running relay's policy looks stale after %v", r.Interval, r.Discover, policy.FetchTimeout, config.PolicyStaleAfter)
 	}
 }

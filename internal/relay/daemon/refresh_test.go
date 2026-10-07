@@ -166,16 +166,15 @@ func TestRefresherDiscoversATeamWhileAFetchHangs(t *testing.T) {
 	close(release)
 }
 
-// A running relay fetches each team's policy at least every 35 seconds, a fetch's own
-// latency included, so a change made in the Terma web app reaches the machine within about
-// half a minute. A fetch ends just after the discovery that started it, so the next one
-// waits for the first discovery after Interval: Interval plus up to one Discover.
+// A running relay starts a fetch of each team's policy at most 35 seconds after the last
+// one started, however long the fetches take: the next is due Interval after the last
+// started, at the first discovery from then.
 func TestARunningRelayFetchesThePolicyEveryHalfMinute(t *testing.T) {
 	t.Parallel()
-	const latency = 300 * time.Millisecond
+	const latency = 9 * time.Second
 	c := newClock()
 	var mu sync.Mutex
-	var fetches []time.Time
+	var starts []time.Time
 	var late time.Duration // how far fetches moved the clock past the last discovery
 	p := Deps{}.Refresher()
 	p.Teams = func() []string { return []string{"a"} }
@@ -183,11 +182,11 @@ func TestARunningRelayFetchesThePolicyEveryHalfMinute(t *testing.T) {
 	p.Now, p.After = c.Now, c.After
 	p.Refresh = func(context.Context, string) error {
 		c.mu.Lock()
+		start := c.now
 		c.now = c.now.Add(latency)
-		at := c.now
 		c.mu.Unlock()
 		mu.Lock()
-		fetches, late = append(fetches, at), late+latency
+		starts, late = append(starts, start), late+latency
 		mu.Unlock()
 		return nil
 	}
@@ -220,12 +219,12 @@ func TestARunningRelayFetchesThePolicyEveryHalfMinute(t *testing.T) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	if len(fetches) < 2 {
-		t.Fatalf("fetched %d times in three minutes", len(fetches))
+	if len(starts) < 2 {
+		t.Fatalf("fetched %d times in three minutes", len(starts))
 	}
-	for i := 1; i < len(fetches); i++ {
-		if gap := fetches[i].Sub(fetches[i-1]); gap > 35*time.Second {
-			t.Fatalf("fetch %d came %v after the one before; want at most 35s", i, gap)
+	for i := 1; i < len(starts); i++ {
+		if gap := starts[i].Sub(starts[i-1]); gap > 35*time.Second {
+			t.Fatalf("fetch %d started %v after the one before; want at most 35s", i, gap)
 		}
 	}
 }
