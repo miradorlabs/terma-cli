@@ -251,6 +251,7 @@ func PrepareCommitMsg(ctx context.Context, env Env) error {
 	if err != nil || r.GitDir == "" {
 		return nil
 	}
+	env.Cwd = "" // git runs its hooks at the checkout's root, not where the agent works: keep its directory
 	manifests, err := r.Store.Manifests()
 	if err != nil {
 		env.Logf("manifests: %v", err)
@@ -310,6 +311,7 @@ func PostCommit(ctx context.Context, env Env) error {
 	if err != nil || r.GitDir == "" {
 		return nil
 	}
+	env.Cwd = "" // git runs its hooks at the checkout's root, not where the agent works: keep its directory
 	head, err := gitx.LastCommit(ctx, r.Root)
 	if err != nil || head.SHA == "" {
 		return nil

@@ -133,9 +133,11 @@ func TestConcurrentWritersKeepEveryProcess(t *testing.T) {
 	now := time.Now()
 	var wg sync.WaitGroup
 	for i := range 16 {
-		wg.Go(func() {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 			Write(dir, "s", Claim{ProjectID: "p", PIDs: []int{1000 + i}}, now)
-		})
+		}()
 	}
 	wg.Wait()
 	c, ok := Read(dir, "s", now)
@@ -393,5 +395,29 @@ func TestClaimFollowsTheDirectoryInPlace(t *testing.T) {
 		if latest, _ := got.At(10, at); latest.Cwd != c.Cwd || latest.Root != "/src/api" {
 			t.Fatalf("move %d: At = %+v", i, latest)
 		}
+	}
+}
+
+// A claim naming no directory (a git hook's, which runs at the checkout's root) keeps the one an
+// agent hook named: a fresh claim is not rewritten, and a stale one keeps it as it refreshes.
+func TestClaimWithoutADirectoryKeepsTheSessions(t *testing.T) {
+	t.Parallel()
+	dir := enable(t)
+	at := time.Now().Add(-time.Hour).Truncate(time.Second)
+	agent := Claim{ProjectID: "p1", Tool: "claude-code", Root: "/src/api", Cwd: "/src/api/web", PIDs: []int{10}}
+	if !Write(dir, "s", agent, at) {
+		t.Fatal("the agent's claim did not write")
+	}
+	git := agent
+	git.Cwd = ""
+	if Write(dir, "s", git, at.Add(time.Second)) {
+		t.Fatal("a git hook's claim within Refresh rewrote the claim")
+	}
+	at = time.Now().Add(2 * Refresh) // freshness is the file mtime, which the first write set to now
+	if !Write(dir, "s", git, at) {
+		t.Fatal("a stale claim was not refreshed")
+	}
+	if got, ok := Read(dir, "s", at); !ok || got.Cwd != "/src/api/web" || len(got.Placements) != 1 || got.Placements[0].Cwd != "/src/api/web" {
+		t.Fatalf("after the git hook's refresh: %+v", got)
 	}
 }

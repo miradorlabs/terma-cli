@@ -48,8 +48,8 @@ type Claim struct {
 	// Root is the working tree the claiming hook ran in, "" outside git: what the relay
 	// stamps as terma.repository.root.
 	Root string `json:"root,omitempty"`
-	// Cwd is the directory the claiming hook ran in, symlink-resolved: what the relay stamps
-	// as terma.working_directory.
+	// Cwd is the directory the claiming agent hook ran in, symlink-resolved: what the relay
+	// stamps as terma.working_directory. A git hook names none and keeps the session's.
 	Cwd       string    `json:"cwd,omitempty"`
 	ClaimedAt time.Time `json:"claimed_at"`
 	// PIDs are the processes the claiming hooks ran under, so a session resumed by another
@@ -205,6 +205,9 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 		if c.Tool == "" {
 			c.Tool = prev.Tool
 		}
+		if c.Cwd == "" {
+			c.Cwd = prev.Cwd
+		}
 		placements = prev.placements()
 		placements = placements[:len(placements)-1]
 	default:
@@ -236,9 +239,9 @@ func samePlace(prev, c Claim) bool {
 }
 
 // sameDirs reports whether c names the working tree and directory prev does, so a fresh claim
-// needs no rewrite.
+// needs no rewrite. A claim naming no directory (a git hook's) keeps prev's.
 func sameDirs(prev, c Claim) bool {
-	return prev.Root == c.Root && prev.Cwd == c.Cwd
+	return prev.Root == c.Root && (c.Cwd == "" || prev.Cwd == c.Cwd)
 }
 
 func subset(a, b []int) bool {

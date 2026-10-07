@@ -231,7 +231,7 @@ const (
 	TermaUsageSemanticsKey = "terma.usage.semantics"
 	// TermaUsageStatusKey is terma.usage.status: Whether the record's usage counts were reported.
 	TermaUsageStatusKey = "terma.usage.status"
-	// TermaWorkingDirectoryKey is terma.working_directory: The absolute path of the directory the session's hooks last ran in.
+	// TermaWorkingDirectoryKey is terma.working_directory: The absolute path of the directory the session's agent hooks last ran in.
 	TermaWorkingDirectoryKey = "terma.working_directory"
 	// UserEmailKey is user.email: User email address.
 	UserEmailKey = "user.email"

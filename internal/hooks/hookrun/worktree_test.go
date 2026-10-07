@@ -2,13 +2,12 @@ package hookrun
 
 import (
 	"context"
+	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/miradorlabs/terma-cli/internal/semconv"
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
