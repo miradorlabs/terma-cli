@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -128,7 +129,7 @@ func TestSetupAndDoctorSayWhenTheTeamHasNoPolicy(t *testing.T) {
 		t.Fatalf("stored policy = %+v, %v; want unset and admitting nothing", loaded.Policy, err)
 	}
 	out, _ = runTerma(t, "doctor")
-	if !strings.Contains(out, "your team has no collection policy yet") || !strings.Contains(out, doctor.NoPolicyStep) {
+	if !regexp.MustCompile(`repository collected +your team has no collection policy\n`).MatchString(out) || !strings.Contains(out, doctor.NoPolicyStep) {
 		t.Errorf("doctor did not say the team has no policy:\n%s", out)
 	}
 }
