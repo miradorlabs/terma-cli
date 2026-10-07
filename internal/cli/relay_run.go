@@ -60,12 +60,7 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 			if res.AlreadyRunning && !quiet {
 				fmt.Fprintln(cmd.OutOrStdout(), "The relay is already running.")
 			}
-			// Exit for the service manager to start the newer terma, whoever installed it;
-			// a hook-started relay is restarted by the next hook.
-			if res.Restart() {
-				return exitWith(ExitRestart)
-			}
-			return nil
+			return app.afterRelay(res)
 		},
 	}
 	// Long, because an agent may export before its first hook.
@@ -76,6 +71,21 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&asService, "service", false, "run as the relay service")
 	_ = cmd.Flags().MarkHidden("service")
 	return cmd
+}
+
+// afterRelay ends a relay's run. One that should run again exits for the service manager to
+// start the newer terma, whoever installed it. A hook-started relay has none: one that
+// updated itself starts its successor, the release it installed, now that its lock is free,
+// since an agent may export before the next hook; one replaced by a newer hook's terma is
+// started again by that hook's next run.
+func (app *App) afterRelay(res daemon.Result) error {
+	if res.Updated && !res.Service {
+		app.spawnRelay(app.stateDir, app.version)
+	}
+	if res.Restart() {
+		return exitWith(ExitRestart)
+	}
+	return nil
 }
 
 // relayUpdater has the relay install each new release in place of its own binary, as
@@ -89,7 +99,13 @@ func (app *App) relayUpdater() *daemon.Updater {
 		os.Getenv("CI") != "" || os.Getenv("TERMA_NO_UPDATE_CHECK") == "1" {
 		return nil
 	}
-	client := &selfupdate.Client{Version: app.version}
+	// The binary as this relay started: once another install replaces it, this relay is no
+	// longer what is installed, and installs nothing over it.
+	binary, err := os.Stat(exe)
+	if err != nil {
+		return nil
+	}
+	client := &selfupdate.Client{Version: app.version, Binary: binary}
 	return &daemon.Updater{Every: daemon.UpdateEvery, Update: func(ctx context.Context) (string, error) {
 		if p, err := selfupdate.LoadPreferences(app.dir); err != nil || !p.Auto {
 			return "", nil

@@ -69,6 +69,10 @@ type Client struct {
 	HTTP    *http.Client
 	BaseURL string // GitHub API base; defaults to https://api.github.com
 	Version string // the running version, for User-Agent
+	// Binary, set, is the executable as this process started from it: a long-running
+	// process whose executable another install has since replaced is no longer the version
+	// installed, and Auto replaces nothing for it.
+	Binary os.FileInfo
 }
 
 // httpClient is the configured client, or one with a timeout, with redirects held to checkDownloadOrigin.

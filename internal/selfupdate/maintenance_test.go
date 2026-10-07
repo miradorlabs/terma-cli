@@ -377,3 +377,35 @@ func TestAFailedLookupBeforeAnInstallIsRetriedSoon(t *testing.T) {
 		t.Fatalf("Auto = %+v after %d downloads, want 2.0.0 installed once the retry is due", o, downloads)
 	}
 }
+
+// A long-running terma whose binary another install has since replaced is no longer what is
+// installed: it installs nothing over it, even a release later than its own, which may be
+// earlier than the one now in place.
+func TestAStaleProcessNeverReplacesTheInstalledBinary(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("in-place updates are Unix-only")
+	}
+	downloads := 0
+	srv := fakeReleases(t, "v1.0.2", []byte("1.0.2"), &downloads, 0)
+	stateDir, exe := t.TempDir(), oldBinary(t)
+	started, err := os.Stat(exe)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// `terma update` from a shell put 1.0.3 in place, renamed over the binary this process runs.
+	next := exe + ".next"
+	if err := os.WriteFile(next, []byte("1.0.3"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(next, exe); err != nil {
+		t.Fatal(err)
+	}
+	c := &Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.1", Binary: started}
+	if o := c.Auto(context.Background(), t.TempDir(), stateDir, exe, nil); o != (Outcome{}) || downloads != 0 {
+		t.Fatalf("Auto = %+v after %d downloads, want nothing done", o, downloads)
+	}
+	if got, _ := os.ReadFile(exe); string(got) != "1.0.3" {
+		t.Fatalf("the installed binary is now %q, want 1.0.3 left in place", got)
+	}
+}

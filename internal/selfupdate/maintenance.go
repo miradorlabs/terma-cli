@@ -196,6 +196,12 @@ func (c *Client) Auto(ctx context.Context, configDir, stateDir, exe string, prog
 		return Outcome{}
 	}
 	defer unlock()
+	if c.Binary != nil {
+		// Checked under the lock: another install may have put a later release in place.
+		if now, err := os.Stat(exe); err != nil || !os.SameFile(now, c.Binary) {
+			return Outcome{}
+		}
+	}
 	cache, rel := c.cachedCheck(ctx, stateDir, c.Version)
 	attempted := cache.Attempted == cache.Latest && time.Since(cache.AttemptAt) < CheckInterval
 	if !p.Auto || !Newer(c.Version, cache.Latest) || !UpdatesItself(exe) || attempted ||

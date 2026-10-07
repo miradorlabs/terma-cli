@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
+	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 )
 
@@ -252,5 +253,35 @@ func TestTheRelayUpdatesOnlyWhereItCould(t *testing.T) {
 	// A pass that looked would have recorded its check.
 	if checked := !selfupdate.LoadCache(release.stateDir).CheckedAt.IsZero(); checked {
 		t.Fatal("turned off, the relay still looked for a release")
+	}
+}
+
+// A hook-started relay that updated itself starts its successor, since no service will; a
+// service's relay is restarted by its service manager, and one that made way for a newer
+// hook's terma is started again by that hook.
+func TestOnlyAnUpdatedHookStartedRelayStartsItsSuccessor(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		res     daemon.Result
+		spawned bool
+		restart bool
+	}{
+		{"updated, hook-started", daemon.Result{Updated: true}, true, true},
+		{"updated, service", daemon.Result{Updated: true, Service: true}, false, true},
+		{"replaced, hook-started", daemon.Result{Replaced: true}, false, true},
+		{"idle, hook-started", daemon.Result{}, false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			app := New(builtin.Agents, "1.3.0")
+			app.stateDir = t.TempDir()
+			spawned := false
+			app.spawnRelay = func(stateDir, version string) {
+				spawned = stateDir == app.stateDir && version == "1.3.0"
+			}
+			err := app.afterRelay(tc.res)
+			if spawned != tc.spawned || (err != nil) != tc.restart {
+				t.Fatalf("afterRelay(%+v): spawned %v, err %v; want spawned %v, restart %v", tc.res, spawned, err, tc.spawned, tc.restart)
+			}
+		})
 	}
 }

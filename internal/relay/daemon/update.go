@@ -15,10 +15,11 @@ const UpdateEvery = time.Hour
 // agent at work exports every few seconds, an idle one about once a minute at most.
 const updateQuiet = 30 * time.Second
 
-// updateMaxWait bounds how long a relay that installed a release waits for its hold to
-// empty and its agents to pause: an agent that never pauses for a working day cannot keep
-// the earlier release running past it.
-var updateMaxWait = 12 * time.Hour
+// updatePauseWait is how long a relay that installed a release waits for its agents to
+// pause; after it, an agent that never pauses for a working day no longer keeps the earlier
+// release running, and the relay restarts at the first moment it holds nothing. It never
+// restarts while it holds anything: that lives in memory alone.
+var updatePauseWait = 12 * time.Hour
 
 // Updater keeps the relay's own terma up to date, so an install nobody runs a command on
 // still takes each release: the relay is the one process that runs all day.

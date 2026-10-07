@@ -16,6 +16,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/procinfo"
+	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 
 	"github.com/spf13/cobra"
 
@@ -168,13 +169,15 @@ type App struct {
 	runUpdateStep        func(ctx context.Context, out io.Writer, argv ...string) error
 	nateBinaryCandidates func() []string
 	nateRemoveBinary     func(cmd *cobra.Command, path string) error
+	// spawnRelay starts a relay for a state directory, detached, as a hook does.
+	spawnRelay func(stateDir, version string)
 }
 
 // New is the command line for the agents agentsFor registers under a config directory, at
 // version.
 func New(agentsFor func(configDir string) *agents.Registry, version string) *App {
 	app := &App{agentsFor: agentsFor, version: version, binDirs: doctor.WellKnownBinDirs, hookExecutable: procinfo.AbsExecutable,
-		managedRoot: "/", runUpdateStep: runUpdateStep, nateRemoveBinary: removeNateBinary}
+		managedRoot: "/", runUpdateStep: runUpdateStep, nateRemoveBinary: removeNateBinary, spawnRelay: daemon.Spawn}
 	app.nateBinaryCandidates = app.installedTermaBinaries
 	return app
 }

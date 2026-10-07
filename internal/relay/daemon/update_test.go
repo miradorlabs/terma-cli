@@ -195,36 +195,35 @@ func TestAnUpdatedRelayRestartsWhileARouteKeepsFailing(t *testing.T) {
 	}
 }
 
-// A relay that installed a newer terma but whose hold never empties restarts at
-// updateMaxWait all the same.
-func TestAnUpdatedRelayRestartsAtTheCap(t *testing.T) {
-	was := updateMaxWait
-	updateMaxWait = 2 * time.Second
-	t.Cleanup(func() { updateMaxWait = was })
-	stateDir, _, token := setUpRelay(t)
+// A relay that installed a newer terma stops waiting for its agents to pause after
+// updatePauseWait, but never restarts while it holds anything: it goes once its hold empties.
+func TestAnUpdatedRelayNeverDropsWhatItHoldsAfterThePauseWait(t *testing.T) {
+	was := updatePauseWait
+	updatePauseWait = time.Second
+	t.Cleanup(func() { updatePauseWait = was })
+	stateDir, dir, token := setUpRelay(t)
 	c := runConfig(stateDir, 0, nil)
-	c.Addr, c.Version, c.Service = freeAddr(t), "1.2.0", true
-	install := make(chan struct{})
-	var waits []time.Duration
-	c.Updater = &Updater{Every: time.Hour, After: now(&waits), Jitter: func(time.Duration) time.Duration { return 0 },
-		Update: func(ctx context.Context) (string, error) {
-			select {
-			case <-install:
-				return "1.3.0", nil
-			case <-ctx.Done():
-				return "", ctx.Err()
-			}
-		}}
+	c.Addr, c.Version, c.Service, c.Updater = freeAddr(t), "1.2.0", true, installsAtOnce()
+	var ahead atomic.Int64
+	c.Engine.Now = func() time.Time { return time.Now().Add(time.Duration(ahead.Load())) }
 	r := startRun(t, c)
 	r.await(t, "the relay")
 	postSessionlessSpans(t, c.Addr, token, 5)
-	close(install)
 	select {
 	case <-r.done:
-	case <-time.After(updateMaxWait + 5*time.Second):
-		t.Fatal("the relay kept running past the cap")
+		t.Fatalf("the relay restarted while it held, past the pause wait: %+v", r.res)
+	case <-time.After(updatePauseWait + 2*time.Second):
+	}
+	ahead.Store(int64(relay.DefaultTraceHold + time.Minute)) // the held spans age out
+	select {
+	case <-r.done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the relay kept running once its hold was empty")
 	}
 	if !r.res.Updated {
 		t.Fatalf("Run = %+v, want Updated", r.res)
+	}
+	if got := counters(t, filepath.Join(dir, StatsFile))["dropped.no_session_trace_at_exit.traces"]; got != 0 {
+		t.Fatalf("the restart dropped %d held spans", got)
 	}
 }
