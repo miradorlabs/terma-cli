@@ -6,7 +6,10 @@ import (
 	"io"
 	"slices"
 	"strings"
+	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
@@ -65,6 +68,23 @@ func (u *setupUI) line(out io.Writer, mark, label, what string) {
 func (u *setupUI) Then(step string) {
 	if !slices.Contains(u.next, step) {
 		u.next = append(u.next, step)
+	}
+}
+
+// policyFetched says which team and policy are now in force, and what is left to do about
+// them: a list to fill in, or commit hooks to turn on for commit-level accuracy.
+func (u *setupUI) policyFetched(team string, pol config.Policy) {
+	if team != "" {
+		u.Summary("Team", team)
+	}
+	if pol.AdmitsNone() {
+		u.Warn("Collects", doctor.PolicySummary(pol))
+		u.Then(doctor.NoRepositoriesStep)
+		return
+	}
+	u.Summary("Collects", doctor.PolicySummary(pol))
+	if doctor.GitHooksOff(pol, time.Now()) {
+		u.Then(doctor.GitHooksOffStep)
 	}
 }
 

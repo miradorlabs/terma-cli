@@ -264,7 +264,14 @@ func (d *run) commitHooks() Check {
 	if d.env.RepoErr != nil {
 		return Check{Status: Skip, Detail: "not inside a repository"}
 	}
-	return CommitHooksCheck(JudgeCommitHooks(d.env.GitDir, d.pol, time.Now()))
+	now := time.Now()
+	verdict := JudgeCommitHooks(d.env.GitDir, d.pol, now)
+	c := CommitHooksCheck(verdict)
+	// A skip with a → line: information that never counts as setup needing attention.
+	if verdict == CommitHooksOff && GitHooksOff(d.pol, now) {
+		c.Fix = GitHooksOffStep
+	}
+	return c
 }
 
 func (d *run) agentsExporting() Check {
