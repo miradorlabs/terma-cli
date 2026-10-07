@@ -226,6 +226,10 @@ func (c *Client) Auto(ctx context.Context, configDir, stateDir, exe string, prog
 	updateCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	if rel == nil {
+		// A check that failed waits out its backoff before any lookup, this one included.
+		if cache.Failed {
+			return Outcome{Notice: notice(cache, c.Version)}
+		}
 		if rel, err = c.Latest(updateCtx); err != nil {
 			// A failed lookup, retried as a failed check is, not held back a day as an install.
 			cache.CheckedAt, cache.Failed, cache.Failures = time.Now(), true, cache.Failures+1

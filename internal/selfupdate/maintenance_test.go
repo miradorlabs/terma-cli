@@ -383,6 +383,10 @@ func TestAFailedLookupBeforeAnInstallIsRetriedSoon(t *testing.T) {
 	if cache.Attempted != "" || !cache.Failed || cache.Failures != 1 {
 		t.Fatalf("after a failed lookup the check records %+v, want a failed check and no attempt", cache)
 	}
+	// Within the backoff, no lookup at all: one would succeed here, and install.
+	if o := c.Auto(context.Background(), t.TempDir(), stateDir, exe, nil); o.Installed != "" || o.Err != nil || downloads != 0 {
+		t.Fatalf("Auto = %+v after %d downloads within the backoff, want no lookup", o, downloads)
+	}
 	cache.CheckedAt = time.Now().Add(-RetryInterval - time.Minute)
 	SaveCache(stateDir, cache)
 	if o := c.Auto(context.Background(), t.TempDir(), stateDir, exe, nil); o.Installed != "2.0.0" || downloads != 1 {
