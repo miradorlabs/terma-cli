@@ -103,10 +103,14 @@ type Repo struct {
 }
 
 // workTree is the checkout's root inside git, "" for a folder outside it: only a working
-// tree is a repository root to the platform.
+// tree is a repository root to the platform. It is symlink-resolved, as the platform compares
+// it, however the hook's cwd reached the checkout (/tmp is /private/tmp on macOS).
 func (r *Repo) workTree() string {
 	if r == nil || r.GitDir == "" {
 		return ""
+	}
+	if resolved, err := filepath.EvalSymlinks(r.Root); err == nil {
+		return resolved
 	}
 	return r.Root
 }
