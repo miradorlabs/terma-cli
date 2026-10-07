@@ -185,6 +185,9 @@ type Outcome struct {
 	Installed string
 	// Notice names a newer release the pass did not install.
 	Notice string
+	// Replaced means another install put a release in place while this process ran, so it
+	// did nothing: the next command runs that release.
+	Replaced bool
 	// Err is a failed install; the next attempt waits a day.
 	Err error
 }
@@ -211,7 +214,7 @@ func (c *Client) Auto(ctx context.Context, configDir, stateDir, exe string, prog
 	// Checked under the lock: another install may have put a later release in place, which
 	// this process's version says nothing about.
 	if c.Replaced(exe) {
-		return Outcome{}
+		return Outcome{Replaced: true}
 	}
 	cache, rel := c.cachedCheck(ctx, stateDir, c.Version)
 	attempted := cache.Attempted == cache.Latest && time.Since(cache.AttemptAt) < CheckInterval
@@ -258,6 +261,8 @@ func (c *Client) Maintain(ctx context.Context, configDir, stateDir, exe string, 
 		fmt.Fprintf(out, "Automatic update failed: %v. Run `terma update` to retry.\n", o.Err)
 	case o.Installed != "":
 		fmt.Fprintf(out, "Updated terma to %s; the next invocation uses it.\n", o.Installed)
+	case o.Replaced:
+		fmt.Fprintln(out, "terma was updated while this command ran; the next invocation uses the new version.")
 	case o.Notice != "":
 		fmt.Fprintln(out, o.Notice)
 	}

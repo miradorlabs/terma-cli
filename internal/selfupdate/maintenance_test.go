@@ -425,7 +425,10 @@ func TestAStaleProcessNeverReplacesTheInstalledBinary(t *testing.T) {
 			if got, _ := os.ReadFile(exe); string(got) != "1.0.3" || older != 0 {
 				t.Fatalf("the installed binary is now %q after %d downloads (%s), want 1.0.3 left in place", got, older, &out)
 			}
-			if o := stale.Auto(context.Background(), configDir, stateDir, exe, nil); o.Installed != "" || older != 0 {
+			if said := strings.Contains(out.String(), "updated while this command ran"); said != tc.knows {
+				t.Fatalf("Maintain said %q; a process that knows its binary says it was updated meanwhile", &out)
+			}
+			if o := stale.Auto(context.Background(), configDir, stateDir, exe, nil); o.Installed != "" || o.Replaced != tc.knows || older != 0 {
 				t.Fatalf("Auto = %+v after %d downloads, want nothing installed", o, older)
 			}
 		})
