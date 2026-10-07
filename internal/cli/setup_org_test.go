@@ -116,3 +116,25 @@ func TestSetupSignInChoosesAmongSeveralOrganizations(t *testing.T) {
 		})
 	}
 }
+
+// A setup that stops at the organization step leaves the credential where it was stored,
+// though the sign-in before it saved the credential under the storage being tried.
+func TestSetupStoppedAtTheOrganizationStepKeepsTheCredentialWhereItWas(t *testing.T) {
+	gateway := newFakeAuth(t)
+	gateway.orgsDown = true
+	authSandbox(t, gateway)
+	sandboxMachine(t)
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway, orgA())); err != nil {
+		t.Fatal(err)
+	}
+	if auth.StoredInFile(testApp.dir, config.DefaultProfile) {
+		t.Skip("no keychain to keep the credential in")
+	}
+	out, err := runTerma(t, "setup", "--harness", "codex", "--insecure-storage")
+	if err == nil || !strings.Contains(err.Error(), "list your organizations") {
+		t.Fatalf("setup should stop at the organization step: %v\n%s", err, out)
+	}
+	if config.InsecureStorage(testApp.dir) || auth.StoredInFile(testApp.dir, config.DefaultProfile) {
+		t.Fatal("the credential stayed in plain text after setup stopped")
+	}
+}

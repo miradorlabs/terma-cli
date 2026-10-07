@@ -30,6 +30,8 @@ type fakeAuth struct {
 	orgLists   atomic.Int32
 	// orgs is what /v1/organizations lists, fakeOrgs when nil.
 	orgs []organization
+	// orgsDown fails /v1/organizations.
+	orgsDown bool
 }
 
 var fakeOrgs = []organization{
@@ -64,6 +66,10 @@ func newFakeAuth(t *testing.T) *fakeAuth {
 			})
 		case "/v1/organizations":
 			f.orgLists.Add(1)
+			if f.orgsDown {
+				http.Error(w, "unavailable", http.StatusServiceUnavailable)
+				return
+			}
 			orgs := f.orgs
 			if orgs == nil {
 				orgs = fakeOrgs

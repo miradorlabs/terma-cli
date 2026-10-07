@@ -67,13 +67,14 @@ type signInResult struct {
 type orgAsker func(orgs []organization, current string) (*organization, error)
 
 // setupSignIn signs in to opts.org, else to the stored sign-in's organization, asking
-// first when its user belongs to several; a browser sign-in chose one on the page. kept
-// is how many organizations the current one was kept among without asking.
-func (app *App) setupSignIn(cmd *cobra.Command, cfg *config.Config, opts signInOptions, ask orgAsker) (_ *config.Config, kept int, _ error) {
+// first when its user belongs to several; a browser sign-in chose one on the page. The
+// count is how many organizations the current one was kept among without asking.
+func (app *App) setupSignIn(cmd *cobra.Command, cfg *config.Config, opts signInOptions, ask orgAsker) (*config.Config, int, error) {
 	res, err := app.signIn(cmd, cfg, opts)
 	if err != nil {
 		return nil, 0, err
 	}
+	kept := 0
 	if res.reused && opts.org.empty() {
 		client, err := api.New(cfg, api.Options{Version: app.version, Credential: res.cred})
 		if err != nil {

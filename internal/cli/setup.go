@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
@@ -153,7 +154,9 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 				reportCredentialStore(ui, cfg, f.insecureStorage)
 				app.settleSecrets(ui, cfg, f.insecureStorage)
 			} else {
+				// A stored session it reused was already saved under the storage being tried.
 				_ = config.UpdateFile(app.dir, func(file *config.File) { file.InsecureStorage = wasInsecure })
+				_ = auth.Relocate(app.dir)
 			}
 			return cfg, err
 		},
