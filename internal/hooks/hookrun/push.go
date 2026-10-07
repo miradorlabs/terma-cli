@@ -17,6 +17,10 @@ import (
 // bounds a commit's files.
 const MaxPushCommits = 50
 
+// maxPushSearch bounds the commits searched for stamped sessions: far more than are reported,
+// so a stamped commit under a run of later ones is still found.
+const maxPushSearch = 1000
+
 // maxPushRefs bounds the ref lines read, so a mirror push of a huge repository cannot make a
 // git call too long for its argument list; a push past it is recorded from its first refs.
 const maxPushRefs = 1000
@@ -71,21 +75,22 @@ func PrePush(ctx context.Context, env Env) error {
 			have = append(have, ref.remoteSHA)
 		}
 	}
-	// One past the bound tells a full list from a cut one.
-	commits, err := gitx.PushedCommits(ctx, r.Root, tips, have, MaxPushCommits+1)
+	commits, err := gitx.PushedCommits(ctx, r.Root, tips, have, maxPushSearch)
 	if err != nil {
 		env.Logf("pushed commits: %v", err)
 		return nil
 	}
-	truncated := len(commits) > MaxPushCommits
-	commits = commits[:min(len(commits), MaxPushCommits)]
 	comment := gitx.CommentCharFS(r.GitDir)
-	var sessions []string
+	var sessions, stamped, others []string
 	tool := ""
-	shas := make([]string, 0, len(commits))
 	for _, c := range commits {
-		shas = append(shas, c.SHA)
-		for _, t := range trailer.Parse(c.Message, comment) {
+		trailers := trailer.Parse(c.Message, comment)
+		if len(trailers) == 0 {
+			others = append(others, c.SHA)
+			continue
+		}
+		stamped = append(stamped, c.SHA)
+		for _, t := range trailers {
 			if !slices.Contains(sessions, t.SessionID) {
 				sessions = append(sessions, t.SessionID)
 			}
@@ -97,6 +102,10 @@ func PrePush(ctx context.Context, env Env) error {
 	if len(sessions) == 0 {
 		return nil
 	}
+	// The stamped commits are the evidence, so a cut list keeps them first.
+	shas := append(stamped, others...)
+	truncated := len(shas) > MaxPushCommits || len(commits) == maxPushSearch
+	shas = shas[:min(len(shas), MaxPushCommits)]
 	attrs := map[string]any{
 		semconv.TermaPushSessionIDsKey: sessions, semconv.GenAIMainAgentNameKey: tool,
 		semconv.TermaPushCommitShasKey: shas, semconv.TermaPushCommitCountKey: len(shas),

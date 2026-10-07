@@ -107,6 +107,21 @@ func TestPrePushRecordsTheStampedCommitsAPushSends(t *testing.T) {
 		t.Errorf("a push of %d refs = %+v", MaxPushCommits+6, events)
 	}
 
+	// A stamped commit under more unstamped ones than the event lists is still found, and
+	// listed first.
+	for i := range MaxPushCommits + 5 {
+		commit(fmt.Sprintf("human %d", i))
+	}
+	tip := git("rev-parse", "HEAD")
+	events = push(fmt.Sprintf("refs/heads/main %s refs/heads/main %s\n", tip, base), "up", remote)
+	if len(events) != 1 {
+		t.Fatalf("a stamped commit under %d later ones was not recorded: %+v", MaxPushCommits+5, events)
+	}
+	if got := events[0].Attrs[semconv.TermaPushCommitShasKey].([]any); len(got) != MaxPushCommits || got[0] != b || got[1] != a ||
+		events[0].Attrs[semconv.TermaPushCommitShasTruncatedKey] != true {
+		t.Errorf("shas = %v (want %s, %s first), truncated %v", got[:3], b, a, events[0].Attrs[semconv.TermaPushCommitShasTruncatedKey])
+	}
+
 	// Nothing stamped in what is sent, nothing to push, or a deletion alone: no event.
 	for _, stdin := range []string{
 		fmt.Sprintf("refs/heads/main %s refs/heads/main %s\n", human, base),

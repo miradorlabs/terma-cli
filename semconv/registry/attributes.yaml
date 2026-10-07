@@ -507,12 +507,13 @@ attributes:
   - key: terma.push.commit.shas
     type: string[]
     stability: development
-    brief: The full ids of the commits the push sends that the remote lacks, newest first, at most 50.
+    brief: The full ids of the commits the push sends that the remote lacks, at most 50, stamped ones first.
     note: >
       Commits reachable from the pushed shas and from none of the remote's shas or any
       remote-tracking ref, as the repository knew them when the push began: a commit another
       remote already has is not listed, so a push to a remote never fetched does not claim
-      history that landed long ago.
+      history that landed long ago. Up to 1,000 such commits are searched; the stamped ones
+      come first, newest first, then the newest of the rest.
   - key: terma.push.commit.count
     type: int
     stability: development

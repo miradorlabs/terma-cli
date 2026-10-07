@@ -167,7 +167,7 @@ const (
 	TermaProviderSessionIDKey = "terma.provider.session.id"
 	// TermaPushCommitCountKey is terma.push.commit.count: How many commits terma.push.commit.shas lists.
 	TermaPushCommitCountKey = "terma.push.commit.count"
-	// TermaPushCommitShasKey is terma.push.commit.shas: The full ids of the commits the push sends that the remote lacks, newest first, at most 50.
+	// TermaPushCommitShasKey is terma.push.commit.shas: The full ids of the commits the push sends that the remote lacks, at most 50, stamped ones first.
 	TermaPushCommitShasKey = "terma.push.commit.shas"
 	// TermaPushCommitShasTruncatedKey is terma.push.commit.shas_truncated: Whether the push sends more commits than terma.push.commit.shas lists.
 	TermaPushCommitShasTruncatedKey = "terma.push.commit.shas_truncated"
