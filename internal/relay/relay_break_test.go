@@ -183,7 +183,7 @@ func TestRelayBoundsTheTraceIndex(t *testing.T) {
 	t.Parallel()
 	r := newRelay(Options{Dir: t.TempDir(), Token: token, Lookup: func(string, time.Time) (claim.Claim, bool) { return claim.Claim{}, false }, Resolve: func(claim.Claim) (Policy, error) { return Policy{}, ErrNoKey }})
 	for i := range maxTraces + 10 {
-		r.learnTrace(fmt.Sprintf("%032x", i), "s")
+		r.learnTrace(fmt.Sprintf("%032x", i), "s", false)
 	}
 	if len(r.traces) > maxTraces || r.Stats().Snapshot().Counters["trace_index_full"] != 10 {
 		t.Fatalf("trace index %d entries, stats %v", len(r.traces), r.Stats().Snapshot().Counters)

@@ -28,6 +28,8 @@ type heldPart struct {
 
 type traceSession struct {
 	session string
+	// claimed is whether a Claimed session key named it, which its unnamed spans inherit.
+	claimed bool
 	at      time.Time
 }
 
@@ -171,26 +173,28 @@ func (r *Relay) sweep() {
 	}
 }
 
-func (r *Relay) learnTrace(traceID, session string) {
+func (r *Relay) learnTrace(traceID, session string, claimed bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, known := r.traces[traceID]; !known && len(r.traces) >= maxTraces {
 		r.stats.add("trace_index_full", 1)
 		return
 	}
-	r.traces[traceID] = traceSession{session, r.opts.Now()}
+	r.traces[traceID] = traceSession{session, claimed, r.opts.Now()}
 }
 
-func (r *Relay) traceOf(traceID string) string {
+func (r *Relay) traceOf(traceID string) (session string, claimed bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return r.traces[traceID].session
+	t := r.traces[traceID]
+	return t.session, t.claimed
 }
 
 // sessionFor resolves a held key to a session ("" for a trace not yet named).
 func (r *Relay) sessionFor(key string) string {
 	if id, ok := strings.CutPrefix(key, tracePrefix); ok {
-		return r.traceOf(id)
+		session, _ := r.traceOf(id)
+		return session
 	}
 	return key
 }

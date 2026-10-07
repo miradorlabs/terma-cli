@@ -74,7 +74,7 @@ func numeric(s string) bool {
 // splitLogs divides a logs export by session, records naming none under the empty key.
 // A record naming its session and a trace teaches learn the trace's session, or an agent
 // that names the session only on its turn-end span would lose a long turn's child spans.
-func (ru *rules) splitLogs(req *logspb.LogsData, learn func(traceID, session string)) map[string]*part {
+func (ru *rules) splitLogs(req *logspb.LogsData, learn func(traceID, session string, claimed bool)) map[string]*part {
 	out := map[string]*part{}
 	for _, rl := range req.GetResourceLogs() {
 		res := rl.GetResource().GetAttributes()
@@ -85,7 +85,7 @@ func (ru *rules) splitLogs(req *logspb.LogsData, learn func(traceID, session str
 			for _, lr := range sl.GetLogRecords() {
 				s, c := ru.sessionOf(lr.GetAttributes(), res)
 				if s != "" && len(lr.GetTraceId()) > 0 {
-					learn(hex.EncodeToString(lr.GetTraceId()), s)
+					learn(hex.EncodeToString(lr.GetTraceId()), s, c)
 				}
 				if _, seen := bySession[s]; !seen {
 					order = append(order, s)
@@ -118,13 +118,13 @@ const tracePrefix = "trace:"
 
 // splitTraces divides a traces export by session, span by span; a span naming no session
 // belongs to its trace's, since children inherit the trace, not the attribute.
-func (ru *rules) splitTraces(req *tracepb.TracesData, learn func(traceID, session string), known func(traceID string) string) map[string]*part {
+func (ru *rules) splitTraces(req *tracepb.TracesData, learn func(traceID, session string, claimed bool), known func(traceID string) (string, bool)) map[string]*part {
 	for _, rs := range req.GetResourceSpans() {
 		res := rs.GetResource().GetAttributes()
 		for _, ss := range rs.GetScopeSpans() {
 			for _, sp := range ss.GetSpans() {
-				if s, _ := ru.sessionOf(sp.GetAttributes(), res); s != "" && len(sp.GetTraceId()) > 0 {
-					learn(hex.EncodeToString(sp.GetTraceId()), s)
+				if s, c := ru.sessionOf(sp.GetAttributes(), res); s != "" && len(sp.GetTraceId()) > 0 {
+					learn(hex.EncodeToString(sp.GetTraceId()), s, c)
 				}
 			}
 		}
@@ -138,13 +138,13 @@ func (ru *rules) splitTraces(req *tracepb.TracesData, learn func(traceID, sessio
 			var order []string
 			for _, sp := range ss.GetSpans() {
 				s, c := ru.sessionOf(sp.GetAttributes(), res)
-				claimed[s] = claimed[s] || c
 				if s == "" && len(sp.GetTraceId()) > 0 {
 					id := hex.EncodeToString(sp.GetTraceId())
-					if s = known(id); s == "" {
+					if s, c = known(id); s == "" {
 						s = tracePrefix + id
 					}
 				}
+				claimed[s] = claimed[s] || c
 				if _, seen := bySession[s]; !seen {
 					order = append(order, s)
 				}

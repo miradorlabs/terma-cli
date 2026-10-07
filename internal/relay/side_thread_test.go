@@ -12,6 +12,7 @@ import (
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
@@ -100,5 +101,42 @@ func TestRelayDropsCodexDesktopSideThreadsInGlobalMode(t *testing.T) {
 		if strings.Contains(sent.String(), s) {
 			t.Fatalf("a side thread left the machine: %q", s)
 		}
+	}
+}
+
+// A fork's child span that names no session, exported after the span that named the fork's
+// thread, inherits the fork's claimed key through its trace, so it waits and is dropped too.
+func TestRelayDropsASideThreadsLaterChildSpanInGlobalMode(t *testing.T) {
+	t.Parallel()
+	u := newUpstream(t)
+	f := newFixture()
+	pol := Policy{Endpoint: u.srv.URL, Key: "key-default", IncludePrompts: true, IncludeToolContent: true}
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+		CatchAll: func() (claim.Claim, bool) { return claim.Claim{ProjectID: "p-default"}, true },
+		Resolve:  func(claim.Claim) (Policy, error) { return pol, nil }})
+	runRelay(t, r)
+	srv := httptest.NewServer(r.Handler())
+	defer srv.Close()
+
+	trace := make([]byte, 16)
+	trace[0] = 7
+	spans := func(sp *tracepb.Span) []byte {
+		b, _ := proto.Marshal(&tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{
+			Resource:   &resourcepb.Resource{Attributes: []*commonpb.KeyValue{kv("service.name", "codex-app-server")}},
+			ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{sp}}}}}})
+		return b
+	}
+	post(t, srv, "/v1/traces", spans(&tracepb.Span{TraceId: trace, SpanId: []byte{1, 0, 0, 0, 0, 0, 0, 0}, Name: "session_loop",
+		Attributes: []*commonpb.KeyValue{kv("thread_id", desktopTitleFork)}}), "application/x-protobuf", token, false)
+	waitForCounters(t, r, func(c map[string]int) bool { return c["received.traces"] == 1 })
+	post(t, srv, "/v1/traces", spans(&tracepb.Span{TraceId: trace, SpanId: []byte{2, 0, 0, 0, 0, 0, 0, 0}, Name: "handle_responses"}),
+		"application/x-protobuf", token, false)
+	waitForCounters(t, r, func(c map[string]int) bool { return c["received.traces"] == 2 })
+	f.mu.Lock()
+	f.now = f.now.Add(2 * time.Minute)
+	f.mu.Unlock()
+	waitForCounters(t, r, func(c map[string]int) bool { return c["dropped.unclaimed_expired.traces"] == 2 })
+	if c := r.Stats().Snapshot().Counters; c["forwarded.traces"] != 0 {
+		t.Fatalf("a side thread's span left: %v", c)
 	}
 }
