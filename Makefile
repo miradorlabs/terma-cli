@@ -109,7 +109,7 @@ bench-hook: build
 .PHONY: release-dry-run
 release-dry-run:
 	HOMEBREW_TAP_TOKEN="$${HOMEBREW_TAP_TOKEN:-unset}" \
-		go run github.com/goreleaser/goreleaser/v2@latest release --snapshot --clean --skip=publish
+		go run github.com/goreleaser/goreleaser/v2@latest release --snapshot --clean --skip=publish,sign
 
 # What CI runs before a release can ship: render dist/ from a throwaway local tag
 # (so the cask URL carries v#{version} exactly as a real release would), then
@@ -118,7 +118,7 @@ release-dry-run:
 test-install:
 	git tag -f v0.0.0-ci >/dev/null
 	HOMEBREW_TAP_TOKEN="$${HOMEBREW_TAP_TOKEN:-unset}" \
-		go run github.com/goreleaser/goreleaser/v2@latest release --clean --skip=publish,validate,announce,before; \
+		go run github.com/goreleaser/goreleaser/v2@latest release --clean --skip=publish,validate,announce,before,sign; \
 		status=$$?; git tag -d v0.0.0-ci >/dev/null; [ $$status -eq 0 ]
 	./scripts/test-install.sh dist v0.0.0-ci
 	@if [ "$$(uname -s)" = Darwin ]; then ./scripts/test-cask.sh dist v0.0.0-ci; \

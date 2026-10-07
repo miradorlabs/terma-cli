@@ -258,8 +258,9 @@ jobs:
       - uses: goreleaser/goreleaser-action@v6
         with:
           version: "~> v2"
-          # `before` is `go test`, which the test job already runs.
-          args: release --clean --skip=publish,validate,announce,before
+          # `before` is `go test`, which the test job already runs; `sign` needs the
+          # release signing key, which only a release has.
+          args: release --clean --skip=publish,validate,announce,before,sign
         env:
           # Read only by the cask template; the dry run pushes nothing.
           HOMEBREW_TAP_TOKEN: dry-run

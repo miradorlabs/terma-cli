@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -161,14 +163,18 @@ func TestUpdateRefreshesWithTheReplacedBinary(t *testing.T) {
 	archive := tarGzWith(t, "terma", []byte("#!/bin/sh\necho new\n"))
 	sum := sha256.Sum256(archive)
 	asset := selfupdate.AssetName(runtime.GOOS, runtime.GOARCH)
+	sums := []byte(hex.EncodeToString(sum[:]) + "  " + asset + "\n")
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/repos/"+selfupdate.Repo+"/releases/latest", func(w http.ResponseWriter, r *http.Request) {
 		host := "http://" + r.Host
-		_, _ = w.Write([]byte(`{"tag_name":"v2.0.0","assets":[{"name":"checksums.txt","browser_download_url":"` + host + `/sums"},{"name":"` + asset + `","browser_download_url":"` + host + `/archive"}]}`))
+		_, _ = w.Write([]byte(`{"tag_name":"v2.0.0","assets":[{"name":"checksums.txt","browser_download_url":"` + host + `/sums"},{"name":"` + selfupdate.SignatureName + `","browser_download_url":"` + host + `/sig"},{"name":"` + asset + `","browser_download_url":"` + host + `/archive"}]}`))
 	})
-	mux.HandleFunc("/sums", func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(hex.EncodeToString(sum[:]) + "  " + asset + "\n"))
-	})
+	mux.HandleFunc("/sums", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(sums) })
+	mux.HandleFunc("/sig", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(selfupdate.Sign(priv, sums)) })
 	mux.HandleFunc("/archive", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(archive) })
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
@@ -180,7 +186,7 @@ func TestUpdateRefreshesWithTheReplacedBinary(t *testing.T) {
 		}
 		steps := recordSteps(t, fail)
 		var out bytes.Buffer
-		client := &selfupdate.Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0"}
+		client := &selfupdate.Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0", ReleaseKeys: []ed25519.PublicKey{pub}}
 		if _, err := testApp.runUpdate(context.Background(), client, t.TempDir(), exe, &out, false, false); err != nil {
 			t.Fatalf("update: %v\n%s", err, &out)
 		}

@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -69,6 +70,8 @@ type Client struct {
 	HTTP    *http.Client
 	BaseURL string // GitHub API base; defaults to https://api.github.com
 	Version string // the running version, for User-Agent
+	// ReleaseKeys, set, replace the keys built into this terma (tests); nil means those.
+	ReleaseKeys []ed25519.PublicKey
 	// Binary is the executable as this process started from it. A process whose executable
 	// another install has since replaced is no longer the version installed (Replaced), and
 	// Auto replaces nothing for it; nor for a process that does not know what it started from.
@@ -154,8 +157,8 @@ func AssetName(goos, goarch string) string {
 	return BinaryName + "_" + strings.ToUpper(goos[:1]) + goos[1:] + "_" + arch + ext
 }
 
-// PickAsset finds the archive and the checksums file for this platform.
-func PickAsset(rel *Release, goos, goarch string) (archive, checksums *Asset, err error) {
+// PickAsset finds the archive, the checksums file and its signature for this platform.
+func PickAsset(rel *Release, goos, goarch string) (archive, checksums, signature *Asset, err error) {
 	want := AssetName(goos, goarch)
 	for i := range rel.Assets {
 		switch rel.Assets[i].Name {
@@ -163,15 +166,20 @@ func PickAsset(rel *Release, goos, goarch string) (archive, checksums *Asset, er
 			archive = &rel.Assets[i]
 		case "checksums.txt":
 			checksums = &rel.Assets[i]
+		case SignatureName:
+			signature = &rel.Assets[i]
 		}
 	}
 	if archive == nil {
-		return nil, nil, fmt.Errorf("release %s has no asset for %s/%s (%s)", rel.TagName, goos, goarch, want)
+		return nil, nil, nil, fmt.Errorf("release %s has no asset for %s/%s (%s)", rel.TagName, goos, goarch, want)
 	}
 	if checksums == nil {
-		return nil, nil, fmt.Errorf("release %s has no checksums.txt", rel.TagName)
+		return nil, nil, nil, fmt.Errorf("release %s has no checksums.txt", rel.TagName)
 	}
-	return archive, checksums, nil
+	if signature == nil {
+		return nil, nil, nil, fmt.Errorf("release %s has no %s: %w", rel.TagName, SignatureName, ErrUnsigned)
+	}
+	return archive, checksums, signature, nil
 }
 
 // ParseChecksums reads goreleaser's checksums.txt ("<sha256>  <file>" per line).
@@ -192,16 +200,23 @@ func ParseChecksums(r io.Reader) map[string]string {
 	return out
 }
 
-// Apply downloads the archive, verifies it against checksums, and swaps the
-// binary at exePath. Returns the installed version.
+// Apply downloads the archive, verifies it against checksums, which a pinned release key
+// must have signed, and swaps the binary at exePath. Returns the installed version.
 func (c *Client) Apply(ctx context.Context, rel *Release, exePath string, out io.Writer) (string, error) {
-	archive, sums, err := PickAsset(rel, runtime.GOOS, runtime.GOARCH)
+	archive, sums, signature, err := PickAsset(rel, runtime.GOOS, runtime.GOARCH)
 	if err != nil {
 		return "", err
 	}
 	sumsBody, err := c.get(ctx, sums.URL)
 	if err != nil {
 		return "", err
+	}
+	sig, err := c.get(ctx, signature.URL)
+	if err != nil {
+		return "", err
+	}
+	if err := Verify(c.keys(), sumsBody, sig); err != nil {
+		return "", fmt.Errorf("release %s: %w", rel.TagName, err)
 	}
 	want := ParseChecksums(bytes.NewReader(sumsBody))[archive.Name]
 	if want == "" {

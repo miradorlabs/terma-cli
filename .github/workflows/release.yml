@@ -13,6 +13,9 @@ permissions:
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
+    # The environment holds the release signing key and deploys from v* tags only, after
+    # its required reviewer approves: a release cannot be signed without that approval.
+    environment: release
     steps:
       - uses: actions/checkout@v5
         with:
@@ -39,6 +42,9 @@ jobs:
           # PAT with contents:write on miradorlabs/homebrew-tap. Without it the
           # release still publishes; only the cask update fails.
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          # The release signing key (scripts/releasesign keygen); without it the release
+          # fails, since terma would refuse to install it.
+          TERMA_SIGNING_KEY: ${{ secrets.TERMA_SIGNING_KEY }}
 
       # Signed build provenance for every published artifact, verifiable with
       # `gh attestation verify <file> --owner miradorlabs`.
@@ -49,6 +55,7 @@ jobs:
             dist/*.tar.gz
             dist/*.zip
             dist/checksums.txt
+            dist/checksums.txt.sig
             install.sh
 
   # The npm shim (`npx @miradorlabs/terma`) downloads this exact release at

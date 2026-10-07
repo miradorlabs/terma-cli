@@ -6,8 +6,11 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -51,11 +54,15 @@ func TestAssetNaming(t *testing.T) {
 		t.Fatalf("got %s", got)
 	}
 	rel := &Release{TagName: "v1.2.3", Assets: []Asset{{Name: "checksums.txt"}, {Name: "terma_Linux_arm64.tar.gz"}}}
-	if _, _, err := PickAsset(rel, "linux", "amd64"); err == nil {
+	if _, _, _, err := PickAsset(rel, "linux", "arm64"); !errors.Is(err, ErrUnsigned) {
+		t.Fatalf("a release without %s = %v, want ErrUnsigned", SignatureName, err)
+	}
+	rel.Assets = append(rel.Assets, Asset{Name: SignatureName})
+	if _, _, _, err := PickAsset(rel, "linux", "amd64"); err == nil {
 		t.Fatal("expected a missing-asset error")
 	}
-	a, s, err := PickAsset(rel, "linux", "arm64")
-	if err != nil || a.Name != "terma_Linux_arm64.tar.gz" || s.Name != "checksums.txt" {
+	a, s, sig, err := PickAsset(rel, "linux", "arm64")
+	if err != nil || a.Name != "terma_Linux_arm64.tar.gz" || s.Name != "checksums.txt" || sig.Name != SignatureName {
 		t.Fatalf("unexpected pick: %v %v %v", a, s, err)
 	}
 	if rel.Version() != "1.2.3" {
@@ -113,15 +120,21 @@ func TestApplyVerifiesChecksumAndSwapsBinary(t *testing.T) {
 	}
 	sum := sha256.Sum256(archive)
 	assetName := AssetName(runtime.GOOS, runtime.GOARCH)
+	sums := []byte(hex.EncodeToString(sum[:]) + "  " + assetName + "\n")
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/repos/"+Repo+"/releases/latest", func(w http.ResponseWriter, r *http.Request) {
 		host := "http://" + r.Host
-		_, _ = w.Write([]byte(`{"tag_name":"v9.0.0","assets":[{"name":"checksums.txt","browser_download_url":"` + host + `/sums"},{"name":"` + assetName + `","browser_download_url":"` + host + `/archive","size":` + "123" + `}]}`))
+		_, _ = w.Write([]byte(`{"tag_name":"v9.0.0","assets":[{"name":"checksums.txt","browser_download_url":"` + host + `/sums"},{"name":"` + SignatureName + `","browser_download_url":"` + host + `/sig"},{"name":"` + assetName + `","browser_download_url":"` + host + `/archive","size":` + "123" + `}]}`))
 	})
-	mux.HandleFunc("/sums", func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(hex.EncodeToString(sum[:]) + "  " + assetName + "\n"))
-	})
+	mux.HandleFunc("/sums", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(sums) })
+	mux.HandleFunc("/sig", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(testSign(sums)) })
+	// Signed by someone else: the checksums are right, and the release is still refused.
+	other, otherPriv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux.HandleFunc("/forged", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(Sign(otherPriv, sums)) })
 	mux.HandleFunc("/archive", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(archive) })
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
@@ -130,13 +143,33 @@ func TestApplyVerifiesChecksumAndSwapsBinary(t *testing.T) {
 	if err := os.WriteFile(exe, []byte("old"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	c := &Client{HTTP: srv.Client(), BaseURL: srv.URL, Version: "1.0.0"}
+	c := &Client{HTTP: srv.Client(), BaseURL: srv.URL, Version: "1.0.0", ReleaseKeys: testKeys()}
 	rel, err := c.Latest(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !Newer("1.0.0", rel.TagName) {
 		t.Fatal("expected a newer release")
+	}
+	// Before anything else: a forged signature, a signature from a key this terma does not
+	// trust, and no signature asset at all are each refused, the binary untouched.
+	signed := rel.Assets[1].URL
+	rel.Assets[1].URL = srv.URL + "/forged"
+	if _, err := c.Apply(context.Background(), rel, exe, nil); !errors.Is(err, ErrUnsigned) {
+		t.Fatalf("a release signed by another key: %v, want ErrUnsigned", err)
+	}
+	rel.Assets[1].URL = signed
+	untrusting := &Client{HTTP: srv.Client(), BaseURL: srv.URL, Version: "1.0.0", ReleaseKeys: []ed25519.PublicKey{other}}
+	if _, err := untrusting.Apply(context.Background(), rel, exe, nil); !errors.Is(err, ErrUnsigned) {
+		t.Fatalf("a release signed by a key this terma does not trust: %v, want ErrUnsigned", err)
+	}
+	unsigned := &Release{TagName: rel.TagName, Assets: rel.Assets[:1:1]}
+	unsigned.Assets = append(unsigned.Assets, rel.Assets[2])
+	if _, err := c.Apply(context.Background(), unsigned, exe, nil); !errors.Is(err, ErrUnsigned) {
+		t.Fatalf("a release without a signature: %v, want ErrUnsigned", err)
+	}
+	if data, _ := os.ReadFile(exe); string(data) != "old" {
+		t.Fatalf("a refused release replaced the binary: %q", data)
 	}
 	got, err := c.Apply(context.Background(), rel, exe, nil)
 	if err != nil || got != "9.0.0" {
@@ -153,7 +186,7 @@ func TestApplyVerifiesChecksumAndSwapsBinary(t *testing.T) {
 
 	// A tampered archive is refused.
 	mux.HandleFunc("/archive2", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("tampered")) })
-	rel.Assets[1].URL = srv.URL + "/archive2"
+	rel.Assets[2].URL = srv.URL + "/archive2"
 	if _, err := c.Apply(context.Background(), rel, exe, nil); err == nil || !strings.Contains(err.Error(), "checksum mismatch") {
 		t.Fatalf("expected a checksum error, got %v", err)
 	}

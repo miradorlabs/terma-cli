@@ -48,6 +48,16 @@ archives:
 checksum:
   name_template: "checksums.txt"
 
+# checksums.txt names every archive's digest, so its signature signs the release: terma
+# installs only a release whose checksums.txt a key pinned in the binary signed
+# (internal/selfupdate). The private key is the release workflow's TERMA_SIGNING_KEY;
+# dry runs skip this (--skip=sign).
+signs:
+  - cmd: go
+    args: ["run", "./scripts/releasesign", "sign", "${artifact}", "${signature}"]
+    artifacts: checksum
+    signature: "${artifact}.sig"
+
 release:
   # A tag like v1.2.0-rc1 is published as a pre-release, so it never becomes what
   # `releases/latest/download/...` resolves to: install.sh, the Homebrew smoke test

@@ -47,7 +47,7 @@ func TestFailedCheckRetriesAfter15Minutes(t *testing.T) {
 				fmt.Fprint(w, `{"tag_name":"v2.0.0","assets":[]}`)
 			}))
 			defer srv.Close()
-			c := &Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0"}
+			c := &Client{ReleaseKeys: testKeys(), BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0"}
 			dir := t.TempDir()
 			// A failed refresh must retry even when an earlier successful result exists.
 			SaveCache(dir, Cache{CheckedAt: time.Now().Add(-25 * time.Hour), Latest: "1.0.0"})
@@ -101,15 +101,18 @@ func TestMaintainUpdatesByDefaultAndVerifiesUpdates(t *testing.T) {
 			binary := []byte("new binary")
 			archive := archiveWith(t, "terma", binary)
 			sum := sha256.Sum256(archive)
+			sums := fmt.Appendf(nil, "%x  %s\n", sum, AssetName(runtime.GOOS, runtime.GOARCH))
 			downloads, lookups := 0, 0
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch r.URL.Path {
 				case "/repos/" + Repo + "/releases/latest":
 					lookups++
 					base := "http://" + r.Host
-					_ = json.NewEncoder(w).Encode(Release{TagName: tag, PublishedAt: published, Assets: []Asset{{Name: AssetName(runtime.GOOS, runtime.GOARCH), URL: base + "/archive"}, {Name: "checksums.txt", URL: base + "/sums"}}})
+					_ = json.NewEncoder(w).Encode(Release{TagName: tag, PublishedAt: published, Assets: []Asset{{Name: AssetName(runtime.GOOS, runtime.GOARCH), URL: base + "/archive"}, {Name: "checksums.txt", URL: base + "/sums"}, {Name: SignatureName, URL: base + "/sig"}}})
 				case "/sums":
-					fmt.Fprintf(w, "%x  %s\n", sum, AssetName(runtime.GOOS, runtime.GOARCH))
+					_, _ = w.Write(sums)
+				case "/sig":
+					_, _ = w.Write(testSign(sums))
 				case "/archive":
 					downloads++
 					if mode == "tampered" {
@@ -149,7 +152,7 @@ func TestMaintainUpdatesByDefaultAndVerifiesUpdates(t *testing.T) {
 				}
 				defer unlock()
 			}
-			c := &Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0", Binary: started}
+			c := &Client{ReleaseKeys: testKeys(), BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0", Binary: started}
 			var out bytes.Buffer
 			for range 2 {
 				c.Maintain(context.Background(), configDir, stateDir, exe, &out)
@@ -264,6 +267,7 @@ func fakeReleases(t *testing.T, tag string, binary []byte, downloads *int, failL
 	t.Helper()
 	archive := archiveWith(t, "terma", binary)
 	sum := sha256.Sum256(archive)
+	sums := fmt.Appendf(nil, "%x  %s\n", sum, AssetName(runtime.GOOS, runtime.GOARCH))
 	lookups := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		base := "http://" + r.Host
@@ -274,9 +278,11 @@ func fakeReleases(t *testing.T, tag string, binary []byte, downloads *int, failL
 				return
 			}
 			_ = json.NewEncoder(w).Encode(Release{TagName: tag, PublishedAt: time.Now().Add(-2 * SoakTime),
-				Assets: []Asset{{Name: AssetName(runtime.GOOS, runtime.GOARCH), URL: base + "/archive"}, {Name: "checksums.txt", URL: base + "/sums"}}})
+				Assets: []Asset{{Name: AssetName(runtime.GOOS, runtime.GOARCH), URL: base + "/archive"}, {Name: "checksums.txt", URL: base + "/sums"}, {Name: SignatureName, URL: base + "/sig"}}})
 		case "/sums":
-			fmt.Fprintf(w, "%x  %s\n", sum, AssetName(runtime.GOOS, runtime.GOARCH))
+			_, _ = w.Write(sums)
+		case "/sig":
+			_, _ = w.Write(testSign(sums))
 		case "/archive":
 			*downloads++
 			_, _ = w.Write(archive)
@@ -312,7 +318,7 @@ func TestAPulledReleaseIsNeverInstalled(t *testing.T) {
 	stateDir := t.TempDir()
 	exe, started := oldBinary(t)
 	SaveCache(stateDir, Cache{CheckedAt: time.Now(), Current: "1.0.0", Latest: "2.0.0", Published: time.Now().Add(-2 * SoakTime)})
-	c := &Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0", Binary: started}
+	c := &Client{ReleaseKeys: testKeys(), BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0", Binary: started}
 	o := c.Auto(context.Background(), t.TempDir(), stateDir, exe, nil)
 	if o.Installed != "" || o.Err != nil || o.Notice != "" || downloads != 0 {
 		t.Fatalf("Auto = %+v after %d downloads, want nothing installed or announced", o, downloads)
@@ -340,7 +346,7 @@ func TestAFailedInstallHoldsBackOnlyThatRelease(t *testing.T) {
 			exe, started := oldBinary(t)
 			SaveCache(stateDir, Cache{CheckedAt: time.Now(), Current: "2.0.0", Latest: "2.0.1",
 				Published: time.Now().Add(-2 * SoakTime), AttemptAt: time.Now(), Attempted: tc.attempted})
-			c := &Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "2.0.0", Binary: started}
+			c := &Client{ReleaseKeys: testKeys(), BaseURL: srv.URL, HTTP: srv.Client(), Version: "2.0.0", Binary: started}
 			o := c.Auto(context.Background(), t.TempDir(), stateDir, exe, nil)
 			if installed := o.Installed == "2.0.1"; installed != tc.installs || installed != (downloads == 1) {
 				t.Fatalf("Auto = %+v after %d downloads, with %s attempted today", o, downloads, tc.attempted)
@@ -375,7 +381,7 @@ func TestAFailedLookupBeforeAnInstallIsRetriedSoon(t *testing.T) {
 	stateDir := t.TempDir()
 	exe, started := oldBinary(t)
 	SaveCache(stateDir, Cache{CheckedAt: time.Now(), Current: "1.0.0", Latest: "2.0.0", Published: time.Now().Add(-2 * SoakTime)})
-	c := &Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0", Binary: started}
+	c := &Client{ReleaseKeys: testKeys(), BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0", Binary: started}
 	if o := c.Auto(context.Background(), t.TempDir(), stateDir, exe, nil); o.Err == nil || o.Installed != "" {
 		t.Fatalf("Auto = %+v, want the failed lookup reported", o)
 	}
@@ -415,12 +421,12 @@ func TestAStaleProcessNeverReplacesTheInstalledBinary(t *testing.T) {
 			latest := fakeReleases(t, "v1.0.3", []byte("1.0.3"), &newer, 0)
 			withdrawn := fakeReleases(t, "v1.0.2", []byte("1.0.2"), &older, 0)
 			// The relay installs 1.0.3 while a command of 1.0.1 is still running.
-			relay := &Client{BaseURL: latest.URL, HTTP: latest.Client(), Version: "1.0.1", Binary: started}
+			relay := &Client{ReleaseKeys: testKeys(), BaseURL: latest.URL, HTTP: latest.Client(), Version: "1.0.1", Binary: started}
 			if o := relay.Auto(context.Background(), configDir, stateDir, exe, nil); o.Installed != "1.0.3" || newer != 1 {
 				t.Fatalf("the relay's install = %+v after %d downloads", o, newer)
 			}
 			// 1.0.3 is then pulled, and that command's updater runs: it must not put 1.0.2 in place.
-			stale := &Client{BaseURL: withdrawn.URL, HTTP: withdrawn.Client(), Version: "1.0.1"}
+			stale := &Client{ReleaseKeys: testKeys(), BaseURL: withdrawn.URL, HTTP: withdrawn.Client(), Version: "1.0.1"}
 			if tc.knows {
 				stale.Binary = started
 			}
@@ -449,14 +455,17 @@ func TestAnInstallRefusesABinaryReplacedDuringTheDownload(t *testing.T) {
 	exe, started := oldBinary(t)
 	archive := archiveWith(t, "terma", []byte("1.0.2"))
 	sum := sha256.Sum256(archive)
+	sums := fmt.Appendf(nil, "%x  %s\n", sum, AssetName(runtime.GOOS, runtime.GOARCH))
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		base := "http://" + r.Host
 		switch r.URL.Path {
 		case "/repos/" + Repo + "/releases/latest":
 			_ = json.NewEncoder(w).Encode(Release{TagName: "v1.0.2", PublishedAt: time.Now().Add(-2 * SoakTime),
-				Assets: []Asset{{Name: AssetName(runtime.GOOS, runtime.GOARCH), URL: base + "/archive"}, {Name: "checksums.txt", URL: base + "/sums"}}})
+				Assets: []Asset{{Name: AssetName(runtime.GOOS, runtime.GOARCH), URL: base + "/archive"}, {Name: "checksums.txt", URL: base + "/sums"}, {Name: SignatureName, URL: base + "/sig"}}})
 		case "/sums":
-			fmt.Fprintf(w, "%x  %s\n", sum, AssetName(runtime.GOOS, runtime.GOARCH))
+			_, _ = w.Write(sums)
+		case "/sig":
+			_, _ = w.Write(testSign(sums))
 		case "/archive":
 			// install.sh puts 1.0.3 in place while the archive is on its way.
 			next := exe + ".next"
@@ -467,7 +476,7 @@ func TestAnInstallRefusesABinaryReplacedDuringTheDownload(t *testing.T) {
 		}
 	}))
 	t.Cleanup(srv.Close)
-	c := &Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.1", Binary: started}
+	c := &Client{ReleaseKeys: testKeys(), BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.1", Binary: started}
 	stateDir := t.TempDir()
 	o := c.Auto(context.Background(), t.TempDir(), stateDir, exe, nil)
 	if got, _ := os.ReadFile(exe); !o.Replaced || o.Installed != "" || o.Err != nil || string(got) != "1.0.3" {

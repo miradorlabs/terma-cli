@@ -144,6 +144,18 @@ find that package manager it names the command to run; a Windows binary is repla
 hand, as Get started says. A build between release tags is never updated and gets no
 notice.
 
+**Signed releases.** Every release's `checksums.txt`, which names each archive's digest, is
+signed with the release key, and terma installs only a release whose signature a key
+built into it made: a release asset that was tampered with or swapped is refused, by
+`terma update` and by the background update alike. The public keys are listed in
+`internal/selfupdate/sign.go`; to check a release by hand, download its `checksums.txt`
+and `checksums.txt.sig` and run `go run ./scripts/releasesign verify checksums.txt
+checksums.txt.sig` from a clone. The installer script and the npm package do not check
+the signature: on a first install, the script, the key it would check against and the
+archives would all come from the same place, so the check would add nothing; what covers
+them is the build provenance GitHub attaches to every release asset (`gh attestation
+verify <file> --owner miradorlabs`).
+
 **A bad release.** terma never installs an older version over a newer one, so a release
 is rolled back by rolling forward: delete the bad release, or mark it a pre-release, so
 GitHub's latest release is the previous one again and machines that have not taken it
