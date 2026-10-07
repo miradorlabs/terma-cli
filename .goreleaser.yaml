@@ -92,6 +92,7 @@ homebrew_casks:
     commit_author:
       name: mirador-bot
       email: engineering@terma.ai
+    caveats: "Next: run `terma setup` in a terminal."
     generate_completions_from_executable:
       executable: terma
       args: [completion]

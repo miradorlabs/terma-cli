@@ -39,7 +39,10 @@ type Config struct {
 	// Engine is the engine's options; Run sets its Token.
 	Engine relay.Options
 	// Workers run beside the engine until it stops, and are waited for.
-	Workers   []func(ctx context.Context)
+	Workers []func(ctx context.Context)
+	// Updater, set, installs each new release in place of this terma, and the relay then
+	// restarts on it.
+	Updater   *Updater
 	Listening func(addr net.Addr, hold time.Duration)
 	// Log, when set, is told of the relay's start and exit, with its counters.
 	Log *Log
@@ -51,13 +54,16 @@ type Result struct {
 	Service        bool
 	// Replaced means a newer terma asked the relay to make way, and it stepped aside.
 	Replaced bool
+	// Updated means the relay installed a newer terma in place of its own, and stopped to
+	// run it.
+	Updated bool
 	// SetupGone means the relay's token was removed: nothing to relay for.
 	SetupGone bool
 }
 
 // Restart reports whether whatever runs the relay should start it again.
 func (r Result) Restart() bool {
-	return r.Replaced || r.Service && !r.SetupGone && !r.AlreadyRunning
+	return r.Replaced || r.Updated || r.Service && !r.SetupGone && !r.AlreadyRunning
 }
 
 // Run runs the relay until ctx ends, it is told to stop or it idles, delivering what it
@@ -140,9 +146,18 @@ func Run(ctx context.Context, c Config) (Result, error) {
 	for _, w := range c.Workers {
 		workers.Go(func() { w(engineCtx) })
 	}
+	updated := make(chan string, 1)
+	if c.Updater != nil {
+		u := *c.Updater
+		if u.Logf == nil {
+			u.Logf = c.Log.Printf
+		}
+		workers.Go(func() { u.Run(engineCtx, updated) })
+	}
 
-	why, serveErr := watch(ctx, r, c.StateDir, c.Idle, served)
+	why, serveErr := watch(ctx, r, c.StateDir, c.Idle, served, updated)
 	res.Replaced = why == stopReplaced
+	res.Updated = why == stopUpdated
 	// A relay stopped once its token went (teardown) is done for good, however it was stopped.
 	res.SetupGone = why == stopSetupGone || !setUp(c.StateDir)
 	if why != stopServeFailed {
@@ -180,6 +195,7 @@ const (
 	stopAsked stopReason = iota
 	stopIdle
 	stopReplaced
+	stopUpdated
 	stopSetupGone
 	stopServeFailed
 )
@@ -191,6 +207,8 @@ func (r stopReason) describe(err error) string {
 		return err.Error()
 	case r == stopReplaced:
 		return "a newer terma asked it to make way"
+	case r == stopUpdated:
+		return "it installed a newer terma"
 	case r == stopSetupGone:
 		return "its setup was removed"
 	case r == stopIdle:
@@ -272,9 +290,16 @@ func listen(dir, addr string) (net.Listener, error) {
 // the default hold, so an agent exporting without pause cannot keep the old terma running.
 var replacedMaxWait = relay.DefaultHold
 
-func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Duration, served <-chan error) (stopReason, error) {
+// watch waits for a reason to stop. A relay that installed a newer terma stops once Quiesce
+// finds its hold empty, no export in flight and none for updateQuiet (for none at all after
+// updatePauseWait), however long that takes: the release is already in place for every
+// hook, so waiting loses nothing, while what it holds in memory would be lost. Its queue is
+// on disk, so a route still retrying never keeps it, and a newer hook asking it to make way
+// is answered by that same wait.
+func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Duration, served <-chan error, updated <-chan string) (stopReason, error) {
 	dir := claim.Dir(stateDir)
 	var replacing time.Time // when a newer terma asked this relay to make way
+	var upgraded time.Time  // when it installed one itself
 	lastPrune := time.Now()
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
@@ -287,6 +312,8 @@ func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Durat
 				err = nil
 			}
 			return stopServeFailed, err
+		case <-updated:
+			upgraded = time.Now()
 		case <-tick.C:
 		}
 		if !setUp(stateDir) {
@@ -298,8 +325,16 @@ func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Durat
 		if replacing.IsZero() && requested(dir, ReplaceFile) {
 			replacing = time.Now()
 		}
-		// Once the hold is empty, since what it keeps is lost at exit; the queue is on disk.
-		if !replacing.IsZero() && (!r.Holding() || time.Since(replacing) >= replacedMaxWait) {
+		if !upgraded.IsZero() {
+			quiet := updateQuiet
+			if time.Since(upgraded) >= updatePauseWait {
+				quiet = 0
+			}
+			if r.Quiesce(quiet) {
+				return stopUpdated, nil
+			}
+		} else if !replacing.IsZero() && (!r.Holding() || time.Since(replacing) >= replacedMaxWait) {
+			// Once the hold is empty, since what it keeps is lost at exit; the queue is on disk.
 			return stopReplaced, nil
 		}
 		if time.Since(lastPrune) > time.Hour {

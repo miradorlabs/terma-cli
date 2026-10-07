@@ -50,6 +50,8 @@ type Release struct {
 	Draft      bool    `json:"draft"`
 	Prerelease bool    `json:"prerelease"`
 	Assets     []Asset `json:"assets"`
+	// PublishedAt starts a minor or major release's soak (Soaking).
+	PublishedAt time.Time `json:"published_at"`
 }
 
 // Asset is one downloadable file of a release.
@@ -67,6 +69,10 @@ type Client struct {
 	HTTP    *http.Client
 	BaseURL string // GitHub API base; defaults to https://api.github.com
 	Version string // the running version, for User-Agent
+	// Binary is the executable as this process started from it. A process whose executable
+	// another install has since replaced is no longer the version installed (Replaced), and
+	// Auto replaces nothing for it; nor for a process that does not know what it started from.
+	Binary os.FileInfo
 }
 
 // httpClient is the configured client, or one with a timeout, with redirects held to checkDownloadOrigin.
@@ -101,6 +107,10 @@ func (c *Client) base() string {
 
 // ErrNoRelease means GitHub has no accessible stable release.
 var ErrNoRelease = errors.New("no published release is available")
+
+// ErrReplaced means another install put a release in place while this process ran, so what
+// it would have installed over it may be the earlier release: it installs nothing.
+var ErrReplaced = errors.New("another install replaced terma meanwhile; run `terma update` again")
 
 // Latest fetches the newest stable release.
 func (c *Client) Latest(ctx context.Context) (*Release, error) {
@@ -211,6 +221,11 @@ func (c *Client) Apply(ctx context.Context, rel *Release, exePath string, out io
 	binary, err := extractBinaryFor(runtime.GOOS, data)
 	if err != nil {
 		return "", err
+	}
+	// Once more after the download, which takes a while: an installer that takes no lock
+	// (install.sh, a copy by hand) may have put a later release in place since.
+	if c.Replaced(exePath) {
+		return "", ErrReplaced
 	}
 	if err := replaceExecutable(exePath, binary); err != nil {
 		return "", err

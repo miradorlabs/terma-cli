@@ -8,9 +8,12 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
+	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
+	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 )
 
@@ -21,10 +24,11 @@ func TestAutomaticUpdatePreference(t *testing.T) {
 		args []string
 		want string
 	}{
+		{[]string{"update", "--auto", "status"}, "Automatic updates: on."},
+		{[]string{"update", "--auto", "off"}, "disabled"},
 		{[]string{"update", "--auto", "status"}, "off (notify only)"},
 		{[]string{"update", "--auto", "on"}, "enabled"},
-		{[]string{"update", "--auto", "status"}, "on"},
-		{[]string{"update", "--auto", "off"}, "disabled"},
+		{[]string{"update", "--auto", "status"}, "Automatic updates: on."},
 	} {
 		out, err := runTerma(t, step.args...)
 		if err != nil || !strings.Contains(out, step.want) {
@@ -37,7 +41,7 @@ func TestAutomaticUpdatePreference(t *testing.T) {
 		}
 	}
 	p, err := selfupdate.LoadPreferences(dir)
-	if err != nil || p.Auto {
+	if err != nil || !p.Auto {
 		t.Fatalf("invalid invocation changed preference: %+v %v", p, err)
 	}
 }
@@ -189,5 +193,149 @@ func TestUpdateThatCannotCheckRefreshesNothing(t *testing.T) {
 	}
 	if strings.Contains(out.String(), "efresh") {
 		t.Errorf("a failed update refreshed:\n%s", &out)
+	}
+}
+
+// Setup says how this installation gets new releases: through the package manager that
+// owns it, by itself, or not at all.
+func TestUpdatesSummary(t *testing.T) {
+	home := t.TempDir()
+	for _, tc := range []struct {
+		name, exe, version, goos string
+		auto                     bool
+		want                     string
+	}{
+		{"installer script", filepath.Join(home, ".local", "bin", "terma"), "1.2.0", "darwin", true, "automatically"},
+		{"turned off", filepath.Join(home, ".local", "bin", "terma"), "1.2.0", "linux", false, "`terma update --auto on`"},
+		{"homebrew", filepath.Join(home, "Caskroom", "terma", "1.2.0", "terma"), "1.2.0", "darwin", true, "through Homebrew: `brew upgrade terma`"},
+		{"npm", filepath.Join(home, "lib", "node_modules", "@miradorlabs", "terma", "vendor", "terma"), "1.2.0", "linux", true, "through npm: `npm install -g @miradorlabs/terma@latest`"},
+		{"source build", filepath.Join(home, "go", "bin", "terma"), "v1.2.0-3-g401af35", "darwin", true, "never for a development build"},
+		{"windows", filepath.Join(home, "terma.exe"), "1.2.0", "windows", true, "download each new release"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := updatesSummary(tc.exe, tc.version, tc.goos, tc.auto); !strings.Contains(got, tc.want) {
+				t.Fatalf("updatesSummary = %q, want it to say %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// Every updater this process runs knows the executable it started from, captured as the
+// process starts: a command that ran a while, or the relay, may outlive its version.
+func TestTheUpdaterKnowsTheBinaryTheProcessStartedFrom(t *testing.T) {
+	app := New(builtin.Agents, "1.2.0")
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	now, err := os.Stat(exe)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c := app.updateClient(); c.Binary == nil || !os.SameFile(c.Binary, now) || c.Version != "1.2.0" {
+		t.Fatalf("updateClient = %+v, want this executable at 1.2.0", c)
+	}
+}
+
+// `terma update` from a process whose binary another install has replaced meanwhile does
+// nothing but say so: its version no longer says what is installed.
+func TestUpdateRefusesOnceAnotherInstallReplacedTerma(t *testing.T) {
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		fmt.Fprint(w, `{"tag_name":"v2.0.0","assets":[]}`)
+	}))
+	defer srv.Close()
+	dir := t.TempDir()
+	exe := filepath.Join(dir, "terma")
+	if err := os.WriteFile(exe, []byte("1.0.0"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	started, err := os.Stat(exe)
+	if err != nil {
+		t.Fatal(err)
+	}
+	next := filepath.Join(dir, "terma.next")
+	if err := os.WriteFile(next, []byte("1.0.1"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(next, exe); err != nil {
+		t.Fatal(err)
+	}
+	c := &selfupdate.Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0", Binary: started}
+	var out bytes.Buffer
+	installed, err := testApp.runUpdate(context.Background(), c, t.TempDir(), exe, &out, false, false)
+	if err == nil || !strings.Contains(err.Error(), "replaced terma meanwhile") || installed || calls != 0 {
+		t.Fatalf("runUpdate = %v, %v after %d lookups; want a refusal and no lookup", installed, err, calls)
+	}
+	if got, _ := os.ReadFile(exe); string(got) != "1.0.1" {
+		t.Fatalf("the installed binary is now %q", got)
+	}
+}
+
+// The relay updates itself only as a release it could replace, outside CI and the opt-out;
+// turned off with --auto off, it asks GitHub nothing.
+func TestTheRelayUpdatesOnlyWhereItCould(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("a Windows relay never replaces itself")
+	}
+	t.Setenv("CI", "")
+	t.Setenv("TERMA_NO_UPDATE_CHECK", "")
+	release := New(builtin.Agents, "1.2.0")
+	release.dir, release.stateDir = t.TempDir(), t.TempDir()
+	if release.relayUpdater() == nil {
+		t.Fatal("a release relay does not update itself")
+	}
+	if testApp.relayUpdater() != nil {
+		t.Fatal("a development build's relay updates itself")
+	}
+	for _, env := range []string{"CI", "TERMA_NO_UPDATE_CHECK"} {
+		t.Run(env, func(t *testing.T) {
+			t.Setenv(env, "1")
+			if release.relayUpdater() != nil {
+				t.Fatalf("the relay updates itself under %s", env)
+			}
+		})
+	}
+	if err := selfupdate.SavePreferences(release.dir, selfupdate.Preferences{Auto: false}); err != nil {
+		t.Fatal(err)
+	}
+	if v, err := release.relayUpdater().Update(t.Context()); v != "" || err != nil {
+		t.Fatalf("turned off, the relay's pass = %q, %v", v, err)
+	}
+	// A pass that looked would have recorded its check.
+	if checked := !selfupdate.LoadCache(release.stateDir).CheckedAt.IsZero(); checked {
+		t.Fatal("turned off, the relay still looked for a release")
+	}
+}
+
+// A hook-started relay that updated itself starts its successor, since no service will; a
+// service's relay is restarted by its service manager, and one that made way for a newer
+// hook's terma is started again by that hook.
+func TestOnlyAnUpdatedHookStartedRelayStartsItsSuccessor(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		res     daemon.Result
+		spawned bool
+		restart bool
+	}{
+		{"updated, hook-started", daemon.Result{Updated: true}, true, true},
+		{"updated, service", daemon.Result{Updated: true, Service: true}, false, true},
+		{"updated, then torn down", daemon.Result{Updated: true, SetupGone: true}, false, true},
+		{"replaced, hook-started", daemon.Result{Replaced: true}, false, true},
+		{"idle, hook-started", daemon.Result{}, false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			app := New(builtin.Agents, "1.3.0")
+			app.stateDir = t.TempDir()
+			spawned := false
+			app.spawnRelay = func(stateDir, version string) {
+				spawned = stateDir == app.stateDir && version == "1.3.0"
+			}
+			err := app.afterRelay(tc.res)
+			if spawned != tc.spawned || (err != nil) != tc.restart {
+				t.Fatalf("afterRelay(%+v): spawned %v, err %v; want spawned %v, restart %v", tc.res, spawned, err, tc.spawned, tc.restart)
+			}
+		})
 	}
 }

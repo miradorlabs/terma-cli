@@ -15,6 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
+	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 )
 
 func (app *App) newRelayRunCommand() *cobra.Command {
@@ -46,6 +47,7 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 				StateDir: app.stateDir, Addr: addr, Idle: idle, Service: asService, Environment: cfg.Environment, Version: app.version, Log: log,
 				Engine:  engine,
 				Workers: []func(context.Context){deps.Refresher().Run, app.sweepHookState},
+				Updater: app.relayUpdater(),
 				Listening: func(at net.Addr, hold time.Duration) {
 					if !quiet {
 						fmt.Fprintf(cmd.OutOrStdout(), "Relay listening on %s (hold %s, idle exit %s).\n", at, hold, idle)
@@ -58,12 +60,7 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 			if res.AlreadyRunning && !quiet {
 				fmt.Fprintln(cmd.OutOrStdout(), "The relay is already running.")
 			}
-			// Exit for the service manager to start the newer terma; a
-			// hook-started relay is restarted by the next hook.
-			if res.Restart() {
-				return exitWith(ExitRestart)
-			}
-			return nil
+			return app.afterRelay(res)
 		},
 	}
 	// Long, because an agent may export before its first hook.
@@ -74,6 +71,42 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&asService, "service", false, "run as the relay service")
 	_ = cmd.Flags().MarkHidden("service")
 	return cmd
+}
+
+// afterRelay ends a relay's run. One that should run again exits for the service manager to
+// start the newer terma, whoever installed it. A hook-started relay has none: one that
+// updated itself starts its successor, the release it installed, now that its lock is free,
+// since an agent may export before the next hook, unless teardown removed its setup
+// meanwhile; one replaced by a newer hook's terma is started again by that hook's next run.
+func (app *App) afterRelay(res daemon.Result) error {
+	if res.Updated && !res.Service && !res.SetupGone {
+		app.spawnRelay(app.stateDir, app.version)
+	}
+	if res.Restart() {
+		return exitWith(ExitRestart)
+	}
+	return nil
+}
+
+// relayUpdater has the relay install each new release in place of its own binary, as
+// interactive commands do, so a machine nobody runs terma on still updates. It is nil where
+// the relay could never install one: a development build, a package manager's or a Windows
+// binary, or a process with updates turned off, as in CI. Turned off with `terma update
+// --auto off`, it asks nothing, not even GitHub.
+func (app *App) relayUpdater() *daemon.Updater {
+	exe, err := os.Executable()
+	if err != nil || app.binary == nil || !selfupdate.IsRelease(app.version) || !selfupdate.UpdatesItself(exe) ||
+		os.Getenv("CI") != "" || os.Getenv("TERMA_NO_UPDATE_CHECK") == "1" {
+		return nil
+	}
+	client := app.updateClient()
+	return &daemon.Updater{Every: daemon.UpdateEvery, Update: func(ctx context.Context) (string, error) {
+		if p, err := selfupdate.LoadPreferences(app.dir); err != nil || !p.Auto {
+			return "", nil
+		}
+		o := client.Auto(ctx, app.dir, app.stateDir, exe, nil)
+		return o.Installed, o.Err
+	}}
 }
 
 // sweepHookState ages out the hooks' state now and hourly while the relay runs, so state

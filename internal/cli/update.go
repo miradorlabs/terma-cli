@@ -34,10 +34,11 @@ keeping every choice you made at setup. It works from what is on disk: it signs 
 nothing and never adds a file. Already on the latest release, update runs just that
 refresh, so it is safe to run again.
 
-Normal interactive commands check daily and notify you when a newer version exists.
-Use --auto on to install those updates automatically, or --auto off for notices only.
-Automatic updates run after successful interactive commands, never inside agent hooks,
-scripts, or CI. Package-managed installations receive notices only.
+terma checks daily for a newer release and installs it by itself: the local relay checks
+in the background, so a machine nobody runs terma on still updates, and so do interactive
+commands. Never inside agent hooks, scripts, or CI. Use --auto off for notices only, and
+--auto on to go back to automatic updates. Homebrew and npm installations, and Windows,
+receive notices only.
 
 Updates compare the installed release version with the latest published release.
 Source builds are not updated automatically; use --force to switch one to the latest
@@ -55,7 +56,7 @@ release.`,
 						return err
 					}
 					if automatic == "on" {
-						fmt.Fprintln(out, "Automatic updates enabled for numbered releases after interactive commands. Package-managed installations receive notices only; unversioned development builds are skipped.")
+						fmt.Fprintln(out, "Automatic updates enabled: terma installs each new release in the background. Package-managed installations receive notices only; unversioned development builds are skipped.")
 					} else {
 						fmt.Fprintln(out, "Automatic updates disabled; update notices remain enabled.")
 					}
@@ -83,17 +84,33 @@ release.`,
 				return fmt.Errorf("cannot start update (another check or update may be running): %w", err)
 			}
 			defer unlock()
-			return app.updateOrRefresh(cmd.Context(), &selfupdate.Client{Version: app.version}, app.stateDir, exe, out, check, force)
+			return app.updateOrRefresh(cmd.Context(), app.updateClient(), app.stateDir, exe, out, check, force)
 		},
 	}
 	cmd.Flags().BoolVar(&check, "check", false, "check for a newer published release without installing")
 	cmd.Flags().BoolVar(&force, "force", false, "replace a source/development build with the latest published release")
-	cmd.Flags().StringVar(&automatic, "auto", "", "automatic updates: on, off, or status (default: off)")
+	cmd.Flags().StringVar(&automatic, "auto", "", "automatic updates: on, off, or status (default: on)")
 	cmd.Flags().BoolVar(&refresh, "refresh", false, "only refresh what terma installed on this machine (agents' status lines and plugins, the relay's service) to this version; runs by itself after an update")
 	// The new binary runs `update --refresh` after an upgrade; people run plain `update`.
 	_ = cmd.Flags().MarkHidden("refresh")
 	cmd.MarkFlagsMutuallyExclusive("auto", "check", "force", "refresh")
 	return cmd
+}
+
+// updatesSummary is how the terma at exe, at version, gets new releases: what setup says.
+func updatesSummary(exe, version, goos string, auto bool) string {
+	if m, ok := selfupdate.ManagedBy(exe); ok {
+		return "through " + m.Name + ": `" + m.Command + "`"
+	}
+	switch {
+	case !selfupdate.IsRelease(version):
+		return "never for a development build: `terma update --force` installs the latest release"
+	case goos == "windows":
+		return "by hand: download each new release from https://github.com/" + selfupdate.Repo + "/releases"
+	case !auto:
+		return "when you run `terma update` (automatic updates are off: `terma update --auto on`)"
+	}
+	return "automatically: terma installs each new release in the background"
 }
 
 // Update phase bounds; a package manager may update its taps first, which takes minutes.
@@ -117,6 +134,11 @@ func (app *App) updateOrRefresh(ctx context.Context, client *selfupdate.Client, 
 // runUpdate reports whether it went on to install a newer version, whose own refresh then
 // runs; false with no error means there was nothing newer to install.
 func (app *App) runUpdate(ctx context.Context, client *selfupdate.Client, dir, exe string, out io.Writer, check, force bool) (bool, error) {
+	// Under the caller's lock: the relay may have installed a release since this process
+	// started, in which case its version says nothing about what is installed now.
+	if client.Replaced(exe) {
+		return false, selfupdate.ErrReplaced
+	}
 	current := client.Version
 	download, cancel := context.WithTimeout(ctx, downloadTimeout)
 	defer cancel()
@@ -136,7 +158,7 @@ func (app *App) runUpdate(ctx context.Context, client *selfupdate.Client, dir, e
 		selfupdate.SaveCache(dir, cache)
 		return false, err
 	}
-	selfupdate.SaveCache(dir, selfupdate.Cache{CheckedAt: time.Now(), Current: current, Latest: rel.Version()})
+	selfupdate.SaveCache(dir, selfupdate.Cache{CheckedAt: time.Now(), Current: current, Latest: rel.Version(), Published: rel.PublishedAt})
 	if !selfupdate.IsRelease(current) {
 		if check {
 			fmt.Fprintf(out, "terma %s is a development build; latest release is %s. Use `terma update --force` to switch to it.\n", current, rel.Version())
@@ -164,7 +186,7 @@ func (app *App) runUpdate(ctx context.Context, client *selfupdate.Client, dir, e
 	if err != nil {
 		return false, err
 	}
-	selfupdate.SaveCache(dir, selfupdate.Cache{CheckedAt: time.Now(), Current: installed, Latest: installed})
+	selfupdate.SaveCache(dir, selfupdate.Cache{CheckedAt: time.Now(), Current: installed, Latest: installed, Published: rel.PublishedAt})
 	fmt.Fprintf(out, "Updated terma %s → %s (%s).\n", current, installed, exe)
 	app.finishUpdate(ctx, exe, out)
 	return true, nil

@@ -17,6 +17,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/relay/service"
+	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 )
 
 func (app *App) doctorEnv(ctx context.Context) doctor.Env {
@@ -82,6 +83,7 @@ func (app *App) relayFacts() doctor.Relay {
 	}
 	if info, ok := daemon.RunningRelay(dir); ok {
 		r.Environment, r.HookStarted = info.Environment, !info.Service
+		r.Version, r.Earlier = info.Version, selfupdate.Newer(info.Version, app.version)
 	}
 	if service.Supported() {
 		state := daemon.CheckService(app.stateDir)

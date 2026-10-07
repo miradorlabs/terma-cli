@@ -108,15 +108,19 @@ type Relay struct {
 	// deliverMu keeps a session's parts in arrival order; taken before mu, never after.
 	deliverMu sync.Mutex
 
-	mu         sync.Mutex
-	held       map[string][]heldPart
-	heldN      int
-	heldBytes  int
-	traces     map[string]traceSession
-	procs      map[int]*procState // sender pid → the sessions it named, and whether it exited
-	outbox     outbox
-	senders    map[route]*sender
-	lastSeen   time.Time
+	mu        sync.Mutex
+	held      map[string][]heldPart
+	heldN     int
+	heldBytes int
+	traces    map[string]traceSession
+	procs     map[int]*procState // sender pid → the sessions it named, and whether it exited
+	outbox    outbox
+	senders   map[route]*sender
+	lastSeen  time.Time
+	// inflight counts the exports being read and routed; refusing, set by Quiesce, answers
+	// each new one 503 so its exporter sends it again, to the next relay.
+	inflight   int
+	refusing   bool
 	wg         sync.WaitGroup
 	sendCtx    context.Context
 	cancelSend context.CancelFunc
@@ -259,8 +263,23 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 		return
 	}
 	r.mu.Lock()
-	r.lastSeen = r.opts.Now()
+	refusing := r.refusing
+	if !refusing {
+		r.inflight++
+		r.lastSeen = r.opts.Now()
+	}
 	r.mu.Unlock()
+	if refusing {
+		r.stats.add("refused_restarting", 1)
+		w.Header().Set("Retry-After", "5")
+		http.Error(w, "the relay is restarting; send this again", http.StatusServiceUnavailable)
+		return
+	}
+	defer func() {
+		r.mu.Lock()
+		r.inflight--
+		r.mu.Unlock()
+	}()
 	body, err := readBody(req)
 	if err != nil {
 		r.stats.add("refused_unreadable", 1)

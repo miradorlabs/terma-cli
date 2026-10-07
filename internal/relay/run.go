@@ -111,6 +111,20 @@ func (r *Relay) Holding() bool {
 	return r.heldN > 0
 }
 
+// Quiesce prepares the relay to stop without losing what it holds in memory: when nothing is
+// held, no export is being read or routed, and none has arrived for quiet, it answers every
+// later export 503, which an exporter sends again, to the next relay, and reports true. What
+// is queued is on disk, so it does not count.
+func (r *Relay) Quiesce(quiet time.Duration) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.heldN > 0 || r.inflight > 0 || r.opts.Now().Sub(r.lastSeen) < quiet {
+		return false
+	}
+	r.refusing = true
+	return true
+}
+
 // Idle reports how long the relay has had no export, if it holds and queues nothing.
 func (r *Relay) Idle() (time.Duration, bool) {
 	r.mu.Lock()
