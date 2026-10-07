@@ -236,3 +236,28 @@ func modeName(m Mode) string {
 	}
 	return "real-login"
 }
+
+// TestClaudeEnvRoutes pins which credential each isolated route hands Claude Code.
+func TestClaudeEnvRoutes(t *testing.T) {
+	t.Setenv("ANTHROPIC_API_KEY", "dummy-api-key")
+	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "subscription-token")
+	for _, tc := range []struct {
+		name      string
+		route     Route
+		want, not string
+	}{
+		{"subscription", RouteSubscription, "CLAUDE_CODE_OAUTH_TOKEN=subscription-token", "ANTHROPIC_API_KEY="},
+		{"api key", RouteAPIKey, "ANTHROPIC_API_KEY=dummy-api-key", "CLAUDE_CODE_OAUTH_TOKEN="},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			sb := &Sandbox{T: t, Mode: Isolated, Dir: t.TempDir(), Terma: "/tmp/terma"}
+			env := sb.claudeEnv(tc.route)
+			if !slices.Contains(env, tc.want) {
+				t.Errorf("env lacks %s", tc.want)
+			}
+			if slices.ContainsFunc(env, func(e string) bool { return strings.HasPrefix(e, tc.not) }) {
+				t.Errorf("env carries %s on the %s route", tc.not, tc.name)
+			}
+		})
+	}
+}
