@@ -180,6 +180,9 @@ func TestCollectionPolicyMissingInvalidAndUnavailable(t *testing.T) {
 			if !tt.wantError && (p.Global() || p.CollectsNothing || p.Admits(config.Repository{Origin: "github.com/acme/web"})) {
 				t.Fatal("an unset policy or an empty list admitted a repository")
 			}
+			if wantUnset := tt.name == "unset" || tt.name == "null"; !tt.wantError && p.Unset != wantUnset {
+				t.Fatalf("Unset = %v, want %v", p.Unset, wantUnset)
+			}
 		})
 	}
 }

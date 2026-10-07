@@ -99,6 +99,40 @@ func TestSetupWarnsWhenTheTeamListsNoRepositories(t *testing.T) {
 	}
 }
 
+// A team no admin has given a collection policy collects nothing; setup and doctor say the
+// policy does not exist yet and who sets it up, not that the team lists no repositories.
+func TestSetupAndDoctorSayWhenTheTeamHasNoPolicy(t *testing.T) {
+	gateway := newFakeAuth(t)
+	gateway.policyBody = `{}`
+	authSandbox(t, gateway)
+	sandboxMachine(t)
+	t.Setenv("CODEX_HOME", t.TempDir())
+	t.Setenv("TERMA_POLICY_STUB", "")
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway, orgB())); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runTerma(t, "setup", "--harness", "codex")
+	if err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	for _, want := range []string{"! Collects      nothing yet: your team has no collection policy", "Next steps:", doctor.NoPolicyStep} {
+		if !strings.Contains(out, want) {
+			t.Errorf("setup output lacks %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "lists no repositories") || strings.Contains(out, doctor.NoRepositoriesStep) {
+		t.Errorf("setup blamed an empty repository list:\n%s", out)
+	}
+	loaded, err := testApp.loadConfig()
+	if err != nil || !loaded.Policy.Unset || !loaded.Policy.AdmitsNone() {
+		t.Fatalf("stored policy = %+v, %v; want unset and admitting nothing", loaded.Policy, err)
+	}
+	out, _ = runTerma(t, "doctor")
+	if !strings.Contains(out, "your team has no collection policy yet") || !strings.Contains(out, doctor.NoPolicyStep) {
+		t.Errorf("doctor did not say the team has no policy:\n%s", out)
+	}
+}
+
 func TestHarnessSelectionComingSoon(t *testing.T) {
 	chosen := map[string]bool{}
 	for _, name := range testApp.agents.Names() {

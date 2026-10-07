@@ -66,9 +66,10 @@ type policyResponse struct {
 }
 
 func (r policyResponse) collectionPolicy() (config.Policy, error) {
-	// An organization that never set a policy admits no repository.
+	// A team no admin has set a policy for admits no repository.
 	if r.Policy == nil {
 		p := config.DefaultPolicy()
+		p.Unset = true
 		p.FetchedAt = time.Now().UTC()
 		return p, nil
 	}

@@ -183,7 +183,7 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 			}
 			if pol.AdmitsNone() {
 				ui.Warn("Collects", doctor.PolicySummary(pol))
-				ui.Then(doctor.NoRepositoriesStep)
+				ui.Then(doctor.NothingCollectedStep(pol))
 			} else {
 				ui.Summary("Collects", doctor.PolicySummary(pol))
 			}

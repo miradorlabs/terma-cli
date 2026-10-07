@@ -332,6 +332,7 @@ func TestDoctorRepositoryCheckUsesThePolicyHooksApply(t *testing.T) {
 		{"listed but never fetched", config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/acme/one"}}, "terma setup", false},
 		{"global but never fetched", config.Policy{Mode: config.ModeGlobal}, "terma setup", false},
 		{"validated, no repositories", config.Policy{Mode: config.ModeRepo, Repositories: []string{" "}, TeamID: "p1", FetchedAt: time.Now()}, NoRepositoriesStep, false},
+		{"validated, no policy set", config.Policy{Mode: config.ModeRepo, Unset: true, TeamID: "p1", FetchedAt: time.Now()}, NoPolicyStep, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			e := env(t, Probes{Credential: signedIn, Spool: func() SpoolState { return SpoolState{} }})

@@ -245,6 +245,17 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 // NoRepositoriesStep is what a developer whose team lists no repositories is told.
 const NoRepositoriesStep = "Nothing is collected until a team admin lists repositories in Terma (Team settings → Data collection), or chooses Every session."
 
+// NoPolicyStep is what a developer whose team has no collection policy yet is told.
+const NoPolicyStep = "Nothing is collected until a team admin sets up your team's collection policy in Terma (Team settings → Data collection)."
+
+// NothingCollectedStep is what to do about a validated policy that admits no repository.
+func NothingCollectedStep(p config.Policy) string {
+	if p.Unset {
+		return NoPolicyStep
+	}
+	return NoRepositoriesStep
+}
+
 // RepositoryCheck says whether policy, the one hooks apply, collects the working copy whose
 // git directory is gitDir, naming the origin terma sees.
 func RepositoryCheck(policy config.Policy, gitDir string, repoErr error) Check {
@@ -253,6 +264,8 @@ func RepositoryCheck(policy config.Policy, gitDir string, repoErr error) Check {
 		return Check{Status: Fail, Detail: repoErr.Error()}
 	case !policy.Validated():
 		return Check{Status: Warn, Detail: "no team collection policy on this machine, so nothing is recorded", Fix: "terma setup"}
+	case policy.Unset:
+		return Check{Status: Warn, Detail: "your team has no collection policy yet, so nothing is recorded anywhere", Fix: NoPolicyStep}
 	case policy.AdmitsNone():
 		return Check{Status: Warn, Detail: "your team lists no repositories, so nothing is recorded anywhere", Fix: NoRepositoriesStep}
 	case gitDir == "":
