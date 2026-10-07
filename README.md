@@ -21,8 +21,8 @@ curl -fsSL https://terma.ai/install.sh | bash
 terma setup
 ```
 
-**Homebrew** (macOS and Linux). It updates with `brew upgrade terma`, which `terma update`
-runs for you.
+**Homebrew** (macOS and Linux). It updates with `brew upgrade terma`; `terma update` runs
+that through the Homebrew that owns this terma.
 
 ```bash
 brew tap miradorlabs/tap
@@ -31,8 +31,8 @@ brew install terma
 terma setup
 ```
 
-**npm**. It updates with `npm install -g @miradorlabs/terma@latest`, which `terma update`
-runs for you. The npm shim adds Node's startup time to every commit, so prefer the
+**npm**. It updates with `npm install -g @miradorlabs/terma@latest`; `terma update` runs
+that through the npm that owns this terma. The npm shim adds Node's startup time to every commit, so prefer the
 installer script or Homebrew where terma runs inside git hooks.
 
 ```bash
@@ -125,9 +125,10 @@ terma update --auto status  # show the current choice
 
 `--auto on` installs only from that check, so an install nobody runs a terma command on
 never updates, whatever the setting. It never replaces a Homebrew or npm installation or a
-Windows binary either: those get the notice, and `terma update` upgrades Homebrew and npm
-through the package manager that owns them (Windows does not update in place yet). A
-build between release tags gets no notice at all. Updates verify the release checksum
+Windows binary either; those only get the notice. `terma update` upgrades Homebrew and npm
+through the package manager that owns them, and when it cannot find that package manager
+it names the command to run. On Windows, download the new release from Releases: terma
+does not update in place there yet. A build between release tags gets no notice at all. Updates verify the release checksum
 before replacing the binary.
 
 After an update, the new version also refreshes what earlier versions wrote in your home
