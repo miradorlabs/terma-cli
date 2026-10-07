@@ -295,7 +295,7 @@ session's hooks last ran in (`terma.repository.root`) and the directory in it
 (`terma.working_directory`), which the agents' own records do not, so Terma can tell which
 checkout a git command ran in and where in it; they are local paths, so they leave with tool
 content or not at all. Every record the relay forwards also names the terma version that
-forwarded it (`terma.version`). Hook events, which queue on this machine and never pass the relay, are
+received it (`terma.version`). Hook events, which queue on this machine and never pass the relay, are
 held to the same policy when they are sent: an event queued before the policy tightened
 leaves without the content it no longer collects, and one from a repository no longer
 listed does not leave.

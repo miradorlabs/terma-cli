@@ -231,7 +231,7 @@ const (
 	TermaUsageSemanticsKey = "terma.usage.semantics"
 	// TermaUsageStatusKey is terma.usage.status: Whether the record's usage counts were reported.
 	TermaUsageStatusKey = "terma.usage.status"
-	// TermaVersionKey is terma.version: The version of terma whose relay forwarded the part.
+	// TermaVersionKey is terma.version: The version of terma whose relay received the part from the agent.
 	TermaVersionKey = "terma.version"
 	// TermaWorkingDirectoryKey is terma.working_directory: The absolute path of the directory the session's agent hooks last ran in.
 	TermaWorkingDirectoryKey = "terma.working_directory"

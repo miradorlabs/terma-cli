@@ -142,6 +142,7 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 	// terma.relay.attribution and terma.relay.session.id mark a part the relay placed by
 	// inference, so the backend can tell the relay's join from its own.
 	stamp(p, semconv.MiradorProjectIDKey, c.ProjectID)
+	// terma.version is the relay that accepted the part: the outbox keeps it across an upgrade.
 	if r.opts.Version != "" {
 		stamp(p, semconv.TermaVersionKey, r.opts.Version)
 	}

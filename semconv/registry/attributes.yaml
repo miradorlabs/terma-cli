@@ -539,8 +539,10 @@ attributes:
   - key: terma.version
     type: string
     stability: development
-    brief: The version of terma whose relay forwarded the part.
-    note: A resource attribute the relay stamps. terma's own records name it in service.version.
+    brief: The version of terma whose relay received the part from the agent.
+    note: >-
+      A resource attribute the relay stamps as it accepts the part, so a part queued across an
+      upgrade keeps the version that accepted it. terma's own records name it in service.version.
     examples: ["0.2.3"]
   - key: terma.relay.heartbeat.reason
     type:

@@ -300,8 +300,8 @@ func TestRelayRoutesLogsPerClaimedSession(t *testing.T) {
 	}
 }
 
-// Every part names the terma that forwarded it, over any value the agent sent, whether its
-// project takes content or withholds it.
+// Every part names the terma whose relay received it, over any value the agent sent and where
+// it sent none, whether its project takes content or withholds it, logs and spans alike.
 func TestRelayStampsItsVersion(t *testing.T) {
 	t.Parallel()
 	u := newUpstream(t)
@@ -313,21 +313,34 @@ func TestRelayStampsItsVersion(t *testing.T) {
 		m.ResourceLogs[0].Resource.Attributes = []*commonpb.KeyValue{kv(semconv.TermaVersionKey, "0.0.1")}
 		postProto(t, srv, "/v1/logs", m)
 	}
-	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["forwarded.logs"] == 2 })
+	postProto(t, srv, "/v1/traces", &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{
+		{Name: "claude_code.tool", Attributes: []*commonpb.KeyValue{kv("session.id", "A")}},
+	}}}}}})
+	waitFor(t, func() bool {
+		c := r.Stats().Snapshot().Counters
+		return c["forwarded.logs"] == 2 && c["forwarded.traces"] == 1
+	})
+	u.checkStamps(t, map[string]map[string]string{semconv.TermaVersionKey: {"Bearer key-p1": "1.2.3", "Bearer key-p2": "1.2.3"}})
 	u.mu.Lock()
 	defer u.mu.Unlock()
-	versions := map[string]string{}
+	spans := 0
 	for _, req := range u.requests {
-		var m logspb.LogsData
+		if req.path != "/v1/traces" {
+			continue
+		}
+		var m tracepb.TracesData
 		if err := proto.Unmarshal(req.body, &m); err != nil {
 			t.Fatal(err)
 		}
-		for _, rl := range m.ResourceLogs {
-			versions[req.auth] = attr(rl.Resource.Attributes, semconv.TermaVersionKey)
+		for _, rs := range m.ResourceSpans {
+			spans++
+			if got := attr(rs.Resource.Attributes, semconv.TermaVersionKey); got != "1.2.3" {
+				t.Errorf("span resource terma.version = %q, want 1.2.3", got)
+			}
 		}
 	}
-	if versions["Bearer key-p1"] != "1.2.3" || versions["Bearer key-p2"] != "1.2.3" {
-		t.Fatalf("terma.version by key = %v", versions)
+	if spans == 0 {
+		t.Fatal("no span reached the host")
 	}
 }
 
