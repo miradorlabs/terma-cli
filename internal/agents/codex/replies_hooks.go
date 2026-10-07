@@ -46,7 +46,7 @@ func captureCodexReplies(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in
 	// Inside Stop's three seconds, beside the funding capture's one.
 	ctx, cancel := context.WithTimeout(ctx, codexCaptureTimeout)
 	defer cancel()
-	next, status, err := readRolloutReplies(ctx, rollout, in.TranscriptPath, cursor, codexReplyMaxText, turnAdmission(ctx, e), func(reply reply) error {
+	next, status, err := readRolloutReplies(ctx, rollout, in.TranscriptPath, cursor, codexReplyMaxText, turnAdmission(ctx, e, r), func(reply reply) error {
 		attrs := hookrun.AgentAttrs(map[string]any{
 			semconv.GenAIMainAgentNameKey: codexTool, semconv.TermaEvidenceSourceKey: sourceCodexRollout,
 			semconv.TermaMessageIDKey: reply.ID, semconv.TermaMessageTextKey: reply.Text, semconv.TermaMessageTruncatedKey: reply.Truncated,

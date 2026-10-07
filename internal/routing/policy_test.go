@@ -272,6 +272,17 @@ func TestStorePolicyPrunesTheTeamLeftBehind(t *testing.T) {
 	if err != nil || file.Profiles["default"].Team != "t2" || file.Profiles["default"].Teams["org_a"] != "t2" {
 		t.Fatalf("profile %+v, %v", file.Profiles["default"], err)
 	}
+	// Another profile still selects t2: reselecting t3 here keeps t2's file for it.
+	if err := config.UpdateProfile(dir, "other", func(p *config.Profile) { p.SelectOrganization("org_a", ""); p.SelectTeam("t2") }); err != nil {
+		t.Fatal(err)
+	}
+	cfg.Policy = *policy("t3", "org_a")
+	if err := StorePolicy(cfg, policy("t3", "org_a")); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, _ := config.ReadPolicy(dir, "t2"); !ok {
+		t.Fatal("a team another profile selects lost its policy file")
+	}
 }
 
 // A refresh of another organization's team stores its policy and keeps the names setup

@@ -2,7 +2,6 @@ package daemon
 
 import (
 	"errors"
-	"maps"
 	"slices"
 	"sync"
 	"time"
@@ -124,7 +123,7 @@ func collectedFor(file *config.File, collected config.Policies, team string) boo
 		return true
 	}
 	for _, p := range file.Profiles {
-		if slices.Contains(slices.Collect(maps.Values(p.CollectedTeams())), team) {
+		if p.Collects(team) {
 			return true
 		}
 	}

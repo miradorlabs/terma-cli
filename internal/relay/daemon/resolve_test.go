@@ -3,6 +3,7 @@ package daemon
 import (
 	"cmp"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -140,8 +141,10 @@ func TestResolverGrantsOnlyATeamTheMachineCollectsFor(t *testing.T) {
 	if pol, err := resolve(claim.Claim{ProjectID: "p1"}); err != nil || !pol.IncludePrompts {
 		t.Fatalf("the selected team was not granted: %+v, %v", pol, err)
 	}
-	if pol, err := resolve(claim.Claim{ProjectID: "p2"}); err == nil && (pol.IncludePrompts || pol.IncludeToolContent || len(pol.Signals) > 0) {
-		t.Fatalf("a team selected nowhere was granted %+v", pol)
+	// Held as a team with no validated policy is, never granted: its exports wait out the
+	// relay's hold, so a profile selecting it meanwhile loses nothing.
+	if pol, err := resolve(claim.Claim{ProjectID: "p2"}); err == nil || !strings.Contains(err.Error(), "no validated collection policy") {
+		t.Fatalf("a team selected nowhere: %+v, %v", pol, err)
 	}
 	// Another profile selects p2: its hooks claim for it, and the one relay forwards for it.
 	if err := config.UpdateProfile(configDir, "other", func(p *config.Profile) { p.OrganizationID = org; p.SelectTeam("p2") }); err != nil {

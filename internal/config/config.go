@@ -81,6 +81,22 @@ func (p *Profile) SelectTeam(team string) {
 	p.Teams[p.OrganizationID] = team
 }
 
+// Collects reports whether team is selected in some organization of this profile.
+func (p *Profile) Collects(team string) bool {
+	if team == "" {
+		return false
+	}
+	if p.Team == team && p.OrganizationID != "" {
+		return true
+	}
+	for org, t := range p.Teams {
+		if org != "" && t == team {
+			return true
+		}
+	}
+	return false
+}
+
 // CollectedTeams is the team selected in each organization, the current one's included:
 // a profile from before Teams were recorded has its one.
 func (p *Profile) CollectedTeams() map[string]string {

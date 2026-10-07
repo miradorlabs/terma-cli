@@ -39,7 +39,7 @@ func captureCodexDesktopActivity(ctx context.Context, e hookrun.Env, r *hookrun.
 	}
 	ctx, cancel := context.WithTimeout(ctx, codexCaptureTimeout)
 	defer cancel()
-	next, status, err := readDesktopActivity(ctx, codexRolloutID(in), in.TranscriptPath, cursor, turnAdmission(ctx, e), func(a desktopActivity) error {
+	next, status, err := readDesktopActivity(ctx, codexRolloutID(in), in.TranscriptPath, cursor, turnAdmission(ctx, e, r), func(a desktopActivity) error {
 		attrs := hookrun.EvidenceAttrs(codexTool, sourceCodexRollout, "desktop")
 		attrs[semconv.TermaCaptureSurfaceKey] = semconv.TermaCaptureSurfaceDesktop
 		hookrun.BoundedAttr(attrs, semconv.TermaTurnIDKey, a.TurnID)

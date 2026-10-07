@@ -109,16 +109,21 @@ func (e Env) Repo(ctx context.Context) (*Repo, error) {
 	return r, nil
 }
 
-// Admits reports whether a team policy collects the working copy at dir, judged as Repo
-// judges the current directory.
-func (e Env) Admits(ctx context.Context, dir string) bool {
+// AdmitsUnder reports whether r's own team policy collects the working copy at dir, judged
+// as Repo judges the current directory: what a session in r reports from elsewhere (a
+// thread's earlier turns in another checkout) is stamped with r's team, so only that
+// team's listing may admit it, never another team's, which may be another organization's.
+func (e Env) AdmitsUnder(ctx context.Context, r *Repo, dir string) bool {
 	e.Cwd = dir
 	_, _, id, err := e.locate(ctx)
 	if err != nil {
 		return false
 	}
-	_, ok := e.admit(id)
-	return ok
+	if r == nil {
+		_, ok := e.admit(id)
+		return ok
+	}
+	return r.Policy.Admits(id)
 }
 
 // locate finds the working copy at Cwd, a Git checkout's root from any directory in it,

@@ -441,4 +441,16 @@ func TestMachineRowsNameOtherTeamsWithoutAPolicy(t *testing.T) {
 	if len(also) != 1 || !strings.Contains(also[0], "team pb of org_b") || !strings.Contains(also[0], "terma setup --org org_b") {
 		t.Fatalf("Also rows = %q; want org_b's team alone", also)
 	}
+	// The selected policy names another team than the organization's recorded one (a
+	// --team override): neither is listed as another team's.
+	cfg.Policy = config.Policy{Mode: config.ModeRepo, TeamID: "px", OrganizationID: "org_a", AuthURL: config.DefaultAuthURL, FetchedAt: time.Now()}
+	also = nil
+	for _, r := range machineRows(cfg, routing.Collect(cfg)) {
+		if r.Label == "Also" {
+			also = append(also, r.Value)
+		}
+	}
+	if len(also) != 1 || !strings.Contains(also[0], "team pb of org_b") {
+		t.Fatalf("Also rows with a team override = %q", also)
+	}
 }

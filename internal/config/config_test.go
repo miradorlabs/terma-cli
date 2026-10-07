@@ -313,9 +313,15 @@ func TestProfileKeepsOneTeamPerOrganization(t *testing.T) {
 	if none.Team != "t" || len(none.Teams) != 0 {
 		t.Fatalf("a team selected with no organization was recorded under one: %+v", none)
 	}
+	if !p.Collects("ta2") || !p.Collects("tb") || p.Collects("ta") || p.Collects("") {
+		t.Fatalf("Collects misjudged %+v", p)
+	}
 	// A profile written before Teams were recorded keeps its team when it adds an
 	// organization: that is what every existing install does on `terma setup --org`.
 	older := &Profile{OrganizationID: "org-a", Team: "ta"}
+	if !older.Collects("ta") {
+		t.Fatal("an older profile does not collect its one team")
+	}
 	older.SelectOrganization("org-b", "Beta")
 	older.SelectTeam("tb")
 	if got := older.CollectedTeams(); len(got) != 2 || got["org-a"] != "ta" || got["org-b"] != "tb" {

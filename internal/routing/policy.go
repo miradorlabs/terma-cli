@@ -82,30 +82,48 @@ func StorePolicy(cfg *config.Config, pol *config.Policy) error {
 		return nil
 	}
 	left := ""
-	err = config.UpdateProfile(cfg.Dir, cfg.ProfileName, func(p *config.Profile) {
+	err = config.UpdateFile(cfg.Dir, func(file *config.File) {
+		name := cmp.Or(cfg.ProfileName, file.ActiveProfile)
+		p := file.Profiles[name]
+		if p == nil {
+			p = &config.Profile{}
+			file.Profiles[name] = p
+		}
 		if p.OrganizationID == "" && cfg.OrganizationID != "" {
 			p.SelectOrganization(cfg.OrganizationID, "")
 		}
 		// Signed into another organization while this fetch ran: its selection stands.
-		if p.OrganizationID == cfg.OrganizationID && (p.Team == "" || cfg.Policy.TeamID == pol.TeamID) {
-			prev := p.Team
-			p.SelectTeam(pol.TeamID)
-			if prev != "" && prev != pol.TeamID && !slices.Contains(slices.Collect(maps.Values(p.CollectedTeams())), prev) {
-				left = prev
-			}
+		if p.OrganizationID != cfg.OrganizationID || p.Team != "" && cfg.Policy.TeamID != pol.TeamID {
+			return
+		}
+		prev := p.Team
+		p.SelectTeam(pol.TeamID)
+		if prev != "" && prev != pol.TeamID && !selectedAnywhere(file, prev) {
+			left = prev
 		}
 	})
 	if err != nil || left == "" {
 		return err
 	}
-	// The team selected before, now selected in no organization, collects nothing: its
-	// policy file would only be refreshed for nothing.
+	// The team selected before, now selected in no profile's organization, collects
+	// nothing: its policy file would only be refreshed for nothing. Another profile that
+	// still selects it (`terma config`) keeps the file, which the state directory shares.
 	if prevPath, err := config.PolicyPath(cfg.StateDir, left); err == nil {
 		if err := os.Remove(prevPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return err
 		}
 	}
 	return nil
+}
+
+// selectedAnywhere reports whether any profile of file selects team in some organization.
+func selectedAnywhere(file *config.File, team string) bool {
+	for _, p := range file.Profiles {
+		if p.Collects(team) {
+			return true
+		}
+	}
+	return false
 }
 
 // ValidatedPolicy is team's last validated policy for cfg's environment; an unreadable

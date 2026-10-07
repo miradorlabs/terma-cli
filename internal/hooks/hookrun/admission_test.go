@@ -362,8 +362,8 @@ func TestAdmitsJudgesTheDirectoryItIsGiven(t *testing.T) {
 	for dir, want := range map[string]bool{
 		listed: true, filepath.Join(listed, "sub"): true, other: false, filepath.Join(t.TempDir(), "gone"): false,
 	} {
-		if got := e.Admits(context.Background(), dir); got != want {
-			t.Errorf("Admits(%s) = %v, want %v", dir, got, want)
+		if got := e.AdmitsUnder(context.Background(), nil, dir); got != want {
+			t.Errorf("AdmitsUnder(%s) = %v, want %v", dir, got, want)
 		}
 	}
 }
@@ -420,10 +420,18 @@ func TestARepositoryIsAdmittedByWhicheverTeamListsIt(t *testing.T) {
 			if ev := e.stamp(r, spool.Event{SessionID: "s"}); ev.Global != tc.global || ev.Attrs[AttrProjectID] != tc.team {
 				t.Fatalf("stamped %+v", ev)
 			}
-			if !e.Admits(ctx, tc.cwd) {
-				t.Fatal("Admits disagrees with Repo")
+			if !e.AdmitsUnder(ctx, r, tc.cwd) || !e.AdmitsUnder(ctx, nil, tc.cwd) {
+				t.Fatal("AdmitsUnder disagrees with Repo")
 			}
 		})
+	}
+	// What a session reports from another checkout is admitted by its own team's policy
+	// alone: another team's repository, listed or not, is never stamped with this team.
+	if r, err := env(site, selected, other).Repo(ctx); err != nil || e2eAdmits(ctx, env(site, selected, other), r, work) {
+		t.Fatalf("a session in team t2's repository had the selected team's repository admitted: %+v, %v", r, err)
+	}
+	if r, err := env(personal, selected, other, global).Repo(ctx); err != nil || !e2eAdmits(ctx, env(personal, selected, other, global), r, site) {
+		t.Fatalf("a session under the global policy was refused a listed repository: %+v, %v", r, err)
 	}
 	// With no Policies, Policy alone admits, as before.
 	if r, err := env(work).Repo(ctx); err != nil || r.ProjectID != "t1" {
@@ -470,4 +478,9 @@ func TestConsentFollowsTheAdmittingPolicy(t *testing.T) {
 	if c := e.ConsentUnder(nil); !c.Global {
 		t.Fatalf("consent outside any repository = %+v; want the selected policy's", c)
 	}
+}
+
+// e2eAdmits is AdmitsUnder for a session in r asked about the checkout at dir.
+func e2eAdmits(ctx context.Context, e Env, r *Repo, dir string) bool {
+	return e.AdmitsUnder(ctx, r, dir)
 }

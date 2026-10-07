@@ -105,9 +105,11 @@ func (d Deps) Resolver(cfg *config.Config, mint func(projectID string)) func(cla
 func (d Deps) CatchAll() func() (claim.Claim, bool) { return CatchAll(d.HookPolicy) }
 
 // Refresher keeps fresh, while the relay runs, every team this machine collects for: the
-// one selected in each organization (config.Config.Teams) and the selected team. A team
-// with a key here but selected nowhere is not refreshed: it collects nothing, and its
-// organization is not recorded to fetch under.
+// one selected in each organization (config.Config.Teams) by the relay's profile and by
+// every other profile of this environment, each refreshed under its own profile's
+// credential, as the one relay forwards for every profile's teams. A team with a key here
+// but selected nowhere is not refreshed: it collects nothing, and its organization is not
+// recorded to fetch under.
 func (d Deps) Refresher() *PolicyRefresher {
 	return &PolicyRefresher{
 		Interval: PolicyRefreshInterval,
@@ -117,11 +119,7 @@ func (d Deps) Refresher() *PolicyRefresher {
 			if err != nil {
 				return nil
 			}
-			teams := slices.Sorted(maps.Values(cfg.Teams))
-			selected := cfg.Policy.Team()
-			if selected != "" && !slices.Contains(teams, selected) {
-				teams = append(teams, selected)
-			}
+			teams, _ := collectedTeams(cfg)
 			return teams
 		},
 		Fetched: func(team string) time.Time {
@@ -139,8 +137,44 @@ func (d Deps) Refresher() *PolicyRefresher {
 			if err != nil {
 				return err
 			}
-			// Under the organization whose team it is, which may not be the profile's.
+			// Under the profile that selected it and the organization whose team it is,
+			// which may be neither the relay's profile nor its organization.
+			if _, profiles := collectedTeams(cfg); profiles[team] != nil {
+				cfg = profiles[team]
+			}
 			return d.RefreshPolicy(ctx, routing.ScopeToTeam(cfg, team))
 		},
 	}
+}
+
+// collectedTeams are the teams the relay refreshes, in order, and for each one selected
+// only by another profile of cfg's environment, that profile's configuration to refresh
+// it under; a team of cfg's own profile maps to nothing, cfg serving it. Another
+// environment's profile is left alone: its policies are not this relay's to validate.
+func collectedTeams(cfg *config.Config) ([]string, map[string]*config.Config) {
+	teams := slices.Sorted(maps.Values(cfg.Teams))
+	if selected := cfg.Policy.Team(); selected != "" && !slices.Contains(teams, selected) {
+		teams = append(teams, selected)
+	}
+	profiles := map[string]*config.Config{}
+	file, err := config.LoadFile(cfg.Dir)
+	if err != nil {
+		return teams, profiles
+	}
+	for _, name := range slices.Sorted(maps.Keys(file.Profiles)) {
+		if name == cfg.ProfileName {
+			continue
+		}
+		other, err := config.Load(cfg.Dir, cfg.StateDir, config.Overrides{Profile: name})
+		if err != nil || other.AuthURL != cfg.AuthURL {
+			continue
+		}
+		for _, team := range slices.Sorted(maps.Values(other.Teams)) {
+			if !slices.Contains(teams, team) {
+				teams = append(teams, team)
+				profiles[team] = other
+			}
+		}
+	}
+	return teams, profiles
 }
