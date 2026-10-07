@@ -124,6 +124,10 @@ func TestSetupAndDoctorSayWhenTheTeamHasNoPolicy(t *testing.T) {
 	if strings.Contains(out, "lists no repositories") || strings.Contains(out, doctor.NoRepositoriesStep) {
 		t.Errorf("setup blamed an empty repository list:\n%s", out)
 	}
+	// No policy has git_hooks off too, but the step is the policy, not commit hooks.
+	if strings.Contains(out, doctor.GitHooksOffStep) {
+		t.Errorf("setup recommended commit hooks to a team with no policy:\n%s", out)
+	}
 	loaded, err := testApp.loadConfig()
 	if err != nil || !loaded.Policy.Unset || !loaded.Policy.AdmitsNone() {
 		t.Fatalf("stored policy = %+v, %v; want unset and admitting nothing", loaded.Policy, err)

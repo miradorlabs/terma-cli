@@ -67,7 +67,11 @@ so two developers on different teams in one repository each report to their own.
 
 ### Which commits are stamped
 
-Commit stamping is the team policy's choice. With it on, the first agent session claimed
+Commit stamping is the team policy's choice, off unless a team admin turns it on in the
+Terma web app. Off, which work landed is inferred from the git commands
+agents run; on, `post-commit` records every commit as it lands, including ones made
+outside an agent, for commit-level accuracy. `terma setup` and `terma doctor` say so when
+your team has it off. With it on, the first agent session claimed
 in a repository the policy collects installs `prepare-commit-msg` and `post-commit` into
 that repository's own `.git/hooks` (the common one, so linked worktrees share them). A
 repository no agent has worked in, and a folder outside git, get nothing. If they are

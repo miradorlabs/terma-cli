@@ -12,7 +12,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/globalmode"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
@@ -184,17 +183,7 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 				daemon.Stop(dir)
 			}
 		},
-		Fetched: func(pol config.Policy) {
-			if team != "" {
-				ui.Summary("Team", team)
-			}
-			if pol.AdmitsNone() {
-				ui.Warn("Collects", doctor.PolicySummary(pol))
-				ui.Then(doctor.NothingCollectedStep(pol))
-			} else {
-				ui.Summary("Collects", doctor.PolicySummary(pol))
-			}
-		},
+		Fetched: func(pol config.Policy) { ui.policyFetched(team, pol) },
 		ConnectRelay: func(ctx context.Context, names []string) error {
 			if f.relayAddr != "" {
 				if err := app.moveRelay(f.relayAddr); err != nil {
