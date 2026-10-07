@@ -211,7 +211,7 @@ func (c *Client) Apply(ctx context.Context, rel *Release, exePath string, out io
 	if err != nil {
 		return "", err
 	}
-	sig, err := c.get(ctx, signature.URL)
+	sig, err := c.getUpTo(ctx, signature.URL, maxSignature+1)
 	if err != nil {
 		return "", err
 	}
@@ -249,6 +249,12 @@ func (c *Client) Apply(ctx context.Context, rel *Release, exePath string, out io
 }
 
 func (c *Client) get(ctx context.Context, target string) ([]byte, error) {
+	return c.getUpTo(ctx, target, maxDownload)
+}
+
+// getUpTo fetches target, reading at most limit bytes: a small file is read no further,
+// whatever is served in its place.
+func (c *Client) getUpTo(ctx context.Context, target string, limit int64) ([]byte, error) {
 	if err := c.checkDownloadOrigin(target); err != nil {
 		return nil, err
 	}
@@ -265,7 +271,7 @@ func (c *Client) get(ctx context.Context, target string) ([]byte, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("download %s: HTTP %d", target, resp.StatusCode)
 	}
-	return io.ReadAll(io.LimitReader(resp.Body, maxDownload))
+	return io.ReadAll(io.LimitReader(resp.Body, limit))
 }
 
 // checkDownloadOrigin refuses an asset URL outside GitHub or an explicit BaseURL: the

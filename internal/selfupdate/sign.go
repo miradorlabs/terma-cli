@@ -20,7 +20,8 @@ const maxSignature = 4096
 // releaseKeys are the ed25519 public keys a release may be signed with, hex, newest first.
 // To rotate: a release lists the new key beside the old and is signed by both (both seeds
 // in TERMA_SIGNING_KEY), and so is every release until no build that lacks the new key is
-// still updating; then the old key and its signature go. A key to retire at once goes with
+// still updating (the User-Agent of the release lookups, terma-cli/<version>, says which
+// versions still do); then the old key and its signature go. A key to retire at once goes with
 // the release that replaces it, and a build that lacks the new key is reinstalled.
 var releaseKeys = []string{
 	"cb6646bf0ec98128bcab6bd5a4b92d0ca4ade2d9e3f17e12e06e33725240667b", // 2026-10-07
