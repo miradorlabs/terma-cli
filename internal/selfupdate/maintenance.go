@@ -249,6 +249,9 @@ func (c *Client) Auto(ctx context.Context, configDir, stateDir, exe string, prog
 		fmt.Fprintf(progress, "Updating terma %s → %s…\n", c.Version, rel.Version())
 	}
 	if _, err := c.Apply(updateCtx, rel, exe, progress); errors.Is(err, ErrReplaced) {
+		// No attempt was made on the binary now in place: its own process may try at once.
+		cache.AttemptAt, cache.Attempted = time.Time{}, ""
+		SaveCache(stateDir, cache)
 		return Outcome{Replaced: true}
 	} else if err != nil {
 		return Outcome{Err: err}

@@ -468,8 +468,13 @@ func TestAnInstallRefusesABinaryReplacedDuringTheDownload(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 	c := &Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.1", Binary: started}
-	o := c.Auto(context.Background(), t.TempDir(), t.TempDir(), exe, nil)
+	stateDir := t.TempDir()
+	o := c.Auto(context.Background(), t.TempDir(), stateDir, exe, nil)
 	if got, _ := os.ReadFile(exe); !o.Replaced || o.Installed != "" || o.Err != nil || string(got) != "1.0.3" {
 		t.Fatalf("Auto = %+v, binary now %q; want Replaced and 1.0.3 left in place", o, got)
+	}
+	// The release was not tried on the binary now in place, whose process may try it at once.
+	if cache := LoadCache(stateDir); cache.Attempted != "" || !cache.AttemptAt.IsZero() {
+		t.Fatalf("an install that lost to another installer left an attempt behind: %+v", cache)
 	}
 }
