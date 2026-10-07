@@ -243,10 +243,10 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 }
 
 // NoRepositoriesStep is what a developer whose team lists no repositories is told.
-const NoRepositoriesStep = "Nothing is collected until a team admin lists repositories in Terma (Team settings → Data collection), or chooses Every session."
+const NoRepositoriesStep = "Nothing is collected until a team admin lists repositories in the Terma web app, or chooses Every session."
 
 // NoPolicyStep is what a developer whose team has no collection policy yet is told.
-const NoPolicyStep = "Nothing is collected until a team admin sets up your team's collection policy in Terma (Team settings → Data collection)."
+const NoPolicyStep = "Nothing is collected until a team admin sets up your team's collection policy in the Terma web app."
 
 // NothingCollectedStep is what to do about a validated policy that admits no repository.
 func NothingCollectedStep(p config.Policy) string {
@@ -287,5 +287,5 @@ func RepositoryCheck(policy config.Policy, gitDir string, repoErr error) Check {
 				`git config core.sshCommand "ssh -i ~/.ssh/<your key> -o IdentitiesOnly=yes"`}
 	}
 	return Check{Status: Warn, Detail: id.Origin + " is not in the team's repositories, so nothing here is recorded",
-		Fix: "ask your team to add " + id.Origin + " in Terma (Team settings → Data collection)"}
+		Fix: "ask your team to add " + id.Origin + " in the Terma web app"}
 }
