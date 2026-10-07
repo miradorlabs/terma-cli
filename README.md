@@ -41,10 +41,11 @@ terma setup
 ```
 
 **Direct download or source**. Binaries are on
-[Releases](https://github.com/miradorlabs/terma-cli/releases), with checksums; `terma update`
-updates a downloaded release in place. From a clone of this repository, `make install`
-builds terma; a build between release tags is never updated until `terma update --force`
-replaces it with the latest release.
+[Releases](https://github.com/miradorlabs/terma-cli/releases), with checksums; on macOS and
+Linux, `terma update` updates a downloaded release in place. From a clone of this
+repository, `make install` builds terma; a build between release tags is never updated
+until `terma update --force` replaces it with the latest release. On Windows, download each
+new release from Releases: terma does not update in place there yet.
 
 ```bash
 make install
@@ -111,8 +112,8 @@ relay, spool delivery, shell completion — and for Terma's own engineers.
 
 ## Updates
 
-terma looks for a new release at most once a day, and only after a terma command you run
-in a terminal. Hooks, the relay, scripts, CI and `--output` other than a table never look.
+terma looks for a new release once a day (every 15 minutes while the lookup is failing),
+and only after a terma command you run in a terminal. Hooks, the relay, scripts, CI and `--output` other than a table never look.
 When one is out, terma says so; `terma update` installs it.
 
 ```bash
@@ -127,9 +128,9 @@ terma update --auto status  # show the current choice
 never updates, whatever the setting. It never replaces a Homebrew or npm installation or a
 Windows binary either; those only get the notice. `terma update` upgrades Homebrew and npm
 through the package manager that owns them, and when it cannot find that package manager
-it names the command to run. On Windows, download the new release from Releases: terma
-does not update in place there yet. A build between release tags gets no notice at all. Updates verify the release checksum
-before replacing the binary.
+it names the command to run; a Windows binary is replaced by hand, as Get started says. A
+build between release tags gets no notice at all. Updates verify the release checksum before
+replacing the binary.
 
 After an update, the new version also refreshes what earlier versions wrote in your home
 directory — the wrapped Claude Code status line, the OpenCode plugin, the relay's service —
