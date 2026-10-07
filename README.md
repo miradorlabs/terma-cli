@@ -211,7 +211,11 @@ so two developers on different teams in one repository each report to their own.
 
 ### Which commits are stamped
 
-Commit stamping is the team policy's choice. With it on, the first agent session claimed
+Commit stamping is the team policy's choice, off unless a team admin turns it on in the
+Terma web app. Off, which work landed is inferred from the git commands
+agents run; on, `post-commit` records every commit as it lands, including ones made
+outside an agent, for commit-level accuracy. `terma setup` and `terma doctor` say so when
+your team has it off. With it on, the first agent session claimed
 in a repository the policy collects installs `prepare-commit-msg` and `post-commit` into
 that repository's own `.git/hooks` (the common one, so linked worktrees share them). A
 repository no agent has worked in, and a folder outside git, get nothing. If they are
@@ -263,7 +267,10 @@ What content leaves is your team's collection policy, set in the Terma web app, 
 The relay and the hook queue's delivery fetch it with your login; until they have,
 nothing they would send leaves. Agents send prompts, model responses and tool input and
 output to the relay, and the relay removes what the policy does not collect before
-anything leaves. Hook events, which queue on this machine and never pass the relay, are
+anything leaves. While it collects tool content, the relay also names the working tree a
+session's hooks last ran in (`terma.repository.root`), which the agents' own records do not,
+so Terma can tell which checkout a git command ran in; it is a local path, so it leaves with
+tool content or not at all. Hook events, which queue on this machine and never pass the relay, are
 held to the same policy when they are sent: an event queued before the policy tightened
 leaves without the content it no longer collects, and one from a repository no longer
 listed does not leave.

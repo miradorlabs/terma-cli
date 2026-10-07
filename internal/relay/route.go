@@ -1,6 +1,7 @@
 package relay
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -141,6 +142,14 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 	// terma.relay.attribution and terma.relay.session.id mark a part the relay placed by
 	// inference, so the backend can tell the relay's join from its own.
 	stamp(p, semconv.MiradorProjectIDKey, c.ProjectID)
+	// The checkout is the relay's to name, never the agent's, and a local path: it leaves only
+	// with the tool content that names paths.
+	unstamp(p, semconv.TermaRepositoryRootKey)
+	if pol.IncludeToolContent {
+		if root := r.rootOf(c, p, how); root != "" {
+			stamp(p, semconv.TermaRepositoryRootKey, root)
+		}
+	}
 	if how.how != "" {
 		stamp(p, semconv.TermaRelayAttributionKey, how.how)
 		if how.session != "" {
@@ -150,6 +159,27 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 		r.stats.add("attributed_by_"+strings.ReplaceAll(how.how, "-", "_")+"."+string(p.signal), p.records)
 	}
 	r.enqueue(c, p)
+}
+
+// rootOf is the working tree the part's session ran in: the placing claim's, or, where global
+// mode's catch-all placed the part without one, its session's own claim's for the same
+// project. "" when no hook has named one.
+func (r *Relay) rootOf(c claim.Claim, p *part, how attribution) string {
+	if c.Root != "" || how.how != semconv.TermaRelayAttributionCatchAll {
+		return c.Root
+	}
+	session := r.sessionFor(p.session)
+	if session == "" || strings.HasPrefix(session, procPrefix) {
+		return ""
+	}
+	own, ok := r.lookup(session)
+	if !ok {
+		return ""
+	}
+	if own, ok = own.At(p.pid, p.at); !ok || own.ProjectID != c.ProjectID {
+		return ""
+	}
+	return own.Root
 }
 
 func (r *Relay) catchAll() (claim.Claim, bool) {
@@ -182,6 +212,29 @@ func stamp(p *part, key, value string) {
 	case *metricspb.MetricsData:
 		for _, rm := range m.GetResourceMetrics() {
 			set(rm.Resource)
+		}
+	}
+}
+
+// unstamp removes a resource attribute from every resource.
+func unstamp(p *part, key string) {
+	drop := func(res *resourcepb.Resource) {
+		if res != nil {
+			res.Attributes = slices.DeleteFunc(res.Attributes, func(kv *commonpb.KeyValue) bool { return kv.GetKey() == key })
+		}
+	}
+	switch m := p.msg.(type) {
+	case *logspb.LogsData:
+		for _, rl := range m.GetResourceLogs() {
+			drop(rl.Resource)
+		}
+	case *tracepb.TracesData:
+		for _, rs := range m.GetResourceSpans() {
+			drop(rs.Resource)
+		}
+	case *metricspb.MetricsData:
+		for _, rm := range m.GetResourceMetrics() {
+			drop(rm.Resource)
 		}
 	}
 }

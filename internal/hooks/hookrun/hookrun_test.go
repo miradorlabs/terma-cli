@@ -346,7 +346,7 @@ func keysOf(attrs map[string]any) []string { return slices.Sorted(maps.Keys(attr
 // commitIdentity is what both commit events carry, and all the unattributed one does.
 var commitIdentity = []string{
 	AttrProjectID, semconv.TermaCommitFileCountKey, semconv.TermaCommitLinesAddedKey, semconv.TermaCommitLinesDeletedKey,
-	semconv.VCSOwnerNameKey, semconv.VCSProviderNameKey, semconv.VCSRefHeadNameKey, semconv.VCSRefHeadRevisionKey,
+	semconv.TermaRepositoryRootKey, semconv.VCSOwnerNameKey, semconv.VCSProviderNameKey, semconv.VCSRefHeadNameKey, semconv.VCSRefHeadRevisionKey,
 	semconv.VCSRefHeadTypeKey, semconv.VCSRepositoryNameKey, semconv.VCSRepositoryURLFullKey,
 }
 
@@ -496,7 +496,11 @@ func TestCommitEventsAreOneFilterApart(t *testing.T) {
 	if got := keysOf(unstamped.Attrs); !slices.Equal(got, commitIdentity) {
 		t.Fatalf("unattributed event shape\n got %v\nwant %v", got, commitIdentity)
 	}
-	for _, k := range []string{semconv.VCSRefHeadNameKey, semconv.VCSRepositoryURLFullKey, semconv.VCSRepositoryNameKey, AttrProjectID} {
+	// The working tree names the checkout as the platform's file state does, for a quiet commit too.
+	if want, _ := filepath.EvalSymlinks(root); stamped.Attrs[semconv.TermaRepositoryRootKey] != want {
+		t.Errorf("terma.commit root = %v, want %s", stamped.Attrs[semconv.TermaRepositoryRootKey], want)
+	}
+	for _, k := range []string{semconv.VCSRefHeadNameKey, semconv.VCSRepositoryURLFullKey, semconv.VCSRepositoryNameKey, AttrProjectID, semconv.TermaRepositoryRootKey} {
 		if stamped.Attrs[k] != unstamped.Attrs[k] {
 			t.Errorf("%s differs between the two commit events: %v vs %v", k, stamped.Attrs[k], unstamped.Attrs[k])
 		}

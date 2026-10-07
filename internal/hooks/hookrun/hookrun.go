@@ -102,6 +102,19 @@ type Repo struct {
 	Repository config.Repository
 }
 
+// workTree is the checkout's root inside git, "" for a folder outside it: only a working
+// tree is a repository root to the platform. It is symlink-resolved, as the platform compares
+// it, however the hook's cwd reached the checkout (/tmp is /private/tmp on macOS).
+func (r *Repo) workTree() string {
+	if r == nil || r.GitDir == "" {
+		return ""
+	}
+	if resolved, err := filepath.EvalSymlinks(r.Root); err == nil {
+		return resolved
+	}
+	return r.Root
+}
+
 // ErrNotAdmitted is a working copy the team policy does not collect: its hooks record nothing.
 var ErrNotAdmitted = errors.New("not among the team's repositories")
 
@@ -196,7 +209,7 @@ func (e Env) claimForRelay(r *Repo, ev spool.Event) {
 		return
 	}
 	tool, _ := ev.Attrs[semconv.GenAIMainAgentNameKey].(string)
-	c := claim.Claim{ProjectID: r.ProjectID, Tool: tool, Repo: r.Name, Worktree: r.Worktree, Repository: r.Repository, PIDs: claimPIDs()}
+	c := claim.Claim{ProjectID: r.ProjectID, Tool: tool, Repo: r.Name, Worktree: r.Worktree, Repository: r.Repository, Root: r.workTree(), PIDs: claimPIDs()}
 	claim.Write(e.StateDir, ev.SessionID, c, e.Time())
 	// A subagent whose telemetry uses its agent id as session id would otherwise be dropped.
 	if agent, _ := ev.Attrs[semconv.TermaAgentIDKey].(string); agent != "" && agent != ev.SessionID {
@@ -350,6 +363,10 @@ func commitAttrs(r *Repo, head gitx.Commit) map[string]any {
 	}
 	if head.Branch != "" {
 		attrs[semconv.VCSRefHeadNameKey], attrs[semconv.VCSRefHeadTypeKey] = head.Branch, semconv.VCSRefHeadTypeBranch
+	}
+	// The working tree is how the platform names a checkout (delivery withholds it with tool content).
+	if root := r.workTree(); root != "" {
+		attrs[semconv.TermaRepositoryRootKey] = root
 	}
 	vcsAttrs(attrs, r)
 	return attrs

@@ -10,6 +10,8 @@ import (
 	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
 	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
+
+	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
 // withhold applies a project's content policy to a part in place and returns how many records it changed.
@@ -35,6 +37,12 @@ func (ru *rules) withhold(p *part, prompts, toolContent bool, unclassified map[s
 			switch key := kv.GetKey(); {
 			case contains(ru.resourcePromptFields, key):
 				if !prompts {
+					changed++
+					continue
+				}
+			case key == semconv.TermaRepositoryRootKey:
+				// The relay's own stamp: a local path, which leaves only with tool content.
+				if !toolContent {
 					changed++
 					continue
 				}

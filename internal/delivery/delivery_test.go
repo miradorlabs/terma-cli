@@ -228,6 +228,32 @@ func TestOutgoingWithholdsTheEmailWithContent(t *testing.T) {
 	}
 }
 
+// A commit's working tree is a local path: it leaves only with tool content,
+// whatever else the policy collects, and the event itself still leaves without it.
+func TestOutgoingWithholdsTheWorkingTreeWithToolContent(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	for _, name := range []string{semconv.TermaCommitEvent, semconv.TermaCommitUnattributedEvent} {
+		ev := spool.Event{Repository: app, Name: name, Attrs: map[string]any{
+			semconv.TermaRepositoryRootKey: "/src/app", semconv.VCSRefHeadRevisionKey: "abc",
+		}}
+		for _, pol := range []config.Policy{
+			{Mode: config.ModeRepo, Repositories: listed},
+			{Mode: config.ModeRepo, Repositories: listed, IncludePrompts: true},
+			{Mode: config.ModeRepo, Repositories: listed, IncludeToolContent: true},
+			{Mode: config.ModeRepo, Repositories: listed, IncludePrompts: true, IncludeToolContent: true},
+		} {
+			out, ok := (Router{ConfigDir: dir}).Outgoing(pol, "p1", ev)
+			if !ok || out.Attrs[semconv.VCSRefHeadRevisionKey] != "abc" {
+				t.Fatalf("%s, prompts %v, tool content %v: = %+v, %v", name, pol.IncludePrompts, pol.IncludeToolContent, out.Attrs, ok)
+			}
+			if got := out.Attrs[semconv.TermaRepositoryRootKey]; (got == "/src/app") != pol.IncludeToolContent {
+				t.Errorf("%s, prompts %v, tool content %v: root = %v", name, pol.IncludePrompts, pol.IncludeToolContent, got)
+			}
+		}
+	}
+}
+
 // Every event kind the hooks spool is classified, as content-bearing or content-free, so
 // delivery never sends an unknown kind's content past a policy that withholds it.
 func TestEveryHookEventKindIsClassified(t *testing.T) {

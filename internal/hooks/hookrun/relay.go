@@ -50,7 +50,7 @@ func ClaimFromPayload(ctx context.Context, env Env, s PayloadSession, tool strin
 	var c claim.Claim
 	switch r, err := env.Repo(ctx); {
 	case err == nil && r.ProjectID != "":
-		c = claim.Claim{ProjectID: r.ProjectID, Tool: tool, Repo: r.Name, Worktree: r.Worktree, Repository: r.Repository}
+		c = claim.Claim{ProjectID: r.ProjectID, Tool: tool, Repo: r.Name, Worktree: r.Worktree, Repository: r.Repository, Root: r.workTree()}
 	case errors.Is(err, ErrNotAdmitted):
 		for _, sid := range []string{id, s.AgentID} {
 			if sid != "" {

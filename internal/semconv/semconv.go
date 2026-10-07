@@ -199,6 +199,8 @@ const (
 	TermaRelayHeartbeatReasonKey = "terma.relay.heartbeat.reason"
 	// TermaRelaySessionIDKey is terma.relay.session.id: The session the relay inferred for a part that named none.
 	TermaRelaySessionIDKey = "terma.relay.session.id"
+	// TermaRepositoryRootKey is terma.repository.root: The absolute path of the working tree the session or the git operation ran in.
+	TermaRepositoryRootKey = "terma.repository.root"
 	// TermaSchemaVersionKey is terma.schema.version: The version of this registry the record follows.
 	TermaSchemaVersionKey = "terma.schema.version"
 	// TermaSessionParentIDKey is terma.session.parent.id: The session that opened this one for a subagent.
