@@ -27,6 +27,9 @@ type fakeAuth struct {
 	deadToken  string
 	policyBody string
 	policies   atomic.Int32
+	orgLists   atomic.Int32
+	// orgs is what /v1/organizations lists, fakeOrgs when nil.
+	orgs []organization
 }
 
 var fakeOrgs = []organization{
@@ -60,7 +63,12 @@ func newFakeAuth(t *testing.T) *fakeAuth {
 				"organization_id": org, "auth_type": "cli_token", "user_id": "u-1", "email": "dev@example.com",
 			})
 		case "/v1/organizations":
-			_ = json.NewEncoder(w).Encode(listOrganizationsResponse{Organizations: fakeOrgs})
+			f.orgLists.Add(1)
+			orgs := f.orgs
+			if orgs == nil {
+				orgs = fakeOrgs
+			}
+			_ = json.NewEncoder(w).Encode(listOrganizationsResponse{Organizations: orgs})
 		case "/v1/projects":
 			_ = json.NewEncoder(w).Encode(listProjectsResponse{Projects: projectsIn(org)})
 		case "/v1/policy":
