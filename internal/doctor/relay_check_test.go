@@ -39,6 +39,10 @@ func TestRelayCheckJudgesTheRelayItself(t *testing.T) {
 			status: Warn, want: "the relay service waits behind it"},
 		{name: "hook-started relay, no service: as designed", relay: func(r *Relay) { r.HookStarted, r.ServiceInstalled, r.ServiceCurrent = true, false, false },
 			env: "dev", status: Pass},
+		{name: "relay of an earlier release, waiting to restart", relay: func(r *Relay) { r.Version, r.Earlier = "1.2.0", true }, env: "dev",
+			status: Warn, want: "still runs terma 1.2.0, an earlier release"},
+		{name: "relay of an earlier release that is not running", relay: func(r *Relay) { r.Running, r.Version, r.Earlier = false, "1.2.0", true }, env: "dev",
+			status: Pass, want: "starts with the next hook"},
 		{name: "wrong environment outranks a stale service", relay: func(r *Relay) { r.Environment, r.ServiceCurrent = "prod", false }, env: "dev",
 			status: Fail, want: "prod environment"},
 	} {

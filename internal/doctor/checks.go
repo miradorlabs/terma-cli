@@ -222,6 +222,13 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 			Detail: "a relay a hook started holds " + addr + ", so the relay service waits behind it and misses what agents export before their first hook",
 			Fix:    "terma setup"}
 	}
+	// Expected for a while after an update: the relay restarts only once nothing it holds in
+	// memory would be lost. Said, so a relay kept by an agent that never pauses is not a mystery.
+	if running && relay.Earlier {
+		return Check{Status: Warn,
+			Detail: "the local relay still runs terma " + relay.Version + ", an earlier release; it restarts on this one once it holds nothing and no agent is exporting",
+			Fix:    "terma setup"}
+	}
 	for _, e := range reg.With[agents.RelayExporter]() {
 		if c, ok := e.(agents.RelayChecker); ok && mine(e) {
 			if detail, fix, problem := c.RelayProblem(); problem {

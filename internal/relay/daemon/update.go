@@ -43,9 +43,12 @@ func (u Updater) Run(ctx context.Context, installed chan<- string) {
 	if u.Every <= 0 {
 		return
 	}
-	after, jitter := u.After, u.Jitter
+	after, jitter, logf := u.After, u.Jitter, u.Logf
 	if after == nil {
 		after = time.After
+	}
+	if logf == nil {
+		logf = func(string, ...any) {}
 	}
 	if jitter == nil {
 		jitter = func(d time.Duration) time.Duration { return rand.N(d) }
@@ -60,9 +63,9 @@ func (u Updater) Run(ctx context.Context, installed chan<- string) {
 		version, err := u.Update(ctx)
 		switch {
 		case err != nil:
-			u.Logf("automatic update failed: %v", err)
+			logf("automatic update failed: %v", err)
 		case version != "":
-			u.Logf("installed terma %s; restarting on it once no agent is exporting", version)
+			logf("installed terma %s; restarting on it once no agent is exporting", version)
 			installed <- version
 			return
 		}

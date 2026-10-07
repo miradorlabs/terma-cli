@@ -85,6 +85,11 @@ type Relay struct {
 	Environment string
 	// HookStarted means the running relay is not the service's: a hook, or a developer, started it.
 	HookStarted bool
+	// Version is the terma the running relay runs, "" when unknown; Earlier that it is an
+	// earlier release than this terma, which it restarts on once it holds nothing and no
+	// agent is exporting.
+	Version string
+	Earlier bool
 	// ServiceInstalled says a relay service is installed; ServiceCurrent that it is the one
 	// this terma would install, in the environment install recorded.
 	ServiceInstalled, ServiceCurrent bool
