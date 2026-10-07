@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -25,7 +24,7 @@ import (
 
 type setupFlags struct {
 	harnesses string
-	// org is --org: the organization to sign into, by name or id; "" keeps the current one.
+	// org is --org: the organization to sign into, by name or id; "" asks among several.
 	org       string
 	noBrowser bool
 	assumeYes bool
@@ -65,7 +64,8 @@ func (app *App) newSetupCommand() *cobra.Command {
 		Short:   "Sign in, choose your team and coding agents, and write machine-wide hooks",
 		Long: `Gets this machine ready to use terma, once per developer:
 
-  1. Signs you in (a browser handoff; --no-browser prints the URL instead).
+  1. Signs you in (a browser handoff; --no-browser prints the URL instead) and, when
+     you belong to several organizations, asks which one (--org names it).
   2. Records which coding agents you work with.
   3. Chooses your team (--team names it) and fetches its collection policy, which
      lists the repositories it collects.
@@ -85,7 +85,7 @@ holds.`,
 		RunE: func(cmd *cobra.Command, _ []string) error { return app.runSetup(cmd, f) },
 	}
 	cmd.Flags().StringVar(&f.harnesses, "harness", "", "comma-separated agents to record ("+strings.Join(app.availableAgentNames(), ", ")+"); default: a picker")
-	cmd.Flags().StringVar(&f.org, "org", "", "organization to sign into, by name or id (default: the current one)")
+	cmd.Flags().StringVar(&f.org, "org", "", "organization to sign into, by name or id (default: asks when you belong to several)")
 	cmd.Flags().BoolVar(&f.noBrowser, "no-browser", false, "print the sign-in URL instead of opening a browser")
 	cmd.Flags().BoolVarP(&f.assumeYes, "yes", "y", false, "skip the browser prompt and picker; record every available installed agent")
 	cmd.Flags().StringVar(&f.relayService, "relay-service", "", "run the local relay as a background service: on or off (default: on, or your last choice)")
@@ -142,14 +142,21 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 	team := ""
 	res, err := setup.Run(cmd.Context(), app.agents, cfg, setup.Steps{
 		SignIn: func(_ context.Context, cfg *config.Config) (*config.Config, error) {
-			cfg, err := app.signInAndReload(cmd, cfg, signInOptions{org: parseOrgRef(f.org), noBrowser: f.noBrowser, pauseBeforeBrowser: !f.assumeYes})
+			opts := signInOptions{org: parseOrgRef(f.org), noBrowser: f.noBrowser, pauseBeforeBrowser: !f.assumeYes}
+			cfg, kept, err := app.setupSignIn(cmd, cfg, opts, askOrganization(cmd, f.assumeYes))
 			if err == nil {
 				fmt.Fprintln(out)
 				ui.Summary("Signed in", signedInAs(cfg))
+				if kept > 1 {
+					ui.Caution("Organization", fmt.Sprintf("kept %s, one of your %d: `terma setup --org <name>` sets up another",
+						cmp.Or(cfg.OrganizationName, cfg.OrganizationID), kept))
+				}
 				reportCredentialStore(ui, cfg, f.insecureStorage)
 				app.settleSecrets(ui, cfg, f.insecureStorage)
 			} else {
+				// A stored session it reused was already saved under the storage being tried.
 				_ = config.UpdateFile(app.dir, func(file *config.File) { file.InsecureStorage = wasInsecure })
+				_ = auth.Relocate(app.dir)
 			}
 			return cfg, err
 		},
@@ -419,32 +426,4 @@ func (app *App) adapterDisplayNames(names []string) []string {
 		}
 	}
 	return out
-}
-
-// setupHeaderInfo is the column beside the logo; it reads only local state, so it is safe
-// to show before signing in.
-func (app *App) setupHeaderInfo(cfg *config.Config, p style.Palette) []string {
-	info := []string{p.Bold("Terma CLI") + " " + p.Dim("("+app.version+")")}
-
-	switch {
-	case cfg.APIKey != "":
-		info = append(info, p.Dim("using TERMA_API_KEY"))
-	default:
-		cred, err := auth.LoadIdentity(app.dir, cfg.ProfileName)
-		if err != nil {
-			info = append(info, p.Dim("not signed in — setup will sign you in"))
-			break
-		}
-		who := cmp.Or(cred.UserEmail, "signed in")
-		org := cmp.Or(cfg.OrganizationName, cfg.OrganizationID)
-		if org != "" {
-			who += "  " + p.Dim("("+org+")")
-		}
-		info = append(info, who)
-	}
-
-	if cwd, err := os.Getwd(); err == nil {
-		info = append(info, p.Dim(output.TildePath(cwd)))
-	}
-	return info
 }
