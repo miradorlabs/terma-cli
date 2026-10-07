@@ -206,11 +206,12 @@ const captureOff = "the collection policy has not been refreshed for over a week
 // machineRows are what this machine collects and where it reports.
 func machineRows(cfg *config.Config) []Row {
 	var rows []Row
+	now := time.Now()
 	switch {
-	case cfg.Policy.Validated() && cfg.Policy.Expired(time.Now()):
-		rows = append(rows, Row{"Capture", "off: " + captureOff + " — run `terma setup`"})
+	case cfg.Policy.Validated() && cfg.Policy.Expired(now):
+		rows = append(rows, Row{"Capture", "off: " + captureOff + " — run `terma setup`"}, Row{"Policy", policyAge(cfg.Policy, now)})
 	case cfg.Policy.Validated():
-		rows = append(rows, Row{"Collecting", PolicySummary(cfg.Policy)}, Row{"Policy", policyAge(cfg.Policy, time.Now())})
+		rows = append(rows, Row{"Collecting", PolicySummary(cfg.Policy)}, Row{"Policy", policyAge(cfg.Policy, now)})
 	}
 	// Name the backend whenever it is not production, by environment or by host overrides.
 	switch {

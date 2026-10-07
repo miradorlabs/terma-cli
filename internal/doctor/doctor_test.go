@@ -106,9 +106,18 @@ func TestContextSaysWhenThePolicyWasChecked(t *testing.T) {
 			}
 		})
 	}
-	rows := Context(Env{Config: &config.Config{Environment: config.EnvProd, AuthURL: config.DefaultAuthURL,
-		Policy: config.Policy{Mode: config.ModeGlobal, TeamID: "t", FetchedAt: now}}, RepoErr: errors.New("not a repository")})
-	if !slices.ContainsFunc(rows, func(r Row) bool { return r.Label == "Policy" && strings.HasSuffix(r.Value, PolicyPropagation) }) {
-		t.Fatalf("rows = %v", rows)
+	for _, tc := range []struct {
+		name string
+		age  time.Duration
+		want string
+	}{
+		{"fresh", 0, "checked 0s ago; " + PolicyPropagation},
+		{"expired, capture off", config.MaxPolicyAge + 48*time.Hour, "checked 9d ago"},
+	} {
+		rows := Context(Env{Config: &config.Config{Environment: config.EnvProd, AuthURL: config.DefaultAuthURL,
+			Policy: config.Policy{Mode: config.ModeGlobal, TeamID: "t", FetchedAt: time.Now().Add(-tc.age)}}, RepoErr: errors.New("not a repository")})
+		if !slices.Contains(rows, Row{"Policy", tc.want}) {
+			t.Fatalf("%s: rows = %v", tc.name, rows)
+		}
 	}
 }
