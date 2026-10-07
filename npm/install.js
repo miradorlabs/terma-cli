@@ -70,7 +70,7 @@ async function main() {
   if (actual !== expected) throw new Error(`checksum mismatch for ${asset}`);
 
   installArchive(archive, asset);
-  console.log(`terma: installed ${version}`);
+  console.log(`terma: installed ${version}. Next: run \`terma setup\` in a terminal.`);
 }
 
 // Keep verified bytes in a private, unpredictable directory until extraction

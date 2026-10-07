@@ -89,6 +89,7 @@ homebrew_casks:
     homepage: https://terma.ai/
     description: Connect coding agents to Terma and stamp the commits they produce
     license: MIT
+    caveats: "Next: run `terma setup` in a terminal."
     commit_author:
       name: mirador-bot
       email: engineering@terma.ai

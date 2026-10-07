@@ -5,45 +5,187 @@
   </picture>
 </p>
 
+
 The `terma` cli connects coding agents to [Terma](https://terma.ai), then stamps the commits
-they produce so agent spend can be traced to shipped code.
+they produce so agent spend can be traced to shipped code. It supports **Claude Code**
+(CLI and Desktop) and **Codex** (CLI and Desktop).
 
-## The workflow
+## Get started
 
-Terma has four commands, and every one is safe to run again. One of them onboards, once
-per developer:
+Install terma, then run `terma setup` once:
 
 ```bash
-terma setup       # sign in, choose your team and agents, write machine-wide hooks
-terma doctor      # verify the chain end to end
+brew tap miradorlabs/tap
+brew trust miradorlabs/tap     # once; Homebrew will not load an untrusted tap
+brew install terma
+terma setup
 ```
 
-`terma setup` signs you in (asking which organization when you belong to several;
-`--org <name-or-id>` names it), chooses your team (`--team <name-or-id>`, else your
-organization's only team, else a picker), records which coding agents you use, fetches
-the team's collection policy, points those agents at the local relay, and writes the
-agents' machine-wide hooks. It changes nothing in git's configuration: when the team's
-policy asks for commit stamping, the first agent session in a repository the policy
-collects installs two hooks in that repository's own `.git/hooks`, chaining to any hook
-already there. Nothing is written into a
-repository's working tree or committed files. Run it again to repair the machine, or
-to switch team or organization.
+Not on Homebrew? See [Install](#install) for the installer script, npm and direct downloads.
 
-`terma doctor` checks the result, `terma update` keeps terma current, and `terma
-teardown` undoes setup on the machine. Restart running agents after setup so they load
-the new configuration.
+`terma setup` signs you in through your browser, then asks a few questions:
 
-Each agent is one choice for its CLI and its desktop app, which share the agent's
-user-level settings: **Claude Code & Desktop** and **Codex TUI & Desktop**. Setup
-approves terma's own Codex hooks itself.
+1. **Organization**, when you belong to several.
+2. **Coding agents**: the ones installed on this machine are preselected.
+3. **Team**, the first time, when your organization has several.
+4. **Updates**: whether terma installs new releases automatically or when you run
+   `terma update`. A Homebrew or npm installation updates through its package manager,
+   so setup tells you that instead of asking.
+
+It then points your agents at terma's local relay and writes their machine-wide hooks.
+Restart any agent that was already running so it loads the new configuration, then check
+the result:
+
+```bash
+terma doctor
+```
+
+## How it works
+
+```mermaid
+flowchart LR
+  agent["Claude Code / Codex"] -- "telemetry" --> relay["terma relay<br/>(127.0.0.1)"]
+  agent -- "hook events" --> hook["terma hook"]
+  git["git commit"] -- "commit hooks" --> hook
+  hook -- "claims the session<br/>for your team" --> relay
+  hook --> queue["local queue"]
+  relay -- "claimed sessions,<br/>filtered by your team's policy" --> terma[("Terma")]
+  queue -- "delivered after<br/>commits and session ends" --> terma
+```
+
+Your team's collection policy, set in the Terma web app, lists the repositories it collects. A hook
+that runs in one of them claims the session for your team; the relay forwards only claimed
+sessions, and only the content the policy collects. Everything else, personal work and
+other repositories included, never leaves your machine. When the policy asks for commit
+stamping, a commit of files an agent session edited gets an `Agent-Session-Id` trailer.
+
+## Commands
+
+Every command is safe to run again:
+
+```bash
+terma setup       # sign in, choose your organization, agents, team and updates, write machine-wide hooks
+terma doctor      # show what this machine collects and check the chain end to end
+terma update      # install the latest release, or refresh what terma installed
+terma teardown    # undo setup on this machine (--sign-out also signs out)
+```
+
+Run `terma setup` again to repair the machine or to switch organization; it reuses a
+working sign-in and the team you chose. `terma doctor` opens with what this machine
+collects and what the repository has in progress (the active session, uncommitted agent
+edits), then checks every link: sign-in, whether the team collects this repository (and
+the origin terma sees), the hooks, the agents' export, the queue, and delivery. Every
+failure names its fix.
+
+Hidden commands remain for the programs that run them — hook execution, the local
+relay, spool delivery, shell completion — and for Terma's own engineers.
+
+## Install
+
+### Homebrew (macOS and Linux)
+
+```bash
+brew tap miradorlabs/tap
+brew trust miradorlabs/tap     # once; Homebrew will not load an untrusted tap
+brew install terma
+terma setup
+```
+
+### Installer script
+
+```bash
+curl -fsSL https://terma.ai/install.sh | bash
+terma setup
+```
+
+The installer selects the platform archive, verifies `checksums.txt`, and installs
+the static binary to `~/.local/bin`, without sudo. Set `TERMA_INSTALL_DIR` to
+override the destination or `TERMA_VERSION=vX.Y.Z` to pin a release. The script is
+POSIX `sh`, so `| sh` works too.
+
+### npm
+
+```bash
+npm install -g @miradorlabs/terma
+terma setup
+```
+
+The npm package downloads the same release binary and verifies its checksum. Prefer
+Homebrew or the installer script where terma runs inside git hooks: the npm shim adds
+Node's startup time to every commit.
+
+### Direct download or source
+
+Native binaries are on [Releases](https://github.com/miradorlabs/terma-cli/releases), with
+checksums. From a clone of this repository:
+
+```bash
+make install
+terma setup
+```
+
+## Updates
+
+terma checks for a newer release once a day, after an interactive command, and says when
+one is out. `terma setup` asks whether to install new releases automatically; you can
+change that any time:
+
+```bash
+terma update --check        # check without installing
+terma update                # install the latest release, or refresh what terma installed
+terma update --auto on      # install new releases automatically
+terma update --auto off     # only say when one is out
+terma update --auto status  # show the current choice
+```
+
+Updates verify the release checksum before replacing the binary. Hooks, the local relay,
+CI, and scripted commands never trigger automatic updates. A Homebrew or npm installation
+is never replaced in place: `terma update` upgrades it through the package manager that
+owns it. A release binary carries its tag, which the updater compares with the latest
+published release; a source build is never updated without `terma update --force`, and
+Windows does not update in place yet.
+
+After an update, the new version also refreshes what earlier versions wrote in your home
+directory — the wrapped Claude Code status line, the OpenCode plugin, the relay's service —
+keeping every choice you made. It works from what is on disk, never signs in, and never
+adds a file. On the latest release, `terma update` does just that refresh.
+
+## Scripted and headless setup
+
+Every question `terma setup` asks has a flag, and with `--yes`, or with no terminal to ask
+on, it asks nothing:
+
+```bash
+terma setup --org acme --team platform --harness claude,codex --yes
+```
+
+- `--org <name-or-id>` signs in to that organization. Without it, setup asks when you
+  belong to several, or, when it cannot ask, keeps the current one and says so.
+- `--team <name-or-id>` sets up that team; without it, setup keeps the team you chose
+  before, else your organization's only team, else asks.
+- `--harness <agents>` records those agents (`claude`, `codex`); with `--yes` and no
+  `--harness`, setup records the agents recorded before and every supported agent
+  installed on this machine.
+- `--yes` skips the prompts and keeps the current organization and update choice.
+- `--no-browser` prints the sign-in URL instead of opening a browser.
+- `--relay-service off` starts the relay on demand from hooks instead of as a background
+  service; `--relay-addr <host:port>` moves it off a loopback port another program holds.
+- `--insecure-storage` saves credentials in plain text instead of the system keychain.
+- `--managed-config <dir>` writes the machine-wide hooks as managed configuration for your
+  organization to deploy, and exits; each developer still runs `terma setup` once.
+
+Every other command reads the team you chose at setup; `--team <name-or-id>` overrides it
+for one command.
+
+## Collection
 
 ### Which repositories are collected
 
-Your team's collection policy, set in Terma, lists the repositories it collects. A
-session or commit is recorded only in a repository the list names; everywhere else the
-hooks record nothing. They leave only a local note that the session is not collected (its
-id, the agent and its process ids; no team, project or repository), so the relay drops its
-telemetry at once instead of holding it.
+Your team's collection policy, set in the Terma web app, lists the repositories it
+collects. A session or commit is collected only in a repository the list names;
+everywhere else the hooks collect nothing. They leave only a local note that the session
+is not collected (its id, the agent and its process ids; no team, project or
+repository), so the relay drops its telemetry at once instead of holding it.
 
 Each entry is a repository as `host/owner/name`, e.g. `github.com/miradorlabs/mirador-platform`.
 The CLI admits a session only inside a git working copy whose `origin` remote, normalised,
@@ -76,7 +218,7 @@ stops terma adding them anywhere new, and `terma teardown` leaves them too, sinc
 terma is gone they only run the hook each one displaced. `terma doctor` reports this
 repository's state.
 
-Only a commit of files a session recorded is stamped: your own commit beside an open
+Only a commit of files a session edited is stamped: your own commit beside an open
 session is yours. A merge, a squash, and the commits a rebase or cherry-pick replays are
 never stamped.
 
@@ -100,61 +242,6 @@ its veto — if it exits non-zero the commit stops — and once terma is gone it
   `.git/hooks`. terma skips such a repository rather than overriding what it chose, and
   `terma doctor` reports that commits here are not stamped.
 
-## Install
-
-### Homebrew (macOS and Linux)
-
-```bash
-brew tap miradorlabs/tap
-brew trust miradorlabs/tap     # once; Homebrew will not load an untrusted tap
-brew install terma
-```
-
-### curl | bash
-
-```bash
-curl -fsSL https://terma.ai/install.sh | bash
-```
-
-The installer selects the platform archive, verifies `checksums.txt`, and installs
-the static binary to `~/.local/bin`, without sudo. Set `TERMA_INSTALL_DIR` to
-override the destination or `TERMA_VERSION=vX.Y.Z` to pin a release. The script is
-POSIX `sh`, so `| sh` works too.
-
-### npm, direct download, or source
-
-```bash
-npm install -g @miradorlabs/terma
-```
-
-Native binaries are also available from [Releases](https://github.com/miradorlabs/terma-cli/releases),
-with checksums. From source:
-
-```bash
-make install
-```
-
-Terma checks for newer versions daily after interactive commands. Update notices are
-on by default; automatic installation is opt-in:
-
-```sh
-terma update --check        # check without installing
-terma update                # install the latest release, or refresh what terma installed
-terma update --auto on      # automatically install future releases
-terma update --auto status  # show the saved preference
-terma update --auto off     # return to notifications only
-```
-
-Updates verify the release checksum before replacing the binary. Hooks, the local
-relay, CI, and scripted commands never trigger automatic updates. `terma update` upgrades a
-Homebrew or npm installation through the package manager that owns it. A release binary
-carries its tag, which the updater compares with the latest published release; a source
-build is never updated without `terma update --force`.
-
-After an update, the new version also refreshes what earlier versions wrote in your home
-directory — the wrapped Claude Code status line, the OpenCode plugin — keeping every
-choice you made. It works from what is on disk, never signs in, and never adds a file.
-On the latest release, `terma update` does just that refresh.
 
 ## Routing
 
@@ -170,7 +257,7 @@ A session that moves to a repository the list does not name, or whose repository
 the list, stops being forwarded; one that moves into a listed repository is forwarded
 from the move on, and what it sent before stays dropped.
 
-What content leaves is your team's collection policy, set in Terma, and nothing else.
+What content leaves is your team's collection policy, set in the Terma web app, and nothing else.
 The relay and the hook queue's delivery fetch it with your login; until they have,
 nothing they would send leaves. Agents send prompts, model responses and tool input and
 output to the relay, and the relay removes what the policy does not collect before
@@ -184,7 +271,7 @@ agent starts; with `--relay-service off`, hooks start it on demand. `terma updat
 rewrites a service an earlier terma wrote. `terma doctor` shows whether it runs and
 delivers; `terma teardown` stops it and removes its service.
 
-## What gets collected
+## Hooks and commit attribution
 
 Terma uses fast, local hooks. Each hook is a guarded one-liner that calls
 terma by the full path it was written with; the binary owns the session files,
@@ -204,27 +291,6 @@ Hooks never make a network request. They append to a local queue, and delivery h
 after commits and session ends with retry and backoff. The prepare-commit-msg path is
 tested against a sub-50 ms budget.
 
-## Supported agents
-
-Terma supports Claude Code (CLI and Desktop) and Codex (CLI and Desktop): commit
-attribution through machine-wide hooks, and each agent's native telemetry through the
-local relay.
-
-## Check the setup
-
-```bash
-terma doctor
-```
-
-`doctor` opens with what this machine collects and what the repository has in progress
-(the active session, uncommitted agent edits), then checks every link end to end —
-sign-in, whether the team collects this repository (and the origin terma sees), hooks, the agents' export, the queue,
-and delivery to the backend. Every failure names its fix.
-
-Organization and team names are shown without UUIDs in normal output; pickers show the
-ID when a name is missing or duplicated, and a name that matches nothing lists yours.
-
-Reads use the team you chose at setup; `--team <id>` overrides it for one command.
 
 ## Privacy and security
 
@@ -238,20 +304,6 @@ permissions. The only thing terma writes inside a repository is its two commit h
 `.git/hooks`, which git neither tracks nor carries in a commit; nothing reaches the working
 tree or committed files. What content leaves is the team's collection policy alone, applied
 on this machine before anything is sent.
-
-## Commands
-
-The command surface is intentionally small, and every command is safe to run again:
-
-```text
-setup       Sign in, choose team and agents, write machine-wide hooks (--org switches)
-doctor      Verify the full chain
-update      Update terma, or refresh what it installed
-teardown    Undo setup on this machine (--sign-out also signs out)
-```
-
-Hidden commands remain for the programs that run them — hook execution, the local
-relay, spool delivery, shell completion — and for Terma's own engineers.
 
 ## Architecture
 

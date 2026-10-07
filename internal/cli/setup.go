@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"runtime"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -72,11 +74,14 @@ func (app *App) newSetupCommand() *cobra.Command {
   4. Points those agents' telemetry at terma's local relay, and runs the relay in
      the background (--relay-service off: started on demand instead).
   5. Writes the agents' machine-wide hooks, so a session in a repository the
-     policy lists is recorded for your team, and nothing anywhere else. git's
+     policy lists is collected for your team, and nothing anywhere else. git's
      configuration is not touched: where the policy asks for commit stamping, the
      first agent session in such a repository installs two hooks in its own
      .git/hooks, chaining to any hook already there. Nothing is written into a
      repository's working tree or committed files.
+  6. Asks how terma installs new releases: automatically, or when you run
+     terma update. A Homebrew or npm installation updates through its package
+     manager instead.
 
 Run it again any time: it reuses a working sign-in, --team switches team, --org
 switches organization, and --relay-addr moves the relay off a port another program
@@ -87,7 +92,7 @@ holds.`,
 	cmd.Flags().StringVar(&f.harnesses, "harness", "", "comma-separated agents to record ("+strings.Join(app.availableAgentNames(), ", ")+"); default: a picker")
 	cmd.Flags().StringVar(&f.org, "org", "", "organization to sign into, by name or id (default: asks when you belong to several)")
 	cmd.Flags().BoolVar(&f.noBrowser, "no-browser", false, "print the sign-in URL instead of opening a browser")
-	cmd.Flags().BoolVarP(&f.assumeYes, "yes", "y", false, "skip the browser prompt and picker; record every available installed agent")
+	cmd.Flags().BoolVarP(&f.assumeYes, "yes", "y", false, "skip the prompts: keep the current organization and update choice, and record every available installed agent")
 	cmd.Flags().StringVar(&f.relayService, "relay-service", "", "run the local relay as a background service: on or off (default: on, or your last choice)")
 	cmd.Flags().StringVar(&f.relayAddr, "relay-addr", "", "move the local relay to this loopback address (default "+claim.DefaultAddr+", or the one recorded)")
 	cmd.Flags().BoolVarP(&f.verbose, "verbose", "v", false, "show each step and what it wrote")
@@ -253,6 +258,11 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 		return nil
 	}
 	if err != nil {
+		ui.printLines()
+		return err
+	}
+	exe, _ := os.Executable()
+	if err := setupUpdates(ui, app.dir, app.version, exe, runtime.GOOS, askUpdates(cmd, f.assumeYes)); err != nil {
 		ui.printLines()
 		return err
 	}
