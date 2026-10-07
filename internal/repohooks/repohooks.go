@@ -71,7 +71,7 @@ func script(hook, terma string) string {
 	fmt.Fprintf(&b, "prev=\"$d/%s%s\"\n", hook, preTermaSuffix)
 	if stdinHooks[hook] {
 		b.WriteString("if [ -x \"$prev\" ]; then\n")
-		b.WriteString("  t=\n  if t=$(mktemp 2>/dev/null); then trap 'rm -f \"$t\"' EXIT; cat >\"$t\" && exec <\"$t\"; fi\n")
+		b.WriteString("  t=\n  if t=$(mktemp \"${TMPDIR:-/tmp}/terma-pre-push.XXXXXX\" 2>/dev/null); then trap 'rm -f \"$t\"' EXIT; trap 'exit 1' HUP INT TERM; cat >\"$t\" && exec <\"$t\"; fi\n")
 		b.WriteString("  \"$prev\" \"$@\" || exit $?\n  [ -n \"$t\" ] && exec <\"$t\"\nfi\n")
 	} else {
 		b.WriteString("if [ -x \"$prev\" ]; then \"$prev\" \"$@\" || exit $?; fi\n")
