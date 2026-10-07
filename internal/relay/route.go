@@ -142,6 +142,9 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 	// terma.relay.attribution and terma.relay.session.id mark a part the relay placed by
 	// inference, so the backend can tell the relay's join from its own.
 	stamp(p, semconv.MiradorProjectIDKey, c.ProjectID)
+	if r.opts.Version != "" {
+		stamp(p, semconv.TermaVersionKey, r.opts.Version)
+	}
 	// The checkout and the directory in it are the relay's to name, never the agent's, and local
 	// paths: they leave only with the tool content that names paths.
 	unstamp(p, semconv.TermaRepositoryRootKey)

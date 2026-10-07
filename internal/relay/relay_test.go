@@ -98,6 +98,7 @@ type fixture struct {
 	claims   map[string]claim.Claim
 	now      time.Time
 	warnings []string
+	version  string
 }
 
 func (f *fixture) warned() []string {
@@ -129,10 +130,11 @@ func (f *fixture) clock() time.Time {
 
 func (f *fixture) relay(t *testing.T, u *upstream, policies map[string]Policy) (*Relay, *httptest.Server) {
 	r := newRelay(Options{Dir: t.TempDir(),
-		Token:  token,
-		Hold:   time.Minute,
-		Lookup: f.lookup,
-		Now:    f.clock,
+		Version: f.version,
+		Token:   token,
+		Hold:    time.Minute,
+		Lookup:  f.lookup,
+		Now:     f.clock,
 		Warnf: func(format string, args ...any) {
 			f.mu.Lock()
 			f.warnings = append(f.warnings, fmt.Sprintf(format, args...))
@@ -295,6 +297,37 @@ func TestRelayRoutesLogsPerClaimedSession(t *testing.T) {
 				t.Fatalf("after the hold: %v", c)
 			}
 		})
+	}
+}
+
+// Every part names the terma that forwarded it, over any value the agent sent, whether its
+// project takes content or withholds it.
+func TestRelayStampsItsVersion(t *testing.T) {
+	t.Parallel()
+	u := newUpstream(t)
+	f := newFixture()
+	f.version = "1.2.3"
+	r, srv := f.relay(t, u, allPolicies(u))
+	for _, session := range []string{"A", "B"} { // p1 takes content, p2 withholds it
+		m := logsOf(session, 1)
+		m.ResourceLogs[0].Resource.Attributes = []*commonpb.KeyValue{kv(semconv.TermaVersionKey, "0.0.1")}
+		postProto(t, srv, "/v1/logs", m)
+	}
+	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["forwarded.logs"] == 2 })
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	versions := map[string]string{}
+	for _, req := range u.requests {
+		var m logspb.LogsData
+		if err := proto.Unmarshal(req.body, &m); err != nil {
+			t.Fatal(err)
+		}
+		for _, rl := range m.ResourceLogs {
+			versions[req.auth] = attr(rl.Resource.Attributes, semconv.TermaVersionKey)
+		}
+	}
+	if versions["Bearer key-p1"] != "1.2.3" || versions["Bearer key-p2"] != "1.2.3" {
+		t.Fatalf("terma.version by key = %v", versions)
 	}
 }
 

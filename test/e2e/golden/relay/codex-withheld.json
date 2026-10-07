@@ -25,6 +25,7 @@
     "resource/telemetry.sdk.language",
     "resource/telemetry.sdk.name",
     "resource/telemetry.sdk.version",
+    "resource/terma.version",
     "slug",
     "terminal.type"
   ],
@@ -53,6 +54,7 @@
     "resource/telemetry.sdk.language",
     "resource/telemetry.sdk.name",
     "resource/telemetry.sdk.version",
+    "resource/terma.version",
     "sandbox_policy",
     "slug",
     "terminal.type"
@@ -75,6 +77,7 @@
     "resource/telemetry.sdk.language",
     "resource/telemetry.sdk.name",
     "resource/telemetry.sdk.version",
+    "resource/terma.version",
     "slug",
     "terminal.type"
   ],
@@ -101,6 +104,7 @@
     "resource/telemetry.sdk.language",
     "resource/telemetry.sdk.name",
     "resource/telemetry.sdk.version",
+    "resource/terma.version",
     "slug",
     "terminal.type",
     "tool_token_count",
@@ -124,6 +128,7 @@
     "resource/telemetry.sdk.language",
     "resource/telemetry.sdk.name",
     "resource/telemetry.sdk.version",
+    "resource/terma.version",
     "slug",
     "source",
     "terminal.type",
@@ -152,6 +157,7 @@
     "resource/telemetry.sdk.language",
     "resource/telemetry.sdk.name",
     "resource/telemetry.sdk.version",
+    "resource/terma.version",
     "slug",
     "success",
     "terminal.type",
@@ -177,6 +183,7 @@
     "resource/telemetry.sdk.language",
     "resource/telemetry.sdk.name",
     "resource/telemetry.sdk.version",
+    "resource/terma.version",
     "slug",
     "terminal.type"
   ],
@@ -196,6 +203,7 @@
     "resource/telemetry.sdk.version",
     "resource/terma.relay.attribution",
     "resource/terma.relay.session.id",
+    "resource/terma.version",
     "session_source",
     "status",
     "success"
@@ -216,6 +224,7 @@
     "resource/telemetry.sdk.version",
     "resource/terma.relay.attribution",
     "resource/terma.relay.session.id",
+    "resource/terma.version",
     "session_source",
     "status",
     "success"
@@ -237,6 +246,7 @@
     "resource/telemetry.sdk.version",
     "resource/terma.relay.attribution",
     "resource/terma.relay.session.id",
+    "resource/terma.version",
     "sandbox",
     "sandbox_policy",
     "session_source",
@@ -260,6 +270,7 @@
     "resource/telemetry.sdk.version",
     "resource/terma.relay.attribution",
     "resource/terma.relay.session.id",
+    "resource/terma.version",
     "sandbox",
     "sandbox_policy",
     "session_source",
@@ -282,6 +293,7 @@
     "resource/telemetry.sdk.version",
     "resource/terma.relay.attribution",
     "resource/terma.relay.session.id",
+    "resource/terma.version",
     "session_source"
   ],
   "metrics/codex.turn.token_usage": [
@@ -300,6 +312,7 @@
     "resource/telemetry.sdk.version",
     "resource/terma.relay.attribution",
     "resource/terma.relay.session.id",
+    "resource/terma.version",
     "session_source",
     "tmp_mem_enabled",
     "token_type"
@@ -320,6 +333,7 @@
     "resource/telemetry.sdk.version",
     "resource/terma.relay.attribution",
     "resource/terma.relay.session.id",
+    "resource/terma.version",
     "session_source",
     "tmp_mem_enabled"
   ],
@@ -339,6 +353,7 @@
     "resource/telemetry.sdk.version",
     "resource/terma.relay.attribution",
     "resource/terma.relay.session.id",
+    "resource/terma.version",
     "session_source"
   ],
   "traces/handle_responses": [
@@ -361,6 +376,7 @@
     "resource/telemetry.sdk.language",
     "resource/telemetry.sdk.name",
     "resource/telemetry.sdk.version",
+    "resource/terma.version",
     "target",
     "thread.id",
     "thread.name"
@@ -387,6 +403,7 @@
     "resource/telemetry.sdk.language",
     "resource/telemetry.sdk.name",
     "resource/telemetry.sdk.version",
+    "resource/terma.version",
     "target",
     "thread.id",
     "thread.name",
