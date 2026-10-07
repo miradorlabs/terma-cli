@@ -19,7 +19,8 @@ var hookContent = map[string][]string{
 	semconv.TermaApprovalRequestedEvent: {semconv.TermaApprovalReasonKey},
 }
 
-// contentFree are the event kinds that carry no content, or (a reply, a thread's name)
+// contentFree are the event kinds that carry no content but terma.repository.root, which
+// Outgoing withholds along with tool content, or (a reply, a thread's name)
 // that Allowed sends or withholds whole. A kind in neither list is withheld whenever the
 // policy withholds any content, so a new kind leaks nothing until it is classified.
 var contentFree = map[string]bool{
@@ -54,6 +55,8 @@ func (r Router) Outgoing(org config.Policy, projectID string, e spool.Event) (sp
 		for _, k := range toolKeys {
 			delete(e.Attrs, k)
 		}
+		// A local path, on whichever event names its checkout: withheld as the relay withholds it.
+		delete(e.Attrs, semconv.TermaRepositoryRootKey)
 	}
 	return e, true
 }

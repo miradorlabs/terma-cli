@@ -326,3 +326,35 @@ func TestAtAcrossMarkAndClaim(t *testing.T) {
 		t.Fatalf("the resumed run's early record = %+v, %v", got, ok)
 	}
 }
+
+// A session that moves to another working tree of the same repository starts a placement,
+// so a record keeps the root its session had when it was made; the same tree again within
+// Refresh writes nothing.
+func TestClaimPlacesEachWorkingTree(t *testing.T) {
+	t.Parallel()
+	dir := enable(t)
+	t0 := time.Now().Add(-time.Hour).Truncate(time.Second)
+	t1 := t0.Add(time.Minute)
+	main := Claim{ProjectID: "p1", Tool: "claude-code", Root: "/src/api", PIDs: []int{10}}
+	Write(dir, "s", main, t0)
+	if Write(dir, "s", main, t0.Add(time.Second)) {
+		t.Fatal("the same working tree within Refresh rewrote the claim")
+	}
+	wt := main
+	wt.Root, wt.Worktree = "/src/api/.claude/worktrees/fix-1", "fix-1"
+	if !Write(dir, "s", wt, t1) {
+		t.Fatal("a move to another working tree did not write")
+	}
+	c, ok := Read(dir, "s", t1)
+	if !ok || len(c.Placements) != 2 || c.Root != wt.Root {
+		t.Fatalf("claim %+v", c)
+	}
+	for _, tc := range []struct {
+		at   time.Time
+		want string
+	}{{t0.Add(time.Second), main.Root}, {t1.Add(time.Second), wt.Root}} {
+		if got, ok := c.At(10, tc.at); !ok || got.Root != tc.want {
+			t.Errorf("At(10, %v).Root = %q, %v; want %q", tc.at, got.Root, ok, tc.want)
+		}
+	}
+}

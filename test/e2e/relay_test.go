@@ -243,6 +243,7 @@ func TestRelayClaude(t *testing.T) {
 				awaitTelemetry(t, sb, func(r contractReporter, e telemetryEvidence) {
 					checkClaudeTelemetry(r, e, sid, sb.ProjectID, !content)
 					checkOnlyClaimed(r, e, "session.id", sid, sb.ProjectID)
+					checkWorkingTree(r, e, "session.id", sid, sb.Repo, content)
 				})
 				if !content && t.Failed() {
 					t.Logf("content upstream received: %v", leakedFields(sb.Receiver.evidence()))
@@ -258,6 +259,29 @@ func TestRelayClaude(t *testing.T) {
 			})
 		}
 	})
+}
+
+// checkWorkingTree: the session's records carry the working tree its hooks ran in, which
+// Claude Code's own records never name, and only while the policy collects tool content.
+func checkWorkingTree(t contractReporter, e telemetryEvidence, key, sid, repo string, content bool) {
+	t.Helper()
+	want := ""
+	if content {
+		want, _ = filepath.EvalSymlinks(repo)
+	}
+	n := 0
+	for _, r := range e.logs {
+		if r.Resource["service.name"] == "terma-cli" || r.Attrs[key] != sid {
+			continue
+		}
+		n++
+		if got := r.Resource["terma.repository.root"]; got != want {
+			t.Errorf("%s: terma.repository.root = %q, want %q", r.Attrs["event.name"], got, want)
+		}
+	}
+	if n == 0 {
+		t.Errorf("no record of session %s to check its working tree on", sid)
+	}
 }
 
 // Codex through the relay. Its metrics name no session and never pass; its child

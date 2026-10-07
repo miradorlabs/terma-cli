@@ -141,6 +141,10 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 	// terma.relay.attribution and terma.relay.session.id mark a part the relay placed by
 	// inference, so the backend can tell the relay's join from its own.
 	stamp(p, semconv.MiradorProjectIDKey, c.ProjectID)
+	// The checkout is a local path, so it leaves only with the tool content that names paths.
+	if root := r.rootOf(c, p); root != "" && pol.IncludeToolContent {
+		stamp(p, semconv.TermaRepositoryRootKey, root)
+	}
 	if how.how != "" {
 		stamp(p, semconv.TermaRelayAttributionKey, how.how)
 		if how.session != "" {
@@ -150,6 +154,27 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 		r.stats.add("attributed_by_"+strings.ReplaceAll(how.how, "-", "_")+"."+string(p.signal), p.records)
 	}
 	r.enqueue(c, p)
+}
+
+// rootOf is the working tree the part's session ran in when the part was made: the placing
+// claim's, or, where global mode placed the part without one, its session's own claim's for
+// the same project. "" when no hook has named one.
+func (r *Relay) rootOf(c claim.Claim, p *part) string {
+	if c.Root != "" {
+		return c.Root
+	}
+	session := r.sessionFor(p.session)
+	if session == "" || strings.HasPrefix(session, procPrefix) {
+		return ""
+	}
+	own, ok := r.lookup(session)
+	if !ok {
+		return ""
+	}
+	if own, ok = own.At(p.pid, p.at); !ok || own.ProjectID != c.ProjectID {
+		return ""
+	}
+	return own.Root
 }
 
 func (r *Relay) catchAll() (claim.Claim, bool) {

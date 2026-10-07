@@ -487,6 +487,20 @@ attributes:
     stability: development
     brief: Where git took the commit message from, as prepare-commit-msg reports it.
 
+  # The checkout.
+  - key: terma.repository.root
+    type: string
+    stability: development
+    brief: The absolute path of the working tree the session or the git operation ran in.
+    note: >
+      A linked worktree's own root, not its main checkout's. A local path, so it leaves only
+      while the team's policy collects tool content, as the paths in an agent's tool input do.
+      On agent telemetry it is a resource attribute the relay stamps from the session's claim:
+      the checkout the session's hooks last ran in, so a command that changes directory
+      itself names a better one.
+    annotations:
+      content: tool
+
   # The relay.
   - key: terma.relay.attribution
     type:

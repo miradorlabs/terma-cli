@@ -9,6 +9,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -50,6 +51,13 @@ func TestWorktreeEventsReportTheMainRepositoryAndProject(t *testing.T) {
 	for _, e := range events {
 		if e.Attrs[AttrProjectID] != "proj-main" {
 			t.Fatalf("%s from %s: attrs %v", e.Name, e.SessionID, e.Attrs)
+		}
+	}
+	// Each session's claim names its own working tree, the linked worktree's and not its main checkout's.
+	mainRoot, _ := filepath.EvalSymlinks(main)
+	for sid, want := range map[string]string{"sess-wt": wt, "sess-main": mainRoot} {
+		if c, ok := claim.Read(stateDir, sid, time.Now()); !ok || c.Root != want {
+			t.Errorf("%s claim root = %q, %v; want %q", sid, c.Root, ok, want)
 		}
 	}
 }
