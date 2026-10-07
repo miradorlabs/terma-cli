@@ -12,6 +12,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
@@ -173,15 +174,16 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 	// The policy the hooks apply here, so doctor never admits a repository they would not:
 	// whichever team's lists this repository, else the selected team's.
 	selected := cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL)
+	collected := routing.Collection(cfg)
 	d.pol = selected
 	if env.RepoErr == nil {
-		d.pol = Admitting(cfg, env.GitDir)
+		d.pol = Admitting(cfg, collected, env.GitDir)
 	}
 	timed(KeyProject, "repository collected", func() Check {
 		if env.RepoErr == nil && d.pol.Global() {
 			return unlessCaptureOff(d.pol, Check{Status: Pass, Detail: "every session, in global mode: " + GlobalDestination(cfg)})
 		}
-		c := ForTeam(RepositoryCheck(d.pol, env.GitDir, env.RepoErr), cfg, env.GitDir, d.pol, selected)
+		c := ForTeam(RepositoryCheck(d.pol, env.GitDir, env.RepoErr), collected, env.GitDir, d.pol, selected)
 		d.admitted = c.Status == Pass
 		return unlessCaptureOff(d.pol, c)
 	})

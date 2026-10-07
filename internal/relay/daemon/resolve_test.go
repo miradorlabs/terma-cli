@@ -17,7 +17,7 @@ import (
 // another organization the profile signed into grants, as does the selected team's once
 // the profile has signed into another organization since: one machine collects for every
 // organization it is signed into.
-func TestResolverGrantsOnlyAValidatedPolicyOfThisLogin(t *testing.T) {
+func TestResolverGrantsOnlyAValidatedPolicyOfThisEnvironment(t *testing.T) {
 	const org, auth = "org_a", "https://auth.example"
 	fetched := time.Now()
 	valid := config.Policy{Mode: config.ModeRepo, IncludePrompts: true, IncludeToolContent: true,

@@ -62,7 +62,8 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 			add("Account", "%s in %s, credentials %s", cmp.Or(cred.Email, "signed in"), cmp.Or(cfg.OrganizationName, cred.OrganizationID), cred.Storage())
 		}
 	}
-	rep.Rows = append(rep.Rows, machineRows(cfg)...)
+	collected := routing.Collect(cfg)
+	rep.Rows = append(rep.Rows, machineRows(cfg, collected)...)
 
 	root, gitDir, reg := env.Root, env.GitDir, env.Agents
 	admission := Check{Status: Pass}
@@ -70,7 +71,7 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 	selected := cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL)
 	pol := selected
 	if env.RepoErr == nil {
-		pol = Admitting(cfg, gitDir)
+		pol = Admitting(cfg, collected.Policies, gitDir)
 	}
 	projectID := cmp.Or(cfg.ProjectID, pol.Team(), cfg.Policy.TeamID)
 	if env.RepoErr != nil {
@@ -78,7 +79,7 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 	} else {
 		admission.Detail = "every session, in global mode: " + GlobalDestination(cfg)
 		if !pol.Global() {
-			admission = ForTeam(RepositoryCheck(pol, gitDir, nil), cfg, gitDir, pol, selected)
+			admission = ForTeam(RepositoryCheck(pol, gitDir, nil), collected.Policies, gitDir, pol, selected)
 		}
 		add("Repository", "%s", admission.Detail)
 		if gitDir == "" {
@@ -176,7 +177,7 @@ func Context(env Env) []Row {
 		return nil
 	}
 	rows := append([]Row{{"Config", output.TildePath(env.ConfigDir)}, {"State", output.TildePath(env.StateDir)}},
-		machineRows(env.Config)...)
+		machineRows(env.Config, routing.Collect(env.Config))...)
 	if env.RepoErr != nil {
 		return rows
 	}
@@ -191,7 +192,7 @@ const captureOff = "the collection policy has not been refreshed for over a week
 
 // machineRows are what this machine collects and where it reports: the selected team's
 // policy, then every other team's it collects for, of this organization or another.
-func machineRows(cfg *config.Config) []Row {
+func machineRows(cfg *config.Config, collected routing.Collected) []Row {
 	var rows []Row
 	switch {
 	case cfg.Policy.Validated() && cfg.Policy.Expired(time.Now()):
@@ -199,7 +200,6 @@ func machineRows(cfg *config.Config) []Row {
 	case cfg.Policy.Validated():
 		rows = append(rows, Row{"Collecting", PolicySummary(cfg.Policy)})
 	}
-	collected := routing.Collect(cfg)
 	for _, p := range collected.Policies {
 		if p.TeamID == cfg.Policy.TeamID {
 			continue
@@ -214,7 +214,8 @@ func machineRows(cfg *config.Config) []Row {
 		rows = append(rows, Row{"Conflict", ConflictText(p)})
 	}
 	for _, p := range collected.Unvalidated {
-		if p.TeamID != cfg.Policy.TeamID {
+		// The selected team's own state is the repository check's to report.
+		if p.TeamID != cfg.Policy.TeamID && p.TeamID != cfg.Teams[cfg.OrganizationID] {
 			rows = append(rows, Row{"Also", p.Label() + ": no validated collection policy on this machine, so nothing is collected for it — run `terma setup --org " + p.OrganizationID + "`"})
 		}
 	}

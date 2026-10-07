@@ -99,7 +99,8 @@ func TestTheRefresherKeepsTheSelectedTeamFresh(t *testing.T) {
 	}
 }
 
-// A team with its key on file and no policy fetched is held, never granted; the relay's refresher finds it at once by its key, and once that fetch is
+// A selected team with its key on file and no policy fetched is held, never granted; the
+// relay's refresher finds it at once among the profile's teams, and once that fetch is
 // stored the team's records follow its policy.
 func TestAFreshBindingIsHeldUntilTheRelayFetchesItsPolicy(t *testing.T) {
 	configDir := t.TempDir()
@@ -107,7 +108,7 @@ func TestAFreshBindingIsHeldUntilTheRelayFetchesItsPolicy(t *testing.T) {
 	const org, auth = "org_a", "https://auth.example"
 	t.Setenv("TERMA_AUTH_URL", auth)
 	cfg := &config.Config{Dir: configDir, StateDir: configDir, ProfileName: "default", OrganizationID: org, AuthURL: auth}
-	if err := config.UpdateProfile(configDir, cfg.ProfileName, func(p *config.Profile) { p.OrganizationID, p.Harnesses = org, []string{"claude"} }); err != nil {
+	if err := config.UpdateProfile(configDir, cfg.ProfileName, func(p *config.Profile) { p.OrganizationID, p.Team, p.Harnesses = org, "p1", []string{"claude"} }); err != nil {
 		t.Fatal(err)
 	}
 	if err := keystore.Set(configDir, "p1", mintedKey, keystore.HostsOf(cfg)); err != nil {

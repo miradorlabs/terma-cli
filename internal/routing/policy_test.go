@@ -155,7 +155,7 @@ func TestCollectionSpansOrganizationsAndHonoursOneGlobalPolicy(t *testing.T) {
 	if got := teams(Collection(cfg)); !slices.Equal(got, []string{"ta", "tb", "tg"}) {
 		t.Fatalf("Collection = %v; want the selected team, the other listing, then the one global policy", got)
 	}
-	if got := Conflicts(cfg); len(got) != 0 {
+	if got := Collect(cfg).Conflicts; len(got) != 0 {
 		t.Fatalf("a lone global policy is a conflict: %v", teams(got))
 	}
 	if got := Collect(cfg).Unvalidated; len(got) != 1 || got[0].TeamID != "tz" {
@@ -177,7 +177,7 @@ func TestCollectionSpansOrganizationsAndHonoursOneGlobalPolicy(t *testing.T) {
 	if got := teams(Collection(cfg)); !slices.Equal(got, []string{"ta", "tb"}) {
 		t.Fatalf("Collection with two global policies = %v", got)
 	}
-	if got := teams(Conflicts(cfg)); !slices.Equal(got, []string{"tg", "th"}) {
+	if got := teams(Collect(cfg).Conflicts); !slices.Equal(got, []string{"tg", "th"}) {
 		t.Fatalf("Conflicts = %v", got)
 	}
 
@@ -189,7 +189,7 @@ func TestCollectionSpansOrganizationsAndHonoursOneGlobalPolicy(t *testing.T) {
 	if got := teams(Collection(cfg)); !slices.Equal(got, []string{"tb", "ta"}) {
 		t.Fatalf("Collection under a selected global policy = %v", got)
 	}
-	if got := teams(Conflicts(cfg)); !slices.Equal(got, []string{"tg", "th"}) {
+	if got := teams(Collect(cfg).Conflicts); !slices.Equal(got, []string{"tg", "th"}) {
 		t.Fatalf("Conflicts under a selected global policy = %v", got)
 	}
 	// Nothing selected: the other listings still collect, and no global policy is honoured.
@@ -197,7 +197,7 @@ func TestCollectionSpansOrganizationsAndHonoursOneGlobalPolicy(t *testing.T) {
 	if got := teams(Collection(cfg)); !slices.Equal(got, []string{"tb"}) {
 		t.Fatalf("Collection with no selected team = %v", got)
 	}
-	if got := teams(Conflicts(cfg)); !slices.Equal(got, []string{"ta", "tg", "th"}) {
+	if got := teams(Collect(cfg).Conflicts); !slices.Equal(got, []string{"ta", "tg", "th"}) {
 		t.Fatalf("Conflicts with no selected team = %v", got)
 	}
 	// A single-organization machine from before Teams were recorded collects as it did.

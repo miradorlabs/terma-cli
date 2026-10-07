@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"errors"
+	"slices"
 	"sync"
 	"time"
 
@@ -88,12 +89,15 @@ func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Polic
 		if p := file.Profiles[cfg.ProfileName]; p != nil {
 			now.Teams = p.CollectedTeams()
 		}
-		// One global policy is honoured (routing.Collection); a claim for another team's
-		// global policy is a session nothing placed, and is granted nothing.
-		global, hasGlobal := routing.Collection(&now).Global()
+		// Only a team this machine collects for is granted: a claim for a team selected
+		// nowhere since, or for another team's global policy, is a session nothing placed.
+		collected := routing.Collection(&now)
+		global, hasGlobal := collected.Global()
 		globalPrimary := hasGlobal && (global.TeamID == "" || global.TeamID == c.ProjectID)
 		org := routing.EffectivePolicy(cfg.StateDir, selected, c.ProjectID)
-		if org.Global() && !globalPrimary {
+		switch {
+		case org.Global() && !globalPrimary,
+			org.Validated() && !slices.ContainsFunc(collected, func(p config.Policy) bool { return p.Team() == c.ProjectID }):
 			org = config.NoPolicy(org.OrganizationID, org.AuthURL)
 		}
 		if cfg.ProfileName != "" && org.FetchedAt.IsZero() && config.PolicyStub() == "" {

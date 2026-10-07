@@ -155,6 +155,7 @@ func Collect(cfg *config.Config) Collected {
 	if selected.Validated() && !selected.Global() {
 		repos = append(repos, selected)
 	}
+	pinned := len(repos) // the selected team's listing stays first; the rest sort by team
 	for _, org := range slices.Sorted(maps.Keys(cfg.Teams)) {
 		team := cfg.Teams[org]
 		if team == selected.TeamID {
@@ -173,7 +174,7 @@ func Collect(cfg *config.Config) Collected {
 			repos = append(repos, p)
 		}
 	}
-	slices.SortStableFunc(repos[min(len(repos), 1):], func(a, b config.Policy) int { return cmp.Compare(a.TeamID, b.TeamID) })
+	slices.SortStableFunc(repos[pinned:], func(a, b config.Policy) int { return cmp.Compare(a.TeamID, b.TeamID) })
 	slices.SortStableFunc(globals, func(a, b config.Policy) int { return cmp.Compare(a.TeamID, b.TeamID) })
 	switch {
 	case selected.Validated() && selected.Global():
@@ -187,9 +188,6 @@ func Collect(cfg *config.Config) Collected {
 
 // Collection is the policies this machine collects under (Collected.Policies).
 func Collection(cfg *config.Config) config.Policies { return Collect(cfg).Policies }
-
-// Conflicts are the global policies this machine does not honour (Collected.Conflicts).
-func Conflicts(cfg *config.Config) config.Policies { return Collect(cfg).Conflicts }
 
 // ScopeToTeam is cfg as a fetch, mint or refresh for team runs it: that team as the
 // project, under the organization the profile selected it in (config.Config.Teams), else

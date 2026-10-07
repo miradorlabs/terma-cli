@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -12,7 +13,6 @@ import (
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
-	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/procinfo"
 	"github.com/miradorlabs/terma-cli/internal/relay"
@@ -104,8 +104,10 @@ func (d Deps) Resolver(cfg *config.Config, mint func(projectID string)) func(cla
 // CatchAll is global mode's claim for everything an agent exports.
 func (d Deps) CatchAll() func() (claim.Claim, bool) { return CatchAll(d.HookPolicy) }
 
-// Refresher keeps fresh, while the relay runs, every team with a key here and the
-// selected team.
+// Refresher keeps fresh, while the relay runs, every team this machine collects for: the
+// one selected in each organization (config.Config.Teams) and the selected team. A team
+// with a key here but selected nowhere is not refreshed: it collects nothing, and its
+// organization is not recorded to fetch under.
 func (d Deps) Refresher() *PolicyRefresher {
 	return &PolicyRefresher{
 		Interval: PolicyRefreshInterval,
@@ -115,7 +117,7 @@ func (d Deps) Refresher() *PolicyRefresher {
 			if err != nil {
 				return nil
 			}
-			teams := keystore.CollectionProjects(cfg.Dir)
+			teams := slices.Sorted(maps.Values(cfg.Teams))
 			selected := cfg.Policy.Team()
 			if selected != "" && !slices.Contains(teams, selected) {
 				teams = append(teams, selected)

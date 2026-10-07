@@ -8,7 +8,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
@@ -252,15 +251,15 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 }
 
 // Admitting is the policy hooks apply to the working copy whose git directory is gitDir:
-// the one of this machine's collection that admits it (config.Policies.Admitting), which
-// may be another team's than the selected one, of this organization or another; the
+// the one of collected, this machine's collection, that admits it (config.Policies.Admitting),
+// which may be another team's than the selected one, of this organization or another; the
 // selected team's policy where none does, or outside git.
-func Admitting(cfg *config.Config, gitDir string) config.Policy {
+func Admitting(cfg *config.Config, collected config.Policies, gitDir string) config.Policy {
 	selected := cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL)
 	if gitDir == "" {
 		return selected
 	}
-	if p, ok := routing.Collection(cfg).Admitting(config.Repository{Origin: gitx.RepositoryFS(gitDir)}); ok {
+	if p, ok := collected.Admitting(config.Repository{Origin: gitx.RepositoryFS(gitDir)}); ok {
 		return p
 	}
 	return selected
@@ -268,8 +267,8 @@ func Admitting(cfg *config.Config, gitDir string) config.Policy {
 
 // ForTeam names, on a passing repository check, the team that collects the repository
 // when it is not the selected one: another team's listing, of this or another organization.
-// A repository other teams list too is named as such: the first listing wins.
-func ForTeam(c Check, cfg *config.Config, gitDir string, pol, selected config.Policy) Check {
+// A repository other teams of the collection list too is named as such: the first listing wins.
+func ForTeam(c Check, collected config.Policies, gitDir string, pol, selected config.Policy) Check {
 	if c.Status != Pass || !pol.Validated() {
 		return c
 	}
@@ -281,7 +280,7 @@ func ForTeam(c Check, cfg *config.Config, gitDir string, pol, selected config.Po
 	}
 	id := config.Repository{Origin: gitx.RepositoryFS(gitDir)}
 	var also []string
-	for _, p := range routing.Collection(cfg) {
+	for _, p := range collected {
 		if p.TeamID != pol.TeamID && !p.Global() && p.Admits(id) {
 			also = append(also, p.Label())
 		}
