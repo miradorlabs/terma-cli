@@ -35,6 +35,7 @@ func (app *App) relayDeps() daemon.Deps {
 		SendHeartbeat: app.relayHeartbeatSend,
 		HookPolicy:    app.hookPolicy,
 		LoadConfig:    app.loadConfig,
+		LoadProfile:   app.loadProfile,
 		RefreshPolicy: pols.Refresh,
 	}
 }

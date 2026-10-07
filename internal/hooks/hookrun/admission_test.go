@@ -425,13 +425,23 @@ func TestARepositoryIsAdmittedByWhicheverTeamListsIt(t *testing.T) {
 			}
 		})
 	}
-	// What a session reports from another checkout is admitted by its own team's policy
-	// alone: another team's repository, listed or not, is never stamped with this team.
+	// What a session reports from another checkout is admitted only when the collection
+	// gives that checkout to the session's own team: another team's repository is never
+	// stamped with this team, not even by a global policy, which takes what no listing names.
+	scratch := namedRepo(t, "scratch", "git@github.com:me/scratch.git")
 	if r, err := env(site, selected, other).Repo(ctx); err != nil || e2eAdmits(ctx, env(site, selected, other), r, work) {
 		t.Fatalf("a session in team t2's repository had the selected team's repository admitted: %+v, %v", r, err)
 	}
-	if r, err := env(personal, selected, other, global).Repo(ctx); err != nil || !e2eAdmits(ctx, env(personal, selected, other, global), r, site) {
-		t.Fatalf("a session under the global policy was refused a listed repository: %+v, %v", r, err)
+	underGlobal := env(personal, selected, other, global)
+	r, err := underGlobal.Repo(ctx)
+	if err != nil || r.ProjectID != "t3" {
+		t.Fatalf("the global policy did not take the unlisted repository: %+v, %v", r, err)
+	}
+	if e2eAdmits(ctx, underGlobal, r, site) || e2eAdmits(ctx, underGlobal, r, work) {
+		t.Fatal("a session under the global policy was given another team's listed repository")
+	}
+	if !e2eAdmits(ctx, underGlobal, r, scratch) {
+		t.Fatal("a session under the global policy was refused an unlisted repository")
 	}
 	// With no Policies, Policy alone admits, as before.
 	if r, err := env(work).Repo(ctx); err != nil || r.ProjectID != "t1" {

@@ -109,10 +109,11 @@ func (e Env) Repo(ctx context.Context) (*Repo, error) {
 	return r, nil
 }
 
-// AdmitsUnder reports whether r's own team policy collects the working copy at dir, judged
-// as Repo judges the current directory: what a session in r reports from elsewhere (a
-// thread's earlier turns in another checkout) is stamped with r's team, so only that
-// team's listing may admit it, never another team's, which may be another organization's.
+// AdmitsUnder reports whether r's own team collects the working copy at dir, judged as
+// Repo judges the current directory: what a session in r reports from elsewhere (a
+// thread's earlier turns in another checkout) is stamped with r's team, so the collection
+// must give that checkout to the same team, never to another's listing, which may be
+// another organization's; a global policy of r's takes only what no listing names.
 func (e Env) AdmitsUnder(ctx context.Context, r *Repo, dir string) bool {
 	e.Cwd = dir
 	_, _, id, err := e.locate(ctx)
@@ -123,7 +124,15 @@ func (e Env) AdmitsUnder(ctx context.Context, r *Repo, dir string) bool {
 		_, ok := e.admit(id)
 		return ok
 	}
-	return r.Policy.Admits(id)
+	return e.ownAdmits(r, id)
+}
+
+// ownAdmits reports whether the working copy id is r's own team's to collect: the
+// collection resolves it to that team (config.Policies.Admitting), not to another team's
+// listing, which a global policy of r's would otherwise sweep up across organizations.
+func (e Env) ownAdmits(r *Repo, id config.Repository) bool {
+	pol, ok := e.admit(id)
+	return ok && pol.Team() == r.Policy.Team()
 }
 
 // locate finds the working copy at Cwd, a Git checkout's root from any directory in it,

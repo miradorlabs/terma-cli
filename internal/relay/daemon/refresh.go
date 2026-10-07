@@ -55,18 +55,32 @@ func (p *PolicyRefresher) Run(ctx context.Context) {
 }
 
 func (p *PolicyRefresher) due() []string {
+	// Discovery reads files: outside the lock, which fetches finishing take.
+	teams := p.Teams()
+	p.mu.Lock()
+	var unknown []string
+	for _, team := range teams {
+		if _, known := p.next[team]; !known && !p.inFlight[team] {
+			unknown = append(unknown, team)
+		}
+	}
+	p.mu.Unlock()
+	fetched := make(map[string]time.Time, len(unknown))
+	for _, team := range unknown {
+		fetched[team] = p.Fetched(team)
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	now := p.Now()
 	var out []string
-	for _, team := range p.Teams() {
+	for _, team := range teams {
 		if p.inFlight[team] {
 			continue
 		}
 		next, known := p.next[team]
 		if !known {
 			next = now
-			if at := p.Fetched(team); !at.IsZero() {
+			if at := fetched[team]; !at.IsZero() {
 				next = at.Add(p.Interval)
 			}
 		}

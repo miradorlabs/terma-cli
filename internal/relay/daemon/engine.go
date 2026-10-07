@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sync"
 	"time"
 
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
@@ -44,6 +45,9 @@ type Deps struct {
 	HookPolicy func() config.Policy
 	// LoadConfig is the configuration as the command line resolves it.
 	LoadConfig func() (*config.Config, error)
+	// LoadProfile is another profile's configuration, resolved as LoadConfig resolves the
+	// relay's: the one relay serves every profile of its environment (`terma config`).
+	LoadProfile func(name string) (*config.Config, error)
 	// RefreshPolicy fetches and stores cfg's project's policy.
 	RefreshPolicy func(ctx context.Context, cfg *config.Config) error
 }
@@ -97,7 +101,7 @@ func (d Deps) Engine(ctx context.Context, stateDir string, cfg *config.Config, s
 
 // Resolver turns a claim into its session's policy, minting a missing key with mint.
 func (d Deps) Resolver(cfg *config.Config, mint func(projectID string)) func(claim.Claim) (relay.Policy, error) {
-	return Resolver(cfg, ResolverDeps{Mint: mint, AgentName: d.AgentName, RelayTargets: d.RelayTargets,
+	return Resolver(cfg, ResolverDeps{Mint: mint, AgentName: d.AgentName, RelayTargets: d.RelayTargets, LoadProfile: d.LoadProfile,
 		Endpoint: func(projectID string) string { return d.Endpoint(cfg, projectID) }})
 }
 
@@ -111,6 +115,9 @@ func (d Deps) CatchAll() func() (claim.Claim, bool) { return CatchAll(d.HookPoli
 // but selected nowhere is not refreshed: it collects nothing, and its organization is not
 // recorded to fetch under.
 func (d Deps) Refresher() *PolicyRefresher {
+	// The discovery's snapshot, so a refresh runs under the profile the last discovery found.
+	var mu sync.Mutex
+	var owners map[string]*config.Config
 	return &PolicyRefresher{
 		Interval: PolicyRefreshInterval,
 		Discover: 5 * time.Second,
@@ -119,7 +126,10 @@ func (d Deps) Refresher() *PolicyRefresher {
 			if err != nil {
 				return nil
 			}
-			teams, _ := collectedTeams(cfg)
+			teams, profiles := d.collectedTeams(cfg)
+			mu.Lock()
+			owners = profiles
+			mu.Unlock()
 			return teams
 		},
 		Fetched: func(team string) time.Time {
@@ -139,8 +149,11 @@ func (d Deps) Refresher() *PolicyRefresher {
 			}
 			// Under the profile that selected it and the organization whose team it is,
 			// which may be neither the relay's profile nor its organization.
-			if _, profiles := collectedTeams(cfg); profiles[team] != nil {
-				cfg = profiles[team]
+			mu.Lock()
+			owner := owners[team]
+			mu.Unlock()
+			if owner != nil {
+				cfg = owner
 			}
 			return d.RefreshPolicy(ctx, routing.ScopeToTeam(cfg, team))
 		},
@@ -151,22 +164,22 @@ func (d Deps) Refresher() *PolicyRefresher {
 // only by another profile of cfg's environment, that profile's configuration to refresh
 // it under; a team of cfg's own profile maps to nothing, cfg serving it. Another
 // environment's profile is left alone: its policies are not this relay's to validate.
-func collectedTeams(cfg *config.Config) ([]string, map[string]*config.Config) {
+func (d Deps) collectedTeams(cfg *config.Config) ([]string, map[string]*config.Config) {
 	teams := slices.Sorted(maps.Values(cfg.Teams))
 	if selected := cfg.Policy.Team(); selected != "" && !slices.Contains(teams, selected) {
 		teams = append(teams, selected)
 	}
 	profiles := map[string]*config.Config{}
 	file, err := config.LoadFile(cfg.Dir)
-	if err != nil {
+	if err != nil || d.LoadProfile == nil {
 		return teams, profiles
 	}
 	for _, name := range slices.Sorted(maps.Keys(file.Profiles)) {
 		if name == cfg.ProfileName {
 			continue
 		}
-		other, err := config.Load(cfg.Dir, cfg.StateDir, config.Overrides{Profile: name})
-		if err != nil || other.AuthURL != cfg.AuthURL {
+		other, err := d.LoadProfile(name)
+		if err != nil || !cfg.SameEnvironment(other) {
 			continue
 		}
 		for _, team := range slices.Sorted(maps.Values(other.Teams)) {

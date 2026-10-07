@@ -133,15 +133,15 @@ func (e Env) checkouts(r *Repo, paths []string) []touched {
 
 // checkoutOf is the checkout holding dir, judged from the filesystem alone: r when dir is in
 // r or no checkout can be read there (an inherited GIT_DIR names r's), another one only if
-// r's own team policy admits it, else nil. Another team's checkout is never reported to
-// r's team, which may be another organization's.
+// it is r's own team's to collect (ownAdmits), else nil. Another team's checkout is never
+// reported to r's team, which may be another organization's.
 func (e Env) checkoutOf(r *Repo, dir string) *Repo {
 	root, gitDir, ok := gitx.LocateFS(dir)
 	if !ok || root == r.Root || gitDir == r.GitDir {
 		return r
 	}
 	id := config.Repository{Origin: gitx.RepositoryFS(gitDir)}
-	if !r.Policy.Admits(id) {
+	if !e.ownAdmits(r, id) {
 		return nil
 	}
 	// Reported only: no store, and never passed to EmitFor, which would claim with it.

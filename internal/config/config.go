@@ -8,11 +8,13 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"net"
 	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -31,86 +33,6 @@ const (
 	credentialsFileName = "credentials.json"
 	dirName             = "terma"
 )
-
-// Profile is the non-secret half of a profile: where to talk to and what is selected.
-type Profile struct {
-	// Environment pins a hidden built-in environment; empty means production.
-	Environment string `json:"environment,omitempty"`
-	// Endpoint overrides; empty means the environment's defaults.
-	APIURL           string `json:"api_url,omitempty"`
-	AuthURL          string `json:"auth_url,omitempty"`
-	AppURL           string `json:"app_url,omitempty"`
-	OTLPURL          string `json:"otlp_url,omitempty"`
-	OrganizationID   string `json:"organization_id,omitempty"`
-	OrganizationName string `json:"organization_name,omitempty"`
-	// Harnesses lists the agents and launch surfaces `terma setup` recorded; a preference, not a connection.
-	Harnesses []string `json:"harnesses,omitempty"`
-	// Team is the team `terma setup` selected, whose policy (PoliciesDir) the hooks apply.
-	Team string `json:"team,omitempty"`
-	// Teams is the team selected in each organization this profile set up, by
-	// organization id: what this machine collects for (routing.Collection). Team is the
-	// current organization's entry.
-	Teams map[string]string `json:"teams,omitempty"`
-}
-
-// SelectOrganization records the account scope, never a repository's project. Switching
-// organization keeps the team selected in the one left, so the machine goes on collecting
-// for it, and brings back the team selected in the new one before, if any.
-func (p *Profile) SelectOrganization(id, name string) {
-	if p.OrganizationID != id {
-		p.SelectTeam(p.Team) // a profile from before Teams were recorded has its team here alone
-		p.OrganizationName = ""
-		p.Team = p.Teams[id]
-	}
-	p.OrganizationID = id
-	if name != "" {
-		p.OrganizationName = name
-	}
-}
-
-// SelectTeam records team as the current organization's, replacing the one selected
-// there before: one team per organization is collected for.
-func (p *Profile) SelectTeam(team string) {
-	p.Team = team
-	if p.OrganizationID == "" || team == "" {
-		return
-	}
-	if p.Teams == nil {
-		p.Teams = map[string]string{}
-	}
-	p.Teams[p.OrganizationID] = team
-}
-
-// Collects reports whether team is selected in some organization of this profile.
-func (p *Profile) Collects(team string) bool {
-	if team == "" {
-		return false
-	}
-	if p.Team == team && p.OrganizationID != "" {
-		return true
-	}
-	for org, t := range p.Teams {
-		if org != "" && t == team {
-			return true
-		}
-	}
-	return false
-}
-
-// CollectedTeams is the team selected in each organization, the current one's included:
-// a profile from before Teams were recorded has its one.
-func (p *Profile) CollectedTeams() map[string]string {
-	teams := make(map[string]string, len(p.Teams)+1)
-	for org, team := range p.Teams {
-		if org != "" && team != "" {
-			teams[org] = team
-		}
-	}
-	if p.OrganizationID != "" && p.Team != "" {
-		teams[p.OrganizationID] = p.Team
-	}
-	return teams
-}
 
 // PinEnvironment records env as the profile's, production as none.
 func (p *Profile) PinEnvironment(env string) {
@@ -132,6 +54,26 @@ type File struct {
 	// system keychain: `terma setup --insecure-storage`, or a setup that found no keychain
 	// to use. Each setup decides it afresh.
 	InsecureStorage bool `json:"insecure_storage,omitempty"`
+}
+
+// Selects reports whether any profile of file selects team in some organization.
+func (f *File) Selects(team string) bool { return f.Owner(team, "") != "" }
+
+// Owner is the name of the profile that selects team, preferring the profile named first,
+// then the active one, then the rest by name; "" when none does.
+func (f *File) Owner(team, first string) string {
+	names := []string{first, f.ActiveProfile}
+	for _, name := range slices.Sorted(maps.Keys(f.Profiles)) {
+		if name != first && name != f.ActiveProfile {
+			names = append(names, name)
+		}
+	}
+	for _, name := range names {
+		if p := f.Profiles[name]; p != nil && p.Collects(team) {
+			return name
+		}
+	}
+	return ""
 }
 
 // Config is the fully resolved view a command works against.
@@ -174,6 +116,13 @@ type Config struct {
 	// APIKey is a server key from TERMA_API_KEY that replaces the login credential;
 	// json:"-" keeps it out of `-o json`.
 	APIKey string `json:"-"`
+}
+
+// SameEnvironment reports whether c and o resolve to one environment: the one their
+// profiles record (a process-wide TERMA_ENV pins both to the same, so it tells nothing)
+// and the same credential host.
+func (c *Config) SameEnvironment(o *Config) bool {
+	return o != nil && c.ProfileEnvironment == o.ProfileEnvironment && c.AuthURL == o.AuthURL
 }
 
 // Overrides are the flag values that win over everything else.

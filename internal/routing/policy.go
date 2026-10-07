@@ -98,7 +98,7 @@ func StorePolicy(cfg *config.Config, pol *config.Policy) error {
 		}
 		prev := p.Team
 		p.SelectTeam(pol.TeamID)
-		if prev != "" && prev != pol.TeamID && !selectedAnywhere(file, prev) {
+		if prev != "" && prev != pol.TeamID && !file.Selects(prev) {
 			left = prev
 		}
 	})
@@ -114,16 +114,6 @@ func StorePolicy(cfg *config.Config, pol *config.Policy) error {
 		}
 	}
 	return nil
-}
-
-// selectedAnywhere reports whether any profile of file selects team in some organization.
-func selectedAnywhere(file *config.File, team string) bool {
-	for _, p := range file.Profiles {
-		if p.Collects(team) {
-			return true
-		}
-	}
-	return false
 }
 
 // ValidatedPolicy is team's last validated policy for cfg's environment; an unreadable
