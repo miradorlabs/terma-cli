@@ -334,3 +334,78 @@ func TestHookManagersInstallingOverTermas(t *testing.T) {
 		})
 	}
 }
+
+// git hands pre-push the refs it pushes on stdin: the displaced hook and terma each read
+// every line of it, byte for byte, under every shell, and an empty push hands both nothing.
+func TestPrePushHandsItsStdinToBothHooks(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the fake terma and displaced hooks are sh scripts")
+	}
+	shells := []string{"sh"}
+	if s := os.Getenv("TERMA_SHIM_SHELLS"); s != "" {
+		shells = strings.Split(s, ",")
+	}
+	const lines = "refs/heads/main 1111111111111111111111111111111111111111 refs/heads/main 0000000000000000000000000000000000000000\n" +
+		"refs/heads/a\\b  2222222222222222222222222222222222222222 refs/heads/$HOME 3333333333333333333333333333333333333333\n"
+	for _, sh := range shells {
+		for _, stdin := range []string{lines, ""} {
+			dir, out := t.TempDir(), t.TempDir()
+			record := func(who string) string {
+				return "#!/bin/sh\ncat > '" + filepath.Join(out, who) + "'\n"
+			}
+			terma := filepath.Join(t.TempDir(), "terma")
+			writeExec(t, terma, record("terma"))
+			writeExec(t, filepath.Join(dir, "pre-push"), script("pre-push", terma))
+			writeExec(t, filepath.Join(dir, "pre-push"+preTermaSuffix), record("prev"))
+			args := append(strings.Fields(sh), filepath.Join(dir, "pre-push"), "origin", "git@example.com:o/r.git")
+			cmd := exec.Command(args[0], args[1:]...)
+			cmd.Dir, cmd.Stdin = t.TempDir(), strings.NewReader(stdin)
+			cmd.Env = append(os.Environ(), "GIT_DIR="+t.TempDir())
+			if b, err := cmd.CombinedOutput(); err != nil || len(b) > 0 {
+				t.Fatalf("%s: pre-push = %v\n%s", sh, err, b)
+			}
+			for _, who := range []string{"prev", "terma"} {
+				if got := readFile(t, filepath.Join(out, who)); got != stdin {
+					t.Errorf("%s: %s read %q, want %q", sh, who, got, stdin)
+				}
+			}
+		}
+	}
+}
+
+// git itself runs the installed pre-push: the hook it displaced and terma both read the
+// refs git pushes, the push goes through, and the displaced hook keeps its veto.
+func TestAPushRunsTheDisplacedHookThenTerma(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the fake terma and displaced hooks are sh scripts")
+	}
+	root, gitDir := scratch(t)
+	remote := t.TempDir()
+	git(t, remote, "init", "-q", "--bare")
+	git(t, root, "remote", "add", "up", remote)
+	git(t, root, "commit", "-q", "--allow-empty", "-m", "first")
+	out := t.TempDir()
+	terma := filepath.Join(t.TempDir(), "terma")
+	writeExec(t, terma, "#!/bin/sh\n{ echo \"$@\"; cat; } > '"+filepath.Join(out, "terma")+"'\n")
+	writeExec(t, hookPath(gitDir, "pre-push"), "#!/bin/sh\ncat > '"+filepath.Join(out, "prev")+"'\n")
+	if _, err := Install(t.TempDir(), terma, gitDir); err != nil {
+		t.Fatal(err)
+	}
+	git(t, root, "push", "-q", "up", "HEAD:refs/heads/main")
+	sha := git(t, root, "rev-parse", "HEAD")
+	want := "HEAD " + sha + " refs/heads/main 0000000000000000000000000000000000000000\n"
+	if got := readFile(t, filepath.Join(out, "prev")); got != want {
+		t.Errorf("the displaced hook read %q, want %q", got, want)
+	}
+	if got := readFile(t, filepath.Join(out, "terma")); got != "hook pre-push up "+remote+"\n"+want {
+		t.Errorf("terma read %q", got)
+	}
+	if git(t, remote, "rev-parse", "main") != sha {
+		t.Error("the push did not land")
+	}
+	writeExec(t, hookPath(gitDir, "pre-push"+preTermaSuffix), "#!/bin/sh\nexit 1\n")
+	git(t, root, "commit", "-q", "--allow-empty", "-m", "second")
+	if b, err := exec.Command("git", "-C", root, "push", "-q", "up", "HEAD:refs/heads/main").CombinedOutput(); err == nil {
+		t.Fatalf("the displaced hook's veto did not stop the push:\n%s", b)
+	}
+}

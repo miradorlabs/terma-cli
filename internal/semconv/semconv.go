@@ -165,6 +165,18 @@ const (
 	TermaOperationStatusKey = "terma.operation.status"
 	// TermaProviderSessionIDKey is terma.provider.session.id: The agent's own session id, where it differs from the session.id terma files the record under.
 	TermaProviderSessionIDKey = "terma.provider.session.id"
+	// TermaPushCommitCountKey is terma.push.commit.count: How many commits terma.push.commit.shas lists.
+	TermaPushCommitCountKey = "terma.push.commit.count"
+	// TermaPushCommitShasKey is terma.push.commit.shas: The full ids of the commits the push sends that the remote lacks, newest first, at most 50.
+	TermaPushCommitShasKey = "terma.push.commit.shas"
+	// TermaPushCommitShasTruncatedKey is terma.push.commit.shas_truncated: Whether the push sends more commits than terma.push.commit.shas lists.
+	TermaPushCommitShasTruncatedKey = "terma.push.commit.shas_truncated"
+	// TermaPushRefsKey is terma.push.refs: The refs the push updates, at most 50 of them.
+	TermaPushRefsKey = "terma.push.refs"
+	// TermaPushRemoteNameKey is terma.push.remote.name: The remote git pushes to, as the push named it; omitted when the push named a URL.
+	TermaPushRemoteNameKey = "terma.push.remote.name"
+	// TermaPushSessionIDsKey is terma.push.session.ids: The sessions stamped into the commits the push sends.
+	TermaPushSessionIDsKey = "terma.push.session.ids"
 	// TermaQuotaStatusKey is terma.quota.status: Whether the record carries the session's quota.
 	TermaQuotaStatusKey = "terma.quota.status"
 	// TermaRateLimitFiveHourResetsAtKey is terma.rate_limit.five_hour.resets_at: When the five-hour window resets, in Unix seconds.
@@ -265,6 +277,8 @@ const (
 	TermaCompactionEvent = "terma.compaction"
 	// TermaFilesTouchedEvent is terma.files.touched: A session wrote files in the repository.
 	TermaFilesTouchedEvent = "terma.files.touched"
+	// TermaPushEvent is terma.push: git is about to push commits stamped with sessions (pre-push).
+	TermaPushEvent = "terma.push"
 	// TermaRelayHeartbeatEvent is terma.relay.heartbeat: The relay is running; sent with service.name terma-relay.
 	TermaRelayHeartbeatEvent = "terma.relay.heartbeat"
 	// TermaSessionAccountEvent is terma.session.account: The account state the session's agent holds.

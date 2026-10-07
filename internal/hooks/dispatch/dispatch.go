@@ -21,6 +21,7 @@ import (
 var gitHookEvents = map[string]agents.Event{
 	"prepare-commit-msg": {Handler: hookrun.PrepareCommitMsg},
 	"post-commit":        {Handler: hookrun.PostCommit, Flush: true},
+	"pre-push":           {Handler: hookrun.PrePush, Flush: true},
 }
 
 // Request is one hook invocation.

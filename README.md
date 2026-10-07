@@ -23,7 +23,7 @@ organization's only team, else a picker), records which coding agents you use, f
 the team's collection policy, points those agents at the local relay, and writes the
 agents' machine-wide hooks. It changes nothing in git's configuration: when the team's
 policy asks for commit stamping, the first agent session in a repository the policy
-collects installs two hooks in that repository's own `.git/hooks`, chaining to any hook
+collects installs three git hooks in that repository's own `.git/hooks`, chaining to any hook
 already there. Nothing is written into a
 repository's working tree or committed files. Run it again to repair the machine, to
 switch team, or, with `--org`, to switch organization.
@@ -67,7 +67,7 @@ so two developers on different teams in one repository each report to their own.
 ### Which commits are stamped
 
 Commit stamping is the team policy's choice. With it on, the first agent session claimed
-in a repository the policy collects installs `prepare-commit-msg` and `post-commit` into
+in a repository the policy collects installs `prepare-commit-msg`, `post-commit` and `pre-push` into
 that repository's own `.git/hooks` (the common one, so linked worktrees share them). A
 repository no agent has worked in, and a folder outside git, get nothing. If they are
 already there, terma does nothing. It never takes them out: switching the policy off only
@@ -201,6 +201,8 @@ Commit attribution works like this:
 2. `prepare-commit-msg` intersects staged files with those manifests and adds one
    `Agent-Session-Id` / `Agent-Tool` trailer pair per matching session.
 3. `post-commit` retires the committed files and records the commit event.
+4. `pre-push` records which stamped commits a push sends and where, so a quiet push
+   (`git push -q`) is still known to have reached the remote.
 
 Hooks never make a network request. They append to a local queue, and delivery happens
 after commits and session ends with retry and backoff. The prepare-commit-msg path is
@@ -236,7 +238,7 @@ team keys stay in the user's configuration directory (`~/.config/terma`, or
 runs — the event queue, the relay and its local token, the hooks' state, the record of the
 repositories its commit hooks are installed in — stays in its state directory
 (`~/.local/state/terma`, or `%LOCALAPPDATA%\terma` on Windows), with the same restrictive
-permissions. The only thing terma writes inside a repository is its two commit hooks, under
+permissions. The only thing terma writes inside a repository is its git hooks, under
 `.git/hooks`, which git neither tracks nor carries in a commit; nothing reaches the working
 tree or committed files. What content leaves is the team's collection policy alone, applied
 on this machine before anything is sent.

@@ -298,6 +298,40 @@ func LastCommit(ctx context.Context, dir string) (Commit, error) {
 	}, nil
 }
 
+// PushedCommit is a commit a push sends: its full id and message.
+type PushedCommit struct {
+	SHA     string
+	Message string
+}
+
+// PushedCommits lists, newest first and at most limit of them, the commits reachable from
+// tips and from none of have nor, when remote names one, that remote's tracking refs: what
+// a push sends that the remote does not have, as far as this repository knows. A sha the
+// repository lacks (the remote moved on) is ignored. One git call.
+func PushedCommits(ctx context.Context, dir, remote string, tips, have []string, limit int) ([]PushedCommit, error) {
+	if len(tips) == 0 || limit <= 0 {
+		return nil, nil
+	}
+	args := []string{"log", "-z", "--ignore-missing", "--format=%H%x1f%B", "-n", strconv.Itoa(limit)}
+	args = append(append(append(args, tips...), "--not"), have...)
+	if remote != "" {
+		args = append(args, "--remotes="+remote)
+	}
+	out, err := run(ctx, dir, args...)
+	if err != nil {
+		return nil, err
+	}
+	var commits []PushedCommit
+	for rec := range strings.SplitSeq(out, "\x00") {
+		sha, msg, ok := strings.Cut(rec, "\x1f")
+		if !ok || sha == "" {
+			continue
+		}
+		commits = append(commits, PushedCommit{SHA: strings.TrimSpace(sha), Message: strings.TrimRight(msg, "\n")})
+	}
+	return commits, nil
+}
+
 // parseNumstat reads the `--numstat -z` block. A rename spans three records (counts
 // with an empty path, old path, new path) and is recorded under the new path; paths
 // are raw, so nothing trims them.

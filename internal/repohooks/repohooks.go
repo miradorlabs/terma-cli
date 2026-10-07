@@ -1,4 +1,4 @@
-// Package repohooks installs terma's two commit hooks into a repository's own
+// Package repohooks installs terma's git hooks into a repository's own
 // .git/hooks, on demand. Nothing in terma takes them out: once terma is gone they only run
 // the hook each one displaced. git runs exactly one file per hook
 // name, so a hook already there is renamed aside and run first, unchanged — the chain
@@ -22,9 +22,13 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 )
 
-// names are the hooks terma installs, the only two with anything to do: one stamps the
-// message, the other records the commit.
-var names = []string{"prepare-commit-msg", "post-commit"}
+// names are the hooks terma installs, the only ones with anything to do: one stamps the
+// message, one records the commit, and one records what a push sends.
+var names = []string{"prepare-commit-msg", "post-commit", "pre-push"}
+
+// stdinHooks are the hooks git hands input on stdin, which both the displaced hook and terma
+// must read.
+var stdinHooks = map[string]bool{"pre-push": true}
 
 // preTermaSuffix names the hook terma displaced, which its script runs first.
 const preTermaSuffix = ".pre-terma"
@@ -51,19 +55,27 @@ var replayState = []string{"CHERRY_PICK_HEAD", "rebase-merge", "rebase-apply", "
 // arguments pass through unchanged. It forks nothing: a replayed commit must cost git no
 // more than a rebase without terma, so the hook has to decide without starting a process.
 // $0 is the hook's path, which is how the displaced hook is found beside it, and git names
-// the git directory in GIT_DIR wherever it is not the checkout's own `.git`.
+// the git directory in GIT_DIR wherever it is not the checkout's own `.git`. A hook git
+// feeds on stdin reads it once into a variable with the shell's own read, and hands each
+// reader a here-document of it, so neither forks a process to share it.
 func script(hook, terma string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "#!/bin/sh\n%s%d: chains to %s%s. Written by terma.\n",
 		marker, templateVersion, hook, preTermaSuffix)
 	b.WriteString("d=\"${0%/*}\"\n[ \"$d\" = \"$0\" ] && d=.\n")
 	fmt.Fprintf(&b, "prev=\"$d/%s%s\"\n", hook, preTermaSuffix)
-	b.WriteString("if [ -x \"$prev\" ]; then \"$prev\" \"$@\" || exit $?; fi\n")
+	run := ""
+	if stdinHooks[hook] {
+		b.WriteString("in=\nwhile IFS= read -r l || [ -n \"$l\" ]; do in=\"${in:+$in\n}$l\"; done\n")
+		b.WriteString("feed() {\n  if [ -n \"$in\" ]; then \"$@\" <<EOF\n$in\nEOF\n  else \"$@\" </dev/null; fi\n}\n")
+		run = "feed "
+	}
+	fmt.Fprintf(&b, "if [ -x \"$prev\" ]; then %s\"$prev\" \"$@\" || exit $?; fi\n", run)
 	b.WriteString("g=\"${GIT_DIR:-.git}\"\n")
 	b.WriteString("if [ ! -d \"$g\" ]; then IFS= read -r line < \"$g\" 2>/dev/null && g=\"${line#gitdir: }\"; fi\n")
 	// Never stamp or record a commit git is replaying.
 	fmt.Fprintf(&b, "for s in %s; do\n  [ -e \"$g/$s\" ] && exit 0\ndone\n", strings.Join(replayState, " "))
-	fmt.Fprintf(&b, "[ -x %[1]s ] && %[1]s hook %[2]s \"$@\" || true\nexit 0\n", shellQuote(terma), hook)
+	fmt.Fprintf(&b, "[ -x %[1]s ] && %[3]s%[1]s hook %[2]s \"$@\" || true\nexit 0\n", shellQuote(terma), hook, run)
 	return b.String()
 }
 
@@ -139,7 +151,7 @@ func Install(stateDir, terma, gitDir string) (changed bool, err error) {
 	return changed, err
 }
 
-// current reports whether both of terma's hooks are already its script at this version,
+// current reports whether all of terma's hooks are already its script at this version,
 // at the name or where a tool that chains to it runs it from: the common case, which needs
 // no lock.
 func current(gitDir, terma string) bool {
@@ -279,7 +291,7 @@ func removeOurCopies(dir, name string) error {
 	return nil
 }
 
-// Installed reports whether both of terma's hooks are in place in the repository at
+// Installed reports whether all of terma's hooks are in place in the repository at
 // gitDir, and whether a hook runs before them: one that was there first, or a tool that
 // installed over terma's and runs its script (pre-commit's migration mode).
 func Installed(gitDir string) (installed, chained bool) {

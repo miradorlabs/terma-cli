@@ -228,12 +228,12 @@ func TestOutgoingWithholdsTheEmailWithContent(t *testing.T) {
 	}
 }
 
-// A commit's working tree is a local path: it leaves only with tool content,
+// A commit's and a push's working tree is a local path: it leaves only with tool content,
 // whatever else the policy collects, and the event itself still leaves without it.
 func TestOutgoingWithholdsTheWorkingTreeWithToolContent(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	for _, name := range []string{semconv.TermaCommitEvent, semconv.TermaCommitUnattributedEvent} {
+	for _, name := range []string{semconv.TermaCommitEvent, semconv.TermaCommitUnattributedEvent, semconv.TermaPushEvent} {
 		ev := spool.Event{Repository: app, Name: name, Attrs: map[string]any{
 			semconv.TermaRepositoryRootKey: "/src/app", semconv.VCSRefHeadRevisionKey: "abc",
 		}}

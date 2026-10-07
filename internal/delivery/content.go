@@ -25,7 +25,7 @@ var hookContent = map[string][]string{
 // policy withholds any content, so a new kind leaks nothing until it is classified.
 var contentFree = map[string]bool{
 	semconv.TermaSessionStartEvent: true, semconv.TermaSessionEndEvent: true,
-	semconv.TermaCompactionEvent: true, semconv.TermaFilesTouchedEvent: true,
+	semconv.TermaCompactionEvent: true, semconv.TermaFilesTouchedEvent: true, semconv.TermaPushEvent: true,
 	semconv.TermaCommitStampedEvent: true, semconv.TermaCommitEvent: true, semconv.TermaCommitUnattributedEvent: true,
 	semconv.TermaSessionQuotaEvent: true, semconv.TermaSessionAccountEvent: true, semconv.TermaSessionLimitEvent: true,
 	semconv.TermaSessionCaptureEvent: true, semconv.TermaSubagentStartEvent: true, semconv.TermaSubagentEndEvent: true,

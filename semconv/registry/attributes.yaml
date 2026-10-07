@@ -487,6 +487,39 @@ attributes:
     stability: development
     brief: Where git took the commit message from, as prepare-commit-msg reports it.
 
+  # Pushes.
+  - key: terma.push.remote.name
+    type: string
+    stability: development
+    brief: The remote git pushes to, as the push named it; omitted when the push named a URL.
+  - key: terma.push.refs
+    type: any
+    stability: development
+    brief: The refs the push updates, at most 50 of them.
+    note: >
+      An array of maps of local_ref, local_sha, remote_ref and remote_sha, as git's pre-push
+      hook lists them; remote_sha is all zeros for a ref the remote does not have yet. A
+      deletion is left out.
+  - key: terma.push.commit.shas
+    type: string[]
+    stability: development
+    brief: The full ids of the commits the push sends that the remote lacks, newest first, at most 50.
+    note: >
+      Commits reachable from the pushed shas and from none of the remote's shas or its
+      remote-tracking refs, as the repository knew them when the push began.
+  - key: terma.push.commit.count
+    type: int
+    stability: development
+    brief: How many commits terma.push.commit.shas lists.
+  - key: terma.push.commit.shas_truncated
+    type: boolean
+    stability: development
+    brief: Whether the push sends more commits than terma.push.commit.shas lists.
+  - key: terma.push.session.ids
+    type: string[]
+    stability: development
+    brief: The sessions stamped into the commits the push sends.
+
   # The checkout.
   - key: terma.repository.root
     type: string

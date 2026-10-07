@@ -135,6 +135,35 @@ events:
       - ref: terma.commit.file.stats_truncated
       - ref: terma.repository.root
 
+  - name: terma.push
+    stability: development
+    requirement_level: recommended
+    brief: git is about to push commits stamped with sessions (pre-push).
+    note: >
+      An attempt: pre-push runs before git talks to the remote, and a push the remote then
+      refuses is not reported again. Sent only when a commit the push sends is stamped.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: terma.push.session.ids
+        requirement_level: required
+      - ref: terma.push.commit.shas
+        requirement_level: required
+      - ref: terma.push.commit.count
+        requirement_level: required
+      - ref: terma.push.commit.shas_truncated
+      - ref: terma.push.refs
+        requirement_level: required
+      - ref: terma.push.remote.name
+      - ref: vcs.repository.url.full
+        note: The URL pushed to, without credentials.
+      - ref: vcs.repository.name
+      - ref: vcs.owner.name
+      - ref: vcs.provider.name
+      - ref: terma.repository.root
+
   - name: terma.commit.unattributed
     stability: development
     requirement_level: recommended
