@@ -1,0 +1,132 @@
+[
+  {
+    "harness": "claude",
+    "version": "2.1.292",
+    "platform": "linux/amd64",
+    "capability": "global.commits",
+    "result": "pass",
+    "last_run": "2026-10-07T04:40:48.452683396Z",
+    "first_passed": "2026-10-07T04:40:48.452683396Z",
+    "terma": "terma version dev",
+    "test": "TestGlobalModeClaude/installed-2.1.292"
+  },
+  {
+    "harness": "claude",
+    "version": "2.1.292",
+    "platform": "linux/amd64",
+    "capability": "global.placement",
+    "result": "pass",
+    "last_run": "2026-10-07T04:40:48.452684518Z",
+    "first_passed": "2026-10-07T04:40:48.452684518Z",
+    "terma": "terma version dev",
+    "test": "TestGlobalModeClaude/installed-2.1.292"
+  },
+  {
+    "harness": "claude",
+    "version": "2.1.292",
+    "platform": "linux/amd64",
+    "capability": "relay.content_allowed",
+    "result": "pass",
+    "last_run": "2026-10-07T04:40:58.86807725Z",
+    "first_passed": "2026-10-07T04:40:58.86807725Z",
+    "terma": "terma version dev",
+    "test": "TestRelayClaude/installed-2.1.292/content"
+  },
+  {
+    "harness": "claude",
+    "version": "2.1.292",
+    "platform": "linux/amd64",
+    "capability": "relay.content_withheld",
+    "result": "pass",
+    "last_run": "2026-10-07T04:41:00.40311635Z",
+    "first_passed": "2026-10-07T04:41:00.40311635Z",
+    "terma": "terma version dev",
+    "test": "TestRelayClaude/installed-2.1.292/withheld"
+  },
+  {
+    "harness": "claude",
+    "version": "2.1.292",
+    "platform": "linux/amd64",
+    "capability": "relay.only_opted_in",
+    "result": "pass",
+    "last_run": "2026-10-07T04:42:28.919148692Z",
+    "first_passed": "2026-10-07T04:42:28.919148692Z",
+    "terma": "terma version dev",
+    "test": "TestRelayNegativeControls/installed-2.1.292"
+  },
+  {
+    "harness": "claude",
+    "version": "2.1.292",
+    "platform": "linux/amd64",
+    "capability": "relay.resumed_elsewhere",
+    "result": "pass",
+    "last_run": "2026-10-07T04:42:39.777250011Z",
+    "first_passed": "2026-10-07T04:42:39.777250011Z",
+    "terma": "terma version dev",
+    "test": "TestRelayResumedElsewhere/installed-2.1.292"
+  },
+  {
+    "harness": "claude",
+    "version": "2.1.292",
+    "platform": "linux/amd64",
+    "capability": "relay.telemetry",
+    "result": "pass",
+    "last_run": "2026-10-07T04:41:00.403139785Z",
+    "first_passed": "2026-10-07T04:41:00.403139785Z",
+    "terma": "terma version dev",
+    "test": "TestRelayClaude/installed-2.1.292"
+  },
+  {
+    "harness": "codex",
+    "version": "0.160.1",
+    "platform": "linux/amd64",
+    "capability": "global.managed",
+    "result": "pass",
+    "last_run": "2026-10-07T04:40:57.585953492Z",
+    "first_passed": "2026-10-07T04:40:57.585953492Z",
+    "terma": "terma version dev",
+    "test": "TestGlobalModeManagedConfig/installed-0.160.1"
+  },
+  {
+    "harness": "codex",
+    "version": "0.160.1",
+    "platform": "linux/amd64",
+    "capability": "global.placement",
+    "result": "pass",
+    "last_run": "2026-10-07T04:40:54.606505882Z",
+    "first_passed": "2026-10-07T04:40:54.606505882Z",
+    "terma": "terma version dev",
+    "test": "TestGlobalModeCodex/installed-0.160.1"
+  },
+  {
+    "harness": "codex",
+    "version": "0.160.1",
+    "platform": "linux/amd64",
+    "capability": "relay.content_allowed",
+    "result": "fail",
+    "last_run": "2026-10-07T04:41:46.577512697Z",
+    "terma": "terma version dev",
+    "test": "TestRelayCodex/installed-0.160.1/content"
+  },
+  {
+    "harness": "codex",
+    "version": "0.160.1",
+    "platform": "linux/amd64",
+    "capability": "relay.content_withheld",
+    "result": "pass",
+    "last_run": "2026-10-07T04:41:58.243391082Z",
+    "first_passed": "2026-10-07T04:41:58.243391082Z",
+    "terma": "terma version dev",
+    "test": "TestRelayCodex/installed-0.160.1/withheld"
+  },
+  {
+    "harness": "codex",
+    "version": "0.160.1",
+    "platform": "linux/amd64",
+    "capability": "relay.telemetry",
+    "result": "fail",
+    "last_run": "2026-10-07T04:41:58.243414768Z",
+    "terma": "terma version dev",
+    "test": "TestRelayCodex/installed-0.160.1"
+  }
+]
