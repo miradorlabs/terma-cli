@@ -137,9 +137,8 @@ func (d Deps) Refresher() *PolicyRefresher {
 			if err != nil {
 				return err
 			}
-			scoped := *cfg
-			scoped.ProjectID = team
-			return d.RefreshPolicy(ctx, &scoped)
+			// Under the organization whose team it is, which may not be the profile's.
+			return d.RefreshPolicy(ctx, routing.ScopeToTeam(cfg, team))
 		},
 	}
 }

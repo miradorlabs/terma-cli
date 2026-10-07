@@ -112,7 +112,9 @@ type Config struct {
 	Team string
 
 	// Policy is the profile's team's policy stored in the state directory, else
-	// DefaultPolicy; one for another login, or unreadable, is NoPolicy.
+	// DefaultPolicy; one for another environment, or unreadable, is NoPolicy. Other
+	// teams' policies, of this organization or another, are the collection's
+	// (routing.Collection): hooks admit a repository by any of them.
 	Policy Policy
 
 	// APIKey is a server key from TERMA_API_KEY that replaces the login credential;
@@ -173,7 +175,7 @@ func Load(dir, stateDir string, o Overrides) (*Config, error) {
 		APIKey:             strings.TrimSpace(os.Getenv("TERMA_API_KEY")),
 	}
 	switch stored, ok, err := ReadPolicy(stateDir, profile.Team); {
-	case err != nil || ok && !stored.AppliesTo(cfg.OrganizationID, cfg.AuthURL):
+	case err != nil || ok && !stored.SameEnvironment(cfg.AuthURL):
 		cfg.Policy = NoPolicy("", "")
 	case ok:
 		cfg.Policy = stored

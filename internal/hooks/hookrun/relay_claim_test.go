@@ -26,7 +26,7 @@ func TestHooksClaimSessionsForTheRelay(t *testing.T) {
 	claimed := 0
 	// The hook runs from elsewhere; the claim names the checkout its payload is in.
 	env := func(stdin string) Env {
-		return Env{StateDir: stateDir, Now: time.Now(), Cwd: t.TempDir(), Stdin: strings.NewReader(stdin), Spool: sp, Policy: hookruntest.Admitting(root), Team: "project-a", OnClaim: func(got string) {
+		return Env{StateDir: stateDir, Now: time.Now(), Cwd: t.TempDir(), Stdin: strings.NewReader(stdin), Spool: sp, Policy: hookruntest.Admitting(root), Team: "project-a", OnClaim: func(got string, _ config.Policy) {
 			if claimed++; got != root {
 				t.Errorf("OnClaim(%q), want the checkout %q", got, root)
 			}
@@ -42,7 +42,7 @@ func TestHooksClaimSessionsForTheRelay(t *testing.T) {
 	}
 	// Nothing was spooled for that call, so the hook's payload claims it.
 	payload := `{"session_id":"` + codex + `","cwd":"` + hookruntest.InJSON(root) + `","tool_name":"shell"}`
-	if !ClaimFromPayload(context.Background(), env(""), mustPayloadSession(t, payload), "codex") {
+	if !claimFromPayload(context.Background(), env(""), mustPayloadSession(t, payload), "codex") {
 		t.Fatal("a Codex hook that spooled nothing did not claim from its payload")
 	}
 	for sid, tool := range map[string]string{claude: "claude-code", codex: "codex"} {
@@ -66,7 +66,7 @@ func TestAnExpiredPolicyStillClaims(t *testing.T) {
 	expired := config.Policy{Mode: config.ModeRepo, Repositories: hookruntest.Admitting(root).Repositories, TeamID: "project-a", Revision: 1, FetchedAt: time.Now().Add(-config.MaxPolicyAge - time.Hour)}
 	sp, _ := spool.Open(t.TempDir())
 	claimed := false
-	env := Env{ConfigDir: configDir, StateDir: stateDir, Now: time.Now(), Cwd: root, Spool: sp, Policy: expired, Team: "project-a", OnClaim: func(string) { claimed = true },
+	env := Env{ConfigDir: configDir, StateDir: stateDir, Now: time.Now(), Cwd: root, Spool: sp, Policy: expired, Team: "project-a", OnClaim: func(string, config.Policy) { claimed = true },
 		Stdin: strings.NewReader(`{"session_id":"expired-session","cwd":"` + hookruntest.InJSON(root) + `","model":"m"}`)}
 	if err := startSession(context.Background(), env); err != nil {
 		t.Fatal(err)
@@ -134,7 +134,7 @@ func TestGlobalModeClaimsEverySession(t *testing.T) {
 	last := hookruntest.InitRepo(t)
 	claimIn := func(dir, sid string, pol config.Policy) (claim.Claim, bool) {
 		env := Env{StateDir: stateDir, Now: time.Now(), Cwd: dir, Stdin: strings.NewReader(""), Policy: pol}
-		ClaimFromPayload(context.Background(), env, PayloadSession{ID: sid, Cwd: dir}, "claude-code")
+		claimFromPayload(context.Background(), env, PayloadSession{ID: sid, Cwd: dir}, "claude-code")
 		return claim.Read(stateDir, sid, time.Now())
 	}
 	for _, tc := range []struct{ dir, sid, want string }{
@@ -180,7 +180,7 @@ func TestTheClaimNamesTheDirectoryTheHookRanIn(t *testing.T) {
 		t.Fatal(err)
 	}
 	payloadEnv := Env{StateDir: stateDir, Now: time.Now(), Cwd: sub, Policy: hookruntest.Admitting(repo), Team: "proj"}
-	ClaimFromPayload(context.Background(), payloadEnv, PayloadSession{ID: "sess-payload", Cwd: sub}, "codex")
+	claimFromPayload(context.Background(), payloadEnv, PayloadSession{ID: "sess-payload", Cwd: sub}, "codex")
 	for _, sid := range []string{"sess-sub", "sess-payload"} {
 		if c, ok := claim.Read(stateDir, sid, time.Now()); !ok || c.Root != root || c.Cwd != dir {
 			t.Errorf("%s: claim root %q, cwd %q, %v; want %q, %q", sid, c.Root, c.Cwd, ok, root, dir)

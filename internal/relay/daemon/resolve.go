@@ -64,8 +64,10 @@ func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Polic
 			}
 			return relay.Policy{}, relay.ErrNoKey
 		}
-		org, chosen := cfg.Policy, cfg.Harnesses
-		// Reread the profile's team and its policy so a refreshed policy also governs queued exports.
+		selected, chosen := cfg.Policy, cfg.Harnesses
+		// Reread the profile's team and its policy so a refreshed policy also governs queued
+		// exports; a profile signed into another organization since keeps the policies it
+		// stored, as this machine collects for every organization it is signed into.
 		if file, err := config.LoadFile(cfg.Dir); err != nil {
 			return relay.Policy{}, err
 		} else if p := file.Profiles[cfg.ProfileName]; p == nil && cfg.ProfileName != "" {
@@ -73,17 +75,22 @@ func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Polic
 			return relay.Policy{}, errors.New("profile removed; restart the relay")
 		} else if p != nil {
 			chosen = p.Harnesses
-			if p.OrganizationID != cfg.OrganizationID {
-				return relay.Policy{}, errors.New("organization changed; restart the relay")
-			}
-			if stored, ok, err := config.ReadPolicy(cfg.StateDir, p.Team); err != nil || !ok || !stored.AppliesTo(cfg.OrganizationID, cfg.AuthURL) {
-				org = config.NoPolicy(cfg.OrganizationID, cfg.AuthURL)
+			if stored, ok, err := config.ReadPolicy(cfg.StateDir, p.Team); err != nil || !ok || !stored.SameEnvironment(cfg.AuthURL) {
+				selected = config.NoPolicy(p.OrganizationID, cfg.AuthURL)
 			} else {
-				org = stored
+				selected = stored
 			}
 		}
-		globalPrimary := org.Global() && (org.TeamID == "" || org.TeamID == c.ProjectID)
-		org = routing.EffectivePolicy(cfg.StateDir, org, c.ProjectID)
+		now := *cfg
+		now.Policy = selected
+		// One global policy is honoured (routing.Collection); a claim for another team's
+		// global policy is a session nothing placed, and is granted nothing.
+		global, hasGlobal := routing.Collection(&now).Global()
+		globalPrimary := hasGlobal && (global.TeamID == "" || global.TeamID == c.ProjectID)
+		org := routing.EffectivePolicy(cfg.StateDir, selected, c.ProjectID)
+		if org.Global() && !globalPrimary {
+			org = config.NoPolicy(org.OrganizationID, org.AuthURL)
+		}
 		if cfg.ProfileName != "" && org.FetchedAt.IsZero() && config.PolicyStub() == "" {
 			// Unknown policy must neither grant nor drop: a new team's exports wait for its fetch.
 			return relay.Policy{}, errors.New("no validated collection policy for this team")

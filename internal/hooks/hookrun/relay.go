@@ -40,17 +40,21 @@ func ReadPayloadSession(payload []byte) (PayloadSession, bool) {
 }
 
 // ClaimFromPayload claims a hook's session for the relay when its handler spooled nothing,
-// so a session whose hooks were trusted mid-way is still forwarded.
-func ClaimFromPayload(ctx context.Context, env Env, s PayloadSession, tool string) bool {
+// so a session whose hooks were trusted mid-way is still forwarded; it names the policy
+// the session was claimed under.
+func ClaimFromPayload(ctx context.Context, env Env, s PayloadSession, tool string) (config.Policy, bool) {
 	if s.ID == "" {
-		return false
+		return config.Policy{}, false
 	}
 	id := s.ID
 	env.Cwd = cmp.Or(s.Cwd, env.Cwd)
 	var c claim.Claim
+	var under config.Policy
+	global, isGlobal := env.global()
 	switch r, err := env.Repo(ctx); {
 	case err == nil && r.ProjectID != "":
 		c = claim.Claim{ProjectID: r.ProjectID, Tool: tool, Repo: r.Name, Worktree: r.Worktree, Repository: r.Repository, Root: r.workTree()}
+		under = r.Policy
 	case errors.Is(err, ErrNotAdmitted):
 		for _, sid := range []string{id, s.AgentID} {
 			if sid != "" {
@@ -60,12 +64,13 @@ func ClaimFromPayload(ctx context.Context, env Env, s PayloadSession, tool strin
 		if env.Policy.Stale(env.Time()) {
 			refreshPolicy(env)
 		}
-		return false
-	case err != nil && env.Policy.Global() && env.Policy.DefaultProjectID != "":
+		return config.Policy{}, false
+	case err != nil && isGlobal && global.DefaultProjectID != "":
 		// Global mode, outside any repository.
-		c = claim.Claim{ProjectID: env.Policy.DefaultProjectID, Tool: tool, Repo: filepath.Base(env.Cwd)}
+		c = claim.Claim{ProjectID: global.DefaultProjectID, Tool: tool, Repo: filepath.Base(env.Cwd)}
+		under = global
 	default:
-		return false
+		return config.Policy{}, false
 	}
 	c.PIDs, c.Cwd = claimPIDs(), env.workingDir()
 	// A subagent's telemetry may name its own id (see claimForRelay).
@@ -74,9 +79,9 @@ func ClaimFromPayload(ctx context.Context, env Env, s PayloadSession, tool strin
 	}
 	if !claim.Write(env.StateDir, id, c, env.Time()) {
 		prev, live := claim.Read(env.StateDir, id, env.Time())
-		return live && prev.ProjectID != ""
+		return under, live && prev.ProjectID != ""
 	}
-	return true
+	return under, true
 }
 
 // workingDir is the directory the hook ran in, symlink-resolved as Repo.workTree is: where
@@ -96,7 +101,7 @@ func (e Env) workingDir() string {
 // on instead of holding it; earlier records keep their own placement. A policy not yet
 // validated is no answer, so it marks only a session already claimed or marked.
 func notCollected(env Env, sessionID, tool string) {
-	if !env.Policy.Validated() {
+	if !env.policies().Validated() {
 		if _, ok := claim.Read(env.StateDir, sessionID, env.Time()); !ok {
 			return
 		}

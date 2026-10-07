@@ -8,6 +8,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
@@ -248,6 +249,30 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 		return Check{Status: Warn, Detail: "local relay on " + addr + " (" + state + "); no key for this team on this machine, so its sessions are dropped", Fix: "terma setup"}
 	}
 	return Check{Status: Pass, Detail: "through the local relay on " + addr + " (" + state + "); it forwards the sessions your team's policy collects"}
+}
+
+// Admitting is the policy hooks apply to the working copy whose git directory is gitDir:
+// the one of this machine's collection that admits it (config.Policies.Admitting), which
+// may be another team's than the selected one, of this organization or another; the
+// selected team's policy where none does, or outside git.
+func Admitting(cfg *config.Config, gitDir string) config.Policy {
+	selected := cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL)
+	if gitDir == "" {
+		return selected
+	}
+	if p, ok := routing.Collection(cfg).Admitting(config.Repository{Origin: gitx.RepositoryFS(gitDir)}); ok {
+		return p
+	}
+	return selected
+}
+
+// ForTeam names, on a passing repository check, the team that collects the repository
+// when it is not the selected one: another team's listing, of this or another organization.
+func ForTeam(c Check, pol, selected config.Policy) Check {
+	if c.Status == Pass && pol.Validated() && pol.TeamID != selected.TeamID {
+		c.Detail += ", collected for " + pol.Label()
+	}
+	return c
 }
 
 // NoRepositoriesStep is what a developer whose team lists no repositories is told.

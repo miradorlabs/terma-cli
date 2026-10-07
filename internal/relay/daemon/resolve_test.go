@@ -13,7 +13,10 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 )
 
-// A policy from another organization or environment, or none validated yet, grants nothing.
+// A policy from another environment, or none validated yet, grants nothing. One from
+// another organization the profile signed into grants, as does the selected team's once
+// the profile has signed into another organization since: one machine collects for every
+// organization it is signed into.
 func TestResolverGrantsOnlyAValidatedPolicyOfThisLogin(t *testing.T) {
 	const org, auth = "org_a", "https://auth.example"
 	fetched := time.Now()
@@ -28,9 +31,9 @@ func TestResolverGrantsOnlyAValidatedPolicyOfThisLogin(t *testing.T) {
 		{name: "validated", policy: func() *config.Policy { return &valid }, ok: true},
 		{name: "never fetched", policy: func() *config.Policy { v := valid; v.FetchedAt = time.Time{}; return &v }},
 		{name: "no policy", policy: func() *config.Policy { return nil }},
-		{name: "another organization", policy: func() *config.Policy { v := valid; v.OrganizationID = "org_b"; return &v }},
+		{name: "another organization", policy: func() *config.Policy { v := valid; v.OrganizationID = "org_b"; return &v }, ok: true},
 		{name: "another environment", policy: func() *config.Policy { v := valid; v.AuthURL = "https://auth.other"; return &v }},
-		{name: "signed in elsewhere since", policy: func() *config.Policy { return &valid }, org: "org_b"},
+		{name: "signed in elsewhere since", policy: func() *config.Policy { return &valid }, org: "org_b", ok: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			configDir := t.TempDir()

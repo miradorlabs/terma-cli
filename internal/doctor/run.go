@@ -170,17 +170,22 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 	timed(KeyAuth, "signed in", d.signedIn)
 
 	d.nonGit = env.RepoErr == nil && env.GitDir == ""
-	// The policy the hooks apply, so doctor never admits a repository they would not.
-	d.pol = cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL)
+	// The policy the hooks apply here, so doctor never admits a repository they would not:
+	// whichever team's lists this repository, else the selected team's.
+	selected := cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL)
+	d.pol = selected
+	if env.RepoErr == nil {
+		d.pol = Admitting(cfg, env.GitDir)
+	}
 	timed(KeyProject, "repository collected", func() Check {
 		if env.RepoErr == nil && d.pol.Global() {
 			return unlessCaptureOff(d.pol, Check{Status: Pass, Detail: "every session, in global mode: " + GlobalDestination(cfg)})
 		}
-		c := RepositoryCheck(d.pol, env.GitDir, env.RepoErr)
+		c := ForTeam(RepositoryCheck(d.pol, env.GitDir, env.RepoErr), d.pol, selected)
 		d.admitted = c.Status == Pass
 		return unlessCaptureOff(d.pol, c)
 	})
-	d.projectID = cmp.Or(cfg.ProjectID, cfg.Policy.TeamID)
+	d.projectID = cmp.Or(cfg.ProjectID, d.pol.Team(), cfg.Policy.TeamID)
 
 	timed(KeyHooks, "commit hooks in effect", d.commitHooks)
 

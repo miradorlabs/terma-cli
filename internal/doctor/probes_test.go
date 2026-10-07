@@ -382,3 +382,44 @@ func TestCaptureOffWarnsTheCollectionChecks(t *testing.T) {
 		})
 	}
 }
+
+// A repository another organization's team lists is collected, for that team, and doctor
+// says so; the machine's rows name every team it also collects for.
+func TestDoctorAdmitsARepositoryByAnotherOrganizationsTeam(t *testing.T) {
+	t.Parallel()
+	e := env(t, Probes{Credential: signedIn, Spool: func() SpoolState { return SpoolState{} }})
+	e.Config.StateDir, e.Config.OrganizationID, e.Config.AuthURL = e.StateDir, "org_a", config.DefaultAuthURL
+	e.Config.Policy = fetched(config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/acme/two"}, OrganizationID: "org_a", AuthURL: config.DefaultAuthURL})
+	other := config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/acme/one"}, TeamID: "p2", OrganizationID: "org_b", OrganizationName: "Beta",
+		AuthURL: config.DefaultAuthURL, IncludePrompts: true, IncludeToolContent: true, FetchedAt: time.Now()}
+	for _, p := range []config.Policy{e.Config.Policy, other} {
+		if err := config.WritePolicy(e.StateDir, p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	c := check(Run(t.Context(), e, Progress{}), KeyProject)
+	if c.Status != Pass || !strings.Contains(c.Detail, "collected for team p2 of Beta") {
+		t.Fatalf("repository = %+v", c)
+	}
+	rep, err := Local(t.Context(), e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var also, repo string
+	for _, r := range rep.Rows {
+		switch r.Label {
+		case "Also":
+			also = r.Value
+		case "Repository":
+			repo = r.Value
+		}
+	}
+	if !strings.Contains(also, "github.com/acme/one") || !strings.Contains(also, "team p2 of Beta") || !strings.Contains(repo, "team p2 of Beta") {
+		t.Fatalf("rows %v", rep.Rows)
+	}
+	for _, c := range rep.Checks {
+		if strings.Contains(c.Fix, "ask a team admin") {
+			t.Fatalf("asked for the list though another team collects here: %+v", c)
+		}
+	}
+}

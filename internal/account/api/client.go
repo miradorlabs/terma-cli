@@ -135,6 +135,17 @@ func New(cfg *config.Config, opts Options) (*Client, error) {
 		if err != nil {
 			return nil, err
 		}
+		// A command scoped to another organization the profile signed into (a team of
+		// its collection, routing.ScopeToTeam) speaks with that organization's credential.
+		if cfg.OrganizationID != "" && loaded.OrganizationID != cfg.OrganizationID {
+			loaded, err = auth.LoadCredentialFor(cfg.Dir, cfg.ProfileName, cfg.OrganizationID)
+			if errors.Is(err, auth.ErrNotLoggedIn) {
+				return nil, fmt.Errorf("organization %s: %w — run `terma setup --org`", cfg.OrganizationID, err)
+			}
+			if err != nil {
+				return nil, err
+			}
+		}
 		cred = loaded
 	}
 	// Refused here, naming both hosts, rather than as the wrong auth host's bare 401.

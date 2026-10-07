@@ -63,7 +63,7 @@ func captureCodexTitle(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in *
 	if !title.UpdatedAt.IsZero() && !title.UpdatedAt.After(at) {
 		at = title.UpdatedAt
 	}
-	if err := e.Spool.Append(spool.Event{Time: at, Name: semconv.TermaSessionTitleEvent, SessionID: in.SessionID, Repository: r.Repository, Global: e.Policy.Global(), Attrs: attrs}); err != nil {
+	if err := e.Spool.Append(spool.Event{Time: at, Name: semconv.TermaSessionTitleEvent, SessionID: in.SessionID, Repository: r.Repository, Global: r.Policy.Global(), Attrs: attrs}); err != nil {
 		e.Logf("codex title: %v", err)
 		return
 	}

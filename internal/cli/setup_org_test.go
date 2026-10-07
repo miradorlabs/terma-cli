@@ -28,7 +28,7 @@ func TestSetupWithoutATerminalSaysItKeptOneOfSeveralOrganizations(t *testing.T) 
 	if err != nil {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}
-	want := "! Organization  kept Acme, one of your 2: `terma setup --org <name>` sets up another"
+	want := "! Organization  kept Acme, one of your 2: `terma setup --org <name>` adds another"
 	if !strings.Contains(out, want) {
 		t.Fatalf("setup did not say it kept one of several organizations (%d listings):\n%s", gateway.orgLists.Load(), out)
 	}

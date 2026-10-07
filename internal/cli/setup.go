@@ -67,7 +67,9 @@ func (app *App) newSetupCommand() *cobra.Command {
 		Long: `Gets this machine ready to use terma, once per developer:
 
   1. Signs you in (a browser handoff; --no-browser prints the URL instead) and, when
-     you belong to several organizations, asks which one (--org names it).
+     you belong to several organizations, asks which one (--org names it). A second
+     run with --org adds another organization: this machine then collects for both,
+     each team's repositories reporting to that team.
   2. Records which coding agents you work with.
   3. Chooses your team (--team names it) and fetches its collection policy, which
      lists the repositories it collects.
@@ -81,8 +83,8 @@ func (app *App) newSetupCommand() *cobra.Command {
      repository's working tree or committed files.
 
 Run it again any time: it reuses a working sign-in, --team switches team, --org
-switches organization, and --relay-addr moves the relay off a port another program
-holds.`,
+adds or switches to an organization, and --relay-addr moves the relay off a port
+another program holds.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error { return app.runSetup(cmd, f) },
 	}
@@ -150,7 +152,7 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 				fmt.Fprintln(out)
 				ui.Summary("Signed in", signedInAs(cfg))
 				if kept > 1 {
-					ui.Caution("Organization", fmt.Sprintf("kept %s, one of your %d: `terma setup --org <name>` sets up another",
+					ui.Caution("Organization", fmt.Sprintf("kept %s, one of your %d: `terma setup --org <name>` adds another",
 						cmp.Or(cfg.OrganizationName, cfg.OrganizationID), kept))
 				}
 				reportCredentialStore(ui, cfg, f.insecureStorage)
@@ -186,7 +188,10 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 				daemon.Stop(dir)
 			}
 		},
-		Fetched: func(pol config.Policy) { ui.policyFetched(team, pol) },
+		Fetched: func(pol config.Policy) {
+			ui.policyFetched(team, pol)
+			app.reportCollection(ui, pol)
+		},
 		ConnectRelay: func(ctx context.Context, names []string) error {
 			if f.relayAddr != "" {
 				if err := app.moveRelay(f.relayAddr); err != nil {
@@ -296,7 +301,7 @@ func (app *App) selectPolicyTeam(cmd *cobra.Command, cfg *config.Config) (string
 	if err != nil {
 		return "", err
 	}
-	cfg.ProjectID = team.ID
+	cfg.ProjectID, cfg.ProjectName = team.ID, team.Name
 	return cmp.Or(team.Name, team.ID), nil
 }
 

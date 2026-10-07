@@ -29,7 +29,7 @@ func TestTouchReportsEachFileUnderItsOwnRepository(t *testing.T) {
 	env := Env{
 		StateDir: stateDir, Now: time.Now(), Cwd: own, Spool: sp, Team: hookruntest.Team,
 		Policy:  listing("github.com/acme/"+filepath.Base(own), "github.com/acme/"+filepath.Base(other)),
-		OnClaim: func(root string) { claimed = append(claimed, root) },
+		OnClaim: func(root string, _ config.Policy) { claimed = append(claimed, root) },
 	}
 	r, err := env.Repo(context.Background())
 	if err != nil {

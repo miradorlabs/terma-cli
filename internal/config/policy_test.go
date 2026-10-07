@@ -1,6 +1,8 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -113,5 +115,80 @@ func TestPolicyTeam(t *testing.T) {
 		if got := c.p.Team(); got != c.want {
 			t.Errorf("%+v.Team() = %q, want %q", c.p, got, c.want)
 		}
+	}
+}
+
+// A repository goes to the first team whose list names it, across every policy the
+// machine collects under; a global policy takes what no list places.
+func TestPoliciesAdmitByAnyListBeforeGlobal(t *testing.T) {
+	t.Setenv("TERMA_POLICY_STUB", "")
+	now := time.Now()
+	a := Policy{Mode: ModeRepo, Repositories: []string{"github.com/acme/app"}, TeamID: "ta", OrganizationID: "org_a", FetchedAt: now}
+	b := Policy{Mode: ModeRepo, Repositories: []string{"github.com/beta/site"}, TeamID: "tb", OrganizationID: "org_b", FetchedAt: now}
+	g := Policy{Mode: ModeGlobal, TeamID: "tg", DefaultProjectID: "tg", OrganizationID: "org_a", FetchedAt: now}
+	ps := Policies{a, b}
+	if got, ok := ps.Admitting(Repository{Origin: "github.com/beta/site"}); !ok || got.TeamID != "tb" {
+		t.Fatalf("another organization's listing did not admit: %+v, %v", got, ok)
+	}
+	if _, ok := ps.Admitting(Repository{Origin: "github.com/me/personal"}); ok {
+		t.Fatal("an unlisted repository was admitted with no global policy")
+	}
+	if _, ok := ps.Global(); ok || ps.Validated() != true {
+		t.Fatal("a collection of repository-mode policies has no global one")
+	}
+	ps = Policies{g, a, b}
+	if got, ok := ps.Admitting(Repository{Origin: "github.com/beta/site"}); !ok || got.TeamID != "tb" {
+		t.Fatalf("a listing lost to the global policy: %+v, %v", got, ok)
+	}
+	if got, ok := ps.Admitting(Repository{Origin: "github.com/me/personal"}); !ok || got.TeamID != "tg" {
+		t.Fatalf("the global policy did not take the unlisted repository: %+v, %v", got, ok)
+	}
+	if got, ok := ps.Global(); !ok || got.TeamID != "tg" {
+		t.Fatalf("Global = %+v, %v", got, ok)
+	}
+	if (Policies{}).Validated() {
+		t.Fatal("no policy is validated")
+	}
+}
+
+// Label names a team for a person from what the policy stored, falling back to ids.
+func TestPolicyLabel(t *testing.T) {
+	for _, tc := range []struct {
+		pol  Policy
+		want string
+	}{
+		{Policy{TeamID: "t1", TeamName: "Platform", OrganizationID: "o1", OrganizationName: "Acme"}, "team Platform of Acme"},
+		{Policy{TeamID: "t1", OrganizationID: "o1"}, "team t1 of o1"},
+		{Policy{TeamID: "t1"}, "team t1"},
+		{Policy{OrganizationName: "Acme"}, "Acme"},
+	} {
+		if got := tc.pol.Label(); got != tc.want {
+			t.Errorf("%+v: Label = %q, want %q", tc.pol, got, tc.want)
+		}
+	}
+}
+
+// ListPolicies reads every team's stored policy and skips what is not one.
+func TestListPoliciesReadsEveryTeam(t *testing.T) {
+	t.Setenv("TERMA_POLICY_STUB", "")
+	dir := t.TempDir()
+	if got, err := ListPolicies(dir); err != nil || len(got) != 0 {
+		t.Fatalf("empty state dir: %v, %v", got, err)
+	}
+	now := time.Now()
+	for _, team := range []string{"tb", "ta"} {
+		if err := WritePolicy(dir, Policy{Mode: ModeRepo, TeamID: team, FetchedAt: now}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(dir, PoliciesDir, "junk.json"), []byte("{"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, PoliciesDir, "refreshed"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	got, err := ListPolicies(dir)
+	if err != nil || len(got) != 2 || got[0].TeamID != "ta" || got[1].TeamID != "tb" {
+		t.Fatalf("ListPolicies = %+v, %v", got, err)
 	}
 }

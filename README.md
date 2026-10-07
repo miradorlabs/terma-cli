@@ -100,8 +100,9 @@ terma update      # install the latest release, or refresh what terma installed
 terma teardown    # undo setup on this machine (--sign-out also signs out)
 ```
 
-Run `terma setup` again to repair the machine or to switch organization; it reuses a
-working sign-in and the team you chose. `terma doctor` opens with what this machine
+Run `terma setup` again to repair the machine, or with `--org` to add another
+organization: one machine collects for every organization you sign into, each team's
+repositories reporting to that team. It reuses a working sign-in and the team you chose. `terma doctor` opens with what this machine
 collects and what the repository has in progress (the active session, uncommitted agent
 edits), then checks every link: sign-in, whether the team collects this repository (and
 the origin terma sees), the hooks, the agents' export, the queue, and delivery. Every
@@ -182,8 +183,10 @@ Every question `terma setup` asks has a flag:
 terma setup --org acme --team platform --harness claude,codex --yes
 ```
 
-- `--org <name-or-id>` signs in to that organization. Without it, setup asks when you
-  belong to several, or, when it cannot ask, keeps the current one and says so.
+- `--org <name-or-id>` signs in to that organization and adds it to what this machine
+  collects for, alongside any organization set up before: a repository goes to whichever
+  team lists it, and one team at most may collect every session. Without it, setup asks
+  when you belong to several, or, when it cannot ask, keeps the current one and says so.
 - `--team <name-or-id>` sets up that team; without it, setup keeps the team you chose
   before, else your organization's only team, else asks.
 - `--harness <agents>` records those agents (`claude`, `codex`); with `--yes` or no

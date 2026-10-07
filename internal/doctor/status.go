@@ -14,9 +14,17 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
+
+// ConflictText says what a global policy the machine does not honour (routing.Conflicts)
+// means for its team.
+func ConflictText(p config.Policy) string {
+	return p.Label() + " collects every session too, which only one team on a machine may: " +
+		"its sessions here are not collected until it lists repositories instead, in the Terma web app"
+}
 
 // Row is one labelled line of context above doctor's checks; a row with no label continues
 // the one before it.
@@ -57,16 +65,20 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 	rep.Rows = append(rep.Rows, machineRows(cfg)...)
 
 	root, gitDir, reg := env.Root, env.GitDir, env.Agents
-	projectID := cmp.Or(cfg.ProjectID, cfg.Policy.TeamID)
 	admission := Check{Status: Pass}
 	hooks := Check{Status: Skip}
-	pol := cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL)
+	selected := cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL)
+	pol := selected
+	if env.RepoErr == nil {
+		pol = Admitting(cfg, gitDir)
+	}
+	projectID := cmp.Or(cfg.ProjectID, pol.Team(), cfg.Policy.TeamID)
 	if env.RepoErr != nil {
 		add("Repository", "not inside a git repository")
 	} else {
 		admission.Detail = "every session, in global mode: " + GlobalDestination(cfg)
 		if !pol.Global() {
-			admission = RepositoryCheck(pol, gitDir, nil)
+			admission = ForTeam(RepositoryCheck(pol, gitDir, nil), pol, selected)
 		}
 		add("Repository", "%s", admission.Detail)
 		if gitDir == "" {
@@ -177,7 +189,8 @@ func Context(env Env) []Row {
 // captureOff is why nothing is collected once the policy has expired (config.MaxPolicyAge).
 const captureOff = "the collection policy has not been refreshed for over a week"
 
-// machineRows are what this machine collects and where it reports.
+// machineRows are what this machine collects and where it reports: the selected team's
+// policy, then every other team's it collects for, of this organization or another.
 func machineRows(cfg *config.Config) []Row {
 	var rows []Row
 	switch {
@@ -185,6 +198,19 @@ func machineRows(cfg *config.Config) []Row {
 		rows = append(rows, Row{"Capture", "off: " + captureOff + " — run `terma setup`"})
 	case cfg.Policy.Validated():
 		rows = append(rows, Row{"Collecting", PolicySummary(cfg.Policy)})
+	}
+	for _, p := range routing.Collection(cfg) {
+		if p.TeamID == cfg.Policy.TeamID {
+			continue
+		}
+		line := PolicySummary(p) + " for " + p.Label()
+		if p.Expired(time.Now()) {
+			line = "off for " + p.Label() + ": " + captureOff
+		}
+		rows = append(rows, Row{"Also", line})
+	}
+	for _, p := range routing.Conflicts(cfg) {
+		rows = append(rows, Row{"Conflict", ConflictText(p)})
 	}
 	// Name the backend whenever it is not production, by environment or by host overrides.
 	switch {

@@ -63,7 +63,7 @@ func captureCodexReplies(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in
 		if !reply.At.IsZero() && !reply.At.After(at) {
 			at = reply.At
 		}
-		return e.Spool.Append(spool.Event{Time: at, Name: semconv.TermaAssistantMessageEvent, SessionID: in.SessionID, TraceID: reply.TraceID, Repository: r.Repository, Global: e.Policy.Global(), Attrs: attrs})
+		return e.Spool.Append(spool.Event{Time: at, Name: semconv.TermaAssistantMessageEvent, SessionID: in.SessionID, TraceID: reply.TraceID, Repository: r.Repository, Global: r.Policy.Global(), Attrs: attrs})
 	})
 	if err != nil {
 		e.Logf("codex replies (%s): %v", status, err)
