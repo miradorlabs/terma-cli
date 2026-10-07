@@ -17,7 +17,9 @@ const SignatureName = "checksums.txt.sig"
 // A new key ships in a release signed with the old one, and the old key goes a release
 // later, once every machine has taken the new one; a key to retire at once goes with the
 // release that replaces it. The private key is the release workflow's TERMA_SIGNING_KEY.
-var releaseKeys = []string{}
+var releaseKeys = []string{
+	"cb6646bf0ec98128bcab6bd5a4b92d0ca4ade2d9e3f17e12e06e33725240667b", // 2026-10-07
+}
 
 // builtinKeys are releaseKeys parsed; a bad entry fails the build's tests (TestBuiltinKeys).
 var builtinKeys = func() []ed25519.PublicKey {

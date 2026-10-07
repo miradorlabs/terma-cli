@@ -147,8 +147,9 @@ notice.
 **Signed releases.** Every release's `checksums.txt`, which names each archive's digest, is
 signed with the release key, and terma installs only a release whose signature a key
 built into it made: a release asset that was tampered with or swapped is refused, by
-`terma update` and by the background update alike. The public keys are listed in
-`internal/selfupdate/sign.go`; to check a release by hand, download its `checksums.txt`
+`terma update` and by the background update alike. The public key is
+`cb6646bf0ec98128bcab6bd5a4b92d0ca4ade2d9e3f17e12e06e33725240667b` (the list, with any
+being rotated in, is in `internal/selfupdate/sign.go`); to check a release by hand, download its `checksums.txt`
 and `checksums.txt.sig` and run `go run ./scripts/releasesign verify checksums.txt
 checksums.txt.sig` from a clone. The installer script and the npm package do not check
 the signature: on a first install, the script, the key it would check against and the
