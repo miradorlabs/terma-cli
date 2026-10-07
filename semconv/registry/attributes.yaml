@@ -500,6 +500,21 @@ attributes:
       itself names a better one.
     annotations:
       content: tool
+  - key: terma.working_directory
+    type: string
+    stability: development
+    brief: The absolute path of the directory the session's agent hooks last ran in.
+    note: >
+      Symlink-resolved, inside a checkout or outside one. Where terma.repository.root is the
+      checkout, this is where in it the agent works: what a tool call's relative paths and a
+      bare git command resolve against, so a command that changes directory itself names a
+      better one. Git hooks, which git runs at the checkout's root, never name it, so after a
+      commit in another linked worktree of the same repository the two can name different
+      checkouts until the next agent hook: do not assume the directory lies under the root.
+      A local path, so it leaves only while the team's policy collects tool content. On
+      agent telemetry it is a resource attribute the relay stamps from the session's claim.
+    annotations:
+      content: tool
 
   # The relay.
   - key: terma.relay.attribution

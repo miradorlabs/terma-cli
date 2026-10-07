@@ -40,8 +40,8 @@ func (ru *rules) withhold(p *part, prompts, toolContent bool, unclassified map[s
 					changed++
 					continue
 				}
-			case key == semconv.TermaRepositoryRootKey:
-				// The relay's own stamp: a local path, which leaves only with tool content.
+			case key == semconv.TermaRepositoryRootKey, key == semconv.TermaWorkingDirectoryKey:
+				// The relay's own stamps: local paths, which leave only with tool content.
 				if !toolContent {
 					changed++
 					continue

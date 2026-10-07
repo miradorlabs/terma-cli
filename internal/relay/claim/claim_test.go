@@ -367,3 +367,57 @@ func TestClaimFollowsTheWorkingTreeInPlace(t *testing.T) {
 		t.Fatalf("the Mark was pushed out: At = %+v, %v", marked, ok)
 	}
 }
+
+// A session that changes directory within its working tree rewrites its latest placement's
+// directory at once, however fresh the claim, and adds no placement.
+func TestClaimFollowsTheDirectoryInPlace(t *testing.T) {
+	t.Parallel()
+	dir := enable(t)
+	at := time.Now().Add(-time.Hour).Truncate(time.Second)
+	top := Claim{ProjectID: "p1", Tool: "claude-code", Root: "/src/api", Cwd: "/src/api", PIDs: []int{10}}
+	if !Write(dir, "s", top, at) {
+		t.Fatal("the first claim did not write")
+	}
+	if Write(dir, "s", top, at.Add(time.Second)) {
+		t.Fatal("the same directory within Refresh rewrote the claim")
+	}
+	sub := top
+	sub.Cwd = "/src/api/web"
+	for i, c := range []Claim{sub, top, sub} {
+		at = at.Add(time.Second)
+		if !Write(dir, "s", c, at) {
+			t.Fatalf("move %d to %s within Refresh did not write", i, c.Cwd)
+		}
+		got, ok := Read(dir, "s", at)
+		if !ok || got.Cwd != c.Cwd || len(got.Placements) != 1 {
+			t.Fatalf("move %d: cwd %q, placements %+v", i, got.Cwd, got.Placements)
+		}
+		if latest, _ := got.At(10, at); latest.Cwd != c.Cwd || latest.Root != "/src/api" {
+			t.Fatalf("move %d: At = %+v", i, latest)
+		}
+	}
+}
+
+// A claim naming no directory (a git hook's, which runs at the checkout's root) keeps the one an
+// agent hook named: a fresh claim is not rewritten, and a stale one keeps it as it refreshes.
+func TestClaimWithoutADirectoryKeepsTheSessions(t *testing.T) {
+	t.Parallel()
+	dir := enable(t)
+	at := time.Now().Add(-time.Hour).Truncate(time.Second)
+	agent := Claim{ProjectID: "p1", Tool: "claude-code", Root: "/src/api", Cwd: "/src/api/web", PIDs: []int{10}}
+	if !Write(dir, "s", agent, at) {
+		t.Fatal("the agent's claim did not write")
+	}
+	git := agent
+	git.Cwd = ""
+	if Write(dir, "s", git, at.Add(time.Second)) {
+		t.Fatal("a git hook's claim within Refresh rewrote the claim")
+	}
+	at = time.Now().Add(2 * Refresh) // freshness is the file mtime, which the first write set to now
+	if !Write(dir, "s", git, at) {
+		t.Fatal("a stale claim was not refreshed")
+	}
+	if got, ok := Read(dir, "s", at); !ok || got.Cwd != "/src/api/web" || len(got.Placements) != 1 || got.Placements[0].Cwd != "/src/api/web" {
+		t.Fatalf("after the git hook's refresh: %+v", got)
+	}
+}

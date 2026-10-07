@@ -2,6 +2,7 @@ package hookrun
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -11,6 +12,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -151,6 +153,39 @@ func TestGlobalModeClaimsEverySession(t *testing.T) {
 			t.Errorf("repo mode claimed a session in %s", dir)
 		}
 	}
+	// Outside git the claim names no working tree, but still the directory the hook ran in.
+	want, _ := filepath.EvalSymlinks(scratch)
+	if c, _ := claim.Read(stateDir, "g-scratch", time.Now()); c.Root != "" || c.Cwd != want {
+		t.Errorf("scratch claim root %q, cwd %q; want no root and %q", c.Root, c.Cwd, want)
+	}
+}
+
+// A claim names the directory its hook ran in next to the working tree: a session in a
+// subdirectory resolves a tool call's relative paths and bare git commands there, not at the
+// checkout's root. A spooled event and a bare payload claim alike.
+func TestTheClaimNamesTheDirectoryTheHookRanIn(t *testing.T) {
+	t.Parallel()
+	stateDir := t.TempDir()
+	repo := hookruntest.InitRepo(t)
+	sub := filepath.Join(repo, "frontend")
+	if err := os.Mkdir(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	root, _ := filepath.EvalSymlinks(repo)
+	dir, _ := filepath.EvalSymlinks(sub)
+	sp, _ := spool.Open(t.TempDir())
+	env := Env{StateDir: stateDir, Now: time.Now(), Cwd: sub, Policy: hookruntest.Admitting(repo), Spool: sp, Version: "test", Team: "proj",
+		Stdin: strings.NewReader(`{"session_id":"sess-sub","cwd":"` + hookruntest.InJSON(sub) + `","hook_event_name":"SessionStart"}`)}
+	if err := startSession(context.Background(), env); err != nil {
+		t.Fatal(err)
+	}
+	payloadEnv := Env{StateDir: stateDir, Now: time.Now(), Cwd: sub, Policy: hookruntest.Admitting(repo), Team: "proj"}
+	ClaimFromPayload(context.Background(), payloadEnv, PayloadSession{ID: "sess-payload", Cwd: sub}, "codex")
+	for _, sid := range []string{"sess-sub", "sess-payload"} {
+		if c, ok := claim.Read(stateDir, sid, time.Now()); !ok || c.Root != root || c.Cwd != dir {
+			t.Errorf("%s: claim root %q, cwd %q, %v; want %q, %q", sid, c.Root, c.Cwd, ok, root, dir)
+		}
+	}
 }
 
 func mustPayloadSession(t *testing.T, payload string) PayloadSession {
@@ -160,4 +195,56 @@ func mustPayloadSession(t *testing.T, payload string) PayloadSession {
 		t.Fatalf("no session in %s", payload)
 	}
 	return s
+}
+
+// git runs its commit hooks at the checkout's root, never where the agent works: an attributed
+// commit refreshes the session's claim without moving its directory, so a push after a commit
+// made from a subdirectory still names the subdirectory.
+func TestCommitHooksKeepTheAgentsDirectory(t *testing.T) {
+	t.Parallel()
+	stateDir := t.TempDir()
+	root := hookruntest.InitRepo(t)
+	ctx := context.Background()
+	if _, err := gitx.Git(ctx, root, "remote", "set-url", "origin", "git@github.com:o/r.git"); err != nil {
+		t.Fatal(err)
+	}
+	sub := filepath.Join(root, "frontend")
+	hookruntest.WriteFile(t, root, "frontend/src/x.ts", "x\n")
+	sp, _ := spool.Open(t.TempDir())
+	env := func(cwd, stdin string, args ...string) Env {
+		return Env{StateDir: stateDir, Now: time.Now(), Cwd: cwd, Policy: listing("github.com/o/r"), Args: args,
+			Stdin: strings.NewReader(stdin), Spool: sp, Version: "test", Team: "proj_test"}
+	}
+	if err := startSession(ctx, env(sub, `{"session_id":"sess-sub","cwd":"`+hookruntest.InJSON(sub)+`","hook_event_name":"SessionStart"}`)); err != nil {
+		t.Fatal(err)
+	}
+	edit := `{"session_id":"sess-sub","cwd":"` + hookruntest.InJSON(sub) + `","tool_name":"Write","tool_input":{"file_path":"` +
+		hookruntest.InJSON(filepath.Join(sub, "src", "x.ts")) + `"}}`
+	if err := editFile(ctx, env(sub, edit)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := gitx.Git(ctx, root, "add", "frontend/src/x.ts"); err != nil {
+		t.Fatal(err)
+	}
+	msgPath := filepath.Join(t.TempDir(), "MSG")
+	if err := os.WriteFile(msgPath, []byte("Add x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := PrepareCommitMsg(ctx, env(root, "", msgPath, "message")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := gitx.Git(ctx, root, "commit", "-q", "-F", msgPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := PostCommit(ctx, env(root, "")); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(hookruntest.Named(hookruntest.Spooled(t, sp), semconv.TermaCommitEvent)); n != 1 {
+		t.Fatalf("the commit was not attributed to the session: %d terma.commit events", n)
+	}
+	tree, _ := filepath.EvalSymlinks(root)
+	dir, _ := filepath.EvalSymlinks(sub)
+	if c, ok := claim.Read(stateDir, "sess-sub", time.Now()); !ok || c.Root != tree || c.Cwd != dir {
+		t.Errorf("after the commit hooks: claim root %q, cwd %q, %v; want %q, %q", c.Root, c.Cwd, ok, tree, dir)
+	}
 }

@@ -81,8 +81,8 @@ func TestTheWorkingTreeIsSymlinkResolved(t *testing.T) {
 	if err := startSession(context.Background(), env); err != nil {
 		t.Fatal(err)
 	}
-	if c, ok := claim.Read(stateDir, "sess-link", time.Now()); !ok || c.Root != want {
-		t.Errorf("claim root = %q, %v; want %q", c.Root, ok, want)
+	if c, ok := claim.Read(stateDir, "sess-link", time.Now()); !ok || c.Root != want || c.Cwd != want {
+		t.Errorf("claim root, cwd = %q, %q, %v; want %q", c.Root, c.Cwd, ok, want)
 	}
 	if _, err := gitx.Git(context.Background(), repo, "commit", "-q", "--allow-empty", "-m", "by hand"); err != nil {
 		t.Fatal(err)

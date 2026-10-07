@@ -261,8 +261,9 @@ func TestRelayClaude(t *testing.T) {
 	})
 }
 
-// checkWorkingTree: the session's records carry the working tree its hooks ran in, which
-// Claude Code's own records never name, and only while the policy collects tool content.
+// checkWorkingTree: the session's records carry the working tree and the directory its hooks
+// ran in, which Claude Code's own records never name, and only while the policy collects tool
+// content.
 func checkWorkingTree(t contractReporter, e telemetryEvidence, key, sid, repo string, content bool) {
 	t.Helper()
 	want := ""
@@ -275,8 +276,11 @@ func checkWorkingTree(t contractReporter, e telemetryEvidence, key, sid, repo st
 			continue
 		}
 		n++
-		if got := r.Resource["terma.repository.root"]; got != want {
-			t.Errorf("%s: terma.repository.root = %q, want %q", r.Attrs["event.name"], got, want)
+		// Claude Code runs at the checkout's root here, so the directory its hooks ran in is the root too.
+		for _, stamp := range []string{"terma.repository.root", "terma.working_directory"} {
+			if got := r.Resource[stamp]; got != want {
+				t.Errorf("%s: %s = %q, want %q", r.Attrs["event.name"], stamp, got, want)
+			}
 		}
 	}
 	if n == 0 {

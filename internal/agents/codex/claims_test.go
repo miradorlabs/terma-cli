@@ -66,8 +66,8 @@ func TestCodexSubagentThreadIsClaimed(t *testing.T) {
 	// Either way the claim names the working tree, which the relay stamps on Codex's own records.
 	tree, _ := filepath.EvalSymlinks(root)
 	for _, id := range []string{"root-thread", "child-thread", "child-thread-2"} {
-		if c, ok := claim.Read(stateDir, id, time.Now()); !ok || c.ProjectID != "project-a" || c.Root != tree {
-			t.Errorf("%s not claimed with its working tree %s: %+v %v", id, tree, c, ok)
+		if c, ok := claim.Read(stateDir, id, time.Now()); !ok || c.ProjectID != "project-a" || c.Root != tree || c.Cwd != tree {
+			t.Errorf("%s not claimed with its working tree and directory %s: %+v %v", id, tree, c, ok)
 		}
 	}
 }

@@ -209,7 +209,7 @@ func (e Env) claimForRelay(r *Repo, ev spool.Event) {
 		return
 	}
 	tool, _ := ev.Attrs[semconv.GenAIMainAgentNameKey].(string)
-	c := claim.Claim{ProjectID: r.ProjectID, Tool: tool, Repo: r.Name, Worktree: r.Worktree, Repository: r.Repository, Root: r.workTree(), PIDs: claimPIDs()}
+	c := claim.Claim{ProjectID: r.ProjectID, Tool: tool, Repo: r.Name, Worktree: r.Worktree, Repository: r.Repository, Root: r.workTree(), Cwd: e.workingDir(), PIDs: claimPIDs()}
 	claim.Write(e.StateDir, ev.SessionID, c, e.Time())
 	// A subagent whose telemetry uses its agent id as session id would otherwise be dropped.
 	if agent, _ := ev.Attrs[semconv.TermaAgentIDKey].(string); agent != "" && agent != ev.SessionID {
@@ -251,6 +251,7 @@ func PrepareCommitMsg(ctx context.Context, env Env) error {
 	if err != nil || r.GitDir == "" {
 		return nil
 	}
+	env.Cwd = "" // git runs its hooks at the checkout's root, not where the agent works: keep its directory
 	manifests, err := r.Store.Manifests()
 	if err != nil {
 		env.Logf("manifests: %v", err)
@@ -310,6 +311,7 @@ func PostCommit(ctx context.Context, env Env) error {
 	if err != nil || r.GitDir == "" {
 		return nil
 	}
+	env.Cwd = "" // git runs its hooks at the checkout's root, not where the agent works: keep its directory
 	head, err := gitx.LastCommit(ctx, r.Root)
 	if err != nil || head.SHA == "" {
 		return nil

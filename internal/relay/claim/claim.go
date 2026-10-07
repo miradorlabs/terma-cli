@@ -47,7 +47,10 @@ type Claim struct {
 	Repository config.Repository `json:"repository,omitzero"`
 	// Root is the working tree the claiming hook ran in, "" outside git: what the relay
 	// stamps as terma.repository.root.
-	Root      string    `json:"root,omitempty"`
+	Root string `json:"root,omitempty"`
+	// Cwd is the directory the claiming agent hook ran in, symlink-resolved: what the relay
+	// stamps as terma.working_directory. A git hook names none and keeps the session's.
+	Cwd       string    `json:"cwd,omitempty"`
 	ClaimedAt time.Time `json:"claimed_at"`
 	// PIDs are the processes the claiming hooks ran under, so a session resumed by another
 	// process where no hook runs is not covered. Empty matches any sender.
@@ -66,7 +69,9 @@ type Placement struct {
 	// Repository is Claim.Repository for this run.
 	Repository config.Repository `json:"repository,omitzero"`
 	// Root is Claim.Root for this run.
-	Root  string    `json:"root,omitempty"`
+	Root string `json:"root,omitempty"`
+	// Cwd is Claim.Cwd for this run.
+	Cwd   string    `json:"cwd,omitempty"`
 	PIDs  []int     `json:"pids,omitempty"`
 	Since time.Time `json:"since"`
 }
@@ -94,7 +99,7 @@ func (c Claim) placements() []Placement {
 	if len(c.Placements) > 0 {
 		return c.Placements
 	}
-	return []Placement{{ProjectID: c.ProjectID, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree, Repository: c.Repository, Root: c.Root, PIDs: c.PIDs}}
+	return []Placement{{ProjectID: c.ProjectID, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree, Repository: c.Repository, Root: c.Root, Cwd: c.Cwd, PIDs: c.PIDs}}
 }
 
 // At is the claim as it applies to a record pid sent at time at: the covering placement
@@ -116,7 +121,7 @@ func (c Claim) At(pid int, at time.Time) (Claim, bool) {
 		return Claim{}, false
 	}
 	return Claim{ProjectID: best.ProjectID, Tool: best.Tool, Repo: best.Repo, Worktree: best.Worktree,
-		Repository: best.Repository, Root: best.Root, PIDs: best.PIDs, ClaimedAt: c.ClaimedAt, Placements: c.Placements}, true
+		Repository: best.Repository, Root: best.Root, Cwd: best.Cwd, PIDs: best.PIDs, ClaimedAt: c.ClaimedAt, Placements: c.Placements}, true
 }
 
 // Dir is the relay directory under the state directory dir.
@@ -173,7 +178,7 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 		return false
 	}
 	// The fast path needs no lock: a fresh claim already naming these processes.
-	if prev, ok := read(p); ok && samePlace(prev, c) && prev.Root == c.Root && subset(c.PIDs, prev.PIDs) {
+	if prev, ok := read(p); ok && samePlace(prev, c) && sameDirs(prev, c) && subset(c.PIDs, prev.PIDs) {
 		if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < refresh {
 			return false
 		}
@@ -193,12 +198,15 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 	switch {
 	case !havePrev:
 	case samePlace(prev, c):
-		if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < refresh && prev.Root == c.Root && subset(c.PIDs, prev.PIDs) {
+		if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < refresh && sameDirs(prev, c) && subset(c.PIDs, prev.PIDs) {
 			return false
 		}
 		c.PIDs = merge(prev.PIDs, c.PIDs)
 		if c.Tool == "" {
 			c.Tool = prev.Tool
+		}
+		if c.Cwd == "" {
+			c.Cwd = prev.Cwd
 		}
 		placements = prev.placements()
 		placements = placements[:len(placements)-1]
@@ -209,7 +217,7 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 	if havePrev && samePlace(prev, c) {
 		since = prev.placements()[len(prev.placements())-1].Since
 	}
-	placements = append(placements, Placement{ProjectID: c.ProjectID, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree, Repository: c.Repository, Root: c.Root, PIDs: c.PIDs, Since: since})
+	placements = append(placements, Placement{ProjectID: c.ProjectID, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree, Repository: c.Repository, Root: c.Root, Cwd: c.Cwd, PIDs: c.PIDs, Since: since})
 	if len(placements) > maxPlacements {
 		placements = placements[len(placements)-maxPlacements:]
 	}
@@ -223,10 +231,17 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 }
 
 // samePlace reports whether c continues prev's latest run. Another working tree of the same
-// repository is the same run, whose Root is rewritten in place: a placement decides where
-// records go, and a session switching between worktrees must never push an earlier one out.
+// repository, or another directory in it, is the same run, whose Root and Cwd are rewritten in
+// place: a placement decides where records go, and a session switching between worktrees must
+// never push an earlier one out.
 func samePlace(prev, c Claim) bool {
 	return prev.ProjectID == c.ProjectID && prev.Repository == c.Repository
+}
+
+// sameDirs reports whether c names the working tree and directory prev does, so a fresh claim
+// needs no rewrite. A claim naming no directory (a git hook's) keeps prev's.
+func sameDirs(prev, c Claim) bool {
+	return prev.Root == c.Root && (c.Cwd == "" || prev.Cwd == c.Cwd)
 }
 
 func subset(a, b []int) bool {
