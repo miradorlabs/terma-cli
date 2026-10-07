@@ -79,15 +79,21 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 }
 
 // relayUpdater has the relay install each new release in place of its own binary, as
-// interactive commands do, so a machine nobody runs terma on still updates; nil where
-// updates are turned off for the process, as in CI.
+// interactive commands do, so a machine nobody runs terma on still updates. It is nil where
+// the relay could never install one: a development build, a package manager's or a Windows
+// binary, or a process with updates turned off, as in CI. Turned off with `terma update
+// --auto off`, it asks nothing, not even GitHub.
 func (app *App) relayUpdater() *daemon.Updater {
 	exe, err := os.Executable()
-	if err != nil || os.Getenv("CI") != "" || os.Getenv("TERMA_NO_UPDATE_CHECK") == "1" {
+	if err != nil || !selfupdate.IsRelease(app.version) || !selfupdate.UpdatesItself(exe) ||
+		os.Getenv("CI") != "" || os.Getenv("TERMA_NO_UPDATE_CHECK") == "1" {
 		return nil
 	}
 	client := &selfupdate.Client{Version: app.version}
 	return &daemon.Updater{Every: daemon.UpdateEvery, Update: func(ctx context.Context) (string, error) {
+		if p, err := selfupdate.LoadPreferences(app.dir); err != nil || !p.Auto {
+			return "", nil
+		}
 		o := client.Auto(ctx, app.dir, app.stateDir, exe, nil)
 		return o.Installed, o.Err
 	}}

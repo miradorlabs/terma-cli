@@ -147,7 +147,8 @@ func Run(ctx context.Context, c Config) (Result, error) {
 		workers.Go(func() { w(engineCtx) })
 	}
 	updated := make(chan string, 1)
-	if u := c.Updater; u != nil {
+	if c.Updater != nil {
+		u := *c.Updater
 		if u.Logf == nil {
 			u.Logf = c.Log.Printf
 		}
@@ -289,14 +290,15 @@ func listen(dir, addr string) (net.Listener, error) {
 // the default hold, so an agent exporting without pause cannot keep the old terma running.
 var replacedMaxWait = relay.DefaultHold
 
-// watch waits for a reason to stop. A relay that installed a newer terma stops once it holds
-// and sends nothing and no agent has exported for updateQuiet, however long that takes: the
-// release is already in place for every hook, so nothing is lost by waiting, while what it
-// holds in memory would be.
+// watch waits for a reason to stop. A relay that installed a newer terma stops once its hold
+// is empty and no agent has exported for updateQuiet, or after updateMaxWait at the latest:
+// the release is already in place for every hook, so waiting loses nothing, while what it
+// holds in memory would be lost. Its queue is on disk, so a route still retrying never keeps
+// it, and a newer hook asking it to make way is answered by that same wait.
 func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Duration, served <-chan error, updated <-chan string) (stopReason, error) {
 	dir := claim.Dir(stateDir)
 	var replacing time.Time // when a newer terma asked this relay to make way
-	var upgraded bool       // it installed one itself
+	var upgraded time.Time  // when it installed one itself
 	lastPrune := time.Now()
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
@@ -310,7 +312,7 @@ func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Durat
 			}
 			return stopServeFailed, err
 		case <-updated:
-			upgraded = true
+			upgraded = time.Now()
 		case <-tick.C:
 		}
 		if !setUp(stateDir) {
@@ -322,8 +324,8 @@ func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Durat
 		if replacing.IsZero() && requested(dir, ReplaceFile) {
 			replacing = time.Now()
 		}
-		if upgraded {
-			if d, quiet := r.Idle(); quiet && d >= updateQuiet {
+		if !upgraded.IsZero() {
+			if !r.Holding() && r.SinceExport() >= updateQuiet || time.Since(upgraded) >= updateMaxWait {
 				return stopUpdated, nil
 			}
 		} else if !replacing.IsZero() && (!r.Holding() || time.Since(replacing) >= replacedMaxWait) {

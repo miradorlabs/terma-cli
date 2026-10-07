@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"slices"
 	"sync/atomic"
@@ -11,6 +13,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/relay"
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 )
 
 // now fires at once, recording each wait it was asked for.
@@ -130,5 +133,88 @@ func TestAnUpdatedRelayDropsNothingItHolds(t *testing.T) {
 	}
 	if got := counters(t, filepath.Join(dir, StatsFile))["dropped.no_session_trace_at_exit.traces"]; got != 0 {
 		t.Fatalf("the restart dropped %d held spans", got)
+	}
+}
+
+// A relay that installed a newer terma restarts even while a route keeps failing, such as
+// a revoked key answered 401: its queue is on disk, and the next relay delivers it.
+func TestAnUpdatedRelayRestartsWhileARouteKeepsFailing(t *testing.T) {
+	var refused atomic.Int64
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		refused.Add(1)
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	t.Cleanup(upstream.Close)
+	stateDir, _, token := setUpRelay(t)
+	c := runConfig(stateDir, 0, nil)
+	c.Addr, c.Version, c.Service = freeAddr(t), "1.2.0", true
+	var ahead atomic.Int64
+	c.Engine.Now = func() time.Time { return time.Now().Add(time.Duration(ahead.Load())) }
+	c.Engine.CatchAll = func() (claim.Claim, bool) { return claim.Claim{ProjectID: "team"}, true }
+	c.Engine.Resolve = func(claim.Claim) (relay.Policy, error) {
+		return relay.Policy{Endpoint: upstream.URL, Key: "revoked"}, nil
+	}
+	install := make(chan struct{})
+	var waits []time.Duration
+	c.Updater = &Updater{Every: time.Hour, After: now(&waits), Jitter: func(time.Duration) time.Duration { return 0 },
+		Update: func(ctx context.Context) (string, error) {
+			select {
+			case <-install:
+				return "1.3.0", nil
+			case <-ctx.Done():
+				return "", ctx.Err()
+			}
+		}}
+	r := startRun(t, c)
+	r.await(t, "the relay")
+	postSessionlessSpans(t, c.Addr, token, 5)
+	ahead.Store(int64(relay.DefaultTraceHold + time.Minute)) // the held spans go to the catch-all
+	for deadline := time.Now().Add(10 * time.Second); refused.Load() == 0; time.Sleep(20 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("the catch-all route never tried to deliver")
+		}
+	}
+	close(install)
+	select {
+	case <-r.done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the relay kept running the release it replaced while a route kept failing")
+	}
+	if !r.res.Updated || !r.res.Restart() {
+		t.Fatalf("Run = %+v, want Updated and a restart", r.res)
+	}
+}
+
+// A relay that installed a newer terma but whose hold never empties restarts at
+// updateMaxWait all the same.
+func TestAnUpdatedRelayRestartsAtTheCap(t *testing.T) {
+	was := updateMaxWait
+	updateMaxWait = 2 * time.Second
+	t.Cleanup(func() { updateMaxWait = was })
+	stateDir, _, token := setUpRelay(t)
+	c := runConfig(stateDir, 0, nil)
+	c.Addr, c.Version, c.Service = freeAddr(t), "1.2.0", true
+	install := make(chan struct{})
+	var waits []time.Duration
+	c.Updater = &Updater{Every: time.Hour, After: now(&waits), Jitter: func(time.Duration) time.Duration { return 0 },
+		Update: func(ctx context.Context) (string, error) {
+			select {
+			case <-install:
+				return "1.3.0", nil
+			case <-ctx.Done():
+				return "", ctx.Err()
+			}
+		}}
+	r := startRun(t, c)
+	r.await(t, "the relay")
+	postSessionlessSpans(t, c.Addr, token, 5)
+	close(install)
+	select {
+	case <-r.done:
+	case <-time.After(updateMaxWait + 5*time.Second):
+		t.Fatal("the relay kept running past the cap")
+	}
+	if !r.res.Updated {
+		t.Fatalf("Run = %+v, want Updated", r.res)
 	}
 }

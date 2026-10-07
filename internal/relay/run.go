@@ -111,6 +111,13 @@ func (r *Relay) Holding() bool {
 	return r.heldN > 0
 }
 
+// SinceExport is how long the relay has had no export, whatever it holds or queues.
+func (r *Relay) SinceExport() time.Duration {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.opts.Now().Sub(r.lastSeen)
+}
+
 // Idle reports how long the relay has had no export, if it holds and queues nothing.
 func (r *Relay) Idle() (time.Duration, bool) {
 	r.mu.Lock()

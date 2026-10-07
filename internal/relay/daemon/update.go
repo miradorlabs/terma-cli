@@ -11,9 +11,14 @@ import (
 const UpdateEvery = time.Hour
 
 // updateQuiet is how long the relay must have had no export before it restarts on the
-// release it installed: agents export about every minute at most, so the restart falls
-// between two exports rather than refusing one.
+// release it installed, so the restart falls in a pause rather than refusing an export: an
+// agent at work exports every few seconds, an idle one about once a minute at most.
 const updateQuiet = 30 * time.Second
+
+// updateMaxWait bounds how long a relay that installed a release waits for its hold to
+// empty and its agents to pause: an agent that never pauses for a working day cannot keep
+// the earlier release running past it.
+var updateMaxWait = 12 * time.Hour
 
 // Updater keeps the relay's own terma up to date, so an install nobody runs a command on
 // still takes each release: the relay is the one process that runs all day.
@@ -38,7 +43,7 @@ func (u Updater) Run(ctx context.Context, installed chan<- string) {
 		after = time.After
 	}
 	if jitter == nil {
-		jitter = func(d time.Duration) time.Duration { return rand.N(d) }
+		jitter = func(d time.Duration) time.Duration { return rand.N(max(d, 1)) }
 	}
 	wait := jitter(u.Every)
 	for {

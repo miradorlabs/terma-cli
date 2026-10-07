@@ -252,3 +252,96 @@ func TestOnlyMinorAndMajorReleasesSoak(t *testing.T) {
 		}
 	}
 }
+
+// fakeReleases serves tag as the latest release, published long enough ago to have soaked,
+// with a downloadable archive of binary; downloads counts the archive's fetches.
+func fakeReleases(t *testing.T, tag string, binary []byte, downloads *int) *httptest.Server {
+	t.Helper()
+	archive := archiveWith(t, "terma", binary)
+	sum := sha256.Sum256(archive)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		base := "http://" + r.Host
+		switch r.URL.Path {
+		case "/repos/" + Repo + "/releases/latest":
+			_ = json.NewEncoder(w).Encode(Release{TagName: tag, PublishedAt: time.Now().Add(-2 * SoakTime),
+				Assets: []Asset{{Name: AssetName(runtime.GOOS, runtime.GOARCH), URL: base + "/archive"}, {Name: "checksums.txt", URL: base + "/sums"}}})
+		case "/sums":
+			fmt.Fprintf(w, "%x  %s\n", sum, AssetName(runtime.GOOS, runtime.GOARCH))
+		case "/archive":
+			*downloads++
+			_, _ = w.Write(archive)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func oldBinary(t *testing.T) string {
+	t.Helper()
+	exe := filepath.Join(t.TempDir(), "terma")
+	if err := os.WriteFile(exe, []byte("old binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return exe
+}
+
+// A release the last check found but that has since been pulled is not installed: the
+// install looks the latest release up again, and the check then names that one.
+func TestAPulledReleaseIsNeverInstalled(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("in-place updates are Unix-only")
+	}
+	downloads := 0
+	srv := fakeReleases(t, "v1.0.0", []byte("new binary"), &downloads)
+	stateDir, exe := t.TempDir(), oldBinary(t)
+	SaveCache(stateDir, Cache{CheckedAt: time.Now(), Current: "1.0.0", Latest: "2.0.0", Published: time.Now().Add(-2 * SoakTime)})
+	c := &Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0"}
+	o := c.Auto(context.Background(), t.TempDir(), stateDir, exe, nil)
+	if o.Installed != "" || o.Err != nil || o.Notice != "" || downloads != 0 {
+		t.Fatalf("Auto = %+v after %d downloads, want nothing installed or announced", o, downloads)
+	}
+	if got := LoadCache(stateDir).Latest; got != "1.0.0" {
+		t.Fatalf("the check still names %s as the latest release", got)
+	}
+}
+
+// A release whose install failed waits a day before it is tried again, but a newer release,
+// such as the patch that fixes it, is tried at once.
+func TestAFailedInstallHoldsBackOnlyThatRelease(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("in-place updates are Unix-only")
+	}
+	for _, tc := range []struct {
+		attempted string
+		installs  bool
+	}{{"2.0.0", true}, {"2.0.1", false}} {
+		t.Run(tc.attempted, func(t *testing.T) {
+			downloads := 0
+			srv := fakeReleases(t, "v2.0.1", []byte("new binary"), &downloads)
+			stateDir, exe := t.TempDir(), oldBinary(t)
+			SaveCache(stateDir, Cache{CheckedAt: time.Now(), Current: "2.0.0", Latest: "2.0.1",
+				Published: time.Now().Add(-2 * SoakTime), AttemptAt: time.Now(), Attempted: tc.attempted})
+			c := &Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "2.0.0"}
+			o := c.Auto(context.Background(), t.TempDir(), stateDir, exe, nil)
+			if installed := o.Installed == "2.0.1"; installed != tc.installs || installed != (downloads == 1) {
+				t.Fatalf("Auto = %+v after %d downloads, with %s attempted today", o, downloads, tc.attempted)
+			}
+			// An install is recorded as the new version's check, which its first pass reuses.
+			if cache := LoadCache(stateDir); tc.installs && cache.Current != "2.0.1" {
+				t.Fatalf("after installing 2.0.1 the check records %q as current", cache.Current)
+			}
+		})
+	}
+}
+
+// Failed lookups in a row space out: 15 minutes, doubling up to a day.
+func TestFailedLookupsBackOff(t *testing.T) {
+	t.Parallel()
+	for failures, want := range []time.Duration{RetryInterval, RetryInterval, 30 * time.Minute, time.Hour, 2 * time.Hour, 4 * time.Hour, 8 * time.Hour, 16 * time.Hour, CheckInterval, CheckInterval} {
+		if got := retryAfter(failures); got != want {
+			t.Errorf("retryAfter(%d) = %v, want %v", failures, got, want)
+		}
+	}
+}

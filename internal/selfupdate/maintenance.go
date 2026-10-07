@@ -44,11 +44,27 @@ func SavePreferences(dir string, p Preferences) error {
 type Cache struct {
 	CheckedAt time.Time `json:"checked_at"`
 	Failed    bool      `json:"failed,omitempty"`
-	Latest    string    `json:"latest"`
+	// Failures counts the lookups that have failed in a row, which space out the next.
+	Failures int    `json:"failures,omitempty"`
+	Latest   string `json:"latest"`
 	// Published is when Latest was published, for its soak; zero in a check recorded before.
 	Published time.Time `json:"published,omitzero"`
 	Current   string    `json:"current,omitempty"`
 	AttemptAt time.Time `json:"attempt_at"`
+	// Attempted is the release AttemptAt tried to install: another may be tried at once.
+	Attempted string `json:"attempted,omitempty"`
+}
+
+// retryAfter is how long a lookup that has failed failures times in a row waits before the
+// next: RetryInterval, doubling up to CheckInterval, so a rate-limited network is not kept so.
+func retryAfter(failures int) time.Duration {
+	wait := RetryInterval
+	for range failures - 1 {
+		if wait *= 2; wait >= CheckInterval {
+			return CheckInterval
+		}
+	}
+	return wait
 }
 
 // Dir is the state directory's folder for the update check, the last refresh and their lock.
@@ -116,11 +132,11 @@ func (c *Client) cachedCheck(ctx context.Context, dir, current string) (Cache, *
 	cache := LoadCache(dir)
 	var release *Release
 	if cache.Current != "" && cache.Current != current {
-		cache = Cache{AttemptAt: cache.AttemptAt}
+		cache = Cache{AttemptAt: cache.AttemptAt, Attempted: cache.Attempted}
 	}
 	interval := CheckInterval
 	if cache.Failed {
-		interval = RetryInterval
+		interval = retryAfter(cache.Failures)
 	}
 	if time.Since(cache.CheckedAt) >= interval || cache.CheckedAt.After(time.Now()) {
 		checkCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
@@ -128,8 +144,10 @@ func (c *Client) cachedCheck(ctx context.Context, dir, current string) (Cache, *
 		cache.CheckedAt, cache.Current = time.Now(), current
 		rel, err := c.Latest(checkCtx)
 		cache.Failed = err != nil
-		if err == nil {
-			cache.Latest, cache.Published, release = rel.Version(), rel.PublishedAt, rel
+		if err != nil {
+			cache.Failures++
+		} else {
+			cache.Latest, cache.Published, cache.Failures, release = rel.Version(), rel.PublishedAt, 0, rel
 		}
 		SaveCache(dir, cache)
 	}
@@ -162,8 +180,9 @@ type Outcome struct {
 // Auto checks for a newer release at most daily and installs it in place of exe for a
 // release build that updates itself, unless the developer turned automatic updates off in
 // configDir; the check's records go in stateDir. A new minor or major version waits out
-// SoakTime first. Each release is attempted once a day at most, so a failing install is not
-// retried at every pass. progress, when set, is told of the download.
+// SoakTime first, and is looked up again before it is installed, so a release pulled since
+// the check is not. Each release is attempted once a day at most, so a failing install is
+// not retried at every pass. progress, when set, is told of the download.
 func (c *Client) Auto(ctx context.Context, configDir, stateDir, exe string, progress io.Writer) Outcome {
 	if !IsRelease(c.Version) {
 		return Outcome{}
@@ -178,11 +197,12 @@ func (c *Client) Auto(ctx context.Context, configDir, stateDir, exe string, prog
 	}
 	defer unlock()
 	cache, rel := c.cachedCheck(ctx, stateDir, c.Version)
-	if !p.Auto || !Newer(c.Version, cache.Latest) || !UpdatesItself(exe) || time.Since(cache.AttemptAt) < CheckInterval ||
+	attempted := cache.Attempted == cache.Latest && time.Since(cache.AttemptAt) < CheckInterval
+	if !p.Auto || !Newer(c.Version, cache.Latest) || !UpdatesItself(exe) || attempted ||
 		Soaking(c.Version, cache.Latest, cache.Published, time.Now()) {
 		return Outcome{Notice: notice(cache, c.Version)}
 	}
-	cache.AttemptAt = time.Now()
+	cache.AttemptAt, cache.Attempted = time.Now(), cache.Latest
 	SaveCache(stateDir, cache)
 	updateCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
@@ -190,9 +210,12 @@ func (c *Client) Auto(ctx context.Context, configDir, stateDir, exe string, prog
 		if rel, err = c.Latest(updateCtx); err != nil {
 			return Outcome{Err: err}
 		}
+		// The release may have been pulled, or followed by another, since the check.
+		cache.Latest, cache.Published = rel.Version(), rel.PublishedAt
+		SaveCache(stateDir, cache)
 	}
 	if !Newer(c.Version, rel.TagName) || Soaking(c.Version, rel.Version(), rel.PublishedAt, time.Now()) {
-		return Outcome{}
+		return Outcome{Notice: notice(cache, c.Version)}
 	}
 	if progress != nil {
 		fmt.Fprintf(progress, "Updating terma %s → %s…\n", c.Version, rel.Version())
@@ -200,7 +223,8 @@ func (c *Client) Auto(ctx context.Context, configDir, stateDir, exe string, prog
 	if _, err := c.Apply(updateCtx, rel, exe, progress); err != nil {
 		return Outcome{Err: err}
 	}
-	cache.Latest, cache.Published, cache.Current, cache.CheckedAt = rel.Version(), rel.PublishedAt, c.Version, time.Now()
+	// Recorded as the new version's check, so its first pass does not look again.
+	cache.Latest, cache.Published, cache.Current, cache.CheckedAt = rel.Version(), rel.PublishedAt, rel.Version(), time.Now()
 	SaveCache(stateDir, cache)
 	return Outcome{Installed: rel.Version()}
 }

@@ -8,9 +8,11 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
+	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 )
 
@@ -214,5 +216,41 @@ func TestUpdatesSummary(t *testing.T) {
 				t.Fatalf("updatesSummary = %q, want it to say %q", got, tc.want)
 			}
 		})
+	}
+}
+
+// The relay updates itself only as a release it could replace, outside CI and the opt-out;
+// turned off with --auto off, it asks GitHub nothing.
+func TestTheRelayUpdatesOnlyWhereItCould(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("a Windows relay never replaces itself")
+	}
+	t.Setenv("CI", "")
+	t.Setenv("TERMA_NO_UPDATE_CHECK", "")
+	release := New(builtin.Agents, "1.2.0")
+	release.dir, release.stateDir = t.TempDir(), t.TempDir()
+	if release.relayUpdater() == nil {
+		t.Fatal("a release relay does not update itself")
+	}
+	if testApp.relayUpdater() != nil {
+		t.Fatal("a development build's relay updates itself")
+	}
+	for _, env := range []string{"CI", "TERMA_NO_UPDATE_CHECK"} {
+		t.Run(env, func(t *testing.T) {
+			t.Setenv(env, "1")
+			if release.relayUpdater() != nil {
+				t.Fatalf("the relay updates itself under %s", env)
+			}
+		})
+	}
+	if err := selfupdate.SavePreferences(release.dir, selfupdate.Preferences{Auto: false}); err != nil {
+		t.Fatal(err)
+	}
+	if v, err := release.relayUpdater().Update(t.Context()); v != "" || err != nil {
+		t.Fatalf("turned off, the relay's pass = %q, %v", v, err)
+	}
+	// A pass that looked would have recorded its check.
+	if checked := !selfupdate.LoadCache(release.stateDir).CheckedAt.IsZero(); checked {
+		t.Fatal("turned off, the relay still looked for a release")
 	}
 }

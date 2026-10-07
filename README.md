@@ -112,13 +112,14 @@ relay, spool delivery, shell completion — and for Terma's own engineers.
 
 ## Updates
 
-terma keeps itself up to date. Once a day it looks for a new release (every 15 minutes
-while the lookup is failing) and installs it in place, verified against the release
+terma keeps itself up to date. Once a day it looks for a new release (after a failed
+lookup, again in 15 minutes, then less and less often) and installs it in place, verified against the release
 checksum. The local relay does this in the background, so a machine nobody runs a terma
 command on still updates, and so does each terma command you run in a terminal. Hooks,
 scripts, CI and `--output` other than a table never look. A relay that installed a
 release keeps running until nothing it holds is waiting and no agent has exported for
-half a minute, then restarts on the new binary, so the restart loses nothing.
+half a minute (12 hours at most), then restarts on the new binary, so the restart loses
+nothing; what it has queued for delivery is on disk, and the new relay sends it.
 
 A patch release (1.4.2 → 1.4.3) installs as soon as it is found. A new minor or major
 version (1.4 → 1.5, 1 → 2) installs once it has been out for 24 hours, so one that breaks
