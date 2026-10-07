@@ -267,7 +267,9 @@ func (d *run) commitHooks() Check {
 	now := time.Now()
 	verdict := JudgeCommitHooks(d.env.GitDir, d.pol, now)
 	c := CommitHooksCheck(verdict)
-	// A skip with a → line: information that never counts as setup needing attention.
+	// Only on the Off verdict: hooks installed under a policy since switched off still
+	// record and stamp, so recommending them there would be wrong. The → line on a skip is
+	// information, never counted as setup needing attention.
 	if verdict == CommitHooksOff && GitHooksOff(d.pol, now) {
 		c.Fix = GitHooksOffStep
 	}
