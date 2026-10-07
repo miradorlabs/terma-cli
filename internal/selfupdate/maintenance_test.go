@@ -133,6 +133,10 @@ func TestMaintainUpdatesByDefaultAndVerifiesUpdates(t *testing.T) {
 			if err := os.WriteFile(exe, []byte("old binary"), 0755); err != nil {
 				t.Fatal(err)
 			}
+			started, err := os.Stat(exe)
+			if err != nil {
+				t.Fatal(err)
+			}
 			if mode == "notify" {
 				if err := SavePreferences(configDir, Preferences{Auto: false}); err != nil {
 					t.Fatal(err)
@@ -145,7 +149,7 @@ func TestMaintainUpdatesByDefaultAndVerifiesUpdates(t *testing.T) {
 				}
 				defer unlock()
 			}
-			c := &Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0"}
+			c := &Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0", Binary: started}
 			var out bytes.Buffer
 			for range 2 {
 				c.Maintain(context.Background(), configDir, stateDir, exe, &out)
@@ -282,13 +286,18 @@ func fakeReleases(t *testing.T, tag string, binary []byte, downloads *int, failL
 	return srv
 }
 
-func oldBinary(t *testing.T) string {
+// oldBinary is an installed terma, and the executable as a process of it started from it.
+func oldBinary(t *testing.T) (string, os.FileInfo) {
 	t.Helper()
 	exe := filepath.Join(t.TempDir(), "terma")
 	if err := os.WriteFile(exe, []byte("old binary"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	return exe
+	started, err := os.Stat(exe)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return exe, started
 }
 
 // A release the last check found but that has since been pulled is not installed: the
@@ -300,9 +309,10 @@ func TestAPulledReleaseIsNeverInstalled(t *testing.T) {
 	}
 	downloads := 0
 	srv := fakeReleases(t, "v1.0.0", []byte("new binary"), &downloads, 0)
-	stateDir, exe := t.TempDir(), oldBinary(t)
+	stateDir := t.TempDir()
+	exe, started := oldBinary(t)
 	SaveCache(stateDir, Cache{CheckedAt: time.Now(), Current: "1.0.0", Latest: "2.0.0", Published: time.Now().Add(-2 * SoakTime)})
-	c := &Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0"}
+	c := &Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0", Binary: started}
 	o := c.Auto(context.Background(), t.TempDir(), stateDir, exe, nil)
 	if o.Installed != "" || o.Err != nil || o.Notice != "" || downloads != 0 {
 		t.Fatalf("Auto = %+v after %d downloads, want nothing installed or announced", o, downloads)
@@ -326,10 +336,11 @@ func TestAFailedInstallHoldsBackOnlyThatRelease(t *testing.T) {
 		t.Run(tc.attempted, func(t *testing.T) {
 			downloads := 0
 			srv := fakeReleases(t, "v2.0.1", []byte("new binary"), &downloads, 0)
-			stateDir, exe := t.TempDir(), oldBinary(t)
+			stateDir := t.TempDir()
+			exe, started := oldBinary(t)
 			SaveCache(stateDir, Cache{CheckedAt: time.Now(), Current: "2.0.0", Latest: "2.0.1",
 				Published: time.Now().Add(-2 * SoakTime), AttemptAt: time.Now(), Attempted: tc.attempted})
-			c := &Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "2.0.0"}
+			c := &Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "2.0.0", Binary: started}
 			o := c.Auto(context.Background(), t.TempDir(), stateDir, exe, nil)
 			if installed := o.Installed == "2.0.1"; installed != tc.installs || installed != (downloads == 1) {
 				t.Fatalf("Auto = %+v after %d downloads, with %s attempted today", o, downloads, tc.attempted)
@@ -361,9 +372,10 @@ func TestAFailedLookupBeforeAnInstallIsRetriedSoon(t *testing.T) {
 	}
 	downloads := 0
 	srv := fakeReleases(t, "v2.0.0", []byte("new binary"), &downloads, 1)
-	stateDir, exe := t.TempDir(), oldBinary(t)
+	stateDir := t.TempDir()
+	exe, started := oldBinary(t)
 	SaveCache(stateDir, Cache{CheckedAt: time.Now(), Current: "1.0.0", Latest: "2.0.0", Published: time.Now().Add(-2 * SoakTime)})
-	c := &Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0"}
+	c := &Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0", Binary: started}
 	if o := c.Auto(context.Background(), t.TempDir(), stateDir, exe, nil); o.Err == nil || o.Installed != "" {
 		t.Fatalf("Auto = %+v, want the failed lookup reported", o)
 	}
@@ -378,34 +390,44 @@ func TestAFailedLookupBeforeAnInstallIsRetriedSoon(t *testing.T) {
 	}
 }
 
-// A long-running terma whose binary another install has since replaced is no longer what is
-// installed: it installs nothing over it, even a release later than its own, which may be
-// earlier than the one now in place.
+// A terma whose binary another install has since replaced is no longer what is installed:
+// it installs nothing over it, even a release later than its own, which may be earlier than
+// the one now in place. Nor does a process that does not know what it started from, however
+// it is called: Maintain after an interactive command as much as the relay's Auto.
 func TestAStaleProcessNeverReplacesTheInstalledBinary(t *testing.T) {
 	t.Parallel()
 	if runtime.GOOS == "windows" {
 		t.Skip("in-place updates are Unix-only")
 	}
-	downloads := 0
-	srv := fakeReleases(t, "v1.0.2", []byte("1.0.2"), &downloads, 0)
-	stateDir, exe := t.TempDir(), oldBinary(t)
-	started, err := os.Stat(exe)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// `terma update` from a shell put 1.0.3 in place, renamed over the binary this process runs.
-	next := exe + ".next"
-	if err := os.WriteFile(next, []byte("1.0.3"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Rename(next, exe); err != nil {
-		t.Fatal(err)
-	}
-	c := &Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.1", Binary: started}
-	if o := c.Auto(context.Background(), t.TempDir(), stateDir, exe, nil); o != (Outcome{}) || downloads != 0 {
-		t.Fatalf("Auto = %+v after %d downloads, want nothing done", o, downloads)
-	}
-	if got, _ := os.ReadFile(exe); string(got) != "1.0.3" {
-		t.Fatalf("the installed binary is now %q, want 1.0.3 left in place", got)
+	for _, tc := range []struct {
+		name  string
+		knows bool
+	}{{"knows its binary", true}, {"does not know its binary", false}} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			configDir, stateDir := t.TempDir(), t.TempDir()
+			exe, started := oldBinary(t)
+			newer, older := 0, 0
+			latest := fakeReleases(t, "v1.0.3", []byte("1.0.3"), &newer, 0)
+			withdrawn := fakeReleases(t, "v1.0.2", []byte("1.0.2"), &older, 0)
+			// The relay installs 1.0.3 while a command of 1.0.1 is still running.
+			relay := &Client{BaseURL: latest.URL, HTTP: latest.Client(), Version: "1.0.1", Binary: started}
+			if o := relay.Auto(context.Background(), configDir, stateDir, exe, nil); o.Installed != "1.0.3" || newer != 1 {
+				t.Fatalf("the relay's install = %+v after %d downloads", o, newer)
+			}
+			// 1.0.3 is then pulled, and that command's updater runs: it must not put 1.0.2 in place.
+			stale := &Client{BaseURL: withdrawn.URL, HTTP: withdrawn.Client(), Version: "1.0.1"}
+			if tc.knows {
+				stale.Binary = started
+			}
+			var out bytes.Buffer
+			stale.Maintain(context.Background(), configDir, stateDir, exe, &out)
+			if got, _ := os.ReadFile(exe); string(got) != "1.0.3" || older != 0 {
+				t.Fatalf("the installed binary is now %q after %d downloads (%s), want 1.0.3 left in place", got, older, &out)
+			}
+			if o := stale.Auto(context.Background(), configDir, stateDir, exe, nil); o.Installed != "" || older != 0 {
+				t.Fatalf("Auto = %+v after %d downloads, want nothing installed", o, older)
+			}
+		})
 	}
 }

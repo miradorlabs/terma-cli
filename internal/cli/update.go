@@ -84,7 +84,7 @@ release.`,
 				return fmt.Errorf("cannot start update (another check or update may be running): %w", err)
 			}
 			defer unlock()
-			return app.updateOrRefresh(cmd.Context(), &selfupdate.Client{Version: app.version}, app.stateDir, exe, out, check, force)
+			return app.updateOrRefresh(cmd.Context(), app.updateClient(), app.stateDir, exe, out, check, force)
 		},
 	}
 	cmd.Flags().BoolVar(&check, "check", false, "check for a newer published release without installing")
@@ -134,6 +134,11 @@ func (app *App) updateOrRefresh(ctx context.Context, client *selfupdate.Client, 
 // runUpdate reports whether it went on to install a newer version, whose own refresh then
 // runs; false with no error means there was nothing newer to install.
 func (app *App) runUpdate(ctx context.Context, client *selfupdate.Client, dir, exe string, out io.Writer, check, force bool) (bool, error) {
+	// Under the caller's lock: the relay may have installed a release since this process
+	// started, in which case its version says nothing about what is installed now.
+	if client.Replaced(exe) {
+		return false, errors.New("another install replaced terma while this command ran; run `terma update` again")
+	}
 	current := client.Version
 	download, cancel := context.WithTimeout(ctx, downloadTimeout)
 	defer cancel()

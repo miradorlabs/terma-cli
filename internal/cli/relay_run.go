@@ -95,17 +95,11 @@ func (app *App) afterRelay(res daemon.Result) error {
 // --auto off`, it asks nothing, not even GitHub.
 func (app *App) relayUpdater() *daemon.Updater {
 	exe, err := os.Executable()
-	if err != nil || !selfupdate.IsRelease(app.version) || !selfupdate.UpdatesItself(exe) ||
+	if err != nil || app.binary == nil || !selfupdate.IsRelease(app.version) || !selfupdate.UpdatesItself(exe) ||
 		os.Getenv("CI") != "" || os.Getenv("TERMA_NO_UPDATE_CHECK") == "1" {
 		return nil
 	}
-	// The binary as this relay started: once another install replaces it, this relay is no
-	// longer what is installed, and installs nothing over it.
-	binary, err := os.Stat(exe)
-	if err != nil {
-		return nil
-	}
-	client := &selfupdate.Client{Version: app.version, Binary: binary}
+	client := app.updateClient()
 	return &daemon.Updater{Every: daemon.UpdateEvery, Update: func(ctx context.Context) (string, error) {
 		if p, err := selfupdate.LoadPreferences(app.dir); err != nil || !p.Auto {
 			return "", nil

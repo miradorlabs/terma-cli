@@ -220,6 +220,59 @@ func TestUpdatesSummary(t *testing.T) {
 	}
 }
 
+// Every updater this process runs knows the executable it started from, captured as the
+// process starts: a command that ran a while, or the relay, may outlive its version.
+func TestTheUpdaterKnowsTheBinaryTheProcessStartedFrom(t *testing.T) {
+	app := New(builtin.Agents, "1.2.0")
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	now, err := os.Stat(exe)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c := app.updateClient(); c.Binary == nil || !os.SameFile(c.Binary, now) || c.Version != "1.2.0" {
+		t.Fatalf("updateClient = %+v, want this executable at 1.2.0", c)
+	}
+}
+
+// `terma update` from a process whose binary another install has replaced meanwhile does
+// nothing but say so: its version no longer says what is installed.
+func TestUpdateRefusesOnceAnotherInstallReplacedTerma(t *testing.T) {
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		fmt.Fprint(w, `{"tag_name":"v2.0.0","assets":[]}`)
+	}))
+	defer srv.Close()
+	dir := t.TempDir()
+	exe := filepath.Join(dir, "terma")
+	if err := os.WriteFile(exe, []byte("1.0.0"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	started, err := os.Stat(exe)
+	if err != nil {
+		t.Fatal(err)
+	}
+	next := filepath.Join(dir, "terma.next")
+	if err := os.WriteFile(next, []byte("1.0.1"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(next, exe); err != nil {
+		t.Fatal(err)
+	}
+	c := &selfupdate.Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0", Binary: started}
+	var out bytes.Buffer
+	installed, err := testApp.runUpdate(context.Background(), c, t.TempDir(), exe, &out, false, false)
+	if err == nil || !strings.Contains(err.Error(), "replaced terma") || installed || calls != 0 {
+		t.Fatalf("runUpdate = %v, %v after %d lookups; want a refusal and no lookup", installed, err, calls)
+	}
+	if got, _ := os.ReadFile(exe); string(got) != "1.0.1" {
+		t.Fatalf("the installed binary is now %q", got)
+	}
+}
+
 // The relay updates itself only as a release it could replace, outside CI and the opt-out;
 // turned off with --auto off, it asks GitHub nothing.
 func TestTheRelayUpdatesOnlyWhereItCould(t *testing.T) {

@@ -167,6 +167,18 @@ func UpdatesItself(exe string) bool {
 	return ManagedCommand(exe) == "" && runtime.GOOS != "windows"
 }
 
+// Replaced reports whether the executable at exe is no longer the one this process started
+// from (Binary): another install has put a release in place since, so this process's version
+// no longer says what is installed, and it must not replace it. False without Binary, which
+// cannot tell.
+func (c *Client) Replaced(exe string) bool {
+	if c.Binary == nil {
+		return false
+	}
+	now, err := os.Stat(exe)
+	return err != nil || !os.SameFile(now, c.Binary)
+}
+
 // Outcome is what one automatic update pass did.
 type Outcome struct {
 	// Installed is the release now in place of the binary, "" when none was installed.
@@ -196,15 +208,14 @@ func (c *Client) Auto(ctx context.Context, configDir, stateDir, exe string, prog
 		return Outcome{}
 	}
 	defer unlock()
-	if c.Binary != nil {
-		// Checked under the lock: another install may have put a later release in place.
-		if now, err := os.Stat(exe); err != nil || !os.SameFile(now, c.Binary) {
-			return Outcome{}
-		}
+	// Checked under the lock: another install may have put a later release in place, which
+	// this process's version says nothing about.
+	if c.Replaced(exe) {
+		return Outcome{}
 	}
 	cache, rel := c.cachedCheck(ctx, stateDir, c.Version)
 	attempted := cache.Attempted == cache.Latest && time.Since(cache.AttemptAt) < CheckInterval
-	if !p.Auto || !Newer(c.Version, cache.Latest) || !UpdatesItself(exe) || attempted ||
+	if !p.Auto || c.Binary == nil || !Newer(c.Version, cache.Latest) || !UpdatesItself(exe) || attempted ||
 		Soaking(c.Version, cache.Latest, cache.Published, time.Now()) {
 		return Outcome{Notice: notice(cache, c.Version)}
 	}
