@@ -178,7 +178,10 @@ What content leaves is your team's collection policy, set in Terma, and nothing 
 The relay and the hook queue's delivery fetch it with your login; until they have,
 nothing they would send leaves. Agents send prompts, model responses and tool input and
 output to the relay, and the relay removes what the policy does not collect before
-anything leaves. Hook events, which queue on this machine and never pass the relay, are
+anything leaves. While it collects tool content, the relay also names the working tree a
+session's hooks last ran in (`terma.repository.root`), which the agents' own records do not,
+so Terma can tell which checkout a git command ran in; it is a local path, so it leaves with
+tool content or not at all. Hook events, which queue on this machine and never pass the relay, are
 held to the same policy when they are sent: an event queued before the policy tightened
 leaves without the content it no longer collects, and one from a repository no longer
 listed does not leave.

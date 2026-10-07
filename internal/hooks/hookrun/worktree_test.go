@@ -2,6 +2,8 @@ package hookrun
 
 import (
 	"context"
+	"github.com/miradorlabs/terma-cli/internal/semconv"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -9,6 +11,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -50,6 +53,51 @@ func TestWorktreeEventsReportTheMainRepositoryAndProject(t *testing.T) {
 	for _, e := range events {
 		if e.Attrs[AttrProjectID] != "proj-main" {
 			t.Fatalf("%s from %s: attrs %v", e.Name, e.SessionID, e.Attrs)
+		}
+	}
+	// Each session's claim names its own working tree, the linked worktree's and not its main checkout's.
+	mainRoot, _ := filepath.EvalSymlinks(main)
+	for sid, want := range map[string]string{"sess-wt": wt, "sess-main": mainRoot} {
+		if c, ok := claim.Read(stateDir, sid, time.Now()); !ok || c.Root != want {
+			t.Errorf("%s claim root = %q, %v; want %q", sid, c.Root, ok, want)
+		}
+	}
+}
+
+// A session that reached its checkout through a symlink still names the resolved working
+// tree, on its claim and on its commit's record, as the platform compares paths.
+func TestTheWorkingTreeIsSymlinkResolved(t *testing.T) {
+	t.Parallel()
+	stateDir := t.TempDir()
+	repo := hookruntest.InitRepo(t)
+	link := filepath.Join(t.TempDir(), "via-link")
+	if err := os.Symlink(repo, link); err != nil {
+		t.Skip("no symlinks here:", err)
+	}
+	want, _ := filepath.EvalSymlinks(repo)
+	sp, _ := spool.Open(t.TempDir())
+	env := Env{StateDir: stateDir, Now: time.Now(), Cwd: link, Policy: hookruntest.Admitting(repo), Spool: sp, Version: "test", Team: "proj",
+		Stdin: strings.NewReader(`{"session_id":"sess-link","cwd":"` + hookruntest.InJSON(link) + `","hook_event_name":"SessionStart"}`)}
+	if err := startSession(context.Background(), env); err != nil {
+		t.Fatal(err)
+	}
+	if c, ok := claim.Read(stateDir, "sess-link", time.Now()); !ok || c.Root != want {
+		t.Errorf("claim root = %q, %v; want %q", c.Root, ok, want)
+	}
+	if _, err := gitx.Git(context.Background(), repo, "commit", "-q", "--allow-empty", "-m", "by hand"); err != nil {
+		t.Fatal(err)
+	}
+	env.Stdin = strings.NewReader("")
+	if err := PostCommit(context.Background(), env); err != nil {
+		t.Fatal(err)
+	}
+	commits := hookruntest.Named(hookruntest.Spooled(t, sp), semconv.TermaCommitUnattributedEvent)
+	if len(commits) != 1 {
+		t.Fatalf("want the commit's record, got %d", len(commits))
+	}
+	for _, e := range commits {
+		if e.Attrs[semconv.TermaRepositoryRootKey] != want {
+			t.Errorf("commit root = %v, want %q", e.Attrs[semconv.TermaRepositoryRootKey], want)
 		}
 	}
 }

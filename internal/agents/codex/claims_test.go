@@ -50,7 +50,7 @@ func TestCodexDesktopActivityCarriesTheProject(t *testing.T) {
 }
 
 // A subagent's own thread id (agent_id) is claimed too, from a spooled event or a bare
-// payload.
+// payload, with the working tree.
 func TestCodexSubagentThreadIsClaimed(t *testing.T) {
 	t.Parallel()
 	root := hookruntest.InitRepo(t)
@@ -63,9 +63,11 @@ func TestCodexSubagentThreadIsClaimed(t *testing.T) {
 	}
 	payload := `{"session_id":"root-thread","agent_id":"child-thread-2","cwd":` + strconv.Quote(root) + `}`
 	hookrun.ClaimFromPayload(context.Background(), hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Team: "project-a"}, payloadSession(t, payload), "codex")
+	// Either way the claim names the working tree, which the relay stamps on Codex's own records.
+	tree, _ := filepath.EvalSymlinks(root)
 	for _, id := range []string{"root-thread", "child-thread", "child-thread-2"} {
-		if c, ok := claim.Read(stateDir, id, time.Now()); !ok || c.ProjectID != "project-a" {
-			t.Errorf("%s not claimed: %+v %v", id, c, ok)
+		if c, ok := claim.Read(stateDir, id, time.Now()); !ok || c.ProjectID != "project-a" || c.Root != tree {
+			t.Errorf("%s not claimed with its working tree %s: %+v %v", id, tree, c, ok)
 		}
 	}
 }

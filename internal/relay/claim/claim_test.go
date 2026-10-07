@@ -326,3 +326,44 @@ func TestAtAcrossMarkAndClaim(t *testing.T) {
 		t.Fatalf("the resumed run's early record = %+v, %v", got, ok)
 	}
 }
+
+// A session that moves to another working tree of the same repository rewrites its latest
+// placement's root at once, however fresh the claim, and adds no placement: switching back
+// and forth must never push out an earlier placement, a Mark above all.
+func TestClaimFollowsTheWorkingTreeInPlace(t *testing.T) {
+	t.Parallel()
+	dir := enable(t)
+	t0 := time.Now().Add(-time.Hour).Truncate(time.Second)
+	Mark(dir, "s", "claude-code", []int{10}, t0)
+	main := Claim{ProjectID: "p1", Tool: "claude-code", Root: "/src/api", PIDs: []int{10}}
+	wt := main
+	wt.Root, wt.Worktree = "/src/api/.claude/worktrees/fix-1", "fix-1"
+	at := t0.Add(time.Minute)
+	if !Write(dir, "s", main, at) {
+		t.Fatal("the first claim did not write")
+	}
+	if Write(dir, "s", main, at.Add(time.Second)) {
+		t.Fatal("the same working tree within Refresh rewrote the claim")
+	}
+	for i := range 2 * maxPlacements {
+		c := wt
+		if i%2 == 1 {
+			c = main
+		}
+		at = at.Add(time.Second)
+		if !Write(dir, "s", c, at) {
+			t.Fatalf("switch %d to %s within Refresh did not write", i, c.Root)
+		}
+		got, ok := Read(dir, "s", at)
+		if !ok || got.Root != c.Root || len(got.Placements) != 2 {
+			t.Fatalf("switch %d: root %q, placements %+v", i, got.Root, got.Placements)
+		}
+		if latest, _ := got.At(10, at); latest.Root != c.Root || latest.ProjectID != "p1" {
+			t.Fatalf("switch %d: At = %+v", i, latest)
+		}
+	}
+	c, _ := Read(dir, "s", at)
+	if marked, ok := c.At(10, t0.Add(time.Second)); !ok || marked.ProjectID != "" {
+		t.Fatalf("the Mark was pushed out: At = %+v, %v", marked, ok)
+	}
+}

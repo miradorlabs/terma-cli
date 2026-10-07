@@ -26,6 +26,7 @@ attribute_groups:
         requirement_level: required
       - ref: terma.relay.attribution
       - ref: terma.relay.session.id
+      - ref: terma.repository.root
   - id: terma.relay.withheld
     visibility: public
     stability: development
@@ -132,6 +133,7 @@ events:
       - ref: terma.commit.file.stats
       - ref: terma.commit.file.stats_reported
       - ref: terma.commit.file.stats_truncated
+      - ref: terma.repository.root
 
   - name: terma.commit.unattributed
     stability: development
@@ -149,6 +151,7 @@ events:
       - ref: terma.commit.file.count
       - ref: terma.commit.lines.added
       - ref: terma.commit.lines.deleted
+      - ref: terma.repository.root
 
   - name: terma.session.quota
     stability: development
