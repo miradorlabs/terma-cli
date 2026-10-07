@@ -5,14 +5,24 @@
   </picture>
 </p>
 
-
 The `terma` cli connects coding agents to [Terma](https://terma.ai), then stamps the commits
 they produce so agent spend can be traced to shipped code. It supports **Claude Code**
 (CLI and Desktop) and **Codex** (CLI and Desktop).
 
 ## Get started
 
-Install terma, then run `terma setup` once:
+Install terma one of these ways, then run `terma setup` once.
+
+**Installer script** (macOS and Linux). Installs to `~/.local/bin`, without sudo, and
+verifies `checksums.txt`. `terma update` updates it in place.
+
+```bash
+curl -fsSL https://terma.ai/install.sh | bash
+terma setup
+```
+
+**Homebrew** (macOS and Linux). It updates with `brew upgrade terma`, which `terma update`
+runs for you.
 
 ```bash
 brew tap miradorlabs/tap
@@ -21,16 +31,34 @@ brew install terma
 terma setup
 ```
 
-Not on Homebrew? See [Install](#install) for the installer script, npm and direct downloads.
+**npm**. It updates with `npm install -g @miradorlabs/terma@latest`, which `terma update`
+runs for you. The npm shim adds Node's startup time to every commit, so prefer the
+installer script or Homebrew where terma runs inside git hooks.
 
-`terma setup` signs you in through your browser, then asks a few questions:
+```bash
+npm install -g @miradorlabs/terma
+terma setup
+```
+
+**Direct download or source**. Binaries are on
+[Releases](https://github.com/miradorlabs/terma-cli/releases), with checksums; `terma update`
+updates a downloaded release in place. From a clone of this repository, `make install`
+builds terma; a build between release tags is never updated until `terma update --force`
+replaces it with the latest release.
+
+```bash
+make install
+terma setup
+```
+
+The installer script takes `TERMA_INSTALL_DIR` to change the destination and
+`TERMA_VERSION=vX.Y.Z` to pin a release. It is POSIX `sh`, so `| sh` works too.
+
+`terma setup` signs you in through your browser, then asks:
 
 1. **Organization**, when you belong to several.
 2. **Coding agents**: the ones installed on this machine are preselected.
 3. **Team**, the first time, when your organization has several.
-4. **Updates**: whether terma installs new releases automatically or when you run
-   `terma update`. A Homebrew or npm installation updates through its package manager,
-   so setup tells you that instead of asking.
 
 It then points your agents at terma's local relay and writes their machine-wide hooks.
 Restart any agent that was already running so it loads the new configuration, then check
@@ -53,18 +81,19 @@ flowchart LR
   queue -- "delivered after<br/>commits and session ends" --> terma
 ```
 
-Your team's collection policy, set in the Terma web app, lists the repositories it collects. A hook
-that runs in one of them claims the session for your team; the relay forwards only claimed
-sessions, and only the content the policy collects. Everything else, personal work and
-other repositories included, never leaves your machine. When the policy asks for commit
-stamping, a commit of files an agent session edited gets an `Agent-Session-Id` trailer.
+Your team's collection policy, set in the Terma web app, lists the repositories it
+collects. A hook that runs in one of them claims the session for your team; the relay
+forwards only claimed sessions, and only the content the policy collects. Everything else,
+personal work and other repositories included, never leaves your machine. When the policy
+asks for commit stamping, a commit of files an agent session edited gets an
+`Agent-Session-Id` trailer.
 
 ## Commands
 
 Every command is safe to run again:
 
 ```bash
-terma setup       # sign in, choose your organization, agents, team and updates, write machine-wide hooks
+terma setup       # sign in, choose your organization, agents and team, write machine-wide hooks
 terma doctor      # show what this machine collects and check the chain end to end
 terma update      # install the latest release, or refresh what terma installed
 terma teardown    # undo setup on this machine (--sign-out also signs out)
@@ -80,70 +109,26 @@ failure names its fix.
 Hidden commands remain for the programs that run them — hook execution, the local
 relay, spool delivery, shell completion — and for Terma's own engineers.
 
-## Install
-
-### Homebrew (macOS and Linux)
-
-```bash
-brew tap miradorlabs/tap
-brew trust miradorlabs/tap     # once; Homebrew will not load an untrusted tap
-brew install terma
-terma setup
-```
-
-### Installer script
-
-```bash
-curl -fsSL https://terma.ai/install.sh | bash
-terma setup
-```
-
-The installer selects the platform archive, verifies `checksums.txt`, and installs
-the static binary to `~/.local/bin`, without sudo. Set `TERMA_INSTALL_DIR` to
-override the destination or `TERMA_VERSION=vX.Y.Z` to pin a release. The script is
-POSIX `sh`, so `| sh` works too.
-
-### npm
-
-```bash
-npm install -g @miradorlabs/terma
-terma setup
-```
-
-The npm package downloads the same release binary and verifies its checksum. Prefer
-Homebrew or the installer script where terma runs inside git hooks: the npm shim adds
-Node's startup time to every commit.
-
-### Direct download or source
-
-Native binaries are on [Releases](https://github.com/miradorlabs/terma-cli/releases), with
-checksums. From a clone of this repository:
-
-```bash
-make install
-terma setup
-```
-
 ## Updates
 
-terma checks for a newer release once a day, after an interactive command, and says when
-one is out. `terma setup` asks whether to install new releases automatically; you can
-change that any time:
+terma looks for a new release at most once a day, and only after a terma command you run
+in a terminal. Hooks, the relay, scripts, CI and `--output` other than a table never look.
+When one is out, terma says so; `terma update` installs it.
 
 ```bash
 terma update --check        # check without installing
 terma update                # install the latest release, or refresh what terma installed
-terma update --auto on      # install new releases automatically
-terma update --auto off     # only say when one is out
+terma update --auto on      # install a new release when that daily check finds one
+terma update --auto off     # only say when one is out (the default)
 terma update --auto status  # show the current choice
 ```
 
-Updates verify the release checksum before replacing the binary. Hooks, the local relay,
-CI, and scripted commands never trigger automatic updates. A Homebrew or npm installation
-is never replaced in place: `terma update` upgrades it through the package manager that
-owns it. A release binary carries its tag, which the updater compares with the latest
-published release; a source build is never updated without `terma update --force`, and
-Windows does not update in place yet.
+`--auto on` installs only from that check, so an install nobody runs a terma command on
+never updates, whatever the setting. It never replaces a Homebrew or npm installation or a
+Windows binary either: those get the notice, and `terma update` upgrades Homebrew and npm
+through the package manager that owns them (Windows does not update in place yet). A
+build between release tags gets no notice at all. Updates verify the release checksum
+before replacing the binary.
 
 After an update, the new version also refreshes what earlier versions wrote in your home
 directory — the wrapped Claude Code status line, the OpenCode plugin, the relay's service —
@@ -152,9 +137,7 @@ adds a file. On the latest release, `terma update` does just that refresh.
 
 ## Scripted and headless setup
 
-Every question `terma setup` asks has a flag. With `--yes`, or with no terminal to ask on,
-it asks nothing about the organization, agents or updates; name the team with `--team` the
-first time, when your organization has several:
+Every question `terma setup` asks has a flag:
 
 ```bash
 terma setup --org acme --team platform --harness claude,codex --yes
@@ -164,11 +147,12 @@ terma setup --org acme --team platform --harness claude,codex --yes
   belong to several, or, when it cannot ask, keeps the current one and says so.
 - `--team <name-or-id>` sets up that team; without it, setup keeps the team you chose
   before, else your organization's only team, else asks.
-- `--harness <agents>` records those agents (`claude`, `codex`); with `--yes` and no
-  `--harness`, setup records the agents recorded before and every supported agent
-  installed on this machine.
-- `--yes` skips the browser prompt and the organization, agents and updates questions,
-  keeping the current organization and update choice.
+- `--harness <agents>` records those agents (`claude`, `codex`); with `--yes` or no
+  terminal and no `--harness`, setup records the agents recorded before and every
+  supported agent installed on this machine.
+- `--yes` skips the browser prompt and the organization and agents questions. The team
+  picker still asks the first time when your organization has several, so name it with
+  `--team`.
 - `--no-browser` prints the sign-in URL instead of opening a browser.
 - `--relay-service off` starts the relay on demand from hooks instead of as a background
   service; `--relay-addr <host:port>` moves it off a loopback port another program holds.

@@ -63,9 +63,6 @@ func TestSetupFetchesThePolicyAndPointsAgentsAtTheRelay(t *testing.T) {
 	if !strings.Contains(out, "Collects      sessions in the team's repositories (github.com/acme/app)") {
 		t.Fatalf("setup did not say the policy:\n%s", out)
 	}
-	if !strings.Contains(out, "✓ Updates       none for a development build") {
-		t.Fatalf("setup did not say how terma is updated:\n%s", out)
-	}
 	token, err := daemon.Token(testApp.stateDir)
 	if err != nil {
 		t.Fatalf("no relay token after setup: %v", err)
