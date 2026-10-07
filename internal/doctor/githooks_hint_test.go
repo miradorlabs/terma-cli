@@ -54,7 +54,7 @@ func TestDoctorRecommendsCommitHooksWhenThePolicyHasThemOff(t *testing.T) {
 	}
 	var out strings.Builder
 	RenderCheck(&out, Check{Name: "commit hooks in effect", Status: c.Status, Detail: c.Detail, Fix: c.Fix}, NameWidth)
-	if !strings.Contains(out.String(), "→ For commit-level accuracy") {
+	if !strings.Contains(out.String(), "→ "+GitHooksOffStep) {
 		t.Fatalf("the recommendation is not printed:\n%s", out.String())
 	}
 	var summary strings.Builder

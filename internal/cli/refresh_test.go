@@ -284,12 +284,7 @@ func TestARefreshTakesOverARelayOfAnEarlierRelease(t *testing.T) {
 		}
 		done <- res
 	}()
-	for _, ok := daemon.RunningRelay(dir); !ok; _, ok = daemon.RunningRelay(dir) {
-		if ctx.Err() != nil {
-			t.Fatal("the relay never started")
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+	awaitRelayRecord(t, dir, 15*time.Second, done)
 
 	original := testApp.version
 	testApp.version = "1.3.0"

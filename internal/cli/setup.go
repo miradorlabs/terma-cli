@@ -71,7 +71,7 @@ func (app *App) newSetupCommand() *cobra.Command {
   4. Points those agents' telemetry at terma's local relay, and runs the relay in
      the background (--relay-service off: started on demand instead).
   5. Writes the agents' machine-wide hooks, so a session in a repository the
-     policy lists is recorded for your team, and nothing anywhere else. git's
+     policy lists is collected for your team, and nothing anywhere else. git's
      configuration is not touched: where the policy asks for commit stamping, the
      first agent session in such a repository installs two hooks in its own
      .git/hooks, chaining to any hook already there. Nothing is written into a

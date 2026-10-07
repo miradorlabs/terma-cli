@@ -315,6 +315,8 @@ func PolicySummary(p config.Policy) string {
 	switch {
 	case p.Global():
 		scope = "every session on this machine"
+	case p.Unset:
+		return "nothing yet: your team has no collection policy"
 	case p.AdmitsNone():
 		return "nothing yet: your team lists no repositories"
 	}

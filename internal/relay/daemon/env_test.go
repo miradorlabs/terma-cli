@@ -229,13 +229,23 @@ func TestARunningRelayRecordsItsEnvironment(t *testing.T) {
 			c.Environment, c.Version, c.Service = "dev", "1.2.0", tc.service
 			done := make(chan error, 1)
 			go func() { _, err := Run(ctx, c); done <- err }()
-			var info RunInfo
-			for ok := false; !ok; {
-				if ctx.Err() != nil {
-					t.Fatal("the relay never recorded itself")
+			// The run file, not RunningRelay: its lock probe, winning the race, would make a
+			// relay that does not wait for its lock see it held and exit as already running.
+			for {
+				if _, err := os.Stat(filepath.Join(dir, RunFile)); err == nil {
+					break
 				}
-				time.Sleep(10 * time.Millisecond)
-				info, ok = RunningRelay(dir)
+				select {
+				case err := <-done:
+					t.Fatalf("the relay exited before it recorded itself: %v", err)
+				case <-ctx.Done():
+					t.Fatal("the relay never recorded itself")
+				case <-time.After(10 * time.Millisecond):
+				}
+			}
+			info, ok := RunningRelay(dir)
+			if !ok {
+				t.Fatal("a relay that recorded itself does not read as running")
 			}
 			if info.PID != os.Getpid() || info.Environment != "dev" || info.Service != tc.service || info.Version != "1.2.0" {
 				t.Fatalf("recorded %+v", info)

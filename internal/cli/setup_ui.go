@@ -75,14 +75,14 @@ func (u *setupUI) Then(step string) {
 }
 
 // policyFetched says which team and policy are now in force, and what is left to do about
-// them: a list to fill in, or commit hooks to turn on for commit-level accuracy.
+// them: a policy to set up, a list to fill in, or commit hooks to turn on.
 func (u *setupUI) policyFetched(team string, pol config.Policy) {
 	if team != "" {
 		u.Summary("Team", team)
 	}
 	if pol.AdmitsNone() {
 		u.Warn("Collects", doctor.PolicySummary(pol))
-		u.Then(doctor.NoRepositoriesStep)
+		u.Then(doctor.NothingCollectedStep(pol))
 		return
 	}
 	u.Summary("Collects", doctor.PolicySummary(pol))

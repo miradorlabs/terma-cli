@@ -243,7 +243,18 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 }
 
 // NoRepositoriesStep is what a developer whose team lists no repositories is told.
-const NoRepositoriesStep = "Nothing is collected until a team admin lists repositories in Terma (Team settings → Data collection), or chooses Every session."
+const NoRepositoriesStep = "Ask a team admin to list repositories, or to collect every session, in the Terma web app; until then, nothing is collected."
+
+// NoPolicyStep is what a developer whose team has no collection policy yet is told.
+const NoPolicyStep = "Ask a team admin to set up your team's collection policy in the Terma web app; until then, nothing is collected."
+
+// NothingCollectedStep is what to do about a validated policy that admits no repository.
+func NothingCollectedStep(p config.Policy) string {
+	if p.Unset {
+		return NoPolicyStep
+	}
+	return NoRepositoriesStep
+}
 
 // RepositoryCheck says whether policy, the one hooks apply, collects the working copy whose
 // git directory is gitDir, naming the origin terma sees.
@@ -252,27 +263,29 @@ func RepositoryCheck(policy config.Policy, gitDir string, repoErr error) Check {
 	case repoErr != nil:
 		return Check{Status: Fail, Detail: repoErr.Error()}
 	case !policy.Validated():
-		return Check{Status: Warn, Detail: "no team collection policy on this machine, so nothing is recorded", Fix: "terma setup"}
+		return Check{Status: Warn, Detail: "no team collection policy on this machine, so nothing is collected", Fix: "terma setup"}
+	case policy.Unset:
+		return Check{Status: Warn, Detail: "your team has no collection policy", Fix: NoPolicyStep}
 	case policy.AdmitsNone():
-		return Check{Status: Warn, Detail: "your team lists no repositories, so nothing is recorded anywhere", Fix: NoRepositoriesStep}
+		return Check{Status: Warn, Detail: "your team lists no repositories", Fix: NoRepositoriesStep}
 	case gitDir == "":
-		return Check{Status: Warn, Detail: "not a git repository, so nothing here is recorded"}
+		return Check{Status: Warn, Detail: "not a git repository, so nothing here is collected"}
 	}
 	id := config.Repository{Origin: gitx.RepositoryFS(gitDir)}
 	switch {
 	case id.Origin == "":
-		return Check{Status: Warn, Detail: "no origin a team could list (none, or a local path), so nothing here is recorded"}
+		return Check{Status: Warn, Detail: "no origin a team could list (none, or a local path), so nothing here is collected"}
 	case policy.Admits(id):
 		return Check{Status: Pass, Detail: id.Origin + " is in the team's repositories"}
 	}
 	// Terma saves only a domain or localhost, so asking the team to list an alias is a dead end.
 	if host, path, _ := strings.Cut(id.Origin, "/"); !strings.Contains(host, ".") && !strings.EqualFold(host, "localhost") {
 		return Check{Status: Warn,
-			Detail: "origin's host " + host + " is not a domain, most likely an SSH host alias from ~/.ssh/config; terma matches the host in the URL, so nothing here is recorded",
+			Detail: "origin's host " + host + " is not a domain, most likely an SSH host alias from ~/.ssh/config; terma matches the host in the URL, so nothing here is collected",
 			Fix: "point origin at the real host, the HostName for " + host + " in ~/.ssh/config, and keep your key: " +
 				"git remote set-url origin 'git@<real host>:" + strings.ReplaceAll(path, "'", `'\''`) + ".git' && " +
 				`git config core.sshCommand "ssh -i ~/.ssh/<your key> -o IdentitiesOnly=yes"`}
 	}
-	return Check{Status: Warn, Detail: id.Origin + " is not in the team's repositories, so nothing here is recorded",
-		Fix: "ask your team to add " + id.Origin + " in Terma (Team settings → Data collection)"}
+	return Check{Status: Warn, Detail: id.Origin + " is not in the team's repositories, so nothing here is collected",
+		Fix: "ask a team admin to add " + id.Origin + " in the Terma web app"}
 }

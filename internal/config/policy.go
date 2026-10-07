@@ -85,6 +85,8 @@ type Policy struct {
 	IncludeToolContent bool     `json:"include_tool_content"`
 	// GitHooks has terma install its commit hooks in the repositories the policy collects.
 	GitHooks bool `json:"git_hooks"`
+	// Unset is a team no admin has given a collection policy yet: it collects nothing.
+	Unset bool `json:"unset,omitempty"`
 	// CollectsNothing is set while no validated policy applies: nothing leaves the machine.
 	CollectsNothing bool      `json:"collects_nothing,omitempty"`
 	Revision        int64     `json:"revision"`

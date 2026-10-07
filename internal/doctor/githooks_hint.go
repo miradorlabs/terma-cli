@@ -9,7 +9,7 @@ import (
 // GitHooksOffStep recommends commit hooks to a developer whose team policy installs none.
 // It is information, not a fix: without the hooks, which work landed is inferred from the
 // git commands agents run, and a commit made outside an agent is not seen as it lands.
-const GitHooksOffStep = "For commit-level accuracy, ask a team admin to turn on commit hooks in the Terma web app. Until then, which work landed is inferred from agent activity."
+const GitHooksOffStep = "Ask a team admin to turn on commit hooks in the Terma web app for commit-level accuracy; until then, which work landed is inferred from agent activity."
 
 // GitHooksOff reports whether p is a policy in force that collects something but installs
 // no commit hook: the one case where turning hooks on is the advice that helps.
