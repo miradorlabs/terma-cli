@@ -36,14 +36,18 @@ type Updater struct {
 }
 
 // Run asks for an update after a jittered wait and then every Every, until ctx ends or a
-// release is installed, which it sends on installed.
+// release is installed, which it sends on installed. Every must be positive: asking without
+// pause would only hammer the release lookup, so an updater without one asks nothing.
 func (u Updater) Run(ctx context.Context, installed chan<- string) {
+	if u.Every <= 0 {
+		return
+	}
 	after, jitter := u.After, u.Jitter
 	if after == nil {
 		after = time.After
 	}
 	if jitter == nil {
-		jitter = func(d time.Duration) time.Duration { return rand.N(max(d, 1)) }
+		jitter = func(d time.Duration) time.Duration { return rand.N(d) }
 	}
 	wait := jitter(u.Every)
 	for {

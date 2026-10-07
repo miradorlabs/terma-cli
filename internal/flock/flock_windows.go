@@ -57,14 +57,20 @@ func lock(ctx context.Context, path string) (func(), error) {
 	return func() { unlockFile(f) }, nil
 }
 
+// pendingDeleteWait bounds how long openLockFile waits out a denial: a lock file being
+// deleted is gone as soon as its holder closes it, well within this, so a denial that lasts
+// longer is a real one, returned even to a caller that waits for ever.
+const pendingDeleteWait = time.Second
+
 // openLockFile opens the lock file at path, waiting out one that Remove is deleting:
 // Windows refuses to open a file pending deletion, with ERROR_ACCESS_DENIED, until its last
-// handle closes. A denial that outlasts ctx is returned as it is.
+// handle closes. A denial that outlasts ctx or pendingDeleteWait is returned as it is.
 func openLockFile(ctx context.Context, path string) (*os.File, error) {
+	deadline := time.Now().Add(pendingDeleteWait)
 	wait := pollMin
 	for {
 		f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, fileMode)
-		if err == nil || !errors.Is(err, windows.ERROR_ACCESS_DENIED) {
+		if err == nil || !errors.Is(err, windows.ERROR_ACCESS_DENIED) || time.Now().After(deadline) {
 			return f, err
 		}
 		timer := time.NewTimer(wait)

@@ -73,6 +73,16 @@ func TestTheUpdaterStopsWithTheRelay(t *testing.T) {
 	u.Run(ctx, make(chan string, 1))
 }
 
+// An updater without a period asks nothing, rather than asking without pause.
+func TestAnUpdaterWithoutAPeriodAsksNothing(t *testing.T) {
+	t.Parallel()
+	u := Updater{Update: func(context.Context) (string, error) {
+		t.Error("asked for an update with no period")
+		return "", nil
+	}}
+	u.Run(t.Context(), make(chan string, 1))
+}
+
 // installsAtOnce is an updater that installs 1.3.0 on its first attempt.
 func installsAtOnce() *Updater {
 	var waits []time.Duration

@@ -118,8 +118,10 @@ checksum. The local relay does this in the background, so a machine nobody runs 
 command on still updates, and so does each terma command you run in a terminal. Hooks,
 scripts, CI and `--output` other than a table never look. A relay that installed a
 release keeps running until nothing it holds is waiting and no agent has exported for
-half a minute (12 hours at most), then restarts on the new binary, so the restart loses
-nothing; what it has queued for delivery is on disk, and the new relay sends it.
+half a minute, then restarts on the new binary, so the restart loses nothing: what it has
+queued for delivery is on disk, and the new relay sends it. An agent that never pauses
+for 12 hours is the exception: the relay restarts then anyway, dropping what it still
+holds.
 
 A patch release (1.4.2 → 1.4.3) installs as soon as it is found. A new minor or major
 version (1.4 → 1.5, 1 → 2) installs once it has been out for 24 hours, so one that breaks

@@ -211,7 +211,7 @@ func (c *Client) Auto(ctx context.Context, configDir, stateDir, exe string, prog
 			return Outcome{Err: err}
 		}
 		// The release may have been pulled, or followed by another, since the check.
-		cache.Latest, cache.Published = rel.Version(), rel.PublishedAt
+		cache.Latest, cache.Published, cache.Attempted = rel.Version(), rel.PublishedAt, rel.Version()
 		SaveCache(stateDir, cache)
 	}
 	if !Newer(c.Version, rel.TagName) || Soaking(c.Version, rel.Version(), rel.PublishedAt, time.Now()) {
