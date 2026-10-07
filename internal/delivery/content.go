@@ -19,9 +19,9 @@ var hookContent = map[string][]string{
 	semconv.TermaApprovalRequestedEvent: {semconv.TermaApprovalReasonKey},
 }
 
-// contentFree are the event kinds that carry no content but terma.repository.root, which
-// Outgoing withholds along with tool content, or (a reply, a thread's name)
-// that Allowed sends or withholds whole. A kind in neither list is withheld whenever the
+// contentFree are the event kinds that carry no content, or (a reply, a thread's name) that
+// Allowed sends or withholds whole; terma.repository.root, which some of them name, Outgoing
+// withholds with tool content. A kind in neither list is withheld whenever the
 // policy withholds any content, so a new kind leaks nothing until it is classified.
 var contentFree = map[string]bool{
 	semconv.TermaSessionStartEvent: true, semconv.TermaSessionEndEvent: true,

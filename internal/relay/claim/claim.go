@@ -173,7 +173,7 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 		return false
 	}
 	// The fast path needs no lock: a fresh claim already naming these processes.
-	if prev, ok := read(p); ok && samePlace(prev, c) && subset(c.PIDs, prev.PIDs) {
+	if prev, ok := read(p); ok && samePlace(prev, c) && prev.Root == c.Root && subset(c.PIDs, prev.PIDs) {
 		if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < refresh {
 			return false
 		}
@@ -193,7 +193,7 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 	switch {
 	case !havePrev:
 	case samePlace(prev, c):
-		if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < refresh && subset(c.PIDs, prev.PIDs) {
+		if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < refresh && prev.Root == c.Root && subset(c.PIDs, prev.PIDs) {
 			return false
 		}
 		c.PIDs = merge(prev.PIDs, c.PIDs)
@@ -222,10 +222,11 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 	return config.WriteFileAtomicNoSync(p, data, 0o600) == nil
 }
 
-// samePlace reports whether c continues prev's latest run. Another working tree is another
-// run, so a record keeps the root its session had when it was made (At).
+// samePlace reports whether c continues prev's latest run. Another working tree of the same
+// repository is the same run, whose Root is rewritten in place: a placement decides where
+// records go, and a session switching between worktrees must never push an earlier one out.
 func samePlace(prev, c Claim) bool {
-	return prev.ProjectID == c.ProjectID && prev.Repository == c.Repository && prev.Root == c.Root
+	return prev.ProjectID == c.ProjectID && prev.Repository == c.Repository
 }
 
 func subset(a, b []int) bool {

@@ -145,3 +145,32 @@ func TestWithholdDropsTheRootWithToolContent(t *testing.T) {
 		}
 	}
 }
+
+// The working tree is the relay's to name: one the agent put on its own resource is dropped
+// when no hook named one, and replaced when one did.
+func TestRelayNamesTheWorkingTreeNotTheAgent(t *testing.T) {
+	t.Parallel()
+	u := newUpstream(t)
+	f := newFixture() // A claims no root
+	f.claim("B", claim.Claim{ProjectID: "p2", Tool: "codex", Root: "/work/b"})
+	policies := allPolicies(u)
+	policies["p2"] = Policy{Endpoint: u.srv.URL, Key: "key-p2", IncludePrompts: true, IncludeToolContent: true}
+	r, srv := f.relay(t, u, policies)
+	logs := mixedLogs()
+	res := logs.ResourceLogs[0].Resource
+	res.Attributes = append(res.Attributes, kv(semconv.TermaRepositoryRootKey, "/agent/says"))
+	body, _ := proto.Marshal(logs)
+	post(t, srv, "/v1/logs", body, "application/x-protobuf", token, false)
+	waitFor(t, func() bool { return r.Stats().Snapshot().Counters["forwarded.logs"] == 3 })
+	roots := u.rootsByKey(t)
+	for key, want := range map[string]string{"Bearer key-p1": "", "Bearer key-p2": "/work/b"} {
+		if len(roots[key]) == 0 {
+			t.Fatalf("nothing reached %s: %v", key, roots)
+		}
+		for _, got := range roots[key] {
+			if got != want {
+				t.Errorf("%s root = %q, want %q", key, got, want)
+			}
+		}
+	}
+}

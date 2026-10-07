@@ -1,6 +1,7 @@
 package relay
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -141,9 +142,13 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 	// terma.relay.attribution and terma.relay.session.id mark a part the relay placed by
 	// inference, so the backend can tell the relay's join from its own.
 	stamp(p, semconv.MiradorProjectIDKey, c.ProjectID)
-	// The checkout is a local path, so it leaves only with the tool content that names paths.
-	if root := r.rootOf(c, p); root != "" && pol.IncludeToolContent {
-		stamp(p, semconv.TermaRepositoryRootKey, root)
+	// The checkout is the relay's to name, never the agent's, and a local path: it leaves only
+	// with the tool content that names paths.
+	unstamp(p, semconv.TermaRepositoryRootKey)
+	if pol.IncludeToolContent {
+		if root := r.rootOf(c, p, how); root != "" {
+			stamp(p, semconv.TermaRepositoryRootKey, root)
+		}
 	}
 	if how.how != "" {
 		stamp(p, semconv.TermaRelayAttributionKey, how.how)
@@ -156,11 +161,11 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 	r.enqueue(c, p)
 }
 
-// rootOf is the working tree the part's session ran in when the part was made: the placing
-// claim's, or, where global mode placed the part without one, its session's own claim's for
-// the same project. "" when no hook has named one.
-func (r *Relay) rootOf(c claim.Claim, p *part) string {
-	if c.Root != "" {
+// rootOf is the working tree the part's session ran in: the placing claim's, or, where global
+// mode's catch-all placed the part without one, its session's own claim's for the same
+// project. "" when no hook has named one.
+func (r *Relay) rootOf(c claim.Claim, p *part, how attribution) string {
+	if c.Root != "" || how.how != semconv.TermaRelayAttributionCatchAll {
 		return c.Root
 	}
 	session := r.sessionFor(p.session)
@@ -207,6 +212,29 @@ func stamp(p *part, key, value string) {
 	case *metricspb.MetricsData:
 		for _, rm := range m.GetResourceMetrics() {
 			set(rm.Resource)
+		}
+	}
+}
+
+// unstamp removes a resource attribute from every resource.
+func unstamp(p *part, key string) {
+	drop := func(res *resourcepb.Resource) {
+		if res != nil {
+			res.Attributes = slices.DeleteFunc(res.Attributes, func(kv *commonpb.KeyValue) bool { return kv.GetKey() == key })
+		}
+	}
+	switch m := p.msg.(type) {
+	case *logspb.LogsData:
+		for _, rl := range m.GetResourceLogs() {
+			drop(rl.Resource)
+		}
+	case *tracepb.TracesData:
+		for _, rs := range m.GetResourceSpans() {
+			drop(rs.Resource)
+		}
+	case *metricspb.MetricsData:
+		for _, rm := range m.GetResourceMetrics() {
+			drop(rm.Resource)
 		}
 	}
 }
