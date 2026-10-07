@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"errors"
+	"maps"
 	"slices"
 	"sync"
 	"time"
@@ -91,13 +92,15 @@ func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Polic
 		}
 		// Only a team this machine collects for is granted: a claim for a team selected
 		// nowhere since, or for another team's global policy, is a session nothing placed.
+		// Hooks under another profile claim for that profile's teams (`terma config`), and
+		// the one relay forwards for every profile's.
 		collected := routing.Collection(&now)
 		global, hasGlobal := collected.Global()
 		globalPrimary := hasGlobal && (global.TeamID == "" || global.TeamID == c.ProjectID)
 		org := routing.EffectivePolicy(cfg.StateDir, selected, c.ProjectID)
 		switch {
 		case org.Global() && !globalPrimary,
-			org.Validated() && !slices.ContainsFunc(collected, func(p config.Policy) bool { return p.Team() == c.ProjectID }):
+			org.Validated() && !collectedFor(file, collected, c.ProjectID):
 			org = config.NoPolicy(org.OrganizationID, org.AuthURL)
 		}
 		if cfg.ProfileName != "" && org.FetchedAt.IsZero() && config.PolicyStub() == "" {
@@ -112,6 +115,20 @@ func Resolver(cfg *config.Config, r ResolverDeps) func(claim.Claim) (relay.Polic
 		pol.Endpoint, pol.Key = r.Endpoint(c.ProjectID), key
 		return pol, nil
 	}
+}
+
+// collectedFor reports whether team is one this machine collects for: in the running
+// profile's collection, or selected in any profile of the installation.
+func collectedFor(file *config.File, collected config.Policies, team string) bool {
+	if slices.ContainsFunc(collected, func(p config.Policy) bool { return p.Team() == team }) {
+		return true
+	}
+	for _, p := range file.Profiles {
+		if slices.Contains(slices.Collect(maps.Values(p.CollectedTeams())), team) {
+			return true
+		}
+	}
+	return false
 }
 
 // CatchAll is where global mode files what nothing placed, rereading the policy every

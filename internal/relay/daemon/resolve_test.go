@@ -115,3 +115,39 @@ func TestResolverWaitsBeforeAskingALockedKeychainAgain(t *testing.T) {
 		t.Fatalf("a resolve inside %s asked the keychain again: %v", keychainRetry, err)
 	}
 }
+
+// A claim for a team this machine no longer collects for — its validated policy file and
+// key still here, the team selected in no organization since — is granted nothing: hooks
+// chose that team before a switch, and the session is one nothing places now.
+func TestResolverGrantsOnlyATeamTheMachineCollectsFor(t *testing.T) {
+	configDir := t.TempDir()
+	t.Setenv("TERMA_POLICY_STUB", "")
+	const org, auth = "org_a", "https://auth.example"
+	cfg := &config.Config{Dir: configDir, StateDir: configDir, ProfileName: "default", OrganizationID: org, AuthURL: auth}
+	if err := config.UpdateProfile(configDir, cfg.ProfileName, func(p *config.Profile) { p.OrganizationID = org; p.SelectTeam("p1") }); err != nil {
+		t.Fatal(err)
+	}
+	for _, team := range []string{"p1", "p2"} {
+		pol := config.Policy{Mode: config.ModeRepo, IncludePrompts: true, IncludeToolContent: true, OrganizationID: org, AuthURL: auth, TeamID: team, FetchedAt: time.Now()}
+		if err := config.WritePolicy(configDir, pol); err != nil {
+			t.Fatal(err)
+		}
+		if err := keystore.Set(configDir, team, mintedKey, keystore.HostsOf(cfg)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	resolve := Resolver(cfg, ResolverDeps{AgentName: func(string) string { return "" }, Endpoint: func(string) string { return "https://otel.example" }, RelayTargets: func(s []string) []string { return s }})
+	if pol, err := resolve(claim.Claim{ProjectID: "p1"}); err != nil || !pol.IncludePrompts {
+		t.Fatalf("the selected team was not granted: %+v, %v", pol, err)
+	}
+	if pol, err := resolve(claim.Claim{ProjectID: "p2"}); err == nil && (pol.IncludePrompts || pol.IncludeToolContent || len(pol.Signals) > 0) {
+		t.Fatalf("a team selected nowhere was granted %+v", pol)
+	}
+	// Another profile selects p2: its hooks claim for it, and the one relay forwards for it.
+	if err := config.UpdateProfile(configDir, "other", func(p *config.Profile) { p.OrganizationID = org; p.SelectTeam("p2") }); err != nil {
+		t.Fatal(err)
+	}
+	if pol, err := resolve(claim.Claim{ProjectID: "p2"}); err != nil || !pol.IncludePrompts {
+		t.Fatalf("another profile's team was not granted: %+v, %v", pol, err)
+	}
+}

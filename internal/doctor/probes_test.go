@@ -15,6 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents/agentstest"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
 // listed is a git repository in a folder called one, origin github.com/acme/one, which the
@@ -422,5 +423,22 @@ func TestDoctorAdmitsARepositoryByAnotherOrganizationsTeam(t *testing.T) {
 		if strings.Contains(c.Fix, "ask a team admin") {
 			t.Fatalf("asked for the list though another team collects here: %+v", c)
 		}
+	}
+}
+
+// The machine's rows name a selected team whose policy is not validated, except the
+// current organization's own, which the repository check reports.
+func TestMachineRowsNameOtherTeamsWithoutAPolicy(t *testing.T) {
+	t.Parallel()
+	cfg := &config.Config{OrganizationID: "org_a", AuthURL: config.DefaultAuthURL, Policy: config.NoPolicy("org_a", config.DefaultAuthURL),
+		Teams: map[string]string{"org_a": "pa", "org_b": "pb"}}
+	var also []string
+	for _, r := range machineRows(cfg, routing.Collect(cfg)) {
+		if r.Label == "Also" {
+			also = append(also, r.Value)
+		}
+	}
+	if len(also) != 1 || !strings.Contains(also[0], "team pb of org_b") || !strings.Contains(also[0], "terma setup --org org_b") {
+		t.Fatalf("Also rows = %q; want org_b's team alone", also)
 	}
 }
