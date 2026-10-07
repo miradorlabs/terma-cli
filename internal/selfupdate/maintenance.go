@@ -202,21 +202,24 @@ func (c *Client) Auto(ctx context.Context, configDir, stateDir, exe string, prog
 		Soaking(c.Version, cache.Latest, cache.Published, time.Now()) {
 		return Outcome{Notice: notice(cache, c.Version)}
 	}
-	cache.AttemptAt, cache.Attempted = time.Now(), cache.Latest
-	SaveCache(stateDir, cache)
 	updateCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	if rel == nil {
 		if rel, err = c.Latest(updateCtx); err != nil {
+			// A failed lookup, retried as a failed check is, not held back a day as an install.
+			cache.CheckedAt, cache.Failed, cache.Failures = time.Now(), true, cache.Failures+1
+			SaveCache(stateDir, cache)
 			return Outcome{Err: err}
 		}
 		// The release may have been pulled, or followed by another, since the check.
-		cache.Latest, cache.Published, cache.Attempted = rel.Version(), rel.PublishedAt, rel.Version()
-		SaveCache(stateDir, cache)
+		cache.Latest, cache.Published = rel.Version(), rel.PublishedAt
 	}
 	if !Newer(c.Version, rel.TagName) || Soaking(c.Version, rel.Version(), rel.PublishedAt, time.Now()) {
+		SaveCache(stateDir, cache)
 		return Outcome{Notice: notice(cache, c.Version)}
 	}
+	cache.AttemptAt, cache.Attempted = time.Now(), rel.Version()
+	SaveCache(stateDir, cache)
 	if progress != nil {
 		fmt.Fprintf(progress, "Updating terma %s → %s…\n", c.Version, rel.Version())
 	}

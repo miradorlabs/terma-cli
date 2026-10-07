@@ -254,15 +254,21 @@ func TestOnlyMinorAndMajorReleasesSoak(t *testing.T) {
 }
 
 // fakeReleases serves tag as the latest release, published long enough ago to have soaked,
-// with a downloadable archive of binary; downloads counts the archive's fetches.
-func fakeReleases(t *testing.T, tag string, binary []byte, downloads *int) *httptest.Server {
+// with a downloadable archive of binary; downloads counts the archive's fetches, and the
+// first failLookups lookups fail.
+func fakeReleases(t *testing.T, tag string, binary []byte, downloads *int, failLookups int) *httptest.Server {
 	t.Helper()
 	archive := archiveWith(t, "terma", binary)
 	sum := sha256.Sum256(archive)
+	lookups := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		base := "http://" + r.Host
 		switch r.URL.Path {
 		case "/repos/" + Repo + "/releases/latest":
+			if lookups++; lookups <= failLookups {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				return
+			}
 			_ = json.NewEncoder(w).Encode(Release{TagName: tag, PublishedAt: time.Now().Add(-2 * SoakTime),
 				Assets: []Asset{{Name: AssetName(runtime.GOOS, runtime.GOARCH), URL: base + "/archive"}, {Name: "checksums.txt", URL: base + "/sums"}}})
 		case "/sums":
@@ -293,7 +299,7 @@ func TestAPulledReleaseIsNeverInstalled(t *testing.T) {
 		t.Skip("in-place updates are Unix-only")
 	}
 	downloads := 0
-	srv := fakeReleases(t, "v1.0.0", []byte("new binary"), &downloads)
+	srv := fakeReleases(t, "v1.0.0", []byte("new binary"), &downloads, 0)
 	stateDir, exe := t.TempDir(), oldBinary(t)
 	SaveCache(stateDir, Cache{CheckedAt: time.Now(), Current: "1.0.0", Latest: "2.0.0", Published: time.Now().Add(-2 * SoakTime)})
 	c := &Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0"}
@@ -319,7 +325,7 @@ func TestAFailedInstallHoldsBackOnlyThatRelease(t *testing.T) {
 	}{{"2.0.0", true}, {"2.0.1", false}} {
 		t.Run(tc.attempted, func(t *testing.T) {
 			downloads := 0
-			srv := fakeReleases(t, "v2.0.1", []byte("new binary"), &downloads)
+			srv := fakeReleases(t, "v2.0.1", []byte("new binary"), &downloads, 0)
 			stateDir, exe := t.TempDir(), oldBinary(t)
 			SaveCache(stateDir, Cache{CheckedAt: time.Now(), Current: "2.0.0", Latest: "2.0.1",
 				Published: time.Now().Add(-2 * SoakTime), AttemptAt: time.Now(), Attempted: tc.attempted})
@@ -343,5 +349,31 @@ func TestFailedLookupsBackOff(t *testing.T) {
 		if got := retryAfter(failures); got != want {
 			t.Errorf("retryAfter(%d) = %v, want %v", failures, got, want)
 		}
+	}
+}
+
+// A lookup that fails just before an install is retried as a failed check is, in 15
+// minutes, not held back a day as a failed install would be.
+func TestAFailedLookupBeforeAnInstallIsRetriedSoon(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("in-place updates are Unix-only")
+	}
+	downloads := 0
+	srv := fakeReleases(t, "v2.0.0", []byte("new binary"), &downloads, 1)
+	stateDir, exe := t.TempDir(), oldBinary(t)
+	SaveCache(stateDir, Cache{CheckedAt: time.Now(), Current: "1.0.0", Latest: "2.0.0", Published: time.Now().Add(-2 * SoakTime)})
+	c := &Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0"}
+	if o := c.Auto(context.Background(), t.TempDir(), stateDir, exe, nil); o.Err == nil || o.Installed != "" {
+		t.Fatalf("Auto = %+v, want the failed lookup reported", o)
+	}
+	cache := LoadCache(stateDir)
+	if cache.Attempted != "" || !cache.Failed || cache.Failures != 1 {
+		t.Fatalf("after a failed lookup the check records %+v, want a failed check and no attempt", cache)
+	}
+	cache.CheckedAt = time.Now().Add(-RetryInterval - time.Minute)
+	SaveCache(stateDir, cache)
+	if o := c.Auto(context.Background(), t.TempDir(), stateDir, exe, nil); o.Installed != "2.0.0" || downloads != 1 {
+		t.Fatalf("Auto = %+v after %d downloads, want 2.0.0 installed once the retry is due", o, downloads)
 	}
 }
