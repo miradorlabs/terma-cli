@@ -243,10 +243,10 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 }
 
 // NoRepositoriesStep is what a developer whose team lists no repositories is told.
-const NoRepositoriesStep = "Nothing is collected until a team admin lists repositories in the Terma web app, or chooses Every session."
+const NoRepositoriesStep = "Ask a team admin to list repositories, or to collect every session, in the Terma web app; until then, nothing is collected."
 
 // NoPolicyStep is what a developer whose team has no collection policy yet is told.
-const NoPolicyStep = "Nothing is collected until a team admin sets up your team's collection policy in the Terma web app."
+const NoPolicyStep = "Ask a team admin to set up your team's collection policy in the Terma web app; until then, nothing is collected."
 
 // NothingCollectedStep is what to do about a validated policy that admits no repository.
 func NothingCollectedStep(p config.Policy) string {
