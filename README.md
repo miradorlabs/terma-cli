@@ -67,8 +67,8 @@ so two developers on different teams in one repository each report to their own.
 
 ### Which commits are stamped
 
-Commit stamping is the team policy's choice, off unless a team admin turns it on (Team
-settings → Data collection). Off, which work landed is inferred from the git commands
+Commit stamping is the team policy's choice, off unless a team admin turns it on in the
+Terma web app. Off, which work landed is inferred from the git commands
 agents run; on, `post-commit` records every commit as it lands, including ones made
 outside an agent, for commit-level accuracy. `terma setup` and `terma doctor` say so when
 your team has it off. With it on, the first agent session claimed
