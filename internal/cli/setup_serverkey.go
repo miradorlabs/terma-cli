@@ -126,6 +126,11 @@ func (app *App) serverKeySignIn(ctx context.Context, cfg *config.Config, org org
 // cfg's profile, marked as signed in with it. A key it cannot store leaves the secret
 // storage as it was.
 func (app *App) keepServerKey(cfg *config.Config, insecure bool) error {
+	// A current key the keychain will not give up cannot be compared with the new one, so
+	// the keystore would keep its hosts for it (recordHosts): refuse until it can be read.
+	if _, err := keystore.Get(app.dir, cfg.Team); err != nil {
+		return fmt.Errorf("read this team's current key (%w): unlock the system keychain, then run `terma setup` again", err)
+	}
 	was := config.InsecureStorage(app.dir)
 	if err := config.UpdateFile(app.dir, func(file *config.File) { file.InsecureStorage = insecure }); err != nil {
 		return err

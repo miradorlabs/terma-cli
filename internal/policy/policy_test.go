@@ -143,11 +143,11 @@ func TestFetchUsesTheProfilesCredential(t *testing.T) {
 // never falls back to the login.
 func TestFetchWithoutTheServerKeyNamesSetup(t *testing.T) {
 	cfg := setUp(t, "")
-	cfg.ServerKeySignIn, cfg.Team = true, team
+	cfg.ServerKeySignIn, cfg.ServerKeyAuthURL, cfg.Team = true, cfg.AuthURL, team
 	if _, err := auth.SaveCredential(cfg.Dir, cfg.ProfileName, &auth.Credential{AccessToken: "a", AuthURL: authURL, OrganizationID: org, ExpiresAt: time.Now().Add(time.Hour)}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := (Source{}).Fetch(t.Context(), cfg); err == nil || !strings.Contains(err.Error(), "terma setup") {
+	if _, err := (Source{}).Fetch(t.Context(), cfg); err == nil || !strings.Contains(err.Error(), "no server key") || !strings.Contains(err.Error(), "terma setup") {
 		t.Fatalf("Fetch = %v", err)
 	}
 }

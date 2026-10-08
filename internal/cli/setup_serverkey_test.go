@@ -328,6 +328,9 @@ func machineFiles(t *testing.T) string {
 	all := string(data)
 	for _, p := range []string{filepath.Join(testApp.dir, "keys.json"), config.CredentialsPath(testApp.dir)} {
 		data, err := os.ReadFile(p)
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -408,6 +411,29 @@ func TestServerKeySetupRecordsALoginTheKeychainRefuses(t *testing.T) {
 	}
 	if !auth.StoredInFile(testApp.dir, config.DefaultProfile) || !config.InsecureStorage(testApp.dir) {
 		t.Fatal("a login left in plain text is not recorded")
+	}
+}
+
+// A rotation while the keychain holding the team's current key will not give it up is
+// refused before anything is written: the keystore could not compare the keys, and would
+// keep the old key's hosts for the new one. Once the keychain opens, the rotation goes
+// through.
+func TestServerKeyRotationWaitsForALockedKeychain(t *testing.T) {
+	_, team := keySandbox(t)
+	setupWithKey(t)
+	before := machineFiles(t)
+	unlock := secret.FailForTest(t, testApp.dir)
+	t.Setenv("TERMA_API_KEY", rotatedKey)
+	if out, err := runTerma(t, "setup", "--yes", "--harness", "claude"); err == nil || !strings.Contains(out+err.Error(), "unlock the system keychain") {
+		t.Fatalf("rotation with the keychain locked: %v\n%s", err, out)
+	}
+	if after := machineFiles(t); after != before {
+		t.Fatalf("a refused rotation changed the machine:\n%s\nwas\n%s", after, before)
+	}
+	unlock()
+	setupWithKey(t)
+	if key, err := keystore.Get(testApp.dir, team); err != nil || key != rotatedKey {
+		t.Fatalf("team key = %q, %v; want the rotated one", key, err)
 	}
 }
 
