@@ -175,7 +175,8 @@ var errNoSessionWithAPIKey = errors.New("TERMA_API_KEY is set — there is no se
 
 // signOut revokes every session this profile holds server-side and deletes the local
 // credentials, one per organization signed into. A failed revoke still clears the local
-// file: the developer asked to be signed out.
+// file: the developer asked to be signed out. A profile set up with a server key stops
+// counting it as its sign-in; the key itself is revoked only in the Terma web app.
 func (app *App) signOut(cmd *cobra.Command) error {
 	out := cmd.OutOrStdout()
 	cfg, err := app.loadConfig()
@@ -185,6 +186,12 @@ func (app *App) signOut(cmd *cobra.Command) error {
 	if cfg.APIKey != "" {
 		return errNoSessionWithAPIKey
 	}
+	if cfg.ServerKeySignIn {
+		if err := config.UpdateProfile(app.dir, cfg.ProfileName, func(p *config.Profile) { p.ServerKeySignIn = false }); err != nil {
+			return err
+		}
+		fmt.Fprintln(out, "Signed out of the team's server key; it keeps working until you revoke it in the Terma web app.")
+	}
 	creds, err := auth.Credentials(app.dir, cfg.ProfileName)
 	switch {
 	case secret.IsUnavailable(err):
@@ -193,7 +200,9 @@ func (app *App) signOut(cmd *cobra.Command) error {
 	case err != nil:
 		return err
 	case len(creds) == 0:
-		fmt.Fprintln(out, "Already signed out.")
+		if !cfg.ServerKeySignIn {
+			fmt.Fprintln(out, "Already signed out.")
+		}
 		return nil
 	}
 	for _, cred := range creds {

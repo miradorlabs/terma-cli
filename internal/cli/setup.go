@@ -82,7 +82,12 @@ func (app *App) newSetupCommand() *cobra.Command {
 
 Run it again any time: it reuses a working sign-in, --team switches team, --org
 switches organization, and --relay-addr moves the relay off a port another program
-holds.`,
+holds.
+
+With TERMA_API_KEY set to a team server key (Ingest permission), setup signs in with
+the key instead, with no browser: it sets up the key's own team, so --org and --team
+take only that organization's and team's ids. Nothing needs TERMA_API_KEY afterwards;
+run setup with a new key to rotate it.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error { return app.runSetup(cmd, f) },
 	}

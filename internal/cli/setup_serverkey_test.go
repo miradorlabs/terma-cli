@@ -146,6 +146,21 @@ func TestSetupWithAServerKey(t *testing.T) {
 	}
 }
 
+// teardown --sign-out signs a machine set up with a server key out: status stops counting
+// the key as its sign-in, and says the key itself is revoked in the web app.
+func TestSignOutOfAServerKey(t *testing.T) {
+	keySandbox(t)
+	setupWithKey(t)
+	t.Setenv("TERMA_API_KEY", "")
+	out, err := runTerma(t, "teardown", "--sign-out", "--yes")
+	if err != nil || !strings.Contains(out, "revoke it in the Terma web app") || strings.Contains(out, "Already signed out") {
+		t.Fatalf("teardown --sign-out: %v\n%s", err, out)
+	}
+	if statusOut, _ := runTerma(t, "status"); !strings.Contains(statusOut, "not signed in") {
+		t.Errorf("status after signing out of the key:\n%s", statusOut)
+	}
+}
+
 // Setup refuses, saying why, before anything is written: a key the auth host does not
 // know, a credential that is no team server key, a key for no team or that cannot ingest,
 // and an --org or --team that is not the key's own id.
