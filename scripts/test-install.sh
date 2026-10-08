@@ -78,7 +78,7 @@ fresh_home() { mktemp -d "$work/home.XXXXXX"; }
 # own error about an unset variable or a file it cannot write.
 clean() {
   local stray
-  stray="$(grep -vE '^(Downloading |Installed |Added |Note: |Next: run |.+ is already on PATH in new )' <<<"$1" || true)"
+  stray="$(grep -vE '^(Downloading |Installed |Added |Note: |Next: run |.+ is (already )?on PATH in )' <<<"$1" || true)"
   [ -z "$stray" ] || fail "stray output: $stray"
 }
 # next_runs <home> <output> runs the installer's `Next:` command in sh, `version` in
@@ -136,6 +136,18 @@ home="$(fresh_home)"
 clean "$(install_as /bin/bash "$home")"
 if ! grep -qxF "$line" "$home/.bashrc" || ! grep -qxF "$line" "$home/.bash_profile" || [ -e "$home/.profile" ]; then
   fail "with .bash_profile: $(ls -A "$home")"
+fi
+
+echo "== bash with a login file it cannot write says which terminals miss out"
+if [ "$(id -u)" != 0 ]; then # root writes it anyway
+  home="$(fresh_home)"
+  : >"$home/.bash_profile"; chmod 444 "$home/.bash_profile"
+  out="$(install_as /bin/bash "$home")"
+  clean "$out"
+  if ! grep -qF "is on PATH in ~/.bashrc, for bash (your login shell), but ~/.bash_profile could not be written" <<<"$out" \
+    || grep -q '^Added' <<<"$out" || ! grep -qxF "$line" "$home/.bashrc" || [ -s "$home/.bash_profile" ]; then
+    fail "a read-only .bash_profile, but said: $out"
+  fi
 fi
 
 echo "== fish: a conf.d file of terma's own, under XDG_CONFIG_HOME when it is set"

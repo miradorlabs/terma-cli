@@ -70,15 +70,16 @@ append_line() {
 }
 
 # Puts line $2 in each of the files $1 names, one per line, where it is missing. Sets
-# files to the ones that have it, shown and joined, and added when any needed it.
+# files to the ones that have it and missed to the ones it could not write, shown and
+# joined, and added when any needed it.
 put_line() {
-  files='' added=''
+  files='' missed='' added=''
   set -f; IFS='
 '
   for rc in $1; do
     if grep -qsxF "$2" "$rc"; then :
     elif append_line "$rc" "$2"; then added=1
-    else continue
+    else missed="${missed:+$missed and }$(shown "$rc")"; continue
     fi
     files="${files:+$files and }$(shown "$rc")"
   done
@@ -188,7 +189,7 @@ next="\`$(shown "$dest/terma") setup\`"
 case ":$PATH:" in
   *":$dest:"*) next="\`terma setup\`" ;;
   *)
-    files='' added=''
+    files='' missed='' added=''
     case "$dest" in
       *:*) ;; # PATH would split it at the colon, so no line can put it there
       *)
@@ -196,7 +197,9 @@ case ":$PATH:" in
           put_line "$rcs" "$(path_line "$shell" "$dest")"
         fi ;;
     esac
-    if [ -n "$added" ]; then
+    if [ -n "$files" ] && [ -n "$missed" ]; then
+      say "${dest} is on PATH in ${files}, for ${shell} (your login shell), but ${missed} could not be written: ${shell} terminals that read it instead will not find terma."
+    elif [ -n "$added" ]; then
       say "Added ${dest} to PATH in ${files}, for ${shell} (your login shell): new ${shell} terminals will find terma."
     elif [ -n "$files" ]; then
       say "${dest} is already on PATH in new ${shell} terminals (${files})."
