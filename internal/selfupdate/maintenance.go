@@ -252,18 +252,20 @@ type Outcome struct {
 	Err error
 }
 
-// Auto is the relay's pass: it checks for a newer release every CheckInterval at most and
-// installs it in place of exe for a release build that updates itself, unless the developer
-// turned automatic updates off in configDir; the check's records go in stateDir. A new minor
-// or major version waits out SoakTime first, and is looked up again before it is installed,
-// so a release pulled since the check is not. Each release is attempted once per
-// AttemptInterval at most, so a failing install is not retried at every pass. progress, when
-// set, is told of the download.
+// Auto is the relay's pass: it looks for a newer release on every call, a cheap probe of the
+// latest tag (latestTag) unless that moved, as the relay spaces its calls itself, and so a
+// patch release, which installs without a soak, reaches a machine within one of the relay's
+// waits; a failed look still backs off (retryAfter). It installs the release in place of exe
+// for a release build that updates itself, unless the developer turned automatic updates
+// off in configDir; the check's records go in stateDir. A new minor or major version waits
+// out SoakTime first, and is looked up again before it is installed, so a release pulled
+// since the check is not. Each release is attempted once per AttemptInterval at most, so a
+// failing install is not retried at every pass. progress, when set, is told of the download.
 func (c *Client) Auto(ctx context.Context, configDir, stateDir, exe string, progress io.Writer) Outcome {
-	return c.auto(ctx, CheckInterval, configDir, stateDir, exe, progress)
+	return c.auto(ctx, 0, configDir, stateDir, exe, progress)
 }
 
-// auto is Auto with every as the interval between looks.
+// auto is Auto with every as the least time between looks.
 func (c *Client) auto(ctx context.Context, every time.Duration, configDir, stateDir, exe string, progress io.Writer) Outcome {
 	if !IsRelease(c.Version) {
 		return Outcome{}

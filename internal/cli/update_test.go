@@ -339,11 +339,3 @@ func TestOnlyAnUpdatedHookStartedRelayStartsItsSuccessor(t *testing.T) {
 		})
 	}
 }
-
-// Each relay ask comes at least UpdateEvery after the last, so it always finds a fresh look
-// due: a patch reaches a running relay within one jittered wait of being published.
-func TestEveryRelayUpdateLooksAgain(t *testing.T) {
-	if daemon.UpdateEvery < selfupdate.CheckInterval {
-		t.Fatalf("UpdateEvery %v is shorter than CheckInterval %v: some relay asks would not look", daemon.UpdateEvery, selfupdate.CheckInterval)
-	}
-}

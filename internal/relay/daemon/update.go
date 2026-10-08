@@ -7,7 +7,7 @@ import (
 )
 
 // UpdateEvery is how often the relay asks for an update, jittered to every 5 to 10 minutes,
-// each ask a fresh look (selfupdate.CheckInterval): a patch release, which installs without a
+// each ask a fresh look (selfupdate.Client.Auto): a patch release, which installs without a
 // soak, reaches a running relay within 10 minutes of publishing.
 const UpdateEvery = 5 * time.Minute
 

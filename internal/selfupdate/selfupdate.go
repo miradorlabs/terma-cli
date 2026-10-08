@@ -33,11 +33,6 @@ const Repo = "miradorlabs/terma-cli"
 // BinaryName is the executable inside each release archive.
 const BinaryName = "terma"
 
-// CheckInterval is how often the relay looks for a newer release: often, so a patch release,
-// which installs without a soak, reaches a machine within minutes. Each look is a cheap
-// probe of the latest tag (latestTag); the release itself is looked up only when it moved.
-const CheckInterval = 5 * time.Minute
-
 // CommandCheckInterval is how often an interactive command looks, after it has finished: the
 // relay keeps a machine current, so a command seldom waits on the network.
 const CommandCheckInterval = time.Hour

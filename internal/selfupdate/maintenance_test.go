@@ -72,11 +72,11 @@ func TestFailedCheckRetriesAfter15Minutes(t *testing.T) {
 			if cache.Failed {
 				t.Fatal("successful retry retained failure state")
 			}
-			cache.CheckedAt = time.Now().Add(-CheckInterval + time.Minute)
+			cache.CheckedAt = time.Now().Add(-CommandCheckInterval + time.Minute)
 			SaveCache(dir, cache)
 			_ = noticeOf(c, context.Background(), dir, c.Version)
 			if calls != 2 {
-				t.Fatal("successful check did not hold for CheckInterval")
+				t.Fatal("successful check did not hold for CommandCheckInterval")
 			}
 		})
 	}
@@ -205,7 +205,7 @@ func noticeOf(c *Client, ctx context.Context, dir, current string) string {
 	if !IsRelease(current) {
 		return ""
 	}
-	cache, _ := c.cachedCheck(ctx, dir, current, CheckInterval)
+	cache, _ := c.cachedCheck(ctx, dir, current, CommandCheckInterval)
 	return notice(cache, current)
 }
 
@@ -410,10 +410,10 @@ func TestACheckLooksTheReleaseUpOnlyWhenTheTagMoved(t *testing.T) {
 			}))
 			t.Cleanup(srv.Close)
 			stateDir := t.TempDir()
-			tc.cache.CheckedAt, tc.cache.Current = time.Now().Add(-CheckInterval-time.Minute), "1.0.0"
+			tc.cache.CheckedAt, tc.cache.Current = time.Now().Add(-time.Minute), "1.0.0"
 			SaveCache(stateDir, tc.cache)
 			c := &Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0"}
-			cache, _ := c.cachedCheck(context.Background(), stateDir, "1.0.0", CheckInterval)
+			cache, _ := c.cachedCheck(context.Background(), stateDir, "1.0.0", 0)
 			if got := lookups == 1; got != tc.lookup {
 				t.Fatalf("%d API lookups, want a lookup: %v", lookups, tc.lookup)
 			}
@@ -427,8 +427,9 @@ func TestACheckLooksTheReleaseUpOnlyWhenTheTagMoved(t *testing.T) {
 	}
 }
 
-// The relay looks every CheckInterval; an interactive command, after it has finished, only
-// every CommandCheckInterval, so a command seldom waits on the network.
+// The relay looks on every pass, however recent the last look, so a pass never waits out
+// another process's look on top of its own wait; an interactive command, after it has
+// finished, only every CommandCheckInterval, so a command seldom waits on the network.
 func TestCommandsLookLessOftenThanTheRelay(t *testing.T) {
 	t.Parallel()
 	requests := 0
@@ -438,7 +439,7 @@ func TestCommandsLookLessOftenThanTheRelay(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 	stateDir := t.TempDir()
-	SaveCache(stateDir, Cache{CheckedAt: time.Now().Add(-CheckInterval - time.Minute), Current: "1.0.0", Latest: "1.0.0"})
+	SaveCache(stateDir, Cache{CheckedAt: time.Now().Add(-time.Minute), Current: "1.0.0", Latest: "1.0.0"})
 	c := &Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0"}
 	c.Maintain(context.Background(), t.TempDir(), stateDir, "terma", io.Discard)
 	if requests != 0 {
@@ -446,12 +447,13 @@ func TestCommandsLookLessOftenThanTheRelay(t *testing.T) {
 	}
 	c.Auto(context.Background(), t.TempDir(), stateDir, "terma", nil)
 	if requests == 0 {
-		t.Fatal("the relay did not look once CheckInterval had passed")
+		t.Fatal("the relay's pass did not look")
 	}
 }
 
-// A lookup that fails just before an install is retried as a failed check is, in 15
-// minutes, not held back a day as a failed install would be.
+// A lookup that fails just before an install, as after an interactive command whose last look
+// is still fresh, is retried as a failed check is, in 15 minutes, not held back a day as a
+// failed install would be.
 func TestAFailedLookupBeforeAnInstallIsRetriedSoon(t *testing.T) {
 	t.Parallel()
 	if runtime.GOOS == "windows" {
@@ -463,7 +465,7 @@ func TestAFailedLookupBeforeAnInstallIsRetriedSoon(t *testing.T) {
 	exe, started := oldBinary(t)
 	SaveCache(stateDir, Cache{CheckedAt: time.Now(), Current: "1.0.0", Latest: "2.0.0", Published: time.Now().Add(-2 * SoakTime)})
 	c := &Client{ReleaseKeys: testKeys(), BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0", Binary: started}
-	if o := c.Auto(context.Background(), t.TempDir(), stateDir, exe, nil); o.Err == nil || o.Installed != "" {
+	if o := c.auto(context.Background(), CommandCheckInterval, t.TempDir(), stateDir, exe, nil); o.Err == nil || o.Installed != "" {
 		t.Fatalf("Auto = %+v, want the failed lookup reported", o)
 	}
 	cache := LoadCache(stateDir)
@@ -471,12 +473,12 @@ func TestAFailedLookupBeforeAnInstallIsRetriedSoon(t *testing.T) {
 		t.Fatalf("after a failed lookup the check records %+v, want a failed check and no attempt", cache)
 	}
 	// Within the backoff, no lookup at all: one would succeed here, and install.
-	if o := c.Auto(context.Background(), t.TempDir(), stateDir, exe, nil); o.Installed != "" || o.Err != nil || downloads != 0 {
+	if o := c.auto(context.Background(), CommandCheckInterval, t.TempDir(), stateDir, exe, nil); o.Installed != "" || o.Err != nil || downloads != 0 {
 		t.Fatalf("Auto = %+v after %d downloads within the backoff, want no lookup", o, downloads)
 	}
 	cache.CheckedAt = time.Now().Add(-RetryInterval - time.Minute)
 	SaveCache(stateDir, cache)
-	if o := c.Auto(context.Background(), t.TempDir(), stateDir, exe, nil); o.Installed != "2.0.0" || downloads != 1 {
+	if o := c.auto(context.Background(), CommandCheckInterval, t.TempDir(), stateDir, exe, nil); o.Installed != "2.0.0" || downloads != 1 {
 		t.Fatalf("Auto = %+v after %d downloads, want 2.0.0 installed once the retry is due", o, downloads)
 	}
 }
