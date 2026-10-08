@@ -51,7 +51,9 @@ func (app *App) NewRootCommand() *cobra.Command {
                    agents, and writes machine-wide hooks. Your team's policy lists
                    the repositories it collects; nothing is written into a
                    repository's files.
-                   Run it again to switch team or organization, or repair the machine.
+                   Run it again to repair the machine.
+  terma switch     signs out and runs setup again: another account, organization
+                   or team.
   terma doctor     verifies the whole chain end to end; every failure names its fix.
   terma update     installs the latest release and refreshes what terma installed.
   terma teardown   undoes setup on this machine (--sign-out also signs out).
@@ -84,6 +86,7 @@ Every command is safe to run again.`,
 
 	root.AddCommand(
 		app.newSetupCommand(),
+		app.newSwitchCommand(),
 		app.newDoctorCommand(),
 		app.newUpdateCommand(),
 		app.newTeardownCommand(),
@@ -170,6 +173,8 @@ type App struct {
 	nateRemoveBinary     func(cmd *cobra.Command, path string) error
 	// spawnRelay starts a relay for a state directory, detached, as a hook does.
 	spawnRelay func(stateDir, version string)
+	// canAsk reports whether a person is at a terminal to answer questions.
+	canAsk func() bool
 	// binary is the executable as this process started from it, for the updater: a command
 	// that ran a while, or the relay, may outlive its version, once another install
 	// replaces the binary.
@@ -180,7 +185,8 @@ type App struct {
 // version.
 func New(agentsFor func(configDir string) *agents.Registry, version string) *App {
 	app := &App{agentsFor: agentsFor, version: version, binDirs: doctor.WellKnownBinDirs, hookExecutable: procinfo.AbsExecutable,
-		managedRoot: "/", runUpdateStep: runUpdateStep, nateRemoveBinary: removeNateBinary, spawnRelay: daemon.Spawn}
+		managedRoot: "/", runUpdateStep: runUpdateStep, nateRemoveBinary: removeNateBinary, spawnRelay: daemon.Spawn,
+		canAsk: canPrompt}
 	app.nateBinaryCandidates = app.installedTermaBinaries
 	if exe, err := os.Executable(); err == nil {
 		app.binary, _ = os.Stat(exe)
