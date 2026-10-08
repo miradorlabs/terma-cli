@@ -93,8 +93,17 @@ func TestGitHookScriptsRunUnderPOSIXShells(t *testing.T) {
 						if data, err := os.ReadFile(log); err == nil {
 							ran = strings.Split(strings.TrimSpace(string(data)), "\n")
 						}
-						if strings.Join(ran, "|") != strings.Join(tc.want, "|") {
-							t.Errorf("ran %q, want %q", ran, tc.want)
+						want := tc.want
+						// A push during a stopped rebase is a real push: pre-push has no replay guard.
+						if name == prePush && tc.replaying != "" {
+							want = nil
+							if tc.prev != "" {
+								want = append(want, "prev one two")
+							}
+							want = append(want, "terma hook "+name+" one two")
+						}
+						if strings.Join(ran, "|") != strings.Join(want, "|") {
+							t.Errorf("ran %q, want %q", ran, want)
 						}
 					})
 				}

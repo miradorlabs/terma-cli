@@ -76,7 +76,7 @@ func (app *App) newSetupCommand() *cobra.Command {
   5. Writes the agents' machine-wide hooks, so a session in a repository the
      policy lists is collected for your team, and nothing anywhere else. git's
      configuration is not touched: where the policy asks for commit stamping, the
-     first agent session in such a repository installs two hooks in its own
+     first agent session in such a repository installs three hooks in its own
      .git/hooks, chaining to any hook already there. Nothing is written into a
      repository's working tree or committed files.
 

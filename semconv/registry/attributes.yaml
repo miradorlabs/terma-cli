@@ -487,6 +487,107 @@ attributes:
     stability: development
     brief: Where git took the commit message from, as prepare-commit-msg reports it.
 
+  # Pushes.
+  - key: terma.push.id
+    type: string
+    stability: development
+    brief: One pushed ref of one push, so a record sent twice can be counted once.
+  - key: terma.push.remote.name
+    type: string
+    stability: development
+    brief: The configured remote the push went to.
+    note: Omitted when the push named a URL instead of a remote.
+    examples: ["origin"]
+  - key: terma.push.remote.url
+    type: string
+    stability: development
+    brief: The URL the push went to, without credentials.
+    note: Omitted for a local path. It need not be origin, which vcs.repository.url.full names.
+  - key: terma.push.remote.ref
+    type: string
+    stability: development
+    brief: The full name of the branch the push updated on the remote.
+    examples: ["refs/heads/feature/parser"]
+  - key: terma.push.local.ref
+    type: string
+    stability: development
+    brief: What was pushed, as git names it to pre-push.
+    note: A full ref name, HEAD, or a commit id when the push named one.
+    examples: ["refs/heads/feature/parser", "HEAD"]
+  - key: terma.push.old.revision
+    type: string
+    stability: development
+    brief: The remote branch's commit id before the push; omitted for a new branch.
+  - key: terma.push.new.revision
+    type: string
+    stability: development
+    brief: The commit id the push set the remote branch to.
+  - key: terma.push.forced
+    type: boolean
+    stability: development
+    brief: Whether the push replaced commits the remote branch had, as a force-push does.
+    note: Omitted for a new branch and when the old commit is not in the local repository.
+  - key: terma.push.range
+    type:
+      members:
+        - id: update
+          value: update
+          brief: The commits in the new revision and not the old one, exactly.
+          stability: development
+        - id: new_branch
+          value: new_branch
+          brief: >
+            A new branch: the commits in the new revision that no branch of the remote
+            had, as the local remote-tracking branches showed before the push.
+          stability: development
+        - id: fallback
+          value: fallback
+          brief: >
+            The commits in the new revision that no remote-tracking branch had before the
+            push, of any remote for a push to a URL: the old commit is not in the local
+            repository, or there is no remote to go by, so they may include commits the
+            remote already had.
+          stability: development
+    stability: development
+    brief: How terma.push.commits was worked out.
+  - key: terma.push.commits
+    type: string[]
+    stability: development
+    brief: The full ids of the commits the push sent, newest first, at most 500 of them.
+  - key: terma.push.commit.count
+    type: int
+    stability: development
+    brief: How many commits the push sent; exact below 10000, at least 10000 otherwise.
+  - key: terma.push.commits_truncated
+    type: boolean
+    stability: development
+    brief: Whether terma.push.commits left commits out.
+  - key: terma.push.session.ids
+    type: string[]
+    stability: development
+    brief: The sessions stamped into the commits terma.push.commits lists.
+  - key: terma.push.status
+    type:
+      members:
+        - id: tracking_ref_updated
+          value: tracking_ref_updated
+          brief: >
+            Once git push exited, the remote-tracking branch had moved to the new revision,
+            which git does only for a ref the remote accepted.
+          stability: development
+        - id: unknown
+          value: unknown
+          brief: >
+            No evidence either way: the push was rejected, was a dry run, outlasted the
+            wait, or has no remote-tracking branch terma can read.
+          stability: development
+    stability: development
+    brief: What the local repository showed about the push's outcome.
+    note: >
+      Evidence, not proof: another local process updating the same remote-tracking branch
+      to the same commit while the push ran would read as tracking_ref_updated. unknown
+      never means rejected.
+
   # The checkout.
   - key: terma.repository.root
     type: string

@@ -1,5 +1,5 @@
-// Package repohooks installs terma's two commit hooks into a repository's own
-// .git/hooks, on demand. Nothing in terma takes them out: once terma is gone they only run
+// Package repohooks installs terma's git hooks into a repository's own .git/hooks, on
+// demand. Nothing in terma takes them out: once terma is gone they only run
 // the hook each one displaced. git runs exactly one file per hook
 // name, so a hook already there is renamed aside and run first, unchanged — the chain
 // pattern the pre-commit framework established — and terma recognizes its own script by
@@ -22,9 +22,13 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 )
 
-// names are the hooks terma installs, the only two with anything to do: one stamps the
-// message, the other records the commit.
-var names = []string{"prepare-commit-msg", "post-commit"}
+// names are the hooks terma installs, the only ones with anything to do: one stamps the
+// message, one records the commit, and one records a push.
+var names = []string{"prepare-commit-msg", "post-commit", prePush}
+
+// prePush is the one hook git gives input on stdin, which its script copies once for both
+// the displaced hook and terma.
+const prePush = "pre-push"
 
 // preTermaSuffix names the hook terma displaced, which its script runs first.
 const preTermaSuffix = ".pre-terma"
@@ -34,7 +38,7 @@ const hooksDir = "hooks"
 
 // templateVersion marks the script terma writes. Bumping it rewrites every installed
 // copy at the next session, which is how a template fix reaches them.
-const templateVersion = 1
+const templateVersion = 2
 
 // marker starts the script's second line and is how terma knows its own file.
 const marker = "# terma-hook v"
@@ -48,16 +52,20 @@ var replayState = []string{"CHERRY_PICK_HEAD", "rebase-merge", "rebase-apply", "
 
 // script is the POSIX sh terma writes for one hook name. It never lets a missing or
 // failing terma block git; the displaced hook runs first and keeps its veto, and git's own
-// arguments pass through unchanged. It forks nothing: a replayed commit must cost git no
-// more than a rebase without terma, so the hook has to decide without starting a process.
-// $0 is the hook's path, which is how the displaced hook is found beside it, and git names
-// the git directory in GIT_DIR wherever it is not the checkout's own `.git`.
+// arguments pass through unchanged. A commit hook forks nothing: a replayed commit must
+// cost git no more than a rebase without terma, so the hook has to decide without starting
+// a process. $0 is the hook's path, which is how the displaced hook is found beside it, and
+// git names the git directory in GIT_DIR wherever it is not the checkout's own `.git`.
 func script(hook, terma string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "#!/bin/sh\n%s%d: chains to %s%s. Written by terma.\n",
 		marker, templateVersion, hook, preTermaSuffix)
 	b.WriteString("d=\"${0%/*}\"\n[ \"$d\" = \"$0\" ] && d=.\n")
 	fmt.Fprintf(&b, "prev=\"$d/%s%s\"\n", hook, preTermaSuffix)
+	if hook == prePush {
+		b.WriteString(prePushBody(terma))
+		return b.String()
+	}
 	b.WriteString("if [ -x \"$prev\" ]; then \"$prev\" \"$@\" || exit $?; fi\n")
 	b.WriteString("g=\"${GIT_DIR:-.git}\"\n")
 	b.WriteString("if [ ! -d \"$g\" ]; then IFS= read -r line < \"$g\" 2>/dev/null && g=\"${line#gitdir: }\"; fi\n")
@@ -65,6 +73,29 @@ func script(hook, terma string) string {
 	fmt.Fprintf(&b, "for s in %s; do\n  [ -e \"$g/$s\" ] && exit 0\ndone\n", strings.Join(replayState, " "))
 	fmt.Fprintf(&b, "[ -x %[1]s ] && %[1]s hook %[2]s \"$@\" || true\nexit 0\n", shellQuote(terma), hook)
 	return b.String()
+}
+
+// prePushBody gives the displaced hook and terma the same bytes on stdin, through a private
+// temporary file: a shell variable would change an empty input or its trailing newlines. A
+// push during a stopped rebase is a real push, so there is no replay guard. Without a file
+// the displaced hook reads git's input itself and terma sits the push out; a copy that
+// fails part way cannot be given to a hook that may veto on it, so the push stops then,
+// and only then.
+func prePushBody(terma string) string {
+	return `t=$(mktemp "${TMPDIR:-/tmp}/terma-pre-push.XXXXXX" 2>/dev/null) || t=
+if [ -z "$t" ]; then
+  if [ -x "$prev" ]; then exec "$prev" "$@"; fi
+  exit 0
+fi
+if ! cat > "$t"; then
+  rm -f "$t"
+  if [ -x "$prev" ]; then echo "terma: could not pass git's input to $prev" >&2; exit 1; fi
+  exit 0
+fi
+if [ -x "$prev" ]; then "$prev" "$@" < "$t" || { s=$?; rm -f "$t"; exit $s; }; fi
+` + fmt.Sprintf("[ -x %[1]s ] && %[1]s hook %[2]s \"$@\" < \"$t\" || true\n", shellQuote(terma), prePush) + `rm -f "$t"
+exit 0
+`
 }
 
 // maxOurScript bounds how far terma reads a hook to tell whether it wrote it. Its own
@@ -119,7 +150,7 @@ func hooksDirFor(gitDir string) (dir, common string, err error) {
 // leaves the repository alone.
 var ErrTaken = errors.New("another tool's hook has replaced terma's, and the hook terma set aside is still there")
 
-// Install writes terma's commit hooks into the repository's own hooks directory; hooks
+// Install writes terma's git hooks into the repository's own hooks directory; hooks
 // already there and current are left as they are. Per name: nothing there gets terma's
 // script; terma's own is rewritten only when it has changed; anyone else's is renamed to
 // <name>.pre-terma, and any copy of terma's script that tool moved aside goes. A
@@ -139,7 +170,7 @@ func Install(stateDir, terma, gitDir string) (changed bool, err error) {
 	return changed, err
 }
 
-// current reports whether both of terma's hooks are already its script at this version,
+// current reports whether all of terma's hooks are already its script at this version,
 // at the name or where a tool that chains to it runs it from: the common case, which needs
 // no lock.
 func current(gitDir, terma string) bool {
@@ -279,7 +310,7 @@ func removeOurCopies(dir, name string) error {
 	return nil
 }
 
-// Installed reports whether both of terma's hooks are in place in the repository at
+// Installed reports whether all of terma's hooks are in place in the repository at
 // gitDir, and whether a hook runs before them: one that was there first, or a tool that
 // installed over terma's and runs its script (pre-commit's migration mode).
 func Installed(gitDir string) (installed, chained bool) {

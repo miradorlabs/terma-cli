@@ -27,7 +27,7 @@ var contentFree = map[string]bool{
 	semconv.TermaSessionStartEvent: true, semconv.TermaSessionEndEvent: true,
 	semconv.TermaCompactionEvent: true, semconv.TermaFilesTouchedEvent: true,
 	semconv.TermaCommitStampedEvent: true, semconv.TermaCommitEvent: true, semconv.TermaCommitUnattributedEvent: true,
-	semconv.TermaSessionQuotaEvent: true, semconv.TermaSessionAccountEvent: true, semconv.TermaSessionLimitEvent: true,
+	semconv.TermaPushEvent: true, semconv.TermaSessionQuotaEvent: true, semconv.TermaSessionAccountEvent: true, semconv.TermaSessionLimitEvent: true,
 	semconv.TermaSessionCaptureEvent: true, semconv.TermaSubagentStartEvent: true, semconv.TermaSubagentEndEvent: true,
 	semconv.TermaSubagentCallEvent: true, semconv.TermaSessionObservationEvent: true,
 	semconv.TermaAssistantMessageEvent: true, semconv.TermaSessionTitleEvent: true,
