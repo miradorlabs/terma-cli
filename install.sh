@@ -7,10 +7,10 @@
 # before you run it: pick the archive for this platform from GitHub Releases, verify
 # it against the release's checksums.txt, extract the single `terma` binary, and
 # place it in ~/.local/bin; it never asks for sudo. When that directory is not on
-# PATH, it appends the one line that adds it to your login shell's startup file (zsh's
-# .zshrc, bash's .bashrc or on macOS its login file, or a fish conf.d file). Nothing
-# else is written; nothing downloaded is executed before it has been verified. Windows
-# users: download terma_Windows_x86_64.zip from https://github.com/miradorlabs/terma-cli/releases.
+# PATH, it appends the one line that adds it to your login shell's startup files (zsh's
+# .zshrc; bash's .bashrc and its login file; or a fish conf.d file). Nothing else is
+# written; nothing downloaded is executed before it has been verified. Windows users:
+# download terma_Windows_x86_64.zip from https://github.com/miradorlabs/terma-cli/releases.
 #
 #   TERMA_VERSION         install this release instead of the latest (v1.2.3 or 1.2.3)
 #   TERMA_INSTALL_DIR     put the binary here instead of ~/.local/bin
@@ -25,20 +25,21 @@ BASE="${TERMA_RELEASE_BASE:-https://github.com/${REPO}/releases}"
 say() { printf '%s\n' "$*" >&2; }
 die() { say "install.sh: $*"; exit 1; }
 
-# The startup file of shell $2 (zsh, bash, fish) on OS $1 (uname -s), picked as
-# internal/shellrc.ShellRC picks it; fails for a shell this script cannot write for.
-startup_file() {
+# The startup files of shell $1 (zsh, bash, fish), one per line, picked as
+# internal/shellrc.ShellRC picks them; fails for a shell this script cannot write for.
+startup_files() {
   [ -n "${HOME:-}" ] || return 1
-  case "$2" in
+  case "$1" in
     zsh) printf '%s\n' "${ZDOTDIR:-$HOME}/.zshrc" ;;
     bash)
-      [ "$1" = Darwin ] || { printf '%s\n' "$HOME/.bashrc"; return 0; }
-      # macOS terminals start login shells, which read the first of these that exists
-      # and is readable.
+      # An interactive shell reads .bashrc. A login shell (a macOS terminal, ssh) reads
+      # the first of these that exists and is readable, and need not read .bashrc, so
+      # both get the line. A new .profile shadows nothing, and sh reads it too.
+      printf '%s\n' "$HOME/.bashrc"
       for f in .bash_profile .bash_login .profile; do
         if [ -r "$HOME/$f" ]; then printf '%s\n' "$HOME/$f"; return 0; fi
       done
-      printf '%s\n' "$HOME/.bash_profile" ;;
+      printf '%s\n' "$HOME/.profile" ;;
     fish) printf '%s\n' "${XDG_CONFIG_HOME:-$HOME/.config}/fish/conf.d/terma.fish" ;;
     *) return 1 ;;
   esac
@@ -66,6 +67,22 @@ append_line() {
   if [ -s "$1" ] && [ -n "$(tail -c 1 "$1")" ]; then sep='\n'; fi
   mkdir -p "$(dirname "$1")" 2>/dev/null &&
     printf '%b# added by the terma installer\n%s\n' "$sep" "$2" 2>/dev/null >>"$1"
+}
+
+# Puts line $2 in each of the files $1 names, one per line, where it is missing. Sets
+# files to the ones that have it, shown and joined, and added when any needed it.
+put_line() {
+  files='' added=''
+  set -f; IFS='
+'
+  for rc in $1; do
+    if grep -qsxF "$2" "$rc"; then :
+    elif append_line "$rc" "$2"; then added=1
+    else continue
+    fi
+    files="${files:+$files and }$(shown "$rc")"
+  done
+  set +f; unset IFS
 }
 
 # Path $1 for a command the user copies: ~/… when that needs no quoting, else the whole
@@ -161,33 +178,33 @@ mv -f "$staged" "$dest/terma" || { rm -f "$staged"; die "could not install ${des
 say "Installed $("$dest/terma" version 2>/dev/null || echo terma) to ${dest}/terma"
 
 # This script runs as a child of the user's shell, so it cannot change that shell's
-# PATH: it puts dest on PATH for the terminals that start next, with one line in the
-# login shell's startup file, written once.
+# PATH: it puts dest on PATH for the terminals that start next, with a line in the
+# login shell's startup files, written once, and gives the full path to run now. The
+# login shell ($SHELL) is the only shell it can know: a terminal set to run another
+# needs that shell's own line.
 shell="${SHELL:-}"
 shell="${shell##*/}"
-rc='' line=''
-case "$dest" in
-  *:*) ;; # PATH would split it at the colon, so no line can put it there
-  *)
-    if [ -z "${TERMA_NO_MODIFY_PATH+set}" ] && rc="$(startup_file "$os" "$shell")"; then
-      line="$(path_line "$shell" "$dest")"
-    fi ;;
-esac
 next="\`$(shown "$dest/terma") setup\`"
 case ":$PATH:" in
   *":$dest:"*) next="\`terma setup\`" ;;
   *)
-    if [ -n "$line" ] && grep -qsxF "$line" "$rc"; then
-      say "$(shown "$rc") already puts ${dest} on PATH; new terminals will find terma."
-    elif [ -n "$line" ] && append_line "$rc" "$line"; then
-      say "Added ${dest} to your PATH in $(shown "$rc"); new terminals will find terma."
+    files='' added=''
+    case "$dest" in
+      *:*) ;; # PATH would split it at the colon, so no line can put it there
+      *)
+        if [ -z "${TERMA_NO_MODIFY_PATH+set}" ] && rcs="$(startup_files "$shell")"; then
+          put_line "$rcs" "$(path_line "$shell" "$dest")"
+        fi ;;
+    esac
+    if [ -n "$added" ]; then
+      say "Added ${dest} to PATH in ${files}, for ${shell} (your login shell): new ${shell} terminals will find terma."
+    elif [ -n "$files" ]; then
+      say "${dest} is already on PATH in new ${shell} terminals (${files})."
     else
-      line=''
       case "$dest" in
         *:*) say "Note: ${dest} cannot go on PATH, which would split it at the ':'." ;;
         *) say "Note: ${dest} is not on your PATH. Add it, e.g.:  export PATH=\"${dest}:\$PATH\"" ;;
       esac
-    fi
-    [ -z "$line" ] || next="\`source $(shown "$rc")\` in this terminal, then \`terma setup\`" ;;
+    fi ;;
 esac
 say "Next: run ${next}."

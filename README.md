@@ -15,12 +15,13 @@ Install terma one of these ways, then run `terma setup` once.
 
 **Installer script** (macOS and Linux). Installs to `~/.local/bin`, without sudo, and
 verifies `checksums.txt`. terma keeps it up to date by itself (see [Updates](#updates)).
-When `~/.local/bin` is not on your PATH, the installer adds it in your shell's startup
-file; run the `source` command it prints (or open a new terminal) before `terma setup`.
+When `~/.local/bin` is not on your PATH, the installer adds it in your login shell's
+startup files, so new terminals find `terma`; in the terminal you installed from, run it
+by its full path.
 
 ```bash
 curl -fsSL https://terma.ai/install.sh | bash
-terma setup
+~/.local/bin/terma setup
 ```
 
 **Homebrew** (macOS and Linux). It updates with `brew upgrade terma`; `terma update` runs

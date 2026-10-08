@@ -154,6 +154,13 @@ func TestDoctorGivesTheCommandThatPutsTermaOnPath(t *testing.T) {
 		t.Fatalf("~/.zshrc = %q, want %q", data, rc.PathLine(dir)+"\n")
 	}
 
+	// bash: the interactive and the login startup file, then the interactive one sourced.
+	t.Setenv("SHELL", "/bin/bash")
+	line := `'export PATH="/opt/terma:$PATH"'`
+	if got, want := AddToPathCommand("/opt/terma"), "echo "+line+" >> ~/.bashrc && echo "+line+" >> ~/.profile && source ~/.bashrc"; got != want {
+		t.Errorf("bash: %q, want %q", got, want)
+	}
+
 	t.Setenv("SHELL", "/usr/bin/fish")
 	if got, want := AddToPathCommand("/opt/terma"), `fish_add_path --move --prepend "/opt/terma"`; got != want {
 		t.Errorf("fish: %q, want %q", got, want)

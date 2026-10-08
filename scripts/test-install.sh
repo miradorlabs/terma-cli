@@ -78,48 +78,65 @@ fresh_home() { mktemp -d "$work/home.XXXXXX"; }
 # own error about an unset variable or a file it cannot write.
 clean() {
   local stray
-  stray="$(grep -vE '^(Downloading |Installed |Added |Note: |Next: run |.+ already puts )' <<<"$1" || true)"
+  stray="$(grep -vE '^(Downloading |Installed |Added |Note: |Next: run |.+ is already on PATH in new )' <<<"$1" || true)"
   [ -z "$stray" ] || fail "stray output: $stray"
 }
-# finds <home> <output> runs the `source …` the installer suggested, in sh, and prints
-# where `terma` then resolves.
-finds() {
+# next_runs <home> <output> runs the installer's `Next:` command in sh, `version` in
+# place of `setup`, and fails unless that reaches the installed terma.
+next_runs() {
   local cmd
   # shellcheck disable=SC2016 # the backticks are the installer's text
-  cmd="$(sed -n 's/^Next: run `source \(.*\)` in this terminal.*/\1/p' <<<"$2")"
-  [ -n "$cmd" ] || fail "no source command in: $2"
-  HOME="$1" PATH=/usr/bin:/bin sh -c ". $cmd && command -v terma"
+  cmd="$(sed -n 's/^Next: run `\(.*\) setup`\.$/\1/p' <<<"$2")"
+  [ -n "$cmd" ] || fail "no Next command in: $2"
+  [ "$(HOME="$1" PATH=/usr/bin:/bin sh -c "$cmd version")" = "$want" ] || fail "\`$cmd version\` is not terma: $2"
+}
+# sourced <home> <file> is where `terma` resolves once sh has sourced <file>.
+sourced() {
+  # shellcheck disable=SC2016 # expanded by the inner sh
+  HOME="$1" PATH=/usr/bin:/bin sh -c '. "$1" && command -v terma' sh "$2"
 }
 # shellcheck disable=SC2016 # the line the installer writes, for the startup file to expand
 line='export PATH="$HOME/.local/bin:$PATH"'
 
-echo "== adds ~/.local/bin to PATH in the zsh startup file, once"
+echo "== adds ~/.local/bin to PATH in the zsh startup file, once, and gives the full path to run now"
 home="$(fresh_home)"
 printf 'alias ll=ls' >"$home/.zshrc" # no trailing newline
 out="$(install_as /bin/zsh "$home")"
 clean "$out"
 [ "$(cat "$home/.zshrc")" = "$(printf 'alias ll=ls\n# added by the terma installer\n%s' "$line")" ] \
   || fail ".zshrc: $(cat "$home/.zshrc")"
-grep -qF "Added $home/.local/bin to your PATH in ~/.zshrc" <<<"$out" || fail "no Added line: $out"
-grep -qF "run \`source ~/.zshrc\` in this terminal, then \`terma setup\`" <<<"$out" || fail "no reload hint: $out"
-[ "$(finds "$home" "$out")" = "$home/.local/bin/terma" ] || fail "sourcing ~/.zshrc does not put terma on PATH"
+grep -qF "Added $home/.local/bin to PATH in ~/.zshrc, for zsh (your login shell): new zsh terminals will find terma." <<<"$out" \
+  || fail "no Added line: $out"
+grep -qxF "Next: run \`~/.local/bin/terma setup\`." <<<"$out" || fail "no full-path next step: $out"
+next_runs "$home" "$out"
+[ "$(sourced "$home" "$home/.zshrc")" = "$home/.local/bin/terma" ] || fail "sourcing ~/.zshrc does not put terma on PATH"
 out="$(install_as /bin/zsh "$home")"
 clean "$out"
 [ "$(grep -cxF "$line" "$home/.zshrc")" = 1 ] || fail "a reinstall added the line again: $(cat "$home/.zshrc")"
-grep -qF ".zshrc already puts $home/.local/bin on PATH" <<<"$out" || fail "a reinstall said: $out"
+grep -qxF "$home/.local/bin is already on PATH in new zsh terminals (~/.zshrc)." <<<"$out" || fail "a reinstall said: $out"
 
 echo "== zsh with ZDOTDIR, quoted where the path needs it"
 home="$(fresh_home)"
 out="$(install_as /bin/zsh "$home" ZDOTDIR="$home/z'sh")"
 clean "$out"
-grep -qxF "$line" "$home/z'sh/.zshrc" || fail "\$ZDOTDIR/.zshrc has no PATH line: $(ls -AR "$home")"
-[ "$(finds "$home" "$out")" = "$home/.local/bin/terma" ] || fail "the suggested source command does not work: $out"
+grep -qF "in '$home/z'\\''sh/.zshrc', for zsh" <<<"$out" || fail "ZDOTDIR shown unquoted: $out"
+[ "$(sourced "$home" "$home/z'sh/.zshrc")" = "$home/.local/bin/terma" ] || fail "\$ZDOTDIR/.zshrc: $(ls -AR "$home")"
 
-echo "== bash: ~/.bashrc, or on macOS the login file it reads"
+echo "== bash: .bashrc for an interactive shell and the login file for a login shell, both read by a real bash"
 home="$(fresh_home)"
-rcfile=.bashrc; [ "$(uname -s)" != Darwin ] || rcfile=.bash_profile
+out="$(install_as /bin/bash "$home")"
+clean "$out"
+grep -qF "in ~/.bashrc and ~/.profile, for bash (your login shell)" <<<"$out" || fail "bash said: $out"
+for mode in -ic -lc; do
+  [ "$(env -i HOME="$home" PATH=/usr/bin:/bin /bin/bash "$mode" 'command -v terma' 2>/dev/null)" = "$home/.local/bin/terma" ] \
+    || fail "bash $mode does not find terma: $(ls -A "$home")"
+done
+home="$(fresh_home)"
+: >"$home/.bash_profile" # the login file bash reads, so no .profile appears
 clean "$(install_as /bin/bash "$home")"
-grep -qxF "$line" "$home/$rcfile" || fail "$rcfile has no PATH line: $(ls -A "$home")"
+if ! grep -qxF "$line" "$home/.bashrc" || ! grep -qxF "$line" "$home/.bash_profile" || [ -e "$home/.profile" ]; then
+  fail "with .bash_profile: $(ls -A "$home")"
+fi
 
 echo "== fish: a conf.d file of terma's own, under XDG_CONFIG_HOME when it is set"
 home="$(fresh_home)"
@@ -171,7 +188,8 @@ home="$(fresh_home)"
 odd="$work/a b\"c\$d\`e\\f'g"
 out="$(install_as /bin/zsh "$home" TERMA_INSTALL_DIR="$odd")"
 clean "$out"
-[ "$(finds "$home" "$out")" = "$odd/terma" ] || fail "sourcing ~/.zshrc does not find $odd/terma: $(cat "$home/.zshrc")"
+next_runs "$home" "$out"
+[ "$(sourced "$home" "$home/.zshrc")" = "$odd/terma" ] || fail "sourcing ~/.zshrc does not find $odd/terma: $(cat "$home/.zshrc")"
 
 echo "== a directory with a colon, which PATH would split, is never written"
 home="$(fresh_home)"
@@ -180,6 +198,7 @@ clean "$out"
 if ! grep -qF "cannot go on PATH" <<<"$out" || ! grep -qF "Next: run \`'$work/a:b/terma' setup\`." <<<"$out"; then
   fail "colon in the directory, but said: $out"
 fi
+next_runs "$home" "$out"
 [ ! -e "$home/.zshrc" ] || fail "wrote .zshrc for a directory PATH cannot hold: $(cat "$home/.zshrc")"
 
 echo "== a relative TERMA_INSTALL_DIR goes on PATH absolute, without .."

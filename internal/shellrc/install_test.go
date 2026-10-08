@@ -23,13 +23,9 @@ func installScript(t *testing.T, fn string, args ...string) (string, bool) {
 	return strings.TrimSuffix(string(out), "\n"), err == nil
 }
 
-func TestInstallScriptPicksTheSameStartupFile(t *testing.T) {
+func TestInstallScriptPicksTheSameStartupFiles(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("install.sh is for macOS and Linux")
-	}
-	uname, err := exec.Command("uname", "-s").Output()
-	if err != nil {
-		t.Fatal(err)
 	}
 	home := rcSandbox(t, "zsh")
 	check := func(what, shell string) {
@@ -39,9 +35,9 @@ func TestInstallScriptPicksTheSameStartupFile(t *testing.T) {
 			t.Setenv("SHELL", "")
 		}
 		want, wantOK := ShellRC()
-		got, ok := installScript(t, "startup_file", strings.TrimSpace(string(uname)), shell)
-		if ok != wantOK || ok && got != want.Path {
-			t.Errorf("%s: install.sh %q %v, ShellRC %q %v", what, got, ok, want.Path, wantOK)
+		got, ok := installScript(t, "startup_files", shell)
+		if ok != wantOK || ok && got != strings.Join(want.Paths, "\n") {
+			t.Errorf("%s: install.sh %q %v, ShellRC %q %v", what, got, ok, want.Paths, wantOK)
 		}
 	}
 	for _, shell := range []string{"zsh", "bash", "fish", "tcsh", ""} {

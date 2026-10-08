@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -20,27 +21,26 @@ func rcSandbox(t *testing.T, shell string) string {
 	return home
 }
 
-func TestShellRCNamesTheFileTheShellReads(t *testing.T) {
+func TestShellRCNamesTheFilesTheShellReads(t *testing.T) {
 	home := rcSandbox(t, "zsh")
-	if rc, ok := ShellRC(); !ok || rc.Path != filepath.Join(home, ".zshrc") || rc.Shell != "zsh" {
+	if rc, ok := ShellRC(); !ok || !slices.Equal(rc.Paths, []string{filepath.Join(home, ".zshrc")}) || rc.Shell != "zsh" {
 		t.Fatalf("zsh: %+v %v", rc, ok)
 	}
 	zdot := t.TempDir()
 	t.Setenv("ZDOTDIR", zdot)
-	if rc, _ := ShellRC(); rc.Path != filepath.Join(zdot, ".zshrc") {
+	if rc, _ := ShellRC(); !slices.Equal(rc.Paths, []string{filepath.Join(zdot, ".zshrc")}) {
 		t.Fatalf("zsh honours ZDOTDIR: %+v", rc)
 	}
 
-	// A macOS terminal starts a login shell, which reads the first of .bash_profile,
-	// .bash_login and .profile that exists and is readable, and never .bashrc.
+	// An interactive bash reads .bashrc; a login bash reads the first of .bash_profile,
+	// .bash_login and .profile that exists and is readable. Both get the line, on every OS.
 	t.Setenv("SHELL", "/usr/local/bin/bash")
 	for _, step := range []struct {
 		create string
 		mode   os.FileMode
-		darwin string
+		login  string
 	}{
-		{"", 0, ".bash_profile"},
-		{".profile", 0o644, ".profile"},
+		{"", 0, ".profile"},
 		{".bash_login", 0o644, ".bash_login"},
 		{".bash_profile", 0o200, ".bash_login"}, // write-only: bash skips it
 		{".bash_profile", 0o644, ".bash_profile"},
@@ -57,17 +57,14 @@ func TestShellRCNamesTheFileTheShellReads(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		want := ".bashrc"
-		if runtime.GOOS == "darwin" {
-			want = step.darwin
-		}
-		if rc, ok := ShellRC(); !ok || rc.Path != filepath.Join(home, want) {
-			t.Fatalf("bash on %s with %q: %+v %v, want %s", runtime.GOOS, step.create, rc, ok, want)
+		want := []string{filepath.Join(home, ".bashrc"), filepath.Join(home, step.login)}
+		if rc, ok := ShellRC(); !ok || !slices.Equal(rc.Paths, want) {
+			t.Fatalf("bash with %q: %+v %v, want %q", step.create, rc, ok, want)
 		}
 	}
 
 	t.Setenv("SHELL", "/opt/homebrew/bin/fish")
-	if rc, ok := ShellRC(); !ok || rc.Path != filepath.Join(home, ".config", "fish", "conf.d", "terma.fish") {
+	if rc, ok := ShellRC(); !ok || !slices.Equal(rc.Paths, []string{filepath.Join(home, ".config", "fish", "conf.d", "terma.fish")}) {
 		t.Fatalf("fish: %+v %v", rc, ok)
 	}
 	if line := (RC{Shell: "fish"}).PathLine(filepath.Join(home, ".local/bin")); line != `fish_add_path --move --prepend "$HOME/.local/bin"` {

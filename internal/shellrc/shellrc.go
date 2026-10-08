@@ -1,4 +1,4 @@
-// Package shellrc finds the developer's shell startup file and writes the line that
+// Package shellrc finds the developer's shell startup files and writes the line that
 // puts a directory first on PATH in that shell. install.sh repeats ShellRC and
 // PathLine in sh, and install_test.go holds the two to the same answers.
 package shellrc
@@ -7,17 +7,18 @@ import (
 	"cmp"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 )
 
-// RC is the developer's shell startup file.
+// RC is the developer's shell and the startup files that put a directory on PATH in
+// it; a running shell sources the first.
 type RC struct {
-	Path  string
+	Paths []string
 	Shell string // "zsh", "bash" or "fish"
 }
 
-// ShellRC is the startup file of the login shell ($SHELL), or false for a shell terma cannot write for.
+// ShellRC is the startup files of the login shell ($SHELL), or false for a shell terma
+// cannot write for.
 func ShellRC() (RC, bool) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -26,22 +27,22 @@ func ShellRC() (RC, bool) {
 	switch shell := filepath.Base(os.Getenv("SHELL")); shell {
 	case "zsh":
 		dir := cmp.Or(os.Getenv("ZDOTDIR"), home)
-		return RC{Path: filepath.Join(dir, ".zshrc"), Shell: shell}, true
+		return RC{Paths: []string{filepath.Join(dir, ".zshrc")}, Shell: shell}, true
 	case "bash":
-		if runtime.GOOS != "darwin" {
-			return RC{Path: filepath.Join(home, ".bashrc"), Shell: shell}, true
-		}
-		// macOS terminals start login shells, which read the first of these that exists
-		// and is readable.
+		// An interactive shell reads .bashrc. A login shell (a macOS terminal, ssh) reads
+		// the first of these that exists and is readable, and need not read .bashrc, so
+		// both get the line. A new .profile shadows nothing, and sh reads it too.
+		login := filepath.Join(home, ".profile")
 		for _, name := range []string{".bash_profile", ".bash_login", ".profile"} {
 			if path := filepath.Join(home, name); readable(path) {
-				return RC{Path: path, Shell: shell}, true
+				login = path
+				break
 			}
 		}
-		return RC{Path: filepath.Join(home, ".bash_profile"), Shell: shell}, true
+		return RC{Paths: []string{filepath.Join(home, ".bashrc"), login}, Shell: shell}, true
 	case "fish":
 		// A file of terma's own, in which fish_add_path moves the entry to the front each run.
-		return RC{Path: filepath.Join(FishConfigDir(home), "conf.d", "terma.fish"), Shell: shell}, true
+		return RC{Paths: []string{filepath.Join(FishConfigDir(home), "conf.d", "terma.fish")}, Shell: shell}, true
 	}
 	return RC{}, false
 }

@@ -117,8 +117,12 @@ func AddToPathCommand(dir string) string {
 	if rc.Shell == "fish" {
 		return line
 	}
-	file := shellPath(rc.Path)
-	return "echo '" + strings.ReplaceAll(line, "'", `'\''`) + "' >> " + file + " && " + ReloadCommand(file)
+	quoted := "'" + strings.ReplaceAll(line, "'", `'\''`) + "'"
+	var command strings.Builder
+	for _, path := range rc.Paths {
+		command.WriteString("echo " + quoted + " >> " + shellPath(path) + " && ")
+	}
+	return command.String() + ReloadCommand(shellPath(rc.Paths[0]))
 }
 
 // shellPath writes ~/… when that needs no quoting, else the full path in single quotes.
