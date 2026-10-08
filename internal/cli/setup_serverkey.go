@@ -20,7 +20,8 @@ const serverKeyAuth = "server_key"
 // useServerKey has s sign in with the team server key in TERMA_API_KEY rather than as a
 // person: the auth host names the key's organization and team, and once the key has
 // fetched the team's policy it is kept as the team's key and the profile records them, so
-// nothing needs TERMA_API_KEY again. Nothing is minted and no credentials.json written.
+// nothing but setup needs TERMA_API_KEY again. Nothing is minted and no login is written;
+// one already on file only moves to where secrets are now kept.
 // org is --org and insecure --insecure-storage; a setup that fails before the key is kept
 // leaves the keystore, the secret storage and the profile's sign-in as they were.
 func (app *App) useServerKey(s *setup.Steps, ui *setupUI, org orgRef, team *string, insecure bool) {

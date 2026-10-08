@@ -210,9 +210,10 @@ it in `TERMA_API_KEY`:
 TERMA_API_KEY=ter_srv_… terma setup --yes --harness claude
 ```
 
-Setup sets up the key's team, with no browser, and keeps the key, so nothing needs
-`TERMA_API_KEY` afterwards. To rotate the key, run the same command with the new one. Add
-`--insecure-storage` on a machine with no system keychain.
+Setup sets up the key's team, with no browser, and keeps the key, so the hooks, the relay,
+`terma doctor` and `terma status` need no `TERMA_API_KEY` afterwards. Setup itself does: run
+it again with the key set, or with a new key to rotate it. Add `--insecure-storage` on a
+machine with no system keychain.
 
 ## Collection
 

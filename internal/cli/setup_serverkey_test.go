@@ -351,18 +351,18 @@ func TestServerKeySetupMovesTheKeyWhereSecretsAreKept(t *testing.T) {
 		}
 		return strings.Contains(string(data), secret)
 	}
-	if !inPlainText(keysFile, testServerKey) || !inPlainText(credentialsFile, login.AccessToken) {
+	if !inPlainText(keysFile, testServerKey) || !inPlainText(credentialsFile, login.AccessToken) || !inPlainText(credentialsFile, login.RefreshToken) {
 		t.Fatal("--insecure-storage kept the key or the login elsewhere")
 	}
 	t.Setenv("TERMA_API_KEY", rotatedKey)
 	setupWithKey(t)
-	if inPlainText(keysFile, testServerKey) || inPlainText(keysFile, rotatedKey) || inPlainText(credentialsFile, login.AccessToken) {
+	if inPlainText(keysFile, testServerKey) || inPlainText(keysFile, rotatedKey) || inPlainText(credentialsFile, login.AccessToken) || inPlainText(credentialsFile, login.RefreshToken) {
 		t.Fatal("a secret stayed in plain text after setup chose the keychain")
 	}
 	if key, err := keystore.Get(testApp.dir, team); err != nil || key != rotatedKey {
 		t.Fatalf("team key = %q, %v; want the rotated one", key, err)
 	}
-	if cred, err := auth.LoadCredential(testApp.dir, config.DefaultProfile); err != nil || cred.AccessToken != login.AccessToken {
+	if cred, err := auth.LoadCredential(testApp.dir, config.DefaultProfile); err != nil || cred.AccessToken != login.AccessToken || cred.RefreshToken != login.RefreshToken {
 		t.Fatalf("the login behind the key: %v", err)
 	}
 }
