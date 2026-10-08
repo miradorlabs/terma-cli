@@ -103,5 +103,11 @@ func (app *App) runSwitch(cmd *cobra.Command, f switchFlags) error {
 	}
 	fmt.Fprintln(out, "In the browser, approve as the account you want: if the Terma app there is signed in as another, sign out of it first or use a private window.")
 	fmt.Fprintln(out)
-	return app.runSetup(cmd, setupFlags{noBrowser: f.noBrowser})
+	return app.runSetup(cmd, app.switchSetupFlags(f))
+}
+
+// switchSetupFlags is how switch runs setup: its other choices stay as recorded, the
+// relay's and where credentials are kept.
+func (app *App) switchSetupFlags(f switchFlags) setupFlags {
+	return setupFlags{noBrowser: f.noBrowser, insecureStorage: config.InsecureStorage(app.dir)}
 }

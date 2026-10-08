@@ -199,3 +199,16 @@ func TestSwitchRefusesAnInactiveProfile(t *testing.T) {
 		t.Errorf("after a refused switch: organization %q team %q, %d sign-ins, %d revokes", org, team, signIns, f.revokes.Load())
 	}
 }
+
+// A machine set up to keep credentials in plain-text files still does after switch.
+func TestSwitchKeepsTheStorageChoice(t *testing.T) {
+	switchSandbox(t, orgA(), acmeWeb)
+	for _, insecure := range []bool{false, true} {
+		if err := config.UpdateFile(testApp.dir, func(f *config.File) { f.InsecureStorage = insecure }); err != nil {
+			t.Fatal(err)
+		}
+		if got := testApp.switchSetupFlags(switchFlags{}).insecureStorage; got != insecure {
+			t.Errorf("recorded insecure storage %v, setup runs with %v", insecure, got)
+		}
+	}
+}
