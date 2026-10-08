@@ -14,7 +14,7 @@
 #
 #   TERMA_VERSION         install this release instead of the latest (v1.2.3 or 1.2.3)
 #   TERMA_INSTALL_DIR     put the binary here instead of ~/.local/bin
-#   TERMA_NO_MODIFY_PATH  set to any value to leave your shell's startup file alone
+#   TERMA_NO_MODIFY_PATH  set, to any value or none, to leave your shell's startup file alone
 set -eu
 
 REPO="miradorlabs/terma-cli"
@@ -166,7 +166,7 @@ say "Installed $("$dest/terma" version 2>/dev/null || echo terma) to ${dest}/ter
 shell="${SHELL:-}"
 shell="${shell##*/}"
 rc='' line=''
-if [ -z "${TERMA_NO_MODIFY_PATH:-}" ] && rc="$(startup_file "$os" "$shell")"; then
+if [ -z "${TERMA_NO_MODIFY_PATH+set}" ] && rc="$(startup_file "$os" "$shell")"; then
   line="$(path_line "$shell" "$dest")"
 fi
 next="\`$(shown "$dest/terma") setup\`"

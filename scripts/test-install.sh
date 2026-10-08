@@ -145,6 +145,7 @@ note() {
   fi
 }
 note "$(install_as /bin/zsh "$home" TERMA_NO_MODIFY_PATH=1)" "opted out"
+note "$(install_as /bin/zsh "$home" TERMA_NO_MODIFY_PATH=)" "opted out, empty"
 note "$(install_as /bin/tcsh "$home")" "unknown shell"
 if [ -x /bin/dash ]; then # Debian's sh; bash fills SHELL in from the user database
   note "$(env -u SHELL HOME="$home" PATH=/usr/bin:/bin TERMA_RELEASE_BASE="$BASE" TERMA_VERSION="$TAG" \

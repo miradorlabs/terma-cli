@@ -55,8 +55,8 @@ terma setup
 ```
 
 The installer script takes `TERMA_INSTALL_DIR` to change the destination,
-`TERMA_VERSION=vX.Y.Z` to pin a release, and `TERMA_NO_MODIFY_PATH` (any value) to
-leave your shell's startup file alone. It is POSIX `sh`, so `| sh` works too.
+`TERMA_VERSION=vX.Y.Z` to pin a release, and `TERMA_NO_MODIFY_PATH` (set to anything,
+even empty) to leave your shell's startup file alone. It is POSIX `sh`, so `| sh` works too.
 
 `terma setup` signs you in through your browser, then asks:
 
