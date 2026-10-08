@@ -132,10 +132,11 @@ relay, spool delivery, shell completion — and for Terma's own engineers.
 
 ## Updates
 
-terma keeps itself up to date. Every few minutes it looks for a new release (after a failed
-lookup, again in 15 minutes, then less often, up to hourly) and installs it in place, verified
-against the release checksum. The local relay does this in the background, so a machine
-nobody runs a terma command on still updates, and so does each terma command you run in a terminal. Hooks,
+terma keeps itself up to date. It looks for a new release (after a failed lookup, again in
+15 minutes, then less often, up to hourly) and installs it in place, verified against the
+release checksum. The local relay does this every few minutes in the background, so a machine
+nobody runs a terma command on still updates, and each terma command you run in a terminal
+does it at most hourly. Hooks,
 scripts, CI and `--output` other than a table never look. A relay that installed a
 release keeps running until nothing it holds is waiting, no export is arriving and none
 has for half a minute (after 12 hours it stops waiting for that pause), then restarts on
