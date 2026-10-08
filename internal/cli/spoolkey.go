@@ -12,7 +12,9 @@ import (
 // spoolKey's fix, when set, is what the developer must do before events are delivered.
 type spoolKey struct{ state, fix string }
 
-// ensureSpoolKey never fails setup: held events wait up to the spool's MaxAge for a key.
+// ensureSpoolKey mints the team's key with the developer's login, unless one is on file; a
+// server-key setup stores its own key instead (useServerKey). It never fails setup: held
+// events wait up to the spool's MaxAge for a key.
 func (app *App) ensureSpoolKey(ctx context.Context, cfg *config.Config) spoolKey {
 	const held = "held until this machine has a key for the team"
 	// A key on file is already where setup keeps secrets: sign-in moved them (settleSecrets).
@@ -20,9 +22,6 @@ func (app *App) ensureSpoolKey(ctx context.Context, cfg *config.Config) spoolKey
 		return spoolKey{held, "Unlock the system keychain, then run `terma setup` again (" + err.Error() + ")."}
 	} else if key != "" {
 		return spoolKey{state: "delivered with this team's key"}
-	}
-	if cfg.APIKey != "" {
-		return spoolKey{held, "TERMA_API_KEY cannot mint a key for hook events: unset it and run `terma setup` again."}
 	}
 	client, err := app.newClient(cfg)
 	var key string

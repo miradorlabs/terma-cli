@@ -12,7 +12,8 @@ import (
 )
 
 // CollectionPolicy asks the account service what the signed-in organization collects from
-// this machine; TERMA_POLICY_STUB is an offline test override.
+// this machine, with the developer's login or the team's own server key;
+// TERMA_POLICY_STUB is an offline test override.
 func (c *Client) CollectionPolicy(ctx context.Context) (config.Policy, error) {
 	if err := ctx.Err(); err != nil {
 		return config.Policy{}, err
@@ -29,13 +30,15 @@ func (c *Client) CollectionPolicy(ctx context.Context) (config.Policy, error) {
 		return p, nil
 	}
 	var response policyResponse
-	if c.apiKey != "" {
-		return config.Policy{}, fmt.Errorf("collection policy requires a developer login; server keys only deliver telemetry")
+	// A server key is bound to its team and names none; a login names the team it reads.
+	query := url.Values{}
+	if c.apiKey == "" {
+		if c.projectID == "" {
+			return config.Policy{}, fmt.Errorf("collection policy requires a team ID")
+		}
+		query.Set("project_id", c.projectID)
 	}
-	if c.projectID == "" {
-		return config.Policy{}, fmt.Errorf("collection policy requires a team ID")
-	}
-	if err := c.AuthGet(ctx, "/v1/policy", url.Values{"project_id": {c.projectID}}, &response); err != nil {
+	if err := c.AuthGet(ctx, "/v1/policy", query, &response); err != nil {
 		return config.Policy{}, err
 	}
 	return response.collectionPolicy()

@@ -187,3 +187,30 @@ func TestATimedOutKeyWriteIsCleanedUp(t *testing.T) {
 		t.Fatal("the mark outlived the item")
 	}
 }
+
+// DeleteHarnessKeys forgets a project's harness keys and their keychain items, and keeps
+// the project's own key and every other project's.
+func TestDeleteHarnessKeysLeavesTheProjectsKey(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	for _, p := range []string{"proj-1", "proj-2"} {
+		if err := SetFor(dir, "claude", p, testKey, Hosts{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := DeleteHarnessKeys(dir, "proj-1"); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := GetFor(dir, "claude", "proj-1"); err != nil || got != "" {
+		t.Fatalf("GetFor = %q, %v; want none", got, err)
+	}
+	if _, err := secret.Get(dir, harnessItem("claude", "proj-1")); err == nil {
+		t.Fatal("the harness key's keychain item outlived its entry")
+	}
+	if got, err := Get(dir, "proj-1"); err != nil || got != testKey {
+		t.Fatalf("Get = %q, %v", got, err)
+	}
+	if got, err := GetFor(dir, "claude", "proj-2"); err != nil || got != testKey {
+		t.Fatalf("another project's harness key = %q, %v", got, err)
+	}
+}

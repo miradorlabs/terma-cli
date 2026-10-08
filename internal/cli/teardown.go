@@ -43,7 +43,9 @@ func (app *App) newTeardownCommand() *cobra.Command {
 
 Your sign-in is kept, so ` + "`terma setup`" + ` sets this machine up again in seconds,
 with the relay's token as it was: agents still running keep reporting without a restart.
---sign-out also revokes the sign-in, and the next setup mints a new token.`,
+--sign-out also revokes the sign-in, and the next setup mints a new token. On a
+machine set up with a server key, it stops the key being this machine's sign-in; the
+key itself is revoked in the Terma web app.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Refused before anything changes, so teardown never stops halfway.
@@ -175,7 +177,8 @@ var errNoSessionWithAPIKey = errors.New("TERMA_API_KEY is set — there is no se
 
 // signOut revokes every session this profile holds server-side and deletes the local
 // credentials, one per organization signed into. A failed revoke still clears the local
-// file: the developer asked to be signed out.
+// file: the developer asked to be signed out. A profile set up with a server key stops
+// counting it as its sign-in; the key itself is revoked only in the Terma web app.
 func (app *App) signOut(cmd *cobra.Command) error {
 	out := cmd.OutOrStdout()
 	cfg, err := app.loadConfig()
@@ -185,6 +188,12 @@ func (app *App) signOut(cmd *cobra.Command) error {
 	if cfg.APIKey != "" {
 		return errNoSessionWithAPIKey
 	}
+	if cfg.ServerKeySignIn {
+		if err := config.UpdateProfile(app.dir, cfg.ProfileName, func(p *config.Profile) { p.ServerKeySignIn, p.ServerKeyAuthURL = false, "" }); err != nil {
+			return err
+		}
+		fmt.Fprintln(out, "Signed out of the team's server key; it keeps working until you revoke it in the Terma web app.")
+	}
 	creds, err := auth.Credentials(app.dir, cfg.ProfileName)
 	switch {
 	case secret.IsUnavailable(err):
@@ -193,7 +202,9 @@ func (app *App) signOut(cmd *cobra.Command) error {
 	case err != nil:
 		return err
 	case len(creds) == 0:
-		fmt.Fprintln(out, "Already signed out.")
+		if !cfg.ServerKeySignIn {
+			fmt.Fprintln(out, "Already signed out.")
+		}
 		return nil
 	}
 	for _, cred := range creds {

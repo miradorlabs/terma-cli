@@ -2,6 +2,8 @@ package secret
 
 import (
 	"errors"
+	"slices"
+	"strings"
 	"sync"
 	"testing"
 
@@ -30,6 +32,10 @@ var useSystemInTests bool
 
 var memory = memoryStore{items: map[string]string{}, failing: map[string]failure{}}
 
+// errRefused is a keychain declining one item while taking others, as one that will not store
+// a secret that large would.
+var errRefused = errors.New("the keychain refused the item")
+
 type failure int
 
 const (
@@ -42,11 +48,16 @@ type memoryStore struct {
 	mu      sync.Mutex
 	items   map[string]string
 	failing map[string]failure
+	// refusing are service and item-name prefixes whose items Set refuses (RefuseForTest).
+	refusing []string
 }
 
 func (m *memoryStore) Set(service, user, password string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if slices.ContainsFunc(m.refusing, func(prefix string) bool { return strings.HasPrefix(service+"\x00"+user, prefix) }) {
+		return errRefused
+	}
 	m.items[service+"\x00"+user] = password
 	return nil
 }
@@ -98,4 +109,18 @@ func failFor(t testing.TB, dir string, f failure) (unlock func()) {
 	}
 	t.Cleanup(unlock)
 	return unlock
+}
+
+// RefuseForTest makes the store refuse to keep any item for the config directory dir whose
+// name starts with prefix, while it keeps every other, until t ends. Only for tests.
+func RefuseForTest(t testing.TB, dir, prefix string) {
+	refused := Service(dir) + "\x00" + prefix
+	memory.mu.Lock()
+	memory.refusing = append(memory.refusing, refused)
+	memory.mu.Unlock()
+	t.Cleanup(func() {
+		memory.mu.Lock()
+		memory.refusing = slices.DeleteFunc(memory.refusing, func(p string) bool { return p == refused })
+		memory.mu.Unlock()
+	})
 }

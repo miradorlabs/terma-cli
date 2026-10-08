@@ -74,6 +74,9 @@ the result:
 terma doctor
 ```
 
+No browser on the machine, such as CI or an ephemeral VM? Sign in with a team server key
+instead: see [Scripted and headless setup](#scripted-and-headless-setup).
+
 ## How it works
 
 ```mermaid
@@ -207,6 +210,23 @@ terma setup --org acme --team platform --harness claude,codex --yes
 Every other command reads the team you chose at setup; `--team <name-or-id>` overrides it
 for one command.
 
+A machine with no one to sign in, such as CI or an ephemeral VM, signs in with a team server
+key instead. Create one in the Terma web app under **Team settings → API keys**, with
+**Ingest only** selected, and run setup with it in `TERMA_API_KEY`:
+
+```bash
+TERMA_API_KEY=ter_srv_… terma setup --yes --harness claude
+```
+
+Setup sets up the key's team, with no browser, and keeps the key, so the hooks, the relay,
+`terma doctor` and `terma status` need no `TERMA_API_KEY` afterwards. Setup itself does: run
+it again with the key set, or with a new key to rotate it. It refuses a key that cannot
+ingest, and warns about one that can also read or write the team's data, since anything on
+the machine can use it. On a machine with no system keychain, setup keeps the key in a
+plain-text file and says so; `--insecure-storage` chooses that up front. The
+[headless setup guide](https://docs.terma.ai/cli/headless-setup) covers rotation, sign-out
+and what `terma doctor` reports.
+
 ## Collection
 
 ### Which repositories are collected
@@ -333,7 +353,9 @@ tested against a sub-50 ms budget.
 
 ## Privacy and security
 
-Authentication uses a browser handoff with PKCE and a loopback callback. Credentials and
+Authentication uses a browser handoff with PKCE and a loopback callback, or, with
+`TERMA_API_KEY`, a team server key, which terma keeps as the team's key and sends only to
+the auth host it was set up against. Credentials and
 team keys stay in the user's configuration directory (`~/.config/terma`, or
 `%APPDATA%\terma` on Windows) with restrictive file permissions. What terma writes as it
 runs — the event queue, the relay and its local token, the hooks' state, the record of the

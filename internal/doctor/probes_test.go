@@ -106,6 +106,41 @@ func TestDoctorTellsALockedKeychainFromNoSignIn(t *testing.T) {
 	}
 }
 
+// A profile set up with a server key is signed in while its team's key is here: doctor and
+// status name the key, and without it both say how to store it again.
+func TestDoctorAndStatusOnAServerKey(t *testing.T) {
+	t.Parallel()
+	keyed := func() (Credential, error) {
+		return Credential{ServerKey: "ter_srv_0123…", OrganizationID: "org_a"}, nil
+	}
+	none := func() (Credential, error) { return Credential{}, errors.New("no server key") }
+	run := func(probe func() (Credential, error)) Env {
+		e := env(t, Probes{Credential: probe, Spool: func() SpoolState { return SpoolState{} }})
+		e.Config.ServerKeySignIn = true
+		return e
+	}
+	if c := check(Run(t.Context(), run(keyed), Progress{}), KeyAuth); c.Status != Pass || c.Detail != "server key ter_srv_0123… in org_a" {
+		t.Fatalf("signed in = %+v", c)
+	}
+	if c := check(Run(t.Context(), run(none), Progress{}), KeyAuth); c.Status != Fail || !strings.Contains(c.Fix, "TERMA_API_KEY") {
+		t.Fatalf("no key = %+v", c)
+	}
+	signedIn, err := Local(t.Context(), run(keyed))
+	if err != nil {
+		t.Fatal(err)
+	}
+	signedOut, err := Local(t.Context(), run(none))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(signedIn.Rows, Row{"Account", "server key ter_srv_0123… in org_a"}) || len(signedIn.Checks) != len(signedOut.Checks)-1 {
+		t.Fatalf("status rows %v, checks %+v", signedIn.Rows, signedIn.Checks)
+	}
+	if !slices.Contains(signedOut.Rows, Row{"Account", "not signed in — run `TERMA_API_KEY=<the team's server key> terma setup`"}) {
+		t.Fatalf("status rows without the key %v", signedOut.Rows)
+	}
+}
+
 // A run under TERMA_ENV that the profile does not record warns: the hooks resolve to the
 // profile's environment, so their events wait for a key that never comes.
 func TestDoctorWarnsWhenTheProfileRecordsAnotherEnvironment(t *testing.T) {

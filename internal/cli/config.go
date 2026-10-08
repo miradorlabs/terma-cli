@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -58,8 +59,11 @@ func (app *App) newConfigShowCommand() *cobra.Command {
 			path := config.Path(app.dir)
 
 			authMode := "cli token"
-			if cfg.APIKey != "" {
+			switch {
+			case cfg.APIKey != "":
 				authMode = "server key (TERMA_API_KEY)"
+			case cfg.ServerKeySignIn:
+				authMode = strings.TrimSpace("server key " + app.storedKeys("", cfg.Team))
 			}
 
 			view := configView{

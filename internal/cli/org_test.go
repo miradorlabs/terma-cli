@@ -32,6 +32,13 @@ type fakeAuth struct {
 	orgs []organization
 	// orgsDown fails /v1/organizations.
 	orgsDown bool
+	// serverKeys are live team server keys, each to its team (serveServerKey).
+	serverKeys map[string]string
+	// keyPolicies counts the policies read with a server key.
+	keyPolicies atomic.Int32
+	// keyPermissions are what whoami says a server key may do: Ingest alone for a key not
+	// listed, nothing at all for one listed as nil.
+	keyPermissions map[string]map[string]bool
 }
 
 var fakeOrgs = []organization{
@@ -47,6 +54,10 @@ func newFakeAuth(t *testing.T) *fakeAuth {
 	f := &fakeAuth{}
 	f.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if _, ok := f.serverKeys[token]; ok {
+			f.serveServerKey(w, r, token)
+			return
+		}
 		org := ""
 		for _, o := range fakeOrgs {
 			if token == "ter_cli_"+o.ID {

@@ -274,6 +274,16 @@ func Set(dir, projectID, key string, hosts Hosts) error {
 	})
 }
 
+// StoredInFile reports whether keys.json holds a project's key itself rather than the
+// keychain: under InsecureStorage, or because no keychain would take it.
+func StoredInFile(dir, projectID string) bool {
+	f, err := load(dir)
+	return err == nil && f.Keys[projectID] != ""
+}
+
+// FilePath is where keys.json lives under the config directory dir.
+func FilePath(dir string) string { return path(dir) }
+
 // HostsFor returns the hosts recorded with a project's key, and whether any were.
 func HostsFor(dir, projectID string) (Hosts, bool) {
 	f, err := load(dir)
@@ -331,6 +341,23 @@ func SetFor(dir, harness, projectID, key string, hosts Hosts) error {
 		f.write(dir, f.HarnessKeys[harness], projectID, harnessItem(harness, projectID), key, inFile)
 		f.recordHosts(dir, projectID, key, hosts)
 		f.write(dir, f.Keys, projectID, projectItem(projectID), key, inFile)
+	})
+}
+
+// DeleteHarnessKeys forgets every harness's key for a project, so each harness exports with
+// the project's own key; their keychain items are marked stale, for sweepStale to remove
+// once the file is on disk.
+func DeleteHarnessKeys(dir, projectID string) error {
+	return update(dir, func(f *file, _ bool) {
+		for harness, keys := range f.HarnessKeys {
+			if v, ok := keys[projectID]; ok && v == "" {
+				f.mark(harnessItem(harness, projectID))
+			}
+			delete(keys, projectID)
+			if len(keys) == 0 {
+				delete(f.HarnessKeys, harness)
+			}
+		}
 	})
 }
 
