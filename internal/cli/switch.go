@@ -64,6 +64,12 @@ func (app *App) runSwitch(cmd *cobra.Command, f switchFlags) error {
 	if cfg.ProjectID != "" {
 		return errors.New("a team is named (--team or TERMA_TEAM_ID); switch asks for the team after you sign in, so drop it first")
 	}
+	// The relay and the hooks run on the active profile, whatever this command names.
+	if file, err := config.LoadFile(app.dir); err != nil {
+		return err
+	} else if cfg.ProfileName != file.ActiveProfile {
+		return fmt.Errorf("profile %q is not the active one (%q): the relay and hooks would go on with %q; switch from the active profile", cfg.ProfileName, file.ActiveProfile, file.ActiveProfile)
+	}
 	if !app.canAsk() {
 		return errors.New("switch needs a terminal: after signing out, setup asks for the organization, team and agents")
 	}

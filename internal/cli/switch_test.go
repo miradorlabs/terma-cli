@@ -185,3 +185,17 @@ func TestSwitchGoesOnPastALockedKeychain(t *testing.T) {
 		t.Errorf("after switch: organization %q team %q", org, team)
 	}
 }
+
+// A profile other than the active one is refused before anything changes: the relay and
+// hooks would go on with the active one.
+func TestSwitchRefusesAnInactiveProfile(t *testing.T) {
+	f := switchSandbox(t, orgA(), acmeWeb)
+	t.Setenv("TERMA_PROFILE", "work")
+	if _, err := switchWith(t, switchFlags{assumeYes: true, noBrowser: true}, ""); err == nil || !strings.Contains(err.Error(), "not the active one") {
+		t.Fatalf("err = %v", err)
+	}
+	t.Setenv("TERMA_PROFILE", "")
+	if org, team, signIns := selected(t); org != orgA().ID || team != acmeWeb || signIns != 2 || f.revokes.Load() != 0 {
+		t.Errorf("after a refused switch: organization %q team %q, %d sign-ins, %d revokes", org, team, signIns, f.revokes.Load())
+	}
+}
