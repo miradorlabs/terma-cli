@@ -21,6 +21,7 @@ PATH in the terminal you installed from: run that first.
 
 ```bash
 curl -fsSL https://terma.ai/install.sh | bash
+# run the `source …` command it printed, if any, then:
 terma setup
 ```
 

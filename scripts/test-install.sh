@@ -135,7 +135,7 @@ out="$(install_in bash /bin/zsh "$home")"
 clean "$out"
 for f in .zshrc .bashrc .profile; do grep -qxF "$line" "$home/$f" || fail "$f has no PATH line: $out"; done
 if ! grep -qF "in ~/.zshrc, for zsh (your login shell)" <<<"$out" \
-  || ! grep -qF "in ~/.bashrc and ~/.profile, for bash (this terminal's shell)" <<<"$out"; then
+  || ! grep -qF "in ~/.bashrc and ~/.profile, for bash (the shell that ran the installer)" <<<"$out"; then
   fail "a bash terminal with zsh to log in, but said: $out"
 fi
 grep -qxF "Next: run \`source ~/.bashrc\`, then \`terma setup\`." <<<"$out" || fail "no bash source step: $out"
@@ -143,16 +143,17 @@ grep -qxF "Next: run \`source ~/.bashrc\`, then \`terma setup\`." <<<"$out" || f
 home="$(fresh_home)"
 out="$(install_in bash /bin/tcsh "$home")" # a login shell it cannot write for
 clean "$out"
-if ! grep -qF "for bash (this terminal's shell)" <<<"$out" \
+if ! grep -qF "for bash (the shell that ran the installer)" <<<"$out" \
   || ! grep -qxF "Next: run \`source ~/.bashrc\`, then \`terma setup\`." <<<"$out"; then
   fail "a bash terminal with tcsh to log in, but said: $out"
 fi
 home="$(fresh_home)"
-out="$(install_in tcsh /bin/zsh "$home")" # started by no shell it knows: the login shell
+out="$(install_in tcsh /bin/zsh "$home")" # a shell it has no source step for: the full path
 clean "$out"
-if ! grep -qxF "Next: run \`source ~/.zshrc\`, then \`terma setup\`." <<<"$out" || [ -e "$home/.bashrc" ]; then
-  fail "an unknown parent should mean the login shell, but said: $out"
+if ! grep -qxF "$line" "$home/.zshrc" || [ -e "$home/.bashrc" ] || grep -q 'source' <<<"$out"; then
+  fail "a tcsh terminal with zsh to log in, but said: $out"
 fi
+next_runs "$home" "$out"
 
 echo "== zsh with ZDOTDIR, quoted where the path needs it"
 home="$(fresh_home)"

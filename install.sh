@@ -8,9 +8,9 @@
 # it against the release's checksums.txt, extract the single `terma` binary, and
 # place it in ~/.local/bin; it never asks for sudo. When that directory is not on
 # PATH, it appends the one line that adds it to the startup files of your login shell,
-# and of the shell this terminal runs when that is another (zsh's .zshrc; bash's
-# .bashrc and its login file; or a fish conf.d file), then prints the `source` command
-# that puts it on PATH in this terminal. Nothing else is written; nothing downloaded is
+# and of the shell that ran it when that is another (zsh's .zshrc; bash's .bashrc and
+# its login file; or a fish conf.d file), then prints the `source` command that puts
+# it on PATH in this terminal. Nothing else is written; nothing downloaded is
 # executed before it has been verified. Windows users: download
 # terma_Windows_x86_64.zip from https://github.com/miradorlabs/terma-cli/releases.
 #
@@ -183,7 +183,7 @@ say "Installed $("$dest/terma" version 2>/dev/null || echo terma) to ${dest}/ter
 
 # This script runs as a child of the user's shell, so it cannot change that shell's
 # PATH. It puts dest on PATH for the terminals that start next, with a line in the
-# startup files of the login shell ($SHELL), and of this terminal's shell when that is
+# startup files of the login shell ($SHELL), and of the shell that ran it when that is
 # another, written once; then it names the file to source to use terma here.
 
 # Puts dest on PATH in the startup files of shell $1, the user's $2, and says so; has
@@ -204,11 +204,12 @@ add_for() {
 
 login="${SHELL:-}"
 login="${login##*/}"
-# The shell this terminal runs is the one that started this script (`curl | bash`).
-# Without ps, or started by anything else, it is taken to be the login shell.
+# The shell that ran this script (`curl | bash` in a terminal) is its parent. Only
+# when ps names it zsh, bash or fish does it get a `source` step: in any other shell,
+# or without ps, the full path is the next step that works.
 here="$(ps -o comm= -p "$PPID" 2>/dev/null)" || here=''
 here="${here%% *}"; here="${here#-}"; here="${here##*/}" # "-zsh" for a login shell
-case "$here" in zsh|bash|fish) ;; *) here="$login" ;; esac
+case "$here" in zsh|bash|fish) ;; *) here='' ;; esac
 
 next="\`$(shown "$dest/terma") setup\`"
 case ":$PATH:" in
@@ -223,7 +224,7 @@ case ":$PATH:" in
             covered=1
             [ "$here" != "$login" ] || reload="$has"
           fi
-          if [ "$here" != "$login" ] && add_for "$here" "this terminal's shell"; then
+          if [ -n "$here" ] && [ "$here" != "$login" ] && add_for "$here" "the shell that ran the installer"; then
             covered=1 reload="$has"
           fi
         fi ;;
