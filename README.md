@@ -100,17 +100,29 @@ Every command is safe to run again:
 
 ```bash
 terma setup       # sign in, choose your organization, agents and team, write machine-wide hooks
+terma switch      # sign out and set up again: another account, organization or team
 terma doctor      # show what this machine collects and check the chain end to end
 terma update      # install the latest release, or refresh what terma installed
 terma teardown    # undo setup on this machine (--sign-out also signs out)
 ```
 
-Run `terma setup` again to repair the machine or to switch organization; it reuses a
-working sign-in and the team you chose. `terma doctor` opens with what this machine
+Run `terma setup` again to repair the machine; it reuses a working sign-in and the team
+you chose. `terma doctor` opens with what this machine
 collects and what the repository has in progress (the active session, uncommitted agent
 edits), then checks every link: sign-in, whether the team collects this repository (and
 the origin terma sees), the hooks, the agents' export, the queue, and delivery. Every
 failure names its fix.
+
+### Switching account, organization or team
+
+`terma switch` signs this machine out and runs `terma setup` again, so you can sign in as
+any account and choose its organization, team and agents. It revokes the sign-in, as
+`terma teardown --sign-out` does, stops the relay, which runs on that sign-in, and
+forgets the organization and team setup chose; your agents' hooks stay in place.
+
+The browser approves the sign-in as whoever is signed in to the Terma app there. To use
+another account, sign out of the app in that browser first, or open the link in a private
+window (`terma switch --no-browser` prints it).
 
 Hidden commands remain for the programs that run them — hook execution, the local
 relay, spool delivery, shell completion — and for Terma's own engineers.
