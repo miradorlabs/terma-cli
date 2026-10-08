@@ -7,10 +7,12 @@
 # before you run it: pick the archive for this platform from GitHub Releases, verify
 # it against the release's checksums.txt, extract the single `terma` binary, and
 # place it in ~/.local/bin; it never asks for sudo. When that directory is not on
-# PATH, it appends the one line that adds it to your login shell's startup files (zsh's
-# .zshrc; bash's .bashrc and its login file; or a fish conf.d file). Nothing else is
-# written; nothing downloaded is executed before it has been verified. Windows users:
-# download terma_Windows_x86_64.zip from https://github.com/miradorlabs/terma-cli/releases.
+# PATH, it appends the one line that adds it to the startup files of your login shell,
+# and of the shell this terminal runs when that is another (zsh's .zshrc; bash's
+# .bashrc and its login file; or a fish conf.d file), then prints the `source` command
+# that puts it on PATH in this terminal. Nothing else is written; nothing downloaded is
+# executed before it has been verified. Windows users: download
+# terma_Windows_x86_64.zip from https://github.com/miradorlabs/terma-cli/releases.
 #
 #   TERMA_VERSION         install this release instead of the latest (v1.2.3 or 1.2.3)
 #   TERMA_INSTALL_DIR     put the binary here instead of ~/.local/bin
@@ -71,9 +73,9 @@ append_line() {
 
 # Puts line $2 in each of the files $1 names, one per line, where it is missing. Sets
 # files to the ones that have it and missed to the ones it could not write, shown and
-# joined, and added when any needed it.
+# joined; has to the first that has it; and added when any needed it.
 put_line() {
-  files='' missed='' added=''
+  files='' missed='' has='' added=''
   set -f; IFS='
 '
   for rc in $1; do
@@ -82,6 +84,7 @@ put_line() {
     else missed="${missed:+$missed and }$(shown "$rc")"; continue
     fi
     files="${files:+$files and }$(shown "$rc")"
+    has="${has:-$rc}"
   done
   set +f; unset IFS
 }
@@ -179,31 +182,55 @@ mv -f "$staged" "$dest/terma" || { rm -f "$staged"; die "could not install ${des
 say "Installed $("$dest/terma" version 2>/dev/null || echo terma) to ${dest}/terma"
 
 # This script runs as a child of the user's shell, so it cannot change that shell's
-# PATH: it puts dest on PATH for the terminals that start next, with a line in the
-# login shell's startup files, written once, and gives the full path to run now. The
-# login shell ($SHELL) is the only shell it can know: a terminal set to run another
-# needs that shell's own line.
-shell="${SHELL:-}"
-shell="${shell##*/}"
+# PATH. It puts dest on PATH for the terminals that start next, with a line in the
+# startup files of the login shell ($SHELL), and of this terminal's shell when that is
+# another, written once; then it names the file to source to use terma here.
+
+# Puts dest on PATH in the startup files of shell $1, the user's $2, and says so; has
+# is then the file to source. Fails when no file of that shell has the line.
+add_for() {
+  rcs="$(startup_files "$1")" || return 1
+  put_line "$rcs" "$(path_line "$1" "$dest")"
+  if [ -n "$files" ] && [ -n "$missed" ]; then
+    say "${dest} is on PATH in ${files}, for $1 ($2), but ${missed} could not be written: $1 terminals that read it instead will not find terma."
+  elif [ -n "$added" ]; then
+    say "Added ${dest} to PATH in ${files}, for $1 ($2): new $1 terminals will find terma."
+  elif [ -n "$files" ]; then
+    say "${dest} is already on PATH in new $1 terminals (${files})."
+  else
+    return 1
+  fi
+}
+
+login="${SHELL:-}"
+login="${login##*/}"
+# The shell this terminal runs is the one that started this script (`curl | bash`).
+# Without ps, or started by anything else, it is taken to be the login shell.
+here="$(ps -o comm= -p "$PPID" 2>/dev/null)" || here=''
+here="${here%% *}"; here="${here#-}"; here="${here##*/}" # "-zsh" for a login shell
+case "$here" in zsh|bash|fish) ;; *) here="$login" ;; esac
+
 next="\`$(shown "$dest/terma") setup\`"
 case ":$PATH:" in
   *":$dest:"*) next="\`terma setup\`" ;;
   *)
-    files='' missed='' added=''
+    covered='' reload=''
     case "$dest" in
       *:*) ;; # PATH would split it at the colon, so no line can put it there
       *)
-        if [ -z "${TERMA_NO_MODIFY_PATH+set}" ] && rcs="$(startup_files "$shell")"; then
-          put_line "$rcs" "$(path_line "$shell" "$dest")"
+        if [ -z "${TERMA_NO_MODIFY_PATH+set}" ]; then
+          if add_for "$login" "your login shell"; then
+            covered=1
+            [ "$here" != "$login" ] || reload="$has"
+          fi
+          if [ "$here" != "$login" ] && add_for "$here" "this terminal's shell"; then
+            covered=1 reload="$has"
+          fi
         fi ;;
     esac
-    if [ -n "$files" ] && [ -n "$missed" ]; then
-      say "${dest} is on PATH in ${files}, for ${shell} (your login shell), but ${missed} could not be written: ${shell} terminals that read it instead will not find terma."
-    elif [ -n "$added" ]; then
-      say "Added ${dest} to PATH in ${files}, for ${shell} (your login shell): new ${shell} terminals will find terma."
-    elif [ -n "$files" ]; then
-      say "${dest} is already on PATH in new ${shell} terminals (${files})."
-    else
+    if [ -n "$reload" ]; then
+      next="\`source $(shown "$reload")\`, then \`terma setup\`"
+    elif [ -z "$covered" ]; then
       case "$dest" in
         *:*) say "Note: ${dest} cannot go on PATH, which would split it at the ':'." ;;
         *) say "Note: ${dest} is not on your PATH. Add it, e.g.:  export PATH=\"${dest}:\$PATH\"" ;;

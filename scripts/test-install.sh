@@ -67,12 +67,20 @@ out="$(HOME="$home" PATH="/usr/bin:/bin" TERMA_RELEASE_BASE="$BASE" TERMA_VERSIO
 [ "$("$home/.local/bin/terma" version)" = "$want" ] || fail "default install did not land in ~/.local/bin: $out"
 ! grep -qi sudo <<<"$out" || fail "installer mentioned sudo: $out"
 
-# install_as <login shell> <home> [VAR=value...] installs to the default destination
-# from a shell whose PATH does not have it, and prints what the installer said.
-install_as() {
-  env HOME="$2" SHELL="$1" PATH="/usr/bin:/bin" TERMA_RELEASE_BASE="$BASE" TERMA_VERSION="$TAG" \
-    "${@:3}" sh "$INSTALLER" 2>&1 </dev/null
+# The installer takes the shell this terminal runs to be its parent process, so each
+# case starts it from a stand-in named for the shell it plays.
+mkdir -p "$work/shells"
+for s in zsh bash fish tcsh; do ln -s /bin/bash "$work/shells/$s"; done
+# install_in <terminal shell> <login shell> <home> [VAR=value...] installs to the default
+# destination from a terminal running <terminal shell> whose PATH does not have it, and
+# prints what the installer said.
+install_in() {
+  # shellcheck disable=SC2016 # expanded by the stand-in
+  env HOME="$3" SHELL="$2" PATH="/usr/bin:/bin" TERMA_RELEASE_BASE="$BASE" TERMA_VERSION="$TAG" \
+    "${@:4}" "$work/shells/$1" -c 'sh "$0"; :' "$INSTALLER" 2>&1 </dev/null
 }
+# install_as <login shell> <home> [VAR=value...]: the same, from a terminal running it.
+install_as() { install_in "${1##*/}" "$@"; }
 fresh_home() { mktemp -d "$work/home.XXXXXX"; }
 # clean <output> fails on any line the installer did not mean to say, such as a shell's
 # own error about an unset variable or a file it cannot write.
@@ -81,24 +89,29 @@ clean() {
   stray="$(grep -vE '^(Downloading |Installed |Added |Note: |Next: run |.+ is (already )?on PATH in )' <<<"$1" || true)"
   [ -z "$stray" ] || fail "stray output: $stray"
 }
-# next_runs <home> <output> runs the installer's `Next:` command in sh, `version` in
-# place of `setup`, and fails unless that reaches the installed terma.
+# reloads <shell> <home> <output> runs the `source …` of the installer's Next: line in
+# <shell> (sh as `.`) and prints where `terma` then resolves.
+reloads() {
+  local src word=source
+  # shellcheck disable=SC2016 # the backticks are the installer's text
+  src="$(sed -n 's/^Next: run `source \(.*\)`, then `terma setup`\.$/\1/p' <<<"$3")"
+  [ -n "$src" ] || fail "no source command in: $3"
+  [ "$1" != sh ] || word=.
+  env -i HOME="$2" PATH=/usr/bin:/bin "$1" -c "$word $src && command -v terma" 2>/dev/null
+}
+# next_runs <home> <output> runs the installer's full-path `Next:` command in sh,
+# `version` in place of `setup`, and fails unless that reaches the installed terma.
 next_runs() {
   local cmd
   # shellcheck disable=SC2016 # the backticks are the installer's text
-  cmd="$(sed -n 's/^Next: run `\(.*\) setup`\.$/\1/p' <<<"$2")"
-  [ -n "$cmd" ] || fail "no Next command in: $2"
+  cmd="$(sed -n 's/^Next: run `\([^`]*\) setup`\.$/\1/p' <<<"$2")"
+  [ -n "$cmd" ] || fail "no full-path Next command in: $2"
   [ "$(HOME="$1" PATH=/usr/bin:/bin sh -c "$cmd version")" = "$want" ] || fail "\`$cmd version\` is not terma: $2"
-}
-# sourced <home> <file> is where `terma` resolves once sh has sourced <file>.
-sourced() {
-  # shellcheck disable=SC2016 # expanded by the inner sh
-  HOME="$1" PATH=/usr/bin:/bin sh -c '. "$1" && command -v terma' sh "$2"
 }
 # shellcheck disable=SC2016 # the line the installer writes, for the startup file to expand
 line='export PATH="$HOME/.local/bin:$PATH"'
 
-echo "== adds ~/.local/bin to PATH in the zsh startup file, once, and gives the full path to run now"
+echo "== adds ~/.local/bin to PATH in the zsh startup file, once, and says what to source here"
 home="$(fresh_home)"
 printf 'alias ll=ls' >"$home/.zshrc" # no trailing newline
 out="$(install_as /bin/zsh "$home")"
@@ -107,26 +120,53 @@ clean "$out"
   || fail ".zshrc: $(cat "$home/.zshrc")"
 grep -qF "Added $home/.local/bin to PATH in ~/.zshrc, for zsh (your login shell): new zsh terminals will find terma." <<<"$out" \
   || fail "no Added line: $out"
-grep -qxF "Next: run \`~/.local/bin/terma setup\`." <<<"$out" || fail "no full-path next step: $out"
-next_runs "$home" "$out"
-[ "$(sourced "$home" "$home/.zshrc")" = "$home/.local/bin/terma" ] || fail "sourcing ~/.zshrc does not put terma on PATH"
+grep -qxF "Next: run \`source ~/.zshrc\`, then \`terma setup\`." <<<"$out" || fail "no source step: $out"
+[ "$(reloads sh "$home" "$out")" = "$home/.local/bin/terma" ] || fail "sourcing ~/.zshrc does not put terma on PATH"
+[ ! -e "$home/.bashrc" ] || fail "wrote .bashrc for a zsh terminal"
 out="$(install_as /bin/zsh "$home")"
 clean "$out"
 [ "$(grep -cxF "$line" "$home/.zshrc")" = 1 ] || fail "a reinstall added the line again: $(cat "$home/.zshrc")"
 grep -qxF "$home/.local/bin is already on PATH in new zsh terminals (~/.zshrc)." <<<"$out" || fail "a reinstall said: $out"
+grep -qxF "Next: run \`source ~/.zshrc\`, then \`terma setup\`." <<<"$out" || fail "a reinstall gave no source step: $out"
+
+echo "== a terminal running another shell than the login shell gets its own line, and that file to source"
+home="$(fresh_home)"
+out="$(install_in bash /bin/zsh "$home")"
+clean "$out"
+for f in .zshrc .bashrc .profile; do grep -qxF "$line" "$home/$f" || fail "$f has no PATH line: $out"; done
+if ! grep -qF "in ~/.zshrc, for zsh (your login shell)" <<<"$out" \
+  || ! grep -qF "in ~/.bashrc and ~/.profile, for bash (this terminal's shell)" <<<"$out"; then
+  fail "a bash terminal with zsh to log in, but said: $out"
+fi
+grep -qxF "Next: run \`source ~/.bashrc\`, then \`terma setup\`." <<<"$out" || fail "no bash source step: $out"
+[ "$(reloads /bin/bash "$home" "$out")" = "$home/.local/bin/terma" ] || fail "sourcing ~/.bashrc in bash does not find terma"
+home="$(fresh_home)"
+out="$(install_in bash /bin/tcsh "$home")" # a login shell it cannot write for
+clean "$out"
+if ! grep -qF "for bash (this terminal's shell)" <<<"$out" \
+  || ! grep -qxF "Next: run \`source ~/.bashrc\`, then \`terma setup\`." <<<"$out"; then
+  fail "a bash terminal with tcsh to log in, but said: $out"
+fi
+home="$(fresh_home)"
+out="$(install_in tcsh /bin/zsh "$home")" # started by no shell it knows: the login shell
+clean "$out"
+if ! grep -qxF "Next: run \`source ~/.zshrc\`, then \`terma setup\`." <<<"$out" || [ -e "$home/.bashrc" ]; then
+  fail "an unknown parent should mean the login shell, but said: $out"
+fi
 
 echo "== zsh with ZDOTDIR, quoted where the path needs it"
 home="$(fresh_home)"
 out="$(install_as /bin/zsh "$home" ZDOTDIR="$home/z'sh")"
 clean "$out"
 grep -qF "in '$home/z'\\''sh/.zshrc', for zsh" <<<"$out" || fail "ZDOTDIR shown unquoted: $out"
-[ "$(sourced "$home" "$home/z'sh/.zshrc")" = "$home/.local/bin/terma" ] || fail "\$ZDOTDIR/.zshrc: $(ls -AR "$home")"
+[ "$(reloads sh "$home" "$out")" = "$home/.local/bin/terma" ] || fail "the quoted source command does not work: $out"
 
 echo "== bash: .bashrc for an interactive shell and the login file for a login shell, both read by a real bash"
 home="$(fresh_home)"
 out="$(install_as /bin/bash "$home")"
 clean "$out"
 grep -qF "in ~/.bashrc and ~/.profile, for bash (your login shell)" <<<"$out" || fail "bash said: $out"
+[ "$(reloads /bin/bash "$home" "$out")" = "$home/.local/bin/terma" ] || fail "bash's source step does not find terma: $out"
 for mode in -ic -lc; do
   [ "$(env -i HOME="$home" PATH=/usr/bin:/bin /bin/bash "$mode" 'command -v terma' 2>/dev/null)" = "$home/.local/bin/terma" ] \
     || fail "bash $mode does not find terma: $(ls -A "$home")"
@@ -148,11 +188,14 @@ if [ "$(id -u)" != 0 ]; then # root writes it anyway
     || grep -q '^Added' <<<"$out" || ! grep -qxF "$line" "$home/.bashrc" || [ -s "$home/.bash_profile" ]; then
     fail "a read-only .bash_profile, but said: $out"
   fi
+  grep -qxF "Next: run \`source ~/.bashrc\`, then \`terma setup\`." <<<"$out" || fail "no source step for the file it wrote: $out"
 fi
 
 echo "== fish: a conf.d file of terma's own, under XDG_CONFIG_HOME when it is set"
 home="$(fresh_home)"
-clean "$(install_as /usr/bin/fish "$home")"
+out="$(install_as /usr/bin/fish "$home")"
+clean "$out"
+grep -qxF "Next: run \`source ~/.config/fish/conf.d/terma.fish\`, then \`terma setup\`." <<<"$out" || fail "no fish source step: $out"
 clean "$(install_as /usr/bin/fish "$home" XDG_CONFIG_HOME="$home/xdg")"
 for conf in "$home/.config" "$home/xdg"; do
   # shellcheck disable=SC2016 # fish expands it
@@ -162,6 +205,7 @@ done
 if fish="$(command -v fish)"; then # CI installs it on Linux
   [ "$(env -i HOME="$home" PATH=/usr/bin:/bin "$fish" -c 'command -v terma')" = "$home/.local/bin/terma" ] \
     || fail "fish does not find terma through terma.fish"
+  [ "$(reloads "$fish" "$home" "$out")" = "$home/.local/bin/terma" ] || fail "fish's source step does not find terma"
 fi
 
 echo "== nothing written when it is already on PATH, opted out, or the shell is unknown or unset"
@@ -181,8 +225,9 @@ note "$(install_as /bin/zsh "$home" TERMA_NO_MODIFY_PATH=1)" "opted out"
 note "$(install_as /bin/zsh "$home" TERMA_NO_MODIFY_PATH=)" "opted out, empty"
 note "$(install_as /bin/tcsh "$home")" "unknown shell"
 if [ -x /bin/dash ]; then # Debian's sh; bash fills SHELL in from the user database
+  # shellcheck disable=SC2016 # expanded by the outer dash, which plays no known shell
   note "$(env -u SHELL HOME="$home" PATH=/usr/bin:/bin TERMA_RELEASE_BASE="$BASE" TERMA_VERSION="$TAG" \
-    /bin/dash "$INSTALLER" 2>&1 </dev/null)" "SHELL unset under dash"
+    /bin/dash -c '/bin/dash "$0"; :' "$INSTALLER" 2>&1 </dev/null)" "SHELL unset under dash"
 fi
 [ "$(ls -A "$home")" = .local ] || fail "wrote $(ls -A "$home")"
 
@@ -204,8 +249,7 @@ home="$(fresh_home)"
 odd="$work/a b\"c\$d\`e\\f'g"
 out="$(install_as /bin/zsh "$home" TERMA_INSTALL_DIR="$odd")"
 clean "$out"
-next_runs "$home" "$out"
-[ "$(sourced "$home" "$home/.zshrc")" = "$odd/terma" ] || fail "sourcing ~/.zshrc does not find $odd/terma: $(cat "$home/.zshrc")"
+[ "$(reloads sh "$home" "$out")" = "$odd/terma" ] || fail "sourcing ~/.zshrc does not find $odd/terma: $(cat "$home/.zshrc")"
 
 echo "== a directory with a colon, which PATH would split, is never written"
 home="$(fresh_home)"
