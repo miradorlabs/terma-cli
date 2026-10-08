@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 )
@@ -77,16 +78,22 @@ func (app *App) runSwitch(cmd *cobra.Command, f switchFlags) error {
 		}
 	}
 	if err := app.signOut(cmd); err != nil {
+		// A keychain it could not clean up signs the machine out all the same.
+		if !secret.IsUnavailable(err) {
+			return err
+		}
+		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: %v\n", err)
+	}
+	// Before the relay stops: one its service starts again reads no team, so it admits
+	// nothing until setup restarts it on the new sign-in.
+	if err := config.UpdateProfile(app.dir, cfg.ProfileName, func(p *config.Profile) {
+		p.OrganizationID, p.OrganizationName, p.Team = "", "", ""
+	}); err != nil {
 		return err
 	}
 	// The relay keeps the sign-in it started with; setup starts it again on the new one.
 	if dir, err := daemon.Dir(app.stateDir); err == nil {
 		daemon.Stop(dir)
-	}
-	if err := config.UpdateProfile(app.dir, cfg.ProfileName, func(p *config.Profile) {
-		p.OrganizationID, p.OrganizationName, p.Team = "", "", ""
-	}); err != nil {
-		return err
 	}
 	fmt.Fprintln(out, "In the browser, approve as the account you want: if the Terma app there is signed in as another, sign out of it first or use a private window.")
 	fmt.Fprintln(out)

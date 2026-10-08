@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
+	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
@@ -168,5 +169,19 @@ func TestAfterSwitchSetupAsksForTheTeam(t *testing.T) {
 	// No terminal here, so asking fails: what matters is that setup asked.
 	if name, err := testApp.selectPolicyTeam(cmd, cfg); err == nil || name != "" || cfg.ProjectID == old.ID {
 		t.Fatalf("setup took %q (%s) without asking: %v", name, cfg.ProjectID, err)
+	}
+}
+
+// A keychain sign-out could not clean up still signs the machine out, so switch goes on
+// to setup and says what to delete by hand.
+func TestSwitchGoesOnPastALockedKeychain(t *testing.T) {
+	switchSandbox(t, orgA(), acmeWeb)
+	secret.FailForTest(t, testApp.dir)
+	out, err := switchWith(t, switchFlags{assumeYes: true, noBrowser: true}, "")
+	if err == nil || !strings.Contains(out, "Open this URL") || !strings.Contains(out, "Warning: signed out, but") {
+		t.Fatalf("switch stopped at the keychain: %v\n%s", err, out)
+	}
+	if org, team, _ := selected(t); org != "" || team != "" {
+		t.Errorf("after switch: organization %q team %q", org, team)
 	}
 }
