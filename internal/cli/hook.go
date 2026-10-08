@@ -72,7 +72,8 @@ func (app *App) hookDeps() dispatch.Deps {
 				fmt.Fprintf(os.Stderr, "terma hook: this repository's commit hooks: %v\n", err)
 			}
 		},
-		Flush: spawnFlush,
+		Flush:     spawnFlush,
+		AwaitPush: func(path string) { spawnDetached("spool", "await-push", path) },
 	}
 }
 
@@ -110,12 +111,16 @@ func (app *App) openSpool() *spool.Spool {
 }
 
 // spawnFlush is silent on failure: the next flush picks up whatever this one leaves.
-func spawnFlush() {
+func spawnFlush() { spawnDetached("spool", "flush", "--quiet") }
+
+// spawnDetached starts terma with args, detached from the hook that asks; it is silent on
+// failure.
+func spawnDetached(args ...string) {
 	exe, err := os.Executable()
 	if err != nil {
 		return
 	}
-	proc := exec.Command(exe, "spool", "flush", "--quiet")
+	proc := exec.Command(exe, args...)
 	proc.Stdin, proc.Stdout, proc.Stderr = nil, nil, nil
 	procinfo.Detach(proc)
 	if err := proc.Start(); err != nil {

@@ -28,8 +28,29 @@ func (app *App) newSpoolCommand() *cobra.Command {
 The spool is delivered later — in the background after a commit or session end,
 or on demand here. A backend outage costs nothing at commit time.`,
 	}
-	cmd.AddCommand(app.newSpoolFlushCommand())
+	cmd.AddCommand(app.newSpoolFlushCommand(), app.newSpoolAwaitPushCommand())
 	return cmd
+}
+
+// newSpoolAwaitPushCommand is the detached half of the pre-push hook: it waits for git push
+// to exit, then spools the push the hook recorded.
+func (app *App) newSpoolAwaitPushCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:    "await-push <record>",
+		Short:  "Internal: report a push once git push has exited",
+		Hidden: true,
+		Args:   cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			hookrun.AwaitPush(cmd.Context(), app.pushEnv(), args[0])
+			return nil
+		},
+	}
+}
+
+// pushEnv is what reporting a push needs: the spool, and a flush once it is spooled.
+func (app *App) pushEnv() hookrun.Env {
+	return hookrun.Env{StateDir: app.stateDir, ConfigDir: app.dir, Spool: app.openSpool(), Flush: spawnFlush,
+		Stderr: os.Stderr, Debug: os.Getenv("TERMA_DEBUG") != ""}
 }
 
 func (app *App) newSpoolFlushCommand() *cobra.Command {
@@ -156,6 +177,10 @@ func (app *App) flushSpool(ctx context.Context, force bool, minInterval time.Dur
 	if s == nil {
 		return delivery.Result{}, errors.New("cannot open the spool directory")
 	}
+	// A push whose detached reporter never finished is reported here, and sent now.
+	env := app.pushEnv()
+	env.Flush = nil
+	hookrun.SweepPushes(ctx, env)
 	cfg, err := app.loadConfig()
 	if err != nil {
 		return delivery.Result{}, err

@@ -156,6 +156,47 @@ events:
       - ref: terma.commit.lines.deleted
       - ref: terma.repository.root
 
+  - name: terma.push
+    stability: development
+    requirement_level: recommended
+    brief: A branch was pushed, one event per branch the push updated.
+    note: >
+      Sent once git push has exited, up to ten minutes after the push; its time is the
+      push's. Deleted branches and refs outside refs/heads are not reported. A push of
+      commits no session was stamped into has no session.id.
+    attributes:
+      - ref: terma.push.id
+        requirement_level: required
+      - ref: terma.push.status
+        requirement_level: required
+      - ref: terma.push.remote.ref
+        requirement_level: required
+      - ref: terma.push.new.revision
+        requirement_level: required
+      - ref: terma.push.range
+        requirement_level: required
+      - ref: terma.push.commits
+        requirement_level: required
+      - ref: terma.push.commit.count
+        requirement_level: required
+      - ref: terma.push.commits_truncated
+        requirement_level: required
+      - ref: terma.push.session.ids
+        requirement_level: required
+      - ref: session.id
+        note: The first session stamped into a pushed commit, when any was.
+      - ref: terma.push.local.ref
+      - ref: terma.push.old.revision
+      - ref: terma.push.forced
+      - ref: terma.push.remote.name
+      - ref: terma.push.remote.url
+      - ref: vcs.repository.url.full
+        note: origin, without credentials, as on terma.commit.
+      - ref: vcs.repository.name
+      - ref: vcs.owner.name
+      - ref: vcs.provider.name
+      - ref: terma.repository.root
+
   - name: terma.session.quota
     stability: development
     requirement_level: recommended

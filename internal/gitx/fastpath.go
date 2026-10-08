@@ -196,15 +196,23 @@ func globalConfigPaths() []string {
 
 // configValue returns the last value of key in section from one git config file.
 func configValue(path, section, key string) (string, bool) {
+	values := configValues(path, section, key)
+	if len(values) == 0 {
+		return "", false
+	}
+	return values[len(values)-1], true
+}
+
+// configValues returns every value of key in section from one git config file, in order.
+func configValues(path, section, key string) []string {
 	f, err := os.Open(path)
 	if err != nil {
-		return "", false
+		return nil
 	}
 	defer f.Close()
 	var (
 		inSection bool
-		value     string
-		found     bool
+		values    []string
 	)
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
@@ -224,9 +232,9 @@ func configValue(path, section, key string) (string, bool) {
 		if !ok || !strings.EqualFold(strings.TrimSpace(k), key) {
 			continue
 		}
-		value, found = unquoteConfigValue(v), true
+		values = append(values, unquoteConfigValue(v))
 	}
-	return value, found
+	return values
 }
 
 // FileStat is one path in a commit with git's line delta for it, whoever wrote the lines.
