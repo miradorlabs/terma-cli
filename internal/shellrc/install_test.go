@@ -57,6 +57,12 @@ func TestInstallScriptPicksTheSameStartupFile(t *testing.T) {
 		}
 		check("bash with "+name, "bash")
 	}
+	if os.Geteuid() != 0 { // root reads it anyway
+		if err := os.Chmod(filepath.Join(home, ".bash_profile"), 0o200); err != nil {
+			t.Fatal(err)
+		}
+		check("bash with an unreadable .bash_profile", "bash")
+	}
 }
 
 func TestInstallScriptWritesTheSamePathLine(t *testing.T) {

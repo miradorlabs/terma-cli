@@ -33,9 +33,10 @@ startup_file() {
     zsh) printf '%s\n' "${ZDOTDIR:-$HOME}/.zshrc" ;;
     bash)
       [ "$1" = Darwin ] || { printf '%s\n' "$HOME/.bashrc"; return 0; }
-      # macOS terminals start login shells, which read the first of these that exists.
+      # macOS terminals start login shells, which read the first of these that exists
+      # and is readable.
       for f in .bash_profile .bash_login .profile; do
-        if [ -e "$HOME/$f" ]; then printf '%s\n' "$HOME/$f"; return 0; fi
+        if [ -r "$HOME/$f" ]; then printf '%s\n' "$HOME/$f"; return 0; fi
       done
       printf '%s\n' "$HOME/.bash_profile" ;;
     fish) printf '%s\n' "${XDG_CONFIG_HOME:-$HOME/.config}/fish/conf.d/terma.fish" ;;
@@ -58,8 +59,9 @@ path_line() {
 }
 
 # Appends line $2 to file $1, after a newline when the file does not end in one; fails
-# quietly when the file cannot be written.
+# quietly when the file cannot be read (nor could the shell read it) or written.
 append_line() {
+  [ ! -e "$1" ] || [ -r "$1" ] || return 1
   sep=''
   if [ -s "$1" ] && [ -n "$(tail -c 1 "$1")" ]; then sep='\n'; fi
   mkdir -p "$(dirname "$1")" 2>/dev/null &&

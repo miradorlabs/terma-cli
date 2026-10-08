@@ -118,13 +118,13 @@ grep -qxF "$line" "$home/z'sh/.zshrc" || fail "\$ZDOTDIR/.zshrc has no PATH line
 echo "== bash: ~/.bashrc, or on macOS the login file it reads"
 home="$(fresh_home)"
 rcfile=.bashrc; [ "$(uname -s)" != Darwin ] || rcfile=.bash_profile
-install_as /bin/bash "$home" >/dev/null
+clean "$(install_as /bin/bash "$home")"
 grep -qxF "$line" "$home/$rcfile" || fail "$rcfile has no PATH line: $(ls -A "$home")"
 
 echo "== fish: a conf.d file of terma's own, under XDG_CONFIG_HOME when it is set"
 home="$(fresh_home)"
-install_as /usr/bin/fish "$home" >/dev/null
-install_as /usr/bin/fish "$home" XDG_CONFIG_HOME="$home/xdg" >/dev/null
+clean "$(install_as /usr/bin/fish "$home")"
+clean "$(install_as /usr/bin/fish "$home" XDG_CONFIG_HOME="$home/xdg")"
 for conf in "$home/.config" "$home/xdg"; do
   # shellcheck disable=SC2016 # fish expands it
   grep -qxF 'fish_add_path --move --prepend "$HOME/.local/bin"' "$conf/fish/conf.d/terma.fish" \
@@ -152,12 +152,17 @@ if [ -x /bin/dash ]; then # Debian's sh; bash fills SHELL in from the user datab
 fi
 [ "$(ls -A "$home")" = .local ] || fail "wrote $(ls -A "$home")"
 
-echo "== a startup file it cannot write gets the note, not the shell's error"
+echo "== a startup file it cannot write or read gets the note, not the shell's error"
 if [ "$(id -u)" != 0 ]; then # root writes it anyway
   home="$(fresh_home)"
   : >"$home/.zshrc"; chmod 444 "$home/.zshrc"
   note "$(install_as /bin/zsh "$home")" "unwritable .zshrc"
   [ ! -s "$home/.zshrc" ] || fail "wrote the read-only .zshrc"
+  home="$(fresh_home)"
+  printf 'x' >"$home/.zshrc"; chmod 200 "$home/.zshrc"
+  note "$(install_as /bin/zsh "$home")" "unreadable .zshrc"
+  chmod 600 "$home/.zshrc"
+  [ "$(cat "$home/.zshrc")" = x ] || fail "wrote the unreadable .zshrc: $(cat "$home/.zshrc")"
 fi
 
 echo "== a directory outside home is written literally, every metacharacter inert"

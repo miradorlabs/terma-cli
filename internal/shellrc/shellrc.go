@@ -31,9 +31,10 @@ func ShellRC() (RC, bool) {
 		if runtime.GOOS != "darwin" {
 			return RC{Path: filepath.Join(home, ".bashrc"), Shell: shell}, true
 		}
-		// macOS terminals start login shells, which read the first of these that exists.
+		// macOS terminals start login shells, which read the first of these that exists
+		// and is readable.
 		for _, name := range []string{".bash_profile", ".bash_login", ".profile"} {
-			if path := filepath.Join(home, name); exists(path) {
+			if path := filepath.Join(home, name); readable(path) {
 				return RC{Path: path, Shell: shell}, true
 			}
 		}
@@ -79,7 +80,11 @@ func escapeDoubleQuoted(s string, backtick bool) string {
 	return s
 }
 
-func exists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
+func readable(path string) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	_ = f.Close()
+	return true
 }

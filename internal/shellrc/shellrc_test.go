@@ -32,16 +32,28 @@ func TestShellRCNamesTheFileTheShellReads(t *testing.T) {
 	}
 
 	// A macOS terminal starts a login shell, which reads the first of .bash_profile,
-	// .bash_login and .profile that exists, and never .bashrc.
+	// .bash_login and .profile that exists and is readable, and never .bashrc.
 	t.Setenv("SHELL", "/usr/local/bin/bash")
-	for _, step := range []struct{ create, darwin string }{
-		{"", ".bash_profile"},
-		{".profile", ".profile"},
-		{".bash_login", ".bash_login"},
-		{".bash_profile", ".bash_profile"},
+	for _, step := range []struct {
+		create string
+		mode   os.FileMode
+		darwin string
+	}{
+		{"", 0, ".bash_profile"},
+		{".profile", 0o644, ".profile"},
+		{".bash_login", 0o644, ".bash_login"},
+		{".bash_profile", 0o200, ".bash_login"}, // write-only: bash skips it
+		{".bash_profile", 0o644, ".bash_profile"},
 	} {
+		if step.mode == 0o200 && os.Geteuid() == 0 {
+			continue // root reads it anyway
+		}
 		if step.create != "" {
-			if err := os.WriteFile(filepath.Join(home, step.create), nil, 0o644); err != nil {
+			path := filepath.Join(home, step.create)
+			if err := os.WriteFile(path, nil, step.mode); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Chmod(path, step.mode); err != nil {
 				t.Fatal(err)
 			}
 		}
