@@ -21,9 +21,9 @@ func switchSandbox(t *testing.T, active organization, team string) *fakeAuth {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
 	sandboxMachine(t)
-	prev := switchCanAsk
-	switchCanAsk = func() bool { return true }
-	t.Cleanup(func() { switchCanAsk = prev })
+	prev := testApp.canAsk
+	testApp.canAsk = func() bool { return true }
+	t.Cleanup(func() { testApp.canAsk = prev })
 	for _, o := range fakeOrgs {
 		if o.ID != active.ID {
 			if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f, o)); err != nil {
@@ -133,7 +133,7 @@ func TestSwitchRefusesBeforeChangingAnything(t *testing.T) {
 // Without a terminal setup could ask nothing, so switch stops before signing out.
 func TestSwitchWithoutATerminalChangesNothing(t *testing.T) {
 	f := switchSandbox(t, orgA(), acmeWeb)
-	switchCanAsk = func() bool { return false }
+	testApp.canAsk = func() bool { return false }
 	if _, err := switchWith(t, switchFlags{assumeYes: true}, ""); err == nil || !strings.Contains(err.Error(), "terminal") {
 		t.Fatalf("err = %v", err)
 	}

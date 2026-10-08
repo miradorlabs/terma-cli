@@ -18,9 +18,6 @@ type switchFlags struct {
 	assumeYes bool
 }
 
-// switchCanAsk reports whether setup's questions can be asked here; tests replace it.
-var switchCanAsk = canPrompt
-
 func (app *App) newSwitchCommand() *cobra.Command {
 	var f switchFlags
 	cmd := &cobra.Command{
@@ -66,7 +63,7 @@ func (app *App) runSwitch(cmd *cobra.Command, f switchFlags) error {
 	if cfg.ProjectID != "" {
 		return errors.New("a team is named (--team or TERMA_TEAM_ID); switch asks for the team after you sign in, so drop it first")
 	}
-	if !switchCanAsk() {
+	if !app.canAsk() {
 		return errors.New("switch needs a terminal: after signing out, setup asks for the organization, team and agents")
 	}
 	if !f.assumeYes {
