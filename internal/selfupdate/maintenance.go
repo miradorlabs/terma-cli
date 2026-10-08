@@ -252,8 +252,8 @@ type Outcome struct {
 	Err error
 }
 
-// Auto, the relay's pass, checks for a newer release every CheckInterval at most and installs
-// it in place of exe for a release build that updates itself, unless the developer turned
+// Auto is the relay's pass: it checks for a newer release every CheckInterval at most and
+// installs it in place of exe for a release build that updates itself, unless the developer turned
 // automatic updates off in configDir; the check's records go in stateDir. A new minor or major version waits out
 // SoakTime first, and is looked up again before it is installed, so a release pulled since
 // the check is not. Each release is attempted once per AttemptInterval at most, so a failing
