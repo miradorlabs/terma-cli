@@ -93,7 +93,9 @@ func TestFetchUsesTheProfilesCredential(t *testing.T) {
 	var bearer string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		bearer = strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-		if r.URL.Path != "/v1/policy" || r.URL.Query().Get("project_id") != team {
+		// A server key names no team; a login names the one it reads.
+		named := r.URL.Query().Get("project_id")
+		if r.URL.Path != "/v1/policy" || strings.HasPrefix(bearer, "ter_srv_") != (named == "") || named != "" && named != team {
 			http.NotFound(w, r)
 			return
 		}

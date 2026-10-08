@@ -47,11 +47,12 @@ func TestCollectionPolicyWireContract(t *testing.T) {
 	}
 }
 
-// A team's server key reads that team's policy itself, as the bearer, the team in the query.
+// A team's server key reads that team's policy itself, as the bearer, naming no team: the
+// key is bound to its own.
 func TestCollectionPolicyWithAServerKey(t *testing.T) {
 	t.Setenv("TERMA_POLICY_STUB", "")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/policy" || r.URL.Query().Get("project_id") != "team" || r.Header.Get("Authorization") != "Bearer ter_srv_team" {
+		if r.URL.Path != "/v1/policy" || r.URL.Query().Has("project_id") || r.Header.Get("Authorization") != "Bearer ter_srv_team" {
 			t.Errorf("wrong policy authentication/URL: %s %s", r.URL, r.Header.Get("Authorization"))
 		}
 		fmt.Fprintf(w, `{"policy":{"version":"1.0","terma":{%s,"global":{}}},"revision":2,"updated_at":"2026-09-30T12:27:05Z"}`, testCapture)

@@ -45,7 +45,11 @@ func (f *fakeAuth) serveServerKey(w http.ResponseWriter, r *http.Request, key st
 			id["permissions"] = perms
 		}
 		_ = json.NewEncoder(w).Encode(id)
-	case r.URL.Path == "/v1/policy" && r.URL.Query().Get("project_id") == team:
+	case r.URL.Path == "/v1/policy" && r.URL.Query().Has("project_id"):
+		// A key is bound to its team, so naming one is refused, as the auth host does.
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprint(w, `{"error":{"code":"INVALID_ARGUMENT","message":"a server key reads its own team's policy: omit project_id"}}`)
+	case r.URL.Path == "/v1/policy":
 		f.keyPolicies.Add(1)
 		fmt.Fprint(w, cmp.Or(f.policyBody, `{"policy":null}`))
 	default:
