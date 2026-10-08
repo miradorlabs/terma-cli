@@ -124,8 +124,9 @@ func PrePush(ctx context.Context, env Env) error {
 		return nil
 	}
 	// git names a push to a URL by the URL twice; a URL never goes out as a remote's name.
+	// A remote can be named for its own location, so only one configured is a remote.
 	remote, url := env.Args[0], env.Args[1]
-	if remote == url {
+	if remote == url && !gitx.RemoteFS(r.GitDir, remote) {
 		remote = ""
 	}
 	rec := pushRecord{ID: rand.Text(), Time: env.Time(), Root: r.Root, GitDir: r.GitDir, Remote: remote, Refs: refs}

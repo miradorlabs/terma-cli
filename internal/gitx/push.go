@@ -76,6 +76,12 @@ func ValidOID(s string) bool {
 	return (len(s) == 40 || len(s) == 64) && strings.Trim(s, "0123456789abcdef") == ""
 }
 
+// RemoteFS reports whether name is a remote configured with a URL.
+func RemoteFS(gitDir, name string) bool {
+	_, ok := configValue(filepath.Join(CommonDirFS(gitDir), "config"), `remote "`+name+`"`, "url")
+	return ok
+}
+
 // TrackingRefFS is the remote-tracking ref git updates when a push of remoteRef to the
 // configured remote succeeds, under git's default fetch mapping. ok is false when that
 // branch would not show the push: no such remote, a push URL apart from the fetch URL,

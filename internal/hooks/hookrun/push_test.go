@@ -366,3 +366,26 @@ func TestPushedListsNameOnlyTheListedCommitsSessions(t *testing.T) {
 		t.Errorf("nil lists: %#v %#v", shas, sessions)
 	}
 }
+
+// A remote named for its own location is still a remote: git passes it as both arguments.
+func TestARemoteNamedForItsLocationIsARemote(t *testing.T) {
+	defer func(f func() int) { gitPushPID = f }(gitPushPID)
+	p := newPushRepo(t)
+	// git resolves the remote's path from the checkout, where pre-push runs.
+	p.git("init", "-q", "--bare", "-b", "main", filepath.Join(p.root, "same.git"))
+	p.git("remote", "add", "same.git", "same.git")
+	p.git("commit", "-q", "--allow-empty", "-m", "more")
+	head := p.sha("HEAD")
+	gitPushPID = func() int { return 0 }
+	var recorded string
+	env := Env{StateDir: p.stateDir, Now: time.Now(), Cwd: p.root, Args: []string{"same.git", "same.git"},
+		Stdin: strings.NewReader(pushLine("refs/heads/main", head, "refs/heads/main", zero) + "\n"), Spool: p.sp,
+		Team: p.team, Policy: hookruntest.Admitting(p.root), AwaitPush: func(path string) { recorded = path }}
+	if err := PrePush(context.Background(), env); err != nil {
+		t.Fatal(err)
+	}
+	rec, err := readPush(recorded)
+	if err != nil || rec.Remote != "same.git" || rec.Refs[0].Tracking != "refs/remotes/same.git/main" {
+		t.Fatalf("record: %+v, %v", rec, err)
+	}
+}
