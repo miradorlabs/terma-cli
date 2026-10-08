@@ -6,12 +6,15 @@
 # The script is POSIX sh, so `| sh` works too. What it does, so you can read it
 # before you run it: pick the archive for this platform from GitHub Releases, verify
 # it against the release's checksums.txt, extract the single `terma` binary, and
-# place it in ~/.local/bin; it never asks for sudo. Nothing else is written; nothing
-# downloaded is executed before it has been verified. Windows users: download
-# terma_Windows_x86_64.zip from https://github.com/miradorlabs/terma-cli/releases.
+# place it in ~/.local/bin; it never asks for sudo. When that directory is not on
+# PATH, it appends the one line that adds it to your login shell's startup file
+# (~/.zshrc, ~/.bashrc or ~/.bash_profile, or a fish conf.d file). Nothing else is
+# written; nothing downloaded is executed before it has been verified. Windows users:
+# download terma_Windows_x86_64.zip from https://github.com/miradorlabs/terma-cli/releases.
 #
-#   TERMA_VERSION      install this release instead of the latest (v1.2.3 or 1.2.3)
-#   TERMA_INSTALL_DIR  put the binary here instead of ~/.local/bin
+#   TERMA_VERSION         install this release instead of the latest (v1.2.3 or 1.2.3)
+#   TERMA_INSTALL_DIR     put the binary here instead of ~/.local/bin
+#   TERMA_NO_MODIFY_PATH  set to leave your shell's startup file alone
 set -eu
 
 REPO="miradorlabs/terma-cli"
@@ -83,6 +86,7 @@ chmod +x "$tmp/terma"
 # Where to put it: an explicit TERMA_INSTALL_DIR, else ~/.local/bin. Never sudo, so
 # the binary is the user's own and `terma update` can replace it.
 dest="${TERMA_INSTALL_DIR:-$HOME/.local/bin}"
+case "$dest" in /*) ;; *) dest="$(pwd)/$dest" ;; esac # a PATH entry must be absolute
 mkdir -p "$dest" || die "cannot create ${dest} (set TERMA_INSTALL_DIR to install elsewhere)"
 # Staged beside the binary and renamed over it, so nothing ever runs a half-written terma:
 # a relay or hook running the old one keeps it until it starts the new one.
@@ -95,8 +99,66 @@ mv -f "$staged" "$dest/terma" || { rm -f "$staged"; die "could not install ${des
 # only browser downloads do. The Homebrew cask strips it because Homebrew sets it.
 
 say "Installed $("$dest/terma" version 2>/dev/null || echo terma) to ${dest}/terma"
+
+# The startup file of the login shell ($SHELL), chosen as internal/shellrc.ShellRC
+# chooses it; fails for a shell this script cannot write for.
+startup_file() {
+  [ -n "${HOME:-}" ] || return 1
+  case "${SHELL##*/}" in
+    zsh) printf '%s\n' "${ZDOTDIR:-$HOME}/.zshrc" ;;
+    bash)
+      # macOS terminals start login shells, which read .bash_profile and not .bashrc.
+      if [ "$os" = Darwin ] && [ -e "$HOME/.bash_profile" ]; then
+        printf '%s\n' "$HOME/.bash_profile"
+      else
+        printf '%s\n' "$HOME/.bashrc"
+      fi ;;
+    fish) printf '%s\n' "${XDG_CONFIG_HOME:-$HOME/.config}/fish/conf.d/terma.fish" ;;
+    *) return 1 ;;
+  esac
+}
+
+# The line that puts dest first on PATH, as shellrc.RC.PathLine writes it: a directory
+# under home as $HOME/…, and what stays active inside double quotes escaped.
+# shellcheck disable=SC2016 # $HOME and $PATH are written for the startup file to expand
+path_line() {
+  prefix='' dir="$dest"
+  case "$dir" in "$HOME"/*) prefix='$HOME/' dir="${dir#"$HOME"/}" ;; esac
+  if [ "${SHELL##*/}" = fish ]; then
+    printf 'fish_add_path --move --prepend "%s%s"\n' "$prefix" "$(printf '%s' "$dir" | sed 's/[\\$"]/\\&/g')"
+  else
+    printf 'export PATH="%s%s:$PATH"\n' "$prefix" "$(printf '%s' "$dir" | sed 's/[\\$"`]/\\&/g')"
+  fi
+}
+
+# Appends the line once, so new terminals find terma, and prints the file. This script
+# runs as a child of the user's shell, so it cannot change that shell's PATH itself.
+add_to_path() {
+  [ -z "${TERMA_NO_MODIFY_PATH:-}" ] || return 1
+  rc="$(startup_file)" || return 1
+  line="$(path_line)"
+  if ! grep -qsxF "$line" "$rc"; then
+    sep='' # a newline first when the file does not end in one
+    if [ -s "$rc" ] && [ -n "$(tail -c 1 "$rc")" ]; then sep='\n'; fi
+    mkdir -p "$(dirname "$rc")" 2>/dev/null || return 1
+    printf '%b# added by the terma installer\n%s\n' "$sep" "$line" >>"$rc" 2>/dev/null || return 1
+  fi
+  printf '%s\n' "$rc"
+}
+
+next="\`terma setup\` in a terminal"
 case ":$PATH:" in
   *":$dest:"*) ;;
-  *) say "Note: ${dest} is not on your PATH. Add it, e.g.:  export PATH=\"${dest}:\$PATH\"" ;;
+  *)
+    if rc="$(add_to_path)"; then
+      shown="$rc"
+      # shellcheck disable=SC2088 # shown to the user, not expanded
+      case "$rc" in "$HOME"/*) shown="~/${rc#"$HOME"/}" ;; esac
+      case "$shown" in *[!A-Za-z0-9/._~-]*) shown="'$rc'" ;; esac
+      say "Added ${dest} to your PATH in ${shown}; new terminals will find terma."
+      next="\`source ${shown}\` in this terminal, then \`terma setup\`"
+    else
+      say "Note: ${dest} is not on your PATH. Add it, e.g.:  export PATH=\"${dest}:\$PATH\""
+    fi ;;
 esac
-say "Next: run \`terma setup\` in a terminal."
+say "Next: run ${next}."

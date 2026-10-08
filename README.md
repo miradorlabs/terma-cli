@@ -15,6 +15,8 @@ Install terma one of these ways, then run `terma setup` once.
 
 **Installer script** (macOS and Linux). Installs to `~/.local/bin`, without sudo, and
 verifies `checksums.txt`. terma keeps it up to date by itself (see [Updates](#updates)).
+When `~/.local/bin` is not on your PATH, the installer adds it in your shell's startup
+file; run the `source` command it prints (or open a new terminal) before `terma setup`.
 
 ```bash
 curl -fsSL https://terma.ai/install.sh | bash
@@ -52,8 +54,9 @@ make install
 terma setup
 ```
 
-The installer script takes `TERMA_INSTALL_DIR` to change the destination and
-`TERMA_VERSION=vX.Y.Z` to pin a release. It is POSIX `sh`, so `| sh` works too.
+The installer script takes `TERMA_INSTALL_DIR` to change the destination,
+`TERMA_VERSION=vX.Y.Z` to pin a release, and `TERMA_NO_MODIFY_PATH=1` to leave your
+shell's startup file alone. It is POSIX `sh`, so `| sh` works too.
 
 `terma setup` signs you in through your browser, then asks:
 

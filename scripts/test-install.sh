@@ -7,9 +7,11 @@
 #
 # Covers the paths a user takes: pinned version piped through bash (the documented
 # `curl | bash`), latest under plain sh, a version without the v prefix, the default
-# destination (~/.local/bin, never sudo), and the two
+# destination (~/.local/bin, never sudo), the PATH line appended for zsh, bash and fish
+# (and when it is not), and the two
 # refusals — a checksum that does not match, and cleartext to a host that is not this
-# machine. Nothing here touches the real PATH: every install goes to a temp dir.
+# machine. Nothing here touches the real PATH: every install goes to a temp dir, under
+# a temp HOME.
 set -euo pipefail
 
 DIST="${1:?usage: test-install.sh <dist-dir> <tag>}"
@@ -22,6 +24,11 @@ work="$(mktemp -d)"
 # `make test-install` exports TERMA_ENV=dev. Keep the release binary's version
 # check in that environment too, with no machine profile influencing its output.
 export TERMA_ENV=dev TERMA_CONFIG_DIR="$work/config"
+# The installer appends to the login shell's startup file; never the developer's own,
+# which ZDOTDIR or XDG_CONFIG_HOME would point at whatever HOME is.
+export HOME="$work/home"
+unset ZDOTDIR XDG_CONFIG_HOME
+mkdir -p "$HOME"
 mirror="$work/mirror/miradorlabs/terma-cli/releases"
 mkdir -p "$mirror/download/$TAG" "$mirror/latest"
 cp "$DIST"/*.tar.gz "$DIST"/checksums.txt "$mirror/download/$TAG/"
@@ -59,6 +66,68 @@ home="$work/home"; mkdir -p "$home"
 out="$(HOME="$home" PATH="/usr/bin:/bin" TERMA_RELEASE_BASE="$BASE" TERMA_VERSION="$TAG" sh "$INSTALLER" 2>&1 </dev/null)"
 [ "$("$home/.local/bin/terma" version)" = "$want" ] || fail "default install did not land in ~/.local/bin: $out"
 ! grep -qi sudo <<<"$out" || fail "installer mentioned sudo: $out"
+
+# install_as <login shell> <home> [VAR=value...] installs to the default destination
+# from a shell whose PATH does not have it, and prints what the installer said.
+install_as() {
+  env HOME="$2" SHELL="$1" PATH="/usr/bin:/bin" TERMA_RELEASE_BASE="$BASE" TERMA_VERSION="$TAG" \
+    "${@:3}" sh "$INSTALLER" 2>&1 </dev/null
+}
+fresh_home() { mktemp -d "$work/home.XXXXXX"; }
+# shellcheck disable=SC2016 # the line the installer writes, for the startup file to expand
+line='export PATH="$HOME/.local/bin:$PATH"'
+
+echo "== adds ~/.local/bin to PATH in the zsh startup file, once"
+home="$(fresh_home)"
+printf 'alias ll=ls' >"$home/.zshrc" # no trailing newline
+out="$(install_as /bin/zsh "$home")"
+[ "$(cat "$home/.zshrc")" = "$(printf 'alias ll=ls\n# added by the terma installer\n%s' "$line")" ] \
+  || fail ".zshrc: $(cat "$home/.zshrc")"
+grep -qF "run \`source ~/.zshrc\` in this terminal, then \`terma setup\`" <<<"$out" || fail "no reload hint: $out"
+# shellcheck disable=SC2016 # expanded by the inner sh
+[ "$(HOME="$home" PATH=/usr/bin:/bin sh -c '. "$HOME/.zshrc" && command -v terma')" = "$home/.local/bin/terma" ] \
+  || fail "sourcing ~/.zshrc does not put terma on PATH"
+install_as /bin/zsh "$home" >/dev/null
+[ "$(grep -cxF "$line" "$home/.zshrc")" = 1 ] || fail "a reinstall added the line again: $(cat "$home/.zshrc")"
+
+echo "== zsh with ZDOTDIR: \$ZDOTDIR/.zshrc"
+home="$(fresh_home)"
+install_as /bin/zsh "$home" ZDOTDIR="$home/zsh" >/dev/null
+grep -qxF "$line" "$home/zsh/.zshrc" || fail "\$ZDOTDIR/.zshrc has no PATH line: $(ls -AR "$home")"
+
+echo "== bash: ~/.bashrc"
+home="$(fresh_home)"
+install_as /bin/bash "$home" >/dev/null
+grep -qxF "$line" "$home/.bashrc" || fail ".bashrc has no PATH line: $(cat "$home/.bashrc" 2>&1)"
+
+echo "== fish: a conf.d file of terma's own"
+home="$(fresh_home)"
+install_as /usr/bin/fish "$home" >/dev/null
+# shellcheck disable=SC2016 # fish expands it
+grep -qxF 'fish_add_path --move --prepend "$HOME/.local/bin"' "$home/.config/fish/conf.d/terma.fish" \
+  || fail "terma.fish: $(cat "$home/.config/fish/conf.d/terma.fish" 2>&1)"
+
+echo "== nothing written when it is already on PATH, when opted out, or for another shell"
+home="$(fresh_home)"
+install_as /bin/zsh "$home" PATH="$home/.local/bin:/usr/bin:/bin" >/dev/null
+out="$(install_as /bin/zsh "$home" TERMA_NO_MODIFY_PATH=1)"
+grep -qF "is not on your PATH" <<<"$out" || fail "opted out, but no PATH note: $out"
+out="$(install_as /bin/dash "$home")"
+grep -qF "is not on your PATH" <<<"$out" || fail "unknown shell, but no PATH note: $out"
+[ "$(ls -A "$home")" = .local ] || fail "wrote $(ls -A "$home")"
+
+echo "== a directory outside home is written literally, every metacharacter inert"
+home="$(fresh_home)"
+odd="$work/a b\"c\$d\`e\\f"
+install_as /bin/zsh "$home" TERMA_INSTALL_DIR="$odd" >/dev/null
+# shellcheck disable=SC2016 # expanded by the inner sh
+[ "$(HOME="$home" PATH=/usr/bin:/bin sh -c '. "$HOME/.zshrc" && command -v terma')" = "$odd/terma" ] \
+  || fail "sourcing ~/.zshrc does not find $odd/terma: $(cat "$home/.zshrc")"
+
+echo "== a relative TERMA_INSTALL_DIR goes on PATH as an absolute path"
+home="$(fresh_home)"
+(cd "$work" && install_as /bin/zsh "$home" TERMA_INSTALL_DIR=rel/bin >/dev/null)
+grep -qF "export PATH=\"$work/rel/bin:" "$home/.zshrc" || fail ".zshrc: $(cat "$home/.zshrc")"
 
 echo "== refuses a checksum that does not match"
 sums="$mirror/download/$TAG/checksums.txt"

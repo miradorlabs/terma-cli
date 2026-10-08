@@ -276,8 +276,9 @@ jobs:
           if-no-files-found: error
 
   # `curl -fsSL https://terma.ai/install.sh | bash`, against those archives served
-  # over loopback: pinned and latest, piped through bash and under sh, plus the two
-  # refusals (checksum mismatch, cleartext). scripts/test-install.sh.
+  # over loopback: pinned and latest, piped through bash and under sh, the PATH line
+  # it appends per shell, plus the two refusals (checksum mismatch, cleartext).
+  # scripts/test-install.sh.
   install-script:
     needs: release-dry-run
     runs-on: ubuntu-latest

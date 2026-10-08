@@ -1,5 +1,6 @@
 // Package shellrc finds the developer's shell startup file and writes the line that
-// puts a directory first on PATH in that shell.
+// puts a directory first on PATH in that shell. install.sh repeats ShellRC and
+// PathLine in sh; change them together.
 package shellrc
 
 import (
