@@ -331,24 +331,39 @@ func machineFiles(t *testing.T) string {
 	return all
 }
 
-// Setup again without --insecure-storage moves a key an earlier --insecure-storage setup kept
-// in plain text in keys.json into the keychain, the rotated key with it.
+// Setup again without --insecure-storage moves what an earlier --insecure-storage setup kept
+// in plain text into the keychain: the key in keys.json, the rotated key with it, and a
+// browser login kept behind the key in credentials.json.
 func TestServerKeySetupMovesTheKeyWhereSecretsAreKept(t *testing.T) {
-	_, team := keySandbox(t)
+	gateway, team := keySandbox(t)
 	if out, err := runTerma(t, "setup", "--yes", "--harness", "claude", "--insecure-storage"); err != nil {
 		t.Fatalf("setup --insecure-storage: %v\n%s", err, out)
 	}
-	keysFile := filepath.Join(testApp.dir, "keys.json")
-	if data, err := os.ReadFile(keysFile); err != nil || !strings.Contains(string(data), testServerKey) {
-		t.Fatalf("--insecure-storage kept the key elsewhere: %v\n%s", err, data)
+	login := storedSession(gateway, orgA())
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, login); err != nil {
+		t.Fatal(err)
+	}
+	keysFile, credentialsFile := filepath.Join(testApp.dir, "keys.json"), config.CredentialsPath(testApp.dir)
+	inPlainText := func(file, secret string) bool {
+		data, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return strings.Contains(string(data), secret)
+	}
+	if !inPlainText(keysFile, testServerKey) || !inPlainText(credentialsFile, login.AccessToken) {
+		t.Fatal("--insecure-storage kept the key or the login elsewhere")
 	}
 	t.Setenv("TERMA_API_KEY", rotatedKey)
 	setupWithKey(t)
-	if data, err := os.ReadFile(keysFile); err != nil || strings.Contains(string(data), testServerKey) || strings.Contains(string(data), rotatedKey) {
-		t.Fatalf("a key stayed in plain text after setup chose the keychain: %v\n%s", err, data)
+	if inPlainText(keysFile, testServerKey) || inPlainText(keysFile, rotatedKey) || inPlainText(credentialsFile, login.AccessToken) {
+		t.Fatal("a secret stayed in plain text after setup chose the keychain")
 	}
 	if key, err := keystore.Get(testApp.dir, team); err != nil || key != rotatedKey {
 		t.Fatalf("team key = %q, %v; want the rotated one", key, err)
+	}
+	if cred, err := auth.LoadCredential(testApp.dir, config.DefaultProfile); err != nil || cred.AccessToken != login.AccessToken {
+		t.Fatalf("the login behind the key: %v", err)
 	}
 }
 

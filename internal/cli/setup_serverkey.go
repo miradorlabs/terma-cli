@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/account/serverkey"
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -119,8 +120,12 @@ func (app *App) keepServerKey(cfg *config.Config, insecure bool) error {
 	if err := keystore.DeleteHarnessKeys(app.dir, cfg.Team); err != nil {
 		return fmt.Errorf("store the server key: %w", err)
 	}
-	// A key an earlier setup kept elsewhere stays there on Set, so move every key to where
-	// secrets are now kept, as a browser sign-in does (settleSecrets).
+	// A key an earlier setup kept elsewhere stays there on Set, and so does a login kept
+	// behind the key: move every secret to where secrets are now kept, as a browser sign-in
+	// does (settleSecrets).
+	if err := auth.Relocate(app.dir); err != nil {
+		return fmt.Errorf("move the sign-in credentials to where secrets are kept: %w", err)
+	}
 	if err := keystore.Relocate(app.dir); err != nil {
 		return fmt.Errorf("move the team keys to where secrets are kept: %w", err)
 	}
