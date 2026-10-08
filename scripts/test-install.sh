@@ -147,6 +147,10 @@ for conf in "$home/.config" "$home/xdg"; do
   grep -qxF 'fish_add_path --move --prepend "$HOME/.local/bin"' "$conf/fish/conf.d/terma.fish" \
     || fail "terma.fish: $(cat "$conf/fish/conf.d/terma.fish" 2>&1)"
 done
+if fish="$(command -v fish)"; then # CI installs it on Linux
+  [ "$(env -i HOME="$home" PATH=/usr/bin:/bin "$fish" -c 'command -v terma')" = "$home/.local/bin/terma" ] \
+    || fail "fish does not find terma through terma.fish"
+fi
 
 echo "== nothing written when it is already on PATH, opted out, or the shell is unknown or unset"
 home="$(fresh_home)"

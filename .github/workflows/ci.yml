@@ -292,6 +292,8 @@ jobs:
         run: |
           shellcheck -s sh install.sh
           shellcheck scripts/test-install.sh scripts/test-cask.sh
+      # A real fish, to start against the conf.d file the installer writes.
+      - run: sudo apt-get install -y -q fish >/dev/null
       - run: ./scripts/test-install.sh dist v0.0.0-ci
 
   # The same on macOS (BSD tools, bash 3.2 as /bin/bash), where install.sh and
