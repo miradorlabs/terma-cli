@@ -31,20 +31,27 @@ func TestShellRCNamesTheFileTheShellReads(t *testing.T) {
 		t.Fatalf("zsh honours ZDOTDIR: %+v", rc)
 	}
 
+	// A macOS terminal starts a login shell, which reads the first of .bash_profile,
+	// .bash_login and .profile that exists, and never .bashrc.
 	t.Setenv("SHELL", "/usr/local/bin/bash")
-	if rc, ok := ShellRC(); !ok || rc.Path != filepath.Join(home, ".bashrc") {
-		t.Fatalf("bash: %+v %v", rc, ok)
-	}
-	// A macOS terminal starts a login shell, which reads .bash_profile and never .bashrc.
-	if err := os.WriteFile(filepath.Join(home, ".bash_profile"), nil, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	want := ".bashrc"
-	if runtime.GOOS == "darwin" {
-		want = ".bash_profile"
-	}
-	if rc, _ := ShellRC(); filepath.Base(rc.Path) != want {
-		t.Fatalf("bash on %s: %s, want %s", runtime.GOOS, rc.Path, want)
+	for _, step := range []struct{ create, darwin string }{
+		{"", ".bash_profile"},
+		{".profile", ".profile"},
+		{".bash_login", ".bash_login"},
+		{".bash_profile", ".bash_profile"},
+	} {
+		if step.create != "" {
+			if err := os.WriteFile(filepath.Join(home, step.create), nil, 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		want := ".bashrc"
+		if runtime.GOOS == "darwin" {
+			want = step.darwin
+		}
+		if rc, ok := ShellRC(); !ok || rc.Path != filepath.Join(home, want) {
+			t.Fatalf("bash on %s with %q: %+v %v, want %s", runtime.GOOS, step.create, rc, ok, want)
+		}
 	}
 
 	t.Setenv("SHELL", "/opt/homebrew/bin/fish")

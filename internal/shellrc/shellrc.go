@@ -1,6 +1,6 @@
 // Package shellrc finds the developer's shell startup file and writes the line that
 // puts a directory first on PATH in that shell. install.sh repeats ShellRC and
-// PathLine in sh; change them together.
+// PathLine in sh, and install_test.go holds the two to the same answers.
 package shellrc
 
 import (
@@ -28,11 +28,16 @@ func ShellRC() (RC, bool) {
 		dir := cmp.Or(os.Getenv("ZDOTDIR"), home)
 		return RC{Path: filepath.Join(dir, ".zshrc"), Shell: shell}, true
 	case "bash":
-		// macOS terminals start login shells, which read .bash_profile and not .bashrc.
-		if profile := filepath.Join(home, ".bash_profile"); runtime.GOOS == "darwin" && exists(profile) {
-			return RC{Path: profile, Shell: shell}, true
+		if runtime.GOOS != "darwin" {
+			return RC{Path: filepath.Join(home, ".bashrc"), Shell: shell}, true
 		}
-		return RC{Path: filepath.Join(home, ".bashrc"), Shell: shell}, true
+		// macOS terminals start login shells, which read the first of these that exists.
+		for _, name := range []string{".bash_profile", ".bash_login", ".profile"} {
+			if path := filepath.Join(home, name); exists(path) {
+				return RC{Path: path, Shell: shell}, true
+			}
+		}
+		return RC{Path: filepath.Join(home, ".bash_profile"), Shell: shell}, true
 	case "fish":
 		// A file of terma's own, in which fish_add_path moves the entry to the front each run.
 		return RC{Path: filepath.Join(FishConfigDir(home), "conf.d", "terma.fish"), Shell: shell}, true
