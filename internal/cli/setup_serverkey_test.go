@@ -331,6 +331,27 @@ func machineFiles(t *testing.T) string {
 	return all
 }
 
+// Setup again without --insecure-storage moves a key an earlier --insecure-storage setup kept
+// in plain text in keys.json into the keychain, the rotated key with it.
+func TestServerKeySetupMovesTheKeyWhereSecretsAreKept(t *testing.T) {
+	_, team := keySandbox(t)
+	if out, err := runTerma(t, "setup", "--yes", "--harness", "claude", "--insecure-storage"); err != nil {
+		t.Fatalf("setup --insecure-storage: %v\n%s", err, out)
+	}
+	keysFile := filepath.Join(testApp.dir, "keys.json")
+	if data, err := os.ReadFile(keysFile); err != nil || !strings.Contains(string(data), testServerKey) {
+		t.Fatalf("--insecure-storage kept the key elsewhere: %v\n%s", err, data)
+	}
+	t.Setenv("TERMA_API_KEY", rotatedKey)
+	setupWithKey(t)
+	if data, err := os.ReadFile(keysFile); err != nil || strings.Contains(string(data), testServerKey) || strings.Contains(string(data), rotatedKey) {
+		t.Fatalf("a key stayed in plain text after setup chose the keychain: %v\n%s", err, data)
+	}
+	if key, err := keystore.Get(testApp.dir, team); err != nil || key != rotatedKey {
+		t.Fatalf("team key = %q, %v; want the rotated one", key, err)
+	}
+}
+
 // Setup again with a rotated key replaces the old one.
 func TestSetupWithARotatedServerKeyReplacesTheOld(t *testing.T) {
 	_, team := keySandbox(t)

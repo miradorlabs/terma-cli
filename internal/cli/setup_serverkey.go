@@ -119,6 +119,11 @@ func (app *App) keepServerKey(cfg *config.Config, insecure bool) error {
 	if err := keystore.DeleteHarnessKeys(app.dir, cfg.Team); err != nil {
 		return fmt.Errorf("store the server key: %w", err)
 	}
+	// A key an earlier setup kept elsewhere stays there on Set, so move every key to where
+	// secrets are now kept, as a browser sign-in does (settleSecrets).
+	if err := keystore.Relocate(app.dir); err != nil {
+		return fmt.Errorf("move the team keys to where secrets are kept: %w", err)
+	}
 	return config.UpdateProfile(app.dir, cfg.ProfileName, func(p *config.Profile) { applyServerKey(p, cfg) })
 }
 
