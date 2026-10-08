@@ -48,6 +48,8 @@ func (app *App) useServerKey(s *setup.Steps, ui *setupUI, org orgRef, team *stri
 	}
 	s.FetchPolicy = func(ctx context.Context, cfg *config.Config) (config.Policy, error) {
 		pol, err := app.policies().FetchWithKey(ctx, cfg, cfg.APIKey)
+		// The sign-in is kept here, once the key has proved it reads the policy and before
+		// setup stores that policy, so a failed fetch writes nothing.
 		if err == nil {
 			err = app.keepServerKey(cfg, insecure)
 		}

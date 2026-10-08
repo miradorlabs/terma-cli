@@ -146,18 +146,37 @@ func TestSetupWithAServerKey(t *testing.T) {
 	}
 }
 
-// teardown --sign-out signs a machine set up with a server key out: status stops counting
-// the key as its sign-in, and says the key itself is revoked in the web app.
+// teardown --sign-out signs a machine set up with a server key out: doctor and status stop
+// counting the key as its sign-in, the output says the key itself is revoked in the web
+// app, and a browser login left behind the key is revoked and deleted too.
 func TestSignOutOfAServerKey(t *testing.T) {
-	keySandbox(t)
-	setupWithKey(t)
-	t.Setenv("TERMA_API_KEY", "")
-	out, err := runTerma(t, "teardown", "--sign-out", "--yes")
-	if err != nil || !strings.Contains(out, "revoke it in the Terma web app") || strings.Contains(out, "Already signed out") {
-		t.Fatalf("teardown --sign-out: %v\n%s", err, out)
-	}
-	if statusOut, _ := runTerma(t, "status"); !strings.Contains(statusOut, "not signed in") {
-		t.Errorf("status after signing out of the key:\n%s", statusOut)
+	for _, behindLogin := range []bool{false, true} {
+		t.Run(fmt.Sprintf("behind a login %v", behindLogin), func(t *testing.T) {
+			gateway, _ := keySandbox(t)
+			if behindLogin {
+				if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway, orgA())); err != nil {
+					t.Fatal(err)
+				}
+			}
+			setupWithKey(t)
+			t.Setenv("TERMA_API_KEY", "")
+			out, err := runTerma(t, "teardown", "--sign-out", "--yes")
+			if err != nil || !strings.Contains(out, "revoke it in the Terma web app") || strings.Contains(out, "Already signed out") {
+				t.Fatalf("teardown --sign-out: %v\n%s", err, out)
+			}
+			if statusOut, _ := runTerma(t, "status"); !strings.Contains(statusOut, "not signed in") {
+				t.Errorf("status after signing out of the key:\n%s", statusOut)
+			}
+			if doctorOut, _ := runTerma(t, "doctor"); !regexp.MustCompile(`(?m)signed in.*no credential`).MatchString(doctorOut) {
+				t.Errorf("doctor after signing out of the key:\n%s", doctorOut)
+			}
+			if revokes := gateway.revokes.Load(); behindLogin && revokes != 1 || !behindLogin && revokes != 0 {
+				t.Errorf("revokes = %d; want the login behind the key revoked, and nothing else", revokes)
+			}
+			if creds, err := auth.Credentials(testApp.dir, config.DefaultProfile); err != nil || len(creds) != 0 {
+				t.Errorf("credentials left after sign-out: %d, %v", len(creds), err)
+			}
+		})
 	}
 }
 

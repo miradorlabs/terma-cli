@@ -43,7 +43,9 @@ func (app *App) newTeardownCommand() *cobra.Command {
 
 Your sign-in is kept, so ` + "`terma setup`" + ` sets this machine up again in seconds,
 with the relay's token as it was: agents still running keep reporting without a restart.
---sign-out also revokes the sign-in, and the next setup mints a new token.`,
+--sign-out also revokes the sign-in, and the next setup mints a new token. On a
+machine set up with a server key, it stops the key being this machine's sign-in; the
+key itself is revoked in the Terma web app.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Refused before anything changes, so teardown never stops halfway.
