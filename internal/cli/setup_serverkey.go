@@ -115,7 +115,7 @@ func (app *App) serverKeySignIn(ctx context.Context, cfg *config.Config, org org
 		return keyPermissions{}, fmt.Errorf("--team %s: the server key in TERMA_API_KEY is team %s's, the only team setup can set up with it — leave --team out", cfg.ProjectID, id.ProjectID)
 	}
 	cfg.OrganizationID, cfg.OrganizationName = id.OrganizationID, known
-	cfg.Team, cfg.ServerKeySignIn = id.ProjectID, true
+	cfg.Team, cfg.ServerKeySignIn, cfg.ServerKeyAuthURL = id.ProjectID, true, cfg.AuthURL
 	cfg.ProfileEnvironment = cfg.Environment
 	return *id.Permissions, nil
 }
@@ -163,5 +163,5 @@ func applyServerKey(p *config.Profile, cfg *config.Config) {
 	p.SelectOrganization(cfg.OrganizationID, "")
 	p.PinEnvironment(cfg.Environment)
 	p.Team = cfg.Team
-	p.ServerKeySignIn = true
+	p.ServerKeySignIn, p.ServerKeyAuthURL = true, cfg.AuthURL
 }

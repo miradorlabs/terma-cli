@@ -335,7 +335,7 @@ func (app *App) revokeSession(ctx context.Context, cfg *config.Config, cred *aut
 func applyLogin(p *config.Profile, cfg *config.Config, cred *auth.Credential, orgName string) {
 	p.SelectOrganization(cred.OrganizationID, orgName)
 	p.PinEnvironment(cfg.Environment)
-	p.ServerKeySignIn = false
+	p.ServerKeySignIn, p.ServerKeyAuthURL = false, ""
 }
 
 func waitForBrowserEnter(cmd *cobra.Command) error {

@@ -51,6 +51,9 @@ type Profile struct {
 	// (TERMA_API_KEY), which the keystore keeps as the team's key, rather than with a
 	// developer's login; a browser sign-in clears it.
 	ServerKeySignIn bool `json:"server_key_sign_in,omitempty"`
+	// ServerKeyAuthURL is the auth host setup checked the server key against, the one host the
+	// policy refresh sends it to; a profile pointed elsewhere refuses rather than disclose it.
+	ServerKeyAuthURL string `json:"server_key_auth_url,omitempty"`
 }
 
 // SelectOrganization records the account scope, never a repository's project.
@@ -117,6 +120,8 @@ type Config struct {
 	// ServerKeySignIn is the profile's: Team's key in the keystore, not a login, is its
 	// credential.
 	ServerKeySignIn bool
+	// ServerKeyAuthURL is the profile's: the auth host its server key was set up against.
+	ServerKeyAuthURL string
 
 	// Policy is the profile's team's policy stored in the state directory, else
 	// DefaultPolicy; one for another login, or unreadable, is NoPolicy.
@@ -177,6 +182,7 @@ func Load(dir, stateDir string, o Overrides) (*Config, error) {
 		Harnesses:          profile.Harnesses,
 		Team:               profile.Team,
 		ServerKeySignIn:    profile.ServerKeySignIn,
+		ServerKeyAuthURL:   profile.ServerKeyAuthURL,
 		Policy:             DefaultPolicy(),
 		APIKey:             strings.TrimSpace(os.Getenv("TERMA_API_KEY")),
 	}

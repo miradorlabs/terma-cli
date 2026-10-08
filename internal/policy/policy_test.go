@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -111,12 +112,25 @@ func TestFetchUsesTheProfilesCredential(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cfg.ServerKeySignIn, cfg.Team = true, team
+	cfg.ServerKeySignIn, cfg.ServerKeyAuthURL, cfg.Team = true, srv.URL, team
 	if err := (Source{}).Refresh(t.Context(), cfg); err != nil || bearer != "ter_srv_team" {
 		t.Fatalf("server-key profile: %v, sent %q", err, bearer)
 	}
 	if stored, ok, err := config.ReadPolicy(cfg.StateDir, team); err != nil || !ok || stored.TeamID != team || !stored.Global() {
 		t.Fatalf("stored %+v, %v, %v", stored, ok, err)
+	}
+
+	// Pointed at another auth host, the profile refuses rather than send the key there.
+	var disclosed atomic.Bool
+	elsewhere := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		disclosed.Store(r.Header.Get("Authorization") != "")
+		fmt.Fprint(w, `{"policy":null}`)
+	}))
+	defer elsewhere.Close()
+	moved := *cfg
+	moved.AuthURL = elsewhere.URL
+	if _, err := (Source{}).Fetch(t.Context(), &moved); err == nil || disclosed.Load() {
+		t.Fatalf("server-key profile pointed elsewhere: %v, key sent there: %v", err, disclosed.Load())
 	}
 
 	cfg.ServerKeySignIn, cfg.APIKey = false, "ter_srv_env"

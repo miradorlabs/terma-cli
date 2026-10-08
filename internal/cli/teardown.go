@@ -189,7 +189,7 @@ func (app *App) signOut(cmd *cobra.Command) error {
 		return errNoSessionWithAPIKey
 	}
 	if cfg.ServerKeySignIn {
-		if err := config.UpdateProfile(app.dir, cfg.ProfileName, func(p *config.Profile) { p.ServerKeySignIn = false }); err != nil {
+		if err := config.UpdateProfile(app.dir, cfg.ProfileName, func(p *config.Profile) { p.ServerKeySignIn, p.ServerKeyAuthURL = false, "" }); err != nil {
 			return err
 		}
 		fmt.Fprintln(out, "Signed out of the team's server key; it keeps working until you revoke it in the Terma web app.")

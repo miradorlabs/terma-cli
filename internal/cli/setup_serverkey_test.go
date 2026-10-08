@@ -108,7 +108,7 @@ func TestSetupWithAServerKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p := file.Profiles[config.DefaultProfile]; p == nil || !p.ServerKeySignIn || p.Team != team || p.OrganizationID != orgA().ID || p.Environment != config.EnvDev {
+	if p := file.Profiles[config.DefaultProfile]; p == nil || !p.ServerKeySignIn || p.Team != team || p.OrganizationID != orgA().ID || p.Environment != config.EnvDev || p.ServerKeyAuthURL != gateway.srv.URL {
 		t.Fatalf("profile = %+v", p)
 	}
 	if key, err := keystore.Get(testApp.dir, team); err != nil || key != testServerKey {

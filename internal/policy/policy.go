@@ -38,6 +38,10 @@ func (s Source) Fetch(ctx context.Context, cfg *config.Config) (config.Policy, e
 		if cfg.ProjectID != cfg.Team {
 			return config.Policy{}, fmt.Errorf("this machine is set up with team %s's server key, which fetches only that team's policy, not team %s's", cfg.Team, cfg.ProjectID)
 		}
+		// The key goes only to the auth host it was set up against, as a login does (CheckEnvironment).
+		if cfg.AuthURL != cfg.ServerKeyAuthURL {
+			return config.Policy{}, fmt.Errorf("this machine's server key was set up against %s, not %s — run `terma setup` with TERMA_API_KEY set", cfg.ServerKeyAuthURL, cfg.AuthURL)
+		}
 		key, err := keystore.Get(cfg.Dir, cfg.ProjectID)
 		if err != nil {
 			return config.Policy{}, err
