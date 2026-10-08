@@ -117,44 +117,6 @@ func (c *Client) base() string {
 	return "https://api.github.com"
 }
 
-// web is GitHub's web base for latestTag: BaseURL when set, so one test server answers both.
-func (c *Client) web() string {
-	if c.BaseURL != "" {
-		return c.base()
-	}
-	return "https://github.com"
-}
-
-// latestTag is the version of the release github.com's latest-release page redirects to, ""
-// when the answer names none; an error when the page could not be asked or refused. The API
-// answers unauthenticated callers 60 times an hour per address, an unchanged answer (304)
-// included, which machines sharing an address and checking every few minutes would spend;
-// the page is not held to that published limit, so the frequent check asks it first.
-func (c *Client) latestTag(ctx context.Context) (string, error) {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodHead, c.web()+"/"+Repo+"/releases/latest", nil)
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("User-Agent", userAgentPrefix+c.Version)
-	client := c.httpClient()
-	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	_ = resp.Body.Close()
-	if resp.StatusCode >= http.StatusBadRequest {
-		return "", fmt.Errorf("github latest release page: HTTP %d", resp.StatusCode)
-	}
-	_, tag, found := strings.Cut(resp.Header.Get("Location"), "/releases/tag/")
-	if !found || !IsRelease(tag) {
-		return "", nil
-	}
-	return strings.TrimPrefix(tag, "v"), nil
-}
-
 // ErrNoRelease means GitHub has no accessible stable release.
 var ErrNoRelease = errors.New("no published release is available")
 

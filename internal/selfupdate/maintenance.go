@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -133,6 +135,44 @@ func Lock(dir string) (func(), error) {
 	return flock.TryLock(statePath(dir, lockFile))
 }
 
+// web is GitHub's web base for latestTag: BaseURL when set, so one test server answers both.
+func (c *Client) web() string {
+	if c.BaseURL != "" {
+		return c.base()
+	}
+	return "https://github.com"
+}
+
+// latestTag is the version of the release github.com's latest-release page redirects to, ""
+// when the answer names none; an error when the page could not be asked or refused. The API
+// answers unauthenticated callers 60 times an hour per address, an unchanged answer (304)
+// included, which machines sharing an address and checking every few minutes would spend;
+// the page is not held to that published limit, so the frequent check asks it first.
+func (c *Client) latestTag(ctx context.Context) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, c.web()+"/"+Repo+"/releases/latest", nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("User-Agent", userAgentPrefix+c.Version)
+	client := c.httpClient()
+	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode >= http.StatusBadRequest {
+		return "", fmt.Errorf("github latest release page: HTTP %d", resp.StatusCode)
+	}
+	_, tag, found := strings.Cut(resp.Header.Get("Location"), "/releases/tag/")
+	if !found || !IsRelease(tag) {
+		return "", nil
+	}
+	return strings.TrimPrefix(tag, "v"), nil
+}
+
 // cachedCheck looks the latest release up once every has passed since the last look (after
 // failed looks, retryAfter), returning the record and the release when this call fetched it.
 // A look whose last answer is complete probes the latest tag first and fetches the release
@@ -212,9 +252,9 @@ type Outcome struct {
 	Err error
 }
 
-// Auto checks for a newer release every CheckInterval at most, as the relay does, and installs it in place of exe for a
-// release build that updates itself, unless the developer turned automatic updates off in
-// configDir; the check's records go in stateDir. A new minor or major version waits out
+// Auto, the relay's pass, checks for a newer release every CheckInterval at most and installs
+// it in place of exe for a release build that updates itself, unless the developer turned
+// automatic updates off in configDir; the check's records go in stateDir. A new minor or major version waits out
 // SoakTime first, and is looked up again before it is installed, so a release pulled since
 // the check is not. Each release is attempted once per AttemptInterval at most, so a failing
 // install is not retried at every pass. progress, when set, is told of the download.
@@ -222,7 +262,7 @@ func (c *Client) Auto(ctx context.Context, configDir, stateDir, exe string, prog
 	return c.auto(ctx, CheckInterval, configDir, stateDir, exe, progress)
 }
 
-// auto is Auto looking every every at most.
+// auto is Auto with every as the interval between looks.
 func (c *Client) auto(ctx context.Context, every time.Duration, configDir, stateDir, exe string, progress io.Writer) Outcome {
 	if !IsRelease(c.Version) {
 		return Outcome{}
