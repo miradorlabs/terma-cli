@@ -33,11 +33,16 @@ const Repo = "miradorlabs/terma-cli"
 // BinaryName is the executable inside each release archive.
 const BinaryName = "terma"
 
-// CheckInterval is how often the passive "update available" notice re-checks.
-const CheckInterval = 24 * time.Hour
+// CheckInterval is how often terma looks for a newer release: often, so a patch release,
+// which installs without a soak, reaches a machine within minutes. Each look is a cheap
+// probe of the latest tag (latestTag); the release itself is looked up only when it moved.
+const CheckInterval = 5 * time.Minute
 
 // RetryInterval bounds how long a failed release lookup suppresses another check.
 const RetryInterval = 15 * time.Minute
+
+// AttemptInterval is how long a release whose install failed waits before it is tried again.
+const AttemptInterval = 24 * time.Hour
 
 // maxDownload bounds a release archive and any file read out of it.
 const maxDownload = 256 << 20
@@ -69,6 +74,9 @@ func (r Release) Version() string { return strings.TrimPrefix(r.TagName, "v") }
 type Client struct {
 	HTTP    *http.Client
 	BaseURL string // GitHub API base; defaults to https://api.github.com
+	// WebURL is GitHub's web base for latestTag; defaults to BaseURL when that is set, so
+	// one test server answers both, else https://github.com.
+	WebURL  string
 	Version string // the running version, for User-Agent
 	// ReleaseKeys, set, replace the keys built into this terma (tests); nil means those.
 	ReleaseKeys []ed25519.PublicKey
@@ -106,6 +114,41 @@ func (c *Client) base() string {
 		return strings.TrimRight(c.BaseURL, "/")
 	}
 	return "https://api.github.com"
+}
+
+func (c *Client) web() string {
+	switch {
+	case c.WebURL != "":
+		return strings.TrimRight(c.WebURL, "/")
+	case c.BaseURL != "":
+		return c.base()
+	}
+	return "https://github.com"
+}
+
+// latestTag is the version of the release github.com's latest-release page redirects to,
+// "" when it cannot tell. The API answers unauthenticated callers 60 times an hour per
+// address, an unchanged answer (304) included, which machines sharing an address checking
+// every few minutes would spend; the page is not held to that limit, so the frequent check
+// asks it and calls the API only when the tag has moved.
+func (c *Client) latestTag(ctx context.Context) string {
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, c.web()+"/"+Repo+"/releases/latest", nil)
+	if err != nil {
+		return ""
+	}
+	req.Header.Set("User-Agent", userAgentPrefix+c.Version)
+	client := c.httpClient()
+	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	resp, err := client.Do(req)
+	if err != nil {
+		return ""
+	}
+	_ = resp.Body.Close()
+	_, tag, found := strings.Cut(resp.Header.Get("Location"), "/releases/tag/")
+	if !found || !IsRelease(tag) {
+		return ""
+	}
+	return strings.TrimPrefix(tag, "v")
 }
 
 // ErrNoRelease means GitHub has no accessible stable release.

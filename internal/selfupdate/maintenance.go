@@ -56,13 +56,17 @@ type Cache struct {
 	Attempted string `json:"attempted,omitempty"`
 }
 
+// maxRetryWait caps retryAfter: the window GitHub's rate limit resets in, so a machine back
+// online after a night's failed lookups still takes a patch within the hour.
+const maxRetryWait = time.Hour
+
 // retryAfter is how long a lookup that has failed failures times in a row waits before the
-// next: RetryInterval, doubling up to CheckInterval, so a rate-limited network is not kept so.
+// next: RetryInterval, doubling up to maxRetryWait, so a rate-limited network is not kept so.
 func retryAfter(failures int) time.Duration {
 	wait := RetryInterval
 	for range failures - 1 {
-		if wait *= 2; wait >= CheckInterval {
-			return CheckInterval
+		if wait *= 2; wait >= maxRetryWait {
+			return maxRetryWait
 		}
 	}
 	return wait
@@ -142,7 +146,12 @@ func (c *Client) cachedCheck(ctx context.Context, dir, current string) (Cache, *
 	if time.Since(cache.CheckedAt) >= interval || cache.CheckedAt.After(time.Now()) {
 		checkCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 		defer cancel()
+		unchanged := !cache.Failed && cache.Latest != "" && !cache.Published.IsZero()
 		cache.CheckedAt, cache.Current = time.Now(), current
+		if unchanged && c.latestTag(checkCtx) == cache.Latest {
+			SaveCache(dir, cache)
+			return cache, nil
+		}
 		rel, err := c.Latest(checkCtx)
 		cache.Failed = err != nil
 		if err != nil {
@@ -189,16 +198,16 @@ type Outcome struct {
 	// Replaced means another install put a release in place while this process ran, so it
 	// did nothing: the next command runs that release.
 	Replaced bool
-	// Err is a failed install; the next attempt waits a day.
+	// Err is a failed install; the next attempt waits AttemptInterval.
 	Err error
 }
 
-// Auto checks for a newer release at most daily and installs it in place of exe for a
+// Auto checks for a newer release every CheckInterval at most and installs it in place of exe for a
 // release build that updates itself, unless the developer turned automatic updates off in
 // configDir; the check's records go in stateDir. A new minor or major version waits out
 // SoakTime first, and is looked up again before it is installed, so a release pulled since
-// the check is not. Each release is attempted once a day at most, so a failing install is
-// not retried at every pass. progress, when set, is told of the download.
+// the check is not. Each release is attempted once per AttemptInterval at most, so a failing
+// install is not retried at every pass. progress, when set, is told of the download.
 func (c *Client) Auto(ctx context.Context, configDir, stateDir, exe string, progress io.Writer) Outcome {
 	if !IsRelease(c.Version) {
 		return Outcome{}
@@ -218,7 +227,7 @@ func (c *Client) Auto(ctx context.Context, configDir, stateDir, exe string, prog
 		return Outcome{Replaced: true}
 	}
 	cache, rel := c.cachedCheck(ctx, stateDir, c.Version)
-	attempted := cache.Attempted == cache.Latest && time.Since(cache.AttemptAt) < CheckInterval
+	attempted := cache.Attempted == cache.Latest && time.Since(cache.AttemptAt) < AttemptInterval
 	if !p.Auto || c.Binary == nil || !Newer(c.Version, cache.Latest) || !UpdatesItself(exe) || attempted ||
 		Soaking(c.Version, cache.Latest, cache.Published, time.Now()) {
 		return Outcome{Notice: notice(cache, c.Version)}

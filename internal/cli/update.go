@@ -34,7 +34,8 @@ keeping every choice you made at setup. It works from what is on disk: it signs 
 nothing and never adds a file. Already on the latest release, update runs just that
 refresh, so it is safe to run again.
 
-terma checks daily for a newer release and installs it by itself: the local relay checks
+terma checks every few minutes for a newer release and installs it by itself, a patch at
+once and a new minor or major version after it has been out for 24 hours: the local relay checks
 in the background, so a machine nobody runs terma on still updates, and so do interactive
 commands. Never inside agent hooks, scripts, or CI. Use --auto off for notices only, and
 --auto on to go back to automatic updates. Homebrew and npm installations, and Windows,

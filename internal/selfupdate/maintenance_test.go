@@ -71,11 +71,11 @@ func TestFailedCheckRetriesAfter15Minutes(t *testing.T) {
 			if cache.Failed {
 				t.Fatal("successful retry retained failure state")
 			}
-			cache.CheckedAt = time.Now().Add(-16 * time.Minute)
+			cache.CheckedAt = time.Now().Add(-CheckInterval + time.Minute)
 			SaveCache(dir, cache)
 			_ = noticeOf(c, context.Background(), dir, c.Version)
 			if calls != 2 {
-				t.Fatal("successful check did not retain daily interval")
+				t.Fatal("successful check did not hold for CheckInterval")
 			}
 		})
 	}
@@ -359,13 +359,61 @@ func TestAFailedInstallHoldsBackOnlyThatRelease(t *testing.T) {
 	}
 }
 
-// Failed lookups in a row space out: 15 minutes, doubling up to a day.
+// Failed lookups in a row space out: 15 minutes, doubling up to an hour.
 func TestFailedLookupsBackOff(t *testing.T) {
 	t.Parallel()
-	for failures, want := range []time.Duration{RetryInterval, RetryInterval, 30 * time.Minute, time.Hour, 2 * time.Hour, 4 * time.Hour, 8 * time.Hour, 16 * time.Hour, CheckInterval, CheckInterval} {
+	for failures, want := range []time.Duration{RetryInterval, RetryInterval, 30 * time.Minute, time.Hour, time.Hour, time.Hour} {
 		if got := retryAfter(failures); got != want {
 			t.Errorf("retryAfter(%d) = %v, want %v", failures, got, want)
 		}
+	}
+}
+
+// The frequent check asks the latest-release page for its tag, and looks the release up in
+// the rate-limited API only when that tag has moved, the page does not say, or the last
+// check left no publish time to soak a release by.
+func TestACheckLooksTheReleaseUpOnlyWhenTheTagMoved(t *testing.T) {
+	t.Parallel()
+	published := time.Now().Add(-2 * SoakTime)
+	for _, tc := range []struct {
+		name   string
+		tag    string
+		cache  Cache
+		lookup bool
+	}{
+		{"unchanged", "v1.0.1", Cache{Latest: "1.0.1", Published: published}, false},
+		{"moved", "v1.0.2", Cache{Latest: "1.0.1", Published: published}, true},
+		{"page says nothing", "", Cache{Latest: "1.0.1", Published: published}, true},
+		{"publish time unknown", "v1.0.1", Cache{Latest: "1.0.1"}, true},
+		{"never checked", "v1.0.1", Cache{}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			lookups := 0
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/" + Repo + "/releases/latest":
+					if tc.tag != "" {
+						http.Redirect(w, r, "/"+Repo+"/releases/tag/"+tc.tag, http.StatusFound)
+					}
+				case "/repos/" + Repo + "/releases/latest":
+					lookups++
+					_ = json.NewEncoder(w).Encode(Release{TagName: "v1.0.2", PublishedAt: published})
+				}
+			}))
+			t.Cleanup(srv.Close)
+			stateDir := t.TempDir()
+			tc.cache.CheckedAt, tc.cache.Current = time.Now().Add(-CheckInterval-time.Minute), "1.0.0"
+			SaveCache(stateDir, tc.cache)
+			c := &Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0"}
+			cache, _ := c.cachedCheck(context.Background(), stateDir, "1.0.0")
+			if got := lookups == 1; got != tc.lookup {
+				t.Fatalf("%d API lookups, want a lookup: %v", lookups, tc.lookup)
+			}
+			if time.Since(cache.CheckedAt) > time.Minute || !LoadCache(stateDir).CheckedAt.Equal(cache.CheckedAt) {
+				t.Fatalf("the check was not recorded: %+v", cache)
+			}
+		})
 	}
 }
 
