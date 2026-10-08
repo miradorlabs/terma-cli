@@ -253,11 +253,12 @@ type Outcome struct {
 }
 
 // Auto is the relay's pass: it checks for a newer release every CheckInterval at most and
-// installs it in place of exe for a release build that updates itself, unless the developer turned
-// automatic updates off in configDir; the check's records go in stateDir. A new minor or major version waits out
-// SoakTime first, and is looked up again before it is installed, so a release pulled since
-// the check is not. Each release is attempted once per AttemptInterval at most, so a failing
-// install is not retried at every pass. progress, when set, is told of the download.
+// installs it in place of exe for a release build that updates itself, unless the developer
+// turned automatic updates off in configDir; the check's records go in stateDir. A new minor
+// or major version waits out SoakTime first, and is looked up again before it is installed,
+// so a release pulled since the check is not. Each release is attempted once per
+// AttemptInterval at most, so a failing install is not retried at every pass. progress, when
+// set, is told of the download.
 func (c *Client) Auto(ctx context.Context, configDir, stateDir, exe string, progress io.Writer) Outcome {
 	return c.auto(ctx, CheckInterval, configDir, stateDir, exe, progress)
 }
