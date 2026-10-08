@@ -161,6 +161,9 @@ func TestPushReportsEachBranchOnceGitPushExits(t *testing.T) {
 	c2 := p.sha("HEAD")
 	events, _ = p.push(pushLine("refs/heads/feature", c2, "refs/heads/feature", c1), "feature")
 	a = events[0].Attrs
+	if ids, ok := a[semconv.TermaPushSessionIDsKey].([]any); !ok || len(ids) != 0 {
+		t.Errorf("an unstamped push's session ids are %#v, not an empty list", a[semconv.TermaPushSessionIDsKey])
+	}
 	if a[semconv.TermaPushRangeKey] != semconv.TermaPushRangeUpdate || !slices.Equal(strs(a[semconv.TermaPushCommitsKey]), []string{c2}) ||
 		a[semconv.TermaPushForcedKey] != false || a[semconv.TermaPushOldRevisionKey] != c1 || events[0].SessionID != "" ||
 		len(strs(a[semconv.TermaPushSessionIDsKey])) != 0 || a[semconv.TermaPushStatusKey] != semconv.TermaPushStatusTrackingRefUpdated {
@@ -344,5 +347,22 @@ func TestSweepReportsATakenPushItsReporterLeft(t *testing.T) {
 	}
 	if left, _ := os.ReadDir(filepath.Join(p.stateDir, PushesDir)); len(left) > 0 {
 		t.Errorf("left %v", left)
+	}
+}
+
+// The sessions are those of the commits listed, and both lists are empty, never nil.
+func TestPushedListsNameOnlyTheListedCommitsSessions(t *testing.T) {
+	commits := make([]gitx.PushedCommit, MaxPushCommits+1)
+	for i := range commits {
+		commits[i].SHA = strings.Repeat("a", 40)
+	}
+	commits[0].Sessions = []string{"sess-listed", "sess-listed", "../bad"}
+	commits[MaxPushCommits].Sessions = []string{"sess-beyond"}
+	shas, sessions := pushedLists(commits)
+	if len(shas) != MaxPushCommits || !slices.Equal(sessions, []string{"sess-listed"}) {
+		t.Errorf("%d shas, sessions %q", len(shas), sessions)
+	}
+	if shas, sessions := pushedLists(nil); shas == nil || sessions == nil {
+		t.Errorf("nil lists: %#v %#v", shas, sessions)
 	}
 }

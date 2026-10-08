@@ -44,17 +44,21 @@ const (
 	pushWait = 10 * time.Minute
 	// pushPoll is how often AwaitPush looks for git push to have exited.
 	pushPoll = 250 * time.Millisecond
-	// pushAbandoned is when SweepPushes takes over a record from its AwaitPush.
+	// pushAbandoned is when SweepPushes takes over a record from its AwaitPush. A report
+	// that itself outlasts it can be sent twice, which terma.push.id lets the platform count once.
 	pushAbandoned = pushWait + 5*time.Minute
 )
 
 // PushRef is one line of pre-push's input: a ref git is about to update on the remote.
 type PushRef struct {
-	LocalRef, LocalSHA, RemoteRef, RemoteSHA string
+	LocalRef  string `json:"local_ref"`
+	LocalSHA  string `json:"local_sha"`
+	RemoteRef string `json:"remote_ref"`
+	RemoteSHA string `json:"remote_sha"`
 	// Tracking is the remote-tracking ref that shows the push landed, "" when none can, and
 	// TrackingBefore its commit id when pre-push ran, "" when it did not exist.
-	Tracking       string `json:",omitempty"`
-	TrackingBefore string `json:",omitempty"`
+	Tracking       string `json:"tracking,omitempty"`
+	TrackingBefore string `json:"tracking_before,omitempty"`
 }
 
 // ParsePushInput reads pre-push's input, keeping the branch updates terma reports: a
@@ -111,7 +115,6 @@ func PrePush(ctx context.Context, env Env) error {
 	if err != nil || r.GitDir == "" {
 		return nil
 	}
-	env.Cwd = "" // git runs its hooks at the checkout's root, not where the agent works: keep its directory
 	input, err := io.ReadAll(io.LimitReader(env.Stdin, maxPushInput))
 	if err != nil {
 		return nil
@@ -288,18 +291,7 @@ func pushEvent(ctx context.Context, env Env, rec pushRecord, i int, ref PushRef,
 		env.Logf("pushed commits: %v", err)
 		return spool.Event{}, false
 	}
-	shas := make([]string, 0, min(len(commits), MaxPushCommits))
-	var sessions []string
-	for _, c := range commits {
-		if len(shas) < MaxPushCommits {
-			shas = append(shas, c.SHA)
-		}
-		for _, s := range c.Sessions {
-			if session.ValidID(s) && !slices.Contains(sessions, s) && len(sessions) < maxPushSessions {
-				sessions = append(sessions, s)
-			}
-		}
-	}
+	shas, sessions := pushedLists(commits)
 	status := semconv.TermaPushStatusUnknown
 	if exited && ref.Tracking != "" && ref.TrackingBefore != ref.LocalSHA {
 		if after, readable := gitx.RefFS(rec.GitDir, ref.Tracking); readable && after == ref.LocalSHA {
@@ -322,4 +314,21 @@ func pushEvent(ctx context.Context, env Env, rec pushRecord, i int, ref PushRef,
 		ev.SessionID = sessions[0]
 	}
 	return ev, true
+}
+
+// pushedLists are the commit ids terma.push.commits lists, at most MaxPushCommits, and the
+// sessions stamped into those commits alone. Neither is ever nil: an empty list is still
+// the string[] the registry declares.
+func pushedLists(commits []gitx.PushedCommit) (shas, sessions []string) {
+	listed := commits[:min(len(commits), MaxPushCommits)]
+	shas, sessions = make([]string, 0, len(listed)), []string{}
+	for _, c := range listed {
+		shas = append(shas, c.SHA)
+		for _, s := range c.Sessions {
+			if session.ValidID(s) && !slices.Contains(sessions, s) && len(sessions) < maxPushSessions {
+				sessions = append(sessions, s)
+			}
+		}
+	}
+	return shas, sessions
 }
