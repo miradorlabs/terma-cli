@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -204,7 +205,7 @@ func noticeOf(c *Client, ctx context.Context, dir, current string) string {
 	if !IsRelease(current) {
 		return ""
 	}
-	cache, _ := c.cachedCheck(ctx, dir, current)
+	cache, _ := c.cachedCheck(ctx, dir, current, CheckInterval)
 	return notice(cache, current)
 }
 
@@ -370,22 +371,26 @@ func TestFailedLookupsBackOff(t *testing.T) {
 }
 
 // The frequent check asks the latest-release page for its tag, and looks the release up in
-// the rate-limited API only when that tag has moved, the page does not say, or the last
-// check left no publish time to soak a release by.
+// the rate-limited API only when that tag has moved, the page names no release, or the last
+// check left no publish time to soak a release by. A page that refuses is a failed look,
+// which backs off rather than falling through to the API.
 func TestACheckLooksTheReleaseUpOnlyWhenTheTagMoved(t *testing.T) {
 	t.Parallel()
 	published := time.Now().Add(-2 * SoakTime)
 	for _, tc := range []struct {
 		name   string
+		page   int
 		tag    string
 		cache  Cache
 		lookup bool
 	}{
-		{"unchanged", "v1.0.1", Cache{Latest: "1.0.1", Published: published}, false},
-		{"moved", "v1.0.2", Cache{Latest: "1.0.1", Published: published}, true},
-		{"page says nothing", "", Cache{Latest: "1.0.1", Published: published}, true},
-		{"publish time unknown", "v1.0.1", Cache{Latest: "1.0.1"}, true},
-		{"never checked", "v1.0.1", Cache{}, true},
+		{"unchanged", http.StatusFound, "v1.0.1", Cache{Latest: "1.0.1", Published: published}, false},
+		{"moved", http.StatusFound, "v1.0.2", Cache{Latest: "1.0.1", Published: published}, true},
+		{"not a release", http.StatusFound, "nightly", Cache{Latest: "1.0.1", Published: published}, true},
+		{"page says nothing", http.StatusOK, "", Cache{Latest: "1.0.1", Published: published}, true},
+		{"page throttled", http.StatusTooManyRequests, "", Cache{Latest: "1.0.1", Published: published}, false},
+		{"publish time unknown", http.StatusFound, "v1.0.1", Cache{Latest: "1.0.1"}, true},
+		{"never checked", http.StatusFound, "v1.0.1", Cache{}, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -394,8 +399,10 @@ func TestACheckLooksTheReleaseUpOnlyWhenTheTagMoved(t *testing.T) {
 				switch r.URL.Path {
 				case "/" + Repo + "/releases/latest":
 					if tc.tag != "" {
-						http.Redirect(w, r, "/"+Repo+"/releases/tag/"+tc.tag, http.StatusFound)
+						// GitHub answers with an absolute URL.
+						w.Header().Set("Location", "https://github.com/"+Repo+"/releases/tag/"+tc.tag)
 					}
+					w.WriteHeader(tc.page)
 				case "/repos/" + Repo + "/releases/latest":
 					lookups++
 					_ = json.NewEncoder(w).Encode(Release{TagName: "v1.0.2", PublishedAt: published})
@@ -406,14 +413,40 @@ func TestACheckLooksTheReleaseUpOnlyWhenTheTagMoved(t *testing.T) {
 			tc.cache.CheckedAt, tc.cache.Current = time.Now().Add(-CheckInterval-time.Minute), "1.0.0"
 			SaveCache(stateDir, tc.cache)
 			c := &Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0"}
-			cache, _ := c.cachedCheck(context.Background(), stateDir, "1.0.0")
+			cache, _ := c.cachedCheck(context.Background(), stateDir, "1.0.0", CheckInterval)
 			if got := lookups == 1; got != tc.lookup {
 				t.Fatalf("%d API lookups, want a lookup: %v", lookups, tc.lookup)
+			}
+			if failed := tc.page >= http.StatusBadRequest; cache.Failed != failed || cache.Failures != map[bool]int{true: 1}[failed] {
+				t.Fatalf("the check records %+v, want failed: %v", cache, failed)
 			}
 			if time.Since(cache.CheckedAt) > time.Minute || !LoadCache(stateDir).CheckedAt.Equal(cache.CheckedAt) {
 				t.Fatalf("the check was not recorded: %+v", cache)
 			}
 		})
+	}
+}
+
+// The relay looks every CheckInterval; an interactive command, after it has finished, only
+// every CommandCheckInterval, so a command seldom waits on the network.
+func TestCommandsLookLessOftenThanTheRelay(t *testing.T) {
+	t.Parallel()
+	requests := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requests++
+		_ = json.NewEncoder(w).Encode(Release{TagName: "v1.0.0", PublishedAt: time.Now().Add(-2 * SoakTime)})
+	}))
+	t.Cleanup(srv.Close)
+	stateDir := t.TempDir()
+	SaveCache(stateDir, Cache{CheckedAt: time.Now().Add(-CheckInterval - time.Minute), Current: "1.0.0", Latest: "1.0.0"})
+	c := &Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0"}
+	c.Maintain(context.Background(), t.TempDir(), stateDir, "terma", io.Discard)
+	if requests != 0 {
+		t.Fatalf("a command looked %d times within CommandCheckInterval", requests)
+	}
+	c.Auto(context.Background(), t.TempDir(), stateDir, "terma", nil)
+	if requests == 0 {
+		t.Fatal("the relay did not look once CheckInterval had passed")
 	}
 }
 

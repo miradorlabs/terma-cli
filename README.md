@@ -185,8 +185,8 @@ verify <file> --owner miradorlabs`).
 **A bad release.** terma never installs an older version over a newer one, so a release
 is rolled back by rolling forward: delete the bad release, or mark it a pre-release, so
 GitHub's latest release is the previous one again and machines that have not taken it
-never will, then publish a fixed patch release, which every machine installs within 10
-minutes. Pull a bad minor or major release within its 24 hours and no machine
+never will, then publish a fixed patch release, which every machine whose relay runs installs
+within 10 minutes. Pull a bad minor or major release within its 24 hours and no machine
 installs it automatically.
 
 After an update, the new version also refreshes what earlier versions wrote in your home
