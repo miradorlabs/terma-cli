@@ -82,6 +82,17 @@ func TestCurrentKeepsTheLastValidatedPolicy(t *testing.T) {
 	}
 }
 
+// A policy the hooks find stale is fetched again by the flush they start, not served from
+// the cache, so with no relay running a change still applies within about a minute.
+func TestCurrentFetchesAStalePolicyAgain(t *testing.T) {
+	cfg := setUp(t, `{"mode":"repo","include_prompts":true}`)
+	stale := cache(cfg, time.Now().Add(-config.PolicyStaleAfter-time.Second))
+	got, err := (Source{}).Current(t.Context(), cfg, team)
+	if err != nil || !got.FetchedAt.After(stale.FetchedAt) || !got.IncludePrompts {
+		t.Fatalf("Current = %+v, %v; want a fresh fetch", got, err)
+	}
+}
+
 // A login from another organization fetches nothing for this one.
 func TestFetchRefusesAnotherOrganizationsLogin(t *testing.T) {
 	cfg := setUp(t, "")

@@ -232,6 +232,11 @@ So a clone in any folder, a subdirectory of it, and a worktree of it at
 session, inside git or not. Each session reports to the team of the developer who ran it,
 so two developers on different teams in one repository each report to their own.
 
+A change made to the policy in the Terma web app reaches each machine within a minute, and
+a session already running follows it from the agent's next hook after that, such as your
+next prompt. With no relay running, a hook is what starts fetching the change, so it takes
+one hook more. `terma doctor` shows when the policy was last checked.
+
 ### Which commits are stamped
 
 Commit stamping is the team policy's choice, off unless a team admin turns it on in the

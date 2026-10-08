@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/flock"
@@ -105,11 +104,8 @@ func notCollected(env Env, sessionID, tool string) {
 }
 
 // refreshedDir is the policies' folder of one file per team whose age keeps hooks to one
-// policy refresh per refreshEvery.
-const (
-	refreshedDir = "refreshed"
-	refreshEvery = time.Minute
-)
+// policy refresh per config.PolicyStaleAfter, the age at which they ask for one.
+const refreshedDir = "refreshed"
 
 // refreshPolicy starts the detached flush, which refreshes a stale policy first: with no
 // relay running, nothing else learns of a repository the team has since listed, and the
@@ -129,7 +125,7 @@ func refreshPolicy(env Env) {
 		return
 	}
 	defer unlock()
-	if info, err := os.Stat(stamp); err == nil && now.Sub(info.ModTime()) < refreshEvery {
+	if info, err := os.Stat(stamp); err == nil && now.Sub(info.ModTime()) < config.PolicyStaleAfter {
 		return
 	}
 	if err := os.WriteFile(stamp, nil, 0o600); err != nil || os.Chtimes(stamp, now, now) != nil {

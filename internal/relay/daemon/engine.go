@@ -21,8 +21,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
-// PolicyRefreshInterval is how often each team's collection policy is fetched again.
-const PolicyRefreshInterval = time.Minute
+// PolicyRefreshInterval is how often each team's collection policy is fetched again, so a
+// change made in the Terma web app reaches this machine within about half a minute.
+const PolicyRefreshInterval = 30 * time.Second
 
 // Deps are what the relay reaches through the command line: the agents' declarations and
 // the network.

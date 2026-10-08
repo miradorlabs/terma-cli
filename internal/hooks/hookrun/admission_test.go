@@ -270,7 +270,8 @@ func TestWhereAHookMarks(t *testing.T) {
 
 // A policy the relay has stopped refreshing may not list a repository the team now
 // collects: a hook outside the list still marks its session and starts a refresh, at most
-// once a minute per team, so the next hook under the refreshed policy claims the session.
+// once per config.PolicyStaleAfter per team, so the next hook under the refreshed policy
+// claims the session.
 func TestAStalePolicyStartsARefresh(t *testing.T) {
 	t.Parallel()
 	stateDir := t.TempDir()
@@ -289,15 +290,15 @@ func TestAStalePolicyStartsARefresh(t *testing.T) {
 	markOf(t, stateDir, "s1")
 	hook("s1", stale, at.Add(30*time.Second))
 	if flushes != 1 {
-		t.Fatalf("%d refreshes in a minute, want 1", flushes)
+		t.Fatalf("%d refreshes in half a minute, want 1", flushes)
 	}
 	hook("s2", otherTeam, at.Add(30*time.Second))
 	if flushes != 2 {
 		t.Fatalf("another team's refresh waited on this one's: %d refreshes", flushes)
 	}
-	hook("s1", stale, at.Add(2*time.Minute))
+	hook("s1", stale, at.Add(55*time.Second))
 	if flushes != 3 {
-		t.Fatalf("%d refreshes after a minute, want 3", flushes)
+		t.Fatalf("%d refreshes after 55 seconds, want 3", flushes)
 	}
 	unlock, err := flock.TryLock(filepath.Join(stateDir, config.PoliciesDir, refreshedDir, "t1.lock"))
 	if err != nil {

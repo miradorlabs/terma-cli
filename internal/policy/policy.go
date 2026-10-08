@@ -16,8 +16,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
-// RefreshInterval is how long a validated policy is used before it is fetched again.
-const RefreshInterval = time.Minute
+// FetchTimeout bounds one policy fetch.
+const FetchTimeout = 10 * time.Second
 
 // Source fetches policies as one terma build.
 type Source struct {
@@ -65,7 +65,7 @@ func (s Source) Fetch(ctx context.Context, cfg *config.Config) (config.Policy, e
 // Refresh fetches and stores cfg's project's policy; a failure keeps the last validated
 // one, which stops granting anything once it expires (config.MaxPolicyAge).
 func (s Source) Refresh(ctx context.Context, cfg *config.Config) error {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, FetchTimeout)
 	defer cancel()
 	pol, err := s.Fetch(ctx, cfg)
 	if err != nil {
@@ -78,11 +78,12 @@ func (s Source) Refresh(ctx context.Context, cfg *config.Config) error {
 	return nil
 }
 
-// Current is team's policy: the validated one while it is fresh, else a refreshed one,
-// else the stale validated one until it expires; a team never validated has none.
+// Current is team's policy: the validated one until it is stale (config.PolicyStaleAfter),
+// else a refreshed one, else the stale validated one until it expires; a team never
+// validated has none.
 func (s Source) Current(ctx context.Context, cfg *config.Config, team string) (config.Policy, error) {
 	cached, ok := routing.ValidatedPolicy(cfg, team)
-	if ok && time.Since(cached.FetchedAt) < RefreshInterval {
+	if ok && !cached.Stale(time.Now()) {
 		return cached, nil
 	}
 	scoped := *cfg

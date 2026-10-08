@@ -174,17 +174,44 @@ func Context(env Env) []Row {
 	return append(rows, repoPolicyRows(env.Agents, env.Root)...)
 }
 
+// PolicyPropagation is how soon a change to the team's policy applies on this machine.
+const PolicyPropagation = "changes made in the Terma web app reach this machine within a minute"
+
+// policyAge says when p was last fetched and, while something keeps it fresh, how soon a
+// change reaches this machine, which a stale one cannot promise.
+func policyAge(p config.Policy, now time.Time) string {
+	checked := "checked " + ago(now.Sub(p.FetchedAt))
+	if p.Stale(now) {
+		return checked
+	}
+	return checked + "; " + PolicyPropagation
+}
+
+// ago is d as a person reads an age: whole seconds, minutes, hours, then days.
+func ago(d time.Duration) string {
+	switch {
+	case d < time.Minute:
+		return fmt.Sprintf("%ds ago", int(max(d, 0)/time.Second))
+	case d < time.Hour:
+		return fmt.Sprintf("%dm ago", int(d/time.Minute))
+	case d < 48*time.Hour:
+		return fmt.Sprintf("%dh ago", int(d/time.Hour))
+	}
+	return fmt.Sprintf("%dd ago", int(d/(24*time.Hour)))
+}
+
 // captureOff is why nothing is collected once the policy has expired (config.MaxPolicyAge).
 const captureOff = "the collection policy has not been refreshed for over a week"
 
 // machineRows are what this machine collects and where it reports.
 func machineRows(cfg *config.Config) []Row {
 	var rows []Row
+	now := time.Now()
 	switch {
-	case cfg.Policy.Validated() && cfg.Policy.Expired(time.Now()):
-		rows = append(rows, Row{"Capture", "off: " + captureOff + " — run `terma setup`"})
+	case cfg.Policy.Validated() && cfg.Policy.Expired(now):
+		rows = append(rows, Row{"Capture", "off: " + captureOff + " — run `terma setup`"}, Row{"Policy", policyAge(cfg.Policy, now)})
 	case cfg.Policy.Validated():
-		rows = append(rows, Row{"Collecting", PolicySummary(cfg.Policy)})
+		rows = append(rows, Row{"Collecting", PolicySummary(cfg.Policy)}, Row{"Policy", policyAge(cfg.Policy, now)})
 	}
 	// Name the backend whenever it is not production, by environment or by host overrides.
 	switch {

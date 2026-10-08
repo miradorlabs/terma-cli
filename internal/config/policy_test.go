@@ -97,6 +97,11 @@ func TestPolicyStale(t *testing.T) {
 	if (Policy{FetchedAt: now.Add(-time.Hour)}).Stale(now) {
 		t.Fatal("a policy never validated is stale")
 	}
+	// With no relay running, the next hook refreshes a policy a minute old, so a change made
+	// in the Terma web app applies within about a minute.
+	if !(Policy{TeamID: "t", FetchedAt: now.Add(-time.Minute)}).Stale(now) {
+		t.Fatal("a policy a minute old is not stale")
+	}
 }
 
 // A policy's team is its own, else global mode's default project.
