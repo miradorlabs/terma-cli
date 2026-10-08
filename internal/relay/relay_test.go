@@ -98,6 +98,7 @@ type fixture struct {
 	claims   map[string]claim.Claim
 	now      time.Time
 	warnings []string
+	version  string
 }
 
 func (f *fixture) warned() []string {
@@ -129,10 +130,11 @@ func (f *fixture) clock() time.Time {
 
 func (f *fixture) relay(t *testing.T, u *upstream, policies map[string]Policy) (*Relay, *httptest.Server) {
 	r := newRelay(Options{Dir: t.TempDir(),
-		Token:  token,
-		Hold:   time.Minute,
-		Lookup: f.lookup,
-		Now:    f.clock,
+		Version: f.version,
+		Token:   token,
+		Hold:    time.Minute,
+		Lookup:  f.lookup,
+		Now:     f.clock,
 		Warnf: func(format string, args ...any) {
 			f.mu.Lock()
 			f.warnings = append(f.warnings, fmt.Sprintf(format, args...))
@@ -295,6 +297,50 @@ func TestRelayRoutesLogsPerClaimedSession(t *testing.T) {
 				t.Fatalf("after the hold: %v", c)
 			}
 		})
+	}
+}
+
+// Every part names the terma whose relay received it, over any value the agent sent and where
+// it sent none, whether its project takes content or withholds it, logs and spans alike.
+func TestRelayStampsItsVersion(t *testing.T) {
+	t.Parallel()
+	u := newUpstream(t)
+	f := newFixture()
+	f.version = "1.2.3"
+	r, srv := f.relay(t, u, allPolicies(u))
+	for _, session := range []string{"A", "B"} { // p1 takes content, p2 withholds it
+		m := logsOf(session, 1)
+		m.ResourceLogs[0].Resource.Attributes = []*commonpb.KeyValue{kv(semconv.TermaVersionKey, "0.0.1")}
+		postProto(t, srv, "/v1/logs", m)
+	}
+	postProto(t, srv, "/v1/traces", &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{
+		{Name: "claude_code.tool", Attributes: []*commonpb.KeyValue{kv("session.id", "A")}},
+	}}}}}})
+	waitFor(t, func() bool {
+		c := r.Stats().Snapshot().Counters
+		return c["forwarded.logs"] == 2 && c["forwarded.traces"] == 1
+	})
+	u.checkStamps(t, map[string]map[string]string{semconv.TermaVersionKey: {"Bearer key-p1": "1.2.3", "Bearer key-p2": "1.2.3"}})
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	spans := 0
+	for _, req := range u.requests {
+		if req.path != "/v1/traces" {
+			continue
+		}
+		var m tracepb.TracesData
+		if err := proto.Unmarshal(req.body, &m); err != nil {
+			t.Fatal(err)
+		}
+		for _, rs := range m.ResourceSpans {
+			spans++
+			if got := attr(rs.Resource.Attributes, semconv.TermaVersionKey); got != "1.2.3" {
+				t.Errorf("span resource terma.version = %q, want 1.2.3", got)
+			}
+		}
+	}
+	if spans == 0 {
+		t.Fatal("no span reached the host")
 	}
 }
 

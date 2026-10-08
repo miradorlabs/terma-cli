@@ -24,6 +24,8 @@ attribute_groups:
     attributes:
       - ref: mirador.project.id
         requirement_level: required
+      - ref: terma.version
+        requirement_level: required
       - ref: terma.relay.attribution
       - ref: terma.relay.session.id
       - ref: terma.repository.root

@@ -16,7 +16,7 @@ var genericSafeKeys = setOf(
 	"session.id", "gen_ai.conversation.id",
 	"tool_use_id", "gen_ai.tool.call.id", "gen_ai.response.id",
 	"event.name", "event.timestamp",
-	semconv.MiradorProjectIDKey, semconv.TermaRelayAttributionKey, semconv.TermaRelaySessionIDKey, semconv.TermaAccountSeatIDKey,
+	semconv.MiradorProjectIDKey, semconv.TermaVersionKey, semconv.TermaRelayAttributionKey, semconv.TermaRelaySessionIDKey, semconv.TermaAccountSeatIDKey,
 	// Models, providers and settings.
 	"model", "gen_ai.request.model", "gen_ai.response.model", "gen_ai.system", "gen_ai.provider.name",
 	"gen_ai.operation.name", "gen_ai.response.finish_reasons",

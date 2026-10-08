@@ -25,6 +25,7 @@
     "resource/telemetry.sdk.language",
     "resource/telemetry.sdk.name",
     "resource/telemetry.sdk.version",
+    "resource/terma.version",
     "slug",
     "terminal.type"
   ],
@@ -53,6 +54,7 @@
     "resource/telemetry.sdk.language",
     "resource/telemetry.sdk.name",
     "resource/telemetry.sdk.version",
+    "resource/terma.version",
     "sandbox_policy",
     "slug",
     "terminal.type"
@@ -75,6 +77,7 @@
     "resource/telemetry.sdk.language",
     "resource/telemetry.sdk.name",
     "resource/telemetry.sdk.version",
+    "resource/terma.version",
     "slug",
     "terminal.type"
   ],
@@ -101,6 +104,7 @@
     "resource/telemetry.sdk.language",
     "resource/telemetry.sdk.name",
     "resource/telemetry.sdk.version",
+    "resource/terma.version",
     "slug",
     "terminal.type",
     "tool_token_count",
@@ -124,6 +128,7 @@
     "resource/telemetry.sdk.language",
     "resource/telemetry.sdk.name",
     "resource/telemetry.sdk.version",
+    "resource/terma.version",
     "slug",
     "source",
     "terminal.type",
@@ -154,6 +159,7 @@
     "resource/telemetry.sdk.language",
     "resource/telemetry.sdk.name",
     "resource/telemetry.sdk.version",
+    "resource/terma.version",
     "slug",
     "success",
     "terminal.type",
@@ -179,6 +185,7 @@
     "resource/telemetry.sdk.language",
     "resource/telemetry.sdk.name",
     "resource/telemetry.sdk.version",
+    "resource/terma.version",
     "slug",
     "terminal.type"
   ],
@@ -202,6 +209,7 @@
     "resource/telemetry.sdk.language",
     "resource/telemetry.sdk.name",
     "resource/telemetry.sdk.version",
+    "resource/terma.version",
     "target",
     "thread.id",
     "thread.name"
@@ -228,6 +236,7 @@
     "resource/telemetry.sdk.language",
     "resource/telemetry.sdk.name",
     "resource/telemetry.sdk.version",
+    "resource/terma.version",
     "target",
     "thread.id",
     "thread.name",
