@@ -11,11 +11,15 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 )
 
-// switchFlags are switch's own flags; --team is the root's.
 type switchFlags struct {
 	noBrowser bool
+	// assumeYes is --yes: it skips switch's own question only. Setup still asks for the
+	// organization, team and agents, the questions switch is for.
 	assumeYes bool
 }
+
+// switchCanAsk reports whether setup's questions can be asked here; tests replace it.
+var switchCanAsk = canPrompt
 
 func (app *App) newSwitchCommand() *cobra.Command {
 	var f switchFlags
@@ -35,12 +39,12 @@ The browser approves the sign-in as whoever is signed in to the Terma app there.
 another account, sign out of the app in that browser first, or open the link in a
 private window (--no-browser prints it).
 
-If setup stops before it finishes, run ` + "`terma setup`" + ` to sign in again.`,
+It needs a terminal, for setup's questions. If setup stops before it finishes, run ` + "`terma setup`" + ` to sign in again.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error { return app.runSwitch(cmd, f) },
 	}
 	cmd.Flags().BoolVar(&f.noBrowser, "no-browser", false, "print the sign-in URL instead of opening a browser")
-	cmd.Flags().BoolVarP(&f.assumeYes, "yes", "y", false, "skip the confirmation prompt")
+	cmd.Flags().BoolVarP(&f.assumeYes, "yes", "y", false, "skip switch's confirmation; setup still asks for the organization, team and agents")
 	return cmd
 }
 
@@ -56,6 +60,14 @@ func (app *App) runSwitch(cmd *cobra.Command, f switchFlags) error {
 	}
 	if os.Getenv("TERMA_ORGANIZATION_ID") != "" {
 		return errors.New("TERMA_ORGANIZATION_ID is set and would choose the organization for you; unset it first")
+	}
+	// A team named up front belongs to the organization being left, and fails only once
+	// the machine is signed out.
+	if cfg.ProjectID != "" {
+		return errors.New("a team is named (--team or TERMA_TEAM_ID); switch asks for the team after you sign in, so drop it first")
+	}
+	if !switchCanAsk() {
+		return errors.New("switch needs a terminal: after signing out, setup asks for the organization, team and agents")
 	}
 	if !f.assumeYes {
 		ok, err := confirm(cmd, "Sign out of this machine and set it up again, as another account, organization or team?")

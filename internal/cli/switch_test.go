@@ -21,6 +21,9 @@ func switchSandbox(t *testing.T, active organization, team string) *fakeAuth {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
 	sandboxMachine(t)
+	prev := switchCanAsk
+	switchCanAsk = func() bool { return true }
+	t.Cleanup(func() { switchCanAsk = prev })
 	for _, o := range fakeOrgs {
 		if o.ID != active.ID {
 			if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f, o)); err != nil {
@@ -111,17 +114,59 @@ func TestSwitchRefusesBeforeChangingAnything(t *testing.T) {
 	}{
 		{name: "server key", env: "TERMA_API_KEY", value: testServerKey, want: errNoSessionWithAPIKey},
 		{name: "organization override", env: "TERMA_ORGANIZATION_ID", value: orgB().ID},
+		{name: "team override", env: "TERMA_TEAM_ID", value: acmeWeb},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := switchSandbox(t, orgA(), acmeWeb)
 			t.Setenv(tc.env, tc.value)
 			_, err := switchWith(t, switchFlags{assumeYes: true, noBrowser: true}, "")
-			if err == nil || (tc.want != nil && !errors.Is(err, tc.want)) || !strings.Contains(err.Error(), tc.env) {
+			if err == nil || (tc.want != nil && !errors.Is(err, tc.want)) || (tc.want == nil && !strings.Contains(err.Error(), tc.env)) {
 				t.Fatalf("err = %v", err)
 			}
 			if org, team, signIns := selected(t); org != orgA().ID || team != acmeWeb || signIns != 2 || f.revokes.Load() != 0 {
 				t.Errorf("after a refused switch: organization %q team %q, %d sign-ins, %d revokes", org, team, signIns, f.revokes.Load())
 			}
 		})
+	}
+}
+
+// Without a terminal setup could ask nothing, so switch stops before signing out.
+func TestSwitchWithoutATerminalChangesNothing(t *testing.T) {
+	f := switchSandbox(t, orgA(), acmeWeb)
+	switchCanAsk = func() bool { return false }
+	if _, err := switchWith(t, switchFlags{assumeYes: true}, ""); err == nil || !strings.Contains(err.Error(), "terminal") {
+		t.Fatalf("err = %v", err)
+	}
+	if org, team, signIns := selected(t); org != orgA().ID || team != acmeWeb || signIns != 2 || f.revokes.Load() != 0 {
+		t.Errorf("after a refused switch: organization %q team %q, %d sign-ins, %d revokes", org, team, signIns, f.revokes.Load())
+	}
+}
+
+// After switch, setup asks for the team again, even in the organization it left: signed
+// back in there, it does not take the team it had.
+func TestAfterSwitchSetupAsksForTheTeam(t *testing.T) {
+	f := switchSandbox(t, orgA(), "")
+	t.Setenv("TERMA_POLICY_STUB", "")
+	old := projectsIn(orgA().ID)[1]
+	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.Team = old.ID }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := switchWith(t, switchFlags{assumeYes: true, noBrowser: true}, ""); err == nil {
+		t.Fatal("the deadline should have cut setup's browser sign-in")
+	}
+	// The browser sign-in approves the same organization again.
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(f, orgA())); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := &cobra.Command{}
+	cmd.SetIn(strings.NewReader(""))
+	cmd.SetContext(t.Context())
+	// No terminal here, so asking fails: what matters is that setup asked.
+	if name, err := testApp.selectPolicyTeam(cmd, cfg); err == nil || name != "" || cfg.ProjectID == old.ID {
+		t.Fatalf("setup took %q (%s) without asking: %v", name, cfg.ProjectID, err)
 	}
 }
