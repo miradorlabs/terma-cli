@@ -124,6 +124,8 @@ never on disk, and a stopping relay drops it.
   `internal/semconv` from it, and code uses those constants, never a literal.
 - Nothing terma does writes into a repository's working tree or committed files. Its git
   hooks go under `.git/hooks`, which git neither tracks nor carries in a commit.
-  What a developer collects is the
+  The rule is about the repositories terma watches: install.sh's PATH line in the
+  developer's shell startup files is outside it, even where a dotfiles repository keeps
+  those files (`TERMA_NO_MODIFY_PATH` opts out). What a developer collects is the
   team policy's repository list, read through `config.Policy.Admits` alone.
 - Help text never mentions the hidden `dev` and `local` environments.
