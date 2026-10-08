@@ -274,6 +274,16 @@ func Set(dir, projectID, key string, hosts Hosts) error {
 	})
 }
 
+// StoredInFile reports whether keys.json holds a project's key itself rather than the
+// keychain: under InsecureStorage, or because no keychain would take it.
+func StoredInFile(dir, projectID string) bool {
+	f, err := load(dir)
+	return err == nil && f.Keys[projectID] != ""
+}
+
+// FilePath is where keys.json lives under the config directory dir.
+func FilePath(dir string) string { return path(dir) }
+
 // HostsFor returns the hosts recorded with a project's key, and whether any were.
 func HostsFor(dir, projectID string) (Hosts, bool) {
 	f, err := load(dir)

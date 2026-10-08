@@ -12,6 +12,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/serverkey"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/setup"
+	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
 // serverKeyAuth is whoami's auth_type for a server key.
@@ -62,6 +63,21 @@ func (app *App) useServerKey(s *setup.Steps, ui *setupUI, org orgRef, team *stri
 	}
 	s.SpoolKey = func(_ context.Context, cfg *config.Config) {
 		ui.OK("Hook events", "delivered with the server key "+keystore.Mask(cfg.APIKey))
+		reportServerKeyStore(ui, cfg, insecure)
+	}
+}
+
+// reportServerKeyStore says where setup kept the server key, as reportCredentialStore does
+// for a login.
+func reportServerKeyStore(ui *setupUI, cfg *config.Config, insecure bool) {
+	file := output.TildePath(keystore.FilePath(cfg.Dir))
+	switch {
+	case !keystore.StoredInFile(cfg.Dir, cfg.Team):
+		ui.Summary("Server key", "in the system keychain")
+	case insecure:
+		ui.Summary("Server key", "in plain text in "+file+" (--insecure-storage)")
+	default:
+		ui.Caution("Server key", "in plain text in "+file+": no system keychain could be used")
 	}
 }
 
@@ -129,6 +145,13 @@ func (app *App) keepServerKey(cfg *config.Config, insecure bool) error {
 	}
 	if err := keystore.Relocate(app.dir); err != nil {
 		return fmt.Errorf("move the team keys to where secrets are kept: %w", err)
+	}
+	// A key no keychain would take stays in keys.json: record that, as settleSecrets does for
+	// a login, so later writes go straight to the file rather than wait on the keychain.
+	if !insecure && keystore.StoredInFile(app.dir, cfg.Team) {
+		if err := config.UpdateFile(app.dir, func(file *config.File) { file.InsecureStorage = true }); err != nil {
+			return err
+		}
 	}
 	return config.UpdateProfile(app.dir, cfg.ProfileName, func(p *config.Profile) { applyServerKey(p, cfg) })
 }

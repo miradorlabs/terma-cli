@@ -17,6 +17,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
+	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 )
@@ -364,6 +365,23 @@ func TestServerKeySetupMovesTheKeyWhereSecretsAreKept(t *testing.T) {
 	}
 	if cred, err := auth.LoadCredential(testApp.dir, config.DefaultProfile); err != nil || cred.AccessToken != login.AccessToken || cred.RefreshToken != login.RefreshToken {
 		t.Fatalf("the login behind the key: %v", err)
+	}
+}
+
+// On a machine with no keychain to use, setup without --insecure-storage keeps the key in
+// keys.json all the same, says so, and records it, as a browser sign-in does for a login.
+func TestServerKeySetupWithNoKeychainSaysTheKeyIsInPlainText(t *testing.T) {
+	_, team := keySandbox(t)
+	secret.FailForTest(t, testApp.dir)
+	out, err := runTerma(t, "setup", "--yes", "--harness", "claude")
+	if err != nil || !strings.Contains(out, "no system keychain could be used") {
+		t.Fatalf("setup with no keychain: %v\n%s", err, out)
+	}
+	if !keystore.StoredInFile(testApp.dir, team) || !config.InsecureStorage(testApp.dir) {
+		t.Fatal("the key is not recorded as kept in keys.json")
+	}
+	if key, err := keystore.Get(testApp.dir, team); err != nil || key != testServerKey {
+		t.Fatalf("team key = %q, %v", key, err)
 	}
 }
 
