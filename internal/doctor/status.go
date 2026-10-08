@@ -53,6 +53,9 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 		} else if err != nil {
 			authOK = false
 			add("Account", "not signed in — run `terma setup`")
+		} else if cred.ServerKey != "" && cred.OtherEnvironment {
+			authOK = false
+			add("Account", "server key set up against a different auth host — run `TERMA_API_KEY=<the team's server key> terma setup`")
 		} else if cred.ServerKey != "" {
 			add("Account", "server key %s in %s", cred.ServerKey, cmp.Or(cfg.OrganizationName, cred.OrganizationID))
 		} else {

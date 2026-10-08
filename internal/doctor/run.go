@@ -251,6 +251,9 @@ func (d *run) signedIn() Check {
 	if err != nil {
 		return Check{Status: Fail, Detail: "no credential for this environment", Fix: "terma setup"}
 	}
+	if cred.OtherEnvironment && cfg.ServerKeySignIn {
+		return Check{Status: Fail, Detail: "the server key was set up against a different auth host", Fix: "TERMA_API_KEY=<the team's server key> terma setup"}
+	}
 	if cred.OtherEnvironment {
 		return Check{Status: Fail, Detail: "signed in against a different environment", Fix: "terma setup"}
 	}

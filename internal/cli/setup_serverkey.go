@@ -86,6 +86,11 @@ func reportServerKeyStore(ui *setupUI, cfg *config.Config, insecure bool) {
 // team server key, a key that cannot ingest, and an --org or --team the key does not
 // belong to; it writes nothing.
 func (app *App) serverKeySignIn(ctx context.Context, cfg *config.Config, org orgRef) (keyPermissions, error) {
+	notAKey := errors.New("TERMA_API_KEY is set, but not to a team server key (" + serverkey.Display + "…) — set one, or unset it to sign in as a person")
+	// Checked before anything is sent, so another kind of credential never leaves the machine.
+	if !serverkey.Is(cfg.APIKey) {
+		return keyPermissions{}, notAKey
+	}
 	client, err := app.newClient(cfg)
 	if err != nil {
 		return keyPermissions{}, err
@@ -99,8 +104,8 @@ func (app *App) serverKeySignIn(ctx context.Context, cfg *config.Config, org org
 		known = cfg.OrganizationName
 	}
 	switch {
-	case id.AuthType != serverKeyAuth || !serverkey.Is(cfg.APIKey):
-		return keyPermissions{}, errors.New("TERMA_API_KEY is set, but not to a team server key (" + serverkey.Display + "…) — set one, or unset it to sign in as a person")
+	case id.AuthType != serverKeyAuth:
+		return keyPermissions{}, notAKey
 	case id.OrganizationID == "" || id.ProjectID == "":
 		return keyPermissions{}, errors.New("the server key in TERMA_API_KEY belongs to no team — use a key minted for one team")
 	case id.Permissions == nil || !id.Permissions.Ingest:

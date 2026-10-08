@@ -229,6 +229,9 @@ func TestSetupWithAServerKeyRefuses(t *testing.T) {
 			if key, _ := keystore.Get(testApp.dir, team); key != "" {
 				t.Fatal("a refused setup stored the key")
 			}
+			if !strings.HasPrefix(tc.key, "ter_srv_") && gateway.whoamis.Load() != 0 {
+				t.Fatal("a credential that is no team server key was sent to the auth host")
+			}
 		})
 	}
 }
@@ -474,5 +477,21 @@ func TestServerKeySetupAndSignInTakeTurns(t *testing.T) {
 	refreshAsTheRelay(t, team)
 	if gateway.policies.Load() != logins+1 || gateway.keyPolicies.Load() != keyed {
 		t.Fatal("a signed-in profile refreshed its policy with the server key")
+	}
+}
+
+// A profile pointed at another auth host after a server-key setup is not signed in there:
+// doctor and status say so and name the key-mode setup, as the policy refresh refuses.
+func TestServerKeyProfileOnAnotherAuthHost(t *testing.T) {
+	keySandbox(t)
+	setupWithKey(t)
+	t.Setenv("TERMA_API_KEY", "")
+	t.Setenv("TERMA_AUTH_URL", "https://auth.elsewhere.example")
+	doctorOut, _ := runTerma(t, "doctor")
+	if !strings.Contains(doctorOut, "set up against a different auth host") || !strings.Contains(doctorOut, "TERMA_API_KEY=") {
+		t.Errorf("doctor on another auth host:\n%s", doctorOut)
+	}
+	if statusOut, _ := runTerma(t, "status"); !strings.Contains(statusOut, "server key set up against a different auth host") {
+		t.Errorf("status on another auth host:\n%s", statusOut)
 	}
 }

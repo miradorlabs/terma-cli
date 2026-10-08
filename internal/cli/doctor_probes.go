@@ -88,7 +88,8 @@ func (app *App) serverKeyCredential(cfg *config.Config) (doctor.Credential, erro
 	case key == "":
 		return doctor.Credential{}, errors.New("no server key for the team on this machine")
 	}
-	return doctor.Credential{ServerKey: keystore.Mask(key), OrganizationID: cfg.OrganizationID}, nil
+	// The key goes only to the auth host it was set up against (policy.Source.Fetch).
+	return doctor.Credential{ServerKey: keystore.Mask(key), OrganizationID: cfg.OrganizationID, OtherEnvironment: cfg.AuthURL != cfg.ServerKeyAuthURL}, nil
 }
 
 // relayFacts are the local relay's state for doctor and status.
