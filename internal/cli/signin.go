@@ -330,10 +330,12 @@ func (app *App) revokeSession(ctx context.Context, cfg *config.Config, cred *aut
 
 // applyLogin records only the account scope, and the environment the credential belongs
 // to: hooks and the flushes they start run without TERMA_ENV, and would otherwise resolve
-// to production and hold every event. Project selection belongs to repositories.
+// to production and hold every event. Project selection belongs to repositories. The
+// login is the profile's credential from then on, not a server key setup stored.
 func applyLogin(p *config.Profile, cfg *config.Config, cred *auth.Credential, orgName string) {
 	p.SelectOrganization(cred.OrganizationID, orgName)
 	p.PinEnvironment(cfg.Environment)
+	p.ServerKeySignIn = false
 }
 
 func waitForBrowserEnter(cmd *cobra.Command) error {
@@ -357,6 +359,15 @@ type identityResponse struct {
 	AuthType       string `json:"auth_type"`
 	UserID         string `json:"user_id"`
 	Email          string `json:"email"`
+	// Permissions are a server key's; nil for a CLI token.
+	Permissions *keyPermissions `json:"permissions,omitempty"`
+}
+
+// keyPermissions are what a server key may do with its team's data.
+type keyPermissions struct {
+	Read   bool `json:"read"`
+	Write  bool `json:"write"`
+	Ingest bool `json:"ingest"`
 }
 
 // reportCredentialStore says where signing in kept the credentials, as gh does.

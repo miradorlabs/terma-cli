@@ -1,6 +1,6 @@
 // Package policy fetches an organization's collection policy with the developer's login,
-// never a telemetry key, and keeps the selected team's last validated one in the state
-// directory (internal/routing).
+// or, on a profile set up with a server key, with the team's own key, and keeps the
+// selected team's last validated one in the state directory (internal/routing).
 package policy
 
 import (
@@ -12,6 +12,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/account/api"
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
+	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 )
@@ -24,32 +25,63 @@ type Source struct {
 	Version string
 }
 
-// Fetch asks cfg's organization for the collection policy of cfg's project, else its
-// default team.
+// Fetch asks cfg's organization for the collection policy of cfg's project: with the
+// project's key from the keystore when the profile signed in with a server key, which
+// reads only the profile's team, else with the developer's login.
 func (s Source) Fetch(ctx context.Context, cfg *config.Config) (config.Policy, error) {
-	var client *api.Client
-	// Only an explicit offline fixture skips the developer's login.
-	if config.PolicyStub() != "" {
-		client = api.NewAnonymous(cfg.AuthURL, s.Version)
-	} else {
-		cred, err := auth.LoadCredential(cfg.Dir, cfg.ProfileName)
+	switch {
+	// Only an explicit offline fixture skips the profile's credential.
+	case config.PolicyStub() != "":
+		return s.fetch(ctx, cfg, api.NewAnonymous(cfg.AuthURL, s.Version))
+	case cfg.ServerKeySignIn:
+		// A key kept from another organization's team would be stamped with this one's.
+		if cfg.ProjectID != cfg.Team {
+			return config.Policy{}, fmt.Errorf("this machine is set up with team %s's server key, which fetches only that team's policy, not team %s's", cfg.Team, cfg.ProjectID)
+		}
+		key, err := keystore.Get(cfg.Dir, cfg.ProjectID)
 		if err != nil {
 			return config.Policy{}, err
 		}
-		if cfg.OrganizationID == "" {
-			cfg.OrganizationID = cred.OrganizationID
+		if key == "" {
+			return config.Policy{}, fmt.Errorf("no server key for team %s on this machine — run `terma setup` with TERMA_API_KEY set", cfg.ProjectID)
 		}
-		if cfg.OrganizationID != cred.OrganizationID {
-			return config.Policy{}, errors.New("collection policy login belongs to another organization — run `terma setup`")
-		}
-		// Policy always uses the developer login, even while TERMA_API_KEY is set.
-		policyConfig := *cfg
-		policyConfig.APIKey = ""
-		client, err = api.New(&policyConfig, api.Options{Version: s.Version, ProjectID: cfg.ProjectID, Credential: cred})
-		if err != nil {
-			return config.Policy{}, err
-		}
+		return s.FetchWithKey(ctx, cfg, key)
 	}
+	cred, err := auth.LoadCredential(cfg.Dir, cfg.ProfileName)
+	if err != nil {
+		return config.Policy{}, err
+	}
+	if cfg.OrganizationID == "" {
+		cfg.OrganizationID = cred.OrganizationID
+	}
+	if cfg.OrganizationID != cred.OrganizationID {
+		return config.Policy{}, errors.New("collection policy login belongs to another organization — run `terma setup`")
+	}
+	// A login profile always uses the developer login, even while TERMA_API_KEY is set.
+	policyConfig := *cfg
+	policyConfig.APIKey = ""
+	client, err := api.New(&policyConfig, api.Options{Version: s.Version, ProjectID: cfg.ProjectID, Credential: cred})
+	if err != nil {
+		return config.Policy{}, err
+	}
+	return s.fetch(ctx, cfg, client)
+}
+
+// FetchWithKey is Fetch with key, cfg's project's own server key, which reads that
+// project's policy and no other.
+func (s Source) FetchWithKey(ctx context.Context, cfg *config.Config, key string) (config.Policy, error) {
+	keyed := *cfg
+	keyed.APIKey = key
+	client, err := api.New(&keyed, api.Options{Version: s.Version, ProjectID: cfg.ProjectID})
+	if err != nil {
+		return config.Policy{}, err
+	}
+	return s.fetch(ctx, cfg, client)
+}
+
+// fetch asks client for cfg's project's policy and stamps it with the login and team it
+// was fetched for.
+func (s Source) fetch(ctx context.Context, cfg *config.Config, client *api.Client) (config.Policy, error) {
 	pol, err := client.CollectionPolicy(ctx)
 	if err != nil {
 		return config.Policy{}, fmt.Errorf("fetch the organization's collection policy: %w", err)

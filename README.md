@@ -202,6 +202,18 @@ terma setup --org acme --team platform --harness claude,codex --yes
 Every other command reads the team you chose at setup; `--team <name-or-id>` overrides it
 for one command.
 
+A machine with no one to sign in, such as an ephemeral VM, signs in with a team server key
+instead. Mint one with only the `Ingest` permission in the Terma web app, and run setup with
+it in `TERMA_API_KEY`:
+
+```bash
+TERMA_API_KEY=ter_srv_… terma setup --yes --harness claude
+```
+
+Setup sets up the key's team, with no browser, and keeps the key, so nothing needs
+`TERMA_API_KEY` afterwards. To rotate the key, run the same command with the new one. Add
+`--insecure-storage` on a machine with no system keychain.
+
 ## Collection
 
 ### Which repositories are collected

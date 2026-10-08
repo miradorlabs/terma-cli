@@ -12,9 +12,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
-// ErrServerKey is setup run under a server key: it signs in as a person.
-var ErrServerKey = errors.New("TERMA_API_KEY is set — setup signs in as a person; unset it first")
-
 // Steps are what setup reaches through the command line: sign-in, prompts, the network
 // and the relay. SignIn, ChooseAgents, SelectTeam and FetchPolicy are required; the rest
 // do nothing when nil.
@@ -50,9 +47,6 @@ type Result struct {
 func Run(ctx context.Context, reg *agents.Registry, cfg *config.Config, s Steps) (Result, error) {
 	if s.SignIn == nil || s.ChooseAgents == nil || s.SelectTeam == nil || s.FetchPolicy == nil {
 		return Result{}, errors.New("setup: sign-in, the agent choice, the team and the policy fetch are required")
-	}
-	if cfg.APIKey != "" {
-		return Result{}, ErrServerKey
 	}
 	cfg, err := s.SignIn(ctx, cfg)
 	if err != nil {

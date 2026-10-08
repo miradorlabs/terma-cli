@@ -2,12 +2,16 @@ package policy
 
 import (
 	"bytes"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
+	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
@@ -79,6 +83,80 @@ func TestCurrentKeepsTheLastValidatedPolicy(t *testing.T) {
 	cfg = setUp(t, refused)
 	if got, err := (Source{}).Current(t.Context(), cfg, team); err == nil {
 		t.Fatalf("never validated: %+v", got)
+	}
+}
+
+// A profile set up with a server key refreshes its team's policy with that team's key from
+// the keystore, TERMA_API_KEY unset and a login on file; a login profile fetches with the
+// login, even with TERMA_API_KEY set.
+func TestFetchUsesTheProfilesCredential(t *testing.T) {
+	var bearer string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		bearer = strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if r.URL.Path != "/v1/policy" || r.URL.Query().Get("project_id") != team {
+			http.NotFound(w, r)
+			return
+		}
+		fmt.Fprint(w, `{"policy":{"version":"1.0","terma":{"capture":{"exclude_prompts":false,"exclude_tool_content":false},"global":{}}},"revision":1,"updated_at":"2026-09-30T12:27:05Z"}`)
+	}))
+	defer srv.Close()
+	cfg := setUp(t, "")
+	cfg.AuthURL = srv.URL
+	if _, err := auth.SaveCredential(cfg.Dir, cfg.ProfileName, &auth.Credential{AccessToken: "ter_cli_login", AuthURL: srv.URL, OrganizationID: org, ExpiresAt: time.Now().Add(time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := keystore.Set(cfg.Dir, team, "ter_srv_team", keystore.Hosts{}); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg.ServerKeySignIn, cfg.Team = true, team
+	if err := (Source{}).Refresh(t.Context(), cfg); err != nil || bearer != "ter_srv_team" {
+		t.Fatalf("server-key profile: %v, sent %q", err, bearer)
+	}
+	if stored, ok, err := config.ReadPolicy(cfg.StateDir, team); err != nil || !ok || stored.TeamID != team || !stored.Global() {
+		t.Fatalf("stored %+v, %v, %v", stored, ok, err)
+	}
+
+	cfg.ServerKeySignIn, cfg.APIKey = false, "ter_srv_env"
+	if _, err := (Source{}).Fetch(t.Context(), cfg); err != nil || bearer != "ter_cli_login" {
+		t.Fatalf("login profile under TERMA_API_KEY: %v, sent %q", err, bearer)
+	}
+}
+
+// A profile set up with a server key whose key is gone says how to store it again, and
+// never falls back to the login.
+func TestFetchWithoutTheServerKeyNamesSetup(t *testing.T) {
+	cfg := setUp(t, "")
+	cfg.ServerKeySignIn, cfg.Team = true, team
+	if _, err := auth.SaveCredential(cfg.Dir, cfg.ProfileName, &auth.Credential{AccessToken: "a", AuthURL: authURL, OrganizationID: org, ExpiresAt: time.Now().Add(time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (Source{}).Fetch(t.Context(), cfg); err == nil || !strings.Contains(err.Error(), "terma setup") {
+		t.Fatalf("Fetch = %v", err)
+	}
+}
+
+// A profile set up with team B's server key fetches no other team's policy, not even with
+// a key kept here for team A of another organization, which it would stamp with B's.
+func TestFetchWithAServerKeyRefusesAnotherTeam(t *testing.T) {
+	var asked int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		asked++
+		fmt.Fprint(w, `{"policy":{"version":"1.0","terma":{"capture":{"exclude_prompts":false,"exclude_tool_content":false},"global":{}}},"revision":1,"updated_at":"2026-09-30T12:27:05Z"}`)
+	}))
+	defer srv.Close()
+	cfg := setUp(t, "")
+	cfg.AuthURL, cfg.OrganizationID, cfg.Team, cfg.ServerKeySignIn = srv.URL, "org_b", "team-b", true
+	for id, key := range map[string]string{team: "ter_srv_a", "team-b": "ter_srv_b"} {
+		if err := keystore.Set(cfg.Dir, id, key, keystore.Hosts{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := (Source{}).Refresh(t.Context(), cfg); err == nil || !strings.Contains(err.Error(), "team-b") || asked != 0 {
+		t.Fatalf("Refresh of team A = %v, %d policies asked for", err, asked)
+	}
+	if stored, ok, err := config.ReadPolicy(cfg.StateDir, team); err != nil || ok {
+		t.Fatalf("stored for team A: %+v, %v, %v", stored, ok, err)
 	}
 }
 

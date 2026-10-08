@@ -39,7 +39,8 @@ type Probes struct {
 	Endpoint func(projectID string) string
 	// Relay is the local relay as the machine finds it.
 	Relay func() Relay
-	// Credential is the signed-in developer, or why there is none.
+	// Credential is the signed-in developer, or the team server key a profile set up with
+	// one signs in with, or why there is none.
 	Credential func() (Credential, error)
 	// Keys are the delivery keys stored on this machine.
 	Keys Keys
@@ -54,6 +55,9 @@ type Credential struct {
 	InFile bool
 	// Locked is a credential the system keychain holds but will not give up now.
 	Locked bool
+	// ServerKey is, masked, the team server key a profile set up with one signs in with;
+	// "" for a developer's login.
+	ServerKey string
 }
 
 // Storage names where a credential's tokens are kept.
@@ -241,18 +245,24 @@ func (d *run) signedIn() Check {
 		return Check{Status: Fail, Detail: "the system keychain holding your credentials is locked or unavailable",
 			Fix: "unlock it: log in to your desktop session, or over SSH on macOS run `security unlock-keychain`"}
 	}
+	if err != nil && cfg.ServerKeySignIn {
+		return Check{Status: Fail, Detail: "set up with a server key, but this machine holds none for the team", Fix: "TERMA_API_KEY=<the team's server key> terma setup"}
+	}
 	if err != nil {
 		return Check{Status: Fail, Detail: "no credential for this environment", Fix: "terma setup"}
 	}
 	if cred.OtherEnvironment {
 		return Check{Status: Fail, Detail: "signed in against a different environment", Fix: "terma setup"}
 	}
-	who := cmp.Or(cred.Email, "your account")
+	who, storage := cmp.Or(cred.Email, "your account"), ", credentials "+cred.Storage()
+	if cred.ServerKey != "" {
+		who, storage = "server key "+cred.ServerKey, ""
+	}
 	env := ""
 	if cfg.Environment != config.EnvProd {
 		env = " [" + cfg.Environment + "]"
 	}
-	detail := who + " in " + cmp.Or(cfg.OrganizationName, cred.OrganizationID) + env + ", credentials " + cred.Storage()
+	detail := who + " in " + cmp.Or(cfg.OrganizationName, cred.OrganizationID) + env + storage
 	// Doctor's own run sees TERMA_ENV; the hooks and the flushes they start do not.
 	if cfg.ProfileEnvironment != "" && cfg.ProfileEnvironment != cfg.Environment {
 		return Check{Status: Warn, Detail: detail + ", but the profile records " + cfg.ProfileEnvironment +

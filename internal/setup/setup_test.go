@@ -78,8 +78,7 @@ func TestSetupLeavesARelayOfTheSameScopeRunning(t *testing.T) {
 	}
 }
 
-// Setup never runs without its sign-in or policy, never under a server key, and a
-// cancelled choice records nothing.
+// Setup never runs without its sign-in or policy, and a cancelled choice records nothing.
 func TestSetupRefusesWhatItCannotDoSafely(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -88,9 +87,6 @@ func TestSetupRefusesWhatItCannotDoSafely(t *testing.T) {
 	missing.FetchPolicy = nil
 	if _, err := Run(t.Context(), agents.New(), &config.Config{Dir: dir, StateDir: dir}, missing); err == nil {
 		t.Fatal("ran without a policy fetch")
-	}
-	if _, err := Run(t.Context(), agents.New(), &config.Config{Dir: dir, StateDir: dir, APIKey: "ter_srv_x"}, steps(dir, &log, policy())); !errors.Is(err, ErrServerKey) {
-		t.Fatalf("under a server key: %v", err)
 	}
 	cancelled := errors.New("cancelled")
 	s := steps(dir, &log, policy())

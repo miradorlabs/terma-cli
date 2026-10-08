@@ -119,9 +119,6 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 	if p := style.For(out); p.Enabled() {
 		fmt.Fprintln(out, style.Header(p, app.setupHeaderInfo(cfg, p)))
 	}
-	if cfg.APIKey != "" {
-		return setup.ErrServerKey
-	}
 	switch f.relayService {
 	case "", "on", "off":
 	default:
@@ -132,17 +129,20 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 			return err
 		}
 	}
-	// Sign-in places secrets by it, and later writes follow; a failed sign-in restores it.
+	// Sign-in places secrets by it, and later writes follow; a failed sign-in restores it. A
+	// server key's setup records it only when it keeps the key (keepServerKey).
 	wasInsecure := config.InsecureStorage(app.dir)
-	if err := config.UpdateFile(app.dir, func(file *config.File) { file.InsecureStorage = f.insecureStorage }); err != nil {
-		return err
+	if cfg.APIKey == "" {
+		if err := config.UpdateFile(app.dir, func(file *config.File) { file.InsecureStorage = f.insecureStorage }); err != nil {
+			return err
+		}
 	}
 
 	ui := newSetupUI(out, f.verbose)
 	ui.title, ui.warnTitle = "Setup complete", "Almost done — finish the steps marked ! below"
 	recorded := false
 	team := ""
-	res, err := setup.Run(cmd.Context(), app.agents, cfg, setup.Steps{
+	steps := setup.Steps{
 		SignIn: func(_ context.Context, cfg *config.Config) (*config.Config, error) {
 			opts := signInOptions{org: parseOrgRef(f.org), noBrowser: f.noBrowser, pauseBeforeBrowser: !f.assumeYes}
 			cfg, kept, err := app.setupSignIn(cmd, cfg, opts, askOrganization(cmd, f.assumeYes))
@@ -233,7 +233,11 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 				ui.Then("Run `terma doctor` to see why this machine could not report to your organization.")
 			}
 		},
-	})
+	}
+	if cfg.APIKey != "" {
+		app.useServerKey(&steps, ui, parseOrgRef(f.org), &team, f.insecureStorage)
+	}
+	res, err := setup.Run(cmd.Context(), app.agents, cfg, steps)
 	// A team picker left after the agents were recorded is still a cancellation, but not
 	// one that recorded nothing.
 	if errors.Is(err, errCancelled) {

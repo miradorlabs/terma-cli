@@ -334,6 +334,23 @@ func SetFor(dir, harness, projectID, key string, hosts Hosts) error {
 	})
 }
 
+// DeleteHarnessKeys forgets every harness's key for a project, so each harness exports with
+// the project's own key; their keychain items are marked stale, for sweepStale to remove
+// once the file is on disk.
+func DeleteHarnessKeys(dir, projectID string) error {
+	return update(dir, func(f *file, _ bool) {
+		for harness, keys := range f.HarnessKeys {
+			if v, ok := keys[projectID]; ok && v == "" {
+				f.mark(harnessItem(harness, projectID))
+			}
+			delete(keys, projectID)
+			if len(keys) == 0 {
+				delete(f.HarnessKeys, harness)
+			}
+		}
+	})
+}
+
 // Relocate moves every key to where config.json now keeps secrets: into the keychain, or,
 // under InsecureStorage, into keys.json. A key the keychain will not take or give up
 // stays where it is; with no keys.json there is nothing to move.

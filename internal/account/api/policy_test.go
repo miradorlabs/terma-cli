@@ -47,6 +47,25 @@ func TestCollectionPolicyWireContract(t *testing.T) {
 	}
 }
 
+// A team's server key reads that team's policy itself, as the bearer, the team in the query.
+func TestCollectionPolicyWithAServerKey(t *testing.T) {
+	t.Setenv("TERMA_POLICY_STUB", "")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/policy" || r.URL.Query().Get("project_id") != "team" || r.Header.Get("Authorization") != "Bearer ter_srv_team" {
+			t.Errorf("wrong policy authentication/URL: %s %s", r.URL, r.Header.Get("Authorization"))
+		}
+		fmt.Fprintf(w, `{"policy":{"version":"1.0","terma":{%s,"global":{}}},"revision":2,"updated_at":"2026-09-30T12:27:05Z"}`, testCapture)
+	}))
+	defer srv.Close()
+	c, err := New(&config.Config{Dir: t.TempDir(), AuthURL: srv.URL, APIURL: "http://127.0.0.1:1", APIKey: "ter_srv_team"}, Options{Version: "test", ProjectID: "team"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p, err := c.CollectionPolicy(t.Context()); err != nil || !p.Global() || p.Revision != 2 {
+		t.Fatalf("policy = %+v, %v", p, err)
+	}
+}
+
 // Opt-in smoke test: TERMA_POLICY_SMOKE_LOGIN=1 for the saved dev login, or a dev token
 // in TERMA_POLICY_SMOKE_TOKEN_FILE.
 func TestCollectionPolicyDev(t *testing.T) {

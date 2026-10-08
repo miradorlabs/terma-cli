@@ -59,6 +59,9 @@ func (app *App) doctorProbes(cfg *config.Config) doctor.Probes {
 		Relay:    app.relayFacts,
 		Endpoint: func(projectID string) string { return app.delivery().Endpoint(cfg, projectID) },
 		Credential: func() (doctor.Credential, error) {
+			if cfg.ServerKeySignIn {
+				return app.serverKeyCredential(cfg)
+			}
 			cred, err := auth.LoadCredential(app.dir, cfg.ProfileName)
 			if secret.IsUnavailable(err) {
 				return doctor.Credential{Locked: true}, nil
@@ -71,6 +74,21 @@ func (app *App) doctorProbes(cfg *config.Config) doctor.Probes {
 		},
 		Keys: app.storedKeys,
 	}
+}
+
+// serverKeyCredential is what a profile set up with a server key signs in with: its team's
+// key in the keystore.
+func (app *App) serverKeyCredential(cfg *config.Config) (doctor.Credential, error) {
+	key, err := keystore.Get(app.dir, cfg.Team)
+	switch {
+	case secret.IsUnavailable(err):
+		return doctor.Credential{Locked: true}, nil
+	case err != nil:
+		return doctor.Credential{}, err
+	case key == "":
+		return doctor.Credential{}, errors.New("no server key for the team on this machine")
+	}
+	return doctor.Credential{ServerKey: keystore.Mask(key), OrganizationID: cfg.OrganizationID}, nil
 }
 
 // relayFacts are the local relay's state for doctor and status.
