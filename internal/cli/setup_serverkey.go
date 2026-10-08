@@ -146,9 +146,10 @@ func (app *App) keepServerKey(cfg *config.Config, insecure bool) error {
 	if err := keystore.Relocate(app.dir); err != nil {
 		return fmt.Errorf("move the team keys to where secrets are kept: %w", err)
 	}
-	// A key no keychain would take stays in keys.json: record that, as settleSecrets does for
-	// a login, so later writes go straight to the file rather than wait on the keychain.
-	if !insecure && keystore.StoredInFile(app.dir, cfg.Team) {
+	// A key, or a login kept behind it, that no keychain would take stays in its file: record
+	// that, as settleSecrets does, so later writes go straight to the file rather than wait on
+	// the keychain.
+	if !insecure && (keystore.StoredInFile(app.dir, cfg.Team) || auth.StoredInFile(app.dir, cfg.ProfileName)) {
 		if err := config.UpdateFile(app.dir, func(file *config.File) { file.InsecureStorage = true }); err != nil {
 			return err
 		}

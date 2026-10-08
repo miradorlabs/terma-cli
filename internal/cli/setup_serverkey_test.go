@@ -389,6 +389,28 @@ func TestServerKeySetupWithNoKeychainSaysTheKeyIsInPlainText(t *testing.T) {
 	}
 }
 
+// A login kept behind the key that the keychain will not take, while it takes the key, stays
+// in credentials.json: setup records that secrets are kept in files, as a browser sign-in
+// does, rather than leave the login in plain text unrecorded.
+func TestServerKeySetupRecordsALoginTheKeychainRefuses(t *testing.T) {
+	gateway, team := keySandbox(t)
+	if out, err := runTerma(t, "setup", "--yes", "--harness", "claude", "--insecure-storage"); err != nil {
+		t.Fatalf("setup --insecure-storage: %v\n%s", err, out)
+	}
+	if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway, orgA())); err != nil {
+		t.Fatal(err)
+	}
+	secret.RefuseForTest(t, testApp.dir, "credential/")
+	t.Setenv("TERMA_API_KEY", rotatedKey)
+	setupWithKey(t)
+	if keystore.StoredInFile(testApp.dir, team) {
+		t.Fatal("the keychain took the key, so it should have moved there")
+	}
+	if !auth.StoredInFile(testApp.dir, config.DefaultProfile) || !config.InsecureStorage(testApp.dir) {
+		t.Fatal("a login left in plain text is not recorded")
+	}
+}
+
 // Setup again with a rotated key replaces the old one.
 func TestSetupWithARotatedServerKeyReplacesTheOld(t *testing.T) {
 	_, team := keySandbox(t)
