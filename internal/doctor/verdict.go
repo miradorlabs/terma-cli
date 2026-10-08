@@ -40,7 +40,7 @@ const (
 	// CommitHooksNotYet means the policy asks for them and no agent session has been
 	// claimed here yet, so there is nothing to install for.
 	CommitHooksNotYet
-	// CommitHooksInstalled means both of terma's hooks are in this repository's .git/hooks.
+	// CommitHooksInstalled means all of terma's hooks are in this repository's .git/hooks.
 	CommitHooksInstalled
 	// CommitHooksChained means installed and chained with another hook: one terma set aside,
 	// or pre-commit's running terma's.

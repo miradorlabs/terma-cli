@@ -165,6 +165,34 @@ const (
 	TermaOperationStatusKey = "terma.operation.status"
 	// TermaProviderSessionIDKey is terma.provider.session.id: The agent's own session id, where it differs from the session.id terma files the record under.
 	TermaProviderSessionIDKey = "terma.provider.session.id"
+	// TermaPushCommitCountKey is terma.push.commit.count: How many commits the push sent; exact below 10000, at least 10000 otherwise.
+	TermaPushCommitCountKey = "terma.push.commit.count"
+	// TermaPushCommitsKey is terma.push.commits: The full ids of the commits the push sent, newest first, at most 500 of them.
+	TermaPushCommitsKey = "terma.push.commits"
+	// TermaPushCommitsTruncatedKey is terma.push.commits_truncated: Whether terma.push.commits left commits out.
+	TermaPushCommitsTruncatedKey = "terma.push.commits_truncated"
+	// TermaPushForcedKey is terma.push.forced: Whether the push replaced commits the remote branch had, as a force-push does.
+	TermaPushForcedKey = "terma.push.forced"
+	// TermaPushIDKey is terma.push.id: One pushed ref of one push, so a record sent twice can be counted once.
+	TermaPushIDKey = "terma.push.id"
+	// TermaPushLocalRefKey is terma.push.local.ref: What was pushed, as git names it to pre-push.
+	TermaPushLocalRefKey = "terma.push.local.ref"
+	// TermaPushNewRevisionKey is terma.push.new.revision: The commit id the push set the remote branch to.
+	TermaPushNewRevisionKey = "terma.push.new.revision"
+	// TermaPushOldRevisionKey is terma.push.old.revision: The remote branch's commit id before the push; omitted for a new branch.
+	TermaPushOldRevisionKey = "terma.push.old.revision"
+	// TermaPushRangeKey is terma.push.range: How terma.push.commits was worked out.
+	TermaPushRangeKey = "terma.push.range"
+	// TermaPushRemoteNameKey is terma.push.remote.name: The configured remote the push went to.
+	TermaPushRemoteNameKey = "terma.push.remote.name"
+	// TermaPushRemoteRefKey is terma.push.remote.ref: The full name of the branch the push updated on the remote.
+	TermaPushRemoteRefKey = "terma.push.remote.ref"
+	// TermaPushRemoteURLKey is terma.push.remote.url: The URL the push went to, without credentials.
+	TermaPushRemoteURLKey = "terma.push.remote.url"
+	// TermaPushSessionIDsKey is terma.push.session.ids: The sessions stamped into the commits terma.push.commits lists.
+	TermaPushSessionIDsKey = "terma.push.session.ids"
+	// TermaPushStatusKey is terma.push.status: What the local repository showed about the push's outcome.
+	TermaPushStatusKey = "terma.push.status"
 	// TermaQuotaStatusKey is terma.quota.status: Whether the record carries the session's quota.
 	TermaQuotaStatusKey = "terma.quota.status"
 	// TermaRateLimitFiveHourResetsAtKey is terma.rate_limit.five_hour.resets_at: When the five-hour window resets, in Unix seconds.
@@ -269,6 +297,8 @@ const (
 	TermaCompactionEvent = "terma.compaction"
 	// TermaFilesTouchedEvent is terma.files.touched: A session wrote files in the repository.
 	TermaFilesTouchedEvent = "terma.files.touched"
+	// TermaPushEvent is terma.push: A branch was pushed, one event per branch the push updated.
+	TermaPushEvent = "terma.push"
 	// TermaRelayHeartbeatEvent is terma.relay.heartbeat: The relay is running; sent with service.name terma-relay.
 	TermaRelayHeartbeatEvent = "terma.relay.heartbeat"
 	// TermaSessionAccountEvent is terma.session.account: The account state the session's agent holds.
@@ -317,6 +347,16 @@ const (
 	TermaCompactionTriggerManual = "manual"
 	// TermaOperationDurationStatusInvalid is terma.operation.duration_status invalid: The agent reported a duration that is not a non-negative integer.
 	TermaOperationDurationStatusInvalid = "invalid"
+	// TermaPushRangeUpdate is terma.push.range update: The commits in the new revision and not the old one, exactly.
+	TermaPushRangeUpdate = "update"
+	// TermaPushRangeNewBranch is terma.push.range new_branch: A new branch: the commits in the new revision that no branch of the remote had, as the local remote-tracking branches showed before the push.
+	TermaPushRangeNewBranch = "new_branch"
+	// TermaPushRangeFallback is terma.push.range fallback: The commits in the new revision that no remote-tracking branch had before the push, of any remote for a push to a URL: the old commit is not in the local repository, or there is no remote to go by, so they may include commits the remote already had.
+	TermaPushRangeFallback = "fallback"
+	// TermaPushStatusTrackingRefUpdated is terma.push.status tracking_ref_updated: Once git push exited, the remote-tracking branch had moved to the new revision, which git does only for a ref the remote accepted.
+	TermaPushStatusTrackingRefUpdated = "tracking_ref_updated"
+	// TermaPushStatusUnknown is terma.push.status unknown: No evidence either way: the push was rejected, was a dry run, outlasted the wait, or has no remote-tracking branch terma can read.
+	TermaPushStatusUnknown = "unknown"
 	// TermaRelayAttributionCatchAll is terma.relay.attribution catch-all: Global mode placed the part in its default project.
 	TermaRelayAttributionCatchAll = "catch-all"
 	// TermaRelayAttributionProcess is terma.relay.attribution process: The part named no session; its process named one.

@@ -21,6 +21,8 @@ import (
 var gitHookEvents = map[string]agents.Event{
 	"prepare-commit-msg": {Handler: hookrun.PrepareCommitMsg},
 	"post-commit":        {Handler: hookrun.PostCommit, Flush: true},
+	// The push is reported by the detached AwaitPush, which flushes once it has.
+	"pre-push": {Handler: hookrun.PrePush},
 }
 
 // Request is one hook invocation.
@@ -50,6 +52,8 @@ type Deps struct {
 	// the policy in force: the relay, and that repository's commit hooks.
 	Claimed func(cwd string, policy config.Policy)
 	Flush   func()
+	// AwaitPush starts a detached hookrun.AwaitPush for a recorded push.
+	AwaitPush func(path string)
 }
 
 // Profile is what a hook reads of the developer's setup.
@@ -120,6 +124,7 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 		Stdin:     io.TeeReader(r.Stdin, payload),
 		OnClaim:   func(root string) { claimed, claimedIn = true, root },
 		Flush:     func() { flushed = true; d.Flush() },
+		AwaitPush: d.AwaitPush,
 		Stdout:    r.Stdout,
 		Stderr:    r.Stderr,
 		ConfigDir: d.ConfigDir,

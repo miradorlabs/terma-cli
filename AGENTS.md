@@ -47,10 +47,10 @@ npm/, install.sh        distribution
 
 ## How it fits together
 
-**Hooks.** `terma setup` writes each agent's user-level hooks. The two commit hooks are
+**Hooks.** `terma setup` writes each agent's user-level hooks. The git hooks are
 installed per repository, on demand: the first agent session claimed in a repository the
-policy collects, with the policy's `git_hooks` on, writes `prepare-commit-msg` and
-`post-commit` into that repository's own `.git/hooks` — the common git directory's, so a
+policy collects, with the policy's `git_hooks` on, writes `prepare-commit-msg`,
+`post-commit` and `pre-push` into that repository's own `.git/hooks` — the common git directory's, so a
 linked worktree shares the one install; hooks already there are left as they are. Nothing
 in terma ever takes them out, the policy switched off and teardown included: once terma is
 gone they only run the hook each one displaced. git runs one file per hook name, so a hook already
@@ -68,7 +68,10 @@ session is claimed for the developer's own team from setup.
 **Commits.** The agent hooks announce the session and record the files it edits in a
 session manifest. At commit time, `prepare-commit-msg` matches the staged files against
 those manifests and adds an `Agent-Session-Id` / `Agent-Tool` trailer for each matching
-session. `post-commit` retires the committed files and records the commit. Hooks never
+session. `post-commit` retires the committed files and records the commit. `pre-push`
+records the refs git is about to push and hands them to a detached `terma spool
+await-push`, which waits for `git push` to exit, reads whether the remote-tracking branch
+moved, walks the pushed commits and spools one `terma.push` per branch. Hooks never
 touch the network: they append events to the spool, and a detached `terma spool flush`
 delivers them to each project. `internal/boundary` keeps `net/http` out of the hook, spool
 and agent packages.
@@ -119,8 +122,8 @@ never on disk, and a stopping relay drops it.
   trailers, hook event names, and every event and attribute terma sends. The Weaver
   registry in `semconv/registry` is their source of truth; `make semconv` renders
   `internal/semconv` from it, and code uses those constants, never a literal.
-- Nothing terma does writes into a repository's working tree or committed files. Its two
-  commit hooks go under `.git/hooks`, which git neither tracks nor carries in a commit.
+- Nothing terma does writes into a repository's working tree or committed files. Its git
+  hooks go under `.git/hooks`, which git neither tracks nor carries in a commit.
   The rule is about the repositories terma watches: install.sh's PATH line in the
   developer's shell startup files is outside it, even where a dotfiles repository keeps
   those files (`TERMA_NO_MODIFY_PATH` opts out). What a developer collects is the

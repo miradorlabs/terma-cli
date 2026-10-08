@@ -244,7 +244,7 @@ Terma web app. Off, which work landed is inferred from the git commands
 agents run; on, `post-commit` records every commit as it lands, including ones made
 outside an agent, for commit-level accuracy. `terma setup` and `terma doctor` say so when
 your team has it off. With it on, the first agent session claimed
-in a repository the policy collects installs `prepare-commit-msg` and `post-commit` into
+in a repository the policy collects installs `prepare-commit-msg`, `post-commit` and `pre-push` into
 that repository's own `.git/hooks` (the common one, so linked worktrees share them). A
 repository no agent has worked in, and a folder outside git, get nothing. If they are
 already there, terma does nothing. It never takes them out: switching the policy off only
@@ -339,7 +339,7 @@ team keys stay in the user's configuration directory (`~/.config/terma`, or
 runs — the event queue, the relay and its local token, the hooks' state, the record of the
 repositories its commit hooks are installed in — stays in its state directory
 (`~/.local/state/terma`, or `%LOCALAPPDATA%\terma` on Windows), with the same restrictive
-permissions. The only thing terma writes inside a repository is its two commit hooks, under
+permissions. The only thing terma writes inside a repository is its git hooks, under
 `.git/hooks`, which git neither tracks nor carries in a commit; nothing reaches the working
 tree or committed files. What content leaves is the team's collection policy alone, applied
 on this machine before anything is sent.
