@@ -173,6 +173,15 @@ out="$(install_as /bin/zsh "$home" TERMA_INSTALL_DIR="$odd")"
 clean "$out"
 [ "$(finds "$home" "$out")" = "$odd/terma" ] || fail "sourcing ~/.zshrc does not find $odd/terma: $(cat "$home/.zshrc")"
 
+echo "== a directory with a colon, which PATH would split, is never written"
+home="$(fresh_home)"
+out="$(install_as /bin/zsh "$home" TERMA_INSTALL_DIR="$work/a:b")"
+clean "$out"
+if ! grep -qF "cannot go on PATH" <<<"$out" || ! grep -qF "Next: run \`'$work/a:b/terma' setup\`." <<<"$out"; then
+  fail "colon in the directory, but said: $out"
+fi
+[ ! -e "$home/.zshrc" ] || fail "wrote .zshrc for a directory PATH cannot hold: $(cat "$home/.zshrc")"
+
 echo "== a relative TERMA_INSTALL_DIR goes on PATH absolute, without .."
 home="$(fresh_home)"
 mkdir -p "$work/sub"

@@ -166,9 +166,13 @@ say "Installed $("$dest/terma" version 2>/dev/null || echo terma) to ${dest}/ter
 shell="${SHELL:-}"
 shell="${shell##*/}"
 rc='' line=''
-if [ -z "${TERMA_NO_MODIFY_PATH+set}" ] && rc="$(startup_file "$os" "$shell")"; then
-  line="$(path_line "$shell" "$dest")"
-fi
+case "$dest" in
+  *:*) ;; # PATH would split it at the colon, so no line can put it there
+  *)
+    if [ -z "${TERMA_NO_MODIFY_PATH+set}" ] && rc="$(startup_file "$os" "$shell")"; then
+      line="$(path_line "$shell" "$dest")"
+    fi ;;
+esac
 next="\`$(shown "$dest/terma") setup\`"
 case ":$PATH:" in
   *":$dest:"*) next="\`terma setup\`" ;;
@@ -179,7 +183,10 @@ case ":$PATH:" in
       say "Added ${dest} to your PATH in $(shown "$rc"); new terminals will find terma."
     else
       line=''
-      say "Note: ${dest} is not on your PATH. Add it, e.g.:  export PATH=\"${dest}:\$PATH\""
+      case "$dest" in
+        *:*) say "Note: ${dest} cannot go on PATH, which would split it at the ':'." ;;
+        *) say "Note: ${dest} is not on your PATH. Add it, e.g.:  export PATH=\"${dest}:\$PATH\"" ;;
+      esac
     fi
     [ -z "$line" ] || next="\`source $(shown "$rc")\` in this terminal, then \`terma setup\`" ;;
 esac
