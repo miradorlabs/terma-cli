@@ -38,10 +38,10 @@ type attribution struct {
 // decide reports whether a part may leave now, with which claim and policy, or why not.
 // A part is placed only by what it or its trace names; a part naming no session waits
 // for its process to exit (decideExited), because a shared process that has shown one
-// claimed session may be about to name a personal one: loss, never a guess. narrow is
-// the part's (part.narrow): global mode's catch-all may not take it.
-func (r *Relay) decide(key string, pid int, at time.Time, narrow bool) (claim.Claim, Policy, string, bool, attribution) {
-	if c, global := r.catchAll(); global && !narrow {
+// claimed session may be about to name a personal one: loss, never a guess. narrow and
+// claimed are the part's (part.narrow, part.claimed): global mode's catch-all may take neither.
+func (r *Relay) decide(key string, pid int, at time.Time, narrow, claimed bool) (claim.Claim, Policy, string, bool, attribution) {
+	if c, global := r.catchAll(); global && !narrow && !claimed {
 		pol, ok := r.resolve(c)
 		if !ok {
 			return claim.Claim{}, Policy{}, whyNoKey, false, attribution{}
@@ -105,7 +105,7 @@ func (r *Relay) decideClaimed(session string, pid int, at time.Time, narrow bool
 func (r *Relay) route(p *part) {
 	r.deliverMu.Lock()
 	defer r.deliverMu.Unlock()
-	c, pol, why, ok, how := r.decide(p.session, p.pid, p.at, p.narrow)
+	c, pol, why, ok, how := r.decide(p.session, p.pid, p.at, p.narrow, p.claimed)
 	if why == whyNotCollected {
 		r.stats.dropped(p.signal, why, p.records)
 		return

@@ -15,6 +15,9 @@ type SessionKey struct {
 	Rank int
 	// RejectNumeric: a numeric value is never a session (an OS thread id).
 	RejectNumeric bool
+	// Claimed: a hook claims every session the key names, so global mode's catch-all never
+	// takes one and a session no hook claims, a harness's hidden side thread, stays here.
+	Claimed bool
 }
 
 // The session keys several agents share, ranked ahead of and after any one agent's.

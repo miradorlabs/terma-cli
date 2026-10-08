@@ -205,7 +205,8 @@ func sessionEnd(ctx context.Context, env hookrun.Env) error {
 }
 
 // postToolUse adds the files a call's patch or shell command wrote to the manifest; Codex
-// has no file-edit event.
+// has no file-edit event. It also drains replies and the thread's name: a Desktop voice turn
+// can run for hours before its Stop.
 func postToolUse(ctx context.Context, env hookrun.Env) error {
 	in, err := readCodexHookInput(env.Stdin)
 	if err != nil {
@@ -222,6 +223,7 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	}
 	captureCodexFunding(ctx, env, r, in)
 	captureCodexDesktopActivity(ctx, env, r, in)
+	captureCodexTitle(ctx, env, r, in, captureCodexReplies(ctx, env, r, in))
 	candidates := codexEditedPaths(in, env.Cwd)
 	if len(candidates) == 0 {
 		return nil

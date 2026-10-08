@@ -108,9 +108,9 @@ func TestPolicyMatrixPerAgent(t *testing.T) {
 	t.Parallel()
 	for _, c := range testCapturers {
 		agent := strings.TrimPrefix(fmt.Sprintf("%T", c), "*")
-		session := "session.id"
+		session := shape.SessionID
 		if cor, ok := c.(shape.Correlator); ok && len(cor.Correlation().SessionKeys) > 0 {
-			session = cor.Correlation().SessionKeys[0].Attr
+			session = cor.Correlation().SessionKeys[0]
 		}
 		rules := c.CaptureRules()
 		for _, global := range []bool{false, true} {
@@ -146,16 +146,20 @@ func TestPolicyMatrixPerAgent(t *testing.T) {
 func sentinel(key string) string { return "SENTINEL<" + key + ">" }
 
 // deliverThroughRelay posts every content field in rules through a running relay and returns what upstream received.
-func deliverThroughRelay(t *testing.T, global bool, pol Policy, sessionKey string, rules shape.CaptureRules) string {
+func deliverThroughRelay(t *testing.T, global bool, pol Policy, key shape.SessionKey, rules shape.CaptureRules) string {
 	t.Helper()
 	u := newUpstream(t)
 	f := newFixture()
 	pol.Endpoint, pol.Key = u.srv.URL, "key"
 	opts := Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
 		Resolve: func(claim.Claim) (Policy, error) { return pol, nil }}
-	sid := "S"
+	sid, sessionKey := "S", key.Attr
 	if global {
 		opts.CatchAll = func() (claim.Claim, bool) { return claim.Claim{ProjectID: "team"}, true }
+		if key.Claimed {
+			// Global mode's catch-all never takes such a session: its hook's claim places it.
+			f.claims[sid] = claim.Claim{ProjectID: "team"}
+		}
 	} else {
 		f.claims[sid] = claim.Claim{ProjectID: "p1"}
 		pol.RequireClaim = true
@@ -230,24 +234,25 @@ func TestWithheldBodyOnlyNamesItsEvent(t *testing.T) {
 }
 
 // Each record names its session by the first key in precedence order; a numeric thread
-// id is an OS thread and names none.
+// id is an OS thread and names none. Codex's keys are Claimed: its hooks claim every session.
 func TestSessionKeyPrecedence(t *testing.T) {
 	t.Parallel()
 	for _, c := range []struct {
-		attrs []*commonpb.KeyValue
-		want  string
+		attrs   []*commonpb.KeyValue
+		want    string
+		claimed bool
 	}{
-		{[]*commonpb.KeyValue{kv("thread.id", "T"), kv("conversation.id", "C"), kv("session.id", "S")}, "S"},
-		{[]*commonpb.KeyValue{kv("thread.id", "T"), kv("gen_ai.conversation.id", "G"), kv("conversation.id", "C")}, "C"},
-		{[]*commonpb.KeyValue{kv("thread_id", "U"), kv("thread.id", "T")}, "T"},
-		{[]*commonpb.KeyValue{kv("thread.id", "4242"), kv("thread_id", "U")}, "U"},
-		{[]*commonpb.KeyValue{kv("thread.id", "4242")}, ""},
+		{[]*commonpb.KeyValue{kv("thread.id", "T"), kv("conversation.id", "C"), kv("session.id", "S")}, "S", false},
+		{[]*commonpb.KeyValue{kv("thread.id", "T"), kv("gen_ai.conversation.id", "G"), kv("conversation.id", "C")}, "C", true},
+		{[]*commonpb.KeyValue{kv("thread_id", "U"), kv("thread.id", "T")}, "T", true},
+		{[]*commonpb.KeyValue{kv("thread.id", "4242"), kv("thread_id", "U")}, "U", true},
+		{[]*commonpb.KeyValue{kv("thread.id", "4242")}, "", false},
 	} {
-		if got := testRules.sessionOf(c.attrs, nil); got != c.want {
-			t.Errorf("%v: session %q, want %q", c.attrs, got, c.want)
+		if got, claimed := testRules.sessionOf(c.attrs, nil); got != c.want || claimed != c.claimed {
+			t.Errorf("%v: session %q claimed %v, want %q %v", c.attrs, got, claimed, c.want, c.claimed)
 		}
 	}
-	if got := testRules.sessionOf(nil, []*commonpb.KeyValue{kv("session.id", "R")}); got != "R" {
+	if got, _ := testRules.sessionOf(nil, []*commonpb.KeyValue{kv("session.id", "R")}); got != "R" {
 		t.Errorf("resource session %q, want R", got)
 	}
 }

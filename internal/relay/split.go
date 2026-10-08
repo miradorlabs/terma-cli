@@ -41,22 +41,25 @@ type part struct {
 	// narrow marks a part that arrived outside global mode, while the relay has one to
 	// enter: only a placement that needs a claim may send it, never one global mode grants.
 	narrow bool
+	// claimed marks a part named by a Claimed session key: only its session's claim may send it.
+	claimed bool
 }
 
-// sessionOf is the first session key, by rank, on the record's attributes, then its resource's.
-func (ru *rules) sessionOf(attrs, resource []*commonpb.KeyValue) string {
+// sessionOf is the first session key, by rank, on the record's attributes, then its
+// resource's, and whether that key is Claimed.
+func (ru *rules) sessionOf(attrs, resource []*commonpb.KeyValue) (string, bool) {
 	for _, set := range [][]*commonpb.KeyValue{attrs, resource} {
 		for _, key := range ru.sessionKeys {
 			for _, kv := range set {
 				if kv.GetKey() == key.Attr {
 					if v := kv.GetValue().GetStringValue(); v != "" && (!key.RejectNumeric || !numeric(v)) {
-						return v
+						return v, key.Claimed
 					}
 				}
 			}
 		}
 	}
-	return ""
+	return "", false
 }
 
 func numeric(s string) bool {
@@ -71,22 +74,24 @@ func numeric(s string) bool {
 // splitLogs divides a logs export by session, records naming none under the empty key.
 // A record naming its session and a trace teaches learn the trace's session, or an agent
 // that names the session only on its turn-end span would lose a long turn's child spans.
-func (ru *rules) splitLogs(req *logspb.LogsData, learn func(traceID, session string)) map[string]*part {
+func (ru *rules) splitLogs(req *logspb.LogsData, learn func(traceID, session string, claimed bool)) map[string]*part {
 	out := map[string]*part{}
 	for _, rl := range req.GetResourceLogs() {
 		res := rl.GetResource().GetAttributes()
 		for _, sl := range rl.GetScopeLogs() {
 			bySession := map[string][]*logspb.LogRecord{}
+			claimed := map[string]bool{}
 			var order []string
 			for _, lr := range sl.GetLogRecords() {
-				s := ru.sessionOf(lr.GetAttributes(), res)
+				s, c := ru.sessionOf(lr.GetAttributes(), res)
 				if s != "" && len(lr.GetTraceId()) > 0 {
-					learn(hex.EncodeToString(lr.GetTraceId()), s)
+					learn(hex.EncodeToString(lr.GetTraceId()), s, c)
 				}
 				if _, seen := bySession[s]; !seen {
 					order = append(order, s)
 				}
 				bySession[s] = append(bySession[s], lr)
+				claimed[s] = claimed[s] || c
 			}
 			for _, s := range order {
 				p := out[s]
@@ -94,6 +99,7 @@ func (ru *rules) splitLogs(req *logspb.LogsData, learn func(traceID, session str
 					p = &part{signal: Logs, session: s, msg: &logspb.LogsData{}}
 					out[s] = p
 				}
+				p.claimed = p.claimed || claimed[s]
 				m := p.msg.(*logspb.LogsData)
 				m.ResourceLogs = append(m.ResourceLogs, &logspb.ResourceLogs{
 					Resource:  cloneResource(rl.GetResource()),
@@ -112,13 +118,13 @@ const tracePrefix = "trace:"
 
 // splitTraces divides a traces export by session, span by span; a span naming no session
 // belongs to its trace's, since children inherit the trace, not the attribute.
-func (ru *rules) splitTraces(req *tracepb.TracesData, learn func(traceID, session string), known func(traceID string) string) map[string]*part {
+func (ru *rules) splitTraces(req *tracepb.TracesData, learn func(traceID, session string, claimed bool), known func(traceID string) (string, bool)) map[string]*part {
 	for _, rs := range req.GetResourceSpans() {
 		res := rs.GetResource().GetAttributes()
 		for _, ss := range rs.GetScopeSpans() {
 			for _, sp := range ss.GetSpans() {
-				if s := ru.sessionOf(sp.GetAttributes(), res); s != "" && len(sp.GetTraceId()) > 0 {
-					learn(hex.EncodeToString(sp.GetTraceId()), s)
+				if s, c := ru.sessionOf(sp.GetAttributes(), res); s != "" && len(sp.GetTraceId()) > 0 {
+					learn(hex.EncodeToString(sp.GetTraceId()), s, c)
 				}
 			}
 		}
@@ -128,15 +134,17 @@ func (ru *rules) splitTraces(req *tracepb.TracesData, learn func(traceID, sessio
 		res := rs.GetResource().GetAttributes()
 		for _, ss := range rs.GetScopeSpans() {
 			bySession := map[string][]*tracepb.Span{}
+			claimed := map[string]bool{}
 			var order []string
 			for _, sp := range ss.GetSpans() {
-				s := ru.sessionOf(sp.GetAttributes(), res)
+				s, c := ru.sessionOf(sp.GetAttributes(), res)
 				if s == "" && len(sp.GetTraceId()) > 0 {
 					id := hex.EncodeToString(sp.GetTraceId())
-					if s = known(id); s == "" {
+					if s, c = known(id); s == "" {
 						s = tracePrefix + id
 					}
 				}
+				claimed[s] = claimed[s] || c
 				if _, seen := bySession[s]; !seen {
 					order = append(order, s)
 				}
@@ -148,6 +156,7 @@ func (ru *rules) splitTraces(req *tracepb.TracesData, learn func(traceID, sessio
 					p = &part{signal: Traces, session: s, msg: &tracepb.TracesData{}}
 					out[s] = p
 				}
+				p.claimed = p.claimed || claimed[s]
 				m := p.msg.(*tracepb.TracesData)
 				m.ResourceSpans = append(m.ResourceSpans, &tracepb.ResourceSpans{
 					Resource:   cloneResource(rs.GetResource()),
@@ -169,6 +178,7 @@ func (ru *rules) splitMetrics(req *metricspb.MetricsData) map[string]*part {
 		for _, sm := range rm.GetScopeMetrics() {
 			bySession := map[string][]*metricspb.Metric{}
 			counts := map[string]int{}
+			claimed := map[string]bool{}
 			var order []string
 			for _, m := range sm.GetMetrics() {
 				for s, piece := range ru.splitMetric(m, res) {
@@ -177,6 +187,7 @@ func (ru *rules) splitMetrics(req *metricspb.MetricsData) map[string]*part {
 					}
 					bySession[s] = append(bySession[s], piece.metric)
 					counts[s] += piece.points
+					claimed[s] = claimed[s] || piece.claimed
 				}
 			}
 			for _, s := range order {
@@ -185,6 +196,7 @@ func (ru *rules) splitMetrics(req *metricspb.MetricsData) map[string]*part {
 					p = &part{signal: Metrics, session: s, msg: &metricspb.MetricsData{}}
 					out[s] = p
 				}
+				p.claimed = p.claimed || claimed[s]
 				m := p.msg.(*metricspb.MetricsData)
 				m.ResourceMetrics = append(m.ResourceMetrics, &metricspb.ResourceMetrics{
 					Resource:     cloneResource(rm.GetResource()),
@@ -199,12 +211,19 @@ func (ru *rules) splitMetrics(req *metricspb.MetricsData) map[string]*part {
 }
 
 type metricPiece struct {
-	metric *metricspb.Metric
-	points int
+	metric  *metricspb.Metric
+	points  int
+	claimed bool
 }
 
 func (ru *rules) splitMetric(m *metricspb.Metric, res []*commonpb.KeyValue) map[string]metricPiece {
 	out := map[string]metricPiece{}
+	claimed := map[string]bool{}
+	sessionOf := func(attrs []*commonpb.KeyValue) string {
+		s, c := ru.sessionOf(attrs, res)
+		claimed[s] = claimed[s] || c
+		return s
+	}
 	shell := func() *metricspb.Metric {
 		return &metricspb.Metric{Name: m.GetName(), Description: m.GetDescription(), Unit: m.GetUnit(), Metadata: m.GetMetadata()}
 	}
@@ -212,57 +231,57 @@ func (ru *rules) splitMetric(m *metricspb.Metric, res []*commonpb.KeyValue) map[
 	case *metricspb.Metric_Sum:
 		groups := map[string][]*metricspb.NumberDataPoint{}
 		for _, dp := range d.Sum.GetDataPoints() {
-			s := ru.sessionOf(dp.GetAttributes(), res)
+			s := sessionOf(dp.GetAttributes())
 			groups[s] = append(groups[s], dp)
 		}
 		for s, pts := range groups {
 			c := shell()
 			c.Data = &metricspb.Metric_Sum{Sum: &metricspb.Sum{DataPoints: pts, AggregationTemporality: d.Sum.GetAggregationTemporality(), IsMonotonic: d.Sum.GetIsMonotonic()}}
-			out[s] = metricPiece{c, len(pts)}
+			out[s] = metricPiece{c, len(pts), claimed[s]}
 		}
 	case *metricspb.Metric_Gauge:
 		groups := map[string][]*metricspb.NumberDataPoint{}
 		for _, dp := range d.Gauge.GetDataPoints() {
-			s := ru.sessionOf(dp.GetAttributes(), res)
+			s := sessionOf(dp.GetAttributes())
 			groups[s] = append(groups[s], dp)
 		}
 		for s, pts := range groups {
 			c := shell()
 			c.Data = &metricspb.Metric_Gauge{Gauge: &metricspb.Gauge{DataPoints: pts}}
-			out[s] = metricPiece{c, len(pts)}
+			out[s] = metricPiece{c, len(pts), claimed[s]}
 		}
 	case *metricspb.Metric_Histogram:
 		groups := map[string][]*metricspb.HistogramDataPoint{}
 		for _, dp := range d.Histogram.GetDataPoints() {
-			s := ru.sessionOf(dp.GetAttributes(), res)
+			s := sessionOf(dp.GetAttributes())
 			groups[s] = append(groups[s], dp)
 		}
 		for s, pts := range groups {
 			c := shell()
 			c.Data = &metricspb.Metric_Histogram{Histogram: &metricspb.Histogram{DataPoints: pts, AggregationTemporality: d.Histogram.GetAggregationTemporality()}}
-			out[s] = metricPiece{c, len(pts)}
+			out[s] = metricPiece{c, len(pts), claimed[s]}
 		}
 	case *metricspb.Metric_ExponentialHistogram:
 		groups := map[string][]*metricspb.ExponentialHistogramDataPoint{}
 		for _, dp := range d.ExponentialHistogram.GetDataPoints() {
-			s := ru.sessionOf(dp.GetAttributes(), res)
+			s := sessionOf(dp.GetAttributes())
 			groups[s] = append(groups[s], dp)
 		}
 		for s, pts := range groups {
 			c := shell()
 			c.Data = &metricspb.Metric_ExponentialHistogram{ExponentialHistogram: &metricspb.ExponentialHistogram{DataPoints: pts, AggregationTemporality: d.ExponentialHistogram.GetAggregationTemporality()}}
-			out[s] = metricPiece{c, len(pts)}
+			out[s] = metricPiece{c, len(pts), claimed[s]}
 		}
 	case *metricspb.Metric_Summary:
 		groups := map[string][]*metricspb.SummaryDataPoint{}
 		for _, dp := range d.Summary.GetDataPoints() {
-			s := ru.sessionOf(dp.GetAttributes(), res)
+			s := sessionOf(dp.GetAttributes())
 			groups[s] = append(groups[s], dp)
 		}
 		for s, pts := range groups {
 			c := shell()
 			c.Data = &metricspb.Metric_Summary{Summary: &metricspb.Summary{DataPoints: pts}}
-			out[s] = metricPiece{c, len(pts)}
+			out[s] = metricPiece{c, len(pts), claimed[s]}
 		}
 	}
 	return out
