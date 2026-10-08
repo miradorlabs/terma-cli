@@ -44,6 +44,8 @@ const (
 	pushWait = 10 * time.Minute
 	// pushPoll is how often AwaitPush looks for git push to have exited.
 	pushPoll = 250 * time.Millisecond
+	// pushRetention is how long a record whose report failed is kept to retry.
+	pushRetention = 24 * time.Hour
 	// pushAbandoned is when SweepPushes takes over a record from its AwaitPush. A report
 	// that itself outlasts it can be sent twice, which terma.push.id lets the platform count once.
 	pushAbandoned = pushWait + 5*time.Minute
@@ -59,6 +61,8 @@ type PushRef struct {
 	// TrackingBefore its commit id when pre-push ran, "" when it did not exist.
 	Tracking       string `json:"tracking,omitempty"`
 	TrackingBefore string `json:"tracking_before,omitempty"`
+	// Reported marks a ref already spooled, when the record is kept to retry the others.
+	Reported bool `json:"reported,omitempty"`
 }
 
 // ParsePushInput reads pre-push's input, keeping the branch updates terma reports: a
@@ -251,11 +255,22 @@ func reportPush(ctx context.Context, env Env, path string, rec pushRecord) {
 	_ = os.Chtimes(taken, now, now)
 	// git push has exited once its process has, or the wait ran out: only the first shows anything.
 	exited := rec.GitPID > 0 && !procinfo.Alive(rec.GitPID)
-	emitted := false
+	emitted, failed := false, false
 	for i, ref := range rec.Refs {
-		ev, ok := pushEvent(ctx, env, rec, i, ref, exited)
-		if ok && env.emit(ev) {
-			emitted = true
+		if ref.Reported {
+			continue
+		}
+		if ev, ok := pushEvent(ctx, env, rec, i, ref, exited); ok && env.emit(ev) {
+			emitted, rec.Refs[i].Reported = true, true
+		} else {
+			failed = true
+		}
+	}
+	// A ref that could not be reported is retried by a later sweep, for a while; the record
+	// written anew starts the sweep's clock again.
+	if failed && time.Since(rec.Time) < pushRetention {
+		if err := config.WriteJSON(path, rec, 0o600); err != nil {
+			env.Logf("keep push record: %v", err)
 		}
 	}
 	if err := config.Remove(taken); err != nil && !errors.Is(err, fs.ErrNotExist) {

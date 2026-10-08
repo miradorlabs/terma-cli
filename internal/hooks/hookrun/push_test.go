@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
@@ -387,5 +388,48 @@ func TestARemoteNamedForItsLocationIsARemote(t *testing.T) {
 	rec, err := readPush(recorded)
 	if err != nil || rec.Remote != "same.git" || rec.Refs[0].Tracking != "refs/remotes/same.git/main" {
 		t.Fatalf("record: %+v, %v", rec, err)
+	}
+}
+
+// A ref whose commits cannot be read is kept to retry, the others reported once; a record
+// past its retention goes.
+func TestAPushRecordIsKeptForTheRefsNotReported(t *testing.T) {
+	defer func(f func() int) { gitPushPID = f }(gitPushPID)
+	p := newPushRepo(t)
+	p.git("commit", "-q", "--allow-empty", "-m", "more")
+	head, missing := p.sha("HEAD"), strings.Repeat("f", 40)
+	gitPushPID = func() int { return 0 }
+	var recorded string
+	input := pushLine("refs/heads/main", head, "refs/heads/main", p.sha("backup/main")) + "\n" +
+		pushLine("refs/heads/gone", missing, "refs/heads/gone", zero) + "\n"
+	env := Env{StateDir: p.stateDir, Now: time.Now(), Cwd: p.root, Args: []string{"backup", p.remote},
+		Stdin: strings.NewReader(input), Spool: p.sp, Team: p.team, Policy: hookruntest.Admitting(p.root),
+		AwaitPush: func(path string) { recorded = path }}
+	if err := PrePush(context.Background(), env); err != nil {
+		t.Fatal(err)
+	}
+	AwaitPush(context.Background(), env, recorded)
+	if events := hookruntest.Named(hookruntest.Spooled(t, p.sp), semconv.TermaPushEvent); len(events) != 1 {
+		t.Fatalf("events: %+v", events)
+	}
+	rec, err := readPush(recorded)
+	if err != nil || !rec.Refs[0].Reported || rec.Refs[1].Reported {
+		t.Fatalf("kept record: %+v, %v", rec, err)
+	}
+	// The retry reports nothing twice; past its retention the record goes.
+	rec.Time = time.Now().Add(-pushRetention - time.Minute)
+	if err := config.WriteJSON(recorded, rec, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-pushAbandoned - time.Minute)
+	if err := os.Chtimes(recorded, old, old); err != nil {
+		t.Fatal(err)
+	}
+	SweepPushes(context.Background(), env)
+	if events := hookruntest.Named(hookruntest.Spooled(t, p.sp), semconv.TermaPushEvent); len(events) != 0 {
+		t.Fatalf("reported again: %+v", events)
+	}
+	if left, _ := os.ReadDir(filepath.Join(p.stateDir, PushesDir)); len(left) > 0 {
+		t.Errorf("left %v", left)
 	}
 }

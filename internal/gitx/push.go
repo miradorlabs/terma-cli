@@ -97,9 +97,12 @@ func TrackingRefFS(gitDir, remote, remoteRef string) (ref string, ok bool) {
 	if !hasURL {
 		return "", false
 	}
-	// A fetch from one repository says nothing about a push to another.
-	if push, ok := configValue(config, section, "pushurl"); ok && push != url {
-		return "", false
+	// A fetch from one repository says nothing about a push to another; the same one
+	// fetched over HTTPS and pushed over SSH is still the one.
+	for _, push := range configValues(config, section, "pushurl") {
+		if push != url && (RepositoryID(push) == "" || RepositoryID(push) != RepositoryID(url)) {
+			return "", false
+		}
 	}
 	fetch := configValues(config, section, "fetch")
 	if len(fetch) != 1 || strings.TrimPrefix(fetch[0], "+") != "refs/heads/*:refs/remotes/"+remote+"/*" {
