@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -71,11 +72,11 @@ func TestFailedCheckRetriesAfter15Minutes(t *testing.T) {
 			if cache.Failed {
 				t.Fatal("successful retry retained failure state")
 			}
-			cache.CheckedAt = time.Now().Add(-16 * time.Minute)
+			cache.CheckedAt = time.Now().Add(-CommandCheckInterval + time.Minute)
 			SaveCache(dir, cache)
 			_ = noticeOf(c, context.Background(), dir, c.Version)
 			if calls != 2 {
-				t.Fatal("successful check did not retain daily interval")
+				t.Fatal("successful check did not hold for CommandCheckInterval")
 			}
 		})
 	}
@@ -204,7 +205,7 @@ func noticeOf(c *Client, ctx context.Context, dir, current string) string {
 	if !IsRelease(current) {
 		return ""
 	}
-	cache, _ := c.cachedCheck(ctx, dir, current)
+	cache, _ := c.cachedCheck(ctx, dir, current, CommandCheckInterval)
 	return notice(cache, current)
 }
 
@@ -359,18 +360,100 @@ func TestAFailedInstallHoldsBackOnlyThatRelease(t *testing.T) {
 	}
 }
 
-// Failed lookups in a row space out: 15 minutes, doubling up to a day.
+// Failed lookups in a row space out: 15 minutes, doubling up to an hour.
 func TestFailedLookupsBackOff(t *testing.T) {
 	t.Parallel()
-	for failures, want := range []time.Duration{RetryInterval, RetryInterval, 30 * time.Minute, time.Hour, 2 * time.Hour, 4 * time.Hour, 8 * time.Hour, 16 * time.Hour, CheckInterval, CheckInterval} {
+	for failures, want := range []time.Duration{RetryInterval, RetryInterval, 30 * time.Minute, time.Hour, time.Hour, time.Hour} {
 		if got := retryAfter(failures); got != want {
 			t.Errorf("retryAfter(%d) = %v, want %v", failures, got, want)
 		}
 	}
 }
 
-// A lookup that fails just before an install is retried as a failed check is, in 15
-// minutes, not held back a day as a failed install would be.
+// The frequent check asks the latest-release page for its tag, and looks the release up in
+// the rate-limited API only when that tag has moved, the page names no release, or the last
+// check left no publish time to soak a release by. A page that refuses is a failed look,
+// which backs off rather than falling through to the API.
+func TestACheckLooksTheReleaseUpOnlyWhenTheTagMoved(t *testing.T) {
+	t.Parallel()
+	published := time.Now().Add(-2 * SoakTime)
+	for _, tc := range []struct {
+		name   string
+		page   int
+		tag    string
+		cache  Cache
+		lookup bool
+	}{
+		{"unchanged", http.StatusFound, "v1.0.1", Cache{Latest: "1.0.1", Published: published}, false},
+		{"moved", http.StatusFound, "v1.0.2", Cache{Latest: "1.0.1", Published: published}, true},
+		{"not a release", http.StatusFound, "nightly", Cache{Latest: "1.0.1", Published: published}, true},
+		{"page says nothing", http.StatusOK, "", Cache{Latest: "1.0.1", Published: published}, true},
+		{"page throttled", http.StatusTooManyRequests, "", Cache{Latest: "1.0.1", Published: published}, false},
+		{"publish time unknown", http.StatusFound, "v1.0.1", Cache{Latest: "1.0.1"}, true},
+		{"never checked", http.StatusFound, "v1.0.1", Cache{}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			lookups := 0
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/" + Repo + "/releases/latest":
+					if tc.tag != "" {
+						// GitHub answers with an absolute URL.
+						w.Header().Set("Location", "https://github.com/"+Repo+"/releases/tag/"+tc.tag)
+					}
+					w.WriteHeader(tc.page)
+				case "/repos/" + Repo + "/releases/latest":
+					lookups++
+					_ = json.NewEncoder(w).Encode(Release{TagName: "v1.0.2", PublishedAt: published})
+				}
+			}))
+			t.Cleanup(srv.Close)
+			stateDir := t.TempDir()
+			tc.cache.CheckedAt, tc.cache.Current = time.Now().Add(-time.Minute), "1.0.0"
+			SaveCache(stateDir, tc.cache)
+			c := &Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0"}
+			cache, _ := c.cachedCheck(context.Background(), stateDir, "1.0.0", 0)
+			if got := lookups == 1; got != tc.lookup {
+				t.Fatalf("%d API lookups, want a lookup: %v", lookups, tc.lookup)
+			}
+			if failed := tc.page >= http.StatusBadRequest; cache.Failed != failed || cache.Failures != map[bool]int{true: 1}[failed] {
+				t.Fatalf("the check records %+v, want failed: %v", cache, failed)
+			}
+			if time.Since(cache.CheckedAt) > time.Minute || !LoadCache(stateDir).CheckedAt.Equal(cache.CheckedAt) {
+				t.Fatalf("the check was not recorded: %+v", cache)
+			}
+		})
+	}
+}
+
+// The relay looks on every pass, however recent the last look, so a pass never waits out
+// another process's look on top of its own wait; an interactive command, after it has
+// finished, only every CommandCheckInterval, so a command seldom waits on the network.
+func TestCommandsLookLessOftenThanTheRelay(t *testing.T) {
+	t.Parallel()
+	requests := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requests++
+		_ = json.NewEncoder(w).Encode(Release{TagName: "v1.0.0", PublishedAt: time.Now().Add(-2 * SoakTime)})
+	}))
+	t.Cleanup(srv.Close)
+	stateDir := t.TempDir()
+	SaveCache(stateDir, Cache{CheckedAt: time.Now().Add(-time.Minute), Current: "1.0.0", Latest: "1.0.0"})
+	c := &Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0"}
+	c.Maintain(context.Background(), t.TempDir(), stateDir, "terma", io.Discard)
+	if requests != 0 {
+		t.Fatalf("a command looked %d times within CommandCheckInterval", requests)
+	}
+	c.Auto(context.Background(), t.TempDir(), stateDir, "terma", nil)
+	if requests == 0 {
+		t.Fatal("the relay's pass did not look")
+	}
+}
+
+// A lookup that fails just before an install, as after an interactive command whose last look
+// is still fresh, is retried as a failed check is, in 15 minutes, not held back a day as a
+// failed install would be.
 func TestAFailedLookupBeforeAnInstallIsRetriedSoon(t *testing.T) {
 	t.Parallel()
 	if runtime.GOOS == "windows" {
@@ -382,7 +465,7 @@ func TestAFailedLookupBeforeAnInstallIsRetriedSoon(t *testing.T) {
 	exe, started := oldBinary(t)
 	SaveCache(stateDir, Cache{CheckedAt: time.Now(), Current: "1.0.0", Latest: "2.0.0", Published: time.Now().Add(-2 * SoakTime)})
 	c := &Client{ReleaseKeys: testKeys(), BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0", Binary: started}
-	if o := c.Auto(context.Background(), t.TempDir(), stateDir, exe, nil); o.Err == nil || o.Installed != "" {
+	if o := c.auto(context.Background(), CommandCheckInterval, t.TempDir(), stateDir, exe, nil); o.Err == nil || o.Installed != "" {
 		t.Fatalf("Auto = %+v, want the failed lookup reported", o)
 	}
 	cache := LoadCache(stateDir)
@@ -390,12 +473,12 @@ func TestAFailedLookupBeforeAnInstallIsRetriedSoon(t *testing.T) {
 		t.Fatalf("after a failed lookup the check records %+v, want a failed check and no attempt", cache)
 	}
 	// Within the backoff, no lookup at all: one would succeed here, and install.
-	if o := c.Auto(context.Background(), t.TempDir(), stateDir, exe, nil); o.Installed != "" || o.Err != nil || downloads != 0 {
+	if o := c.auto(context.Background(), CommandCheckInterval, t.TempDir(), stateDir, exe, nil); o.Installed != "" || o.Err != nil || downloads != 0 {
 		t.Fatalf("Auto = %+v after %d downloads within the backoff, want no lookup", o, downloads)
 	}
 	cache.CheckedAt = time.Now().Add(-RetryInterval - time.Minute)
 	SaveCache(stateDir, cache)
-	if o := c.Auto(context.Background(), t.TempDir(), stateDir, exe, nil); o.Installed != "2.0.0" || downloads != 1 {
+	if o := c.auto(context.Background(), CommandCheckInterval, t.TempDir(), stateDir, exe, nil); o.Installed != "2.0.0" || downloads != 1 {
 		t.Fatalf("Auto = %+v after %d downloads, want 2.0.0 installed once the retry is due", o, downloads)
 	}
 }

@@ -132,10 +132,11 @@ relay, spool delivery, shell completion — and for Terma's own engineers.
 
 ## Updates
 
-terma keeps itself up to date. Once a day it looks for a new release (after a failed
-lookup, again in 15 minutes, then less and less often) and installs it in place, verified against the release
-checksum. The local relay does this in the background, so a machine nobody runs a terma
-command on still updates, and so does each terma command you run in a terminal. Hooks,
+terma keeps itself up to date. It looks for a new release (after a failed lookup, again in
+15 minutes, then less often, up to hourly) and installs it in place, verified against the
+release checksum. The local relay does this every few minutes in the background, so a machine
+nobody runs a terma command on still updates, and each terma command you run in a terminal
+does it at most hourly. Hooks,
 scripts, CI and `--output` other than a table never look. A relay that installed a
 release keeps running until nothing it holds is waiting, no export is arriving and none
 has for half a minute (after 12 hours it stops waiting for that pause), then restarts on
@@ -145,7 +146,8 @@ arrives as it stops is answered "try again", and the agent sends it to the new r
 relay that a hook started, rather than the background service, starts its successor
 itself.
 
-A patch release (1.4.2 → 1.4.3) installs as soon as it is found. A new minor or major
+A patch release (1.4.2 → 1.4.3) installs as soon as it is found, within 10 minutes of
+publishing on a machine whose relay runs. A new minor or major
 version (1.4 → 1.5, 1 → 2) installs once it has been out for 24 hours, so one that breaks
 can be pulled before it reaches every machine. `terma update` never waits.
 
@@ -184,8 +186,8 @@ verify <file> --owner miradorlabs`).
 **A bad release.** terma never installs an older version over a newer one, so a release
 is rolled back by rolling forward: delete the bad release, or mark it a pre-release, so
 GitHub's latest release is the previous one again and machines that have not taken it
-never will, then publish a fixed patch release, which every machine installs at its next
-daily check. Pull a bad minor or major release within its 24 hours and no machine
+never will, then publish a fixed patch release, which every machine whose relay runs installs
+within 10 minutes. Pull a bad minor or major release within its 24 hours and no machine
 installs it automatically.
 
 After an update, the new version also refreshes what earlier versions wrote in your home

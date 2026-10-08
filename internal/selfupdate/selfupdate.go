@@ -33,11 +33,15 @@ const Repo = "miradorlabs/terma-cli"
 // BinaryName is the executable inside each release archive.
 const BinaryName = "terma"
 
-// CheckInterval is how often the passive "update available" notice re-checks.
-const CheckInterval = 24 * time.Hour
+// CommandCheckInterval is how often an interactive command looks, after it has finished: the
+// relay keeps a machine current, so a command seldom waits on the network.
+const CommandCheckInterval = time.Hour
 
 // RetryInterval bounds how long a failed release lookup suppresses another check.
 const RetryInterval = 15 * time.Minute
+
+// AttemptInterval is how long a release whose install failed waits before it is tried again.
+const AttemptInterval = 24 * time.Hour
 
 // maxDownload bounds a release archive and any file read out of it.
 const maxDownload = 256 << 20

@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -56,13 +58,17 @@ type Cache struct {
 	Attempted string `json:"attempted,omitempty"`
 }
 
+// maxRetryWait caps retryAfter: the window GitHub's rate limit resets in, so a machine back
+// online after a night's failed lookups still takes a patch within the hour.
+const maxRetryWait = time.Hour
+
 // retryAfter is how long a lookup that has failed failures times in a row waits before the
-// next: RetryInterval, doubling up to CheckInterval, so a rate-limited network is not kept so.
+// next: RetryInterval, doubling up to maxRetryWait, so a rate-limited network is not kept so.
 func retryAfter(failures int) time.Duration {
 	wait := RetryInterval
 	for range failures - 1 {
-		if wait *= 2; wait >= CheckInterval {
-			return CheckInterval
+		if wait *= 2; wait >= maxRetryWait {
+			return maxRetryWait
 		}
 	}
 	return wait
@@ -129,26 +135,79 @@ func Lock(dir string) (func(), error) {
 	return flock.TryLock(statePath(dir, lockFile))
 }
 
-func (c *Client) cachedCheck(ctx context.Context, dir, current string) (Cache, *Release) {
+// web is GitHub's web base for latestTag: BaseURL when set, so one test server answers both.
+func (c *Client) web() string {
+	if c.BaseURL != "" {
+		return c.base()
+	}
+	return "https://github.com"
+}
+
+// latestTag is the version of the release github.com's latest-release page redirects to, ""
+// when the answer names none; an error when the page could not be asked or refused. The API
+// answers unauthenticated callers 60 times an hour per address, an unchanged answer (304)
+// included, which machines sharing an address and checking every few minutes would spend;
+// the page is not held to that published limit, so the frequent check asks it first.
+func (c *Client) latestTag(ctx context.Context) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, c.web()+"/"+Repo+"/releases/latest", nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("User-Agent", userAgentPrefix+c.Version)
+	client := c.httpClient()
+	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode >= http.StatusBadRequest {
+		return "", fmt.Errorf("github latest release page: HTTP %d", resp.StatusCode)
+	}
+	_, tag, found := strings.Cut(resp.Header.Get("Location"), "/releases/tag/")
+	if !found || !IsRelease(tag) {
+		return "", nil
+	}
+	return strings.TrimPrefix(tag, "v"), nil
+}
+
+// cachedCheck looks the latest release up once every has passed since the last look (after
+// failed looks, retryAfter), returning the record and the release when this call fetched it.
+// A look whose last answer is complete probes the latest tag first and fetches the release
+// only when the tag moved; a probe that fails is a failed look, which backs off rather than
+// sending every machine behind a throttled address on to the rate-limited API.
+func (c *Client) cachedCheck(ctx context.Context, dir, current string, every time.Duration) (Cache, *Release) {
 	cache := LoadCache(dir)
 	var release *Release
 	if cache.Current != "" && cache.Current != current {
 		cache = Cache{AttemptAt: cache.AttemptAt, Attempted: cache.Attempted}
 	}
-	interval := CheckInterval
+	interval := every
 	if cache.Failed {
 		interval = retryAfter(cache.Failures)
 	}
 	if time.Since(cache.CheckedAt) >= interval || cache.CheckedAt.After(time.Now()) {
-		checkCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
-		defer cancel()
-		cache.CheckedAt, cache.Current = time.Now(), current
-		rel, err := c.Latest(checkCtx)
-		cache.Failed = err != nil
+		var err error
+		if !cache.Failed && cache.Latest != "" && !cache.Published.IsZero() {
+			var tag string
+			if tag, err = c.latestTag(ctx); err == nil && tag == cache.Latest {
+				cache.CheckedAt, cache.Current = time.Now(), current
+				SaveCache(dir, cache)
+				return cache, nil
+			}
+		}
+		if err == nil {
+			checkCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+			release, err = c.Latest(checkCtx)
+			cancel()
+		}
+		cache.CheckedAt, cache.Current, cache.Failed = time.Now(), current, err != nil
 		if err != nil {
 			cache.Failures++
 		} else {
-			cache.Latest, cache.Published, cache.Failures, release = rel.Version(), rel.PublishedAt, 0, rel
+			cache.Latest, cache.Published, cache.Failures = release.Version(), release.PublishedAt, 0
 		}
 		SaveCache(dir, cache)
 	}
@@ -189,17 +248,25 @@ type Outcome struct {
 	// Replaced means another install put a release in place while this process ran, so it
 	// did nothing: the next command runs that release.
 	Replaced bool
-	// Err is a failed install; the next attempt waits a day.
+	// Err is a failed install; the next attempt waits AttemptInterval.
 	Err error
 }
 
-// Auto checks for a newer release at most daily and installs it in place of exe for a
-// release build that updates itself, unless the developer turned automatic updates off in
-// configDir; the check's records go in stateDir. A new minor or major version waits out
-// SoakTime first, and is looked up again before it is installed, so a release pulled since
-// the check is not. Each release is attempted once a day at most, so a failing install is
-// not retried at every pass. progress, when set, is told of the download.
+// Auto is the relay's pass: it looks for a newer release on every call, a cheap probe of the
+// latest tag (latestTag) unless that moved, as the relay spaces its calls itself, and so a
+// patch release, which installs without a soak, reaches a machine within one of the relay's
+// waits; a failed look still backs off (retryAfter). It installs the release in place of exe
+// for a release build that updates itself, unless the developer turned automatic updates
+// off in configDir; the check's records go in stateDir. A new minor or major version waits
+// out SoakTime first, and is looked up again before it is installed, so a release pulled
+// since the check is not. Each release is attempted once per AttemptInterval at most, so a
+// failing install is not retried at every pass. progress, when set, is told of the download.
 func (c *Client) Auto(ctx context.Context, configDir, stateDir, exe string, progress io.Writer) Outcome {
+	return c.auto(ctx, 0, configDir, stateDir, exe, progress)
+}
+
+// auto is Auto with every as the least time between looks.
+func (c *Client) auto(ctx context.Context, every time.Duration, configDir, stateDir, exe string, progress io.Writer) Outcome {
 	if !IsRelease(c.Version) {
 		return Outcome{}
 	}
@@ -217,8 +284,8 @@ func (c *Client) Auto(ctx context.Context, configDir, stateDir, exe string, prog
 	if c.Replaced(exe) {
 		return Outcome{Replaced: true}
 	}
-	cache, rel := c.cachedCheck(ctx, stateDir, c.Version)
-	attempted := cache.Attempted == cache.Latest && time.Since(cache.AttemptAt) < CheckInterval
+	cache, rel := c.cachedCheck(ctx, stateDir, c.Version, every)
+	attempted := cache.Attempted == cache.Latest && time.Since(cache.AttemptAt) < AttemptInterval
 	if !p.Auto || c.Binary == nil || !Newer(c.Version, cache.Latest) || !UpdatesItself(exe) || attempted ||
 		Soaking(c.Version, cache.Latest, cache.Published, time.Now()) {
 		return Outcome{Notice: notice(cache, c.Version)}
@@ -262,10 +329,10 @@ func (c *Client) Auto(ctx context.Context, configDir, stateDir, exe string, prog
 	return Outcome{Installed: rel.Version()}
 }
 
-// Maintain is Auto after a human-facing command, saying what it did. Errors never change
-// the command's result.
+// Maintain is Auto after a human-facing command, looking every CommandCheckInterval at most
+// and saying what it did. Errors never change the command's result.
 func (c *Client) Maintain(ctx context.Context, configDir, stateDir, exe string, out io.Writer) {
-	o := c.Auto(ctx, configDir, stateDir, exe, out)
+	o := c.auto(ctx, CommandCheckInterval, configDir, stateDir, exe, out)
 	switch {
 	case o.Err != nil:
 		fmt.Fprintf(out, "Automatic update failed: %v. Run `terma update` to retry.\n", o.Err)
