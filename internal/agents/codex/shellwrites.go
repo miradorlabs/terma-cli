@@ -12,12 +12,18 @@ import (
 // shellWrites returns the files a shell command names as written (redirect targets, the
 // operands of the writers in writtenIndexes, and the files of a patch it runs), in the
 // order it writes them, resolved against cwd and any cd before them; committed is how many
-// of them come before its last git commit, or -1 when it makes none. Nothing when the
-// command does not parse.
+// of them come before its last git commit, or -1 when it makes none. A command that does
+// not parse gives only the files of a patch in its text.
 func shellWrites(command, cwd string) (paths []string, committed int) {
 	file, err := syntax.NewParser().Parse(strings.NewReader(command), "")
 	if err != nil {
-		return nil, -1
+		for _, p := range applyPatchPaths(command) {
+			if !filepath.IsAbs(p) {
+				p = filepath.Join(cwd, p)
+			}
+			paths = append(paths, filepath.Clean(p))
+		}
+		return paths, -1
 	}
 	dir := cwd
 	var out []string
@@ -104,8 +110,12 @@ func shellWrites(command, cwd string) (paths []string, committed int) {
 				}
 			}
 			if len(words) > 0 && words[0].text == "mkdir" {
-				for _, w := range words[1:] {
-					if p, ok := resolve(w); ok && !strings.HasPrefix(w.text, "-") {
+				args := make([]string, len(words))
+				for i, w := range words {
+					args[i] = w.text
+				}
+				for _, i := range operands(args, "-m", "--mode") {
+					if p, ok := resolve(words[i]); ok {
 						made[p] = true
 					}
 				}

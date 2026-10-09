@@ -182,6 +182,7 @@ func TestCodexHooksNeverFailOnBadInput(t *testing.T) {
 		for name, fn := range map[string]func(context.Context, hookrun.Env) error{
 			"session-start": sessionStart,
 			"session-end":   sessionEnd,
+			"pre-tool-use":  preToolUse,
 			"post-tool-use": postToolUse,
 		} {
 			env := hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: t.TempDir(), Stdin: strings.NewReader(bad), Version: "test"}

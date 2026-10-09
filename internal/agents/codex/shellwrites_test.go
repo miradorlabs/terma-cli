@@ -56,6 +56,7 @@ func TestShellWrites(t *testing.T) {
 		{"git mv into a directory made first", "mkdir -p docs/notes && git mv src/p4.txt docs/notes/p4.txt && git commit -m move", in("src/p4.txt", "docs/notes/p4.txt")},
 		{"into a directory made first", "mkdir -p pairs && printf 'seven\\n' > pairs/o7.txt && git add -- pairs/o7.txt", in("pairs/o7.txt")},
 		{"git reads", "git add a.go && git commit -m mv", nil},
+		{"into a directory made with a mode", "mkdir -m 0755 newdir && printf x > newdir/f.txt", in("newdir/f.txt")},
 		{"subshell cd ends with it", "(cd src && gofmt -w a.go); gofmt -w b.go", in("src/a.go", "b.go")},
 		{"named >& target", "make >& build.log", in("build.log")},
 		{"function body runs nothing", "f() { cd src; echo x > g.txt; }; echo y > h.txt", in("h.txt")},
@@ -75,6 +76,7 @@ func TestShellWrites(t *testing.T) {
 		{"comment", "echo hi # > nope.txt", nil},
 		// A patch body is not shell: its redirect writes nothing.
 		{"patch heredoc", "apply_patch <<'PATCH'\n*** Begin Patch\n*** Add File: x.sh\n+echo a > out.txt\n*** End Patch\nPATCH", in("x.sh")},
+		{"patch in a command that does not parse", "apply_patch <<'PATCH'\n*** Begin Patch\n*** Add File: z.txt\n+z\n*** End Patch\nPATCH\nif then", in("z.txt")},
 		{"patch argument", "apply_patch '*** Begin Patch\n*** Add File: new/y.sh\n+y\n*** End Patch'", in("new/y.sh")},
 		{"patch after a cd", "cd src && apply_patch <<'PATCH'\n*** Begin Patch\n*** Update File: a.go\n@@\n-a\n+b\n*** End Patch\nPATCH", in("src/a.go")},
 	} {
