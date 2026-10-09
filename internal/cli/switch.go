@@ -93,7 +93,7 @@ func (app *App) runSwitch(cmd *cobra.Command, f switchFlags) error {
 	// Before the relay stops: one its service starts again reads no team, so it admits
 	// nothing until setup restarts it on the new sign-in.
 	if err := config.UpdateProfile(app.dir, cfg.ProfileName, func(p *config.Profile) {
-		p.OrganizationID, p.OrganizationName, p.Team = "", "", ""
+		p.OrganizationID, p.OrganizationName, p.Team, p.TeamName = "", "", "", ""
 	}); err != nil {
 		return err
 	}

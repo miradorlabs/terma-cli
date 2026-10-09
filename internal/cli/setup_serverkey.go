@@ -172,6 +172,9 @@ func (app *App) keepServerKey(cfg *config.Config, insecure bool) error {
 func applyServerKey(p *config.Profile, cfg *config.Config) {
 	p.SelectOrganization(cfg.OrganizationID, "")
 	p.PinEnvironment(cfg.Environment)
+	if p.Team != cfg.Team {
+		p.TeamName = ""
+	}
 	p.Team = cfg.Team
 	p.ServerKeySignIn, p.ServerKeyAuthURL = true, cfg.AuthURL
 }

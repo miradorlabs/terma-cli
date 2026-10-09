@@ -167,7 +167,7 @@ func TestAfterSwitchSetupAsksForTheTeam(t *testing.T) {
 	cmd.SetIn(strings.NewReader(""))
 	cmd.SetContext(t.Context())
 	// No terminal here, so asking fails: what matters is that setup asked.
-	if name, err := testApp.selectPolicyTeam(cmd, cfg); err == nil || name != "" || cfg.ProjectID == old.ID {
+	if name, err := testApp.selectPolicyTeam(cmd, cfg, false); err == nil || name != "" || cfg.ProjectID == old.ID {
 		t.Fatalf("setup took %q (%s) without asking: %v", name, cfg.ProjectID, err)
 	}
 }

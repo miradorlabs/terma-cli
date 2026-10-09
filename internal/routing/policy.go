@@ -77,6 +77,9 @@ func StorePolicy(cfg *config.Config, pol *config.Policy) error {
 		case p.OrganizationID != cfg.OrganizationID:
 			rejected = errors.New("organization changed while fetching collection policy")
 		case p.Team == "" || cfg.Policy.TeamID == pol.TeamID:
+			if p.Team != pol.TeamID {
+				p.TeamName = ""
+			}
 			p.Team = pol.TeamID
 		}
 	})
