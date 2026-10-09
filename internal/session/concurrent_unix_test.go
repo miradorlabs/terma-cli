@@ -374,3 +374,45 @@ func TestASessionKnownOnlyByDeltasIsAttributed(t *testing.T) {
 		t.Fatalf("attribution = %+v", got)
 	}
 }
+
+// A record parked while another hook unparks waits out the production lock timeout and
+// survives the drain; a drainer that cannot take the store hands nothing on and removes nothing.
+func TestParkDuringUnparkKeepsTheRecord(t *testing.T) {
+	t.Parallel()
+	dir := filepath.Join(t.TempDir(), "terma")
+	draining, parking, competing := Open(dir), Open(dir), Open(dir)
+	if err := draining.Park("events", []byte("A\n")); err != nil {
+		t.Fatal(err)
+	}
+	unpark := func(s *Store, during func()) string {
+		t.Helper()
+		var got []byte
+		if err := s.Unpark("events", func(lines []byte) error {
+			got = lines
+			if during != nil {
+				during()
+			}
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+		return string(got)
+	}
+	first := unpark(draining, func() {
+		if err := parking.Park("events", []byte("B\n")); err != nil {
+			t.Errorf("parking B while A drains: %v", err)
+		}
+		if got := unpark(competing, nil); got != "" {
+			t.Errorf("a drainer without the store unparked %q", got)
+		}
+	})
+	if first != "A\n" {
+		t.Fatalf("first drain = %q, want A", first)
+	}
+	if second := unpark(draining, nil); second != "B\n" {
+		t.Fatalf("second drain = %q, want B, parked while A drained", second)
+	}
+	if third := unpark(draining, nil); third != "" {
+		t.Fatalf("third drain = %q, want nothing left", third)
+	}
+}

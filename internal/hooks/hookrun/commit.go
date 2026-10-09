@@ -28,7 +28,7 @@ func PrepareCommitMsg(ctx context.Context, env Env) error {
 	case "merge", "squash":
 		return nil
 	}
-	r, err := env.Repo(ctx)
+	r, err := env.resolve(ctx)
 	if err != nil || r.GitDir == "" {
 		return nil
 	}

@@ -2,6 +2,8 @@ package hookrun
 
 import (
 	"context"
+	"crypto/sha256"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,6 +15,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
+	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
@@ -60,11 +63,22 @@ func commitAs(t *testing.T, env func(args ...string) Env, root, msg string, rel 
 
 // terma-cli#32: Codex runs `git commit … && git log -1` in its workspace-write sandbox, where
 // the commit's hooks may write .git but not the state directory. The commit's events wait in
-// the repository's store, and the next hook outside the sandbox spools them, once.
+// the git directory, also for a repository whose session store is a workspace's under the
+// state directory, and the next hook outside the sandbox but prepare-commit-msg spools them, once.
 func TestASandboxedCommitIsSpooledByTheNextHook(t *testing.T) {
 	skipUnlessReadOnlyDirs(t)
+	for _, tc := range []struct {
+		name      string
+		workspace bool
+	}{{"git store", false}, {"begun outside git", true}} {
+		t.Run(tc.name, func(t *testing.T) { sandboxedCommit(t, tc.workspace) })
+	}
+}
+
+func sandboxedCommit(t *testing.T, workspace bool) {
 	root := hookruntest.InitRepo(t)
-	spoolDir := t.TempDir()
+	stateDir := t.TempDir()
+	spoolDir := filepath.Join(stateDir, spool.Dir)
 	sp, err := spool.Open(spoolDir)
 	if err != nil {
 		t.Fatal(err)
@@ -72,19 +86,32 @@ func TestASandboxedCommitIsSpooledByTheNextHook(t *testing.T) {
 	now := time.Now().UTC()
 	flushes := 0
 	env := func(args ...string) Env {
-		return Env{StateDir: t.TempDir(), Now: now, Cwd: root, Policy: hookruntest.Admitting(root), Args: args,
+		return Env{StateDir: stateDir, Now: now, Cwd: root, Policy: hookruntest.Admitting(root), Args: args,
 			Spool: sp, Team: hookruntest.Team, Flush: func() { flushes++ }}
 	}
+	store, refused := hookruntest.Store(t, root), []string{spoolDir, stateDir}
+	if workspace {
+		// A session begun before `git init` keeps its store under the state directory.
+		dir := filepath.Join(stateDir, project.WorkspacesDir, fmt.Sprintf("%x", sha256.Sum256([]byte(root))))
+		store, refused = session.Open(dir), append(refused, dir)
+	}
 	codex := session.Session{ID: codexSession, Tool: "codex", ToolVersion: "0.160.1"}
-	if err := hookruntest.Store(t, root).Touch(codex, []string{"pairs/e4b.txt"}, now); err != nil {
+	if err := store.Touch(codex, []string{"pairs/e4b.txt"}, now); err != nil {
 		t.Fatal(err)
 	}
 	hookruntest.WriteFile(t, root, "pairs/e4b.txt", "b\n")
 
-	// The sandbox: opening the spool's lock is refused, as Codex's seatbelt refused it.
-	if err := os.Chmod(spoolDir, 0o500); err != nil {
-		t.Fatal(err)
+	// The sandbox: the state directory refuses every write, as Codex's seatbelt refused it.
+	readOnly := func(mode os.FileMode) {
+		t.Helper()
+		for _, dir := range refused {
+			if err := os.Chmod(dir, mode); err != nil {
+				t.Fatal(err)
+			}
+		}
 	}
+	readOnly(0o500)
+	t.Cleanup(func() { readOnly(0o700) })
 	sha := commitAs(t, env, root, "e4 b then log", "pairs/e4b.txt")
 	if entries, _ := os.ReadDir(spoolDir); len(entries) != 0 {
 		t.Fatalf("the sandboxed hooks reached the spool: %v", entries)
@@ -93,10 +120,19 @@ func TestASandboxedCommitIsSpooledByTheNextHook(t *testing.T) {
 		t.Fatalf("the commit was not stamped:\n%s", msg)
 	}
 
-	// Codex's PostToolUse hook runs outside the sandbox, and resolves the repository first.
-	if err := os.Chmod(spoolDir, 0o700); err != nil {
+	readOnly(0o700)
+	// prepare-commit-msg keeps to its budget and leaves the parked events to the next hook.
+	msgPath := filepath.Join(t.TempDir(), "COMMIT_EDITMSG")
+	if err := os.WriteFile(msgPath, []byte("next\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	if err := PrepareCommitMsg(context.Background(), env(msgPath, "message")); err != nil {
+		t.Fatal(err)
+	}
+	if entries, _ := os.ReadDir(spoolDir); len(entries) != 0 {
+		t.Fatalf("prepare-commit-msg unparked: %v", entries)
+	}
+	// Codex's PostToolUse hook runs outside the sandbox, and resolves the repository first.
 	for range 2 {
 		if _, err := env().Repo(context.Background()); err != nil {
 			t.Fatal(err)

@@ -503,13 +503,22 @@ func (s *Store) Retire(before time.Time) {
 
 // Park keeps lines the state directory refused, in the file name.jsonl, until Unpark hands
 // them on. A git hook in an agent's sandbox may write the repository's own git directory,
-// where the store is, but not terma's state directory.
+// where the store is, but not terma's state directory. While another hook holds the store,
+// perhaps unparking, the lines go to a file of their own, name~<random>.jsonl, written whole,
+// so no drain removes them unread.
 func (s *Store) Park(name string, lines []byte) error {
-	unlock, _, err := s.create()
+	unlock, held, err := s.create()
 	if err != nil {
 		return err
 	}
 	defer unlock()
+	if !held {
+		var b [8]byte
+		if _, err := rand.Read(b[:]); err != nil {
+			return err
+		}
+		return config.WriteFileAtomicNoSync(filepath.Join(s.dir, name+deltaSep+hex.EncodeToString(b[:])+parkedExt), lines, fileMode)
+	}
 	f, err := os.OpenFile(filepath.Join(s.dir, name+parkedExt), os.O_CREATE|os.O_WRONLY|os.O_APPEND, fileMode)
 	if err != nil {
 		return err
@@ -521,24 +530,47 @@ func (s *Store) Park(name string, lines []byte) error {
 	return f.Close()
 }
 
-// Unpark passes what Park kept under name to deliver, and drops it once deliver has taken it.
+// Unpark passes what Park kept under name to deliver, and removes the files it passed once
+// deliver has taken them. It changes nothing unless it holds the store: a hook that cannot
+// leaves the parked lines to the next.
 func (s *Store) Unpark(name string, deliver func(lines []byte) error) error {
-	path := filepath.Join(s.dir, name+parkedExt)
-	if _, err := os.Stat(path); err != nil {
+	if len(s.parked(name)) == 0 {
 		return nil // nothing parked: the common case takes no lock
 	}
-	defer s.lock()()
-	lines, err := os.ReadFile(path)
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil // another hook took it first
+	unlock, held := s.acquire()
+	defer unlock()
+	if !held {
+		return nil
 	}
-	if err != nil {
-		return err
+	var lines []byte
+	var read []string
+	for _, path := range s.parked(name) {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue // another hook took it first
+		}
+		if len(data) > 0 && data[len(data)-1] != '\n' {
+			data = append(data, '\n')
+		}
+		lines, read = append(lines, data...), append(read, path)
+	}
+	if len(read) == 0 {
+		return nil
 	}
 	if err := deliver(lines); err != nil {
 		return err
 	}
-	return os.Remove(path)
+	removeAll(read)
+	return nil
+}
+
+// parked is the files Park wrote under name.
+func (s *Store) parked(name string) []string {
+	paths, _ := filepath.Glob(filepath.Join(s.dir, name+deltaSep+"*"+parkedExt))
+	if _, err := os.Stat(filepath.Join(s.dir, name+parkedExt)); err == nil {
+		paths = append(paths, filepath.Join(s.dir, name+parkedExt))
+	}
+	return paths
 }
 
 // removeTemps removes atomic-write temporary files a crash left in dir before before.

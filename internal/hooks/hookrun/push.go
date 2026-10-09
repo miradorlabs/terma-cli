@@ -179,14 +179,14 @@ func PrePush(ctx context.Context, env Env) error {
 	return nil
 }
 
-// unparkPushes records the pushes a sandboxed pre-push parked in r's store and starts their
+// unparkPushes records the pushes a sandboxed pre-push parked in r's git directory and starts their
 // AwaitPush, which reports each at once, its git push long gone.
 func (e Env) unparkPushes(r *Repo) {
 	if e.AwaitPush == nil {
 		return
 	}
 	var recorded []string
-	err := r.Store.Unpark(parkedPushes, func(lines []byte) error {
+	err := r.parking().Unpark(parkedPushes, func(lines []byte) error {
 		for line := range bytes.Lines(lines) {
 			var rec pushRecord
 			if json.Unmarshal(line, &rec) != nil || rec.ID == "" {
