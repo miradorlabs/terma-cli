@@ -56,6 +56,7 @@ func TestShellWrites(t *testing.T) {
 		{"git mv into a directory made first", "mkdir -p docs/notes && git mv src/p4.txt docs/notes/p4.txt && git commit -m move", in("src/p4.txt", "docs/notes/p4.txt")},
 		{"into a directory made first", "mkdir -p pairs && printf 'seven\\n' > pairs/o7.txt && git add -- pairs/o7.txt", in("pairs/o7.txt")},
 		{"git reads", "git add a.go && git commit -m mv", nil},
+		{"cp into a directory made first", "mkdir out && cp input.txt out", in("out/input.txt")},
 		{"into a directory made with a mode", "mkdir -m 0755 newdir && printf x > newdir/f.txt", in("newdir/f.txt")},
 		{"subshell cd ends with it", "(cd src && gofmt -w a.go); gofmt -w b.go", in("src/a.go", "b.go")},
 		{"named >& target", "make >& build.log", in("build.log")},

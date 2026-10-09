@@ -43,8 +43,8 @@ func shellWrites(command, cwd string) (paths []string, committed int) {
 	made := map[string]bool{}
 	add := func(w word) {
 		p, ok := resolve(w)
-		if !ok {
-			return
+		if !ok || made[p] {
+			return // a directory the command makes: mv's and cp's file lands under it
 		}
 		if info, err := os.Stat(p); err == nil && !info.Mode().IsRegular() {
 			return // a directory, or /dev/null
