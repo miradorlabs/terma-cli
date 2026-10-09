@@ -425,6 +425,7 @@ func TestCodexSkippedWritesDoNotClaimHumanCommits(t *testing.T) {
 		"test -f absent && printf agent > f.txt; git commit -m human",
 		"if test -f absent; then printf agent > f.txt; fi; git commit -m human",
 		"git commit -m human; false && printf agent > f.txt; true",
+		"cp missing f.txt; git commit -m human",
 	} {
 		t.Run(command, func(t *testing.T) {
 			c := newCodexCall(t)
@@ -436,7 +437,7 @@ func TestCodexSkippedWritesDoNotClaimHumanCommits(t *testing.T) {
 			c.installTestHooks()
 			c.shell(command)
 			if touched := hookruntest.Named(hookruntest.Spooled(t, c.sp), semconv.TermaFilesTouchedEvent); len(touched) != 0 {
-				t.Fatalf("skipped writes reported files: %+v", touched)
+				t.Errorf("skipped writes reported files: %+v", touched)
 			}
 			msg, _ := gitx.Git(c.ctx, c.root, "log", "-1", "--format=%B")
 			if strings.Contains(msg, "Agent-Session-Id") {
@@ -501,6 +502,7 @@ func TestCodexRenamesRetireSourceFiles(t *testing.T) {
 		{"git mv old.txt new.txt && git commit -m move", "old.txt", "new.txt"},
 		{"git mv olddir newdir && git commit -m move", "olddir/nested/f.txt", "newdir/nested/f.txt"},
 		{"mkdir -p dest && git mv olddir dest && git commit -m move", "olddir/f.txt", "dest/olddir/f.txt"},
+		{"false && mkdir out; git mv src out && git commit -m move", "src/f.txt", "out/f.txt"},
 	} {
 		t.Run(tc.command, func(t *testing.T) {
 			c := newCodexCall(t)
@@ -527,10 +529,65 @@ func TestCodexRenamesRetireSourceFiles(t *testing.T) {
 	}
 }
 
+func TestCodexDirectoryMoveIncludesSymlinks(t *testing.T) {
+	c := newCodexCall(t)
+	if err := os.Mkdir(filepath.Join(c.root, "src"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("../target", filepath.Join(c.root, "src/link")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	c.git("add", "src/link")
+	c.git("commit", "-qm", "base")
+	c.installTestHooks()
+	c.shell("git mv src out && git commit -m move")
+	msg, _ := gitx.Git(c.ctx, c.root, "log", "-1", "--format=%B")
+	if !strings.Contains(msg, "Agent-Session-Id: "+codexCallSession) {
+		t.Fatalf("symlink-only directory move was not stamped:\n%s", msg)
+	}
+}
+
+func TestCodexSuccessfulExternalWriterChainIsStamped(t *testing.T) {
+	c := newCodexCall(t)
+	hookruntest.WriteFile(t, c.root, "source.txt", "agent\n")
+	c.git("add", "source.txt")
+	c.git("commit", "-qm", "base")
+	c.installTestHooks()
+	c.shell("cp source.txt f.txt && git add f.txt && git commit -m agent")
+	msg, _ := gitx.Git(c.ctx, c.root, "log", "-1", "--format=%B")
+	if !strings.Contains(msg, "Agent-Session-Id: "+codexCallSession) {
+		t.Fatalf("successful external edit/add/commit chain was not stamped:\n%s", msg)
+	}
+}
+
+func TestCodexNestedCommitsKeepPathsRetired(t *testing.T) {
+	for _, command := range []string{
+		"printf agent > f.txt; git add f.txt; echo \"$(git commit -m agent)\"",
+		"printf agent > f.txt; git add f.txt; env -S 'git commit -m agent'",
+	} {
+		t.Run(command, func(t *testing.T) {
+			c := newCodexCall(t)
+			c.installTestHooks()
+			c.shell(command)
+			msg, _ := gitx.Git(c.ctx, c.root, "log", "-1", "--format=%B")
+			if !strings.Contains(msg, "Agent-Session-Id: "+codexCallSession) {
+				t.Fatalf("nested commit was not stamped:\n%s", msg)
+			}
+			hookruntest.WriteFile(t, c.root, "f.txt", "human\n")
+			c.git("add", "f.txt")
+			if msg := c.commit("human"); strings.Contains(msg, "Agent-Session-Id") {
+				t.Fatalf("nested commit restored consumed paths:\n%s", msg)
+			}
+		})
+	}
+}
+
 func TestCodexExecWithNameRetiresCommittedPaths(t *testing.T) {
 	c := newCodexCall(t)
 	c.installTestHooks()
-	command := "printf agent > f.txt && git add f.txt && exec -a git-alias git commit -m agent"
+	// Git can dispatch an argv[0] starting with git- as a builtin name, so use a
+	// neutral name that exercises exec's -a option on every supported platform.
+	command := "printf agent > f.txt && git add f.txt && exec -a terma-test git commit -m agent"
 	c.run(command, func() {
 		// exec -a is a Bash extension; Git for Windows includes Bash too.
 		if _, err := exec.LookPath("bash"); err != nil {

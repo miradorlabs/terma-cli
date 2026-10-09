@@ -2,6 +2,7 @@ package codex
 
 import (
 	"maps"
+	"path/filepath"
 
 	"mvdan.cc/sh/v3/syntax"
 )
@@ -45,11 +46,13 @@ func mergeShellRoutes(a, b shellFlowRoutes) shellFlowRoutes {
 
 type shellFlow struct {
 	writers, commits map[*syntax.Stmt]bool
+	requiresSuccess  map[*syntax.Stmt]bool
+	entries          map[*syntax.Stmt]shellFlowState
 	first            shellFlowState
 }
 
-func guaranteedShellWrites(file *syntax.File, sources []*syntax.Stmt, commits map[*syntax.Stmt]bool) (before, after, reported map[*syntax.Stmt]bool) {
-	f := shellFlow{writers: map[*syntax.Stmt]bool{}, commits: commits}
+func guaranteedShellWrites(file *syntax.File, sources []*syntax.Stmt, commits, successful map[*syntax.Stmt]bool) (before, after, reported map[*syntax.Stmt]bool) {
+	f := shellFlow{writers: map[*syntax.Stmt]bool{}, commits: commits, requiresSuccess: successful}
 	for _, stmt := range sources {
 		f.writers[stmt] = true
 	}
@@ -66,6 +69,28 @@ func guaranteedShellWrites(file *syntax.File, sources []*syntax.Stmt, commits ma
 	return before, remaining.writes, remaining.all
 }
 
+// shellDirectoryStates names the mkdir calls that must have succeeded before each
+// statement. Possible branch/loop effects are not treated as completed effects.
+func shellDirectoryStates(file *syntax.File) map[*syntax.Stmt]shellFlowState {
+	dirs := map[*syntax.Stmt]bool{}
+	syntax.Walk(file, func(node syntax.Node) bool {
+		if _, ok := node.(*syntax.FuncDecl); ok {
+			return false
+		}
+		if stmt, ok := node.(*syntax.Stmt); ok {
+			if call, ok := stmt.Cmd.(*syntax.CallExpr); ok {
+				if words := wordsOf(call); len(words) > 0 && filepath.Base(words[0].text) == "mkdir" {
+					dirs[stmt] = true
+				}
+			}
+		}
+		return true
+	})
+	f := shellFlow{writers: dirs, requiresSuccess: dirs, entries: map[*syntax.Stmt]shellFlowState{}}
+	f.list(file.Stmts, shellFlowRoutes{{live: true}})
+	return f.entries
+}
+
 func (f *shellFlow) list(stmts []*syntax.Stmt, in shellFlowRoutes) shellFlowResult {
 	out := shellFlowResult{nilRoutes(), in}
 	for _, stmt := range stmts {
@@ -77,9 +102,16 @@ func (f *shellFlow) list(stmts []*syntax.Stmt, in shellFlowRoutes) shellFlowResu
 func nilRoutes() shellFlowRoutes { return shellFlowRoutes{} }
 
 func (f *shellFlow) statement(stmt *syntax.Stmt, in shellFlowRoutes) shellFlowResult {
+	if f.entries != nil {
+		f.entries[stmt] = mergeShellState(f.entries[stmt], mergeShellState(in[0], in[1]))
+	}
 	if stmt.Background || stmt.Coprocess {
 		return shellFlowResult{in, in} // completion does not wait for this work
 	}
+	if call, ok := stmt.Cmd.(*syntax.CallExpr); ok && f.containsCommit(call) {
+		return f.opaque(call, in) // substitutions run before the outer call's writes
+	}
+	prior := in
 	for i, state := range in {
 		if state.live && f.writers[stmt] {
 			state.writes = maps.Clone(state.writes)
@@ -126,6 +158,9 @@ func (f *shellFlow) statement(stmt *syntax.Stmt, in shellFlowRoutes) shellFlowRe
 			in = shellFlowRoutes{{}, past}
 		}
 		out = shellFlowResult{in, in}
+		if f.requiresSuccess[stmt] {
+			out[0] = prior // an external writer's effect cannot be assumed after failure
+		}
 		words := wordsOf(cmd)
 		if len(words) == 1 {
 			switch words[0].text {
@@ -149,6 +184,17 @@ func (f *shellFlow) statement(stmt *syntax.Stmt, in shellFlowRoutes) shellFlowRe
 // Branches, loops and substitutions are deliberately not interpreted. Their writes
 // may be skipped; a possible commit still prevents later writes from being preclaimed.
 func (f *shellFlow) opaque(node syntax.Node, in shellFlowRoutes) shellFlowResult {
+	if f.entries != nil && node != nil {
+		syntax.Walk(node, func(n syntax.Node) bool {
+			if _, ok := n.(*syntax.FuncDecl); ok {
+				return false
+			}
+			if stmt, ok := n.(*syntax.Stmt); ok {
+				f.entries[stmt] = mergeShellState(f.entries[stmt], mergeShellState(in[0], in[1]))
+			}
+			return true
+		})
+	}
 	if f.containsCommit(node) {
 		f.first = mergeShellState(f.first, in[0])
 		past := mergeShellState(in[0], in[1])

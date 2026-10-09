@@ -9,7 +9,7 @@ import (
 // directoryMovePaths expands a Git directory move while its source is still visible.
 // After the source disappears, an existing directory destination cannot tell us which
 // files were moved into it, so do not invent a file at either directory's bare path.
-func directoryMovePaths(words []word, cwd string, made map[string]bool) ([]string, bool) {
+func directoryMovePaths(words []word, cwd string, made, possible map[string]bool) ([]string, bool) {
 	if len(words) == 0 || filepath.Base(words[0].text) != "mv" {
 		return nil, false
 	}
@@ -35,6 +35,9 @@ func directoryMovePaths(words []word, cwd string, made map[string]bool) ([]strin
 		return nil, false
 	}
 	destInfo, _ := os.Stat(dest)
+	if destInfo == nil && possible[dest] && !made[dest] {
+		return nil, true // a skipped/failed mkdir can change rename-into-directory semantics
+	}
 	destIsDir := made[dest] || (destInfo != nil && destInfo.IsDir())
 	var sources []string
 	directory, missing := false, false
@@ -66,7 +69,7 @@ func directoryMovePaths(words []word, cwd string, made map[string]bool) ([]strin
 			continue
 		}
 		_ = filepath.WalkDir(source, func(path string, entry fs.DirEntry, err error) error {
-			if err != nil || !entry.Type().IsRegular() {
+			if err != nil || (!entry.Type().IsRegular() && entry.Type()&fs.ModeSymlink == 0) {
 				return nil
 			}
 			relative, err := filepath.Rel(source, path)

@@ -116,6 +116,9 @@ func TestShellWritesBeforeEachCommit(t *testing.T) {
 		{"wrapped commit", "printf x > a.txt && git add a.txt && command git commit -m a", []int{1}},
 		{"commit under env -u", "printf x > a.txt && env -u GIT_DIR git commit -m a", []int{1}},
 		{"commit under env", "printf x > a.txt && env GIT_AUTHOR_NAME=x git commit -m a", []int{1}},
+		{"commit under env split string", "printf x > a.txt && env -S 'git commit -m a'", []int{1}},
+		{"commit under env attached split string", "printf x > a.txt && env -S'git commit -m a'", []int{1}},
+		{"commit under env long split string", "printf x > a.txt && env --split-string='git commit -m a'", []int{1}},
 		{"exec name before commit", "printf x > a.txt && exec -a alias git commit -m a", []int{1}},
 		{"exec name and option terminator", "printf x > a.txt && exec -a alias -- git commit -m a", []int{1}},
 		{"exec attached name", "printf x > a.txt && exec -agit-alias git commit -m a", []int{1}},
@@ -142,6 +145,9 @@ func TestShellWritePlanControlFlow(t *testing.T) {
 		before, after, reported []string
 	}{
 		{"printf x > a; git commit -m a", []string{"a"}, nil, []string{"a"}},
+		{"cp source a; git commit -m human", nil, nil, nil},
+		{"cp source a && git commit -m a", []string{"a"}, nil, []string{"a"}},
+		{"printf x > a; git add a; echo \"$(git commit -m a)\"", []string{"a"}, nil, []string{"a"}},
 		{"false && printf x > a; git commit -m human", nil, nil, nil},
 		{"true || printf x > a; git commit -m human", nil, nil, nil},
 		{"test -f gate && printf x > a; git commit -m human", nil, nil, nil},
@@ -172,6 +178,37 @@ func TestShellWritePlanControlFlow(t *testing.T) {
 				if !slices.Equal(check.got, want) {
 					t.Errorf("%s: got %v, want %v", check.name, check.got, want)
 				}
+			}
+		})
+	}
+}
+
+func TestShellDirectoryPredictionsFollowControlFlow(t *testing.T) {
+	t.Parallel()
+	cwd := t.TempDir()
+	if err := os.Mkdir(filepath.Join(cwd, "src"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cwd, "src/f"), []byte("file\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		command string
+		want    []string
+	}{
+		{"false && mkdir out; git mv src out && git commit -m move", []string{"src/f", "out/f"}},
+		{"mkdir out && git mv src out && git commit -m move", []string{"src/f", "out/src/f"}},
+		{"test -f gate && mkdir out; git mv src out && git commit -m move", nil},
+		{"if test -f gate; then mkdir out; fi; git mv src out && git commit -m move", nil},
+	} {
+		t.Run(tc.command, func(t *testing.T) {
+			_, _, before, _, _ := shellWritePlan(tc.command, cwd)
+			var want []string
+			for _, path := range tc.want {
+				want = append(want, filepath.Join(cwd, path))
+			}
+			if !slices.Equal(before, want) {
+				t.Fatalf("prediction: got %v, want %v", before, want)
 			}
 		})
 	}

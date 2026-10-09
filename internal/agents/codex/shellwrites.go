@@ -38,6 +38,10 @@ func shellWritePlan(command, cwd string) (paths []string, commits []int, before,
 	var sources []*syntax.Stmt
 	var stmt *syntax.Stmt
 	boundaries := map[*syntax.Stmt]bool{}
+	successful := map[*syntax.Stmt]bool{}
+	directoryStates := shellDirectoryStates(file)
+	created := map[*syntax.Stmt]map[string]bool{}
+	possibleMade := map[string]bool{}
 	resolve := func(w word) (string, bool) {
 		if !w.literal || w.text == "" || (dir == "" && !filepath.IsAbs(w.text)) {
 			return "", false
@@ -48,12 +52,11 @@ func shellWritePlan(command, cwd string) (paths []string, commits []int, before,
 		}
 		return p, true
 	}
-	// made holds the directories a mkdir earlier in the command creates: read before the
-	// command runs, they do not exist yet.
+	// made holds only directories whose mkdir must have succeeded before this statement.
 	made := map[string]bool{}
 	add := func(w word) {
 		p, ok := resolve(w)
-		if !ok || made[p] {
+		if !ok || made[p] || possibleMade[p] {
 			return // a directory the command makes: mv's and cp's file lands under it
 		}
 		if info, err := os.Stat(p); err == nil && !info.Mode().IsRegular() {
@@ -70,6 +73,7 @@ func shellWritePlan(command, cwd string) (paths []string, commits []int, before,
 		node syntax.Node
 		dir  string
 		stmt *syntax.Stmt
+		made map[string]bool
 	}
 	var stack []scope
 	syntax.Walk(file, func(n syntax.Node) bool {
@@ -77,6 +81,7 @@ func shellWritePlan(command, cwd string) (paths []string, commits []int, before,
 			top := stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
 			stmt = top.stmt
+			made = top.made
 			switch t := top.node.(type) {
 			case *syntax.Subshell, *syntax.CmdSubst, *syntax.ProcSubst:
 				dir = top.dir // a cd inside ends with it
@@ -92,17 +97,25 @@ func shellWritePlan(command, cwd string) (paths []string, commits []int, before,
 			return true
 		}
 		parentStmt := stmt
+		parentMade := made
 		switch n := n.(type) {
 		case *syntax.FuncDecl:
 			return false // defining a function runs nothing
 		case *syntax.Stmt:
 			stmt = n
+			made = map[string]bool{}
+			for previous := range directoryStates[n].all {
+				for path := range created[previous] {
+					made[path] = true
+				}
+			}
 			// apply_patch takes its patch as an argument or a heredoc; it makes any directory.
 			for _, patch := range patches(n) {
 				for _, p := range applyPatchPaths(patch) {
 					if p, ok := resolve(word{p, true}); ok {
 						out = append(out, p)
 						sources = append(sources, stmt)
+						successful[stmt] = true
 					}
 				}
 			}
@@ -122,20 +135,25 @@ func shellWritePlan(command, cwd string) (paths []string, commits []int, before,
 					dir = "" // somewhere the shell decides; relative targets after it are unknown
 				}
 			}
-			if len(words) > 0 && filepath.Base(words[0].text) == "mkdir" {
+			if len(words) > 0 && filepath.Base(words[0].text) == "mkdir" && directoryStates[stmt].live {
+				dirs := map[string]bool{}
 				args := make([]string, len(words))
 				for i, w := range words {
 					args[i] = w.text
 				}
 				for _, i := range operands(args, "-m", "--mode") {
 					if p, ok := resolve(words[i]); ok {
-						made[p] = true
+						dirs[p] = true
 						if slices.Contains(args, "-p") || slices.Contains(args, "--parents") {
 							for parent := filepath.Dir(p); parent != filepath.Dir(parent); parent = filepath.Dir(parent) {
-								made[parent] = true
+								dirs[parent] = true
 							}
 						}
 					}
+				}
+				created[stmt] = dirs
+				for path := range dirs {
+					possibleMade[path] = true
 				}
 			}
 			writeWords, shellDir := words, dir
@@ -149,15 +167,20 @@ func shellWritePlan(command, cwd string) (paths []string, commits []int, before,
 			var moved []string
 			var handled bool
 			if gitMove {
-				moved, handled = directoryMovePaths(writeWords, dir, made)
+				moved, handled = directoryMovePaths(writeWords, dir, made, possibleMade)
 			}
 			if handled {
 				out = append(out, moved...)
 				for range moved {
 					sources = append(sources, stmt)
 				}
+				successful[stmt] = len(moved) > 0
 			} else {
-				for _, w := range writtenOperands(writeWords) {
+				operands := writtenOperands(writeWords)
+				if len(operands) > 0 {
+					successful[stmt] = true
+				}
+				for _, w := range operands {
 					add(w)
 				}
 			}
@@ -167,10 +190,10 @@ func shellWritePlan(command, cwd string) (paths []string, commits []int, before,
 				boundaries[stmt] = true
 			}
 		}
-		stack = append(stack, scope{n, dir, parentStmt})
+		stack = append(stack, scope{n, dir, parentStmt, parentMade})
 		return true
 	})
-	pre, post, report := guaranteedShellWrites(file, sources, boundaries)
+	pre, post, report := guaranteedShellWrites(file, sources, boundaries, successful)
 	for i, source := range sources {
 		if pre[source] {
 			before = append(before, out[i])
@@ -214,53 +237,6 @@ func patches(st *syntax.Stmt) []string {
 		out = append(out, b.String())
 	}
 	return out
-}
-
-// wordsOf is a command's words, from the command it runs: past the wrappers that run the
-// next word as a command (command, env and exec, with their options and env's assignments).
-func wordsOf(call *syntax.CallExpr) []word {
-	words := make([]word, len(call.Args))
-	for i, a := range call.Args {
-		words[i] = literal(a)
-	}
-	for len(words) > 0 {
-		switch filepath.Base(words[0].text) {
-		case "command", "exec":
-			wrapper := filepath.Base(words[0].text)
-			words = words[1:]
-			for len(words) > 0 && strings.HasPrefix(words[0].text, "-") {
-				option := words[0].text
-				if option == "--" {
-					words = words[1:]
-					break
-				}
-				if wrapper == "command" && strings.ContainsAny(option, "vV") {
-					return nil // command -v and -V look a command up; nothing runs
-				}
-				words = words[1:]
-				if _, name, hasName := strings.Cut(strings.TrimPrefix(option, "-"), "a"); wrapper == "exec" && hasName {
-					if name == "" && len(words) > 0 {
-						words = words[1:] // exec -a NAME, including clustered -cla NAME
-					}
-					// Any attached suffix is the name; remaining words can still be options.
-				}
-			}
-		case "env":
-			words = words[1:]
-			for len(words) > 0 && (strings.HasPrefix(words[0].text, "-") || strings.Contains(words[0].text, "=")) {
-				switch a := words[0].text; {
-				case a == "-C" || a == "--chdir" || strings.HasPrefix(a, "--chdir="):
-					return nil // run somewhere else, so its relative paths are unknown
-				case a == "-u":
-					words = words[1:] // the name to unset
-				}
-				words = words[1:]
-			}
-		default:
-			return words
-		}
-	}
-	return words
 }
 
 // written reports whether a redirect sends the command's output to its word: not stderr
