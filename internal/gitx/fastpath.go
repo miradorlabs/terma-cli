@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -251,9 +252,6 @@ type Commit struct {
 	AuthorEmail string
 	Message     string
 	Files       []FileStat
-	// RenameSources are the old paths of detected renames, for manifest retirement.
-	// Copies do not retire their source.
-	RenameSources []string
 	// Branch is the local branch HEAD is on, or "" when detached.
 	Branch string
 	// Parents are the parent shas in git's order.
@@ -286,15 +284,10 @@ func (c Commit) Paths() []string {
 	return paths
 }
 
-// RetiredPaths includes rename sources as well as the commit's reported file paths.
-func (c Commit) RetiredPaths() []string {
-	return append(c.Paths(), c.RenameSources...)
-}
-
 // LastCommit reads HEAD's sha, author, refs, parents, message and numstat in one git
 // call (~13.5 ms, nearly all process start).
 func LastCommit(ctx context.Context, dir string) (Commit, error) {
-	out, err := run(ctx, dir, "log", "-1", "-z", "--format=%H%x1f%ae%x1f%D%x1f%P%x1f%B%x1e", "--raw", "--numstat", "--diff-merges=first-parent", "HEAD")
+	out, err := run(ctx, dir, "log", "-1", "-z", "--format=%H%x1f%ae%x1f%D%x1f%P%x1f%B%x1e", "--numstat", "HEAD")
 	if err != nil {
 		return Commit{}, err
 	}
@@ -303,16 +296,68 @@ func LastCommit(ctx context.Context, dir string) (Commit, error) {
 	if len(parts) < 5 {
 		return Commit{}, errNoCommit
 	}
-	files, sources := parseCommitDiff(tail)
 	return Commit{
-		SHA:           parts[0],
-		AuthorEmail:   parts[1],
-		Branch:        branchFromRefs(parts[2]),
-		Parents:       strings.Fields(parts[3]),
-		Message:       strings.TrimRight(parts[4], "\n"),
-		Files:         files,
-		RenameSources: sources,
+		SHA:         parts[0],
+		AuthorEmail: parts[1],
+		Branch:      branchFromRefs(parts[2]),
+		Parents:     strings.Fields(parts[3]),
+		Message:     strings.TrimRight(parts[4], "\n"),
+		Files:       parseNumstat(tail),
 	}, nil
+}
+
+// parseNumstat reads the `--numstat -z` block. A rename spans three records (counts
+// with an empty path, old path, new path) and is recorded under the new path; paths
+// are raw, so nothing trims them.
+func parseNumstat(block string) []FileStat {
+	// The NUL and newline after the --format record are framing, not the first path.
+	block = strings.TrimPrefix(block, "\x00")
+	block = strings.TrimPrefix(block, "\n")
+	records := strings.Split(block, "\x00")
+	var out []FileStat
+	for i := 0; i < len(records); i++ {
+		rec := records[i]
+		if rec == "" {
+			continue
+		}
+		addedField, rest, ok := strings.Cut(rec, "\t")
+		if !ok {
+			continue
+		}
+		deletedField, path, ok := strings.Cut(rest, "\t")
+		if !ok {
+			continue
+		}
+		if path == "" {
+			// Rename or copy: the next two records are the old and the new path.
+			if i+2 >= len(records) {
+				break
+			}
+			path = records[i+2]
+			i += 2
+		}
+		if path == "" {
+			continue
+		}
+		added, addedOK := parseCount(addedField)
+		deleted, deletedOK := parseCount(deletedField)
+		out = append(out, FileStat{
+			Path:    path,
+			Added:   added,
+			Deleted: deleted,
+			Binary:  !addedOK || !deletedOK,
+		})
+	}
+	return out
+}
+
+// parseCount reads one numstat count; ok is false for git's "-" or anything not a number.
+func parseCount(field string) (int, bool) {
+	n, err := strconv.Atoi(field)
+	if err != nil || n < 0 {
+		return 0, false
+	}
+	return n, true
 }
 
 // branchFromRefs pulls the local branch out of git's %D list ("HEAD -> main, origin/main").

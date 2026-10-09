@@ -53,14 +53,6 @@ func TestShellWrites(t *testing.T) {
 		{"cp into a directory", "cp a.go b.go src/", in("src/a.go", "src/b.go")},
 		{"mv into a directory", "mv a.go src", in("a.go", "src/a.go")},
 		{"git mv both ends", "git mv -f old.go new.go", in("old.go", "new.go")},
-		{"git mv dry run", "git mv -n old.go new.go; git mv --dry-run old.go new.go", nil},
-		{"git mv clustered dry run", "git mv -fn old.go new.go", nil},
-		{"git mv dry-run disabled", "git mv --dry-run --no-dry-run old.go new.go", in("old.go", "new.go")},
-		{"git mv after global options", "git -C src -c core.quotePath=false mv old.go new.go; printf x > root.go", in("src/old.go", "src/new.go", "root.go")},
-		{"git mv repeated -C", "git -C src -C .. mv old.go new.go", in("old.go", "new.go")},
-		{"git mv attached -C", "git -Csrc mv old.go new.go", in("src/old.go", "src/new.go")},
-		{"git mv expanded -C", "git -C \"$DIR\" mv old.go new.go", nil},
-		{"git mv overridden work tree", "git --work-tree=elsewhere mv old.go new.go", nil},
 		{"git mv into a directory made first", "mkdir -p docs/notes && git mv src/p4.txt docs/notes/p4.txt && git commit -m move", in("src/p4.txt", "docs/notes/p4.txt")},
 		{"into a directory made first", "mkdir -p pairs && printf 'seven\\n' > pairs/o7.txt && git add -- pairs/o7.txt", in("pairs/o7.txt")},
 		{"git reads", "git add a.go && git commit -m mv", nil},
@@ -91,7 +83,6 @@ func TestShellWrites(t *testing.T) {
 		{"command lookup runs nothing", "command -v cp ./agent.txt ./f.txt; command -pV sed -i s/a/b/ a.go", nil},
 		{"env -C moves the writer", "env -C sub sed -i s/x/y/ f.txt; env --chdir=sub gofmt -w g.go", nil},
 		{"wrapped writer", "env LC_ALL=C sed -i 's/a/b/' a.go; command -p gofmt -w b.go", in("a.go", "b.go")},
-		{"exec with a name", "exec -a alias gofmt -w a.go", in("a.go")},
 		{"patch argument", "apply_patch '*** Begin Patch\n*** Add File: new/y.sh\n+y\n*** End Patch'", in("new/y.sh")},
 		{"patch after a cd", "cd src && apply_patch <<'PATCH'\n*** Begin Patch\n*** Update File: a.go\n@@\n-a\n+b\n*** End Patch\nPATCH", in("src/a.go")},
 	} {
@@ -112,10 +103,6 @@ func TestShellWritesBeforeEachCommit(t *testing.T) {
 		want          []int
 	}{
 		{"no commit", "printf x > a.txt", nil},
-		{"noncommitting modes", "git rebase --abort; git am --quit; git cherry-pick --no-commit abc; git revert -n abc; git commit --dry-run; printf x > a.txt; git commit -m a", []int{1}},
-		{"option name in commit message", "printf x > a.txt; git commit -m --abort", []int{1}},
-		{"commit no-verify still commits", "printf x > a.txt; git commit -n -m a", []int{1}},
-		{"merge no-commit disabled", "printf x > a.txt; git merge --no-commit --commit topic", []int{1}},
 		{"write then commit", "printf x > a.txt && git add a.txt && git commit -m a", []int{1}},
 		{"commit then write", "git commit -m human && printf agent > f.txt", []int{0}},
 		{"two commits", "git commit -m human && printf agent > h && git add h && git commit -m agent", []int{0, 1}},
@@ -123,13 +110,6 @@ func TestShellWritesBeforeEachCommit(t *testing.T) {
 		{"wrapped commit", "printf x > a.txt && git add a.txt && command git commit -m a", []int{1}},
 		{"commit under env -u", "printf x > a.txt && env -u GIT_DIR git commit -m a", []int{1}},
 		{"commit under env", "printf x > a.txt && env GIT_AUTHOR_NAME=x git commit -m a", []int{1}},
-		{"commit under env split string", "printf x > a.txt && env -S 'git commit -m a'", []int{1}},
-		{"commit under env attached split string", "printf x > a.txt && env -S'git commit -m a'", []int{1}},
-		{"commit under env long split string", "printf x > a.txt && env --split-string='git commit -m a'", []int{1}},
-		{"exec name before commit", "printf x > a.txt && exec -a alias git commit -m a", []int{1}},
-		{"exec name and option terminator", "printf x > a.txt && exec -a alias -- git commit -m a", []int{1}},
-		{"exec attached name", "printf x > a.txt && exec -agit-alias git commit -m a", []int{1}},
-		{"exec attached name ending in a", "printf x > a.txt && exec -aalpha git commit -m a", []int{1}},
 		{"a conflict resolved and the pick continued", "printf ok > f.txt && git add f.txt && GIT_EDITOR=true git cherry-pick --continue", []int{1}},
 		{"commit lookup is no commit", "printf x > a.txt && command -v git commit", nil},
 		{"commit message is not a subcommand", "git log --grep commit && printf x > a.txt", nil},
@@ -137,86 +117,6 @@ func TestShellWritesBeforeEachCommit(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if _, got := shellWrites(tc.command, cwd); !slices.Equal(got, tc.want) {
 				t.Fatalf("commits = %v, want %v", got, tc.want)
-			}
-		})
-	}
-}
-
-// Predictions must hold on every route reaching a commit; PostToolUse must not
-// resurrect consumed paths or report a writer that a successful call can skip.
-func TestShellWritePlanControlFlow(t *testing.T) {
-	t.Parallel()
-	cwd := t.TempDir()
-	for _, tc := range []struct {
-		command                 string
-		before, after, reported []string
-	}{
-		{"printf x > a; git commit -m a", []string{"a"}, nil, []string{"a"}},
-		{"cp source a; git commit -m human", nil, nil, nil},
-		{"cp source a && git commit -m a", []string{"a"}, nil, []string{"a"}},
-		{"false && cd nowhere; printf x > a && git commit -m a", []string{"a"}, nil, []string{"a"}},
-		{"printf x > a; git add a; echo \"$(git commit -m a)\"", []string{"a"}, nil, []string{"a"}},
-		{"false && printf x > a; git commit -m human", nil, nil, nil},
-		{"true || printf x > a; git commit -m human", nil, nil, nil},
-		{"test -f gate && printf x > a; git commit -m human", nil, nil, nil},
-		{"test -f gate && printf x > a && git commit -m a", []string{"a"}, nil, []string{"a"}},
-		{"false || printf x > a; git commit -m a", []string{"a"}, nil, []string{"a"}},
-		{"git commit -m human; false && printf x > a; true", nil, nil, nil},
-		{"git commit -m human; test -f gate && printf x > a; true", nil, nil, nil},
-		{"git commit -m human && printf x > a", nil, []string{"a"}, []string{"a"}},
-		{"git commit -m human; printf x > a; git commit -m a", nil, nil, []string{"a"}},
-		{"if test -f gate; then printf x > a; fi; git commit -m human", nil, nil, nil},
-		{"for item in $ITEMS; do printf x > a; done; git commit -m human", nil, nil, nil},
-		{"(printf x > a && git commit -m a)", []string{"a"}, nil, []string{"a"}},
-		{"{ printf x > a; }; git commit -m a", []string{"a"}, nil, []string{"a"}},
-		{"printf x | tee a && git commit -m a", []string{"a"}, nil, []string{"a"}},
-		{"printf x > a && GIT_EDITOR=true git merge --continue", []string{"a"}, nil, []string{"a"}},
-		{"printf x > a && git merge --squash topic", []string{"a"}, []string{"a"}, []string{"a"}},
-	} {
-		t.Run(tc.command, func(t *testing.T) {
-			_, _, before, after, reported := shellWritePlan(tc.command, cwd)
-			for _, check := range []struct {
-				name      string
-				got, want []string
-			}{{"before", before, tc.before}, {"after", after, tc.after}, {"reported", reported, tc.reported}} {
-				var want []string
-				for _, path := range check.want {
-					want = append(want, filepath.Join(cwd, path))
-				}
-				if !slices.Equal(check.got, want) {
-					t.Errorf("%s: got %v, want %v", check.name, check.got, want)
-				}
-			}
-		})
-	}
-}
-
-func TestShellDirectoryPredictionsFollowControlFlow(t *testing.T) {
-	t.Parallel()
-	cwd := t.TempDir()
-	if err := os.Mkdir(filepath.Join(cwd, "src"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(cwd, "src/f"), []byte("file\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	for _, tc := range []struct {
-		command string
-		want    []string
-	}{
-		{"false && mkdir out; git mv src out && git commit -m move", []string{"src/f", "out/f"}},
-		{"mkdir out && git mv src out && git commit -m move", []string{"src/f", "out/src/f"}},
-		{"test -f gate && mkdir out; git mv src out && git commit -m move", nil},
-		{"if test -f gate; then mkdir out; fi; git mv src out && git commit -m move", nil},
-	} {
-		t.Run(tc.command, func(t *testing.T) {
-			_, _, before, _, _ := shellWritePlan(tc.command, cwd)
-			var want []string
-			for _, path := range tc.want {
-				want = append(want, filepath.Join(cwd, path))
-			}
-			if !slices.Equal(before, want) {
-				t.Fatalf("prediction: got %v, want %v", before, want)
 			}
 		})
 	}

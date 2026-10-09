@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 )
@@ -221,10 +220,9 @@ func TestLastCommitFileStats(t *testing.T) {
 		}
 	}
 	for _, tc := range []struct {
-		name        string
-		setup       func(t *testing.T, root string)
-		want        []FileStat
-		wantSources []string
+		name  string
+		setup func(t *testing.T, root string)
+		want  []FileStat
 	}{
 		{
 			name: "text files",
@@ -264,7 +262,6 @@ func TestLastCommitFileStats(t *testing.T) {
 				{Path: "new.txt", Added: 1},
 				{Path: "zz.txt", Added: 1},
 			},
-			wantSources: []string{"old.txt"},
 		},
 		{
 			name: "empty commit",
@@ -285,9 +282,6 @@ func TestLastCommitFileStats(t *testing.T) {
 			}
 			if len(c.Files) != len(tc.want) {
 				t.Fatalf("files = %+v, want %+v", c.Files, tc.want)
-			}
-			if !slices.Equal(c.RenameSources, tc.wantSources) {
-				t.Fatalf("rename sources = %v, want %v", c.RenameSources, tc.wantSources)
 			}
 			for i := range c.Files {
 				if c.Files[i] != tc.want[i] {
@@ -351,9 +345,6 @@ func TestLastCommitTellsMergesAndSquashes(t *testing.T) {
 	mustGit(t, root, "merge", "-q", "--no-ff", "--no-edit", "feature")
 	if c := head(); len(c.Parents) != 2 || !c.IsMerge() || c.IsSquash() {
 		t.Fatalf("merge commit: parents=%v merge=%v squash=%v", c.Parents, c.IsMerge(), c.IsSquash())
-	}
-	if c := head(); !slices.Equal(c.Paths(), []string{"feature"}) {
-		t.Fatalf("merge paths must name changes from the first parent: %v", c.Paths())
 	}
 
 	// A squash is a single-parent commit; only git's default subject gives it away.

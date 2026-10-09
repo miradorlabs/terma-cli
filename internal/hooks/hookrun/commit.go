@@ -84,8 +84,7 @@ func PrepareCommitMsg(ctx context.Context, env Env) error {
 const MaxCommitFileStats = 50
 
 // PostCommit records the commit against its stamped sessions and retires its files from
-// their manifests. Unstamped merges and squashes also retire their incorporated files;
-// an ordinary unstamped commit gets a count-only event.
+// their manifests; an unstamped commit gets a count-only event.
 func PostCommit(ctx context.Context, env Env) error {
 	r, err := env.Repo(ctx)
 	if err != nil || r.GitDir == "" {
@@ -98,23 +97,10 @@ func PostCommit(ctx context.Context, env Env) error {
 	}
 	stamped := uniqueSessions(trailer.Parse(head.Message, gitx.CommentCharFS(r.GitDir)))
 	if len(stamped) == 0 {
-		if head.IsMerge() || head.IsSquash() {
-			// These commits are intentionally unstamped, but they incorporate edits
-			// recorded before conflict resolution or squash. They must retire them too.
-			manifests, err := r.Store.Manifests()
-			if err != nil {
-				env.Logf("merge manifests: %v", err)
-			}
-			for _, m := range manifests {
-				if err := r.Store.Consume(m.Key(), head.RetiredPaths()); err != nil {
-					env.Logf("consume merge manifest: %v", err)
-				}
-			}
-		}
-		emitUnattributedCommit(env, r, head)
+		emitUnattributedCommit(env, r, head) // human-only commit: no manifest to retire
 		return nil
 	}
-	files := head.RetiredPaths()
+	files := head.Paths()
 	keys := make([]session.Key, 0, len(stamped))
 	for _, t := range stamped {
 		agent, _ := t.Agent()
