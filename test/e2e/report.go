@@ -77,7 +77,7 @@ func WriteReport(dir string) error {
 		fmt.Fprintf(&b, "| %s | %s |\n", bin, Version(path))
 	}
 	fmt.Fprintf(&b, "\n| credential | present |\n|---|---|\n")
-	for _, k := range []string{"CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_API_KEY", "ANTHROPIC_FEDERATION_RULE_ID", "OPENAI_API_KEY", "TERMA_E2E_REAL_LOGIN", "TERMA_E2E_CODEX_AUTH"} {
+	for _, k := range []string{"CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "TERMA_E2E_REAL_LOGIN", "TERMA_E2E_CODEX_AUTH"} {
 		present := "no"
 		if os.Getenv(k) != "" {
 			present = "yes"

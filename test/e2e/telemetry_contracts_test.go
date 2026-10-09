@@ -515,9 +515,9 @@ func checkCodexHistogram(t contractReporter, e telemetryEvidence, name string, f
 const upstreamCodexSessionEnd = "codex-session-end"
 
 // knownUpstream reports whether this run tolerates a documented upstream failure,
-// named in TERMA_E2E_KNOWN_UPSTREAM (comma-separated). Only pull-request CI sets it,
-// so an upstream race does not turn unrelated pull requests red at random; local runs
-// and the nightly live workflow leave it unset and stay strict.
+// named in TERMA_E2E_KNOWN_UPSTREAM (comma-separated). Pull-request CI sets it, so an
+// upstream race does not turn unrelated pull requests red at random; `make run` leaves
+// it unset and stays strict.
 func knownUpstream(name string) bool {
 	return slices.Contains(strings.Split(os.Getenv("TERMA_E2E_KNOWN_UPSTREAM"), ","), name)
 }
