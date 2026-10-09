@@ -47,6 +47,8 @@ type Profile struct {
 	Harnesses []string `json:"harnesses,omitempty"`
 	// Team is the team `terma setup` selected, whose policy (PoliciesDir) the hooks apply.
 	Team string `json:"team,omitempty"`
+	// TeamName is Team's name as setup last saw it, for doctor to name; cleared with Team.
+	TeamName string `json:"team_name,omitempty"`
 	// ServerKeySignIn records that setup signed the profile in with Team's server key
 	// (TERMA_API_KEY), which the keystore keeps as the team's key, rather than with a
 	// developer's login; a browser sign-in clears it.
@@ -60,7 +62,7 @@ type Profile struct {
 func (p *Profile) SelectOrganization(id, name string) {
 	if p.OrganizationID != id {
 		p.OrganizationName = ""
-		p.Team = ""
+		p.Team, p.TeamName = "", ""
 	}
 	p.OrganizationID = id
 	if name != "" {
@@ -117,6 +119,8 @@ type Config struct {
 	Harnesses []string
 	// Team is the team the profile selected, kept even while its policy is not stored.
 	Team string
+	// TeamName is Team's name as setup last saw it; empty when it never saw one.
+	TeamName string
 	// ServerKeySignIn is the profile's: Team's key in the keystore, not a login, is its
 	// credential.
 	ServerKeySignIn bool
@@ -181,6 +185,7 @@ func Load(dir, stateDir string, o Overrides) (*Config, error) {
 		ProjectID:          firstNonEmpty(o.ProjectID, os.Getenv("TERMA_TEAM_ID")),
 		Harnesses:          profile.Harnesses,
 		Team:               profile.Team,
+		TeamName:           profile.TeamName,
 		ServerKeySignIn:    profile.ServerKeySignIn,
 		ServerKeyAuthURL:   profile.ServerKeyAuthURL,
 		Policy:             DefaultPolicy(),

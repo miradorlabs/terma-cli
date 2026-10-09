@@ -74,7 +74,7 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 	} else {
 		admission.Detail = "every session, in global mode: " + GlobalDestination(cfg)
 		if !pol.Global() {
-			admission = RepositoryCheck(pol, gitDir, nil)
+			admission = RepositoryCheck(pol, TeamLabel(cfg), gitDir, nil)
 		}
 		add("Repository", "%s", admission.Detail)
 		if gitDir == "" {

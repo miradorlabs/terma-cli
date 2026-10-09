@@ -37,8 +37,70 @@ func TestSetupAfterTeardownReusesTheSelectedTeam(t *testing.T) {
 	cmd := &cobra.Command{}
 	cmd.SetIn(strings.NewReader(""))
 	cmd.SetContext(t.Context())
-	if name, err := testApp.selectPolicyTeam(cmd, cfg); err != nil || name != selected.Name || cfg.ProjectID != selected.ID {
+	if name, err := testApp.selectPolicyTeam(cmd, cfg, false); err != nil || name != selected.Name || cfg.ProjectID != selected.ID {
 		t.Fatalf("selectPolicyTeam = %q, %v; project %q, want %s", name, err, cfg.ProjectID, selected.ID)
+	}
+}
+
+// On a terminal, the team an earlier setup saved is only the picker's default in an
+// organization with several, where a team created since is easily the one meant; --team
+// and an organization with one team are taken without asking, and a saved team since
+// deleted gives way to the only one, or, when setup cannot ask, is refused by name.
+func TestSetupOffersTheSavedTeamAsTheDefault(t *testing.T) {
+	gateway := newFakeAuth(t)
+	authSandbox(t, gateway)
+	t.Setenv("TERMA_POLICY_STUB", "")
+	for _, c := range []struct {
+		name     string
+		org      organization
+		explicit bool
+		gone     bool
+		ask      bool
+		asks     bool
+	}{
+		{"several teams, saved", orgA(), false, false, true, true},
+		{"several teams, --team", orgA(), true, false, true, false},
+		{"one team, saved", orgB(), false, false, true, false},
+		{"one team, saved team deleted", orgB(), false, true, false, false},
+		{"several teams, saved team deleted, cannot ask", orgA(), false, true, false, false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway, c.org)); err != nil {
+				t.Fatal(err)
+			}
+			saved := projectsIn(c.org.ID)[len(projectsIn(c.org.ID))-1]
+			savedID := saved.ID
+			if c.gone {
+				savedID = "dddddddd-0000-4000-8000-000000000009"
+			}
+			if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.OrganizationID, p.Team = c.org.ID, savedID }); err != nil {
+				t.Fatal(err)
+			}
+			cfg, err := testApp.loadConfig()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if c.explicit {
+				cfg.ProjectID = saved.ID
+			}
+			cmd := &cobra.Command{}
+			cmd.SetIn(strings.NewReader(""))
+			cmd.SetContext(t.Context())
+			// No terminal here, so a picker fails: what matters is whether setup asked.
+			name, err := testApp.selectPolicyTeam(cmd, cfg, c.ask)
+			if asked := err != nil && strings.Contains(err.Error(), "no terminal to prompt on"); asked != c.asks {
+				t.Fatalf("selectPolicyTeam = %q, %v; asked %v, want %v", name, err, asked, c.asks)
+			}
+			if c.gone && len(projectsIn(c.org.ID)) > 1 {
+				if err == nil || !strings.Contains(err.Error(), "no longer in this organization") {
+					t.Fatalf("selectPolicyTeam = %q, %v; want the deleted team refused by name", name, err)
+				}
+				return
+			}
+			if !c.asks && (err != nil || name != saved.Name || cfg.ProjectID != saved.ID) {
+				t.Fatalf("selectPolicyTeam = %q, %v; project %q, want %s", name, err, cfg.ProjectID, saved.ID)
+			}
+		})
 	}
 }
 
@@ -136,9 +198,10 @@ func TestSetupAndDoctorSayWhenTheTeamHasNoPolicy(t *testing.T) {
 	if err != nil || !loaded.Policy.Unset || !loaded.Policy.AdmitsNone() {
 		t.Fatalf("stored policy = %+v, %v; want unset and admitting nothing", loaded.Policy, err)
 	}
+	// Doctor names the team and organization it asked, to hold against the web app's.
 	out, _ = runTerma(t, "doctor")
-	if !regexp.MustCompile(`repository collected +your team has no collection policy\n`).MatchString(out) || !strings.Contains(out, doctor.NoPolicyStep) {
-		t.Errorf("doctor did not say the team has no policy:\n%s", out)
+	if !regexp.MustCompile(`repository collected +team "Beta Core" \(bbbbbbbb\) in Beta Labs has no collection policy\n`).MatchString(out) || !strings.Contains(out, doctor.NoPolicyStep) {
+		t.Errorf("doctor did not say which team has no policy:\n%s", out)
 	}
 }
 

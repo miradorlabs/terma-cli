@@ -80,7 +80,8 @@ func (app *App) newSetupCommand() *cobra.Command {
      .git/hooks, chaining to any hook already there. Nothing is written into a
      repository's working tree or committed files.
 
-Run it again any time: it reuses a working sign-in, --team switches team, --org
+Run it again any time: it reuses a working sign-in, offers the team chosen before
+as the default when the organization has several, --team switches team, --org
 switches organization, and --relay-addr moves the relay off a port another program
 holds.
 
@@ -182,7 +183,7 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 			}
 		},
 		SelectTeam: func(_ context.Context, cfg *config.Config) error {
-			name, err := app.selectPolicyTeam(cmd, cfg)
+			name, err := app.selectPolicyTeam(cmd, cfg, !f.assumeYes && canPrompt())
 			team = name
 			return err
 		},
@@ -192,7 +193,10 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 				daemon.Stop(dir)
 			}
 		},
-		Fetched: func(pol config.Policy) { ui.policyFetched(team, pol) },
+		Fetched: func(pol config.Policy) {
+			ui.policyFetched(team, pol)
+			app.recordTeamName(cfg.ProfileName, pol.TeamID, team)
+		},
 		ConnectRelay: func(ctx context.Context, names []string) error {
 			if f.relayAddr != "" {
 				if err := app.moveRelay(f.relayAddr); err != nil {
@@ -278,36 +282,6 @@ func (app *App) reportUpdates(ui *setupUI) {
 		return
 	}
 	ui.Summary("Updates", updatesSummary(exe, app.version, runtime.GOOS, p.Auto))
-}
-
-// selectPolicyTeam picks the team whose policy is set up, and returns its name; it never
-// creates a telemetry key.
-func (app *App) selectPolicyTeam(cmd *cobra.Command, cfg *config.Config) (string, error) {
-	if config.PolicyStub() != "" {
-		return "", nil
-	}
-	if cfg.ProjectID == "" {
-		cfg.ProjectID = cfg.Team
-	}
-	client, err := app.newClient(cfg)
-	if err != nil {
-		return "", err
-	}
-	projects, err := availableProjects(cmd.Context(), client)
-	if err != nil {
-		return "", err
-	}
-	var team *project
-	if cfg.ProjectID != "" {
-		team, err = matchProject(projects, cfg.ProjectID)
-	} else {
-		team, err = soleOrPick(cmd, projects, "")
-	}
-	if err != nil {
-		return "", err
-	}
-	cfg.ProjectID = team.ID
-	return cmp.Or(team.Name, team.ID), nil
 }
 
 // chooseHarnesses resolves the machine-level agent list: --harness, else a picker,

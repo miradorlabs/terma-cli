@@ -3,6 +3,7 @@ package doctor
 import (
 	"cmp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
@@ -254,7 +255,29 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 const NoRepositoriesStep = "Ask a team admin to list repositories, or to collect every session, in the Terma web app; until then, nothing is collected."
 
 // NoPolicyStep is what a developer whose team has no collection policy yet is told.
-const NoPolicyStep = "Ask a team admin to set up your team's collection policy in the Terma web app; until then, nothing is collected."
+const NoPolicyStep = "Ask a team admin to set up your team's collection policy in the Terma web app, or, if it was set up on another team, run `terma setup` for that team; until then, nothing is collected."
+
+// TeamLabel names the team whose policy cfg holds, with its organization and, off
+// production, its environment: what to hold against the team in the web app when the
+// two disagree.
+func TeamLabel(cfg *config.Config) string {
+	id := cfg.Policy.Team()
+	if id == "" {
+		return "your team"
+	}
+	// The ID stays beside the name, which may have changed in the web app since setup saw it.
+	label := "team " + id
+	if cfg.TeamName != "" && cfg.Team == id {
+		label = "team " + strconv.Quote(cfg.TeamName) + " (" + id[:min(len(id), 8)] + ")"
+	}
+	if org := cmp.Or(cfg.OrganizationName, cfg.OrganizationID); org != "" {
+		label += " in " + org
+	}
+	if cfg.Environment != "" && cfg.Environment != config.EnvProd {
+		label += " (" + cfg.Environment + ")"
+	}
+	return label
+}
 
 // NothingCollectedStep is what to do about a validated policy that admits no repository.
 func NothingCollectedStep(p config.Policy) string {
@@ -265,15 +288,16 @@ func NothingCollectedStep(p config.Policy) string {
 }
 
 // RepositoryCheck says whether policy, the one hooks apply, collects the working copy whose
-// git directory is gitDir, naming the origin terma sees.
-func RepositoryCheck(policy config.Policy, gitDir string, repoErr error) Check {
+// git directory is gitDir, naming the origin terma sees, and team (TeamLabel) when it has
+// no policy.
+func RepositoryCheck(policy config.Policy, team, gitDir string, repoErr error) Check {
 	switch {
 	case repoErr != nil:
 		return Check{Status: Fail, Detail: repoErr.Error()}
 	case !policy.Validated():
 		return Check{Status: Warn, Detail: "no team collection policy on this machine, so nothing is collected", Fix: "terma setup"}
 	case policy.Unset:
-		return Check{Status: Warn, Detail: "your team has no collection policy", Fix: NoPolicyStep}
+		return Check{Status: Warn, Detail: cmp.Or(team, "your team") + " has no collection policy", Fix: NoPolicyStep}
 	case policy.AdmitsNone():
 		return Check{Status: Warn, Detail: "your team lists no repositories", Fix: NoRepositoriesStep}
 	case gitDir == "":

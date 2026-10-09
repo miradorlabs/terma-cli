@@ -257,11 +257,35 @@ func TestDoctorChecksTheRepositoryList(t *testing.T) {
 	}
 }
 
+// TeamLabel names the policy's team by the name setup saw for it, else by its ID, with
+// the organization and any environment but production.
+func TestTeamLabel(t *testing.T) {
+	t.Parallel()
+	const id, other = "aaaaaaaa-0000-4000-8000-000000000001", "aaaaaaaa-0000-4000-8000-000000000002"
+	for _, c := range []struct {
+		name string
+		cfg  config.Config
+		want string
+	}{
+		{"named", config.Config{Team: id, TeamName: "Acme Web", OrganizationName: "Acme", Environment: config.EnvProd}, `team "Acme Web" (aaaaaaaa) in Acme`},
+		{"off production", config.Config{Team: id, TeamName: "Acme Web", OrganizationID: "org-1", Environment: "dev"}, `team "Acme Web" (aaaaaaaa) in org-1 (dev)`},
+		{"the name is another team's", config.Config{Team: other, TeamName: "Acme API", OrganizationName: "Acme"}, "team " + id + " in Acme"},
+		{"no team", config.Config{}, "your team"},
+	} {
+		if c.name != "no team" {
+			c.cfg.Policy = config.Policy{TeamID: id}
+		}
+		if got := TeamLabel(&c.cfg); got != c.want {
+			t.Errorf("%s: TeamLabel = %q, want %q", c.name, got, c.want)
+		}
+	}
+}
+
 // A folder outside git, or a repository with no hosted origin, warns and says which.
 func TestRepositoryCheckSaysWhyNothingIsListed(t *testing.T) {
 	t.Parallel()
 	pol := fetched(config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/acme/one"}})
-	if c := RepositoryCheck(pol, "", nil); c.Status != Warn || !strings.Contains(c.Detail, "not a git repository") {
+	if c := RepositoryCheck(pol, "", "", nil); c.Status != Warn || !strings.Contains(c.Detail, "not a git repository") {
 		t.Fatalf("outside git = %+v", c)
 	}
 	_, gitDir := listed(t)
@@ -269,7 +293,7 @@ func TestRepositoryCheckSaysWhyNothingIsListed(t *testing.T) {
 		if out, err := exec.Command("git", append([]string{"-C", filepath.Dir(gitDir), "remote"}, args...)...).CombinedOutput(); err != nil {
 			t.Fatalf("git remote %v: %v\n%s", args, err, out)
 		}
-		if c := RepositoryCheck(pol, gitDir, nil); c.Status != Warn || !strings.Contains(c.Detail, "no origin") {
+		if c := RepositoryCheck(pol, "", gitDir, nil); c.Status != Warn || !strings.Contains(c.Detail, "no origin") {
 			t.Fatalf("after git remote %v: %+v", args, c)
 		}
 	}
@@ -290,7 +314,7 @@ func TestRepositoryCheckAdvisesOnAnSSHAlias(t *testing.T) {
 		if out, err := exec.Command("git", "-C", filepath.Dir(gitDir), "remote", "set-url", "origin", origin).CombinedOutput(); err != nil {
 			t.Fatalf("git remote set-url: %v\n%s", err, out)
 		}
-		c := RepositoryCheck(pol, gitDir, nil)
+		c := RepositoryCheck(pol, "", gitDir, nil)
 		advised := strings.Contains(c.Fix, "git remote set-url origin 'git@<real host>:acme/one.git'") && strings.Contains(c.Fix, "core.sshCommand")
 		if c.Status != Warn || advised != alias || alias && strings.Contains(c.Fix, "ask a team admin") {
 			t.Errorf("%s: %+v", origin, c)
