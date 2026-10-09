@@ -95,10 +95,7 @@ func shellWrites(command, cwd string) (paths []string, committed int) {
 				add(literal(n.Word))
 			}
 		case *syntax.CallExpr:
-			words := make([]word, len(n.Args))
-			for i, a := range n.Args {
-				words[i] = literal(a)
-			}
+			words := wordsOf(n)
 			if len(words) > 0 && words[0].text == "cd" {
 				switch {
 				case len(words) == 2 && words[1].literal && filepath.IsAbs(words[1].text):
@@ -109,7 +106,7 @@ func shellWrites(command, cwd string) (paths []string, committed int) {
 					dir = "" // somewhere the shell decides; relative targets after it are unknown
 				}
 			}
-			if len(words) > 0 && words[0].text == "mkdir" {
+			if len(words) > 0 && filepath.Base(words[0].text) == "mkdir" {
 				args := make([]string, len(words))
 				for i, w := range words {
 					args[i] = w.text
@@ -136,12 +133,16 @@ func shellWrites(command, cwd string) (paths []string, committed int) {
 // patches returns the patch text an apply_patch statement is given.
 func patches(st *syntax.Stmt) []string {
 	call, ok := st.Cmd.(*syntax.CallExpr)
-	if !ok || len(call.Args) == 0 || literal(call.Args[0]).text != "apply_patch" {
+	if !ok {
+		return nil
+	}
+	words := wordsOf(call)
+	if len(words) == 0 || filepath.Base(words[0].text) != "apply_patch" {
 		return nil
 	}
 	var out []string
-	for _, a := range call.Args[1:] {
-		if w := literal(a); w.literal {
+	for _, w := range words[1:] {
+		if w.literal {
 			out = append(out, w.text)
 		}
 	}
@@ -158,6 +159,35 @@ func patches(st *syntax.Stmt) []string {
 		out = append(out, b.String())
 	}
 	return out
+}
+
+// wordsOf is a command's words, from the command it runs: past the wrappers that run the
+// next word as a command (command, env and exec, with their options and env's assignments).
+func wordsOf(call *syntax.CallExpr) []word {
+	words := make([]word, len(call.Args))
+	for i, a := range call.Args {
+		words[i] = literal(a)
+	}
+	for len(words) > 0 {
+		switch filepath.Base(words[0].text) {
+		case "command", "exec":
+			words = words[1:]
+			for len(words) > 0 && strings.HasPrefix(words[0].text, "-") {
+				words = words[1:]
+			}
+		case "env":
+			words = words[1:]
+			for len(words) > 0 && (strings.HasPrefix(words[0].text, "-") || strings.Contains(words[0].text, "=")) {
+				if words[0].text == "-u" || words[0].text == "-C" {
+					words = words[1:] // the name to unset, or the directory
+				}
+				words = words[1:]
+			}
+		default:
+			return words
+		}
+	}
+	return words
 }
 
 // gitSubcommand is the subcommand of a git command line, after git's own options.

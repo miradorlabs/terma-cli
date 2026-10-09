@@ -393,6 +393,10 @@ func TestCodexSameCallCommitLeavesItsFilesRetired(t *testing.T) {
 		{"git mv", "git mv old.txt new.txt && git commit -m move", "new.txt", func(c *codexCall) {
 			c.git("mv", "old.txt", "new.txt")
 		}},
+		{"wrapped commit", "printf x > w.txt && git add w.txt && command git commit -m w", "w.txt", func(c *codexCall) {
+			hookruntest.WriteFile(c.t, c.root, "w.txt", "x")
+			c.git("add", "w.txt")
+		}},
 		{"write", "printf '%s\\n' 'Terma Sandbox Team' > CONTRIBUTORS\n git add -- CONTRIBUTORS\n git commit -m \"Add CONTRIBUTORS with Terma Sandbox Team\"", "CONTRIBUTORS", func(c *codexCall) {
 			hookruntest.WriteFile(c.t, c.root, "CONTRIBUTORS", "Terma Sandbox Team\n")
 			c.git("add", "--", "CONTRIBUTORS")

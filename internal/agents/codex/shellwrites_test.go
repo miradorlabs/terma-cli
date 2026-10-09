@@ -78,6 +78,9 @@ func TestShellWrites(t *testing.T) {
 		// A patch body is not shell: its redirect writes nothing.
 		{"patch heredoc", "apply_patch <<'PATCH'\n*** Begin Patch\n*** Add File: x.sh\n+echo a > out.txt\n*** End Patch\nPATCH", in("x.sh")},
 		{"patch in a command that does not parse", "apply_patch <<'PATCH'\n*** Begin Patch\n*** Add File: z.txt\n+z\n*** End Patch\nPATCH\nif then", in("z.txt")},
+		{"wrapped patch", "command apply_patch <<'PATCH'\n*** Begin Patch\n*** Add File: w.txt\n+w\n*** End Patch\nPATCH", in("w.txt")},
+		{"patch by path", "/usr/local/bin/apply_patch <<'PATCH'\n*** Begin Patch\n*** Add File: v.txt\n+v\n*** End Patch\nPATCH", in("v.txt")},
+		{"wrapped writer", "env LC_ALL=C sed -i 's/a/b/' a.go; command -p gofmt -w b.go", in("a.go", "b.go")},
 		{"patch argument", "apply_patch '*** Begin Patch\n*** Add File: new/y.sh\n+y\n*** End Patch'", in("new/y.sh")},
 		{"patch after a cd", "cd src && apply_patch <<'PATCH'\n*** Begin Patch\n*** Update File: a.go\n@@\n-a\n+b\n*** End Patch\nPATCH", in("src/a.go")},
 	} {
@@ -102,6 +105,9 @@ func TestShellWritesBeforeTheCommit(t *testing.T) {
 		{"commit then write", "git commit -m human && printf agent > f.txt", 0},
 		{"the last commit counts", "printf x > a.txt && git commit -am a && printf y > b.txt && git commit -am b && printf z > c.txt", 2},
 		{"git options before commit", "printf x > a.txt; git -C . -c user.name=x commit -m a", 1},
+		{"wrapped commit", "printf x > a.txt && git add a.txt && command git commit -m a", 1},
+		{"commit under env -u", "printf x > a.txt && env -u GIT_DIR git commit -m a", 1},
+		{"commit under env", "printf x > a.txt && env GIT_AUTHOR_NAME=x git commit -m a", 1},
 		{"commit message is not a subcommand", "git log --grep commit && printf x > a.txt", -1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
