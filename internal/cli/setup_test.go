@@ -45,7 +45,7 @@ func TestSetupAfterTeardownReusesTheSelectedTeam(t *testing.T) {
 // On a terminal, the team an earlier setup saved is only the picker's default in an
 // organization with several, where a team created since is easily the one meant; --team
 // and an organization with one team are taken without asking, and a saved team since
-// deleted gives way to the only one.
+// deleted gives way to the only one, or, when setup cannot ask, is refused by name.
 func TestSetupOffersTheSavedTeamAsTheDefault(t *testing.T) {
 	gateway := newFakeAuth(t)
 	authSandbox(t, gateway)
@@ -55,12 +55,14 @@ func TestSetupOffersTheSavedTeamAsTheDefault(t *testing.T) {
 		org      organization
 		explicit bool
 		gone     bool
+		ask      bool
 		asks     bool
 	}{
-		{"several teams, saved", orgA(), false, false, true},
-		{"several teams, --team", orgA(), true, false, false},
-		{"one team, saved", orgB(), false, false, false},
-		{"one team, saved team deleted", orgB(), false, true, false},
+		{"several teams, saved", orgA(), false, false, true, true},
+		{"several teams, --team", orgA(), true, false, true, false},
+		{"one team, saved", orgB(), false, false, true, false},
+		{"one team, saved team deleted", orgB(), false, true, false, false},
+		{"several teams, saved team deleted, cannot ask", orgA(), false, true, false, false},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway, c.org)); err != nil {
@@ -85,9 +87,15 @@ func TestSetupOffersTheSavedTeamAsTheDefault(t *testing.T) {
 			cmd.SetIn(strings.NewReader(""))
 			cmd.SetContext(t.Context())
 			// No terminal here, so a picker fails: what matters is whether setup asked.
-			name, err := testApp.selectPolicyTeam(cmd, cfg, true)
+			name, err := testApp.selectPolicyTeam(cmd, cfg, c.ask)
 			if asked := err != nil && strings.Contains(err.Error(), "no terminal to prompt on"); asked != c.asks {
 				t.Fatalf("selectPolicyTeam = %q, %v; asked %v, want %v", name, err, asked, c.asks)
+			}
+			if c.gone && len(projectsIn(c.org.ID)) > 1 {
+				if err == nil || !strings.Contains(err.Error(), "no longer in this organization") {
+					t.Fatalf("selectPolicyTeam = %q, %v; want the deleted team refused by name", name, err)
+				}
+				return
 			}
 			if !c.asks && (err != nil || name != saved.Name || cfg.ProjectID != saved.ID) {
 				t.Fatalf("selectPolicyTeam = %q, %v; project %q, want %s", name, err, cfg.ProjectID, saved.ID)

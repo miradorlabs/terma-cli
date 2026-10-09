@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 
 	"github.com/spf13/cobra"
@@ -92,8 +93,12 @@ func (app *App) selectPolicyTeam(cmd *cobra.Command, cfg *config.Config, ask boo
 	if err != nil {
 		return "", err
 	}
-	// A saved team since deleted is no team to keep: the picker, or the only team, decides.
+	// A saved team since deleted is no team to keep: the picker, or the only team, decides,
+	// and a setup that cannot ask says so rather than reach the picker anyway.
 	if saved != "" && !slices.ContainsFunc(projects, func(p project) bool { return p.ID == saved }) {
+		if !ask && len(projects) > 1 {
+			return "", fmt.Errorf("team %s, chosen before, is no longer in this organization — pass --team to choose another", saved)
+		}
 		cfg.ProjectID, saved = "", ""
 	}
 	var team *project
