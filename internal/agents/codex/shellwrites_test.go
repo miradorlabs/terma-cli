@@ -110,6 +110,7 @@ func TestShellWritesBeforeEachCommit(t *testing.T) {
 		{"wrapped commit", "printf x > a.txt && git add a.txt && command git commit -m a", []int{1}},
 		{"commit under env -u", "printf x > a.txt && env -u GIT_DIR git commit -m a", []int{1}},
 		{"commit under env", "printf x > a.txt && env GIT_AUTHOR_NAME=x git commit -m a", []int{1}},
+		{"a conflict resolved and the pick continued", "printf ok > f.txt && git add f.txt && GIT_EDITOR=true git cherry-pick --continue", []int{1}},
 		{"commit lookup is no commit", "printf x > a.txt && command -v git commit", nil},
 		{"commit message is not a subcommand", "git log --grep commit && printf x > a.txt", nil},
 	} {

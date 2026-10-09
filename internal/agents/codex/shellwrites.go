@@ -119,7 +119,7 @@ func shellWrites(command, cwd string) (paths []string, commits []int) {
 			for _, w := range writtenOperands(words) {
 				add(w)
 			}
-			if gitSubcommand(words) == "commit" {
+			if slices.Contains(committing, gitSubcommand(words)) {
 				commits = append(commits, len(out))
 			}
 		}
@@ -194,6 +194,9 @@ func wordsOf(call *syntax.CallExpr) []word {
 	}
 	return words
 }
+
+// committing are the git subcommands that make commits prepare-commit-msg stamps.
+var committing = []string{"commit", "cherry-pick", "revert", "rebase", "am"}
 
 // gitSubcommand is the subcommand of a git command line, after git's own options.
 func gitSubcommand(words []word) string {
