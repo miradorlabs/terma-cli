@@ -139,6 +139,7 @@ func (e *Env) Open(ctx context.Context, sessionID, cwd string) (*Repo, bool) {
 
 // Repo resolves the repository, or outside Git the current directory, and its project,
 // or ErrNotAdmitted, before anything is written, for one the team policy does not collect.
+// It first hands on what hooks in an agent's sandbox parked there (unpark).
 func (e Env) Repo(ctx context.Context) (*Repo, error) {
 	root, gitDir, id, err := e.locate(ctx)
 	if err != nil {

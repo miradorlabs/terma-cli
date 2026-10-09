@@ -201,7 +201,9 @@ func (e Env) unparkPushes(r *Repo) {
 		return nil
 	})
 	if err != nil {
+		// Still parked: the next hook records them all again and awaits each once.
 		e.Logf("unpark pushes: %v", err)
+		return
 	}
 	for _, path := range recorded {
 		e.AwaitPush(path)

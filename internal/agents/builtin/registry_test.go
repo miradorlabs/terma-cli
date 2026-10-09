@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
+	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
 // One name per adapter, one adapter per event, and no flush after an unhandled event.
@@ -157,6 +158,17 @@ func TestSupportCatalogCoversEveryHarness(t *testing.T) {
 		}
 		if a.Telemetry.Level != agents.SupportFull || a.Support != agents.SupportFull {
 			t.Errorf("%s exports telemetry but the catalog says telemetry %q, overall %q", h.Name(), a.Telemetry.Level, a.Support)
+		}
+	}
+}
+
+// An agent's label keys its sessions on disk and in trailers: a label the session store
+// refuses would leave every commit of that agent unstamped.
+func TestEveryToolLabelIsASessionKey(t *testing.T) {
+	t.Parallel()
+	for _, a := range reg.All() {
+		if tool := agents.Tool(a); !session.ValidID(tool) || strings.Contains(tool, "/") {
+			t.Errorf("%s's label %q cannot key its sessions", a.Name(), tool)
 		}
 	}
 }
