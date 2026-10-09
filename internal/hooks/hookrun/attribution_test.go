@@ -1,5 +1,3 @@
-//go:build unix
-
 package hookrun
 
 import (
@@ -8,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -26,6 +25,14 @@ const (
 	claudeSession = "5e757e6f-3040-4c57-b37d-01d44cc43053"
 	codexSession  = "01a11fd5-7d48-7843-b64c-2cf93f9b39b5"
 )
+
+// skipUnlessReadOnlyDirs skips where a directory's mode cannot stand in for a sandbox's refusal.
+func skipUnlessReadOnlyDirs(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("a read-only directory does not refuse writes here")
+	}
+}
 
 // commitAs stages rel and runs the commit hooks around git commit, as git does, returning HEAD.
 func commitAs(t *testing.T, env func(args ...string) Env, root, msg string, rel ...string) string {
@@ -55,9 +62,7 @@ func commitAs(t *testing.T, env func(args ...string) Env, root, msg string, rel 
 // the commit's hooks may write .git but not the state directory. The commit's events wait in
 // the repository's store, and the next hook outside the sandbox spools them, once.
 func TestASandboxedCommitIsSpooledByTheNextHook(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("root writes through a read-only directory")
-	}
+	skipUnlessReadOnlyDirs(t)
 	root := hookruntest.InitRepo(t)
 	spoolDir := t.TempDir()
 	sp, err := spool.Open(spoolDir)
@@ -201,9 +206,7 @@ func TestASessionWithNoAgentHasNoAgent(t *testing.T) {
 // waits in the repository's store, and the next hook outside the sandbox reports it, once.
 // The commit's trailers are a real mixed commit's (3e6c16f in terma-sim-sandbox).
 func TestASandboxedPushIsReportedByTheNextHook(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("root writes through a read-only directory")
-	}
+	skipUnlessReadOnlyDirs(t)
 	// git push has exited by the time a hook outside the sandbox runs.
 	gone := exec.Command("true")
 	if err := gone.Run(); err != nil {

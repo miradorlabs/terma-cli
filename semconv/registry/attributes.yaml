@@ -461,6 +461,7 @@ attributes:
     type: string[]
     stability: development
     brief: The sessions stamped into the commit.
+    note: Each id once, though two agents may share it; terma.commit.sessions names each session.
   - key: terma.commit.sessions
     type: any
     stability: development
@@ -475,6 +476,7 @@ attributes:
     type: int
     stability: development
     brief: How many sessions are stamped into the commit.
+    note: The length of terma.commit.sessions.
   - key: terma.commit.staged.count
     type: int
     stability: development
@@ -576,6 +578,7 @@ attributes:
     type: string[]
     stability: development
     brief: The sessions stamped into the commits terma.push.commits lists.
+    note: Each id once, though two agents may share it; terma.push.sessions names each session.
   - key: terma.push.sessions
     type: any
     stability: development
