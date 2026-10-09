@@ -172,6 +172,9 @@ func wordsOf(call *syntax.CallExpr) []word {
 		case "command", "exec":
 			words = words[1:]
 			for len(words) > 0 && strings.HasPrefix(words[0].text, "-") {
+				if strings.ContainsAny(words[0].text, "vV") {
+					return nil // command -v and -V look a command up; nothing runs
+				}
 				words = words[1:]
 			}
 		case "env":
