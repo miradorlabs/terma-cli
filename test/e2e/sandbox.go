@@ -93,6 +93,8 @@ type Sandbox struct {
 	// relayed means the agents export to the local relay (UseRelay), never straight to
 	// the receiver: the scenario is that nothing else reaches it.
 	relayed      bool
+	serviceRelay bool   // the relay runs as the service manager runs it (StartServiceRelay)
+	stopService  func() // stops that manager starting it again
 	relayAddr    string
 	codexTrusted map[string]bool
 	// codexTrustWithdrawn counts the approvals CodexHooksUntrusted took back.
