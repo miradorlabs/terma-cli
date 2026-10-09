@@ -11,10 +11,10 @@ import (
 
 // shellWrites returns the files a shell command names as written (redirect targets, the
 // operands of the writers in writtenIndexes, and the files of a patch it runs), in the
-// order it writes them, resolved against cwd and any cd before them; committed is how many
-// of them come before its last git commit, or -1 when it makes none. A command that does
-// not parse gives only the files of a patch in its text.
-func shellWrites(command, cwd string) (paths []string, committed int) {
+// order it writes them, resolved against cwd and any cd before them; commits holds, for
+// each git commit it makes, how many of them come before it. A command that does not parse
+// gives only the files of a patch in its text.
+func shellWrites(command, cwd string) (paths []string, commits []int) {
 	file, err := syntax.NewParser().Parse(strings.NewReader(command), "")
 	if err != nil {
 		for _, p := range applyPatchPaths(command) {
@@ -23,11 +23,10 @@ func shellWrites(command, cwd string) (paths []string, committed int) {
 			}
 			paths = append(paths, filepath.Clean(p))
 		}
-		return paths, -1
+		return paths, nil
 	}
 	dir := cwd
 	var out []string
-	committed = -1
 	resolve := func(w word) (string, bool) {
 		if !w.literal || w.text == "" || (dir == "" && !filepath.IsAbs(w.text)) {
 			return "", false
@@ -121,13 +120,13 @@ func shellWrites(command, cwd string) (paths []string, committed int) {
 				add(w)
 			}
 			if gitSubcommand(words) == "commit" {
-				committed = len(out)
+				commits = append(commits, len(out))
 			}
 		}
 		stack = append(stack, scope{n, dir})
 		return true
 	})
-	return out, committed
+	return out, commits
 }
 
 // patches returns the patch text an apply_patch statement is given.
@@ -178,8 +177,11 @@ func wordsOf(call *syntax.CallExpr) []word {
 		case "env":
 			words = words[1:]
 			for len(words) > 0 && (strings.HasPrefix(words[0].text, "-") || strings.Contains(words[0].text, "=")) {
-				if words[0].text == "-u" || words[0].text == "-C" {
-					words = words[1:] // the name to unset, or the directory
+				switch a := words[0].text; {
+				case a == "-C" || a == "--chdir" || strings.HasPrefix(a, "--chdir="):
+					return nil // run somewhere else, so its relative paths are unknown
+				case a == "-u":
+					words = words[1:] // the name to unset
 				}
 				words = words[1:]
 			}

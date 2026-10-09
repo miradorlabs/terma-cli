@@ -383,6 +383,27 @@ func TestCodexWriteAfterACommitDoesNotClaimIt(t *testing.T) {
 	}
 }
 
+// A write between two commits in one call claims neither: the first commit is the
+// developer's staged change, made before the agent wrote anything.
+func TestCodexWriteBetweenTwoCommitsDoesNotClaimTheFirst(t *testing.T) {
+	c := newCodexCall(t)
+	hookruntest.WriteFile(t, c.root, "h", "base\n")
+	c.git("add", "h")
+	c.git("commit", "-qm", "base")
+	hookruntest.WriteFile(t, c.root, "h", "human\n")
+	c.git("add", "h")
+	var human string
+	c.run("git commit -m human && printf agent > h && git add h && git commit -m agent", func() {
+		human = c.commit("human")
+		hookruntest.WriteFile(t, c.root, "h", "agent")
+		c.git("add", "h")
+		c.commit("agent")
+	})
+	if strings.Contains(human, "Agent-Session-Id") {
+		t.Fatalf("the developer's commit was stamped by a write that came after it:\n%s", human)
+	}
+}
+
 // After a call commits what it wrote, its PostToolUse leaves those files retired: a
 // developer's later commit of them is not the session's.
 func TestCodexSameCallCommitLeavesItsFilesRetired(t *testing.T) {

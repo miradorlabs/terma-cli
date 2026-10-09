@@ -80,6 +80,7 @@ func TestShellWrites(t *testing.T) {
 		{"patch in a command that does not parse", "apply_patch <<'PATCH'\n*** Begin Patch\n*** Add File: z.txt\n+z\n*** End Patch\nPATCH\nif then", in("z.txt")},
 		{"wrapped patch", "command apply_patch <<'PATCH'\n*** Begin Patch\n*** Add File: w.txt\n+w\n*** End Patch\nPATCH", in("w.txt")},
 		{"patch by path", "/usr/local/bin/apply_patch <<'PATCH'\n*** Begin Patch\n*** Add File: v.txt\n+v\n*** End Patch\nPATCH", in("v.txt")},
+		{"env -C moves the writer", "env -C sub sed -i s/x/y/ f.txt; env --chdir=sub gofmt -w g.go", nil},
 		{"wrapped writer", "env LC_ALL=C sed -i 's/a/b/' a.go; command -p gofmt -w b.go", in("a.go", "b.go")},
 		{"patch argument", "apply_patch '*** Begin Patch\n*** Add File: new/y.sh\n+y\n*** End Patch'", in("new/y.sh")},
 		{"patch after a cd", "cd src && apply_patch <<'PATCH'\n*** Begin Patch\n*** Update File: a.go\n@@\n-a\n+b\n*** End Patch\nPATCH", in("src/a.go")},
@@ -93,26 +94,26 @@ func TestShellWrites(t *testing.T) {
 }
 
 // committed counts the writes a commit in the command takes in; a write after it is not its.
-func TestShellWritesBeforeTheCommit(t *testing.T) {
+func TestShellWritesBeforeEachCommit(t *testing.T) {
 	t.Parallel()
 	cwd := t.TempDir()
 	for _, tc := range []struct {
 		name, command string
-		want          int
+		want          []int
 	}{
-		{"no commit", "printf x > a.txt", -1},
-		{"write then commit", "printf x > a.txt && git add a.txt && git commit -m a", 1},
-		{"commit then write", "git commit -m human && printf agent > f.txt", 0},
-		{"the last commit counts", "printf x > a.txt && git commit -am a && printf y > b.txt && git commit -am b && printf z > c.txt", 2},
-		{"git options before commit", "printf x > a.txt; git -C . -c user.name=x commit -m a", 1},
-		{"wrapped commit", "printf x > a.txt && git add a.txt && command git commit -m a", 1},
-		{"commit under env -u", "printf x > a.txt && env -u GIT_DIR git commit -m a", 1},
-		{"commit under env", "printf x > a.txt && env GIT_AUTHOR_NAME=x git commit -m a", 1},
-		{"commit message is not a subcommand", "git log --grep commit && printf x > a.txt", -1},
+		{"no commit", "printf x > a.txt", nil},
+		{"write then commit", "printf x > a.txt && git add a.txt && git commit -m a", []int{1}},
+		{"commit then write", "git commit -m human && printf agent > f.txt", []int{0}},
+		{"two commits", "git commit -m human && printf agent > h && git add h && git commit -m agent", []int{0, 1}},
+		{"git options before commit", "printf x > a.txt; git -C . -c user.name=x commit -m a", []int{1}},
+		{"wrapped commit", "printf x > a.txt && git add a.txt && command git commit -m a", []int{1}},
+		{"commit under env -u", "printf x > a.txt && env -u GIT_DIR git commit -m a", []int{1}},
+		{"commit under env", "printf x > a.txt && env GIT_AUTHOR_NAME=x git commit -m a", []int{1}},
+		{"commit message is not a subcommand", "git log --grep commit && printf x > a.txt", nil},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, got := shellWrites(tc.command, cwd); got != tc.want {
-				t.Fatalf("committed = %d, want %d", got, tc.want)
+			if _, got := shellWrites(tc.command, cwd); !slices.Equal(got, tc.want) {
+				t.Fatalf("commits = %v, want %v", got, tc.want)
 			}
 		})
 	}
