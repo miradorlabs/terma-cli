@@ -38,26 +38,26 @@ func TestTrackingRefFSFollowsThePushURL(t *testing.T) {
 }
 
 // Each commit's session and tool trailers come back in their order, so a tool stays with
-// the session before it, and no other trailer comes with them.
+// the session before it. The trailers are those of a real mixed commit, 3e6c16f in
+// terma-sim-sandbox, whose terma.commit and terma.push reached prd.
 func TestCommitsKeepEachToolWithItsSession(t *testing.T) {
 	dir := initRepo(t)
 	ctx := context.Background()
-	msg := "mixed\n\nAgent-Session-Id: 5e757e6f-3040-4c57-b37d-01d44cc43053\nAgent-Tool: claude-code/2.1.3\n" +
-		"Signed-off-by: Dev <dev@example.com>\nAgent-Session-Id: 5e757e6f-3040-4c57-b37d-01d44cc43053\nAgent-Tool: codex/0.160.1\n"
+	const trailers = "Agent-Session-Id: 01a11feb-88f3-7f92-9137-144b0ac92b7e\nAgent-Tool: codex\n" +
+		"Agent-Session-Id: 0102cabd-6dca-42ce-9888-c0e010ece99f\nAgent-Tool: claude-code\n" +
+		"Agent-Session-Id: 01a11fee-3f5c-75a1-80fd-0d26987b1720\nAgent-Tool: codex\n"
 	if _, err := Git(ctx, dir, "commit", "-q", "--allow-empty", "-m", "by hand"); err != nil {
 		t.Fatal(err)
 	}
 	base, _ := Git(ctx, dir, "rev-parse", "HEAD")
-	if _, err := Git(ctx, dir, "commit", "-q", "--allow-empty", "-m", msg); err != nil {
+	if _, err := Git(ctx, dir, "commit", "-q", "--allow-empty", "-m", "pairs: mixed Claude Code and Codex commit\n\n"+trailers); err != nil {
 		t.Fatal(err)
 	}
 	commits, err := Commits(ctx, dir, "HEAD", []string{strings.TrimSpace(base)}, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "Agent-Session-Id: 5e757e6f-3040-4c57-b37d-01d44cc43053\nAgent-Tool: claude-code/2.1.3\n" +
-		"Agent-Session-Id: 5e757e6f-3040-4c57-b37d-01d44cc43053\nAgent-Tool: codex/0.160.1\n"
-	if len(commits) != 1 || !ValidOID(commits[0].SHA) || commits[0].Trailers != want {
+	if len(commits) != 1 || !ValidOID(commits[0].SHA) || commits[0].Trailers != trailers {
 		t.Fatalf("commits = %+v", commits)
 	}
 }

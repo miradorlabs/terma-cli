@@ -5,6 +5,7 @@ package hookrun
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -193,5 +194,71 @@ func TestASessionWithNoAgentHasNoAgent(t *testing.T) {
 	}
 	if agent, ok := soleAgent([]trailer.Trailer{{SessionID: "s1"}}); ok {
 		t.Errorf("no agent was named, yet the main agent is %q", agent)
+	}
+}
+
+// A push from the sandbox: pre-push cannot record it in the state directory, so the record
+// waits in the repository's store, and the next hook outside the sandbox reports it, once.
+// The commit's trailers are a real mixed commit's (3e6c16f in terma-sim-sandbox).
+func TestASandboxedPushIsReportedByTheNextHook(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root writes through a read-only directory")
+	}
+	// git push has exited by the time a hook outside the sandbox runs.
+	gone := exec.Command("true")
+	if err := gone.Run(); err != nil {
+		t.Fatal(err)
+	}
+	defer func(f func() int) { gitPushPID = f }(gitPushPID)
+	gitPushPID = func() int { return gone.Process.Pid }
+	p := newPushRepo(t)
+	p.git("checkout", "-q", "-b", "feature")
+	p.git("commit", "-q", "--allow-empty", "-m", "pairs: mixed Claude Code and Codex commit\n\n"+
+		"Agent-Session-Id: 01a11feb-88f3-7f92-9137-144b0ac92b7e\nAgent-Tool: codex\n"+
+		"Agent-Session-Id: 0102cabd-6dca-42ce-9888-c0e010ece99f\nAgent-Tool: claude-code\n")
+	tip := p.sha("HEAD")
+	ctx := context.Background()
+	awaited := 0
+	var env func(stdin string) Env
+	env = func(stdin string) Env {
+		return Env{StateDir: p.stateDir, Now: time.Now(), Cwd: p.root, Args: []string{"backup", p.remote},
+			Stdin: strings.NewReader(stdin), Spool: p.sp, Team: p.team, Policy: hookruntest.Admitting(p.root),
+			AwaitPush: func(path string) { awaited++; AwaitPush(ctx, env(""), path) }}
+	}
+
+	pushes := filepath.Join(p.stateDir, PushesDir)
+	if err := os.MkdirAll(pushes, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(pushes, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	if err := PrePush(ctx, env(pushLine("refs/heads/feature", tip, "refs/heads/feature", zero)+"\n")); err != nil {
+		t.Fatal(err)
+	}
+	p.git("push", "-q", "backup", "feature")
+	if awaited != 0 {
+		t.Fatal("a push the state directory refused was awaited")
+	}
+
+	if err := os.Chmod(pushes, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if _, err := env("").Repo(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got := hookruntest.Named(hookruntest.Spooled(t, p.sp), semconv.TermaPushEvent)
+	if awaited != 1 || len(got) != 1 {
+		t.Fatalf("awaited %d, reported %d pushes, want 1 each", awaited, len(got))
+	}
+	a := got[0].Attrs
+	if a[semconv.TermaPushNewRevisionKey] != tip || a[semconv.TermaPushStatusKey] != semconv.TermaPushStatusTrackingRefUpdated ||
+		!reflect.DeepEqual(sessionMaps(a[semconv.TermaPushSessionsKey]), []map[string]any{
+			{"session_id": "01a11feb-88f3-7f92-9137-144b0ac92b7e", "agent": "codex"},
+			{"session_id": "0102cabd-6dca-42ce-9888-c0e010ece99f", "agent": "claude-code"},
+		}) {
+		t.Errorf("terma.push = %+v", a)
 	}
 }

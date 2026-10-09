@@ -260,22 +260,22 @@ func TestOneIDFromTwoToolsIsTwoSessions(t *testing.T) {
 func TestUnparkDropsOnlyWhatWasDelivered(t *testing.T) {
 	t.Parallel()
 	s := newStore(t)
-	if err := s.Unpark(func([]byte) error { t.Fatal("nothing was parked"); return nil }); err != nil {
+	if err := s.Unpark("events", func([]byte) error { t.Fatal("nothing was parked"); return nil }); err != nil {
 		t.Fatal(err)
 	}
 	for _, line := range []string{"one\n", "two\n"} {
-		if err := s.Park([]byte(line)); err != nil {
+		if err := s.Park("events", []byte(line)); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := s.Unpark(func([]byte) error { return errors.New("spool refused") }); err == nil {
+	if err := s.Unpark("events", func([]byte) error { return errors.New("spool refused") }); err == nil {
 		t.Fatal("a failed delivery was not reported")
 	}
 	var got []byte
-	if err := s.Unpark(func(lines []byte) error { got = lines; return nil }); err != nil || string(got) != "one\ntwo\n" {
+	if err := s.Unpark("events", func(lines []byte) error { got = lines; return nil }); err != nil || string(got) != "one\ntwo\n" {
 		t.Fatalf("unparked %q, %v", got, err)
 	}
-	if err := s.Unpark(func([]byte) error { t.Fatal("unparked twice"); return nil }); err != nil {
+	if err := s.Unpark("events", func([]byte) error { t.Fatal("unparked twice"); return nil }); err != nil {
 		t.Fatal(err)
 	}
 }

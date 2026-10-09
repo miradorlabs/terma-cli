@@ -85,7 +85,7 @@ type Store struct {
 
 const (
 	activeFile   = "session.json"
-	outboxFile   = "outbox.jsonl"
+	parkedExt    = ".jsonl"
 	manifestsDir = "manifests"
 	manifestExt  = ".json"
 	// A delta is one touch recorded while another writer held the store: <id>~<random>.delta.
@@ -501,16 +501,16 @@ func (s *Store) Retire(before time.Time) {
 	_ = os.Remove(s.dir) // fails, harmlessly, once a writer that came in has written
 }
 
-// Park keeps lines the spool refused until Unpark hands them on. A git hook in an agent's
-// sandbox may write the repository's own git directory, where the store is, but not
-// terma's state directory.
-func (s *Store) Park(lines []byte) error {
+// Park keeps lines the state directory refused, in the file name.jsonl, until Unpark hands
+// them on. A git hook in an agent's sandbox may write the repository's own git directory,
+// where the store is, but not terma's state directory.
+func (s *Store) Park(name string, lines []byte) error {
 	unlock, _, err := s.create()
 	if err != nil {
 		return err
 	}
 	defer unlock()
-	f, err := os.OpenFile(filepath.Join(s.dir, outboxFile), os.O_CREATE|os.O_WRONLY|os.O_APPEND, fileMode)
+	f, err := os.OpenFile(filepath.Join(s.dir, name+parkedExt), os.O_CREATE|os.O_WRONLY|os.O_APPEND, fileMode)
 	if err != nil {
 		return err
 	}
@@ -521,9 +521,9 @@ func (s *Store) Park(lines []byte) error {
 	return f.Close()
 }
 
-// Unpark passes what Park kept to deliver, and drops it once deliver has taken it.
-func (s *Store) Unpark(deliver func(lines []byte) error) error {
-	path := filepath.Join(s.dir, outboxFile)
+// Unpark passes what Park kept under name to deliver, and drops it once deliver has taken it.
+func (s *Store) Unpark(name string, deliver func(lines []byte) error) error {
+	path := filepath.Join(s.dir, name+parkedExt)
 	if _, err := os.Stat(path); err != nil {
 		return nil // nothing parked: the common case takes no lock
 	}

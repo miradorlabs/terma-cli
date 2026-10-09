@@ -161,30 +161,39 @@ func (e Env) Repo(ctx context.Context) (*Repo, error) {
 	return r, nil
 }
 
-// park keeps an event the spool refused in the repository's store, which a git hook run in
-// an agent's sandbox can still write; the next hook there that reaches the spool unparks it.
-func (e Env) park(r *Repo, ev spool.Event) bool {
+// What a git hook run in an agent's sandbox could not write to the state directory waits in
+// the repository's store, which it can write, under these names.
+const (
+	parkedEvents = "events"
+	parkedPushes = "pushes"
+)
+
+// park keeps v, which the state directory refused, in the repository's store under name;
+// the next hook there that reaches the state directory unparks it.
+func (e Env) park(r *Repo, name string, v any) bool {
 	if r == nil || r.GitDir == "" {
 		return false // a folder outside git keeps its store in the state directory too
 	}
-	line, err := json.Marshal(ev)
+	line, err := json.Marshal(v)
 	if err == nil {
-		err = r.Store.Park(append(line, '\n'))
+		err = r.Store.Park(name, append(line, '\n'))
 	}
 	if err != nil {
-		e.Logf("park event: %v", err)
+		e.Logf("park %s: %v", name, err)
 		return false
 	}
 	return true
 }
 
-// unpark spools what a sandboxed hook parked in r's store, in one append, and starts a flush.
+// unpark hands on what sandboxed hooks parked in r's store: events to the spool, in one
+// append, then a flush, and pushes to AwaitPush.
 func (e Env) unpark(r *Repo) {
+	e.unparkPushes(r)
 	if e.Spool == nil {
 		return
 	}
 	moved := false
-	err := r.Store.Unpark(func(lines []byte) error {
+	err := r.Store.Unpark(parkedEvents, func(lines []byte) error {
 		var events []spool.Event
 		for line := range bytes.Lines(lines) {
 			var ev spool.Event
@@ -234,7 +243,7 @@ func (e Env) EmitFor(r *Repo, ev spool.Event) bool {
 	if ev.Time.IsZero() {
 		ev.Time = e.Time()
 	}
-	return e.emit(ev) || e.park(r, ev)
+	return e.emit(ev) || e.park(r, parkedEvents, ev)
 }
 
 // stamp names the event's repository, for delivery's admission, and its project.

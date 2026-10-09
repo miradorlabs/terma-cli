@@ -1,6 +1,7 @@
 package hookrun
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/json"
@@ -171,10 +172,40 @@ func PrePush(ctx context.Context, env Env) error {
 	path := filepath.Join(env.StateDir, PushesDir, rec.ID+".json")
 	if err := config.WriteJSON(path, rec, 0o600); err != nil {
 		env.Logf("record push: %v", err)
+		env.park(r, parkedPushes, rec)
 		return nil
 	}
 	env.AwaitPush(path)
 	return nil
+}
+
+// unparkPushes records the pushes a sandboxed pre-push parked in r's store and starts their
+// AwaitPush, which reports each at once, its git push long gone.
+func (e Env) unparkPushes(r *Repo) {
+	if e.AwaitPush == nil {
+		return
+	}
+	var recorded []string
+	err := r.Store.Unpark(parkedPushes, func(lines []byte) error {
+		for line := range bytes.Lines(lines) {
+			var rec pushRecord
+			if json.Unmarshal(line, &rec) != nil || rec.ID == "" {
+				continue
+			}
+			path := filepath.Join(e.StateDir, PushesDir, rec.ID+".json")
+			if err := config.WriteJSON(path, rec, 0o600); err != nil {
+				return err
+			}
+			recorded = append(recorded, path)
+		}
+		return nil
+	})
+	if err != nil {
+		e.Logf("unpark pushes: %v", err)
+	}
+	for _, path := range recorded {
+		e.AwaitPush(path)
+	}
 }
 
 // AwaitPush waits for git push to exit, then reports the push recorded at path and
