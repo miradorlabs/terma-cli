@@ -139,14 +139,27 @@ func shellWritePlan(command, cwd string) (paths []string, commits []int, before,
 				}
 			}
 			writeWords, shellDir := words, dir
-			if len(words) > 0 && filepath.Base(words[0].text) == "git" {
+			gitMove := len(words) > 0 && filepath.Base(words[0].text) == "git"
+			if gitMove {
 				writeWords, dir = gitCommand(words, dir)
 				if len(writeWords) == 0 || writeWords[0].text != "mv" {
 					writeWords = nil
 				}
 			}
-			for _, w := range writtenOperands(writeWords) {
-				add(w)
+			var moved []string
+			var handled bool
+			if gitMove {
+				moved, handled = directoryMovePaths(writeWords, dir, made)
+			}
+			if handled {
+				out = append(out, moved...)
+				for range moved {
+					sources = append(sources, stmt)
+				}
+			} else {
+				for _, w := range writtenOperands(writeWords) {
+					add(w)
+				}
 			}
 			dir = shellDir // git -C affects this invocation, not the shell
 			if makesCommit(words) {
@@ -213,12 +226,24 @@ func wordsOf(call *syntax.CallExpr) []word {
 	for len(words) > 0 {
 		switch filepath.Base(words[0].text) {
 		case "command", "exec":
+			wrapper := filepath.Base(words[0].text)
 			words = words[1:]
 			for len(words) > 0 && strings.HasPrefix(words[0].text, "-") {
-				if strings.ContainsAny(words[0].text, "vV") {
+				option := words[0].text
+				if option == "--" {
+					words = words[1:]
+					break
+				}
+				if wrapper == "command" && strings.ContainsAny(option, "vV") {
 					return nil // command -v and -V look a command up; nothing runs
 				}
 				words = words[1:]
+				if _, name, hasName := strings.Cut(strings.TrimPrefix(option, "-"), "a"); wrapper == "exec" && hasName {
+					if name == "" && len(words) > 0 {
+						words = words[1:] // exec -a NAME, including clustered -cla NAME
+					}
+					// Any attached suffix is the name; remaining words can still be options.
+				}
 			}
 		case "env":
 			words = words[1:]

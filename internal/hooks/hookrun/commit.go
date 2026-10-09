@@ -106,7 +106,7 @@ func PostCommit(ctx context.Context, env Env) error {
 				env.Logf("merge manifests: %v", err)
 			}
 			for _, m := range manifests {
-				if err := r.Store.Consume(m.Key(), head.Paths()); err != nil {
+				if err := r.Store.Consume(m.Key(), head.RetiredPaths()); err != nil {
 					env.Logf("consume merge manifest: %v", err)
 				}
 			}
@@ -114,7 +114,7 @@ func PostCommit(ctx context.Context, env Env) error {
 		emitUnattributedCommit(env, r, head)
 		return nil
 	}
-	files := head.Paths()
+	files := head.RetiredPaths()
 	keys := make([]session.Key, 0, len(stamped))
 	for _, t := range stamped {
 		agent, _ := t.Agent()

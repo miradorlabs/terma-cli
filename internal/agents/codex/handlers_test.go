@@ -494,6 +494,65 @@ func TestCodexGitMvWithGlobalOptionsStampsAndRetiresFiles(t *testing.T) {
 	}
 }
 
+func TestCodexRenamesRetireSourceFiles(t *testing.T) {
+	for _, tc := range []struct {
+		command, source, destination string
+	}{
+		{"git mv old.txt new.txt && git commit -m move", "old.txt", "new.txt"},
+		{"git mv olddir newdir && git commit -m move", "olddir/nested/f.txt", "newdir/nested/f.txt"},
+		{"mkdir -p dest && git mv olddir dest && git commit -m move", "olddir/f.txt", "dest/olddir/f.txt"},
+	} {
+		t.Run(tc.command, func(t *testing.T) {
+			c := newCodexCall(t)
+			hookruntest.WriteFile(t, c.root, tc.source, "original\n")
+			c.git("add", tc.source)
+			c.git("commit", "-qm", "base")
+			c.installTestHooks()
+			c.shell(tc.command)
+			msg, _ := gitx.Git(c.ctx, c.root, "log", "-1", "--format=%B")
+			if !strings.Contains(msg, "Agent-Session-Id: "+codexCallSession) {
+				t.Fatalf("rename was not stamped:\n%s", msg)
+			}
+			hookruntest.WriteFile(t, c.root, tc.source, "human recreation\n")
+			c.git("add", tc.source)
+			if msg := c.commit("human source"); strings.Contains(msg, "Agent-Session-Id") {
+				t.Fatalf("rename source claimed a later human recreation:\n%s", msg)
+			}
+			hookruntest.WriteFile(t, c.root, tc.destination, "human destination\n")
+			c.git("add", tc.destination)
+			if msg := c.commit("human destination"); strings.Contains(msg, "Agent-Session-Id") {
+				t.Fatalf("rename destination claimed later human work:\n%s", msg)
+			}
+		})
+	}
+}
+
+func TestCodexExecWithNameRetiresCommittedPaths(t *testing.T) {
+	c := newCodexCall(t)
+	c.installTestHooks()
+	command := "printf agent > f.txt && git add f.txt && exec -a git-alias git commit -m agent"
+	c.run(command, func() {
+		// exec -a is a Bash extension; Git for Windows includes Bash too.
+		if _, err := exec.LookPath("bash"); err != nil {
+			t.Skip("Bash not installed")
+		}
+		cmd := exec.Command("bash", "-c", command)
+		cmd.Dir = c.root
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("shell call: %v\n%s", err, out)
+		}
+	})
+	msg, _ := gitx.Git(c.ctx, c.root, "log", "-1", "--format=%B")
+	if !strings.Contains(msg, "Agent-Session-Id: "+codexCallSession) {
+		t.Fatalf("exec commit was not stamped:\n%s", msg)
+	}
+	hookruntest.WriteFile(t, c.root, "f.txt", "human\n")
+	c.git("add", "f.txt")
+	if msg := c.commit("human"); strings.Contains(msg, "Agent-Session-Id") {
+		t.Fatalf("exec commit was restored by the post hook:\n%s", msg)
+	}
+}
+
 func TestCodexMergeContinueRetiresResolutionWithoutStampingMerge(t *testing.T) {
 	c := newCodexCall(t)
 	hookruntest.WriteFile(t, c.root, "f.txt", "base\n")

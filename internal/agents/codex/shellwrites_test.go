@@ -88,6 +88,7 @@ func TestShellWrites(t *testing.T) {
 		{"command lookup runs nothing", "command -v cp ./agent.txt ./f.txt; command -pV sed -i s/a/b/ a.go", nil},
 		{"env -C moves the writer", "env -C sub sed -i s/x/y/ f.txt; env --chdir=sub gofmt -w g.go", nil},
 		{"wrapped writer", "env LC_ALL=C sed -i 's/a/b/' a.go; command -p gofmt -w b.go", in("a.go", "b.go")},
+		{"exec with a name", "exec -a alias gofmt -w a.go", in("a.go")},
 		{"patch argument", "apply_patch '*** Begin Patch\n*** Add File: new/y.sh\n+y\n*** End Patch'", in("new/y.sh")},
 		{"patch after a cd", "cd src && apply_patch <<'PATCH'\n*** Begin Patch\n*** Update File: a.go\n@@\n-a\n+b\n*** End Patch\nPATCH", in("src/a.go")},
 	} {
@@ -115,6 +116,10 @@ func TestShellWritesBeforeEachCommit(t *testing.T) {
 		{"wrapped commit", "printf x > a.txt && git add a.txt && command git commit -m a", []int{1}},
 		{"commit under env -u", "printf x > a.txt && env -u GIT_DIR git commit -m a", []int{1}},
 		{"commit under env", "printf x > a.txt && env GIT_AUTHOR_NAME=x git commit -m a", []int{1}},
+		{"exec name before commit", "printf x > a.txt && exec -a alias git commit -m a", []int{1}},
+		{"exec name and option terminator", "printf x > a.txt && exec -a alias -- git commit -m a", []int{1}},
+		{"exec attached name", "printf x > a.txt && exec -agit-alias git commit -m a", []int{1}},
+		{"exec attached name ending in a", "printf x > a.txt && exec -aalpha git commit -m a", []int{1}},
 		{"a conflict resolved and the pick continued", "printf ok > f.txt && git add f.txt && GIT_EDITOR=true git cherry-pick --continue", []int{1}},
 		{"commit lookup is no commit", "printf x > a.txt && command -v git commit", nil},
 		{"commit message is not a subcommand", "git log --grep commit && printf x > a.txt", nil},
