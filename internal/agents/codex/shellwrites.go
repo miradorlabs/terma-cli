@@ -36,7 +36,10 @@ func shellWritePlan(command, cwd string) (paths []string, commits []int, before,
 	dir := cwd
 	var out []string
 	var sources []*syntax.Stmt
+	var locations []bool
 	var stmt *syntax.Stmt
+	var lastCD *syntax.Stmt
+	locationKnown := true
 	boundaries := map[*syntax.Stmt]bool{}
 	successful := map[*syntax.Stmt]bool{}
 	directoryStates := shellDirectoryStates(file)
@@ -68,12 +71,15 @@ func shellWritePlan(command, cwd string) (paths []string, commits []int, before,
 		}
 		out = append(out, p)
 		sources = append(sources, stmt)
+		locations = append(locations, locationKnown || filepath.IsAbs(w.text))
 	}
 	type scope struct {
-		node syntax.Node
-		dir  string
-		stmt *syntax.Stmt
-		made map[string]bool
+		node          syntax.Node
+		dir           string
+		stmt          *syntax.Stmt
+		made          map[string]bool
+		lastCD        *syntax.Stmt
+		locationKnown bool
 	}
 	var stack []scope
 	syntax.Walk(file, func(n syntax.Node) bool {
@@ -82,12 +88,15 @@ func shellWritePlan(command, cwd string) (paths []string, commits []int, before,
 			stack = stack[:len(stack)-1]
 			stmt = top.stmt
 			made = top.made
+			locationKnown = top.locationKnown
 			switch t := top.node.(type) {
 			case *syntax.Subshell, *syntax.CmdSubst, *syntax.ProcSubst:
 				dir = top.dir // a cd inside ends with it
+				lastCD = top.lastCD
 			case *syntax.BinaryCmd:
 				if t.Op == syntax.Pipe || t.Op == syntax.PipeAll {
 					dir = top.dir // so does one in a pipeline, each part a subshell
+					lastCD = top.lastCD
 				}
 			case *syntax.IfClause, *syntax.CaseClause, *syntax.WhileClause, *syntax.ForClause:
 				if dir != top.dir {
@@ -98,11 +107,13 @@ func shellWritePlan(command, cwd string) (paths []string, commits []int, before,
 		}
 		parentStmt := stmt
 		parentMade := made
+		parentCD, parentLocation := lastCD, locationKnown
 		switch n := n.(type) {
 		case *syntax.FuncDecl:
 			return false // defining a function runs nothing
 		case *syntax.Stmt:
 			stmt = n
+			locationKnown = lastCD == nil || directoryStates[n].all[lastCD]
 			made = map[string]bool{}
 			for previous := range directoryStates[n].all {
 				for path := range created[previous] {
@@ -112,9 +123,11 @@ func shellWritePlan(command, cwd string) (paths []string, commits []int, before,
 			// apply_patch takes its patch as an argument or a heredoc; it makes any directory.
 			for _, patch := range patches(n) {
 				for _, p := range applyPatchPaths(patch) {
+					known := locationKnown || filepath.IsAbs(p)
 					if p, ok := resolve(word{p, true}); ok {
 						out = append(out, p)
 						sources = append(sources, stmt)
+						locations = append(locations, known)
 						successful[stmt] = true
 					}
 				}
@@ -125,7 +138,8 @@ func shellWritePlan(command, cwd string) (paths []string, commits []int, before,
 			}
 		case *syntax.CallExpr:
 			words := wordsOf(n)
-			if len(words) > 0 && words[0].text == "cd" {
+			if len(words) > 0 && words[0].text == "cd" && directoryStates[stmt].live {
+				lastCD = stmt
 				switch {
 				case len(words) == 2 && words[1].literal && filepath.IsAbs(words[1].text):
 					dir = filepath.Clean(words[1].text)
@@ -157,11 +171,15 @@ func shellWritePlan(command, cwd string) (paths []string, commits []int, before,
 				}
 			}
 			writeWords, shellDir := words, dir
+			shellLocation := locationKnown
 			gitMove := len(words) > 0 && filepath.Base(words[0].text) == "git"
 			if gitMove {
 				writeWords, dir = gitCommand(words, dir)
-				if len(writeWords) == 0 || writeWords[0].text != "mv" {
+				if len(writeWords) == 0 || writeWords[0].text != "mv" || hasGitOption(writeWords, "--dry-run", "n") {
 					writeWords = nil
+				}
+				if _, independentDir := gitCommand(words, ""); independentDir != "" {
+					locationKnown = true
 				}
 			}
 			var moved []string
@@ -173,6 +191,7 @@ func shellWritePlan(command, cwd string) (paths []string, commits []int, before,
 				out = append(out, moved...)
 				for range moved {
 					sources = append(sources, stmt)
+					locations = append(locations, locationKnown)
 				}
 				successful[stmt] = len(moved) > 0
 			} else {
@@ -185,16 +204,20 @@ func shellWritePlan(command, cwd string) (paths []string, commits []int, before,
 				}
 			}
 			dir = shellDir // git -C affects this invocation, not the shell
+			locationKnown = shellLocation
 			if makesCommit(words) {
 				commits = append(commits, len(out))
 				boundaries[stmt] = true
 			}
 		}
-		stack = append(stack, scope{n, dir, parentStmt, parentMade})
+		stack = append(stack, scope{n, dir, parentStmt, parentMade, parentCD, parentLocation})
 		return true
 	})
 	pre, post, report := guaranteedShellWrites(file, sources, boundaries, successful)
 	for i, source := range sources {
+		if !locations[i] {
+			continue // a conditional cd cannot locate a relative write on every route
+		}
 		if pre[source] {
 			before = append(before, out[i])
 		}
@@ -253,39 +276,6 @@ func written(r *syntax.Redirect) bool {
 		return w.literal && w.text != "-" && strings.Trim(w.text, "0123456789") != ""
 	}
 	return false
-}
-
-type word struct {
-	text string
-	// literal is false when the shell would expand the word, so its text is not the path.
-	literal bool
-}
-
-// literal is the word's text when the shell expands nothing in it: plain, quoted, or both.
-func literal(w *syntax.Word) word {
-	var b strings.Builder
-	for _, part := range w.Parts {
-		switch p := part.(type) {
-		case *syntax.Lit:
-			if strings.ContainsAny(p.Value, "*?[{\\") || strings.HasPrefix(p.Value, "~") {
-				return word{}
-			}
-			b.WriteString(p.Value)
-		case *syntax.SglQuoted:
-			b.WriteString(p.Value)
-		case *syntax.DblQuoted:
-			for _, inner := range p.Parts {
-				l, ok := inner.(*syntax.Lit)
-				if !ok {
-					return word{}
-				}
-				b.WriteString(l.Value)
-			}
-		default:
-			return word{}
-		}
-	}
-	return word{b.String(), true}
 }
 
 // writtenOperands returns the arguments a command writes to.

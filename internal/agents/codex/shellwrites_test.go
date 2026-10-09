@@ -53,6 +53,9 @@ func TestShellWrites(t *testing.T) {
 		{"cp into a directory", "cp a.go b.go src/", in("src/a.go", "src/b.go")},
 		{"mv into a directory", "mv a.go src", in("a.go", "src/a.go")},
 		{"git mv both ends", "git mv -f old.go new.go", in("old.go", "new.go")},
+		{"git mv dry run", "git mv -n old.go new.go; git mv --dry-run old.go new.go", nil},
+		{"git mv clustered dry run", "git mv -fn old.go new.go", nil},
+		{"git mv dry-run disabled", "git mv --dry-run --no-dry-run old.go new.go", in("old.go", "new.go")},
 		{"git mv after global options", "git -C src -c core.quotePath=false mv old.go new.go; printf x > root.go", in("src/old.go", "src/new.go", "root.go")},
 		{"git mv repeated -C", "git -C src -C .. mv old.go new.go", in("old.go", "new.go")},
 		{"git mv attached -C", "git -Csrc mv old.go new.go", in("src/old.go", "src/new.go")},
@@ -109,6 +112,10 @@ func TestShellWritesBeforeEachCommit(t *testing.T) {
 		want          []int
 	}{
 		{"no commit", "printf x > a.txt", nil},
+		{"noncommitting modes", "git rebase --abort; git am --quit; git cherry-pick --no-commit abc; git revert -n abc; git commit --dry-run; printf x > a.txt; git commit -m a", []int{1}},
+		{"option name in commit message", "printf x > a.txt; git commit -m --abort", []int{1}},
+		{"commit no-verify still commits", "printf x > a.txt; git commit -n -m a", []int{1}},
+		{"merge no-commit disabled", "printf x > a.txt; git merge --no-commit --commit topic", []int{1}},
 		{"write then commit", "printf x > a.txt && git add a.txt && git commit -m a", []int{1}},
 		{"commit then write", "git commit -m human && printf agent > f.txt", []int{0}},
 		{"two commits", "git commit -m human && printf agent > h && git add h && git commit -m agent", []int{0, 1}},
@@ -147,6 +154,7 @@ func TestShellWritePlanControlFlow(t *testing.T) {
 		{"printf x > a; git commit -m a", []string{"a"}, nil, []string{"a"}},
 		{"cp source a; git commit -m human", nil, nil, nil},
 		{"cp source a && git commit -m a", []string{"a"}, nil, []string{"a"}},
+		{"false && cd nowhere; printf x > a && git commit -m a", []string{"a"}, nil, []string{"a"}},
 		{"printf x > a; git add a; echo \"$(git commit -m a)\"", []string{"a"}, nil, []string{"a"}},
 		{"false && printf x > a; git commit -m human", nil, nil, nil},
 		{"true || printf x > a; git commit -m human", nil, nil, nil},

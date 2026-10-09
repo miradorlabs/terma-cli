@@ -79,7 +79,7 @@ func shellDirectoryStates(file *syntax.File) map[*syntax.Stmt]shellFlowState {
 		}
 		if stmt, ok := node.(*syntax.Stmt); ok {
 			if call, ok := stmt.Cmd.(*syntax.CallExpr); ok {
-				if words := wordsOf(call); len(words) > 0 && filepath.Base(words[0].text) == "mkdir" {
+				if words := wordsOf(call); len(words) > 0 && (filepath.Base(words[0].text) == "mkdir" || words[0].text == "cd") {
 					dirs[stmt] = true
 				}
 			}

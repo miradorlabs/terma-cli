@@ -426,6 +426,7 @@ func TestCodexSkippedWritesDoNotClaimHumanCommits(t *testing.T) {
 		"if test -f absent; then printf agent > f.txt; fi; git commit -m human",
 		"git commit -m human; false && printf agent > f.txt; true",
 		"cp missing f.txt; git commit -m human",
+		"git mv -n f.txt new.txt && git commit -m human",
 	} {
 		t.Run(command, func(t *testing.T) {
 			c := newCodexCall(t)
@@ -557,6 +558,27 @@ func TestCodexSuccessfulExternalWriterChainIsStamped(t *testing.T) {
 	msg, _ := gitx.Git(c.ctx, c.root, "log", "-1", "--format=%B")
 	if !strings.Contains(msg, "Agent-Session-Id: "+codexCallSession) {
 		t.Fatalf("successful external edit/add/commit chain was not stamped:\n%s", msg)
+	}
+}
+
+func TestCodexSkippedCDAndNonCommittingModesDoNotHideEdits(t *testing.T) {
+	for _, command := range []string{
+		"git rebase --abort; printf agent > f.txt; git add f.txt; git commit -m agent",
+		"git commit --dry-run; printf agent > f.txt && git add f.txt && git commit -m agent",
+		"false && cd src; printf agent > f.txt && git add f.txt && git commit -m agent",
+		"true || cd src; printf agent > f.txt && git add f.txt && git commit -m agent",
+		"cd src && printf agent > f.txt && git add f.txt && git commit -m agent",
+	} {
+		t.Run(command, func(t *testing.T) {
+			c := newCodexCall(t)
+			hookruntest.WriteFile(t, c.root, "src/keep.txt", "keep\n")
+			c.installTestHooks()
+			c.shell(command)
+			msg, _ := gitx.Git(c.ctx, c.root, "log", "-1", "--format=%B")
+			if !strings.Contains(msg, "Agent-Session-Id: "+codexCallSession) {
+				t.Fatalf("a skipped/no-op command hid the actual edit:\n%s", msg)
+			}
+		})
 	}
 }
 

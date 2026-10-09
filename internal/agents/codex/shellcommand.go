@@ -97,3 +97,36 @@ func splitEnvWords(value string) []word {
 	}
 	return out
 }
+
+type word struct {
+	text string
+	// literal is false when the shell would expand the word, so its text is not the path.
+	literal bool
+}
+
+// literal is the word's text when the shell expands nothing in it: plain, quoted, or both.
+func literal(w *syntax.Word) word {
+	var b strings.Builder
+	for _, part := range w.Parts {
+		switch p := part.(type) {
+		case *syntax.Lit:
+			if strings.ContainsAny(p.Value, "*?[{\\") || strings.HasPrefix(p.Value, "~") {
+				return word{}
+			}
+			b.WriteString(p.Value)
+		case *syntax.SglQuoted:
+			b.WriteString(p.Value)
+		case *syntax.DblQuoted:
+			for _, inner := range p.Parts {
+				l, ok := inner.(*syntax.Lit)
+				if !ok {
+					return word{}
+				}
+				b.WriteString(l.Value)
+			}
+		default:
+			return word{}
+		}
+	}
+	return word{b.String(), true}
+}

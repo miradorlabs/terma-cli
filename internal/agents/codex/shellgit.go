@@ -10,24 +10,51 @@ import (
 var committing = []string{"commit", "cherry-pick", "revert", "rebase", "am"}
 
 func makesCommit(words []word) bool {
-	if gitSubcommand(words) != "merge" {
-		return slices.Contains(committing, gitSubcommand(words))
+	command, _ := gitCommand(words, "")
+	if len(command) == 0 {
+		return false
 	}
-	for _, w := range words {
-		if slices.Contains([]string{"--abort", "--quit", "--squash", "--no-commit"}, w.text) {
+	name := command[0].text
+	if name != "merge" && !slices.Contains(committing, name) {
+		return false
+	}
+	for _, flag := range []string{"--abort", "--quit", "--no-commit", "--dry-run"} {
+		if hasGitOption(command, flag, "") {
 			return false
 		}
+	}
+	if name == "merge" && hasGitOption(command, "--squash", "") {
+		return false
+	}
+	if (name == "cherry-pick" || name == "revert") && hasGitOption(command, "--no-commit", "n") {
+		return false
 	}
 	return true // an unstamped merge still retires the files it incorporates
 }
 
-// gitSubcommand is the subcommand of a git command line, after git's own options.
-func gitSubcommand(words []word) string {
-	command, _ := gitCommand(words, "")
-	if len(command) > 0 {
-		return command[0].text
+// hasGitOption ignores option values and pathspecs, and honors --no-<option> toggles.
+func hasGitOption(args []word, flag, short string) bool {
+	enabled := false
+	opposite := "--no-" + strings.TrimPrefix(flag, "--")
+	if strings.HasPrefix(flag, "--no-") {
+		opposite = "--" + strings.TrimPrefix(flag, "--no-")
 	}
-	return ""
+	for i := 1; i < len(args); i++ {
+		a := args[i].text
+		if a == "--" {
+			break
+		}
+		if (a == "--squash" && args[0].text == "commit") || slices.Contains([]string{"-m", "--message", "-F", "--file", "-c", "-C", "--reuse-message", "--reedit-message", "--author", "--date", "--fixup", "--trailer", "-t", "--template"}, a) {
+			i++
+			continue
+		}
+		if a == flag || (short != "" && strings.HasPrefix(a, "-") && !strings.HasPrefix(a, "--") && strings.Trim(a[1:], "fvknxesq") == "" && strings.Contains(a[1:], short)) {
+			enabled = true
+		} else if a == opposite {
+			enabled = false
+		}
+	}
+	return enabled
 }
 
 // gitCommand strips Git's global options and resolves each -C relative to the previous
