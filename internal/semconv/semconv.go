@@ -227,8 +227,14 @@ const (
 	TermaRateLimitSpendLimitUsedPercentKey = "terma.rate_limit.spend_limit.used_percent"
 	// TermaRelayAttributionKey is terma.relay.attribution: How the relay found the part's session when the part did not name it.
 	TermaRelayAttributionKey = "terma.relay.attribution"
+	// TermaRelayExitReasonKey is terma.relay.exit.reason: Why the relay stopped, on the heartbeat that says it is stopping.
+	TermaRelayExitReasonKey = "terma.relay.exit.reason"
+	// TermaRelayHeartbeatCounterKey is terma.relay.heartbeat.counter: How many of each thing the relay counted since the previous heartbeat that carried counters, one attribute per counter.
+	TermaRelayHeartbeatCounterKey = "terma.relay.heartbeat.counter"
 	// TermaRelayHeartbeatReasonKey is terma.relay.heartbeat.reason: Why the relay sent a heartbeat.
 	TermaRelayHeartbeatReasonKey = "terma.relay.heartbeat.reason"
+	// TermaRelayLaunchKey is terma.relay.launch: What started the relay.
+	TermaRelayLaunchKey = "terma.relay.launch"
 	// TermaRelaySessionIDKey is terma.relay.session.id: The session the relay inferred for a part that named none.
 	TermaRelaySessionIDKey = "terma.relay.session.id"
 	// TermaRepositoryRootKey is terma.repository.root: The absolute path of the working tree the session or the git operation ran in.
@@ -365,12 +371,32 @@ const (
 	TermaRelayAttributionCatchAll = "catch-all"
 	// TermaRelayAttributionProcess is terma.relay.attribution process: The part named no session; its process named one.
 	TermaRelayAttributionProcess = "process"
+	// TermaRelayExitReasonAsked is terma.relay.exit.reason asked: Asked to stop, or its process was signalled.
+	TermaRelayExitReasonAsked = "asked"
+	// TermaRelayExitReasonIdle is terma.relay.exit.reason idle: It had been idle and no hold or queue kept it.
+	TermaRelayExitReasonIdle = "idle"
+	// TermaRelayExitReasonReplaced is terma.relay.exit.reason replaced: A newer terma asked it to make way.
+	TermaRelayExitReasonReplaced = "replaced"
+	// TermaRelayExitReasonUpdated is terma.relay.exit.reason updated: It installed a newer terma and stopped to run it.
+	TermaRelayExitReasonUpdated = "updated"
+	// TermaRelayExitReasonSetupGone is terma.relay.exit.reason setup-gone: Its setup was removed.
+	TermaRelayExitReasonSetupGone = "setup-gone"
+	// TermaRelayExitReasonServeFailed is terma.relay.exit.reason serve-failed: Its server failed.
+	TermaRelayExitReasonServeFailed = "serve-failed"
 	// TermaRelayHeartbeatReasonStart is terma.relay.heartbeat.reason start: The relay started.
 	TermaRelayHeartbeatReasonStart = "start"
 	// TermaRelayHeartbeatReasonInterval is terma.relay.heartbeat.reason interval: The heartbeat period passed.
 	TermaRelayHeartbeatReasonInterval = "interval"
 	// TermaRelayHeartbeatReasonSetup is terma.relay.heartbeat.reason setup: Setup finished; the platform reads it as installed and working.
 	TermaRelayHeartbeatReasonSetup = "setup"
+	// TermaRelayHeartbeatReasonExit is terma.relay.heartbeat.reason exit: The relay is about to stop, saying why it stopped.
+	TermaRelayHeartbeatReasonExit = "exit"
+	// TermaRelayLaunchService is terma.relay.launch service: The service manager's relay (launchd, systemd, a Windows service).
+	TermaRelayLaunchService = "service"
+	// TermaRelayLaunchHook is terma.relay.launch hook: terma started it on demand, from an agent's hook or a terma command such as setup or update.
+	TermaRelayLaunchHook = "hook"
+	// TermaRelayLaunchManual is terma.relay.launch manual: A developer started it from the command line.
+	TermaRelayLaunchManual = "manual"
 	// TermaUsageScopeParentTurn is terma.usage.scope parent_turn: The parent conversation's turn, subagents excluded.
 	TermaUsageScopeParentTurn = "parent_turn"
 	// TermaUsageSemanticsSnapshot is terma.usage.semantics snapshot: A repeated snapshot, never an additive delta.

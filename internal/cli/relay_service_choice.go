@@ -83,7 +83,7 @@ func (app *App) ensureRelay(ctx context.Context, flag, env string, report func(w
 			return
 		}
 		report(false, "running in the background")
-		if isRunning && !running.Service {
+		if isRunning && running.Launch != daemon.LaunchService {
 			daemon.Stop(dir)
 		}
 		app.awaitServiceRelay(dir)

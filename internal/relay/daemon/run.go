@@ -19,6 +19,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
 // Config is what a relay runs with.
@@ -32,6 +33,13 @@ type Config struct {
 	// Service is the service manager's relay: it waits out another relay's lock, and asks to
 	// be started again when it stops.
 	Service bool
+	// Follow is the relay Supersede starts as it asks the running one to make way: it waits
+	// out that relay's lock, at most as long as the relay may take to go, and runs in its
+	// place. One waits at a time (FollowLockFile).
+	Follow bool
+	// Launch is what started a relay that is not the service's, on the heartbeat and in
+	// RunInfo: a hook, or a developer when empty. Service overrides it.
+	Launch Launch
 	// Environment is the backend environment the relay delivers to, recorded for doctor.
 	Environment string
 	// Version is this terma's, recorded so a newer one's hooks can ask the relay to make way.
@@ -59,6 +67,20 @@ type Result struct {
 	Updated bool
 	// SetupGone means the relay's token was removed: nothing to relay for.
 	SetupGone bool
+	// exitBeat sends the relay's last heartbeat (ExitBeat); nil once setup is gone.
+	exitBeat func()
+}
+
+// ExitBeat sends the stopped relay's last heartbeat, waiting at most exitBeatWait: why it
+// stopped, and what it counted since the previous beat, what it dropped and left queued at
+// exit included, which an idle exit or a teardown would otherwise lose. Run leaves it to its
+// caller, to send once whatever starts the next relay is under way, since nothing listens
+// meanwhile and an agent never sends a refused export again. A relay whose setup is gone
+// sends none: teardown took away what it would report with.
+func (r Result) ExitBeat() {
+	if r.exitBeat != nil {
+		r.exitBeat()
+	}
 }
 
 // Restart reports whether whatever runs the relay should start it again.
@@ -77,7 +99,23 @@ func Run(ctx context.Context, c Config) (Result, error) {
 			return res, nil
 		}
 	}
-	unlock, busy, err := lock(ctx, dir, res.Service)
+	lockCtx, wait := ctx, res.Service
+	unfollow := func() {}
+	if c.Follow && !res.Service {
+		var err error
+		if unfollow, err = flock.TryLock(filepath.Join(dir, FollowLockFile)); err != nil {
+			// Another relay already waits to take over, or none can: not this one.
+			res.AlreadyRunning = true
+			return res, nil
+		}
+		var cancelWait context.CancelFunc
+		lockCtx, cancelWait = context.WithTimeout(ctx, replacedMaxWait+followSlack)
+		defer cancelWait()
+		wait = true
+	}
+	unlock, busy, err := lock(lockCtx, dir, wait)
+	// Whether it took over or gave up, the next relay to make way gets its own follower.
+	unfollow()
 	if err != nil {
 		return res, err
 	}
@@ -101,18 +139,19 @@ func Run(ctx context.Context, c Config) (Result, error) {
 	}
 	opts := c.Engine
 	opts.Token = token
-	r := relay.New(opts)
-	kind := "on demand"
+	launch := cmp.Or(c.Launch, LaunchManual)
 	if res.Service {
-		kind = "service"
+		launch = LaunchService
 	}
-	c.Log.Printf("relay pid %d (%s, %s) listening on %s", os.Getpid(), kind, cmp.Or(c.Environment, "prod"), ln.Addr())
+	opts.Launch = string(launch)
+	r := relay.New(opts)
+	c.Log.Printf("relay pid %d (%s, %s) listening on %s", os.Getpid(), launch, cmp.Or(c.Environment, "prod"), ln.Addr())
 	if c.Listening != nil {
 		c.Listening(ln.Addr(), opts.Hold)
 	}
 	claim.Prune(c.StateDir, time.Now())
 	runPath := filepath.Join(dir, RunFile)
-	if data, err := json.Marshal(RunInfo{PID: os.Getpid(), Environment: c.Environment, Service: res.Service, Version: c.Version}); err == nil {
+	if data, err := json.Marshal(RunInfo{PID: os.Getpid(), Environment: c.Environment, Launch: launch, Service: res.Service, Version: c.Version}); err == nil {
 		_ = config.WriteFileAtomicNoSync(runPath, append(data, '\n'), 0o600)
 	}
 	// Gone before the lock is, so the next relay's records are never removed.
@@ -184,6 +223,14 @@ func Run(ctx context.Context, c Config) (Result, error) {
 	if line, err := json.Marshal(snap.Counters); err == nil {
 		c.Log.Printf("relay pid %d stopped (%s): %s", os.Getpid(), why.describe(serveErr), line)
 	}
+	if !res.SetupGone {
+		exit := why.exit(serveErr)
+		res.exitBeat = func() {
+			ctx, cancel := context.WithTimeout(context.Background(), exitBeatWait)
+			defer cancel()
+			_ = r.StopHeartbeat(ctx, exit)
+		}
+	}
 	return res, serveErr
 }
 
@@ -217,6 +264,26 @@ func (r stopReason) describe(err error) string {
 	return "asked to stop"
 }
 
+// exitBeatWait bounds the last heartbeat, which a stopped relay's process waits for.
+const exitBeatWait = 3 * time.Second
+
+// exit is the last heartbeat's terma.relay.exit.reason for this run's end.
+func (r stopReason) exit(err error) string {
+	switch {
+	case err != nil:
+		return semconv.TermaRelayExitReasonServeFailed
+	case r == stopReplaced:
+		return semconv.TermaRelayExitReasonReplaced
+	case r == stopUpdated:
+		return semconv.TermaRelayExitReasonUpdated
+	case r == stopSetupGone:
+		return semconv.TermaRelayExitReasonSetupGone
+	case r == stopIdle:
+		return semconv.TermaRelayExitReasonIdle
+	}
+	return semconv.TermaRelayExitReasonAsked
+}
+
 // setUp reports whether the relay's token is still under stateDir.
 func setUp(stateDir string) bool {
 	_, err := Token(stateDir)
@@ -228,7 +295,10 @@ type RunInfo struct {
 	PID int `json:"pid"`
 	// Environment is the backend environment it delivers to.
 	Environment string `json:"environment"`
-	// Service is true for the service's relay, false for one a hook or a developer started.
+	// Launch is what started the relay: the service manager, a hook, or a developer.
+	Launch Launch `json:"launch"`
+	// Service is Launch == LaunchService, still written for a terma from before Launch,
+	// and read from one: its record has no launch.
 	Service bool `json:"service"`
 	// Version is the terma it runs.
 	Version string `json:"version,omitempty"`
@@ -247,6 +317,9 @@ func RunningRelay(dir string) (RunInfo, bool) {
 	var info RunInfo
 	if json.Unmarshal(data, &info) != nil || info.PID <= 0 {
 		return RunInfo{}, false
+	}
+	if info.Launch == "" && info.Service {
+		info.Launch = LaunchService
 	}
 	return info, true
 }
@@ -289,6 +362,10 @@ func listen(dir, addr string) (net.Listener, error) {
 // replacedMaxWait bounds how long a relay asked to make way waits for its hold to empty:
 // the default hold, so an agent exporting without pause cannot keep the old terma running.
 var replacedMaxWait = relay.DefaultHold
+
+// followSlack is how long a following relay waits beyond replacedMaxWait, for the relay
+// making way to deliver what it accepted and let go of its lock.
+const followSlack = 30 * time.Second
 
 // watch waits for a reason to stop. A relay that installed a newer terma stops once Quiesce
 // finds its hold empty, no export in flight and none for updateQuiet (for none at all after

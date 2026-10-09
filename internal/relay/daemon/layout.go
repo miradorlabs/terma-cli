@@ -24,8 +24,11 @@ const (
 	// StopFile asks the relay whose pid it holds to stop, since Windows has no SIGTERM.
 	StopFile = "stop"
 	// ReplaceFile asks the relay whose pid it holds to make way for a newer terma (Spawn).
-	ReplaceFile   = "replace"
-	NoServiceFile = "no-service"
+	ReplaceFile = "replace"
+	// FollowLockFile is held by the one relay waiting to take over from a relay asked to
+	// make way (Config.Follow).
+	FollowLockFile = "follow.lock"
+	NoServiceFile  = "no-service"
 	// EnvFile is the environment every relay of this state directory runs in (RecordEnv).
 	EnvFile = "env.json"
 	// RunFile describes the running relay, its pid included (RunningRelay).

@@ -7,9 +7,11 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strconv"
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/relay/service"
 )
 
@@ -101,7 +103,7 @@ func TestAHookStartedRelayRunsInTheRecordedEnvironment(t *testing.T) {
 	}
 	t.Setenv("TERMA_ENV", "") // the hook's environment
 	proc := spawnCommand("/opt/terma/bin/terma", dir)
-	if !slices.Equal(proc.Args, []string{"/opt/terma/bin/terma", "relay", "run", "--quiet"}) {
+	if !slices.Equal(proc.Args, []string{"/opt/terma/bin/terma", "relay", "run", "--quiet", "--launch", "hook"}) {
 		t.Fatalf("args = %v", proc.Args)
 	}
 	if !slices.Contains(proc.Env, "TERMA_ENV=dev") {
@@ -221,12 +223,13 @@ func TestARunningRelayRecordsItsEnvironment(t *testing.T) {
 		name    string
 		idle    time.Duration
 		service bool
-	}{{"hook-started", time.Hour, false}, {"started by hand, never idling", 0, false}, {"service", 0, true}} {
+		launch  Launch
+	}{{"hook-started", time.Hour, false, LaunchHook}, {"started by hand, never idling", 0, false, LaunchManual}, {"service", 0, true, LaunchService}} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer cancel()
 			c := runConfig(stateDir, tc.idle, nil)
-			c.Environment, c.Version, c.Service = "dev", "1.2.0", tc.service
+			c.Environment, c.Version, c.Service, c.Launch = "dev", "1.2.0", tc.service, tc.launch
 			done := make(chan error, 1)
 			go func() { _, err := Run(ctx, c); done <- err }()
 			// The run file, not RunningRelay: its lock probe, winning the race, would make a
@@ -247,7 +250,7 @@ func TestARunningRelayRecordsItsEnvironment(t *testing.T) {
 			if !ok {
 				t.Fatal("a relay that recorded itself does not read as running")
 			}
-			if info.PID != os.Getpid() || info.Environment != "dev" || info.Service != tc.service || info.Version != "1.2.0" {
+			if info.PID != os.Getpid() || info.Environment != "dev" || info.Launch != tc.launch || info.Version != "1.2.0" {
 				t.Fatalf("recorded %+v", info)
 			}
 			cancel()
@@ -274,5 +277,26 @@ func TestAStaleRunRecordIsNotARunningRelay(t *testing.T) {
 	}
 	if info, ok := RunningRelay(dir); ok {
 		t.Fatalf("a crashed relay's record reads as running: %+v", info)
+	}
+}
+
+// The record of a relay from before terma.relay.launch says only "service"; a service relay
+// of that release still reads as the service's, so a newer hook's Supersede checks what the
+// service runs before asking it to make way.
+func TestAnEarlierServiceRelayReadsAsTheService(t *testing.T) {
+	t.Parallel()
+	_, dir, _ := setUpRelay(t)
+	unlock, err := flock.TryLock(filepath.Join(dir, LockFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unlock()
+	record := `{"pid":` + strconv.Itoa(os.Getpid()) + `,"environment":"dev","service":true,"version":"0.9.0"}`
+	if err := os.WriteFile(filepath.Join(dir, RunFile), []byte(record), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	info, ok := RunningRelay(dir)
+	if !ok || info.Launch != LaunchService {
+		t.Fatalf("an earlier service relay reads as %+v, %v", info, ok)
 	}
 }

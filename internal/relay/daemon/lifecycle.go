@@ -102,27 +102,45 @@ func Spawn(stateDir, version string) {
 // an earlier release than version and what starts the next relay is this terma: a later
 // hook, or a service that runs this binary. A service that runs another install would start
 // the earlier release again, at every hook. A newer relay is left alone, so two installs
-// never take turns. It starts no relay.
+// never take turns. The service's relay is started again by the service manager, and a
+// service that runs this terma has its relay waiting for the lock already; otherwise
+// Supersede starts the relay that takes the place of the one making way, since that one is
+// the earlier release and starts none, and an agent exporting before the next hook would
+// find nothing listening.
 func Supersede(stateDir, version string) {
 	dir := claim.Dir(stateDir)
 	running, ok := RunningRelay(dir)
-	if !ok || !selfupdate.Newer(running.Version, version) || running.Service && !serviceRunsThis(stateDir) {
+	if !ok || !selfupdate.Newer(running.Version, version) || running.Launch == LaunchService && !serviceRunsThis(stateDir) {
 		return
 	}
 	_ = config.WriteFileAtomicNoSync(filepath.Join(dir, ReplaceFile), []byte(strconv.Itoa(running.PID)+"\n"), 0o600)
+	if running.Launch != LaunchService && !serviceRunsThis(stateDir) {
+		follow(dir)
+	}
+}
+
+// follow starts the relay that waits to take over from the one asked to make way, unless
+// one waits already. It does not wait: the relay making way still listens.
+var follow = func(dir string) {
+	unlock, err := flock.TryLock(filepath.Join(dir, FollowLockFile))
+	if err != nil {
+		return
+	}
+	unlock()
+	_ = start(dir, "--follow")
 }
 
 // serviceRunsThis reports whether the installed service starts this terma.
 var serviceRunsThis = func(stateDir string) bool { return CheckService(stateDir).Current }
 
-// start starts `terma relay run --quiet` detached, logging to the relay's log.
-func start(dir string) error {
+// start starts `terma relay run --quiet` detached with args, logging to the relay's log.
+func start(dir string, args ...string) error {
 	exe, err := os.Executable()
 	// A <package>.test binary is no relay, and would only fail on the flags.
 	if err != nil || strings.HasSuffix(filepath.Base(exe), ".test") {
 		return errors.New("relay: no terma binary to start")
 	}
-	proc := spawnCommand(exe, dir)
+	proc := spawnCommand(exe, dir, args...)
 	procinfo.Detach(proc)
 	out := openDaemonLog(dir)
 	if out != nil {
@@ -140,8 +158,8 @@ func start(dir string) error {
 
 // spawnCommand is the hook-started relay. A hook's environment is not the developer's (it
 // may lack TERMA_ENV), so the relay runs in the one install recorded, where there is one.
-func spawnCommand(exe, dir string) *exec.Cmd {
-	proc := exec.Command(exe, "relay", "run", "--quiet")
+func spawnCommand(exe, dir string, args ...string) *exec.Cmd {
+	proc := exec.Command(exe, append([]string{"relay", "run", "--quiet", "--launch", "hook"}, args...)...)
 	if env, ok := RecordedEnv(dir); ok {
 		proc.Env = withRelayEnv(os.Environ(), env)
 	}

@@ -101,7 +101,7 @@ func (app *App) relayFacts() doctor.Relay {
 		r.LastFailure = strings.TrimSpace(string(data))
 	}
 	if info, ok := daemon.RunningRelay(dir); ok {
-		r.Environment, r.HookStarted = info.Environment, !info.Service
+		r.Environment, r.HookStarted = info.Environment, info.Launch != daemon.LaunchService
 		r.Version, r.Earlier = info.Version, selfupdate.Newer(info.Version, app.version)
 	}
 	if service.Supported() {
