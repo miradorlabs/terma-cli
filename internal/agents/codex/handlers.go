@@ -237,6 +237,31 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	return nil
 }
 
+// preToolUse records the files a shell call is about to write, so a commit in the same
+// call is stamped: the call's PostToolUse comes after that commit, and Codex sends none for
+// a patch it runs from the shell.
+func preToolUse(ctx context.Context, env hookrun.Env) error {
+	in, err := readCodexHookInput(env.Stdin)
+	if err != nil {
+		env.Logf("%v", err)
+		return nil
+	}
+	if in.ToolName != codexShellTool || !session.ValidID(in.SessionID) {
+		return nil
+	}
+	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+	paths := codexEditedPaths(in, env.Cwd)
+	if len(paths) == 0 {
+		return nil
+	}
+	r, err := env.Repo(ctx)
+	if err != nil {
+		return nil
+	}
+	env.Expect(r, session.Session{ID: in.SessionID, Tool: codexTool, Model: in.Model}, paths)
+	return nil
+}
+
 func codexEditedPaths(in *codexHookInput, cwd string) []string {
 	var input struct {
 		Command  string `json:"command"`

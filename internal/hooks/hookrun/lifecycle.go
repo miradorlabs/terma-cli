@@ -87,6 +87,19 @@ func (e Env) Touch(r *Repo, sess session.Session, toolName string, paths []strin
 	}
 }
 
+// Expect records in sess's manifest the files a tool call is about to write, without
+// reporting them: a commit in the same call is stamped, and the hook after the call
+// reports what was written.
+func (e Env) Expect(r *Repo, sess session.Session, paths []string) {
+	for _, c := range e.checkouts(r, paths) {
+		if c.repo == r {
+			if err := r.Store.Touch(sess, c.files, e.Time()); err != nil {
+				e.Logf("record files: %v", err)
+			}
+		}
+	}
+}
+
 // touched is the files of one checkout, repo-relative, as a set.
 type touched struct {
 	repo  *Repo

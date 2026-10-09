@@ -23,6 +23,13 @@ type = "command"
 command = "[ -x \"$HOME/.local/bin/terma\" ] && \"$HOME/.local/bin/terma\" hook --user codex-permission-request || true"
 timeout = 10
 
+[[hooks.PreToolUse]]
+
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = "[ -x \"$HOME/.local/bin/terma\" ] && \"$HOME/.local/bin/terma\" hook --user codex-pre-tool-use || true"
+timeout = 10
+
 [[hooks.PostToolUse]]
 
 [[hooks.PostToolUse.hooks]]

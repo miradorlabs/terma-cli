@@ -96,8 +96,9 @@ func TestCodexHooksMergeKeepsDescriptionAndUserGroups(t *testing.T) {
 	if !ours.Async {
 		t.Fatal("PostToolUse must be async")
 	}
-	if pre, ok := doc.Hooks["PreToolUse"]; ok {
-		t.Fatalf("PreToolUse would delay every call for nothing: %+v", pre)
+	// PreToolUse makes the agent wait, so a commit in the same call finds the files it writes.
+	if pre := doc.Hooks["PreToolUse"]; len(pre) != 1 || pre[0].Hooks[0].Command != testCommand("codex-pre-tool-use") || pre[0].Hooks[0].Async {
+		t.Fatalf("PreToolUse must be terma's synchronous hook: %+v", pre)
 	}
 	if approval := doc.Hooks["PermissionRequest"]; len(approval) != 1 || approval[0].Hooks[0].Command != testCommand("codex-permission-request") {
 		t.Fatalf("PermissionRequest missing: %+v", approval)

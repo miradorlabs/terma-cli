@@ -19,17 +19,27 @@ func shellWrites(command, cwd string) []string {
 	}
 	dir := cwd
 	var out []string
-	add := func(w word) {
+	resolve := func(w word) (string, bool) {
 		if !w.literal || w.text == "" || (dir == "" && !filepath.IsAbs(w.text)) {
-			return
+			return "", false
 		}
 		p := filepath.Clean(w.text)
 		if !filepath.IsAbs(p) {
 			p = filepath.Join(dir, p)
 		}
+		return p, true
+	}
+	// made holds the directories a mkdir earlier in the command creates: read before the
+	// command runs, they do not exist yet.
+	made := map[string]bool{}
+	add := func(w word) {
+		p, ok := resolve(w)
+		if !ok {
+			return
+		}
 		if info, err := os.Stat(p); err == nil && !info.Mode().IsRegular() {
 			return // a directory, or /dev/null
-		} else if err != nil {
+		} else if err != nil && !made[filepath.Dir(p)] {
 			if parent, err := os.Stat(filepath.Dir(p)); err != nil || !parent.IsDir() {
 				return // nothing was written there: cp's into a file, a stale cd
 			}
@@ -79,6 +89,13 @@ func shellWrites(command, cwd string) []string {
 					dir = filepath.Join(dir, words[1].text)
 				default:
 					dir = "" // somewhere the shell decides; relative targets after it are unknown
+				}
+			}
+			if len(words) > 0 && words[0].text == "mkdir" {
+				for _, w := range words[1:] {
+					if p, ok := resolve(w); ok && !strings.HasPrefix(w.text, "-") {
+						made[p] = true
+					}
 				}
 			}
 			for _, w := range writtenOperands(words) {
@@ -142,6 +159,9 @@ func literal(w *syntax.Word) word {
 
 // writtenOperands returns the arguments a command writes to.
 func writtenOperands(words []word) []word {
+	if len(words) > 2 && filepath.Base(words[0].text) == "git" && words[1].text == "mv" {
+		words = words[1:] // git mv moves as mv does
+	}
 	args := make([]string, len(words))
 	for i, w := range words {
 		args[i] = w.text
