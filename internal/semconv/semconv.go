@@ -95,6 +95,8 @@ const (
 	TermaCommitSessionCountKey = "terma.commit.session.count"
 	// TermaCommitSessionIDsKey is terma.commit.session.ids: The sessions stamped into the commit.
 	TermaCommitSessionIDsKey = "terma.commit.session.ids"
+	// TermaCommitSessionsKey is terma.commit.sessions: The sessions stamped into the commit, each with its agent.
+	TermaCommitSessionsKey = "terma.commit.sessions"
 	// TermaCommitStagedCountKey is terma.commit.staged.count: How many files were staged when the message was stamped.
 	TermaCommitStagedCountKey = "terma.commit.staged.count"
 	// TermaCompactionItemIDKey is terma.compaction.item.id: The agent's id for the compaction item.
@@ -191,6 +193,8 @@ const (
 	TermaPushRemoteURLKey = "terma.push.remote.url"
 	// TermaPushSessionIDsKey is terma.push.session.ids: The sessions stamped into the commits terma.push.commits lists.
 	TermaPushSessionIDsKey = "terma.push.session.ids"
+	// TermaPushSessionsKey is terma.push.sessions: The sessions stamped into the commits terma.push.commits lists, each with its agent.
+	TermaPushSessionsKey = "terma.push.sessions"
 	// TermaPushStatusKey is terma.push.status: What the local repository showed about the push's outcome.
 	TermaPushStatusKey = "terma.push.status"
 	// TermaQuotaStatusKey is terma.quota.status: Whether the record carries the session's quota.
