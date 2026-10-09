@@ -1,6 +1,7 @@
 package hookrun
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/json"
@@ -21,6 +22,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
+	"github.com/miradorlabs/terma-cli/internal/trailer"
 )
 
 // A push is reported once git push has exited, so the event can say whether the remote
@@ -36,7 +38,7 @@ const (
 	MaxPushCommits = 500
 	// maxPushWalk bounds the history walk, and so terma.push.commit.count.
 	maxPushWalk = 10000
-	// maxPushSessions bounds terma.push.session.ids.
+	// maxPushSessions bounds terma.push.sessions and terma.push.session.ids.
 	maxPushSessions = 100
 	// maxPushInput bounds what pre-push reads: a line is about 150 bytes, one per ref.
 	maxPushInput = 4 << 20
@@ -170,10 +172,42 @@ func PrePush(ctx context.Context, env Env) error {
 	path := filepath.Join(env.StateDir, PushesDir, rec.ID+".json")
 	if err := config.WriteJSON(path, rec, 0o600); err != nil {
 		env.Logf("record push: %v", err)
+		env.park(r, parkedPushes, rec)
 		return nil
 	}
 	env.AwaitPush(path)
 	return nil
+}
+
+// unparkPushes records the pushes a sandboxed pre-push parked in r's git directory and starts their
+// AwaitPush, which reports each at once, its git push long gone.
+func (e Env) unparkPushes(r *Repo) {
+	if e.AwaitPush == nil {
+		return
+	}
+	var recorded []string
+	err := r.parking().Unpark(parkedPushes, func(lines []byte) error {
+		for line := range bytes.Lines(lines) {
+			var rec pushRecord
+			if json.Unmarshal(line, &rec) != nil || rec.ID == "" {
+				continue
+			}
+			path := filepath.Join(e.StateDir, PushesDir, rec.ID+".json")
+			if err := config.WriteJSON(path, rec, 0o600); err != nil {
+				return err
+			}
+			recorded = append(recorded, path)
+		}
+		return nil
+	})
+	if err != nil {
+		// Still parked: the next hook records them all again and awaits each once.
+		e.Logf("unpark pushes: %v", err)
+		return
+	}
+	for _, path := range recorded {
+		e.AwaitPush(path)
+	}
 }
 
 // AwaitPush waits for git push to exit, then reports the push recorded at path and
@@ -308,6 +342,7 @@ func pushEvent(ctx context.Context, env Env, rec pushRecord, i int, ref PushRef,
 		return spool.Event{}, false
 	}
 	shas, sessions := pushedLists(commits)
+	ids := sessionIDs(sessions)
 	status := semconv.TermaPushStatusUnknown
 	if exited && ref.Tracking != "" && ref.TrackingBefore != ref.LocalSHA {
 		if after, readable := gitx.RefFS(rec.GitDir, ref.Tracking); readable && after == ref.LocalSHA {
@@ -323,28 +358,31 @@ func pushEvent(ctx context.Context, env Env, rec pushRecord, i int, ref PushRef,
 	attrs[semconv.TermaPushCommitsKey] = shas
 	attrs[semconv.TermaPushCommitCountKey] = len(commits)
 	attrs[semconv.TermaPushCommitsTruncatedKey] = len(shas) < len(commits)
-	attrs[semconv.TermaPushSessionIDsKey] = sessions
+	attrs[semconv.TermaPushSessionIDsKey] = ids
+	attrs[semconv.TermaPushSessionsKey] = sessionsAttr(sessions)
 	ev := rec.Event
 	ev.Attrs = attrs
-	if len(sessions) > 0 {
-		ev.SessionID = sessions[0]
+	if len(ids) > 0 {
+		ev.SessionID = ids[0]
 	}
 	return ev, true
 }
 
 // pushedLists are the commit ids terma.push.commits lists, at most MaxPushCommits, and the
-// sessions stamped into those commits alone. Neither is ever nil: an empty list is still
-// the string[] the registry declares.
-func pushedLists(commits []gitx.PushedCommit) (shas, sessions []string) {
+// sessions stamped into those commits alone, each agent's session once, at most
+// maxPushSessions. shas is never nil: an empty list is still the string[] the registry declares.
+func pushedLists(commits []gitx.PushedCommit) (shas []string, sessions []trailer.Trailer) {
 	listed := commits[:min(len(commits), MaxPushCommits)]
-	shas, sessions = make([]string, 0, len(listed)), []string{}
+	shas = make([]string, 0, len(listed))
+	var stamped []trailer.Trailer
 	for _, c := range listed {
 		shas = append(shas, c.SHA)
-		for _, s := range c.Sessions {
-			if session.ValidID(s) && !slices.Contains(sessions, s) && len(sessions) < maxPushSessions {
-				sessions = append(sessions, s)
+		for _, t := range trailer.Parse(c.Trailers, "") {
+			if session.ValidID(t.SessionID) {
+				stamped = append(stamped, t)
 			}
 		}
 	}
-	return shas, sessions
+	sessions = uniqueSessions(stamped)
+	return shas, sessions[:min(len(sessions), maxPushSessions)]
 }

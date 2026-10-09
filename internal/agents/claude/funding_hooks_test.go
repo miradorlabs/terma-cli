@@ -417,7 +417,8 @@ func TestSessionEndReportsAnUnreportedLimit(t *testing.T) {
 		t.Fatalf("a reported limit was sent again: %+v", got)
 	}
 
-	// A StopFailure whose append failed leaves the limit to the session's end.
+	// A StopFailure whose append failed parks the limit in the repository: the session's end
+	// spools it, and does not report it again.
 	env.Now = env.Now.Add(time.Minute)
 	write(apiError(env.Now.Add(-time.Second), "overloaded"))
 	spoolDir := filepath.Join(t.TempDir(), "spool")
@@ -435,8 +436,8 @@ func TestSessionEndReportsAnUnreportedLimit(t *testing.T) {
 	if err := os.Mkdir(spoolDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if got := limitRun(t, env, path, "", sessionEnd); len(got) != 1 || got[0].Attrs[semconv.TermaEvidenceSourceKey] != sourceClaudeTranscript {
-		t.Fatalf("a failed append was taken as reported: %+v", got)
+	if got := limitRun(t, env, path, "", sessionEnd); len(got) != 1 || got[0].Attrs[semconv.TermaEvidenceSourceKey] != sourceClaudeStopFailure {
+		t.Fatalf("a parked limit was not sent once: %+v", got)
 	}
 
 	// A failure Claude Code gave no category stays without one.

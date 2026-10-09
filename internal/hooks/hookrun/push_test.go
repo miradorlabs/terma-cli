@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -15,6 +16,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/spool"
+	"github.com/miradorlabs/terma-cli/internal/trailer"
 )
 
 func TestParsePushInput(t *testing.T) {
@@ -121,6 +123,17 @@ func pushLine(local, localSHA, remoteRef, remoteSHA string) string {
 
 const zero = "0000000000000000000000000000000000000000"
 
+// sessionMaps reads a spooled sessions attribute back.
+func sessionMaps(v any) []map[string]any {
+	var out []map[string]any
+	if list, ok := v.([]any); ok {
+		for _, m := range list {
+			out = append(out, m.(map[string]any))
+		}
+	}
+	return out
+}
+
 func strs(v any) []string {
 	var out []string
 	if list, ok := v.([]any); ok {
@@ -137,7 +150,7 @@ func TestPushReportsEachBranchOnceGitPushExits(t *testing.T) {
 
 	// A new branch with one stamped commit: only that commit, since main is on the remote.
 	p.git("checkout", "-q", "-b", "feature")
-	p.git("commit", "-q", "--allow-empty", "-m", "agent work\n\nAgent-Session-Id: sess-1\nAgent-Tool: claude")
+	p.git("commit", "-q", "--allow-empty", "-m", "agent work\n\nAgent-Session-Id: sess-1\nAgent-Tool: claude-code/2.1.3")
 	c1 := p.sha("HEAD")
 	events, ok := p.push(pushLine("refs/heads/feature", c1, "refs/heads/feature", zero), "feature")
 	if !ok || len(events) != 1 {
@@ -151,6 +164,11 @@ func TestPushReportsEachBranchOnceGitPushExits(t *testing.T) {
 		a[semconv.TermaPushNewRevisionKey] != c1 || a[semconv.TermaPushOldRevisionKey] != nil || a[semconv.TermaPushForcedKey] != nil ||
 		a[AttrProjectID] != hookruntest.Team || a[semconv.VCSRepositoryURLFullKey] == nil {
 		t.Errorf("new branch: %+v", a)
+	}
+	if got := sessionMaps(a[semconv.TermaPushSessionsKey]); !reflect.DeepEqual(got, []map[string]any{
+		{"session_id": "sess-1", "agent": "claude-code", "agent_version": "2.1.3"},
+	}) {
+		t.Errorf("new branch sessions = %v", got)
 	}
 	// The remote's local path is no URL to send.
 	if _, ok := a[semconv.TermaPushRemoteURLKey]; ok {
@@ -357,13 +375,15 @@ func TestPushedListsNameOnlyTheListedCommitsSessions(t *testing.T) {
 	for i := range commits {
 		commits[i].SHA = strings.Repeat("a", 40)
 	}
-	commits[0].Sessions = []string{"sess-listed", "sess-listed", "../bad"}
-	commits[MaxPushCommits].Sessions = []string{"sess-beyond"}
+	commits[0].Trailers = "Agent-Session-Id: sess-listed\nAgent-Tool: codex/1\nAgent-Session-Id: ../bad\n"
+	commits[1].Trailers = "Agent-Session-Id: sess-listed\nAgent-Tool: codex/2\nAgent-Session-Id: sess-listed\nAgent-Tool: claude-code\n"
+	commits[MaxPushCommits].Trailers = "Agent-Session-Id: sess-beyond\nAgent-Tool: codex\n"
 	shas, sessions := pushedLists(commits)
-	if len(shas) != MaxPushCommits || !slices.Equal(sessions, []string{"sess-listed"}) {
-		t.Errorf("%d shas, sessions %q", len(shas), sessions)
+	want := []trailer.Trailer{{SessionID: "sess-listed", Tool: "codex/1"}, {SessionID: "sess-listed", Tool: "claude-code"}}
+	if len(shas) != MaxPushCommits || !slices.Equal(sessions, want) {
+		t.Errorf("%d shas, sessions %+v", len(shas), sessions)
 	}
-	if shas, sessions := pushedLists(nil); shas == nil || sessions == nil {
+	if shas, sessions := pushedLists(nil); shas == nil || sessionIDs(sessions) == nil || sessionsAttr(sessions) == nil {
 		t.Errorf("nil lists: %#v %#v", shas, sessions)
 	}
 }

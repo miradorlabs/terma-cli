@@ -21,6 +21,19 @@ type Trailer struct {
 	Tool      string
 }
 
+// Agent splits Tool into the agent, which with SessionID is the session's identity, and
+// its version, which is not.
+func (t Trailer) Agent() (agent, version string) {
+	agent, version, _ = strings.Cut(t.Tool, "/")
+	return agent, version
+}
+
+// key is the session's identity: one agent's id, whatever its version.
+func (t Trailer) key() [2]string {
+	agent, _ := t.Agent()
+	return [2]string{agent, t.SessionID}
+}
+
 // trailerLine matches "Token: value" the way git's interpret-trailers does.
 var trailerLine = regexp.MustCompile(`^([A-Za-z0-9][A-Za-z0-9-]*):[ \t]*(.*)$`)
 
@@ -65,20 +78,20 @@ func Parse(message, commentChar string) []Trailer {
 	return out
 }
 
-// Stamp appends a trailer for every session not already present, laid out as git does,
-// and reports false when nothing changed.
+// Stamp appends a trailer for every session not already present, by agent and id, laid out
+// as git does, and reports false when nothing changed.
 func Stamp(message string, sessions []Trailer, commentChar string) (string, bool) {
-	present := map[string]bool{}
+	present := map[[2]string]bool{}
 	for _, t := range Parse(message, commentChar) {
-		present[t.SessionID] = true
+		present[t.key()] = true
 	}
 	var lines []string
 	for _, s := range sessions {
 		// A multi-line id is no real session; an unstamped commit beats a false record.
-		if s.SessionID == "" || s.SessionID != oneLine(s.SessionID) || present[s.SessionID] {
+		if s.SessionID == "" || s.SessionID != oneLine(s.SessionID) || present[s.key()] {
 			continue
 		}
-		present[s.SessionID] = true
+		present[s.key()] = true
 		lines = append(lines, Format(s)...)
 	}
 	if len(lines) == 0 {

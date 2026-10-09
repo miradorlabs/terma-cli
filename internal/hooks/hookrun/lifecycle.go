@@ -52,7 +52,7 @@ func (e Env) Announce(r *Repo, sess session.Session, extra map[string]any) {
 
 // EndSession clears the active session and spools the end; manifests stay, the work may be uncommitted.
 func (e Env) EndSession(r *Repo, id, tool string) {
-	_ = r.Store.ClearActive(id)
+	_ = r.Store.ClearActive(session.Key{Tool: tool, ID: id})
 	e.EmitFor(r, spool.Event{Name: semconv.TermaSessionEndEvent, SessionID: id, Attrs: map[string]any{
 		semconv.GenAIMainAgentNameKey: tool,
 	}})

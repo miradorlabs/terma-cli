@@ -97,6 +97,8 @@ events:
         requirement_level: required
       - ref: terma.commit.session.ids
         requirement_level: required
+      - ref: terma.commit.sessions
+        requirement_level: required
       - ref: terma.commit.session.count
         requirement_level: required
       - ref: terma.commit.staged.count
@@ -113,8 +115,14 @@ events:
       - ref: session.id
         requirement_level: required
       - ref: gen_ai.main_agent.name
-        requirement_level: required
+        requirement_level:
+          conditionally_required: When every stamped session is the one agent's.
+        note: >
+          The agent alone, without its version. A commit stamped by several agents has
+          none: terma.commit.sessions names each session's.
       - ref: terma.commit.session.ids
+        requirement_level: required
+      - ref: terma.commit.sessions
         requirement_level: required
       - ref: terma.commit.session.count
         requirement_level: required
@@ -182,6 +190,8 @@ events:
       - ref: terma.push.commits_truncated
         requirement_level: required
       - ref: terma.push.session.ids
+        requirement_level: required
+      - ref: terma.push.sessions
         requirement_level: required
       - ref: session.id
         note: The first session stamped into a pushed commit, when any was.

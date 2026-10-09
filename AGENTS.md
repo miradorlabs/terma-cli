@@ -85,10 +85,11 @@ index them, and hold them only where there is no keychain or `--insecure-storage
 The state directory (`config.StateDir`) holds what terma writes as it runs: `relay/`,
 `spool/`, `policies/`, `agents/<agent>/` (each agent's hook state), `funding/`,
 `workspaces/` (session stores for work begun outside git) and `update/`; a repository's
-session store is `.git/terma/`. Names are lowercase with dashes; `.json`, `.log` and
-`.lock` say what a file holds, a single plain value has no extension, a folder of per-key
-files is plural, a name never repeats its folder's, and state that belongs to one agent
-sits under its name. `App.Execute` resolves both directories once and passes them down;
+session store is `.git/terma/`, which also keeps what a git hook in an agent's sandbox could
+not write to the state directory, until a hook outside the sandbox moves it there. Names
+are lowercase with dashes; `.json`, `.log` and `.lock` say what a file holds, a single
+plain value has no extension, a folder of per-key files is plural, a name never repeats
+its folder's, and state that belongs to one agent sits under its name. `App.Execute` resolves both directories once and passes them down;
 nothing below it reads them from the environment (`internal/boundary`).
 
 **Telemetry.** Claude Code and Codex ignore exporter settings in repository config, and

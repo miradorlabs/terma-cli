@@ -49,7 +49,7 @@ func TestConsumeAndPruneCreateNothing(t *testing.T) {
 	t.Parallel()
 	dir := filepath.Join(t.TempDir(), "terma")
 	store := Open(dir)
-	if err := store.Consume("sess-1", []string{"a.go"}); err != nil {
+	if err := store.Consume(Key{Tool: "codex", ID: "sess-1"}, []string{"a.go"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := store.Prune(time.Now()); err != nil {
@@ -225,7 +225,7 @@ func TestContendedTouchesLoseNothing(t *testing.T) {
 	if got := fileCount(t, store); got != writers+1 {
 		t.Fatalf("the fold kept %d of %d files", got, writers+1)
 	}
-	if deltas, _ := filepath.Glob(filepath.Join(store.dir, manifestsDir, "*"+deltaExt)); len(deltas) != 0 {
+	if deltas, _ := filepath.Glob(filepath.Join(store.dir, manifestsDir, "*", "*"+deltaExt)); len(deltas) != 0 {
 		t.Fatalf("the locked touch left %d deltas", len(deltas))
 	}
 }
@@ -243,7 +243,7 @@ func TestConsumeAndPruneFoldDeltas(t *testing.T) {
 	if err := store.writeDelta(&Manifest{SessionID: sess.ID, Tool: "codex", StartedAt: long, UpdatedAt: long, Files: map[string]time.Time{"b.go": long, "c.go": long}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.Consume(sess.ID, []string{"b.go"}); err != nil {
+	if err := store.Consume(sess.Key(), []string{"b.go"}); err != nil {
 		t.Fatal(err)
 	}
 	manifests, err := store.Manifests()
@@ -298,7 +298,7 @@ func TestMixedLockedAndContendedWritersLoseNothing(t *testing.T) {
 		}
 		for range 4 {
 			wg.Go(func() {
-				if err := steady.Consume(sess.ID, []string{"never-touched.go"}); err != nil {
+				if err := steady.Consume(sess.Key(), []string{"never-touched.go"}); err != nil {
 					t.Errorf("consume: %v", err)
 				}
 			})
@@ -340,7 +340,7 @@ func TestMergeFoldsDeltasOfBothSessions(t *testing.T) {
 			t.Errorf("the merged manifest lost %s: %v", f, manifests[0].Files)
 		}
 	}
-	if deltas, _ := filepath.Glob(filepath.Join(store.dir, manifestsDir, "*"+deltaExt)); len(deltas) != 0 {
+	if deltas, _ := filepath.Glob(filepath.Join(store.dir, manifestsDir, "*", "*"+deltaExt)); len(deltas) != 0 {
 		t.Fatalf("the merge left %d deltas", len(deltas))
 	}
 }
@@ -362,7 +362,7 @@ func TestASessionKnownOnlyByDeltasIsAttributed(t *testing.T) {
 	if err := store.Touch(Session{ID: "sess-1", Tool: "codex", ToolVersion: "0.158.0"}, []string{"a.go"}, time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(store.manifestPath("sess-1")); !os.IsNotExist(err) {
+	if _, err := os.Stat(store.manifestPath(Key{Tool: "codex", ID: "sess-1"})); !os.IsNotExist(err) {
 		t.Fatalf("a contended touch wrote the manifest itself: %v", err)
 	}
 	manifests, err := store.Manifests()
@@ -372,5 +372,47 @@ func TestASessionKnownOnlyByDeltasIsAttributed(t *testing.T) {
 	got := Attribute([]string{"a.go", "b.go"}, manifests)
 	if len(got) != 1 || got[0].SessionID != "sess-1" || got[0].Tool != "codex/0.158.0" || len(got[0].Files) != 1 {
 		t.Fatalf("attribution = %+v", got)
+	}
+}
+
+// A record parked while another hook unparks waits out the production lock timeout and
+// survives the drain; a drainer that cannot take the store hands nothing on and removes nothing.
+func TestParkDuringUnparkKeepsTheRecord(t *testing.T) {
+	t.Parallel()
+	dir := filepath.Join(t.TempDir(), "terma")
+	draining, parking, competing := Open(dir), Open(dir), Open(dir)
+	if err := draining.Park("events", []byte("A\n")); err != nil {
+		t.Fatal(err)
+	}
+	unpark := func(s *Store, during func()) string {
+		t.Helper()
+		var got []byte
+		if err := s.Unpark("events", func(lines []byte) error {
+			got = lines
+			if during != nil {
+				during()
+			}
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+		return string(got)
+	}
+	first := unpark(draining, func() {
+		if err := parking.Park("events", []byte("B\n")); err != nil {
+			t.Errorf("parking B while A drains: %v", err)
+		}
+		if got := unpark(competing, nil); got != "" {
+			t.Errorf("a drainer without the store unparked %q", got)
+		}
+	})
+	if first != "A\n" {
+		t.Fatalf("first drain = %q, want A", first)
+	}
+	if second := unpark(draining, nil); second != "B\n" {
+		t.Fatalf("second drain = %q, want B, parked while A drained", second)
+	}
+	if third := unpark(draining, nil); third != "" {
+		t.Fatalf("third drain = %q, want nothing left", third)
 	}
 }

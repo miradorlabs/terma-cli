@@ -446,9 +446,9 @@ attributes:
     stability: development
     brief: The commit's changes per file, at most 50 of them.
     note: >
-      An array of maps of path, lines_added, lines_deleted and session_id, the stamped
-      session whose manifest names the file. A binary file has no line counts; a file no
-      session touched has no session_id.
+      An array of maps of path, lines_added, lines_deleted, and session_id and agent, the
+      stamped session whose manifest names the file. A binary file has no line counts; a
+      file no session touched has no session_id or agent.
   - key: terma.commit.file.stats_reported
     type: int
     stability: development
@@ -461,10 +461,22 @@ attributes:
     type: string[]
     stability: development
     brief: The sessions stamped into the commit.
+    note: Each id once, though two agents may share it; terma.commit.sessions names each session.
+  - key: terma.commit.sessions
+    type: any
+    stability: development
+    brief: The sessions stamped into the commit, each with its agent.
+    note: >
+      An array of maps of session_id, agent and agent_version, in stamping order, one per
+      agent and session id: harnesses choose their own ids, so an id names a session only
+      with its agent. agent is the Agent-Tool trailer's agent, such as claude-code or codex,
+      and agent_version its version, which is no part of the session's identity. A session
+      stamped with no Agent-Tool has no agent and no agent_version.
   - key: terma.commit.session.count
     type: int
     stability: development
     brief: How many sessions are stamped into the commit.
+    note: The length of terma.commit.sessions.
   - key: terma.commit.staged.count
     type: int
     stability: development
@@ -566,6 +578,14 @@ attributes:
     type: string[]
     stability: development
     brief: The sessions stamped into the commits terma.push.commits lists.
+    note: Each id once, though two agents may share it; terma.push.sessions names each session.
+  - key: terma.push.sessions
+    type: any
+    stability: development
+    brief: The sessions stamped into the commits terma.push.commits lists, each with its agent.
+    note: >
+      Maps as terma.commit.sessions has them, at most 100, each agent and session id once
+      however many commits carry it.
   - key: terma.push.status
     type:
       members:
