@@ -21,6 +21,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
+	"github.com/miradorlabs/terma-cli/internal/trailer"
 )
 
 // A push is reported once git push has exited, so the event can say whether the remote
@@ -36,7 +37,7 @@ const (
 	MaxPushCommits = 500
 	// maxPushWalk bounds the history walk, and so terma.push.commit.count.
 	maxPushWalk = 10000
-	// maxPushSessions bounds terma.push.session.ids.
+	// maxPushSessions bounds terma.push.sessions and terma.push.session.ids.
 	maxPushSessions = 100
 	// maxPushInput bounds what pre-push reads: a line is about 150 bytes, one per ref.
 	maxPushInput = 4 << 20
@@ -308,6 +309,7 @@ func pushEvent(ctx context.Context, env Env, rec pushRecord, i int, ref PushRef,
 		return spool.Event{}, false
 	}
 	shas, sessions := pushedLists(commits)
+	ids := sessionIDs(sessions)
 	status := semconv.TermaPushStatusUnknown
 	if exited && ref.Tracking != "" && ref.TrackingBefore != ref.LocalSHA {
 		if after, readable := gitx.RefFS(rec.GitDir, ref.Tracking); readable && after == ref.LocalSHA {
@@ -323,28 +325,31 @@ func pushEvent(ctx context.Context, env Env, rec pushRecord, i int, ref PushRef,
 	attrs[semconv.TermaPushCommitsKey] = shas
 	attrs[semconv.TermaPushCommitCountKey] = len(commits)
 	attrs[semconv.TermaPushCommitsTruncatedKey] = len(shas) < len(commits)
-	attrs[semconv.TermaPushSessionIDsKey] = sessions
+	attrs[semconv.TermaPushSessionIDsKey] = ids
+	attrs[semconv.TermaPushSessionsKey] = sessionsAttr(sessions)
 	ev := rec.Event
 	ev.Attrs = attrs
-	if len(sessions) > 0 {
-		ev.SessionID = sessions[0]
+	if len(ids) > 0 {
+		ev.SessionID = ids[0]
 	}
 	return ev, true
 }
 
 // pushedLists are the commit ids terma.push.commits lists, at most MaxPushCommits, and the
-// sessions stamped into those commits alone. Neither is ever nil: an empty list is still
-// the string[] the registry declares.
-func pushedLists(commits []gitx.PushedCommit) (shas, sessions []string) {
+// sessions stamped into those commits alone, each agent's session once, at most
+// maxPushSessions. shas is never nil: an empty list is still the string[] the registry declares.
+func pushedLists(commits []gitx.PushedCommit) (shas []string, sessions []trailer.Trailer) {
 	listed := commits[:min(len(commits), MaxPushCommits)]
-	shas, sessions = make([]string, 0, len(listed)), []string{}
+	shas = make([]string, 0, len(listed))
+	var stamped []trailer.Trailer
 	for _, c := range listed {
 		shas = append(shas, c.SHA)
-		for _, s := range c.Sessions {
-			if session.ValidID(s) && !slices.Contains(sessions, s) && len(sessions) < maxPushSessions {
-				sessions = append(sessions, s)
+		for _, t := range trailer.Parse(c.Trailers, "") {
+			if session.ValidID(t.SessionID) {
+				stamped = append(stamped, t)
 			}
 		}
 	}
-	return shas, sessions
+	sessions = uniqueSessions(stamped)
+	return shas, sessions[:min(len(sessions), maxPushSessions)]
 }

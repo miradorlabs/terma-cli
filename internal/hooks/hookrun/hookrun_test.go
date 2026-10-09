@@ -79,7 +79,8 @@ func TestOnlyRecordedFilesAreStamped(t *testing.T) {
 	if got := stamp("reused\n", "commit", "HEAD"); len(got) != 1 || got[0].SessionID != "thread-9" {
 		t.Errorf("a reused message for the session's file was not stamped: %+v", got)
 	}
-	stamp("reused\n\nAgent-Session-Id: thread-9\nAgent-Tool: codex\n", "commit", "HEAD")
+	// Another version of the session's agent is the same session.
+	stamp("reused\n\nAgent-Session-Id: thread-9\nAgent-Tool: claude-code/2.0.0\n", "commit", "HEAD")
 	if data, _ := os.ReadFile(msgPath); strings.Count(string(data), "Agent-Session-Id") != 1 {
 		t.Errorf("a reused message already carrying the session's trailer was stamped again:\n%s", data)
 	}
@@ -486,7 +487,7 @@ func TestCommitEventsAreOneFilterApart(t *testing.T) {
 
 	wantStamped := slices.Sorted(slices.Values(append(slices.Clone(commitIdentity),
 		semconv.TermaCommitFileStatsKey, semconv.TermaCommitFileStatsReportedKey, semconv.TermaCommitFileStatsTruncatedKey,
-		semconv.TermaCommitSessionCountKey, semconv.TermaCommitSessionIDsKey, semconv.GenAIMainAgentNameKey)))
+		semconv.TermaCommitSessionCountKey, semconv.TermaCommitSessionIDsKey, semconv.TermaCommitSessionsKey, semconv.GenAIMainAgentNameKey)))
 	if got := keysOf(stamped.Attrs); !slices.Equal(got, wantStamped) {
 		t.Fatalf("terma.commit changed shape\n got %v\nwant %v", got, wantStamped)
 	}

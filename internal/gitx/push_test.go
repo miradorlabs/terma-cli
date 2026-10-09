@@ -1,8 +1,10 @@
 package gitx
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -32,5 +34,30 @@ func TestTrackingRefFSFollowsThePushURL(t *testing.T) {
 				t.Errorf("got %q, %v; want ok %v", ref, ok, tc.ok)
 			}
 		})
+	}
+}
+
+// Each commit's session and tool trailers come back in their order, so a tool stays with
+// the session before it, and no other trailer comes with them.
+func TestCommitsKeepEachToolWithItsSession(t *testing.T) {
+	dir := initRepo(t)
+	ctx := context.Background()
+	msg := "mixed\n\nAgent-Session-Id: 5e757e6f-3040-4c57-b37d-01d44cc43053\nAgent-Tool: claude-code/2.1.3\n" +
+		"Signed-off-by: Dev <dev@example.com>\nAgent-Session-Id: 5e757e6f-3040-4c57-b37d-01d44cc43053\nAgent-Tool: codex/0.160.1\n"
+	if _, err := Git(ctx, dir, "commit", "-q", "--allow-empty", "-m", "by hand"); err != nil {
+		t.Fatal(err)
+	}
+	base, _ := Git(ctx, dir, "rev-parse", "HEAD")
+	if _, err := Git(ctx, dir, "commit", "-q", "--allow-empty", "-m", msg); err != nil {
+		t.Fatal(err)
+	}
+	commits, err := Commits(ctx, dir, "HEAD", []string{strings.TrimSpace(base)}, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "Agent-Session-Id: 5e757e6f-3040-4c57-b37d-01d44cc43053\nAgent-Tool: claude-code/2.1.3\n" +
+		"Agent-Session-Id: 5e757e6f-3040-4c57-b37d-01d44cc43053\nAgent-Tool: codex/0.160.1\n"
+	if len(commits) != 1 || !ValidOID(commits[0].SHA) || commits[0].Trailers != want {
+		t.Fatalf("commits = %+v", commits)
 	}
 }

@@ -52,7 +52,7 @@ func TestStampIsIdempotent(t *testing.T) {
 	if changed || out != msg {
 		t.Fatalf("expected no change, got changed=%v:\n%s", changed, out)
 	}
-	out, changed = Stamp(msg, []Trailer{{SessionID: "s1"}, {SessionID: "s2"}}, "#")
+	out, changed = Stamp(msg, []Trailer{{SessionID: "s1", Tool: "codex/1.0"}, {SessionID: "s2"}}, "#")
 	if !changed || !strings.HasSuffix(out, "Agent-Session-Id: s2\n") {
 		t.Fatalf("second session not appended:\n%s", out)
 	}
@@ -109,5 +109,37 @@ func TestParsePairsToolWithSession(t *testing.T) {
 	got := Parse(msg, "#")
 	if len(got) != 2 || got[0] != (Trailer{SessionID: "s1", Tool: "claude-code/2"}) || got[1] != (Trailer{SessionID: "s2"}) {
 		t.Fatalf("unexpected parse: %+v", got)
+	}
+}
+
+// A session is one agent's id: a new version of the agent is the same session, and another
+// agent's session with the same id is a second one. The id is a real Codex thread's.
+func TestStampKeysSessionsByAgentAndID(t *testing.T) {
+	t.Parallel()
+	const id = "01a11fd5-7d48-7843-b64c-2cf93f9b39b5"
+	msg := "Subject\n\nAgent-Session-Id: " + id + "\nAgent-Tool: codex/0.160.1\n"
+	if out, changed := Stamp(msg, []Trailer{{SessionID: id, Tool: "codex/0.161.0"}}, "#"); changed {
+		t.Fatalf("a version change restamped the session:\n%s", out)
+	}
+	out, changed := Stamp(msg, []Trailer{{SessionID: id, Tool: "claude-code/2.1.3"}}, "#")
+	if !changed {
+		t.Fatal("another agent's session with the same id was not stamped")
+	}
+	want := []Trailer{{SessionID: id, Tool: "codex/0.160.1"}, {SessionID: id, Tool: "claude-code/2.1.3"}}
+	if got := Parse(out, "#"); len(got) != 2 || got[0] != want[0] || got[1] != want[1] {
+		t.Fatalf("parse = %+v, want %+v", got, want)
+	}
+}
+
+func TestAgentSplitsVersion(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct{ tool, agent, version string }{
+		{"codex/0.160.1", "codex", "0.160.1"},
+		{"claude-code", "claude-code", ""},
+		{"", "", ""},
+	} {
+		if agent, version := (Trailer{Tool: tc.tool}).Agent(); agent != tc.agent || version != tc.version {
+			t.Errorf("Agent(%q) = %q, %q", tc.tool, agent, version)
+		}
 	}
 }

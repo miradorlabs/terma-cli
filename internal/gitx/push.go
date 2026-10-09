@@ -111,18 +111,20 @@ func TrackingRefFS(gitDir, remote, remoteRef string) (ref string, ok bool) {
 	return "refs/remotes/" + remote + "/" + branch, true
 }
 
-// PushedCommit is one commit a push sent, with the sessions stamped into it.
+// PushedCommit is one commit a push sent.
 type PushedCommit struct {
-	SHA      string
-	Sessions []string
+	SHA string
+	// Trailers are its Agent-Session-Id and Agent-Tool trailer lines, in their order, which
+	// pairs each tool with its session.
+	Trailers string
 }
 
 // PushWalkTimeout bounds the history walk behind a push. It runs detached, after the push.
 const PushWalkTimeout = 30 * time.Second
 
 // Commits lists the commits reachable from tip and from none of exclude, newest first, at
-// most limit, with each one's Agent-Session-Id trailer values. It never fetches: a partial
-// clone's missing object is an error.
+// most limit, with each one's Agent-Session-Id and Agent-Tool trailers. It never fetches: a
+// partial clone's missing object is an error.
 func Commits(ctx context.Context, dir, tip string, exclude []string, limit int) ([]PushedCommit, error) {
 	ctx, cancel := context.WithTimeout(ctx, PushWalkTimeout)
 	defer cancel()
@@ -133,7 +135,7 @@ func Commits(ctx context.Context, dir, tip string, exclude []string, limit int) 
 	}
 	cmd := exec.CommandContext(ctx, "git", "-C", dir, "log", "--stdin", "--no-show-signature",
 		fmt.Sprintf("--max-count=%d", limit),
-		"--format=%H%x1f%(trailers:key=Agent-Session-Id,valueonly,separator=%x1f)%x1e")
+		"--format=%H%x1f%(trailers:key=Agent-Session-Id,key=Agent-Tool,unfold)%x1e")
 	cmd.Env = detachedEnv()
 	cmd.Stdin = strings.NewReader(revs.String())
 	var stdout, stderr bytes.Buffer
@@ -143,17 +145,11 @@ func Commits(ctx context.Context, dir, tip string, exclude []string, limit int) 
 	}
 	var out []PushedCommit
 	for record := range strings.SplitSeq(stdout.String(), "\x1e") {
-		fields := strings.Split(strings.TrimLeft(record, "\n"), "\x1f")
-		if !ValidOID(fields[0]) {
+		sha, trailers, _ := strings.Cut(strings.TrimLeft(record, "\n"), "\x1f")
+		if !ValidOID(sha) {
 			continue
 		}
-		c := PushedCommit{SHA: fields[0]}
-		for _, v := range fields[1:] {
-			if v = strings.TrimSpace(v); v != "" {
-				c.Sessions = append(c.Sessions, v)
-			}
-		}
-		out = append(out, c)
+		out = append(out, PushedCommit{SHA: sha, Trailers: trailers})
 	}
 	return out, nil
 }

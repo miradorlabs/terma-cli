@@ -121,23 +121,26 @@ func Open(dir string) (*Spool, error) {
 
 func (s *Spool) path() string { return filepath.Join(s.dir, eventsFile) }
 
-// Append records one event under the lock Flush holds while rewriting the file, so it
-// never lands on a file about to be replaced.
-func (s *Spool) Append(e Event) error {
-	return s.AppendContext(context.Background(), e)
+// Append records events in one write under the lock Flush holds while rewriting the file,
+// so they never land on a file about to be replaced.
+func (s *Spool) Append(events ...Event) error {
+	return s.AppendContext(context.Background(), events...)
 }
 
 // AppendContext observes caller cancellation and caps lock waits even when the
-// caller has no deadline. An error means the event was not queued.
-func (s *Spool) AppendContext(ctx context.Context, e Event) error {
-	if e.Time.IsZero() {
-		e.Time = time.Now()
+// caller has no deadline. An error means no event was queued.
+func (s *Spool) AppendContext(ctx context.Context, events ...Event) error {
+	var lines []byte
+	for _, e := range events {
+		if e.Time.IsZero() {
+			e.Time = time.Now()
+		}
+		line, err := json.Marshal(e)
+		if err != nil {
+			return err
+		}
+		lines = append(append(lines, line...), '\n')
 	}
-	line, err := json.Marshal(e)
-	if err != nil {
-		return err
-	}
-	line = append(line, '\n')
 	// The budget starts after the encode: a slow encode charged to the wait would
 	// refuse a lock nobody holds and lose the event.
 	lockCtx, cancel := context.WithTimeout(ctx, localLockTimeout)
@@ -152,7 +155,7 @@ func (s *Spool) AppendContext(ctx context.Context, e Event) error {
 		return err
 	}
 	defer f.Close()
-	_, err = f.Write(line)
+	_, err = f.Write(lines)
 	return err
 }
 

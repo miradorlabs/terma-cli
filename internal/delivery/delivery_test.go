@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -325,5 +326,41 @@ func TestALockedKeychainKeepsEventsQueued(t *testing.T) {
 	}
 	if n, _, _ := s.Pending(); n != 1 {
 		t.Fatalf("pending = %d, want the event kept", n)
+	}
+}
+
+// Each session leaves with its agent whatever content the policy withholds, as an OTLP list
+// of key-value lists, from the spooled shape a commit or push hook writes.
+func TestSessionPairsLeaveUnderEveryPolicy(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	sessions := []any{
+		map[string]any{"session_id": "5e757e6f-3040-4c57-b37d-01d44cc43053", "agent": "claude-code", "agent_version": "2.1.3"},
+		map[string]any{"session_id": "5e757e6f-3040-4c57-b37d-01d44cc43053", "agent": "codex"},
+	}
+	for _, ev := range []spool.Event{
+		{Repository: app, Name: semconv.TermaCommitStampedEvent, Attrs: map[string]any{semconv.TermaCommitSessionsKey: sessions}},
+		{Repository: app, Name: semconv.TermaCommitEvent, Attrs: map[string]any{semconv.TermaCommitSessionsKey: sessions}},
+		{Repository: app, Name: semconv.TermaPushEvent, Attrs: map[string]any{semconv.TermaPushSessionsKey: sessions}},
+	} {
+		out, ok := (Router{ConfigDir: dir}).Outgoing(config.Policy{Mode: config.ModeRepo, Repositories: listed}, "p1", ev)
+		if !ok {
+			t.Fatalf("%s was withheld", ev.Name)
+		}
+		attrs := attrsOf(out.Attrs)
+		if len(attrs) != 1 || attrs[0].Value.Array == nil || len(attrs[0].Value.Array.Values) != 2 {
+			t.Fatalf("%s sessions = %+v", ev.Name, attrs)
+		}
+		var got []string
+		for _, s := range attrs[0].Value.Array.Values {
+			for _, kv := range s.KVList.Values {
+				got = append(got, kv.Key+"="+*kv.Value.String)
+			}
+		}
+		want := []string{"agent=claude-code", "agent_version=2.1.3", "session_id=5e757e6f-3040-4c57-b37d-01d44cc43053",
+			"agent=codex", "session_id=5e757e6f-3040-4c57-b37d-01d44cc43053"}
+		if !slices.Equal(got, want) {
+			t.Errorf("%s sessions = %v", ev.Name, got)
+		}
 	}
 }

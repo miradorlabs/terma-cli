@@ -7,10 +7,10 @@ import (
 	"time"
 )
 
-// writeRawManifest plants a manifest file bypassing Touch's validation.
+// writeRawManifest plants a manifest file in codex's folder, bypassing Touch's validation.
 func writeRawManifest(t *testing.T, s *Store, name, body string) {
 	t.Helper()
-	dir := filepath.Join(s.dir, manifestsDir)
+	dir := filepath.Join(s.dir, manifestsDir, "codex")
 	if err := os.MkdirAll(dir, dirMode); err != nil {
 		t.Fatal(err)
 	}
@@ -31,7 +31,7 @@ func TestManifestsRejectsUnsafeSessionID(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			s := newStore(t)
 			writeRawManifest(t, s, "planted.json",
-				`{"session_id":`+quote(tc.id)+`,"files":{"a.go":"2026-01-01T00:00:00Z"}}`)
+				`{"session_id":`+quote(tc.id)+`,"tool":"codex","files":{"a.go":"2026-01-01T00:00:00Z"}}`)
 			got, err := s.Manifests()
 			if err != nil {
 				t.Fatal(err)
@@ -43,11 +43,12 @@ func TestManifestsRejectsUnsafeSessionID(t *testing.T) {
 	}
 }
 
-// A manifest whose id does not match its file name is skipped.
-func TestManifestsRequiresIDToMatchFileName(t *testing.T) {
+// A manifest whose id does not match its file name, or whose tool its folder, is skipped.
+func TestManifestsRequiresKeyToMatchPath(t *testing.T) {
 	t.Parallel()
 	s := newStore(t)
-	writeRawManifest(t, s, "a.json", `{"session_id":"b","files":{}}`)
+	writeRawManifest(t, s, "a.json", `{"session_id":"b","tool":"codex","files":{}}`)
+	writeRawManifest(t, s, "c.json", `{"session_id":"c","tool":"claude-code","files":{}}`)
 	got, err := s.Manifests()
 	if err != nil {
 		t.Fatal(err)
@@ -70,7 +71,7 @@ func TestPruneStaysInsideManifestsDir(t *testing.T) {
 	}
 	s := Open(gitDir)
 	writeRawManifest(t, s, "planted.json",
-		`{"session_id":"../../victim","files":{},"updated_at":"2000-01-01T00:00:00Z"}`)
+		`{"session_id":"../../victim","tool":"codex","files":{},"updated_at":"2000-01-01T00:00:00Z"}`)
 
 	if _, err := s.Prune(time.Now()); err != nil {
 		t.Fatal(err)
@@ -80,21 +81,24 @@ func TestPruneStaysInsideManifestsDir(t *testing.T) {
 	}
 }
 
-// A tool label may not break out of its trailer line.
+// A tool label may not break out of its trailer line: a multi-line tool names no folder,
+// and a multi-line version is dropped.
 func TestManifestsStripsMultilineToolLabel(t *testing.T) {
 	t.Parallel()
 	s := newStore(t)
 	writeRawManifest(t, s, "s1.json",
-		`{"session_id":"s1","tool":"claude-code\nAgent-Session-Id: forged","files":{"a.go":"2026-01-01T00:00:00Z"}}`)
+		`{"session_id":"s1","tool":"codex\nAgent-Session-Id: forged","files":{"a.go":"2026-01-01T00:00:00Z"}}`)
+	writeRawManifest(t, s, "s2.json",
+		`{"session_id":"s2","tool":"codex","tool_version":"1\nAgent-Session-Id: forged","files":{"a.go":"2026-01-01T00:00:00Z"}}`)
 	got, err := s.Manifests()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 1 {
-		t.Fatalf("expected the manifest to survive with its tool cleared, got %+v", got)
+	if len(got) != 1 || got[0].SessionID != "s2" {
+		t.Fatalf("expected only s2 to survive, got %+v", got)
 	}
-	if got[0].ToolLabel() != "" {
-		t.Fatalf("expected an empty tool label, got %q", got[0].ToolLabel())
+	if got[0].ToolLabel() != "codex" {
+		t.Fatalf("expected the version dropped, got %q", got[0].ToolLabel())
 	}
 }
 
@@ -103,7 +107,7 @@ func TestAttributeNeverReturnsMultilineID(t *testing.T) {
 	t.Parallel()
 	s := newStore(t)
 	writeRawManifest(t, s, "planted.json",
-		`{"session_id":"ok\nCo-authored-by: Attacker <a@evil.test>","files":{"a.go":"2026-01-01T00:00:00Z"}}`)
+		`{"session_id":"ok\nCo-authored-by: Attacker <a@evil.test>","tool":"codex","files":{"a.go":"2026-01-01T00:00:00Z"}}`)
 	manifests, err := s.Manifests()
 	if err != nil {
 		t.Fatal(err)
@@ -139,7 +143,7 @@ func TestDeltasRequireASafeIDMatchingTheirFileName(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s := newStore(t)
-			writeRawManifest(t, s, tc.file, `{"session_id":`+quote(tc.id)+`,"files":{"a.go":"2026-01-01T00:00:00Z"}}`)
+			writeRawManifest(t, s, tc.file, `{"session_id":`+quote(tc.id)+`,"tool":"codex","files":{"a.go":"2026-01-01T00:00:00Z"}}`)
 			got, err := s.Manifests()
 			if err != nil {
 				t.Fatal(err)

@@ -44,6 +44,22 @@ type Manifest struct {
 	Files       map[string]time.Time `json:"files"`
 }
 
+// Key is a session's identity. Each harness chooses its own ids, so an id is unique only
+// with the tool that chose it.
+type Key struct {
+	Tool string
+	ID   string
+}
+
+// valid reports whether both halves are safe to persist as path components.
+func (k Key) valid() bool { return ValidID(k.Tool) && ValidID(k.ID) }
+
+// Key is the manifest's session identity.
+func (m Manifest) Key() Key { return Key{Tool: m.Tool, ID: m.SessionID} }
+
+// Key is the session's identity.
+func (s Session) Key() Key { return Key{Tool: s.Tool, ID: s.ID} }
+
 // ToolLabel renders the Agent-Tool trailer value.
 func (m Manifest) ToolLabel() string { return toolLabel(m.Tool, m.ToolVersion) }
 
@@ -69,6 +85,7 @@ type Store struct {
 
 const (
 	activeFile   = "session.json"
+	outboxFile   = "outbox.jsonl"
 	manifestsDir = "manifests"
 	manifestExt  = ".json"
 	// A delta is one touch recorded while another writer held the store: <id>~<random>.delta.
@@ -100,8 +117,8 @@ func isMultiline(v string) bool {
 
 // SetActive records the session a harness just announced.
 func (s *Store) SetActive(sess Session) error {
-	if !ValidID(sess.ID) {
-		return fmt.Errorf("invalid session id %q", sess.ID)
+	if !sess.Key().valid() {
+		return fmt.Errorf("invalid session %q of tool %q", sess.ID, sess.Tool)
 	}
 	if sess.StartedAt.IsZero() {
 		sess.StartedAt = time.Now()
@@ -133,23 +150,21 @@ func (s *Store) Active(now time.Time, ttl time.Duration) (*Session, bool) {
 	return &sess, true
 }
 
-// ClearActive forgets the active session if it is id (or any, when id is empty).
-func (s *Store) ClearActive(id string) error {
+// ClearActive forgets the active session if it is k.
+func (s *Store) ClearActive(k Key) error {
 	if s.missing() {
 		return nil
 	}
 	defer s.lock()()
-	return s.clearActive(id)
+	return s.clearActive(k)
 }
 
 // clearActive is ClearActive for a caller that already holds the store lock.
-func (s *Store) clearActive(id string) error {
+func (s *Store) clearActive(k Key) error {
 	path := filepath.Join(s.dir, activeFile)
-	if id != "" {
-		var sess Session
-		if err := readJSON(path, &sess); err != nil || sess.ID != id {
-			return nil
-		}
+	var sess Session
+	if err := readJSON(path, &sess); err != nil || sess.Key() != k {
+		return nil
 	}
 	err := os.Remove(path)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -206,8 +221,8 @@ func (s *Store) acquire() (unlock func(), held bool) {
 // Touch records that sess edited files (repo-relative) at at, and refreshes the
 // active session's UpdatedAt so the TTL fallback tracks activity.
 func (s *Store) Touch(sess Session, files []string, at time.Time) error {
-	if !ValidID(sess.ID) {
-		return fmt.Errorf("invalid session id %q", sess.ID)
+	if !sess.Key().valid() {
+		return fmt.Errorf("invalid session %q of tool %q", sess.ID, sess.Tool)
 	}
 	unlock, held, err := s.create()
 	if err != nil {
@@ -225,16 +240,16 @@ func (s *Store) Touch(sess Session, files []string, at time.Time) error {
 		// own survives, and the next locked writer folds it in.
 		return s.writeDelta(touched)
 	}
-	m, deltas, err := s.load(sess.ID)
+	m, deltas, err := s.load(sess.Key())
 	if err != nil {
 		return err
 	}
 	m = fold(m, touched)
-	if err := writeJSON(s.manifestPath(sess.ID), m); err != nil {
+	if err := writeJSON(s.manifestPath(sess.Key()), m); err != nil {
 		return err
 	}
 	removeAll(deltas)
-	if active, _ := s.Active(at, 0); active != nil && active.ID == sess.ID {
+	if active, _ := s.Active(at, 0); active != nil && active.Key() == sess.Key() {
 		active.UpdatedAt = at
 		_ = writeJSON(filepath.Join(s.dir, activeFile), active)
 	}
@@ -250,9 +265,6 @@ func newManifest(sess Session, at time.Time) *Manifest {
 func fold(dst, src *Manifest) *Manifest {
 	if dst == nil {
 		dst = &Manifest{SessionID: src.SessionID, Tool: src.Tool, ToolVersion: src.ToolVersion, StartedAt: src.StartedAt, Files: map[string]time.Time{}}
-	}
-	if dst.Tool == "" {
-		dst.Tool, dst.ToolVersion = src.Tool, src.ToolVersion
 	}
 	if dst.StartedAt.IsZero() || !src.StartedAt.IsZero() && src.StartedAt.Before(dst.StartedAt) {
 		dst.StartedAt = src.StartedAt
@@ -274,21 +286,21 @@ func (s *Store) writeDelta(m *Manifest) error {
 	if _, err := rand.Read(b[:]); err != nil {
 		return err
 	}
-	return writeJSON(filepath.Join(s.dir, manifestsDir, m.SessionID+deltaSep+hex.EncodeToString(b[:])+deltaExt), m)
+	return writeJSON(filepath.Join(s.dir, manifestsDir, m.Tool, m.SessionID+deltaSep+hex.EncodeToString(b[:])+deltaExt), m)
 }
 
-// load is id's manifest with its deltas folded in, and the deltas' paths, which a locked
+// load is k's manifest with its deltas folded in, and the deltas' paths, which a locked
 // writer removes once it has written the result. A delta that appears later is kept.
-func (s *Store) load(id string) (*Manifest, []string, error) {
-	m, err := s.manifest(id)
+func (s *Store) load(k Key) (*Manifest, []string, error) {
+	m, err := s.manifest(k)
 	if err != nil {
 		return nil, nil, err
 	}
-	paths, _ := filepath.Glob(filepath.Join(s.dir, manifestsDir, id+deltaSep+"*"+deltaExt))
+	paths, _ := filepath.Glob(filepath.Join(s.dir, manifestsDir, k.Tool, k.ID+deltaSep+"*"+deltaExt))
 	var folded []string
 	for _, p := range paths {
 		var d Manifest
-		if readJSON(p, &d) != nil || d.SessionID != id {
+		if readJSON(p, &d) != nil || d.Key() != k {
 			continue
 		}
 		if d.Files == nil {
@@ -312,17 +324,39 @@ func (s *Store) Manifests() ([]Manifest, error) {
 	return out, err
 }
 
-// manifests is Manifests, with each session's delta paths.
-func (s *Store) manifests() ([]Manifest, map[string][]string, error) {
-	entries, err := os.ReadDir(filepath.Join(s.dir, manifestsDir))
+// manifests is Manifests, with each session's delta paths. A tool's manifests are in a
+// folder of its name.
+func (s *Store) manifests() ([]Manifest, map[Key][]string, error) {
+	tools, err := os.ReadDir(filepath.Join(s.dir, manifestsDir))
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil, nil
 	}
 	if err != nil {
 		return nil, nil, err
 	}
-	byID := map[string]*Manifest{}
-	deltas := map[string][]string{}
+	byKey := map[Key]*Manifest{}
+	deltas := map[Key][]string{}
+	for _, t := range tools {
+		if t.IsDir() && ValidID(t.Name()) {
+			s.readTool(t.Name(), byKey, deltas)
+		}
+	}
+	out := make([]Manifest, 0, len(byKey))
+	for _, m := range byKey {
+		// ToolVersion reaches the commit message too: no line breaks.
+		if isMultiline(m.ToolVersion) {
+			m.ToolVersion = ""
+		}
+		out = append(out, *m)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].StartedAt.Before(out[j].StartedAt) })
+	return out, deltas, nil
+}
+
+// readTool folds the manifests and deltas in tool's folder into byKey and deltas.
+func (s *Store) readTool(tool string, byKey map[Key]*Manifest, deltas map[Key][]string) {
+	dir := filepath.Join(s.dir, manifestsDir, tool)
+	entries, _ := os.ReadDir(dir)
 	for _, e := range entries {
 		name := e.Name()
 		if e.IsDir() {
@@ -341,70 +375,62 @@ func (s *Store) manifests() ([]Manifest, map[string][]string, error) {
 			continue
 		}
 		var m Manifest
-		if err := readJSON(filepath.Join(s.dir, manifestsDir, name), &m); err != nil {
+		if err := readJSON(filepath.Join(dir, name), &m); err != nil {
 			continue // a torn write is skipped, never fatal to a commit
 		}
-		// Revalidate on read: the id reaches a commit message (a newline forges trailers)
-		// and Prune's manifestPath ("../../x" deletes elsewhere), so it must match its file name.
-		if !ValidID(m.SessionID) || id != m.SessionID {
+		// Revalidate on read: the key reaches a commit message (a newline forges trailers)
+		// and Prune's manifestPath ("../../x" deletes elsewhere), so it must match its path.
+		k := m.Key()
+		if !k.valid() || k != (Key{Tool: tool, ID: id}) {
 			continue
 		}
 		if m.Files == nil {
 			m.Files = map[string]time.Time{}
 		}
 		if strings.HasSuffix(name, deltaExt) {
-			deltas[id] = append(deltas[id], filepath.Join(s.dir, manifestsDir, name))
+			deltas[k] = append(deltas[k], filepath.Join(dir, name))
 		}
-		byID[id] = fold(byID[id], &m)
+		byKey[k] = fold(byKey[k], &m)
 	}
-	out := make([]Manifest, 0, len(byID))
-	for _, m := range byID {
-		// Tool and ToolVersion reach the commit message too: no line breaks.
-		if isMultiline(m.Tool) || isMultiline(m.ToolVersion) {
-			m.Tool, m.ToolVersion = "", ""
-		}
-		out = append(out, *m)
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].StartedAt.Before(out[j].StartedAt) })
-	return out, deltas, nil
 }
 
 // Consume removes files a commit carried from a session's manifest; an emptied manifest
 // is kept as evidence the session reports edits, so the fallback never claims for it.
-func (s *Store) Consume(sessionID string, files []string) error {
+func (s *Store) Consume(k Key, files []string) error {
 	if s.missing() {
 		return nil
 	}
 	defer s.lock()()
-	m, deltas, err := s.load(sessionID)
+	m, deltas, err := s.load(k)
 	if err != nil || m == nil {
 		return err
 	}
 	for _, f := range files {
 		delete(m.Files, Normalize(f))
 	}
-	if err := writeJSON(s.manifestPath(sessionID), m); err != nil {
+	if err := writeJSON(s.manifestPath(k), m); err != nil {
 		return err
 	}
 	removeAll(deltas)
 	return nil
 }
 
-// Merge folds fromID's manifest into into's (later touch wins), retires it and its
-// active record, and returns the files that moved, sorted.
+// Merge folds the manifest of into's tool's session fromID into into's (later touch wins),
+// retires it and its active record, and returns the files that moved, sorted.
 func (s *Store) Merge(fromID string, into Session, at time.Time) ([]string, error) {
-	if !ValidID(into.ID) {
-		return nil, fmt.Errorf("invalid session id %q", into.ID)
+	if !into.Key().valid() {
+		return nil, fmt.Errorf("invalid session %q of tool %q", into.ID, into.Tool)
 	}
+	from := Key{Tool: into.Tool, ID: fromID}
 	if !ValidID(fromID) || fromID == into.ID || s.missing() {
 		return nil, nil
 	}
 	defer s.lock()()
-	src, srcDeltas, err := s.load(fromID)
+	src, srcDeltas, err := s.load(from)
 	if err != nil || src == nil {
 		return nil, err
 	}
-	dst, dstDeltas, err := s.load(into.ID)
+	dst, dstDeltas, err := s.load(into.Key())
 	if err != nil {
 		return nil, err
 	}
@@ -422,15 +448,15 @@ func (s *Store) Merge(fromID string, into Session, at time.Time) ([]string, erro
 		files = append(files, f)
 	}
 	// Target first: a hook killed in between leaves the files in both manifests, not neither.
-	if err := writeJSON(s.manifestPath(into.ID), dst); err != nil {
+	if err := writeJSON(s.manifestPath(into.Key()), dst); err != nil {
 		return nil, err
 	}
 	removeAll(dstDeltas)
-	if err := os.Remove(s.manifestPath(fromID)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+	if err := os.Remove(s.manifestPath(from)); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return nil, err
 	}
 	removeAll(srcDeltas)
-	_ = s.clearActive(fromID)
+	_ = s.clearActive(from)
 	slices.Sort(files)
 	return files, nil
 }
@@ -457,7 +483,12 @@ func (s *Store) Retire(before time.Time) {
 		return
 	}
 	_, err := s.prune(before)
-	removeTemps(filepath.Join(s.dir, manifestsDir), before)
+	tools, _ := os.ReadDir(filepath.Join(s.dir, manifestsDir))
+	for _, t := range tools {
+		dir := filepath.Join(s.dir, manifestsDir, t.Name())
+		removeTemps(dir, before)
+		_ = os.Remove(dir) // only when empty
+	}
 	removeTemps(s.dir, before)
 	_ = os.Remove(filepath.Join(s.dir, manifestsDir)) // only when empty
 	entries, _ := os.ReadDir(s.dir)
@@ -468,6 +499,46 @@ func (s *Store) Retire(before time.Time) {
 	}
 	flock.Remove(filepath.Join(s.dir, lockFile), unlock)
 	_ = os.Remove(s.dir) // fails, harmlessly, once a writer that came in has written
+}
+
+// Park keeps lines the spool refused until Unpark hands them on. A git hook in an agent's
+// sandbox may write the repository's own git directory, where the store is, but not
+// terma's state directory.
+func (s *Store) Park(lines []byte) error {
+	unlock, _, err := s.create()
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	f, err := os.OpenFile(filepath.Join(s.dir, outboxFile), os.O_CREATE|os.O_WRONLY|os.O_APPEND, fileMode)
+	if err != nil {
+		return err
+	}
+	if _, err := f.Write(lines); err != nil {
+		_ = f.Close()
+		return err
+	}
+	return f.Close()
+}
+
+// Unpark passes what Park kept to deliver, and drops it once deliver has taken it.
+func (s *Store) Unpark(deliver func(lines []byte) error) error {
+	path := filepath.Join(s.dir, outboxFile)
+	if _, err := os.Stat(path); err != nil {
+		return nil // nothing parked: the common case takes no lock
+	}
+	defer s.lock()()
+	lines, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil // another hook took it first
+	}
+	if err != nil {
+		return err
+	}
+	if err := deliver(lines); err != nil {
+		return err
+	}
+	return os.Remove(path)
 }
 
 // removeTemps removes atomic-write temporary files a crash left in dir before before.
@@ -490,15 +561,15 @@ func (s *Store) prune(before time.Time) (int, error) {
 	for _, m := range manifests {
 		if m.UpdatedAt.Before(before) {
 			// Its deltas go too, or they would bring the session back.
-			removeAll(deltas[m.SessionID])
-			if err := os.Remove(s.manifestPath(m.SessionID)); err == nil || len(deltas[m.SessionID]) > 0 {
+			removeAll(deltas[m.Key()])
+			if err := os.Remove(s.manifestPath(m.Key())); err == nil || len(deltas[m.Key()]) > 0 {
 				n++
 			}
 		}
 	}
 	// Active with no ttl reports fresh, so the cutoff is the test.
 	if active, _ := s.Active(before, 0); active != nil && active.UpdatedAt.Before(before) {
-		_ = s.clearActive(active.ID)
+		_ = s.clearActive(active.Key())
 	}
 	return n, nil
 }
@@ -547,16 +618,16 @@ func Normalize(p string) string {
 	return strings.TrimSuffix(p, "/")
 }
 
-func (s *Store) manifestPath(id string) string {
-	return filepath.Join(s.dir, manifestsDir, id+manifestExt)
+func (s *Store) manifestPath(k Key) string {
+	return filepath.Join(s.dir, manifestsDir, k.Tool, k.ID+manifestExt)
 }
 
-func (s *Store) manifest(id string) (*Manifest, error) {
-	if !ValidID(id) {
-		return nil, fmt.Errorf("invalid session id %q", id)
+func (s *Store) manifest(k Key) (*Manifest, error) {
+	if !k.valid() {
+		return nil, fmt.Errorf("invalid session %q of tool %q", k.ID, k.Tool)
 	}
 	var m Manifest
-	err := readJSON(s.manifestPath(id), &m)
+	err := readJSON(s.manifestPath(k), &m)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
 	}

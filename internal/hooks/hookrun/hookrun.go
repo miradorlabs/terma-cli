@@ -5,8 +5,10 @@
 package hookrun
 
 import (
+	"bytes"
 	"cmp"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -155,7 +157,51 @@ func (e Env) Repo(ctx context.Context) (*Repo, error) {
 	if e.Policy.Global() {
 		r.ProjectID = e.Policy.DefaultProjectID
 	}
+	e.unpark(r)
 	return r, nil
+}
+
+// park keeps an event the spool refused in the repository's store, which a git hook run in
+// an agent's sandbox can still write; the next hook there that reaches the spool unparks it.
+func (e Env) park(r *Repo, ev spool.Event) bool {
+	if r == nil || r.GitDir == "" {
+		return false // a folder outside git keeps its store in the state directory too
+	}
+	line, err := json.Marshal(ev)
+	if err == nil {
+		err = r.Store.Park(append(line, '\n'))
+	}
+	if err != nil {
+		e.Logf("park event: %v", err)
+		return false
+	}
+	return true
+}
+
+// unpark spools what a sandboxed hook parked in r's store, in one append, and starts a flush.
+func (e Env) unpark(r *Repo) {
+	if e.Spool == nil {
+		return
+	}
+	moved := false
+	err := r.Store.Unpark(func(lines []byte) error {
+		var events []spool.Event
+		for line := range bytes.Lines(lines) {
+			var ev spool.Event
+			if json.Unmarshal(line, &ev) == nil {
+				events = append(events, ev)
+			}
+		}
+		moved = len(events) > 0
+		return e.Spool.Append(events...)
+	})
+	if err != nil {
+		e.Logf("unpark events: %v", err)
+		return
+	}
+	if moved && e.Flush != nil {
+		e.Flush()
+	}
 }
 
 // Admits reports whether the team policy collects the working copy at dir, judged as Repo
@@ -180,11 +226,15 @@ func (e Env) locate(ctx context.Context) (root, gitDir string, id config.Reposit
 	return root, gitDir, id, nil
 }
 
-// EmitFor spools an event stamped with the repository's project, and reports whether it was spooled.
+// EmitFor spools an event stamped with the repository's project, parking it in the
+// repository's store when the spool cannot be written, and reports whether it was kept.
 func (e Env) EmitFor(r *Repo, ev spool.Event) bool {
 	ev = e.stamp(r, ev)
 	e.claimForRelay(r, ev)
-	return e.emit(ev)
+	if ev.Time.IsZero() {
+		ev.Time = e.Time()
+	}
+	return e.emit(ev) || e.park(r, ev)
 }
 
 // stamp names the event's repository, for delivery's admission, and its project.

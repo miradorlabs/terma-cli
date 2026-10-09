@@ -3,6 +3,7 @@ package hookrun
 import (
 	"context"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/gitx"
@@ -65,12 +66,10 @@ func PrepareCommitMsg(ctx context.Context, env Env) error {
 		env.Logf("write message: %v", err)
 		return nil
 	}
-	ids := make([]string, 0, len(attributions))
-	for _, a := range attributions {
-		ids = append(ids, a.SessionID)
-	}
+	ids := sessionIDs(trailers)
 	attrs := map[string]any{
-		semconv.TermaCommitSessionIDsKey: ids, semconv.TermaCommitSessionCountKey: len(ids), semconv.TermaCommitStagedCountKey: len(staged),
+		semconv.TermaCommitSessionIDsKey: ids, semconv.TermaCommitSessionsKey: sessionsAttr(trailers),
+		semconv.TermaCommitSessionCountKey: len(trailers), semconv.TermaCommitStagedCountKey: len(staged),
 	}
 	if source != "" {
 		attrs[semconv.TermaCommitMessageSourceKey] = source
@@ -96,31 +95,95 @@ func PostCommit(ctx context.Context, env Env) error {
 	if err != nil || head.SHA == "" {
 		return nil
 	}
-	stamped := trailer.Parse(head.Message, gitx.CommentCharFS(r.GitDir))
+	stamped := uniqueSessions(trailer.Parse(head.Message, gitx.CommentCharFS(r.GitDir)))
 	if len(stamped) == 0 {
 		emitUnattributedCommit(env, r, head) // human-only commit: no manifest to retire
 		return nil
 	}
 	files := head.Paths()
-	ids := make([]string, 0, len(stamped))
+	keys := make([]session.Key, 0, len(stamped))
 	for _, t := range stamped {
-		ids = append(ids, t.SessionID)
+		agent, _ := t.Agent()
+		if agent == "" {
+			// Not terma's stamp, which always names the agent: no manifest of it to retire.
+			env.Logf("session %s stamped with no %s", t.SessionID, trailer.KeyTool)
+			continue
+		}
+		keys = append(keys, session.Key{Tool: agent, ID: t.SessionID})
 	}
 	// Read before Consume empties the manifests. A single stamped session still names its
 	// files, since its commit can carry a hand edit too.
-	owners := fileOwners(env, r.Store, ids)
-	for _, id := range ids {
-		if err := r.Store.Consume(id, files); err != nil {
+	owners := fileOwners(env, r.Store, keys)
+	for _, k := range keys {
+		if err := r.Store.Consume(k, files); err != nil {
 			env.Logf("consume manifest: %v", err)
 		}
 	}
 	attrs := commitAttrs(r, head)
-	attrs[semconv.TermaCommitSessionIDsKey] = ids
-	attrs[semconv.TermaCommitSessionCountKey] = len(ids)
-	attrs[semconv.GenAIMainAgentNameKey] = stamped[0].Tool
+	attrs[semconv.TermaCommitSessionIDsKey] = sessionIDs(stamped)
+	attrs[semconv.TermaCommitSessionsKey] = sessionsAttr(stamped)
+	attrs[semconv.TermaCommitSessionCountKey] = len(stamped)
+	if agent, ok := soleAgent(stamped); ok {
+		attrs[semconv.GenAIMainAgentNameKey] = agent
+	}
 	addFileStats(attrs, head.Files, owners)
-	env.EmitFor(r, spool.Event{Name: semconv.TermaCommitEvent, SessionID: ids[0], Attrs: attrs})
+	env.EmitFor(r, spool.Event{Name: semconv.TermaCommitEvent, SessionID: stamped[0].SessionID, Attrs: attrs})
 	return nil
+}
+
+// uniqueSessions is each agent's session once, in stamping order: an id names a session
+// only with its agent, and a version change is no new session.
+func uniqueSessions(stamped []trailer.Trailer) []trailer.Trailer {
+	type key struct{ agent, id string }
+	seen := map[key]bool{}
+	var out []trailer.Trailer
+	for _, t := range stamped {
+		agent, _ := t.Agent()
+		if k := (key{agent, t.SessionID}); !seen[k] {
+			seen[k] = true
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// sessionIDs are the sessions' ids, each once, as the session.ids attributes list them.
+func sessionIDs(sessions []trailer.Trailer) []string {
+	ids := make([]string, 0, len(sessions))
+	for _, t := range sessions {
+		if !slices.Contains(ids, t.SessionID) {
+			ids = append(ids, t.SessionID)
+		}
+	}
+	return ids
+}
+
+// sessionsAttr is the sessions as terma.commit.sessions and terma.push.sessions list them:
+// a session with no agent has no agent key, never a stand-in. Never nil, like the registry's array.
+func sessionsAttr(sessions []trailer.Trailer) []map[string]any {
+	out := make([]map[string]any, 0, len(sessions))
+	for _, t := range sessions {
+		e := map[string]any{"session_id": t.SessionID}
+		if agent, version := t.Agent(); agent != "" {
+			e["agent"] = agent
+			if version != "" {
+				e["agent_version"] = version
+			}
+		}
+		out = append(out, e)
+	}
+	return out
+}
+
+// soleAgent is the agent of every session, when they share one: a mixed commit has none.
+func soleAgent(sessions []trailer.Trailer) (string, bool) {
+	agent, _ := sessions[0].Agent()
+	for _, t := range sessions[1:] {
+		if a, _ := t.Agent(); a != agent {
+			return "", false
+		}
+	}
+	return agent, agent != ""
 }
 
 // emitUnattributedCommit spools the coverage denominator: a commit's identity and size,
@@ -176,7 +239,7 @@ func lineTotals(stats []gitx.FileStat) (added, deleted int) {
 
 // addFileStats attaches the commit's numstat delta, an upper bound on what an agent wrote;
 // a binary file has no line counts, so it is never reported as zero lines changed.
-func addFileStats(attrs map[string]any, stats []gitx.FileStat, owners map[string]string) {
+func addFileStats(attrs map[string]any, stats []gitx.FileStat, owners map[string]session.Key) {
 	if len(stats) == 0 {
 		return
 	}
@@ -188,8 +251,8 @@ func addFileStats(attrs map[string]any, stats []gitx.FileStat, owners map[string
 	for _, f := range reported {
 		e := map[string]any{"path": f.Path}
 		// The stamped session whose manifest names the file; a hand edit beside an agent's has none.
-		if id := owners[session.Normalize(f.Path)]; id != "" {
-			e["session_id"] = id
+		if k, ok := owners[session.Normalize(f.Path)]; ok {
+			e["session_id"], e["agent"] = k.ID, k.Tool
 		}
 		if !f.Binary {
 			e["lines_added"], e["lines_deleted"] = f.Added, f.Deleted
@@ -202,20 +265,16 @@ func addFileStats(attrs map[string]any, stats []gitx.FileStat, owners map[string
 }
 
 // fileOwners maps each path to the stamped session that touched it last.
-func fileOwners(env Env, store *session.Store, ids []string) map[string]string {
+func fileOwners(env Env, store *session.Store, keys []session.Key) map[string]session.Key {
 	manifests, err := store.Manifests()
 	if err != nil {
 		env.Logf("manifests: %v", err)
 		return nil
 	}
-	stamped := make(map[string]bool, len(ids))
-	for _, id := range ids {
-		stamped[id] = true
-	}
-	owners := make(map[string]string)
+	owners := make(map[string]session.Key)
 	touchedAt := make(map[string]time.Time)
 	for _, m := range manifests {
-		if !stamped[m.SessionID] {
+		if !slices.Contains(keys, m.Key()) {
 			continue
 		}
 		for f, at := range m.Files {
@@ -223,7 +282,7 @@ func fileOwners(env Env, store *session.Store, ids []string) map[string]string {
 			if prev, seen := touchedAt[f]; seen && !at.After(prev) {
 				continue
 			}
-			owners[f], touchedAt[f] = m.SessionID, at
+			owners[f], touchedAt[f] = m.Key(), at
 		}
 	}
 	return owners

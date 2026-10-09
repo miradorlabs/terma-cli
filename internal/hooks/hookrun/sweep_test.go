@@ -54,7 +54,7 @@ func TestSweepAgesOutHookStateAndWorkspaces(t *testing.T) {
 		return root
 	}
 	stale := store("stale", old)
-	write(project.WorkspacesDir+"/stale/manifests/"+".tmp-1", old) // a crashed write's
+	write(project.WorkspacesDir+"/stale/manifests/agent/"+".tmp-1", old) // a crashed write's
 	fresh := store("fresh", now)
 	// A store a hook has just created holds only its lock, and stays.
 	write(project.WorkspacesDir+"/new/store.lock", now)
@@ -72,7 +72,7 @@ func TestSweepAgesOutHookStateAndWorkspaces(t *testing.T) {
 	want := []string{
 		"cursors/live.json",
 		"cursors/live.json.lock",
-		project.WorkspacesDir + "/fresh/manifests/s-fresh.json",
+		project.WorkspacesDir + "/fresh/manifests/agent/s-fresh.json",
 		project.WorkspacesDir + "/fresh/store.lock",
 		project.WorkspacesDir + "/new/store.lock",
 	}

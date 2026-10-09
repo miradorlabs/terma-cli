@@ -49,7 +49,7 @@ func TestConsumeAndPruneCreateNothing(t *testing.T) {
 	t.Parallel()
 	dir := filepath.Join(t.TempDir(), "terma")
 	store := Open(dir)
-	if err := store.Consume("sess-1", []string{"a.go"}); err != nil {
+	if err := store.Consume(Key{Tool: "codex", ID: "sess-1"}, []string{"a.go"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := store.Prune(time.Now()); err != nil {
@@ -225,7 +225,7 @@ func TestContendedTouchesLoseNothing(t *testing.T) {
 	if got := fileCount(t, store); got != writers+1 {
 		t.Fatalf("the fold kept %d of %d files", got, writers+1)
 	}
-	if deltas, _ := filepath.Glob(filepath.Join(store.dir, manifestsDir, "*"+deltaExt)); len(deltas) != 0 {
+	if deltas, _ := filepath.Glob(filepath.Join(store.dir, manifestsDir, "*", "*"+deltaExt)); len(deltas) != 0 {
 		t.Fatalf("the locked touch left %d deltas", len(deltas))
 	}
 }
@@ -243,7 +243,7 @@ func TestConsumeAndPruneFoldDeltas(t *testing.T) {
 	if err := store.writeDelta(&Manifest{SessionID: sess.ID, Tool: "codex", StartedAt: long, UpdatedAt: long, Files: map[string]time.Time{"b.go": long, "c.go": long}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.Consume(sess.ID, []string{"b.go"}); err != nil {
+	if err := store.Consume(sess.Key(), []string{"b.go"}); err != nil {
 		t.Fatal(err)
 	}
 	manifests, err := store.Manifests()
@@ -298,7 +298,7 @@ func TestMixedLockedAndContendedWritersLoseNothing(t *testing.T) {
 		}
 		for range 4 {
 			wg.Go(func() {
-				if err := steady.Consume(sess.ID, []string{"never-touched.go"}); err != nil {
+				if err := steady.Consume(sess.Key(), []string{"never-touched.go"}); err != nil {
 					t.Errorf("consume: %v", err)
 				}
 			})
@@ -340,7 +340,7 @@ func TestMergeFoldsDeltasOfBothSessions(t *testing.T) {
 			t.Errorf("the merged manifest lost %s: %v", f, manifests[0].Files)
 		}
 	}
-	if deltas, _ := filepath.Glob(filepath.Join(store.dir, manifestsDir, "*"+deltaExt)); len(deltas) != 0 {
+	if deltas, _ := filepath.Glob(filepath.Join(store.dir, manifestsDir, "*", "*"+deltaExt)); len(deltas) != 0 {
 		t.Fatalf("the merge left %d deltas", len(deltas))
 	}
 }
@@ -362,7 +362,7 @@ func TestASessionKnownOnlyByDeltasIsAttributed(t *testing.T) {
 	if err := store.Touch(Session{ID: "sess-1", Tool: "codex", ToolVersion: "0.158.0"}, []string{"a.go"}, time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(store.manifestPath("sess-1")); !os.IsNotExist(err) {
+	if _, err := os.Stat(store.manifestPath(Key{Tool: "codex", ID: "sess-1"})); !os.IsNotExist(err) {
 		t.Fatalf("a contended touch wrote the manifest itself: %v", err)
 	}
 	manifests, err := store.Manifests()
