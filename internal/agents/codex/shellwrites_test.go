@@ -52,6 +52,12 @@ func TestShellWrites(t *testing.T) {
 		{"mv both ends", "mv old.go new.go", in("old.go", "new.go")},
 		{"cp into a directory", "cp a.go b.go src/", in("src/a.go", "src/b.go")},
 		{"mv into a directory", "mv a.go src", in("a.go", "src/a.go")},
+		{"git mv both ends", "git mv -f old.go new.go", in("old.go", "new.go")},
+		{"git mv into a directory made first", "mkdir -p docs/notes && git mv src/p4.txt docs/notes/p4.txt && git commit -m move", in("src/p4.txt", "docs/notes/p4.txt")},
+		{"into a directory made first", "mkdir -p pairs && printf 'seven\\n' > pairs/o7.txt && git add -- pairs/o7.txt", in("pairs/o7.txt")},
+		{"git reads", "git add a.go && git commit -m mv", nil},
+		{"cp into a directory made first", "mkdir out && cp input.txt out", in("out/input.txt")},
+		{"into a directory made with a mode", "mkdir -m 0755 newdir && printf x > newdir/f.txt", in("newdir/f.txt")},
 		{"subshell cd ends with it", "(cd src && gofmt -w a.go); gofmt -w b.go", in("src/a.go", "b.go")},
 		{"named >& target", "make >& build.log", in("build.log")},
 		{"function body runs nothing", "f() { cd src; echo x > g.txt; }; echo y > h.txt", in("h.txt")},
@@ -69,12 +75,48 @@ func TestShellWrites(t *testing.T) {
 		{"expanded targets", "echo x > $OUT; sed -i 's/a/b/' *.go; echo y > ~/f", nil},
 		{"assignment prefix", "GOFLAGS=-mod=mod gofmt -w a.go", in("a.go")},
 		{"comment", "echo hi # > nope.txt", nil},
-		// Codex's own patch heredoc'd into a shell call is applyPatchPaths' to read.
-		{"patch body", "apply_patch <<'PATCH'\n*** Begin Patch\n*** Add File: x.sh\n+echo a > out.txt\n*** End Patch\nPATCH", nil},
+		// A patch body is not shell: its redirect writes nothing.
+		{"patch heredoc", "apply_patch <<'PATCH'\n*** Begin Patch\n*** Add File: x.sh\n+echo a > out.txt\n*** End Patch\nPATCH", in("x.sh")},
+		{"patch in a command that does not parse", "apply_patch <<'PATCH'\n*** Begin Patch\n*** Add File: z.txt\n+z\n*** End Patch\nPATCH\nif then", in("z.txt")},
+		{"wrapped patch", "command apply_patch <<'PATCH'\n*** Begin Patch\n*** Add File: w.txt\n+w\n*** End Patch\nPATCH", in("w.txt")},
+		{"patch by path", "/usr/local/bin/apply_patch <<'PATCH'\n*** Begin Patch\n*** Add File: v.txt\n+v\n*** End Patch\nPATCH", in("v.txt")},
+		{"command lookup runs nothing", "command -v cp ./agent.txt ./f.txt; command -pV sed -i s/a/b/ a.go", nil},
+		{"env -C moves the writer", "env -C sub sed -i s/x/y/ f.txt; env --chdir=sub gofmt -w g.go", nil},
+		{"wrapped writer", "env LC_ALL=C sed -i 's/a/b/' a.go; command -p gofmt -w b.go", in("a.go", "b.go")},
+		{"patch argument", "apply_patch '*** Begin Patch\n*** Add File: new/y.sh\n+y\n*** End Patch'", in("new/y.sh")},
+		{"patch after a cd", "cd src && apply_patch <<'PATCH'\n*** Begin Patch\n*** Update File: a.go\n@@\n-a\n+b\n*** End Patch\nPATCH", in("src/a.go")},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := shellWrites(tc.command, cwd); !slices.Equal(got, tc.want) {
+			if got, _ := shellWrites(tc.command, cwd); !slices.Equal(got, tc.want) {
 				t.Fatalf("shellWrites(%q)\n got %v\nwant %v", tc.command, got, tc.want)
+			}
+		})
+	}
+}
+
+// committed counts the writes a commit in the command takes in; a write after it is not its.
+func TestShellWritesBeforeEachCommit(t *testing.T) {
+	t.Parallel()
+	cwd := t.TempDir()
+	for _, tc := range []struct {
+		name, command string
+		want          []int
+	}{
+		{"no commit", "printf x > a.txt", nil},
+		{"write then commit", "printf x > a.txt && git add a.txt && git commit -m a", []int{1}},
+		{"commit then write", "git commit -m human && printf agent > f.txt", []int{0}},
+		{"two commits", "git commit -m human && printf agent > h && git add h && git commit -m agent", []int{0, 1}},
+		{"git options before commit", "printf x > a.txt; git -C . -c user.name=x commit -m a", []int{1}},
+		{"wrapped commit", "printf x > a.txt && git add a.txt && command git commit -m a", []int{1}},
+		{"commit under env -u", "printf x > a.txt && env -u GIT_DIR git commit -m a", []int{1}},
+		{"commit under env", "printf x > a.txt && env GIT_AUTHOR_NAME=x git commit -m a", []int{1}},
+		{"a conflict resolved and the pick continued", "printf ok > f.txt && git add f.txt && GIT_EDITOR=true git cherry-pick --continue", []int{1}},
+		{"commit lookup is no commit", "printf x > a.txt && command -v git commit", nil},
+		{"commit message is not a subcommand", "git log --grep commit && printf x > a.txt", nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, got := shellWrites(tc.command, cwd); !slices.Equal(got, tc.want) {
+				t.Fatalf("commits = %v, want %v", got, tc.want)
 			}
 		})
 	}

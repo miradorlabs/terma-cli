@@ -9,27 +9,45 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
-// shellWrites returns the files a shell command names as written (redirect targets and the
-// operands of the writers in writtenIndexes), resolved against cwd and any cd before them;
-// nothing when the command does not parse.
-func shellWrites(command, cwd string) []string {
+// shellWrites returns the files a shell command names as written (redirect targets, the
+// operands of the writers in writtenIndexes, and the files of a patch it runs), in the
+// order it writes them, resolved against cwd and any cd before them; commits holds, for
+// each git commit it makes, how many of them come before it. A command that does not parse
+// gives only the files of a patch in its text.
+func shellWrites(command, cwd string) (paths []string, commits []int) {
 	file, err := syntax.NewParser().Parse(strings.NewReader(command), "")
 	if err != nil {
-		return nil
+		for _, p := range applyPatchPaths(command) {
+			if !filepath.IsAbs(p) {
+				p = filepath.Join(cwd, p)
+			}
+			paths = append(paths, filepath.Clean(p))
+		}
+		return paths, nil
 	}
 	dir := cwd
 	var out []string
-	add := func(w word) {
+	resolve := func(w word) (string, bool) {
 		if !w.literal || w.text == "" || (dir == "" && !filepath.IsAbs(w.text)) {
-			return
+			return "", false
 		}
 		p := filepath.Clean(w.text)
 		if !filepath.IsAbs(p) {
 			p = filepath.Join(dir, p)
 		}
+		return p, true
+	}
+	// made holds the directories a mkdir earlier in the command creates: read before the
+	// command runs, they do not exist yet.
+	made := map[string]bool{}
+	add := func(w word) {
+		p, ok := resolve(w)
+		if !ok || made[p] {
+			return // a directory the command makes: mv's and cp's file lands under it
+		}
 		if info, err := os.Stat(p); err == nil && !info.Mode().IsRegular() {
 			return // a directory, or /dev/null
-		} else if err != nil {
+		} else if err != nil && !made[filepath.Dir(p)] {
 			if parent, err := os.Stat(filepath.Dir(p)); err != nil || !parent.IsDir() {
 				return // nothing was written there: cp's into a file, a stale cd
 			}
@@ -62,15 +80,21 @@ func shellWrites(command, cwd string) []string {
 		switch n := n.(type) {
 		case *syntax.FuncDecl:
 			return false // defining a function runs nothing
+		case *syntax.Stmt:
+			// apply_patch takes its patch as an argument or a heredoc; it makes any directory.
+			for _, patch := range patches(n) {
+				for _, p := range applyPatchPaths(patch) {
+					if p, ok := resolve(word{p, true}); ok {
+						out = append(out, p)
+					}
+				}
+			}
 		case *syntax.Redirect:
 			if written(n) {
 				add(literal(n.Word))
 			}
 		case *syntax.CallExpr:
-			words := make([]word, len(n.Args))
-			for i, a := range n.Args {
-				words[i] = literal(a)
-			}
+			words := wordsOf(n)
 			if len(words) > 0 && words[0].text == "cd" {
 				switch {
 				case len(words) == 2 && words[1].literal && filepath.IsAbs(words[1].text):
@@ -81,14 +105,113 @@ func shellWrites(command, cwd string) []string {
 					dir = "" // somewhere the shell decides; relative targets after it are unknown
 				}
 			}
+			if len(words) > 0 && filepath.Base(words[0].text) == "mkdir" {
+				args := make([]string, len(words))
+				for i, w := range words {
+					args[i] = w.text
+				}
+				for _, i := range operands(args, "-m", "--mode") {
+					if p, ok := resolve(words[i]); ok {
+						made[p] = true
+					}
+				}
+			}
 			for _, w := range writtenOperands(words) {
 				add(w)
+			}
+			if slices.Contains(committing, gitSubcommand(words)) {
+				commits = append(commits, len(out))
 			}
 		}
 		stack = append(stack, scope{n, dir})
 		return true
 	})
+	return out, commits
+}
+
+// patches returns the patch text an apply_patch statement is given.
+func patches(st *syntax.Stmt) []string {
+	call, ok := st.Cmd.(*syntax.CallExpr)
+	if !ok {
+		return nil
+	}
+	words := wordsOf(call)
+	if len(words) == 0 || filepath.Base(words[0].text) != "apply_patch" {
+		return nil
+	}
+	var out []string
+	for _, w := range words[1:] {
+		if w.literal {
+			out = append(out, w.text)
+		}
+	}
+	for _, r := range st.Redirs {
+		if r.Op != syntax.Hdoc && r.Op != syntax.DashHdoc || r.Hdoc == nil {
+			continue
+		}
+		var b strings.Builder
+		for _, p := range r.Hdoc.Parts {
+			if lit, ok := p.(*syntax.Lit); ok {
+				b.WriteString(lit.Value)
+			}
+		}
+		out = append(out, b.String())
+	}
 	return out
+}
+
+// wordsOf is a command's words, from the command it runs: past the wrappers that run the
+// next word as a command (command, env and exec, with their options and env's assignments).
+func wordsOf(call *syntax.CallExpr) []word {
+	words := make([]word, len(call.Args))
+	for i, a := range call.Args {
+		words[i] = literal(a)
+	}
+	for len(words) > 0 {
+		switch filepath.Base(words[0].text) {
+		case "command", "exec":
+			words = words[1:]
+			for len(words) > 0 && strings.HasPrefix(words[0].text, "-") {
+				if strings.ContainsAny(words[0].text, "vV") {
+					return nil // command -v and -V look a command up; nothing runs
+				}
+				words = words[1:]
+			}
+		case "env":
+			words = words[1:]
+			for len(words) > 0 && (strings.HasPrefix(words[0].text, "-") || strings.Contains(words[0].text, "=")) {
+				switch a := words[0].text; {
+				case a == "-C" || a == "--chdir" || strings.HasPrefix(a, "--chdir="):
+					return nil // run somewhere else, so its relative paths are unknown
+				case a == "-u":
+					words = words[1:] // the name to unset
+				}
+				words = words[1:]
+			}
+		default:
+			return words
+		}
+	}
+	return words
+}
+
+// committing are the git subcommands that make commits prepare-commit-msg stamps.
+var committing = []string{"commit", "cherry-pick", "revert", "rebase", "am"}
+
+// gitSubcommand is the subcommand of a git command line, after git's own options.
+func gitSubcommand(words []word) string {
+	if len(words) == 0 || filepath.Base(words[0].text) != "git" {
+		return ""
+	}
+	for i := 1; i < len(words); i++ {
+		switch a := words[i].text; {
+		case a == "-C" || a == "-c" || a == "--git-dir" || a == "--work-tree" || a == "--namespace":
+			i++
+		case !strings.HasPrefix(a, "-"):
+			return a
+		}
+	}
+	return ""
 }
 
 // written reports whether a redirect sends the command's output to its word: not stderr
@@ -142,6 +265,9 @@ func literal(w *syntax.Word) word {
 
 // writtenOperands returns the arguments a command writes to.
 func writtenOperands(words []word) []word {
+	if len(words) > 2 && filepath.Base(words[0].text) == "git" && words[1].text == "mv" {
+		words = words[1:] // git mv moves as mv does
+	}
 	args := make([]string, len(words))
 	for i, w := range words {
 		args[i] = w.text

@@ -224,7 +224,7 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	captureCodexFunding(ctx, env, r, in)
 	captureCodexDesktopActivity(ctx, env, r, in)
 	captureCodexTitle(ctx, env, r, in, captureCodexReplies(ctx, env, r, in))
-	candidates := codexEditedPaths(in, env.Cwd)
+	candidates, commits := codexEditedPaths(in, env.Cwd)
 	if len(candidates) == 0 {
 		return nil
 	}
@@ -233,27 +233,66 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	if codexDesktopRoute(env, r) {
 		attrs[semconv.TermaCaptureSurfaceKey] = semconv.TermaCaptureSurfaceDesktop
 	}
-	env.Touch(r, session.Session{ID: in.SessionID, Tool: codexTool, Model: in.Model}, in.ToolName, candidates, attrs)
+	sess := session.Session{ID: in.SessionID, Tool: codexTool, Model: in.Model}
+	if len(commits) == 0 {
+		env.Touch(r, sess, in.ToolName, candidates, attrs)
+		return nil
+	}
+	// The call's commits took in what it wrote before them: recording those files again
+	// would hand the next commit of them to this session.
+	env.Expect(r, sess, candidates[commits[len(commits)-1]:])
+	env.Report(r, sess, in.ToolName, candidates, attrs)
 	return nil
 }
 
-func codexEditedPaths(in *codexHookInput, cwd string) []string {
+// preToolUse records the files a shell call writes before its first commit, so that commit
+// is stamped: the call's PostToolUse comes after it. A write between two commits is left
+// out, since it would claim the first. A call that makes no commit has all its files
+// recorded, since Codex sends no PostToolUse for a patch it runs from the shell.
+func preToolUse(ctx context.Context, env hookrun.Env) error {
+	in, err := readCodexHookInput(env.Stdin)
+	if err != nil {
+		env.Logf("%v", err)
+		return nil
+	}
+	if in.ToolName != codexShellTool || !session.ValidID(in.SessionID) {
+		return nil
+	}
+	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+	paths, commits := codexEditedPaths(in, env.Cwd)
+	if len(commits) > 0 {
+		paths = paths[:commits[0]] // a write after a commit must not claim it
+	}
+	if len(paths) == 0 {
+		return nil
+	}
+	r, err := env.Repo(ctx)
+	if err != nil {
+		return nil
+	}
+	env.Expect(r, session.Session{ID: in.SessionID, Tool: codexTool, Model: in.Model}, paths)
+	return nil
+}
+
+// codexEditedPaths returns the files a call writes, in order, and for each commit the call
+// makes, how many of them come before it.
+func codexEditedPaths(in *codexHookInput, cwd string) (paths []string, commits []int) {
 	var input struct {
 		Command  string `json:"command"`
 		FilePath string `json:"file_path"`
 		Path     string `json:"path"`
 	}
 	_ = json.Unmarshal(in.ToolInput, &input)
+	if in.ToolName == codexShellTool {
+		return shellWrites(input.Command, cwd)
+	}
 	var out []string
 	for _, p := range []string{input.FilePath, input.Path} {
 		if p != "" {
 			out = append(out, p)
 		}
 	}
-	if in.ToolName == codexShellTool {
-		out = append(out, shellWrites(input.Command, cwd)...)
-	}
-	return append(out, applyPatchPaths(input.Command)...)
+	return append(out, applyPatchPaths(input.Command)...), nil
 }
 
 // codexShellTool is the tool_name Codex gives every shell call (exec_command and the rest).

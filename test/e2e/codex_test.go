@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -184,6 +185,33 @@ func codexEditStampsCommit(t *testing.T, b Binary, newest bool, how string) {
 	if !strings.Contains(msg, "Agent-Tool: codex") {
 		t.Errorf("commit lacks Agent-Tool trailer:\n%s", msg)
 	}
+}
+
+// TestCodexSameCallCommitIsStamped commits in the shell call that writes the file, as
+// Codex often does: the call's PostToolUse comes after the commit, so PreToolUse stamps it.
+func TestCodexSameCallCommitIsStamped(t *testing.T) {
+	forEachCodex(t, func(t *testing.T, b Binary, newest bool) {
+		for _, tc := range []struct{ name, command string }{
+			{"shell write", "printf hello > hello.txt && git add hello.txt && git commit -m hello"},
+			{"patch from the shell", "apply_patch <<'PATCH'\n*** Begin Patch\n*** Add File: hello.txt\n+hello\n*** End Patch\nPATCH\ngit add hello.txt && git commit -m hello"},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				track(t)
+				route := codexSubscription(t)
+				sb := New(t, Isolated, WithCodex(b))
+				run := sb.CodexExec(route,
+					"Run exactly this as ONE shell command, then reply with exactly TERMA_OK:\n"+tc.command,
+					"-s", "workspace-write", "--add-dir", filepath.Join(sb.Repo, ".git"))
+				if pre := sb.HookPayloads("codex-pre-tool-use"); len(pre) > 0 {
+					CheckKeys(t, "codex/hook-PreToolUse", keysOf(pre[0]), newest)
+				}
+				msg := sb.git("log", "-1", "--format=%B")
+				if !strings.Contains(msg, "hello") || !strings.Contains(msg, "Agent-Session-Id: "+run.ThreadID) {
+					t.Fatalf("commit made in the same call not stamped with %s:\n%s\n%s", run.ThreadID, msg, tail(run.Stdout, 1500))
+				}
+			})
+		}
+	})
 }
 
 // TestCodexAPIKey is the API route: auth_mode says so. Needs OPENAI_API_KEY.

@@ -23,6 +23,8 @@ var codexHooks = []struct {
 	{"UserPromptSubmit", "codex-user-prompt-submit", true, 10},
 	// Codex sends repository hooks no approval decision, only the request.
 	{"PermissionRequest", "codex-permission-request", false, 10},
+	// Synchronous so a commit in the same shell call finds the files it writes.
+	{"PreToolUse", "codex-pre-tool-use", false, 10},
 	{"PostToolUse", "codex-post-tool-use", true, 10},
 	// Synchronous so the local snapshot finishes before codex exec exits.
 	{"Stop", "codex-stop", false, 3},

@@ -116,7 +116,7 @@ func TestCodexSessionStampsItsCommitFromShellWrite(t *testing.T) {
 func TestCodexEditedPathsParsesShellOnlyForShellCalls(t *testing.T) {
 	t.Parallel()
 	in := &codexHookInput{ToolName: "apply_patch", ToolInput: []byte(`{"command":"*** Begin Patch\n*** Add File: x.sh\n+echo a > out.txt\n*** End Patch"}`)}
-	if got := codexEditedPaths(in, t.TempDir()); len(got) != 1 || got[0] != "x.sh" {
+	if got, _ := codexEditedPaths(in, t.TempDir()); len(got) != 1 || got[0] != "x.sh" {
 		t.Fatalf("got %v, want [x.sh]", got)
 	}
 }
@@ -182,6 +182,7 @@ func TestCodexHooksNeverFailOnBadInput(t *testing.T) {
 		for name, fn := range map[string]func(context.Context, hookrun.Env) error{
 			"session-start": sessionStart,
 			"session-end":   sessionEnd,
+			"pre-tool-use":  preToolUse,
 			"post-tool-use": postToolUse,
 		} {
 			env := hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: t.TempDir(), Stdin: strings.NewReader(bad), Version: "test"}
@@ -189,5 +190,258 @@ func TestCodexHooksNeverFailOnBadInput(t *testing.T) {
 				t.Fatalf("%s(%q) = %v, want nil", name, bad, err)
 			}
 		}
+	}
+}
+
+// Codex runs a call's PostToolUse after the call, so a commit in the call itself, or one
+// after a patch run from the shell (which has no PostToolUse), is stamped only through
+// PreToolUse. The commands are the ones Codex 0.160.1 ran in live sessions.
+func TestCodexPreToolUseStampsACommitInTheSameCall(t *testing.T) {
+	for _, tc := range []struct {
+		name, command string
+		before        []string    // committed first
+		mkdir         string      // the directory the command makes first
+		write         [][2]string // what the command writes: path, content
+		git           [][]string  // and the git commands it runs before committing
+	}{
+		{
+			name:    "write and commit",
+			command: "printf x > pairs/p.txt && git add pairs/p.txt && git commit -m p",
+			before:  []string{"pairs/keep.txt"},
+			write:   [][2]string{{"pairs/p.txt", "x"}},
+		},
+		{
+			name:    "one command per line",
+			command: "printf '%s\\n' 'Terma Sandbox Team' > CONTRIBUTORS\n git add -- CONTRIBUTORS\n git commit -m \"Add CONTRIBUTORS with Terma Sandbox Team\"",
+			write:   [][2]string{{"CONTRIBUTORS", "Terma Sandbox Team\n"}},
+		},
+		{
+			name:    "into a directory made first",
+			command: "mkdir -p pairs && printf 'seven\\n' > pairs/o7.txt && git add -- pairs/o7.txt && git commit -m 'Add pairs/o7.txt with seven' && git status --short && git show --stat --oneline HEAD",
+			write:   [][2]string{{"pairs/o7.txt", "seven\n"}},
+		},
+		{
+			name:    "git mv into a directory made first",
+			command: "mkdir -p docs/notes && git mv src/p4_subdir.txt docs/notes/p4_subdir.txt && git diff --cached --stat && git commit -m \"Move p4_subdir note into docs/notes\" && git status --short",
+			before:  []string{"src/p4_subdir.txt"},
+			mkdir:   "docs/notes",
+			git:     [][]string{{"mv", "src/p4_subdir.txt", "docs/notes/p4_subdir.txt"}},
+		},
+		{
+			name:    "patch from the shell",
+			command: "apply_patch <<'PATCH'\n*** Begin Patch\n*** Add File: pairs/b.txt\n+heredoc\n*** End Patch\nPATCH",
+			before:  []string{"pairs/keep.txt"},
+			write:   [][2]string{{"pairs/b.txt", "heredoc\n"}},
+		},
+		{
+			name:    "patch from the shell that updates, deletes and moves",
+			command: "apply_patch <<'PATCH'\n*** Begin Patch\n*** Update File: pairs/d1.txt\n@@\n-one\n+one updated\n*** Delete File: pairs/d2.txt\n*** Update File: pairs/d3.txt\n*** Move to: pairs/d3moved.txt\n@@\n-three\n+three moved\n*** End Patch\nPATCH",
+			before:  []string{"pairs/d1.txt", "pairs/d2.txt", "pairs/d3.txt"},
+			git:     [][]string{{"rm", "-q", "pairs/d2.txt"}, {"mv", "pairs/d3.txt", "pairs/d3moved.txt"}},
+			write:   [][2]string{{"pairs/d1.txt", "one updated\n"}, {"pairs/d3moved.txt", "three moved\n"}},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			root := hookruntest.InitRepo(t)
+			stateDir := t.TempDir()
+			sp, _ := spool.Open(t.TempDir())
+			for _, p := range tc.before {
+				hookruntest.WriteFile(t, root, p, "before\n")
+			}
+			if len(tc.before) > 0 {
+				for _, args := range [][]string{{"add", "-A"}, {"commit", "-qm", "before"}} {
+					if _, err := gitx.Git(ctx, root, args...); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			const id = "01a1204e-2470-7e31-859b-486d42353986"
+			env := hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Spool: sp, Version: "test",
+				Stdin: strings.NewReader(`{"session_id":"` + id + `","turn_id":"01a1204e-26df-7540-ae80-03d0159e9625","transcript_path":null,"cwd":` + strconv.Quote(root) +
+					`,"hook_event_name":"PreToolUse","model":"gpt-6.1-sol","permission_mode":"bypassPermissions","tool_name":"Bash","tool_input":{"command":` + strconv.Quote(tc.command) +
+					`},"tool_use_id":"exec-1acd400f-cd4d-41b9-a47c-a31aaa337bd5"}`)}
+			if err := preToolUse(ctx, env); err != nil {
+				t.Fatal(err)
+			}
+			if tc.mkdir != "" {
+				if err := os.MkdirAll(filepath.Join(root, tc.mkdir), 0o755); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for _, args := range tc.git {
+				if _, err := gitx.Git(ctx, root, args...); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for _, w := range tc.write {
+				hookruntest.WriteFile(t, root, w[0], w[1])
+			}
+			if _, err := gitx.Git(ctx, root, "add", "-A"); err != nil {
+				t.Fatal(err)
+			}
+			msgPath := filepath.Join(t.TempDir(), "COMMIT_EDITMSG")
+			_ = os.WriteFile(msgPath, []byte("agent work\n"), 0o644)
+			commitEnv := hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Args: []string{msgPath, "message"}, Stdin: strings.NewReader(""), Spool: sp, Version: "test"}
+			if err := hookrun.PrepareCommitMsg(ctx, commitEnv); err != nil {
+				t.Fatal(err)
+			}
+			if data, _ := os.ReadFile(msgPath); !strings.Contains(string(data), "Agent-Session-Id: "+id) {
+				t.Fatalf("commit made in the same call not stamped:\n%s", data)
+			}
+			// The call's PostToolUse reports the files; reporting them here too would count them twice.
+			for _, ev := range hookruntest.Spooled(t, sp) {
+				if ev.Name == semconv.TermaFilesTouchedEvent {
+					t.Fatalf("PreToolUse reported files: %+v", ev)
+				}
+			}
+		})
+	}
+}
+
+// codexCall runs a shell call's hooks around git: PreToolUse, then run (the call's own
+// effect, its commits made through commit), then PostToolUse.
+type codexCall struct {
+	t        *testing.T
+	ctx      context.Context
+	root     string
+	stateDir string
+	sp       *spool.Spool
+}
+
+const codexCallSession = "01a1204e-2470-7e31-859b-486d42353986"
+
+func newCodexCall(t *testing.T) *codexCall {
+	sp, _ := spool.Open(t.TempDir())
+	return &codexCall{t: t, ctx: context.Background(), root: hookruntest.InitRepo(t), stateDir: t.TempDir(), sp: sp}
+}
+
+func (c *codexCall) env(stdin string, args ...string) hookrun.Env {
+	return hookrun.Env{StateDir: c.stateDir, Now: time.Now(), Cwd: c.root, Policy: hookruntest.Admitting(c.root), Args: args, Stdin: strings.NewReader(stdin), Spool: c.sp, Version: "test"}
+}
+
+func (c *codexCall) payload(event, command string) string {
+	return `{"session_id":"` + codexCallSession + `","turn_id":"01a1204e-26df-7540-ae80-03d0159e9625","transcript_path":null,"cwd":` + strconv.Quote(c.root) +
+		`,"hook_event_name":"` + event + `","model":"gpt-6.1-sol","permission_mode":"bypassPermissions","tool_name":"Bash","tool_input":{"command":` + strconv.Quote(command) +
+		`},"tool_use_id":"exec-1acd400f-cd4d-41b9-a47c-a31aaa337bd5","tool_response":""}`
+}
+
+func (c *codexCall) git(args ...string) {
+	c.t.Helper()
+	if _, err := gitx.Git(c.ctx, c.root, args...); err != nil {
+		c.t.Fatal(err)
+	}
+}
+
+// commit commits what is staged as the commit hooks see it, and returns its message.
+func (c *codexCall) commit(message string) string {
+	c.t.Helper()
+	msgPath := filepath.Join(c.t.TempDir(), "COMMIT_EDITMSG")
+	_ = os.WriteFile(msgPath, []byte(message+"\n"), 0o644)
+	if err := hookrun.PrepareCommitMsg(c.ctx, c.env("", msgPath, "message")); err != nil {
+		c.t.Fatal(err)
+	}
+	c.git("commit", "-q", "-F", msgPath)
+	if err := hookrun.PostCommit(c.ctx, c.env("")); err != nil {
+		c.t.Fatal(err)
+	}
+	data, _ := os.ReadFile(msgPath)
+	return string(data)
+}
+
+func (c *codexCall) run(command string, effect func()) {
+	c.t.Helper()
+	if err := preToolUse(c.ctx, c.env(c.payload("PreToolUse", command))); err != nil {
+		c.t.Fatal(err)
+	}
+	effect()
+	if err := postToolUse(c.ctx, c.env(c.payload("PostToolUse", command))); err != nil {
+		c.t.Fatal(err)
+	}
+}
+
+// A file written after the call's commit is not that commit's: here a developer's staged
+// change goes out first.
+func TestCodexWriteAfterACommitDoesNotClaimIt(t *testing.T) {
+	c := newCodexCall(t)
+	hookruntest.WriteFile(t, c.root, "f.txt", "base\n")
+	c.git("add", "f.txt")
+	c.git("commit", "-qm", "base")
+	hookruntest.WriteFile(t, c.root, "f.txt", "human\n")
+	c.git("add", "f.txt")
+	var human string
+	c.run("git commit -m human && printf agent > f.txt", func() {
+		human = c.commit("human")
+		hookruntest.WriteFile(t, c.root, "f.txt", "agent")
+	})
+	if strings.Contains(human, "Agent-Session-Id") {
+		t.Fatalf("the developer's commit was stamped by a write that came after it:\n%s", human)
+	}
+	c.git("add", "f.txt")
+	if msg := c.commit("agent"); !strings.Contains(msg, "Agent-Session-Id: "+codexCallSession) {
+		t.Fatalf("the agent's write, committed next, not stamped:\n%s", msg)
+	}
+}
+
+// A write between two commits in one call claims neither: the first commit is the
+// developer's staged change, made before the agent wrote anything.
+func TestCodexWriteBetweenTwoCommitsDoesNotClaimTheFirst(t *testing.T) {
+	c := newCodexCall(t)
+	hookruntest.WriteFile(t, c.root, "h", "base\n")
+	c.git("add", "h")
+	c.git("commit", "-qm", "base")
+	hookruntest.WriteFile(t, c.root, "h", "human\n")
+	c.git("add", "h")
+	var human string
+	c.run("git commit -m human && printf agent > h && git add h && git commit -m agent", func() {
+		human = c.commit("human")
+		hookruntest.WriteFile(t, c.root, "h", "agent")
+		c.git("add", "h")
+		c.commit("agent")
+	})
+	if strings.Contains(human, "Agent-Session-Id") {
+		t.Fatalf("the developer's commit was stamped by a write that came after it:\n%s", human)
+	}
+}
+
+// After a call commits what it wrote, its PostToolUse leaves those files retired: a
+// developer's later commit of them is not the session's.
+func TestCodexSameCallCommitLeavesItsFilesRetired(t *testing.T) {
+	for _, tc := range []struct {
+		name, command, file string
+		effect              func(c *codexCall)
+	}{
+		{"git mv", "git mv old.txt new.txt && git commit -m move", "new.txt", func(c *codexCall) {
+			c.git("mv", "old.txt", "new.txt")
+		}},
+		{"wrapped commit", "printf x > w.txt && git add w.txt && command git commit -m w", "w.txt", func(c *codexCall) {
+			hookruntest.WriteFile(c.t, c.root, "w.txt", "x")
+			c.git("add", "w.txt")
+		}},
+		{"write", "printf '%s\\n' 'Terma Sandbox Team' > CONTRIBUTORS\n git add -- CONTRIBUTORS\n git commit -m \"Add CONTRIBUTORS with Terma Sandbox Team\"", "CONTRIBUTORS", func(c *codexCall) {
+			hookruntest.WriteFile(c.t, c.root, "CONTRIBUTORS", "Terma Sandbox Team\n")
+			c.git("add", "--", "CONTRIBUTORS")
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := newCodexCall(t)
+			hookruntest.WriteFile(t, c.root, "old.txt", "old\n")
+			c.git("add", "old.txt")
+			c.git("commit", "-qm", "base")
+			c.run(tc.command, func() {
+				tc.effect(c)
+				if msg := c.commit("agent"); !strings.Contains(msg, "Agent-Session-Id: "+codexCallSession) {
+					t.Fatalf("commit in the call not stamped:\n%s", msg)
+				}
+			})
+			if touched := hookruntest.Named(hookruntest.Spooled(t, c.sp), semconv.TermaFilesTouchedEvent); len(touched) != 1 {
+				t.Fatalf("the call's files should be reported once, got %d events", len(touched))
+			}
+			hookruntest.WriteFile(t, c.root, tc.file, "human\n")
+			c.git("add", tc.file)
+			if msg := c.commit("human"); strings.Contains(msg, "Agent-Session-Id") {
+				t.Fatalf("the developer's later commit of %s was stamped:\n%s", tc.file, msg)
+			}
+		})
 	}
 }

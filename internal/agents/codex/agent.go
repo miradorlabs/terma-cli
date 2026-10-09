@@ -39,6 +39,7 @@ func (Agent) Events() map[string]agents.Handler {
 		"codex-user-prompt-submit": userPromptSubmit,
 		"codex-permission-request": permissionRequest,
 		"codex-session-end":        sessionEnd,
+		"codex-pre-tool-use":       preToolUse,
 		"codex-post-tool-use":      postToolUse,
 		"codex-stop":               stop,
 		"codex-subagent-start":     subagentStart,
