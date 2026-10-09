@@ -112,3 +112,38 @@ func TestEachTeamKeepsItsPolicyAndEachProfileItsTeam(t *testing.T) {
 		t.Fatalf("a refresh rewrote config.json:\n%s", after)
 	}
 }
+
+// Selecting another team drops the name setup saw for the last one, so doctor never puts
+// one team's name on another; refreshing the same team keeps it.
+func TestStorePolicyClearsTheNameOfATeamItReplaces(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if err := config.UpdateProfile(dir, "default", func(p *config.Profile) {
+		p.OrganizationID, p.Team, p.TeamName = "org_a", "live", "Live"
+	}); err != nil {
+		t.Fatal(err)
+	}
+	store := func(selected, team string) {
+		t.Helper()
+		cfg := &config.Config{Dir: dir, StateDir: dir, ProfileName: "default", OrganizationID: "org_a", AuthURL: "https://auth.example",
+			Policy: config.Policy{TeamID: selected}}
+		pol := &config.Policy{Mode: config.ModeRepo, TeamID: team, OrganizationID: "org_a", AuthURL: "https://auth.example", Revision: 1, FetchedAt: time.Now()}
+		if err := StorePolicy(cfg, pol); err != nil {
+			t.Fatal(err)
+		}
+	}
+	name := func() string {
+		t.Helper()
+		file, err := config.LoadFile(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return file.Profiles["default"].TeamName
+	}
+	if store("live", "live"); name() != "Live" {
+		t.Fatalf("a refresh dropped the team's name: %q", name())
+	}
+	if store("other", "other"); name() != "" {
+		t.Fatalf("another team kept the name %q", name())
+	}
+}

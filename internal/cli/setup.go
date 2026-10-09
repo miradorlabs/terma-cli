@@ -80,7 +80,8 @@ func (app *App) newSetupCommand() *cobra.Command {
      .git/hooks, chaining to any hook already there. Nothing is written into a
      repository's working tree or committed files.
 
-Run it again any time: it reuses a working sign-in, --team switches team, --org
+Run it again any time: it reuses a working sign-in, offers the team chosen before
+as the default when the organization has several, --team switches team, --org
 switches organization, and --relay-addr moves the relay off a port another program
 holds.
 
@@ -182,7 +183,7 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 			}
 		},
 		SelectTeam: func(_ context.Context, cfg *config.Config) error {
-			name, err := app.selectPolicyTeam(cmd, cfg, !f.assumeYes && output.Interactive())
+			name, err := app.selectPolicyTeam(cmd, cfg, !f.assumeYes && canPrompt())
 			team = name
 			return err
 		},

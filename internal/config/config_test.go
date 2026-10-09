@@ -274,9 +274,9 @@ func TestLoad_EndpointPrecedence(t *testing.T) {
 
 func TestProfileSelectOrganization(t *testing.T) {
 	t.Parallel()
-	p := &Profile{OrganizationID: "org-a", OrganizationName: "Acme"}
+	p := &Profile{OrganizationID: "org-a", OrganizationName: "Acme", Team: "t1", TeamName: "Acme Web"}
 	p.SelectOrganization("org-b", "")
-	if p.OrganizationID != "org-b" || p.OrganizationName != "" {
+	if p.OrganizationID != "org-b" || p.OrganizationName != "" || p.Team != "" || p.TeamName != "" {
 		t.Fatalf("organization switch retained the previous name: %+v", p)
 	}
 	p.SelectOrganization("org-b", "Beta")

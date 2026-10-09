@@ -267,8 +267,8 @@ func TestTeamLabel(t *testing.T) {
 		cfg  config.Config
 		want string
 	}{
-		{"named", config.Config{Team: id, TeamName: "Acme Web", OrganizationName: "Acme", Environment: config.EnvProd}, `team "Acme Web" in Acme`},
-		{"off production", config.Config{Team: id, TeamName: "Acme Web", OrganizationID: "org-1", Environment: "dev"}, `team "Acme Web" in org-1 (dev)`},
+		{"named", config.Config{Team: id, TeamName: "Acme Web", OrganizationName: "Acme", Environment: config.EnvProd}, `team "Acme Web" (aaaaaaaa) in Acme`},
+		{"off production", config.Config{Team: id, TeamName: "Acme Web", OrganizationID: "org-1", Environment: "dev"}, `team "Acme Web" (aaaaaaaa) in org-1 (dev)`},
 		{"the name is another team's", config.Config{Team: other, TeamName: "Acme API", OrganizationName: "Acme"}, "team " + id + " in Acme"},
 		{"no team", config.Config{}, "your team"},
 	} {

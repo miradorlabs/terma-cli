@@ -255,7 +255,7 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 const NoRepositoriesStep = "Ask a team admin to list repositories, or to collect every session, in the Terma web app; until then, nothing is collected."
 
 // NoPolicyStep is what a developer whose team has no collection policy yet is told.
-const NoPolicyStep = "Ask a team admin to set up your team's collection policy in the Terma web app, or run `terma setup` and choose the team that has one; until then, nothing is collected."
+const NoPolicyStep = "Ask a team admin to set up your team's collection policy in the Terma web app, or, if it was set up on another team, run `terma setup` for that team; until then, nothing is collected."
 
 // TeamLabel names the team whose policy cfg holds, with its organization and, off
 // production, its environment: what to hold against the team in the web app when the
@@ -265,9 +265,10 @@ func TeamLabel(cfg *config.Config) string {
 	if id == "" {
 		return "your team"
 	}
+	// The ID stays beside the name, which may have changed in the web app since setup saw it.
 	label := "team " + id
 	if cfg.TeamName != "" && cfg.Team == id {
-		label = "team " + strconv.Quote(cfg.TeamName)
+		label = "team " + strconv.Quote(cfg.TeamName) + " (" + id[:min(len(id), 8)] + ")"
 	}
 	if org := cmp.Or(cfg.OrganizationName, cfg.OrganizationID); org != "" {
 		label += " in " + org

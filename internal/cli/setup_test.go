@@ -44,7 +44,8 @@ func TestSetupAfterTeardownReusesTheSelectedTeam(t *testing.T) {
 
 // On a terminal, the team an earlier setup saved is only the picker's default in an
 // organization with several, where a team created since is easily the one meant; --team
-// and an organization with one team are taken without asking.
+// and an organization with one team are taken without asking, and a saved team since
+// deleted gives way to the only one.
 func TestSetupOffersTheSavedTeamAsTheDefault(t *testing.T) {
 	gateway := newFakeAuth(t)
 	authSandbox(t, gateway)
@@ -53,18 +54,24 @@ func TestSetupOffersTheSavedTeamAsTheDefault(t *testing.T) {
 		name     string
 		org      organization
 		explicit bool
+		gone     bool
 		asks     bool
 	}{
-		{"several teams, saved", orgA(), false, true},
-		{"several teams, --team", orgA(), true, false},
-		{"one team, saved", orgB(), false, false},
+		{"several teams, saved", orgA(), false, false, true},
+		{"several teams, --team", orgA(), true, false, false},
+		{"one team, saved", orgB(), false, false, false},
+		{"one team, saved team deleted", orgB(), false, true, false},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			if _, err := auth.SaveCredential(testApp.dir, config.DefaultProfile, storedSession(gateway, c.org)); err != nil {
 				t.Fatal(err)
 			}
 			saved := projectsIn(c.org.ID)[len(projectsIn(c.org.ID))-1]
-			if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.OrganizationID, p.Team = c.org.ID, saved.ID }); err != nil {
+			savedID := saved.ID
+			if c.gone {
+				savedID = "dddddddd-0000-4000-8000-000000000009"
+			}
+			if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.OrganizationID, p.Team = c.org.ID, savedID }); err != nil {
 				t.Fatal(err)
 			}
 			cfg, err := testApp.loadConfig()
@@ -185,7 +192,7 @@ func TestSetupAndDoctorSayWhenTheTeamHasNoPolicy(t *testing.T) {
 	}
 	// Doctor names the team and organization it asked, to hold against the web app's.
 	out, _ = runTerma(t, "doctor")
-	if !regexp.MustCompile(`repository collected +team "Beta Core" in Beta Labs has no collection policy\n`).MatchString(out) || !strings.Contains(out, doctor.NoPolicyStep) {
+	if !regexp.MustCompile(`repository collected +team "Beta Core" \(bbbbbbbb\) in Beta Labs has no collection policy\n`).MatchString(out) || !strings.Contains(out, doctor.NoPolicyStep) {
 		t.Errorf("doctor did not say which team has no policy:\n%s", out)
 	}
 }

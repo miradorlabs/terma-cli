@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"slices"
 
 	"github.com/spf13/cobra"
 
@@ -90,6 +91,10 @@ func (app *App) selectPolicyTeam(cmd *cobra.Command, cfg *config.Config, ask boo
 	projects, err := availableProjects(cmd.Context(), client)
 	if err != nil {
 		return "", err
+	}
+	// A saved team since deleted is no team to keep: the picker, or the only team, decides.
+	if saved != "" && !slices.ContainsFunc(projects, func(p project) bool { return p.ID == saved }) {
+		cfg.ProjectID, saved = "", ""
 	}
 	var team *project
 	switch {
