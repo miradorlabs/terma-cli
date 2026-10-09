@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -345,6 +346,9 @@ func TestLastCommitTellsMergesAndSquashes(t *testing.T) {
 	mustGit(t, root, "merge", "-q", "--no-ff", "--no-edit", "feature")
 	if c := head(); len(c.Parents) != 2 || !c.IsMerge() || c.IsSquash() {
 		t.Fatalf("merge commit: parents=%v merge=%v squash=%v", c.Parents, c.IsMerge(), c.IsSquash())
+	}
+	if c := head(); !slices.Equal(c.Paths(), []string{"feature"}) {
+		t.Fatalf("merge paths must name changes from the first parent: %v", c.Paths())
 	}
 
 	// A squash is a single-parent commit; only git's default subject gives it away.

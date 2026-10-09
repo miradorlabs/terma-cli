@@ -15,6 +15,14 @@ import (
 // each git commit it makes, how many of them come before it. A command that does not parse
 // gives only the files of a patch in its text.
 func shellWrites(command, cwd string) (paths []string, commits []int) {
+	paths, commits, _, _, _ = shellWritePlan(command, cwd)
+	return paths, commits
+}
+
+// shellWritePlan keeps extraction separate from predictions: a named write is safe to
+// expect only on every control-flow path reaching the first commit, or (after the call)
+// on every path completing after its last commit.
+func shellWritePlan(command, cwd string) (paths []string, commits []int, before, after, reported []string) {
 	file, err := syntax.NewParser().Parse(strings.NewReader(command), "")
 	if err != nil {
 		for _, p := range applyPatchPaths(command) {
@@ -23,10 +31,13 @@ func shellWrites(command, cwd string) (paths []string, commits []int) {
 			}
 			paths = append(paths, filepath.Clean(p))
 		}
-		return paths, nil
+		return paths, nil, paths, paths, paths
 	}
 	dir := cwd
 	var out []string
+	var sources []*syntax.Stmt
+	var stmt *syntax.Stmt
+	boundaries := map[*syntax.Stmt]bool{}
 	resolve := func(w word) (string, bool) {
 		if !w.literal || w.text == "" || (dir == "" && !filepath.IsAbs(w.text)) {
 			return "", false
@@ -53,16 +64,19 @@ func shellWrites(command, cwd string) (paths []string, commits []int) {
 			}
 		}
 		out = append(out, p)
+		sources = append(sources, stmt)
 	}
 	type scope struct {
 		node syntax.Node
 		dir  string
+		stmt *syntax.Stmt
 	}
 	var stack []scope
 	syntax.Walk(file, func(n syntax.Node) bool {
 		if n == nil {
 			top := stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
+			stmt = top.stmt
 			switch t := top.node.(type) {
 			case *syntax.Subshell, *syntax.CmdSubst, *syntax.ProcSubst:
 				dir = top.dir // a cd inside ends with it
@@ -77,15 +91,18 @@ func shellWrites(command, cwd string) (paths []string, commits []int) {
 			}
 			return true
 		}
+		parentStmt := stmt
 		switch n := n.(type) {
 		case *syntax.FuncDecl:
 			return false // defining a function runs nothing
 		case *syntax.Stmt:
+			stmt = n
 			// apply_patch takes its patch as an argument or a heredoc; it makes any directory.
 			for _, patch := range patches(n) {
 				for _, p := range applyPatchPaths(patch) {
 					if p, ok := resolve(word{p, true}); ok {
 						out = append(out, p)
+						sources = append(sources, stmt)
 					}
 				}
 			}
@@ -113,20 +130,46 @@ func shellWrites(command, cwd string) (paths []string, commits []int) {
 				for _, i := range operands(args, "-m", "--mode") {
 					if p, ok := resolve(words[i]); ok {
 						made[p] = true
+						if slices.Contains(args, "-p") || slices.Contains(args, "--parents") {
+							for parent := filepath.Dir(p); parent != filepath.Dir(parent); parent = filepath.Dir(parent) {
+								made[parent] = true
+							}
+						}
 					}
 				}
 			}
-			for _, w := range writtenOperands(words) {
+			writeWords, shellDir := words, dir
+			if len(words) > 0 && filepath.Base(words[0].text) == "git" {
+				writeWords, dir = gitCommand(words, dir)
+				if len(writeWords) == 0 || writeWords[0].text != "mv" {
+					writeWords = nil
+				}
+			}
+			for _, w := range writtenOperands(writeWords) {
 				add(w)
 			}
-			if slices.Contains(committing, gitSubcommand(words)) {
+			dir = shellDir // git -C affects this invocation, not the shell
+			if makesCommit(words) {
 				commits = append(commits, len(out))
+				boundaries[stmt] = true
 			}
 		}
-		stack = append(stack, scope{n, dir})
+		stack = append(stack, scope{n, dir, parentStmt})
 		return true
 	})
-	return out, commits
+	pre, post, report := guaranteedShellWrites(file, sources, boundaries)
+	for i, source := range sources {
+		if pre[source] {
+			before = append(before, out[i])
+		}
+		if post[source] {
+			after = append(after, out[i])
+		}
+		if report[source] {
+			reported = append(reported, out[i])
+		}
+	}
+	return out, commits, before, after, reported
 }
 
 // patches returns the patch text an apply_patch statement is given.
@@ -195,25 +238,6 @@ func wordsOf(call *syntax.CallExpr) []word {
 	return words
 }
 
-// committing are the git subcommands that make commits prepare-commit-msg stamps.
-var committing = []string{"commit", "cherry-pick", "revert", "rebase", "am"}
-
-// gitSubcommand is the subcommand of a git command line, after git's own options.
-func gitSubcommand(words []word) string {
-	if len(words) == 0 || filepath.Base(words[0].text) != "git" {
-		return ""
-	}
-	for i := 1; i < len(words); i++ {
-		switch a := words[i].text; {
-		case a == "-C" || a == "-c" || a == "--git-dir" || a == "--work-tree" || a == "--namespace":
-			i++
-		case !strings.HasPrefix(a, "-"):
-			return a
-		}
-	}
-	return ""
-}
-
 // written reports whether a redirect sends the command's output to its word: not stderr
 // alone, not a heredoc, and not a descriptor copy such as 2>&1 or >&-.
 func written(r *syntax.Redirect) bool {
@@ -265,9 +289,6 @@ func literal(w *syntax.Word) word {
 
 // writtenOperands returns the arguments a command writes to.
 func writtenOperands(words []word) []word {
-	if len(words) > 2 && filepath.Base(words[0].text) == "git" && words[1].text == "mv" {
-		words = words[1:] // git mv moves as mv does
-	}
 	args := make([]string, len(words))
 	for i, w := range words {
 		args[i] = w.text

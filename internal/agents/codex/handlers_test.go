@@ -3,7 +3,9 @@ package codex
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -357,6 +359,172 @@ func (c *codexCall) run(command string, effect func()) {
 	effect()
 	if err := postToolUse(c.ctx, c.env(c.payload("PostToolUse", command))); err != nil {
 		c.t.Fatal(err)
+	}
+}
+
+// The helper is invoked by real Git hooks in the lifecycle tests below.
+func TestCodexGitHookProcess(t *testing.T) {
+	root := os.Getenv("TERMA_TEST_HOOK_ROOT")
+	if root == "" {
+		return
+	}
+	i := slices.Index(os.Args, "--")
+	if i < 0 || i+1 == len(os.Args) {
+		t.Fatal("missing hook event")
+	}
+	env := hookrun.Env{Cwd: root, StateDir: os.Getenv("TERMA_TEST_HOOK_STATE"), Policy: hookruntest.Admitting(root), Args: os.Args[i+2:], Now: time.Now()}
+	var err error
+	switch os.Args[i+1] {
+	case "prepare-commit-msg":
+		err = hookrun.PrepareCommitMsg(context.Background(), env)
+	case "post-commit":
+		err = hookrun.PostCommit(context.Background(), env)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func (c *codexCall) installTestHooks() {
+	c.t.Helper()
+	if _, err := exec.LookPath("sh"); err != nil {
+		c.t.Skip("POSIX shell not installed")
+	}
+	binary, err := os.Executable()
+	if err != nil {
+		c.t.Fatal(err)
+	}
+	hooks := c.t.TempDir()
+	for _, event := range []string{"prepare-commit-msg", "post-commit"} {
+		quote := func(s string) string { return "'" + strings.ReplaceAll(filepath.ToSlash(s), "'", "'\\''") + "'" }
+		// Race-enabled child tests need no exit delay; two default one-second
+		// sleeps would consume gitx.Git's entire timeout without doing work.
+		script := "#!/bin/sh\nGORACE='atexit_sleep_ms=0' TERMA_TEST_HOOK_ROOT=" + quote(c.root) + " TERMA_TEST_HOOK_STATE=" + quote(c.stateDir) + " " + quote(binary) + " -test.run='^TestCodexGitHookProcess$' -- " + event + " \"$@\" >/dev/null\n"
+		if err := os.WriteFile(filepath.Join(hooks, event), []byte(script), 0o755); err != nil {
+			c.t.Fatal(err)
+		}
+	}
+	c.git("config", "core.hooksPath", hooks)
+}
+
+func (c *codexCall) shell(command string) {
+	c.t.Helper()
+	c.run(command, func() {
+		cmd := exec.Command("sh", "-c", command)
+		cmd.Dir = c.root
+		if out, err := cmd.CombinedOutput(); err != nil {
+			c.t.Fatalf("shell call: %v\n%s", err, out)
+		}
+	})
+}
+
+func TestCodexSkippedWritesDoNotClaimHumanCommits(t *testing.T) {
+	for _, command := range []string{
+		"false && printf agent > f.txt; git commit -m human",
+		"true || printf agent > f.txt; git commit -m human",
+		"test -f absent && printf agent > f.txt; git commit -m human",
+		"if test -f absent; then printf agent > f.txt; fi; git commit -m human",
+		"git commit -m human; false && printf agent > f.txt; true",
+	} {
+		t.Run(command, func(t *testing.T) {
+			c := newCodexCall(t)
+			hookruntest.WriteFile(t, c.root, "f.txt", "base\n")
+			c.git("add", "f.txt")
+			c.git("commit", "-qm", "base")
+			hookruntest.WriteFile(t, c.root, "f.txt", "human\n")
+			c.git("add", "f.txt")
+			c.installTestHooks()
+			c.shell(command)
+			if touched := hookruntest.Named(hookruntest.Spooled(t, c.sp), semconv.TermaFilesTouchedEvent); len(touched) != 0 {
+				t.Fatalf("skipped writes reported files: %+v", touched)
+			}
+			msg, _ := gitx.Git(c.ctx, c.root, "log", "-1", "--format=%B")
+			if strings.Contains(msg, "Agent-Session-Id") {
+				t.Fatalf("skipped write claimed the human commit:\n%s", msg)
+			}
+			hookruntest.WriteFile(t, c.root, "f.txt", "next human\n")
+			c.git("add", "f.txt")
+			if msg := c.commit("next human"); strings.Contains(msg, "Agent-Session-Id") {
+				t.Fatalf("skipped write remained in the manifest:\n%s", msg)
+			}
+		})
+	}
+}
+
+func TestCodexMkdirParentsAndGuardedWritesAreStamped(t *testing.T) {
+	for _, command := range []string{
+		"mkdir -p docs/guides && printf agent > docs/index.md && git add docs/index.md && git commit -m agent",
+		"false || printf agent > f.txt; git add f.txt && git commit -m agent",
+		"printf agent > f.txt && git add f.txt && git commit -m agent",
+	} {
+		t.Run(command, func(t *testing.T) {
+			c := newCodexCall(t)
+			c.installTestHooks()
+			c.shell(command)
+			msg, _ := gitx.Git(c.ctx, c.root, "log", "-1", "--format=%B")
+			if !strings.Contains(msg, "Agent-Session-Id: "+codexCallSession) {
+				t.Fatalf("same-call commit not stamped:\n%s", msg)
+			}
+		})
+	}
+}
+
+func TestCodexGitMvWithGlobalOptionsStampsAndRetiresFiles(t *testing.T) {
+	for _, command := range []string{
+		"git -C sub -c core.quotePath=false mv old.txt new.txt && git add sub && git commit -m move",
+		"git -C sub -C .. mv sub/old.txt sub/new.txt && git commit -m move",
+	} {
+		t.Run(command, func(t *testing.T) {
+			c := newCodexCall(t)
+			hookruntest.WriteFile(t, c.root, "sub/old.txt", "old\n")
+			c.git("add", "sub/old.txt")
+			c.git("commit", "-qm", "base")
+			c.installTestHooks()
+			c.shell(command)
+			msg, _ := gitx.Git(c.ctx, c.root, "log", "-1", "--format=%B")
+			if !strings.Contains(msg, "Agent-Session-Id: "+codexCallSession) {
+				t.Fatalf("git mv with global options was not stamped:\n%s", msg)
+			}
+			hookruntest.WriteFile(t, c.root, "sub/new.txt", "human\n")
+			c.git("add", "sub/new.txt")
+			if msg := c.commit("human"); strings.Contains(msg, "Agent-Session-Id") {
+				t.Fatalf("git mv paths were not retired:\n%s", msg)
+			}
+		})
+	}
+}
+
+func TestCodexMergeContinueRetiresResolutionWithoutStampingMerge(t *testing.T) {
+	c := newCodexCall(t)
+	hookruntest.WriteFile(t, c.root, "f.txt", "base\n")
+	c.git("add", "f.txt")
+	c.git("commit", "-qm", "base")
+	c.git("checkout", "-qb", "topic")
+	hookruntest.WriteFile(t, c.root, "f.txt", "topic\n")
+	c.git("commit", "-qam", "topic")
+	c.git("checkout", "-q", "main")
+	hookruntest.WriteFile(t, c.root, "f.txt", "main\n")
+	c.git("commit", "-qam", "main")
+	if _, err := gitx.Git(c.ctx, c.root, "merge", "topic"); err == nil {
+		t.Fatal("expected a merge conflict")
+	}
+	c.installTestHooks()
+	c.shell("printf spare > spare.txt; printf resolution > f.txt && git add f.txt && GIT_EDITOR=true git merge --continue")
+	head, err := gitx.LastCommit(c.ctx, c.root)
+	if err != nil || !head.IsMerge() {
+		t.Fatalf("merge did not finish: %+v, %v", head, err)
+	}
+	if strings.Contains(head.Message, "Agent-Session-Id") {
+		t.Fatalf("merge must retain the no-stamping rule:\n%s", head.Message)
+	}
+	hookruntest.WriteFile(t, c.root, "f.txt", "later human\n")
+	c.git("add", "f.txt")
+	if msg := c.commit("human"); strings.Contains(msg, "Agent-Session-Id") {
+		t.Fatalf("retired merge resolution claimed a later human commit:\n%s", msg)
+	}
+	c.git("add", "spare.txt")
+	if msg := c.commit("spare"); !strings.Contains(msg, "Agent-Session-Id: "+codexCallSession) {
+		t.Fatalf("merge retired a file it did not incorporate:\n%s", msg)
 	}
 }
 

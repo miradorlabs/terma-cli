@@ -287,7 +287,7 @@ func (c Commit) Paths() []string {
 // LastCommit reads HEAD's sha, author, refs, parents, message and numstat in one git
 // call (~13.5 ms, nearly all process start).
 func LastCommit(ctx context.Context, dir string) (Commit, error) {
-	out, err := run(ctx, dir, "log", "-1", "-z", "--format=%H%x1f%ae%x1f%D%x1f%P%x1f%B%x1e", "--numstat", "HEAD")
+	out, err := run(ctx, dir, "log", "-1", "-z", "--format=%H%x1f%ae%x1f%D%x1f%P%x1f%B%x1e", "--numstat", "--diff-merges=first-parent", "HEAD")
 	if err != nil {
 		return Commit{}, err
 	}

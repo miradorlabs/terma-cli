@@ -224,8 +224,18 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	captureCodexFunding(ctx, env, r, in)
 	captureCodexDesktopActivity(ctx, env, r, in)
 	captureCodexTitle(ctx, env, r, in, captureCodexReplies(ctx, env, r, in))
-	candidates, commits := codexEditedPaths(in, env.Cwd)
-	if len(candidates) == 0 {
+	var candidates, expected []string
+	if in.ToolName == codexShellTool {
+		var input struct {
+			Command string `json:"command"`
+		}
+		_ = json.Unmarshal(in.ToolInput, &input)
+		_, _, _, expected, candidates = shellWritePlan(input.Command, env.Cwd)
+	} else {
+		candidates, _ = codexEditedPaths(in, env.Cwd)
+		expected = candidates
+	}
+	if len(candidates) == 0 && len(expected) == 0 {
 		return nil
 	}
 	attrs := hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType)
@@ -234,21 +244,14 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 		attrs[semconv.TermaCaptureSurfaceKey] = semconv.TermaCaptureSurfaceDesktop
 	}
 	sess := session.Session{ID: in.SessionID, Tool: codexTool, Model: in.Model}
-	if len(commits) == 0 {
-		env.Touch(r, sess, in.ToolName, candidates, attrs)
-		return nil
-	}
-	// The call's commits took in what it wrote before them: recording those files again
-	// would hand the next commit of them to this session.
-	env.Expect(r, sess, candidates[commits[len(commits)-1]:])
+	env.Expect(r, sess, expected)
 	env.Report(r, sess, in.ToolName, candidates, attrs)
 	return nil
 }
 
-// preToolUse records the files a shell call writes before its first commit, so that commit
-// is stamped: the call's PostToolUse comes after it. A write between two commits is left
-// out, since it would claim the first. A call that makes no commit has all its files
-// recorded, since Codex sends no PostToolUse for a patch it runs from the shell.
+// preToolUse records writes that precede the first commit on every route reaching it.
+// A write between commits, or one a successful path can skip, cannot claim that commit.
+// With no commit, definite writes are recorded because shell patches may have no PostToolUse.
 func preToolUse(ctx context.Context, env hookrun.Env) error {
 	in, err := readCodexHookInput(env.Stdin)
 	if err != nil {
@@ -259,10 +262,7 @@ func preToolUse(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	paths, commits := codexEditedPaths(in, env.Cwd)
-	if len(commits) > 0 {
-		paths = paths[:commits[0]] // a write after a commit must not claim it
-	}
+	paths := codexExpectedPaths(in, env.Cwd)
 	if len(paths) == 0 {
 		return nil
 	}
@@ -272,6 +272,16 @@ func preToolUse(ctx context.Context, env hookrun.Env) error {
 	}
 	env.Expect(r, session.Session{ID: in.SessionID, Tool: codexTool, Model: in.Model}, paths)
 	return nil
+}
+
+// codexExpectedPaths chooses writes that precede the first commit on every route to it.
+func codexExpectedPaths(in *codexHookInput, cwd string) []string {
+	var input struct {
+		Command string `json:"command"`
+	}
+	_ = json.Unmarshal(in.ToolInput, &input)
+	_, _, pre, _, _ := shellWritePlan(input.Command, cwd)
+	return pre
 }
 
 // codexEditedPaths returns the files a call writes, in order, and for each commit the call

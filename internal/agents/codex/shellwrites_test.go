@@ -53,6 +53,11 @@ func TestShellWrites(t *testing.T) {
 		{"cp into a directory", "cp a.go b.go src/", in("src/a.go", "src/b.go")},
 		{"mv into a directory", "mv a.go src", in("a.go", "src/a.go")},
 		{"git mv both ends", "git mv -f old.go new.go", in("old.go", "new.go")},
+		{"git mv after global options", "git -C src -c core.quotePath=false mv old.go new.go; printf x > root.go", in("src/old.go", "src/new.go", "root.go")},
+		{"git mv repeated -C", "git -C src -C .. mv old.go new.go", in("old.go", "new.go")},
+		{"git mv attached -C", "git -Csrc mv old.go new.go", in("src/old.go", "src/new.go")},
+		{"git mv expanded -C", "git -C \"$DIR\" mv old.go new.go", nil},
+		{"git mv overridden work tree", "git --work-tree=elsewhere mv old.go new.go", nil},
 		{"git mv into a directory made first", "mkdir -p docs/notes && git mv src/p4.txt docs/notes/p4.txt && git commit -m move", in("src/p4.txt", "docs/notes/p4.txt")},
 		{"into a directory made first", "mkdir -p pairs && printf 'seven\\n' > pairs/o7.txt && git add -- pairs/o7.txt", in("pairs/o7.txt")},
 		{"git reads", "git add a.go && git commit -m mv", nil},
@@ -117,6 +122,51 @@ func TestShellWritesBeforeEachCommit(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if _, got := shellWrites(tc.command, cwd); !slices.Equal(got, tc.want) {
 				t.Fatalf("commits = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// Predictions must hold on every route reaching a commit; PostToolUse must not
+// resurrect consumed paths or report a writer that a successful call can skip.
+func TestShellWritePlanControlFlow(t *testing.T) {
+	t.Parallel()
+	cwd := t.TempDir()
+	for _, tc := range []struct {
+		command                 string
+		before, after, reported []string
+	}{
+		{"printf x > a; git commit -m a", []string{"a"}, nil, []string{"a"}},
+		{"false && printf x > a; git commit -m human", nil, nil, nil},
+		{"true || printf x > a; git commit -m human", nil, nil, nil},
+		{"test -f gate && printf x > a; git commit -m human", nil, nil, nil},
+		{"test -f gate && printf x > a && git commit -m a", []string{"a"}, nil, []string{"a"}},
+		{"false || printf x > a; git commit -m a", []string{"a"}, nil, []string{"a"}},
+		{"git commit -m human; false && printf x > a; true", nil, nil, nil},
+		{"git commit -m human; test -f gate && printf x > a; true", nil, nil, nil},
+		{"git commit -m human && printf x > a", nil, []string{"a"}, []string{"a"}},
+		{"git commit -m human; printf x > a; git commit -m a", nil, nil, []string{"a"}},
+		{"if test -f gate; then printf x > a; fi; git commit -m human", nil, nil, nil},
+		{"for item in $ITEMS; do printf x > a; done; git commit -m human", nil, nil, nil},
+		{"(printf x > a && git commit -m a)", []string{"a"}, nil, []string{"a"}},
+		{"{ printf x > a; }; git commit -m a", []string{"a"}, nil, []string{"a"}},
+		{"printf x | tee a && git commit -m a", []string{"a"}, nil, []string{"a"}},
+		{"printf x > a && GIT_EDITOR=true git merge --continue", []string{"a"}, nil, []string{"a"}},
+		{"printf x > a && git merge --squash topic", []string{"a"}, []string{"a"}, []string{"a"}},
+	} {
+		t.Run(tc.command, func(t *testing.T) {
+			_, _, before, after, reported := shellWritePlan(tc.command, cwd)
+			for _, check := range []struct {
+				name      string
+				got, want []string
+			}{{"before", before, tc.before}, {"after", after, tc.after}, {"reported", reported, tc.reported}} {
+				var want []string
+				for _, path := range check.want {
+					want = append(want, filepath.Join(cwd, path))
+				}
+				if !slices.Equal(check.got, want) {
+					t.Errorf("%s: got %v, want %v", check.name, check.got, want)
+				}
 			}
 		})
 	}
