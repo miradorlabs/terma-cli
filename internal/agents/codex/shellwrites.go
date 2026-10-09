@@ -9,16 +9,19 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
-// shellWrites returns the files a shell command names as written (redirect targets and the
-// operands of the writers in writtenIndexes), resolved against cwd and any cd before them;
-// nothing when the command does not parse.
-func shellWrites(command, cwd string) []string {
+// shellWrites returns the files a shell command names as written (redirect targets, the
+// operands of the writers in writtenIndexes, and the files of a patch it runs), in the
+// order it writes them, resolved against cwd and any cd before them; committed is how many
+// of them come before its last git commit, or -1 when it makes none. Nothing when the
+// command does not parse.
+func shellWrites(command, cwd string) (paths []string, committed int) {
 	file, err := syntax.NewParser().Parse(strings.NewReader(command), "")
 	if err != nil {
-		return nil
+		return nil, -1
 	}
 	dir := cwd
 	var out []string
+	committed = -1
 	resolve := func(w word) (string, bool) {
 		if !w.literal || w.text == "" || (dir == "" && !filepath.IsAbs(w.text)) {
 			return "", false
@@ -72,6 +75,15 @@ func shellWrites(command, cwd string) []string {
 		switch n := n.(type) {
 		case *syntax.FuncDecl:
 			return false // defining a function runs nothing
+		case *syntax.Stmt:
+			// apply_patch takes its patch as an argument or a heredoc; it makes any directory.
+			for _, patch := range patches(n) {
+				for _, p := range applyPatchPaths(patch) {
+					if p, ok := resolve(word{p, true}); ok {
+						out = append(out, p)
+					}
+				}
+			}
 		case *syntax.Redirect:
 			if written(n) {
 				add(literal(n.Word))
@@ -101,11 +113,57 @@ func shellWrites(command, cwd string) []string {
 			for _, w := range writtenOperands(words) {
 				add(w)
 			}
+			if gitSubcommand(words) == "commit" {
+				committed = len(out)
+			}
 		}
 		stack = append(stack, scope{n, dir})
 		return true
 	})
+	return out, committed
+}
+
+// patches returns the patch text an apply_patch statement is given.
+func patches(st *syntax.Stmt) []string {
+	call, ok := st.Cmd.(*syntax.CallExpr)
+	if !ok || len(call.Args) == 0 || literal(call.Args[0]).text != "apply_patch" {
+		return nil
+	}
+	var out []string
+	for _, a := range call.Args[1:] {
+		if w := literal(a); w.literal {
+			out = append(out, w.text)
+		}
+	}
+	for _, r := range st.Redirs {
+		if r.Op != syntax.Hdoc && r.Op != syntax.DashHdoc || r.Hdoc == nil {
+			continue
+		}
+		var b strings.Builder
+		for _, p := range r.Hdoc.Parts {
+			if lit, ok := p.(*syntax.Lit); ok {
+				b.WriteString(lit.Value)
+			}
+		}
+		out = append(out, b.String())
+	}
 	return out
+}
+
+// gitSubcommand is the subcommand of a git command line, after git's own options.
+func gitSubcommand(words []word) string {
+	if len(words) == 0 || filepath.Base(words[0].text) != "git" {
+		return ""
+	}
+	for i := 1; i < len(words); i++ {
+		switch a := words[i].text; {
+		case a == "-C" || a == "-c" || a == "--git-dir" || a == "--work-tree" || a == "--namespace":
+			i++
+		case !strings.HasPrefix(a, "-"):
+			return a
+		}
+	}
+	return ""
 }
 
 // written reports whether a redirect sends the command's output to its word: not stderr

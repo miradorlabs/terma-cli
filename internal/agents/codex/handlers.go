@@ -224,7 +224,7 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	captureCodexFunding(ctx, env, r, in)
 	captureCodexDesktopActivity(ctx, env, r, in)
 	captureCodexTitle(ctx, env, r, in, captureCodexReplies(ctx, env, r, in))
-	candidates := codexEditedPaths(in, env.Cwd)
+	candidates, committed := codexEditedPaths(in, env.Cwd)
 	if len(candidates) == 0 {
 		return nil
 	}
@@ -233,13 +233,21 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	if codexDesktopRoute(env, r) {
 		attrs[semconv.TermaCaptureSurfaceKey] = semconv.TermaCaptureSurfaceDesktop
 	}
-	env.Touch(r, session.Session{ID: in.SessionID, Tool: codexTool, Model: in.Model}, in.ToolName, candidates, attrs)
+	sess := session.Session{ID: in.SessionID, Tool: codexTool, Model: in.Model}
+	if committed < 0 {
+		env.Touch(r, sess, in.ToolName, candidates, attrs)
+		return nil
+	}
+	// PreToolUse recorded what the call wrote before its commit, which took them in:
+	// recording them again would hand the next commit of those files to this session.
+	env.Expect(r, sess, candidates[committed:])
+	env.Report(r, sess, in.ToolName, candidates, attrs)
 	return nil
 }
 
-// preToolUse records the files a shell call is about to write, so a commit in the same
-// call is stamped: the call's PostToolUse comes after that commit, and Codex sends none for
-// a patch it runs from the shell.
+// preToolUse records the files a shell call writes before its last commit, so that commit
+// is stamped: the call's PostToolUse comes after it. A call that makes no commit has all its
+// files recorded, since Codex sends no PostToolUse for a patch it runs from the shell.
 func preToolUse(ctx context.Context, env hookrun.Env) error {
 	in, err := readCodexHookInput(env.Stdin)
 	if err != nil {
@@ -250,7 +258,10 @@ func preToolUse(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	paths := codexEditedPaths(in, env.Cwd)
+	paths, committed := codexEditedPaths(in, env.Cwd)
+	if committed >= 0 {
+		paths = paths[:committed] // a write after the commit must not claim it
+	}
 	if len(paths) == 0 {
 		return nil
 	}
@@ -262,23 +273,25 @@ func preToolUse(ctx context.Context, env hookrun.Env) error {
 	return nil
 }
 
-func codexEditedPaths(in *codexHookInput, cwd string) []string {
+// codexEditedPaths returns the files a call writes, in order, and how many of them a
+// commit in the same call takes in: -1 when the call makes no commit.
+func codexEditedPaths(in *codexHookInput, cwd string) (paths []string, committed int) {
 	var input struct {
 		Command  string `json:"command"`
 		FilePath string `json:"file_path"`
 		Path     string `json:"path"`
 	}
 	_ = json.Unmarshal(in.ToolInput, &input)
+	if in.ToolName == codexShellTool {
+		return shellWrites(input.Command, cwd)
+	}
 	var out []string
 	for _, p := range []string{input.FilePath, input.Path} {
 		if p != "" {
 			out = append(out, p)
 		}
 	}
-	if in.ToolName == codexShellTool {
-		out = append(out, shellWrites(input.Command, cwd)...)
-	}
-	return append(out, applyPatchPaths(input.Command)...)
+	return append(out, applyPatchPaths(input.Command)...), -1
 }
 
 // codexShellTool is the tool_name Codex gives every shell call (exec_command and the rest).

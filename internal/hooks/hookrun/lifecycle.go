@@ -63,13 +63,25 @@ func (e Env) EndSession(r *Repo, id, tool string) {
 // the commit stamping, and claims the session; another checkout is reported only if the team
 // policy admits it, and a path in no admitted checkout is dropped.
 func (e Env) Touch(r *Repo, sess session.Session, toolName string, paths []string, extra map[string]any) {
+	e.Expect(r, sess, paths)
+	e.Report(r, sess, toolName, paths, extra)
+}
+
+// Expect records in sess's manifest the files of r among paths, without reporting them: a
+// hook before a tool call records what a commit in the call will take in.
+func (e Env) Expect(r *Repo, sess session.Session, paths []string) {
 	for _, c := range e.checkouts(r, paths) {
 		if c.repo == r {
 			if err := r.Store.Touch(sess, c.files, e.Time()); err != nil {
 				e.Logf("record files: %v", err)
-				continue
 			}
 		}
+	}
+}
+
+// Report spools paths as Touch does, without recording them in the manifest.
+func (e Env) Report(r *Repo, sess session.Session, toolName string, paths []string, extra map[string]any) {
+	for _, c := range e.checkouts(r, paths) {
 		attrs := map[string]any{
 			semconv.GenAIMainAgentNameKey: sess.Tool, semconv.GenAIToolNameKey: toolName, semconv.TermaFilesPathsKey: c.files,
 		}
@@ -83,19 +95,6 @@ func (e Env) Touch(r *Repo, sess session.Session, toolName string, paths []strin
 			e.EmitFor(r, ev)
 		} else {
 			e.emit(e.stamp(c.repo, ev))
-		}
-	}
-}
-
-// Expect records in sess's manifest the files a tool call is about to write, without
-// reporting them: a commit in the same call is stamped, and the hook after the call
-// reports what was written.
-func (e Env) Expect(r *Repo, sess session.Session, paths []string) {
-	for _, c := range e.checkouts(r, paths) {
-		if c.repo == r {
-			if err := r.Store.Touch(sess, c.files, e.Time()); err != nil {
-				e.Logf("record files: %v", err)
-			}
 		}
 	}
 }

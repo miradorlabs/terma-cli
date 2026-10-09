@@ -73,12 +73,37 @@ func TestShellWrites(t *testing.T) {
 		{"expanded targets", "echo x > $OUT; sed -i 's/a/b/' *.go; echo y > ~/f", nil},
 		{"assignment prefix", "GOFLAGS=-mod=mod gofmt -w a.go", in("a.go")},
 		{"comment", "echo hi # > nope.txt", nil},
-		// Codex's own patch heredoc'd into a shell call is applyPatchPaths' to read.
-		{"patch body", "apply_patch <<'PATCH'\n*** Begin Patch\n*** Add File: x.sh\n+echo a > out.txt\n*** End Patch\nPATCH", nil},
+		// A patch body is not shell: its redirect writes nothing.
+		{"patch heredoc", "apply_patch <<'PATCH'\n*** Begin Patch\n*** Add File: x.sh\n+echo a > out.txt\n*** End Patch\nPATCH", in("x.sh")},
+		{"patch argument", "apply_patch '*** Begin Patch\n*** Add File: new/y.sh\n+y\n*** End Patch'", in("new/y.sh")},
+		{"patch after a cd", "cd src && apply_patch <<'PATCH'\n*** Begin Patch\n*** Update File: a.go\n@@\n-a\n+b\n*** End Patch\nPATCH", in("src/a.go")},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := shellWrites(tc.command, cwd); !slices.Equal(got, tc.want) {
+			if got, _ := shellWrites(tc.command, cwd); !slices.Equal(got, tc.want) {
 				t.Fatalf("shellWrites(%q)\n got %v\nwant %v", tc.command, got, tc.want)
+			}
+		})
+	}
+}
+
+// committed counts the writes a commit in the command takes in; a write after it is not its.
+func TestShellWritesBeforeTheCommit(t *testing.T) {
+	t.Parallel()
+	cwd := t.TempDir()
+	for _, tc := range []struct {
+		name, command string
+		want          int
+	}{
+		{"no commit", "printf x > a.txt", -1},
+		{"write then commit", "printf x > a.txt && git add a.txt && git commit -m a", 1},
+		{"commit then write", "git commit -m human && printf agent > f.txt", 0},
+		{"the last commit counts", "printf x > a.txt && git commit -am a && printf y > b.txt && git commit -am b && printf z > c.txt", 2},
+		{"git options before commit", "printf x > a.txt; git -C . -c user.name=x commit -m a", 1},
+		{"commit message is not a subcommand", "git log --grep commit && printf x > a.txt", -1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, got := shellWrites(tc.command, cwd); got != tc.want {
+				t.Fatalf("committed = %d, want %d", got, tc.want)
 			}
 		})
 	}
