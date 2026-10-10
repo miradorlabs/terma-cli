@@ -98,23 +98,30 @@ func Spawn(stateDir, version string) {
 	}
 }
 
-// Supersede asks the relay running for the state directory stateDir to make way when it runs
-// an earlier release than version and what starts the next relay is this terma: a later
-// hook, or a service that runs this binary. A service that runs another install would start
-// the earlier release again, at every hook. A newer relay is left alone, so two installs
-// never take turns. The service's relay is started again by the service manager, and a
-// service that runs this terma has its relay waiting for the lock already; otherwise
-// Supersede starts the relay that takes the place of the one making way, since that one is
-// the earlier release and starts none, and an agent exporting before the next hook would
-// find nothing listening.
+// Supersede asks the relay running for the state directory stateDir to make way for this
+// terma (version), and makes sure something takes its place.
+//
+// It asks only a relay of an earlier release, and a service's relay only when the service
+// runs this binary: a service of another install would start the earlier release again, at
+// every hook. A newer relay is left alone, so two installs never take turns.
+//
+// What takes the place of the relay making way: for the service's, the service manager, and
+// for any other, the service's relay when one of this terma waits for the lock already, or
+// else the follower Supersede starts. The relay making way is the earlier release and starts
+// nothing itself, and an agent exporting before the next hook would find nothing listening.
 func Supersede(stateDir, version string) {
 	dir := claim.Dir(stateDir)
 	running, ok := RunningRelay(dir)
-	if !ok || !selfupdate.Newer(running.Version, version) || running.Launch == LaunchService && !serviceRunsThis(stateDir) {
+	if !ok || !selfupdate.Newer(running.Version, version) {
+		return
+	}
+	service := running.Launch == LaunchService
+	ours := serviceRunsThis(stateDir)
+	if service && !ours {
 		return
 	}
 	_ = config.WriteFileAtomicNoSync(filepath.Join(dir, ReplaceFile), []byte(strconv.Itoa(running.PID)+"\n"), 0o600)
-	if running.Launch != LaunchService && !serviceRunsThis(stateDir) {
+	if !service && !ours {
 		follow(dir)
 	}
 }

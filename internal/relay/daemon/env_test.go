@@ -106,6 +106,10 @@ func TestAHookStartedRelayRunsInTheRecordedEnvironment(t *testing.T) {
 	if !slices.Equal(proc.Args, []string{"/opt/terma/bin/terma", "relay", "run", "--quiet", "--launch", "hook"}) {
 		t.Fatalf("args = %v", proc.Args)
 	}
+	// The follower Supersede starts (test/e2e's "replaced" disruption runs the same command).
+	if f := spawnCommand("/opt/terma/bin/terma", dir, "--follow"); !slices.Equal(f.Args, []string{"/opt/terma/bin/terma", "relay", "run", "--quiet", "--launch", "hook", "--follow"}) {
+		t.Fatalf("follower args = %v", f.Args)
+	}
 	if !slices.Contains(proc.Env, "TERMA_ENV=dev") {
 		t.Fatalf("the spawned relay does not run in the recorded environment: %v", proc.Env)
 	}

@@ -99,7 +99,10 @@ func Run(ctx context.Context, c Config) (Result, error) {
 			return res, nil
 		}
 	}
-	lockCtx, wait := ctx, res.Service
+	lockCtx, poll := ctx, time.Duration(0)
+	if res.Service {
+		poll = lockPoll
+	}
 	unfollow := func() {}
 	if c.Follow && !res.Service {
 		var err error
@@ -111,10 +114,10 @@ func Run(ctx context.Context, c Config) (Result, error) {
 		var cancelWait context.CancelFunc
 		lockCtx, cancelWait = context.WithTimeout(ctx, replacedMaxWait+followSlack)
 		defer cancelWait()
-		wait = true
+		poll = followPoll
 		followWaiting()
 	}
-	unlock, busy, err := lock(lockCtx, dir, wait)
+	unlock, busy, err := lock(lockCtx, dir, poll)
 	// Whether it took over or gave up, the next relay to make way gets its own follower.
 	unfollow()
 	if err != nil {
@@ -277,8 +280,6 @@ func (r stopReason) exit(err error) string {
 		return semconv.TermaRelayExitReasonReplaced
 	case r == stopUpdated:
 		return semconv.TermaRelayExitReasonUpdated
-	case r == stopSetupGone:
-		return semconv.TermaRelayExitReasonSetupGone
 	case r == stopIdle:
 		return semconv.TermaRelayExitReasonIdle
 	}
@@ -325,20 +326,24 @@ func RunningRelay(dir string) (RunInfo, bool) {
 	return info, true
 }
 
-// lockPoll is how often the service's relay retries a lock another relay holds. Nothing
-// listens between that relay's exit and the retry, so the wait is short.
-const lockPoll = 250 * time.Millisecond
+// lockPoll is how often the service's relay retries a lock another relay holds, and
+// followPoll a following relay's: nothing listens between that relay's exit and the retry,
+// and a follower is there for that moment alone, so its wait is shorter still.
+const (
+	lockPoll   = 250 * time.Millisecond
+	followPoll = 25 * time.Millisecond
+)
 
-// lock takes the single-instance lock, with wait waiting out another relay; a nil unlock
-// means this relay must not run.
-func lock(ctx context.Context, dir string, wait bool) (unlock func(), busy bool, err error) {
+// lock takes the single-instance lock, retrying every poll while another relay holds it
+// (never, with poll 0); a nil unlock means this relay must not run.
+func lock(ctx context.Context, dir string, poll time.Duration) (unlock func(), busy bool, err error) {
 	path := filepath.Join(dir, LockFile)
 	unlock, err = flock.TryLock(path)
-	for wait && flock.IsBusy(err) {
+	for poll > 0 && flock.IsBusy(err) {
 		select {
 		case <-ctx.Done():
 			return nil, false, nil
-		case <-time.After(lockPoll):
+		case <-time.After(poll):
 		}
 		unlock, err = flock.TryLock(path)
 	}

@@ -56,6 +56,9 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 				},
 			})
 			if err != nil {
+				if lastBeatDue(res) {
+					res.ExitBeat()
+				}
 				return err
 			}
 			if res.AlreadyRunning && !quiet {
@@ -82,24 +85,31 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 	return cmd
 }
 
-// afterRelay ends a relay's run. One that should run again exits for the service manager to
-// start the newer terma, whoever installed it. A hook-started relay has none: one that
-// updated itself starts its successor, the release it installed, now that its lock is free,
-// since an agent may export before the next hook, unless teardown removed its setup
-// meanwhile; one replaced by a newer terma is followed by the relay Supersede started. The
-// last heartbeat goes after that, as nothing listens until the next relay does, and not at
-// all from a service relay the manager starts again, which it does only once this exits.
+// afterRelay ends a relay's run. A relay that should run again exits for the service manager
+// to start the newer terma, whoever installed it. A hook-started relay has no manager: one
+// that updated itself starts its successor now that its lock is free, since an agent may
+// export before the next hook (unless teardown removed its setup meanwhile), and one replaced
+// by a newer terma is followed by the relay Supersede started. The last heartbeat goes once
+// that successor is under way (lastBeatDue).
 func (app *App) afterRelay(res daemon.Result) error {
 	if res.Updated && !res.Service && !res.SetupGone {
 		app.spawnRelay(app.stateDir, app.version)
 	}
-	if !res.Service || !res.Restart() {
+	if lastBeatDue(res) {
 		res.ExitBeat()
 	}
 	if res.Restart() {
 		return exitWith(ExitRestart)
 	}
 	return nil
+}
+
+// lastBeatDue reports whether a stopped relay sends its last heartbeat, which can take
+// seconds. Every stop does, a failure's and a service's included, but a service relay stepping
+// aside for a newer terma or for the one it installed: its manager starts the next relay only
+// once this process exits, and nothing listens until then.
+func lastBeatDue(res daemon.Result) bool {
+	return !res.Service || !res.Replaced && !res.Updated
 }
 
 // relayUpdater has the relay install each new release in place of its own binary, as

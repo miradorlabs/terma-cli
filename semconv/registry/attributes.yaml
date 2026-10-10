@@ -723,10 +723,6 @@ attributes:
           value: updated
           brief: It installed a newer terma and stopped to run it.
           stability: development
-        - id: setup_gone
-          value: setup-gone
-          brief: Its setup was removed.
-          stability: development
         - id: serve_failed
           value: serve-failed
           brief: Its server failed.
@@ -741,7 +737,8 @@ attributes:
       Aggregate, content-free health: records received, forwarded and dropped for each reason,
       and heartbeats sent and failed, each a delta since the last beat that carried counters,
       so summing a relay's beats gives its totals. The key's suffix is the relay's own counter
-      name (internal/relay/stats.go), e.g. `terma.relay.heartbeat.counter.dropped.unclaimed.logs`;
+      name, every one pinned in internal/relay/counter_names_test.go, e.g.
+      `terma.relay.heartbeat.counter.dropped.unclaimed_expired.logs`;
       the attributes the content policy met unclassified leave only as their total,
       `terma.relay.heartbeat.counter.unclassified`, never by name. A counter that did not move
       is left out.

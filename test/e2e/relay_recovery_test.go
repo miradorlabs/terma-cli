@@ -46,7 +46,8 @@ var relayDisruptions = []relayDisruption{
 	}},
 	// What a newer terma's hook does (daemon.Supersede): it asks the relay to make way, and
 	// starts the relay that follows it, unless the service manager starts the next. Done
-	// here, since the sandbox's terma is a development build, which never supersedes a relay.
+	// here, since the sandbox's terma is a development build, which never supersedes a relay;
+	// the follower's command is pinned in internal/relay/daemon (TestAHookStartedRelayRunsInTheRecordedEnvironment).
 	{"replaced", func(t *testing.T, sb *Sandbox, pid int) {
 		dir := filepath.Join(sb.TermaConfig, "relay")
 		if err := os.WriteFile(filepath.Join(dir, "replace"), []byte(strconv.Itoa(pid)+"\n"), 0o600); err != nil {

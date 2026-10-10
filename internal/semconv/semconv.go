@@ -379,8 +379,6 @@ const (
 	TermaRelayExitReasonReplaced = "replaced"
 	// TermaRelayExitReasonUpdated is terma.relay.exit.reason updated: It installed a newer terma and stopped to run it.
 	TermaRelayExitReasonUpdated = "updated"
-	// TermaRelayExitReasonSetupGone is terma.relay.exit.reason setup-gone: Its setup was removed.
-	TermaRelayExitReasonSetupGone = "setup-gone"
 	// TermaRelayExitReasonServeFailed is terma.relay.exit.reason serve-failed: Its server failed.
 	TermaRelayExitReasonServeFailed = "serve-failed"
 	// TermaRelayHeartbeatReasonStart is terma.relay.heartbeat.reason start: The relay started.

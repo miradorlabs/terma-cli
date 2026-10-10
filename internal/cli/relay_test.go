@@ -288,3 +288,24 @@ func disconnect(t *testing.T, agent string) {
 		t.Fatalf("disconnect %s: %v", agent, err)
 	}
 }
+
+// A stopped relay sends its last heartbeat on every stop, a failure's and a service's
+// included, but a service relay stepping aside for a newer terma or the one it installed: its
+// manager starts the next relay only once the process exits, and nothing listens until then.
+func TestLastBeatDue(t *testing.T) {
+	for _, tc := range []struct {
+		res  daemon.Result
+		want bool
+	}{
+		{daemon.Result{}, true},
+		{daemon.Result{Replaced: true}, true},
+		{daemon.Result{Updated: true}, true},
+		{daemon.Result{Service: true}, true},
+		{daemon.Result{Service: true, Replaced: true}, false},
+		{daemon.Result{Service: true, Updated: true}, false},
+	} {
+		if got := lastBeatDue(tc.res); got != tc.want {
+			t.Errorf("lastBeatDue(%+v) = %v, want %v", tc.res, got, tc.want)
+		}
+	}
+}
