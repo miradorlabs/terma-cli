@@ -400,3 +400,33 @@ func TestAJudgementAgainstEarlierNightsSaysSo(t *testing.T) {
 		t.Errorf("earlier %q, headline %q", h.Earlier, h.headline())
 	}
 }
+
+// A key a failed run of a build saw as text, and its whole census only as a number, is not
+// withheld: the whole run's kinds replace the failed run's, and a failed run after adds none.
+func TestAWholeRunsKindsReplaceAFailedRuns(t *testing.T) {
+	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
+	failed := map[string]bool{"codex\x000.164.0": true}
+	text := field("0.164.0", "logs/codex.api_request", "attempt", "unclassified", day)
+	number := field("0.164.0", "logs/codex.api_request", "attempt", "unclassified", day.Add(24*time.Hour), e2e.KindNumber)
+	for _, order := range []string{"failed first", "whole first"} {
+		var cat Catalog
+		if order == "failed first" {
+			mergeFields(&cat, []e2e.FieldRow{text}, failed)
+			mergeFields(&cat, []e2e.FieldRow{number}, nil)
+		} else {
+			mergeFields(&cat, []e2e.FieldRow{number}, nil)
+			mergeFields(&cat, []e2e.FieldRow{text}, failed)
+		}
+		if f := cat.Fields[0]; !slices.Equal(f.Kinds, []string{e2e.KindNumber}) || f.withheld() {
+			t.Errorf("%s: kinds %v, withheld %v", order, f.Kinds, f.withheld())
+		}
+	}
+	// Nor does a failed run of a newer build.
+	var cat Catalog
+	mergeFields(&cat, []e2e.FieldRow{number}, nil)
+	newer := field("0.165.0", "logs/codex.api_request", "attempt", "unclassified", day.Add(48*time.Hour))
+	mergeFields(&cat, []e2e.FieldRow{newer}, map[string]bool{"codex\x000.165.0": true})
+	if f := cat.Fields[0]; f.withheld() {
+		t.Errorf("a newer build's failed run: kinds %v", f.Kinds)
+	}
+}

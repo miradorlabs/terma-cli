@@ -113,17 +113,24 @@ func mergeFields(cat *Catalog, rows []e2e.FieldRow, partial map[string]bool) {
 			sortVersionsDesc(f.Versions)
 			f.Versions = f.Versions[:min(len(f.Versions), keepVersions)]
 		}
-		if !partial[r.Harness+"\x00"+r.Version] && !slices.Contains(f.Whole, r.Version) {
+		// A whole run's kinds replace those a failed run of the build left (keys of an error path
+		// may carry text), and a failed run adds none to a build censused whole: as its census's
+		// surfaces are.
+		failedRun := partial[r.Harness+"\x00"+r.Version]
+		wasWhole := slices.Contains(f.Whole, r.Version)
+		if !failedRun && !wasWhole {
 			f.Whole = append(f.Whole, r.Version)
 			sortVersionsDesc(f.Whole)
 			f.Whole = f.Whole[:min(len(f.Whole), keepVersions)]
 		}
 		// The kinds are the newest build's: a key an old build sent as text and a new one as a
 		// number is no longer withheld. Its class, and what the relay keeps of it, are the latest
-		// run's: a key classified since is no longer withheld either.
+		// run's: a key classified since is no longer withheld either. A failed run is no evidence
+		// over a whole census: it changes no kinds of a key one saw.
 		switch {
 		case f.Versions[0] != r.Version:
-		case newest != r.Version:
+		case failedRun && len(f.Whole) > 0:
+		case newest != r.Version, !failedRun && !wasWhole:
 			f.Kinds, f.Class, f.Kept = slices.Clone(r.Kinds), r.Class, slices.Clone(r.Kept)
 		default:
 			for _, k := range r.Kinds {
@@ -136,6 +143,7 @@ func mergeFields(cat *Catalog, rows []e2e.FieldRow, partial map[string]bool) {
 				f.Class, f.Kept = r.Class, slices.Clone(r.Kept)
 			}
 		}
+
 	}
 	for _, f := range added {
 		cat.Fields = append(cat.Fields, *f)
