@@ -249,3 +249,56 @@ func TestClip(t *testing.T) {
 		t.Errorf("clip with no line end = %q", got)
 	}
 }
+
+// A key every kept census has aged past leaves the catalog, and a key's kinds and class are
+// its newest build's: a key an old build sent as text and a new one as a number is no longer
+// withheld.
+func TestCatalogKeepsWhatItsCensusesSaw(t *testing.T) {
+	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
+	var cat Catalog
+	mergeFields(&cat, []e2e.FieldRow{
+		field("0.150.0", "logs/codex.api_request", "gone_key", "safe", day),
+		field("0.150.0", "logs/codex.api_request", "turns", "unclassified", day),
+	})
+	for i := range keepCensuses {
+		v := fmt.Sprintf("0.16%d.0", i)
+		mergeFields(&cat, []e2e.FieldRow{field(v, "logs/codex.api_request", "turns", "unclassified", day.Add(time.Duration(i+1)*24*time.Hour), e2e.KindNumber)})
+	}
+	keys := map[string]FieldEntry{}
+	for _, f := range cat.Fields {
+		keys[f.Key] = f
+	}
+	if _, ok := keys["gone_key"]; ok {
+		t.Error("a key no kept census saw is still in the catalog")
+	}
+	if f := keys["turns"]; !slices.Equal(f.Kinds, []string{e2e.KindNumber}) || withheldUnclassified(f.Class, f.Kinds) {
+		t.Errorf("turns: kinds %v, withheld %v: the newest build sends a number", f.Kinds, withheldUnclassified(f.Class, f.Kinds))
+	}
+}
+
+// A night that reached only a build older than the catalog's newest says so, and is no quiet
+// night: the newest failed to install, or its tests did not run.
+func TestDigestSaysTheNewestWasNotReached(t *testing.T) {
+	day := time.Date(2026, 10, 9, 4, 0, 0, 0, time.UTC)
+	var cat Catalog
+	mergeFields(&cat, []e2e.FieldRow{field("0.162.1", "logs/codex.api_request", "model", "safe", day)})
+	_, _, hs := fieldDrift(cat, []e2e.FieldRow{field("0.162.0", "logs/codex.api_request", "model", "safe", day.Add(24*time.Hour))}, day.Add(24*time.Hour))
+	d := Drift{Harnesses: hs}
+	if !hs[0].Behind || d.Quiet() || !strings.Contains(hs[0].headline(), "0.162.1, the newest censused before, was not reached") {
+		t.Errorf("behind %v, quiet %v, headline %q", hs[0].Behind, d.Quiet(), hs[0].headline())
+	}
+}
+
+// What a harness names is escaped where it is shown: "<" in Slack would start a link, and "|"
+// in a markdown table would end a cell.
+func TestDigestEscapesWhatHarnessesName(t *testing.T) {
+	d := Drift{GeneratedAt: time.Date(2026, 10, 10, 4, 0, 0, 0, time.UTC), Harnesses: []HarnessDrift{{Harness: "codex", Name: "Codex CLI", Version: "1", Previous: "1",
+		Added: []FieldChange{{Surface: "logs/<x|y>", Key: "a&b"}}}}}
+	data, _ := json.Marshal(d.slack())
+	if !strings.Contains(string(data), "a\\u0026amp;b") || !strings.Contains(string(data), "\\u0026lt;x|y\\u0026gt;") {
+		t.Errorf("slack text not escaped: %s", data)
+	}
+	if got := tableCell("a|b"); got != `a\|b` {
+		t.Errorf("tableCell = %q", got)
+	}
+}

@@ -71,3 +71,20 @@ func TestClassifyResourceKeys(t *testing.T) {
 		t.Errorf("Classify = %v, want %v", got, want)
 	}
 }
+
+// A process's arguments are what it was asked to do: withheld with prompts on a record as on
+// its resource. A record carrying them used to send them with content withheld.
+func TestProcessArgumentsOnARecordAreWithheld(t *testing.T) {
+	t.Parallel()
+	ru := compose(testCorrelators, testCapturers)
+	for _, key := range []string{"process.command_args", "process.command_line"} {
+		out, _ := ru.withholdAttrs([]*commonpb.KeyValue{{Key: key, Value: strValue("terma --token secret")}, {Key: "model", Value: strValue("m")}}, false, true, false, map[string]int{})
+		if len(out) != 1 || out[0].GetKey() != "model" {
+			t.Errorf("%s on a record with prompts withheld: %v", key, out)
+		}
+		out, _ = ru.withholdAttrs([]*commonpb.KeyValue{{Key: key, Value: strValue("terma --token secret")}}, true, true, false, map[string]int{})
+		if len(out) != 1 {
+			t.Errorf("%s on a record with prompts collected: %v", key, out)
+		}
+	}
+}

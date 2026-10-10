@@ -45,7 +45,10 @@ type HarnessDrift struct {
 	Version  string `json:"version"`
 	Previous string `json:"previous,omitempty"`
 	// First is a harness the catalog had no census of; Surfaces and Keys its census's size.
-	First    bool `json:"first,omitempty"`
+	First bool `json:"first,omitempty"`
+	// Behind is a night whose newest build of the harness is older than Previous: the newest
+	// was not reached (it failed to install, or its tests did not run).
+	Behind   bool `json:"behind,omitempty"`
 	Surfaces int  `json:"surfaces,omitempty"`
 	Keys     int  `json:"keys,omitempty"`
 	// NewSurfaces are surfaces no build of the harness had (a span renamed is one, not each of
@@ -67,7 +70,7 @@ type HarnessDrift struct {
 
 // changed reports whether h has anything new to say.
 func (h HarnessDrift) changed() bool {
-	return h.First || len(h.NewSurfaces)+len(h.Added)+len(h.Removed)+len(h.Unseen)+len(h.Withheld) > 0
+	return h.First || h.Behind || len(h.NewSurfaces)+len(h.Added)+len(h.Removed)+len(h.Unseen)+len(h.Withheld) > 0
 }
 
 // FieldChange is one key on one surface.
@@ -149,6 +152,7 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, now time.Time) (noCensus bool,
 		d.First = !censused
 		if censused {
 			d.Previous = prev.Version
+			d.Behind = versionLess(version, prev.Version)
 		}
 		newSurfaces := map[string]*SurfaceChange{}
 		for _, id := range slices.Sorted(maps.Keys(tonight)) {
@@ -256,7 +260,10 @@ func (h HarnessDrift) headline() string {
 		return fmt.Sprintf("%s %s: first census, %s, %s", h.Name, h.Version, plural(h.Surfaces, "surface"), plural(h.Keys, "key"))
 	}
 	build := h.Version
-	if h.Previous != h.Version {
+	switch {
+	case h.Behind:
+		build += " (" + h.Previous + ", the newest censused before, was not reached)"
+	case h.Previous != h.Version:
 		build += " (was " + h.Previous + ")"
 	}
 	var parts []string
@@ -272,7 +279,7 @@ func (h HarnessDrift) headline() string {
 		}
 	}
 	if len(parts) == 0 {
-		parts = append(parts, "no changes")
+		parts = append(parts, "no field changes")
 	}
 	return h.Name + " " + build + ": " + strings.Join(parts, ", ")
 }
@@ -455,12 +462,20 @@ func clip(s string, limit int) string {
 	return s[:cut] + "\n…"
 }
 
+// slackEscape escapes what Slack's mrkdwn reads as markup in text that came from a harness:
+// a key or surface with "<" in it would otherwise be a link.
+func slackEscape(s string) string {
+	return strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;").Replace(s)
+}
+
 // slack is the digest as a Slack incoming webhook's payload: a header, the alarms, a section
 // per harness that changed and one for compatibility, and a link to the run.
 func (d Drift) slack() map[string]any {
 	type block = map[string]any
 	text := func(s string) block { return block{"type": "mrkdwn", "text": s} }
-	section := func(s string) block { return block{"type": "section", "text": text(clip(s, sectionLimit))} }
+	section := func(s string) block {
+		return block{"type": "section", "text": text(clip(slackEscape(s), sectionLimit))}
+	}
 	summary := "Harness drift: no changes"
 	if !d.Quiet() {
 		summary = "Harness drift: changes to look at"

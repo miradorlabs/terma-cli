@@ -82,26 +82,38 @@ func mergeFields(cat *Catalog, rows []e2e.FieldRow) {
 		e := FieldEntry{Harness: r.Harness, Surface: r.Surface, Key: r.Key}
 		f, ok := fields[e.id()]
 		if !ok {
-			f = &FieldEntry{Harness: r.Harness, Surface: r.Surface, Key: r.Key, FirstSeen: r.Version}
+			f = &FieldEntry{Harness: r.Harness, Surface: r.Surface, Key: r.Key, FirstSeen: r.Version, Kinds: slices.Clone(r.Kinds), Class: r.Class}
 			added = append(added, f)
 			fields[e.id()] = f
 		}
 		if f.FirstSeen == "" || versionLess(r.Version, f.FirstSeen) {
 			f.FirstSeen = r.Version
 		}
+		newest := ""
+		if len(f.Versions) > 0 {
+			newest = f.Versions[0]
+		}
 		if !slices.Contains(f.Versions, r.Version) {
 			f.Versions = append(f.Versions, r.Version)
 			sortVersionsDesc(f.Versions)
 			f.Versions = f.Versions[:min(len(f.Versions), keepVersions)]
 		}
-		for _, k := range r.Kinds {
-			if !slices.Contains(f.Kinds, k) {
-				f.Kinds = append(f.Kinds, k)
+		// The kinds and class are the newest build's: a key an old build sent as text and a
+		// new one as a number is no longer withheld.
+		switch {
+		case f.Versions[0] != r.Version:
+		case newest != r.Version:
+			f.Kinds, f.Class = slices.Clone(r.Kinds), r.Class
+		default:
+			for _, k := range r.Kinds {
+				if !slices.Contains(f.Kinds, k) {
+					f.Kinds = append(f.Kinds, k)
+				}
 			}
-		}
-		slices.Sort(f.Kinds)
-		if r.Class != "" {
-			f.Class = r.Class
+			slices.Sort(f.Kinds)
+			if r.Class != "" {
+				f.Class = r.Class
+			}
 		}
 	}
 	for _, f := range added {
@@ -133,16 +145,21 @@ func mergeFields(cat *Catalog, rows []e2e.FieldRow) {
 		}
 		return versionLess(b.Version, a.Version)
 	})
-	// A harness keeps its newest censuses; the catalog's keys say what older builds had.
+	// A harness keeps its newest censuses, and a key only while one of them saw it.
 	kept := cat.Censuses[:0]
 	count := map[string]int{}
+	censused := map[string]bool{} // harness and version
 	for _, c := range cat.Censuses {
 		if count[c.Harness] < keepCensuses {
 			kept = append(kept, c)
+			censused[c.id()] = true
 		}
 		count[c.Harness]++
 	}
 	cat.Censuses = kept
+	cat.Fields = slices.DeleteFunc(cat.Fields, func(f FieldEntry) bool {
+		return !slices.ContainsFunc(f.Versions, func(v string) bool { return censused[f.Harness+"\x00"+v] })
+	})
 }
 
 func sortVersionsDesc(vs []string) {
@@ -260,7 +277,7 @@ func renderFields(cat Catalog, now time.Time) string {
 			bySurface[f.Surface] = append(bySurface[f.Surface], f)
 		}
 		for _, s := range slices.Sorted(maps.Keys(bySurface)) {
-			fmt.Fprintf(&b, "\n### `%s`\n\n| Key | Class | Values | First censused | In %s |\n|---|---|---|---|---|\n", s, newest.Version)
+			fmt.Fprintf(&b, "\n### `%s`\n\n| Key | Class | Values | First censused | In %s |\n|---|---|---|---|---|\n", tableCell(s), newest.Version)
 			for _, f := range bySurface[s] {
 				in := "yes"
 				if !slices.Contains(f.Versions, newest.Version) {
@@ -270,9 +287,12 @@ func renderFields(cat Catalog, now time.Time) string {
 				if withheldUnclassified(f.Class, f.Kinds) {
 					class = "**unclassified · withheld**"
 				}
-				fmt.Fprintf(&b, "| `%s` | %s | %s | %s | %s |\n", f.Key, class, strings.Join(f.Kinds, ", "), f.FirstSeen, in)
+				fmt.Fprintf(&b, "| `%s` | %s | %s | %s | %s |\n", tableCell(f.Key), class, strings.Join(f.Kinds, ", "), f.FirstSeen, in)
 			}
 		}
 	}
 	return b.String()
 }
+
+// tableCell is a key or surface as a markdown table cell holds it: a pipe would end the cell.
+func tableCell(s string) string { return strings.ReplaceAll(s, "|", `\|`) }

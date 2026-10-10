@@ -195,8 +195,9 @@ after checking what changed.
 ## Field census and drift
 
 The goldens pin the few surfaces terma parses. The field census covers everything else:
-every attribute key each harness build exports over OTLP, on every surface (a log event, a
-span or its events, a metric, the resource), with the kinds of value it carried (`text`,
+every attribute key each harness build exports over OTLP, on every surface the relay applies
+its content policy to (a log event, a span, its events and links, a metric and its exemplars,
+the instrumentation scope, the resource), with the kinds of value it carried (`text`,
 `number`, `bool`, `list`, `map`). The workload scenarios' direct runs and
 `TestClaudeInteractiveFields` (the events only an interactive session sends, such as
 `permission_mode_changed`) record it, and the run writes `report/fields.json`. Each key is
@@ -212,8 +213,9 @@ project withholds content:
 The catalog, `docs/compat/fields.json`, lives beside the compatibility history on the
 `compat-matrix` branch, and `docs/FIELDS.md` renders it: per harness, per surface, each key's
 class, kinds, the first build it was seen in, and whether the newest build still has it. A
-key keeps its first build and its newest five, a harness its newest five censuses, and the
-file holds one entry a line, so a night's change is a diff of what changed.
+key keeps its first build and its newest five, and its kinds and class are the newest
+build's; a harness keeps its newest five censuses, and a key leaves once none of them saw
+it. The file holds one entry a line, so a night's change is a diff of what changed.
 
 Every night `live.yml`'s `compat` job starts from the published history and catalog, says
 what the night changed against them, then merges the night in and publishes it (`make
@@ -231,8 +233,8 @@ compat` and `make drift` do the same locally, into `docs/`). The digest,
   still withheld from before are one reminder line until they are.
 
 It also lists capabilities whose result changed, and says so when the census did not run,
-or did not reach a harness censused within the week: a census that did not run never reads
-as a quiet night. The digest goes to the run's summary and to Slack through the
+did not reach a harness censused within the week, or reached only a build older than the
+newest it had: a census that did not run never reads as a quiet night. The digest goes to the run's summary and to Slack through the
 `SLACK_WEBHOOK_URL` secret in the `live-harnesses` environment, every night, so a quiet
 channel means the job did not run. Drift never fails the night; a removed key on a surface
 terma parses fails its golden.

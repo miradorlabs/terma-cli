@@ -148,8 +148,8 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
-  # The matrix and the field catalog: this night's rows and field census from both platforms
-  # merged into the history and catalog, rendered as docs/COMPATIBILITY.md,
+  # The matrix and the field catalog: this night's rows from both platforms, and the field
+  # census macOS takes, merged into the history and catalog, rendered as docs/COMPATIBILITY.md,
   # docs/compat/compat.json (the website's data) and docs/FIELDS.md, published as an artefact
   # and the run's summary. Both live on the compat-matrix branch, which each scheduled run
   # extends and pushes: that branch's docs/compat/compat.json is the published matrix.
@@ -194,6 +194,8 @@ jobs:
           cat report/drift.md >> "$GITHUB_STEP_SUMMARY"
           if [ -f ../../docs/COMPATIBILITY.md ]; then cat ../../docs/COMPATIBILITY.md >> "$GITHUB_STEP_SUMMARY"; fi
       - name: Post the digest to Slack
+        # A webhook that fails (revoked, Slack down) must not keep the night from being published.
+        continue-on-error: true
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         working-directory: test/e2e

@@ -63,12 +63,13 @@ machines: machine-image
 	 ./bin/linux/e2e.test -test.v -test.timeout 40m -test.run '$(if $(RUN),$(RUN),$(MACHINE_RUN))'
 
 # The compatibility matrix (docs/COMPATIBILITY.md, docs/compat/) and the field catalog
-# (docs/FIELDS.md, docs/compat/fields.json): merge the latest runs' report/compat.json and
-# report/fields.json — this machine's, and the Linux machine's from `make machines` — into
+# (docs/FIELDS.md, docs/compat/fields.json): merge the latest runs' report/compat.json —
+# this machine's, and the Linux machine's from `make machines` — and this machine's field
+# census, report/fields.json, into
 # the history and catalog and render them. RUNS and FIELD_RUNS name other runs' files (CI's
 # artefacts). The nightly job does the same on the compat-matrix branch, where both live.
 RUNS ?= $(wildcard report/compat.json report/linux/compat.json)
-FIELD_RUNS ?= $(wildcard report/fields.json report/linux/fields.json)
+FIELD_RUNS ?= $(wildcard report/fields.json)
 COMPATGEN = go run ./compatgen $(foreach r,$(RUNS),-run $(r)) $(foreach f,$(FIELD_RUNS),-fields $(f))
 .PHONY: compat drift
 compat:

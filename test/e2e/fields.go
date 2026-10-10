@@ -3,7 +3,9 @@ package e2e
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"maps"
 	"os"
 	"os/exec"
@@ -20,6 +22,7 @@ import (
 	colmetricspb "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
+	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
 	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 )
 
@@ -30,8 +33,10 @@ import (
 // classify`), and compatgen merges them into the field catalog (docs/compat/fields.json),
 // says what changed since (report/drift.md), and renders docs/FIELDS.md.
 
-// A surface is where a key was seen: "resource", "logs/<event>", "traces/<span>",
-// "traces/<span>/events/<event>" or "metrics/<metric>".
+// A surface is where a key was seen: "resource", "scope" (the instrumentation scope's
+// attributes), "logs/<event>", "traces/<span>", "traces/<span>/events/<event>",
+// "traces/<span>/links", "metrics/<metric>" or "metrics/<metric>/exemplars": everywhere the
+// relay applies the content policy.
 
 // Value kinds. The relay keeps an unclassified key whose every value is a number or a
 // boolean, so only "text" makes an unclassified key a loss.
@@ -95,6 +100,7 @@ func ObserveFields(b Binary, requests []ExportRequest) {
 					continue
 				}
 				for _, sl := range rl.GetScopeLogs() {
+					see("scope", sl.GetScope().GetAttributes())
 					for _, lr := range sl.GetLogRecords() {
 						// The event.name attribute is the name the platform reads; Codex puts its
 						// tracing callsite in the record's EventName ("event otel/src/...rs:785").
@@ -120,11 +126,15 @@ func ObserveFields(b Binary, requests []ExportRequest) {
 					continue
 				}
 				for _, ss := range rs.GetScopeSpans() {
+					see("scope", ss.GetScope().GetAttributes())
 					for _, sp := range ss.GetSpans() {
 						name := SpanSurface(sp.GetName(), sp.GetAttributes())
 						see("traces/"+name, sp.GetAttributes())
 						for _, ev := range sp.GetEvents() {
 							see("traces/"+name+"/events/"+withoutLine(ev.GetName()), ev.GetAttributes())
+						}
+						for _, l := range sp.GetLinks() {
+							see("traces/"+name+"/links", l.GetAttributes())
 						}
 					}
 				}
@@ -135,19 +145,29 @@ func ObserveFields(b Binary, requests []ExportRequest) {
 					continue
 				}
 				for _, sm := range rm.GetScopeMetrics() {
+					see("scope", sm.GetScope().GetAttributes())
 					for _, mt := range sm.GetMetrics() {
 						surface := "metrics/" + mt.GetName()
+						exemplars := func(es []*metricspb.Exemplar) {
+							for _, e := range es {
+								see(surface+"/exemplars", e.GetFilteredAttributes())
+							}
+						}
 						for _, p := range mt.GetSum().GetDataPoints() {
 							see(surface, p.GetAttributes())
+							exemplars(p.GetExemplars())
 						}
 						for _, p := range mt.GetGauge().GetDataPoints() {
 							see(surface, p.GetAttributes())
+							exemplars(p.GetExemplars())
 						}
 						for _, p := range mt.GetHistogram().GetDataPoints() {
 							see(surface, p.GetAttributes())
+							exemplars(p.GetExemplars())
 						}
 						for _, p := range mt.GetExponentialHistogram().GetDataPoints() {
 							see(surface, p.GetAttributes())
+							exemplars(p.GetExemplars())
 						}
 						for _, p := range mt.GetSummary().GetDataPoints() {
 							see(surface, p.GetAttributes())
@@ -237,7 +257,12 @@ func WriteFields(dir, terma string) error {
 		keys[classKey(id.surface, id.key)] = true
 	}
 	fieldsMu.Unlock()
+	path := filepath.Join(dir, "fields.json")
 	if len(rows) == 0 {
+		// No stale census from an earlier run for `make drift` to take for this one's.
+		if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
 		return nil
 	}
 	classes, err := classify(terma, slices.Sorted(maps.Keys(keys)))
@@ -262,7 +287,7 @@ func WriteFields(dir, terma string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(dir, "fields.json"), append(data, '\n'), 0o644)
+	return os.WriteFile(path, append(data, '\n'), 0o644)
 }
 
 // classKey is the key as `terma relay classify` takes it: a resource attribute's and a span

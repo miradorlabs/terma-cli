@@ -29,10 +29,12 @@ func (Agent) CaptureRules() shape.CaptureRules {
 		// encoding is only ever rollout_item_json_v1 and rollout_item_type a rollout item's variant name.
 		SafeKeys: []string{"codex.request.reasoning_effort", "codex.turn.reasoning_effort", "auth.env_codex_api_key_enabled", "auth.env_codex_api_key_present", "auth.env_openai_api_key_present", "auth.env_refresh_token_url_override_present", "auth.header_attached", "auth.retry_after_unauthorized", "app_server.api_version", "app_server.client_name", "app_server.client_version", "app_server.connection_id", "codex.op", "conversation.id", "thread.id", "thread_id", "turn.id", "call_id", "event.kind", "provider_name", "slug", "reasoning_effort", "reasoning_summary", "model_reasoning_effort", "approval_policy", "sandbox_policy", "sandbox", "auth_mode", "originator", "app.version", "session_source", "mcp_server", "mcp_server_origin", "mcp_servers", "server_kind", "server_name", "agent_name", "tmp_mem_enabled", "token_type", "tool_namespace", "command_category", "tool_result_seq", "output_truncated", "input_token_count", "output_token_count", "cached_token_count", "cache_write_token_count", "reasoning_token_count", "tool_token_count", "busy_ns", "idle_ns", "target", "hook_event_name", "turn_id", "os", "os_version", "env", "wire_api", "hook.command_outcome", "hook.display_order", "hook.event_name", "hook.execution_mode", "hook.handler_type", "hook.scope", "hook.source", "hook.timeout_sec", "unified_exec_process_id", "submission.id", "startup.phase", "startup.status", "refresh_strategy", "tool_origin", "build_mode", "handler_type", "model.provided", "bundle_shape", "catalog_surface", "read_progress", "execution_mode", "api.path", "encoding", "rollout_item_type",
 			// 0.162: where its credentials are kept (codex.auth_storage.*), a turn's phase on its
-			// spans, a shell snapshot's state, and the hosting product. Each a fixed vocabulary in
-			// codex-rs (otel/src/auth_storage.rs, bounded_product_sku: "codex" or "other").
+			// spans, and the hosting product. Each a fixed vocabulary in codex-rs
+			// (otel/src/auth_storage.rs, bounded_product_sku: "codex" or "other"). A shell
+			// snapshot's "state" is one too, but the name is too generic to make safe for every
+			// agent: it stays withheld.
 			"actual_store", "selected_store", "store_mode", "storage_phase", "credential_kind", "secure_outcome", "secure_error", "fallback_reason",
-			"codex.turn.phase", "state", "product_sku"},
+			"codex.turn.phase", "product_sku"},
 		SafePrefixes: []string{"codex.turn.token_usage.", "codex.usage."},
 		// The backend keys a Codex seat on the workspace and the login; the email is withheld.
 		Principal: shape.Principal{Scope: "user.account_id", Email: "user.email"},

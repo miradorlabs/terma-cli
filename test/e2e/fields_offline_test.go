@@ -35,6 +35,9 @@ func TestObserveFields(t *testing.T) {
 	clear(fieldSeen)
 	fieldsMu.Unlock()
 	b := Binary{Harness: "opencode", Version: "1.2.3"}
+	point := &metricspb.NumberDataPoint{Attributes: []*commonpb.KeyValue{str("type", "input"), str("cached", "true")},
+		Exemplars: []*metricspb.Exemplar{{FilteredAttributes: []*commonpb.KeyValue{str("trace.note", "x")}}}}
+	metric := &metricspb.Metric{Name: "tokens", Data: &metricspb.Metric_Sum{Sum: &metricspb.Sum{DataPoints: []*metricspb.NumberDataPoint{point}}}}
 	ObserveFields(b, []ExportRequest{
 		{Payload: &collogspb.ExportLogsServiceRequest{ResourceLogs: []*logspb.ResourceLogs{
 			{Resource: res("opencode"), ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{
@@ -49,12 +52,12 @@ func TestObserveFields(t *testing.T) {
 			}}}},
 		}}},
 		{Payload: &coltracepb.ExportTraceServiceRequest{ResourceSpans: []*tracepb.ResourceSpans{{Resource: res("opencode"),
-			ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{{Name: "chat gpt-6", Attributes: []*commonpb.KeyValue{str("gen_ai.operation.name", "chat"), num("gen_ai.usage.input_tokens", 4)},
+			ScopeSpans: []*tracepb.ScopeSpans{{Scope: &commonpb.InstrumentationScope{Attributes: []*commonpb.KeyValue{str("scope.flag", "on")}}, Spans: []*tracepb.Span{{Name: "chat gpt-6", Attributes: []*commonpb.KeyValue{str("gen_ai.operation.name", "chat"), num("gen_ai.usage.input_tokens", 4)},
+				Links: []*tracepb.Span_Link{{Attributes: []*commonpb.KeyValue{str("link.kind", "parent")}}},
 				Events: []*tracepb.Span_Event{{Name: "tool.output", Attributes: []*commonpb.KeyValue{str("content", "out")}},
 					{Name: "event otel/src/tool_result.rs:54", Attributes: []*commonpb.KeyValue{str("auth_mode", "ApiKey")}}}}}}}}}}},
 		{Payload: &colmetricspb.ExportMetricsServiceRequest{ResourceMetrics: []*metricspb.ResourceMetrics{{Resource: res("opencode"),
-			ScopeMetrics: []*metricspb.ScopeMetrics{{Metrics: []*metricspb.Metric{{Name: "tokens", Data: &metricspb.Metric_Sum{Sum: &metricspb.Sum{
-				DataPoints: []*metricspb.NumberDataPoint{{Attributes: []*commonpb.KeyValue{str("type", "input"), str("cached", "true")}}}}}}}}}}}}},
+			ScopeMetrics: []*metricspb.ScopeMetrics{{Metrics: []*metricspb.Metric{metric}}}}}}},
 	})
 	got := map[string][]string{}
 	fieldsMu.Lock()
@@ -79,6 +82,9 @@ func TestObserveFields(t *testing.T) {
 		"traces/chat {target}/events/event otel/src/tool_result.rs auth_mode": {KindText},
 		"metrics/tokens type":                                                 {KindText},
 		"metrics/tokens cached":                                               {KindBool},
+		"scope scope.flag":                                                    {KindText},
+		"traces/chat {target}/links link.kind":                                {KindText},
+		"metrics/tokens/exemplars trace.note":                                 {KindText},
 	}
 	if !maps.EqualFunc(got, want, slices.Equal) {
 		for k, v := range got {
