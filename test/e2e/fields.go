@@ -58,19 +58,32 @@ type FieldRow struct {
 	Key     string   `json:"key"`
 	Kinds   []string `json:"kinds"`
 	Class   string   `json:"class,omitempty"` // safe | prompt | tool_content | unclassified
-	// Withheld is an unclassified key the relay drops under a policy that withholds content:
-	// one with a kind of value it does not keep where the key sits.
-	Withheld bool      `json:"withheld,omitempty"`
+	// Kept are the kinds of value the relay keeps of an unclassified key where it sits, as
+	// `terma relay classify` says: on a record numbers and booleans, on a resource none.
+	Kept     []string  `json:"kept,omitempty"`
 	Platform string    `json:"platform"`
 	Terma    string    `json:"terma,omitempty"`
 	At       time.Time `json:"at"`
 }
 
+// Withheld reports an unclassified key the relay drops under a policy that withholds
+// content: one sent with a kind of value the relay does not keep where it sits.
+func Withheld(class string, kinds, kept []string) bool {
+	return class == "unclassified" && slices.ContainsFunc(kinds, func(k string) bool { return !slices.Contains(kept, k) })
+}
+
 type fieldID struct{ harness, version, surface, key string }
+
+// seenField is what the census saw of a key: the kinds of value it carried, and where it sits
+// as `terma relay classify` asks it.
+type seenField struct {
+	kinds map[string]bool
+	query classQuery
+}
 
 var (
 	fieldsMu  sync.Mutex
-	fieldSeen = map[fieldID]map[string]bool{}
+	fieldSeen = map[fieldID]*seenField{}
 )
 
 // ObserveFields records the keys in requests, what harness b exported straight to the
@@ -78,22 +91,25 @@ var (
 func ObserveFields(b Binary, requests []ExportRequest) {
 	fieldsMu.Lock()
 	defer fieldsMu.Unlock()
-	see := func(surface string, kvs []*commonpb.KeyValue) {
+	// seeAt records the keys in kvs on surface, sitting at site, on the span event named event
+	// for one there; see records a record's, or what the policy treats as one.
+	seeAt := func(site, event, surface string, kvs []*commonpb.KeyValue) {
 		for _, kv := range kvs {
 			id := fieldID{b.Harness, b.Version, surface, kv.GetKey()}
 			if fieldSeen[id] == nil {
-				fieldSeen[id] = map[string]bool{}
+				fieldSeen[id] = &seenField{kinds: map[string]bool{}, query: classQuery{Site: site, Event: event, Key: kv.GetKey()}}
 			}
-			fieldSeen[id][kindOf(kv.GetValue())] = true
+			fieldSeen[id].kinds[kindOf(kv.GetValue())] = true
 		}
 	}
+	see := func(surface string, kvs []*commonpb.KeyValue) { seeAt("record", "", surface, kvs) }
 	resource := func(r *resourcepb.Resource) bool {
 		for _, kv := range r.GetAttributes() {
 			if kv.GetKey() == "service.name" && TermaService(kv.GetValue().GetStringValue()) {
 				return false
 			}
 		}
-		see("resource", r.GetAttributes())
+		seeAt("resource", "", "resource", r.GetAttributes())
 		return true
 	}
 	for _, req := range requests {
@@ -135,7 +151,8 @@ func ObserveFields(b Binary, requests []ExportRequest) {
 						name := SpanSurface(sp.GetName(), sp.GetAttributes())
 						see("traces/"+name, sp.GetAttributes())
 						for _, ev := range sp.GetEvents() {
-							see("traces/"+name+"/events/"+withoutLine(ev.GetName()), ev.GetAttributes())
+							event := withoutLine(ev.GetName())
+							seeAt("event", event, "traces/"+name+"/events/"+event, ev.GetAttributes())
 						}
 						for _, l := range sp.GetLinks() {
 							see("traces/"+name+"/links", l.GetAttributes())
@@ -255,10 +272,12 @@ func WriteFields(dir, terma string) error {
 	now := time.Now().UTC()
 	platform, version := runtime.GOOS+"/"+runtime.GOARCH, Version(terma)
 	queries := map[classQuery]bool{}
-	for id, kinds := range fieldSeen {
+	asked := make([]classQuery, 0, len(fieldSeen))
+	for id, f := range fieldSeen {
 		rows = append(rows, FieldRow{Harness: id.harness, Version: id.version, Surface: id.surface, Key: id.key,
-			Kinds: slices.Sorted(maps.Keys(kinds)), Platform: platform, Terma: version, At: now})
-		queries[queryFor(id.surface, id.key)] = true
+			Kinds: slices.Sorted(maps.Keys(f.kinds)), Platform: platform, Terma: version, At: now})
+		asked = append(asked, f.query)
+		queries[f.query] = true
 	}
 	fieldsMu.Unlock()
 	// No census from an earlier run stays for `make drift` to take for this one's, whether this
@@ -275,9 +294,11 @@ func WriteFields(dir, terma string) error {
 		return fmt.Errorf("classify the census with %s: %w", terma, err)
 	}
 	for i := range rows {
-		v := verdicts[queryFor(rows[i].Surface, rows[i].Key)]
+		v := verdicts[asked[i]]
 		rows[i].Class = v.Class
-		rows[i].Withheld = v.Class == "unclassified" && slices.ContainsFunc(rows[i].Kinds, func(k string) bool { return !slices.Contains(v.Kept, k) })
+		if v.Class == "unclassified" {
+			rows[i].Kept = v.Kept
+		}
 	}
 	sort.Slice(rows, func(i, j int) bool {
 		a, b := rows[i], rows[j]
@@ -295,21 +316,12 @@ func WriteFields(dir, terma string) error {
 
 // classQuery is a key as `terma relay classify` takes it: where it sits, as the relay's
 // content policy tells them apart (a resource, a span event, or a record, as it treats every
-// other surface), and the span event's name.
+// other surface), and the span event's name. The census records it as it sees the key, so no
+// surface's name is read back for it.
 type classQuery struct {
 	Site  string `json:"site"`
 	Event string `json:"event,omitempty"`
 	Key   string `json:"key"`
-}
-
-func queryFor(surface, key string) classQuery {
-	if surface == "resource" {
-		return classQuery{Site: "resource", Key: key}
-	}
-	if _, event, ok := strings.Cut(surface, "/events/"); ok && strings.HasPrefix(surface, "traces/") {
-		return classQuery{Site: "event", Event: event, Key: key}
-	}
-	return classQuery{Site: "record", Key: key}
 }
 
 // verdict is what `terma relay classify` says of a key: its class, and the kinds of value it

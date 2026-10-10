@@ -202,9 +202,9 @@ the instrumentation scope, the resource), with the kinds of value it carried (`t
 `TestClaudeInteractiveFields` (the events only an interactive session sends, such as
 `permission_mode_changed`) record it, and the run writes `report/fields.json`. Each key is
 classified by the terma under test, `terma relay classify`, as its relay treats it where it
-sits (a record, a resource or a span event) when a project withholds content; the relay also
-names the kinds of value it keeps, so the census marks a key withheld from what the relay
-says, never from a rule of its own:
+sits (a record, a resource or a span event, as the census saw it) when a project withholds
+content; the relay also names the kinds of value it keeps of the key there, so the catalog
+and the digest judge a key withheld from what the relay says, never from a rule of their own:
 
 | class | what the relay does |
 |---|---|

@@ -27,10 +27,12 @@ func field(version, surface, key, class string, at time.Time, kinds ...string) e
 	if len(kinds) == 0 {
 		kinds = []string{e2e.KindText}
 	}
-	// Withheld as the relay says of an unclassified key on a record: unless every value is a
-	// number or a flag.
-	withheld := class == "unclassified" && slices.ContainsFunc(kinds, func(k string) bool { return k != e2e.KindNumber && k != e2e.KindBool })
-	return e2e.FieldRow{Harness: "codex", Version: version, Surface: surface, Key: key, Class: class, Kinds: kinds, Withheld: withheld, Platform: "darwin/arm64", At: at}
+	r := e2e.FieldRow{Harness: "codex", Version: version, Surface: surface, Key: key, Class: class, Kinds: kinds, Platform: "darwin/arm64", At: at}
+	if class == "unclassified" {
+		// What `terma relay classify` keeps of an unclassified key on a record.
+		r.Kept = []string{e2e.KindNumber, e2e.KindBool}
+	}
+	return r
 }
 
 // A run's census against the catalog: a key no build had is new, a key the previous newest
@@ -52,11 +54,10 @@ func TestFieldDriftAndCatalog(t *testing.T) {
 	if err := run(c, day1); err != nil {
 		t.Fatal(err)
 	}
-	// The census takes withholding from `terma relay classify`, which keeps no kind of value of
-	// an unclassified resource attribute.
+	// `terma relay classify` keeps no kind of value of an unclassified resource attribute.
 	pid := func(at time.Time) e2e.FieldRow {
 		r := field("0.162.0", "resource", "process.parent_pid", "unclassified", at, e2e.KindNumber)
-		r.Withheld = true
+		r.Kept = nil
 		return r
 	}
 	c.fieldRuns = []string{writeFieldRun(t, dir, "f2.json", []e2e.FieldRow{
@@ -284,8 +285,26 @@ func TestCatalogKeepsWhatItsCensusesSaw(t *testing.T) {
 	if _, ok := keys["gone_key"]; ok {
 		t.Error("a key no kept census saw is still in the catalog")
 	}
-	if f := keys["turns"]; !slices.Equal(f.Kinds, []string{e2e.KindNumber}) || f.Withheld {
-		t.Errorf("turns: kinds %v, withheld %v: the newest build sends a number", f.Kinds, f.Withheld)
+	if f := keys["turns"]; !slices.Equal(f.Kinds, []string{e2e.KindNumber}) || f.withheld() {
+		t.Errorf("turns: kinds %v, withheld %v: the newest build sends a number", f.Kinds, f.withheld())
+	}
+}
+
+// A key withheld one night and classified by the next is no longer withheld, though the
+// harness shipped no new build: the class, and what the relay keeps, are the latest run's.
+func TestCatalogTakesTheLatestClassOfABuild(t *testing.T) {
+	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
+	var cat Catalog
+	mergeFields(&cat, []e2e.FieldRow{field("0.162.0", "logs/codex.api_request", "product_sku", "unclassified", day)})
+	if len(cat.Fields) != 1 || !cat.Fields[0].withheld() {
+		t.Fatalf("night 1: %+v, want product_sku withheld", cat.Fields)
+	}
+	mergeFields(&cat, []e2e.FieldRow{field("0.162.0", "logs/codex.api_request", "product_sku", "safe", day.Add(24*time.Hour))})
+	if f := cat.Fields[0]; f.Class != "safe" || f.withheld() {
+		t.Errorf("night 2: class %s, withheld %v, want safe and sent", f.Class, f.withheld())
+	}
+	if md := renderFields(cat, day.Add(24*time.Hour)); strings.Contains(md, "withheld**") || !strings.Contains(md, "| `product_sku` | safe |") {
+		t.Errorf("FIELDS.md still has product_sku withheld:\n%s", md)
 	}
 }
 

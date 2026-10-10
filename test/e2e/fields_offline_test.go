@@ -60,14 +60,17 @@ func TestObserveFields(t *testing.T) {
 			ScopeSpans: []*tracepb.ScopeSpans{{Scope: &commonpb.InstrumentationScope{Attributes: []*commonpb.KeyValue{str("scope.flag", "on")}}, Spans: []*tracepb.Span{{Name: "chat gpt-6", Attributes: []*commonpb.KeyValue{str("gen_ai.operation.name", "chat"), num("gen_ai.usage.input_tokens", 4)},
 				Links: []*tracepb.Span_Link{{Attributes: []*commonpb.KeyValue{str("link.kind", "parent")}}},
 				Events: []*tracepb.Span_Event{{Name: "tool.output", Attributes: []*commonpb.KeyValue{str("content", "out")}},
-					{Name: "event otel/src/tool_result.rs:54", Attributes: []*commonpb.KeyValue{str("auth_mode", "ApiKey")}}}}}}}}}}},
+					{Name: "event otel/src/tool_result.rs:54", Attributes: []*commonpb.KeyValue{str("auth_mode", "ApiKey")}}}},
+				// A span whose name reads like a span event's surface is still a span.
+				{Name: "GET /v1/events/x", Attributes: []*commonpb.KeyValue{str("http.method", "GET")}}}}}}}}},
 		{Payload: &colmetricspb.ExportMetricsServiceRequest{ResourceMetrics: []*metricspb.ResourceMetrics{{Resource: res("opencode"),
 			ScopeMetrics: []*metricspb.ScopeMetrics{{Metrics: []*metricspb.Metric{metric}}}}}}},
 	})
-	got := map[string][]string{}
+	got, sites := map[string][]string{}, map[string]classQuery{}
 	fieldsMu.Lock()
-	for id, kinds := range fieldSeen {
-		got[id.surface+" "+id.key] = slices.Sorted(maps.Keys(kinds))
+	for id, f := range fieldSeen {
+		got[id.surface+" "+id.key] = slices.Sorted(maps.Keys(f.kinds))
+		sites[id.surface+" "+id.key] = f.query
 	}
 	clear(fieldSeen)
 	fieldsMu.Unlock()
@@ -90,6 +93,20 @@ func TestObserveFields(t *testing.T) {
 		"scope scope.flag":                                                    {KindText},
 		"traces/chat {target}/links link.kind":                                {KindText},
 		"metrics/tokens/exemplars trace.note":                                 {KindText},
+		"traces/GET /v1/events/x http.method":                                 {KindText},
+	}
+	// Where each key sits, as the relay is asked about it.
+	for surfaceKey, want := range map[string]classQuery{
+		"resource service.name":                                               {Site: "resource", Key: "service.name"},
+		"logs/tool_result tool_name":                                          {Site: "record", Key: "tool_name"},
+		"traces/chat {target}/events/tool.output content":                     {Site: "event", Event: "tool.output", Key: "content"},
+		"traces/chat {target}/events/event otel/src/tool_result.rs auth_mode": {Site: "event", Event: "event otel/src/tool_result.rs", Key: "auth_mode"},
+		"traces/GET /v1/events/x http.method":                                 {Site: "record", Key: "http.method"},
+		"metrics/tokens/exemplars trace.note":                                 {Site: "record", Key: "trace.note"},
+	} {
+		if sites[surfaceKey] != want {
+			t.Errorf("%s sits at %+v, want %+v", surfaceKey, sites[surfaceKey], want)
+		}
 	}
 	if !maps.EqualFunc(got, want, slices.Equal) {
 		for k, v := range got {
@@ -127,7 +144,7 @@ func TestKindOfMatchesTheRelay(t *testing.T) {
 func TestAnUnclassifiedCensusLeavesNoEarlierOne(t *testing.T) {
 	fieldsMu.Lock()
 	clear(fieldSeen)
-	fieldSeen[fieldID{"opencode", "1.2.3", "resource", "service.name"}] = map[string]bool{KindText: true}
+	fieldSeen[fieldID{"opencode", "1.2.3", "resource", "service.name"}] = &seenField{kinds: map[string]bool{KindText: true}, query: classQuery{Site: "resource", Key: "service.name"}}
 	fieldsMu.Unlock()
 	t.Cleanup(func() { fieldsMu.Lock(); clear(fieldSeen); fieldsMu.Unlock() })
 	dir := t.TempDir()
@@ -143,12 +160,13 @@ func TestAnUnclassifiedCensusLeavesNoEarlierOne(t *testing.T) {
 	}
 }
 
-// The census takes each key's class and withholding from `terma relay classify`, as structured
-// queries: a number on a resource is withheld when the relay keeps no kind of value there.
+// The census takes each key's class, and the kinds of value it keeps, from `terma relay
+// classify`, asked where the key sits: a number on a resource is withheld when the relay keeps
+// no kind of value there.
 func TestCensusTakesWithholdingFromTheRelay(t *testing.T) {
 	fieldsMu.Lock()
 	clear(fieldSeen)
-	fieldSeen[fieldID{"opencode", "1.2.3", "resource", "process.parent_pid"}] = map[string]bool{KindNumber: true}
+	fieldSeen[fieldID{"opencode", "1.2.3", "resource", "process.parent_pid"}] = &seenField{kinds: map[string]bool{KindNumber: true}, query: classQuery{Site: "resource", Key: "process.parent_pid"}}
 	fieldsMu.Unlock()
 	t.Cleanup(func() { fieldsMu.Lock(); clear(fieldSeen); fieldsMu.Unlock() })
 	dir := t.TempDir()
@@ -174,7 +192,7 @@ echo '[{"class": "unclassified", "kept": []}]'
 	if err := json.Unmarshal(data, &rows); err != nil {
 		t.Fatal(err)
 	}
-	if len(rows) != 1 || rows[0].Class != "unclassified" || !rows[0].Withheld || rows[0].Terma != "terma 9.9.9" {
+	if len(rows) != 1 || rows[0].Class != "unclassified" || !Withheld(rows[0].Class, rows[0].Kinds, rows[0].Kept) || rows[0].Terma != "terma 9.9.9" {
 		t.Errorf("census = %+v", rows)
 	}
 }

@@ -44,9 +44,9 @@ type FieldEntry struct {
 	// Class is what the relay of the latest run that saw it does with it.
 	Class string   `json:"class"`
 	Kinds []string `json:"kinds"`
-	// Withheld is an unclassified key the relay drops under a policy that withholds content,
-	// as the latest run that saw it says.
-	Withheld bool `json:"withheld,omitempty"`
+	// Kept are the kinds of value the relay keeps of it, unclassified, as the latest run that
+	// saw it says.
+	Kept []string `json:"kept,omitempty"`
 	// FirstSeen is the oldest build the catalog saw it in; Versions the newest it was seen in,
 	// newest first, at most keepVersions.
 	FirstSeen string   `json:"first_seen"`
@@ -57,6 +57,9 @@ const (
 	keepVersions = 5
 	keepCensuses = 5
 )
+
+// withheld reports a key the relay drops, unclassified, under a policy that withholds content.
+func (f FieldEntry) withheld() bool { return e2e.Withheld(f.Class, f.Kinds, f.Kept) }
 
 func (f FieldEntry) id() string { return f.Harness + "\x00" + f.Surface + "\x00" + f.Key }
 
@@ -85,7 +88,7 @@ func mergeFields(cat *Catalog, rows []e2e.FieldRow) {
 		e := FieldEntry{Harness: r.Harness, Surface: r.Surface, Key: r.Key}
 		f, ok := fields[e.id()]
 		if !ok {
-			f = &FieldEntry{Harness: r.Harness, Surface: r.Surface, Key: r.Key, FirstSeen: r.Version, Kinds: slices.Clone(r.Kinds), Class: r.Class, Withheld: r.Withheld}
+			f = &FieldEntry{Harness: r.Harness, Surface: r.Surface, Key: r.Key, FirstSeen: r.Version, Kinds: slices.Clone(r.Kinds), Class: r.Class, Kept: slices.Clone(r.Kept)}
 			added = append(added, f)
 			fields[e.id()] = f
 		}
@@ -101,14 +104,14 @@ func mergeFields(cat *Catalog, rows []e2e.FieldRow) {
 			sortVersionsDesc(f.Versions)
 			f.Versions = f.Versions[:min(len(f.Versions), keepVersions)]
 		}
-		// The kinds, class and withholding are the newest build's: a key an old build sent as
-		// text and a new one as a number is no longer withheld.
+		// The kinds are the newest build's: a key an old build sent as text and a new one as a
+		// number is no longer withheld. Its class, and what the relay keeps of it, are the latest
+		// run's: a key classified since is no longer withheld either.
 		switch {
 		case f.Versions[0] != r.Version:
 		case newest != r.Version:
-			f.Kinds, f.Class, f.Withheld = slices.Clone(r.Kinds), r.Class, r.Withheld
+			f.Kinds, f.Class, f.Kept = slices.Clone(r.Kinds), r.Class, slices.Clone(r.Kept)
 		default:
-			f.Withheld = f.Withheld || r.Withheld
 			for _, k := range r.Kinds {
 				if !slices.Contains(f.Kinds, k) {
 					f.Kinds = append(f.Kinds, k)
@@ -116,7 +119,7 @@ func mergeFields(cat *Catalog, rows []e2e.FieldRow) {
 			}
 			slices.Sort(f.Kinds)
 			if r.Class != "" {
-				f.Class = r.Class
+				f.Class, f.Kept = r.Class, slices.Clone(r.Kept)
 			}
 		}
 	}
@@ -257,7 +260,7 @@ func renderFields(cat Catalog, now time.Time) string {
 		for _, f := range byHarness[h.ID] {
 			if slices.Contains(f.Versions, newest.Version) {
 				keys++
-				if f.Withheld {
+				if f.withheld() {
 					withheld++
 				}
 			}
@@ -282,7 +285,7 @@ func renderFields(cat Catalog, now time.Time) string {
 					in = "**no** (last " + f.Versions[0] + ")"
 				}
 				class := classLabel[f.Class]
-				if f.Withheld {
+				if f.withheld() {
 					class = "**unclassified · withheld**"
 				}
 				fmt.Fprintf(&b, "| `%s` | %s | %s | %s | %s |\n", tableCell(f.Key), class, strings.Join(f.Kinds, ", "), f.FirstSeen, in)
