@@ -36,7 +36,7 @@ func TestCompatHistory(t *testing.T) {
 		{Harness: "codex", Version: "0.158.0", Capability: "relay.telemetry", Result: "fail", Platform: "linux/arm64", At: day1},
 		{Harness: "codex", Version: "0.158.0", Capability: "relay.daemon", Result: "pass", Platform: "linux/arm64", At: day1},
 	})
-	if err := run([]string{r1}, hist, md, web, day1); err != nil {
+	if err := run(config{runs: []string{r1}, history: hist, md: md, json: web, catalog: filepath.Join(dir, "fields.json"), fieldsMD: filepath.Join(dir, "FIELDS.md")}, day1); err != nil {
 		t.Fatal(err)
 	}
 	r2 := writeRun(t, dir, "r2.json", []e2e.CompatRow{
@@ -44,7 +44,7 @@ func TestCompatHistory(t *testing.T) {
 		{Harness: "codex", Version: "0.158.0", Capability: "relay.daemon", Result: "not run", Platform: "linux/arm64", At: day2},
 		{Harness: "codex", Version: "0.158.0", Capability: "relay.telemetry", Result: "pass", Platform: "darwin/arm64", At: day2},
 	})
-	if err := run([]string{r2}, hist, md, web, day2); err != nil {
+	if err := run(config{runs: []string{r2}, history: hist, md: md, json: web, catalog: filepath.Join(dir, "fields.json"), fieldsMD: filepath.Join(dir, "FIELDS.md")}, day2); err != nil {
 		t.Fatal(err)
 	}
 	var entries []Entry

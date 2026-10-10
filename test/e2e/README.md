@@ -192,6 +192,44 @@ carried when last recorded. A missing key fails (interface drift); a new key is
 noted in the report so the matrix can grow. Re-record with `E2E_UPDATE_GOLDEN=1`
 after checking what changed.
 
+## Field census and drift
+
+The goldens pin the few surfaces terma parses. The field census covers everything else:
+every attribute key each harness build exports over OTLP, on every surface (a log event, a
+span or its events, a metric, the resource), with the kinds of value it carried (`text`,
+`number`, `bool`, `list`, `map`). The workload scenarios' direct runs and
+`TestClaudeInteractiveFields` (the events only an interactive session sends, such as
+`permission_mode_changed`) record it, and the run writes `report/fields.json`. Each key is
+classified by the terma under test, `terma relay classify`, as its relay treats it when a
+project withholds content:
+
+| class | what the relay does |
+|---|---|
+| `safe` | sends it, whatever the policy |
+| `prompt` / `tool_content` | sends it only when the project collects prompts / tool content |
+| `unclassified` | drops it, and counts it, when its value is text; a number or flag passes |
+
+`make compat` merges the census into the catalog, `docs/compat/fields.json`, and renders
+`docs/FIELDS.md`: per harness, per surface, each key's class, kinds, the build it was first
+seen in, and whether the newest build still has it.
+
+Every night `live.yml`'s `digest` job compares the night's runs with the committed catalog
+and history (`make drift` locally) and writes `report/drift.md`, `drift.json` and
+`slack.json`. For each harness's newest build it lists:
+
+- **new fields**: keys no build had on that surface
+- **removed fields**: keys the previous newest build had on a surface this one still sends
+- **unclassified fields the relay withholds**: classify each in `internal/relay/allow.go`,
+  an agent's capture rules, or as content
+- **surfaces not seen**: what the previous build sent and this run did not reach
+
+It also lists capabilities whose result changed. The digest goes to the run's summary and
+to Slack through the `SLACK_WEBHOOK_URL` secret in the `live-harnesses` environment, every
+night, so a quiet channel means the job did not run. Drift never fails the night; a removed
+key on a surface terma parses fails its golden. To accept a change, commit the job's
+`catalog-update` artefact (the regenerated `docs/`), or run `make compat` with the night's
+`compat-*` and `fields-*` artefacts as `RUNS` and `FIELD_RUNS`.
+
 ## Versions
 
 Each scenario runs against the installed binary and the last three releases

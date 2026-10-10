@@ -57,7 +57,7 @@ func TestRelayWorkloadsDsh(t *testing.T) {
 			{"bash", func(*Sandbox) []claudeStep { return []claudeStep{{bash("printf ok")}} }},
 		} {
 			t.Run(w.name, func(t *testing.T) {
-				runBoth(t, dshSandbox(w.steps), func(t *testing.T, sb *Sandbox) {
+				runBoth(t, b, dshSandbox(w.steps), func(t *testing.T, sb *Sandbox) {
 					if !sb.relayed {
 						sb.UseDshDirect()
 					}

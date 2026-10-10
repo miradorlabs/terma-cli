@@ -1,9 +1,14 @@
-// Command compatgen keeps terma's compatibility matrix: it merges the live suite's runs
-// (report/compat.json, one per run and platform) into the history
+// Command compatgen keeps terma's compatibility matrix and field catalog: it merges the live
+// suite's runs (report/compat.json, one per run and platform) into the history
 // (docs/compat/history.json), and renders the matrix people read
-// (docs/COMPATIBILITY.md) and the data the website reads (docs/compat/compat.json).
+// (docs/COMPATIBILITY.md) and the data the website reads (docs/compat/compat.json); and it
+// merges each run's field census (report/fields.json) into the field catalog
+// (docs/compat/fields.json), rendered as docs/FIELDS.md.
 //
-//	go run ./compatgen -run report/compat.json [-run other/compat.json ...]
+//	go run ./compatgen -run report/compat.json [-fields report/fields.json] [-digest report]
+//
+// With -digest it first writes what the runs changed against the history and catalog as they
+// were: report/drift.json, drift.md, and slack.json for a Slack incoming webhook.
 //
 // The history keeps, per harness build, platform and capability, the latest result
 // with when it ran and when it first passed; a build that stops being tested keeps its
@@ -49,36 +54,81 @@ func (e Entry) key() string {
 	return e.Harness + "|" + e.Version + "|" + e.Platform + "|" + e.Capability
 }
 
+// config is what one compatgen run reads and writes.
+type config struct {
+	runs, fieldRuns   []string
+	history, md, json string
+	catalog, fieldsMD string
+	digest, link      string
+}
+
 func main() {
-	var runs runsFlag
+	var c config
+	var runs, fields runsFlag
 	flag.Var(&runs, "run", "a run's compat.json (repeatable)")
-	history := flag.String("history", "../../docs/compat/history.json", "the history, read and rewritten")
-	md := flag.String("md", "../../docs/COMPATIBILITY.md", "the rendered matrix")
-	out := flag.String("json", "../../docs/compat/compat.json", "the matrix for the website")
+	flag.Var(&fields, "fields", "a run's fields.json (repeatable)")
+	flag.StringVar(&c.history, "history", "../../docs/compat/history.json", "the history, read and rewritten")
+	flag.StringVar(&c.md, "md", "../../docs/COMPATIBILITY.md", "the rendered matrix")
+	flag.StringVar(&c.json, "json", "../../docs/compat/compat.json", "the matrix for the website")
+	flag.StringVar(&c.catalog, "catalog", "../../docs/compat/fields.json", "the field catalog, read and rewritten")
+	flag.StringVar(&c.fieldsMD, "fields-md", "../../docs/FIELDS.md", "the rendered field catalog")
+	flag.StringVar(&c.digest, "digest", "", "write what the runs changed (drift.json, drift.md, slack.json) to this directory")
+	flag.StringVar(&c.link, "link", "", "the run, linked from the digest")
 	flag.Parse()
-	if err := run(runs, *history, *md, *out, time.Now().UTC()); err != nil {
+	c.runs, c.fieldRuns = runs, fields
+	if err := run(c, time.Now().UTC()); err != nil {
 		fmt.Fprintln(os.Stderr, "compatgen:", err)
 		os.Exit(1)
 	}
 }
 
-func run(runs []string, historyPath, mdPath, jsonPath string, now time.Time) error {
+func run(c config, now time.Time) error {
 	hist := map[string]Entry{}
 	var prior []Entry
-	if err := readJSON(historyPath, &prior); err != nil {
+	if err := readJSON(c.history, &prior); err != nil {
 		return err
 	}
 	for _, e := range prior {
 		hist[e.key()] = e
 	}
-	for _, p := range runs {
+	var catalog Catalog
+	if err := readJSON(c.catalog, &catalog); err != nil {
+		return err
+	}
+	var compatRows []e2e.CompatRow
+	for _, p := range c.runs {
 		var rows []e2e.CompatRow
 		if err := readJSON(p, &rows); err != nil {
 			return err
 		}
-		for _, r := range rows {
-			merge(hist, Entry{Harness: r.Harness, Version: r.Version, Platform: r.Platform, Capability: r.Capability,
-				Result: r.Result, LastRun: r.At, Terma: r.Terma, Test: r.Test})
+		compatRows = append(compatRows, rows...)
+	}
+	var fieldRows []e2e.FieldRow
+	for _, p := range c.fieldRuns {
+		var rows []e2e.FieldRow
+		if err := readJSON(p, &rows); err != nil {
+			return err
+		}
+		fieldRows = append(fieldRows, rows...)
+	}
+	if c.digest != "" {
+		d := Drift{GeneratedAt: now, Link: c.link, Harnesses: fieldDrift(catalog, fieldRows), Compat: compatDrift(hist, compatRows)}
+		if err := writeDigest(c.digest, d); err != nil {
+			return err
+		}
+	}
+	for _, r := range compatRows {
+		merge(hist, Entry{Harness: r.Harness, Version: r.Version, Platform: r.Platform, Capability: r.Capability,
+			Result: r.Result, LastRun: r.At, Terma: r.Terma, Test: r.Test})
+	}
+	if len(fieldRows) > 0 || len(catalog.Fields) > 0 {
+		mergeFields(&catalog, fieldRows)
+		catalog.GeneratedAt = now
+		if err := writeJSON(c.catalog, catalog); err != nil {
+			return err
+		}
+		if err := writeFile(c.fieldsMD, []byte(renderFields(catalog, now))); err != nil {
+			return err
 		}
 	}
 	entries := make([]Entry, 0, len(hist))
@@ -86,13 +136,24 @@ func run(runs []string, historyPath, mdPath, jsonPath string, now time.Time) err
 		entries = append(entries, e)
 	}
 	sort.Slice(entries, func(i, j int) bool { return entries[i].key() < entries[j].key() })
-	if err := writeJSON(historyPath, entries); err != nil {
+	if err := writeJSON(c.history, entries); err != nil {
 		return err
 	}
-	if err := writeJSON(jsonPath, website(entries, now)); err != nil {
+	if err := writeJSON(c.json, website(entries, now)); err != nil {
 		return err
 	}
-	return writeFile(mdPath, []byte(render(entries, now)))
+	return writeFile(c.md, []byte(render(entries, now)))
+}
+
+// writeDigest writes d as drift.json, drift.md and slack.json in dir.
+func writeDigest(dir string, d Drift) error {
+	if err := writeJSON(filepath.Join(dir, "drift.json"), d); err != nil {
+		return err
+	}
+	if err := writeFile(filepath.Join(dir, "drift.md"), []byte(d.markdown())); err != nil {
+		return err
+	}
+	return writeJSON(filepath.Join(dir, "slack.json"), d.slack())
 }
 
 // merge files e in the history: a newer result replaces an older one; the first pass

@@ -114,6 +114,14 @@ jobs:
           path: test/e2e/report/compat.json
           if-no-files-found: ignore
           retention-days: 30
+      - name: Upload this platform's field census
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: fields-macos
+          path: test/e2e/report/fields.json
+          if-no-files-found: ignore
+          retention-days: 30
       - name: Remove temporary login
         if: always()
         run: rm -f "$RUNNER_TEMP/terma-codex-auth.json"
@@ -205,3 +213,58 @@ jobs:
           if git diff --cached --quiet; then exit 0; fi
           git commit -q -m "compat: nightly matrix, $(date -u +%F)"
           git push -q origin compat-matrix
+
+  # What the night's runs changed against the committed history and field catalog: new and
+  # removed fields per harness build, fields the relay withholds as unclassified, and
+  # capabilities whose result changed. Said in the run's summary and in Slack every night,
+  # "no changes" included, so a quiet channel means the job did not run. Accepting a change
+  # is committing the catalog-update artefact (or `make compat` with these runs) in a PR.
+  digest:
+    needs: [e2e, machines]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: live-harnesses
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: test/e2e/go.mod
+          cache-dependency-path: |
+            go.sum
+            test/e2e/go.sum
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: "{compat,fields}-*"
+          path: test/e2e/runs
+      - name: Compare with the catalog and history
+        working-directory: test/e2e
+        run: |
+          args=()
+          for f in runs/compat-*/compat.json; do [ -f "$f" ] && args+=(-run "$f"); done
+          for f in runs/fields-*/fields.json; do [ -f "$f" ] && args+=(-fields "$f"); done
+          go run ./compatgen "${args[@]}" -digest report -link "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          cat report/drift.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Post to Slack
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        working-directory: test/e2e
+        run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "::notice::No SLACK_WEBHOOK_URL in the live-harnesses environment: the digest was not posted."
+            exit 0
+          fi
+          curl -fsS -X POST -H 'Content-Type: application/json' --data @report/slack.json "$SLACK_WEBHOOK_URL"
+      - name: Upload the digest and the updated catalog
+        uses: actions/upload-artifact@v5
+        with:
+          name: catalog-update
+          path: |
+            test/e2e/report/drift.*
+            test/e2e/report/slack.json
+            docs/FIELDS.md
+            docs/COMPATIBILITY.md
+            docs/compat/
+          retention-days: 30
