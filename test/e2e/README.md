@@ -221,10 +221,11 @@ The catalog, `docs/compat/fields.json`, lives beside the compatibility history o
 `compat-matrix` branch, and `docs/FIELDS.md` renders it: per harness, per surface, each key's
 class, kinds, the first build it was seen in, and whether the newest build censused whole
 still has it (a partial census's absences are no evidence). A
-key keeps its first build and its newest five, and its kinds and class are the newest
-build's, and apart from them the newest builds a whole census saw it in, the evidence a
-build sent it (what only a failed run saw, an error path's, is not, though the build is
-censused whole another night); a harness keeps its newest
+key keeps its first build and its newest five, and apart from them the newest builds a
+whole census saw it in, the evidence a build sent it (what only a failed run saw, an error
+path's, is not, though the build is censused whole another night). Its kinds are the newest
+of those builds' (a failed run's only until a whole census sees it), and its class the
+latest run's, the terma under test's answer; a harness keeps its newest
 five censuses, and five whole ones however old (a
 partial census, one a census scenario failed before taking whole, does not push out the
 whole ones), and a key leaves once none of them saw it. The file holds one entry a line, so a night's change is a diff of what changed.

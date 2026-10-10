@@ -123,28 +123,30 @@ func mergeFields(cat *Catalog, rows []e2e.FieldRow, partial map[string]bool) {
 			sortVersionsDesc(f.Whole)
 			f.Whole = f.Whole[:min(len(f.Whole), keepVersions)]
 		}
-		// The kinds are the newest build's: a key an old build sent as text and a new one as a
-		// number is no longer withheld. A failed run is no evidence over a whole census: it
-		// changes no kinds of a key one saw. Its class, and what the relay keeps of it, are the
-		// latest run's, failed or whole: they are the terma under test's answer, not the
-		// harness's, so a key classified since is no longer withheld either.
-		if f.Versions[0] == r.Version {
-			switch {
-			case failedRun && len(f.Whole) > 0:
-			case newest != r.Version, !failedRun && !wasWhole:
-				f.Kinds = slices.Clone(r.Kinds)
-			default:
-				for _, k := range r.Kinds {
-					if !slices.Contains(f.Kinds, k) {
-						f.Kinds = append(f.Kinds, k)
-					}
+		// The kinds are those of the newest build a whole census saw it in: a key an old build
+		// sent as text and a new one as a number is no longer withheld. That build's first whole
+		// run replaces what was there, a failed run's included, and a later one adds to it; a
+		// failed run sets them only while no whole census has seen the key, and an older
+		// build's whole run never. Its class, and what the relay keeps of it, are the latest
+		// run's, failed or whole: they are the terma under test's answer, not the harness's, so
+		// a key classified since is no longer withheld either.
+		newestWhole := !failedRun && f.Whole[0] == r.Version                       // the newest build censused whole
+		onlyFailed := failedRun && len(f.Whole) == 0 && f.Versions[0] == r.Version // no whole census yet
+		switch {
+		case newestWhole && !wasWhole, onlyFailed && newest != r.Version:
+			f.Kinds = slices.Clone(r.Kinds)
+		case newestWhole, onlyFailed:
+			for _, k := range r.Kinds {
+				if !slices.Contains(f.Kinds, k) {
+					f.Kinds = append(f.Kinds, k)
 				}
-				slices.Sort(f.Kinds)
 			}
-			if r.Class != "" {
-				f.Class, f.Kept = r.Class, slices.Clone(r.Kept)
-			}
+			slices.Sort(f.Kinds)
 		}
+		if r.Class != "" {
+			f.Class, f.Kept = r.Class, slices.Clone(r.Kept)
+		}
+
 	}
 	for _, f := range added {
 		cat.Fields = append(cat.Fields, *f)
