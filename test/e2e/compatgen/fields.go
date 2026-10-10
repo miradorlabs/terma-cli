@@ -226,6 +226,11 @@ func (cat *Catalog) wholeAfter(harness, version string) bool {
 	})
 }
 
+// censusedAt reports whether the catalog took a census of harness at version, whole or not.
+func (cat *Catalog) censusedAt(harness, version string) bool {
+	return slices.ContainsFunc(cat.Censuses, func(c Census) bool { return c.Harness == harness && c.Version == version })
+}
+
 // censusedWhole reports whether the catalog took a whole census of harness at version.
 func (cat *Catalog) censusedWhole(harness, version string) bool {
 	return slices.ContainsFunc(cat.Censuses, func(c Census) bool {

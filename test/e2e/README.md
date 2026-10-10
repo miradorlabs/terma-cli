@@ -236,8 +236,8 @@ runs over two nights against a scratch origin. The digest,
 - **new surfaces**: surfaces no build had, once each with its keys counted, so a renamed
   span is one line, not one per key
 - **new fields**: keys new to their surface, or new to the harness anywhere, in the newest
-  build or the build judged (below), so what an older build censused whole adds is said the
-  night it goes into the catalog
+  build or any build the catalog has no census of, so whatever goes into the catalog is said
+  new the night it does
 - **removed fields** and **surfaces no longer sent**: what the newest build the night
   censused whole no longer sends that the newest older build censused whole did. Only a whole
   census is evidence: a partial one is a failed run, where keys of an error path come, so a

@@ -395,3 +395,28 @@ func TestWhatTheJudgedBuildAddedIsNew(t *testing.T) {
 		t.Errorf("the next night said it again: %+v", h)
 	}
 }
+
+// What any build the catalog has no census of brings is new the night it comes, whole or
+// partial, judged or not: it all goes into the catalog that night.
+func TestWhatEveryNewBuildBringsIsNew(t *testing.T) {
+	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
+	var cat Catalog
+	mergeFields(&cat, []e2e.FieldRow{field("0.163.0", "logs/codex.api_request", "model", "safe", day)}, nil)
+	tonight := []e2e.FieldRow{
+		field("0.164.0", "logs/codex.api_request", "model", "safe", day.Add(24*time.Hour)),
+		field("0.164.0", "logs/codex.api_request", "from_partial", "safe", day.Add(24*time.Hour)),
+		field("0.165.0", "logs/codex.api_request", "model", "safe", day.Add(24*time.Hour)),
+		field("0.165.0", "logs/codex.api_request", "from_whole", "safe", day.Add(24*time.Hour)),
+		field("0.166.0", "logs/codex.api_request", "model", "safe", day.Add(24*time.Hour)),
+	}
+	ran := censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.164.0", Failed: true}, {Harness: "codex", Version: "0.165.0"},
+		{Harness: "codex", Version: "0.166.0", Failed: true}})
+	_, _, hs := fieldDrift(cat, tonight, ran, day.Add(24*time.Hour))
+	var added []string
+	for _, c := range hs[0].Added {
+		added = append(added, c.Key)
+	}
+	if !slices.Equal(added, []string{"from_partial", "from_whole"}) {
+		t.Errorf("added %v", added)
+	}
+}

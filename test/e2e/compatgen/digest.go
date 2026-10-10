@@ -129,6 +129,15 @@ func (d Drift) Quiet() bool {
 	return !slices.ContainsFunc(d.Harnesses, HarnessDrift.changed)
 }
 
+// rowBuilds are the builds rows are of.
+func rowBuilds(rows []e2e.FieldRow) map[string]bool {
+	out := map[string]bool{}
+	for _, r := range rows {
+		out[r.Version] = true
+	}
+	return out
+}
+
 // censusRuns is what tonight's census scenarios did (e2e.CensusRun, report/census.json): per
 // harness, the newest build they ran, passed or failed; and the builds one of them failed
 // for, whose census is partial.
@@ -200,8 +209,9 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran censusRuns, now time.Time)
 		}
 		whole, ok := cat.lastWhole(harness, judged)
 		judging := judged != "" && ok && !cat.censusedWhole(harness, judged) && !cat.wholeAfter(harness, judged)
-		// What is new is new in the newest build or in the build judged, the newest's row first:
-		// what the judged build added goes into the catalog tonight, and would never be new again.
+		// What is new is new in the newest build or in any build the catalog has no census of,
+		// the newest build's row first: all of it goes into the catalog tonight, and would never
+		// be new again.
 		tonight := map[string]e2e.FieldRow{}
 		sent := map[string]bool{}
 		for _, r := range hr {
@@ -210,9 +220,13 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran censusRuns, now time.Time)
 				sent[r.Surface] = true
 			}
 		}
-		if judging && judged != version {
+		newBuilds := slices.DeleteFunc(slices.Collect(maps.Keys(rowBuilds(hr))), func(v string) bool {
+			return v == version || cat.censusedAt(harness, v)
+		})
+		sortVersionsDesc(newBuilds)
+		for _, v := range newBuilds {
 			for _, r := range hr {
-				if _, ok := tonight[r.Surface+"\x00"+r.Key]; !ok && r.Version == judged {
+				if _, ok := tonight[r.Surface+"\x00"+r.Key]; !ok && r.Version == v {
 					tonight[r.Surface+"\x00"+r.Key] = r
 				}
 			}
