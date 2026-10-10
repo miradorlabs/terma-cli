@@ -201,8 +201,10 @@ the instrumentation scope, the resource), with the kinds of value it carried (`t
 `number`, `bool`, `list`, `map`, `bytes`). The workload scenarios' direct runs and
 `TestClaudeInteractiveFields` (the events only an interactive session sends, such as
 `permission_mode_changed`) record it, and the run writes `report/fields.json`, and beside it
-`report/census.json`: the builds those scenarios ran (`TakesCensus`), and whether one failed
-for a build, whose census is then partial. Each key is
+`report/census.json`: the builds those scenarios ran (`TakesCensus`), each by scenario, and
+whether one failed for a build. A build's census is whole only if every census scenario that
+ran that night ran it and none failed: one a scenario failed for, or did not run (a release
+between two scenarios' lookups), is partial. Each key is
 classified by the terma under test, `terma relay classify`, as its relay treats it where it
 sits (a record, a resource or a span event, as the census saw it) when a project withholds
 content; the relay also names the kinds of value it keeps of the key there, so the catalog
@@ -239,8 +241,9 @@ runs over two nights against a scratch origin. The digest,
   night censused, so whatever goes into the catalog is said new the night it does
 - **removed fields** and **surfaces no longer sent**: what each build the night censused
   whole for the first time no longer sends, oldest first, each against the build before it,
-  the first against the newest older build censused whole (a removal says the build it went
-  in, where that is not the last). Only a whole census is evidence: a partial one is a failed
+  the first against the newest older build censused whole, by what it sent tonight where it
+  is censused whole tonight too, so what a build sends only sometimes is not gone for missing
+  one night (a removal says the build it went in, where that is not the last). Only a whole census is evidence: a partial one is a failed
   run, where keys of an error path come, so a night whose newest build is partial judges the
   whole ones before it, or nothing, and says so. A build is judged once, and only while no
   newer build has a whole census: a re-run that did not reach an error path is no evidence.

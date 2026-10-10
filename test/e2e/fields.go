@@ -73,18 +73,20 @@ func Withheld(class string, kinds, kept []string) bool {
 	return class == "unclassified" && slices.ContainsFunc(kinds, func(k string) bool { return !slices.Contains(kept, k) })
 }
 
-// CensusRun is a build a scenario that takes the census (runBoth, TestClaudeInteractiveFields)
-// ran, and whether one failed for it: a build one failed for has a partial census, and one
-// they ran and no census reached was not reached. report/census.json holds them, beside the
-// census.
+// CensusRun is a build a scenario that takes the census (the test that calls runBoth, and
+// TestClaudeInteractiveFields) ran, and whether it failed for it. A build's census is whole
+// only if every census scenario that ran that night ran it and none failed: one a scenario
+// failed for, or did not run, is partial. A build they ran and no census reached was not
+// reached. report/census.json holds them, beside the census.
 type CensusRun struct {
 	Harness  string `json:"harness"`
 	Version  string `json:"version"`
+	Scenario string `json:"scenario"`
 	Failed   bool   `json:"failed,omitempty"`
 	Platform string `json:"platform"`
 }
 
-var censusRuns = map[[2]string]*CensusRun{}
+var censusRuns = map[[3]string]*CensusRun{}
 
 // TakesCensus records that t takes the census of b: if t fails, b's census is partial. A
 // skipped t ran nothing.
@@ -96,9 +98,10 @@ func TakesCensus(t *testing.T, b Binary) {
 		}
 		fieldsMu.Lock()
 		defer fieldsMu.Unlock()
-		k := [2]string{b.Harness, b.Version}
+		scenario, _, _ := strings.Cut(t.Name(), "/")
+		k := [3]string{b.Harness, b.Version, scenario}
 		if censusRuns[k] == nil {
-			censusRuns[k] = &CensusRun{Harness: b.Harness, Version: b.Version, Platform: runtime.GOOS + "/" + runtime.GOARCH}
+			censusRuns[k] = &CensusRun{Harness: b.Harness, Version: b.Version, Scenario: scenario, Platform: runtime.GOOS + "/" + runtime.GOARCH}
 		}
 		censusRuns[k].Failed = censusRuns[k].Failed || t.Failed()
 	})
@@ -327,7 +330,8 @@ func WriteFields(dir, terma string) error {
 	}
 	if len(runs) > 0 {
 		sort.Slice(runs, func(i, j int) bool {
-			return runs[i].Harness+"\x00"+runs[i].Version < runs[j].Harness+"\x00"+runs[j].Version
+			a, b := runs[i], runs[j]
+			return a.Harness+"\x00"+a.Version+"\x00"+a.Scenario < b.Harness+"\x00"+b.Version+"\x00"+b.Scenario
 		})
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return err

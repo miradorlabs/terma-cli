@@ -68,7 +68,7 @@ func (h HarnessDrift) build(newBuild string) string {
 		notes = append(notes, newBuild+"was "+h.Previous)
 	}
 	if h.Since != "" {
-		notes = append(notes, "judged against "+h.Since+", the last whole census")
+		notes = append(notes, "judged against "+h.Since+", censused whole")
 	}
 	if len(notes) == 0 {
 		return h.Version
@@ -186,6 +186,9 @@ func changeLines(cs []FieldChange, withClass bool, d detail) []string {
 		line := "`" + c.Key + "` on `" + c.Surface + "`"
 		if withClass && c.Class != "" {
 			line += " (" + classLabel[c.Class] + ")"
+		}
+		if c.From != "" {
+			line += " (in " + c.From + ")"
 		}
 		line += goneIn(c.In, c.Back)
 		out = append(out, line+c.Source.note(d))

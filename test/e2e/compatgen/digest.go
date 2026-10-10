@@ -94,8 +94,10 @@ type FieldChange struct {
 	Key     string   `json:"key"`
 	Class   string   `json:"class,omitempty"`
 	Kinds   []string `json:"kinds,omitempty"`
-	// In is the build that no longer sends it, of a removal, where it is not the last build
-	// judged; Back the later build judged that sends it again, if one does.
+	// From is the build that sent it, of an addition, where it is not Version. In is the build
+	// that no longer sends it, of a removal, where it is not the last build judged; Back the
+	// later build judged that sends it again, if one does.
+	From string `json:"from,omitempty"`
 	In   string `json:"in,omitempty"`
 	Back string `json:"back,omitempty"`
 	// Source is where the harness's source names it, where it is public.
@@ -141,49 +143,12 @@ func (d Drift) Quiet() bool {
 	return !slices.ContainsFunc(d.Harnesses, HarnessDrift.changed)
 }
 
-func firstOr(vs []string) string {
-	if len(vs) == 0 {
-		return ""
-	}
-	return vs[0]
-}
-
 // lastJudged is the last build what is gone was judged on: Judged, or Version.
 func (h HarnessDrift) lastJudged() string {
 	if h.Judged != "" {
 		return h.Judged
 	}
 	return h.Version
-}
-
-// rowBuilds are the builds rows are of.
-func rowBuilds(rows []e2e.FieldRow) map[string]bool {
-	out := map[string]bool{}
-	for _, r := range rows {
-		out[r.Version] = true
-	}
-	return out
-}
-
-// censusRuns is what tonight's census scenarios did (e2e.CensusRun, report/census.json): per
-// harness, the newest build they ran, passed or failed; and the builds one of them failed
-// for, whose census is partial.
-type censusRuns struct {
-	newest map[string]string
-	failed map[string]bool // harness and version
-}
-
-func censusRan(runs []e2e.CensusRun) censusRuns {
-	ran := censusRuns{newest: map[string]string{}, failed: map[string]bool{}}
-	for _, r := range runs {
-		if versionLess(ran.newest[r.Harness], r.Version) {
-			ran.newest[r.Harness] = r.Version
-		}
-		if r.Failed {
-			ran.failed[r.Harness+"\x00"+r.Version] = true
-		}
-	}
-	return ran
 }
 
 // fieldDrift compares a night's census with the catalog before it is merged; ran is what
@@ -262,6 +227,9 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran censusRuns, now time.Time)
 		for _, id := range slices.Sorted(maps.Keys(tonight)) {
 			r := tonight[id]
 			c := FieldChange{Surface: r.Surface, Key: r.Key, Class: r.Class, Kinds: r.Kinds}
+			if r.Version != version {
+				c.From = r.Version
+			}
 			newKey := !keys[harness][r.Key]
 			switch {
 			case d.First:
@@ -342,6 +310,13 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran censusRuns, now time.Time)
 				if f.Harness == harness && slices.Contains(f.Whole, whole.Version) {
 					base.keys[f.Surface+"\x00"+f.Key] = FieldChange{Surface: f.Surface, Key: f.Key, Class: f.Class, Kinds: f.Kinds}
 				}
+			}
+			// The catalog has every night's whole census of it; the build judged has tonight's.
+			// Where it is censused whole tonight too, it is judged by what it sent tonight, so
+			// a key or surface a build sends only sometimes is not gone for missing one night.
+			if again := sends(since); len(again.keys) > 0 && !ran.failed[harness+"\x00"+since] {
+				maps.DeleteFunc(base.keys, func(k string, _ FieldChange) bool { _, ok := again.keys[k]; return !ok })
+				base.surfaces = slices.DeleteFunc(slices.Clone(base.surfaces), func(s string) bool { return !slices.Contains(again.surfaces, s) })
 			}
 		} else if len(judged) > 1 && !d.First {
 			since, base, chain = judged[0], sends(judged[0]), judged[1:]

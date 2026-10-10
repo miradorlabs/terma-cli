@@ -223,7 +223,7 @@ func TestCensusRunsAreWrittenBesideTheCensus(t *testing.T) {
 	if err := json.Unmarshal(data, &runs); err != nil {
 		t.Fatal(err)
 	}
-	if len(runs) != 1 || runs[0].Version != "0.84.2" || runs[0].Failed {
+	if len(runs) != 1 || runs[0].Version != "0.84.2" || runs[0].Failed || runs[0].Scenario != "TestCensusRunsAreWrittenBesideTheCensus" {
 		t.Errorf("census runs %+v", runs)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "fields.json")); !errors.Is(err, fs.ErrNotExist) {

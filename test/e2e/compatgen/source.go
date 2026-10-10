@@ -114,6 +114,7 @@ type finding struct {
 	within  string
 	gone    bool   // looked for in the build before too
 	in      string // the build it went in, where not the last judged
+	from    string // the build that sent it, of an addition, where not Version
 	says    **SourceSays
 }
 
@@ -145,7 +146,7 @@ func (h *HarnessDrift) findings() []finding {
 	}{{h.Added, false}, {h.Withheld, false}, {h.Removed, true}} {
 		for i := range list.cs {
 			within, _ := surfaceName(list.cs[i].Surface)
-			out = append(out, finding{name: list.cs[i].Key, within: within, gone: list.gone, in: list.cs[i].In, says: &list.cs[i].Source})
+			out = append(out, finding{name: list.cs[i].Key, within: within, gone: list.gone, in: list.cs[i].In, from: list.cs[i].From, says: &list.cs[i].Source})
 		}
 	}
 	for i := range h.Unseen {
@@ -184,6 +185,9 @@ func linkSources(d *Drift, known map[string][]string) {
 		// it went in, and in the build judged before that one, the chain's or base.
 		builds := func(f finding) (at, before string) {
 			if !f.gone {
+				if f.from != "" {
+					return f.from, ""
+				}
 				return h.Version, ""
 			}
 			at = f.in

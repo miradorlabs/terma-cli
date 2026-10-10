@@ -88,7 +88,7 @@ func TestARemovalAcrossPartialBuilds(t *testing.T) {
 	if len(h.Removed) != 1 || h.Removed[0].Key != "attempt" {
 		t.Errorf("removed %+v, want attempt", h.Removed)
 	}
-	if h.Previous != "0.155.0" || h.Since != "0.150.0" || !strings.Contains(h.headline(), "(was 0.155.0; judged against 0.150.0, the last whole census)") {
+	if h.Previous != "0.155.0" || h.Since != "0.150.0" || !strings.Contains(h.headline(), "(was 0.155.0; judged against 0.150.0, censused whole)") {
 		t.Errorf("previous %s, since %s, headline %q", h.Previous, h.Since, h.headline())
 	}
 }
@@ -295,5 +295,48 @@ func TestAChainSaysWhatCameBack(t *testing.T) {
 	_, _, hs = fieldDrift(partial, two, ran, day.Add(24*time.Hour))
 	if h := hs[0]; h.Since != "0.164.0" || len(h.Removed) != 1 || h.Removed[0].Key != "dropped" {
 		t.Errorf("since %s, removed %+v", h.Since, h.Removed)
+	}
+}
+
+// A build a census scenario of the night did not run lacks that scenario's surfaces: its census
+// is partial, though nothing failed.
+func TestABuildEveryScenarioDidNotRunIsPartial(t *testing.T) {
+	ran := censusRan([]e2e.CensusRun{
+		{Harness: "claude", Version: "2.1.3", Scenario: "TestClaudeInteractiveFields"},
+		{Harness: "claude", Version: "2.1.3", Scenario: "TestRelayWorkloadsClaude"},
+		{Harness: "claude", Version: "2.1.4", Scenario: "TestRelayWorkloadsClaude"},
+		{Harness: "pi", Version: "0.84.2", Scenario: "TestRelayWorkloadsPi"},
+	})
+	if ran.failed["claude\x002.1.3"] || !ran.failed["claude\x002.1.4"] || ran.failed["pi\x000.84.2"] {
+		t.Errorf("partial %v", ran.failed)
+	}
+}
+
+// A key a build sends only sometimes, seen on one of its whole nights, is not gone from the
+// next build for missing tonight, when the build before is censused whole tonight without it.
+func TestASometimesKeyIsJudgedByTonight(t *testing.T) {
+	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
+	var cat Catalog
+	mergeFields(&cat, []e2e.FieldRow{field("2.1.3", "logs/user_prompt", "prompt_length", "safe", day),
+		field("2.1.3", "logs/retention_sweep", "deleted", "safe", day)}, nil)
+	tonight := []e2e.FieldRow{field("2.1.3", "logs/user_prompt", "prompt_length", "safe", day.Add(24*time.Hour)),
+		field("2.1.4", "logs/user_prompt", "prompt_length", "safe", day.Add(24*time.Hour))}
+	ran := censusRan([]e2e.CensusRun{{Harness: "codex", Version: "2.1.3"}, {Harness: "codex", Version: "2.1.4"}})
+	if _, _, hs := fieldDrift(cat, tonight, ran, day.Add(24*time.Hour)); len(hs[0].Unseen)+len(hs[0].Removed) != 0 {
+		t.Errorf("unseen %+v, removed %+v", hs[0].Unseen, hs[0].Removed)
+	}
+}
+
+// A new field an older build of the night brought says which.
+func TestANewFieldSaysItsBuild(t *testing.T) {
+	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
+	var cat Catalog
+	mergeFields(&cat, []e2e.FieldRow{field("0.164.0", "logs/codex.api_request", "model", "safe", day)}, nil)
+	tonight := []e2e.FieldRow{field("0.164.0", "logs/codex.api_request", "error.message", "safe", day.Add(24*time.Hour)),
+		field("0.165.0", "logs/codex.api_request", "model", "safe", day.Add(24*time.Hour))}
+	ran := censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.164.0", Failed: true}, {Harness: "codex", Version: "0.165.0"}})
+	_, _, hs := fieldDrift(cat, tonight, ran, day.Add(24*time.Hour))
+	if md := (Drift{Harnesses: hs}).markdown(); !strings.Contains(md, "`error.message` on `logs/codex.api_request` (safe) (in 0.164.0)") {
+		t.Errorf("drift.md:\n%s", md)
 	}
 }

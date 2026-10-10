@@ -165,12 +165,12 @@ func TestDigestSaysAnUncensusedHarnessThatRanIsMissing(t *testing.T) {
 func TestTheBuildJudgedAgainstIsNamed(t *testing.T) {
 	h := HarnessDrift{Harness: "codex", Name: "Codex CLI", Version: "0.162.0", Previous: "0.162.0", Since: "0.161.0",
 		Removed: []FieldChange{{Surface: "logs/x", Key: "k"}}}
-	if got := h.headline(); !strings.HasPrefix(got, "Codex CLI 0.162.0 (judged against 0.161.0, the last whole census): 1 removed field") {
+	if got := h.headline(); !strings.HasPrefix(got, "Codex CLI 0.162.0 (judged against 0.161.0, censused whole): 1 removed field") {
 		t.Errorf("headline %q", got)
 	}
 	h.Removed, h.Previous, h.Compare = nil, "0.162.0", "https://c"
 	h.Version = "0.162.1"
-	if got := (Drift{Harnesses: []HarnessDrift{h}}).unchanged(); got != "Codex CLI 0.162.1 (new build, was 0.162.0; judged against 0.161.0, the last whole census, \x00https://c\x01diff\x02)" {
+	if got := (Drift{Harnesses: []HarnessDrift{h}}).unchanged(); got != "Codex CLI 0.162.1 (new build, was 0.162.0; judged against 0.161.0, censused whole, \x00https://c\x01diff\x02)" {
 		t.Errorf("unchanged %q", got)
 	}
 }
