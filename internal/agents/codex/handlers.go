@@ -166,7 +166,8 @@ func consumePayload(env hookrun.Env) error {
 	return nil
 }
 
-// stop drains the thread's quota, replies and name before starting delivery.
+// stop withdraws the claims of calls that wrote nothing, then drains the thread's quota,
+// replies and name before starting delivery.
 func stop(ctx context.Context, env hookrun.Env) error {
 	in, err := readCodexHookInput(env.Stdin)
 	if err != nil {
@@ -178,6 +179,7 @@ func stop(ctx context.Context, env hookrun.Env) error {
 	if err != nil {
 		return nil
 	}
+	settleExpected(env, r, in.SessionID)
 	captureCodexFunding(ctx, env, r, in)
 	captureCodexDesktopActivity(ctx, env, r, in)
 	captureCodexTitle(ctx, env, r, in, captureCodexReplies(ctx, env, r, in))
@@ -248,7 +250,8 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 // preToolUse records the files a shell call writes before its first commit, so that commit
 // is stamped: the call's PostToolUse comes after it. A write between two commits is left
 // out, since it would claim the first. A call that makes no commit has all its files
-// recorded, since Codex sends no PostToolUse for a patch it runs from the shell.
+// recorded, since Codex sends no PostToolUse for a patch it runs from the shell. The turn's
+// Stop withdraws the claims on files the call left unchanged (expected.go).
 func preToolUse(ctx context.Context, env hookrun.Env) error {
 	in, err := readCodexHookInput(env.Stdin)
 	if err != nil {
@@ -270,7 +273,9 @@ func preToolUse(ctx context.Context, env hookrun.Env) error {
 	if err != nil {
 		return nil
 	}
-	env.Expect(r, session.Session{ID: in.SessionID, Tool: codexTool, Model: in.Model}, paths)
+	sess := session.Session{ID: in.SessionID, Tool: codexTool, Model: in.Model}
+	held := heldFiles(r, sess.Key())
+	expect(env, r, sess, held, env.Expect(r, sess, paths))
 	return nil
 }
 

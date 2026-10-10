@@ -13,6 +13,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
+	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -443,5 +444,88 @@ func TestCodexSameCallCommitLeavesItsFilesRetired(t *testing.T) {
 				t.Fatalf("the developer's later commit of %s was stamped:\n%s", tc.file, msg)
 			}
 		})
+	}
+}
+
+// endTurn runs the turn's Stop, with an empty CODEX_HOME.
+func (c *codexCall) endTurn() {
+	c.t.Helper()
+	c.t.Setenv("CODEX_HOME", c.t.TempDir())
+	if err := stop(c.ctx, c.env(c.payload("Stop", ""))); err != nil {
+		c.t.Fatal(err)
+	}
+}
+
+// A call the developer declines never runs and gets no PostToolUse: by the end of the turn
+// its PreToolUse has claimed nothing, so the developer's own commit of the file is theirs.
+// Reproduced live with Codex 0.160.1's app-server (TestCodexDeclinedWriteClaimsNothing).
+func TestCodexDeclinedCallClaimsNothing(t *testing.T) {
+	for _, command := range []string{
+		"printf codex > NOTES.md",
+		"printf codex > NOTES.md && git add NOTES.md && git commit -m notes",
+	} {
+		t.Run(command, func(t *testing.T) {
+			c := newCodexCall(t)
+			if err := preToolUse(c.ctx, c.env(c.payload("PreToolUse", command))); err != nil {
+				t.Fatal(err)
+			}
+			c.endTurn()
+			hookruntest.WriteFile(t, c.root, "NOTES.md", "mine\n")
+			c.git("add", "NOTES.md")
+			if msg := c.commit("my notes"); strings.Contains(msg, "Agent-Session-Id") {
+				t.Fatalf("the developer's commit was stamped by a declined call:\n%s", msg)
+			}
+		})
+	}
+}
+
+// The end of the turn withdraws only what a call claimed and left unchanged: a patch the
+// shell ran, which gets no PostToolUse, keeps its claim, as does an earlier edit's.
+func TestCodexEndOfTurnKeepsWhatCallsWrote(t *testing.T) {
+	c := newCodexCall(t)
+	hookruntest.WriteFile(t, c.root, "edited.txt", "base\n")
+	c.git("add", "edited.txt")
+	c.git("commit", "-qm", "base")
+	c.run("printf agent > edited.txt", func() { hookruntest.WriteFile(t, c.root, "edited.txt", "agent") })
+	if err := preToolUse(c.ctx, c.env(c.payload("PreToolUse", "printf again > edited.txt"))); err != nil {
+		t.Fatal(err) // declined
+	}
+	patch := "apply_patch <<'PATCH'\n*** Begin Patch\n*** Add File: patched.txt\n+patched\n*** End Patch\nPATCH"
+	if err := preToolUse(c.ctx, c.env(c.payload("PreToolUse", patch))); err != nil {
+		t.Fatal(err)
+	}
+	hookruntest.WriteFile(t, c.root, "patched.txt", "patched\n")
+	c.endTurn()
+	c.git("add", "edited.txt", "patched.txt")
+	if msg := c.commit("agent"); !strings.Contains(msg, "Agent-Session-Id: "+codexCallSession) {
+		t.Fatalf("the session's edits lost their claim at the end of the turn:\n%s", msg)
+	}
+	for _, f := range []string{"edited.txt", "patched.txt"} {
+		hookruntest.WriteFile(t, c.root, f, "human\n")
+	}
+	c.git("add", "edited.txt", "patched.txt")
+	if msg := c.commit("human"); strings.Contains(msg, "Agent-Session-Id") {
+		t.Fatalf("the developer's later commit was stamped:\n%s", msg)
+	}
+}
+
+// Two parallel calls claim one file before either records it: one writes it, the other is
+// declined. The declined call's unchanged record must not withdraw the other's claim.
+func TestCodexParallelCallsKeepAWrittenClaim(t *testing.T) {
+	c := newCodexCall(t)
+	env := c.env("")
+	r, err := env.Repo(c.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sess := session.Session{ID: codexCallSession, Tool: codexTool}
+	files := env.Expect(r, sess, []string{filepath.Join(c.root, "f.txt")})
+	expect(env, r, sess, nil, files) // the call that writes, before it runs
+	hookruntest.WriteFile(t, c.root, "f.txt", "agent")
+	expect(env, r, sess, nil, files) // the declined call, recorded late
+	c.endTurn()
+	c.git("add", "f.txt")
+	if msg := c.commit("agent"); !strings.Contains(msg, "Agent-Session-Id: "+codexCallSession) {
+		t.Fatalf("the declined call withdrew the parallel call's written claim:\n%s", msg)
 	}
 }
