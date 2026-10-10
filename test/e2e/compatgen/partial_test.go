@@ -384,3 +384,19 @@ func TestCountsAndSurfacesSayTheirBuilds(t *testing.T) {
 		t.Errorf("new surfaces %+v", s)
 	}
 }
+
+// A build judged against one whose census tonight is partial is judged by its earlier nights,
+// and says so: what it sent on some of them alone may read gone.
+func TestAJudgementAgainstEarlierNightsSaysSo(t *testing.T) {
+	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
+	var cat Catalog
+	mergeFields(&cat, []e2e.FieldRow{field("2.1.3", "logs/api_request", "model", "safe", day),
+		field("2.1.3", "logs/retention_sweep", "deleted", "safe", day)}, nil)
+	tonight := []e2e.FieldRow{field("2.1.3", "logs/api_request", "model", "safe", day.Add(24*time.Hour)),
+		field("2.1.4", "logs/api_request", "model", "safe", day.Add(24*time.Hour))}
+	ran := censusRan([]e2e.CensusRun{{Harness: "codex", Version: "2.1.3", Failed: true}, {Harness: "codex", Version: "2.1.4"}})
+	_, _, hs := fieldDrift(cat, tonight, ran, day.Add(24*time.Hour))
+	if h := hs[0]; h.Earlier != "2.1.3" || !strings.Contains(h.headline(), "judged against 2.1.3's earlier nights, its census tonight partial") {
+		t.Errorf("earlier %q, headline %q", h.Earlier, h.headline())
+	}
+}

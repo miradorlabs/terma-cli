@@ -3,7 +3,6 @@ package main
 import (
 	"maps"
 	"slices"
-	"sort"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/e2e"
@@ -58,6 +57,9 @@ type HarnessDrift struct {
 	// Since is the build Removed and Unseen were judged against, where it is not Previous: the
 	// newest older build with a whole census, the ones after it partial.
 	Since string `json:"since,omitempty"`
+	// Earlier is the build judged against, where it was judged by its earlier nights' whole
+	// censuses, its census tonight partial: what it sent only on some of them may read gone.
+	Earlier string `json:"earlier,omitempty"`
 	// Unreached is a build newer than Version that the census should have reached and did
 	// not: Previous, the newest the catalog had (it failed to install, or its tests did not
 	// run), or the newest tonight's census scenarios ran (they failed before its census).
@@ -124,16 +126,6 @@ type GoneSurface struct {
 	In     string      `json:"in,omitempty"`
 	Back   string      `json:"back,omitempty"`
 	Source *SourceSays `json:"source,omitempty"`
-}
-
-// CompatChange is a capability whose result for a build changed, or a build's first failure.
-type CompatChange struct {
-	Harness    string `json:"harness"`
-	Version    string `json:"version"`
-	Platform   string `json:"platform"`
-	Capability string `json:"capability"`
-	From       string `json:"from,omitempty"`
-	To         string `json:"to"`
 }
 
 // Quiet reports a night that took the census of every harness it should have and found
@@ -321,9 +313,15 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran censusRuns, now time.Time)
 				}
 			}
 			// The catalog has every night's whole census of it; the build judged has tonight's.
-			// Where it is censused whole tonight too, it is judged by what it sent tonight, so
-			// a key or surface a build sends only sometimes is not gone for missing one night.
-			if again := sends(since); len(again.keys) > 0 && !ran.failed[harness+"\x00"+since] {
+			// Where it is censused whole tonight too, it is judged by what it sent tonight, one
+			// night against one, so a key or surface it sent on some earlier night alone is not
+			// gone. Where its census tonight is partial, it is judged by its earlier nights, and
+			// the digest says so (Earlier).
+			switch again := sends(since); {
+			case len(again.keys) == 0:
+			case ran.failed[harness+"\x00"+since]:
+				d.Earlier = since
+			default:
 				maps.DeleteFunc(base.keys, func(k string, _ FieldChange) bool { _, ok := again.keys[k]; return !ok })
 				base.surfaces = slices.DeleteFunc(slices.Clone(base.surfaces), func(s string) bool { return !slices.Contains(again.surfaces, s) })
 			}
@@ -406,27 +404,6 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran censusRuns, now time.Time)
 		out = append(out, d)
 	}
 	return len(rows) == 0, missing, out
-}
-
-// compatDrift compares a night's results with the history before they are merged.
-func compatDrift(hist map[string]Entry, rows []e2e.CompatRow) []CompatChange {
-	var out []CompatChange
-	for _, r := range rows {
-		e := Entry{Harness: r.Harness, Version: r.Version, Platform: r.Platform, Capability: r.Capability}
-		prev, ok := hist[e.key()]
-		switch {
-		case r.Result == "not run":
-		case !ok && r.Result == "fail":
-			out = append(out, CompatChange{r.Harness, r.Version, r.Platform, r.Capability, "", r.Result})
-		case ok && prev.Result != "not run" && prev.Result != r.Result:
-			out = append(out, CompatChange{r.Harness, r.Version, r.Platform, r.Capability, prev.Result, r.Result})
-		}
-	}
-	sort.Slice(out, func(i, j int) bool {
-		a, b := out[i], out[j]
-		return a.Harness+a.Version+a.Platform+a.Capability < b.Harness+b.Version+b.Platform+b.Capability
-	})
-	return out
 }
 
 func harnessName(id string) string {

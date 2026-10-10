@@ -67,7 +67,10 @@ func (h HarnessDrift) build(newBuild string) string {
 	case h.Previous != h.Version:
 		notes = append(notes, newBuild+"was "+h.Previous)
 	}
-	if h.Since != "" {
+	switch {
+	case h.Earlier != "":
+		notes = append(notes, "judged against "+h.Earlier+"'s earlier nights, its census tonight partial")
+	case h.Since != "":
 		notes = append(notes, "judged against "+h.Since+", censused whole")
 	}
 	if len(notes) == 0 {
