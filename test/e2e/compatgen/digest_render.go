@@ -208,7 +208,7 @@ func (d Drift) alarms() []string {
 		out = append(out, "No field census reached the digest: the job that takes it failed before writing it, or could not classify it. See the run.")
 	}
 	if len(d.Missing) > 0 {
-		out = append(out, "No census this night of "+strings.Join(d.Missing, ", ")+", censused within the week: its tests did not run, or its exporter sent nothing.")
+		out = append(out, "No census this night of "+strings.Join(d.Missing, ", ")+": censused within the week or run tonight, its tests did not run or failed before the census, or its exporter sent nothing.")
 	}
 	return out
 }

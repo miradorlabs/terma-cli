@@ -416,3 +416,19 @@ func TestHeadlinePlurals(t *testing.T) {
 		t.Errorf("headline = %q, want %q", got, want)
 	}
 }
+
+// A harness whose census scenarios ran and took no census is missing, though the catalog
+// never censused it: one that fails before its census every night is no quiet night.
+func TestDigestSaysAnUncensusedHarnessThatRanIsMissing(t *testing.T) {
+	now := time.Date(2026, 10, 10, 4, 0, 0, 0, time.UTC)
+	var cat Catalog
+	ran := censusRan([]e2e.CompatRow{
+		{Harness: "gemini", Version: "0.64.0", Capability: e2e.CensusCapability, Result: "fail"},
+		{Harness: "codex", Version: "0.162.0", Capability: e2e.CensusCapability, Result: "pass"},
+	})
+	noCensus, missing, _ := fieldDrift(cat, []e2e.FieldRow{field("0.162.0", "logs/codex.api_request", "model", "safe", now)}, ran, now)
+	d := Drift{NoCensus: noCensus, Missing: missing}
+	if !slices.Equal(missing, []string{"Gemini CLI"}) || d.Quiet() {
+		t.Errorf("missing %v, quiet %v", missing, d.Quiet())
+	}
+}

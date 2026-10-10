@@ -250,7 +250,8 @@ would cut a section short. A source that cannot be read leaves its findings unli
 the digest says so. Nothing is read on a night with nothing to link.
 
 It also lists capabilities whose result changed, and says so when the census did not run,
-did not reach a harness censused within the week, or did not reach the newest build: the
+did not reach a harness censused within the week or whose census scenarios ran that night,
+or did not reach the newest build: the
 newest the catalog had, or the newest the night's census scenarios ran (those that prove
 `relay.equivalent`, `e2e.CensusCapability`). A census that did not run never reads as a
 quiet night. The digest goes to the run's summary and to Slack through the

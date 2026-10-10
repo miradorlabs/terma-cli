@@ -24,8 +24,8 @@ type Drift struct {
 	// NoCensus is a night whose runs brought no field census at all: the job that takes it
 	// failed before writing it, or could not classify it.
 	NoCensus bool `json:"no_census,omitempty"`
-	// Missing names the harnesses the catalog took a census of within missingWithin that this
-	// night has none of.
+	// Missing names the harnesses this night has no census of that it should have: those the
+	// catalog took a census of within missingWithin, and those whose census scenarios ran.
 	Missing   []string       `json:"missing,omitempty"`
 	Harnesses []HarnessDrift `json:"harnesses"`
 	// SourceErrors are the builds whose source could not be read, their findings unlinked.
@@ -143,6 +143,13 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran map[string]string, now tim
 	for _, c := range cat.Censuses {
 		if newest, _ := cat.newestCensus(c.Harness); newest.id() == c.id() && now.Sub(c.At) <= missingWithin && byHarness[c.Harness] == nil {
 			missing = append(missing, harnessName(c.Harness))
+		}
+	}
+	// A harness whose census scenarios ran tonight and took none is missing too, censused
+	// before or never: else one that fails before its census every night reads as quiet.
+	for harness := range ran {
+		if byHarness[harness] == nil && !slices.Contains(missing, harnessName(harness)) {
+			missing = append(missing, harnessName(harness))
 		}
 	}
 	slices.Sort(missing)
