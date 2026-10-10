@@ -201,14 +201,16 @@ the instrumentation scope, the resource), with the kinds of value it carried (`t
 `number`, `bool`, `list`, `map`, `bytes`). The workload scenarios' direct runs and
 `TestClaudeInteractiveFields` (the events only an interactive session sends, such as
 `permission_mode_changed`) record it, and the run writes `report/fields.json`. Each key is
-classified by the terma under test, `terma relay classify`, as its relay treats it when a
-project withholds content:
+classified by the terma under test, `terma relay classify`, as its relay treats it where it
+sits (a record, a resource or a span event) when a project withholds content; the relay also
+names the kinds of value it keeps, so the census marks a key withheld from what the relay
+says, never from a rule of its own:
 
 | class | what the relay does |
 |---|---|
 | `safe` | sends it, whatever the policy |
 | `prompt` / `tool_content` | sends it only when the project collects prompts / tool content |
-| `unclassified` | drops it, and counts it, when its value is text; a number or flag passes |
+| `unclassified` | drops it, and counts it, unless it keeps the value's kind: a number or flag on a record, nothing on a resource |
 
 The catalog, `docs/compat/fields.json`, lives beside the compatibility history on the
 `compat-matrix` branch, and `docs/FIELDS.md` renders it: per harness, per surface, each key's
@@ -230,7 +232,7 @@ runs over two nights against a scratch origin. The digest,
 - **removed fields** and **surfaces no longer sent**: what the previous build had and a
   newer one does not, judged only on a newer build, since a re-run of the same build that
   did not reach an error path is no evidence
-- **newly withheld fields**: unclassified keys with text values, which the relay drops;
+- **newly withheld fields**: unclassified keys the relay drops;
   classify each in `internal/relay/allow.go`, an agent's capture rules, or as content. Those
   still withheld from before are one reminder line until they are.
 

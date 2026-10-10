@@ -13,9 +13,10 @@ import (
 
 // newRelayClassifyCommand says what the relay's content policy does with attribute keys, as
 // this terma's relay would: the e2e suite's field catalog classifies every key an agent sends
-// with it. Keys come as a JSON array on stdin ("resource/" prefixes a resource attribute's,
-// "event/<name>/" one on a span event);
-// the answer is a JSON object of key to safe, prompt, tool_content or unclassified.
+// with it. Keys come as a JSON array on stdin, each {"site": "record" | "resource" | "event",
+// "event": <a span event's name>, "key": <the key>}; the answer is an array in the same order,
+// each {"class": "safe" | "prompt" | "tool_content" | "unclassified", "kept": [the kinds of
+// value the key keeps with all content withheld]}.
 func (app *App) newRelayClassifyCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:    "classify",
@@ -27,13 +28,18 @@ func (app *App) newRelayClassifyCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			var keys []string
-			if err := json.Unmarshal(data, &keys); err != nil {
+			var queries []relay.FieldQuery
+			if err := json.Unmarshal(data, &queries); err != nil {
 				return fmt.Errorf("want a JSON array of attribute keys on stdin: %w", err)
+			}
+			for _, q := range queries {
+				if q.Site != relay.SiteRecord && q.Site != relay.SiteResource && q.Site != relay.SiteEvent {
+					return fmt.Errorf("%q sits nowhere the relay knows: %q", q.Key, q.Site)
+				}
 			}
 			enc := json.NewEncoder(cmd.OutOrStdout())
 			enc.SetIndent("", "  ")
-			return enc.Encode(relay.Classify(app.agents.With[shape.Capturer](), keys))
+			return enc.Encode(relay.Classify(app.agents.With[shape.Capturer](), queries))
 		},
 	}
 }

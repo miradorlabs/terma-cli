@@ -27,13 +27,17 @@ func field(version, surface, key, class string, at time.Time, kinds ...string) e
 	if len(kinds) == 0 {
 		kinds = []string{e2e.KindText}
 	}
-	return e2e.FieldRow{Harness: "codex", Version: version, Surface: surface, Key: key, Class: class, Kinds: kinds, Platform: "darwin/arm64", At: at}
+	// Withheld as the relay says of an unclassified key on a record: unless every value is a
+	// number or a flag.
+	withheld := class == "unclassified" && slices.ContainsFunc(kinds, func(k string) bool { return k != e2e.KindNumber && k != e2e.KindBool })
+	return e2e.FieldRow{Harness: "codex", Version: version, Surface: surface, Key: key, Class: class, Kinds: kinds, Withheld: withheld, Platform: "darwin/arm64", At: at}
 }
 
 // A run's census against the catalog: a key no build had is new, a key the previous newest
 // build had on a surface still seen is removed, a surface not seen is said apart, and an
-// unclassified key with text values is withheld while one with only numbers passes. The
-// catalog then has every build each key was seen in.
+// unclassified key with text values is withheld while one with only numbers passes, on a
+// record; on a resource the relay withholds it whatever its value. The catalog then has every
+// build each key was seen in.
 func TestFieldDriftAndCatalog(t *testing.T) {
 	dir := t.TempDir()
 	day1 := time.Date(2026, 10, 9, 4, 0, 0, 0, time.UTC)
@@ -48,7 +52,15 @@ func TestFieldDriftAndCatalog(t *testing.T) {
 	if err := run(c, day1); err != nil {
 		t.Fatal(err)
 	}
+	// The census takes withholding from `terma relay classify`, which keeps no kind of value of
+	// an unclassified resource attribute.
+	pid := func(at time.Time) e2e.FieldRow {
+		r := field("0.162.0", "resource", "process.parent_pid", "unclassified", at, e2e.KindNumber)
+		r.Withheld = true
+		return r
+	}
 	c.fieldRuns = []string{writeFieldRun(t, dir, "f2.json", []e2e.FieldRow{
+		pid(day2),
 		field("0.162.0", "logs/codex.api_request", "model", "safe", day2),
 		field("0.162.0", "logs/codex.api_request", "product_sku", "unclassified", day2),
 		field("0.162.0", "logs/codex.api_request", "turn_count", "unclassified", day2, e2e.KindNumber),
@@ -78,17 +90,18 @@ func TestFieldDriftAndCatalog(t *testing.T) {
 	if h.Version != "0.162.0" || h.Previous != "0.161.0" {
 		t.Errorf("builds %s, previous %s", h.Version, h.Previous)
 	}
-	if got := keys(h.Added); !slices.Equal(got, []string{"product_sku", "turn_count"}) {
+	if got := keys(h.Added); !slices.Equal(got, []string{"product_sku", "turn_count", "process.parent_pid"}) {
 		t.Errorf("added %v", got)
 	}
 	if got := keys(h.Removed); !slices.Equal(got, []string{"old_key"}) {
 		t.Errorf("removed %v", got)
 	}
-	if got := keys(h.Withheld); !slices.Equal(got, []string{"product_sku"}) {
-		t.Errorf("withheld %v: an unclassified number passes", got)
+	if got := keys(h.Withheld); !slices.Equal(got, []string{"product_sku", "process.parent_pid"}) {
+		t.Errorf("withheld %v: an unclassified number passes on a record, not on a resource", got)
 	}
 	// The next night, the same key withheld is a reminder, not a change.
 	c.fieldRuns = []string{writeFieldRun(t, dir, "f3.json", []e2e.FieldRow{
+		pid(day2.Add(24 * time.Hour)),
 		field("0.162.0", "logs/codex.api_request", "model", "safe", day2.Add(24*time.Hour)),
 		field("0.162.0", "logs/codex.api_request", "product_sku", "unclassified", day2.Add(24*time.Hour)),
 		field("0.162.0", "logs/codex.api_request", "turn_count", "unclassified", day2.Add(24*time.Hour), e2e.KindNumber),
@@ -101,7 +114,7 @@ func TestFieldDriftAndCatalog(t *testing.T) {
 	if err := json.Unmarshal(data, &next); err != nil {
 		t.Fatal(err)
 	}
-	if n := next.Harnesses[0]; len(n.Withheld) != 0 || !slices.Equal(keys(n.StillWithheld), []string{"product_sku"}) || !next.Quiet() {
+	if n := next.Harnesses[0]; len(n.Withheld) != 0 || !slices.Equal(keys(n.StillWithheld), []string{"product_sku", "process.parent_pid"}) || !next.Quiet() {
 		t.Errorf("the next night: withheld %v, still %v, quiet %v", keys(n.Withheld), keys(n.StillWithheld), next.Quiet())
 	}
 	if !slices.Equal(h.Unseen, []string{"metrics/codex.turn.e2e_duration_ms"}) {
@@ -118,7 +131,7 @@ func TestFieldDriftAndCatalog(t *testing.T) {
 		}
 	}
 	md, _ := os.ReadFile(c.fieldsMD)
-	for _, want := range []string{"## Codex CLI", "`product_sku` | **unclassified · withheld**", "`old_key` | safe | text | 0.161.0 | **no** (last 0.161.0)"} {
+	for _, want := range []string{"## Codex CLI", "`product_sku` | **unclassified · withheld**", "`process.parent_pid` | **unclassified · withheld** | number", "`old_key` | safe | text | 0.161.0 | **no** (last 0.161.0)"} {
 		if !strings.Contains(string(md), want) {
 			t.Errorf("FIELDS.md lacks %q:\n%s", want, md)
 		}
@@ -271,8 +284,8 @@ func TestCatalogKeepsWhatItsCensusesSaw(t *testing.T) {
 	if _, ok := keys["gone_key"]; ok {
 		t.Error("a key no kept census saw is still in the catalog")
 	}
-	if f := keys["turns"]; !slices.Equal(f.Kinds, []string{e2e.KindNumber}) || withheldUnclassified(f.Class, f.Kinds) {
-		t.Errorf("turns: kinds %v, withheld %v: the newest build sends a number", f.Kinds, withheldUnclassified(f.Class, f.Kinds))
+	if f := keys["turns"]; !slices.Equal(f.Kinds, []string{e2e.KindNumber}) || f.Withheld {
+		t.Errorf("turns: kinds %v, withheld %v: the newest build sends a number", f.Kinds, f.Withheld)
 	}
 }
 
@@ -305,30 +318,41 @@ func TestDigestEscapesWhatHarnessesName(t *testing.T) {
 
 // A night that changed everything is still one message Slack takes: at most 50 blocks, the
 // sections' text within the budget, and a line saying what was left for the run's summary.
+// Many small changes meet the block limit first, a few long ones the budget.
 func TestSlackDigestFitsOneMessage(t *testing.T) {
-	d := Drift{GeneratedAt: time.Date(2026, 10, 10, 4, 0, 0, 0, time.UTC), Link: "https://ci/run/3"}
-	for i := range 80 {
-		h := HarnessDrift{Harness: fmt.Sprint("h", i), Name: fmt.Sprint("Harness ", i), Version: "2", Previous: "1"}
-		for k := range 40 {
-			h.Added = append(h.Added, FieldChange{Surface: "logs/" + strings.Repeat("s", 40), Key: fmt.Sprint("key_", k)})
+	for _, c := range []struct {
+		name            string
+		harnesses, keys int
+		blocksFull      bool
+	}{
+		{"many short", 80, 1, true},
+		{"few long", 20, 40, false},
+	} {
+		d := Drift{GeneratedAt: time.Date(2026, 10, 10, 4, 0, 0, 0, time.UTC), Link: "https://ci/run/3"}
+		for i := range c.harnesses {
+			h := HarnessDrift{Harness: fmt.Sprint("h", i), Name: fmt.Sprint("Harness ", i), Version: "2", Previous: "1"}
+			for k := range c.keys {
+				f := FieldChange{Surface: "logs/" + strings.Repeat("s", 150), Key: fmt.Sprint("key_", k)}
+				h.Added, h.Removed = append(h.Added, f), append(h.Removed, f)
+			}
+			d.Harnesses = append(d.Harnesses, h)
 		}
-		d.Harnesses = append(d.Harnesses, h)
-	}
-	payload := d.slack()
-	blocks := payload["blocks"].([]map[string]any)
-	size := 0
-	for _, b := range blocks {
-		if b["type"] == "section" {
-			size += len(b["text"].(map[string]any)["text"].(string))
+		payload := d.slack()
+		blocks := payload["blocks"].([]map[string]any)
+		size := 0
+		for _, b := range blocks {
+			if b["type"] == "section" {
+				size += len(b["text"].(map[string]any)["text"].(string))
+			}
 		}
-	}
-	if len(blocks) > maxBlocks || size > slackBudget+sectionLimit {
-		t.Errorf("%d blocks, %d characters of section text", len(blocks), size)
-	}
-	data, _ := json.Marshal(payload)
-	for _, want := range []string{"more, too long for one message", "https://ci/run/3", "Harness 0 2 (was 1)"} {
-		if !strings.Contains(string(data), want) {
-			t.Errorf("slack payload lacks %q", want)
+		if len(blocks) > maxBlocks || size > slackBudget+sectionLimit || (len(blocks) == maxBlocks) != c.blocksFull {
+			t.Errorf("%s: %d blocks, %d characters of section text", c.name, len(blocks), size)
+		}
+		data, _ := json.Marshal(payload)
+		for _, want := range []string{"more, too long for one message", "https://ci/run/3", "Harness 0 2 (was 1)"} {
+			if !strings.Contains(string(data), want) {
+				t.Errorf("%s: slack payload lacks %q", c.name, want)
+			}
 		}
 	}
 }

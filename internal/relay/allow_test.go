@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
@@ -35,7 +36,12 @@ func TestClassificationCoversTheGoldens(t *testing.T) {
 		}
 		for surface, keys := range surfaces {
 			for _, k := range keys {
-				if testRules.classify(k) == FieldUnclassified {
+				// The goldens name a resource attribute "resource/<key>".
+				q := FieldQuery{Site: SiteRecord, Key: k}
+				if key, ok := strings.CutPrefix(k, "resource/"); ok {
+					q = FieldQuery{Site: SiteResource, Key: key}
+				}
+				if testRules.classify(q) == FieldUnclassified {
 					t.Errorf("%s %s: %q is unclassified", filepath.Base(f), surface, k)
 				}
 			}

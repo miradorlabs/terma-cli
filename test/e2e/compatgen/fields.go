@@ -44,6 +44,9 @@ type FieldEntry struct {
 	// Class is what the relay of the latest run that saw it does with it.
 	Class string   `json:"class"`
 	Kinds []string `json:"kinds"`
+	// Withheld is an unclassified key the relay drops under a policy that withholds content,
+	// as the latest run that saw it says.
+	Withheld bool `json:"withheld,omitempty"`
 	// FirstSeen is the oldest build the catalog saw it in; Versions the newest it was seen in,
 	// newest first, at most keepVersions.
 	FirstSeen string   `json:"first_seen"`
@@ -82,7 +85,7 @@ func mergeFields(cat *Catalog, rows []e2e.FieldRow) {
 		e := FieldEntry{Harness: r.Harness, Surface: r.Surface, Key: r.Key}
 		f, ok := fields[e.id()]
 		if !ok {
-			f = &FieldEntry{Harness: r.Harness, Surface: r.Surface, Key: r.Key, FirstSeen: r.Version, Kinds: slices.Clone(r.Kinds), Class: r.Class}
+			f = &FieldEntry{Harness: r.Harness, Surface: r.Surface, Key: r.Key, FirstSeen: r.Version, Kinds: slices.Clone(r.Kinds), Class: r.Class, Withheld: r.Withheld}
 			added = append(added, f)
 			fields[e.id()] = f
 		}
@@ -98,13 +101,14 @@ func mergeFields(cat *Catalog, rows []e2e.FieldRow) {
 			sortVersionsDesc(f.Versions)
 			f.Versions = f.Versions[:min(len(f.Versions), keepVersions)]
 		}
-		// The kinds and class are the newest build's: a key an old build sent as text and a
-		// new one as a number is no longer withheld.
+		// The kinds, class and withholding are the newest build's: a key an old build sent as
+		// text and a new one as a number is no longer withheld.
 		switch {
 		case f.Versions[0] != r.Version:
 		case newest != r.Version:
-			f.Kinds, f.Class = slices.Clone(r.Kinds), r.Class
+			f.Kinds, f.Class, f.Withheld = slices.Clone(r.Kinds), r.Class, r.Withheld
 		default:
+			f.Withheld = f.Withheld || r.Withheld
 			for _, k := range r.Kinds {
 				if !slices.Contains(f.Kinds, k) {
 					f.Kinds = append(f.Kinds, k)
@@ -230,12 +234,6 @@ var classLabel = map[string]string{
 	"":             "?",
 }
 
-// withheldUnclassified reports a key the relay drops as unclassified: one with a value that
-// is text. An unclassified number or flag passes.
-func withheldUnclassified(class string, kinds []string) bool {
-	return class == "unclassified" && slices.ContainsFunc(kinds, func(k string) bool { return k != e2e.KindNumber && k != e2e.KindBool })
-}
-
 func renderFields(cat Catalog, now time.Time) string {
 	var b strings.Builder
 	b.WriteString("# Harness telemetry fields\n\n")
@@ -244,7 +242,7 @@ func renderFields(cat Catalog, now time.Time) string {
 	b.WriteString(" the instrumentation scope, the resource), with the kinds of value it carried, and what terma's relay does with it when a project withholds content.")
 	fmt.Fprintf(&b, " Last generated %s. Do not edit by hand: the catalog is `docs/compat/fields.json`, beside this file on the compat-matrix branch.\n\n", now.Format("2006-01-02"))
 	b.WriteString("**safe** leaves whatever the policy · **prompt** / **tool content** leave only when the project collects them · ")
-	b.WriteString("**unclassified** is withheld when its value is text, and counted, until it is classified in `internal/relay` or an agent's capture rules.\n\n")
+	b.WriteString("**unclassified** is withheld, and counted, until it is classified in `internal/relay` or an agent's capture rules: on a record whenever its value is not a number or a flag, on a resource whatever its value.\n\n")
 	byHarness := map[string][]FieldEntry{}
 	for _, f := range cat.Fields {
 		byHarness[f.Harness] = append(byHarness[f.Harness], f)
@@ -259,7 +257,7 @@ func renderFields(cat Catalog, now time.Time) string {
 		for _, f := range byHarness[h.ID] {
 			if slices.Contains(f.Versions, newest.Version) {
 				keys++
-				if withheldUnclassified(f.Class, f.Kinds) {
+				if f.Withheld {
 					withheld++
 				}
 			}
@@ -284,7 +282,7 @@ func renderFields(cat Catalog, now time.Time) string {
 					in = "**no** (last " + f.Versions[0] + ")"
 				}
 				class := classLabel[f.Class]
-				if withheldUnclassified(f.Class, f.Kinds) {
+				if f.Withheld {
 					class = "**unclassified · withheld**"
 				}
 				fmt.Fprintf(&b, "| `%s` | %s | %s | %s | %s |\n", tableCell(f.Key), class, strings.Join(f.Kinds, ", "), f.FirstSeen, in)

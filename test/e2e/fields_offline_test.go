@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"encoding/json"
 	"errors"
 	"io/fs"
 	"maps"
@@ -139,5 +140,41 @@ func TestAnUnclassifiedCensusLeavesNoEarlierOne(t *testing.T) {
 	}
 	if _, err := os.Stat(path); !errors.Is(err, fs.ErrNotExist) {
 		t.Fatalf("the earlier census is still there: %v", err)
+	}
+}
+
+// The census takes each key's class and withholding from `terma relay classify`, as structured
+// queries: a number on a resource is withheld when the relay keeps no kind of value there.
+func TestCensusTakesWithholdingFromTheRelay(t *testing.T) {
+	fieldsMu.Lock()
+	clear(fieldSeen)
+	fieldSeen[fieldID{"opencode", "1.2.3", "resource", "process.parent_pid"}] = map[string]bool{KindNumber: true}
+	fieldsMu.Unlock()
+	t.Cleanup(func() { fieldsMu.Lock(); clear(fieldSeen); fieldsMu.Unlock() })
+	dir := t.TempDir()
+	// A terma that checks the one query it is asked, and keeps nothing of it.
+	terma := filepath.Join(dir, "terma")
+	script := `#!/bin/sh
+[ "$1" = --version ] && { echo "terma 9.9.9"; exit 0; }
+in=$(cat)
+[ "$in" = '[{"site":"resource","key":"process.parent_pid"}]' ] || { echo "unexpected query: $in" >&2; exit 1; }
+echo '[{"class": "unclassified", "kept": []}]'
+`
+	if err := os.WriteFile(terma, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteFields(dir, terma); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "fields.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rows []FieldRow
+	if err := json.Unmarshal(data, &rows); err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || rows[0].Class != "unclassified" || !rows[0].Withheld || rows[0].Terma != "terma 9.9.9" {
+		t.Errorf("census = %+v", rows)
 	}
 }

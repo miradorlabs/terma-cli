@@ -175,8 +175,8 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, now time.Time) (noCensus bool,
 					d.Added = append(d.Added, c)
 				}
 			}
-			if withheldUnclassified(r.Class, r.Kinds) {
-				if prev, ok := known[FieldEntry{Harness: harness, Surface: r.Surface, Key: r.Key}.id()]; ok && withheldUnclassified(prev.Class, prev.Kinds) {
+			if r.Withheld {
+				if prev, ok := known[FieldEntry{Harness: harness, Surface: r.Surface, Key: r.Key}.id()]; ok && prev.Withheld {
 					d.StillWithheld = append(d.StillWithheld, c)
 				} else {
 					d.Withheld = append(d.Withheld, c)

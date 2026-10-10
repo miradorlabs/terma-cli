@@ -38,8 +38,9 @@ import (
 // "traces/<span>/links", "metrics/<metric>" or "metrics/<metric>/exemplars": everywhere the
 // relay applies the content policy.
 
-// Value kinds. The relay keeps an unclassified key whose every value is a number or a
-// boolean, so only "text" makes an unclassified key a loss.
+// Value kinds, as `terma relay classify` names them in the kinds a key keeps. Where an
+// unclassified key keeps any, on a record, they are numbers and booleans: what cannot carry
+// what was said.
 const (
 	KindText   = "text"
 	KindNumber = "number"
@@ -51,12 +52,15 @@ const (
 
 // FieldRow is one key one harness build emitted on one surface, in one run.
 type FieldRow struct {
-	Harness  string    `json:"harness"`
-	Version  string    `json:"version"`
-	Surface  string    `json:"surface"`
-	Key      string    `json:"key"`
-	Kinds    []string  `json:"kinds"`
-	Class    string    `json:"class,omitempty"` // safe | prompt | tool_content | unclassified
+	Harness string   `json:"harness"`
+	Version string   `json:"version"`
+	Surface string   `json:"surface"`
+	Key     string   `json:"key"`
+	Kinds   []string `json:"kinds"`
+	Class   string   `json:"class,omitempty"` // safe | prompt | tool_content | unclassified
+	// Withheld is an unclassified key the relay drops under a policy that withholds content:
+	// one with a kind of value it does not keep where the key sits.
+	Withheld bool      `json:"withheld,omitempty"`
 	Platform string    `json:"platform"`
 	Terma    string    `json:"terma,omitempty"`
 	At       time.Time `json:"at"`
@@ -249,12 +253,12 @@ func WriteFields(dir, terma string) error {
 	fieldsMu.Lock()
 	rows := make([]FieldRow, 0, len(fieldSeen))
 	now := time.Now().UTC()
-	platform := runtime.GOOS + "/" + runtime.GOARCH
-	keys := map[string]bool{}
+	platform, version := runtime.GOOS+"/"+runtime.GOARCH, Version(terma)
+	queries := map[classQuery]bool{}
 	for id, kinds := range fieldSeen {
 		rows = append(rows, FieldRow{Harness: id.harness, Version: id.version, Surface: id.surface, Key: id.key,
-			Kinds: slices.Sorted(maps.Keys(kinds)), Platform: platform, Terma: Version(terma), At: now})
-		keys[classKey(id.surface, id.key)] = true
+			Kinds: slices.Sorted(maps.Keys(kinds)), Platform: platform, Terma: version, At: now})
+		queries[queryFor(id.surface, id.key)] = true
 	}
 	fieldsMu.Unlock()
 	// No census from an earlier run stays for `make drift` to take for this one's, whether this
@@ -266,16 +270,14 @@ func WriteFields(dir, terma string) error {
 	if len(rows) == 0 {
 		return nil
 	}
-	classes, err := classify(terma, slices.Sorted(maps.Keys(keys)))
+	verdicts, err := classify(terma, slices.Collect(maps.Keys(queries)))
 	if err != nil {
 		return fmt.Errorf("classify the census with %s: %w", terma, err)
 	}
 	for i := range rows {
-		c, ok := classes[classKey(rows[i].Surface, rows[i].Key)]
-		if !ok {
-			return fmt.Errorf("%s classified no %q", terma, rows[i].Key)
-		}
-		rows[i].Class = c
+		v := verdicts[queryFor(rows[i].Surface, rows[i].Key)]
+		rows[i].Class = v.Class
+		rows[i].Withheld = v.Class == "unclassified" && slices.ContainsFunc(rows[i].Kinds, func(k string) bool { return !slices.Contains(v.Kept, k) })
 	}
 	sort.Slice(rows, func(i, j int) bool {
 		a, b := rows[i], rows[j]
@@ -291,27 +293,54 @@ func WriteFields(dir, terma string) error {
 	return os.WriteFile(path, append(data, '\n'), 0o644)
 }
 
-// classKey is the key as `terma relay classify` takes it: a resource attribute's and a span
-// event's prefixed, since the relay treats each by where it is.
-func classKey(surface, key string) string {
+// classQuery is a key as `terma relay classify` takes it: where it sits, as the relay's
+// content policy tells them apart (a resource, a span event, or a record, as it treats every
+// other surface), and the span event's name.
+type classQuery struct {
+	Site  string `json:"site"`
+	Event string `json:"event,omitempty"`
+	Key   string `json:"key"`
+}
+
+func queryFor(surface, key string) classQuery {
 	if surface == "resource" {
-		return "resource/" + key
+		return classQuery{Site: "resource", Key: key}
 	}
 	if _, event, ok := strings.Cut(surface, "/events/"); ok && strings.HasPrefix(surface, "traces/") {
-		return "event/" + event + "/" + key
+		return classQuery{Site: "event", Event: event, Key: key}
 	}
-	return key
+	return classQuery{Site: "record", Key: key}
+}
+
+// verdict is what `terma relay classify` says of a key: its class, and the kinds of value it
+// keeps with all content withheld.
+type verdict struct {
+	Class string   `json:"class"`
+	Kept  []string `json:"kept"`
 }
 
 // classify asks the terma at path what its relay does with each key.
-func classify(terma string, keys []string) (map[string]string, error) {
-	in, _ := json.Marshal(keys)
+func classify(terma string, queries []classQuery) (map[classQuery]verdict, error) {
+	in, err := json.Marshal(queries)
+	if err != nil {
+		return nil, err
+	}
 	cmd := exec.Command(terma, "relay", "classify")
 	cmd.Stdin = bytes.NewReader(in)
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, err
 	}
-	classes := map[string]string{}
-	return classes, json.Unmarshal(out, &classes)
+	var verdicts []verdict
+	if err := json.Unmarshal(out, &verdicts); err != nil {
+		return nil, err
+	}
+	if len(verdicts) != len(queries) {
+		return nil, fmt.Errorf("%d verdicts for %d keys", len(verdicts), len(queries))
+	}
+	byQuery := make(map[classQuery]verdict, len(queries))
+	for i, q := range queries {
+		byQuery[q] = verdicts[i]
+	}
+	return byQuery, nil
 }
