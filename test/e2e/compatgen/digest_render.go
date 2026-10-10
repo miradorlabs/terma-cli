@@ -25,15 +25,21 @@ func (h HarnessDrift) headline() string {
 		build += " (was " + h.Previous + ")"
 	}
 	var parts []string
+	// Each says its plural, which is not always its last word's.
 	for _, p := range []struct {
-		n    int
-		what string
+		n         int
+		one, many string
 	}{
-		{len(h.NewSurfaces), "new surface"}, {len(h.Added), "new field"}, {len(h.Removed), "removed field"},
-		{len(h.Unseen), "surface no longer sent"}, {len(h.Withheld), "newly withheld field"},
+		{len(h.NewSurfaces), "new surface", "new surfaces"}, {len(h.Added), "new field", "new fields"},
+		{len(h.Removed), "removed field", "removed fields"},
+		{len(h.Unseen), "surface no longer sent", "surfaces no longer sent"},
+		{len(h.Withheld), "newly withheld field", "newly withheld fields"},
 	} {
-		if p.n > 0 {
-			parts = append(parts, plural(p.n, p.what))
+		switch {
+		case p.n == 1:
+			parts = append(parts, "1 "+p.one)
+		case p.n > 1:
+			parts = append(parts, fmt.Sprintf("%d %s", p.n, p.many))
 		}
 	}
 	if len(parts) == 0 {
@@ -42,6 +48,7 @@ func (h HarnessDrift) headline() string {
 	return h.Name + " " + build + ": " + strings.Join(parts, ", ")
 }
 
+// plural counts n of a noun that takes an "s".
 func plural(n int, what string) string {
 	if n == 1 {
 		return "1 " + what

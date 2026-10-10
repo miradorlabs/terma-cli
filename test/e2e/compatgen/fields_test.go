@@ -379,3 +379,13 @@ func TestSlackDigestFitsOneMessage(t *testing.T) {
 		}
 	}
 }
+
+// A headline counts each change in its own plural: "surfaces no longer sent", not "surface no
+// longer sents".
+func TestHeadlinePlurals(t *testing.T) {
+	h := HarnessDrift{Name: "Codex CLI", Version: "0.162.1", Previous: "0.162.0", Unseen: []string{"a", "b"},
+		Added: []FieldChange{{Key: "k"}}, Withheld: []FieldChange{{Key: "k"}, {Key: "l"}}}
+	if got, want := h.headline(), "Codex CLI 0.162.1 (was 0.162.0): 1 new field, 2 surfaces no longer sent, 2 newly withheld fields"; got != want {
+		t.Errorf("headline = %q, want %q", got, want)
+	}
+}
