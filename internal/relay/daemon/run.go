@@ -83,6 +83,13 @@ func (r Result) ExitBeat() {
 	}
 }
 
+// LastBeatDue reports whether the relay's caller sends the last heartbeat (ExitBeat), which
+// can take seconds. A relay a hook or a developer started does, whatever stopped it. The
+// service's does not: its manager starts the next relay only once this process exits, and
+// nothing listens until then, whatever the reason; its counters since the last beat stay in
+// stats.json.
+func (r Result) LastBeatDue() bool { return !r.Service }
+
 // Restart reports whether whatever runs the relay should start it again.
 func (r Result) Restart() bool {
 	return r.Replaced || r.Updated || r.Service && !r.SetupGone && !r.AlreadyRunning
@@ -117,7 +124,11 @@ func Run(ctx context.Context, c Config) (Result, error) {
 		poll = followPoll
 		followWaiting()
 	}
-	unlock, busy, err := lock(lockCtx, dir, poll)
+	marker := ""
+	if res.Service {
+		marker = ServiceWaitFile
+	}
+	unlock, busy, err := lock(lockCtx, dir, poll, marker)
 	// Whether it took over or gave up, the next relay to make way gets its own follower.
 	unfollow()
 	if err != nil {
@@ -326,33 +337,6 @@ func RunningRelay(dir string) (RunInfo, bool) {
 	return info, true
 }
 
-// lockPoll is how often the service's relay retries a lock another relay holds, and
-// followPoll a following relay's: nothing listens between that relay's exit and the retry,
-// and a follower is there for that moment alone, so its wait is shorter still.
-const (
-	lockPoll   = 250 * time.Millisecond
-	followPoll = 25 * time.Millisecond
-)
-
-// lock takes the single-instance lock, retrying every poll while another relay holds it
-// (never, with poll 0); a nil unlock means this relay must not run.
-func lock(ctx context.Context, dir string, poll time.Duration) (unlock func(), busy bool, err error) {
-	path := filepath.Join(dir, LockFile)
-	unlock, err = flock.TryLock(path)
-	for poll > 0 && flock.IsBusy(err) {
-		select {
-		case <-ctx.Done():
-			return nil, false, nil
-		case <-time.After(poll):
-		}
-		unlock, err = flock.TryLock(path)
-	}
-	if flock.IsBusy(err) {
-		return nil, true, nil
-	}
-	return unlock, false, err
-}
-
 // listen writes a failure where status reads it, since a hook-started relay has nowhere to print.
 func listen(dir, addr string) (net.Listener, error) {
 	ln, err := net.Listen("tcp", addr)
@@ -364,18 +348,6 @@ func listen(dir, addr string) (net.Listener, error) {
 	_ = os.Remove(filepath.Join(dir, ErrorFile))
 	return ln, nil
 }
-
-// replacedMaxWait bounds how long a relay asked to make way waits for its hold to empty:
-// the default hold, so an agent exporting without pause cannot keep the old terma running.
-var replacedMaxWait = relay.DefaultHold
-
-// followSlack is how long a following relay waits beyond replacedMaxWait, for the relay
-// making way to deliver what it accepted and let go of its lock.
-const followSlack = 30 * time.Second
-
-// followWaiting runs once a following relay holds FollowLockFile and starts to wait; tests
-// learn of it here, since probing the lock themselves would make the follower give way.
-var followWaiting = func() {}
 
 // watch waits for a reason to stop. A relay that installed a newer terma stops once Quiesce
 // finds its hold empty, no export in flight and none for updateQuiet (for none at all after

@@ -735,8 +735,12 @@ attributes:
     brief: How many of each thing the relay counted since the previous heartbeat that carried counters, one attribute per counter.
     note: >-
       Aggregate, content-free health: records received, forwarded and dropped for each reason,
-      and heartbeats sent and failed, each a delta since the last beat that carried counters,
-      so summing a relay's beats gives its totals. The key's suffix is the relay's own counter
+      and heartbeats sent and failed, each a delta since the last beat that carried counters
+      (a failed beat's go with the next), so a relay's beats sum to what it counted up to its
+      last delivered beat. A relay a hook or a developer started sends a last beat as it
+      stops; the service's relay, which its manager restarts only once it exits, a killed
+      relay, and a last beat that fails leave the rest in the relay's stats.json. The key's
+      suffix is the relay's own counter
       name, every one pinned in internal/relay/counter_names_test.go, e.g.
       `terma.relay.heartbeat.counter.dropped.unclaimed_expired.logs`;
       the attributes the content policy met unclassified leave only as their total,

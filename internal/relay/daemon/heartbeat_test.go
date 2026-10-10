@@ -164,3 +164,20 @@ func TestARelayWhoseSetupWentSendsNoExitHeartbeat(t *testing.T) {
 		t.Fatalf("%d beats after teardown, want none", n)
 	}
 }
+
+// The caller sends the last heartbeat of a relay a hook or a developer started, whatever
+// stopped it, and never the service's: its manager starts the next relay only once the
+// process exits, and nothing listens until then.
+func TestLastBeatDue(t *testing.T) {
+	for _, tc := range []struct {
+		res  Result
+		want bool
+	}{
+		{Result{}, true}, {Result{Replaced: true}, true}, {Result{Updated: true}, true},
+		{Result{Service: true}, false}, {Result{Service: true, Replaced: true}, false}, {Result{Service: true, Updated: true}, false},
+	} {
+		if got := tc.res.LastBeatDue(); got != tc.want {
+			t.Errorf("%+v.LastBeatDue() = %v, want %v", tc.res, got, tc.want)
+		}
+	}
+}

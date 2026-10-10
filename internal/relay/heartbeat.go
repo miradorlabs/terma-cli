@@ -20,8 +20,10 @@ import (
 // started the relay on its resource, timestamped when sent; it goes through HeartbeatSend,
 // never the outbox, and a failed beat is not kept. Its terma.relay.heartbeat.reason says why
 // it was sent. Every beat carries the counters since the previous one as
-// terma.relay.heartbeat.counter.<name> ints, so a relay's beats sum to everything it
-// counted; the last, as the relay stops, also says why it stopped.
+// terma.relay.heartbeat.counter.<name> ints, and a failed beat hands its counters to the
+// next. The last, sent as a relay a hook or a developer started stops, also says why; the
+// service's relay sends none (daemon.Result.LastBeatDue). So a relay's beats sum to what it
+// counted up to its last delivered beat; what came after stays in its stats.json.
 
 const (
 	// HeartbeatService is the heartbeat's service.name.

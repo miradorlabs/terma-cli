@@ -1,11 +1,13 @@
 package daemon
 
 import (
+	"path/filepath"
 	"slices"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 )
 
@@ -29,21 +31,31 @@ func followed(t *testing.T) func() []string {
 
 // A relay asked to make way is followed by the relay that takes its place, since the earlier
 // release stepping aside starts none; not when the service manager starts the next, as it
-// does the service's relay, and as a service that runs this terma does from the lock.
+// does the service's relay, nor when a service of this terma waits for the lock already. A
+// service that is installed but not waiting (booted out, or past its start limit) is no
+// successor.
 func TestASupersededRelayIsFollowedUnlessTheServiceTakesOver(t *testing.T) {
 	for _, tc := range []struct {
-		name              string
-		service, runsThis bool
-		followed          bool
+		name                       string
+		service, runsThis, waiting bool
+		followed                   bool
 	}{
-		{"hook relay, no service of this terma", false, false, true},
-		{"hook relay, a service of this terma", false, true, false},
-		{"service relay", true, true, false},
+		{"hook relay, no service of this terma", false, false, false, true},
+		{"hook relay, a service of this terma, not waiting", false, true, false, true},
+		{"hook relay, a service of this terma waiting", false, true, true, false},
+		{"service relay", true, true, false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			runsThis(t, tc.runsThis)
 			calls := followed(t)
 			stateDir, dir, _ := setUpRelay(t)
+			if tc.waiting {
+				unmark, err := flock.TryLock(filepath.Join(dir, ServiceWaitFile))
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(unmark)
+			}
 			c := runConfig(stateDir, 0, nil)
 			c.Version, c.Service = "1.2.0", tc.service
 			r := startRun(t, c)
@@ -104,7 +116,31 @@ func TestAFollowerTakesOverOnceTheRelayIsGone(t *testing.T) {
 	}
 	gone := time.Now()
 	follower.await(t, "the follower")
-	if took := time.Since(gone); took > time.Second {
+	// It polls every followPoll; the rest is starting to listen.
+	if took := time.Since(gone); took > 300*time.Millisecond {
 		t.Errorf("the follower listened %v after the relay it follows was gone", took)
+	}
+}
+
+// The service's relay holds ServiceWaitFile while it waits for another relay's lock, and lets
+// go once it runs: that is how Supersede knows it will take over.
+func TestAWaitingServiceRelayMarksItself(t *testing.T) {
+	stateDir, dir, _ := setUpRelay(t)
+	unlock, err := flock.TryLock(filepath.Join(dir, LockFile)) // another relay runs
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := runConfig(stateDir, 0, nil)
+	c.Service = true
+	r := startRun(t, c)
+	for deadline := time.Now().Add(5 * time.Second); !serviceWaiting(dir); time.Sleep(20 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("the waiting service relay never marked itself")
+		}
+	}
+	unlock()
+	r.await(t, "the service relay")
+	if serviceWaiting(dir) {
+		t.Error("the service relay still marks itself waiting once it runs")
 	}
 }

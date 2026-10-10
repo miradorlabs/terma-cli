@@ -28,7 +28,10 @@ const (
 	// FollowLockFile is held by the one relay waiting to take over from a relay asked to
 	// make way (Config.Follow).
 	FollowLockFile = "follow.lock"
-	NoServiceFile  = "no-service"
+	// ServiceWaitFile is held by the service's relay while it waits for another relay's lock,
+	// so Supersede knows it will take over and starts no follower.
+	ServiceWaitFile = "service-wait.lock"
+	NoServiceFile   = "no-service"
 	// EnvFile is the environment every relay of this state directory runs in (RecordEnv).
 	EnvFile = "env.json"
 	// RunFile describes the running relay, its pid included (RunningRelay).

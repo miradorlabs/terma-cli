@@ -106,9 +106,10 @@ func Spawn(stateDir, version string) {
 // every hook. A newer relay is left alone, so two installs never take turns.
 //
 // What takes the place of the relay making way: for the service's, the service manager, and
-// for any other, the service's relay when one of this terma waits for the lock already, or
-// else the follower Supersede starts. The relay making way is the earlier release and starts
-// nothing itself, and an agent exporting before the next hook would find nothing listening.
+// for any other, the service's relay when one of this terma waits for the lock already (it
+// holds ServiceWaitFile), or else the follower Supersede starts. The relay making way is the
+// earlier release and starts nothing itself, and an agent exporting before the next hook
+// would find nothing listening.
 func Supersede(stateDir, version string) {
 	dir := claim.Dir(stateDir)
 	running, ok := RunningRelay(dir)
@@ -121,9 +122,18 @@ func Supersede(stateDir, version string) {
 		return
 	}
 	_ = config.WriteFileAtomicNoSync(filepath.Join(dir, ReplaceFile), []byte(strconv.Itoa(running.PID)+"\n"), 0o600)
-	if !service && !ours {
+	if !service && (!ours || !serviceWaiting(dir)) {
 		follow(dir)
 	}
+}
+
+// serviceWaiting reports whether the service's relay waits for the lock in dir (ServiceWaitFile).
+func serviceWaiting(dir string) bool {
+	unlock, err := flock.TryLock(filepath.Join(dir, ServiceWaitFile))
+	if err == nil {
+		unlock()
+	}
+	return flock.IsBusy(err)
 }
 
 // follow starts the relay that waits to take over from the one asked to make way, unless

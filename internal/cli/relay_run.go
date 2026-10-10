@@ -56,7 +56,7 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 				},
 			})
 			if err != nil {
-				if lastBeatDue(res) {
+				if res.LastBeatDue() {
 					res.ExitBeat()
 				}
 				return err
@@ -90,26 +90,18 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 // that updated itself starts its successor now that its lock is free, since an agent may
 // export before the next hook (unless teardown removed its setup meanwhile), and one replaced
 // by a newer terma is followed by the relay Supersede started. The last heartbeat goes once
-// that successor is under way (lastBeatDue).
+// that successor is under way (Result.LastBeatDue).
 func (app *App) afterRelay(res daemon.Result) error {
 	if res.Updated && !res.Service && !res.SetupGone {
 		app.spawnRelay(app.stateDir, app.version)
 	}
-	if lastBeatDue(res) {
+	if res.LastBeatDue() {
 		res.ExitBeat()
 	}
 	if res.Restart() {
 		return exitWith(ExitRestart)
 	}
 	return nil
-}
-
-// lastBeatDue reports whether a stopped relay sends its last heartbeat, which can take
-// seconds. Every stop does, a failure's and a service's included, but a service relay stepping
-// aside for a newer terma or for the one it installed: its manager starts the next relay only
-// once this process exits, and nothing listens until then.
-func lastBeatDue(res daemon.Result) bool {
-	return !res.Service || !res.Replaced && !res.Updated
 }
 
 // relayUpdater has the relay install each new release in place of its own binary, as
