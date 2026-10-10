@@ -363,3 +363,46 @@ func TestHeadlinePlurals(t *testing.T) {
 // A harness whose census scenarios ran and took no census is missing, though the catalog
 
 // never censused it: one that fails before its census every night is no quiet night.
+
+// One run that both censuses a build anew and re-censuses whole one the catalog has partial
+// lands both, whatever order it visits them in: an append that grows the censuses must not
+// lose the update.
+func TestMergeLandsEveryCensusOfARun(t *testing.T) {
+	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
+	for range 50 {
+		var cat Catalog
+		mergeFields(&cat, []e2e.FieldRow{field("0.162.0", "logs/codex.api_request", "model", "safe", day)}, map[string]bool{"codex\x000.162.0": true})
+		cat.Censuses = slices.Clip(cat.Censuses)
+		rows := []e2e.FieldRow{field("0.162.0", "logs/codex.api_request", "model", "safe", day.Add(time.Hour))}
+		for i := range 8 {
+			r := field("2.1.29"+fmt.Sprint(i), "logs/user_prompt", "prompt_length", "safe", day.Add(time.Hour))
+			r.Harness = fmt.Sprint("h", i)
+			rows = append(rows, r)
+		}
+		mergeFields(&cat, rows, nil)
+		if !cat.censusedWhole("codex", "0.162.0") || len(cat.Censuses) != 9 {
+			t.Fatalf("censuses %+v", cat.Censuses)
+		}
+	}
+}
+
+// FIELDS.md shows a harness as its newest whole census has it: a partial census's absences
+// are no evidence a key is gone.
+func TestFieldsShowsTheNewestWholeCensus(t *testing.T) {
+	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
+	var cat Catalog
+	mergeFields(&cat, []e2e.FieldRow{field("0.161.0", "logs/codex.api_request", "model", "safe", day),
+		field("0.161.0", "logs/codex.api_request", "attempt", "safe", day)}, nil)
+	mergeFields(&cat, []e2e.FieldRow{field("0.162.0", "logs/codex.api_request", "model", "safe", day.Add(24*time.Hour))},
+		map[string]bool{"codex\x000.162.0": true})
+	md := renderFields(cat, day.Add(24*time.Hour))
+	for _, want := range []string{"| Codex CLI | 0.161.0 (0.162.0 partial) | 1 | 2 | 0 |",
+		"so the keys below are as 0.161.0, the newest censused whole, has them", "| `attempt` | safe | text | 0.161.0 | yes |"} {
+		if !strings.Contains(md, want) {
+			t.Errorf("FIELDS.md lacks %q:\n%s", want, md)
+		}
+	}
+	if strings.Contains(md, "**no**") {
+		t.Errorf("a key a partial census did not see is shown gone:\n%s", md)
+	}
+}

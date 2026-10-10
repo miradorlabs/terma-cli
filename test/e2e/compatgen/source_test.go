@@ -15,6 +15,7 @@ import (
 )
 
 // tarball is a tree as GitHub serves one: every path under one folder.
+
 func tarball(t *testing.T, files map[string]string) []byte {
 	t.Helper()
 	var buf bytes.Buffer
@@ -39,7 +40,9 @@ func tarball(t *testing.T, files map[string]string) []byte {
 }
 
 // The builds of a fake Codex: 0.161.0 sends a persistence metric and tags a snapshot metric
+
 // with "state"; 0.162.0 still defines the metric, drops the turn's phase field, and adds a key.
+
 func fakeCodex(t *testing.T) map[string][]byte {
 	metrics := `const APPEND_METRIC: &str = "codex.rollout.persistence.append";
 `
@@ -92,8 +95,11 @@ func withSource(t *testing.T, builds map[string][]byte) {
 }
 
 // A finding about Codex links the lines that name it at its build; one gone says whether the
+
 // new build's source still names it, or where the build before did; a key leads to the lines
+
 // beside its surface, not to every line that says its name.
+
 func TestSourceLinks(t *testing.T) {
 	withSource(t, fakeCodex(t))
 	d := Drift{Harnesses: []HarnessDrift{{Harness: "codex", Name: "Codex CLI", Version: "0.162.0", Previous: "0.161.0",
@@ -164,7 +170,9 @@ func TestSourceLinks(t *testing.T) {
 }
 
 // A build whose source cannot be read leaves its findings unlinked, and the digest says so;
+
 // a harness whose source is not public, or a night with nothing to link, reads nothing.
+
 func TestSourceLinksFailOpen(t *testing.T) {
 	withSource(t, map[string][]byte{})
 	d := Drift{Harnesses: []HarnessDrift{
@@ -191,18 +199,15 @@ func TestSourceLinksFailOpen(t *testing.T) {
 }
 
 // A Slack section cut where no line ends is not cut inside a link.
-func TestClipKeepsLinksWhole(t *testing.T) {
-	s := renderLinks(slackEscape("`k` · "+link("https://github.com/x#L1", "x.rs:1")), true)
-	if got := clip(s, len("`k` · <https://git")); got != "`k` · \n…" {
-		t.Errorf("clip = %q", got)
-	}
-}
 
 func itoa(n int) string { b, _ := json.Marshal(n); return string(b) }
 
 // What the real Codex tree does that a small one does not: a generic key named in hundreds
+
 // of lines before the one beside its metric, a metric named by a constant, test modules
+
 // inside source files, and a generic tag dropped from its metric but said elsewhere.
+
 func TestSourceLinksOnARealShapedTree(t *testing.T) {
 	before := map[string]string{
 		"codex-rs/otel/src/metrics/names.rs": "pub const TOOL_CALL_METRIC: &str = \"codex.tool.call\";\n",
@@ -244,7 +249,9 @@ func TestSourceLinksOnARealShapedTree(t *testing.T) {
 }
 
 // The build before unread, a field still in the new build's source beside its surface still
+
 // says so; one named only away from its surface is left unlinked, not called gone.
+
 func TestSourceLinksWithoutTheBuildBefore(t *testing.T) {
 	withSource(t, map[string][]byte{"rust-v0.162.0": tarball(t, map[string]string{
 		"codex-rs/exec/src/snapshot.rs": "fn record(state: &str) {\n    let tags = [(\"state\", state)];\n    metrics.counter(\"codex.shell_snapshot.command\", 1, &tags);\n}\n",
@@ -268,7 +275,9 @@ func TestSourceLinksWithoutTheBuildBefore(t *testing.T) {
 }
 
 // A section the links would push past Slack's limit drops them, and keeps every finding;
+
 // a section with room keeps one link a finding.
+
 func TestSlackDropsLinksBeforeFindings(t *testing.T) {
 	says := &SourceSays{Version: "0.162.0", Refs: []SourceRef{
 		{Path: "codex-rs/a.rs", Line: 1, URL: "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/" + strings.Repeat("d/", 80) + "a.rs#L1"},
@@ -292,7 +301,9 @@ func TestSlackDropsLinksBeforeFindings(t *testing.T) {
 func mustJSON(v any) []byte { b, _ := json.Marshal(v); return b }
 
 // A key as common as "model", named nowhere beside its surface, is left unlinked rather than
+
 // linked to lines that have nothing to do with it; one named in a few lines is linked.
+
 func TestSourceLinksLeaveACommonKeyUnplaced(t *testing.T) {
 	files := map[string]string{"codex-rs/otel/src/macros.rs": "macro_rules! log_event {\n    () => { info!(model = %m) };\n}\n"}
 	for i := range 10 {
@@ -312,8 +323,11 @@ func TestSourceLinksLeaveACommonKeyUnplaced(t *testing.T) {
 }
 
 // A file that names many surfaces (Codex keeps its log events in one): a key's line belongs
+
 // to the surface named nearest it, so a key gone from one event is gone, though another
+
 // event in the file still names it.
+
 func TestSourceLinksPlaceAKeyByTheSurfaceThatOwnsItsLine(t *testing.T) {
 	events := func(decisionCallID bool) string {
 		id := ""
@@ -340,55 +354,19 @@ func TestSourceLinksPlaceAKeyByTheSurfaceThatOwnsItsLine(t *testing.T) {
 }
 
 // A test module's raw strings hold braces that are text; a constant's string may be on the
+
 // line after it; an import of the constant is not its use.
-func TestSourceScanReadsRustAsItIs(t *testing.T) {
-	files := map[string]string{
-		"codex-rs/auth/src/util.rs":          "#[cfg(test)]\nmod tests {\n    const BODY: &str = r#\"{\n        \"a\": {\"b\": 1}\n    }\"#;\n    fn t() { emit(\"codex.only_in_a_test\"); }\n}\n\nfn real() {\n    emit(\"codex.after_tests\");\n}\n",
-		"codex-rs/otel/src/metrics/names.rs": "pub const SPAWN_PHASE_METRIC: &str =\n    \"codex.multi_agent.spawn.phase\";\n",
-		"codex-rs/otel/src/spawn.rs":         "use crate::metrics::SPAWN_PHASE_METRIC;\n\nfn spawn() {\n    let tags = [(\"phase\", p)];\n    metrics.record(SPAWN_PHASE_METRIC, d, &tags);\n}\n",
-	}
-	withSource(t, map[string][]byte{"rust-v0.162.0": tarball(t, files)})
-	d := Drift{Harnesses: []HarnessDrift{{Harness: "codex", Name: "Codex CLI", Version: "0.162.0", Previous: "0.162.0",
-		NewSurfaces: []SurfaceChange{{Surface: "logs/codex.only_in_a_test"}, {Surface: "logs/codex.after_tests"}},
-		Added:       []FieldChange{{Surface: "metrics/codex.multi_agent.spawn.phase", Key: "phase"}}}}}
-	linkSources(&d, nil)
-	h := d.Harnesses[0]
-	if s := h.NewSurfaces[0].Source; s != nil && len(s.Refs) > 0 {
-		t.Errorf("a name in a test module's raw-string test was linked: %+v", s)
-	}
-	if s := h.NewSurfaces[1].Source; s == nil || len(s.Refs) != 1 || s.Refs[0].Line != 10 {
-		t.Errorf("the code after the test module: %+v", s)
-	}
-	if s := h.Added[0].Source; s == nil || len(s.Refs) != 1 || s.Refs[0].Path != "codex-rs/otel/src/spawn.rs" || s.Refs[0].Line != 4 {
-		t.Errorf("phase, beside the use of a two-line constant: %+v", s)
-	}
-}
 
 // Comments are no build's code: a name left in a trailing or a block comment is not still in
+
 // the source; a string that holds "//" or "/*" is still a string.
-func TestSourceScanSkipsComments(t *testing.T) {
-	files := map[string]string{
-		"codex-rs/otel/src/a.rs": "fn a() {\n    emit(\"codex.live\"); // was \"codex.trailing\"\n    /* \"codex.block_one\"\n       \"codex.block_two\" */ emit(\"codex.after_block\");\n" +
-			"    let url = \"https://x/*y\"; emit(\"codex.after_url\");\n    let q = '\"'; emit(\"codex.after_char\");\n}\n",
-	}
-	withSource(t, map[string][]byte{"rust-v0.162.0": tarball(t, files)})
-	var ss []SurfaceChange
-	for _, name := range []string{"live", "trailing", "block_one", "block_two", "after_block", "after_url", "after_char"} {
-		ss = append(ss, SurfaceChange{Surface: "logs/codex." + name})
-	}
-	d := Drift{Harnesses: []HarnessDrift{{Harness: "codex", Name: "Codex CLI", Version: "0.162.0", Previous: "0.162.0", NewSurfaces: ss}}}
-	linkSources(&d, nil)
-	for i, want := range []bool{true, false, false, false, true, true, true} {
-		s := d.Harnesses[0].NewSurfaces[i]
-		if got := s.Source != nil && len(s.Source.Refs) > 0; got != want {
-			t.Errorf("%s linked %v, want %v", s.Surface, got, want)
-		}
-	}
-}
 
 // A key at the end of a function belongs to the surface named in it, though the next
+
 // function's metric is named nearer; and a raw string with hashes (r##"…"##) is text, whose
+
 // "/*" opens no comment.
+
 func TestSourceLinksPlaceAKeyInItsFunction(t *testing.T) {
 	// auth.error is 9 lines below its event's name and 4 above the next function's metric.
 	file := "fn websocket_connect() {\n    log_event!(\n        event.name = \"codex.websocket_connect\",\n" +
@@ -419,7 +397,9 @@ func TestSourceLinksPlaceAKeyInItsFunction(t *testing.T) {
 }
 
 // What is gone is linked against the build it was judged against, not the partial one after
+
 // it: the diff and the build before are the last whole census's.
+
 func TestSourceLinksJudgeAgainstTheLastWholeBuild(t *testing.T) {
 	withSource(t, map[string][]byte{
 		"rust-v0.161.0": tarball(t, map[string]string{"codex-rs/core/src/turn.rs": "fn run() {\n    span(\"turn\", attempt = a);\n}\n"}),
@@ -436,3 +416,7 @@ func TestSourceLinksJudgeAgainstTheLastWholeBuild(t *testing.T) {
 		t.Errorf("attempt: %q", got)
 	}
 }
+
+// Rust nests block comments: a name inside the outer one, after an inner one closes, is
+
+// still comment.

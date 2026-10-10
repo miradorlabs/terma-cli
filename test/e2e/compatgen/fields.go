@@ -143,10 +143,13 @@ func mergeFields(cat *Catalog, rows []e2e.FieldRow, partial map[string]bool) {
 	for _, f := range added {
 		cat.Fields = append(cat.Fields, *f)
 	}
+	// New censuses are appended once the existing ones are updated: an append that grows the
+	// slice would leave a pointer into it writing to the old array.
 	censuses := map[string]*Census{}
 	for i := range cat.Censuses {
 		censuses[cat.Censuses[i].id()] = &cat.Censuses[i]
 	}
+	var newCensuses []Census
 	for b, surfaces := range seen {
 		c := Census{Harness: b.harness, Version: b.version, Surfaces: slices.Sorted(maps.Keys(surfaces)), At: at[b], Partial: partial[b.harness+"\x00"+b.version]}
 		if prev, ok := censuses[c.id()]; ok {
@@ -160,8 +163,9 @@ func mergeFields(cat *Catalog, rows []e2e.FieldRow, partial map[string]bool) {
 			}
 			continue
 		}
-		cat.Censuses = append(cat.Censuses, c)
+		newCensuses = append(newCensuses, c)
 	}
+	cat.Censuses = append(cat.Censuses, newCensuses...)
 	sort.Slice(cat.Fields, func(i, j int) bool { return cat.Fields[i].id() < cat.Fields[j].id() })
 	sort.Slice(cat.Censuses, func(i, j int) bool {
 		a, b := cat.Censuses[i], cat.Censuses[j]
@@ -229,6 +233,28 @@ func (cat *Catalog) censusedWhole(harness, version string) bool {
 	return slices.ContainsFunc(cat.Censuses, func(c Census) bool {
 		return c.Harness == harness && c.Version == version && !c.Partial
 	})
+}
+
+// shown is the census FIELDS.md shows harness as: its newest whole one, since what a partial
+// census did not see is no evidence of absence, or its newest if none is whole; and its
+// newest.
+func (cat *Catalog) shown(harness string) (shown, newest Census, ok bool) {
+	newest, ok = cat.newestCensus(harness)
+	if !ok {
+		return Census{}, Census{}, false
+	}
+	shown = newest
+	if newest.Partial {
+		if whole, found := cat.lastWhole(harness, newest.Version); found {
+			shown = whole
+		}
+	}
+	return shown, newest, true
+}
+
+// sentBy reports a key the build at version, or one after it, sent.
+func (f FieldEntry) sentBy(version string) bool {
+	return slices.ContainsFunc(f.Versions, func(v string) bool { return !versionLess(v, version) })
 }
 
 // newestCensus is the newest build of harness the catalog took the census of.
@@ -310,27 +336,41 @@ func renderFields(cat Catalog, now time.Time) string {
 	}
 	b.WriteString("## At a glance\n\n| Harness | Newest build censused | Surfaces | Keys | Unclassified, withheld |\n|---|---|---|---|---|\n")
 	for _, h := range e2e.Harnesses {
-		newest, ok := cat.newestCensus(h.ID)
+		shown, newest, ok := cat.shown(h.ID)
 		if !ok {
 			continue
 		}
 		keys, withheld := 0, 0
 		for _, f := range byHarness[h.ID] {
-			if slices.Contains(f.Versions, newest.Version) {
+			if f.sentBy(shown.Version) {
 				keys++
 				if f.withheld() {
 					withheld++
 				}
 			}
 		}
-		fmt.Fprintf(&b, "| %s | %s | %d | %d | %d |\n", h.Name, newest.Version, len(newest.Surfaces), keys, withheld)
+		build := shown.Version
+		if newest.id() != shown.id() {
+			build += " (" + newest.Version + " partial)"
+		} else if shown.Partial {
+			build += " (partial)"
+		}
+		fmt.Fprintf(&b, "| %s | %s | %d | %d | %d |\n", h.Name, build, len(shown.Surfaces), keys, withheld)
 	}
 	for _, h := range e2e.Harnesses {
-		newest, ok := cat.newestCensus(h.ID)
+		shown, newest, ok := cat.shown(h.ID)
 		if !ok {
 			continue
 		}
-		fmt.Fprintf(&b, "\n## %s\n\nNewest build censused: %s.\n", h.Name, newest.Version)
+		fmt.Fprintf(&b, "\n## %s\n\nNewest build censused: %s.", h.Name, newest.Version)
+		switch {
+		case newest.id() != shown.id():
+			fmt.Fprintf(&b, " Its census was partial (a census scenario failed), so the keys below are as %s, the newest censused whole, has them.", shown.Version)
+		case shown.Partial:
+			b.WriteString(" Its census was partial (a census scenario failed), and no build was censused whole: a key it did not see may still be sent.")
+		}
+		b.WriteString("\n")
+		newest = shown
 		bySurface := map[string][]FieldEntry{}
 		for _, f := range byHarness[h.ID] {
 			bySurface[f.Surface] = append(bySurface[f.Surface], f)
@@ -339,7 +379,7 @@ func renderFields(cat Catalog, now time.Time) string {
 			fmt.Fprintf(&b, "\n### `%s`\n\n| Key | Class | Values | First censused | In %s |\n|---|---|---|---|---|\n", tableCell(s), newest.Version)
 			for _, f := range bySurface[s] {
 				in := "yes"
-				if !slices.Contains(f.Versions, newest.Version) {
+				if !f.sentBy(newest.Version) {
 					in = "**no** (last " + f.Versions[0] + ")"
 				}
 				class := classLabel[f.Class]

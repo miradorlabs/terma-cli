@@ -172,7 +172,7 @@ func scan(r io.Reader, s source, needles map[needle]bool, aliases map[string]str
 // lexState is what a line of Rust starts inside of: a block comment, or a raw string and the
 // quote and hashes that end it.
 type lexState struct {
-	block  bool
+	block  int // block comments open: Rust nests them
 	rawEnd string
 }
 
@@ -198,9 +198,13 @@ func code(line string, st *lexState) string {
 			b.WriteString(`""`)
 			i += end + len(st.rawEnd) - 1
 			st.rawEnd = ""
-		case st.block:
-			if c == '*' && next == '/' {
-				st.block = false
+		case st.block > 0:
+			switch {
+			case c == '*' && next == '/':
+				st.block--
+				i++
+			case c == '/' && next == '*':
+				st.block++
 				i++
 			}
 		case !inString && c == 'r' && (next == '"' || next == '#') && (i == 0 || !isIdent(line[i-1])):
@@ -234,7 +238,7 @@ func code(line string, st *lexState) string {
 		case c == '/' && next == '/':
 			return b.String()
 		case c == '/' && next == '*':
-			st.block = true
+			st.block = 1
 			i++
 		default:
 			b.WriteByte(c)

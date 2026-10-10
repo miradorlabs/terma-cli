@@ -214,7 +214,8 @@ and the digest judge a key withheld from what the relay says, never from a rule 
 
 The catalog, `docs/compat/fields.json`, lives beside the compatibility history on the
 `compat-matrix` branch, and `docs/FIELDS.md` renders it: per harness, per surface, each key's
-class, kinds, the first build it was seen in, and whether the newest build still has it. A
+class, kinds, the first build it was seen in, and whether the newest build censused whole
+still has it (a partial census's absences are no evidence). A
 key keeps its first build and its newest five, and its kinds and class are the newest
 build's, and it also keeps the newest whole build that saw it; a harness keeps its newest
 five censuses, and five whole ones however old (a
