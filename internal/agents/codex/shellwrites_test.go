@@ -85,6 +85,11 @@ func TestShellWrites(t *testing.T) {
 		{"wrapped writer", "env LC_ALL=C sed -i 's/a/b/' a.go; command -p gofmt -w b.go", in("a.go", "b.go")},
 		{"patch argument", "apply_patch '*** Begin Patch\n*** Add File: new/y.sh\n+y\n*** End Patch'", in("new/y.sh")},
 		{"patch after a cd", "cd src && apply_patch <<'PATCH'\n*** Begin Patch\n*** Update File: a.go\n@@\n-a\n+b\n*** End Patch\nPATCH", in("src/a.go")},
+		// A patch the parse cannot read is read from the text, as before the parse.
+		{"patch piped in", "cat <<'EOF' | apply_patch\n*** Begin Patch\n*** Update File: a.go\n@@\n-a\n+b\n*** End Patch\nEOF", in("a.go")},
+		{"patch from a substitution", "apply_patch \"$(cat <<'EOF'\n*** Begin Patch\n*** Update File: a.go\n@@\n-a\n+b\n*** End Patch\nEOF\n)\"", in("a.go")},
+		{"patch with an expansion", "apply_patch \"*** Begin Patch\n*** Add File: a.go\n+$HOME\n*** End Patch\"", in("a.go")},
+		{"patch in a nested shell", "bash -lc 'apply_patch <<EOF\n*** Begin Patch\n*** Update File: a.go\n@@\n-a\n+b\n*** End Patch\nEOF'", in("a.go")},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if got, _ := shellWrites(tc.command, cwd); !slices.Equal(got, tc.want) {

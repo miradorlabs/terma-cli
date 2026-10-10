@@ -67,16 +67,20 @@ func (e Env) Touch(r *Repo, sess session.Session, toolName string, paths []strin
 	e.Report(r, sess, toolName, paths, extra)
 }
 
-// Expect records in sess's manifest the files of r among paths, without reporting them: a
-// hook before a tool call records what a commit in the call will take in.
-func (e Env) Expect(r *Repo, sess session.Session, paths []string) {
+// Expect records in sess's manifest the files of r among paths, without reporting them, and
+// returns them repo-relative: a hook before a tool call records what a commit in the call
+// will take in.
+func (e Env) Expect(r *Repo, sess session.Session, paths []string) []string {
 	for _, c := range e.checkouts(r, paths) {
 		if c.repo == r {
 			if err := r.Store.Touch(sess, c.files, e.Time()); err != nil {
 				e.Logf("record files: %v", err)
+				return nil
 			}
+			return c.files
 		}
 	}
+	return nil
 }
 
 // Report spools paths as Touch does, without recording them in the manifest.

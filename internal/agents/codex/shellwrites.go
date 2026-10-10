@@ -12,21 +12,26 @@ import (
 // shellWrites returns the files a shell command names as written (redirect targets, the
 // operands of the writers in writtenIndexes, and the files of a patch it runs), in the
 // order it writes them, resolved against cwd and any cd before them; commits holds, for
-// each git commit it makes, how many of them come before it. A command that does not parse
-// gives only the files of a patch in its text.
+// each git commit it makes, how many of them come before it. A command that does not parse,
+// or runs no patch the parse can read (one piped in, or built by the shell), gives the files
+// of a patch in its text, last.
 func shellWrites(command, cwd string) (paths []string, commits []int) {
-	file, err := syntax.NewParser().Parse(strings.NewReader(command), "")
-	if err != nil {
+	inText := func() (out []string) {
 		for _, p := range applyPatchPaths(command) {
 			if !filepath.IsAbs(p) {
 				p = filepath.Join(cwd, p)
 			}
-			paths = append(paths, filepath.Clean(p))
+			out = append(out, filepath.Clean(p))
 		}
-		return paths, nil
+		return out
+	}
+	file, err := syntax.NewParser().Parse(strings.NewReader(command), "")
+	if err != nil {
+		return inText(), nil
 	}
 	dir := cwd
 	var out []string
+	patched := false
 	resolve := func(w word) (string, bool) {
 		if !w.literal || w.text == "" || (dir == "" && !filepath.IsAbs(w.text)) {
 			return "", false
@@ -85,7 +90,7 @@ func shellWrites(command, cwd string) (paths []string, commits []int) {
 			for _, patch := range patches(n) {
 				for _, p := range applyPatchPaths(patch) {
 					if p, ok := resolve(word{p, true}); ok {
-						out = append(out, p)
+						out, patched = append(out, p), true
 					}
 				}
 			}
@@ -126,6 +131,9 @@ func shellWrites(command, cwd string) (paths []string, commits []int) {
 		stack = append(stack, scope{n, dir})
 		return true
 	})
+	if !patched {
+		out = append(out, inText()...)
+	}
 	return out, commits
 }
 
