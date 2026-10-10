@@ -164,9 +164,9 @@ type baseline struct {
 
 // chooseBaseline is the newest older build censused whole, what its whole censuses saw
 // (FieldEntry.Whole; a partial census is a failed run, where keys of an error path come). Where
-// it is censused whole tonight too, it is what it sent tonight, one night against one, so what
-// it sent on some earlier night alone is not gone; otherwise it is its earlier nights, and the
-// digest says so. Where the catalog has none, but has the harness, it is the oldest build judged
+// it is censused whole tonight too, it is all it sent tonight, one night against one: what it
+// sent on some earlier night alone is not gone, and what tonight's census reached first is
+// there for the next build to drop. Otherwise it is its earlier nights, and the digest says so. Where the catalog has none, but has the harness, it is the oldest build judged
 // tonight, the rest judged against it.
 func chooseBaseline(cat Catalog, n night, judged []string, first bool) (b baseline) {
 	whole, ok := cat.lastWhole(n.harness, firstOr(judged))
@@ -188,8 +188,7 @@ func chooseBaseline(cat Catalog, n night, judged []string, first bool) (b baseli
 	case n.partial(whole.Version):
 		b.earlier, b.partial = whole.Version, true
 	default:
-		maps.DeleteFunc(b.base.keys, func(k string, _ FieldChange) bool { _, ok := again.keys[k]; return !ok })
-		b.base.surfaces = slices.DeleteFunc(slices.Clone(b.base.surfaces), func(s string) bool { return !slices.Contains(again.surfaces, s) })
+		b.base = again
 	}
 	return b
 }

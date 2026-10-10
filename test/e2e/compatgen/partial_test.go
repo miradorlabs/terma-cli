@@ -400,3 +400,18 @@ func TestAJudgementAgainstEarlierNightsSaysSo(t *testing.T) {
 		t.Errorf("earlier %q, headline %q", h.Earlier, h.headline())
 	}
 }
+
+// The build judged against, censused whole tonight, is all it sent tonight: a key tonight's
+// census of it reached first, and the next build drops, is gone.
+func TestTheBaselineIsAllItSentTonight(t *testing.T) {
+	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
+	var cat Catalog
+	mergeFields(&cat, []e2e.FieldRow{field("0.163.0", "logs/codex.api_request", "model", "safe", day)}, nil)
+	tonight := []e2e.FieldRow{field("0.163.0", "logs/codex.api_request", "model", "safe", day.Add(24*time.Hour)),
+		field("0.163.0", "logs/codex.api_request", "reached_tonight", "safe", day.Add(24*time.Hour)),
+		field("0.164.0", "logs/codex.api_request", "model", "safe", day.Add(24*time.Hour))}
+	ran := censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.163.0"}, {Harness: "codex", Version: "0.164.0"}})
+	if _, _, hs := fieldDrift(cat, tonight, ran, day.Add(24*time.Hour)); len(hs[0].Removed) != 1 || hs[0].Removed[0].Key != "reached_tonight" {
+		t.Errorf("removed %+v, want reached_tonight", hs[0].Removed)
+	}
+}
