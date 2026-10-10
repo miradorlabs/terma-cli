@@ -80,11 +80,13 @@ func settleExpected(e hookrun.Env, r *hookrun.Repo, sessionID string) {
 	var unchanged []string
 	for _, p := range paths {
 		var call expectedCall
-		if b, err := os.ReadFile(p); err == nil && json.Unmarshal(b, &call) == nil && call.Root == r.Root {
-			for f, before := range call.Files {
-				if before.same(statFile(filepath.Join(r.Root, filepath.FromSlash(f)))) {
-					unchanged = append(unchanged, f)
-				}
+		b, err := os.ReadFile(p)
+		if err == nil && json.Unmarshal(b, &call) == nil && call.Root != r.Root {
+			continue // another checkout's: its own Stop settles it
+		}
+		for f, before := range call.Files {
+			if before.same(statFile(filepath.Join(r.Root, filepath.FromSlash(f)))) {
+				unchanged = append(unchanged, f)
 			}
 		}
 		_ = os.Remove(p)
