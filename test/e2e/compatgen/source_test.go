@@ -363,3 +363,25 @@ func TestSourceScanReadsRustAsItIs(t *testing.T) {
 		t.Errorf("phase, beside the use of a two-line constant: %+v", s)
 	}
 }
+
+// Comments are no build's code: a name left in a trailing or a block comment is not still in
+// the source; a string that holds "//" or "/*" is still a string.
+func TestSourceScanSkipsComments(t *testing.T) {
+	files := map[string]string{
+		"codex-rs/otel/src/a.rs": "fn a() {\n    emit(\"codex.live\"); // was \"codex.trailing\"\n    /* \"codex.block_one\"\n       \"codex.block_two\" */ emit(\"codex.after_block\");\n" +
+			"    let url = \"https://x/*y\"; emit(\"codex.after_url\");\n    let q = '\"'; emit(\"codex.after_char\");\n}\n",
+	}
+	withSource(t, map[string][]byte{"rust-v0.162.0": tarball(t, files)})
+	var ss []SurfaceChange
+	for _, name := range []string{"live", "trailing", "block_one", "block_two", "after_block", "after_url", "after_char"} {
+		ss = append(ss, SurfaceChange{Surface: "logs/codex." + name})
+	}
+	d := Drift{Harnesses: []HarnessDrift{{Harness: "codex", Name: "Codex CLI", Version: "0.162.0", Previous: "0.162.0", NewSurfaces: ss}}}
+	linkSources(&d, nil)
+	for i, want := range []bool{true, false, false, false, true, true, true} {
+		s := d.Harnesses[0].NewSurfaces[i]
+		if got := s.Source != nil && len(s.Source.Refs) > 0; got != want {
+			t.Errorf("%s linked %v, want %v", s.Surface, got, want)
+		}
+	}
+}

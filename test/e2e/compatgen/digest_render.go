@@ -50,6 +50,9 @@ func (h HarnessDrift) headline() string {
 			parts = append(parts, fmt.Sprintf("%d %s", p.n, p.many))
 		}
 	}
+	if h.Partial {
+		parts = append(parts, "census partial (a scenario failed), nothing judged removed")
+	}
 	if len(parts) == 0 {
 		parts = append(parts, "no field changes")
 	}

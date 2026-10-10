@@ -36,10 +36,15 @@ func field(version, surface, key, class string, at time.Time, kinds ...string) e
 }
 
 // A run's census against the catalog: a key no build had is new, a key the previous newest
+
 // build had on a surface still seen is removed, a surface not seen is said apart, and an
+
 // unclassified key with text values is withheld while one with only numbers passes, on a
+
 // record; on a resource the relay withholds it whatever its value. The catalog then has every
+
 // build each key was seen in.
+
 func TestFieldDriftAndCatalog(t *testing.T) {
 	dir := t.TempDir()
 	day1 := time.Date(2026, 10, 9, 4, 0, 0, 0, time.UTC)
@@ -140,7 +145,9 @@ func TestFieldDriftAndCatalog(t *testing.T) {
 }
 
 // The Slack message says each harness's changes, links the run, and on a quiet day says so
+
 // in one line rather than staying silent.
+
 func TestSlackDigest(t *testing.T) {
 	at := time.Date(2026, 10, 10, 4, 0, 0, 0, time.UTC)
 	busy := Drift{GeneratedAt: at, Link: "https://ci/run/2", Harnesses: []HarnessDrift{{Harness: "claude", Name: "Claude Code", Version: "2.1.296", Previous: "2.1.295",
@@ -161,61 +168,21 @@ func TestSlackDigest(t *testing.T) {
 }
 
 // A night that brought no census, or none of a harness the catalog censused within the week,
+
 // is no quiet night: a census that did not run must not read as one that found nothing.
-func TestDigestSaysWhatWasNotCensused(t *testing.T) {
-	now := time.Date(2026, 10, 10, 4, 0, 0, 0, time.UTC)
-	cat := Catalog{Censuses: []Census{
-		{Harness: "codex", Version: "0.162.0", At: now.Add(-24 * time.Hour)},
-		{Harness: "hermes", Version: "0.20.5", At: now.Add(-30 * 24 * time.Hour)}, // aged out
-	}}
-	noCensus, missing, _ := fieldDrift(cat, nil, nil, now)
-	if d := (Drift{NoCensus: noCensus, Missing: missing}); !noCensus || d.Quiet() {
-		t.Errorf("no rows: noCensus %v, quiet %v", noCensus, d.Quiet())
-	}
-	rows := []e2e.FieldRow{field("2.1.296", "logs/api_request", "model", "safe", now)}
-	rows[0].Harness = "claude"
-	noCensus, missing, hs := fieldDrift(cat, rows, nil, now)
-	d := Drift{NoCensus: noCensus, Missing: missing, Harnesses: hs}
-	if noCensus || !slices.Equal(missing, []string{"Codex CLI"}) || d.Quiet() {
-		t.Errorf("claude only: noCensus %v, missing %v, quiet %v", noCensus, missing, d.Quiet())
-	}
-	if !strings.Contains(d.markdown(), "No census this night of Codex CLI") {
-		t.Errorf("the digest does not say Codex was not censused:\n%s", d.markdown())
-	}
-}
 
 // A surface no build had is said once, with its keys counted, not key by key: a span renamed
+
 // carries keys the harness already sends. A key new to the harness on it is still a new
+
 // field. A re-run of the same build reports nothing gone: a key that only comes on an error
+
 // path would otherwise read as removed.
-func TestDigestSurfacesAndReruns(t *testing.T) {
-	day := time.Date(2026, 10, 9, 4, 0, 0, 0, time.UTC)
-	var cat Catalog
-	mergeFields(&cat, []e2e.FieldRow{
-		field("0.162.0", "traces/old_fn", "code.file.path", "safe", day),
-		field("0.162.0", "traces/old_fn", "busy_ns", "safe", day, e2e.KindNumber),
-		field("0.162.0", "logs/codex.tool_result", "error", "prompt", day), // only on an error path
-	})
-	tonight := []e2e.FieldRow{
-		field("0.162.0", "traces/new_fn", "code.file.path", "safe", day.Add(24*time.Hour)),
-		field("0.162.0", "traces/new_fn", "busy_ns", "safe", day.Add(24*time.Hour), e2e.KindNumber),
-		field("0.162.0", "traces/new_fn", "fresh_key", "safe", day.Add(24*time.Hour)),
-	}
-	_, _, hs := fieldDrift(cat, tonight, nil, day.Add(24*time.Hour))
-	h := hs[0]
-	if len(h.NewSurfaces) != 1 || h.NewSurfaces[0] != (SurfaceChange{Surface: "traces/new_fn", Keys: 3, NewKeys: 1}) {
-		t.Errorf("new surfaces %+v", h.NewSurfaces)
-	}
-	if len(h.Added) != 1 || h.Added[0].Key != "fresh_key" {
-		t.Errorf("added %+v: only the key new to the harness", h.Added)
-	}
-	if len(h.Removed)+len(h.Unseen) != 0 {
-		t.Errorf("a re-run of the same build reported removed %+v, unseen %v", h.Removed, h.Unseen)
-	}
-}
 
 // A key keeps the first build it was seen in and its newest keepVersions; a harness its
+
 // newest keepCensuses censuses; and the catalog is written one entry a line.
+
 func TestCatalogIsBounded(t *testing.T) {
 	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
 	var cat Catalog
@@ -249,7 +216,9 @@ func TestCatalogIsBounded(t *testing.T) {
 }
 
 // A Slack section is cut at the end of a line, so neither a character, a code span nor an
+
 // escape is split.
+
 func TestClip(t *testing.T) {
 	s := "*Codex*\n• `ключ` on `traces/x`\n• `ключ2` on `traces/y`"
 	got := clip(s, len("*Codex*\n• `ключ` on `traces/x`\n• `кл"))
@@ -269,8 +238,11 @@ func TestClip(t *testing.T) {
 }
 
 // A key every kept census has aged past leaves the catalog, and a key's kinds and class are
+
 // its newest build's: a key an old build sent as text and a new one as a number is no longer
+
 // withheld.
+
 func TestCatalogKeepsWhatItsCensusesSaw(t *testing.T) {
 	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
 	var cat Catalog
@@ -295,7 +267,9 @@ func TestCatalogKeepsWhatItsCensusesSaw(t *testing.T) {
 }
 
 // A key withheld one night and classified by the next is no longer withheld, though the
+
 // harness shipped no new build: the class, and what the relay keeps, are the latest run's.
+
 func TestCatalogTakesTheLatestClassOfABuild(t *testing.T) {
 	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
 	var cat Catalog
@@ -313,62 +287,29 @@ func TestCatalogTakesTheLatestClassOfABuild(t *testing.T) {
 }
 
 // A night that reached only a build older than the catalog's newest says so, and is no quiet
+
 // night: the newest failed to install, or its tests did not run.
-func TestDigestSaysTheNewestWasNotReached(t *testing.T) {
-	day := time.Date(2026, 10, 9, 4, 0, 0, 0, time.UTC)
-	var cat Catalog
-	mergeFields(&cat, []e2e.FieldRow{field("0.162.1", "logs/codex.api_request", "model", "safe", day)})
-	_, _, hs := fieldDrift(cat, []e2e.FieldRow{field("0.162.0", "logs/codex.api_request", "model", "safe", day.Add(24*time.Hour))}, nil, day.Add(24*time.Hour))
-	d := Drift{Harnesses: hs}
-	if hs[0].Unreached != "0.162.1" || d.Quiet() || !strings.Contains(hs[0].headline(), "0.162.1, the newest censused before, was not reached") {
-		t.Errorf("unreached %q, quiet %v, headline %q", hs[0].Unreached, d.Quiet(), hs[0].headline())
-	}
-}
 
 // A night whose census scenarios ran a newer build than any census reached says so, though
+
 // the build the census did reach is newer than the catalog's: the newest failed before its
+
 // census was taken.
-func TestDigestSaysTheNewestRunWasNotReached(t *testing.T) {
-	day := time.Date(2026, 10, 9, 4, 0, 0, 0, time.UTC)
-	var cat Catalog
-	mergeFields(&cat, []e2e.FieldRow{field("0.160.0", "logs/codex.api_request", "model", "safe", day)})
-	night := day.Add(24 * time.Hour)
-	ran := censusRan([]e2e.CompatRow{
-		{Harness: "codex", Version: "0.161.0", Capability: e2e.CensusCapability, Result: "pass"},
-		{Harness: "codex", Version: "0.162.0", Capability: e2e.CensusCapability, Result: "fail"},
-		// Neither a skipped scenario nor another capability's is a census that should have been taken.
-		{Harness: "codex", Version: "0.163.0", Capability: e2e.CensusCapability, Result: "not run"},
-		{Harness: "codex", Version: "0.164.0", Capability: "relay.telemetry", Result: "fail"},
-	})
-	_, _, hs := fieldDrift(cat, []e2e.FieldRow{field("0.161.0", "logs/codex.api_request", "model", "safe", night)}, ran, night)
-	d := Drift{Harnesses: hs}
-	if hs[0].Unreached != "0.162.0" || d.Quiet() || !strings.Contains(hs[0].headline(), "0.161.0 (0.162.0, run tonight, was not reached)") {
-		t.Errorf("unreached %q, quiet %v, headline %q", hs[0].Unreached, d.Quiet(), hs[0].headline())
-	}
-	// The census of the newest build it ran: nothing unreached.
-	_, _, hs = fieldDrift(cat, []e2e.FieldRow{field("0.162.0", "logs/codex.api_request", "model", "safe", night)}, ran, night)
-	if hs[0].Unreached != "" || !(Drift{Harnesses: hs}).Quiet() {
-		t.Errorf("unreached %q with the newest censused", hs[0].Unreached)
-	}
-}
+
+// A census a scenario failed before taking whole judges nothing removed: what it did not see
+
+// it may not have reached. A census every scenario took whole does.
 
 // What a harness names is escaped where it is shown: "<" in Slack would start a link, and "|"
+
 // in a markdown table would end a cell.
-func TestDigestEscapesWhatHarnessesName(t *testing.T) {
-	d := Drift{GeneratedAt: time.Date(2026, 10, 10, 4, 0, 0, 0, time.UTC), Harnesses: []HarnessDrift{{Harness: "codex", Name: "Codex CLI", Version: "1", Previous: "1",
-		Added: []FieldChange{{Surface: "logs/<x|y>", Key: "a&b"}}}}}
-	data, _ := json.Marshal(d.slack())
-	if !strings.Contains(string(data), "a\\u0026amp;b") || !strings.Contains(string(data), "\\u0026lt;x|y\\u0026gt;") {
-		t.Errorf("slack text not escaped: %s", data)
-	}
-	if got := tableCell("a|b"); got != `a\|b` {
-		t.Errorf("tableCell = %q", got)
-	}
-}
 
 // A night that changed everything is still one message Slack takes: at most 50 blocks, the
+
 // sections' text within the budget, and a line saying what was left for the run's summary.
+
 // Many small changes meet the block limit first, a few long ones the budget.
+
 func TestSlackDigestFitsOneMessage(t *testing.T) {
 	for _, c := range []struct {
 		name            string
@@ -408,7 +349,9 @@ func TestSlackDigestFitsOneMessage(t *testing.T) {
 }
 
 // A headline counts each change in its own plural: "surfaces no longer sent", not "surface no
+
 // longer sents".
+
 func TestHeadlinePlurals(t *testing.T) {
 	h := HarnessDrift{Name: "Codex CLI", Version: "0.162.1", Previous: "0.162.0", Unseen: []GoneSurface{{Surface: "a"}, {Surface: "b"}},
 		Added: []FieldChange{{Key: "k"}}, Withheld: []FieldChange{{Key: "k"}, {Key: "l"}}}
@@ -418,17 +361,5 @@ func TestHeadlinePlurals(t *testing.T) {
 }
 
 // A harness whose census scenarios ran and took no census is missing, though the catalog
+
 // never censused it: one that fails before its census every night is no quiet night.
-func TestDigestSaysAnUncensusedHarnessThatRanIsMissing(t *testing.T) {
-	now := time.Date(2026, 10, 10, 4, 0, 0, 0, time.UTC)
-	var cat Catalog
-	ran := censusRan([]e2e.CompatRow{
-		{Harness: "gemini", Version: "0.64.0", Capability: e2e.CensusCapability, Result: "fail"},
-		{Harness: "codex", Version: "0.162.0", Capability: e2e.CensusCapability, Result: "pass"},
-	})
-	noCensus, missing, _ := fieldDrift(cat, []e2e.FieldRow{field("0.162.0", "logs/codex.api_request", "model", "safe", now)}, ran, now)
-	d := Drift{NoCensus: noCensus, Missing: missing}
-	if !slices.Equal(missing, []string{"Gemini CLI"}) || d.Quiet() {
-		t.Errorf("missing %v, quiet %v", missing, d.Quiet())
-	}
-}

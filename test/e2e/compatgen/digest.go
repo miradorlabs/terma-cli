@@ -46,6 +46,9 @@ type HarnessDrift struct {
 	Previous string `json:"previous,omitempty"`
 	// First is a harness the catalog had no census of; Surfaces and Keys its census's size.
 	First bool `json:"first,omitempty"`
+	// Partial is a census of Version a census scenario failed before taking whole: Removed
+	// and Unseen are not judged.
+	Partial bool `json:"partial,omitempty"`
 	// Unreached is a build newer than Version that the census should have reached and did
 	// not: Previous, the newest the catalog had (it failed to install, or its tests did not
 	// run), or the newest tonight's census scenarios ran (they failed before its census).
@@ -73,7 +76,7 @@ type HarnessDrift struct {
 
 // changed reports whether h has anything new to say.
 func (h HarnessDrift) changed() bool {
-	return h.First || h.Unreached != "" || len(h.NewSurfaces)+len(h.Added)+len(h.Removed)+len(h.Unseen)+len(h.Withheld) > 0
+	return h.First || h.Partial || h.Unreached != "" || len(h.NewSurfaces)+len(h.Added)+len(h.Removed)+len(h.Unseen)+len(h.Withheld) > 0
 }
 
 // FieldChange is one key on one surface.
@@ -121,21 +124,34 @@ func (d Drift) Quiet() bool {
 	return !slices.ContainsFunc(d.Harnesses, HarnessDrift.changed)
 }
 
-// censusRan names, per harness, the newest build tonight's census scenarios ran: what proves
-// e2e.CensusCapability, passed or failed.
-func censusRan(rows []e2e.CompatRow) map[string]string {
-	out := map[string]string{}
+// censusRuns is what tonight's census scenarios did, as the rows that prove
+// e2e.CensusCapability say (only the platform that takes the census runs them): per harness,
+// the newest build they ran, passed or failed; and the builds one of them failed for, whose
+// census may be partial.
+type censusRuns struct {
+	newest map[string]string
+	failed map[string]bool // harness and version
+}
+
+func censusRan(rows []e2e.CompatRow) censusRuns {
+	ran := censusRuns{newest: map[string]string{}, failed: map[string]bool{}}
 	for _, r := range rows {
-		if r.Capability == e2e.CensusCapability && r.Result != "not run" && versionLess(out[r.Harness], r.Version) {
-			out[r.Harness] = r.Version
+		if r.Capability != e2e.CensusCapability || r.Result == "not run" {
+			continue
+		}
+		if versionLess(ran.newest[r.Harness], r.Version) {
+			ran.newest[r.Harness] = r.Version
+		}
+		if r.Result == "fail" {
+			ran.failed[r.Harness+"\x00"+r.Version] = true
 		}
 	}
-	return out
+	return ran
 }
 
 // fieldDrift compares a night's census with the catalog before it is merged; ran is what
 // censusRan says of the night.
-func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran map[string]string, now time.Time) (noCensus bool, missing []string, out []HarnessDrift) {
+func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran censusRuns, now time.Time) (noCensus bool, missing []string, out []HarnessDrift) {
 	byHarness := map[string][]e2e.FieldRow{}
 	for _, r := range rows {
 		byHarness[r.Harness] = append(byHarness[r.Harness], r)
@@ -147,7 +163,7 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran map[string]string, now tim
 	}
 	// A harness whose census scenarios ran tonight and took none is missing too, censused
 	// before or never: else one that fails before its census every night reads as quiet.
-	for harness := range ran {
+	for harness := range ran.newest {
 		if byHarness[harness] == nil && !slices.Contains(missing, harnessName(harness)) {
 			missing = append(missing, harnessName(harness))
 		}
@@ -189,7 +205,7 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran map[string]string, now tim
 				d.Unreached = prev.Version
 			}
 		}
-		if v := ran[harness]; versionLess(version, v) && versionLess(d.Unreached, v) {
+		if v := ran.newest[harness]; versionLess(version, v) && versionLess(d.Unreached, v) {
 			d.Unreached = v
 		}
 		newSurfaces := map[string]*SurfaceChange{}
@@ -229,7 +245,10 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran map[string]string, now tim
 		if d.First {
 			d.Surfaces, d.Keys = len(sent), len(tonight)
 		}
-		if censused && versionLess(prev.Version, version) {
+		// A census a scenario failed before taking whole is no evidence of what the build does
+		// not send: it says what it saw, and nothing is judged gone.
+		d.Partial = ran.failed[harness+"\x00"+version]
+		if censused && versionLess(prev.Version, version) && !d.Partial {
 			for _, f := range cat.Fields {
 				if f.Harness != harness || !slices.Contains(f.Versions, prev.Version) || !sent[f.Surface] {
 					continue

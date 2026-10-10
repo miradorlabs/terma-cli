@@ -112,10 +112,11 @@ func scan(r io.Reader, s source, needles map[needle]bool, aliases map[string]str
 		sc.Buffer(make([]byte, 64<<10), 4<<20)
 		var tests testModule
 		pending := "" // a constant whose string is on this line
+		block := false
 		for n := 1; sc.Scan(); n++ {
-			line := sc.Text()
+			line := code(sc.Text(), &block)
 			t := strings.TrimSpace(line)
-			if tests.skip(line) || strings.HasPrefix(t, "//") {
+			if tests.skip(line) || t == "" {
 				continue
 			}
 			if aliases != nil {
@@ -158,6 +159,53 @@ func scan(r io.Reader, s source, needles map[needle]bool, aliases map[string]str
 			return nil, nil, fmt.Errorf("%s: %w", file, err)
 		}
 	}
+}
+
+// code is a line's code: its strings kept, its comments dropped, "//" to the end of the line
+// and "/* … */" across lines. block says whether the line starts inside a block comment, and
+// is left saying whether the next one does.
+func code(line string, block *bool) string {
+	var b strings.Builder
+	inString := false
+	for i := 0; i < len(line); i++ {
+		c := line[i]
+		next := byte(0)
+		if i+1 < len(line) {
+			next = line[i+1]
+		}
+		switch {
+		case *block:
+			if c == '*' && next == '/' {
+				*block = false
+				i++
+			}
+		case inString:
+			b.WriteByte(c)
+			if c == '\\' && next != 0 {
+				b.WriteByte(next)
+				i++
+			} else if c == '"' {
+				inString = false
+			}
+		case c == '\'' && i+2 < len(line) && line[i+2] == '\'':
+			b.WriteString("'_'") // a character, which names nothing: '"' is no string
+			i += 2
+		case c == '\'' && next == '\\' && i+3 < len(line) && line[i+3] == '\'':
+			b.WriteString("'_'")
+			i += 3
+		case c == '"':
+			inString = true
+			b.WriteByte(c)
+		case c == '/' && next == '/':
+			return b.String()
+		case c == '/' && next == '*':
+			*block = true
+			i++
+		default:
+			b.WriteByte(c)
+		}
+	}
+	return b.String()
 }
 
 // testModule follows a source file's test module (#[cfg(test)] mod … { … }, or mod tests

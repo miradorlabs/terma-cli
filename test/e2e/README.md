@@ -231,7 +231,9 @@ runs over two nights against a scratch origin. The digest,
 - **new fields**: keys new to their surface, or new to the harness anywhere
 - **removed fields** and **surfaces no longer sent**: what the previous build had and a
   newer one does not, judged only on a newer build, since a re-run of the same build that
-  did not reach an error path is no evidence
+  did not reach an error path is no evidence, and only from a whole census: a night one of
+  whose census scenarios failed for the build says its census is partial and judges nothing
+  removed
 - **newly withheld fields**: unclassified keys the relay drops;
   classify each in `internal/relay/allow.go`, an agent's capture rules, or as content. Those
   still withheld from before are one reminder line until they are.
@@ -239,7 +241,8 @@ runs over two nights against a scratch origin. The digest,
 For a harness whose source is public (Codex, `sources` in `compatgen/source.go`; one line
 adds another), `-source` links each of these to the lines of the build's source that name
 it, read from its release tag's tarball, and a new build's headline links the comparison
-of the two tags. Tests, test modules and comments are not the build's source. A key is
+of the two tags. Tests, test modules and comments (to the end of a line, or a block) are not
+the build's source. A key is
 linked beside its surface's name (or the constant that holds it): a line that names a key
 belongs to the surface named nearest it, of all the harness is known to send, so a generic
 key leads to its own metric or event, not to every line that says it nor to another event in
