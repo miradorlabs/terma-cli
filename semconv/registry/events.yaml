@@ -552,3 +552,7 @@ events:
       - ref: terma.relay.heartbeat.reason
         requirement_level: required
       - ref: host.name
+      - ref: terma.relay.exit.reason
+        requirement_level: recommended
+      - ref: terma.relay.heartbeat.counter
+        requirement_level: recommended

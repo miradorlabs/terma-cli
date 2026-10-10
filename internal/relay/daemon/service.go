@@ -248,7 +248,7 @@ func RemoveService(ctx context.Context, stateDir string) (bool, error) {
 		return false, err
 	}
 	removed, err := m.Remove(ctx)
-	if running, ok := RunningRelay(m.RelayDir); ok && running.Service {
+	if running, ok := RunningRelay(m.RelayDir); ok && running.Launch == LaunchService {
 		Stop(m.RelayDir)
 	}
 	return removed, err

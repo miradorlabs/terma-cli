@@ -21,7 +21,8 @@ import (
 func (app *App) newRelayRunCommand() *cobra.Command {
 	var idle time.Duration
 	var addr string
-	var quiet, asService bool
+	var quiet, asService, follow bool
+	var launch daemon.Launch
 	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "Run the relay in the foreground until it has been idle for --idle",
@@ -44,7 +45,7 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 			engine := deps.Engine(ctx, app.stateDir, cfg, daemon.SettingsFromEnv(), cmd.ErrOrStderr())
 			engine.Warnf = log.Printf
 			res, err := daemon.Run(ctx, daemon.Config{
-				StateDir: app.stateDir, Addr: addr, Idle: idle, Service: asService, Environment: cfg.Environment, Version: app.version, Log: log,
+				StateDir: app.stateDir, Addr: addr, Idle: idle, Service: asService, Follow: follow, Launch: launch, Environment: cfg.Environment, Version: app.version, Log: log,
 				Engine:  engine,
 				Workers: []func(context.Context){deps.Refresher().Run, app.sweepHookState},
 				Updater: app.relayUpdater(),
@@ -55,6 +56,9 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 				},
 			})
 			if err != nil {
+				if res.LastBeatDue() {
+					res.ExitBeat()
+				}
 				return err
 			}
 			if res.AlreadyRunning && !quiet {
@@ -69,18 +73,30 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&quiet, "quiet", false, "print nothing")
 	// Only the service definitions pass it: setup replaces a relay that was started any other way.
 	cmd.Flags().BoolVar(&asService, "service", false, "run as the relay service")
+	// Only Spawn passes it, for a hook or a command such as setup, so the heartbeat tells a
+	// relay terma started on demand from one a developer did; --service says the service's.
+	cmd.Flags().Var(&launch, "launch", "what started this relay: hook or manual")
+	_ = cmd.Flags().MarkHidden("launch")
+	// Only Supersede passes it, starting the relay that takes over from the one it asked to
+	// make way.
+	cmd.Flags().BoolVar(&follow, "follow", false, "wait for the running relay to stop, then run in its place")
+	_ = cmd.Flags().MarkHidden("follow")
 	_ = cmd.Flags().MarkHidden("service")
 	return cmd
 }
 
-// afterRelay ends a relay's run. One that should run again exits for the service manager to
-// start the newer terma, whoever installed it. A hook-started relay has none: one that
-// updated itself starts its successor, the release it installed, now that its lock is free,
-// since an agent may export before the next hook, unless teardown removed its setup
-// meanwhile; one replaced by a newer hook's terma is started again by that hook's next run.
+// afterRelay ends a relay's run. A relay that should run again exits for the service manager
+// to start the newer terma, whoever installed it. A hook-started relay has no manager: one
+// that updated itself starts its successor now that its lock is free, since an agent may
+// export before the next hook (unless teardown removed its setup meanwhile), and one replaced
+// by a newer terma is followed by the relay Supersede started. The last heartbeat goes once
+// that successor is under way (Result.LastBeatDue).
 func (app *App) afterRelay(res daemon.Result) error {
 	if res.Updated && !res.Service && !res.SetupGone {
 		app.spawnRelay(app.stateDir, app.version)
+	}
+	if res.LastBeatDue() {
+		res.ExitBeat()
 	}
 	if res.Restart() {
 		return exitWith(ExitRestart)
