@@ -66,9 +66,12 @@ type needle struct {
 	field bool
 }
 
+// hit is a line that names a needle, and the line of the function it is in (fnStart), 0 at
+// a file's top level.
 type hit struct {
 	path string
 	line int
+	fn   int
 }
 
 var (
@@ -79,6 +82,7 @@ var (
 	// constHead is one whose string is on the next line.
 	constHead = regexp.MustCompile(`\bconst\s+([A-Z][A-Z0-9_]*)\s*:\s*&(?:'static\s+)?str\s*=\s*$`)
 	upperName = regexp.MustCompile(`\b[A-Z][A-Z0-9_]+\b`)
+	fnStart   = regexp.MustCompile(`^\s*(?:pub(?:\([^)]*\))?\s+)?(?:const\s+)?(?:async\s+)?(?:unsafe\s+)?fn\s+\w`)
 )
 
 // scan reads a tarball of s's tree, as GitHub serves one (every path under one folder), and
@@ -112,12 +116,16 @@ func scan(r io.Reader, s source, needles map[needle]bool, aliases map[string]str
 		sc.Buffer(make([]byte, 64<<10), 4<<20)
 		var tests testModule
 		pending := "" // a constant whose string is on this line
-		block := false
+		var lex lexState
+		fn := 0
 		for n := 1; sc.Scan(); n++ {
-			line := code(sc.Text(), &block)
+			line := code(sc.Text(), &lex)
 			t := strings.TrimSpace(line)
 			if tests.skip(line) || t == "" {
 				continue
+			}
+			if fnStart.MatchString(line) {
+				fn = n
 			}
 			if aliases != nil {
 				// An import names the constant, not the surface's use.
@@ -126,14 +134,14 @@ func scan(r io.Reader, s source, needles map[needle]bool, aliases map[string]str
 				}
 				for _, name := range upperName.FindAllString(line, -1) {
 					if lit, ok := aliases[name]; ok && !constName.MatchString(line) {
-						add(needle{lit, false}, hit{file, n})
+						add(needle{lit, false}, hit{file, n, fn})
 					}
 				}
 				continue
 			}
 			parts := strings.Split(line, `"`)
 			for i := 1; i < len(parts)-1; i += 2 {
-				add(needle{parts[i], false}, hit{file, n})
+				add(needle{parts[i], false}, hit{file, n, fn})
 			}
 			if m := constName.FindStringSubmatch(line); m != nil && needles[needle{m[2], false}] {
 				found[m[1]] = m[2]
@@ -151,7 +159,7 @@ func scan(r io.Reader, s source, needles map[needle]bool, aliases map[string]str
 					if len(before) > 0 && slices.Contains([]string{"let", "mut", "const", "static", "type"}, before[len(before)-1]) {
 						continue
 					}
-					add(needle{line[m[2]:m[3]], true}, hit{file, n})
+					add(needle{line[m[2]:m[3]], true}, hit{file, n, fn})
 				}
 			}
 		}
@@ -161,10 +169,18 @@ func scan(r io.Reader, s source, needles map[needle]bool, aliases map[string]str
 	}
 }
 
+// lexState is what a line of Rust starts inside of: a block comment, or a raw string and the
+// quote and hashes that end it.
+type lexState struct {
+	block  bool
+	rawEnd string
+}
+
 // code is a line's code: its strings kept, its comments dropped, "//" to the end of the line
-// and "/* … */" across lines. block says whether the line starts inside a block comment, and
-// is left saying whether the next one does.
-func code(line string, block *bool) string {
+// and "/* … */" across lines, and its raw strings (r#"…"#) emptied, since what they hold is
+// text (JSON, a shell script) that names nothing. st carries what the line starts inside of
+// to the next.
+func code(line string, st *lexState) string {
 	var b strings.Builder
 	inString := false
 	for i := 0; i < len(line); i++ {
@@ -174,10 +190,29 @@ func code(line string, block *bool) string {
 			next = line[i+1]
 		}
 		switch {
-		case *block:
+		case st.rawEnd != "":
+			end := strings.Index(line[i:], st.rawEnd)
+			if end < 0 {
+				return b.String()
+			}
+			b.WriteString(`""`)
+			i += end + len(st.rawEnd) - 1
+			st.rawEnd = ""
+		case st.block:
 			if c == '*' && next == '/' {
-				*block = false
+				st.block = false
 				i++
+			}
+		case !inString && c == 'r' && (next == '"' || next == '#') && (i == 0 || !isIdent(line[i-1])):
+			hashes := 0
+			for i+1+hashes < len(line) && line[i+1+hashes] == '#' {
+				hashes++
+			}
+			if i+1+hashes < len(line) && line[i+1+hashes] == '"' {
+				st.rawEnd = `"` + strings.Repeat("#", hashes)
+				i += 1 + hashes
+			} else {
+				b.WriteByte(c) // r#ident, a raw identifier
 			}
 		case inString:
 			b.WriteByte(c)
@@ -199,7 +234,7 @@ func code(line string, block *bool) string {
 		case c == '/' && next == '/':
 			return b.String()
 		case c == '/' && next == '*':
-			*block = true
+			st.block = true
 			i++
 		default:
 			b.WriteByte(c)
@@ -208,34 +243,23 @@ func code(line string, block *bool) string {
 	return b.String()
 }
 
+func isIdent(c byte) bool {
+	return c == '_' || c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z'
+}
+
 // testModule follows a source file's test module (#[cfg(test)] mod … { … }, or mod tests
 // { … }), whose lines are no build's code: a constant a test keeps names nothing the build
 // sends.
 type testModule struct {
 	cfg   bool // the last attribute was #[cfg(test)]
 	depth int  // inside the module, its braces open
-	raw   bool // inside a raw string (r#"…"#), whose braces are text
 }
 
 func (m *testModule) skip(line string) bool {
 	t := strings.TrimSpace(line)
 	braces := func() int {
-		code := line
-		if m.raw {
-			end := strings.Index(code, `"#`)
-			if end < 0 {
-				return 0
-			}
-			m.raw, code = false, code[end+2:]
-		}
-		if start := strings.Index(code, `r#"`); start >= 0 {
-			if !strings.Contains(code[start+3:], `"#`) {
-				m.raw = true
-			}
-			code = code[:start]
-		}
 		n := 0
-		for i, part := range strings.Split(code, `"`) {
+		for i, part := range strings.Split(line, `"`) {
 			if i%2 == 0 {
 				n += strings.Count(part, "{") - strings.Count(part, "}")
 			}

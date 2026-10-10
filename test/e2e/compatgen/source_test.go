@@ -385,3 +385,35 @@ func TestSourceScanSkipsComments(t *testing.T) {
 		}
 	}
 }
+
+// A key at the end of a function belongs to the surface named in it, though the next
+// function's metric is named nearer; and a raw string with hashes (r##"…"##) is text, whose
+// "/*" opens no comment.
+func TestSourceLinksPlaceAKeyInItsFunction(t *testing.T) {
+	// auth.error is 9 lines below its event's name and 4 above the next function's metric.
+	file := "fn websocket_connect() {\n    log_event!(\n        event.name = \"codex.websocket_connect\",\n" +
+		"        attempt = a,\n        duration_ms = d,\n        success = s,\n        error.message = e,\n" +
+		"        auth.mode = m,\n        auth.retry = r,\n        auth.attempt = n,\n        auth.recovery = v,\n" +
+		"        auth.error = x,\n    );\n}\nfn websocket_request() {\n    self.counter(\"codex.websocket.request\", 1, &[]);\n}\n" +
+		// Read as a plain string, the raw string's quote would end it and its "/*" open a
+		// comment that hides the code after it.
+		"\nfn script() -> &'static str {\n    r##\"a\"b /* c\"##\n}\n\nfn after() {\n    emit(\"codex.after_script\");\n}\n"
+	files := map[string]string{"codex-rs/otel/src/events/session_telemetry.rs": file}
+	// Said elsewhere too, so only its own event places it.
+	for i := range 4 {
+		files[fmt.Sprintf("codex-rs/login/src/e%d.rs", i)] = "fn f() {\n    report(\"auth.error\");\n}\n"
+	}
+	withSource(t, map[string][]byte{"rust-v0.162.0": tarball(t, files)})
+	known := map[string][]string{"codex": {"codex.websocket.request", "codex.websocket_connect"}}
+	d := Drift{Harnesses: []HarnessDrift{{Harness: "codex", Name: "Codex CLI", Version: "0.162.0", Previous: "0.162.0",
+		Added:       []FieldChange{{Surface: "logs/codex.websocket_connect", Key: "auth.error"}},
+		NewSurfaces: []SurfaceChange{{Surface: "logs/codex.after_script"}}}}}
+	linkSources(&d, known)
+	h := d.Harnesses[0]
+	if s := h.Added[0].Source; s == nil || len(s.Refs) != 1 || s.Refs[0].Line != 12 {
+		t.Errorf("auth.error, at the end of websocket_connect: %+v", s)
+	}
+	if s := h.NewSurfaces[0].Source; s == nil || len(s.Refs) != 1 || s.Refs[0].Line != 24 {
+		t.Errorf("the code after a raw string holding \"/*\": %+v", s)
+	}
+}

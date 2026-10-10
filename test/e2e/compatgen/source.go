@@ -260,11 +260,16 @@ func rank(f finding, hits map[needle][]hit, owned map[string][]owner) (all []hit
 	if f.within == "" || len(within) == 0 {
 		return unplaced()
 	}
-	// A key's line is beside its surface where the surface named nearest it, of all the
-	// harness is known to send, is its own: at what distance.
+	// A key's line is beside its surface where the surface named nearest it in the same
+	// function, of all the harness is known to send, is its own: at what distance. A key at the
+	// end of a function is not the next one's, and one in a function that names no surface the
+	// harness is known to send (an event not yet censused) is no known surface's.
 	distance := func(h hit) int {
 		best, d := "", -1
 		for _, o := range owned[h.path] {
+			if o.fn != h.fn {
+				continue
+			}
 			od := abs(o.line - h.line)
 			if d < 0 || od < d || (od == d && o.name == f.within) {
 				best, d = o.name, od
@@ -290,8 +295,8 @@ func rank(f finding, hits map[needle][]hit, owned map[string][]owner) (all []hit
 
 // owner is a line that names a surface.
 type owner struct {
-	line int
-	name string
+	line, fn int
+	name     string
 }
 
 // owners are, per file, the lines that name each of names.
@@ -299,7 +304,7 @@ func owners(hits map[needle][]hit, names []string) map[string][]owner {
 	out := map[string][]owner{}
 	for _, name := range names {
 		for _, h := range hits[needle{name, false}] {
-			out[h.path] = append(out[h.path], owner{h.line, name})
+			out[h.path] = append(out[h.path], owner{h.line, h.fn, name})
 		}
 	}
 	return out
