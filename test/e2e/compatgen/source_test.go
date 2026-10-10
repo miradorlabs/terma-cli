@@ -6,7 +6,10 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"maps"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -17,7 +20,8 @@ func tarball(t *testing.T, files map[string]string) []byte {
 	var buf bytes.Buffer
 	zw := gzip.NewWriter(&buf)
 	tw := tar.NewWriter(zw)
-	for name, body := range files {
+	for _, name := range slices.Sorted(maps.Keys(files)) {
+		body := files[name]
 		if err := tw.WriteHeader(&tar.Header{Name: "codex-rust-v0/" + name, Mode: 0o644, Size: int64(len(body)), Typeflag: tar.TypeReg}); err != nil {
 			t.Fatal(err)
 		}
@@ -138,7 +142,7 @@ func TestSourceLinks(t *testing.T) {
 	for _, want := range []string{
 		"Codex CLI 0.162.0 (was 0.161.0, [diff](https://github.com/openai/codex/compare/rust-v0.161.0...rust-v0.162.0))",
 		"`product_sku` on `logs/codex.mcp` · [mcp.rs:3](https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/core/src/mcp.rs#L3)",
-		"`codex.turn.phase` on `traces/turn` · gone from 0.162.0's source, was [turn.rs:2](https://github.com/openai/codex/blob/rust-v0.161.0/codex-rs/core/src/turn.rs#L2)",
+		"`codex.turn.phase` on `traces/turn` · gone from 0.162.0's source, was in 0.161.0's: [turn.rs:2](https://github.com/openai/codex/blob/rust-v0.161.0/codex-rs/core/src/turn.rs#L2)",
 		"`metrics/codex.rollout.persistence.append` · still in 0.162.0's source: [persistence_metrics.rs:1](",
 	} {
 		if !strings.Contains(md, want) {
@@ -195,3 +199,114 @@ func TestClipKeepsLinksWhole(t *testing.T) {
 }
 
 func itoa(n int) string { b, _ := json.Marshal(n); return string(b) }
+
+// What the real Codex tree does that a small one does not: a generic key named in hundreds
+// of lines before the one beside its metric, a metric named by a constant, test modules
+// inside source files, and a generic tag dropped from its metric but said elsewhere.
+func TestSourceLinksOnARealShapedTree(t *testing.T) {
+	before := map[string]string{
+		"codex-rs/otel/src/metrics/names.rs": "pub const TOOL_CALL_METRIC: &str = \"codex.tool.call\";\n",
+		"codex-rs/otel/src/events/telemetry.rs": "fn tool_call(name: &str) {\n    let mut tags = vec![];\n    tags.push((\"tool\", name));\n" +
+			"    self.counter(TOOL_CALL_METRIC, 1, &tags);\n}\n",
+		"codex-rs/exec/src/snapshot.rs": "fn record(state: &str) {\n    let tags = [(\"state\", state)];\n    metrics.counter(\"codex.shell_snapshot.command\", 1, &tags);\n}\n",
+		// A metric only a test module still names: no build sends it.
+		"codex-rs/proxy/src/policy.rs": "fn decide() {}\n\n#[cfg(test)]\nmod tests {\n    const LEGACY: &str = \"codex.proxy.block\";\n    fn t() { if x { y() } }\n}\n\nfn after_tests() {\n    emit(\"codex.proxy.allow\");\n}\n",
+	}
+	// "tool" and "state" said in 120 files that sort before the ones that matter.
+	for i := range 120 {
+		before[fmt.Sprintf("codex-rs/a%03d/src/lib.rs", i)] = "fn f() {\n    report(\"tool\", \"state\");\n}\n"
+	}
+	after := maps.Clone(before)
+	after["codex-rs/exec/src/snapshot.rs"] = "fn record() {\n    metrics.counter(\"codex.shell_snapshot.command\", 1, &[]);\n}\n"
+	withSource(t, map[string][]byte{"rust-v0.161.0": tarball(t, before), "rust-v0.162.0": tarball(t, after)})
+	d := Drift{Harnesses: []HarnessDrift{{Harness: "codex", Name: "Codex CLI", Version: "0.162.0", Previous: "0.161.0",
+		Added:   []FieldChange{{Surface: "metrics/codex.tool.call", Key: "tool"}},
+		Removed: []FieldChange{{Surface: "metrics/codex.shell_snapshot.command", Key: "state"}},
+		Unseen:  []GoneSurface{{Surface: "logs/codex.proxy.block"}, {Surface: "logs/codex.proxy.allow"}},
+	}}}
+	linkSources(&d)
+	h := d.Harnesses[0]
+	md := d.markdown()
+	for _, want := range []string{
+		// Beside the constant that names its metric, past the 120 other lines that say it.
+		"`tool` on `metrics/codex.tool.call` · [telemetry.rs:3](",
+		"`state` on `metrics/codex.shell_snapshot.command` · gone from 0.162.0's source, was in 0.161.0's: [snapshot.rs:2](",
+		"`logs/codex.proxy.block` · named in neither build's source",
+		"`logs/codex.proxy.allow` · still in 0.162.0's source: [policy.rs:10](",
+	} {
+		if !strings.Contains(md, want) {
+			t.Errorf("drift.md lacks %q:\n%s", want, md)
+		}
+	}
+	if s := h.Added[0].Source; s == nil || s.More != 0 {
+		t.Errorf("tool: %+v, want only the line beside its metric", s)
+	}
+}
+
+// The build before unread, a field still in the new build's source beside its surface still
+// says so; one named only away from its surface is left unlinked, not called gone.
+func TestSourceLinksWithoutTheBuildBefore(t *testing.T) {
+	withSource(t, map[string][]byte{"rust-v0.162.0": tarball(t, map[string]string{
+		"codex-rs/exec/src/snapshot.rs": "fn record(state: &str) {\n    let tags = [(\"state\", state)];\n    metrics.counter(\"codex.shell_snapshot.command\", 1, &tags);\n}\n",
+		"codex-rs/cli/src/doctor.rs":    "fn check() {\n    report(\"mode\", m);\n}\n",
+		"codex-rs/core/src/turn.rs":     "fn run() {\n    span(\"turn\");\n}\n",
+	})})
+	d := Drift{Harnesses: []HarnessDrift{{Harness: "codex", Name: "Codex CLI", Version: "0.162.0", Previous: "0.161.0",
+		Removed: []FieldChange{{Surface: "metrics/codex.shell_snapshot.command", Key: "state"}, {Surface: "traces/turn", Key: "mode"}},
+	}}}
+	linkSources(&d)
+	h := d.Harnesses[0]
+	if s := h.Removed[0].Source; s == nil || len(s.Refs) != 1 || !strings.Contains(s.note(allLinks), "still in 0.162.0's source") {
+		t.Errorf("state: %+v", s)
+	}
+	if h.Removed[1].Source != nil {
+		t.Errorf("mode, named only away from its span, was given a verdict: %+v", h.Removed[1].Source)
+	}
+	if len(d.SourceErrors) != 1 || !strings.Contains(string(mustJSON(d.slack())), "Source links left out: Codex CLI 0.161.0") {
+		t.Errorf("source errors %v not said in Slack", d.SourceErrors)
+	}
+}
+
+// A section the links would push past Slack's limit drops them, and keeps every finding;
+// a section with room keeps one link a finding.
+func TestSlackDropsLinksBeforeFindings(t *testing.T) {
+	says := &SourceSays{Version: "0.162.0", Refs: []SourceRef{
+		{Path: "codex-rs/a.rs", Line: 1, URL: "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/" + strings.Repeat("d/", 80) + "a.rs#L1"},
+		{Path: "codex-rs/b.rs", Line: 2, URL: "https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/b.rs#L2"}}}
+	h := HarnessDrift{Harness: "codex", Name: "Codex CLI", Version: "0.162.0", Previous: "0.161.0"}
+	for i := range 12 {
+		h.Added = append(h.Added, FieldChange{Surface: "logs/codex.api_request", Key: fmt.Sprint("key_", i), Source: says})
+	}
+	h.Withheld = []FieldChange{{Surface: "logs/codex.api_request", Key: "the_one_to_act_on", Source: says}}
+	big := string(mustJSON(Drift{Harnesses: []HarnessDrift{h}}.slack()))
+	if !strings.Contains(big, "the_one_to_act_on") || strings.Contains(big, "a.rs:1") {
+		t.Errorf("a section too long with links: %s", big)
+	}
+	h.Added = h.Added[:1]
+	small := string(mustJSON(Drift{Harnesses: []HarnessDrift{h}}.slack()))
+	if !strings.Contains(small, "|a.rs:1") || strings.Contains(small, "|b.rs:2") || !strings.Contains(small, "+1 more") {
+		t.Errorf("a section with room: %s", small)
+	}
+}
+
+func mustJSON(v any) []byte { b, _ := json.Marshal(v); return b }
+
+// A key as common as "model", named nowhere beside its surface, is left unlinked rather than
+// linked to lines that have nothing to do with it; one named in a few lines is linked.
+func TestSourceLinksLeaveACommonKeyUnplaced(t *testing.T) {
+	files := map[string]string{"codex-rs/otel/src/macros.rs": "macro_rules! log_event {\n    () => { info!(model = %m) };\n}\n"}
+	for i := range 10 {
+		files[fmt.Sprintf("codex-rs/a%d/src/lib.rs", i)] = "fn f() {\n    report(\"model\", m);\n}\n"
+	}
+	files["codex-rs/mcp/src/sku.rs"] = "fn sku() {\n    tags.push((\"product_sku\", s));\n}\n"
+	withSource(t, map[string][]byte{"rust-v0.162.0": tarball(t, files)})
+	d := Drift{Harnesses: []HarnessDrift{{Harness: "codex", Name: "Codex CLI", Version: "0.162.0", Previous: "0.162.0",
+		Added: []FieldChange{{Surface: "logs/codex.sse_event", Key: "model"}, {Surface: "logs/codex.mcp", Key: "product_sku"}}}}}
+	linkSources(&d)
+	if s := d.Harnesses[0].Added[0].Source; s != nil {
+		t.Errorf("model linked by its name alone: %+v", s)
+	}
+	if s := d.Harnesses[0].Added[1].Source; s == nil || len(s.Refs) != 1 {
+		t.Errorf("product_sku: %+v", s)
+	}
+}

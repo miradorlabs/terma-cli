@@ -1,15 +1,9 @@
 package main
 
 import (
-	"archive/tar"
-	"bufio"
-	"compress/gzip"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"path"
-	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -52,10 +46,11 @@ type SourceRef struct {
 }
 
 // SourceSays is where a harness's source names a finding: Refs in Version, the build it was
-// found in (for one gone, the new build), and Before in Previous, for one gone. More and
-// BeforeMore count the lines past those listed.
+// found in (for one Gone, the new build), and Before in Previous, for one gone, where the
+// build before could be read. More and BeforeMore count the lines past those listed.
 type SourceSays struct {
 	Version    string      `json:"version"`
+	Gone       bool        `json:"gone,omitempty"`
 	Refs       []SourceRef `json:"refs,omitempty"`
 	More       int         `json:"more,omitempty"`
 	Previous   string      `json:"previous,omitempty"`
@@ -63,10 +58,13 @@ type SourceSays struct {
 	BeforeMore int         `json:"before_more,omitempty"`
 }
 
-// maxRefs bounds the lines a finding links; maxHits the lines a scan keeps of one name.
+// maxRefs bounds the lines a finding links; maxHits the lines a scan keeps of one name, far
+// past any the ranking needs, so it only bounds a pathological tree; maxUnplaced the lines a
+// key may be named in to be linked by its name alone (rank).
 const (
-	maxRefs = 2
-	maxHits = 50
+	maxRefs     = 2
+	maxHits     = 10000
+	maxUnplaced = 3
 )
 
 // openSource reads a tarball of repo at tag; tests replace it.
@@ -81,81 +79,6 @@ var openSource = func(repo, tag string) (io.ReadCloser, error) {
 		return nil, fmt.Errorf("%s at %s: %s", repo, tag, resp.Status)
 	}
 	return resp.Body, nil
-}
-
-// needle is a name to find: as a quoted string, or as a name assigned to, the way a tracing
-// macro names a field ("codex.turn.phase = ...").
-type needle struct {
-	text  string
-	field bool
-}
-
-type hit struct {
-	path string
-	line int
-}
-
-var assignedName = regexp.MustCompile(`(?:^|[\s,({])([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)\s*=[^=>]`)
-
-// scan reads a tarball of s's tree, as GitHub serves one (every path under one folder), and
-// finds where each needle is named, outside tests and comments.
-func scan(r io.Reader, s source, needles map[needle]bool) (map[needle][]hit, error) {
-	zr, err := gzip.NewReader(r)
-	if err != nil {
-		return nil, err
-	}
-	tr := tar.NewReader(zr)
-	out := map[needle][]hit{}
-	add := func(n needle, h hit) {
-		if needles[n] && len(out[n]) < maxHits {
-			out[n] = append(out[n], h)
-		}
-	}
-	for {
-		h, err := tr.Next()
-		if errors.Is(err, io.EOF) {
-			return out, nil
-		}
-		if err != nil {
-			return nil, err
-		}
-		_, file, _ := strings.Cut(h.Name, "/")
-		if h.Typeflag != tar.TypeReg || !strings.HasPrefix(file, s.dir) || !strings.HasSuffix(file, s.ext) || testFile(file) {
-			continue
-		}
-		sc := bufio.NewScanner(tr)
-		sc.Buffer(make([]byte, 64<<10), 4<<20)
-		for n := 1; sc.Scan(); n++ {
-			line := sc.Text()
-			if strings.HasPrefix(strings.TrimSpace(line), "//") {
-				continue
-			}
-			parts := strings.Split(line, `"`)
-			for i := 1; i < len(parts)-1; i += 2 {
-				add(needle{parts[i], false}, hit{file, n})
-			}
-			if strings.Contains(line, "=") {
-				for _, m := range assignedName.FindAllStringSubmatchIndex(line, -1) {
-					before := strings.Fields(line[:m[2]])
-					if len(before) > 0 && slices.Contains([]string{"let", "mut", "const", "static", "type"}, before[len(before)-1]) {
-						continue
-					}
-					add(needle{line[m[2]:m[3]], true}, hit{file, n})
-				}
-			}
-		}
-		if err := sc.Err(); err != nil {
-			return nil, fmt.Errorf("%s: %w", file, err)
-		}
-	}
-}
-
-func abs(n int) int { return max(n, -n) }
-
-func testFile(file string) bool {
-	base := path.Base(file)
-	return strings.Contains(file, "/tests/") || strings.Contains(file, "/benches/") || base == "tests.rs" ||
-		strings.HasSuffix(base, "_test.rs") || strings.HasSuffix(base, "_tests.rs")
 }
 
 // surfaceName is the name a harness's source gives a surface: a log event's, a metric's, a
@@ -267,34 +190,41 @@ func linkSources(d *Drift) {
 		}
 		hitsAt, hitsBefore := read(h.Version, at), read(h.Previous, before)
 		for _, f := range fs {
-			if hitsAt == nil || (f.gone && newer && hitsBefore == nil) {
+			if hitsAt == nil {
 				continue
 			}
-			says := &SourceSays{Version: h.Version}
-			says.Refs, says.More = refsOf(s, h.Version, f, hitsAt)
-			if f.gone && newer {
-				says.Previous = h.Previous
-				says.Before, says.BeforeMore = refsOf(s, h.Previous, f, hitsBefore)
+			at, atBeside, placed := rank(f, hitsAt)
+			says := &SourceSays{Version: h.Version, Gone: f.gone && newer}
+			if says.Gone && hitsBefore != nil {
+				before, beforeBeside, beforePlaced := rank(f, hitsBefore)
+				// A key gone is still in the source only where it is still beside its surface:
+				// a generic key ("state") is named elsewhere whether or not its metric keeps it.
+				if beforeBeside && !atBeside {
+					at, placed = nil, true
+				}
+				if beforePlaced {
+					says.Previous = h.Previous
+					says.Before, says.BeforeMore = refs(s, h.Previous, before)
+				}
 			}
+			// Unplaced, or with the build before unread named only away from its surface (it
+			// may be gone), a finding is left unlinked rather than linked to what it is not.
+			if !placed || (says.Gone && says.Previous == "" && f.within != "" && !atBeside) {
+				continue
+			}
+			says.Refs, says.More = refs(s, h.Version, at)
 			*f.says = says
 		}
 	}
 }
 
-func scanBuild(s source, version string, needles map[needle]bool) (map[needle][]hit, error) {
-	r, err := openSource(s.repo, s.tagOf(version))
-	if err != nil {
-		return nil, err
-	}
-	defer r.Close()
-	return scan(r, s, needles)
-}
-
-// refsOf links the lines that name f in version, at most maxRefs, and counts the rest. A key
-// whose surface the source names is linked only in the files that name both, nearest that
-// name first; any other finding, a quoted name before an assigned one.
-func refsOf(s source, version string, f finding, hits map[needle][]hit) ([]SourceRef, int) {
-	var all []hit
+// rank orders the lines that name f, and says whether they sit beside its surface: a key
+// whose surface the build's source names is ranked by the files that name both, nearest that
+// name first; any other finding, a quoted name before an assigned one. A key named nowhere
+// beside its surface is placed only if the source names it in at most maxUnplaced lines:
+// a name as common as "model" placed by its name alone would link lines that have nothing to
+// do with the finding.
+func rank(f finding, hits map[needle][]hit) (all []hit, beside, placed bool) {
 	for _, n := range f.names() {
 		for _, h := range hits[n] {
 			if !slices.Contains(all, h) {
@@ -302,30 +232,43 @@ func refsOf(s source, version string, f finding, hits map[needle][]hit) ([]Sourc
 			}
 		}
 	}
-	if within := hits[needle{f.within, false}]; f.within != "" && len(within) > 0 {
-		distance := func(h hit) int {
-			d := -1
-			for _, w := range within {
-				if w.path == h.path && (d < 0 || abs(w.line-h.line) < d) {
-					d = abs(w.line - h.line)
-				}
-			}
-			return d
+	unplaced := func() ([]hit, bool, bool) {
+		if !f.surface && len(all) > maxUnplaced {
+			return nil, false, false
 		}
-		var beside []hit
-		for _, h := range all {
-			if distance(h) >= 0 {
-				beside = append(beside, h)
+		return all, false, true
+	}
+	within := hits[needle{f.within, false}]
+	if f.within == "" || len(within) == 0 {
+		return unplaced()
+	}
+	distance := func(h hit) int {
+		d := -1
+		for _, w := range within {
+			if w.path == h.path && (d < 0 || abs(w.line-h.line) < d) {
+				d = abs(w.line - h.line)
 			}
 		}
-		if len(beside) > 0 {
-			slices.SortStableFunc(beside, func(a, b hit) int { return distance(a) - distance(b) })
-			all = beside
+		return d
+	}
+	var near []hit
+	for _, h := range all {
+		if distance(h) >= 0 {
+			near = append(near, h)
 		}
 	}
-	var refs []SourceRef
-	for _, h := range all[:min(len(all), maxRefs)] {
-		refs = append(refs, SourceRef{Path: h.path, Line: h.line, URL: s.blob(version, h.path, h.line)})
+	if len(near) == 0 {
+		return unplaced()
 	}
-	return refs, len(all) - len(refs)
+	slices.SortStableFunc(near, func(a, b hit) int { return distance(a) - distance(b) })
+	return near, true, true
+}
+
+// refs links at most maxRefs of hits in version, and counts the rest.
+func refs(s source, version string, hits []hit) ([]SourceRef, int) {
+	var out []SourceRef
+	for _, h := range hits[:min(len(hits), maxRefs)] {
+		out = append(out, SourceRef{Path: h.path, Line: h.line, URL: s.blob(version, h.path, h.line)})
+	}
+	return out, len(hits) - len(out)
 }

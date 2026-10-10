@@ -239,12 +239,15 @@ runs over two nights against a scratch origin. The digest,
 For a harness whose source is public (Codex, `sources` in `compatgen/source.go`; one line
 adds another), `-source` links each of these to the lines of the build's source that name
 it, read from its release tag's tarball, and a new build's headline links the comparison
-of the two tags. A key is linked beside its surface's name, so a generic key leads to its
-metric, not to every line that says it. A field or surface gone says which it is: **still in**
-the new build's source (it was not sent tonight: a condition, a schedule, a scenario) or
-**gone from** it (removed), with where the build before named it. A source that cannot be
-read leaves its findings unlinked, and the digest says so. Nothing is read on a night with
-nothing to link.
+of the two tags. Tests, test modules and comments are not the build's source. A key is
+linked beside its surface's name (or the constant that holds it), so a generic key leads to
+its metric, not to every line that says it; a key named nowhere beside its surface is linked
+only if a few lines name it, and a name as common as `model` is left unlinked. A field or
+surface gone says which it is: **still in** the new build's source beside its surface (it was
+not sent tonight: a condition, a schedule, a scenario) or **gone from** it (removed), with
+where the build before named it. Slack shows one link a finding, and none where the links
+would cut a section short. A source that cannot be read leaves its findings unlinked, and
+the digest says so. Nothing is read on a night with nothing to link.
 
 It also lists capabilities whose result changed, and says so when the census did not run,
 did not reach a harness censused within the week, or did not reach the newest build: the

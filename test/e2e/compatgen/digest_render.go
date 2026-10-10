@@ -78,13 +78,29 @@ func renderLinks(s string, slack bool) string {
 	return linkMark.ReplaceAllString(s, "[$2]($1)")
 }
 
+// detail is how much of a source note a format has room for: every link, one link a
+// finding, or the note's words alone.
+type detail int
+
+const (
+	allLinks detail = iota
+	oneLink
+	noLinks
+)
+
 // note is where a harness's source names a finding: its lines, or for one gone, whether the
 // new build's source still names it, or where the build before did.
-func (s *SourceSays) note() string {
+func (s *SourceSays) note(d detail) string {
 	if s == nil {
 		return ""
 	}
 	refs := func(rs []SourceRef, more int) string {
+		if d == noLinks {
+			return ""
+		}
+		if d == oneLink && len(rs) > 1 {
+			rs, more = rs[:1], more+len(rs)-1
+		}
 		var out []string
 		for _, r := range rs {
 			out = append(out, link(r.URL, fmt.Sprintf("%s:%d", path.Base(r.Path), r.Line)))
@@ -94,15 +110,24 @@ func (s *SourceSays) note() string {
 		}
 		return strings.Join(out, ", ")
 	}
+	says := func(verdict string, rs []SourceRef, more int) string {
+		if r := refs(rs, more); r != "" {
+			return " · " + verdict + ": " + r
+		}
+		return " · " + verdict
+	}
 	switch {
-	case s.Previous == "" && len(s.Refs) == 0:
+	case !s.Gone:
+		if r := refs(s.Refs, s.More); r != "" {
+			return " · " + r
+		}
 		return ""
-	case s.Previous == "":
-		return " · " + refs(s.Refs, s.More)
 	case len(s.Refs) > 0:
-		return " · still in " + s.Version + "'s source: " + refs(s.Refs, s.More)
+		return says("still in "+s.Version+"'s source", s.Refs, s.More)
 	case len(s.Before) > 0:
-		return " · gone from " + s.Version + "'s source, was " + refs(s.Before, s.BeforeMore)
+		return says("gone from "+s.Version+"'s source, was in "+s.Previous+"'s", s.Before, s.BeforeMore)
+	case s.Previous == "":
+		return " · not named in " + s.Version + "'s source"
 	}
 	return " · named in neither build's source"
 }
@@ -123,36 +148,36 @@ func listed(lines []string) []string {
 	return append(slices.Clip(lines[:maxListed]), fmt.Sprintf("… and %d more", len(lines)-maxListed))
 }
 
-func changeLines(cs []FieldChange, withClass bool) []string {
+func changeLines(cs []FieldChange, withClass bool, d detail) []string {
 	var out []string
 	for _, c := range cs {
 		line := "`" + c.Key + "` on `" + c.Surface + "`"
 		if withClass && c.Class != "" {
 			line += " (" + classLabel[c.Class] + ")"
 		}
-		out = append(out, line+c.Source.note())
+		out = append(out, line+c.Source.note(d))
 	}
 	return listed(out)
 }
 
-func surfaceLines(ss []SurfaceChange) []string {
+func surfaceLines(ss []SurfaceChange, d detail) []string {
 	var out []string
 	for _, s := range ss {
-		out = append(out, fmt.Sprintf("`%s` (%s, %d new)%s", s.Surface, plural(s.Keys, "key"), s.NewKeys, s.Source.note()))
+		out = append(out, fmt.Sprintf("`%s` (%s, %d new)%s", s.Surface, plural(s.Keys, "key"), s.NewKeys, s.Source.note(d)))
 	}
 	return listed(out)
 }
 
-func goneLines(ss []GoneSurface) []string {
+func goneLines(ss []GoneSurface, d detail) []string {
 	var out []string
 	for _, s := range ss {
-		out = append(out, "`"+s.Surface+"`"+s.Source.note())
+		out = append(out, "`"+s.Surface+"`"+s.Source.note(d))
 	}
 	return listed(out)
 }
 
-// sections are what a harness's change says, titled.
-func (h HarnessDrift) sections() []struct {
+// sections are what a harness's change says, titled, with as much of each source note as d.
+func (h HarnessDrift) sections(d detail) []struct {
 	title string
 	lines []string
 } {
@@ -160,11 +185,11 @@ func (h HarnessDrift) sections() []struct {
 		title string
 		lines []string
 	}{
-		{"New surfaces", surfaceLines(h.NewSurfaces)},
-		{"New fields", changeLines(h.Added, true)},
-		{"Removed fields", changeLines(h.Removed, true)},
-		{"Surfaces no longer sent", goneLines(h.Unseen)},
-		{"Newly withheld by the relay, unclassified", changeLines(h.Withheld, false)},
+		{"New surfaces", surfaceLines(h.NewSurfaces, d)},
+		{"New fields", changeLines(h.Added, true, d)},
+		{"Removed fields", changeLines(h.Removed, true, d)},
+		{"Surfaces no longer sent", goneLines(h.Unseen, d)},
+		{"Newly withheld by the relay, unclassified", changeLines(h.Withheld, false, d)},
 	}
 }
 
@@ -243,7 +268,7 @@ func (d Drift) markdown() string {
 			continue
 		}
 		fmt.Fprintf(&b, "## %s\n\n", h.headline())
-		for _, sec := range h.sections() {
+		for _, sec := range h.sections(allLinks) {
 			if len(sec.lines) == 0 {
 				continue
 			}
@@ -314,8 +339,9 @@ func slackEscape(s string) string {
 func (d Drift) slack() map[string]any {
 	type block = map[string]any
 	text := func(s string) block { return block{"type": "mrkdwn", "text": s} }
+	slackText := func(s string) string { return renderLinks(slackEscape(s), true) }
 	section := func(s string) block {
-		return block{"type": "section", "text": text(clip(renderLinks(slackEscape(s), true), sectionLimit))}
+		return block{"type": "section", "text": text(clip(slackText(s), sectionLimit))}
 	}
 	summary := "Harness drift: no changes"
 	if !d.Quiet() {
@@ -332,20 +358,32 @@ func (d Drift) slack() map[string]any {
 		if !h.changed() {
 			continue
 		}
-		var b strings.Builder
-		b.WriteString("*" + h.headline() + "*")
-		for _, sec := range h.sections() {
-			if len(sec.lines) > 0 {
-				b.WriteString("\n_" + sec.title + "_\n• " + strings.Join(sec.lines, "\n• "))
+		// One source link a finding; none, where the links would push the section past its
+		// limit and cut the findings at its end (drift.md has them all).
+		said := func(d detail) string {
+			var b strings.Builder
+			b.WriteString("*" + h.headline() + "*")
+			for _, sec := range h.sections(d) {
+				if len(sec.lines) > 0 {
+					b.WriteString("\n_" + sec.title + "_\n• " + strings.Join(sec.lines, "\n• "))
+				}
 			}
+			return b.String()
 		}
-		blocks = append(blocks, section(b.String()))
+		s := said(oneLink)
+		if len(slackText(s)) > sectionLimit {
+			s = said(noLinks)
+		}
+		blocks = append(blocks, section(s))
 	}
 	if u := d.unchanged(); u != "" && !d.Quiet() {
 		blocks = append(blocks, section("_Unchanged:_ "+u))
 	}
 	if s := d.stillWithheld(); s != "" {
 		blocks = append(blocks, section(s))
+	}
+	if len(d.SourceErrors) > 0 {
+		blocks = append(blocks, section("_Source links left out: "+strings.Join(d.SourceErrors, "; ")+"._"))
 	}
 	if len(d.Compat) > 0 {
 		var lines []string
