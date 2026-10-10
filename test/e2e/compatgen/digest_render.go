@@ -23,17 +23,7 @@ func (h HarnessDrift) headline() string {
 		}
 		return fmt.Sprintf("%s %s: first census, %s, %s", h.Name, build, plural(h.Surfaces, "surface"), plural(h.Keys, "key"))
 	}
-	build := h.Version
-	switch {
-	case h.Unreached == h.Previous && h.Unreached != "":
-		build += " (" + h.Unreached + ", the newest censused before, was not reached)"
-	case h.Unreached != "":
-		build += " (" + h.Unreached + ", run tonight, was not reached)"
-	case h.Previous != h.Version && h.Since != "":
-		build += " (was " + h.Previous + "; judged against " + h.Since + ", the last whole census" + h.compareLink() + ")"
-	case h.Previous != h.Version:
-		build += " (was " + h.Previous + h.compareLink() + ")"
-	}
+	build := h.build("")
 	var parts []string
 	// Each says its plural, which is not always its last word's.
 	for _, p := range []struct {
@@ -59,6 +49,28 @@ func (h HarnessDrift) headline() string {
 		parts = append(parts, "no field changes")
 	}
 	return h.Name + " " + build + ": " + strings.Join(parts, ", ")
+}
+
+// build is the build a harness's line names, and what it was compared with: the build before
+// it (newBuild says it is one, on a line of builds with nothing new), the build not reached,
+// the build what is gone was judged against, and the comparison of their source.
+func (h HarnessDrift) build(newBuild string) string {
+	var notes []string
+	switch {
+	case h.Unreached == h.Previous && h.Unreached != "":
+		notes = append(notes, h.Unreached+", the newest censused before, was not reached")
+	case h.Unreached != "":
+		notes = append(notes, h.Unreached+", run tonight, was not reached")
+	case h.Previous != h.Version:
+		notes = append(notes, newBuild+"was "+h.Previous)
+	}
+	if h.Since != "" {
+		notes = append(notes, "judged against "+h.Since+", the last whole census")
+	}
+	if len(notes) == 0 {
+		return h.Version
+	}
+	return h.Version + " (" + strings.Join(notes, "; ") + h.compareLink() + ")"
 }
 
 // compareLink links the source's changes since Previous, where they are public.
@@ -225,11 +237,7 @@ func (d Drift) unchanged() string {
 		if h.changed() {
 			continue
 		}
-		b := h.Name + " " + h.Version
-		if h.Previous != h.Version {
-			b += " (new build, was " + h.Previous + h.compareLink() + ")"
-		}
-		builds = append(builds, b)
+		builds = append(builds, h.Name+" "+h.build("new build, "))
 	}
 	return strings.Join(builds, ", ")
 }

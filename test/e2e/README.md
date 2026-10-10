@@ -216,7 +216,8 @@ The catalog, `docs/compat/fields.json`, lives beside the compatibility history o
 `compat-matrix` branch, and `docs/FIELDS.md` renders it: per harness, per surface, each key's
 class, kinds, the first build it was seen in, and whether the newest build still has it. A
 key keeps its first build and its newest five, and its kinds and class are the newest
-build's; a harness keeps its newest five censuses, and five whole ones however old (a
+build's, and it also keeps the newest whole build that saw it; a harness keeps its newest
+five censuses, and five whole ones however old (a
 partial census, one a census scenario failed before taking whole, does not push out the
 whole ones), and a key leaves once none of them saw it. The file holds one entry a line, so a night's change is a diff of what changed.
 
@@ -235,8 +236,8 @@ runs over two nights against a scratch origin. The digest,
   did not reach an error path is no evidence, and only from a whole census: a night one of
   whose census scenarios failed for the build says its census is partial and judges nothing
   removed; a build is judged once, on its first whole census, against the newest older one
-  and every partial build since (what those saw, they saw), and the digest names that build
-  where it is not the previous one
+  (a partial census is a failed run, where keys of an error path come, so it is no evidence),
+  and the digest names that build where it is not the previous one
 - **newly withheld fields**: unclassified keys the relay drops;
   classify each in `internal/relay/allow.go`, an agent's capture rules, or as content. Those
   still withheld from before are one reminder line until they are.

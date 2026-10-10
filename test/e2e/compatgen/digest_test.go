@@ -227,3 +227,61 @@ func TestARemovalAcrossPartialBuilds(t *testing.T) {
 		t.Errorf("previous %s, since %s, headline %q", h.Previous, h.Since, h.headline())
 	}
 }
+
+// A key only a failed run saw, an error path's, is no evidence the build before sent it: a
+// whole build without it reports nothing removed.
+func TestAKeyOnlyAPartialRunSawIsNotRemoved(t *testing.T) {
+	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
+	var cat Catalog
+	mergeFields(&cat, []e2e.FieldRow{field("0.150.0", "logs/codex.api_request", "model", "safe", day)}, nil)
+	mergeFields(&cat, []e2e.FieldRow{
+		field("0.151.0", "logs/codex.api_request", "model", "safe", day.Add(24*time.Hour)),
+		field("0.151.0", "logs/codex.api_request", "error.message", "prompt", day.Add(24*time.Hour)),
+	}, map[string]bool{"codex\x000.151.0": true})
+	tonight := []e2e.FieldRow{field("0.152.0", "logs/codex.api_request", "model", "safe", day.Add(48*time.Hour))}
+	ran := censusRan([]e2e.CompatRow{{Harness: "codex", Version: "0.152.0", Capability: e2e.CensusCapability, Result: "pass"}})
+	if _, _, hs := fieldDrift(cat, tonight, ran, day.Add(48*time.Hour)); len(hs[0].Removed) != 0 {
+		t.Errorf("removed %+v: only a failed run sent it", hs[0].Removed)
+	}
+}
+
+// Ten partial builds in a row, the first five seeing a key and the rest not, prune neither
+// the key nor the whole census that saw it: the whole build after them reports it removed.
+func TestTenPartialBuildsKeepAKeyTheWholeCensusSaw(t *testing.T) {
+	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
+	night := func(i int) time.Time { return day.Add(time.Duration(i) * 24 * time.Hour) }
+	var cat Catalog
+	mergeFields(&cat, []e2e.FieldRow{field("0.150.0", "logs/codex.api_request", "model", "safe", night(0)),
+		field("0.150.0", "logs/codex.api_request", "attempt", "safe", night(0))}, nil)
+	for i := 1; i <= 2*keepCensuses; i++ {
+		v := fmt.Sprintf("0.1%d.0", 50+i)
+		rows := []e2e.FieldRow{field(v, "logs/codex.api_request", "model", "safe", night(i))}
+		if i <= keepCensuses {
+			rows = append(rows, field(v, "logs/codex.api_request", "attempt", "safe", night(i)))
+		}
+		mergeFields(&cat, rows, map[string]bool{"codex\x00" + v: true})
+	}
+	if !slices.ContainsFunc(cat.Fields, func(f FieldEntry) bool { return f.Key == "attempt" && slices.Contains(f.Versions, "0.150.0") }) {
+		t.Fatalf("attempt, or its whole build, pruned: %+v", cat.Fields)
+	}
+	tonight := []e2e.FieldRow{field("0.170.0", "logs/codex.api_request", "model", "safe", night(20))}
+	ran := censusRan([]e2e.CompatRow{{Harness: "codex", Version: "0.170.0", Capability: e2e.CensusCapability, Result: "pass"}})
+	if _, _, hs := fieldDrift(cat, tonight, ran, night(20)); len(hs[0].Removed) != 1 || hs[0].Removed[0].Key != "attempt" {
+		t.Errorf("removed %+v, want attempt", hs[0].Removed)
+	}
+}
+
+// A build judged against an older one than the build before says so, on every line that
+// names it.
+func TestTheBuildJudgedAgainstIsNamed(t *testing.T) {
+	h := HarnessDrift{Harness: "codex", Name: "Codex CLI", Version: "0.162.0", Previous: "0.162.0", Since: "0.161.0",
+		Removed: []FieldChange{{Surface: "logs/x", Key: "k"}}}
+	if got := h.headline(); !strings.HasPrefix(got, "Codex CLI 0.162.0 (judged against 0.161.0, the last whole census): 1 removed field") {
+		t.Errorf("headline %q", got)
+	}
+	h.Removed, h.Previous, h.Compare = nil, "0.162.0", "https://c"
+	h.Version = "0.162.1"
+	if got := (Drift{Harnesses: []HarnessDrift{h}}).unchanged(); got != "Codex CLI 0.162.1 (new build, was 0.162.0; judged against 0.161.0, the last whole census, \x00https://c\x01diff\x02)" {
+		t.Errorf("unchanged %q", got)
+	}
+}

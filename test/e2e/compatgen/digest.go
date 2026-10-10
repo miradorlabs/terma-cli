@@ -259,14 +259,11 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran censusRuns, now time.Time)
 			if whole.Version != d.Previous {
 				d.Since = whole.Version
 			}
-			// A key was sent if a build from the whole census to this one sent it: the builds in
-			// between were partial, but what they saw they saw. (A key keeps only its newest
-			// builds, which partial ones may fill.)
-			sentSince := func(f FieldEntry) bool {
-				return slices.ContainsFunc(f.Versions, func(v string) bool { return !versionLess(v, whole.Version) && versionLess(v, version) })
-			}
+			// Only what the whole census saw is evidence: a partial census is a failed run, where
+			// keys of an error path come. (A key keeps its newest whole build, however many
+			// partial ones come after it.)
 			for _, f := range cat.Fields {
-				if f.Harness != harness || !sentSince(f) || !sent[f.Surface] {
+				if f.Harness != harness || !slices.Contains(f.Versions, whole.Version) || !sent[f.Surface] {
 					continue
 				}
 				if _, ok := tonight[f.Surface+"\x00"+f.Key]; !ok {

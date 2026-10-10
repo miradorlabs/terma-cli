@@ -77,6 +77,19 @@ func mergeFields(cat *Catalog, rows []e2e.FieldRow, partial map[string]bool) {
 		fields[cat.Fields[i].id()] = &cat.Fields[i]
 	}
 	var added []*FieldEntry
+	// The builds censused whole, before this run and by it: a key keeps the newest of them
+	// that saw it, whatever partial builds came after, for removals to be judged against.
+	wholeBuild := map[string]bool{}
+	for _, c := range cat.Censuses {
+		if !c.Partial {
+			wholeBuild[c.id()] = true
+		}
+	}
+	for _, r := range rows {
+		if id := r.Harness + "\x00" + r.Version; !partial[id] {
+			wholeBuild[id] = true
+		}
+	}
 	type build struct{ harness, version string }
 	seen := map[build]map[string]bool{}
 	at := map[build]time.Time{}
@@ -106,7 +119,7 @@ func mergeFields(cat *Catalog, rows []e2e.FieldRow, partial map[string]bool) {
 		if !slices.Contains(f.Versions, r.Version) {
 			f.Versions = append(f.Versions, r.Version)
 			sortVersionsDesc(f.Versions)
-			f.Versions = f.Versions[:min(len(f.Versions), keepVersions)]
+			f.Versions = keepNewest(f.Versions, func(v string) bool { return wholeBuild[f.Harness+"\x00"+v] })
 		}
 		// The kinds are the newest build's: a key an old build sent as text and a new one as a
 		// number is no longer withheld. Its class, and what the relay keeps of it, are the latest
@@ -177,6 +190,21 @@ func mergeFields(cat *Catalog, rows []e2e.FieldRow, partial map[string]bool) {
 	cat.Fields = slices.DeleteFunc(cat.Fields, func(f FieldEntry) bool {
 		return !slices.ContainsFunc(f.Versions, func(v string) bool { return censused[f.Harness+"\x00"+v] })
 	})
+}
+
+// keepNewest keeps the newest keepVersions of vs, newest first, and the newest whole one
+// past them.
+func keepNewest(vs []string, whole func(string) bool) []string {
+	if len(vs) <= keepVersions {
+		return vs
+	}
+	kept := slices.Clone(vs[:keepVersions])
+	if !slices.ContainsFunc(kept, whole) {
+		if i := slices.IndexFunc(vs[keepVersions:], whole); i >= 0 {
+			kept = append(kept, vs[keepVersions+i])
+		}
+	}
+	return kept
 }
 
 func sortVersionsDesc(vs []string) {
