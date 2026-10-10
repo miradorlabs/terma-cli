@@ -76,6 +76,8 @@ var (
 	// constName is a constant that names a string ("const TOOL_CALL_METRIC: &str = "...""):
 	// the code that records a surface often names it by the constant.
 	constName = regexp.MustCompile(`\bconst\s+([A-Z][A-Z0-9_]*)\s*:\s*&(?:'static\s+)?str\s*=\s*"([^"]*)"`)
+	// constHead is one whose string is on the next line.
+	constHead = regexp.MustCompile(`\bconst\s+([A-Z][A-Z0-9_]*)\s*:\s*&(?:'static\s+)?str\s*=\s*$`)
 	upperName = regexp.MustCompile(`\b[A-Z][A-Z0-9_]+\b`)
 )
 
@@ -109,12 +111,18 @@ func scan(r io.Reader, s source, needles map[needle]bool, aliases map[string]str
 		sc := bufio.NewScanner(tr)
 		sc.Buffer(make([]byte, 64<<10), 4<<20)
 		var tests testModule
+		pending := "" // a constant whose string is on this line
 		for n := 1; sc.Scan(); n++ {
 			line := sc.Text()
-			if tests.skip(line) || strings.HasPrefix(strings.TrimSpace(line), "//") {
+			t := strings.TrimSpace(line)
+			if tests.skip(line) || strings.HasPrefix(t, "//") {
 				continue
 			}
 			if aliases != nil {
+				// An import names the constant, not the surface's use.
+				if strings.HasPrefix(t, "use ") || strings.HasPrefix(t, "pub use ") || strings.HasPrefix(t, "pub(crate) use ") {
+					continue
+				}
 				for _, name := range upperName.FindAllString(line, -1) {
 					if lit, ok := aliases[name]; ok && !constName.MatchString(line) {
 						add(needle{lit, false}, hit{file, n})
@@ -128,6 +136,13 @@ func scan(r io.Reader, s source, needles map[needle]bool, aliases map[string]str
 			}
 			if m := constName.FindStringSubmatch(line); m != nil && needles[needle{m[2], false}] {
 				found[m[1]] = m[2]
+			}
+			if pending != "" && len(parts) > 2 && strings.HasPrefix(t, `"`) && needles[needle{parts[1], false}] {
+				found[pending] = parts[1]
+			}
+			pending = ""
+			if m := constHead.FindStringSubmatch(line); m != nil {
+				pending = m[1]
 			}
 			if strings.Contains(line, "=") {
 				for _, m := range assignedName.FindAllStringSubmatchIndex(line, -1) {
@@ -151,13 +166,28 @@ func scan(r io.Reader, s source, needles map[needle]bool, aliases map[string]str
 type testModule struct {
 	cfg   bool // the last attribute was #[cfg(test)]
 	depth int  // inside the module, its braces open
+	raw   bool // inside a raw string (r#"…"#), whose braces are text
 }
 
 func (m *testModule) skip(line string) bool {
 	t := strings.TrimSpace(line)
 	braces := func() int {
+		code := line
+		if m.raw {
+			end := strings.Index(code, `"#`)
+			if end < 0 {
+				return 0
+			}
+			m.raw, code = false, code[end+2:]
+		}
+		if start := strings.Index(code, `r#"`); start >= 0 {
+			if !strings.Contains(code[start+3:], `"#`) {
+				m.raw = true
+			}
+			code = code[:start]
+		}
 		n := 0
-		for i, part := range strings.Split(line, `"`) {
+		for i, part := range strings.Split(code, `"`) {
 			if i%2 == 0 {
 				n += strings.Count(part, "{") - strings.Count(part, "}")
 			}

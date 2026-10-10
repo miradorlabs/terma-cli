@@ -240,8 +240,10 @@ For a harness whose source is public (Codex, `sources` in `compatgen/source.go`;
 adds another), `-source` links each of these to the lines of the build's source that name
 it, read from its release tag's tarball, and a new build's headline links the comparison
 of the two tags. Tests, test modules and comments are not the build's source. A key is
-linked beside its surface's name (or the constant that holds it), so a generic key leads to
-its metric, not to every line that says it; a key named nowhere beside its surface is linked
+linked beside its surface's name (or the constant that holds it): a line that names a key
+belongs to the surface named nearest it, of all the harness is known to send, so a generic
+key leads to its own metric or event, not to every line that says it nor to another event in
+the same file; a key named nowhere beside its surface is linked
 only if a few lines name it, and a name as common as `model` is left unlinked. A field or
 surface gone says which it is: **still in** the new build's source beside its surface (it was
 not sent tonight: a condition, a schedule, a scenario) or **gone from** it (removed), with

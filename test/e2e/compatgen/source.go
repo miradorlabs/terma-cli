@@ -3,10 +3,13 @@ package main
 import (
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/miradorlabs/terma-cli/e2e"
 )
 
 // Source links. With -source, a finding about a harness whose source is public links the
@@ -153,7 +156,11 @@ func (h *HarnessDrift) findings() []finding {
 }
 
 // linkSources links d's findings to the source of each harness whose source is public.
-func linkSources(d *Drift) {
+//
+// known names, per harness, every surface it is known to send (knownSurfaces): a line that
+// names a key belongs to the surface named nearest it, so in a file that names many (Codex
+// keeps its log events in one) a key is placed by the surface that owns its line.
+func linkSources(d *Drift, known map[string][]string) {
 	for i := range d.Harnesses {
 		h := &d.Harnesses[i]
 		s, ok := sources[h.Harness]
@@ -169,12 +176,23 @@ func linkSources(d *Drift) {
 			continue
 		}
 		at, before := map[needle]bool{}, map[needle]bool{}
+		names := slices.Clone(known[h.Harness])
+		gone := false
 		for _, f := range fs {
 			for _, n := range f.needles() {
 				at[n] = true
 				if f.gone && newer {
-					before[n] = true
+					before[n], gone = true, true
 				}
+			}
+			if f.within != "" {
+				names = append(names, f.within)
+			}
+		}
+		for _, name := range names {
+			at[needle{name, false}] = true
+			if gone {
+				before[needle{name, false}] = true
 			}
 		}
 		read := func(version string, needles map[needle]bool) map[needle][]hit {
@@ -193,10 +211,10 @@ func linkSources(d *Drift) {
 			if hitsAt == nil {
 				continue
 			}
-			at, atBeside, placed := rank(f, hitsAt)
+			at, atBeside, placed := rank(f, hitsAt, owners(hitsAt, names))
 			says := &SourceSays{Version: h.Version, Gone: f.gone && newer}
 			if says.Gone && hitsBefore != nil {
-				before, beforeBeside, beforePlaced := rank(f, hitsBefore)
+				before, beforeBeside, beforePlaced := rank(f, hitsBefore, owners(hitsBefore, names))
 				// A key gone is still in the source only where it is still beside its surface:
 				// a generic key ("state") is named elsewhere whether or not its metric keeps it.
 				if beforeBeside && !atBeside {
@@ -224,7 +242,7 @@ func linkSources(d *Drift) {
 // beside its surface is placed only if the source names it in at most maxUnplaced lines:
 // a name as common as "model" placed by its name alone would link lines that have nothing to
 // do with the finding.
-func rank(f finding, hits map[needle][]hit) (all []hit, beside, placed bool) {
+func rank(f finding, hits map[needle][]hit, owned map[string][]owner) (all []hit, beside, placed bool) {
 	for _, n := range f.names() {
 		for _, h := range hits[n] {
 			if !slices.Contains(all, h) {
@@ -242,12 +260,18 @@ func rank(f finding, hits map[needle][]hit) (all []hit, beside, placed bool) {
 	if f.within == "" || len(within) == 0 {
 		return unplaced()
 	}
+	// A key's line is beside its surface where the surface named nearest it, of all the
+	// harness is known to send, is its own: at what distance.
 	distance := func(h hit) int {
-		d := -1
-		for _, w := range within {
-			if w.path == h.path && (d < 0 || abs(w.line-h.line) < d) {
-				d = abs(w.line - h.line)
+		best, d := "", -1
+		for _, o := range owned[h.path] {
+			od := abs(o.line - h.line)
+			if d < 0 || od < d || (od == d && o.name == f.within) {
+				best, d = o.name, od
 			}
+		}
+		if best != f.within {
+			return -1
 		}
 		return d
 	}
@@ -262,6 +286,48 @@ func rank(f finding, hits map[needle][]hit) (all []hit, beside, placed bool) {
 	}
 	slices.SortStableFunc(near, func(a, b hit) int { return distance(a) - distance(b) })
 	return near, true, true
+}
+
+// owner is a line that names a surface.
+type owner struct {
+	line int
+	name string
+}
+
+// owners are, per file, the lines that name each of names.
+func owners(hits map[needle][]hit, names []string) map[string][]owner {
+	out := map[string][]owner{}
+	for _, name := range names {
+		for _, h := range hits[needle{name, false}] {
+			out[h.path] = append(out[h.path], owner{h.line, name})
+		}
+	}
+	return out
+}
+
+// knownSurfaces names, per harness, the surfaces the catalog and the night's census know it
+// to send, by the names its source gives them.
+func knownSurfaces(cat Catalog, rows []e2e.FieldRow) map[string][]string {
+	set := map[string]map[string]bool{}
+	add := func(harness, surface string) {
+		if name, ok := surfaceName(surface); ok {
+			if set[harness] == nil {
+				set[harness] = map[string]bool{}
+			}
+			set[harness][name] = true
+		}
+	}
+	for _, f := range cat.Fields {
+		add(f.Harness, f.Surface)
+	}
+	for _, r := range rows {
+		add(r.Harness, r.Surface)
+	}
+	out := map[string][]string{}
+	for h, names := range set {
+		out[h] = slices.Sorted(maps.Keys(names))
+	}
+	return out
 }
 
 // refs links at most maxRefs of hits in version, and counts the rest.

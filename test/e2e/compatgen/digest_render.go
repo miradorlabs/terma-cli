@@ -360,10 +360,10 @@ func (d Drift) slack() map[string]any {
 		}
 		// One source link a finding; none, where the links would push the section past its
 		// limit and cut the findings at its end (drift.md has them all).
-		said := func(d detail) string {
+		said := func(level detail) string {
 			var b strings.Builder
 			b.WriteString("*" + h.headline() + "*")
-			for _, sec := range h.sections(d) {
+			for _, sec := range h.sections(level) {
 				if len(sec.lines) > 0 {
 					b.WriteString("\n_" + sec.title + "_\n• " + strings.Join(sec.lines, "\n• "))
 				}

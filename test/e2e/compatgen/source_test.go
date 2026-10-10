@@ -102,7 +102,7 @@ func TestSourceLinks(t *testing.T) {
 		Removed:  []FieldChange{{Surface: "traces/turn", Key: "codex.turn.phase"}},
 		Unseen:   []GoneSurface{{Surface: "metrics/codex.rollout.persistence.append"}, {Surface: "resource"}},
 	}}}
-	linkSources(&d)
+	linkSources(&d, nil)
 	h := d.Harnesses[0]
 	if h.Compare != "https://github.com/openai/codex/compare/rust-v0.161.0...rust-v0.162.0" {
 		t.Errorf("compare = %q", h.Compare)
@@ -171,7 +171,7 @@ func TestSourceLinksFailOpen(t *testing.T) {
 		{Harness: "codex", Name: "Codex CLI", Version: "0.163.0", Previous: "0.162.0", Added: []FieldChange{{Surface: "logs/x", Key: "k"}}},
 		{Harness: "claude", Name: "Claude Code", Version: "2.1.296", Previous: "2.1.295", Added: []FieldChange{{Surface: "logs/x", Key: "k"}}},
 	}}
-	linkSources(&d)
+	linkSources(&d, nil)
 	if d.Harnesses[0].Added[0].Source != nil || d.Harnesses[1].Added[0].Source != nil || d.Harnesses[1].Compare != "" {
 		t.Errorf("linked %+v", d.Harnesses)
 	}
@@ -184,7 +184,7 @@ func TestSourceLinksFailOpen(t *testing.T) {
 	opened := false
 	openSource = func(string, string) (io.ReadCloser, error) { opened = true; return nil, errors.New("no") }
 	quiet := Drift{Harnesses: []HarnessDrift{{Harness: "codex", Name: "Codex CLI", Version: "0.163.0", Previous: "0.162.0"}}}
-	linkSources(&quiet)
+	linkSources(&quiet, nil)
 	if opened || quiet.Harnesses[0].Compare == "" {
 		t.Errorf("a night with nothing to link read the source (%v), or left out the comparison", opened)
 	}
@@ -224,7 +224,7 @@ func TestSourceLinksOnARealShapedTree(t *testing.T) {
 		Removed: []FieldChange{{Surface: "metrics/codex.shell_snapshot.command", Key: "state"}},
 		Unseen:  []GoneSurface{{Surface: "logs/codex.proxy.block"}, {Surface: "logs/codex.proxy.allow"}},
 	}}}
-	linkSources(&d)
+	linkSources(&d, nil)
 	h := d.Harnesses[0]
 	md := d.markdown()
 	for _, want := range []string{
@@ -254,7 +254,7 @@ func TestSourceLinksWithoutTheBuildBefore(t *testing.T) {
 	d := Drift{Harnesses: []HarnessDrift{{Harness: "codex", Name: "Codex CLI", Version: "0.162.0", Previous: "0.161.0",
 		Removed: []FieldChange{{Surface: "metrics/codex.shell_snapshot.command", Key: "state"}, {Surface: "traces/turn", Key: "mode"}},
 	}}}
-	linkSources(&d)
+	linkSources(&d, nil)
 	h := d.Harnesses[0]
 	if s := h.Removed[0].Source; s == nil || len(s.Refs) != 1 || !strings.Contains(s.note(allLinks), "still in 0.162.0's source") {
 		t.Errorf("state: %+v", s)
@@ -302,11 +302,64 @@ func TestSourceLinksLeaveACommonKeyUnplaced(t *testing.T) {
 	withSource(t, map[string][]byte{"rust-v0.162.0": tarball(t, files)})
 	d := Drift{Harnesses: []HarnessDrift{{Harness: "codex", Name: "Codex CLI", Version: "0.162.0", Previous: "0.162.0",
 		Added: []FieldChange{{Surface: "logs/codex.sse_event", Key: "model"}, {Surface: "logs/codex.mcp", Key: "product_sku"}}}}}
-	linkSources(&d)
+	linkSources(&d, nil)
 	if s := d.Harnesses[0].Added[0].Source; s != nil {
 		t.Errorf("model linked by its name alone: %+v", s)
 	}
 	if s := d.Harnesses[0].Added[1].Source; s == nil || len(s.Refs) != 1 {
 		t.Errorf("product_sku: %+v", s)
+	}
+}
+
+// A file that names many surfaces (Codex keeps its log events in one): a key's line belongs
+// to the surface named nearest it, so a key gone from one event is gone, though another
+// event in the file still names it.
+func TestSourceLinksPlaceAKeyByTheSurfaceThatOwnsItsLine(t *testing.T) {
+	events := func(decisionCallID bool) string {
+		id := ""
+		if decisionCallID {
+			id = "            call_id = %call_id,\n"
+		}
+		return "fn tool_decision() {\n        log_event!(\n            event.name = \"codex.tool_decision\",\n" + id +
+			"            decision = %d,\n        );\n}\n\nfn sandbox_outcome() {\n        log_event!(\n            event.name = \"codex.sandbox_outcome\",\n" +
+			"            call_id = %call_id,\n            outcome = %o,\n        );\n}\n"
+	}
+	withSource(t, map[string][]byte{
+		"rust-v0.161.0": tarball(t, map[string]string{"codex-rs/otel/src/events/session_telemetry.rs": events(true)}),
+		"rust-v0.162.0": tarball(t, map[string]string{"codex-rs/otel/src/events/session_telemetry.rs": events(false)}),
+	})
+	known := map[string][]string{"codex": {"codex.sandbox_outcome", "codex.tool_decision"}}
+	d := Drift{Harnesses: []HarnessDrift{{Harness: "codex", Name: "Codex CLI", Version: "0.162.0", Previous: "0.161.0",
+		Removed: []FieldChange{{Surface: "logs/codex.tool_decision", Key: "call_id"}}}}}
+	// Only knowing every surface the harness sends says the other call_id is sandbox_outcome's.
+	linkSources(&d, known)
+	h := d.Harnesses[0]
+	if got := renderLinks(h.Removed[0].Source.note(allLinks), false); !strings.Contains(got, "gone from 0.162.0's source, was in 0.161.0's: [session_telemetry.rs:4]") {
+		t.Errorf("call_id, gone from codex.tool_decision: %q", got)
+	}
+}
+
+// A test module's raw strings hold braces that are text; a constant's string may be on the
+// line after it; an import of the constant is not its use.
+func TestSourceScanReadsRustAsItIs(t *testing.T) {
+	files := map[string]string{
+		"codex-rs/auth/src/util.rs":          "#[cfg(test)]\nmod tests {\n    const BODY: &str = r#\"{\n        \"a\": {\"b\": 1}\n    }\"#;\n    fn t() { emit(\"codex.only_in_a_test\"); }\n}\n\nfn real() {\n    emit(\"codex.after_tests\");\n}\n",
+		"codex-rs/otel/src/metrics/names.rs": "pub const SPAWN_PHASE_METRIC: &str =\n    \"codex.multi_agent.spawn.phase\";\n",
+		"codex-rs/otel/src/spawn.rs":         "use crate::metrics::SPAWN_PHASE_METRIC;\n\nfn spawn() {\n    let tags = [(\"phase\", p)];\n    metrics.record(SPAWN_PHASE_METRIC, d, &tags);\n}\n",
+	}
+	withSource(t, map[string][]byte{"rust-v0.162.0": tarball(t, files)})
+	d := Drift{Harnesses: []HarnessDrift{{Harness: "codex", Name: "Codex CLI", Version: "0.162.0", Previous: "0.162.0",
+		NewSurfaces: []SurfaceChange{{Surface: "logs/codex.only_in_a_test"}, {Surface: "logs/codex.after_tests"}},
+		Added:       []FieldChange{{Surface: "metrics/codex.multi_agent.spawn.phase", Key: "phase"}}}}}
+	linkSources(&d, nil)
+	h := d.Harnesses[0]
+	if s := h.NewSurfaces[0].Source; s != nil && len(s.Refs) > 0 {
+		t.Errorf("a name in a test module's raw-string test was linked: %+v", s)
+	}
+	if s := h.NewSurfaces[1].Source; s == nil || len(s.Refs) != 1 || s.Refs[0].Line != 10 {
+		t.Errorf("the code after the test module: %+v", s)
+	}
+	if s := h.Added[0].Source; s == nil || len(s.Refs) != 1 || s.Refs[0].Path != "codex-rs/otel/src/spawn.rs" || s.Refs[0].Line != 4 {
+		t.Errorf("phase, beside the use of a two-line constant: %+v", s)
 	}
 }
