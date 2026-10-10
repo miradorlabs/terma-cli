@@ -166,7 +166,8 @@ func (ru *rules) withholdAttrs(attrs []*commonpb.KeyValue, prompts, toolContent,
 		case !toolContent && contains(ru.toolContentFields, key):
 			changed = true
 			continue
-		case !prompts && contains(ru.promptDropFields, key):
+		case !prompts && (contains(ru.promptDropFields, key) || contains(ru.resourcePromptFields, key)):
+			// A process's arguments are withheld on a record as on its resource.
 			changed = true
 			continue
 		case !prompts && contains(ru.promptFields, key) && kv.GetValue().GetStringValue() != marker:
