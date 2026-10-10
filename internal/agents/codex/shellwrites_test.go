@@ -92,6 +92,12 @@ func TestShellWrites(t *testing.T) {
 		{"patch piped in after a cd", "cd src && cat <<'EOF' | apply_patch\n*** Begin Patch\n*** Add File: a.go\n+a\n*** End Patch\nEOF", in("src/a.go")},
 		{"a patch read and one piped in", "apply_patch <<'P'\n*** Begin Patch\n*** Add File: a.go\n+a\n*** End Patch\nP\ncat <<'EOF' | apply_patch\n*** Begin Patch\n*** Add File: b.go\n+b\n*** End Patch\nEOF", in("a.go", "b.go")},
 		{"apply_patch named in a message", "git commit -m 'fix apply_patch pipe' && apply_patch <<'EOF'\n*** Begin Patch\n*** Add File: a.go\n+a\n*** End Patch\nEOF", in("a.go")},
+		{"patch in a variable", "P='*** Begin Patch\n*** Update File: a.go\n@@\n-a\n+b\n*** End Patch'; apply_patch \"$P\"", in("a.go")},
+		{"patch in a variable piped in", "P='*** Begin Patch\n*** Update File: a.go\n@@\n-a\n+b\n*** End Patch'; printf '%s' \"$P\" | apply_patch", in("a.go")},
+		{"patch piped into a shell", "cat <<'EOF' | bash -c apply_patch\n*** Begin Patch\n*** Add File: a.go\n+a\n*** End Patch\nEOF", in("a.go")},
+		{"patch text in a nested shell after a cd", "cd src && bash -lc 'python3 fix.py <<EOF\n*** Begin Patch\n*** Update File: a.go\n@@\n-a\n+b\n*** End Patch\nEOF'", in("src/a.go")},
+		// Read as v0.2.4 read it, from the text; never as the directory the cut leaves.
+		{"header cut at an expansion", "cat <<EOF | apply_patch\n*** Begin Patch\n*** Add File: src/$N.go\n+x\n*** End Patch\nEOF", in("src/$N.go")},
 		{"patch in a nested shell", "bash -lc 'apply_patch <<EOF\n*** Begin Patch\n*** Update File: a.go\n@@\n-a\n+b\n*** End Patch\nEOF'", in("a.go")},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -124,6 +130,7 @@ func TestShellWritesBeforeEachCommit(t *testing.T) {
 		{"patch piped in, then committed", "cat <<'EOF' | apply_patch\n*** Begin Patch\n*** Add File: a.go\n+a\n*** End Patch\nEOF\ngit add a.go && git commit -m a", []int{1}},
 		{"patch in a nested shell, then committed", "bash -lc 'apply_patch <<EOF\n*** Begin Patch\n*** Add File: a.go\n+a\n*** End Patch\nEOF' && git add a.go && git commit -m a", []int{1}},
 		{"apply_patch named in a commit message", "git commit -m 'fix apply_patch pipe' && apply_patch <<'EOF'\n*** Begin Patch\n*** Add File: a.go\n+a\n*** End Patch\nEOF", []int{0}},
+		{"patch in a variable, then committed", "P='*** Begin Patch\n*** Add File: a.go\n+a\n*** End Patch'; apply_patch \"$P\" && git add a.go && git commit -m a", []int{1}},
 		{"commit in a nested shell", "printf x > a.txt && bash -c 'git add a.txt && git commit -m a'", []int{1}},
 		{"commit, then a patch piped in", "git commit -m human && cat <<'EOF' | apply_patch\n*** Begin Patch\n*** Add File: a.go\n+a\n*** End Patch\nEOF", []int{0}},
 	} {

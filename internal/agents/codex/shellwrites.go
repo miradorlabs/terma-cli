@@ -14,11 +14,11 @@ import (
 // order it writes them, resolved against cwd and any cd before them; commits holds, for
 // each git commit it makes, how many of them come before it. A script given to sh -c is read
 // as the commands it runs. A patch the parse cannot read (piped in, or built by the shell) is
-// read from the text of its pipeline; a command that does not parse, or names no apply_patch,
-// gives the files of a patch in its text, last.
+// read where it runs, from the text of its pipeline, else of the whole command; a command that
+// does not parse, or runs no apply_patch, gives the files of a patch in its text, last.
 func shellWrites(command, cwd string) (paths []string, commits []int) {
 	inText := func() (out []string) {
-		for _, p := range applyPatchPaths(command) {
+		for _, p := range patchPaths(command) {
 			if !filepath.IsAbs(p) {
 				p = filepath.Join(cwd, p)
 			}
@@ -127,7 +127,11 @@ func shellWrites(command, cwd string) (paths []string, commits []int) {
 			if len(words) > 0 && filepath.Base(words[0].text) == "apply_patch" {
 				ran = true
 				if st, ok := stack[len(stack)-1].node.(*syntax.Stmt); ok && !read[st] {
-					for _, p := range applyPatchPaths(textOf(pipeline(stack))) {
+					recovered := patchPaths(textOf(pipeline(stack)))
+					if len(recovered) == 0 {
+						recovered = patchPaths(command) // built elsewhere, say in a variable
+					}
+					for _, p := range recovered {
 						if p, ok := resolve(word{p, true}); ok {
 							out = append(out, p)
 						}
@@ -140,7 +144,7 @@ func shellWrites(command, cwd string) (paths []string, commits []int) {
 					commits = append(commits, len(out)+c)
 				}
 				out = append(out, sub...)
-				ran = ran || strings.Contains(script, "apply_patch")
+				ran = ran || strings.Contains(script, "*** ") // a patch in it was read there
 			}
 			if slices.Contains(committing, gitSubcommand(words)) {
 				commits = append(commits, len(out))

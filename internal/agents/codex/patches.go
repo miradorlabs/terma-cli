@@ -66,3 +66,15 @@ func patches(st *syntax.Stmt) []string {
 	}
 	return out
 }
+
+// patchPaths are the files of the patches in text, less a header the shell cut short at an
+// expansion (src/$N.go reads src/): that names a directory, not a file.
+func patchPaths(text string) []string {
+	var out []string
+	for _, p := range applyPatchPaths(text) {
+		if !strings.HasSuffix(p, "/") {
+			out = append(out, p)
+		}
+	}
+	return out
+}
