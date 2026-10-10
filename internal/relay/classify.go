@@ -3,8 +3,12 @@ package relay
 import (
 	"strings"
 
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
+	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
+	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
+
 	"github.com/miradorlabs/terma-cli/internal/relay/shape"
-	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
 // FieldClass is what the content policy does with an attribute key when a project withholds
@@ -36,40 +40,69 @@ func Classify(capturers []shape.Capturer, keys []string) map[string]FieldClass {
 	return out
 }
 
-// classify mirrors withholdAttrs and withhold's resource and span-event passes.
+// sample is the text value a key is classified with: what was said, as far as any rule knows.
+const sample = "what was said"
+
+// classify runs key, with a text value, through the content policy itself (withhold), where
+// key says it sits, and reports what became of it: counted as unclassified is unclassified
+// (the relay drops such a key under any policy that withholds anything), masked or dropped
+// with only prompts withheld is prompt, dropped with only tool content withheld is tool
+// content, and kept through both is safe.
 func (ru *rules) classify(key string) FieldClass {
+	at := func(prompts, toolContent bool) (kv *commonpb.KeyValue, unclassified bool) {
+		p, find := placed(key)
+		counted := map[string]int{}
+		ru.withhold(p, prompts, toolContent, counted)
+		return find(), len(counted) > 0
+	}
+	if _, unclassified := at(false, false); unclassified {
+		return FieldUnclassified
+	}
+	if kv, _ := at(false, true); kv == nil || kv.GetValue().GetStringValue() != sample {
+		return FieldPrompt
+	}
+	if kv, _ := at(true, false); kv == nil {
+		return FieldToolContent
+	}
+	return FieldSafe
+}
+
+// placed builds a part carrying key with the sample value where key says it sits, and a
+// function that finds it in the part once the policy has been applied, nil when it is gone.
+func placed(key string) (*part, func() *commonpb.KeyValue) {
+	attr := func(k string) []*commonpb.KeyValue {
+		return []*commonpb.KeyValue{{Key: k, Value: &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: sample}}}}
+	}
+	get := func(attrs []*commonpb.KeyValue, k string) *commonpb.KeyValue {
+		for _, kv := range attrs {
+			if kv.GetKey() == k {
+				return kv
+			}
+		}
+		return nil
+	}
 	if rest, ok := strings.CutPrefix(key, "event/"); ok {
 		// An event's name may hold slashes (an agent may name its events by source file); a key does not.
 		i := strings.LastIndex(rest, "/")
 		event, k := rest[:max(i, 0)], rest[i+1:]
-		if !contains(ru.toolContentEvents, event) {
-			return ru.classify(k)
+		sp := &tracepb.Span{Name: "span", Events: []*tracepb.Span_Event{{Name: event, Attributes: attr(k)}}}
+		p := &part{signal: Traces, msg: &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{Resource: &resourcepb.Resource{},
+			ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{sp}}}}}}}
+		return p, func() *commonpb.KeyValue {
+			if len(sp.Events) == 0 {
+				return nil
+			}
+			return get(sp.Events[0].Attributes, k)
 		}
-		// A tool-content event goes whole when tool content is withheld; its prompt keys go
-		// with prompts too, and the rest, unclassified included, is the tool's output.
-		if ru.contentKey(k) && !contains(ru.toolContentFields, k) {
-			return FieldPrompt
-		}
-		return FieldToolContent
 	}
-	if rk, ok := strings.CutPrefix(key, "resource/"); ok {
-		switch {
-		case contains(ru.resourcePromptFields, rk):
-			return FieldPrompt
-		case rk == semconv.TermaRepositoryRootKey, rk == semconv.TermaWorkingDirectoryKey:
-			return FieldToolContent
-		case ru.safeKey(rk):
-			return FieldSafe
-		}
-		return FieldUnclassified
+	if k, ok := strings.CutPrefix(key, "resource/"); ok {
+		res := &resourcepb.Resource{Attributes: attr(k)}
+		p := &part{signal: Logs, msg: &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{Resource: res,
+			ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{{}}}}}}}}
+		return p, func() *commonpb.KeyValue { return get(res.Attributes, k) }
 	}
-	switch {
-	case contains(ru.toolContentFields, key):
-		return FieldToolContent
-	case ru.contentKey(key):
-		return FieldPrompt
-	case ru.safeKey(key):
-		return FieldSafe
-	}
-	return FieldUnclassified
+	rec := &logspb.LogRecord{Attributes: attr(key)}
+	p := &part{signal: Logs, msg: &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{Resource: &resourcepb.Resource{},
+		ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{rec}}}}}}}
+	return p, func() *commonpb.KeyValue { return get(rec.Attributes, key) }
 }

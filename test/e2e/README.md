@@ -209,26 +209,33 @@ project withholds content:
 | `prompt` / `tool_content` | sends it only when the project collects prompts / tool content |
 | `unclassified` | drops it, and counts it, when its value is text; a number or flag passes |
 
-`make compat` merges the census into the catalog, `docs/compat/fields.json`, and renders
-`docs/FIELDS.md`: per harness, per surface, each key's class, kinds, the build it was first
-seen in, and whether the newest build still has it.
+The catalog, `docs/compat/fields.json`, lives beside the compatibility history on the
+`compat-matrix` branch, and `docs/FIELDS.md` renders it: per harness, per surface, each key's
+class, kinds, the first build it was seen in, and whether the newest build still has it. A
+key keeps its first build and its newest five, a harness its newest five censuses, and the
+file holds one entry a line, so a night's change is a diff of what changed.
 
-Every night `live.yml`'s `digest` job compares the night's runs with the committed catalog
-and history (`make drift` locally) and writes `report/drift.md`, `drift.json` and
-`slack.json`. For each harness's newest build it lists:
+Every night `live.yml`'s `compat` job starts from the published history and catalog, says
+what the night changed against them, then merges the night in and publishes it (`make
+compat` and `make drift` do the same locally, into `docs/`). The digest,
+`report/drift.md`, `drift.json` and `slack.json`, gives for each harness's newest build:
 
-- **new fields**: keys no build had on that surface
-- **removed fields**: keys the previous newest build had on a surface this one still sends
-- **unclassified fields the relay withholds**: classify each in `internal/relay/allow.go`,
-  an agent's capture rules, or as content
-- **surfaces not seen**: what the previous build sent and this run did not reach
+- **new surfaces**: surfaces no build had, once each with its keys counted, so a renamed
+  span is one line, not one per key
+- **new fields**: keys new to their surface, or new to the harness anywhere
+- **removed fields** and **surfaces no longer sent**: what the previous build had and a
+  newer one does not, judged only on a newer build, since a re-run of the same build that
+  did not reach an error path is no evidence
+- **newly withheld fields**: unclassified keys with text values, which the relay drops;
+  classify each in `internal/relay/allow.go`, an agent's capture rules, or as content. Those
+  still withheld from before are one reminder line until they are.
 
-It also lists capabilities whose result changed. The digest goes to the run's summary and
-to Slack through the `SLACK_WEBHOOK_URL` secret in the `live-harnesses` environment, every
-night, so a quiet channel means the job did not run. Drift never fails the night; a removed
-key on a surface terma parses fails its golden. To accept a change, commit the job's
-`catalog-update` artefact (the regenerated `docs/`), or run `make compat` with the night's
-`compat-*` and `fields-*` artefacts as `RUNS` and `FIELD_RUNS`.
+It also lists capabilities whose result changed, and says so when the census did not run,
+or did not reach a harness censused within the week: a census that did not run never reads
+as a quiet night. The digest goes to the run's summary and to Slack through the
+`SLACK_WEBHOOK_URL` secret in the `live-harnesses` environment, every night, so a quiet
+channel means the job did not run. Drift never fails the night; a removed key on a surface
+terma parses fails its golden.
 
 ## Versions
 

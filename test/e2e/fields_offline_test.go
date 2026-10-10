@@ -93,3 +93,20 @@ func TestObserveFields(t *testing.T) {
 		}
 	}
 }
+
+// The census counts a string as a number as the relay's numericOrBool does, or the digest
+// would miss a key the relay withholds: a long digit string is text to it.
+func TestKindOfMatchesTheRelay(t *testing.T) {
+	sv := func(s string) *commonpb.AnyValue {
+		return &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: s}}
+	}
+	for s, want := range map[string]string{
+		"3": KindNumber, "-12.5": KindNumber, "true": KindBool, "": KindText, "3 files": KindText,
+		"0x1f": KindText, "NaN": KindText, "Inf": KindText, "1_000": KindText, "1p3": KindText,
+		"123456789012345678901234567890123": KindText, // 33 digits: past the relay's cap
+	} {
+		if got := kindOf(sv(s)); got != want {
+			t.Errorf("kindOf(%q) = %s, want %s", s, got, want)
+		}
+	}
+}

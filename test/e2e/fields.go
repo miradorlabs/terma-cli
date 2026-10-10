@@ -3,6 +3,8 @@ package e2e
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -203,12 +205,16 @@ func kindOf(v *commonpb.AnyValue) string {
 	case *commonpb.AnyValue_BytesValue:
 		return KindBytes
 	case *commonpb.AnyValue_StringValue:
-		// The relay counts a string that is wholly a number or a boolean as one.
+		// The relay counts a string that is wholly a number or a boolean as one: the rule is
+		// internal/relay's numericOrBool, kept the same here.
 		s := x.StringValue
 		if s == "true" || s == "false" {
 			return KindBool
 		}
-		if _, err := strconv.ParseFloat(s, 64); err == nil && !strings.ContainsAny(s, "xXnN_") {
+		if s == "" || len(s) > 32 {
+			return KindText
+		}
+		if _, err := strconv.ParseFloat(s, 64); err == nil && !strings.ContainsAny(s, "xXpPiInN_") {
 			return KindNumber
 		}
 	}
@@ -216,7 +222,9 @@ func kindOf(v *commonpb.AnyValue) string {
 }
 
 // WriteFields writes this run's census to dir/fields.json, each key classified by the terma
-// at path, as its relay would treat it.
+// at path, as its relay would treat it. A census it cannot classify is not written: the
+// nightly digest then says the census is missing, where unclassified rows would read as a
+// quiet night.
 func WriteFields(dir, terma string) error {
 	fieldsMu.Lock()
 	rows := make([]FieldRow, 0, len(fieldSeen))
@@ -225,31 +233,23 @@ func WriteFields(dir, terma string) error {
 	keys := map[string]bool{}
 	for id, kinds := range fieldSeen {
 		rows = append(rows, FieldRow{Harness: id.harness, Version: id.version, Surface: id.surface, Key: id.key,
-			Kinds: slices.Sorted(func(yield func(string) bool) {
-				for k := range kinds {
-					if !yield(k) {
-						return
-					}
-				}
-			}), Platform: platform, Terma: Version(terma), At: now})
+			Kinds: slices.Sorted(maps.Keys(kinds)), Platform: platform, Terma: Version(terma), At: now})
 		keys[classKey(id.surface, id.key)] = true
 	}
 	fieldsMu.Unlock()
 	if len(rows) == 0 {
 		return nil
 	}
-	classes, err := classify(terma, slices.Sorted(func(yield func(string) bool) {
-		for k := range keys {
-			if !yield(k) {
-				return
-			}
-		}
-	}))
+	classes, err := classify(terma, slices.Sorted(maps.Keys(keys)))
 	if err != nil {
-		os.Stderr.WriteString("field census: no classification: " + err.Error() + "\n")
+		return fmt.Errorf("classify the census with %s: %w", terma, err)
 	}
 	for i := range rows {
-		rows[i].Class = classes[classKey(rows[i].Surface, rows[i].Key)]
+		c, ok := classes[classKey(rows[i].Surface, rows[i].Key)]
+		if !ok {
+			return fmt.Errorf("%s classified no %q", terma, rows[i].Key)
+		}
+		rows[i].Class = c
 	}
 	sort.Slice(rows, func(i, j int) bool {
 		a, b := rows[i], rows[j]

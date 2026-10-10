@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"maps"
 	"slices"
 	"sort"
 	"strings"
@@ -12,8 +15,10 @@ import (
 
 // The field catalog (docs/compat/fields.json) is what terma knows each harness emits: every
 // attribute key on every surface, the builds it was seen in, the kinds of value it carried,
-// and what terma's relay does with it. Each run's census (report/fields.json) is merged into
-// it; docs/FIELDS.md renders it.
+// and what terma's relay does with it. It lives beside the history on the compat-matrix
+// branch, which the nightly job extends; each run's census (report/fields.json) is merged into
+// it, and docs/FIELDS.md renders it. It is bounded: a key keeps the first build it was seen
+// in and the newest keepVersions, a harness its newest keepCensuses censuses.
 
 // Catalog is the field catalog.
 type Catalog struct {
@@ -39,82 +44,87 @@ type FieldEntry struct {
 	// Class is what the relay of the latest run that saw it does with it.
 	Class string   `json:"class"`
 	Kinds []string `json:"kinds"`
-	// Versions are the builds it was seen in, newest first.
-	Versions []string  `json:"versions"`
-	LastSeen time.Time `json:"last_seen"`
+	// FirstSeen is the oldest build the catalog saw it in; Versions the newest it was seen in,
+	// newest first, at most keepVersions.
+	FirstSeen string   `json:"first_seen"`
+	Versions  []string `json:"versions"`
 }
+
+const (
+	keepVersions = 5
+	keepCensuses = 5
+)
 
 func (f FieldEntry) id() string { return f.Harness + "\x00" + f.Surface + "\x00" + f.Key }
 
 func (c Census) id() string { return c.Harness + "\x00" + c.Version }
 
-// mergeFields files a run's census in the catalog.
+// mergeFields files a run's census in the catalog. Runs are merged in the order they ran, so
+// a key's class is the latest run's.
 func mergeFields(cat *Catalog, rows []e2e.FieldRow) {
 	fields := map[string]*FieldEntry{}
 	for i := range cat.Fields {
 		fields[cat.Fields[i].id()] = &cat.Fields[i]
 	}
-	censuses := map[string]*Census{}
-	for i := range cat.Censuses {
-		censuses[cat.Censuses[i].id()] = &cat.Censuses[i]
-	}
 	var added []*FieldEntry
-	var newCensuses []Census
-	seenSurfaces := map[string]map[string]bool{}
+	type build struct{ harness, version string }
+	seen := map[build]map[string]bool{}
+	at := map[build]time.Time{}
 	for _, r := range rows {
-		cid := r.Harness + "\x00" + r.Version
-		if seenSurfaces[cid] == nil {
-			seenSurfaces[cid] = map[string]bool{}
+		b := build{r.Harness, r.Version}
+		if seen[b] == nil {
+			seen[b] = map[string]bool{}
 		}
-		seenSurfaces[cid][r.Surface] = true
+		seen[b][r.Surface] = true
+		if r.At.After(at[b]) {
+			at[b] = r.At
+		}
 		e := FieldEntry{Harness: r.Harness, Surface: r.Surface, Key: r.Key}
-		prev, ok := fields[e.id()]
+		f, ok := fields[e.id()]
 		if !ok {
-			fresh := &FieldEntry{Harness: r.Harness, Surface: r.Surface, Key: r.Key, Class: r.Class,
-				Kinds: slices.Clone(r.Kinds), Versions: []string{r.Version}, LastSeen: r.At}
-			added = append(added, fresh)
-			fields[e.id()] = fresh
-			continue
+			f = &FieldEntry{Harness: r.Harness, Surface: r.Surface, Key: r.Key, FirstSeen: r.Version}
+			added = append(added, f)
+			fields[e.id()] = f
 		}
-		if !slices.Contains(prev.Versions, r.Version) {
-			prev.Versions = append(prev.Versions, r.Version)
-			sortVersionsDesc(prev.Versions)
+		if f.FirstSeen == "" || versionLess(r.Version, f.FirstSeen) {
+			f.FirstSeen = r.Version
+		}
+		if !slices.Contains(f.Versions, r.Version) {
+			f.Versions = append(f.Versions, r.Version)
+			sortVersionsDesc(f.Versions)
+			f.Versions = f.Versions[:min(len(f.Versions), keepVersions)]
 		}
 		for _, k := range r.Kinds {
-			if !slices.Contains(prev.Kinds, k) {
-				prev.Kinds = append(prev.Kinds, k)
+			if !slices.Contains(f.Kinds, k) {
+				f.Kinds = append(f.Kinds, k)
 			}
 		}
-		slices.Sort(prev.Kinds)
-		if r.At.After(prev.LastSeen) {
-			prev.LastSeen = r.At
-			if r.Class != "" {
-				prev.Class = r.Class
-			}
+		slices.Sort(f.Kinds)
+		if r.Class != "" {
+			f.Class = r.Class
 		}
-	}
-	for cid, surfaces := range seenSurfaces {
-		harness, version, _ := strings.Cut(cid, "\x00")
-		var at time.Time
-		for _, r := range rows {
-			if r.Harness == harness && r.Version == version && r.At.After(at) {
-				at = r.At
-			}
-		}
-		c := Census{Harness: harness, Version: version, Surfaces: slices.Sorted(keysOf(surfaces)), At: at}
-		if prev, ok := censuses[c.id()]; ok {
-			prev.Surfaces = slices.Sorted(keysOf(union(prev.Surfaces, c.Surfaces)))
-			if at.After(prev.At) {
-				prev.At = at
-			}
-			continue
-		}
-		newCensuses = append(newCensuses, c)
 	}
 	for _, f := range added {
 		cat.Fields = append(cat.Fields, *f)
 	}
-	cat.Censuses = append(cat.Censuses, newCensuses...)
+	censuses := map[string]*Census{}
+	for i := range cat.Censuses {
+		censuses[cat.Censuses[i].id()] = &cat.Censuses[i]
+	}
+	for b, surfaces := range seen {
+		c := Census{Harness: b.harness, Version: b.version, Surfaces: slices.Sorted(maps.Keys(surfaces)), At: at[b]}
+		if prev, ok := censuses[c.id()]; ok {
+			for _, s := range prev.Surfaces {
+				surfaces[s] = true
+			}
+			prev.Surfaces = slices.Sorted(maps.Keys(surfaces))
+			if c.At.After(prev.At) {
+				prev.At = c.At
+			}
+			continue
+		}
+		cat.Censuses = append(cat.Censuses, c)
+	}
 	sort.Slice(cat.Fields, func(i, j int) bool { return cat.Fields[i].id() < cat.Fields[j].id() })
 	sort.Slice(cat.Censuses, func(i, j int) bool {
 		a, b := cat.Censuses[i], cat.Censuses[j]
@@ -123,27 +133,16 @@ func mergeFields(cat *Catalog, rows []e2e.FieldRow) {
 		}
 		return versionLess(b.Version, a.Version)
 	})
-}
-
-func keysOf(m map[string]bool) func(func(string) bool) {
-	return func(yield func(string) bool) {
-		for k := range m {
-			if !yield(k) {
-				return
-			}
+	// A harness keeps its newest censuses; the catalog's keys say what older builds had.
+	kept := cat.Censuses[:0]
+	count := map[string]int{}
+	for _, c := range cat.Censuses {
+		if count[c.Harness] < keepCensuses {
+			kept = append(kept, c)
 		}
+		count[c.Harness]++
 	}
-}
-
-func union(a, b []string) map[string]bool {
-	m := map[string]bool{}
-	for _, s := range a {
-		m[s] = true
-	}
-	for _, s := range b {
-		m[s] = true
-	}
-	return m
+	cat.Censuses = kept
 }
 
 func sortVersionsDesc(vs []string) {
@@ -160,6 +159,48 @@ func (cat *Catalog) newestCensus(harness string) (Census, bool) {
 		}
 	}
 	return best, found
+}
+
+// writeCatalog writes cat one entry a line, so a night's change to the catalog is a diff of
+// the entries it changed.
+func writeCatalog(path string, cat Catalog) error {
+	var b bytes.Buffer
+	at, err := json.Marshal(cat.GeneratedAt)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(&b, "{\n  \"generated_at\": %s,\n", at)
+	list := func(name string, n int, entry func(int) any, last bool) error {
+		fmt.Fprintf(&b, "  %q: [", name)
+		for i := range n {
+			line, err := json.Marshal(entry(i))
+			if err != nil {
+				return err
+			}
+			if i > 0 {
+				b.WriteByte(',')
+			}
+			b.WriteString("\n    ")
+			b.Write(line)
+		}
+		if n > 0 {
+			b.WriteString("\n  ")
+		}
+		b.WriteString("]")
+		if !last {
+			b.WriteByte(',')
+		}
+		b.WriteByte('\n')
+		return nil
+	}
+	if err := list("censuses", len(cat.Censuses), func(i int) any { return cat.Censuses[i] }, false); err != nil {
+		return err
+	}
+	if err := list("fields", len(cat.Fields), func(i int) any { return cat.Fields[i] }, true); err != nil {
+		return err
+	}
+	b.WriteString("}\n")
+	return writeFile(path, b.Bytes())
 }
 
 // --- rendering -----------------------------------------------------------------------
@@ -193,47 +234,32 @@ func renderFields(cat Catalog, now time.Time) string {
 	}
 	b.WriteString("## At a glance\n\n| Harness | Newest build censused | Surfaces | Keys | Unclassified, withheld |\n|---|---|---|---|---|\n")
 	for _, h := range e2e.Harnesses {
-		fs := byHarness[h.ID]
 		newest, ok := cat.newestCensus(h.ID)
-		if !ok || len(fs) == 0 {
+		if !ok {
 			continue
 		}
-		surfaces := map[string]bool{}
-		withheld := 0
-		for _, f := range fs {
+		keys, withheld := 0, 0
+		for _, f := range byHarness[h.ID] {
 			if slices.Contains(f.Versions, newest.Version) {
-				surfaces[f.Surface] = true
+				keys++
 				if withheldUnclassified(f.Class, f.Kinds) {
 					withheld++
 				}
 			}
 		}
-		keys := 0
-		for _, f := range fs {
-			if slices.Contains(f.Versions, newest.Version) {
-				keys++
-			}
-		}
-		fmt.Fprintf(&b, "| %s | %s | %d | %d | %d |\n", h.Name, newest.Version, len(surfaces), keys, withheld)
+		fmt.Fprintf(&b, "| %s | %s | %d | %d | %d |\n", h.Name, newest.Version, len(newest.Surfaces), keys, withheld)
 	}
 	for _, h := range e2e.Harnesses {
-		fs := byHarness[h.ID]
 		newest, ok := cat.newestCensus(h.ID)
-		if !ok || len(fs) == 0 {
+		if !ok {
 			continue
 		}
 		fmt.Fprintf(&b, "\n## %s\n\nNewest build censused: %s.\n", h.Name, newest.Version)
 		bySurface := map[string][]FieldEntry{}
-		for _, f := range fs {
+		for _, f := range byHarness[h.ID] {
 			bySurface[f.Surface] = append(bySurface[f.Surface], f)
 		}
-		for _, s := range slices.Sorted(func(yield func(string) bool) {
-			for k := range bySurface {
-				if !yield(k) {
-					return
-				}
-			}
-		}) {
+		for _, s := range slices.Sorted(maps.Keys(bySurface)) {
 			fmt.Fprintf(&b, "\n### `%s`\n\n| Key | Class | Values | First censused | In %s |\n|---|---|---|---|---|\n", s, newest.Version)
 			for _, f := range bySurface[s] {
 				in := "yes"
@@ -244,7 +270,7 @@ func renderFields(cat Catalog, now time.Time) string {
 				if withheldUnclassified(f.Class, f.Kinds) {
 					class = "**unclassified · withheld**"
 				}
-				fmt.Fprintf(&b, "| `%s` | %s | %s | %s | %s |\n", f.Key, class, strings.Join(f.Kinds, ", "), f.Versions[len(f.Versions)-1], in)
+				fmt.Fprintf(&b, "| `%s` | %s | %s | %s | %s |\n", f.Key, class, strings.Join(f.Kinds, ", "), f.FirstSeen, in)
 			}
 		}
 	}

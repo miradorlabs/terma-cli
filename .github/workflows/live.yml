@@ -148,23 +148,33 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
-  # The matrix: this night's rows from both platforms merged into the history, rendered
-  # as docs/COMPATIBILITY.md and docs/compat/compat.json (the website's data), published
-  # as an artefact and the run's summary. The history lives on the compat-matrix
-  # branch, which each scheduled run extends and pushes: that branch's
-  # docs/compat/compat.json is the published matrix.
+  # The matrix and the field catalog: this night's rows and field census from both platforms
+  # merged into the history and catalog, rendered as docs/COMPATIBILITY.md,
+  # docs/compat/compat.json (the website's data) and docs/FIELDS.md, published as an artefact
+  # and the run's summary. Both live on the compat-matrix branch, which each scheduled run
+  # extends and pushes: that branch's docs/compat/compat.json is the published matrix.
+  #
+  # Before merging, the job says what the night changed against them (compatgen -digest): new
+  # and removed fields per harness build, fields the relay withholds as unclassified,
+  # capabilities whose result changed, and a census that did not run. It goes to the summary
+  # and to Slack every night, "no changes" included, so a quiet channel means the job did not
+  # run. Drift never fails the night.
   compat:
     needs: [e2e, machines]
     if: always()
     runs-on: ubuntu-latest
+    environment: live-harnesses
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v5
-      - name: Start from the published history
+      - name: Start from the published history and catalog
         run: |
           if git fetch -q origin compat-matrix 2>/dev/null; then
-            git show origin/compat-matrix:docs/compat/history.json > docs/compat/history.json || true
+            mkdir -p docs/compat
+            for f in docs/compat/history.json docs/compat/fields.json docs/FIELDS.md; do
+              git show "origin/compat-matrix:$f" > "$f" 2>/dev/null || rm -f "$f"
+            done
           fi
       - uses: actions/setup-go@v6
         with:
@@ -172,24 +182,37 @@ jobs:
           cache-dependency-path: test/e2e/go.sum
       - uses: actions/download-artifact@v5
         with:
-          pattern: compat-*
+          pattern: "{compat,fields}-*"
           path: test/e2e/runs
-      - name: Render the matrix
+      - name: Say what changed, and render the matrix and catalog
         working-directory: test/e2e
         run: |
-          runs=$(find runs -name compat.json | sort | sed 's/^/-run /' | tr '\n' ' ')
-          if [ -z "$runs" ]; then
-            echo "No compatibility rows this night." >> "$GITHUB_STEP_SUMMARY"
+          args=()
+          for f in $(find runs -name compat.json | sort); do args+=(-run "$f"); done
+          for f in $(find runs -name fields.json | sort); do args+=(-fields "$f"); done
+          go run ./compatgen "${args[@]}" -digest report -link "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          cat report/drift.md >> "$GITHUB_STEP_SUMMARY"
+          if [ -f ../../docs/COMPATIBILITY.md ]; then cat ../../docs/COMPATIBILITY.md >> "$GITHUB_STEP_SUMMARY"; fi
+      - name: Post the digest to Slack
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        working-directory: test/e2e
+        run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "::notice::No SLACK_WEBHOOK_URL in the live-harnesses environment: the digest was not posted."
             exit 0
           fi
-          go run ./compatgen $runs
-          cat ../../docs/COMPATIBILITY.md >> "$GITHUB_STEP_SUMMARY"
+          curl -fsS -X POST -H 'Content-Type: application/json' --data @report/slack.json "$SLACK_WEBHOOK_URL"
       - uses: actions/upload-artifact@v5
         with:
           name: compatibility-matrix
           path: |
             docs/COMPATIBILITY.md
+            docs/FIELDS.md
             docs/compat/
+            test/e2e/report/drift.*
+            test/e2e/report/slack.json
+          if-no-files-found: ignore
           retention-days: 90
       - name: Publish to the compat-matrix branch
         if: github.event_name == 'schedule'
@@ -197,6 +220,7 @@ jobs:
           set -e
           tmp=$(mktemp -d)
           cp -R docs/COMPATIBILITY.md docs/compat "$tmp/"
+          if [ -f docs/FIELDS.md ]; then cp docs/FIELDS.md "$tmp/"; fi
           git config user.name "terma-compat"
           git config user.email "terma-compat@users.noreply.github.com"
           if git rev-parse -q --verify origin/compat-matrix >/dev/null; then
@@ -209,62 +233,9 @@ jobs:
           rm -rf docs/compat
           cp -R "$tmp/COMPATIBILITY.md" docs/COMPATIBILITY.md
           cp -R "$tmp/compat" docs/compat
+          if [ -f "$tmp/FIELDS.md" ]; then cp "$tmp/FIELDS.md" docs/FIELDS.md; fi
           git add -f docs/COMPATIBILITY.md docs/compat
+          if [ -f docs/FIELDS.md ]; then git add -f docs/FIELDS.md; fi
           if git diff --cached --quiet; then exit 0; fi
-          git commit -q -m "compat: nightly matrix, $(date -u +%F)"
+          git commit -q -m "compat: nightly matrix and field catalog, $(date -u +%F)"
           git push -q origin compat-matrix
-
-  # What the night's runs changed against the committed history and field catalog: new and
-  # removed fields per harness build, fields the relay withholds as unclassified, and
-  # capabilities whose result changed. Said in the run's summary and in Slack every night,
-  # "no changes" included, so a quiet channel means the job did not run. Accepting a change
-  # is committing the catalog-update artefact (or `make compat` with these runs) in a PR.
-  digest:
-    needs: [e2e, machines]
-    if: always()
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment: live-harnesses
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: test/e2e/go.mod
-          cache-dependency-path: |
-            go.sum
-            test/e2e/go.sum
-      - uses: actions/download-artifact@v5
-        with:
-          pattern: "{compat,fields}-*"
-          path: test/e2e/runs
-      - name: Compare with the catalog and history
-        working-directory: test/e2e
-        run: |
-          args=()
-          for f in runs/compat-*/compat.json; do [ -f "$f" ] && args+=(-run "$f"); done
-          for f in runs/fields-*/fields.json; do [ -f "$f" ] && args+=(-fields "$f"); done
-          go run ./compatgen "${args[@]}" -digest report -link "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-          cat report/drift.md >> "$GITHUB_STEP_SUMMARY"
-      - name: Post to Slack
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        working-directory: test/e2e
-        run: |
-          if [ -z "$SLACK_WEBHOOK_URL" ]; then
-            echo "::notice::No SLACK_WEBHOOK_URL in the live-harnesses environment: the digest was not posted."
-            exit 0
-          fi
-          curl -fsS -X POST -H 'Content-Type: application/json' --data @report/slack.json "$SLACK_WEBHOOK_URL"
-      - name: Upload the digest and the updated catalog
-        uses: actions/upload-artifact@v5
-        with:
-          name: catalog-update
-          path: |
-            test/e2e/report/drift.*
-            test/e2e/report/slack.json
-            docs/FIELDS.md
-            docs/COMPATIBILITY.md
-            docs/compat/
-          retention-days: 30

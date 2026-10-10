@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -142,5 +143,109 @@ func TestSlackDigest(t *testing.T) {
 	data, _ = json.Marshal(quiet.slack())
 	if !quiet.Quiet() || !strings.Contains(string(data), "No changes. Censused: Codex CLI 0.162.0, Gemini CLI 0.64.0 (new build, was 0.63.0).") {
 		t.Errorf("quiet day: %s", data)
+	}
+}
+
+// A night that brought no census, or none of a harness the catalog censused within the week,
+// is no quiet night: a census that did not run must not read as one that found nothing.
+func TestDigestSaysWhatWasNotCensused(t *testing.T) {
+	now := time.Date(2026, 10, 10, 4, 0, 0, 0, time.UTC)
+	cat := Catalog{Censuses: []Census{
+		{Harness: "codex", Version: "0.162.0", At: now.Add(-24 * time.Hour)},
+		{Harness: "hermes", Version: "0.20.5", At: now.Add(-30 * 24 * time.Hour)}, // aged out
+	}}
+	noCensus, missing, _ := fieldDrift(cat, nil, now)
+	if d := (Drift{NoCensus: noCensus, Missing: missing}); !noCensus || d.Quiet() {
+		t.Errorf("no rows: noCensus %v, quiet %v", noCensus, d.Quiet())
+	}
+	rows := []e2e.FieldRow{field("2.1.296", "logs/api_request", "model", "safe", now)}
+	rows[0].Harness = "claude"
+	noCensus, missing, hs := fieldDrift(cat, rows, now)
+	d := Drift{NoCensus: noCensus, Missing: missing, Harnesses: hs}
+	if noCensus || !slices.Equal(missing, []string{"Codex CLI"}) || d.Quiet() {
+		t.Errorf("claude only: noCensus %v, missing %v, quiet %v", noCensus, missing, d.Quiet())
+	}
+	if !strings.Contains(d.markdown(), "No census this night of Codex CLI") {
+		t.Errorf("the digest does not say Codex was not censused:\n%s", d.markdown())
+	}
+}
+
+// A surface no build had is said once, with its keys counted, not key by key: a span renamed
+// carries keys the harness already sends. A key new to the harness on it is still a new
+// field. A re-run of the same build reports nothing gone: a key that only comes on an error
+// path would otherwise read as removed.
+func TestDigestSurfacesAndReruns(t *testing.T) {
+	day := time.Date(2026, 10, 9, 4, 0, 0, 0, time.UTC)
+	var cat Catalog
+	mergeFields(&cat, []e2e.FieldRow{
+		field("0.162.0", "traces/old_fn", "code.file.path", "safe", day),
+		field("0.162.0", "traces/old_fn", "busy_ns", "safe", day, e2e.KindNumber),
+		field("0.162.0", "logs/codex.tool_result", "error", "prompt", day), // only on an error path
+	})
+	tonight := []e2e.FieldRow{
+		field("0.162.0", "traces/new_fn", "code.file.path", "safe", day.Add(24*time.Hour)),
+		field("0.162.0", "traces/new_fn", "busy_ns", "safe", day.Add(24*time.Hour), e2e.KindNumber),
+		field("0.162.0", "traces/new_fn", "fresh_key", "safe", day.Add(24*time.Hour)),
+	}
+	_, _, hs := fieldDrift(cat, tonight, day.Add(24*time.Hour))
+	h := hs[0]
+	if len(h.NewSurfaces) != 1 || h.NewSurfaces[0] != (SurfaceChange{Surface: "traces/new_fn", Keys: 3, NewKeys: 1}) {
+		t.Errorf("new surfaces %+v", h.NewSurfaces)
+	}
+	if len(h.Added) != 1 || h.Added[0].Key != "fresh_key" {
+		t.Errorf("added %+v: only the key new to the harness", h.Added)
+	}
+	if len(h.Removed)+len(h.Unseen) != 0 {
+		t.Errorf("a re-run of the same build reported removed %+v, unseen %v", h.Removed, h.Unseen)
+	}
+}
+
+// A key keeps the first build it was seen in and its newest keepVersions; a harness its
+// newest keepCensuses censuses; and the catalog is written one entry a line.
+func TestCatalogIsBounded(t *testing.T) {
+	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
+	var cat Catalog
+	for i := range 8 {
+		v := fmt.Sprintf("0.16%d.0", i)
+		mergeFields(&cat, []e2e.FieldRow{field(v, "logs/codex.api_request", "model", "safe", day.Add(time.Duration(i)*24*time.Hour))})
+	}
+	f := cat.Fields[0]
+	if f.FirstSeen != "0.160.0" || !slices.Equal(f.Versions, []string{"0.167.0", "0.166.0", "0.165.0", "0.164.0", "0.163.0"}) {
+		t.Errorf("first seen %s, versions %v", f.FirstSeen, f.Versions)
+	}
+	if len(cat.Censuses) != keepCensuses || cat.Censuses[0].Version != "0.167.0" {
+		t.Errorf("censuses %+v", cat.Censuses)
+	}
+	path := filepath.Join(t.TempDir(), "fields.json")
+	if err := writeCatalog(path, cat); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(path)
+	var back Catalog
+	if err := json.Unmarshal(data, &back); err != nil {
+		t.Fatalf("%v:\n%s", err, data)
+	}
+	// {, generated_at, "censuses": [, an entry a line, ], "fields": [, an entry a line, ], }
+	if lines := strings.Count(string(data), "\n"); lines != 3+keepCensuses+2+len(cat.Fields)+2 {
+		t.Errorf("%d lines, want one per entry:\n%s", lines, data)
+	}
+	if len(back.Fields) != 1 || len(back.Censuses) != keepCensuses {
+		t.Errorf("read back %+v", back)
+	}
+}
+
+// A Slack section is cut at the end of a line, so neither a character nor a code span is split.
+func TestClip(t *testing.T) {
+	s := "*Codex*\n• `ключ` on `traces/x`\n• `ключ2` on `traces/y`"
+	got := clip(s, len("*Codex*\n• `ключ` on `traces/x`\n• `кл"))
+	if got != "*Codex*\n• `ключ` on `traces/x`\n…" {
+		t.Errorf("clip = %q", got)
+	}
+	if clip(s, 1000) != s {
+		t.Error("clip cut a short text")
+	}
+	long := strings.Repeat("ключ", 10)
+	if got := clip(long, 5); got != "кл\n…" {
+		t.Errorf("clip with no line end = %q", got)
 	}
 }

@@ -66,7 +66,7 @@ machines: machine-image
 # (docs/FIELDS.md, docs/compat/fields.json): merge the latest runs' report/compat.json and
 # report/fields.json — this machine's, and the Linux machine's from `make machines` — into
 # the history and catalog and render them. RUNS and FIELD_RUNS name other runs' files (CI's
-# artefacts). Accepting a drift the nightly run reported is this, in a pull request.
+# artefacts). The nightly job does the same on the compat-matrix branch, where both live.
 RUNS ?= $(wildcard report/compat.json report/linux/compat.json)
 FIELD_RUNS ?= $(wildcard report/fields.json report/linux/fields.json)
 COMPATGEN = go run ./compatgen $(foreach r,$(RUNS),-run $(r)) $(foreach f,$(FIELD_RUNS),-fields $(f))

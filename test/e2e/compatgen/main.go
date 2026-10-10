@@ -112,7 +112,8 @@ func run(c config, now time.Time) error {
 		fieldRows = append(fieldRows, rows...)
 	}
 	if c.digest != "" {
-		d := Drift{GeneratedAt: now, Link: c.link, Harnesses: fieldDrift(catalog, fieldRows), Compat: compatDrift(hist, compatRows)}
+		d := Drift{GeneratedAt: now, Link: c.link, Compat: compatDrift(hist, compatRows)}
+		d.NoCensus, d.Missing, d.Harnesses = fieldDrift(catalog, fieldRows, now)
 		if err := writeDigest(c.digest, d); err != nil {
 			return err
 		}
@@ -124,7 +125,7 @@ func run(c config, now time.Time) error {
 	if len(fieldRows) > 0 || len(catalog.Fields) > 0 {
 		mergeFields(&catalog, fieldRows)
 		catalog.GeneratedAt = now
-		if err := writeJSON(c.catalog, catalog); err != nil {
+		if err := writeCatalog(c.catalog, catalog); err != nil {
 			return err
 		}
 		if err := writeFile(c.fieldsMD, []byte(renderFields(catalog, now))); err != nil {
