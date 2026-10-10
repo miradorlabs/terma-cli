@@ -118,6 +118,9 @@ func TestShellWritesBeforeEachCommit(t *testing.T) {
 		{"a conflict resolved and the pick continued", "printf ok > f.txt && git add f.txt && GIT_EDITOR=true git cherry-pick --continue", []int{1}},
 		{"commit lookup is no commit", "printf x > a.txt && command -v git commit", nil},
 		{"commit message is not a subcommand", "git log --grep commit && printf x > a.txt", nil},
+		{"patch piped in, then committed", "cat <<'EOF' | apply_patch\n*** Begin Patch\n*** Add File: a.go\n+a\n*** End Patch\nEOF\ngit add a.go && git commit -m a", []int{1}},
+		{"patch in a nested shell, then committed", "bash -lc 'apply_patch <<EOF\n*** Begin Patch\n*** Add File: a.go\n+a\n*** End Patch\nEOF' && git add a.go && git commit -m a", []int{1}},
+		{"commit, then a patch piped in", "git commit -m human && cat <<'EOF' | apply_patch\n*** Begin Patch\n*** Add File: a.go\n+a\n*** End Patch\nEOF", []int{0}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if _, got := shellWrites(tc.command, cwd); !slices.Equal(got, tc.want) {

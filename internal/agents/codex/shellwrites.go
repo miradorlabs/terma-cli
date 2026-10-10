@@ -14,7 +14,7 @@ import (
 // order it writes them, resolved against cwd and any cd before them; commits holds, for
 // each git commit it makes, how many of them come before it. A command that does not parse,
 // or runs no patch the parse can read (one piped in, or built by the shell), gives the files
-// of a patch in its text, last.
+// of a patch in its text where it first names apply_patch, else last.
 func shellWrites(command, cwd string) (paths []string, commits []int) {
 	inText := func() (out []string) {
 		for _, p := range applyPatchPaths(command) {
@@ -31,7 +31,7 @@ func shellWrites(command, cwd string) (paths []string, commits []int) {
 	}
 	dir := cwd
 	var out []string
-	patched := false
+	patched, recovered := false, false
 	resolve := func(w word) (string, bool) {
 		if !w.literal || w.text == "" || (dir == "" && !filepath.IsAbs(w.text)) {
 			return "", false
@@ -124,6 +124,9 @@ func shellWrites(command, cwd string) (paths []string, commits []int) {
 			for _, w := range writtenOperands(words) {
 				add(w)
 			}
+			if !patched && !recovered && slices.ContainsFunc(words, func(w word) bool { return strings.Contains(w.text, "apply_patch") }) {
+				out, recovered = append(out, inText()...), true // before any commit that follows
+			}
 			if slices.Contains(committing, gitSubcommand(words)) {
 				commits = append(commits, len(out))
 			}
@@ -131,7 +134,7 @@ func shellWrites(command, cwd string) (paths []string, commits []int) {
 		stack = append(stack, scope{n, dir})
 		return true
 	})
-	if !patched {
+	if !patched && !recovered {
 		out = append(out, inText()...)
 	}
 	return out, commits

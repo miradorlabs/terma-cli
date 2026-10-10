@@ -13,6 +13,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
+	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -505,5 +506,26 @@ func TestCodexEndOfTurnKeepsWhatCallsWrote(t *testing.T) {
 	c.git("add", "edited.txt", "patched.txt")
 	if msg := c.commit("human"); strings.Contains(msg, "Agent-Session-Id") {
 		t.Fatalf("the developer's later commit was stamped:\n%s", msg)
+	}
+}
+
+// Two parallel calls claim one file before either records it: one writes it, the other is
+// declined. The declined call's unchanged record must not withdraw the other's claim.
+func TestCodexParallelCallsKeepAWrittenClaim(t *testing.T) {
+	c := newCodexCall(t)
+	env := c.env("")
+	r, err := env.Repo(c.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sess := session.Session{ID: codexCallSession, Tool: codexTool}
+	files := env.Expect(r, sess, []string{filepath.Join(c.root, "f.txt")})
+	expect(env, r, sess, nil, files) // the call that writes, before it runs
+	hookruntest.WriteFile(t, c.root, "f.txt", "agent")
+	expect(env, r, sess, nil, files) // the declined call, recorded late
+	c.endTurn()
+	c.git("add", "f.txt")
+	if msg := c.commit("agent"); !strings.Contains(msg, "Agent-Session-Id: "+codexCallSession) {
+		t.Fatalf("the declined call withdrew the parallel call's written claim:\n%s", msg)
 	}
 }

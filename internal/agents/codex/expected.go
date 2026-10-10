@@ -73,11 +73,12 @@ func expect(e hookrun.Env, r *hookrun.Repo, sess session.Session, held map[strin
 }
 
 // settleExpected, at the end of a turn, withdraws the claims of the session's calls on files
-// they left as they were: the call was declined or wrote nothing there.
+// they left as they were: the call was declined or wrote nothing there. A file two parallel
+// calls claimed is withdrawn only when neither changed it.
 func settleExpected(e hookrun.Env, r *hookrun.Repo, sessionID string) {
 	dir := filepath.Join(e.StateDir, codexExpectedDir)
 	paths, _ := filepath.Glob(filepath.Join(dir, hookrun.EvidenceID(sessionID)+".*.json"))
-	var unchanged []string
+	same := map[string]bool{}
 	for _, p := range paths {
 		var call expectedCall
 		b, err := os.ReadFile(p)
@@ -85,11 +86,18 @@ func settleExpected(e hookrun.Env, r *hookrun.Repo, sessionID string) {
 			continue // another checkout's: its own Stop settles it
 		}
 		for f, before := range call.Files {
-			if before.same(statFile(filepath.Join(r.Root, filepath.FromSlash(f)))) {
-				unchanged = append(unchanged, f)
+			unchanged := before.same(statFile(filepath.Join(r.Root, filepath.FromSlash(f))))
+			if prior, seen := same[f]; !seen || prior {
+				same[f] = unchanged
 			}
 		}
 		_ = os.Remove(p)
+	}
+	var unchanged []string
+	for f, ok := range same {
+		if ok {
+			unchanged = append(unchanged, f)
+		}
 	}
 	if len(unchanged) > 0 {
 		if err := r.Store.Consume(session.Key{Tool: codexTool, ID: sessionID}, unchanged); err != nil {
