@@ -235,6 +235,8 @@ runs over two nights against a scratch origin. The digest,
   did not reach an error path is no evidence, and only from a whole census: a night one of
   whose census scenarios failed for the build says its census is partial and judges nothing
   removed; a build is judged once, on its first whole census, against the newest older one
+  and every partial build since (what those saw, they saw), and the digest names that build
+  where it is not the previous one
 - **newly withheld fields**: unclassified keys the relay drops;
   classify each in `internal/relay/allow.go`, an agent's capture rules, or as content. Those
   still withheld from before are one reminder line until they are.

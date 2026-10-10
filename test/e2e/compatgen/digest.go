@@ -49,6 +49,9 @@ type HarnessDrift struct {
 	// Partial is a census of Version a census scenario failed before taking whole: Removed
 	// and Unseen are not judged.
 	Partial bool `json:"partial,omitempty"`
+	// Since is the build Removed and Unseen were judged against, where it is not Previous: the
+	// newest older build with a whole census, the ones after it partial.
+	Since string `json:"since,omitempty"`
 	// Unreached is a build newer than Version that the census should have reached and did
 	// not: Previous, the newest the catalog had (it failed to install, or its tests did not
 	// run), or the newest tonight's census scenarios ran (they failed before its census).
@@ -253,8 +256,17 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran censusRuns, now time.Time)
 		// error path, or a scenario that did not run, would read as one gone.
 		d.Partial = ran.failed[harness+"\x00"+version]
 		if whole, ok := cat.lastWhole(harness, version); ok && !d.Partial && !cat.censusedWhole(harness, version) {
+			if whole.Version != d.Previous {
+				d.Since = whole.Version
+			}
+			// A key was sent if a build from the whole census to this one sent it: the builds in
+			// between were partial, but what they saw they saw. (A key keeps only its newest
+			// builds, which partial ones may fill.)
+			sentSince := func(f FieldEntry) bool {
+				return slices.ContainsFunc(f.Versions, func(v string) bool { return !versionLess(v, whole.Version) && versionLess(v, version) })
+			}
 			for _, f := range cat.Fields {
-				if f.Harness != harness || !slices.Contains(f.Versions, whole.Version) || !sent[f.Surface] {
+				if f.Harness != harness || !sentSince(f) || !sent[f.Surface] {
 					continue
 				}
 				if _, ok := tonight[f.Surface+"\x00"+f.Key]; !ok {

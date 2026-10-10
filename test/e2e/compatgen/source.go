@@ -167,9 +167,15 @@ func linkSources(d *Drift, known map[string][]string) {
 		if !ok {
 			continue
 		}
-		newer := h.Previous != "" && versionLess(h.Previous, h.Version)
+		// The build before is the one what is gone was judged against (Since, where the builds
+		// between were partial).
+		base := h.Previous
+		if h.Since != "" {
+			base = h.Since
+		}
+		newer := base != "" && versionLess(base, h.Version)
 		if newer {
-			h.Compare = s.compare(h.Previous, h.Version)
+			h.Compare = s.compare(base, h.Version)
 		}
 		fs := h.findings()
 		if len(fs) == 0 {
@@ -206,7 +212,7 @@ func linkSources(d *Drift, known map[string][]string) {
 			}
 			return hits
 		}
-		hitsAt, hitsBefore := read(h.Version, at), read(h.Previous, before)
+		hitsAt, hitsBefore := read(h.Version, at), read(base, before)
 		for _, f := range fs {
 			if hitsAt == nil {
 				continue
@@ -221,8 +227,8 @@ func linkSources(d *Drift, known map[string][]string) {
 					at, placed = nil, true
 				}
 				if beforePlaced {
-					says.Previous = h.Previous
-					says.Before, says.BeforeMore = refs(s, h.Previous, before)
+					says.Previous = base
+					says.Before, says.BeforeMore = refs(s, base, before)
 				}
 			}
 			// Unplaced, or with the build before unread named only away from its surface (it

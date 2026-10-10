@@ -417,3 +417,22 @@ func TestSourceLinksPlaceAKeyInItsFunction(t *testing.T) {
 		t.Errorf("the code after a raw string holding \"/*\": %+v", s)
 	}
 }
+
+// What is gone is linked against the build it was judged against, not the partial one after
+// it: the diff and the build before are the last whole census's.
+func TestSourceLinksJudgeAgainstTheLastWholeBuild(t *testing.T) {
+	withSource(t, map[string][]byte{
+		"rust-v0.161.0": tarball(t, map[string]string{"codex-rs/core/src/turn.rs": "fn run() {\n    span(\"turn\", attempt = a);\n}\n"}),
+		"rust-v0.162.1": tarball(t, map[string]string{"codex-rs/core/src/turn.rs": "fn run() {\n    span(\"turn\");\n}\n"}),
+	})
+	d := Drift{Harnesses: []HarnessDrift{{Harness: "codex", Name: "Codex CLI", Version: "0.162.1", Previous: "0.162.0", Since: "0.161.0",
+		Removed: []FieldChange{{Surface: "traces/turn", Key: "attempt"}}}}}
+	linkSources(&d, nil)
+	h := d.Harnesses[0]
+	if len(d.SourceErrors) != 0 || h.Compare != "https://github.com/openai/codex/compare/rust-v0.161.0...rust-v0.162.1" {
+		t.Errorf("errors %v, compare %s", d.SourceErrors, h.Compare)
+	}
+	if got := renderLinks(h.Removed[0].Source.note(allLinks), false); !strings.Contains(got, "gone from 0.162.1's source, was in 0.161.0's: [turn.rs:2]") {
+		t.Errorf("attempt: %q", got)
+	}
+}

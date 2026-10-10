@@ -200,3 +200,30 @@ func TestAPartialBuildIsJudgedWhenWhole(t *testing.T) {
 		t.Errorf("whole night: removed %+v, want retry_reason", hs[0].Removed)
 	}
 }
+
+// A key sent by the partial builds after the last whole census, and by more of them than a key
+// keeps builds of, is still judged gone when a whole build no longer sends it; and the digest
+// names the build it was judged against.
+func TestARemovalAcrossPartialBuilds(t *testing.T) {
+	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
+	night := func(i int) time.Time { return day.Add(time.Duration(i) * 24 * time.Hour) }
+	both := func(v string, at time.Time) []e2e.FieldRow {
+		return []e2e.FieldRow{field(v, "logs/codex.api_request", "model", "safe", at), field(v, "logs/codex.api_request", "attempt", "safe", at)}
+	}
+	var cat Catalog
+	mergeFields(&cat, both("0.150.0", night(0)), nil)
+	for i := 1; i <= keepVersions; i++ {
+		v := fmt.Sprintf("0.15%d.0", i)
+		mergeFields(&cat, both(v, night(i)), map[string]bool{"codex\x00" + v: true})
+	}
+	tonight := []e2e.FieldRow{field("0.160.0", "logs/codex.api_request", "model", "safe", night(9))}
+	ran := censusRan([]e2e.CompatRow{{Harness: "codex", Version: "0.160.0", Capability: e2e.CensusCapability, Result: "pass"}})
+	_, _, hs := fieldDrift(cat, tonight, ran, night(9))
+	h := hs[0]
+	if len(h.Removed) != 1 || h.Removed[0].Key != "attempt" {
+		t.Errorf("removed %+v, want attempt", h.Removed)
+	}
+	if h.Previous != "0.155.0" || h.Since != "0.150.0" || !strings.Contains(h.headline(), "(was 0.155.0; judged against 0.150.0, the last whole census)") {
+		t.Errorf("previous %s, since %s, headline %q", h.Previous, h.Since, h.headline())
+	}
+}

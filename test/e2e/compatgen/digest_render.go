@@ -29,6 +29,8 @@ func (h HarnessDrift) headline() string {
 		build += " (" + h.Unreached + ", the newest censused before, was not reached)"
 	case h.Unreached != "":
 		build += " (" + h.Unreached + ", run tonight, was not reached)"
+	case h.Previous != h.Version && h.Since != "":
+		build += " (was " + h.Previous + "; judged against " + h.Since + ", the last whole census" + h.compareLink() + ")"
 	case h.Previous != h.Version:
 		build += " (was " + h.Previous + h.compareLink() + ")"
 	}
