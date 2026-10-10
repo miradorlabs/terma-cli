@@ -207,7 +207,7 @@ func code(line string, st *lexState) string {
 				st.block++
 				i++
 			}
-		case !inString && c == 'r' && (next == '"' || next == '#') && (i == 0 || !isIdent(line[i-1])):
+		case !inString && c == 'r' && (next == '"' || next == '#') && rawStart(line, i):
 			hashes := 0
 			for i+1+hashes < len(line) && line[i+1+hashes] == '#' {
 				hashes++
@@ -247,6 +247,15 @@ func code(line string, st *lexState) string {
 	return b.String()
 }
 
+// rawStart reports whether the r at i starts a raw string, r"…" or a byte one, br"…": it does
+// not end an identifier.
+func rawStart(line string, i int) bool {
+	if i > 0 && line[i-1] == 'b' {
+		i--
+	}
+	return i == 0 || !isIdent(line[i-1])
+}
+
 func isIdent(c byte) bool {
 	return c == '_' || c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z'
 }
@@ -270,14 +279,17 @@ func (m *testModule) skip(line string) bool {
 		}
 		return n
 	}
-	switch {
-	case m.depth > 0:
+	if m.depth > 0 {
 		m.depth += braces()
 		return true
-	case t == "#[cfg(test)]":
-		m.cfg = true
-		return true
-	case t == "" || strings.HasPrefix(t, "#["):
+	}
+	// The attribute on its own line, or on the module's ("#[cfg(test)] mod tests {").
+	if rest, ok := strings.CutPrefix(t, "#[cfg(test)]"); ok {
+		if m.cfg, t = true, strings.TrimSpace(rest); t == "" {
+			return true
+		}
+	}
+	if t == "" || strings.HasPrefix(t, "#[") {
 		return m.cfg
 	}
 	mod := strings.HasPrefix(t, "mod ") || strings.HasPrefix(t, "pub mod ") || strings.HasPrefix(t, "pub(crate) mod ")

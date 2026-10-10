@@ -75,3 +75,23 @@ func TestSourceScanNestsBlockComments(t *testing.T) {
 		t.Errorf("the code after the nested comment: %+v", s)
 	}
 }
+
+// A test module whose attribute is on its own line ("#[cfg(test)] mod tests {"), and a raw
+// byte string (br#"…"#), are no build's code.
+func TestSourceScanSkipsInlineTestModulesAndByteStrings(t *testing.T) {
+	files := map[string]string{"codex-rs/a.rs": "fn a() {\n    let fixture = br#\"a\" \"codex.in_bytes\" \"b\"#;\n    emit(\"codex.live\");\n}\n\n" +
+		"#[cfg(test)] mod tests {\n    fn t() { emit(\"codex.in_test\"); }\n}\n\nfn after() {\n    emit(\"codex.after\");\n}\n"}
+	withSource(t, map[string][]byte{"rust-v0.162.0": tarball(t, files)})
+	var ss []SurfaceChange
+	for _, name := range []string{"in_bytes", "live", "in_test", "after"} {
+		ss = append(ss, SurfaceChange{Surface: "logs/codex." + name})
+	}
+	d := Drift{Harnesses: []HarnessDrift{{Harness: "codex", Name: "Codex CLI", Version: "0.162.0", Previous: "0.162.0", NewSurfaces: ss}}}
+	linkSources(&d, nil)
+	for i, want := range []bool{false, true, false, true} {
+		s := d.Harnesses[0].NewSurfaces[i]
+		if got := s.Source != nil && len(s.Source.Refs) > 0; got != want {
+			t.Errorf("%s linked %v, want %v", s.Surface, got, want)
+		}
+	}
+}

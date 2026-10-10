@@ -166,8 +166,9 @@ type baseline struct {
 // (FieldEntry.Whole; a partial census is a failed run, where keys of an error path come). Where
 // it is censused whole tonight too, it is all it sent tonight, one night against one: what it
 // sent on some earlier night alone is not gone, and what tonight's census reached first is
-// there for the next build to drop. Otherwise it is its earlier nights, and the digest says so. Where the catalog has none, but has the harness, it is the oldest build judged
-// tonight, the rest judged against it.
+// there for the next build to drop. Otherwise it is its earlier nights, and the digest says so.
+// Where the catalog has none, but has the harness, it is the oldest build judged tonight, the
+// rest judged against it.
 func chooseBaseline(cat Catalog, n night, judged []string, first bool) (b baseline) {
 	whole, ok := cat.lastWhole(n.harness, firstOr(judged))
 	if !ok {
