@@ -200,7 +200,9 @@ its content policy to (a log event, a span, its events and links, a metric and i
 the instrumentation scope, the resource), with the kinds of value it carried (`text`,
 `number`, `bool`, `list`, `map`, `bytes`). The workload scenarios' direct runs and
 `TestClaudeInteractiveFields` (the events only an interactive session sends, such as
-`permission_mode_changed`) record it, and the run writes `report/fields.json`. Each key is
+`permission_mode_changed`) record it, and the run writes `report/fields.json`, and beside it
+`report/census.json`: the builds those scenarios ran (`TakesCensus`), and whether one failed
+for a build, whose census is then partial. Each key is
 classified by the terma under test, `terma relay classify`, as its relay treats it where it
 sits (a record, a resource or a span event, as the census saw it) when a project withholds
 content; the relay also names the kinds of value it keeps of the key there, so the catalog
@@ -234,13 +236,13 @@ runs over two nights against a scratch origin. The digest,
 - **new surfaces**: surfaces no build had, once each with its keys counted, so a renamed
   span is one line, not one per key
 - **new fields**: keys new to their surface, or new to the harness anywhere
-- **removed fields** and **surfaces no longer sent**: what the previous build had and a
-  newer one does not, judged only on a newer build, since a re-run of the same build that
-  did not reach an error path is no evidence, and only from a whole census: a night one of
-  whose census scenarios failed for the build says its census is partial and judges nothing
-  removed; a build is judged once, on its first whole census, against the newest older one
-  (a partial census is a failed run, where keys of an error path come, so it is no evidence),
-  and the digest names that build where it is not the previous one
+- **removed fields** and **surfaces no longer sent**: what the newest build the night
+  censused whole no longer sends that the newest older build censused whole did. Only a whole
+  census is evidence: a partial one is a failed run, where keys of an error path come, so a
+  night whose newest build is partial judges the newest whole one before it, or nothing, and
+  says so. A build is judged once, on its first whole census, and only while no newer build
+  has one: a re-run that did not reach an error path is no evidence. The digest names the
+  builds judged and judged against where they are not the newest and the previous one
 - **newly withheld fields**: unclassified keys the relay drops;
   classify each in `internal/relay/allow.go`, an agent's capture rules, or as content. Those
   still withheld from before are one reminder line until they are.
@@ -264,8 +266,8 @@ the digest says so. Nothing is read on a night with nothing to link.
 It also lists capabilities whose result changed, and says so when the census did not run,
 did not reach a harness censused within the week or whose census scenarios ran that night,
 or did not reach the newest build: the
-newest the catalog had, or the newest the night's census scenarios ran (those that prove
-`telemetry.census`, `e2e.CensusCapability`: `runBoth` and `TestClaudeInteractiveFields`). A census that did not run never reads as a
+newest the catalog had, or the newest the night's census scenarios ran (`report/census.json`).
+A census that did not run never reads as a
 quiet night. The digest goes to the run's summary and to Slack through the
 `SLACK_WEBHOOK_URL` secret in the `live-harnesses` environment, every night, so a quiet
 channel means the job did not run. Drift never fails the night; a removed key on a surface

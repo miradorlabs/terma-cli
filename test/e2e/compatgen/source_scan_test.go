@@ -4,6 +4,7 @@ import (
 	"testing"
 )
 
+// A Slack section cut where no line ends is not cut inside a link.
 func TestClipKeepsLinksWhole(t *testing.T) {
 	s := renderLinks(slackEscape("`k` · "+link("https://github.com/x#L1", "x.rs:1")), true)
 	if got := clip(s, len("`k` · <https://git")); got != "`k` · \n…" {
@@ -11,6 +12,8 @@ func TestClipKeepsLinksWhole(t *testing.T) {
 	}
 }
 
+// A test module's raw strings hold braces that are text; a constant's string may be on the
+// line after it; an import of the constant is not its use.
 func TestSourceScanReadsRustAsItIs(t *testing.T) {
 	files := map[string]string{
 		"codex-rs/auth/src/util.rs":          "#[cfg(test)]\nmod tests {\n    const BODY: &str = r#\"{\n        \"a\": {\"b\": 1}\n    }\"#;\n    fn t() { emit(\"codex.only_in_a_test\"); }\n}\n\nfn real() {\n    emit(\"codex.after_tests\");\n}\n",
@@ -34,6 +37,8 @@ func TestSourceScanReadsRustAsItIs(t *testing.T) {
 	}
 }
 
+// Comments are no build's code: a name left in a trailing or a block comment is not still in
+// the source; a string that holds "//" or "/*" is still a string.
 func TestSourceScanSkipsComments(t *testing.T) {
 	files := map[string]string{
 		"codex-rs/otel/src/a.rs": "fn a() {\n    emit(\"codex.live\"); // was \"codex.trailing\"\n    /* \"codex.block_one\"\n       \"codex.block_two\" */ emit(\"codex.after_block\");\n" +
@@ -54,6 +59,8 @@ func TestSourceScanSkipsComments(t *testing.T) {
 	}
 }
 
+// Rust nests block comments: a name inside the outer one, after an inner one closes, is
+// still comment.
 func TestSourceScanNestsBlockComments(t *testing.T) {
 	files := map[string]string{"codex-rs/a.rs": "fn a() {\n    /* outer /* inner */ emit(\"codex.dead\"); */ emit(\"codex.live\");\n}\n"}
 	withSource(t, map[string][]byte{"rust-v0.162.0": tarball(t, files)})

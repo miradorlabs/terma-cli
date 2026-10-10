@@ -70,7 +70,8 @@ machines: machine-image
 # artefacts). The nightly job does the same on the compat-matrix branch, where both live.
 RUNS ?= $(wildcard report/compat.json report/linux/compat.json)
 FIELD_RUNS ?= $(wildcard report/fields.json)
-COMPATGEN = go run ./compatgen $(foreach r,$(RUNS),-run $(r)) $(foreach f,$(FIELD_RUNS),-fields $(f))
+CENSUS_RUNS ?= $(wildcard report/census.json)
+COMPATGEN = go run ./compatgen $(foreach r,$(RUNS),-run $(r)) $(foreach f,$(FIELD_RUNS),-fields $(f)) $(foreach c,$(CENSUS_RUNS),-census $(c))
 .PHONY: compat drift
 compat:
 	$(COMPATGEN)

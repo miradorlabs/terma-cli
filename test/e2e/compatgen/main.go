@@ -59,6 +59,7 @@ func (e Entry) key() string {
 // config is what one compatgen run reads and writes.
 type config struct {
 	runs, fieldRuns   []string
+	censusRuns        []string
 	history, md, json string
 	catalog, fieldsMD string
 	digest, link      string
@@ -68,9 +69,10 @@ type config struct {
 
 func main() {
 	var c config
-	var runs, fields runsFlag
+	var runs, fields, census runsFlag
 	flag.Var(&runs, "run", "a run's compat.json (repeatable)")
 	flag.Var(&fields, "fields", "a run's fields.json (repeatable)")
+	flag.Var(&census, "census", "a run's census.json, the builds its census scenarios ran (repeatable)")
 	flag.StringVar(&c.history, "history", "../../docs/compat/history.json", "the history, read and rewritten")
 	flag.StringVar(&c.md, "md", "../../docs/COMPATIBILITY.md", "the rendered matrix")
 	flag.StringVar(&c.json, "json", "../../docs/compat/compat.json", "the matrix for the website")
@@ -80,7 +82,7 @@ func main() {
 	flag.StringVar(&c.link, "link", "", "the run, linked from the digest")
 	flag.BoolVar(&c.source, "source", false, "link the digest's findings to the lines of a public harness source that name them (downloads it)")
 	flag.Parse()
-	c.runs, c.fieldRuns = runs, fields
+	c.runs, c.fieldRuns, c.censusRuns = runs, fields, census
 	if err := run(c, time.Now().UTC()); err != nil {
 		fmt.Fprintln(os.Stderr, "compatgen:", err)
 		os.Exit(1)
@@ -116,7 +118,15 @@ func run(c config, now time.Time) error {
 		}
 		fieldRows = append(fieldRows, rows...)
 	}
-	ran := censusRan(compatRows)
+	var censusRows []e2e.CensusRun
+	for _, p := range c.censusRuns {
+		var rows []e2e.CensusRun
+		if err := readJSON(p, &rows); err != nil {
+			return err
+		}
+		censusRows = append(censusRows, rows...)
+	}
+	ran := censusRan(censusRows)
 	if c.digest != "" {
 		d := Drift{GeneratedAt: now, Link: c.link, Compat: compatDrift(hist, compatRows)}
 		d.NoCensus, d.Missing, d.Harnesses = fieldDrift(catalog, fieldRows, ran, now)

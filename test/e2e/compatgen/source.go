@@ -181,14 +181,25 @@ func linkSources(d *Drift, known map[string][]string) {
 		if len(fs) == 0 {
 			continue
 		}
-		at, before := map[needle]bool{}, map[needle]bool{}
+		// What is gone is gone from the build judged (Judged, where Version's census was
+		// partial); the rest is in Version.
+		goneAt := h.Version
+		if h.Judged != "" {
+			goneAt = h.Judged
+		}
+		judgedNewer := base != "" && versionLess(base, goneAt)
+		at, atGone, before := map[needle]bool{}, map[needle]bool{}, map[needle]bool{}
 		names := slices.Clone(known[h.Harness])
 		gone := false
 		for _, f := range fs {
 			for _, n := range f.needles() {
-				at[n] = true
-				if f.gone && newer {
-					before[n], gone = true, true
+				if !f.gone {
+					at[n] = true
+					continue
+				}
+				atGone[n], gone = true, true
+				if judgedNewer {
+					before[n] = true
 				}
 			}
 			if f.within != "" {
@@ -198,8 +209,14 @@ func linkSources(d *Drift, known map[string][]string) {
 		for _, name := range names {
 			at[needle{name, false}] = true
 			if gone {
-				before[needle{name, false}] = true
+				atGone[needle{name, false}] = true
+				if judgedNewer {
+					before[needle{name, false}] = true
+				}
 			}
+		}
+		if goneAt == h.Version {
+			maps.Copy(at, atGone)
 		}
 		read := func(version string, needles map[needle]bool) map[needle][]hit {
 			if len(needles) == 0 {
@@ -213,12 +230,20 @@ func linkSources(d *Drift, known map[string][]string) {
 			return hits
 		}
 		hitsAt, hitsBefore := read(h.Version, at), read(base, before)
+		hitsGone := hitsAt
+		if goneAt != h.Version && gone {
+			hitsGone = read(goneAt, atGone)
+		}
 		for _, f := range fs {
-			if hitsAt == nil {
+			hits, version := hitsAt, h.Version
+			if f.gone {
+				hits, version = hitsGone, goneAt
+			}
+			if hits == nil {
 				continue
 			}
-			at, atBeside, placed := rank(f, hitsAt, owners(hitsAt, names))
-			says := &SourceSays{Version: h.Version, Gone: f.gone && newer}
+			at, atBeside, placed := rank(f, hits, owners(hits, names))
+			says := &SourceSays{Version: version, Gone: f.gone && judgedNewer}
 			if says.Gone && hitsBefore != nil {
 				before, beforeBeside, beforePlaced := rank(f, hitsBefore, owners(hitsBefore, names))
 				// A key gone is still in the source only where it is still beside its surface:
@@ -236,7 +261,7 @@ func linkSources(d *Drift, known map[string][]string) {
 			if !placed || (says.Gone && says.Previous == "" && f.within != "" && !atBeside) {
 				continue
 			}
-			says.Refs, says.More = refs(s, h.Version, at)
+			says.Refs, says.More = refs(s, version, at)
 			*f.says = says
 		}
 	}

@@ -218,6 +218,14 @@ func (cat *Catalog) lastWhole(harness, version string) (Census, bool) {
 	return best, found
 }
 
+// wholeAfter reports whether the catalog took a whole census of harness at a build newer than
+// version.
+func (cat *Catalog) wholeAfter(harness, version string) bool {
+	return slices.ContainsFunc(cat.Censuses, func(c Census) bool {
+		return c.Harness == harness && !c.Partial && versionLess(version, c.Version)
+	})
+}
+
 // censusedWhole reports whether the catalog took a whole census of harness at version.
 func (cat *Catalog) censusedWhole(harness, version string) bool {
 	return slices.ContainsFunc(cat.Censuses, func(c Census) bool {
@@ -337,7 +345,7 @@ func renderFields(cat Catalog, now time.Time) string {
 		}
 		keys, withheld := 0, 0
 		for _, f := range byHarness[h.ID] {
-			if f.sentBy(shown.Version) {
+			if f.sentBy(shown.Version) || (shown.Partial && f.seenBy(shown.Version)) {
 				keys++
 				if f.withheld() {
 					withheld++
@@ -375,7 +383,7 @@ func renderFields(cat Catalog, now time.Time) string {
 			for _, f := range bySurface[s] {
 				in := "yes"
 				switch {
-				case f.sentBy(newest.Version):
+				case f.sentBy(newest.Version), shown.Partial && f.seenBy(newest.Version):
 				case f.seenBy(newest.Version):
 					in = "only in a failed run"
 				default:

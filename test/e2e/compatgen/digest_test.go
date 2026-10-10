@@ -11,6 +11,8 @@ import (
 	"github.com/miradorlabs/terma-cli/e2e"
 )
 
+// A night that brought no census, or none of a harness the catalog censused within the week,
+// is no quiet night: a census that did not run must not read as one that found nothing.
 func TestDigestSaysWhatWasNotCensused(t *testing.T) {
 	now := time.Date(2026, 10, 10, 4, 0, 0, 0, time.UTC)
 	cat := Catalog{Censuses: []Census{
@@ -33,6 +35,10 @@ func TestDigestSaysWhatWasNotCensused(t *testing.T) {
 	}
 }
 
+// A surface no build had is said once, with its keys counted, not key by key: a span renamed
+// carries keys the harness already sends. A key new to the harness on it is still a new
+// field. A re-run of the same build reports nothing gone: a key that only comes on an error
+// path would otherwise read as removed.
 func TestDigestSurfacesAndReruns(t *testing.T) {
 	day := time.Date(2026, 10, 9, 4, 0, 0, 0, time.UTC)
 	var cat Catalog
@@ -59,6 +65,8 @@ func TestDigestSurfacesAndReruns(t *testing.T) {
 	}
 }
 
+// A night that reached only a build older than the catalog's newest says so, and is no quiet
+// night: the newest failed to install, or its tests did not run.
 func TestDigestSaysTheNewestWasNotReached(t *testing.T) {
 	day := time.Date(2026, 10, 9, 4, 0, 0, 0, time.UTC)
 	var cat Catalog
@@ -70,17 +78,17 @@ func TestDigestSaysTheNewestWasNotReached(t *testing.T) {
 	}
 }
 
+// A night whose census scenarios ran a newer build than any census reached says so, though
+// the build the census did reach is newer than the catalog's: the newest failed before its
+// census was taken.
 func TestDigestSaysTheNewestRunWasNotReached(t *testing.T) {
 	day := time.Date(2026, 10, 9, 4, 0, 0, 0, time.UTC)
 	var cat Catalog
 	mergeFields(&cat, []e2e.FieldRow{field("0.160.0", "logs/codex.api_request", "model", "safe", day)}, nil)
 	night := day.Add(24 * time.Hour)
-	ran := censusRan([]e2e.CompatRow{
-		{Harness: "codex", Version: "0.161.0", Capability: e2e.CensusCapability, Result: "pass"},
-		{Harness: "codex", Version: "0.162.0", Capability: e2e.CensusCapability, Result: "fail"},
-		// Neither a skipped scenario nor another capability's is a census that should have been taken.
-		{Harness: "codex", Version: "0.163.0", Capability: e2e.CensusCapability, Result: "not run"},
-		{Harness: "codex", Version: "0.164.0", Capability: "relay.telemetry", Result: "fail"},
+	ran := censusRan([]e2e.CensusRun{
+		{Harness: "codex", Version: "0.161.0"},
+		{Harness: "codex", Version: "0.162.0", Failed: true},
 	})
 	_, _, hs := fieldDrift(cat, []e2e.FieldRow{field("0.161.0", "logs/codex.api_request", "model", "safe", night)}, ran, night)
 	d := Drift{Harnesses: hs}
@@ -95,6 +103,8 @@ func TestDigestSaysTheNewestRunWasNotReached(t *testing.T) {
 	}
 }
 
+// A census a scenario failed before taking whole judges nothing removed: what it did not see
+// it may not have reached. A census every scenario took whole does.
 func TestDigestJudgesNoRemovalFromAPartialCensus(t *testing.T) {
 	day := time.Date(2026, 10, 9, 4, 0, 0, 0, time.UTC)
 	var cat Catalog
@@ -109,7 +119,7 @@ func TestDigestJudgesNoRemovalFromAPartialCensus(t *testing.T) {
 		result  string
 		removed int
 	}{{"fail", 0}, {"pass", 1}} {
-		ran := censusRan([]e2e.CompatRow{{Harness: "codex", Version: "0.162.0", Capability: e2e.CensusCapability, Result: c.result}})
+		ran := censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.162.0", Failed: c.result == "fail"}})
 		_, _, hs := fieldDrift(cat, tonight, ran, night)
 		h := hs[0]
 		if h.Partial != (c.result == "fail") || len(h.Removed) != c.removed || len(h.Unseen) != c.removed {
@@ -121,6 +131,8 @@ func TestDigestJudgesNoRemovalFromAPartialCensus(t *testing.T) {
 	}
 }
 
+// What a harness names is escaped where it is shown: "<" in Slack would start a link, and "|"
+// in a markdown table would end a cell.
 func TestDigestEscapesWhatHarnessesName(t *testing.T) {
 	d := Drift{GeneratedAt: time.Date(2026, 10, 10, 4, 0, 0, 0, time.UTC), Harnesses: []HarnessDrift{{Harness: "codex", Name: "Codex CLI", Version: "1", Previous: "1",
 		Added: []FieldChange{{Surface: "logs/<x|y>", Key: "a&b"}}}}}
@@ -133,12 +145,14 @@ func TestDigestEscapesWhatHarnessesName(t *testing.T) {
 	}
 }
 
+// A harness whose census scenarios ran and took no census is missing, though the catalog
+// never censused it: one that fails before its census every night is no quiet night.
 func TestDigestSaysAnUncensusedHarnessThatRanIsMissing(t *testing.T) {
 	now := time.Date(2026, 10, 10, 4, 0, 0, 0, time.UTC)
 	var cat Catalog
-	ran := censusRan([]e2e.CompatRow{
-		{Harness: "gemini", Version: "0.64.0", Capability: e2e.CensusCapability, Result: "fail"},
-		{Harness: "codex", Version: "0.162.0", Capability: e2e.CensusCapability, Result: "pass"},
+	ran := censusRan([]e2e.CensusRun{
+		{Harness: "gemini", Version: "0.64.0", Failed: true},
+		{Harness: "codex", Version: "0.162.0"},
 	})
 	noCensus, missing, _ := fieldDrift(cat, []e2e.FieldRow{field("0.162.0", "logs/codex.api_request", "model", "safe", now)}, ran, now)
 	d := Drift{NoCensus: noCensus, Missing: missing}
@@ -170,7 +184,7 @@ func TestPartialCensusesKeepTheWholeOne(t *testing.T) {
 		t.Fatalf("last whole census %+v, %v", whole, ok)
 	}
 	tonight := []e2e.FieldRow{field("0.170.0", "logs/codex.api_request", "model", "safe", night(9))}
-	ran := censusRan([]e2e.CompatRow{{Harness: "codex", Version: "0.170.0", Capability: e2e.CensusCapability, Result: "pass"}})
+	ran := censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.170.0"}})
 	_, _, hs := fieldDrift(cat, tonight, ran, night(9))
 	if len(hs[0].Removed) != 1 || hs[0].Removed[0].Key != "retry_reason" {
 		t.Errorf("removed %+v, want retry_reason, judged against the last whole census", hs[0].Removed)
@@ -190,12 +204,12 @@ func TestAPartialBuildIsJudgedWhenWhole(t *testing.T) {
 		field("0.161.0", "logs/codex.api_request", "retry_reason", "safe", day),
 	}, nil)
 	tonight := []e2e.FieldRow{field("0.162.0", "logs/codex.api_request", "model", "safe", day.Add(24*time.Hour))}
-	failed := censusRan([]e2e.CompatRow{{Harness: "codex", Version: "0.162.0", Capability: e2e.CensusCapability, Result: "fail"}})
+	failed := censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.162.0", Failed: true}})
 	if _, _, hs := fieldDrift(cat, tonight, failed, day.Add(24*time.Hour)); !hs[0].Partial || len(hs[0].Removed) != 0 {
 		t.Fatalf("partial night: %+v", hs[0])
 	}
 	mergeFields(&cat, tonight, failed.failed)
-	passed := censusRan([]e2e.CompatRow{{Harness: "codex", Version: "0.162.0", Capability: e2e.CensusCapability, Result: "pass"}})
+	passed := censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.162.0"}})
 	if _, _, hs := fieldDrift(cat, tonight, passed, day.Add(48*time.Hour)); len(hs[0].Removed) != 1 {
 		t.Errorf("whole night: removed %+v, want retry_reason", hs[0].Removed)
 	}
@@ -217,7 +231,7 @@ func TestARemovalAcrossPartialBuilds(t *testing.T) {
 		mergeFields(&cat, both(v, night(i)), map[string]bool{"codex\x00" + v: true})
 	}
 	tonight := []e2e.FieldRow{field("0.160.0", "logs/codex.api_request", "model", "safe", night(9))}
-	ran := censusRan([]e2e.CompatRow{{Harness: "codex", Version: "0.160.0", Capability: e2e.CensusCapability, Result: "pass"}})
+	ran := censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.160.0"}})
 	_, _, hs := fieldDrift(cat, tonight, ran, night(9))
 	h := hs[0]
 	if len(h.Removed) != 1 || h.Removed[0].Key != "attempt" {
@@ -239,7 +253,7 @@ func TestAKeyOnlyAPartialRunSawIsNotRemoved(t *testing.T) {
 		field("0.151.0", "logs/codex.api_request", "error.message", "prompt", day.Add(24*time.Hour)),
 	}, map[string]bool{"codex\x000.151.0": true})
 	tonight := []e2e.FieldRow{field("0.152.0", "logs/codex.api_request", "model", "safe", day.Add(48*time.Hour))}
-	ran := censusRan([]e2e.CompatRow{{Harness: "codex", Version: "0.152.0", Capability: e2e.CensusCapability, Result: "pass"}})
+	ran := censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.152.0"}})
 	if _, _, hs := fieldDrift(cat, tonight, ran, day.Add(48*time.Hour)); len(hs[0].Removed) != 0 {
 		t.Errorf("removed %+v: only a failed run sent it", hs[0].Removed)
 	}
@@ -265,7 +279,7 @@ func TestTenPartialBuildsKeepAKeyTheWholeCensusSaw(t *testing.T) {
 		t.Fatalf("attempt, or its whole build, pruned: %+v", cat.Fields)
 	}
 	tonight := []e2e.FieldRow{field("0.170.0", "logs/codex.api_request", "model", "safe", night(20))}
-	ran := censusRan([]e2e.CompatRow{{Harness: "codex", Version: "0.170.0", Capability: e2e.CensusCapability, Result: "pass"}})
+	ran := censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.170.0"}})
 	if _, _, hs := fieldDrift(cat, tonight, ran, night(20)); len(hs[0].Removed) != 1 || hs[0].Removed[0].Key != "attempt" {
 		t.Errorf("removed %+v, want attempt", hs[0].Removed)
 	}
@@ -308,10 +322,38 @@ func TestAWholeBuildTakesNothingFromItsFailedNight(t *testing.T) {
 			mergeFields(&cat, failedRun, failed)
 		}
 		tonight := []e2e.FieldRow{field("0.164.0", "logs/codex.api_request", "model", "safe", night(3))}
-		ran := censusRan([]e2e.CompatRow{{Harness: "codex", Version: "0.164.0", Capability: e2e.CensusCapability, Result: "pass"}})
+		ran := censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.164.0"}})
 		_, _, hs := fieldDrift(cat, tonight, ran, night(3))
 		if h := hs[0]; len(h.Removed)+len(h.Unseen) != 0 {
 			t.Errorf("%s: removed %+v, unseen %+v: only the failed run sent them", order, h.Removed, h.Unseen)
 		}
+	}
+}
+
+// A night that censuses two new builds, the older whole and the newer partial, judges the
+// whole one, which would otherwise become the next build's baseline unjudged: a key it no
+// longer sends is reported that night, and not again when the newer build is censused whole.
+func TestTheNewestWholeBuildOfANightIsJudged(t *testing.T) {
+	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
+	night := func(i int) time.Time { return day.Add(time.Duration(i) * 24 * time.Hour) }
+	var cat Catalog
+	mergeFields(&cat, []e2e.FieldRow{field("0.163.0", "logs/codex.api_request", "model", "safe", night(0)),
+		field("0.163.0", "logs/codex.api_request", "attempt", "safe", night(0))}, nil)
+	tonight := []e2e.FieldRow{field("0.164.0", "logs/codex.api_request", "model", "safe", night(1)),
+		field("0.165.0", "logs/codex.api_request", "model", "safe", night(1))}
+	ran := censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.164.0"}, {Harness: "codex", Version: "0.165.0", Failed: true}})
+	_, _, hs := fieldDrift(cat, tonight, ran, night(1))
+	h := hs[0]
+	if h.Version != "0.165.0" || h.Judged != "0.164.0" || len(h.Removed) != 1 || h.Removed[0].Key != "attempt" {
+		t.Fatalf("version %s, judged %s, removed %+v", h.Version, h.Judged, h.Removed)
+	}
+	if !strings.Contains(h.headline(), "census partial (a scenario failed), removals judged on 0.164.0") {
+		t.Errorf("headline %q", h.headline())
+	}
+	mergeFields(&cat, tonight, ran.failed)
+	next := []e2e.FieldRow{field("0.165.0", "logs/codex.api_request", "model", "safe", night(2))}
+	ran = censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.165.0"}})
+	if _, _, hs = fieldDrift(cat, next, ran, night(2)); len(hs[0].Removed) != 0 || hs[0].Since != "" && hs[0].Since != "0.164.0" {
+		t.Errorf("the next night: removed %+v, judged against %s", hs[0].Removed, hs[0].Since)
 	}
 }

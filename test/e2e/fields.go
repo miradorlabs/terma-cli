@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"testing"
 	"time"
 
 	collogspb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
@@ -72,10 +73,36 @@ func Withheld(class string, kinds, kept []string) bool {
 	return class == "unclassified" && slices.ContainsFunc(kinds, func(k string) bool { return !slices.Contains(kept, k) })
 }
 
-// CensusCapability is what every scenario that takes the census proves of the build it runs
-// (runBoth, TestClaudeInteractiveFields): a build one of them failed for has a partial census,
-// and one tonight's results prove it of, and no census reached, was not reached.
-const CensusCapability = "telemetry.census"
+// CensusRun is a build a scenario that takes the census (runBoth, TestClaudeInteractiveFields)
+// ran, and whether one failed for it: a build one failed for has a partial census, and one
+// they ran and no census reached was not reached. report/census.json holds them, beside the
+// census.
+type CensusRun struct {
+	Harness  string `json:"harness"`
+	Version  string `json:"version"`
+	Failed   bool   `json:"failed,omitempty"`
+	Platform string `json:"platform"`
+}
+
+var censusRuns = map[[2]string]*CensusRun{}
+
+// TakesCensus records that t takes the census of b: if t fails, b's census is partial. A
+// skipped t ran nothing.
+func TakesCensus(t *testing.T, b Binary) {
+	t.Helper()
+	t.Cleanup(func() {
+		if t.Skipped() && !t.Failed() {
+			return
+		}
+		fieldsMu.Lock()
+		defer fieldsMu.Unlock()
+		k := [2]string{b.Harness, b.Version}
+		if censusRuns[k] == nil {
+			censusRuns[k] = &CensusRun{Harness: b.Harness, Version: b.Version, Platform: runtime.GOOS + "/" + runtime.GOARCH}
+		}
+		censusRuns[k].Failed = censusRuns[k].Failed || t.Failed()
+	})
+}
 
 type fieldID struct{ harness, version, surface, key string }
 
@@ -284,12 +311,34 @@ func WriteFields(dir, terma string) error {
 		asked = append(asked, f.query)
 		queries[f.query] = true
 	}
+	runs := make([]CensusRun, 0, len(censusRuns))
+	for _, r := range censusRuns {
+		runs = append(runs, *r)
+	}
 	fieldsMu.Unlock()
 	// No census from an earlier run stays for `make drift` to take for this one's, whether this
-	// one took none or could not classify it.
+	// one took none or could not classify it. What the census scenarios ran is written either
+	// way: it says the census is missing, or partial.
 	path := filepath.Join(dir, "fields.json")
-	if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return err
+	for _, p := range []string{path, filepath.Join(dir, "census.json")} {
+		if err := os.Remove(p); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
+	}
+	if len(runs) > 0 {
+		sort.Slice(runs, func(i, j int) bool {
+			return runs[i].Harness+"\x00"+runs[i].Version < runs[j].Harness+"\x00"+runs[j].Version
+		})
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return err
+		}
+		data, err := json.MarshalIndent(runs, "", "  ")
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(dir, "census.json"), append(data, '\n'), 0o644); err != nil {
+			return err
+		}
 	}
 	if len(rows) == 0 {
 		return nil

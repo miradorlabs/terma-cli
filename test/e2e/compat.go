@@ -43,7 +43,6 @@ var Capabilities = []Capability{
 	{"global.commits", "Global mode: every commit carries its session"},
 	{"global.managed", "Global mode: organization-managed hooks, no trust step"},
 	{"relay.heartbeat", "The machine's heartbeat reaches the project's ingest"},
-	{"telemetry.census", "Every field the harness exports is censused and classified"},
 }
 
 // Harnesses are the matrix's columns' groups, with the name docs show.

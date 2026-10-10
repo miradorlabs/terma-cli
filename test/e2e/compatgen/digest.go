@@ -49,6 +49,9 @@ type HarnessDrift struct {
 	// Partial is a census of Version a census scenario failed before taking whole: Removed
 	// and Unseen are not judged.
 	Partial bool `json:"partial,omitempty"`
+	// Judged is the build Removed and Unseen were judged on, where it is not Version: the
+	// newest censused whole tonight, Version's census partial.
+	Judged string `json:"judged,omitempty"`
 	// Since is the build Removed and Unseen were judged against, where it is not Previous: the
 	// newest older build with a whole census, the ones after it partial.
 	Since string `json:"since,omitempty"`
@@ -63,10 +66,9 @@ type HarnessDrift struct {
 	// the harness anywhere.
 	NewSurfaces []SurfaceChange `json:"new_surfaces,omitempty"`
 	Added       []FieldChange   `json:"added,omitempty"`
-	// Removed and Unseen are judged only when Version is newer than Previous: keys Previous
-	// had on a surface Version still sends, without them, and surfaces Version does not send.
-	// A re-run of the same build is no evidence: a key that comes with an error path, or
-	// a scenario that did not run, would read as one gone.
+	// Removed and Unseen are what the build judged (Judged, or Version) no longer sends that
+	// the newest older build censused whole (Since, or Previous) did: keys on a surface it
+	// still sends, and surfaces. See fieldDrift for when a build is judged.
 	Removed []FieldChange `json:"removed,omitempty"`
 	Unseen  []GoneSurface `json:"unseen,omitempty"`
 	// Compare links the source's changes from Previous to Version, where it is public.
@@ -127,25 +129,21 @@ func (d Drift) Quiet() bool {
 	return !slices.ContainsFunc(d.Harnesses, HarnessDrift.changed)
 }
 
-// censusRuns is what tonight's census scenarios did, as the rows that prove
-// e2e.CensusCapability say (only the platform that takes the census runs them): per harness,
-// the newest build they ran, passed or failed; and the builds one of them failed for, whose
-// census may be partial.
+// censusRuns is what tonight's census scenarios did (e2e.CensusRun, report/census.json): per
+// harness, the newest build they ran, passed or failed; and the builds one of them failed
+// for, whose census is partial.
 type censusRuns struct {
 	newest map[string]string
 	failed map[string]bool // harness and version
 }
 
-func censusRan(rows []e2e.CompatRow) censusRuns {
+func censusRan(runs []e2e.CensusRun) censusRuns {
 	ran := censusRuns{newest: map[string]string{}, failed: map[string]bool{}}
-	for _, r := range rows {
-		if r.Capability != e2e.CensusCapability || r.Result == "not run" {
-			continue
-		}
+	for _, r := range runs {
 		if versionLess(ran.newest[r.Harness], r.Version) {
 			ran.newest[r.Harness] = r.Version
 		}
-		if r.Result == "fail" {
+		if r.Failed {
 			ran.failed[r.Harness+"\x00"+r.Version] = true
 		}
 	}
@@ -248,29 +246,47 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran censusRuns, now time.Time)
 		if d.First {
 			d.Surfaces, d.Keys = len(sent), len(tonight)
 		}
-		// A census a scenario failed before taking whole is no evidence of what the build does
-		// not send: it says what it saw, and nothing is judged gone.
-		// What is gone is judged once, on the first whole census of a build, against the newest
-		// older build with a whole census, so a partial one between them hides nothing. A
-		// re-run of a build already censused whole is no evidence: a key that comes with an
-		// error path, or a scenario that did not run, would read as one gone.
+		// What is gone is judged once a night, on the newest build censused whole tonight: a
+		// census a scenario failed before taking whole is no evidence of what a build does not
+		// send, so a partial newest build leaves it to the newest whole one before it, which
+		// would otherwise become the next build's baseline unjudged. It is judged against the
+		// newest older build censused whole, so a partial one between them hides nothing, and
+		// only the first time it is censused whole, and only if no newer build is: a re-run is
+		// no evidence (a key that comes with an error path, or a scenario that did not run,
+		// would read as one gone).
 		d.Partial = ran.failed[harness+"\x00"+version]
-		if whole, ok := cat.lastWhole(harness, version); ok && !d.Partial && !cat.censusedWhole(harness, version) {
+		judged := ""
+		for _, r := range hr {
+			if !ran.failed[harness+"\x00"+r.Version] && versionLess(judged, r.Version) {
+				judged = r.Version
+			}
+		}
+		whole, ok := cat.lastWhole(harness, judged)
+		if judged != "" && ok && !cat.censusedWhole(harness, judged) && !cat.wholeAfter(harness, judged) {
+			if judged != version {
+				d.Judged = judged
+			}
 			if whole.Version != d.Previous {
 				d.Since = whole.Version
+			}
+			had, sentThen := map[string]bool{}, map[string]bool{}
+			for _, r := range hr {
+				if r.Version == judged {
+					had[r.Surface+"\x00"+r.Key], sentThen[r.Surface] = true, true
+				}
 			}
 			// Only what a whole census saw is evidence (FieldEntry.Whole): a partial census is a
 			// failed run, where keys of an error path come.
 			for _, f := range cat.Fields {
-				if f.Harness != harness || !slices.Contains(f.Whole, whole.Version) || !sent[f.Surface] {
+				if f.Harness != harness || !slices.Contains(f.Whole, whole.Version) || !sentThen[f.Surface] {
 					continue
 				}
-				if _, ok := tonight[f.Surface+"\x00"+f.Key]; !ok {
+				if !had[f.Surface+"\x00"+f.Key] {
 					d.Removed = append(d.Removed, FieldChange{Surface: f.Surface, Key: f.Key, Class: f.Class, Kinds: f.Kinds})
 				}
 			}
 			for _, s := range whole.Surfaces {
-				if !sent[s] {
+				if !sentThen[s] {
 					d.Unseen = append(d.Unseen, GoneSurface{Surface: s})
 				}
 			}

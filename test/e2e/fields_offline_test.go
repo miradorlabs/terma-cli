@@ -196,3 +196,37 @@ echo '[{"class": "unclassified", "kept": []}]'
 		t.Errorf("census = %+v", rows)
 	}
 }
+
+// What the census scenarios ran is written beside the census, whatever became of it: a
+// scenario that ran is a run, a skipped one is not.
+func TestCensusRunsAreWrittenBesideTheCensus(t *testing.T) {
+	fieldsMu.Lock()
+	clear(fieldSeen)
+	clear(censusRuns)
+	fieldsMu.Unlock()
+	t.Cleanup(func() { fieldsMu.Lock(); clear(fieldSeen); clear(censusRuns); fieldsMu.Unlock() })
+	t.Run("ran", func(t *testing.T) { TakesCensus(t, Binary{Harness: "pi", Version: "0.84.2"}) })
+	t.Run("skipped", func(t *testing.T) {
+		TakesCensus(t, Binary{Harness: "pi", Version: "0.85.0"})
+		t.Skip("not installed")
+	})
+	dir := t.TempDir()
+	// No census reached: the runs are written all the same, and no fields.json.
+	if err := WriteFields(dir, filepath.Join(dir, "no-terma")); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "census.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var runs []CensusRun
+	if err := json.Unmarshal(data, &runs); err != nil {
+		t.Fatal(err)
+	}
+	if len(runs) != 1 || runs[0].Version != "0.84.2" || runs[0].Failed {
+		t.Errorf("census runs %+v", runs)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "fields.json")); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("fields.json without a census: %v", err)
+	}
+}

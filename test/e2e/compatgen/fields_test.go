@@ -36,15 +36,10 @@ func field(version, surface, key, class string, at time.Time, kinds ...string) e
 }
 
 // A run's census against the catalog: a key no build had is new, a key the previous newest
-
 // build had on a surface still seen is removed, a surface not seen is said apart, and an
-
 // unclassified key with text values is withheld while one with only numbers passes, on a
-
 // record; on a resource the relay withholds it whatever its value. The catalog then has every
-
 // build each key was seen in.
-
 func TestFieldDriftAndCatalog(t *testing.T) {
 	dir := t.TempDir()
 	day1 := time.Date(2026, 10, 9, 4, 0, 0, 0, time.UTC)
@@ -145,9 +140,7 @@ func TestFieldDriftAndCatalog(t *testing.T) {
 }
 
 // The Slack message says each harness's changes, links the run, and on a quiet day says so
-
 // in one line rather than staying silent.
-
 func TestSlackDigest(t *testing.T) {
 	at := time.Date(2026, 10, 10, 4, 0, 0, 0, time.UTC)
 	busy := Drift{GeneratedAt: at, Link: "https://ci/run/2", Harnesses: []HarnessDrift{{Harness: "claude", Name: "Claude Code", Version: "2.1.296", Previous: "2.1.295",
@@ -167,22 +160,8 @@ func TestSlackDigest(t *testing.T) {
 	}
 }
 
-// A night that brought no census, or none of a harness the catalog censused within the week,
-
-// is no quiet night: a census that did not run must not read as one that found nothing.
-
-// A surface no build had is said once, with its keys counted, not key by key: a span renamed
-
-// carries keys the harness already sends. A key new to the harness on it is still a new
-
-// field. A re-run of the same build reports nothing gone: a key that only comes on an error
-
-// path would otherwise read as removed.
-
 // A key keeps the first build it was seen in and its newest keepVersions; a harness its
-
 // newest keepCensuses censuses; and the catalog is written one entry a line.
-
 func TestCatalogIsBounded(t *testing.T) {
 	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
 	var cat Catalog
@@ -216,9 +195,7 @@ func TestCatalogIsBounded(t *testing.T) {
 }
 
 // A Slack section is cut at the end of a line, so neither a character, a code span nor an
-
 // escape is split.
-
 func TestClip(t *testing.T) {
 	s := "*Codex*\n• `ключ` on `traces/x`\n• `ключ2` on `traces/y`"
 	got := clip(s, len("*Codex*\n• `ключ` on `traces/x`\n• `кл"))
@@ -238,11 +215,8 @@ func TestClip(t *testing.T) {
 }
 
 // A key every kept census has aged past leaves the catalog, and a key's kinds and class are
-
 // its newest build's: a key an old build sent as text and a new one as a number is no longer
-
 // withheld.
-
 func TestCatalogKeepsWhatItsCensusesSaw(t *testing.T) {
 	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
 	var cat Catalog
@@ -267,9 +241,7 @@ func TestCatalogKeepsWhatItsCensusesSaw(t *testing.T) {
 }
 
 // A key withheld one night and classified by the next is no longer withheld, though the
-
 // harness shipped no new build: the class, and what the relay keeps, are the latest run's.
-
 func TestCatalogTakesTheLatestClassOfABuild(t *testing.T) {
 	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
 	var cat Catalog
@@ -286,30 +258,9 @@ func TestCatalogTakesTheLatestClassOfABuild(t *testing.T) {
 	}
 }
 
-// A night that reached only a build older than the catalog's newest says so, and is no quiet
-
-// night: the newest failed to install, or its tests did not run.
-
-// A night whose census scenarios ran a newer build than any census reached says so, though
-
-// the build the census did reach is newer than the catalog's: the newest failed before its
-
-// census was taken.
-
-// A census a scenario failed before taking whole judges nothing removed: what it did not see
-
-// it may not have reached. A census every scenario took whole does.
-
-// What a harness names is escaped where it is shown: "<" in Slack would start a link, and "|"
-
-// in a markdown table would end a cell.
-
 // A night that changed everything is still one message Slack takes: at most 50 blocks, the
-
 // sections' text within the budget, and a line saying what was left for the run's summary.
-
 // Many small changes meet the block limit first, a few long ones the budget.
-
 func TestSlackDigestFitsOneMessage(t *testing.T) {
 	for _, c := range []struct {
 		name            string
@@ -349,9 +300,7 @@ func TestSlackDigestFitsOneMessage(t *testing.T) {
 }
 
 // A headline counts each change in its own plural: "surfaces no longer sent", not "surface no
-
 // longer sents".
-
 func TestHeadlinePlurals(t *testing.T) {
 	h := HarnessDrift{Name: "Codex CLI", Version: "0.162.1", Previous: "0.162.0", Unseen: []GoneSurface{{Surface: "a"}, {Surface: "b"}},
 		Added: []FieldChange{{Key: "k"}}, Withheld: []FieldChange{{Key: "k"}, {Key: "l"}}}
@@ -359,10 +308,6 @@ func TestHeadlinePlurals(t *testing.T) {
 		t.Errorf("headline = %q, want %q", got, want)
 	}
 }
-
-// A harness whose census scenarios ran and took no census is missing, though the catalog
-
-// never censused it: one that fails before its census every night is no quiet night.
 
 // One run that both censuses a build anew and re-censuses whole one the catalog has partial
 // lands both, whatever order it visits them in: an append that grows the censuses must not
@@ -404,5 +349,20 @@ func TestFieldsShowsTheNewestWholeCensus(t *testing.T) {
 	}
 	if strings.Contains(md, "**no**") {
 		t.Errorf("a key a partial census did not see is shown gone:\n%s", md)
+	}
+}
+
+// A harness no census has taken whole yet shows the keys its partial ones saw, marked partial,
+// rather than none.
+func TestFieldsShowsAHarnessCensusedOnlyInPart(t *testing.T) {
+	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
+	var cat Catalog
+	mergeFields(&cat, []e2e.FieldRow{field("0.163.0", "logs/codex.api_request", "model", "safe", day),
+		field("0.163.0", "logs/codex.api_request", "product_sku", "unclassified", day)}, map[string]bool{"codex\x000.163.0": true})
+	md := renderFields(cat, day)
+	for _, want := range []string{"| Codex CLI | 0.163.0 (partial) | 1 | 2 | 1 |", "| `model` | safe | text | 0.163.0 | yes |", "no build was censused whole"} {
+		if !strings.Contains(md, want) {
+			t.Errorf("FIELDS.md lacks %q:\n%s", want, md)
+		}
 	}
 }
