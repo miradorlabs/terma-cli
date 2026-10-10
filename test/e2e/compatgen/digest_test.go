@@ -357,3 +357,41 @@ func TestTheNewestWholeBuildOfANightIsJudged(t *testing.T) {
 		t.Errorf("the next night: removed %+v, judged against %s", hs[0].Removed, hs[0].Since)
 	}
 }
+
+// What the build judged added is said the night it is judged, though the newer build's
+// partial census missed it: a key it adds, withheld, and a surface it renames to. The next
+// night, the newer build censused whole says none of it again.
+func TestWhatTheJudgedBuildAddedIsNew(t *testing.T) {
+	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
+	night := func(i int) time.Time { return day.Add(time.Duration(i) * 24 * time.Hour) }
+	var cat Catalog
+	mergeFields(&cat, []e2e.FieldRow{field("0.163.0", "logs/codex.api_request", "model", "safe", night(0)),
+		field("0.163.0", "logs/codex.old_event", "model", "safe", night(0))}, nil)
+	tonight := []e2e.FieldRow{
+		field("0.164.0", "logs/codex.api_request", "model", "safe", night(1)),
+		field("0.164.0", "logs/codex.api_request", "newkey", "unclassified", night(1)),
+		field("0.164.0", "logs/codex.new_event", "model", "safe", night(1)),
+		field("0.165.0", "logs/codex.api_request", "model", "safe", night(1)),
+	}
+	ran := censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.164.0"}, {Harness: "codex", Version: "0.165.0", Failed: true}})
+	_, _, hs := fieldDrift(cat, tonight, ran, night(1))
+	h := hs[0]
+	keys := func(cs []FieldChange) (out []string) {
+		for _, c := range cs {
+			out = append(out, c.Key)
+		}
+		return out
+	}
+	if !slices.Equal(keys(h.Added), []string{"newkey"}) || !slices.Equal(keys(h.Withheld), []string{"newkey"}) ||
+		len(h.NewSurfaces) != 1 || h.NewSurfaces[0].Surface != "logs/codex.new_event" || len(h.Unseen) != 1 {
+		t.Fatalf("added %v, withheld %v, new surfaces %+v, unseen %+v", keys(h.Added), keys(h.Withheld), h.NewSurfaces, h.Unseen)
+	}
+	mergeFields(&cat, tonight, ran.failed)
+	next := []e2e.FieldRow{field("0.165.0", "logs/codex.api_request", "model", "safe", night(2)),
+		field("0.165.0", "logs/codex.api_request", "newkey", "unclassified", night(2)),
+		field("0.165.0", "logs/codex.new_event", "model", "safe", night(2))}
+	_, _, hs = fieldDrift(cat, next, censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.165.0"}}), night(2))
+	if h := hs[0]; len(h.Added)+len(h.Withheld)+len(h.NewSurfaces)+len(h.Removed)+len(h.Unseen) != 0 {
+		t.Errorf("the next night said it again: %+v", h)
+	}
+}

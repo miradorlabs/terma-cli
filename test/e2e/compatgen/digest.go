@@ -190,12 +190,31 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran censusRuns, now time.Time)
 			}
 		}
 		d := HarnessDrift{Harness: harness, Name: harnessName(harness), Version: version}
+		// The build judged for what is gone (see below), the newest censused whole tonight.
+		d.Partial = ran.failed[harness+"\x00"+version]
+		judged := ""
+		for _, r := range hr {
+			if !ran.failed[harness+"\x00"+r.Version] && versionLess(judged, r.Version) {
+				judged = r.Version
+			}
+		}
+		whole, ok := cat.lastWhole(harness, judged)
+		judging := judged != "" && ok && !cat.censusedWhole(harness, judged) && !cat.wholeAfter(harness, judged)
+		// What is new is new in the newest build or in the build judged, the newest's row first:
+		// what the judged build added goes into the catalog tonight, and would never be new again.
 		tonight := map[string]e2e.FieldRow{}
 		sent := map[string]bool{}
 		for _, r := range hr {
 			if r.Version == version {
 				tonight[r.Surface+"\x00"+r.Key] = r
 				sent[r.Surface] = true
+			}
+		}
+		if judging && judged != version {
+			for _, r := range hr {
+				if _, ok := tonight[r.Surface+"\x00"+r.Key]; !ok && r.Version == judged {
+					tonight[r.Surface+"\x00"+r.Key] = r
+				}
 			}
 		}
 		prev, censused := cat.newestCensus(harness)
@@ -254,15 +273,7 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran censusRuns, now time.Time)
 		// only the first time it is censused whole, and only if no newer build is: a re-run is
 		// no evidence (a key that comes with an error path, or a scenario that did not run,
 		// would read as one gone).
-		d.Partial = ran.failed[harness+"\x00"+version]
-		judged := ""
-		for _, r := range hr {
-			if !ran.failed[harness+"\x00"+r.Version] && versionLess(judged, r.Version) {
-				judged = r.Version
-			}
-		}
-		whole, ok := cat.lastWhole(harness, judged)
-		if judged != "" && ok && !cat.censusedWhole(harness, judged) && !cat.wholeAfter(harness, judged) {
+		if judging {
 			if judged != version {
 				d.Judged = judged
 			}
