@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"math/rand/v2"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -181,5 +183,117 @@ func TestWhatAWholeCensusFirstReachesIsNew(t *testing.T) {
 	_, _, hs := fieldDrift(cat, tonight, ran, day.Add(48*time.Hour))
 	if a := hs[0].Added; len(a) != 1 || a[0].Key != "reached_whole" {
 		t.Errorf("added %+v, want reached_whole", a)
+	}
+}
+
+// Seeded histories of nightly runs as the nightly job runs them: each night the newest three
+// releases, a release now and then adding and dropping keys, runs that fail partway (seeing
+// part of what the build sends, and keys of an error path), builds not reached, and the
+// catalog read back from fields.json. Whatever goes into the catalog is said new that night,
+// and nothing said gone is sent by the build it was judged gone from.
+func TestNightlyHistories(t *testing.T) {
+	for seed := range int64(200) {
+		rng := rand.New(rand.NewPCG(uint64(seed), 1))
+		dir := t.TempDir()
+		path := filepath.Join(dir, "fields.json")
+		sends := [][]string{{"k0", "k1", "k2"}}
+		var cat Catalog
+		for n := range 20 {
+			at := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC).Add(time.Duration(n) * 24 * time.Hour)
+			for range rng.IntN(3) {
+				keys := slices.Clone(sends[len(sends)-1])
+				if len(keys) > 1 && rng.IntN(2) == 0 {
+					i := rng.IntN(len(keys))
+					keys = slices.Delete(keys, i, i+1)
+				}
+				keys = append(keys, fmt.Sprintf("k%d_%d", n, len(sends)))
+				sends = append(sends, keys)
+			}
+			var rows []e2e.FieldRow
+			var runs []e2e.CensusRun
+			truly := map[string][]string{} // what each build sends, whatever a run saw
+			for b := max(0, len(sends)-3); b < len(sends); b++ {
+				v := fmt.Sprintf("0.%d.0", 100+b)
+				if rng.IntN(10) == 0 {
+					continue // not reached
+				}
+				failed := rng.IntN(4) == 0
+				truly[v] = sends[b]
+				runs = append(runs, e2e.CensusRun{Harness: "codex", Version: v, Failed: failed})
+				for _, k := range sends[b] {
+					if !failed || rng.IntN(2) == 0 {
+						rows = append(rows, field(v, "logs/codex.api_request", k, "safe", at))
+					}
+				}
+				if failed {
+					rows = append(rows, field(v, "logs/codex.api_request", "error.message", "prompt", at))
+				}
+			}
+			ran := censusRan(runs)
+			_, _, hs := fieldDrift(cat, rows, ran, at)
+			before := map[string]bool{}
+			for _, f := range cat.Fields {
+				before[f.Key] = true
+			}
+			for _, h := range hs {
+				if h.First {
+					continue
+				}
+				said := map[string]bool{}
+				for _, c := range h.Added {
+					said[c.Key] = true
+				}
+				for _, r := range rows {
+					if !before[r.Key] && !said[r.Key] {
+						t.Fatalf("seed %d night %d: %s went into the catalog unsaid", seed, n, r.Key)
+					}
+				}
+				for _, c := range h.Removed {
+					in := c.In
+					if in == "" {
+						in = h.lastJudged()
+					}
+					if slices.Contains(truly[in], c.Key) || c.Key == "error.message" {
+						t.Fatalf("seed %d night %d: %s said gone in %s, which sent it", seed, n, c.Key, in)
+					}
+				}
+			}
+			mergeFields(&cat, rows, ran.failed)
+			if err := writeCatalog(path, cat); err != nil {
+				t.Fatal(err)
+			}
+			cat = Catalog{}
+			if err := readJSON(path, &cat); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+}
+
+// A key one build of a night drops and a later one sends again says so; and a harness the
+// catalog has only partially, two builds censused whole tonight, has the newer judged against
+// the older.
+func TestAChainSaysWhatCameBack(t *testing.T) {
+	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
+	var cat Catalog
+	mergeFields(&cat, []e2e.FieldRow{field("0.163.0", "logs/codex.api_request", "model", "safe", day),
+		field("0.163.0", "logs/codex.api_request", "flaps", "safe", day)}, nil)
+	tonight := []e2e.FieldRow{field("0.164.0", "logs/codex.api_request", "model", "safe", day.Add(24*time.Hour)),
+		field("0.165.0", "logs/codex.api_request", "model", "safe", day.Add(24*time.Hour)),
+		field("0.165.0", "logs/codex.api_request", "flaps", "safe", day.Add(24*time.Hour))}
+	ran := censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.164.0"}, {Harness: "codex", Version: "0.165.0"}})
+	_, _, hs := fieldDrift(cat, tonight, ran, day.Add(24*time.Hour))
+	if md := (Drift{Harnesses: hs}).markdown(); !strings.Contains(md, "`flaps` on `logs/codex.api_request` (safe) (gone in 0.164.0, back in 0.165.0)") {
+		t.Errorf("drift.md:\n%s", md)
+	}
+
+	var partial Catalog
+	mergeFields(&partial, []e2e.FieldRow{field("0.163.0", "logs/codex.api_request", "model", "safe", day)}, map[string]bool{"codex\x000.163.0": true})
+	two := []e2e.FieldRow{field("0.164.0", "logs/codex.api_request", "model", "safe", day.Add(24*time.Hour)),
+		field("0.164.0", "logs/codex.api_request", "dropped", "safe", day.Add(24*time.Hour)),
+		field("0.165.0", "logs/codex.api_request", "model", "safe", day.Add(24*time.Hour))}
+	_, _, hs = fieldDrift(partial, two, ran, day.Add(24*time.Hour))
+	if h := hs[0]; h.Since != "0.164.0" || len(h.Removed) != 1 || h.Removed[0].Key != "dropped" {
+		t.Errorf("since %s, removed %+v", h.Since, h.Removed)
 	}
 }

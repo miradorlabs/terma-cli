@@ -152,6 +152,18 @@ func (s *SourceSays) note(d detail) string {
 	return " · named in neither build's source"
 }
 
+// goneIn says the build a removal went in, where it is not the last judged, and the build
+// that sends it again, if one does.
+func goneIn(in, back string) string {
+	switch {
+	case in == "":
+		return ""
+	case back != "":
+		return " (gone in " + in + ", back in " + back + ")"
+	}
+	return " (gone in " + in + ")"
+}
+
 // plural counts n of a noun that takes an "s".
 func plural(n int, what string) string {
 	if n == 1 {
@@ -175,9 +187,7 @@ func changeLines(cs []FieldChange, withClass bool, d detail) []string {
 		if withClass && c.Class != "" {
 			line += " (" + classLabel[c.Class] + ")"
 		}
-		if c.In != "" {
-			line += " (gone in " + c.In + ")"
-		}
+		line += goneIn(c.In, c.Back)
 		out = append(out, line+c.Source.note(d))
 	}
 	return listed(out)
@@ -195,9 +205,7 @@ func goneLines(ss []GoneSurface, d detail) []string {
 	var out []string
 	for _, s := range ss {
 		line := "`" + s.Surface + "`"
-		if s.In != "" {
-			line += " (gone in " + s.In + ")"
-		}
+		line += goneIn(s.In, s.Back)
 		out = append(out, line+s.Source.note(d))
 	}
 	return listed(out)
