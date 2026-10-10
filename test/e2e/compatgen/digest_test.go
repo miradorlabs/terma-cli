@@ -302,3 +302,11 @@ func TestEachNewWholeBuildOfANightIsJudgedInTurn(t *testing.T) {
 		t.Errorf("the next night said it again: %+v", hs[0])
 	}
 }
+
+// A first census a scenario failed for says it is partial: its counts are not the harness's.
+func TestAPartialFirstCensusSaysSo(t *testing.T) {
+	h := HarnessDrift{Name: "Pi", Version: "0.84.2", First: true, Partial: true, Surfaces: 2, Keys: 9}
+	if got := h.headline(); got != "Pi 0.84.2: first census, 2 surfaces, 9 keys, census partial (a scenario failed)" {
+		t.Errorf("headline %q", got)
+	}
+}

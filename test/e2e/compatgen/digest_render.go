@@ -21,7 +21,11 @@ func (h HarnessDrift) headline() string {
 		if h.Unreached != "" {
 			build += " (" + h.Unreached + ", run tonight, was not reached)"
 		}
-		return fmt.Sprintf("%s %s: first census, %s, %s", h.Name, build, plural(h.Surfaces, "surface"), plural(h.Keys, "key"))
+		first := fmt.Sprintf("%s %s: first census, %s, %s", h.Name, build, plural(h.Surfaces, "surface"), plural(h.Keys, "key"))
+		if h.Partial {
+			first += ", census partial (a scenario failed)"
+		}
+		return first
 	}
 	build := h.build("")
 	var parts []string
