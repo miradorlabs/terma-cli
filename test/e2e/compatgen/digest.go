@@ -44,11 +44,12 @@ type HarnessDrift struct {
 	Previous string `json:"previous,omitempty"`
 	// First is a harness the catalog had no census of; Surfaces and Keys its census's size.
 	First bool `json:"first,omitempty"`
-	// Behind is a night whose newest build of the harness is older than Previous: the newest
-	// was not reached (it failed to install, or its tests did not run).
-	Behind   bool `json:"behind,omitempty"`
-	Surfaces int  `json:"surfaces,omitempty"`
-	Keys     int  `json:"keys,omitempty"`
+	// Unreached is a build newer than Version that the census should have reached and did
+	// not: Previous, the newest the catalog had (it failed to install, or its tests did not
+	// run), or the newest tonight's census scenarios ran (they failed before its census).
+	Unreached string `json:"unreached,omitempty"`
+	Surfaces  int    `json:"surfaces,omitempty"`
+	Keys      int    `json:"keys,omitempty"`
 	// NewSurfaces are surfaces no build of the harness had (a span renamed is one, not each of
 	// its keys); Added are keys new to their surface on a surface the catalog knew, or new to
 	// the harness anywhere.
@@ -68,7 +69,7 @@ type HarnessDrift struct {
 
 // changed reports whether h has anything new to say.
 func (h HarnessDrift) changed() bool {
-	return h.First || h.Behind || len(h.NewSurfaces)+len(h.Added)+len(h.Removed)+len(h.Unseen)+len(h.Withheld) > 0
+	return h.First || h.Unreached != "" || len(h.NewSurfaces)+len(h.Added)+len(h.Removed)+len(h.Unseen)+len(h.Withheld) > 0
 }
 
 // FieldChange is one key on one surface.
@@ -106,8 +107,21 @@ func (d Drift) Quiet() bool {
 	return !slices.ContainsFunc(d.Harnesses, HarnessDrift.changed)
 }
 
-// fieldDrift compares a night's census with the catalog before it is merged.
-func fieldDrift(cat Catalog, rows []e2e.FieldRow, now time.Time) (noCensus bool, missing []string, out []HarnessDrift) {
+// censusRan names, per harness, the newest build tonight's census scenarios ran: what proves
+// e2e.CensusCapability, passed or failed.
+func censusRan(rows []e2e.CompatRow) map[string]string {
+	out := map[string]string{}
+	for _, r := range rows {
+		if r.Capability == e2e.CensusCapability && r.Result != "not run" && versionLess(out[r.Harness], r.Version) {
+			out[r.Harness] = r.Version
+		}
+	}
+	return out
+}
+
+// fieldDrift compares a night's census with the catalog before it is merged; ran is what
+// censusRan says of the night.
+func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran map[string]string, now time.Time) (noCensus bool, missing []string, out []HarnessDrift) {
 	byHarness := map[string][]e2e.FieldRow{}
 	for _, r := range rows {
 		byHarness[r.Harness] = append(byHarness[r.Harness], r)
@@ -150,7 +164,12 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, now time.Time) (noCensus bool,
 		d.First = !censused
 		if censused {
 			d.Previous = prev.Version
-			d.Behind = versionLess(version, prev.Version)
+			if versionLess(version, prev.Version) {
+				d.Unreached = prev.Version
+			}
+		}
+		if v := ran[harness]; versionLess(version, v) && versionLess(d.Unreached, v) {
+			d.Unreached = v
 		}
 		newSurfaces := map[string]*SurfaceChange{}
 		for _, id := range slices.Sorted(maps.Keys(tonight)) {

@@ -72,6 +72,10 @@ func Withheld(class string, kinds, kept []string) bool {
 	return class == "unclassified" && slices.ContainsFunc(kinds, func(k string) bool { return !slices.Contains(kept, k) })
 }
 
+// CensusCapability is what a scenario that takes the census proves of the build it runs
+// (runBoth): a build tonight's results prove it of, and no census reached, was not reached.
+const CensusCapability = "relay.equivalent"
+
 type fieldID struct{ harness, version, surface, key string }
 
 // seenField is what the census saw of a key: the kinds of value it carried, and where it sits

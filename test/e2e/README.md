@@ -237,8 +237,10 @@ runs over two nights against a scratch origin. The digest,
   still withheld from before are one reminder line until they are.
 
 It also lists capabilities whose result changed, and says so when the census did not run,
-did not reach a harness censused within the week, or reached only a build older than the
-newest it had: a census that did not run never reads as a quiet night. The digest goes to the run's summary and to Slack through the
+did not reach a harness censused within the week, or did not reach the newest build: the
+newest the catalog had, or the newest the night's census scenarios ran (those that prove
+`relay.equivalent`, `e2e.CensusCapability`). A census that did not run never reads as a
+quiet night. The digest goes to the run's summary and to Slack through the
 `SLACK_WEBHOOK_URL` secret in the `live-harnesses` environment, every night, so a quiet
 channel means the job did not run. Drift never fails the night; a removed key on a surface
 terma parses fails its golden.

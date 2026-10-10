@@ -168,13 +168,13 @@ func TestDigestSaysWhatWasNotCensused(t *testing.T) {
 		{Harness: "codex", Version: "0.162.0", At: now.Add(-24 * time.Hour)},
 		{Harness: "hermes", Version: "0.20.5", At: now.Add(-30 * 24 * time.Hour)}, // aged out
 	}}
-	noCensus, missing, _ := fieldDrift(cat, nil, now)
+	noCensus, missing, _ := fieldDrift(cat, nil, nil, now)
 	if d := (Drift{NoCensus: noCensus, Missing: missing}); !noCensus || d.Quiet() {
 		t.Errorf("no rows: noCensus %v, quiet %v", noCensus, d.Quiet())
 	}
 	rows := []e2e.FieldRow{field("2.1.296", "logs/api_request", "model", "safe", now)}
 	rows[0].Harness = "claude"
-	noCensus, missing, hs := fieldDrift(cat, rows, now)
+	noCensus, missing, hs := fieldDrift(cat, rows, nil, now)
 	d := Drift{NoCensus: noCensus, Missing: missing, Harnesses: hs}
 	if noCensus || !slices.Equal(missing, []string{"Codex CLI"}) || d.Quiet() {
 		t.Errorf("claude only: noCensus %v, missing %v, quiet %v", noCensus, missing, d.Quiet())
@@ -201,7 +201,7 @@ func TestDigestSurfacesAndReruns(t *testing.T) {
 		field("0.162.0", "traces/new_fn", "busy_ns", "safe", day.Add(24*time.Hour), e2e.KindNumber),
 		field("0.162.0", "traces/new_fn", "fresh_key", "safe", day.Add(24*time.Hour)),
 	}
-	_, _, hs := fieldDrift(cat, tonight, day.Add(24*time.Hour))
+	_, _, hs := fieldDrift(cat, tonight, nil, day.Add(24*time.Hour))
 	h := hs[0]
 	if len(h.NewSurfaces) != 1 || h.NewSurfaces[0] != (SurfaceChange{Surface: "traces/new_fn", Keys: 3, NewKeys: 1}) {
 		t.Errorf("new surfaces %+v", h.NewSurfaces)
@@ -318,10 +318,37 @@ func TestDigestSaysTheNewestWasNotReached(t *testing.T) {
 	day := time.Date(2026, 10, 9, 4, 0, 0, 0, time.UTC)
 	var cat Catalog
 	mergeFields(&cat, []e2e.FieldRow{field("0.162.1", "logs/codex.api_request", "model", "safe", day)})
-	_, _, hs := fieldDrift(cat, []e2e.FieldRow{field("0.162.0", "logs/codex.api_request", "model", "safe", day.Add(24*time.Hour))}, day.Add(24*time.Hour))
+	_, _, hs := fieldDrift(cat, []e2e.FieldRow{field("0.162.0", "logs/codex.api_request", "model", "safe", day.Add(24*time.Hour))}, nil, day.Add(24*time.Hour))
 	d := Drift{Harnesses: hs}
-	if !hs[0].Behind || d.Quiet() || !strings.Contains(hs[0].headline(), "0.162.1, the newest censused before, was not reached") {
-		t.Errorf("behind %v, quiet %v, headline %q", hs[0].Behind, d.Quiet(), hs[0].headline())
+	if hs[0].Unreached != "0.162.1" || d.Quiet() || !strings.Contains(hs[0].headline(), "0.162.1, the newest censused before, was not reached") {
+		t.Errorf("unreached %q, quiet %v, headline %q", hs[0].Unreached, d.Quiet(), hs[0].headline())
+	}
+}
+
+// A night whose census scenarios ran a newer build than any census reached says so, though
+// the build the census did reach is newer than the catalog's: the newest failed before its
+// census was taken.
+func TestDigestSaysTheNewestRunWasNotReached(t *testing.T) {
+	day := time.Date(2026, 10, 9, 4, 0, 0, 0, time.UTC)
+	var cat Catalog
+	mergeFields(&cat, []e2e.FieldRow{field("0.160.0", "logs/codex.api_request", "model", "safe", day)})
+	night := day.Add(24 * time.Hour)
+	ran := censusRan([]e2e.CompatRow{
+		{Harness: "codex", Version: "0.161.0", Capability: e2e.CensusCapability, Result: "pass"},
+		{Harness: "codex", Version: "0.162.0", Capability: e2e.CensusCapability, Result: "fail"},
+		// Neither a skipped scenario nor another capability's is a census that should have been taken.
+		{Harness: "codex", Version: "0.163.0", Capability: e2e.CensusCapability, Result: "not run"},
+		{Harness: "codex", Version: "0.164.0", Capability: "relay.telemetry", Result: "fail"},
+	})
+	_, _, hs := fieldDrift(cat, []e2e.FieldRow{field("0.161.0", "logs/codex.api_request", "model", "safe", night)}, ran, night)
+	d := Drift{Harnesses: hs}
+	if hs[0].Unreached != "0.162.0" || d.Quiet() || !strings.Contains(hs[0].headline(), "0.161.0 (0.162.0, run tonight, was not reached)") {
+		t.Errorf("unreached %q, quiet %v, headline %q", hs[0].Unreached, d.Quiet(), hs[0].headline())
+	}
+	// The census of the newest build it ran: nothing unreached.
+	_, _, hs = fieldDrift(cat, []e2e.FieldRow{field("0.162.0", "logs/codex.api_request", "model", "safe", night)}, ran, night)
+	if hs[0].Unreached != "" || !(Drift{Harnesses: hs}).Quiet() {
+		t.Errorf("unreached %q with the newest censused", hs[0].Unreached)
 	}
 }
 

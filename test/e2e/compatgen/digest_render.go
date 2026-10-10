@@ -15,12 +15,18 @@ const maxListed = 12
 
 func (h HarnessDrift) headline() string {
 	if h.First {
-		return fmt.Sprintf("%s %s: first census, %s, %s", h.Name, h.Version, plural(h.Surfaces, "surface"), plural(h.Keys, "key"))
+		build := h.Version
+		if h.Unreached != "" {
+			build += " (" + h.Unreached + ", run tonight, was not reached)"
+		}
+		return fmt.Sprintf("%s %s: first census, %s, %s", h.Name, build, plural(h.Surfaces, "surface"), plural(h.Keys, "key"))
 	}
 	build := h.Version
 	switch {
-	case h.Behind:
-		build += " (" + h.Previous + ", the newest censused before, was not reached)"
+	case h.Unreached == h.Previous && h.Unreached != "":
+		build += " (" + h.Unreached + ", the newest censused before, was not reached)"
+	case h.Unreached != "":
+		build += " (" + h.Unreached + ", run tonight, was not reached)"
 	case h.Previous != h.Version:
 		build += " (was " + h.Previous + ")"
 	}
