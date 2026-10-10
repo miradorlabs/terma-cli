@@ -49,7 +49,7 @@ type HarnessDrift struct {
 	// Partial is a census of Version a census scenario failed before taking whole: Removed
 	// and Unseen are not judged.
 	Partial bool `json:"partial,omitempty"`
-	// Judged is the build Removed and Unseen were judged on, where it is not Version: the
+	// Judged is the last build Removed and Unseen were judged on, where it is not Version: the
 	// newest censused whole tonight, Version's census partial.
 	Judged string `json:"judged,omitempty"`
 	// Since is the build Removed and Unseen were judged against, where it is not Previous: the
@@ -63,7 +63,8 @@ type HarnessDrift struct {
 	Keys      int    `json:"keys,omitempty"`
 	// NewSurfaces are surfaces no build of the harness had (a span renamed is one, not each of
 	// its keys); Added are keys new to their surface on a surface the catalog knew, or new to
-	// the harness anywhere.
+	// the harness anywhere. Both are of Version and of every build tonight the catalog has no
+	// census of, which all go into it tonight, Version's row first.
 	NewSurfaces []SurfaceChange `json:"new_surfaces,omitempty"`
 	Added       []FieldChange   `json:"added,omitempty"`
 	// Removed and Unseen are what the build judged (Judged, or Version) no longer sends that
@@ -73,8 +74,8 @@ type HarnessDrift struct {
 	Unseen  []GoneSurface `json:"unseen,omitempty"`
 	// Compare links the source's changes from Previous to Version, where it is public.
 	Compare string `json:"compare,omitempty"`
-	// Withheld are Version's unclassified keys with text values, which the relay drops, that
-	// the catalog did not have withheld; StillWithheld those it did, until each is classified.
+	// Withheld are the unclassified keys the relay drops, of the same builds as Added, that the
+	// catalog did not have withheld; StillWithheld those it did, until each is classified.
 	Withheld      []FieldChange `json:"withheld,omitempty"`
 	StillWithheld []FieldChange `json:"still_withheld,omitempty"`
 }
@@ -90,6 +91,9 @@ type FieldChange struct {
 	Key     string   `json:"key"`
 	Class   string   `json:"class,omitempty"`
 	Kinds   []string `json:"kinds,omitempty"`
+	// In is the build that no longer sends it, of a removal, where it is not the last build
+	// judged.
+	In string `json:"in,omitempty"`
 	// Source is where the harness's source names it, where it is public.
 	Source *SourceSays `json:"source,omitempty"`
 }
@@ -106,8 +110,10 @@ type SurfaceChange struct {
 
 // GoneSurface is a surface the previous build sent and the new one did not.
 type GoneSurface struct {
-	Surface string      `json:"surface"`
-	Source  *SourceSays `json:"source,omitempty"`
+	Surface string `json:"surface"`
+	// In is the build that no longer sends it, where it is not the last build judged.
+	In     string      `json:"in,omitempty"`
+	Source *SourceSays `json:"source,omitempty"`
 }
 
 // CompatChange is a capability whose result for a build changed, or a build's first failure.
@@ -127,6 +133,13 @@ func (d Drift) Quiet() bool {
 		return false
 	}
 	return !slices.ContainsFunc(d.Harnesses, HarnessDrift.changed)
+}
+
+func firstOr(vs []string) string {
+	if len(vs) == 0 {
+		return ""
+	}
+	return vs[0]
 }
 
 // rowBuilds are the builds rows are of.
@@ -199,16 +212,7 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran censusRuns, now time.Time)
 			}
 		}
 		d := HarnessDrift{Harness: harness, Name: harnessName(harness), Version: version}
-		// The build judged for what is gone (see below), the newest censused whole tonight.
 		d.Partial = ran.failed[harness+"\x00"+version]
-		judged := ""
-		for _, r := range hr {
-			if !ran.failed[harness+"\x00"+r.Version] && versionLess(judged, r.Version) {
-				judged = r.Version
-			}
-		}
-		whole, ok := cat.lastWhole(harness, judged)
-		judging := judged != "" && ok && !cat.censusedWhole(harness, judged) && !cat.wholeAfter(harness, judged)
 		// What is new is new in the newest build or in any build the catalog has no census of,
 		// the newest build's row first: all of it goes into the catalog tonight, and would never
 		// be new again.
@@ -279,41 +283,67 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran censusRuns, now time.Time)
 		if d.First {
 			d.Surfaces, d.Keys = len(sent), len(tonight)
 		}
-		// What is gone is judged once a night, on the newest build censused whole tonight: a
+		// What is gone is judged on every build censused whole tonight for the first time, while
+		// no newer build is, oldest first, each against the build before it: the first against the
+		// newest older build censused whole, so a partial one between them hides nothing. A
 		// census a scenario failed before taking whole is no evidence of what a build does not
-		// send, so a partial newest build leaves it to the newest whole one before it, which
-		// would otherwise become the next build's baseline unjudged. It is judged against the
-		// newest older build censused whole, so a partial one between them hides nothing, and
-		// only the first time it is censused whole, and only if no newer build is: a re-run is
-		// no evidence (a key that comes with an error path, or a scenario that did not run,
-		// would read as one gone).
-		if judging {
-			if judged != version {
-				d.Judged = judged
+		// send (a key that comes with an error path, or a scenario that did not run, would read
+		// as one gone), and nor is a re-run of a build censused whole. Each build is judged, so
+		// none becomes a baseline unjudged, and a key one build adds and the next drops is said
+		// gone.
+		var judged []string
+		for v := range rowBuilds(hr) {
+			if !ran.failed[harness+"\x00"+v] && !cat.censusedWhole(harness, v) && !cat.wholeAfter(harness, v) {
+				judged = append(judged, v)
+			}
+		}
+		slices.SortFunc(judged, func(a, b string) int {
+			if versionLess(a, b) {
+				return -1
+			}
+			return 1
+		})
+		if whole, ok := cat.lastWhole(harness, firstOr(judged)); ok && len(judged) > 0 {
+			last := judged[len(judged)-1]
+			if last != version {
+				d.Judged = last
 			}
 			if whole.Version != d.Previous {
 				d.Since = whole.Version
 			}
-			had, sentThen := map[string]bool{}, map[string]bool{}
-			for _, r := range hr {
-				if r.Version == judged {
-					had[r.Surface+"\x00"+r.Key], sentThen[r.Surface] = true, true
-				}
-			}
 			// Only what a whole census saw is evidence (FieldEntry.Whole): a partial census is a
 			// failed run, where keys of an error path come.
+			base := map[string]FieldChange{}
 			for _, f := range cat.Fields {
-				if f.Harness != harness || !slices.Contains(f.Whole, whole.Version) || !sentThen[f.Surface] {
-					continue
-				}
-				if !had[f.Surface+"\x00"+f.Key] {
-					d.Removed = append(d.Removed, FieldChange{Surface: f.Surface, Key: f.Key, Class: f.Class, Kinds: f.Kinds})
+				if f.Harness == harness && slices.Contains(f.Whole, whole.Version) {
+					base[f.Surface+"\x00"+f.Key] = FieldChange{Surface: f.Surface, Key: f.Key, Class: f.Class, Kinds: f.Kinds}
 				}
 			}
-			for _, s := range whole.Surfaces {
-				if !sentThen[s] {
-					d.Unseen = append(d.Unseen, GoneSurface{Surface: s})
+			baseSurfaces := whole.Surfaces
+			for _, v := range judged {
+				in := ""
+				if v != last {
+					in = v
 				}
+				had, sentThen := map[string]FieldChange{}, map[string]bool{}
+				for _, r := range hr {
+					if r.Version == v {
+						had[r.Surface+"\x00"+r.Key] = FieldChange{Surface: r.Surface, Key: r.Key, Class: r.Class, Kinds: r.Kinds}
+						sentThen[r.Surface] = true
+					}
+				}
+				for _, k := range slices.Sorted(maps.Keys(base)) {
+					if c := base[k]; sentThen[c.Surface] && had[k].Key == "" {
+						c.In = in
+						d.Removed = append(d.Removed, c)
+					}
+				}
+				for _, s := range baseSurfaces {
+					if !sentThen[s] {
+						d.Unseen = append(d.Unseen, GoneSurface{Surface: s, In: in})
+					}
+				}
+				base, baseSurfaces = had, slices.Sorted(maps.Keys(sentThen))
 			}
 		}
 		out = append(out, d)

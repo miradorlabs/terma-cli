@@ -238,13 +238,15 @@ runs over two nights against a scratch origin. The digest,
 - **new fields**: keys new to their surface, or new to the harness anywhere, in the newest
   build or any build the catalog has no census of, so whatever goes into the catalog is said
   new the night it does
-- **removed fields** and **surfaces no longer sent**: what the newest build the night
-  censused whole no longer sends that the newest older build censused whole did. Only a whole
-  census is evidence: a partial one is a failed run, where keys of an error path come, so a
-  night whose newest build is partial judges the newest whole one before it, or nothing, and
-  says so. A build is judged once, on its first whole census, and only while no newer build
-  has one: a re-run that did not reach an error path is no evidence. The digest names the
-  builds judged and judged against where they are not the newest and the previous one
+- **removed fields** and **surfaces no longer sent**: what each build the night censused
+  whole for the first time no longer sends, oldest first, each against the build before it,
+  the first against the newest older build censused whole (a removal says the build it went
+  in, where that is not the last). Only a whole census is evidence: a partial one is a failed
+  run, where keys of an error path come, so a night whose newest build is partial judges the
+  whole ones before it, or nothing, and says so. A build is judged once, and only while no
+  newer build has a whole census: a re-run that did not reach an error path is no evidence.
+  The digest names the builds judged and judged against where they are not the newest and
+  the previous one
 - **newly withheld fields**: unclassified keys the relay drops;
   classify each in `internal/relay/allow.go`, an agent's capture rules, or as content. Those
   still withheld from before are one reminder line until they are.

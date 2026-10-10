@@ -420,3 +420,40 @@ func TestWhatEveryNewBuildBringsIsNew(t *testing.T) {
 		t.Errorf("added %v", added)
 	}
 }
+
+// Two new builds censused whole in one night are each judged, oldest first, against the one
+// before: a key the first drops is gone in it, and one the first adds and the second drops
+// is new and gone. The next night says none of it again.
+func TestEachNewWholeBuildOfANightIsJudgedInTurn(t *testing.T) {
+	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
+	night := func(i int) time.Time { return day.Add(time.Duration(i) * 24 * time.Hour) }
+	var cat Catalog
+	mergeFields(&cat, []e2e.FieldRow{field("0.163.0", "logs/codex.api_request", "model", "safe", night(0)),
+		field("0.163.0", "logs/codex.api_request", "dropped_early", "safe", night(0))}, nil)
+	tonight := []e2e.FieldRow{
+		field("0.164.0", "logs/codex.api_request", "model", "safe", night(1)),
+		field("0.164.0", "logs/codex.api_request", "brief", "safe", night(1)),
+		field("0.165.0", "logs/codex.api_request", "model", "safe", night(1)),
+	}
+	ran := censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.164.0"}, {Harness: "codex", Version: "0.165.0"}})
+	_, _, hs := fieldDrift(cat, tonight, ran, night(1))
+	h := hs[0]
+	var added, removed []string
+	for _, c := range h.Added {
+		added = append(added, c.Key)
+	}
+	for _, c := range h.Removed {
+		removed = append(removed, c.Key+"@"+c.In)
+	}
+	if !slices.Equal(added, []string{"brief"}) || !slices.Equal(removed, []string{"dropped_early@0.164.0", "brief@"}) {
+		t.Fatalf("added %v, removed %v", added, removed)
+	}
+	if md := (Drift{Harnesses: hs}).markdown(); !strings.Contains(md, "`dropped_early` on `logs/codex.api_request` (safe) (gone in 0.164.0)") {
+		t.Errorf("drift.md does not say where it went:\n%s", md)
+	}
+	mergeFields(&cat, tonight, ran.failed)
+	next := []e2e.FieldRow{field("0.165.0", "logs/codex.api_request", "model", "safe", night(2))}
+	if _, _, hs = fieldDrift(cat, next, censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.165.0"}}), night(2)); hs[0].changed() {
+		t.Errorf("the next night said it again: %+v", hs[0])
+	}
+}

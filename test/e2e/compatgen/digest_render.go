@@ -175,6 +175,9 @@ func changeLines(cs []FieldChange, withClass bool, d detail) []string {
 		if withClass && c.Class != "" {
 			line += " (" + classLabel[c.Class] + ")"
 		}
+		if c.In != "" {
+			line += " (gone in " + c.In + ")"
+		}
 		out = append(out, line+c.Source.note(d))
 	}
 	return listed(out)
@@ -191,7 +194,11 @@ func surfaceLines(ss []SurfaceChange, d detail) []string {
 func goneLines(ss []GoneSurface, d detail) []string {
 	var out []string
 	for _, s := range ss {
-		out = append(out, "`"+s.Surface+"`"+s.Source.note(d))
+		line := "`" + s.Surface + "`"
+		if s.In != "" {
+			line += " (gone in " + s.In + ")"
+		}
+		out = append(out, line+s.Source.note(d))
 	}
 	return listed(out)
 }
