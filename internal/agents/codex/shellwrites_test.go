@@ -89,6 +89,9 @@ func TestShellWrites(t *testing.T) {
 		{"patch piped in", "cat <<'EOF' | apply_patch\n*** Begin Patch\n*** Update File: a.go\n@@\n-a\n+b\n*** End Patch\nEOF", in("a.go")},
 		{"patch from a substitution", "apply_patch \"$(cat <<'EOF'\n*** Begin Patch\n*** Update File: a.go\n@@\n-a\n+b\n*** End Patch\nEOF\n)\"", in("a.go")},
 		{"patch with an expansion", "apply_patch \"*** Begin Patch\n*** Add File: a.go\n+$HOME\n*** End Patch\"", in("a.go")},
+		{"patch piped in after a cd", "cd src && cat <<'EOF' | apply_patch\n*** Begin Patch\n*** Add File: a.go\n+a\n*** End Patch\nEOF", in("src/a.go")},
+		{"a patch read and one piped in", "apply_patch <<'P'\n*** Begin Patch\n*** Add File: a.go\n+a\n*** End Patch\nP\ncat <<'EOF' | apply_patch\n*** Begin Patch\n*** Add File: b.go\n+b\n*** End Patch\nEOF", in("a.go", "b.go")},
+		{"apply_patch named in a message", "git commit -m 'fix apply_patch pipe' && apply_patch <<'EOF'\n*** Begin Patch\n*** Add File: a.go\n+a\n*** End Patch\nEOF", in("a.go")},
 		{"patch in a nested shell", "bash -lc 'apply_patch <<EOF\n*** Begin Patch\n*** Update File: a.go\n@@\n-a\n+b\n*** End Patch\nEOF'", in("a.go")},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -120,6 +123,8 @@ func TestShellWritesBeforeEachCommit(t *testing.T) {
 		{"commit message is not a subcommand", "git log --grep commit && printf x > a.txt", nil},
 		{"patch piped in, then committed", "cat <<'EOF' | apply_patch\n*** Begin Patch\n*** Add File: a.go\n+a\n*** End Patch\nEOF\ngit add a.go && git commit -m a", []int{1}},
 		{"patch in a nested shell, then committed", "bash -lc 'apply_patch <<EOF\n*** Begin Patch\n*** Add File: a.go\n+a\n*** End Patch\nEOF' && git add a.go && git commit -m a", []int{1}},
+		{"apply_patch named in a commit message", "git commit -m 'fix apply_patch pipe' && apply_patch <<'EOF'\n*** Begin Patch\n*** Add File: a.go\n+a\n*** End Patch\nEOF", []int{0}},
+		{"commit in a nested shell", "printf x > a.txt && bash -c 'git add a.txt && git commit -m a'", []int{1}},
 		{"commit, then a patch piped in", "git commit -m human && cat <<'EOF' | apply_patch\n*** Begin Patch\n*** Add File: a.go\n+a\n*** End Patch\nEOF", []int{0}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

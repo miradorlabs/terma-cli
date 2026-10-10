@@ -12,9 +12,10 @@ import (
 // shellWrites returns the files a shell command names as written (redirect targets, the
 // operands of the writers in writtenIndexes, and the files of a patch it runs), in the
 // order it writes them, resolved against cwd and any cd before them; commits holds, for
-// each git commit it makes, how many of them come before it. A command that does not parse,
-// or runs no patch the parse can read (one piped in, or built by the shell), gives the files
-// of a patch in its text where it first names apply_patch, else last.
+// each git commit it makes, how many of them come before it. A script given to sh -c is read
+// as the commands it runs. A patch the parse cannot read (piped in, or built by the shell) is
+// read from the text of its pipeline; a command that does not parse, or names no apply_patch,
+// gives the files of a patch in its text, last.
 func shellWrites(command, cwd string) (paths []string, commits []int) {
 	inText := func() (out []string) {
 		for _, p := range applyPatchPaths(command) {
@@ -31,7 +32,10 @@ func shellWrites(command, cwd string) (paths []string, commits []int) {
 	}
 	dir := cwd
 	var out []string
-	patched, recovered := false, false
+	// read holds the apply_patch statements whose patch the parse read; ran is whether the
+	// command runs apply_patch at all.
+	read := map[*syntax.Stmt]bool{}
+	ran := false
 	resolve := func(w word) (string, bool) {
 		if !w.literal || w.text == "" || (dir == "" && !filepath.IsAbs(w.text)) {
 			return "", false
@@ -58,10 +62,6 @@ func shellWrites(command, cwd string) (paths []string, commits []int) {
 			}
 		}
 		out = append(out, p)
-	}
-	type scope struct {
-		node syntax.Node
-		dir  string
 	}
 	var stack []scope
 	syntax.Walk(file, func(n syntax.Node) bool {
@@ -90,7 +90,7 @@ func shellWrites(command, cwd string) (paths []string, commits []int) {
 			for _, patch := range patches(n) {
 				for _, p := range applyPatchPaths(patch) {
 					if p, ok := resolve(word{p, true}); ok {
-						out, patched = append(out, p), true
+						out, read[n] = append(out, p), true
 					}
 				}
 			}
@@ -124,8 +124,23 @@ func shellWrites(command, cwd string) (paths []string, commits []int) {
 			for _, w := range writtenOperands(words) {
 				add(w)
 			}
-			if !patched && !recovered && slices.ContainsFunc(words, func(w word) bool { return strings.Contains(w.text, "apply_patch") }) {
-				out, recovered = append(out, inText()...), true // before any commit that follows
+			if len(words) > 0 && filepath.Base(words[0].text) == "apply_patch" {
+				ran = true
+				if st, ok := stack[len(stack)-1].node.(*syntax.Stmt); ok && !read[st] {
+					for _, p := range applyPatchPaths(textOf(pipeline(stack))) {
+						if p, ok := resolve(word{p, true}); ok {
+							out = append(out, p)
+						}
+					}
+				}
+			}
+			if script, ok := shellScript(words); ok && dir != "" {
+				sub, subCommits := shellWrites(script, dir)
+				for _, c := range subCommits {
+					commits = append(commits, len(out)+c)
+				}
+				out = append(out, sub...)
+				ran = ran || strings.Contains(script, "apply_patch")
 			}
 			if slices.Contains(committing, gitSubcommand(words)) {
 				commits = append(commits, len(out))
@@ -134,41 +149,33 @@ func shellWrites(command, cwd string) (paths []string, commits []int) {
 		stack = append(stack, scope{n, dir})
 		return true
 	})
-	if !patched && !recovered {
+	if !ran {
 		out = append(out, inText()...)
 	}
 	return out, commits
 }
 
-// patches returns the patch text an apply_patch statement is given.
-func patches(st *syntax.Stmt) []string {
-	call, ok := st.Cmd.(*syntax.CallExpr)
-	if !ok {
-		return nil
+// scope is a node of the walk and the directory a cd before it left.
+type scope struct {
+	node syntax.Node
+	dir  string
+}
+
+// shellScript is the script a shell runs with -c (sh, bash, zsh or dash), when it is literal.
+func shellScript(words []word) (string, bool) {
+	if len(words) < 3 || !slices.Contains([]string{"sh", "bash", "zsh", "dash"}, filepath.Base(words[0].text)) {
+		return "", false
 	}
-	words := wordsOf(call)
-	if len(words) == 0 || filepath.Base(words[0].text) != "apply_patch" {
-		return nil
-	}
-	var out []string
-	for _, w := range words[1:] {
-		if w.literal {
-			out = append(out, w.text)
+	for i, w := range words[1 : len(words)-1] {
+		if !strings.HasPrefix(w.text, "-") || strings.HasPrefix(w.text, "--") {
+			return "", false
+		}
+		if strings.Contains(w.text, "c") {
+			script := words[i+2]
+			return script.text, script.literal
 		}
 	}
-	for _, r := range st.Redirs {
-		if r.Op != syntax.Hdoc && r.Op != syntax.DashHdoc || r.Hdoc == nil {
-			continue
-		}
-		var b strings.Builder
-		for _, p := range r.Hdoc.Parts {
-			if lit, ok := p.(*syntax.Lit); ok {
-				b.WriteString(lit.Value)
-			}
-		}
-		out = append(out, b.String())
-	}
-	return out
+	return "", false
 }
 
 // wordsOf is a command's words, from the command it runs: past the wrappers that run the
