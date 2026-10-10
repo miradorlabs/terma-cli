@@ -1,13 +1,11 @@
 package daemon
 
 import (
-	"path/filepath"
 	"slices"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 )
 
@@ -72,20 +70,20 @@ func TestAFollowerTakesOverOnceTheRelayIsGone(t *testing.T) {
 	old := startRun(t, c)
 	awaitRecord(t, old, dir)
 
+	waiting := make(chan struct{}, 1)
+	was := followWaiting
+	followWaiting = func() { waiting <- struct{}{} }
+	t.Cleanup(func() { followWaiting = was })
+
 	f := runConfig(stateDir, 0, nil)
 	f.Addr, f.Follow = addr, true
 	follower := startRun(t, f)
-	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(10 * time.Millisecond) {
-		unlock, err := flock.TryLock(filepath.Join(dir, FollowLockFile))
-		if flock.IsBusy(err) {
-			break // the follower waits
-		}
-		if err == nil {
-			unlock()
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("the follower never started waiting")
-		}
+	select {
+	case <-waiting:
+	case <-follower.done:
+		t.Fatalf("the follower gave way with no other waiting: %+v", follower.res)
+	case <-time.After(5 * time.Second):
+		t.Fatal("the follower never started waiting")
 	}
 	if res := run(t, f); !res.AlreadyRunning {
 		t.Fatalf("a second follower = %+v, want it to give way", res)

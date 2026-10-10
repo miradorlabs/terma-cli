@@ -112,6 +112,7 @@ func Run(ctx context.Context, c Config) (Result, error) {
 		lockCtx, cancelWait = context.WithTimeout(ctx, replacedMaxWait+followSlack)
 		defer cancelWait()
 		wait = true
+		followWaiting()
 	}
 	unlock, busy, err := lock(lockCtx, dir, wait)
 	// Whether it took over or gave up, the next relay to make way gets its own follower.
@@ -366,6 +367,10 @@ var replacedMaxWait = relay.DefaultHold
 // followSlack is how long a following relay waits beyond replacedMaxWait, for the relay
 // making way to deliver what it accepted and let go of its lock.
 const followSlack = 30 * time.Second
+
+// followWaiting runs once a following relay holds FollowLockFile and starts to wait; tests
+// learn of it here, since probing the lock themselves would make the follower give way.
+var followWaiting = func() {}
 
 // watch waits for a reason to stop. A relay that installed a newer terma stops once Quiesce
 // finds its hold empty, no export in flight and none for updateQuiet (for none at all after
