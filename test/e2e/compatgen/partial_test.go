@@ -430,3 +430,17 @@ func TestAWholeRunsKindsReplaceAFailedRuns(t *testing.T) {
 		t.Errorf("a newer build's failed run: kinds %v", f.Kinds)
 	}
 }
+
+// A failed run's class, and what the relay keeps, carry through: they are the terma under
+// test's answer, not the harness's, so a key it classified since is no longer withheld.
+func TestAFailedRunsClassCarriesThrough(t *testing.T) {
+	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
+	var cat Catalog
+	mergeFields(&cat, []e2e.FieldRow{field("0.164.0", "logs/codex.api_request", "k", "unclassified", day)}, nil)
+	for _, v := range []string{"0.164.0", "0.165.0"} {
+		mergeFields(&cat, []e2e.FieldRow{field(v, "logs/codex.api_request", "k", "safe", day.Add(24*time.Hour))}, map[string]bool{"codex\x00" + v: true})
+		if f := cat.Fields[0]; f.Class != "safe" || f.withheld() {
+			t.Errorf("after a failed run of %s: class %s, withheld %v", v, f.Class, f.withheld())
+		}
+	}
+}

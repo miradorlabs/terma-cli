@@ -124,26 +124,27 @@ func mergeFields(cat *Catalog, rows []e2e.FieldRow, partial map[string]bool) {
 			f.Whole = f.Whole[:min(len(f.Whole), keepVersions)]
 		}
 		// The kinds are the newest build's: a key an old build sent as text and a new one as a
-		// number is no longer withheld. Its class, and what the relay keeps of it, are the latest
-		// run's: a key classified since is no longer withheld either. A failed run is no evidence
-		// over a whole census: it changes no kinds of a key one saw.
-		switch {
-		case f.Versions[0] != r.Version:
-		case failedRun && len(f.Whole) > 0:
-		case newest != r.Version, !failedRun && !wasWhole:
-			f.Kinds, f.Class, f.Kept = slices.Clone(r.Kinds), r.Class, slices.Clone(r.Kept)
-		default:
-			for _, k := range r.Kinds {
-				if !slices.Contains(f.Kinds, k) {
-					f.Kinds = append(f.Kinds, k)
+		// number is no longer withheld. A failed run is no evidence over a whole census: it
+		// changes no kinds of a key one saw. Its class, and what the relay keeps of it, are the
+		// latest run's, failed or whole: they are the terma under test's answer, not the
+		// harness's, so a key classified since is no longer withheld either.
+		if f.Versions[0] == r.Version {
+			switch {
+			case failedRun && len(f.Whole) > 0:
+			case newest != r.Version, !failedRun && !wasWhole:
+				f.Kinds = slices.Clone(r.Kinds)
+			default:
+				for _, k := range r.Kinds {
+					if !slices.Contains(f.Kinds, k) {
+						f.Kinds = append(f.Kinds, k)
+					}
 				}
+				slices.Sort(f.Kinds)
 			}
-			slices.Sort(f.Kinds)
 			if r.Class != "" {
 				f.Class, f.Kept = r.Class, slices.Clone(r.Kept)
 			}
 		}
-
 	}
 	for _, f := range added {
 		cat.Fields = append(cat.Fields, *f)
