@@ -248,7 +248,8 @@ func TestCatalogIsBounded(t *testing.T) {
 	}
 }
 
-// A Slack section is cut at the end of a line, so neither a character nor a code span is split.
+// A Slack section is cut at the end of a line, so neither a character, a code span nor an
+// escape is split.
 func TestClip(t *testing.T) {
 	s := "*Codex*\n• `ключ` on `traces/x`\n• `ключ2` on `traces/y`"
 	got := clip(s, len("*Codex*\n• `ключ` on `traces/x`\n• `кл"))
@@ -261,6 +262,9 @@ func TestClip(t *testing.T) {
 	long := strings.Repeat("ключ", 10)
 	if got := clip(long, 5); got != "кл\n…" {
 		t.Errorf("clip with no line end = %q", got)
+	}
+	if got := clip(slackEscape("a<b&c"), len("a&lt;b&am")); got != "a&lt;b\n…" {
+		t.Errorf("clip inside an escape = %q", got)
 	}
 }
 

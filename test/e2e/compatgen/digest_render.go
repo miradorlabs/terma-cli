@@ -210,8 +210,8 @@ const (
 	slackBudget  = 30000
 )
 
-// clip cuts s to at most limit bytes at the end of a line, so neither a character nor a code
-// span is split, and says so.
+// clip cuts s, escaped for Slack, to at most limit bytes at the end of a line, so neither a
+// character, a code span nor an escape is split, and says so.
 func clip(s string, limit int) string {
 	if len(s) <= limit {
 		return s
@@ -221,6 +221,10 @@ func clip(s string, limit int) string {
 		cut = limit
 		for cut > 0 && s[cut]&0xC0 == 0x80 {
 			cut--
+		}
+		// Every "&" in escaped text begins an escape: one not closed before the cut is cut off.
+		if amp := strings.LastIndexByte(s[:cut], '&'); amp >= 0 && !strings.Contains(s[amp:cut], ";") {
+			cut = amp
 		}
 	}
 	return s[:cut] + "\n…"

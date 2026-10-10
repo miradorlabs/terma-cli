@@ -181,6 +181,8 @@ jobs:
       - name: Say what changed, and render the matrix and catalog
         working-directory: test/e2e
         run: |
+          # No artifact at all leaves no runs/; the digest then says the census is missing.
+          mkdir -p runs
           args=()
           for f in $(find runs -name compat.json | sort); do args+=(-run "$f"); done
           for f in $(find runs -name fields.json | sort); do args+=(-fields "$f"); done
