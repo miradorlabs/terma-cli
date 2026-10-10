@@ -28,7 +28,9 @@ type Drift struct {
 	// night has none of.
 	Missing   []string       `json:"missing,omitempty"`
 	Harnesses []HarnessDrift `json:"harnesses"`
-	Compat    []CompatChange `json:"compat"`
+	// SourceErrors are the builds whose source could not be read, their findings unlinked.
+	SourceErrors []string       `json:"source_errors,omitempty"`
+	Compat       []CompatChange `json:"compat"`
 }
 
 // missingWithin is how recently a harness must have been censused for its absence to count:
@@ -60,7 +62,9 @@ type HarnessDrift struct {
 	// A re-run of the same build is no evidence: a key that comes with an error path, or
 	// a scenario that did not run, would read as one gone.
 	Removed []FieldChange `json:"removed,omitempty"`
-	Unseen  []string      `json:"unseen,omitempty"`
+	Unseen  []GoneSurface `json:"unseen,omitempty"`
+	// Compare links the source's changes from Previous to Version, where it is public.
+	Compare string `json:"compare,omitempty"`
 	// Withheld are Version's unclassified keys with text values, which the relay drops, that
 	// the catalog did not have withheld; StillWithheld those it did, until each is classified.
 	Withheld      []FieldChange `json:"withheld,omitempty"`
@@ -78,6 +82,8 @@ type FieldChange struct {
 	Key     string   `json:"key"`
 	Class   string   `json:"class,omitempty"`
 	Kinds   []string `json:"kinds,omitempty"`
+	// Source is where the harness's source names it, where it is public.
+	Source *SourceSays `json:"source,omitempty"`
 }
 
 // SurfaceChange is a surface new to a harness, with how many keys it carried and how many of
@@ -86,6 +92,14 @@ type SurfaceChange struct {
 	Surface string `json:"surface"`
 	Keys    int    `json:"keys"`
 	NewKeys int    `json:"new_keys"`
+	// Source is where the harness's source names it, where it is public.
+	Source *SourceSays `json:"source,omitempty"`
+}
+
+// GoneSurface is a surface the previous build sent and the new one did not.
+type GoneSurface struct {
+	Surface string      `json:"surface"`
+	Source  *SourceSays `json:"source,omitempty"`
 }
 
 // CompatChange is a capability whose result for a build changed, or a build's first failure.
@@ -219,7 +233,7 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran map[string]string, now tim
 			}
 			for _, s := range prev.Surfaces {
 				if !sent[s] {
-					d.Unseen = append(d.Unseen, s)
+					d.Unseen = append(d.Unseen, GoneSurface{Surface: s})
 				}
 			}
 		}

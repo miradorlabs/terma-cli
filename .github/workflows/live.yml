@@ -186,7 +186,7 @@ jobs:
           args=()
           for f in $(find runs -name compat.json | sort); do args+=(-run "$f"); done
           for f in $(find runs -name fields.json | sort); do args+=(-fields "$f"); done
-          go run ./compatgen "${args[@]}" -digest report -link "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          go run ./compatgen "${args[@]}" -digest report -source -link "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           cat report/drift.md >> "$GITHUB_STEP_SUMMARY"
           if [ -f ../../docs/COMPATIBILITY.md ]; then cat ../../docs/COMPATIBILITY.md >> "$GITHUB_STEP_SUMMARY"; fi
       - name: Post the digest to Slack

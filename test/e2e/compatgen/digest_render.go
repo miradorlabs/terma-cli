@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"maps"
+	"path"
+	"regexp"
 	"slices"
 	"strings"
 )
@@ -28,7 +30,7 @@ func (h HarnessDrift) headline() string {
 	case h.Unreached != "":
 		build += " (" + h.Unreached + ", run tonight, was not reached)"
 	case h.Previous != h.Version:
-		build += " (was " + h.Previous + ")"
+		build += " (was " + h.Previous + h.compareLink() + ")"
 	}
 	var parts []string
 	// Each says its plural, which is not always its last word's.
@@ -54,6 +56,57 @@ func (h HarnessDrift) headline() string {
 	return h.Name + " " + build + ": " + strings.Join(parts, ", ")
 }
 
+// compareLink links the source's changes since Previous, where they are public.
+func (h HarnessDrift) compareLink() string {
+	if h.Compare == "" {
+		return ""
+	}
+	return ", " + link(h.Compare, "diff")
+}
+
+// link is a link in a line of the digest, written as each format writes one (renderLinks):
+// [text](url) in markdown, <url|text> in Slack once the text around it is escaped.
+func link(url, text string) string { return "\x00" + url + "\x01" + text + "\x02" }
+
+var linkMark = regexp.MustCompile("\x00([^\x01]*)\x01([^\x02]*)\x02")
+
+// renderLinks writes the links in s as markdown (or Slack, with slack set) writes them.
+func renderLinks(s string, slack bool) string {
+	if slack {
+		return linkMark.ReplaceAllString(s, "<$1|$2>")
+	}
+	return linkMark.ReplaceAllString(s, "[$2]($1)")
+}
+
+// note is where a harness's source names a finding: its lines, or for one gone, whether the
+// new build's source still names it, or where the build before did.
+func (s *SourceSays) note() string {
+	if s == nil {
+		return ""
+	}
+	refs := func(rs []SourceRef, more int) string {
+		var out []string
+		for _, r := range rs {
+			out = append(out, link(r.URL, fmt.Sprintf("%s:%d", path.Base(r.Path), r.Line)))
+		}
+		if more > 0 {
+			out = append(out, fmt.Sprintf("+%d more", more))
+		}
+		return strings.Join(out, ", ")
+	}
+	switch {
+	case s.Previous == "" && len(s.Refs) == 0:
+		return ""
+	case s.Previous == "":
+		return " · " + refs(s.Refs, s.More)
+	case len(s.Refs) > 0:
+		return " · still in " + s.Version + "'s source: " + refs(s.Refs, s.More)
+	case len(s.Before) > 0:
+		return " · gone from " + s.Version + "'s source, was " + refs(s.Before, s.BeforeMore)
+	}
+	return " · named in neither build's source"
+}
+
 // plural counts n of a noun that takes an "s".
 func plural(n int, what string) string {
 	if n == 1 {
@@ -77,7 +130,7 @@ func changeLines(cs []FieldChange, withClass bool) []string {
 		if withClass && c.Class != "" {
 			line += " (" + classLabel[c.Class] + ")"
 		}
-		out = append(out, line)
+		out = append(out, line+c.Source.note())
 	}
 	return listed(out)
 }
@@ -85,15 +138,15 @@ func changeLines(cs []FieldChange, withClass bool) []string {
 func surfaceLines(ss []SurfaceChange) []string {
 	var out []string
 	for _, s := range ss {
-		out = append(out, fmt.Sprintf("`%s` (%s, %d new)", s.Surface, plural(s.Keys, "key"), s.NewKeys))
+		out = append(out, fmt.Sprintf("`%s` (%s, %d new)%s", s.Surface, plural(s.Keys, "key"), s.NewKeys, s.Source.note()))
 	}
 	return listed(out)
 }
 
-func codeLines(ss []string) []string {
+func goneLines(ss []GoneSurface) []string {
 	var out []string
 	for _, s := range ss {
-		out = append(out, "`"+s+"`")
+		out = append(out, "`"+s.Surface+"`"+s.Source.note())
 	}
 	return listed(out)
 }
@@ -110,7 +163,7 @@ func (h HarnessDrift) sections() []struct {
 		{"New surfaces", surfaceLines(h.NewSurfaces)},
 		{"New fields", changeLines(h.Added, true)},
 		{"Removed fields", changeLines(h.Removed, true)},
-		{"Surfaces no longer sent", codeLines(h.Unseen)},
+		{"Surfaces no longer sent", goneLines(h.Unseen)},
 		{"Newly withheld by the relay, unclassified", changeLines(h.Withheld, false)},
 	}
 }
@@ -144,7 +197,7 @@ func (d Drift) unchanged() string {
 		}
 		b := h.Name + " " + h.Version
 		if h.Previous != h.Version {
-			b += " (new build, was " + h.Previous + ")"
+			b += " (new build, was " + h.Previous + h.compareLink() + ")"
 		}
 		builds = append(builds, b)
 	}
@@ -208,10 +261,13 @@ func (d Drift) markdown() string {
 		}
 		b.WriteString("\n")
 	}
+	for _, e := range d.SourceErrors {
+		b.WriteString("_Source links left out: " + e + "._\n\n")
+	}
 	if d.Link != "" {
 		fmt.Fprintf(&b, "[The run](%s)\n", d.Link)
 	}
-	return b.String()
+	return renderLinks(b.String(), false)
 }
 
 // A Slack message holds at most 50 blocks, and a section's text at most 3000 characters.
@@ -235,9 +291,13 @@ func clip(s string, limit int) string {
 		for cut > 0 && s[cut]&0xC0 == 0x80 {
 			cut--
 		}
-		// Every "&" in escaped text begins an escape: one not closed before the cut is cut off.
+		// Every "&" in escaped text begins an escape and every "<" a link: one not closed
+		// before the cut is cut off.
 		if amp := strings.LastIndexByte(s[:cut], '&'); amp >= 0 && !strings.Contains(s[amp:cut], ";") {
 			cut = amp
+		}
+		if lt := strings.LastIndexByte(s[:cut], '<'); lt >= 0 && !strings.Contains(s[lt:cut], ">") {
+			cut = lt
 		}
 	}
 	return s[:cut] + "\n…"
@@ -255,7 +315,7 @@ func (d Drift) slack() map[string]any {
 	type block = map[string]any
 	text := func(s string) block { return block{"type": "mrkdwn", "text": s} }
 	section := func(s string) block {
-		return block{"type": "section", "text": text(clip(slackEscape(s), sectionLimit))}
+		return block{"type": "section", "text": text(clip(renderLinks(slackEscape(s), true), sectionLimit))}
 	}
 	summary := "Harness drift: no changes"
 	if !d.Quiet() {

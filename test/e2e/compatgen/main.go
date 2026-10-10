@@ -5,10 +5,12 @@
 // merges each run's field census (report/fields.json) into the field catalog
 // (docs/compat/fields.json), rendered as docs/FIELDS.md.
 //
-//	go run ./compatgen -run report/compat.json [-fields report/fields.json] [-digest report]
+//	go run ./compatgen -run report/compat.json [-fields report/fields.json] [-digest report [-source]]
 //
 // With -digest it first writes what the runs changed against the history and catalog as they
-// were: report/drift.json, drift.md, and slack.json for a Slack incoming webhook.
+// were: report/drift.json, drift.md, and slack.json for a Slack incoming webhook. With -source
+// the digest links each finding to the lines of a public harness source that name it
+// (source.go).
 //
 // The history keeps, per harness build, platform and capability, the latest result
 // with when it ran and when it first passed; a build that stops being tested keeps its
@@ -60,6 +62,8 @@ type config struct {
 	history, md, json string
 	catalog, fieldsMD string
 	digest, link      string
+	// source links the digest's findings to the source of harnesses whose source is public.
+	source bool
 }
 
 func main() {
@@ -74,6 +78,7 @@ func main() {
 	flag.StringVar(&c.fieldsMD, "fields-md", "../../docs/FIELDS.md", "the rendered field catalog")
 	flag.StringVar(&c.digest, "digest", "", "write what the runs changed (drift.json, drift.md, slack.json) to this directory")
 	flag.StringVar(&c.link, "link", "", "the run, linked from the digest")
+	flag.BoolVar(&c.source, "source", false, "link the digest's findings to the lines of a public harness source that name them (downloads it)")
 	flag.Parse()
 	c.runs, c.fieldRuns = runs, fields
 	if err := run(c, time.Now().UTC()); err != nil {
@@ -114,6 +119,9 @@ func run(c config, now time.Time) error {
 	if c.digest != "" {
 		d := Drift{GeneratedAt: now, Link: c.link, Compat: compatDrift(hist, compatRows)}
 		d.NoCensus, d.Missing, d.Harnesses = fieldDrift(catalog, fieldRows, censusRan(compatRows), now)
+		if c.source {
+			linkSources(&d)
+		}
 		if err := writeDigest(c.digest, d); err != nil {
 			return err
 		}

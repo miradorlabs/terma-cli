@@ -118,7 +118,7 @@ func TestFieldDriftAndCatalog(t *testing.T) {
 	if n := next.Harnesses[0]; len(n.Withheld) != 0 || !slices.Equal(keys(n.StillWithheld), []string{"product_sku", "process.parent_pid"}) || !next.Quiet() {
 		t.Errorf("the next night: withheld %v, still %v, quiet %v", keys(n.Withheld), keys(n.StillWithheld), next.Quiet())
 	}
-	if !slices.Equal(h.Unseen, []string{"metrics/codex.turn.e2e_duration_ms"}) {
+	if len(h.Unseen) != 1 || h.Unseen[0].Surface != "metrics/codex.turn.e2e_duration_ms" {
 		t.Errorf("unseen %v", h.Unseen)
 	}
 	var cat Catalog
@@ -410,7 +410,7 @@ func TestSlackDigestFitsOneMessage(t *testing.T) {
 // A headline counts each change in its own plural: "surfaces no longer sent", not "surface no
 // longer sents".
 func TestHeadlinePlurals(t *testing.T) {
-	h := HarnessDrift{Name: "Codex CLI", Version: "0.162.1", Previous: "0.162.0", Unseen: []string{"a", "b"},
+	h := HarnessDrift{Name: "Codex CLI", Version: "0.162.1", Previous: "0.162.0", Unseen: []GoneSurface{{Surface: "a"}, {Surface: "b"}},
 		Added: []FieldChange{{Key: "k"}}, Withheld: []FieldChange{{Key: "k"}, {Key: "l"}}}
 	if got, want := h.headline(), "Codex CLI 0.162.1 (was 0.162.0): 1 new field, 2 surfaces no longer sent, 2 newly withheld fields"; got != want {
 		t.Errorf("headline = %q, want %q", got, want)

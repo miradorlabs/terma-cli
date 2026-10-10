@@ -77,4 +77,4 @@ compat:
 # What the runs changed against the committed history and catalog, said in report/drift.md
 # and report/slack.json (the nightly job posts it); LINK is the run's URL.
 drift:
-	$(COMPATGEN) -digest report $(if $(LINK),-link '$(LINK)')
+	$(COMPATGEN) -digest report -source $(if $(LINK),-link '$(LINK)')

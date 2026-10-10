@@ -236,6 +236,16 @@ runs over two nights against a scratch origin. The digest,
   classify each in `internal/relay/allow.go`, an agent's capture rules, or as content. Those
   still withheld from before are one reminder line until they are.
 
+For a harness whose source is public (Codex, `sources` in `compatgen/source.go`; one line
+adds another), `-source` links each of these to the lines of the build's source that name
+it, read from its release tag's tarball, and a new build's headline links the comparison
+of the two tags. A key is linked beside its surface's name, so a generic key leads to its
+metric, not to every line that says it. A field or surface gone says which it is: **still in**
+the new build's source (it was not sent tonight: a condition, a schedule, a scenario) or
+**gone from** it (removed), with where the build before named it. A source that cannot be
+read leaves its findings unlinked, and the digest says so. Nothing is read on a night with
+nothing to link.
+
 It also lists capabilities whose result changed, and says so when the census did not run,
 did not reach a harness censused within the week, or did not reach the newest build: the
 newest the catalog had, or the newest the night's census scenarios ran (those that prove
