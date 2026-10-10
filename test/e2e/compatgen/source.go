@@ -137,7 +137,7 @@ func (h *HarnessDrift) findings() []finding {
 	var out []finding
 	for i := range h.NewSurfaces {
 		if name, ok := surfaceName(h.NewSurfaces[i].Surface); ok {
-			out = append(out, finding{name: name, surface: true, says: &h.NewSurfaces[i].Source})
+			out = append(out, finding{name: name, surface: true, from: h.NewSurfaces[i].From, says: &h.NewSurfaces[i].Source})
 		}
 	}
 	for _, list := range []struct {

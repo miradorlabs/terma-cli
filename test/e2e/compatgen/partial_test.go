@@ -340,3 +340,47 @@ func TestANewFieldSaysItsBuild(t *testing.T) {
 		t.Errorf("drift.md:\n%s", md)
 	}
 }
+
+// A key a night's chain drops, sends again and drops again is said once, as its last drop.
+func TestAKeyDroppedTwiceIsSaidOnce(t *testing.T) {
+	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
+	var cat Catalog
+	mergeFields(&cat, []e2e.FieldRow{field("0.163.0", "logs/codex.api_request", "model", "safe", day),
+		field("0.163.0", "logs/codex.api_request", "flaps", "safe", day)}, nil)
+	var tonight []e2e.FieldRow
+	var runs []e2e.CensusRun
+	for _, b := range []struct {
+		v     string
+		flaps bool
+	}{{"0.164.0", false}, {"0.165.0", true}, {"0.166.0", false}} {
+		tonight = append(tonight, field(b.v, "logs/codex.api_request", "model", "safe", day.Add(24*time.Hour)))
+		if b.flaps {
+			tonight = append(tonight, field(b.v, "logs/codex.api_request", "flaps", "safe", day.Add(24*time.Hour)))
+		}
+		runs = append(runs, e2e.CensusRun{Harness: "codex", Version: b.v})
+	}
+	_, _, hs := fieldDrift(cat, tonight, censusRan(runs), day.Add(24*time.Hour))
+	if r := hs[0].Removed; len(r) != 1 || r[0].Key != "flaps" || r[0].In != "" {
+		t.Errorf("removed %+v, want flaps once, gone in the last build", r)
+	}
+}
+
+// A first census counts the surfaces and keys of the same builds; a new surface only an older
+// build of the night sent says which.
+func TestCountsAndSurfacesSayTheirBuilds(t *testing.T) {
+	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
+	tonight := []e2e.FieldRow{field("0.164.0", "logs/codex.api_request", "model", "safe", day),
+		field("0.164.0", "logs/codex.older_only", "model", "safe", day),
+		field("0.165.0", "logs/codex.api_request", "model", "safe", day)}
+	ran := censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.164.0"}, {Harness: "codex", Version: "0.165.0"}})
+	_, _, hs := fieldDrift(Catalog{}, tonight, ran, day)
+	if h := hs[0]; !h.First || h.Surfaces != 2 || h.Keys != 2 {
+		t.Errorf("first census: %d surfaces, %d keys", h.Surfaces, h.Keys)
+	}
+	var cat Catalog
+	mergeFields(&cat, []e2e.FieldRow{field("0.163.0", "logs/codex.api_request", "model", "safe", day)}, nil)
+	_, _, hs = fieldDrift(cat, tonight, ran, day.Add(24*time.Hour))
+	if s := hs[0].NewSurfaces; len(s) != 1 || s[0].From != "0.164.0" || !strings.Contains(surfaceLines(s, allLinks)[0], "0 new, in 0.164.0)") {
+		t.Errorf("new surfaces %+v", s)
+	}
+}

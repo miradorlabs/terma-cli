@@ -110,6 +110,8 @@ type SurfaceChange struct {
 	Surface string `json:"surface"`
 	Keys    int    `json:"keys"`
 	NewKeys int    `json:"new_keys"`
+	// From is the build that sent it, where Version did not: the newest of tonight's that did.
+	From string `json:"from,omitempty"`
 	// Source is where the harness's source names it, where it is public.
 	Source *SourceSays `json:"source,omitempty"`
 }
@@ -236,8 +238,11 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran censusRuns, now time.Time)
 			case !surfaces[harness][r.Surface]:
 				s := newSurfaces[r.Surface]
 				if s == nil {
-					s = &SurfaceChange{Surface: r.Surface}
+					s = &SurfaceChange{Surface: r.Surface, From: c.From}
 					newSurfaces[r.Surface] = s
+				}
+				if c.From == "" || (s.From != "" && versionLess(s.From, c.From)) {
+					s.From = c.From
 				}
 				s.Keys++
 				if newKey {
@@ -261,7 +266,11 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran censusRuns, now time.Time)
 			d.NewSurfaces = append(d.NewSurfaces, *newSurfaces[s])
 		}
 		if d.First {
-			d.Surfaces, d.Keys = len(sent), len(tonight)
+			counted := map[string]bool{}
+			for _, r := range tonight {
+				counted[r.Surface] = true
+			}
+			d.Surfaces, d.Keys = len(counted), len(tonight)
 		}
 		// What is gone is judged on every build censused whole tonight for the first time, while
 		// no newer build is, oldest first, each against the build before it: the first against the
@@ -332,6 +341,25 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran censusRuns, now time.Time)
 			if since != d.Previous {
 				d.Since = since
 			}
+			// A key or surface the chain drops more than once is said once, as its last drop.
+			removedAt, unseenAt := map[string]int{}, map[string]int{}
+			removed := func(c FieldChange) {
+				k := c.Surface + "\x00" + c.Key
+				if i, ok := removedAt[k]; ok {
+					d.Removed[i] = c
+					return
+				}
+				removedAt[k] = len(d.Removed)
+				d.Removed = append(d.Removed, c)
+			}
+			unseen := func(g GoneSurface) {
+				if i, ok := unseenAt[g.Surface]; ok {
+					d.Unseen[i] = g
+					return
+				}
+				unseenAt[g.Surface] = len(d.Unseen)
+				d.Unseen = append(d.Unseen, g)
+			}
 			for i, v := range chain {
 				in := ""
 				if v != last {
@@ -359,7 +387,7 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran censusRuns, now time.Time)
 						if in != "" {
 							c.Back = back(k, "")
 						}
-						d.Removed = append(d.Removed, c)
+						removed(c)
 					}
 				}
 				for _, s := range base.surfaces {
@@ -368,7 +396,7 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran censusRuns, now time.Time)
 						if in != "" {
 							g.Back = back("", s)
 						}
-						d.Unseen = append(d.Unseen, g)
+						unseen(g)
 					}
 				}
 				base = now

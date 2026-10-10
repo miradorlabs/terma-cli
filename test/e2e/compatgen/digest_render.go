@@ -199,7 +199,11 @@ func changeLines(cs []FieldChange, withClass bool, d detail) []string {
 func surfaceLines(ss []SurfaceChange, d detail) []string {
 	var out []string
 	for _, s := range ss {
-		out = append(out, fmt.Sprintf("`%s` (%s, %d new)%s", s.Surface, plural(s.Keys, "key"), s.NewKeys, s.Source.note(d)))
+		in := ""
+		if s.From != "" {
+			in = ", in " + s.From
+		}
+		out = append(out, fmt.Sprintf("`%s` (%s, %d new%s)%s", s.Surface, plural(s.Keys, "key"), s.NewKeys, in, s.Source.note(d)))
 	}
 	return listed(out)
 }
