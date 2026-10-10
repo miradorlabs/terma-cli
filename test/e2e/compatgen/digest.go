@@ -259,11 +259,10 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran censusRuns, now time.Time)
 			if whole.Version != d.Previous {
 				d.Since = whole.Version
 			}
-			// Only what the whole census saw is evidence: a partial census is a failed run, where
-			// keys of an error path come. (A key keeps its newest whole build, however many
-			// partial ones come after it.)
+			// Only what a whole census saw is evidence (FieldEntry.Whole): a partial census is a
+			// failed run, where keys of an error path come.
 			for _, f := range cat.Fields {
-				if f.Harness != harness || !slices.Contains(f.Versions, whole.Version) || !sent[f.Surface] {
+				if f.Harness != harness || !slices.Contains(f.Whole, whole.Version) || !sent[f.Surface] {
 					continue
 				}
 				if _, ok := tonight[f.Surface+"\x00"+f.Key]; !ok {

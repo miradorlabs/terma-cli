@@ -54,6 +54,11 @@ type FieldEntry struct {
 	// newest first, at most keepVersions.
 	FirstSeen string   `json:"first_seen"`
 	Versions  []string `json:"versions"`
+	// Whole are the newest builds a whole census saw it in, newest first, at most
+	// keepVersions: the evidence a build sent it. A build's partial census, a failed run, sees
+	// keys of an error path, so what only one saw is in Versions alone, though the build is
+	// censused whole another night.
+	Whole []string `json:"whole,omitempty"`
 }
 
 const (
@@ -77,19 +82,6 @@ func mergeFields(cat *Catalog, rows []e2e.FieldRow, partial map[string]bool) {
 		fields[cat.Fields[i].id()] = &cat.Fields[i]
 	}
 	var added []*FieldEntry
-	// The builds censused whole, before this run and by it: a key keeps the newest of them
-	// that saw it, whatever partial builds came after, for removals to be judged against.
-	wholeBuild := map[string]bool{}
-	for _, c := range cat.Censuses {
-		if !c.Partial {
-			wholeBuild[c.id()] = true
-		}
-	}
-	for _, r := range rows {
-		if id := r.Harness + "\x00" + r.Version; !partial[id] {
-			wholeBuild[id] = true
-		}
-	}
 	type build struct{ harness, version string }
 	seen := map[build]map[string]bool{}
 	at := map[build]time.Time{}
@@ -119,7 +111,12 @@ func mergeFields(cat *Catalog, rows []e2e.FieldRow, partial map[string]bool) {
 		if !slices.Contains(f.Versions, r.Version) {
 			f.Versions = append(f.Versions, r.Version)
 			sortVersionsDesc(f.Versions)
-			f.Versions = keepNewest(f.Versions, func(v string) bool { return wholeBuild[f.Harness+"\x00"+v] })
+			f.Versions = f.Versions[:min(len(f.Versions), keepVersions)]
+		}
+		if !partial[r.Harness+"\x00"+r.Version] && !slices.Contains(f.Whole, r.Version) {
+			f.Whole = append(f.Whole, r.Version)
+			sortVersionsDesc(f.Whole)
+			f.Whole = f.Whole[:min(len(f.Whole), keepVersions)]
 		}
 		// The kinds are the newest build's: a key an old build sent as text and a new one as a
 		// number is no longer withheld. Its class, and what the relay keeps of it, are the latest
@@ -153,11 +150,18 @@ func mergeFields(cat *Catalog, rows []e2e.FieldRow, partial map[string]bool) {
 	for b, surfaces := range seen {
 		c := Census{Harness: b.harness, Version: b.version, Surfaces: slices.Sorted(maps.Keys(surfaces)), At: at[b], Partial: partial[b.harness+"\x00"+b.version]}
 		if prev, ok := censuses[c.id()]; ok {
-			prev.Partial = prev.Partial && c.Partial
-			for _, s := range prev.Surfaces {
-				surfaces[s] = true
+			// A census's surfaces are its whole runs' once it has one: a partial run's, a
+			// failed run's, are no evidence of what the build sends.
+			switch {
+			case prev.Partial && !c.Partial:
+				prev.Surfaces, prev.Partial = c.Surfaces, false
+			case !prev.Partial && c.Partial:
+			default:
+				for _, s := range prev.Surfaces {
+					surfaces[s] = true
+				}
+				prev.Surfaces = slices.Sorted(maps.Keys(surfaces))
 			}
-			prev.Surfaces = slices.Sorted(maps.Keys(surfaces))
 			if c.At.After(prev.At) {
 				prev.At = c.At
 			}
@@ -192,23 +196,9 @@ func mergeFields(cat *Catalog, rows []e2e.FieldRow, partial map[string]bool) {
 	}
 	cat.Censuses = kept
 	cat.Fields = slices.DeleteFunc(cat.Fields, func(f FieldEntry) bool {
-		return !slices.ContainsFunc(f.Versions, func(v string) bool { return censused[f.Harness+"\x00"+v] })
+		kept := func(v string) bool { return censused[f.Harness+"\x00"+v] }
+		return !slices.ContainsFunc(f.Versions, kept) && !slices.ContainsFunc(f.Whole, kept)
 	})
-}
-
-// keepNewest keeps the newest keepVersions of vs, newest first, and the newest whole one
-// past them.
-func keepNewest(vs []string, whole func(string) bool) []string {
-	if len(vs) <= keepVersions {
-		return vs
-	}
-	kept := slices.Clone(vs[:keepVersions])
-	if !slices.ContainsFunc(kept, whole) {
-		if i := slices.IndexFunc(vs[keepVersions:], whole); i >= 0 {
-			kept = append(kept, vs[keepVersions+i])
-		}
-	}
-	return kept
 }
 
 func sortVersionsDesc(vs []string) {
@@ -254,6 +244,11 @@ func (cat *Catalog) shown(harness string) (shown, newest Census, ok bool) {
 
 // sentBy reports a key the build at version, or one after it, sent.
 func (f FieldEntry) sentBy(version string) bool {
+	return slices.ContainsFunc(f.Whole, func(v string) bool { return !versionLess(v, version) })
+}
+
+// seenBy reports a key a build at version, or one after it, sent in any run, failed ones too.
+func (f FieldEntry) seenBy(version string) bool {
 	return slices.ContainsFunc(f.Versions, func(v string) bool { return !versionLess(v, version) })
 }
 
@@ -379,7 +374,11 @@ func renderFields(cat Catalog, now time.Time) string {
 			fmt.Fprintf(&b, "\n### `%s`\n\n| Key | Class | Values | First censused | In %s |\n|---|---|---|---|---|\n", tableCell(s), newest.Version)
 			for _, f := range bySurface[s] {
 				in := "yes"
-				if !f.sentBy(newest.Version) {
+				switch {
+				case f.sentBy(newest.Version):
+				case f.seenBy(newest.Version):
+					in = "only in a failed run"
+				default:
 					in = "**no** (last " + f.Versions[0] + ")"
 				}
 				class := classLabel[f.Class]

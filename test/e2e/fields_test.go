@@ -19,6 +19,7 @@ import (
 func TestClaudeInteractiveFields(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
 		track(t)
+		Proves(t, b.Harness, b.Version, CensusCapability)
 		const key = "synthetic-telemetry-key"
 		t.Setenv("ANTHROPIC_API_KEY", key)
 		sb := New(t, Isolated, WithClaude(b))

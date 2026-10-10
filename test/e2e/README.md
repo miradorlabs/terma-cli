@@ -217,7 +217,9 @@ The catalog, `docs/compat/fields.json`, lives beside the compatibility history o
 class, kinds, the first build it was seen in, and whether the newest build censused whole
 still has it (a partial census's absences are no evidence). A
 key keeps its first build and its newest five, and its kinds and class are the newest
-build's, and it also keeps the newest whole build that saw it; a harness keeps its newest
+build's, and apart from them the newest builds a whole census saw it in, the evidence a
+build sent it (what only a failed run saw, an error path's, is not, though the build is
+censused whole another night); a harness keeps its newest
 five censuses, and five whole ones however old (a
 partial census, one a census scenario failed before taking whole, does not push out the
 whole ones), and a key leaves once none of them saw it. The file holds one entry a line, so a night's change is a diff of what changed.
@@ -263,7 +265,7 @@ It also lists capabilities whose result changed, and says so when the census did
 did not reach a harness censused within the week or whose census scenarios ran that night,
 or did not reach the newest build: the
 newest the catalog had, or the newest the night's census scenarios ran (those that prove
-`relay.equivalent`, `e2e.CensusCapability`). A census that did not run never reads as a
+`telemetry.census`, `e2e.CensusCapability`: `runBoth` and `TestClaudeInteractiveFields`). A census that did not run never reads as a
 quiet night. The digest goes to the run's summary and to Slack through the
 `SLACK_WEBHOOK_URL` secret in the `live-harnesses` environment, every night, so a quiet
 channel means the job did not run. Drift never fails the night; a removed key on a surface

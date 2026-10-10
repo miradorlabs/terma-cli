@@ -261,7 +261,7 @@ func TestTenPartialBuildsKeepAKeyTheWholeCensusSaw(t *testing.T) {
 		}
 		mergeFields(&cat, rows, map[string]bool{"codex\x00" + v: true})
 	}
-	if !slices.ContainsFunc(cat.Fields, func(f FieldEntry) bool { return f.Key == "attempt" && slices.Contains(f.Versions, "0.150.0") }) {
+	if !slices.ContainsFunc(cat.Fields, func(f FieldEntry) bool { return f.Key == "attempt" && slices.Contains(f.Whole, "0.150.0") }) {
 		t.Fatalf("attempt, or its whole build, pruned: %+v", cat.Fields)
 	}
 	tonight := []e2e.FieldRow{field("0.170.0", "logs/codex.api_request", "model", "safe", night(20))}
@@ -283,5 +283,35 @@ func TestTheBuildJudgedAgainstIsNamed(t *testing.T) {
 	h.Version = "0.162.1"
 	if got := (Drift{Harnesses: []HarnessDrift{h}}).unchanged(); got != "Codex CLI 0.162.1 (new build, was 0.162.0; judged against 0.161.0, the last whole census, \x00https://c\x01diff\x02)" {
 		t.Errorf("unchanged %q", got)
+	}
+}
+
+// The nightly job censuses each build about three nights running: a build censused partially
+// one night and whole another, in either order, takes nothing from the failed night as
+// evidence. A key and a surface only the failed run sent are not reported gone from the next.
+func TestAWholeBuildTakesNothingFromItsFailedNight(t *testing.T) {
+	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
+	night := func(i int) time.Time { return day.Add(time.Duration(i) * 24 * time.Hour) }
+	failedRun := []e2e.FieldRow{field("0.163.0", "logs/codex.api_request", "model", "safe", night(1)),
+		field("0.163.0", "logs/codex.api_request", "error.message", "prompt", night(1)),
+		field("0.163.0", "logs/codex.stream_error", "reason", "safe", night(1))}
+	wholeRun := []e2e.FieldRow{field("0.163.0", "logs/codex.api_request", "model", "safe", night(2))}
+	failed := map[string]bool{"codex\x000.163.0": true}
+	for _, order := range []string{"failed first", "whole first"} {
+		var cat Catalog
+		mergeFields(&cat, []e2e.FieldRow{field("0.162.0", "logs/codex.api_request", "model", "safe", night(0))}, nil)
+		if order == "failed first" {
+			mergeFields(&cat, failedRun, failed)
+			mergeFields(&cat, wholeRun, nil)
+		} else {
+			mergeFields(&cat, wholeRun, nil)
+			mergeFields(&cat, failedRun, failed)
+		}
+		tonight := []e2e.FieldRow{field("0.164.0", "logs/codex.api_request", "model", "safe", night(3))}
+		ran := censusRan([]e2e.CompatRow{{Harness: "codex", Version: "0.164.0", Capability: e2e.CensusCapability, Result: "pass"}})
+		_, _, hs := fieldDrift(cat, tonight, ran, night(3))
+		if h := hs[0]; len(h.Removed)+len(h.Unseen) != 0 {
+			t.Errorf("%s: removed %+v, unseen %+v: only the failed run sent them", order, h.Removed, h.Unseen)
+		}
 	}
 }
