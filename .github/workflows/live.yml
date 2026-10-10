@@ -169,13 +169,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Start from the published history and catalog
-        run: |
-          if git fetch -q origin compat-matrix 2>/dev/null; then
-            mkdir -p docs/compat
-            for f in docs/compat/history.json docs/compat/fields.json docs/FIELDS.md; do
-              git show "origin/compat-matrix:$f" > "$f" 2>/dev/null || rm -f "$f"
-            done
-          fi
+        run: test/e2e/compatgen/publish.sh restore
       - uses: actions/setup-go@v6
         with:
           go-version-file: test/e2e/go.mod
@@ -218,26 +212,4 @@ jobs:
           retention-days: 90
       - name: Publish to the compat-matrix branch
         if: github.event_name == 'schedule'
-        run: |
-          set -e
-          tmp=$(mktemp -d)
-          cp -R docs/COMPATIBILITY.md docs/compat "$tmp/"
-          if [ -f docs/FIELDS.md ]; then cp docs/FIELDS.md "$tmp/"; fi
-          git config user.name "terma-compat"
-          git config user.email "terma-compat@users.noreply.github.com"
-          if git rev-parse -q --verify origin/compat-matrix >/dev/null; then
-            git checkout -q -B compat-matrix origin/compat-matrix
-          else
-            git checkout -q --orphan compat-matrix
-            git rm -rq --cached . && git clean -fdxq
-          fi
-          mkdir -p docs
-          rm -rf docs/compat
-          cp -R "$tmp/COMPATIBILITY.md" docs/COMPATIBILITY.md
-          cp -R "$tmp/compat" docs/compat
-          if [ -f "$tmp/FIELDS.md" ]; then cp "$tmp/FIELDS.md" docs/FIELDS.md; fi
-          git add -f docs/COMPATIBILITY.md docs/compat
-          if [ -f docs/FIELDS.md ]; then git add -f docs/FIELDS.md; fi
-          if git diff --cached --quiet; then exit 0; fi
-          git commit -q -m "compat: nightly matrix and field catalog, $(date -u +%F)"
-          git push -q origin compat-matrix
+        run: test/e2e/compatgen/publish.sh publish

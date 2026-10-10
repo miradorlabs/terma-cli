@@ -302,3 +302,33 @@ func TestDigestEscapesWhatHarnessesName(t *testing.T) {
 		t.Errorf("tableCell = %q", got)
 	}
 }
+
+// A night that changed everything is still one message Slack takes: at most 50 blocks, the
+// sections' text within the budget, and a line saying what was left for the run's summary.
+func TestSlackDigestFitsOneMessage(t *testing.T) {
+	d := Drift{GeneratedAt: time.Date(2026, 10, 10, 4, 0, 0, 0, time.UTC), Link: "https://ci/run/3"}
+	for i := range 80 {
+		h := HarnessDrift{Harness: fmt.Sprint("h", i), Name: fmt.Sprint("Harness ", i), Version: "2", Previous: "1"}
+		for k := range 40 {
+			h.Added = append(h.Added, FieldChange{Surface: "logs/" + strings.Repeat("s", 40), Key: fmt.Sprint("key_", k)})
+		}
+		d.Harnesses = append(d.Harnesses, h)
+	}
+	payload := d.slack()
+	blocks := payload["blocks"].([]map[string]any)
+	size := 0
+	for _, b := range blocks {
+		if b["type"] == "section" {
+			size += len(b["text"].(map[string]any)["text"].(string))
+		}
+	}
+	if len(blocks) > maxBlocks || size > slackBudget+sectionLimit {
+		t.Errorf("%d blocks, %d characters of section text", len(blocks), size)
+	}
+	data, _ := json.Marshal(payload)
+	for _, want := range []string{"more, too long for one message", "https://ci/run/3", "Harness 0 2 (was 1)"} {
+		if !strings.Contains(string(data), want) {
+			t.Errorf("slack payload lacks %q", want)
+		}
+	}
+}

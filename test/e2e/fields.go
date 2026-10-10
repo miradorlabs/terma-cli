@@ -257,12 +257,13 @@ func WriteFields(dir, terma string) error {
 		keys[classKey(id.surface, id.key)] = true
 	}
 	fieldsMu.Unlock()
+	// No census from an earlier run stays for `make drift` to take for this one's, whether this
+	// one took none or could not classify it.
 	path := filepath.Join(dir, "fields.json")
+	if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
 	if len(rows) == 0 {
-		// No stale census from an earlier run for `make drift` to take for this one's.
-		if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return err
-		}
 		return nil
 	}
 	classes, err := classify(terma, slices.Sorted(maps.Keys(keys)))

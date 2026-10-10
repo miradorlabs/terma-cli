@@ -1,7 +1,11 @@
 package e2e
 
 import (
+	"errors"
+	"io/fs"
 	"maps"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 
@@ -114,5 +118,26 @@ func TestKindOfMatchesTheRelay(t *testing.T) {
 		if got := kindOf(sv(s)); got != want {
 			t.Errorf("kindOf(%q) = %s, want %s", s, got, want)
 		}
+	}
+}
+
+// A census the terma under test cannot classify is not written, and takes the earlier run's
+// with it, so `make drift` never reads an old census as this run's.
+func TestAnUnclassifiedCensusLeavesNoEarlierOne(t *testing.T) {
+	fieldsMu.Lock()
+	clear(fieldSeen)
+	fieldSeen[fieldID{"opencode", "1.2.3", "resource", "service.name"}] = map[string]bool{KindText: true}
+	fieldsMu.Unlock()
+	t.Cleanup(func() { fieldsMu.Lock(); clear(fieldSeen); fieldsMu.Unlock() })
+	dir := t.TempDir()
+	path := filepath.Join(dir, "fields.json")
+	if err := os.WriteFile(path, []byte("[]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteFields(dir, filepath.Join(dir, "no-terma")); err == nil {
+		t.Fatal("a census no terma classified was written")
+	}
+	if _, err := os.Stat(path); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("the earlier census is still there: %v", err)
 	}
 }

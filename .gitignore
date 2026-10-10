@@ -24,3 +24,5 @@ test/e2e/versions/
 docs/COMPATIBILITY.md
 docs/compat/compat.json
 docs/compat/history.json
+docs/compat/fields.json
+docs/FIELDS.md

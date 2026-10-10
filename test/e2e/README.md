@@ -198,7 +198,7 @@ The goldens pin the few surfaces terma parses. The field census covers everythin
 every attribute key each harness build exports over OTLP, on every surface the relay applies
 its content policy to (a log event, a span, its events and links, a metric and its exemplars,
 the instrumentation scope, the resource), with the kinds of value it carried (`text`,
-`number`, `bool`, `list`, `map`). The workload scenarios' direct runs and
+`number`, `bool`, `list`, `map`, `bytes`). The workload scenarios' direct runs and
 `TestClaudeInteractiveFields` (the events only an interactive session sends, such as
 `permission_mode_changed`) record it, and the run writes `report/fields.json`. Each key is
 classified by the terma under test, `terma relay classify`, as its relay treats it when a
@@ -219,7 +219,9 @@ it. The file holds one entry a line, so a night's change is a diff of what chang
 
 Every night `live.yml`'s `compat` job starts from the published history and catalog, says
 what the night changed against them, then merges the night in and publishes it (`make
-compat` and `make drift` do the same locally, into `docs/`). The digest,
+compat` and `make drift` do the same locally, into `docs/`, where git ignores them). Its two
+git steps are `compatgen/publish.sh restore` and `publish`, which `TestPublishTwoNights`
+runs over two nights against a scratch origin. The digest,
 `report/drift.md`, `drift.json` and `slack.json`, gives for each harness's newest build:
 
 - **new surfaces**: surfaces no build had, once each with its keys counted, so a renamed
