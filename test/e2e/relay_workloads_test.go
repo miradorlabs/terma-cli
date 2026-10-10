@@ -126,10 +126,11 @@ func compareShapes(t *testing.T, direct, relayed map[string]int, unshut bool) {
 	}
 }
 
-// runBoth runs a workload directly and through the relay, compares, and checks the
-// relay dropped nothing.
-func runBoth(t *testing.T, sandbox func(t *testing.T) *Sandbox, run func(t *testing.T, sb *Sandbox)) {
+// runBoth runs a workload of harness b directly and through the relay, compares, and checks
+// the relay dropped nothing. The direct run's fields join the census (ObserveFields).
+func runBoth(t *testing.T, b Binary, sandbox func(t *testing.T) *Sandbox, run func(t *testing.T, sb *Sandbox)) {
 	t.Helper()
+	TakesCensus(t, b)
 	var direct map[string]int
 	directEnded := false
 	t.Run("direct", func(t *testing.T) {
@@ -138,6 +139,7 @@ func runBoth(t *testing.T, sandbox func(t *testing.T) *Sandbox, run func(t *test
 		time.Sleep(6 * time.Second)
 		direct = telemetryShape(sb.Receiver.evidence())
 		directEnded = sb.endedCleanly()
+		ObserveFields(b, sb.Receiver.Requests())
 	})
 	t.Run("relay", func(t *testing.T) {
 		track(t)
@@ -271,7 +273,7 @@ func TestRelayWorkloadsClaude(t *testing.T) {
 		}
 		for _, w := range workloads {
 			t.Run(w.name, func(t *testing.T) {
-				runBoth(t, func(t *testing.T) *Sandbox {
+				runBoth(t, b, func(t *testing.T) *Sandbox {
 					t.Setenv("ANTHROPIC_API_KEY", "synthetic-telemetry-key")
 					return New(t, Isolated, WithClaude(b))
 				}, func(t *testing.T, sb *Sandbox) {
@@ -348,7 +350,7 @@ func TestRelayWorkloadsCodex(t *testing.T) {
 		}
 		for _, w := range workloads {
 			t.Run(w.name, func(t *testing.T) {
-				runBoth(t, func(t *testing.T) *Sandbox {
+				runBoth(t, b, func(t *testing.T) *Sandbox {
 					t.Setenv("OPENAI_API_KEY", "synthetic-telemetry-key")
 					return New(t, Isolated, WithCodex(b))
 				}, func(t *testing.T, sb *Sandbox) {
@@ -402,7 +404,7 @@ func TestRelayWorkloadsOpenCode(t *testing.T) {
 		for _, w := range []struct{ name, cmd string }{{"reply", ""}, {"bash", "printf ok"}} {
 			t.Run(w.name, func(t *testing.T) {
 				var provider *httptest.Server
-				runBoth(t, func(t *testing.T) *Sandbox {
+				runBoth(t, b, func(t *testing.T) *Sandbox {
 					sb := New(t, Isolated)
 					var calls atomic.Int32
 					provider = httptest.NewServer(openAIToolProvider(&calls, w.cmd))

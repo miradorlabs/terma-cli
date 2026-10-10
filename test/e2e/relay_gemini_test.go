@@ -47,7 +47,7 @@ func TestRelayWorkloadsGemini(t *testing.T) {
 			{"shell", "run_shell_command", func(*Sandbox) map[string]any { return map[string]any{"command": "printf ok"} }},
 		} {
 			t.Run(w.name, func(t *testing.T) {
-				runBoth(t, geminiSandbox(w.tool, w.args), func(t *testing.T, sb *Sandbox) {
+				runBoth(t, b, geminiSandbox(w.tool, w.args), func(t *testing.T, sb *Sandbox) {
 					if !sb.relayed {
 						sb.UseGeminiDirect()
 					}

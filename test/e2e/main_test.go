@@ -22,6 +22,9 @@ func TestMain(m *testing.M) {
 		if err := WriteCompat(dir, Version(terma)); err != nil {
 			os.Stderr.WriteString("live compat: " + err.Error() + "\n")
 		}
+		if err := WriteFields(dir, terma); err != nil {
+			os.Stderr.WriteString("live fields: " + err.Error() + "\n")
+		}
 	}
 	os.Exit(code)
 }

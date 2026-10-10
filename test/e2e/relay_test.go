@@ -89,10 +89,7 @@ func isDigits(s string) bool {
 
 // fromTerma reports a record terma sends itself, not an agent: its hooks' events, and the
 // relay's heartbeat, which names the machine and no project (and starts a minute in).
-func fromTerma(r LogRecord) bool {
-	s := r.Resource["service.name"]
-	return s == "terma-cli" || s == "terma-relay"
-}
+func fromTerma(r LogRecord) bool { return TermaService(r.Resource["service.name"]) }
 
 // agentRecords counts what reached upstream from an agent rather than from terma itself.
 func agentRecords(e telemetryEvidence) int {

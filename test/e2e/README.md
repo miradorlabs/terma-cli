@@ -192,6 +192,99 @@ carried when last recorded. A missing key fails (interface drift); a new key is
 noted in the report so the matrix can grow. Re-record with `E2E_UPDATE_GOLDEN=1`
 after checking what changed.
 
+## Field census and drift
+
+The goldens pin the few surfaces terma parses. The field census covers everything else:
+every attribute key each harness build exports over OTLP, on every surface the relay applies
+its content policy to (a log event, a span, its events and links, a metric and its exemplars,
+the instrumentation scope, the resource), with the kinds of value it carried (`text`,
+`number`, `bool`, `list`, `map`, `bytes`). The workload scenarios' direct runs and
+`TestClaudeInteractiveFields` (the events only an interactive session sends, such as
+`permission_mode_changed`) record it, and the run writes `report/fields.json`, and beside it
+`report/census.json`: the builds those scenarios ran (`TakesCensus`), each by scenario, and
+whether one failed for a build. A build's census is whole only if every census scenario that
+ran that night ran it and none failed: one a scenario failed for, or did not run (a release
+between two scenarios' lookups), is partial. A scenario that ran no build at all (one that
+could not list or fetch its releases) is not seen, and its builds count as whole without it. Each key is
+classified by the terma under test, `terma relay classify`, as its relay treats it where it
+sits (a record, a resource or a span event, as the census saw it) when a project withholds
+content; the relay also names the kinds of value it keeps of the key there, so the catalog
+and the digest judge a key withheld from what the relay says, never from a rule of their own:
+
+| class | what the relay does |
+|---|---|
+| `safe` | sends it, whatever the policy |
+| `prompt` / `tool_content` | sends it only when the project collects prompts / tool content |
+| `unclassified` | drops it, and counts it, unless it keeps the value's kind: a number or flag on a record, nothing on a resource |
+
+The catalog, `docs/compat/fields.json`, lives beside the compatibility history on the
+`compat-matrix` branch, and `docs/FIELDS.md` renders it: per harness, per surface, each key's
+class, kinds, the first build it was seen in, and whether the newest build censused whole
+still has it (a partial census's absences are no evidence). A
+key keeps its first build and its newest five, and apart from them the newest builds a
+whole census saw it in, the evidence a build sent it (what only a failed run saw, an error
+path's, is not, though the build is censused whole another night). Its kinds are the newest
+of those builds' (a failed run's only until a whole census sees it), and its class the
+latest run's, the terma under test's answer; a harness keeps its newest
+five censuses, and five whole ones however old (a
+partial census, one a census scenario failed before taking whole, does not push out the
+whole ones), and a key leaves once none of them saw it. The file holds one entry a line, so a night's change is a diff of what changed.
+
+Every night `live.yml`'s `compat` job starts from the published history and catalog, says
+what the night changed against them, then merges the night in and publishes it (`make
+compat` and `make drift` do the same locally, into `docs/`, where git ignores them). Its two
+git steps are `compatgen/publish.sh restore` and `publish`, which `TestPublishTwoNights`
+runs over two nights against a scratch origin. The digest,
+`report/drift.md`, `drift.json` and `slack.json`, gives for each harness's newest build:
+
+- **new surfaces**: surfaces no build had, once each with its keys counted, so a renamed
+  span is one line, not one per key
+- **new fields**: keys new to their surface, or new to the harness anywhere, in any build the
+  night censused, so whatever goes into the catalog is said new the night it does
+- **removed fields** and **surfaces no longer sent**: what each build the night censused
+  whole for the first time no longer sends, oldest first, each against the build before it,
+  the first against the newest older build censused whole: by what it sent tonight, where it
+  is censused whole tonight too, and by its earlier nights' whole censuses where its census
+  tonight is partial or it was not censused tonight, which the digest says (a removal says the build it went in, where that
+  is not the last). Each build is judged on one night, so a key or surface a harness sends
+  only sometimes (Claude's `retention_sweep`, Codex's sampled `codex.rollout.persistence.*`)
+  can read gone on a night the build before sent it and the new one did not; for Codex the
+  source note says whether it is still in the new build's source. Only a whole census is evidence: a partial one is a failed
+  run, where keys of an error path come, so a night whose newest build is partial judges the
+  whole ones before it, or nothing, and says so. A build is judged once, and only while no
+  newer build has a whole census: a re-run that did not reach an error path is no evidence.
+  The digest names the builds judged and judged against where they are not the newest and
+  the previous one
+- **newly withheld fields**: unclassified keys the relay drops;
+  classify each in `internal/relay/allow.go`, an agent's capture rules, or as content. Those
+  still withheld from before are one reminder line until they are.
+
+For a harness whose source is public (Codex, `sources` in `compatgen/source.go`; one line
+adds another), `-source` links each of these to the lines of the build's source that name
+it, read from its release tag's tarball, and a new build's headline links the comparison
+of the two tags. Tests, test modules and comments (to the end of a line, or a block) are not
+the build's source. A key is
+linked beside its surface's name (or the constant that holds it): a line that names a key
+belongs to the surface named nearest it in the same function, of all the harness is known to
+send, so a generic key leads to its own metric or event, not to every line that says it nor
+to another event in the same file; a key named nowhere beside its surface is linked
+only if a few lines name it, and a name as common as `model` is left unlinked. A field or
+surface gone says which it is: **still in** the new build's source beside its surface (it was
+not sent tonight: a condition, a schedule, a scenario) or **gone from** it (removed), with
+where the build before named it. Slack shows one link a finding, and none where the links
+would cut a section short. A source that cannot be read leaves its findings unlinked, and
+the digest says so. Nothing is read on a night with nothing to link.
+
+It also lists capabilities whose result changed, and says so when the census did not run,
+did not reach a harness censused within the week or whose census scenarios ran that night,
+or did not reach the newest build: the
+newest the catalog had, or the newest the night's census scenarios ran (`report/census.json`).
+A census that did not run never reads as a
+quiet night. The digest goes to the run's summary and to Slack through the
+`SLACK_WEBHOOK_URL` secret in the `live-harnesses` environment, every night, so a quiet
+channel means the job did not run. Drift never fails the night; a removed key on a surface
+terma parses fails its golden.
+
 ## Versions
 
 Each scenario runs against the installed binary and the last three releases
