@@ -98,6 +98,7 @@ func TestShellWrites(t *testing.T) {
 		{"patch text in a nested shell after a cd", "cd src && bash -lc 'python3 fix.py <<EOF\n*** Begin Patch\n*** Update File: a.go\n@@\n-a\n+b\n*** End Patch\nEOF'", in("src/a.go")},
 		// Read as v0.2.4 read it, from the text; never as the directory the cut leaves.
 		{"header cut at an expansion", "cat <<EOF | apply_patch\n*** Begin Patch\n*** Add File: src/$N.go\n+x\n*** End Patch\nEOF", in("src/$N.go")},
+		{"a patch read and committed, then one from a file", "apply_patch <<'P'\n*** Begin Patch\n*** Update File: a.go\n@@\n-a\n+b\n*** End Patch\nP\ngit add a.go && git commit -m a && apply_patch < next.patch", in("a.go")},
 		{"patch in a nested shell", "bash -lc 'apply_patch <<EOF\n*** Begin Patch\n*** Update File: a.go\n@@\n-a\n+b\n*** End Patch\nEOF'", in("a.go")},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

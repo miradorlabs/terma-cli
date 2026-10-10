@@ -32,9 +32,10 @@ func shellWrites(command, cwd string) (paths []string, commits []int) {
 	}
 	dir := cwd
 	var out []string
-	// read holds the apply_patch statements whose patch the parse read; ran is whether the
-	// command runs apply_patch at all.
+	// read holds the apply_patch statements whose patch the parse read, and readPaths their
+	// files; ran is whether the command runs apply_patch at all.
 	read := map[*syntax.Stmt]bool{}
+	readPaths := map[string]bool{}
 	ran := false
 	resolve := func(w word) (string, bool) {
 		if !w.literal || w.text == "" || (dir == "" && !filepath.IsAbs(w.text)) {
@@ -90,7 +91,7 @@ func shellWrites(command, cwd string) (paths []string, commits []int) {
 			for _, patch := range patches(n) {
 				for _, p := range applyPatchPaths(patch) {
 					if p, ok := resolve(word{p, true}); ok {
-						out, read[n] = append(out, p), true
+						out, read[n], readPaths[p] = append(out, p), true, true
 					}
 				}
 			}
@@ -127,12 +128,13 @@ func shellWrites(command, cwd string) (paths []string, commits []int) {
 			if len(words) > 0 && filepath.Base(words[0].text) == "apply_patch" {
 				ran = true
 				if st, ok := stack[len(stack)-1].node.(*syntax.Stmt); ok && !read[st] {
-					recovered := patchPaths(textOf(pipeline(stack)))
+					recovered, whole := patchPaths(textOf(pipeline(stack))), false
 					if len(recovered) == 0 {
-						recovered = patchPaths(command) // built elsewhere, say in a variable
+						recovered, whole = patchPaths(command), true // built elsewhere, say in a variable
 					}
 					for _, p := range recovered {
-						if p, ok := resolve(word{p, true}); ok {
+						// The whole text holds the patches other statements ran too: not this one's.
+						if p, ok := resolve(word{p, true}); ok && (!whole || !readPaths[p]) {
 							out = append(out, p)
 						}
 					}
