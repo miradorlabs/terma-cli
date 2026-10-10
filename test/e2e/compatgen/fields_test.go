@@ -188,7 +188,7 @@ func TestCatalogIsBounded(t *testing.T) {
 	var cat Catalog
 	for i := range 8 {
 		v := fmt.Sprintf("0.16%d.0", i)
-		mergeFields(&cat, []e2e.FieldRow{field(v, "logs/codex.api_request", "model", "safe", day.Add(time.Duration(i)*24*time.Hour))})
+		mergeFields(&cat, []e2e.FieldRow{field(v, "logs/codex.api_request", "model", "safe", day.Add(time.Duration(i)*24*time.Hour))}, nil)
 	}
 	f := cat.Fields[0]
 	if f.FirstSeen != "0.160.0" || !slices.Equal(f.Versions, []string{"0.167.0", "0.166.0", "0.165.0", "0.164.0", "0.163.0"}) {
@@ -249,10 +249,10 @@ func TestCatalogKeepsWhatItsCensusesSaw(t *testing.T) {
 	mergeFields(&cat, []e2e.FieldRow{
 		field("0.150.0", "logs/codex.api_request", "gone_key", "safe", day),
 		field("0.150.0", "logs/codex.api_request", "turns", "unclassified", day),
-	})
+	}, nil)
 	for i := range keepCensuses {
 		v := fmt.Sprintf("0.16%d.0", i)
-		mergeFields(&cat, []e2e.FieldRow{field(v, "logs/codex.api_request", "turns", "unclassified", day.Add(time.Duration(i+1)*24*time.Hour), e2e.KindNumber)})
+		mergeFields(&cat, []e2e.FieldRow{field(v, "logs/codex.api_request", "turns", "unclassified", day.Add(time.Duration(i+1)*24*time.Hour), e2e.KindNumber)}, nil)
 	}
 	keys := map[string]FieldEntry{}
 	for _, f := range cat.Fields {
@@ -273,11 +273,11 @@ func TestCatalogKeepsWhatItsCensusesSaw(t *testing.T) {
 func TestCatalogTakesTheLatestClassOfABuild(t *testing.T) {
 	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
 	var cat Catalog
-	mergeFields(&cat, []e2e.FieldRow{field("0.162.0", "logs/codex.api_request", "product_sku", "unclassified", day)})
+	mergeFields(&cat, []e2e.FieldRow{field("0.162.0", "logs/codex.api_request", "product_sku", "unclassified", day)}, nil)
 	if len(cat.Fields) != 1 || !cat.Fields[0].withheld() {
 		t.Fatalf("night 1: %+v, want product_sku withheld", cat.Fields)
 	}
-	mergeFields(&cat, []e2e.FieldRow{field("0.162.0", "logs/codex.api_request", "product_sku", "safe", day.Add(24*time.Hour))})
+	mergeFields(&cat, []e2e.FieldRow{field("0.162.0", "logs/codex.api_request", "product_sku", "safe", day.Add(24*time.Hour))}, nil)
 	if f := cat.Fields[0]; f.Class != "safe" || f.withheld() {
 		t.Errorf("night 2: class %s, withheld %v, want safe and sent", f.Class, f.withheld())
 	}

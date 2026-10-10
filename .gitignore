@@ -16,6 +16,7 @@ test/e2e/.env.local
 test/e2e/bin/
 test/e2e/report/
 test/e2e/versions/
+test/e2e/compatgen/compatgen
 
 # Local provisioning credential
 /openai-key.txt

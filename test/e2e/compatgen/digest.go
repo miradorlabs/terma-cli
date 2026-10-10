@@ -247,17 +247,21 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran censusRuns, now time.Time)
 		}
 		// A census a scenario failed before taking whole is no evidence of what the build does
 		// not send: it says what it saw, and nothing is judged gone.
+		// What is gone is judged once, on the first whole census of a build, against the newest
+		// older build with a whole census, so a partial one between them hides nothing. A
+		// re-run of a build already censused whole is no evidence: a key that comes with an
+		// error path, or a scenario that did not run, would read as one gone.
 		d.Partial = ran.failed[harness+"\x00"+version]
-		if censused && versionLess(prev.Version, version) && !d.Partial {
+		if whole, ok := cat.lastWhole(harness, version); ok && !d.Partial && !cat.censusedWhole(harness, version) {
 			for _, f := range cat.Fields {
-				if f.Harness != harness || !slices.Contains(f.Versions, prev.Version) || !sent[f.Surface] {
+				if f.Harness != harness || !slices.Contains(f.Versions, whole.Version) || !sent[f.Surface] {
 					continue
 				}
 				if _, ok := tonight[f.Surface+"\x00"+f.Key]; !ok {
 					d.Removed = append(d.Removed, FieldChange{Surface: f.Surface, Key: f.Key, Class: f.Class, Kinds: f.Kinds})
 				}
 			}
-			for _, s := range prev.Surfaces {
+			for _, s := range whole.Surfaces {
 				if !sent[s] {
 					d.Unseen = append(d.Unseen, GoneSurface{Surface: s})
 				}

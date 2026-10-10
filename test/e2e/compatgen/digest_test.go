@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -39,7 +40,7 @@ func TestDigestSurfacesAndReruns(t *testing.T) {
 		field("0.162.0", "traces/old_fn", "code.file.path", "safe", day),
 		field("0.162.0", "traces/old_fn", "busy_ns", "safe", day, e2e.KindNumber),
 		field("0.162.0", "logs/codex.tool_result", "error", "prompt", day), // only on an error path
-	})
+	}, nil)
 	tonight := []e2e.FieldRow{
 		field("0.162.0", "traces/new_fn", "code.file.path", "safe", day.Add(24*time.Hour)),
 		field("0.162.0", "traces/new_fn", "busy_ns", "safe", day.Add(24*time.Hour), e2e.KindNumber),
@@ -61,7 +62,7 @@ func TestDigestSurfacesAndReruns(t *testing.T) {
 func TestDigestSaysTheNewestWasNotReached(t *testing.T) {
 	day := time.Date(2026, 10, 9, 4, 0, 0, 0, time.UTC)
 	var cat Catalog
-	mergeFields(&cat, []e2e.FieldRow{field("0.162.1", "logs/codex.api_request", "model", "safe", day)})
+	mergeFields(&cat, []e2e.FieldRow{field("0.162.1", "logs/codex.api_request", "model", "safe", day)}, nil)
 	_, _, hs := fieldDrift(cat, []e2e.FieldRow{field("0.162.0", "logs/codex.api_request", "model", "safe", day.Add(24*time.Hour))}, censusRuns{}, day.Add(24*time.Hour))
 	d := Drift{Harnesses: hs}
 	if hs[0].Unreached != "0.162.1" || d.Quiet() || !strings.Contains(hs[0].headline(), "0.162.1, the newest censused before, was not reached") {
@@ -72,7 +73,7 @@ func TestDigestSaysTheNewestWasNotReached(t *testing.T) {
 func TestDigestSaysTheNewestRunWasNotReached(t *testing.T) {
 	day := time.Date(2026, 10, 9, 4, 0, 0, 0, time.UTC)
 	var cat Catalog
-	mergeFields(&cat, []e2e.FieldRow{field("0.160.0", "logs/codex.api_request", "model", "safe", day)})
+	mergeFields(&cat, []e2e.FieldRow{field("0.160.0", "logs/codex.api_request", "model", "safe", day)}, nil)
 	night := day.Add(24 * time.Hour)
 	ran := censusRan([]e2e.CompatRow{
 		{Harness: "codex", Version: "0.161.0", Capability: e2e.CensusCapability, Result: "pass"},
@@ -101,7 +102,7 @@ func TestDigestJudgesNoRemovalFromAPartialCensus(t *testing.T) {
 		field("0.161.0", "logs/codex.api_request", "model", "safe", day),
 		field("0.161.0", "logs/codex.api_request", "attempt", "safe", day),
 		field("0.161.0", "logs/codex.tool_result", "tool_name", "safe", day),
-	})
+	}, nil)
 	night := day.Add(24 * time.Hour)
 	tonight := []e2e.FieldRow{field("0.162.0", "logs/codex.api_request", "model", "safe", night)}
 	for _, c := range []struct {
@@ -143,5 +144,59 @@ func TestDigestSaysAnUncensusedHarnessThatRanIsMissing(t *testing.T) {
 	d := Drift{NoCensus: noCensus, Missing: missing}
 	if !slices.Equal(missing, []string{"Gemini CLI"}) || d.Quiet() {
 		t.Errorf("missing %v, quiet %v", missing, d.Quiet())
+	}
+}
+
+// Partial censuses neither push the last whole one out of the catalog nor hide a removal: a
+// key the last whole census saw stays through five partial builds, and the next whole build
+// without it reports it removed, once.
+func TestPartialCensusesKeepTheWholeOne(t *testing.T) {
+	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
+	var cat Catalog
+	mergeFields(&cat, []e2e.FieldRow{
+		field("0.160.0", "logs/codex.api_request", "model", "safe", day),
+		field("0.160.0", "logs/codex.api_request", "retry_reason", "safe", day),
+	}, nil)
+	night := func(i int) time.Time { return day.Add(time.Duration(i) * 24 * time.Hour) }
+	for i := 1; i <= keepCensuses; i++ {
+		v := fmt.Sprintf("0.16%d.0", i)
+		partial := map[string]bool{"codex\x00" + v: true}
+		mergeFields(&cat, []e2e.FieldRow{field(v, "logs/codex.api_request", "model", "safe", night(i))}, partial)
+	}
+	if !slices.ContainsFunc(cat.Fields, func(f FieldEntry) bool { return f.Key == "retry_reason" }) {
+		t.Fatal("partial censuses pruned a key the last whole census saw")
+	}
+	if whole, ok := cat.lastWhole("codex", "0.170.0"); !ok || whole.Version != "0.160.0" {
+		t.Fatalf("last whole census %+v, %v", whole, ok)
+	}
+	tonight := []e2e.FieldRow{field("0.170.0", "logs/codex.api_request", "model", "safe", night(9))}
+	ran := censusRan([]e2e.CompatRow{{Harness: "codex", Version: "0.170.0", Capability: e2e.CensusCapability, Result: "pass"}})
+	_, _, hs := fieldDrift(cat, tonight, ran, night(9))
+	if len(hs[0].Removed) != 1 || hs[0].Removed[0].Key != "retry_reason" {
+		t.Errorf("removed %+v, want retry_reason, judged against the last whole census", hs[0].Removed)
+	}
+	mergeFields(&cat, tonight, ran.failed)
+	if _, _, hs = fieldDrift(cat, tonight, ran, night(10)); len(hs[0].Removed) != 0 {
+		t.Errorf("a re-run of a build censused whole reported %+v removed again", hs[0].Removed)
+	}
+}
+
+// A build censused partially one night and whole the next is judged on the night it is whole.
+func TestAPartialBuildIsJudgedWhenWhole(t *testing.T) {
+	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
+	var cat Catalog
+	mergeFields(&cat, []e2e.FieldRow{
+		field("0.161.0", "logs/codex.api_request", "model", "safe", day),
+		field("0.161.0", "logs/codex.api_request", "retry_reason", "safe", day),
+	}, nil)
+	tonight := []e2e.FieldRow{field("0.162.0", "logs/codex.api_request", "model", "safe", day.Add(24*time.Hour))}
+	failed := censusRan([]e2e.CompatRow{{Harness: "codex", Version: "0.162.0", Capability: e2e.CensusCapability, Result: "fail"}})
+	if _, _, hs := fieldDrift(cat, tonight, failed, day.Add(24*time.Hour)); !hs[0].Partial || len(hs[0].Removed) != 0 {
+		t.Fatalf("partial night: %+v", hs[0])
+	}
+	mergeFields(&cat, tonight, failed.failed)
+	passed := censusRan([]e2e.CompatRow{{Harness: "codex", Version: "0.162.0", Capability: e2e.CensusCapability, Result: "pass"}})
+	if _, _, hs := fieldDrift(cat, tonight, passed, day.Add(48*time.Hour)); len(hs[0].Removed) != 1 {
+		t.Errorf("whole night: removed %+v, want retry_reason", hs[0].Removed)
 	}
 }

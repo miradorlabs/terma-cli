@@ -34,6 +34,9 @@ type Census struct {
 	Version  string    `json:"version"`
 	Surfaces []string  `json:"surfaces"`
 	At       time.Time `json:"at"`
+	// Partial is a census a census scenario failed before taking whole: what it did not see
+	// is no evidence the build does not send it.
+	Partial bool `json:"partial,omitempty"`
 }
 
 // FieldEntry is one key a harness emitted on one surface.
@@ -65,9 +68,10 @@ func (f FieldEntry) id() string { return f.Harness + "\x00" + f.Surface + "\x00"
 
 func (c Census) id() string { return c.Harness + "\x00" + c.Version }
 
-// mergeFields files a run's census in the catalog. Runs are merged in the order they ran, so
-// a key's class is the latest run's.
-func mergeFields(cat *Catalog, rows []e2e.FieldRow) {
+// mergeFields files a run's census in the catalog, partial naming the builds whose census is
+// (censusRuns.failed). Runs are merged in the order they ran, so a key's class is the latest
+// run's.
+func mergeFields(cat *Catalog, rows []e2e.FieldRow, partial map[string]bool) {
 	fields := map[string]*FieldEntry{}
 	for i := range cat.Fields {
 		fields[cat.Fields[i].id()] = &cat.Fields[i]
@@ -131,8 +135,9 @@ func mergeFields(cat *Catalog, rows []e2e.FieldRow) {
 		censuses[cat.Censuses[i].id()] = &cat.Censuses[i]
 	}
 	for b, surfaces := range seen {
-		c := Census{Harness: b.harness, Version: b.version, Surfaces: slices.Sorted(maps.Keys(surfaces)), At: at[b]}
+		c := Census{Harness: b.harness, Version: b.version, Surfaces: slices.Sorted(maps.Keys(surfaces)), At: at[b], Partial: partial[b.harness+"\x00"+b.version]}
 		if prev, ok := censuses[c.id()]; ok {
+			prev.Partial = prev.Partial && c.Partial
 			for _, s := range prev.Surfaces {
 				surfaces[s] = true
 			}
@@ -152,16 +157,21 @@ func mergeFields(cat *Catalog, rows []e2e.FieldRow) {
 		}
 		return versionLess(b.Version, a.Version)
 	})
-	// A harness keeps its newest censuses, and a key only while one of them saw it.
+	// A harness keeps its newest censuses, and as many whole ones, older if need be: partial
+	// censuses must not push out the whole ones that say what a build sends. A key stays only
+	// while one of them saw it.
 	kept := cat.Censuses[:0]
-	count := map[string]int{}
+	count, whole := map[string]int{}, map[string]int{}
 	censused := map[string]bool{} // harness and version
 	for _, c := range cat.Censuses {
-		if count[c.Harness] < keepCensuses {
+		if count[c.Harness] < keepCensuses || (!c.Partial && whole[c.Harness] < keepCensuses) {
 			kept = append(kept, c)
 			censused[c.id()] = true
+			count[c.Harness]++
+			if !c.Partial {
+				whole[c.Harness]++
+			}
 		}
-		count[c.Harness]++
 	}
 	cat.Censuses = kept
 	cat.Fields = slices.DeleteFunc(cat.Fields, func(f FieldEntry) bool {
@@ -171,6 +181,26 @@ func mergeFields(cat *Catalog, rows []e2e.FieldRow) {
 
 func sortVersionsDesc(vs []string) {
 	sort.Slice(vs, func(i, j int) bool { return versionLess(vs[j], vs[i]) })
+}
+
+// lastWhole is the newest build of harness older than version the catalog took a whole census
+// of: what a build is judged against for what it no longer sends.
+func (cat *Catalog) lastWhole(harness, version string) (Census, bool) {
+	var best Census
+	found := false
+	for _, c := range cat.Censuses {
+		if c.Harness == harness && !c.Partial && versionLess(c.Version, version) && (!found || versionLess(best.Version, c.Version)) {
+			best, found = c, true
+		}
+	}
+	return best, found
+}
+
+// censusedWhole reports whether the catalog took a whole census of harness at version.
+func (cat *Catalog) censusedWhole(harness, version string) bool {
+	return slices.ContainsFunc(cat.Censuses, func(c Census) bool {
+		return c.Harness == harness && c.Version == version && !c.Partial
+	})
 }
 
 // newestCensus is the newest build of harness the catalog took the census of.

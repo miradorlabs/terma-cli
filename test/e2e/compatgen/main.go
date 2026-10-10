@@ -116,9 +116,10 @@ func run(c config, now time.Time) error {
 		}
 		fieldRows = append(fieldRows, rows...)
 	}
+	ran := censusRan(compatRows)
 	if c.digest != "" {
 		d := Drift{GeneratedAt: now, Link: c.link, Compat: compatDrift(hist, compatRows)}
-		d.NoCensus, d.Missing, d.Harnesses = fieldDrift(catalog, fieldRows, censusRan(compatRows), now)
+		d.NoCensus, d.Missing, d.Harnesses = fieldDrift(catalog, fieldRows, ran, now)
 		if c.source {
 			linkSources(&d, knownSurfaces(catalog, fieldRows))
 		}
@@ -131,7 +132,7 @@ func run(c config, now time.Time) error {
 			Result: r.Result, LastRun: r.At, Terma: r.Terma, Test: r.Test})
 	}
 	if len(fieldRows) > 0 || len(catalog.Fields) > 0 {
-		mergeFields(&catalog, fieldRows)
+		mergeFields(&catalog, fieldRows, ran.failed)
 		catalog.GeneratedAt = now
 		if err := writeCatalog(c.catalog, catalog); err != nil {
 			return err
