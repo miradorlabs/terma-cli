@@ -163,3 +163,23 @@ func TestAWholeBuildTakesNothingFromItsFailedNight(t *testing.T) {
 		}
 	}
 }
+
+// A build the catalog has only partially is new evidence when censused whole, though a newer
+// build comes the same night: what its whole census first reaches is new.
+func TestWhatAWholeCensusFirstReachesIsNew(t *testing.T) {
+	day := time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)
+	var cat Catalog
+	mergeFields(&cat, []e2e.FieldRow{field("0.163.0", "logs/codex.api_request", "model", "safe", day)}, nil)
+	mergeFields(&cat, []e2e.FieldRow{field("0.164.0", "logs/codex.api_request", "model", "safe", day.Add(24*time.Hour))},
+		map[string]bool{"codex\x000.164.0": true})
+	tonight := []e2e.FieldRow{
+		field("0.164.0", "logs/codex.api_request", "model", "safe", day.Add(48*time.Hour)),
+		field("0.164.0", "logs/codex.api_request", "reached_whole", "safe", day.Add(48*time.Hour)),
+		field("0.165.0", "logs/codex.api_request", "model", "safe", day.Add(48*time.Hour)),
+	}
+	ran := censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.164.0"}, {Harness: "codex", Version: "0.165.0", Failed: true}})
+	_, _, hs := fieldDrift(cat, tonight, ran, day.Add(48*time.Hour))
+	if a := hs[0].Added; len(a) != 1 || a[0].Key != "reached_whole" {
+		t.Errorf("added %+v, want reached_whole", a)
+	}
+}

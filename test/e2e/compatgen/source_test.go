@@ -397,3 +397,25 @@ func TestSourceLinksWhatIsGoneAtTheBuildJudged(t *testing.T) {
 		t.Errorf("attempt: %q", got)
 	}
 }
+
+// Each removal of a night that judged several builds is linked at the build it went in,
+// against the build judged before that one.
+func TestSourceLinksEachRemovalAtItsOwnBuilds(t *testing.T) {
+	src := func(keys ...string) []byte {
+		body := "fn run() {\n    span(\"turn\""
+		for _, k := range keys {
+			body += ", " + k + " = x"
+		}
+		return tarball(t, map[string]string{"codex-rs/core/src/turn.rs": body + ");\n}\n"})
+	}
+	withSource(t, map[string][]byte{"rust-v0.163.0": src("dropped_early"), "rust-v0.164.0": src("brief"), "rust-v0.165.0": src()})
+	d := Drift{Harnesses: []HarnessDrift{{Harness: "codex", Name: "Codex CLI", Version: "0.165.0", Previous: "0.163.0", Chain: []string{"0.164.0", "0.165.0"},
+		Removed: []FieldChange{{Surface: "traces/turn", Key: "dropped_early", In: "0.164.0"}, {Surface: "traces/turn", Key: "brief"}}}}}
+	linkSources(&d, nil)
+	h := d.Harnesses[0]
+	for i, want := range []string{"gone from 0.164.0's source, was in 0.163.0's: [turn.rs:2]", "gone from 0.165.0's source, was in 0.164.0's: [turn.rs:2]"} {
+		if got := renderLinks(h.Removed[i].Source.note(allLinks), false); !strings.Contains(got, want) {
+			t.Errorf("%s: %q, want %q", h.Removed[i].Key, got, want)
+		}
+	}
+}

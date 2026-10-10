@@ -49,6 +49,9 @@ type HarnessDrift struct {
 	// Partial is a census of Version a census scenario failed before taking whole: Removed
 	// and Unseen are not judged.
 	Partial bool `json:"partial,omitempty"`
+	// Chain are the builds Removed and Unseen were judged on, oldest first, each against the
+	// one before it, the first against Since, or Previous.
+	Chain []string `json:"chain,omitempty"`
 	// Judged is the last build Removed and Unseen were judged on, where it is not Version: the
 	// newest censused whole tonight, Version's census partial.
 	Judged string `json:"judged,omitempty"`
@@ -63,8 +66,8 @@ type HarnessDrift struct {
 	Keys      int    `json:"keys,omitempty"`
 	// NewSurfaces are surfaces no build of the harness had (a span renamed is one, not each of
 	// its keys); Added are keys new to their surface on a surface the catalog knew, or new to
-	// the harness anywhere. Both are of Version and of every build tonight the catalog has no
-	// census of, which all go into it tonight, Version's row first.
+	// the harness anywhere. Both are of every build tonight, whose rows all go into the
+	// catalog tonight, Version's row first.
 	NewSurfaces []SurfaceChange `json:"new_surfaces,omitempty"`
 	Added       []FieldChange   `json:"added,omitempty"`
 	// Removed and Unseen are what the build judged (Judged, or Version) no longer sends that
@@ -142,6 +145,14 @@ func firstOr(vs []string) string {
 	return vs[0]
 }
 
+// lastJudged is the last build what is gone was judged on: Judged, or Version.
+func (h HarnessDrift) lastJudged() string {
+	if h.Judged != "" {
+		return h.Judged
+	}
+	return h.Version
+}
+
 // rowBuilds are the builds rows are of.
 func rowBuilds(rows []e2e.FieldRow) map[string]bool {
 	out := map[string]bool{}
@@ -213,9 +224,9 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran censusRuns, now time.Time)
 		}
 		d := HarnessDrift{Harness: harness, Name: harnessName(harness), Version: version}
 		d.Partial = ran.failed[harness+"\x00"+version]
-		// What is new is new in the newest build or in any build the catalog has no census of,
-		// the newest build's row first: all of it goes into the catalog tonight, and would never
-		// be new again.
+		// What is new is new in any build tonight, the newest's row first: whatever the catalog
+		// has not seen goes into it tonight, from a re-run's error path or a build's first whole
+		// census as much as from a new build, and would never be new again.
 		tonight := map[string]e2e.FieldRow{}
 		sent := map[string]bool{}
 		for _, r := range hr {
@@ -224,11 +235,9 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran censusRuns, now time.Time)
 				sent[r.Surface] = true
 			}
 		}
-		newBuilds := slices.DeleteFunc(slices.Collect(maps.Keys(rowBuilds(hr))), func(v string) bool {
-			return v == version || cat.censusedAt(harness, v)
-		})
-		sortVersionsDesc(newBuilds)
-		for _, v := range newBuilds {
+		others := slices.DeleteFunc(slices.Collect(maps.Keys(rowBuilds(hr))), func(v string) bool { return v == version })
+		sortVersionsDesc(others)
+		for _, v := range others {
 			for _, r := range hr {
 				if _, ok := tonight[r.Surface+"\x00"+r.Key]; !ok && r.Version == v {
 					tonight[r.Surface+"\x00"+r.Key] = r
@@ -305,6 +314,7 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran censusRuns, now time.Time)
 		})
 		if whole, ok := cat.lastWhole(harness, firstOr(judged)); ok && len(judged) > 0 {
 			last := judged[len(judged)-1]
+			d.Chain = judged
 			if last != version {
 				d.Judged = last
 			}

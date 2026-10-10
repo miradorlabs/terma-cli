@@ -112,7 +112,8 @@ type finding struct {
 	name    string
 	surface bool // a surface's name, not a key's
 	within  string
-	gone    bool // looked for in the build before too
+	gone    bool   // looked for in the build before too
+	in      string // the build it went in, where not the last judged
 	says    **SourceSays
 }
 
@@ -144,12 +145,12 @@ func (h *HarnessDrift) findings() []finding {
 	}{{h.Added, false}, {h.Withheld, false}, {h.Removed, true}} {
 		for i := range list.cs {
 			within, _ := surfaceName(list.cs[i].Surface)
-			out = append(out, finding{name: list.cs[i].Key, within: within, gone: list.gone, says: &list.cs[i].Source})
+			out = append(out, finding{name: list.cs[i].Key, within: within, gone: list.gone, in: list.cs[i].In, says: &list.cs[i].Source})
 		}
 	}
 	for i := range h.Unseen {
 		if name, ok := surfaceName(h.Unseen[i].Surface); ok {
-			out = append(out, finding{name: name, surface: true, gone: true, says: &h.Unseen[i].Source})
+			out = append(out, finding{name: name, surface: true, gone: true, in: h.Unseen[i].In, says: &h.Unseen[i].Source})
 		}
 	}
 	return out
@@ -167,83 +168,79 @@ func linkSources(d *Drift, known map[string][]string) {
 		if !ok {
 			continue
 		}
-		// The build before is the one what is gone was judged against (Since, where the builds
-		// between were partial).
+		// What is gone was judged against Since, where the builds between were partial.
 		base := h.Previous
 		if h.Since != "" {
 			base = h.Since
 		}
-		newer := base != "" && versionLess(base, h.Version)
-		if newer {
+		if base != "" && versionLess(base, h.Version) {
 			h.Compare = s.compare(base, h.Version)
 		}
 		fs := h.findings()
 		if len(fs) == 0 {
 			continue
 		}
-		// What is gone is gone from the build judged (Judged, where Version's census was
-		// partial); the rest is in Version.
-		goneAt := h.Version
-		if h.Judged != "" {
-			goneAt = h.Judged
-		}
-		judgedNewer := base != "" && versionLess(base, goneAt)
-		at, atGone, before := map[needle]bool{}, map[needle]bool{}, map[needle]bool{}
-		names := slices.Clone(known[h.Harness])
-		gone := false
-		for _, f := range fs {
-			for _, n := range f.needles() {
-				if !f.gone {
-					at[n] = true
-					continue
-				}
-				atGone[n], gone = true, true
-				if judgedNewer {
-					before[n] = true
-				}
+		// A finding is looked for in a build: what is new in Version; what is gone in the build
+		// it went in, and in the build judged before that one, the chain's or base.
+		builds := func(f finding) (at, before string) {
+			if !f.gone {
+				return h.Version, ""
 			}
+			at = f.in
+			if at == "" {
+				at = h.lastJudged()
+			}
+			before = base
+			if i := slices.Index(h.Chain, at); i > 0 {
+				before = h.Chain[i-1]
+			}
+			if before == "" || !versionLess(before, at) {
+				before = ""
+			}
+			return at, before
+		}
+		names := slices.Clone(known[h.Harness])
+		for _, f := range fs {
 			if f.within != "" {
 				names = append(names, f.within)
 			}
 		}
-		for _, name := range names {
-			at[needle{name, false}] = true
-			if gone {
-				atGone[needle{name, false}] = true
-				if judgedNewer {
-					before[needle{name, false}] = true
+		need := map[string]map[needle]bool{}
+		want := func(version string, ns []needle) {
+			if need[version] == nil {
+				need[version] = map[needle]bool{}
+				for _, name := range names {
+					need[version][needle{name, false}] = true
 				}
 			}
-		}
-		if goneAt == h.Version {
-			maps.Copy(at, atGone)
-		}
-		read := func(version string, needles map[needle]bool) map[needle][]hit {
-			if len(needles) == 0 {
-				return nil
+			for _, n := range ns {
+				need[version][n] = true
 			}
-			hits, err := scanBuild(s, version, needles)
-			if err != nil {
-				d.SourceErrors = append(d.SourceErrors, fmt.Sprintf("%s %s: %v", h.Name, version, err))
-				return nil
-			}
-			return hits
-		}
-		hitsAt, hitsBefore := read(h.Version, at), read(base, before)
-		hitsGone := hitsAt
-		if goneAt != h.Version && gone {
-			hitsGone = read(goneAt, atGone)
 		}
 		for _, f := range fs {
-			hits, version := hitsAt, h.Version
-			if f.gone {
-				hits, version = hitsGone, goneAt
+			at, before := builds(f)
+			want(at, f.needles())
+			if before != "" {
+				want(before, f.needles())
 			}
-			if hits == nil {
+		}
+		hits := map[string]map[needle][]hit{}
+		for _, version := range slices.Sorted(maps.Keys(need)) {
+			found, err := scanBuild(s, version, need[version])
+			if err != nil {
+				d.SourceErrors = append(d.SourceErrors, fmt.Sprintf("%s %s: %v", h.Name, version, err))
 				continue
 			}
-			at, atBeside, placed := rank(f, hits, owners(hits, names))
-			says := &SourceSays{Version: version, Gone: f.gone && judgedNewer}
+			hits[version] = found
+		}
+		for _, f := range fs {
+			atVersion, beforeVersion := builds(f)
+			hitsAt, hitsBefore := hits[atVersion], hits[beforeVersion]
+			if hitsAt == nil {
+				continue
+			}
+			at, atBeside, placed := rank(f, hitsAt, owners(hitsAt, names))
+			says := &SourceSays{Version: atVersion, Gone: f.gone && beforeVersion != ""}
 			if says.Gone && hitsBefore != nil {
 				before, beforeBeside, beforePlaced := rank(f, hitsBefore, owners(hitsBefore, names))
 				// A key gone is still in the source only where it is still beside its surface:
@@ -252,8 +249,8 @@ func linkSources(d *Drift, known map[string][]string) {
 					at, placed = nil, true
 				}
 				if beforePlaced {
-					says.Previous = base
-					says.Before, says.BeforeMore = refs(s, base, before)
+					says.Previous = beforeVersion
+					says.Before, says.BeforeMore = refs(s, beforeVersion, before)
 				}
 			}
 			// Unplaced, or with the build before unread named only away from its surface (it
@@ -261,7 +258,7 @@ func linkSources(d *Drift, known map[string][]string) {
 			if !placed || (says.Gone && says.Previous == "" && f.within != "" && !atBeside) {
 				continue
 			}
-			says.Refs, says.More = refs(s, version, at)
+			says.Refs, says.More = refs(s, atVersion, at)
 			*f.says = says
 		}
 	}
