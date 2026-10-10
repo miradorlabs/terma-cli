@@ -88,7 +88,7 @@ func TestARemovalAcrossPartialBuilds(t *testing.T) {
 	if len(h.Removed) != 1 || h.Removed[0].Key != "attempt" {
 		t.Errorf("removed %+v, want attempt", h.Removed)
 	}
-	if h.Previous != "0.155.0" || h.Since != "0.150.0" || !strings.Contains(h.headline(), "(was 0.155.0; judged against 0.150.0, censused whole)") {
+	if h.Previous != "0.155.0" || h.Since != "0.150.0" || !strings.Contains(h.headline(), "(was 0.155.0; judged against 0.150.0's earlier nights, not censused tonight)") {
 		t.Errorf("previous %s, since %s, headline %q", h.Previous, h.Since, h.headline())
 	}
 }

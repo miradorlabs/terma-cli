@@ -58,8 +58,10 @@ type HarnessDrift struct {
 	// newest older build with a whole census, the ones after it partial.
 	Since string `json:"since,omitempty"`
 	// Earlier is the build judged against, where it was judged by its earlier nights' whole
-	// censuses, its census tonight partial: what it sent only on some of them may read gone.
-	Earlier string `json:"earlier,omitempty"`
+	// censuses, not tonight's: what it sent only on some of them may read gone. EarlierPartial
+	// says its census tonight was partial; otherwise it was not censused tonight.
+	Earlier        string `json:"earlier,omitempty"`
+	EarlierPartial bool   `json:"earlier_partial,omitempty"`
 	// Unreached is a build newer than Version that the census should have reached and did
 	// not: Previous, the newest the catalog had (it failed to install, or its tests did not
 	// run), or the newest tonight's census scenarios ran (they failed before its census).
@@ -165,242 +167,28 @@ func fieldDrift(cat Catalog, rows []e2e.FieldRow, ran censusRuns, now time.Time)
 		}
 	}
 	slices.Sort(missing)
-	known := map[string]FieldEntry{}
-	surfaces := map[string]map[string]bool{} // harness → surfaces the catalog knows
-	keys := map[string]map[string]bool{}     // harness → keys the catalog knows, on any surface
-	for _, f := range cat.Fields {
-		known[f.id()] = f
-		if surfaces[f.Harness] == nil {
-			surfaces[f.Harness], keys[f.Harness] = map[string]bool{}, map[string]bool{}
-		}
-		surfaces[f.Harness][f.Surface] = true
-		keys[f.Harness][f.Key] = true
-	}
+	idx := indexCatalog(cat)
 	for _, harness := range slices.Sorted(maps.Keys(byHarness)) {
-		hr := byHarness[harness]
-		version := hr[0].Version
-		for _, r := range hr {
-			if versionLess(version, r.Version) {
-				version = r.Version
+		n := night{harness: harness, rows: byHarness[harness], ran: ran}
+		for v := range rowBuilds(n.rows) {
+			if versionLess(n.newest, v) {
+				n.newest = v
 			}
 		}
-		d := HarnessDrift{Harness: harness, Name: harnessName(harness), Version: version}
-		d.Partial = ran.failed[harness+"\x00"+version]
-		// What is new is new in any build tonight, the newest's row first: whatever the catalog
-		// has not seen goes into it tonight, from a re-run's error path or a build's first whole
-		// census as much as from a new build, and would never be new again.
-		tonight := map[string]e2e.FieldRow{}
-		sent := map[string]bool{}
-		for _, r := range hr {
-			if r.Version == version {
-				tonight[r.Surface+"\x00"+r.Key] = r
-				sent[r.Surface] = true
-			}
-		}
-		others := slices.DeleteFunc(slices.Collect(maps.Keys(rowBuilds(hr))), func(v string) bool { return v == version })
-		sortVersionsDesc(others)
-		for _, v := range others {
-			for _, r := range hr {
-				if _, ok := tonight[r.Surface+"\x00"+r.Key]; !ok && r.Version == v {
-					tonight[r.Surface+"\x00"+r.Key] = r
-				}
-			}
-		}
+		d := HarnessDrift{Harness: harness, Name: harnessName(harness), Version: n.newest, Partial: n.partial(n.newest)}
 		prev, censused := cat.newestCensus(harness)
 		d.First = !censused
 		if censused {
 			d.Previous = prev.Version
-			if versionLess(version, prev.Version) {
+			if versionLess(d.Version, prev.Version) {
 				d.Unreached = prev.Version
 			}
 		}
-		if v := ran.newest[harness]; versionLess(version, v) && versionLess(d.Unreached, v) {
+		if v := ran.newest[harness]; versionLess(d.Version, v) && versionLess(d.Unreached, v) {
 			d.Unreached = v
 		}
-		newSurfaces := map[string]*SurfaceChange{}
-		for _, id := range slices.Sorted(maps.Keys(tonight)) {
-			r := tonight[id]
-			c := FieldChange{Surface: r.Surface, Key: r.Key, Class: r.Class, Kinds: r.Kinds}
-			if r.Version != version {
-				c.From = r.Version
-			}
-			newKey := !keys[harness][r.Key]
-			switch {
-			case d.First:
-			case !surfaces[harness][r.Surface]:
-				s := newSurfaces[r.Surface]
-				if s == nil {
-					s = &SurfaceChange{Surface: r.Surface, From: c.From}
-					newSurfaces[r.Surface] = s
-				}
-				if c.From == "" || (s.From != "" && versionLess(s.From, c.From)) {
-					s.From = c.From
-				}
-				s.Keys++
-				if newKey {
-					s.NewKeys++
-					d.Added = append(d.Added, c)
-				}
-			default:
-				if _, ok := known[FieldEntry{Harness: harness, Surface: r.Surface, Key: r.Key}.id()]; !ok {
-					d.Added = append(d.Added, c)
-				}
-			}
-			if e2e.Withheld(r.Class, r.Kinds, r.Kept) {
-				if prev, ok := known[FieldEntry{Harness: harness, Surface: r.Surface, Key: r.Key}.id()]; ok && prev.withheld() {
-					d.StillWithheld = append(d.StillWithheld, c)
-				} else {
-					d.Withheld = append(d.Withheld, c)
-				}
-			}
-		}
-		for _, s := range slices.Sorted(maps.Keys(newSurfaces)) {
-			d.NewSurfaces = append(d.NewSurfaces, *newSurfaces[s])
-		}
-		if d.First {
-			counted := map[string]bool{}
-			for _, r := range tonight {
-				counted[r.Surface] = true
-			}
-			d.Surfaces, d.Keys = len(counted), len(tonight)
-		}
-		// What is gone is judged on every build censused whole tonight for the first time, while
-		// no newer build is, oldest first, each against the build before it: the first against the
-		// newest older build censused whole, so a partial one between them hides nothing. A
-		// census a scenario failed before taking whole is no evidence of what a build does not
-		// send (a key that comes with an error path, or a scenario that did not run, would read
-		// as one gone), and nor is a re-run of a build censused whole. Each build is judged, so
-		// none becomes a baseline unjudged, and a key one build adds and the next drops is said
-		// gone.
-		var judged []string
-		for v := range rowBuilds(hr) {
-			if !ran.failed[harness+"\x00"+v] && !cat.censusedWhole(harness, v) && !cat.wholeAfter(harness, v) {
-				judged = append(judged, v)
-			}
-		}
-		slices.SortFunc(judged, func(a, b string) int {
-			if versionLess(a, b) {
-				return -1
-			}
-			return 1
-		})
-		// What each build sent, as tonight's rows say.
-		type sending struct {
-			keys     map[string]FieldChange
-			surfaces []string
-		}
-		sends := func(v string) sending {
-			keys, surfaces := map[string]FieldChange{}, map[string]bool{}
-			for _, r := range hr {
-				if r.Version == v {
-					keys[r.Surface+"\x00"+r.Key] = FieldChange{Surface: r.Surface, Key: r.Key, Class: r.Class, Kinds: r.Kinds}
-					surfaces[r.Surface] = true
-				}
-			}
-			return sending{keys, slices.Sorted(maps.Keys(surfaces))}
-		}
-		// The baseline: the newest older build censused whole, what its whole census saw
-		// (FieldEntry.Whole; a partial census is a failed run, where keys of an error path
-		// come); where the catalog has none, but has the harness, the oldest build judged
-		// tonight, the rest judged against it.
-		var base sending
-		since, chain := "", judged
-		if whole, ok := cat.lastWhole(harness, firstOr(judged)); ok {
-			since, base = whole.Version, sending{map[string]FieldChange{}, whole.Surfaces}
-			for _, f := range cat.Fields {
-				if f.Harness == harness && slices.Contains(f.Whole, whole.Version) {
-					base.keys[f.Surface+"\x00"+f.Key] = FieldChange{Surface: f.Surface, Key: f.Key, Class: f.Class, Kinds: f.Kinds}
-				}
-			}
-			// The catalog has every night's whole census of it; the build judged has tonight's.
-			// Where it is censused whole tonight too, it is judged by what it sent tonight, one
-			// night against one, so a key or surface it sent on some earlier night alone is not
-			// gone. Where its census tonight is partial, it is judged by its earlier nights, and
-			// the digest says so (Earlier).
-			switch again := sends(since); {
-			case len(again.keys) == 0:
-			case ran.failed[harness+"\x00"+since]:
-				d.Earlier = since
-			default:
-				maps.DeleteFunc(base.keys, func(k string, _ FieldChange) bool { _, ok := again.keys[k]; return !ok })
-				base.surfaces = slices.DeleteFunc(slices.Clone(base.surfaces), func(s string) bool { return !slices.Contains(again.surfaces, s) })
-			}
-		} else if len(judged) > 1 && !d.First {
-			since, base, chain = judged[0], sends(judged[0]), judged[1:]
-		} else {
-			chain = nil
-		}
-		if len(chain) > 0 {
-			last := chain[len(chain)-1]
-			d.Chain = chain
-			if last != version {
-				d.Judged = last
-			}
-			if since != d.Previous {
-				d.Since = since
-			}
-			// A key or surface the chain drops more than once is said once, as its last drop.
-			removedAt, unseenAt := map[string]int{}, map[string]int{}
-			removed := func(c FieldChange) {
-				k := c.Surface + "\x00" + c.Key
-				if i, ok := removedAt[k]; ok {
-					d.Removed[i] = c
-					return
-				}
-				removedAt[k] = len(d.Removed)
-				d.Removed = append(d.Removed, c)
-			}
-			unseen := func(g GoneSurface) {
-				if i, ok := unseenAt[g.Surface]; ok {
-					d.Unseen[i] = g
-					return
-				}
-				unseenAt[g.Surface] = len(d.Unseen)
-				d.Unseen = append(d.Unseen, g)
-			}
-			for i, v := range chain {
-				in := ""
-				if v != last {
-					in = v
-				}
-				now := sends(v)
-				sent := map[string]bool{}
-				for _, s := range now.surfaces {
-					sent[s] = true
-				}
-				// A key or surface an earlier build of the chain dropped and a later one sends
-				// again says which: it is not gone for good.
-				back := func(k, surface string) string {
-					for _, w := range chain[i+1:] {
-						later := sends(w)
-						if _, ok := later.keys[k]; ok || (k == "" && slices.Contains(later.surfaces, surface)) {
-							return w
-						}
-					}
-					return ""
-				}
-				for _, k := range slices.Sorted(maps.Keys(base.keys)) {
-					if c := base.keys[k]; sent[c.Surface] && now.keys[k].Key == "" {
-						c.In = in
-						if in != "" {
-							c.Back = back(k, "")
-						}
-						removed(c)
-					}
-				}
-				for _, s := range base.surfaces {
-					if !sent[s] {
-						g := GoneSurface{Surface: s, In: in}
-						if in != "" {
-							g.Back = back("", s)
-						}
-						unseen(g)
-					}
-				}
-				base = now
-			}
-		}
-
+		d.additions(idx, n.seen())
+		d.judgeChain(n, chooseBaseline(cat, n, judgedBuilds(cat, n), d.First))
 		out = append(out, d)
 	}
 	return len(rows) == 0, missing, out

@@ -91,7 +91,7 @@ func TestDigestSaysTheNewestRunWasNotReached(t *testing.T) {
 	})
 	_, _, hs := fieldDrift(cat, []e2e.FieldRow{field("0.161.0", "logs/codex.api_request", "model", "safe", night)}, ran, night)
 	d := Drift{Harnesses: hs}
-	if hs[0].Unreached != "0.162.0" || d.Quiet() || !strings.Contains(hs[0].headline(), "0.161.0 (0.162.0, run tonight, was not reached)") {
+	if hs[0].Unreached != "0.162.0" || d.Quiet() || !strings.Contains(hs[0].headline(), "0.161.0 (0.162.0, run tonight, was not reached; judged against 0.160.0's earlier nights, not censused tonight)") {
 		t.Errorf("unreached %q, quiet %v, headline %q", hs[0].Unreached, d.Quiet(), hs[0].headline())
 	}
 	// The census of the newest build it ran: nothing unreached, but a scenario of it failed,

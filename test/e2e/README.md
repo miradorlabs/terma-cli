@@ -244,7 +244,7 @@ runs over two nights against a scratch origin. The digest,
   whole for the first time no longer sends, oldest first, each against the build before it,
   the first against the newest older build censused whole: by what it sent tonight, where it
   is censused whole tonight too, and by its earlier nights' whole censuses where its census
-  tonight is partial, which the digest says (a removal says the build it went in, where that
+  tonight is partial or it was not censused tonight, which the digest says (a removal says the build it went in, where that
   is not the last). Each build is judged on one night, so a key or surface a harness sends
   only sometimes (Claude's `retention_sweep`, Codex's sampled `codex.rollout.persistence.*`)
   can read gone on a night the build before sent it and the new one did not; for Codex the
