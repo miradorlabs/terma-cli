@@ -127,14 +127,9 @@ func CommentCharFS(gitDir string) string {
 	return value
 }
 
-// RemoteURLFS reads remote.origin.url from the common dir's config through
-// NormalizeRemote; includes are not followed. "" outside git.
-func RemoteURLFS(gitDir string) string {
-	_, url := OriginFS(gitDir)
-	return url
-}
-
-// OriginFS is RepositoryFS and RemoteURLFS from one read of the config.
+// OriginFS reads remote.origin.url from the common dir's config, so a linked worktree shares
+// it: its RepositoryID, and its URL through NormalizeRemote. Includes are not followed. Both
+// are "" outside git.
 func OriginFS(gitDir string) (id, url string) {
 	if gitDir == "" {
 		return "", ""
@@ -192,8 +187,7 @@ func HooksPathFS(gitDir string) (local, worktree string) {
 	return local, worktree
 }
 
-// RepositoryFS is origin's RepositoryID, read from the main repository's config so a
-// linked worktree shares it; "" outside git.
+// RepositoryFS is OriginFS's RepositoryID alone.
 func RepositoryFS(gitDir string) string {
 	id, _ := OriginFS(gitDir)
 	return id

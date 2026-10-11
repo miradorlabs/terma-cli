@@ -38,7 +38,10 @@ attribute_groups:
       - ref: vcs.owner.name
       - ref: vcs.provider.name
       - ref: vcs.ref.head.name
-        note: The branch the checkout's HEAD was on at the session's last hook; omitted on a detached HEAD.
+        note: >
+          The branch the checkout's HEAD was on at the session's last hook, read from git's
+          files; omitted on a detached HEAD, and in a reftable repository, whose commit events
+          still name it.
       - ref: vcs.ref.head.type
         note: branch, omitted on a detached HEAD.
   - id: terma.relay.withheld

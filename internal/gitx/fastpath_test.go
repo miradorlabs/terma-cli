@@ -364,19 +364,19 @@ func TestLastCommitTellsMergesAndSquashes(t *testing.T) {
 }
 
 // Outside git there is no remote: a config file in the working directory is not one.
-func TestRemoteURLFSOutsideGit(t *testing.T) {
+func TestOriginFSOutsideGit(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "config"), []byte("[remote \"origin\"]\n\turl = https://github.com/acme/app\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	t.Chdir(dir)
-	if got := RemoteURLFS(""); got != "" {
-		t.Fatalf("RemoteURLFS(\"\") = %q", got)
+	if got := remoteURL(""); got != "" {
+		t.Fatalf("OriginFS(\"\") = %q", got)
 	}
 }
 
-// RemoteURLFS agrees with git's normalised remote.origin.url, including from a linked worktree.
-func TestRemoteURLFSMatchesGit(t *testing.T) {
+// OriginFS's URL agrees with git's normalised remote.origin.url, including from a linked worktree.
+func TestOriginFSMatchesGit(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not installed")
 	}
@@ -389,7 +389,7 @@ func TestRemoteURLFSMatchesGit(t *testing.T) {
 	root := t.TempDir()
 	mustGit(t, root, "init", "-q", "-b", "main")
 	gitDir := filepath.Join(root, ".git")
-	if got := RemoteURLFS(gitDir); got != "" {
+	if got := remoteURL(gitDir); got != "" {
 		t.Fatalf("no origin yet, got %q", got)
 	}
 	mustGit(t, root, "remote", "add", "origin", "https://alex:ghp_secret@github.com/miradorlabs/terma-cli.git")
@@ -397,12 +397,12 @@ func TestRemoteURLFSMatchesGit(t *testing.T) {
 	if want != "https://github.com/miradorlabs/terma-cli" {
 		t.Fatalf("git-backed value = %q", want)
 	}
-	if got := RemoteURLFS(gitDir); got != want {
-		t.Fatalf("RemoteURLFS = %q, want %q", got, want)
+	if got := remoteURL(gitDir); got != want {
+		t.Fatalf("OriginFS = %q, want %q", got, want)
 	}
 	// The file is read on every call, so a changed remote is seen at once.
 	mustGit(t, root, "remote", "set-url", "origin", "git@github.com:miradorlabs/other.git")
-	if got, want := RemoteURLFS(gitDir), "https://github.com/miradorlabs/other"; got != want {
+	if got, want := remoteURL(gitDir), "https://github.com/miradorlabs/other"; got != want {
 		t.Fatalf("after set-url: %q, want %q", got, want)
 	}
 
@@ -420,7 +420,7 @@ func TestRemoteURLFSMatchesGit(t *testing.T) {
 	if !ok || !strings.Contains(wtGitDir, "worktrees") {
 		t.Fatalf("LocateFS(worktree) = %q, %v", wtGitDir, ok)
 	}
-	if got, want := RemoteURLFS(wtGitDir), "https://github.com/miradorlabs/other"; got != want {
+	if got, want := remoteURL(wtGitDir), "https://github.com/miradorlabs/other"; got != want {
 		t.Fatalf("from a linked worktree: %q, want %q", got, want)
 	}
 }
@@ -510,4 +510,9 @@ func TestBranchFSNamesNoBranchInAReftableRepository(t *testing.T) {
 	if got := BranchFS(filepath.Join(repo, ".git")); got != "" {
 		t.Errorf("BranchFS = %q, want none", got)
 	}
+}
+
+func remoteURL(gitDir string) string {
+	_, url := OriginFS(gitDir)
+	return url
 }

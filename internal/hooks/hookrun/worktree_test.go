@@ -59,7 +59,7 @@ func TestWorktreeEventsReportTheMainRepositoryAndProject(t *testing.T) {
 	// checkout's, with git's name for the worktree and the branch its own HEAD is on; both share
 	// the repository's origin.
 	mainRoot, _ := filepath.EvalSymlinks(main)
-	remote := gitx.RemoteURLFS(filepath.Join(main, ".git"))
+	_, remote := gitx.OriginFS(filepath.Join(main, ".git"))
 	for sid, want := range map[string]claim.Claim{
 		"sess-wt":   {Root: wt, Worktree: "feature-x", Branch: "feature-x", Remote: remote},
 		"sess-main": {Root: mainRoot, Branch: "main", Remote: remote},
