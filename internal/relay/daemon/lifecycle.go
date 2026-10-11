@@ -150,11 +150,18 @@ var follow = func(dir string) {
 // serviceRunsThis reports whether the installed service starts this terma.
 var serviceRunsThis = func(stateDir string) bool { return CheckService(stateDir).Current }
 
+// TestBinary reports whether exe is a Go test binary, <package>.test, or on Windows
+// <package>.test.exe.
+func TestBinary(exe string) bool {
+	return strings.HasSuffix(strings.TrimSuffix(filepath.Base(exe), ".exe"), ".test")
+}
+
 // start starts `terma relay run --quiet` detached with args, logging to the relay's log.
 func start(dir string, args ...string) error {
 	exe, err := os.Executable()
-	// A <package>.test binary is no relay, and would only fail on the flags.
-	if err != nil || strings.HasSuffix(filepath.Base(exe), ".test") {
+	// A test binary is no relay: started as one, it would run its package's tests detached,
+	// holding the relay's log open.
+	if err != nil || TestBinary(exe) {
 		return errors.New("relay: no terma binary to start")
 	}
 	proc := spawnCommand(exe, dir, args...)
