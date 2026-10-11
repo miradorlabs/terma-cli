@@ -293,3 +293,22 @@ func TestHeartbeatSendsUnclassifiedNamesOnlyAsATotal(t *testing.T) {
 		}
 	}
 }
+
+// Beats in flight together each hand back only their own counters when they fail: a failed
+// earlier beat after a later one succeeded leaves the later beat's counters reported once,
+// and its own for the next beat.
+func TestAFailedBeatHandsBackOnlyItsOwnCounters(t *testing.T) {
+	t.Parallel()
+	s := newStats()
+	s.add("forwarded", 3)
+	a := s.takeSinceBeat() // beat A: 3, in flight
+	s.add("forwarded", 5)
+	if b := s.takeSinceBeat(); b["forwarded"] != 5 { // beat B: 5, sent
+		t.Fatalf("beat B took %v", b)
+	}
+	s.untake(a) // beat A failed
+	s.add("forwarded", 1)
+	if next := s.takeSinceBeat(); next["forwarded"] != 4 {
+		t.Errorf("next beat took %v, want A's 3 and the new 1, not B's 5 again", next)
+	}
+}

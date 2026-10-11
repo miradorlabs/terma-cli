@@ -8,8 +8,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"syscall"
+	"testing"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -150,18 +150,12 @@ var follow = func(dir string) {
 // serviceRunsThis reports whether the installed service starts this terma.
 var serviceRunsThis = func(stateDir string) bool { return CheckService(stateDir).Current }
 
-// TestBinary reports whether exe is a Go test binary, <package>.test, or on Windows
-// <package>.test.exe.
-func TestBinary(exe string) bool {
-	return strings.HasSuffix(strings.TrimSuffix(filepath.Base(exe), ".exe"), ".test")
-}
-
 // start starts `terma relay run --quiet` detached with args, logging to the relay's log.
 func start(dir string, args ...string) error {
 	exe, err := os.Executable()
 	// A test binary is no relay: started as one, it would run its package's tests detached,
 	// holding the relay's log open.
-	if err != nil || TestBinary(exe) {
+	if err != nil || testing.Testing() {
 		return errors.New("relay: no terma binary to start")
 	}
 	proc := spawnCommand(exe, dir, args...)
