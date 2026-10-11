@@ -10,7 +10,7 @@ import (
 
 // checkoutSafeKeys name the checkout a session ran in by its repository and branch, and say
 // whether it is a linked worktree: what commit events already send, so they leave under any
-// policy.
+// policy, on the resource the relay stamps alone (withhold).
 var checkoutSafeKeys = []string{
 	semconv.VCSRepositoryURLFullKey, semconv.VCSRepositoryNameKey, semconv.VCSOwnerNameKey, semconv.VCSProviderNameKey,
 	semconv.VCSRefHeadNameKey, semconv.VCSRefHeadTypeKey, semconv.TermaRepositoryWorktreeLinkedKey,

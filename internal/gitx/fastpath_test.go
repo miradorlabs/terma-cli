@@ -496,3 +496,18 @@ func TestBranchFSMatchesGit(t *testing.T) {
 		t.Error("outside git named a branch")
 	}
 }
+
+// A reftable repository keeps HEAD in its tables; its HEAD file is a stub naming
+// refs/heads/.invalid, which names no branch. Git before 2.45 cannot make one.
+func TestBranchFSNamesNoBranchInAReftableRepository(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not on PATH")
+	}
+	repo := t.TempDir()
+	if err := exec.Command("git", "-C", repo, "init", "-q", "-b", "main", "--ref-format=reftable").Run(); err != nil {
+		t.Skipf("this git cannot make a reftable repository: %v", err)
+	}
+	if got := BranchFS(filepath.Join(repo, ".git")); got != "" {
+		t.Errorf("BranchFS = %q, want none", got)
+	}
+}

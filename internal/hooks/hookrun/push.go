@@ -160,7 +160,7 @@ func PrePush(ctx context.Context, env Env) error {
 	if u := gitx.NormalizeRemote(url); u != "" {
 		attrs[semconv.TermaPushRemoteURLKey] = u
 	}
-	if origin := gitx.RemoteURLFS(r.GitDir); origin != "" {
+	if origin := r.Remote; origin != "" {
 		attrs[semconv.VCSRepositoryURLFullKey] = origin
 	}
 	if root := r.workTree(); root != "" {

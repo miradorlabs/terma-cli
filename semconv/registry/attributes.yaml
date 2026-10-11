@@ -650,9 +650,11 @@ attributes:
     brief: Git's name for the linked worktree the session's hooks last ran in.
     note: >
       Its directory under the repository's .git/worktrees, which an agent harness often names
-      after the task, so it leaves only while the team's policy collects tool content. Omitted
-      in a main checkout. On agent telemetry it is a resource attribute the relay stamps from
-      the session's claim.
+      after the task, so it leaves only while the team's policy collects tool content. The
+      branch, often the same slug, leaves under any policy, as commit events send it: a branch
+      is what a developer pushes to the remote, a worktree's directory is this machine's alone.
+      Omitted in a main checkout. On agent telemetry it is a resource attribute the relay
+      stamps from the session's claim.
     examples: ["feature-parser"]
     annotations:
       content: tool

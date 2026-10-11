@@ -40,7 +40,6 @@ var generic = shape.CaptureRules{
 	ResourcePromptFields: []string{"process.command_args", "process.command_line"},
 	// cwd is a local path, as file_path is.
 	ToolContentFields: []string{"gen_ai.tool.call.arguments", "gen_ai.tool.call.result", "file_path", "result", "cwd"},
-	SafeKeys:          checkoutSafeKeys,
 }
 
 func compose(correlators []shape.Correlator, capturers []shape.Capturer) *rules {

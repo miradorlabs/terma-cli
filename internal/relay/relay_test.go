@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -79,9 +80,13 @@ func (u *upstream) logs(t *testing.T) (byAuth map[string][]*logspb.LogRecord, pr
 	return byAuth, projects
 }
 
+// attr is key's value, a boolean as "true" or "false"; "" when kvs has none.
 func attr(kvs []*commonpb.KeyValue, key string) string {
 	for _, kv := range kvs {
 		if kv.Key == key {
+			if b, ok := kv.Value.GetValue().(*commonpb.AnyValue_BoolValue); ok {
+				return strconv.FormatBool(b.BoolValue)
+			}
 			return kv.Value.GetStringValue()
 		}
 	}

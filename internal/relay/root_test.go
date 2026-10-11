@@ -2,7 +2,6 @@ package relay
 
 import (
 	"net/http/httptest"
-	"strconv"
 	"testing"
 	"time"
 
@@ -31,22 +30,10 @@ func (u *upstream) stampsByKey(t *testing.T, stamp string) map[string][]string {
 			t.Fatal(err)
 		}
 		for _, rl := range m.ResourceLogs {
-			out[req.auth] = append(out[req.auth], attrText(rl.Resource.Attributes, stamp))
+			out[req.auth] = append(out[req.auth], attr(rl.Resource.Attributes, stamp))
 		}
 	}
 	return out
-}
-
-func attrText(kvs []*commonpb.KeyValue, key string) string {
-	for _, kv := range kvs {
-		if kv.Key == key {
-			if b, ok := kv.Value.GetValue().(*commonpb.AnyValue_BoolValue); ok {
-				return strconv.FormatBool(b.BoolValue)
-			}
-			return kv.Value.GetStringValue()
-		}
-	}
-	return ""
 }
 
 // checkStamps asserts that every resource each key received carries want[stamp][key].

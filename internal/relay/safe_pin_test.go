@@ -65,15 +65,13 @@ var pinnedSafeKeys = []string{
 	"span.type", "speed", "stage", "start_time", "start_type", "startup.phase",
 	"startup.status", "status", "stop_reason", "submission.id", "success", "target",
 	"telemetry.sdk.language", "telemetry.sdk.name", "telemetry.sdk.version",
-	"terma.account.seat.id", "terma.relay.attribution", "terma.relay.session.id", "terma.repository.worktree.linked",
-	"terma.version", "terminal.type", "thread.id",
+	"terma.account.seat.id", "terma.relay.attribution", "terma.relay.session.id", "terma.version", "terminal.type", "thread.id",
 	"thread.name", "thread_id", "tmp_mem_enabled", "token_type", "tool",
 	"tool_input_size_bytes", "tool_name", "tool_name_safe", "tool_namespace",
 	"tool_origin", "tool_result_seq", "tool_result_size_bytes", "tool_source",
 	"tool_token_count", "tool_type", "tool_use_id", "transport", "trigger", "ttft_ms",
 	"turn.id", "turn_id", "type", "unified_exec_process_id", "user.account_id", "user.account_uuid", "user.id",
-	"user_prompt_length", "vcs.owner.name", "vcs.provider.name", "vcs.ref.head.name", "vcs.ref.head.type",
-	"vcs.repository.name", "vcs.repository.url.full", "version", "wire_api",
+	"user_prompt_length", "version", "wire_api",
 }
 
 var pinnedSafePrefixes = []string{"codex.turn.token_usage.", "codex.usage.", "gen_ai.usage."}
