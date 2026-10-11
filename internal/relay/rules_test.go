@@ -33,9 +33,9 @@ var (
 	pinnedResourcePromptFields = []string{"process.command_args", "process.command_line"}
 	pinnedPromptBodyEvents     = []string{"opencode.user_prompt", "opencode.session.created", "pi.user_prompt", "omp.user_prompt", "hermes.user_prompt", "hermes.assistant_response", "dsh.user_prompt", "dsh.assistant_response"}
 	pinnedToolContentFields    = []string{"tool_parameters", "tool_input", "full_command", "bash_command", "arguments", "output",
-		"gen_ai.tool.call.arguments", "gen_ai.tool.call.result", "opencode.tool.file_path",
+		"gen_ai.tool.call.arguments", "gen_ai.tool.call.result", "opencode.tool.file_path", "opencode.session.directory",
 		"function_args", "hook_input", "hook_output", "stdout", "stderr",
-		"file_path", "result"}
+		"file_path", "result", "cwd"}
 	pinnedToolContentEvents = []string{"tool.output", "tool.input"}
 	pinnedSessionKeys       = []string{"session.id", "conversation.id", "gen_ai.conversation.id", "thread.id", "thread_id"}
 )

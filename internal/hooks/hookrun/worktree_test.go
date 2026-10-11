@@ -55,11 +55,18 @@ func TestWorktreeEventsReportTheMainRepositoryAndProject(t *testing.T) {
 			t.Fatalf("%s from %s: attrs %v", e.Name, e.SessionID, e.Attrs)
 		}
 	}
-	// Each session's claim names its own working tree, the linked worktree's and not its main checkout's.
+	// Each session's claim names its own working tree, the linked worktree's and not its main
+	// checkout's, with git's name for the worktree and the branch its own HEAD is on; both share
+	// the repository's origin.
 	mainRoot, _ := filepath.EvalSymlinks(main)
-	for sid, want := range map[string]string{"sess-wt": wt, "sess-main": mainRoot} {
-		if c, ok := claim.Read(stateDir, sid, time.Now()); !ok || c.Root != want {
-			t.Errorf("%s claim root = %q, %v; want %q", sid, c.Root, ok, want)
+	remote := gitx.RemoteURLFS(filepath.Join(main, ".git"))
+	for sid, want := range map[string]claim.Claim{
+		"sess-wt":   {Root: wt, Worktree: "feature-x", Branch: "feature-x", Remote: remote},
+		"sess-main": {Root: mainRoot, Branch: "main", Remote: remote},
+	} {
+		c, ok := claim.Read(stateDir, sid, time.Now())
+		if !ok || c.Root != want.Root || c.Worktree != want.Worktree || c.Branch != want.Branch || c.Remote != want.Remote || c.Remote == "" {
+			t.Errorf("%s claim = %+v, %v; want root %q, worktree %q, branch %q, remote %q", sid, c, ok, want.Root, want.Worktree, want.Branch, want.Remote)
 		}
 	}
 }

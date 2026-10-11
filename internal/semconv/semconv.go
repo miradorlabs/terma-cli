@@ -233,6 +233,10 @@ const (
 	TermaRelaySessionIDKey = "terma.relay.session.id"
 	// TermaRepositoryRootKey is terma.repository.root: The absolute path of the working tree the session or the git operation ran in.
 	TermaRepositoryRootKey = "terma.repository.root"
+	// TermaRepositoryWorktreeLinkedKey is terma.repository.worktree.linked: Whether the session's checkout is a linked worktree of its repository, not its main checkout.
+	TermaRepositoryWorktreeLinkedKey = "terma.repository.worktree.linked"
+	// TermaRepositoryWorktreeNameKey is terma.repository.worktree.name: Git's name for the linked worktree the session's hooks last ran in.
+	TermaRepositoryWorktreeNameKey = "terma.repository.worktree.name"
 	// TermaSchemaVersionKey is terma.schema.version: The version of this registry the record follows.
 	TermaSchemaVersionKey = "terma.schema.version"
 	// TermaSessionParentIDKey is terma.session.parent.id: The session that opened this one for a subagent.

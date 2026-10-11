@@ -104,6 +104,13 @@ type Repo struct {
 	Repository config.Repository
 }
 
+// claim is the relay's claim of a session for r's project: the working copy, by its checkout,
+// its origin and the branch its HEAD is on (read from git's files, with no git subprocess).
+func (r *Repo) claim(tool string) claim.Claim {
+	return claim.Claim{ProjectID: r.ProjectID, Tool: tool, Repo: r.Name, Worktree: r.Worktree, Repository: r.Repository,
+		Root: r.workTree(), Remote: gitx.RemoteURLFS(r.GitDir), Branch: gitx.BranchFS(r.GitDir)}
+}
+
 // workTree is the checkout's root inside git, "" for a folder outside it: only a working
 // tree is a repository root to the platform. It is symlink-resolved, as the platform compares
 // it, however the hook's cwd reached the checkout (/tmp is /private/tmp on macOS).
@@ -288,7 +295,8 @@ func (e Env) claimForRelay(r *Repo, ev spool.Event) {
 		return
 	}
 	tool, _ := ev.Attrs[semconv.GenAIMainAgentNameKey].(string)
-	c := claim.Claim{ProjectID: r.ProjectID, Tool: tool, Repo: r.Name, Worktree: r.Worktree, Repository: r.Repository, Root: r.workTree(), Cwd: e.workingDir(), PIDs: claimPIDs()}
+	c := r.claim(tool)
+	c.Cwd, c.PIDs = e.workingDir(), claimPIDs()
 	claim.Write(e.StateDir, ev.SessionID, c, e.Time())
 	// A subagent whose telemetry uses its agent id as session id would otherwise be dropped.
 	if agent, _ := ev.Attrs[semconv.TermaAgentIDKey].(string); agent != "" && agent != ev.SessionID {

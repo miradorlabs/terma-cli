@@ -42,7 +42,7 @@ var genericSafeKeys = setOf(
 	"feature", "mcp_tool",
 	"os_platform", "os_release", "start_time", "end_time",
 	// Semantic-convention gen_ai attributes, and exporter settings.
-	"cwd", "gen_ai.tool.call_id", "gen_ai.token.type", "gen_ai.output.type",
+	"gen_ai.tool.call_id", "gen_ai.token.type", "gen_ai.output.type",
 	"gen_ai.prompt.name", "gen_ai.agent.name", "gen_ai.request.seed", "gen_ai.request.presence_penalty",
 	"gen_ai.request.max_tokens", "gen_ai.request.frequency_penalty", "gen_ai.request.choice.count",
 	// The process an exporter runs in — never its arguments (process.command_args).

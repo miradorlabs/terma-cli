@@ -137,6 +137,28 @@ func RemoteURLFS(gitDir string) string {
 	return NormalizeRemote(raw)
 }
 
+// BranchFS is the local branch a checkout's HEAD is on, from its git directory's HEAD file,
+// without running git: a linked worktree's own HEAD, not its main checkout's, and a branch
+// with no commits yet by its name. "" outside git, on a detached HEAD, and on an unreadable one.
+func BranchFS(gitDir string) string {
+	if gitDir == "" {
+		return ""
+	}
+	data, err := os.ReadFile(filepath.Join(gitDir, "HEAD"))
+	if err != nil {
+		return ""
+	}
+	ref, ok := strings.CutPrefix(strings.TrimSpace(string(data)), "ref: ")
+	if !ok {
+		return ""
+	}
+	branch, _ := strings.CutPrefix(strings.TrimSpace(ref), "refs/heads/")
+	if branch == strings.TrimSpace(ref) {
+		return "" // a symbolic ref outside refs/heads names no branch
+	}
+	return branch
+}
+
 // GlobalHooksPathFS reads core.hooksPath from git's global config, without running git;
 // includes are not followed.
 func GlobalHooksPathFS() string {

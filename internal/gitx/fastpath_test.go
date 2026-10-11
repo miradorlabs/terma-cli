@@ -464,3 +464,35 @@ func TestLinkedWorktreeFS(t *testing.T) {
 		t.Fatalf("bare worktree: %q, %q, %v", name, mainRoot, linked)
 	}
 }
+
+// BranchFS reads the branch git names, in a main checkout and in a linked worktree on
+// another branch, and none on a detached HEAD.
+func TestBranchFSMatchesGit(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not on PATH")
+	}
+	repo := t.TempDir()
+	mustGit(t, repo, "init", "-q", "-b", "main")
+	if got := BranchFS(filepath.Join(repo, ".git")); got != "main" {
+		t.Errorf("a branch with no commits yet: %q", got)
+	}
+	mustGit(t, repo, "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "--allow-empty", "-m", "one")
+	wt := filepath.Join(t.TempDir(), "feature")
+	mustGit(t, repo, "worktree", "add", "-q", "-b", "feature/x", wt)
+	for dir, want := range map[string]string{repo: "main", wt: "feature/x"} {
+		_, gitDir, ok := LocateFS(dir)
+		if !ok {
+			t.Fatalf("no git directory for %s", dir)
+		}
+		if got, git := BranchFS(gitDir), mustGit(t, dir, "branch", "--show-current"); got != want || got != git {
+			t.Errorf("%s: BranchFS %q, git %q, want %q", dir, got, git, want)
+		}
+	}
+	mustGit(t, wt, "checkout", "-q", "--detach")
+	if _, gitDir, _ := LocateFS(wt); BranchFS(gitDir) != "" {
+		t.Errorf("a detached HEAD named %q", BranchFS(gitDir))
+	}
+	if BranchFS("") != "" {
+		t.Error("outside git named a branch")
+	}
+}
