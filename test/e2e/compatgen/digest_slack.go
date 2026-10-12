@@ -70,8 +70,12 @@ func slackSection(s string) block {
 	return block{"type": "section", "text": mrkdwn(clip(slackText(s), sectionLimit))}
 }
 
-// attachment is one bar of a harness's changes: its colour, "" for Slack's own, and its text.
-type attachment struct{ colour, text string }
+// attachment is one bar of a harness's changes: its colour, "" for Slack's own, and its texts,
+// a section each, so lists that share a bar never share a section's limit.
+type attachment struct {
+	colour string
+	texts  []string
+}
 
 // slack is the digest as a Slack incoming webhook's payload: as blocks a summary (slackSummary),
 // then, under a divider, each harness's changes as attachments (slackChanges), as many whole
@@ -101,13 +105,17 @@ func (d Drift) slack() map[string]any {
 		if left > 1 {
 			more = fmt.Sprintf("%d harnesses", left)
 		}
-		atts = append(atts, attachment{"", "_… and " + more + " more, too long for one message: see the run's summary._"})
+		atts = append(atts, attachment{"", []string{"_… and " + more + " more, too long for one message: see the run's summary._"}})
 	}
 	payload := map[string]any{"text": summary, "blocks": blocks}
 	if len(atts) > 0 {
 		var out []block
 		for _, a := range atts {
-			att := block{"blocks": []block{slackSection(a.text)}}
+			var sections []block
+			for _, t := range a.texts {
+				sections = append(sections, slackSection(t))
+			}
+			att := block{"blocks": sections}
 			if a.colour != "" {
 				att["color"] = a.colour
 			}
@@ -161,7 +169,7 @@ func (d Drift) slackSummary() []block {
 // its findings (drift.md has them all).
 func (h HarnessDrift) slackChanges() []attachment {
 	said := func(level detail) []attachment {
-		out := []attachment{{"", "*" + h.headline() + "*"}}
+		out := []attachment{{"", []string{"*" + h.headline() + "*"}}}
 		for _, sec := range h.sections(level) {
 			if len(sec.lines) == 0 {
 				continue
@@ -174,23 +182,25 @@ func (h HarnessDrift) slackChanges() []attachment {
 			// An unsigned list has no colour (colours has no ""), so it joins the headline's bar.
 			i := slices.IndexFunc(out, func(a attachment) bool { return a.colour == colours[sec.sign] })
 			if i < 0 {
-				out = append(out, attachment{colours[sec.sign], list})
+				out = append(out, attachment{colours[sec.sign], []string{list}})
 				continue
 			}
-			out[i].text += "\n" + list
+			out[i].texts = append(out[i].texts, list)
 		}
 		return out
 	}
 	out := said(oneLink)
-	if slices.ContainsFunc(out, func(a attachment) bool { return len(slackText(a.text)) > sectionLimit }) {
+	if slices.ContainsFunc(out, func(a attachment) bool {
+		return slices.ContainsFunc(a.texts, func(t string) bool { return len(slackText(t)) > sectionLimit })
+	}) {
 		out = said(noLinks)
 	}
 	return out
 }
 
 // fitHarnesses are the first of harnesses, whole, that fit one message after blocks: at most
-// maxBlocks blocks and attachments, one kept for the line saying what was left out, and their
-// text within the budget. A harness is kept or left out whole, never its headline without
+// maxBlocks blocks, an attachment's sections each counted, one kept for the line saying what
+// was left out, and their text within the budget. A harness is kept or left out whole, never its headline without
 // what went.
 func fitHarnesses(blocks []block, harnesses [][]attachment) [][]attachment {
 	n, size := len(blocks), 0
@@ -201,9 +211,12 @@ func fitHarnesses(blocks []block, harnesses [][]attachment) [][]attachment {
 	}
 	for i, h := range harnesses {
 		for _, a := range h {
-			size += len(slackText(a.text))
+			for _, t := range a.texts {
+				size += len(slackText(t))
+				n++
+			}
 		}
-		if n += len(h); n > maxBlocks-1 || size > slackBudget {
+		if n > maxBlocks-1 || size > slackBudget {
 			return harnesses[:i]
 		}
 	}

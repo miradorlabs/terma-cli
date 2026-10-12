@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -314,5 +315,47 @@ func TestAReleaseLinksItsSourceWithoutACensus(t *testing.T) {
 	}
 	if l := d.Releases[0].line(func(s string) string { return s }); !strings.Contains(renderLinks(l, false), "(was 0.162.1, [diff](https://github.com/openai/codex/compare/rust-v0.162.1...rust-v0.163.0))") {
 		t.Errorf("line %q", renderLinks(l, false))
+	}
+}
+
+// Lists that share a bar are a section each: new surfaces and new fields, each within a
+// section's limit, would together pass it, and be cut.
+func TestListsOnOneBarAreSectionsEach(t *testing.T) {
+	h := HarnessDrift{Harness: "codex", Name: "Codex CLI", Version: "0.163.0", Previous: "0.162.0"}
+	long := "logs/" + strings.Repeat("s", 150)
+	for i := range maxListed {
+		h.NewSurfaces = append(h.NewSurfaces, SurfaceChange{Surface: fmt.Sprint(long, i), Keys: 1, NewKeys: 1})
+		h.Added = append(h.Added, FieldChange{Surface: long, Key: fmt.Sprint("key_", i), Class: "safe"})
+	}
+	data, err := json.Marshal(Drift{GeneratedAt: time.Date(2026, 10, 12, 4, 0, 0, 0, time.UTC), Harnesses: []HarnessDrift{h}}.slack())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var p struct {
+		Attachments []struct {
+			Color  string `json:"color"`
+			Blocks []struct {
+				Text struct{ Text string } `json:"text"`
+			} `json:"blocks"`
+		} `json:"attachments"`
+	}
+	if err := json.Unmarshal(data, &p); err != nil {
+		t.Fatal(err)
+	}
+	var green []string
+	for _, a := range p.Attachments {
+		if a.Color == addedColour {
+			for _, b := range a.Blocks {
+				green = append(green, b.Text.Text)
+			}
+		}
+	}
+	if len(green) != 2 {
+		t.Fatalf("the green bar's sections %d: want new surfaces and new fields apart", len(green))
+	}
+	for _, s := range green {
+		if len(s) > sectionLimit || strings.HasSuffix(s, "\n…") || !strings.Contains(s, "11") {
+			t.Errorf("a section cut short (%d bytes): …%s", len(s), s[max(0, len(s)-80):])
+		}
 	}
 }
