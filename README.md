@@ -333,7 +333,8 @@ output to the relay, and the relay removes what the policy does not collect befo
 anything leaves. The relay also names the checkout a session's hooks last ran in, which
 the agents' own records do not: its repository's origin and branch (`vcs.repository.url.full`,
 `vcs.ref.head.name`) and whether it is a linked worktree, as agents that run sessions side by
-side make (`terma.repository.worktree.linked`). While the policy collects tool content, it
+side make (`terma.repository.worktree.linked`), and that terma's hooks will name the checkout
+of each file the agent's own edit tools write (`terma.hooks.file_edits`). While the policy collects tool content, it
 also names the working tree (`terma.repository.root`), the directory in it
 (`terma.working_directory`) and the worktree's name (`terma.repository.worktree.name`), so
 Terma can tell which checkout a git command ran in and where in it; they are local paths, or

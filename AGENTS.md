@@ -102,7 +102,8 @@ still lists the claim's repository. It sends them with the team's key and applie
 collection policy: agents export all content to it, and the policy alone decides what
 leaves (`config.Policy.Content`). The claim also names the checkout the hook ran in, which
 the relay stamps on the session's records (`stampCheckout`): its origin, branch and whether
-it is a linked worktree under any policy (`vcs.*`, `terma.repository.worktree.linked`), and
+it is a linked worktree, with the promise that its hooks report each file-tool edit's checkout,
+under any policy (`vcs.*`, `terma.repository.worktree.linked`, `terma.hooks.file_edits`), and
 its working tree, the directory in it and the worktree's name with tool content only
 (`terma.repository.root`, `terma.working_directory`, `terma.repository.worktree.name`). Hook events never pass the relay, so delivery applies
 the same rules when it sends them. A session marked not collected is dropped on arrival;
