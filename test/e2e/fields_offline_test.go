@@ -102,7 +102,8 @@ func TestObserveFields(t *testing.T) {
 		"traces/chat {target}/events/tool.output content":                     {Site: "event", Event: "tool.output", Key: "content"},
 		"traces/chat {target}/events/event otel/src/tool_result.rs auth_mode": {Site: "event", Event: "event otel/src/tool_result.rs", Key: "auth_mode"},
 		"traces/GET /v1/events/x http.method":                                 {Site: "record", Key: "http.method"},
-		"metrics/tokens/exemplars trace.note":                                 {Site: "record", Key: "trace.note"},
+		"metrics/tokens/exemplars trace.note":                                 {Site: "metric", Event: "tokens", Key: "trace.note"},
+		"metrics/tokens type":                                                 {Site: "metric", Event: "tokens", Key: "type"},
 	} {
 		if sites[surfaceKey] != want {
 			t.Errorf("%s sits at %+v, want %+v", surfaceKey, sites[surfaceKey], want)

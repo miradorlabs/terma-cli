@@ -204,6 +204,8 @@ func ObserveFields(b Binary, requests []ExportRequest) {
 					see("scope", sm.GetScope().GetAttributes())
 					for _, mt := range sm.GetMetrics() {
 						surface := "metrics/" + mt.GetName()
+						// A metric's keys are classified on it: an agent may make one safe there alone.
+						see := func(surface string, kvs []*commonpb.KeyValue) { seeAt("metric", mt.GetName(), surface, kvs) }
 						exemplars := func(es []*metricspb.Exemplar) {
 							for _, e := range es {
 								see(surface+"/exemplars", e.GetFilteredAttributes())

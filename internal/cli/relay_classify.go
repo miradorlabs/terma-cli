@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"slices"
 
 	"github.com/spf13/cobra"
 
@@ -33,7 +34,7 @@ func (app *App) newRelayClassifyCommand() *cobra.Command {
 				return fmt.Errorf("want a JSON array of attribute keys on stdin: %w", err)
 			}
 			for _, q := range queries {
-				if q.Site != relay.SiteRecord && q.Site != relay.SiteResource && q.Site != relay.SiteEvent {
+				if !slices.Contains([]relay.FieldSite{relay.SiteRecord, relay.SiteResource, relay.SiteEvent, relay.SiteMetric}, q.Site) {
 					return fmt.Errorf("%q sits nowhere the relay knows: %q", q.Key, q.Site)
 				}
 			}

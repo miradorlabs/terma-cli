@@ -58,6 +58,10 @@ type CaptureRules struct {
 	// SafeKeys and SafePrefixes pass with content withheld, unless another agent declares them content.
 	SafeKeys     []string
 	SafePrefixes []string
+	// MetricSafeKeys pass with content withheld on the data points of the metric they are
+	// listed under, and nowhere else: a key too generic a name to be safe everywhere that one
+	// metric fills from a fixed vocabulary. Unless another agent declares them content.
+	MetricSafeKeys map[string][]string
 }
 
 // Principal is the attribute pair the backend keys a user on: a scope (a shared workspace id)
