@@ -41,7 +41,7 @@ func (app *App) relayDeps() daemon.Deps {
 }
 
 // fileEditHooks reports whether terma's hooks run for tool's sessions as written, file-edit hooks included. A claim
-// is a hook's, so they run, except where the agent runs its hooks only once trusted: Codex's notifier claims a session
+// is a hook's, so they run, except where the agent runs its hooks only once trusted: its notifier can claim a session
 // whose hooks it has not approved, or has disabled.
 func (app *App) fileEditHooks(tool string) bool {
 	a, ok := app.agents.ForTool(tool)
