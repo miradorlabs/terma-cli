@@ -181,3 +181,52 @@ func TestAFileNamedThroughASymlinkIsTheSessionsOwn(t *testing.T) {
 		t.Errorf("manifest = %q, want notes/n.md", got)
 	}
 }
+
+// A worktree's manifests mirrored from a main-checkout session expire like its own: a touch older than
+// ManifestRetention, never committed, does not stamp a developer's commit of the file weeks later.
+func TestAMirroredWorktreeManifestExpires(t *testing.T) {
+	t.Parallel()
+	stateDir := t.TempDir()
+	main := hookruntest.InitRepo(t)
+	ctx := context.Background()
+	if _, err := gitx.Git(ctx, main, "commit", "-q", "--allow-empty", "-m", "init"); err != nil {
+		t.Fatal(err)
+	}
+	wt := filepath.Join(main, ".claude", "worktrees", "feature-z")
+	if _, err := gitx.Git(ctx, main, "worktree", "add", "-q", wt); err != nil {
+		t.Fatal(err)
+	}
+	pol := hookruntest.Admitting(main)
+	now := time.Now()
+	env := func(at time.Time, cwd, stdin string, args ...string) Env {
+		return Env{StateDir: stateDir, Now: at, Cwd: cwd, Policy: pol, Args: args, Stdin: strings.NewReader(stdin), Version: "test", Team: "proj-main"}
+	}
+	edit := func(at time.Time, sess, rel string) {
+		t.Helper()
+		hookruntest.WriteFile(t, wt, rel, "package src\n")
+		in := `{"session_id":"` + sess + `","cwd":"` + hookruntest.InJSON(main) + `"`
+		if err := startSession(ctx, env(at, main, in+`,"hook_event_name":"SessionStart","source":"startup"}`)); err != nil {
+			t.Fatal(err)
+		}
+		if err := editFile(ctx, env(at, main, in+`,"tool_name":"Write","tool_input":{"file_path":"`+hookruntest.InJSON(filepath.Join(wt, rel))+`"}}`)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	edit(now.Add(-ManifestRetention-time.Hour), "sess-old", "src/y.go")
+	edit(now, "sess-new", "src/z.go")
+
+	if _, err := gitx.Git(ctx, wt, "add", "src/y.go", "src/z.go"); err != nil {
+		t.Fatal(err)
+	}
+	msgPath := filepath.Join(t.TempDir(), "MSG")
+	if err := os.WriteFile(msgPath, []byte("work\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := PrepareCommitMsg(ctx, env(now, wt, "", msgPath)); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(msgPath)
+	if got := trailer.Parse(string(data), "#"); len(got) != 1 || got[0].SessionID != "sess-new" {
+		t.Fatalf("the worktree commit's trailers = %+v, want only sess-new's\n%s", got, data)
+	}
+}

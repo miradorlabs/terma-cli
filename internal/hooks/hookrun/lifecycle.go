@@ -60,7 +60,7 @@ func (e Env) EndSession(r *Repo, id, tool string) {
 }
 
 // Touch spools the reported paths, absolute or relative to Cwd, as one event per checkout,
-// naming its repository. The session's own checkout r, and a linked worktree of its
+// naming its repository. The session's own checkout r, and any other checkout of its
 // repository, also record them in their manifests, for the commit stamping; only r claims the
 // session. Another checkout is reported only if the team policy admits it, and a path in no
 // admitted checkout is dropped.
@@ -71,9 +71,9 @@ func (e Env) Touch(r *Repo, sess session.Session, toolName string, paths []strin
 
 // Expect records in sess's manifest the files of r among paths, without reporting them, and
 // returns them repo-relative: a hook before a tool call records what a commit in the call
-// will take in. A linked worktree of r's repository, where a session started in the main
-// checkout often works, records its files in its own manifest too, since a commit there is
-// stamped from it; it is not claimed.
+// will take in. Another checkout of r's repository (a linked worktree, where a session started
+// in the main checkout often works, or the main checkout from a worktree session) records its
+// files in its own manifest too, since a commit there is stamped from it; it is not claimed.
 func (e Env) Expect(r *Repo, sess session.Session, paths []string) []string {
 	var own []string
 	for _, c := range e.checkouts(r, paths) {
@@ -87,7 +87,11 @@ func (e Env) Expect(r *Repo, sess session.Session, paths []string) []string {
 				e.Logf("worktree store: %v", err)
 				continue
 			}
+			// Only a session announced in the worktree prunes its store, so a mirrored touch expires here.
 			store = session.Open(dir)
+			if _, err := store.Prune(e.Time().Add(-ManifestRetention)); err != nil {
+				e.Logf("worktree prune: %v", err)
+			}
 		}
 		if err := store.Touch(sess, c.files, e.Time()); err != nil {
 			e.Logf("record files: %v", err)
@@ -153,7 +157,7 @@ func (e Env) checkouts(r *Repo, paths []string) []touched {
 		if rel == "" {
 			continue
 		}
-		i := slices.IndexFunc(out, func(t touched) bool { return t.repo.Root == repo.Root })
+		i := slices.IndexFunc(out, func(t touched) bool { return samePath(t.repo.Root, repo.Root) })
 		if i < 0 {
 			i = len(out)
 			out = append(out, touched{repo: repo})
