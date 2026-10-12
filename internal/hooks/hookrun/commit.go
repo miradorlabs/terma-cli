@@ -37,6 +37,10 @@ func PrepareCommitMsg(ctx context.Context, env Env) error {
 	if err != nil {
 		env.Logf("manifests: %v", err)
 	}
+	// A store is pruned only when a session starts in its checkout or mirrors a touch into it, so an expired
+	// manifest can outlive its retention here.
+	cutoff := env.Time().Add(-ManifestRetention)
+	manifests = slices.DeleteFunc(manifests, func(m session.Manifest) bool { return m.UpdatedAt.Before(cutoff) })
 	if len(manifests) == 0 {
 		return nil // nothing could be attributed; skip the git call entirely
 	}
