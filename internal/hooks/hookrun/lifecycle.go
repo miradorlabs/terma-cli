@@ -65,21 +65,28 @@ func (e Env) EndSession(r *Repo, id, tool string) {
 // session. Another checkout is reported only if the team policy admits it, and a path in no
 // admitted checkout is dropped.
 func (e Env) Touch(r *Repo, sess session.Session, toolName string, paths []string, extra map[string]any) {
-	e.Expect(r, sess, paths)
+	e.record(r, sess, paths, true)
 	e.Report(r, sess, toolName, paths, extra)
 }
 
 // Expect records in sess's manifest the files of r among paths, without reporting them, and
 // returns them repo-relative: a hook before a tool call records what a commit in the call
-// will take in. Another checkout of r's repository (a linked worktree, where a session started
+// will take in. Only r's manifest records a prediction, since only there can settling it
+// withdraw it when the call is declined or writes nothing.
+func (e Env) Expect(r *Repo, sess session.Session, paths []string) []string {
+	return e.record(r, sess, paths, false)
+}
+
+// record writes the files of r among paths to sess's manifest and returns them repo-relative.
+// With mirror, another checkout of r's repository (a linked worktree, where a session started
 // in the main checkout often works, or the main checkout from a worktree session) records its
 // files in its own manifest too, since a commit there is stamped from it; it is not claimed.
-func (e Env) Expect(r *Repo, sess session.Session, paths []string) []string {
+func (e Env) record(r *Repo, sess session.Session, paths []string, mirror bool) []string {
 	var own []string
 	for _, c := range e.checkouts(r, paths) {
 		store := r.Store
 		if c.repo != r {
-			if !sameRepository(r, c.repo) {
+			if !mirror || !sameRepository(r, c.repo) {
 				continue
 			}
 			dir, err := project.StoreDir(e.StateDir, c.repo.Root, c.repo.GitDir)

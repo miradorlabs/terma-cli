@@ -237,6 +237,13 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	}
 	sess := session.Session{ID: in.SessionID, Tool: codexTool, Model: in.Model}
 	if len(commits) == 0 {
+		if in.ToolName == codexShellTool {
+			// A shell command's targets are guesses, written or not: only the session's own manifest records them,
+			// where the turn's Stop withdraws the unchanged ones (expected.go).
+			env.Expect(r, sess, candidates)
+			env.Report(r, sess, in.ToolName, candidates, attrs)
+			return nil
+		}
 		env.Touch(r, sess, in.ToolName, candidates, attrs)
 		return nil
 	}

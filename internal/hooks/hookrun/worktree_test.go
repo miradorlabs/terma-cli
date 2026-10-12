@@ -275,3 +275,44 @@ func TestAnExpiredMirroredManifestStampsNothing(t *testing.T) {
 		t.Fatalf("the developer's commit carries %+v, want no trailer\n%s", got, data)
 	}
 }
+
+// A hook's prediction before a tool call (Codex's PreToolUse) stays in the session's own checkout: a prediction
+// mirrored into a linked worktree could not be withdrawn when the call is declined or writes nothing, and would stamp
+// a developer's later commit there.
+func TestAPredictionIsNotMirroredIntoAWorktree(t *testing.T) {
+	t.Parallel()
+	stateDir := t.TempDir()
+	main := hookruntest.InitRepo(t)
+	ctx := context.Background()
+	if _, err := gitx.Git(ctx, main, "commit", "-q", "--allow-empty", "-m", "init"); err != nil {
+		t.Fatal(err)
+	}
+	wt := filepath.Join(main, ".claude", "worktrees", "feature-p")
+	if _, err := gitx.Git(ctx, main, "worktree", "add", "-q", wt); err != nil {
+		t.Fatal(err)
+	}
+	env := func(cwd string, args ...string) Env {
+		return Env{StateDir: stateDir, Now: time.Now(), Cwd: cwd, Policy: hookruntest.Admitting(main), Args: args, Version: "test", Team: "proj-main"}
+	}
+	r, err := env(main).resolve(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hookruntest.WriteFile(t, wt, "src/p.go", "package src\n")
+	env(main).Expect(r, session.Session{ID: "sess-codex", Tool: "codex"}, []string{filepath.Join(wt, "src/p.go")})
+
+	if _, err := gitx.Git(ctx, wt, "add", "src/p.go"); err != nil {
+		t.Fatal(err)
+	}
+	msgPath := filepath.Join(t.TempDir(), "MSG")
+	if err := os.WriteFile(msgPath, []byte("work\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := PrepareCommitMsg(ctx, env(wt, msgPath)); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(msgPath)
+	if got := trailer.Parse(string(data), "#"); len(got) != 0 {
+		t.Fatalf("the developer's commit carries %+v, want no trailer\n%s", got, data)
+	}
+}

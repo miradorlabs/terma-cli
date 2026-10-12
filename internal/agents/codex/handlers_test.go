@@ -529,3 +529,39 @@ func TestCodexParallelCallsKeepAWrittenClaim(t *testing.T) {
 		t.Fatalf("the declined call withdrew the parallel call's written claim:\n%s", msg)
 	}
 }
+
+// A shell command's targets are guesses (written or not), withdrawn at Stop only in the session's own checkout: one in
+// a linked worktree is never mirrored there, so a developer's later commit of that file in the worktree is unstamped.
+func TestCodexShellTargetInAWorktreeIsNotMirrored(t *testing.T) {
+	root := hookruntest.InitRepo(t)
+	stateDir := t.TempDir()
+	ctx := context.Background()
+	sp, _ := spool.Open(t.TempDir())
+	if _, err := gitx.Git(ctx, root, "commit", "-q", "--allow-empty", "-m", "init"); err != nil {
+		t.Fatal(err)
+	}
+	wt := filepath.Join(root, ".claude", "worktrees", "x")
+	if _, err := gitx.Git(ctx, root, "worktree", "add", "-q", wt); err != nil {
+		t.Fatal(err)
+	}
+	const id = "01a08bd5-0487-74b1-9d82-45e619c574fc"
+	hookruntest.WriteFile(t, wt, "notes/b.md", "orig\n")
+	command := strconv.Quote("test -f .claude/worktrees/x/notes/b.md || printf 'codex\\n' > .claude/worktrees/x/notes/b.md")
+	env := hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Policy: hookruntest.Admitting(root), Spool: sp, Version: "test",
+		Stdin: strings.NewReader(`{"session_id":"` + id + `","hook_event_name":"PostToolUse","cwd":` + strconv.Quote(root) + `,"model":"gpt-6","permission_mode":"default","tool_name":"Bash","tool_use_id":"c1","turn_id":"t1","transcript_path":null,"tool_response":"","tool_input":{"command":` + command + `}}`)}
+	if err := postToolUse(ctx, env); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := gitx.Git(ctx, wt, "add", "notes"); err != nil {
+		t.Fatal(err)
+	}
+	msgPath := filepath.Join(t.TempDir(), "COMMIT_EDITMSG")
+	_ = os.WriteFile(msgPath, []byte("dev work\n"), 0o644)
+	commitEnv := hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: wt, Policy: hookruntest.Admitting(root), Args: []string{msgPath, "message"}, Stdin: strings.NewReader(""), Spool: sp, Version: "test"}
+	if err := hookrun.PrepareCommitMsg(ctx, commitEnv); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(msgPath); strings.Contains(string(data), "Agent-Session-Id") {
+		t.Fatalf("a developer's worktree commit was stamped from a Codex shell target:\n%s", data)
+	}
+}
