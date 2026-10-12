@@ -102,6 +102,15 @@ type Repo struct {
 	Worktree string
 	// Repository is the working copy as the team policy's repository list names it.
 	Repository config.Repository
+	// Remote is origin's browsable URL, without credentials: "" for a local path or no origin.
+	Remote string
+}
+
+// claim is the relay's claim of a session for r's project: the working copy, by its checkout,
+// its origin and the branch its HEAD is on (read from git's files, with no git subprocess).
+func (r *Repo) claim(tool string) claim.Claim {
+	return claim.Claim{ProjectID: r.ProjectID, Tool: tool, Repo: r.Name, Worktree: r.Worktree, Repository: r.Repository,
+		Root: r.workTree(), Remote: r.Remote, Branch: gitx.BranchFS(r.GitDir)}
 }
 
 // workTree is the checkout's root inside git, "" for a folder outside it: only a working
@@ -151,7 +160,7 @@ func (e Env) Repo(ctx context.Context) (*Repo, error) {
 // resolve is Repo without the unpark, for prepare-commit-msg, which has a commit's latency
 // budget to keep: the next hook hands the parked records on.
 func (e Env) resolve(ctx context.Context) (*Repo, error) {
-	root, gitDir, id, err := e.locate(ctx)
+	root, gitDir, id, remote, err := e.locate(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -162,7 +171,7 @@ func (e Env) resolve(ctx context.Context) (*Repo, error) {
 	if err != nil {
 		return nil, err
 	}
-	r := &Repo{Root: root, GitDir: gitDir, Store: session.Open(storeDir), Repository: id}
+	r := &Repo{Root: root, GitDir: gitDir, Store: session.Open(storeDir), Repository: id, Remote: remote}
 	r.Name, r.Worktree = CheckoutNames(root, gitDir)
 	r.ProjectID = e.Team
 	if e.Policy.Global() {
@@ -237,22 +246,22 @@ func (e Env) unpark(r *Repo) {
 // judges the current directory.
 func (e Env) Admits(ctx context.Context, dir string) bool {
 	e.Cwd = dir
-	_, _, id, err := e.locate(ctx)
+	_, _, id, _, err := e.locate(ctx)
 	return err == nil && e.Policy.Admits(id)
 }
 
 // locate finds the working copy at Cwd, a Git checkout's root from any directory in it,
-// and how admission names it.
-func (e Env) locate(ctx context.Context) (root, gitDir string, id config.Repository, err error) {
+// how admission names it, and its origin's URL.
+func (e Env) locate(ctx context.Context) (root, gitDir string, id config.Repository, remote string, err error) {
 	// Filesystem first: a git subprocess is a third of the hook budget on macOS.
 	root, gitDir, ok := gitx.LocateFS(e.Cwd)
 	if !ok {
 		if root, gitDir, err = project.Locate(ctx, e.Cwd); err != nil {
-			return "", "", id, err
+			return "", "", id, "", err
 		}
 	}
-	id.Origin = gitx.RepositoryFS(gitDir)
-	return root, gitDir, id, nil
+	id.Origin, remote = gitx.OriginFS(gitDir)
+	return root, gitDir, id, remote, nil
 }
 
 // EmitFor spools an event stamped with the repository's project, parking it in the
@@ -288,7 +297,8 @@ func (e Env) claimForRelay(r *Repo, ev spool.Event) {
 		return
 	}
 	tool, _ := ev.Attrs[semconv.GenAIMainAgentNameKey].(string)
-	c := claim.Claim{ProjectID: r.ProjectID, Tool: tool, Repo: r.Name, Worktree: r.Worktree, Repository: r.Repository, Root: r.workTree(), Cwd: e.workingDir(), PIDs: claimPIDs()}
+	c := r.claim(tool)
+	c.Cwd, c.PIDs = e.workingDir(), claimPIDs()
 	claim.Write(e.StateDir, ev.SessionID, c, e.Time())
 	// A subagent whose telemetry uses its agent id as session id would otherwise be dropped.
 	if agent, _ := ev.Attrs[semconv.TermaAgentIDKey].(string); agent != "" && agent != ev.SessionID {

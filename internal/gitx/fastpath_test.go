@@ -364,19 +364,19 @@ func TestLastCommitTellsMergesAndSquashes(t *testing.T) {
 }
 
 // Outside git there is no remote: a config file in the working directory is not one.
-func TestRemoteURLFSOutsideGit(t *testing.T) {
+func TestOriginFSOutsideGit(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "config"), []byte("[remote \"origin\"]\n\turl = https://github.com/acme/app\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	t.Chdir(dir)
-	if got := RemoteURLFS(""); got != "" {
-		t.Fatalf("RemoteURLFS(\"\") = %q", got)
+	if got := remoteURL(""); got != "" {
+		t.Fatalf("OriginFS(\"\") = %q", got)
 	}
 }
 
-// RemoteURLFS agrees with git's normalised remote.origin.url, including from a linked worktree.
-func TestRemoteURLFSMatchesGit(t *testing.T) {
+// OriginFS's URL agrees with git's normalised remote.origin.url, including from a linked worktree.
+func TestOriginFSMatchesGit(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not installed")
 	}
@@ -389,7 +389,7 @@ func TestRemoteURLFSMatchesGit(t *testing.T) {
 	root := t.TempDir()
 	mustGit(t, root, "init", "-q", "-b", "main")
 	gitDir := filepath.Join(root, ".git")
-	if got := RemoteURLFS(gitDir); got != "" {
+	if got := remoteURL(gitDir); got != "" {
 		t.Fatalf("no origin yet, got %q", got)
 	}
 	mustGit(t, root, "remote", "add", "origin", "https://alex:ghp_secret@github.com/miradorlabs/terma-cli.git")
@@ -397,12 +397,12 @@ func TestRemoteURLFSMatchesGit(t *testing.T) {
 	if want != "https://github.com/miradorlabs/terma-cli" {
 		t.Fatalf("git-backed value = %q", want)
 	}
-	if got := RemoteURLFS(gitDir); got != want {
-		t.Fatalf("RemoteURLFS = %q, want %q", got, want)
+	if got := remoteURL(gitDir); got != want {
+		t.Fatalf("OriginFS = %q, want %q", got, want)
 	}
 	// The file is read on every call, so a changed remote is seen at once.
 	mustGit(t, root, "remote", "set-url", "origin", "git@github.com:miradorlabs/other.git")
-	if got, want := RemoteURLFS(gitDir), "https://github.com/miradorlabs/other"; got != want {
+	if got, want := remoteURL(gitDir), "https://github.com/miradorlabs/other"; got != want {
 		t.Fatalf("after set-url: %q, want %q", got, want)
 	}
 
@@ -420,7 +420,7 @@ func TestRemoteURLFSMatchesGit(t *testing.T) {
 	if !ok || !strings.Contains(wtGitDir, "worktrees") {
 		t.Fatalf("LocateFS(worktree) = %q, %v", wtGitDir, ok)
 	}
-	if got, want := RemoteURLFS(wtGitDir), "https://github.com/miradorlabs/other"; got != want {
+	if got, want := remoteURL(wtGitDir), "https://github.com/miradorlabs/other"; got != want {
 		t.Fatalf("from a linked worktree: %q, want %q", got, want)
 	}
 }
@@ -463,4 +463,56 @@ func TestLinkedWorktreeFS(t *testing.T) {
 	if name, mainRoot, linked := LinkedWorktreeFS(gitDir); !linked || name != "from-bare" || mainRoot != "" {
 		t.Fatalf("bare worktree: %q, %q, %v", name, mainRoot, linked)
 	}
+}
+
+// BranchFS reads the branch git names, in a main checkout and in a linked worktree on
+// another branch, and none on a detached HEAD.
+func TestBranchFSMatchesGit(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not on PATH")
+	}
+	repo := t.TempDir()
+	mustGit(t, repo, "init", "-q", "-b", "main")
+	if got := BranchFS(filepath.Join(repo, ".git")); got != "main" {
+		t.Errorf("a branch with no commits yet: %q", got)
+	}
+	mustGit(t, repo, "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "--allow-empty", "-m", "one")
+	wt := filepath.Join(t.TempDir(), "feature")
+	mustGit(t, repo, "worktree", "add", "-q", "-b", "feature/x", wt)
+	for dir, want := range map[string]string{repo: "main", wt: "feature/x"} {
+		_, gitDir, ok := LocateFS(dir)
+		if !ok {
+			t.Fatalf("no git directory for %s", dir)
+		}
+		if got, git := BranchFS(gitDir), mustGit(t, dir, "branch", "--show-current"); got != want || got != git {
+			t.Errorf("%s: BranchFS %q, git %q, want %q", dir, got, git, want)
+		}
+	}
+	mustGit(t, wt, "checkout", "-q", "--detach")
+	if _, gitDir, _ := LocateFS(wt); BranchFS(gitDir) != "" {
+		t.Errorf("a detached HEAD named %q", BranchFS(gitDir))
+	}
+	if BranchFS("") != "" {
+		t.Error("outside git named a branch")
+	}
+}
+
+// A reftable repository keeps HEAD in its tables; its HEAD file is a stub naming
+// refs/heads/.invalid, which names no branch. Git before 2.45 cannot make one.
+func TestBranchFSNamesNoBranchInAReftableRepository(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not on PATH")
+	}
+	repo := t.TempDir()
+	if err := exec.Command("git", "-C", repo, "init", "-q", "-b", "main", "--ref-format=reftable").Run(); err != nil {
+		t.Skipf("this git cannot make a reftable repository: %v", err)
+	}
+	if got := BranchFS(filepath.Join(repo, ".git")); got != "" {
+		t.Errorf("BranchFS = %q, want none", got)
+	}
+}
+
+func remoteURL(gitDir string) string {
+	_, url := OriginFS(gitDir)
+	return url
 }

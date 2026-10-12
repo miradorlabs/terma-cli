@@ -203,7 +203,7 @@ func commitAttrs(r *Repo, head gitx.Commit) map[string]any {
 	if len(head.Files) > 0 {
 		attrs[semconv.TermaCommitLinesAddedKey], attrs[semconv.TermaCommitLinesDeletedKey] = lineTotals(head.Files)
 	}
-	if remote := gitx.RemoteURLFS(r.GitDir); remote != "" {
+	if remote := r.Remote; remote != "" {
 		attrs[semconv.VCSRepositoryURLFullKey] = remote
 	}
 	if head.Branch != "" {

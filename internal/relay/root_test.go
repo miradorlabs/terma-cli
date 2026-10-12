@@ -14,8 +14,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
-// stampsByKey is the resource attribute stamp each key's resources carried; a resource
-// without one counts as "".
+// stampsByKey is the resource attribute stamp each key's resources carried, a boolean as
+// "true" or "false"; a resource without one counts as "".
 func (u *upstream) stampsByKey(t *testing.T, stamp string) map[string][]string {
 	t.Helper()
 	u.mu.Lock()

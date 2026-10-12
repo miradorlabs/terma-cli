@@ -330,11 +330,15 @@ What content leaves is your team's collection policy, set in the Terma web app, 
 The relay and the hook queue's delivery fetch it with your login; until they have,
 nothing they would send leaves. Agents send prompts, model responses and tool input and
 output to the relay, and the relay removes what the policy does not collect before
-anything leaves. While it collects tool content, the relay also names the working tree a
-session's hooks last ran in (`terma.repository.root`) and the directory in it
-(`terma.working_directory`), which the agents' own records do not, so Terma can tell which
-checkout a git command ran in and where in it; they are local paths, so they leave with tool
-content or not at all. Every record the relay forwards also names the terma version that
+anything leaves. The relay also names the checkout a session's hooks last ran in, which
+the agents' own records do not: its repository's origin and branch (`vcs.repository.url.full`,
+`vcs.ref.head.name`) and whether it is a linked worktree, as agents that run sessions side by
+side make (`terma.repository.worktree.linked`). While the policy collects tool content, it
+also names the working tree (`terma.repository.root`), the directory in it
+(`terma.working_directory`) and the worktree's name (`terma.repository.worktree.name`), so
+Terma can tell which checkout a git command ran in and where in it; they are local paths, or
+names an agent often takes from the task, so they leave with tool content or not at all. The
+working directory an agent reports itself is held to the same rule. Every record the relay forwards also names the terma version that
 received it (`terma.version`). Hook events, which queue on this machine and never pass the relay, are
 held to the same policy when they are sent: an event queued before the policy tightened
 leaves without the content it no longer collects, and one from a repository no longer

@@ -11,6 +11,7 @@ import (
 	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
 	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
@@ -146,19 +147,7 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 	if r.opts.Version != "" {
 		stamp(p, semconv.TermaVersionKey, r.opts.Version)
 	}
-	// The checkout and the directory in it are the relay's to name, never the agent's, and local
-	// paths: they leave only with the tool content that names paths.
-	unstamp(p, semconv.TermaRepositoryRootKey)
-	unstamp(p, semconv.TermaWorkingDirectoryKey)
-	if pol.IncludeToolContent {
-		ran := r.ranIn(c, p, how)
-		if ran.Root != "" {
-			stamp(p, semconv.TermaRepositoryRootKey, ran.Root)
-		}
-		if ran.Cwd != "" {
-			stamp(p, semconv.TermaWorkingDirectoryKey, ran.Cwd)
-		}
-	}
+	stampCheckout(p, r.ranIn(c, p, how), pol.IncludeToolContent)
 	if how.how != "" {
 		stamp(p, semconv.TermaRelayAttributionKey, how.how)
 		if how.session != "" {
@@ -172,8 +161,8 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 
 // ranIn is the claim naming where the part's session ran, its Root the working tree and its
 // Cwd the directory: the placing claim, or, where global mode's catch-all placed the part
-// without either, its session's own claim for the same project. Both are "" when no hook has
-// named them.
+// without either, its session's own claim for the same project. Its checkout is empty when no
+// hook has named one.
 func (r *Relay) ranIn(c claim.Claim, p *part, how attribution) claim.Claim {
 	if c.Root != "" || c.Cwd != "" || how.how != semconv.TermaRelayAttributionCatchAll {
 		return c
@@ -200,15 +189,17 @@ func (r *Relay) catchAll() (claim.Claim, bool) {
 }
 
 // stamp sets a resource attribute on every resource, replacing any value: the relay decides, not the agent.
-func stamp(p *part, key, value string) {
+func stamp(p *part, key, value string) { stampValue(p, key, strValue(value)) }
+
+func stampValue(p *part, key string, value *commonpb.AnyValue) {
 	set := func(res *resourcepb.Resource) {
 		for _, kv := range res.Attributes {
 			if kv.GetKey() == key {
-				kv.Value = strValue(value)
+				kv.Value = proto.CloneOf(value)
 				return
 			}
 		}
-		res.Attributes = append(res.Attributes, &commonpb.KeyValue{Key: key, Value: strValue(value)})
+		res.Attributes = append(res.Attributes, &commonpb.KeyValue{Key: key, Value: proto.CloneOf(value)})
 	}
 	switch m := p.msg.(type) {
 	case *logspb.LogsData:

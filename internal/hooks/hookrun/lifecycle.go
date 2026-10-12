@@ -90,7 +90,7 @@ func (e Env) Report(r *Repo, sess session.Session, toolName string, paths []stri
 			semconv.GenAIMainAgentNameKey: sess.Tool, semconv.GenAIToolNameKey: toolName, semconv.TermaFilesPathsKey: c.files,
 		}
 		maps.Copy(attrs, extra)
-		if remote := gitx.RemoteURLFS(c.repo.GitDir); remote != "" {
+		if remote := c.repo.Remote; remote != "" {
 			attrs[semconv.VCSRepositoryURLFullKey] = remote
 		}
 		vcsAttrs(attrs, c.repo)
@@ -155,10 +155,11 @@ func (e Env) checkoutOf(r *Repo, dir string) *Repo {
 	if !ok || root == r.Root || gitDir == r.GitDir {
 		return r
 	}
-	id := config.Repository{Origin: gitx.RepositoryFS(gitDir)}
+	origin, remote := gitx.OriginFS(gitDir)
+	id := config.Repository{Origin: origin}
 	if !e.Policy.Admits(id) {
 		return nil
 	}
 	// Reported only: no store, and never passed to EmitFor, which would claim with it.
-	return &Repo{Root: root, GitDir: gitDir, ProjectID: r.ProjectID, Repository: id}
+	return &Repo{Root: root, GitDir: gitDir, ProjectID: r.ProjectID, Repository: id, Remote: remote}
 }
