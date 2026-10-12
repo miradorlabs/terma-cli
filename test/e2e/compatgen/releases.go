@@ -53,10 +53,11 @@ type ReleaseFields struct {
 // Passed reports a release that ran checks and failed none.
 func (r Release) Passed() bool { return r.Checks > 0 && len(r.Failed) == 0 }
 
-// releases are the builds tonight's rows name that no night before ran, by harness then
-// version: a build the history has a result of, or the catalog a census of, was; one whose
-// every check was skipped was not, so its first night that runs is its release. hs is the
-// night's field drift, and ran what its census scenarios ran.
+// releases are the builds tonight ran for the first time, by harness then version. A build
+// ran on a night that has a result of it, passed or failed, or a census of it; one whose every
+// check was skipped did not, so it is said neither then nor known after, and its first night
+// that runs is its release. hs is the night's field drift, and ran what its census scenarios
+// ran.
 func releases(hist map[string]Entry, cat Catalog, rows []e2e.CompatRow, fields []e2e.FieldRow, hs []HarnessDrift, ran censusRuns) []Release {
 	known := map[string][]string{} // harness → builds before tonight
 	for _, e := range hist {
@@ -77,11 +78,11 @@ func releases(hist map[string]Entry, cat Catalog, rows []e2e.CompatRow, fields [
 		}
 	}
 	for _, r := range rows {
-		b := build{r.Harness, r.Version}
-		add(b)
 		if r.Result == "not run" {
 			continue
 		}
+		b := build{r.Harness, r.Version}
+		add(b)
 		if checks[b] == nil {
 			checks[b] = map[FailedCheck]bool{}
 		}

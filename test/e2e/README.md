@@ -238,8 +238,10 @@ runs over two nights against a scratch origin. The digest,
 `report/drift.md`, `drift.json` and `slack.json`, leads with the night's **new releases**:
 each harness build tested for the first time (one neither the history nor the catalog has),
 against the newest build known before it, with whether it passed every capability check it
-ran (each capability on each platform once; a skipped one is not counted, and one that ran
-none says so) and what its census found new or gone, or that the night took none. A night
+ran (each capability on each platform once; a skipped one is not counted, and one censused
+that ran none says so) and what its census found new or gone, or that the night took none.
+A build the night skipped every check of, and took no census of, is no release until a night
+runs it. A night
 with none says so too. A release's failures are said on its line, not again among the
 capability changes, and a release that failed or ran no checks makes the night no quiet
 one. What came and what went are signed as a diff signs them (`+key`, `-key`) and coloured:

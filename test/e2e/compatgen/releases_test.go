@@ -53,9 +53,14 @@ func TestAReleaseIsABuildNoNightRanBefore(t *testing.T) {
 	if l := claude.line(bold); !strings.Contains(l, "❌ *Claude Code 2.1.297 (first build seen)*: fails 1 of 2 checks: Prompts and tool content withheld when the project says so (macOS)") {
 		t.Errorf("claude line %q", l)
 	}
-	if rs := releases(hist, Catalog{}, []e2e.CompatRow{check("codex", "0.163.0", "relay.desktop", "darwin/arm64", "not run")}, nil, nil, censusRuns{}); rs[0].Checks != 0 || rs[0].Passed() ||
+	skipped := []e2e.CompatRow{check("codex", "0.163.0", "relay.desktop", "darwin/arm64", "not run")}
+	if rs := releases(hist, Catalog{}, skipped, nil, nil, censusRuns{}); len(rs) != 0 {
+		t.Errorf("a build whose every check was skipped, and no census taken, is a release: %+v", rs)
+	}
+	census := []e2e.FieldRow{field("0.163.0", "logs/codex.api_request", "model", "safe", time.Now())}
+	if rs := releases(hist, Catalog{}, skipped, census, nil, censusRuns{}); len(rs) != 1 || rs[0].Checks != 0 || rs[0].Passed() ||
 		!strings.Contains(rs[0].line(bold), "⚪ *Codex CLI 0.163.0 (was 0.162.0)*: no checks ran") {
-		t.Errorf("a release whose every check was skipped: %+v", rs[0])
+		t.Errorf("a censused build whose every check was skipped: %+v", rs)
 	}
 }
 
