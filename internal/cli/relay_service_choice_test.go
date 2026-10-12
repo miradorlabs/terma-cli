@@ -42,11 +42,11 @@ func TestForeignRelays(t *testing.T) {
 		foreign bool
 	}{
 		{"none running", daemon.RunInfo{}, false, "dev", false},
-		{"the service's, in this environment", daemon.RunInfo{Environment: "dev", Service: true}, true, "dev", false},
-		{"another environment: delivers nothing here", daemon.RunInfo{Environment: "prod", Service: true}, true, "dev", true},
+		{"the service's, in this environment", daemon.RunInfo{Environment: "dev", Launch: daemon.LaunchService}, true, "dev", false},
+		{"another environment: delivers nothing here", daemon.RunInfo{Environment: "prod", Launch: daemon.LaunchService}, true, "dev", true},
 		{"hook-started, another environment", daemon.RunInfo{Environment: "prod"}, true, "dev", true},
 		{"hook-started, this environment: handed to the service, not replaced", daemon.RunInfo{Environment: "dev"}, true, "dev", false},
-		{"environment not recorded", daemon.RunInfo{Service: true}, true, "dev", false},
+		{"environment not recorded", daemon.RunInfo{Launch: daemon.LaunchService}, true, "dev", false},
 	} {
 		if got := foreignRelay(tc.running, tc.ok, tc.env); got != tc.foreign {
 			t.Errorf("%s: foreignRelay = %v, want %v", tc.name, got, tc.foreign)

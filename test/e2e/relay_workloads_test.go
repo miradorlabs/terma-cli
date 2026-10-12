@@ -28,7 +28,7 @@ import (
 func telemetryShape(e telemetryEvidence) map[string]int {
 	out := map[string]int{}
 	for _, r := range e.logs {
-		if r.Resource["service.name"] == "terma-cli" {
+		if termaService(r.Resource) {
 			continue
 		}
 		name := r.Attrs["event.name"]

@@ -234,8 +234,8 @@ func TestRelayRunRecordsItsEnvironment(t *testing.T) {
 	if !ok {
 		t.Fatal("a relay that recorded itself does not read as running")
 	}
-	if info.Environment != "dev" || info.Service {
-		t.Fatalf("recorded %+v, want a hook-style relay delivering to dev", info)
+	if info.Environment != "dev" || info.Launch != daemon.LaunchManual {
+		t.Fatalf("recorded %+v, want a manually started relay delivering to dev", info)
 	}
 	facts := testApp.relayFacts()
 	if facts.Environment != "dev" || !facts.HookStarted {

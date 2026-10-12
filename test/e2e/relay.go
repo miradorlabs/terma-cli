@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -22,6 +23,9 @@ type RelayOptions struct {
 	// Start runs the relay before the agent. Without it the first hook that claims a
 	// session starts it, as on a developer's machine — the cold start under test.
 	Start bool
+	// Service runs the relay before the agent the way this service manager does
+	// (StartServiceRelay), started again after it fails.
+	Service ServiceManager
 	// Hold overrides how long unclaimed records wait (TERMA_RELAY_HOLD).
 	Hold time.Duration
 	// NoKey leaves the machine without a key for the project: set up, but never
@@ -76,6 +80,66 @@ func (sb *Sandbox) UseRelay(o RelayOptions) {
 	if o.Start {
 		sb.StartRelay()
 	}
+	if o.Service != nil {
+		sb.StartServiceRelay(o.Service)
+	}
+}
+
+// ServiceManager says how long after a relay that ran for ran failed the service manager
+// starts it again, as the service definitions ask (internal/relay/service).
+type ServiceManager func(ran time.Duration) time.Duration
+
+// Systemd waits RestartSec=5 after every failure.
+func Systemd(time.Duration) time.Duration { return 5 * time.Second }
+
+// Launchd starts a job no sooner than ThrottleInterval (5) after its previous start: a
+// relay that ran longer is started again at once.
+func Launchd(ran time.Duration) time.Duration { return max(0, 5*time.Second-ran) }
+
+// StartServiceRelay runs `terma relay run --service` as manager does, started again after
+// any exit but a clean one (systemd's Restart=on-failure, launchd's KeepAlive without
+// SuccessfulExit), until the test ends.
+func (sb *Sandbox) StartServiceRelay(manager ServiceManager) {
+	t := sb.T
+	t.Helper()
+	sb.serviceRelay = true
+	logPath := filepath.Join(sb.Dir, "relay.log")
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	// StopRelay stops the manager first, as `launchctl bootout` / `systemctl stop` would,
+	// or it would start each relay StopRelay stops again.
+	var once sync.Once
+	sb.stopService = func() { once.Do(func() { close(stop) }) }
+	go func() {
+		defer close(done)
+		for {
+			began := time.Now()
+			cmd := exec.Command(sb.Terma, "relay", "run", "--service", "--idle", "0", "--quiet")
+			cmd.Env, cmd.Dir = sb.termaEnv(), sb.Repo
+			f, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+			if err == nil {
+				cmd.Stdout, cmd.Stderr = f, f
+			}
+			err = cmd.Run()
+			if f != nil {
+				_ = f.Close()
+			}
+			if err == nil {
+				return
+			}
+			select {
+			case <-stop:
+				return
+			case <-time.After(manager(time.Since(began))):
+			}
+		}
+	}()
+	t.Cleanup(func() { sb.StopRelay(); <-done })
+	sb.logRelayOnFailure(logPath)
+	if !sb.waitRelay(10 * time.Second) {
+		data, _ := os.ReadFile(logPath)
+		t.Fatalf("the service's relay never came up on %s:\n%s", sb.relayAddr, data)
+	}
 }
 
 // recordHarnesses sets the default profile's chosen agents.
@@ -112,14 +176,37 @@ func (sb *Sandbox) StartRelay() {
 		t.Fatalf("start relay: %v", err)
 	}
 	go func() { _ = cmd.Wait(); _ = logFile.Close() }()
+	sb.logRelayOnFailure(logPath)
+	if !sb.waitRelay(10 * time.Second) {
+		data, _ := os.ReadFile(logPath)
+		t.Fatalf("relay never came up on %s:\n%s", sb.relayAddr, data)
+	}
+}
+
+// logHookRelayOnFailure is logRelayOnFailure for the relays hooks start, which keep their
+// own log in the relay's directory, every one after the last; what they print goes to
+// daemon.log beside it.
+func (sb *Sandbox) logHookRelayOnFailure() {
+	dir := filepath.Join(sb.TermaConfig, "relay")
+	sb.logRelayOnFailure(filepath.Join(dir, "activity.log"))
+	sb.logRelayOnFailure(filepath.Join(dir, "daemon.log"))
+}
+
+// logRelayOnFailure logs, when the test fails, the relay log at logPath, the claims, and
+// when each hook ran: which hook claimed a session, and how long after its first export.
+func (sb *Sandbox) logRelayOnFailure(logPath string) {
+	t := sb.T
 	t.Cleanup(func() {
 		if !t.Failed() {
 			return
 		}
 		data, _ := os.ReadFile(logPath)
 		t.Logf("relay log:\n%s", tail(string(data), 4000))
-		// When each claim was written, and when each hook ran: which hook claimed a
-		// session, and how long after its first export.
+		// The last relay's exit counters, and the one's before it.
+		for _, name := range []string{"stats-prev.json", "stats.json"} {
+			data, _ := os.ReadFile(filepath.Join(sb.TermaConfig, "relay", name))
+			t.Logf("%s: %s", name, strings.Join(strings.Fields(string(data)), " "))
+		}
 		claims, _ := filepath.Glob(filepath.Join(sb.TermaConfig, "relay", "claims", "*.json"))
 		for _, c := range claims {
 			data, _ := os.ReadFile(c)
@@ -135,10 +222,6 @@ func (sb *Sandbox) StartRelay() {
 			}
 		}
 	})
-	if !sb.waitRelay(10 * time.Second) {
-		data, _ := os.ReadFile(logPath)
-		t.Fatalf("relay never came up on %s:\n%s", sb.relayAddr, data)
-	}
 }
 
 // WaitRelayCount waits until the running relay's counters under prefix sum to at least
@@ -173,19 +256,42 @@ func (sb *Sandbox) waitRelay(timeout time.Duration) bool {
 	return false
 }
 
-// StopRelay stops the relay, whoever started it, and waits for it to write its stats.
+// StopRelay stops the relays running, whoever started them, one waiting to take over
+// included once it has, and waits for each to write its stats and let go of its lock.
 func (sb *Sandbox) StopRelay() {
-	dir := filepath.Join(sb.TermaConfig, "relay")
-	pid := recordedPID(dir)
-	if pid <= 0 {
-		return
+	if sb.stopService != nil {
+		sb.stopService()
 	}
-	_ = syscall.Kill(pid, syscall.SIGTERM)
-	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
-		if recordedPID(dir) == 0 {
-			return
+	dir := filepath.Join(sb.TermaConfig, "relay")
+	for deadline := time.Now().Add(20 * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
+		pid := recordedPID(dir)
+		if pid <= 0 {
+			if !relayLocked(dir) {
+				return
+			}
+			continue // a relay going, or one about to record itself
+		}
+		if syscall.Kill(pid, syscall.SIGTERM) != nil {
+			return // a record no relay left behind: killed, so nothing holds the lock
+		}
+		for until := time.Now().Add(10 * time.Second); recordedPID(dir) == pid && time.Now().Before(until); {
+			time.Sleep(50 * time.Millisecond)
 		}
 	}
+}
+
+// relayLocked reports whether a relay holds dir's lock.
+func relayLocked(dir string) bool {
+	f, err := os.Open(filepath.Join(dir, "daemon.lock"))
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	if syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB) != nil {
+		return true
+	}
+	_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+	return false
 }
 
 // recordedPID is the pid the running relay recorded in its directory dir, 0 when none runs.

@@ -50,7 +50,7 @@ func (r *Relay) Run(ctx context.Context) {
 				if !beaten {
 					reason, beaten = semconv.TermaRelayHeartbeatReasonStart, true
 				}
-				r.wg.Go(func() { _ = r.heartbeat(ctx, reason) })
+				r.wg.Go(func() { _ = r.heartbeat(ctx, reason, "") })
 				lastBeat = now
 			}
 		}

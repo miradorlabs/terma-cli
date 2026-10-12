@@ -30,14 +30,14 @@ import (
 //   - content leaves only as the team's policy allows;
 //   - nothing else reaches upstream — a session outside any repository, in a
 //     repository the team does not list, or in one this machine holds no key for;
-//   - how a cold start (relay not running when the agent starts) goes.
+//   - a cold start (relay not running when the agent starts) loses nothing.
 
 // checkOnlyClaimed fails if anything the agent exported reached upstream without
-// belonging to the claimed session and project. terma's own spooled events
-// (service.name=terma-cli) are the hooks' delivery, not the relay's, and are skipped.
+// belonging to the claimed session and project. terma's own records (termaService) are
+// the hooks' delivery and the relay's heartbeat, not what it forwarded, and are skipped.
 func checkOnlyClaimed(t contractReporter, e telemetryEvidence, key, sid, project string) {
 	t.Helper()
-	agent := func(res map[string]string) bool { return res["service.name"] != "terma-cli" }
+	agent := func(res map[string]string) bool { return !termaService(res) }
 	// A record naming no session passes only as the relay's inference, said on its
 	// resource: attributed by the process that sent it, to this session.
 	inferred := func(res map[string]string) bool {
@@ -88,9 +88,13 @@ func isDigits(s string) bool {
 }
 
 // fromTerma reports a record terma sends itself, not an agent: its hooks' events, and the
-// relay's heartbeat, which names the machine and no project (and starts a minute in).
-func fromTerma(r LogRecord) bool {
-	s := r.Resource["service.name"]
+// relay's heartbeat, which names the machine and no project (a minute in, and as each
+// relay stops).
+func fromTerma(r LogRecord) bool { return termaService(r.Resource) }
+
+// termaService reports a resource of terma's own records, not an agent's.
+func termaService(res map[string]string) bool {
+	s := res["service.name"]
 	return s == "terma-cli" || s == "terma-relay"
 }
 
@@ -272,7 +276,7 @@ func checkWorkingTree(t contractReporter, e telemetryEvidence, key, sid, repo st
 	}
 	n := 0
 	for _, r := range e.logs {
-		if r.Resource["service.name"] == "terma-cli" || r.Attrs[key] != sid {
+		if termaService(r.Resource) || r.Attrs[key] != sid {
 			continue
 		}
 		n++
@@ -415,8 +419,7 @@ func TestRelayNegativeControls(t *testing.T) {
 }
 
 // The relay is not running when the agent starts: the first hook that claims the
-// session starts it. This records what arrived rather than failing on it — how the
-// first export races the relay's start is what this scenario measures.
+// session starts it, before the agent's first export, so the whole contract arrives.
 func TestRelayColdStart(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
 		ProvesAll(t, b, "relay.cold_start")
@@ -432,23 +435,14 @@ func TestRelayColdStart(t *testing.T) {
 		if !sb.waitRelay(10 * time.Second) {
 			t.Fatal("no hook started the relay")
 		}
-		var failures contractFailures
-		for deadline := time.Now().Add(30 * time.Second); ; time.Sleep(time.Second) {
-			failures = nil
-			checkClaudeTelemetry(&failures, sb.Receiver.evidence(), sid, sb.ProjectID, true)
-			if len(failures) == 0 || time.Now().After(deadline) {
-				break
-			}
-		}
+		sb.logHookRelayOnFailure()
+		awaitTelemetry(t, sb, func(r contractReporter, e telemetryEvidence) {
+			checkClaudeTelemetry(r, e, sid, sb.ProjectID, true)
+		})
 		sb.StopRelay()
 		c := sb.RelayStats()
 		noteRelayStats(t.Name(), c)
 		failUnclassified(t, c)
-		if len(failures) == 0 {
-			Note(t.Name(), "cold start: the whole contract arrived")
-		} else {
-			Note(t.Name(), fmt.Sprintf("cold start: %d contract checks missed, first: %s", len(failures), failures[0]))
-		}
 	})
 }
 
@@ -518,7 +512,7 @@ func reached(r *Receiver) map[string]map[string]bool {
 		case *collogspb.ExportLogsServiceRequest:
 			for _, rl := range m.ResourceLogs {
 				res := flatten(rl.GetResource().GetAttributes())
-				if res["service.name"] == "terma-cli" {
+				if termaService(res) {
 					continue
 				}
 				for _, sl := range rl.ScopeLogs {
@@ -629,8 +623,7 @@ func TestRelayConcurrentProjects(t *testing.T) {
 }
 
 // The relay started by a Codex hook: Codex runs the hook, so a relay it starts must
-// still be able to listen and to reach upstream. Fails if no hook could start one;
-// records how much of the contract arrived.
+// still be able to listen and to reach upstream, and the whole contract arrives.
 func TestRelayCodexColdStart(t *testing.T) {
 	forEachCodex(t, func(t *testing.T, b Binary, _ bool) {
 		ProvesAll(t, b, "relay.cold_start")
@@ -645,26 +638,14 @@ func TestRelayCodexColdStart(t *testing.T) {
 		if !sb.waitRelay(10 * time.Second) {
 			t.Fatal("no Codex hook started the relay")
 		}
-		var failures contractFailures
-		for deadline := time.Now().Add(30 * time.Second); ; time.Sleep(time.Second) {
-			failures = nil
-			checkCodexTelemetry(&failures, sb.Receiver.evidence(), run.ThreadID, sb.ProjectID, true, true)
-			if len(failures) == 0 || time.Now().After(deadline) {
-				break
-			}
-		}
+		sb.logHookRelayOnFailure()
+		awaitTelemetry(t, sb, func(r contractReporter, e telemetryEvidence) {
+			checkCodexTelemetry(r, e, run.ThreadID, sb.ProjectID, true, true)
+		})
 		sb.StopRelay()
 		c := sb.RelayStats()
 		noteRelayStats(t.Name(), c)
 		failUnclassified(t, c)
-		if sum(c, "forwarded.") == 0 {
-			t.Fatalf("the hook-started relay forwarded nothing: %v", c)
-		}
-		if len(failures) == 0 {
-			Note(t.Name(), "cold start: the whole contract arrived")
-		} else {
-			Note(t.Name(), fmt.Sprintf("cold start: %d contract checks missed, first: %s", len(failures), failures[0]))
-		}
 	})
 }
 

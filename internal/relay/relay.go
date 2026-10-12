@@ -90,6 +90,9 @@ type Options struct {
 	Now func() time.Time
 	// Version is terma's, sent as the User-Agent.
 	Version string
+	// Launch is what started the relay, on the heartbeat's resource: the service manager,
+	// a hook on demand, or a developer. A string; the daemon owns the vocabulary.
+	Launch string
 	// Logf, when set, is told why each part that could not leave was dropped (TERMA_RELAY_DEBUG=1).
 	Logf func(format string, args ...any)
 	// Warnf, when set, is told what an operator should see whatever the debug setting: a
@@ -237,7 +240,7 @@ func (r *Relay) routes() *http.ServeMux {
 			reason = "request"
 		}
 		w.Header().Set("Content-Type", "application/json")
-		if err := r.heartbeat(req.Context(), reason); err != nil {
+		if err := r.heartbeat(req.Context(), reason, ""); err != nil {
 			w.WriteHeader(http.StatusBadGateway)
 			_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 			return

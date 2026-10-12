@@ -4,7 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"strings"
+	"testing"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -83,7 +83,7 @@ func (app *App) ensureRelay(ctx context.Context, flag, env string, report func(w
 			return
 		}
 		report(false, "running in the background")
-		if isRunning && !running.Service {
+		if isRunning && running.Launch != daemon.LaunchService {
 			daemon.Stop(dir)
 		}
 		app.awaitServiceRelay(dir)
@@ -130,7 +130,4 @@ func keepService(state daemon.ServiceState, foreign bool, flag string) bool {
 }
 
 // realTerma is false for a test binary, which must not touch the machine's relay service.
-func realTerma() bool {
-	exe, err := os.Executable()
-	return err == nil && !strings.HasSuffix(filepath.Base(exe), ".test")
-}
+func realTerma() bool { return !testing.Testing() }
