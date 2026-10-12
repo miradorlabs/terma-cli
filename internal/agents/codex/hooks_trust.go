@@ -36,8 +36,9 @@ type hookTrust struct {
 	// Entries is how many hooks from this file Codex has a record for.
 	Entries int
 	// Trusted is how many of those carry a trusted hash.
-	Trusted  int
-	Disabled int
+	Trusted int
+	// DisabledKeys names the entries switched off in Codex.
+	DisabledKeys map[string]bool
 	// TrustedKeys names the trusted entries ("<event>:<group>:<handler>"): an entry added to
 	// an already-trusted file has no record and is skipped without a word.
 	TrustedKeys map[string]bool
@@ -94,7 +95,10 @@ func (c exporter) hookTrustFor(hooksPath string) (hookTrust, error) {
 			trust.TrustedHashes[name] = hash
 		}
 		if enabled, ok := entry[codexHookEnabledKey].(bool); ok && !enabled {
-			trust.Disabled++
+			if trust.DisabledKeys == nil {
+				trust.DisabledKeys = map[string]bool{}
+			}
+			trust.DisabledKeys[name] = true
 		}
 	}
 	return trust, nil
