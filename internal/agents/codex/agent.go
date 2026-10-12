@@ -126,14 +126,19 @@ func (Agent) UserHooksTrusted() (present, trusted bool, err error) {
 		return true, false, err
 	}
 	// An event with no entry of terma's runs nothing of terma's: PostToolUse reports file edits.
-	events := map[string]bool{}
+	found := map[string]bool{}
 	for _, e := range entries {
 		if trust.DisabledKeys[e.Key()] || trust.TrustedHashes[e.Key()] != e.Hash {
 			return true, false, nil
 		}
-		events[e.Event] = true
+		found[e.Event] = true
 	}
-	return true, len(events) == len(codexHooks), nil
+	for _, h := range codexHooks {
+		if !found[h.Event] {
+			return true, false, nil
+		}
+	}
+	return true, true, nil
 }
 
 // RemoveNotifier restores the user's own notifier.

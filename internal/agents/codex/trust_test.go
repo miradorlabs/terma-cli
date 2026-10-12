@@ -90,7 +90,27 @@ func TestUserHooksTrustedFollowsTheRecordedHashes(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(codexHome, "config.toml"), []byte(trustedConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	// Without its PostToolUse entry Codex reports no file edits, however trusted the rest.
+	// A setup from another terma path rewrites every entry, and Codex skips them all.
+	write("/usr/local/bin/terma")
+	if _, trusted, err := (Agent{}).UserHooksTrusted(); err != nil || trusted {
+		t.Fatalf("rewritten hooks still trusted: %v, %v", trusted, err)
+	}
+}
+
+// Without its PostToolUse entry Codex reports no file edits, however trusted the rest.
+func TestUserHooksTrustedNeedsEveryEntry(t *testing.T) {
+	codexHome, hooksFile := userHooked(t)
+	entries, err := termaEntriesIn(hooksFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var config strings.Builder
+	for _, e := range entries {
+		config.WriteString("[hooks.state." + quoteTOMLString(hooksFile+":"+e.Key()) + "]\ntrusted_hash = \"" + e.Hash + "\"\n\n")
+	}
+	if err := os.WriteFile(filepath.Join(codexHome, "config.toml"), []byte(config.String()), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	raw, err := os.ReadFile(hooksFile)
 	if err != nil {
 		t.Fatal(err)
@@ -108,10 +128,5 @@ func TestUserHooksTrustedFollowsTheRecordedHashes(t *testing.T) {
 	}
 	if present, trusted, err := (Agent{}).UserHooksTrusted(); err != nil || !present || trusted {
 		t.Fatalf("no PostToolUse entry: present %v trusted %v, %v", present, trusted, err)
-	}
-	// A setup from another terma path rewrites every entry, and Codex skips them all.
-	write("/usr/local/bin/terma")
-	if _, trusted, err := (Agent{}).UserHooksTrusted(); err != nil || trusted {
-		t.Fatalf("rewritten hooks still trusted: %v, %v", trusted, err)
 	}
 }
