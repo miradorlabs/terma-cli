@@ -1,6 +1,8 @@
 package hookrun
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"maps"
 	"path/filepath"
 	"slices"
@@ -63,10 +65,11 @@ func (e Env) EndSession(r *Repo, id, tool string) {
 // naming its repository. The session's own checkout r, and any other checkout of its
 // repository, also record them in their manifests, for the commit stamping; only r claims the
 // session. Another checkout is reported only if the team policy admits it, and a path in no
-// admitted checkout is dropped.
+// admitted checkout is dropped. Each event names its checkout by id (terma.checkout.id): the
+// agent's hook saw the edit happen.
 func (e Env) Touch(r *Repo, sess session.Session, toolName string, paths []string, extra map[string]any) {
 	e.record(r, sess, paths, true)
-	e.Report(r, sess, toolName, paths, extra)
+	e.report(r, sess, toolName, paths, extra, true)
 }
 
 // Expect records in sess's manifest the files of r among paths, without reporting them, and
@@ -111,8 +114,13 @@ func (e Env) record(r *Repo, sess session.Session, paths []string, mirror bool) 
 	return own
 }
 
-// Report spools paths as Touch does, without recording them in the manifest.
+// Report spools paths as Touch does, without recording them in the manifest or naming a
+// checkout id: what it reports may be a guess.
 func (e Env) Report(r *Repo, sess session.Session, toolName string, paths []string, extra map[string]any) {
+	e.report(r, sess, toolName, paths, extra, false)
+}
+
+func (e Env) report(r *Repo, sess session.Session, toolName string, paths []string, extra map[string]any, confirmed bool) {
 	for _, c := range e.checkouts(r, paths) {
 		attrs := map[string]any{
 			semconv.GenAIMainAgentNameKey: sess.Tool, semconv.GenAIToolNameKey: toolName, semconv.TermaFilesPathsKey: c.files,
@@ -122,6 +130,9 @@ func (e Env) Report(r *Repo, sess session.Session, toolName string, paths []stri
 			attrs[semconv.VCSRepositoryURLFullKey] = remote
 		}
 		vcsAttrs(attrs, c.repo)
+		if root := c.repo.workTree(); confirmed && root != "" {
+			attrs[semconv.TermaCheckoutIDKey] = checkoutID(root)
+		}
 		ev := spool.Event{Name: semconv.TermaFilesTouchedEvent, SessionID: sess.ID, Attrs: attrs}
 		if c.repo == r {
 			e.EmitFor(r, ev)
@@ -193,6 +204,13 @@ func (e Env) checkoutOf(r *Repo, dir string) *Repo {
 	}
 	// Reported only: no store, and never passed to EmitFor, which would claim with it.
 	return &Repo{Root: root, GitDir: gitDir, ProjectID: r.ProjectID, Repository: id, Remote: remote}
+}
+
+// checkoutID is terma.checkout.id for a symlink-resolved checkout root: the first 32 hex
+// characters of its SHA-256, which the platform recomputes from any root it observes.
+func checkoutID(root string) string {
+	sum := sha256.Sum256([]byte(filepath.Clean(root)))
+	return hex.EncodeToString(sum[:16])
 }
 
 // sameRepository reports whether two checkouts share one git repository: a main checkout and

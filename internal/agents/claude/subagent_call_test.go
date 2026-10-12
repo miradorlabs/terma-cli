@@ -191,6 +191,9 @@ func TestEditNamesItsToolCall(t *testing.T) {
 	if len(events) != 1 || events[0].Attrs[semconv.GenAIToolCallIDKey] != "toolu_01" {
 		t.Fatalf("touched = %+v", events)
 	}
+	if got := events[0].Attrs[semconv.TermaCheckoutIDKey]; got != hookruntest.CheckoutID(root) {
+		t.Errorf("checkout id = %v, want the edit's checkout's", got)
+	}
 }
 
 // `claude --agent <name>` stamps agent_type on every hook; without agent_id it is not a subagent.

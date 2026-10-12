@@ -4,6 +4,8 @@ package hookruntest
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -48,6 +50,13 @@ func InitRepo(t *testing.T) string {
 	}
 	resolved, _ := filepath.EvalSymlinks(dir)
 	return resolved
+}
+
+// CheckoutID is terma.checkout.id for root, a resolved path, by the contract the platform
+// recomputes it with: the first 32 hex characters of the root's SHA-256.
+func CheckoutID(root string) string {
+	sum := sha256.Sum256([]byte(root))
+	return hex.EncodeToString(sum[:])[:32]
 }
 
 // WriteFile writes content to rel under root, creating its directories.

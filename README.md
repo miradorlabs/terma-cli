@@ -342,7 +342,9 @@ working directory an agent reports itself is held to the same rule. Every record
 received it (`terma.version`). Hook events, which queue on this machine and never pass the relay, are
 held to the same policy when they are sent: an event queued before the policy tightened
 leaves without the content it no longer collects, and one from a repository no longer
-listed does not leave.
+listed does not leave. An edit the agent's hook saw names its checkout by
+`terma.checkout.id`, a hash of the working tree's path, under any policy: it names no path,
+though anyone who can guess the path can recompute it.
 
 `terma setup` runs the relay as a per-user background service, so it is up before any
 agent starts; with `--relay-service off`, hooks start it on demand. `terma update`

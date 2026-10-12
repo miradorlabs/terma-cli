@@ -609,6 +609,16 @@ attributes:
       never means rejected.
 
   # The checkout.
+  - key: terma.checkout.id
+    type: string
+    stability: development
+    brief: The checkout a confirmed edit landed in, as a hash of its working tree's path.
+    note: >
+      The first 32 lowercase hex characters of the SHA-256 of terma.repository.root as a
+      string: the cleaned, symlink-resolved absolute root, a linked worktree's own. Not
+      content: it names no path, so it leaves under every policy, and whoever knows a root
+      can recompute it. Only the hook that saw the edit stamps it.
+    examples: ["ddc5e473a09bd156b4eb7c426367aa59"]
   - key: terma.repository.root
     type: string
     stability: development
