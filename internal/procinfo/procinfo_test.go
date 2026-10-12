@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 )
@@ -51,16 +50,61 @@ func TestFindSenderNamesTheConnectingProcess(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = conn.Close() }()
-	remote := conn.RemoteAddr().String()
-	port, _ := strconv.Atoi(remote[strings.LastIndexByte(remote, ':')+1:])
-	if pid, ok := FindSender(port); !ok || pid != child.Process.Pid {
-		t.Fatalf("FindSender(%d) = %d, %v; want the child %d", port, pid, ok, child.Process.Pid)
+	port, server := conn.RemoteAddr().(*net.TCPAddr).Port, conn.LocalAddr().(*net.TCPAddr).Port
+	if pid, ok := FindSender(port, server); !ok || pid != child.Process.Pid {
+		t.Fatalf("FindSender(%d, %d) = %d, %v; want the child %d", port, server, pid, ok, child.Process.Pid)
 	}
 }
 
 // connectEnv makes the test binary the connecting child: it dials the address and
-// holds the connection until its stdin closes.
-const connectEnv = "PROCINFO_TEST_CONNECT"
+// holds the connection until its stdin closes. bindEnv makes it a process holding a socket
+// on [::1] at the given port, says "bound" or "no" on stdout, and holds it until stdin
+// closes.
+const (
+	connectEnv = "PROCINFO_TEST_CONNECT"
+	bindEnv    = "PROCINFO_TEST_BIND"
+)
+
+// A newer process holding the sender's port number on another address is not the sender:
+// matched on the port alone, it was, and a session's telemetry went to it (macOS lists the
+// newest process first).
+func TestFindSenderMatchesBothEnds(t *testing.T) {
+	t.Parallel()
+	if !Supported {
+		t.Skip("unsupported")
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = ln.Close() }()
+	start := func(env string) (*exec.Cmd, io.ReadCloser) {
+		child := exec.Command(os.Args[0], "-test.run=^$")
+		child.Env = append(os.Environ(), env)
+		stdin, _ := child.StdinPipe()
+		stdout, _ := child.StdoutPipe()
+		if err := child.Start(); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = stdin.Close(); _ = child.Process.Kill(); _ = child.Wait() })
+		return child, stdout
+	}
+	sender, _ := start(connectEnv + "=" + ln.Addr().String())
+	conn, err := ln.Accept()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close() }()
+	port, server := conn.RemoteAddr().(*net.TCPAddr).Port, conn.LocalAddr().(*net.TCPAddr).Port
+	_, out := start(fmt.Sprint(bindEnv, "=", port))
+	said := make([]byte, 5)
+	if n, _ := io.ReadFull(out, said); string(said[:n]) != "bound" {
+		t.Skipf("no [::1]:%d here to share the port number", port)
+	}
+	if pid, ok := FindSender(port, server); !ok || pid != sender.Process.Pid {
+		t.Fatalf("FindSender(%d, %d) = %d, %v; want the sender %d, not the process holding [::1]:%d", port, server, pid, ok, sender.Process.Pid, port)
+	}
+}
 
 // executableEnv makes the test binary print AbsExecutable and exit.
 const executableEnv = "PROCINFO_TEST_EXECUTABLE"
@@ -103,6 +147,17 @@ func TestMain(m *testing.M) {
 		fmt.Println(exe)
 		os.Exit(0)
 	}
+	if port := os.Getenv(bindEnv); port != "" {
+		ln, err := net.Listen("tcp6", "[::1]:"+port)
+		if err != nil {
+			fmt.Print("no")
+			os.Exit(0)
+		}
+		fmt.Print("bound")
+		_, _ = io.Copy(io.Discard, os.Stdin)
+		_ = ln.Close()
+		os.Exit(0)
+	}
 	if addr := os.Getenv(connectEnv); addr != "" {
 		conn, err := net.Dial("tcp", addr)
 		if err != nil {
@@ -117,6 +172,6 @@ func TestMain(m *testing.M) {
 
 func BenchmarkFindSender(b *testing.B) {
 	for b.Loop() {
-		FindSender(1)
+		FindSender(1, 2)
 	}
 }

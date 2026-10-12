@@ -28,10 +28,13 @@ func Ancestors() []int {
 }
 
 // FindSender returns the process holding the client end of a loopback connection from
-// port, asking the kernel (about 3 ms over 900 processes on macOS), never a subprocess.
-func FindSender(port int) (pid int, ok bool) {
+// port to server, asking the kernel (about 3 ms over 900 processes on macOS), never a
+// subprocess. Both ends are matched: a socket of another process can share the client's
+// port number on another address (an IPv6 one, or a connection out of the machine), and
+// matching the port alone named that process, the newest first.
+func FindSender(port, server int) (pid int, ok bool) {
 	if !Supported {
 		return 0, false
 	}
-	return findSender(port, os.Getpid())
+	return findSender(port, server, os.Getpid())
 }

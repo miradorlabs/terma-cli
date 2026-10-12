@@ -33,6 +33,7 @@ const (
 	procFDInfoSize       = 8   // sizeof(struct proc_fdinfo)
 	socketFDInfoSize     = 792 // sizeof(struct socket_fdinfo)
 	offSocketKind        = 256 // psi.soi_kind
+	offForeignPort       = 264 // psi.soi_proto.pri_tcp.tcpsi_ini.insi_fport
 	offLocalPort         = 268 // psi.soi_proto.pri_tcp.tcpsi_ini.insi_lport
 	sockInfoTCP          = 2   // SOCKINFO_TCP
 	maxFDsPerProcess     = 4096
@@ -49,8 +50,8 @@ func procInfo(callnum, pid, flavor int, arg uint64, buf []byte) (int, bool) {
 	return int(n), true
 }
 
-// ownsPort reports whether pid holds a TCP socket bound locally to port.
-func ownsPort(pid, port int) bool {
+// ownsConn reports whether pid holds a TCP socket from local port port to remote port server.
+func ownsConn(pid, port, server int) bool {
 	fds := make([]byte, procFDInfoSize*maxFDsPerProcess)
 	n, ok := procInfo(procInfoCallPIDInfo, pid, procPIDListFDs, 0, fds)
 	if !ok {
@@ -68,9 +69,12 @@ func ownsPort(pid, port int) bool {
 		if binary.LittleEndian.Uint32(info[offSocketKind:]) != sockInfoTCP {
 			continue
 		}
-		// insi_lport holds the port in network byte order in its low 16 bits.
-		raw := binary.LittleEndian.Uint32(info[offLocalPort:])
-		if int(uint16(raw>>8)|uint16(raw<<8)) == port {
+		// insi_lport and insi_fport hold a port in network byte order in their low 16 bits.
+		netPort := func(off int) int {
+			raw := binary.LittleEndian.Uint32(info[off:])
+			return int(uint16(raw>>8) | uint16(raw<<8))
+		}
+		if netPort(offLocalPort) == port && netPort(offForeignPort) == server {
 			return true
 		}
 	}

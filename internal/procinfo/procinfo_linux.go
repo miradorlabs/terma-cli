@@ -31,10 +31,10 @@ func parentOf(pid int) (int, bool) {
 // Supported is true: /proc answers both questions.
 const Supported = true
 
-// ownsPort reports whether pid holds a TCP socket bound locally to port.
-func ownsPort(pid, port int) bool {
+// ownsConn reports whether pid holds a TCP socket from local port port to remote port server.
+func ownsConn(pid, port, server int) bool {
 	inodes := map[string]bool{}
-	suffix := fmt.Sprintf(":%04X", port)
+	local, remote := fmt.Sprintf(":%04X", port), fmt.Sprintf(":%04X", server)
 	for _, table := range []string{"/proc/net/tcp", "/proc/net/tcp6"} {
 		f, err := os.Open(table)
 		if err != nil {
@@ -44,7 +44,7 @@ func ownsPort(pid, port int) bool {
 		sc.Scan() // header
 		for sc.Scan() {
 			fields := strings.Fields(sc.Text())
-			if len(fields) > 9 && strings.HasSuffix(fields[1], suffix) {
+			if len(fields) > 9 && strings.HasSuffix(fields[1], local) && strings.HasSuffix(fields[2], remote) {
 				inodes["socket:["+fields[9]+"]"] = true
 			}
 		}
