@@ -236,8 +236,8 @@ compat` and `make drift` do the same locally, into `docs/`, where git ignores th
 git steps are `compatgen/publish.sh restore` and `publish`, which `TestPublishTwoNights`
 runs over two nights against a scratch origin. The digest,
 `report/drift.md`, `drift.json` and `slack.json`, leads with the night's **new releases**:
-each harness build tested for the first time (one neither the history nor the catalog has),
-against the newest build known before it, with whether it passed every capability check it
+each harness build tested for the first time and newer than any tested before (an older
+build, re-run or backported, is no news), against the newest build known before it, with whether it passed every capability check it
 ran (each capability on each platform once; a skipped one is not counted, and one censused
 that ran none says so) and what its census found new or gone, or that the night took none.
 A build the night skipped every check of, and took no census of, is no release until a night

@@ -359,3 +359,14 @@ func TestListsOnOneBarAreSectionsEach(t *testing.T) {
 		}
 	}
 }
+
+// A build older than the newest known is no release, though nothing knows it: the catalog
+// forgets old censuses, and a build it forgot, run again, is no news.
+func TestAnOlderBuildIsNoRelease(t *testing.T) {
+	cat := Catalog{Censuses: []Census{{Harness: "codex", Version: "0.170.0"}}}
+	rows := []e2e.CompatRow{check("codex", "0.165.0", "relay.telemetry", "linux/amd64", "pass"), check("codex", "0.171.0", "relay.telemetry", "linux/amd64", "pass")}
+	rs := releases(map[string]Entry{}, cat, rows, nil, nil, censusRuns{})
+	if len(rs) != 1 || rs[0].Version != "0.171.0" || rs[0].Previous != "0.170.0" {
+		t.Errorf("releases %+v: only 0.171.0, against 0.170.0", rs)
+	}
+}

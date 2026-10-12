@@ -53,11 +53,13 @@ type ReleaseFields struct {
 // Passed reports a release that ran checks and failed none.
 func (r Release) Passed() bool { return r.Checks > 0 && len(r.Failed) == 0 }
 
-// releases are the builds tonight ran for the first time, by harness then version. A build
-// ran on a night that has a result of it, passed or failed, or a census of it; one whose every
-// check was skipped did not, so it is said neither then nor known after, and its first night
-// that runs is its release. hs is the night's field drift, and ran what its census scenarios
-// ran.
+// releases are the builds tonight ran for the first time that are newer than any run before,
+// by harness then version. A build ran on a night that has a result of it, passed or failed,
+// or a census of it; one whose every check was skipped did not, so it is said neither then nor
+// known after, and its first night that runs is its release. A build older than the newest
+// known is no release: the catalog forgets old censuses, and a build it forgot, run again, is
+// no news (nor is a backport). hs is the night's field drift, and ran what its census
+// scenarios ran.
 func releases(hist map[string]Entry, cat Catalog, rows []e2e.CompatRow, fields []e2e.FieldRow, hs []HarnessDrift, ran censusRuns) []Release {
 	known := map[string][]string{} // harness → builds before tonight
 	for _, e := range hist {
@@ -72,8 +74,12 @@ func releases(hist map[string]Entry, cat Catalog, rows []e2e.CompatRow, fields [
 	checks := map[build]map[FailedCheck]bool{} // the checks each build ran, passed or failed
 	failed := map[build][]FailedCheck{}
 	var builds []build
+	newest := map[string]string{}
+	for h, vs := range known {
+		newest[h] = slices.MaxFunc(vs, compareVersions)
+	}
 	add := func(b build) {
-		if !slices.Contains(known[b.harness], b.version) && !slices.Contains(builds, b) {
+		if versionLess(newest[b.harness], b.version) && !slices.Contains(builds, b) {
 			builds = append(builds, b)
 		}
 	}
