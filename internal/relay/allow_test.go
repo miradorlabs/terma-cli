@@ -49,12 +49,19 @@ func TestClassificationCoversTheGoldens(t *testing.T) {
 	}
 }
 
-// A key is safe or content, never both.
+// A key is safe or content, never both, on a metric alone too.
 func TestNoKeyIsBothSafeAndContent(t *testing.T) {
 	t.Parallel()
 	for key := range testRules.safeKeys {
 		if testRules.contentKey(key) {
 			t.Errorf("%q is listed as safe and as content", key)
+		}
+	}
+	for metric, keys := range testRules.metricSafeKeys {
+		for _, key := range keys {
+			if testRules.contentKey(key) {
+				t.Errorf("%q is listed as safe on %s and as content", key, metric)
+			}
 		}
 	}
 }
@@ -238,7 +245,7 @@ func TestNumbersAndFlagsPassUnderAnyKey(t *testing.T) {
 	}
 	unclassified := map[string]int{}
 	attrs, _ := testRules.withholdAttrs([]*commonpb.KeyValue{kv("num_hooks", "3"), kv("x.new_note", "3 files"),
-		{Key: "x.count", Value: &commonpb.AnyValue{Value: &commonpb.AnyValue_IntValue{IntValue: 4}}}}, false, false, false, unclassified)
+		{Key: "x.count", Value: &commonpb.AnyValue{Value: &commonpb.AnyValue_IntValue{IntValue: 4}}}}, false, false, false, nil, unclassified)
 	if attr(attrs, "num_hooks") != "3" || len(attrs) != 2 || unclassified["x.new_note"] != 1 {
 		t.Fatalf("attrs %v, unclassified %v", attrs, unclassified)
 	}

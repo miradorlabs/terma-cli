@@ -3,6 +3,7 @@ package relay
 import (
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
+	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
 	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/protobuf/proto"
@@ -32,8 +33,11 @@ type FieldSite string
 
 const (
 	// SiteRecord is a log record's attribute, and as the policy treats them, a span's, a
-	// span link's, a metric point's, an exemplar's and the instrumentation scope's.
+	// span link's and the instrumentation scope's.
 	SiteRecord FieldSite = "record"
+	// SiteMetric is a metric's data point's or exemplar's attribute: an agent may make a key
+	// safe on one metric alone (shape.CaptureRules.MetricSafeKeys).
+	SiteMetric FieldSite = "metric"
 	// SiteResource is a resource attribute.
 	SiteResource FieldSite = "resource"
 	// SiteEvent is a span event's attribute: the policy treats some events whole.
@@ -41,7 +45,7 @@ const (
 )
 
 // FieldQuery is a key to classify, and where it sits; Event names the span event of one on
-// SiteEvent.
+// SiteEvent, and the metric of one on SiteMetric.
 type FieldQuery struct {
 	Site  FieldSite `json:"site"`
 	Event string    `json:"event,omitempty"`
@@ -124,6 +128,12 @@ func (ru *rules) apply(q FieldQuery, v *commonpb.AnyValue, prompts, toolContent 
 			}
 			return sp.Events[0].Attributes
 		}
+	case SiteMetric:
+		pt := &metricspb.NumberDataPoint{Attributes: attrs}
+		p = &part{signal: Metrics, msg: &metricspb.MetricsData{ResourceMetrics: []*metricspb.ResourceMetrics{{Resource: &resourcepb.Resource{},
+			ScopeMetrics: []*metricspb.ScopeMetrics{{Metrics: []*metricspb.Metric{{Name: q.Event,
+				Data: &metricspb.Metric_Sum{Sum: &metricspb.Sum{DataPoints: []*metricspb.NumberDataPoint{pt}}}}}}}}}}}
+		after = func() []*commonpb.KeyValue { return pt.Attributes }
 	case SiteResource:
 		res := &resourcepb.Resource{Attributes: attrs}
 		p = &part{signal: Logs, msg: &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{Resource: res,

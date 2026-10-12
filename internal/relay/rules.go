@@ -27,6 +27,7 @@ type rules struct {
 	bodyPrefixes         []string
 	safeKeys             map[string]bool
 	safePrefixes         []string
+	metricSafeKeys       map[string][]string // metric name → keys safe on its data points
 }
 
 const defaultMarker = "<REDACTED>"
@@ -59,6 +60,7 @@ func compose(correlators []shape.Correlator, capturers []shape.Capturer) *rules 
 		return cmp.Or(cmp.Compare(a.Rank, b.Rank), strings.Compare(a.Attr, b.Attr))
 	})
 	r.safeKeys, r.safePrefixes = maps.Clone(genericSafeKeys), slices.Clone(genericSafePrefixes)
+	r.metricSafeKeys = map[string][]string{}
 	all := []shape.CaptureRules{generic}
 	for _, c := range capturers {
 		all = append(all, c.CaptureRules())
@@ -75,6 +77,9 @@ func compose(correlators []shape.Correlator, capturers []shape.Capturer) *rules 
 			r.safeKeys[k] = true
 		}
 		r.safePrefixes = union(r.safePrefixes, c.SafePrefixes)
+		for metric, keys := range c.MetricSafeKeys {
+			r.metricSafeKeys[metric] = union(r.metricSafeKeys[metric], keys)
+		}
 		if len(c.MarkerKeys) > 0 {
 			r.agents = append(r.agents, shape.CaptureRules{Marker: c.Marker, MarkerKeys: slices.Clone(c.MarkerKeys), Principal: c.Principal})
 		}

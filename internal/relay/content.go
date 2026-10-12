@@ -19,13 +19,24 @@ func (ru *rules) withhold(p *part, prompts, toolContent bool, unclassified map[s
 	}
 	changed := 0
 	applyIn := func(attrs []*commonpb.KeyValue, toolEvent bool) []*commonpb.KeyValue {
-		out, did := ru.withholdAttrs(attrs, prompts, toolContent, toolEvent, unclassified)
+		out, did := ru.withholdAttrs(attrs, prompts, toolContent, toolEvent, nil, unclassified)
 		if did {
 			changed++
 		}
 		return out
 	}
 	apply := func(attrs []*commonpb.KeyValue) []*commonpb.KeyValue { return applyIn(attrs, false) }
+	// onMetric withholds from a metric's data points, where the keys its agent lists under the
+	// metric are safe too (shape.CaptureRules.MetricSafeKeys).
+	onMetric := func(metric string) func([]*commonpb.KeyValue) []*commonpb.KeyValue {
+		return func(attrs []*commonpb.KeyValue) []*commonpb.KeyValue {
+			out, did := ru.withholdAttrs(attrs, prompts, toolContent, false, ru.metricSafeKeys[metric], unclassified)
+			if did {
+				changed++
+			}
+			return out
+		}
+	}
 	resource := func(r *resourcepb.Resource) {
 		if r == nil {
 			return
@@ -57,7 +68,7 @@ func (ru *rules) withhold(p *part, prompts, toolContent bool, unclassified map[s
 		}
 		r.Attributes = kept
 	}
-	exemplars := func(values []*metricspb.Exemplar) {
+	exemplars := func(values []*metricspb.Exemplar, apply func([]*commonpb.KeyValue) []*commonpb.KeyValue) {
 		for _, value := range values {
 			value.FilteredAttributes = apply(value.FilteredAttributes)
 		}
@@ -71,21 +82,22 @@ func (ru *rules) withhold(p *part, prompts, toolContent bool, unclassified map[s
 					sm.Scope.Attributes = apply(sm.Scope.Attributes)
 				}
 				for _, mt := range sm.GetMetrics() {
+					apply := onMetric(mt.GetName())
 					for _, pt := range mt.GetSum().GetDataPoints() {
 						pt.Attributes = apply(pt.GetAttributes())
-						exemplars(pt.Exemplars)
+						exemplars(pt.Exemplars, apply)
 					}
 					for _, pt := range mt.GetGauge().GetDataPoints() {
 						pt.Attributes = apply(pt.GetAttributes())
-						exemplars(pt.Exemplars)
+						exemplars(pt.Exemplars, apply)
 					}
 					for _, pt := range mt.GetHistogram().GetDataPoints() {
 						pt.Attributes = apply(pt.GetAttributes())
-						exemplars(pt.Exemplars)
+						exemplars(pt.Exemplars, apply)
 					}
 					for _, pt := range mt.GetExponentialHistogram().GetDataPoints() {
 						pt.Attributes = apply(pt.Attributes)
-						exemplars(pt.Exemplars)
+						exemplars(pt.Exemplars, apply)
 					}
 					for _, pt := range mt.GetSummary().GetDataPoints() {
 						pt.Attributes = apply(pt.Attributes)
@@ -157,8 +169,9 @@ func (ru *rules) withhold(p *part, prompts, toolContent bool, unclassified map[s
 	return changed
 }
 
-// withholdAttrs applies the content policy to attrs; in a toolEvent an unclassified key is kept.
-func (ru *rules) withholdAttrs(attrs []*commonpb.KeyValue, prompts, toolContent, toolEvent bool, unclassified map[string]int) ([]*commonpb.KeyValue, bool) {
+// withholdAttrs applies the content policy to attrs; in a toolEvent an unclassified key is
+// kept, and the keys in safeHere are safe in attrs alone (a metric's, MetricSafeKeys).
+func (ru *rules) withholdAttrs(attrs []*commonpb.KeyValue, prompts, toolContent, toolEvent bool, safeHere []string, unclassified map[string]int) ([]*commonpb.KeyValue, bool) {
 	marker, principal := ru.marker(attrs), ru.principal(attrs)
 	changed := false
 	out := attrs[:0]
@@ -175,7 +188,7 @@ func (ru *rules) withholdAttrs(attrs []*commonpb.KeyValue, prompts, toolContent,
 		case !prompts && contains(ru.promptFields, key) && kv.GetValue().GetStringValue() != marker:
 			kv.Value = &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: marker}}
 			changed = true
-		case !toolEvent && !ru.contentKey(key) && !ru.safeKey(key) && !scalarNonText(kv.GetValue()):
+		case !toolEvent && !ru.contentKey(key) && !ru.safeKey(key) && !contains(safeHere, key) && !scalarNonText(kv.GetValue()):
 			unclassified[key]++
 			changed = true
 			continue

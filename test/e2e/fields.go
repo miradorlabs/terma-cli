@@ -204,6 +204,8 @@ func ObserveFields(b Binary, requests []ExportRequest) {
 					see("scope", sm.GetScope().GetAttributes())
 					for _, mt := range sm.GetMetrics() {
 						surface := "metrics/" + mt.GetName()
+						// A metric's keys are classified on it: an agent may make one safe there alone.
+						see := func(surface string, kvs []*commonpb.KeyValue) { seeAt("metric", mt.GetName(), surface, kvs) }
 						exemplars := func(es []*metricspb.Exemplar) {
 							for _, e := range es {
 								see(surface+"/exemplars", e.GetFilteredAttributes())
@@ -373,8 +375,8 @@ func WriteFields(dir, terma string) error {
 }
 
 // classQuery is a key as `terma relay classify` takes it: where it sits, as the relay's
-// content policy tells them apart (a resource, a span event, or a record, as it treats every
-// other surface), and the span event's name. The census records it as it sees the key, so no
+// content policy tells them apart (a resource, a span event, a metric, or a record, as it
+// treats every other surface), and the span event's or the metric's name. The census records it as it sees the key, so no
 // surface's name is read back for it.
 type classQuery struct {
 	Site  string `json:"site"`

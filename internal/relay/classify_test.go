@@ -23,7 +23,7 @@ func TestClassifyAgreesWithTheContentPolicy(t *testing.T) {
 	for _, key := range slices.Sorted(maps.Keys(keys)) {
 		class := ru.classify(FieldQuery{Site: SiteRecord, Key: key})
 		unclassified := map[string]int{}
-		out, _ := ru.withholdAttrs([]*commonpb.KeyValue{{Key: key, Value: strValue("what was said")}}, false, false, false, unclassified)
+		out, _ := ru.withholdAttrs([]*commonpb.KeyValue{{Key: key, Value: strValue("what was said")}}, false, false, false, nil, unclassified)
 		var did string
 		switch {
 		case unclassified[key] > 0:
@@ -89,11 +89,11 @@ func TestProcessArgumentsOnARecordAreWithheld(t *testing.T) {
 	t.Parallel()
 	ru := compose(testCorrelators, testCapturers)
 	for _, key := range []string{"process.command_args", "process.command_line"} {
-		out, _ := ru.withholdAttrs([]*commonpb.KeyValue{{Key: key, Value: strValue("terma --token secret")}, {Key: "model", Value: strValue("m")}}, false, true, false, map[string]int{})
+		out, _ := ru.withholdAttrs([]*commonpb.KeyValue{{Key: key, Value: strValue("terma --token secret")}, {Key: "model", Value: strValue("m")}}, false, true, false, nil, map[string]int{})
 		if len(out) != 1 || out[0].GetKey() != "model" {
 			t.Errorf("%s on a record with prompts withheld: %v", key, out)
 		}
-		out, _ = ru.withholdAttrs([]*commonpb.KeyValue{{Key: key, Value: strValue("terma --token secret")}}, true, true, false, map[string]int{})
+		out, _ = ru.withholdAttrs([]*commonpb.KeyValue{{Key: key, Value: strValue("terma --token secret")}}, true, true, false, nil, map[string]int{})
 		if len(out) != 1 {
 			t.Errorf("%s on a record with prompts collected: %v", key, out)
 		}
