@@ -65,15 +65,7 @@ func (sb *Sandbox) claudeEnv(route Route) []string {
 		case RouteSubscription:
 			env = append(env, "CLAUDE_CODE_OAUTH_TOKEN="+creds.OAuthToken)
 		case RouteAPIKey:
-			if os.Getenv("ANTHROPIC_FEDERATION_RULE_ID") != "" && sb.ClaudeBaseURL == "" {
-				federation, err := githubClaudeFederation(sb.Dir)
-				if err != nil {
-					sb.T.Fatalf("Claude federation: %v", err)
-				}
-				env = append(env, federation...)
-			} else {
-				env = append(env, "ANTHROPIC_API_KEY="+creds.APIKey)
-			}
+			env = append(env, "ANTHROPIC_API_KEY="+creds.APIKey)
 		}
 	}
 	if sb.ClaudeBaseURL != "" {
