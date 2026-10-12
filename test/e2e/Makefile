@@ -55,8 +55,10 @@ machines: machine-image
 	$(LINUX_GO) sh -c 'cd /src && go build -buildvcs=false -o test/e2e/bin/linux/terma ./cmd/terma && cd test/e2e && go test -c -o bin/linux/e2e.test .'
 	# seccomp and AppArmor unconfined: Codex runs tool commands in bwrap, which needs the user
 	# namespaces Docker's default seccomp profile forbids and the mounts its default AppArmor
-	# profile does ("bwrap: Failed to make / slave"), on a Linux host such as CI's; a
-	# developer's machine allows both.
+	# profile forbids ("bwrap: Failed to make / slave"). Docker Desktop applies neither. An
+	# Ubuntu 24.04+ host also gives bwrap no capabilities in its user namespace ("bwrap:
+	# loopback: Failed RTM_NEWADDR") until `sysctl -w kernel.apparmor_restrict_unprivileged_userns=0`,
+	# which CI's machine job runs first.
 	docker run --rm --security-opt seccomp=unconfined --security-opt apparmor=unconfined -v "$(CURDIR)":/work/e2e -w /work/e2e \
 	 -e TERMA_E2E=1 -e TERMA_ENV=dev -e TERMA_E2E_BINARY=/work/e2e/bin/linux/terma \
 	 -e TERMA_E2E_CLAUDE_VERSIONS=installed -e TERMA_E2E_CODEX_VERSIONS=installed \
