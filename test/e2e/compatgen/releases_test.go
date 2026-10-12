@@ -35,7 +35,7 @@ func TestAReleaseIsABuildNoNightRanBefore(t *testing.T) {
 		check("claude", "2.1.297", "relay.content_withheld", "darwin/arm64", "pass"),
 		check("claude", "2.1.297", "relay.content_withheld", "darwin/arm64", "fail"),
 	}
-	rs := releases(hist, Catalog{}, rows, nil, nil)
+	rs := releases(hist, Catalog{}, rows, nil, nil, censusRuns{})
 	if len(rs) != 2 || rs[0].Harness != "claude" || rs[1].Version != "0.162.1" {
 		t.Fatalf("releases %+v", rs)
 	}
@@ -53,7 +53,7 @@ func TestAReleaseIsABuildNoNightRanBefore(t *testing.T) {
 	if l := claude.line(bold); !strings.Contains(l, "❌ *Claude Code 2.1.297 (first build seen)*: fails 1 of 2 checks: Prompts and tool content withheld when the project says so (macOS)") {
 		t.Errorf("claude line %q", l)
 	}
-	if rs := releases(hist, Catalog{}, []e2e.CompatRow{check("codex", "0.163.0", "relay.desktop", "darwin/arm64", "not run")}, nil, nil); rs[0].Checks != 0 || rs[0].Passed() ||
+	if rs := releases(hist, Catalog{}, []e2e.CompatRow{check("codex", "0.163.0", "relay.desktop", "darwin/arm64", "not run")}, nil, nil, censusRuns{}); rs[0].Checks != 0 || rs[0].Passed() ||
 		!strings.Contains(rs[0].line(bold), "⚪ *Codex CLI 0.163.0 (was 0.162.0)*: no checks ran") {
 		t.Errorf("a release whose every check was skipped: %+v", rs[0])
 	}
@@ -76,7 +76,7 @@ func TestAReleaseSaysWhatItsCensusFound(t *testing.T) {
 	}
 	_, _, hs := fieldDrift(cat, tonight, censusRuns{}, day.Add(24*time.Hour))
 	rows := []e2e.CompatRow{check("codex", "0.162.1", "relay.telemetry", "linux/amd64", "pass")}
-	rs := releases(map[string]Entry{}, cat, rows, tonight, hs)
+	rs := releases(map[string]Entry{}, cat, rows, tonight, hs, censusRuns{})
 	if len(rs) != 1 || rs[0].Previous != "0.162.0" {
 		t.Fatalf("releases %+v", rs)
 	}
@@ -93,7 +93,7 @@ func TestAReleaseSaysWhatItsCensusFound(t *testing.T) {
 // line, not again among the compatibility changes, and makes no quiet night.
 func TestTheDigestLeadsWithTheReleases(t *testing.T) {
 	d := Drift{GeneratedAt: time.Date(2026, 10, 12, 4, 0, 0, 0, time.UTC)}
-	if !strings.Contains(d.markdown(), "None tonight") || !strings.Contains(slackText(t, d), "*New releases:* none tonight") {
+	if !strings.Contains(d.markdown(), "None tonight") || !strings.Contains(slackDigestText(t, d), "*New releases:* none tonight") {
 		t.Errorf("no releases is not said:\n%s", d.markdown())
 	}
 	d.Harnesses = []HarnessDrift{{Harness: "gemini", Name: "Gemini CLI", Version: "0.63.0", Previous: "0.62.0"}}
@@ -118,7 +118,7 @@ func TestTheDigestLeadsWithTheReleases(t *testing.T) {
 	if strings.Count(md, "Claude Code 2.1.297") != 1 || !strings.Contains(md, "Codex CLI 0.162.0") {
 		t.Errorf("a release's failure is said twice, or another change not at all:\n%s", md)
 	}
-	if s := slackText(t, d); strings.Index(s, "New releases") > strings.Index(s, "Compatibility changes") {
+	if s := slackDigestText(t, d); strings.Index(s, "New releases") > strings.Index(s, "Compatibility changes") {
 		t.Errorf("the releases do not lead:\n%s", s)
 	}
 	if d.Compat = nil; d.Quiet() {
@@ -178,8 +178,8 @@ func slackItems(t *testing.T, d Drift) []slackItem {
 	return out
 }
 
-// slackText is the text of d's Slack payload, in the order Slack shows it.
-func slackText(t *testing.T, d Drift) string {
+// slackDigestText is the text of d's Slack payload, in the order Slack shows it.
+func slackDigestText(t *testing.T, d Drift) string {
 	t.Helper()
 	var b strings.Builder
 	for _, it := range slackItems(t, d) {
@@ -189,8 +189,8 @@ func slackText(t *testing.T, d Drift) string {
 }
 
 // A harness's changes are its headline on Slack's own bar, for a colour says nothing of how
-// the build did; then one green attachment of all that came and one red of all that went; what
-// is neither, the newly withheld, keeps Slack's own bar.
+// the build did, with what neither came nor went (the newly withheld); then one green
+// attachment of all that came and one red of all that went.
 func TestSlackColoursWhatCameAndWent(t *testing.T) {
 	d := Drift{GeneratedAt: time.Date(2026, 10, 12, 4, 0, 0, 0, time.UTC), Harnesses: []HarnessDrift{{
 		Harness: "codex", Name: "Codex CLI", Version: "0.162.1", Previous: "0.162.0",
@@ -200,30 +200,21 @@ func TestSlackColoursWhatCameAndWent(t *testing.T) {
 		Unseen:      []GoneSurface{{Surface: "metrics/codex.dropped"}},
 		Withheld:    []FieldChange{{Surface: "logs/codex.api_request", Key: "state"}},
 	}}}
-	var coloured []slackItem
-	for _, it := range slackItems(t, d) {
-		if strings.Contains(it.text, "_New surfaces_") || strings.Contains(it.text, "_Removed fields_") || strings.Contains(it.text, "_Newly withheld") {
-			coloured = append(coloured, it)
-		}
-	}
-	if len(coloured) != 3 {
-		t.Fatalf("attachments %+v: want what came, what went, and the withheld", coloured)
-	}
-	came, went, withheld := coloured[0], coloured[1], coloured[2]
 	items := slackItems(t, d)
-	if i := slices.Index(items, came); i < 1 || items[i-1].colour != "" || !strings.HasPrefix(items[i-1].text, "*Codex CLI 0.162.1") {
-		t.Errorf("the headline is not on its own, uncoloured, before what came: %+v", items)
+	i := slices.IndexFunc(items, func(it slackItem) bool { return strings.HasPrefix(it.text, "*Codex CLI 0.162.1") })
+	if i < 0 || len(items) != i+3 {
+		t.Fatalf("items %+v: want the headline, what came and what went, last", items)
+	}
+	head, came, went := items[i], items[i+1], items[i+2]
+	if head.colour != "" || !strings.Contains(head.text, "_Newly withheld by the relay, unclassified_\n• `state`") {
+		t.Errorf("the headline, with the withheld, on Slack's own bar: %+v", head)
 	}
 	if came.colour != addedColour || strings.Contains(came.text, "*Codex CLI") ||
 		!strings.Contains(came.text, "_New fields_\n`+region`") || strings.Contains(came.text, addedMark) {
 		t.Errorf("what came: %+v", came)
 	}
-	if went.colour != removedColour || strings.Contains(went.text, "*Codex CLI") ||
-		!strings.Contains(went.text, "_Surfaces no longer sent_\n`-metrics/codex.dropped`") || !strings.Contains(went.text, "`-gone`") {
+	if went.colour != removedColour || !strings.Contains(went.text, "_Surfaces no longer sent_\n`-metrics/codex.dropped`") || !strings.Contains(went.text, "`-gone`") {
 		t.Errorf("what went: %+v", went)
-	}
-	if withheld.colour != "" || !strings.Contains(withheld.text, "• `state`") {
-		t.Errorf("the withheld: %+v", withheld)
 	}
 	// The summary first, then under a divider the harnesses' changes, with nothing after them.
 	d.Harnesses = append(d.Harnesses, HarnessDrift{Harness: "pi", Name: "Pi", Version: "0.84.2", Previous: "0.84.2"})
@@ -232,11 +223,71 @@ func TestSlackColoursWhatCameAndWent(t *testing.T) {
 	at := func(prefix string) int {
 		return slices.IndexFunc(items, func(it slackItem) bool { return strings.HasPrefix(it.text, prefix) })
 	}
-	unchanged, run, heading, head := at("_Unchanged:_ Pi 0.84.2"), at("<https://ci/run/4|The run>"), at("*Field changes by harness*"), at("*Codex CLI 0.162.1")
-	if unchanged < 0 || run < 0 || !(unchanged < run && run < heading-1 && heading < head) || items[heading-1].text != "" || !strings.HasPrefix(items[len(items)-1].text, "_Newly withheld") {
+	unchanged, run, heading, codex := at("_Unchanged:_ Pi 0.84.2"), at("<https://ci/run/4|The run>"), at("*Field changes by harness*"), at("*Codex CLI 0.162.1")
+	if unchanged < 0 || run < 0 || !(unchanged < run && run < heading-1 && heading < codex) || items[heading-1].text != "" || items[len(items)-1].colour != removedColour {
 		t.Errorf("not summary, divider, then the harnesses: %+v", items)
 	}
 	if md := d.markdown(); !strings.Contains(md, "- 🟢 `+region`") || !strings.Contains(md, "- 🔴 `-gone`") || !strings.Contains(md, "- `state`") {
 		t.Errorf("drift.md does not mark what came and went:\n%s", md)
+	}
+}
+
+// A build whose first night skipped every check is no release yet: its first night that runs
+// is, though the history has its skipped checks.
+func TestASkippedFirstNightIsNoRelease(t *testing.T) {
+	hist := map[string]Entry{}
+	for _, e := range []Entry{
+		{Harness: "codex", Version: "0.162.0", Platform: "linux/amd64", Capability: "relay.telemetry", Result: "pass"},
+		{Harness: "codex", Version: "0.163.0", Platform: "linux/amd64", Capability: "relay.telemetry", Result: "not run"},
+	} {
+		hist[e.key()] = e
+	}
+	rs := releases(hist, Catalog{}, []e2e.CompatRow{check("codex", "0.163.0", "relay.telemetry", "linux/amd64", "fail")}, nil, nil, censusRuns{})
+	if len(rs) != 1 || rs[0].Version != "0.163.0" || rs[0].Previous != "0.162.0" || rs[0].Passed() {
+		t.Errorf("releases %+v: 0.163.0's first night that ran, failed", rs)
+	}
+}
+
+// Two releases of one harness in a night: a key both send is the older's news, and each says
+// whether its own census was partial; a harness new to the catalog is a first census in each.
+func TestTwoReleasesInANight(t *testing.T) {
+	day := time.Date(2026, 10, 9, 4, 0, 0, 0, time.UTC)
+	var cat Catalog
+	mergeFields(&cat, []e2e.FieldRow{field("0.162.0", "logs/codex.api_request", "model", "safe", day)}, nil)
+	tonight := []e2e.FieldRow{
+		field("0.162.1", "logs/codex.api_request", "model", "safe", day.Add(24*time.Hour)),
+		field("0.162.1", "logs/codex.api_request", "k1", "safe", day.Add(24*time.Hour)),
+		field("0.162.2", "logs/codex.api_request", "model", "safe", day.Add(24*time.Hour)),
+		field("0.162.2", "logs/codex.api_request", "k1", "safe", day.Add(24*time.Hour)),
+		field("0.162.2", "logs/codex.api_request", "k2", "safe", day.Add(24*time.Hour)),
+	}
+	ran := censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.162.1", Failed: true}, {Harness: "codex", Version: "0.162.2"}})
+	_, _, hs := fieldDrift(cat, tonight, ran, day.Add(24*time.Hour))
+	rs := releases(map[string]Entry{}, cat, nil, tonight, hs, ran)
+	if len(rs) != 2 {
+		t.Fatalf("releases %+v", rs)
+	}
+	older, newer := rs[0].Fields, rs[1].Fields
+	if older.Added != 1 || !older.Partial || newer.Added != 1 || newer.Partial {
+		t.Errorf("0.162.1 %+v, 0.162.2 %+v: k1 the older's, k2 the newer's; the older's census partial", older, newer)
+	}
+	_, _, hs = fieldDrift(Catalog{}, tonight, ran, day.Add(24*time.Hour))
+	for _, r := range releases(map[string]Entry{}, Catalog{}, nil, tonight, hs, ran) {
+		if !r.Fields.First || r.Fields.Keys == 0 {
+			t.Errorf("%s %+v: a harness new to the catalog is a first census", r.Version, r.Fields)
+		}
+	}
+}
+
+// Failures on two platforms with one short name say which each is.
+func TestTwoLinuxFailuresSayTheirArchitecture(t *testing.T) {
+	r := Release{Name: "Codex CLI", Version: "0.163.0", Checks: 2, Failed: []FailedCheck{
+		{Capability: "relay.telemetry", Platform: "linux/amd64"}, {Capability: "relay.telemetry", Platform: "linux/arm64"}}}
+	if l := r.line(func(s string) string { return s }); !strings.Contains(l, "(linux/amd64); Telemetry reaches the project through the local relay (linux/arm64)") {
+		t.Errorf("line %q", l)
+	}
+	r.Failed = r.Failed[:1]
+	if l := r.line(func(s string) string { return s }); !strings.Contains(l, "(Linux)") {
+		t.Errorf("one Linux failure: %q", l)
 	}
 }

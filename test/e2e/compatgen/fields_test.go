@@ -265,8 +265,9 @@ func TestCatalogTakesTheLatestClassOfABuild(t *testing.T) {
 }
 
 // A night that changed everything is still one message Slack takes: at most 50 blocks and
-// attachments, their text within the budget, and a line saying what was left for the run's
-// summary. Many small changes meet the limit first, a few long ones the budget.
+// attachments, their text within the budget, and a line saying how many harnesses were left
+// for the run's summary, each kept or left whole. Many small changes meet the limit first (no
+// room for another harness's three), a few long ones the budget.
 func TestSlackDigestFitsOneMessage(t *testing.T) {
 	for _, c := range []struct {
 		name            string
@@ -290,11 +291,16 @@ func TestSlackDigestFitsOneMessage(t *testing.T) {
 		for _, it := range items {
 			size += len(it.text)
 		}
-		if len(items) > maxBlocks || size > slackBudget+sectionLimit || (len(items) == maxBlocks) != c.blocksFull {
+		if len(items) > maxBlocks || size > slackBudget+sectionLimit || (maxBlocks-len(items) < 3) != c.blocksFull {
 			t.Errorf("%s: %d blocks and attachments, %d characters of text", c.name, len(items), size)
 		}
+		// The last harness kept is whole: what went is its last bar, before the line saying
+		// what was left out.
+		if last := items[len(items)-2]; last.colour != removedColour {
+			t.Errorf("%s: a harness cut short, its last bar %+v", c.name, last)
+		}
 		data, _ := json.Marshal(d.slack())
-		for _, want := range []string{"more, too long for one message", "https://ci/run/3", "Harness 0 2 (was 1)"} {
+		for _, want := range []string{"harnesses more, too long for one message", "https://ci/run/3", "Harness 0 2 (was 1)"} {
 			if !strings.Contains(string(data), want) {
 				t.Errorf("%s: slack payload lacks %q", c.name, want)
 			}

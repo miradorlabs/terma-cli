@@ -325,7 +325,7 @@ func (d Drift) markdown() string {
 	}
 	b.WriteString("## New releases\n\n")
 	if len(d.Releases) == 0 {
-		b.WriteString("None tonight: every build tested was tested before.\n\n")
+		b.WriteString("None tonight.\n\n")
 	}
 	for _, l := range d.releaseLines(func(s string) string { return "**" + s + "**" }) {
 		b.WriteString("- " + l + "\n")
@@ -353,7 +353,11 @@ func (d Drift) markdown() string {
 			}
 			fmt.Fprintf(&b, "**%s**\n\n", sec.title)
 			for _, l := range sec.lines {
-				b.WriteString("- " + marks[sec.sign] + l + "\n")
+				mark := marks[sec.sign]
+				if strings.HasPrefix(l, "… and ") { // listed's count of the rest is no finding
+					mark = ""
+				}
+				b.WriteString("- " + mark + l + "\n")
 			}
 			b.WriteString("\n")
 		}

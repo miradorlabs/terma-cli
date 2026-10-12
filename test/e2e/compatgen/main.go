@@ -134,7 +134,7 @@ func run(c config, now time.Time) error {
 			linkSources(&d, knownSurfaces(catalog, fieldRows))
 		}
 		// After the source links, whose comparison of two builds a release's line links too.
-		d.Releases = releases(hist, catalog, compatRows, fieldRows, d.Harnesses)
+		d.Releases = releases(hist, catalog, compatRows, fieldRows, d.Harnesses, ran)
 		if err := writeDigest(c.digest, d); err != nil {
 			return err
 		}

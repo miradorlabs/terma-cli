@@ -28,7 +28,7 @@ type Drift struct {
 	// catalog took a census of within missingWithin, and those whose census scenarios ran.
 	Missing []string `json:"missing,omitempty"`
 	// Releases are the builds tested tonight for the first time.
-	Releases  []Release      `json:"releases"`
+	Releases  []Release      `json:"releases,omitempty"`
 	Harnesses []HarnessDrift `json:"harnesses"`
 	// SourceErrors are the builds whose source could not be read, their findings unlinked.
 	SourceErrors []string       `json:"source_errors,omitempty"`

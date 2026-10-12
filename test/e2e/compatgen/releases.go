@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"fmt"
 	"slices"
 	"strings"
@@ -51,12 +52,16 @@ type ReleaseFields struct {
 // Passed reports a release that ran checks and failed none.
 func (r Release) Passed() bool { return r.Checks > 0 && len(r.Failed) == 0 }
 
-// releases are the builds tonight's rows name that neither the history nor the catalog
-// does, by harness then version; hs is the night's field drift.
-func releases(hist map[string]Entry, cat Catalog, rows []e2e.CompatRow, fields []e2e.FieldRow, hs []HarnessDrift) []Release {
+// releases are the builds tonight's rows name that no night before ran, by harness then
+// version: a build the history has a result of, or the catalog a census of, was; one whose
+// every check was skipped was not, so its first night that runs is its release. hs is the
+// night's field drift, and ran what its census scenarios ran.
+func releases(hist map[string]Entry, cat Catalog, rows []e2e.CompatRow, fields []e2e.FieldRow, hs []HarnessDrift, ran censusRuns) []Release {
 	known := map[string][]string{} // harness → builds before tonight
 	for _, e := range hist {
-		known[e.Harness] = append(known[e.Harness], e.Version)
+		if e.Result != "not run" {
+			known[e.Harness] = append(known[e.Harness], e.Version)
+		}
 	}
 	for _, c := range cat.Censuses {
 		known[c.Harness] = append(known[c.Harness], c.Version)
@@ -89,13 +94,7 @@ func releases(hist map[string]Entry, cat Catalog, rows []e2e.CompatRow, fields [
 		add(build{f.Harness, f.Version})
 	}
 	slices.SortFunc(builds, func(a, b build) int {
-		if a.harness != b.harness {
-			return strings.Compare(a.harness, b.harness)
-		}
-		if versionLess(a.version, b.version) {
-			return -1
-		}
-		return 1
+		return cmp.Or(strings.Compare(a.harness, b.harness), compareVersions(a.version, b.version))
 	})
 	var out []Release
 	for _, b := range builds {
@@ -106,11 +105,11 @@ func releases(hist map[string]Entry, cat Catalog, rows []e2e.CompatRow, fields [
 			}
 		}
 		slices.SortFunc(r.Failed, func(x, y FailedCheck) int {
-			return strings.Compare(x.Capability+x.Platform, y.Capability+y.Platform)
+			return cmp.Or(strings.Compare(x.Capability, y.Capability), strings.Compare(x.Platform, y.Platform))
 		})
 		for _, h := range hs {
 			if h.Harness == b.harness {
-				r.Fields = h.fieldsOf(b.version, fields)
+				r.Fields = h.fieldsOf(b.version, fields, ran)
 				if h.Version == b.version && h.Previous == r.Previous {
 					r.Compare = h.Compare
 				}
@@ -121,29 +120,54 @@ func releases(hist map[string]Entry, cat Catalog, rows []e2e.CompatRow, fields [
 	return out
 }
 
-// fieldsOf counts what h says of build v: nil where the night took no census of it.
-func (h HarnessDrift) fieldsOf(v string, rows []e2e.FieldRow) *ReleaseFields {
-	if !slices.ContainsFunc(rows, func(r e2e.FieldRow) bool { return r.Harness == h.Harness && r.Version == v }) {
+// compareVersions orders two builds as versionLess does, 0 for the same.
+func compareVersions(a, b string) int {
+	switch {
+	case versionLess(a, b):
+		return -1
+	case versionLess(b, a):
+		return 1
+	}
+	return 0
+}
+
+// fieldsOf counts what h says of build v, nil where the night took no census of it. What came
+// is the build's that first sent it tonight, the oldest: h's From names the newest, and a key
+// two of tonight's builds send is the first one's news. What went is the build's In names.
+func (h HarnessDrift) fieldsOf(v string, rows []e2e.FieldRow, ran censusRuns) *ReleaseFields {
+	first := map[string]string{} // surface, or surface and key → the oldest build tonight that sent it
+	surfaces, keys := map[string]bool{}, map[string]bool{}
+	for _, r := range rows {
+		if r.Harness != h.Harness {
+			continue
+		}
+		for _, id := range []string{r.Surface, fieldID(r.Surface, r.Key)} {
+			if was, ok := first[id]; !ok || versionLess(r.Version, was) {
+				first[id] = r.Version
+			}
+		}
+		if r.Version == v {
+			surfaces[r.Surface], keys[fieldID(r.Surface, r.Key)] = true, true
+		}
+	}
+	if len(keys) == 0 {
 		return nil
 	}
-	f := &ReleaseFields{}
-	if v == h.Version {
-		f.First, f.Partial, f.Surfaces, f.Keys = h.First, h.Partial, h.Surfaces, h.Keys
-	}
-	in := func(from string) bool { return from == v || from == "" && h.Version == v }
+	n := night{harness: h.Harness, ran: ran}
+	f := &ReleaseFields{First: h.First, Partial: n.partial(v), Surfaces: len(surfaces), Keys: len(keys)}
 	gone := func(in string) bool { return in == v || in == "" && h.lastJudged() == v }
 	for _, s := range h.NewSurfaces {
-		if in(s.From) {
+		if first[s.Surface] == v {
 			f.NewSurfaces++
 		}
 	}
 	for _, c := range h.Added {
-		if in(c.From) {
+		if first[fieldID(c.Surface, c.Key)] == v {
 			f.Added++
 		}
 	}
 	for _, c := range h.Withheld {
-		if in(c.From) {
+		if first[fieldID(c.Surface, c.Key)] == v {
 			f.Withheld++
 		}
 	}
@@ -169,9 +193,21 @@ func (r Release) line(strong func(string) string) string {
 		mark, verdict = "⚪", "no checks ran"
 	case len(r.Failed) > 0:
 		mark = "❌"
+		// A platform by its short name, unless two of the failures' share one (linux/amd64
+		// and linux/arm64), which then name the architecture.
+		short := map[string][]string{}
+		for _, c := range r.Failed {
+			if s := platformShort(c.Platform); !slices.Contains(short[s], c.Platform) {
+				short[s] = append(short[s], c.Platform)
+			}
+		}
 		var names []string
 		for _, c := range r.Failed {
-			names = append(names, capabilityLabel(c.Capability)+" ("+platformShort(c.Platform)+")")
+			where := platformShort(c.Platform)
+			if len(short[where]) > 1 {
+				where = c.Platform
+			}
+			names = append(names, capabilityLabel(c.Capability)+" ("+where+")")
 		}
 		if len(names) > 3 {
 			names = append(names[:3], fmt.Sprintf("+%d more", len(names)-3))
