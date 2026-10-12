@@ -96,50 +96,30 @@ and the credential-free telemetry scenarios against pinned real harness builds,
 tolerating only Codex's documented SessionEnd race there
 (`TERMA_E2E_KNOWN_UPSTREAM=codex-session-end`; see `TestCodexSessionEndProbe`).
 `E2E harness contracts` (`live.yml`) runs nightly and on manual dispatch against the latest
-three releases. Claude uses GitHub OIDC with Anthropic workload identity
-federation; no Anthropic API-key secret is needed. The workflow contains the
-non-secret federation, organization, service-account and workspace IDs. Each
-Claude process gets a fresh identity token in a private temporary file and
-exchanges it through Claude Code's native federation support. These short
-headless scenarios use API billing, not subscription credentials.
+three releases. Every contract that needs no account runs against local fixture providers, as
+PR CI's do: the relay and hook contracts, the field census and the drift digest. One that needs
+an account runs where the `live-harnesses` environment has its secret, `OPENAI_API_KEY` for
+Codex's real API scenarios and `ANTHROPIC_API_KEY` for Claude's, and is skipped where it has
+not; the job summary says which. A missing secret narrows the night; it does not fail it.
 
 The workflow file `live.yml`, its `live-harnesses` environment and CI's `live-contracts`
-check keep those names: the federation rule below, the OpenAI secret and the repository
-ruleset name them.
+check keep those names: the repository ruleset and the OpenAI secret name them.
 
-The Anthropic rule is configured for inference only (`workspace:inference`) in
-workspace `terma-cli-ci` (`wrkspc_01Ug36g2VPKLUSFZ9LZXFTvU`), with a maximum token
-lifetime of 600 seconds. Its match requires all of:
+The repository was recreated on 2026-10-06, and `live-harnesses` has had neither secret since.
+Claude formerly signed in through GitHub OIDC with Anthropic workload identity federation, but
+the federation rule in workspace `terma-cli-ci` (`wrkspc_01Ug36g2VPKLUSFZ9LZXFTvU`) matches the
+old repository's ID, `1383906316`, not this one's; the suite no longer uses it. Restoring Claude's
+real API scenarios is an `ANTHROPIC_API_KEY` from that workspace, or a rule re-pointed at this
+repository and the federation support put back.
 
-- Audience `https://api.anthropic.com`.
-- Subject `repo:miradorlabs@243301318/terma-cli@1383906316:environment:live-harnesses`.
-- Repository `miradorlabs/terma-cli`, repository ID `1383906316`, owner ID `243301318`.
-- Ref `refs/heads/main` and workflow
-  `miradorlabs/terma-cli/.github/workflows/live.yml@refs/heads/main`.
-- Event `schedule` or `workflow_dispatch`.
+Codex's real API scenarios need `OPENAI_API_KEY`, a restricted service-account key in a
+dedicated CI project: OpenAI project `terma-cli-ci` (`proj_lQLLGXqCoNP9vAVYyhJokAu5`), service
+account `terma-cli-live-ci`, with `api.responses.write` and `api.model.read`. A $10/month project
+spend limit was configured, but OpenAI returned enforcement status `inactive`; do not rely on it
+as an enforced cap until that is resolved.
 
-Manual dispatches must target `main`. Branch-only subjects, pull requests, pushes,
-and other workflows cannot use this rule. The service account has the developer
-organization role; the rule narrows its minted tokens to inference in this workspace.
-Workspace spending caps and rate overrides must be configured in the Console;
-they have not been set by this provisioning step.
-
-Codex still requires `OPENAI_API_KEY`, a restricted service-account key in a
-dedicated CI project, under GitHub Settings → Environments → `live-harnesses`.
-OpenAI provisioning uses project `terma-cli-ci` (`proj_lQLLGXqCoNP9vAVYyhJokAu5`)
-and service account `terma-cli-live-ci`. Its GitHub secret contains a scoped API
-key with `api.responses.write` and `api.model.read`; the initial unrestricted
-key was deleted. A direct Responses request and model listing both succeeded.
-A $10/month project spend limit was configured, but OpenAI returned enforcement
-status `inactive`; do not rely on it as an enforced cap until that is resolved.
-
-Local Claude API-key runs remain supported with `ANTHROPIC_API_KEY`; configured
-federation takes precedence in the real API scenario. Synthetic provider tests
-continue to use only dummy credentials.
-
-Missing API credentials fail the preflight. Subscription scenarios receive no
-subscription credentials on nightly runs and are reported as **not run**, not
-passed. The GitHub job summary includes the detailed coverage report.
+Subscription scenarios receive no subscription credentials on nightly runs and are reported as
+**not run**, not passed. The GitHub job summary includes the detailed coverage report.
 
 To run subscription checks manually, enable **include_subscriptions** when
 running the workflow and supply `CLAUDE_CODE_OAUTH_TOKEN` and `CODEX_AUTH_JSON`
@@ -162,6 +142,7 @@ command argument, source file, or chat):
 
 ```sh
 gh secret set OPENAI_API_KEY --repo miradorlabs/terma-cli --env live-harnesses
+gh secret set ANTHROPIC_API_KEY --repo miradorlabs/terma-cli --env live-harnesses
 ```
 
 After this workflow change is on the branch GitHub will run, trigger and inspect
@@ -172,8 +153,8 @@ gh workflow run live.yml --repo miradorlabs/terma-cli -f include_subscriptions=f
 gh run list --repo miradorlabs/terma-cli --workflow live.yml --limit 3
 ```
 
-The OpenAI API key is supplied only to credential preflight and the test run, not
-checkout or build steps. An API-only pass does not establish subscription-route
+The API keys are supplied only to the test run, not checkout or build steps; the summary
+step is told only whether each is set. An API-only pass does not establish subscription-route
 compatibility.
 
 ## Cost

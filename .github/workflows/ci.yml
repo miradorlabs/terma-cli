@@ -172,8 +172,7 @@ jobs:
       TERMA_E2E_DSH_VERSIONS: "0.2.0-rc.2"
       TERMA_E2E_BINARY: ${{ github.workspace }}/test/e2e/bin/terma
       # Codex 0.158.0 sometimes exits without running its SessionEnd hook, with or
-      # without Terma (TestCodexSessionEndProbe). Pull requests report it instead of
-      # failing on it; the nightly e2e workflow stays strict.
+      # without Terma (TestCodexSessionEndProbe), so it is reported instead of failing.
       TERMA_E2E_KNOWN_UPSTREAM: codex-session-end
     steps:
       - uses: actions/checkout@v5

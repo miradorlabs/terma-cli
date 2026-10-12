@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"os"
 	"regexp"
 	"slices"
 	"strings"
@@ -193,13 +192,13 @@ func TestClaudeEditStampsCommit(t *testing.T) {
 
 // TestClaudeAPIKeyHeadless is the Console route: the call is exported and the
 // session announced, and the status line, which does not run headless, sends
-// nothing. Needs ANTHROPIC_API_KEY or GitHub workload identity federation.
+// nothing. Needs ANTHROPIC_API_KEY.
 func TestClaudeAPIKeyHeadless(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, newest bool) {
 		track(t)
-		if ClaudeCredentials().APIKey == "" && os.Getenv("ANTHROPIC_FEDERATION_RULE_ID") == "" {
-			Record(t.Name(), "not run", "needs ANTHROPIC_API_KEY or GitHub federation")
-			t.Skip("no ANTHROPIC_API_KEY or GitHub federation")
+		if ClaudeCredentials().APIKey == "" {
+			Record(t.Name(), "not run", "needs ANTHROPIC_API_KEY")
+			t.Skip("no ANTHROPIC_API_KEY")
 		}
 		sb := New(t, Isolated, WithClaude(b))
 		result, sid := sb.ClaudeHeadless(RouteAPIKey, "Reply with exactly TERMA_OK and nothing else.", "--tools", "")
@@ -236,4 +235,29 @@ func modeName(m Mode) string {
 		return "isolated"
 	}
 	return "real-login"
+}
+
+// TestClaudeEnvRoutes pins which credential each isolated route hands Claude Code.
+func TestClaudeEnvRoutes(t *testing.T) {
+	t.Setenv("ANTHROPIC_API_KEY", "dummy-api-key")
+	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "subscription-token")
+	for _, tc := range []struct {
+		name      string
+		route     Route
+		want, not string
+	}{
+		{"subscription", RouteSubscription, "CLAUDE_CODE_OAUTH_TOKEN=subscription-token", "ANTHROPIC_API_KEY="},
+		{"api key", RouteAPIKey, "ANTHROPIC_API_KEY=dummy-api-key", "CLAUDE_CODE_OAUTH_TOKEN="},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			sb := &Sandbox{T: t, Mode: Isolated, Dir: t.TempDir(), Terma: "/tmp/terma"}
+			env := sb.claudeEnv(tc.route)
+			if !slices.Contains(env, tc.want) {
+				t.Errorf("env lacks %s", tc.want)
+			}
+			if slices.ContainsFunc(env, func(e string) bool { return strings.HasPrefix(e, tc.not) }) {
+				t.Errorf("env carries %s on the %s route", tc.not, tc.name)
+			}
+		})
+	}
 }
