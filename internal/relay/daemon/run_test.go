@@ -54,7 +54,7 @@ func TestARelayExitsWhenIdle(t *testing.T) {
 	stateDir, dir, _ := setUpRelay(t)
 	var listened bool
 	res := run(t, runConfig(stateDir, time.Millisecond, func(net.Addr, time.Duration) { listened = true }))
-	if !listened || res != (Result{}) {
+	if !listened || res.Replaced || res.Updated || res.SetupGone || res.AlreadyRunning || res.Service {
 		t.Fatalf("Run = %+v, listened %v", res, listened)
 	}
 	if _, err := os.Stat(filepath.Join(dir, StatsFile)); err != nil {

@@ -962,8 +962,15 @@ func TestRelayHeartbeat(t *testing.T) {
 	if got := attr(rec.Attributes, semconv.HostNameKey); got != host {
 		t.Errorf("heartbeat host.name = %q, want %q", got, host)
 	}
-	if len(rec.Attributes) != 2 {
-		t.Errorf("heartbeat says more than its reason and host: %v", rec.Attributes)
+	// The requested beat carries its reason, host and counters, never an exit reason. Each
+	// beat's send is counted after it left, so this one reports the interval beat's.
+	for _, kv := range rec.Attributes[2:] {
+		if !strings.HasPrefix(kv.Key, semconv.TermaRelayHeartbeatCounterKey+".") {
+			t.Errorf("the requested beat carries %s", kv.Key)
+		}
+	}
+	if got := beatCounters(rec)["heartbeats_sent"]; got != 1 {
+		t.Errorf("the requested beat reports %d beats sent since the last, want 1", got)
 	}
 	if rec.TimeUnixNano != uint64(f.clock().UnixNano()) {
 		t.Errorf("heartbeat time %d, want the send time", rec.TimeUnixNano)

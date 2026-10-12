@@ -18,20 +18,22 @@ var codexHooks = []struct {
 	Hook    string
 	Async   bool
 	Timeout int
+	Matcher string
 }{
-	{"SessionStart", "codex-session-start", false, 10},
-	{"UserPromptSubmit", "codex-user-prompt-submit", true, 10},
+	{"SessionStart", "codex-session-start", false, 10, ""},
+	{"UserPromptSubmit", "codex-user-prompt-submit", true, 10, ""},
 	// Codex sends repository hooks no approval decision, only the request.
-	{"PermissionRequest", "codex-permission-request", false, 10},
-	// Synchronous so a commit in the same shell call finds the files it writes.
-	{"PreToolUse", "codex-pre-tool-use", false, 10},
-	{"PostToolUse", "codex-post-tool-use", true, 10},
+	{"PermissionRequest", "codex-permission-request", false, 10, ""},
+	// Synchronous so a commit in the same shell call finds the files it writes; Codex waits
+	// on it, so it runs for shell calls alone, the only ones it reads.
+	{"PreToolUse", "codex-pre-tool-use", false, 10, codexShellTool},
+	{"PostToolUse", "codex-post-tool-use", true, 10, ""},
 	// Synchronous so the local snapshot finishes before codex exec exits.
-	{"Stop", "codex-stop", false, 3},
-	{"SessionEnd", "codex-session-end", false, 3},
+	{"Stop", "codex-stop", false, 3, ""},
+	{"SessionEnd", "codex-session-end", false, 3, ""},
 	// SubagentStop stays synchronous so its event is spooled before the parent's Stop.
-	{"SubagentStart", "codex-subagent-start", true, 10},
-	{"SubagentStop", "codex-subagent-stop", false, 3},
+	{"SubagentStart", "codex-subagent-start", true, 10, ""},
+	{"SubagentStop", "codex-subagent-stop", false, 3, ""},
 }
 
 type codexHookHandler struct {
@@ -74,8 +76,7 @@ func ownGroups(command func(event string) string) ([]hookmgr.EventHook, error) {
 		if onWindows {
 			handler.CommandWindows, _ = hookmgr.WindowsHookCommand(hookmgr.SystemCmd(), handler.Command)
 		}
-		// No matcher from terma: which calls edit files is the binary's to decide.
-		entry, err := hookmgr.Group(h.Event, "", handler)
+		entry, err := hookmgr.Group(h.Event, h.Matcher, handler)
 		if err != nil {
 			return nil, err
 		}
@@ -167,13 +168,14 @@ func ownEntries(path string, command func(event string) string) ([]Entry, error)
 				continue
 			}
 			var group struct {
-				Hooks []json.RawMessage `json:"hooks"`
+				Matcher *string           `json:"matcher"`
+				Hooks   []json.RawMessage `json:"hooks"`
 			}
 			if err := json.Unmarshal(raw, &group); err != nil || len(group.Hooks) != 1 {
 				continue
 			}
 			entry := Entry{Event: h.Event, Group: g}
-			if entry.Hash, err = codexEntryHash(entry, nil, group.Hooks[0]); err != nil {
+			if entry.Hash, err = codexEntryHash(entry, group.Matcher, group.Hooks[0]); err != nil {
 				return nil, err
 			}
 			out = append(out, entry)
@@ -222,7 +224,11 @@ func managedRequirements(command func(event string) string) string {
 	var b strings.Builder
 	b.WriteString("# terma: hooks for every Codex session on this machine.\n[hooks]\n")
 	for _, h := range codexHooks {
-		fmt.Fprintf(&b, "\n[[hooks.%s]]\n\n[[hooks.%s.hooks]]\ntype = \"command\"\ncommand = %s\ntimeout = %d\n", h.Event, h.Event, tomlString(command(h.Hook)), h.Timeout)
+		fmt.Fprintf(&b, "\n[[hooks.%s]]\n", h.Event)
+		if h.Matcher != "" {
+			fmt.Fprintf(&b, "matcher = %s\n", tomlString(h.Matcher))
+		}
+		fmt.Fprintf(&b, "\n[[hooks.%s.hooks]]\ntype = \"command\"\ncommand = %s\ntimeout = %d\n", h.Event, tomlString(command(h.Hook)), h.Timeout)
 		if h.Async {
 			b.WriteString("async = true\n")
 		}

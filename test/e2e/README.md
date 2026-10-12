@@ -285,6 +285,18 @@ quiet night. The digest goes to the run's summary and to Slack through the
 channel means the job did not run. Drift never fails the night; a removed key on a surface
 terma parses fails its golden.
 
+## Relay restarts
+
+`TestRelayClaudeMidTurn` and `TestRelayCodexMidTurn` stop the relay at a session's second
+model request and hold the reply for longer than Claude Code's five-second export. Every
+run proves the upgrade: a hook-started relay asked to make way is followed at once by the
+relay that takes its place, and the session arrives whole. `TERMA_E2E_RELAY_COMPARE=1`
+runs the whole comparison instead, each of `killed` and `replaced` under each way the
+relay runs: started by hooks, or kept by launchd or systemd as the service definitions
+ask (emulated: a failed relay is started again at once once it ran 5 seconds, or 5
+seconds after it exits). A killed relay loses what the agent exports before another
+starts, so those cells fail by design; what they lost is the measurement.
+
 ## Versions
 
 Each scenario runs against the installed binary and the last three releases

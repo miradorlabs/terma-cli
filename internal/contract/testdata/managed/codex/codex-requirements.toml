@@ -24,6 +24,7 @@ command = "[ -x \"$HOME/.local/bin/terma\" ] && \"$HOME/.local/bin/terma\" hook 
 timeout = 10
 
 [[hooks.PreToolUse]]
+matcher = "Bash"
 
 [[hooks.PreToolUse.hooks]]
 type = "command"

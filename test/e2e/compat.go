@@ -32,6 +32,7 @@ var Capabilities = []Capability{
 	{"relay.content_allowed", "Prompts and tool content delivered when allowed"},
 	{"relay.equivalent", "The same telemetry through the relay as exported directly"},
 	{"relay.cold_start", "Relay not running when the session starts"},
+	{"relay.replaced_mid_turn", "Relay replaced by a newer terma mid-turn: the session still arrives whole"},
 	{"relay.late_claim", "Session claimed after its first export"},
 	{"relay.concurrent_projects", "Two repositories' sessions at once, each to its own project"},
 	{"relay.resumed_elsewhere", "A session resumed outside the repository stays out"},

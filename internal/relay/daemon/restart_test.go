@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"net"
 	"net/http"
 	"os"
@@ -361,7 +362,9 @@ func awaitRecord(t *testing.T, r *relayRun, dir string) {
 // askToMakeWay is a newer terma's request to the relay running in this process.
 func askToMakeWay(t *testing.T, dir string) {
 	t.Helper()
-	if err := os.WriteFile(filepath.Join(dir, ReplaceFile), fmt.Appendf(nil, "%d\n", os.Getpid()), 0o600); err != nil {
+	// Atomically, as Supersede writes it: the relay's check reads and removes the file, and
+	// would lose a request it found still empty.
+	if err := config.WriteFileAtomicNoSync(filepath.Join(dir, ReplaceFile), fmt.Appendf(nil, "%d\n", os.Getpid()), 0o600); err != nil {
 		t.Fatal(err)
 	}
 }

@@ -2,9 +2,12 @@ package e2e
 
 import (
 	"encoding/json"
+	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -210,6 +213,41 @@ func TestCodexSameCallCommitIsStamped(t *testing.T) {
 					t.Fatalf("commit made in the same call not stamped with %s:\n%s\n%s", run.ThreadID, msg, tail(run.Stdout, 1500))
 				}
 			})
+		}
+	})
+}
+
+// TestCodexDeclinedWriteClaimsNothing: Codex runs PreToolUse before it asks to run a call,
+// and the developer declines. The call never runs, so the developer's own commit of the file
+// it named is not stamped. Offline: a fixture model, and an app-server client that declines.
+func TestCodexDeclinedWriteClaimsNothing(t *testing.T) {
+	forEachCodex(t, func(t *testing.T, b Binary, _ bool) {
+		track(t)
+		t.Setenv("OPENAI_API_KEY", "synthetic-telemetry-key")
+		sb := New(t, Isolated, WithCodex(b))
+		var calls atomic.Int32
+		provider := httptest.NewServer(codexWorkloadProvider(&calls, []string{"printf codex > NOTES.md"}))
+		t.Cleanup(provider.Close)
+		app := sb.StartAppServer(b, "terma-e2e", provider.URL)
+		params := threadParams(sb.Repo, true)
+		params["approvalPolicy"] = "untrusted" // a write asks first
+		th, _ := app.call("thread/start", params)["thread"].(map[string]any)
+		thread, _ := th["id"].(string)
+		app.Turn(thread, "Do the task.")
+		app.Close()
+		if len(sb.HookPayloads("codex-pre-tool-use")) == 0 {
+			t.Fatal("no PreToolUse: the scenario does not reach the claim it tests")
+		}
+		if _, err := os.Stat(filepath.Join(sb.Repo, "NOTES.md")); err == nil {
+			t.Fatal("the declined call ran")
+		}
+		if err := os.WriteFile(filepath.Join(sb.Repo, "NOTES.md"), []byte("mine\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		sb.git("add", "NOTES.md")
+		sb.git("commit", "-m", "my notes")
+		if msg := sb.git("log", "-1", "--format=%B"); strings.Contains(msg, "Agent-Session-Id") {
+			t.Fatalf("the developer's commit was stamped by declined thread %s:\n%s", thread, msg)
 		}
 	})
 }

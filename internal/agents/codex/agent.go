@@ -162,5 +162,5 @@ func userHooksPath() (string, error) {
 
 // StateDirs are the directories its hooks keep state in.
 func (Agent) StateDirs() []string {
-	return []string{codexFundingCursorDir, codexReplyCursorDir, codexDesktopCursorDir, codexTitleStateDir}
+	return []string{codexFundingCursorDir, codexReplyCursorDir, codexDesktopCursorDir, codexTitleStateDir, codexExpectedDir}
 }
