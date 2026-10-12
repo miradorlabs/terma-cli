@@ -96,15 +96,27 @@ func TestFindSenderMatchesBothEnds(t *testing.T) {
 	}
 	defer func() { _ = conn.Close() }()
 	port, server := conn.RemoteAddr().(*net.TCPAddr).Port, conn.LocalAddr().(*net.TCPAddr).Port
-	_, out := start(fmt.Sprint(bindEnv, "=", port))
-	said := make([]byte, 5)
-	if n, _ := io.ReadFull(out, said); string(said[:n]) != "bound" {
+	binder, out := start(fmt.Sprint(bindEnv, "=", port))
+	said, _ := io.ReadAll(io.LimitReader(out, 5))
+	switch string(said) {
+	case "bound":
+	case "no":
 		t.Skipf("no [::1]:%d here to share the port number", port)
+	default:
+		t.Fatalf("the process to hold [::1]:%d said %q", port, said)
 	}
 	if pid, ok := FindSender(port, server); !ok || pid != sender.Process.Pid {
 		t.Fatalf("FindSender(%d, %d) = %d, %v; want the sender %d, not the process holding [::1]:%d", port, server, pid, ok, sender.Process.Pid, port)
 	}
+	// Where the platform asks each process, the other is refused outright: where it lists
+	// the sender first (Linux, oldest first), FindSender alone would pass on the port.
+	if ownsConnForTest != nil && (ownsConnForTest(binder.Process.Pid, port, server) || !ownsConnForTest(sender.Process.Pid, port, server)) {
+		t.Fatalf("the process holding [::1]:%d is taken for the connection %d→%d, or the sender is not", port, port, server)
+	}
 }
+
+// ownsConnForTest is ownsConn, where the platform asks each process (procinfo_scan_test.go).
+var ownsConnForTest func(pid, port, server int) bool
 
 // executableEnv makes the test binary print AbsExecutable and exit.
 const executableEnv = "PROCINFO_TEST_EXECUTABLE"
