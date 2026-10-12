@@ -18,7 +18,8 @@ type Release struct {
 	Harness string `json:"harness"`
 	Name    string `json:"name"`
 	Version string `json:"version"`
-	// Previous is the newest build of the harness known before tonight, older than Version.
+	// Previous is the newest build of the harness known before tonight, older than Version;
+	// Compare links the source's changes between them, where it is public (linkSources).
 	Previous string `json:"previous,omitempty"`
 	Compare  string `json:"compare,omitempty"`
 	// Checks counts the capability checks the build ran tonight, each capability on each
@@ -110,9 +111,6 @@ func releases(hist map[string]Entry, cat Catalog, rows []e2e.CompatRow, fields [
 		for _, h := range hs {
 			if h.Harness == b.harness {
 				r.Fields = h.fieldsOf(b.version, fields, ran)
-				if h.Version == b.version && h.Previous == r.Previous {
-					r.Compare = h.Compare
-				}
 			}
 		}
 		out = append(out, r)

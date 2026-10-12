@@ -130,11 +130,10 @@ func run(c config, now time.Time) error {
 	if c.digest != "" {
 		d := Drift{GeneratedAt: now, Link: c.link, Compat: compatDrift(hist, compatRows)}
 		d.NoCensus, d.Missing, d.Harnesses = fieldDrift(catalog, fieldRows, ran, now)
+		d.Releases = releases(hist, catalog, compatRows, fieldRows, d.Harnesses, ran)
 		if c.source {
 			linkSources(&d, knownSurfaces(catalog, fieldRows))
 		}
-		// After the source links, whose comparison of two builds a release's line links too.
-		d.Releases = releases(hist, catalog, compatRows, fieldRows, d.Harnesses, ran)
 		if err := writeDigest(c.digest, d); err != nil {
 			return err
 		}

@@ -171,6 +171,7 @@ func (h HarnessDrift) slackChanges() []attachment {
 				bullet = ""
 			}
 			list := "_" + sec.title + "_\n" + bullet + strings.Join(sec.lines, "\n"+bullet)
+			// An unsigned list has no colour (colours has no ""), so it joins the headline's bar.
 			i := slices.IndexFunc(out, func(a attachment) bool { return a.colour == colours[sec.sign] })
 			if i < 0 {
 				out = append(out, attachment{colours[sec.sign], list})

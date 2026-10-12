@@ -291,3 +291,23 @@ func TestTwoLinuxFailuresSayTheirArchitecture(t *testing.T) {
 		t.Errorf("one Linux failure: %q", l)
 	}
 }
+
+// A release links the comparison of its source with the build known before it, where the
+// source is public, though the night took no census of it; a harness's own does not.
+func TestAReleaseLinksItsSourceWithoutACensus(t *testing.T) {
+	d := Drift{Releases: []Release{
+		{Harness: "codex", Name: "Codex CLI", Version: "0.163.0", Previous: "0.162.1", Checks: 1},
+		{Harness: "codex", Name: "Codex CLI", Version: "0.1.0", Checks: 1}, // no build before it
+		{Harness: "claude", Name: "Claude Code", Version: "2.1.297", Previous: "2.1.296", Checks: 1},
+	}}
+	linkSources(&d, nil)
+	if got := d.Releases[0].Compare; got != "https://github.com/openai/codex/compare/rust-v0.162.1...rust-v0.163.0" {
+		t.Errorf("codex compare %q", got)
+	}
+	if d.Releases[1].Compare != "" || d.Releases[2].Compare != "" {
+		t.Errorf("a first build, or a harness with no public source, linked a comparison: %+v", d.Releases)
+	}
+	if l := d.Releases[0].line(func(s string) string { return s }); !strings.Contains(renderLinks(l, false), "(was 0.162.1, [diff](https://github.com/openai/codex/compare/rust-v0.162.1...rust-v0.163.0))") {
+		t.Errorf("line %q", renderLinks(l, false))
+	}
+}
