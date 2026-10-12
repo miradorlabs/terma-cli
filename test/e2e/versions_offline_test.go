@@ -100,19 +100,20 @@ func TestResolveChecked(t *testing.T) {
 	}
 	path := filepath.Join(t.TempDir(), "history.json")
 	platform := runtime.GOOS + "/" + runtime.GOARCH
-	if err := os.WriteFile(path, []byte(`[{"harness": "zz", "version": "1.2.0", "platform": "`+platform+`", "capability": "relay.telemetry", "result": "pass"}]`), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(`[{"harness": "zz", "version": "1.1.0", "platform": "`+platform+`", "capability": "relay.telemetry", "result": "pass"}]`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("TERMA_E2E_CHECKED", path)
-	if got := versions(resolve(t, "zz", "checked", list, ensure)); !slices.Equal(got, []string{"1.2.0", "1.3.0", "1.4.0"}) {
+	t.Cleanup(func() { reportMu.Lock(); delete(reportNotes, "yy/versions"); reportMu.Unlock() })
+	if got := versions(resolve(t, "zz", "checked", list, ensure)); !slices.Equal(got, []string{"1.1.0", "1.2.0", "1.3.0", "1.4.0"}) {
 		t.Errorf("checked: %v", got)
 	}
 	fetched = nil
-	if got := versions(resolve(t, "zz", "1.4.0,checked", list, ensure)); !slices.Equal(got, []string{"1.2.0", "1.3.0", "1.4.0"}) || countOf(fetched, "1.4.0") != 1 {
+	if got := versions(resolve(t, "zz", "1.4.0,checked", list, ensure)); !slices.Equal(got, []string{"1.1.0", "1.2.0", "1.3.0", "1.4.0"}) || countOf(fetched, "1.4.0") != 1 {
 		t.Errorf("a build named and checked: %v, fetched %v", got, fetched)
 	}
 	if got := versions(resolve(t, "yy", "checked", list, ensure)); !slices.Equal(got, []string{"1.2.0", "1.3.0", "1.4.0"}) {
-		t.Errorf("no history of yy: %v, want the last three", got)
+		t.Errorf("no history of yy: %v, want the last three, not zz's 1.1.0 on", got)
 	}
 	reportMu.Lock()
 	notes := slices.Clone(reportNotes["yy/versions"])
