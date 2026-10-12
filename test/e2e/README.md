@@ -216,7 +216,19 @@ what the night changed against them, then merges the night in and publishes it (
 compat` and `make drift` do the same locally, into `docs/`, where git ignores them). Its two
 git steps are `compatgen/publish.sh restore` and `publish`, which `TestPublishTwoNights`
 runs over two nights against a scratch origin. The digest,
-`report/drift.md`, `drift.json` and `slack.json`, gives for each harness's newest build:
+`report/drift.md`, `drift.json` and `slack.json`, leads with the night's **new releases**:
+each harness build tested for the first time and newer than any tested before (an older
+build, re-run or backported, is no news), against the newest build known before it, with whether it passed every capability check it
+ran (each capability on each platform once; a skipped one is not counted, and one censused
+that ran none says so) and what its census found new or gone, or that the night took none.
+A build the night skipped every check of, and took no census of, is no release until a night
+runs it. A night
+with none says so too. A release's failures are said on its line, not again among the
+capability changes, and a release that failed or ran no checks makes the night no quiet
+one. What came and what went are signed as a diff signs them (`+key`, `-key`) and coloured:
+in Slack each harness's are an attachment with a green bar and one with a red, and in the
+run's summary each line has a green or red mark. Then it gives for each harness's newest
+build:
 
 - **new surfaces**: surfaces no build had, once each with its keys counted, so a renamed
   span is one line, not one per key

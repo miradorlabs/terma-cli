@@ -141,12 +141,7 @@ func judgedBuilds(cat Catalog, n night) []string {
 			judged = append(judged, v)
 		}
 	}
-	slices.SortFunc(judged, func(a, b string) int {
-		if versionLess(a, b) {
-			return -1
-		}
-		return 1
-	})
+	slices.SortFunc(judged, compareVersions)
 	return judged
 }
 

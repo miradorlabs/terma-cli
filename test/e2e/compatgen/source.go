@@ -163,6 +163,13 @@ func (h *HarnessDrift) findings() []finding {
 // names a key belongs to the surface named nearest it, so in a file that names many (Codex
 // keeps its log events in one) a key is placed by the surface that owns its line.
 func linkSources(d *Drift, known map[string][]string) {
+	// A release's comparison is of the build known before it, censused tonight or not.
+	for i := range d.Releases {
+		r := &d.Releases[i]
+		if s, ok := sources[r.Harness]; ok && r.Previous != "" {
+			r.Compare = s.compare(r.Previous, r.Version)
+		}
+	}
 	for i := range d.Harnesses {
 		h := &d.Harnesses[i]
 		s, ok := sources[h.Harness]

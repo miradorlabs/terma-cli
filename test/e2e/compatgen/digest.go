@@ -9,7 +9,8 @@ import (
 )
 
 // The digest is what a night's runs changed against the catalog and the history as last
-// published: per harness, the newest build censused, the surfaces and keys that appeared,
+// published: the builds tested for the first time (Releases), whether each passed; per
+// harness, the newest build censused, the surfaces and keys that appeared,
 // those a newer build no longer sends, and the keys the relay withholds as unclassified; and
 // every capability whose result changed. A run that brought no census, or none of a harness
 // the catalog saw lately, says so: a quiet night is one that took the census and found
@@ -25,7 +26,9 @@ type Drift struct {
 	NoCensus bool `json:"no_census,omitempty"`
 	// Missing names the harnesses this night has no census of that it should have: those the
 	// catalog took a census of within missingWithin, and those whose census scenarios ran.
-	Missing   []string       `json:"missing,omitempty"`
+	Missing []string `json:"missing,omitempty"`
+	// Releases are the builds tested tonight for the first time.
+	Releases  []Release      `json:"releases,omitempty"`
 	Harnesses []HarnessDrift `json:"harnesses"`
 	// SourceErrors are the builds whose source could not be read, their findings unlinked.
 	SourceErrors []string       `json:"source_errors,omitempty"`
@@ -131,9 +134,9 @@ type GoneSurface struct {
 }
 
 // Quiet reports a night that took the census of every harness it should have and found
-// nothing worth a look.
+// nothing worth a look: a release that passed its checks is news, not a change.
 func (d Drift) Quiet() bool {
-	if d.NoCensus || len(d.Missing) > 0 || len(d.Compat) > 0 {
+	if d.NoCensus || len(d.Missing) > 0 || len(d.Compat) > 0 || slices.ContainsFunc(d.Releases, func(r Release) bool { return !r.Passed() }) {
 		return false
 	}
 	return !slices.ContainsFunc(d.Harnesses, HarnessDrift.changed)

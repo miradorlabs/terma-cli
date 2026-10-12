@@ -15,6 +15,22 @@ import (
 // maxListed bounds each list a message spells out; the rest is counted.
 const maxListed = 12
 
+// What a build added and what it no longer sends are signed as a diff signs them, and
+// coloured green and red: in the run's summary, which colours no text, by a mark before each
+// line, and in Slack by the bar of the attachment that holds them.
+const (
+	addedMark   = "🟢"
+	removedMark = "🔴"
+)
+
+// marks are what a line of a signed section starts with in the run's summary.
+var marks = map[string]string{"+": addedMark + " ", "-": removedMark + " "}
+
+// signed writes name as a diff line writes it: its sign, then it, as code.
+func signed(sign, name string) string {
+	return "`" + sign + name + "`"
+}
+
 func (h HarnessDrift) headline() string {
 	if h.First {
 		build := h.Version
@@ -189,10 +205,10 @@ func listed(lines []string) []string {
 	return append(slices.Clip(lines[:maxListed]), fmt.Sprintf("… and %d more", len(lines)-maxListed))
 }
 
-func changeLines(cs []FieldChange, withClass bool, d detail) []string {
+func changeLines(cs []FieldChange, sign string, withClass bool, d detail) []string {
 	var out []string
 	for _, c := range cs {
-		line := "`" + c.Key + "` on `" + c.Surface + "`"
+		line := signed(sign, c.Key) + " on `" + c.Surface + "`"
 		if withClass && c.Class != "" {
 			line += " (" + classLabel[c.Class] + ")"
 		}
@@ -212,7 +228,7 @@ func surfaceLines(ss []SurfaceChange, d detail) []string {
 		if s.From != "" {
 			in = ", in " + s.From
 		}
-		out = append(out, fmt.Sprintf("`%s` (%s, %d new%s)%s", s.Surface, plural(s.Keys, "key"), s.NewKeys, in, s.Source.note(d)))
+		out = append(out, fmt.Sprintf("%s (%s, %d new%s)%s", signed("+", s.Surface), plural(s.Keys, "key"), s.NewKeys, in, s.Source.note(d)))
 	}
 	return listed(out)
 }
@@ -220,27 +236,29 @@ func surfaceLines(ss []SurfaceChange, d detail) []string {
 func goneLines(ss []GoneSurface, d detail) []string {
 	var out []string
 	for _, s := range ss {
-		line := "`" + s.Surface + "`"
+		line := signed("-", s.Surface)
 		line += goneIn(s.In, s.Back)
 		out = append(out, line+s.Source.note(d))
 	}
 	return listed(out)
 }
 
-// sections are what a harness's change says, titled, with as much of each source note as d.
-func (h HarnessDrift) sections(d detail) []struct {
+// section is one titled list of what a harness's change says; sign is "+" or "-" for a list
+// of what came or went, whose lines are signed as a diff signs them and take no bullet.
+type section struct {
 	title string
 	lines []string
-} {
-	return []struct {
-		title string
-		lines []string
-	}{
-		{"New surfaces", surfaceLines(h.NewSurfaces, d)},
-		{"New fields", changeLines(h.Added, true, d)},
-		{"Removed fields", changeLines(h.Removed, true, d)},
-		{"Surfaces no longer sent", goneLines(h.Unseen, d)},
-		{"Newly withheld by the relay, unclassified", changeLines(h.Withheld, false, d)},
+	sign  string
+}
+
+// sections are what a harness's change says, with as much of each source note as d.
+func (h HarnessDrift) sections(d detail) []section {
+	return []section{
+		{"New surfaces", surfaceLines(h.NewSurfaces, d), "+"},
+		{"New fields", changeLines(h.Added, "+", true, d), "+"},
+		{"Removed fields", changeLines(h.Removed, "-", true, d), "-"},
+		{"Surfaces no longer sent", goneLines(h.Unseen, d), "-"},
+		{"Newly withheld by the relay, unclassified", changeLines(h.Withheld, "", false, d), ""},
 	}
 }
 
@@ -264,14 +282,18 @@ func (d Drift) alarms() []string {
 	return out
 }
 
-// unchanged names the harness builds with nothing new, as one line.
+// unchanged names the harness builds with nothing new, as one line; a release by its build
+// alone, which its release line says more of.
 func (d Drift) unchanged() string {
 	var builds []string
 	for _, h := range d.Harnesses {
-		if h.changed() {
-			continue
+		switch {
+		case h.changed():
+		case slices.ContainsFunc(d.Releases, func(r Release) bool { return r.Harness == h.Harness && r.Version == h.Version }):
+			builds = append(builds, h.Name+" "+h.Version)
+		default:
+			builds = append(builds, h.Name+" "+h.build("new build, "))
 		}
-		builds = append(builds, h.Name+" "+h.build("new build, "))
 	}
 	return strings.Join(builds, ", ")
 }
@@ -301,6 +323,16 @@ func (d Drift) markdown() string {
 	for _, a := range d.alarms() {
 		b.WriteString("**" + a + "**\n\n")
 	}
+	b.WriteString("## New releases\n\n")
+	if len(d.Releases) == 0 {
+		b.WriteString("None tonight.\n\n")
+	}
+	for _, l := range d.releaseLines(func(s string) string { return "**" + s + "**" }) {
+		b.WriteString("- " + l + "\n")
+	}
+	if len(d.Releases) > 0 {
+		b.WriteString("\n")
+	}
 	if d.Quiet() {
 		b.WriteString("No changes: every field and capability as the catalog and history have them.\n\n")
 	}
@@ -321,14 +353,18 @@ func (d Drift) markdown() string {
 			}
 			fmt.Fprintf(&b, "**%s**\n\n", sec.title)
 			for _, l := range sec.lines {
-				b.WriteString("- " + l + "\n")
+				mark := marks[sec.sign]
+				if strings.HasPrefix(l, "… and ") { // listed's count of the rest is no finding
+					mark = ""
+				}
+				b.WriteString("- " + mark + l + "\n")
 			}
 			b.WriteString("\n")
 		}
 	}
-	if len(d.Compat) > 0 {
+	if compat := d.otherCompat(); len(compat) > 0 {
 		b.WriteString("## Compatibility changes\n\n")
-		for _, c := range d.Compat {
+		for _, c := range compat {
 			b.WriteString("- " + c.line() + "\n")
 		}
 		b.WriteString("\n")

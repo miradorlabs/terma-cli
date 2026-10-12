@@ -283,7 +283,7 @@ func TestAChainSaysWhatCameBack(t *testing.T) {
 		field("0.165.0", "logs/codex.api_request", "flaps", "safe", day.Add(24*time.Hour))}
 	ran := censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.164.0"}, {Harness: "codex", Version: "0.165.0"}})
 	_, _, hs := fieldDrift(cat, tonight, ran, day.Add(24*time.Hour))
-	if md := (Drift{Harnesses: hs}).markdown(); !strings.Contains(md, "`flaps` on `logs/codex.api_request` (safe) (gone in 0.164.0, back in 0.165.0)") {
+	if md := (Drift{Harnesses: hs}).markdown(); !strings.Contains(md, "🔴 `-flaps` on `logs/codex.api_request` (safe) (gone in 0.164.0, back in 0.165.0)") {
 		t.Errorf("drift.md:\n%s", md)
 	}
 
@@ -336,7 +336,7 @@ func TestANewFieldSaysItsBuild(t *testing.T) {
 		field("0.165.0", "logs/codex.api_request", "model", "safe", day.Add(24*time.Hour))}
 	ran := censusRan([]e2e.CensusRun{{Harness: "codex", Version: "0.164.0", Failed: true}, {Harness: "codex", Version: "0.165.0"}})
 	_, _, hs := fieldDrift(cat, tonight, ran, day.Add(24*time.Hour))
-	if md := (Drift{Harnesses: hs}).markdown(); !strings.Contains(md, "`error.message` on `logs/codex.api_request` (safe) (in 0.164.0)") {
+	if md := (Drift{Harnesses: hs}).markdown(); !strings.Contains(md, "🟢 `+error.message` on `logs/codex.api_request` (safe) (in 0.164.0)") {
 		t.Errorf("drift.md:\n%s", md)
 	}
 }

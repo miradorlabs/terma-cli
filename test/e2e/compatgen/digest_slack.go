@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -46,79 +47,178 @@ func slackEscape(s string) string {
 	return strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;").Replace(s)
 }
 
-// slack is the digest as a Slack incoming webhook's payload: a header, the alarms, a section
-// per harness that changed and one for compatibility, and a link to the run.
+// Slack colours no text, so what came and what went sit in attachments whose bar is green
+// and red. Slack shows a message's attachments after its blocks, so the digest is a summary
+// in blocks, then below a divider each harness's changes in attachments; the bar of one that
+// is neither is Slack's own.
+const (
+	addedColour   = "#2EB67D"
+	removedColour = "#E01E5A"
+)
+
+var colours = map[string]string{"+": addedColour, "-": removedColour}
+
+type block = map[string]any
+
+func mrkdwn(s string) block { return block{"type": "mrkdwn", "text": s} }
+
+// slackText is s escaped for Slack, its links written as Slack writes them.
+func slackText(s string) string { return renderLinks(slackEscape(s), true) }
+
+// slackSection is s as a section block, cut to what one section holds.
+func slackSection(s string) block {
+	return block{"type": "section", "text": mrkdwn(clip(slackText(s), sectionLimit))}
+}
+
+// attachment is one bar of a harness's changes: its colour, "" for Slack's own, and its texts,
+// a section each, so lists that share a bar never share a section's limit.
+type attachment struct {
+	colour string
+	texts  []string
+}
+
+// slack is the digest as a Slack incoming webhook's payload: as blocks a summary (slackSummary),
+// then, under a divider, each harness's changes as attachments (slackChanges), as many whole
+// harnesses as one message holds.
 func (d Drift) slack() map[string]any {
-	type block = map[string]any
-	text := func(s string) block { return block{"type": "mrkdwn", "text": s} }
-	slackText := func(s string) string { return renderLinks(slackEscape(s), true) }
-	section := func(s string) block {
-		return block{"type": "section", "text": text(clip(slackText(s), sectionLimit))}
-	}
 	summary := "Harness drift: no changes"
 	if !d.Quiet() {
 		summary = "Harness drift: changes to look at"
 	}
+	blocks := d.slackSummary()
+	var harnesses [][]attachment
+	for _, h := range d.Harnesses {
+		if h.changed() {
+			harnesses = append(harnesses, h.slackChanges())
+		}
+	}
+	if len(harnesses) > 0 {
+		blocks = append(blocks, block{"type": "divider"}, slackSection("*Field changes by harness*"))
+	}
+	var atts []attachment
+	fit := fitHarnesses(blocks, harnesses)
+	for _, a := range fit {
+		atts = append(atts, a...)
+	}
+	if left := len(harnesses) - len(fit); left > 0 {
+		more := "1 harness"
+		if left > 1 {
+			more = fmt.Sprintf("%d harnesses", left)
+		}
+		atts = append(atts, attachment{"", []string{"_… and " + more + " more, too long for one message: see the run's summary._"}})
+	}
+	payload := map[string]any{"text": summary, "blocks": blocks}
+	if len(atts) > 0 {
+		var out []block
+		for _, a := range atts {
+			var sections []block
+			for _, t := range a.texts {
+				sections = append(sections, slackSection(t))
+			}
+			att := block{"blocks": sections}
+			if a.colour != "" {
+				att["color"] = a.colour
+			}
+			out = append(out, att)
+		}
+		payload["attachments"] = out
+	}
+	return payload
+}
+
+// slackSummary is the digest's summary as blocks: a header, the alarms, the new releases, the
+// builds unchanged, what is still withheld, compatibility, and a link to the run.
+func (d Drift) slackSummary() []block {
 	blocks := []block{{"type": "header", "text": block{"type": "plain_text", "text": "Harness drift — " + d.GeneratedAt.Format("2006-01-02")}}}
 	for _, a := range d.alarms() {
-		blocks = append(blocks, section(":warning: *"+a+"*"))
+		blocks = append(blocks, slackSection(":warning: *"+a+"*"))
+	}
+	if len(d.Releases) == 0 {
+		blocks = append(blocks, slackSection("*New releases:* none tonight"))
+	} else {
+		blocks = append(blocks, slackSection("*New releases*\n• "+strings.Join(d.releaseLines(func(s string) string { return "*" + s + "*" }), "\n• ")))
 	}
 	if d.Quiet() {
-		blocks = append(blocks, section("No changes. Censused: "+d.unchanged()+"."))
-	}
-	for _, h := range d.Harnesses {
-		if !h.changed() {
-			continue
-		}
-		// One source link a finding; none, where the links would push the section past its
-		// limit and cut the findings at its end (drift.md has them all).
-		said := func(level detail) string {
-			var b strings.Builder
-			b.WriteString("*" + h.headline() + "*")
-			for _, sec := range h.sections(level) {
-				if len(sec.lines) > 0 {
-					b.WriteString("\n_" + sec.title + "_\n• " + strings.Join(sec.lines, "\n• "))
-				}
-			}
-			return b.String()
-		}
-		s := said(oneLink)
-		if len(slackText(s)) > sectionLimit {
-			s = said(noLinks)
-		}
-		blocks = append(blocks, section(s))
-	}
-	if u := d.unchanged(); u != "" && !d.Quiet() {
-		blocks = append(blocks, section("_Unchanged:_ "+u))
+		blocks = append(blocks, slackSection("No changes. Censused: "+d.unchanged()+"."))
+	} else if u := d.unchanged(); u != "" {
+		blocks = append(blocks, slackSection("_Unchanged:_ "+u))
 	}
 	if s := d.stillWithheld(); s != "" {
-		blocks = append(blocks, section(s))
+		blocks = append(blocks, slackSection(s))
 	}
 	if len(d.SourceErrors) > 0 {
-		blocks = append(blocks, section("_Source links left out: "+strings.Join(d.SourceErrors, "; ")+"._"))
+		blocks = append(blocks, slackSection("_Source links left out: "+strings.Join(d.SourceErrors, "; ")+"._"))
 	}
-	if len(d.Compat) > 0 {
+	if compat := d.otherCompat(); len(compat) > 0 {
 		var lines []string
-		for _, c := range d.Compat {
+		for _, c := range compat {
 			lines = append(lines, c.line())
 		}
-		blocks = append(blocks, section("*Compatibility changes*\n• "+strings.Join(listed(lines), "\n• ")))
-	}
-	// The alarms and harnesses come first, so what the budget leaves out is the tail; the
-	// run's summary has the whole digest.
-	kept, size := 1, 0
-	for _, b := range blocks[1:] {
-		n := len(b["text"].(block)["text"].(string))
-		if kept >= maxBlocks-2 || size+n > slackBudget {
-			break
-		}
-		kept, size = kept+1, size+n
-	}
-	if left := len(blocks) - kept; left > 0 {
-		blocks = append(blocks[:kept], section(fmt.Sprintf("_… and %s more, too long for one message: see the run's summary._", plural(left, "section"))))
+		blocks = append(blocks, slackSection("*Compatibility changes*\n• "+strings.Join(listed(lines), "\n• ")))
 	}
 	if d.Link != "" {
-		blocks = append(blocks, block{"type": "context", "elements": []block{text("<" + d.Link + "|The run> · the catalog and the matrix are on the compat-matrix branch")}})
+		blocks = append(blocks, block{"type": "context", "elements": []block{mrkdwn("<" + d.Link + "|The run> · the catalog and the matrix are on the compat-matrix branch")}})
 	}
-	return map[string]any{"text": summary, "blocks": blocks}
+	return blocks
+}
+
+// slackChanges are h's changes as attachments: its headline, with what neither came nor went
+// (the newly withheld), on Slack's own bar, for a colour says only what came and what went,
+// never how the build did; then what came on a green bar and what went on a red. One source
+// link a finding, or none where the links would push a bar past what a section holds and cut
+// its findings (drift.md has them all).
+func (h HarnessDrift) slackChanges() []attachment {
+	said := func(level detail) []attachment {
+		out := []attachment{{"", []string{"*" + h.headline() + "*"}}}
+		for _, sec := range h.sections(level) {
+			if len(sec.lines) == 0 {
+				continue
+			}
+			bullet := "• "
+			if sec.sign != "" {
+				bullet = ""
+			}
+			list := "_" + sec.title + "_\n" + bullet + strings.Join(sec.lines, "\n"+bullet)
+			// An unsigned list has no colour (colours has no ""), so it joins the headline's bar.
+			i := slices.IndexFunc(out, func(a attachment) bool { return a.colour == colours[sec.sign] })
+			if i < 0 {
+				out = append(out, attachment{colours[sec.sign], []string{list}})
+				continue
+			}
+			out[i].texts = append(out[i].texts, list)
+		}
+		return out
+	}
+	out := said(oneLink)
+	if slices.ContainsFunc(out, func(a attachment) bool {
+		return slices.ContainsFunc(a.texts, func(t string) bool { return len(slackText(t)) > sectionLimit })
+	}) {
+		out = said(noLinks)
+	}
+	return out
+}
+
+// fitHarnesses are the first of harnesses, whole, that fit one message after blocks: at most
+// maxBlocks blocks, an attachment's sections each counted, one kept for the line saying what
+// was left out, and their text within the budget. A harness is kept or left out whole, never its headline without
+// what went.
+func fitHarnesses(blocks []block, harnesses [][]attachment) [][]attachment {
+	n, size := len(blocks), 0
+	for _, b := range blocks {
+		if t, ok := b["text"].(block); ok {
+			size += len(t["text"].(string))
+		}
+	}
+	for i, h := range harnesses {
+		for _, a := range h {
+			for _, t := range a.texts {
+				size += len(slackText(t))
+				n++
+			}
+		}
+		if n > maxBlocks-1 || size > slackBudget {
+			return harnesses[:i]
+		}
+	}
+	return harnesses
 }
