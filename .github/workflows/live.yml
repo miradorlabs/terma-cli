@@ -26,15 +26,16 @@ jobs:
       contents: read
     env:
       INCLUDE_SUBSCRIPTIONS: ${{ github.event_name == 'workflow_dispatch' && inputs.include_subscriptions || false }}
-      # The newest build each harness was checked on, and every release since (versions.go,
-      # sinceChecked): the build people run keeps being tested, what is new is judged against
-      # it, and no release goes untested however many ship in a day. Without the published
-      # history, the last three releases.
+      # The newest build each harness was checked on here, on macOS, and every release since,
+      # the newest five of a burst (versions.go, sinceChecked): the build people run keeps
+      # being tested, and what is new is judged against it the same night. Without the
+      # published history, the last three releases. DeepSeek ships prereleases alone, which
+      # "checked" does not pick: its newest build, as before.
       TERMA_E2E_CLAUDE_VERSIONS: checked
       TERMA_E2E_CODEX_VERSIONS: checked
       TERMA_E2E_OPENCODE_VERSIONS: checked
       TERMA_E2E_GEMINI_VERSIONS: checked
-      TERMA_E2E_DSH_VERSIONS: checked
+      TERMA_E2E_DSH_VERSIONS: last3
       TERMA_E2E_KNOWN_UPSTREAM: codex-session-end
     steps:
       - uses: actions/checkout@v5

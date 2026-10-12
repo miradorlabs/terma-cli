@@ -30,7 +30,8 @@ import (
 // TERMA_E2E_CLAUDE_VERSIONS / TERMA_E2E_CODEX_VERSIONS (and each harness's own):
 // "installed", "lastN", "checked", or a comma list of versions; default
 // "installed,last3". "checked" is the newest build the history at TERMA_E2E_CHECKED
-// has a result of and every release since, as the nightly runs them (sinceChecked).
+// has a result of on this platform and every release since, as the nightly runs them
+// (sinceChecked); it applies to harnesses that ship releases, not prereleases alone.
 // Downloads are cached under test/e2e/versions/ (ignored by git).
 
 // Binary is one harness build to test.
@@ -359,13 +360,19 @@ func abs(p string) string {
 const fallbackLast = 3
 
 // maxSinceChecked bounds the releases "checked" tests after the newest checked build: a burst
-// of releases is tested whole up to it, the newest of them beyond it.
+// of releases is tested whole up to it; beyond it, its newest are, and the older ones of the
+// burst are never tested, the next night starting from the newest.
 const maxSinceChecked = 5
 
 // checkedBuilds is the "checked" spec for harness among its releases, oldest first: the
-// builds sinceChecked picks by the history at TERMA_E2E_CHECKED. why says why there are
-// none, "" where there are.
+// builds sinceChecked picks by the history at TERMA_E2E_CHECKED, of this platform alone,
+// since another (the Linux machine job, which tests the newest release every night) says
+// nothing of what this one checked. why says why there are none, "" where there are.
 func checkedBuilds(harness string, releases []string) (builds []string, why string) {
+	return checkedBuildsOn(runtime.GOOS+"/"+runtime.GOARCH, harness, releases)
+}
+
+func checkedBuildsOn(platform, harness string, releases []string) (builds []string, why string) {
 	path := os.Getenv("TERMA_E2E_CHECKED")
 	if path == "" {
 		return nil, "no history of checked builds (TERMA_E2E_CHECKED)"
@@ -374,24 +381,20 @@ func checkedBuilds(harness string, releases []string) (builds []string, why stri
 	if err != nil {
 		return nil, "the history of checked builds is unreadable"
 	}
-	var history []struct {
-		Harness string `json:"harness"`
-		Version string `json:"version"`
-		Result  string `json:"result"`
-	}
+	var history []CompatRow
 	if err := json.Unmarshal(data, &history); err != nil {
 		return nil, "the history of checked builds is unreadable"
 	}
 	var checked []string
 	for _, e := range history {
 		// A build whose every check was skipped was not checked.
-		if e.Harness == harness && (e.Result == "pass" || e.Result == "fail") {
+		if e.Harness == harness && e.Platform == platform && (e.Result == "pass" || e.Result == "fail") {
 			checked = append(checked, e.Version)
 		}
 	}
 	builds = sinceChecked(releases, checked, maxSinceChecked)
 	if len(builds) == 0 {
-		return nil, "the history has checked no " + harness + " build"
+		return nil, "the history has checked no " + harness + " release on " + platform
 	}
 	return builds, ""
 }
