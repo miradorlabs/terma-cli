@@ -230,3 +230,48 @@ func TestAMirroredWorktreeManifestExpires(t *testing.T) {
 		t.Fatalf("the worktree commit's trailers = %+v, want only sess-new's\n%s", got, data)
 	}
 }
+
+// A mirrored worktree manifest older than ManifestRetention stamps nothing, though no later touch in the worktree
+// pruned it: a developer's commit of the file weeks later is the developer's.
+func TestAnExpiredMirroredManifestStampsNothing(t *testing.T) {
+	t.Parallel()
+	stateDir := t.TempDir()
+	main := hookruntest.InitRepo(t)
+	ctx := context.Background()
+	if _, err := gitx.Git(ctx, main, "commit", "-q", "--allow-empty", "-m", "init"); err != nil {
+		t.Fatal(err)
+	}
+	wt := filepath.Join(main, ".claude", "worktrees", "feature-w")
+	if _, err := gitx.Git(ctx, main, "worktree", "add", "-q", wt); err != nil {
+		t.Fatal(err)
+	}
+	pol := hookruntest.Admitting(main)
+	now := time.Now()
+	old := now.Add(-ManifestRetention - time.Hour)
+	env := func(at time.Time, cwd, stdin string, args ...string) Env {
+		return Env{StateDir: stateDir, Now: at, Cwd: cwd, Policy: pol, Args: args, Stdin: strings.NewReader(stdin), Version: "test", Team: "proj-main"}
+	}
+	hookruntest.WriteFile(t, wt, "src/w.go", "package src\n")
+	in := `{"session_id":"sess-old","cwd":"` + hookruntest.InJSON(main) + `"`
+	if err := startSession(ctx, env(old, main, in+`,"hook_event_name":"SessionStart","source":"startup"}`)); err != nil {
+		t.Fatal(err)
+	}
+	if err := editFile(ctx, env(old, main, in+`,"tool_name":"Write","tool_input":{"file_path":"`+hookruntest.InJSON(filepath.Join(wt, "src/w.go"))+`"}}`)); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := gitx.Git(ctx, wt, "add", "src/w.go"); err != nil {
+		t.Fatal(err)
+	}
+	msgPath := filepath.Join(t.TempDir(), "MSG")
+	if err := os.WriteFile(msgPath, []byte("work\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := PrepareCommitMsg(ctx, env(now, wt, "", msgPath)); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(msgPath)
+	if got := trailer.Parse(string(data), "#"); len(got) != 0 {
+		t.Fatalf("the developer's commit carries %+v, want no trailer\n%s", got, data)
+	}
+}
