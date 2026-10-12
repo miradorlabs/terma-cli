@@ -3,7 +3,10 @@
 // runs, so a claim covers only the agent process that made it.
 package procinfo
 
-import "os"
+import (
+	"net/netip"
+	"os"
+)
 
 // maxDepth bounds an ancestry walk; a real chain is a handful of processes deep.
 const maxDepth = 32
@@ -28,10 +31,24 @@ func Ancestors() []int {
 }
 
 // FindSender returns the process holding the client end of a loopback connection from
-// port, asking the kernel (about 3 ms over 900 processes on macOS), never a subprocess.
-func FindSender(port int) (pid int, ok bool) {
+// client to server, asking the kernel (about 3 ms over 900 processes on macOS), never a
+// subprocess. The whole connection is matched, both addresses and both ports: another
+// process can hold a socket with the same port numbers on other addresses (an IPv6 one, or
+// a connection out of the machine), and matching the client's port alone named that
+// process, the newest first.
+func FindSender(client, server netip.AddrPort) (pid int, ok bool) {
 	if !Supported {
 		return 0, false
 	}
-	return findSender(port, os.Getpid())
+	return findSender(conn{client: unmapped(client), server: unmapped(server)}, os.Getpid())
+}
+
+// conn is one TCP connection by its two ends, an IPv4-mapped address as IPv4.
+type conn struct{ client, server netip.AddrPort }
+
+func unmapped(a netip.AddrPort) netip.AddrPort { return netip.AddrPortFrom(a.Addr().Unmap(), a.Port()) }
+
+// is reports whether a socket from local to remote is c's client end.
+func (c conn) is(local, remote netip.AddrPort) bool {
+	return unmapped(local) == c.client && unmapped(remote) == c.server
 }

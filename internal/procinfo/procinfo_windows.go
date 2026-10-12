@@ -4,6 +4,7 @@ package procinfo
 
 import (
 	"encoding/binary"
+	"net/netip"
 	"sync"
 	"time"
 	"unsafe"
@@ -83,15 +84,15 @@ const (
 	afInet6                     = 23
 	tcpTableOwnerPIDConnections = 4
 	// Row sizes of MIB_TCPROW_OWNER_PID and MIB_TCP6ROW_OWNER_PID, and offsets in each.
-	row4Size, row4LocalPort, row4PID = 24, 8, 20
-	row6Size, row6LocalPort, row6PID = 56, 20, 52
+	row4Size, row4LocalAddr, row4LocalPort, row4RemoteAddr, row4RemotePort, row4PID = 24, 4, 8, 12, 16, 20
+	row6Size, row6LocalAddr, row6LocalPort, row6RemoteAddr, row6RemotePort, row6PID = 56, 0, 20, 24, 44, 52
 )
 
-// findSender finds the TCP table row whose local port is port, IPv4 then IPv6.
-func findSender(port, self int) (int, bool) {
-	for _, t := range []struct{ af, size, localPort, pid int }{
-		{afInet, row4Size, row4LocalPort, row4PID},
-		{afInet6, row6Size, row6LocalPort, row6PID},
+// findSender finds the TCP table row of c's client end, IPv4 then IPv6.
+func findSender(c conn, self int) (int, bool) {
+	for _, t := range []struct{ af, size, addrLen, localAddr, localPort, remoteAddr, remotePort, pid int }{
+		{afInet, row4Size, 4, row4LocalAddr, row4LocalPort, row4RemoteAddr, row4RemotePort, row4PID},
+		{afInet6, row6Size, 16, row6LocalAddr, row6LocalPort, row6RemoteAddr, row6RemotePort, row6PID},
 	} {
 		table, ok := tcpTable(t.af)
 		if !ok || len(table) < 4 {
@@ -106,9 +107,13 @@ func findSender(port, self int) (int, bool) {
 				break
 			}
 			// Ports sit in the low 16 bits of a DWORD, in network byte order.
-			local := int(binary.BigEndian.Uint16(row[t.localPort:]))
+			// Addresses sit in network byte order, as in_addr and in6_addr do.
+			end := func(addr, port int) netip.AddrPort {
+				a, _ := netip.AddrFromSlice(row[addr : addr+t.addrLen])
+				return netip.AddrPortFrom(a, binary.BigEndian.Uint16(row[port:]))
+			}
 			pid := int(binary.LittleEndian.Uint32(row[t.pid:]))
-			if local == port && pid != self && pid > 4 {
+			if c.is(end(t.localAddr, t.localPort), end(t.remoteAddr, t.remotePort)) && pid != self && pid > 4 {
 				return pid, true
 			}
 		}

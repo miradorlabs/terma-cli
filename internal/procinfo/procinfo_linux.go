@@ -2,7 +2,9 @@ package procinfo
 
 import (
 	"bufio"
-	"fmt"
+	"encoding/binary"
+	"encoding/hex"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -31,10 +33,9 @@ func parentOf(pid int) (int, bool) {
 // Supported is true: /proc answers both questions.
 const Supported = true
 
-// ownsPort reports whether pid holds a TCP socket bound locally to port.
-func ownsPort(pid, port int) bool {
+// ownsConn reports whether pid holds c's client end.
+func ownsConn(pid int, c conn) bool {
 	inodes := map[string]bool{}
-	suffix := fmt.Sprintf(":%04X", port)
 	for _, table := range []string{"/proc/net/tcp", "/proc/net/tcp6"} {
 		f, err := os.Open(table)
 		if err != nil {
@@ -44,7 +45,12 @@ func ownsPort(pid, port int) bool {
 		sc.Scan() // header
 		for sc.Scan() {
 			fields := strings.Fields(sc.Text())
-			if len(fields) > 9 && strings.HasSuffix(fields[1], suffix) {
+			if len(fields) <= 9 {
+				continue
+			}
+			local, lok := procAddr(fields[1])
+			remote, rok := procAddr(fields[2])
+			if lok && rok && c.is(local, remote) {
 				inodes["socket:["+fields[9]+"]"] = true
 			}
 		}
@@ -76,4 +82,20 @@ func allPIDs() []int {
 		}
 	}
 	return out
+}
+
+// procAddr reads /proc/net/tcp's ADDR:PORT: the port in hex, the address as hex 32-bit words
+// each printed in the host's byte order (four for tcp6, one for tcp).
+func procAddr(s string) (netip.AddrPort, bool) {
+	hexAddr, hexPort, ok := strings.Cut(s, ":")
+	raw, err := hex.DecodeString(hexAddr)
+	port, perr := strconv.ParseUint(hexPort, 16, 16)
+	if !ok || err != nil || perr != nil || (len(raw) != 4 && len(raw) != 16) {
+		return netip.AddrPort{}, false
+	}
+	for i := 0; i < len(raw); i += 4 {
+		binary.NativeEndian.PutUint32(raw[i:], binary.BigEndian.Uint32(raw[i:]))
+	}
+	addr, _ := netip.AddrFromSlice(raw)
+	return netip.AddrPortFrom(addr, uint16(port)), true
 }
