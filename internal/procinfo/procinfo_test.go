@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -34,20 +35,27 @@ func TestFindSenderNamesTheConnectingProcess(t *testing.T) {
 	if !Supported {
 		t.Skip("unsupported")
 	}
-	// Over IPv4, as the relay listens, and IPv6, whose addresses each platform lays out apart.
-	for _, network := range []struct{ name, listen string }{{"tcp4", "127.0.0.1:0"}, {"tcp6", "[::1]:0"}} {
-		t.Run(network.name, func(t *testing.T) {
+	// Over IPv4, as the relay listens, and IPv6, whose addresses each platform lays out apart;
+	// and to a listener on every address, which sees an IPv4 client as IPv4-mapped.
+	for _, network := range []struct{ name, listen, dial string }{
+		{"tcp4", "127.0.0.1:0", ""}, {"tcp6", "[::1]:0", ""}, {"tcp", "[::]:0", "127.0.0.1"},
+	} {
+		t.Run(network.name+" "+network.listen, func(t *testing.T) {
 			t.Parallel()
 			ln, err := net.Listen(network.name, network.listen)
 			if err != nil {
-				if network.name == "tcp6" {
-					t.Skipf("no [::1] here: %v", err)
+				if network.name != "tcp4" {
+					t.Skipf("no %s here: %v", network.listen, err)
 				}
 				t.Fatal(err)
 			}
 			defer func() { _ = ln.Close() }()
+			addr := ln.Addr().String()
+			if network.dial != "" {
+				addr = net.JoinHostPort(network.dial, strconv.Itoa(ln.Addr().(*net.TCPAddr).Port))
+			}
 			child := exec.Command(os.Args[0], "-test.run=^$")
-			child.Env = append(os.Environ(), connectEnv+"="+ln.Addr().String())
+			child.Env = append(os.Environ(), connectEnv+"="+addr)
 			stdin, _ := child.StdinPipe()
 			if err := child.Start(); err != nil {
 				t.Fatal(err)
