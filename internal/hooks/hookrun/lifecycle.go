@@ -206,10 +206,10 @@ func (e Env) checkoutOf(r *Repo, dir string) *Repo {
 	return &Repo{Root: root, GitDir: gitDir, ProjectID: r.ProjectID, Repository: id, Remote: remote}
 }
 
-// checkoutID is terma.checkout.id for a symlink-resolved checkout root: the first 32 hex
-// characters of its SHA-256, which the platform recomputes from any root it observes.
+// checkoutID is terma.checkout.id for a checkout root as terma.repository.root sends it: the
+// first 32 hex characters of its SHA-256, which the platform recomputes from the roots it sees.
 func checkoutID(root string) string {
-	sum := sha256.Sum256([]byte(filepath.Clean(root)))
+	sum := sha256.Sum256([]byte(root))
 	return hex.EncodeToString(sum[:16])
 }
 
