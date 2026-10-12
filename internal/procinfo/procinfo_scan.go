@@ -2,11 +2,11 @@
 
 package procinfo
 
-// findSender asks every process whether it owns the connection from port to server:
-// neither platform has a table naming a socket's owner.
-func findSender(port, server, self int) (int, bool) {
+// findSender asks every process whether it owns c's client end: neither platform has a
+// table naming a socket's owner.
+func findSender(c conn, self int) (int, bool) {
 	for _, p := range allPIDs() {
-		if p != self && ownsConn(p, port, server) {
+		if p != self && ownsConn(p, c) {
 			return p, true
 		}
 	}

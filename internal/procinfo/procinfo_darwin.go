@@ -2,6 +2,7 @@ package procinfo
 
 import (
 	"encoding/binary"
+	"net/netip"
 	"syscall"
 	"unsafe"
 
@@ -35,6 +36,10 @@ const (
 	offSocketKind        = 256 // psi.soi_kind
 	offForeignPort       = 264 // psi.soi_proto.pri_tcp.tcpsi_ini.insi_fport
 	offLocalPort         = 268 // psi.soi_proto.pri_tcp.tcpsi_ini.insi_lport
+	offVFlag             = 288 // psi.soi_proto.pri_tcp.tcpsi_ini.insi_vflag
+	offForeignAddr       = 296 // psi.soi_proto.pri_tcp.tcpsi_ini.insi_faddr, 16 bytes
+	offLocalAddr         = 312 // psi.soi_proto.pri_tcp.tcpsi_ini.insi_laddr, 16 bytes
+	iniIPv4              = 0x1 // INI_IPV4: the addresses are in4in6_addr, IPv4 in the last 4 bytes
 	sockInfoTCP          = 2   // SOCKINFO_TCP
 	maxFDsPerProcess     = 4096
 )
@@ -50,8 +55,8 @@ func procInfo(callnum, pid, flavor int, arg uint64, buf []byte) (int, bool) {
 	return int(n), true
 }
 
-// ownsConn reports whether pid holds a TCP socket from local port port to remote port server.
-func ownsConn(pid, port, server int) bool {
+// ownsConn reports whether pid holds c's client end.
+func ownsConn(pid int, c conn) bool {
 	fds := make([]byte, procFDInfoSize*maxFDsPerProcess)
 	n, ok := procInfo(procInfoCallPIDInfo, pid, procPIDListFDs, 0, fds)
 	if !ok {
@@ -63,18 +68,23 @@ func ownsConn(pid, port, server int) bool {
 		if binary.LittleEndian.Uint32(fds[i+4:]) != proxFDTypeSocket {
 			continue
 		}
-		if m, ok := procInfo(procInfoCallFDInfo, pid, procPIDFDSocketInfo, uint64(fd), info); !ok || m < offLocalPort+4 {
+		if m, ok := procInfo(procInfoCallFDInfo, pid, procPIDFDSocketInfo, uint64(fd), info); !ok || m < offLocalAddr+16 {
 			continue
 		}
 		if binary.LittleEndian.Uint32(info[offSocketKind:]) != sockInfoTCP {
 			continue
 		}
 		// insi_lport and insi_fport hold a port in network byte order in their low 16 bits.
-		netPort := func(off int) int {
-			raw := binary.LittleEndian.Uint32(info[off:])
-			return int(uint16(raw>>8) | uint16(raw<<8))
+		end := func(addrOff, portOff int) netip.AddrPort {
+			raw := binary.LittleEndian.Uint32(info[portOff:])
+			port := uint16(raw>>8) | uint16(raw<<8)
+			a := [16]byte(info[addrOff : addrOff+16])
+			if info[offVFlag]&iniIPv4 != 0 {
+				return netip.AddrPortFrom(netip.AddrFrom4([4]byte(a[12:])), port)
+			}
+			return netip.AddrPortFrom(netip.AddrFrom16(a), port)
 		}
-		if netPort(offLocalPort) == port && netPort(offForeignPort) == server {
+		if c.is(end(offLocalAddr, offLocalPort), end(offForeignAddr, offForeignPort)) {
 			return true
 		}
 	}

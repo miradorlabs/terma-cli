@@ -5,6 +5,7 @@ import (
 	"context"
 	"net"
 	"net/http"
+	"net/netip"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -12,20 +13,23 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// The relay asks for the sender by the connection's client port, then its own: two ports of
+// The relay asks for the sender by the connection's client end, then its own: two ends of
 // one type, which a swap would still compile.
 func TestTheSenderIsAskedForByBothEnds(t *testing.T) {
 	t.Parallel()
 	var asked atomic.Value
 	f := newFixture()
 	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
-		PeerPID: func(port, server int) (int, bool) { asked.Store([2]int{port, server}); return 0, false }})
+		PeerPID: func(client, server netip.AddrPort) (int, bool) {
+			asked.Store([2]netip.AddrPort{client, server})
+			return 0, false
+		}})
 	srv, _ := startRelay(t, r)
-	var client atomic.Int64
+	var client atomic.Value
 	transport := &http.Transport{DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 		c, err := (&net.Dialer{}).DialContext(ctx, network, addr)
 		if err == nil {
-			client.Store(int64(c.LocalAddr().(*net.TCPAddr).Port))
+			client.Store(c.LocalAddr().(*net.TCPAddr).AddrPort())
 		}
 		return c, err
 	}}
@@ -39,8 +43,8 @@ func TestTheSenderIsAskedForByBothEnds(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = resp.Body.Close()
-	want := [2]int{int(client.Load()), srv.Listener.Addr().(*net.TCPAddr).Port}
-	if got, _ := asked.Load().([2]int); got != want {
-		t.Errorf("PeerPID asked with %v, want the client's port then the relay's, %v", got, want)
+	want := [2]netip.AddrPort{client.Load().(netip.AddrPort), srv.Listener.Addr().(*net.TCPAddr).AddrPort()}
+	if got, _ := asked.Load().([2]netip.AddrPort); got != want {
+		t.Errorf("PeerPID asked with %v, want the client's end then the relay's, %v", got, want)
 	}
 }

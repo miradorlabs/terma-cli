@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/netip"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -33,42 +34,50 @@ func TestFindSenderNamesTheConnectingProcess(t *testing.T) {
 	if !Supported {
 		t.Skip("unsupported")
 	}
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = ln.Close() }()
-	child := exec.Command(os.Args[0], "-test.run=^$")
-	child.Env = append(os.Environ(), connectEnv+"="+ln.Addr().String())
-	stdin, _ := child.StdinPipe()
-	if err := child.Start(); err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = stdin.Close(); _ = child.Process.Kill(); _ = child.Wait() }()
-	conn, err := ln.Accept()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = conn.Close() }()
-	port, server := conn.RemoteAddr().(*net.TCPAddr).Port, conn.LocalAddr().(*net.TCPAddr).Port
-	if pid, ok := FindSender(port, server); !ok || pid != child.Process.Pid {
-		t.Fatalf("FindSender(%d, %d) = %d, %v; want the child %d", port, server, pid, ok, child.Process.Pid)
+	// Over IPv4, as the relay listens, and IPv6, whose addresses each platform lays out apart.
+	for _, network := range []struct{ name, listen string }{{"tcp4", "127.0.0.1:0"}, {"tcp6", "[::1]:0"}} {
+		t.Run(network.name, func(t *testing.T) {
+			t.Parallel()
+			ln, err := net.Listen(network.name, network.listen)
+			if err != nil {
+				if network.name == "tcp6" {
+					t.Skipf("no [::1] here: %v", err)
+				}
+				t.Fatal(err)
+			}
+			defer func() { _ = ln.Close() }()
+			child := exec.Command(os.Args[0], "-test.run=^$")
+			child.Env = append(os.Environ(), connectEnv+"="+ln.Addr().String())
+			stdin, _ := child.StdinPipe()
+			if err := child.Start(); err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = stdin.Close(); _ = child.Process.Kill(); _ = child.Wait() }()
+			conn, err := ln.Accept()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = conn.Close() }()
+			client, server := conn.RemoteAddr().(*net.TCPAddr).AddrPort(), conn.LocalAddr().(*net.TCPAddr).AddrPort()
+			if pid, ok := FindSender(client, server); !ok || pid != child.Process.Pid {
+				t.Fatalf("FindSender(%v, %v) = %d, %v; want the child %d", client, server, pid, ok, child.Process.Pid)
+			}
+		})
 	}
 }
 
 // connectEnv makes the test binary the connecting child: it dials the address and
-// holds the connection until its stdin closes. bindEnv makes it a process holding a socket
-// on [::1] at the given port, says "bound" or "no" on stdout, and holds it until stdin
-// closes.
+// holds the connection until its stdin closes. decoyEnv, "FROM TO", makes it dial TO from
+// FROM, say "bound" or "no" on stdout, and hold that until stdin closes.
 const (
 	connectEnv = "PROCINFO_TEST_CONNECT"
-	bindEnv    = "PROCINFO_TEST_BIND"
+	decoyEnv   = "PROCINFO_TEST_DECOY"
 )
 
-// A newer process holding the sender's port number on another address is not the sender:
-// matched on the port alone, it was, and a session's telemetry went to it (macOS lists the
-// newest process first).
-func TestFindSenderMatchesBothEnds(t *testing.T) {
+// A newer process holding a connection with the sender's two port numbers, between other
+// addresses, is not the sender: matched on ports, it was, and a session's telemetry went to it
+// (macOS lists the newest process first).
+func TestFindSenderMatchesTheWholeConnection(t *testing.T) {
 	t.Parallel()
 	if !Supported {
 		t.Skip("unsupported")
@@ -78,11 +87,23 @@ func TestFindSenderMatchesBothEnds(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = ln.Close() }()
+	port := ln.Addr().(*net.TCPAddr).Port
+	ln6, err := net.Listen("tcp6", fmt.Sprintf("[::1]:%d", port))
+	if err != nil {
+		t.Skipf("no [::1]:%d here for a connection with the same ports: %v", port, err)
+	}
+	defer func() { _ = ln6.Close() }()
 	start := func(env string) (*exec.Cmd, io.ReadCloser) {
 		child := exec.Command(os.Args[0], "-test.run=^$")
 		child.Env = append(os.Environ(), env)
-		stdin, _ := child.StdinPipe()
-		stdout, _ := child.StdoutPipe()
+		stdin, err := child.StdinPipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		stdout, err := child.StdoutPipe()
+		if err != nil {
+			t.Fatal(err)
+		}
 		if err := child.Start(); err != nil {
 			t.Fatal(err)
 		}
@@ -90,33 +111,37 @@ func TestFindSenderMatchesBothEnds(t *testing.T) {
 		return child, stdout
 	}
 	sender, _ := start(connectEnv + "=" + ln.Addr().String())
-	conn, err := ln.Accept()
+	c, err := ln.Accept()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = conn.Close() }()
-	port, server := conn.RemoteAddr().(*net.TCPAddr).Port, conn.LocalAddr().(*net.TCPAddr).Port
-	binder, out := start(fmt.Sprint(bindEnv, "=", port))
+	defer func() { _ = c.Close() }()
+	client, server := c.RemoteAddr().(*net.TCPAddr).AddrPort(), c.LocalAddr().(*net.TCPAddr).AddrPort()
+	decoy, out := start(fmt.Sprintf("%s=[::1]:%d [::1]:%d", decoyEnv, client.Port(), server.Port()))
 	said, _ := io.ReadAll(io.LimitReader(out, 5))
 	switch string(said) {
 	case "bound":
 	case "no":
-		t.Skipf("no [::1]:%d here to share the port number", port)
+		t.Skipf("no [::1]:%d here to connect from", client.Port())
 	default:
-		t.Fatalf("the process to hold [::1]:%d said %q", port, said)
+		t.Fatalf("the decoy said %q", said)
 	}
-	if pid, ok := FindSender(port, server); !ok || pid != sender.Process.Pid {
-		t.Fatalf("FindSender(%d, %d) = %d, %v; want the sender %d, not the process holding [::1]:%d", port, server, pid, ok, sender.Process.Pid, port)
+	if dc, err := ln6.Accept(); err == nil {
+		defer func() { _ = dc.Close() }()
 	}
-	// Where the platform asks each process, the other is refused outright: where it lists
-	// the sender first (Linux, oldest first), FindSender alone would pass on the port.
-	if ownsConnForTest != nil && (ownsConnForTest(binder.Process.Pid, port, server) || !ownsConnForTest(sender.Process.Pid, port, server)) {
-		t.Fatalf("the process holding [::1]:%d is taken for the connection %d→%d, or the sender is not", port, port, server)
+	if pid, ok := FindSender(client, server); !ok || pid != sender.Process.Pid {
+		t.Fatalf("FindSender(%v, %v) = %d, %v; want the sender %d, not the decoy %d on [::1]", client, server, pid, ok, sender.Process.Pid, decoy.Process.Pid)
+	}
+	// Where the platform asks each process, the decoy is refused outright: where it lists the
+	// sender first (Linux, oldest first), FindSender alone would pass on the ports.
+	whole := conn{client: client, server: server}
+	if ownsConnForTest != nil && (ownsConnForTest(decoy.Process.Pid, whole) || !ownsConnForTest(sender.Process.Pid, whole)) {
+		t.Fatalf("the decoy %d is taken for %v→%v, or the sender %d is not", decoy.Process.Pid, client, server, sender.Process.Pid)
 	}
 }
 
 // ownsConnForTest is ownsConn, where the platform asks each process (procinfo_scan_test.go).
-var ownsConnForTest func(pid, port, server int) bool
+var ownsConnForTest func(pid int, c conn) bool
 
 // executableEnv makes the test binary print AbsExecutable and exit.
 const executableEnv = "PROCINFO_TEST_EXECUTABLE"
@@ -159,15 +184,20 @@ func TestMain(m *testing.M) {
 		fmt.Println(exe)
 		os.Exit(0)
 	}
-	if port := os.Getenv(bindEnv); port != "" {
-		ln, err := net.Listen("tcp6", "[::1]:"+port)
+	if ends := os.Getenv(decoyEnv); ends != "" {
+		from, to, _ := strings.Cut(ends, " ")
+		local, err := net.ResolveTCPAddr("tcp6", from)
+		var c net.Conn
+		if err == nil {
+			c, err = (&net.Dialer{LocalAddr: local}).Dial("tcp6", to)
+		}
 		if err != nil {
 			fmt.Print("no")
 			os.Exit(0)
 		}
 		fmt.Print("bound")
 		_, _ = io.Copy(io.Discard, os.Stdin)
-		_ = ln.Close()
+		_ = c.Close()
 		os.Exit(0)
 	}
 	if addr := os.Getenv(connectEnv); addr != "" {
@@ -184,6 +214,6 @@ func TestMain(m *testing.M) {
 
 func BenchmarkFindSender(b *testing.B) {
 	for b.Loop() {
-		FindSender(1, 2)
+		FindSender(netip.MustParseAddrPort("127.0.0.1:1"), netip.MustParseAddrPort("127.0.0.1:2"))
 	}
 }

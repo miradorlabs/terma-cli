@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/netip"
 	"strings"
 	"sync"
 	"time"
@@ -76,9 +77,9 @@ type Options struct {
 	// ClaimCacheTTL and PolicyCacheTTL keep Lookup's and Resolve's answers that long (0: ask every time).
 	ClaimCacheTTL  time.Duration
 	PolicyCacheTTL time.Duration
-	// PeerPID names the process behind a connection from its two ends, the client's port and
-	// the relay's; without it the session alone decides.
-	PeerPID func(port, server int) (int, bool)
+	// PeerPID names the process behind a connection from its two ends, the client's and the
+	// relay's; without it the session alone decides.
+	PeerPID func(client, server netip.AddrPort) (int, bool)
 	// ProcessAlive reports whether a sender still runs; sessionless parts go by process once it exits.
 	ProcessAlive func(pid int) bool
 	// HTTP sends upstream; a no-redirect client with a 15-second timeout when nil.

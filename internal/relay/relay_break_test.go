@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"os"
 	"strings"
 	"sync"
@@ -376,7 +377,7 @@ func TestRelayClaimCoversOnlyItsProcesses(t *testing.T) {
 	f.claims["A"] = claim.Claim{ProjectID: "p1", PIDs: []int{100, 101}}
 	var sender atomic.Int64
 	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
-		PeerPID: func(int, int) (int, bool) { pid := int(sender.Load()); return pid, pid != 0 },
+		PeerPID: func(netip.AddrPort, netip.AddrPort) (int, bool) { pid := int(sender.Load()); return pid, pid != 0 },
 		Resolve: func(c claim.Claim) (Policy, error) { return allPolicies(u)[c.ProjectID], nil }})
 	runRelay(t, r)
 	srv := httptest.NewUnstartedServer(r.Handler())
@@ -418,7 +419,7 @@ func TestRelayExitNamesWhyHeld(t *testing.T) {
 	f.claims["A"] = claim.Claim{ProjectID: "p1", PIDs: []int{100}}
 	var logged []string
 	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
-		PeerPID: func(int, int) (int, bool) { return 555, true },
+		PeerPID: func(netip.AddrPort, netip.AddrPort) (int, bool) { return 555, true },
 		Logf:    func(format string, args ...any) { logged = append(logged, fmt.Sprintf(format, args...)) },
 		Resolve: func(c claim.Claim) (Policy, error) { return allPolicies(u)[c.ProjectID], nil }})
 	srv, stop := startRelay(t, r)
@@ -515,7 +516,7 @@ type procRelay struct {
 func newProcRelay(t *testing.T) *procRelay {
 	pr := &procRelay{t: t, u: newUpstream(t), f: newFixture()}
 	pr.r = newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: pr.f.lookup, Now: pr.f.clock,
-		PeerPID:      func(int, int) (int, bool) { pid := int(pr.sender.Load()); return pid, pid != 0 },
+		PeerPID:      func(netip.AddrPort, netip.AddrPort) (int, bool) { pid := int(pr.sender.Load()); return pid, pid != 0 },
 		ProcessAlive: func(pid int) bool { _, gone := pr.dead.Load(pid); return !gone },
 		Resolve: func(c claim.Claim) (Policy, error) {
 			if p, ok := allPolicies(pr.u)[c.ProjectID]; ok {
@@ -985,7 +986,7 @@ func TestRelayRetriesAFailedSenderLookup(t *testing.T) {
 	f.claims["A"] = claim.Claim{ProjectID: "p1", PIDs: []int{101}}
 	var lookups atomic.Int32
 	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
-		PeerPID: func(int, int) (int, bool) {
+		PeerPID: func(netip.AddrPort, netip.AddrPort) (int, bool) {
 			if lookups.Add(1) == 1 {
 				return 0, false
 			}
