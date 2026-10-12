@@ -141,9 +141,9 @@ func TestSourceLinks(t *testing.T) {
 	md := d.markdown()
 	for _, want := range []string{
 		"Codex CLI 0.162.0 (was 0.161.0, [diff](https://github.com/openai/codex/compare/rust-v0.161.0...rust-v0.162.0))",
-		"`product_sku` on `logs/codex.mcp` · [mcp.rs:3](https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/core/src/mcp.rs#L3)",
-		"`codex.turn.phase` on `traces/turn` · gone from 0.162.0's source, was in 0.161.0's: [turn.rs:2](https://github.com/openai/codex/blob/rust-v0.161.0/codex-rs/core/src/turn.rs#L2)",
-		"`metrics/codex.rollout.persistence.append` · still in 0.162.0's source: [persistence_metrics.rs:1](",
+		"🟢 `+product_sku` on `logs/codex.mcp` · [mcp.rs:3](https://github.com/openai/codex/blob/rust-v0.162.0/codex-rs/core/src/mcp.rs#L3)",
+		"🔴 `-codex.turn.phase` on `traces/turn` · gone from 0.162.0's source, was in 0.161.0's: [turn.rs:2](https://github.com/openai/codex/blob/rust-v0.161.0/codex-rs/core/src/turn.rs#L2)",
+		"🔴 `-metrics/codex.rollout.persistence.append` · still in 0.162.0's source: [persistence_metrics.rs:1](",
 	} {
 		if !strings.Contains(md, want) {
 			t.Errorf("drift.md lacks %q:\n%s", want, md)
@@ -221,10 +221,10 @@ func TestSourceLinksOnARealShapedTree(t *testing.T) {
 	md := d.markdown()
 	for _, want := range []string{
 		// Beside the constant that names its metric, past the 120 other lines that say it.
-		"`tool` on `metrics/codex.tool.call` · [telemetry.rs:3](",
-		"`state` on `metrics/codex.shell_snapshot.command` · gone from 0.162.0's source, was in 0.161.0's: [snapshot.rs:2](",
-		"`logs/codex.proxy.block` · named in neither build's source",
-		"`logs/codex.proxy.allow` · still in 0.162.0's source: [policy.rs:10](",
+		"🟢 `+tool` on `metrics/codex.tool.call` · [telemetry.rs:3](",
+		"🔴 `-state` on `metrics/codex.shell_snapshot.command` · gone from 0.162.0's source, was in 0.161.0's: [snapshot.rs:2](",
+		"🔴 `-logs/codex.proxy.block` · named in neither build's source",
+		"🔴 `-logs/codex.proxy.allow` · still in 0.162.0's source: [policy.rs:10](",
 	} {
 		if !strings.Contains(md, want) {
 			t.Errorf("drift.md lacks %q:\n%s", want, md)

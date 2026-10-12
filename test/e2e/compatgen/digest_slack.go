@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -46,8 +47,21 @@ func slackEscape(s string) string {
 	return strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;").Replace(s)
 }
 
-// slack is the digest as a Slack incoming webhook's payload: a header, the alarms, a section
-// per harness that changed and one for compatibility, and a link to the run.
+// Slack colours no text, so what came and what went sit in attachments whose bar is green
+// and red. Slack shows a message's attachments after its blocks, so the digest is a summary
+// in blocks, then below a divider each harness's changes in attachments; the bar of one that
+// is neither is Slack's own.
+const (
+	addedColour   = "#2EB67D"
+	removedColour = "#E01E5A"
+)
+
+var colours = map[string]string{"+": addedColour, "-": removedColour}
+
+// slack is the digest as a Slack incoming webhook's payload: as blocks a header, the alarms,
+// the new releases, the builds unchanged, what is still withheld, compatibility and a link to
+// the run; then, under a divider, each harness's changes as attachments, its headline on
+// Slack's own bar, what came in green and what went in red.
 func (d Drift) slack() map[string]any {
 	type block = map[string]any
 	text := func(s string) block { return block{"type": "mrkdwn", "text": s} }
@@ -63,30 +77,13 @@ func (d Drift) slack() map[string]any {
 	for _, a := range d.alarms() {
 		blocks = append(blocks, section(":warning: *"+a+"*"))
 	}
+	if len(d.Releases) == 0 {
+		blocks = append(blocks, section("*New releases:* none tonight"))
+	} else {
+		blocks = append(blocks, section("*New releases*\n• "+strings.Join(d.releaseLines(func(s string) string { return "*" + s + "*" }), "\n• ")))
+	}
 	if d.Quiet() {
 		blocks = append(blocks, section("No changes. Censused: "+d.unchanged()+"."))
-	}
-	for _, h := range d.Harnesses {
-		if !h.changed() {
-			continue
-		}
-		// One source link a finding; none, where the links would push the section past its
-		// limit and cut the findings at its end (drift.md has them all).
-		said := func(level detail) string {
-			var b strings.Builder
-			b.WriteString("*" + h.headline() + "*")
-			for _, sec := range h.sections(level) {
-				if len(sec.lines) > 0 {
-					b.WriteString("\n_" + sec.title + "_\n• " + strings.Join(sec.lines, "\n• "))
-				}
-			}
-			return b.String()
-		}
-		s := said(oneLink)
-		if len(slackText(s)) > sectionLimit {
-			s = said(noLinks)
-		}
-		blocks = append(blocks, section(s))
 	}
 	if u := d.unchanged(); u != "" && !d.Quiet() {
 		blocks = append(blocks, section("_Unchanged:_ "+u))
@@ -97,28 +94,88 @@ func (d Drift) slack() map[string]any {
 	if len(d.SourceErrors) > 0 {
 		blocks = append(blocks, section("_Source links left out: "+strings.Join(d.SourceErrors, "; ")+"._"))
 	}
-	if len(d.Compat) > 0 {
+	if compat := d.otherCompat(); len(compat) > 0 {
 		var lines []string
-		for _, c := range d.Compat {
+		for _, c := range compat {
 			lines = append(lines, c.line())
 		}
 		blocks = append(blocks, section("*Compatibility changes*\n• "+strings.Join(listed(lines), "\n• ")))
 	}
-	// The alarms and harnesses come first, so what the budget leaves out is the tail; the
-	// run's summary has the whole digest.
-	kept, size := 1, 0
-	for _, b := range blocks[1:] {
-		n := len(b["text"].(block)["text"].(string))
-		if kept >= maxBlocks-2 || size+n > slackBudget {
-			break
-		}
-		kept, size = kept+1, size+n
-	}
-	if left := len(blocks) - kept; left > 0 {
-		blocks = append(blocks[:kept], section(fmt.Sprintf("_… and %s more, too long for one message: see the run's summary._", plural(left, "section"))))
-	}
 	if d.Link != "" {
 		blocks = append(blocks, block{"type": "context", "elements": []block{text("<" + d.Link + "|The run> · the catalog and the matrix are on the compat-matrix branch")}})
 	}
-	return map[string]any{"text": summary, "blocks": blocks}
+	type attachment struct {
+		colour string
+		text   string
+	}
+	var atts []attachment
+	for _, h := range d.Harnesses {
+		if !h.changed() {
+			continue
+		}
+		// The harness's headline on Slack's own bar, for a colour says only what came and what
+		// went, never how the build did; then its lists, what came together and what went
+		// together. One source link a finding, or none where the links would push a list past
+		// its limit and cut its findings (drift.md has them all).
+		said := func(level detail) []attachment {
+			out := []attachment{{"", "*" + h.headline() + "*"}}
+			for _, sec := range h.sections(level) {
+				if len(sec.lines) == 0 {
+					continue
+				}
+				bullet := "• "
+				if sec.sign != "" {
+					bullet = ""
+				}
+				list := "_" + sec.title + "_\n" + bullet + strings.Join(sec.lines, "\n"+bullet)
+				if n := len(out); n > 0 && out[n-1].colour == colours[sec.sign] {
+					out[n-1].text += "\n" + list
+					continue
+				}
+				out = append(out, attachment{colours[sec.sign], list})
+			}
+			return out
+		}
+		lists := said(oneLink)
+		if slices.ContainsFunc(lists, func(a attachment) bool { return len(slackText(a.text)) > sectionLimit }) {
+			lists = said(noLinks)
+		}
+		atts = append(atts, lists...)
+	}
+	if len(atts) > 0 {
+		blocks = append(blocks, block{"type": "divider"}, section("*Field changes by harness*"))
+	}
+	// The summary comes first, so what the budget leaves out is the harnesses at the end;
+	// the run's summary has the whole digest.
+	kept, size := len(blocks), 0
+	for _, b := range blocks {
+		if t, ok := b["text"].(block); ok {
+			size += len(t["text"].(string))
+		}
+	}
+	keptAtts := 0
+	for _, a := range atts {
+		n := len(slackText(a.text))
+		// One place is kept for the line saying what was left out.
+		if kept+keptAtts >= maxBlocks-1 || size+n > slackBudget {
+			break
+		}
+		keptAtts, size = keptAtts+1, size+n
+	}
+	if left := len(atts) - keptAtts; left > 0 {
+		atts = append(atts[:keptAtts], attachment{"", fmt.Sprintf("_… and %s more, too long for one message: see the run's summary._", plural(left, "section"))})
+	}
+	var out []block
+	for _, a := range atts {
+		att := block{"blocks": []block{section(a.text)}}
+		if a.colour != "" {
+			att["color"] = a.colour
+		}
+		out = append(out, att)
+	}
+	payload := map[string]any{"text": summary, "blocks": blocks}
+	if len(out) > 0 {
+		payload["attachments"] = out
+	}
+	return payload
 }

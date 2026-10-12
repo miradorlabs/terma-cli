@@ -293,7 +293,7 @@ func TestEachNewWholeBuildOfANightIsJudgedInTurn(t *testing.T) {
 	if !slices.Equal(added, []string{"brief"}) || !slices.Equal(removed, []string{"dropped_early@0.164.0", "brief@"}) {
 		t.Fatalf("added %v, removed %v", added, removed)
 	}
-	if md := (Drift{Harnesses: hs}).markdown(); !strings.Contains(md, "`dropped_early` on `logs/codex.api_request` (safe) (gone in 0.164.0)") {
+	if md := (Drift{Harnesses: hs}).markdown(); !strings.Contains(md, "🔴 `-dropped_early` on `logs/codex.api_request` (safe) (gone in 0.164.0)") {
 		t.Errorf("drift.md does not say where it went:\n%s", md)
 	}
 	mergeFields(&cat, tonight, ran.failed)

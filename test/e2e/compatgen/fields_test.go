@@ -147,10 +147,16 @@ func TestSlackDigest(t *testing.T) {
 		Added: []FieldChange{{Surface: "logs/permission_mode_changed", Key: "to_mode", Class: "safe"}}}},
 		Compat: []CompatChange{{Harness: "claude", Version: "2.1.296", Platform: "darwin/arm64", Capability: "relay.telemetry", From: "pass", To: "fail"}}}
 	data, _ := json.Marshal(busy.slack())
-	for _, want := range []string{"Claude Code 2.1.296 (was 2.1.295): 1 new field", "`to_mode` on `logs/permission_mode_changed`", "pass → fail", "https://ci/run/2"} {
+	for _, want := range []string{"Claude Code 2.1.296 (was 2.1.295): 1 new field", "pass → fail", "https://ci/run/2"} {
 		if !strings.Contains(string(data), want) {
 			t.Errorf("slack payload lacks %q: %s", want, data)
 		}
+	}
+	// The headline on Slack's own bar, then what came in a green attachment, signed as a diff
+	// signs it, with no bullet or mark.
+	if items := slackItems(t, busy); !slices.Contains(items, slackItem{"", "*Claude Code 2.1.296 (was 2.1.295): 1 new field*"}) ||
+		!slices.Contains(items, slackItem{addedColour, "_New fields_\n`+to_mode` on `logs/permission_mode_changed` (safe)"}) {
+		t.Errorf("no green attachment of what came: %+v", slackItems(t, busy))
 	}
 	quiet := Drift{GeneratedAt: at, Harnesses: []HarnessDrift{{Harness: "codex", Name: "Codex CLI", Version: "0.162.0", Previous: "0.162.0"},
 		{Harness: "gemini", Name: "Gemini CLI", Version: "0.64.0", Previous: "0.63.0"}}}
@@ -258,9 +264,9 @@ func TestCatalogTakesTheLatestClassOfABuild(t *testing.T) {
 	}
 }
 
-// A night that changed everything is still one message Slack takes: at most 50 blocks, the
-// sections' text within the budget, and a line saying what was left for the run's summary.
-// Many small changes meet the block limit first, a few long ones the budget.
+// A night that changed everything is still one message Slack takes: at most 50 blocks and
+// attachments, their text within the budget, and a line saying what was left for the run's
+// summary. Many small changes meet the limit first, a few long ones the budget.
 func TestSlackDigestFitsOneMessage(t *testing.T) {
 	for _, c := range []struct {
 		name            string
@@ -279,18 +285,15 @@ func TestSlackDigestFitsOneMessage(t *testing.T) {
 			}
 			d.Harnesses = append(d.Harnesses, h)
 		}
-		payload := d.slack()
-		blocks := payload["blocks"].([]map[string]any)
+		items := slackItems(t, d)
 		size := 0
-		for _, b := range blocks {
-			if b["type"] == "section" {
-				size += len(b["text"].(map[string]any)["text"].(string))
-			}
+		for _, it := range items {
+			size += len(it.text)
 		}
-		if len(blocks) > maxBlocks || size > slackBudget+sectionLimit || (len(blocks) == maxBlocks) != c.blocksFull {
-			t.Errorf("%s: %d blocks, %d characters of section text", c.name, len(blocks), size)
+		if len(items) > maxBlocks || size > slackBudget+sectionLimit || (len(items) == maxBlocks) != c.blocksFull {
+			t.Errorf("%s: %d blocks and attachments, %d characters of text", c.name, len(items), size)
 		}
-		data, _ := json.Marshal(payload)
+		data, _ := json.Marshal(d.slack())
 		for _, want := range []string{"more, too long for one message", "https://ci/run/3", "Harness 0 2 (was 1)"} {
 			if !strings.Contains(string(data), want) {
 				t.Errorf("%s: slack payload lacks %q", c.name, want)
