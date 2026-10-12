@@ -267,12 +267,17 @@ func TestRelayClaude(t *testing.T) {
 
 // checkWorkingTree: the session's records carry the working tree and the directory its hooks
 // ran in, which Claude Code's own records never name, and only while the policy collects tool
-// content.
+// content; and the sandbox's origin and branch, in its main checkout, under any policy.
 func checkWorkingTree(t contractReporter, e telemetryEvidence, key, sid, repo string, content bool) {
 	t.Helper()
 	want := ""
 	if content {
 		want, _ = filepath.EvalSymlinks(repo)
+	}
+	checkout := map[string]string{
+		"vcs.repository.url.full": "https://github.com/acme/repo", "vcs.owner.name": "acme", "vcs.repository.name": "repo",
+		"vcs.provider.name": "github", "vcs.ref.head.name": "main", "vcs.ref.head.type": "branch",
+		"terma.repository.worktree.linked": "false", "terma.repository.worktree.name": "",
 	}
 	n := 0
 	for _, r := range e.logs {
@@ -282,6 +287,11 @@ func checkWorkingTree(t contractReporter, e telemetryEvidence, key, sid, repo st
 		n++
 		// Claude Code runs at the checkout's root here, so the directory its hooks ran in is the root too.
 		for _, stamp := range []string{"terma.repository.root", "terma.working_directory"} {
+			if got := r.Resource[stamp]; got != want {
+				t.Errorf("%s: %s = %q, want %q", r.Attrs["event.name"], stamp, got, want)
+			}
+		}
+		for stamp, want := range checkout {
 			if got := r.Resource[stamp]; got != want {
 				t.Errorf("%s: %s = %q, want %q", r.Attrs["event.name"], stamp, got, want)
 			}

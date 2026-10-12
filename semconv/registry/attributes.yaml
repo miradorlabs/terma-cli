@@ -636,6 +636,28 @@ attributes:
       agent telemetry it is a resource attribute the relay stamps from the session's claim.
     annotations:
       content: tool
+  - key: terma.repository.worktree.linked
+    type: boolean
+    stability: development
+    brief: Whether the session's checkout is a linked worktree of its repository, not its main checkout.
+    note: >
+      A linked worktree is one `git worktree add` made, as agent harnesses do to run sessions
+      side by side. On agent telemetry it is a resource attribute the relay stamps from the
+      session's claim, omitted outside git.
+  - key: terma.repository.worktree.name
+    type: string
+    stability: development
+    brief: Git's name for the linked worktree the session's hooks last ran in.
+    note: >
+      Its directory under the repository's .git/worktrees, which an agent harness often names
+      after the task, so it leaves only while the team's policy collects tool content. The
+      branch, often the same slug, leaves under any policy, as commit events send it: a branch
+      is what a developer pushes to the remote, a worktree's directory is this machine's alone.
+      Omitted in a main checkout. On agent telemetry it is a resource attribute the relay
+      stamps from the session's claim.
+    examples: ["feature-parser"]
+    annotations:
+      content: tool
 
   # The relay.
   - key: terma.relay.attribution

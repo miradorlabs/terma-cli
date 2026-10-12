@@ -127,14 +127,41 @@ func CommentCharFS(gitDir string) string {
 	return value
 }
 
-// RemoteURLFS reads remote.origin.url from the common dir's config through
-// NormalizeRemote; includes are not followed. "" outside git.
-func RemoteURLFS(gitDir string) string {
+// OriginFS reads remote.origin.url from the common dir's config, so a linked worktree shares
+// it: its RepositoryID, and its URL through NormalizeRemote. Includes are not followed. Both
+// are "" outside git.
+func OriginFS(gitDir string) (id, url string) {
+	if gitDir == "" {
+		return "", ""
+	}
+	raw, _ := configValue(filepath.Join(CommonDirFS(gitDir), "config"), `remote "origin"`, "url")
+	return RepositoryID(raw), NormalizeRemote(raw)
+}
+
+// BranchFS is the local branch a checkout's HEAD is on, from its git directory's HEAD file,
+// without running git: a linked worktree's own HEAD, not its main checkout's, and a branch
+// with no commits yet by its name. "" outside git, on a detached HEAD, on an unreadable one,
+// and in a reftable repository, whose HEAD file is a stub naming refs/heads/.invalid.
+func BranchFS(gitDir string) string {
 	if gitDir == "" {
 		return ""
 	}
-	raw, _ := configValue(filepath.Join(CommonDirFS(gitDir), "config"), `remote "origin"`, "url")
-	return NormalizeRemote(raw)
+	data, err := os.ReadFile(filepath.Join(gitDir, "HEAD"))
+	if err != nil {
+		return ""
+	}
+	ref, ok := strings.CutPrefix(strings.TrimSpace(string(data)), "ref: ")
+	if !ok {
+		return ""
+	}
+	branch, _ := strings.CutPrefix(strings.TrimSpace(ref), "refs/heads/")
+	if branch == strings.TrimSpace(ref) {
+		return "" // a symbolic ref outside refs/heads names no branch
+	}
+	if strings.HasPrefix(branch, ".") || strings.Contains(branch, "/.") {
+		return "" // no branch name has a component starting with a dot: reftable's stub
+	}
+	return branch
 }
 
 // GlobalHooksPathFS reads core.hooksPath from git's global config, without running git;
@@ -160,14 +187,10 @@ func HooksPathFS(gitDir string) (local, worktree string) {
 	return local, worktree
 }
 
-// RepositoryFS is origin's RepositoryID, read from the main repository's config so a
-// linked worktree shares it; "" outside git.
+// RepositoryFS is OriginFS's RepositoryID alone.
 func RepositoryFS(gitDir string) string {
-	if gitDir == "" {
-		return ""
-	}
-	raw, _ := configValue(filepath.Join(CommonDirFS(gitDir), "config"), `remote "origin"`, "url")
-	return RepositoryID(raw)
+	id, _ := OriginFS(gitDir)
+	return id
 }
 
 func globalConfigPaths() []string {

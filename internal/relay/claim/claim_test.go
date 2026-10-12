@@ -421,3 +421,32 @@ func TestClaimWithoutADirectoryKeepsTheSessions(t *testing.T) {
 		t.Fatalf("after the git hook's refresh: %+v", got)
 	}
 }
+
+// A fresh claim is rewritten at once for another branch, remote or worktree of the same
+// working tree, and its placement carries them: a checkout of another branch is told at the
+// next hook, not the next refresh.
+func TestClaimFollowsTheBranch(t *testing.T) {
+	t.Parallel()
+	dir := enable(t)
+	now := time.Now()
+	c := Claim{ProjectID: "p1", Root: "/work/a", Cwd: "/work/a", Remote: "https://github.com/acme/web", Branch: "main"}
+	if !Write(dir, "sess-1", c, now) {
+		t.Fatal("first claim not written")
+	}
+	if Write(dir, "sess-1", c, now.Add(time.Second)) {
+		t.Fatal("the same claim is not rewritten while fresh")
+	}
+	for _, next := range []Claim{
+		{ProjectID: "p1", Root: "/work/a", Cwd: "/work/a", Remote: "https://github.com/acme/web", Branch: "fix/login"},
+		{ProjectID: "p1", Root: "/work/a", Cwd: "/work/a", Remote: "https://github.com/acme/web2", Branch: "fix/login"},
+		{ProjectID: "p1", Root: "/work/a", Cwd: "/work/a", Remote: "https://github.com/acme/web2", Branch: "fix/login", Worktree: "login"},
+	} {
+		if !Write(dir, "sess-1", next, now.Add(2*time.Second)) {
+			t.Fatalf("%+v: not rewritten", next)
+		}
+		got, ok := Read(dir, "sess-1", now.Add(2*time.Second))
+		if at, covered := got.At(0, time.Time{}); !ok || !covered || at.Branch != next.Branch || at.Remote != next.Remote || at.Worktree != next.Worktree {
+			t.Fatalf("read %+v, at %+v", got, at)
+		}
+	}
+}

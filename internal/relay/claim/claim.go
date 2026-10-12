@@ -50,7 +50,12 @@ type Claim struct {
 	Root string `json:"root,omitempty"`
 	// Cwd is the directory the claiming agent hook ran in, symlink-resolved: what the relay
 	// stamps as terma.working_directory. A git hook names none and keeps the session's.
-	Cwd       string    `json:"cwd,omitempty"`
+	Cwd string `json:"cwd,omitempty"`
+	// Remote is the working copy's origin, normalised without credentials, and Branch the
+	// branch its HEAD is on, "" when detached: what the relay stamps as
+	// vcs.repository.url.full and vcs.ref.head.name.
+	Remote    string    `json:"remote,omitempty"`
+	Branch    string    `json:"branch,omitempty"`
 	ClaimedAt time.Time `json:"claimed_at"`
 	// PIDs are the processes the claiming hooks ran under, so a session resumed by another
 	// process where no hook runs is not covered. Empty matches any sender.
@@ -71,9 +76,12 @@ type Placement struct {
 	// Root is Claim.Root for this run.
 	Root string `json:"root,omitempty"`
 	// Cwd is Claim.Cwd for this run.
-	Cwd   string    `json:"cwd,omitempty"`
-	PIDs  []int     `json:"pids,omitempty"`
-	Since time.Time `json:"since"`
+	Cwd string `json:"cwd,omitempty"`
+	// Remote and Branch are Claim.Remote and Claim.Branch for this run.
+	Remote string    `json:"remote,omitempty"`
+	Branch string    `json:"branch,omitempty"`
+	PIDs   []int     `json:"pids,omitempty"`
+	Since  time.Time `json:"since"`
 }
 
 // maxPIDs allows a few runs of one session, each with its chain of ancestors.
@@ -99,7 +107,8 @@ func (c Claim) placements() []Placement {
 	if len(c.Placements) > 0 {
 		return c.Placements
 	}
-	return []Placement{{ProjectID: c.ProjectID, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree, Repository: c.Repository, Root: c.Root, Cwd: c.Cwd, PIDs: c.PIDs}}
+	return []Placement{{ProjectID: c.ProjectID, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree, Repository: c.Repository, Root: c.Root, Cwd: c.Cwd,
+		Remote: c.Remote, Branch: c.Branch, PIDs: c.PIDs}}
 }
 
 // At is the claim as it applies to a record pid sent at time at: the covering placement
@@ -121,7 +130,8 @@ func (c Claim) At(pid int, at time.Time) (Claim, bool) {
 		return Claim{}, false
 	}
 	return Claim{ProjectID: best.ProjectID, Tool: best.Tool, Repo: best.Repo, Worktree: best.Worktree,
-		Repository: best.Repository, Root: best.Root, Cwd: best.Cwd, PIDs: best.PIDs, ClaimedAt: c.ClaimedAt, Placements: c.Placements}, true
+		Repository: best.Repository, Root: best.Root, Cwd: best.Cwd, Remote: best.Remote, Branch: best.Branch,
+		PIDs: best.PIDs, ClaimedAt: c.ClaimedAt, Placements: c.Placements}, true
 }
 
 // Dir is the relay directory under the state directory dir.
@@ -217,7 +227,8 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 	if havePrev && samePlace(prev, c) {
 		since = prev.placements()[len(prev.placements())-1].Since
 	}
-	placements = append(placements, Placement{ProjectID: c.ProjectID, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree, Repository: c.Repository, Root: c.Root, Cwd: c.Cwd, PIDs: c.PIDs, Since: since})
+	placements = append(placements, Placement{ProjectID: c.ProjectID, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree, Repository: c.Repository,
+		Root: c.Root, Cwd: c.Cwd, Remote: c.Remote, Branch: c.Branch, PIDs: c.PIDs, Since: since})
 	if len(placements) > maxPlacements {
 		placements = placements[len(placements)-maxPlacements:]
 	}
@@ -238,10 +249,12 @@ func samePlace(prev, c Claim) bool {
 	return prev.ProjectID == c.ProjectID && prev.Repository == c.Repository
 }
 
-// sameDirs reports whether c names the working tree and directory prev does, so a fresh claim
-// needs no rewrite. A claim naming no directory (a git hook's) keeps prev's.
+// sameDirs reports whether c names the working tree, directory, worktree, remote and branch
+// prev does, so a fresh claim needs no rewrite: a checkout of another branch in the same tree
+// is told at the next hook. A claim naming no directory (a git hook's) keeps prev's.
 func sameDirs(prev, c Claim) bool {
-	return prev.Root == c.Root && (c.Cwd == "" || prev.Cwd == c.Cwd)
+	return prev.Root == c.Root && (c.Cwd == "" || prev.Cwd == c.Cwd) &&
+		prev.Worktree == c.Worktree && prev.Remote == c.Remote && prev.Branch == c.Branch
 }
 
 func subset(a, b []int) bool {
