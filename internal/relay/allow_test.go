@@ -49,12 +49,19 @@ func TestClassificationCoversTheGoldens(t *testing.T) {
 	}
 }
 
-// A key is safe or content, never both.
+// A key is safe or content, never both, on a metric alone too.
 func TestNoKeyIsBothSafeAndContent(t *testing.T) {
 	t.Parallel()
 	for key := range testRules.safeKeys {
 		if testRules.contentKey(key) {
 			t.Errorf("%q is listed as safe and as content", key)
+		}
+	}
+	for metric, keys := range testRules.metricSafeKeys {
+		for _, key := range keys {
+			if testRules.contentKey(key) {
+				t.Errorf("%q is listed as safe on %s and as content", key, metric)
+			}
 		}
 	}
 }

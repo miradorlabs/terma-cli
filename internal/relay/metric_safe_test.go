@@ -63,3 +63,34 @@ func TestAKeyIsSafeOnItsMetricAlone(t *testing.T) {
 		t.Errorf("classified %+v: safe on its metric alone", v)
 	}
 }
+
+// Every kind of data point is judged with its metric's safe keys; the metric's scope is not.
+func TestEveryPointKindTakesItsMetricsSafeKeys(t *testing.T) {
+	t.Parallel()
+	attrs := func() []*commonpb.KeyValue { return []*commonpb.KeyValue{kv("state", "prewarm_ready")} }
+	sum := &metricspb.NumberDataPoint{Attributes: attrs()}
+	gauge := &metricspb.NumberDataPoint{Attributes: attrs()}
+	hist := &metricspb.HistogramDataPoint{Attributes: attrs()}
+	exp := &metricspb.ExponentialHistogramDataPoint{Attributes: attrs()}
+	summary := &metricspb.SummaryDataPoint{Attributes: attrs()}
+	scope := &commonpb.InstrumentationScope{Attributes: attrs()}
+	name := "codex.shell_snapshot.wait_ms"
+	p := &part{signal: Metrics, msg: &metricspb.MetricsData{ResourceMetrics: []*metricspb.ResourceMetrics{{Resource: &resourcepb.Resource{},
+		ScopeMetrics: []*metricspb.ScopeMetrics{{Scope: scope, Metrics: []*metricspb.Metric{
+			{Name: name, Data: &metricspb.Metric_Sum{Sum: &metricspb.Sum{DataPoints: []*metricspb.NumberDataPoint{sum}}}},
+			{Name: name, Data: &metricspb.Metric_Gauge{Gauge: &metricspb.Gauge{DataPoints: []*metricspb.NumberDataPoint{gauge}}}},
+			{Name: name, Data: &metricspb.Metric_Histogram{Histogram: &metricspb.Histogram{DataPoints: []*metricspb.HistogramDataPoint{hist}}}},
+			{Name: name, Data: &metricspb.Metric_ExponentialHistogram{ExponentialHistogram: &metricspb.ExponentialHistogram{DataPoints: []*metricspb.ExponentialHistogramDataPoint{exp}}}},
+			{Name: name, Data: &metricspb.Metric_Summary{Summary: &metricspb.Summary{DataPoints: []*metricspb.SummaryDataPoint{summary}}}},
+		}}}}}}}
+	testRules.withhold(p, false, false, map[string]int{})
+	for kind, got := range map[string][]*commonpb.KeyValue{"sum": sum.Attributes, "gauge": gauge.Attributes, "histogram": hist.Attributes,
+		"exponential histogram": exp.Attributes, "summary": summary.Attributes} {
+		if attr(got, "state") == "" {
+			t.Errorf("a %s point of %s lost its state", kind, name)
+		}
+	}
+	if attr(scope.Attributes, "state") != "" {
+		t.Error("the metric's scope kept state: a scope is no metric's")
+	}
+}

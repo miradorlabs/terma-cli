@@ -375,8 +375,8 @@ func WriteFields(dir, terma string) error {
 }
 
 // classQuery is a key as `terma relay classify` takes it: where it sits, as the relay's
-// content policy tells them apart (a resource, a span event, or a record, as it treats every
-// other surface), and the span event's name. The census records it as it sees the key, so no
+// content policy tells them apart (a resource, a span event, a metric, or a record, as it
+// treats every other surface), and the span event's or the metric's name. The census records it as it sees the key, so no
 // surface's name is read back for it.
 type classQuery struct {
 	Site  string `json:"site"`

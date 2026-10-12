@@ -14,8 +14,9 @@ import (
 
 // newRelayClassifyCommand says what the relay's content policy does with attribute keys, as
 // this terma's relay would: the e2e suite's field catalog classifies every key an agent sends
-// with it. Keys come as a JSON array on stdin, each {"site": "record" | "resource" | "event",
-// "event": <a span event's name>, "key": <the key>}; the answer is an array in the same order,
+// with it. Keys come as a JSON array on stdin, each {"site": "record" | "resource" | "event" |
+// "metric", "event": <the span event's or the metric's name>, "key": <the key>}; the answer is
+// an array in the same order,
 // each {"class": "safe" | "prompt" | "tool_content" | "unclassified", "kept": [the kinds of
 // value the key keeps with all content withheld]}.
 func (app *App) newRelayClassifyCommand() *cobra.Command {

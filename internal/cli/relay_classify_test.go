@@ -18,7 +18,8 @@ func TestRelayClassify(t *testing.T) {
 	c.SetArgs([]string{"classify"})
 	c.SetIn(strings.NewReader(`[{"site": "record", "key": "from_mode"}, {"site": "record", "key": "prompt"},
 		{"site": "record", "key": "a.key.no.rule.names"}, {"site": "resource", "key": "a.key.no.rule.names"},
-		{"site": "event", "event": "tool.output", "key": "content"}]`))
+		{"site": "event", "event": "tool.output", "key": "content"},
+		{"site": "metric", "event": "codex.shell_snapshot.command", "key": "state"}, {"site": "metric", "event": "codex.other", "key": "state"}]`))
 	c.SetOut(&out)
 	c.SetErr(io.Discard)
 	if err := c.ExecuteContext(context.Background()); err != nil {
@@ -35,7 +36,8 @@ func TestRelayClassify(t *testing.T) {
 	for _, v := range got {
 		said = append(said, v.Class+" "+strings.Join(v.Kept, ","))
 	}
-	want := []string{"safe text,number,bool,list,map,bytes", "prompt ", "unclassified number,bool", "unclassified ", "tool_content "}
+	want := []string{"safe text,number,bool,list,map,bytes", "prompt ", "unclassified number,bool", "unclassified ", "tool_content ",
+		"safe text,number,bool,list,map,bytes", "unclassified number,bool"}
 	if !slices.Equal(said, want) {
 		t.Errorf("classify = %q, want %q", said, want)
 	}

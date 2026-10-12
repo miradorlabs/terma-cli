@@ -207,7 +207,7 @@ ran that night ran it and none failed: one a scenario failed for, or did not run
 between two scenarios' lookups), is partial. A scenario that ran no build at all (one that
 could not list or fetch its releases) is not seen, and its builds count as whole without it. Each key is
 classified by the terma under test, `terma relay classify`, as its relay treats it where it
-sits (a record, a resource or a span event, as the census saw it) when a project withholds
+sits (a record, a resource, a span event or a metric, as the census saw it) when a project withholds
 content; the relay also names the kinds of value it keeps of the key there, so the catalog
 and the digest judge a key withheld from what the relay says, never from a rule of their own:
 
