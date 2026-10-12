@@ -36,7 +36,12 @@ func TestClassificationCoversTheGoldens(t *testing.T) {
 		}
 		for surface, keys := range surfaces {
 			for _, k := range keys {
-				if c := testRules.classify(strings.TrimPrefix(k, "resource/")); c == "unclassified" {
+				// The goldens name a resource attribute "resource/<key>".
+				q := FieldQuery{Site: SiteRecord, Key: k}
+				if key, ok := strings.CutPrefix(k, "resource/"); ok {
+					q = FieldQuery{Site: SiteResource, Key: key}
+				}
+				if testRules.classify(q) == FieldUnclassified {
 					t.Errorf("%s %s: %q is unclassified", filepath.Base(f), surface, k)
 				}
 			}
@@ -237,17 +242,6 @@ func TestNumbersAndFlagsPassUnderAnyKey(t *testing.T) {
 	if attr(attrs, "num_hooks") != "3" || len(attrs) != 2 || unclassified["x.new_note"] != 1 {
 		t.Fatalf("attrs %v, unclassified %v", attrs, unclassified)
 	}
-}
-
-// classify says how the relay treats key with content withheld: "safe", "content" or "unclassified".
-func (ru *rules) classify(key string) string {
-	switch {
-	case ru.contentKey(key):
-		return "content"
-	case testRules.safeKey(key):
-		return "safe"
-	}
-	return "unclassified"
 }
 
 // A tool-content event the policy sends keeps its output whatever the key: Claude's Read

@@ -45,7 +45,7 @@ func TestRelayWorkloadsPi(t *testing.T) {
 			{"write", "write", map[string]any{"path": "hello.txt", "content": "hello\n"}},
 		} {
 			t.Run(w.name, func(t *testing.T) {
-				runBoth(t, piToolSandbox(w.tool, w.args), func(t *testing.T, sb *Sandbox) {
+				runBoth(t, b, piToolSandbox(w.tool, w.args), func(t *testing.T, sb *Sandbox) {
 					if !sb.relayed {
 						sb.UsePiExtensionDirect()
 					}

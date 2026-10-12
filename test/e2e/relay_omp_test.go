@@ -29,7 +29,7 @@ func TestRelayWorkloadsOmp(t *testing.T) {
 		ProvesAll(t, b, "relay.equivalent")
 		for _, w := range []struct{ name, cmd string }{{"reply", ""}, {"bash", "printf ok"}} {
 			t.Run(w.name, func(t *testing.T) {
-				runBoth(t, ompSandbox(t, w.cmd), func(t *testing.T, sb *Sandbox) {
+				runBoth(t, b, ompSandbox(t, w.cmd), func(t *testing.T, sb *Sandbox) {
 					if !sb.relayed {
 						sb.UseOmpExtensionDirect()
 					}

@@ -13,6 +13,6 @@ func (app *App) newRelayCommand() *cobra.Command {
 		Short:  "The local OTLP relay that forwards only the team's repositories' telemetry",
 		Hidden: true,
 	}
-	cmd.AddCommand(app.newRelayRunCommand(), app.newRelaySetupCommand(), app.newRelayDaemonCommand(), app.newRelaySuperviseCommand())
+	cmd.AddCommand(app.newRelayRunCommand(), app.newRelaySetupCommand(), app.newRelayDaemonCommand(), app.newRelaySuperviseCommand(), app.newRelayClassifyCommand())
 	return cmd
 }

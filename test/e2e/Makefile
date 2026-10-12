@@ -25,7 +25,7 @@ test: build
 telemetry: build
 	TERMA_E2E=1 TERMA_E2E_BINARY="$(CURDIR)/bin/terma" \
 	 ./bin/e2e.test -test.v -test.timeout 30m \
-	 -test.run '^(TestClaudeTelemetry|TestCodexTelemetry|TestClaudeStopFailureDelivery|TestRelay.*|TestMachineHooks.*|TestPi.*|TestGemini.*|TestDsh.*|TestHermes.*)$$'
+	 -test.run '^(TestClaudeTelemetry|TestCodexTelemetry|TestClaudeInteractiveFields|TestClaudeStopFailureDelivery|TestRelay.*|TestMachineHooks.*|TestPi.*|TestGemini.*|TestDsh.*|TestHermes.*)$$'
 # Loads test/e2e/.env.local (credentials, never committed) and runs every scenario.
 # RUN=TestClaude... narrows it; ARGS adds test flags.
 run: build
@@ -62,10 +62,20 @@ machines: machine-image
 	 $(MACHINE_IMAGE):$(CLAUDE_VERSION)-$(CODEX_VERSION) \
 	 ./bin/linux/e2e.test -test.v -test.timeout 40m -test.run '$(if $(RUN),$(RUN),$(MACHINE_RUN))'
 
-# The compatibility matrix (docs/COMPATIBILITY.md, docs/compat/): merge the latest runs'
-# report/compat.json — this machine's, and the Linux machine's from `make machines` —
-# into the history and render it. RUNS names other runs' files (CI's artefacts).
+# The compatibility matrix (docs/COMPATIBILITY.md, docs/compat/) and the field catalog
+# (docs/FIELDS.md, docs/compat/fields.json): merge the latest runs' report/compat.json —
+# this machine's, and the Linux machine's from `make machines` — and this machine's field
+# census, report/fields.json, into
+# the history and catalog and render them. RUNS and FIELD_RUNS name other runs' files (CI's
+# artefacts). The nightly job does the same on the compat-matrix branch, where both live.
 RUNS ?= $(wildcard report/compat.json report/linux/compat.json)
-.PHONY: compat
+FIELD_RUNS ?= $(wildcard report/fields.json)
+CENSUS_RUNS ?= $(wildcard report/census.json)
+COMPATGEN = go run ./compatgen $(foreach r,$(RUNS),-run $(r)) $(foreach f,$(FIELD_RUNS),-fields $(f)) $(foreach c,$(CENSUS_RUNS),-census $(c))
+.PHONY: compat drift
 compat:
-	go run ./compatgen $(foreach r,$(RUNS),-run $(r))
+	$(COMPATGEN)
+# What the runs changed against the committed history and catalog, said in report/drift.md
+# and report/slack.json (the nightly job posts it); LINK is the run's URL.
+drift:
+	$(COMPATGEN) -digest report -source $(if $(LINK),-link '$(LINK)')

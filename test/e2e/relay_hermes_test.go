@@ -47,7 +47,7 @@ func TestRelayWorkloadsHermes(t *testing.T) {
 			{"write", "write_file", map[string]any{"path": "hello.txt", "content": "hello\n"}},
 		} {
 			t.Run(w.name, func(t *testing.T) {
-				runBoth(t, hermesSandbox(w.tool, w.args), func(t *testing.T, sb *Sandbox) {
+				runBoth(t, b, hermesSandbox(w.tool, w.args), func(t *testing.T, sb *Sandbox) {
 					if !sb.relayed {
 						sb.UseHermesPluginDirect()
 					}

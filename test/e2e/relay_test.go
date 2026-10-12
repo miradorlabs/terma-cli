@@ -93,10 +93,7 @@ func isDigits(s string) bool {
 func fromTerma(r LogRecord) bool { return termaService(r.Resource) }
 
 // termaService reports a resource of terma's own records, not an agent's.
-func termaService(res map[string]string) bool {
-	s := res["service.name"]
-	return s == "terma-cli" || s == "terma-relay"
-}
+func termaService(res map[string]string) bool { return TermaService(res["service.name"]) }
 
 // agentRecords counts what reached upstream from an agent rather than from terma itself.
 func agentRecords(e telemetryEvidence) int {
