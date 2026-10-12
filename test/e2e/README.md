@@ -142,6 +142,7 @@ command argument, source file, or chat):
 
 ```sh
 gh secret set OPENAI_API_KEY --repo miradorlabs/terma-cli --env live-harnesses
+gh secret set ANTHROPIC_API_KEY --repo miradorlabs/terma-cli --env live-harnesses
 ```
 
 After this workflow change is on the branch GitHub will run, trigger and inspect
@@ -152,8 +153,8 @@ gh workflow run live.yml --repo miradorlabs/terma-cli -f include_subscriptions=f
 gh run list --repo miradorlabs/terma-cli --workflow live.yml --limit 3
 ```
 
-The OpenAI API key is supplied only to credential preflight and the test run, not
-checkout or build steps. An API-only pass does not establish subscription-route
+The API keys are supplied only to the test run, not checkout or build steps; the summary
+step is told only whether each is set. An API-only pass does not establish subscription-route
 compatibility.
 
 ## Cost

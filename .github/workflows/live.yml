@@ -46,8 +46,9 @@ jobs:
       # Subscription coverage, asked for by hand, does need its secrets.
       - name: Say which accounts this run has
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Whether each key is set, not the key: this step needs no more.
+          HAS_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY != '' }}
+          HAS_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
           CLAUDE_CODE_OAUTH_TOKEN: ${{ inputs.include_subscriptions && secrets.CLAUDE_CODE_OAUTH_TOKEN || '' }}
           CODEX_AUTH_JSON: ${{ inputs.include_subscriptions && secrets.CODEX_AUTH_JSON || '' }}
         run: |
@@ -55,7 +56,8 @@ jobs:
             echo '| account | contracts |'
             echo '|---|---|'
             for key in OPENAI_API_KEY ANTHROPIC_API_KEY; do
-              if [ -n "${!key}" ]; then echo "| \`$key\` | run |"; else echo "| \`$key\` | **skipped**: not set in live-harnesses |"; fi
+              has="HAS_$key"
+              if [ "${!has}" = "true" ]; then echo "| \`$key\` | will run |"; else echo "| \`$key\` | **skipped**: not set in live-harnesses |"; fi
             done
           } >> "$GITHUB_STEP_SUMMARY"
           if [ "$INCLUDE_SUBSCRIPTIONS" != "true" ]; then
