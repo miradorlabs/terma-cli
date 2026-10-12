@@ -53,9 +53,11 @@ machines: machine-image
 	# -buildvcs=false: git rejects the mounted repo's owner inside the container, and this
 	# test binary carries no version anyway.
 	$(LINUX_GO) sh -c 'cd /src && go build -buildvcs=false -o test/e2e/bin/linux/terma ./cmd/terma && cd test/e2e && go test -c -o bin/linux/e2e.test .'
-	# seccomp unconfined: Codex runs tool commands in bwrap, which needs the user
-	# namespaces Docker's default profile forbids and a developer's machine allows.
-	docker run --rm --security-opt seccomp=unconfined -v "$(CURDIR)":/work/e2e -w /work/e2e \
+	# seccomp and AppArmor unconfined: Codex runs tool commands in bwrap, which needs the user
+	# namespaces Docker's default seccomp profile forbids and the mounts its default AppArmor
+	# profile does ("bwrap: Failed to make / slave"), on a Linux host such as CI's; a
+	# developer's machine allows both.
+	docker run --rm --security-opt seccomp=unconfined --security-opt apparmor=unconfined -v "$(CURDIR)":/work/e2e -w /work/e2e \
 	 -e TERMA_E2E=1 -e TERMA_ENV=dev -e TERMA_E2E_BINARY=/work/e2e/bin/linux/terma \
 	 -e TERMA_E2E_CLAUDE_VERSIONS=installed -e TERMA_E2E_CODEX_VERSIONS=installed \
 	 -e TERMA_E2E_KNOWN_UPSTREAM=codex-session-end -e TERMA_E2E_REPORT=report/linux \

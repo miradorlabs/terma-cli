@@ -137,6 +137,12 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v5
+      # Ubuntu 24.04 gives a process no capabilities in a user namespace it creates unless an
+      # AppArmor profile allows it, so Codex's bwrap sandbox cannot bring up its loopback
+      # ("bwrap: loopback: Failed RTM_NEWADDR") and every tool command fails. This runner is
+      # thrown away after the job; a developer's machine needs no such change.
+      - name: Let sandboxes have capabilities in their user namespaces
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - name: Run the machine scenarios
         working-directory: test/e2e
         # The agents' newest releases; the rows record the versions they turn out to be.
