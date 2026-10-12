@@ -8,6 +8,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
+	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
@@ -59,9 +60,10 @@ func (e Env) EndSession(r *Repo, id, tool string) {
 }
 
 // Touch spools the reported paths, absolute or relative to Cwd, as one event per checkout,
-// naming its repository. The session's own checkout r also records them in its manifest, for
-// the commit stamping, and claims the session; another checkout is reported only if the team
-// policy admits it, and a path in no admitted checkout is dropped.
+// naming its repository. The session's own checkout r, and a linked worktree of its
+// repository, also record them in their manifests, for the commit stamping; only r claims the
+// session. Another checkout is reported only if the team policy admits it, and a path in no
+// admitted checkout is dropped.
 func (e Env) Touch(r *Repo, sess session.Session, toolName string, paths []string, extra map[string]any) {
 	e.Expect(r, sess, paths)
 	e.Report(r, sess, toolName, paths, extra)
@@ -69,18 +71,33 @@ func (e Env) Touch(r *Repo, sess session.Session, toolName string, paths []strin
 
 // Expect records in sess's manifest the files of r among paths, without reporting them, and
 // returns them repo-relative: a hook before a tool call records what a commit in the call
-// will take in.
+// will take in. A linked worktree of r's repository, where a session started in the main
+// checkout often works, records its files in its own manifest too, since a commit there is
+// stamped from it; it is not claimed.
 func (e Env) Expect(r *Repo, sess session.Session, paths []string) []string {
+	var own []string
 	for _, c := range e.checkouts(r, paths) {
-		if c.repo == r {
-			if err := r.Store.Touch(sess, c.files, e.Time()); err != nil {
-				e.Logf("record files: %v", err)
-				return nil
+		store := r.Store
+		if c.repo != r {
+			if !sameRepository(r, c.repo) {
+				continue
 			}
-			return c.files
+			dir, err := project.StoreDir(e.StateDir, c.repo.Root, c.repo.GitDir)
+			if err != nil {
+				e.Logf("worktree store: %v", err)
+				continue
+			}
+			store = session.Open(dir)
+		}
+		if err := store.Touch(sess, c.files, e.Time()); err != nil {
+			e.Logf("record files: %v", err)
+			continue
+		}
+		if c.repo == r {
+			own = c.files
 		}
 	}
-	return nil
+	return own
 }
 
 // Report spools paths as Touch does, without recording them in the manifest.
@@ -131,6 +148,9 @@ func (e Env) checkouts(r *Repo, paths []string) []touched {
 		}
 		rel := gitx.Relativize(repo.Root, p)
 		if rel == "" {
+			rel = gitx.Relativize(resolved(repo.Root), filepath.Join(resolved(dir), filepath.Base(p)))
+		}
+		if rel == "" {
 			continue
 		}
 		i := slices.IndexFunc(out, func(t touched) bool { return t.repo.Root == repo.Root })
@@ -152,7 +172,7 @@ func (e Env) checkouts(r *Repo, paths []string) []touched {
 // the team policy admits it, else nil.
 func (e Env) checkoutOf(r *Repo, dir string) *Repo {
 	root, gitDir, ok := gitx.LocateFS(dir)
-	if !ok || root == r.Root || gitDir == r.GitDir {
+	if !ok || samePath(root, r.Root) || samePath(gitDir, r.GitDir) {
 		return r
 	}
 	origin, remote := gitx.OriginFS(gitDir)
@@ -162,4 +182,24 @@ func (e Env) checkoutOf(r *Repo, dir string) *Repo {
 	}
 	// Reported only: no store, and never passed to EmitFor, which would claim with it.
 	return &Repo{Root: root, GitDir: gitDir, ProjectID: r.ProjectID, Repository: id, Remote: remote}
+}
+
+// sameRepository reports whether two checkouts share one git repository: a main checkout and
+// its linked worktrees do.
+func sameRepository(a, b *Repo) bool {
+	return samePath(gitx.CommonDirFS(a.GitDir), gitx.CommonDirFS(b.GitDir))
+}
+
+// samePath reports whether a and b name one path once symlinks are resolved: an agent may
+// report its cwd resolved (/private/tmp/x on macOS) and a file under the link (/tmp/x/y).
+func samePath(a, b string) bool {
+	return a == b || resolved(a) == resolved(b)
+}
+
+// resolved is p with symlinks resolved, or p itself when it cannot be.
+func resolved(p string) string {
+	if r, err := filepath.EvalSymlinks(p); err == nil {
+		return r
+	}
+	return p
 }
