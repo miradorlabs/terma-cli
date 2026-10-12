@@ -134,8 +134,8 @@ func TestCheckoutIDPinsTheSharedVectors(t *testing.T) {
 		"/work/repo":                     "ddc5e473a09bd156b4eb7c426367aa59",
 		"/work/repo/.claude/worktrees/x": "181e983f33192a1a71e6bd8ce72e9776",
 	} {
-		if got := checkoutID(root); got != want {
-			t.Errorf("checkoutID(%q) = %s, want %s", root, got, want)
+		if got, helper := checkoutID(root), hookruntest.CheckoutID(root); got != want || helper != want {
+			t.Errorf("checkoutID(%q) = %s, hookruntest.CheckoutID = %s, want %s", root, got, helper, want)
 		}
 	}
 }
@@ -164,7 +164,8 @@ func TestTouchNamesEachCheckoutByIDAndReportNone(t *testing.T) {
 		t.Fatalf("spooled %s", hookruntest.Names(events))
 	}
 	for i, want := range []string{hookruntest.CheckoutID(own), hookruntest.CheckoutID(other), "", ""} {
-		if got, _ := events[i].Attrs[semconv.TermaCheckoutIDKey].(string); got != want {
+		got, stamped := events[i].Attrs[semconv.TermaCheckoutIDKey].(string)
+		if got != want || stamped != (want != "") {
 			t.Errorf("event %d (%v) checkout id = %q, want %q", i, events[i].Attrs[semconv.GenAIToolNameKey], got, want)
 		}
 	}
