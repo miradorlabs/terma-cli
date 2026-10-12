@@ -127,6 +127,8 @@ const (
 	TermaFundingStatusKey = "terma.funding.status"
 	// TermaHookEventKey is terma.hook.event: The agent hook that produced the record.
 	TermaHookEventKey = "terma.hook.event"
+	// TermaHooksFileEditsKey is terma.hooks.file_edits: Whether terma's agent hooks report the session's file edits, each with its checkout.
+	TermaHooksFileEditsKey = "terma.hooks.file_edits"
 	// TermaInvocationInitialStepsKey is terma.invocation.initial_steps: How many steps the conversation held when the invocation began.
 	TermaInvocationInitialStepsKey = "terma.invocation.initial_steps"
 	// TermaInvocationNumberKey is terma.invocation.number: The agent's invocation counter.

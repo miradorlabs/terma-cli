@@ -30,6 +30,7 @@ attribute_groups:
       - ref: terma.relay.session.id
       - ref: terma.repository.root
       - ref: terma.working_directory
+      - ref: terma.hooks.file_edits
       - ref: terma.repository.worktree.linked
       - ref: terma.repository.worktree.name
       - ref: vcs.repository.url.full

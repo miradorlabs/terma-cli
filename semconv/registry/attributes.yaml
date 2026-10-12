@@ -636,6 +636,17 @@ attributes:
       agent telemetry it is a resource attribute the relay stamps from the session's claim.
     annotations:
       content: tool
+  - key: terma.hooks.file_edits
+    type: boolean
+    stability: development
+    brief: Whether terma's agent hooks report the session's file edits, each with its checkout.
+    note: >
+      True where a hook named the session's checkout. Each successful call of the agent's own
+      file-editing tools (Claude Code's Edit, Write, MultiEdit and NotebookEdit; Codex's
+      apply_patch) that writes into an admitted checkout is then followed by a
+      terma.files.touched event for that call, naming each file relative to its checkout, so a
+      backend can wait for that event rather than guess the checkout. On agent telemetry it is
+      a resource attribute the relay stamps from the session's claim, omitted outside git.
   - key: terma.repository.worktree.linked
     type: boolean
     stability: development

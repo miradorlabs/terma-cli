@@ -13,7 +13,7 @@ import (
 // policy, on the resource the relay stamps alone (withhold).
 var checkoutSafeKeys = []string{
 	semconv.VCSRepositoryURLFullKey, semconv.VCSRepositoryNameKey, semconv.VCSOwnerNameKey, semconv.VCSProviderNameKey,
-	semconv.VCSRefHeadNameKey, semconv.VCSRefHeadTypeKey, semconv.TermaRepositoryWorktreeLinkedKey,
+	semconv.VCSRefHeadNameKey, semconv.VCSRefHeadTypeKey, semconv.TermaRepositoryWorktreeLinkedKey, semconv.TermaHooksFileEditsKey,
 }
 
 // checkoutContentKeys name it by local path, and by the worktree's name, which an agent
@@ -45,10 +45,12 @@ func stampCheckout(p *part, ran claim.Claim, toolContent bool) {
 		stamp(p, semconv.VCSRefHeadNameKey, ran.Branch)
 		stamp(p, semconv.VCSRefHeadTypeKey, semconv.VCSRefHeadTypeBranch)
 	}
-	// Root is "" outside git, where a checkout is neither.
+	// Root is "" outside git, where a checkout is neither. Only a hook names it, so its post-tool-use
+	// hooks report the session's file edits.
 	if ran.Root != "" {
 		stampValue(p, semconv.TermaRepositoryWorktreeLinkedKey,
 			&commonpb.AnyValue{Value: &commonpb.AnyValue_BoolValue{BoolValue: ran.Worktree != ""}})
+		stampValue(p, semconv.TermaHooksFileEditsKey, &commonpb.AnyValue{Value: &commonpb.AnyValue_BoolValue{BoolValue: true}})
 	}
 	if !toolContent {
 		return
