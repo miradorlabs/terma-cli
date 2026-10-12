@@ -137,6 +137,17 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v5
+      # Ubuntu 24.04 gives a process no capabilities in a user namespace it creates unless an
+      # AppArmor profile allows it, so Codex's bwrap sandbox cannot bring up its loopback
+      # ("bwrap: loopback: Failed RTM_NEWADDR") and every tool command fails. This runner is
+      # thrown away after the job. Docker Desktop needs no such change; an Ubuntu 24.04+
+      # machine running the scenarios does (test/e2e/Makefile, `machines`). An image without
+      # the restriction has nothing to lift.
+      - name: Let sandboxes have capabilities in their user namespaces
+        run: |
+          if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
       - name: Run the machine scenarios
         working-directory: test/e2e
         # The agents' newest releases; the rows record the versions they turn out to be.

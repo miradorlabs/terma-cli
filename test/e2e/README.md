@@ -11,7 +11,13 @@ make telemetry                 # real harnesses, local provider fixtures, no cre
 make run                      # build in Docker, run natively, write report/latest.md
 make run RUN=TestClaudeSubscriptionSession
 E2E_UPDATE_GOLDEN=1 make run # re-record the attribute key sets after a harness upgrade
+make machines                  # global mode and the relay on a fresh Linux machine, in Docker
 ```
+
+`make machines` runs in Docker Desktop as it is. On an Ubuntu 24.04+ host, Codex's tool
+sandbox (bwrap) also needs `sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0`
+first, as CI's machine job does; without it every Codex tool command fails inside the
+container.
 
 Every scenario runs in a sandbox: scratch Terma config, scratch harness config, a
 scratch git global config and a scratch git repository, with the machine-wide hooks
