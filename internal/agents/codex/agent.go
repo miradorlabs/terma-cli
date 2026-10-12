@@ -111,7 +111,7 @@ func (Agent) UserHooksTrustStep() string {
 }
 
 // UserHooksTrusted reports whether Codex runs every one of terma's machine-wide entries as
-// written: one changed since it was trusted, or switched off, is skipped in silence.
+// written: one changed since it was trusted, switched off, or missing is skipped in silence.
 func (Agent) UserHooksTrusted() (present, trusted bool, err error) {
 	path, err := userHooksPath()
 	if err != nil {
@@ -125,15 +125,15 @@ func (Agent) UserHooksTrusted() (present, trusted bool, err error) {
 	if err != nil {
 		return true, false, err
 	}
-	if trust.Disabled > 0 {
-		return true, false, nil
-	}
+	// An event with no entry of terma's runs nothing of terma's: PostToolUse reports file edits.
+	events := map[string]bool{}
 	for _, e := range entries {
-		if trust.TrustedHashes[e.Key()] != e.Hash {
+		if trust.DisabledKeys[e.Key()] || trust.TrustedHashes[e.Key()] != e.Hash {
 			return true, false, nil
 		}
+		events[e.Event] = true
 	}
-	return true, true, nil
+	return true, len(events) == len(codexHooks), nil
 }
 
 // RemoveNotifier restores the user's own notifier.

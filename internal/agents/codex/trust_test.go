@@ -1,6 +1,7 @@
 package codex
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -67,6 +68,46 @@ func TestUserHooksTrustedFollowsTheRecordedHashes(t *testing.T) {
 	}
 	if _, trusted, err := (Agent{}).UserHooksTrusted(); err != nil || !trusted {
 		t.Fatalf("every entry trusted: %v, %v", trusted, err)
+	}
+	trustedConfig := config.String()
+	// A hook of the developer's switched off leaves terma's running; one of terma's does not.
+	for _, c := range []struct {
+		key  string
+		want bool
+	}{{"pre_tool_use:9:0", true}, {"post_tool_use:0:0", false}} {
+		header := "[hooks.state." + quoteTOMLString(hooksFile+":"+c.key) + "]\n"
+		disabled := trustedConfig + header + "enabled = false\n"
+		if strings.Contains(trustedConfig, header) {
+			disabled = strings.Replace(trustedConfig, header, header+"enabled = false\n", 1)
+		}
+		if err := os.WriteFile(filepath.Join(codexHome, "config.toml"), []byte(disabled), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, trusted, err := (Agent{}).UserHooksTrusted(); err != nil || trusted != c.want {
+			t.Fatalf("%s switched off: trusted %v, want %v (%v)", c.key, trusted, c.want, err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(codexHome, "config.toml"), []byte(trustedConfig), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// Without its PostToolUse entry Codex reports no file edits, however trusted the rest.
+	raw, err := os.ReadFile(hooksFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc map[string]map[string]any
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatal(err)
+	}
+	delete(doc["hooks"], "PostToolUse")
+	if raw, err = json.Marshal(doc); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(hooksFile, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if present, trusted, err := (Agent{}).UserHooksTrusted(); err != nil || !present || trusted {
+		t.Fatalf("no PostToolUse entry: present %v trusted %v, %v", present, trusted, err)
 	}
 	// A setup from another terma path rewrites every entry, and Codex skips them all.
 	write("/usr/local/bin/terma")
