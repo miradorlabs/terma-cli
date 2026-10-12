@@ -641,7 +641,9 @@ attributes:
     stability: development
     brief: Whether terma's agent hooks report the session's file edits, each with its checkout.
     note: >
-      True where a hook named the session's checkout. Each successful call of the agent's own
+      True where a hook named the session's checkout and terma's hooks run as written for the
+      session's agent (Codex runs them only once the developer trusts them; its notifier claims a
+      session either way). Each successful call of the agent's own
       file-editing tools (Claude Code's Edit, Write, MultiEdit and NotebookEdit; Codex's
       apply_patch) that writes into an admitted checkout is then followed by a
       terma.files.touched event for that call, naming each file relative to its checkout, so a

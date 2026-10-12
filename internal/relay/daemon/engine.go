@@ -32,6 +32,8 @@ type Deps struct {
 	Capturers   []shape.Capturer
 	// AgentName is the agent behind a tool label.
 	AgentName func(tool string) string
+	// FileEditHooks reports whether terma's hooks that report file edits run for a tool label's sessions.
+	FileEditHooks func(tool string) bool
 	// RelayTargets names the agents among the developer's choices that send through the relay.
 	RelayTargets func(selected []string) []string
 	// Endpoint is a project's ingest host.
@@ -88,7 +90,8 @@ func (d Deps) Engine(ctx context.Context, stateDir string, cfg *config.Config, s
 		Hold: s.Hold, Dir: filepath.Join(claim.Dir(stateDir), relay.OutboxDir), Resolve: d.Resolver(cfg, minter.Mint), Version: d.Version,
 		Lookup:   func(sessionID string, now time.Time) (claim.Claim, bool) { return claim.Read(stateDir, sessionID, now) },
 		CatchAll: d.CatchAll(), HeartbeatSend: d.SendHeartbeat, HeartbeatEvery: s.Heartbeat,
-		PeerPID: procinfo.FindSender, ProcessAlive: procinfo.Alive, ClaimCacheTTL: time.Second, PolicyCacheTTL: time.Second}
+		PeerPID: procinfo.FindSender, ProcessAlive: procinfo.Alive, ClaimCacheTTL: time.Second, PolicyCacheTTL: time.Second,
+		FileEditHooks: d.FileEditHooks}
 	if s.Debug && logw != nil {
 		opts.Logf = func(f string, a ...any) { fmt.Fprintf(logw, time.Now().Format("15:04:05.000 ")+f+"\n", a...) }
 	}

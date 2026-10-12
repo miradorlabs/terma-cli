@@ -12,6 +12,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
+	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/globalmode"
 	"github.com/miradorlabs/terma-cli/internal/policy"
@@ -28,6 +29,7 @@ func (app *App) relayDeps() daemon.Deps {
 		Correlators:   app.agents.With[shape.Correlator](),
 		Capturers:     app.agents.With[shape.Capturer](),
 		AgentName:     app.agents.NameForTool,
+		FileEditHooks: app.fileEditHooks,
 		RelayTargets:  app.agents.RelayTargets,
 		Endpoint:      app.delivery().Endpoint,
 		CreateKey:     app.createProjectKey,
@@ -36,6 +38,22 @@ func (app *App) relayDeps() daemon.Deps {
 		LoadConfig:    app.loadConfig,
 		RefreshPolicy: pols.Refresh,
 	}
+}
+
+// fileEditHooks reports whether terma's hooks run for tool's sessions as written, file-edit hooks included. A claim
+// is a hook's, so they run, except where the agent runs its hooks only once trusted: Codex's notifier claims a session
+// whose hooks it has not approved, or has disabled.
+func (app *App) fileEditHooks(tool string) bool {
+	a, ok := app.agents.ForTool(tool)
+	if !ok {
+		return false
+	}
+	t, gated := a.(agents.UserHooksTrust)
+	if !gated {
+		return true
+	}
+	present, trusted, err := t.UserHooksTrusted()
+	return err == nil && present && trusted
 }
 
 // policies fetch collection policies as this build.

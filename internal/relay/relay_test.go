@@ -104,6 +104,8 @@ type fixture struct {
 	now      time.Time
 	warnings []string
 	version  string
+	// fileEditHooks is the relay's FileEditHooks: none when nil.
+	fileEditHooks func(tool string) bool
 }
 
 func (f *fixture) warned() []string {
@@ -135,11 +137,12 @@ func (f *fixture) clock() time.Time {
 
 func (f *fixture) relay(t *testing.T, u *upstream, policies map[string]Policy) (*Relay, *httptest.Server) {
 	r := newRelay(Options{Dir: t.TempDir(),
-		Version: f.version,
-		Token:   token,
-		Hold:    time.Minute,
-		Lookup:  f.lookup,
-		Now:     f.clock,
+		Version:       f.version,
+		FileEditHooks: f.fileEditHooks,
+		Token:         token,
+		Hold:          time.Minute,
+		Lookup:        f.lookup,
+		Now:           f.clock,
 		Warnf: func(format string, args ...any) {
 			f.mu.Lock()
 			f.warnings = append(f.warnings, fmt.Sprintf(format, args...))

@@ -147,7 +147,8 @@ func (r *Relay) deliverAttributed(c claim.Claim, pol Policy, p *part, how attrib
 	if r.opts.Version != "" {
 		stamp(p, semconv.TermaVersionKey, r.opts.Version)
 	}
-	stampCheckout(p, r.ranIn(c, p, how), pol.IncludeToolContent)
+	ran := r.ranIn(c, p, how)
+	stampCheckout(p, ran, pol.IncludeToolContent, ran.Root != "" && r.opts.FileEditHooks != nil && r.opts.FileEditHooks(ran.Tool))
 	if how.how != "" {
 		stamp(p, semconv.TermaRelayAttributionKey, how.how)
 		if how.session != "" {

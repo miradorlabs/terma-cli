@@ -69,6 +69,9 @@ type Options struct {
 	Lookup func(sessionID string, now time.Time) (claim.Claim, bool)
 	// Resolve turns a claim into a Policy, or ErrNoKey.
 	Resolve func(c claim.Claim) (Policy, error)
+	// FileEditHooks reports whether terma's hooks that report an agent's file edits run for the sessions of
+	// tool, a claim's label; terma.hooks.file_edits is never stamped when nil.
+	FileEditHooks func(tool string) bool
 	// CatchAll, in global mode, is where a part whose hold ran out unplaced goes instead of being dropped.
 	CatchAll func() (claim.Claim, bool)
 	// HeartbeatSend, set, turns the heartbeat on; HeartbeatEvery is its period.

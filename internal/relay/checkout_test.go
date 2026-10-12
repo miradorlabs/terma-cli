@@ -29,12 +29,14 @@ func spoofedCheckout() []*commonpb.KeyValue {
 // linked worktree, under any policy: Claude Code's (A) in the main checkout, Codex's (B) in a
 // linked worktree. The worktree's name, like the paths, leaves only with tool content. Whatever
 // the agent named itself on the resource is gone, and what it names on a record is its own,
-// withheld with content as any key not classified safe is.
+// withheld with content as any key not classified safe is. Only the agent whose hooks run as
+// written (here Claude Code, not an untrusted Codex) promises to report its file edits.
 func TestRelayStampsTheCheckout(t *testing.T) {
 	t.Parallel()
 	for _, codexContent := range []bool{true, false} {
 		u := newUpstream(t)
 		f := newFixture()
+		f.fileEditHooks = func(tool string) bool { return tool == "claude-code" }
 		f.claim("A", claim.Claim{ProjectID: "p1", Tool: "claude-code", Repository: config.Repository{Origin: "github.com/acme/web"},
 			Root: "/work/web", Cwd: "/work/web", Remote: "https://github.com/acme/web", Branch: "main"})
 		f.claim("B", claim.Claim{ProjectID: "p2", Tool: "codex", Repository: config.Repository{Origin: "gitlab.com/acme/tools/cli"},
@@ -62,7 +64,7 @@ func TestRelayStampsTheCheckout(t *testing.T) {
 			semconv.VCSRefHeadNameKey:                {"Bearer key-p1": "main", "Bearer key-p2": "feature/parser"},
 			semconv.VCSRefHeadTypeKey:                {"Bearer key-p1": "branch", "Bearer key-p2": "branch"},
 			semconv.TermaRepositoryWorktreeLinkedKey: {"Bearer key-p1": "false", "Bearer key-p2": "true"},
-			semconv.TermaHooksFileEditsKey:           {"Bearer key-p1": "true", "Bearer key-p2": "true"},
+			semconv.TermaHooksFileEditsKey:           {"Bearer key-p1": "true", "Bearer key-p2": ""},
 			semconv.TermaRepositoryWorktreeNameKey:   {"Bearer key-p1": "", "Bearer key-p2": worktree},
 			semconv.TermaRepositoryRootKey:           {"Bearer key-p1": "/work/web", "Bearer key-p2": root},
 			"cwd":                                    {"Bearer key-p1": "/Users/dev/work", "Bearer key-p2": cwd},
@@ -108,7 +110,7 @@ func TestStampCheckoutNamesOnlyWhatTheClaimDoes(t *testing.T) {
 		p := &part{signal: Logs, msg: &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{
 			Resource: &resourcepb.Resource{Attributes: spoofedCheckout()},
 		}}}}
-		stampCheckout(p, c.ran, c.toolContent)
+		stampCheckout(p, c.ran, c.toolContent, c.ran.Root != "")
 		res := p.msg.(*logspb.LogsData).ResourceLogs[0].Resource.Attributes
 		for _, key := range slices.Concat(checkoutSafeKeys, checkoutContentKeys) {
 			if got := attr(res, key); got != c.want[key] {

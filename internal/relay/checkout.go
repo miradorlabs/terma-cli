@@ -24,7 +24,8 @@ var checkoutContentKeys = []string{
 
 // stampCheckout names the checkout the part's session ran in, from the claim ran: the
 // relay's to name, never the agent's, so whatever the agent sent under these keys goes first.
-func stampCheckout(p *part, ran claim.Claim, toolContent bool) {
+// fileEdits says terma's hooks report the session's file edits, each with its checkout.
+func stampCheckout(p *part, ran claim.Claim, toolContent, fileEdits bool) {
 	for _, key := range checkoutSafeKeys {
 		unstamp(p, key)
 	}
@@ -45,11 +46,12 @@ func stampCheckout(p *part, ran claim.Claim, toolContent bool) {
 		stamp(p, semconv.VCSRefHeadNameKey, ran.Branch)
 		stamp(p, semconv.VCSRefHeadTypeKey, semconv.VCSRefHeadTypeBranch)
 	}
-	// Root is "" outside git, where a checkout is neither. Only a hook names it, so its post-tool-use
-	// hooks report the session's file edits.
+	// Root is "" outside git, where a checkout is neither.
 	if ran.Root != "" {
 		stampValue(p, semconv.TermaRepositoryWorktreeLinkedKey,
 			&commonpb.AnyValue{Value: &commonpb.AnyValue_BoolValue{BoolValue: ran.Worktree != ""}})
+	}
+	if fileEdits {
 		stampValue(p, semconv.TermaHooksFileEditsKey, &commonpb.AnyValue{Value: &commonpb.AnyValue_BoolValue{BoolValue: true}})
 	}
 	if !toolContent {
