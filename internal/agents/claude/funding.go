@@ -13,6 +13,7 @@ import (
 // Values of terma.evidence.source.
 const (
 	sourceClaudeAccount     = "claude_account"
+	sourceClaudeHook        = "claude_hook"
 	sourceClaudeStatusline  = "claude_statusline"
 	sourceClaudeStopFailure = "claude_stop_failure"
 	sourceClaudeTranscript  = "claude_transcript"
