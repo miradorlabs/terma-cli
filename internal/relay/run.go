@@ -131,7 +131,7 @@ func (r *Relay) Quiesce(quiet time.Duration) bool {
 func (r *Relay) Idle() (time.Duration, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.heldN > 0 {
+	if r.heldN > 0 || len(r.linkWaits) > 0 {
 		return 0, false
 	}
 	for _, s := range r.senders {

@@ -327,9 +327,6 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 			r.route(p)
 		}
 	}
-	for _, p := range r.awaitLinks(waits) {
-		r.route(p)
-	}
 	for _, p := range parts {
 		if p.session == "" {
 			// A part naming no session may still go by its process once it exits (decideExited).
@@ -341,6 +338,10 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 			}
 			p.session = procKey(pid)
 		}
+		r.route(p)
+	}
+	// After the records beside them, so a poll whose span came first never overtakes them.
+	for _, p := range r.awaitLinks(waits) {
 		r.route(p)
 	}
 	// An empty success response is valid OTLP in either encoding.

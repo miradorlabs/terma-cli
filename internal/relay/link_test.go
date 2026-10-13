@@ -93,19 +93,28 @@ func TestLinkStampsAPollWhoseSpanFollows(t *testing.T) {
 	}
 }
 
-// A span that came first stamps its poll as the poll arrives, without a wait.
+// A span that came first stamps its poll as the poll arrives, without a wait, and the poll
+// does not overtake the record exported before it.
 func TestLinkStampsAPollWhoseSpanCameFirst(t *testing.T) {
 	t.Parallel()
 	u := newUpstream(t)
 	r, srv, _, _, _ := linkRelay(t, u)
 	postProto(t, srv, "/v1/traces", pollSpan("exec-poll", "exec-orig"))
-	postProto(t, srv, "/v1/logs", toolResults("exec-poll"))
+	postProto(t, srv, "/v1/logs", toolResults("exec_command:exec-cmd", "exec-poll"))
 	if c := r.Stats().Snapshot().Counters; c["linked_records"] != 1 {
 		t.Fatalf("the poll waited for a span already seen: %v", c)
 	}
-	waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 1 })
+	waitForCounters(t, r, func(c map[string]int) bool { return c["forwarded.logs"] == 2 })
 	if got := u.origins(t); got["exec-poll"] != "exec-orig" {
 		t.Fatalf("origins = %v", got)
+	}
+	got, _ := u.logs(t)
+	var order []string
+	for _, lr := range got["Bearer key-p2"] {
+		order = append(order, attr(lr.Attributes, "call_id"))
+	}
+	if !slices.Equal(order, []string{"exec-cmd", "exec-poll"}) {
+		t.Fatalf("order = %v", order)
 	}
 }
 
@@ -192,7 +201,7 @@ func TestLinkStopSendsWaitingPolls(t *testing.T) {
 	u := newUpstream(t)
 	r, srv, _, _, stop := linkRelay(t, u)
 	postProto(t, srv, "/v1/logs", toolResults("exec-poll"))
-	if r.Quiesce(0) || !r.Holding() {
+	if _, idle := r.Idle(); idle || r.Quiesce(0) || !r.Holding() {
 		t.Fatal("quiesced or not holding with a poll waiting for its span")
 	}
 	stop()
