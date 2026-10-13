@@ -205,6 +205,9 @@ func (app *App) reuseStoredSession(ctx context.Context, cfg *config.Config, want
 	if err != nil {
 		return nil, false, err
 	}
+	// A credential saved before terma kept the email and user id learns them from whoami.
+	verified.UserEmail = cmp.Or(verified.UserEmail, identity.Email)
+	verified.UserID = cmp.Or(verified.UserID, identity.UserID)
 	// Saved as a sign-in would, so running setup again moves the tokens to where they now belong.
 	if _, err := auth.SaveCredential(app.dir, cfg.ProfileName, verified); err != nil {
 		return nil, false, err
@@ -220,10 +223,6 @@ func (app *App) reuseStoredSession(ctx context.Context, cfg *config.Config, want
 		if org, err := app.lookupOrganization(ctx, cfg, verified, verified.OrganizationID); err == nil {
 			orgName = org.Name
 		}
-	}
-	if identity.Email != "" && verified.UserEmail == "" {
-		verified.UserEmail = identity.Email
-		_ = auth.UpdateCredential(app.dir, cfg.ProfileName, verified)
 	}
 	if err := config.UpdateProfile(app.dir, cfg.ProfileName, func(p *config.Profile) { applyLogin(p, cfg, verified, orgName) }); err != nil {
 		return nil, false, err

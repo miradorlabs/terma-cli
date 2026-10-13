@@ -778,3 +778,18 @@ attributes:
       the attributes the content policy met unclassified leave only as their total,
       `terma.relay.heartbeat.counter.unclassified`, never by name. A counter that did not move
       is left out.
+
+  # The developer.
+  - key: terma.user.id
+    type: string
+    stability: development
+    brief: The Mirador user terma is signed in as, by id.
+    note: >-
+      On the relay heartbeat, a record attribute read as each beat is sent, since the developer
+      can sign in, out or switch while the relay runs. Left out when terma is signed out, signed
+      in for another organization or environment than its profile's, or set up with a server
+      key, and on a beat that goes with any key but that of the team whose validated policy the
+      login fetched, to any ingest but the profile's own, or with a key filed with another
+      deployment's API host: such a key may belong to another organization or environment. The
+      relay sets it, so the platform shows it and never authorizes with it.
+    examples: ["5b0e5f8c-3c2a-4d1e-9f6b-2a7c8d9e0f11"]

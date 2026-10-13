@@ -8,7 +8,7 @@ import (
 )
 
 // The relay's heartbeat is a log record sent to the project's ingest with the project's
-// key, every period, naming terma's version and the machine.
+// key, every period, naming terma's version, the machine and the signed-in user.
 func TestRelayHeartbeat(t *testing.T) {
 	forEachClaude(t, func(t *testing.T, b Binary, _ bool) {
 		ProvesAll(t, b, "relay.heartbeat")
@@ -35,6 +35,12 @@ func TestRelayHeartbeat(t *testing.T) {
 			if beat.Attrs[k] == "" {
 				t.Errorf("heartbeat has no %s: %v", k, beat.Attrs)
 			}
+		}
+		if beat.Attrs["terma.user.id"] != accountUser {
+			t.Errorf("heartbeat terma.user.id = %q, want the signed-in %s: %v", beat.Attrs["terma.user.id"], accountUser, beat.Attrs)
+		}
+		if _, ok := beat.Resource["terma.user.id"]; ok {
+			t.Errorf("heartbeat carries terma.user.id on its resource: %v", beat.Resource)
 		}
 		for _, k := range []string{"event.name", "terma.version"} {
 			if _, ok := beat.Attrs[k]; ok {

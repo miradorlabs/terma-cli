@@ -312,3 +312,38 @@ func TestAFailedBeatHandsBackOnlyItsOwnCounters(t *testing.T) {
 		t.Errorf("next beat took %v, want A's 3 and the new 1, not B's 5 again", next)
 	}
 }
+
+// NameHeartbeatUser puts terma.user.id on the beat's record, never its resource, and "" names
+// no one.
+func TestNameHeartbeatUserNamesTheRecord(t *testing.T) {
+	t.Parallel()
+	for _, user := range []string{"", "user-a"} {
+		var beat *logspb.LogsData
+		r := newRelay(Options{Dir: t.TempDir(), Token: token,
+			HeartbeatSend: func(_ context.Context, b *logspb.LogsData) error { beat = b; return nil }})
+		if err := r.heartbeat(context.Background(), semconv.TermaRelayHeartbeatReasonInterval, ""); err != nil {
+			t.Fatal(err)
+		}
+		if attr(beat.ResourceLogs[0].ScopeLogs[0].LogRecords[0].Attributes, semconv.TermaUserIDKey) != "" {
+			t.Fatal("the relay named a user itself; only the sender does")
+		}
+		NameHeartbeatUser(beat, user)
+		rec := beat.ResourceLogs[0].ScopeLogs[0].LogRecords[0]
+		n := 0
+		for _, kv := range rec.Attributes {
+			if kv.Key == semconv.TermaUserIDKey {
+				n++
+			}
+		}
+		want := 0
+		if user != "" {
+			want = 1
+		}
+		if got := attr(rec.Attributes, semconv.TermaUserIDKey); got != user || n != want {
+			t.Errorf("named %q: terma.user.id = %q, %d times", user, got, n)
+		}
+		if attr(beat.ResourceLogs[0].Resource.Attributes, semconv.TermaUserIDKey) != "" {
+			t.Errorf("named %q on the resource", user)
+		}
+	}
+}
