@@ -48,16 +48,19 @@ func (rc RC) LauncherBlock(name string) string {
 			"    end\n" +
 			"end"
 	} else {
-		// A shell expands an alias as it reads a function's name, so one of the same name
-		// would make the definition a syntax error on every start: the alias stays, and the
-		// function is read only when there is none.
-		body = "alias " + name + " >/dev/null 2>&1 || eval '" + name + `() {
+		// An alias or a function the developer already gave the name stays theirs: the
+		// function is defined only where the name is a program on PATH, or nothing yet. It
+		// is read through eval because a shell expands an alias as it reads a function's
+		// name, which beside one would be a syntax error on every start.
+		body = `case "$(command -v ` + name + ` 2>/dev/null)" in
+/* | "") eval '` + name + `() {
   if command -v terma >/dev/null 2>&1; then
     terma launch ` + name + ` -- "$@"
   else
     command ` + name + ` "$@"
   fi
-}'`
+}' ;;
+esac`
 	}
 	return begin + "\n" + note + "\n" + body + "\n" + end + "\n"
 }
@@ -167,18 +170,39 @@ func editLauncher(path, name, block string, install bool) (bool, error) {
 }
 
 // cutLauncher splits text around name's marked block: what precedes its first line and
-// what follows its last.
+// what follows its last. The block is the end marker's line and the nearest begin marker's
+// line above it: a begin marker whose end the developer deleted names nothing, so whatever
+// they wrote below it is never taken for terma's.
 func cutLauncher(text, name string) (head, tail string, found bool) {
 	begin, end := launcherMarkers(name)
-	i := strings.Index(text, begin+"\n")
-	if i < 0 || i > 0 && text[i-1] != '\n' {
-		return text, "", false
-	}
-	j := strings.Index(text[i:], "\n"+end)
+	j := lineIndex(text, end, 0)
 	if j < 0 {
 		return text, "", false
 	}
-	rest := text[i+j+len("\n"+end):]
-	rest = strings.TrimPrefix(rest, "\n")
-	return text[:i], rest, true
+	i := -1
+	for at := lineIndex(text[:j], begin, 0); at >= 0; at = lineIndex(text[:j], begin, at+1) {
+		i = at
+	}
+	if i < 0 {
+		return text, "", false
+	}
+	return text[:i], strings.TrimPrefix(text[j+len(end):], "\n"), true
+}
+
+// lineIndex is where a line that is exactly marker starts in text, at or after from.
+func lineIndex(text, marker string, from int) int {
+	for from <= len(text) {
+		i := strings.Index(text[from:], marker)
+		if i < 0 {
+			return -1
+		}
+		i += from
+		starts := i == 0 || text[i-1] == '\n'
+		ends := i+len(marker) == len(text) || text[i+len(marker)] == '\n'
+		if starts && ends {
+			return i
+		}
+		from = i + 1
+	}
+	return -1
 }

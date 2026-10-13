@@ -87,6 +87,37 @@ func TestLauncherWritesThroughALink(t *testing.T) {
 	}
 }
 
+// A begin marker whose end marker the developer deleted is not a block: what they wrote
+// below it survives a second install and a removal, which touch only the whole block.
+func TestLauncherLeavesWhatFollowsAnOrphanedMarker(t *testing.T) {
+	home := rcSandbox(t, "zsh")
+	rc := filepath.Join(home, ".zshrc")
+	begin, _ := launcherMarkers("agentx")
+	mine := "export A=1\n" + begin + "\n# the end marker was deleted\nexport KEEP=1\nalias gs='git status'\n"
+	if err := os.WriteFile(rc, []byte(mine), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if _, err := InstallLauncher("agentx"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	data, _ := os.ReadFile(rc)
+	if !strings.HasPrefix(string(data), mine) || strings.Count(string(data), "terma launch agentx --") != 1 {
+		t.Fatalf("after two installs:\n%s", data)
+	}
+	if _, err := RemoveLauncher("agentx"); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(rc); string(data) != mine {
+		t.Fatalf("after removal:\n%q\nwant:\n%q", data, mine)
+	}
+	// A marker inside a longer line is not a marker.
+	if _, _, found := cutLauncher("echo '"+begin+"'\n# <<< terma launch agentx <<< trailing\n", "agentx"); found {
+		t.Fatal("found a block where no line is a marker")
+	}
+}
+
 // A shell terma writes nothing for, an unusable name and the kill switch are each said, never guessed around.
 func TestLauncherRefusesWhatItCannotWrite(t *testing.T) {
 	rcSandbox(t, "nu")
@@ -169,6 +200,21 @@ func TestLauncherBlockIsSafeToSource(t *testing.T) {
 			}
 			if got := run(". "+rc, both); got != "aliased now" {
 				t.Errorf("beside an alias: %q", got)
+			}
+			// So is a function of the same name, and sourcing the file twice changes nothing.
+			own := "agentx() { echo \"mine $*\"; }\n" + block + block + "agentx now\n"
+			if err := os.WriteFile(rc, []byte(own), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if got := run(". "+rc, both); got != "mine now" {
+				t.Errorf("beside the developer's own function: %q", got)
+			}
+			if got := run("set -eu\n"+block+block+"agentx -p x", both); got != "terma launch agentx -- -p x" {
+				t.Errorf("sourced twice under set -eu: %q", got)
+			}
+			// With the command not installed yet, the shell still starts.
+			if got := run("set -eu\n"+block+"echo started", "/usr/bin:/bin"); got != "started" {
+				t.Errorf("with no such command: %q", got)
 			}
 		})
 	}
