@@ -129,15 +129,15 @@ func (Agent) LaunchCommand() string { return command }
 // are cleared for this one process. The CLI keeps OTEL_EXPORTER_* out of what it runs.
 func (Agent) LaunchEnv(cfg agents.RelayConfig) (set map[string]string, unset []string) {
 	return map[string]string{
-			"COPILOT_OTEL_ENABLED":                               "true",
-			harness.EnvOTLPEndpoint:                              cfg.Endpoint + "/" + cfg.Token,
-			harness.EnvOTLPProtocol:                              "http/json",
-			"OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT": "true",
-		}, []string{
-			"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT",
-			"OTEL_EXPORTER_OTLP_TRACES_PROTOCOL", "OTEL_EXPORTER_OTLP_METRICS_PROTOCOL",
-			"COPILOT_OTEL_EXPORTER_TYPE", "COPILOT_OTEL_FILE_EXPORTER_PATH",
-		}
+		"COPILOT_OTEL_ENABLED":                               "true",
+		harness.EnvOTLPEndpoint:                              cfg.Endpoint + "/" + cfg.Token,
+		harness.EnvOTLPProtocol:                              "http/json",
+		"OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT": "true",
+	}, []string{
+		"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT",
+		"OTEL_EXPORTER_OTLP_TRACES_PROTOCOL", "OTEL_EXPORTER_OTLP_METRICS_PROTOCOL",
+		"COPILOT_OTEL_EXPORTER_TYPE", "COPILOT_OTEL_FILE_EXPORTER_PATH",
+	}
 }
 
 var (
