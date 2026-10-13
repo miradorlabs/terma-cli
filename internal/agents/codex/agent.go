@@ -107,11 +107,11 @@ func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
 
 // UserHooksTrustStep is how the developer trusts the machine-wide hooks.
 func (Agent) UserHooksTrustStep() string {
-	return "Approve Terma's hooks in Codex: run `/hooks` (in the desktop app: Settings → Hooks → Review). Until then Codex runs none of the new or changed ones, and records nothing for them."
+	return "Approve Terma's hooks in Codex: run `/hooks` (in the desktop app: Settings → Hooks → Review). Until then Codex runs none of the new or changed ones, and records nothing for them. One that is missing comes back with `terma setup`."
 }
 
 // UserHooksTrusted reports whether Codex runs every one of terma's machine-wide entries as
-// written: one changed since it was trusted, or switched off, is skipped in silence.
+// written: one changed since it was trusted, switched off, or missing is skipped in silence.
 func (Agent) UserHooksTrusted() (present, trusted bool, err error) {
 	path, err := userHooksPath()
 	if err != nil {
@@ -125,11 +125,16 @@ func (Agent) UserHooksTrusted() (present, trusted bool, err error) {
 	if err != nil {
 		return true, false, err
 	}
-	if trust.Disabled > 0 {
-		return true, false, nil
-	}
+	// An event with no entry of terma's runs nothing of terma's: PostToolUse reports file edits.
+	found := map[string]bool{}
 	for _, e := range entries {
-		if trust.TrustedHashes[e.Key()] != e.Hash {
+		if trust.DisabledKeys[e.Key()] || trust.TrustedHashes[e.Key()] != e.Hash {
+			return true, false, nil
+		}
+		found[e.Event] = true
+	}
+	for _, h := range codexHooks {
+		if !found[h.Event] {
 			return true, false, nil
 		}
 	}

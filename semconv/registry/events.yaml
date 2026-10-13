@@ -101,6 +101,10 @@ events:
       - ref: vcs.repository.name
       - ref: vcs.owner.name
       - ref: vcs.provider.name
+      - ref: terma.checkout.id
+        note: >
+          The checkout the files are in, on an edit the agent's hook confirmed; absent on
+          files a hook only guessed (a shell command's targets) and outside git.
 
   - name: terma.commit.stamped
     stability: development

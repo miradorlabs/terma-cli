@@ -59,8 +59,8 @@ trusted_hash = "sha256:ddd"
 	if trust.Trusted != 3 {
 		t.Fatalf("Trusted = %d, want 3", trust.Trusted)
 	}
-	if trust.Disabled != 1 {
-		t.Fatalf("Disabled = %d, want 1", trust.Disabled)
+	if len(trust.DisabledKeys) != 1 || !trust.DisabledKeys["session_end:0:0"] {
+		t.Fatalf("DisabledKeys = %v, want session_end:0:0", trust.DisabledKeys)
 	}
 }
 

@@ -102,7 +102,7 @@ func TestTouchInAGlobalFolderOutsideGitNamesNoRepository(t *testing.T) {
 	if len(events) != 1 || hookruntest.Joined(events[0].Attrs[semconv.TermaFilesPathsKey]) != "notes.md" {
 		t.Fatalf("spooled %+v", events)
 	}
-	for _, k := range []string{semconv.VCSRepositoryURLFullKey, semconv.VCSRepositoryNameKey, semconv.VCSOwnerNameKey} {
+	for _, k := range []string{semconv.VCSRepositoryURLFullKey, semconv.VCSRepositoryNameKey, semconv.VCSOwnerNameKey, semconv.TermaCheckoutIDKey} {
 		if v, ok := events[0].Attrs[k]; ok {
 			t.Errorf("%s = %v outside git", k, v)
 		}
@@ -124,6 +124,51 @@ func TestTouchOutsideCollectedRepositoriesSpoolsNothing(t *testing.T) {
 	}, nil)
 	if events := hookruntest.Spooled(t, sp); len(events) != 0 {
 		t.Fatalf("spooled %s", hookruntest.Names(events))
+	}
+}
+
+// The platform recomputes the id from the roots it observes: these vectors are pinned there too.
+func TestCheckoutIDPinsTheSharedVectors(t *testing.T) {
+	t.Parallel()
+	for root, want := range map[string]string{
+		"/work/repo":                     "ddc5e473a09bd156b4eb7c426367aa59",
+		"/work/repo/.claude/worktrees/x": "181e983f33192a1a71e6bd8ce72e9776",
+		`C:\work\repo`:                   "1f2a010850eb4d2af56ef8a8ec4bd8e8",
+	} {
+		if got, helper := checkoutID(root), hookruntest.CheckoutID(root); got != want || helper != want {
+			t.Errorf("checkoutID(%q) = %s, hookruntest.CheckoutID = %s, want %s", root, got, helper, want)
+		}
+	}
+}
+
+// A confirmed edit names each checkout it landed in by id; a report of files a hook only
+// guessed names none.
+func TestTouchNamesEachCheckoutByIDAndReportNone(t *testing.T) {
+	t.Parallel()
+	own, other := hookruntest.InitRepo(t), hookruntest.InitRepo(t)
+	sp, _ := spool.Open(t.TempDir())
+	env := Env{
+		StateDir: t.TempDir(), Now: time.Now(), Cwd: own, Spool: sp, Team: hookruntest.Team,
+		Policy: listing("github.com/acme/"+filepath.Base(own), "github.com/acme/"+filepath.Base(other)),
+	}
+	r, err := env.Repo(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	sess := session.Session{ID: "sess-checkout-id", Tool: "claude-code"}
+	paths := []string{filepath.Join(own, "a.go"), filepath.Join(other, "b.go")}
+	env.Touch(r, sess, "Edit", paths, nil)
+	env.Report(r, sess, "Bash", paths, nil)
+
+	events := hookruntest.Spooled(t, sp)
+	if len(events) != 4 {
+		t.Fatalf("spooled %s", hookruntest.Names(events))
+	}
+	for i, want := range []string{hookruntest.CheckoutID(own), hookruntest.CheckoutID(other), "", ""} {
+		got, stamped := events[i].Attrs[semconv.TermaCheckoutIDKey].(string)
+		if got != want || stamped != (want != "") {
+			t.Errorf("event %d (%v) checkout id = %q, want %q", i, events[i].Attrs[semconv.GenAIToolNameKey], got, want)
+		}
 	}
 }
 

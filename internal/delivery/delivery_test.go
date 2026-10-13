@@ -20,7 +20,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
+	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -251,6 +253,36 @@ func TestOutgoingWithholdsTheWorkingTreeWithToolContent(t *testing.T) {
 			if got := out.Attrs[semconv.TermaRepositoryRootKey]; (got == "/src/app") != pol.IncludeToolContent {
 				t.Errorf("%s, prompts %v, tool content %v: root = %v", name, pol.IncludePrompts, pol.IncludeToolContent, got)
 			}
+		}
+	}
+}
+
+// A confirmed edit's checkout id names no path: it leaves under every policy, the working
+// tree only with tool content.
+func TestOutgoingSendsTheCheckoutIDUnderEveryPolicy(t *testing.T) {
+	t.Parallel()
+	root := hookruntest.InitRepo(t)
+	sp, _ := spool.Open(t.TempDir())
+	env := hookrun.Env{StateDir: t.TempDir(), Now: time.Now(), Cwd: root, Spool: sp, Team: hookruntest.Team, Policy: hookruntest.Admitting(root)}
+	r, err := env.Repo(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	env.Touch(r, session.Session{ID: "sess-out-1", Tool: "codex"}, "apply_patch", []string{"a.go"}, nil)
+	touched := hookruntest.Named(hookruntest.Spooled(t, sp), semconv.TermaFilesTouchedEvent)
+	if len(touched) != 1 {
+		t.Fatalf("spooled %+v", touched)
+	}
+	repos := []string{touched[0].Repository.Origin}
+	for _, pol := range []config.Policy{
+		{Mode: config.ModeRepo, Repositories: repos},
+		{Mode: config.ModeRepo, Repositories: repos, IncludePrompts: true},
+		{Mode: config.ModeRepo, Repositories: repos, IncludeToolContent: true},
+		{Mode: config.ModeRepo, Repositories: repos, IncludePrompts: true, IncludeToolContent: true},
+	} {
+		out, ok := (Router{ConfigDir: t.TempDir()}).Outgoing(pol, hookruntest.Team, touched[0])
+		if !ok || out.Attrs[semconv.TermaCheckoutIDKey] != hookruntest.CheckoutID(root) {
+			t.Errorf("prompts %v, tool content %v: files touched = %+v, %v", pol.IncludePrompts, pol.IncludeToolContent, out.Attrs, ok)
 		}
 	}
 }

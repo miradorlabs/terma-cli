@@ -65,6 +65,9 @@ func TestCodexSessionStampsItsCommitFromApplyPatch(t *testing.T) {
 	if len(touched) != 1 || touched[0].Attrs[semconv.GenAIToolCallIDKey] != "call_1" {
 		t.Fatalf("file touch must carry Codex's tool call id: %+v", touched)
 	}
+	if got := touched[0].Attrs[semconv.TermaCheckoutIDKey]; got != hookruntest.CheckoutID(root) {
+		t.Errorf("checkout id = %v, want the patch's checkout's", got)
+	}
 
 	if _, err := gitx.Git(ctx, root, "add", "src"); err != nil {
 		t.Fatal(err)
@@ -98,6 +101,11 @@ func TestCodexSessionStampsItsCommitFromShellWrite(t *testing.T) {
 		Stdin: strings.NewReader(`{"session_id":"` + id + `","hook_event_name":"PostToolUse","cwd":` + strconv.Quote(root) + `,"model":"gpt-6","permission_mode":"default","tool_name":"Bash","tool_use_id":"c1","turn_id":"t1","transcript_path":null,"tool_response":"","tool_input":{"command":` + command + `}}`)}
 	if err := postToolUse(ctx, env); err != nil {
 		t.Fatal(err)
+	}
+	// A shell command's targets are guesses: they name no checkout id.
+	touched := hookruntest.Named(hookruntest.Spooled(t, sp), semconv.TermaFilesTouchedEvent)
+	if len(touched) != 1 || touched[0].Attrs[semconv.TermaCheckoutIDKey] != nil {
+		t.Fatalf("shell write touched = %+v", touched)
 	}
 	if _, err := gitx.Git(ctx, root, "add", "src"); err != nil {
 		t.Fatal(err)

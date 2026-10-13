@@ -77,6 +77,8 @@ const (
 	TermaCaptureGapKey = "terma.capture.gap"
 	// TermaCaptureSurfaceKey is terma.capture.surface: The capture path the record came from.
 	TermaCaptureSurfaceKey = "terma.capture.surface"
+	// TermaCheckoutIDKey is terma.checkout.id: The checkout a confirmed edit landed in, as a hash of its working tree's path.
+	TermaCheckoutIDKey = "terma.checkout.id"
 	// TermaCommitFileCountKey is terma.commit.file.count: How many files the commit changed.
 	TermaCommitFileCountKey = "terma.commit.file.count"
 	// TermaCommitFileStatsKey is terma.commit.file.stats: The commit's changes per file, at most 50 of them.
