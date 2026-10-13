@@ -91,8 +91,10 @@ Every command is safe to run again.`,
 		app.newUpdateCommand(),
 		app.newTeardownCommand(),
 		// Hidden. Other programs run these: agents and git run hook, the relay service runs
-		// relay, hooks run spool, the Homebrew cask runs completion and install.sh version.
+		// relay, hooks run spool, the Homebrew cask runs completion and install.sh version,
+		// and the shell functions setup writes run launch.
 		app.newHookCommand(),
+		app.newLaunchCommand(),
 		app.newRelayCommand(),
 		app.newSpoolCommand(),
 		app.newVersionCommand(),
@@ -143,7 +145,7 @@ func (app *App) automaticUpdatesAllowed(cmd *cobra.Command, interactive bool) bo
 	for c := cmd; c != nil; c = c.Parent() {
 		switch c.Name() {
 		// nate removes the updater's state and the executable; its post-run must not recreate them.
-		case "hook", "spool", "update", "version", "completion", "__complete", "__completeNoDesc", "nate":
+		case "hook", "launch", "spool", "update", "version", "completion", "__complete", "__completeNoDesc", "nate":
 			return false
 		}
 	}
@@ -220,8 +222,13 @@ func (app *App) Execute() int {
 		if quietCommand(os.Args[1:]) {
 			return 0
 		}
-		fmt.Fprintf(style.Highlight(os.Stderr), "%s %v\n", style.For(os.Stderr).Fail("Error:"), err)
-		return 1
+		// The developer typed their agent's command, not terma's: it starts all the same,
+		// with nothing of terma's in its environment.
+		if !launchCommand(os.Args[1:]) {
+			fmt.Fprintf(style.Highlight(os.Stderr), "%s %v\n", style.For(os.Stderr).Fail("Error:"), err)
+			return 1
+		}
+		dir, stateDir = "", ""
 	}
 	app.configure(dir, stateDir)
 
