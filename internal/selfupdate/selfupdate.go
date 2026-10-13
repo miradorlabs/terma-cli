@@ -64,7 +64,13 @@ type Asset struct {
 	Name string `json:"name"`
 	URL  string `json:"browser_download_url"`
 	Size int64  `json:"size"`
+	// State is "uploaded" once GitHub holds the whole file, "open" while it is still being
+	// sent; "" in a payload that does not say.
+	State string `json:"state,omitempty"`
 }
+
+// uploaded reports whether the whole file is on the release, to download.
+func (a Asset) uploaded() bool { return a.State == "" || a.State == "uploaded" }
 
 // Version is Release's version without the leading "v".
 func (r Release) Version() string { return strings.TrimPrefix(r.TagName, "v") }
@@ -76,10 +82,13 @@ type Client struct {
 	Version string // the running version, for User-Agent
 	// ReleaseKeys, set, replace the keys built into this terma (tests); nil means those.
 	ReleaseKeys []ed25519.PublicKey
-	// Binary is the executable as this process started from it. A process whose executable
-	// another install has since replaced is no longer the version installed (Replaced), and
-	// Auto replaces nothing for it; nor for a process that does not know what it started from.
+	// Binary is the executable as this process started from it, or as it has installed it
+	// since (Apply). A process whose executable another install has since replaced is no
+	// longer the version installed (Replaced), and Auto replaces nothing for it; nor for a
+	// process that does not know what it started from.
 	Binary os.FileInfo
+	// installed is the release Apply last put in place of Binary, "" before any (current).
+	installed string
 }
 
 // httpClient is the configured client, or one with a timeout, with redirects held to checkDownloadOrigin.
@@ -161,27 +170,31 @@ func AssetName(goos, goarch string) string {
 	return BinaryName + "_" + strings.ToUpper(goos[:1]) + goos[1:] + "_" + arch + ext
 }
 
-// PickAsset finds the archive, the checksums file and its signature for this platform.
+// PickAsset finds the archive, the checksums file and its signature for this platform, each
+// wholly uploaded. A release without one of them is not ready (ErrNotReady).
 func PickAsset(rel *Release, goos, goarch string) (archive, checksums, signature *Asset, err error) {
 	want := AssetName(goos, goarch)
 	for i := range rel.Assets {
+		if !rel.Assets[i].uploaded() {
+			continue
+		}
 		switch rel.Assets[i].Name {
 		case want:
 			archive = &rel.Assets[i]
-		case "checksums.txt":
+		case checksumsName:
 			checksums = &rel.Assets[i]
 		case SignatureName:
 			signature = &rel.Assets[i]
 		}
 	}
 	if archive == nil {
-		return nil, nil, nil, fmt.Errorf("release %s has no asset for %s/%s (%s)", rel.TagName, goos, goarch, want)
+		return nil, nil, nil, fmt.Errorf("release %s has no asset for %s/%s (%s): %w", rel.TagName, goos, goarch, want, ErrNotReady)
 	}
 	if checksums == nil {
-		return nil, nil, nil, fmt.Errorf("release %s has no checksums.txt", rel.TagName)
+		return nil, nil, nil, fmt.Errorf("release %s has no %s: %w", rel.TagName, checksumsName, ErrNotReady)
 	}
 	if signature == nil {
-		return nil, nil, nil, fmt.Errorf("release %s has no %s: %w", rel.TagName, SignatureName, ErrUnsigned)
+		return nil, nil, nil, fmt.Errorf("release %s has no %s: %w (%w)", rel.TagName, SignatureName, ErrUnsigned, ErrNotReady)
 	}
 	return archive, checksums, signature, nil
 }
@@ -205,7 +218,8 @@ func ParseChecksums(r io.Reader) map[string]string {
 }
 
 // Apply downloads the archive, verifies it against checksums, which a pinned release key
-// must have signed, and swaps the binary at exePath. Returns the installed version.
+// must have signed, and swaps the binary at exePath. Returns the installed version, which
+// this process goes on as (adopt).
 func (c *Client) Apply(ctx context.Context, rel *Release, exePath string, out io.Writer) (string, error) {
 	archive, sums, signature, err := PickAsset(rel, runtime.GOOS, runtime.GOARCH)
 	if err != nil {
@@ -249,6 +263,7 @@ func (c *Client) Apply(ctx context.Context, rel *Release, exePath string, out io
 	if err := replaceExecutable(exePath, binary); err != nil {
 		return "", err
 	}
+	c.adopt(rel.Version(), exePath)
 	return rel.Version(), nil
 }
 

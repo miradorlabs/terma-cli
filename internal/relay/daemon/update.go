@@ -8,7 +8,8 @@ import (
 
 // UpdateEvery is how often the relay asks for an update, jittered to every 5 to 10 minutes,
 // each ask a fresh look (selfupdate.Client.Auto): a patch release, which installs without a
-// soak, reaches a running relay within 10 minutes of publishing.
+// soak, reaches a running relay within 10 minutes of its build finishing, also while the
+// relay still waits to restart on a release it installed before.
 const UpdateEvery = 5 * time.Minute
 
 // updateQuiet is how long the relay must have had no export before it restarts on the
@@ -37,8 +38,10 @@ type Updater struct {
 	Jitter func(time.Duration) time.Duration
 }
 
-// Run asks for an update after a jittered wait and then every Every, until ctx ends or a
-// release is installed, which it sends on installed. Every must be positive: asking without
+// Run asks for an update after a jittered wait and then every Every, until ctx ends, sending
+// each release it installs on installed. It goes on asking after an install: the relay may
+// wait hours for its agents to pause before it restarts, and a release published meanwhile
+// would otherwise reach the machine only once it had. Every must be positive: asking without
 // pause would only hammer the release lookup, so an updater without one asks nothing.
 func (u Updater) Run(ctx context.Context, installed chan<- string) {
 	if u.Every <= 0 {
@@ -63,12 +66,18 @@ func (u Updater) Run(ctx context.Context, installed chan<- string) {
 		}
 		version, err := u.Update(ctx)
 		switch {
+		case err != nil && ctx.Err() != nil:
+			// Cut short by the relay stopping, which is no failure to report.
+			return
 		case err != nil:
 			logf("automatic update failed: %v", err)
 		case version != "":
 			logf("installed terma %s; restarting on it once no agent is exporting", version)
-			installed <- version
-			return
+			select {
+			case installed <- version:
+			case <-ctx.Done():
+				return
+			}
 		}
 		wait = u.Every + jitter(u.Every)
 	}

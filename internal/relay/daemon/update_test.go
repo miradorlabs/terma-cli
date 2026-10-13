@@ -26,20 +26,44 @@ func now(waits *[]time.Duration) func(time.Duration) <-chan time.Time {
 	}
 }
 
-// The updater asks after a jittered wait, again every Every plus jitter after a failure or
-// nothing new, and stops once it has installed a release, saying which.
-func TestTheUpdaterAsksUntilItInstallsARelease(t *testing.T) {
+// once fires at once the first time it is asked to wait and never again: an updater's clock
+// whose second ask is still to come.
+func once() func(time.Duration) <-chan time.Time {
+	asked := false
+	return func(time.Duration) <-chan time.Time {
+		if asked {
+			return nil
+		}
+		asked = true
+		c := make(chan time.Time, 1)
+		c <- time.Now()
+		return c
+	}
+}
+
+// The updater asks after a jittered wait and again every Every plus jitter, whatever the
+// answer was: a failure, nothing new, or a release it installed, each of which it sends. A
+// release published while the relay waits to restart on the last is so installed too.
+func TestTheUpdaterGoesOnAskingAfterItInstallsARelease(t *testing.T) {
 	t.Parallel()
+	ctx, stop := context.WithCancel(t.Context())
+	defer stop()
 	var waits []time.Duration
 	var logged []string
 	answers := []struct {
 		version string
 		err     error
-	}{{"", errors.New("offline")}, {"", nil}, {"1.3.0", nil}}
+	}{{"", errors.New("offline")}, {"", nil}, {"1.3.0", nil}, {"", nil}, {"1.3.1", nil}}
 	calls := 0
 	u := Updater{
-		Every:  time.Hour,
-		After:  now(&waits),
+		Every: time.Hour,
+		After: func(d time.Duration) <-chan time.Time {
+			if calls == len(answers) {
+				stop() // the relay stops before the next ask
+				return nil
+			}
+			return now(&waits)(d)
+		},
 		Jitter: func(d time.Duration) time.Duration { return d / 4 },
 		Logf:   func(format string, args ...any) { logged = append(logged, fmt.Sprintf(format, args...)) },
 		Update: func(context.Context) (string, error) {
@@ -48,16 +72,59 @@ func TestTheUpdaterAsksUntilItInstallsARelease(t *testing.T) {
 			return a.version, a.err
 		},
 	}
-	installed := make(chan string, 1)
-	u.Run(t.Context(), installed)
-	if got := <-installed; got != "1.3.0" || calls != 3 {
-		t.Fatalf("installed %q after %d attempts, want 1.3.0 after 3", got, calls)
+	installed := make(chan string, len(answers))
+	u.Run(ctx, installed)
+	close(installed)
+	var got []string
+	for version := range installed {
+		got = append(got, version)
 	}
-	if want := []time.Duration{15 * time.Minute, 75 * time.Minute, 75 * time.Minute}; !slices.Equal(waits, want) {
+	if !slices.Equal(got, []string{"1.3.0", "1.3.1"}) || calls != 5 {
+		t.Fatalf("installed %q after %d attempts, want 1.3.0 then 1.3.1 after 5", got, calls)
+	}
+	if want := []time.Duration{15 * time.Minute, 75 * time.Minute, 75 * time.Minute, 75 * time.Minute, 75 * time.Minute}; !slices.Equal(waits, want) {
 		t.Fatalf("waited %v, want %v", waits, want)
 	}
-	if len(logged) != 2 || logged[0] != "automatic update failed: offline" {
+	if len(logged) != 3 || logged[0] != "automatic update failed: offline" {
 		t.Fatalf("logged %q", logged)
+	}
+}
+
+// An updater whose relay stops while nothing takes the release it installed ends with the
+// relay, rather than keeping it from stopping.
+func TestTheUpdaterNeverOutlivesTheRelayToSayWhatItInstalled(t *testing.T) {
+	t.Parallel()
+	ctx, stop := context.WithCancel(t.Context())
+	defer stop()
+	u := Updater{Every: time.Hour, After: once(), Jitter: func(time.Duration) time.Duration { return 0 },
+		Update: func(context.Context) (string, error) {
+			stop()
+			return "1.3.0", nil
+		}}
+	done := make(chan struct{})
+	go func() { u.Run(ctx, make(chan string)); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the updater still waits to send an install nothing will take")
+	}
+}
+
+// A pass the relay cut short by stopping is no failed update to report in its log.
+func TestAPassCutShortByTheRelayStoppingIsNoFailure(t *testing.T) {
+	t.Parallel()
+	ctx, stop := context.WithCancel(t.Context())
+	defer stop()
+	var logged []string
+	u := Updater{Every: time.Hour, After: once(), Jitter: func(time.Duration) time.Duration { return 0 },
+		Logf: func(format string, args ...any) { logged = append(logged, fmt.Sprintf(format, args...)) },
+		Update: func(ctx context.Context) (string, error) {
+			stop()
+			return "", ctx.Err()
+		}}
+	u.Run(ctx, make(chan string, 1))
+	if len(logged) != 0 {
+		t.Fatalf("logged %q for a pass the relay cut short", logged)
 	}
 }
 
@@ -83,10 +150,10 @@ func TestAnUpdaterWithoutAPeriodAsksNothing(t *testing.T) {
 	u.Run(t.Context(), make(chan string, 1))
 }
 
-// installsAtOnce is an updater that installs 1.3.0 on its first attempt.
+// installsAtOnce is an updater that installs 1.3.0 on its first attempt; its next is an
+// hour away.
 func installsAtOnce() *Updater {
-	var waits []time.Duration
-	return &Updater{Every: time.Hour, After: now(&waits), Jitter: func(time.Duration) time.Duration { return 0 },
+	return &Updater{Every: time.Hour, After: once(), Jitter: func(time.Duration) time.Duration { return 0 },
 		Update: func(context.Context) (string, error) { return "1.3.0", nil }}
 }
 
@@ -165,8 +232,7 @@ func TestAnUpdatedRelayRestartsWhileARouteKeepsFailing(t *testing.T) {
 		return relay.Policy{Endpoint: upstream.URL, Key: "revoked"}, nil
 	}
 	install := make(chan struct{})
-	var waits []time.Duration
-	c.Updater = &Updater{Every: time.Hour, After: now(&waits), Jitter: func(time.Duration) time.Duration { return 0 },
+	c.Updater = &Updater{Every: time.Hour, After: once(), Jitter: func(time.Duration) time.Duration { return 0 },
 		Update: func(ctx context.Context) (string, error) {
 			select {
 			case <-install:
@@ -225,5 +291,31 @@ func TestAnUpdatedRelayNeverDropsWhatItHoldsAfterThePauseWait(t *testing.T) {
 	}
 	if got := counters(t, filepath.Join(dir, StatsFile))["dropped.no_session_trace_at_exit.traces"]; got != 0 {
 		t.Fatalf("the restart dropped %d held spans", got)
+	}
+}
+
+// A relay that installs another release while it still waits for its agents to pause waits
+// no longer for it: updatePauseWait runs from the first release it installed.
+func TestALaterInstallDoesNotStartTheWaitForAPauseAgain(t *testing.T) {
+	was := updatePauseWait
+	updatePauseWait = 2 * time.Second
+	t.Cleanup(func() { updatePauseWait = was })
+	stateDir, _, _ := setUpRelay(t)
+	c := runConfig(stateDir, 0, nil)
+	c.Version, c.Service = "1.2.0", true
+	// A release every 200ms, ten in the wait: were each to start it again, it would never
+	// end. The relay started moments ago, so nothing has paused for updateQuiet yet.
+	var installs atomic.Int64
+	c.Updater = &Updater{Every: 200 * time.Millisecond, Jitter: func(time.Duration) time.Duration { return 0 },
+		Update: func(context.Context) (string, error) { return fmt.Sprintf("1.3.%d", installs.Add(1)), nil }}
+	r := startRun(t, c)
+	r.await(t, "the relay")
+	select {
+	case <-r.done:
+	case <-time.After(15 * time.Second):
+		t.Fatalf("after %d installs the relay still waits for a pause", installs.Load())
+	}
+	if !r.res.Updated || installs.Load() < 2 {
+		t.Fatalf("Run = %+v after %d installs, want Updated after several", r.res, installs.Load())
 	}
 }

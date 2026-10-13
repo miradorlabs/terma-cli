@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
@@ -270,6 +272,79 @@ func TestUpdateRefusesOnceAnotherInstallReplacedTerma(t *testing.T) {
 	}
 	if got, _ := os.ReadFile(exe); string(got) != "1.0.1" {
 		t.Fatalf("the installed binary is now %q", got)
+	}
+}
+
+// `terma update` on a release GitHub already names the latest, but whose build has not
+// uploaded its files yet, says the release is still being built, and leaves the binary alone;
+// so does --check, rather than call it available. Both record it as unbuilt, as the
+// background look does, so no later command announces it.
+func TestUpdateSaysWhenTheLatestReleaseIsStillBeingBuilt(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("in-place updates are Unix-only")
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprint(w, `{"tag_name":"v1.0.1","assets":[]}`)
+	}))
+	defer srv.Close()
+	exe := filepath.Join(t.TempDir(), "terma")
+	if err := os.WriteFile(exe, []byte("1.0.0"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	c := &selfupdate.Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0"}
+	var out bytes.Buffer
+	stateDir := t.TempDir()
+	if _, err := testApp.runUpdate(context.Background(), c, stateDir, exe, &out, true, false); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "still being built") || strings.Contains(out.String(), "available") {
+		t.Fatalf("--check said %q of a release with no files yet", &out)
+	}
+	if cache := selfupdate.LoadCache(stateDir); !cache.Unbuilt || cache.Latest != "1.0.1" {
+		t.Fatalf("--check recorded %+v, want 1.0.1 unbuilt", cache)
+	}
+	installed, err := testApp.runUpdate(context.Background(), c, stateDir, exe, &out, false, false)
+	if !errors.Is(err, selfupdate.ErrNotReady) || !strings.Contains(err.Error(), "still being built") || installed {
+		t.Fatalf("runUpdate = %v, %v; want the release named as still being built", installed, err)
+	}
+	if !selfupdate.LoadCache(stateDir).Unbuilt {
+		t.Fatal("update recorded a release with no files as built")
+	}
+	// A package manager is not asked for it either: its package comes from the same build.
+	managed := filepath.Join(t.TempDir(), "Cellar", "terma", "1.0.0", "bin", "terma")
+	if err := os.MkdirAll(filepath.Dir(managed), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(managed, []byte("1.0.0"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if installed, err := testApp.runUpdate(context.Background(), c, stateDir, managed, &out, false, false); !errors.Is(err, selfupdate.ErrNotReady) || installed {
+		t.Fatalf("runUpdate of a Homebrew terma = %v, %v; want the release named as still being built", installed, err)
+	}
+	if got, _ := os.ReadFile(exe); string(got) != "1.0.0" {
+		t.Fatalf("the installed binary is now %q", got)
+	}
+}
+
+// `terma update` and --check keep the record of the last install tried when they record
+// their own look: a release the background update holds back after a failed install is not
+// tried again at its next pass because a developer checked meanwhile.
+func TestUpdateKeepsTheLastInstallTried(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprint(w, `{"tag_name":"v1.0.1","assets":[]}`)
+	}))
+	defer srv.Close()
+	stateDir := t.TempDir()
+	tried := time.Now().Add(-time.Hour).Round(time.Second)
+	selfupdate.SaveCache(stateDir, selfupdate.Cache{CheckedAt: tried, Current: "1.0.0", Latest: "1.0.1", AttemptAt: tried, Attempted: "1.0.1", AttemptedBy: "1.0.0"})
+	c := &selfupdate.Client{BaseURL: srv.URL, HTTP: srv.Client(), Version: "1.0.0"}
+	var out bytes.Buffer
+	if _, err := testApp.runUpdate(context.Background(), c, stateDir, "unused", &out, true, false); err != nil {
+		t.Fatal(err)
+	}
+	cache := selfupdate.LoadCache(stateDir)
+	if cache.Attempted != "1.0.1" || cache.AttemptedBy != "1.0.0" || !cache.AttemptAt.Equal(tried) || !cache.CheckedAt.After(tried) {
+		t.Fatalf("--check recorded %+v, want its own look and the install tried an hour ago kept", cache)
 	}
 }
 

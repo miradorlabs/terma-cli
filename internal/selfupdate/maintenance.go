@@ -52,10 +52,46 @@ type Cache struct {
 	Latest   string `json:"latest"`
 	// Published is when Latest was published, for its soak; zero in a check recorded before.
 	Published time.Time `json:"published,omitzero"`
+	// Unbuilt means Latest was last seen without its files (ErrNotReady): each look asks
+	// after them again, and until they are there it is neither installed nor announced.
+	Unbuilt   bool      `json:"unbuilt,omitempty"`
 	Current   string    `json:"current,omitempty"`
 	AttemptAt time.Time `json:"attempt_at"`
 	// Attempted is the release AttemptAt tried to install: another may be tried at once.
 	Attempted string `json:"attempted,omitempty"`
+	// AttemptedBy is the build that tried it, "" for one from before this was recorded. A
+	// later build is not held back by it (held): the failure may have been the earlier
+	// build's own, such as a release key it lacks or a fault since fixed.
+	AttemptedBy string `json:"attempted_by,omitempty"`
+}
+
+// Found records rel as the latest release, with whether its files are there yet (Unbuilt):
+// every look that fetches a release records it so, `terma update`'s as much as the relay's.
+func (c *Cache) Found(rel *Release) {
+	_, _, _, err := PickAsset(rel, runtime.GOOS, runtime.GOARCH)
+	c.Latest, c.Published, c.Unbuilt = rel.Version(), rel.PublishedAt, errors.Is(err, ErrNotReady)
+}
+
+// attempt is the record of the last install tried alone, which outlives what a look found.
+func (c Cache) attempt() Cache {
+	return Cache{AttemptAt: c.AttemptAt, Attempted: c.Attempted, AttemptedBy: c.AttemptedBy}
+}
+
+// Checked records in dir a look that `terma update` made for itself, which found rel for a
+// terma at current, and returns the record. It keeps the last install tried, as every look
+// does: a release held back after a failed install stays so.
+func Checked(dir, current string, rel *Release) Cache {
+	cache := LoadCache(dir).attempt()
+	cache.CheckedAt, cache.Current = time.Now(), current
+	cache.Found(rel)
+	SaveCache(dir, cache)
+	return cache
+}
+
+// held reports whether latest is a release whose install failed less than AttemptInterval
+// ago, tried by this build (running) or a later one, so that it is not tried again yet.
+func (c Cache) held(running string) bool {
+	return c.Attempted == c.Latest && time.Since(c.AttemptAt) < AttemptInterval && !Newer(c.AttemptedBy, running)
 }
 
 // maxRetryWait caps retryAfter: the window GitHub's rate limit resets in, so a machine back
@@ -149,20 +185,10 @@ func (c *Client) web() string {
 // included, which machines sharing an address and checking every few minutes would spend;
 // the page is not held to that published limit, so the frequent check asks it first.
 func (c *Client) latestTag(ctx context.Context) (string, error) {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodHead, c.web()+"/"+Repo+"/releases/latest", nil)
+	resp, err := c.head(ctx, "/releases/latest")
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("User-Agent", userAgentPrefix+c.Version)
-	client := c.httpClient()
-	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	_ = resp.Body.Close()
 	if resp.StatusCode >= http.StatusBadRequest {
 		return "", fmt.Errorf("github latest release page: HTTP %d", resp.StatusCode)
 	}
@@ -173,49 +199,78 @@ func (c *Client) latestTag(ctx context.Context) (string, error) {
 	return strings.TrimPrefix(tag, "v"), nil
 }
 
-// cachedCheck looks the latest release up once every has passed since the last look (after
+// cachedCheck looks for the latest release once every has passed since the last look (after
 // failed looks, retryAfter), returning the record and the release when this call fetched it.
-// A look whose last answer is complete probes the latest tag first and fetches the release
-// only when the tag moved; a probe that fails is a failed look, which backs off rather than
-// sending every machine behind a throttled address on to the rate-limited API.
 func (c *Client) cachedCheck(ctx context.Context, dir, current string, every time.Duration) (Cache, *Release) {
 	cache := LoadCache(dir)
 	var release *Release
 	if cache.Current != "" && cache.Current != current {
-		cache = Cache{AttemptAt: cache.AttemptAt, Attempted: cache.Attempted}
+		cache = cache.attempt()
 	}
 	interval := every
 	if cache.Failed {
 		interval = retryAfter(cache.Failures)
 	}
 	if time.Since(cache.CheckedAt) >= interval || cache.CheckedAt.After(time.Now()) {
+		before := cache
 		var err error
-		if !cache.Failed && cache.Latest != "" && !cache.Published.IsZero() {
-			var tag string
-			if tag, err = c.latestTag(ctx); err == nil && tag == cache.Latest {
-				cache.CheckedAt, cache.Current = time.Now(), current
-				SaveCache(dir, cache)
-				return cache, nil
-			}
-		}
-		if err == nil {
-			checkCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
-			release, err = c.Latest(checkCtx)
-			cancel()
+		release, err = c.look(ctx, &cache)
+		// A look its process was stopped during is no look, failed or otherwise.
+		if err != nil && ctx.Err() != nil {
+			return before, nil
 		}
 		cache.CheckedAt, cache.Current, cache.Failed = time.Now(), current, err != nil
 		if err != nil {
 			cache.Failures++
 		} else {
-			cache.Latest, cache.Published, cache.Failures = release.Version(), release.PublishedAt, 0
+			cache.Failures = 0
 		}
 		SaveCache(dir, cache)
 	}
 	return cache, release
 }
 
+// look asks what the latest release is and records the answer in cache, returning the
+// release when it had to be fetched from the API. A look whose last answer is complete asks
+// the release page for the latest tag first, and of a tag that moved, or whose release had no
+// files yet, whether its files are there (built): it fetches the release only once they are,
+// so a release costs a machine one lookup however long its build waits. A page that refuses
+// is a failed look, which backs off rather than sending every machine behind a throttled
+// address on to the rate-limited API.
+func (c *Client) look(ctx context.Context, cache *Cache) (*Release, error) {
+	if !cache.Failed && cache.Latest != "" && (!cache.Published.IsZero() || cache.Unbuilt) {
+		tag, err := c.latestTag(ctx)
+		if err != nil || tag == cache.Latest && !cache.Unbuilt {
+			return nil, err
+		}
+		if tag != "" {
+			ready, err := c.built(ctx, tag)
+			if err != nil {
+				return nil, err
+			}
+			if !ready {
+				if tag != cache.Latest {
+					cache.Latest, cache.Published = tag, time.Time{}
+				}
+				cache.Unbuilt = true
+				return nil, nil
+			}
+		}
+	}
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	release, err := c.Latest(ctx)
+	if err != nil {
+		return nil, err
+	}
+	cache.Found(release)
+	return release, nil
+}
+
+// notice names a newer release for the developer to install with `terma update`: not one
+// without its files yet, which that could not install either.
 func notice(cache Cache, current string) string {
-	if !Newer(current, cache.Latest) {
+	if cache.Unbuilt || !Newer(current, cache.Latest) {
 		return ""
 	}
 	return fmt.Sprintf("A newer terma is available (%s → %s). Run `terma update`.", current, cache.Latest)
@@ -228,15 +283,36 @@ func UpdatesItself(exe string) bool {
 }
 
 // Replaced reports whether the executable at exe is no longer the one this process started
-// from (Binary): another install has put a release in place since, so this process's version
-// no longer says what is installed, and it must not replace it. False without Binary, which
-// cannot tell.
+// from or installed (Binary): another install has put a release in place since, so this
+// process's version no longer says what is installed, and it must not replace it. False
+// without Binary, which cannot tell. The file's size and time are compared too: a file this
+// process installed is not held open as the one it started from is, so once another install
+// replaces it, a later file may be given its inode.
 func (c *Client) Replaced(exe string) bool {
 	if c.Binary == nil {
 		return false
 	}
 	now, err := os.Stat(exe)
-	return err != nil || !os.SameFile(now, c.Binary)
+	return err != nil || !os.SameFile(now, c.Binary) || now.Size() != c.Binary.Size() || !now.ModTime().Equal(c.Binary.ModTime())
+}
+
+// current is the release installed where this process started: its own, or the one it has
+// installed in its place since. A process that keeps running after it installed a release,
+// as the relay does until its agents pause, compares the next release to that one.
+func (c *Client) current() string {
+	if c.installed != "" {
+		return c.installed
+	}
+	return c.Version
+}
+
+// adopt has this process go on as version, which it just installed at exe: what is
+// installed is no longer what it started from but is its own doing, so the next release is
+// installed over it rather than refused as another install's (Replaced).
+func (c *Client) adopt(version, exe string) {
+	if info, err := os.Stat(exe); err == nil {
+		c.installed, c.Binary = version, info
+	}
 }
 
 // Outcome is what one automatic update pass did.
@@ -260,14 +336,18 @@ type Outcome struct {
 // off in configDir; the check's records go in stateDir. A new minor or major version waits
 // out SoakTime first, and is looked up again before it is installed, so a release pulled
 // since the check is not. Each release is attempted once per AttemptInterval at most, so a
-// failing install is not retried at every pass. progress, when set, is told of the download.
+// failing install is not retried at every pass; a release still being built and signed
+// (ErrNotReady) is no attempt, and each look asks after its files again (look). A process
+// that installed a release goes on as it (current), so its later passes install the releases
+// after it. progress, when set, is told of the download.
 func (c *Client) Auto(ctx context.Context, configDir, stateDir, exe string, progress io.Writer) Outcome {
 	return c.auto(ctx, 0, configDir, stateDir, exe, progress)
 }
 
 // auto is Auto with every as the least time between looks.
 func (c *Client) auto(ctx context.Context, every time.Duration, configDir, stateDir, exe string, progress io.Writer) Outcome {
-	if !IsRelease(c.Version) {
+	current := c.current()
+	if !IsRelease(current) {
 		return Outcome{}
 	}
 	p, err := LoadPreferences(configDir)
@@ -284,43 +364,53 @@ func (c *Client) auto(ctx context.Context, every time.Duration, configDir, state
 	if c.Replaced(exe) {
 		return Outcome{Replaced: true}
 	}
-	cache, rel := c.cachedCheck(ctx, stateDir, c.Version, every)
-	attempted := cache.Attempted == cache.Latest && time.Since(cache.AttemptAt) < AttemptInterval
-	if !p.Auto || c.Binary == nil || !Newer(c.Version, cache.Latest) || !UpdatesItself(exe) || attempted ||
-		Soaking(c.Version, cache.Latest, cache.Published, time.Now()) {
-		return Outcome{Notice: notice(cache, c.Version)}
+	cache, rel := c.cachedCheck(ctx, stateDir, current, every)
+	if !p.Auto || c.Binary == nil || cache.Unbuilt || !Newer(current, cache.Latest) || !UpdatesItself(exe) || cache.held(c.Version) ||
+		Soaking(current, cache.Latest, cache.Published, time.Now()) {
+		return Outcome{Notice: notice(cache, current)}
 	}
 	updateCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	if rel == nil {
 		// A check that failed waits out its backoff before any lookup, this one included.
 		if cache.Failed {
-			return Outcome{Notice: notice(cache, c.Version)}
+			return Outcome{Notice: notice(cache, current)}
 		}
 		if rel, err = c.Latest(updateCtx); err != nil {
-			// A failed lookup, retried as a failed check is, not held back a day as an install.
-			cache.CheckedAt, cache.Failed, cache.Failures = time.Now(), true, cache.Failures+1
-			SaveCache(stateDir, cache)
+			// A failed lookup, retried as a failed check is, not held back a day as an install;
+			// one its process was stopped during is neither.
+			if ctx.Err() == nil {
+				cache.CheckedAt, cache.Failed, cache.Failures = time.Now(), true, cache.Failures+1
+				SaveCache(stateDir, cache)
+			}
 			return Outcome{Err: err}
 		}
 		// The release may have been pulled, or followed by another, since the check.
-		cache.Latest, cache.Published = rel.Version(), rel.PublishedAt
+		cache.Found(rel)
 	}
-	if !Newer(c.Version, rel.TagName) || Soaking(c.Version, rel.Version(), rel.PublishedAt, time.Now()) {
+	// One that followed may be without its files still, or not be one to install by itself.
+	if cache.Unbuilt || !Newer(current, rel.TagName) || Soaking(current, rel.Version(), rel.PublishedAt, time.Now()) {
 		SaveCache(stateDir, cache)
-		return Outcome{Notice: notice(cache, c.Version)}
+		return Outcome{Notice: notice(cache, current)}
 	}
-	cache.AttemptAt, cache.Attempted = time.Now(), rel.Version()
+	cache.AttemptAt, cache.Attempted, cache.AttemptedBy = time.Now(), rel.Version(), c.Version
 	SaveCache(stateDir, cache)
 	if progress != nil {
-		fmt.Fprintf(progress, "Updating terma %s → %s…\n", c.Version, rel.Version())
+		fmt.Fprintf(progress, "Updating terma %s → %s…\n", current, rel.Version())
 	}
-	if _, err := c.Apply(updateCtx, rel, exe, progress); errors.Is(err, ErrReplaced) {
-		// No attempt was made on the binary now in place: its own process may try at once.
-		cache.AttemptAt, cache.Attempted = time.Time{}, ""
+	_, err = c.Apply(updateCtx, rel, exe, progress)
+	replaced := errors.Is(err, ErrReplaced)
+	if replaced || err != nil && ctx.Err() != nil {
+		// Not the release's failure, so it is not held back: another install's binary is in
+		// place, whose own process may try at once, or this process was stopped during the
+		// install, as a relay is that restarts on the release before.
+		cache.AttemptAt, cache.Attempted, cache.AttemptedBy = time.Time{}, "", ""
 		SaveCache(stateDir, cache)
+	}
+	if replaced {
 		return Outcome{Replaced: true}
-	} else if err != nil {
+	}
+	if err != nil {
 		return Outcome{Err: err}
 	}
 	// Recorded as the new version's check, so its first pass does not look again.

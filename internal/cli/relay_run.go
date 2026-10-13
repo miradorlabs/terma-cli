@@ -115,6 +115,8 @@ func (app *App) relayUpdater() *daemon.Updater {
 		os.Getenv("CI") != "" || os.Getenv("TERMA_NO_UPDATE_CHECK") == "1" {
 		return nil
 	}
+	// One client for the relay's life: it goes on as each release it installs, so the next
+	// is installed over that one (selfupdate.Client.Auto).
 	client := app.updateClient()
 	return &daemon.Updater{Every: daemon.UpdateEvery, Update: func(ctx context.Context) (string, error) {
 		if p, err := selfupdate.LoadPreferences(app.dir); err != nil || !p.Auto {
