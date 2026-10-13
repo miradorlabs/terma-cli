@@ -116,6 +116,29 @@ func TestLauncherLeavesWhatFollowsAnOrphanedMarker(t *testing.T) {
 	if _, _, found := cutLauncher("echo '"+begin+"'\n# <<< terma launch agentx <<< trailing\n", "agentx"); found {
 		t.Fatal("found a block where no line is a marker")
 	}
+
+	// An end marker left above with no begin hides nothing: the block below it is still
+	// the one a second install replaces and a removal takes out.
+	_, end := launcherMarkers("agentx")
+	stray := end + "\nexport B=2\n"
+	if err := os.WriteFile(rc, []byte(stray), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for range 3 {
+		if _, err := InstallLauncher("agentx"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	data, _ = os.ReadFile(rc)
+	if !strings.HasPrefix(string(data), stray) || strings.Count(string(data), "terma launch agentx --") != 1 || !LauncherInstalled("agentx") {
+		t.Fatalf("after three installs below a stray end marker:\n%s", data)
+	}
+	if _, err := RemoveLauncher("agentx"); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(rc); string(data) != stray {
+		t.Fatalf("after removal:\n%q\nwant:\n%q", data, stray)
+	}
 }
 
 // A shell terma writes nothing for, an unusable name and the kill switch are each said, never guessed around.

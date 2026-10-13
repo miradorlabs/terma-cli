@@ -170,39 +170,27 @@ func editLauncher(path, name, block string, install bool) (bool, error) {
 }
 
 // cutLauncher splits text around name's marked block: what precedes its first line and
-// what follows its last. The block is the end marker's line and the nearest begin marker's
-// line above it: a begin marker whose end the developer deleted names nothing, so whatever
-// they wrote below it is never taken for terma's.
+// what follows its last. The block is the first end marker's line that has a begin marker's
+// line above it, with the nearest such line: a marker the developer left without its pair
+// names nothing, so what they wrote around it is never taken for terma's, and a stray one
+// never hides the block.
 func cutLauncher(text, name string) (head, tail string, found bool) {
 	begin, end := launcherMarkers(name)
-	j := lineIndex(text, end, 0)
-	if j < 0 {
-		return text, "", false
-	}
-	i := -1
-	for at := lineIndex(text[:j], begin, 0); at >= 0; at = lineIndex(text[:j], begin, at+1) {
-		i = at
-	}
-	if i < 0 {
-		return text, "", false
-	}
-	return text[:i], strings.TrimPrefix(text[j+len(end):], "\n"), true
-}
-
-// lineIndex is where a line that is exactly marker starts in text, at or after from.
-func lineIndex(text, marker string, from int) int {
-	for from <= len(text) {
-		i := strings.Index(text[from:], marker)
-		if i < 0 {
-			return -1
+	start := -1
+	for at := 0; at < len(text); {
+		line, next := text[at:], len(text)
+		if nl := strings.IndexByte(line, '\n'); nl >= 0 {
+			line, next = line[:nl], at+nl+1
 		}
-		i += from
-		starts := i == 0 || text[i-1] == '\n'
-		ends := i+len(marker) == len(text) || text[i+len(marker)] == '\n'
-		if starts && ends {
-			return i
+		switch line {
+		case begin:
+			start = at
+		case end:
+			if start >= 0 {
+				return text[:start], text[next:], true
+			}
 		}
-		from = i + 1
+		at = next
 	}
-	return -1
+	return text, "", false
 }
