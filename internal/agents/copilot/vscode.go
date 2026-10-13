@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"net"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -28,7 +27,8 @@ import (
 // Copilot Chat's own exporter (github.copilot.chat.otel.*) is left as the developer has
 // it: once it is on, VS Code copies its endpoint into the extension host's environment and
 // into the terminals it opens for Copilot, where every extension's and tool's exporter
-// would read it.
+// would read it. The agent host's settings are not Copilot's alone either: VS Code hands
+// the same exporter to the Claude and Codex agents a developer has it host there.
 const (
 	hostEnabled  = "chat.agentHost.otel.enabled"
 	hostEndpoint = "chat.agentHost.otel.otlpEndpoint"
@@ -46,9 +46,10 @@ var vscodeFlavors = []string{"Code", "Code - Insiders"}
 // copilotStorage is where Copilot keeps its state in a VS Code it has run in.
 const copilotStorage = "github.copilot-chat"
 
-// vscodeUserDirs are the user settings directories of the VS Code builds Copilot has run
-// in here, under VSCODE_APPDATA where the developer moved VS Code's data with it.
-func vscodeUserDirs() []string {
+// vscodeUserDirs are the user settings directories of the VS Code builds here, under
+// VSCODE_APPDATA where the developer moved VS Code's data with it: those Copilot has run
+// in, which setup configures, or with all set every one, which an undo looks through.
+func vscodeUserDirs(all bool) []string {
 	base := os.Getenv("VSCODE_APPDATA")
 	if base == "" {
 		var err error
@@ -59,40 +60,60 @@ func vscodeUserDirs() []string {
 	var dirs []string
 	for _, flavor := range vscodeFlavors {
 		dir := filepath.Join(base, flavor, "User")
-		if info, err := os.Stat(filepath.Join(dir, "globalStorage", copilotStorage)); err == nil && info.IsDir() {
+		probe := filepath.Join(dir, "globalStorage", copilotStorage)
+		if all {
+			probe = dir
+		}
+		if info, err := os.Stat(probe); err == nil && info.IsDir() {
 			dirs = append(dirs, dir)
 		}
 	}
 	return dirs
 }
 
-// shellEndpoints are the variables VS Code's agent host exports to ahead of its settings.
-var shellEndpoints = []string{harness.EnvOTLPEndpoint, "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"}
+// undoPaths are the settings files an undo looks at: every VS Code's here, and any a
+// record says setup wrote, wherever Copilot's storage or VS Code's data has gone since.
+func (a Agent) undoPaths() []string {
+	var paths []string
+	for _, dir := range vscodeUserDirs(true) {
+		paths = append(paths, filepath.Join(dir, "settings.json"))
+	}
+	records, _ := filepath.Glob(filepath.Join(a.ConfigDir, config.SetupDir, name+"-*.json"))
+	for _, record := range records {
+		var j struct {
+			ConfigPath string `json:"config_path"`
+		}
+		if data, err := os.ReadFile(record); err == nil && json.Unmarshal(data, &j) == nil && j.ConfigPath != "" && !slices.Contains(paths, j.ConfigPath) {
+			paths = append(paths, j.ConfigPath)
+		}
+	}
+	return paths
+}
 
-// shellEndpoint names an OTLP endpoint variable exported where terma runs that sends off
-// this machine. VS Code applies its settings only to the variables its own environment
+// shellEndpoints are the variables the Copilot runtime exports to ahead of what VS Code's
+// settings give its agent host.
+var shellEndpoints = []string{harness.EnvOTLPEndpoint, "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "COPILOT_OTEL_ENDPOINT"}
+
+// shellEndpoint names an OTLP endpoint variable exported where terma runs that is not the
+// relay at addr. VS Code applies its settings only to the variables its own environment
 // leaves unset, and takes that environment from the developer's shell: with one set, the
-// agent host would export there, and with terma's settings, its content too. An endpoint
-// on this machine is let be: the relay is one, as another agent's own exporter names it
-// here, and what a collector of the developer's receives stays with them. The value may
-// hold a credential, so only the name is returned.
-func shellEndpoint() (string, bool) {
+// agent host exports there already, and terma's settings would only add what was said to
+// it. A collector on this machine is no exception, since it is there to forward. The
+// relay's own address is: another agent's exporter names it in the environment terma is
+// started from. The value may hold a credential, so only the name is returned.
+func shellEndpoint(addr string) (string, bool) {
 	for _, name := range shellEndpoints {
-		if v := os.Getenv(name); v != "" && !loopbackURL(v) {
+		if v := os.Getenv(name); v != "" && !relayURL(v, addr) {
 			return name, true
 		}
 	}
 	return "", false
 }
 
-// loopbackURL reports whether raw is a URL of this machine's own.
-func loopbackURL(raw string) bool {
+// relayURL reports whether raw is a URL of the relay at addr.
+func relayURL(raw, addr string) bool {
 	u, err := url.Parse(strings.Trim(raw, `"'`))
-	if err != nil {
-		return false
-	}
-	ip := net.ParseIP(u.Hostname())
-	return u.Hostname() == "localhost" || ip != nil && ip.IsLoopback()
+	return err == nil && addr != "" && u.Host == addr
 }
 
 // exporterSettings are the members that send the agent host's exporter to the relay, each
@@ -212,6 +233,7 @@ func (a Agent) disconnectVSCode(path, token string) (changed bool, skipped []str
 			delete(j.Previous, key)
 		}
 	}
+	doc.keepOwnIgnored(j, current)
 	result, remaining := j.Apply(current)
 	for key := range j.Installed {
 		if raw, ok := current[key]; ok {
@@ -256,146 +278,28 @@ func vscodePointed(path, addr string) bool {
 	return enabled == "true" && strings.HasPrefix(endpoint, "http://"+addr+"/")
 }
 
-// settingsDoc is a VS Code settings file as its syntax tree: packed again, whatever was
-// not changed is byte for byte what was read.
-type settingsDoc struct {
-	root hujson.Value
-	obj  *hujson.Object
-	// added counts the members set has put first, so later ones follow them in order.
-	added int
-}
-
-func parseSettings(data []byte) (*settingsDoc, error) {
-	if len(bytes.TrimSpace(data)) == 0 {
-		data = []byte("{}\n")
-	}
-	root, err := hujson.Parse(data)
-	if err != nil {
-		return nil, err
-	}
-	obj, ok := root.Value.(*hujson.Object)
-	if !ok {
-		return nil, errors.New("expected a JSON object")
-	}
-	return &settingsDoc{root: root, obj: obj}, nil
-}
-
-func (d *settingsDoc) pack() []byte { return d.root.Pack() }
-
-// find is the member VS Code reads for key: the last of that name.
-func (d *settingsDoc) find(key string) int {
-	for i := len(d.obj.Members) - 1; i >= 0; i-- {
-		if lit, ok := d.obj.Members[i].Name.Value.(hujson.Literal); ok && lit.String() == key {
-			return i
-		}
-	}
-	return -1
-}
-
-// raw is key's value as written, without the comments and space around it.
-func (d *settingsDoc) raw(key string) (string, bool) {
-	i := d.find(key)
-	if i < 0 {
-		return "", false
-	}
-	return string(hujson.Value{Value: d.obj.Members[i].Value.Value}.Pack()), true
-}
-
-// text is key's value when it is a string.
-func (d *settingsDoc) text(key string) (string, bool) {
-	i := d.find(key)
-	if i < 0 {
-		return "", false
-	}
-	lit, ok := d.obj.Members[i].Value.Value.(hujson.Literal)
-	if !ok || lit.Kind() != '"' {
-		return "", false
-	}
-	return lit.String(), true
-}
-
-// set gives key the raw JSON value, in place where the file has the member, else as a new
-// member at the top: there a comma always follows it, whatever comments end the file.
-func (d *settingsDoc) set(key, raw string) error {
-	value, err := hujson.Parse([]byte(raw))
-	if err != nil {
-		return fmt.Errorf("%s: %w", key, err)
-	}
-	if i := d.find(key); i >= 0 {
-		d.obj.Members[i].Value.Value = value.Value
-		return nil
-	}
-	indent := "    "
-	if len(d.obj.Members) > 0 {
-		before := string(d.obj.Members[0].Name.BeforeExtra)
-		if i := strings.LastIndexByte(before, '\n'); i >= 0 && strings.Trim(before[i+1:], " \t") == "" && before[i+1:] != "" {
-			indent = before[i+1:]
-		}
-	} else if !bytes.Contains(d.obj.AfterExtra, []byte("\n")) {
-		d.obj.AfterExtra = hujson.Extra("\n")
-	}
-	member := hujson.ObjectMember{
-		Name:  hujson.Value{BeforeExtra: hujson.Extra("\n" + indent), Value: hujson.String(key)},
-		Value: hujson.Value{BeforeExtra: hujson.Extra(" "), Value: value.Value},
-	}
-	d.obj.Members = slices.Insert(d.obj.Members, d.added, member)
-	d.added++
-	return nil
-}
-
-// remove takes key's member out; a comment written above it stays, above what follows.
-func (d *settingsDoc) remove(key string) {
-	i := d.find(key)
-	if i < 0 {
+// keepOwnIgnored lets an undo take terma's names out of a sync-ignore list the developer
+// has edited since setup: left to the record's rule, an edited list would be skipped whole
+// and keep them. It records the list as it now stands as what setup wrote, and that list
+// without terma's names as what came before.
+func (d *settingsDoc) keepOwnIgnored(j *harness.Journal, current map[string]string) {
+	raw, ok := current[syncIgnored]
+	if !ok || raw == j.Installed[syncIgnored] {
 		return
 	}
-	before := d.obj.Members[i].Name.BeforeExtra
-	if len(bytes.TrimSpace(before)) > 0 {
-		if i+1 < len(d.obj.Members) {
-			next := &d.obj.Members[i+1].Name
-			next.BeforeExtra = append(slices.Clone(before), bytes.TrimLeft(next.BeforeExtra, " \t")...)
-		} else {
-			d.obj.AfterExtra = append(slices.Clone(before), bytes.TrimLeft(d.obj.AfterExtra, " \t")...)
-		}
+	list, ok := d.ignored()
+	if !ok {
+		return
 	}
-	d.obj.Members = slices.Delete(d.obj.Members, i, i+1)
-	// An object left with nothing in it closes on the line it opens on.
-	if len(d.obj.Members) == 0 && len(bytes.TrimSpace(d.obj.AfterExtra)) == 0 {
-		d.obj.AfterExtra = nil
+	j.Installed[syncIgnored], j.Previous[syncIgnored] = raw, nil
+	if rest := withoutKeys(list, exporterKeys); len(rest) == len(list) {
+		// None of terma's names are in it any more: it is the developer's as it stands.
+		delete(j.Installed, syncIgnored)
+		delete(j.Previous, syncIgnored)
+	} else if len(rest) > 0 {
+		prior := rawList(rest)
+		j.Previous[syncIgnored] = &prior
 	}
-}
-
-// ignored is the file's sync-ignore list; false when it is not a list of names.
-func (d *settingsDoc) ignored() ([]string, bool) {
-	var list []string
-	if raw, ok := d.raw(syncIgnored); ok {
-		plain, err := hujson.Standardize([]byte(raw))
-		if err != nil || json.Unmarshal(plain, &list) != nil {
-			return nil, false
-		}
-	}
-	return list, true
-}
-
-// withKeys is list with the keys it lacks added; withoutKeys is list with none of them.
-func withKeys(list, keys []string) []string {
-	list = slices.Clone(list)
-	for _, key := range keys {
-		if !slices.Contains(list, key) {
-			list = append(list, key)
-		}
-	}
-	return list
-}
-
-func withoutKeys(list, keys []string) []string {
-	return slices.DeleteFunc(slices.Clone(list), func(k string) bool { return slices.Contains(keys, k) })
-}
-
-// rawList is list as raw JSON.
-func rawList(list []string) string {
-	out, _ := json.Marshal(list)
-	return string(out)
 }
 
 // forgetOwn takes out of existing, what the file held before a setup with no record of an

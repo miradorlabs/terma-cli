@@ -40,12 +40,12 @@ func TestSetupStartsTheCLIThroughTerma(t *testing.T) {
 	if _, err := a.ConfigureRelay(ctx, relay); err != nil || holds() {
 		t.Fatalf("configure without the CLI: %v", err)
 	}
-	if _, _, problem := a.RelayProblem(); problem {
+	if _, _, problem := a.RelayProblem(relayAddr); problem {
 		t.Fatal("a problem with no CLI to start")
 	}
 
 	t.Setenv("PATH", bin)
-	if detail, fix, problem := a.RelayProblem(); !problem || !strings.Contains(detail, "through terma") || fix != "terma setup" {
+	if detail, fix, problem := a.RelayProblem(relayAddr); !problem || !strings.Contains(detail, "through terma") || fix != "terma setup" {
 		t.Fatalf("RelayProblem before setup = %q, %q, %v", detail, fix, problem)
 	}
 	res, err := a.ConfigureRelay(ctx, relay)
@@ -55,7 +55,7 @@ func TestSetupStartsTheCLIThroughTerma(t *testing.T) {
 	if !noted(res, "new terminal") {
 		t.Errorf("notes do not say the function needs a new shell: %q", res.Notes)
 	}
-	if _, _, problem := a.RelayProblem(); problem {
+	if _, _, problem := a.RelayProblem(relayAddr); problem {
 		t.Fatal("a problem after setup")
 	}
 	set, unset := a.LaunchEnv(relay)
@@ -72,10 +72,10 @@ func TestSetupStartsTheCLIThroughTerma(t *testing.T) {
 	}
 
 	t.Setenv("TERMA_SHELL_LAUNCHERS", "0")
-	if _, err := a.ConfigureRelay(ctx, relay); err != nil || holds() {
-		t.Fatalf("configure under the kill switch: %v", err)
+	if res, err := a.ConfigureRelay(ctx, relay); err != nil || holds() || !noted(res, "TERMA_SHELL_LAUNCHERS=0") {
+		t.Fatalf("configure under the kill switch: %+v, %v", res, err)
 	}
-	if detail, _, problem := a.RelayProblem(); !problem || !strings.Contains(detail, "TERMA_SHELL_LAUNCHERS") {
+	if detail, _, problem := a.RelayProblem(relayAddr); !problem || !strings.Contains(detail, "TERMA_SHELL_LAUNCHERS") {
 		t.Fatalf("RelayProblem under the kill switch = %q, %v", detail, problem)
 	}
 
@@ -127,7 +127,7 @@ func TestSetupSaysWhenItCannotStartTheCLI(t *testing.T) {
 	if err != nil || !noted(res, "zsh, bash and fish") {
 		t.Fatalf("configure under an unknown shell: %+v, %v", res, err)
 	}
-	if _, fix, problem := a.RelayProblem(); !problem || !strings.Contains(fix, "zsh, bash or fish") {
+	if _, fix, problem := a.RelayProblem(relayAddr); !problem || !strings.Contains(fix, "zsh, bash or fish") {
 		t.Fatalf("doctor's fix under an unknown shell = %q, %v", fix, problem)
 	}
 }

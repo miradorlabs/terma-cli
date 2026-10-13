@@ -34,10 +34,10 @@ type RelayExporter interface {
 	RelayPointed(addr string) (pointed, known bool)
 }
 
-// RelayChecker is an agent with a condition that keeps its telemetry from the relay
-// after setup.
+// RelayChecker is an agent with a condition that keeps its telemetry from the relay at
+// addr after setup.
 type RelayChecker interface {
-	RelayProblem() (detail, fix string, ok bool)
+	RelayProblem(addr string) (detail, fix string, ok bool)
 }
 
 // Labeled is an agent whose hooks and trailers use a label other than its name.

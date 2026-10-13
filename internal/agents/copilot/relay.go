@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/harness"
@@ -17,26 +18,40 @@ import (
 // host runs, from VS Code's user settings, and the CLI's, which reads only its
 // environment, through a shell function that starts it with `terma launch`. A settings or
 // startup file terma cannot write is said and left: neither stops setup, nor the other.
+// With neither pointed, the result is pending, so setup does not report the agent as exporting.
 func (a Agent) ConfigureRelay(_ context.Context, cfg agents.RelayConfig) (agents.RelayResult, error) {
 	var out agents.RelayResult
 	a.configureVSCode(cfg, &out)
 	configureCLI(&out)
+	if len(out.Paths) == 0 {
+		out.Pending = true
+		if len(out.Notes) == 0 {
+			out.Notes = append(out.Notes, "Found neither the "+command+" command nor a VS Code that Copilot has run in, so there is nothing of Copilot's to point at the relay yet. Run `terma setup` again once one is installed.")
+		}
+	}
 	return out, nil
 }
 
 func (a Agent) configureVSCode(cfg agents.RelayConfig, out *agents.RelayResult) {
-	dirs := vscodeUserDirs()
+	dirs := vscodeUserDirs(false)
 	if len(dirs) == 0 {
 		return
 	}
-	if variable, set := shellEndpoint(); set {
+	if variable, set := shellEndpoint(strings.TrimPrefix(cfg.Endpoint, "http://")); set {
 		// What an earlier setup wrote goes too: its content switch would now serve that endpoint.
-		for _, dir := range dirs {
-			if _, _, err := a.disconnectVSCode(filepath.Join(dir, "settings.json"), cfg.Token); err != nil {
+		took := false
+		for _, path := range a.undoPaths() {
+			changed, _, err := a.disconnectVSCode(path, cfg.Token)
+			if err != nil {
 				out.Notes = append(out.Notes, err.Error())
 			}
+			took = took || changed
 		}
-		out.Notes = append(out.Notes, variable+" is exported in your shell, and VS Code reads it ahead of its settings: Copilot there would export to it, content included, and not to the relay. Terma left VS Code's settings alone; unset it where VS Code starts, then run `terma setup` again.")
+		note := variable + " is exported in your shell, and VS Code reads it ahead of its settings: Copilot there exports to it, not to the relay, and terma's settings would add what was said to that export. Terma wrote none of its settings into VS Code"
+		if took {
+			note += ", and took out the ones an earlier setup wrote; restart VS Code so it stops using them"
+		}
+		out.Notes = append(out.Notes, note+". Unset "+variable+" where VS Code starts, then run `terma setup` again.")
 		return
 	}
 	restart := false
@@ -67,6 +82,7 @@ func configureCLI(out *agents.RelayResult) {
 		if _, err := shellrc.RemoveLauncher(command); err != nil {
 			out.Notes = append(out.Notes, err.Error())
 		}
+		out.Notes = append(out.Notes, "TERMA_SHELL_LAUNCHERS=0 keeps terma's "+command+" function out of your shell: "+quiet+".")
 		return
 	}
 	changed, err := shellrc.InstallLauncher(command)
@@ -86,13 +102,13 @@ func configureCLI(out *agents.RelayResult) {
 	}
 }
 
-// UnconfigureRelay restores VS Code's settings to what they held before setup and takes
-// the CLI's function out of the shell startup files, each whatever becomes of the other.
+// UnconfigureRelay restores VS Code's settings to what they held before setup, wherever a
+// record says setup wrote them, and takes the CLI's function out of the shell startup
+// files, each whatever becomes of the other.
 func (a Agent) UnconfigureRelay(_ context.Context, token string) (agents.RelayResult, error) {
 	var out agents.RelayResult
 	var errs []error
-	for _, dir := range vscodeUserDirs() {
-		path := filepath.Join(dir, "settings.json")
+	for _, path := range a.undoPaths() {
 		changed, skipped, err := a.disconnectVSCode(path, token)
 		if err != nil {
 			errs = append(errs, err)
@@ -115,20 +131,20 @@ func (a Agent) UnconfigureRelay(_ context.Context, token string) (agents.RelayRe
 // environment could say, and where an endpoint in the shell keeps setup from writing the
 // settings: RelayProblem says that.
 func (Agent) RelayPointed(addr string) (pointed, known bool) {
-	dirs := vscodeUserDirs()
+	dirs := vscodeUserDirs(false)
 	for _, dir := range dirs {
 		if !vscodePointed(filepath.Join(dir, "settings.json"), addr) {
-			_, blocked := shellEndpoint()
+			_, blocked := shellEndpoint(addr)
 			return false, !blocked
 		}
 	}
 	return len(dirs) > 0, len(dirs) > 0
 }
 
-// RelayProblem names what still keeps Copilot's telemetry from the relay after setup.
-func (Agent) RelayProblem() (detail, fix string, ok bool) {
-	if variable, set := shellEndpoint(); set && len(vscodeUserDirs()) > 0 {
-		return variable + " is exported in your shell, and VS Code reads it ahead of its settings, so Copilot in VS Code exports nothing to the relay",
+// RelayProblem names what still keeps Copilot's telemetry from the relay at addr after setup.
+func (Agent) RelayProblem(addr string) (detail, fix string, ok bool) {
+	if variable, set := shellEndpoint(addr); set && len(vscodeUserDirs(false)) > 0 {
+		return variable + " is exported in your shell, and VS Code reads it ahead of its settings, so Copilot in VS Code exports to it and not to the relay",
 			"unset " + variable + " where VS Code starts, then run `terma setup`", true
 	}
 	if _, err := exec.LookPath(command); err == nil && !shellrc.LauncherInstalled(command) {

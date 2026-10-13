@@ -32,7 +32,7 @@ func (Agent) Installed(context.Context) bool {
 	if _, err := exec.LookPath(command); err == nil {
 		return true
 	}
-	return len(vscodeUserDirs()) > 0
+	return len(vscodeUserDirs(false)) > 0
 }
 
 // Surfaces is Copilot as one choice: the CLI and VS Code share the hooks directory.

@@ -353,7 +353,10 @@ where it reads it. VS Code runs it in its agent host, configured from the user
 byte of the file, comments included, and `terma teardown` puts back what the settings
 held before; restart VS Code after setup. VS Code reads an exporter endpoint from its
 environment ahead of its settings, so where `OTEL_EXPORTER_OTLP_ENDPOINT` in your shell
-names a collector off this machine, setup leaves VS Code's settings alone and says so.
+names a collector of your own, setup writes none of its settings into VS Code and says
+so: Copilot there already exports to that collector, and terma's settings would only add
+what was said to it. The agent host's exporter is VS Code's, not Copilot's alone: the
+Claude and Codex agents you have VS Code host there are handed the same one.
 Copilot Chat's own exporter (`github.copilot.chat.otel.*`) is never switched on: VS Code
 would copy its endpoint into every extension's environment. The Copilot CLI reads its
 exporter only from its environment, so setup defines a `copilot` shell function in your

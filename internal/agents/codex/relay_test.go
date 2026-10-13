@@ -56,7 +56,7 @@ func TestConfigureRelayRestartsOnlyAfterAChange(t *testing.T) {
 	if restarts(res) {
 		t.Fatalf("an unchanged config asked for a restart: %v", res.Notes)
 	}
-	if _, _, stale := a.RelayProblem(); stale {
+	if _, _, stale := a.RelayProblem(""); stale {
 		t.Fatal("doctor would flag the restarted daemon")
 	}
 
