@@ -237,20 +237,23 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	}
 	sess := session.Session{ID: in.SessionID, Tool: codexTool, Model: in.Model}
 	if len(commits) == 0 {
-		if in.ToolName == codexPatchTool {
+		switch in.ToolName {
+		case codexPatchTool:
 			env.Touch(r, sess, in.ToolName, candidates, attrs)
-			return nil
+		case codexShellTool:
+			// A shell command's targets are guesses, written or not: only the session's own manifest records them,
+			// where the turn's Stop withdraws the unchanged ones (expected.go).
+			env.Expect(r, sess, candidates)
+			env.Report(r, sess, in.ToolName, candidates, attrs)
+		default:
+			// Any other tool's path may only have been read (view_image, an MCP tool): it is
+			// recorded, mirrored to sibling checkouts, as an edit would be, but names no checkout.
+			// Accepted risk: a path such a tool only read stays claimed until retention, so the
+			// developer's own later commit of it is stamped too; recording no claim would stop
+			// an MCP write stamping its commit. Upgrade path: Report alone for Codex's read-only
+			// built-ins.
+			env.TouchGuessed(r, sess, in.ToolName, candidates, attrs)
 		}
-		// Any other tool's paths are guesses, written or not: a shell command's targets, or
-		// a path argument that may only have been read (view_image, an MCP tool). Only the
-		// session's own manifest records them, and only a shell call's has a before-state
-		// for the turn's Stop to withdraw the unchanged ones (expected.go).
-		// Accepted risk: a path another tool only read (view_image) stays claimed until
-		// retention, so the developer's own later commit of it is stamped too; recording no
-		// claim would stop an MCP write stamping its commit. Upgrade path: Report alone for
-		// Codex's read-only built-ins.
-		env.Expect(r, sess, candidates)
-		env.Report(r, sess, in.ToolName, candidates, attrs)
 		return nil
 	}
 	// The call's commits took in what it wrote before them: recording those files again

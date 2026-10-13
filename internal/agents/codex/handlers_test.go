@@ -173,6 +173,52 @@ func TestCodexNonPatchToolNamesNoCheckout(t *testing.T) {
 	}
 }
 
+// An MCP write from a session in the main checkout into a linked worktree of the same
+// repository is mirrored to the worktree's manifest, so a commit there carries the session's
+// trailer, though the touch names no checkout.
+func TestCodexMCPWriteIntoASiblingWorktreeStampsItsCommit(t *testing.T) {
+	main := hookruntest.InitRepo(t)
+	stateDir := t.TempDir()
+	ctx := context.Background()
+	sp, _ := spool.Open(t.TempDir())
+	if _, err := gitx.Git(ctx, main, "commit", "-q", "--allow-empty", "-m", "init"); err != nil {
+		t.Fatal(err)
+	}
+	wt := filepath.Join(main, ".claude", "worktrees", "feature-m")
+	if _, err := gitx.Git(ctx, main, "worktree", "add", "-q", wt); err != nil {
+		t.Fatal(err)
+	}
+	const id = "01a08bd5-0487-74b1-9d82-45e619c574fc"
+	hookruntest.WriteFile(t, wt, "src/m.go", "package src\n")
+	input := `{"file_path":` + strconv.Quote(filepath.Join(wt, "src", "m.go")) + `,"content":"package src\\n"}`
+	pol := hookruntest.Admitting(main)
+	env := hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: main, Policy: pol, Spool: sp, Version: "test",
+		Stdin: strings.NewReader(`{"session_id":"` + id + `","hook_event_name":"PostToolUse","cwd":` + strconv.Quote(main) + `,"tool_name":"mcp__filesystem__write_file","tool_use_id":"call_mcp","tool_input":` + input + `,"tool_response":"ok"}`)}
+	if err := postToolUse(ctx, env); err != nil {
+		t.Fatal(err)
+	}
+	touched := hookruntest.Named(hookruntest.Spooled(t, sp), semconv.TermaFilesTouchedEvent)
+	if len(touched) != 1 || hookruntest.Joined(touched[0].Attrs[semconv.TermaFilesPathsKey]) != "src/m.go" {
+		t.Fatalf("touched = %+v", touched)
+	}
+	if got := touched[0].Attrs[semconv.TermaCheckoutIDKey]; got != nil {
+		t.Fatalf("an MCP write confirmed no edit, yet names checkout %v", got)
+	}
+
+	if _, err := gitx.Git(ctx, wt, "add", "src/m.go"); err != nil {
+		t.Fatal(err)
+	}
+	msgPath := filepath.Join(t.TempDir(), "COMMIT_EDITMSG")
+	_ = os.WriteFile(msgPath, []byte("work\n"), 0o644)
+	commitEnv := hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: wt, Policy: pol, Args: []string{msgPath, "message"}, Stdin: strings.NewReader(""), Spool: sp, Version: "test"}
+	if err := hookrun.PrepareCommitMsg(ctx, commitEnv); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(msgPath); !strings.Contains(string(data), "Agent-Session-Id: "+id) {
+		t.Fatalf("an MCP write into a sibling worktree no longer stamps its commit there:\n%s", data)
+	}
+}
+
 // A patch is not a shell script: a redirect inside its body names no file.
 func TestCodexEditedPathsParsesShellOnlyForShellCalls(t *testing.T) {
 	t.Parallel()
