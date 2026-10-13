@@ -34,11 +34,9 @@ func (a Agent) ConfigureRelay(_ context.Context, cfg agents.RelayConfig) (agents
 
 func (a Agent) configureVSCode(cfg agents.RelayConfig, out *agents.RelayResult) {
 	dirs := vscodeUserDirs(false)
-	if len(dirs) == 0 {
-		return
-	}
 	if variable, set := shellEndpoint(strings.TrimPrefix(cfg.Endpoint, "http://")); set {
-		// What an earlier setup wrote goes too: its content switch would now serve that endpoint.
+		// What an earlier setup wrote goes first, wherever a record says it is: its content
+		// switch would now serve that endpoint.
 		took := false
 		for _, path := range a.undoPaths() {
 			changed, _, err := a.disconnectVSCode(path, cfg.Token)
@@ -47,11 +45,17 @@ func (a Agent) configureVSCode(cfg agents.RelayConfig, out *agents.RelayResult) 
 			}
 			took = took || changed
 		}
+		if len(dirs) == 0 && !took {
+			return
+		}
 		note := variable + " is exported in your shell, and VS Code reads it ahead of its settings: Copilot there exports to it, not to the relay, and terma's settings would add what was said to that export. Terma wrote none of its settings into VS Code"
 		if took {
 			note += ", and took out the ones an earlier setup wrote; restart VS Code so it stops using them"
 		}
 		out.Notes = append(out.Notes, note+". Unset "+variable+" where VS Code starts, then run `terma setup` again.")
+		return
+	}
+	if len(dirs) == 0 {
 		return
 	}
 	restart := false

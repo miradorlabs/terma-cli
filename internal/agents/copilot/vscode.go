@@ -92,7 +92,7 @@ func (a Agent) undoPaths() []string {
 
 // shellEndpoints are the variables the Copilot runtime exports to ahead of what VS Code's
 // settings give its agent host.
-var shellEndpoints = []string{harness.EnvOTLPEndpoint, "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "COPILOT_OTEL_ENDPOINT"}
+var shellEndpoints = []string{harness.EnvOTLPEndpoint, "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT", "COPILOT_OTEL_ENDPOINT"}
 
 // shellEndpoint names an OTLP endpoint variable exported where terma runs that is not the
 // relay at addr. VS Code applies its settings only to the variables its own environment
@@ -149,13 +149,6 @@ func (a Agent) connectVSCode(dir string, cfg agents.RelayConfig) (path string, c
 		return path, false, "", fmt.Errorf("it does not parse as JSON with comments: %w", err)
 	}
 	installing := exporterSettings(cfg)
-	// The endpoint names this machine's relay and token: synced, it would switch another
-	// machine's export on, pointed at a relay it does not have.
-	if list, ok := doc.ignored(); ok {
-		installing[syncIgnored] = rawList(withKeys(list, exporterKeys))
-	} else {
-		note = "Could not add terma's settings to " + syncIgnored + " in " + path + ", which is not a list of names: with Settings Sync on, add " + strings.Join(exporterKeys, ", ") + " to it yourself, or they follow you to your other machines."
-	}
 	existing := map[string]string{}
 	for key := range installing {
 		if raw, ok := doc.raw(key); ok {
@@ -166,15 +159,29 @@ func (a Agent) connectVSCode(dir string, cfg agents.RelayConfig) (path string, c
 	if err != nil {
 		return path, false, "", err
 	}
-	if previous == nil {
-		doc.forgetOwn(existing, cfg)
+	// With its record lost, an exporter already pointed at the relay is an earlier setup's,
+	// not what the developer had: kept as theirs, teardown would restore it and leave the
+	// export on. Its names in the sync-ignore list are that setup's too.
+	endpoint, _ := doc.text(hostEndpoint)
+	own := previous == nil && strings.HasPrefix(endpoint, cfg.Endpoint+"/")
+	if own {
+		clear(existing)
 	}
-	for _, key := range append(slices.Clone(exporterKeys), syncIgnored) {
-		if raw, ok := installing[key]; ok {
-			if err := doc.set(key, raw); err != nil {
-				return path, false, "", err
-			}
+	for _, key := range exporterKeys {
+		if err := doc.set(key, installing[key]); err != nil {
+			return path, false, "", err
 		}
+	}
+	// The endpoint names this machine's relay and token: synced, it would switch another
+	// machine's export on, pointed at a relay it does not have. The record holds the names
+	// terma added, which an undo takes out again.
+	switch added, ok := doc.ignoreNames(exporterKeys); {
+	case !ok:
+		note = "Could not add terma's settings to " + syncIgnored + " in " + path + ", which is not a list of names: with Settings Sync on, add " + strings.Join(exporterKeys, ", ") + " to it yourself, or they follow you to your other machines."
+	case own:
+		installing[syncIgnored] = rawList(exporterKeys)
+	case len(added) > 0:
+		installing[syncIgnored] = rawList(added)
 	}
 	// The record first, so no write leaves settings terma cannot undo; a write that then
 	// fails takes the record back with it.
@@ -202,19 +209,20 @@ func (a Agent) disconnectVSCode(path, token string) (changed bool, skipped []str
 		return false, nil, err
 	}
 	writePath, _, err := config.ResolveWritePath(path)
-	if err != nil {
-		return false, nil, err
+	var data []byte
+	if err == nil {
+		data, err = os.ReadFile(writePath)
 	}
-	data, err := os.ReadFile(writePath)
 	if errors.Is(err, fs.ErrNotExist) {
 		return false, nil, harness.DeleteJournal(a.ConfigDir, name, path)
 	}
+	// Settings terma never pointed at the relay are not terma's to read or parse: one it
+	// cannot read is no reason to stop an undo that has nothing recorded there.
+	if j == nil && (err != nil || token == "" || !bytes.Contains(data, []byte("/"+token))) {
+		return false, nil, nil
+	}
 	if err != nil {
 		return false, nil, err
-	}
-	// Settings terma never pointed at the relay are not terma's to parse.
-	if j == nil && (token == "" || !bytes.Contains(data, []byte("/"+token))) {
-		return false, nil, nil
 	}
 	doc, err := parseSettings(data)
 	if err != nil {
@@ -223,6 +231,11 @@ func (a Agent) disconnectVSCode(path, token string) (changed bool, skipped []str
 	if j == nil {
 		j = doc.unrecorded(path, token)
 	}
+	// The names terma added to the sync-ignore list come out by name, whatever the
+	// developer has done to the list since.
+	doc.unignoreNames(listOf(j.Installed[syncIgnored]))
+	delete(j.Installed, syncIgnored)
+	delete(j.Previous, syncIgnored)
 	current := map[string]string{}
 	for key := range j.Installed {
 		if raw, ok := doc.raw(key); ok {
@@ -233,7 +246,6 @@ func (a Agent) disconnectVSCode(path, token string) (changed bool, skipped []str
 			delete(j.Previous, key)
 		}
 	}
-	doc.keepOwnIgnored(j, current)
 	result, remaining := j.Apply(current)
 	for key := range j.Installed {
 		if raw, ok := current[key]; ok {
@@ -278,49 +290,6 @@ func vscodePointed(path, addr string) bool {
 	return enabled == "true" && strings.HasPrefix(endpoint, "http://"+addr+"/")
 }
 
-// keepOwnIgnored lets an undo take terma's names out of a sync-ignore list the developer
-// has edited since setup: left to the record's rule, an edited list would be skipped whole
-// and keep them. It records the list as it now stands as what setup wrote, and that list
-// without terma's names as what came before.
-func (d *settingsDoc) keepOwnIgnored(j *harness.Journal, current map[string]string) {
-	raw, ok := current[syncIgnored]
-	if !ok || raw == j.Installed[syncIgnored] {
-		return
-	}
-	list, ok := d.ignored()
-	if !ok {
-		return
-	}
-	j.Installed[syncIgnored], j.Previous[syncIgnored] = raw, nil
-	if rest := withoutKeys(list, exporterKeys); len(rest) == len(list) {
-		// None of terma's names are in it any more: it is the developer's as it stands.
-		delete(j.Installed, syncIgnored)
-		delete(j.Previous, syncIgnored)
-	} else if len(rest) > 0 {
-		prior := rawList(rest)
-		j.Previous[syncIgnored] = &prior
-	}
-}
-
-// forgetOwn takes out of existing, what the file held before a setup with no record of an
-// earlier one, the values that earlier setup wrote: an exporter already pointed at cfg's
-// relay is terma's, and so are its names in the sync-ignore list. Kept, they would be
-// restored as the developer's own, and teardown would leave the export on.
-func (d *settingsDoc) forgetOwn(existing map[string]string, cfg agents.RelayConfig) {
-	if endpoint, _ := d.text(hostEndpoint); !strings.HasPrefix(endpoint, cfg.Endpoint+"/") {
-		return
-	}
-	for _, key := range exporterKeys {
-		delete(existing, key)
-	}
-	delete(existing, syncIgnored)
-	if list, ok := d.ignored(); ok {
-		if rest := withoutKeys(list, exporterKeys); len(rest) > 0 {
-			existing[syncIgnored] = rawList(rest)
-		}
-	}
-}
-
 // unrecorded stands in for a lost record of a file still holding the relay's token: the
 // exporter pointed at it, its switches and its names in the sync-ignore list are terma's,
 // with nothing earlier to restore.
@@ -332,15 +301,7 @@ func (d *settingsDoc) unrecorded(path, token string) *harness.Journal {
 				installed[key] = raw
 			}
 		}
+		installed[syncIgnored] = rawList(exporterKeys)
 	}
-	j := harness.NewJournal(name, path, nil, installed, nil, nil, nil)
-	if list, ok := d.ignored(); ok && len(installed) > 0 && len(withoutKeys(list, exporterKeys)) < len(list) {
-		j.Installed[syncIgnored], _ = d.raw(syncIgnored)
-		j.Previous[syncIgnored] = nil
-		if rest := withoutKeys(list, exporterKeys); len(rest) > 0 {
-			prior := rawList(rest)
-			j.Previous[syncIgnored] = &prior
-		}
-	}
-	return j
+	return harness.NewJournal(name, path, nil, installed, nil, nil, nil)
 }

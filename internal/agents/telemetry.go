@@ -8,7 +8,9 @@ import (
 )
 
 // RelayConfig is where an agent's telemetry reaches the local relay. Token is never
-// printed or put in an agent's tool environment.
+// printed, and stays out of the environment an agent gives its tools wherever the agent
+// lets it: one that takes its exporter only from its own environment is handed the token
+// there, and what its tools then see is that agent's doing.
 type RelayConfig struct {
 	Endpoint    string
 	Token       string

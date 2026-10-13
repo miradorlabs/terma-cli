@@ -387,8 +387,53 @@ func TestUndoGoesByItsRecord(t *testing.T) {
 	}
 }
 
+// A settings file terma cannot read stops no undo that has nothing recorded there: setup
+// undoes every agent the developer did not choose, Copilot among them.
+func TestUndoPassesOverSettingsItNeverWrote(t *testing.T) {
+	a, settings := sandbox(t)
+	// A directory where the settings file belongs, and for another build a dangling link.
+	if err := os.Mkdir(settings, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	insiders := filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(settings))), "Code - Insiders", "User")
+	if err := os.MkdirAll(insiders, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(insiders, "gone.json"), filepath.Join(insiders, "settings.json")); err != nil {
+		t.Skip("no symbolic links here")
+	}
+	if undone, err := a.UnconfigureRelay(context.Background(), relay.Token); err != nil || len(undone.Paths) > 0 {
+		t.Fatalf("unconfigure = %+v, %v", undone, err)
+	}
+}
+
+// Under a shell endpoint, what an earlier setup wrote comes out even from a VS Code whose
+// Copilot storage is gone since: found by that storage alone, its content switch would stay.
+func TestShellEndpointUndoesByItsRecordToo(t *testing.T) {
+	a, settings := sandbox(t)
+	if err := os.WriteFile(settings, []byte(handWritten), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	configure(t, a)
+	if err := os.RemoveAll(filepath.Join(filepath.Dir(settings), "globalStorage")); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("OTEL_EXPORTER_OTLP_METRICS_ENDPOINT", "http://localhost:4318/v1/metrics")
+	res := configure(t, a)
+	if !noted(res, "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT is exported in your shell") || !noted(res, "took out") {
+		t.Fatalf("configure: %+v", res)
+	}
+	if data, _ := os.ReadFile(settings); string(data) != handWritten {
+		t.Fatalf("an earlier setup's settings are still there:\n%s", data)
+	}
+	// With nothing of terma's left and no Copilot in VS Code, the endpoint is not VS Code's concern.
+	if again := configure(t, a); noted(again, "exported in your shell") {
+		t.Fatalf("a second configure: %+v", again)
+	}
+}
+
 // A sync-ignore list the developer edited after setup loses terma's names and keeps
-// theirs: skipped whole as changed, it would keep naming settings that are gone.
+// theirs, layout and comments included, through a setup run again in between.
 func TestUndoTakesItsNamesOutOfAnEditedSyncList(t *testing.T) {
 	a, settings := sandbox(t)
 	if err := os.WriteFile(settings, []byte("{\n  \"settingsSync.ignoredSettings\": [\"editor.fontSize\"]\n}\n"), 0o600); err != nil {
@@ -412,5 +457,41 @@ func TestUndoTakesItsNamesOutOfAnEditedSyncList(t *testing.T) {
 	after := settingsOf(t, settings)
 	if got, _ := json.Marshal(after[syncIgnored]); string(got) != `["window.zoomLevel","editor.fontSize"]` || len(after) != 1 {
 		t.Fatalf("settings after undo: %v", after)
+	}
+
+	// Laid out over lines with a comment of the developer's, then set up again.
+	configure(t, a)
+	reflowed := `{
+  "chat.agentHost.otel.enabled": true,
+  "chat.agentHost.otel.otlpEndpoint": "http://127.0.0.1:43180/tok-0123456789abcdef/v1/traces",
+  "chat.agentHost.otel.captureContent": true,
+  "settingsSync.ignoredSettings": [
+    "window.zoomLevel", // this screen only
+    "chat.agentHost.otel.enabled",
+    "chat.agentHost.otel.otlpEndpoint",
+    "chat.agentHost.otel.captureContent",
+    "editor.fontSize",
+  ]
+}
+`
+	if err := os.WriteFile(settings, []byte(reflowed), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	configure(t, a)
+	if data, _ := os.ReadFile(settings); string(data) != reflowed {
+		t.Fatalf("a setup with nothing to add rewrote the developer's layout:\n%s", data)
+	}
+	if undone := unconfigure(t, a, relay.Token); len(undone.Notes) > 0 {
+		t.Fatalf("unconfigure: %+v", undone)
+	}
+	want := `{
+  "settingsSync.ignoredSettings": [
+    "window.zoomLevel", // this screen only
+    "editor.fontSize",
+  ]
+}
+`
+	if data, _ := os.ReadFile(settings); string(data) != want {
+		t.Fatalf("settings after undo:\n%s\nwant:\n%s", data, want)
 	}
 }

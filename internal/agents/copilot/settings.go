@@ -102,20 +102,18 @@ func (d *settingsDoc) set(key, raw string) error {
 	return nil
 }
 
-// remove takes key's member out; a comment written above it stays, above what follows.
+// remove takes key's member out; a comment written ahead of it stays, ahead of what follows.
 func (d *settingsDoc) remove(key string) {
 	i := d.find(key)
 	if i < 0 {
 		return
 	}
 	before := d.obj.Members[i].Name.BeforeExtra
-	if len(bytes.TrimSpace(before)) > 0 {
-		if i+1 < len(d.obj.Members) {
-			next := &d.obj.Members[i+1].Name
-			next.BeforeExtra = append(slices.Clone(before), bytes.TrimLeft(next.BeforeExtra, " \t")...)
-		} else {
-			d.obj.AfterExtra = append(slices.Clone(before), bytes.TrimLeft(d.obj.AfterExtra, " \t")...)
-		}
+	if i+1 < len(d.obj.Members) {
+		next := &d.obj.Members[i+1].Name
+		next.BeforeExtra = carry(before, next.BeforeExtra)
+	} else {
+		d.obj.AfterExtra = carry(before, d.obj.AfterExtra)
 	}
 	d.obj.Members = slices.Delete(d.obj.Members, i, i+1)
 	// An object left with nothing in it closes on the line it opens on.
@@ -124,35 +122,94 @@ func (d *settingsDoc) remove(key string) {
 	}
 }
 
-// ignored is the file's sync-ignore list; false when it is not a list of names.
-func (d *settingsDoc) ignored() ([]string, bool) {
-	var list []string
-	if raw, ok := d.raw(syncIgnored); ok {
-		plain, err := hujson.Standardize([]byte(raw))
-		if err != nil || json.Unmarshal(plain, &list) != nil {
-			return nil, false
+// ignoreNames adds the names the sync-ignore list lacks, in place where the file has a
+// list, so its layout and comments stay, else as a new list. It returns the names it
+// added; ok is false when the file's value is not a list, which is left as it is.
+func (d *settingsDoc) ignoreNames(names []string) (added []string, ok bool) {
+	i := d.find(syncIgnored)
+	if i < 0 {
+		return names, d.set(syncIgnored, rawList(names)) == nil
+	}
+	list, ok := d.obj.Members[i].Value.Value.(*hujson.Array)
+	if !ok {
+		return nil, false
+	}
+	// A new element sits as the last one does: on a line of its own, or after the comma.
+	var before hujson.Extra
+	if n := len(list.Elements); n > 0 {
+		last := string(list.Elements[n-1].BeforeExtra)
+		if at := strings.LastIndexByte(last, '\n'); at >= 0 && strings.Trim(last[at:], " \t\n") == "" {
+			before = hujson.Extra(last[at:])
 		}
 	}
-	return list, true
-}
-
-// withKeys is list with the keys it lacks added; withoutKeys is list with none of them.
-func withKeys(list, keys []string) []string {
-	list = slices.Clone(list)
-	for _, key := range keys {
-		if !slices.Contains(list, key) {
-			list = append(list, key)
+	for _, name := range names {
+		if !slices.ContainsFunc(list.Elements, func(e hujson.Value) bool { return named(e, name) }) {
+			list.Elements = append(list.Elements, hujson.Value{BeforeExtra: slices.Clone(before), Value: hujson.String(name)})
+			added = append(added, name)
 		}
 	}
-	return list
+	return added, true
 }
 
-func withoutKeys(list, keys []string) []string {
-	return slices.DeleteFunc(slices.Clone(list), func(k string) bool { return slices.Contains(keys, k) })
+// unignoreNames takes names out of the sync-ignore list, whatever else the developer has
+// put in it since, and the list out with them once it names nothing.
+func (d *settingsDoc) unignoreNames(names []string) {
+	i := d.find(syncIgnored)
+	if i < 0 {
+		return
+	}
+	list, ok := d.obj.Members[i].Value.Value.(*hujson.Array)
+	if !ok {
+		return
+	}
+	for at := len(list.Elements) - 1; at >= 0; at-- {
+		e := list.Elements[at]
+		if !slices.ContainsFunc(names, func(name string) bool { return named(e, name) }) {
+			continue
+		}
+		if at+1 < len(list.Elements) {
+			list.Elements[at+1].BeforeExtra = carry(e.BeforeExtra, list.Elements[at+1].BeforeExtra)
+		} else {
+			list.AfterExtra = carry(e.BeforeExtra, list.AfterExtra)
+		}
+		list.Elements = slices.Delete(list.Elements, at, at+1)
+	}
+	if len(list.Elements) == 0 && len(bytes.TrimSpace(list.AfterExtra)) == 0 {
+		d.remove(syncIgnored)
+	}
+}
+
+// carry is after, the space and comments ahead of what follows a value being taken out,
+// with the comments ahead of that value put first: a comment the developer wrote there,
+// about the line above as often as the one below, stays where they wrote it.
+func carry(before, after hujson.Extra) hujson.Extra {
+	kept := bytes.TrimRight(before, " \t\r\n")
+	if len(kept) == 0 {
+		return after
+	}
+	out := slices.Clone(kept)
+	// A line comment runs to the end of its line: what follows must start a new one.
+	if !bytes.Contains(after, []byte("\n")) {
+		out = append(out, '\n')
+	}
+	return append(out, after...)
+}
+
+// named reports whether the list element e is the string name.
+func named(e hujson.Value, name string) bool {
+	lit, ok := e.Value.(hujson.Literal)
+	return ok && lit.Kind() == '"' && lit.String() == name
 }
 
 // rawList is list as raw JSON.
 func rawList(list []string) string {
 	out, _ := json.Marshal(list)
 	return string(out)
+}
+
+// listOf is the names in the raw JSON list raw.
+func listOf(raw string) []string {
+	var list []string
+	_ = json.Unmarshal([]byte(raw), &list)
+	return list
 }
