@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
@@ -18,32 +20,34 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 )
 
-// VS Code keeps Copilot's exporters in its user settings, a JSON-with-comments file the
-// developer edits by hand too: terma changes only the members below and leaves every other
-// byte, comment and comma as it was. VS Code runs Copilot in two places with an exporter
-// each: its own agent in the extension host (github.copilot.chat.otel.*), and the Copilot
-// runtime in the agent host (chat.agentHost.otel.*), read when VS Code starts.
+// VS Code runs the Copilot runtime in its agent host, a process of its own whose exporter
+// VS Code sets as it starts from chat.agentHost.otel.* in the user settings. That file is
+// JSON with comments the developer edits by hand too: terma changes only the members below
+// and leaves every other byte, comment and comma as it was.
+//
+// Copilot Chat's own exporter (github.copilot.chat.otel.*) is left as the developer has
+// it: once it is on, VS Code copies its endpoint into the extension host's environment and
+// into the terminals it opens for Copilot, where every extension's and tool's exporter
+// would read it.
 const (
-	chatEnabled  = "github.copilot.chat.otel.enabled"
-	chatEndpoint = "github.copilot.chat.otel.otlpEndpoint"
-	chatContent  = "github.copilot.chat.otel.captureContent"
 	hostEnabled  = "chat.agentHost.otel.enabled"
 	hostEndpoint = "chat.agentHost.otel.otlpEndpoint"
 	hostContent  = "chat.agentHost.otel.captureContent"
 	// syncIgnored lists the settings Settings Sync leaves on this machine.
 	syncIgnored = "settingsSync.ignoredSettings"
-	// telemetryLevel "off" switches the extension's exporter off with VS Code's own telemetry.
-	telemetryLevel = "telemetry.telemetryLevel"
 )
 
 // exporterKeys are the exporter settings terma writes, in the order it writes them.
-var exporterKeys = []string{chatEnabled, chatEndpoint, chatContent, hostEnabled, hostEndpoint, hostContent}
+var exporterKeys = []string{hostEnabled, hostEndpoint, hostContent}
 
 // vscodeFlavors are the VS Code builds that ship Copilot, by their data directory's name.
 var vscodeFlavors = []string{"Code", "Code - Insiders"}
 
-// vscodeUserDirs are the user settings directories of the VS Code builds that have run
-// here, under VSCODE_APPDATA where the developer moved VS Code's data with it.
+// copilotStorage is where Copilot keeps its state in a VS Code it has run in.
+const copilotStorage = "github.copilot-chat"
+
+// vscodeUserDirs are the user settings directories of the VS Code builds Copilot has run
+// in here, under VSCODE_APPDATA where the developer moved VS Code's data with it.
 func vscodeUserDirs() []string {
 	base := os.Getenv("VSCODE_APPDATA")
 	if base == "" {
@@ -55,54 +59,81 @@ func vscodeUserDirs() []string {
 	var dirs []string
 	for _, flavor := range vscodeFlavors {
 		dir := filepath.Join(base, flavor, "User")
-		if info, err := os.Stat(dir); err == nil && info.IsDir() {
+		if info, err := os.Stat(filepath.Join(dir, "globalStorage", copilotStorage)); err == nil && info.IsDir() {
 			dirs = append(dirs, dir)
 		}
 	}
 	return dirs
 }
 
-// exporterSettings are the members that send both of VS Code's Copilot exporters to the
-// relay, each as raw JSON. Neither exporter's headers reach the Copilot runtime VS Code
-// starts, so the relay's token rides the endpoint path. All content is exported: the relay
-// withholds what the team's policy does not collect.
+// shellEndpoints are the variables VS Code's agent host exports to ahead of its settings.
+var shellEndpoints = []string{harness.EnvOTLPEndpoint, "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"}
+
+// shellEndpoint names an OTLP endpoint variable exported where terma runs that sends off
+// this machine. VS Code applies its settings only to the variables its own environment
+// leaves unset, and takes that environment from the developer's shell: with one set, the
+// agent host would export there, and with terma's settings, its content too. An endpoint
+// on this machine is let be: the relay is one, as another agent's own exporter names it
+// here, and what a collector of the developer's receives stays with them. The value may
+// hold a credential, so only the name is returned.
+func shellEndpoint() (string, bool) {
+	for _, name := range shellEndpoints {
+		if v := os.Getenv(name); v != "" && !loopbackURL(v) {
+			return name, true
+		}
+	}
+	return "", false
+}
+
+// loopbackURL reports whether raw is a URL of this machine's own.
+func loopbackURL(raw string) bool {
+	u, err := url.Parse(strings.Trim(raw, `"'`))
+	if err != nil {
+		return false
+	}
+	ip := net.ParseIP(u.Hostname())
+	return u.Hostname() == "localhost" || ip != nil && ip.IsLoopback()
+}
+
+// exporterSettings are the members that send the agent host's exporter to the relay, each
+// as raw JSON. No setting gives it a header, so the relay's token rides the endpoint path,
+// and the path names the signal: the agent host appends one only to an endpoint with none.
+// All content is exported: the relay withholds what the team's policy does not collect.
 func exporterSettings(cfg agents.RelayConfig) map[string]string {
-	base := cfg.Endpoint + "/" + cfg.Token
 	return map[string]string{
-		chatEnabled:  "true",
-		chatEndpoint: string(hujson.String(base)),
-		chatContent:  "true",
 		hostEnabled:  "true",
-		// The agent host appends the signal path only to an endpoint with none.
-		hostEndpoint: string(hujson.String(base + "/v1/traces")),
+		hostEndpoint: string(hujson.String(cfg.Endpoint + "/" + cfg.Token + "/v1/traces")),
 		hostContent:  "true",
 	}
 }
 
-// connectVSCode writes the exporter settings into the settings file of the VS Code at dir
-// and reports whether it changed the file.
-func (a Agent) connectVSCode(dir string, cfg agents.RelayConfig) (path string, changed bool, err error) {
+// connectVSCode writes the exporter settings into the settings file of the VS Code at dir.
+// It reports whether it changed the file, and what the developer should know: a
+// sync-ignore list terma could not add its settings to.
+func (a Agent) connectVSCode(dir string, cfg agents.RelayConfig) (path string, changed bool, note string, err error) {
 	path = filepath.Join(dir, "settings.json")
 	if a.ConfigDir == "" {
-		return path, false, errors.New("no config directory to record VS Code's earlier settings in")
+		return path, false, "", errors.New("no config directory to record VS Code's earlier settings in")
 	}
 	writePath, _, err := config.ResolveWritePath(path)
 	if err != nil {
-		return path, false, err
+		return path, false, "", err
 	}
 	data, err := os.ReadFile(writePath)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return path, false, err
+		return path, false, "", err
 	}
 	doc, err := parseSettings(data)
 	if err != nil {
-		return path, false, fmt.Errorf("%s does not parse as JSON with comments, so terma leaves it alone: %w", path, err)
+		return path, false, "", fmt.Errorf("it does not parse as JSON with comments: %w", err)
 	}
 	installing := exporterSettings(cfg)
 	// The endpoint names this machine's relay and token: synced, it would switch another
 	// machine's export on, pointed at a relay it does not have.
-	if ignored, ok := doc.withIgnored(exporterKeys); ok {
-		installing[syncIgnored] = ignored
+	if list, ok := doc.ignored(); ok {
+		installing[syncIgnored] = rawList(withKeys(list, exporterKeys))
+	} else {
+		note = "Could not add terma's settings to " + syncIgnored + " in " + path + ", which is not a list of names: with Settings Sync on, add " + strings.Join(exporterKeys, ", ") + " to it yourself, or they follow you to your other machines."
 	}
 	existing := map[string]string{}
 	for key := range installing {
@@ -112,23 +143,34 @@ func (a Agent) connectVSCode(dir string, cfg agents.RelayConfig) (path string, c
 	}
 	previous, err := harness.LoadJournal(a.ConfigDir, name, path)
 	if err != nil {
-		return path, false, err
+		return path, false, "", err
+	}
+	if previous == nil {
+		doc.forgetOwn(existing, cfg)
 	}
 	for _, key := range append(slices.Clone(exporterKeys), syncIgnored) {
 		if raw, ok := installing[key]; ok {
 			if err := doc.set(key, raw); err != nil {
-				return path, false, err
+				return path, false, "", err
 			}
 		}
 	}
-	// The record first: a write that then fails leaves settings the record does not match,
-	// which an undo leaves alone.
+	// The record first, so no write leaves settings terma cannot undo; a write that then
+	// fails takes the record back with it.
 	if err := harness.NewJournal(name, path, existing, installing, nil, nil, previous).Save(a.ConfigDir); err != nil {
-		return path, false, err
+		return path, false, "", err
 	}
 	out := doc.pack()
 	// The endpoint carries the relay's token: private to this user.
-	return path, !bytes.Equal(out, data), config.WriteFileAtomic(writePath, out, harness.SettingsMode)
+	if err := config.WriteFileAtomic(writePath, out, harness.SettingsMode); err != nil {
+		if previous != nil {
+			_ = previous.Save(a.ConfigDir)
+		} else {
+			_ = harness.DeleteJournal(a.ConfigDir, name, path)
+		}
+		return path, false, "", err
+	}
+	return path, !bytes.Equal(out, data), note, nil
 }
 
 // disconnectVSCode puts back what the settings file at path held before setup, for each
@@ -164,6 +206,10 @@ func (a Agent) disconnectVSCode(path, token string) (changed bool, skipped []str
 	for key := range j.Installed {
 		if raw, ok := doc.raw(key); ok {
 			current[key] = raw
+		} else {
+			// The developer took the member out: there is nothing of terma's left to undo.
+			delete(j.Installed, key)
+			delete(j.Previous, key)
 		}
 	}
 	result, remaining := j.Apply(current)
@@ -180,7 +226,7 @@ func (a Agent) disconnectVSCode(path, token string) (changed bool, skipped []str
 	slices.Sort(result.Skipped)
 	out := doc.pack()
 	if changed = !bytes.Equal(out, data); changed {
-		mode := fs.FileMode(harness.SettingsMode)
+		mode := harness.SettingsMode
 		if info, err := os.Stat(writePath); err == nil {
 			mode = info.Mode().Perm()
 		}
@@ -194,7 +240,7 @@ func (a Agent) disconnectVSCode(path, token string) (changed bool, skipped []str
 	return changed, result.Skipped, remaining.Save(a.ConfigDir)
 }
 
-// vscodePointed reports whether the extension's exporter in the settings file at path is
+// vscodePointed reports whether the agent host's exporter in the settings file at path is
 // on and sends to the relay at addr.
 func vscodePointed(path, addr string) bool {
 	data, err := os.ReadFile(path)
@@ -205,8 +251,8 @@ func vscodePointed(path, addr string) bool {
 	if err != nil {
 		return false
 	}
-	enabled, _ := doc.raw(chatEnabled)
-	endpoint, _ := doc.text(chatEndpoint)
+	enabled, _ := doc.raw(hostEnabled)
+	endpoint, _ := doc.text(hostEndpoint)
 	return enabled == "true" && strings.HasPrefix(endpoint, "http://"+addr+"/")
 }
 
@@ -313,6 +359,10 @@ func (d *settingsDoc) remove(key string) {
 		}
 	}
 	d.obj.Members = slices.Delete(d.obj.Members, i, i+1)
+	// An object left with nothing in it closes on the line it opens on.
+	if len(d.obj.Members) == 0 && len(bytes.TrimSpace(d.obj.AfterExtra)) == 0 {
+		d.obj.AfterExtra = nil
+	}
 }
 
 // ignored is the file's sync-ignore list; false when it is not a list of names.
@@ -327,46 +377,65 @@ func (d *settingsDoc) ignored() ([]string, bool) {
 	return list, true
 }
 
-// withIgnored is the sync-ignore list with keys added, as raw JSON; false when the file's
-// own list is not one terma can add to.
-func (d *settingsDoc) withIgnored(keys []string) (string, bool) {
-	list, ok := d.ignored()
-	if !ok {
-		return "", false
-	}
+// withKeys is list with the keys it lacks added; withoutKeys is list with none of them.
+func withKeys(list, keys []string) []string {
+	list = slices.Clone(list)
 	for _, key := range keys {
 		if !slices.Contains(list, key) {
 			list = append(list, key)
 		}
 	}
-	out, err := json.Marshal(list)
-	return string(out), err == nil
+	return list
+}
+
+func withoutKeys(list, keys []string) []string {
+	return slices.DeleteFunc(slices.Clone(list), func(k string) bool { return slices.Contains(keys, k) })
+}
+
+// rawList is list as raw JSON.
+func rawList(list []string) string {
+	out, _ := json.Marshal(list)
+	return string(out)
+}
+
+// forgetOwn takes out of existing, what the file held before a setup with no record of an
+// earlier one, the values that earlier setup wrote: an exporter already pointed at cfg's
+// relay is terma's, and so are its names in the sync-ignore list. Kept, they would be
+// restored as the developer's own, and teardown would leave the export on.
+func (d *settingsDoc) forgetOwn(existing map[string]string, cfg agents.RelayConfig) {
+	if endpoint, _ := d.text(hostEndpoint); !strings.HasPrefix(endpoint, cfg.Endpoint+"/") {
+		return
+	}
+	for _, key := range exporterKeys {
+		delete(existing, key)
+	}
+	delete(existing, syncIgnored)
+	if list, ok := d.ignored(); ok {
+		if rest := withoutKeys(list, exporterKeys); len(rest) > 0 {
+			existing[syncIgnored] = rawList(rest)
+		}
+	}
 }
 
 // unrecorded stands in for a lost record of a file still holding the relay's token: the
-// exporters pointed at it and their switches are terma's, with nothing earlier to restore.
+// exporter pointed at it, its switches and its names in the sync-ignore list are terma's,
+// with nothing earlier to restore.
 func (d *settingsDoc) unrecorded(path, token string) *harness.Journal {
 	installed := map[string]string{}
-	for _, exporter := range [][]string{{chatEndpoint, chatEnabled, chatContent}, {hostEndpoint, hostEnabled, hostContent}} {
-		if endpoint, _ := d.text(exporter[0]); !strings.Contains(endpoint, "/"+token) {
-			continue
-		}
-		for _, key := range exporter {
-			if raw, ok := d.raw(key); ok && (key == exporter[0] || raw == "true") {
+	if endpoint, _ := d.text(hostEndpoint); strings.Contains(endpoint, "/"+token) {
+		for _, key := range exporterKeys {
+			if raw, ok := d.raw(key); ok && (key == hostEndpoint || raw == "true") {
 				installed[key] = raw
 			}
 		}
 	}
 	j := harness.NewJournal(name, path, nil, installed, nil, nil, nil)
-	// The sync-ignore list goes back to what it names besides terma's settings.
-	if list, ok := d.ignored(); ok && len(installed) > 0 && slices.ContainsFunc(list, func(k string) bool { return slices.Contains(exporterKeys, k) }) {
+	if list, ok := d.ignored(); ok && len(installed) > 0 && len(withoutKeys(list, exporterKeys)) < len(list) {
 		j.Installed[syncIgnored], _ = d.raw(syncIgnored)
 		j.Previous[syncIgnored] = nil
-		if rest := slices.DeleteFunc(list, func(k string) bool { return slices.Contains(exporterKeys, k) }); len(rest) > 0 {
-			if out, err := json.Marshal(rest); err == nil {
-				prior := string(out)
-				j.Previous[syncIgnored] = &prior
-			}
+		if rest := withoutKeys(list, exporterKeys); len(rest) > 0 {
+			prior := rawList(rest)
+			j.Previous[syncIgnored] = &prior
 		}
 	}
 	return j

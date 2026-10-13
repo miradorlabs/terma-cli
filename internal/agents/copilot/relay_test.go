@@ -52,7 +52,7 @@ func TestSetupStartsTheCLIThroughTerma(t *testing.T) {
 	if err != nil || !holds() || !slices.Contains(res.Paths, rc) {
 		t.Fatalf("configure: %+v, %v", res, err)
 	}
-	if !slices.ContainsFunc(res.Notes, func(n string) bool { return strings.Contains(n, "new terminal") }) {
+	if !noted(res, "new terminal") {
 		t.Errorf("notes do not say the function needs a new shell: %q", res.Notes)
 	}
 	if _, _, problem := a.RelayProblem(); problem {
@@ -60,7 +60,8 @@ func TestSetupStartsTheCLIThroughTerma(t *testing.T) {
 	}
 	set, unset := a.LaunchEnv(relay)
 	if set[harness.EnvOTLPEndpoint] != "http://127.0.0.1:43180/"+relay.Token || set["COPILOT_OTEL_ENABLED"] != "true" ||
-		set["OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"] != "true" || !slices.Contains(unset, "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT") {
+		set["OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"] != "true" ||
+		!slices.Contains(unset, "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT") || !slices.Contains(unset, "COPILOT_OTEL_ENDPOINT") {
 		t.Fatalf("LaunchEnv = %v, %v", set, unset)
 	}
 	if _, has := set[harness.EnvOTLPHeaders]; has {
@@ -88,6 +89,29 @@ func TestSetupStartsTheCLIThroughTerma(t *testing.T) {
 	}
 }
 
+// A startup file terma cannot write is said, and stops neither setup nor VS Code's half.
+func TestSetupGoesOnPastAStartupFileItCannotWrite(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no shell startup files on Windows")
+	}
+	a, settings := sandbox(t)
+	home, _ := os.UserHomeDir()
+	bin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, command), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin)
+	t.Setenv("SHELL", "/bin/zsh")
+	// A directory where the startup file belongs: it can be neither read nor replaced.
+	if err := os.Mkdir(filepath.Join(home, ".zshrc"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	res, err := a.ConfigureRelay(context.Background(), relay)
+	if err != nil || !noted(res, "Could not write the copilot function") || !slices.Contains(res.Paths, settings) {
+		t.Fatalf("configure with an unwritable startup file: %+v, %v", res, err)
+	}
+}
+
 // A shell terma writes no function for is said, since the CLI then exports nothing.
 func TestSetupSaysWhenItCannotStartTheCLI(t *testing.T) {
 	if runtime.GOOS == "windows" {
@@ -100,7 +124,7 @@ func TestSetupSaysWhenItCannotStartTheCLI(t *testing.T) {
 	}
 	t.Setenv("PATH", bin)
 	res, err := a.ConfigureRelay(context.Background(), relay)
-	if err != nil || !slices.ContainsFunc(res.Notes, func(n string) bool { return strings.Contains(n, "zsh, bash and fish") }) {
+	if err != nil || !noted(res, "zsh, bash and fish") {
 		t.Fatalf("configure under an unknown shell: %+v, %v", res, err)
 	}
 	if _, fix, problem := a.RelayProblem(); !problem || !strings.Contains(fix, "zsh, bash or fish") {

@@ -2,27 +2,25 @@ package copilot
 
 import "github.com/miradorlabs/terma-cli/internal/relay/shape"
 
-// Correlation names the session: gen_ai.conversation.id on the spans of the Copilot
-// runtime and of VS Code's own agent, session.id on VS Code's session-start record. Both
-// are the session_id the hooks claim.
+// Correlation names the session: gen_ai.conversation.id on every span of the Copilot
+// runtime, which is the session_id its hooks claim. Its metrics name no session, and go by
+// the process that sent them.
 func (Agent) Correlation() shape.Correlation {
-	return shape.Correlation{SessionKeys: []shape.SessionKey{shape.SessionID, shape.GenAIConversationID}}
+	return shape.Correlation{SessionKeys: []shape.SessionKey{shape.GenAIConversationID}}
 }
 
-// CaptureRules are where Copilot's telemetry carries content beyond the GenAI attributes
-// every agent shares: the Copilot runtime restates a shell tool's command, and VS Code's
-// own agent the request, its reply and reasoning, and its hooks' input and output.
+// CaptureRules are where the Copilot runtime's telemetry carries content beyond the GenAI
+// attributes every agent shares: it restates a shell tool's command.
 func (Agent) CaptureRules() shape.CaptureRules {
 	return shape.CaptureRules{
-		PromptDropFields: []string{"copilot_chat.user_request", "copilot_chat.markdown_content", "copilot_chat.reasoning_content"},
-		ToolContentFields: []string{"github.copilot.tool.parameters.command",
-			"copilot_chat.hook_command", "copilot_chat.hook_input", "copilot_chat.hook_output"},
+		ToolContentFields: []string{"github.copilot.tool.parameters.command"},
 		// Strings only: a number or a flag passes whatever its key (a request's AI credits,
 		// its billing multiplier), and a key no rule names is withheld with the content.
+		// Each is one CLI 1.0.96 sends, read from its own export.
 		SafeKeys: []string{
-			// The Copilot runtime (CLI 1.0.96): the ids of a turn and of its requests, who
-			// started a request (user or agent), the kind of agent, a tool's kind, a
-			// command's exit status, the account's pseudonymous id and the exporter's instance.
+			// The ids of a turn and of its requests, who started a request (user or agent),
+			// the kind of agent, a tool's kind, a command's exit status, the account's
+			// pseudonymous id and the exporter's instance.
 			"github.copilot.interaction_id", "github.copilot.turn_id", "github.copilot.turn_count", "github.copilot.initiator",
 			"github.copilot.service_request_id", "github.copilot.agent.type", "gen_ai.request.previous_response.id",
 			"gen_ai.tool.type", "gen_ai.token.modality", "process.exit.code", "enduser.pseudo.id", "service.instance.id",
@@ -35,12 +33,6 @@ func (Agent) CaptureRules() shape.CaptureRules {
 			"github.copilot.mcp.server.state", "github.copilot.mcp.server.source",
 			"github.copilot.sandbox.backend", "github.copilot.sandbox.control", "github.copilot.sandbox.decision_kind",
 			"github.copilot.sandbox.enforcement_point", "github.copilot.sandbox.outcome", "github.copilot.sandbox.platform",
-			// VS Code's own agent (Copilot Chat 0.69): the chat session and the one that
-			// spawned it, the request's id at the service and its shape (the API, a message
-			// count, the stream flag), a hook's type and outcome, and an error's class.
-			"copilot_chat.session_id", "copilot_chat.chat_session_id", "copilot_chat.parent_chat_session_id",
-			"copilot_chat.server_request_id", "copilot_chat.request.options", "copilot_chat.request.shape",
-			"copilot_chat.hook_type", "copilot_chat.hook_result_kind", "error.type",
 		},
 	}
 }

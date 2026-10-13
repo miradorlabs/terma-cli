@@ -3,9 +3,7 @@ package copilot
 
 import (
 	"context"
-	"os"
 	"os/exec"
-	"path/filepath"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 )
@@ -16,9 +14,10 @@ const (
 	command = "copilot"
 )
 
-// Agent is GitHub Copilot's CLI and its agents in VS Code. Both read one user-level hooks
-// directory and export GenAI telemetry of their own: VS Code from its user settings, the
-// CLI from its environment alone, so setup hands the CLI's start to `terma launch`.
+// Agent is GitHub Copilot's CLI and Copilot in VS Code. Both read one user-level hooks
+// directory and run the Copilot runtime, which exports GenAI telemetry of its own: in VS
+// Code's agent host from VS Code's user settings, in the CLI from its environment alone,
+// so setup hands the CLI's start to `terma launch`.
 type Agent struct {
 	// ConfigDir is terma's config directory, where the record of what setup replaced in
 	// VS Code's settings is kept.
@@ -33,12 +32,7 @@ func (Agent) Installed(context.Context) bool {
 	if _, err := exec.LookPath(command); err == nil {
 		return true
 	}
-	for _, dir := range vscodeUserDirs() {
-		if info, err := os.Stat(filepath.Join(dir, "globalStorage", "github.copilot-chat")); err == nil && info.IsDir() {
-			return true
-		}
-	}
-	return false
+	return len(vscodeUserDirs()) > 0
 }
 
 // Surfaces is Copilot as one choice: the CLI and VS Code share the hooks directory.
@@ -62,8 +56,8 @@ func (Agent) FlushAfter() []string { return []string{"copilot-stop", "copilot-se
 
 // Coverage is how completely terma supports the agent.
 func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
-	return agents.CapabilitySupport{Level: agents.SupportFull},
-		agents.CapabilitySupport{Level: agents.SupportPartial, Note: "native OTLP through the local relay only; AI credits, no cost; the CLI exports only when started through the shell function setup writes"}
+	return agents.CapabilitySupport{Level: agents.SupportPartial, Note: "files its edit tools write; a file a shell command writes is not recorded"},
+		agents.CapabilitySupport{Level: agents.SupportPartial, Note: "native OTLP through the local relay only; AI credits, no cost; the CLI exports when started through the shell function setup writes, VS Code from its agent host, and Copilot Chat's own agent in VS Code not at all"}
 }
 
 var (

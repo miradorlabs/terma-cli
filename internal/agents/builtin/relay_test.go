@@ -113,14 +113,18 @@ func TestConfigureIsolatesAgentFilesAndEnvironment(t *testing.T) {
 	}
 }
 
-// vscodeSettings is the user settings file, relative to home, of a VS Code that has run in
-// the sandbox: an editor that never ran has no settings directory, and gets no settings.
+// vscodeSettings is the user settings file, relative to home, of a VS Code Copilot has run
+// in, in the sandbox: an editor it never ran in gets no settings.
 func vscodeSettings(t *testing.T, home string) string {
 	t.Helper()
 	base := filepath.Join(home, "vscode")
 	t.Setenv("VSCODE_APPDATA", base)
+	// No exporter of the developer's own in the shell the tests run from: VS Code would
+	// read it ahead of its settings, and setup then writes none.
+	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+	t.Setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "")
 	user := filepath.Join(base, "Code", "User")
-	if err := os.MkdirAll(user, 0o700); err != nil {
+	if err := os.MkdirAll(filepath.Join(user, "globalStorage", "github.copilot-chat"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	rel, err := filepath.Rel(home, filepath.Join(user, "settings.json"))

@@ -27,7 +27,6 @@ var (
 		"gen_ai.tool.definitions",
 		"omp.gen_ai.request.messages", "omp.gen_ai.response.text",
 		"request_text", "response_text",
-		"copilot_chat.user_request", "copilot_chat.markdown_content", "copilot_chat.reasoning_content",
 		// Free text that may restate what was said, and keys too generic to vouch for.
 		"error", "reason", "reasoning", "routing.reasoning", "metadata", "value", "key", "from", "db", "query_script",
 		"gen_ai.tool.description", "gen_ai.agent.description", "gen_ai.request.stop_sequences"}
@@ -36,7 +35,7 @@ var (
 	pinnedToolContentFields    = []string{"tool_parameters", "tool_input", "full_command", "bash_command", "arguments", "output",
 		"gen_ai.tool.call.arguments", "gen_ai.tool.call.result", "opencode.tool.file_path", "opencode.session.directory",
 		"function_args", "hook_input", "hook_output", "stdout", "stderr",
-		"github.copilot.tool.parameters.command", "copilot_chat.hook_command", "copilot_chat.hook_input", "copilot_chat.hook_output",
+		"github.copilot.tool.parameters.command",
 		"file_path", "result", "cwd"}
 	pinnedToolContentEvents = []string{"tool.output", "tool.input"}
 	pinnedSessionKeys       = []string{"session.id", "conversation.id", "gen_ai.conversation.id", "thread.id", "thread_id"}
