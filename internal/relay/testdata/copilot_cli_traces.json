@@ -1,0 +1,1694 @@
+{
+ "resourceSpans": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "service.instance.id",
+      "value": {
+       "stringValue": "copilot-otel-39084-1"
+      }
+     },
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "github-copilot"
+      }
+     },
+     {
+      "key": "service.version",
+      "value": {
+       "stringValue": "1.0.96"
+      }
+     }
+    ],
+    "droppedAttributesCount": 0,
+    "entityRefs": []
+   },
+   "scopeSpans": [
+    {
+     "scope": {
+      "name": "github.copilot",
+      "version": "1.0.96",
+      "attributes": [],
+      "droppedAttributesCount": 0
+     },
+     "spans": [
+      {
+       "traceId": "00000000000000000000000000000001",
+       "spanId": "0000000000000001",
+       "traceState": "",
+       "parentSpanId": "0000000000000002",
+       "flags": 257,
+       "name": "execute_tool apply_patch",
+       "kind": 1,
+       "startTimeUnixNano": "1791906596170000000",
+       "endTimeUnixNano": "1791906596204000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "00000001-0000-4000-8000-000000000001"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "apply_patch"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.id",
+         "value": {
+          "stringValue": "custom_call_1"
+         }
+        },
+        {
+         "key": "gen_ai.tool.type",
+         "value": {
+          "stringValue": "function"
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "github"
+         }
+        },
+        {
+         "key": "gen_ai.tool.description",
+         "value": {
+          "stringValue": "TOOL-DESCRIPTION"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "*** Begin Patch\n*** Add File: a.txt\n+one\n*** End Patch\n"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "Added 1 file(s): /work/repo/a.txt"
+         }
+        }
+       ],
+       "droppedAttributesCount": 0,
+       "events": [],
+       "droppedEventsCount": 0,
+       "links": [],
+       "droppedLinksCount": 0,
+       "status": {
+        "message": "",
+        "code": 0
+       }
+      },
+      {
+       "traceId": "00000000000000000000000000000001",
+       "spanId": "0000000000000003",
+       "traceState": "",
+       "parentSpanId": "0000000000000002",
+       "flags": 257,
+       "name": "chat gpt-6-luna",
+       "kind": 3,
+       "startTimeUnixNano": "1791906593416000000",
+       "endTimeUnixNano": "1791906596164000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "github"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gpt-6-luna"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "00000001-0000-4000-8000-000000000001"
+         }
+        },
+        {
+         "key": "gen_ai.request.stream",
+         "value": {
+          "boolValue": true
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "tool_calls"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "14354"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "58"
+         }
+        },
+        {
+         "key": "gen_ai.usage.cache_write.input_tokens",
+         "value": {
+          "intValue": "14351"
+         }
+        },
+        {
+         "key": "gen_ai.usage.reasoning.output_tokens",
+         "value": {
+          "intValue": "27"
+         }
+        },
+        {
+         "key": "gen_ai.response.model",
+         "value": {
+          "stringValue": "gpt-6-luna"
+         }
+        },
+        {
+         "key": "gen_ai.response.id",
+         "value": {
+          "stringValue": "resp_1"
+         }
+        },
+        {
+         "key": "github.copilot.service_request_id",
+         "value": {
+          "stringValue": "00000003-0000-4000-8000-000000000001"
+         }
+        },
+        {
+         "key": "github.copilot.cost",
+         "value": {
+          "doubleValue": 1.0
+         }
+        },
+        {
+         "key": "github.copilot.nano_aiu",
+         "value": {
+          "doubleValue": 182317500.0
+         }
+        },
+        {
+         "key": "github.copilot.server_duration",
+         "value": {
+          "doubleValue": 2266.0
+         }
+        },
+        {
+         "key": "github.copilot.initiator",
+         "value": {
+          "stringValue": "user"
+         }
+        },
+        {
+         "key": "github.copilot.turn_id",
+         "value": {
+          "stringValue": "0"
+         }
+        },
+        {
+         "key": "github.copilot.interaction_id",
+         "value": {
+          "stringValue": "00000002-0000-4000-8000-000000000001"
+         }
+        },
+        {
+         "key": "gen_ai.response.time_to_first_chunk",
+         "value": {
+          "doubleValue": 2.469836917
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"user\",\"parts\":[{\"type\":\"text\",\"content\":\"PROMPT-TEXT\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"assistant\",\"parts\":[{\"type\":\"tool_call\",\"id\":\"custom_call_1\",\"name\":\"apply_patch\",\"arguments\":\"*** Begin Patch\\n*** Add File: a.txt\\n+one\\n*** End Patch\\n\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.system_instructions",
+         "value": {
+          "stringValue": "[{\"type\":\"text\",\"content\":\"SYSTEM-INSTRUCTIONS\"}]"
+         }
+        },
+        {
+         "key": "gen_ai.tool.definitions",
+         "value": {
+          "stringValue": "[{\"type\":\"function\",\"name\":\"bash\",\"description\":\"TOOL-DEFINITION\"}]"
+         }
+        }
+       ],
+       "droppedAttributesCount": 0,
+       "events": [],
+       "droppedEventsCount": 0,
+       "links": [],
+       "droppedLinksCount": 0,
+       "status": {
+        "message": "",
+        "code": 0
+       }
+      },
+      {
+       "traceId": "00000000000000000000000000000001",
+       "spanId": "0000000000000004",
+       "traceState": "",
+       "parentSpanId": "0000000000000002",
+       "flags": 257,
+       "name": "execute_tool apply_patch",
+       "kind": 1,
+       "startTimeUnixNano": "1791906597438000000",
+       "endTimeUnixNano": "1791906597457000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "00000001-0000-4000-8000-000000000001"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "apply_patch"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.id",
+         "value": {
+          "stringValue": "custom_call_2"
+         }
+        },
+        {
+         "key": "gen_ai.tool.type",
+         "value": {
+          "stringValue": "function"
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "github"
+         }
+        },
+        {
+         "key": "gen_ai.tool.description",
+         "value": {
+          "stringValue": "TOOL-DESCRIPTION"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "*** Begin Patch\n*** Update File: a.txt\n@@\n-one\n+two\n*** End Patch\n"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "Modified 1 file(s): /work/repo/a.txt"
+         }
+        }
+       ],
+       "droppedAttributesCount": 0,
+       "events": [],
+       "droppedEventsCount": 0,
+       "links": [],
+       "droppedLinksCount": 0,
+       "status": {
+        "message": "",
+        "code": 0
+       }
+      },
+      {
+       "traceId": "00000000000000000000000000000001",
+       "spanId": "0000000000000005",
+       "traceState": "",
+       "parentSpanId": "0000000000000002",
+       "flags": 257,
+       "name": "chat gpt-6-luna",
+       "kind": 3,
+       "startTimeUnixNano": "1791906596238000000",
+       "endTimeUnixNano": "1791906597435000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "github"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gpt-6-luna"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "00000001-0000-4000-8000-000000000001"
+         }
+        },
+        {
+         "key": "gen_ai.request.stream",
+         "value": {
+          "boolValue": true
+         }
+        },
+        {
+         "key": "gen_ai.request.previous_response.id",
+         "value": {
+          "stringValue": "resp_1"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "tool_calls"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "14483"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "33"
+         }
+        },
+        {
+         "key": "gen_ai.usage.cache_read.input_tokens",
+         "value": {
+          "intValue": "14351"
+         }
+        },
+        {
+         "key": "gen_ai.usage.cache_write.input_tokens",
+         "value": {
+          "intValue": "129"
+         }
+        },
+        {
+         "key": "gen_ai.usage.reasoning.output_tokens",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "gen_ai.response.model",
+         "value": {
+          "stringValue": "gpt-6-luna"
+         }
+        },
+        {
+         "key": "gen_ai.response.id",
+         "value": {
+          "stringValue": "resp_2"
+         }
+        },
+        {
+         "key": "github.copilot.service_request_id",
+         "value": {
+          "stringValue": "00000003-0000-4000-8000-000000000002"
+         }
+        },
+        {
+         "key": "github.copilot.cost",
+         "value": {
+          "doubleValue": 1.0
+         }
+        },
+        {
+         "key": "github.copilot.nano_aiu",
+         "value": {
+          "doubleValue": 17643500.0
+         }
+        },
+        {
+         "key": "github.copilot.server_duration",
+         "value": {
+          "doubleValue": 1193.0
+         }
+        },
+        {
+         "key": "github.copilot.initiator",
+         "value": {
+          "stringValue": "agent"
+         }
+        },
+        {
+         "key": "github.copilot.turn_id",
+         "value": {
+          "stringValue": "1"
+         }
+        },
+        {
+         "key": "github.copilot.interaction_id",
+         "value": {
+          "stringValue": "00000002-0000-4000-8000-000000000001"
+         }
+        },
+        {
+         "key": "gen_ai.response.time_to_first_chunk",
+         "value": {
+          "doubleValue": 0.906145333
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"tool\",\"parts\":[{\"type\":\"tool_call_3\",\"id\":\"custom_call_1\",\"response\":\"Added 1 file(s): /work/repo/a.txt\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"assistant\",\"parts\":[{\"type\":\"tool_call\",\"id\":\"custom_call_2\",\"name\":\"apply_patch\",\"arguments\":\"*** Begin Patch\\n*** Update File: a.txt\\n@@\\n-one\\n+two\\n*** End Patch\\n\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.system_instructions",
+         "value": {
+          "stringValue": "[{\"type\":\"text\",\"content\":\"SYSTEM-INSTRUCTIONS\"}]"
+         }
+        },
+        {
+         "key": "gen_ai.tool.definitions",
+         "value": {
+          "stringValue": "[{\"type\":\"function\",\"name\":\"bash\",\"description\":\"TOOL-DEFINITION\"}]"
+         }
+        }
+       ],
+       "droppedAttributesCount": 0,
+       "events": [],
+       "droppedEventsCount": 0,
+       "links": [],
+       "droppedLinksCount": 0,
+       "status": {
+        "message": "",
+        "code": 0
+       }
+      },
+      {
+       "traceId": "00000000000000000000000000000001",
+       "spanId": "0000000000000006",
+       "traceState": "",
+       "parentSpanId": "0000000000000002",
+       "flags": 257,
+       "name": "execute_tool bash bash",
+       "kind": 1,
+       "startTimeUnixNano": "1791906598491000000",
+       "endTimeUnixNano": "1791906598567000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "00000001-0000-4000-8000-000000000001"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "bash"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.id",
+         "value": {
+          "stringValue": "call_4"
+         }
+        },
+        {
+         "key": "gen_ai.tool.type",
+         "value": {
+          "stringValue": "function"
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "github"
+         }
+        },
+        {
+         "key": "gen_ai.tool.description",
+         "value": {
+          "stringValue": "TOOL-DESCRIPTION"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.arguments",
+         "value": {
+          "stringValue": "{\"command\":\"env | grep -c OTEL_EXPORTER\",\"description\":\"Count OTEL_EXPORTER environment variables\"}"
+         }
+        },
+        {
+         "key": "github.copilot.tool.parameters.command",
+         "value": {
+          "stringValue": "env | grep -c OTEL_EXPORTER"
+         }
+        },
+        {
+         "key": "process.executable.name",
+         "value": {
+          "stringValue": "bash"
+         }
+        },
+        {
+         "key": "process.executable.path",
+         "value": {
+          "stringValue": "/bin/bash"
+         }
+        },
+        {
+         "key": "process.exit.code",
+         "value": {
+          "intValue": "1"
+         }
+        },
+        {
+         "key": "gen_ai.tool.call.result",
+         "value": {
+          "stringValue": "0\n<shellId: 0 completed with exit code 1>"
+         }
+        }
+       ],
+       "droppedAttributesCount": 0,
+       "events": [
+        {
+         "timeUnixNano": "1791906598542000000",
+         "name": "github.copilot.sandbox.enforcement_state",
+         "attributes": [
+          {
+           "key": "github.copilot.sandbox.decision_kind",
+           "value": {
+            "stringValue": "enforcement_state"
+           }
+          },
+          {
+           "key": "github.copilot.sandbox.control",
+           "value": {
+            "stringValue": "process"
+           }
+          },
+          {
+           "key": "github.copilot.sandbox.outcome",
+           "value": {
+            "stringValue": "inactive"
+           }
+          },
+          {
+           "key": "github.copilot.sandbox.enforcement_point",
+           "value": {
+            "stringValue": "shell"
+           }
+          },
+          {
+           "key": "github.copilot.sandbox.platform",
+           "value": {
+            "stringValue": "macos"
+           }
+          },
+          {
+           "key": "github.copilot.sandbox.backend",
+           "value": {
+            "stringValue": "unsupported"
+           }
+          }
+         ],
+         "droppedAttributesCount": 0
+        }
+       ],
+       "droppedEventsCount": 0,
+       "links": [],
+       "droppedLinksCount": 0,
+       "status": {
+        "message": "",
+        "code": 0
+       }
+      },
+      {
+       "traceId": "00000000000000000000000000000001",
+       "spanId": "0000000000000007",
+       "traceState": "",
+       "parentSpanId": "0000000000000002",
+       "flags": 257,
+       "name": "chat gpt-6-luna",
+       "kind": 3,
+       "startTimeUnixNano": "1791906597472000000",
+       "endTimeUnixNano": "1791906598484000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "github"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gpt-6-luna"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "00000001-0000-4000-8000-000000000001"
+         }
+        },
+        {
+         "key": "gen_ai.request.stream",
+         "value": {
+          "boolValue": true
+         }
+        },
+        {
+         "key": "gen_ai.request.previous_response.id",
+         "value": {
+          "stringValue": "resp_2"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "tool_calls"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "14587"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "36"
+         }
+        },
+        {
+         "key": "gen_ai.usage.cache_read.input_tokens",
+         "value": {
+          "intValue": "14480"
+         }
+        },
+        {
+         "key": "gen_ai.usage.cache_write.input_tokens",
+         "value": {
+          "intValue": "104"
+         }
+        },
+        {
+         "key": "gen_ai.usage.reasoning.output_tokens",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "gen_ai.response.model",
+         "value": {
+          "stringValue": "gpt-6-luna"
+         }
+        },
+        {
+         "key": "gen_ai.response.id",
+         "value": {
+          "stringValue": "resp_3"
+         }
+        },
+        {
+         "key": "github.copilot.service_request_id",
+         "value": {
+          "stringValue": "00000003-0000-4000-8000-000000000003"
+         }
+        },
+        {
+         "key": "github.copilot.cost",
+         "value": {
+          "doubleValue": 1.0
+         }
+        },
+        {
+         "key": "github.copilot.nano_aiu",
+         "value": {
+          "doubleValue": 17610000.0
+         }
+        },
+        {
+         "key": "github.copilot.server_duration",
+         "value": {
+          "doubleValue": 1009.0
+         }
+        },
+        {
+         "key": "github.copilot.initiator",
+         "value": {
+          "stringValue": "agent"
+         }
+        },
+        {
+         "key": "github.copilot.turn_id",
+         "value": {
+          "stringValue": "2"
+         }
+        },
+        {
+         "key": "github.copilot.interaction_id",
+         "value": {
+          "stringValue": "00000002-0000-4000-8000-000000000001"
+         }
+        },
+        {
+         "key": "gen_ai.response.time_to_first_chunk",
+         "value": {
+          "doubleValue": 0.748035667
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"tool\",\"parts\":[{\"type\":\"tool_call_3\",\"id\":\"custom_call_2\",\"response\":\"Modified 1 file(s): /work/repo/a.txt\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"assistant\",\"parts\":[{\"type\":\"tool_call\",\"id\":\"call_4\",\"name\":\"bash\",\"arguments\":{\"command\":\"env | grep -c OTEL_EXPORTER\",\"description\":\"Count OTEL_EXPORTER environment variables\"}}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.system_instructions",
+         "value": {
+          "stringValue": "[{\"type\":\"text\",\"content\":\"SYSTEM-INSTRUCTIONS\"}]"
+         }
+        },
+        {
+         "key": "gen_ai.tool.definitions",
+         "value": {
+          "stringValue": "[{\"type\":\"function\",\"name\":\"bash\",\"description\":\"TOOL-DEFINITION\"}]"
+         }
+        }
+       ],
+       "droppedAttributesCount": 0,
+       "events": [],
+       "droppedEventsCount": 0,
+       "links": [],
+       "droppedLinksCount": 0,
+       "status": {
+        "message": "",
+        "code": 0
+       }
+      },
+      {
+       "traceId": "00000000000000000000000000000001",
+       "spanId": "0000000000000008",
+       "traceState": "",
+       "parentSpanId": "0000000000000002",
+       "flags": 257,
+       "name": "chat gpt-6-luna",
+       "kind": 3,
+       "startTimeUnixNano": "1791906598586000000",
+       "endTimeUnixNano": "1791906599646000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "github"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "gpt-6-luna"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "00000001-0000-4000-8000-000000000001"
+         }
+        },
+        {
+         "key": "gen_ai.request.stream",
+         "value": {
+          "boolValue": true
+         }
+        },
+        {
+         "key": "gen_ai.request.previous_response.id",
+         "value": {
+          "stringValue": "resp_3"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "14649"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "40"
+         }
+        },
+        {
+         "key": "gen_ai.usage.cache_read.input_tokens",
+         "value": {
+          "intValue": "14584"
+         }
+        },
+        {
+         "key": "gen_ai.usage.cache_write.input_tokens",
+         "value": {
+          "intValue": "62"
+         }
+        },
+        {
+         "key": "gen_ai.usage.reasoning.output_tokens",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "gen_ai.response.model",
+         "value": {
+          "stringValue": "gpt-6-luna"
+         }
+        },
+        {
+         "key": "gen_ai.response.id",
+         "value": {
+          "stringValue": "resp_4"
+         }
+        },
+        {
+         "key": "github.copilot.service_request_id",
+         "value": {
+          "stringValue": "00000003-0000-4000-8000-000000000004"
+         }
+        },
+        {
+         "key": "github.copilot.cost",
+         "value": {
+          "doubleValue": 1.0
+         }
+        },
+        {
+         "key": "github.copilot.nano_aiu",
+         "value": {
+          "doubleValue": 17389000.0
+         }
+        },
+        {
+         "key": "github.copilot.server_duration",
+         "value": {
+          "doubleValue": 1057.0
+         }
+        },
+        {
+         "key": "github.copilot.initiator",
+         "value": {
+          "stringValue": "agent"
+         }
+        },
+        {
+         "key": "github.copilot.turn_id",
+         "value": {
+          "stringValue": "3"
+         }
+        },
+        {
+         "key": "github.copilot.interaction_id",
+         "value": {
+          "stringValue": "00000002-0000-4000-8000-000000000001"
+         }
+        },
+        {
+         "key": "gen_ai.response.time_to_first_chunk",
+         "value": {
+          "doubleValue": 0.644679375
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"tool\",\"parts\":[{\"type\":\"tool_call_3\",\"id\":\"call_4\",\"response\":\"0\\n<shellId: 0 completed with exit code 1>\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"assistant\",\"parts\":[{\"type\":\"text\",\"content\":\"REPLY-TEXT\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.system_instructions",
+         "value": {
+          "stringValue": "[{\"type\":\"text\",\"content\":\"SYSTEM-INSTRUCTIONS\"}]"
+         }
+        },
+        {
+         "key": "gen_ai.tool.definitions",
+         "value": {
+          "stringValue": "[{\"type\":\"function\",\"name\":\"bash\",\"description\":\"TOOL-DEFINITION\"}]"
+         }
+        }
+       ],
+       "droppedAttributesCount": 0,
+       "events": [],
+       "droppedEventsCount": 0,
+       "links": [],
+       "droppedLinksCount": 0,
+       "status": {
+        "message": "",
+        "code": 0
+       }
+      },
+      {
+       "traceId": "00000000000000000000000000000001",
+       "spanId": "0000000000000002",
+       "traceState": "",
+       "parentSpanId": "",
+       "flags": 257,
+       "name": "invoke_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1791906593382000000",
+       "endTimeUnixNano": "1791906599683000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "github"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "00000001-0000-4000-8000-000000000001"
+         }
+        },
+        {
+         "key": "enduser.pseudo.id",
+         "value": {
+          "stringValue": "00000000000000000000000000000000"
+         }
+        },
+        {
+         "key": "github.copilot.context.mcp_server_names",
+         "value": {
+          "stringValue": "[\"github-mcp-server\"]"
+         }
+        },
+        {
+         "key": "github.copilot.agent.type",
+         "value": {
+          "stringValue": "builtin"
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "58073"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "167"
+         }
+        },
+        {
+         "key": "github.copilot.cost",
+         "value": {
+          "doubleValue": 4.0
+         }
+        },
+        {
+         "key": "github.copilot.nano_aiu",
+         "value": {
+          "doubleValue": 234960000.0
+         }
+        },
+        {
+         "key": "github.copilot.turn_count",
+         "value": {
+          "intValue": "4"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"user\",\"parts\":[{\"type\":\"text\",\"content\":\"PROMPT-TEXT\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\":\"assistant\",\"parts\":[{\"type\":\"text\",\"content\":\"REPLY-TEXT\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.system_instructions",
+         "value": {
+          "stringValue": "[{\"type\":\"text\",\"content\":\"SYSTEM-INSTRUCTIONS\"}]"
+         }
+        },
+        {
+         "key": "gen_ai.tool.definitions",
+         "value": {
+          "stringValue": "[{\"type\":\"function\",\"name\":\"bash\",\"description\":\"TOOL-DEFINITION\"}]"
+         }
+        }
+       ],
+       "droppedAttributesCount": 0,
+       "events": [
+        {
+         "timeUnixNano": "1791906593382000000",
+         "name": "github.copilot.mcp.server.lifecycle",
+         "attributes": [
+          {
+           "key": "github.copilot.mcp.server.state",
+           "value": {
+            "stringValue": "discovered"
+           }
+          },
+          {
+           "key": "github.copilot.mcp.server.name_hash",
+           "value": {
+            "stringValue": "0000000000000000000000000000000000000000000000000000000000000000"
+           }
+          },
+          {
+           "key": "github.copilot.mcp.server.name",
+           "value": {
+            "stringValue": "github-mcp-server"
+           }
+          },
+          {
+           "key": "github.copilot.mcp.server.source",
+           "value": {
+            "stringValue": "builtin"
+           }
+          }
+         ],
+         "droppedAttributesCount": 0
+        },
+        {
+         "timeUnixNano": "1791906593382000000",
+         "name": "github.copilot.mcp.server.lifecycle",
+         "attributes": [
+          {
+           "key": "github.copilot.mcp.server.state",
+           "value": {
+            "stringValue": "initialized"
+           }
+          },
+          {
+           "key": "github.copilot.mcp.server.name_hash",
+           "value": {
+            "stringValue": "0000000000000000000000000000000000000000000000000000000000000000"
+           }
+          },
+          {
+           "key": "github.copilot.mcp.server.name",
+           "value": {
+            "stringValue": "github-mcp-server"
+           }
+          },
+          {
+           "key": "github.copilot.mcp.server.source",
+           "value": {
+            "stringValue": "builtin"
+           }
+          }
+         ],
+         "droppedAttributesCount": 0
+        },
+        {
+         "timeUnixNano": "1791906593382000000",
+         "name": "github.copilot.user.message",
+         "attributes": [
+          {
+           "key": "github.copilot.user.message.source",
+           "value": {
+            "stringValue": "user"
+           }
+          },
+          {
+           "key": "github.copilot.user.message.interaction_id",
+           "value": {
+            "stringValue": "00000002-0000-4000-8000-000000000001"
+           }
+          },
+          {
+           "key": "github.copilot.user.message.turn_id",
+           "value": {
+            "stringValue": "0"
+           }
+          }
+         ],
+         "droppedAttributesCount": 0
+        },
+        {
+         "timeUnixNano": "1791906593391000000",
+         "name": "github.copilot.hook.start",
+         "attributes": [
+          {
+           "key": "github.copilot.hook.type",
+           "value": {
+            "stringValue": "sessionStart"
+           }
+          },
+          {
+           "key": "github.copilot.hook.invocation_id",
+           "value": {
+            "stringValue": "00000004-0000-4000-8000-000000000001"
+           }
+          }
+         ],
+         "droppedAttributesCount": 0
+        },
+        {
+         "timeUnixNano": "1791906593402000000",
+         "name": "github.copilot.hook.end",
+         "attributes": [
+          {
+           "key": "github.copilot.hook.type",
+           "value": {
+            "stringValue": "sessionStart"
+           }
+          },
+          {
+           "key": "github.copilot.hook.invocation_id",
+           "value": {
+            "stringValue": "00000004-0000-4000-8000-000000000001"
+           }
+          },
+          {
+           "key": "github.copilot.hook.duration",
+           "value": {
+            "doubleValue": 0.011576417
+           }
+          }
+         ],
+         "droppedAttributesCount": 0
+        },
+        {
+         "timeUnixNano": "1791906593410000000",
+         "name": "github.copilot.session.usage_info",
+         "attributes": [
+          {
+           "key": "github.copilot.token_limit",
+           "value": {
+            "intValue": "272000"
+           }
+          },
+          {
+           "key": "github.copilot.current_tokens",
+           "value": {
+            "intValue": "15696"
+           }
+          },
+          {
+           "key": "github.copilot.messages_length",
+           "value": {
+            "intValue": "3"
+           }
+          }
+         ],
+         "droppedAttributesCount": 0
+        },
+        {
+         "timeUnixNano": "1791906596182000000",
+         "name": "github.copilot.hook.start",
+         "attributes": [
+          {
+           "key": "github.copilot.hook.type",
+           "value": {
+            "stringValue": "postToolUse"
+           }
+          },
+          {
+           "key": "github.copilot.hook.invocation_id",
+           "value": {
+            "stringValue": "00000004-0000-4000-8000-000000000002"
+           }
+          },
+          {
+           "key": "github.copilot.hook.tool_names",
+           "value": {
+            "stringValue": "[\"apply_patch\"]"
+           }
+          }
+         ],
+         "droppedAttributesCount": 0
+        },
+        {
+         "timeUnixNano": "1791906596201000000",
+         "name": "github.copilot.hook.end",
+         "attributes": [
+          {
+           "key": "github.copilot.hook.type",
+           "value": {
+            "stringValue": "postToolUse"
+           }
+          },
+          {
+           "key": "github.copilot.hook.invocation_id",
+           "value": {
+            "stringValue": "00000004-0000-4000-8000-000000000002"
+           }
+          },
+          {
+           "key": "github.copilot.hook.tool_names",
+           "value": {
+            "stringValue": "[\"apply_patch\"]"
+           }
+          },
+          {
+           "key": "github.copilot.hook.decision",
+           "value": {
+            "stringValue": "allow"
+           }
+          },
+          {
+           "key": "github.copilot.hook.duration",
+           "value": {
+            "doubleValue": 0.019342625
+           }
+          }
+         ],
+         "droppedAttributesCount": 0
+        },
+        {
+         "timeUnixNano": "1791906596232000000",
+         "name": "github.copilot.session.usage_info",
+         "attributes": [
+          {
+           "key": "github.copilot.token_limit",
+           "value": {
+            "intValue": "272000"
+           }
+          },
+          {
+           "key": "github.copilot.current_tokens",
+           "value": {
+            "intValue": "15837"
+           }
+          },
+          {
+           "key": "github.copilot.messages_length",
+           "value": {
+            "intValue": "5"
+           }
+          }
+         ],
+         "droppedAttributesCount": 0
+        },
+        {
+         "timeUnixNano": "1791906597440000000",
+         "name": "github.copilot.hook.start",
+         "attributes": [
+          {
+           "key": "github.copilot.hook.type",
+           "value": {
+            "stringValue": "postToolUse"
+           }
+          },
+          {
+           "key": "github.copilot.hook.invocation_id",
+           "value": {
+            "stringValue": "00000004-0000-4000-8000-000000000003"
+           }
+          },
+          {
+           "key": "github.copilot.hook.tool_names",
+           "value": {
+            "stringValue": "[\"apply_patch\"]"
+           }
+          }
+         ],
+         "droppedAttributesCount": 0
+        },
+        {
+         "timeUnixNano": "1791906597456000000",
+         "name": "github.copilot.hook.end",
+         "attributes": [
+          {
+           "key": "github.copilot.hook.type",
+           "value": {
+            "stringValue": "postToolUse"
+           }
+          },
+          {
+           "key": "github.copilot.hook.invocation_id",
+           "value": {
+            "stringValue": "00000004-0000-4000-8000-000000000003"
+           }
+          },
+          {
+           "key": "github.copilot.hook.tool_names",
+           "value": {
+            "stringValue": "[\"apply_patch\"]"
+           }
+          },
+          {
+           "key": "github.copilot.hook.decision",
+           "value": {
+            "stringValue": "allow"
+           }
+          },
+          {
+           "key": "github.copilot.hook.duration",
+           "value": {
+            "doubleValue": 0.015547417
+           }
+          }
+         ],
+         "droppedAttributesCount": 0
+        },
+        {
+         "timeUnixNano": "1791906597467000000",
+         "name": "github.copilot.session.usage_info",
+         "attributes": [
+          {
+           "key": "github.copilot.token_limit",
+           "value": {
+            "intValue": "272000"
+           }
+          },
+          {
+           "key": "github.copilot.current_tokens",
+           "value": {
+            "intValue": "15954"
+           }
+          },
+          {
+           "key": "github.copilot.messages_length",
+           "value": {
+            "intValue": "7"
+           }
+          }
+         ],
+         "droppedAttributesCount": 0
+        },
+        {
+         "timeUnixNano": "1791906598550000000",
+         "name": "github.copilot.hook.start",
+         "attributes": [
+          {
+           "key": "github.copilot.hook.type",
+           "value": {
+            "stringValue": "postToolUse"
+           }
+          },
+          {
+           "key": "github.copilot.hook.invocation_id",
+           "value": {
+            "stringValue": "00000004-0000-4000-8000-000000000004"
+           }
+          },
+          {
+           "key": "github.copilot.hook.tool_names",
+           "value": {
+            "stringValue": "[\"bash\"]"
+           }
+          }
+         ],
+         "droppedAttributesCount": 0
+        },
+        {
+         "timeUnixNano": "1791906598565000000",
+         "name": "github.copilot.hook.end",
+         "attributes": [
+          {
+           "key": "github.copilot.hook.type",
+           "value": {
+            "stringValue": "postToolUse"
+           }
+          },
+          {
+           "key": "github.copilot.hook.invocation_id",
+           "value": {
+            "stringValue": "00000004-0000-4000-8000-000000000004"
+           }
+          },
+          {
+           "key": "github.copilot.hook.tool_names",
+           "value": {
+            "stringValue": "[\"bash\"]"
+           }
+          },
+          {
+           "key": "github.copilot.hook.decision",
+           "value": {
+            "stringValue": "allow"
+           }
+          },
+          {
+           "key": "github.copilot.hook.duration",
+           "value": {
+            "doubleValue": 0.015057125
+           }
+          }
+         ],
+         "droppedAttributesCount": 0
+        },
+        {
+         "timeUnixNano": "1791906598579000000",
+         "name": "github.copilot.session.usage_info",
+         "attributes": [
+          {
+           "key": "github.copilot.token_limit",
+           "value": {
+            "intValue": "272000"
+           }
+          },
+          {
+           "key": "github.copilot.current_tokens",
+           "value": {
+            "intValue": "16026"
+           }
+          },
+          {
+           "key": "github.copilot.messages_length",
+           "value": {
+            "intValue": "9"
+           }
+          }
+         ],
+         "droppedAttributesCount": 0
+        },
+        {
+         "timeUnixNano": "1791906599651000000",
+         "name": "github.copilot.hook.start",
+         "attributes": [
+          {
+           "key": "github.copilot.hook.type",
+           "value": {
+            "stringValue": "agentStop"
+           }
+          },
+          {
+           "key": "github.copilot.hook.invocation_id",
+           "value": {
+            "stringValue": "00000004-0000-4000-8000-000000000005"
+           }
+          }
+         ],
+         "droppedAttributesCount": 0
+        },
+        {
+         "timeUnixNano": "1791906599665000000",
+         "name": "github.copilot.hook.end",
+         "attributes": [
+          {
+           "key": "github.copilot.hook.type",
+           "value": {
+            "stringValue": "agentStop"
+           }
+          },
+          {
+           "key": "github.copilot.hook.invocation_id",
+           "value": {
+            "stringValue": "00000004-0000-4000-8000-000000000005"
+           }
+          },
+          {
+           "key": "github.copilot.hook.duration",
+           "value": {
+            "doubleValue": 0.013790125
+           }
+          }
+         ],
+         "droppedAttributesCount": 0
+        },
+        {
+         "timeUnixNano": "1791906599665000000",
+         "name": "github.copilot.hook.start",
+         "attributes": [
+          {
+           "key": "github.copilot.hook.type",
+           "value": {
+            "stringValue": "sessionEnd"
+           }
+          },
+          {
+           "key": "github.copilot.hook.invocation_id",
+           "value": {
+            "stringValue": "00000004-0000-4000-8000-000000000006"
+           }
+          }
+         ],
+         "droppedAttributesCount": 0
+        },
+        {
+         "timeUnixNano": "1791906599679000000",
+         "name": "github.copilot.hook.end",
+         "attributes": [
+          {
+           "key": "github.copilot.hook.type",
+           "value": {
+            "stringValue": "sessionEnd"
+           }
+          },
+          {
+           "key": "github.copilot.hook.invocation_id",
+           "value": {
+            "stringValue": "00000004-0000-4000-8000-000000000006"
+           }
+          },
+          {
+           "key": "github.copilot.hook.duration",
+           "value": {
+            "doubleValue": 0.014140333
+           }
+          }
+         ],
+         "droppedAttributesCount": 0
+        }
+       ],
+       "droppedEventsCount": 0,
+       "links": [],
+       "droppedLinksCount": 0,
+       "status": {
+        "message": "",
+        "code": 0
+       }
+      }
+     ],
+     "schemaUrl": ""
+    }
+   ],
+   "schemaUrl": "https://opentelemetry.io/schemas/1.44.0"
+  }
+ ]
+}

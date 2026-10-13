@@ -157,9 +157,10 @@ func TestPlannersRefuseAFileTheyCannotRead(t *testing.T) {
 func TestUserHooksInstallIdempotentlyAndRemoveCleanly(t *testing.T) {
 	t.Parallel()
 	mine := map[string]string{
-		"claude": `{"env":{"A":"1"},"hooks":{"Stop":[{"hooks":[{"type":"command","command":"say done"}]}]}}`,
-		"codex":  `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"say done"}]}]}}`,
-		"cursor": `{"version":1,"hooks":{"stop":[{"command":"say done"}]}}`,
+		"claude":  `{"env":{"A":"1"},"hooks":{"Stop":[{"hooks":[{"type":"command","command":"say done"}]}]}}`,
+		"codex":   `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"say done"}]}]}}`,
+		"cursor":  `{"version":1,"hooks":{"stop":[{"command":"say done"}]}}`,
+		"copilot": `{"version":1,"hooks":{"Stop":[{"type":"command","bash":"say done"}]}}`,
 	}
 	for _, a := range reg.With[agents.UserHooks]() {
 		t.Run(a.Name(), func(t *testing.T) {

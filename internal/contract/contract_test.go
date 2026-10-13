@@ -72,9 +72,13 @@ func TestRelayExporterFiles(t *testing.T) {
 			for key, dir := range map[string]string{
 				"CLAUDE_CONFIG_DIR": "claude", "CODEX_HOME": "codex", "XDG_CONFIG_HOME": "xdg",
 				"PI_CODING_AGENT_DIR": "pi", "OMP_DIR": "omp", "HERMES_HOME": "hermes",
-				"GEMINI_CLI_HOME": "gemini", "DSH_HOME": "dsh",
+				"GEMINI_CLI_HOME": "gemini", "DSH_HOME": "dsh", "COPILOT_HOME": "copilot", "VSCODE_APPDATA": "vscode",
 			} {
 				t.Setenv(key, filepath.Join(home, dir))
+			}
+			// An editor that has run here: one that never has gets no settings.
+			if err := os.MkdirAll(filepath.Join(home, "vscode", "Code", "User"), 0o700); err != nil {
+				t.Fatal(err)
 			}
 			state := filepath.Join(home, ".terma-state", "relay")
 			if err := os.MkdirAll(state, 0o700); err != nil {

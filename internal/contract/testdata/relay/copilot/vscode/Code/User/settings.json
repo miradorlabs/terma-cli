@@ -1,0 +1,9 @@
+{
+    "github.copilot.chat.otel.enabled": true,
+    "github.copilot.chat.otel.otlpEndpoint": "http://127.0.0.1:43180/relay-token",
+    "github.copilot.chat.otel.captureContent": true,
+    "chat.agentHost.otel.enabled": true,
+    "chat.agentHost.otel.otlpEndpoint": "http://127.0.0.1:43180/relay-token/v1/traces",
+    "chat.agentHost.otel.captureContent": true,
+    "settingsSync.ignoredSettings": ["github.copilot.chat.otel.enabled","github.copilot.chat.otel.otlpEndpoint","github.copilot.chat.otel.captureContent","chat.agentHost.otel.enabled","chat.agentHost.otel.otlpEndpoint","chat.agentHost.otel.captureContent"]
+}
