@@ -205,7 +205,7 @@ func (app *App) reuseStoredSession(ctx context.Context, cfg *config.Config, want
 	if err != nil {
 		return nil, false, err
 	}
-	// A credential kept before its email or user id was learns them from whoami.
+	// A credential saved before terma kept the email and user id learns them from whoami.
 	verified.UserEmail = cmp.Or(verified.UserEmail, identity.Email)
 	verified.UserID = cmp.Or(verified.UserID, identity.UserID)
 	// Saved as a sign-in would, so running setup again moves the tokens to where they now belong.

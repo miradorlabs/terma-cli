@@ -335,7 +335,11 @@ func TestNameHeartbeatUserNamesTheRecord(t *testing.T) {
 				n++
 			}
 		}
-		if got := attr(rec.Attributes, semconv.TermaUserIDKey); got != user || n != min(len(user), 1) {
+		want := 0
+		if user != "" {
+			want = 1
+		}
+		if got := attr(rec.Attributes, semconv.TermaUserIDKey); got != user || n != want {
 			t.Errorf("named %q: terma.user.id = %q, %d times", user, got, n)
 		}
 		if attr(beat.ResourceLogs[0].Resource.Attributes, semconv.TermaUserIDKey) != "" {

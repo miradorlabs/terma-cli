@@ -86,9 +86,7 @@ func (r *Relay) StopHeartbeat(ctx context.Context, exit string) error {
 }
 
 // NameHeartbeatUser names user, the Mirador user terma is signed in as, on beat's record as
-// terma.user.id; "" names no one. The sender calls it only for a beat that goes with the
-// signed-in organization's own team key, so the id never reaches another organization's or
-// environment's ingest.
+// terma.user.id; "" names no one.
 func NameHeartbeatUser(beat *logspb.LogsData, user string) {
 	if user == "" {
 		return

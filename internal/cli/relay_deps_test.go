@@ -18,9 +18,10 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
-// Only a beat that goes with the selected team's key names the signed-in user: a beat that
-// falls back to another key held here, which may be another organization's or environment's,
-// names no one, and so does one sent while the login is another organization's.
+// Only a beat that goes with the key of the team whose validated policy the login fetched names
+// the signed-in user: a beat that falls back to another key held here, goes with a key
+// TERMA_TEAM_ID alone picked or to another environment's ingest, names no one, and so does one
+// sent while the login is another organization's.
 func TestHeartbeatNamesTheUserOnlyWithTheTeamKey(t *testing.T) {
 	var sent []string // "<key>=<terma.user.id>" per beat the ingest accepted
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -76,7 +77,20 @@ func TestHeartbeatNamesTheUserOnlyWithTheTeamKey(t *testing.T) {
 	send()
 	signIn("org-b", "user-b") // the login moved to another organization; the profile did not
 	send()
-	want := []string{"ter_srv_elsewhere=", "ter_srv_team=user-a", "ter_srv_team="}
+	signIn("org-a", "user-a")
+	// No team selected, so no validated policy: TERMA_TEAM_ID alone picks the key.
+	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.Team = "" }); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TERMA_TEAM_ID", "elsewhere")
+	send()
+	t.Setenv("TERMA_TEAM_ID", "")
+	selectPolicy(t, config.Policy{Mode: config.ModeRepo, TeamID: "team", Revision: 1, FetchedAt: time.Now()})
+	// Unpinned, the profile's ingest is its environment's, while the team's key was filed with
+	// this test ingest's hosts: another environment's, so the beat goes there naming no one.
+	t.Setenv("TERMA_OTLP_URL", "")
+	send()
+	want := []string{"ter_srv_elsewhere=", "ter_srv_team=user-a", "ter_srv_team=", "ter_srv_elsewhere=", "ter_srv_team="}
 	if strings.Join(sent, " ") != strings.Join(want, " ") {
 		t.Fatalf("beats sent %q, want %q", sent, want)
 	}

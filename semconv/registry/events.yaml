@@ -578,4 +578,6 @@ events:
         requirement_level: recommended
       - ref: terma.user.id
         requirement_level:
-          conditionally_required: When terma is signed in as a person.
+          conditionally_required: >-
+            When terma is signed in as a person in the profile's organization and the beat goes
+            with the key of the team whose policy that login fetched.
