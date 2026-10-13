@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -43,7 +44,7 @@ func TestStagedFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	staged, err := StagedFiles(ctx, dir)
-	if err != nil || len(staged) != 1 || staged[0] != "src/a.go" {
+	if err != nil || len(staged) != 1 || staged[0] != (StagedFile{Path: "src/a.go"}) {
 		t.Fatalf("staged %v (%v)", staged, err)
 	}
 	if _, err := run(ctx, dir, "commit", "-q", "-m", "first\n\nAgent-Session-Id: s1"); err != nil {
@@ -51,6 +52,33 @@ func TestStagedFiles(t *testing.T) {
 	}
 	if staged, _ := StagedFiles(ctx, dir); len(staged) != 0 {
 		t.Fatalf("nothing should be staged after commit: %v", staged)
+	}
+}
+
+// A staged rename names the path it moved from, edited or not, whatever diff.renames says.
+func TestStagedFilesNamesARenamesOldPath(t *testing.T) {
+	t.Parallel()
+	dir := initRepo(t)
+	ctx := context.Background()
+	if err := os.MkdirAll(filepath.Join(dir, "src"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.WriteFile(filepath.Join(dir, "src", "store.ts"), []byte("one\ntwo\nthree\nfour\nfive\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "b.txt"), []byte("b\n"), 0o644)
+	for _, args := range [][]string{{"add", "-A"}, {"commit", "-q", "-m", "first"}, {"config", "diff.renames", "false"}, {"mv", "src/store.ts", "src/storage.ts"}} {
+		if _, err := run(ctx, dir, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_ = os.WriteFile(filepath.Join(dir, "src", "storage.ts"), []byte("one\ntwo\nthree\nfour\nfive\nsix\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "b.txt"), []byte("b\nb\n"), 0o644)
+	if _, err := run(ctx, dir, "add", "-A"); err != nil {
+		t.Fatal(err)
+	}
+	staged, err := StagedFiles(ctx, dir)
+	want := []StagedFile{{Path: "b.txt"}, {Path: "src/storage.ts", OldPath: "src/store.ts"}}
+	if err != nil || !slices.Equal(staged, want) {
+		t.Fatalf("staged %+v (%v), want %+v", staged, err, want)
 	}
 }
 

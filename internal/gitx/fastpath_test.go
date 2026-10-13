@@ -165,14 +165,14 @@ func TestParseNumstat(t *testing.T) {
 			// A rename spends three records.
 			block: "\x004\t2\t\x00old.txt\x00new.txt\x009\t9\tafter.txt\x00",
 			want: []FileStat{
-				{Path: "new.txt", Added: 4, Deleted: 2},
+				{Path: "new.txt", OldPath: "old.txt", Added: 4, Deleted: 2},
 				{Path: "after.txt", Added: 9, Deleted: 9},
 			},
 		},
 		{
 			name:  "binary rename",
 			block: "\x00-\t-\t\x00old.bin\x00new.bin\x00",
-			want:  []FileStat{{Path: "new.bin", Binary: true}},
+			want:  []FileStat{{Path: "new.bin", OldPath: "old.bin", Binary: true}},
 		},
 		{
 			name:  "tabs and spaces in a path stay in the path",
@@ -248,18 +248,19 @@ func TestLastCommitFileStats(t *testing.T) {
 			},
 		},
 		{
-			name: "rename with an edit, followed by another file",
+			name: "rename with an edit under diff.renames=false, followed by another file",
 			setup: func(t *testing.T, root string) {
 				write(t, root, "old.txt", "a\nb\nc\n")
 				write(t, root, "zz.txt", "z\n")
 				commit(t, root, "add")
+				mustGit(t, root, "config", "diff.renames", "false")
 				mustGit(t, root, "mv", "old.txt", "new.txt")
 				write(t, root, "new.txt", "a\nb\nc\nd\n")
 				write(t, root, "zz.txt", "z\nz\n")
 				commit(t, root, "rename and edit")
 			},
 			want: []FileStat{
-				{Path: "new.txt", Added: 1},
+				{Path: "new.txt", OldPath: "old.txt", Added: 1},
 				{Path: "zz.txt", Added: 1},
 			},
 		},
