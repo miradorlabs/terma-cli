@@ -87,41 +87,12 @@ func (d Deps) Engine(ctx context.Context, stateDir string, cfg *config.Config, s
 	opts := relay.Options{Correlators: d.Correlators, Capturers: d.Capturers,
 		Hold: s.Hold, Dir: filepath.Join(claim.Dir(stateDir), relay.OutboxDir), Resolve: d.Resolver(cfg, minter.Mint), Version: d.Version,
 		Lookup:   func(sessionID string, now time.Time) (claim.Claim, bool) { return claim.Read(stateDir, sessionID, now) },
-		CatchAll: d.CatchAll(), HeartbeatSend: d.SendHeartbeat, HeartbeatEvery: s.Heartbeat, UserID: d.UserID(),
+		CatchAll: d.CatchAll(), HeartbeatSend: d.SendHeartbeat, HeartbeatEvery: s.Heartbeat,
 		PeerPID: procinfo.FindSender, ProcessAlive: procinfo.Alive, ClaimCacheTTL: time.Second, PolicyCacheTTL: time.Second}
 	if s.Debug && logw != nil {
 		opts.Logf = func(f string, a ...any) { fmt.Fprintf(logw, time.Now().Format("15:04:05.000 ")+f+"\n", a...) }
 	}
 	return opts
-}
-
-// UserID is who the heartbeat names, read from the configuration as it stands at each
-// beat; nil without LoadConfig.
-func (d Deps) UserID() func() string {
-	if d.LoadConfig == nil {
-		return nil
-	}
-	return func() string {
-		cfg, err := d.LoadConfig()
-		if err != nil {
-			return ""
-		}
-		return SignedInUser(cfg)
-	}
-}
-
-// SignedInUser is the Mirador user cfg's profile is signed in as, from credentials.json
-// alone, never the keychain: "" when it is signed out, signed in for another environment,
-// or set up with a server key, which is no one's.
-func SignedInUser(cfg *config.Config) string {
-	if cfg.ServerKeySignIn {
-		return ""
-	}
-	cred, err := auth.LoadIdentity(cfg.Dir, cfg.ProfileName)
-	if err != nil || cred.CheckEnvironment(cfg.AuthURL) != nil {
-		return ""
-	}
-	return cred.UserID
 }
 
 // Resolver turns a claim into its session's policy, minting a missing key with mint.

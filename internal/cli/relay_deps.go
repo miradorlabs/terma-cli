@@ -11,6 +11,7 @@ import (
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/globalmode"
@@ -62,6 +63,8 @@ func (app *App) createProjectKey(ctx context.Context, cfg *config.Config, projec
 
 // relayHeartbeatSend delivers a heartbeat to a project's ingest with that project's key: the
 // selected team's, minted if missing, else any project's held here; with none, nothing is sent.
+// Only a beat that goes with the selected team's key names the signed-in user: any other key
+// held here may belong to another organization or environment.
 func (app *App) relayHeartbeatSend(ctx context.Context, beat *logspb.LogsData) error {
 	cfg, err := config.Load(app.dir, app.stateDir, config.Overrides{})
 	if err != nil {
@@ -81,10 +84,27 @@ func (app *App) relayHeartbeatSend(ctx context.Context, beat *logspb.LogsData) e
 			return err // every key sits in the one keychain: asking for the next would wait as long
 		}
 		if projectID != "" && key != "" {
+			if projectID == selected {
+				relay.NameHeartbeatUser(beat, signedInUser(cfg))
+			}
 			return sendHeartbeat(ctx, app.delivery().Endpoint(cfg, projectID), key, beat)
 		}
 	}
 	return relay.ErrNoKey
+}
+
+// signedInUser is the Mirador user cfg's profile is signed in as, from credentials.json alone,
+// never the keychain: "" when it is signed out, signed in for another organization or
+// environment, or set up with a server key, which is no one's.
+func signedInUser(cfg *config.Config) string {
+	if cfg.ServerKeySignIn {
+		return ""
+	}
+	cred, err := auth.LoadIdentity(cfg.Dir, cfg.ProfileName)
+	if err != nil || cred.CheckEnvironment(cfg.AuthURL) != nil || cred.OrganizationID != cfg.OrganizationID {
+		return ""
+	}
+	return cred.UserID
 }
 
 func sendHeartbeat(ctx context.Context, endpoint, key string, beat *logspb.LogsData) error {

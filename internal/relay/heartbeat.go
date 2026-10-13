@@ -16,9 +16,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
-// The heartbeat is one log record naming the machine, and the Mirador user signed in as it
-// is sent if any (terma.user.id), with terma's version and what started the relay on its
-// resource, timestamped when sent; it goes through HeartbeatSend,
+// The heartbeat is one log record naming the machine, with terma's version and what
+// started the relay on its resource, timestamped when sent; it goes through HeartbeatSend,
 // never the outbox, and a failed beat is not kept. Its terma.relay.heartbeat.reason says why
 // it was sent. Every beat carries the counters since the previous one as
 // terma.relay.heartbeat.counter.<name> ints, and a failed beat hands its counters to the
@@ -86,6 +85,23 @@ func (r *Relay) StopHeartbeat(ctx context.Context, exit string) error {
 	return r.heartbeat(ctx, semconv.TermaRelayHeartbeatReasonExit, exit)
 }
 
+// NameHeartbeatUser names user, the Mirador user terma is signed in as, on beat's record as
+// terma.user.id; "" names no one. The sender calls it only for a beat that goes with the
+// signed-in organization's own team key, so the id never reaches another organization's or
+// environment's ingest.
+func NameHeartbeatUser(beat *logspb.LogsData, user string) {
+	if user == "" {
+		return
+	}
+	for _, rl := range beat.GetResourceLogs() {
+		for _, sl := range rl.GetScopeLogs() {
+			for _, rec := range sl.GetLogRecords() {
+				rec.Attributes = append(rec.Attributes, &commonpb.KeyValue{Key: semconv.TermaUserIDKey, Value: strValue(user)})
+			}
+		}
+	}
+}
+
 func (r *Relay) heartbeatData(reason string, attrs []*commonpb.KeyValue) *logspb.LogsData {
 	host, _ := os.Hostname()
 	now := uint64(r.opts.Now().UnixNano())
@@ -98,11 +114,6 @@ func (r *Relay) heartbeatData(reason string, attrs []*commonpb.KeyValue) *logspb
 			{Key: semconv.TermaRelayHeartbeatReasonKey, Value: strValue(reason)},
 			{Key: semconv.HostNameKey, Value: strValue(host)},
 		}, attrs...),
-	}
-	if r.opts.UserID != nil {
-		if user := r.opts.UserID(); user != "" {
-			rec.Attributes = append(rec.Attributes, &commonpb.KeyValue{Key: semconv.TermaUserIDKey, Value: strValue(user)})
-		}
 	}
 	res := &resourcepb.Resource{Attributes: []*commonpb.KeyValue{
 		{Key: semconv.ServiceNameKey, Value: strValue(HeartbeatService)},

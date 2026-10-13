@@ -313,49 +313,33 @@ func TestAFailedBeatHandsBackOnlyItsOwnCounters(t *testing.T) {
 	}
 }
 
-// Each beat names the Mirador user signed in as it is sent, on the record, and no one while
-// signed out: a sign-in, sign-out or switch while the relay runs shows on the next beat.
-func TestHeartbeatNamesTheUserSignedInAsItIsSent(t *testing.T) {
+// NameHeartbeatUser puts terma.user.id on the beat's record, never its resource, and "" names
+// no one.
+func TestNameHeartbeatUserNamesTheRecord(t *testing.T) {
 	t.Parallel()
-	var beats []*logspb.LogsData
-	user := ""
-	r := newRelay(Options{Dir: t.TempDir(), Token: token, UserID: func() string { return user },
-		HeartbeatSend: func(_ context.Context, b *logspb.LogsData) error { beats = append(beats, b); return nil }})
-	for _, id := range []string{"", "user-a", "user-b", ""} {
-		user = id
+	for _, user := range []string{"", "user-a"} {
+		var beat *logspb.LogsData
+		r := newRelay(Options{Dir: t.TempDir(), Token: token,
+			HeartbeatSend: func(_ context.Context, b *logspb.LogsData) error { beat = b; return nil }})
 		if err := r.heartbeat(context.Background(), semconv.TermaRelayHeartbeatReasonInterval, ""); err != nil {
 			t.Fatal(err)
 		}
-	}
-	for i, want := range []string{"", "user-a", "user-b", ""} {
-		rec := beats[i].ResourceLogs[0].ScopeLogs[0].LogRecords[0]
-		got, ok := "", false
+		if attr(beat.ResourceLogs[0].ScopeLogs[0].LogRecords[0].Attributes, semconv.TermaUserIDKey) != "" {
+			t.Fatal("the relay named a user itself; only the sender does")
+		}
+		NameHeartbeatUser(beat, user)
+		rec := beat.ResourceLogs[0].ScopeLogs[0].LogRecords[0]
+		n := 0
 		for _, kv := range rec.Attributes {
 			if kv.Key == semconv.TermaUserIDKey {
-				got, ok = kv.Value.GetStringValue(), true
+				n++
 			}
 		}
-		if got != want || ok != (want != "") {
-			t.Errorf("beat %d: terma.user.id = %q (present %v), want %q", i, got, ok, want)
+		if got := attr(rec.Attributes, semconv.TermaUserIDKey); got != user || n != min(len(user), 1) {
+			t.Errorf("named %q: terma.user.id = %q, %d times", user, got, n)
 		}
-		if attr(beats[i].ResourceLogs[0].Resource.Attributes, semconv.TermaUserIDKey) != "" {
-			t.Errorf("beat %d carries terma.user.id on its resource", i)
-		}
-	}
-}
-
-// A relay that cannot ask who is signed in names no one.
-func TestHeartbeatWithoutAUserNamesNoOne(t *testing.T) {
-	t.Parallel()
-	var beats []*logspb.LogsData
-	r := newRelay(Options{Dir: t.TempDir(), Token: token,
-		HeartbeatSend: func(_ context.Context, b *logspb.LogsData) error { beats = append(beats, b); return nil }})
-	if err := r.heartbeat(context.Background(), semconv.TermaRelayHeartbeatReasonStart, ""); err != nil {
-		t.Fatal(err)
-	}
-	for _, kv := range beats[0].ResourceLogs[0].ScopeLogs[0].LogRecords[0].Attributes {
-		if kv.Key == semconv.TermaUserIDKey {
-			t.Fatalf("a relay without UserID named %q", kv.Value.GetStringValue())
+		if attr(beat.ResourceLogs[0].Resource.Attributes, semconv.TermaUserIDKey) != "" {
+			t.Errorf("named %q on the resource", user)
 		}
 	}
 }

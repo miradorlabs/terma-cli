@@ -95,10 +95,6 @@ type Options struct {
 	// Launch is what started the relay, on the heartbeat's resource: the service manager,
 	// a hook on demand, or a developer. A string; the daemon owns the vocabulary.
 	Launch string
-	// UserID, when set, is asked at every beat who the developer is signed in as, since they
-	// can sign in, out or switch while the relay runs: the heartbeat names that Mirador user
-	// as terma.user.id, and no one when it answers "".
-	UserID func() string
 	// Logf, when set, is told why each part that could not leave was dropped (TERMA_RELAY_DEBUG=1).
 	Logf func(format string, args ...any)
 	// Warnf, when set, is told what an operator should see whatever the debug setting: a
