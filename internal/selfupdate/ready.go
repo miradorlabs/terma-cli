@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"runtime"
 	"time"
 )
@@ -61,23 +60,4 @@ func (c *Client) built(ctx context.Context, version string) (bool, error) {
 		}
 	}
 	return true, nil
-}
-
-// current is the release installed where this process started: its own, or the one it has
-// installed in its place since. A process that keeps running after it installed a release,
-// as the relay does until its agents pause, compares the next release to that one.
-func (c *Client) current() string {
-	if c.installed != "" {
-		return c.installed
-	}
-	return c.Version
-}
-
-// adopt has this process go on as version, which it just installed at exe: what is
-// installed is no longer what it started from but is its own doing, so the next release is
-// installed over it rather than refused as another install's (Replaced).
-func (c *Client) adopt(version, exe string) {
-	if info, err := os.Stat(exe); err == nil {
-		c.installed, c.Binary = version, info
-	}
 }

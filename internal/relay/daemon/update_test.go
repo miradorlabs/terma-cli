@@ -280,21 +280,21 @@ func TestAnUpdatedRelayNeverDropsWhatItHoldsAfterThePauseWait(t *testing.T) {
 // no longer for it: updatePauseWait runs from the first release it installed.
 func TestALaterInstallDoesNotStartTheWaitForAPauseAgain(t *testing.T) {
 	was := updatePauseWait
-	updatePauseWait = time.Second
+	updatePauseWait = 2 * time.Second
 	t.Cleanup(func() { updatePauseWait = was })
 	stateDir, _, _ := setUpRelay(t)
 	c := runConfig(stateDir, 0, nil)
 	c.Version, c.Service = "1.2.0", true
-	// A release every 300ms: were each to start the wait again, it would never end. The
-	// relay started moments ago, so nothing has paused for updateQuiet yet.
+	// A release every 200ms, ten in the wait: were each to start it again, it would never
+	// end. The relay started moments ago, so nothing has paused for updateQuiet yet.
 	var installs atomic.Int64
-	c.Updater = &Updater{Every: 300 * time.Millisecond, Jitter: func(time.Duration) time.Duration { return 0 },
+	c.Updater = &Updater{Every: 200 * time.Millisecond, Jitter: func(time.Duration) time.Duration { return 0 },
 		Update: func(context.Context) (string, error) { return fmt.Sprintf("1.3.%d", installs.Add(1)), nil }}
 	r := startRun(t, c)
 	r.await(t, "the relay")
 	select {
 	case <-r.done:
-	case <-time.After(5 * time.Second):
+	case <-time.After(15 * time.Second):
 		t.Fatalf("after %d installs the relay still waits for a pause", installs.Load())
 	}
 	if !r.res.Updated || installs.Load() < 2 {
